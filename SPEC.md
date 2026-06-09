@@ -63,6 +63,8 @@ Article-inspired capabilities such as remote task ingress, always-on control, pe
 
 Loop-inspired capabilities such as scheduled discovery, goal loops, connector-backed triage, trace diagnosis, auto-fix proposals, and regression-test generation are allowed only as declarative contracts and reviewable artifacts until an explicit future execution layer exists. The core Harness must not run cron jobs, open PRs, update external trackers, or apply trace-derived fixes.
 
+Live loop scheduling is outside the current product boundary. The Harness may define readiness requirements for a future execution layer, but it must not imply support for always-on agents, daemonized work, hook-triggered mutation, autonomous notifications, or scheduled external-system updates until loop contracts, execution ledgers, replay evidence, approval policy, connector contracts, no-progress detection, isolated workspaces, budget ceilings, and human/reviewer gates are stable.
+
 ## 4. V1 Command Surface
 
 V1 keeps the command surface narrow.
@@ -200,6 +202,17 @@ These names can be reserved in docs, but V1 must not claim full execution suppor
 - model/backend routing
 - observability runtime integration
 
+### Deferred to a future execution track
+
+- `loop run`
+- `loop record`
+- `loop status`
+- `loop inspect`
+- live loop scheduling through cron, hooks, CI, or daemon processes
+- connector-backed notifications or issue-tracker updates
+
+Future loop commands must start as dry-run and record-only surfaces. They may resolve contracts, explain planned actions, write ledger previews, and inspect prior records before they are allowed to execute scheduled work.
+
 If these appear in V1 docs, they must be described as future extension points or lightweight checklist workflows.
 
 ## 6. Architecture
@@ -269,6 +282,8 @@ Responsibilities:
 - Standards/rule packs provide reusable review and delivery criteria selected by profile or file type.
 - Workflow-pack schemas describe installable packs, their skills, standards, scripts, environment contracts, and approval gates.
 - Loop contracts describe repeated agent workflows: trigger, cadence, goal, input sources, skills, connectors, state spine, triage outputs, hard stops, budget, and review gates.
+- Loop ledgers record future or manual loop runs: trigger source, resolved profile, workflow-pack version, loop-contract version, input snapshot, action summary, produced artifacts, replay evidence, budget usage, stop reason, approval state, and reviewer outcome.
+- Connector contracts describe external integrations as capabilities with side effects, credentials, redaction rules, rate limits, mutability class, and approval requirements. A connector declaration is not permission to call the connector.
 - Templates are files copied or suggested into target repositories.
 - Scripts perform deterministic scaffold, audit, validate, and doctor operations.
 - Tests protect idempotency, schema rules, and migration safety.
@@ -284,6 +299,15 @@ Agentic-engineering lessons are adopted as product mechanisms, not as required t
 - Repeated work can be promoted into Wiki updates, standards/rule-pack changes, or workflow-pack candidates through reviewable diffs.
 - Loops are adopted as declarative contracts: they can describe discovery, triage, verification, and continuation rules, but they do not schedule or execute themselves.
 - Trace and failure records can be promoted into regression-test proposals with exact replay inputs and plain-English assertions.
+
+Live-loop readiness is modeled as a separate future execution track:
+
+- A loop contract is required before any loop can be dry-run, recorded, or scheduled.
+- A loop must have an owner, goal, cadence, input sources, state spine, triage output, mutability class, hard stops, budget ceiling, approval gates, and failure escalation.
+- Every loop run must create an execution-ledger entry that can be inspected without chat history.
+- Every change proposal must link to replay evidence; unsupported evidence means report-only status.
+- No-progress detection must stop repeated identical observations, unchanged findings, repeated failed commands, repeated tool calls, empty evidence deltas, and budget exhaustion.
+- Scheduling remains disabled until dry-run, record-only, status, and inspect flows are stable.
 
 ## 7. Safety Rules
 
@@ -301,6 +325,10 @@ Default behavior:
 - Do not call external services from plan, review, or pack validation unless an explicit integration contract and approval gate require it.
 - Do not validate loop contracts by running scheduled jobs, dispatching live agents, opening PRs, or mutating external systems.
 - Every loop contract must declare hard stops: maximum iterations, timeout or no-progress detection, budget ceiling, and human/reviewer approval gates.
+- Do not treat connector configuration as approval. External connectors require explicit contracts that describe side effects, credentials, redaction, rate limits, and approval gates.
+- Do not let loop output approve itself. Worker output, reviewer evidence, approval state, and acceptance decision must be separate records.
+- Do not run mutating loop work in the user's main checkout. Any future mutating loop must use an isolated worktree or task workspace.
+- Stop any future loop run when budget, hard-stop, no-progress, missing replay evidence, missing reviewer gate, or unresolved connector credentials are detected.
 
 Required old-project output:
 
@@ -564,6 +592,30 @@ Gate:
 - Repeated delivery findings can be promoted into standards, Wiki updates, or workflow-pack candidates with reviewable diffs.
 - Real failures can be promoted into regression-test proposals without automatically modifying test suites.
 
+### Future Track: Live Loop Scheduling Readiness
+
+Goal: Prepare, but not yet enable, scheduled or hook-triggered agent loops.
+
+Scope:
+
+- Loop contract readiness checks
+- Loop execution-ledger schema
+- Replay-evidence requirements for loop-produced proposals
+- Approval policy for read-only inspection, report generation, file mutation, command execution, external notification, issue creation, branch/commit/PR creation, and destructive actions
+- Connector contract schema for GitHub, CI, issue trackers, chat, email, local files, and account-bearing CLIs
+- Worktree/task-workspace isolation requirement
+- No-progress detection
+- Budget and quota ceilings
+- Reviewer-gate and notification-routing rules
+- Dry-run, record-only, status, and inspect command candidates
+
+Gate:
+
+- A loop can be dry-run, recorded, inspected, and replayed without relying on chat history.
+- Loop records show trigger source, resolved profile, workflow pack, loop contract version, input snapshot, tool/action summary, produced artifacts, budget usage, stop reason, approval state, and reviewer outcome.
+- Scheduled execution remains disabled until the dry-run and record-only surfaces have stable fixtures, schema validation, reviewable examples, and explicit user approval.
+- The first eligible loop class is read-only maintenance proposal generation: stale-doc detection, rule-pack drift, workflow-pack candidate proposals, and failure-to-regression proposals.
+
 ## 12. Phase Dependency Gates
 
 - V2 cannot start until V1 `doctor` is stable.
@@ -573,7 +625,7 @@ Gate:
 - V4.5 cannot start until isolated execution evidence is replayable.
 - V5 cannot start until single-project install, upgrade, and rollback are stable.
 - Workflow-pack execution cannot start until pack validation, profile resolution, environment contracts, and approval gates are stable.
-- Live loop scheduling cannot start until loop contracts, replay evidence, connector contracts, budget ceilings, no-progress detection, and human approval gates are stable. Live scheduling remains outside the current roadmap.
+- Live loop scheduling cannot start until the future-track readiness gate is satisfied: loop contracts, execution ledgers, replay evidence, approval policy, connector contracts, budget ceilings, no-progress detection, isolated workspaces, and human/reviewer gates must all be stable. Live scheduling remains outside the current roadmap.
 
 ## 13. First Implementation Cut
 
