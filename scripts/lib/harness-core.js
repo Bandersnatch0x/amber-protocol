@@ -4128,11 +4128,12 @@ function validateLoopContracts(loopContracts, errors, warnings) {
     }
 
     const hasTimeout = contract.hardStops && typeof contract.hardStops.timeoutMinutes === "number";
+    const hasMinuteBudget = contract.budget && typeof contract.budget.maxMinutes === "number";
     const hasTokenBudget = contract.budget && typeof contract.budget.maxTokens === "number";
     const hasUsdBudget = contract.budget && typeof contract.budget.maxUsd === "number";
 
-    if (!hasTimeout && !hasTokenBudget && !hasUsdBudget) {
-      errors.push(`${prefix} must specify at least one of: hardStops.timeoutMinutes, budget.maxTokens, or budget.maxUsd.`);
+    if (!hasTimeout && !hasMinuteBudget && !hasTokenBudget && !hasUsdBudget) {
+      errors.push(`${prefix} must specify at least one of: hardStops.timeoutMinutes, budget.maxMinutes, budget.maxTokens, or budget.maxUsd.`);
     }
 
     if (!Array.isArray(contract.reviewGates) || contract.reviewGates.length === 0) {
@@ -4177,6 +4178,95 @@ function describeLoopContracts(data) {
         }
       }))
     : [];
+}
+
+function inspectLoopReadiness(data) {
+  const controls = [];
+  const blockers = [];
+  const loopContracts = Array.isArray(data.loopContracts) ? data.loopContracts : [];
+  const connectorContracts = Array.isArray(data.connectorContracts) ? data.connectorContracts : [];
+  const connectorIds = new Set(connectorContracts.map((connector) => connector && connector.id).filter(Boolean));
+  const approvalPolicy = data.approvalPolicy && typeof data.approvalPolicy === "object" ? data.approvalPolicy : null;
+  const loopLedger = data.loopLedger && typeof data.loopLedger === "object" ? data.loopLedger : null;
+  const workspaceIsolation = data.workspaceIsolation && typeof data.workspaceIsolation === "object" ? data.workspaceIsolation : null;
+
+  if (loopContracts.length > 0) {
+    controls.push("loop contract");
+  } else {
+    blockers.push("loop contract is missing");
+  }
+
+  if (connectorContracts.length > 0) {
+    controls.push("connector contracts");
+  }
+
+  if (approvalPolicy && approvalPolicy.selfApprovalAllowed === false) {
+    controls.push("approval policy");
+  } else {
+    blockers.push("approval policy must disallow self-approval");
+  }
+
+  if (
+    loopLedger &&
+    loopLedger.required === true &&
+    loopLedger.chatHistoryRequired === false &&
+    loopLedger.recordsInputSnapshot === true &&
+    loopLedger.recordsToolSummary === true &&
+    loopLedger.recordsBudgetUsage === true &&
+    loopLedger.recordsStopReason === true &&
+    loopLedger.recordsApprovalState === true &&
+    loopLedger.recordsReviewerOutcome === true
+  ) {
+    controls.push("execution ledger");
+  } else {
+    blockers.push("execution ledger policy must record replay evidence, budget usage, stop reason, approval state, and reviewer outcome without chat history");
+  }
+
+  if (
+    workspaceIsolation &&
+    workspaceIsolation.mutatingLoopsUseWorktree === true &&
+    workspaceIsolation.mainCheckoutMutation === false
+  ) {
+    controls.push("workspace isolation");
+  } else {
+    blockers.push("workspace isolation must require worktrees for mutating loops and forbid main-checkout mutation");
+  }
+
+  for (const contract of loopContracts) {
+    const contractId = contract && contract.id ? contract.id : "unknown-loop";
+    const connectors = Array.isArray(contract.connectors) ? contract.connectors : [];
+    for (const connector of connectors) {
+      if (!connectorIds.has(connector)) {
+        blockers.push(`connector contract ${connector} is missing for loop ${contractId}`);
+      }
+    }
+    if (contract && contract.hardStops && contract.hardStops.noProgressDetection === true) {
+      controls.push("no-progress detection");
+    } else {
+      blockers.push(`no-progress detection is missing for loop ${contractId}`);
+    }
+    if (contract && contract.budget && Number.isFinite(contract.budget.maxMinutes)) {
+      controls.push("budget ceiling");
+    } else {
+      blockers.push(`budget ceiling is missing for loop ${contractId}`);
+    }
+    if (Array.isArray(contract.reviewGates) && contract.reviewGates.length > 0) {
+      controls.push("reviewer gate");
+    } else {
+      blockers.push(`reviewer gate is missing for loop ${contractId}`);
+    }
+  }
+
+  blockers.push("live scheduling is disabled by product boundary");
+
+  return {
+    readyForDryRun: loopContracts.length > 0 && blockers.every((blocker) => blocker === "live scheduling is disabled by product boundary"),
+    readyForRecordOnly: loopContracts.length > 0 && blockers.every((blocker) => blocker === "live scheduling is disabled by product boundary"),
+    readyForLiveScheduling: false,
+    allowedNow: ["describe", "validate", "dry-run", "record"],
+    controls: [...new Set(controls)],
+    blockers
+  };
 }
 
 function validateWorkflowPackReferences(packPath, data) {
@@ -4257,6 +4347,148 @@ function inspectWorkflowPack(filePath) {
       stopConditions: ["missing approval", "unsafe script declaration", "undeclared external integration"]
     }
   };
+}
+
+function inspectWorkflowPackReadiness(filePath) {
+  const packPath = path.resolve(filePath);
+  const errors = [];
+  const warnings = [];
+  let data = null;
+
+  try {
+    data = readJson(packPath);
+  } catch (error) {
+    return {
+      file: packPath,
+      errors: [`Cannot read workflow pack: ${error.message}`],
+      warnings,
+      execution: {
+        executesAnything: false,
+        schedulesJobs: false,
+        callsExternalSystems: false
+      }
+    };
+  }
+
+  const validation = validateWorkflowPackData(data);
+  errors.push(...validation.errors);
+  warnings.push(...validation.warnings);
+
+  return {
+    file: packPath,
+    errors,
+    warnings,
+    validation,
+    readiness: inspectLoopReadiness(data),
+    execution: {
+      executesAnything: false,
+      schedulesJobs: false,
+      callsExternalSystems: false
+    }
+  };
+}
+
+function findLoopContract(data, contractId) {
+  const contracts = Array.isArray(data.loopContracts) ? data.loopContracts : [];
+  const contract = contracts.find((candidate) => candidate && candidate.id === contractId);
+  if (!contract) {
+    throw new Error(`Loop contract ${contractId} was not found.`);
+  }
+  return contract;
+}
+
+function buildLoopLedgerRecord(data, contract, options = {}) {
+  const now = new Date().toISOString();
+  return {
+    schemaVersion: 1,
+    recordedAt: now,
+    triggerSource: options.triggerSource || "manual",
+    resolvedProfile: options.profile || null,
+    workflowPackVersion: data.version || null,
+    contractId: contract.id,
+    contractVersion: contract.version || data.version || null,
+    inputSnapshot: {
+      sources: Array.isArray(contract.inputSources) ? contract.inputSources : [],
+      capturedAt: now
+    },
+    actionSummary: options.actionSummary || "dry-run preview only; no actions executed",
+    producedArtifacts: [],
+    replayEvidence: [],
+    budgetUsage: { minutes: 0 },
+    stopReason: options.stopReason || "dry-run-only",
+    approvalState: "pending-review",
+    reviewerOutcome: "not-reviewed",
+    executesAnything: false,
+    schedulesJobs: false,
+    callsExternalSystems: false
+  };
+}
+
+function inspectLoopContract(options = {}) {
+  const absolutePath = path.resolve(options.file);
+  const data = readJson(absolutePath);
+  const contract = findLoopContract(data, options.contract);
+  return {
+    file: absolutePath,
+    errors: [],
+    warnings: [],
+    contract,
+    readiness: inspectLoopReadiness(data),
+    execution: {
+      executesAnything: false,
+      schedulesJobs: false,
+      callsExternalSystems: false
+    }
+  };
+}
+
+function dryRunLoopContract(options = {}) {
+  const errors = [];
+  if (!options.dryRun) {
+    errors.push("loop run requires --dry-run until live scheduling is implemented.");
+  }
+  if (errors.length > 0) {
+    return { errors, warnings: [], executesAnything: false, schedulesJobs: false };
+  }
+  const absolutePath = path.resolve(options.file);
+  const data = readJson(absolutePath);
+  const contract = findLoopContract(data, options.contract);
+  const ledgerPreview = buildLoopLedgerRecord(data, contract, { stopReason: "dry-run-only" });
+  if (options.output) {
+    fs.mkdirSync(path.dirname(path.resolve(options.output)), { recursive: true });
+    fs.writeFileSync(path.resolve(options.output), JSON.stringify(ledgerPreview, null, 2));
+  }
+  return {
+    mode: "dry-run",
+    file: absolutePath,
+    errors: [],
+    warnings: [],
+    ledgerPreview,
+    executesAnything: false,
+    schedulesJobs: false,
+    callsExternalSystems: false
+  };
+}
+
+function recordLoopContract(options = {}) {
+  const absolutePath = path.resolve(options.file);
+  const data = readJson(absolutePath);
+  const contract = findLoopContract(data, options.contract);
+  const record = buildLoopLedgerRecord(data, contract, {
+    triggerSource: options.triggerSource || "manual",
+    stopReason: options.stopReason || "manual-record"
+  });
+  if (options.output) {
+    fs.mkdirSync(path.dirname(path.resolve(options.output)), { recursive: true });
+    fs.writeFileSync(path.resolve(options.output), JSON.stringify(record, null, 2));
+  }
+  return { record, errors: [], warnings: [], executesAnything: false, schedulesJobs: false, callsExternalSystems: false };
+}
+
+function inspectLoopLedger(options = {}) {
+  const ledgerPath = path.resolve(options.ledger);
+  const record = readJson(ledgerPath);
+  return { ledger: ledgerPath, record, errors: [], warnings: [] };
 }
 
 function validateProjectProfileData(data) {
@@ -4518,6 +4750,18 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--loop-contract") {
       args.loopContract = argv[index + 1];
+      index += 1;
+    } else if (arg === "--contract") {
+      args.contract = argv[index + 1];
+      index += 1;
+    } else if (arg === "--ledger") {
+      args.ledger = argv[index + 1];
+      index += 1;
+    } else if (arg === "--trigger-source") {
+      args.triggerSource = argv[index + 1];
+      index += 1;
+    } else if (arg === "--stop-reason") {
+      args.stopReason = argv[index + 1];
       index += 1;
     } else if (arg === "--hard-stop-status") {
       args.hardStopStatus = argv[index + 1];
@@ -4960,10 +5204,14 @@ module.exports = {
   compareAdoptionReports,
   dispatchAgentTask,
   doctor,
+  dryRunLoopContract,
   inspectMaintenance,
+  inspectLoopContract,
+  inspectLoopLedger,
   inspectTeamDistribution,
   inspectProjectProfile,
   inspectWorkflowPack,
+  inspectWorkflowPackReadiness,
   inspectTaskResult,
   generateAdoptionReport,
   gateAdoptionReport,
@@ -4975,6 +5223,7 @@ module.exports = {
   proposeMaintenance,
   printResult,
   prepareTaskExecution,
+  recordLoopContract,
   recordAgentReview,
   reviewPlan,
   rollbackTeamDistribution,

@@ -1,6 +1,12 @@
 # Declarative Loop Contract Implementation Plan
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Goal:** Complete the spec-defined live-loop readiness layer without adding live scheduling, daemon work, external writes, or autonomous mutation.
+
+**Architecture:** Build on the current local artifact model in `scripts/lib/harness-core.js`: workflow packs already declare loop contracts, task preparation already writes replayable ledgers, orchestration records already carry loop status, and maintenance already inspects reviewable evidence. The remaining plan adds explicit readiness validation, dry-run/record-only loop commands, connector and approval-policy checks, no-progress detection metadata, and documentation that keeps the execution boundary visible.
+
+**Tech Stack:** Node.js built-ins, `node:test`, JSON artifacts under `.harness/`, existing CLI routing in `scripts/harness.js`, and existing workflow-pack/profile fixtures.
+
 ## Objective
 
 Implement the approved Declarative Loop Contract design as artifact-only Harness behavior:
@@ -22,7 +28,20 @@ Do not add a scheduler, cron runner, live subagent runner, external writes, PR a
 - V4 tests: `tests/phase-v4.test.js`
 - V4.5 tests: `tests/phase-v4-5.test.js`
 - V5.5 tests: `tests/phase-v5-5.test.js`
+- Future-readiness tests to add: `tests/phase-future-loop-readiness.test.js`
 - Verification scripts: `npm test`, `npm run manifests`, `npm run doctor`
+
+## Current Implementation Baseline
+
+The current repository already implements the first declarative layer this plan originally described:
+
+- `tests/phase-v3.test.js` covers workflow-pack `loopContracts` validation and inspection.
+- `tests/phase-v4.test.js` covers task preparation ledgers, evidence packs, trace replay, and regression proposal fields.
+- `tests/phase-v4-5.test.js` covers orchestration records with `--loop-contract`, hard-stop status, budget status, review bandwidth, and reviewer gate status.
+- `scripts/lib/harness-core.js` already contains `validateLoopContracts`, `describeLoopContracts`, task `ledger.json` generation, evidence inspection, `dispatchAgentTask`, and `recordAgentReview`.
+- `SPEC.md` now goes beyond that baseline and requires a future execution-readiness layer: loop ledgers, connector contracts, explicit approval policy, no-progress detection, isolated workspace checks, budget ceilings, reviewer gates, and dry-run/record-only future loop commands.
+
+Treat Tasks 1-4 below as the implemented baseline. Execute Tasks 5-8 to close the gap between the current implementation and the revised spec.
 
 ## Domain Language And Architecture Guardrails
 
@@ -77,11 +96,13 @@ Recommended packet order:
 2. Task replay evidence shape.
 3. Orchestration loop status shape.
 4. Maintenance regression proposal extraction.
-5. Docs, fixtures, and full verification.
+5. Future-loop readiness report and gate.
+6. Dry-run/record-only `loop` command surface.
+7. Docs, fixtures, and full verification.
 
 ## Task 1: Validate Loop Contracts In Workflow Packs
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
   Edit `tests/phase-v3.test.js`.
 
@@ -129,7 +150,7 @@ Recommended packet order:
   assert.match(errors, /must not write external systems/);
   ```
 
-- [ ] **Step 2: Run the targeted test and verify it fails**
+- [x] **Step 2: Run the targeted test and verify it fails**
 
   ```sh
   node --test tests/phase-v3.test.js
@@ -137,7 +158,7 @@ Recommended packet order:
 
   Expected result before implementation: the test fails because `loopContracts` are not exposed or validated.
 
-- [ ] **Step 3: Extend the sample pack**
+- [x] **Step 3: Extend the sample pack**
 
   Edit `workflow-packs/safe-harness-bootstrap.pack.json`.
 
@@ -166,7 +187,7 @@ Recommended packet order:
   }
   ```
 
-- [ ] **Step 4: Validate loop contract data**
+- [x] **Step 4: Validate loop contract data**
 
   Edit `scripts/lib/harness-core.js`.
 
@@ -217,7 +238,7 @@ Recommended packet order:
 
   Include `loopContracts: describeLoopContracts(data)` in the inspected pack payload.
 
-- [ ] **Step 5: Run the targeted test and verify it passes**
+- [x] **Step 5: Run the targeted test and verify it passes**
 
   ```sh
   node --test tests/phase-v3.test.js
@@ -225,7 +246,7 @@ Recommended packet order:
 
   Expected result after implementation: V3 tests pass and unsafe loop contracts are rejected.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```sh
   git add scripts/lib/harness-core.js tests/phase-v3.test.js workflow-packs/safe-harness-bootstrap.pack.json
@@ -234,7 +255,7 @@ Recommended packet order:
 
 ## Task 2: Preserve Trace-To-Regression Replay Evidence
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
   Edit `tests/phase-v4.test.js`.
 
@@ -273,7 +294,7 @@ Recommended packet order:
   });
   ```
 
-- [ ] **Step 2: Run the targeted test and verify it fails**
+- [x] **Step 2: Run the targeted test and verify it fails**
 
   ```sh
   node --test tests/phase-v4.test.js
@@ -281,7 +302,7 @@ Recommended packet order:
 
   Expected result before implementation: CLI options are ignored and `traceReplay` is absent.
 
-- [ ] **Step 3: Parse task options**
+- [x] **Step 3: Parse task options**
 
   Edit `scripts/lib/harness-core.js` and `scripts/harness.js`.
 
@@ -311,7 +332,7 @@ Recommended packet order:
 
   Keep the existing required `--task` behavior unchanged.
 
-- [ ] **Step 4: Store replay evidence**
+- [x] **Step 4: Store replay evidence**
 
   Edit `scripts/lib/harness-core.js`.
 
@@ -366,7 +387,7 @@ Recommended packet order:
   - Approval required: true
   ```
 
-- [ ] **Step 5: Run the targeted test and verify it passes**
+- [x] **Step 5: Run the targeted test and verify it passes**
 
   ```sh
   node --test tests/phase-v4.test.js
@@ -374,7 +395,7 @@ Recommended packet order:
 
   Expected result after implementation: V4 tests pass and trace-derived replay data is persisted.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```sh
   git add scripts/harness.js scripts/lib/harness-core.js tests/phase-v4.test.js
@@ -383,7 +404,7 @@ Recommended packet order:
 
 ## Task 3: Add Loop Contract Status To Orchestration Records
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
   Edit `tests/phase-v4-5.test.js`.
 
@@ -424,7 +445,7 @@ Recommended packet order:
 
   Then assert the reviewed dispatch has `reviewGateStatus === "satisfied"`.
 
-- [ ] **Step 2: Run the targeted test and verify it fails**
+- [x] **Step 2: Run the targeted test and verify it fails**
 
   ```sh
   node --test tests/phase-v4-5.test.js
@@ -432,7 +453,7 @@ Recommended packet order:
 
   Expected result before implementation: `dispatch.loop` is absent.
 
-- [ ] **Step 3: Parse agent loop options**
+- [x] **Step 3: Parse agent loop options**
 
   Edit `scripts/lib/harness-core.js`.
 
@@ -456,7 +477,7 @@ Recommended packet order:
 
   For `agent review`, pass `reviewGateStatus`.
 
-- [ ] **Step 4: Store loop status**
+- [x] **Step 4: Store loop status**
 
   Edit `scripts/lib/harness-core.js`.
 
@@ -483,7 +504,7 @@ Recommended packet order:
 
   In `recordAgentReview`, update `dispatch.loop.reviewGateStatus` when `options.reviewGateStatus` is present. If `dispatch.loop` does not exist, create it with `contractId: null`, `hardStopStatus: "not-recorded"`, `budgetStatus: "not-recorded"`, and `reviewBandwidthStatus: "not-recorded"`. Do not treat `reviewBandwidthStatus` as evidence by itself; it is a **Review bandwidth** signal on the **Orchestration record**.
 
-- [ ] **Step 5: Run the targeted test and verify it passes**
+- [x] **Step 5: Run the targeted test and verify it passes**
 
   ```sh
   node --test tests/phase-v4-5.test.js
@@ -491,7 +512,7 @@ Recommended packet order:
 
   Expected result after implementation: V4.5 tests pass and reviewer evidence remains separate from worker output.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```sh
   git add scripts/harness.js scripts/lib/harness-core.js tests/phase-v4-5.test.js
@@ -500,7 +521,7 @@ Recommended packet order:
 
 ## Task 4: Promote Failures Into Regression Proposals
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
   Edit `tests/phase-v5-5.test.js`.
 
@@ -543,7 +564,7 @@ Recommended packet order:
   assert.equal(fs.existsSync(path.join(target, "tests", "trace-failure.test.js")), false);
   ```
 
-- [ ] **Step 2: Run the targeted test and verify it fails**
+- [x] **Step 2: Run the targeted test and verify it fails**
 
   ```sh
   node --test tests/phase-v5-5.test.js
@@ -551,7 +572,7 @@ Recommended packet order:
 
   Expected result before implementation: `regressionProposals` and the proposal section are absent.
 
-- [ ] **Step 3: Extract regression proposals**
+- [x] **Step 3: Extract regression proposals**
 
   Edit `scripts/lib/harness-core.js`.
 
@@ -611,7 +632,7 @@ Recommended packet order:
 
   Add `regressionProposals: extractRegressionProposals(targetRoot)` to `inspectMaintenance`.
 
-- [ ] **Step 4: Add proposal markdown section**
+- [x] **Step 4: Add proposal markdown section**
 
   Edit `buildMaintenanceProposalContent`.
 
@@ -636,7 +657,7 @@ Recommended packet order:
 
   Preserve `sourceFilesChanged: false`; this command must not modify `tests/` or source docs. A **Regression proposal** is not an approved regression test until a human accepts it.
 
-- [ ] **Step 5: Run the targeted test and verify it passes**
+- [x] **Step 5: Run the targeted test and verify it passes**
 
   ```sh
   node --test tests/phase-v5-5.test.js
@@ -644,45 +665,681 @@ Recommended packet order:
 
   Expected result after implementation: maintenance tests pass and **Regression proposals** are reviewable only.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```sh
   git add scripts/lib/harness-core.js tests/phase-v5-5.test.js
   git commit -m "feat: propose regressions from trace evidence"
   ```
 
-## Task 5: Update Docs And Fixtures
+## Task 5: Add Future Loop Readiness Report And Gate
 
-- [ ] **Step 1: Update public docs only if behavior differs**
+**Files:**
+
+- Modify: `scripts/lib/harness-core.js`
+- Modify: `scripts/harness.js`
+- Create: `tests/phase-future-loop-readiness.test.js`
+- Modify: `workflow-packs/safe-harness-bootstrap.pack.json`
+
+- [x] **Step 1: Write failing tests for readiness inspection**
+
+  Create `tests/phase-future-loop-readiness.test.js`.
+
+  ```js
+  "use strict";
+
+  const assert = require("node:assert/strict");
+  const fs = require("node:fs");
+  const os = require("node:os");
+  const path = require("node:path");
+  const { spawnSync } = require("node:child_process");
+  const test = require("node:test");
+
+  const ROOT = path.resolve(__dirname, "..");
+  const CLI = path.join(ROOT, "scripts", "harness.js");
+
+  function tempDir(name) {
+    return fs.mkdtempSync(path.join(os.tmpdir(), `coding-harness-loop-readiness-${name}-`));
+  }
+
+  function writeJson(filePath, data) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  }
+
+  function runHarness(args) {
+    return spawnSync(process.execPath, [CLI, ...args], {
+      cwd: ROOT,
+      encoding: "utf8"
+    });
+  }
+
+  test("pack readiness reports missing future-loop controls without executing anything", () => {
+    const dir = tempDir("missing-controls");
+    const pack = path.join(dir, "pack.json");
+    writeJson(pack, {
+      id: "unsafe-loop-pack",
+      name: "Unsafe Loop Pack",
+      version: "0.1.0",
+      skills: [],
+      standards: [],
+      scripts: {},
+      integrations: [],
+      approvalGates: [],
+      loopContracts: [{
+        id: "daily-triage",
+        goal: "Review incoming signals",
+        owner: "maintainers",
+        trigger: { type: "scheduled", cadence: "daily" },
+        inputSources: ["docs/signals.md"],
+        stateSpine: ".harness/loops/daily-triage/state.json",
+        triageOutputs: ["candidate-task"],
+        connectors: ["github"],
+        hardStops: { maxIterations: 3, noProgressDetection: true },
+        budget: { maxMinutes: 30 },
+        reviewGates: ["human-review"],
+        execution: { executesAnything: false, schedulesJobs: false }
+      }]
+    });
+
+    const result = runHarness(["pack", "readiness", "--file", pack, "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+
+    assert.equal(payload.readiness.readyForLiveScheduling, false);
+    assert.deepEqual(payload.readiness.allowedNow, ["describe", "validate", "dry-run", "record"]);
+    assert.match(payload.readiness.blockers.join("\n"), /connector contract github/);
+    assert.match(payload.readiness.blockers.join("\n"), /approval policy/);
+    assert.match(payload.readiness.blockers.join("\n"), /execution ledger/);
+    assert.match(payload.readiness.blockers.join("\n"), /workspace isolation/);
+    assert.equal(payload.execution.executesAnything, false);
+    assert.equal(payload.execution.schedulesJobs, false);
+  });
+
+  test("pack readiness passes only as dry-run-ready when all controls are declared", () => {
+    const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+    const result = runHarness(["pack", "readiness", "--file", pack, "--json"]);
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+
+    assert.equal(payload.readiness.readyForLiveScheduling, false);
+    assert.equal(payload.readiness.readyForDryRun, true);
+    assert.equal(payload.readiness.readyForRecordOnly, true);
+    assert.deepEqual(payload.readiness.blockers, ["live scheduling is disabled by product boundary"]);
+    assert.ok(payload.readiness.controls.includes("loop contract"));
+    assert.ok(payload.readiness.controls.includes("connector contracts"));
+    assert.ok(payload.readiness.controls.includes("approval policy"));
+    assert.ok(payload.readiness.controls.includes("execution ledger"));
+    assert.ok(payload.readiness.controls.includes("workspace isolation"));
+    assert.ok(payload.readiness.controls.includes("no-progress detection"));
+    assert.ok(payload.readiness.controls.includes("reviewer gate"));
+  });
+  ```
+
+- [x] **Step 2: Run the targeted test and verify it fails**
+
+  ```sh
+  node --test tests/phase-future-loop-readiness.test.js
+  ```
+
+  Expected result before implementation: the command fails because `pack readiness` is unknown.
+
+- [x] **Step 3: Add declarative readiness data to the sample pack**
+
+  Edit `workflow-packs/safe-harness-bootstrap.pack.json` so the existing loop contract has all readiness declarations required by `SPEC.md`. Keep every value declarative and non-executing.
+
+  Add or update these top-level fields:
+
+  ```json
+  {
+    "connectorContracts": [
+      {
+        "id": "local-docs",
+        "type": "filesystem",
+        "mode": "read-only",
+        "credentials": "none",
+        "redaction": "not-required",
+        "externalWrites": false
+      }
+    ],
+    "approvalPolicy": {
+      "readOnlyInspection": "allowed",
+      "reportGeneration": "allowed",
+      "fileMutation": "requires-human-approval",
+      "commandExecution": "requires-human-approval",
+      "externalNotification": "requires-human-approval",
+      "issueCreation": "requires-human-approval",
+      "selfApprovalAllowed": false
+    },
+    "loopLedger": {
+      "required": true,
+      "pathTemplate": ".harness/loops/{contractId}/ledger.json",
+      "chatHistoryRequired": false,
+      "recordsInputSnapshot": true,
+      "recordsToolSummary": true,
+      "recordsBudgetUsage": true,
+      "recordsStopReason": true,
+      "recordsApprovalState": true,
+      "recordsReviewerOutcome": true
+    },
+    "workspaceIsolation": {
+      "mutatingLoopsUseWorktree": true,
+      "mainCheckoutMutation": false
+    }
+  }
+  ```
+
+  Ensure the existing loop contract references the declared connector and keeps these controls:
+
+  ```json
+  {
+    "connectors": ["local-docs"],
+    "hardStops": {
+      "maxIterations": 3,
+      "noProgressDetection": true
+    },
+    "budget": {
+      "maxMinutes": 30
+    },
+    "reviewGates": ["human-review"],
+    "execution": {
+      "executesAnything": false,
+      "schedulesJobs": false
+    }
+  }
+  ```
+
+- [x] **Step 4: Implement readiness inspection in the core module**
+
+  Add a small pure function near `describeLoopContracts` in `scripts/lib/harness-core.js`.
+
+  ```js
+  function inspectLoopReadiness(data) {
+    const controls = [];
+    const blockers = [];
+    const loopContracts = Array.isArray(data.loopContracts) ? data.loopContracts : [];
+    const connectorContracts = Array.isArray(data.connectorContracts) ? data.connectorContracts : [];
+    const connectorIds = new Set(connectorContracts.map((connector) => connector && connector.id).filter(Boolean));
+    const approvalPolicy = data.approvalPolicy && typeof data.approvalPolicy === "object" ? data.approvalPolicy : null;
+    const loopLedger = data.loopLedger && typeof data.loopLedger === "object" ? data.loopLedger : null;
+    const workspaceIsolation = data.workspaceIsolation && typeof data.workspaceIsolation === "object" ? data.workspaceIsolation : null;
+
+    if (loopContracts.length > 0) {
+      controls.push("loop contract");
+    } else {
+      blockers.push("loop contract is missing");
+    }
+
+    if (connectorContracts.length > 0) {
+      controls.push("connector contracts");
+    }
+
+    if (approvalPolicy && approvalPolicy.selfApprovalAllowed === false) {
+      controls.push("approval policy");
+    } else {
+      blockers.push("approval policy must disallow self-approval");
+    }
+
+    if (
+      loopLedger &&
+      loopLedger.required === true &&
+      loopLedger.chatHistoryRequired === false &&
+      loopLedger.recordsInputSnapshot === true &&
+      loopLedger.recordsToolSummary === true &&
+      loopLedger.recordsBudgetUsage === true &&
+      loopLedger.recordsStopReason === true &&
+      loopLedger.recordsApprovalState === true &&
+      loopLedger.recordsReviewerOutcome === true
+    ) {
+      controls.push("execution ledger");
+    } else {
+      blockers.push("execution ledger policy must record replay evidence, budget usage, stop reason, approval state, and reviewer outcome without chat history");
+    }
+
+    if (
+      workspaceIsolation &&
+      workspaceIsolation.mutatingLoopsUseWorktree === true &&
+      workspaceIsolation.mainCheckoutMutation === false
+    ) {
+      controls.push("workspace isolation");
+    } else {
+      blockers.push("workspace isolation must require worktrees for mutating loops and forbid main-checkout mutation");
+    }
+
+    for (const contract of loopContracts) {
+      const contractId = contract && contract.id ? contract.id : "unknown-loop";
+      const connectors = Array.isArray(contract.connectors) ? contract.connectors : [];
+      for (const connector of connectors) {
+        if (!connectorIds.has(connector)) {
+          blockers.push(`connector contract ${connector} is missing for loop ${contractId}`);
+        }
+      }
+      if (contract && contract.hardStops && contract.hardStops.noProgressDetection === true) {
+        controls.push("no-progress detection");
+      } else {
+        blockers.push(`no-progress detection is missing for loop ${contractId}`);
+      }
+      if (contract && contract.budget && Number.isFinite(contract.budget.maxMinutes)) {
+        controls.push("budget ceiling");
+      } else {
+        blockers.push(`budget ceiling is missing for loop ${contractId}`);
+      }
+      if (Array.isArray(contract.reviewGates) && contract.reviewGates.length > 0) {
+        controls.push("reviewer gate");
+      } else {
+        blockers.push(`reviewer gate is missing for loop ${contractId}`);
+      }
+    }
+
+    blockers.push("live scheduling is disabled by product boundary");
+
+    return {
+      readyForDryRun: loopContracts.length > 0 && blockers.every((blocker) => blocker === "live scheduling is disabled by product boundary"),
+      readyForRecordOnly: loopContracts.length > 0 && blockers.every((blocker) => blocker === "live scheduling is disabled by product boundary"),
+      readyForLiveScheduling: false,
+      allowedNow: ["describe", "validate", "dry-run", "record"],
+      controls: [...new Set(controls)],
+      blockers
+    };
+  }
+  ```
+
+  Then add `inspectWorkflowPackReadiness(filePath)`:
+
+  ```js
+  function inspectWorkflowPackReadiness(filePath) {
+    const absolutePath = path.resolve(filePath);
+    const data = readJson(absolutePath);
+    const validation = validateWorkflowPackData(data);
+    return {
+      file: absolutePath,
+      validation,
+      readiness: inspectLoopReadiness(data),
+      execution: {
+        executesAnything: false,
+        schedulesJobs: false,
+        callsExternalSystems: false
+      }
+    };
+  }
+  ```
+
+  Export `inspectWorkflowPackReadiness`.
+
+- [x] **Step 5: Route `pack readiness` through the CLI**
+
+  In `scripts/harness.js`, import `inspectWorkflowPackReadiness` from `harness-core`.
+
+  Update the `pack` action routing:
+
+  ```js
+  } else if (action === "readiness") {
+    result = inspectWorkflowPackReadiness(args.file || args._[1]);
+  } else {
+    console.error(usage("pack"));
+    return 1;
+  }
+  ```
+
+  Update `usage("pack")` so it lists:
+
+  ```text
+  node scripts/harness.js pack readiness --file workflow-packs/safe-harness-bootstrap.pack.json --json
+  ```
+
+- [x] **Step 6: Run the targeted test and verify it passes**
+
+  ```sh
+  node --test tests/phase-future-loop-readiness.test.js
+  ```
+
+  Expected result after implementation: readiness tests pass, and no command schedules or executes loop work.
+
+- [x] **Step 7: Commit**
+
+  ```sh
+  git add scripts/lib/harness-core.js scripts/harness.js tests/phase-future-loop-readiness.test.js workflow-packs/safe-harness-bootstrap.pack.json
+  git commit -m "feat: add loop readiness inspection"
+  ```
+
+## Task 6: Add Dry-Run And Record-Only Loop Command Surface
+
+**Files:**
+
+- Modify: `scripts/lib/harness-core.js`
+- Modify: `scripts/harness.js`
+- Modify: `tests/phase-future-loop-readiness.test.js`
+
+- [x] **Step 1: Write failing tests for `loop run`, `loop record`, `loop status`, and `loop inspect`**
+
+  Append these tests to `tests/phase-future-loop-readiness.test.js`.
+
+  ```js
+  test("loop run only writes a dry-run ledger preview", () => {
+    const dir = tempDir("loop-dry-run");
+    const ledger = path.join(dir, "ledger-preview.json");
+    const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+
+    const result = runHarness([
+      "loop", "run",
+      "--file", pack,
+      "--contract", "daily-harness-triage",
+      "--dry-run",
+      "--output", ledger,
+      "--json"
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.mode, "dry-run");
+    assert.equal(payload.executesAnything, false);
+    assert.equal(payload.schedulesJobs, false);
+    assert.equal(payload.ledgerPreview.contractId, "daily-harness-triage");
+    assert.equal(payload.ledgerPreview.stopReason, "dry-run-only");
+    assert.equal(fs.existsSync(ledger), true);
+  });
+
+  test("loop run refuses non-dry-run execution", () => {
+    const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+    const result = runHarness(["loop", "run", "--file", pack, "--contract", "daily-harness-triage", "--json"]);
+
+    assert.notEqual(result.status, 0);
+    const payload = JSON.parse(result.stdout);
+    assert.match(payload.errors.join("\n"), /requires --dry-run/);
+  });
+
+  test("loop record stores manual loop evidence and loop status can inspect it", () => {
+    const dir = tempDir("loop-record");
+    const ledger = path.join(dir, "manual-ledger.json");
+    const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+
+    const recordResult = runHarness([
+      "loop", "record",
+      "--file", pack,
+      "--contract", "daily-harness-triage",
+      "--trigger-source", "manual",
+      "--stop-reason", "reviewer-gate-required",
+      "--output", ledger,
+      "--json"
+    ]);
+
+    assert.equal(recordResult.status, 0, recordResult.stderr);
+    const recorded = JSON.parse(recordResult.stdout);
+    assert.equal(recorded.record.contractId, "daily-harness-triage");
+    assert.equal(recorded.record.approvalState, "pending-review");
+    assert.equal(recorded.record.reviewerOutcome, "not-reviewed");
+
+    const statusResult = runHarness(["loop", "status", "--ledger", ledger, "--json"]);
+    assert.equal(statusResult.status, 0, statusResult.stderr);
+    const status = JSON.parse(statusResult.stdout);
+    assert.equal(status.record.stopReason, "reviewer-gate-required");
+    assert.equal(status.record.executesAnything, false);
+  });
+
+  test("loop inspect explains contract readiness without writing a ledger", () => {
+    const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+    const result = runHarness(["loop", "inspect", "--file", pack, "--contract", "daily-harness-triage", "--json"]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.contract.id, "daily-harness-triage");
+    assert.equal(payload.readiness.readyForLiveScheduling, false);
+    assert.equal(payload.execution.executesAnything, false);
+  });
+  ```
+
+- [x] **Step 2: Run the targeted test and verify it fails**
+
+  ```sh
+  node --test tests/phase-future-loop-readiness.test.js
+  ```
+
+  Expected result before implementation: the new tests fail because the `loop` command is unknown.
+
+- [x] **Step 3: Implement loop contract resolution and ledger preview helpers**
+
+  Add these helpers in `scripts/lib/harness-core.js` near the readiness helpers:
+
+  ```js
+  function findLoopContract(data, contractId) {
+    const contracts = Array.isArray(data.loopContracts) ? data.loopContracts : [];
+    const contract = contracts.find((candidate) => candidate && candidate.id === contractId);
+    if (!contract) {
+      throw new Error(`Loop contract ${contractId} was not found.`);
+    }
+    return contract;
+  }
+
+  function buildLoopLedgerRecord(data, contract, options = {}) {
+    const now = new Date().toISOString();
+    return {
+      schemaVersion: 1,
+      recordedAt: now,
+      triggerSource: options.triggerSource || "manual",
+      resolvedProfile: options.profile || null,
+      workflowPackVersion: data.version || null,
+      contractId: contract.id,
+      contractVersion: contract.version || data.version || null,
+      inputSnapshot: {
+        sources: Array.isArray(contract.inputSources) ? contract.inputSources : [],
+        capturedAt: now
+      },
+      actionSummary: options.actionSummary || "dry-run preview only; no actions executed",
+      producedArtifacts: [],
+      replayEvidence: [],
+      budgetUsage: { minutes: 0 },
+      stopReason: options.stopReason || "dry-run-only",
+      approvalState: "pending-review",
+      reviewerOutcome: "not-reviewed",
+      executesAnything: false,
+      schedulesJobs: false,
+      callsExternalSystems: false
+    };
+  }
+  ```
+
+- [x] **Step 4: Implement record-only core functions**
+
+  Add these functions to `scripts/lib/harness-core.js` and export them.
+
+  ```js
+  function inspectLoopContract(options = {}) {
+    const absolutePath = path.resolve(options.file);
+    const data = readJson(absolutePath);
+    const contract = findLoopContract(data, options.contract);
+    return {
+      file: absolutePath,
+      contract,
+      readiness: inspectLoopReadiness(data),
+      execution: {
+        executesAnything: false,
+        schedulesJobs: false,
+        callsExternalSystems: false
+      }
+    };
+  }
+
+  function dryRunLoopContract(options = {}) {
+    const errors = [];
+    if (!options.dryRun) {
+      errors.push("loop run requires --dry-run until live scheduling is implemented.");
+    }
+    if (errors.length > 0) {
+      return { errors, warnings: [], executesAnything: false, schedulesJobs: false };
+    }
+    const absolutePath = path.resolve(options.file);
+    const data = readJson(absolutePath);
+    const contract = findLoopContract(data, options.contract);
+    const ledgerPreview = buildLoopLedgerRecord(data, contract, { stopReason: "dry-run-only" });
+    if (options.output) {
+      fs.mkdirSync(path.dirname(path.resolve(options.output)), { recursive: true });
+      fs.writeFileSync(path.resolve(options.output), JSON.stringify(ledgerPreview, null, 2));
+    }
+    return {
+      mode: "dry-run",
+      file: absolutePath,
+      ledgerPreview,
+      executesAnything: false,
+      schedulesJobs: false,
+      callsExternalSystems: false
+    };
+  }
+
+  function recordLoopContract(options = {}) {
+    const absolutePath = path.resolve(options.file);
+    const data = readJson(absolutePath);
+    const contract = findLoopContract(data, options.contract);
+    const record = buildLoopLedgerRecord(data, contract, {
+      triggerSource: options.triggerSource || "manual",
+      stopReason: options.stopReason || "manual-record"
+    });
+    if (options.output) {
+      fs.mkdirSync(path.dirname(path.resolve(options.output)), { recursive: true });
+      fs.writeFileSync(path.resolve(options.output), JSON.stringify(record, null, 2));
+    }
+    return { record, executesAnything: false, schedulesJobs: false, callsExternalSystems: false };
+  }
+
+  function inspectLoopLedger(options = {}) {
+    const ledgerPath = path.resolve(options.ledger);
+    const record = readJson(ledgerPath);
+    return { ledger: ledgerPath, record };
+  }
+  ```
+
+- [x] **Step 5: Route `loop` subcommands through the CLI**
+
+  In `scripts/harness.js`, import the new functions:
+
+  ```js
+  dryRunLoopContract,
+  inspectLoopContract,
+  inspectLoopLedger,
+  recordLoopContract
+  ```
+
+  Add `"loop"` to `COMMANDS`.
+
+  Add a `loop` usage branch:
+
+  ```text
+  node scripts/harness.js loop inspect --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --json
+  node scripts/harness.js loop run --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --dry-run --output .harness/loops/daily-harness-triage/ledger-preview.json --json
+  node scripts/harness.js loop record --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --trigger-source manual --stop-reason reviewer-gate-required --output .harness/loops/daily-harness-triage/manual-ledger.json --json
+  node scripts/harness.js loop status --ledger .harness/loops/daily-harness-triage/manual-ledger.json --json
+  ```
+
+  Add route handling:
+
+  ```js
+  } else if (command === "loop") {
+    const action = args._ && args._[0];
+    if (action === "inspect") {
+      result = inspectLoopContract({ file: args.file, contract: args.contract });
+    } else if (action === "run") {
+      result = dryRunLoopContract({
+        file: args.file,
+        contract: args.contract,
+        dryRun: args.dryRun,
+        output: args.output
+      });
+    } else if (action === "record") {
+      result = recordLoopContract({
+        file: args.file,
+        contract: args.contract,
+        triggerSource: args.triggerSource,
+        stopReason: args.stopReason,
+        output: args.output
+      });
+    } else if (action === "status") {
+      result = inspectLoopLedger({ ledger: args.ledger });
+    } else {
+      console.error(usage("loop"));
+      return 1;
+    }
+  }
+  ```
+
+  Extend `parseArgs` in `scripts/lib/harness-core.js` for:
+
+  ```js
+  } else if (arg === "--contract") {
+    args.contract = argv[index + 1];
+    index += 1;
+  } else if (arg === "--ledger") {
+    args.ledger = argv[index + 1];
+    index += 1;
+  } else if (arg === "--trigger-source") {
+    args.triggerSource = argv[index + 1];
+    index += 1;
+  } else if (arg === "--stop-reason") {
+    args.stopReason = argv[index + 1];
+    index += 1;
+  }
+  ```
+
+  `--dry-run` already exists. Keep existing `--loop-contract` support for orchestration records; do not rename it.
+
+- [x] **Step 6: Run the targeted test and verify it passes**
+
+  ```sh
+  node --test tests/phase-future-loop-readiness.test.js
+  ```
+
+  Expected result after implementation: all future-readiness tests pass.
+
+- [x] **Step 7: Commit**
+
+  ```sh
+  git add scripts/lib/harness-core.js scripts/harness.js tests/phase-future-loop-readiness.test.js
+  git commit -m "feat: add record-only loop command surface"
+  ```
+
+## Task 7: Update Docs And Fixtures
+
+- [x] **Step 1: Update public docs only if behavior differs**
 
   Update `README.md`, `SPEC.md`, `ROADMAP.md`, and `docs/superpowers/specs/2026-06-09-declarative-loop-contract-design.md` only when shipped field names or constraints differ from the approved design.
 
-- [ ] **Step 2: Update examples if output shape changes**
+  Required documentation points if Tasks 5-6 are implemented exactly as planned:
+
+  - `loop inspect`, `loop run --dry-run`, `loop record`, and `loop status` are record-only surfaces.
+  - `pack readiness` never runs jobs, dispatches live agents, writes external systems, or opens PRs.
+  - `readyForLiveScheduling` remains `false` by design.
+  - Connector configuration is not approval.
+  - Loop output cannot approve itself.
+  - Mutating loops must remain outside the current product boundary.
+
+- [x] **Step 2: Update examples if output shape changes**
 
   If CLI output snapshots or example adoption reports include workflow pack or maintenance details, regenerate or edit only the affected example files. Do not update unrelated generated examples.
 
-- [ ] **Step 3: Run docs-adjacent verification**
+- [x] **Step 3: Run docs-adjacent verification**
 
   ```sh
   npm run manifests
   npm run doctor
+  node scripts/harness.js pack readiness --file workflow-packs/safe-harness-bootstrap.pack.json --json
+  node scripts/harness.js loop inspect --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --json
   ```
 
   Expected results:
 
   - `npm run manifests` reports `Errors: 0`.
   - `npm run doctor` reports product-repo checks with `Errors: 0`.
+  - `pack readiness` reports `readyForDryRun: true`, `readyForRecordOnly: true`, and `readyForLiveScheduling: false`.
+  - `loop inspect` reports `execution.executesAnything: false`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
   ```sh
   git add README.md SPEC.md ROADMAP.md docs/superpowers/specs/2026-06-09-declarative-loop-contract-design.md workflow-packs/safe-harness-bootstrap.pack.json
   git commit -m "docs: align loop contract implementation"
   ```
 
-## Task 6: Full Verification
+## Task 8: Full Verification
 
-- [ ] **Step 1: Run the full test suite**
+- [x] **Step 1: Run the full test suite**
 
   ```sh
   npm test
@@ -690,7 +1347,7 @@ Recommended packet order:
 
   Expected result: all Node tests pass.
 
-- [ ] **Step 2: Run manifest validation**
+- [x] **Step 2: Run manifest validation**
 
   ```sh
   npm run manifests
@@ -698,7 +1355,7 @@ Recommended packet order:
 
   Expected result: `Errors: 0`.
 
-- [ ] **Step 3: Run product doctor**
+- [x] **Step 3: Run product doctor**
 
   ```sh
   npm run doctor
@@ -706,20 +1363,26 @@ Recommended packet order:
 
   Expected result: `Errors: 0`.
 
-- [ ] **Step 4: Run a manual smoke check**
+- [x] **Step 4: Run a manual smoke check**
 
   ```sh
   node scripts/harness.js pack inspect --file workflow-packs/safe-harness-bootstrap.pack.json --json
   node scripts/harness.js pack validate --file workflow-packs/safe-harness-bootstrap.pack.json --json
+  node scripts/harness.js pack readiness --file workflow-packs/safe-harness-bootstrap.pack.json --json
+  node scripts/harness.js loop run --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --dry-run --output .harness/loops/daily-harness-triage/ledger-preview.json --json
+  node scripts/harness.js loop status --ledger .harness/loops/daily-harness-triage/ledger-preview.json --json
   ```
 
   Expected result:
 
   - `pack inspect` reports `loopContracts[0].id === "daily-harness-triage"`.
   - `pack validate` reports no errors.
+  - `pack readiness` reports live scheduling is disabled by product boundary.
+  - `loop run --dry-run` writes a ledger preview with `stopReason === "dry-run-only"`.
+  - `loop status` can inspect the ledger preview without chat history.
   - No command schedules jobs, dispatches live agents, writes external systems, opens PRs, or modifies tests.
 
-- [ ] **Step 5: Commit verification-only updates if needed**
+- [x] **Step 5: Commit verification-only updates if needed**
 
   ```sh
   git status --short

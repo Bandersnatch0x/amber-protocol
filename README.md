@@ -134,6 +134,8 @@ StockAgents example artifacts live under `docs/examples/` and are review-only. T
 | V5.5 Maintenance Proposals | Implemented | stale docs, drift, wiki lint, reviewable proposals |
 | Future Live Loop Scheduling | Not implemented | future-only readiness track; scheduled execution remains disabled |
 
+Loop readiness is available as a static, record-only surface. `pack readiness` checks declarative controls without running jobs, dispatching live agents, writing external systems, or opening PRs. `loop inspect`, `loop run --dry-run`, `loop record`, and `loop status` resolve contracts and write or inspect ledger records only; `readyForLiveScheduling` remains `false` by product boundary.
+
 For the full boundary and phase notes, see [SPEC.md](./SPEC.md) and [ROADMAP.md](./ROADMAP.md).
 
 ## CI/CD
