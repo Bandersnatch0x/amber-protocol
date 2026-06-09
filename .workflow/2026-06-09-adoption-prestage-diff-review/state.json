@@ -1,0 +1,28 @@
+{
+  "title": "Adoption Pre-Stage Diff Review",
+  "slug": "2026-06-09-adoption-prestage-diff-review",
+  "status": "completed",
+  "mode": "simulated-subagent-driven-development",
+  "approval": {
+    "user_confirmed": true,
+    "risky_external_steps": "not requested",
+    "destructive_steps": "not used",
+    "git_stage_or_commit": "not used"
+  },
+  "packets": [
+    { "id": "packet-a-implementation-review", "status": "completed" },
+    { "id": "packet-b-docs-artifacts-review", "status": "completed" },
+    { "id": "packet-c-boundary-review", "status": "completed" },
+    { "id": "packet-d-verification", "status": "completed" }
+  ],
+  "verification": {
+    "implementation_review": "passed",
+    "docs_artifacts_review": "passed",
+    "boundary_review": "passed",
+    "cli_suite": "passed",
+    "npm_test": "passed",
+    "manifests": "passed",
+    "workflow_artifact": "passed",
+    "stockagents_boundary": "passed"
+  }
+}

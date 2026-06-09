@@ -1,0 +1,25 @@
+{
+  "title": "Adoption Decision-Record Command",
+  "slug": "2026-06-09-adoption-decision-record-command",
+  "status": "completed",
+  "mode": "simulated-subagent-driven-development",
+  "approval": {
+    "user_confirmed": true,
+    "risky_external_steps": "not requested",
+    "destructive_steps": "not used"
+  },
+  "packets": [
+    { "id": "packet-a-tests", "status": "completed" },
+    { "id": "packet-b-implementation", "status": "completed" },
+    { "id": "packet-c-stockagents-docs", "status": "completed" },
+    { "id": "packet-d-verification", "status": "completed" }
+  ],
+  "verification": {
+    "red": "passing: RED failed before implementation for missing adoption decision-record route",
+    "targeted": "passing: node --test tests/harness-cli.test.js (28 tests)",
+    "stockagents_smoke": "passing: docs/examples/stockagents-adoption-decision-record.md generated; StockAgents root boundary clean",
+    "npm_test": "passing: npm test (83 tests)",
+    "manifests": "passing: npm run manifests (Errors: 0)",
+    "workflow_artifact": "passing: verify_workflow.py .workflow/2026-06-09-adoption-decision-record-command"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "title": "Adoption Integration Readiness Review",
+  "slug": "2026-06-09-adoption-integration-readiness-review",
+  "status": "completed",
+  "mode": "simulated-subagent-driven-development",
+  "approval": {
+    "user_confirmed": true,
+    "risky_external_steps": "not requested",
+    "destructive_steps": "not used"
+  },
+  "packets": [
+    { "id": "packet-a-diff-inventory", "status": "completed" },
+    { "id": "packet-b-spec-boundary-review", "status": "completed" },
+    { "id": "packet-c-quality-review", "status": "completed" },
+    { "id": "packet-d-verification", "status": "completed" }
+  ],
+  "verification": {
+    "diff_inventory": "passed",
+    "spec_boundary_review": "passed",
+    "quality_review": "passed",
+    "cli_suite": "passed",
+    "npm_test": "passed",
+    "manifests": "passed",
+    "workflow_artifact": "passed",
+    "stockagents_boundary": "passed"
+  }
+}
