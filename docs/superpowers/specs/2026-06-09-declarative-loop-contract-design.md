@@ -35,6 +35,17 @@ The Harness should preserve original inputs, relevant configuration, evidence, a
 
 The limiting resource in loop orchestration is not the number of workers that can run. It is the amount of trustworthy review a human or reviewer agent can actually absorb. Loop contracts should declare concurrency limits and review gates before any future execution layer can rely on them.
 
+### Implemented Command Surface
+
+The current implementation ships only static and record-only loop surfaces:
+
+- `pack readiness` inspects declared controls and reports `readyForLiveScheduling: false` without running jobs, dispatching live agents, writing external systems, or opening PRs.
+- `loop inspect` explains a selected loop contract and readiness state without writing a ledger.
+- `loop run --dry-run` writes a ledger preview with `stopReason: "dry-run-only"` and refuses non-dry-run execution.
+- `loop record` stores manually supplied loop evidence, and `loop status` reads that ledger without relying on chat history.
+
+Connector configuration is not approval, loop output cannot approve itself, and mutating loops remain outside the current product boundary.
+
 ## Non-Goals
 
 - Do not add a scheduler, cron runner, or live loop daemon.

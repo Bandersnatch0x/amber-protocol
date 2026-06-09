@@ -8,12 +8,16 @@ const {
   compareAdoptionReports,
   dispatchAgentTask,
   doctor,
+  dryRunLoopContract,
   gateAdoptionReport,
   generateAdoptionReport,
+  inspectLoopContract,
+  inspectLoopLedger,
   inspectMaintenance,
   inspectProjectProfile,
   inspectTeamDistribution,
   inspectWorkflowPack,
+  inspectWorkflowPackReadiness,
   inspectTaskResult,
   installTeamDistribution,
   listAdoptionReports,
@@ -22,6 +26,7 @@ const {
   proposeMaintenance,
   prepareTaskExecution,
   printResult,
+  recordLoopContract,
   recordAgentReview,
   reviewPlan,
   rollbackTeamDistribution,
@@ -41,7 +46,7 @@ const {
   writeAdoptionReportsIndex,
 } = require("./lib/harness-core");
 
-const COMMANDS = ["init", "audit", "wiki", "doctor", "handoff", "plan", "gate", "review", "accept", "pack", "profile", "task", "result", "agent", "team", "maintenance", "adoption"];
+const COMMANDS = ["init", "audit", "wiki", "doctor", "handoff", "plan", "gate", "review", "accept", "pack", "profile", "task", "result", "agent", "team", "maintenance", "adoption", "loop"];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
 
@@ -79,6 +84,7 @@ function usage(command) {
     "  node scripts/harness.js review --target path/to/repo --plan docs/plans/F001-small-slice.md",
     "  node scripts/harness.js accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
     "  node scripts/harness.js pack inspect --file workflow-packs/safe-harness-bootstrap.pack.json",
+    "  node scripts/harness.js pack readiness --file workflow-packs/safe-harness-bootstrap.pack.json --json",
     "  node scripts/harness.js profile inspect --file profiles/default.profile.json",
     "  node scripts/harness.js task prepare --target path/to/repo --plan docs/plans/F001-small-slice.md --task slice-1",
     "  node scripts/harness.js result inspect --target path/to/repo --task slice-1",
@@ -162,6 +168,17 @@ function commandSummary(command) {
       "  node scripts/harness.js adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md"
     ].join("\n");
   }
+  if (command === "loop") {
+    return [
+      "Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling.",
+      "",
+      "Examples:",
+      "  node scripts/harness.js loop inspect --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --json",
+      "  node scripts/harness.js loop run --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --dry-run --output .harness/loops/daily-harness-triage/ledger-preview.json --json",
+      "  node scripts/harness.js loop record --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --trigger-source manual --stop-reason reviewer-gate-required --output .harness/loops/daily-harness-triage/manual-ledger.json --json",
+      "  node scripts/harness.js loop status --ledger .harness/loops/daily-harness-triage/manual-ledger.json --json"
+    ].join("\n");
+  }
   return "Run Coding Harness command.";
 }
 
@@ -204,13 +221,15 @@ function run(argv = process.argv.slice(2)) {
     result = acceptPlan(args.target, args.plan);
   } else if (command === "pack") {
     const action = args._ && args._[0];
-    if (action !== "inspect" && action !== "validate") {
-      result = { target: args.target, errors: ["pack requires inspect or validate."], warnings: [] };
-    } else {
+    if (action === "inspect" || action === "validate") {
       result = inspectWorkflowPack(args.file || "");
       if (action === "validate") {
         result.valid = result.errors.length === 0;
       }
+    } else if (action === "readiness") {
+      result = inspectWorkflowPackReadiness(args.file || args._[1] || "");
+    } else {
+      result = { target: args.target, errors: ["pack requires inspect, validate, or readiness."], warnings: [] };
     }
   } else if (command === "profile") {
     const action = args._ && args._[0];
@@ -245,6 +264,30 @@ function run(argv = process.argv.slice(2)) {
       result = recordAgentReview(args.target, args);
     } else {
       result = { target: args.target, errors: ["agent requires dispatch, stop, resume, or review."], warnings: [] };
+    }
+  } else if (command === "loop") {
+    const action = args._ && args._[0];
+    if (action === "inspect") {
+      result = inspectLoopContract({ file: args.file, contract: args.contract });
+    } else if (action === "run") {
+      result = dryRunLoopContract({
+        file: args.file,
+        contract: args.contract,
+        dryRun: args.dryRun,
+        output: args.output
+      });
+    } else if (action === "record") {
+      result = recordLoopContract({
+        file: args.file,
+        contract: args.contract,
+        triggerSource: args.triggerSource,
+        stopReason: args.stopReason,
+        output: args.output
+      });
+    } else if (action === "status") {
+      result = inspectLoopLedger({ ledger: args.ledger });
+    } else {
+      result = { target: args.target, errors: ["loop requires inspect, run, record, or status."], warnings: [] };
     }
   } else if (command === "team") {
     const action = args._ && args._[0];

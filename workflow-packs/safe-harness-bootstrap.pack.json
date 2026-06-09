@@ -8,6 +8,40 @@
     "harness-delivery"
   ],
   "externalIntegrations": [],
+  "connectorContracts": [
+    {
+      "id": "local-docs",
+      "type": "filesystem",
+      "mode": "read-only",
+      "credentials": "none",
+      "redaction": "not-required",
+      "externalWrites": false
+    }
+  ],
+  "approvalPolicy": {
+    "readOnlyInspection": "allowed",
+    "reportGeneration": "allowed",
+    "fileMutation": "requires-human-approval",
+    "commandExecution": "requires-human-approval",
+    "externalNotification": "requires-human-approval",
+    "issueCreation": "requires-human-approval",
+    "selfApprovalAllowed": false
+  },
+  "loopLedger": {
+    "required": true,
+    "pathTemplate": ".harness/loops/{contractId}/ledger.json",
+    "chatHistoryRequired": false,
+    "recordsInputSnapshot": true,
+    "recordsToolSummary": true,
+    "recordsBudgetUsage": true,
+    "recordsStopReason": true,
+    "recordsApprovalState": true,
+    "recordsReviewerOutcome": true
+  },
+  "workspaceIsolation": {
+    "mutatingLoopsUseWorktree": true,
+    "mainCheckoutMutation": false
+  },
   "steps": [
     {
       "id": "audit-target",
@@ -47,7 +81,9 @@
       "skills": [
         "harness-maintenance"
       ],
-      "connectors": [],
+      "connectors": [
+        "local-docs"
+      ],
       "triageOutputs": [
         "archive",
         "candidate-task",
@@ -61,6 +97,7 @@
         "noProgressDetection": true
       },
       "budget": {
+        "maxMinutes": 30,
         "maxTokens": 200000,
         "maxUsd": 25
       },
