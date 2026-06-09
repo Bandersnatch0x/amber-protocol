@@ -60,6 +60,14 @@ test("pack inspect and profile inspect explain declarations without execution", 
   assert.equal(packPayload.execution.executesAnything, false);
   assert.match(packPayload.dryRun.summary, /without dispatching workers/);
   assert.ok(profilePayload.profile.packIds.includes("safe-harness-bootstrap"));
+
+  // Loop contracts validation
+  assert.ok(Array.isArray(packPayload.pack.loopContracts));
+  assert.equal(packPayload.pack.loopContracts[0].id, "daily-harness-triage");
+  assert.equal(packPayload.pack.loopContracts[0].execution.executesAnything, false);
+  assert.equal(packPayload.pack.loopContracts[0].hardStops.maxIterations, 3);
+  assert.equal(packPayload.pack.loopContracts[0].hardStops.noProgressDetection, true);
+  assert.equal(packPayload.pack.loopContracts[0].triageOutputs.includes("candidate-task"), true);
 });
 
 test("pack validate catches missing skills, broken standards, unsafe scripts, and undeclared integrations", () => {
@@ -90,5 +98,40 @@ test("pack validate catches missing skills, broken standards, unsafe scripts, an
   assert.match(errors, /missing-standard/);
   assert.match(errors, /must not declare executable scripts/);
   assert.match(errors, /undeclared external integration github/);
+});
+
+test("pack validate rejects unsafe loop contracts", () => {
+  const root = tempDir("loop-contract");
+  const badPack = path.join(root, "bad-loop.pack.json");
+  writeJson(badPack, {
+    id: "bad-loop",
+    title: "Bad Loop",
+    version: "1.0.0",
+    steps: [{ id: "inspect", title: "Inspect", kind: "manual", description: "Inspect only" }],
+    loopContracts: [{
+      id: "unsafe-loop",
+      trigger: { type: "scheduled", cadence: "daily" },
+      goal: "Find issues",
+      stateSpine: ".harness/loops/unsafe/state.json",
+      inputs: ["issues"],
+      skills: ["triage"],
+      triageOutputs: ["candidate-task"],
+      hardStops: { maxIterations: 0, noProgressDetection: false },
+      budget: {},
+      reviewGates: [],
+      execution: { schedulesJobs: true, dispatchesAgents: true, writesExternalSystems: true }
+    }]
+  });
+
+  const result = runHarness(["pack", "validate", "--file", badPack, "--json"]);
+
+  assert.notEqual(result.status, 0);
+  const errors = JSON.parse(result.stdout).errors.join("\n");
+  assert.match(errors, /maxIterations/);
+  assert.match(errors, /budget/);
+  assert.match(errors, /reviewGates must contain at least one entry/);
+  assert.match(errors, /must not schedule jobs/);
+  assert.match(errors, /must not dispatch live agents/);
+  assert.match(errors, /must not write external systems/);
 });
 
