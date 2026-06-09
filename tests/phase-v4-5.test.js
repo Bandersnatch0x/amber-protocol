@@ -71,6 +71,16 @@ test("agent dispatch supports stop resume and separate reviewer evidence", () =>
     "local",
     "--concurrency",
     "1",
+    "--loop-contract",
+    "daily-harness-triage",
+    "--hard-stop-status",
+    "within-limits",
+    "--budget-status",
+    "within-budget",
+    "--review-bandwidth-status",
+    "available",
+    "--review-gate-status",
+    "pending",
     "--json"
   ]);
   const stop = runHarness(["agent", "stop", "--target", target, "--task", "slice-1", "--json"]);
@@ -88,6 +98,8 @@ test("agent dispatch supports stop resume and separate reviewer evidence", () =>
     "approved",
     "--evidence",
     "reviewed ledger",
+    "--review-gate-status",
+    "satisfied",
     "--json"
   ]);
   const dispatchPath = path.join(target, ".harness", "orchestration", "slice-1", "dispatch.json");
@@ -104,5 +116,17 @@ test("agent dispatch supports stop resume and separate reviewer evidence", () =>
   assert.equal(fs.existsSync(reviewPath), true);
   assert.equal(JSON.parse(fs.readFileSync(dispatchPath, "utf8")).workerOutput, null);
   assert.equal(JSON.parse(fs.readFileSync(reviewPath, "utf8")).reviewer, "reviewer-b");
+
+  // Loop contract status assertions
+  const dispatchPayload = JSON.parse(dispatch.stdout);
+  assert.equal(dispatchPayload.dispatch.loop.contractId, "daily-harness-triage");
+  assert.equal(dispatchPayload.dispatch.loop.hardStopStatus, "within-limits");
+  assert.equal(dispatchPayload.dispatch.loop.budgetStatus, "within-budget");
+  assert.equal(dispatchPayload.dispatch.loop.reviewBandwidthStatus, "available");
+  assert.equal(dispatchPayload.dispatch.loop.reviewGateStatus, "pending");
+
+  const reviewPayload = JSON.parse(review.stdout);
+  const dispatchData = JSON.parse(fs.readFileSync(dispatchPath, "utf8"));
+  assert.equal(dispatchData.loop.reviewGateStatus, "satisfied");
 });
 
