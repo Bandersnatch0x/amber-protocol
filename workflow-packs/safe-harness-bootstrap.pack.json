@@ -27,5 +27,53 @@
       "kind": "manual",
       "description": "Run wiki, handoff, and doctor validation; record command output as evidence."
     }
+  ],
+  "loopContracts": [
+    {
+      "id": "daily-harness-triage",
+      "title": "Daily Harness Triage",
+      "trigger": {
+        "type": "scheduled",
+        "cadence": "daily",
+        "enabled": false
+      },
+      "goal": "Inspect Harness health and produce reviewable candidate work without executing it.",
+      "stateSpine": ".harness/loops/daily-harness-triage/state.json",
+      "inputs": [
+        "doctor report",
+        "maintenance inspect",
+        "recent evolution findings"
+      ],
+      "skills": [
+        "harness-maintenance"
+      ],
+      "connectors": [],
+      "triageOutputs": [
+        "archive",
+        "candidate-task",
+        "needs-human",
+        "blocked",
+        "regression-test-proposal"
+      ],
+      "hardStops": {
+        "maxIterations": 3,
+        "timeoutMinutes": 30,
+        "noProgressDetection": true
+      },
+      "budget": {
+        "maxTokens": 200000,
+        "maxUsd": 25
+      },
+      "reviewGates": [
+        "human-approval",
+        "reviewer-evidence"
+      ],
+      "execution": {
+        "executesAnything": false,
+        "schedulesJobs": false,
+        "dispatchesAgents": false,
+        "writesExternalSystems": false
+      }
+    }
   ]
 }

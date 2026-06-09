@@ -3089,7 +3089,118 @@ function validateWorkflowPackData(data) {
     }
   }
 
+  validateLoopContracts(data.loopContracts, errors, warnings);
+
   return { errors, warnings };
+}
+
+function validateLoopContracts(loopContracts, errors, warnings) {
+  if (loopContracts === undefined) {
+    return;
+  }
+
+  if (!Array.isArray(loopContracts)) {
+    errors.push("Workflow pack loopContracts must be an array when present.");
+    return;
+  }
+
+  const VALID_TRIGGER_TYPES = new Set(["manual", "scheduled", "goal", "external-signal"]);
+  const VALID_TRIAGE_OUTPUTS = new Set(["archive", "candidate-task", "needs-human", "blocked", "regression-test-proposal"]);
+  const VALID_HARD_STOP_STATUSES = new Set(["not-recorded", "within-limits", "hit-limit"]);
+  const VALID_BUDGET_STATUSES = new Set(["not-recorded", "within-budget", "over-budget"]);
+
+  loopContracts.forEach((contract, index) => {
+    const prefix = `Loop contract [${index}]`;
+
+    if (!contract || typeof contract !== "object" || Array.isArray(contract)) {
+      errors.push(`${prefix} must be an object.`);
+      return;
+    }
+
+    for (const field of ["id", "goal", "stateSpine"]) {
+      if (typeof contract[field] !== "string" || contract[field].trim() === "") {
+        errors.push(`${prefix}.${field} must be a non-empty string.`);
+      }
+    }
+
+    if (contract.trigger && typeof contract.trigger === "object") {
+      if (!VALID_TRIGGER_TYPES.has(contract.trigger.type)) {
+        errors.push(`${prefix}.trigger.type must be one of: manual, scheduled, goal, external-signal.`);
+      }
+    }
+
+    if (Array.isArray(contract.triageOutputs)) {
+      const invalidOutputs = contract.triageOutputs.filter((output) => !VALID_TRIAGE_OUTPUTS.has(output));
+      if (invalidOutputs.length > 0) {
+        errors.push(`${prefix}.triageOutputs contains invalid values: ${invalidOutputs.join(", ")}.`);
+      }
+    }
+
+    if (contract.hardStops && typeof contract.hardStops === "object") {
+      const maxIterations = contract.hardStops.maxIterations;
+      if (typeof maxIterations === "number" && maxIterations <= 0) {
+        errors.push(`${prefix}.hardStops.maxIterations must be greater than 0.`);
+      } else if (maxIterations === undefined) {
+        errors.push(`${prefix}.hardStops.maxIterations is required.`);
+      }
+
+      if (contract.hardStops.noProgressDetection !== true) {
+        errors.push(`${prefix}.hardStops.noProgressDetection must be true.`);
+      }
+    } else {
+      errors.push(`${prefix}.hardStops is required.`);
+    }
+
+    const hasTimeout = contract.hardStops && typeof contract.hardStops.timeoutMinutes === "number";
+    const hasTokenBudget = contract.budget && typeof contract.budget.maxTokens === "number";
+    const hasUsdBudget = contract.budget && typeof contract.budget.maxUsd === "number";
+
+    if (!hasTimeout && !hasTokenBudget && !hasUsdBudget) {
+      errors.push(`${prefix} must specify at least one of: hardStops.timeoutMinutes, budget.maxTokens, or budget.maxUsd.`);
+    }
+
+    if (!Array.isArray(contract.reviewGates) || contract.reviewGates.length === 0) {
+      errors.push(`${prefix}.reviewGates must contain at least one entry.`);
+    }
+
+    if (contract.execution && typeof contract.execution === "object") {
+      if (contract.execution.executesAnything !== false) {
+        errors.push(`${prefix}.execution.executesAnything must be false.`);
+      }
+      if (contract.execution.schedulesJobs === true) {
+        errors.push(`${prefix} must not schedule jobs.`);
+      }
+      if (contract.execution.dispatchesAgents === true) {
+        errors.push(`${prefix} must not dispatch live agents.`);
+      }
+      if (contract.execution.writesExternalSystems === true) {
+        errors.push(`${prefix} must not write external systems.`);
+      }
+    }
+  });
+}
+
+function describeLoopContracts(data) {
+  return Array.isArray(data.loopContracts)
+    ? data.loopContracts.map((contract) => ({
+        id: contract.id,
+        title: contract.title || contract.id,
+        trigger: contract.trigger || null,
+        goal: contract.goal || "",
+        stateSpine: contract.stateSpine || "",
+        triageOutputs: Array.isArray(contract.triageOutputs) ? contract.triageOutputs : [],
+        hardStops: contract.hardStops || {},
+        budget: contract.budget || {},
+        connectors: Array.isArray(contract.connectors) ? contract.connectors : [],
+        reviewGates: Array.isArray(contract.reviewGates) ? contract.reviewGates : [],
+        execution: {
+          executesAnything: false,
+          schedulesJobs: Boolean(contract.execution && contract.execution.schedulesJobs),
+          dispatchesAgents: Boolean(contract.execution && contract.execution.dispatchesAgents),
+          writesExternalSystems: Boolean(contract.execution && contract.execution.writesExternalSystems)
+        }
+      }))
+    : [];
 }
 
 function validateWorkflowPackReferences(packPath, data) {
@@ -3155,7 +3266,8 @@ function inspectWorkflowPack(filePath) {
       id: data.id,
       title: data.title,
       version: data.version,
-      stepCount: Array.isArray(data.steps) ? data.steps.length : 0
+      stepCount: Array.isArray(data.steps) ? data.steps.length : 0,
+      loopContracts: describeLoopContracts(data)
     },
     execution: {
       executesAnything: false,
