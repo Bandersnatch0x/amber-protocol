@@ -207,7 +207,7 @@ function run(argv = process.argv.slice(2)) {
     if (action !== "prepare") {
       result = { target: args.target, errors: ["task requires prepare."], warnings: [] };
     } else {
-      result = prepareTaskExecution(args.target, args.plan, args.task);
+      result = prepareTaskExecution(args.target, args.plan, args.task, args);
     }
   } else if (command === "result") {
     const action = args._ && args._[0];

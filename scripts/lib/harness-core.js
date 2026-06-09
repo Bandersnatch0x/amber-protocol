@@ -494,7 +494,7 @@ function acceptPlan(target, planRelativePath) {
   };
 }
 
-function prepareTaskExecution(target, planRelativePath, taskIdInput) {
+function prepareTaskExecution(target, planRelativePath, taskIdInput, options = {}) {
   const targetRoot = resolveTarget(target);
   const taskId = slugify(taskIdInput);
   const errors = [];
@@ -527,6 +527,7 @@ function prepareTaskExecution(target, planRelativePath, taskIdInput) {
     },
     commands: [],
     failureAttribution: null,
+    traceDerived: Boolean(options.traceInput || options.regressionAssertion),
     createdAt: new Date().toISOString()
   };
   const evidence = {
@@ -536,22 +537,61 @@ function prepareTaskExecution(target, planRelativePath, taskIdInput) {
     requiredForReplay: ["ledger.json", "evidence.json", "replay.md"],
     chatHistoryRequired: false
   };
-  const replay = [
+
+  if (options.traceInput || options.agentConfig) {
+    evidence.traceReplay = {
+      traceInput: options.traceInput || "",
+      agentConfig: options.agentConfig || "",
+      exactReplayRequired: Boolean(options.traceInput)
+    };
+  }
+
+  if (options.regressionAssertion) {
+    evidence.regressionProposal = {
+      assertion: options.regressionAssertion,
+      status: "proposed",
+      modifiesTests: false,
+      approvalRequired: true
+    };
+  }
+
+  const replayLines = [
     "# Replay",
     "",
     `Task: ${taskId}`,
     `Plan: ${planRelativePath}`,
     `Worktree: ${worktreeRelativePath}`,
-    "",
-    "This prepared result contains no executed commands yet. Replay starts from the ledger, evidence pack, and worktree path recorded here.",
     ""
-  ].join("\n");
+  ];
+
+  if (evidence.traceReplay) {
+    replayLines.push("## Trace Replay", "");
+    replayLines.push(`- Trace input: ${evidence.traceReplay.traceInput}`);
+    replayLines.push(`- Agent config: ${evidence.traceReplay.agentConfig}`);
+    replayLines.push(`- Exact replay required: ${evidence.traceReplay.exactReplayRequired}`);
+    replayLines.push("");
+  }
+
+  if (evidence.regressionProposal) {
+    replayLines.push("## Regression Proposal", "");
+    replayLines.push(`- Assertion: ${evidence.regressionProposal.assertion}`);
+    replayLines.push(`- Modifies tests: ${evidence.regressionProposal.modifiesTests}`);
+    replayLines.push(`- Approval required: ${evidence.regressionProposal.approvalRequired}`);
+    replayLines.push("");
+  }
+
+  if (!evidence.traceReplay && !evidence.regressionProposal) {
+    replayLines.push("This prepared result contains no executed commands yet. Replay starts from the ledger, evidence pack, and worktree path recorded here.");
+    replayLines.push("");
+  }
+
+  const replay = replayLines.join("\n");
 
   fs.writeFileSync(path.join(executionPath, "ledger.json"), JSON.stringify(ledger, null, 2));
   fs.writeFileSync(path.join(executionPath, "evidence.json"), JSON.stringify(evidence, null, 2));
   fs.writeFileSync(path.join(executionPath, "replay.md"), replay);
 
-  return {
+  const result = {
     target: targetRoot,
     task: taskId,
     plan: planRelativePath,
@@ -560,6 +600,16 @@ function prepareTaskExecution(target, planRelativePath, taskIdInput) {
     errors,
     warnings
   };
+
+  if (evidence.traceReplay) {
+    result.traceReplay = evidence.traceReplay;
+  }
+
+  if (evidence.regressionProposal) {
+    result.regressionProposal = evidence.regressionProposal;
+  }
+
+  return result;
 }
 
 function inspectTaskResult(target, taskIdInput) {
@@ -3516,6 +3566,15 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--reports-dir") {
       args.reportsDir = argv[index + 1];
+      index += 1;
+    } else if (arg === "--trace-input") {
+      args.traceInput = argv[index + 1];
+      index += 1;
+    } else if (arg === "--agent-config") {
+      args.agentConfig = argv[index + 1];
+      index += 1;
+    } else if (arg === "--regression-assertion") {
+      args.regressionAssertion = argv[index + 1];
       index += 1;
     } else if (arg === "--json") {
       args.json = true;
