@@ -72,6 +72,33 @@ test("maintenance propose writes reviewable gardening proposal without changing 
   const overviewPath = path.join(target, "docs", "wiki", "product", "overview.md");
   const beforeOverview = fs.readFileSync(overviewPath, "utf8");
 
+  // Add trace-derived evidence
+  const executionPath = path.join(target, ".harness", "executions", "trace-failure");
+  fs.mkdirSync(executionPath, { recursive: true });
+  fs.writeFileSync(path.join(executionPath, "evidence.json"), JSON.stringify({
+    taskId: "trace-failure",
+    plan: "docs/plans/F001-trace-failure.md",
+    evidence: [],
+    requiredForReplay: ["ledger.json", "evidence.json", "replay.md"],
+    chatHistoryRequired: false,
+    traceReplay: {
+      traceInput: "fixtures/traces/failing-input.json",
+      agentConfig: "crm-agent-v2",
+      exactReplayRequired: true
+    },
+    regressionProposal: {
+      assertion: "The response must include specific deal details, not just a count",
+      status: "proposed",
+      modifiesTests: false,
+      approvalRequired: true
+    }
+  }, null, 2));
+
+  const inspect = runHarness(["maintenance", "inspect", "--target", target, "--json"]);
+  assert.equal(inspect.status, 0, inspect.stderr);
+  const inspectPayload = JSON.parse(inspect.stdout);
+  assert.ok(inspectPayload.regressionProposals.some((proposal) => proposal.taskId === "trace-failure"));
+
   const result = runHarness(["maintenance", "propose", "--target", target, "--json"]);
 
   assert.equal(result.status, 0, result.stderr);
@@ -83,5 +110,9 @@ test("maintenance propose writes reviewable gardening proposal without changing 
   const proposal = fs.readFileSync(proposalPath, "utf8");
   assert.match(proposal, /Missing rollback evidence/);
   assert.match(proposal, /Suggested Standards Diff/);
+  assert.match(proposal, /Regression Proposals/);
+  assert.match(proposal, /trace-failure/);
+  assert.match(proposal, /The response must include specific deal details/);
   assert.equal(fs.readFileSync(overviewPath, "utf8"), beforeOverview);
+  assert.equal(fs.existsSync(path.join(target, "tests", "trace-failure.test.js")), false);
 });

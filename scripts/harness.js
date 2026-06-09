@@ -34,6 +34,10 @@ const {
   validateAdoptionReports,
   validatePlanGate,
   validateHandoff,
+  writeAdoptionApplyPlan,
+  writeAdoptionDecisionRecord,
+  writeAdoptionNextActions,
+  writeAdoptionSelectedFiles,
   writeAdoptionReportsIndex,
 } = require("./lib/harness-core");
 
@@ -89,7 +93,10 @@ function usage(command) {
     "  node scripts/harness.js adoption compare --reports-dir docs/examples/adoptions",
     "  node scripts/harness.js adoption gate --reports-dir docs/examples/adoptions",
     "  node scripts/harness.js adoption status --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md",
-    "  node scripts/harness.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/stockagents-adoption-bundle"
+    "  node scripts/harness.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/stockagents-adoption-bundle",
+    "  node scripts/harness.js adoption next-actions --bundle-dir docs/examples/stockagents-adoption-bundle --output docs/examples/stockagents-adoption-next-actions.md",
+    "  node scripts/harness.js adoption decision-record --bundle-dir docs/examples/stockagents-adoption-bundle --output docs/examples/stockagents-adoption-decision-record.md",
+    "  node scripts/harness.js adoption selected-files --bundle-dir docs/examples/stockagents-adoption-bundle --output docs/examples/stockagents-adoption-selected-files.md --include AGENTS.md"
   ].join("\n");
 }
 
@@ -143,7 +150,17 @@ function commandSummary(command) {
     return "Inspect stale docs, wiki lint readiness, upgrade guidance, drift, and reviewable maintenance proposals.";
   }
   if (command === "adoption") {
-    return "Generate, list, or index safe adoption report artifacts without modifying target projects.";
+    return [
+      "Generate, list, or index safe adoption report artifacts without modifying target projects.",
+      "",
+      "Examples:",
+      "  node scripts/harness.js adoption report --target path/to/repo --output docs/examples/project-adoption-report.md",
+      "  node scripts/harness.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle",
+      "  node scripts/harness.js adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md",
+      "  node scripts/harness.js adoption decision-record --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-decision-record.md",
+      "  node scripts/harness.js adoption apply-plan --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-apply-plan.md --dry-run",
+      "  node scripts/harness.js adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md"
+    ].join("\n");
   }
   return "Run Coding Harness command.";
 }
@@ -271,8 +288,16 @@ function run(argv = process.argv.slice(2)) {
       result = statusAdoptionReports(args);
     } else if (action === "bundle") {
       result = bundleAdoptionArtifacts(args);
+    } else if (action === "next-actions") {
+      result = writeAdoptionNextActions(args);
+    } else if (action === "decision-record") {
+      result = writeAdoptionDecisionRecord(args);
+    } else if (action === "apply-plan") {
+      result = writeAdoptionApplyPlan(args);
+    } else if (action === "selected-files") {
+      result = writeAdoptionSelectedFiles(args);
     } else {
-      result = { target: args.target, errors: ["adoption requires report, list, index, validate, compare, gate, status, or bundle."], warnings: [] };
+      result = { target: args.target, errors: ["adoption requires report, list, index, validate, compare, gate, status, bundle, next-actions, decision-record, apply-plan, or selected-files."], warnings: [] };
     }
   } else {
     result = doctor(args.target);
