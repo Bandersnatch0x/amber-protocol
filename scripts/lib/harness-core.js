@@ -1328,6 +1328,64 @@ function extractEvolutionFindings(targetRoot) {
     .sort((left, right) => right.count - left.count || left.finding.localeCompare(right.finding));
 }
 
+function readRegressionProposal(evidencePath, taskDir, targetRoot) {
+  let data;
+  try {
+    data = readJson(evidencePath);
+  } catch (error) {
+    return null;
+  }
+
+  if (!data.regressionProposal || data.regressionProposal.status !== "proposed") {
+    return null;
+  }
+  const assertion = data.regressionProposal.assertion;
+  if (!assertion) {
+    return null;
+  }
+
+  return {
+    taskId: data.taskId || taskDir,
+    plan: data.plan || "",
+    assertion,
+    traceInput: data.traceReplay ? data.traceReplay.traceInput || "" : "",
+    agentConfig: data.traceReplay ? data.traceReplay.agentConfig || "" : "",
+    modifiesTests: false,
+    approvalRequired: true,
+    source: relativeSlash(targetRoot, evidencePath)
+  };
+}
+
+function extractRegressionProposals(targetRoot) {
+  const executionsRoot = path.join(targetRoot, ".harness", "executions");
+  if (!pathExists(executionsRoot)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const proposals = [];
+  for (const taskDir of fs.readdirSync(executionsRoot)) {
+    const evidencePath = path.join(executionsRoot, taskDir, "evidence.json");
+    if (!pathExists(evidencePath)) {
+      continue;
+    }
+    const proposal = readRegressionProposal(evidencePath, taskDir, targetRoot);
+    if (!proposal) {
+      continue;
+    }
+    const key = `${proposal.taskId}\n${proposal.assertion}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    proposals.push(proposal);
+  }
+
+  return proposals
+    .sort((left, right) => left.taskId.localeCompare(right.taskId))
+    .slice(0, 50);
+}
+
 function inspectMaintenance(target, options = {}) {
   const targetRoot = resolveTarget(target);
   const loaded = loadTeamRegistry(options.registry);
@@ -1346,6 +1404,7 @@ function inspectMaintenance(target, options = {}) {
     migrationAssistant: buildMigrationAssistant(targetRoot, loaded.registry),
     upgradeAssistant: buildUpgradeAssistant(targetRoot, loaded.registry),
     evolutionRollup: extractEvolutionFindings(targetRoot),
+    regressionProposals: extractRegressionProposals(targetRoot),
     errors: loaded.errors,
     warnings: loaded.warnings
   };
@@ -2377,6 +2436,806 @@ function bundleAdoptionArtifacts(options = {}) {
   return bundle;
 }
 
+function extractAdoptionGateFindings(markdown) {
+  const body = getSectionBody(markdown, "Findings");
+  if (!body) {
+    return [];
+  }
+
+  return body.split(/\r?\n/)
+    .map((line) => line.match(/^\s*-\s+([^:]+):\s+(.+?)\s*$/))
+    .filter(Boolean)
+    .map((match) => ({ id: match[1].trim(), message: match[2].trim() }));
+}
+
+function extractAdoptionGateMetrics(markdown) {
+  const body = getSectionBody(markdown, "Metrics");
+  if (!body) {
+    return [];
+  }
+
+  return body.split(/\r?\n/)
+    .map((line) => line.match(/^\s*-\s+([^:]+):\s+(.+?)\s*$/))
+    .filter(Boolean)
+    .map((match) => {
+      const value = Number(match[2].trim());
+      return {
+        label: match[1].trim(),
+        value: Number.isNaN(value) ? match[2].trim() : value
+      };
+    });
+}
+
+function adoptionNextActionsApprovalGates() {
+  return [
+    {
+      id: "command-confirmation",
+      question: "Confirm, replace, or reject the candidate verification command."
+    },
+    {
+      id: "bootstrap-write",
+      question: "Approve full init, selected manual patches, or keep the target read-only."
+    },
+    {
+      id: "wiki-scope",
+      question: "Choose required files only, required plus optional wiki starters, or defer wiki starters."
+    }
+  ];
+}
+
+function adoptionNextActionsErrorResult(fields, errors, warnings) {
+  return {
+    kind: "adoption-next-actions",
+    target: fields.target || "n/a",
+    bundleDir: fields.bundleDir || "",
+    outputPath: fields.outputPath || "",
+    latestReport: null,
+    gateDecision: "wait",
+    nextSafeAction: "Fix adoption next-actions errors before sharing this checklist.",
+    findings: [],
+    metrics: [],
+    requiredHarnessFiles: REQUIRED_HARNESS_FILES,
+    optionalStarterWikiFiles: OPTIONAL_STARTER_WIKI_FILES,
+    candidateCommands: [],
+    unknowns: [],
+    approvalGates: adoptionNextActionsApprovalGates(),
+    boundaries: adoptionBundleBoundaries(),
+    errors,
+    warnings
+  };
+}
+
+function buildAdoptionNextActionsContent(nextActions) {
+  const lines = [
+    "# Adoption Next Actions",
+    "",
+    "Status: review only",
+    "",
+    `Target: ${nextActions.target}`,
+    `Bundle: ${nextActions.bundleDir}`,
+    `Latest report: ${nextActions.latestReport || "none"}`,
+    `Gate decision: ${nextActions.gateDecision}`,
+    `Next safe action: ${nextActions.nextSafeAction}`,
+    "",
+    "## Boundary",
+    "",
+    "This document is a read-only planning artifact.",
+    "",
+    `- Target project files copied: ${nextActions.boundaries.targetProjectFilesCopied}`,
+    `- Target project commands executed: ${nextActions.boundaries.targetProjectCommandsExecuted}`,
+    `- Dynamic Workflow executed: ${nextActions.boundaries.dynamicWorkflowExecuted}`,
+    `- Live subagents invoked: ${nextActions.boundaries.liveSubagentsInvoked}`,
+    "",
+    "## Gate Findings",
+    ""
+  ];
+
+  if (nextActions.findings.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const finding of nextActions.findings) {
+      lines.push(`- ${finding.id}: ${finding.message}`);
+    }
+  }
+
+  lines.push("", "## Required Harness Files Pending Approval", "");
+  for (const relativePath of nextActions.requiredHarnessFiles) {
+    lines.push(`- \`${relativePath}\``);
+  }
+
+  lines.push("", "## Optional Starter Wiki Files", "");
+  for (const relativePath of nextActions.optionalStarterWikiFiles) {
+    lines.push(`- \`${relativePath}\``);
+  }
+
+  lines.push("", "## Candidate Command To Confirm", "");
+  if (nextActions.candidateCommands.length === 0) {
+    lines.push("- none detected");
+  } else {
+    for (const command of nextActions.candidateCommands) {
+      lines.push(`- ${command}`);
+    }
+  }
+
+  lines.push(
+    "",
+    "Confirmation needed:",
+    "",
+    "- Is this the correct default verification command?",
+    "- Should it run from the repository root or a subdirectory?",
+    "- Does it require a virtual environment, environment variables, data files, or external services?",
+    "- Is there a lighter smoke command that should run before the full suite?",
+    "",
+    "## Unknowns To Resolve",
+    ""
+  );
+
+  if (nextActions.unknowns.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const unknown of nextActions.unknowns) {
+      lines.push(`- ${unknown}`);
+    }
+  }
+
+  lines.push("", "## Human Approval Gates", "");
+  for (const gate of nextActions.approvalGates) {
+    lines.push(`- ${gate.id}: ${gate.question}`);
+  }
+
+  lines.push(
+    "",
+    "## Recommended Next Sequence",
+    "",
+    "1. Human reviews this document and answers the approval gates.",
+    "2. If writes are approved, confirm the target path and exact file list before running init.",
+    "3. Re-run adoption report, index, status, gate, and bundle after any approved target change.",
+    "4. Treat target command execution as a separate approval step after the command is confirmed.",
+    "",
+    "Commands that write to the target project or execute its tests remain outside this artifact.",
+    ""
+  );
+
+  return lines.join("\n");
+}
+
+function writeAdoptionNextActions(options = {}) {
+  const bundleDir = options.bundleDir ? path.resolve(options.bundleDir) : "";
+  const outputPath = options.output ? path.resolve(options.output) : "";
+  const errors = [];
+  const warnings = [];
+
+  if (!bundleDir) {
+    errors.push("adoption next-actions requires --bundle-dir.");
+  }
+  if (!outputPath) {
+    errors.push("adoption next-actions requires --output.");
+  }
+  if (bundleDir && (!pathExists(bundleDir) || !fs.statSync(bundleDir).isDirectory())) {
+    errors.push(`Bundle directory does not exist: ${bundleDir}`);
+  }
+  if (outputPath && pathExists(outputPath)) {
+    errors.push(`Next-actions output already exists: ${outputPath}`);
+  }
+  if (errors.length > 0) {
+    return adoptionNextActionsErrorResult({ bundleDir, outputPath }, errors, warnings);
+  }
+
+  const manifestPath = path.join(bundleDir, "manifest.json");
+  if (!pathExists(manifestPath)) {
+    errors.push(`Bundle manifest is missing: ${manifestPath}`);
+    return adoptionNextActionsErrorResult({ bundleDir, outputPath }, errors, warnings);
+  }
+
+  let manifest;
+  try {
+    manifest = readJson(manifestPath);
+  } catch (error) {
+    errors.push(`Cannot read bundle manifest: ${error.message}`);
+    return adoptionNextActionsErrorResult({ bundleDir, outputPath }, errors, warnings);
+  }
+
+  const latestReport = manifest.latestReport
+    ? (path.isAbsolute(manifest.latestReport) ? manifest.latestReport : path.resolve(bundleDir, manifest.latestReport))
+    : "";
+  let candidateCommands = [];
+  let unknowns = [];
+  if (latestReport && pathExists(latestReport)) {
+    const parsed = parseAdoptionReportForComparison(latestReport);
+    if (parsed.error) {
+      warnings.push(parsed.error);
+    } else {
+      candidateCommands = parsed.report.candidateCommands;
+      unknowns = parsed.report.unknowns;
+    }
+  } else if (latestReport) {
+    warnings.push(`Latest report is missing: ${latestReport}`);
+  }
+
+  const gatePath = path.join(bundleDir, "gate.md");
+  const gateMarkdown = pathExists(gatePath) ? readText(gatePath) : "";
+  const findings = gateMarkdown ? extractAdoptionGateFindings(gateMarkdown) : [];
+  const metrics = gateMarkdown ? extractAdoptionGateMetrics(gateMarkdown) : [];
+  const approvalGates = adoptionNextActionsApprovalGates();
+  const nextActions = {
+    kind: "adoption-next-actions",
+    target: manifest.target || "unknown",
+    bundleDir,
+    outputPath,
+    latestReport: latestReport || null,
+    gateDecision: manifest.gateDecision || "wait",
+    nextSafeAction: manifest.nextSafeAction || "Review adoption gate findings before initializing or changing the target project.",
+    findings,
+    metrics,
+    requiredHarnessFiles: REQUIRED_HARNESS_FILES,
+    optionalStarterWikiFiles: OPTIONAL_STARTER_WIKI_FILES,
+    candidateCommands,
+    unknowns,
+    approvalGates,
+    boundaries: {
+      ...adoptionBundleBoundaries(),
+      ...(manifest.boundaries || {})
+    },
+    errors,
+    warnings
+  };
+
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, buildAdoptionNextActionsContent(nextActions));
+
+  return nextActions;
+}
+
+function adoptionDecisionRecordDecisions() {
+  return [
+    {
+      id: "command-confirmation",
+      title: "Gate A: Command Confirmation",
+      status: "pending",
+      decision: "Confirm, replace, or reject candidate verification commands."
+    },
+    {
+      id: "bootstrap-write",
+      title: "Gate B: Bootstrap Write",
+      status: "pending",
+      decision: "Approve full init, selected manual patches, or keep the target read-only."
+    },
+    {
+      id: "wiki-scope",
+      title: "Gate C: Wiki Scope",
+      status: "pending",
+      decision: "Choose required files only, required plus optional wiki starters, or defer wiki starters."
+    }
+  ];
+}
+
+const ADOPTION_DECISION_GATE_IDS = new Set(["command-confirmation", "bootstrap-write", "wiki-scope"]);
+const ADOPTION_DECISION_STATUSES = new Set(["pending", "approved", "rejected", "deferred"]);
+
+function applyAdoptionDecisionSpecs(decisions, specs) {
+  const errors = [];
+  const decisionById = new Map(decisions.map((decision) => [decision.id, decision]));
+
+  for (const spec of specs) {
+    const raw = String(spec || "").trim();
+    const separator = raw.indexOf("=");
+    if (separator === -1) {
+      errors.push(`Decision must use <gate>=<status>[:note]: ${raw}`);
+      continue;
+    }
+
+    const gateId = raw.slice(0, separator).trim();
+    const value = raw.slice(separator + 1).trim();
+    const noteSeparator = value.indexOf(":");
+    const status = (noteSeparator === -1 ? value : value.slice(0, noteSeparator)).trim();
+    const note = noteSeparator === -1 ? "" : value.slice(noteSeparator + 1).trim();
+
+    if (!ADOPTION_DECISION_GATE_IDS.has(gateId)) {
+      errors.push(`Unknown decision gate: ${gateId}`);
+      continue;
+    }
+    if (!ADOPTION_DECISION_STATUSES.has(status)) {
+      errors.push(`Unknown decision status: ${status}`);
+      continue;
+    }
+
+    const decision = decisionById.get(gateId);
+    decision.status = status;
+    if (note) {
+      decision.note = note;
+    }
+  }
+
+  return errors;
+}
+
+function adoptionDecisionApprovalStatus(decisions) {
+  return decisions.some((decision) => decision.status !== "pending" || decision.note) ? "recorded" : "pending";
+}
+
+function adoptionDecisionRecordErrorResult(fields, errors, warnings) {
+  return {
+    kind: "adoption-decision-record",
+    target: fields.target || "n/a",
+    bundleDir: fields.bundleDir || "",
+    outputPath: fields.outputPath || "",
+    latestReport: null,
+    gateDecision: "wait",
+    nextSafeAction: "Fix adoption decision-record errors before sharing this record.",
+    approvalStatus: "pending",
+    decisions: adoptionDecisionRecordDecisions(),
+    findings: [],
+    boundaries: adoptionBundleBoundaries(),
+    errors,
+    warnings
+  };
+}
+
+function buildAdoptionDecisionRecordContent(record) {
+  const lines = [
+    "# Adoption Decision Record",
+    "",
+    `Status: ${record.approvalStatus}`,
+    "",
+    `Target: ${record.target}`,
+    `Bundle: ${record.bundleDir}`,
+    `Latest report: ${record.latestReport || "none"}`,
+    `Gate decision: ${record.gateDecision}`,
+    `Next safe action: ${record.nextSafeAction}`,
+    "",
+    "## Boundary",
+    "",
+    `- Target project files copied: ${record.boundaries.targetProjectFilesCopied}`,
+    `- Target project commands executed: ${record.boundaries.targetProjectCommandsExecuted}`,
+    `- Dynamic Workflow executed: ${record.boundaries.dynamicWorkflowExecuted}`,
+    `- Live subagents invoked: ${record.boundaries.liveSubagentsInvoked}`,
+    "",
+    "## Gate Findings",
+    ""
+  ];
+
+  if (record.findings.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const finding of record.findings) {
+      lines.push(`- ${finding.id}: ${finding.message}`);
+    }
+  }
+
+  lines.push("", "## Decisions", "");
+  for (const decision of record.decisions) {
+    lines.push(`### ${decision.title}`, "");
+    lines.push(`Status: ${decision.status}`, "");
+    lines.push(`Decision: ${decision.decision}`, "");
+    if (decision.note) {
+      lines.push(`Note: ${decision.note}`, "");
+    }
+    lines.push("Evidence:", "");
+    lines.push(`- Bundle: ${record.bundleDir}`);
+    lines.push(`- Gate decision: ${record.gateDecision}`);
+    lines.push("");
+  }
+
+  lines.push(
+    "## Required User Action",
+    "",
+    "- Fill in Gate A, Gate B, and Gate C before any target write or target command execution.",
+    "- Keep this record pending if the target project should remain read-only.",
+    "",
+    "This record does not approve target writes or command execution by itself.",
+    ""
+  );
+
+  return lines.join("\n");
+}
+
+function writeAdoptionDecisionRecord(options = {}) {
+  const bundleDir = options.bundleDir ? path.resolve(options.bundleDir) : "";
+  const outputPath = options.output ? path.resolve(options.output) : "";
+  const errors = [];
+  const warnings = [];
+
+  if (!bundleDir) {
+    errors.push("adoption decision-record requires --bundle-dir.");
+  }
+  if (!outputPath) {
+    errors.push("adoption decision-record requires --output.");
+  }
+  if (bundleDir && (!pathExists(bundleDir) || !fs.statSync(bundleDir).isDirectory())) {
+    errors.push(`Bundle directory does not exist: ${bundleDir}`);
+  }
+  if (outputPath && pathExists(outputPath)) {
+    errors.push(`Decision record already exists: ${outputPath}`);
+  }
+  if (errors.length > 0) {
+    return adoptionDecisionRecordErrorResult({ bundleDir, outputPath }, errors, warnings);
+  }
+
+  const manifestPath = path.join(bundleDir, "manifest.json");
+  if (!pathExists(manifestPath)) {
+    errors.push(`Bundle manifest is missing: ${manifestPath}`);
+    return adoptionDecisionRecordErrorResult({ bundleDir, outputPath }, errors, warnings);
+  }
+
+  let manifest;
+  try {
+    manifest = readJson(manifestPath);
+  } catch (error) {
+    errors.push(`Cannot read bundle manifest: ${error.message}`);
+    return adoptionDecisionRecordErrorResult({ bundleDir, outputPath }, errors, warnings);
+  }
+
+  const gatePath = path.join(bundleDir, "gate.md");
+  const gateMarkdown = pathExists(gatePath) ? readText(gatePath) : "";
+  const decisions = adoptionDecisionRecordDecisions();
+  const decisionSpecs = Array.isArray(options.decisions) ? options.decisions : (options.decision ? [options.decision] : []);
+  errors.push(...applyAdoptionDecisionSpecs(decisions, decisionSpecs));
+  if (errors.length > 0) {
+    return adoptionDecisionRecordErrorResult({ target: manifest.target, bundleDir, outputPath }, errors, warnings);
+  }
+
+  const record = {
+    kind: "adoption-decision-record",
+    target: manifest.target || "unknown",
+    bundleDir,
+    outputPath,
+    latestReport: manifest.latestReport || null,
+    gateDecision: manifest.gateDecision || "wait",
+    nextSafeAction: manifest.nextSafeAction || "Review adoption gate findings before initializing or changing the target project.",
+    approvalStatus: adoptionDecisionApprovalStatus(decisions),
+    decisions,
+    findings: gateMarkdown ? extractAdoptionGateFindings(gateMarkdown) : [],
+    boundaries: {
+      ...adoptionBundleBoundaries(),
+      ...(manifest.boundaries || {})
+    },
+    errors,
+    warnings
+  };
+
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, buildAdoptionDecisionRecordContent(record));
+
+  return record;
+}
+
+function adoptionApplyPlanBoundaries() {
+  return {
+    targetProjectFilesWritten: false,
+    targetProjectCommandsExecuted: false,
+    dynamicWorkflowExecuted: false,
+    liveSubagentsInvoked: false
+  };
+}
+
+function adoptionApplyPlanErrorResult(fields, errors, warnings) {
+  return {
+    kind: "adoption-apply-plan",
+    target: fields.target || "n/a",
+    bundleDir: fields.bundleDir || "",
+    outputPath: fields.outputPath || "",
+    dryRun: Boolean(fields.dryRun),
+    gateDecision: "wait",
+    applyReady: false,
+    preview: { created: [], skipped: [] },
+    requiredHarnessFiles: REQUIRED_HARNESS_FILES,
+    optionalStarterWikiFiles: OPTIONAL_STARTER_WIKI_FILES,
+    boundaries: adoptionApplyPlanBoundaries(),
+    errors,
+    warnings
+  };
+}
+
+function buildAdoptionApplyPlanContent(plan) {
+  const lines = [
+    "# Adoption Apply Plan",
+    "",
+    `Target: ${plan.target}`,
+    `Bundle: ${plan.bundleDir}`,
+    `Gate decision: ${plan.gateDecision}`,
+    `Dry run: ${plan.dryRun}`,
+    `Apply ready: ${plan.applyReady}`,
+    "",
+    "## Boundary",
+    "",
+    `- Target project files written: ${plan.boundaries.targetProjectFilesWritten}`,
+    `- Target project commands executed: ${plan.boundaries.targetProjectCommandsExecuted}`,
+    `- Dynamic Workflow executed: ${plan.boundaries.dynamicWorkflowExecuted}`,
+    `- Live subagents invoked: ${plan.boundaries.liveSubagentsInvoked}`,
+    "",
+    "## Created Preview",
+    ""
+  ];
+
+  if (plan.preview.created.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const item of plan.preview.created) {
+      lines.push(`- ${item}`);
+    }
+  }
+
+  lines.push("", "## Skipped Existing Files", "");
+  if (plan.preview.skipped.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const item of plan.preview.skipped) {
+      lines.push(`- ${item}`);
+    }
+  }
+
+  lines.push("", "## Required Harness Files", "");
+  for (const item of plan.requiredHarnessFiles) {
+    lines.push(`- ${item}`);
+  }
+
+  lines.push("", "## Optional Starter Wiki Files", "");
+  for (const item of plan.optionalStarterWikiFiles) {
+    lines.push(`- ${item}`);
+  }
+
+  lines.push(
+    "",
+    "## Required User Action",
+    "",
+    "- Review this dry-run plan before approving any target write.",
+    "- Run a separate approved command for any future non-dry-run target change.",
+    "- Treat target command execution as a separate approval step.",
+    "",
+    "This plan does not write target files or run target commands.",
+    ""
+  );
+
+  return lines.join("\n");
+}
+
+function writeAdoptionApplyPlan(options = {}) {
+  const bundleDir = options.bundleDir ? path.resolve(options.bundleDir) : "";
+  const outputPath = options.output ? path.resolve(options.output) : "";
+  const dryRun = options.dryRun === true;
+  const errors = [];
+  const warnings = [];
+
+  if (!bundleDir) {
+    errors.push("adoption apply-plan requires --bundle-dir.");
+  }
+  if (!outputPath) {
+    errors.push("adoption apply-plan requires --output.");
+  }
+  if (!dryRun) {
+    errors.push("adoption apply-plan requires --dry-run in V1.");
+  }
+  if (bundleDir && (!pathExists(bundleDir) || !fs.statSync(bundleDir).isDirectory())) {
+    errors.push(`Bundle directory does not exist: ${bundleDir}`);
+  }
+  if (outputPath && pathExists(outputPath)) {
+    errors.push(`Apply plan already exists: ${outputPath}`);
+  }
+  if (errors.length > 0) {
+    return adoptionApplyPlanErrorResult({ bundleDir, outputPath, dryRun }, errors, warnings);
+  }
+
+  const manifestPath = path.join(bundleDir, "manifest.json");
+  if (!pathExists(manifestPath)) {
+    errors.push(`Bundle manifest is missing: ${manifestPath}`);
+    return adoptionApplyPlanErrorResult({ bundleDir, outputPath, dryRun }, errors, warnings);
+  }
+
+  let manifest;
+  try {
+    manifest = readJson(manifestPath);
+  } catch (error) {
+    errors.push(`Cannot read bundle manifest: ${error.message}`);
+    return adoptionApplyPlanErrorResult({ bundleDir, outputPath, dryRun }, errors, warnings);
+  }
+
+  if (!manifest.target) {
+    errors.push("Bundle manifest must include target.");
+    return adoptionApplyPlanErrorResult({ bundleDir, outputPath, dryRun }, errors, warnings);
+  }
+
+  const preview = scaffoldHarness(manifest.target, { dryRun: true });
+  const plan = {
+    kind: "adoption-apply-plan",
+    target: path.resolve(manifest.target),
+    bundleDir,
+    outputPath,
+    dryRun: true,
+    gateDecision: manifest.gateDecision || "wait",
+    applyReady: false,
+    preview: {
+      created: preview.created,
+      skipped: preview.skipped
+    },
+    requiredHarnessFiles: REQUIRED_HARNESS_FILES,
+    optionalStarterWikiFiles: OPTIONAL_STARTER_WIKI_FILES,
+    boundaries: adoptionApplyPlanBoundaries(),
+    errors,
+    warnings
+  };
+
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, buildAdoptionApplyPlanContent(plan));
+
+  return plan;
+}
+
+function adoptionSelectedFilesBoundaries() {
+  return {
+    targetProjectFilesWritten: false,
+    targetProjectCommandsExecuted: false,
+    dynamicWorkflowExecuted: false,
+    liveSubagentsInvoked: false
+  };
+}
+
+function isSafeSelectableHarnessPath(filePath) {
+  const normalized = String(filePath || "").replace(/\\/g, "/");
+  const segments = normalized.split("/").filter(Boolean);
+  return (
+    normalized === filePath &&
+    normalized.length > 0 &&
+    !path.win32.isAbsolute(filePath) &&
+    !path.posix.isAbsolute(filePath) &&
+    !segments.includes("..")
+  );
+}
+
+function adoptionSelectedFilesErrorResult(fields, errors, warnings) {
+  return {
+    kind: "adoption-selected-files",
+    target: fields.target || "n/a",
+    bundleDir: fields.bundleDir || "",
+    outputPath: fields.outputPath || "",
+    selectedFiles: [],
+    requiredSelected: [],
+    optionalSelected: [],
+    supportSelected: [],
+    requiredHarnessFiles: REQUIRED_HARNESS_FILES,
+    optionalStarterWikiFiles: OPTIONAL_STARTER_WIKI_FILES,
+    boundaries: adoptionSelectedFilesBoundaries(),
+    errors,
+    warnings
+  };
+}
+
+function buildAdoptionSelectedFilesContent(proposal) {
+  const selected = new Set(proposal.selectedFiles);
+  const lines = [
+    "# Adoption Selected Files Proposal",
+    "",
+    `Target: ${proposal.target}`,
+    `Bundle: ${proposal.bundleDir}`,
+    `Selected files: ${proposal.selectedFiles.length}`,
+    "",
+    "## Boundary",
+    "",
+    `- Target project files written: ${proposal.boundaries.targetProjectFilesWritten}`,
+    `- Target project commands executed: ${proposal.boundaries.targetProjectCommandsExecuted}`,
+    `- Dynamic Workflow executed: ${proposal.boundaries.dynamicWorkflowExecuted}`,
+    `- Live subagents invoked: ${proposal.boundaries.liveSubagentsInvoked}`,
+    "",
+    "## Selected Files",
+    ""
+  ];
+
+  if (proposal.selectedFiles.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const filePath of proposal.selectedFiles) {
+      lines.push(`- ${filePath}`);
+    }
+  }
+
+  lines.push("", "## Required Harness Files", "");
+  for (const filePath of proposal.requiredHarnessFiles) {
+    lines.push(`- [${selected.has(filePath) ? "x" : " "}] ${filePath}`);
+  }
+
+  lines.push("", "## Optional Starter Wiki Files", "");
+  for (const filePath of proposal.optionalStarterWikiFiles) {
+    lines.push(`- [${selected.has(filePath) ? "x" : " "}] ${filePath}`);
+  }
+
+  if (proposal.supportFiles.length > 0) {
+    lines.push("", "## Support Files", "");
+    for (const filePath of proposal.supportFiles) {
+      lines.push(`- [${selected.has(filePath) ? "x" : " "}] ${filePath}`);
+    }
+  }
+
+  lines.push(
+    "",
+    "## Required User Action",
+    "",
+    "- Review selected files before approving any target write.",
+    "- Generate a new apply-plan dry-run after changing selected files.",
+    "- Treat target writes and target command execution as separate approval steps.",
+    "",
+    "This proposal does not write target files or run target commands.",
+    ""
+  );
+
+  return lines.join("\n");
+}
+
+function writeAdoptionSelectedFiles(options = {}) {
+  const bundleDir = options.bundleDir ? path.resolve(options.bundleDir) : "";
+  const outputPath = options.output ? path.resolve(options.output) : "";
+  const included = Array.isArray(options.includes) ? options.includes : (options.include ? [options.include] : []);
+  const selectedFiles = [...new Set(included.map((item) => String(item || "").trim()).filter(Boolean))];
+  const errors = [];
+  const warnings = [];
+
+  if (!bundleDir) {
+    errors.push("adoption selected-files requires --bundle-dir.");
+  }
+  if (!outputPath) {
+    errors.push("adoption selected-files requires --output.");
+  }
+  if (bundleDir && (!pathExists(bundleDir) || !fs.statSync(bundleDir).isDirectory())) {
+    errors.push(`Bundle directory does not exist: ${bundleDir}`);
+  }
+  if (outputPath && pathExists(outputPath)) {
+    errors.push(`Selected-files proposal already exists: ${outputPath}`);
+  }
+  if (errors.length > 0) {
+    return adoptionSelectedFilesErrorResult({ bundleDir, outputPath }, errors, warnings);
+  }
+
+  const manifestPath = path.join(bundleDir, "manifest.json");
+  if (!pathExists(manifestPath)) {
+    errors.push(`Bundle manifest is missing: ${manifestPath}`);
+    return adoptionSelectedFilesErrorResult({ bundleDir, outputPath }, errors, warnings);
+  }
+
+  let manifest;
+  try {
+    manifest = readJson(manifestPath);
+  } catch (error) {
+    errors.push(`Cannot read bundle manifest: ${error.message}`);
+    return adoptionSelectedFilesErrorResult({ bundleDir, outputPath }, errors, warnings);
+  }
+
+  const templateFiles = listTemplateFiles().map((item) => item.relativePath).sort();
+  const selectable = new Set(templateFiles);
+  for (const filePath of selectedFiles) {
+    if (!isSafeSelectableHarnessPath(filePath)) {
+      errors.push(`Unsafe selected file path: ${filePath}`);
+    } else if (!selectable.has(filePath)) {
+      errors.push(`Unknown selected file: ${filePath}`);
+    }
+  }
+  if (errors.length > 0) {
+    return adoptionSelectedFilesErrorResult({ target: manifest.target, bundleDir, outputPath }, errors, warnings);
+  }
+
+  const requiredSet = new Set(REQUIRED_HARNESS_FILES);
+  const optionalSet = new Set(OPTIONAL_STARTER_WIKI_FILES);
+  const supportFiles = templateFiles.filter((filePath) => !requiredSet.has(filePath) && !optionalSet.has(filePath));
+  const proposal = {
+    kind: "adoption-selected-files",
+    target: manifest.target || "unknown",
+    bundleDir,
+    outputPath,
+    selectedFiles,
+    requiredSelected: selectedFiles.filter((filePath) => requiredSet.has(filePath)),
+    optionalSelected: selectedFiles.filter((filePath) => optionalSet.has(filePath)),
+    supportSelected: selectedFiles.filter((filePath) => !requiredSet.has(filePath) && !optionalSet.has(filePath)),
+    requiredHarnessFiles: REQUIRED_HARNESS_FILES,
+    optionalStarterWikiFiles: OPTIONAL_STARTER_WIKI_FILES,
+    supportFiles,
+    boundaries: adoptionSelectedFilesBoundaries(),
+    errors,
+    warnings
+  };
+
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, buildAdoptionSelectedFilesContent(proposal));
+
+  return proposal;
+}
+
 function generateAdoptionReport(target, options = {}) {
   const targetRoot = resolveTarget(target);
   const errors = [];
@@ -2479,6 +3338,20 @@ function buildMaintenanceProposalContent(inspection) {
   } else {
     for (const item of inspection.evolutionRollup) {
       lines.push(`- ${item.finding} (${item.count} occurrences)`);
+    }
+  }
+
+  lines.push("", "## Regression Proposals", "");
+  if (!Array.isArray(inspection.regressionProposals) || inspection.regressionProposals.length === 0) {
+    lines.push("- No trace-derived regression proposals detected.");
+  } else {
+    for (const proposal of inspection.regressionProposals) {
+      lines.push(`- ${proposal.taskId}: ${proposal.assertion}`);
+      lines.push(`  - Trace input: ${proposal.traceInput}`);
+      lines.push(`  - Agent config: ${proposal.agentConfig}`);
+      lines.push(`  - Source: ${proposal.source}`);
+      lines.push(`  - Modifies tests: ${proposal.modifiesTests}`);
+      lines.push(`  - Approval required: ${proposal.approvalRequired}`);
     }
   }
 
@@ -3586,6 +4459,10 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--decision") {
       args.decision = argv[index + 1];
+      if (!Array.isArray(args.decisions)) {
+        args.decisions = [];
+      }
+      args.decisions.push(argv[index + 1]);
       index += 1;
     } else if (arg === "--evidence") {
       args.evidence = argv[index + 1];
@@ -3604,6 +4481,16 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--output-dir") {
       args.outputDir = argv[index + 1];
+      index += 1;
+    } else if (arg === "--bundle-dir") {
+      args.bundleDir = argv[index + 1];
+      index += 1;
+    } else if (arg === "--include") {
+      args.include = argv[index + 1];
+      if (!Array.isArray(args.includes)) {
+        args.includes = [];
+      }
+      args.includes.push(argv[index + 1]);
       index += 1;
     } else if (arg === "--report") {
       args.report = argv[index + 1];
@@ -3901,6 +4788,88 @@ function printResult(result, options = {}) {
     return;
   }
 
+  if (result.kind === "adoption-selected-files") {
+    console.log(`Output: ${result.outputPath || "n/a"}`);
+    console.log(`Target: ${result.target || "n/a"}`);
+    console.log(`Bundle directory: ${result.bundleDir || "n/a"}`);
+    console.log(`Selected files: ${Array.isArray(result.selectedFiles) ? result.selectedFiles.length : 0}`);
+    console.log(`Required selected: ${Array.isArray(result.requiredSelected) ? result.requiredSelected.length : 0}`);
+    console.log(`Optional selected: ${Array.isArray(result.optionalSelected) ? result.optionalSelected.length : 0}`);
+    if (Array.isArray(result.errors) && result.errors.length > 0) {
+      console.log(`Errors: ${result.errors.length}`);
+      for (const error of result.errors) {
+        console.log(`  - ${error}`);
+      }
+    } else {
+      console.log("Errors: 0");
+    }
+    return;
+  }
+
+  if (result.kind === "adoption-apply-plan") {
+    console.log(`Output: ${result.outputPath || "n/a"}`);
+    console.log(`Target: ${result.target || "n/a"}`);
+    console.log(`Bundle directory: ${result.bundleDir || "n/a"}`);
+    console.log(`Dry run: ${result.dryRun}`);
+    console.log(`Apply ready: ${result.applyReady}`);
+    console.log(`Created preview: ${result.preview ? result.preview.created.length : 0}`);
+    console.log(`Skipped existing: ${result.preview ? result.preview.skipped.length : 0}`);
+    if (Array.isArray(result.errors) && result.errors.length > 0) {
+      console.log(`Errors: ${result.errors.length}`);
+      for (const error of result.errors) {
+        console.log(`  - ${error}`);
+      }
+    } else {
+      console.log("Errors: 0");
+    }
+    return;
+  }
+
+  if (result.kind === "adoption-decision-record") {
+    console.log(`Output: ${result.outputPath || "n/a"}`);
+    console.log(`Target: ${result.target || "n/a"}`);
+    console.log(`Bundle directory: ${result.bundleDir || "n/a"}`);
+    console.log(`Gate decision: ${result.gateDecision}`);
+    console.log(`Approval status: ${result.approvalStatus}`);
+    console.log(`Decisions: ${Array.isArray(result.decisions) ? result.decisions.length : 0}`);
+    if (Array.isArray(result.decisions)) {
+      for (const decision of result.decisions) {
+        console.log(`  - ${decision.id}: ${decision.status}`);
+      }
+    }
+    if (Array.isArray(result.errors) && result.errors.length > 0) {
+      console.log(`Errors: ${result.errors.length}`);
+      for (const error of result.errors) {
+        console.log(`  - ${error}`);
+      }
+    } else {
+      console.log("Errors: 0");
+    }
+    return;
+  }
+
+  if (result.kind === "adoption-next-actions") {
+    console.log(`Output: ${result.outputPath || "n/a"}`);
+    console.log(`Target: ${result.target || "n/a"}`);
+    console.log(`Bundle directory: ${result.bundleDir || "n/a"}`);
+    console.log(`Gate decision: ${result.gateDecision}`);
+    console.log(`Approval gates: ${Array.isArray(result.approvalGates) ? result.approvalGates.length : 0}`);
+    if (Array.isArray(result.approvalGates)) {
+      for (const gate of result.approvalGates) {
+        console.log(`  - ${gate.id}: ${gate.question}`);
+      }
+    }
+    if (Array.isArray(result.errors) && result.errors.length > 0) {
+      console.log(`Errors: ${result.errors.length}`);
+      for (const error of result.errors) {
+        console.log(`  - ${error}`);
+      }
+    } else {
+      console.log("Errors: 0");
+    }
+    return;
+  }
+
   if (result.kind === "adoption-bundle") {
     console.log(`Bundle directory: ${result.outputDir || "n/a"}`);
     console.log(`Target: ${result.target || "n/a"}`);
@@ -4025,5 +4994,9 @@ module.exports = {
   validateProjectProfileData,
   validateWorkflowPackData,
   writeAdoptionReportsIndex,
+  writeAdoptionNextActions,
+  writeAdoptionDecisionRecord,
+  writeAdoptionApplyPlan,
+  writeAdoptionSelectedFiles,
   validateWiki
 };

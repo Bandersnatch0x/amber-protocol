@@ -566,6 +566,351 @@ test("adoption bundle writes a review bundle with manifest and refuses overwrite
   assert.match(JSON.parse(second.stdout).errors.join("\n"), /Bundle output directory already exists|already exists/);
 });
 
+test("adoption next-actions writes a gate checklist from a bundle and refuses overwrite", () => {
+  const root = tempDir("adoption-next-actions");
+  const reportsDir = path.join(root, "adoptions");
+  const bundleDir = path.join(root, "bundle");
+  const reportPath = path.join(reportsDir, "newer.md");
+  const output = path.join(root, "next-actions.md");
+  fs.mkdirSync(reportsDir, { recursive: true });
+  fs.mkdirSync(bundleDir, { recursive: true });
+  fs.writeFileSync(
+    reportPath,
+    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 2\n- Existing docs: 3\n- Conflicts: 0\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n\n### Unknowns\n\n- exact lint command unknown\n"
+  );
+  fs.writeFileSync(
+    path.join(bundleDir, "gate.md"),
+    "# Adoption Gate Report\n\nReport: newer.md\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\nDecision: wait\n\n## Findings\n\n- missing-harness-files: 2 Harness files are still missing.\n- candidate-commands-unconfirmed: 1 candidate command(s) require human confirmation.\n- unknowns-present: 1 unknown(s) remain unresolved.\n\n## Metrics\n\n- Existing Harness files: 0\n- Missing Harness files: 2\n- Conflicts: 0\n"
+  );
+  fs.writeFileSync(
+    path.join(bundleDir, "status.md"),
+    "# Adoption Status\n\nReports: 1\nLatest report: newer.md\nGate decision: wait\nNext safe action: Review adoption gate findings before initializing or changing the target project.\n"
+  );
+  fs.writeFileSync(
+    path.join(bundleDir, "manifest.json"),
+    `${JSON.stringify({
+      kind: "adoption-bundle",
+      target: "C:\\tmp\\ProjectA",
+      reportsDir,
+      latestReport: reportPath,
+      gateDecision: "wait",
+      nextSafeAction: "Review adoption gate findings before initializing or changing the target project.",
+      boundaries: {
+        targetProjectFilesCopied: false,
+        targetProjectCommandsExecuted: false,
+        dynamicWorkflowExecuted: false,
+        liveSubagentsInvoked: false
+      }
+    }, null, 2)}\n`
+  );
+
+  const result = runHarness(["adoption", "next-actions", "--bundle-dir", bundleDir, "--output", output, "--json"]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.kind, "adoption-next-actions");
+  assert.equal(payload.target, "C:\\tmp\\ProjectA");
+  assert.equal(payload.outputPath, output);
+  assert.equal(payload.gateDecision, "wait");
+  assert.deepEqual(payload.approvalGates.map((gate) => gate.id), ["command-confirmation", "bootstrap-write", "wiki-scope"]);
+  assert.equal(payload.boundaries.targetProjectFilesCopied, false);
+  assert.equal(payload.boundaries.targetProjectCommandsExecuted, false);
+  const content = fs.readFileSync(output, "utf8");
+  assert.match(content, /Required Harness Files Pending Approval/);
+  assert.match(content, /Candidate Command To Confirm/);
+  assert.match(content, /python -m pytest/);
+  assert.match(content, /Human Approval Gates/);
+
+  const second = runHarness(["adoption", "next-actions", "--bundle-dir", bundleDir, "--output", output, "--json"]);
+  assert.notEqual(second.status, 0);
+  assert.match(JSON.parse(second.stdout).errors.join("\n"), /Next-actions output already exists|already exists/);
+});
+
+test("adoption decision-record writes pending approval gates from a bundle and refuses overwrite", () => {
+  const root = tempDir("adoption-decision-record");
+  const bundleDir = path.join(root, "bundle");
+  const output = path.join(root, "decision-record.md");
+  fs.mkdirSync(bundleDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(bundleDir, "gate.md"),
+    "# Adoption Gate Report\n\nReport: newer.md\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\nDecision: wait\n\n## Findings\n\n- missing-harness-files: 2 Harness files are still missing.\n- candidate-commands-unconfirmed: 1 candidate command(s) require human confirmation.\n\n## Metrics\n\n- Missing Harness files: 2\n- Conflicts: 0\n"
+  );
+  fs.writeFileSync(
+    path.join(bundleDir, "manifest.json"),
+    `${JSON.stringify({
+      kind: "adoption-bundle",
+      target: "C:\\tmp\\ProjectA",
+      latestReport: "newer.md",
+      gateDecision: "wait",
+      nextSafeAction: "Review adoption gate findings before initializing or changing the target project.",
+      boundaries: {
+        targetProjectFilesCopied: false,
+        targetProjectCommandsExecuted: false,
+        dynamicWorkflowExecuted: false,
+        liveSubagentsInvoked: false
+      }
+    }, null, 2)}\n`
+  );
+
+  const result = runHarness(["adoption", "decision-record", "--bundle-dir", bundleDir, "--output", output, "--json"]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.kind, "adoption-decision-record");
+  assert.equal(payload.target, "C:\\tmp\\ProjectA");
+  assert.equal(payload.outputPath, output);
+  assert.equal(payload.gateDecision, "wait");
+  assert.equal(payload.approvalStatus, "pending");
+  assert.deepEqual(payload.decisions.map((decision) => decision.id), ["command-confirmation", "bootstrap-write", "wiki-scope"]);
+  assert.deepEqual([...new Set(payload.decisions.map((decision) => decision.status))], ["pending"]);
+  assert.equal(payload.boundaries.targetProjectFilesCopied, false);
+  assert.equal(payload.boundaries.targetProjectCommandsExecuted, false);
+  const content = fs.readFileSync(output, "utf8");
+  assert.match(content, /# Adoption Decision Record/);
+  assert.match(content, /Gate A: Command Confirmation/);
+  assert.match(content, /Gate B: Bootstrap Write/);
+  assert.match(content, /Gate C: Wiki Scope/);
+  assert.match(content, /Status: pending/);
+
+  const second = runHarness(["adoption", "decision-record", "--bundle-dir", bundleDir, "--output", output, "--json"]);
+  assert.notEqual(second.status, 0);
+  assert.match(JSON.parse(second.stdout).errors.join("\n"), /Decision record already exists|already exists/);
+});
+
+test("adoption decision-record records explicit decision statuses and notes", () => {
+  const root = tempDir("adoption-decision-record-decisions");
+  const bundleDir = path.join(root, "bundle");
+  const output = path.join(root, "decision-record.md");
+  fs.mkdirSync(bundleDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(bundleDir, "manifest.json"),
+    `${JSON.stringify({
+      kind: "adoption-bundle",
+      target: "C:\\tmp\\ProjectA",
+      latestReport: "newer.md",
+      gateDecision: "wait",
+      nextSafeAction: "Review adoption gate findings before initializing or changing the target project.",
+      boundaries: {
+        targetProjectFilesCopied: false,
+        targetProjectCommandsExecuted: false,
+        dynamicWorkflowExecuted: false,
+        liveSubagentsInvoked: false
+      }
+    }, null, 2)}\n`
+  );
+
+  const result = runHarness([
+    "adoption",
+    "decision-record",
+    "--bundle-dir",
+    bundleDir,
+    "--output",
+    output,
+    "--decision",
+    "command-confirmation=approved:Use python -m pytest",
+    "--decision",
+    "bootstrap-write=deferred:Wait for owner review",
+    "--decision",
+    "wiki-scope=rejected"
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Approval status: recorded/);
+  const content = fs.readFileSync(output, "utf8");
+  assert.match(content, /Status: approved/);
+  assert.match(content, /Note: Use python -m pytest/);
+  assert.match(content, /Status: deferred/);
+  assert.match(content, /Note: Wait for owner review/);
+  assert.match(content, /Status: rejected/);
+});
+
+test("adoption decision-record rejects unknown decision gates and statuses", () => {
+  const root = tempDir("adoption-decision-record-invalid");
+  const bundleDir = path.join(root, "bundle");
+  const output = path.join(root, "decision-record.md");
+  fs.mkdirSync(bundleDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(bundleDir, "manifest.json"),
+    `${JSON.stringify({ kind: "adoption-bundle", target: "C:\\tmp\\ProjectA" }, null, 2)}\n`
+  );
+
+  const badGate = runHarness(["adoption", "decision-record", "--bundle-dir", bundleDir, "--output", output, "--decision", "unknown-gate=approved", "--json"]);
+  assert.notEqual(badGate.status, 0);
+  assert.match(JSON.parse(badGate.stdout).errors.join("\n"), /Unknown decision gate/);
+  assert.equal(fs.existsSync(output), false);
+
+  const badStatus = runHarness(["adoption", "decision-record", "--bundle-dir", bundleDir, "--output", output, "--decision", "command-confirmation=maybe", "--json"]);
+  assert.notEqual(badStatus.status, 0);
+  assert.match(JSON.parse(badStatus.stdout).errors.join("\n"), /Unknown decision status/);
+  assert.equal(fs.existsSync(output), false);
+});
+
+test("adoption apply-plan writes a dry-run bootstrap plan and refuses overwrite", () => {
+  const root = tempDir("adoption-apply-plan");
+  const target = path.join(root, "target");
+  const bundleDir = path.join(root, "bundle");
+  const output = path.join(root, "apply-plan.md");
+  fs.mkdirSync(target, { recursive: true });
+  fs.mkdirSync(bundleDir, { recursive: true });
+  fs.writeFileSync(path.join(target, "AGENTS.md"), "# Existing agent rules\n");
+  fs.writeFileSync(
+    path.join(bundleDir, "manifest.json"),
+    `${JSON.stringify({
+      kind: "adoption-bundle",
+      target,
+      gateDecision: "wait",
+      nextSafeAction: "Review adoption gate findings before initializing or changing the target project.",
+      boundaries: {
+        targetProjectFilesCopied: false,
+        targetProjectCommandsExecuted: false,
+        dynamicWorkflowExecuted: false,
+        liveSubagentsInvoked: false
+      }
+    }, null, 2)}\n`
+  );
+
+  const result = runHarness(["adoption", "apply-plan", "--bundle-dir", bundleDir, "--output", output, "--dry-run", "--json"]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.kind, "adoption-apply-plan");
+  assert.equal(payload.target, target);
+  assert.equal(payload.outputPath, output);
+  assert.equal(payload.dryRun, true);
+  assert.equal(payload.boundaries.targetProjectFilesWritten, false);
+  assert.equal(payload.boundaries.targetProjectCommandsExecuted, false);
+  assert.ok(payload.preview.created.includes("feature_list.json"));
+  assert.ok(payload.preview.skipped.includes("AGENTS.md"));
+  const content = fs.readFileSync(output, "utf8");
+  assert.match(content, /# Adoption Apply Plan/);
+  assert.match(content, /Dry run: true/);
+  assert.match(content, /feature_list\.json/);
+  assert.match(content, /AGENTS\.md/);
+
+  const second = runHarness(["adoption", "apply-plan", "--bundle-dir", bundleDir, "--output", output, "--dry-run", "--json"]);
+  assert.notEqual(second.status, 0);
+  assert.match(JSON.parse(second.stdout).errors.join("\n"), /Apply plan already exists|already exists/);
+});
+
+test("adoption apply-plan requires dry-run in V1", () => {
+  const root = tempDir("adoption-apply-plan-no-dry-run");
+  const target = path.join(root, "target");
+  const bundleDir = path.join(root, "bundle");
+  const output = path.join(root, "apply-plan.md");
+  fs.mkdirSync(target, { recursive: true });
+  fs.mkdirSync(bundleDir, { recursive: true });
+  fs.writeFileSync(path.join(bundleDir, "manifest.json"), `${JSON.stringify({ kind: "adoption-bundle", target }, null, 2)}\n`);
+
+  const result = runHarness(["adoption", "apply-plan", "--bundle-dir", bundleDir, "--output", output, "--json"]);
+
+  assert.notEqual(result.status, 0);
+  assert.match(JSON.parse(result.stdout).errors.join("\n"), /requires --dry-run/);
+  assert.equal(fs.existsSync(output), false);
+});
+
+test("adoption selected-files writes a proposal with included files and refuses overwrite", () => {
+  const root = tempDir("adoption-selected-files");
+  const target = path.join(root, "target");
+  const bundleDir = path.join(root, "bundle");
+  const output = path.join(root, "selected-files.md");
+  fs.mkdirSync(target, { recursive: true });
+  fs.mkdirSync(bundleDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(bundleDir, "manifest.json"),
+    `${JSON.stringify({
+      kind: "adoption-bundle",
+      target,
+      gateDecision: "wait",
+      boundaries: {
+        targetProjectFilesCopied: false,
+        targetProjectCommandsExecuted: false,
+        dynamicWorkflowExecuted: false,
+        liveSubagentsInvoked: false
+      }
+    }, null, 2)}\n`
+  );
+
+  const result = runHarness([
+    "adoption",
+    "selected-files",
+    "--bundle-dir",
+    bundleDir,
+    "--output",
+    output,
+    "--include",
+    "AGENTS.md",
+    "--include",
+    "docs/wiki/index.md",
+    "--include",
+    "docs/wiki/product/feature-map.md",
+    "--json"
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.kind, "adoption-selected-files");
+  assert.equal(payload.target, target);
+  assert.equal(payload.outputPath, output);
+  assert.deepEqual(payload.selectedFiles, ["AGENTS.md", "docs/wiki/index.md", "docs/wiki/product/feature-map.md"]);
+  assert.equal(payload.requiredSelected.length, 2);
+  assert.equal(payload.optionalSelected.length, 1);
+  assert.equal(payload.boundaries.targetProjectFilesWritten, false);
+  assert.equal(payload.boundaries.targetProjectCommandsExecuted, false);
+  const content = fs.readFileSync(output, "utf8");
+  assert.match(content, /# Adoption Selected Files Proposal/);
+  assert.match(content, /Selected Files/);
+  assert.match(content, /AGENTS\.md/);
+  assert.ok(content.includes("docs/wiki/product/feature-map.md"));
+
+  const second = runHarness(["adoption", "selected-files", "--bundle-dir", bundleDir, "--output", output, "--json"]);
+  assert.notEqual(second.status, 0);
+  assert.match(JSON.parse(second.stdout).errors.join("\n"), /Selected-files proposal already exists|already exists/);
+});
+
+test("adoption selected-files rejects unknown included files", () => {
+  const root = tempDir("adoption-selected-files-invalid");
+  const target = path.join(root, "target");
+  const bundleDir = path.join(root, "bundle");
+  const output = path.join(root, "selected-files.md");
+  fs.mkdirSync(target, { recursive: true });
+  fs.mkdirSync(bundleDir, { recursive: true });
+  fs.writeFileSync(path.join(bundleDir, "manifest.json"), `${JSON.stringify({ kind: "adoption-bundle", target }, null, 2)}\n`);
+
+  const result = runHarness(["adoption", "selected-files", "--bundle-dir", bundleDir, "--output", output, "--include", "not-a-harness-file.md", "--json"]);
+
+  assert.notEqual(result.status, 0);
+  assert.match(JSON.parse(result.stdout).errors.join("\n"), /Unknown selected file/);
+  assert.equal(fs.existsSync(output), false);
+});
+
+test("adoption selected-files rejects unsafe included paths", () => {
+  const root = tempDir("adoption-selected-files-unsafe");
+  const target = path.join(root, "target");
+  const bundleDir = path.join(root, "bundle");
+  const output = path.join(root, "selected-files.md");
+  fs.mkdirSync(target, { recursive: true });
+  fs.mkdirSync(bundleDir, { recursive: true });
+  fs.writeFileSync(path.join(bundleDir, "manifest.json"), `${JSON.stringify({ kind: "adoption-bundle", target }, null, 2)}\n`);
+
+  const result = runHarness([
+    "adoption",
+    "selected-files",
+    "--bundle-dir",
+    bundleDir,
+    "--output",
+    output,
+    "--include",
+    "../AGENTS.md",
+    "--include",
+    path.join(target, "CLAUDE.md"),
+    "--json"
+  ]);
+
+  assert.notEqual(result.status, 0);
+  assert.match(JSON.parse(result.stdout).errors.join("\n"), /Unsafe selected file path/);
+  assert.equal(fs.existsSync(output), false);
+});
+
 test("wiki, handoff, and doctor commands validate a scaffolded Harness", () => {
   const target = tempDir("validators");
   assert.equal(runHarness(["init", "--target", target]).status, 0);
@@ -612,15 +957,19 @@ test("unknown command returns a clear error", () => {
 
 test("help scopes dry-run to commands that support it", () => {
   const globalHelp = runHarness(["--help"]);
+  const adoptionHelp = runHarness(["adoption", "--help"]);
   const initHelp = runHarness(["init", "--help"]);
   const wikiHelp = runHarness(["wiki", "--help"]);
   const doctorHelp = runHarness(["doctor", "--help"]);
 
   assert.equal(globalHelp.status, 0);
+  assert.equal(adoptionHelp.status, 0);
   assert.equal(initHelp.status, 0);
   assert.equal(wikiHelp.status, 0);
   assert.equal(doctorHelp.status, 0);
   assert.doesNotMatch(globalHelp.stdout, /--dry-run/);
+  assert.match(adoptionHelp.stdout, /adoption apply-plan/);
+  assert.match(adoptionHelp.stdout, /--dry-run/);
   assert.match(initHelp.stdout, /--dry-run/);
   assert.match(wikiHelp.stdout, /--dry-run/);
   assert.doesNotMatch(doctorHelp.stdout, /--dry-run/);
