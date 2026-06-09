@@ -1,0 +1,19 @@
+{
+  "id": "harness-delivery",
+  "title": "Harness Delivery Standard",
+  "version": "0.1.0",
+  "checks": [
+    {
+      "id": "user-confirmation",
+      "description": "Implementation-ready plans require explicit user confirmation."
+    },
+    {
+      "id": "verification-evidence",
+      "description": "Plans must define verification and evidence fields before acceptance."
+    },
+    {
+      "id": "scope-boundary",
+      "description": "Changes must preserve the current phase boundary unless the roadmap phase explicitly expands it."
+    }
+  ]
+}

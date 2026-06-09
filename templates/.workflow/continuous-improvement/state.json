@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "mode": "manual",
+  "activeWorkflow": null,
+  "queue": [],
+  "approvalGates": [
+    "delete files or directories",
+    "run destructive git operations",
+    "change secrets, credentials, billing, production data, or external accounts",
+    "publish, deploy, post, email, or write to external systems",
+    "add, remove, or upgrade dependencies",
+    "create or modify database migrations",
+    "perform broad codemods, mass renames, or cross-domain rewrites",
+    "change primary product behavior, major UI flows, or security boundaries"
+  ],
+  "resultNotes": []
+}

@@ -1,0 +1,43 @@
+{
+  "features": [
+    {
+      "id": "F001",
+      "priority": 1,
+      "area": "example",
+      "title": "First active feature",
+      "user_visible_behavior": "Example behavior.",
+      "status": "in_progress",
+      "verification": [
+        "Run a check"
+      ],
+      "evidence": [],
+      "notes": []
+    },
+    {
+      "id": "F002",
+      "priority": 2,
+      "area": "example",
+      "title": "Second active feature",
+      "user_visible_behavior": "Example behavior.",
+      "status": "in_progress",
+      "verification": [
+        "Run a check"
+      ],
+      "evidence": [],
+      "notes": []
+    },
+    {
+      "id": "F003",
+      "priority": 3,
+      "area": "example",
+      "title": "Passing without evidence",
+      "user_visible_behavior": "Example behavior.",
+      "status": "passing",
+      "verification": [
+        "Run a check"
+      ],
+      "evidence": [],
+      "notes": []
+    }
+  ]
+}

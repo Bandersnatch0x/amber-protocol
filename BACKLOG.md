@@ -1,0 +1,43 @@
+# Coding Harness Backlog
+
+This backlog tracks implementation status across the roadmap. V1 remains Safe Harness Bootstrap only: `init`, `audit`, `wiki`, `doctor`, and `handoff`; later phases add gated artifact and metadata flows.
+
+## Completed In Current Workflow
+
+- Unified CLI command surface: `init`, `audit`, `wiki`, `doctor`, and `handoff`.
+- `wiki` now creates missing Wiki skeleton files, skips existing files, supports `--dry-run`, and validates after creation.
+- CLI failure-path tests cover non-zero parseable JSON for `wiki`, `handoff`, and `doctor`.
+- Standalone validator wrapper tests cover broken fixture failures.
+- Audit now reports existing docs, wiki-like files, and approval-required patch suggestions.
+- Local manifest validation now checks `.codex-plugin/plugin.json` and `.claude-plugin/plugin.json`, including JSON shape, required fields, Codex interface metadata, and referenced skills paths.
+- Audit safety output now includes suggested additions, unknowns, and a next safe read-only command.
+- CLI failure behavior is covered: `wiki`, `handoff`, and `doctor` return non-zero on validation errors; failure JSON is parseable; standalone validator wrappers have spawn tests.
+- Validator coverage now includes feature-list schema branches, wiki link/path edge cases, and doctor aggregation across V1 guardrails.
+- Starter Wiki templates now include `Unknowns / Needs Confirmation` sections for product, architecture, engineering, and feature context pages; Wiki validation warns when those sections are missing.
+- Minimum Harness files and optional starter Wiki files are represented by separate constants; `doctor` accepts a minimum Harness when optional starter pages are absent and unlinked.
+- CLI help is command-specific, scopes `--dry-run` to `init` and `wiki`, and `package.json` exposes the `coding-harness` bin entry.
+- Audit reports tooling evidence from lockfiles and Python project files without inventing commands; invalid `package.json` is recorded as an unknown parse issue.
+- V1.5 target classification is implemented; product-repo `doctor` validates product checks without requiring target Harness files at repository root.
+- V1.5 sample workflow pack/profile smoke inspection is implemented without executing scripts or workflows.
+- V2 planning layer is implemented with `plan` and `gate`; plans are tied to `feature_list.json`, include vertical slices and verification, and require user confirmation before implementation-ready status.
+- V2.5 review and accept gates are implemented; review loads static standards and blocks missing confirmation, while accept appends a Harness evolution log only after review passes.
+- V3 workflow pack design kit is implemented with `pack inspect`, `pack validate`, and `profile inspect`; validation catches missing skills, broken standards, unsafe scripts, and undeclared integrations without executing workflows.
+- V4 isolated execution foundation is implemented with `task prepare` and `result inspect`; task artifacts include worktree directory, ledger, evidence pack, and replay file without relying on chat history.
+- V4.5 agent orchestration records are implemented with `agent dispatch`, `agent stop`, `agent resume`, and `agent review`; workers cannot self-approve and reviewer evidence is separate from worker output.
+- V5 team distribution is implemented with local registry metadata, team presets, rule packs, compatibility matrix, and `team inspect/install/pin/update/rollback`; updates can be previewed and target-project customizations are preserved.
+- V5.5 continuous maintenance is implemented with `maintenance inspect` and `maintenance propose`; stale knowledge, upgrade guidance, rule-pack drift, and repeated delivery findings are reported as reviewable evidence.
+
+## P0
+
+## P2
+
+No open V1, V1.5, V2, V2.5, V3, V4, V4.5, V5, or V5.5 implementation items.
+
+## Deferred
+
+- Dynamic workflow execution.
+- Live product subagent runner dispatch.
+- Automatic task command execution.
+- Model/backend routing.
+- External marketplace publishing.
+- Automatic rewrite of old project files.

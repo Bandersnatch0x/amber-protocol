@@ -1,0 +1,9 @@
+{
+  "name": "bad-json",
+  "version": "0.1.0",
+  "description": "Fixture with invalid Codex JSON.",
+  "author": {
+    "name": "Test"
+  },
+  "skills": "../skills"
+}

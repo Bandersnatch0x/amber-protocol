@@ -1,0 +1,24 @@
+{
+  "title": "Adoption Report",
+  "slug": "2026-06-09-adoption-report",
+  "status": "completed",
+  "approval": {
+    "user_confirmed": true,
+    "risky_external_steps": "not requested",
+    "destructive_steps": "not used"
+  },
+  "packets": [
+    { "id": "packet-a-tests", "status": "completed" },
+    { "id": "packet-b-implementation", "status": "completed" },
+    { "id": "packet-c-stockagents-smoke", "status": "completed" },
+    { "id": "packet-d-docs-verification", "status": "completed" },
+    { "id": "packet-e-output-dir", "status": "completed" }
+  ],
+  "verification": {
+    "targeted": "node --test tests/harness-cli.test.js: passed 13 tests",
+    "npm_test": "npm test: passed 64 tests",
+    "stockagents_smoke": "adoption report generated docs/examples/stockagents-adoption-report.md; target root Harness files absent",
+    "workflow_artifact": "verify_workflow.py .workflow\\2026-06-09-adoption-report: passed",
+    "manifests": "npm run manifests: passed with 0 errors"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "harness-delivery",
+  "name": "Harness Delivery Rule Pack",
+  "version": "1.1.0",
+  "standards": ["standards/harness-delivery.json"],
+  "rules": [
+    {
+      "id": "no-target-overwrite",
+      "severity": "error",
+      "description": "Distribution flows must not overwrite existing target project files."
+    },
+    {
+      "id": "preview-before-upgrade",
+      "severity": "error",
+      "description": "Version updates must expose a dry-run preview or require explicit confirmation."
+    },
+    {
+      "id": "separate-review-evidence",
+      "severity": "error",
+      "description": "Reviewer evidence must remain separate from worker output."
+    }
+  ]
+}

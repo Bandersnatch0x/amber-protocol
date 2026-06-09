@@ -1,0 +1,9 @@
+{
+  "name": "bad-manifests-missing-codex",
+  "version": "0.1.0",
+  "description": "Fixture with no Codex manifest.",
+  "author": {
+    "name": "Test"
+  },
+  "skills": "../skills"
+}

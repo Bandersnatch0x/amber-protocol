@@ -1,0 +1,23 @@
+{
+  "title": "Adoption Gate",
+  "slug": "2026-06-09-adoption-gate",
+  "status": "completed",
+  "mode": "simulated-subagent-driven-development",
+  "approval": {
+    "user_confirmed": true,
+    "risky_external_steps": "not requested",
+    "destructive_steps": "not used"
+  },
+  "packets": [
+    { "id": "packet-a-tests", "status": "completed" },
+    { "id": "packet-b-implementation", "status": "completed" },
+    { "id": "packet-c-stockagents-docs", "status": "completed" },
+    { "id": "packet-d-verification", "status": "completed" }
+  ],
+  "verification": {
+    "targeted": "passing",
+    "stockagents_smoke": "passing",
+    "npm_test": "passing",
+    "workflow_artifact": "passing"
+  }
+}
