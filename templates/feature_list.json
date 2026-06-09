@@ -1,0 +1,21 @@
+{
+  "features": [
+    {
+      "id": "F001",
+      "priority": 1,
+      "area": "harness",
+      "title": "Customize the repository Harness",
+      "user_visible_behavior": "A fresh agent can understand the project, run verification, and hand off work safely.",
+      "status": "not_started",
+      "verification": [
+        "Read docs/wiki/index.md and confirm core project pages are linked.",
+        "Run the standard verification command recorded in docs/wiki/engineering/verification.md.",
+        "Run node scripts/doctor.js --target . from the Coding Harness toolkit."
+      ],
+      "evidence": [],
+      "notes": [
+        "Replace this starter feature with project-specific features after the Harness is customized."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "coding-harness",
+  "version": "0.1.0",
+  "description": "Safe Harness Bootstrap for repository-local agent instructions, wiki, validation, and handoff.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "../skills"
+}

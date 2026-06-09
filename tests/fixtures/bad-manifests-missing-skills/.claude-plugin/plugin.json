@@ -1,0 +1,9 @@
+{
+  "name": "bad-manifests-missing-skills",
+  "version": "0.1.0",
+  "description": "Fixture with missing skills path.",
+  "author": {
+    "name": "Test"
+  },
+  "skills": "../missing-skills"
+}

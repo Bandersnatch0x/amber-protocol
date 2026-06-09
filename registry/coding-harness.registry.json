@@ -1,0 +1,55 @@
+{
+  "name": "coding-harness-team-registry",
+  "schemaVersion": "1.0.0",
+  "description": "Local team distribution registry for Coding Harness.",
+  "presets": [
+    {
+      "id": "safe-bootstrap",
+      "file": "team-presets/safe-bootstrap.team-preset.json"
+    }
+  ],
+  "rulePacks": [
+    {
+      "id": "harness-delivery",
+      "file": "rule-packs/harness-delivery.rule-pack.json"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "default",
+      "file": "profiles/default.profile.json"
+    }
+  ],
+  "versions": {
+    "1.0.0": {
+      "releasedAt": "2026-06-09",
+      "preset": "safe-bootstrap",
+      "profile": "profiles/default.profile.json",
+      "workflowPacks": ["workflow-packs/safe-harness-bootstrap.pack.json"],
+      "rulePacks": ["standards/harness-delivery.json"],
+      "managedProjectFiles": [],
+      "compatibility": {
+        "codex": ">=0.0.0",
+        "claudeCode": "optional",
+        "os": ["windows", "macos", "linux"],
+        "node": ">=20.0.0",
+        "profileVersion": "1.0.0"
+      }
+    },
+    "1.1.0": {
+      "releasedAt": "2026-06-09",
+      "preset": "safe-bootstrap",
+      "profile": "profiles/default.profile.json",
+      "workflowPacks": ["workflow-packs/safe-harness-bootstrap.pack.json"],
+      "rulePacks": ["rule-packs/harness-delivery.rule-pack.json", "standards/harness-delivery.json"],
+      "managedProjectFiles": [],
+      "compatibility": {
+        "codex": ">=0.0.0",
+        "claudeCode": "optional",
+        "os": ["windows", "macos", "linux"],
+        "node": ">=20.0.0",
+        "profileVersion": "1.1.0"
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "safe-harness-bootstrap",
+  "title": "Safe Harness Bootstrap",
+  "version": "0.1.0",
+  "description": "Declarative smoke pack for inspecting the V1 Safe Harness Bootstrap workflow without executing scripts.",
+  "skills": [],
+  "standards": [
+    "harness-delivery"
+  ],
+  "externalIntegrations": [],
+  "steps": [
+    {
+      "id": "audit-target",
+      "title": "Audit Target",
+      "kind": "manual",
+      "description": "Run the read-only audit command and inspect missing files, conflicts, unknowns, and next safe command."
+    },
+    {
+      "id": "initialize-or-skip",
+      "title": "Initialize Or Skip",
+      "kind": "manual",
+      "description": "Create missing Harness files only when the target has no conflicting files."
+    },
+    {
+      "id": "validate-harness",
+      "title": "Validate Harness",
+      "kind": "manual",
+      "description": "Run wiki, handoff, and doctor validation; record command output as evidence."
+    }
+  ]
+}

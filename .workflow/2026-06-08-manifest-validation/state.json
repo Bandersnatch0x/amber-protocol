@@ -1,0 +1,33 @@
+{
+  "status": "completed",
+  "created_at": "2026-06-08",
+  "goal": "Implement local manifest validation for V1.",
+  "packets": [
+    {
+      "id": "A",
+      "title": "Inspect manifest schema",
+      "status": "completed"
+    },
+    {
+      "id": "B",
+      "title": "Tests and fixtures",
+      "status": "completed"
+    },
+    {
+      "id": "C",
+      "title": "Implementation",
+      "status": "completed"
+    },
+    {
+      "id": "D",
+      "title": "Docs and verification",
+      "status": "completed"
+    }
+  ],
+  "verification": {
+    "npm_test": "passed: 26 tests",
+    "plugin_validation": "passed",
+    "cli_smoke": "passed",
+    "boundary_scan": "future roadmap references only"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "safe-bootstrap",
+  "name": "Safe Bootstrap Team Preset",
+  "description": "Team default for artifact-only Harness adoption.",
+  "profile": "profiles/default.profile.json",
+  "workflowPacks": ["workflow-packs/safe-harness-bootstrap.pack.json"],
+  "rulePacks": ["rule-packs/harness-delivery.rule-pack.json"],
+  "managedProjectFiles": []
+}

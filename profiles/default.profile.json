@@ -1,0 +1,16 @@
+{
+  "id": "default",
+  "title": "Default Coding Harness Profile",
+  "version": "0.1.0",
+  "packIds": [
+    "safe-harness-bootstrap"
+  ],
+  "standards": [
+    "harness-delivery"
+  ],
+  "environment": {
+    "requiresNetwork": false,
+    "requiresExternalWrites": false,
+    "requiresHumanApproval": true
+  }
+}

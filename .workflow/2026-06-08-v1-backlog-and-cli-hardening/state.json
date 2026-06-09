@@ -1,0 +1,60 @@
+{
+  "status": "completed",
+  "created_at": "2026-06-08",
+  "goal": "Organize remaining V1 work and advance the next safe implementation slice.",
+  "v1_boundary": {
+    "dynamic_workflow_execution": "deferred",
+    "subagent_orchestration_product_feature": "deferred",
+    "worktree_orchestration": "deferred",
+    "model_routing": "deferred",
+    "automatic_rewrite_old_project_files": "forbidden"
+  },
+  "packets": [
+    {
+      "id": "A",
+      "title": "V1 backlog and boundary review",
+      "owner": "subagent",
+      "status": "completed"
+    },
+    {
+      "id": "B",
+      "title": "CLI and validator coverage review",
+      "owner": "subagent",
+      "status": "completed"
+    },
+    {
+      "id": "C",
+      "title": "Local implementation slice",
+      "owner": "main",
+      "status": "completed",
+      "selected_slice": "audit report hardening, wiki create-or-validate, CLI failure coverage"
+    },
+    {
+      "id": "D",
+      "title": "Integration and verification",
+      "owner": "main",
+      "status": "completed"
+    }
+  ],
+  "verification": {
+    "npm_test": "passed: 42 tests",
+    "plugin_validation": "passed: local manifest validation and external Codex plugin validation",
+    "cli_smoke": "passed",
+    "boundary_scan": "clean: command surface remains init, audit, wiki, doctor, handoff; no root template instances"
+  },
+  "latest_continuation": {
+    "date": "2026-06-08",
+    "status": "completed",
+    "change": "Minimum Harness files and optional starter Wiki files are now represented separately; CLI help is command-specific; audit distinguishes confirmed commands from tooling evidence; Wiki starter context pages require Unknowns / Needs Confirmation sections; doctor still requires a real PROGRESS.md Next Action or Next Actions section with non-placeholder content.",
+    "verification": [
+      "node --test tests/scaffold-harness.test.js: passed 10 tests",
+      "node --test tests/validate-wiki.test.js: passed 6 tests",
+      "node --test tests/harness-cli.test.js: passed 9 tests",
+      "npm test: passed 42 tests",
+      "npm run manifests: Errors 0",
+      "external Codex plugin validation: passed",
+      "root safety check: no root template instances found",
+      "V1 boundary scan: clean"
+    ]
+  }
+}

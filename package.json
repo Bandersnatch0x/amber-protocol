@@ -1,0 +1,21 @@
+{
+  "name": "coding-harness",
+  "version": "0.1.0",
+  "description": "Safe Harness Bootstrap toolkit for repository-local agent instructions, wiki, validation, and handoff.",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "coding-harness": "scripts/harness.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --test",
+    "doctor": "node scripts/harness.js doctor --target .",
+    "handoff": "node scripts/harness.js handoff --target .",
+    "manifests": "node scripts/validate-manifests.js --target ."
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "license": "UNLICENSED"
+}
