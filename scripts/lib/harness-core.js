@@ -695,6 +695,26 @@ function dispatchAgentTask(target, options = {}) {
   if (!pathExists(path.join(targetRoot, ".harness", "executions", taskId, "ledger.json"))) {
     errors.push(`Prepared task ledger is missing for ${taskId}.`);
   }
+
+  // Validate loop contract status values
+  const VALID_HARD_STOP_STATUSES = new Set(["not-recorded", "within-limits", "hit-limit"]);
+  const VALID_BUDGET_STATUSES = new Set(["not-recorded", "within-budget", "over-budget"]);
+  const VALID_REVIEW_BANDWIDTH_STATUSES = new Set(["not-recorded", "available", "saturated"]);
+  const VALID_REVIEW_GATE_STATUSES = new Set(["pending", "satisfied", "blocked"]);
+
+  if (options.hardStopStatus && !VALID_HARD_STOP_STATUSES.has(options.hardStopStatus)) {
+    errors.push(`Invalid hardStopStatus: ${options.hardStopStatus}. Must be one of: not-recorded, within-limits, hit-limit.`);
+  }
+  if (options.budgetStatus && !VALID_BUDGET_STATUSES.has(options.budgetStatus)) {
+    errors.push(`Invalid budgetStatus: ${options.budgetStatus}. Must be one of: not-recorded, within-budget, over-budget.`);
+  }
+  if (options.reviewBandwidthStatus && !VALID_REVIEW_BANDWIDTH_STATUSES.has(options.reviewBandwidthStatus)) {
+    errors.push(`Invalid reviewBandwidthStatus: ${options.reviewBandwidthStatus}. Must be one of: not-recorded, available, saturated.`);
+  }
+  if (options.reviewGateStatus && !VALID_REVIEW_GATE_STATUSES.has(options.reviewGateStatus)) {
+    errors.push(`Invalid reviewGateStatus: ${options.reviewGateStatus}. Must be one of: pending, satisfied, blocked.`);
+  }
+
   if (errors.length > 0) {
     return { target: targetRoot, task: taskId || null, errors, warnings };
   }
@@ -712,6 +732,13 @@ function dispatchAgentTask(target, options = {}) {
     reviewerEvidence: null,
     controls: { stop: true, resume: true },
     workersCannotSelfApprove: true,
+    loop: {
+      contractId: options.loopContract || null,
+      hardStopStatus: options.hardStopStatus || "not-recorded",
+      budgetStatus: options.budgetStatus || "not-recorded",
+      reviewBandwidthStatus: options.reviewBandwidthStatus || "not-recorded",
+      reviewGateStatus: options.reviewGateStatus || "pending"
+    },
     createdAt: new Date().toISOString()
   };
   fs.writeFileSync(paths.dispatchPath, JSON.stringify(dispatch, null, 2));
@@ -751,6 +778,16 @@ function recordAgentReview(target, options = {}) {
       errors.push("Reviewer evidence must be recorded by the assigned reviewer.");
       return { target: targetRoot, task: taskId, errors, warnings };
     }
+
+    // Validate reviewGateStatus if provided
+    if (options.reviewGateStatus) {
+      const VALID_REVIEW_GATE_STATUSES = new Set(["pending", "satisfied", "blocked"]);
+      if (!VALID_REVIEW_GATE_STATUSES.has(options.reviewGateStatus)) {
+        errors.push(`Invalid reviewGateStatus: ${options.reviewGateStatus}. Must be one of: pending, satisfied, blocked.`);
+        return { target: targetRoot, task: taskId, errors, warnings };
+      }
+    }
+
     const reviewerEvidence = {
       taskId,
       reviewer: options.reviewer,
@@ -762,6 +799,22 @@ function recordAgentReview(target, options = {}) {
     fs.writeFileSync(paths.reviewerEvidencePath, JSON.stringify(reviewerEvidence, null, 2));
     dispatch.reviewerEvidence = relativeSlash(targetRoot, paths.reviewerEvidencePath);
     dispatch.status = "reviewed";
+
+    // Update loop reviewGateStatus if provided
+    if (options.reviewGateStatus) {
+      if (!dispatch.loop) {
+        dispatch.loop = {
+          contractId: null,
+          hardStopStatus: "not-recorded",
+          budgetStatus: "not-recorded",
+          reviewBandwidthStatus: "not-recorded",
+          reviewGateStatus: options.reviewGateStatus
+        };
+      } else {
+        dispatch.loop.reviewGateStatus = options.reviewGateStatus;
+      }
+    }
+
     fs.writeFileSync(paths.dispatchPath, JSON.stringify(dispatch, null, 2));
     return { target: targetRoot, task: taskId, reviewerEvidence, dispatch, errors, warnings };
   } catch (error) {
@@ -3575,6 +3628,21 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--regression-assertion") {
       args.regressionAssertion = argv[index + 1];
+      index += 1;
+    } else if (arg === "--loop-contract") {
+      args.loopContract = argv[index + 1];
+      index += 1;
+    } else if (arg === "--hard-stop-status") {
+      args.hardStopStatus = argv[index + 1];
+      index += 1;
+    } else if (arg === "--budget-status") {
+      args.budgetStatus = argv[index + 1];
+      index += 1;
+    } else if (arg === "--review-bandwidth-status") {
+      args.reviewBandwidthStatus = argv[index + 1];
+      index += 1;
+    } else if (arg === "--review-gate-status") {
+      args.reviewGateStatus = argv[index + 1];
       index += 1;
     } else if (arg === "--json") {
       args.json = true;
