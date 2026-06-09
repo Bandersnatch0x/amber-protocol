@@ -69,3 +69,34 @@ test("task prepare blocks unconfirmed plans", () => {
   assert.match(JSON.parse(result.stdout).errors.join("\n"), /User confirmation is required/);
 });
 
+test("task prepare records trace-derived replay and regression proposal", () => {
+  const target = tempDir("trace-regression");
+  assert.equal(runHarness(["init", "--target", target]).status, 0);
+  assert.equal(runHarness(["plan", "--target", target, "--feature", "F001", "--title", "Trace regression"]).status, 0);
+  const plan = "docs/plans/F001-trace-regression.md";
+  const planPath = path.join(target, plan);
+  fs.writeFileSync(planPath, fs.readFileSync(planPath, "utf8").replace("User Confirmation: pending", "User Confirmation: confirmed"));
+
+  const result = runHarness([
+    "task", "prepare",
+    "--target", target,
+    "--plan", plan,
+    "--task", "trace-failure",
+    "--trace-input", "fixtures/traces/failing-input.json",
+    "--agent-config", "crm-agent-v2",
+    "--regression-assertion", "The response must include specific deal details, not just a count",
+    "--json"
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.traceReplay.traceInput, "fixtures/traces/failing-input.json");
+  assert.equal(payload.regressionProposal.assertion, "The response must include specific deal details, not just a count");
+
+  const evidence = JSON.parse(fs.readFileSync(path.join(target, ".harness", "executions", "trace-failure", "evidence.json"), "utf8"));
+  assert.equal(evidence.traceReplay.traceInput, "fixtures/traces/failing-input.json");
+  assert.equal(evidence.traceReplay.agentConfig, "crm-agent-v2");
+  assert.equal(evidence.regressionProposal.status, "proposed");
+  assert.equal(evidence.regressionProposal.modifiesTests, false);
+});
+
