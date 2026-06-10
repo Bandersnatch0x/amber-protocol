@@ -85,6 +85,7 @@ const COMMANDS = [
 	"route",
 	"session",
 	"migrate",
+	"daemon",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
@@ -586,6 +587,57 @@ async function run(argv = process.argv.slice(2)) {
 		}
 		printResult(result, { json: true });
 		return 0;
+	} else if (command === "daemon") {
+		const action = args._ && args._[0];
+		const { stopDaemon, getDaemonStatus } = require("./lib/daemon");
+
+		if (action === "status") {
+			const status = getDaemonStatus(process.cwd());
+			const text = status.running
+				? `Daemon running (PID: ${status.pid})`
+				: "Daemon not running";
+			result = {
+				target: args.target,
+				text,
+				errors: [],
+				warnings: [],
+			};
+			if (!args.json) {
+				console.log(text);
+				return status.running ? 0 : 1;
+			}
+			printResult(result, { json: true });
+			return status.running ? 0 : 1;
+		}
+
+		if (action === "stop") {
+			const stopResult = stopDaemon(process.cwd());
+			result = {
+				target: args.target,
+				text: stopResult.success ? "Daemon stopped" : stopResult.error,
+				errors: stopResult.success ? [] : [stopResult.error],
+				warnings: [],
+			};
+			if (!args.json) {
+				console.log(stopResult.success ? "Daemon stopped" : stopResult.error);
+				return stopResult.success ? 0 : 1;
+			}
+			printResult(result, { json: true });
+			return stopResult.success ? 0 : 1;
+		}
+
+		result = {
+			target: args.target,
+			text: "Usage: harness daemon <status|stop>",
+			errors: ["Unknown daemon subcommand"],
+			warnings: [],
+		};
+		if (!args.json) {
+			console.log("Usage: harness daemon <status|stop>");
+			return 1;
+		}
+		printResult(result, { json: true });
+		return 1;
 	} else if (command === "doctor") {
 		result = doctor(args.target);
 	} else {
