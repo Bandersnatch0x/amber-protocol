@@ -22,6 +22,15 @@ function executeCommand(command, options = {}) {
 async function executeStage(stage, options = {}) {
 	const { type, name, target } = stage;
 
+	if (options.dryRun) {
+		return {
+			success: true,
+			stage: name,
+			type,
+			message: `Dry-run: would execute ${type} stage "${name}"`,
+		};
+	}
+
 	if (type === "command") {
 		const result = executeCommand(target, options);
 		return {
