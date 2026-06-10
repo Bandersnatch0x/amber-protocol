@@ -98,6 +98,27 @@
 			"dispatchAgentTask",
 			"setAgentDispatchStatus",
 			"recordAgentReview"
+		],
+		"team": [
+			"resolveRegistryPath",
+			"validateTeamRegistryData",
+			"loadTeamRegistry",
+			"compareSemver",
+			"latestTeamVersion",
+			"findTeamVersion",
+			"teamStatePaths",
+			"summarizeTeamRegistry",
+			"buildCompatibilityMatrix",
+			"buildTeamLock",
+			"writeTeamSnapshot",
+			"loadTeamLock",
+			"inspectTeamDistribution",
+			"installTeamDistribution",
+			"diffArtifactLists",
+			"buildTeamUpdatePreview",
+			"updateTeamDistribution",
+			"pinTeamDistribution",
+			"rollbackTeamDistribution"
 		]
 	}
 }
