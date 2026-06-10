@@ -159,6 +159,23 @@
 			"hasPluginManifestDirectory",
 			"doctorProductRepo",
 			"doctor"
+		],
+		"adoption-reports": [
+			"ADOPTION_COMPARE_METRICS",
+			"buildAdoptionReportContent",
+			"uniqueAdoptionReportPath",
+			"parseAdoptionReportMetadata",
+			"listAdoptionReports",
+			"buildAdoptionReportsIndexContent",
+			"writeAdoptionReportsIndex",
+			"validateAdoptionReports",
+			"readAdoptionReportMetric",
+			"parseAdoptionReportForComparison",
+			"compareStringLists",
+			"buildMetricComparison",
+			"buildAdoptionReportDiffContent",
+			"compareAdoptionReports",
+			"generateAdoptionReport"
 		]
 	}
 }
