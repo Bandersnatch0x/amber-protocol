@@ -13,7 +13,8 @@
     "doctor": "node scripts/harness.js doctor --target .",
     "handoff": "node scripts/harness.js handoff --target .",
     "manifests": "node scripts/validate-manifests.js --target .",
-    "test:load": "node --test tests/load/"
+    "test:load": "node --test tests/load/sequential-sessions.test.js",
+    "test:e2e": "node --test tests/e2e/"
   },
   "engines": {
     "node": ">=18.17"
