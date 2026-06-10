@@ -41,6 +41,12 @@ async function checkGate(gate, context = {}, options = {}) {
 	}
 
 	if (type === "user-approval") {
+		if (typeof options.autoApprove === "function") {
+			if (options.autoApprove(gate)) {
+				return { passed: true, gateId: gate.id, type, autoApproved: true };
+			}
+			return { passed: false, gateId: gate.id, type, autoApproved: false };
+		}
 		const prompt = (description || "Proceed to next stage?") + " (yes/no): ";
 		const answer = await promptUser(prompt, options.input);
 		const passed = answer === "yes" || answer === "y";
@@ -48,6 +54,12 @@ async function checkGate(gate, context = {}, options = {}) {
 	}
 
 	if (type === "step-confirm") {
+		if (typeof options.autoApprove === "function") {
+			if (options.autoApprove(gate)) {
+				return { passed: true, gateId: gate.id, type, autoApproved: true };
+			}
+			return { passed: false, gateId: gate.id, type, autoApproved: false };
+		}
 		const prompt = (description || "Continue?") + " (y/n): ";
 		const answer = await promptUser(prompt, options.input);
 		const passed = answer === "y" || answer === "yes";
