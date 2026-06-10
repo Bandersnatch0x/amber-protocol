@@ -1,6 +1,9 @@
 "use strict";
 
 const { spawnSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const { saveCheckpoint } = require("./checkpoint-manager");
 
 function executeCommand(command, options = {}) {
 	const result = spawnSync(command, {
@@ -67,4 +70,100 @@ async function executeStages(stages, options, shouldContinue) {
 	return results;
 }
 
-module.exports = { executeStage, executeStages, executeCommand };
+function getWorktreeState(projectRoot, sessionId) {
+	const { execSync } = require("child_process");
+	const worktreePath = path.join(
+		projectRoot,
+		".harness",
+		"worktrees",
+		sessionId,
+	);
+
+	if (!fs.existsSync(worktreePath)) {
+		return { branch: null, commit: null, uncommittedFiles: [] };
+	}
+
+	try {
+		const branch = execSync("git rev-parse --abbrev-ref HEAD", {
+			cwd: worktreePath,
+			encoding: "utf8",
+		}).trim();
+		const commit = execSync("git rev-parse HEAD", {
+			cwd: worktreePath,
+			encoding: "utf8",
+		}).trim();
+		const statusOutput = execSync("git status --porcelain", {
+			cwd: worktreePath,
+			encoding: "utf8",
+		});
+		const uncommittedFiles = statusOutput
+			? statusOutput
+					.trim()
+					.split("\n")
+					.map((line) => line.substring(3))
+			: [];
+
+		return { branch, commit, uncommittedFiles };
+	} catch {
+		return { branch: null, commit: null, uncommittedFiles: [] };
+	}
+}
+
+async function executeStagesWithCheckpoints(
+	stages,
+	projectRoot,
+	sessionId,
+	manifest,
+	options,
+	shouldContinue,
+) {
+	const results = [];
+	const updatedManifest = JSON.parse(JSON.stringify(manifest));
+	updatedManifest.completedStages = updatedManifest.completedStages || [];
+
+	for (let i = 0; i < stages.length; i++) {
+		const stage = stages[i];
+
+		if (!shouldContinue()) break;
+
+		const worktreeState = getWorktreeState(projectRoot, sessionId);
+		saveCheckpoint(
+			projectRoot,
+			sessionId,
+			`${stage.name}-before`,
+			updatedManifest,
+			worktreeState,
+		);
+
+		const result = await executeStage(stage, options);
+		results.push(result);
+
+		if (result.success) {
+			updatedManifest.completedStages = [
+				...updatedManifest.completedStages,
+				stage.name,
+			];
+			updatedManifest.currentStage = stages[i + 1]?.name || null;
+		}
+
+		saveCheckpoint(
+			projectRoot,
+			sessionId,
+			stage.name,
+			updatedManifest,
+			worktreeState,
+		);
+
+		if (!result.success && !stage.optional) break;
+	}
+
+	return results;
+}
+
+module.exports = {
+	executeStage,
+	executeStages,
+	executeStagesWithCheckpoints,
+	executeCommand,
+	getWorktreeState,
+};

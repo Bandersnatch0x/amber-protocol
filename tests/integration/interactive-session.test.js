@@ -112,7 +112,7 @@ describe("Interactive Session Integration", () => {
 			{ encoding: "utf8", cwd: ROOT },
 		);
 		assert.strictEqual(continueResult.status, 0);
-		assert.match(continueResult.stdout, /Ready to continue/);
+		assert.match(continueResult.stdout, /Session resumed/);
 	});
 
 	it("session --help includes continue", () => {
