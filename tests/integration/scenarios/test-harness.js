@@ -80,7 +80,10 @@ class IntegrationTestHarness {
 
 		const timelinePath = path.join(sessionDir, "timeline.jsonl");
 		const writer = new TimelineWriter(timelinePath);
-		writer.append({ type: "session_created", data: { sessionId: manifest.sessionId, goal } });
+		writer.append({
+			type: "session_created",
+			data: { sessionId: manifest.sessionId, goal },
+		});
 		writer.close();
 
 		return { sessionDir, manifest };
@@ -98,7 +101,6 @@ class IntegrationTestHarness {
 		const result = await executeSession(sessionDir, manifest, route, options);
 		return result;
 	}
-
 
 	/**
 	 * Run a route pipeline through the given stages.

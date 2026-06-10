@@ -54,7 +54,12 @@ async function executeAutonomous(projectRoot, sessionId, options = {}) {
 				dryRun: options.dryRun,
 			});
 		} catch (err) {
-			return { success: false, exitCode: 1, error: err.message, attempts: attempt };
+			return {
+				success: false,
+				exitCode: 1,
+				error: err.message,
+				attempts: attempt,
+			};
 		}
 
 		if (sessionResult.success) {
