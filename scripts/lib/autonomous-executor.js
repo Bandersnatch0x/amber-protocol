@@ -47,10 +47,15 @@ async function executeAutonomous(projectRoot, sessionId, options = {}) {
 	while (attempt < retryConfig.maxAttempts) {
 		attempt++;
 
-		const sessionResult = await executeSession(sessionDir, manifest, route, {
-			autoApprove: (gate) => shouldAutoApproveGate(gate.type, policy),
-			dryRun: options.dryRun,
-		});
+		let sessionResult;
+		try {
+			sessionResult = await executeSession(sessionDir, manifest, route, {
+				autoApprove: (gate) => shouldAutoApproveGate(gate.type, policy),
+				dryRun: options.dryRun,
+			});
+		} catch (err) {
+			return { success: false, exitCode: 1, error: err.message, attempts: attempt };
+		}
 
 		if (sessionResult.success) {
 			return {

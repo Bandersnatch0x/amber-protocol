@@ -15,7 +15,7 @@ describe("sequential sessions load test", () => {
       const result = spawnSync(process.execPath, [
         path.join(ROOT, "scripts/harness.js"),
         "session", "start",
-        "--goal", `implement load test ${i}`,
+        "--goal", `implement load test feature ${i}`,
         "--json"
       ], { cwd: ROOT, encoding: "utf8", timeout: 10000 });
 

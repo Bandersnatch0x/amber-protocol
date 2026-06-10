@@ -18,10 +18,10 @@ class Logger {
 
 	log(level, message, data = {}) {
 		const entry = {
+			...data,
 			timestamp: new Date().toISOString(),
 			level,
 			message,
-			...data,
 		};
 
 		fs.appendFileSync(this.filePath, JSON.stringify(entry) + "\n", "utf8");
