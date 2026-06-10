@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["timestamp", "type"],
+  "properties": {
+    "timestamp": { "type": "string", "format": "date-time" },
+    "type": {
+      "enum": [
+        "session_created", "route_selected", "stage_started", "stage_completed",
+        "stage_failed", "gate_triggered", "gate_passed", "gate_failed",
+        "checkpoint_created", "session_paused", "session_resumed", "session_completed",
+        "session_failed", "session_aborted", "budget_warning", "budget_exceeded", "error"
+      ]
+    },
+    "stage": { "type": "string" },
+    "data": { "type": "object" },
+    "error": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "stack": { "type": "string" },
+        "recoverable": { "type": "boolean" }
+      }
+    }
+  }
+}

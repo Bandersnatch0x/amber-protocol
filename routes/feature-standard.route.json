@@ -1,0 +1,21 @@
+{
+  "routeId": "feature-standard",
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "displayName": "Standard Feature Development",
+  "description": "Complete feature delivery with planning and review",
+  "trigger": {
+    "goalPattern": "^(add|implement|create|build)\\s+.*feature",
+    "complexity": "medium"
+  },
+  "stages": [
+    { "name": "capture", "displayName": "Capture Requirements", "type": "skill", "target": "requirement-clarification", "gateAfter": "user-approval-plan" },
+    { "name": "plan", "displayName": "Create Plan", "type": "pack", "target": "feature-planning", "gateAfter": "user-approval-implement" },
+    { "name": "implement", "displayName": "Implement Feature", "type": "pack", "target": "tdd-implementation" },
+    { "name": "verify", "displayName": "Run Verification", "type": "command", "target": "npm test" }
+  ],
+  "gates": [
+    { "id": "user-approval-plan", "type": "user-approval", "description": "Approve plan before implementation?" },
+    { "id": "user-approval-implement", "type": "user-approval", "description": "Proceed with implementation?" }
+  ]
+}
