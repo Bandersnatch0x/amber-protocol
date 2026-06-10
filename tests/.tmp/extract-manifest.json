@@ -176,6 +176,14 @@
 			"buildAdoptionReportDiffContent",
 			"compareAdoptionReports",
 			"generateAdoptionReport"
+		],
+		"adoption-gate": [
+			"adoptionGateFindings",
+			"buildAdoptionGateContent",
+			"gateAdoptionReport",
+			"nextAdoptionStatusAction",
+			"buildAdoptionStatusContent",
+			"statusAdoptionReports"
 		]
 	}
 }
