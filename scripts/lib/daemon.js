@@ -13,7 +13,7 @@ function startDaemon(projectRoot, sessionId, options = {}) {
 	}
 
 	if (fs.existsSync(pidPath)) {
-		const pid = parseInt(fs.readFileSync(pidPath, "utf8"));
+		const pid = parseInt(fs.readFileSync(pidPath, "utf8"), 10);
 		if (isProcessRunning(pid)) {
 			return { success: false, error: "Daemon already running", pid };
 		}
@@ -55,7 +55,7 @@ function stopDaemon(projectRoot, options = {}) {
 		return { success: false, error: "No daemon running" };
 	}
 
-	const pid = parseInt(fs.readFileSync(pidPath, "utf8"));
+	const pid = parseInt(fs.readFileSync(pidPath, "utf8"), 10);
 
 	if (!isProcessRunning(pid)) {
 		fs.unlinkSync(pidPath);
@@ -84,7 +84,7 @@ function getDaemonStatus(projectRoot) {
 		return { running: false };
 	}
 
-	const pid = parseInt(fs.readFileSync(pidPath, "utf8"));
+	const pid = parseInt(fs.readFileSync(pidPath, "utf8"), 10);
 	const running = isProcessRunning(pid);
 
 	if (!running) {

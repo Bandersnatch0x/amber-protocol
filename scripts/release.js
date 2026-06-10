@@ -40,7 +40,9 @@ function bumpVersion(currentVersion, bump) {
 	} else if (/^\d+\.\d+\.\d+$/.test(bump)) {
 		return bump;
 	} else {
-		throw new Error(`Invalid bump type: ${bump}. Use major, minor, patch, or explicit version.`);
+		throw new Error(
+			`Invalid bump type: ${bump}. Use major, minor, patch, or explicit version.`,
+		);
 	}
 	return parts.join(".");
 }
@@ -55,7 +57,9 @@ function release(bumpType = "minor") {
 
 	const status = run("git status --porcelain");
 	if (status) {
-		console.error("   ERROR: Working directory is not clean. Commit or stash changes first.");
+		console.error(
+			"   ERROR: Working directory is not clean. Commit or stash changes first.",
+		);
 		process.exit(1);
 	}
 	console.log("   ✅ Working directory clean");
@@ -106,7 +110,9 @@ See CHANGELOG.md for details.`;
 
 	// 8. GitHub release instructions
 	console.log("\n8. GitHub Release...");
-	console.log(`   Create release at: https://github.com/coding-harness/releases/new?tag=v${newVersion}`);
+	console.log(
+		`   Create release at: https://github.com/coding-harness/releases/new?tag=v${newVersion}`,
+	);
 	console.log("   - Title: Coding Harness Phase B v" + newVersion);
 	console.log("   - Attach: CHANGELOG.md");
 	console.log("   - Mark as: Latest release");
@@ -126,9 +132,11 @@ if (bumpType === "--help" || bumpType === "-h") {
 	process.exit(0);
 }
 
-try {
-	release(bumpType);
-} catch (e) {
-	console.error("ERROR:", e.message);
-	process.exit(1);
+if (require.main === module) {
+	try {
+		release(bumpType);
+	} catch (e) {
+		console.error("ERROR:", e.message);
+		process.exit(1);
+	}
 }
