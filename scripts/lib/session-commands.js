@@ -297,6 +297,22 @@ async function continueSession(projectRoot, options) {
 		return result(`Cannot continue session with status: ${manifest.status}`, 1);
 	}
 
+	// Autonomous mode: delegate to autonomous executor
+	if (manifest.mode === "autonomous") {
+		const { executeAutonomous } = require("./autonomous-executor");
+		const autoResult = await executeAutonomous(projectRoot, sessionId, options);
+
+		if (autoResult.exitCode === 2) {
+			return result("Session paused due to budget", 2);
+		}
+
+		if (!autoResult.success) {
+			return result(`Session failed: ${autoResult.error}`, 1);
+		}
+
+		return result(`Session completed: ${autoResult.stagesCompleted} stages`, 0);
+	}
+
 	let checkpoint;
 	if (fromCheckpoint) {
 		checkpoint = loadCheckpointByStage(projectRoot, sessionId, fromCheckpoint);
