@@ -1,6 +1,7 @@
 "use strict";
 
-const SUPPORTED_VERSIONS = ["1.0.0"];
+const SCHEMA_VERSION = "1.0.0";
+const SUPPORTED_VERSIONS = [SCHEMA_VERSION];
 
 function checkSchemaVersion(manifest) {
 	if (!manifest.schemaVersion) {
@@ -21,4 +22,4 @@ function checkSchemaVersion(manifest) {
 	return { valid: true };
 }
 
-module.exports = { checkSchemaVersion, SUPPORTED_VERSIONS };
+module.exports = { checkSchemaVersion, SUPPORTED_VERSIONS, SCHEMA_VERSION };

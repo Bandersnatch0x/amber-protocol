@@ -586,8 +586,11 @@ async function run(argv = process.argv.slice(2)) {
 		}
 		printResult(result, { json: true });
 		return 0;
-	} else {
+	} else if (command === "doctor") {
 		result = doctor(args.target);
+	} else {
+		console.error(`No handler registered for command: ${command}`);
+		return 1;
 	}
 
 	printResult(result, { json: args.json, summary: args.summary });

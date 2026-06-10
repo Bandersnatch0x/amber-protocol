@@ -2,12 +2,8 @@
 
 const fs = require("fs");
 const path = require("path");
-
-const CURRENT_SCHEMA_VERSION = "1.0.0";
-
-function getSessionsDir(projectRoot) {
-	return path.join(projectRoot, ".harness", "sessions");
-}
+const { getSessionsDir } = require("./session-commands");
+const { SCHEMA_VERSION } = require("./schema-version-checker");
 
 function migrateManifests(projectRoot, options = {}) {
 	const { dryRun = false } = options;
@@ -41,11 +37,9 @@ function migrateManifests(projectRoot, options = {}) {
 		);
 		const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
-		if (manifest.schemaVersion === CURRENT_SCHEMA_VERSION) {
+		if (manifest.schemaVersion === SCHEMA_VERSION) {
 			skipped++;
-			logs.push(
-				`Skipped ${sessionDirName}: already at ${CURRENT_SCHEMA_VERSION}`,
-			);
+			logs.push(`Skipped ${sessionDirName}: already at ${SCHEMA_VERSION}`);
 			continue;
 		}
 
@@ -55,14 +49,14 @@ function migrateManifests(projectRoot, options = {}) {
 			const backupPath = manifestPath + ".backup";
 			fs.copyFileSync(manifestPath, backupPath);
 
-			manifest.schemaVersion = CURRENT_SCHEMA_VERSION;
+			manifest.schemaVersion = SCHEMA_VERSION;
 			fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 			logs.push(
-				`Migrated ${sessionDirName}: ${originalVersion || "missing"} → ${CURRENT_SCHEMA_VERSION}`,
+				`Migrated ${sessionDirName}: ${originalVersion || "missing"} → ${SCHEMA_VERSION}`,
 			);
 		} else {
 			logs.push(
-				`Would migrate ${sessionDirName}: ${manifest.schemaVersion || "missing"} → ${CURRENT_SCHEMA_VERSION}`,
+				`Would migrate ${sessionDirName}: ${manifest.schemaVersion || "missing"} → ${SCHEMA_VERSION}`,
 			);
 		}
 
@@ -81,4 +75,4 @@ function migrateManifests(projectRoot, options = {}) {
 	};
 }
 
-module.exports = { migrateManifests, CURRENT_SCHEMA_VERSION };
+module.exports = { migrateManifests, CURRENT_SCHEMA_VERSION: SCHEMA_VERSION };
