@@ -11,6 +11,20 @@
 			"REQUIRED_HANDOFF_SECTIONS",
 			"WIKI_CONTEXT_STARTER_FILES",
 			"SEMVER_PATTERN"
+		],
+		"fs-utils": [
+			"AUDIT_IGNORED_DIRECTORY_NAMES",
+			"resolveTarget",
+			"pathExists",
+			"readText",
+			"readJson",
+			"writeJson",
+			"walkFiles",
+			"isIgnoredAuditPath",
+			"walkProjectFiles",
+			"relativeSlash",
+			"repoRelativePath",
+			"fileContains"
 		]
 	}
 }
