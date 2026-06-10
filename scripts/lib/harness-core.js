@@ -2010,28 +2010,6 @@ function writeAdoptionReportsIndex(options = {}) {
 	};
 }
 
-function isLocalMarkdownLink(linkTarget) {
-	return (
-		Boolean(linkTarget) &&
-		!/^[a-z][a-z0-9+.-]*:/i.test(linkTarget) &&
-		!linkTarget.startsWith("#") &&
-		linkTarget.split(/[?#]/)[0].toLowerCase().endsWith(".md")
-	);
-}
-
-function extractMarkdownLinks(content) {
-	const links = [];
-	const pattern = /\[[^\]]+\]\(([^)]+)\)/g;
-	let match = pattern.exec(content);
-	while (match) {
-		const linkTarget = match[1].trim();
-		if (isLocalMarkdownLink(linkTarget)) {
-			links.push(linkTarget);
-		}
-		match = pattern.exec(content);
-	}
-	return links;
-}
 
 function isInsideDirectory(parentDir, childPath) {
 	const relativePath = path.relative(parentDir, childPath);
