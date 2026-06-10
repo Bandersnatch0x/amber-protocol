@@ -184,6 +184,19 @@
 			"nextAdoptionStatusAction",
 			"buildAdoptionStatusContent",
 			"statusAdoptionReports"
+		],
+		"adoption-bundle": [
+			"adoptionBundleBoundaries",
+			"buildAdoptionBundleDiffFallbackContent",
+			"buildAdoptionBundleReadmeContent",
+			"adoptionBundleErrorResult",
+			"bundleAdoptionArtifacts",
+			"extractAdoptionGateFindings",
+			"extractAdoptionGateMetrics",
+			"adoptionNextActionsApprovalGates",
+			"adoptionNextActionsErrorResult",
+			"buildAdoptionNextActionsContent",
+			"writeAdoptionNextActions"
 		]
 	}
 }
