@@ -6,10 +6,20 @@ const { executeStage } = require("./stage-executor");
 const { checkGate, createGateContext } = require("./gate-handler");
 const { BudgetTracker, estimateStageConsumption } = require("./budget-tracker");
 const { TimelineWriter } = require("./timeline-writer");
+const { acquireLock, releaseLock } = require("./session-lock");
 
 async function executeSession(sessionDir, manifest, route, options = {}) {
 	const timelinePath = path.join(sessionDir, "timeline.jsonl");
 	const writer = new TimelineWriter(timelinePath);
+
+	// Acquire session lock to prevent concurrent access
+	const projectRoot = path.dirname(path.dirname(path.dirname(sessionDir)));
+	const sessionId = path.basename(sessionDir);
+	const lockResult = acquireLock(projectRoot, sessionId);
+	if (!lockResult.success) {
+		await writer.close();
+		throw new Error(lockResult.error);
+	}
 
 	const tracker = new BudgetTracker(
 		manifest.budget?.total || Infinity,
@@ -130,6 +140,8 @@ async function executeSession(sessionDir, manifest, route, options = {}) {
 		});
 		await writer.close();
 		throw error;
+	} finally {
+		releaseLock(projectRoot, sessionId);
 	}
 }
 
