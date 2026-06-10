@@ -21,6 +21,9 @@ flowchart LR
   Core --> Profiles["profiles/<br/>Project profiles"]
   Core --> Examples["docs/examples/<br/>Review artifacts"]
   Core --> Validators["scripts/validate-*<br/>Manifest/wiki checks"]
+  Core --> Routes["routes/*.route.json<br/>Delivery route definitions"]
+  Core --> Schemas["schemas/*.schema.json<br/>JSON Schema drafts"]
+  Core --> PhaseB["src/migration/ src/security/<br/>Migration tools + Security scanners"]
   Tests["tests/<br/>Node test suite"] --> CLI
 
   Target["Target repository"] -. "init/wiki create missing files only" .-> Templates
@@ -37,6 +40,8 @@ Core boundaries:
 
 ## Command Surface
 
+### V1–V5.5 Commands
+
 Safe bootstrap:
 
 ```sh
@@ -45,6 +50,42 @@ node scripts/harness.js audit --target path/to/project --summary
 node scripts/harness.js wiki --target path/to/project --dry-run
 node scripts/harness.js doctor --target path/to/project
 node scripts/harness.js handoff --target path/to/project
+```
+
+### Phase B Commands
+
+Route engine:
+
+```sh
+node scripts/harness.js route list
+node scripts/harness.js route inspect feature-standard
+node scripts/harness.js route validate routes/feature-standard.route.json
+node scripts/harness.js route test bugfix-quick --dry-run
+```
+
+Session lifecycle:
+
+```sh
+node scripts/harness.js session start --goal "fix login bug"
+node scripts/harness.js session start --goal "add feature" --mode interactive
+node scripts/harness.js session status
+node scripts/harness.js session list
+node scripts/harness.js session abort <session-id>
+node scripts/harness.js session continue
+```
+
+Migration:
+
+```sh
+node scripts/harness.js migrate --target .
+node scripts/harness.js migrate --target . --dry-run
+```
+
+Daemon:
+
+```sh
+node scripts/harness.js daemon status
+node scripts/harness.js daemon stop
 ```
 
 Adoption review chain:
@@ -123,16 +164,17 @@ StockAgents example artifacts live under `docs/examples/` and are review-only. T
 
 | Phase | Status | Scope |
 | --- | --- | --- |
-| V1 Safe Harness Bootstrap | Implemented | `init`, `audit`, `wiki`, `doctor`, `handoff` |
-| V1.5 Compatibility Hardening | Implemented | target classification, bounded summaries, manifest/wiki validation |
-| V2 Planning Layer | Implemented | plans, human gates, source bundles, checkpoint fields |
-| V2.5 Review And Acceptance | Implemented | static review, acceptance records, regression proposals |
-| V3 Workflow Pack Design Kit | Implemented | declarative pack/profile inspection and validation |
-| V4 Isolated Execution Foundation | Implemented | task ledgers, evidence, replay artifacts |
-| V4.5 Agent Orchestration Records | Implemented | dispatch/reviewer records without worker execution |
-| V5 Team Distribution | Implemented | local registry, install/pin/update/rollback metadata |
-| V5.5 Maintenance Proposals | Implemented | stale docs, drift, wiki lint, reviewable proposals |
-| Future Live Loop Scheduling | Not implemented | future-only readiness track; scheduled execution remains disabled |
+| V1 – V5.5 | Implemented | `init`, `audit`, `wiki`, `doctor`, `handoff`, plans, gates, reviews, packs, teams, maintenance, loops |
+| **Phase B Alpha W1** | Implemented | Schema foundation: route/session timeline schemas + validators |
+| **Phase B Alpha W2** | Implemented | Route engine: route-loader, route-selector, `route` CLI |
+| **Phase B Alpha W3** | Implemented | Session lifecycle: state machine, worktree manager, `session` CLI |
+| **Phase B Alpha W4** | Implemented | Interactive execution: stage executor, gate handler, budget tracker |
+| **Phase B Alpha W5** | Implemented | Checkpoint & continue: checkpoint-manager, migrate CLI |
+| **Phase B Beta** | Implemented | Autonomous mode: executor, policy, daemon, logger, notifier, session-lock |
+| **Phase B RC** | Implemented | Integration testing: e2e/load/migration/security test suites |
+| **Phase B GA** | Implemented | Release: publish/release scripts, migration tools (dry-run, rollback, schema-validator) |
+| **Phase C** | Scaffold only | Web Viewer — 7 config files, 0 pages. Deferred. |
+| Future Live Loop Scheduling | Not implemented | future-only readiness track |
 
 Loop readiness is available as a static, record-only surface. `pack readiness` checks declarative controls without running jobs, dispatching live agents, writing external systems, or opening PRs. `loop inspect`, `loop run --dry-run`, `loop record`, and `loop status` resolve contracts and write or inspect ledger records only; `readyForLiveScheduling` remains `false` by product boundary.
 
@@ -168,6 +210,12 @@ node scripts/harness.js --help
 ```
 
 The test suite uses Node's built-in test runner and requires Node `>=18.17`.
+
+Load and E2E tests (separate, may be slower):
+
+```sh
+npm run test:load
+```
 
 ## Non-Goals
 
