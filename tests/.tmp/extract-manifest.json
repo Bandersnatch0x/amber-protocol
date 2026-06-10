@@ -25,6 +25,20 @@
 			"relativeSlash",
 			"repoRelativePath",
 			"fileContains"
+		],
+		"text-utils": [
+			"slugify",
+			"formatList",
+			"formatCommandList",
+			"timestampForFileName",
+			"escapeMarkdownTableCell",
+			"extractMarkdownLinks",
+			"isInsideDirectory",
+			"isExternalLink",
+			"stripAnchorAndQuery",
+			"getSectionBody",
+			"hasSectionWithBody",
+			"extractMarkdownListUnderSubheading"
 		]
 	}
 }

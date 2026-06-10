@@ -41,10 +41,15 @@ function parseBlocks(source) {
 		}
 		if (current) {
 			for (const ch of line) {
-				if (ch === "{" || ch === "[" || ch === "(") depth += 1;
-				else if (ch === "}" || ch === "]" || ch === ")") depth -= 1;
+				if (ch === "{") depth += 1;
+				else if (ch === "}") depth -= 1;
 			}
-			if (depth === 0 && (current.kind === "fn" ? line.includes("}") : line.trimEnd().endsWith(";"))) {
+			if (
+				depth === 0 &&
+				(current.kind === "fn"
+					? line.includes("}")
+					: line.trimEnd().endsWith(";"))
+			) {
 				current.end = i;
 				blocks.push(current);
 				current = null;
