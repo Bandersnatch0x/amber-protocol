@@ -79,6 +79,15 @@
 			"validateCodexManifest",
 			"validateManifests",
 			"classifyTarget"
+		],
+		"planning": [
+			"buildPlanContent",
+			"scaffoldPlan",
+			"readPlanField",
+			"validatePlanGate",
+			"discoverStandards",
+			"reviewPlan",
+			"acceptPlan"
 		]
 	}
 }
