@@ -53,6 +53,13 @@ const {
 	testRoute,
 } = require("./lib/route-commands");
 
+const {
+	startSession,
+	statusSession,
+	listSessions,
+	abortSession,
+} = require("./lib/session-commands");
+
 const COMMANDS = [
 	"init",
 	"audit",
@@ -73,6 +80,7 @@ const COMMANDS = [
 	"adoption",
 	"loop",
 	"route",
+	"session",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
@@ -223,10 +231,32 @@ function commandSummary(command) {
 			"  node scripts/harness.js route test bugfix-quick --dry-run",
 		].join("\n");
 	}
+	if (command === "session") {
+		return [
+			"Manage session lifecycle: start, status, list, abort.",
+			"",
+			"Subcommands:",
+			'  start --goal "..." [--route <id>] [--budget <n>] [--worktree]',
+			"      Create a new session, write manifest + timeline, optionally create worktree.",
+			"  status [<id>]",
+			"      Show status of current session or specified session by ID.",
+			"  list",
+			"      List all sessions in reverse chronological order.",
+			"  abort <id>",
+			"      Set session status to aborted, write abort event, cleanup worktree.",
+			"",
+			"Examples:",
+			'  node scripts/harness.js session start --goal "implement user auth"',
+			'  node scripts/harness.js session start --goal "fix login bug" --route bugfix-quick --worktree',
+			"  node scripts/harness.js session status",
+			"  node scripts/harness.js session list",
+			"  node scripts/harness.js session abort <session-id>",
+		].join("\n");
+	}
 	return "Run Coding Harness command.";
 }
 
-function run(argv = process.argv.slice(2)) {
+async function run(argv = process.argv.slice(2)) {
 	const [command, ...rest] = argv;
 
 	if (!command || command === "--help" || command === "-h") {
@@ -460,6 +490,44 @@ function run(argv = process.argv.slice(2)) {
 		}
 		printResult(result, { json: true });
 		return routeResult.exitCode;
+	} else if (command === "session") {
+		const action = args._ && args._[0];
+		let sessionResult;
+		if (action === "start") {
+			sessionResult = await startSession(args.target || process.cwd(), {
+				goal: args.goal || args._[1],
+				route: args.route,
+				budget: args.budget ? parseInt(args.budget, 10) : undefined,
+				worktree: args.worktree,
+			});
+		} else if (action === "status") {
+			sessionResult = statusSession(args.target || process.cwd(), {
+				sessionId: args._[1],
+			});
+		} else if (action === "list") {
+			sessionResult = listSessions(args.target || process.cwd(), {});
+		} else if (action === "abort") {
+			sessionResult = await abortSession(args.target || process.cwd(), {
+				sessionId: args._[1],
+			});
+		} else {
+			sessionResult = {
+				text: "session requires start, status, list, or abort.",
+				exitCode: 1,
+			};
+		}
+		result = {
+			target: args.target,
+			text: sessionResult.text,
+			errors: sessionResult.exitCode === 0 ? [] : [sessionResult.text],
+			warnings: [],
+		};
+		if (!args.json) {
+			console.log(sessionResult.text);
+			return sessionResult.exitCode;
+		}
+		printResult(result, { json: true });
+		return sessionResult.exitCode;
 	} else {
 		result = doctor(args.target);
 	}
@@ -469,7 +537,9 @@ function run(argv = process.argv.slice(2)) {
 }
 
 if (require.main === module) {
-	process.exitCode = run();
+	run().then((code) => {
+		process.exitCode = code;
+	});
 }
 
 module.exports = { run, usage };
