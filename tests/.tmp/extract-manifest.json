@@ -197,6 +197,25 @@
 			"adoptionNextActionsErrorResult",
 			"buildAdoptionNextActionsContent",
 			"writeAdoptionNextActions"
+		],
+		"adoption-proposals": [
+			"ADOPTION_DECISION_GATE_IDS",
+			"ADOPTION_DECISION_STATUSES",
+			"adoptionDecisionRecordDecisions",
+			"applyAdoptionDecisionSpecs",
+			"adoptionDecisionApprovalStatus",
+			"adoptionDecisionRecordErrorResult",
+			"buildAdoptionDecisionRecordContent",
+			"writeAdoptionDecisionRecord",
+			"adoptionApplyPlanBoundaries",
+			"adoptionApplyPlanErrorResult",
+			"buildAdoptionApplyPlanContent",
+			"writeAdoptionApplyPlan",
+			"adoptionSelectedFilesBoundaries",
+			"isSafeSelectableHarnessPath",
+			"adoptionSelectedFilesErrorResult",
+			"buildAdoptionSelectedFilesContent",
+			"writeAdoptionSelectedFiles"
 		]
 	}
 }
