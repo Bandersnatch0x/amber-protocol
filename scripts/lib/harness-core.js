@@ -5,6 +5,20 @@ const path = require("node:path");
 
 // __CORE_REQUIRES__
 const {
+	slugify,
+	formatList,
+	formatCommandList,
+	timestampForFileName,
+	escapeMarkdownTableCell,
+	extractMarkdownLinks,
+	isInsideDirectory,
+	isExternalLink,
+	stripAnchorAndQuery,
+	getSectionBody,
+	hasSectionWithBody,
+	extractMarkdownListUnderSubheading,
+} = require("./core/text-utils");
+const {
 	AUDIT_IGNORED_DIRECTORY_NAMES,
 	resolveTarget,
 	pathExists,
@@ -98,15 +112,6 @@ function scaffoldWiki(target, options = {}) {
 	};
 }
 
-function slugify(value) {
-	return (
-		String(value || "")
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "")
-			.slice(0, 80) || "plan"
-	);
-}
 
 function loadFeatureList(targetRoot) {
 	return readJson(path.join(targetRoot, "feature_list.json"));
@@ -1562,21 +1567,6 @@ function inspectMaintenance(target, options = {}) {
 	};
 }
 
-function formatList(items, emptyText = "none") {
-	if (!Array.isArray(items) || items.length === 0) {
-		return [`- ${emptyText}`];
-	}
-	return items.map((item) => `- ${item}`);
-}
-
-function formatCommandList(commands, emptyText = "none") {
-	if (!Array.isArray(commands) || commands.length === 0) {
-		return [`- ${emptyText}`];
-	}
-	return commands.map(
-		(command) => `- ${command.source}: ${command.name} -> ${command.command}`,
-	);
-}
 
 function buildAdoptionReportContent(parts) {
 	const {
@@ -1669,9 +1659,6 @@ function buildAdoptionReportContent(parts) {
 	return lines.join("\n");
 }
 
-function timestampForFileName(date = new Date()) {
-	return date.toISOString().replace(/[:.]/g, "-").toLowerCase();
-}
 
 function uniqueAdoptionReportPath(targetRoot, outputDir) {
 	const directory = path.resolve(outputDir);
@@ -1776,11 +1763,6 @@ function listAdoptionReports(options = {}) {
 	};
 }
 
-function escapeMarkdownTableCell(value) {
-	return String(value || "")
-		.replace(/\r?\n/g, " ")
-		.replace(/\|/g, "\\|");
-}
 
 function buildAdoptionReportsIndexContent(listing, outputPath) {
 	const outputDir = path.dirname(outputPath);
@@ -1854,14 +1836,6 @@ function writeAdoptionReportsIndex(options = {}) {
 	};
 }
 
-
-function isInsideDirectory(parentDir, childPath) {
-	const relativePath = path.relative(parentDir, childPath);
-	return (
-		relativePath === "" ||
-		(!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
-	);
-}
 
 function validateAdoptionReports(options = {}) {
 	const reportsDir = options.reportsDir ? path.resolve(options.reportsDir) : "";
@@ -1959,30 +1933,6 @@ function validateAdoptionReports(options = {}) {
 	};
 }
 
-function extractMarkdownListUnderSubheading(markdown, heading) {
-	const lines = markdown.split(/\r?\n/);
-	const headingPattern = new RegExp(
-		`^###\\s+${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`,
-		"i",
-	);
-	const start = lines.findIndex((line) => headingPattern.test(line));
-	if (start === -1) {
-		return [];
-	}
-
-	const items = [];
-	for (let index = start + 1; index < lines.length; index += 1) {
-		const line = lines[index];
-		if (/^#{2,3}\s+/.test(line)) {
-			break;
-		}
-		const match = line.match(/^\s*-\s+(.+?)\s*$/);
-		if (match && match[1].toLowerCase() !== "none") {
-			items.push(match[1]);
-		}
-	}
-	return items;
-}
 
 function readAdoptionReportMetric(markdown, label) {
 	const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -4074,30 +4024,6 @@ function validateContinuousImprovementStateFile(filePath) {
 	return { errors, warnings };
 }
 
-function extractMarkdownLinks(markdown) {
-	const links = [];
-	const pattern = /!?\[[^\]]*]\(([^)]+)\)/g;
-	let match;
-
-	while ((match = pattern.exec(markdown)) !== null) {
-		const raw = match[1].trim();
-		if (!raw) {
-			continue;
-		}
-		const target = raw.split(/\s+/)[0].replace(/^<|>$/g, "");
-		links.push(target);
-	}
-
-	return links;
-}
-
-function isExternalLink(link) {
-	return /^(https?:|mailto:|tel:|#)/i.test(link);
-}
-
-function stripAnchorAndQuery(link) {
-	return link.split("#")[0].split("?")[0];
-}
 
 function validateWiki(target) {
 	const targetRoot = resolveTarget(target);
@@ -4463,32 +4389,6 @@ function hasVerificationCommand(targetRoot) {
 	return /```(?:sh|bash|powershell|ps1|cmd)?\s*[\r\n]+[^`]+```/i.test(content);
 }
 
-function getSectionBody(markdown, heading) {
-	const lines = markdown.split(/\r?\n/);
-	const headingPattern = new RegExp(
-		`^##\\s+${heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`,
-		"i",
-	);
-	const start = lines.findIndex((line) => headingPattern.test(line));
-	if (start === -1) {
-		return null;
-	}
-
-	const body = [];
-	for (let index = start + 1; index < lines.length; index += 1) {
-		if (/^##\s+/.test(lines[index])) {
-			break;
-		}
-		body.push(lines[index]);
-	}
-
-	return body.join("\n");
-}
-
-function hasSectionWithBody(markdown, heading) {
-	const body = getSectionBody(markdown, heading);
-	return body !== null && body.trim().length > 0;
-}
 
 function validateHandoff(target) {
 	const targetRoot = resolveTarget(target);
