@@ -133,6 +133,15 @@
 			"inspectMaintenance",
 			"buildMaintenanceProposalContent",
 			"proposeMaintenance"
+		],
+		"workflow-packs": [
+			"validateWorkflowPackData",
+			"validateLoopContracts",
+			"describeLoopContracts",
+			"inspectLoopReadiness",
+			"validateWorkflowPackReferences",
+			"inspectWorkflowPack",
+			"inspectWorkflowPackReadiness"
 		]
 	}
 }
