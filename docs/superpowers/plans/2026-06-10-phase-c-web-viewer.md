@@ -1,4 +1,4 @@
-# Phase C — Web Viewer: Next.js Dashboard (8 weeks)
+> **Status**: 🟡 SCAFFOLD ONLY — 7 config files created, 0 pages/components. Deferred — see progress.md.\n>\n# Phase C — Web Viewer: Next.js Dashboard (8 weeks)
 
 **Created:** 2026-06-10  
 **Status:** Planning  
