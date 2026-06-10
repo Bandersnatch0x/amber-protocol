@@ -46,7 +46,7 @@ function findMostRecentSession(projectRoot) {
 }
 
 async function startSession(projectRoot, options) {
-	const { goal, route: routeId, budget, worktree } = options;
+	const { goal, route: routeId, budget, worktree, mode } = options;
 
 	if (!goal) {
 		return { text: "Error: --goal is required", exitCode: 1 };
@@ -115,6 +115,12 @@ async function startSession(projectRoot, options) {
 		}
 	}
 
+	if (mode) {
+		manifest.mode = mode;
+		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+		lines.push(`Mode: ${mode}`);
+	}
+
 	return {
 		text: lines.join("\n"),
 		exitCode: 0,
@@ -152,6 +158,10 @@ function statusSession(projectRoot, options) {
 
 	if (manifest.currentStage) {
 		lines.push(`Current stage: ${manifest.currentStage}`);
+	}
+
+	if (manifest.mode) {
+		lines.push(`Mode: ${manifest.mode}`);
 	}
 
 	if (manifest.completedStages && manifest.completedStages.length > 0) {
@@ -240,4 +250,39 @@ async function abortSession(projectRoot, options) {
 	return { text: `Session aborted: ${sessionId}`, exitCode: 0 };
 }
 
-module.exports = { startSession, statusSession, listSessions, abortSession };
+async function continueSession(projectRoot, options) {
+	let { sessionId } = options;
+
+	if (!sessionId) {
+		sessionId = findMostRecentSession(projectRoot);
+		if (!sessionId) {
+			return { text: "No sessions found to continue", exitCode: 1 };
+		}
+	}
+
+	const sessionDir = getSessionDir(projectRoot, sessionId);
+	const manifestPath = path.join(sessionDir, "manifest.json");
+
+	if (!fs.existsSync(manifestPath)) {
+		return { text: `Session not found: ${sessionId}`, exitCode: 1 };
+	}
+
+	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+	if (manifest.status === "completed") {
+		return { text: "Session already completed", exitCode: 1 };
+	}
+
+	if (manifest.status === "aborted") {
+		return { text: "Session was aborted", exitCode: 1 };
+	}
+
+	return {
+		text: `Ready to continue session ${sessionId} from stage: ${manifest.currentStage || "start"}`,
+		exitCode: 0,
+		sessionId,
+		manifest,
+	};
+}
+
+module.exports = { startSession, statusSession, listSessions, abortSession, continueSession };

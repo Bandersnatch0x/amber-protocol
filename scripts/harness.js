@@ -58,6 +58,7 @@ const {
 	statusSession,
 	listSessions,
 	abortSession,
+	continueSession,
 } = require("./lib/session-commands");
 
 const COMMANDS = [
@@ -233,10 +234,10 @@ function commandSummary(command) {
 	}
 	if (command === "session") {
 		return [
-			"Manage session lifecycle: start, status, list, abort.",
+			"Manage session lifecycle: start, status, list, abort, continue.",
 			"",
 			"Subcommands:",
-			'  start --goal "..." [--route <id>] [--budget <n>] [--worktree]',
+			'  start --goal "..." [--route <id>] [--budget <n>] [--worktree] [--mode interactive]',
 			"      Create a new session, write manifest + timeline, optionally create worktree.",
 			"  status [<id>]",
 			"      Show status of current session or specified session by ID.",
@@ -244,13 +245,17 @@ function commandSummary(command) {
 			"      List all sessions in reverse chronological order.",
 			"  abort <id>",
 			"      Set session status to aborted, write abort event, cleanup worktree.",
+			"  continue [<id>]",
+			"      Continue a paused or incomplete session from its current stage.",
 			"",
 			"Examples:",
 			'  node scripts/harness.js session start --goal "implement user auth"',
 			'  node scripts/harness.js session start --goal "fix login bug" --route bugfix-quick --worktree',
+			'  node scripts/harness.js session start --goal "add feature" --mode interactive',
 			"  node scripts/harness.js session status",
 			"  node scripts/harness.js session list",
 			"  node scripts/harness.js session abort <session-id>",
+			"  node scripts/harness.js session continue",
 		].join("\n");
 	}
 	return "Run Coding Harness command.";
@@ -499,6 +504,7 @@ async function run(argv = process.argv.slice(2)) {
 				route: args.route,
 				budget: args.budget ? parseInt(args.budget, 10) : undefined,
 				worktree: args.worktree,
+				mode: args.mode,
 			});
 		} else if (action === "status") {
 			sessionResult = statusSession(args.target || process.cwd(), {
@@ -510,9 +516,13 @@ async function run(argv = process.argv.slice(2)) {
 			sessionResult = await abortSession(args.target || process.cwd(), {
 				sessionId: args._[1],
 			});
+		} else if (action === "continue") {
+			sessionResult = await continueSession(args.target || process.cwd(), {
+				sessionId: args._[1],
+			});
 		} else {
 			sessionResult = {
-				text: "session requires start, status, list, or abort.",
+				text: "session requires start, status, list, abort, or continue.",
 				exitCode: 1,
 			};
 		}

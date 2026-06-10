@@ -4662,6 +4662,20 @@ function parseArgs(argv) {
     if (arg === "--target") {
       args.target = argv[index + 1];
       index += 1;
+    } else if (arg === "--goal") {
+      args.goal = argv[index + 1];
+      index += 1;
+    } else if (arg === "--route") {
+      args.route = argv[index + 1];
+      index += 1;
+    } else if (arg === "--budget") {
+      args.budget = argv[index + 1];
+      index += 1;
+    } else if (arg === "--worktree") {
+      args.worktree = true;
+    } else if (arg === "--mode") {
+      args.mode = argv[index + 1];
+      index += 1;
     } else if (arg === "--feature") {
       args.feature = argv[index + 1];
       index += 1;
