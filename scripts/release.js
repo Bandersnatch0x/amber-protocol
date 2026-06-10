@@ -71,6 +71,8 @@ function release(bumpType = "minor") {
 		console.log("   ✅ Tests pass");
 	} catch (e) {
 		console.error("   ❌ Tests failed. Fix before releasing.");
+		if (e.stdout) console.log(e.stdout);
+		if (e.stderr) console.error(e.stderr);
 		process.exit(1);
 	}
 

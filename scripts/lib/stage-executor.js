@@ -10,6 +10,7 @@ function executeCommand(command, options = {}) {
 		shell: true,
 		encoding: "utf8",
 		cwd: options.cwd || process.cwd(),
+		timeout: options.stageTimeout || 0,
 	});
 	return {
 		success: result.status === 0,
