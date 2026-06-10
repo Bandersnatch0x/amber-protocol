@@ -18,6 +18,25 @@ async function executeSession(sessionDir, manifest, route, options = {}) {
 
 	let stagesCompleted = 0;
 	const gatesMap = new Map((route.gates || []).map((g) => [g.id, g]));
+	const manifestPath = path.join(sessionDir, "manifest.json");
+
+	function persistBudget() {
+		if (fs.existsSync(manifestPath)) {
+			try {
+				const currentManifest = JSON.parse(
+					fs.readFileSync(manifestPath, "utf8"),
+				);
+				currentManifest.budget = tracker.toJSON();
+				currentManifest.updatedAt = new Date().toISOString();
+				fs.writeFileSync(
+					manifestPath,
+					JSON.stringify(currentManifest, null, 2),
+				);
+			} catch (err) {
+				console.error(`Warning: failed to persist budget: ${err.message}`);
+			}
+		}
+	}
 
 	try {
 		for (const stage of route.stages) {
@@ -47,6 +66,7 @@ async function executeSession(sessionDir, manifest, route, options = {}) {
 					data: { used: budgetResult.used, total: budgetResult.total },
 				});
 				await writer.close();
+				persistBudget();
 				return { success: false, reason: "Budget exceeded", stagesCompleted };
 			}
 
@@ -59,6 +79,7 @@ async function executeSession(sessionDir, manifest, route, options = {}) {
 					data: { error: stageResult.error },
 				});
 				await writer.close();
+				persistBudget();
 				return { success: false, reason: "Stage failed", stagesCompleted };
 			}
 
@@ -92,6 +113,7 @@ async function executeSession(sessionDir, manifest, route, options = {}) {
 							data: { gateId: gate.id, userInput: gateResult.userInput },
 						});
 						await writer.close();
+						persistBudget();
 						return { success: false, reason: "Gate rejected", stagesCompleted };
 					}
 				}
@@ -99,6 +121,7 @@ async function executeSession(sessionDir, manifest, route, options = {}) {
 		}
 
 		await writer.close();
+		persistBudget();
 		return { success: true, stagesCompleted };
 	} catch (error) {
 		await writer.append({
