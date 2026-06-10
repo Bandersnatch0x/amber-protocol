@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { createManifest } = require("./session-manifest");
-const { TimelineWriter } = require("./timeline");
+const { TimelineWriter } = require("./timeline-writer");
 const { SessionStateMachine, STATES } = require("./session-state-machine");
 const {
 	loadLatestCheckpoint,
