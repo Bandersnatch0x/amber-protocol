@@ -39,6 +39,14 @@
 			"getSectionBody",
 			"hasSectionWithBody",
 			"extractMarkdownListUnderSubheading"
+		],
+		"validators": [
+			"loadFeatureList",
+			"findFeatureById",
+			"validateFeatureListData",
+			"validateFeatureListFile",
+			"validateContinuousImprovementStateFile",
+			"validateWiki"
 		]
 	}
 }
