@@ -47,7 +47,7 @@ function parseBlocks(source) {
 			if (
 				depth === 0 &&
 				(current.kind === "fn"
-					? line.includes("}")
+					? line.startsWith("}") // top-level closing brace at column 0
 					: line.trimEnd().endsWith(";"))
 			) {
 				current.end = i;
