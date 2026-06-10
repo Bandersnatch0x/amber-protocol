@@ -53,6 +53,23 @@
 			"copyTemplateFiles",
 			"scaffoldHarness",
 			"scaffoldWiki"
+		],
+		"audit": [
+			"detectCommands",
+			"detectToolingEvidence",
+			"addCandidateCommand",
+			"detectCandidateCommands",
+			"isLikelyDocumentation",
+			"listProjectDocs",
+			"isWikiLike",
+			"buildSuggestedPatches",
+			"buildAuditUnknowns",
+			"buildNextSafeCommand",
+			"auditProject",
+			"fileMentionsWiki",
+			"hasNextAction",
+			"hasVerificationCommand",
+			"validateHandoff"
 		]
 	}
 }
