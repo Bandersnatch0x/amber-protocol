@@ -4,23 +4,28 @@
  * Schema validator — detects version and validates upgrade compatibility.
  */
 
-const V55_KNOWN_FIELDS = new Set([
-	"version", "agents", "routes", "skills",
-]);
+const V55_KNOWN_FIELDS = new Set(["version", "agents", "routes", "skills"]);
 
 const PHASE_B_KNOWN_FIELDS = new Set([
-	"version", "framework", "agents", "skills", "routes",
-	"profiles", "migratedAt", "migrationId",
+	"version",
+	"framework",
+	"agents",
+	"skills",
+	"routes",
+	"profiles",
+	"migratedAt",
+	"migrationId",
 ]);
 
 const DEPRECATED_FIELDS = new Set([
-	"deprecated_field", "legacy_api", "old_config",
-	"legacyMode", "compat",
+	"deprecated_field",
+	"legacy_api",
+	"old_config",
+	"legacyMode",
+	"compat",
 ]);
 
-const REMOVED_FIELDS = new Set([
-	"deprecated_field",
-]);
+const REMOVED_FIELDS = new Set(["deprecated_field"]);
 
 /**
  * @param {object} settings
@@ -53,7 +58,9 @@ function validateUpgrade(settings, targetVersion) {
 	if (!settings || typeof settings !== "object") {
 		return {
 			compatible: false,
-			breakingChanges: [{ field: "root", message: "Settings is not a valid object" }],
+			breakingChanges: [
+				{ field: "root", message: "Settings is not a valid object" },
+			],
 			deprecatedFields: [],
 			warnings: [],
 		};

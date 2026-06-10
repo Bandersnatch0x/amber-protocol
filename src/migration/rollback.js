@@ -7,7 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const BACKUP_PATTERN = /^\.backup-(\d{4}-\d{2}-\d{2}-\d{6})\.json$/;
+const BACKUP_PATTERN = /^\.backup-(\d{4}-\d{2}-\d{2}-\d{6}(?:-\d{3})?)\.json$/;
 
 /**
  * Find all backup files in a directory, sorted newest first.
@@ -55,6 +55,8 @@ function createBackup(settingsPath) {
 		String(now.getHours()).padStart(2, "0"),
 		String(now.getMinutes()).padStart(2, "0"),
 		String(now.getSeconds()).padStart(2, "0"),
+		"-",
+		String(now.getMilliseconds()).padStart(3, "0"),
 	].join("");
 
 	const backupName = `.backup-${stamp}.json`;
@@ -85,12 +87,18 @@ function rollback(settingsPath, backupPath) {
 		try {
 			parsed = JSON.parse(backupContent);
 		} catch (e) {
-			return { success: false, error: `Backup file is not valid JSON: ${backupPath}` };
+			return {
+				success: false,
+				error: `Backup file is not valid JSON: ${backupPath}`,
+			};
 		}
 
 		// Validate backup has reasonable structure
 		if (!parsed || typeof parsed !== "object") {
-			return { success: false, error: "Backup content is not a valid settings object" };
+			return {
+				success: false,
+				error: "Backup content is not a valid settings object",
+			};
 		}
 
 		// Create a pre-rollback backup of current settings

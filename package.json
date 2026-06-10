@@ -1,6 +1,6 @@
 {
   "name": "coding-harness",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Safe Harness Bootstrap toolkit for repository-local agent instructions, wiki, validation, and handoff.",
   "private": true,
   "type": "commonjs",

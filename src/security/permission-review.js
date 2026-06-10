@@ -42,7 +42,8 @@ function pathMatches(pattern, testPath) {
  */
 function reviewPermissions(settings, usageLog) {
 	const findings = [];
-	const permissions = (settings && settings.permissions && settings.permissions.allow) || [];
+	const permissions =
+		(settings && settings.permissions && settings.permissions.allow) || [];
 
 	// Check for overly broad permissions
 	for (const perm of permissions) {
@@ -59,9 +60,18 @@ function reviewPermissions(settings, usageLog) {
 			}
 
 			// Check sensitive path write access
-			if (perm.tool === "write" || perm.tool === "delete" || perm.tool === "exec") {
+			if (
+				perm.tool === "write" ||
+				perm.tool === "delete" ||
+				perm.tool === "exec"
+			) {
 				for (const sensitive of SENSITIVE_PATHS) {
-					if (paths.some(pp => pp === sensitive || pp.includes(sensitive.replace(/\*+/g, "")))) {
+					if (
+						paths.some(
+							(pp) =>
+								pp === sensitive || pp.includes(sensitive.replace(/\*+/g, "")),
+						)
+					) {
 						findings.push({
 							issue: "sensitive_path",
 							severity: "warning",
@@ -78,7 +88,8 @@ function reviewPermissions(settings, usageLog) {
 	// Check unused permissions
 	for (const perm of permissions) {
 		const isUsed = usageLog.some(
-			u => u.tool === perm.tool && perm.paths.some(p => pathMatches(p, u.path)),
+			(u) =>
+				u.tool === perm.tool && perm.paths.some((p) => pathMatches(p, u.path)),
 		);
 
 		if (!isUsed && usageLog.length > 0) {
@@ -95,7 +106,9 @@ function reviewPermissions(settings, usageLog) {
 	// Check for usage without permissions
 	for (const usage of usageLog) {
 		const hasPermission = permissions.some(
-			p => p.tool === usage.tool && p.paths.some(pp => pathMatches(pp, usage.path)),
+			(p) =>
+				p.tool === usage.tool &&
+				p.paths.some((pp) => pathMatches(pp, usage.path)),
 		);
 
 		if (!hasPermission) {
@@ -111,14 +124,14 @@ function reviewPermissions(settings, usageLog) {
 
 	// Deduplicate findings
 	const seen = new Set();
-	const unique = findings.filter(f => {
+	const unique = findings.filter((f) => {
 		const key = `${f.issue}:${f.tool}:${f.message}`;
 		if (seen.has(key)) return false;
 		seen.add(key);
 		return true;
 	});
 
-	const hasErrors = unique.some(f => f.severity === "error");
+	const hasErrors = unique.some((f) => f.severity === "error");
 
 	return {
 		findings: unique,

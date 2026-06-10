@@ -62,15 +62,19 @@ function computeDiff(before, after) {
 }
 
 function generateSummary(diff) {
-	const added = diff.filter(d => d.type === "added");
-	const removed = diff.filter(d => d.type === "removed");
-	const modified = diff.filter(d => d.type === "modified" || d.type === "changed");
+	const added = diff.filter((d) => d.type === "added");
+	const removed = diff.filter((d) => d.type === "removed");
+	const modified = diff.filter(
+		(d) => d.type === "modified" || d.type === "changed",
+	);
 
 	const parts = [];
 	if (added.length) parts.push(`${added.length} field(s) will be added`);
 	if (removed.length) parts.push(`${removed.length} field(s) will be removed`);
-	if (modified.length) parts.push(`${modified.length} field(s) will be modified`);
-	if (parts.length === 0) parts.push("No changes needed — settings appear to already be Phase B");
+	if (modified.length)
+		parts.push(`${modified.length} field(s) will be modified`);
+	if (parts.length === 0)
+		parts.push("No changes needed — settings appear to already be Phase B");
 
 	return parts.join(", ") + ".";
 }

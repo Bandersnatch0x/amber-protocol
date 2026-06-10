@@ -24,37 +24,59 @@ describe("dryRun", () => {
 	it("displays before/after diff", () => {
 		const result = dryRun(v55Settings);
 		assert.ok(result.diff.length > 0, "Should have diff entries");
-		assert.ok(result.diff.some(d => d.field === "version" && d.before === "5.5" && d.after === "1.0.0"),
-			"Should show version change from 5.5 to 1.0.0");
+		assert.ok(
+			result.diff.some(
+				(d) =>
+					d.field === "version" && d.before === "5.5" && d.after === "1.0.0",
+			),
+			"Should show version change from 5.5 to 1.0.0",
+		);
 	});
 
 	it("does not modify the original settings", () => {
 		const original = JSON.parse(JSON.stringify(v55Settings));
 		dryRun(v55Settings);
 
-		assert.deepStrictEqual(v55Settings, original, "Original should be unmodified");
+		assert.deepStrictEqual(
+			v55Settings,
+			original,
+			"Original should be unmodified",
+		);
 		assert.strictEqual(v55Settings.version, "5.5", "Version should remain 5.5");
 	});
 
 	it("shows which fields will be added", () => {
 		const result = dryRun(v55Settings);
-		const addedFields = result.diff.filter(d => d.type === "added");
+		const addedFields = result.diff.filter((d) => d.type === "added");
 		assert.ok(addedFields.length > 0, "Should show added fields");
-		assert.ok(addedFields.some(f => f.field === "framework"), "Should add framework field");
-		assert.ok(addedFields.some(f => f.field === "skills"), "Should add skills field");
+		assert.ok(
+			addedFields.some((f) => f.field === "framework"),
+			"Should add framework field",
+		);
+		assert.ok(
+			addedFields.some((f) => f.field === "skills"),
+			"Should add skills field",
+		);
 	});
 
 	it("shows which fields will be renamed/removed", () => {
 		const result = dryRun(v55Settings);
-		const removedFields = result.diff.filter(d => d.type === "removed" || d.type === "renamed");
+		const removedFields = result.diff.filter(
+			(d) => d.type === "removed" || d.type === "renamed",
+		);
 		assert.ok(removedFields.length > 0, "Should show removed/renamed fields");
-		assert.ok(removedFields.some(f => f.field === "deprecated_field"),
-			"Should show deprecated_field as removed");
+		assert.ok(
+			removedFields.some((f) => f.field === "deprecated_field"),
+			"Should show deprecated_field as removed",
+		);
 	});
 
 	it("provides a human-readable summary", () => {
 		const result = dryRun(v55Settings);
-		assert.ok(typeof result.summary === "string", "Should have a summary string");
+		assert.ok(
+			typeof result.summary === "string",
+			"Should have a summary string",
+		);
 		assert.ok(result.summary.length > 0, "Summary should not be empty");
 	});
 
@@ -67,7 +89,9 @@ describe("dryRun", () => {
 		};
 
 		const result = dryRun(phaseB);
-		assert.ok(result.diff.every(d => d.type !== "changed"),
-			"No changes should be needed for already-migrated settings");
+		assert.ok(
+			result.diff.every((d) => d.type !== "changed"),
+			"No changes should be needed for already-migrated settings",
+		);
 	});
 });
