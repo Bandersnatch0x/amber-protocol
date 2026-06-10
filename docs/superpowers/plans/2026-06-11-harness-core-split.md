@@ -1,9 +1,15 @@
 # Refactor Plan — Split harness-core.js Into Domain Modules
 
 **Created:** 2026-06-11
-**Status:** Approved, not started
+**Status:** ✅ Completed 2026-06-11 on branch `refactor/split-harness-core`
 **Type:** Pure-move refactor (no behavior change)
-**Estimated effort:** 24 tiny commits, 2–3 days
+**Outcome:** 6,360 → 289-line facade + 21 modules under `scripts/lib/core/` (largest 734 lines). Final verification: 180/180 moved blocks byte-identical to baseline `0a4f79a` (single reviewed diff: REPO_ROOT path depth in constants.js). 435 tests green after every commit; structural guard added in `tests/harness-core-structure.test.js` (no duplicate definitions, no facade requires from core/, 800-line ceiling, facade stays logic-free).
+
+**Execution notes (deviations from the plan below):**
+- A first attempt extracted modules by COPY instead of MOVE, leaving duplicate drifting definitions and reverse `require("../harness-core")` calls in core modules. It was rolled back (`backup/split-attempt-1` preserves it) and redone as a true move.
+- Extraction was automated with a one-off script (function-block cut + dependency-scan + topological-order guard) instead of manual edits; the script caught one real ordering violation (`scaffoldWiki → validateWiki`) and was itself fixed twice (paren-counting in regex literals; multi-line signatures with `options = {}` parameters).
+- `isLocalMarkdownLink` no longer existed at baseline (deleted with the dead `extractMarkdownLinks` in commit 2), so text-utils shipped 12 symbols instead of 13.
+- `REQUIRED_HARNESS_FILES` turned out to be an alias of `MINIMUM_HARNESS_FILES`, defusing the suspected audit behavior change from attempt 1.
 
 ## Problem Statement
 

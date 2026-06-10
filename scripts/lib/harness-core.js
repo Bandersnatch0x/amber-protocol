@@ -1,9 +1,8 @@
 "use strict";
 
-const fs = require("node:fs");
-const path = require("node:path");
-
-// __CORE_REQUIRES__
+// Facade: the V1–V5.5 mainline lives in scripts/lib/core/ domain modules.
+// This file re-exports the public surface so callers keep using
+// require("./lib/harness-core") unchanged. Do not add logic here.
 const {
 	parseArgs,
 	printAuditSummary,
