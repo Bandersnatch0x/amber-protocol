@@ -24,7 +24,10 @@ function acquireLock(projectRoot, sessionId) {
 		if (lock) {
 			const age = Date.now() - lock.timestamp;
 			if (age < LOCK_TIMEOUT_MS) {
-				return { success: false, error: "Session is locked by another process" };
+				return {
+					success: false,
+					error: "Session is locked by another process",
+				};
 			}
 			// Stale lock - remove it
 			fs.unlinkSync(lockPath);
