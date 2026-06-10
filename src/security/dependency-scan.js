@@ -14,8 +14,8 @@ function parseAuditOutput(auditJson) {
 			const severity = v.severity || "unknown";
 			const via = Array.isArray(v.via) ? v.via : [];
 			const titles = via
-				.filter(item => item && typeof item === "object" && item.title)
-				.map(item => item.title);
+				.filter((item) => item && typeof item === "object" && item.title)
+				.map((item) => item.title);
 
 			results.push({
 				package: v.name || key,
@@ -40,7 +40,7 @@ function parseAuditOutput(auditJson) {
  */
 function dependencyScan(vulnerabilities) {
 	const hasHighOrCritical = vulnerabilities.some(
-		v => v.severity === "high" || v.severity === "critical",
+		(v) => v.severity === "high" || v.severity === "critical",
 	);
 
 	const counts = { low: 0, moderate: 0, high: 0, critical: 0, unknown: 0 };
@@ -62,7 +62,9 @@ function dependencyScan(vulnerabilities) {
 	return {
 		vulnerabilities,
 		counts,
-		summary: parts.length ? `${vulnerabilities.length} vulnerabilities (${parts.join(", ")})` : "No vulnerabilities found",
+		summary: parts.length
+			? `${vulnerabilities.length} vulnerabilities (${parts.join(", ")})`
+			: "No vulnerabilities found",
 		pass: !hasHighOrCritical,
 	};
 }

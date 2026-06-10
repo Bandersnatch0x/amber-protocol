@@ -89,8 +89,8 @@ describe("TimelineWriter", () => {
 		const badPath = path.join(blocker, "timeline.jsonl");
 
 		const writer = new TimelineWriter(badPath);
-		await assert.rejects(
-			() => writer.append({ type: "session_created", data: {} }),
+		await assert.rejects(() =>
+			writer.append({ type: "session_created", data: {} }),
 		);
 		await writer.close().catch(() => {});
 	});

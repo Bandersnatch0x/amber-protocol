@@ -560,6 +560,9 @@ async function run(argv = process.argv.slice(2)) {
 			errors: sessionResult.exitCode === 0 ? [] : [sessionResult.text],
 			warnings: [],
 		};
+		if (sessionResult.sessionId) {
+			result.sessionId = sessionResult.sessionId;
+		}
 		if (!args.json) {
 			console.log(sessionResult.text);
 			return sessionResult.exitCode;

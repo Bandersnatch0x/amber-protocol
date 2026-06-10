@@ -41,8 +41,15 @@ function migrateSettings(settings) {
 
 	// Copy over known user customizations (not in the deprecated/rename set)
 	const knownPhaseBFields = new Set([
-		"version", "framework", "migrationId", "migratedAt", "previousVersion",
-		"agents", "routes", "skills", "profiles",
+		"version",
+		"framework",
+		"migrationId",
+		"migratedAt",
+		"previousVersion",
+		"agents",
+		"routes",
+		"skills",
+		"profiles",
 	]);
 
 	for (const [key, value] of Object.entries(v55)) {
@@ -77,7 +84,7 @@ function migrateAgents(v55Agents) {
 function migrateRoutes(v55Routes) {
 	if (!Array.isArray(v55Routes)) return [];
 
-	return v55Routes.map(route => ({
+	return v55Routes.map((route) => ({
 		...route,
 		framework: "phase-b",
 		version: "1.0.0",

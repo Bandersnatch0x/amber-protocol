@@ -36,8 +36,15 @@ describe("readTimeline", () => {
 
 	it("parses each JSONL line into an event object", () => {
 		const lines = [
-			JSON.stringify({ timestamp: "2026-06-10T00:00:00.000Z", type: "session_created" }),
-			JSON.stringify({ timestamp: "2026-06-10T00:00:01.000Z", type: "stage_started", stage: "capture" }),
+			JSON.stringify({
+				timestamp: "2026-06-10T00:00:00.000Z",
+				type: "session_created",
+			}),
+			JSON.stringify({
+				timestamp: "2026-06-10T00:00:01.000Z",
+				type: "stage_started",
+				stage: "capture",
+			}),
 		];
 		fs.writeFileSync(timelinePath, lines.join("\n") + "\n");
 
@@ -60,9 +67,15 @@ describe("readTimeline", () => {
 
 	it("skips corrupt lines by default and keeps valid ones", () => {
 		const content = [
-			JSON.stringify({ timestamp: "2026-06-10T00:00:00.000Z", type: "session_created" }),
+			JSON.stringify({
+				timestamp: "2026-06-10T00:00:00.000Z",
+				type: "session_created",
+			}),
 			"{not valid json",
-			JSON.stringify({ timestamp: "2026-06-10T00:00:02.000Z", type: "session_completed" }),
+			JSON.stringify({
+				timestamp: "2026-06-10T00:00:02.000Z",
+				type: "session_completed",
+			}),
 		].join("\n");
 		fs.writeFileSync(timelinePath, content);
 
@@ -74,7 +87,10 @@ describe("readTimeline", () => {
 
 	it("throws on a corrupt line when strict is enabled", () => {
 		const content = [
-			JSON.stringify({ timestamp: "2026-06-10T00:00:00.000Z", type: "session_created" }),
+			JSON.stringify({
+				timestamp: "2026-06-10T00:00:00.000Z",
+				type: "session_created",
+			}),
 			"{broken",
 		].join("\n");
 		fs.writeFileSync(timelinePath, content);

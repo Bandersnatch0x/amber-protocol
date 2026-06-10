@@ -20,7 +20,8 @@ const PATTERNS = [
 	},
 	{
 		type: "GitHub Token",
-		regex: /(?:gh[pousr]_[A-Za-z0-9_]{36,}|github[_-]?token\s*[:=]\s*["'`][A-Za-z0-9_]{20,}["'`])/gi,
+		regex:
+			/(?:gh[pousr]_[A-Za-z0-9_]{36,}|github[_-]?token\s*[:=]\s*["'`][A-Za-z0-9_]{20,}["'`])/gi,
 	},
 	{
 		type: "JWT Token",
@@ -28,7 +29,8 @@ const PATTERNS = [
 	},
 	{
 		type: "Password Assignment",
-		regex: /(?:password|passwd|pwd|secret)\s*[:=]\s*["'`]([^"'\n]{6,})["'`](?!\s*\/\/(?:\s*eslint| biome))/gi,
+		regex:
+			/(?:password|passwd|pwd|secret)\s*[:=]\s*["'`]([^"'\n]{6,})["'`](?!\s*\/\/(?:\s*eslint| biome))/gi,
 	},
 	{
 		type: "Private Key",
@@ -69,7 +71,10 @@ function scanForSecrets(files) {
 
 					const matchedText = match[0];
 					// Truncate long matches for readability
-					const displayMatch = matchedText.length > 60 ? matchedText.slice(0, 57) + "..." : matchedText;
+					const displayMatch =
+						matchedText.length > 60
+							? matchedText.slice(0, 57) + "..."
+							: matchedText;
 
 					findings.push({
 						file: file.path,

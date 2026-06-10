@@ -23,9 +23,7 @@ function readTimeline(filePath, { strict = false } = {}) {
 			events.push(JSON.parse(line));
 		} catch (err) {
 			if (strict) {
-				throw new Error(
-					`Corrupt timeline at line ${i + 1}: ${err.message}`,
-				);
+				throw new Error(`Corrupt timeline at line ${i + 1}: ${err.message}`);
 			}
 		}
 	}
