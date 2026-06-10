@@ -154,6 +154,11 @@
 		"profiles": [
 			"validateProjectProfileData",
 			"inspectProjectProfile"
+		],
+		"doctor": [
+			"hasPluginManifestDirectory",
+			"doctorProductRepo",
+			"doctor"
 		]
 	}
 }
