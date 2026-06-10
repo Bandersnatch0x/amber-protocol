@@ -70,7 +70,7 @@ test("session status shows current session", () => {
 	const match = startResult.stdout.match(/Session created: ([a-f0-9-]+)/);
 	const sessionId = match[1];
 
-	const result = runHarness(["session", "status"]);
+	const result = runHarness(["session", "status", sessionId]);
 	assert.equal(result.status, 0);
 	assert.match(result.stdout, new RegExp(sessionId));
 	assert.match(result.stdout, /Status: created/);

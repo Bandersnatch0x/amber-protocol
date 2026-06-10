@@ -1,6 +1,12 @@
 "use strict";
 
-const SCHEMA_VERSION = "1.0.0";
+const path = require("path");
+const fs = require("fs");
+
+const packageJson = JSON.parse(
+	fs.readFileSync(path.join(__dirname, "../../package.json"), "utf8"),
+);
+const SCHEMA_VERSION = packageJson.version;
 const SUPPORTED_VERSIONS = [SCHEMA_VERSION];
 
 function checkSchemaVersion(manifest) {

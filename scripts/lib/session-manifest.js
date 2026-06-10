@@ -3,6 +3,7 @@ const addFormats = require("ajv-formats");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { SCHEMA_VERSION } = require("./schema-version-checker");
 
 const schemaPath = path.join(
 	__dirname,
@@ -18,7 +19,7 @@ function createManifest({ route, goal, budget }) {
 	const now = new Date().toISOString();
 	return {
 		sessionId: crypto.randomUUID(),
-		schemaVersion: "1.0.0",
+		schemaVersion: SCHEMA_VERSION,
 		createdAt: now,
 		updatedAt: now,
 		route,

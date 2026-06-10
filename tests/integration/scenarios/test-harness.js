@@ -9,6 +9,9 @@
 const path = require("path");
 const fs = require("fs");
 const { ensureDir, removeDir, readJSONL } = require("../../scripts/lib");
+const { executeSession } = require("../../../scripts/lib/execution-engine");
+const { createManifest } = require("../../../scripts/lib/session-manifest");
+const { TimelineWriter } = require("../../../scripts/lib/timeline-writer");
 
 const DEFAULT_WORK_DIR = path.resolve(
 	__dirname,
@@ -50,6 +53,52 @@ class IntegrationTestHarness {
 	cleanup() {
 		this.teardown();
 	}
+
+	/**
+	 * Start a new session: create session directory and manifest.
+	 * @param {string} projectRoot
+	 * @param {{ goal: string, budget?: number }} options
+	 * @returns {{ sessionDir: string, manifest: object }}
+	 */
+	startSession(projectRoot, { goal, budget }) {
+		const manifest = createManifest({
+			route: { id: "test-e2e-route", version: "1.0.0" },
+			goal,
+			budget,
+		});
+
+		const sessionDir = path.join(
+			projectRoot,
+			".harness",
+			"sessions",
+			manifest.sessionId,
+		);
+		fs.mkdirSync(sessionDir, { recursive: true });
+
+		const manifestPath = path.join(sessionDir, "manifest.json");
+		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+		const timelinePath = path.join(sessionDir, "timeline.jsonl");
+		const writer = new TimelineWriter(timelinePath);
+		writer.append({ type: "session_created", data: { sessionId: manifest.sessionId, goal } });
+		writer.close();
+
+		return { sessionDir, manifest };
+	}
+
+	/**
+	 * Run the full execution flow for a route.
+	 * @param {string} sessionDir
+	 * @param {object} manifest
+	 * @param {{ routeId: string, stages: object[], gates?: object[] }} route
+	 * @param {{ input?: import("stream").Readable }} [options]
+	 * @returns {Promise<{success: boolean, stagesCompleted: number, reason?: string}>}
+	 */
+	async runFlow(sessionDir, manifest, route, options = {}) {
+		const result = await executeSession(sessionDir, manifest, route, options);
+		return result;
+	}
+
 
 	/**
 	 * Run a route pipeline through the given stages.
