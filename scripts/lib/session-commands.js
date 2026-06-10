@@ -9,10 +9,14 @@ const {
 	loadLatestCheckpoint,
 	loadCheckpointByStage,
 } = require("./checkpoint-manager");
-const { checkSchemaVersion } = require("./schema-version-checker");
+const {
+	checkSchemaVersion,
+	SCHEMA_VERSION,
+} = require("./schema-version-checker");
 const { createWorktree, removeWorktree } = require("./worktree-manager");
 const { selectRoute } = require("./route-selector");
 const { loadRoutes } = require("./route-loader");
+const { result } = require("./result");
 
 const ROUTES_DIR = path.join(__dirname, "../../routes");
 
@@ -24,48 +28,48 @@ function getSessionDir(projectRoot, sessionId) {
 	return path.join(getSessionsDir(projectRoot), sessionId);
 }
 
-function findMostRecentSession(projectRoot) {
+function findMostRecentSession(projectRoot, { excludeCompleted = false } = {}) {
 	const sessionsDir = getSessionsDir(projectRoot);
-	if (!fs.existsSync(sessionsDir)) {
-		return null;
-	}
+	if (!fs.existsSync(sessionsDir)) return null;
 
-	const sessions = fs.readdirSync(sessionsDir).filter((name) => {
-		const manifestPath = path.join(sessionsDir, name, "manifest.json");
-		return fs.existsSync(manifestPath);
-	});
+	const manifests = fs
+		.readdirSync(sessionsDir)
+		.filter((name) =>
+			fs.existsSync(path.join(sessionsDir, name, "manifest.json")),
+		)
+		.map((name) =>
+			JSON.parse(
+				fs.readFileSync(path.join(sessionsDir, name, "manifest.json"), "utf8"),
+			),
+		)
+		.filter(
+			(m) =>
+				!excludeCompleted ||
+				(m.status !== "completed" &&
+					m.status !== "aborted" &&
+					m.status !== "failed"),
+		)
+		.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-	if (sessions.length === 0) return null;
-
-	sessions.sort((a, b) => {
-		const aManifest = JSON.parse(
-			fs.readFileSync(path.join(sessionsDir, a, "manifest.json"), "utf8"),
-		);
-		const bManifest = JSON.parse(
-			fs.readFileSync(path.join(sessionsDir, b, "manifest.json"), "utf8"),
-		);
-		return new Date(bManifest.createdAt) - new Date(aManifest.createdAt);
-	});
-
-	return sessions[0];
+	return manifests.length > 0 ? manifests[0].sessionId : null;
 }
 
 async function startSession(projectRoot, options) {
 	const { goal, route: routeId, budget, worktree, mode } = options;
 
 	if (!goal) {
-		return { text: "Error: --goal is required", exitCode: 1 };
+		return result("Error: --goal is required", 1);
 	}
 
 	let selectedRouteId = routeId;
-	let routeVersion = "1.0.0";
+	let routeVersion = SCHEMA_VERSION;
 
 	if (!selectedRouteId) {
 		const { routes } = loadRoutes(ROUTES_DIR);
 		const match = selectRoute(goal, routes);
 
 		if (!match.matched) {
-			return { text: "Error: No matching route found for goal", exitCode: 1 };
+			return result("Error: No matching route found for goal", 1);
 		}
 
 		selectedRouteId = match.routeId;
@@ -75,12 +79,9 @@ async function startSession(projectRoot, options) {
 		const { routes } = loadRoutes(ROUTES_DIR);
 		const route = routes.find((r) => r.routeId === selectedRouteId);
 		if (!route) {
-			return {
-				text: `Error: Route "${selectedRouteId}" not found`,
-				exitCode: 1,
-			};
+			return result(`Error: Route "${selectedRouteId}" not found`, 1);
 		}
-		routeVersion = route.version || "1.0.0";
+		routeVersion = route.version || SCHEMA_VERSION;
 	}
 
 	const manifest = createManifest({
@@ -139,7 +140,7 @@ function statusSession(projectRoot, options) {
 	if (!sessionId) {
 		sessionId = findMostRecentSession(projectRoot);
 		if (!sessionId) {
-			return { text: "No sessions found", exitCode: 1 };
+			return result("No sessions found", 1);
 		}
 	}
 
@@ -148,7 +149,7 @@ function statusSession(projectRoot, options) {
 		"manifest.json",
 	);
 	if (!fs.existsSync(manifestPath)) {
-		return { text: `Session not found: ${sessionId}`, exitCode: 1 };
+		return result(`Session not found: ${sessionId}`, 1);
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
@@ -182,13 +183,13 @@ function statusSession(projectRoot, options) {
 		);
 	}
 
-	return { text: lines.join("\n"), exitCode: 0 };
+	return result(lines.join("\n"), 0);
 }
 
 function listSessions(projectRoot, _options) {
 	const sessionsDir = getSessionsDir(projectRoot);
 	if (!fs.existsSync(sessionsDir)) {
-		return { text: "No sessions found", exitCode: 0 };
+		return result("No sessions found", 0);
 	}
 
 	const sessions = fs
@@ -205,7 +206,7 @@ function listSessions(projectRoot, _options) {
 		.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
 	if (sessions.length === 0) {
-		return { text: "No sessions found", exitCode: 0 };
+		return result("No sessions found", 0);
 	}
 
 	const lines = ["Sessions:"];
@@ -214,21 +215,21 @@ function listSessions(projectRoot, _options) {
 		lines.push(`  ${id} [${s.status}] ${s.route.id} — ${s.goal}`);
 	}
 
-	return { text: lines.join("\n"), exitCode: 0 };
+	return result(lines.join("\n"), 0);
 }
 
 async function abortSession(projectRoot, options) {
 	const { sessionId } = options;
 
 	if (!sessionId) {
-		return { text: "Error: --session-id is required", exitCode: 1 };
+		return result("Error: --session-id is required", 1);
 	}
 
 	const sessionDir = getSessionDir(projectRoot, sessionId);
 	const manifestPath = path.join(sessionDir, "manifest.json");
 
 	if (!fs.existsSync(manifestPath)) {
-		return { text: `Session not found: ${sessionId}`, exitCode: 1 };
+		return result(`Session not found: ${sessionId}`, 1);
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
@@ -236,7 +237,7 @@ async function abortSession(projectRoot, options) {
 	const transition = sm.transition(STATES.ABORTED);
 
 	if (!transition.success) {
-		return { text: `Cannot abort: ${transition.error}`, exitCode: 1 };
+		return result(`Cannot abort: ${transition.error}`, 1);
 	}
 
 	manifest.status = STATES.ABORTED;
@@ -252,7 +253,7 @@ async function abortSession(projectRoot, options) {
 		removeWorktree(projectRoot, sessionId);
 	}
 
-	return { text: `Session aborted: ${sessionId}`, exitCode: 0 };
+	return result(`Session aborted: ${sessionId}`, 0);
 }
 
 async function continueSession(projectRoot, options) {
@@ -261,7 +262,7 @@ async function continueSession(projectRoot, options) {
 	if (!sessionId) {
 		sessionId = findMostRecentNonCompletedSession(projectRoot);
 		if (!sessionId) {
-			return { text: "No resumable sessions found", exitCode: 1 };
+			return result("No resumable sessions found", 1);
 		}
 	}
 
@@ -269,22 +270,22 @@ async function continueSession(projectRoot, options) {
 	const manifestPath = path.join(sessionDir, "manifest.json");
 
 	if (!fs.existsSync(manifestPath)) {
-		return { text: `Session not found: ${sessionId}`, exitCode: 1 };
+		return result(`Session not found: ${sessionId}`, 1);
 	}
 
 	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
 	const versionCheck = checkSchemaVersion(manifest);
 	if (!versionCheck.valid) {
-		return { text: `Schema error: ${versionCheck.error}`, exitCode: 1 };
+		return result(`Schema error: ${versionCheck.error}`, 1);
 	}
 
 	if (manifest.status === "completed") {
-		return { text: "Session already completed", exitCode: 1 };
+		return result("Session already completed", 1);
 	}
 
 	if (manifest.status === "aborted") {
-		return { text: "Session was aborted", exitCode: 1 };
+		return result("Session was aborted", 1);
 	}
 
 	if (
@@ -293,17 +294,14 @@ async function continueSession(projectRoot, options) {
 		manifest.status !== "created" &&
 		manifest.status !== "routed"
 	) {
-		return {
-			text: `Cannot continue session with status: ${manifest.status}`,
-			exitCode: 1,
-		};
+		return result(`Cannot continue session with status: ${manifest.status}`, 1);
 	}
 
 	let checkpoint;
 	if (fromCheckpoint) {
 		checkpoint = loadCheckpointByStage(projectRoot, sessionId, fromCheckpoint);
 		if (!checkpoint) {
-			return { text: `Checkpoint not found: ${fromCheckpoint}`, exitCode: 1 };
+			return result(`Checkpoint not found: ${fromCheckpoint}`, 1);
 		}
 	} else {
 		checkpoint = loadLatestCheckpoint(projectRoot, sessionId);
@@ -323,13 +321,15 @@ async function continueSession(projectRoot, options) {
 	if (sm.currentState === STATES.CREATED) {
 		const routeTransition = sm.transition(STATES.ROUTED);
 		if (!routeTransition.success) {
-			return { text: `Cannot route session: ${routeTransition.error}`, exitCode: 1 };
+			return result(`Cannot route session: ${routeTransition.error}`, 1);
 		}
 		manifest.status = STATES.ROUTED;
 		manifest.updatedAt = new Date().toISOString();
 		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-		const routeTimeline = new TimelineWriter(path.join(sessionDir, "timeline.jsonl"));
+		const routeTimeline = new TimelineWriter(
+			path.join(sessionDir, "timeline.jsonl"),
+		);
 		await routeTimeline.append(routeTransition.event);
 		await routeTimeline.close();
 
@@ -338,7 +338,7 @@ async function continueSession(projectRoot, options) {
 
 	const transition = sm.transition(STATES.EXECUTING);
 	if (!transition.success) {
-		return { text: `Cannot resume: ${transition.error}`, exitCode: 1 };
+		return result(`Cannot resume: ${transition.error}`, 1);
 	}
 
 	manifest.status = STATES.EXECUTING;
@@ -363,35 +363,11 @@ async function continueSession(projectRoot, options) {
 		lines.push(`Restored from checkpoint: ${checkpoint.stage}`);
 	}
 
-	return { text: lines.join("\n"), exitCode: 0 };
+	return result(lines.join("\n"), 0);
 }
 
 function findMostRecentNonCompletedSession(projectRoot) {
-	const sessionsDir = getSessionsDir(projectRoot);
-	if (!fs.existsSync(sessionsDir)) {
-		return null;
-	}
-
-	const sessions = fs
-		.readdirSync(sessionsDir)
-		.filter((name) =>
-			fs.existsSync(path.join(sessionsDir, name, "manifest.json")),
-		)
-		.map((name) => {
-			const manifest = JSON.parse(
-				fs.readFileSync(path.join(sessionsDir, name, "manifest.json"), "utf8"),
-			);
-			return manifest;
-		})
-		.filter(
-			(m) =>
-				m.status !== "completed" &&
-				m.status !== "aborted" &&
-				m.status !== "failed",
-		)
-		.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-	return sessions.length > 0 ? sessions[0].sessionId : null;
+	return findMostRecentSession(projectRoot, { excludeCompleted: true });
 }
 
 module.exports = {
@@ -400,4 +376,5 @@ module.exports = {
 	listSessions,
 	abortSession,
 	continueSession,
+	getSessionsDir,
 };

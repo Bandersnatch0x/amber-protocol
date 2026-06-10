@@ -2,6 +2,7 @@
 
 const path = require("path");
 const { loadRoutes, loadRouteFile } = require("./route-loader");
+const { result } = require("./result");
 
 const DEFAULT_ROUTES_DIR = path.join(__dirname, "../../routes");
 
@@ -17,7 +18,7 @@ function findRoute(routeId, routesDir) {
 function listRoutes(routesDir = DEFAULT_ROUTES_DIR) {
 	const { routes } = loadRoutes(routesDir);
 	if (routes.length === 0) {
-		return { text: "No routes found.", exitCode: 0 };
+		return result("No routes found.");
 	}
 
 	const lines = ["Available routes:"];
@@ -28,7 +29,7 @@ function listRoutes(routesDir = DEFAULT_ROUTES_DIR) {
 			`  ${route.routeId} (v${version}) — ${stageCount(route)} stages — ${description}`,
 		);
 	}
-	return { text: lines.join("\n"), exitCode: 0 };
+	return result(lines.join("\n"));
 }
 
 function renderStageTree(route) {
@@ -51,7 +52,7 @@ function renderStageTree(route) {
 function inspectRoute(routeId, routesDir = DEFAULT_ROUTES_DIR) {
 	const route = findRoute(routeId, routesDir);
 	if (!route) {
-		return { text: `Route "${routeId}" not found.`, exitCode: 1 };
+		return result(`Route "${routeId}" not found.`, 1);
 	}
 
 	const { filePath, ...clean } = route;
@@ -64,30 +65,30 @@ function inspectRoute(routeId, routesDir = DEFAULT_ROUTES_DIR) {
 		"Full definition:",
 		JSON.stringify(clean, null, 2),
 	];
-	return { text: lines.join("\n"), exitCode: 0 };
+	return result(lines.join("\n"));
 }
 
 function validateRouteFile(filePath) {
 	if (!filePath) {
-		return { text: "route validate requires a file path.", exitCode: 1 };
+		return result("route validate requires a file path.", 1);
 	}
 
-	const result = loadRouteFile(filePath);
-	if (result.valid) {
-		return { text: `VALID: ${filePath}`, exitCode: 0 };
+	const loadResult = loadRouteFile(filePath);
+	if (loadResult.valid) {
+		return result(`VALID: ${filePath}`);
 	}
 
 	const lines = [`INVALID: ${filePath}`, "Errors:"];
-	for (const error of result.errors) {
+	for (const error of loadResult.errors) {
 		lines.push(`  - ${error}`);
 	}
-	return { text: lines.join("\n"), exitCode: 1 };
+	return result(lines.join("\n"), 1);
 }
 
 function testRoute(routeId, routesDir = DEFAULT_ROUTES_DIR) {
 	const route = findRoute(routeId, routesDir);
 	if (!route) {
-		return { text: `Route "${routeId}" not found.`, exitCode: 1 };
+		return result(`Route "${routeId}" not found.`, 1);
 	}
 
 	const lines = [`Dry-run for route: ${route.routeId}`, "Stage sequence:"];
@@ -98,7 +99,7 @@ function testRoute(routeId, routesDir = DEFAULT_ROUTES_DIR) {
 		}
 	});
 	lines.push("No execution performed (dry-run).");
-	return { text: lines.join("\n"), exitCode: 0 };
+	return result(lines.join("\n"));
 }
 
 module.exports = { listRoutes, inspectRoute, validateRouteFile, testRoute };
