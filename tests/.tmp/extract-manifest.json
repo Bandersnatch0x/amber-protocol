@@ -150,6 +150,10 @@
 			"dryRunLoopContract",
 			"recordLoopContract",
 			"inspectLoopLedger"
+		],
+		"profiles": [
+			"validateProjectProfileData",
+			"inspectProjectProfile"
 		]
 	}
 }
