@@ -1,0 +1,92 @@
+# Setting Up Pre-Commit Hooks
+
+Pre-commit hooks ensure code quality before changes are committed to version control.
+
+## Prerequisites
+
+- Git repository with Coding Harness initialized
+- Node.js >= 18.17
+
+## Step 1: Install Hook Dependencies
+
+```bash
+npm install --save-dev husky lint-staged
+```
+
+## Step 2: Configure Hooks
+
+Create `.husky/pre-commit`:
+
+```bash
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+npx lint-staged
+```
+
+## Step 3: Configure lint-staged
+
+Add to `package.json`:
+
+```json
+{
+  "lint-staged": {
+    "*.{js,ts}": ["eslint --fix", "prettier --write"],
+    "*.md": ["markdownlint --fix"],
+    "skills/**/SKILL.md": ["coding-harness skill validate"]
+  }
+}
+```
+
+## Step 4: Add Harness-Specific Hooks
+
+In `settings.json`:
+
+```json
+{
+  "hooks": {
+    "pre-commit": {
+      "security": "coding-harness security audit",
+      "validation": "coding-harness validate",
+      "tests": "npm test"
+    },
+    "pre-push": {
+      "full-suite": "npm run test:all",
+      "audit": "coding-harness security audit --strict"
+    }
+  }
+}
+```
+
+## Step 5: Test the Hooks
+
+```bash
+# Stage some changes
+git add .
+
+# Test pre-commit manually
+coding-harness hook run pre-commit
+
+# Commit — hooks run automatically
+git commit -m "feat: add new feature"
+```
+
+## Hook Lifecycle
+
+```
+Stage Changes → Pre-Commit → Commit → Pre-Push → Push
+                      ↓                    ↓
+               Security Audit        Full Test Suite
+               Validation            Security Audit
+               Unit Tests
+```
+
+## Troubleshooting
+
+- **Hook not running**: Run `npx husky install`
+- **Permission denied**: Run `chmod +x .husky/pre-commit`
+- **Skip hooks (emergency)**: `git commit --no-verify`
+
+---
+
+See also: [Hooks API Reference](../api/hooks-api.md)
