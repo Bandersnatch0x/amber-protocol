@@ -17,14 +17,14 @@ function loadPolicy(projectRoot = process.cwd()) {
 
 function getDefaultPolicy() {
 	return {
-		// Gates: autonomous mode auto-approves ALL gates by default,
-		// including user-approval, since there's no human in the loop.
-		// Users can override by creating .harness/autonomous-policy.json
-		// with more restrictive gate rules.
+		// Gates: user-approval gates are blocked by default —
+		// autonomous mode must not silently bypass human decisions.
+		// Users can override in .harness/autonomous-policy.json
+		// with --auto-approve-all or per-gate rules.
 		gates: {
 			auto: "approve",
-			"user-approval": "approve",
-			"step-confirm": "skip",
+			"user-approval": "block",
+			"step-confirm": "block",
 		},
 		retry: {
 			maxAttempts: 3,

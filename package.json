@@ -12,7 +12,8 @@
     "check": "node --test",
     "doctor": "node scripts/harness.js doctor --target .",
     "handoff": "node scripts/harness.js handoff --target .",
-    "manifests": "node scripts/validate-manifests.js --target ."
+    "manifests": "node scripts/validate-manifests.js --target .",
+    "test:load": "node --test tests/load/"
   },
   "engines": {
     "node": ">=18.17"

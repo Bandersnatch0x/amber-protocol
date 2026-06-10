@@ -9,6 +9,7 @@ const { TimelineWriter } = require("./timeline-writer");
 const { acquireLock, releaseLock } = require("./session-lock");
 
 async function executeSession(sessionDir, manifest, route, options = {}) {
+	const { stageTimeout } = options; // per-stage timeout in ms
 	const timelinePath = path.join(sessionDir, "timeline.jsonl");
 	const writer = new TimelineWriter(timelinePath);
 
