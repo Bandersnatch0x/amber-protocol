@@ -93,6 +93,11 @@
 			"prepareTaskExecution",
 			"inspectTaskResult",
 			"orchestrationPaths"
+		],
+		"agent-orchestration": [
+			"dispatchAgentTask",
+			"setAgentDispatchStatus",
+			"recordAgentReview"
 		]
 	}
 }
