@@ -216,6 +216,11 @@
 			"adoptionSelectedFilesErrorResult",
 			"buildAdoptionSelectedFilesContent",
 			"writeAdoptionSelectedFiles"
+		],
+		"cli-output": [
+			"parseArgs",
+			"printAuditSummary",
+			"printResult"
 		]
 	}
 }
