@@ -53,6 +53,8 @@ const {
 	testRoute,
 } = require("./lib/route-commands");
 
+const { migrateManifests } = require("./lib/migrate-command");
+
 const {
 	startSession,
 	statusSession,
@@ -82,6 +84,7 @@ const COMMANDS = [
 	"loop",
 	"route",
 	"session",
+	"migrate",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
@@ -256,6 +259,18 @@ function commandSummary(command) {
 			"  node scripts/harness.js session list",
 			"  node scripts/harness.js session abort <session-id>",
 			"  node scripts/harness.js session continue",
+		].join("\n");
+	}
+	if (command === "migrate") {
+		return [
+			"Migrate session manifests to the current schema version.",
+			"",
+			"Options:",
+			"  --dry-run    Preview changes without writing files.",
+			"",
+			"Examples:",
+			"  node scripts/harness.js migrate --target <path>",
+			"  node scripts/harness.js migrate --target <path> --dry-run",
 		].join("\n");
 	}
 	return "Run Coding Harness command.";
@@ -538,6 +553,27 @@ async function run(argv = process.argv.slice(2)) {
 		}
 		printResult(result, { json: true });
 		return sessionResult.exitCode;
+	} else if (command === "migrate") {
+		const migrateResult = migrateManifests(args.target || process.cwd(), {
+			dryRun: args.dryRun,
+		});
+		result = {
+			target: args.target,
+			text: migrateResult.message,
+			errors: [],
+			warnings: [],
+		};
+		if (!args.json) {
+			console.log(migrateResult.message);
+			if (migrateResult.logs && migrateResult.logs.length > 0) {
+				for (const log of migrateResult.logs) {
+					console.log(`  ${log}`);
+				}
+			}
+			return 0;
+		}
+		printResult(result, { json: true });
+		return 0;
 	} else {
 		result = doctor(args.target);
 	}

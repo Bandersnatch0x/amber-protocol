@@ -3,8 +3,13 @@
 const fs = require("fs");
 const path = require("path");
 const { createManifest } = require("./session-manifest");
-const { TimelineWriter } = require("./timeline-writer");
+const { TimelineWriter } = require("./timeline");
 const { SessionStateMachine, STATES } = require("./session-state-machine");
+const {
+	loadLatestCheckpoint,
+	loadCheckpointByStage,
+} = require("./checkpoint-manager");
+const { checkSchemaVersion } = require("./schema-version-checker");
 const { createWorktree, removeWorktree } = require("./worktree-manager");
 const { selectRoute } = require("./route-selector");
 const { loadRoutes } = require("./route-loader");
@@ -251,12 +256,12 @@ async function abortSession(projectRoot, options) {
 }
 
 async function continueSession(projectRoot, options) {
-	let { sessionId } = options;
+	let { sessionId, fromCheckpoint } = options;
 
 	if (!sessionId) {
-		sessionId = findMostRecentSession(projectRoot);
+		sessionId = findMostRecentNonCompletedSession(projectRoot);
 		if (!sessionId) {
-			return { text: "No sessions found to continue", exitCode: 1 };
+			return { text: "No resumable sessions found", exitCode: 1 };
 		}
 	}
 
@@ -269,6 +274,11 @@ async function continueSession(projectRoot, options) {
 
 	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
+	const versionCheck = checkSchemaVersion(manifest);
+	if (!versionCheck.valid) {
+		return { text: `Schema error: ${versionCheck.error}`, exitCode: 1 };
+	}
+
 	if (manifest.status === "completed") {
 		return { text: "Session already completed", exitCode: 1 };
 	}
@@ -277,12 +287,117 @@ async function continueSession(projectRoot, options) {
 		return { text: "Session was aborted", exitCode: 1 };
 	}
 
-	return {
-		text: `Ready to continue session ${sessionId} from stage: ${manifest.currentStage || "start"}`,
-		exitCode: 0,
-		sessionId,
-		manifest,
-	};
+	if (
+		manifest.status !== "paused" &&
+		manifest.status !== "executing" &&
+		manifest.status !== "created" &&
+		manifest.status !== "routed"
+	) {
+		return {
+			text: `Cannot continue session with status: ${manifest.status}`,
+			exitCode: 1,
+		};
+	}
+
+	let checkpoint;
+	if (fromCheckpoint) {
+		checkpoint = loadCheckpointByStage(projectRoot, sessionId, fromCheckpoint);
+		if (!checkpoint) {
+			return { text: `Checkpoint not found: ${fromCheckpoint}`, exitCode: 1 };
+		}
+	} else {
+		checkpoint = loadLatestCheckpoint(projectRoot, sessionId);
+	}
+
+	if (checkpoint) {
+		manifest.currentStage =
+			checkpoint.manifest.currentStage || manifest.currentStage;
+		manifest.completedStages =
+			checkpoint.manifest.completedStages || manifest.completedStages || [];
+		manifest.budget = checkpoint.manifest.budget || manifest.budget;
+	}
+
+	const sm = new SessionStateMachine(manifest.status);
+
+	// Auto-route created sessions before executing
+	if (sm.currentState === STATES.CREATED) {
+		const routeTransition = sm.transition(STATES.ROUTED);
+		if (!routeTransition.success) {
+			return { text: `Cannot route session: ${routeTransition.error}`, exitCode: 1 };
+		}
+		manifest.status = STATES.ROUTED;
+		manifest.updatedAt = new Date().toISOString();
+		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+		const routeTimeline = new TimelineWriter(path.join(sessionDir, "timeline.jsonl"));
+		await routeTimeline.append(routeTransition.event);
+		await routeTimeline.close();
+
+		sm.currentState = STATES.ROUTED;
+	}
+
+	const transition = sm.transition(STATES.EXECUTING);
+	if (!transition.success) {
+		return { text: `Cannot resume: ${transition.error}`, exitCode: 1 };
+	}
+
+	manifest.status = STATES.EXECUTING;
+	manifest.updatedAt = new Date().toISOString();
+	fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+	const timelinePath = path.join(sessionDir, "timeline.jsonl");
+	const writer = new TimelineWriter(timelinePath);
+	await writer.append({
+		type: "session_resumed",
+		data: { sessionId, fromCheckpoint: checkpoint?.stage || null },
+	});
+	await writer.close();
+
+	const lines = [
+		`Session resumed: ${sessionId}`,
+		`Current stage: ${manifest.currentStage || "none"}`,
+		`Completed stages: ${(manifest.completedStages || []).join(", ") || "none"}`,
+	];
+
+	if (checkpoint) {
+		lines.push(`Restored from checkpoint: ${checkpoint.stage}`);
+	}
+
+	return { text: lines.join("\n"), exitCode: 0 };
 }
 
-module.exports = { startSession, statusSession, listSessions, abortSession, continueSession };
+function findMostRecentNonCompletedSession(projectRoot) {
+	const sessionsDir = getSessionsDir(projectRoot);
+	if (!fs.existsSync(sessionsDir)) {
+		return null;
+	}
+
+	const sessions = fs
+		.readdirSync(sessionsDir)
+		.filter((name) =>
+			fs.existsSync(path.join(sessionsDir, name, "manifest.json")),
+		)
+		.map((name) => {
+			const manifest = JSON.parse(
+				fs.readFileSync(path.join(sessionsDir, name, "manifest.json"), "utf8"),
+			);
+			return manifest;
+		})
+		.filter(
+			(m) =>
+				m.status !== "completed" &&
+				m.status !== "aborted" &&
+				m.status !== "failed",
+		)
+		.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+	return sessions.length > 0 ? sessions[0].sessionId : null;
+}
+
+module.exports = {
+	startSession,
+	statusSession,
+	listSessions,
+	abortSession,
+	continueSession,
+};
