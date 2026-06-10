@@ -14,15 +14,21 @@ function acquireLock(projectRoot, sessionId) {
 	}
 
 	if (fs.existsSync(lockPath)) {
-		const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
-		const age = Date.now() - lock.timestamp;
-
-		if (age < LOCK_TIMEOUT_MS) {
-			return { success: false, error: "Session is locked by another process" };
+		let lock;
+		try {
+			lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+		} catch {
+			// Corrupt lock file - treat as stale
+			fs.unlinkSync(lockPath);
 		}
-
-		// Stale lock - remove it
-		fs.unlinkSync(lockPath);
+		if (lock) {
+			const age = Date.now() - lock.timestamp;
+			if (age < LOCK_TIMEOUT_MS) {
+				return { success: false, error: "Session is locked by another process" };
+			}
+			// Stale lock - remove it
+			fs.unlinkSync(lockPath);
+		}
 	}
 
 	fs.writeFileSync(
@@ -51,7 +57,12 @@ function isLocked(projectRoot, sessionId) {
 		return false;
 	}
 
-	const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+	let lock;
+	try {
+		lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+	} catch {
+		return false;
+	}
 	const age = Date.now() - lock.timestamp;
 
 	return age < LOCK_TIMEOUT_MS;
