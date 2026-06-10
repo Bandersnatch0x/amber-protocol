@@ -24,6 +24,7 @@ flowchart LR
   Core --> Routes["routes/*.route.json<br/>Delivery route definitions"]
   Core --> Schemas["schemas/*.schema.json<br/>JSON Schema drafts"]
   Core --> PhaseB["src/migration/ src/security/<br/>Migration tools + Security scanners"]
+  Core -.-> Web["apps/web/<br/>Phase C scaffolding (deferred)"]
   Tests["tests/<br/>Node test suite"] --> CLI
 
   Target["Target repository"] -. "init/wiki create missing files only" .-> Templates
@@ -131,6 +132,10 @@ node scripts/harness.js maintenance propose --target path/to/project
 ```
 
 Run `node scripts/harness.js <command> --help` for scoped command help.
+
+Additional commands `task`, `result`, `agent`, and `loop` exist but are
+lower-level orchestration tools used internally by the execution engine;
+they are not documented in this README.
 
 ## What Gets Installed
 
