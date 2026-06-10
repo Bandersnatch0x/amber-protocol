@@ -1,0 +1,8 @@
+{
+  "routeId": "Broken Route",
+  "schemaVersion": "0.9.0",
+  "version": "1.0.0",
+  "displayName": "Deliberately Broken Route",
+  "description": "Used by tests to prove validation rejects malformed routes",
+  "stages": []
+}
