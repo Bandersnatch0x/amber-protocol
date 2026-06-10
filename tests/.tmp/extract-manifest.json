@@ -70,6 +70,15 @@
 			"hasNextAction",
 			"hasVerificationCommand",
 			"validateHandoff"
+		],
+		"manifests": [
+			"loadManifest",
+			"requireManifestString",
+			"validateSkillsPath",
+			"validateCommonManifest",
+			"validateCodexManifest",
+			"validateManifests",
+			"classifyTarget"
 		]
 	}
 }
