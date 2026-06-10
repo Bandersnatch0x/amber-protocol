@@ -119,6 +119,20 @@
 			"updateTeamDistribution",
 			"pinTeamDistribution",
 			"rollbackTeamDistribution"
+		],
+		"maintenance": [
+			"listWikiMarkdownFiles",
+			"detectStaleDocs",
+			"buildWikiLintCi",
+			"detectRulePackDrift",
+			"buildUpgradeAssistant",
+			"buildMigrationAssistant",
+			"extractEvolutionFindings",
+			"readRegressionProposal",
+			"extractRegressionProposals",
+			"inspectMaintenance",
+			"buildMaintenanceProposalContent",
+			"proposeMaintenance"
 		]
 	}
 }
