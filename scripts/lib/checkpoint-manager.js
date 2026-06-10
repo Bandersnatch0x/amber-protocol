@@ -51,13 +51,20 @@ function loadLatestCheckpoint(projectRoot, sessionId) {
 		.filter((f) => f.endsWith(".json"));
 	if (files.length === 0) return null;
 
-	const checkpoints = files.map((f) => {
-		const content = fs.readFileSync(path.join(checkpointsDir, f), "utf8");
-		return JSON.parse(content);
-	});
+	const checkpoints = [];
+	for (const f of files) {
+		try {
+			const content = fs.readFileSync(path.join(checkpointsDir, f), "utf8");
+			checkpoints.push(JSON.parse(content));
+		} catch (err) {
+			console.error(
+				`Warning: skipping corrupt checkpoint ${f}: ${err.message}`,
+			);
+		}
+	}
 
 	checkpoints.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-	return checkpoints[0];
+	return checkpoints.length > 0 ? checkpoints[0] : null;
 }
 
 function listCheckpoints(projectRoot, sessionId) {
@@ -69,10 +76,17 @@ function listCheckpoints(projectRoot, sessionId) {
 	const files = fs
 		.readdirSync(checkpointsDir)
 		.filter((f) => f.endsWith(".json"));
-	const checkpoints = files.map((f) => {
-		const content = fs.readFileSync(path.join(checkpointsDir, f), "utf8");
-		return JSON.parse(content);
-	});
+	const checkpoints = [];
+	for (const f of files) {
+		try {
+			const content = fs.readFileSync(path.join(checkpointsDir, f), "utf8");
+			checkpoints.push(JSON.parse(content));
+		} catch (err) {
+			console.error(
+				`Warning: skipping corrupt checkpoint ${f}: ${err.message}`,
+			);
+		}
+	}
 
 	return checkpoints.sort(
 		(a, b) => new Date(a.timestamp) - new Date(b.timestamp),

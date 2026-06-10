@@ -514,13 +514,25 @@ async function run(argv = process.argv.slice(2)) {
 		const action = args._ && args._[0];
 		let sessionResult;
 		if (action === "start") {
-			sessionResult = await startSession(args.target || process.cwd(), {
-				goal: args.goal || args._[1],
-				route: args.route,
-				budget: args.budget ? parseInt(args.budget, 10) : undefined,
-				worktree: args.worktree,
-				mode: args.mode,
-			});
+			let parsedBudget;
+			if (args.budget) {
+				parsedBudget = parseInt(args.budget, 10);
+				if (isNaN(parsedBudget) || parsedBudget <= 0) {
+					sessionResult = {
+						text: "Error: --budget must be a positive integer",
+						exitCode: 1,
+					};
+				}
+			}
+			if (!sessionResult) {
+				sessionResult = await startSession(args.target || process.cwd(), {
+					goal: args.goal || args._[1],
+					route: args.route,
+					budget: parsedBudget,
+					worktree: args.worktree,
+					mode: args.mode,
+				});
+			}
 		} else if (action === "status") {
 			sessionResult = statusSession(args.target || process.cwd(), {
 				sessionId: args._[1],
@@ -583,9 +595,14 @@ async function run(argv = process.argv.slice(2)) {
 }
 
 if (require.main === module) {
-	run().then((code) => {
-		process.exitCode = code;
-	});
+	run()
+		.then((code) => {
+			process.exitCode = code;
+		})
+		.catch((err) => {
+			console.error(err.message || err);
+			process.exitCode = 1;
+		});
 }
 
 module.exports = { run, usage };

@@ -49,6 +49,8 @@ function migrateManifests(projectRoot, options = {}) {
 			continue;
 		}
 
+		const originalVersion = manifest.schemaVersion || null;
+
 		if (!dryRun) {
 			const backupPath = manifestPath + ".backup";
 			fs.copyFileSync(manifestPath, backupPath);
@@ -56,7 +58,7 @@ function migrateManifests(projectRoot, options = {}) {
 			manifest.schemaVersion = CURRENT_SCHEMA_VERSION;
 			fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 			logs.push(
-				`Migrated ${sessionDirName}: ${manifest.schemaVersion === CURRENT_SCHEMA_VERSION ? "missing" : manifest.schemaVersion} → ${CURRENT_SCHEMA_VERSION}`,
+				`Migrated ${sessionDirName}: ${originalVersion || "missing"} → ${CURRENT_SCHEMA_VERSION}`,
 			);
 		} else {
 			logs.push(
