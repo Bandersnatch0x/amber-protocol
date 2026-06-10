@@ -88,6 +88,11 @@
 			"discoverStandards",
 			"reviewPlan",
 			"acceptPlan"
+		],
+		"task-execution": [
+			"prepareTaskExecution",
+			"inspectTaskResult",
+			"orchestrationPaths"
 		]
 	}
 }
