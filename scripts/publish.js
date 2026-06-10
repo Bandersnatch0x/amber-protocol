@@ -39,7 +39,12 @@ function publish(options = {}) {
 	// 1. Verify package contents
 	console.log("1. Packing to verify contents...");
 	const packOutput = run("npm pack --dry-run 2>&1");
-	console.log(packOutput.split("\n").map(l => `   ${l}`).join("\n"));
+	console.log(
+		packOutput
+			.split("\n")
+			.map((l) => `   ${l}`)
+			.join("\n"),
+	);
 
 	// Check for required files
 	const requiredFiles = [
@@ -78,11 +83,15 @@ function publish(options = {}) {
 				console.log(`   ⚠️  Registry shows ${info}, expected ${version}`);
 			}
 		} catch (e) {
-			console.log("   ℹ️  Verification skipped (may take a moment to propagate)");
+			console.log(
+				"   ℹ️  Verification skipped (may take a moment to propagate)",
+			);
 		}
 	}
 
 	console.log("\n=== Publish complete ===");
 }
 
-publish();
+if (require.main === module) {
+	publish();
+}
