@@ -5,7 +5,9 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { exportGovernanceEvidence } = require("../scripts/lib/governance-commands");
+const {
+	exportGovernanceEvidence,
+} = require("../scripts/lib/governance-commands");
 
 describe("governance evidence", () => {
 	let tmpDir;
@@ -40,17 +42,17 @@ describe("governance evidence", () => {
 			{
 				type: "session_created",
 				timestamp: new Date().toISOString(),
-				data: { goal: "Implement user authentication" }
+				data: { goal: "Implement user authentication" },
 			},
 			{
 				type: "command_executed",
 				timestamp: new Date().toISOString(),
-				data: { command: "npm install express" }
+				data: { command: "npm install express" },
 			},
 			{
 				type: "command_executed",
 				timestamp: new Date().toISOString(),
-				data: { command: "npm test" }
+				data: { command: "npm test" },
 			},
 		];
 		fs.writeFileSync(
@@ -113,5 +115,96 @@ describe("governance evidence", () => {
 		assert.ok(content.includes("Create schema"));
 		assert.ok(content.includes("Worktree"));
 		assert.ok(content.includes("/path/to/worktree"));
+	});
+
+	it("session export → empty timeline produces minimal output", () => {
+		const sessionId = "test-session-empty";
+		const sessionsDir = path.join(tmpDir, ".amber", "sessions", sessionId);
+		fs.mkdirSync(sessionsDir, { recursive: true });
+
+		fs.writeFileSync(
+			path.join(sessionsDir, "manifest.json"),
+			JSON.stringify(
+				{
+					sessionId,
+					goal: "Empty test",
+					status: "active",
+					createdAt: new Date().toISOString(),
+				},
+				null,
+				2,
+			),
+		);
+
+		// Empty timeline (0 events)
+		fs.writeFileSync(path.join(sessionsDir, "timeline.jsonl"), "");
+
+		const outputPath = path.join(tmpDir, "session-empty.md");
+		const result = exportGovernanceEvidence(tmpDir, {
+			session: sessionId,
+			output: outputPath,
+		});
+
+		assert.strictEqual(result.errors.length, 0);
+		const content = fs.readFileSync(outputPath, "utf8");
+		assert.ok(content.includes("# Session Evidence"));
+		assert.ok(content.includes(sessionId));
+		// No goal or commands since no session_created event
+		assert.ok(!content.includes("Goal:"));
+	});
+
+	it("execution export → missing ledger produces markdown with just task id", () => {
+		const taskId = "test-task-no-ledger";
+		const taskDir = path.join(tmpDir, ".amber", "executions", taskId);
+		fs.mkdirSync(taskDir, { recursive: true });
+
+		// Only evidence.json, no ledger.json
+		fs.writeFileSync(
+			path.join(taskDir, "evidence.json"),
+			JSON.stringify({ commands: ["npm install"] }, null, 2),
+		);
+
+		const outputPath = path.join(tmpDir, "task-no-ledger.md");
+		const result = exportGovernanceEvidence(tmpDir, {
+			task: taskId,
+			output: outputPath,
+		});
+
+		assert.strictEqual(result.errors.length, 0);
+		const content = fs.readFileSync(outputPath, "utf8");
+		assert.ok(content.includes("# Execution Evidence"));
+		assert.ok(content.includes(taskId));
+		// Commands from evidence.json still appear
+		assert.ok(content.includes("npm install"));
+	});
+
+	it("execution export → missing evidence produces markdown without commands section", () => {
+		const taskId = "test-task-no-evidence";
+		const taskDir = path.join(tmpDir, ".amber", "executions", taskId);
+		fs.mkdirSync(taskDir, { recursive: true });
+
+		// Only ledger.json, no evidence.json
+		fs.writeFileSync(
+			path.join(taskDir, "ledger.json"),
+			JSON.stringify(
+				{ plan: "# Simple Plan", status: "completed", worktree: "/tmp/wt" },
+				null,
+				2,
+			),
+		);
+
+		const outputPath = path.join(tmpDir, "task-no-evidence.md");
+		const result = exportGovernanceEvidence(tmpDir, {
+			task: taskId,
+			output: outputPath,
+		});
+
+		assert.strictEqual(result.errors.length, 0);
+		const content = fs.readFileSync(outputPath, "utf8");
+		assert.ok(content.includes("# Execution Evidence"));
+		assert.ok(content.includes("# Simple Plan"));
+		assert.ok(content.includes("/tmp/wt"));
+		// No commands section
+		assert.ok(!content.includes("## Commands"));
 	});
 });
