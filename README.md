@@ -1,5 +1,9 @@
 # Amber Protocol
 
+<p align="center">
+  <img src="./assets/brand/amber-protocol-logo.png" alt="Amber Protocol logo" width="160" />
+</p>
+
 [简体中文](./README.zh-CN.md)
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)

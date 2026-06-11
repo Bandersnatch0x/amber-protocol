@@ -68,9 +68,8 @@ Phase C development is already underway. Web-based project viewer. Team collabor
 
 ## Join Us
 
-- ⭐ [Star us on GitHub](https://github.com/coding-harness)
-- 💬 [Join our Discord](https://discord.gg/coding-harness)
-- 🐛 [Report bugs](https://github.com/coding-harness/issues)
+- ⭐ Star the repository
+- 🐛 Report bugs via the project issue tracker
 - 📖 [Read the docs](../user-guide/getting-started.md)
 
 **Happy building!**

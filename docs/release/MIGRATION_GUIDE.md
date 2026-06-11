@@ -141,4 +141,4 @@ After migration, verify:
 
 - [Troubleshooting Guide](../user-guide/troubleshooting.md)
 - [FAQ](../user-guide/faq.md)
-- [GitHub Issues](https://github.com/coding-harness/issues)
+- the project issue tracker

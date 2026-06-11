@@ -72,4 +72,4 @@ To all our alpha testers, RC participants, and community contributors — this r
 
 ---
 
-[GitHub](https://github.com/coding-harness) · [Documentation](../user-guide/getting-started.md) · [Changelog](./CHANGELOG.md)
+[Documentation](../user-guide/getting-started.md) · [Changelog](./CHANGELOG.md)

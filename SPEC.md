@@ -1,22 +1,21 @@
-# Coding Harness SPEC
+# Amber Protocol SPEC
 
 Status: draft v1
 
-This spec defines the first shippable shape of `coding-harness`: a Codex + Claude Code Harness integration and verification toolkit.
+This spec defines the first shippable shape of `amber-protocol`: a Codex + Claude Code Amber integration and verification toolkit.
 
 It is based on:
 
-- The current Harness Engineering operating manual in `guide.md`
+- The current Harness Engineering operating manual (legacy name) in `guide.md`
 - OpenAI's repository-as-system-of-record pattern
 - Anthropic's Dynamic Workflows direction
-- The `Chachamaru127/claude-code-harness` reference implementation shape
 - Roundtable review using product-boundary grilling and technical review
 - Matt Van Horn's agentic-engineering workflow notes, interpreted as workflow mechanisms rather than tool dependencies
 - Loop-engineering and agent-observability notes, interpreted as declarative contracts, replay evidence, and regression proposals rather than live automation
 
 ## 1. Product Positioning
 
-`coding-harness` is a plugin-first toolkit for safely installing, auditing, validating, and maintaining an Agent-readable Harness inside real code repositories.
+`amber-protocol` is a plugin-first toolkit for safely installing, auditing, validating, and maintaining an Agent-readable Amber setup inside real code repositories.
 
 It is not a general Agent operating system.
 
@@ -43,7 +42,7 @@ V1 does not promise deep framework-specific understanding. Framework packs can b
 
 V1 is:
 
-> A pluginized Harness installer, auditor, Wiki scaffold, doctor, handoff validator, and static continuous-improvement state template.
+> A pluginized Amber installer, auditor, Wiki scaffold, doctor, handoff validator, and static continuous-improvement state template.
 
 V1 is not:
 
@@ -59,11 +58,11 @@ The first version should build trust by being safe, inspectable, idempotent, and
 
 V1.x may validate workflow-pack shape, standards references, profile metadata, and human approval gates. It must still stop before executing dynamic workflows, dispatching workers, or calling project-specific external systems on the user's behalf.
 
-Article-inspired capabilities such as remote task ingress, always-on control, permission-bypass modes, account-bearing CLIs, or live multi-session dispatch are outside the core Harness. They may be represented later only as explicit integration contracts, dry-run checks, redacted evidence, and human approval gates.
+Article-inspired capabilities such as remote task ingress, always-on control, permission-bypass modes, account-bearing CLIs, or live multi-session dispatch are outside the core Amber Protocol. They may be represented later only as explicit integration contracts, dry-run checks, redacted evidence, and human approval gates.
 
-Loop-inspired capabilities such as scheduled discovery, goal loops, connector-backed triage, trace diagnosis, auto-fix proposals, and regression-test generation are allowed only as declarative contracts and reviewable artifacts until an explicit future execution layer exists. The core Harness must not run cron jobs, open PRs, update external trackers, or apply trace-derived fixes.
+Loop-inspired capabilities such as scheduled discovery, goal loops, connector-backed triage, trace diagnosis, auto-fix proposals, and regression-test generation are allowed only as declarative contracts and reviewable artifacts until an explicit future execution layer exists. The core Amber Protocol must not run cron jobs, open PRs, update external trackers, or apply trace-derived fixes.
 
-Live loop scheduling is outside the current product boundary. The Harness may define readiness requirements for a future execution layer, but it must not imply support for always-on agents, daemonized work, hook-triggered mutation, autonomous notifications, or scheduled external-system updates until loop contracts, execution ledgers, replay evidence, approval policy, connector contracts, no-progress detection, isolated workspaces, budget ceilings, and human/reviewer gates are stable.
+Live loop scheduling is outside the current product boundary. The Amber setup may define readiness requirements for a future execution layer, but it must not imply support for always-on agents, daemonized work, hook-triggered mutation, autonomous notifications, or scheduled external-system updates until loop contracts, execution ledgers, replay evidence, approval policy, connector contracts, no-progress detection, isolated workspaces, budget ceilings, and human/reviewer gates are stable.
 
 ## 4. V1 Command Surface
 
@@ -71,7 +70,7 @@ V1 keeps the command surface narrow.
 
 ### `init`
 
-Initialize a new or empty project with a minimal Harness.
+Initialize a new or empty project with a minimal Amber setup.
 
 Creates, when safe:
 
@@ -101,7 +100,7 @@ Outputs a migration report describing:
 - Existing Agent instructions
 - Existing docs and Wiki-like files
 - Available install/start/test/build commands
-- Missing Harness files
+- Missing Amber files
 - Conflicts
 - Suggested safe additions
 - Suggested patches that require user approval
@@ -126,7 +125,7 @@ docs/wiki/
   architecture/module-boundaries.md
   engineering/runbook.md
   engineering/verification.md
-  agent/harness.md
+  agent/amber.md
   agent/failure-patterns.md
   features/
   glossary.md
@@ -141,7 +140,7 @@ Rules:
 
 ### `doctor`
 
-Validate whether the Harness is actually usable.
+Validate whether the Amber setup is actually usable.
 
 Checks:
 
@@ -153,12 +152,12 @@ Checks:
 - `AGENTS.md` / `CLAUDE.md` route to the Wiki
 - Verification commands are present
 - Handoff/progress files contain next-action information
-- The target is classified as a Harness product repo, an already-harnessed repo, or an unharnessed target repo
+- The target is classified as an Amber setup product repo, an already-harnessed repo, or an unharnessed target repo
 - Profile, standards, and workflow-pack references resolve when present
 - Required local runtimes and environment variables are reported as available, missing, or not applicable
 - Continuous-improvement state is valid when present
 
-V1 doctor validates the Harness itself. It does not promise to run full CI or end-to-end tests for the target project.
+V1 doctor validates the Amber setup itself. It does not promise to run full CI or end-to-end tests for the target project.
 
 ### `handoff`
 
@@ -220,7 +219,7 @@ If these appear in V1 docs, they must be described as future extension points or
 The toolkit is split into platform adapters and shared core.
 
 ```text
-coding-harness/
+amber-protocol/
   .codex-plugin/
     plugin.json
   .claude-plugin/
@@ -228,11 +227,11 @@ coding-harness/
     settings.json
     hooks.json
   skills/
-    harness-init/
-    harness-audit/
-    harness-wiki/
-    harness-doctor/
-    harness-handoff/
+    amber-init/
+    amber-audit/
+    amber-wiki/
+    amber-doctor/
+    amber-handoff/
   profiles/
     default/
       profile.json
@@ -258,7 +257,7 @@ coding-harness/
     .workflow/continuous-improvement/packets/README.md
     docs/wiki/...
   scripts/
-    scaffold-harness.js
+    scaffold-amber.js
     audit-project.js
     validate-feature-list.js
     validate-wiki.js
@@ -267,7 +266,7 @@ coding-harness/
     fixtures/
     validate-feature-list.test.js
     validate-wiki.test.js
-    scaffold-harness.test.js
+    scaffold-amber.test.js
   guide.md
   SPEC.md
   ROADMAP.md
@@ -361,11 +360,11 @@ Complex task planning is deferred to V2 through durable plan artifacts. A plan s
 
 V1 is acceptable when:
 
-- Running `init` in an empty repository creates the minimal Harness file set.
+- Running `init` in an empty repository creates the minimal Amber file set.
 - Running `audit` in an existing repository does not modify files by default.
 - Re-running `init` does not duplicate content or overwrite user files.
 - `doctor` detects missing files, schema failures, multiple `in_progress` features, empty evidence on `passing`, Wiki broken links, and missing verification commands.
-- The generated Wiki skeleton can be used by a fresh Agent to find product, architecture, engineering, verification, and Harness guidance.
+- The generated Wiki skeleton can be used by a fresh Agent to find product, architecture, engineering, verification, and Amber guidance.
 - Plugin manifests pass local structural validation.
 - Scripts work on Windows and do not assume bash-only execution.
 - README explains new-project setup, old-project audit, validation, rollback/uninstall boundaries, and V1 non-goals.
@@ -380,7 +379,7 @@ V1 is acceptable when:
 - The safest cross-platform script runtime. Node.js is the current default candidate.
 - License boundaries for reference implementations. Ideas can be referenced; code reuse requires license review.
 - Workflow-pack manifest shape, including skills, standards, profile metadata, scripts, required environment variables, and install/upgrade behavior.
-- How to separate a Harness product repository from a target repository during `doctor`.
+- How to separate an Amber setup product repository from a target repository during `doctor`.
 - How to model external-system integrations safely: environment contract, dry-run checks, redacted logs, and no implicit network calls.
 - How to model plan source bundles for issues, screenshots, terminal errors, meeting transcripts, prior plans, recent research summaries, and codebase findings.
 - How much human feedback evidence is required before a redirected or accepted task can be considered reviewable.
@@ -388,9 +387,9 @@ V1 is acceptable when:
 
 ## 11. Revised Roadmap
 
-### V1: Safe Harness Bootstrap
+### V1: Safe Amber Bootstrap
 
-Goal: Safely install and validate a minimal repository-local Harness.
+Goal: Safely install and validate a minimal repository-local Amber setup.
 
 Scope:
 
@@ -411,7 +410,7 @@ Gate:
 
 ### V1.5: Compatibility Hardening
 
-Goal: Make the dual-plugin shape reliable across supported platforms and make the Harness self-aware enough to distinguish the toolkit repo from target repos.
+Goal: Make the dual-plugin shape reliable across supported platforms and make the Amber setup self-aware enough to distinguish the toolkit repo from target repos.
 
 Scope:
 
@@ -429,7 +428,7 @@ Gate:
 
 - Both platform adapters can be locally validated.
 - Shared core works without duplicating logic.
-- Running `doctor --target .` in this repository reports product-repo status instead of treating the toolkit as a broken target Harness.
+- Running `doctor --target .` in this repository reports product-repo status instead of treating the toolkit as a broken target Amber setup.
 - A sample workflow pack can be structurally inspected without executing its workflow.
 
 ### V2: Planning Layer
@@ -471,14 +470,14 @@ Scope:
 - Reviewer output schema
 - Standards/rule-pack selection by profile and changed file type
 - Static pre-delivery checklist output
-- Harness evolution log for lessons that should update project rules or Wiki
+- Amber evolution log for lessons that should update project rules or Wiki
 
 Gate:
 
 - Review can block empty evidence, false `passing`, and unresolved blockers.
 - Review can report which standards were loaded, which checks passed, which checks were not applicable, and which findings require user action.
 - Review can preserve the human signal behind a decision: why work was accepted, redirected, narrowed, or rejected.
-- A completed task can append a concise Harness evolution record without inventing future-facing rules.
+- A completed task can append a concise Amber evolution record without inventing future-facing rules.
 
 ### V3: Workflow Pack Design Kit
 
@@ -569,9 +568,9 @@ Gate:
 - Teams can install, pin, update, and roll back versions.
 - Teams can preview pack changes before upgrade and keep target-repo customizations intact.
 
-### V5.5: Continuous Harness Maintenance
+### V5.5: Continuous Amber Maintenance
 
-Goal: Keep Harness and Wiki from becoming stale.
+Goal: Keep the Amber setup and Wiki from becoming stale.
 
 Scope:
 
@@ -580,7 +579,7 @@ Scope:
 - Stale-doc detection
 - Migration assistant
 - Upgrade assistant
-- Harness evolution rollups
+- Amber evolution rollups
 - Rule-pack drift detection
 - Workflow-pack candidate proposals from repeated work
 - Failure-to-regression proposals from trace or execution evidence
@@ -632,8 +631,8 @@ Gate:
 The first implementation cut should create:
 
 - Minimal plugin manifests
-- Harness templates
-- `scaffold-harness.js`
+- Amber templates
+- `scaffold-amber.js`
 - `audit-project.js`
 - `validate-feature-list.js`
 - `validate-wiki.js`
@@ -641,6 +640,6 @@ The first implementation cut should create:
 - target classification in `doctor`
 - minimal workflow-pack/profile schema validation
 - continuous-improvement state template and validator
-- Fixture tests for empty repo, old repo, and broken Harness
+- Fixture tests for empty repo, old repo, and broken Amber setup
 
 The first cut should not implement dynamic workflows.

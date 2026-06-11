@@ -76,7 +76,7 @@ coding-harness logs --tail 50
 
 ## Reporting Bugs
 
-1. Check [existing issues](https://github.com/coding-harness/issues)
+1. Check existing issues in the project issue tracker
 2. Run `coding-harness doctor --report` to gather diagnostics
 3. Include in your report:
    - Node version (`node --version`)
