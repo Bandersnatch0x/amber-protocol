@@ -6,7 +6,7 @@ This spec defines the first shippable shape of `amber-protocol`: a Codex + Claud
 
 It is based on:
 
-- The current Harness Engineering operating manual (legacy name) in `guide.md`
+- The current Harness Engineering operating manual (legacy name) in `docs/legacy/guide.md`
 - OpenAI's repository-as-system-of-record pattern
 - Anthropic's Dynamic Workflows direction
 - Roundtable review using product-boundary grilling and technical review
@@ -267,7 +267,7 @@ amber-protocol/
     validate-feature-list.test.js
     validate-wiki.test.js
     scaffold-amber.test.js
-  guide.md
+  docs/legacy/guide.md
   SPEC.md
   ROADMAP.md
   README.md
