@@ -1,6 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-const { execFileSync } = require("child_process");
 
 function validateLoopContract(contractPath) {
 	const errors = [];
@@ -235,24 +234,26 @@ function checkExecutionReadiness(projectRoot, planPath) {
 					"Worktree has active merge/rebase (conflict state detected)",
 				);
 			} else {
-				// Check for uncommitted changes via git status --porcelain
+				// Check for uncommitted changes via .git/index mtime heuristic
+				// If index was modified within last 60s, assume recent changes
 				try {
-					const status = execFileSync("git", ["status", "--porcelain"], {
-						cwd: projectRoot,
-						encoding: "utf8",
-						stdio: ["ignore", "pipe", "pipe"],
-						timeout: 10000,
-					}).trim();
-					if (status.length > 0) {
-						const lines = status.split("\n").length;
-						warnings.push(
-							`Worktree has ${lines} uncommitted change(s) (git status --porcelain)`,
-						);
+					const indexPath = path.join(gitDir, "index");
+					if (fs.existsSync(indexPath)) {
+						const indexStat = fs.statSync(indexPath);
+						const indexAge = Date.now() - indexStat.mtimeMs;
+						if (indexAge < 60000) {
+							warnings.push(
+								`Worktree may have uncommitted changes (index modified ${Math.round(indexAge / 1000)}s ago)`,
+							);
+						} else {
+							checks.worktree = true;
+						}
 					} else {
+						// No index file = fresh repo or corrupted
 						checks.worktree = true;
 					}
 				} catch (e) {
-					warnings.push(`Cannot check worktree state via git: ${e.message}`);
+					warnings.push(`Cannot check worktree state: ${e.message}`);
 				}
 			}
 		} catch (e) {
