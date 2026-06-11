@@ -380,8 +380,34 @@ function proposeMaintenance(target, options = {}) {
 		};
 	}
 
+	// Apply priority filter if specified
+	let filteredInspection = inspection;
+	if (options.priority) {
+		const priorityLevels = {
+			high: ['staleDocs', 'rulePackDrift'],
+			medium: ['upgradeAssistant', 'evolutionRollup'],
+			low: ['regressionProposals'],
+		};
+
+		const allowedCategories = [];
+		if (options.priority === 'high') {
+			allowedCategories.push(...priorityLevels.high);
+		} else if (options.priority === 'medium') {
+			allowedCategories.push(...priorityLevels.high, ...priorityLevels.medium);
+		} else if (options.priority === 'low') {
+			allowedCategories.push(...priorityLevels.high, ...priorityLevels.medium, ...priorityLevels.low);
+		}
+
+		filteredInspection = { ...inspection };
+		if (!allowedCategories.includes('staleDocs')) filteredInspection.staleDocs = [];
+		if (!allowedCategories.includes('rulePackDrift')) filteredInspection.rulePackDrift = { drifted: false, expected: [], actual: [] };
+		if (!allowedCategories.includes('upgradeAssistant')) filteredInspection.upgradeAssistant = { currentVersion: null, latestVersion: null };
+		if (!allowedCategories.includes('evolutionRollup')) filteredInspection.evolutionRollup = [];
+		if (!allowedCategories.includes('regressionProposals')) filteredInspection.regressionProposals = [];
+	}
+
 	const proposalRoot = path.join(
-		resolveStateDirForCreate(inspection.target),
+		resolveStateDirForCreate(filteredInspection.target),
 		"maintenance",
 		"proposals",
 	);
@@ -390,16 +416,17 @@ function proposeMaintenance(target, options = {}) {
 		`${new Date().toISOString().replace(/[:.]/g, "-")}-maintenance-proposal.md`,
 	);
 	fs.mkdirSync(proposalRoot, { recursive: true });
-	fs.writeFileSync(proposalPath, buildMaintenanceProposalContent(inspection));
+	fs.writeFileSync(proposalPath, buildMaintenanceProposalContent(filteredInspection));
 
 	return {
-		target: inspection.target,
-		proposalPath: relativeSlash(inspection.target, proposalPath),
+		target: filteredInspection.target,
+		proposalPath: relativeSlash(filteredInspection.target, proposalPath),
 		reviewable: true,
 		sourceFilesChanged: false,
-		inspection,
+		inspection: filteredInspection,
+		priority: options.priority || 'all',
 		errors: [],
-		warnings: inspection.warnings,
+		warnings: filteredInspection.warnings,
 	};
 }
 

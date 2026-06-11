@@ -118,18 +118,21 @@ function validateWorkflowPack(packPath) {
 	return { valid: errors.length === 0, errors, warnings, unsafePatterns };
 }
 
-function validateIntegration(integrationPath) {
+function validateIntegration(integrationPath, options = {}) {
 	const warnings = [];
 	const sideEffects = [];
 	const permissionGates = [];
+	const explanations = [];
 
 	if (!fs.existsSync(integrationPath)) {
+		const explanation = `Integration file not found at path: ${integrationPath}. Ensure the path is correct and the file exists.`;
 		return {
 			valid: false,
 			sideEffects: [],
 			credentialsRequired: false,
 			permissionGates: [],
 			warnings: [`Integration file not found: ${integrationPath}`],
+			explanation: options.explain ? explanation : undefined,
 		};
 	}
 
@@ -137,54 +140,78 @@ function validateIntegration(integrationPath) {
 	try {
 		config = JSON.parse(fs.readFileSync(integrationPath, "utf8"));
 	} catch (e) {
+		const explanation = `Failed to parse integration file as JSON. Error: ${e.message}. Check for syntax errors in the JSON file.`;
 		return {
 			valid: false,
 			sideEffects: [],
 			credentialsRequired: false,
 			permissionGates: [],
 			warnings: [`Invalid JSON: ${e.message}`],
+			explanation: options.explain ? explanation : undefined,
 		};
 	}
 
 	const configStr = JSON.stringify(config);
 
 	// Detect side effects
-	if (/\bfile[:.]write|writeFile|createWriteStream|fs\.write/i.test(configStr))
+	if (/\bfile[:.]write|writeFile|createWriteStream|fs\.write/i.test(configStr)) {
 		sideEffects.push("file_write");
-	if (/\bnetwork|http[s]?:|fetch|axios|request\b/i.test(configStr))
+		if (options.explain) explanations.push("Detected file write operations in integration config.");
+	}
+	if (/\bnetwork|http[s]?:|fetch|axios|request\b/i.test(configStr)) {
 		sideEffects.push("network_call");
-	if (/\bspawn|exec|child_process|shell\b/i.test(configStr))
+		if (options.explain) explanations.push("Detected network/HTTP calls in integration config.");
+	}
+	if (/\bspawn|exec|child_process|shell\b/i.test(configStr)) {
 		sideEffects.push("process_spawn");
-	if (/\bdb|database|sql|query|transaction\b/i.test(configStr))
+		if (options.explain) explanations.push("Detected process spawning or shell execution in integration config.");
+	}
+	if (/\bdb|database|sql|query|transaction\b/i.test(configStr)) {
 		sideEffects.push("database_operation");
+		if (options.explain) explanations.push("Detected database operations in integration config.");
+	}
 
 	// Check credentials requirement
 	const credentialsRequired =
 		/\bapi[_-]?key|token|secret|password|credential|auth\b/i.test(configStr);
+	if (credentialsRequired && options.explain) {
+		explanations.push("Integration requires credentials (API keys, tokens, or passwords).");
+	}
 
 	// Detect permission gates
 	if (config.permissions || /\bpermission[s]?:|requires\b/i.test(configStr)) {
 		permissionGates.push("explicit_permissions_declared");
+		if (options.explain) explanations.push("Integration declares explicit permission requirements.");
 	}
 
 	// Warnings
 	if (sideEffects.length > 0 && !config.sideEffects) {
 		warnings.push("Side effects detected but not declared in config");
+		if (options.explain) explanations.push("Warning: Side effects found but not documented in the config file. Add a 'sideEffects' field.");
 	}
 	if (credentialsRequired && !config.credentials && !config.auth) {
 		warnings.push("Credentials required but not documented in config");
+		if (options.explain) explanations.push("Warning: Credentials required but no 'credentials' or 'auth' field found in config.");
 	}
 
-	return {
+	const result = {
 		valid: true,
 		sideEffects,
 		credentialsRequired,
 		permissionGates,
 		warnings,
 	};
+
+	if (options.explain) {
+		result.explanation = explanations.length > 0
+			? explanations.join(" ")
+			: "Integration is valid with no issues detected.";
+	}
+
+	return result;
 }
 
-function checkExecutionReadiness(projectRoot, planPath) {
+function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 	const blockers = [];
 	const warnings = [];
 	const checks = {
@@ -210,6 +237,19 @@ function checkExecutionReadiness(projectRoot, planPath) {
 				);
 			} else {
 				checks.plan = true;
+			}
+
+			// Strict mode: additional plan checks
+			if (options.strict) {
+				if (!/## Goals?|## Objectives?/i.test(planContent)) {
+					blockers.push("Strict: Plan missing Goals or Objectives section");
+				}
+				if (!/## Implementation|## Steps/i.test(planContent)) {
+					blockers.push("Strict: Plan missing Implementation or Steps section");
+				}
+				if (!/## Test/i.test(planContent)) {
+					warnings.push("Strict: Plan missing Test section (recommended)");
+				}
 			}
 		} catch (e) {
 			blockers.push(`Cannot read plan: ${e.message}`);
@@ -324,11 +364,25 @@ function checkExecutionReadiness(projectRoot, planPath) {
 		}
 	}
 
+	// Strict mode: additional environment checks
+	if (options.strict) {
+		if (!checks.policy) {
+			blockers.push("Strict: Policy file (autonomous-policy.json) required");
+		}
+		if (policy && !policy.gates) {
+			warnings.push("Strict: Policy missing 'gates' configuration");
+		}
+		if (policy && !policy.budget) {
+			warnings.push("Strict: Policy missing 'budget' configuration");
+		}
+	}
+
 	return {
 		ready: blockers.length === 0,
 		blockers,
 		warnings,
 		checks,
+		strictMode: options.strict || false,
 	};
 }
 
