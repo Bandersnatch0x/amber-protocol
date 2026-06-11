@@ -62,7 +62,7 @@ A: Hooks run with the same permissions as the user. Review hook scripts carefull
 A: Yes, via skills, custom routes, hooks, and agent profiles. See [Extension Points](../architecture/extension-points.md).
 
 **Q: How do I contribute?**  
-A: See [CONTRIBUTING.md](https://github.com/coding-harness/contrib) and [Architecture Overview](../architecture/overview.md).
+A: See [Architecture Overview](../architecture/overview.md).
 
 **Q: Where are my sessions stored?**  
 A: By default in `~/.coding-harness/sessions/`. Configure via `sessionDir` in settings.

@@ -1,12 +1,15 @@
 # Ubiquitous Language
 
-## Harness domain
+## Amber domain
 
 | Term | Definition | Aliases to avoid |
 | --- | --- | --- |
-| Harness | Repository-local operating layer that helps agents find context, track feature state, validate work, and hand off safely. | framework, platform, agent OS |
-| Target repository | Repository being initialized, audited, validated, or maintained by the Harness. | project, app, repo when ambiguous |
-| Product repository | This `coding-harness` repository when `doctor` is validating the toolkit itself. | self repo, harness repo |
+| Amber Protocol | The product: a repository-local governance layer for coding agents that installs, audits, validates, and maintains agent-facing project state. | Coding Harness (legacy name), framework, platform |
+| Amber setup | Repository-local operating layer that helps agents find context, track feature state, validate work, and hand off safely. | Harness (legacy term), agent OS |
+| Amber state | Runtime state directory `.amber` holding sessions, executions, orchestration records, team metadata, and maintenance proposals. | state folder when ambiguous |
+| Legacy Harness state | Pre-rename `.harness` runtime state. Readable for compatibility; never written for new entities. Migrate with `amber migrate state`. | .harness as an active term |
+| Target repository | Repository being initialized, audited, validated, or maintained by the Amber setup. | project, app, repo when ambiguous |
+| Product repository | This `amber-protocol` repository when `doctor` is validating the toolkit itself. | self repo, harness repo |
 | Agent entrypoint | File that tells an agent where project context, rules, and verification live. | prompt file, instruction blob |
 | Wiki | Stable project knowledge under `docs/wiki/` that agents should read instead of inventing facts. | docs, knowledge base |
 | Feature state | Machine-readable status and evidence for planned or completed work. | task list, project status |
@@ -21,7 +24,7 @@
 | Source bundle | Structured set of inspected inputs that informed a plan, including provenance and confidence. | context pile, attachments |
 | Gate | Static validation step that blocks implementation-ready status until required plan evidence exists. | approval step, check |
 | Review | Static assessment of plan or work evidence against standards and required user action. | QA, audit when ambiguous |
-| Accept | Operation that records a reviewed plan as accepted and appends Harness evolution evidence. | merge, approve |
+| Accept | Operation that records a reviewed plan as accepted and appends Amber evolution evidence. | merge, approve |
 | Human feedback | Recorded judgment explaining why work was accepted, redirected, narrowed, or rejected. | comment, opinion |
 | Evidence | Concrete proof that a claim was verified, including commands, results, dates, and notes. | proof, output |
 | Verification | Explicit checks an agent or human can run or inspect to validate behavior. | testing, validation |
@@ -59,24 +62,24 @@
 | --- | --- | --- |
 | Adoption report | Reviewable trial artifact summarizing audit, init dry-run, team status, and maintenance inspection for a target repository. | migration report, onboarding report |
 | Adoption gate | Conservative decision artifact that says whether a target repository should wait, proceed, or address risks. | go/no-go, migration gate |
-| Team distribution | Local metadata for installing, pinning, updating, rolling back, and inspecting Harness versions and presets. | marketplace, release channel |
+| Team distribution | Local metadata for installing, pinning, updating, rolling back, and inspecting Amber versions and presets. | marketplace, release channel |
 | Maintenance proposal | Reviewable proposal for stale knowledge, upgrade guidance, drift, repeated findings, or regression candidates. | auto-fix, cleanup task |
-| Harness evolution | Record of accepted lessons that may later update Wiki, standards, rule packs, or workflow-pack candidates. | changelog, retrospective |
+| Amber evolution | Record of accepted lessons that may later update Wiki, standards, rule packs, or workflow-pack candidates. | changelog, retrospective |
 | Regression proposal | Reviewable suggestion to turn a real failure into a repeatable assertion or test without modifying the test suite automatically. | regression test, bug fix |
 
 ## Relationships
 
-- A **Target repository** may contain one **Harness**.
-- A **Harness** has many **Agent entrypoints**, **Wiki** pages, **Feature state** records, and **Handoff** artifacts.
+- A **Target repository** may contain one **Amber setup**.
+- An **Amber setup** has many **Agent entrypoints**, **Wiki** pages, **Feature state** records, and **Handoff** artifacts.
 - A **Plan** belongs to exactly one **Feature state** entry and may reference many **Source bundle** items.
 - A **Gate** validates one **Plan** before work is implementation-ready.
 - A **Review** evaluates one **Plan** or artifact set against many **Standards**.
-- An **Accept** operation records one successful **Review** into **Harness evolution**.
+- An **Accept** operation records one successful **Review** into **Amber evolution**.
 - A **Workflow pack** may include many **Loop contracts**, **Skills**, **Standards**, and **Integration contracts**.
 - A **Loop contract** writes to one **State spine** and may produce many **Triage outputs**.
 - A **Task preparation** creates one **Execution ledger**, one **Evidence pack**, and one **Replay** artifact.
 - An **Orchestration record** links one **Worker** and one **Reviewer**; the **Worker** must not self-approve.
-- A **Maintenance proposal** may promote repeated **Harness evolution** findings into **Standards**, **Wiki**, **Workflow pack** candidates, or **Regression proposals**.
+- A **Maintenance proposal** may promote repeated **Amber evolution** findings into **Standards**, **Wiki**, **Workflow pack** candidates, or **Regression proposals**.
 
 ## Example dialogue
 
@@ -88,7 +91,7 @@
 >
 > **Developer:** "And if a real failure appears, we preserve the replay input and create a **regression proposal**, not an automatic test rewrite."
 >
-> **Domain expert:** "Exactly. The **Harness** records evidence and proposals; it does not run unattended automation for the user."
+> **Domain expert:** "Exactly. The **Amber setup** records evidence and proposals; it does not run unattended automation for the user."
 
 ## Flagged ambiguities
 
@@ -96,5 +99,5 @@
 - **Validation** can mean schema checks, plan gates, review, or runtime verification; use **Gate**, **Review**, or **Verification**.
 - **Workflow** can mean a declared pack, a live agent process, or a repeated loop; use **Workflow pack** or **Loop contract**.
 - **Execution** can mean prepared artifacts or real command execution; use **Task preparation** for artifact creation and reserve execution for future live behavior.
-- **Connector** can imply a real external call; use **Integration contract** unless the Harness actually calls the external system.
+- **Connector** can imply a real external call; use **Integration contract** unless the Amber setup actually calls the external system.
 - **Regression test** can imply modifying a test suite; use **Regression proposal** until a human approves the change.

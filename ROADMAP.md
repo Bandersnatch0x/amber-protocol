@@ -4,9 +4,9 @@ Implementation status: V1 through V5.5 are implemented in this repository as loc
 
 Live loop scheduling is a future execution track, not an implied part of V5.5 maintenance. The current product may describe, validate, dry-run, and record loops, but it must not run always-on scheduled agents until the isolation, evidence, approval, connector, and no-progress controls below are stable.
 
-## V1: Safe Harness Bootstrap
+## V1: Safe Amber Bootstrap
 
-Goal: safely install and validate a minimal repository-local Harness.
+Goal: safely install and validate a minimal repository-local Amber setup.
 
 Scope:
 
@@ -88,13 +88,13 @@ Scope:
 - Evidence completeness checks
 - Human feedback and redirect log
 - Release readiness summary
-- Harness evolution log
+- Amber evolution log
 
 Gate:
 
 - Review reports loaded standards, applicable checks, non-applicable checks, findings, and required user action
 - Review preserves why work was accepted, redirected, narrowed, or rejected
-- Completed tasks can append a concise Harness evolution record with reviewable diffs
+- Completed tasks can append a concise Amber evolution record with reviewable diffs
 
 ## V3: Workflow Pack Design Kit
 
@@ -183,9 +183,9 @@ Gate:
 - Teams can install, pin, update, and roll back versions
 - Teams can preview pack changes before upgrade and keep target-repo customizations intact
 
-## V5.5: Continuous Harness Maintenance
+## V5.5: Continuous Amber Maintenance
 
-Goal: keep Harness, Wiki, standards, and profiles from becoming stale.
+Goal: keep the Amber setup, Wiki, standards, and profiles from becoming stale.
 
 Scope:
 
@@ -194,7 +194,7 @@ Scope:
 - Stale-doc detection
 - Migration assistant
 - Upgrade assistant
-- Harness evolution rollups
+- Amber evolution rollups
 - Rule-pack drift detection
 - Workflow-pack candidate proposals from repeated work
 - Failure-to-regression proposals from trace or execution evidence

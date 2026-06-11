@@ -113,7 +113,7 @@ See CHANGELOG.md for details.`;
 	// 8. GitHub release instructions
 	console.log("\n8. GitHub Release...");
 	console.log(
-		`   Create release at: https://github.com/coding-harness/releases/new?tag=v${newVersion}`,
+		`   Tag v${newVersion} is ready; create the release in your hosting platform.`,
 	);
 	console.log("   - Title: Coding Harness Phase B v" + newVersion);
 	console.log("   - Attach: CHANGELOG.md");
