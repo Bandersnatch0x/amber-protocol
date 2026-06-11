@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { resolveStateDirForRead } = require("./state-dir-resolver");
 
 const LOCK_TIMEOUT_MS = 300000; // 5 minutes
 
@@ -72,7 +73,7 @@ function isLocked(projectRoot, sessionId) {
 }
 
 function getLockPath(projectRoot, sessionId) {
-	return path.join(projectRoot, ".harness", "sessions", sessionId, ".lock");
+	return path.join(resolveStateDirForRead(projectRoot), "sessions", sessionId, ".lock");
 }
 
 module.exports = { acquireLock, releaseLock, isLocked };

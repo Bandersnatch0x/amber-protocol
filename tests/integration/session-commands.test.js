@@ -37,7 +37,7 @@ test("session start creates manifest and timeline", () => {
 	const sessionId = match[1];
 	const manifestPath = path.join(
 		ROOT,
-		".harness",
+		".amber",
 		"sessions",
 		sessionId,
 		"manifest.json",
@@ -50,7 +50,7 @@ test("session start creates manifest and timeline", () => {
 
 	const timelinePath = path.join(
 		ROOT,
-		".harness",
+		".amber",
 		"sessions",
 		sessionId,
 		"timeline.jsonl",
@@ -136,7 +136,7 @@ test("session abort sets status to aborted", () => {
 
 	const manifestPath = path.join(
 		ROOT,
-		".harness",
+		".amber",
 		"sessions",
 		sessionId,
 		"manifest.json",

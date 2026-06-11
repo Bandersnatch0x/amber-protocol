@@ -5,7 +5,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const ROOT = path.join(__dirname, "../..");
-const TEST_PROJECT = path.join(ROOT, ".harness-test-interactive");
+const TEST_PROJECT = path.join(ROOT, ".amber-test-interactive");
 
 describe("Interactive Session Integration", () => {
 	beforeEach(() => {
@@ -45,7 +45,7 @@ describe("Interactive Session Integration", () => {
 		const sessionId = match[1];
 		const manifestPath = path.join(
 			TEST_PROJECT,
-			".harness",
+			".amber",
 			"sessions",
 			sessionId,
 			"manifest.json",

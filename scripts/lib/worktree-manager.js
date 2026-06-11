@@ -3,11 +3,11 @@
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { resolveStateDirForRead, resolveStateDirForCreate } = require("./state-dir-resolver");
 
 function createWorktree(projectRoot, sessionId) {
 	const worktreePath = path.join(
-		projectRoot,
-		".harness",
+		resolveStateDirForCreate(projectRoot),
 		"worktrees",
 		sessionId,
 	);
@@ -50,8 +50,7 @@ function createWorktree(projectRoot, sessionId) {
 
 function removeWorktree(projectRoot, sessionId) {
 	const worktreePath = path.join(
-		projectRoot,
-		".harness",
+		resolveStateDirForRead(projectRoot),
 		"worktrees",
 		sessionId,
 	);

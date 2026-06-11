@@ -47,7 +47,7 @@ describe("session-commands", () => {
 
 			const sessionDir = path.join(
 				TEST_ROOT,
-				".harness",
+				".amber",
 				"sessions",
 				result.sessionId,
 			);
@@ -63,7 +63,7 @@ describe("session-commands", () => {
 
 			const manifestPath = path.join(
 				TEST_ROOT,
-				".harness",
+				".amber",
 				"sessions",
 				result.sessionId,
 				"manifest.json",
@@ -84,7 +84,7 @@ describe("session-commands", () => {
 
 			const manifestPath = path.join(
 				TEST_ROOT,
-				".harness",
+				".amber",
 				"sessions",
 				result.sessionId,
 				"manifest.json",
@@ -105,7 +105,7 @@ describe("session-commands", () => {
 
 			const worktreePath = path.join(
 				TEST_ROOT,
-				".harness",
+				".amber",
 				"worktrees",
 				result.sessionId,
 			);
@@ -192,7 +192,7 @@ describe("session-commands", () => {
 
 			const manifestPath = path.join(
 				TEST_ROOT,
-				".harness",
+				".amber",
 				"sessions",
 				start.sessionId,
 				"manifest.json",
@@ -212,7 +212,7 @@ describe("session-commands", () => {
 
 			const timelinePath = path.join(
 				TEST_ROOT,
-				".harness",
+				".amber",
 				"sessions",
 				start.sessionId,
 				"timeline.jsonl",

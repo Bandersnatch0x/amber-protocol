@@ -69,7 +69,7 @@ class IntegrationTestHarness {
 
 		const sessionDir = path.join(
 			projectRoot,
-			".harness",
+			".amber",
 			"sessions",
 			manifest.sessionId,
 		);

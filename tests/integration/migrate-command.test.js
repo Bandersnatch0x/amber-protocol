@@ -22,7 +22,7 @@ describe("Migrate Command", () => {
 
 	it("adds schemaVersion to manifests missing it", () => {
 		const sessionId = "test-session-1";
-		const sessionDir = path.join(testDir, ".harness", "sessions", sessionId);
+		const sessionDir = path.join(testDir, ".amber", "sessions", sessionId);
 		fs.mkdirSync(sessionDir, { recursive: true });
 
 		const oldManifest = { sessionId, status: "completed", goal: "test" };
@@ -47,7 +47,7 @@ describe("Migrate Command", () => {
 
 	it("skips manifests already at 1.0.0", () => {
 		const sessionId = "test-session-2";
-		const sessionDir = path.join(testDir, ".harness", "sessions", sessionId);
+		const sessionDir = path.join(testDir, ".amber", "sessions", sessionId);
 		fs.mkdirSync(sessionDir, { recursive: true });
 
 		const manifest = {
@@ -70,7 +70,7 @@ describe("Migrate Command", () => {
 
 	it("supports dry-run mode", () => {
 		const sessionId = "test-session-3";
-		const sessionDir = path.join(testDir, ".harness", "sessions", sessionId);
+		const sessionDir = path.join(testDir, ".amber", "sessions", sessionId);
 		fs.mkdirSync(sessionDir, { recursive: true });
 
 		const oldManifest = { sessionId, status: "completed", goal: "test" };

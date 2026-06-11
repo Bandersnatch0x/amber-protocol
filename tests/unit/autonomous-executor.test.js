@@ -14,7 +14,7 @@ describe("autonomous-executor", () => {
 		// Create required directory structure for autonomous executor
 		const sessionsDir = path.join(
 			testRoot,
-			".harness",
+			".amber",
 			"sessions",
 			"test-session-id",
 		);
@@ -41,7 +41,7 @@ describe("autonomous-executor", () => {
 		fs.writeFileSync(path.join(sessionsDir, "timeline.jsonl"), "");
 
 		// Create policy file
-		const harnessDir = path.join(testRoot, ".harness");
+		const harnessDir = path.join(testRoot, ".amber");
 		const policy = {
 			gates: {
 				auto: "approve",

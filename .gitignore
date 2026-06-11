@@ -14,8 +14,13 @@ build/
 .vite/
 *.tsbuildinfo
 
-# Local Harness runtime state
+# Local Harness and Amber runtime state
 .harness/
+.amber/
+.amber/
+
+# Test temp output
+tests/.tmp/
 
 # Package dry-run and local archive output
 npm-pack-dry-run.json

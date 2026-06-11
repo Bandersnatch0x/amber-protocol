@@ -36,13 +36,13 @@ describe("worktree-manager", () => {
 		}
 	});
 
-	it("creates a worktree in .harness/worktrees/<session-id>", () => {
+	it("creates a worktree in .amber/worktrees/<session-id>", () => {
 		const result = createWorktree(TEST_ROOT, SESSION_ID);
 		assert.strictEqual(result.success, true);
 
 		const worktreePath = path.join(
 			TEST_ROOT,
-			".harness",
+			".amber",
 			"worktrees",
 			SESSION_ID,
 		);
@@ -53,7 +53,7 @@ describe("worktree-manager", () => {
 	it("returns the worktree path on success", () => {
 		const result = createWorktree(TEST_ROOT, SESSION_ID);
 		assert.ok(
-			result.path.endsWith(path.join(".harness", "worktrees", SESSION_ID)),
+			result.path.endsWith(path.join(".amber", "worktrees", SESSION_ID)),
 		);
 	});
 
@@ -69,7 +69,7 @@ describe("worktree-manager", () => {
 		createWorktree(TEST_ROOT, SESSION_ID);
 		const worktreePath = path.join(
 			TEST_ROOT,
-			".harness",
+			".amber",
 			"worktrees",
 			SESSION_ID,
 		);

@@ -2,9 +2,10 @@
 
 const fs = require("fs");
 const path = require("path");
+const { resolveStateDirForRead } = require("./state-dir-resolver");
 
 function collectMetrics(projectRoot, sessionId) {
-  const manifestPath = path.join(projectRoot, ".harness", "sessions", sessionId, "manifest.json");
+  const manifestPath = path.join(resolveStateDirForRead(projectRoot), "sessions", sessionId, "manifest.json");
 
   if (!fs.existsSync(manifestPath)) {
     return null;
@@ -24,7 +25,7 @@ function collectMetrics(projectRoot, sessionId) {
 }
 
 function getMetricsSummary(projectRoot) {
-  const sessionsDir = path.join(projectRoot, ".harness", "sessions");
+  const sessionsDir = path.join(resolveStateDirForRead(projectRoot), "sessions");
 
   if (!fs.existsSync(sessionsDir)) {
     return { totalSessions: 0, successRate: 0, avgDuration: 0 };

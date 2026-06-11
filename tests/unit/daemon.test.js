@@ -21,7 +21,7 @@ describe("daemon", () => {
 	});
 
 	it("should write PID file on start", () => {
-		const pidFile = path.join(testRoot, ".harness", "daemon.pid");
+		const pidFile = path.join(testRoot, ".amber", "daemon.pid");
 		const result = startDaemon(testRoot, "test-session", { test: true });
 		assert.ok(result.success);
 		assert.ok(fs.existsSync(pidFile));
@@ -36,7 +36,7 @@ describe("daemon", () => {
 		startDaemon(testRoot, "test-session", { test: true });
 		const result = stopDaemon(testRoot, { test: true });
 		assert.ok(result.success);
-		const pidFile = path.join(testRoot, ".harness", "daemon.pid");
+		const pidFile = path.join(testRoot, ".amber", "daemon.pid");
 		assert.strictEqual(fs.existsSync(pidFile), false);
 	});
 });

@@ -1,12 +1,9 @@
 const fs = require("fs");
 const path = require("path");
+const { resolveStateDirForRead } = require("./state-dir-resolver");
 
 function loadPolicy(projectRoot = process.cwd()) {
-	const policyPath = path.join(
-		projectRoot,
-		".harness",
-		"autonomous-policy.json",
-	);
+	const policyPath = path.join(resolveStateDirForRead(projectRoot), "autonomous-policy.json");
 
 	if (!fs.existsSync(policyPath)) {
 		return getDefaultPolicy();
@@ -19,7 +16,7 @@ function getDefaultPolicy() {
 	return {
 		// Gates: user-approval gates are blocked by default —
 		// autonomous mode must not silently bypass human decisions.
-		// Users can override in .harness/autonomous-policy.json
+		// Users can override in .amber/autonomous-policy.json
 		// with --auto-approve-all or per-gate rules.
 		gates: {
 			auto: "approve",

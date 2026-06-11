@@ -33,7 +33,7 @@ describe("Continue Recovery", () => {
 
 		const manifestPath = path.join(
 			testDir,
-			".harness",
+			".amber",
 			"sessions",
 			sessionId,
 			"manifest.json",
@@ -69,7 +69,7 @@ describe("Continue Recovery", () => {
 		// Set most recent (result2) to paused
 		const manifest2Path = path.join(
 			testDir,
-			".harness",
+			".amber",
 			"sessions",
 			result2.sessionId,
 			"manifest.json",
@@ -90,7 +90,7 @@ describe("Continue Recovery", () => {
 		});
 		const manifestPath = path.join(
 			testDir,
-			".harness",
+			".amber",
 			"sessions",
 			result.sessionId,
 			"manifest.json",

@@ -11,9 +11,10 @@ const {
 } = require("./autonomous-policy");
 const { loadRoutes } = require("./route-loader");
 const { TimelineWriter } = require("./timeline-writer");
+const { resolveStateDirForRead } = require("./state-dir-resolver");
 
 async function executeAutonomous(projectRoot, sessionId, options = {}) {
-	const sessionDir = path.join(projectRoot, ".harness", "sessions", sessionId);
+	const sessionDir = path.join(resolveStateDirForRead(projectRoot), "sessions", sessionId);
 	const manifestPath = path.join(sessionDir, "manifest.json");
 
 	if (!fs.existsSync(manifestPath)) {

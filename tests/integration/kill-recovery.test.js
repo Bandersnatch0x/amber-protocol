@@ -40,7 +40,7 @@ describe("Kill Recovery", () => {
 		for (const point of interruptionPoints) {
 			const manifestPath = path.join(
 				testDir,
-				".harness",
+				".amber",
 				"sessions",
 				sessionId,
 				"manifest.json",
@@ -77,7 +77,7 @@ describe("Kill Recovery", () => {
 
 		const manifestPath = path.join(
 			testDir,
-			".harness",
+			".amber",
 			"sessions",
 			sessionId,
 			"manifest.json",
