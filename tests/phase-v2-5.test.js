@@ -11,7 +11,7 @@ const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
 
 function tempDir(name) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `coding-harness-v2-5-${name}-`));
+  return fs.mkdtempSync(path.join(os.tmpdir(), `amber-v2-5-${name}-`));
 }
 
 function runHarness(args) {

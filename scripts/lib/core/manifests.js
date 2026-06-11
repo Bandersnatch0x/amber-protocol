@@ -172,10 +172,10 @@ function classifyTarget(target) {
 	if (
 		pathExists(path.join(targetRoot, "SPEC.md")) &&
 		pathExists(path.join(targetRoot, "ROADMAP.md")) &&
-		pathExists(path.join(targetRoot, "scripts", "harness.js")) &&
+		pathExists(path.join(targetRoot, "scripts", "amber.js")) &&
 		pathExists(path.join(targetRoot, "templates"))
 	) {
-		evidence.push("SPEC.md", "ROADMAP.md", "scripts/harness.js", "templates/");
+		evidence.push("SPEC.md", "ROADMAP.md", "scripts/amber.js", "templates/");
 		return { type: "product-repo", evidence };
 	}
 

@@ -1,6 +1,6 @@
 {
   "id": "default",
-  "title": "Default Coding Harness Profile",
+  "title": "Default Amber Protocol Profile",
   "version": "0.1.0",
   "packIds": [
     "safe-amber-bootstrap"

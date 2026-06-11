@@ -9,7 +9,7 @@ const test = require("node:test");
 const { scaffoldHarness, validateHandoff } = require("../scripts/lib/amber-core");
 
 function tempDir(name) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `coding-harness-handoff-${name}-`));
+  return fs.mkdtempSync(path.join(os.tmpdir(), `amber-handoff-${name}-`));
 }
 
 test("scaffolded handoff file is valid", () => {

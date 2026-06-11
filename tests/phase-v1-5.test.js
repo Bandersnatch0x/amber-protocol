@@ -18,7 +18,7 @@ const {
 } = require("../scripts/lib/amber-core");
 
 function tempDir(name) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `coding-harness-v1-5-${name}-`));
+  return fs.mkdtempSync(path.join(os.tmpdir(), `amber-v1-5-${name}-`));
 }
 
 function runHarness(args) {

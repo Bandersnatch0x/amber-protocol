@@ -102,48 +102,48 @@ function usage(command) {
 		}
 
 		return [
-			`Usage: node scripts/harness.js ${command} --target <repo> ${options.join(" ")}`,
+			`Usage: node scripts/amber.js ${command} --target <repo> ${options.join(" ")}`,
 			"",
 			commandSummary(command),
 		].join("\n");
 	}
 
 	return [
-		"Usage: node scripts/harness.js <command> --target <repo> [--json]",
+		"Usage: node scripts/amber.js <command> --target <repo> [--json]",
 		"",
 		`Commands: ${COMMANDS.join(", ")}`,
-		"Run `node scripts/harness.js <command> --help` for command-specific options.",
+		"Run `node scripts/amber.js <command> --help` for command-specific options.",
 		"",
 		"Examples:",
-		"  node scripts/harness.js init --target path/to/repo",
-		"  node scripts/harness.js audit --target path/to/repo",
-		"  node scripts/harness.js wiki --target path/to/repo",
-		"  node scripts/harness.js handoff --target path/to/repo",
-		"  node scripts/harness.js doctor --target path/to/repo",
-		'  node scripts/harness.js plan --target path/to/repo --feature F001 --title "Small slice"',
-		"  node scripts/harness.js gate --target path/to/repo --plan docs/plans/F001-small-slice.md",
-		"  node scripts/harness.js review --target path/to/repo --plan docs/plans/F001-small-slice.md",
-		"  node scripts/harness.js accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
-		"  node scripts/harness.js pack inspect --file workflow-packs/safe-amber-bootstrap.pack.json",
-		"  node scripts/harness.js pack readiness --file workflow-packs/safe-amber-bootstrap.pack.json --json",
-		"  node scripts/harness.js profile inspect --file profiles/default.profile.json",
-		"  node scripts/harness.js task prepare --target path/to/repo --plan docs/plans/F001-small-slice.md --task slice-1",
-		"  node scripts/harness.js result inspect --target path/to/repo --task slice-1",
-		"  node scripts/harness.js agent dispatch --target path/to/repo --task slice-1 --worker worker-a --reviewer reviewer-b",
-		"  node scripts/harness.js team install --target path/to/repo --version 1.0.0 --preset safe-bootstrap",
-		"  node scripts/harness.js maintenance inspect --target path/to/repo",
-		"  node scripts/harness.js adoption report --target path/to/repo --output docs/examples/project-adoption-report.md",
-		"  node scripts/harness.js adoption report --target path/to/repo --output-dir docs/examples",
-		"  node scripts/harness.js adoption list --reports-dir docs/examples/adoptions",
-		"  node scripts/harness.js adoption index --reports-dir docs/examples/adoptions --output docs/examples/adoptions-index.md",
-		"  node scripts/harness.js adoption validate --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md",
-		"  node scripts/harness.js adoption compare --reports-dir docs/examples/adoptions",
-		"  node scripts/harness.js adoption gate --reports-dir docs/examples/adoptions",
-		"  node scripts/harness.js adoption status --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md",
-		"  node scripts/harness.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/stockagents-adoption-bundle",
-		"  node scripts/harness.js adoption next-actions --bundle-dir docs/examples/stockagents-adoption-bundle --output docs/examples/stockagents-adoption-next-actions.md",
-		"  node scripts/harness.js adoption decision-record --bundle-dir docs/examples/stockagents-adoption-bundle --output docs/examples/stockagents-adoption-decision-record.md",
-		"  node scripts/harness.js adoption selected-files --bundle-dir docs/examples/stockagents-adoption-bundle --output docs/examples/stockagents-adoption-selected-files.md --include AGENTS.md",
+		"  node scripts/amber.js init --target path/to/repo",
+		"  node scripts/amber.js audit --target path/to/repo",
+		"  node scripts/amber.js wiki --target path/to/repo",
+		"  node scripts/amber.js handoff --target path/to/repo",
+		"  node scripts/amber.js doctor --target path/to/repo",
+		'  node scripts/amber.js plan --target path/to/repo --feature F001 --title "Small slice"',
+		"  node scripts/amber.js gate --target path/to/repo --plan docs/plans/F001-small-slice.md",
+		"  node scripts/amber.js review --target path/to/repo --plan docs/plans/F001-small-slice.md",
+		"  node scripts/amber.js accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
+		"  node scripts/amber.js pack inspect --file workflow-packs/safe-amber-bootstrap.pack.json",
+		"  node scripts/amber.js pack readiness --file workflow-packs/safe-amber-bootstrap.pack.json --json",
+		"  node scripts/amber.js profile inspect --file profiles/default.profile.json",
+		"  node scripts/amber.js task prepare --target path/to/repo --plan docs/plans/F001-small-slice.md --task slice-1",
+		"  node scripts/amber.js result inspect --target path/to/repo --task slice-1",
+		"  node scripts/amber.js agent dispatch --target path/to/repo --task slice-1 --worker worker-a --reviewer reviewer-b",
+		"  node scripts/amber.js team install --target path/to/repo --version 1.0.0 --preset safe-bootstrap",
+		"  node scripts/amber.js maintenance inspect --target path/to/repo",
+		"  node scripts/amber.js adoption report --target path/to/repo --output docs/examples/project-adoption-report.md",
+		"  node scripts/amber.js adoption report --target path/to/repo --output-dir docs/examples",
+		"  node scripts/amber.js adoption list --reports-dir docs/examples/adoptions",
+		"  node scripts/amber.js adoption index --reports-dir docs/examples/adoptions --output docs/examples/adoptions-index.md",
+		"  node scripts/amber.js adoption validate --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md",
+		"  node scripts/amber.js adoption compare --reports-dir docs/examples/adoptions",
+		"  node scripts/amber.js adoption gate --reports-dir docs/examples/adoptions",
+		"  node scripts/amber.js adoption status --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md",
+		"  node scripts/amber.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/sample-adoption-bundle",
+		"  node scripts/amber.js adoption next-actions --bundle-dir docs/examples/sample-adoption-bundle --output docs/examples/sample-adoption-next-actions.md",
+		"  node scripts/amber.js adoption decision-record --bundle-dir docs/examples/sample-adoption-bundle --output docs/examples/sample-adoption-decision-record.md",
+		"  node scripts/amber.js adoption selected-files --bundle-dir docs/examples/sample-adoption-bundle --output docs/examples/sample-adoption-selected-files.md --include AGENTS.md",
 	].join("\n");
 }
 
@@ -201,12 +201,12 @@ function commandSummary(command) {
 			"Generate, list, or index safe adoption report artifacts without modifying target projects.",
 			"",
 			"Examples:",
-			"  node scripts/harness.js adoption report --target path/to/repo --output docs/examples/project-adoption-report.md",
-			"  node scripts/harness.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle",
-			"  node scripts/harness.js adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md",
-			"  node scripts/harness.js adoption decision-record --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-decision-record.md",
-			"  node scripts/harness.js adoption apply-plan --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-apply-plan.md --dry-run",
-			"  node scripts/harness.js adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md",
+			"  node scripts/amber.js adoption report --target path/to/repo --output docs/examples/project-adoption-report.md",
+			"  node scripts/amber.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle",
+			"  node scripts/amber.js adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md",
+			"  node scripts/amber.js adoption decision-record --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-decision-record.md",
+			"  node scripts/amber.js adoption apply-plan --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-apply-plan.md --dry-run",
+			"  node scripts/amber.js adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md",
 		].join("\n");
 	}
 	if (command === "loop") {
@@ -231,10 +231,10 @@ function commandSummary(command) {
 			"  test <id> --dry-run  Print the ordered stage sequence and gate points.",
 			"",
 			"Examples:",
-			"  node scripts/harness.js route list",
-			"  node scripts/harness.js route inspect feature-standard",
-			"  node scripts/harness.js route validate routes/feature-standard.route.json",
-			"  node scripts/harness.js route test bugfix-quick --dry-run",
+			"  node scripts/amber.js route list",
+			"  node scripts/amber.js route inspect feature-standard",
+			"  node scripts/amber.js route validate routes/feature-standard.route.json",
+			"  node scripts/amber.js route test bugfix-quick --dry-run",
 		].join("\n");
 	}
 	if (command === "session") {
@@ -254,13 +254,13 @@ function commandSummary(command) {
 			"      Continue a paused or incomplete session from its current stage.",
 			"",
 			"Examples:",
-			'  node scripts/harness.js session start --goal "implement user auth"',
-			'  node scripts/harness.js session start --goal "fix login bug" --route bugfix-quick --worktree',
-			'  node scripts/harness.js session start --goal "add feature" --mode interactive',
-			"  node scripts/harness.js session status",
-			"  node scripts/harness.js session list",
-			"  node scripts/harness.js session abort <session-id>",
-			"  node scripts/harness.js session continue",
+			'  node scripts/amber.js session start --goal "implement user auth"',
+			'  node scripts/amber.js session start --goal "fix login bug" --route bugfix-quick --worktree',
+			'  node scripts/amber.js session start --goal "add feature" --mode interactive',
+			"  node scripts/amber.js session status",
+			"  node scripts/amber.js session list",
+			"  node scripts/amber.js session abort <session-id>",
+			"  node scripts/amber.js session continue",
 		].join("\n");
 	}
 	if (command === "migrate") {
@@ -282,7 +282,7 @@ function commandSummary(command) {
 			"  node scripts/amber.js migrate wiki --target <path>",
 		].join("\n");
 	}
-	return "Run Coding Harness command.";
+	return "Run Amber Protocol command.";
 }
 
 async function run(argv = process.argv.slice(2)) {

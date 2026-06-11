@@ -9,7 +9,7 @@ const test = require("node:test");
 const { scaffoldHarness, validateWiki } = require("../scripts/lib/amber-core");
 
 function tempDir(name) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `coding-harness-wiki-${name}-`));
+  return fs.mkdtempSync(path.join(os.tmpdir(), `amber-wiki-${name}-`));
 }
 
 function writeFile(root, relativePath, content) {

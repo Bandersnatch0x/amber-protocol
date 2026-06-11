@@ -48,7 +48,7 @@ function bumpVersion(currentVersion, bump) {
 }
 
 function release(bumpType = "minor") {
-	console.log("=== Coding Harness Release ===\n");
+	console.log("=== Amber Protocol Release ===\n");
 
 	// 1. Pre-flight checks
 	console.log("1. Pre-flight checks...");
@@ -115,7 +115,7 @@ See CHANGELOG.md for details.`;
 	console.log(
 		`   Tag v${newVersion} is ready; create the release in your hosting platform.`,
 	);
-	console.log("   - Title: Coding Harness Phase B v" + newVersion);
+	console.log("   - Title: Amber Protocol Phase B v" + newVersion);
 	console.log("   - Attach: CHANGELOG.md");
 	console.log("   - Mark as: Latest release");
 
