@@ -117,7 +117,7 @@ Adoption 命令面向不应被自动修改的旧项目或既有项目。
 - `adoption apply-plan --dry-run` 预览 bootstrap 文件创建；V1 拒绝非 dry-run apply plan。
 - `adoption selected-files` 只接受安全的相对已知 Amber 文件路径，并且只写入指定的提案文件。
 
-StockAgents 示例产物位于 `docs/examples/`，仅用于审查。它们不表示目标项目已被初始化、修改或测试。
+示例 adoption 产物位于 `docs/examples/`，仅用于审查。它们不表示目标项目已被初始化、修改或测试。
 
 ## 简版 Roadmap
 

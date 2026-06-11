@@ -192,7 +192,7 @@ Adoption commands are for old or existing projects that should not be modified a
 - `adoption apply-plan --dry-run` previews bootstrap file creation; non-dry-run apply plans are rejected in V1.
 - `adoption selected-files` accepts only safe relative known Amber file paths and writes only the requested proposal.
 
-StockAgents example artifacts live under `docs/examples/` and are review-only. They do not imply the target project was initialized, modified, or tested.
+Sample adoption artifacts live under `docs/examples/` and are review-only. They do not imply the target project was initialized, modified, or tested.
 
 ## Short Roadmap
 

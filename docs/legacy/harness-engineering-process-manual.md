@@ -1,3 +1,5 @@
+> Historical document predating the Amber Protocol rename; product names reflect the era. See docs/legacy/README.md.
+
 # Harness Engineering 可实操流程手册
 
 基于 Learn Harness Engineering 课程整理：<https://walkinglabs.github.io/learn-harness-engineering/en/>
