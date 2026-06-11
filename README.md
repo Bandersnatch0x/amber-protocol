@@ -1,20 +1,20 @@
-# Coding Harness
+# Amber Protocol
 
 [简体中文](./README.zh-CN.md)
 
-![Coding Harness](./assets/readme/coding-harness-banner.png)
+![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
-Coding Harness is a repository-local governance and control layer for agent-assisted engineering. It installs, audits, validates, and maintains a small set of project files that help agents understand a codebase, keep feature state explicit, and hand off work cleanly.
+Amber Protocol is a repository-local governance and control layer for agent-assisted engineering. It installs, audits, validates, and maintains a small set of project files that help agents understand a codebase, keep feature state explicit, and hand off work cleanly.
 
 The current product is deliberately conservative. It creates review artifacts, dry-run plans, approval records, workflow-pack metadata, and maintenance proposals. It does not run Dynamic Workflows, invoke live subagents, execute target project commands, or automatically rewrite old project files.
 
-The repository and package are still named `Coding Harness` today. The product direction is converging toward **Amber Protocol**: a repo-local governance layer for coding agents. That direction clarifies the role of the project. It is not trying to become a general agent framework or execution platform. It is trying to constrain, verify, audit, and hand off agent work safely inside a repository.
+Amber Protocol (formerly Coding Harness) is a repo-local governance layer for coding agents. It is not trying to become a general agent framework or execution platform. It is trying to constrain, verify, audit, and hand off agent work safely inside a repository. The legacy `coding-harness` bin and `.harness` state remain readable for one release; see `docs/release/MIGRATION_GUIDE.md`.
 
-![Coding Harness safe bootstrap infographic](./assets/readme/coding-harness-cover.png)
+![Amber Protocol safe bootstrap infographic](./assets/readme/amber-protocol-cover.png)
 
 ## Positioning
 
-This project is strongest when framed as a governance-first harness with supporting verification and lifecycle capabilities. A useful way to read the current system is through seven control layers: `Execution`, `Tooling`, `Context`, `Lifecycle`, `Observability`, `Verification`, and `Governance`.
+This project is strongest when framed as a governance-first protocol layer with supporting verification and lifecycle capabilities. A useful way to read the current system is through seven control layers: `Execution`, `Tooling`, `Context`, `Lifecycle`, `Observability`, `Verification`, and `Governance`.
 
 | Layer | Current role in this project | Priority |
 | --- | --- | --- |
@@ -32,8 +32,8 @@ This is the architectural through-line behind the Amber Protocol direction: stre
 
 ```mermaid
 flowchart LR
-  CLI["scripts/harness.js<br/>Unified CLI"] --> Core["scripts/lib/harness-core.js<br/>Deterministic operations"]
-  Core --> Templates["templates/<br/>Harness starter files"]
+  CLI["scripts/amber.js<br/>Unified CLI"] --> Core["scripts/lib/amber-core.js<br/>Deterministic operations"]
+  Core --> Templates["templates/<br/>Amber starter files"]
   Core --> Skills["skills/<br/>Agent-facing instructions"]
   Core --> Packs["workflow-packs/<br/>Declarative packs"]
   Core --> Profiles["profiles/<br/>Project profiles"]
@@ -51,8 +51,8 @@ flowchart LR
 
 Core boundaries:
 
-- `scripts/harness.js` handles command routing and user-facing output.
-- `scripts/lib/harness-core.js` contains deterministic scaffold, audit, adoption, planning, review, team, and maintenance logic.
+- `scripts/amber.js` handles command routing and user-facing output.
+- `scripts/lib/amber-core.js` contains deterministic scaffold, audit, adoption, planning, review, team, and maintenance logic.
 - `templates/`, `skills/`, `workflow-packs/`, and `profiles/` are declarative inputs.
 - `tests/` protect idempotency, output safety, schema validation, and V1 boundaries.
 - `docs/examples/` contains review artifacts generated from real read-only trials.
@@ -71,11 +71,11 @@ Control-plane emphasis:
 Safe bootstrap:
 
 ```sh
-node scripts/harness.js init --target path/to/project
-node scripts/harness.js audit --target path/to/project --summary
-node scripts/harness.js wiki --target path/to/project --dry-run
-node scripts/harness.js doctor --target path/to/project
-node scripts/harness.js handoff --target path/to/project
+node scripts/amber.js init --target path/to/project
+node scripts/amber.js audit --target path/to/project --summary
+node scripts/amber.js wiki --target path/to/project --dry-run
+node scripts/amber.js doctor --target path/to/project
+node scripts/amber.js handoff --target path/to/project
 ```
 
 ### Phase B Commands
@@ -83,80 +83,80 @@ node scripts/harness.js handoff --target path/to/project
 Route engine:
 
 ```sh
-node scripts/harness.js route list
-node scripts/harness.js route inspect feature-standard
-node scripts/harness.js route validate routes/feature-standard.route.json
-node scripts/harness.js route test bugfix-quick --dry-run
+node scripts/amber.js route list
+node scripts/amber.js route inspect feature-standard
+node scripts/amber.js route validate routes/feature-standard.route.json
+node scripts/amber.js route test bugfix-quick --dry-run
 ```
 
 Session lifecycle:
 
 ```sh
-node scripts/harness.js session start --goal "fix login bug"
-node scripts/harness.js session start --goal "add feature" --mode interactive
-node scripts/harness.js session status
-node scripts/harness.js session list
-node scripts/harness.js session abort <session-id>
-node scripts/harness.js session continue
+node scripts/amber.js session start --goal "fix login bug"
+node scripts/amber.js session start --goal "add feature" --mode interactive
+node scripts/amber.js session status
+node scripts/amber.js session list
+node scripts/amber.js session abort <session-id>
+node scripts/amber.js session continue
 ```
 
 Migration:
 
 ```sh
-node scripts/harness.js migrate --target .
-node scripts/harness.js migrate --target . --dry-run
+node scripts/amber.js migrate --target .
+node scripts/amber.js migrate --target . --dry-run
 ```
 
 Daemon:
 
 ```sh
-node scripts/harness.js daemon status
-node scripts/harness.js daemon stop
+node scripts/amber.js daemon status
+node scripts/amber.js daemon stop
 ```
 
 Adoption review chain:
 
 ```sh
-node scripts/harness.js adoption report --target path/to/project --output-dir docs/examples/adoptions
-node scripts/harness.js adoption index --reports-dir docs/examples/adoptions --output docs/examples/adoptions-index.md
-node scripts/harness.js adoption validate --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md
-node scripts/harness.js adoption compare --reports-dir docs/examples/adoptions
-node scripts/harness.js adoption gate --reports-dir docs/examples/adoptions
-node scripts/harness.js adoption status --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md
-node scripts/harness.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle
-node scripts/harness.js adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md
-node scripts/harness.js adoption decision-record --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-decision-record.md
-node scripts/harness.js adoption apply-plan --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-apply-plan.md --dry-run
-node scripts/harness.js adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md
+node scripts/amber.js adoption report --target path/to/project --output-dir docs/examples/adoptions
+node scripts/amber.js adoption index --reports-dir docs/examples/adoptions --output docs/examples/adoptions-index.md
+node scripts/amber.js adoption validate --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md
+node scripts/amber.js adoption compare --reports-dir docs/examples/adoptions
+node scripts/amber.js adoption gate --reports-dir docs/examples/adoptions
+node scripts/amber.js adoption status --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md
+node scripts/amber.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle
+node scripts/amber.js adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md
+node scripts/amber.js adoption decision-record --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-decision-record.md
+node scripts/amber.js adoption apply-plan --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-apply-plan.md --dry-run
+node scripts/amber.js adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md
 ```
 
 Artifact-only planning and review:
 
 ```sh
-node scripts/harness.js plan --target path/to/project --feature F001 --title "Small slice"
-node scripts/harness.js gate --target path/to/project --plan docs/plans/F001-small-slice.md
-node scripts/harness.js review --target path/to/project --plan docs/plans/F001-small-slice.md
-node scripts/harness.js accept --target path/to/project --plan docs/plans/F001-small-slice.md
+node scripts/amber.js plan --target path/to/project --feature F001 --title "Small slice"
+node scripts/amber.js gate --target path/to/project --plan docs/plans/F001-small-slice.md
+node scripts/amber.js review --target path/to/project --plan docs/plans/F001-small-slice.md
+node scripts/amber.js accept --target path/to/project --plan docs/plans/F001-small-slice.md
 ```
 
 Declarative inspection:
 
 ```sh
-node scripts/harness.js pack inspect --file workflow-packs/safe-harness-bootstrap.pack.json
-node scripts/harness.js pack validate --file workflow-packs/safe-harness-bootstrap.pack.json
-node scripts/harness.js profile inspect --file profiles/default.profile.json
+node scripts/amber.js pack inspect --file workflow-packs/safe-amber-bootstrap.pack.json
+node scripts/amber.js pack validate --file workflow-packs/safe-amber-bootstrap.pack.json
+node scripts/amber.js profile inspect --file profiles/default.profile.json
 ```
 
 Local team and maintenance metadata:
 
 ```sh
-node scripts/harness.js team inspect --target path/to/project
-node scripts/harness.js team install --target path/to/project --version 1.0.0 --preset safe-bootstrap
-node scripts/harness.js maintenance inspect --target path/to/project
-node scripts/harness.js maintenance propose --target path/to/project
+node scripts/amber.js team inspect --target path/to/project
+node scripts/amber.js team install --target path/to/project --version 1.0.0 --preset safe-bootstrap
+node scripts/amber.js maintenance inspect --target path/to/project
+node scripts/amber.js maintenance propose --target path/to/project
 ```
 
-Run `node scripts/harness.js <command> --help` for scoped command help.
+Run `node scripts/amber.js <command> --help` for scoped command help.
 
 Additional commands `task`, `result`, `agent`, and `loop` exist but are
 lower-level orchestration tools used internally by the execution engine;
@@ -164,7 +164,7 @@ they are not documented in this README.
 
 ## What Gets Installed
 
-Minimum Harness files checked by `doctor`:
+Minimum Amber files checked by `doctor`:
 
 - `AGENTS.md` and `CLAUDE.md`
 - `feature_list.json`
@@ -186,7 +186,7 @@ Adoption commands are for old or existing projects that should not be modified a
 - `adoption next-actions` creates a checklist for human approval.
 - `adoption decision-record` records Gate A/B/C decisions but does not execute them.
 - `adoption apply-plan --dry-run` previews bootstrap file creation; non-dry-run apply plans are rejected in V1.
-- `adoption selected-files` accepts only safe relative known Harness file paths and writes only the requested proposal.
+- `adoption selected-files` accepts only safe relative known Amber file paths and writes only the requested proposal.
 
 StockAgents example artifacts live under `docs/examples/` and are review-only. They do not imply the target project was initialized, modified, or tested.
 
@@ -236,7 +236,7 @@ No workflow publishes packages, creates releases, or uses repository secrets.
 npm test
 npm run manifests
 npm run doctor
-node scripts/harness.js --help
+node scripts/amber.js --help
 ```
 
 The test suite uses Node's built-in test runner and requires Node `>=18.17`.
