@@ -1,5 +1,7 @@
 "use strict";
 
+const fs = require("fs");
+const path = require("path");
 const {
   governanceDocs,
   exportSessionEvidence,
@@ -48,24 +50,67 @@ function exportGovernanceEvidence(target, options = {}) {
     };
   }
 
-  if (!options.output) {
+  if (!options.output && !options.all) {
     return {
       target,
-      errors: ["--output is required"],
+      errors: ["--output is required (unless using --all)"],
       warnings: [],
     };
   }
 
   try {
     let result;
-    if (options.session) {
+    if (options.all) {
+      // Batch export all sessions and executions
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const batchDir = path.join(target, '.amber', 'governance', 'evidence', timestamp);
+      fs.mkdirSync(batchDir, { recursive: true });
+
+      const { resolveStateDirForRead } = require('./state-dir-resolver');
+      const stateDir = resolveStateDirForRead(target);
+      const sessionsDir = path.join(stateDir, 'sessions');
+      const executionsDir = path.join(stateDir, 'executions');
+
+      let exported = 0;
+      const errors = [];
+
+      // Export all sessions
+      if (fs.existsSync(sessionsDir)) {
+        const sessions = fs.readdirSync(sessionsDir);
+        for (const sessionId of sessions) {
+          try {
+            const outputPath = path.join(batchDir, `session-${sessionId}.md`);
+            exportSessionEvidence(sessionId, target, outputPath);
+            exported++;
+          } catch (err) {
+            errors.push(`Session ${sessionId}: ${err.message}`);
+          }
+        }
+      }
+
+      // Export all executions
+      if (fs.existsSync(executionsDir)) {
+        const tasks = fs.readdirSync(executionsDir);
+        for (const taskId of tasks) {
+          try {
+            const outputPath = path.join(batchDir, `execution-${taskId}.md`);
+            exportExecutionEvidence(taskId, target, outputPath);
+            exported++;
+          } catch (err) {
+            errors.push(`Execution ${taskId}: ${err.message}`);
+          }
+        }
+      }
+
+      result = { batchDir, count: exported, errors };
+    } else if (options.session) {
       result = exportSessionEvidence(options.session, target, options.output);
     } else if (options.task) {
       result = exportExecutionEvidence(options.task, target, options.output);
     } else {
       return {
         target,
-        errors: ["Must specify --session <id> or --task <id>"],
+        errors: ["Must specify --session <id>, --task <id>, or --all"],
         warnings: [],
       };
     }
@@ -73,7 +118,7 @@ function exportGovernanceEvidence(target, options = {}) {
     return {
       target,
       ...result,
-      errors: [],
+      errors: result.errors || [],
       warnings: [],
     };
   } catch (error) {
