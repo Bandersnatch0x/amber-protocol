@@ -2,6 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** ✅ Phase 1 completed 2026-06-11 on branch `feat/amber-protocol-rename` (456/456 tests green, manifests green, audit guard green). Phase 2 (governance surfaces) remains a skeleton pending its own detailed plan.
+
+**Execution notes (deviations discovered while implementing):**
+- `scripts/amber.js` has a `require.main === module` entry guard, so the forwarding shims must call the exported `run()` explicitly — a bare `require()` is inert. The plan's original shim code was corrected accordingly.
+- The repo had no `.amber/` gitignore entry; the first resolver commit accidentally captured 323 runtime session files and was redone via soft-reset with `.amber/` ignored.
+- Per-module commits for the resolver wiring collapsed into one Phase B commit: switching test fixtures from `.harness` to `.amber` spans all session/daemon/worktree tests at once, so implementation and assertions had to move together.
+- `orchestrationPaths`/`teamStatePaths` are shared by creators and readers; both gained a `forCreate` option instead of a blanket switch.
+- **The project has never shipped (user decision mid-execution): there is no V5.5 audience to migrate.** `docs/release/MIGRATION_GUIDE.md` and the `migrating-from-v5.5` tutorial were deleted instead of rewritten. `amber migrate state|wiki` stay — they serve pre-rename working copies of this repo.
+- Third-party repository references and placeholder external org links were removed on user request (SPEC reference implementation mention, `github.com/coding-harness` links, Discord placeholder).
+- The audit guard gained line-level legacy-marker exemptions (`legacy|deprecated|formerly|…`) so README/UL can state the former name without file-level grants; `classifyTarget` product evidence now checks `scripts/amber.js`.
+- Validation item "amber handoff --target . passes" was wrong in the draft: `session-handoff.md` never existed in the product repo (verified identical on master) — handoff is a target-repo command. Item recorded as N/A, not a regression.
+- A parallel agent cleaned `stockagents` strings during Tasks 6–7; later commits switched from `git add -A` to explicit paths to avoid absorbing its work.
+
 **Goal:** Rename Coding Harness to **Amber Protocol** (package `amber-protocol`, CLI `amber`, state dir `.amber`) with legacy compatibility, then add governance-facing evidence/policy/audit surfaces in a separate phase.
 
 **Architecture:** Phase 1 is a compatibility-safe rename: new `amber` entrypoints with forwarding shims, the facade renamed to `amber-core.js` (the 21 `scripts/lib/core/` domain modules stay), a shared state-dir resolver (`.amber` canonical, `.harness` legacy-read), migration commands (`migrate state`, `migrate wiki`), asset renames with all code references updated, doc rewrite/archival, and a permanent legacy-reference audit test. Phase 2 (governance: evidence export, policy check, audit export) is sketched here and gets its own detailed plan after Phase 1 ships.
