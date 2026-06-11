@@ -835,7 +835,9 @@ async function run(argv = process.argv.slice(2)) {
 		if (action === "validate-integration") {
 			const { validateIntegration } = require("./lib/core/execution-validator");
 			const contractPath = args.contract || "";
-			const validationResult = validateIntegration(contractPath);
+			const validationResult = validateIntegration(contractPath, {
+				explain: args.explain || false,
+			});
 			result = {
 				target: args.target,
 				...validationResult,
@@ -855,7 +857,9 @@ async function run(argv = process.argv.slice(2)) {
 			} else {
 				const targetRoot = resolveTarget(args.target);
 				const resolvedPlan = require("path").resolve(targetRoot, planPath);
-				const readiness = checkExecutionReadiness(targetRoot, resolvedPlan);
+				const readiness = checkExecutionReadiness(targetRoot, resolvedPlan, {
+					strict: args.strict || false,
+				});
 				result = {
 					target: args.target,
 					plan: planPath,
@@ -863,6 +867,7 @@ async function run(argv = process.argv.slice(2)) {
 					blockers: readiness.blockers,
 					errors: readiness.blockers,
 					warnings: readiness.warnings,
+					strictMode: readiness.strictMode,
 				};
 			}
 		} else {
