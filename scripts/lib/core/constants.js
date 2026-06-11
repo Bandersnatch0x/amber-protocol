@@ -25,7 +25,7 @@ const MINIMUM_HARNESS_FILES = [
 	"docs/wiki/architecture/system-map.md",
 	"docs/wiki/engineering/runbook.md",
 	"docs/wiki/engineering/verification.md",
-	"docs/wiki/agent/harness.md",
+	"docs/wiki/agent/amber.md",
 	"docs/wiki/agent/continuous-improvement.md",
 	"docs/wiki/agent/workflow-packets.md",
 	".workflow/continuous-improvement/state.json",

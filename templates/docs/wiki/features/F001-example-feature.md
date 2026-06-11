@@ -8,7 +8,7 @@ A fresh agent can understand the project, run verification, and hand off work sa
 
 In:
 
-- Customize the Harness files for this repository.
+- Customize the Amber setup files for this repository.
 
 Out:
 
@@ -26,11 +26,11 @@ Out:
 
 1. Read `docs/wiki/index.md`.
 2. Run the command in `docs/wiki/engineering/verification.md`.
-3. Run the Coding Harness doctor from the toolkit repository.
+3. Run the Amber Protocol doctor from the toolkit repository.
 
 ## Architecture Notes
 
-- The Harness is repository-local.
+- The Amber setup is repository-local.
 - Machine-readable state lives in `feature_list.json`.
 - Stable context lives in `docs/wiki/`.
 
