@@ -85,6 +85,7 @@ const {
 } = require("./core/loops");
 const {
 	validateLoopContract,
+	validateIntegration,
 } = require("./core/execution-validator");
 const {
 	validateWorkflowPackData,
@@ -183,6 +184,10 @@ const {
 } = require("./core/scaffold");
 const {
 	governanceDocs,
+	exportSessionEvidence,
+	exportExecutionEvidence,
+	inspectPolicy,
+	generateAuditReport,
 } = require("./core/governance");
 const {
 	loadFeatureList,
@@ -249,8 +254,12 @@ module.exports = {
 	dispatchAgentTask,
 	doctor,
 	dryRunLoopContract,
+	exportSessionEvidence,
+	exportExecutionEvidence,
+	generateAuditReport,
 	governanceDocs,
 	inspectMaintenance,
+	inspectPolicy,
 	inspectLoopContract,
 	inspectLoopLedger,
 	inspectTeamDistribution,
@@ -283,6 +292,7 @@ module.exports = {
 	validateFeatureListFile,
 	validateHandoff,
 	validateAdoptionReports,
+	validateIntegration,
 	validateLoopContract,
 	validateManifests,
 	validatePlanGate,

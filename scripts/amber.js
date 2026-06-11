@@ -290,6 +290,20 @@ function commandSummary(command) {
 			"  node scripts/amber.js migrate wiki --target <path>",
 		].join("\n");
 	}
+	if (command === "execution") {
+		return [
+			"Validate execution boundaries and integration contracts.",
+			"",
+			"Subcommands:",
+			"  validate-integration  Validate integration contract structure and hardstops.",
+			"  validate-loop         Validate loop contract structure (via loop validate-loop).",
+			"  readiness             Review plan for execution boundary violations.",
+			"",
+			"Examples:",
+			"  node scripts/amber.js execution validate-integration --contract path/to/contract.json --json",
+			"  node scripts/amber.js execution readiness --plan path/to/plan.md --target path/to/repo --json",
+		].join("\n");
+	}
 	if (command === "governance") {
 		return [
 			"Create governance documentation for a target repository.",
