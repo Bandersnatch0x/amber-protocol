@@ -128,7 +128,7 @@ test("blocked features without notes warn instead of fail", () => {
 });
 
 test("invalid json file reports a readable error", () => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), "coding-harness-invalid-feature-"));
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-invalid-feature-"));
   const filePath = path.join(target, "feature_list.json");
   fs.writeFileSync(filePath, "{ invalid json");
 

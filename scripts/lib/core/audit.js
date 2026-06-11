@@ -213,7 +213,7 @@ function buildAuditUnknowns(
 }
 
 function buildNextSafeCommand(targetRoot) {
-	return `node scripts/harness.js audit --target ${JSON.stringify(targetRoot)} --json`;
+	return `node scripts/amber.js audit --target ${JSON.stringify(targetRoot)} --json`;
 }
 
 function auditProject(target) {

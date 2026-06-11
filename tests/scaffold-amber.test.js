@@ -16,7 +16,7 @@ const {
 } = require("../scripts/lib/amber-core");
 
 function tempDir(name) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `coding-harness-${name}-`));
+  return fs.mkdtempSync(path.join(os.tmpdir(), `amber-${name}-`));
 }
 
 function copyFixture(name) {
@@ -90,7 +90,7 @@ test("audit reports existing docs and approval-required patch suggestions", () =
   assert.ok(result.suggestedPatches.every((patch) => patch.requiresApproval === true));
   assert.ok(result.untouchedFiles.includes("AGENTS.md"));
   assert.ok(Array.isArray(result.unknowns));
-  assert.match(result.nextSafeCommand, /harness\.js audit --target/);
+  assert.match(result.nextSafeCommand, /amber\.js audit --target/);
 });
 
 test("audit ignores dependency and generated-output markdown noise", () => {

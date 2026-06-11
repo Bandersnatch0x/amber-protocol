@@ -50,7 +50,7 @@ function publish(options = {}) {
 	const requiredFiles = [
 		"package.json",
 		"README.md",
-		"scripts/harness.js",
+		"scripts/amber.js",
 		"scripts/lib/",
 		"schemas/",
 		"templates/",
@@ -76,7 +76,7 @@ function publish(options = {}) {
 	if (!dryRun) {
 		console.log("\n3. Verifying on registry...");
 		try {
-			const info = run(`npm view coding-harness version 2>&1`);
+			const info = run(`npm view amber-protocol version 2>&1`);
 			if (info === version) {
 				console.log(`   ✅ npm registry shows v${version}`);
 			} else {

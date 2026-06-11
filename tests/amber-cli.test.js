@@ -112,7 +112,7 @@ test("adoption report aggregates safe trial steps without initializing target", 
   assert.equal(payload.sections.map((section) => section.id).join(","), "audit,init-dry-run,team,maintenance");
   assert.equal(fs.existsSync(output), true);
   const report = fs.readFileSync(output, "utf8");
-  assert.match(report, /# Coding Harness Adoption Report/);
+  assert.match(report, /# Amber Protocol Adoption Report/);
   assert.match(report, /## Audit Summary/);
   assert.match(report, /python -m pytest/);
   assert.match(report, /## Init Dry Run/);
@@ -161,11 +161,11 @@ test("adoption list reads report metadata without writing an index", () => {
   const newerReport = path.join(reportsDir, "project-b.md");
   fs.writeFileSync(
     olderReport,
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n"
   );
   fs.writeFileSync(
     newerReport,
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectB\nGenerated: 2026-06-09T02:00:00.000Z\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectB\nGenerated: 2026-06-09T02:00:00.000Z\n"
   );
 
   const result = runHarness(["adoption", "list", "--reports-dir", reportsDir, "--json"]);
@@ -193,11 +193,11 @@ test("adoption index writes a markdown index and refuses to overwrite it", () =>
   const output = path.join(reportsDir, "adoptions-index.md");
   fs.writeFileSync(
     path.join(reportsDir, "project-a.md"),
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n"
   );
   fs.writeFileSync(
     path.join(reportsDir, "project-b.md"),
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectB\nGenerated: 2026-06-09T02:00:00.000Z\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectB\nGenerated: 2026-06-09T02:00:00.000Z\n"
   );
 
   const result = runHarness(["adoption", "index", "--reports-dir", reportsDir, "--output", output, "--json"]);
@@ -221,7 +221,7 @@ test("adoption validate checks report metadata without writing files", () => {
   const reportsDir = tempDir("adoption-validate-reports");
   fs.writeFileSync(
     path.join(reportsDir, "project-a.md"),
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n"
   );
 
   const result = runHarness(["adoption", "validate", "--reports-dir", reportsDir, "--json"]);
@@ -245,7 +245,7 @@ test("adoption validate reports broken index links", () => {
   const indexPath = path.join(reportsDir, "adoptions-index.md");
   fs.writeFileSync(
     path.join(reportsDir, "project-a.md"),
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n"
   );
   fs.writeFileSync(
     indexPath,
@@ -280,7 +280,7 @@ test("adoption compare auto-selects the latest two reports and reports deltas", 
   fs.writeFileSync(
     olderReport,
     [
-      "# Coding Harness Adoption Report",
+      "# Amber Protocol Adoption Report",
       "",
       "Target: C:\\tmp\\ProjectA",
       "Generated: 2026-06-09T01:00:00.000Z",
@@ -311,7 +311,7 @@ test("adoption compare auto-selects the latest two reports and reports deltas", 
   fs.writeFileSync(
     newerReport,
     [
-      "# Coding Harness Adoption Report",
+      "# Amber Protocol Adoption Report",
       "",
       "Target: C:\\tmp\\ProjectA",
       "Generated: 2026-06-09T02:00:00.000Z",
@@ -362,11 +362,11 @@ test("adoption compare writes markdown diff and refuses to overwrite it", () => 
   const output = path.join(reportsDir, "diff.md");
   fs.writeFileSync(
     base,
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 5\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n\n### Unknowns\n\n- exact lint command unknown\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 5\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n\n### Unknowns\n\n- exact lint command unknown\n"
   );
   fs.writeFileSync(
     head,
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 3\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n- package.json: lint -> npm run lint\n\n### Unknowns\n\n- none\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 3\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n- package.json: lint -> npm run lint\n\n### Unknowns\n\n- none\n"
   );
 
   const result = runHarness(["adoption", "compare", "--base", base, "--head", head, "--output", output, "--json"]);
@@ -391,7 +391,7 @@ test("adoption gate reports a conservative wait decision for risky reports", () 
   fs.writeFileSync(
     report,
     [
-      "# Coding Harness Adoption Report",
+      "# Amber Protocol Adoption Report",
       "",
       "Target: C:\\tmp\\ProjectA",
       "Generated: 2026-06-09T01:00:00.000Z",
@@ -429,11 +429,11 @@ test("adoption gate selects the latest report from a reports directory", () => {
   const reportsDir = tempDir("adoption-gate-reports-dir");
   fs.writeFileSync(
     path.join(reportsDir, "older.md"),
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 4\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 4\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
   );
   fs.writeFileSync(
     path.join(reportsDir, "newer.md"),
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 0\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 0\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
   );
 
   const result = runHarness(["adoption", "gate", "--reports-dir", reportsDir, "--json"]);
@@ -451,7 +451,7 @@ test("adoption gate writes markdown output and refuses to overwrite it", () => {
   const output = path.join(reportsDir, "gate.md");
   fs.writeFileSync(
     report,
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 0\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 0\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
   );
 
   const result = runHarness(["adoption", "gate", "--report", report, "--output", output, "--json"]);
@@ -476,11 +476,11 @@ test("adoption status summarizes reports index gate compare and next action", ()
   const indexPath = path.join(reportsDir, "adoptions-index.md");
   fs.writeFileSync(
     older,
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 4\n- Existing docs: 1\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 4\n- Existing docs: 1\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
   );
   fs.writeFileSync(
     newer,
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 2\n- Existing docs: 3\n- Conflicts: 0\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n\n### Unknowns\n\n- exact lint command unknown\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 2\n- Existing docs: 3\n- Conflicts: 0\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n\n### Unknowns\n\n- exact lint command unknown\n"
   );
   fs.writeFileSync(
     indexPath,
@@ -506,7 +506,7 @@ test("adoption status writes markdown output and refuses to overwrite it", () =>
   const output = path.join(reportsDir, "status.md");
   fs.writeFileSync(
     path.join(reportsDir, "report.md"),
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 0\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 0\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
   );
 
   const result = runHarness(["adoption", "status", "--reports-dir", reportsDir, "--output", output, "--json"]);
@@ -530,11 +530,11 @@ test("adoption bundle writes a review bundle with manifest and refuses overwrite
   const indexPath = path.join(reportsDir, "adoptions-index.md");
   fs.writeFileSync(
     path.join(reportsDir, "older.md"),
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 4\n- Existing docs: 1\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 4\n- Existing docs: 1\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n"
   );
   fs.writeFileSync(
     path.join(reportsDir, "newer.md"),
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 2\n- Existing docs: 3\n- Conflicts: 0\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n\n### Unknowns\n\n- exact lint command unknown\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 2\n- Existing docs: 3\n- Conflicts: 0\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n\n### Unknowns\n\n- exact lint command unknown\n"
   );
   fs.writeFileSync(
     indexPath,
@@ -576,7 +576,7 @@ test("adoption next-actions writes a gate checklist from a bundle and refuses ov
   fs.mkdirSync(bundleDir, { recursive: true });
   fs.writeFileSync(
     reportPath,
-    "# Coding Harness Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 2\n- Existing docs: 3\n- Conflicts: 0\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n\n### Unknowns\n\n- exact lint command unknown\n"
+    "# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Harness files: 2\n- Existing docs: 3\n- Conflicts: 0\n\n### Candidate Commands\n\n- python: test -> python -m pytest\n\n### Unknowns\n\n- exact lint command unknown\n"
   );
   fs.writeFileSync(
     path.join(bundleDir, "gate.md"),

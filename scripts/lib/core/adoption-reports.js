@@ -61,7 +61,7 @@ function buildAdoptionReportContent(parts) {
 		maintenance,
 	} = parts;
 	const lines = [
-		"# Coding Harness Adoption Report",
+		"# Amber Protocol Adoption Report",
 		"",
 		`Target: ${targetRoot}`,
 		`Generated: ${new Date().toISOString()}`,
@@ -107,7 +107,7 @@ function buildAdoptionReportContent(parts) {
 	} else {
 		lines.push("- Current version: not installed");
 		lines.push(
-			"- Suggested install: `node scripts/harness.js team install --target <target> --version 1.0.0 --preset safe-bootstrap`",
+			"- Suggested install: `node scripts/amber.js team install --target <target> --version 1.0.0 --preset safe-bootstrap`",
 		);
 	}
 
@@ -134,8 +134,8 @@ function buildAdoptionReportContent(parts) {
 		"## Next Safe Commands",
 		"",
 		`- ${audit.nextSafeCommand}`,
-		`- node scripts/harness.js init --target ${JSON.stringify(targetRoot)} --dry-run`,
-		`- node scripts/harness.js maintenance inspect --target ${JSON.stringify(targetRoot)} --json`,
+		`- node scripts/amber.js init --target ${JSON.stringify(targetRoot)} --dry-run`,
+		`- node scripts/amber.js maintenance inspect --target ${JSON.stringify(targetRoot)} --json`,
 		"",
 	);
 
@@ -160,7 +160,7 @@ function parseAdoptionReportMetadata(filePath) {
 	const content = readText(filePath);
 	const lines = content.split(/\r?\n/).slice(0, 40);
 	if (
-		!lines.some((line) => line.trim() === "# Coding Harness Adoption Report")
+		!lines.some((line) => line.trim() === "# Amber Protocol Adoption Report")
 	) {
 		return null;
 	}
