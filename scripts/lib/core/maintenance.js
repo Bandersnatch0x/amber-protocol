@@ -325,8 +325,8 @@ function buildMaintenanceProposalContent(inspection) {
 	if (inspection.evolutionRollup.length === 0) {
 		lines.push("# No repeated delivery findings to promote.");
 	} else {
-		lines.push("--- standards/harness-delivery.json");
-		lines.push("+++ standards/harness-delivery.json");
+		lines.push("--- standards/amber-delivery.json");
+		lines.push("+++ standards/amber-delivery.json");
 		for (const item of inspection.evolutionRollup) {
 			lines.push(`+ delivery finding: ${item.finding}`);
 		}

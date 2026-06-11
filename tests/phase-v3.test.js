@@ -32,7 +32,7 @@ function validPack(overrides = {}) {
     title: "Example Pack",
     version: "0.1.0",
     skills: [],
-    standards: ["harness-delivery"],
+    standards: ["amber-delivery"],
     externalIntegrations: [],
     steps: [
       {

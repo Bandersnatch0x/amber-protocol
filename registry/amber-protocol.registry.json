@@ -10,8 +10,8 @@
   ],
   "rulePacks": [
     {
-      "id": "harness-delivery",
-      "file": "rule-packs/harness-delivery.rule-pack.json"
+      "id": "amber-delivery",
+      "file": "rule-packs/amber-delivery.rule-pack.json"
     }
   ],
   "profiles": [
@@ -26,7 +26,7 @@
       "preset": "safe-bootstrap",
       "profile": "profiles/default.profile.json",
       "workflowPacks": ["workflow-packs/safe-harness-bootstrap.pack.json"],
-      "rulePacks": ["standards/harness-delivery.json"],
+      "rulePacks": ["standards/amber-delivery.json"],
       "managedProjectFiles": [],
       "compatibility": {
         "codex": ">=0.0.0",
@@ -41,7 +41,7 @@
       "preset": "safe-bootstrap",
       "profile": "profiles/default.profile.json",
       "workflowPacks": ["workflow-packs/safe-harness-bootstrap.pack.json"],
-      "rulePacks": ["rule-packs/harness-delivery.rule-pack.json", "standards/harness-delivery.json"],
+      "rulePacks": ["rule-packs/amber-delivery.rule-pack.json", "standards/amber-delivery.json"],
       "managedProjectFiles": [],
       "compatibility": {
         "codex": ">=0.0.0",
