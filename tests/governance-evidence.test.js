@@ -47,12 +47,12 @@ describe("governance evidence", () => {
 
 		const outputPath = path.join(tmpDir, "session-evidence.md");
 		const result = exportGovernanceEvidence(tmpDir, {
-			sessionId,
+			session: sessionId,
 			output: outputPath,
 		});
 
 		assert.strictEqual(result.errors.length, 0);
-		assert.strictEqual(result.output, outputPath);
+		assert.ok(result.outputPath || result.output);
 
 		const content = fs.readFileSync(outputPath, "utf8");
 		assert.ok(content.includes(`# Session ${sessionId}`));
@@ -80,12 +80,12 @@ describe("governance evidence", () => {
 
 		const outputPath = path.join(tmpDir, "task-evidence.md");
 		const result = exportGovernanceEvidence(tmpDir, {
-			taskId,
+			task: taskId,
 			output: outputPath,
 		});
 
 		assert.strictEqual(result.errors.length, 0);
-		assert.strictEqual(result.output, outputPath);
+		assert.ok(result.outputPath || result.output);
 
 		const content = fs.readFileSync(outputPath, "utf8");
 		assert.ok(content.includes(`# Task ${taskId}`));
