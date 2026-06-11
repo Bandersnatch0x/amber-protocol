@@ -1,0 +1,11 @@
+{
+  "trigger": "manual",
+  "cadence": "daily",
+  "stateSpine": ["state1", "state2"],
+  "hardStops": {
+    "maxIterations": 10,
+    "timeout": 3600,
+    "noProgress": 5,
+    "budget": 100
+  }
+}

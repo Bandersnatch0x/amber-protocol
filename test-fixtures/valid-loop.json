@@ -1,0 +1,20 @@
+{
+  "goal": "Test loop contract",
+  "owner": "test-agent",
+  "trigger": "timer",
+  "cadence": "daily",
+  "inputSources": ["git status"],
+  "stateSpine": "state.json",
+  "triageOutput": "triage.md",
+  "hardStops": {
+    "maxIterations": 10,
+    "timeout": 3600,
+    "noProgress": true,
+    "budget": 100000
+  },
+  "budgetCeiling": {
+    "maxTokens": 100000,
+    "maxDuration": 3600
+  },
+  "reviewerGate": "user-approval"
+}

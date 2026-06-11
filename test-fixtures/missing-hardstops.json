@@ -1,0 +1,6 @@
+{
+  "goal": "Test loop contract",
+  "owner": "test-agent",
+  "trigger": "timer",
+  "cadence": "daily"
+}

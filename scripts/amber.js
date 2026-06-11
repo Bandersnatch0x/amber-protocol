@@ -64,6 +64,10 @@ const {
 	continueSession,
 } = require("./lib/session-commands");
 
+const {
+	validateWorkflowPack,
+} = require("./lib/core/execution-validator");
+
 const COMMANDS = [
 	"init",
 	"audit",
@@ -87,6 +91,8 @@ const COMMANDS = [
 	"session",
 	"migrate",
 	"daemon",
+	"governance",
+	"execution",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
@@ -126,6 +132,7 @@ function usage(command) {
 		"  node scripts/amber.js accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
 		"  node scripts/amber.js pack inspect --file workflow-packs/safe-amber-bootstrap.pack.json",
 		"  node scripts/amber.js pack readiness --file workflow-packs/safe-amber-bootstrap.pack.json --json",
+		"  node scripts/amber.js pack validate-execution --file workflow-packs/safe-amber-bootstrap.pack.json --json",
 		"  node scripts/amber.js profile inspect --file profiles/default.profile.json",
 		"  node scripts/amber.js task prepare --target path/to/repo --plan docs/plans/F001-small-slice.md --task slice-1",
 		"  node scripts/amber.js result inspect --target path/to/repo --task slice-1",
@@ -218,6 +225,7 @@ function commandSummary(command) {
 			"  node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --output .amber/loops/daily-amber-triage/ledger-preview.json --json",
 			"  node scripts/amber.js loop record --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --trigger-source manual --stop-reason reviewer-gate-required --output .amber/loops/daily-amber-triage/manual-ledger.json --json",
 			"  node scripts/amber.js loop status --ledger .amber/loops/daily-amber-triage/manual-ledger.json --json",
+			"  node scripts/amber.js loop validate-loop --contract path/to/contract.json --json",
 		].join("\n");
 	}
 	if (command === "route") {
@@ -282,6 +290,28 @@ function commandSummary(command) {
 			"  node scripts/amber.js migrate wiki --target <path>",
 		].join("\n");
 	}
+	if (command === "governance") {
+		return [
+			"Create governance documentation for a target repository.",
+			"",
+			"Subcommands:",
+			"  docs         Generate governance documents (CODE_OF_CONDUCT.md, CONTRIBUTING.md, GOVERNANCE.md).",
+			"  evidence     Export governance evidence from sessions or tasks.",
+			"  policy       Show governance policy (defaults and overrides).",
+			"  audit        Generate comprehensive audit report with policy, sessions, and executions.",
+			"",
+			"Examples:",
+			"  node scripts/amber.js governance docs --target path/to/repo",
+			"  node scripts/amber.js governance docs --target path/to/repo --json",
+			"  node scripts/amber.js governance evidence --session <id> --output evidence.md",
+			"  node scripts/amber.js governance evidence --task <id> --output evidence.md --json",
+			"  node scripts/amber.js governance policy --target path/to/repo",
+			"  node scripts/amber.js governance policy --target path/to/repo --json",
+			"  node scripts/amber.js governance audit --target path/to/repo --output audit.md",
+			"  node scripts/amber.js governance audit --target path/to/repo --output audit.md --since 2025-01-01",
+			"  node scripts/amber.js governance audit --target path/to/repo --output audit.md --json",
+		].join("\n");
+	}
 	return "Run Amber Protocol command.";
 }
 
@@ -335,10 +365,19 @@ async function run(argv = process.argv.slice(2)) {
 			}
 		} else if (action === "readiness") {
 			result = inspectWorkflowPackReadiness(args.file || args._[1] || "");
+		} else if (action === "validate-execution") {
+			const packPath = args.file || args.pack || args._[1] || "";
+			const validationResult = validateWorkflowPack(packPath);
+			result = {
+				target: args.target,
+				...validationResult,
+				errors: validationResult.errors || [],
+				warnings: validationResult.warnings || [],
+			};
 		} else {
 			result = {
 				target: args.target,
-				errors: ["pack requires inspect, validate, or readiness."],
+				errors: ["pack requires inspect, validate, readiness, or validate-execution."],
 				warnings: [],
 			};
 		}
@@ -416,10 +455,13 @@ async function run(argv = process.argv.slice(2)) {
 			});
 		} else if (action === "status") {
 			result = inspectLoopLedger({ ledger: args.ledger });
+		} else if (action === "validate-loop") {
+			const { validateLoopContract } = require("./lib/amber-core");
+			result = validateLoopContract(args.contract);
 		} else {
 			result = {
 				target: args.target,
-				errors: ["loop requires inspect, run, record, or status."],
+				errors: ["loop requires inspect, run, record, status, or validate-loop."],
 				warnings: [],
 			};
 		}
@@ -446,12 +488,80 @@ async function run(argv = process.argv.slice(2)) {
 		const action = args._ && args._[0];
 		if (action === "inspect") {
 			result = inspectMaintenance(args.target, args);
-		} else if (action === "propose") {
+		} else if (action === "propose" || action === "proposal") {
 			result = proposeMaintenance(args.target, args);
+		} else if (action === "stale-docs") {
+			const { detectStaleDocs } = require("./lib/core/maintenance");
+			const { resolveTarget } = require("./lib/core/fs-utils");
+			const targetRoot = resolveTarget(args.target);
+			const thresholdDays = args.thresholdDays || 180;
+			const staleResult = detectStaleDocs(targetRoot, thresholdDays);
+			result = {
+				target: targetRoot,
+				staleDocs: staleResult.staleDocs,
+				thresholdDays: staleResult.thresholdDays,
+				errors: [],
+				warnings: [],
+			};
+		} else if (action === "wiki-lint") {
+			const { validateWikiStructure } = require("./lib/core/maintenance");
+			const { resolveTarget } = require("./lib/core/fs-utils");
+			const targetRoot = resolveTarget(args.target);
+			result = validateWikiStructure(targetRoot);
+		} else if (action === "pack-drift") {
+			const { detectPackDrift } = require("./lib/core/maintenance");
+			const { resolveTarget } = require("./lib/core/fs-utils");
+			const { resolveRegistryPath } = require("./lib/core/team");
+			const targetRoot = resolveTarget(args.target);
+			const registryPath = resolveRegistryPath(args.registry);
+			const driftResult = detectPackDrift(targetRoot, registryPath);
+			result = {
+				target: targetRoot,
+				...driftResult,
+				errors: [],
+				warnings: [],
+			};
+		} else if (action === "upgrade-preview") {
+			const { previewUpgrade } = require("./lib/core/maintenance");
+			const { resolveTarget } = require("./lib/core/fs-utils");
+			const { resolveRegistryPath } = require("./lib/core/team");
+			const targetRoot = resolveTarget(args.target);
+			const registryPath = resolveRegistryPath(args.registry);
+			const previewResult = previewUpgrade(targetRoot, args.version, registryPath);
+			result = {
+				target: targetRoot,
+				...previewResult,
+				errors: [],
+				warnings: [],
+			};
+		} else if (action === "evolution-rollup") {
+			const { rollupEvolutionFindings } = require("./lib/core/maintenance");
+			const { resolveTarget } = require("./lib/core/fs-utils");
+			const targetRoot = resolveTarget(args.target);
+			const threshold = args.threshold ? parseInt(args.threshold, 10) : 2;
+			const rollupResult = rollupEvolutionFindings(targetRoot);
+			result = {
+				target: targetRoot,
+				findings: rollupResult.findings.filter((f) => f.count >= threshold),
+				threshold,
+				errors: [],
+				warnings: [],
+			};
+		} else if (action === "regression-proposals") {
+			const { extractRegressionProposals } = require("./lib/core/maintenance");
+			const { resolveTarget } = require("./lib/core/fs-utils");
+			const targetRoot = resolveTarget(args.target);
+			const proposals = extractRegressionProposals(targetRoot);
+			result = {
+				target: targetRoot,
+				proposals,
+				errors: [],
+				warnings: [],
+			};
 		} else {
 			result = {
 				target: args.target,
-				errors: ["maintenance requires inspect or propose."],
+				errors: ["maintenance requires inspect, propose, proposal, stale-docs, wiki-lint, pack-drift, upgrade-preview, evolution-rollup, or regression-proposals."],
 				warnings: [],
 			};
 		}
@@ -667,6 +777,74 @@ async function run(argv = process.argv.slice(2)) {
 		return 1;
 	} else if (command === "doctor") {
 		result = doctor(args.target);
+	} else if (command === "governance") {
+		const action = args._ && args._[0];
+		const {
+			createGovernanceDocs,
+			exportGovernanceEvidence,
+			inspectGovernancePolicy,
+			auditGovernance,
+		} = require("./lib/governance-commands");
+		if (action === "docs") {
+			result = createGovernanceDocs(args.target);
+		} else if (action === "evidence") {
+			result = exportGovernanceEvidence(args.target || process.cwd(), {
+				sessionId: args.session,
+				taskId: args.task,
+				output: args.output,
+				json: args.json,
+			});
+		} else if (action === "policy") {
+			result = inspectGovernancePolicy(args.target);
+		} else if (action === "audit") {
+			result = auditGovernance(args.target, {
+				output: args.output,
+				since: args.since,
+			});
+		} else {
+			result = {
+				target: args.target,
+				errors: ["governance requires docs, evidence, policy, or audit."],
+				warnings: [],
+			};
+		}
+	} else if (command === "execution") {
+		const action = args._ && args._[0];
+		if (action === "validate-integration") {
+			const { validateIntegration } = require("./lib/core/execution-validator");
+			const contractPath = args.contract || "";
+			const validationResult = validateIntegration(contractPath);
+			result = {
+				target: args.target,
+				...validationResult,
+			};
+		} else if (action === "readiness") {
+			const planPath = args.plan || "";
+			if (!planPath) {
+				result = {
+					target: args.target,
+					errors: ["execution readiness requires --plan <path>."],
+					warnings: [],
+				};
+			} else {
+				const review = reviewPlan(args.target, planPath);
+				const ready = review.errors.length === 0;
+				result = {
+					target: args.target,
+					plan: planPath,
+					ready,
+					blockers: ready ? [] : review.errors,
+					errors: ready ? [] : review.errors,
+					warnings: [],
+				};
+			}
+		} else {
+			result = {
+				target: args.target,
+				errors: ["execution requires validate-integration or readiness."],
+				warnings: [],
+			};
+		}
 	} else {
 		console.error(`No handler registered for command: ${command}`);
 		return 1;

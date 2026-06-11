@@ -30,36 +30,41 @@ function listWikiMarkdownFiles(targetRoot) {
 	return walkFiles(wikiRoot).filter((filePath) => filePath.endsWith(".md"));
 }
 
-function detectStaleDocs(targetRoot, options = {}) {
-	const now = options.now || new Date();
-	const maxAgeDays = options.maxAgeDays || 180;
+function detectStaleDocs(projectRoot, thresholdDays = 180) {
+	const now = Date.now();
+	const thresholdMs = thresholdDays * 24 * 60 * 60 * 1000;
 	const staleDocs = [];
 
-	for (const filePath of listWikiMarkdownFiles(targetRoot)) {
+	for (const filePath of listWikiMarkdownFiles(projectRoot)) {
 		const content = readText(filePath);
-		const relativePath = relativeSlash(targetRoot, filePath);
+		const relativePath = relativeSlash(projectRoot, filePath);
 		const match = content.match(/^Last Reviewed:\s*(\d{4}-\d{2}-\d{2})\s*$/m);
+
 		if (!match) {
 			staleDocs.push({
 				path: relativePath,
+				lastReviewed: null,
+				ageDays: null,
 				reason: "missing Last Reviewed marker",
 			});
 			continue;
 		}
+
 		const reviewedAt = new Date(`${match[1]}T00:00:00Z`);
-		const ageDays = Math.floor(
-			(now.getTime() - reviewedAt.getTime()) / 86400000,
-		);
-		if (Number.isFinite(ageDays) && ageDays > maxAgeDays) {
+		const ageMs = now - reviewedAt.getTime();
+		const ageDays = Math.floor(ageMs / 86400000);
+
+		if (ageMs > thresholdMs) {
 			staleDocs.push({
 				path: relativePath,
-				reason: `last reviewed ${ageDays} days ago`,
 				lastReviewed: match[1],
+				ageDays,
+				reason: `last reviewed ${ageDays} days ago`,
 			});
 		}
 	}
 
-	return staleDocs;
+	return { staleDocs, thresholdDays };
 }
 
 function buildWikiLintCi(targetRoot) {
@@ -173,6 +178,29 @@ function extractEvolutionFindings(targetRoot) {
 		);
 }
 
+function rollupEvolutionFindings(projectRoot) {
+	const filePath = path.join(projectRoot, "docs", "wiki", "engineering", "harness-evolution.md");
+	if (!pathExists(filePath)) {
+		return { findings: [], threshold: 2 };
+	}
+
+	const counts = new Map();
+	for (const line of readText(filePath).split(/\r?\n/)) {
+		const match = line.match(/Finding:\s*(.+?)\s*$/);
+		if (match) {
+			const text = match[1].trim();
+			counts.set(text, (counts.get(text) || 0) + 1);
+		}
+	}
+
+	const findings = [...counts.entries()]
+		.filter(([, count]) => count >= 2)
+		.map(([text, count]) => ({ text, count }))
+		.sort((a, b) => b.count - a.count || a.text.localeCompare(b.text));
+
+	return { findings, threshold: 2 };
+}
+
 function readRegressionProposal(evidencePath, taskDir, targetRoot) {
 	let data;
 	try {
@@ -238,11 +266,12 @@ function inspectMaintenance(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const loaded = loadTeamRegistry(options.registry);
 	const wikiValidation = validateWiki(targetRoot);
+	const staleDocsResult = detectStaleDocs(targetRoot);
 
 	return {
 		target: targetRoot,
 		readOnly: true,
-		staleDocs: detectStaleDocs(targetRoot),
+		staleDocs: staleDocsResult.staleDocs,
 		wikiLint: {
 			...buildWikiLintCi(targetRoot),
 			errors: wikiValidation.errors,
@@ -374,6 +403,147 @@ function proposeMaintenance(target, options = {}) {
 	};
 }
 
+function detectPackDrift(projectRoot, registryPath) {
+	const paths = teamStatePaths(projectRoot);
+	if (!pathExists(paths.lockPath)) {
+		return { drifted: false, installed: [], latest: [], diff: [] };
+	}
+
+	const lock = readJson(paths.lockPath);
+	const registry = readJson(registryPath);
+	const installed = Array.isArray(lock.rulePacks) ? lock.rulePacks : [];
+	const latestVer = latestTeamVersion(registry);
+	const latest = registry.versions?.[latestVer]?.rulePacks || [];
+	const diff = latest.filter(p => !installed.includes(p));
+
+	return {
+		drifted: JSON.stringify([...installed].sort()) !== JSON.stringify([...latest].sort()),
+		installed,
+		latest,
+		diff,
+	};
+}
+
+function validateWikiStructure(projectRoot) {
+	return validateWiki(projectRoot);
+}
+
+function previewUpgrade(projectRoot, version, registryPath) {
+	const paths = teamStatePaths(projectRoot);
+	const lock = loadTeamLock(paths);
+	const registry = readJson(registryPath);
+	const targetVersion = version || latestTeamVersion(registry);
+	const targetRelease = registry.versions?.[targetVersion];
+
+	if (!lock) {
+		return {
+			currentVersion: null,
+			targetVersion,
+			changes: { addedPacks: targetRelease?.rulePacks || [], removedPacks: [], updatedPacks: [] },
+		};
+	}
+
+	const current = Array.isArray(lock.rulePacks) ? lock.rulePacks : [];
+	const target = Array.isArray(targetRelease?.rulePacks) ? targetRelease.rulePacks : [];
+	const addedPacks = target.filter(p => !current.includes(p));
+	const removedPacks = current.filter(p => !target.includes(p));
+	const updatedPacks = target.filter(p => current.includes(p));
+
+	return {
+		currentVersion: lock.installedVersion,
+		targetVersion,
+		changes: { addedPacks, removedPacks, updatedPacks },
+	};
+}
+
+function generateMaintenanceProposal(projectRoot, outputPath) {
+	const targetRoot = resolveTarget(projectRoot);
+	const loaded = loadTeamRegistry();
+
+	const m1 = detectStaleDocs(targetRoot);
+	const m2 = validateWiki(targetRoot);
+	const m3 = detectRulePackDrift(targetRoot, loaded.registry);
+	const m4 = buildUpgradeAssistant(targetRoot, loaded.registry);
+	const m5 = rollupEvolutionFindings(targetRoot);
+	const m6 = extractRegressionProposals(targetRoot);
+
+	const actions = [];
+	if (m1.staleDocs.length > 0) {
+		actions.push({ impact: "high", action: `Review ${m1.staleDocs.length} stale docs` });
+	}
+	if (m2.errors.length > 0) {
+		actions.push({ impact: "high", action: `Fix ${m2.errors.length} wiki lint errors` });
+	}
+	if (m3.drifted) {
+		actions.push({ impact: "medium", action: "Sync rule pack drift" });
+	}
+	if (m4.updateAvailable) {
+		actions.push({ impact: "medium", action: `Upgrade to ${m4.latestVersion}` });
+	}
+	if (m5.findings.length > 0) {
+		actions.push({ impact: "low", action: `Address ${m5.findings.length} repeated findings` });
+	}
+	if (m6.length > 0) {
+		actions.push({ impact: "low", action: `Review ${m6.length} regression proposals` });
+	}
+
+	const sortOrder = { high: 0, medium: 1, low: 2 };
+	actions.sort((a, b) => sortOrder[a.impact] - sortOrder[b.impact]);
+
+	const lines = [
+		"# Harness Maintenance Proposal",
+		"",
+		`Generated: ${new Date().toISOString()}`,
+		`Target: ${targetRoot}`,
+		"",
+		"## 1. Stale Docs",
+		"",
+		m1.staleDocs.length === 0 ? "No stale docs detected." : m1.staleDocs.map(d => `- ${d.path}: ${d.reason}`).join("\n"),
+		"",
+		"## 2. Wiki Lint Errors",
+		"",
+		m2.errors.length === 0 ? "No wiki lint errors." : m2.errors.map(e => `- ${e}`).join("\n"),
+		m2.warnings.length > 0 ? `\nWarnings:\n${m2.warnings.map(w => `- ${w}`).join("\n")}` : "",
+		"",
+		"## 3. Pack Drift",
+		"",
+		`Drifted: ${m3.drifted}`,
+		m3.installed ? `- Installed version: ${m3.installedVersion}` : "- Not installed",
+		`- Expected packs: ${m3.expected.join(", ") || "none"}`,
+		`- Actual packs: ${m3.actual.join(", ") || "none"}`,
+		"",
+		"## 4. Available Upgrades",
+		"",
+		`Current: ${m4.currentVersion || "not installed"}`,
+		`Latest: ${m4.latestVersion}`,
+		`Update available: ${m4.updateAvailable || false}`,
+		m4.upgradeCommand ? `Command: \`${m4.upgradeCommand}\`` : "",
+		"",
+		"## 5. Repeated Findings",
+		"",
+		m5.findings.length === 0 ? "No repeated findings." : m5.findings.map(f => `- ${f.text} (${f.count}×)`).join("\n"),
+		"",
+		"## 6. Regression Proposals",
+		"",
+		m6.length === 0 ? "No regression proposals." : m6.map(p => `- ${p.taskId}: ${p.assertion}\n  Source: ${p.source}`).join("\n\n"),
+		"",
+		"## 7. Prioritized Actions",
+		"",
+		actions.length === 0 ? "No actions required." : actions.map(a => `- [${a.impact.toUpperCase()}] ${a.action}`).join("\n"),
+		"",
+	];
+
+	const content = lines.filter(l => l !== undefined).join("\n");
+	fs.writeFileSync(outputPath, content, "utf8");
+
+	return {
+		sections: 7,
+		staleDocs: m1.staleDocs.length,
+		drifted: m3.drifted,
+		proposals: m6.length,
+	};
+}
+
 module.exports = {
 	listWikiMarkdownFiles,
 	detectStaleDocs,
@@ -382,9 +552,14 @@ module.exports = {
 	buildUpgradeAssistant,
 	buildMigrationAssistant,
 	extractEvolutionFindings,
+	rollupEvolutionFindings,
 	readRegressionProposal,
 	extractRegressionProposals,
 	inspectMaintenance,
 	buildMaintenanceProposalContent,
 	proposeMaintenance,
+	validateWikiStructure,
+	detectPackDrift,
+	previewUpgrade,
+	generateMaintenanceProposal,
 };

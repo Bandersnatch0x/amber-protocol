@@ -39,6 +39,9 @@ function parseArgs(argv) {
 		} else if (arg === "--task") {
 			args.task = argv[index + 1];
 			index += 1;
+		} else if (arg === "--session") {
+			args.session = argv[index + 1];
+			index += 1;
 		} else if (arg === "--worker") {
 			args.worker = argv[index + 1];
 			index += 1;
@@ -124,6 +127,15 @@ function parseArgs(argv) {
 			index += 1;
 		} else if (arg === "--stop-reason") {
 			args.stopReason = argv[index + 1];
+			index += 1;
+		} else if (arg === "--since") {
+			args.since = argv[index + 1];
+			index += 1;
+		} else if (arg === "--threshold") {
+			args.threshold = argv[index + 1];
+			index += 1;
+		} else if (arg === "--threshold-days") {
+			args.thresholdDays = argv[index + 1];
 			index += 1;
 		} else if (arg === "--hard-stop-status") {
 			args.hardStopStatus = argv[index + 1];

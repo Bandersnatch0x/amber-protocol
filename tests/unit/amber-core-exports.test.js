@@ -57,7 +57,7 @@ describe("amber-core exports snapshot", () => {
 			"updateTeamDistribution",
 			"validateContinuousImprovementStateFile",
 			"validateFeatureListData", "validateFeatureListFile",
-			"validateHandoff", "validateManifests",
+			"validateHandoff", "validateLoopContract", "validateManifests",
 			"validatePlanGate", "validateProjectProfileData",
 			"validateWiki", "validateWorkflowPackData",
 		];
@@ -95,12 +95,12 @@ describe("amber-core exports snapshot", () => {
 	});
 
 	// ── Export count ───────────────────────────────────────────────────
-	it("exports exactly 57 symbols", () => {
+	it("exports exactly 59 symbols", () => {
 		const keys = Object.keys(harnessCore).sort();
 		assert.strictEqual(
 			keys.length,
-			57,
-			`Expected 57 exports, got ${keys.length}. ` +
+			59,
+			`Expected 59 exports, got ${keys.length}. ` +
 				`If you intentionally added/removed an export, update this count. ` +
 				`New exports: ${keys.filter(k => !KNOWN_EXPORTS.has(k)).join(", ")}`,
 		);
@@ -116,7 +116,7 @@ const KNOWN_EXPORTS = new Set([
 	"classifyTarget", "compareAdoptionReports",
 	"dispatchAgentTask", "doctor",
 	"dryRunLoopContract", "gateAdoptionReport",
-	"generateAdoptionReport", "inspectLoopContract",
+	"generateAdoptionReport", "governanceDocs", "inspectLoopContract",
 	"inspectLoopLedger", "inspectMaintenance",
 	"inspectProjectProfile", "inspectTaskResult",
 	"inspectTeamDistribution", "inspectWorkflowPack",
@@ -132,7 +132,7 @@ const KNOWN_EXPORTS = new Set([
 	"updateTeamDistribution", "validateAdoptionReports",
 	"validateContinuousImprovementStateFile",
 	"validateFeatureListData", "validateFeatureListFile",
-	"validateHandoff", "validateManifests",
+	"validateHandoff", "validateLoopContract", "validateManifests",
 	"validatePlanGate", "validateProjectProfileData",
 	"validateWiki", "validateWorkflowPackData",
 	"writeAdoptionApplyPlan", "writeAdoptionDecisionRecord",

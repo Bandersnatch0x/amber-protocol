@@ -1,0 +1,7 @@
+{
+  "name": "test-integration",
+  "type": "api",
+  "sideEffects": ["network_call"],
+  "credentials": "use-secret-manager",
+  "permissions": ["read"]
+}
