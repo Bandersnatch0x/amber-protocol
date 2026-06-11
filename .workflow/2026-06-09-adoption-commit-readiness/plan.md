@@ -11,7 +11,7 @@ Prepare the accumulated adoption workflow changes for review by grouping files i
 - Current working tree changes are classified into reviewable groups.
 - Commit groups separate implementation, examples, and workflow evidence.
 - Report records files that should be reviewed together.
-- Verification confirms tests and StockAgents boundary still pass.
+- Verification confirms tests and sample boundary still pass.
 
 ## V1 Boundary
 

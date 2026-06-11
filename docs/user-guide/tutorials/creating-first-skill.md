@@ -1,11 +1,11 @@
 # Creating Your First Skill
 
-Skills are extensions that add capabilities to Coding Harness. This tutorial walks through creating a custom skill.
+Skills are extensions that add capabilities to Amber Protocol. This tutorial walks through creating a custom skill.
 
 ## Prerequisites
 
-- Coding Harness v1.0.0+ installed
-- A project initialized with `coding-harness init`
+- Amber Protocol v1.0.0+ installed
+- A project initialized with `amber-protocol init`
 
 ## Step 1: Create the Skill Structure
 
@@ -68,7 +68,7 @@ Add to `settings.json`:
 
 ```bash
 # Dry-run test
-coding-harness skill test code-reviewer --input "review this code: function foo() { return 1/0; }"
+amber-protocol skill test code-reviewer --input "review this code: function foo() { return 1/0; }"
 ```
 
 ## Best Practices

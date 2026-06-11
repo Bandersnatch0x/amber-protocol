@@ -12,5 +12,5 @@ Review changed behavior and documentation against V1 boundaries.
 ## Do Not
 
 - Expand the command surface unless a defect requires a focused fix.
-- Write to StockAgents.
+- Write to sample.
 

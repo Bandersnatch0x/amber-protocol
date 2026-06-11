@@ -4,7 +4,7 @@ Pre-commit hooks ensure code quality before changes are committed to version con
 
 ## Prerequisites
 
-- Git repository with Coding Harness initialized
+- Git repository with Amber Protocol initialized
 - Node.js >= 18.17
 
 ## Step 1: Install Hook Dependencies
@@ -33,12 +33,12 @@ Add to `package.json`:
   "lint-staged": {
     "*.{js,ts}": ["eslint --fix", "prettier --write"],
     "*.md": ["markdownlint --fix"],
-    "skills/**/SKILL.md": ["coding-harness skill validate"]
+    "skills/**/SKILL.md": ["amber-protocol skill validate"]
   }
 }
 ```
 
-## Step 4: Add Harness-Specific Hooks
+## Step 4: Add Amber-Specific Hooks
 
 In `settings.json`:
 
@@ -46,13 +46,13 @@ In `settings.json`:
 {
   "hooks": {
     "pre-commit": {
-      "security": "coding-harness security audit",
-      "validation": "coding-harness validate",
+      "security": "amber-protocol security audit",
+      "validation": "amber-protocol validate",
       "tests": "npm test"
     },
     "pre-push": {
       "full-suite": "npm run test:all",
-      "audit": "coding-harness security audit --strict"
+      "audit": "amber-protocol security audit --strict"
     }
   }
 }
@@ -65,7 +65,7 @@ In `settings.json`:
 git add .
 
 # Test pre-commit manually
-coding-harness hook run pre-commit
+amber-protocol hook run pre-commit
 
 # Commit — hooks run automatically
 git commit -m "feat: add new feature"

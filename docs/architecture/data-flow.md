@@ -1,6 +1,6 @@
 # Data Flow
 
-How data moves through the Coding Harness Phase B system.
+How data moves through the Amber Protocol Phase B system.
 
 ## Tool Invocation Flow
 
@@ -113,15 +113,15 @@ checkpoint-0 → checkpoint-1 → ... → checkpoint-N
 | Data | Location | Format |
 |------|----------|--------|
 | Settings | `settings.json` | JSON |
-| Sessions | `~/.coding-harness/sessions/` | JSON manifest + timeline |
+| Sessions | `~/.amber-protocol/sessions/` | JSON manifest + timeline |
 | Backups | `.backup-*.json` | JSON |
-| Logs | `~/.coding-harness/logs/` | Text/JSON |
+| Logs | `~/.amber-protocol/logs/` | Text/JSON |
 | Reports | `docs/reports/` | Markdown |
 
 ## Integration Points
 
 ```
-Coding Harness
+Amber Protocol
     │
     ├── Git (hooks)
     ├── npm (audit)

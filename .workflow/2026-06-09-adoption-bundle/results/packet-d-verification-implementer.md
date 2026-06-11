@@ -20,7 +20,7 @@ python C:/Users/amsterdam/.codex/skills/codex-dynamic-workflows/scripts/verify_w
 
 ## Boundary Evidence
 
-StockAgents root check stayed clean:
+sample root check stayed clean:
 
 - `AGENTS.md=false`
 - `CLAUDE.md=false`

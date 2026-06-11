@@ -11,13 +11,13 @@
   "packets": [
     { "id": "packet-a-tests", "status": "completed" },
     { "id": "packet-b-implementation", "status": "completed" },
-    { "id": "packet-c-stockagents-docs", "status": "completed" },
+    { "id": "packet-c-sample-docs", "status": "completed" },
     { "id": "packet-d-verification", "status": "completed" }
   ],
   "verification": {
     "red": "passing: RED failed before implementation for missing apply-plan route and dry-run guard",
     "targeted": "passing: node --test tests/harness-cli.test.js (32 tests)",
-    "stockagents_smoke": "passing: docs/examples/stockagents-adoption-apply-plan.md generated; StockAgents root boundary clean",
+    "sample_smoke": "passing: docs/examples/sample-adoption-apply-plan.md generated; sample root boundary clean",
     "npm_test": "passing: npm test (87 tests)",
     "manifests": "passing: npm run manifests (Errors: 0)",
     "workflow_artifact": "passing: verify_workflow.py .workflow/2026-06-09-adoption-apply-plan-dry-run"

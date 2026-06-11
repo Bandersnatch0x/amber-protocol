@@ -17,7 +17,7 @@ Executed with isolated packet records:
 
 - Packet A: RED tests, spec review, quality review.
 - Packet B: implementation, spec review, quality review.
-- Packet C: StockAgents smoke/docs, spec review, quality review.
+- Packet C: sample smoke/docs, spec review, quality review.
 - Packet D: verification, spec review, quality review.
 
 ## Safety Boundary

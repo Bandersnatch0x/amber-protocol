@@ -7,7 +7,7 @@ Status: complete.
 - `adoption report --output-dir <dir>` generates timestamped report files.
 - Repeated runs produce distinct files and do not overwrite earlier reports.
 - `--output` and `--output-dir` are mutually exclusive.
-- StockAgents smoke generated two distinct reports under `docs/examples/adoptions/`.
+- sample smoke generated two distinct reports under `docs/examples/adoptions/`.
 
 ## Boundary
 

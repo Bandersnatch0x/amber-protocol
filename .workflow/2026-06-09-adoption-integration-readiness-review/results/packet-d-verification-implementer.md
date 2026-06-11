@@ -9,7 +9,7 @@ Status: DONE
 - `npm test`: passed, 90 tests.
 - `npm run manifests`: passed, `Errors: 0`.
 - `python C:/Users/amsterdam/.codex/skills/codex-dynamic-workflows/scripts/verify_workflow.py .workflow/2026-06-09-adoption-integration-readiness-review`: passed.
-- StockAgents boundary check: selected Harness files remained absent.
+- sample boundary check: selected Harness files remained absent.
 
 ## Boundary Evidence
 

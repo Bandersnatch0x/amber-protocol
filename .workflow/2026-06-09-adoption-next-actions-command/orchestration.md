@@ -13,8 +13,8 @@ Mode: simulated subagent-driven-development
    - Reuse existing adoption bundle artifacts.
    - Preserve no-overwrite and V1 boundaries.
 
-3. `packet-c-stockagents-docs`
-   - Generate a StockAgents CLI-produced next-actions artifact.
+3. `packet-c-sample-docs`
+   - Generate a sample CLI-produced next-actions artifact.
    - Update README and examples documentation.
 
 4. `packet-d-verification`
@@ -30,7 +30,7 @@ Each packet produces:
 
 ## Hard Stops
 
-- Stop before writing to `D:\code_space\trae-project\StockAgents`.
-- Stop before running StockAgents tests, lint, build, or Python modules.
+- Stop before writing to `D:\code_space\trae-project\sample`.
+- Stop before running sample tests, lint, build, or Python modules.
 - Stop before real subagent or Dynamic Workflow execution.
 

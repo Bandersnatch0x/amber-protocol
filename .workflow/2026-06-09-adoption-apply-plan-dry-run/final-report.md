@@ -22,15 +22,15 @@ node scripts/harness.js adoption apply-plan --bundle-dir <bundle-dir> --output <
 - Does not write target files.
 - Does not execute target project commands.
 
-## StockAgents Smoke
+## sample Smoke
 
 Generated:
 
-- `docs/examples/stockagents-adoption-apply-plan.md`
+- `docs/examples/sample-adoption-apply-plan.md`
 
 Result:
 
-- target: `D:\code_space\trae-project\StockAgents`
+- target: `D:\code_space\trae-project\sample`
 - dry-run: true
 - apply ready: false
 - created preview: 30
@@ -48,6 +48,6 @@ Result:
 
 - Dynamic Workflow execution: not implemented
 - Live subagent orchestration: not used
-- StockAgents writes: not used
-- StockAgents command execution: not used
+- sample writes: not used
+- sample command execution: not used
 - Automatic overwrite: not used

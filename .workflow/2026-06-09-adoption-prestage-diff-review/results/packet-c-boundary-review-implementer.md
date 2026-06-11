@@ -5,7 +5,7 @@ Status: DONE
 ## Checks
 
 - Git staged files: none.
-- StockAgents boundary files:
+- sample boundary files:
   - `AGENTS.md`: absent
   - `CLAUDE.md`: absent
   - `feature_list.json`: absent

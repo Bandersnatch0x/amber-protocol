@@ -1,6 +1,6 @@
 # CLI Commands Reference
 
-Complete reference for Coding Harness CLI commands (Phase B v1.0.0).
+Complete reference for Amber Protocol CLI commands (Phase B v1.0.0).
 
 ## Global Flags
 
@@ -16,10 +16,10 @@ Complete reference for Coding Harness CLI commands (Phase B v1.0.0).
 
 ### `init`
 
-Initialize a new Coding Harness project.
+Initialize a new Amber Protocol project.
 
 ```bash
-coding-harness init [--target <dir>] [--force] [--dry-run]
+amber-protocol init [--target <dir>] [--force] [--dry-run]
 ```
 
 | Option | Description |
@@ -33,7 +33,7 @@ coding-harness init [--target <dir>] [--force] [--dry-run]
 Diagnose project health and configuration.
 
 ```bash
-coding-harness doctor [--target <dir>] [--report]
+amber-protocol doctor [--target <dir>] [--report]
 ```
 
 | Option | Description |
@@ -48,7 +48,7 @@ coding-harness doctor [--target <dir>] [--report]
 Migrate settings from V5.5 to Phase B.
 
 ```bash
-coding-harness migrate [--dry-run] [--validate] [--target <dir>]
+amber-protocol migrate [--dry-run] [--validate] [--target <dir>]
 ```
 
 | Option | Description |
@@ -62,7 +62,7 @@ coding-harness migrate [--dry-run] [--validate] [--target <dir>]
 Roll back to a previous backup.
 
 ```bash
-coding-harness rollback [--list] [--restore <file>] [--dry-run]
+amber-protocol rollback [--list] [--restore <file>] [--dry-run]
 ```
 
 | Option | Description |
@@ -78,7 +78,7 @@ coding-harness rollback [--list] [--restore <file>] [--dry-run]
 List available routes.
 
 ```bash
-coding-harness route list
+amber-protocol route list
 ```
 
 ### `route inspect`
@@ -86,7 +86,7 @@ coding-harness route list
 Show details for a specific route.
 
 ```bash
-coding-harness route inspect <name> [--json]
+amber-protocol route inspect <name> [--json]
 ```
 
 ### `route test`
@@ -94,7 +94,7 @@ coding-harness route inspect <name> [--json]
 Test a route (dry-run).
 
 ```bash
-coding-harness route test <name> [--dry-run] [--stage <n>]
+amber-protocol route test <name> [--dry-run] [--stage <n>]
 ```
 
 ### `route validate`
@@ -102,7 +102,7 @@ coding-harness route test <name> [--dry-run] [--stage <n>]
 Validate a route definition.
 
 ```bash
-coding-harness route validate <file>
+amber-protocol route validate <file>
 ```
 
 ## Session Commands
@@ -112,7 +112,7 @@ coding-harness route validate <file>
 Start a new execution session.
 
 ```bash
-coding-harness session start [--route <name>] [--agent <name>] [--goal "<text>"]
+amber-protocol session start [--route <name>] [--agent <name>] [--goal "<text>"]
 ```
 
 ### `session status`
@@ -120,7 +120,7 @@ coding-harness session start [--route <name>] [--agent <name>] [--goal "<text>"]
 Show status of current or specified session.
 
 ```bash
-coding-harness session status [<id>]
+amber-protocol session status [<id>]
 ```
 
 ### `session list`
@@ -128,7 +128,7 @@ coding-harness session status [<id>]
 List all sessions.
 
 ```bash
-coding-harness session list [--limit <n>]
+amber-protocol session list [--limit <n>]
 ```
 
 ### `session abort`
@@ -136,7 +136,7 @@ coding-harness session list [--limit <n>]
 Abort an active session.
 
 ```bash
-coding-harness session abort [<id>]
+amber-protocol session abort [<id>]
 ```
 
 ## Security Commands
@@ -146,7 +146,7 @@ coding-harness session abort [<id>]
 Run full security audit.
 
 ```bash
-coding-harness security audit [--target <dir>] [--output <file>]
+amber-protocol security audit [--target <dir>] [--output <file>]
 ```
 
 ### `security scan dependencies`
@@ -154,7 +154,7 @@ coding-harness security audit [--target <dir>] [--output <file>]
 Scan npm dependencies for vulnerabilities.
 
 ```bash
-coding-harness security scan dependencies [--severity <level>]
+amber-protocol security scan dependencies [--severity <level>]
 ```
 
 ### `security scan secrets`
@@ -162,7 +162,7 @@ coding-harness security scan dependencies [--severity <level>]
 Scan source code for hardcoded secrets.
 
 ```bash
-coding-harness security scan secrets [--path <dir>]
+amber-protocol security scan secrets [--path <dir>]
 ```
 
 ### `security review permissions`
@@ -170,7 +170,7 @@ coding-harness security scan secrets [--path <dir>]
 Review permission configuration.
 
 ```bash
-coding-harness security review permissions [--target <dir>]
+amber-protocol security review permissions [--target <dir>]
 ```
 
 ## Skill Commands
@@ -180,7 +180,7 @@ coding-harness security review permissions [--target <dir>]
 List registered skills.
 
 ```bash
-coding-harness skill list
+amber-protocol skill list
 ```
 
 ### `skill validate`
@@ -188,7 +188,7 @@ coding-harness skill list
 Validate a skill definition.
 
 ```bash
-coding-harness skill validate <name>
+amber-protocol skill validate <name>
 ```
 
 ### `skill test`
@@ -196,7 +196,7 @@ coding-harness skill validate <name>
 Test a skill with input.
 
 ```bash
-coding-harness skill test <name> --input "<text>"
+amber-protocol skill test <name> --input "<text>"
 ```
 
 ## Adoption Commands
@@ -206,7 +206,7 @@ coding-harness skill test <name> --input "<text>"
 Generate adoption report.
 
 ```bash
-coding-harness adoption report --target <dir> [--output <file>] [--output-dir <dir>]
+amber-protocol adoption report --target <dir> [--output <file>] [--output-dir <dir>]
 ```
 
 ### `adoption gate`
@@ -214,7 +214,7 @@ coding-harness adoption report --target <dir> [--output <file>] [--output-dir <d
 Check adoption gate status.
 
 ```bash
-coding-harness adoption gate --target <dir> [--output <file>]
+amber-protocol adoption gate --target <dir> [--output <file>]
 ```
 
 ---

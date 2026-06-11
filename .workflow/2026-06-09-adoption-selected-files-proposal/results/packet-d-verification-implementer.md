@@ -8,7 +8,7 @@ Status: DONE
 - `npm test`: passed, 89 tests.
 - `npm run manifests`: passed, `Errors: 0`.
 - `python C:/Users/amsterdam/.codex/skills/codex-dynamic-workflows/scripts/verify_workflow.py .workflow/2026-06-09-adoption-selected-files-proposal`: passed.
-- Final StockAgents boundary check: selected files remained absent from `D:\code_space\trae-project\StockAgents`.
+- Final sample boundary check: selected files remained absent from `D:\code_space\trae-project\sample`.
 
 ## Boundary Evidence
 

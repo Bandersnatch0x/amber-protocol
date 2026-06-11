@@ -6,7 +6,7 @@ Status: APPROVED
 
 - Groups separate implementation from generated examples and workflow evidence.
 - Suggested commit messages do not claim Dynamic Workflow execution.
-- The report includes a hard boundary excluding StockAgents files.
+- The report includes a hard boundary excluding sample files.
 
 ## Result
 

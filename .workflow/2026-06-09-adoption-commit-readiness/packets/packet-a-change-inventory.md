@@ -13,6 +13,6 @@ Inventory the current working tree without staging, committing, or mutating targ
 ## Do Not
 
 - Stage or commit.
-- Write to StockAgents.
+- Write to sample.
 - Invoke real subagents.
 

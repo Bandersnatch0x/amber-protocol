@@ -13,12 +13,12 @@ Status: DONE
 - Modified docs:
   - `README.md`
   - `docs/examples/README.md`
-- New StockAgents examples:
-  - `docs/examples/stockagents-adoption-apply-plan.md`
-  - `docs/examples/stockagents-adoption-decision-record.md`
-  - `docs/examples/stockagents-adoption-decision-record-decisions.md`
-  - `docs/examples/stockagents-adoption-next-actions-cli.md`
-  - `docs/examples/stockagents-adoption-selected-files.md`
+- New sample examples:
+  - `docs/examples/sample-adoption-apply-plan.md`
+  - `docs/examples/sample-adoption-decision-record.md`
+  - `docs/examples/sample-adoption-decision-record-decisions.md`
+  - `docs/examples/sample-adoption-next-actions-cli.md`
+  - `docs/examples/sample-adoption-selected-files.md`
 - New workflow evidence directories:
   - `.workflow/2026-06-09-adoption-next-actions-command/`
   - `.workflow/2026-06-09-adoption-decision-record-command/`

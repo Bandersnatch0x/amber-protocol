@@ -8,9 +8,9 @@
 
 ## 0:00-0:30 — Problem Statement
 
-**[Screen: Title card "Coding Harness Phase B"]**
+**[Screen: Title card "Amber Protocol Phase B"]**
 
-"AI coding tools are powerful, but they need guardrails. Today I'll show you how Coding Harness Phase B makes AI-assisted development safe, auditable, and extensible."
+"AI coding tools are powerful, but they need guardrails. Today I'll show you how Amber Protocol Phase B makes AI-assisted development safe, auditable, and extensible."
 
 ---
 
@@ -18,22 +18,22 @@
 
 ### 0:30 — Installation (15s)
 ```bash
-npm install -g coding-harness
-coding-harness --version
+npm install -g amber-protocol
+amber-protocol --version
 ```
 **[Show: v1.0.0 output]**
 
 ### 0:45 — Initialize Project (30s)
 ```bash
 mkdir demo-project && cd demo-project
-coding-harness init
-coding-harness doctor
+amber-protocol init
+amber-protocol doctor
 ```
 **[Show: Project structure with skills/, routes/, profiles/]**
 
 ### 1:15 — Security Audit (30s)
 ```bash
-coding-harness security audit
+amber-protocol security audit
 ```
 **[Show: Audit report with dependency scan, secret scan, permission review]**
 "Zero configuration — security is on by default."
@@ -55,27 +55,27 @@ mkdir -p skills/greeter
 
 ### 2:20 — Dry-Run (20s)
 ```bash
-coding-harness migrate --dry-run
+amber-protocol migrate --dry-run
 ```
 **[Show: Diff output showing what will change]**
 
 ### 2:40 — Apply Migration (20s)
 ```bash
-coding-harness migrate
+amber-protocol migrate
 ```
 **[Show: New settings.json with Phase B format]**
 
 ### 3:00 — Verify (15s)
 ```bash
-coding-harness validate
-coding-harness route test default --dry-run
+amber-protocol validate
+amber-protocol route test default --dry-run
 ```
 **[Show: Validation passes]**
 
 ### 3:15 — Rollback (15s)
 ```bash
-coding-harness rollback --list
-coding-harness rollback --restore .backup-2026-06-10-120000.json
+amber-protocol rollback --list
+amber-protocol rollback --restore .backup-2026-06-10-120000.json
 ```
 "Migration is reversible. Your settings are never lost."
 
@@ -97,7 +97,7 @@ cat routes/secure-deploy.route.json
 
 ### 4:30 — Run Route (30s)
 ```bash
-coding-harness route test secure-deploy --dry-run
+amber-protocol route test secure-deploy --dry-run
 ```
 **[Show: Stage-by-stage execution preview]**
 
@@ -108,11 +108,11 @@ coding-harness route test secure-deploy --dry-run
 "Phase B is available now. One command to install. One command to secure your project. One command to migrate from V5.5."
 
 ```bash
-npm install -g coding-harness
+npm install -g amber-protocol
 ```
 
 - ⭐ Star us on GitHub
-- 📖 Read the docs at coding-harness.dev
+- 📖 Read the docs at amber-protocol.dev
 - 💬 Join our Discord community
 
 "Happy building, and stay secure!"

@@ -18,7 +18,7 @@ python C:/Users/amsterdam/.codex/skills/codex-dynamic-workflows/scripts/verify_w
 - Manifest validation: pass, errors 0
 - Workflow verification: pass
 
-## StockAgents Boundary
+## sample Boundary
 
 - `AGENTS.md=false`
 - `CLAUDE.md=false`

@@ -2,5 +2,5 @@
 
 Status: approved.
 
-- Verification covers targeted docs example, full test suite, manifests, workflow artifacts, and StockAgents boundary.
-- The final decision for StockAgents is conservative `wait`, matching gate rules.
+- Verification covers targeted docs example, full test suite, manifests, workflow artifacts, and sample boundary.
+- The final decision for sample is conservative `wait`, matching gate rules.

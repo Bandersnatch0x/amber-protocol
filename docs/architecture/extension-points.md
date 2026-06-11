@@ -1,6 +1,6 @@
 # Extension Points
 
-Coding Harness Phase B is designed for extensibility. This guide covers all supported extension points.
+Amber Protocol Phase B is designed for extensibility. This guide covers all supported extension points.
 
 ## Extension Architecture
 
@@ -149,7 +149,7 @@ Register → Validate → Load → Activate → Execute → Deactivate
 ## Best Practices
 
 1. **Namespacing**: Use unique names for skills and hooks
-2. **Error Handling**: Extensions should never crash the harness
+2. **Error Handling**: Extensions should never crash the toolkit
 3. **Idempotency**: Safe to load/activate multiple times
 4. **Versioning**: Include version in plugin metadata
 5. **Documentation**: Always include a README or SKILL.md

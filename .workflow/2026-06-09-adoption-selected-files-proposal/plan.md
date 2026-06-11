@@ -19,7 +19,7 @@ node scripts/harness.js adoption selected-files --bundle-dir <bundle> --output <
 - Repeatable `--include <relative-path>` records selected files.
 - Unknown included files return errors and do not write output.
 - JSON output is machine-readable.
-- StockAgents smoke writes only under `docs/examples/`.
+- sample smoke writes only under `docs/examples/`.
 
 ## V1 Boundary
 

@@ -1,16 +1,16 @@
-# Announcing Coding Harness Phase B: GA Release
+# Announcing Amber Protocol Phase B: GA Release
 
-*June 10, 2026 — The Coding Harness Team*
+*June 10, 2026 — The Amber Protocol Team*
 
 ---
 
-**We're thrilled to announce that Coding Harness Phase B is now Generally Available!**
+**We're thrilled to announce that Amber Protocol Phase B is now Generally Available!**
 
 ## Why Phase B Matters
 
 AI-powered development tools have transformed how we write code. But the gap between "AI can generate code" and "AI can safely participate in a professional development workflow" has remained stubbornly wide.
 
-Coding Harness Phase B bridges that gap.
+Amber Protocol Phase B bridges that gap.
 
 We've rebuilt the harness from the ground up to be **safe by default**, **auditable at every step**, and **extensible by design**.
 
@@ -56,10 +56,10 @@ Configure specialized agents with specific models, tools, and skills. Want a sec
 ## Get Started in 30 Seconds
 
 ```bash
-npm install -g coding-harness
-coding-harness init my-project
+npm install -g amber-protocol
+amber init my-project
 cd my-project
-coding-harness doctor
+amber doctor
 ```
 
 ## What's Next

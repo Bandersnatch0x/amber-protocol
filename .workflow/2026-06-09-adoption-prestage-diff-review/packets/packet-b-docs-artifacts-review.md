@@ -2,7 +2,7 @@
 
 ## Objective
 
-Review README, examples README, and generated StockAgents artifacts.
+Review README, examples README, and generated sample artifacts.
 
 ## Do
 

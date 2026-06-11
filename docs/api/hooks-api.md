@@ -1,6 +1,6 @@
 # Hooks API
 
-Hooks enable custom automation at lifecycle events. Coding Harness supports several hook points.
+Hooks enable custom automation at lifecycle events. Amber Protocol supports several hook points.
 
 ## Hook Lifecycle
 
@@ -83,7 +83,7 @@ Runs before git commit.
     "pre-commit": {
       "lint": "npm run lint",
       "test": "npm test -- --passWithNoTests",
-      "audit": "coding-harness security audit --quick"
+      "audit": "amber-protocol security audit --quick"
     }
   }
 }
@@ -97,7 +97,7 @@ Runs before git push.
 {
   "hooks": {
     "pre-push": {
-      "security": "coding-harness security audit --strict",
+      "security": "amber-protocol security audit --strict",
       "integration": "npm run test:integration",
       "timeout": 120000
     }

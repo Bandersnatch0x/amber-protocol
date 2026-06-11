@@ -18,7 +18,7 @@ node scripts/harness.js adoption apply-plan --bundle-dir <bundle> --output <file
 - Command refuses overwrite.
 - Command previews target bootstrap file creation using dry-run only.
 - JSON output is machine-readable.
-- StockAgents smoke writes only under `docs/examples/`.
+- sample smoke writes only under `docs/examples/`.
 
 ## V1 Boundary
 

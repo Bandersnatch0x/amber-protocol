@@ -4,7 +4,7 @@ Learn how to create a custom agent profile with specialized capabilities.
 
 ## Step 1: Understand Agent Profiles
 
-Agents in Coding Harness are defined by:
+Agents in Amber Protocol are defined by:
 - **Model**: The LLM provider and model (e.g., `claude-sonnet-4`)
 - **Skills**: Which skills the agent has access to
 - **Tools**: Permitted tools (read, write, execute, etc.)
@@ -50,10 +50,10 @@ Add to `settings.json`:
 
 ```bash
 # Run review agent on a code change
-coding-harness agent run reviewer --input "src/utils.js" --task "review for security issues"
+amber-protocol agent run reviewer --input "src/utils.js" --task "review for security issues"
 
 # Interactive session
-coding-harness session start --agent reviewer --route feature-standard
+amber-protocol session start --agent reviewer --route feature-standard
 ```
 
 ## Step 5: Create Multi-Agent Workflow

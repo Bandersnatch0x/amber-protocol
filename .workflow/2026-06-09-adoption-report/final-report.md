@@ -8,7 +8,7 @@ Status: complete.
 - Added `adoption report --target <repo> --output-dir <dir>` for timestamped non-conflicting report names.
 - The report aggregates audit summary, init dry-run, team distribution status/update preview, and maintenance inspection.
 - Report generation does not initialize the target project, install team metadata, run target commands, or overwrite existing report files.
-- Generated a real StockAgents report at `docs/examples/stockagents-adoption-report.md`.
+- Generated a real sample report at `docs/examples/sample-adoption-report.md`.
 
 ## Rejected
 

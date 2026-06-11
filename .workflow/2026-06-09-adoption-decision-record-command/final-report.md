@@ -13,7 +13,7 @@ Implemented `adoption decision-record` as a V1-safe CLI command that turns an ad
 - `tests/harness-cli.test.js`
 - `README.md`
 - `docs/examples/README.md`
-- `docs/examples/stockagents-adoption-decision-record.md`
+- `docs/examples/sample-adoption-decision-record.md`
 
 ## Command
 
@@ -31,15 +31,15 @@ node scripts/harness.js adoption decision-record --bundle-dir <bundle-dir> --out
 - Records Gate A/B/C as pending by default.
 - Does not approve target writes or target command execution by itself.
 
-## StockAgents Smoke
+## sample Smoke
 
 Generated:
 
-- `docs/examples/stockagents-adoption-decision-record.md`
+- `docs/examples/sample-adoption-decision-record.md`
 
 Result:
 
-- target: `D:\code_space\trae-project\StockAgents`
+- target: `D:\code_space\trae-project\sample`
 - gate decision: `wait`
 - approval status: `pending`
 - decisions: 3
@@ -56,6 +56,6 @@ Result:
 
 - Dynamic Workflow execution: not implemented
 - Live subagent orchestration: not used
-- StockAgents writes: not used
-- StockAgents command execution: not used
+- sample writes: not used
+- sample command execution: not used
 - Automatic overwrite: not used

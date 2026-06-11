@@ -8,7 +8,7 @@ Goal: implement a read-only `adoption validate` command for adoption report arti
 - `adoption validate --reports-dir <dir> --index <file>` also checks markdown links in the index resolve to files under the reports directory.
 - The command is read-only and never writes reports, indexes, or target project files.
 - Broken report metadata or broken index links are reported as errors.
-- StockAgents example reports and `adoptions-index.md` validate successfully.
+- sample example reports and `adoptions-index.md` validate successfully.
 - Full verification passes.
 
 ## Boundaries
@@ -22,5 +22,5 @@ Goal: implement a read-only `adoption validate` command for adoption report arti
 
 - Packet A: RED tests.
 - Packet B: core and CLI implementation.
-- Packet C: StockAgents examples smoke and docs.
+- Packet C: sample examples smoke and docs.
 - Packet D: verification and workflow closeout.

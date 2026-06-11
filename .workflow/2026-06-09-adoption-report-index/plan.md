@@ -8,7 +8,7 @@ Success criteria:
 - `adoption index --reports-dir <dir> --output <file>` writes a markdown index.
 - Index generation refuses to overwrite existing files.
 - Reports are sorted newest first.
-- StockAgents reports under `docs/examples/adoptions/` can be listed and indexed.
+- sample reports under `docs/examples/adoptions/` can be listed and indexed.
 
 Constraints:
 
@@ -19,7 +19,7 @@ Constraints:
 Verification:
 
 - TDD with CLI tests.
-- StockAgents reports smoke test.
+- sample reports smoke test.
 - `npm test`.
 - Workflow artifact verification.
 

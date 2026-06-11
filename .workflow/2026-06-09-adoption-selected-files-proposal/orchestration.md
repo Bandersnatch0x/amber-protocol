@@ -11,8 +11,8 @@ Mode: simulated subagent-driven-development
    - Implement repeatable `--include` parsing.
    - Implement selected-files proposal writer.
 
-3. `packet-c-stockagents-docs`
-   - Generate a StockAgents selected-files example.
+3. `packet-c-sample-docs`
+   - Generate a sample selected-files example.
    - Update README and examples docs.
 
 4. `packet-d-verification`
@@ -28,7 +28,7 @@ Each packet requires:
 
 ## Hard Stops
 
-- Stop before writing to `D:\code_space\trae-project\StockAgents`.
-- Stop before running StockAgents commands.
+- Stop before writing to `D:\code_space\trae-project\sample`.
+- Stop before running sample commands.
 - Stop before real subagent or Dynamic Workflow execution.
 

@@ -1,10 +1,10 @@
 # System Architecture
 
-High-level overview of the current `Coding Harness` repository and the architectural direction that is converging toward **Amber Protocol**.
+High-level overview of the current `Amber Protocol` repository and the architectural direction that is converging toward **Amber Protocol**.
 
 ## Positioning
 
-The current repository and package names still use `Coding Harness`. Architecturally, the project is moving toward a clearer role: a repository-local governance layer for coding agents.
+The current repository and package names still use `Amber Protocol`. Architecturally, the project is moving toward a clearer role: a repository-local governance layer for coding agents.
 
 The system can be understood through seven internal control layers:
 
@@ -24,7 +24,7 @@ The practical emphasis is `Governance`, `Verification`, and `Observability`, wit
 
 ```mermaid
 flowchart LR
-  CLI["CLI<br/>scripts/harness.js"] --> Core["Deterministic core<br/>scripts/lib/harness-core.js"]
+  CLI["CLI<br/>scripts/amber.js"] --> Core["Deterministic core<br/>scripts/lib/amber-core.js"]
   Core --> Lifecycle["Lifecycle<br/>routes, sessions, checkpoints, worktrees"]
   Core --> Verification["Verification<br/>doctor, audit, validation, review, gates"]
   Core --> Observability["Observability<br/>timelines, manifests, ledgers, reports"]
@@ -38,8 +38,8 @@ flowchart LR
 
 ### CLI and deterministic core
 
-- `scripts/harness.js` handles command routing and user-facing output.
-- `scripts/lib/harness-core.js` aggregates deterministic scaffold, audit, adoption, planning, review, team, and maintenance logic.
+- `scripts/amber.js` handles command routing and user-facing output.
+- `scripts/lib/amber-core.js` aggregates deterministic scaffold, audit, adoption, planning, review, team, and maintenance logic.
 - The CLI is intentionally repository-local and artifact-first.
 
 ### Lifecycle layer

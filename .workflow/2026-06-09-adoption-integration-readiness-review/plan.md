@@ -10,7 +10,7 @@ Review the accumulated adoption workflow implementation and examples for release
 
 - Current adoption command chain is internally consistent.
 - README and examples documentation describe only V1-safe behavior.
-- StockAgents remains a read-only validation target.
+- sample remains a read-only validation target.
 - Any concrete defect found during review is fixed with focused tests.
 - Verification evidence is recorded in this workflow.
 

@@ -27,7 +27,7 @@ node scripts/harness.js adoption decision-record --bundle-dir <bundle> --output 
 - Unknown gates or statuses return errors and do not write output.
 - Markdown and JSON include recorded statuses and notes.
 - The record still does not approve or execute target project writes by itself.
-- StockAgents example is generated under `docs/examples/`.
+- sample example is generated under `docs/examples/`.
 
 ## V1 Boundary
 
