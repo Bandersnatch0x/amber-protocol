@@ -46,12 +46,12 @@ test("core modules define each symbol exactly once", () => {
 	assert.ok(seen.size >= 170, `expected >=170 definitions, got ${seen.size}`);
 });
 
-test("core modules never require the harness-core facade", () => {
+test("core modules never require a facade", () => {
 	for (const file of moduleFiles) {
 		const source = fs.readFileSync(path.join(CORE, file), "utf8");
 		assert.ok(
-			!source.includes("harness-core"),
-			`${file} must not require the facade (circular require)`,
+			!source.includes("harness-core") && !source.includes("amber-core"),
+			`${file} must not require a facade (circular require)`,
 		);
 	}
 });
@@ -65,9 +65,9 @@ test("core modules stay under the 800-line ceiling", () => {
 	}
 });
 
-test("harness-core facade contains no function definitions", () => {
+test("amber-core facade contains no function definitions", () => {
 	const facade = fs.readFileSync(
-		path.join(CORE, "..", "harness-core.js"),
+		path.join(CORE, "..", "amber-core.js"),
 		"utf8",
 	);
 	assert.ok(

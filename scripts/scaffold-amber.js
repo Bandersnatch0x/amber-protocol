@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 "use strict";
 
-const { parseArgs, printResult, scaffoldHarness } = require("./lib/harness-core");
+const { parseArgs, printResult, scaffoldHarness } = require("./lib/amber-core");
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log("Usage: node scripts/scaffold-harness.js --target <repo> [--dry-run] [--json]");
+    console.log("Usage: node scripts/scaffold-amber.js --target <repo> [--dry-run] [--json]");
     return;
   }
 

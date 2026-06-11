@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * Snapshot test — locks all exported symbols from harness-core.js.
+ * Snapshot test — locks all exported symbols from amber-core.js.
  *
  * Any refactoring that renames, removes, or changes the type of an
  * exported symbol will cause this test to fail, protecting against
@@ -11,9 +11,9 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
 const path = require("path");
-const harnessCore = require("../../scripts/lib/harness-core");
+const harnessCore = require("../../scripts/lib/amber-core");
 
-describe("harness-core exports snapshot", () => {
+describe("amber-core exports snapshot", () => {
 	// ── Constants ──────────────────────────────────────────────────────
 	describe("constants", () => {
 		it("DEFAULT_TEAM_REGISTRY is a string", () => {
@@ -139,3 +139,11 @@ const KNOWN_EXPORTS = new Set([
 	"writeAdoptionNextActions", "writeAdoptionReportsIndex",
 	"writeAdoptionSelectedFiles",
 ]);
+
+describe("legacy alias", () => {
+	it("harness-core re-exports amber-core identically", () => {
+		const amberCore = require("../../scripts/lib/amber-core");
+		const legacy = require("../../scripts/lib/harness-core");
+		assert.strictEqual(legacy, amberCore, "alias must be the same object");
+	});
+});

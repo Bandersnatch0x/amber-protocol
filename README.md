@@ -4,11 +4,29 @@
 
 ![Coding Harness](./assets/readme/coding-harness-banner.png)
 
-Coding Harness is a repository-local operating kit for agent-assisted engineering. It installs, audits, validates, and maintains a small set of files that help agents understand a project, keep feature state explicit, and hand off work cleanly.
+Coding Harness is a repository-local governance and control layer for agent-assisted engineering. It installs, audits, validates, and maintains a small set of project files that help agents understand a codebase, keep feature state explicit, and hand off work cleanly.
 
 The current product is deliberately conservative. It creates review artifacts, dry-run plans, approval records, workflow-pack metadata, and maintenance proposals. It does not run Dynamic Workflows, invoke live subagents, execute target project commands, or automatically rewrite old project files.
 
+The repository and package are still named `Coding Harness` today. The product direction is converging toward **Amber Protocol**: a repo-local governance layer for coding agents. That direction clarifies the role of the project. It is not trying to become a general agent framework or execution platform. It is trying to constrain, verify, audit, and hand off agent work safely inside a repository.
+
 ![Coding Harness safe bootstrap infographic](./assets/readme/coding-harness-cover.png)
+
+## Positioning
+
+This project is strongest when framed as a governance-first harness with supporting verification and lifecycle capabilities. A useful way to read the current system is through seven control layers: `Execution`, `Tooling`, `Context`, `Lifecycle`, `Observability`, `Verification`, and `Governance`.
+
+| Layer | Current role in this project | Priority |
+| --- | --- | --- |
+| `Execution` | Minimal. The project avoids becoming a general execution runtime or live agent platform. | Low |
+| `Tooling` | CLI commands, schemas, validators, workflow packs, and profiles expose explicit interfaces. | Medium |
+| `Context` | Starter docs, wiki scaffolds, manifests, and handoff artifacts keep project context explicit. | Medium |
+| `Lifecycle` | Routes, sessions, checkpoints, worktrees, and continuation flows organize work locally. | Medium |
+| `Observability` | Timelines, manifests, ledgers, reports, and maintenance artifacts make behavior inspectable. | High |
+| `Verification` | Doctor, audit, validation, review, and gate surfaces provide explicit checks. | High |
+| `Governance` | Approval records, safe defaults, policy boundaries, and adoption controls constrain behavior. | Highest |
+
+This is the architectural through-line behind the Amber Protocol direction: strengthen `Governance`, `Verification`, and `Observability`; keep `Lifecycle` repository-local; avoid drifting into a full agent platform.
 
 ## Architecture
 
@@ -38,6 +56,13 @@ Core boundaries:
 - `templates/`, `skills/`, `workflow-packs/`, and `profiles/` are declarative inputs.
 - `tests/` protect idempotency, output safety, schema validation, and V1 boundaries.
 - `docs/examples/` contains review artifacts generated from real read-only trials.
+
+Control-plane emphasis:
+
+- **Governance:** approvals, adoption gates, safety boundaries, maintenance proposals, and explicit non-goals.
+- **Verification:** doctor, audits, schema validation, review artifacts, and dry-run proof surfaces.
+- **Observability:** session timelines, ledgers, manifests, reports, and other inspectable records.
+- **Lifecycle:** routes, sessions, checkpoints, and worktrees remain local control mechanisms rather than a full orchestration platform.
 
 ## Command Surface
 

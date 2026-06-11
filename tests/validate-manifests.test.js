@@ -7,7 +7,7 @@ const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
 
-const { validateManifests } = require("../scripts/lib/harness-core");
+const { validateManifests } = require("../scripts/lib/amber-core");
 
 function fixture(name) {
   return path.join(__dirname, "fixtures", name);
