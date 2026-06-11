@@ -108,6 +108,17 @@ function doctor(target) {
 
 	for (const relativePath of REQUIRED_HARNESS_FILES) {
 		if (!pathExists(path.join(targetRoot, relativePath))) {
+			// Forced-migration hint: when the new-name agent wiki page is the
+			// missing file but the legacy page exists, point at migrate wiki.
+			if (
+				relativePath === "docs/wiki/agent/amber.md" &&
+				pathExists(path.join(targetRoot, "docs", "wiki", "agent", "harness.md"))
+			) {
+				errors.push(
+					`Missing required file: ${relativePath} (legacy harness.md found — run: amber migrate wiki --target .)`,
+				);
+				continue;
+			}
 			errors.push(`Missing required file: ${relativePath}`);
 		}
 	}

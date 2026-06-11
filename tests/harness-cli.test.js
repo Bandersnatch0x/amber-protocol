@@ -983,6 +983,22 @@ test("package exposes amber as primary bin with a legacy coding-harness alias", 
   assert.equal(packageJson.bin["coding-harness"], "scripts/compat/coding-harness.js");
 });
 
+test("migrate state copies legacy .harness into .amber via the CLI", () => {
+  const target = tempDir("migrate-state");
+  const legacySession = path.join(target, ".harness", "sessions", "legacy-1");
+  fs.mkdirSync(legacySession, { recursive: true });
+  fs.writeFileSync(path.join(legacySession, "manifest.json"), JSON.stringify({ sessionId: "legacy-1" }));
+
+  const result = runHarness(["migrate", "state", "--target", target, "--json"]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.errors.length, 0);
+  assert.ok(payload.copied.length >= 1);
+  assert.equal(fs.existsSync(path.join(target, ".amber", "sessions", "legacy-1", "manifest.json")), true);
+  assert.equal(fs.existsSync(path.join(target, ".harness", "sessions", "legacy-1", "manifest.json")), true);
+});
+
 test("legacy entrypoints forward to the amber CLI", () => {
   for (const entry of ["scripts/harness.js", "scripts/compat/coding-harness.js"]) {
     const result = spawnSync(process.execPath, [path.join(ROOT, entry), "--help"], {
