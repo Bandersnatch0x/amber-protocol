@@ -1,11 +1,11 @@
 ---
-name: harness-wiki
-description: Create or validate the repository-local Coding Harness Wiki skeleton.
+name: amber-wiki
+description: Create or validate the repository-local Amber Protocol Wiki skeleton.
 ---
 
-# Harness Wiki
+# Amber Wiki
 
-Use when a user asks to create or validate the repository-local Harness Wiki.
+Use when a user asks to create or validate the repository-local Amber Protocol setup Wiki.
 
 ## Workflow
 

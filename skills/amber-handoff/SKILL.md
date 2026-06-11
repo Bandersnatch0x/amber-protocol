@@ -1,9 +1,9 @@
 ---
-name: harness-handoff
+name: amber-handoff
 description: Prepare session continuity using Progress, feature state, and handoff files.
 ---
 
-# Harness Handoff
+# Amber Handoff
 
 Use when a user asks to end a session or prepare continuity for another agent.
 

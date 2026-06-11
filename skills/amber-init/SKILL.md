@@ -1,11 +1,11 @@
 ---
-name: harness-init
-description: Install the V1 Coding Harness scaffold in a repository without overwriting existing files.
+name: amber-init
+description: Install the V1 Amber Protocol scaffold in a repository without overwriting existing files.
 ---
 
-# Harness Init
+# Amber Init
 
-Use when a user asks to initialize or install the Coding Harness in a repository.
+Use when a user asks to initialize or install the Amber Protocol in a repository.
 
 ## Workflow
 

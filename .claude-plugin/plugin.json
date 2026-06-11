@@ -1,7 +1,7 @@
 {
-  "name": "coding-harness",
+  "name": "amber-protocol",
   "version": "0.1.0",
-  "description": "Safe Harness Bootstrap for repository-local agent instructions, wiki, validation, and handoff.",
+  "description": "Amber Protocol: repository-local governance kit for coding agents — init, audit, wiki, doctor, and handoff workflows.",
   "author": {
     "name": "Local developer"
   },
