@@ -57,7 +57,7 @@ test("team install update rollback and pin preserve target customizations", () =
   assert.equal(install.status, 0, install.stderr);
   assert.equal(JSON.parse(install.stdout).lock.installedVersion, "1.0.0");
 
-  const lockPath = path.join(target, ".harness", "team", "lock.json");
+  const lockPath = path.join(target, ".amber", "team", "lock.json");
   const lockBeforePreview = fs.readFileSync(lockPath, "utf8");
   const preview = runHarness(["team", "update", "--target", target, "--version", "1.1.0", "--dry-run", "--json"]);
   assert.equal(preview.status, 0, preview.stderr);
@@ -75,7 +75,7 @@ test("team install update rollback and pin preserve target customizations", () =
   const update = runHarness(["team", "update", "--target", target, "--version", "1.1.0", "--confirm", "--json"]);
   assert.equal(update.status, 0, update.stderr);
   assert.equal(JSON.parse(update.stdout).lock.installedVersion, "1.1.0");
-  assert.equal(fs.existsSync(path.join(target, ".harness", "team", "snapshots", "1.1.0.json")), true);
+  assert.equal(fs.existsSync(path.join(target, ".amber", "team", "snapshots", "1.1.0.json")), true);
 
   const rollback = runHarness(["team", "rollback", "--target", target, "--version", "1.0.0", "--confirm", "--json"]);
   assert.equal(rollback.status, 0, rollback.stderr);

@@ -213,10 +213,10 @@ function commandSummary(command) {
 			"Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling.",
 			"",
 			"Examples:",
-			"  node scripts/harness.js loop inspect --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --json",
-			"  node scripts/harness.js loop run --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --dry-run --output .harness/loops/daily-harness-triage/ledger-preview.json --json",
-			"  node scripts/harness.js loop record --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --trigger-source manual --stop-reason reviewer-gate-required --output .harness/loops/daily-harness-triage/manual-ledger.json --json",
-			"  node scripts/harness.js loop status --ledger .harness/loops/daily-harness-triage/manual-ledger.json --json",
+			"  node scripts/amber.js loop inspect --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --json",
+			"  node scripts/amber.js loop run --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --dry-run --output .amber/loops/daily-harness-triage/ledger-preview.json --json",
+			"  node scripts/amber.js loop record --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --trigger-source manual --stop-reason reviewer-gate-required --output .amber/loops/daily-harness-triage/manual-ledger.json --json",
+			"  node scripts/amber.js loop status --ledger .amber/loops/daily-harness-triage/manual-ledger.json --json",
 		].join("\n");
 	}
 	if (command === "route") {

@@ -36,11 +36,11 @@ test("task prepare creates isolated ledger, evidence pack, replay file, and work
 
   const prepared = runHarness(["task", "prepare", "--target", target, "--plan", plan, "--task", "slice-1", "--json"]);
   const inspected = runHarness(["result", "inspect", "--target", target, "--task", "slice-1", "--json"]);
-  const executionRoot = path.join(target, ".harness", "executions", "slice-1");
+  const executionRoot = path.join(target, ".amber", "executions", "slice-1");
 
   assert.equal(prepared.status, 0, prepared.stderr);
   assert.equal(inspected.status, 0, inspected.stderr);
-  assert.equal(fs.existsSync(path.join(target, ".harness", "worktrees", "slice-1")), true);
+  assert.equal(fs.existsSync(path.join(target, ".amber", "worktrees", "slice-1")), true);
   assert.equal(fs.existsSync(path.join(executionRoot, "ledger.json")), true);
   assert.equal(fs.existsSync(path.join(executionRoot, "evidence.json")), true);
   assert.equal(fs.existsSync(path.join(executionRoot, "replay.md")), true);
@@ -93,7 +93,7 @@ test("task prepare records trace-derived replay and regression proposal", () => 
   assert.equal(payload.traceReplay.traceInput, "fixtures/traces/failing-input.json");
   assert.equal(payload.regressionProposal.assertion, "The response must include specific deal details, not just a count");
 
-  const evidence = JSON.parse(fs.readFileSync(path.join(target, ".harness", "executions", "trace-failure", "evidence.json"), "utf8"));
+  const evidence = JSON.parse(fs.readFileSync(path.join(target, ".amber", "executions", "trace-failure", "evidence.json"), "utf8"));
   assert.equal(evidence.traceReplay.traceInput, "fixtures/traces/failing-input.json");
   assert.equal(evidence.traceReplay.agentConfig, "crm-agent-v2");
   assert.equal(evidence.regressionProposal.status, "proposed");

@@ -102,8 +102,8 @@ test("agent dispatch supports stop resume and separate reviewer evidence", () =>
     "satisfied",
     "--json"
   ]);
-  const dispatchPath = path.join(target, ".harness", "orchestration", "slice-1", "dispatch.json");
-  const reviewPath = path.join(target, ".harness", "orchestration", "slice-1", "reviewer-evidence.json");
+  const dispatchPath = path.join(target, ".amber", "orchestration", "slice-1", "dispatch.json");
+  const reviewPath = path.join(target, ".amber", "orchestration", "slice-1", "reviewer-evidence.json");
 
   assert.equal(dispatch.status, 0, dispatch.stderr);
   assert.equal(stop.status, 0, stop.stderr);
