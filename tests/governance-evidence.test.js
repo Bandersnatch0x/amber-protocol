@@ -37,8 +37,21 @@ describe("governance evidence", () => {
 		);
 
 		const timeline = [
-			{ type: "command", command: "npm install express" },
-			{ type: "command", command: "npm test" },
+			{
+				type: "session_created",
+				timestamp: new Date().toISOString(),
+				data: { goal: "Implement user authentication" }
+			},
+			{
+				type: "command_executed",
+				timestamp: new Date().toISOString(),
+				data: { command: "npm install express" }
+			},
+			{
+				type: "command_executed",
+				timestamp: new Date().toISOString(),
+				data: { command: "npm test" }
+			},
 		];
 		fs.writeFileSync(
 			path.join(sessionsDir, "timeline.jsonl"),
@@ -55,7 +68,8 @@ describe("governance evidence", () => {
 		assert.ok(result.outputPath || result.output);
 
 		const content = fs.readFileSync(outputPath, "utf8");
-		assert.ok(content.includes(`# Session ${sessionId}`));
+		assert.ok(content.includes("# Session Evidence"));
+		assert.ok(content.includes(sessionId));
 		assert.ok(content.includes("Implement user authentication"));
 		assert.ok(content.includes("npm install express"));
 		assert.ok(content.includes("npm test"));
@@ -63,19 +77,25 @@ describe("governance evidence", () => {
 
 	it("execution export → markdown contains plan + worktree", () => {
 		const taskId = "test-task-001";
-		const taskDir = path.join(tmpDir, ".amber", "tasks", taskId);
+		const taskDir = path.join(tmpDir, ".amber", "executions", taskId);
 		fs.mkdirSync(taskDir, { recursive: true });
 
-		const plan = "# Task Plan\n\n## Steps\n1. Create schema\n2. Add tests";
-		fs.writeFileSync(path.join(taskDir, "plan.md"), plan);
-
-		const worktree = {
-			path: "/path/to/worktree",
-			branch: "task/test-task-001",
+		const ledger = {
+			plan: "# Task Plan\n\n## Steps\n1. Create schema\n2. Add tests",
+			status: "completed",
+			worktree: "/path/to/worktree",
 		};
 		fs.writeFileSync(
-			path.join(taskDir, "worktree.json"),
-			JSON.stringify(worktree, null, 2),
+			path.join(taskDir, "ledger.json"),
+			JSON.stringify(ledger, null, 2),
+		);
+
+		const evidence = {
+			commands: ["npm install", "npm test"],
+		};
+		fs.writeFileSync(
+			path.join(taskDir, "evidence.json"),
+			JSON.stringify(evidence, null, 2),
 		);
 
 		const outputPath = path.join(tmpDir, "task-evidence.md");
@@ -88,10 +108,10 @@ describe("governance evidence", () => {
 		assert.ok(result.outputPath || result.output);
 
 		const content = fs.readFileSync(outputPath, "utf8");
-		assert.ok(content.includes(`# Task ${taskId}`));
-		assert.ok(content.includes("# Task Plan"));
+		assert.ok(content.includes("# Execution Evidence"));
+		assert.ok(content.includes(taskId));
 		assert.ok(content.includes("Create schema"));
-		assert.ok(content.includes("## Worktree"));
+		assert.ok(content.includes("Worktree"));
 		assert.ok(content.includes("/path/to/worktree"));
 	});
 });
