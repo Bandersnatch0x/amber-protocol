@@ -1,0 +1,5 @@
+{
+  "trigger": "manual",
+  "cadence": "daily",
+  "stateSpine": ["state1"]
+}

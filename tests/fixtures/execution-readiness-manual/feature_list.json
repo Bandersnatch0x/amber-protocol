@@ -1,0 +1,9 @@
+{
+  "features": [
+    {
+      "id": "F001",
+      "title": "Test Feature",
+      "verification": ["Run test"]
+    }
+  ]
+}

@@ -1,5 +1,8 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
 const {
 	loadPolicy,
 	shouldAutoApproveGate,
@@ -29,5 +32,32 @@ describe("autonomous-policy", () => {
 		const config = getRetryConfig(policy);
 		assert.strictEqual(config.maxAttempts, 3);
 		assert.strictEqual(config.backoffMs.length, 3);
+	});
+
+	it("should ignore auto-approve-all in policy file", () => {
+		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-test-"));
+		const amberDir = path.join(tmpDir, ".amber");
+		fs.mkdirSync(amberDir, { recursive: true });
+
+		const invalidPolicy = {
+			"auto-approve-all": true,
+			gates: {
+				auto: "approve",
+				"user-approval": "block",
+				"step-confirm": "block",
+			},
+		};
+		fs.writeFileSync(
+			path.join(amberDir, "autonomous-policy.json"),
+			JSON.stringify(invalidPolicy, null, 2)
+		);
+
+		try {
+			const policy = loadPolicy(tmpDir);
+			assert.strictEqual(shouldAutoApproveGate("user-approval", policy), false);
+			assert.strictEqual(shouldAutoApproveGate("step-confirm", policy), false);
+		} finally {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
+		}
 	});
 });
