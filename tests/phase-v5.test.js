@@ -65,7 +65,7 @@ test("team install update rollback and pin preserve target customizations", () =
   assert.equal(previewPayload.preview.willWrite, false);
   assert.equal(previewPayload.preview.customizationsPreserved, true);
   assert.deepEqual(previewPayload.preview.projectFileWrites, []);
-  assert.ok(previewPayload.preview.changedArtifacts.includes("workflow-packs/safe-harness-bootstrap.pack.json"));
+  assert.ok(previewPayload.preview.changedArtifacts.includes("workflow-packs/safe-amber-bootstrap.pack.json"));
   assert.equal(fs.readFileSync(lockPath, "utf8"), lockBeforePreview);
 
   const blockedUpdate = runHarness(["team", "update", "--target", target, "--version", "1.1.0", "--json"]);

@@ -63,7 +63,7 @@ function doctorProductRepo(targetRoot, classification) {
 	const samplePackPath = path.join(
 		targetRoot,
 		"workflow-packs",
-		"safe-harness-bootstrap.pack.json",
+		"safe-amber-bootstrap.pack.json",
 	);
 	const sampleProfilePath = path.join(
 		targetRoot,

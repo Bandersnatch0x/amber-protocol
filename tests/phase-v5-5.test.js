@@ -46,7 +46,7 @@ test("maintenance inspect detects stale docs upgrade guidance and rule-pack drif
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.readOnly, true);
   assert.ok(payload.staleDocs.some((doc) => doc.path === "docs/wiki/product/overview.md"));
-  assert.match(payload.wikiLint.ciCommand, /harness\.js wiki/);
+  assert.match(payload.wikiLint.ciCommand, /amber\.js wiki/);
   assert.equal(payload.rulePackDrift.drifted, true);
   assert.deepEqual(payload.rulePackDrift.actual, ["custom.rule-pack.json"]);
   assert.equal(payload.upgradeAssistant.currentVersion, "1.0.0");

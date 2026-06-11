@@ -85,7 +85,7 @@ test("pack readiness reports missing future-loop controls without executing anyt
 });
 
 test("pack readiness passes only as dry-run-ready when all controls are declared", () => {
-  const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+  const pack = path.join(ROOT, "workflow-packs", "safe-amber-bootstrap.pack.json");
   const result = runHarness(["pack", "readiness", "--file", pack, "--json"]);
   assert.equal(result.status, 0, result.stderr);
   const payload = JSON.parse(result.stdout);
@@ -106,7 +106,7 @@ test("pack readiness passes only as dry-run-ready when all controls are declared
 test("loop run only writes a dry-run ledger preview", () => {
   const dir = tempDir("loop-dry-run");
   const ledger = path.join(dir, "ledger-preview.json");
-  const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+  const pack = path.join(ROOT, "workflow-packs", "safe-amber-bootstrap.pack.json");
 
   const result = runHarness([
     "loop",
@@ -114,7 +114,7 @@ test("loop run only writes a dry-run ledger preview", () => {
     "--file",
     pack,
     "--contract",
-    "daily-harness-triage",
+    "daily-amber-triage",
     "--dry-run",
     "--output",
     ledger,
@@ -126,14 +126,14 @@ test("loop run only writes a dry-run ledger preview", () => {
   assert.equal(payload.mode, "dry-run");
   assert.equal(payload.executesAnything, false);
   assert.equal(payload.schedulesJobs, false);
-  assert.equal(payload.ledgerPreview.contractId, "daily-harness-triage");
+  assert.equal(payload.ledgerPreview.contractId, "daily-amber-triage");
   assert.equal(payload.ledgerPreview.stopReason, "dry-run-only");
   assert.equal(fs.existsSync(ledger), true);
 });
 
 test("loop run refuses non-dry-run execution", () => {
-  const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
-  const result = runHarness(["loop", "run", "--file", pack, "--contract", "daily-harness-triage", "--json"]);
+  const pack = path.join(ROOT, "workflow-packs", "safe-amber-bootstrap.pack.json");
+  const result = runHarness(["loop", "run", "--file", pack, "--contract", "daily-amber-triage", "--json"]);
 
   assert.notEqual(result.status, 0);
   const payload = JSON.parse(result.stdout);
@@ -143,7 +143,7 @@ test("loop run refuses non-dry-run execution", () => {
 test("loop record stores manual loop evidence and loop status can inspect it", () => {
   const dir = tempDir("loop-record");
   const ledger = path.join(dir, "manual-ledger.json");
-  const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+  const pack = path.join(ROOT, "workflow-packs", "safe-amber-bootstrap.pack.json");
 
   const recordResult = runHarness([
     "loop",
@@ -151,7 +151,7 @@ test("loop record stores manual loop evidence and loop status can inspect it", (
     "--file",
     pack,
     "--contract",
-    "daily-harness-triage",
+    "daily-amber-triage",
     "--trigger-source",
     "manual",
     "--stop-reason",
@@ -163,7 +163,7 @@ test("loop record stores manual loop evidence and loop status can inspect it", (
 
   assert.equal(recordResult.status, 0, recordResult.stderr);
   const recorded = JSON.parse(recordResult.stdout);
-  assert.equal(recorded.record.contractId, "daily-harness-triage");
+  assert.equal(recorded.record.contractId, "daily-amber-triage");
   assert.equal(recorded.record.approvalState, "pending-review");
   assert.equal(recorded.record.reviewerOutcome, "not-reviewed");
 
@@ -175,12 +175,12 @@ test("loop record stores manual loop evidence and loop status can inspect it", (
 });
 
 test("loop inspect explains contract readiness without writing a ledger", () => {
-  const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
-  const result = runHarness(["loop", "inspect", "--file", pack, "--contract", "daily-harness-triage", "--json"]);
+  const pack = path.join(ROOT, "workflow-packs", "safe-amber-bootstrap.pack.json");
+  const result = runHarness(["loop", "inspect", "--file", pack, "--contract", "daily-amber-triage", "--json"]);
 
   assert.equal(result.status, 0, result.stderr);
   const payload = JSON.parse(result.stdout);
-  assert.equal(payload.contract.id, "daily-harness-triage");
+  assert.equal(payload.contract.id, "daily-amber-triage");
   assert.equal(payload.readiness.readyForLiveScheduling, false);
   assert.equal(payload.execution.executesAnything, false);
 });

@@ -51,7 +51,7 @@ test("doctor reports product-repo status for this toolkit repository", () => {
 });
 
 test("sample workflow pack and profile can be inspected without execution", () => {
-  const packPath = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+  const packPath = path.join(ROOT, "workflow-packs", "safe-amber-bootstrap.pack.json");
   const profilePath = path.join(ROOT, "profiles", "default.profile.json");
 
   const packResult = inspectWorkflowPack(packPath);
@@ -59,8 +59,8 @@ test("sample workflow pack and profile can be inspected without execution", () =
 
   assert.deepEqual(packResult.errors, []);
   assert.equal(packResult.execution.executesAnything, false);
-  assert.equal(packResult.pack.id, "safe-harness-bootstrap");
+  assert.equal(packResult.pack.id, "safe-amber-bootstrap");
   assert.ok(packResult.pack.stepCount > 0);
   assert.deepEqual(profileResult.errors, []);
-  assert.ok(profileResult.profile.packIds.includes("safe-harness-bootstrap"));
+  assert.ok(profileResult.profile.packIds.includes("safe-amber-bootstrap"));
 });

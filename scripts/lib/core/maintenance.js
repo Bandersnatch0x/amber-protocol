@@ -64,7 +64,7 @@ function detectStaleDocs(targetRoot, options = {}) {
 
 function buildWikiLintCi(targetRoot) {
 	return {
-		ciCommand: `node scripts/harness.js wiki --target ${JSON.stringify(targetRoot)} --dry-run --json`,
+		ciCommand: `node scripts/amber.js wiki --target ${JSON.stringify(targetRoot)} --dry-run --json`,
 		localCommand: `node scripts/validate-wiki.js --target ${JSON.stringify(targetRoot)}`,
 		check: "wiki-link-and-starter-file-lint",
 	};
@@ -105,7 +105,7 @@ function buildUpgradeAssistant(targetRoot, registry) {
 			installed: false,
 			currentVersion: null,
 			latestVersion,
-			installCommand: `node scripts/harness.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap`,
+			installCommand: `node scripts/amber.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap`,
 		};
 	}
 
@@ -114,8 +114,8 @@ function buildUpgradeAssistant(targetRoot, registry) {
 		currentVersion: lock.installedVersion,
 		latestVersion,
 		updateAvailable: compareSemver(lock.installedVersion, latestVersion) < 0,
-		previewCommand: `node scripts/harness.js team update --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --dry-run --json`,
-		upgradeCommand: `node scripts/harness.js team update --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --confirm --json`,
+		previewCommand: `node scripts/amber.js team update --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --dry-run --json`,
+		upgradeCommand: `node scripts/amber.js team update --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --confirm --json`,
 	};
 }
 
@@ -129,7 +129,7 @@ function buildMigrationAssistant(targetRoot, registry) {
 		return {
 			needed: true,
 			reason: "team distribution is not installed",
-			nextCommand: `node scripts/harness.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap`,
+			nextCommand: `node scripts/amber.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap`,
 		};
 	}
 
@@ -139,7 +139,7 @@ function buildMigrationAssistant(targetRoot, registry) {
 			compareSemver(lock.installedVersion, latestVersion) < 0,
 		currentProfile: lock.profile,
 		targetProfile: latestRelease.profile,
-		nextCommand: `node scripts/harness.js team update --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --dry-run --json`,
+		nextCommand: `node scripts/amber.js team update --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --dry-run --json`,
 	};
 }
 

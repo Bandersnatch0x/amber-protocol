@@ -124,8 +124,8 @@ function usage(command) {
 		"  node scripts/harness.js gate --target path/to/repo --plan docs/plans/F001-small-slice.md",
 		"  node scripts/harness.js review --target path/to/repo --plan docs/plans/F001-small-slice.md",
 		"  node scripts/harness.js accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
-		"  node scripts/harness.js pack inspect --file workflow-packs/safe-harness-bootstrap.pack.json",
-		"  node scripts/harness.js pack readiness --file workflow-packs/safe-harness-bootstrap.pack.json --json",
+		"  node scripts/harness.js pack inspect --file workflow-packs/safe-amber-bootstrap.pack.json",
+		"  node scripts/harness.js pack readiness --file workflow-packs/safe-amber-bootstrap.pack.json --json",
 		"  node scripts/harness.js profile inspect --file profiles/default.profile.json",
 		"  node scripts/harness.js task prepare --target path/to/repo --plan docs/plans/F001-small-slice.md --task slice-1",
 		"  node scripts/harness.js result inspect --target path/to/repo --task slice-1",
@@ -214,10 +214,10 @@ function commandSummary(command) {
 			"Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling.",
 			"",
 			"Examples:",
-			"  node scripts/amber.js loop inspect --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --json",
-			"  node scripts/amber.js loop run --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --dry-run --output .amber/loops/daily-harness-triage/ledger-preview.json --json",
-			"  node scripts/amber.js loop record --file workflow-packs/safe-harness-bootstrap.pack.json --contract daily-harness-triage --trigger-source manual --stop-reason reviewer-gate-required --output .amber/loops/daily-harness-triage/manual-ledger.json --json",
-			"  node scripts/amber.js loop status --ledger .amber/loops/daily-harness-triage/manual-ledger.json --json",
+			"  node scripts/amber.js loop inspect --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --json",
+			"  node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --output .amber/loops/daily-amber-triage/ledger-preview.json --json",
+			"  node scripts/amber.js loop record --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --trigger-source manual --stop-reason reviewer-gate-required --output .amber/loops/daily-amber-triage/manual-ledger.json --json",
+			"  node scripts/amber.js loop status --ledger .amber/loops/daily-amber-triage/manual-ledger.json --json",
 		].join("\n");
 	}
 	if (command === "route") {
