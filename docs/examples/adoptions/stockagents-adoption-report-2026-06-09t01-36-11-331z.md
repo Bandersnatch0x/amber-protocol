@@ -1,6 +1,6 @@
 # Coding Harness Adoption Report
 
-Target: D:\code_space\trae-project\StockAgents
+Target: D:\code_space\trae-project\sample
 Generated: 2026-06-09T01:36:11.512Z
 
 No target project files were initialized by this report.
@@ -61,6 +61,6 @@ No target project files were initialized by this report.
 
 ## Next Safe Commands
 
-- node scripts/harness.js audit --target "D:\\code_space\\trae-project\\StockAgents" --json
-- node scripts/harness.js init --target "D:\\code_space\\trae-project\\StockAgents" --dry-run
-- node scripts/harness.js maintenance inspect --target "D:\\code_space\\trae-project\\StockAgents" --json
+- node scripts/harness.js audit --target "D:\\code_space\\trae-project\\sample" --json
+- node scripts/harness.js init --target "D:\\code_space\\trae-project\\sample" --dry-run
+- node scripts/harness.js maintenance inspect --target "D:\\code_space\\trae-project\\sample" --json

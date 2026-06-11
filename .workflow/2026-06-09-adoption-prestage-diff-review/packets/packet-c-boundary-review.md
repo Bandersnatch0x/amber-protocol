@@ -6,11 +6,11 @@ Confirm target isolation and V1 hard stops.
 
 ## Do
 
-- Check StockAgents boundary files remain absent.
+- Check sample boundary files remain absent.
 - Check no git staging or committing happened.
 - Check workflow evidence records simulated packets only.
 
 ## Do Not
 
-- Run StockAgents commands.
+- Run sample commands.
 

@@ -1,3 +1,5 @@
+> Historical Phase B Alpha task list predating the Amber Protocol rename; command and file names reflect the era.
+
 # Phase B Alpha - 完整任务清单
 
 **时间**: 5周（W1-W5）  
@@ -76,7 +78,7 @@
 
 ### 任务 2.3: 集成到 harness.js
 - [ ] 添加 `route` 命令到主 CLI
-  - `node scripts/harness.js route <subcommand>`
+  - `node scripts/amber.js route <subcommand>`
 - [ ] 添加 help 文本
 - [ ] 端到端测试
 
@@ -97,7 +99,7 @@
 
 ### 任务 3.1: Session 命令组
 - [ ] `session start --goal "..." [--route <id>]`
-  - 创建 `.harness/sessions/<uuid>/`
+  - 创建 `.amber/sessions/<uuid>/`
   - 写入 `manifest.json`
   - 初始化 `timeline.jsonl`
   - 状态: created
@@ -121,7 +123,7 @@
 
 ### 任务 3.3: Worktree 管理
 - [ ] 实现 `scripts/lib/worktree-manager.js`
-  - 创建隔离 worktree: `.harness/worktrees/<session-id>/`
+  - 创建隔离 worktree: `.amber/worktrees/<session-id>/`
   - 基于当前 branch
   - 清理逻辑（session 结束时）
 - [ ] 测试（创建、隔离、清理）
@@ -148,7 +150,7 @@
   - `server/trpc.ts`
   - `server/routers/sessions.ts`
 - [ ] Session 列表页面 `app/sessions/page.tsx`
-  - 读取 `.harness/sessions/*/manifest.json`
+  - 读取 `.amber/sessions/*/manifest.json`
   - 显示 id, status, goal, createdAt
   - 状态筛选
 - [ ] Session 详情页面 `app/sessions/[id]/page.tsx`
@@ -164,10 +166,10 @@
 
 **验收**:
 - [ ] `session start --goal "test"` 创建新 session
-- [ ] `.harness/sessions/<uuid>/manifest.json` 存在且 schema 有效
+- [ ] `.amber/sessions/<uuid>/manifest.json` 存在且 schema 有效
 - [ ] `session status` 显示当前 session 信息
 - [ ] 故意 kill 进程，session 状态保留在 executing
-- [ ] Worktree 在 `.harness/worktrees/<uuid>/` 创建成功
+- [ ] Worktree 在 `.amber/worktrees/<uuid>/` 创建成功
 - [ ] Web Dashboard 显示 session 统计
 - [ ] Web 可以浏览 session 列表和查看详情
 
@@ -244,7 +246,7 @@
 ### 任务 5.1: Checkpoint 系统
 - [ ] 创建 `scripts/lib/checkpoint-manager.js`
   - 在关键点保存 checkpoint（stage 开始/结束）
-  - 路径: `.harness/sessions/<id>/checkpoints/<stage>.json`
+  - 路径: `.amber/sessions/<id>/checkpoints/<stage>.json`
   - 包含: stage, timestamp, manifest snapshot, worktree state
 - [ ] 恢复逻辑
   - 读取最新 checkpoint
@@ -324,7 +326,7 @@
 session start --goal "implement user authentication" --mode interactive
 
 # 预期:
-# - 创建 .harness/sessions/<uuid>/
+# - 创建 .amber/sessions/<uuid>/
 # - manifest.json schemaVersion="1.0.0", status="created"
 # - timeline.jsonl 有 session_created event
 # - 自动选择 route: feature-standard

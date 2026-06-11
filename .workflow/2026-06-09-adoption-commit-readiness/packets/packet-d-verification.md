@@ -9,7 +9,7 @@ Run final checks for commit readiness.
 - Run focused and full test suites.
 - Run manifest validation.
 - Verify this workflow artifact.
-- Confirm StockAgents boundary files remain absent.
+- Confirm sample boundary files remain absent.
 
 ## Do Not
 

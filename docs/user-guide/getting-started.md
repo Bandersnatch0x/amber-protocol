@@ -1,6 +1,6 @@
-# Getting Started with Coding Harness (Phase B v1.0.0)
+# Getting Started with Amber Protocol (Phase B v1.0.0)
 
-Welcome to Coding Harness! This guide will walk you through installation, first-time setup, and creating your first skill.
+Welcome to Amber Protocol! This guide will walk you through installation, first-time setup, and creating your first skill.
 
 ## Prerequisites
 
@@ -12,11 +12,11 @@ Welcome to Coding Harness! This guide will walk you through installation, first-
 
 ```bash
 # Install globally from npm
-npm install -g coding-harness
+npm install -g amber-protocol
 
 # Verify installation
-coding-harness --version
-# => coding-harness v1.0.0 (phase-b)
+amber-protocol --version
+# => amber-protocol v1.0.0 (phase-b)
 ```
 
 ## First-Time Setup
@@ -27,7 +27,7 @@ coding-harness --version
 # Create a new project
 mkdir my-agent-project
 cd my-agent-project
-coding-harness init
+amber-protocol init
 ```
 
 This scaffolds:
@@ -40,7 +40,7 @@ This scaffolds:
 
 ```bash
 # Run the doctor to check everything is set up correctly
-coding-harness doctor
+amber-protocol doctor
 ```
 
 ### 3. Your First Skill
@@ -55,7 +55,7 @@ Greets the user with a friendly message.
 ## Usage
 
 When a user says "say hello", respond with:
-"Hello! I'm your Coding Harness assistant. How can I help you build today?"
+"Hello! I'm your Amber Protocol assistant. How can I help you build today?"
 ```
 
 ### 4. Create a Route
@@ -77,10 +77,10 @@ Create `routes/hello.route.json`:
 
 ```bash
 # Test the route (dry-run)
-coding-harness route test hello-world --dry-run
+amber-protocol route test hello-world --dry-run
 
 # Run the route
-coding-harness run hello-world
+amber-protocol run hello-world
 ```
 
 ## Next Steps
@@ -90,6 +90,3 @@ coding-harness run hello-world
 - [Troubleshooting](./troubleshooting.md) — Common issues and fixes
 - [FAQ](./faq.md) — Frequently asked questions
 
-## Migrating from V5.5?
-
-See the [Migration Guide](../release/MIGRATION_GUIDE.md) for detailed instructions.

@@ -10,5 +10,5 @@ Run final verification and close the workflow.
 - Full tests pass.
 - Manifests pass.
 - Workflow verification passes.
-- StockAgents boundary evidence is recorded.
+- sample boundary evidence is recorded.
 

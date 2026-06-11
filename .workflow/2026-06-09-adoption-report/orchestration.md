@@ -4,7 +4,7 @@
 
 - Packet A: Define behavior with tests.
 - Packet B: Implement core and CLI.
-- Packet C: Run StockAgents smoke test.
+- Packet C: Run sample smoke test.
 - Packet D: Update docs and finalize verification.
 
 ## Integration Policy

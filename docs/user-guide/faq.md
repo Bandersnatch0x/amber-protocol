@@ -2,13 +2,13 @@
 
 ## Installation
 
-**Q: Can I use Coding Harness without npm?**  
-A: Yes, clone the repository and use `node scripts/harness.js` directly.
+**Q: Can I use Amber Protocol without npm?**  
+A: Yes, clone the repository and use `node scripts/amber.js` directly.
 
 **Q: What Node.js version is required?**  
 A: Node.js >= 18.17. We recommend the latest LTS release.
 
-**Q: Does Coding Harness work on Windows?**  
+**Q: Does Amber Protocol work on Windows?**  
 A: Yes, Windows 10+ is fully supported. Some git features require Git for Windows.
 
 ## Migration
@@ -17,7 +17,7 @@ A: Yes, Windows 10+ is fully supported. Some git features require Git for Window
 A: Yes, skills are backward-compatible. The SKILL.md format is unchanged.
 
 **Q: Can I roll back after migration?**  
-A: Yes, a backup is created automatically. Use `coding-harness rollback`.
+A: Yes, a backup is created automatically. Use `amber-protocol rollback`.
 
 **Q: What happens to my custom settings?**  
 A: All custom settings are preserved. Only deprecated fields are renamed/removed.
@@ -33,7 +33,7 @@ A: Initial startup installs dependencies and indexes skills. Subsequent runs are
 **Q: How can I speed up hook execution?**  
 A: Skip heavy hooks during development:
 ```bash
-coding-harness hook run pre-commit --light
+amber-protocol hook run pre-commit --light
 ```
 
 **Q: Can I limit token usage?**  
@@ -48,9 +48,9 @@ A: Yes, configure budget in your agent profile:
 A: API keys should be stored in environment variables, never in settings files.
 
 **Q: Can I audit my project for security issues?**  
-A: Yes, run `coding-harness security audit` for dependency, secret, and permission scans.
+A: Yes, run `amber-protocol security audit` for dependency, secret, and permission scans.
 
-**Q: What permissions model does Coding Harness use?**  
+**Q: What permissions model does Amber Protocol use?**  
 A: Least-privilege by default. Configure allowed tools and paths in `settings.json`.
 
 **Q: Are hooks sandboxed?**  
@@ -58,22 +58,22 @@ A: Hooks run with the same permissions as the user. Review hook scripts carefull
 
 ## Development
 
-**Q: Can I extend Coding Harness?**  
+**Q: Can I extend Amber Protocol?**  
 A: Yes, via skills, custom routes, hooks, and agent profiles. See [Extension Points](../architecture/extension-points.md).
 
 **Q: How do I contribute?**  
 A: See [Architecture Overview](../architecture/overview.md).
 
 **Q: Where are my sessions stored?**  
-A: By default in `~/.coding-harness/sessions/`. Configure via `sessionDir` in settings.
+A: By default in `~/.amber-protocol/sessions/`. Configure via `sessionDir` in settings.
 
 ## Troubleshooting
 
-**Q: `coding-harness: command not found`**  
-A: The npm global bin is not in PATH. Use `npx coding-harness` or fix your PATH.
+**Q: `amber-protocol: command not found`**  
+A: The npm global bin is not in PATH. Use `npx amber-protocol` or fix your PATH.
 
 **Q: My skill isn't loading**  
 A: Check that SKILL.md exists in `skills/<name>/` and the skill is listed in settings.json.
 
 **Q: Hooks aren't running**  
-A: Run `npx husky install` to set up git hooks, then verify with `coding-harness doctor`.
+A: Run `npx husky install` to set up git hooks, then verify with `amber-protocol doctor`.

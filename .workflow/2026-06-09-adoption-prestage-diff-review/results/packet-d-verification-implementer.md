@@ -10,7 +10,7 @@ Status: DONE
 - `npm test`: passed, 90 tests.
 - `npm run manifests`: passed, `Errors: 0`.
 - Workflow artifact verification: passed.
-- StockAgents boundary check: selected Harness files remained absent.
+- sample boundary check: selected Harness files remained absent.
 
 ## Notes
 

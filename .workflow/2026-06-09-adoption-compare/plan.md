@@ -8,7 +8,7 @@ Goal: implement read-only comparison for generated adoption report artifacts.
 - `adoption compare --base <file> --head <file> --output <file>` writes a markdown diff only to the explicit output path.
 - Existing output files are never overwritten.
 - Comparison reports target equality, generated timestamps, audit metric deltas, candidate-command changes, and unknown changes.
-- StockAgents timestamped reports can be compared.
+- sample timestamped reports can be compared.
 - Full verification passes.
 
 ## Boundaries
@@ -23,5 +23,5 @@ Goal: implement read-only comparison for generated adoption report artifacts.
 
 - Packet A: RED tests.
 - Packet B: core and CLI implementation.
-- Packet C: StockAgents smoke and docs.
+- Packet C: sample smoke and docs.
 - Packet D: verification and workflow closeout.

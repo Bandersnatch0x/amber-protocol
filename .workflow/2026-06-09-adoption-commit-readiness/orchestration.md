@@ -11,7 +11,7 @@ Mode: simulated subagent-driven-development
    - Produce coherent commit candidate groups.
 
 3. `packet-c-boundary-review`
-   - Review groups for V1 boundary and StockAgents safety.
+   - Review groups for V1 boundary and sample safety.
 
 4. `packet-d-verification`
    - Run verification and close the workflow.
@@ -26,8 +26,8 @@ Each packet requires:
 
 ## Hard Stops
 
-- Stop before writing to `D:\code_space\trae-project\StockAgents`.
-- Stop before running StockAgents commands.
+- Stop before writing to `D:\code_space\trae-project\sample`.
+- Stop before running sample commands.
 - Stop before real subagent or Dynamic Workflow execution.
 - Stop before git staging or committing.
 

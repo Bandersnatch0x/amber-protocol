@@ -12,8 +12,8 @@ Mode: simulated subagent-driven-development
    - Implement core helper and CLI route.
    - Preserve no-overwrite and V1 boundaries.
 
-3. `packet-c-stockagents-docs`
-   - Generate a StockAgents decision-record example.
+3. `packet-c-sample-docs`
+   - Generate a sample decision-record example.
    - Update README and examples docs.
 
 4. `packet-d-verification`
@@ -29,7 +29,7 @@ Each packet requires:
 
 ## Hard Stops
 
-- Stop before writing to `D:\code_space\trae-project\StockAgents`.
-- Stop before running StockAgents tests, lint, build, Python modules, or package scripts.
+- Stop before writing to `D:\code_space\trae-project\sample`.
+- Stop before running sample tests, lint, build, Python modules, or package scripts.
 - Stop before real subagent or Dynamic Workflow execution.
 

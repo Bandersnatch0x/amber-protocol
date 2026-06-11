@@ -14,7 +14,7 @@ Prepared the accumulated adoption changes for review by producing commit candida
 
 1. Adoption CLI chain:
    - implementation, tests, README, examples README.
-2. StockAgents review examples:
+2. sample review examples:
    - generated adoption review artifacts under `docs/examples/`.
 3. Prior workflow evidence:
    - completed simulated packet/spec/quality workflow runs.
@@ -28,7 +28,7 @@ Prepared the accumulated adoption changes for review by producing commit candida
 - `npm test`: passed, 90 tests.
 - `npm run manifests`: passed, `Errors: 0`.
 - Workflow artifact verification: passed.
-- StockAgents boundary check: passed; selected Harness files remain absent from `D:\code_space\trae-project\StockAgents`.
+- sample boundary check: passed; selected Harness files remain absent from `D:\code_space\trae-project\sample`.
 
 ## V1 Boundary
 

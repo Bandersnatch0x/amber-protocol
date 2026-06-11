@@ -11,12 +11,12 @@
   "packets": [
     { "id": "packet-a-tests", "status": "completed" },
     { "id": "packet-b-implementation", "status": "completed" },
-    { "id": "packet-c-stockagents-docs", "status": "completed" },
+    { "id": "packet-c-sample-docs", "status": "completed" },
     { "id": "packet-d-verification", "status": "completed" }
   ],
   "verification": {
     "targeted": "passing: node --test tests/harness-cli.test.js",
-    "stockagents_smoke": "passing: docs/examples/stockagents-adoption-bundle generated; StockAgents root boundary clean",
+    "sample_smoke": "passing: docs/examples/sample-adoption-bundle generated; sample root boundary clean",
     "relative_bundle_smoke": "passing: node ../../scripts/harness.js adoption bundle from docs/examples",
     "npm_test": "passing: npm test (79 tests)",
     "manifests": "passing: npm run manifests (Errors: 0)",

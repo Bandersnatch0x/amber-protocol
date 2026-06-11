@@ -8,7 +8,7 @@ Success criteria:
 - The target repository is not initialized automatically.
 - The target repository root files are not overwritten.
 - Report generation is deterministic enough to test.
-- StockAgents can be used as a real target smoke test.
+- sample can be used as a real target smoke test.
 
 Constraints:
 
@@ -22,5 +22,5 @@ Verification:
 - Add failing tests first.
 - Run targeted tests.
 - Run `npm test`.
-- Smoke test against `D:\code_space\trae-project\StockAgents`.
+- Smoke test against `D:\code_space\trae-project\sample`.
 

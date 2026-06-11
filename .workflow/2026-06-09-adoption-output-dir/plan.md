@@ -13,7 +13,7 @@ Success criteria:
 Verification:
 
 - CLI regression test.
-- StockAgents smoke test.
+- sample smoke test.
 - `npm test`.
 - Workflow artifact verification.
 

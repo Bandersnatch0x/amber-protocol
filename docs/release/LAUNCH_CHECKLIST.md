@@ -21,7 +21,6 @@
 - [x] Release assets ready
   - [x] CHANGELOG.md
   - [x] RELEASE_NOTES.md
-  - [x] MIGRATION_GUIDE.md
   - [x] Blog post
   - [x] Demo script
 - [x] Version bumped to 1.0.0 in package.json
@@ -60,15 +59,15 @@
 ### Twitter/X Thread
 
 **Tweet 1/5:**
-🚀 Coding Harness Phase B v1.0.0 is now GA!
+🚀 Amber Protocol Phase B v1.0.0 is now GA!
 Security audits, automated migration, skill plugins, and agent profiles — all in one tool.
-npm install -g coding-harness
+npm install -g amber-protocol
 
 **Tweet 2/5:**
 🔒 Built-in security audit scans for dependency vulns, hardcoded secrets, and permission issues. Zero config required.
 
 **Tweet 3/5:**
-🔄 Migrating from V5.5? One command: `coding-harness migrate --dry-run`
+🔄 Migrating from V5.5? One command: `amber-protocol migrate --dry-run`
 Preview changes, apply, or rollback. No guessing.
 
 **Tweet 4/5:**
@@ -82,7 +81,7 @@ Links below 👇
 ### Discord Announcement
 
 ```
-@everyone 🚀 Coding Harness Phase B v1.0.0 is now Generally Available!
+@everyone 🚀 Amber Protocol Phase B v1.0.0 is now Generally Available!
 
 What's new:
 🔒 Built-in security audit (deps, secrets, permissions)
@@ -92,7 +91,7 @@ What's new:
 🪝 Lifecycle hooks for tool execution
 
 Get started:
-npm install -g coding-harness
+npm install -g amber-protocol
 
 Read the announcement: [blog post link]
 Migration guide: [migration guide link]

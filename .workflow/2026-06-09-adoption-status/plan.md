@@ -8,7 +8,7 @@ Goal: implement a read-only status summary for generated adoption artifacts.
 - `adoption status --reports-dir <dir> --index <file> --json` includes index validation status.
 - `adoption status --reports-dir <dir> --index <file> --output <file>` writes markdown status only to an explicit unused path.
 - Existing output files are never overwritten.
-- StockAgents examples produce a `wait` status with blockers and a review-oriented next safe action.
+- sample examples produce a `wait` status with blockers and a review-oriented next safe action.
 - Full verification passes.
 
 ## Boundaries
@@ -23,5 +23,5 @@ Goal: implement a read-only status summary for generated adoption artifacts.
 
 - Packet A: RED tests, spec review, quality review.
 - Packet B: implementation, spec review, quality review.
-- Packet C: StockAgents smoke and docs, spec review, quality review.
+- Packet C: sample smoke and docs, spec review, quality review.
 - Packet D: final verification and workflow closeout.

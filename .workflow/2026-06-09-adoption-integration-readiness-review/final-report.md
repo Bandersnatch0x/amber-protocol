@@ -26,7 +26,7 @@ Reviewed the accumulated adoption workflow changes and generated examples for re
 - `npm test`: passed, 90 tests.
 - `npm run manifests`: passed, `Errors: 0`.
 - Workflow artifact verification: passed.
-- StockAgents boundary check: passed; selected Harness files remain absent from `D:\code_space\trae-project\StockAgents`.
+- sample boundary check: passed; selected Harness files remain absent from `D:\code_space\trae-project\sample`.
 
 ## V1 Boundary
 

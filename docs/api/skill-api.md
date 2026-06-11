@@ -1,6 +1,6 @@
 # Skill API
 
-Skills extend Coding Harness with custom capabilities. This reference covers skill creation, registration, and lifecycle.
+Skills extend Amber Protocol with custom capabilities. This reference covers skill creation, registration, and lifecycle.
 
 ## Skill Structure
 
@@ -57,7 +57,7 @@ Skills are registered in `settings.json`:
 List all registered skills.
 
 ```js
-const skills = require("coding-harness/skills");
+const skills = require("amber-protocol/skills");
 const list = await skills.list();
 // => [{ name: "code-reviewer", path: "skills/code-reviewer/SKILL.md" }]
 ```

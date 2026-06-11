@@ -13,7 +13,7 @@ Adds a V1-safe adoption review chain for existing projects. The new adoption com
   - `adoption selected-files`
 - Extend adoption CLI help and README coverage.
 - Add tests for overwrite refusal, decision parsing, dry-run enforcement, selected-file validation, and unsafe include paths.
-- Add StockAgents review artifacts under `docs/examples/`.
+- Add sample review artifacts under `docs/examples/`.
 - Record simulated workflow packet/spec/quality review evidence under `.workflow/`.
 - Document future live loop scheduling readiness as a future-only track.
 
@@ -24,7 +24,7 @@ Adds a V1-safe adoption review chain for existing projects. The new adoption com
 - No target project writes.
 - No target project command execution.
 - No automatic overwrite.
-- StockAgents was used as a read-only validation target only.
+- sample was used as a read-only validation target only.
 
 ## Verification
 
@@ -32,12 +32,12 @@ Adds a V1-safe adoption review chain for existing projects. The new adoption com
 - `npm test`: passed, 90 tests.
 - `npm run manifests`: passed, `Errors: 0`.
 - Workflow artifact verification passed for all staged workflow evidence.
-- StockAgents boundary check passed: selected Harness files remain absent from `D:\code_space\trae-project\StockAgents`.
+- sample boundary check passed: selected Harness files remain absent from `D:\code_space\trae-project\sample`.
 
 ## Commit Structure
 
 - `8c4fae7` Add V1-safe adoption review commands
-- `a3c8cb7` Add StockAgents adoption review artifacts
+- `a3c8cb7` Add sample adoption review artifacts
 - `dc8479f` Record adoption workflow evidence
 - `a652747` Document future live loop readiness boundary
 

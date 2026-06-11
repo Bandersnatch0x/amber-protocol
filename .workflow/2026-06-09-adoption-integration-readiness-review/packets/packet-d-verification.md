@@ -10,10 +10,10 @@ Run final repository and workflow verification.
 - Run full tests.
 - Run manifest validation.
 - Verify this workflow artifact.
-- Confirm StockAgents boundary files remain absent.
+- Confirm sample boundary files remain absent.
 
 ## Do Not
 
-- Execute StockAgents project commands.
-- Write StockAgents files.
+- Execute sample project commands.
+- Write sample files.
 

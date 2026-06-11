@@ -13,8 +13,8 @@ Mode: simulated subagent-driven-development
    - Reuse scaffold dry-run preview.
    - Preserve no-overwrite behavior.
 
-3. `packet-c-stockagents-docs`
-   - Generate StockAgents apply-plan example.
+3. `packet-c-sample-docs`
+   - Generate sample apply-plan example.
    - Update README and examples docs.
 
 4. `packet-d-verification`
@@ -31,7 +31,7 @@ Each packet requires:
 ## Hard Stops
 
 - Stop before non-dry-run apply behavior.
-- Stop before writing to `D:\code_space\trae-project\StockAgents`.
-- Stop before running StockAgents commands.
+- Stop before writing to `D:\code_space\trae-project\sample`.
+- Stop before running sample commands.
 - Stop before real subagent or Dynamic Workflow execution.
 

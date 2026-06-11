@@ -363,7 +363,7 @@ Timeline (审计日志)
     "total": 50000,
     "used": 12345
   },
-  "worktree": ".harness/worktrees/550e8400-e29b-41d4-a716-446655440000",
+  "worktree": ".amber/worktrees/550e8400-e29b-41d4-a716-446655440000",
   "metadata": {
     "agent": "claude",
     "branch": "feature/auth"
@@ -443,7 +443,7 @@ Timeline (审计日志)
 {"timestamp":"2026-06-10T14:32:00.000Z","type":"stage_completed","stage":"capture","data":{"duration":114211}}
 {"timestamp":"2026-06-10T14:32:00.100Z","type":"gate_triggered","data":{"gateId":"user-approval-plan","type":"user-approval"}}
 {"timestamp":"2026-06-10T14:33:15.500Z","type":"gate_passed","data":{"gateId":"user-approval-plan","approvedBy":"human"}}
-{"timestamp":"2026-06-10T14:33:20.000Z","type":"checkpoint_created","stage":"capture","data":{"checkpointPath":".harness/sessions/550e8400/checkpoints/capture.json"}}
+{"timestamp":"2026-06-10T14:33:20.000Z","type":"checkpoint_created","stage":"capture","data":{"checkpointPath":".amber/sessions/550e8400/checkpoints/capture.json"}}
 ```
 
 ---
@@ -595,7 +595,7 @@ Timeline (审计日志)
 1. **读取时检查**:
    ```javascript
    if (manifest.schemaVersion !== CURRENT_VERSION) {
-     throw new Error(`Unsupported schema version ${manifest.schemaVersion}. Run 'harness migrate'.`);
+     throw new Error(`Unsupported schema version ${manifest.schemaVersion}. Run 'amber migrate'.`);
    }
    ```
 
@@ -624,7 +624,7 @@ Timeline (审计日志)
 ## 数据存储位置
 
 ```
-.harness/
+.amber/
 ├── sessions/
 │   └── <session-id>/
 │       ├── manifest.json          # Session Manifest
@@ -655,13 +655,13 @@ Timeline (审计日志)
 
 ```bash
 # 验证 route
-node scripts/harness.js route validate routes/feature-standard.route.json
+node scripts/amber.js route validate routes/feature-standard.route.json
 
 # 验证 session manifest
-node scripts/harness.js session validate <session-id>
+node scripts/amber.js session validate <session-id>
 
 # 验证 timeline 完整性
-node scripts/harness.js session verify-timeline <session-id>
+node scripts/amber.js session verify-timeline <session-id>
 ```
 
 ### 编程式验证

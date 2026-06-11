@@ -4,7 +4,7 @@ Status: APPROVED
 
 ## Spec Compliance
 
-- Verification covered targeted CLI behavior, full project tests, manifest validation, workflow artifact structure, and StockAgents write boundary.
+- Verification covered targeted CLI behavior, full project tests, manifest validation, workflow artifact structure, and sample write boundary.
 - The selected-files workflow completed without requiring target project mutation.
 - V1 hard stops were preserved.
 

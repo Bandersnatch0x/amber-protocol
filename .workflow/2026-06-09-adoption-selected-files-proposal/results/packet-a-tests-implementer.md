@@ -17,7 +17,7 @@ Status: DONE
 ## Boundary Notes
 
 - Tests use temporary directories only.
-- No StockAgents writes.
+- No sample writes.
 - No target project commands.
 - No Dynamic Workflow or live subagent execution.
 

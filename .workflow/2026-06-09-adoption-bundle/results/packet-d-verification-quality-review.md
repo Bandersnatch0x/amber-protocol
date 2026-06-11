@@ -6,7 +6,7 @@ Status: APPROVED
 
 - Verification commands are matched to the changed surface area.
 - The bundle smoke uses `docs/examples` as the working directory to exercise documented relative usage.
-- The generated StockAgents bundle manifest is machine-readable and reviewable.
+- The generated sample bundle manifest is machine-readable and reviewable.
 - Documentation and tests are aligned with the implemented CLI behavior.
 
 ## Residual Risk

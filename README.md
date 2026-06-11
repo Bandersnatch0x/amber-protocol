@@ -12,7 +12,7 @@ Amber Protocol is a repository-local governance and control layer for agent-assi
 
 The current product is deliberately conservative. It creates review artifacts, dry-run plans, approval records, workflow-pack metadata, and maintenance proposals. It does not run Dynamic Workflows, invoke live subagents, execute target project commands, or automatically rewrite old project files.
 
-Amber Protocol (formerly Coding Harness) is a repo-local governance layer for coding agents. It is not trying to become a general agent framework or execution platform. It is trying to constrain, verify, audit, and hand off agent work safely inside a repository. The legacy `coding-harness` bin and `.harness` state remain readable for one release; see `docs/release/MIGRATION_GUIDE.md`.
+Amber Protocol (formerly Coding Harness) is a repo-local governance layer for coding agents. It is not trying to become a general agent framework or execution platform. It is trying to constrain, verify, audit, and hand off agent work safely inside a repository. Legacy `coding-harness` entrypoints and `.harness` state stay readable through built-in shims and the `amber migrate` commands.
 
 ![Amber Protocol safe bootstrap infographic](./assets/readme/amber-protocol-cover.png)
 

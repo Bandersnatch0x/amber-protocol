@@ -5,7 +5,7 @@ Status: APPROVED
 ## Spec Compliance
 
 - V1 hard stops were preserved.
-- StockAgents remained read-only.
+- sample remained read-only.
 - Git staging and committing remained unused.
 
 ## Result

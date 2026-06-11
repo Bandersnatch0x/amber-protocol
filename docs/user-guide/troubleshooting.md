@@ -1,14 +1,14 @@
 # Troubleshooting
 
-Common issues and their solutions when using Coding Harness.
+Common issues and their solutions when using Amber Protocol.
 
 ## Installation Issues
 
-### `command not found: coding-harness`
+### `command not found: amber-protocol`
 **Cause:** npm global bin directory not in PATH.  
 **Fix:** Add npm global bin to PATH or use npx:
 ```bash
-npx coding-harness --version
+npx amber-protocol --version
 ```
 
 ### `EACCES: permission denied`
@@ -16,7 +16,7 @@ npx coding-harness --version
 **Fix:** Use a Node version manager (nvm, fnm, volta):
 ```bash
 volta install node
-npm install -g coding-harness
+npm install -g amber-protocol
 ```
 
 ## Initialization Issues
@@ -25,14 +25,14 @@ npm install -g coding-harness
 **Cause:** Trying to initialize in a non-empty directory.  
 **Fix:** Use `--force` to overwrite, or initialize in an empty directory:
 ```bash
-coding-harness init --force
+amber-protocol init --force
 ```
 
 ### `doctor: missing required files`
-**Cause:** Some harness files are missing after init.  
+**Cause:** Some Amber files are missing after init.  
 **Fix:** Re-run init or create missing files manually:
 ```bash
-coding-harness init --repair
+amber-protocol init --repair
 ```
 
 ## Migration Issues
@@ -41,7 +41,7 @@ coding-harness init --repair
 **Cause:** Settings schema cannot be migrated automatically.  
 **Fix:** Run validation to see specific issues:
 ```bash
-coding-harness migrate --validate
+amber-protocol migrate --validate
 ```
 
 ### `rollback: no backups found`
@@ -57,30 +57,30 @@ Enable debug logging to diagnose issues:
 
 ```bash
 # Set debug level
-export CODING_HARNESS_DEBUG=1
+export AMBER_DEBUG=1
 
 # Run with verbose output
-coding-harness --verbose doctor
+amber-protocol --verbose doctor
 ```
 
 ## Log Files
 
 Logs are stored in:
-- **Linux/macOS:** `~/.coding-harness/logs/`
-- **Windows:** `%USERPROFILE%\.coding-harness\logs\`
+- **Linux/macOS:** `~/.amber-protocol/logs/`
+- **Windows:** `%USERPROFILE%\.amber-protocol\logs\`
 
 ```bash
 # View recent logs
-coding-harness logs --tail 50
+amber-protocol logs --tail 50
 ```
 
 ## Reporting Bugs
 
 1. Check existing issues in the project issue tracker
-2. Run `coding-harness doctor --report` to gather diagnostics
+2. Run `amber-protocol doctor --report` to gather diagnostics
 3. Include in your report:
    - Node version (`node --version`)
-   - Coding Harness version (`coding-harness --version`)
+   - Amber Protocol version (`amber-protocol --version`)
    - OS and version
    - Steps to reproduce
    - Error output with `--verbose`

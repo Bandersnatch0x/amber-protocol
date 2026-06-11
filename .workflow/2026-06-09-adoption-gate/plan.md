@@ -9,7 +9,7 @@ Goal: implement a read-only readiness gate for generated adoption reports.
 - `adoption gate --report <file> --output <file>` writes a markdown gate report only to an explicit unused path.
 - Existing output files are never overwritten.
 - Gate findings explain why the decision is `ready` or `wait`.
-- StockAgents examples produce a conservative `wait` decision without modifying the target project.
+- sample examples produce a conservative `wait` decision without modifying the target project.
 - Full verification passes.
 
 ## Conservative Gate Rules
@@ -32,5 +32,5 @@ Goal: implement a read-only readiness gate for generated adoption reports.
 
 - Packet A: RED tests, spec review, quality review.
 - Packet B: implementation, spec review, quality review.
-- Packet C: StockAgents smoke and docs, spec review, quality review.
+- Packet C: sample smoke and docs, spec review, quality review.
 - Packet D: final verification and workflow closeout.

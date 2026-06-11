@@ -10,5 +10,5 @@ Final verification:
 
 Additional smoke:
 
-- `adoption list --reports-dir D:\code_space\coding-harness\docs\examples\adoptions --json`: status `0`, 2 StockAgents reports.
+- `adoption list --reports-dir D:\code_space\coding-harness\docs\examples\adoptions --json`: status `0`, 2 sample reports.
 - `adoption index --reports-dir D:\code_space\coding-harness\docs\examples\adoptions --output D:\code_space\coding-harness\docs\examples\adoptions-index.md --json`: status `0`, 2 indexed reports.

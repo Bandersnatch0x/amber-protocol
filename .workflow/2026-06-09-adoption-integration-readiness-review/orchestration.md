@@ -14,7 +14,7 @@ Mode: simulated subagent-driven-development
    - Review changed code and tests for maintainability issues.
 
 4. `packet-d-verification`
-   - Run full verification and StockAgents boundary check.
+   - Run full verification and sample boundary check.
 
 ## Review Rule
 
@@ -26,7 +26,7 @@ Each packet requires:
 
 ## Hard Stops
 
-- Stop before writing to `D:\code_space\trae-project\StockAgents`.
-- Stop before running StockAgents commands.
+- Stop before writing to `D:\code_space\trae-project\sample`.
+- Stop before running sample commands.
 - Stop before real subagent or Dynamic Workflow execution.
 

@@ -11,13 +11,13 @@
   "packets": [
     { "id": "packet-a-tests", "status": "completed" },
     { "id": "packet-b-implementation", "status": "completed" },
-    { "id": "packet-c-stockagents-docs", "status": "completed" },
+    { "id": "packet-c-sample-docs", "status": "completed" },
     { "id": "packet-d-verification", "status": "completed" }
   ],
   "verification": {
     "red": "passed",
     "targeted": "passed",
-    "stockagents_smoke": "passed",
+    "sample_smoke": "passed",
     "npm_test": "passed",
     "manifests": "passed",
     "workflow_artifact": "passed"

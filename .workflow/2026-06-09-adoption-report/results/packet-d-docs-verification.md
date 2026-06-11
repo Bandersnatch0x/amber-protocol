@@ -3,8 +3,8 @@
 Accepted:
 
 - Updated `README.md` with `adoption report` usage.
-- Updated StockAgents walkthrough with the report command and result.
-- Generated `docs/examples/stockagents-adoption-report.md`.
+- Updated sample walkthrough with the report command and result.
+- Generated `docs/examples/sample-adoption-report.md`.
 
 Verification:
 

@@ -4,7 +4,7 @@ Packets:
 
 - Packet A: RED tests for list/index behavior.
 - Packet B: implementation.
-- Packet C: StockAgents reports smoke and docs.
+- Packet C: sample reports smoke and docs.
 - Packet D: verification and final report.
 
 Integration policy:

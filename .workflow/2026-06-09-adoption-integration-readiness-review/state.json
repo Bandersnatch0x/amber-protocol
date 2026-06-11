@@ -22,6 +22,6 @@
     "npm_test": "passed",
     "manifests": "passed",
     "workflow_artifact": "passed",
-    "stockagents_boundary": "passed"
+    "sample_boundary": "passed"
   }
 }

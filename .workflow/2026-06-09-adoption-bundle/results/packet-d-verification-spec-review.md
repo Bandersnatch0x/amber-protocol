@@ -8,7 +8,7 @@ Status: APPROVED
 - Full repository tests pass.
 - Manifest validation still passes.
 - Workflow artifact verification passes.
-- StockAgents remains a read-only test target with no Harness bootstrap files written to its root.
+- sample remains a read-only test target with no Harness bootstrap files written to its root.
 - V1 exclusions remain intact:
   - no Dynamic Workflow implementation
   - no live subagent orchestration

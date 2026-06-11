@@ -26,27 +26,27 @@ Review focus:
 - `selected-files` rejects unknown and unsafe `--include` paths.
 - Tests cover overwrite refusal and machine-readable JSON errors.
 
-## Group 2: StockAgents Review Examples
+## Group 2: sample Review Examples
 
 Suggested commit message:
 
 ```text
-Add StockAgents adoption review artifacts
+Add sample adoption review artifacts
 ```
 
 Files:
 
-- `docs/examples/stockagents-adoption-apply-plan.md`
-- `docs/examples/stockagents-adoption-decision-record-decisions.md`
-- `docs/examples/stockagents-adoption-decision-record.md`
-- `docs/examples/stockagents-adoption-next-actions-cli.md`
-- `docs/examples/stockagents-adoption-selected-files.md`
+- `docs/examples/sample-adoption-apply-plan.md`
+- `docs/examples/sample-adoption-decision-record-decisions.md`
+- `docs/examples/sample-adoption-decision-record.md`
+- `docs/examples/sample-adoption-next-actions-cli.md`
+- `docs/examples/sample-adoption-selected-files.md`
 
 Review focus:
 
 - Artifacts live under `docs/examples/`.
 - Artifacts document review state only.
-- Artifacts do not imply StockAgents was initialized, modified, or tested.
+- Artifacts do not imply sample was initialized, modified, or tested.
 
 ## Group 3: Prior Workflow Evidence
 
@@ -95,6 +95,6 @@ None currently identified.
 
 ## Hard Boundary
 
-- Do not include any files from `D:\code_space\trae-project\StockAgents`.
+- Do not include any files from `D:\code_space\trae-project\sample`.
 - Do not stage or commit from this workflow without an explicit follow-up request.
 

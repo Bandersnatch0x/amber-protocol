@@ -11,7 +11,7 @@ Implemented a V1-safe `adoption selected-files` command that creates an explicit
 - `scripts/lib/harness-core.js`
 - `scripts/harness.js`
 - `tests/harness-cli.test.js`
-- `docs/examples/stockagents-adoption-selected-files.md`
+- `docs/examples/sample-adoption-selected-files.md`
 - `README.md`
 - `docs/examples/README.md`
 
@@ -19,7 +19,7 @@ Implemented a V1-safe `adoption selected-files` command that creates an explicit
 
 - Packet A tests: implementer, spec review, and quality review approved.
 - Packet B implementation: implementer, spec review, and quality review approved.
-- Packet C StockAgents docs: implementer, spec review, and quality review approved.
+- Packet C sample docs: implementer, spec review, and quality review approved.
 - Packet D verification: implementer, spec review, and quality review approved.
 
 ## Verification
@@ -29,7 +29,7 @@ Implemented a V1-safe `adoption selected-files` command that creates an explicit
 - `npm test`: passed, 89 tests.
 - `npm run manifests`: passed, `Errors: 0`.
 - Workflow artifact verification: passed.
-- StockAgents boundary check: passed; selected files remain absent from `D:\code_space\trae-project\StockAgents`.
+- sample boundary check: passed; selected files remain absent from `D:\code_space\trae-project\sample`.
 
 ## V1 Boundary
 

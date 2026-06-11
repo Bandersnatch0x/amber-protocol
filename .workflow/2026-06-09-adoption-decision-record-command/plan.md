@@ -18,7 +18,7 @@ node scripts/harness.js adoption decision-record --bundle-dir <bundle> --output 
 - Default decisions are `pending`, not approved.
 - Record includes Gate A/B/C, evidence sources, V1 boundaries, and next safe action.
 - JSON output is machine-readable.
-- StockAgents smoke writes only under `docs/examples/`.
+- sample smoke writes only under `docs/examples/`.
 
 ## V1 Boundary
 

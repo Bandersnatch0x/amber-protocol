@@ -15,15 +15,15 @@ Generated bundle files:
 - `gate.md`
 - `manifest.json`
 
-## StockAgents Smoke
+## sample Smoke
 
 Generated:
 
-- `docs/examples/stockagents-adoption-bundle/`
+- `docs/examples/sample-adoption-bundle/`
 
 Result:
 
-- target: `D:\code_space\trae-project\StockAgents`
+- target: `D:\code_space\trae-project\sample`
 - gate decision: `wait`
 - errors: 0
 - target project files copied: false

@@ -9,7 +9,7 @@ Status: ready for PR review.
 ## Local Commits
 
 - `8c4fae7` Add V1-safe adoption review commands
-- `a3c8cb7` Add StockAgents adoption review artifacts
+- `a3c8cb7` Add sample adoption review artifacts
 - `dc8479f` Record adoption workflow evidence
 - `a652747` Document future live loop readiness boundary
 
@@ -19,7 +19,7 @@ Status: ready for PR review.
 - Full test suite: passed, 90 tests.
 - Manifest validation: passed, `Errors: 0`.
 - Workflow verification: passed for adoption workflow evidence.
-- StockAgents boundary: passed; target bootstrap files remain absent.
+- sample boundary: passed; target bootstrap files remain absent.
 
 ## Findings
 

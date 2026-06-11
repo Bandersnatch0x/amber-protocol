@@ -15,7 +15,7 @@ Goal: generate a reviewable adoption evidence bundle from existing adoption arti
   - `manifest.json`
 - Manifest records generated files, source paths, target, latest report, gate decision, next safe action, and safety boundaries.
 - Bundle generation reads adoption artifacts only and does not copy or mutate target project files.
-- StockAgents examples can produce a bundle.
+- sample examples can produce a bundle.
 - Full verification passes.
 
 ## Boundaries
@@ -30,5 +30,5 @@ Goal: generate a reviewable adoption evidence bundle from existing adoption arti
 
 - Packet A: RED tests, spec review, quality review.
 - Packet B: implementation, spec review, quality review.
-- Packet C: StockAgents smoke and docs, spec review, quality review.
+- Packet C: sample smoke and docs, spec review, quality review.
 - Packet D: final verification and workflow closeout.

@@ -16,7 +16,7 @@ Tracked modified files:
 Untracked artifact groups:
 
 - 7 workflow directories under `.workflow/`
-- 5 StockAgents adoption example files under `docs/examples/`
+- 5 sample adoption example files under `docs/examples/`
 
 ## Notes
 

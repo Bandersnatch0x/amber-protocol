@@ -11,4 +11,4 @@ Final verification:
 
 Boundary check:
 
-- StockAgents root Harness files remained absent: `AGENTS.md`, `CLAUDE.md`, `feature_list.json`, `PROGRESS.md`, `session-handoff.md`, `clean-state-checklist.md`, and `evaluator-rubric.md`.
+- sample root Harness files remained absent: `AGENTS.md`, `CLAUDE.md`, `feature_list.json`, `PROGRESS.md`, `session-handoff.md`, `clean-state-checklist.md`, and `evaluator-rubric.md`.

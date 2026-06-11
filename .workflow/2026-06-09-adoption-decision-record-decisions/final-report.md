@@ -31,17 +31,17 @@ Supported statuses:
 - `tests/harness-cli.test.js`
 - `README.md`
 - `docs/examples/README.md`
-- `docs/examples/stockagents-adoption-decision-record-decisions.md`
+- `docs/examples/sample-adoption-decision-record-decisions.md`
 
-## StockAgents Smoke
+## sample Smoke
 
 Generated:
 
-- `docs/examples/stockagents-adoption-decision-record-decisions.md`
+- `docs/examples/sample-adoption-decision-record-decisions.md`
 
 Result:
 
-- target: `D:\code_space\trae-project\StockAgents`
+- target: `D:\code_space\trae-project\sample`
 - approval status: `recorded`
 - Gate A: `deferred`
 - Gate B: `deferred`
@@ -59,6 +59,6 @@ Result:
 
 - Dynamic Workflow execution: not implemented
 - Live subagent orchestration: not used
-- StockAgents writes: not used
-- StockAgents command execution: not used
+- sample writes: not used
+- sample command execution: not used
 - Automatic overwrite: not used

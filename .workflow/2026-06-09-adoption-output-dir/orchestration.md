@@ -4,7 +4,7 @@ Packets:
 
 - Packet A: RED tests.
 - Packet B: implementation.
-- Packet C: StockAgents smoke and docs.
+- Packet C: sample smoke and docs.
 - Packet D: final verification.
 
 Boundary:

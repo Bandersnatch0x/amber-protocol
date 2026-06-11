@@ -2,7 +2,7 @@
 
 ## Objective
 
-Review proposed groups against V1 boundaries and StockAgents safety.
+Review proposed groups against V1 boundaries and sample safety.
 
 ## Do
 

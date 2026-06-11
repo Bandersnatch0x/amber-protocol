@@ -4,7 +4,7 @@ Status: APPROVED
 
 ## Review
 
-- The test is focused on the new behavior and avoids coupling to StockAgents.
+- The test is focused on the new behavior and avoids coupling to sample.
 - Fixture data is minimal but representative: manifest, gate, status, and latest adoption report.
 - Assertions check outcome shape rather than incidental formatting.
 

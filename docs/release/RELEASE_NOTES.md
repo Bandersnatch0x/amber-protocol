@@ -40,7 +40,6 @@ We've streamlined the configuration format. Key changes from V5.5:
 - Deprecated V5.5-only fields are removed
 - Skills and profiles are now first-class concepts
 
-Full details in the [Migration Guide](./MIGRATION_GUIDE.md).
 
 ## Getting Started
 

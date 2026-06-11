@@ -8,7 +8,7 @@ Mode: simulated subagent-driven-development
    - Review changed implementation and tests for defects.
 
 2. `packet-b-docs-artifacts-review`
-   - Review README, examples README, and generated StockAgents artifacts.
+   - Review README, examples README, and generated sample artifacts.
 
 3. `packet-c-boundary-review`
    - Review V1 safety boundaries and target isolation.
@@ -26,8 +26,8 @@ Each packet requires:
 
 ## Hard Stops
 
-- Stop before writing to `D:\code_space\trae-project\StockAgents`.
-- Stop before running StockAgents commands.
+- Stop before writing to `D:\code_space\trae-project\sample`.
+- Stop before running sample commands.
 - Stop before real subagent or Dynamic Workflow execution.
 - Stop before git staging or committing.
 
