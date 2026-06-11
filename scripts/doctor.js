@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-const { doctor, parseArgs, printResult } = require("./lib/harness-core");
+const { doctor, parseArgs, printResult } = require("./lib/amber-core");
 
 function main() {
   const args = parseArgs(process.argv.slice(2));

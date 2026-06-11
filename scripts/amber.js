@@ -44,7 +44,7 @@ const {
 	writeAdoptionNextActions,
 	writeAdoptionSelectedFiles,
 	writeAdoptionReportsIndex,
-} = require("./lib/harness-core");
+} = require("./lib/amber-core");
 
 const {
 	listRoutes,

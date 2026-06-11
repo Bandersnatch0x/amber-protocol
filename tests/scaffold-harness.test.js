@@ -13,7 +13,7 @@ const {
   OPTIONAL_STARTER_WIKI_FILES,
   scaffoldHarness,
   validateContinuousImprovementStateFile
-} = require("../scripts/lib/harness-core");
+} = require("../scripts/lib/amber-core");
 
 function tempDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `coding-harness-${name}-`));
