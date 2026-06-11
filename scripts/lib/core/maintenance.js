@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-dir-resolver");
 
 const {
 	pathExists,
@@ -204,7 +205,7 @@ function readRegressionProposal(evidencePath, taskDir, targetRoot) {
 }
 
 function extractRegressionProposals(targetRoot) {
-	const executionsRoot = path.join(targetRoot, ".harness", "executions");
+	const executionsRoot = path.join(resolveStateDirForRead(targetRoot), "executions");
 	if (!pathExists(executionsRoot)) {
 		return [];
 	}
@@ -351,8 +352,7 @@ function proposeMaintenance(target, options = {}) {
 	}
 
 	const proposalRoot = path.join(
-		inspection.target,
-		".harness",
+		resolveStateDirForCreate(inspection.target),
 		"maintenance",
 		"proposals",
 	);

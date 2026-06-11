@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-dir-resolver");
 
 const {
 	pathExists,
@@ -46,8 +47,8 @@ function prepareTaskExecution(
 		};
 	}
 
-	const worktreeRelativePath = path.join(".harness", "worktrees", taskId);
-	const executionRelativePath = path.join(".harness", "executions", taskId);
+	const worktreeRelativePath = path.join(".amber", "worktrees", taskId);
+	const executionRelativePath = path.join(".amber", "executions", taskId);
 	const worktreePath = path.join(targetRoot, worktreeRelativePath);
 	const executionPath = path.join(targetRoot, executionRelativePath);
 	fs.mkdirSync(worktreePath, { recursive: true });
@@ -180,7 +181,7 @@ function inspectTaskResult(target, taskIdInput) {
 		};
 	}
 
-	const executionPath = path.join(targetRoot, ".harness", "executions", taskId);
+	const executionPath = path.join(resolveStateDirForRead(targetRoot), "executions", taskId);
 	const ledgerPath = path.join(executionPath, "ledger.json");
 	const evidencePath = path.join(executionPath, "evidence.json");
 	const replayPath = path.join(executionPath, "replay.md");
@@ -222,8 +223,13 @@ function inspectTaskResult(target, taskIdInput) {
 	};
 }
 
-function orchestrationPaths(targetRoot, taskId) {
-	const root = path.join(targetRoot, ".harness", "orchestration", taskId);
+function orchestrationPaths(targetRoot, taskId, options = {}) {
+	// Dispatch creates a new orchestration record (canonical .amber);
+	// status/review operate on the record wherever it already lives.
+	const stateDir = options.forCreate
+		? resolveStateDirForCreate(targetRoot)
+		: resolveStateDirForRead(targetRoot);
+	const root = path.join(stateDir, "orchestration", taskId);
 	return {
 		root,
 		dispatchPath: path.join(root, "dispatch.json"),

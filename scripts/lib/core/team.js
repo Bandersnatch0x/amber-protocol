@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("node:path");
+const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-dir-resolver");
 
 const {
 	DEFAULT_TEAM_REGISTRY,
@@ -129,8 +130,13 @@ function findTeamVersion(registry, version) {
 	};
 }
 
-function teamStatePaths(targetRoot) {
-	const root = path.join(targetRoot, ".harness", "team");
+function teamStatePaths(targetRoot, options = {}) {
+	// install creates new team state (canonical .amber); inspect/update/
+	// pin/rollback operate on the state wherever it already lives.
+	const stateDir = options.forCreate
+		? resolveStateDirForCreate(targetRoot)
+		: resolveStateDirForRead(targetRoot);
+	const root = path.join(stateDir, "team");
 	return {
 		root,
 		lockPath: path.join(root, "lock.json"),
@@ -249,7 +255,7 @@ function inspectTeamDistribution(target, options = {}) {
 
 function installTeamDistribution(target, options = {}) {
 	const targetRoot = resolveTarget(target);
-	const paths = teamStatePaths(targetRoot);
+	const paths = teamStatePaths(targetRoot, { forCreate: true });
 	const loaded = loadTeamRegistry(options.registry);
 	const errors = [...loaded.errors];
 	const warnings = [...loaded.warnings];
@@ -330,8 +336,8 @@ function buildTeamUpdatePreview(targetRoot, lock, version, release) {
 		toVersion: version,
 		willWrite: false,
 		targetWrites: [
-			".harness/team/lock.json",
-			`.harness/team/snapshots/${version}.json`,
+			".amber/team/lock.json",
+			`.amber/team/snapshots/${version}.json`,
 		],
 		projectFileWrites: release.managedProjectFiles,
 		customizationsPreserved: release.managedProjectFiles.length === 0,

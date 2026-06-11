@@ -120,7 +120,7 @@ test("adoption report aggregates safe trial steps without initializing target", 
   assert.match(report, /## Maintenance/);
   assert.match(report, /No target project files were initialized by this report/);
   assert.equal(fs.existsSync(path.join(target, "AGENTS.md")), false);
-  assert.equal(fs.existsSync(path.join(target, ".harness", "team", "lock.json")), false);
+  assert.equal(fs.existsSync(path.join(target, ".amber", "team", "lock.json")), false);
 });
 
 test("adoption report output-dir creates non-conflicting timestamped reports", () => {

@@ -35,7 +35,7 @@ test("maintenance inspect detects stale docs upgrade guidance and rule-pack drif
   const target = initializedTeamTarget("inspect");
   const overviewPath = path.join(target, "docs", "wiki", "product", "overview.md");
   fs.writeFileSync(overviewPath, "# Overview\n\nLast Reviewed: 2020-01-01\n\nOld product context.\n");
-  const lockPath = path.join(target, ".harness", "team", "lock.json");
+  const lockPath = path.join(target, ".amber", "team", "lock.json");
   const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
   lock.rulePacks = ["custom.rule-pack.json"];
   fs.writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
@@ -73,7 +73,7 @@ test("maintenance propose writes reviewable gardening proposal without changing 
   const beforeOverview = fs.readFileSync(overviewPath, "utf8");
 
   // Add trace-derived evidence
-  const executionPath = path.join(target, ".harness", "executions", "trace-failure");
+  const executionPath = path.join(target, ".amber", "executions", "trace-failure");
   fs.mkdirSync(executionPath, { recursive: true });
   fs.writeFileSync(path.join(executionPath, "evidence.json"), JSON.stringify({
     taskId: "trace-failure",

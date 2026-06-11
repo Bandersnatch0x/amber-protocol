@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { resolveStateDirForRead } = require("../state-dir-resolver");
 
 const {
 	pathExists,
@@ -48,7 +49,7 @@ function dispatchAgentTask(target, options = {}) {
 	}
 	if (
 		!pathExists(
-			path.join(targetRoot, ".harness", "executions", taskId, "ledger.json"),
+			path.join(resolveStateDirForRead(targetRoot), "executions", taskId, "ledger.json"),
 		)
 	) {
 		errors.push(`Prepared task ledger is missing for ${taskId}.`);
@@ -113,7 +114,7 @@ function dispatchAgentTask(target, options = {}) {
 		return { target: targetRoot, task: taskId || null, errors, warnings };
 	}
 
-	const paths = orchestrationPaths(targetRoot, taskId);
+	const paths = orchestrationPaths(targetRoot, taskId, { forCreate: true });
 	fs.mkdirSync(paths.root, { recursive: true });
 	const dispatch = {
 		taskId,
