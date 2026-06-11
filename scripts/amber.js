@@ -54,6 +54,7 @@ const {
 } = require("./lib/route-commands");
 
 const { migrateManifests } = require("./lib/migrate-command");
+const { migrateState, migrateWiki } = require("./lib/state-migration");
 
 const {
 	startSession,
@@ -264,14 +265,21 @@ function commandSummary(command) {
 	}
 	if (command === "migrate") {
 		return [
-			"Migrate session manifests to the current schema version.",
+			"Migrate session manifests to the current schema version, or migrate",
+			"legacy state and wiki naming to the Amber Protocol layout.",
+			"",
+			"Subcommands:",
+			"  state        Copy legacy .harness state into .amber (source kept).",
+			"  wiki         Rename docs/wiki/agent/harness.md to amber.md and fix links.",
+			"  (none)       Migrate session manifests to the current schema version.",
 			"",
 			"Options:",
-			"  --dry-run    Preview changes without writing files.",
+			"  --dry-run    Preview changes without writing files (manifest mode).",
 			"",
 			"Examples:",
-			"  node scripts/harness.js migrate --target <path>",
-			"  node scripts/harness.js migrate --target <path> --dry-run",
+			"  node scripts/amber.js migrate --target <path>",
+			"  node scripts/amber.js migrate state --target <path>",
+			"  node scripts/amber.js migrate wiki --target <path>",
 		].join("\n");
 	}
 	return "Run Coding Harness command.";
@@ -570,26 +578,42 @@ async function run(argv = process.argv.slice(2)) {
 		printResult(result, { json: true });
 		return sessionResult.exitCode;
 	} else if (command === "migrate") {
-		const migrateResult = migrateManifests(args.target || process.cwd(), {
-			dryRun: args.dryRun,
-		});
-		result = {
-			target: args.target,
-			text: migrateResult.message,
-			errors: [],
-			warnings: [],
-		};
-		if (!args.json) {
-			console.log(migrateResult.message);
-			if (migrateResult.logs && migrateResult.logs.length > 0) {
-				for (const log of migrateResult.logs) {
-					console.log(`  ${log}`);
+		const migrateAction = args._ && args._[0];
+		if (migrateAction === "state") {
+			const stateResult = migrateState(args.target || process.cwd());
+			result = {
+				...stateResult,
+				target: args.target || process.cwd(),
+				errors: [
+					...stateResult.errors,
+					...stateResult.failed.map((f) => `validation failed: ${f}`),
+				],
+			};
+		} else if (migrateAction === "wiki") {
+			const wikiResult = migrateWiki(args.target || process.cwd());
+			result = { ...wikiResult, target: args.target || process.cwd() };
+		} else {
+			const migrateResult = migrateManifests(args.target || process.cwd(), {
+				dryRun: args.dryRun,
+			});
+			result = {
+				target: args.target,
+				text: migrateResult.message,
+				errors: [],
+				warnings: [],
+			};
+			if (!args.json) {
+				console.log(migrateResult.message);
+				if (migrateResult.logs && migrateResult.logs.length > 0) {
+					for (const log of migrateResult.logs) {
+						console.log(`  ${log}`);
+					}
 				}
+				return 0;
 			}
+			printResult(result, { json: true });
 			return 0;
 		}
-		printResult(result, { json: true });
-		return 0;
 	} else if (command === "daemon") {
 		const action = args._ && args._[0];
 		const { stopDaemon, getDaemonStatus } = require("./lib/daemon");
