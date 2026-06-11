@@ -33,7 +33,7 @@ test("team inspect exposes registry metadata and compatibility matrix", () => {
   assert.ok(payload.registry.versions["1.0.0"]);
   assert.ok(payload.registry.versions["1.1.0"]);
   assert.deepEqual(payload.registry.presets.map((preset) => preset.id), ["safe-bootstrap"]);
-  assert.deepEqual(payload.registry.rulePacks.map((pack) => pack.id), ["harness-delivery"]);
+  assert.deepEqual(payload.registry.rulePacks.map((pack) => pack.id), ["amber-delivery"]);
   assert.equal(payload.compatibilityMatrix.codex.minimum, "0.0.0");
   assert.ok(payload.compatibilityMatrix.os.includes("windows"));
 });

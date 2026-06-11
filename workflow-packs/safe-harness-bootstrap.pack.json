@@ -5,7 +5,7 @@
   "description": "Declarative smoke pack for inspecting the V1 Safe Harness Bootstrap workflow without executing scripts.",
   "skills": [],
   "standards": [
-    "harness-delivery"
+    "amber-delivery"
   ],
   "externalIntegrations": [],
   "connectorContracts": [

@@ -6,7 +6,7 @@
     "safe-harness-bootstrap"
   ],
   "standards": [
-    "harness-delivery"
+    "amber-delivery"
   ],
   "environment": {
     "requiresNetwork": false,
