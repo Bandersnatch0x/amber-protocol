@@ -1,17 +1,18 @@
 {
-  "name": "coding-harness",
+  "name": "amber-protocol",
   "version": "1.0.0",
-  "description": "Safe Harness Bootstrap toolkit for repository-local agent instructions, wiki, validation, and handoff.",
+  "description": "Amber Protocol: repository-local governance kit for coding agents — install, audit, validate, and hand off agent-facing project state.",
   "private": true,
   "type": "commonjs",
   "bin": {
-    "coding-harness": "scripts/harness.js"
+    "amber": "scripts/amber.js",
+    "coding-harness": "scripts/compat/coding-harness.js"
   },
   "scripts": {
     "test": "node --test",
     "check": "node --test",
-    "doctor": "node scripts/harness.js doctor --target .",
-    "handoff": "node scripts/harness.js handoff --target .",
+    "doctor": "node scripts/amber.js doctor --target .",
+    "handoff": "node scripts/amber.js handoff --target .",
     "manifests": "node scripts/validate-manifests.js --target .",
     "test:load": "node --test tests/load/sequential-sessions.test.js",
     "test:e2e": "node --test tests/e2e/"
