@@ -72,7 +72,7 @@ test("agent dispatch supports stop resume and separate reviewer evidence", () =>
     "--concurrency",
     "1",
     "--loop-contract",
-    "daily-harness-triage",
+    "daily-amber-triage",
     "--hard-stop-status",
     "within-limits",
     "--budget-status",
@@ -119,7 +119,7 @@ test("agent dispatch supports stop resume and separate reviewer evidence", () =>
 
   // Loop contract status assertions
   const dispatchPayload = JSON.parse(dispatch.stdout);
-  assert.equal(dispatchPayload.dispatch.loop.contractId, "daily-harness-triage");
+  assert.equal(dispatchPayload.dispatch.loop.contractId, "daily-amber-triage");
   assert.equal(dispatchPayload.dispatch.loop.hardStopStatus, "within-limits");
   assert.equal(dispatchPayload.dispatch.loop.budgetStatus, "within-budget");
   assert.equal(dispatchPayload.dispatch.loop.reviewBandwidthStatus, "available");

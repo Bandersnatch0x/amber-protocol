@@ -3,7 +3,7 @@
   "title": "Default Coding Harness Profile",
   "version": "0.1.0",
   "packIds": [
-    "safe-harness-bootstrap"
+    "safe-amber-bootstrap"
   ],
   "standards": [
     "amber-delivery"

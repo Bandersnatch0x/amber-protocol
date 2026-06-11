@@ -1,5 +1,5 @@
 {
-  "id": "safe-harness-bootstrap",
+  "id": "safe-amber-bootstrap",
   "title": "Safe Harness Bootstrap",
   "version": "0.1.0",
   "description": "Declarative smoke pack for inspecting the V1 Safe Harness Bootstrap workflow without executing scripts.",
@@ -64,7 +64,7 @@
   ],
   "loopContracts": [
     {
-      "id": "daily-harness-triage",
+      "id": "daily-amber-triage",
       "title": "Daily Harness Triage",
       "trigger": {
         "type": "scheduled",
@@ -72,7 +72,7 @@
         "enabled": false
       },
       "goal": "Inspect Harness health and produce reviewable candidate work without executing it.",
-      "stateSpine": ".harness/loops/daily-harness-triage/state.json",
+      "stateSpine": ".harness/loops/daily-amber-triage/state.json",
       "inputs": [
         "doctor report",
         "maintenance inspect",

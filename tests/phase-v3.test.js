@@ -47,7 +47,7 @@ function validPack(overrides = {}) {
 }
 
 test("pack inspect and profile inspect explain declarations without execution", () => {
-  const pack = path.join(ROOT, "workflow-packs", "safe-harness-bootstrap.pack.json");
+  const pack = path.join(ROOT, "workflow-packs", "safe-amber-bootstrap.pack.json");
   const profile = path.join(ROOT, "profiles", "default.profile.json");
 
   const packResult = runHarness(["pack", "inspect", "--file", pack, "--json"]);
@@ -59,11 +59,11 @@ test("pack inspect and profile inspect explain declarations without execution", 
   const profilePayload = JSON.parse(profileResult.stdout);
   assert.equal(packPayload.execution.executesAnything, false);
   assert.match(packPayload.dryRun.summary, /without dispatching workers/);
-  assert.ok(profilePayload.profile.packIds.includes("safe-harness-bootstrap"));
+  assert.ok(profilePayload.profile.packIds.includes("safe-amber-bootstrap"));
 
   // Loop contracts validation
   assert.ok(Array.isArray(packPayload.pack.loopContracts));
-  assert.equal(packPayload.pack.loopContracts[0].id, "daily-harness-triage");
+  assert.equal(packPayload.pack.loopContracts[0].id, "daily-amber-triage");
   assert.equal(packPayload.pack.loopContracts[0].execution.executesAnything, false);
   assert.equal(packPayload.pack.loopContracts[0].hardStops.maxIterations, 3);
   assert.equal(packPayload.pack.loopContracts[0].hardStops.noProgressDetection, true);

@@ -25,7 +25,7 @@
       "releasedAt": "2026-06-09",
       "preset": "safe-bootstrap",
       "profile": "profiles/default.profile.json",
-      "workflowPacks": ["workflow-packs/safe-harness-bootstrap.pack.json"],
+      "workflowPacks": ["workflow-packs/safe-amber-bootstrap.pack.json"],
       "rulePacks": ["standards/amber-delivery.json"],
       "managedProjectFiles": [],
       "compatibility": {
@@ -40,7 +40,7 @@
       "releasedAt": "2026-06-09",
       "preset": "safe-bootstrap",
       "profile": "profiles/default.profile.json",
-      "workflowPacks": ["workflow-packs/safe-harness-bootstrap.pack.json"],
+      "workflowPacks": ["workflow-packs/safe-amber-bootstrap.pack.json"],
       "rulePacks": ["rule-packs/amber-delivery.rule-pack.json", "standards/amber-delivery.json"],
       "managedProjectFiles": [],
       "compatibility": {
