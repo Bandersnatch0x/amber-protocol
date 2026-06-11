@@ -10,7 +10,7 @@ const test = require("node:test");
 const ROOT = path.resolve(__dirname, "..");
 
 function tempDir(name) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `coding-harness-cli-fail-${name}-`));
+  return fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-fail-${name}-`));
 }
 
 function copyFixture(name) {
