@@ -975,8 +975,26 @@ test("help scopes dry-run to commands that support it", () => {
   assert.doesNotMatch(doctorHelp.stdout, /--dry-run/);
 });
 
-test("package exposes a bin entry for the unified Harness CLI", () => {
+test("package exposes amber as primary bin with a legacy coding-harness alias", () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 
-  assert.equal(packageJson.bin["coding-harness"], "scripts/harness.js");
+  assert.equal(packageJson.name, "amber-protocol");
+  assert.equal(packageJson.bin.amber, "scripts/amber.js");
+  assert.equal(packageJson.bin["coding-harness"], "scripts/compat/coding-harness.js");
+});
+
+test("legacy entrypoints forward to the amber CLI", () => {
+  for (const entry of ["scripts/harness.js", "scripts/compat/coding-harness.js"]) {
+    const result = spawnSync(process.execPath, [path.join(ROOT, entry), "--help"], {
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 0, `${entry} --help should exit 0`);
+    assert.match(result.stdout, /amber|harness/i);
+  }
+  const compat = spawnSync(
+    process.execPath,
+    [path.join(ROOT, "scripts", "compat", "coding-harness.js"), "--help"],
+    { encoding: "utf8" },
+  );
+  assert.match(compat.stderr, /deprecated/i, "compat shim warns on stderr");
 });
