@@ -1,7 +1,7 @@
 {
-  "name": "coding-harness-team-registry",
+  "name": "amber-protocol-team-registry",
   "schemaVersion": "1.0.0",
-  "description": "Local team distribution registry for Coding Harness.",
+  "description": "Local team distribution registry for Amber Protocol.",
   "presets": [
     {
       "id": "safe-bootstrap",

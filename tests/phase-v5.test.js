@@ -29,7 +29,7 @@ test("team inspect exposes registry metadata and compatibility matrix", () => {
   assert.equal(result.status, 0, result.stderr);
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.installed, false);
-  assert.equal(payload.registry.name, "coding-harness-team-registry");
+  assert.equal(payload.registry.name, "amber-protocol-team-registry");
   assert.ok(payload.registry.versions["1.0.0"]);
   assert.ok(payload.registry.versions["1.1.0"]);
   assert.deepEqual(payload.registry.presets.map((preset) => preset.id), ["safe-bootstrap"]);

@@ -9,7 +9,7 @@ const TEMPLATE_ROOT = path.join(REPO_ROOT, "templates");
 const DEFAULT_TEAM_REGISTRY = path.join(
 	REPO_ROOT,
 	"registry",
-	"coding-harness.registry.json",
+	"amber-protocol.registry.json",
 );
 
 const MINIMUM_HARNESS_FILES = [
