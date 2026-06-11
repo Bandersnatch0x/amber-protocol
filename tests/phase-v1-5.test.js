@@ -8,7 +8,7 @@ const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
-const CLI = path.join(ROOT, "scripts", "harness.js");
+const CLI = path.join(ROOT, "scripts", "amber.js");
 
 const {
   classifyTarget,
