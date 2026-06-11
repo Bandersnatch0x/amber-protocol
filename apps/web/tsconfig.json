@@ -19,11 +19,11 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@server/*": ["./src/server/*"],
-      "@lib/*": ["./src/lib/*"],
-      "@components/*": ["./src/components/*"],
-      "@types/*": ["./src/types/*"]
+      "@/*": ["./*"],
+      "@server/*": ["./server/*"],
+      "@lib/*": ["./lib/*"],
+      "@components/*": ["./components/*"],
+      "@types/*": ["./types/*"]
     },
     "baseUrl": "."
   },
