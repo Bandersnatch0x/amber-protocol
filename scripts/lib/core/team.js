@@ -34,8 +34,8 @@ function validateTeamRegistryData(data) {
 	if (!data || typeof data !== "object" || Array.isArray(data)) {
 		return { errors: ["Team registry must contain an object."], warnings };
 	}
-	if (data.name !== "coding-harness-team-registry") {
-		errors.push("Team registry name must be coding-harness-team-registry.");
+	if (data.name !== "amber-protocol-team-registry") {
+		errors.push("Team registry name must be amber-protocol-team-registry.");
 	}
 	if (!Array.isArray(data.presets) || data.presets.length === 0) {
 		errors.push("Team registry must define at least one preset.");
