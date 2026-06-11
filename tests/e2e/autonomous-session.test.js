@@ -52,7 +52,7 @@ describe("autonomous session E2E", () => {
     ], { cwd: testRoot, encoding: "utf8", timeout: 15000 });
 
     const startResult = JSON.parse(start.stdout);
-    const manifestPath = path.join(testRoot, ".harness", "sessions", startResult.sessionId, "manifest.json");
+    const manifestPath = path.join(testRoot, ".amber", "sessions", startResult.sessionId, "manifest.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
     assert.strictEqual(manifest.mode, "autonomous");

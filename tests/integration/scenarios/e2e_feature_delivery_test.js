@@ -142,7 +142,7 @@ describe("E2E Feature Delivery", () => {
 
 			const stageSessionDir = path.join(
 				projectRoot,
-				".harness",
+				".amber",
 				"sessions",
 				singleManifest.sessionId,
 			);
@@ -165,7 +165,7 @@ describe("E2E Feature Delivery", () => {
 		// Verify checkpoints directory has files
 		const checkpointsDir = path.join(
 			projectRoot,
-			".harness",
+			".amber",
 			"sessions",
 			manifest.sessionId,
 			"checkpoints",

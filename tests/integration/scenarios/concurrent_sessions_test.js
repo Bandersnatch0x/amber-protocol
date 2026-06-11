@@ -24,7 +24,7 @@ function removeDir(dir) {
 }
 
 function getSessionDir(projectRoot, sessionId) {
-  return path.join(projectRoot, ".harness", "sessions", sessionId);
+  return path.join(projectRoot, ".amber", "sessions", sessionId);
 }
 
 // ── route fixtures (no gates → executeSession completes without blocking) ─
@@ -156,7 +156,7 @@ test("runs 3 sessions concurrently with no file conflicts", async () => {
   for (const result of results) {
     const manifestPath = path.join(
       TMP_DIR,
-      ".harness",
+      ".amber",
       "sessions",
       result.sessionId,
       "manifest.json",
@@ -177,7 +177,7 @@ test("isolates session working directories", async () => {
   );
 
   const dirs = results.map((r) =>
-    path.join(TMP_DIR, ".harness", "sessions", r.sessionId),
+    path.join(TMP_DIR, ".amber", "sessions", r.sessionId),
   );
 
   // All session directories are unique
@@ -229,7 +229,7 @@ test("runConcurrentSessions helper function", async () => {
   for (const r of results) {
     const manifestPath = path.join(
       TMP_DIR,
-      ".harness",
+      ".amber",
       "sessions",
       r.sessionId,
       "manifest.json",

@@ -3,9 +3,10 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const { resolveStateDirForRead, resolveStateDirForCreate } = require("./state-dir-resolver");
 
 function startDaemon(projectRoot, sessionId, options = {}) {
-	const pidPath = path.join(projectRoot, ".harness", "daemon.pid");
+	const pidPath = path.join(resolveStateDirForCreate(projectRoot), "daemon.pid");
 	const harnessDir = path.dirname(pidPath);
 
 	if (!fs.existsSync(harnessDir)) {
@@ -49,7 +50,7 @@ function startDaemon(projectRoot, sessionId, options = {}) {
 }
 
 function stopDaemon(projectRoot, options = {}) {
-	const pidPath = path.join(projectRoot, ".harness", "daemon.pid");
+	const pidPath = path.join(resolveStateDirForRead(projectRoot), "daemon.pid");
 
 	if (!fs.existsSync(pidPath)) {
 		return { success: false, error: "No daemon running" };
@@ -78,7 +79,7 @@ function stopDaemon(projectRoot, options = {}) {
 }
 
 function getDaemonStatus(projectRoot) {
-	const pidPath = path.join(projectRoot, ".harness", "daemon.pid");
+	const pidPath = path.join(resolveStateDirForRead(projectRoot), "daemon.pid");
 
 	if (!fs.existsSync(pidPath)) {
 		return { running: false };

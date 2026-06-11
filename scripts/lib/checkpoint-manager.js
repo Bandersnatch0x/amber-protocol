@@ -2,11 +2,11 @@
 
 const fs = require("fs");
 const path = require("path");
+const { resolveStateDirForRead } = require("./state-dir-resolver");
 
 function getCheckpointsDir(projectRoot, sessionId) {
 	return path.join(
-		projectRoot,
-		".harness",
+		resolveStateDirForRead(projectRoot),
 		"sessions",
 		sessionId,
 		"checkpoints",

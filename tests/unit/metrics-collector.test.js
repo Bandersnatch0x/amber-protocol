@@ -15,7 +15,7 @@ describe("metrics-collector", () => {
 		fs.mkdirSync(testRoot, { recursive: true });
 
 		// Create test sessions
-		const sessionsDir = path.join(testRoot, ".harness", "sessions");
+		const sessionsDir = path.join(testRoot, ".amber", "sessions");
 		fs.mkdirSync(sessionsDir, { recursive: true });
 
 		// Session 1: completed

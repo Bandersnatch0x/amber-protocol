@@ -17,15 +17,26 @@ const { createWorktree, removeWorktree } = require("./worktree-manager");
 const { selectRoute } = require("./route-selector");
 const { loadRoutes } = require("./route-loader");
 const { result } = require("./result");
+const {
+	resolveStateDirForRead,
+	resolveStateDirForCreate,
+	CANONICAL_STATE_DIR,
+} = require("./state-dir-resolver");
 
 const ROUTES_DIR = path.join(__dirname, "../../routes");
 
 function getSessionsDir(projectRoot) {
-	return path.join(projectRoot, ".harness", "sessions");
+	// Discovery/read path: prefers .amber, falls back to legacy .harness.
+	return path.join(resolveStateDirForRead(projectRoot), "sessions");
 }
 
 function getSessionDir(projectRoot, sessionId) {
 	return path.join(getSessionsDir(projectRoot), sessionId);
+}
+
+function getSessionDirForCreate(projectRoot, sessionId) {
+	// New sessions are always created under the canonical .amber state dir.
+	return path.join(resolveStateDirForCreate(projectRoot), "sessions", sessionId);
 }
 
 function findMostRecentSession(projectRoot, { excludeCompleted = false } = {}) {
@@ -90,7 +101,7 @@ async function startSession(projectRoot, options) {
 		budget,
 	});
 
-	const sessionDir = getSessionDir(projectRoot, manifest.sessionId);
+	const sessionDir = getSessionDirForCreate(projectRoot, manifest.sessionId);
 	fs.mkdirSync(sessionDir, { recursive: true });
 
 	const manifestPath = path.join(sessionDir, "manifest.json");
@@ -113,7 +124,7 @@ async function startSession(projectRoot, options) {
 	if (worktree) {
 		const worktreeResult = createWorktree(projectRoot, manifest.sessionId);
 		if (worktreeResult.success) {
-			manifest.worktree = `.harness/worktrees/${manifest.sessionId}`;
+			manifest.worktree = `${CANONICAL_STATE_DIR}/worktrees/${manifest.sessionId}`;
 			fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 			lines.push(`Worktree: ${manifest.sessionId}`);
 		} else {

@@ -4,6 +4,7 @@ const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { saveCheckpoint } = require("./checkpoint-manager");
+const { resolveStateDirForRead } = require("./state-dir-resolver");
 
 function executeCommand(command, options = {}) {
 	const result = spawnSync(command, {
@@ -83,8 +84,7 @@ async function executeStages(stages, options, shouldContinue) {
 function getWorktreeState(projectRoot, sessionId) {
 	const { execSync } = require("child_process");
 	const worktreePath = path.join(
-		projectRoot,
-		".harness",
+		resolveStateDirForRead(projectRoot),
 		"worktrees",
 		sessionId,
 	);
