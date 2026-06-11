@@ -64,9 +64,7 @@ const {
 	continueSession,
 } = require("./lib/session-commands");
 
-const {
-	validateWorkflowPack,
-} = require("./lib/core/execution-validator");
+const { validateWorkflowPack } = require("./lib/core/execution-validator");
 
 const COMMANDS = [
 	"init",
@@ -296,7 +294,7 @@ function commandSummary(command) {
 			"",
 			"Subcommands:",
 			"  validate-integration  Validate integration contract structure and hardstops.",
-			"  validate-loop         Validate loop contract structure (via loop validate-loop).",
+
 			"  readiness             Review plan for execution boundary violations.",
 			"",
 			"Examples:",
@@ -391,7 +389,9 @@ async function run(argv = process.argv.slice(2)) {
 		} else {
 			result = {
 				target: args.target,
-				errors: ["pack requires inspect, validate, readiness, or validate-execution."],
+				errors: [
+					"pack requires inspect, validate, readiness, or validate-execution.",
+				],
 				warnings: [],
 			};
 		}
@@ -475,7 +475,9 @@ async function run(argv = process.argv.slice(2)) {
 		} else {
 			result = {
 				target: args.target,
-				errors: ["loop requires inspect, run, record, status, or validate-loop."],
+				errors: [
+					"loop requires inspect, run, record, status, or validate-loop.",
+				],
 				warnings: [],
 			};
 		}
@@ -541,7 +543,11 @@ async function run(argv = process.argv.slice(2)) {
 			const { resolveRegistryPath } = require("./lib/core/team");
 			const targetRoot = resolveTarget(args.target);
 			const registryPath = resolveRegistryPath(args.registry);
-			const previewResult = previewUpgrade(targetRoot, args.version, registryPath);
+			const previewResult = previewUpgrade(
+				targetRoot,
+				args.version,
+				registryPath,
+			);
 			result = {
 				target: targetRoot,
 				...previewResult,
@@ -575,7 +581,9 @@ async function run(argv = process.argv.slice(2)) {
 		} else {
 			result = {
 				target: args.target,
-				errors: ["maintenance requires inspect, propose, proposal, stale-docs, wiki-lint, pack-drift, upgrade-preview, evolution-rollup, or regression-proposals."],
+				errors: [
+					"maintenance requires inspect, propose, proposal, stale-docs, wiki-lint, pack-drift, upgrade-preview, evolution-rollup, or regression-proposals.",
+				],
 				warnings: [],
 			};
 		}
@@ -803,8 +811,8 @@ async function run(argv = process.argv.slice(2)) {
 			result = createGovernanceDocs(args.target);
 		} else if (action === "evidence") {
 			result = exportGovernanceEvidence(args.target || process.cwd(), {
-				sessionId: args.session,
-				taskId: args.task,
+				session: args.session,
+				task: args.task,
 				output: args.output,
 				json: args.json,
 			});
@@ -833,6 +841,10 @@ async function run(argv = process.argv.slice(2)) {
 				...validationResult,
 			};
 		} else if (action === "readiness") {
+			const {
+				checkExecutionReadiness,
+			} = require("./lib/core/execution-validator");
+			const { resolveTarget } = require("./lib/core/fs-utils");
 			const planPath = args.plan || "";
 			if (!planPath) {
 				result = {
@@ -841,15 +853,16 @@ async function run(argv = process.argv.slice(2)) {
 					warnings: [],
 				};
 			} else {
-				const review = reviewPlan(args.target, planPath);
-				const ready = review.errors.length === 0;
+				const targetRoot = resolveTarget(args.target);
+				const resolvedPlan = require("path").resolve(targetRoot, planPath);
+				const readiness = checkExecutionReadiness(targetRoot, resolvedPlan);
 				result = {
 					target: args.target,
 					plan: planPath,
-					ready,
-					blockers: ready ? [] : review.errors,
-					errors: ready ? [] : review.errors,
-					warnings: [],
+					ready: readiness.ready,
+					blockers: readiness.blockers,
+					errors: readiness.blockers,
+					warnings: readiness.warnings,
 				};
 			}
 		} else {
