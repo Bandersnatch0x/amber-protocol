@@ -25,7 +25,7 @@ describe("Interactive Session Integration", () => {
 		const result = spawnSync(
 			process.execPath,
 			[
-				path.join(ROOT, "scripts/harness.js"),
+				path.join(ROOT, "scripts/amber.js"),
 				"session",
 				"start",
 				"--goal",
@@ -58,7 +58,7 @@ describe("Interactive Session Integration", () => {
 		spawnSync(
 			process.execPath,
 			[
-				path.join(ROOT, "scripts/harness.js"),
+				path.join(ROOT, "scripts/amber.js"),
 				"session",
 				"start",
 				"--goal",
@@ -74,7 +74,7 @@ describe("Interactive Session Integration", () => {
 		const statusResult = spawnSync(
 			process.execPath,
 			[
-				path.join(ROOT, "scripts/harness.js"),
+				path.join(ROOT, "scripts/amber.js"),
 				"session",
 				"status",
 				"--target",
@@ -89,7 +89,7 @@ describe("Interactive Session Integration", () => {
 		spawnSync(
 			process.execPath,
 			[
-				path.join(ROOT, "scripts/harness.js"),
+				path.join(ROOT, "scripts/amber.js"),
 				"session",
 				"start",
 				"--goal",
@@ -103,7 +103,7 @@ describe("Interactive Session Integration", () => {
 		const continueResult = spawnSync(
 			process.execPath,
 			[
-				path.join(ROOT, "scripts/harness.js"),
+				path.join(ROOT, "scripts/amber.js"),
 				"session",
 				"continue",
 				"--target",
@@ -118,7 +118,7 @@ describe("Interactive Session Integration", () => {
 	it("session --help includes continue", () => {
 		const result = spawnSync(
 			process.execPath,
-			[path.join(ROOT, "scripts/harness.js"), "session", "--help"],
+			[path.join(ROOT, "scripts/amber.js"), "session", "--help"],
 			{ encoding: "utf8", cwd: ROOT },
 		);
 		assert.match(result.stdout, /continue/);
