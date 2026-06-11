@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "**/package-lock.json",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "检查是否正在编辑 package-lock.json。如果是，返回 {\"ok\": false, \"reason\": \"请使用 npm install/uninstall 修改依赖，不要直接编辑 package-lock.json\"}",
+            "continueOnBlock": false
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "tool": "Edit",
+        "matcher": "**/*.{js,ts}",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node --test tests/unit/",
+            "continueOnError": true
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(npm run *)",
+      "Bash(node --test *)",
+      "Bash(git *)",
+      "Skill(validate-amber-setup)"
+    ]
+  }
+}
