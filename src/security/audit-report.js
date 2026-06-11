@@ -107,7 +107,7 @@ function generateAuditReport(depResult, secretResult, permResult) {
 	// Metadata
 	report += "## Metadata\n\n";
 	report += `- **Date:** ${date}\n`;
-	report += `- **Tool:** coding-harness security audit v1.0.0\n`;
+	report += `- **Tool:** amber-protocol security audit v1.0.0\n`;
 	report += `- **Scanners:** dependency-scan, secret-scan, permission-review\n`;
 
 	return report;

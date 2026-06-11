@@ -8,7 +8,7 @@ const ROOT = path.join(__dirname, "../..");
 describe("daemon lifecycle E2E", () => {
   it("should report status correctly", () => {
     const status = spawnSync(process.execPath, [
-      path.join(ROOT, "scripts/harness.js"),
+      path.join(ROOT, "scripts/amber.js"),
       "daemon", "status"
     ], { cwd: ROOT, encoding: "utf8", timeout: 15000 });
 
@@ -18,7 +18,7 @@ describe("daemon lifecycle E2E", () => {
 
   it("should show 'not running' when no daemon", () => {
     const status = spawnSync(process.execPath, [
-      path.join(ROOT, "scripts/harness.js"),
+      path.join(ROOT, "scripts/amber.js"),
       "daemon", "status"
     ], { cwd: ROOT, encoding: "utf8", timeout: 15000 });
 

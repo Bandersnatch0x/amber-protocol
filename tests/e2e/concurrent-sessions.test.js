@@ -11,7 +11,7 @@ describe("concurrent sessions E2E", () => {
 
     for (let i = 0; i < 5; i++) {
       const result = spawnSync(process.execPath, [
-        path.join(ROOT, "scripts/harness.js"),
+        path.join(ROOT, "scripts/amber.js"),
         "session", "start",
         "--goal", `implement feature ${i}`,
         "--json"

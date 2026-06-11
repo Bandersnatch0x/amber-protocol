@@ -28,7 +28,7 @@ describe("autonomous session E2E", () => {
 
   it("should start an autonomous session", () => {
     const start = spawnSync(process.execPath, [
-      path.join(ROOT, "scripts/harness.js"),
+      path.join(ROOT, "scripts/amber.js"),
       "session", "start",
       "--goal", "implement test feature",
       "--mode", "autonomous",
@@ -44,7 +44,7 @@ describe("autonomous session E2E", () => {
 
   it("should store autonomous mode in manifest", () => {
     const start = spawnSync(process.execPath, [
-      path.join(ROOT, "scripts/harness.js"),
+      path.join(ROOT, "scripts/amber.js"),
       "session", "start",
       "--goal", "implement test feature",
       "--mode", "autonomous",
