@@ -1,11 +1,11 @@
 ---
-name: harness-audit
+name: amber-audit
 description: Inspect an existing repository for Harness readiness without modifying project files.
 ---
 
-# Harness Audit
+# Amber Audit
 
-Use when a user asks to inspect an existing repository before installing the Harness.
+Use when a user asks to inspect an existing repository before installing the Amber Protocol setup.
 
 ## Workflow
 

@@ -1,27 +1,27 @@
 {
-  "name": "coding-harness",
+  "name": "amber-protocol",
   "version": "0.1.0",
-  "description": "Safe Harness Bootstrap for repository-local agent instructions, wiki, validation, and handoff.",
+  "description": "Amber Protocol: repository-local governance kit for coding agents — init, audit, wiki, doctor, and handoff workflows.",
   "author": {
     "name": "Local developer"
   },
   "license": "UNLICENSED",
   "keywords": [
     "agent",
-    "harness",
+    "amber",
     "validation",
     "handoff"
   ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Coding Harness",
-    "shortDescription": "Install and validate a safe repository-local Harness.",
-    "longDescription": "Coding Harness provides V1-safe init, audit, wiki, doctor, and handoff workflows for agent-friendly repositories. It does not run dynamic workflows or dispatch subagents.",
+    "displayName": "Amber Protocol",
+    "shortDescription": "Install and validate a safe repository-local Amber Protocol setup.",
+    "longDescription": "Amber Protocol provides V1-safe init, audit, wiki, doctor, and handoff workflows for agent-friendly repositories. It does not run dynamic workflows or dispatch subagents.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
       "Write"
     ],
-    "defaultPrompt": "Initialize or audit a repository-local Coding Harness."
+    "defaultPrompt": "Initialize or audit a repository-local Amber Protocol setup."
   }
 }

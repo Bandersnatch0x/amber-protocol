@@ -1,9 +1,9 @@
 ---
-name: harness-continuous-improvement
+name: amber-continuous-improvement
 description: Use when continuing a repository improvement goal, running an automation wakeup, or selecting the next safe Harness-backed improvement slice.
 ---
 
-# Harness Continuous Improvement
+# Amber Continuous Improvement
 
 ## Workflow
 
