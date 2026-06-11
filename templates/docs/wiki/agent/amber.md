@@ -1,6 +1,6 @@
-# Harness
+# Amber
 
-The Harness keeps agent work bounded and recoverable.
+The Amber Protocol setup keeps agent work bounded and recoverable.
 
 ## V1 Scope
 
@@ -22,7 +22,7 @@ The Harness keeps agent work bounded and recoverable.
 
 ## Continuous Improvement
 
-The Harness can describe and track a continuous-improvement loop without executing it autonomously.
+The Amber setup can describe and track a continuous-improvement loop without executing it autonomously.
 
 - Use `.workflow/continuous-improvement/state.json` for queue, approval gates, and result notes.
 - Use [Continuous improvement](continuous-improvement.md) for the operating loop.

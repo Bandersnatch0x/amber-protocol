@@ -10,11 +10,11 @@
       "verification": [
         "Read docs/wiki/index.md and confirm core project pages are linked.",
         "Run the standard verification command recorded in docs/wiki/engineering/verification.md.",
-        "Run node scripts/doctor.js --target . from the Coding Harness toolkit."
+        "Run node scripts/doctor.js --target . from the Amber Protocol toolkit."
       ],
       "evidence": [],
       "notes": [
-        "Replace this starter feature with project-specific features after the Harness is customized."
+        "Replace this starter feature with project-specific features after the Amber setup is customized."
       ]
     }
   ]

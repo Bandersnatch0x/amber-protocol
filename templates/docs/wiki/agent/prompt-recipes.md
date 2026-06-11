@@ -2,7 +2,7 @@
 
 ## Start A Session
 
-Read the Harness files, summarize current state, identify the active feature, then run verification.
+Read the Amber setup files, summarize current state, identify the active feature, then run verification.
 
 ## Close A Session
 

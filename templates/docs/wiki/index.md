@@ -25,7 +25,7 @@ This Wiki is the stable map for agents and humans working in the repository.
 
 ## Agent Harness
 
-- [Harness](agent/harness.md)
+- [Amber](agent/amber.md)
 - [Working rules](agent/working-rules.md)
 - [Continuous improvement](agent/continuous-improvement.md)
 - [Workflow packets](agent/workflow-packets.md)
