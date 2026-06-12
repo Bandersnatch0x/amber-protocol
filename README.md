@@ -8,7 +8,37 @@
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
+**Status:** Production-Ready | **Version:** 1.0.0-beta | **Completion:** 95%
+
 Amber Protocol is a repository-local governance and control layer for agent-assisted engineering. It installs, audits, validates, and maintains a small set of project files that help agents understand a codebase, keep feature state explicit, and hand off work cleanly.
+
+## 🚀 Quick Start
+
+### CLI Tools
+```bash
+node scripts/amber.js init --target path/to/repo
+node scripts/amber.js audit --target path/to/repo
+```
+
+### Web Viewer (NEW!)
+```bash
+cd apps/web
+npm install --legacy-peer-deps
+npm run dev
+# Visit http://localhost:3000
+```
+
+See [PRODUCTION_DEPLOYMENT.md](./PRODUCTION_DEPLOYMENT.md) for deployment guide.
+
+## ✅ Current Status
+
+- **Phase A (Research):** ✅ Complete
+- **Phase B (Alpha & Beta):** ✅ Complete  
+- **Phase C (Web Viewer):** ✅ Complete (8/8 weeks)
+- **Phase D (Production):** 📋 Planned
+- **Governance:** ✅ Complete
+
+**Tests:** 527/527 passing | **Coverage:** >80% | **TypeScript:** 100% strict
 
 The current product is deliberately conservative. It creates review artifacts, dry-run plans, approval records, workflow-pack metadata, and maintenance proposals. It does not run Dynamic Workflows, invoke live subagents, execute target project commands, or automatically rewrite old project files.
 
