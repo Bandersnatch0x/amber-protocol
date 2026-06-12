@@ -8,6 +8,8 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: [],
+    // Playwright owns tests/e2e (*.spec.ts); vitest must not collect them.
+    exclude: ['**/node_modules/**', 'tests/e2e/**'],
   },
   resolve: {
     alias: {

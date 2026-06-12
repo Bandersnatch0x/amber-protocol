@@ -520,10 +520,21 @@ async function run(argv = process.argv.slice(2)) {
 				warnings: [],
 			};
 		} else if (action === "wiki-lint") {
-			const { validateWikiStructure } = require("./lib/core/maintenance");
+			const {
+				validateWikiStructure,
+				fixWikiMarkers,
+			} = require("./lib/core/maintenance");
 			const { resolveTarget } = require("./lib/core/fs-utils");
 			const targetRoot = resolveTarget(args.target);
+			let fixResult = null;
+			if (args.fixMarkers) {
+				fixResult = fixWikiMarkers(targetRoot);
+			}
 			result = validateWikiStructure(targetRoot);
+			if (fixResult) {
+				result.fixedMarkers = fixResult.fixed;
+				result.fixedMarkerCount = fixResult.fixedCount;
+			}
 		} else if (action === "pack-drift") {
 			const { detectPackDrift } = require("./lib/core/maintenance");
 			const { resolveTarget } = require("./lib/core/fs-utils");
@@ -813,6 +824,7 @@ async function run(argv = process.argv.slice(2)) {
 			result = exportGovernanceEvidence(args.target || process.cwd(), {
 				session: args.session,
 				task: args.task,
+				all: args.all,
 				output: args.output,
 				json: args.json,
 			});

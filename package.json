@@ -9,8 +9,8 @@
     "coding-harness": "scripts/compat/coding-harness.js"
   },
   "scripts": {
-    "test": "node --test",
-    "check": "node --test",
+    "test": "node --test tests/",
+    "check": "node --test tests/",
     "doctor": "node scripts/amber.js doctor --target .",
     "handoff": "node scripts/amber.js handoff --target .",
     "manifests": "node scripts/validate-manifests.js --target .",

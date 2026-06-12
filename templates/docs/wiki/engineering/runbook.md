@@ -12,8 +12,4 @@
 
 ## Unknowns / Needs Confirmation
 
-- Confirm repository-specific startup steps, common tasks, and operational checks.
-
-## Unknowns / Needs Confirmation
-
 - Confirm the real startup steps, common maintenance tasks, and project-specific operational checks.

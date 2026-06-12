@@ -1,5 +1,6 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { VirtualTimeline } from '@/components/session/VirtualTimeline';
 import { SessionEvent } from '@/lib/types/session-events';
 
@@ -25,16 +26,15 @@ describe('VirtualTimeline', () => {
     expect(screen.getByText('No events yet')).toBeDefined();
   });
 
-  it('should render events', () => {
-    const events = makeEvents(3);
-    const { container } = render(<VirtualTimeline events={events} />);
-    expect(container.querySelector('[class*="h-[600px]"]')).toBeDefined();
+  it('should render scroll container for events', () => {
+    const { container } = render(<VirtualTimeline events={makeEvents(3)} />);
+    expect(screen.queryByText('No events yet')).toBeNull();
+    expect(container.querySelector('div.overflow-auto')).not.toBeNull();
   });
 
-  it('should handle event click', () => {
+  it('should not invoke click handler without interaction', () => {
     const onClick = vi.fn();
     render(<VirtualTimeline events={makeEvents(1)} onEventClick={onClick} />);
-    // TimelineRow renders, click handler is passed
     expect(onClick).not.toHaveBeenCalled();
   });
 });

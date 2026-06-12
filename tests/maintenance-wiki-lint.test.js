@@ -73,3 +73,53 @@ test("amber maintenance wiki-lint - valid wiki has no errors", () => {
 
 	fs.rmSync(target, { recursive: true, force: true });
 });
+
+test("amber maintenance wiki-lint --fix-markers appends missing marker sections", () => {
+	const target = tempDir("fix-markers");
+	const productDir = path.join(target, "docs", "wiki", "product");
+	fs.mkdirSync(productDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(target, "docs", "wiki", "index.md"),
+		"# Index\n\n[Overview](product/overview.md)\n"
+	);
+	fs.writeFileSync(
+		path.join(productDir, "overview.md"),
+		"# Product Overview\n\n## Goal\n\nSomething.\n"
+	);
+
+	const result = runAmber([
+		"maintenance",
+		"wiki-lint",
+		"--target",
+		target,
+		"--fix-markers",
+		"--json",
+	]);
+
+	assert.strictEqual(result.status, 0);
+	const json = JSON.parse(result.stdout);
+	assert.deepEqual(json.fixedMarkers, ["docs/wiki/product/overview.md"]);
+	assert.strictEqual(json.fixedMarkerCount, 1);
+
+	const content = fs.readFileSync(path.join(productDir, "overview.md"), "utf8");
+	assert.match(content, /## Unknowns \/ Needs Confirmation/);
+	assert.strictEqual(
+		content.match(/## Unknowns \/ Needs Confirmation/g).length,
+		1,
+	);
+
+	// Second run is a no-op: the marker already exists.
+	const second = runAmber([
+		"maintenance",
+		"wiki-lint",
+		"--target",
+		target,
+		"--fix-markers",
+		"--json",
+	]);
+	assert.strictEqual(second.status, 0);
+	const secondJson = JSON.parse(second.stdout);
+	assert.deepEqual(secondJson.fixedMarkers, []);
+
+	fs.rmSync(target, { recursive: true, force: true });
+});

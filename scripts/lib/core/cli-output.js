@@ -149,6 +149,9 @@ function parseArgs(argv) {
 		} else if (arg === "--review-gate-status") {
 			args.reviewGateStatus = argv[index + 1];
 			index += 1;
+		} else if (arg === "--priority") {
+			args.priority = argv[index + 1];
+			index += 1;
 		} else if (arg === "--json") {
 			args.json = true;
 		} else if (arg === "--dry-run") {
@@ -157,6 +160,14 @@ function parseArgs(argv) {
 			args.confirm = true;
 		} else if (arg === "--summary") {
 			args.summary = true;
+		} else if (arg === "--all") {
+			args.all = true;
+		} else if (arg === "--explain") {
+			args.explain = true;
+		} else if (arg === "--strict") {
+			args.strict = true;
+		} else if (arg === "--fix-markers") {
+			args.fixMarkers = true;
 		} else if (arg === "--help" || arg === "-h") {
 			args.help = true;
 		} else {

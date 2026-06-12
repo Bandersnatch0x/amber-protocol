@@ -455,6 +455,38 @@ function validateWikiStructure(projectRoot) {
 	return validateWiki(projectRoot);
 }
 
+function fixWikiMarkers(projectRoot) {
+	const {
+		WIKI_CONTEXT_STARTER_FILES,
+	} = require("./constants");
+	const {
+		hasSectionWithBody,
+	} = require("./text-utils");
+
+	const fixed = [];
+	for (const relativePath of WIKI_CONTEXT_STARTER_FILES) {
+		const filePath = path.join(projectRoot, relativePath);
+		if (!pathExists(filePath)) {
+			continue;
+		}
+		const content = readText(filePath);
+		if (hasSectionWithBody(content, "Unknowns / Needs Confirmation")) {
+			continue;
+		}
+		const section = [
+			"## Unknowns / Needs Confirmation",
+			"",
+			"- Confirm the facts on this page; mark anything unverified.",
+			"",
+		].join("\n");
+		const trimmed = content.replace(/\s*$/, "");
+		fs.writeFileSync(filePath, `${trimmed}\n\n${section}`);
+		fixed.push(relativePath);
+	}
+
+	return { fixed, fixedCount: fixed.length };
+}
+
 function previewUpgrade(projectRoot, version, registryPath) {
 	const paths = teamStatePaths(projectRoot);
 	const lock = loadTeamLock(paths);
@@ -586,6 +618,7 @@ module.exports = {
 	buildMaintenanceProposalContent,
 	proposeMaintenance,
 	validateWikiStructure,
+	fixWikiMarkers,
 	detectPackDrift,
 	previewUpgrade,
 	generateMaintenanceProposal,

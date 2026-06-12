@@ -27,6 +27,20 @@ This backlog tracks implementation status across the roadmap. V1 remains Safe Am
 - V5 team distribution is implemented with local registry metadata, team presets, rule packs, compatibility matrix, and `team inspect/install/pin/update/rollback`; updates can be previewed and target-project customizations are preserved.
 - V5.5 continuous maintenance is implemented with `maintenance inspect` and `maintenance propose`; stale knowledge, upgrade guidance, rule-pack drift, and repeated delivery findings are reported as reviewable evidence.
 
+## Phase B / C / D (beyond the V1–V5.5 governance surface)
+
+- Phase B (routes, sessions, interactive + autonomous execution, checkpoint/continue, migration, daemon, governance) is implemented and covered by the root `tests/` suite. `error-recovery.js` and `health-checker.js` exist (earlier status docs that listed them as missing were stale).
+- Phase C (web viewer in `apps/web`) is implemented: sessions, routes, gates, settings, and timeline pages plus SSE real-time updates. Unit tests run under `npm test` in `apps/web`; Playwright e2e specs live in `apps/web/tests/e2e` but are not wired into CI.
+- Phase D (production hardening) is partial: `apps/web/lib/auth-token.ts` and `apps/web/lib/error-logger.ts` exist, but SSE-endpoint auth enforcement and external monitoring integration are not wired. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+## Gap fixes (audit pass)
+
+- `parseArgs` now recognizes `--priority`, `--fix-markers`, `--all`, `--explain`, and `--strict`; previously these landed in positional args and silently never reached their already-implemented handlers.
+- `maintenance wiki-lint --fix-markers` is implemented: it appends a missing `Unknowns / Needs Confirmation` section to starter wiki pages, and is idempotent.
+- `governance evidence --all` is wired through the CLI.
+- Duplicate `Unknowns / Needs Confirmation` sections in `templates/docs/wiki/**` starter pages were de-duplicated.
+- Test hygiene: root `npm test` is scoped to `tests/` so it no longer descends into `.claude/worktrees/` copies; `apps/web` vitest excludes Playwright `*.spec.ts`; the three `tests/client` web tests that never ran (missing `@testing-library/*` deps, JSX-in-`.ts`) now pass under happy-dom.
+
 ## P0
 
 ## P2
@@ -41,3 +55,4 @@ No open V1, V1.5, V2, V2.5, V3, V4, V4.5, V5, or V5.5 implementation items.
 - Model/backend routing.
 - External marketplace publishing.
 - Automatic rewrite of old project files.
+- Phase D: SSE-endpoint auth enforcement and external error-monitoring integration.

@@ -8,7 +8,7 @@
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
-**Status:** Production-Ready | **Version:** 1.0.0-beta | **Completion:** 95%
+**Status:** Beta | **Version:** 1.0.0-beta
 
 Amber Protocol is a repository-local governance and control layer for agent-assisted engineering. It installs, audits, validates, and maintains a small set of project files that help agents understand a codebase, keep feature state explicit, and hand off work cleanly.
 
@@ -20,7 +20,7 @@ node scripts/amber.js init --target path/to/repo
 node scripts/amber.js audit --target path/to/repo
 ```
 
-### Web Viewer (NEW!)
+### Web Viewer
 ```bash
 cd apps/web
 npm install --legacy-peer-deps
@@ -28,17 +28,17 @@ npm run dev
 # Visit http://localhost:3000
 ```
 
-See [PRODUCTION_DEPLOYMENT.md](./PRODUCTION_DEPLOYMENT.md) for deployment guide.
+See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for the deployment guide.
 
 ## ✅ Current Status
 
-- **Phase A (Research):** ✅ Complete
-- **Phase B (Alpha & Beta):** ✅ Complete  
-- **Phase C (Web Viewer):** ✅ Complete (8/8 weeks)
-- **Phase D (Production):** 📋 Planned
-- **Governance:** ✅ Complete
+- **Amber core (V1–V5.5 command surface):** implemented and tested
+- **Phase B (routes, sessions, autonomous mode, migration):** implemented and tested
+- **Phase C (Web Viewer):** implemented; unit-tested, Playwright e2e specs exist but are not wired into CI
+- **Phase D (production hardening):** partial — SSE auth helpers and error logging exist, SSE endpoint enforcement and external monitoring are not wired
+- **Governance surfaces:** implemented and tested
 
-**Tests:** 527/527 passing | **Coverage:** >80% | **TypeScript:** 100% strict
+Run `npm test` (root suite) and `cd apps/web && npm test` (web suite) for current counts.
 
 The current product is deliberately conservative. It creates review artifacts, dry-run plans, approval records, workflow-pack metadata, and maintenance proposals. It does not run Dynamic Workflows, invoke live subagents, execute target project commands, or automatically rewrite old project files.
 
@@ -76,7 +76,7 @@ flowchart LR
   Core --> Routes["routes/*.route.json<br/>Delivery route definitions"]
   Core --> Schemas["schemas/*.schema.json<br/>JSON Schema drafts"]
   Core --> PhaseB["src/migration/ src/security/<br/>Migration tools + Security scanners"]
-  Core -.-> Web["apps/web/<br/>Phase C scaffolding (deferred)"]
+  Core -.-> Web["apps/web/<br/>Phase C web viewer"]
   Tests["tests/<br/>Node test suite"] --> CLI
 
   Target["Target repository"] -. "init/wiki create missing files only" .-> Templates
