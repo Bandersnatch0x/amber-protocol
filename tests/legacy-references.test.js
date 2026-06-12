@@ -53,7 +53,6 @@ const ALLOWLIST = [
 	"maintainability-review-round2.md",
 	"tests-review-round2.md",
 	"fix-round1.md",
-	"progress.md",
 ];
 
 // Files inside allowlisted directories that must STILL be clean — active docs.
@@ -83,7 +82,16 @@ function* walk(dir) {
 	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
 		const full = path.join(dir, entry.name);
 		if (entry.isDirectory()) {
-			if (entry.name === "node_modules" || entry.name === ".git" || entry.name === ".tmp") continue;
+			// Skip generated/build output: .next embeds absolute paths that
+			// legitimately contain the on-disk repo folder name.
+			if (
+				entry.name === "node_modules" ||
+				entry.name === ".git" ||
+				entry.name === ".tmp" ||
+				entry.name === ".next" ||
+				entry.name === "dist" ||
+				entry.name === "coverage"
+			) continue;
 			yield* walk(full);
 		} else yield full;
 	}

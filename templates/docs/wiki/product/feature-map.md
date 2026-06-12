@@ -8,8 +8,4 @@ Use this page to connect `feature_list.json` entries to richer context.
 
 ## Unknowns / Needs Confirmation
 
-- Replace the example feature mapping with project-specific features.
-
-## Unknowns / Needs Confirmation
-
 - Replace the example feature row with project-specific feature IDs and Wiki pages.

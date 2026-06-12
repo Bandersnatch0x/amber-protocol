@@ -8,8 +8,4 @@ Use this page to explain ownership boundaries and dependencies.
 
 ## Unknowns / Needs Confirmation
 
-- Confirm module names, ownership boundaries, and dependency rules.
-
-## Unknowns / Needs Confirmation
-
 - Replace the example boundary row with project-specific modules and ownership limits.

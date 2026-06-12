@@ -9,8 +9,4 @@ Describe how important data moves through the system.
 
 ## Unknowns / Needs Confirmation
 
-- Confirm important inputs, validation points, state changes, and outputs.
-
-## Unknowns / Needs Confirmation
-
 - Confirm the real inputs, validation points, state stores, and outputs.

@@ -16,8 +16,4 @@ Record command, result, date, and any relevant logs or screenshots in `feature_l
 
 ## Unknowns / Needs Confirmation
 
-- Replace `node --version` with the repository's real verification command when known.
-
-## Unknowns / Needs Confirmation
-
 - Replace the baseline command with the repository's real test, lint, build, or smoke command.

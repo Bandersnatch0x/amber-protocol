@@ -44,8 +44,4 @@ Record verification command output after customization.
 
 ## Unknowns / Needs Confirmation
 
-- Confirm whether this example feature should be replaced, renamed, or removed.
-
-## Unknowns / Needs Confirmation
-
 - Confirm the project-specific feature ID, behavior, acceptance criteria, and verification evidence that should replace this example.

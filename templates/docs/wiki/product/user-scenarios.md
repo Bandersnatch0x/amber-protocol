@@ -10,8 +10,4 @@
 
 ## Unknowns / Needs Confirmation
 
-- Confirm primary scenario names, users, goals, and failure modes.
-
-## Unknowns / Needs Confirmation
-
 - Confirm the real user roles, situations, success outcomes, and failure modes.

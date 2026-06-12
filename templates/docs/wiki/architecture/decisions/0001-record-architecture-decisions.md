@@ -19,8 +19,4 @@ Record meaningful architecture decisions in `docs/wiki/architecture/decisions/`.
 
 ## Unknowns / Needs Confirmation
 
-- Confirm whether this starter decision remains accepted for this repository.
-
-## Unknowns / Needs Confirmation
-
 - Confirm whether this repository needs additional architecture decision records before feature work continues.

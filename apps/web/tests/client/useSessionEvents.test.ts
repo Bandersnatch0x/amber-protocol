@@ -1,39 +1,37 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSessionEvents } from '@/lib/hooks/useSessionEvents';
 
-describe('useSessionEvents', () => {
-  let mockEventSource: any;
-  let onopen: Function;
-  let onmessage: Function;
-  let onerror: Function;
+class MockEventSource {
+  static instances: MockEventSource[] = [];
+  url: string;
+  readyState = 1;
+  onopen: ((ev?: unknown) => void) | null = null;
+  onmessage: ((ev: { data: string }) => void) | null = null;
+  onerror: ((ev?: unknown) => void) | null = null;
+  close = vi.fn();
 
+  constructor(url: string) {
+    this.url = url;
+    MockEventSource.instances.push(this);
+  }
+
+  static get last(): MockEventSource {
+    return MockEventSource.instances[MockEventSource.instances.length - 1];
+  }
+}
+
+describe('useSessionEvents', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    onopen = vi.fn();
-    onmessage = vi.fn();
-    onerror = vi.fn();
-
-    mockEventSource = {
-      close: vi.fn(),
-    };
-
-    global.EventSource = vi.fn(() => {
-      const es = {
-        ...mockEventSource,
-        set onopen(fn: Function) { onopen = fn; },
-        set onmessage(fn: Function) { onmessage = fn; },
-        set onerror(fn: Function) { onerror = fn; },
-        get readyState() { return 1; },
-      };
-      Object.defineProperty(es, 'onopen', { set: (fn: Function) => { onopen = fn; } });
-      Object.defineProperty(es, 'onmessage', { set: (fn: Function) => { onmessage = fn; } });
-      Object.defineProperty(es, 'onerror', { set: (fn: Function) => { onerror = fn; } });
-      return es;
-    }) as any;
+    MockEventSource.instances = [];
+    vi.stubGlobal('EventSource', MockEventSource);
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -46,39 +44,61 @@ describe('useSessionEvents', () => {
 
   it('should connect when sessionId is provided', () => {
     const { result } = renderHook(() => useSessionEvents('session-1'));
-    expect(global.EventSource).toHaveBeenCalledWith('/api/sessions/session-1/events');
-    act(() => { onopen(); });
+    expect(MockEventSource.last.url).toBe('/api/sessions/session-1/events');
+    act(() => {
+      MockEventSource.last.onopen?.();
+    });
     expect(result.current.connectionState).toBe('open');
   });
 
   it('should update status on event', () => {
     const { result } = renderHook(() => useSessionEvents('session-1'));
-    act(() => { onopen(); });
     act(() => {
-      onmessage({ data: JSON.stringify({ type: 'session_started', sessionId: 'session-1', timestamp: Date.now() }) });
+      MockEventSource.last.onopen?.();
+    });
+    act(() => {
+      MockEventSource.last.onmessage?.({
+        data: JSON.stringify({
+          type: 'session_started',
+          sessionId: 'session-1',
+          timestamp: Date.now(),
+        }),
+      });
     });
     expect(result.current.status).toBe('running');
+    expect(result.current.events).toHaveLength(1);
   });
 
   it('should handle reconnect with backoff', () => {
-    const { result } = renderHook(() => useSessionEvents('session-1'));
-    act(() => { onerror(); });
-    expect(global.EventSource).toHaveBeenCalledTimes(2);
+    renderHook(() => useSessionEvents('session-1'));
+    const first = MockEventSource.last;
+    act(() => {
+      first.onerror?.();
+    });
+    expect(first.close).toHaveBeenCalled();
+    expect(MockEventSource.instances).toHaveLength(1);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(MockEventSource.instances).toHaveLength(2);
+    expect(MockEventSource.last).not.toBe(first);
   });
 
   it('should close connection on unmount', () => {
     const { unmount } = renderHook(() => useSessionEvents('session-1'));
+    const es = MockEventSource.last;
     unmount();
-    expect(mockEventSource.close).toHaveBeenCalled();
+    expect(es.close).toHaveBeenCalled();
   });
 
   it('should handle sessionId change', () => {
     const { rerender } = renderHook(
       (props: { sessionId: string | null }) => useSessionEvents(props.sessionId),
-      { initialProps: { sessionId: 'session-1' } }
+      { initialProps: { sessionId: 'session-1' as string | null } },
     );
-    expect(global.EventSource).toHaveBeenCalledWith('/api/sessions/session-1/events');
+    expect(MockEventSource.last.url).toBe('/api/sessions/session-1/events');
     rerender({ sessionId: 'session-2' });
-    expect(global.EventSource).toHaveBeenLastCalledWith('/api/sessions/session-2/events');
+    expect(MockEventSource.last.url).toBe('/api/sessions/session-2/events');
   });
 });
