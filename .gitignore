@@ -27,6 +27,13 @@ build/
 # Test temp output
 tests/.tmp/
 
+# Local tool / screenshot artifacts
+.mimocode/
+.playwright-cli/
+apps/web/.playwright-cli/
+apps/web/.tanstack/
+apps/web/screenshots/
+
 # Package dry-run and local archive output
 npm-pack-dry-run.json
 *.tgz

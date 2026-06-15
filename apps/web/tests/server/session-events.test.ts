@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { sessionEvents } from '@/server/services/session-events';
-import { eventBroadcaster } from '@/server/services/event-broadcaster';
-import { eventStore } from '@/server/services/event-store';
+import { sessionEvents } from '@server/services/session-events';
+import { eventBroadcaster } from '@server/services/event-broadcaster';
+import { eventStore } from '@server/services/event-store';
 
-vi.mock('@/server/services/event-broadcaster', () => ({
+vi.mock('@server/services/event-broadcaster', () => ({
   eventBroadcaster: {
     broadcast: vi.fn(),
     addConnection: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock('@/server/services/event-broadcaster', () => ({
   },
 }));
 
-vi.mock('@/server/services/event-store', () => ({
+vi.mock('@server/services/event-store', () => ({
   eventStore: {
     addEvent: vi.fn(),
   },

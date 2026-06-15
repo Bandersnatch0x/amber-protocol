@@ -1,14 +1,7 @@
-import { router } from './trpc';
-import { sessionRouter } from './routers/session';
-import { routeRouter } from './routers/route';
-import { sessionControlRouter } from './routers/session-control';
-import { gateRouter } from './routers/gate';
+import { createApp } from './app';
 
-export const appRouter = router({
-  session: sessionRouter,
-  route: routeRouter,
-  sessionControl: sessionControlRouter,
-  gate: gateRouter,
+const PORT = Number(process.env.PORT ?? 3001);
+
+createApp().listen(PORT, () => {
+  console.log(`API server listening on http://localhost:${PORT}`);
 });
-
-export type AppRouter = typeof appRouter;

@@ -1,6 +1,6 @@
 import { router, publicProcedure } from '../trpc';
 import { z } from 'zod';
-import { readSessionList, readSessionById, readTimelineEvents } from '@/lib/session-reader';
+import { readSessionList, readSessionById, readTimelineEvents } from '../lib/session-reader';
 
 export const sessionRouter = router({
   list: publicProcedure.query(() => {

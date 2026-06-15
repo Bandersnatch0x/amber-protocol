@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SessionEventSchema, SessionStatusSchema } from '@/server/types/session-events';
+import { SessionEventSchema, SessionStatusSchema } from '@server/types/session-events';
 
 describe('SSE endpoint schema validation', () => {
   it('should validate all event types', () => {

@@ -1,0 +1,220 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+**Amber Protocol** (formerly Coding Harness) is a repository-local governance and control layer for agent-assisted engineering. It provides installation, auditing, validation, and maintenance capabilities for project files that help agents understand codebases, track feature state, and hand off work cleanly.
+
+**Product Boundary:** Amber is a governance-first protocol layer, NOT a general agent framework or execution platform. It focuses on constraining, verifying, auditing, and handing off agent work safely inside a repository.
+
+## Core Architecture
+
+### Module Organization
+
+```
+scripts/amber.js              → Unified CLI entry point
+scripts/lib/amber-core.js     → Facade re-exporting public surface from scripts/lib/core/*
+scripts/lib/core/             → Domain modules (adoption-*, loops, doctor, profiles, etc.)
+scripts/lib/route-commands.js → Route engine (loader, selector, inspector)
+scripts/lib/session-commands.js → Session lifecycle (start, status, list, abort, continue)
+templates/                    → Amber starter files (AGENTS.md, CLAUDE.md, feature_list.json, etc.)
+routes/                       → Route definitions (feature-standard, bugfix-quick, refactor-safe)
+schemas/                      → JSON Schema validation (route, session-manifest, timeline-event)
+workflow-packs/               → Declarative workflow packs
+skills/                       → Agent-facing skill instructions (amber-init, amber-audit, etc.)
+profiles/                     → Project profiles
+src/migration/                → Migration utilities (dry-run, rollback, schema-validator)
+apps/web/                     → Phase C web viewer (Vite + React + tRPC)
+```
+
+### Control Layers (Priority Order)
+
+1. **Governance** (Highest) - Approval records, policy boundaries, adoption controls
+2. **Verification** (High) - Doctor, audit, validation, review, gate surfaces
+3. **Observability** (High) - Timelines, manifests, ledgers, reports
+4. **Lifecycle** (Medium) - Routes, sessions, checkpoints, worktrees
+5. **Context** (Medium) - Starter docs, wiki scaffolds, manifests, handoff artifacts
+6. **Tooling** (Medium) - CLI commands, schemas, validators, workflow packs
+7. **Execution** (Low) - Minimal; avoids becoming a live agent platform
+
+## Common Commands
+
+### Core Operations
+```bash
+# Install Amber files (idempotent, skips existing files)
+node scripts/amber.js init --target path/to/repo
+
+# Audit existing project (read-only)
+node scripts/amber.js audit --target path/to/repo --summary
+
+# Create/validate wiki skeleton
+node scripts/amber.js wiki --target path/to/repo --dry-run
+
+# Validate Amber setup
+node scripts/amber.js doctor --target path/to/repo
+
+# Generate handoff report
+node scripts/amber.js handoff --target path/to/repo
+```
+
+### Route Engine
+```bash
+# List available routes
+node scripts/amber.js route list
+
+# Inspect route definition
+node scripts/amber.js route inspect feature-standard
+
+# Validate route file
+node scripts/amber.js route validate routes/feature-standard.route.json
+
+# Test route (dry-run)
+node scripts/amber.js route test bugfix-quick --dry-run
+```
+
+### Session Lifecycle
+```bash
+# Start new session
+node scripts/amber.js session start --goal "fix login bug"
+node scripts/amber.js session start --goal "add feature" --mode interactive
+
+# Check session status
+node scripts/amber.js session status
+
+# List all sessions
+node scripts/amber.js session list
+
+# Abort session
+node scripts/amber.js session abort <session-id>
+
+# Continue from checkpoint
+node scripts/amber.js session continue
+```
+
+### Adoption (for existing projects)
+```bash
+# Generate adoption report
+node scripts/amber.js adoption report --target path/to/project --output-dir docs/examples/adoptions
+
+# Create adoption bundle
+node scripts/amber.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle
+
+# Gate check
+node scripts/amber.js adoption gate --reports-dir docs/examples/adoptions
+
+# Generate next actions
+node scripts/amber.js adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md
+```
+
+### Migration
+```bash
+# Migrate from legacy .harness to .amber
+node scripts/amber.js migrate --target . --dry-run
+node scripts/amber.js migrate --target .
+```
+
+### Testing & Validation
+```bash
+# Run all tests
+npm test
+
+# Run specific test suites
+npm run test:load        # Load tests
+npm run test:e2e         # E2E tests
+
+# Validate manifests
+npm run manifests
+
+# Run doctor check
+npm run doctor
+```
+
+### Web Viewer (Phase C)
+```bash
+cd apps/web
+npm install --legacy-peer-deps
+npm run dev              # Start dev server (client + backend)
+npm run dev:client       # Vite dev server only
+npm run dev:server       # Express + tRPC server only
+npm run build            # Production build
+npm test                 # Run Vitest tests
+npm run test:e2e         # Run Playwright tests
+```
+
+## Development Notes
+
+### Key Design Principles
+
+1. **Idempotency**: `init` and `wiki` commands skip existing files; re-running is safe
+2. **Read-Only by Default**: `audit` and adoption reports never modify target projects
+3. **Dry-Run First**: Planning and review commands generate artifacts before execution
+4. **Safety Boundaries**: V1 does NOT execute dynamic workflows, dispatch live agents, or auto-rewrite existing project docs
+5. **Schema-Driven**: All route/session/timeline structures are validated against JSON Schema
+
+### Non-Goals (Critical)
+
+- ❌ Dynamic Workflow execution
+- ❌ Live subagent runner invocation  
+- ❌ Automatic target project command execution
+- ❌ External marketplace publishing
+- ❌ Automatic rewrite of existing target project docs
+- ❌ Scheduled loop execution (current product boundary)
+
+### File Conventions
+
+- **Templates** (`templates/`): Safe defaults for AGENTS.md, CLAUDE.md, feature_list.json, etc.
+- **Routes** (`routes/`): JSON definitions with stages, gates, and triggers
+- **Sessions** (`.amber/sessions/` or `.harness/sessions/`): Session manifest, timeline.jsonl, checkpoints
+- **Schemas** (`schemas/`): JSON Schema Draft 2020-12 validation definitions
+- **Wiki** (`docs/wiki/`): Project context skeleton (architecture, runbook, verification, glossary)
+
+### Testing Strategy
+
+- **Unit tests**: `tests/unit/` - Core logic, schemas, validators
+- **Integration tests**: `tests/integration/` - Route/session workflows
+- **E2E tests**: `tests/e2e/` - Full command flows
+- **Load tests**: `tests/load/` - Sequential session stress tests
+- **Migration tests**: `tests/migration/` - Legacy state migration
+- **Security tests**: `tests/security/` - Boundary checks
+
+### Legacy Compatibility
+
+- Legacy `.harness/` state is readable via built-in shims
+- `coding-harness` entrypoint remains available via `scripts/compat/coding-harness.js`
+- `scripts/harness.js` is aliased to `scripts/amber.js`
+- Use `node scripts/amber.js migrate` to convert legacy state to new format
+
+### Web Viewer Architecture
+
+- **Frontend**: Vite + React 18 + TanStack Router + TanStack Query
+- **Backend**: Express 5 + tRPC 10
+- **Styling**: Tailwind CSS
+- **Testing**: Vitest (unit) + Playwright (E2E)
+- **Server runs on**: `localhost:3001` (configurable via PORT env var)
+- **Client runs on**: `localhost:5173` (Vite default)
+
+### Common Gotchas
+
+1. **Web app uses `--legacy-peer-deps`**: Required for current dependency resolution
+2. **Daemon commands exist but are lower-level**: Not documented in main README; used internally by execution engine
+3. **Loop commands are dry-run/inspect only**: `readyForLiveScheduling` is `false` by product boundary
+4. **Route/session schemas are versioned**: Check `schemaVersion` field; migration utilities exist in `src/migration/`
+5. **Agent instructions live in `skills/`**: These are NOT general coding patterns; they're task-specific agent workflows
+
+### When Working on This Codebase
+
+- **Adding new commands**: Update `COMMANDS` array in `scripts/amber.js` and implement in `scripts/lib/` modules
+- **Modifying schemas**: Update `schemas/*.schema.json` and ensure validators in `scripts/validate-*.js` are synced
+- **Adding templates**: Place in `templates/` and update `scripts/lib/core/scaffolding.js`
+- **Adding routes**: Create `.route.json` in `routes/` following `schemas/route.schema.json`
+- **Migration changes**: Add utilities to `src/migration/` with dry-run support
+
+### CI/CD
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on pushes and PRs:
+- Tests on Node 18.x, 20.x, 22.x
+- Manifest validation
+- Doctor checks
+- CLI smoke tests
+- Release dry-run on version tags (does NOT auto-publish)

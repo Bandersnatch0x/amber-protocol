@@ -1,7 +1,7 @@
 import { router, publicProcedure } from '../trpc';
 import { z } from 'zod';
 import { sessionEvents } from '../services/session-events';
-import { readSessionById } from '@/lib/session-reader';
+import { readSessionById } from '../lib/session-reader';
 import { SessionStatusSchema } from '../types/session-events';
 
 const statusTransitions: Record<string, string[]> = {

@@ -1,6 +1,6 @@
 import { router, publicProcedure } from '../trpc';
 import { z } from 'zod';
-import { listRoutes, getRouteById, groupRoutesByCategory } from '@/lib/route-reader';
+import { listRoutes, getRouteById, groupRoutesByCategory } from '../lib/route-reader';
 
 export const routeRouter = router({
   list: publicProcedure.query(() => {
