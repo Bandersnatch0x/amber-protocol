@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SessionStatusSchema, SessionEventSchema } from '@/server/types/session-events';
+import { SessionStatusSchema, SessionEventSchema } from '@server/types/session-events';
 
 describe('Session status transitions', () => {
   const transitions: Record<string, string[]> = {

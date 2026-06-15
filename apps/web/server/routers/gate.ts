@@ -1,6 +1,6 @@
 import { router, publicProcedure } from '../trpc';
 import { z } from 'zod';
-import { listGates, getGate, approveGate, rejectGate } from '@/lib/gate-reader';
+import { listGates, getGate, approveGate, rejectGate } from '../lib/gate-reader';
 
 export const gateRouter = router({
   list: publicProcedure

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { eventBroadcaster } from '@/server/services/event-broadcaster';
-import { SessionEvent } from '@/server/types/session-events';
+import { eventBroadcaster } from '@server/services/event-broadcaster';
+import { SessionEvent } from '@server/types/session-events';
 
 function createMockResponse(): any {
   const handlers = new Map<string, Function[]>();
