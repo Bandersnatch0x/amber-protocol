@@ -2,8 +2,15 @@ import { Request, Response } from 'express';
 import { eventBroadcaster } from '../services/event-broadcaster';
 import { eventStore } from '../services/event-store';
 import { readSessionById } from '../lib/session-reader';
+import { validateSSEAuthToken } from '../lib/auth-token';
 
 export function handleSSE(req: Request, res: Response): void {
+  const auth = validateSSEAuthToken(req);
+  if (!auth.valid) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
   const { sessionId } = req.params;
 
   // Verify session exists
