@@ -232,3 +232,23 @@ describe("real skills integration", () => {
 		}
 	});
 });
+
+const { validateManifests } = require("../../scripts/lib/core/manifests");
+const { readJson } = require("../../scripts/lib/core/fs-utils");
+
+describe("plugin manifests", () => {
+	const repoRoot = path.resolve(__dirname, "../..");
+
+	it("validate without errors", () => {
+		const result = validateManifests(repoRoot);
+		assert.deepStrictEqual(result.errors, []);
+	});
+
+	it("declare version 1.0.0 matching package.json", () => {
+		const pkg = readJson(path.join(repoRoot, "package.json"));
+		const claude = readJson(path.join(repoRoot, ".claude-plugin/plugin.json"));
+		const codex = readJson(path.join(repoRoot, ".codex-plugin/plugin.json"));
+		assert.strictEqual(claude.version, pkg.version);
+		assert.strictEqual(codex.version, pkg.version);
+	});
+});
