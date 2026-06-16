@@ -1,5 +1,9 @@
 # Amber Protocol
 
+<p align="center">
+  <img src="./assets/brand/amber-protocol-logo.png" alt="Amber Protocol logo" width="160" />
+</p>
+
 [English](./README.md)
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
@@ -137,15 +141,17 @@ Adoption 命令面向不应被自动修改的旧项目或既有项目。
 
 | 阶段 | 状态 | 范围 |
 | --- | --- | --- |
-| V1 Safe Amber Bootstrap | 已实现 | `init`、`audit`、`wiki`、`doctor`、`handoff` |
-| V1.5 Compatibility Hardening | 已实现 | 目标分类、有界摘要、manifest/wiki 校验 |
-| V2 Planning Layer | 已实现 | 计划、人工 gate、source bundle、checkpoint 字段 |
-| V2.5 Review And Acceptance | 已实现 | 静态审查、验收记录、回归提案 |
-| V3 Workflow Pack Design Kit | 已实现 | 声明式 pack/profile 检查与校验 |
-| V4 Isolated Execution Foundation | 已实现 | task ledger、evidence、replay artifact |
-| V4.5 Agent Orchestration Records | 已实现 | dispatch/reviewer 记录，不执行 worker |
-| V5 Team Distribution | 已实现 | 本地 registry、install/pin/update/rollback 元数据 |
-| V5.5 Maintenance Proposals | 已实现 | stale docs、drift、wiki lint、可审查提案 |
+| V1 – V5.5 | 已实现 | `init`、`audit`、`wiki`、`doctor`、`handoff`、plans、gates、reviews、packs、teams、maintenance、loops |
+| **Phase B Alpha W1** | 已实现 | Schema 基础：route/session timeline schemas + validators |
+| **Phase B Alpha W2** | 已实现 | Route engine：route-loader、route-selector、`route` CLI |
+| **Phase B Alpha W3** | 已实现 | Session lifecycle：state machine、worktree manager、`session` CLI |
+| **Phase B Alpha W4** | 已实现 | Interactive execution：stage executor、gate handler、budget tracker |
+| **Phase B Alpha W5** | 已实现 | Checkpoint & continue：checkpoint-manager、migrate CLI |
+| **Phase B Beta** | 已实现 | Autonomous mode：executor、policy、daemon、logger、notifier、session-lock |
+| **Phase B RC** | 已实现 | Integration testing：e2e/load/migration/security test suites |
+| **Phase B GA** | 已实现 | Release：publish/release scripts、migration tools（dry-run、rollback、schema-validator） |
+| **Phase C** | 已实现 | Web Viewer — Vite + React + TanStack Router；单元测试通过；Playwright e2e 已接入 CI |
+| **Phase D** | 部分实现 | Production hardening — SSE auth helpers 与 error logging 已存在；SSE endpoint enforcement 与外部监控尚未接入 |
 | Future Live Loop Scheduling | 未实现 | 仅保留未来 readiness 轨道；scheduled execution 仍禁用 |
 
 完整边界和阶段说明见 [SPEC.md](./SPEC.md) 与 [ROADMAP.md](./ROADMAP.md)。
@@ -160,7 +166,9 @@ CI 在 push 和 pull request 上运行：
 - 运行 `npm test`
 - 运行 manifest 校验
 - 运行 `doctor --target .`
-- smoke-check CLI help
+- 运行 `npm run gen:agents:check`，确保各平台生成的命令产物没有漂移
+- 使用 `node scripts/amber.js --help` 做 CLI smoke-check
+- 在 `apps/web` 中构建、单元测试并运行 Playwright e2e 测试（Node 20.x）
 
 当推送类似 `v1.2.3` 的 tag 时，会运行 release dry-run：
 

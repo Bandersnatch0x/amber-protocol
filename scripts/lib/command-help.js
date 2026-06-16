@@ -5,7 +5,7 @@
 // joined with newlines. Adding a command's help is a one-line data edit here,
 // not a new branch in the CLI dispatcher.
 const COMMAND_HELP = {
-	init: "Create missing Harness files without overwriting existing files. Supports --dry-run.",
+	init: "Create missing Amber starter files without overwriting existing files. Supports --dry-run.",
 	audit: "Inspect an existing project without writing files. Supports --summary for bounded text output.",
 	wiki: "Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run.",
 	handoff: "Validate session-handoff.md required V1 sections.",

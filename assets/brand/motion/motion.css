@@ -1,0 +1,131 @@
+:root {
+  --p2m-duration: 2400ms;
+  --stage-bg: #2a2a2a;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--stage-bg);
+  font-family: system-ui, sans-serif;
+}
+
+#logo-root {
+  position: relative;
+  width: 320px;
+  height: 320px;
+  isolation: isolate;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+#frame-base {
+  z-index: 1;
+}
+
+#gem-glow {
+  z-index: 2;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  filter: blur(10px) brightness(1.05);
+  animation: gem-glow-pulse var(--p2m-duration) cubic-bezier(0.33, 0, 0.2, 1) infinite;
+}
+
+#gem-core {
+  z-index: 3;
+  clip-path: polygon(38% 18%, 62% 18%, 72% 50%, 50% 82%, 28% 50%);
+  transform-origin: 50% 52%;
+  animation: gem-core-drift var(--p2m-duration) cubic-bezier(0.42, 0, 0.58, 1) infinite;
+}
+
+#frame-gold {
+  z-index: 4;
+  mix-blend-mode: screen;
+  opacity: 0.35;
+  filter: saturate(1.4) brightness(1.25);
+  animation: gold-sheen var(--p2m-duration) cubic-bezier(0, 0, 0.58, 1) 120ms infinite;
+}
+
+@keyframes gem-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    filter: blur(6px) brightness(0.88);
+  }
+
+  50% {
+    opacity: 0.92;
+    filter: blur(12px) brightness(1.12);
+  }
+}
+
+@keyframes gem-core-drift {
+  0%,
+  100% {
+    transform: translateY(2px) scaleY(0.98);
+    filter: brightness(0.92) saturate(0.96);
+  }
+
+  45% {
+    transform: translateY(-3px) scaleY(1.04);
+    filter: brightness(1.08) saturate(1.08);
+  }
+
+  70% {
+    transform: translateY(0);
+    filter: brightness(0.98) saturate(1);
+  }
+}
+
+@keyframes gold-sheen {
+  0%,
+  18%,
+  100% {
+    opacity: 0.35;
+  }
+
+  42% {
+    opacity: 1;
+  }
+
+  58% {
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #gem-glow,
+  #gem-core,
+  #frame-gold {
+    animation: none;
+  }
+
+  #gem-glow {
+    opacity: 0.7;
+    filter: blur(8px) brightness(1);
+  }
+
+  #gem-core {
+    transform: none;
+    filter: none;
+  }
+
+  #frame-gold {
+    opacity: 0.5;
+  }
+}

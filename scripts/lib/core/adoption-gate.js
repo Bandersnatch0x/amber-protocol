@@ -24,7 +24,7 @@ function adoptionGateFindings(report) {
 		findings.push({
 			id: "missing-harness-files",
 			severity: "wait",
-			message: `${missingHarnessFiles} Harness files are still missing.`,
+			message: `${missingHarnessFiles} Amber starter files are still missing.`,
 		});
 	}
 
@@ -216,7 +216,7 @@ function buildAdoptionStatusContent(status) {
 		lines.push(`- Base: ${status.compare.base.file}`);
 		lines.push(`- Head: ${status.compare.head.file}`);
 		lines.push(
-			`- Missing Harness files delta: ${status.compare.metrics.missingHarnessFiles.delta ?? "n/a"}`,
+			`- Missing Amber starter files delta: ${status.compare.metrics.missingHarnessFiles.delta ?? "n/a"}`,
 		);
 		lines.push(
 			`- Candidate commands added: ${status.compare.candidateCommands.added.length}`,
