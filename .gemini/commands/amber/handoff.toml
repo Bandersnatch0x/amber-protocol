@@ -1,0 +1,8 @@
+# GENERATED — edit skills/ instead. Run: npm run gen:agents
+description = "Prepare session continuity using Progress, feature state, and handoff files."
+prompt = """
+Run the Amber amber-handoff workflow for the target repository.
+If no target is provided, use the current repository root (.).
+Execute: node scripts/amber.js handoff --target {{args}}
+Report the command output faithfully; never overwrite user-authored files without approval.
+"""
