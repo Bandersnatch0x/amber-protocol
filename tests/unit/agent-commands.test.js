@@ -203,3 +203,32 @@ describe("generateAgentCommands", () => {
 		assert.strictEqual(check.changed, false);
 	});
 });
+
+const { COMMANDS } = require("../../scripts/amber.js");
+
+describe("real skills integration", () => {
+	const repoRoot = path.resolve(__dirname, "../..");
+	const skills = collectAmberSkills(path.join(repoRoot, "skills"));
+
+	it("discovers the five core skills", () => {
+		const names = skills.map((s) => s.name).sort();
+		assert.deepStrictEqual(names, [
+			"amber-audit",
+			"amber-doctor",
+			"amber-handoff",
+			"amber-init",
+			"amber-wiki",
+		]);
+	});
+
+	it("every skill command targets a real amber.js subcommand", () => {
+		for (const skill of skills) {
+			const name = extractCommandName(skill.amber.command);
+			assert.ok(
+				COMMANDS.includes(name),
+				`${skill.name} → unknown command "${name}"`,
+			);
+			assert.match(skill.amber.command, /^node scripts\/amber\.js /);
+		}
+	});
+});
