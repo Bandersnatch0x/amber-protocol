@@ -17,6 +17,8 @@ const { createWorktree, removeWorktree } = require("./worktree-manager");
 const { selectRoute } = require("./route-selector");
 const { loadRoutes } = require("./route-loader");
 const { result } = require("./result");
+const { ensureContinuitySurfaces } = require("./continuity-surfaces");
+const { writeJson } = require("./core/fs-utils");
 const {
 	resolveStateDirForRead,
 	resolveStateDirForCreate,
@@ -100,20 +102,8 @@ async function startSession(projectRoot, options) {
 		goal,
 		budget,
 	});
-
 	const sessionDir = getSessionDirForCreate(projectRoot, manifest.sessionId);
 	fs.mkdirSync(sessionDir, { recursive: true });
-
-	const manifestPath = path.join(sessionDir, "manifest.json");
-	fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-
-	const timelinePath = path.join(sessionDir, "timeline.jsonl");
-	const writer = new TimelineWriter(timelinePath);
-	await writer.append({
-		type: "session_created",
-		data: { sessionId: manifest.sessionId, goal },
-	});
-	await writer.close();
 
 	const lines = [
 		`Session created: ${manifest.sessionId}`,
@@ -121,11 +111,17 @@ async function startSession(projectRoot, options) {
 		`Goal: ${goal}`,
 	];
 
+	const extras = {
+		continuitySurfaces: ensureContinuitySurfaces(projectRoot),
+	};
+	lines.push(
+		`Continuity surfaces: ${extras.continuitySurfaces.memory}, ${extras.continuitySurfaces.notes}, ${extras.continuitySurfaces.tasksReadme}`,
+	);
+
 	if (worktree) {
 		const worktreeResult = createWorktree(projectRoot, manifest.sessionId);
 		if (worktreeResult.success) {
-			manifest.worktree = `${CANONICAL_STATE_DIR}/worktrees/${manifest.sessionId}`;
-			fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+			extras.worktree = `${CANONICAL_STATE_DIR}/worktrees/${manifest.sessionId}`;
 			lines.push(`Worktree: ${manifest.sessionId}`);
 		} else {
 			lines.push(`Worktree failed: ${worktreeResult.error}`);
@@ -133,15 +129,26 @@ async function startSession(projectRoot, options) {
 	}
 
 	if (mode) {
-		manifest.mode = mode;
-		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+		extras.mode = mode;
 		lines.push(`Mode: ${mode}`);
 	}
+
+	const finalManifest = { ...manifest, ...extras };
+	const manifestPath = path.join(sessionDir, "manifest.json");
+	writeJson(manifestPath, finalManifest);
+
+	const timelinePath = path.join(sessionDir, "timeline.jsonl");
+	const writer = new TimelineWriter(timelinePath);
+	await writer.append({
+		type: "session_created",
+		data: { sessionId: finalManifest.sessionId, goal },
+	});
+	await writer.close();
 
 	return {
 		text: lines.join("\n"),
 		exitCode: 0,
-		sessionId: manifest.sessionId,
+		sessionId: finalManifest.sessionId,
 	};
 }
 

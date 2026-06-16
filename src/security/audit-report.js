@@ -73,6 +73,12 @@ function generateAuditReport(depResult, secretResult, permResult) {
 		report += "No permission issues found.\n\n";
 	}
 
+	// Governance Categories
+	report += "## Governance Categories\n\n";
+	report += "- Dependency Scan → `dependency-vulnerability-review`\n";
+	report += "- Secret Scan → `secret-exposure-review`\n";
+	report += "- Permission Review → `permission-surface-review`\n\n";
+
 	// Remediation section
 	report += "## Remediation\n\n";
 

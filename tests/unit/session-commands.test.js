@@ -75,6 +75,29 @@ describe("session-commands", () => {
 			assert.strictEqual(manifest.route.id, "feature-standard");
 		});
 
+		it("creates continuity surfaces and references them in the manifest", async () => {
+			const result = await startSession(TEST_ROOT, {
+				goal: "test continuity",
+				route: "feature-standard",
+			});
+
+			const manifestPath = path.join(
+				TEST_ROOT,
+				".amber",
+				"sessions",
+				result.sessionId,
+				"manifest.json",
+			);
+			const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+			assert.ok(manifest.continuitySurfaces);
+			assert.strictEqual(manifest.continuitySurfaces.memory, "MEMORY.md");
+			assert.strictEqual(manifest.continuitySurfaces.notes, "notes.md");
+			assert.ok(fs.existsSync(path.join(TEST_ROOT, "MEMORY.md")));
+			assert.ok(fs.existsSync(path.join(TEST_ROOT, "notes.md")));
+			assert.ok(fs.existsSync(path.join(TEST_ROOT, "tasks", "README.md")));
+		});
+
 		it("auto-selects route when not specified", async () => {
 			const result = await startSession(TEST_ROOT, {
 				goal: "fix the login bug",

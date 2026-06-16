@@ -1,0 +1,90 @@
+{
+  "id": "security-governance",
+  "title": "Security Governance",
+  "version": "1.0.0",
+  "description": "Declarative review criteria for AI-assisted coding security: dependency, secret, permission, insecure-code, repair-verification, and high-risk-action review.",
+  "categories": [
+    {
+      "id": "dependency-vulnerability-review",
+      "name": "Dependency vulnerability review",
+      "description": "Review declared dependencies and runtime packages for known vulnerabilities.",
+      "requiredEvidence": [
+        "dependency scan result",
+        "vulnerability list with severity",
+        "fix availability statement"
+      ],
+      "remediationExpectation": "Update, patch, or replace vulnerable dependencies; record verification command."
+    },
+    {
+      "id": "secret-exposure-review",
+      "name": "Secret exposure review",
+      "description": "Scan source code and generated artifacts for hardcoded credentials or secrets.",
+      "requiredEvidence": [
+        "secret scan findings",
+        "file and line references",
+        "rotation status"
+      ],
+      "remediationExpectation": "Remove secrets from source, rotate exposed credentials, move to environment variables or a secrets manager."
+    },
+    {
+      "id": "permission-surface-review",
+      "name": "Permission surface review",
+      "description": "Review permission and capability declarations for least-privilege alignment.",
+      "requiredEvidence": [
+        "permission review findings",
+        "justification for broad permissions",
+        "missing-permission list"
+      ],
+      "remediationExpectation": "Tighten overly broad permissions, remove unused capabilities, document required permissions."
+    },
+    {
+      "id": "insecure-code-generation-review",
+      "name": "Insecure code generation review",
+      "description": "Review AI-generated or modified code for injection, unsafe eval, missing validation, and other insecure patterns.",
+      "requiredEvidence": [
+        "changed files",
+        "insecure pattern checklist",
+        "reviewer sign-off"
+      ],
+      "remediationExpectation": "Refactor unsafe patterns, add input validation, and re-review before acceptance."
+    },
+    {
+      "id": "vulnerability-repair-verification",
+      "name": "Vulnerability repair verification",
+      "description": "Verify that a reported vulnerability has been remediated without introducing regressions.",
+      "requiredEvidence": [
+        "re-scan result",
+        "regression test or replay evidence",
+        "reviewer confirmation"
+      ],
+      "remediationExpectation": "Confirm the vulnerability no longer appears and related behavior is covered by tests or verification."
+    },
+    {
+      "id": "high-risk-agent-action-review",
+      "name": "High-risk agent action review",
+      "description": "Review agent actions that mutate state, execute commands, or touch sensitive surfaces.",
+      "requiredEvidence": [
+        "action log",
+        "approval record",
+        "rollback plan"
+      ],
+      "remediationExpectation": "Require explicit human approval, use isolated workspaces, and preserve rollback evidence."
+    }
+  ],
+  "severityNames": [
+    "critical",
+    "high",
+    "medium",
+    "low",
+    "info"
+  ],
+  "approvalPolicy": {
+    "readOnlyInspection": "allowed",
+    "reportGeneration": "allowed",
+    "fileMutation": "requires-human-approval",
+    "commandExecution": "requires-human-approval",
+    "externalNotification": "requires-human-approval",
+    "issueCreation": "requires-human-approval",
+    "selfApprovalAllowed": false
+  }
+}
