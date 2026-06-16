@@ -252,3 +252,27 @@ describe("plugin manifests", () => {
 		assert.strictEqual(codex.version, pkg.version);
 	});
 });
+
+describe("root AGENTS.md", () => {
+	const repoRoot = path.resolve(__dirname, "../..");
+
+	it("exists and documents the amber.js entry", () => {
+		const file = path.join(repoRoot, "AGENTS.md");
+		assert.ok(fs.existsSync(file), "AGENTS.md missing");
+		const text = fs.readFileSync(file, "utf8");
+		assert.match(text, /node scripts\/amber\.js/);
+	});
+
+	it("lists every core skill command name", () => {
+		const text = fs.readFileSync(path.join(repoRoot, "AGENTS.md"), "utf8");
+		const skills = collectAmberSkills(path.join(repoRoot, "skills"));
+		for (const skill of skills) {
+			const name = extractCommandName(skill.amber.command);
+			assert.match(
+				text,
+				new RegExp(`amber\\.js ${name}\\b`),
+				`AGENTS.md missing command: ${name}`,
+			);
+		}
+	});
+});
