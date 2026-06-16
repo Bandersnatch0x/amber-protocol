@@ -1093,8 +1093,9 @@ Expected: 空输出（所有改动已提交）。
 
 不做：Copilot/Windsurf 适配、`amber-continuous-improvement` 与其余 19 命令、由 plugin/skill 实际执行命令、外部 marketplace 发布。
 
-## 待验证点（对应 spec §9，实现期顺手确认，不阻塞本计划）
+## 待验证点（对应 spec §9，更新：2026-06-16）
 
-- Cursor / Gemini 放置 `SKILL.md` 的确切目录（本计划只产出 Gemini 的 `.gemini/commands/*.toml` 手动命令，skill 层目录留待平台文档确认）。
-- Codex 对 `.codex-plugin` `skills` 相对路径的解析、是否需要 `.codex/skills/` 实体目录。
-- Claude plugin manifest 是否支持 `commands` 字段（如支持，可在后续追加，不影响本计划产物）。
+- ✅ **Codex / Cursor skill 目录 = `.agents/skills/`**（官方确认）。生成器已镜像全部 `skills/` 到 `.agents/skills/`（`listSkillDirs` + 镜像 outputs，幂等、`check` 守护）。
+- ✅ **Codex 不需 `.codex/skills/`，也不依赖 `.codex-plugin` 指向**：官方机制即 `.agents/skills/` 实体目录，已满足。
+- ⏳ **Gemini skill 层目录**未核实——当前靠 `.gemini/commands/*.toml` 手动命令覆盖。
+- ⏳ **Claude plugin `commands` 字段**：未使用，slash 直接放 `.claude/commands/` 已生效。
