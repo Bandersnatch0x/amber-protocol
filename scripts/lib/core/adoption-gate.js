@@ -19,6 +19,11 @@ function adoptionGateFindings(report) {
 	const findings = [];
 	const missingHarnessFiles = report.metrics.missingHarnessFiles;
 	const conflicts = report.metrics.conflicts;
+	const targetType = report.targetType;
+
+	if (targetType === "product-repo") {
+		return findings;
+	}
 
 	if (typeof missingHarnessFiles === "number" && missingHarnessFiles > 0) {
 		findings.push({

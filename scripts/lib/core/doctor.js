@@ -18,10 +18,8 @@ const {
 	resolveTarget,
 } = require("./fs-utils");
 
-const {
-	classifyTarget,
-	validateManifests,
-} = require("./manifests");
+const { validateManifests } = require("./manifests");
+const { classifyTarget } = require("./target-classification");
 
 const {
 	inspectProjectProfile,

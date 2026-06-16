@@ -50,17 +50,15 @@ test("doctor reports product-repo status for this toolkit repository", () => {
   assert.match(humanResult.stdout, /Target type: product-repo/);
 });
 
-test("audit summary classifies this repository as product-repo with expected notes", () => {
+test("audit summary uses product-repo mode without root starter gaps", () => {
   const result = runHarness(["audit", "--target", ROOT, "--summary"]);
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Target type: product-repo/);
-  assert.match(result.stdout, /Missing Amber starter files: \d+/);
-  assert.match(
-    result.stdout,
-    /Missing Amber starter files at repo root are expected for the Amber Protocol product repository/,
-  );
-  assert.match(result.stdout, /Starter scaffolds live under templates\//);
+  assert.match(result.stdout, /Template starter files: \d+\/\d+ in templates\//);
+  assert.doesNotMatch(result.stdout, /Missing Amber starter files:/);
+  assert.match(result.stdout, /Suggested additions: 0/);
+  assert.match(result.stdout, /Conflicts: 0/);
 });
 
 test("sample workflow pack and profile can be inspected without execution", () => {

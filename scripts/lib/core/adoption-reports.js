@@ -71,8 +71,15 @@ function buildAdoptionReportContent(parts) {
 		"## Audit Summary",
 		"",
 		`- Read-only: ${audit.readOnly}`,
-		`- Existing Amber starter files: ${audit.existing.length}`,
-		`- Missing Amber starter files: ${audit.missing.length}`,
+		`- Target type: ${audit.classification.type}`,
+		...(audit.auditMode === "product-repo"
+			? [
+					`- Template starter files: ${audit.templateStarterFiles.existing.length}/${audit.templateStarterFiles.existing.length + audit.templateStarterFiles.missing.length} in templates/`,
+				]
+			: [
+					`- Existing Amber starter files: ${audit.existing.length}`,
+					`- Missing Amber starter files: ${audit.missing.length}`,
+				]),
 		`- Existing docs: ${audit.docs.length}`,
 		`- Wiki-like files: ${audit.wikiLikeFiles.length}`,
 		`- Conflicts: ${audit.conflicts.length}`,
@@ -443,9 +450,12 @@ function parseAdoptionReportForComparison(filePath) {
 		metrics[key] = readAdoptionReportMetric(markdown, label);
 	}
 
+	const targetType = readAdoptionReportMetric(markdown, "Target type");
+
 	return {
 		report: {
 			...metadata,
+			targetType,
 			metrics,
 			candidateCommands: extractMarkdownListUnderSubheading(
 				markdown,

@@ -8,7 +8,6 @@ const {
 } = require("./constants");
 
 const AUDIT_IGNORED_DIRECTORY_NAMES = new Set([
-	".claude",
 	".git",
 	".mypy_cache",
 	".next",
@@ -48,6 +47,10 @@ function writeJson(filePath, data) {
 	fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
 }
 
+function collectFilesBySuffix(root, suffix) {
+	return walkFiles(root).filter((filePath) => filePath.endsWith(suffix));
+}
+
 function walkFiles(root) {
 	if (!pathExists(root)) {
 		return [];
@@ -72,6 +75,12 @@ function isIgnoredAuditPath(relativePath) {
 	const normalized = relativePath.split(path.sep).join("/").toLowerCase();
 	const segments = normalized.split("/").filter(Boolean);
 	if (segments.some((segment) => AUDIT_IGNORED_DIRECTORY_NAMES.has(segment))) {
+		return true;
+	}
+	if (
+		normalized === ".claude/worktrees" ||
+		normalized.startsWith(".claude/worktrees/")
+	) {
 		return true;
 	}
 	return (
@@ -129,6 +138,7 @@ module.exports = {
 	readText,
 	readJson,
 	writeJson,
+	collectFilesBySuffix,
 	walkFiles,
 	isIgnoredAuditPath,
 	walkProjectFiles,
