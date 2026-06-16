@@ -6,6 +6,8 @@ const path = require("node:path");
 const {
 	parseSkillFrontmatter,
 	extractCommandName,
+	applyPositionalArgs,
+	applyGeminiArgs,
 	renderClaudeCommand,
 	renderGeminiCommand,
 	collectAmberSkills,
@@ -139,6 +141,26 @@ describe("renderGeminiCommand", () => {
 		});
 		assert.match(out, /description = "Use \\"quotes\\" here\."/);
 	});
+
+	it("collapses multiple argument placeholders into a single {{args}}", () => {
+		const out = renderGeminiCommand({
+			name: "amber-plan",
+			description: "Scaffold a plan.",
+			amber: {
+				command:
+					"node scripts/amber.js plan --target {{target}} --feature {{feature}} --title {{title}}",
+				args: [
+					{ name: "target" },
+					{ name: "feature" },
+					{ name: "title" },
+				],
+				manualName: "amber-plan",
+			},
+		});
+		assert.match(out, /node scripts\/amber\.js plan --target \{\{args\}\}/);
+		assert.doesNotMatch(out, /\{\{feature\}\}/);
+		assert.doesNotMatch(out, /\{\{title\}\}/);
+	});
 });
 
 describe("collectAmberSkills", () => {
@@ -243,13 +265,17 @@ describe("real skills integration", () => {
 	const repoRoot = path.resolve(__dirname, "../..");
 	const skills = collectAmberSkills(path.join(repoRoot, "skills"));
 
-	it("discovers the five core skills", () => {
+	it("discovers the core skills", () => {
 		const names = skills.map((s) => s.name).sort();
 		assert.deepStrictEqual(names, [
+			"amber-adoption",
 			"amber-audit",
 			"amber-doctor",
 			"amber-handoff",
 			"amber-init",
+			"amber-plan",
+			"amber-route",
+			"amber-session",
 			"amber-wiki",
 		]);
 	});

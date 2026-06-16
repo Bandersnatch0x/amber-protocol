@@ -1,0 +1,8 @@
+# GENERATED — edit skills/ instead. Run: npm run gen:agents
+description = "Scaffold a new Amber plan file for a feature slice."
+prompt = """
+Run the Amber amber-plan workflow for the target repository.
+If no target is provided, use the current repository root (.).
+Execute: node scripts/amber.js plan --target {{args}}
+Report the command output faithfully; never overwrite user-authored files without approval.
+"""
