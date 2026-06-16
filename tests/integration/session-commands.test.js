@@ -3,15 +3,24 @@
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const fs = require("fs");
+const os = require("node:os");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "../..");
 
+// Isolated session root so manifests and continuity surfaces land in a tempdir
+// instead of the amber source tree. cwd stays at ROOT so routes resolve.
+const SESSION_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "amber-session-int-"));
+
+test.after(() => {
+	fs.rmSync(SESSION_ROOT, { recursive: true, force: true });
+});
+
 function runHarness(args) {
 	return spawnSync(
 		process.execPath,
-		[path.join(ROOT, "scripts", "harness.js"), ...args],
+		[path.join(ROOT, "scripts", "harness.js"), ...args, "--target", SESSION_ROOT],
 		{
 			cwd: ROOT,
 			encoding: "utf8",
@@ -36,7 +45,7 @@ test("session start creates manifest and timeline", () => {
 
 	const sessionId = match[1];
 	const manifestPath = path.join(
-		ROOT,
+		SESSION_ROOT,
 		".amber",
 		"sessions",
 		sessionId,
@@ -49,7 +58,7 @@ test("session start creates manifest and timeline", () => {
 	assert.equal(manifest.goal, "implement test feature");
 
 	const timelinePath = path.join(
-		ROOT,
+		SESSION_ROOT,
 		".amber",
 		"sessions",
 		sessionId,
@@ -135,7 +144,7 @@ test("session abort sets status to aborted", () => {
 	assert.match(result.stdout, /Session aborted/);
 
 	const manifestPath = path.join(
-		ROOT,
+		SESSION_ROOT,
 		".amber",
 		"sessions",
 		sessionId,
