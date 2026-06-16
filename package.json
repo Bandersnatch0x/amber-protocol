@@ -15,7 +15,9 @@
     "handoff": "node scripts/amber.js handoff --target .",
     "manifests": "node scripts/validate-manifests.js --target .",
     "test:load": "node --test tests/load/sequential-sessions.test.js",
-    "test:e2e": "node --test tests/e2e/"
+    "test:e2e": "node --test tests/e2e/",
+    "gen:agents": "node scripts/gen-agent-commands.js",
+    "gen:agents:check": "node scripts/gen-agent-commands.js --check"
   },
   "engines": {
     "node": ">=18.17"
