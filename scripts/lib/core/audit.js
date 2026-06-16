@@ -7,6 +7,8 @@ const {
 	REQUIRED_HARNESS_FILES,
 } = require("./constants");
 
+const { classifyTarget } = require("./target-classification");
+
 const {
 	fileContains,
 	isIgnoredAuditPath,
@@ -17,8 +19,6 @@ const {
 	resolveTarget,
 	walkProjectFiles,
 } = require("./fs-utils");
-
-const { classifyTarget } = require("./manifests");
 
 const {
 	getSectionBody,
@@ -218,30 +218,31 @@ function buildNextSafeCommand(targetRoot) {
 	return `node scripts/amber.js audit --target ${JSON.stringify(targetRoot)} --json`;
 }
 
-function auditProject(target) {
-	const targetRoot = resolveTarget(target);
-	const classification = classifyTarget(targetRoot);
+function listStarterFileStatus(rootDir, relativePaths) {
 	const existing = [];
 	const missing = [];
 
-	for (const relativePath of REQUIRED_HARNESS_FILES) {
-		if (pathExists(path.join(targetRoot, relativePath))) {
+	for (const relativePath of relativePaths) {
+		if (pathExists(path.join(rootDir, relativePath))) {
 			existing.push(relativePath);
 		} else {
 			missing.push(relativePath);
 		}
 	}
 
-	const agentDocs = [
+	return { existing, missing };
+}
+
+function listAgentDocs(targetRoot) {
+	return [
 		"AGENTS.md",
 		"CLAUDE.md",
 		".cursorrules",
 		".windsurfrules",
 	].filter((fileName) => pathExists(path.join(targetRoot, fileName)));
+}
 
-	const conflicts = agentDocs.filter((fileName) =>
-		["AGENTS.md", "CLAUDE.md"].includes(fileName),
-	);
+function buildAuditDetection(targetRoot) {
 	const docs = listProjectDocs(targetRoot);
 	const wikiLikeFiles = docs.filter(isWikiLike);
 	const parseIssues = [];
@@ -259,25 +260,77 @@ function auditProject(target) {
 	);
 
 	return {
-		target: targetRoot,
-		readOnly: true,
-		classification,
-		existing,
-		missing,
-		agentDocs,
 		docs,
 		wikiLikeFiles,
 		commands,
 		candidateCommands,
 		toolingEvidence,
 		parseIssues,
+		unknowns,
+	};
+}
+
+function auditTargetRepo(targetRoot, classification) {
+	const { existing, missing } = listStarterFileStatus(
+		targetRoot,
+		REQUIRED_HARNESS_FILES,
+	);
+	const agentDocs = listAgentDocs(targetRoot);
+	const conflicts = agentDocs.filter((fileName) =>
+		["AGENTS.md", "CLAUDE.md"].includes(fileName),
+	);
+
+	return {
+		target: targetRoot,
+		readOnly: true,
+		auditMode: "target-repo",
+		classification,
+		existing,
+		missing,
+		agentDocs,
 		conflicts,
 		suggestedAdditions: missing,
 		suggestedPatches: buildSuggestedPatches(conflicts),
 		untouchedFiles: conflicts,
-		unknowns,
+		...buildAuditDetection(targetRoot),
 		nextSafeCommand: buildNextSafeCommand(targetRoot),
 	};
+}
+
+function auditProductRepo(targetRoot, classification) {
+	const templateRoot = path.join(targetRoot, "templates");
+	const templateStarterFiles = listStarterFileStatus(
+		templateRoot,
+		REQUIRED_HARNESS_FILES,
+	);
+
+	return {
+		target: targetRoot,
+		readOnly: true,
+		auditMode: "product-repo",
+		classification,
+		templateStarterFiles,
+		existing: [],
+		missing: [],
+		agentDocs: listAgentDocs(targetRoot),
+		conflicts: [],
+		suggestedAdditions: [],
+		suggestedPatches: [],
+		untouchedFiles: [],
+		...buildAuditDetection(targetRoot),
+		nextSafeCommand: buildNextSafeCommand(targetRoot),
+	};
+}
+
+function auditProject(target) {
+	const targetRoot = resolveTarget(target);
+	const classification = classifyTarget(targetRoot);
+
+	if (classification.type === "product-repo") {
+		return auditProductRepo(targetRoot, classification);
+	}
+
+	return auditTargetRepo(targetRoot, classification);
 }
 
 function fileMentionsWiki(filePath) {

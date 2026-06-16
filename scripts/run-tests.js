@@ -4,25 +4,10 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { collectFilesBySuffix } = require("./lib/core/fs-utils");
+
 const ROOT = path.resolve(__dirname, "..");
 const TESTS_DIR = path.join(ROOT, "tests");
-
-function collectTestFiles(dir, files = []) {
-	if (!fs.existsSync(dir)) {
-		return files;
-	}
-
-	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-		const fullPath = path.join(dir, entry.name);
-		if (entry.isDirectory()) {
-			collectTestFiles(fullPath, files);
-		} else if (entry.isFile() && entry.name.endsWith(".test.js")) {
-			files.push(fullPath);
-		}
-	}
-
-	return files;
-}
 
 function resolveRequestedFiles(patterns) {
 	const files = [];
@@ -36,7 +21,9 @@ function resolveRequestedFiles(patterns) {
 
 		const stats = fs.statSync(resolved);
 		if (stats.isDirectory()) {
-			collectTestFiles(resolved, files);
+			collectFilesBySuffix(resolved, ".test.js").forEach((filePath) => {
+				files.push(filePath);
+			});
 		} else {
 			files.push(resolved);
 		}
@@ -47,7 +34,9 @@ function resolveRequestedFiles(patterns) {
 
 const patterns = process.argv.slice(2);
 const files = (
-	patterns.length > 0 ? resolveRequestedFiles(patterns) : collectTestFiles(TESTS_DIR)
+	patterns.length > 0
+		? resolveRequestedFiles(patterns)
+		: collectFilesBySuffix(TESTS_DIR, ".test.js")
 ).sort();
 
 if (files.length === 0) {

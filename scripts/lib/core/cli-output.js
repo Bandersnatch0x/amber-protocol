@@ -179,30 +179,32 @@ function parseArgs(argv) {
 	return args;
 }
 
-function isProductRepoAudit(result) {
-	return result.classification?.type === "product-repo";
+function printAuditClassification(result) {
+	if (result.classification.type) {
+		console.log(`Target type: ${result.classification.type}`);
+	}
 }
 
-function printProductRepoAuditNotes() {
-	console.log(
-		"Note: Missing Amber starter files at repo root are expected for the Amber Protocol product repository.",
-	);
-	console.log(
-		"Starter scaffolds live under templates/ and are installed into targets via init.",
-	);
+function printAuditStarterSummary(result) {
+	if (result.auditMode === "product-repo") {
+		const template = result.templateStarterFiles;
+		const total =
+			template.existing.length + template.missing.length;
+		console.log(
+			`Template starter files: ${template.existing.length}/${total} in templates/`,
+		);
+		return;
+	}
+
+	console.log(`Existing Amber starter files: ${result.existing.length}`);
+	console.log(`Missing Amber starter files: ${result.missing.length}`);
 }
 
 function printAuditSummary(result) {
 	console.log(`Audit summary: ${result.target}`);
 	console.log(`Read-only: ${result.readOnly}`);
-	if (result.classification?.type) {
-		console.log(`Target type: ${result.classification.type}`);
-	}
-	console.log(`Existing Amber starter files: ${result.existing.length}`);
-	console.log(`Missing Amber starter files: ${result.missing.length}`);
-	if (isProductRepoAudit(result)) {
-		printProductRepoAuditNotes();
-	}
+	printAuditClassification(result);
+	printAuditStarterSummary(result);
 	console.log(
 		`Suggested additions: ${Array.isArray(result.suggestedAdditions) ? result.suggestedAdditions.length : 0}`,
 	);
@@ -306,14 +308,8 @@ function printResult(result, options = {}) {
 		}
 		console.log(`Target: ${result.target}`);
 		console.log(`Read-only: ${result.readOnly}`);
-		if (result.classification?.type) {
-			console.log(`Target type: ${result.classification.type}`);
-		}
-		console.log(`Existing Amber starter files: ${result.existing.length}`);
-		console.log(`Missing Amber starter files: ${result.missing.length}`);
-		if (isProductRepoAudit(result)) {
-			printProductRepoAuditNotes();
-		}
+		printAuditClassification(result);
+		printAuditStarterSummary(result);
 		for (const item of result.missing) {
 			console.log(`  - ${item}`);
 		}
