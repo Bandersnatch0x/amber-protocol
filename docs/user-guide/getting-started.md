@@ -1,92 +1,71 @@
-# Getting Started with Amber Protocol (Phase B v1.0.0)
+# Getting Started with Amber Protocol
 
-Welcome to Amber Protocol! This guide will walk you through installation, first-time setup, and creating your first skill.
+Amber Protocol is a repo-local AI coding governance console for engineering teams. It helps teams prepare, review, verify, hand off, and audit AI-assisted coding work inside a repository. It does not run live agents, execute project commands automatically, or replace human review.
 
 ## Prerequisites
 
 - **Node.js** >= 18.17
 - **npm** >= 9.x
-- **Git** >= 2.30 (optional, for git integration)
 
-## Installation
+## Service packages
 
-```bash
-# Install globally from npm
-npm install -g amber-protocol
+Amber Protocol is organized into five service packages. Each package is a documentation and navigation grouping over existing CLI commands — service packages are not command namespaces of their own.
 
-# Verify installation
-amber-protocol --version
-# => amber-protocol v1.0.0 (phase-b)
-```
+| Service package | Start here | Outcome |
+| --- | --- | --- |
+| Repository Onboarding | `node scripts/amber.js doctor --target .` | Confirm the repo has agent-facing rules, wiki, feature state, handoff, and verification surfaces. |
+| Adoption Review | `node scripts/amber.js adoption report --target . --output-dir docs/examples/adoptions` | Produce read-only readiness evidence before changing an existing repo. |
+| Governed Delivery | `node scripts/amber.js plan --target . --feature F001 --title "Small slice"` | Move one task through plan, gate, review, accept, and completion evidence. |
+| Continuity Layer | `node scripts/amber.js session start --goal "fix login bug"` | Start or resume work with session, checkpoint, timeline, and continuity-surface references. |
+| Security Governance | `node scripts/amber.js security audit --target . --output docs/examples/security-audit.md` | Review dependency, secret, permission, and secure-review evidence. |
 
 ## First-Time Setup
 
-### 1. Initialize a Project
+### 1. Initialize a new project
 
 ```bash
-# Create a new project
 mkdir my-agent-project
 cd my-agent-project
-amber-protocol init
+node scripts/amber.js init --target .
 ```
 
-This scaffolds:
-- `settings.json` — your project configuration
-- `skills/` — directory for custom skills
-- `routes/` — workflow route definitions
-- `profiles/` — agent profiles
+This scaffolds safe defaults:
 
-### 2. Verify Your Setup
+- `AGENTS.md` and `CLAUDE.md`
+- `feature_list.json`
+- `PROGRESS.md`
+- `session-handoff.md`
+- `docs/wiki/` skeleton
+- `.workflow/continuous-improvement/state.json`
+
+Re-running `init` skips existing files, so it is safe to call more than once.
+
+### 2. Verify your setup
 
 ```bash
-# Run the doctor to check everything is set up correctly
-amber-protocol doctor
+node scripts/amber.js doctor --target .
 ```
 
-### 3. Your First Skill
+### 3. Explore a service package
 
-Create `skills/hello-world/SKILL.md`:
-
-```markdown
-# Hello World Skill
-
-Greets the user with a friendly message.
-
-## Usage
-
-When a user says "say hello", respond with:
-"Hello! I'm your Amber Protocol assistant. How can I help you build today?"
-```
-
-### 4. Create a Route
-
-Create `routes/hello.route.json`:
-
-```json
-{
-  "name": "hello-world",
-  "description": "A simple greeting route",
-  "goals": ["greeting", "hello"],
-  "stages": [
-    { "name": "greet", "action": "skill:hello-world" }
-  ]
-}
-```
-
-### 5. Run the Route
+Pick the package closest to your current goal and run the real commands documented for it. For example, Security Governance:
 
 ```bash
-# Test the route (dry-run)
-amber-protocol route test hello-world --dry-run
-
-# Run the route
-amber-protocol run hello-world
+node scripts/amber.js security audit --target . --output docs/examples/security-audit.md
+node scripts/amber.js pack validate --file workflow-packs/security-audit.pack.json
 ```
 
-## Next Steps
+## Non-goals
 
-- [Tutorials](./tutorials/) — Step-by-step guides for common workflows
+- Amber Protocol does not execute dynamic workflows.
+- It does not invoke live subagent runners.
+- It does not run target-project commands automatically.
+- It does not create automatic pull requests or rewrite existing project docs without review.
+
+## Next steps
+
 - [CLI Commands](../api/cli-commands.md) — Complete command reference
+- [Architecture](../architecture/overview.md) — How the pieces fit together
+- [SPEC.md](../../SPEC.md) — Product boundary and release criteria
 - [Troubleshooting](./troubleshooting.md) — Common issues and fixes
 - [FAQ](./faq.md) — Frequently asked questions
-

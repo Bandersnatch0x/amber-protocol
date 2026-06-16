@@ -1,0 +1,114 @@
+{
+  "id": "vuln-repair-verification",
+  "title": "Vulnerability Repair Verification",
+  "version": "1.0.0",
+  "description": "Declarative governance pack for verifying that a reported vulnerability has been remediated without introducing regressions.",
+  "skills": [],
+  "standards": [
+    "security-governance"
+  ],
+  "externalIntegrations": [],
+  "connectorContracts": [
+    {
+      "id": "local-source",
+      "type": "filesystem",
+      "mode": "read-only",
+      "credentials": "none",
+      "redaction": "not-required",
+      "externalWrites": false
+    }
+  ],
+  "approvalPolicy": {
+    "readOnlyInspection": "allowed",
+    "reportGeneration": "allowed",
+    "fileMutation": "requires-human-approval",
+    "commandExecution": "requires-human-approval",
+    "externalNotification": "requires-human-approval",
+    "issueCreation": "requires-human-approval",
+    "selfApprovalAllowed": false
+  },
+  "loopLedger": {
+    "required": true,
+    "pathTemplate": ".amber/loops/{contractId}/ledger.json",
+    "chatHistoryRequired": false,
+    "recordsInputSnapshot": true,
+    "recordsToolSummary": true,
+    "recordsBudgetUsage": true,
+    "recordsStopReason": true,
+    "recordsApprovalState": true,
+    "recordsReviewerOutcome": true
+  },
+  "workspaceIsolation": {
+    "mutatingLoopsUseWorktree": true,
+    "mainCheckoutMutation": false
+  },
+  "steps": [
+    {
+      "id": "re-run-scan",
+      "title": "Re-run Scan",
+      "kind": "manual",
+      "description": "Re-run the original vulnerability scan and confirm the finding is gone."
+    },
+    {
+      "id": "run-regression-checks",
+      "title": "Run Regression Checks",
+      "kind": "manual",
+      "description": "Run targeted tests or verification commands to confirm no regression was introduced."
+    },
+    {
+      "id": "record-verification",
+      "title": "Record Verification",
+      "kind": "manual",
+      "description": "Record re-scan result, regression evidence, and reviewer confirmation."
+    }
+  ],
+  "loopContracts": [
+    {
+      "id": "post-repair-verification",
+      "title": "Post-Repair Verification",
+      "trigger": {
+        "type": "manual",
+        "enabled": false
+      },
+      "goal": "Verify a vulnerability repair with re-scan and regression evidence, without applying further fixes automatically.",
+      "stateSpine": ".amber/loops/post-repair-verification/state.json",
+      "inputs": [
+        "original vulnerability report",
+        "re-scan result",
+        "regression evidence"
+      ],
+      "skills": [
+        "amber-vuln-repair-verification"
+      ],
+      "connectors": [
+        "local-source"
+      ],
+      "triageOutputs": [
+        "archive",
+        "candidate-task",
+        "needs-human",
+        "blocked"
+      ],
+      "hardStops": {
+        "maxIterations": 1,
+        "timeoutMinutes": 30,
+        "noProgressDetection": true
+      },
+      "budget": {
+        "maxMinutes": 30,
+        "maxTokens": 100000,
+        "maxUsd": 10
+      },
+      "reviewGates": [
+        "human-approval",
+        "reviewer-evidence"
+      ],
+      "execution": {
+        "executesAnything": false,
+        "schedulesJobs": false,
+        "dispatchesAgents": false,
+        "writesExternalSystems": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "id": "secure-code-review",
+  "title": "Secure Code Review",
+  "version": "1.0.0",
+  "description": "Declarative governance pack for reviewing AI-generated or modified code for insecure patterns before acceptance.",
+  "skills": [],
+  "standards": [
+    "security-governance"
+  ],
+  "externalIntegrations": [],
+  "connectorContracts": [
+    {
+      "id": "local-source",
+      "type": "filesystem",
+      "mode": "read-only",
+      "credentials": "none",
+      "redaction": "not-required",
+      "externalWrites": false
+    }
+  ],
+  "approvalPolicy": {
+    "readOnlyInspection": "allowed",
+    "reportGeneration": "allowed",
+    "fileMutation": "requires-human-approval",
+    "commandExecution": "requires-human-approval",
+    "externalNotification": "requires-human-approval",
+    "issueCreation": "requires-human-approval",
+    "selfApprovalAllowed": false
+  },
+  "loopLedger": {
+    "required": true,
+    "pathTemplate": ".amber/loops/{contractId}/ledger.json",
+    "chatHistoryRequired": false,
+    "recordsInputSnapshot": true,
+    "recordsToolSummary": true,
+    "recordsBudgetUsage": true,
+    "recordsStopReason": true,
+    "recordsApprovalState": true,
+    "recordsReviewerOutcome": true
+  },
+  "workspaceIsolation": {
+    "mutatingLoopsUseWorktree": true,
+    "mainCheckoutMutation": false
+  },
+  "steps": [
+    {
+      "id": "inspect-changes",
+      "title": "Inspect Changes",
+      "kind": "manual",
+      "description": "Identify files changed by an agent and capture the diff as evidence."
+    },
+    {
+      "id": "check-insecure-patterns",
+      "title": "Check Insecure Patterns",
+      "kind": "manual",
+      "description": "Review changes for injection, unsafe eval, missing validation, and other insecure patterns."
+    },
+    {
+      "id": "record-review-outcome",
+      "title": "Record Review Outcome",
+      "kind": "manual",
+      "description": "Record reviewer sign-off, required changes, or rejection with evidence."
+    }
+  ],
+  "loopContracts": [
+    {
+      "id": "pre-accept-secure-review",
+      "title": "Pre-Accept Secure Review",
+      "trigger": {
+        "type": "manual",
+        "enabled": false
+      },
+      "goal": "Review AI-modified code for security issues before acceptance, without mutating code.",
+      "stateSpine": ".amber/loops/pre-accept-secure-review/state.json",
+      "inputs": [
+        "changed files",
+        "diff",
+        "insecure pattern checklist"
+      ],
+      "skills": [
+        "amber-secure-code-review"
+      ],
+      "connectors": [
+        "local-source"
+      ],
+      "triageOutputs": [
+        "archive",
+        "candidate-task",
+        "needs-human",
+        "blocked"
+      ],
+      "hardStops": {
+        "maxIterations": 1,
+        "timeoutMinutes": 30,
+        "noProgressDetection": true
+      },
+      "budget": {
+        "maxMinutes": 30,
+        "maxTokens": 100000,
+        "maxUsd": 10
+      },
+      "reviewGates": [
+        "human-approval",
+        "reviewer-evidence"
+      ],
+      "execution": {
+        "executesAnything": false,
+        "schedulesJobs": false,
+        "dispatchesAgents": false,
+        "writesExternalSystems": false
+      }
+    }
+  ]
+}

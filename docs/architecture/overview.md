@@ -1,10 +1,10 @@
 # System Architecture
 
-High-level overview of the current `Amber Protocol` repository and the architectural direction that is converging toward **Amber Protocol**.
+High-level overview of the current `Amber Protocol` repository. The primary CLI is `scripts/amber.js`, the deterministic core is `scripts/lib/amber-core.js`, and `scripts/harness.js` remains only as a legacy compatibility shim.
 
 ## Positioning
 
-The current repository and package names still use `Amber Protocol`. Architecturally, the project is moving toward a clearer role: a repository-local governance layer for coding agents.
+The current repository and package name are `Amber Protocol`. Architecturally, the project is a repository-local governance layer for coding agents.
 
 The system can be understood through seven internal control layers:
 

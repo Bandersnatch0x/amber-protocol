@@ -610,6 +610,9 @@ function printResult(result, options = {}) {
 	}
 
 	console.log(`Target: ${result.target || "n/a"}`);
+	if (typeof result.text === "string") {
+		console.log(result.text);
+	}
 	if (result.classification && result.classification.type) {
 		console.log(`Target type: ${result.classification.type}`);
 	}
