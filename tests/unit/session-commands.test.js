@@ -22,9 +22,26 @@ function removeTestRoot(dir) {
 	});
 }
 
+function cleanupTestRoot(dir) {
+	if (!fs.existsSync(dir)) return;
+	const worktreesDir = path.join(dir, ".amber", "worktrees");
+	if (fs.existsSync(worktreesDir)) {
+		for (const name of fs.readdirSync(worktreesDir)) {
+			const worktreePath = path.join(worktreesDir, name);
+			if (fs.statSync(worktreePath).isDirectory()) {
+				spawnSync("git", ["worktree", "remove", worktreePath, "--force"], {
+					cwd: dir,
+					encoding: "utf8",
+				});
+			}
+		}
+	}
+	removeTestRoot(dir);
+}
+
 describe("session-commands", () => {
 	beforeEach(() => {
-		removeTestRoot(TEST_ROOT);
+		cleanupTestRoot(TEST_ROOT);
 		fs.mkdirSync(TEST_ROOT, { recursive: true });
 
 		spawnSync("git", ["init"], { cwd: TEST_ROOT });
@@ -38,7 +55,7 @@ describe("session-commands", () => {
 	});
 
 	afterEach(() => {
-		removeTestRoot(TEST_ROOT);
+		cleanupTestRoot(TEST_ROOT);
 	});
 
 	describe("startSession", () => {
