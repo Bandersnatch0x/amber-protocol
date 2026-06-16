@@ -10,4 +10,4 @@ If no target is given, use the current repository root (`.`).
 
 Execute: `node scripts/amber.js handoff --target $1`
 
-Report the command output faithfully. Do not overwrite user-authored files without approval.
+Report the command output faithfully; never overwrite user-authored files without approval.

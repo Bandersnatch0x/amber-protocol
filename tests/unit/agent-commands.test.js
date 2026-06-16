@@ -217,6 +217,22 @@ describe("generateAgentCommands", () => {
 		const check = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.deepStrictEqual(check.changed, []);
 	});
+
+	it("sanitizes manualName to prevent path traversal", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-evil": skillMd(
+				"amber-evil",
+				"node scripts/amber.js init --target {{target}}",
+				"../../evil",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		const result = generateAgentCommands({ skillsRoot, repoRoot });
+		for (const relativePath of result.paths) {
+			assert.ok(!relativePath.includes(".."), `path escaped: ${relativePath}`);
+		}
+		assert.ok(fs.existsSync(path.join(repoRoot, ".claude/commands/evil.md")));
+	});
 });
 
 const { COMMANDS } = require("../../scripts/amber.js");
