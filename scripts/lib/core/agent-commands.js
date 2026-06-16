@@ -4,6 +4,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathExists, readText, relativeSlash } = require("./fs-utils");
 
+const SAFETY_NOTE =
+	"Report the command output faithfully; never overwrite user-authored files without approval.";
+
 function stripQuotes(value) {
 	const t = String(value).trim();
 	if (
@@ -79,7 +82,7 @@ function renderClaudeCommand(skill) {
 		"",
 		`Execute: \`${commandLine}\``,
 		"",
-		"Report the command output faithfully. Do not overwrite user-authored files without approval.",
+		SAFETY_NOTE,
 		"",
 	);
 	return lines.join("\n");
@@ -106,7 +109,7 @@ function renderGeminiCommand(skill) {
 		`Run the Amber ${skill.name} workflow for the target repository.`,
 		"If no target is provided, use the current repository root (.).",
 		`Execute: ${promptCommand}`,
-		"Report the command output faithfully; never overwrite user-authored files without approval.",
+		SAFETY_NOTE,
 		'"""',
 		"",
 	].join("\n");
@@ -140,13 +143,14 @@ function normalizeEol(value) {
 function planOutputs(skills, repoRoot) {
 	const outputs = [];
 	for (const skill of skills) {
+		const manualName = path.basename(skill.amber.manualName);
 		const shortName = extractCommandName(skill.amber.command);
 		outputs.push({
 			path: path.join(
 				repoRoot,
 				".claude",
 				"commands",
-				`${skill.amber.manualName}.md`,
+				`${manualName}.md`,
 			),
 			content: renderClaudeCommand(skill),
 		});
