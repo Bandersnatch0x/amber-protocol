@@ -1,11 +1,21 @@
-const { describe, it } = require("node:test");
+const { describe, it, after } = require("node:test");
 const assert = require("assert");
 const { spawnSync } = require("child_process");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "../..");
 
 describe("sequential sessions load test", () => {
+	// Isolated target so session state / continuity surfaces land in a tempdir
+	// instead of the amber source tree. cwd stays at ROOT so routes resolve.
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-load-"));
+
+	after(() => {
+		fs.rmSync(target, { recursive: true, force: true });
+	});
+
 	it("should complete 20 sessions in <2 minutes", () => {
 		const startTime = Date.now();
 		let successCount = 0;
@@ -20,6 +30,8 @@ describe("sequential sessions load test", () => {
 					"start",
 					"--goal",
 					`implement load test feature ${i}`,
+					"--target",
+					target,
 					"--json",
 				],
 				{ cwd: ROOT, encoding: "utf8", timeout: 10000 },
