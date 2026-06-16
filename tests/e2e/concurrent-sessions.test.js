@@ -1,11 +1,21 @@
-const { describe, it } = require("node:test");
+const { describe, it, after } = require("node:test");
 const assert = require("assert");
 const { spawnSync } = require("child_process");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "../..");
 
 describe("concurrent sessions E2E", () => {
+  // Use an isolated target so `session start` writes its manifests and
+  // continuity surfaces into a tempdir instead of polluting the repo root.
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-concurrent-"));
+
+  after(() => {
+    fs.rmSync(target, { recursive: true, force: true });
+  });
+
   it("should handle 5 concurrent sessions", () => {
     const sessions = [];
 
@@ -14,6 +24,7 @@ describe("concurrent sessions E2E", () => {
         path.join(ROOT, "scripts/amber.js"),
         "session", "start",
         "--goal", `implement feature ${i}`,
+        "--target", target,
         "--json"
       ], { cwd: ROOT, encoding: "utf8", timeout: 15000 });
 

@@ -4,11 +4,25 @@
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
-Amber Protocol（原 Coding Harness）是一个仓库本地的编码代理治理层（governance layer）。它用于安装、审计、验证和维护一组小而明确的项目文件，帮助 Agent 理解项目、显式记录功能状态，并在会话之间可靠交接。
+Amber Protocol 是一个面向工程团队的仓库本地 AI 编码治理控制台。它帮助团队在仓库内准备、审查、验证、交接和审计由 AI 辅助的编码工作。
 
 当前产品刻意保持保守。它会创建审查产物、dry-run 计划、审批记录、workflow-pack 元数据和维护提案。它不会运行 Dynamic Workflow，不会调用真实 subagent，不会执行目标项目命令，也不会自动重写旧项目文件。
 
 ![Amber Protocol 安全 bootstrap 信息图](./assets/readme/amber-protocol-cover.png)
+
+## 服务包
+
+以下命令按照五个服务包进行组织。服务包是对现有真实 CLI 命令的文档分组，而不是独立的命令命名空间。
+
+| 服务包 | 从这里开始 | 产出 |
+| --- | --- | --- |
+| Repository Onboarding | `node scripts/amber.js doctor --target .` | 确认仓库具备面向 Agent 的规则、Wiki、功能状态、交接和验证表面。 |
+| Adoption Review | `node scripts/amber.js adoption report --target . --output-dir docs/examples/adoptions` | 在改动旧仓库之前生成只读的就绪度证据。 |
+| Governed Delivery | `node scripts/amber.js plan --target . --feature F001 --title "Small slice"` | 让一个任务依次经过计划、闸门、审查、验收和完成度证据。 |
+| Continuity Layer | `node scripts/amber.js session start --goal "fix login bug"` | 启动或恢复会话、检查点、时间线和连续性表面的工作。 |
+| Security Governance | `node scripts/amber.js security audit --target . --output docs/examples/security-audit.md` | 审查依赖、密钥、权限和安全审查证据。 |
+
+以上均为真实 CLI 命令；“服务包”列仅用于文档导航，不是命令命名空间。
 
 ## 架构
 

@@ -1,0 +1,121 @@
+{
+  "id": "security-audit",
+  "title": "Security Audit",
+  "version": "1.0.0",
+  "description": "Declarative governance pack for running a read-only security audit across dependency, secret, and permission surfaces.",
+  "skills": [],
+  "standards": [
+    "security-governance"
+  ],
+  "externalIntegrations": [],
+  "connectorContracts": [
+    {
+      "id": "local-source",
+      "type": "filesystem",
+      "mode": "read-only",
+      "credentials": "none",
+      "redaction": "not-required",
+      "externalWrites": false
+    }
+  ],
+  "approvalPolicy": {
+    "readOnlyInspection": "allowed",
+    "reportGeneration": "allowed",
+    "fileMutation": "requires-human-approval",
+    "commandExecution": "requires-human-approval",
+    "externalNotification": "requires-human-approval",
+    "issueCreation": "requires-human-approval",
+    "selfApprovalAllowed": false
+  },
+  "loopLedger": {
+    "required": true,
+    "pathTemplate": ".amber/loops/{contractId}/ledger.json",
+    "chatHistoryRequired": false,
+    "recordsInputSnapshot": true,
+    "recordsToolSummary": true,
+    "recordsBudgetUsage": true,
+    "recordsStopReason": true,
+    "recordsApprovalState": true,
+    "recordsReviewerOutcome": true
+  },
+  "workspaceIsolation": {
+    "mutatingLoopsUseWorktree": true,
+    "mainCheckoutMutation": false
+  },
+  "steps": [
+    {
+      "id": "scan-dependencies",
+      "title": "Scan Dependencies",
+      "kind": "manual",
+      "description": "Run a dependency vulnerability scan and record the result as evidence."
+    },
+    {
+      "id": "scan-secrets",
+      "title": "Scan Secrets",
+      "kind": "manual",
+      "description": "Run a secret exposure scan across source code and generated artifacts."
+    },
+    {
+      "id": "review-permissions",
+      "title": "Review Permissions",
+      "kind": "manual",
+      "description": "Review permission and capability declarations for least-privilege alignment."
+    },
+    {
+      "id": "write-report",
+      "title": "Write Audit Report",
+      "kind": "manual",
+      "description": "Combine scan results into a reviewable markdown audit report."
+    }
+  ],
+  "loopContracts": [
+    {
+      "id": "scheduled-security-audit",
+      "title": "Scheduled Security Audit",
+      "trigger": {
+        "type": "scheduled",
+        "cadence": "weekly",
+        "enabled": false
+      },
+      "goal": "Produce a reviewable security audit report without mutating target code.",
+      "stateSpine": ".amber/loops/scheduled-security-audit/state.json",
+      "inputs": [
+        "dependency scan result",
+        "secret scan result",
+        "permission review result"
+      ],
+      "skills": [
+        "amber-security-audit"
+      ],
+      "connectors": [
+        "local-source"
+      ],
+      "triageOutputs": [
+        "archive",
+        "candidate-task",
+        "needs-human",
+        "blocked"
+      ],
+      "hardStops": {
+        "maxIterations": 1,
+        "timeoutMinutes": 30,
+        "noProgressDetection": true
+      },
+      "budget": {
+        "maxMinutes": 30,
+        "maxTokens": 100000,
+        "maxUsd": 10
+      },
+      "reviewGates": [
+        "human-approval",
+        "reviewer-evidence"
+      ],
+      "execution": {
+        "executesAnything": false,
+        "schedulesJobs": false,
+        "dispatchesAgents": false,
+        "writesExternalSystems": false
+      }
+    }
+  ]
+}

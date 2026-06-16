@@ -10,7 +10,7 @@
 
 **Status:** Beta | **Version:** 1.0.0-beta
 
-Amber Protocol is a repository-local governance and control layer for agent-assisted engineering. It installs, audits, validates, and maintains a small set of project files that help agents understand a codebase, keep feature state explicit, and hand off work cleanly.
+Amber Protocol is a repo-local AI coding governance console for engineering teams. It helps teams prepare, review, verify, hand off, and audit AI-assisted coding work inside a repository.
 
 ## 🚀 Quick Start
 
@@ -42,7 +42,7 @@ Run `npm test` (root suite) and `cd apps/web && npm test` (web suite) for curren
 
 The current product is deliberately conservative. It creates review artifacts, dry-run plans, approval records, workflow-pack metadata, and maintenance proposals. It does not run Dynamic Workflows, invoke live subagents, execute target project commands, or automatically rewrite old project files.
 
-Amber Protocol (formerly Coding Harness) is a repo-local governance layer for coding agents. It is not trying to become a general agent framework or execution platform. It is trying to constrain, verify, audit, and hand off agent work safely inside a repository. Legacy `coding-harness` entrypoints and `.harness` state stay readable through built-in shims and the `amber migrate` commands.
+Legacy `coding-harness` entrypoints remain compatibility shims, but new documentation and commands should lead with `amber` and Amber Protocol terminology.
 
 ![Amber Protocol safe bootstrap infographic](./assets/readme/amber-protocol-cover.png)
 
@@ -61,6 +61,20 @@ This project is strongest when framed as a governance-first protocol layer with 
 | `Governance` | Approval records, safe defaults, policy boundaries, and adoption controls constrain behavior. | Highest |
 
 This is the architectural through-line behind the Amber Protocol direction: strengthen `Governance`, `Verification`, and `Observability`; keep `Lifecycle` repository-local; avoid drifting into a full agent platform.
+
+## Service packages
+
+The commands below are organized into five service packages. Each package is a documentation grouping over existing real CLI commands, not a command namespace of its own.
+
+| Service package | Start here | Outcome |
+| --- | --- | --- |
+| Repository Onboarding | `node scripts/amber.js doctor --target .` | Confirm the repo has agent-facing rules, wiki, feature state, handoff, and verification surfaces. |
+| Adoption Review | `node scripts/amber.js adoption report --target . --output-dir docs/examples/adoptions` | Produce read-only readiness evidence before changing an existing repo. |
+| Governed Delivery | `node scripts/amber.js plan --target . --feature F001 --title "Small slice"` | Move one task through plan, gate, review, accept, and completion evidence. |
+| Continuity Layer | `node scripts/amber.js session start --goal "fix login bug"` | Start or resume work with session, checkpoint, timeline, and continuity-surface references. |
+| Security Governance | `node scripts/amber.js security audit --target . --output docs/examples/security-audit.md` | Review dependency, secret, permission, and secure-review evidence. |
+
+These are the real CLI commands; the "Service package" column is a documentation grouping, not a command namespace.
 
 ## Architecture
 

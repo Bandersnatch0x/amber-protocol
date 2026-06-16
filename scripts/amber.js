@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 
+const path = require("node:path");
+
 const {
 	acceptPlan,
 	auditProject,
@@ -66,6 +68,8 @@ const {
 
 const { validateWorkflowPack } = require("./lib/core/execution-validator");
 
+const { commandSummary } = require("./lib/command-help");
+
 const COMMANDS = [
 	"init",
 	"audit",
@@ -91,6 +95,7 @@ const COMMANDS = [
 	"daemon",
 	"governance",
 	"execution",
+	"security",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
@@ -152,181 +157,6 @@ function usage(command) {
 	].join("\n");
 }
 
-function commandSummary(command) {
-	if (command === "init") {
-		return "Create missing Harness files without overwriting existing files. Supports --dry-run.";
-	}
-	if (command === "audit") {
-		return "Inspect an existing project without writing files. Supports --summary for bounded text output.";
-	}
-	if (command === "wiki") {
-		return "Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run.";
-	}
-	if (command === "handoff") {
-		return "Validate session-handoff.md required V1 sections.";
-	}
-	if (command === "doctor") {
-		return "Run Harness guardrail checks and target classification.";
-	}
-	if (command === "plan") {
-		return "Create a feature-linked vertical-slice plan without overwriting existing files. Supports --dry-run.";
-	}
-	if (command === "gate") {
-		return "Validate that a plan is tied to feature state and has user confirmation.";
-	}
-	if (command === "review") {
-		return "Review a plan against static Harness standards and release-readiness checks.";
-	}
-	if (command === "accept") {
-		return "Accept a reviewed plan and append a Harness evolution record.";
-	}
-	if (command === "pack") {
-		return "Inspect or validate declarative workflow packs without executing them.";
-	}
-	if (command === "profile") {
-		return "Inspect declarative project profiles.";
-	}
-	if (command === "task") {
-		return "Prepare isolated task ledger, evidence, replay, and worktree artifacts.";
-	}
-	if (command === "result") {
-		return "Inspect replayable task result artifacts without relying on chat history.";
-	}
-	if (command === "agent") {
-		return "Create and control auditable worker/reviewer dispatch records without executing agent work.";
-	}
-	if (command === "team") {
-		return "Inspect, install, pin, update, and roll back local team distribution metadata.";
-	}
-	if (command === "maintenance") {
-		return "Inspect stale docs, wiki lint readiness, upgrade guidance, drift, and reviewable maintenance proposals.";
-	}
-	if (command === "adoption") {
-		return [
-			"Generate, list, or index safe adoption report artifacts without modifying target projects.",
-			"",
-			"Examples:",
-			"  node scripts/amber.js adoption report --target path/to/repo --output docs/examples/project-adoption-report.md",
-			"  node scripts/amber.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/project-adoption-bundle",
-			"  node scripts/amber.js adoption next-actions --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-next-actions.md",
-			"  node scripts/amber.js adoption decision-record --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-decision-record.md",
-			"  node scripts/amber.js adoption apply-plan --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-apply-plan.md --dry-run",
-			"  node scripts/amber.js adoption selected-files --bundle-dir docs/examples/project-adoption-bundle --output docs/examples/project-adoption-selected-files.md --include AGENTS.md",
-		].join("\n");
-	}
-	if (command === "loop") {
-		return [
-			"Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling.",
-			"",
-			"Examples:",
-			"  node scripts/amber.js loop inspect --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --json",
-			"  node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --output .amber/loops/daily-amber-triage/ledger-preview.json --json",
-			"  node scripts/amber.js loop record --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --trigger-source manual --stop-reason reviewer-gate-required --output .amber/loops/daily-amber-triage/manual-ledger.json --json",
-			"  node scripts/amber.js loop status --ledger .amber/loops/daily-amber-triage/manual-ledger.json --json",
-			"  node scripts/amber.js loop validate-loop --contract path/to/contract.json --json",
-		].join("\n");
-	}
-	if (command === "route") {
-		return [
-			"Inspect, validate, and dry-run delivery routes from routes/*.route.json.",
-			"",
-			"Subcommands:",
-			"  list                 List all routes (id, version, stage count).",
-			"  inspect <id>         Print a route's stage tree and full JSON.",
-			"  validate <file>      Validate a route file; non-zero exit on invalid.",
-			"  test <id> --dry-run  Print the ordered stage sequence and gate points.",
-			"",
-			"Examples:",
-			"  node scripts/amber.js route list",
-			"  node scripts/amber.js route inspect feature-standard",
-			"  node scripts/amber.js route validate routes/feature-standard.route.json",
-			"  node scripts/amber.js route test bugfix-quick --dry-run",
-		].join("\n");
-	}
-	if (command === "session") {
-		return [
-			"Manage session lifecycle: start, status, list, abort, continue.",
-			"",
-			"Subcommands:",
-			'  start --goal "..." [--route <id>] [--budget <n>] [--worktree] [--mode interactive]',
-			"      Create a new session, write manifest + timeline, optionally create worktree.",
-			"  status [<id>]",
-			"      Show status of current session or specified session by ID.",
-			"  list",
-			"      List all sessions in reverse chronological order.",
-			"  abort <id>",
-			"      Set session status to aborted, write abort event, cleanup worktree.",
-			"  continue [<id>]",
-			"      Continue a paused or incomplete session from its current stage.",
-			"",
-			"Examples:",
-			'  node scripts/amber.js session start --goal "implement user auth"',
-			'  node scripts/amber.js session start --goal "fix login bug" --route bugfix-quick --worktree',
-			'  node scripts/amber.js session start --goal "add feature" --mode interactive',
-			"  node scripts/amber.js session status",
-			"  node scripts/amber.js session list",
-			"  node scripts/amber.js session abort <session-id>",
-			"  node scripts/amber.js session continue",
-		].join("\n");
-	}
-	if (command === "migrate") {
-		return [
-			"Migrate session manifests to the current schema version, or migrate",
-			"legacy state and wiki naming to the Amber Protocol layout.",
-			"",
-			"Subcommands:",
-			"  state        Copy legacy .harness state into .amber (source kept).",
-			"  wiki         Rename docs/wiki/agent/harness.md to amber.md and fix links.",
-			"  (none)       Migrate session manifests to the current schema version.",
-			"",
-			"Options:",
-			"  --dry-run    Preview changes without writing files (manifest mode).",
-			"",
-			"Examples:",
-			"  node scripts/amber.js migrate --target <path>",
-			"  node scripts/amber.js migrate state --target <path>",
-			"  node scripts/amber.js migrate wiki --target <path>",
-		].join("\n");
-	}
-	if (command === "execution") {
-		return [
-			"Validate execution boundaries and integration contracts.",
-			"",
-			"Subcommands:",
-			"  validate-integration  Validate integration contract structure and hardstops.",
-
-			"  readiness             Review plan for execution boundary violations.",
-			"",
-			"Examples:",
-			"  node scripts/amber.js execution validate-integration --contract path/to/contract.json --json",
-			"  node scripts/amber.js execution readiness --plan path/to/plan.md --target path/to/repo --json",
-		].join("\n");
-	}
-	if (command === "governance") {
-		return [
-			"Create governance documentation for a target repository.",
-			"",
-			"Subcommands:",
-			"  docs         Generate governance documents (CODE_OF_CONDUCT.md, CONTRIBUTING.md, GOVERNANCE.md).",
-			"  evidence     Export governance evidence from sessions or tasks.",
-			"  policy       Show governance policy (defaults and overrides).",
-			"  audit        Generate comprehensive audit report with policy, sessions, and executions.",
-			"",
-			"Examples:",
-			"  node scripts/amber.js governance docs --target path/to/repo",
-			"  node scripts/amber.js governance docs --target path/to/repo --json",
-			"  node scripts/amber.js governance evidence --session <id> --output evidence.md",
-			"  node scripts/amber.js governance evidence --task <id> --output evidence.md --json",
-			"  node scripts/amber.js governance policy --target path/to/repo",
-			"  node scripts/amber.js governance policy --target path/to/repo --json",
-			"  node scripts/amber.js governance audit --target path/to/repo --output audit.md",
-			"  node scripts/amber.js governance audit --target path/to/repo --output audit.md --since 2025-01-01",
-			"  node scripts/amber.js governance audit --target path/to/repo --output audit.md --json",
-		].join("\n");
-	}
-	return "Run Amber Protocol command.";
-}
-
 async function run(argv = process.argv.slice(2)) {
 	const [command, ...rest] = argv;
 
@@ -367,7 +197,31 @@ async function run(argv = process.argv.slice(2)) {
 	} else if (command === "review") {
 		result = reviewPlan(args.target, args.plan);
 	} else if (command === "accept") {
-		result = acceptPlan(args.target, args.plan);
+		const acceptResult = acceptPlan(args.target, args.plan);
+		result = acceptResult;
+		if (args.session) {
+			const { buildCompletionResult } = require("./lib/completion-gate");
+			const completionResult = buildCompletionResult(
+				args.target || process.cwd(),
+				args.session,
+				args,
+			);
+			result = {
+				...acceptResult,
+				text: [
+					acceptResult.text || "",
+					completionResult.text,
+				].join("\n"),
+				warnings: [
+					...(acceptResult.warnings || []),
+					...completionResult.warnings,
+				],
+				errors: [
+					...(acceptResult.errors || []),
+					...completionResult.errors,
+				],
+			};
+		}
 	} else if (command === "pack") {
 		const action = args._ && args._[0];
 		if (action === "inspect" || action === "validate") {
@@ -589,11 +443,26 @@ async function run(argv = process.argv.slice(2)) {
 				errors: [],
 				warnings: [],
 			};
+		} else if (action === "distill") {
+			const { writeDistillProposal } = require("./lib/distill-candidates");
+			const { resolveTarget } = require("./lib/core/fs-utils");
+			const targetRoot = resolveTarget(args.target);
+			const outputPath =
+				args.output ||
+				path.join(targetRoot, "docs", "maintenance", "distill-proposals.md");
+			const proposalResult = writeDistillProposal(targetRoot, outputPath, args);
+			result = {
+				target: targetRoot,
+				outputPath: proposalResult.outputPath,
+				candidateCount: proposalResult.candidateCount,
+				errors: [],
+				warnings: [],
+			};
 		} else {
 			result = {
 				target: args.target,
 				errors: [
-					"maintenance requires inspect, propose, proposal, stale-docs, wiki-lint, pack-drift, upgrade-preview, evolution-rollup, or regression-proposals.",
+					"maintenance requires inspect, propose, proposal, stale-docs, wiki-lint, pack-drift, upgrade-preview, evolution-rollup, regression-proposals, or distill.",
 				],
 				warnings: [],
 			};
@@ -699,9 +568,27 @@ async function run(argv = process.argv.slice(2)) {
 			sessionResult = await continueSession(args.target || process.cwd(), {
 				sessionId: args._[1],
 			});
+		} else if (action === "complete-check") {
+			if (!args.session) {
+				sessionResult = {
+					text: "session complete-check requires --session <id>.",
+					exitCode: 1,
+				};
+			} else {
+				const { buildCompletionResult } = require("./lib/completion-gate");
+				const completion = buildCompletionResult(
+					args.target || process.cwd(),
+					args.session,
+					args,
+				);
+				sessionResult = {
+					text: completion.text,
+					exitCode: completion.errors.length > 0 ? 1 : 0,
+				};
+			}
 		} else {
 			sessionResult = {
-				text: "session requires start, status, list, abort, or continue.",
+				text: "session requires start, status, list, abort, continue, or complete-check.",
 				exitCode: 1,
 			};
 		}
@@ -888,6 +775,14 @@ async function run(argv = process.argv.slice(2)) {
 				errors: ["execution requires validate-integration or readiness."],
 				warnings: [],
 			};
+		}
+	} else if (command === "security") {
+		const action = args._ && args._[0];
+		if (action === "audit") {
+			const { generateSecurityAuditReport } = require("./lib/security-commands");
+			result = generateSecurityAuditReport(args.target || ".", args);
+		} else {
+			result = { errors: ["security requires audit."], warnings: [] };
 		}
 	} else {
 		console.error(`No handler registered for command: ${command}`);

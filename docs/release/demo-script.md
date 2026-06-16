@@ -1,114 +1,108 @@
-# Phase B v1.0.0 Demo Script
+# Amber Protocol Service Package Demo Script
 
 **Duration:** 5:30  
 **Presenter:** [Name]  
-**Date:** June 10, 2026
+**Date:** June 15, 2026
 
 ---
 
 ## 0:00-0:30 — Problem Statement
 
-**[Screen: Title card "Amber Protocol Phase B"]**
+**[Screen: Title card "Amber Protocol Service Packages"]**
 
-"AI coding tools are powerful, but they need guardrails. Today I'll show you how Amber Protocol Phase B makes AI-assisted development safe, auditable, and extensible."
+"AI coding tools are powerful, but they need guardrails. Today I'll show you how Amber Protocol organizes repo-local AI governance into five service packages. Each package is a documentation grouping over existing CLI commands — there are no new command namespaces, no live agent execution, and no automatic PR creation."
 
 ---
 
-## 0:30-2:00 — Key Features Demo
+## 0:30-1:30 — Repository Onboarding
 
-### 0:30 — Installation (15s)
-```bash
-npm install -g amber-protocol
-amber-protocol --version
-```
-**[Show: v1.0.0 output]**
-
-### 0:45 — Initialize Project (30s)
+### 0:30 — Initialize Project (30s)
 ```bash
 mkdir demo-project && cd demo-project
-amber-protocol init
-amber-protocol doctor
+node scripts/amber.js init --target .
 ```
-**[Show: Project structure with skills/, routes/, profiles/]**
+**[Show: Project structure with AGENTS.md, CLAUDE.md, feature_list.json, docs/wiki/]**
 
-### 1:15 — Security Audit (30s)
+### 1:00 — Verify Setup (30s)
 ```bash
-amber-protocol security audit
+node scripts/amber.js doctor --target .
 ```
-**[Show: Audit report with dependency scan, secret scan, permission review]**
-"Zero configuration — security is on by default."
-
-### 1:45 — Create a Skill (15s)
-```bash
-mkdir -p skills/greeter
-```
-**[Show: SKILL.md content]**
-"Skills are just Markdown files. No code needed."
+**[Show: Doctor report with required files and checks]**
+"Onboarding confirms the repo has agent-facing rules, wiki, feature state, handoff, and verification surfaces."
 
 ---
 
-## 2:00-3:30 — Migration Walkthrough
+## 1:30-2:30 — Adoption Review
 
-### 2:00 — V5.5 Project (20s)
-**[Show: V5.5 settings.json with old format]**
-"Here's a V5.5 project. Let's migrate it."
-
-### 2:20 — Dry-Run (20s)
+### 1:30 — Generate Read-Only Report (30s)
 ```bash
-amber-protocol migrate --dry-run
+node scripts/amber.js adoption report --target . --output-dir docs/examples/adoptions
 ```
-**[Show: Diff output showing what will change]**
+**[Show: Adoption report summarizing audit, init dry-run, team, and maintenance evidence]**
 
-### 2:40 — Apply Migration (20s)
+### 2:00 — Gate And Bundle (30s)
 ```bash
-amber-protocol migrate
+node scripts/amber.js adoption gate --report docs/examples/adoptions/...
+node scripts/amber.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions/index.md --output-dir docs/examples/project-adoption-bundle
 ```
-**[Show: New settings.json with Phase B format]**
-
-### 3:00 — Verify (15s)
-```bash
-amber-protocol validate
-amber-protocol route test default --dry-run
-```
-**[Show: Validation passes]**
-
-### 3:15 — Rollback (15s)
-```bash
-amber-protocol rollback --list
-amber-protocol rollback --restore .backup-2026-06-10-120000.json
-```
-"Migration is reversible. Your settings are never lost."
+"Adoption Review produces read-only readiness evidence before any changes are made."
 
 ---
 
-## 3:30-5:00 — Advanced Use Case
+## 2:30-3:30 — Governed Delivery
 
-### 3:30 — Agent Profile (30s)
+### 2:30 — Plan And Gate (30s)
 ```bash
-cat profiles/security-auditor.profile.json
+node scripts/amber.js plan --target . --feature F001 --title "Small slice"
+node scripts/amber.js gate --target . --plan docs/plans/F001-small-slice.md
 ```
-**[Show: Profile with restricted tools, specific model, thinking budget]**
+**[Show: Plan file and gate report asking for user confirmation]**
 
-### 4:00 — Multi-Agent Route (30s)
+### 3:00 — Review, Accept, And Completion Check (30s)
 ```bash
-cat routes/secure-deploy.route.json
+node scripts/amber.js review --target . --plan docs/plans/F001-small-slice.md
+node scripts/amber.js session complete-check --target . --session <session-id>
 ```
-**[Show: Worker → Reviewer → Deploy pipeline]**
+"Governed Delivery moves one task through plan, gate, review, accept, and completion evidence. The gate blocks implementation-ready status until required evidence exists."
 
-### 4:30 — Run Route (30s)
+---
+
+## 3:30-4:15 — Continuity Layer
+
+### 3:30 — Start And Resume Work (30s)
 ```bash
-amber-protocol route test secure-deploy --dry-run
+node scripts/amber.js session start --target . --goal "fix login bug"
+node scripts/amber.js session status --target .
+node scripts/amber.js session continue --target .
 ```
-**[Show: Stage-by-stage execution preview]**
+**[Show: Session manifest, timeline, and continuity-surface references]**
+"The Continuity Layer helps humans and agents resume work from repo-local session state, checkpoints, and continuity surfaces."
+
+---
+
+## 4:15-5:00 — Security Governance
+
+### 4:15 — Security Audit (25s)
+```bash
+node scripts/amber.js security audit --target . --output docs/examples/security-audit.md
+```
+**[Show: Security audit report with dependency, secret, and permission sections]**
+
+### 4:40 — Validate Security Governance Pack (20s)
+```bash
+node scripts/amber.js pack validate --file workflow-packs/security-audit.pack.json
+```
+**[Show: Pack validation passes]**
+"Security Governance reviews dependency, secret, permission, and secure-review evidence through declarative, dry-run-safe packs."
 
 ---
 
 ## 5:00-5:30 — Call to Action
 
-"Phase B is available now. One command to install. One command to secure your project. One command to migrate from V5.5."
+"Amber Protocol keeps AI-assisted coding work repo-local, artifact-first, and reviewable. Service packages help you navigate the commands, but every command is real and under your control."
 
 ```bash
-npm install -g amber-protocol
+node scripts/amber.js --help
 ```
 
 - ⭐ Star us on GitHub
@@ -122,9 +116,7 @@ npm install -g amber-protocol
 ## Setup Checklist
 
 - [ ] Clean terminal with no previous output
-- [ ] Current directory is empty or has demo-project
-- [ ] All example content pre-created (SKILL.md, profiles, routes)
-- [ ] Internet connection for npm install
+- [ ] Current directory is an Amber Protocol clone or empty project
+- [ ] Node >= 18.17 installed
 - [ ] Recording software tested
 - [ ] Microphone checked
-- [ ] Backup Restore Keys: have timestamped backup path ready
