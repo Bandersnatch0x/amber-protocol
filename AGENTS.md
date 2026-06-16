@@ -25,6 +25,10 @@ node scripts/amber.js <command> --target <repo>
 
 ## Skills & commands
 
-Per-command agent instructions live in `skills/<name>/SKILL.md` (the source of truth).
-Run `npm run gen:agents` to regenerate Claude (`.claude/commands/`) and Gemini
-(`.gemini/commands/amber/`) command products; edit `skills/`, never the generated files.
+`skills/<name>/SKILL.md` is the single source of truth. Run `npm run gen:agents` to
+regenerate every platform product (edit `skills/`, never the generated files;
+`npm run gen:agents:check` guards against drift in CI):
+
+- **Claude Code** — loaded via `.claude-plugin/` → `skills/`; manual slash commands in `.claude/commands/`.
+- **Codex & Cursor** — skills mirrored to `.agents/skills/` (the shared open-standard location both read natively).
+- **Gemini CLI** — manual commands in `.gemini/commands/amber/`.
