@@ -3,7 +3,6 @@
 const path = require("node:path");
 
 const { SEMVER_PATTERN } = require("./constants");
-const { classifyTarget } = require("./target-classification");
 
 const {
 	pathExists,
@@ -170,5 +169,4 @@ module.exports = {
 	validateCommonManifest,
 	validateCodexManifest,
 	validateManifests,
-	classifyTarget,
 };

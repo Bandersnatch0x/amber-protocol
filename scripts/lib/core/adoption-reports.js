@@ -45,11 +45,63 @@ const {
 const ADOPTION_COMPARE_METRICS = [
 	["existingHarnessFiles", "Existing Amber starter files"],
 	["missingHarnessFiles", "Missing Amber starter files"],
+	["templateStarterFilesPresent", "Template starter files present"],
+	["templateStarterFilesMissing", "Template starter files missing"],
 	["existingDocs", "Existing docs"],
 	["wikiLikeFiles", "Wiki-like files"],
 	["conflicts", "Conflicts"],
 	["staleDocs", "Stale docs"],
 ];
+
+function buildInitDryRunSection(initDryRun) {
+	if (initDryRun.notApplicable) {
+		return [
+			"## Init Dry Run",
+			"",
+			`- Not applicable: ${initDryRun.reason}`,
+			"",
+		];
+	}
+
+	return [
+		"## Init Dry Run",
+		"",
+		`- Would create: ${initDryRun.created.length}`,
+		`- Would skip: ${initDryRun.skipped.length}`,
+		"",
+		"### First Suggested Additions",
+		"",
+		...formatList(initDryRun.created.slice(0, 10), "none"),
+		"",
+	];
+}
+
+function buildAuditSummaryLines(audit) {
+	const lines = [
+		`- Read-only: ${audit.readOnly}`,
+		`- Target type: ${audit.classification.type}`,
+	];
+
+	if (audit.auditMode === "product-repo") {
+		lines.push(
+			`- Template starter files present: ${audit.templateStarterFiles.existing.length}`,
+			`- Template starter files missing: ${audit.templateStarterFiles.missing.length}`,
+		);
+	} else {
+		lines.push(
+			`- Existing Amber starter files: ${audit.existing.length}`,
+			`- Missing Amber starter files: ${audit.missing.length}`,
+		);
+	}
+
+	lines.push(
+		`- Existing docs: ${audit.docs.length}`,
+		`- Wiki-like files: ${audit.wikiLikeFiles.length}`,
+		`- Conflicts: ${audit.conflicts.length}`,
+	);
+
+	return lines;
+}
 
 function buildAdoptionReportContent(parts) {
 	const {
@@ -70,19 +122,7 @@ function buildAdoptionReportContent(parts) {
 		"",
 		"## Audit Summary",
 		"",
-		`- Read-only: ${audit.readOnly}`,
-		`- Target type: ${audit.classification.type}`,
-		...(audit.auditMode === "product-repo"
-			? [
-					`- Template starter files: ${audit.templateStarterFiles.existing.length}/${audit.templateStarterFiles.existing.length + audit.templateStarterFiles.missing.length} in templates/`,
-				]
-			: [
-					`- Existing Amber starter files: ${audit.existing.length}`,
-					`- Missing Amber starter files: ${audit.missing.length}`,
-				]),
-		`- Existing docs: ${audit.docs.length}`,
-		`- Wiki-like files: ${audit.wikiLikeFiles.length}`,
-		`- Conflicts: ${audit.conflicts.length}`,
+		...buildAuditSummaryLines(audit),
 		"",
 		"### Candidate Commands",
 		"",
@@ -92,15 +132,7 @@ function buildAdoptionReportContent(parts) {
 		"",
 		...formatList(audit.unknowns, "none"),
 		"",
-		"## Init Dry Run",
-		"",
-		`- Would create: ${initDryRun.created.length}`,
-		`- Would skip: ${initDryRun.skipped.length}`,
-		"",
-		"### First Suggested Additions",
-		"",
-		...formatList(initDryRun.created.slice(0, 10), "none"),
-		"",
+		...buildInitDryRunSection(initDryRun),
 		"## Team Distribution",
 		"",
 		`- Installed: ${team.installed}`,
@@ -677,7 +709,16 @@ function generateAdoptionReport(target, options = {}) {
 	}
 
 	const audit = auditProject(targetRoot);
-	const initDryRun = scaffoldHarness(targetRoot, { dryRun: true });
+	const initDryRun =
+		audit.auditMode === "product-repo"
+			? {
+					created: [],
+					skipped: [],
+					notApplicable: true,
+					reason:
+						"Product repository distributes starter scaffolds from templates/; root init is not applicable.",
+				}
+			: scaffoldHarness(targetRoot, { dryRun: true });
 	const team = inspectTeamDistribution(targetRoot, options);
 	let teamUpdatePreview = null;
 	if (team.installed && team.lock && team.registry.versions["1.1.0"]) {

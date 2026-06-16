@@ -180,7 +180,7 @@ function parseArgs(argv) {
 }
 
 function printAuditClassification(result) {
-	if (result.classification.type) {
+	if (result.classification?.type) {
 		console.log(`Target type: ${result.classification.type}`);
 	}
 }
@@ -188,8 +188,7 @@ function printAuditClassification(result) {
 function printAuditStarterSummary(result) {
 	if (result.auditMode === "product-repo") {
 		const template = result.templateStarterFiles;
-		const total =
-			template.existing.length + template.missing.length;
+		const total = template.existing.length + template.missing.length;
 		console.log(
 			`Template starter files: ${template.existing.length}/${total} in templates/`,
 		);
@@ -198,6 +197,22 @@ function printAuditStarterSummary(result) {
 
 	console.log(`Existing Amber starter files: ${result.existing.length}`);
 	console.log(`Missing Amber starter files: ${result.missing.length}`);
+}
+
+function printAuditStarterDetails(result) {
+	if (result.auditMode !== "product-repo") {
+		return;
+	}
+
+	const missing = result.templateStarterFiles?.missing || [];
+	if (missing.length === 0) {
+		return;
+	}
+
+	console.log("Missing template starter files:");
+	for (const item of missing) {
+		console.log(`  - ${item}`);
+	}
 }
 
 function printAuditSummary(result) {
@@ -310,8 +325,12 @@ function printResult(result, options = {}) {
 		console.log(`Read-only: ${result.readOnly}`);
 		printAuditClassification(result);
 		printAuditStarterSummary(result);
-		for (const item of result.missing) {
-			console.log(`  - ${item}`);
+		if (result.auditMode === "product-repo") {
+			printAuditStarterDetails(result);
+		} else {
+			for (const item of result.missing) {
+				console.log(`  - ${item}`);
+			}
 		}
 		if (
 			Array.isArray(result.suggestedAdditions) &&
