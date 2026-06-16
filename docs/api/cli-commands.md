@@ -12,6 +12,18 @@ Complete reference for Amber Protocol CLI commands (Phase B v1.0.0).
 | `--json` | Output in JSON format |
 | `--dry-run` | Preview changes without executing |
 
+## Service packages
+
+The commands below are organized into service packages. Service packages are documentation and navigation groupings over existing CLI commands; they are not new CLI command namespaces.
+
+| Service package | Existing commands |
+| --- | --- |
+| Repository Onboarding | [`init`](#init), [`doctor`](#doctor), `wiki` |
+| Adoption Review | [`adoption report`](#adoption-report), `adoption bundle`, [`adoption gate`](#adoption-gate) |
+| Governed Delivery | [`plan`](#plan), [`gate`](#gate), [`review`](#review), [`accept`](#accept), [`session complete-check`](#session-complete-check) |
+| Continuity Layer | [`session start`](#session-start), [`session status`](#session-status), `session continue` |
+| Security Governance | [`security audit`](#security-audit), security governance packs |
+
 ## Core Commands
 
 ### `init`
@@ -40,6 +52,46 @@ amber-protocol doctor [--target <dir>] [--report]
 |--------|-------------|
 | `--target <dir>` | Target directory to diagnose |
 | `--report` | Generate detailed report file |
+
+## Planning and Review Commands
+
+### `plan`
+
+Create a feature-linked vertical-slice plan without overwriting existing files.
+
+```bash
+amber-protocol plan --target <dir> --feature <id> --title "<title>" [--dry-run]
+```
+
+### `gate`
+
+Validate that a plan is tied to feature state and has user confirmation.
+
+```bash
+amber-protocol gate --target <dir> --plan <relative-path>
+```
+
+### `review`
+
+Review a plan against static standards and release-readiness checks.
+
+```bash
+amber-protocol review --target <dir> --plan <relative-path>
+```
+
+### `accept`
+
+Accept a reviewed plan and append an evolution record. When `--session` is provided, also prints the session's completion-gate status as a warning; with `--strict`, missing evidence becomes an error.
+
+```bash
+amber-protocol accept --target <dir> --plan <relative-path> [--session <id>] [--strict]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--plan <path>` | Relative path to the plan to accept |
+| `--session <id>` | Optional session id for completion-gate check |
+| `--strict` | Turn missing completion evidence into errors |
 
 ## Migration Commands
 
@@ -139,39 +191,28 @@ Abort an active session.
 amber-protocol session abort [<id>]
 ```
 
+### `session complete-check`
+
+Report whether a session has enough goal, timeline, verification, approval, and handoff evidence to be treated as complete. Report-only unless `--strict` is passed.
+
+```bash
+amber-protocol session complete-check --session <id> [--strict]
+```
+
 ## Security Commands
 
 ### `security audit`
 
-Run full security audit.
+Generate a security governance audit report in report-only mode. The current CLI wrapper produces a report from the security report generator without executing real dependency or filesystem scans, and it does not mutate target code.
 
 ```bash
 amber-protocol security audit [--target <dir>] [--output <file>]
 ```
 
-### `security scan dependencies`
-
-Scan npm dependencies for vulnerabilities.
-
-```bash
-amber-protocol security scan dependencies [--severity <level>]
-```
-
-### `security scan secrets`
-
-Scan source code for hardcoded secrets.
-
-```bash
-amber-protocol security scan secrets [--path <dir>]
-```
-
-### `security review permissions`
-
-Review permission configuration.
-
-```bash
-amber-protocol security review permissions [--target <dir>]
-```
+| Option | Description |
+|--------|-------------|
+| `--target <dir>` | Target directory (default: current) |
+| `--output <file>` | Write the report to a file instead of stdout |
 
 ## Skill Commands
 
@@ -216,6 +257,21 @@ Check adoption gate status.
 ```bash
 amber-protocol adoption gate --target <dir> [--output <file>]
 ```
+
+## Maintenance Commands
+
+### `maintenance distill`
+
+Find repeated work patterns across plans, reviews, gate reports, adoption next-actions, and maintenance proposals, and write a reviewable markdown candidate list. Does not install or execute workflow packs.
+
+```bash
+amber-protocol maintenance distill --target <dir> [--output <file>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--target <dir>` | Target directory (default: current) |
+| `--output <file>` | Output path for the proposal (default: `docs/maintenance/distill-proposals.md`) |
 
 ---
 

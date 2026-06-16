@@ -1496,3 +1496,75 @@ test("legacy entrypoints forward to the amber CLI", () => {
 	);
 	assert.match(compat.stderr, /deprecated/i, "compat shim warns on stderr");
 });
+
+test("security audit command exposes help", () => {
+	const result = runHarness(["security", "audit", "--help"]);
+	assert.equal(result.status, 0);
+	assert.match(result.stdout, /security audit/);
+	assert.match(result.stdout, /--target/);
+	assert.match(result.stdout, /--output/);
+});
+
+test("session complete-check reports missing evidence for a new session", () => {
+	const target = tempDir("session-complete-check");
+	const start = runHarness([
+		"session",
+		"start",
+		"--goal",
+		"test completion",
+		"--route",
+		"bugfix-quick",
+		"--target",
+		target,
+		"--json",
+	]);
+	assert.equal(start.status, 0, start.stderr);
+	const { sessionId } = JSON.parse(start.stdout);
+
+	const check = runHarness([
+		"session",
+		"complete-check",
+		"--target",
+		target,
+		"--session",
+		sessionId,
+		"--json",
+	]);
+	assert.equal(check.status, 0, check.stderr);
+	const payload = JSON.parse(check.stdout);
+	assert.match(payload.text, /Completion status: fail/);
+	assert.match(payload.text, /Missing:/);
+});
+
+test("maintenance distill writes a proposal from repeated plan headings", () => {
+	const target = tempDir("maintenance-distill");
+	fs.mkdirSync(path.join(target, "docs", "superpowers", "plans"), {
+		recursive: true,
+	});
+	fs.writeFileSync(
+		path.join(target, "docs", "superpowers", "plans", "a.md"),
+		"# Refactor auth\n",
+	);
+	fs.writeFileSync(
+		path.join(target, "docs", "superpowers", "plans", "b.md"),
+		"# Refactor auth\n",
+	);
+	const output = path.join(target, "docs", "maintenance", "distill-proposals.md");
+
+	const result = runHarness([
+		"maintenance",
+		"distill",
+		"--target",
+		target,
+		"--output",
+		output,
+		"--json",
+	]);
+	assert.equal(result.status, 0, result.stderr);
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.outputPath, output);
+	assert.ok(payload.candidateCount >= 1);
+	const report = fs.readFileSync(output, "utf8");
+	assert.match(report, /# Distill Proposals/);
+	assert.match(report, /Refactor auth/);
+});

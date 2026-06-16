@@ -64,9 +64,27 @@ Loop-inspired capabilities such as scheduled discovery, goal loops, connector-ba
 
 Live loop scheduling is outside the current product boundary. The Amber setup may define readiness requirements for a future execution layer, but it must not imply support for always-on agents, daemonized work, hook-triggered mutation, autonomous notifications, or scheduled external-system updates until loop contracts, execution ledgers, replay evidence, approval policy, connector contracts, no-progress detection, isolated workspaces, budget ceilings, and human/reviewer gates are stable.
 
+## Service packages
+
+Service packages are documentation and navigation groupings over existing artifact-first CLI commands. They do not introduce new CLI command namespaces, hosted execution, external automation, live agent dispatch, or automatic PR creation. Running a service package means running the real CLI commands documented under that package, such as `init`, `doctor`, `adoption report`, `plan`, `session`, or `security audit`.
+
 ## 4. V1 Command Surface
 
-V1 keeps the command surface narrow.
+V1 command surface is broader than the original bootstrap scope but remains artifact-first, read-only or dry-run by default, and free of live execution promises.
+
+Implemented commands include:
+
+- **Bootstrap and verification:** `init`, `audit`, `wiki`, `doctor`, `handoff`
+- **Planning and review:** `plan`, `gate`, `review`, `accept`
+- **Declarative inspection:** `pack`, `profile`
+- **Task and agent records:** `task`, `result`, `agent`
+- **Team and maintenance:** `team`, `maintenance`
+- **Adoption:** `adoption report`, `adoption bundle`, `adoption gate`, and related read-only artifacts
+- **Routes and sessions:** `route`, `session`, `migrate`, `daemon`
+- **Governance and execution boundaries:** `governance`, `execution`
+- **Security governance:** `security audit`
+
+These commands create or inspect repo-local artifacts. They do not execute dynamic workflows, dispatch live agents, run target-project commands automatically, or create external PRs. See [docs/api/cli-commands.md](./docs/api/cli-commands.md) for the full command reference.
 
 ### `init`
 
@@ -173,42 +191,19 @@ Checks:
 
 ## 5. Deferred Command Surface
 
-These names can be reserved in docs, but V1 must not claim full execution support.
-
-### Deferred to V2
-
-- `plan`
-- `gate`
-
-### Deferred to V2.5
-
-- `review`
-- `accept`
-- `standards`
-
-### Deferred to V3
-
-- `pack`
-- `profile`
-- workflow-pack validation beyond local structural checks
-
-### Deferred to V3+
-
-- `work`
-- dynamic workflow execution
-- subagent dispatch
-- worktree orchestration
-- model/backend routing
-- observability runtime integration
+These capabilities are reserved for future versions. V1 may document them as future extension points, but it must not imply full execution support.
 
 ### Deferred to a future execution track
 
-- `loop run`
-- `loop record`
-- `loop status`
-- `loop inspect`
-- live loop scheduling through cron, hooks, CI, or daemon processes
-- connector-backed notifications or issue-tracker updates
+- Dynamic workflow execution
+- Live multi-agent dispatch
+- Worktree orchestration as a general runtime
+- Model/backend routing
+- Observability runtime integration
+- `loop run` with live scheduling through cron, hooks, CI, or daemon processes
+- Connector-backed notifications or issue-tracker updates
+- Automatic PR creation
+- Automatic rewrite of existing target project docs
 
 Future loop commands must start as dry-run and record-only surfaces. They may resolve contracts, explain planned actions, write ledger previews, and inspect prior records before they are allowed to execute scheduled work.
 

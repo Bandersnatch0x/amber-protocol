@@ -15,6 +15,12 @@
 | Feature state | Machine-readable status and evidence for planned or completed work. | task list, project status |
 | Progress state | Human-readable current progress and next-action record. | notes, scratchpad |
 | Handoff | Session-transition artifact that records repo state, runtime state, blockers, and next actions. | summary, context dump |
+| Service package | Documentation and navigation grouping of existing CLI commands and artifacts around a complete governance outcome, such as onboarding, adoption review, delivery, continuity, or security governance. Service packages are not CLI commands themselves. | feature bucket, marketing category, CLI command group |
+| Governance console | Repository-local command and artifact surface that records plans, evidence, approvals, verification, and handoff state for AI-assisted coding work. | hosted platform, live agent runtime |
+| Continuity surface | Repo-local files that help humans and agents resume work without injecting content into a model automatically. | memory when ambiguous, state spine |
+| Completion gate | Deterministic report-only check that explains whether a session has enough goal, timeline, verification, approval, and handoff evidence to be treated as complete. | LLM judgement, auto-accept |
+| Evidence bundle | Reviewable set of repo-local artifacts that support a decision, such as a gate, adoption review, completion check, or audit. | chat transcript dump |
+| Security governance pack | Declarative workflow pack and standard set for dependency, secret, permission, insecure-code, repair-verification, and high-risk-action review. | scanner implementation, exploit framework |
 
 ## Planning and review lifecycle
 

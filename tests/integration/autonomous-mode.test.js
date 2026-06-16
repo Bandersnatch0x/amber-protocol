@@ -1,11 +1,21 @@
-const { describe, it } = require("node:test");
+const { describe, it, after } = require("node:test");
 const assert = require("assert");
 const { spawnSync } = require("child_process");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "../..");
 
 describe("autonomous mode integration", () => {
+	// Isolated target so session start does not write continuity surfaces into
+	// the amber source tree. cwd stays at ROOT so routes resolve.
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-autonomous-mode-"));
+
+	after(() => {
+		fs.rmSync(target, { recursive: true, force: true });
+	});
+
 	it("should accept --mode autonomous flag", () => {
 		const result = spawnSync(
 			process.execPath,
@@ -17,6 +27,8 @@ describe("autonomous mode integration", () => {
 				"implement test feature",
 				"--mode",
 				"autonomous",
+				"--target",
+				target,
 				"--json",
 			],
 			{ cwd: ROOT, encoding: "utf8", timeout: 15000 },
