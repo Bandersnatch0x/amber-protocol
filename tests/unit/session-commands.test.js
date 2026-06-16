@@ -12,11 +12,19 @@ const {
 
 const TEST_ROOT = path.join(__dirname, "../fixtures/session-test-repo");
 
+function removeTestRoot(dir) {
+	if (!fs.existsSync(dir)) return;
+	fs.rmSync(dir, {
+		recursive: true,
+		force: true,
+		maxRetries: 10,
+		retryDelay: 100,
+	});
+}
+
 describe("session-commands", () => {
 	beforeEach(() => {
-		if (fs.existsSync(TEST_ROOT)) {
-			fs.rmSync(TEST_ROOT, { recursive: true, force: true });
-		}
+		removeTestRoot(TEST_ROOT);
 		fs.mkdirSync(TEST_ROOT, { recursive: true });
 
 		spawnSync("git", ["init"], { cwd: TEST_ROOT });
@@ -30,9 +38,7 @@ describe("session-commands", () => {
 	});
 
 	afterEach(() => {
-		if (fs.existsSync(TEST_ROOT)) {
-			fs.rmSync(TEST_ROOT, { recursive: true, force: true });
-		}
+		removeTestRoot(TEST_ROOT);
 	});
 
 	describe("startSession", () => {

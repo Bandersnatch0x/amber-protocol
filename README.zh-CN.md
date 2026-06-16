@@ -1,7 +1,7 @@
 # Amber Protocol
 
 <p align="center">
-  <img src="./assets/brand/amber-protocol-logo.png" alt="Amber Protocol logo" width="160" />
+  <img src="./assets/brand/amber-protocol-logo.png" alt="Amber Protocol 标志" width="160" />
 </p>
 
 [English](./README.md)
@@ -172,7 +172,7 @@ CI 在 push 和 pull request 上运行：
 
 当推送类似 `v1.2.3` 的 tag 时，会运行 release dry-run：
 
-- 依赖 CI 测试矩阵
+- 依赖 `test` 和 `web` 两个 CI job
 - 运行 `npm pack --dry-run`
 - 上传生成的 package preview artifact
 
