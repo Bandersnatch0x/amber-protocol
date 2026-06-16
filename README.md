@@ -275,7 +275,7 @@ CI runs on pushes and pull requests:
 
 Release dry-run runs when a tag like `v1.2.3` is pushed:
 
-- reruns the CI checks
+- depends on both the `test` and `web` CI jobs
 - runs `npm pack --dry-run`
 - uploads the generated package preview as an artifact
 
