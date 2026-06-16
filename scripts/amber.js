@@ -804,4 +804,4 @@ if (require.main === module) {
 		});
 }
 
-module.exports = { run, usage };
+module.exports = { run, usage, COMMANDS };

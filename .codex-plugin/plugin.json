@@ -1,6 +1,6 @@
 {
   "name": "amber-protocol",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Amber Protocol: repository-local governance kit for coding agents — init, audit, wiki, doctor, and handoff workflows.",
   "author": {
     "name": "Local developer"
@@ -12,7 +12,7 @@
     "validation",
     "handoff"
   ],
-  "skills": "./skills/",
+  "skills": "../skills",
   "interface": {
     "displayName": "Amber Protocol",
     "shortDescription": "Install and validate a safe repository-local Amber Protocol setup.",
