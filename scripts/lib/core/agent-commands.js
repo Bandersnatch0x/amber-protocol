@@ -167,25 +167,24 @@ function planOutputs(skills, repoRoot) {
 function generateAgentCommands({ skillsRoot, repoRoot, check = false }) {
 	const skills = collectAmberSkills(skillsRoot);
 	const outputs = planOutputs(skills, repoRoot);
-	const stale = [];
+	const paths = [];
+	const changed = [];
 	for (const output of outputs) {
+		const relativePath = relativeSlash(repoRoot, output.path);
+		paths.push(relativePath);
 		const existing = pathExists(output.path) ? readText(output.path) : null;
 		const isStale =
 			existing === null ||
 			normalizeEol(existing) !== normalizeEol(output.content);
 		if (isStale) {
-			stale.push(relativeSlash(repoRoot, output.path));
+			changed.push(relativePath);
 			if (!check) {
 				fs.mkdirSync(path.dirname(output.path), { recursive: true });
 				fs.writeFileSync(output.path, output.content);
 			}
 		}
 	}
-	return {
-		written: outputs.map((output) => relativeSlash(repoRoot, output.path)),
-		stale,
-		changed: stale.length > 0,
-	};
+	return { paths, changed };
 }
 
 module.exports = {
