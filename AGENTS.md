@@ -16,6 +16,10 @@ node scripts/amber.js <command> --target <repo>
 - `node scripts/amber.js wiki --target <repo>` — create/validate the wiki skeleton.
 - `node scripts/amber.js doctor --target <repo>` — validate the Amber setup.
 - `node scripts/amber.js handoff --target <repo>` — validate session handoff state.
+- `node scripts/amber.js route list` — list available routes.
+- `node scripts/amber.js session status` — inspect the current session.
+- `node scripts/amber.js adoption report --target <repo> --output-dir docs/examples/adoptions` — generate an adoption report.
+- `node scripts/amber.js plan --target <repo> --feature <feature-id> --title "<title>"` — scaffold a feature plan.
 
 ## Safety boundaries
 

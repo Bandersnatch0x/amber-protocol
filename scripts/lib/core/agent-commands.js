@@ -93,7 +93,18 @@ function applyGeminiArgs(command, args) {
 	if (list.length === 0) {
 		return command;
 	}
-	return command.split(`{{${list[0].name}}}`).join("{{args}}");
+	if (list.length === 1) {
+		return command.split(`{{${list[0].name}}}`).join("{{args}}");
+	}
+	// Multi-argument skills collapse the entire argument block into a single
+	// {{args}} placeholder. The prompt instructs the user to supply all
+	// required values (e.g. --target . --feature F001 --title "Slice").
+	const first = command.indexOf("{{");
+	const last = command.lastIndexOf("}}");
+	if (first === -1 || last === -1) {
+		return command;
+	}
+	return command.slice(0, first) + "{{args}}" + command.slice(last + 2);
 }
 
 function escapeTomlBasic(value) {
