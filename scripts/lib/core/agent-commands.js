@@ -136,6 +136,21 @@ function collectAmberSkills(skillsRoot) {
 	return skills.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function listSkillDirs(skillsRoot) {
+	if (!pathExists(skillsRoot)) {
+		return [];
+	}
+	return fs
+		.readdirSync(skillsRoot, { withFileTypes: true })
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				pathExists(path.join(skillsRoot, entry.name, "SKILL.md")),
+		)
+		.map((entry) => entry.name)
+		.sort();
+}
+
 function normalizeEol(value) {
 	return String(value).replace(/\r\n/g, "\n");
 }
@@ -171,6 +186,12 @@ function planOutputs(skills, repoRoot) {
 function generateAgentCommands({ skillsRoot, repoRoot, check = false }) {
 	const skills = collectAmberSkills(skillsRoot);
 	const outputs = planOutputs(skills, repoRoot);
+	for (const name of listSkillDirs(skillsRoot)) {
+		outputs.push({
+			path: path.join(repoRoot, ".agents", "skills", name, "SKILL.md"),
+			content: readText(path.join(skillsRoot, name, "SKILL.md")),
+		});
+	}
 	const paths = [];
 	const changed = [];
 	for (const output of outputs) {
@@ -200,5 +221,6 @@ module.exports = {
 	escapeTomlBasic,
 	renderGeminiCommand,
 	collectAmberSkills,
+	listSkillDirs,
 	generateAgentCommands,
 };

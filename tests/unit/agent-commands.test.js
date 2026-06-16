@@ -9,6 +9,7 @@ const {
 	renderClaudeCommand,
 	renderGeminiCommand,
 	collectAmberSkills,
+	listSkillDirs,
 	generateAgentCommands,
 } = require("../../scripts/lib/core/agent-commands");
 
@@ -181,7 +182,8 @@ describe("generateAgentCommands", () => {
 	it("writes Claude .md and Gemini .toml products", () => {
 		const { skillsRoot, repoRoot } = setup();
 		const result = generateAgentCommands({ skillsRoot, repoRoot });
-		assert.strictEqual(result.changed.length, 2);
+		// 1 amber skill → claude .md + gemini .toml + .agents/skills mirror
+		assert.strictEqual(result.changed.length, 3);
 		assert.deepStrictEqual(result.paths, result.changed);
 		assert.ok(
 			fs.existsSync(path.join(repoRoot, ".claude/commands/amber-init.md")),
@@ -196,7 +198,7 @@ describe("generateAgentCommands", () => {
 		generateAgentCommands({ skillsRoot, repoRoot });
 		const second = generateAgentCommands({ skillsRoot, repoRoot });
 		assert.deepStrictEqual(second.changed, []);
-		assert.strictEqual(second.paths.length, 2);
+		assert.strictEqual(second.paths.length, 3);
 	});
 
 	it("check mode reports changes without writing", () => {
@@ -305,5 +307,40 @@ describe("root AGENTS.md", () => {
 				`AGENTS.md missing command: ${name}`,
 			);
 		}
+	});
+});
+
+describe("listSkillDirs + .agents/skills mirror", () => {
+	it("lists all directories containing SKILL.md, sorted", () => {
+		const root = makeTempSkills({
+			"b-skill": skillMd(
+				"b-skill",
+				"node scripts/amber.js doctor --target {{target}}",
+			),
+			"a-skill": "---\nname: a-skill\ndescription: plain.\n---\n",
+		});
+		fs.mkdirSync(path.join(root, "empty-dir"));
+		assert.deepStrictEqual(listSkillDirs(root), ["a-skill", "b-skill"]);
+	});
+
+	it("mirrors every skill (amber or not) to .agents/skills", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-init": skillMd(
+				"amber-init",
+				"node scripts/amber.js init --target {{target}}",
+			),
+			"plain-skill": "---\nname: plain-skill\ndescription: plain.\n---\n",
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+		generateAgentCommands({ skillsRoot, repoRoot });
+		const mirrored = path.join(repoRoot, ".agents/skills/amber-init/SKILL.md");
+		assert.ok(fs.existsSync(mirrored));
+		assert.strictEqual(
+			fs.readFileSync(mirrored, "utf8"),
+			fs.readFileSync(path.join(skillsRoot, "amber-init/SKILL.md"), "utf8"),
+		);
+		assert.ok(
+			fs.existsSync(path.join(repoRoot, ".agents/skills/plain-skill/SKILL.md")),
+		);
 	});
 });
