@@ -47,8 +47,44 @@ jobs:
       - name: Run repository doctor
         run: npm run doctor
 
+      - name: Check generated agents are up to date
+        run: npm run gen:agents:check
+
       - name: Smoke-check CLI help
-        run: node scripts/harness.js --help
+        run: node scripts/amber.js --help
+
+  web:
+    name: Web viewer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20.x
+
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm install --legacy-peer-deps
+
+      - name: Build web app
+        working-directory: apps/web
+        run: npm run build
+
+      - name: Run web unit tests
+        working-directory: apps/web
+        run: npm run test
+
+      - name: Install Playwright dependencies
+        working-directory: apps/web
+        run: npx playwright install --with-deps
+
+      - name: Run web E2E tests
+        working-directory: apps/web
+        run: npm run test:e2e
 
   release-dry-run:
     name: Release dry-run

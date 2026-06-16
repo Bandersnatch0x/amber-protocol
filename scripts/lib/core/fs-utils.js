@@ -8,6 +8,7 @@ const {
 } = require("./constants");
 
 const AUDIT_IGNORED_DIRECTORY_NAMES = new Set([
+	".claude",
 	".git",
 	".mypy_cache",
 	".next",

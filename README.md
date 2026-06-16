@@ -34,7 +34,7 @@ See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for the deployment guide.
 
 - **Amber core (V1–V5.5 command surface):** implemented and tested
 - **Phase B (routes, sessions, autonomous mode, migration):** implemented and tested
-- **Phase C (Web Viewer):** implemented; unit-tested, Playwright e2e specs exist but are not wired into CI
+- **Phase C (Web Viewer):** implemented; unit-tested, Playwright e2e specs wired into CI via the `web` job
 - **Phase D (production hardening):** partial — SSE auth helpers and error logging exist, SSE endpoint enforcement and external monitoring are not wired
 - **Governance surfaces:** implemented and tested
 
@@ -251,7 +251,8 @@ Sample adoption artifacts live under `docs/examples/` and are review-only. They 
 | **Phase B Beta** | Implemented | Autonomous mode: executor, policy, daemon, logger, notifier, session-lock |
 | **Phase B RC** | Implemented | Integration testing: e2e/load/migration/security test suites |
 | **Phase B GA** | Implemented | Release: publish/release scripts, migration tools (dry-run, rollback, schema-validator) |
-| **Phase C** | Scaffold only | Web Viewer — 7 config files, 0 pages. Deferred. |
+| **Phase C** | Implemented | Web Viewer — Vite + React + TanStack Router; unit-tested; Playwright e2e specs wired into CI via the `web` job |
+| **Phase D** | Partial | Production hardening — SSE auth helpers and error logging exist; SSE endpoint enforcement and external monitoring are not wired |
 | Future Live Loop Scheduling | Not implemented | future-only readiness track |
 
 Loop readiness is available as a static, record-only surface. `pack readiness` checks declarative controls without running jobs, dispatching live agents, writing external systems, or opening PRs. `loop inspect`, `loop run --dry-run`, `loop record`, and `loop status` resolve contracts and write or inspect ledger records only; `readyForLiveScheduling` remains `false` by product boundary.
@@ -268,7 +269,9 @@ CI runs on pushes and pull requests:
 - run `npm test`
 - run manifest validation
 - run `doctor --target .`
-- smoke-check CLI help
+- run `npm run gen:agents:check` to ensure generated platform commands have not drifted
+- smoke-check CLI help with `node scripts/amber.js --help`
+- build, unit-test, and e2e-test the web viewer in `apps/web` (Node 20.x, Playwright)
 
 Release dry-run runs when a tag like `v1.2.3` is pushed:
 

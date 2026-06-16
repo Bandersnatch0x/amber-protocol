@@ -9,13 +9,13 @@
     "coding-harness": "scripts/compat/coding-harness.js"
   },
   "scripts": {
-    "test": "node --test tests/",
-    "check": "node --test tests/",
+    "test": "node scripts/run-tests.js",
+    "check": "node scripts/run-tests.js",
     "doctor": "node scripts/amber.js doctor --target .",
     "handoff": "node scripts/amber.js handoff --target .",
     "manifests": "node scripts/validate-manifests.js --target .",
-    "test:load": "node --test tests/load/sequential-sessions.test.js",
-    "test:e2e": "node --test tests/e2e/",
+    "test:load": "node scripts/run-tests.js tests/load/sequential-sessions.test.js",
+    "test:e2e": "node scripts/run-tests.js tests/e2e/",
     "gen:agents": "node scripts/gen-agent-commands.js",
     "gen:agents:check": "node scripts/gen-agent-commands.js --check"
   },

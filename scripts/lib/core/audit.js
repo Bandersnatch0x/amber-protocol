@@ -18,6 +18,8 @@ const {
 	walkProjectFiles,
 } = require("./fs-utils");
 
+const { classifyTarget } = require("./manifests");
+
 const {
 	getSectionBody,
 	hasSectionWithBody,
@@ -218,6 +220,7 @@ function buildNextSafeCommand(targetRoot) {
 
 function auditProject(target) {
 	const targetRoot = resolveTarget(target);
+	const classification = classifyTarget(targetRoot);
 	const existing = [];
 	const missing = [];
 
@@ -258,6 +261,7 @@ function auditProject(target) {
 	return {
 		target: targetRoot,
 		readOnly: true,
+		classification,
 		existing,
 		missing,
 		agentDocs,

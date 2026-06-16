@@ -20,6 +20,14 @@ describe("amber-core exports snapshot", () => {
 		});
 		it("MINIMUM_HARNESS_FILES is an array", () => {
 			assert.ok(Array.isArray(harnessCore.MINIMUM_HARNESS_FILES));
+			assert.strictEqual(
+				harnessCore.MINIMUM_AMBER_FILES,
+				harnessCore.MINIMUM_HARNESS_FILES,
+			);
+			assert.strictEqual(
+				harnessCore.REQUIRED_AMBER_FILES,
+				harnessCore.REQUIRED_HARNESS_FILES,
+			);
 		});
 		it("OPTIONAL_STARTER_WIKI_FILES is an array", () => {
 			assert.ok(Array.isArray(harnessCore.OPTIONAL_STARTER_WIKI_FILES));
@@ -117,12 +125,12 @@ describe("amber-core exports snapshot", () => {
 	});
 
 	// ── Export count ───────────────────────────────────────────────────
-	it("exports exactly 64 symbols", () => {
+	it("exports exactly 66 symbols", () => {
 		const keys = Object.keys(harnessCore).sort();
 		assert.strictEqual(
 			keys.length,
-			64,
-			`Expected 64 exports, got ${keys.length}. ` +
+			66,
+			`Expected 66 exports, got ${keys.length}. ` +
 				`If you intentionally added/removed an export, update this count. ` +
 				`New exports: ${keys.filter((k) => !KNOWN_EXPORTS.has(k)).join(", ")}`,
 		);
@@ -133,9 +141,11 @@ describe("amber-core exports snapshot", () => {
 const KNOWN_EXPORTS = new Set([
 	"DEFAULT_TEAM_REGISTRY",
 	"MINIMUM_HARNESS_FILES",
+	"MINIMUM_AMBER_FILES",
 	"OPTIONAL_STARTER_WIKI_FILES",
 	"REQUIRED_HANDOFF_SECTIONS",
 	"REQUIRED_HARNESS_FILES",
+	"REQUIRED_AMBER_FILES",
 	"TEMPLATE_ROOT",
 	"acceptPlan",
 	"auditProject",

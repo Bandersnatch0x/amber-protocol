@@ -43,8 +43,8 @@ const {
 } = require("./text-utils");
 
 const ADOPTION_COMPARE_METRICS = [
-	["existingHarnessFiles", "Existing Harness files"],
-	["missingHarnessFiles", "Missing Harness files"],
+	["existingHarnessFiles", "Existing Amber starter files"],
+	["missingHarnessFiles", "Missing Amber starter files"],
 	["existingDocs", "Existing docs"],
 	["wikiLikeFiles", "Wiki-like files"],
 	["conflicts", "Conflicts"],
@@ -71,8 +71,8 @@ function buildAdoptionReportContent(parts) {
 		"## Audit Summary",
 		"",
 		`- Read-only: ${audit.readOnly}`,
-		`- Existing Harness files: ${audit.existing.length}`,
-		`- Missing Harness files: ${audit.missing.length}`,
+		`- Existing Amber starter files: ${audit.existing.length}`,
+		`- Missing Amber starter files: ${audit.missing.length}`,
 		`- Existing docs: ${audit.docs.length}`,
 		`- Wiki-like files: ${audit.wikiLikeFiles.length}`,
 		`- Conflicts: ${audit.conflicts.length}`,
