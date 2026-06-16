@@ -62,13 +62,13 @@ No blockers were found. All changes are additive and preserve product boundaries
 
 **Problem:** Running `audit` on the Amber source repo reported missing starter files without explaining that this is expected for the product repository.
 
-**Fix:** `auditProject` now includes `classification` from `classifyTarget`. Summary output prints `Target type: product-repo` and notes that starter scaffolds live under `templates/`. Audit doc walks ignore `.claude/` trees to reduce agent-worktree noise.
+**Fix:** `auditProject` branches into `auditProductRepo` / `auditTargetRepo` (mirroring `doctor`). Product-repo audits report `templates/` starter inventory instead of root-level gaps. Audit doc walks ignore only `.claude/worktrees/` to reduce agent-worktree noise.
 
 ### A3. Legacy “Harness” user-facing labels (Low)
 
 **Problem:** Audit/adoption CLI output still said “Harness files” after the Amber Protocol rename.
 
-**Fix:** User-facing strings now read “Amber starter files”. Added `MINIMUM_AMBER_FILES` / `REQUIRED_AMBER_FILES` aliases alongside legacy constant names for internal compatibility.
+**Fix:** User-facing strings now read “Amber starter files”. Internal constants remain `MINIMUM_HARNESS_FILES` / `REQUIRED_HARNESS_FILES` until a future atomic rename pass.
 
 ### A4. CI / docs drift (Low)
 
@@ -82,7 +82,7 @@ No blockers were found. All changes are additive and preserve product boundaries
 
 | Item | Priority | Notes |
 | --- | --- | --- |
-| Internal constant rename (`MINIMUM_HARNESS_FILES` → identifiers only) | Low | Aliases added; full rename deferred to avoid wide internal churn |
+| Internal constant rename (`MINIMUM_HARNESS_FILES` → identifiers only) | Low | User-facing labels updated; full constant rename deferred to avoid wide internal churn |
 | Deeper Phase B regression pass | Optional | Budget persistence, migrate logging — spot-check when touching execution paths |
 | Full load test on Windows | Optional | `test:load` works via runner; broad load suite still slow |
 | `session-handoff.md` on product repo | N/A | Intentionally absent; `handoff` fails by design on source repo |

@@ -8,6 +8,7 @@ const { collectFilesBySuffix } = require("./lib/core/fs-utils");
 
 const ROOT = path.resolve(__dirname, "..");
 const TESTS_DIR = path.join(ROOT, "tests");
+const TEST_IGNORED_DIRS = new Set(["node_modules", "fixtures"]);
 
 function resolveRequestedFiles(patterns) {
 	const files = [];
@@ -21,9 +22,11 @@ function resolveRequestedFiles(patterns) {
 
 		const stats = fs.statSync(resolved);
 		if (stats.isDirectory()) {
-			collectFilesBySuffix(resolved, ".test.js").forEach((filePath) => {
-				files.push(filePath);
-			});
+			collectFilesBySuffix(resolved, ".test.js", TEST_IGNORED_DIRS).forEach(
+				(filePath) => {
+					files.push(filePath);
+				},
+			);
 		} else {
 			files.push(resolved);
 		}
@@ -36,7 +39,7 @@ const patterns = process.argv.slice(2);
 const files = (
 	patterns.length > 0
 		? resolveRequestedFiles(patterns)
-		: collectFilesBySuffix(TESTS_DIR, ".test.js")
+		: collectFilesBySuffix(TESTS_DIR, ".test.js", TEST_IGNORED_DIRS)
 ).sort();
 
 if (files.length === 0) {

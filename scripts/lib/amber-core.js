@@ -157,8 +157,8 @@ const {
 	validateCommonManifest,
 	validateCodexManifest,
 	validateManifests,
-	classifyTarget,
 } = require("./core/manifests");
+const { classifyTarget } = require("./core/target-classification");
 const {
 	detectCommands,
 	detectToolingEvidence,

@@ -597,6 +597,47 @@ test("adoption gate reports a conservative wait decision for risky reports", () 
 	assert.equal(fs.existsSync(path.join(reportsDir, "gate.md")), false);
 });
 
+test("adoption gate skips starter-file findings for product-repo reports", () => {
+	const reportsDir = tempDir("adoption-gate-product-repo");
+	const report = path.join(reportsDir, "product-report.md");
+	fs.writeFileSync(
+		report,
+		[
+			"# Amber Protocol Adoption Report",
+			"",
+			"Target: D:\\code_space\\coding-harness",
+			"Generated: 2026-06-17T00:00:00.000Z",
+			"",
+			"## Audit Summary",
+			"",
+			"- Read-only: true",
+			"- Target type: product-repo",
+			"- Template starter files present: 10",
+			"- Template starter files missing: 7",
+			"- Existing docs: 100",
+			"- Wiki-like files: 50",
+			"- Conflicts: 2",
+			"",
+			"### Candidate Commands",
+			"",
+			"- none",
+			"",
+			"### Unknowns",
+			"",
+			"- none",
+			"",
+		].join("\n"),
+	);
+
+	const result = runHarness(["adoption", "gate", "--report", report, "--json"]);
+
+	assert.equal(result.status, 0, result.stderr);
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.decision, "ready");
+	assert.deepEqual(payload.findings, []);
+	assert.equal(payload.report.targetType, "product-repo");
+});
+
 test("adoption gate selects the latest report from a reports directory", () => {
 	const reportsDir = tempDir("adoption-gate-reports-dir");
 	fs.writeFileSync(

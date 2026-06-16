@@ -159,6 +159,7 @@ function gateAdoptionReport(options = {}) {
 			file: report.file,
 			target: report.target,
 			generatedAt: report.generatedAt,
+			targetType: report.targetType,
 		},
 		decision: findings.length === 0 ? "ready" : "wait",
 		findings,

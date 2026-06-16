@@ -47,8 +47,28 @@ function writeJson(filePath, data) {
 	fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
 }
 
-function collectFilesBySuffix(root, suffix) {
-	return walkFiles(root).filter((filePath) => filePath.endsWith(suffix));
+function collectFilesBySuffix(root, suffix, ignoredDirNames = new Set()) {
+	const files = [];
+
+	function walk(current) {
+		if (!pathExists(current)) {
+			return;
+		}
+
+		for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+			const fullPath = path.join(current, entry.name);
+			if (entry.isDirectory()) {
+				if (!ignoredDirNames.has(entry.name)) {
+					walk(fullPath);
+				}
+			} else if (entry.isFile() && fullPath.endsWith(suffix)) {
+				files.push(fullPath);
+			}
+		}
+	}
+
+	walk(root);
+	return files;
 }
 
 function walkFiles(root) {
