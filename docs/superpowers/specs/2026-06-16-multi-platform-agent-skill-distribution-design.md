@@ -161,11 +161,12 @@ x-amber:
 - ❌ 由 plugin/skill **实际执行** Amber 命令 —— 仍由 agent 在其权限模型下运行，符合 Amber "不自动执行" 的产品边界。
 - ❌ 发布到任何外部 marketplace。
 
-## 9. 待验证点（实现期用官方 docs + `--help` 最终确认）
+## 9. 平台落点（更新：2026-06-16 已确认并落地）
 
-1. **Cursor / Gemini 放置 `SKILL.md` 的确切目录**：调研确认二者支持 skills，但官方目录约定较新；存在 `.agents/skills/` 这类跨平台位置的说法待证实。不影响架构，仅为分发落点参数。
-2. **Codex `.codex-plugin/` 的 `skills` 相对路径解析规则**，以及 Codex 是否需要 `.codex/skills/` 实体目录 vs plugin 指向。
-3. **Claude plugin manifest 是否支持 `commands` 字段**声明 slash 命令位置。
+1. ✅ **Codex / Cursor 的 skill 目录已确认 = `.agents/skills/`**（Codex 官方 developers.openai.com/codex/skills 用 `.agents/skills/`，非第三方所传 `.codex/skills/`；Cursor 官方 cursor.com/docs/skills 支持 `.cursor/skills/` 或 `.agents/skills/`）。二者无"指向"机制，skill 必须实体存在，故生成器已**镜像全部 `skills/` 到 `.agents/skills/`**（一个目录通吃两家）。
+2. ✅ **Codex 不依赖 `.codex-plugin` 指向**：官方机制是 `.agents/skills/` 实体目录，已由镜像满足；`.codex-plugin/plugin.json` 作为补充 manifest 保留。
+3. ⏳ **Gemini skill 层目录**仍未核实——Gemini 当前靠 `.gemini/commands/*.toml` 手动命令覆盖；如需 skill 自动调用再核实其目录。
+4. ⏳ **Claude plugin manifest 的 `commands` 字段**：本期未使用，slash 命令直接放 `.claude/commands/` 已生效；如需经 plugin 声明可后续追加。
 
 ## 10. 验收标准
 
