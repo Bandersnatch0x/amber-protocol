@@ -32,17 +32,21 @@ npm run start
 
 ## Environment Variables
 
-Currently no environment variables are required.
-
-Planned (not yet wired):
+Required for production:
 
 ```bash
-# SSE Authentication secret
+# SSE Authentication secret (mandatory in production)
 SSE_AUTH_SECRET=your-secret-key
+```
 
+Optional:
+
+```bash
 # Monitoring
 SENTRY_DSN=https://...
 ```
+
+In development and test environments, the SSE endpoint will allow connections when `SSE_AUTH_SECRET` is unset and log a warning. In production, requests without a valid token receive HTTP 401.
 
 ## Deployment Options
 
@@ -132,14 +136,14 @@ PORT=3001 npm start
 - Input validation (Zod)
 - Path traversal protection
 - Error boundaries
-- SSE token helpers exist (`lib/auth-token.ts`); enforcing them on the SSE
-  endpoint is not yet wired
+- SSE authentication enforced on `/api/sessions/:id/events`; tokens are compared with `crypto.timingSafeEqual` and missing or invalid tokens receive HTTP 401
 
 ### Recommendations
 
 - Deploy behind HTTPS
 - Use an internal network for the backend
 - Enable rate limiting
+- Rotate `SSE_AUTH_SECRET` periodically and store it in a secrets manager
 
 ## Rollback
 
@@ -151,7 +155,7 @@ npm run build && npm start
 
 ## Production Checklist
 
-- [ ] Environment variables configured
+- [x] Environment variables configured
 - [ ] HTTPS enabled
 - [ ] Monitoring setup
 - [ ] Error tracking enabled
