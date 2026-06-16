@@ -22,6 +22,15 @@ function makeTempSkills(entries) {
 	return root;
 }
 
+function skillMd(name, command, manualName = name) {
+	const amber = JSON.stringify({
+		command,
+		args: [{ name: "target" }],
+		manualName,
+	});
+	return `---\nname: ${name}\ndescription: ${name} description.\nx-amber-json: ${amber}\n---\n`;
+}
+
 describe("parseSkillFrontmatter", () => {
 	it("parses name, description, and x-amber-json", () => {
 		const md = [
@@ -134,10 +143,14 @@ describe("renderGeminiCommand", () => {
 describe("collectAmberSkills", () => {
 	it("returns only skills that declare x-amber-json, sorted by name", () => {
 		const root = makeTempSkills({
-			"amber-wiki":
-				'---\nname: amber-wiki\ndescription: Wiki.\nx-amber-json: {"command":"node scripts/amber.js wiki --target {{target}}","args":[{"name":"target"}],"manualName":"amber-wiki"}\n---\n',
-			"amber-init":
-				'---\nname: amber-init\ndescription: Init.\nx-amber-json: {"command":"node scripts/amber.js init --target {{target}}","args":[{"name":"target"}],"manualName":"amber-init"}\n---\n',
+			"amber-wiki": skillMd(
+				"amber-wiki",
+				"node scripts/amber.js wiki --target {{target}}",
+			),
+			"amber-init": skillMd(
+				"amber-init",
+				"node scripts/amber.js init --target {{target}}",
+			),
 			"amber-plain": "---\nname: amber-plain\ndescription: No amber.\n---\n",
 		});
 		const skills = collectAmberSkills(root);
@@ -156,8 +169,10 @@ describe("collectAmberSkills", () => {
 describe("generateAgentCommands", () => {
 	function setup() {
 		const skillsRoot = makeTempSkills({
-			"amber-init":
-				'---\nname: amber-init\ndescription: Init.\nx-amber-json: {"command":"node scripts/amber.js init --target {{target}}","args":[{"name":"target"}],"manualName":"amber-init"}\n---\n',
+			"amber-init": skillMd(
+				"amber-init",
+				"node scripts/amber.js init --target {{target}}",
+			),
 		});
 		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
 		return { skillsRoot, repoRoot };
@@ -166,7 +181,8 @@ describe("generateAgentCommands", () => {
 	it("writes Claude .md and Gemini .toml products", () => {
 		const { skillsRoot, repoRoot } = setup();
 		const result = generateAgentCommands({ skillsRoot, repoRoot });
-		assert.strictEqual(result.changed, true);
+		assert.strictEqual(result.changed.length, 2);
+		assert.deepStrictEqual(result.paths, result.changed);
 		assert.ok(
 			fs.existsSync(path.join(repoRoot, ".claude/commands/amber-init.md")),
 		);
@@ -175,19 +191,18 @@ describe("generateAgentCommands", () => {
 		);
 	});
 
-	it("is idempotent — second run reports no changes", () => {
+	it("is idempotent — second run reports nothing changed", () => {
 		const { skillsRoot, repoRoot } = setup();
 		generateAgentCommands({ skillsRoot, repoRoot });
 		const second = generateAgentCommands({ skillsRoot, repoRoot });
-		assert.strictEqual(second.changed, false);
-		assert.deepStrictEqual(second.stale, []);
+		assert.deepStrictEqual(second.changed, []);
+		assert.strictEqual(second.paths.length, 2);
 	});
 
-	it("check mode reports stale without writing", () => {
+	it("check mode reports changes without writing", () => {
 		const { skillsRoot, repoRoot } = setup();
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
-		assert.strictEqual(result.changed, true);
-		assert.ok(result.stale.length > 0);
+		assert.ok(result.changed.length > 0);
 		assert.strictEqual(
 			fs.existsSync(path.join(repoRoot, ".claude/commands/amber-init.md")),
 			false,
@@ -200,7 +215,7 @@ describe("generateAgentCommands", () => {
 		const file = path.join(repoRoot, ".claude/commands/amber-init.md");
 		fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/\n/g, "\r\n"));
 		const check = generateAgentCommands({ skillsRoot, repoRoot, check: true });
-		assert.strictEqual(check.changed, false);
+		assert.deepStrictEqual(check.changed, []);
 	});
 });
 
