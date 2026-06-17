@@ -218,3 +218,17 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on pushes and PRs:
 - Doctor checks
 - CLI smoke tests
 - Release dry-run on version tags (does NOT auto-publish)
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub (`Bandersnatch0x/amber-protocol`); use the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical triage roles with default label strings. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: `CONTEXT.md` at repo root + `docs/adr/`. See `docs/agents/domain.md`.
