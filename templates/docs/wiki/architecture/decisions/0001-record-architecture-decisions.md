@@ -1,3 +1,11 @@
+---
+type: decision
+title: 0001 Record Architecture Decisions
+description: Architecture decision record: record architecture decisions.
+tags: [architecture, decision]
+updated: 2026-06-17
+---
+
 # 0001 Record Architecture Decisions
 
 ## Status

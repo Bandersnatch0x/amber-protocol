@@ -1,3 +1,11 @@
+---
+type: runbook
+title: Runbook
+description: How to run, operate, and recover the system.
+tags: [engineering]
+updated: 2026-06-17
+---
+
 # Runbook
 
 ## Startup

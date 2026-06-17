@@ -168,6 +168,8 @@ function parseArgs(argv) {
 			args.strict = true;
 		} else if (arg === "--fix-markers") {
 			args.fixMarkers = true;
+		} else if (arg === "--okf") {
+			args.okf = true;
 		} else if (arg === "--help" || arg === "-h") {
 			args.help = true;
 		} else {

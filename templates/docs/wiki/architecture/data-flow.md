@@ -1,3 +1,11 @@
+---
+type: architecture
+title: Data Flow
+description: How data moves through the system.
+tags: [architecture]
+updated: 2026-06-17
+---
+
 # Data Flow
 
 Describe how important data moves through the system.

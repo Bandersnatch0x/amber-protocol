@@ -33,6 +33,9 @@ describe("amber-core exports snapshot", () => {
 		it("TEMPLATE_ROOT is a string", () => {
 			assert.strictEqual(typeof harnessCore.TEMPLATE_ROOT, "string");
 		});
+		it("OKF_VERSION is a string", () => {
+			assert.strictEqual(typeof harnessCore.OKF_VERSION, "string");
+		});
 	});
 
 	// ── Core functions ─────────────────────────────────────────────────
@@ -40,9 +43,11 @@ describe("amber-core exports snapshot", () => {
 		const funcs = [
 			"acceptPlan",
 			"auditProject",
+			"buildOkfGraph",
 			"classifyTarget",
 			"dispatchAgentTask",
 			"doctor",
+			"exportOkfBundle",
 			"inspectLoopContract",
 			"inspectLoopLedger",
 			"inspectMaintenance",
@@ -54,6 +59,7 @@ describe("amber-core exports snapshot", () => {
 			"installTeamDistribution",
 			"listTemplateFiles",
 			"parseArgs",
+			"parseOkfFrontmatter",
 			"pinTeamDistribution",
 			"prepareTaskExecution",
 			"printResult",
@@ -73,6 +79,7 @@ describe("amber-core exports snapshot", () => {
 			"validateHandoff",
 			"validateLoopContract",
 			"validateManifests",
+			"validateOkfFrontmatter",
 			"validatePlanGate",
 			"validateProjectProfileData",
 			"validateWiki",
@@ -117,12 +124,12 @@ describe("amber-core exports snapshot", () => {
 	});
 
 	// ── Export count ───────────────────────────────────────────────────
-	it("exports exactly 64 symbols", () => {
+	it("exports exactly 69 symbols", () => {
 		const keys = Object.keys(harnessCore).sort();
 		assert.strictEqual(
 			keys.length,
-			64,
-			`Expected 64 exports, got ${keys.length}. ` +
+			69,
+			`Expected 69 exports, got ${keys.length}. ` +
 				`If you intentionally added/removed an export, update this count. ` +
 				`New exports: ${keys.filter((k) => !KNOWN_EXPORTS.has(k)).join(", ")}`,
 		);
@@ -133,12 +140,14 @@ describe("amber-core exports snapshot", () => {
 const KNOWN_EXPORTS = new Set([
 	"DEFAULT_TEAM_REGISTRY",
 	"MINIMUM_HARNESS_FILES",
+	"OKF_VERSION",
 	"OPTIONAL_STARTER_WIKI_FILES",
 	"REQUIRED_HANDOFF_SECTIONS",
 	"REQUIRED_HARNESS_FILES",
 	"TEMPLATE_ROOT",
 	"acceptPlan",
 	"auditProject",
+	"buildOkfGraph",
 	"bundleAdoptionArtifacts",
 	"classifyTarget",
 	"compareAdoptionReports",
@@ -146,6 +155,7 @@ const KNOWN_EXPORTS = new Set([
 	"doctor",
 	"dryRunLoopContract",
 	"exportExecutionEvidence",
+	"exportOkfBundle",
 	"exportSessionEvidence",
 	"gateAdoptionReport",
 	"generateAuditReport",
@@ -164,6 +174,7 @@ const KNOWN_EXPORTS = new Set([
 	"listAdoptionReports",
 	"listTemplateFiles",
 	"parseArgs",
+	"parseOkfFrontmatter",
 	"pinTeamDistribution",
 	"prepareTaskExecution",
 	"printResult",
@@ -186,6 +197,7 @@ const KNOWN_EXPORTS = new Set([
 	"validateIntegration",
 	"validateLoopContract",
 	"validateManifests",
+	"validateOkfFrontmatter",
 	"validatePlanGate",
 	"validateProjectProfileData",
 	"validateWiki",

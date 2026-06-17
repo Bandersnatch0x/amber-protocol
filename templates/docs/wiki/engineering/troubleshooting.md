@@ -1,3 +1,11 @@
+---
+type: runbook
+title: Troubleshooting
+description: Common problems and how to resolve them.
+tags: [engineering]
+updated: 2026-06-17
+---
+
 # Troubleshooting
 
 ## Known Issues

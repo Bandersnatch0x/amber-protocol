@@ -1,3 +1,11 @@
+---
+type: product
+title: Feature Map
+description: Map of product features and their current state.
+tags: [product]
+updated: 2026-06-17
+---
+
 # Feature Map
 
 Use this page to connect `feature_list.json` entries to richer context.

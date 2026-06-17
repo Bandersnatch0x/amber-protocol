@@ -1,3 +1,11 @@
+---
+type: agent
+title: Prompt Recipes
+description: Reusable prompt recipes for this repository.
+tags: [agent]
+updated: 2026-06-17
+---
+
 # Prompt Recipes
 
 ## Start A Session

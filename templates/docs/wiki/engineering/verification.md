@@ -1,3 +1,11 @@
+---
+type: runbook
+title: Verification
+description: How to verify the system behaves correctly.
+tags: [engineering]
+updated: 2026-06-17
+---
+
 # Verification
 
 ## Standard Command

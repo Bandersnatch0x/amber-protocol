@@ -94,7 +94,7 @@ function doctorProductRepo(targetRoot, classification) {
 	};
 }
 
-function doctor(target) {
+function doctor(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const classification = classifyTarget(targetRoot);
 	if (classification.type === "product-repo") {
@@ -133,7 +133,7 @@ function doctor(target) {
 	errors.push(...continuousImprovementResult.errors);
 	warnings.push(...continuousImprovementResult.warnings);
 
-	const wikiResult = validateWiki(targetRoot);
+	const wikiResult = validateWiki(targetRoot, { okf: options.okf === true });
 	errors.push(...wikiResult.errors);
 	warnings.push(...wikiResult.warnings);
 

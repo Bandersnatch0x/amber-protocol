@@ -1,3 +1,11 @@
+---
+type: product
+title: Product Overview
+description: What this product is, who it serves, and its core value.
+tags: [product]
+updated: 2026-06-17
+---
+
 # Product Overview
 
 ## Goal

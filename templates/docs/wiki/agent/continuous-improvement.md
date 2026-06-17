@@ -1,3 +1,11 @@
+---
+type: agent
+title: Continuous Improvement
+description: Continuous-improvement loop and its state.
+tags: [agent]
+updated: 2026-06-17
+---
+
 # Continuous Improvement
 
 Use this loop for recurring health passes, automation wakeups, goal-mode continuation, or "keep improving this project" requests.
