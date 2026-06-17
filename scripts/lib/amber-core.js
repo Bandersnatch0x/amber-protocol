@@ -198,6 +198,15 @@ const {
 	validateWiki,
 } = require("./core/validators");
 const {
+	OKF_VERSION,
+	parseOkfFrontmatter,
+	validateOkfFrontmatter,
+} = require("./core/okf-frontmatter");
+const {
+	buildOkfGraph,
+	exportOkfBundle,
+} = require("./core/okf-export");
+const {
 	slugify,
 	formatList,
 	formatCommandList,
@@ -241,12 +250,14 @@ const {
 module.exports = {
 	DEFAULT_TEAM_REGISTRY,
 	MINIMUM_HARNESS_FILES,
+	OKF_VERSION,
 	OPTIONAL_STARTER_WIKI_FILES,
 	REQUIRED_HANDOFF_SECTIONS,
 	REQUIRED_HARNESS_FILES,
 	TEMPLATE_ROOT,
 	acceptPlan,
 	auditProject,
+	buildOkfGraph,
 	bundleAdoptionArtifacts,
 	classifyTarget,
 	compareAdoptionReports,
@@ -254,6 +265,7 @@ module.exports = {
 	doctor,
 	dryRunLoopContract,
 	exportExecutionEvidence,
+	exportOkfBundle,
 	exportSessionEvidence,
 	gateAdoptionReport,
 	generateAdoptionReport,
@@ -272,6 +284,7 @@ module.exports = {
 	listAdoptionReports,
 	listTemplateFiles,
 	parseArgs,
+	parseOkfFrontmatter,
 	pinTeamDistribution,
 	prepareTaskExecution,
 	printResult,
@@ -294,6 +307,7 @@ module.exports = {
 	validateIntegration,
 	validateLoopContract,
 	validateManifests,
+	validateOkfFrontmatter,
 	validatePlanGate,
 	validateProjectProfileData,
 	validateWiki,

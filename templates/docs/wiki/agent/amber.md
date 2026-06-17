@@ -1,3 +1,11 @@
+---
+type: agent
+title: Amber
+description: How agents use the Amber setup in this repository.
+tags: [agent]
+updated: 2026-06-17
+---
+
 # Amber
 
 The Amber Protocol setup keeps agent work bounded and recoverable.

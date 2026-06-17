@@ -23,6 +23,8 @@ const {
 	stripAnchorAndQuery,
 } = require("./text-utils");
 
+const { validateOkfFrontmatter } = require("./okf-frontmatter");
+
 function loadFeatureList(targetRoot) {
 	return readJson(path.join(targetRoot, "feature_list.json"));
 }
@@ -225,11 +227,12 @@ function validateContinuousImprovementStateFile(filePath) {
 	return { errors, warnings };
 }
 
-function validateWiki(target) {
+function validateWiki(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const wikiRoot = path.join(targetRoot, "docs", "wiki");
 	const errors = [];
 	const warnings = [];
+	const checkOkf = options.okf === true;
 
 	if (!pathExists(wikiRoot)) {
 		return {
@@ -276,6 +279,16 @@ function validateWiki(target) {
 			warnings.push(
 				`${relativePath} is missing an Unknowns / Needs Confirmation section.`,
 			);
+		}
+
+		if (checkOkf) {
+			const okf = validateOkfFrontmatter(content);
+			for (const error of okf.errors) {
+				errors.push(`${relativePath}: ${error}`);
+			}
+			for (const warning of okf.warnings) {
+				warnings.push(`${relativePath}: ${warning}`);
+			}
 		}
 	}
 

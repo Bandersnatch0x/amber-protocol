@@ -1,3 +1,11 @@
+---
+type: agent
+title: Failure Patterns
+description: Known failure patterns and how to avoid them.
+tags: [agent]
+updated: 2026-06-17
+---
+
 # Failure Patterns
 
 ## Premature Completion

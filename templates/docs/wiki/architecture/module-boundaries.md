@@ -1,3 +1,11 @@
+---
+type: architecture
+title: Module Boundaries
+description: Module boundaries and ownership.
+tags: [architecture]
+updated: 2026-06-17
+---
+
 # Module Boundaries
 
 Use this page to explain ownership boundaries and dependencies.

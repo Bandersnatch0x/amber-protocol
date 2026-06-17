@@ -32,6 +32,7 @@ const {
 	recordAgentReview,
 	reviewPlan,
 	rollbackTeamDistribution,
+	exportOkfBundle,
 	scaffoldHarness,
 	scaffoldPlan,
 	scaffoldWiki,
@@ -41,6 +42,7 @@ const {
 	validateAdoptionReports,
 	validatePlanGate,
 	validateHandoff,
+	validateWiki,
 	writeAdoptionApplyPlan,
 	writeAdoptionDecisionRecord,
 	writeAdoptionNextActions,
@@ -183,7 +185,13 @@ async function run(argv = process.argv.slice(2)) {
 	} else if (command === "audit") {
 		result = auditProject(args.target);
 	} else if (command === "wiki") {
-		result = scaffoldWiki(args.target, { dryRun: args.dryRun });
+		if (args._ && args._[0] === "export") {
+			result = exportOkfBundle(args.target, { outputDir: args.outputDir });
+		} else if (args.okf) {
+			result = validateWiki(args.target, { okf: true });
+		} else {
+			result = scaffoldWiki(args.target, { dryRun: args.dryRun });
+		}
 	} else if (command === "handoff") {
 		result = validateHandoff(args.target);
 	} else if (command === "plan") {
@@ -696,7 +704,7 @@ async function run(argv = process.argv.slice(2)) {
 		printResult(result, { json: true });
 		return 1;
 	} else if (command === "doctor") {
-		result = doctor(args.target);
+		result = doctor(args.target, { okf: args.okf });
 	} else if (command === "governance") {
 		const action = args._ && args._[0];
 		const {

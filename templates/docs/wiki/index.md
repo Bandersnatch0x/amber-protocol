@@ -1,3 +1,11 @@
+---
+type: index
+title: Project Wiki
+description: Stable map of the repository for agents and humans.
+tags: [wiki]
+updated: 2026-06-17
+---
+
 # Project Wiki
 
 This Wiki is the stable map for agents and humans working in the repository.

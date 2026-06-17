@@ -1,3 +1,11 @@
+---
+type: product
+title: User Scenarios
+description: Primary user scenarios and journeys.
+tags: [product]
+updated: 2026-06-17
+---
+
 # User Scenarios
 
 ## Scenario Template

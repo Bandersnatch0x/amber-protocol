@@ -1,3 +1,11 @@
+---
+type: agent
+title: Workflow Packets
+description: Workflow packets and how they are used.
+tags: [agent]
+updated: 2026-06-17
+---
+
 # Workflow Packets
 
 Use packets when the task has independent tracks, ambiguity, or enough risk that research and review should be separated from implementation.

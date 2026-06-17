@@ -1,3 +1,11 @@
+---
+type: feature
+title: F001 Example Feature
+description: Example feature page template.
+tags: [feature]
+updated: 2026-06-17
+---
+
 # F001 Example Feature
 
 ## User-Visible Behavior

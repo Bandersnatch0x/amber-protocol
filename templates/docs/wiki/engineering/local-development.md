@@ -1,3 +1,11 @@
+---
+type: runbook
+title: Local Development
+description: Local development setup and workflow.
+tags: [engineering]
+updated: 2026-06-17
+---
+
 # Local Development
 
 ## Requirements

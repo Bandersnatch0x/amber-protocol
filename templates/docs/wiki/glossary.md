@@ -1,3 +1,11 @@
+---
+type: glossary
+title: Glossary
+description: Definitions of project-specific terms.
+tags: [glossary]
+updated: 2026-06-17
+---
+
 # Glossary
 
 | Term | Meaning |

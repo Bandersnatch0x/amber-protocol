@@ -1,3 +1,11 @@
+---
+type: architecture
+title: System Map
+description: Components, external systems, and their responsibilities.
+tags: [architecture]
+updated: 2026-06-17
+---
+
 # System Map
 
 ## Components

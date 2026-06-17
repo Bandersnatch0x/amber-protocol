@@ -1,3 +1,11 @@
+---
+type: agent
+title: Working Rules
+description: Working rules agents must follow in this repository.
+tags: [agent]
+updated: 2026-06-17
+---
+
 # Working Rules
 
 - Read `PROGRESS.md`, `feature_list.json`, and `docs/wiki/index.md` before work.
