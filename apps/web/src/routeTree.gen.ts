@@ -14,8 +14,10 @@ import { Route as GatesRouteImport } from './routes/gates'
 import { Route as SessionsRouteRouteImport } from './routes/sessions/route'
 import { Route as RoutesRouteRouteImport } from './routes/routes/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TranscriptsIndexRouteImport } from './routes/transcripts/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
 import { Route as RoutesIndexRouteImport } from './routes/routes/index'
+import { Route as TranscriptsIdRouteImport } from './routes/transcripts/$id'
 import { Route as SessionsIdRouteRouteImport } from './routes/sessions/$id/route'
 import { Route as RoutesIdRouteRouteImport } from './routes/routes/$id/route'
 import { Route as SessionsIdIndexRouteImport } from './routes/sessions/$id/index'
@@ -47,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TranscriptsIndexRoute = TranscriptsIndexRouteImport.update({
+  id: '/transcripts/',
+  path: '/transcripts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SessionsIndexRoute = SessionsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -56,6 +63,11 @@ const RoutesIndexRoute = RoutesIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => RoutesRouteRoute,
+} as any)
+const TranscriptsIdRoute = TranscriptsIdRouteImport.update({
+  id: '/transcripts/$id',
+  path: '/transcripts/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SessionsIdRouteRoute = SessionsIdRouteRouteImport.update({
   id: '/$id',
@@ -91,8 +103,10 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
+  '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes/': typeof RoutesIndexRoute
   '/sessions/': typeof SessionsIndexRoute
+  '/transcripts/': typeof TranscriptsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id/': typeof RoutesIdIndexRoute
   '/sessions/$id/': typeof SessionsIdIndexRoute
@@ -101,8 +115,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/gates': typeof GatesRoute
   '/settings': typeof SettingsRoute
+  '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes': typeof RoutesIndexRoute
   '/sessions': typeof SessionsIndexRoute
+  '/transcripts': typeof TranscriptsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id': typeof RoutesIdIndexRoute
   '/sessions/$id': typeof SessionsIdIndexRoute
@@ -116,8 +132,10 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
+  '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes/': typeof RoutesIndexRoute
   '/sessions/': typeof SessionsIndexRoute
+  '/transcripts/': typeof TranscriptsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id/': typeof RoutesIdIndexRoute
   '/sessions/$id/': typeof SessionsIdIndexRoute
@@ -132,8 +150,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/routes/$id'
     | '/sessions/$id'
+    | '/transcripts/$id'
     | '/routes/'
     | '/sessions/'
+    | '/transcripts/'
     | '/sessions/$id/timeline'
     | '/routes/$id/'
     | '/sessions/$id/'
@@ -142,8 +162,10 @@ export interface FileRouteTypes {
     | '/'
     | '/gates'
     | '/settings'
+    | '/transcripts/$id'
     | '/routes'
     | '/sessions'
+    | '/transcripts'
     | '/sessions/$id/timeline'
     | '/routes/$id'
     | '/sessions/$id'
@@ -156,8 +178,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/routes/$id'
     | '/sessions/$id'
+    | '/transcripts/$id'
     | '/routes/'
     | '/sessions/'
+    | '/transcripts/'
     | '/sessions/$id/timeline'
     | '/routes/$id/'
     | '/sessions/$id/'
@@ -169,6 +193,8 @@ export interface RootRouteChildren {
   SessionsRouteRoute: typeof SessionsRouteRouteWithChildren
   GatesRoute: typeof GatesRoute
   SettingsRoute: typeof SettingsRoute
+  TranscriptsIdRoute: typeof TranscriptsIdRoute
+  TranscriptsIndexRoute: typeof TranscriptsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -208,6 +234,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/transcripts/': {
+      id: '/transcripts/'
+      path: '/transcripts'
+      fullPath: '/transcripts/'
+      preLoaderRoute: typeof TranscriptsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sessions/': {
       id: '/sessions/'
       path: '/'
@@ -221,6 +254,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/routes/'
       preLoaderRoute: typeof RoutesIndexRouteImport
       parentRoute: typeof RoutesRouteRoute
+    }
+    '/transcripts/$id': {
+      id: '/transcripts/$id'
+      path: '/transcripts/$id'
+      fullPath: '/transcripts/$id'
+      preLoaderRoute: typeof TranscriptsIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/sessions/$id': {
       id: '/sessions/$id'
@@ -320,6 +360,8 @@ const rootRouteChildren: RootRouteChildren = {
   SessionsRouteRoute: SessionsRouteRouteWithChildren,
   GatesRoute: GatesRoute,
   SettingsRoute: SettingsRoute,
+  TranscriptsIdRoute: TranscriptsIdRoute,
+  TranscriptsIndexRoute: TranscriptsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

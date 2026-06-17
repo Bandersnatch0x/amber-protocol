@@ -8,6 +8,7 @@ export const Route = createRootRoute({ component: RootLayout });
 
 const navItems = [
   { to: '/sessions', label: 'Sessions' },
+  { to: '/transcripts', label: 'Transcripts' },
   { to: '/routes', label: 'Routes' },
   { to: '/gates', label: 'Gates' },
   { to: '/settings', label: 'Settings' },
