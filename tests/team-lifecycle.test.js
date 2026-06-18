@@ -14,6 +14,7 @@ const {
 	installTeamDistribution,
 	updateTeamDistribution,
 	rollbackTeamDistribution,
+	pinTeamDistribution,
 } = require("../scripts/lib/core/team");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -158,4 +159,50 @@ test("rollbackTeamDistribution errors when no snapshot exists for the version", 
 	assert.equal(readLock(target).installedVersion, "1.0.0");
 	fs.rmSync(target, { recursive: true, force: true });
 });
+
+test("pinTeamDistribution records a pinnedVersion without changing installedVersion", () => {
+	const target = tempTarget();
+	installTeamDistribution(target, { registry: REGISTRY, version: "1.0.0" });
+
+	const result = pinTeamDistribution(target, {
+		registry: REGISTRY,
+		version: "1.0.0",
+	});
+
+	assert.deepEqual(result.errors, []);
+	const lock = readLock(target);
+	assert.equal(lock.pinnedVersion, "1.0.0");
+	assert.equal(lock.installedVersion, "1.0.0");
+
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("pinTeamDistribution requires a --version", () => {
+	const target = tempTarget();
+	installTeamDistribution(target, { registry: REGISTRY, version: "1.0.0" });
+
+	const result = pinTeamDistribution(target, { registry: REGISTRY });
+	assert.ok(result.errors.some((e) => /version/i.test(e)));
+
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("pinTeamDistribution errors when the version is not in the registry", () => {
+	const target = tempTarget();
+	installTeamDistribution(target, { registry: REGISTRY, version: "1.0.0" });
+
+	const result = pinTeamDistribution(target, {
+		registry: REGISTRY,
+		version: "9.9.9",
+	});
+	assert.ok(result.errors.some((e) => /not available/i.test(e)));
+	// The lock keeps its installed version and gains no pin (stays at the
+	// initial null that buildTeamLock seeds).
+	const lock = readLock(target);
+	assert.equal(lock.installedVersion, "1.0.0");
+	assert.equal(lock.pinnedVersion, null);
+
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
 
