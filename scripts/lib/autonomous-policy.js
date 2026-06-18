@@ -9,7 +9,20 @@ function loadPolicy(projectRoot = process.cwd()) {
 		return getDefaultPolicy();
 	}
 
-	return JSON.parse(fs.readFileSync(policyPath, "utf8"));
+	// A present-but-corrupt policy must not crash callers (inspectPolicy and the
+	// autonomous executor dereference the result without their own guard). Fail
+	// safe to the defaults: they block user-approval, so a broken security policy
+	// can only ever stop autonomous actions, never silently auto-approve them.
+	let parsed;
+	try {
+		parsed = JSON.parse(fs.readFileSync(policyPath, "utf8"));
+	} catch {
+		return getDefaultPolicy();
+	}
+	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+		return getDefaultPolicy();
+	}
+	return parsed;
 }
 
 function getDefaultPolicy() {
