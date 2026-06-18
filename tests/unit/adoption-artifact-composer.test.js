@@ -11,6 +11,9 @@ const {
 } = require("../../scripts/lib/core/adoption-artifact-composer");
 
 const { defaultAdoptionBoundaries } = require("../../scripts/lib/core/terminology");
+const {
+	parseAdoptionMetricsBlock,
+} = require("../../scripts/lib/core/adoption-metrics");
 
 test("renderAdoptionGateDocument includes findings and metrics", () => {
 	const markdown = renderAdoptionGateDocument({
@@ -78,6 +81,47 @@ test("renderAdoptionReport includes adoption report header and no-init notice", 
 	assert.match(markdown, /# Amber Protocol Adoption Report/);
 	assert.match(markdown, /No target-repository files were initialized/);
 	assert.match(markdown, /## Team Distribution/);
+});
+
+test("renderAdoptionReport embeds a machine-readable metrics block with staleDocs from maintenance", () => {
+	const markdown = renderAdoptionReport({
+		targetRoot: "/tmp/repo",
+		audit: {
+			readOnly: true,
+			classification: { type: "target-repo" },
+			auditMode: "target-repo",
+			existing: ["AGENTS.md", "feature_list.json"],
+			missing: ["PROGRESS.md"],
+			docs: ["README.md"],
+			wikiLikeFiles: ["docs/wiki/index.md"],
+			conflicts: ["CLAUDE.md"],
+			candidateCommands: [],
+			unknowns: [],
+			nextSafeCommand: "node scripts/amber.js init --target . --dry-run",
+		},
+		initDryRun: { created: [], skipped: [], notApplicable: false },
+		team: {
+			installed: false,
+			registry: { name: "test-registry", versions: {} },
+			lock: null,
+		},
+		teamUpdatePreview: null,
+		maintenance: {
+			staleDocs: [{ path: "docs/old.md" }, { path: "docs/older.md" }],
+			rulePackDrift: { drifted: false },
+			upgradeAssistant: { currentVersion: null, latestVersion: "1.0.0" },
+		},
+	});
+	assert.deepEqual(parseAdoptionMetricsBlock(markdown), {
+		existingHarnessFiles: 2,
+		missingHarnessFiles: 1,
+		templateStarterFilesPresent: 0,
+		templateStarterFilesMissing: 0,
+		existingDocs: 1,
+		wikiLikeFiles: 1,
+		conflicts: 1,
+		staleDocs: 2,
+	});
 });
 
 test("renderAdoptionNextActionsDocument does not duplicate boundary lines", () => {
