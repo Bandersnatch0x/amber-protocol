@@ -117,3 +117,27 @@ test("summarizeExecutions skips tasks without a ledger and tolerates missing evi
 	assert.equal(result.length, 1);
 	assert.equal(result[0].commands, 0);
 });
+
+test("summarizeExecutions records a corrupt ledger as corrupt instead of throwing", () => {
+	const executionsDir = tempDir("gov-corrupt-ledger");
+	writeExecution(executionsDir, "healthy", { plan: "p", status: "completed" });
+	const corruptDir = path.join(executionsDir, "broken");
+	fs.mkdirSync(corruptDir, { recursive: true });
+	fs.writeFileSync(path.join(corruptDir, "ledger.json"), "{ not json");
+
+	const result = summarizeExecutions(executionsDir);
+	// Neither row is lost: the corrupt task is surfaced as an audit signal.
+	assert.equal(result.length, 2);
+	const broken = result.find((e) => e.id === "broken");
+	assert.equal(broken.status, "corrupt");
+});
+
+test("summarizeExecutions tolerates a corrupt evidence file with commands=0", () => {
+	const executionsDir = tempDir("gov-corrupt-evidence");
+	writeExecution(executionsDir, "e1", { plan: "p", status: "running" });
+	fs.writeFileSync(path.join(executionsDir, "e1", "evidence.json"), "{ broken");
+
+	const [execution] = summarizeExecutions(executionsDir);
+	assert.equal(execution.status, "running");
+	assert.equal(execution.commands, 0);
+});
