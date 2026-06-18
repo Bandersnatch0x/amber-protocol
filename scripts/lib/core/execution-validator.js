@@ -26,6 +26,18 @@ function validateLoopContract(contractPath) {
 		};
 	}
 
+	// JSON.parse succeeds on a literal `null`/scalar/array, so the catch above
+	// does not protect the contract.trigger / contract.hardStops reads below.
+	// Reject a non-object body the same way as unparseable JSON.
+	if (!contract || typeof contract !== "object" || Array.isArray(contract)) {
+		return {
+			valid: false,
+			errors: ["Contract must be a JSON object"],
+			warnings: [],
+			explanation: "Contract file does not contain a JSON object.",
+		};
+	}
+
 	// Validate required fields
 	if (!contract.trigger) errors.push("Missing required field: trigger");
 	if (!contract.cadence) errors.push("Missing required field: cadence");
@@ -78,6 +90,17 @@ function validateWorkflowPack(packPath) {
 		return {
 			valid: false,
 			errors: [`Invalid JSON: ${e.message}`],
+			warnings: [],
+			unsafePatterns: [],
+		};
+	}
+
+	// A literal `null`/scalar/array parses cleanly but is not a pack object;
+	// guard before the pack.schemaVersion / pack.files reads below.
+	if (!pack || typeof pack !== "object" || Array.isArray(pack)) {
+		return {
+			valid: false,
+			errors: ["Pack must be a JSON object"],
 			warnings: [],
 			unsafePatterns: [],
 		};
@@ -147,6 +170,22 @@ function validateIntegration(integrationPath, options = {}) {
 			credentialsRequired: false,
 			permissionGates: [],
 			warnings: [`Invalid JSON: ${e.message}`],
+			explanation: options.explain ? explanation : undefined,
+		};
+	}
+
+	// JSON.parse succeeds on a literal `null`/scalar/array, so the catch above
+	// does not protect the config.permissions read below. Treat a non-object
+	// body as an invalid integration instead of crashing.
+	if (!config || typeof config !== "object" || Array.isArray(config)) {
+		const explanation =
+			"Integration file does not contain a JSON object. Provide an object with the integration configuration.";
+		return {
+			valid: false,
+			sideEffects: [],
+			credentialsRequired: false,
+			permissionGates: [],
+			warnings: ["Integration config must be a JSON object"],
 			explanation: options.explain ? explanation : undefined,
 		};
 	}

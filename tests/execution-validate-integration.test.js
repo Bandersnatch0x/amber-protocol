@@ -47,3 +47,17 @@ test('validateIntegration - valid integration with declared side effects has no 
 
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
+
+test('validateIntegration - JSON null body returns invalid instead of throwing', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'validate-integration-test-'));
+  const integrationPath = path.join(tempDir, 'null.json');
+  fs.writeFileSync(integrationPath, 'null');
+
+  const result = validateIntegration(integrationPath, { explain: true });
+
+  assert.strictEqual(result.valid, false);
+  assert.ok(result.warnings.some((w) => w.includes('must be a JSON object')));
+  assert.ok(result.explanation.includes('does not contain a JSON object'));
+
+  fs.rmSync(tempDir, { recursive: true, force: true });
+});

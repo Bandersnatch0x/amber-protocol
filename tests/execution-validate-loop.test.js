@@ -135,3 +135,16 @@ test('validateLoopContract - invalid JSON returns error', () => {
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
+test('validateLoopContract - JSON null body returns error instead of throwing', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'validate-loop-test-'));
+  const contractPath = path.join(tempDir, 'null.json');
+  fs.writeFileSync(contractPath, 'null');
+
+  const result = validateLoopContract(contractPath);
+
+  assert.strictEqual(result.valid, false);
+  assert.ok(result.errors.some((e) => e.includes('must be a JSON object')));
+
+  fs.rmSync(tempDir, { recursive: true, force: true });
+});
+
