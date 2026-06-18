@@ -84,27 +84,16 @@ function addCandidateCommand(candidateCommands, command) {
 	}
 }
 
-function detectCandidateCommands(targetRoot, toolingEvidence = []) {
+// Pure decision core for detectCandidateCommands: given the python-tooling
+// evidence flags already gathered from disk, emit the candidate verification
+// commands. Extracted so the pytest/ruff/default branching is testable without
+// touching the filesystem.
+function buildPythonCandidates({
+	hasTestsDirectory,
+	hasPytestEvidence,
+	hasRuffEvidence,
+}) {
 	const candidateCommands = [];
-	const hasPythonEvidence = toolingEvidence.some(
-		(item) => item.name === "python",
-	);
-	if (!hasPythonEvidence) {
-		return candidateCommands;
-	}
-
-	const hasTestsDirectory =
-		pathExists(path.join(targetRoot, "tests")) ||
-		pathExists(path.join(targetRoot, "test"));
-	const hasPytestEvidence =
-		hasTestsDirectory ||
-		pathExists(path.join(targetRoot, "pytest.ini")) ||
-		fileContains(targetRoot, "requirements.txt", /^pytest(?:[<>=~! ]|$)/im) ||
-		fileContains(targetRoot, "pyproject.toml", /\[tool\.pytest/i);
-	const hasRuffEvidence =
-		fileContains(targetRoot, "requirements.txt", /^ruff(?:[<>=~! ]|$)/im) ||
-		fileContains(targetRoot, "pyproject.toml", /\[tool\.ruff/i);
-
 	if (hasPytestEvidence) {
 		addCandidateCommand(candidateCommands, {
 			source: hasTestsDirectory ? "tests/" : "python tooling evidence",
@@ -139,6 +128,33 @@ function detectCandidateCommands(targetRoot, toolingEvidence = []) {
 	}
 
 	return candidateCommands;
+}
+
+function detectCandidateCommands(targetRoot, toolingEvidence = []) {
+	const hasPythonEvidence = toolingEvidence.some(
+		(item) => item.name === "python",
+	);
+	if (!hasPythonEvidence) {
+		return [];
+	}
+
+	const hasTestsDirectory =
+		pathExists(path.join(targetRoot, "tests")) ||
+		pathExists(path.join(targetRoot, "test"));
+	const hasPytestEvidence =
+		hasTestsDirectory ||
+		pathExists(path.join(targetRoot, "pytest.ini")) ||
+		fileContains(targetRoot, "requirements.txt", /^pytest(?:[<>=~! ]|$)/im) ||
+		fileContains(targetRoot, "pyproject.toml", /\[tool\.pytest/i);
+	const hasRuffEvidence =
+		fileContains(targetRoot, "requirements.txt", /^ruff(?:[<>=~! ]|$)/im) ||
+		fileContains(targetRoot, "pyproject.toml", /\[tool\.ruff/i);
+
+	return buildPythonCandidates({
+		hasTestsDirectory,
+		hasPytestEvidence,
+		hasRuffEvidence,
+	});
 }
 
 function isLikelyDocumentation(relativePath) {
@@ -346,11 +362,11 @@ function fileMentionsWiki(filePath) {
 	);
 }
 
-function hasNextAction(filePath) {
-	if (!pathExists(filePath)) {
-		return false;
-	}
-	const content = readText(filePath);
+// Pure core of hasNextAction: given the handoff file's full content, extract
+// the Next Action(s) section body and decide whether it records a real action.
+// Lines that are blank, HTML comments, or sentinel placeholders (none/n/a/tbd/
+// todo/pending/...) are ignored. Extracted so the line-analysis is testable.
+function hasNextActionInContent(content) {
 	const body =
 		getSectionBody(content, "Next Action") ??
 		getSectionBody(content, "Next Actions");
@@ -375,6 +391,19 @@ function hasNextAction(filePath) {
 		});
 }
 
+function hasNextAction(filePath) {
+	if (!pathExists(filePath)) {
+		return false;
+	}
+	return hasNextActionInContent(readText(filePath));
+}
+
+// Pure core of hasVerificationCommand: true when the wiki verification doc's
+// content contains a fenced shell/bash/powershell/cmd code block.
+function hasVerificationCommandInContent(content) {
+	return /```(?:sh|bash|powershell|ps1|cmd)?\s*[\r\n]+[^`]+```/i.test(content);
+}
+
 function hasVerificationCommand(targetRoot) {
 	const verificationPath = path.join(
 		targetRoot,
@@ -386,8 +415,7 @@ function hasVerificationCommand(targetRoot) {
 	if (!pathExists(verificationPath)) {
 		return false;
 	}
-	const content = readText(verificationPath);
-	return /```(?:sh|bash|powershell|ps1|cmd)?\s*[\r\n]+[^`]+```/i.test(content);
+	return hasVerificationCommandInContent(readText(verificationPath));
 }
 
 function validateHandoff(target) {
@@ -421,6 +449,7 @@ module.exports = {
 	detectToolingEvidence,
 	addCandidateCommand,
 	detectCandidateCommands,
+	buildPythonCandidates,
 	isLikelyDocumentation,
 	listProjectDocs,
 	isWikiLike,
@@ -430,6 +459,8 @@ module.exports = {
 	auditProject,
 	fileMentionsWiki,
 	hasNextAction,
+	hasNextActionInContent,
 	hasVerificationCommand,
+	hasVerificationCommandInContent,
 	validateHandoff,
 };
