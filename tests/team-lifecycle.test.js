@@ -13,6 +13,7 @@ const path = require("node:path");
 const {
 	installTeamDistribution,
 	updateTeamDistribution,
+	rollbackTeamDistribution,
 } = require("../scripts/lib/core/team");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -96,3 +97,65 @@ test("updateTeamDistribution --confirm advances the lock and records the previou
 
 	fs.rmSync(target, { recursive: true, force: true });
 });
+
+test("rollbackTeamDistribution restores an earlier version and records a ledger entry", () => {
+	const target = tempTarget();
+	installTeamDistribution(target, { registry: REGISTRY, version: "1.0.0" });
+	updateTeamDistribution(target, {
+		registry: REGISTRY,
+		version: "1.1.0",
+		confirm: true,
+	});
+
+	const result = rollbackTeamDistribution(target, {
+		registry: REGISTRY,
+		version: "1.0.0",
+		confirm: true,
+	});
+
+	assert.deepEqual(result.errors, []);
+	assert.equal(result.previousVersion, "1.1.0");
+	const lock = readLock(target);
+	assert.equal(lock.installedVersion, "1.0.0");
+	assert.equal(lock.previousVersion, "1.1.0");
+
+	// The rollback is journalled for audit.
+	const ledgerPath = path.join(target, ".amber", "team", "rollback-ledger.json");
+	assert.ok(fs.existsSync(ledgerPath));
+	const ledger = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
+	assert.equal(ledger.length, 1);
+	assert.equal(ledger[0].fromVersion, "1.1.0");
+	assert.equal(ledger[0].toVersion, "1.0.0");
+
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("rollbackTeamDistribution requires --confirm", () => {
+	const target = tempTarget();
+	installTeamDistribution(target, { registry: REGISTRY, version: "1.0.0" });
+
+	const result = rollbackTeamDistribution(target, {
+		registry: REGISTRY,
+		version: "1.0.0",
+	});
+
+	assert.ok(result.errors.some((e) => /confirm/i.test(e)));
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("rollbackTeamDistribution errors when no snapshot exists for the version", () => {
+	const target = tempTarget();
+	installTeamDistribution(target, { registry: REGISTRY, version: "1.0.0" });
+
+	const result = rollbackTeamDistribution(target, {
+		registry: REGISTRY,
+		version: "9.9.9",
+		confirm: true,
+	});
+
+	assert.ok(result.errors.some((e) => /snapshot/i.test(e)));
+	// The lock is left untouched at the installed version.
+	assert.equal(readLock(target).installedVersion, "1.0.0");
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
