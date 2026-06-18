@@ -17,9 +17,12 @@ const {
 } = require("./fs-utils");
 
 const {
+	getSectionBody,
 	hasSectionWithBody,
 	slugify,
 } = require("./text-utils");
+
+const EVIDENCE_SCHEMA_FIELDS = ["Command", "Result", "Date"];
 
 const {
 	findFeatureById,
@@ -133,53 +136,28 @@ function readPlanField(content, field) {
 	return match ? match[1].trim() : "";
 }
 
-function validatePlanGate(target, planRelativePath) {
-	const targetRoot = resolveTarget(target);
+// Pure core of validatePlanGate: given the plan content and an injected feature
+// resolver, produce the gate errors/warnings without touching the filesystem.
+// resolveFeature(featureId) => { found: boolean, error: string|null } where a
+// non-null error means feature_list.json could not be read. Extracted so the
+// validation branching (feature field, feature lookup, required sections, user
+// confirmation) is unit-testable.
+function validatePlanContent({ content, resolveFeature }) {
 	const errors = [];
 	const warnings = [];
-
-	if (!planRelativePath) {
-		return {
-			target: targetRoot,
-			plan: null,
-			errors: ["Gate requires --plan <relative-plan-path>."],
-			warnings,
-		};
-	}
-
-	const planPath = path.resolve(targetRoot, planRelativePath);
-	if (!planPath.startsWith(targetRoot)) {
-		return {
-			target: targetRoot,
-			plan: planRelativePath,
-			errors: ["Plan path must stay inside the target repository."],
-			warnings,
-		};
-	}
-	if (!pathExists(planPath)) {
-		return {
-			target: targetRoot,
-			plan: planRelativePath,
-			errors: [`Plan file is missing: ${planRelativePath}`],
-			warnings,
-		};
-	}
-
-	const content = readText(planPath);
 	const featureId = readPlanField(content, "Feature");
 	const userConfirmation = readPlanField(content, "User Confirmation");
 
 	if (!featureId) {
 		errors.push("Plan must include a Feature field.");
 	} else {
-		try {
-			if (!findFeatureById(targetRoot, featureId)) {
-				errors.push(
-					`Plan feature ${featureId} was not found in feature_list.json.`,
-				);
-			}
-		} catch (error) {
-			errors.push(`Cannot read feature_list.json: ${error.message}`);
+		const { found, error } = resolveFeature(featureId);
+		if (error) {
+			errors.push(`Cannot read feature_list.json: ${error}`);
+		} else if (!found) {
+			errors.push(
+				`Plan feature ${featureId} was not found in feature_list.json.`,
+			);
 		}
 	}
 
@@ -201,12 +179,56 @@ function validatePlanGate(target, planRelativePath) {
 		);
 	}
 
+	return { feature: featureId || null, errors, warnings };
+}
+
+function validatePlanGate(target, planRelativePath) {
+	const targetRoot = resolveTarget(target);
+
+	if (!planRelativePath) {
+		return {
+			target: targetRoot,
+			plan: null,
+			errors: ["Gate requires --plan <relative-plan-path>."],
+			warnings: [],
+		};
+	}
+
+	const planPath = path.resolve(targetRoot, planRelativePath);
+	if (!planPath.startsWith(targetRoot)) {
+		return {
+			target: targetRoot,
+			plan: planRelativePath,
+			errors: ["Plan path must stay inside the target repository."],
+			warnings: [],
+		};
+	}
+	if (!pathExists(planPath)) {
+		return {
+			target: targetRoot,
+			plan: planRelativePath,
+			errors: [`Plan file is missing: ${planRelativePath}`],
+			warnings: [],
+		};
+	}
+
+	const content = readText(planPath);
+	const result = validatePlanContent({
+		content,
+		resolveFeature: (featureId) => {
+			try {
+				const feature = findFeatureById(targetRoot, featureId);
+				return { found: Boolean(feature), error: null };
+			} catch (error) {
+				return { found: false, error: error.message };
+			}
+		},
+	});
+
 	return {
 		target: targetRoot,
 		plan: planRelativePath,
-		feature: featureId || null,
-		errors,
-		warnings,
+		...result,
 	};
 }
 
@@ -235,17 +257,119 @@ function discoverStandards() {
 		});
 }
 
-function reviewPlan(target, planRelativePath) {
-	const targetRoot = resolveTarget(target);
-	const standards = discoverStandards();
-	const gateResult = validatePlanGate(targetRoot, planRelativePath);
-	const findings = gateResult.errors.map((message) => ({
+function evaluateStandardCheck(content, checkId) {
+	switch (checkId) {
+		case "user-confirmation":
+			if (!/^confirmed$/i.test(readPlanField(content, "User Confirmation"))) {
+				return {
+					pass: false,
+					message:
+						"Implementation-ready plans require explicit user confirmation.",
+				};
+			}
+			return { pass: true };
+		case "verification-evidence": {
+			if (!hasSectionWithBody(content, "Verification")) {
+				return {
+					pass: false,
+					message:
+						"Plans must define a non-empty Verification section before acceptance.",
+				};
+			}
+			const evidenceBody = getSectionBody(content, "Evidence Schema");
+			if (!evidenceBody || !evidenceBody.trim()) {
+				return {
+					pass: false,
+					message:
+						"Plans must define an Evidence Schema section before acceptance.",
+				};
+			}
+			const missingFields = EVIDENCE_SCHEMA_FIELDS.filter(
+				(field) =>
+					!new RegExp(`^\\s*-\\s*${field}:`, "im").test(evidenceBody),
+			);
+			if (missingFields.length > 0) {
+				return {
+					pass: false,
+					message: `Evidence Schema must define ${missingFields.join(", ")} fields before acceptance.`,
+				};
+			}
+			return { pass: true };
+		}
+		case "scope-boundary": {
+			const acceptanceBody = getSectionBody(content, "Acceptance Criteria");
+			if (!acceptanceBody || !acceptanceBody.trim()) {
+				return {
+					pass: false,
+					message:
+						"Plans must acknowledge scope boundaries in Acceptance Criteria before acceptance.",
+				};
+			}
+			const acknowledgesBoundary =
+				/guardrails/i.test(acceptanceBody) ||
+				/phase boundary/i.test(acceptanceBody);
+			if (!acknowledgesBoundary) {
+				return {
+					pass: false,
+					message:
+						"Acceptance Criteria must preserve the current phase boundary (include guardrails or phase-boundary acknowledgment).",
+				};
+			}
+			return { pass: true };
+		}
+		default:
+			return { pass: true };
+	}
+}
+
+// Pure evaluator for loaded standards against plan content. Each check returns
+// a finding when it fails; unknown check ids are treated as passing so future
+// standards can be added without breaking review.
+function evaluateStandardChecks({ content, standards }) {
+	const findings = [];
+	for (const standard of standards) {
+		for (const check of standard.checks) {
+			const result = evaluateStandardCheck(content, check.id);
+			if (!result.pass) {
+				findings.push({
+					severity: "error",
+					checkId: check.id,
+					standard: standard.id,
+					message: result.message,
+				});
+			}
+		}
+	}
+	return findings;
+}
+
+// Pure core of reviewPlan: given a gate result and the loaded standards, build
+// the review object — classify gate errors into findings (user-confirmation vs
+// plan-gate), evaluate standards against plan content, expand standards into
+// applicable checks, and compute the required user action and release readiness.
+// Extracted so the review assembly is unit-testable without discoverStandards/
+// validatePlanGate hitting disk.
+function buildReviewResult({
+	targetRoot,
+	planRelativePath,
+	gateResult,
+	standards,
+	content = "",
+}) {
+	const gateFindings = gateResult.errors.map((message) => ({
 		severity: "error",
 		checkId: /User confirmation/.test(message)
 			? "user-confirmation"
 			: "plan-gate",
 		message,
 	}));
+	const gateCheckIds = new Set(gateFindings.map((finding) => finding.checkId));
+	const standardFindings = content
+		? evaluateStandardChecks({ content, standards }).filter(
+				(finding) => !gateCheckIds.has(finding.checkId),
+			)
+		: [];
+	const findings = [...gateFindings, ...standardFindings];
 
 	const applicableChecks = standards.flatMap((standard) =>
 		standard.checks.map((check) => ({
@@ -272,6 +396,26 @@ function reviewPlan(target, planRelativePath) {
 		errors: findings.map((finding) => finding.message),
 		warnings: gateResult.warnings,
 	};
+}
+
+function reviewPlan(target, planRelativePath) {
+	const targetRoot = resolveTarget(target);
+	const standards = discoverStandards();
+	const gateResult = validatePlanGate(targetRoot, planRelativePath);
+	let content = "";
+	if (gateResult.plan) {
+		const planPath = path.join(targetRoot, gateResult.plan);
+		if (pathExists(planPath)) {
+			content = readText(planPath);
+		}
+	}
+	return buildReviewResult({
+		targetRoot,
+		planRelativePath,
+		gateResult,
+		standards,
+		content,
+	});
 }
 
 function acceptPlan(target, planRelativePath) {
@@ -328,8 +472,11 @@ module.exports = {
 	buildPlanContent,
 	scaffoldPlan,
 	readPlanField,
+	validatePlanContent,
 	validatePlanGate,
 	discoverStandards,
+	evaluateStandardChecks,
+	buildReviewResult,
 	reviewPlan,
 	acceptPlan,
 };
