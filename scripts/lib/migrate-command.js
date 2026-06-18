@@ -35,7 +35,16 @@ function migrateManifests(projectRoot, options = {}) {
 			sessionDirName,
 			"manifest.json",
 		);
-		const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+		let manifest;
+		try {
+			manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+		} catch {
+			// A corrupt manifest cannot be migrated; skip and log it rather than
+			// aborting migration for the healthy sessions beside it.
+			skipped++;
+			logs.push(`Skipped ${sessionDirName}: manifest is corrupt`);
+			continue;
+		}
 
 		if (manifest.schemaVersion === SCHEMA_VERSION) {
 			skipped++;
