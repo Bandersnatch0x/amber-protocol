@@ -79,3 +79,18 @@ test("rollupEvolutionFindings returns empty findings with threshold when the fil
 		threshold: 2,
 	});
 });
+
+test("extractEvolutionFindings and rollupEvolutionFindings apply the same significance cutoff", () => {
+	// Invariant: both lineage adapters must agree on which findings are
+	// significant. They share one threshold source, so the rolled-up set and
+	// the extracted set always reference the identical findings.
+	const root = tempTarget();
+	writeEvolution(
+		root,
+		"Finding: thrice\nFinding: thrice\nFinding: thrice\nFinding: twice\nFinding: twice\nFinding: once\n",
+	);
+	const extracted = extractEvolutionFindings(root).map((r) => r.finding);
+	const rolled = rollupEvolutionFindings(root).findings.map((r) => r.text);
+	assert.deepEqual(rolled, extracted);
+	assert.deepEqual(rolled, ["thrice", "twice"]);
+});

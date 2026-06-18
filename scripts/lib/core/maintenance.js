@@ -157,6 +157,11 @@ function buildMigrationAssistant(targetRoot, registry) {
 // and rollupEvolutionFindings previously duplicated this read+match+count+sort;
 // it lives here once. Returns [] when the file is absent. Does not filter by
 // threshold — each caller applies its own cutoff.
+// A finding is "significant" once it recurs. Both lineage adapters
+// (extractEvolutionFindings, rollupEvolutionFindings) share this single cutoff
+// so the threshold can never drift between them.
+const EVOLUTION_FINDING_MIN_COUNT = 2;
+
 function countEvolutionFindings(targetRoot) {
 	const filePath = path.join(
 		targetRoot,
@@ -188,15 +193,15 @@ function countEvolutionFindings(targetRoot) {
 
 function extractEvolutionFindings(targetRoot) {
 	return countEvolutionFindings(targetRoot).filter(
-		(item) => item.count > 1,
+		(item) => item.count >= EVOLUTION_FINDING_MIN_COUNT,
 	);
 }
 
 function rollupEvolutionFindings(projectRoot) {
-	const findings = countEvolutionFindings(projectRoot)
-		.filter((item) => item.count >= 2)
-		.map(({ finding, count }) => ({ text: finding, count }));
-	return { findings, threshold: 2 };
+	const findings = extractEvolutionFindings(projectRoot).map(
+		({ finding, count }) => ({ text: finding, count }),
+	);
+	return { findings, threshold: EVOLUTION_FINDING_MIN_COUNT };
 }
 
 function readRegressionProposal(evidencePath, taskDir, targetRoot) {
