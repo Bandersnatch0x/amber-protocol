@@ -53,3 +53,47 @@ test("project with stale docs + drift → proposal.md has 2+ sections", () => {
 	fs.rmSync(fixtureRoot, { recursive: true, force: true });
 });
 
+test("unknown --priority value errors instead of silently emptying the proposal", () => {
+	// An unrecognized priority used to leave allowedCategories empty, which
+	// zeroed every section and wrote a blank proposal with no error. Validate
+	// the input and fail fast instead.
+	const fixtureRoot = tempDir();
+	fs.mkdirSync(path.join(fixtureRoot, "docs", "wiki", "engineering"), {
+		recursive: true,
+	});
+	fs.writeFileSync(
+		path.join(fixtureRoot, "docs", "wiki", "engineering", "verification.md"),
+		"Last Reviewed: 2000-01-01\n"
+	);
+
+	const result = proposeMaintenance(fixtureRoot, { priority: "bogus" });
+
+	assert.ok(
+		result.errors.some((e) => /priority/i.test(e)),
+		`expected a priority error, got: ${JSON.stringify(result.errors)}`
+	);
+	assert.ok(!result.proposalPath, "no proposal should be written for a bad priority");
+
+	fs.rmSync(fixtureRoot, { recursive: true, force: true });
+});
+
+test("valid --priority values are accepted and write a proposal", () => {
+	const fixtureRoot = tempDir();
+	fs.mkdirSync(path.join(fixtureRoot, "docs", "wiki", "engineering"), {
+		recursive: true,
+	});
+	fs.writeFileSync(
+		path.join(fixtureRoot, "docs", "wiki", "engineering", "verification.md"),
+		"Last Reviewed: 2000-01-01\n"
+	);
+
+	for (const priority of ["high", "medium", "low"]) {
+		const result = proposeMaintenance(fixtureRoot, { priority });
+		assert.deepEqual(result.errors, [], `priority ${priority} should be accepted`);
+		assert.ok(result.proposalPath, `priority ${priority} should write a proposal`);
+	}
+
+	fs.rmSync(fixtureRoot, { recursive: true, force: true });
+});
+
+

@@ -408,6 +408,20 @@ function proposeMaintenance(target, options = {}) {
 	// Apply priority filter if specified
 	let filteredInspection = inspection;
 	if (options.priority) {
+		// Validate the requested priority up front. An unrecognized value used to
+		// fall through every branch, leaving allowedCategories empty so each
+		// section was zeroed and a blank proposal was written with no error — a
+		// silent failure. Fail fast with a clear message instead.
+		if (!['high', 'medium', 'low'].includes(options.priority)) {
+			return {
+				target: inspection.target,
+				errors: [
+					`Unknown priority "${options.priority}". Use high, medium, or low.`,
+				],
+				warnings: inspection.warnings,
+			};
+		}
+
 		const priorityLevels = {
 			high: ['staleDocs', 'rulePackDrift'],
 			medium: ['upgradeAssistant', 'evolutionRollup'],
