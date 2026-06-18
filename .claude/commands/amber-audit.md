@@ -1,5 +1,5 @@
 ---
-description: Inspect an existing repository for Harness readiness without modifying project files.
+description: Inspect an existing repository for Amber Setup readiness without modifying project files.
 argument-hint: [target]
 ---
 

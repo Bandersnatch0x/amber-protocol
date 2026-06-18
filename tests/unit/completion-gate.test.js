@@ -8,7 +8,7 @@ const test = require("node:test");
 const {
 	evaluateCompletion,
 	formatCompletion,
-} = require("../../scripts/lib/completion-gate");
+} = require("../../scripts/lib/completion-check");
 
 function tempRoot() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-completion-"));
@@ -146,6 +146,6 @@ test("formatCompletion produces readable output", () => {
 		reasons: ["goal present"],
 		missing: ["timeline"],
 	});
-	assert.match(text, /Completion status: fail/);
+	assert.match(text, /Completion check status: fail/);
 	assert.match(text, /Missing: timeline/);
 });

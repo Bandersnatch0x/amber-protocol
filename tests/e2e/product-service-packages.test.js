@@ -146,7 +146,7 @@ test("Governed Delivery: plan, gate, review, and session complete-check", () => 
 	]);
 	assert.equal(complete.status, 0, complete.stderr);
 	const payload = JSON.parse(complete.stdout);
-	assert.match(payload.text, /Completion status: fail/);
+	assert.match(payload.text, /Completion check status: fail/);
 });
 
 test("Continuity Layer: session start and status", () => {

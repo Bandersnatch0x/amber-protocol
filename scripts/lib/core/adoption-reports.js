@@ -27,16 +27,19 @@ const {
 } = require("./scaffold");
 
 const {
+	renderAdoptionReport,
+	renderAdoptionReportDiff,
+	renderAdoptionReportsIndex,
+} = require("./adoption-artifact-composer");
+
+const {
 	inspectTeamDistribution,
 	updateTeamDistribution,
 } = require("./team");
 
 const {
-	escapeMarkdownTableCell,
 	extractMarkdownLinks,
 	extractMarkdownListUnderSubheading,
-	formatCommandList,
-	formatList,
 	isInsideDirectory,
 	slugify,
 	timestampForFileName,
@@ -52,134 +55,6 @@ const ADOPTION_COMPARE_METRICS = [
 	["conflicts", "Conflicts"],
 	["staleDocs", "Stale docs"],
 ];
-
-function buildInitDryRunSection(initDryRun) {
-	if (initDryRun.notApplicable) {
-		return [
-			"## Init Dry Run",
-			"",
-			`- Not applicable: ${initDryRun.reason}`,
-			"",
-		];
-	}
-
-	return [
-		"## Init Dry Run",
-		"",
-		`- Would create: ${initDryRun.created.length}`,
-		`- Would skip: ${initDryRun.skipped.length}`,
-		"",
-		"### First Suggested Additions",
-		"",
-		...formatList(initDryRun.created.slice(0, 10), "none"),
-		"",
-	];
-}
-
-function buildAuditSummaryLines(audit) {
-	const lines = [
-		`- Read-only: ${audit.readOnly}`,
-		`- Target type: ${audit.classification.type}`,
-	];
-
-	if (audit.auditMode === "product-repo") {
-		lines.push(
-			`- Template starter files present: ${audit.templateStarterFiles.existing.length}`,
-			`- Template starter files missing: ${audit.templateStarterFiles.missing.length}`,
-		);
-	} else {
-		lines.push(
-			`- Existing Amber starter files: ${audit.existing.length}`,
-			`- Missing Amber starter files: ${audit.missing.length}`,
-		);
-	}
-
-	lines.push(
-		`- Existing docs: ${audit.docs.length}`,
-		`- Wiki-like files: ${audit.wikiLikeFiles.length}`,
-		`- Conflicts: ${audit.conflicts.length}`,
-	);
-
-	return lines;
-}
-
-function buildAdoptionReportContent(parts) {
-	const {
-		targetRoot,
-		audit,
-		initDryRun,
-		team,
-		teamUpdatePreview,
-		maintenance,
-	} = parts;
-	const lines = [
-		"# Amber Protocol Adoption Report",
-		"",
-		`Target: ${targetRoot}`,
-		`Generated: ${new Date().toISOString()}`,
-		"",
-		"No target project files were initialized by this report.",
-		"",
-		"## Audit Summary",
-		"",
-		...buildAuditSummaryLines(audit),
-		"",
-		"### Candidate Commands",
-		"",
-		...formatCommandList(audit.candidateCommands, "none"),
-		"",
-		"### Unknowns",
-		"",
-		...formatList(audit.unknowns, "none"),
-		"",
-		...buildInitDryRunSection(initDryRun),
-		"## Team Distribution",
-		"",
-		`- Installed: ${team.installed}`,
-		`- Registry: ${team.registry.name}`,
-		`- Available versions: ${Object.keys(team.registry.versions || {}).join(", ") || "none"}`,
-		"",
-	];
-
-	if (team.lock) {
-		lines.push(`- Current version: ${team.lock.installedVersion}`);
-	} else {
-		lines.push("- Current version: not installed");
-		lines.push(
-			"- Suggested install: `node scripts/amber.js team install --target <target> --version 1.0.0 --preset safe-bootstrap`",
-		);
-	}
-
-	if (teamUpdatePreview && teamUpdatePreview.preview) {
-		lines.push(
-			`- Update preview: ${teamUpdatePreview.preview.fromVersion} -> ${teamUpdatePreview.preview.toVersion}`,
-		);
-		lines.push(
-			`- Update would write immediately: ${teamUpdatePreview.preview.willWrite}`,
-		);
-		lines.push(
-			`- Customizations preserved: ${teamUpdatePreview.preview.customizationsPreserved}`,
-		);
-	}
-
-	lines.push(
-		"",
-		"## Maintenance",
-		"",
-		`- Stale docs: ${maintenance.staleDocs.length}`,
-		`- Rule-pack drift: ${maintenance.rulePackDrift.drifted}`,
-		`- Upgrade: ${maintenance.upgradeAssistant.currentVersion || "not installed"} -> ${maintenance.upgradeAssistant.latestVersion}`,
-		"",
-		"## Next Safe Commands",
-		"",
-		`- ${audit.nextSafeCommand}`,
-		`- node scripts/amber.js init --target ${JSON.stringify(targetRoot)} --dry-run`,
-		`- node scripts/amber.js maintenance inspect --target ${JSON.stringify(targetRoot)} --json`,
-		"",
-	);
-
-	return lines.join("\n");
-}
 
 function uniqueAdoptionReportPath(targetRoot, outputDir) {
 	const directory = path.resolve(outputDir);
@@ -284,35 +159,6 @@ function listAdoptionReports(options = {}) {
 	};
 }
 
-function buildAdoptionReportsIndexContent(listing, outputPath) {
-	const outputDir = path.dirname(outputPath);
-	const lines = [
-		"# Adoption Reports Index",
-		"",
-		`Reports directory: ${listing.reportsDir}`,
-		`Generated: ${new Date().toISOString()}`,
-		"",
-		"Reports are sorted newest first.",
-		"",
-	];
-
-	if (listing.reports.length === 0) {
-		lines.push("No adoption reports found.", "");
-		return lines.join("\n");
-	}
-
-	lines.push("| Generated | Target | Report |", "| --- | --- | --- |");
-	for (const report of listing.reports) {
-		const linkTarget = relativeSlash(outputDir, report.file);
-		const fileName = path.basename(report.file);
-		lines.push(
-			`| ${escapeMarkdownTableCell(report.generatedAt)} | ${escapeMarkdownTableCell(report.target)} | [${escapeMarkdownTableCell(fileName)}](${linkTarget}) |`,
-		);
-	}
-	lines.push("");
-	return lines.join("\n");
-}
-
 function writeAdoptionReportsIndex(options = {}) {
 	const reportsDir = options.reportsDir ? path.resolve(options.reportsDir) : "";
 	const outputPath = options.output ? path.resolve(options.output) : "";
@@ -347,7 +193,7 @@ function writeAdoptionReportsIndex(options = {}) {
 	fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 	fs.writeFileSync(
 		outputPath,
-		buildAdoptionReportsIndexContent(listing, outputPath),
+		renderAdoptionReportsIndex(listing, outputPath),
 	);
 
 	return {
@@ -528,39 +374,6 @@ function buildMetricComparison(baseMetrics, headMetrics) {
 	return metrics;
 }
 
-function buildAdoptionReportDiffContent(comparison) {
-	const lines = [
-		"# Adoption Report Diff",
-		"",
-		`Base: ${comparison.base.file}`,
-		`Head: ${comparison.head.file}`,
-		`Same target: ${comparison.sameTarget}`,
-		"",
-		"## Metric Deltas",
-		"",
-		"| Metric | Base | Head | Delta |",
-		"| --- | ---: | ---: | ---: |",
-	];
-
-	for (const metric of Object.values(comparison.metrics)) {
-		lines.push(
-			`| ${metric.label} | ${metric.base ?? "n/a"} | ${metric.head ?? "n/a"} | ${metric.delta ?? "n/a"} |`,
-		);
-	}
-
-	lines.push("", "## Candidate Commands Added", "");
-	lines.push(...formatList(comparison.candidateCommands.added, "none"));
-	lines.push("", "## Candidate Commands Removed", "");
-	lines.push(...formatList(comparison.candidateCommands.removed, "none"));
-	lines.push("", "## Unknowns Added", "");
-	lines.push(...formatList(comparison.unknowns.added, "none"));
-	lines.push("", "## Unknowns Removed", "");
-	lines.push(...formatList(comparison.unknowns.removed, "none"));
-	lines.push("");
-
-	return lines.join("\n");
-}
-
 function compareAdoptionReports(options = {}) {
 	const reportsDir = options.reportsDir ? path.resolve(options.reportsDir) : "";
 	const outputPath = options.output ? path.resolve(options.output) : "";
@@ -670,7 +483,7 @@ function compareAdoptionReports(options = {}) {
 
 	if (outputPath) {
 		fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-		fs.writeFileSync(outputPath, buildAdoptionReportDiffContent(comparison));
+		fs.writeFileSync(outputPath, renderAdoptionReportDiff(comparison));
 	}
 
 	return comparison;
@@ -740,7 +553,7 @@ function generateAdoptionReport(target, options = {}) {
 		return { target: targetRoot, reportPath: outputPath, errors, warnings };
 	}
 
-	const content = buildAdoptionReportContent({
+	const content = renderAdoptionReport({
 		targetRoot,
 		audit,
 		initDryRun,
@@ -768,18 +581,15 @@ function generateAdoptionReport(target, options = {}) {
 
 module.exports = {
 	ADOPTION_COMPARE_METRICS,
-	buildAdoptionReportContent,
 	uniqueAdoptionReportPath,
 	parseAdoptionReportMetadata,
 	listAdoptionReports,
-	buildAdoptionReportsIndexContent,
 	writeAdoptionReportsIndex,
 	validateAdoptionReports,
 	readAdoptionReportMetric,
 	parseAdoptionReportForComparison,
 	compareStringLists,
 	buildMetricComparison,
-	buildAdoptionReportDiffContent,
 	compareAdoptionReports,
 	generateAdoptionReport,
 };

@@ -1,6 +1,6 @@
 ---
 name: amber-continuous-improvement
-description: Use when continuing a repository improvement goal, running an automation wakeup, or selecting the next safe Harness-backed improvement slice.
+description: Use when continuing a repository improvement goal, running an automation wakeup, or selecting the next safe Amber-backed improvement slice.
 ---
 
 # Amber Continuous Improvement
@@ -28,7 +28,7 @@ description: Use when continuing a repository improvement goal, running an autom
 - Prefer small patches over broad rewrites.
 - Do not overwrite user-authored files without explicit approval.
 - Do not delete, deploy, publish, change secrets, change dependencies, create migrations, or perform destructive git operations without approval.
-- Do not execute dynamic workflows, dispatch subagents, orchestrate worktrees, or route models from the V1 Harness.
+- Do not execute Dynamic Workflows, dispatch subagents, orchestrate worktrees, or route models from the V1 Amber Protocol boundary.
 
 ## Result Note Template
 

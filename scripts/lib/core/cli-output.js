@@ -2,180 +2,99 @@
 
 const path = require("node:path");
 
+// Declarative flag table driving parseArgs. Each entry maps a CLI flag to the
+// args key it sets and how it consumes argv:
+//   kind: "value"   -> args[key] = next argv token (default)
+//   kind: "boolean" -> args[key] = true, no token consumed
+//   accumulate      -> also push the value onto args[accumulate] (repeatable flag)
+// Adding a flag is a single row here, not a new branch in a parse ladder.
+const FLAG_SPECS = {
+	"--target": { key: "target" },
+	"--goal": { key: "goal" },
+	"--route": { key: "route" },
+	"--budget": { key: "budget" },
+	"--mode": { key: "mode" },
+	"--feature": { key: "feature" },
+	"--title": { key: "title" },
+	"--plan": { key: "plan" },
+	"--file": { key: "file" },
+	"--task": { key: "task" },
+	"--session": { key: "session" },
+	"--worker": { key: "worker" },
+	"--reviewer": { key: "reviewer" },
+	"--backend": { key: "backend" },
+	"--concurrency": { key: "concurrency" },
+	"--evidence": { key: "evidence" },
+	"--version": { key: "version" },
+	"--preset": { key: "preset" },
+	"--registry": { key: "registry" },
+	"--output": { key: "output" },
+	"--output-dir": { key: "outputDir" },
+	"--bundle-dir": { key: "bundleDir" },
+	"--report": { key: "report" },
+	"--base": { key: "base" },
+	"--head": { key: "head" },
+	"--index": { key: "index" },
+	"--reports-dir": { key: "reportsDir" },
+	"--trace-input": { key: "traceInput" },
+	"--agent-config": { key: "agentConfig" },
+	"--regression-assertion": { key: "regressionAssertion" },
+	"--loop-contract": { key: "loopContract" },
+	"--contract": { key: "contract" },
+	"--ledger": { key: "ledger" },
+	"--trigger-source": { key: "triggerSource" },
+	"--stop-reason": { key: "stopReason" },
+	"--since": { key: "since" },
+	"--threshold": { key: "threshold" },
+	"--threshold-days": { key: "thresholdDays" },
+	"--hard-stop-status": { key: "hardStopStatus" },
+	"--budget-status": { key: "budgetStatus" },
+	"--review-bandwidth-status": { key: "reviewBandwidthStatus" },
+	"--review-gate-status": { key: "reviewGateStatus" },
+	"--priority": { key: "priority" },
+	"--decision": { key: "decision", accumulate: "decisions" },
+	"--include": { key: "include", accumulate: "includes" },
+	"--worktree": { key: "worktree", kind: "boolean" },
+	"--json": { key: "json", kind: "boolean" },
+	"--dry-run": { key: "dryRun", kind: "boolean" },
+	"--confirm": { key: "confirm", kind: "boolean" },
+	"--summary": { key: "summary", kind: "boolean" },
+	"--all": { key: "all", kind: "boolean" },
+	"--explain": { key: "explain", kind: "boolean" },
+	"--strict": { key: "strict", kind: "boolean" },
+	"--fix-markers": { key: "fixMarkers", kind: "boolean" },
+	"--okf": { key: "okf", kind: "boolean" },
+	"--help": { key: "help", kind: "boolean" },
+	"-h": { key: "help", kind: "boolean" },
+};
+
 function parseArgs(argv) {
 	const args = { target: process.cwd(), json: false, dryRun: false };
 
 	for (let index = 0; index < argv.length; index += 1) {
 		const arg = argv[index];
-		if (arg === "--target") {
-			args.target = argv[index + 1];
-			index += 1;
-		} else if (arg === "--goal") {
-			args.goal = argv[index + 1];
-			index += 1;
-		} else if (arg === "--route") {
-			args.route = argv[index + 1];
-			index += 1;
-		} else if (arg === "--budget") {
-			args.budget = argv[index + 1];
-			index += 1;
-		} else if (arg === "--worktree") {
-			args.worktree = true;
-		} else if (arg === "--mode") {
-			args.mode = argv[index + 1];
-			index += 1;
-		} else if (arg === "--feature") {
-			args.feature = argv[index + 1];
-			index += 1;
-		} else if (arg === "--title") {
-			args.title = argv[index + 1];
-			index += 1;
-		} else if (arg === "--plan") {
-			args.plan = argv[index + 1];
-			index += 1;
-		} else if (arg === "--file") {
-			args.file = argv[index + 1];
-			index += 1;
-		} else if (arg === "--task") {
-			args.task = argv[index + 1];
-			index += 1;
-		} else if (arg === "--session") {
-			args.session = argv[index + 1];
-			index += 1;
-		} else if (arg === "--worker") {
-			args.worker = argv[index + 1];
-			index += 1;
-		} else if (arg === "--reviewer") {
-			args.reviewer = argv[index + 1];
-			index += 1;
-		} else if (arg === "--backend") {
-			args.backend = argv[index + 1];
-			index += 1;
-		} else if (arg === "--concurrency") {
-			args.concurrency = argv[index + 1];
-			index += 1;
-		} else if (arg === "--decision") {
-			args.decision = argv[index + 1];
-			if (!Array.isArray(args.decisions)) {
-				args.decisions = [];
-			}
-			args.decisions.push(argv[index + 1]);
-			index += 1;
-		} else if (arg === "--evidence") {
-			args.evidence = argv[index + 1];
-			index += 1;
-		} else if (arg === "--version") {
-			args.version = argv[index + 1];
-			index += 1;
-		} else if (arg === "--preset") {
-			args.preset = argv[index + 1];
-			index += 1;
-		} else if (arg === "--registry") {
-			args.registry = argv[index + 1];
-			index += 1;
-		} else if (arg === "--output") {
-			args.output = argv[index + 1];
-			index += 1;
-		} else if (arg === "--output-dir") {
-			args.outputDir = argv[index + 1];
-			index += 1;
-		} else if (arg === "--bundle-dir") {
-			args.bundleDir = argv[index + 1];
-			index += 1;
-		} else if (arg === "--include") {
-			args.include = argv[index + 1];
-			if (!Array.isArray(args.includes)) {
-				args.includes = [];
-			}
-			args.includes.push(argv[index + 1]);
-			index += 1;
-		} else if (arg === "--report") {
-			args.report = argv[index + 1];
-			index += 1;
-		} else if (arg === "--base") {
-			args.base = argv[index + 1];
-			index += 1;
-		} else if (arg === "--head") {
-			args.head = argv[index + 1];
-			index += 1;
-		} else if (arg === "--index") {
-			args.index = argv[index + 1];
-			index += 1;
-		} else if (arg === "--reports-dir") {
-			args.reportsDir = argv[index + 1];
-			index += 1;
-		} else if (arg === "--trace-input") {
-			args.traceInput = argv[index + 1];
-			index += 1;
-		} else if (arg === "--agent-config") {
-			args.agentConfig = argv[index + 1];
-			index += 1;
-		} else if (arg === "--regression-assertion") {
-			args.regressionAssertion = argv[index + 1];
-			index += 1;
-		} else if (arg === "--loop-contract") {
-			args.loopContract = argv[index + 1];
-			index += 1;
-		} else if (arg === "--contract") {
-			args.contract = argv[index + 1];
-			index += 1;
-		} else if (arg === "--ledger") {
-			args.ledger = argv[index + 1];
-			index += 1;
-		} else if (arg === "--trigger-source") {
-			args.triggerSource = argv[index + 1];
-			index += 1;
-		} else if (arg === "--stop-reason") {
-			args.stopReason = argv[index + 1];
-			index += 1;
-		} else if (arg === "--since") {
-			args.since = argv[index + 1];
-			index += 1;
-		} else if (arg === "--threshold") {
-			args.threshold = argv[index + 1];
-			index += 1;
-		} else if (arg === "--threshold-days") {
-			args.thresholdDays = argv[index + 1];
-			index += 1;
-		} else if (arg === "--hard-stop-status") {
-			args.hardStopStatus = argv[index + 1];
-			index += 1;
-		} else if (arg === "--budget-status") {
-			args.budgetStatus = argv[index + 1];
-			index += 1;
-		} else if (arg === "--review-bandwidth-status") {
-			args.reviewBandwidthStatus = argv[index + 1];
-			index += 1;
-		} else if (arg === "--review-gate-status") {
-			args.reviewGateStatus = argv[index + 1];
-			index += 1;
-		} else if (arg === "--priority") {
-			args.priority = argv[index + 1];
-			index += 1;
-		} else if (arg === "--json") {
-			args.json = true;
-		} else if (arg === "--dry-run") {
-			args.dryRun = true;
-		} else if (arg === "--confirm") {
-			args.confirm = true;
-		} else if (arg === "--summary") {
-			args.summary = true;
-		} else if (arg === "--all") {
-			args.all = true;
-		} else if (arg === "--explain") {
-			args.explain = true;
-		} else if (arg === "--strict") {
-			args.strict = true;
-		} else if (arg === "--fix-markers") {
-			args.fixMarkers = true;
-		} else if (arg === "--okf") {
-			args.okf = true;
-		} else if (arg === "--help" || arg === "-h") {
-			args.help = true;
-		} else {
+		const spec = FLAG_SPECS[arg];
+
+		if (!spec) {
 			args._ = args._ || [];
 			args._.push(arg);
+			continue;
 		}
+
+		if (spec.kind === "boolean") {
+			args[spec.key] = true;
+			continue;
+		}
+
+		const value = argv[index + 1];
+		args[spec.key] = value;
+		if (spec.accumulate) {
+			if (!Array.isArray(args[spec.accumulate])) {
+				args[spec.accumulate] = [];
+			}
+			args[spec.accumulate].push(value);
+		}
+		index += 1;
 	}
 
 	return args;
@@ -282,6 +201,29 @@ function printAuditSummary(result) {
 	}
 }
 
+// Shared "Errors: N" footer used by every structured result branch below.
+// Empty or absent errors render as "Errors: 0".
+function printErrorFooter(result) {
+	if (Array.isArray(result.errors) && result.errors.length > 0) {
+		console.log(`Errors: ${result.errors.length}`);
+		for (const error of result.errors) {
+			console.log(`  - ${error}`);
+		}
+	} else {
+		console.log("Errors: 0");
+	}
+}
+
+// Shared "Warnings: N" footer; prints nothing when there are no warnings.
+function printWarningFooter(result) {
+	if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+		console.log(`Warnings: ${result.warnings.length}`);
+		for (const warning of result.warnings) {
+			console.log(`  - ${warning}`);
+		}
+	}
+}
+
 function printResult(result, options = {}) {
 	if (options.json) {
 		process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -309,12 +251,7 @@ function printResult(result, options = {}) {
 				}
 			}
 		}
-		if (Array.isArray(result.warnings) && result.warnings.length > 0) {
-			console.log(`Warnings: ${result.warnings.length}`);
-			for (const warning of result.warnings) {
-				console.log(`  - ${warning}`);
-			}
-		}
+		printWarningFooter(result);
 		return;
 	}
 
@@ -435,20 +372,8 @@ function printResult(result, options = {}) {
 				`  - ${report.generatedAt}: ${path.basename(report.file)} -> ${report.target}`,
 			);
 		}
-		if (Array.isArray(result.errors) && result.errors.length > 0) {
-			console.log(`Errors: ${result.errors.length}`);
-			for (const error of result.errors) {
-				console.log(`  - ${error}`);
-			}
-		} else {
-			console.log("Errors: 0");
-		}
-		if (Array.isArray(result.warnings) && result.warnings.length > 0) {
-			console.log(`Warnings: ${result.warnings.length}`);
-			for (const warning of result.warnings) {
-				console.log(`  - ${warning}`);
-			}
-		}
+		printErrorFooter(result);
+		printWarningFooter(result);
 		return;
 	}
 
@@ -469,14 +394,7 @@ function printResult(result, options = {}) {
 			`Candidate commands added: ${result.candidateCommands.added.length}`,
 		);
 		console.log(`Unknowns removed: ${result.unknowns.removed.length}`);
-		if (Array.isArray(result.errors) && result.errors.length > 0) {
-			console.log(`Errors: ${result.errors.length}`);
-			for (const error of result.errors) {
-				console.log(`  - ${error}`);
-			}
-		} else {
-			console.log("Errors: 0");
-		}
+		printErrorFooter(result);
 		return;
 	}
 
@@ -491,14 +409,7 @@ function printResult(result, options = {}) {
 		for (const finding of result.findings) {
 			console.log(`  - ${finding.id}: ${finding.message}`);
 		}
-		if (Array.isArray(result.errors) && result.errors.length > 0) {
-			console.log(`Errors: ${result.errors.length}`);
-			for (const error of result.errors) {
-				console.log(`  - ${error}`);
-			}
-		} else {
-			console.log("Errors: 0");
-		}
+		printErrorFooter(result);
 		return;
 	}
 
@@ -515,14 +426,7 @@ function printResult(result, options = {}) {
 		console.log(
 			`Optional selected: ${Array.isArray(result.optionalSelected) ? result.optionalSelected.length : 0}`,
 		);
-		if (Array.isArray(result.errors) && result.errors.length > 0) {
-			console.log(`Errors: ${result.errors.length}`);
-			for (const error of result.errors) {
-				console.log(`  - ${error}`);
-			}
-		} else {
-			console.log("Errors: 0");
-		}
+		printErrorFooter(result);
 		return;
 	}
 
@@ -538,14 +442,7 @@ function printResult(result, options = {}) {
 		console.log(
 			`Skipped existing: ${result.preview ? result.preview.skipped.length : 0}`,
 		);
-		if (Array.isArray(result.errors) && result.errors.length > 0) {
-			console.log(`Errors: ${result.errors.length}`);
-			for (const error of result.errors) {
-				console.log(`  - ${error}`);
-			}
-		} else {
-			console.log("Errors: 0");
-		}
+		printErrorFooter(result);
 		return;
 	}
 
@@ -563,14 +460,7 @@ function printResult(result, options = {}) {
 				console.log(`  - ${decision.id}: ${decision.status}`);
 			}
 		}
-		if (Array.isArray(result.errors) && result.errors.length > 0) {
-			console.log(`Errors: ${result.errors.length}`);
-			for (const error of result.errors) {
-				console.log(`  - ${error}`);
-			}
-		} else {
-			console.log("Errors: 0");
-		}
+		printErrorFooter(result);
 		return;
 	}
 
@@ -587,14 +477,7 @@ function printResult(result, options = {}) {
 				console.log(`  - ${gate.id}: ${gate.question}`);
 			}
 		}
-		if (Array.isArray(result.errors) && result.errors.length > 0) {
-			console.log(`Errors: ${result.errors.length}`);
-			for (const error of result.errors) {
-				console.log(`  - ${error}`);
-			}
-		} else {
-			console.log("Errors: 0");
-		}
+		printErrorFooter(result);
 		return;
 	}
 
@@ -612,14 +495,7 @@ function printResult(result, options = {}) {
 			}
 		}
 		console.log(`Next safe action: ${result.nextSafeAction}`);
-		if (Array.isArray(result.errors) && result.errors.length > 0) {
-			console.log(`Errors: ${result.errors.length}`);
-			for (const error of result.errors) {
-				console.log(`  - ${error}`);
-			}
-		} else {
-			console.log("Errors: 0");
-		}
+		printErrorFooter(result);
 		return;
 	}
 
@@ -640,14 +516,7 @@ function printResult(result, options = {}) {
 			console.log(`  - ${blocker.id}: ${blocker.message}`);
 		}
 		console.log(`Next safe action: ${result.nextSafeAction}`);
-		if (Array.isArray(result.errors) && result.errors.length > 0) {
-			console.log(`Errors: ${result.errors.length}`);
-			for (const error of result.errors) {
-				console.log(`  - ${error}`);
-			}
-		} else {
-			console.log("Errors: 0");
-		}
+		printErrorFooter(result);
 		return;
 	}
 

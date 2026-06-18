@@ -152,7 +152,7 @@ test("adoption report aggregates safe trial steps without initializing target", 
 	assert.match(report, /## Maintenance/);
 	assert.match(
 		report,
-		/No target project files were initialized by this report/,
+		/No target-repository files were initialized by this report/,
 	);
 	assert.equal(fs.existsSync(path.join(target, "AGENTS.md")), false);
 	assert.equal(
@@ -895,7 +895,7 @@ test("adoption next-actions writes a gate checklist from a bundle and refuses ov
 	);
 	fs.writeFileSync(
 		path.join(bundleDir, "status.md"),
-		"# Adoption Status\n\nReports: 1\nLatest report: newer.md\nGate decision: wait\nNext safe action: Review adoption gate findings before initializing or changing the target project.\n",
+		"# Adoption Status\n\nReports: 1\nLatest report: newer.md\nGate decision: wait\nNext safe action: Review adoption gate findings before initializing or changing the target repository.\n",
 	);
 	fs.writeFileSync(
 		path.join(bundleDir, "manifest.json"),
@@ -907,7 +907,7 @@ test("adoption next-actions writes a gate checklist from a bundle and refuses ov
 				latestReport: reportPath,
 				gateDecision: "wait",
 				nextSafeAction:
-					"Review adoption gate findings before initializing or changing the target project.",
+					"Review adoption gate findings before initializing or changing the target repository.",
 				boundaries: {
 					targetProjectFilesCopied: false,
 					targetProjectCommandsExecuted: false,
@@ -943,7 +943,7 @@ test("adoption next-actions writes a gate checklist from a bundle and refuses ov
 	assert.equal(payload.boundaries.targetProjectFilesCopied, false);
 	assert.equal(payload.boundaries.targetProjectCommandsExecuted, false);
 	const content = fs.readFileSync(output, "utf8");
-	assert.match(content, /Required Harness Files Pending Approval/);
+	assert.match(content, /Required Amber Starter Files Pending Approval/);
 	assert.match(content, /Candidate Command To Confirm/);
 	assert.match(content, /python -m pytest/);
 	assert.match(content, /Human Approval Gates/);
@@ -982,7 +982,7 @@ test("adoption decision-record writes pending approval gates from a bundle and r
 				latestReport: "newer.md",
 				gateDecision: "wait",
 				nextSafeAction:
-					"Review adoption gate findings before initializing or changing the target project.",
+					"Review adoption gate findings before initializing or changing the target repository.",
 				boundaries: {
 					targetProjectFilesCopied: false,
 					targetProjectCommandsExecuted: false,
@@ -1059,7 +1059,7 @@ test("adoption decision-record records explicit decision statuses and notes", ()
 				latestReport: "newer.md",
 				gateDecision: "wait",
 				nextSafeAction:
-					"Review adoption gate findings before initializing or changing the target project.",
+					"Review adoption gate findings before initializing or changing the target repository.",
 				boundaries: {
 					targetProjectFilesCopied: false,
 					targetProjectCommandsExecuted: false,
@@ -1160,7 +1160,7 @@ test("adoption apply-plan writes a dry-run bootstrap plan and refuses overwrite"
 				target,
 				gateDecision: "wait",
 				nextSafeAction:
-					"Review adoption gate findings before initializing or changing the target project.",
+					"Review adoption gate findings before initializing or changing the target repository.",
 				boundaries: {
 					targetProjectFilesCopied: false,
 					targetProjectCommandsExecuted: false,
@@ -1573,7 +1573,7 @@ test("session complete-check reports missing evidence for a new session", () => 
 	]);
 	assert.equal(check.status, 0, check.stderr);
 	const payload = JSON.parse(check.stdout);
-	assert.match(payload.text, /Completion status: fail/);
+	assert.match(payload.text, /Completion check status: fail/);
 	assert.match(payload.text, /Missing:/);
 });
 

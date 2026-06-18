@@ -41,30 +41,10 @@ function saveCheckpoint(
 }
 
 function loadLatestCheckpoint(projectRoot, sessionId) {
-	const checkpointsDir = getCheckpointsDir(projectRoot, sessionId);
-	if (!fs.existsSync(checkpointsDir)) {
-		return null;
-	}
-
-	const files = fs
-		.readdirSync(checkpointsDir)
-		.filter((f) => f.endsWith(".json"));
-	if (files.length === 0) return null;
-
-	const checkpoints = [];
-	for (const f of files) {
-		try {
-			const content = fs.readFileSync(path.join(checkpointsDir, f), "utf8");
-			checkpoints.push(JSON.parse(content));
-		} catch (err) {
-			console.error(
-				`Warning: skipping corrupt checkpoint ${f}: ${err.message}`,
-			);
-		}
-	}
-
-	checkpoints.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-	return checkpoints.length > 0 ? checkpoints[0] : null;
+	// listCheckpoints already handles dir enumeration, corrupt-file skipping,
+	// and timestamp sorting (ascending); the latest is its last element.
+	const checkpoints = listCheckpoints(projectRoot, sessionId);
+	return checkpoints.length > 0 ? checkpoints[checkpoints.length - 1] : null;
 }
 
 function listCheckpoints(projectRoot, sessionId) {

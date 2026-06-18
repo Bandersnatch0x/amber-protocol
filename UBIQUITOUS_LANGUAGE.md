@@ -1,5 +1,7 @@
 # Ubiquitous Language
 
+> **Deprecated.** `CONTEXT.md` at the repo root is the canonical glossary. This file is retained for reference during migration; new terms and conflict resolutions belong in `CONTEXT.md` only. See `docs/agents/domain.md`.
+
 ## Amber domain
 
 | Term | Definition | Aliases to avoid |

@@ -238,6 +238,70 @@ function inspectPolicy(targetRoot) {
   return { policy, defaults, overrides, errors, warnings };
 }
 
+// Gather one summary row per session under sessionsDir by parsing each
+// timeline.jsonl. Extracted from generateAuditReport so the state-reading is
+// testable on its own, not only through the rendered audit markdown.
+function summarizeSessions(sessionsDir, options = {}) {
+  const sessions = [];
+  if (!fs.existsSync(sessionsDir)) return sessions;
+
+  const sessionIds = fs.readdirSync(sessionsDir).filter(f => fs.statSync(path.join(sessionsDir, f)).isDirectory());
+  for (const id of sessionIds) {
+    const timelinePath = path.join(sessionsDir, id, 'timeline.jsonl');
+    if (!fs.existsSync(timelinePath)) continue;
+
+    const events = readTimeline(timelinePath);
+    const created = events.find(e => e.type === 'session_created');
+    const end = events.find(e => e.type === 'session_completed' || e.type === 'session_aborted');
+    const commands = events.filter(e => e.type === 'command_executed').length;
+    const approvals = events.filter(e => e.type === 'gate_triggered' || e.type === 'gate_passed').length;
+
+    if (options.since && created?.timestamp) {
+      if (new Date(created.timestamp) < new Date(options.since)) continue;
+    }
+
+    sessions.push({
+      id,
+      goal: created?.data?.goal || 'N/A',
+      start: created?.timestamp || 'N/A',
+      end: end?.timestamp || 'N/A',
+      commands,
+      approvals,
+      status: end ? end.type.replace('session_', '') : 'running'
+    });
+  }
+
+  return sessions;
+}
+
+// Gather one summary row per execution under executionsDir from its ledger and
+// evidence files. Extracted alongside summarizeSessions for the same reason.
+function summarizeExecutions(executionsDir) {
+  const executions = [];
+  if (!fs.existsSync(executionsDir)) return executions;
+
+  const taskIds = fs.readdirSync(executionsDir).filter(f => fs.statSync(path.join(executionsDir, f)).isDirectory());
+  for (const id of taskIds) {
+    const ledgerPath = path.join(executionsDir, id, 'ledger.json');
+    const evidencePath = path.join(executionsDir, id, 'evidence.json');
+
+    if (!fs.existsSync(ledgerPath)) continue;
+
+    const ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
+    const evidence = fs.existsSync(evidencePath) ? JSON.parse(fs.readFileSync(evidencePath, 'utf8')) : null;
+    const commands = evidence?.commands?.length || 0;
+
+    executions.push({
+      id,
+      plan: ledger.plan || 'N/A',
+      status: ledger.status || 'N/A',
+      commands
+    });
+  }
+
+  return executions;
+}
+
 function generateAuditReport(targetRoot, outputPath, options = {}) {
   const target = path.resolve(targetRoot);
   const sessionsDir = path.join(target, '.amber', 'sessions');
@@ -268,34 +332,7 @@ function generateAuditReport(targetRoot, outputPath, options = {}) {
 
   // Section 2: Session summary
   lines.push('## 2. Session Summary', '');
-  const sessions = [];
-  if (fs.existsSync(sessionsDir)) {
-    const sessionIds = fs.readdirSync(sessionsDir).filter(f => fs.statSync(path.join(sessionsDir, f)).isDirectory());
-    for (const id of sessionIds) {
-      const timelinePath = path.join(sessionsDir, id, 'timeline.jsonl');
-      if (!fs.existsSync(timelinePath)) continue;
-
-      const events = readTimeline(timelinePath);
-      const created = events.find(e => e.type === 'session_created');
-      const end = events.find(e => e.type === 'session_completed' || e.type === 'session_aborted');
-      const commands = events.filter(e => e.type === 'command_executed').length;
-      const approvals = events.filter(e => e.type === 'gate_triggered' || e.type === 'gate_passed').length;
-
-      if (options.since && created?.timestamp) {
-        if (new Date(created.timestamp) < new Date(options.since)) continue;
-      }
-
-      sessions.push({
-        id,
-        goal: created?.data?.goal || 'N/A',
-        start: created?.timestamp || 'N/A',
-        end: end?.timestamp || 'N/A',
-        commands,
-        approvals,
-        status: end ? end.type.replace('session_', '') : 'running'
-      });
-    }
-  }
+  const sessions = summarizeSessions(sessionsDir, options);
 
   lines.push('| ID | Goal | Start | End | Commands | Approvals | Status |');
   lines.push('|----|------|-------|-----|----------|-----------|--------|');
@@ -308,27 +345,7 @@ function generateAuditReport(targetRoot, outputPath, options = {}) {
 
   // Section 3: Execution summary
   lines.push('## 3. Execution Summary', '');
-  const executions = [];
-  if (fs.existsSync(executionsDir)) {
-    const taskIds = fs.readdirSync(executionsDir).filter(f => fs.statSync(path.join(executionsDir, f)).isDirectory());
-    for (const id of taskIds) {
-      const ledgerPath = path.join(executionsDir, id, 'ledger.json');
-      const evidencePath = path.join(executionsDir, id, 'evidence.json');
-
-      if (!fs.existsSync(ledgerPath)) continue;
-
-      const ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
-      const evidence = fs.existsSync(evidencePath) ? JSON.parse(fs.readFileSync(evidencePath, 'utf8')) : null;
-      const commands = evidence?.commands?.length || 0;
-
-      executions.push({
-        id,
-        plan: ledger.plan || 'N/A',
-        status: ledger.status || 'N/A',
-        commands
-      });
-    }
-  }
+  const executions = summarizeExecutions(executionsDir);
 
   lines.push('| Task ID | Plan | Status | Commands |');
   lines.push('|---------|------|--------|----------|');
@@ -370,4 +387,4 @@ function generateAuditReport(targetRoot, outputPath, options = {}) {
   };
 }
 
-module.exports = { governanceDocs, exportSessionEvidence, exportExecutionEvidence, inspectPolicy, generateAuditReport };
+module.exports = { governanceDocs, exportSessionEvidence, exportExecutionEvidence, inspectPolicy, summarizeSessions, summarizeExecutions, generateAuditReport };

@@ -25,6 +25,10 @@ const {
 	findFeatureById,
 } = require("./validators");
 
+const {
+	MESSAGES,
+} = require("./terminology");
+
 function buildPlanContent(feature, title) {
 	return [
 		`# Plan: ${title}`,
@@ -50,7 +54,7 @@ function buildPlanContent(feature, title) {
 		"## Acceptance Criteria",
 		"",
 		"- The user-visible behavior is demonstrably satisfied.",
-		"- Existing Harness guardrails still pass.",
+		MESSAGES.planGuardrailsCheck,
 		"",
 		"## Verification",
 		"",
@@ -304,7 +308,7 @@ function acceptPlan(target, planRelativePath) {
 
 	fs.mkdirSync(path.dirname(evolutionPath), { recursive: true });
 	if (!pathExists(evolutionPath)) {
-		fs.writeFileSync(evolutionPath, `# Harness Evolution Log\n${entry}`);
+		fs.writeFileSync(evolutionPath, `${MESSAGES.evolutionLogHeading}\n${entry}`);
 	} else {
 		fs.appendFileSync(evolutionPath, entry);
 	}

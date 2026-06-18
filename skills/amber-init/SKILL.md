@@ -18,4 +18,4 @@ Use when a user asks to initialize or install the Amber Protocol in a repository
 
 ## Boundary
 
-This skill only installs the V1 Safe Harness Bootstrap. It does not run dynamic workflows or dispatch subagents.
+This skill only installs the V1 Amber scaffold (safe-bootstrap team preset). It does not run Dynamic Workflows or dispatch subagents.

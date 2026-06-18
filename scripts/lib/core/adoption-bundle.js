@@ -4,15 +4,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const {
-	buildAdoptionGateContent,
-	buildAdoptionStatusContent,
 	gateAdoptionReport,
 	statusAdoptionReports,
 } = require("./adoption-gate");
 
 const {
-	buildAdoptionReportDiffContent,
-	buildAdoptionReportsIndexContent,
 	listAdoptionReports,
 	parseAdoptionReportForComparison,
 } = require("./adoption-reports");
@@ -24,8 +20,6 @@ const {
 
 const {
 	pathExists,
-	readJson,
-	readText,
 	writeJson,
 } = require("./fs-utils");
 
@@ -33,13 +27,26 @@ const {
 	getSectionBody,
 } = require("./text-utils");
 
+const {
+	MESSAGES,
+	defaultAdoptionBoundaries,
+} = require("./terminology");
+
+const {
+	renderAdoptionBundleReadme,
+	renderAdoptionNextActionsDocument,
+	renderAdoptionGateDocument,
+	renderAdoptionReportDiff,
+	renderAdoptionReportsIndex,
+	renderAdoptionStatusDocument,
+} = require("./adoption-artifact-composer");
+
+const {
+	writeAdoptionBundleArtifact,
+} = require("./adoption-bundle-artifact");
+
 function adoptionBundleBoundaries() {
-	return {
-		targetProjectFilesCopied: false,
-		targetProjectCommandsExecuted: false,
-		dynamicWorkflowExecuted: false,
-		liveSubagentsInvoked: false,
-	};
+	return defaultAdoptionBoundaries();
 }
 
 function buildAdoptionBundleDiffFallbackContent(status) {
@@ -67,41 +74,6 @@ function buildAdoptionBundleDiffFallbackContent(status) {
 	}
 
 	lines.push("");
-	return lines.join("\n");
-}
-
-function buildAdoptionBundleReadmeContent(bundle) {
-	const lines = [
-		"# Adoption Review Bundle",
-		"",
-		`Target: ${bundle.target}`,
-		`Generated: ${bundle.generatedAt}`,
-		`Reports directory: ${bundle.reportsDir}`,
-		`Latest report: ${bundle.latestReport || "none"}`,
-		`Gate decision: ${bundle.gateDecision}`,
-		`Next safe action: ${bundle.nextSafeAction}`,
-		"",
-		"## Files",
-		"",
-	];
-
-	for (const file of bundle.files) {
-		lines.push(`- [${file.relativePath}](${file.relativePath})`);
-	}
-
-	lines.push(
-		"",
-		"## V1 Boundaries",
-		"",
-		`- Target project files copied: ${bundle.boundaries.targetProjectFilesCopied}`,
-		`- Target project commands executed: ${bundle.boundaries.targetProjectCommandsExecuted}`,
-		`- Dynamic Workflow executed: ${bundle.boundaries.dynamicWorkflowExecuted}`,
-		`- Live subagents invoked: ${bundle.boundaries.liveSubagentsInvoked}`,
-		"",
-		"This bundle is a read-only review artifact. It does not copy files from the target project and does not run target project commands.",
-		"",
-	);
-
 	return lines.join("\n");
 }
 
@@ -243,26 +215,26 @@ function bundleAdoptionArtifacts(options = {}) {
 	fs.mkdirSync(outputDir);
 	fs.writeFileSync(
 		path.join(outputDir, "README.md"),
-		buildAdoptionBundleReadmeContent(bundle),
+		renderAdoptionBundleReadme(bundle),
 	);
 	fs.writeFileSync(
 		path.join(outputDir, "status.md"),
-		buildAdoptionStatusContent(status),
+		renderAdoptionStatusDocument(status),
 	);
 	fs.writeFileSync(
 		path.join(outputDir, "index.md"),
-		buildAdoptionReportsIndexContent(listing, path.join(outputDir, "index.md")),
+		renderAdoptionReportsIndex(listing, path.join(outputDir, "index.md")),
 	);
 	fs.writeFileSync(
 		path.join(outputDir, "diff.md"),
 		status.compare
-			? buildAdoptionReportDiffContent(status.compare)
+			? renderAdoptionReportDiff(status.compare)
 			: buildAdoptionBundleDiffFallbackContent(status),
 	);
 	fs.writeFileSync(
 		path.join(outputDir, "gate.md"),
 		gate
-			? buildAdoptionGateContent(gate)
+			? renderAdoptionGateDocument(gate)
 			: "# Adoption Gate Report\n\nNo latest report was available.\n",
 	);
 	writeJson(manifestPath, manifest);
@@ -345,218 +317,74 @@ function adoptionNextActionsErrorResult(fields, errors, warnings) {
 	};
 }
 
-function buildAdoptionNextActionsContent(nextActions) {
-	const lines = [
-		"# Adoption Next Actions",
-		"",
-		"Status: review only",
-		"",
-		`Target: ${nextActions.target}`,
-		`Bundle: ${nextActions.bundleDir}`,
-		`Latest report: ${nextActions.latestReport || "none"}`,
-		`Gate decision: ${nextActions.gateDecision}`,
-		`Next safe action: ${nextActions.nextSafeAction}`,
-		"",
-		"## Boundary",
-		"",
-		"This document is a read-only planning artifact.",
-		"",
-		`- Target project files copied: ${nextActions.boundaries.targetProjectFilesCopied}`,
-		`- Target project commands executed: ${nextActions.boundaries.targetProjectCommandsExecuted}`,
-		`- Dynamic Workflow executed: ${nextActions.boundaries.dynamicWorkflowExecuted}`,
-		`- Live subagents invoked: ${nextActions.boundaries.liveSubagentsInvoked}`,
-		"",
-		"## Gate Findings",
-		"",
-	];
-
-	if (nextActions.findings.length === 0) {
-		lines.push("- none");
-	} else {
-		for (const finding of nextActions.findings) {
-			lines.push(`- ${finding.id}: ${finding.message}`);
-		}
-	}
-
-	lines.push("", "## Required Harness Files Pending Approval", "");
-	for (const relativePath of nextActions.requiredHarnessFiles) {
-		lines.push(`- \`${relativePath}\``);
-	}
-
-	lines.push("", "## Optional Starter Wiki Files", "");
-	for (const relativePath of nextActions.optionalStarterWikiFiles) {
-		lines.push(`- \`${relativePath}\``);
-	}
-
-	lines.push("", "## Candidate Command To Confirm", "");
-	if (nextActions.candidateCommands.length === 0) {
-		lines.push("- none detected");
-	} else {
-		for (const command of nextActions.candidateCommands) {
-			lines.push(`- ${command}`);
-		}
-	}
-
-	lines.push(
-		"",
-		"Confirmation needed:",
-		"",
-		"- Is this the correct default verification command?",
-		"- Should it run from the repository root or a subdirectory?",
-		"- Does it require a virtual environment, environment variables, data files, or external services?",
-		"- Is there a lighter smoke command that should run before the full suite?",
-		"",
-		"## Unknowns To Resolve",
-		"",
-	);
-
-	if (nextActions.unknowns.length === 0) {
-		lines.push("- none");
-	} else {
-		for (const unknown of nextActions.unknowns) {
-			lines.push(`- ${unknown}`);
-		}
-	}
-
-	lines.push("", "## Human Approval Gates", "");
-	for (const gate of nextActions.approvalGates) {
-		lines.push(`- ${gate.id}: ${gate.question}`);
-	}
-
-	lines.push(
-		"",
-		"## Recommended Next Sequence",
-		"",
-		"1. Human reviews this document and answers the approval gates.",
-		"2. If writes are approved, confirm the target path and exact file list before running init.",
-		"3. Re-run adoption report, index, status, gate, and bundle after any approved target change.",
-		"4. Treat target command execution as a separate approval step after the command is confirmed.",
-		"",
-		"Commands that write to the target project or execute its tests remain outside this artifact.",
-		"",
-	);
-
-	return lines.join("\n");
-}
-
 function writeAdoptionNextActions(options = {}) {
-	const bundleDir = options.bundleDir ? path.resolve(options.bundleDir) : "";
-	const outputPath = options.output ? path.resolve(options.output) : "";
-	const errors = [];
-	const warnings = [];
+	return writeAdoptionBundleArtifact(options, {
+		command: "adoption next-actions",
+		outputExistsLabel: "Next-actions output",
+		emptyResult: adoptionNextActionsErrorResult,
+		render: renderAdoptionNextActionsDocument,
+		build: (manifest, ctx) => {
+			const latestReport = manifest.latestReport
+				? path.isAbsolute(manifest.latestReport)
+					? manifest.latestReport
+					: path.resolve(ctx.bundleDir, manifest.latestReport)
+				: "";
+			let candidateCommands = [];
+			let unknowns = [];
+			if (latestReport && pathExists(latestReport)) {
+				const parsed = parseAdoptionReportForComparison(latestReport);
+				if (parsed.error) {
+					ctx.warnings.push(parsed.error);
+				} else {
+					candidateCommands = parsed.report.candidateCommands;
+					unknowns = parsed.report.unknowns;
+				}
+			} else if (latestReport) {
+				ctx.warnings.push(`Latest report is missing: ${latestReport}`);
+			}
 
-	if (!bundleDir) {
-		errors.push("adoption next-actions requires --bundle-dir.");
-	}
-	if (!outputPath) {
-		errors.push("adoption next-actions requires --output.");
-	}
-	if (
-		bundleDir &&
-		(!pathExists(bundleDir) || !fs.statSync(bundleDir).isDirectory())
-	) {
-		errors.push(`Bundle directory does not exist: ${bundleDir}`);
-	}
-	if (outputPath && pathExists(outputPath)) {
-		errors.push(`Next-actions output already exists: ${outputPath}`);
-	}
-	if (errors.length > 0) {
-		return adoptionNextActionsErrorResult(
-			{ bundleDir, outputPath },
-			errors,
-			warnings,
-		);
-	}
-
-	const manifestPath = path.join(bundleDir, "manifest.json");
-	if (!pathExists(manifestPath)) {
-		errors.push(`Bundle manifest is missing: ${manifestPath}`);
-		return adoptionNextActionsErrorResult(
-			{ bundleDir, outputPath },
-			errors,
-			warnings,
-		);
-	}
-
-	let manifest;
-	try {
-		manifest = readJson(manifestPath);
-	} catch (error) {
-		errors.push(`Cannot read bundle manifest: ${error.message}`);
-		return adoptionNextActionsErrorResult(
-			{ bundleDir, outputPath },
-			errors,
-			warnings,
-		);
-	}
-
-	const latestReport = manifest.latestReport
-		? path.isAbsolute(manifest.latestReport)
-			? manifest.latestReport
-			: path.resolve(bundleDir, manifest.latestReport)
-		: "";
-	let candidateCommands = [];
-	let unknowns = [];
-	if (latestReport && pathExists(latestReport)) {
-		const parsed = parseAdoptionReportForComparison(latestReport);
-		if (parsed.error) {
-			warnings.push(parsed.error);
-		} else {
-			candidateCommands = parsed.report.candidateCommands;
-			unknowns = parsed.report.unknowns;
-		}
-	} else if (latestReport) {
-		warnings.push(`Latest report is missing: ${latestReport}`);
-	}
-
-	const gatePath = path.join(bundleDir, "gate.md");
-	const gateMarkdown = pathExists(gatePath) ? readText(gatePath) : "";
-	const findings = gateMarkdown
-		? extractAdoptionGateFindings(gateMarkdown)
-		: [];
-	const metrics = gateMarkdown ? extractAdoptionGateMetrics(gateMarkdown) : [];
-	const approvalGates = adoptionNextActionsApprovalGates();
-	const nextActions = {
-		kind: "adoption-next-actions",
-		target: manifest.target || "unknown",
-		bundleDir,
-		outputPath,
-		latestReport: latestReport || null,
-		gateDecision: manifest.gateDecision || "wait",
-		nextSafeAction:
-			manifest.nextSafeAction ||
-			"Review adoption gate findings before initializing or changing the target project.",
-		findings,
-		metrics,
-		requiredHarnessFiles: REQUIRED_HARNESS_FILES,
-		optionalStarterWikiFiles: OPTIONAL_STARTER_WIKI_FILES,
-		candidateCommands,
-		unknowns,
-		approvalGates,
-		boundaries: {
-			...adoptionBundleBoundaries(),
-			...(manifest.boundaries || {}),
+			const gateMarkdown = ctx.readBundleFile("gate.md");
+			const findings = gateMarkdown
+				? extractAdoptionGateFindings(gateMarkdown)
+				: [];
+			const metrics = gateMarkdown
+				? extractAdoptionGateMetrics(gateMarkdown)
+				: [];
+			return {
+				kind: "adoption-next-actions",
+				target: manifest.target || "unknown",
+				bundleDir: ctx.bundleDir,
+				outputPath: ctx.outputPath,
+				latestReport: latestReport || null,
+				gateDecision: manifest.gateDecision || "wait",
+				nextSafeAction:
+					manifest.nextSafeAction || MESSAGES.adoptionReviewBeforeChange,
+				findings,
+				metrics,
+				requiredHarnessFiles: REQUIRED_HARNESS_FILES,
+				optionalStarterWikiFiles: OPTIONAL_STARTER_WIKI_FILES,
+				candidateCommands,
+				unknowns,
+				approvalGates: adoptionNextActionsApprovalGates(),
+				boundaries: {
+					...adoptionBundleBoundaries(),
+					...(manifest.boundaries || {}),
+				},
+				errors: ctx.errors,
+				warnings: ctx.warnings,
+			};
 		},
-		errors,
-		warnings,
-	};
-
-	fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-	fs.writeFileSync(outputPath, buildAdoptionNextActionsContent(nextActions));
-
-	return nextActions;
+	});
 }
 
 module.exports = {
 	adoptionBundleBoundaries,
 	buildAdoptionBundleDiffFallbackContent,
-	buildAdoptionBundleReadmeContent,
 	adoptionBundleErrorResult,
 	bundleAdoptionArtifacts,
 	extractAdoptionGateFindings,
 	extractAdoptionGateMetrics,
 	adoptionNextActionsApprovalGates,
 	adoptionNextActionsErrorResult,
-	buildAdoptionNextActionsContent,
 	writeAdoptionNextActions,
 };

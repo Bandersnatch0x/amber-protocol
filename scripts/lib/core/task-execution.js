@@ -19,6 +19,54 @@ const {
 	slugify,
 } = require("./text-utils");
 
+const {
+	MESSAGES,
+	cannotReadTaskEvidence,
+} = require("./terminology");
+
+// Pure renderer for replay.md: builds the replay document from the task
+// coordinates and the assembled evidence object. Extracted from
+// prepareTaskExecution so the markdown shape is testable on its own.
+function buildReplayContent(taskId, planRelativePath, worktreeRelativePath, evidence) {
+	const replayLines = [
+		"# Replay",
+		"",
+		`Task: ${taskId}`,
+		`Plan: ${planRelativePath}`,
+		`Worktree: ${worktreeRelativePath}`,
+		"",
+	];
+
+	if (evidence.traceReplay) {
+		replayLines.push("## Trace Replay", "");
+		replayLines.push(`- Trace input: ${evidence.traceReplay.traceInput}`);
+		replayLines.push(`- Agent config: ${evidence.traceReplay.agentConfig}`);
+		replayLines.push(
+			`- Exact replay required: ${evidence.traceReplay.exactReplayRequired}`,
+		);
+		replayLines.push("");
+	}
+
+	if (evidence.regressionProposal) {
+		replayLines.push("## Regression Proposal", "");
+		replayLines.push(`- Assertion: ${evidence.regressionProposal.assertion}`);
+		replayLines.push(
+			`- Modifies tests: ${evidence.regressionProposal.modifiesTests}`,
+		);
+		replayLines.push(
+			`- Approval required: ${evidence.regressionProposal.approvalRequired}`,
+		);
+		replayLines.push("");
+	}
+
+	if (!evidence.traceReplay && !evidence.regressionProposal) {
+		replayLines.push(MESSAGES.replayNoCommandsYet);
+		replayLines.push("");
+	}
+
+	return replayLines.join("\n");
+}
+
 function prepareTaskExecution(
 	target,
 	planRelativePath,
@@ -92,45 +140,12 @@ function prepareTaskExecution(
 		};
 	}
 
-	const replayLines = [
-		"# Replay",
-		"",
-		`Task: ${taskId}`,
-		`Plan: ${planRelativePath}`,
-		`Worktree: ${worktreeRelativePath}`,
-		"",
-	];
-
-	if (evidence.traceReplay) {
-		replayLines.push("## Trace Replay", "");
-		replayLines.push(`- Trace input: ${evidence.traceReplay.traceInput}`);
-		replayLines.push(`- Agent config: ${evidence.traceReplay.agentConfig}`);
-		replayLines.push(
-			`- Exact replay required: ${evidence.traceReplay.exactReplayRequired}`,
-		);
-		replayLines.push("");
-	}
-
-	if (evidence.regressionProposal) {
-		replayLines.push("## Regression Proposal", "");
-		replayLines.push(`- Assertion: ${evidence.regressionProposal.assertion}`);
-		replayLines.push(
-			`- Modifies tests: ${evidence.regressionProposal.modifiesTests}`,
-		);
-		replayLines.push(
-			`- Approval required: ${evidence.regressionProposal.approvalRequired}`,
-		);
-		replayLines.push("");
-	}
-
-	if (!evidence.traceReplay && !evidence.regressionProposal) {
-		replayLines.push(
-			"This prepared result contains no executed commands yet. Replay starts from the ledger, evidence pack, and worktree path recorded here.",
-		);
-		replayLines.push("");
-	}
-
-	const replay = replayLines.join("\n");
+	const replay = buildReplayContent(
+		taskId,
+		planRelativePath,
+		worktreeRelativePath,
+		evidence,
+	);
 
 	fs.writeFileSync(
 		path.join(executionPath, "ledger.json"),
@@ -196,7 +211,7 @@ function inspectTaskResult(target, taskIdInput) {
 	try {
 		evidence = readJson(evidencePath);
 	} catch (error) {
-		errors.push(`Cannot read evidence pack: ${error.message}`);
+		errors.push(cannotReadTaskEvidence(error.message));
 	}
 	if (!pathExists(replayPath)) {
 		errors.push("Replay file is missing.");
@@ -238,6 +253,7 @@ function orchestrationPaths(targetRoot, taskId, options = {}) {
 }
 
 module.exports = {
+	buildReplayContent,
 	prepareTaskExecution,
 	inspectTaskResult,
 	orchestrationPaths,

@@ -81,7 +81,7 @@ amber-protocol review --target <dir> --plan <relative-path>
 
 ### `accept`
 
-Accept a reviewed plan and append an evolution record. When `--session` is provided, also prints the session's completion-gate status as a warning; with `--strict`, missing evidence becomes an error.
+Accept a reviewed plan and append an evolution record. When `--session` is provided, also prints the session's completion-check status as a warning; with `--strict`, missing evidence becomes an error.
 
 ```bash
 amber-protocol accept --target <dir> --plan <relative-path> [--session <id>] [--strict]
@@ -90,7 +90,7 @@ amber-protocol accept --target <dir> --plan <relative-path> [--session <id>] [--
 | Option | Description |
 |--------|-------------|
 | `--plan <path>` | Relative path to the plan to accept |
-| `--session <id>` | Optional session id for completion-gate check |
+| `--session <id>` | Optional session id for completion-check |
 | `--strict` | Turn missing completion evidence into errors |
 
 ## Migration Commands

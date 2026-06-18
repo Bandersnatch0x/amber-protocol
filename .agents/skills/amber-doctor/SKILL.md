@@ -16,4 +16,4 @@ Use when a user asks whether a repository Amber Protocol setup is usable.
 
 ## Boundary
 
-Doctor validates the Amber Protocol setup itself. It does not promise full CI or end-to-end validation for the target project.
+Doctor validates the Amber Setup itself. It does not promise full CI or end-to-end validation for the target repository.
