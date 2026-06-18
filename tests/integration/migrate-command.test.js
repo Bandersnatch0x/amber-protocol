@@ -68,6 +68,30 @@ describe("Migrate Command", () => {
 		assert.strictEqual(result.skipped, 1);
 	});
 
+	it("skips a corrupt manifest and still migrates healthy ones", () => {
+		const healthyDir = path.join(testDir, ".amber", "sessions", "healthy");
+		fs.mkdirSync(healthyDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(healthyDir, "manifest.json"),
+			JSON.stringify(
+				{ sessionId: "healthy", status: "completed", goal: "x" },
+				null,
+				2,
+			),
+		);
+		const corruptDir = path.join(testDir, ".amber", "sessions", "broken");
+		fs.mkdirSync(corruptDir, { recursive: true });
+		fs.writeFileSync(path.join(corruptDir, "manifest.json"), "{ broken json");
+
+		const result = migrateManifests(testDir, { dryRun: false });
+
+		// One bad file must not abort migration for the healthy session beside it.
+		assert.strictEqual(result.success, true);
+		assert.strictEqual(result.migrated, 1);
+		assert.strictEqual(result.skipped, 1);
+		assert.ok(result.logs.some((l) => /corrupt/i.test(l)));
+	});
+
 	it("supports dry-run mode", () => {
 		const sessionId = "test-session-3";
 		const sessionDir = path.join(testDir, ".amber", "sessions", sessionId);
