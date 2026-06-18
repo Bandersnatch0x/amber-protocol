@@ -94,4 +94,18 @@ describe("dryRun", () => {
 			"No changes should be needed for already-migrated settings",
 		);
 	});
+
+	it("treats null/undefined settings as empty instead of throwing", () => {
+		// migrateSettings is null-safe (settings || {}); dryRun must match so the
+		// same empty/missing input cannot crash one path while the other copes.
+		for (const value of [null, undefined]) {
+			const result = dryRun(value);
+			assert.strictEqual(typeof result, "object");
+			assert.ok(Object.hasOwn(result, "diff"));
+			assert.ok(
+				result.diff.some((d) => d.field === "framework" && d.type === "added"),
+				`empty input should still preview the framework field for ${value}`,
+			);
+		}
+	});
 });

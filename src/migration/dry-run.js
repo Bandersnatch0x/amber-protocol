@@ -11,7 +11,9 @@ const { migrateSettings } = require("./v5-to-phase-b");
  * @returns {{ before: object, after: object, diff: Array, summary: string }}
  */
 function dryRun(settings) {
-	const before = JSON.parse(JSON.stringify(settings));
+	// Match migrateSettings's null-safety (it does `settings || {}`) so the same
+	// empty/missing input can't crash the preview while the apply path copes.
+	const before = JSON.parse(JSON.stringify(settings || {}));
 	const after = migrateSettings(before);
 
 	const diff = computeDiff(before, after);
