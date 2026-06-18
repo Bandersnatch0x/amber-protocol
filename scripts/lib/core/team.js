@@ -257,20 +257,14 @@ function inspectTeamDistribution(target, options = {}) {
 	};
 }
 
-function installTeamDistribution(target, options = {}) {
-	const targetRoot = resolveTarget(target);
-	const paths = teamStatePaths(targetRoot, { forCreate: true });
-	const loaded = loadTeamRegistry(options.registry);
+// Pure validation core of installTeamDistribution: given the loaded registry,
+// the selected version, the resolved preset, and whether a lock already
+// exists, produce the install-request errors/warnings without touching disk.
+// Extracted so the install preconditions are unit-testable.
+function validateInstallRequest({ loaded, selected, preset, lockExists }) {
 	const errors = [...loaded.errors];
-	const warnings = [...loaded.warnings];
-	const selected = findTeamVersion(loaded.registry, options.version);
-	const preset =
-		options.preset || (selected.release && selected.release.preset);
-
-	if (pathExists(paths.lockPath)) {
-		errors.push(
-			MESSAGES.teamAlreadyInstalled,
-		);
+	if (lockExists) {
+		errors.push(MESSAGES.teamAlreadyInstalled);
 	}
 	if (!selected.release) {
 		errors.push(
@@ -280,6 +274,23 @@ function installTeamDistribution(target, options = {}) {
 	if (preset && !loaded.registry.presets.some((item) => item.id === preset)) {
 		errors.push(`Team preset ${preset} is not registered.`);
 	}
+	return { errors, warnings: loaded.warnings };
+}
+
+function installTeamDistribution(target, options = {}) {
+	const targetRoot = resolveTarget(target);
+	const paths = teamStatePaths(targetRoot, { forCreate: true });
+	const loaded = loadTeamRegistry(options.registry);
+	const selected = findTeamVersion(loaded.registry, options.version);
+	const preset =
+		options.preset || (selected.release && selected.release.preset);
+
+	const { errors, warnings } = validateInstallRequest({
+		loaded,
+		selected,
+		preset,
+		lockExists: pathExists(paths.lockPath),
+	});
 	if (errors.length > 0) {
 		return { target: targetRoot, errors, warnings };
 	}
@@ -442,6 +453,24 @@ function pinTeamDistribution(target, options = {}) {
 	return { target: targetRoot, lock, errors, warnings };
 }
 
+// Pure core of rollbackTeamDistribution: assemble the next lock from the
+// current lock and the chosen snapshot, stamping both timestamps with an
+// injected `now` (ISO string) so the assembly is deterministic and testable.
+function buildRollbackLock({ lock, snapshot, version, now }) {
+	return {
+		...lock,
+		installedVersion: version,
+		profile: snapshot.release.profile,
+		workflowPacks: snapshot.release.workflowPacks,
+		rulePacks: snapshot.release.rulePacks,
+		managedProjectFiles: snapshot.release.managedProjectFiles,
+		customizationsPreserved: snapshot.release.managedProjectFiles.length === 0,
+		previousVersion: lock.installedVersion,
+		rolledBackAt: now,
+		updatedAt: now,
+	};
+}
+
 function rollbackTeamDistribution(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const paths = teamStatePaths(targetRoot);
@@ -470,26 +499,15 @@ function rollbackTeamDistribution(target, options = {}) {
 	}
 
 	const snapshot = readJson(snapshotPath);
-	const previousVersion = lock.installedVersion;
-	const nextLock = {
-		...lock,
-		installedVersion: version,
-		profile: snapshot.release.profile,
-		workflowPacks: snapshot.release.workflowPacks,
-		rulePacks: snapshot.release.rulePacks,
-		managedProjectFiles: snapshot.release.managedProjectFiles,
-		customizationsPreserved: snapshot.release.managedProjectFiles.length === 0,
-		previousVersion,
-		rolledBackAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
-	};
+	const now = new Date().toISOString();
+	const nextLock = buildRollbackLock({ lock, snapshot, version, now });
 	writeJson(paths.lockPath, nextLock);
 
 	const ledger = pathExists(paths.rollbackLedgerPath)
 		? readJson(paths.rollbackLedgerPath)
 		: [];
 	ledger.push({
-		fromVersion: previousVersion,
+		fromVersion: nextLock.previousVersion,
 		toVersion: version,
 		snapshot: relativeSlash(targetRoot, snapshotPath),
 		rolledBackAt: nextLock.rolledBackAt,
@@ -499,7 +517,7 @@ function rollbackTeamDistribution(target, options = {}) {
 	return {
 		target: targetRoot,
 		lock: nextLock,
-		previousVersion,
+		previousVersion: nextLock.previousVersion,
 		snapshot: relativeSlash(targetRoot, snapshotPath),
 		errors,
 		warnings,
@@ -523,6 +541,8 @@ module.exports = {
 	installTeamDistribution,
 	diffArtifactLists,
 	buildTeamUpdatePreview,
+	buildRollbackLock,
+	validateInstallRequest,
 	updateTeamDistribution,
 	pinTeamDistribution,
 	rollbackTeamDistribution,
