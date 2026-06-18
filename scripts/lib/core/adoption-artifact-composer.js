@@ -17,6 +17,11 @@ const {
 	formatList,
 } = require("./text-utils");
 
+const {
+	buildAdoptionAuditMetrics,
+	serializeAdoptionMetricsBlock,
+} = require("./adoption-metrics");
+
 function renderMarkdown(lines) {
 	return lines.join("\n");
 }
@@ -382,6 +387,7 @@ function buildInitDryRunSection(initDryRun) {
 }
 
 function buildAuditSummaryLines(audit) {
+	const metrics = buildAdoptionAuditMetrics(audit);
 	const lines = [
 		`- Read-only: ${audit.readOnly}`,
 		`- Target type: ${audit.classification.type}`,
@@ -389,20 +395,20 @@ function buildAuditSummaryLines(audit) {
 
 	if (audit.auditMode === "product-repo") {
 		lines.push(
-			`- Template starter files present: ${audit.templateStarterFiles.existing.length}`,
-			`- Template starter files missing: ${audit.templateStarterFiles.missing.length}`,
+			`- Template starter files present: ${metrics.templateStarterFilesPresent}`,
+			`- Template starter files missing: ${metrics.templateStarterFilesMissing}`,
 		);
 	} else {
 		lines.push(
-			`- Existing Amber starter files: ${audit.existing.length}`,
-			`- Missing Amber starter files: ${audit.missing.length}`,
+			`- Existing Amber starter files: ${metrics.existingHarnessFiles}`,
+			`- Missing Amber starter files: ${metrics.missingHarnessFiles}`,
 		);
 	}
 
 	lines.push(
-		`- Existing docs: ${audit.docs.length}`,
-		`- Wiki-like files: ${audit.wikiLikeFiles.length}`,
-		`- Conflicts: ${audit.conflicts.length}`,
+		`- Existing docs: ${metrics.existingDocs}`,
+		`- Wiki-like files: ${metrics.wikiLikeFiles}`,
+		`- Conflicts: ${metrics.conflicts}`,
 	);
 
 	return lines;
@@ -482,6 +488,16 @@ function renderAdoptionReport(parts) {
 		`- node scripts/amber.js maintenance inspect --target ${JSON.stringify(targetRoot)} --json`,
 		"",
 	);
+
+	// Embed the compare metrics as structured data so `adoption compare`/`gate`
+	// consume them directly instead of re-parsing the prose labels above. The
+	// prose stays human-facing; this block is the data contract. staleDocs is
+	// sourced from maintenance, not audit, so it is stamped on here.
+	const metrics = {
+		...buildAdoptionAuditMetrics(audit),
+		staleDocs: maintenance.staleDocs.length,
+	};
+	lines.push(serializeAdoptionMetricsBlock(metrics), "");
 
 	return renderMarkdown(lines);
 }

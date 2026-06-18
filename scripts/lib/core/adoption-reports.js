@@ -34,8 +34,14 @@ const {
 
 const {
 	inspectTeamDistribution,
+	latestTeamVersion,
 	updateTeamDistribution,
 } = require("./team");
+
+const {
+	buildAdoptionAuditMetrics,
+	parseAdoptionMetricsBlock,
+} = require("./adoption-metrics");
 
 const {
 	extractMarkdownLinks,
@@ -323,9 +329,16 @@ function parseAdoptionReportForComparison(filePath) {
 	}
 
 	const markdown = readText(resolved);
+	// Prefer the structured metrics block when present; fall back to prose-label
+	// parsing for reports written before the block existed. The block is the
+	// data contract, prose is presentation.
+	const embedded = parseAdoptionMetricsBlock(markdown);
 	const metrics = {};
 	for (const [key, label] of ADOPTION_COMPARE_METRICS) {
-		metrics[key] = readAdoptionReportMetric(markdown, label);
+		metrics[key] =
+			embedded && key in embedded
+				? embedded[key]
+				: readAdoptionReportMetric(markdown, label);
 	}
 
 	const targetType = readAdoptionReportMetric(markdown, "Target type");
@@ -534,10 +547,14 @@ function generateAdoptionReport(target, options = {}) {
 			: scaffoldHarness(targetRoot, { dryRun: true });
 	const team = inspectTeamDistribution(targetRoot, options);
 	let teamUpdatePreview = null;
-	if (team.installed && team.lock && team.registry.versions["1.1.0"]) {
+	const previewVersion =
+		team.installed && team.lock && team.registry
+			? latestTeamVersion(team.registry)
+			: null;
+	if (previewVersion && team.registry.versions[previewVersion]) {
 		teamUpdatePreview = updateTeamDistribution(targetRoot, {
 			...options,
-			version: "1.1.0",
+			version: previewVersion,
 			dryRun: true,
 		});
 	}
@@ -581,6 +598,7 @@ function generateAdoptionReport(target, options = {}) {
 
 module.exports = {
 	ADOPTION_COMPARE_METRICS,
+	buildAdoptionAuditMetrics,
 	uniqueAdoptionReportPath,
 	parseAdoptionReportMetadata,
 	listAdoptionReports,
