@@ -207,4 +207,32 @@ describe("governance evidence", () => {
 		// No commands section
 		assert.ok(!content.includes("## Commands"));
 	});
+
+	it("execution export → malformed ledger is recorded, valid evidence still exported", () => {
+		const taskId = "test-task-corrupt-ledger";
+		const taskDir = path.join(tmpDir, ".amber", "executions", taskId);
+		fs.mkdirSync(taskDir, { recursive: true });
+
+		// Corrupt ledger.json (not valid JSON), valid evidence.json.
+		fs.writeFileSync(path.join(taskDir, "ledger.json"), "{ not: valid json ");
+		fs.writeFileSync(
+			path.join(taskDir, "evidence.json"),
+			JSON.stringify({ commands: ["npm run build"] }, null, 2),
+		);
+
+		const outputPath = path.join(tmpDir, "task-corrupt-ledger.md");
+		const result = exportGovernanceEvidence(tmpDir, {
+			task: taskId,
+			output: outputPath,
+		});
+
+		assert.strictEqual(result.errors.length, 0);
+		const content = fs.readFileSync(outputPath, "utf8");
+		assert.ok(content.includes("# Execution Evidence"));
+		assert.ok(content.includes(taskId));
+		// Corruption is recorded in the audit artifact, not silently dropped.
+		assert.ok(/ledger\.json could not be parsed/i.test(content));
+		// Evidence from the still-valid file is preserved.
+		assert.ok(content.includes("npm run build"));
+	});
 });

@@ -175,17 +175,40 @@ function exportSessionEvidence(sessionId, targetRoot, outputPath) {
   return { exported: true, events: events.length, outputPath: output };
 }
 
+// Read JSON without throwing. Returns the parsed value, or records a parse
+// error so callers can degrade gracefully instead of crashing — important for
+// evidence export, where a corrupt state file is itself an audit signal.
+function readJsonSafe(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return { value: null, error: null };
+  }
+  try {
+    return { value: JSON.parse(fs.readFileSync(filePath, 'utf8')), error: null };
+  } catch (error) {
+    return { value: null, error: error.message };
+  }
+}
+
 function exportExecutionEvidence(taskId, targetRoot, outputPath) {
   const target = path.resolve(targetRoot);
   const execDir = path.join(target, '.amber', 'executions', taskId);
-  const ledgerPath = path.join(execDir, 'ledger.json');
-  const evidencePath = path.join(execDir, 'evidence.json');
 
-  const ledger = fs.existsSync(ledgerPath) ? JSON.parse(fs.readFileSync(ledgerPath, 'utf8')) : null;
-  const evidence = fs.existsSync(evidencePath) ? JSON.parse(fs.readFileSync(evidencePath, 'utf8')) : null;
+  const ledgerRead = readJsonSafe(path.join(execDir, 'ledger.json'));
+  const evidenceRead = readJsonSafe(path.join(execDir, 'evidence.json'));
+  const ledger = ledgerRead.value;
+  const evidence = evidenceRead.value;
 
   const output = path.resolve(outputPath);
   const lines = ['# Execution Evidence', '', `**Task ID:** ${taskId}`, ''];
+
+  // Record any unparseable state file in the artifact rather than discarding
+  // the whole export when one file is corrupt.
+  if (ledgerRead.error) {
+    lines.push(`> WARNING: ledger.json could not be parsed: ${ledgerRead.error}`, '');
+  }
+  if (evidenceRead.error) {
+    lines.push(`> WARNING: evidence.json could not be parsed: ${evidenceRead.error}`, '');
+  }
 
   if (ledger) {
     if (ledger.plan) lines.push(`**Plan:** ${ledger.plan}`, '');
