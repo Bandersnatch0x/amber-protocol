@@ -79,6 +79,10 @@ function buildWikiLintCi(targetRoot) {
 	};
 }
 
+// Integrity drift: does the installed lock still match the rulePacks that ITS
+// OWN installed version declares? Answers "has my install been tampered with or
+// fallen out of sync with its version spec?" Compare with detectPackDrift, which
+// instead measures the gap to the LATEST version.
 function detectRulePackDrift(targetRoot, registry) {
 	const paths = teamStatePaths(targetRoot);
 	const lock = loadTeamLock(paths);
@@ -442,6 +446,10 @@ function proposeMaintenance(target, options = {}) {
 	};
 }
 
+// Upgrade-gap drift: how do the installed rulePacks compare to the LATEST
+// version's rulePacks? Answers "am I behind the newest release?" (`diff` lists
+// packs the latest version adds). Distinct from detectRulePackDrift, which
+// compares against the installed version's own spec, not the latest.
 function detectPackDrift(projectRoot, registryPath) {
 	const paths = teamStatePaths(projectRoot);
 	if (!pathExists(paths.lockPath)) {
