@@ -58,3 +58,16 @@ test("parses manifests with nested route and budget fields", () => {
 	assert.equal(loaded.manifest.route.id, "bugfix-quick");
 	assert.equal(loaded.manifest.budget.total, 100);
 });
+
+test("flags a corrupt manifest instead of throwing", () => {
+	const root = tempProject();
+	const sessionDir = path.join(root, ".amber", "sessions", "broken");
+	fs.mkdirSync(sessionDir, { recursive: true });
+	fs.writeFileSync(path.join(sessionDir, "manifest.json"), "{ broken json");
+	const loaded = loadSessionManifest(root, "broken");
+	// Distinguishes corrupt (file present, unparseable) from missing (null), so
+	// callers can report it precisely instead of crashing on a bare parse.
+	assert.equal(loaded.corrupt, true);
+	assert.equal(loaded.manifest, null);
+	assert.equal(loaded.manifestPath, path.join(sessionDir, "manifest.json"));
+});
