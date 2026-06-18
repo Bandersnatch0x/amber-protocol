@@ -1,0 +1,97 @@
+"use strict";
+
+// Integration coverage for detectCandidateCommands — the filesystem-coupled
+// evidence gatherer whose pure decision core (buildPythonCandidates) is unit
+// tested separately. These exercise the disk-reading glue (which paths and
+// file-content regexes trigger which candidates), where path/regex/order bugs
+// would otherwise hide.
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+const {
+	detectCandidateCommands,
+} = require("../../scripts/lib/core/audit");
+
+const PYTHON_EVIDENCE = [{ source: "pyproject.toml", name: "python" }];
+
+function tempTarget() {
+	return fs.mkdtempSync(path.join(os.tmpdir(), "candidate-cmd-"));
+}
+
+function write(root, relativePath, content) {
+	const full = path.join(root, relativePath);
+	fs.mkdirSync(path.dirname(full), { recursive: true });
+	fs.writeFileSync(full, content);
+}
+
+test("returns no candidates when there is no python tooling evidence", () => {
+	const root = tempTarget();
+	write(root, "tests/test_app.py", "def test_ok():\n    assert True\n");
+	// Even with a tests/ dir, no python evidence means no candidates.
+	assert.deepEqual(detectCandidateCommands(root, []), []);
+});
+
+test("python evidence with no test files yields the default pytest candidate", () => {
+	const root = tempTarget();
+	const candidates = detectCandidateCommands(root, PYTHON_EVIDENCE);
+	assert.equal(candidates.length, 1);
+	assert.equal(candidates[0].name, "pytest");
+	assert.equal(candidates[0].source, "python tooling evidence");
+	assert.match(candidates[0].reason, /no explicit verification command/i);
+});
+
+test("a tests/ directory labels the pytest candidate source as tests/", () => {
+	const root = tempTarget();
+	fs.mkdirSync(path.join(root, "tests"));
+	const candidates = detectCandidateCommands(root, PYTHON_EVIDENCE);
+	assert.equal(candidates.length, 1);
+	assert.equal(candidates[0].name, "pytest");
+	assert.equal(candidates[0].source, "tests/");
+});
+
+test("a singular test/ directory also counts as a tests directory", () => {
+	const root = tempTarget();
+	fs.mkdirSync(path.join(root, "test"));
+	const candidates = detectCandidateCommands(root, PYTHON_EVIDENCE);
+	assert.equal(candidates[0].source, "tests/");
+});
+
+test("pytest.ini is recognised as pytest evidence without a tests directory", () => {
+	const root = tempTarget();
+	write(root, "pytest.ini", "[pytest]\n");
+	const candidates = detectCandidateCommands(root, PYTHON_EVIDENCE);
+	assert.equal(candidates[0].name, "pytest");
+	assert.equal(candidates[0].source, "python tooling evidence");
+});
+
+test("requirements.txt with pytest and ruff yields both candidates", () => {
+	const root = tempTarget();
+	write(root, "requirements.txt", "pytest>=7.0\nruff==0.1.0\nrequests\n");
+	const candidates = detectCandidateCommands(root, PYTHON_EVIDENCE);
+	assert.deepEqual(
+		candidates.map((c) => c.name),
+		["pytest", "ruff"],
+	);
+	// No tests/ dir, so pytest is sourced from tooling evidence.
+	assert.equal(candidates[0].source, "python tooling evidence");
+});
+
+test("pyproject.toml [tool.ruff] alone yields only the ruff candidate (no default pytest)", () => {
+	const root = tempTarget();
+	write(root, "pyproject.toml", "[tool.ruff]\nline-length = 100\n");
+	const candidates = detectCandidateCommands(root, PYTHON_EVIDENCE);
+	assert.deepEqual(
+		candidates.map((c) => c.name),
+		["ruff"],
+	);
+});
+
+test("pyproject.toml [tool.pytest.ini_options] is recognised as pytest evidence", () => {
+	const root = tempTarget();
+	write(root, "pyproject.toml", "[tool.pytest.ini_options]\nminversion = \"7.0\"\n");
+	const candidates = detectCandidateCommands(root, PYTHON_EVIDENCE);
+	assert.equal(candidates[0].name, "pytest");
+});
