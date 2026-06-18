@@ -311,9 +311,10 @@ function summarizeExecutions(executionsDir) {
     if (!fs.existsSync(ledgerPath)) continue;
 
     const { value: ledger, error: ledgerError } = readJsonSafe(ledgerPath);
-    if (ledgerError) {
-      // A corrupt ledger is itself an audit signal — surface the task as
-      // corrupt rather than letting one bad file throw away the whole report.
+    if (ledgerError || !ledger || typeof ledger !== 'object' || Array.isArray(ledger)) {
+      // A corrupt OR non-object ledger (e.g. a literal `null` body, which parses
+      // without error) is itself an audit signal — surface the task as corrupt
+      // rather than letting one bad file throw away the whole report.
       executions.push({ id, plan: 'N/A', status: 'corrupt', commands: 0 });
       continue;
     }

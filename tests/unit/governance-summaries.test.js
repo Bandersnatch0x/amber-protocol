@@ -132,6 +132,22 @@ test("summarizeExecutions records a corrupt ledger as corrupt instead of throwin
 	assert.equal(broken.status, "corrupt");
 });
 
+test("summarizeExecutions records a JSON null ledger body as corrupt instead of throwing", () => {
+	// readJsonSafe returns {value:null, error:null} for a literal `null` body
+	// (parse succeeds), so the corrupt-error branch is skipped and ledger.plan
+	// used to throw. A non-object ledger is just as unusable as unparseable JSON.
+	const executionsDir = tempDir("gov-null-ledger");
+	writeExecution(executionsDir, "healthy", { plan: "p", status: "completed" });
+	const nullDir = path.join(executionsDir, "nullish");
+	fs.mkdirSync(nullDir, { recursive: true });
+	fs.writeFileSync(path.join(nullDir, "ledger.json"), "null");
+
+	const result = summarizeExecutions(executionsDir);
+	assert.equal(result.length, 2);
+	const nullish = result.find((e) => e.id === "nullish");
+	assert.equal(nullish.status, "corrupt");
+});
+
 test("summarizeExecutions tolerates a corrupt evidence file with commands=0", () => {
 	const executionsDir = tempDir("gov-corrupt-evidence");
 	writeExecution(executionsDir, "e1", { plan: "p", status: "running" });
