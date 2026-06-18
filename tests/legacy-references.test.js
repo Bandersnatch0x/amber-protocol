@@ -79,7 +79,19 @@ function isAllowed(rel) {
 }
 
 function* walk(dir) {
-	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+	let entries;
+	try {
+		entries = fs.readdirSync(dir, { withFileTypes: true });
+	} catch (err) {
+		// A directory can vanish mid-walk when a sibling test concurrently
+		// creates and tears down a fixture tree (e.g. worktree-manager's
+		// tests/fixtures/worktree-test-repo). A path that no longer exists has
+		// nothing to scan and cannot be an offender, so skip it rather than
+		// letting an ENOENT race fail this guard.
+		if (err.code === "ENOENT") return;
+		throw err;
+	}
+	for (const entry of entries) {
 		const full = path.join(dir, entry.name);
 		if (entry.isDirectory()) {
 			// Skip generated/build output: .next embeds absolute paths that
@@ -110,7 +122,16 @@ test("legacy harness references appear only in the allowlist or on labeled lines
 		const rel = path.relative(REPO, file);
 		if (isAllowed(rel)) continue;
 		if (!/\.(js|json|md)$/.test(file)) continue;
-		const lines = fs.readFileSync(file, "utf8").split("\n");
+		let raw;
+		try {
+			raw = fs.readFileSync(file, "utf8");
+		} catch (err) {
+			// Same concurrent-teardown race as walk(): a file yielded a moment
+			// ago may already be gone. A nonexistent file is not an offender.
+			if (err.code === "ENOENT") continue;
+			throw err;
+		}
+		const lines = raw.split("\n");
 		for (let i = 0; i < lines.length; i++) {
 			if (LINE_EXEMPT.test(lines[i])) continue;
 			for (const pattern of PATTERNS) {
