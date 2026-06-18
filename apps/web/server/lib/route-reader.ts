@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { resolveWithin } from './safe-path';
 
 export interface Route {
   id: string;
@@ -54,9 +55,10 @@ export function listRoutes(): Route[] {
 
 export function getRouteById(id: string): Route | null {
   const routesDir = getAmberRoutesPath();
-  const routePath = path.join(routesDir, `${id}.route.json`);
-
-  if (!fs.existsSync(routePath)) {
+  // `id` is an unconstrained tRPC input; embed it in the filename only after a
+  // traversal guard so `../`-style ids cannot read files outside routes/.
+  const routePath = resolveWithin(routesDir, `${id}.route.json`);
+  if (!routePath || !fs.existsSync(routePath)) {
     return null;
   }
 
