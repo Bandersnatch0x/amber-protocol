@@ -225,6 +225,15 @@ function readRegressionProposal(evidencePath, taskDir, targetRoot) {
 		return null;
 	}
 
+	// The catch above only guards JSON *syntax* errors; a body of valid JSON
+	// `null` (or any non-object) parses cleanly, then the data.regressionProposal
+	// read below throws. Since extractRegressionProposals walks every evidence
+	// file, one such file would crash the whole inspection — skip it like an
+	// unparseable one instead.
+	if (!data || typeof data !== "object") {
+		return null;
+	}
+
 	if (
 		!data.regressionProposal ||
 		data.regressionProposal.status !== "proposed"
