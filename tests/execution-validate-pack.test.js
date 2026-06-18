@@ -44,3 +44,16 @@ test('validateWorkflowPack - valid pack returns no errors', () => {
 
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
+
+test('validateWorkflowPack - JSON null body returns error instead of throwing', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'validate-pack-test-'));
+  const packPath = path.join(tempDir, 'null.pack.json');
+  fs.writeFileSync(packPath, 'null');
+
+  const result = validateWorkflowPack(packPath);
+
+  assert.strictEqual(result.valid, false);
+  assert.ok(result.errors.some((e) => e.includes('must be a JSON object')));
+
+  fs.rmSync(tempDir, { recursive: true, force: true });
+});
