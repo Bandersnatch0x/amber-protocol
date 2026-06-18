@@ -29,7 +29,18 @@ function evaluateCompletion(projectRoot, sessionId) {
 		};
 	}
 
-	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	let manifest;
+	try {
+		manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	} catch {
+		// A present but unparseable manifest fails the gate, symmetric with the
+		// missing case above, instead of crashing the completion check.
+		return {
+			status: "fail",
+			reasons: [],
+			missing: ["manifest is corrupt"],
+		};
+	}
 	const timelineEvents = readTimeline(timelinePath);
 	const eventTypes = new Set(timelineEvents.map((event) => event.type));
 

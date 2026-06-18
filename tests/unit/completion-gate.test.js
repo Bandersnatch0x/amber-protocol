@@ -56,6 +56,19 @@ test("passes when all completion evidence is present", () => {
 	assert.equal(result.missing.length, 0);
 });
 
+test("reports a corrupt manifest as fail instead of throwing", () => {
+	const root = tempRoot();
+	const sessionId = "corrupt-session";
+	const sessionDir = path.join(root, ".amber", "sessions", sessionId);
+	fs.mkdirSync(sessionDir, { recursive: true });
+	fs.writeFileSync(path.join(sessionDir, "manifest.json"), "{ broken json");
+	// A corrupt manifest must be reported as a failed gate, symmetric with the
+	// existing "manifest not found" handling, rather than crashing the check.
+	const result = evaluateCompletion(root, sessionId);
+	assert.equal(result.status, "fail");
+	assert.ok(result.missing.includes("manifest is corrupt"));
+});
+
 test("fails when verification is missing", () => {
 	const root = tempRoot();
 	const sessionId = "missing-verification";
