@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { resolveWithin } from './safe-path';
 import type { SessionEvent } from '../types/session-events';
 
 export interface Session {
@@ -70,7 +71,13 @@ export function readSessionList(): Session[] {
 
 export function readSessionById(id: string): SessionDetail | null {
   const sessionsDir = getAmberSessionsPath();
-  const sessionDir = path.join(sessionsDir, id);
+  // `id` arrives from the tRPC input (z.string(), unconstrained), so guard
+  // against path traversal before touching the filesystem — a malicious id is
+  // treated as a missing session.
+  const sessionDir = resolveWithin(sessionsDir, id);
+  if (!sessionDir) {
+    return null;
+  }
   const manifestPath = path.join(sessionDir, 'manifest.json');
 
   if (!fs.existsSync(manifestPath)) {
@@ -125,7 +132,11 @@ function normalizeEvent(raw: unknown): SessionEvent | null {
 
 export function readTimelineEvents(sessionId: string, limit?: number): SessionEvent[] {
   const sessionsDir = getAmberSessionsPath();
-  const timelinePath = path.join(sessionsDir, sessionId, 'timeline.jsonl');
+  const sessionDir = resolveWithin(sessionsDir, sessionId);
+  if (!sessionDir) {
+    return [];
+  }
+  const timelinePath = path.join(sessionDir, 'timeline.jsonl');
 
   if (!fs.existsSync(timelinePath)) {
     return [];
