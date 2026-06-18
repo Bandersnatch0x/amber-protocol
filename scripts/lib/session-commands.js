@@ -62,8 +62,14 @@ function loadSessionManifest(projectRoot, sessionId) {
 	if (!fs.existsSync(manifestPath)) {
 		return null;
 	}
-	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-	return { manifest, sessionDir, manifestPath };
+	try {
+		const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+		return { manifest, sessionDir, manifestPath };
+	} catch {
+		// Present but unparseable (e.g. half-written). Distinguished from missing
+		// (null) so callers report it precisely instead of crashing on a bare parse.
+		return { manifest: null, sessionDir, manifestPath, corrupt: true };
+	}
 }
 
 function loadAllSessionManifests(projectRoot) {
@@ -196,6 +202,9 @@ function statusSession(projectRoot, options) {
 	if (!loaded) {
 		return result(`Session not found: ${sessionId}`, 1);
 	}
+	if (loaded.corrupt) {
+		return result(`Session manifest is corrupt: ${sessionId}`, 1);
+	}
 	const { manifest } = loaded;
 
 	const lines = [
@@ -257,6 +266,9 @@ async function abortSession(projectRoot, options) {
 	if (!loaded) {
 		return result(`Session not found: ${sessionId}`, 1);
 	}
+	if (loaded.corrupt) {
+		return result(`Session manifest is corrupt: ${sessionId}`, 1);
+	}
 	const { manifest, sessionDir, manifestPath } = loaded;
 
 	const sm = new SessionStateMachine(manifest.status);
@@ -295,6 +307,9 @@ async function continueSession(projectRoot, options) {
 	const loaded = loadSessionManifest(projectRoot, sessionId);
 	if (!loaded) {
 		return result(`Session not found: ${sessionId}`, 1);
+	}
+	if (loaded.corrupt) {
+		return result(`Session manifest is corrupt: ${sessionId}`, 1);
 	}
 	const { manifest, sessionDir, manifestPath } = loaded;
 
