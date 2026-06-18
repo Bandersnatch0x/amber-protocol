@@ -60,4 +60,44 @@ describe("autonomous-policy", () => {
 			fs.rmSync(tmpDir, { recursive: true, force: true });
 		}
 	});
+
+	it("should fall back to the fail-safe default policy on a corrupt policy file", () => {
+		// A present-but-unparseable security policy must not crash callers, and
+		// must fail safe: the defaults block user-approval rather than inheriting
+		// whatever the broken file might have intended.
+		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-test-"));
+		const amberDir = path.join(tmpDir, ".amber");
+		fs.mkdirSync(amberDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(amberDir, "autonomous-policy.json"),
+			"{ not valid json"
+		);
+
+		try {
+			const policy = loadPolicy(tmpDir);
+			assert.ok(policy && typeof policy === "object");
+			assert.strictEqual(policy.gates.auto, "approve");
+			assert.strictEqual(shouldAutoApproveGate("user-approval", policy), false);
+		} finally {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
+		}
+	});
+
+	it("should fall back to the fail-safe default policy on a non-object policy body", () => {
+		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-test-"));
+		const amberDir = path.join(tmpDir, ".amber");
+		fs.mkdirSync(amberDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(amberDir, "autonomous-policy.json"),
+			"null"
+		);
+
+		try {
+			const policy = loadPolicy(tmpDir);
+			assert.ok(policy && typeof policy === "object");
+			assert.strictEqual(policy.gates["user-approval"], "block");
+		} finally {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
+		}
+	});
 });
