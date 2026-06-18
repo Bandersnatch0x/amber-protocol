@@ -431,12 +431,19 @@ async function run(argv = process.argv.slice(2)) {
 			const { rollupEvolutionFindings } = require("./lib/core/maintenance");
 			const { resolveTarget } = require("./lib/core/fs-utils");
 			const targetRoot = resolveTarget(args.target);
-			const threshold = args.threshold ? parseInt(args.threshold, 10) : 2;
-			const rollupResult = rollupEvolutionFindings(targetRoot);
+			const parsedThreshold = args.threshold
+				? Number.parseInt(args.threshold, 10)
+				: undefined;
+			// Pass the threshold through so filtering happens once, inside the
+			// function; a non-integer arg falls back to the module default.
+			const minCount = Number.isInteger(parsedThreshold)
+				? parsedThreshold
+				: undefined;
+			const rollupResult = rollupEvolutionFindings(targetRoot, minCount);
 			result = {
 				target: targetRoot,
-				findings: rollupResult.findings.filter((f) => f.count >= threshold),
-				threshold,
+				findings: rollupResult.findings,
+				threshold: rollupResult.threshold,
 				errors: [],
 				warnings: [],
 			};

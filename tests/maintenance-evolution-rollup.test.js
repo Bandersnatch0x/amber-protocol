@@ -47,3 +47,66 @@ test("amber maintenance evolution-rollup - filters by threshold", () => {
 
 	fs.rmSync(target, { recursive: true, force: true });
 });
+
+test("amber maintenance evolution-rollup - --threshold 1 surfaces single-occurrence findings", () => {
+	const target = tempDir("threshold-low");
+	const evolutionDir = path.join(target, "docs", "wiki", "engineering");
+	fs.mkdirSync(evolutionDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(evolutionDir, "harness-evolution.md"),
+		"# Evolution\n\nFinding: X\nFinding: X\nFinding: Y\n"
+	);
+
+	const result = runAmber([
+		"maintenance",
+		"evolution-rollup",
+		"--target",
+		target,
+		"--threshold",
+		"1",
+		"--json",
+	]);
+
+	assert.strictEqual(result.status, 0);
+	const json = JSON.parse(result.stdout);
+	assert.strictEqual(json.threshold, 1);
+	assert.deepStrictEqual(
+		json.findings.map((f) => [f.text, f.count]),
+		[
+			["X", 2],
+			["Y", 1],
+		]
+	);
+
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("amber maintenance evolution-rollup - --threshold 3 excludes findings below the cutoff", () => {
+	const target = tempDir("threshold-high");
+	const evolutionDir = path.join(target, "docs", "wiki", "engineering");
+	fs.mkdirSync(evolutionDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(evolutionDir, "harness-evolution.md"),
+		"# Evolution\n\nFinding: X\nFinding: X\nFinding: X\nFinding: Y\nFinding: Y\n"
+	);
+
+	const result = runAmber([
+		"maintenance",
+		"evolution-rollup",
+		"--target",
+		target,
+		"--threshold",
+		"3",
+		"--json",
+	]);
+
+	assert.strictEqual(result.status, 0);
+	const json = JSON.parse(result.stdout);
+	assert.strictEqual(json.threshold, 3);
+	assert.deepStrictEqual(
+		json.findings.map((f) => f.text),
+		["X"]
+	);
+
+	fs.rmSync(target, { recursive: true, force: true });
+});
