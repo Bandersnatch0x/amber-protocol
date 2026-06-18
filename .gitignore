@@ -38,6 +38,12 @@ apps/web/screenshots/
 npm-pack-dry-run.json
 *.tgz
 
+# Local scratch dirs (agent transcripts, terminal state, archived drafts) —
+# not version-controlled
+agent-tools/
+terminals/
+.archive/
+
 # Logs
 *.log
 npm-debug.log*
