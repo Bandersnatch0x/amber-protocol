@@ -310,8 +310,15 @@ function summarizeExecutions(executionsDir) {
 
     if (!fs.existsSync(ledgerPath)) continue;
 
-    const ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
-    const evidence = fs.existsSync(evidencePath) ? JSON.parse(fs.readFileSync(evidencePath, 'utf8')) : null;
+    const { value: ledger, error: ledgerError } = readJsonSafe(ledgerPath);
+    if (ledgerError) {
+      // A corrupt ledger is itself an audit signal — surface the task as
+      // corrupt rather than letting one bad file throw away the whole report.
+      executions.push({ id, plan: 'N/A', status: 'corrupt', commands: 0 });
+      continue;
+    }
+
+    const evidence = readJsonSafe(evidencePath).value;
     const commands = evidence?.commands?.length || 0;
 
     executions.push({
