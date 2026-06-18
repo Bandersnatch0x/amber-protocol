@@ -94,3 +94,28 @@ test("extractEvolutionFindings and rollupEvolutionFindings apply the same signif
 	assert.deepEqual(rolled, extracted);
 	assert.deepEqual(rolled, ["thrice", "twice"]);
 });
+
+test("rollupEvolutionFindings honours an explicit minCount below the default", () => {
+	const root = tempTarget();
+	writeEvolution(root, "Finding: dup\nFinding: dup\nFinding: solo\n");
+	const result = rollupEvolutionFindings(root, 1);
+	assert.equal(result.threshold, 1);
+	assert.deepEqual(
+		result.findings.map((r) => [r.text, r.count]),
+		[
+			["dup", 2],
+			["solo", 1],
+		],
+	);
+});
+
+test("rollupEvolutionFindings honours an explicit minCount above the default", () => {
+	const root = tempTarget();
+	writeEvolution(root, "Finding: thrice\nFinding: thrice\nFinding: thrice\nFinding: twice\nFinding: twice\n");
+	const result = rollupEvolutionFindings(root, 3);
+	assert.equal(result.threshold, 3);
+	assert.deepEqual(
+		result.findings.map((r) => r.text),
+		["thrice"],
+	);
+});

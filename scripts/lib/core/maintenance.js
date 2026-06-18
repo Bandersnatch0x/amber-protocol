@@ -191,17 +191,26 @@ function countEvolutionFindings(targetRoot) {
 		);
 }
 
-function extractEvolutionFindings(targetRoot) {
+// Findings that recur at least minCount times. The single filtering point for
+// both lineage adapters and the CLI rollup, so the cutoff lives in one place.
+function significantEvolutionFindings(targetRoot, minCount) {
 	return countEvolutionFindings(targetRoot).filter(
-		(item) => item.count >= EVOLUTION_FINDING_MIN_COUNT,
+		(item) => item.count >= minCount,
 	);
 }
 
-function rollupEvolutionFindings(projectRoot) {
-	const findings = extractEvolutionFindings(projectRoot).map(
+function extractEvolutionFindings(targetRoot) {
+	return significantEvolutionFindings(targetRoot, EVOLUTION_FINDING_MIN_COUNT);
+}
+
+function rollupEvolutionFindings(
+	projectRoot,
+	minCount = EVOLUTION_FINDING_MIN_COUNT,
+) {
+	const findings = significantEvolutionFindings(projectRoot, minCount).map(
 		({ finding, count }) => ({ text: finding, count }),
 	);
-	return { findings, threshold: EVOLUTION_FINDING_MIN_COUNT };
+	return { findings, threshold: minCount };
 }
 
 function readRegressionProposal(evidencePath, taskDir, targetRoot) {
