@@ -451,6 +451,21 @@ function inspectWorkflowPack(filePath) {
 	const validation = validateWorkflowPackData(data);
 	errors.push(...validation.errors);
 	warnings.push(...validation.warnings);
+
+	// readJson returns a literal `null`/scalar/array unchanged; validation above
+	// flags it but the data.id / validateWorkflowPackReferences reads below would
+	// still throw on it. Bail with the validation errors instead — same posture
+	// as inspectProjectProfile. inspectWorkflowPack feeds doctor's product-repo
+	// smoke check, so a non-object pack body must not crash the doctor.
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
+		return {
+			file: packPath,
+			errors,
+			warnings,
+			execution: { executesAnything: false },
+		};
+	}
+
 	errors.push(...validateWorkflowPackReferences(packPath, data));
 
 	return {
@@ -505,6 +520,22 @@ function inspectWorkflowPackReadiness(filePath) {
 	const validation = validateWorkflowPackData(data);
 	errors.push(...validation.errors);
 	warnings.push(...validation.warnings);
+
+	// A non-object pack body parses cleanly but would crash inspectLoopReadiness
+	// on data.loopContracts below; return the validation errors instead.
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
+		return {
+			file: packPath,
+			errors,
+			warnings,
+			validation,
+			execution: {
+				executesAnything: false,
+				schedulesJobs: false,
+				callsExternalSystems: false,
+			},
+		};
+	}
 
 	return {
 		file: packPath,
