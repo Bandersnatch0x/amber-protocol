@@ -99,6 +99,18 @@ function scaffoldPlan(target, options = {}) {
 		return { target: targetRoot, created, skipped, errors, warnings };
 	}
 
+	// buildPlanContent maps feature.verification unconditionally (its pinned
+	// contract assumes a valid feature). feature_list.json is untrusted target
+	// input, so a feature missing its verification array would crash the pure
+	// builder here at the command boundary. Surface a clean error via the
+	// envelope instead of letting the TypeError escape to the top-level catch.
+	if (!Array.isArray(feature.verification)) {
+		errors.push(
+			`Feature ${featureId} has no verification array in feature_list.json; run validate-feature-list to fix it.`,
+		);
+		return { target: targetRoot, created, skipped, errors, warnings };
+	}
+
 	const title = options.title || feature.title;
 	const relativePath = path.join(
 		"docs",
