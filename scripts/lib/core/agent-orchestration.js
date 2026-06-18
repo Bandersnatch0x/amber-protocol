@@ -19,6 +19,41 @@ const {
 	slugify,
 } = require("./text-utils");
 
+// The accepted loop/dispatch status values, centralized so they cannot drift
+// between dispatchAgentTask and recordAgentReview. Each entry maps a status
+// field to its accepted set plus the error label used in messages.
+const DISPATCH_STATUS_FIELDS = [
+	{
+		field: "hardStopStatus",
+		set: new Set(["not-recorded", "within-limits", "hit-limit"]),
+	},
+	{
+		field: "budgetStatus",
+		set: new Set(["not-recorded", "within-budget", "over-budget"]),
+	},
+	{
+		field: "reviewBandwidthStatus",
+		set: new Set(["not-recorded", "available", "saturated"]),
+	},
+	{
+		field: "reviewGateStatus",
+		set: new Set(["pending", "satisfied", "blocked"]),
+	},
+];
+
+function statusFieldErrors(options) {
+	const errors = [];
+	for (const { field, set } of DISPATCH_STATUS_FIELDS) {
+		const value = options[field];
+		if (value && !set.has(value)) {
+			errors.push(
+				`Invalid ${field}: ${value}. Must be one of: ${[...set].join(", ")}.`,
+			);
+		}
+	}
+	return errors;
+}
+
 function dispatchAgentTask(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const taskId = slugify(options.task);
@@ -56,59 +91,7 @@ function dispatchAgentTask(target, options = {}) {
 	}
 
 	// Validate loop contract status values
-	const VALID_HARD_STOP_STATUSES = new Set([
-		"not-recorded",
-		"within-limits",
-		"hit-limit",
-	]);
-	const VALID_BUDGET_STATUSES = new Set([
-		"not-recorded",
-		"within-budget",
-		"over-budget",
-	]);
-	const VALID_REVIEW_BANDWIDTH_STATUSES = new Set([
-		"not-recorded",
-		"available",
-		"saturated",
-	]);
-	const VALID_REVIEW_GATE_STATUSES = new Set([
-		"pending",
-		"satisfied",
-		"blocked",
-	]);
-
-	if (
-		options.hardStopStatus &&
-		!VALID_HARD_STOP_STATUSES.has(options.hardStopStatus)
-	) {
-		errors.push(
-			`Invalid hardStopStatus: ${options.hardStopStatus}. Must be one of: not-recorded, within-limits, hit-limit.`,
-		);
-	}
-	if (
-		options.budgetStatus &&
-		!VALID_BUDGET_STATUSES.has(options.budgetStatus)
-	) {
-		errors.push(
-			`Invalid budgetStatus: ${options.budgetStatus}. Must be one of: not-recorded, within-budget, over-budget.`,
-		);
-	}
-	if (
-		options.reviewBandwidthStatus &&
-		!VALID_REVIEW_BANDWIDTH_STATUSES.has(options.reviewBandwidthStatus)
-	) {
-		errors.push(
-			`Invalid reviewBandwidthStatus: ${options.reviewBandwidthStatus}. Must be one of: not-recorded, available, saturated.`,
-		);
-	}
-	if (
-		options.reviewGateStatus &&
-		!VALID_REVIEW_GATE_STATUSES.has(options.reviewGateStatus)
-	) {
-		errors.push(
-			`Invalid reviewGateStatus: ${options.reviewGateStatus}. Must be one of: pending, satisfied, blocked.`,
-		);
-	}
+	errors.push(...statusFieldErrors(options));
 
 	if (errors.length > 0) {
 		return { target: targetRoot, task: taskId || null, errors, warnings };
@@ -178,15 +161,11 @@ function recordAgentReview(target, options = {}) {
 
 		// Validate reviewGateStatus if provided
 		if (options.reviewGateStatus) {
-			const VALID_REVIEW_GATE_STATUSES = new Set([
-				"pending",
-				"satisfied",
-				"blocked",
-			]);
-			if (!VALID_REVIEW_GATE_STATUSES.has(options.reviewGateStatus)) {
-				errors.push(
-					`Invalid reviewGateStatus: ${options.reviewGateStatus}. Must be one of: pending, satisfied, blocked.`,
-				);
+			const [statusError] = statusFieldErrors({
+				reviewGateStatus: options.reviewGateStatus,
+			});
+			if (statusError) {
+				errors.push(statusError);
 				return { target: targetRoot, task: taskId, errors, warnings };
 			}
 		}

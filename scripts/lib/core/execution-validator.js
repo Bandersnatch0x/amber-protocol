@@ -211,6 +211,79 @@ function validateIntegration(integrationPath, options = {}) {
 	return result;
 }
 
+// Deep module: pure analysis of a plan document's content. All plan-derived
+// readiness logic lives here (approval detection, strict section checks, env
+// var extraction, integration extraction). It takes injected resolvers for the
+// side-effectful lookups (does a var exist in the environment? does an
+// integration file exist? does a .approved sibling exist?) so it stays testable
+// without touching the filesystem or process.env.
+//
+// Returns { blockers, warnings, checks: { plan, env, integrations } }.
+function analyzePlanContent(planContent, options = {}) {
+	const {
+		strict = false,
+		hasEnvVar = () => true,
+		hasApprovalFile = () => false,
+		hasIntegrationFile = () => true,
+	} = options;
+
+	const blockers = [];
+	const warnings = [];
+	const checks = { plan: false, env: false, integrations: false };
+
+	// Approval: either an inline marker or a sibling .approved file.
+	const hasMarker =
+		/<!-- gate: approved -->|<!-- approved -->/i.test(planContent);
+	if (!hasMarker && !hasApprovalFile()) {
+		blockers.push(
+			"Plan not approved (missing approval marker or .approved file)",
+		);
+	} else {
+		checks.plan = true;
+	}
+
+	// Strict mode: required structural sections.
+	if (strict) {
+		if (!/## Goals?|## Objectives?/i.test(planContent)) {
+			blockers.push("Strict: Plan missing Goals or Objectives section");
+		}
+		if (!/## Implementation|## Steps/i.test(planContent)) {
+			blockers.push("Strict: Plan missing Implementation or Steps section");
+		}
+		if (!/## Test/i.test(planContent)) {
+			warnings.push("Strict: Plan missing Test section (recommended)");
+		}
+	}
+
+	// Referenced environment variables.
+	const envVars = [
+		...planContent.matchAll(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g),
+	].map((m) => m[1]);
+	const missing = envVars.filter((v) => !hasEnvVar(v));
+	if (missing.length > 0) {
+		blockers.push(`Missing env vars: ${missing.join(", ")}`);
+	} else {
+		checks.env = true;
+	}
+
+	// Referenced integrations.
+	const integrations = [
+		...planContent.matchAll(/integration:\s*([^\s,]+)/gi),
+	].map((m) => m[1]);
+	if (integrations.length > 0) {
+		const invalid = integrations.filter((name) => !hasIntegrationFile(name));
+		if (invalid.length > 0) {
+			blockers.push(`Integration files not found: ${invalid.join(", ")}`);
+		} else {
+			checks.integrations = true;
+		}
+	} else {
+		checks.integrations = true;
+	}
+
+	return { blockers, warnings, checks };
+}
+
 function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 	const blockers = [];
 	const warnings = [];
@@ -222,35 +295,28 @@ function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 		integrations: false,
 	};
 
-	// Check plan exists and is approved
+	// Analyze the plan content once (approval, env vars, integrations, strict).
+	// The previous implementation read planPath three separate times.
 	if (!fs.existsSync(planPath)) {
 		blockers.push(`Plan file not found: ${planPath}`);
 	} else {
 		try {
 			const planContent = fs.readFileSync(planPath, "utf8");
-			const hasApproval =
-				/<!-- gate: approved -->|<!-- approved -->/i.test(planContent) ||
-				fs.existsSync(planPath.replace(/\.md$/, ".approved"));
-			if (!hasApproval) {
-				blockers.push(
-					"Plan not approved (missing approval marker or .approved file)",
-				);
-			} else {
-				checks.plan = true;
-			}
-
-			// Strict mode: additional plan checks
-			if (options.strict) {
-				if (!/## Goals?|## Objectives?/i.test(planContent)) {
-					blockers.push("Strict: Plan missing Goals or Objectives section");
-				}
-				if (!/## Implementation|## Steps/i.test(planContent)) {
-					blockers.push("Strict: Plan missing Implementation or Steps section");
-				}
-				if (!/## Test/i.test(planContent)) {
-					warnings.push("Strict: Plan missing Test section (recommended)");
-				}
-			}
+			const analysis = analyzePlanContent(planContent, {
+				strict: options.strict,
+				hasEnvVar: (name) => Boolean(process.env[name]),
+				hasApprovalFile: () =>
+					fs.existsSync(planPath.replace(/\.md$/, ".approved")),
+				hasIntegrationFile: (name) =>
+					fs.existsSync(
+						path.join(projectRoot, "integrations", `${name}.json`),
+					),
+			});
+			blockers.push(...analysis.blockers);
+			warnings.push(...analysis.warnings);
+			checks.plan = analysis.checks.plan;
+			checks.env = analysis.checks.env;
+			checks.integrations = analysis.checks.integrations;
 		} catch (e) {
 			blockers.push(`Cannot read plan: ${e.message}`);
 		}
@@ -318,52 +384,6 @@ function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 		warnings.push("No autonomous-policy.json found");
 	}
 
-	// Check env vars required by plan
-	if (fs.existsSync(planPath)) {
-		try {
-			const planContent = fs.readFileSync(planPath, "utf8");
-			const envVars = [
-				...planContent.matchAll(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g),
-			].map((m) => m[1]);
-			const missing = envVars.filter((v) => !process.env[v]);
-			if (missing.length > 0) {
-				blockers.push(`Missing env vars: ${missing.join(", ")}`);
-			} else if (envVars.length > 0) {
-				checks.env = true;
-			} else {
-				checks.env = true; // no env vars required
-			}
-		} catch (e) {
-			warnings.push(`Cannot check env vars: ${e.message}`);
-		}
-	}
-
-	// Validate integrations declared in plan
-	if (fs.existsSync(planPath)) {
-		try {
-			const planContent = fs.readFileSync(planPath, "utf8");
-			const integrations = [
-				...planContent.matchAll(/integration:\s*([^\s,]+)/gi),
-			].map((m) => m[1]);
-			if (integrations.length > 0) {
-				const integrationsDir = path.join(projectRoot, "integrations");
-				const invalid = integrations.filter((name) => {
-					const intPath = path.join(integrationsDir, `${name}.json`);
-					return !fs.existsSync(intPath);
-				});
-				if (invalid.length > 0) {
-					blockers.push(`Integration files not found: ${invalid.join(", ")}`);
-				} else {
-					checks.integrations = true;
-				}
-			} else {
-				checks.integrations = true; // no integrations declared
-			}
-		} catch (e) {
-			warnings.push(`Cannot validate integrations: ${e.message}`);
-		}
-	}
-
 	// Strict mode: additional environment checks
 	if (options.strict) {
 		if (!checks.policy) {
@@ -390,5 +410,6 @@ module.exports = {
 	validateLoopContract,
 	validateWorkflowPack,
 	validateIntegration,
+	analyzePlanContent,
 	checkExecutionReadiness,
 };

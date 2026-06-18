@@ -15,6 +15,15 @@ const {
 	pathExists,
 } = require("./fs-utils");
 
+const {
+	MESSAGES,
+} = require("./terminology");
+
+const {
+	renderAdoptionGateDocument,
+	renderAdoptionStatusDocument,
+} = require("./adoption-artifact-composer");
+
 function adoptionGateFindings(report) {
 	const findings = [];
 	const missingHarnessFiles = report.metrics.missingHarnessFiles;
@@ -58,36 +67,6 @@ function adoptionGateFindings(report) {
 	}
 
 	return findings;
-}
-
-function buildAdoptionGateContent(gate) {
-	const lines = [
-		"# Adoption Gate Report",
-		"",
-		`Report: ${gate.report.file}`,
-		`Target: ${gate.report.target}`,
-		`Generated: ${gate.report.generatedAt}`,
-		`Decision: ${gate.decision}`,
-		"",
-		"## Findings",
-		"",
-	];
-
-	if (gate.findings.length === 0) {
-		lines.push("- none");
-	} else {
-		for (const finding of gate.findings) {
-			lines.push(`- ${finding.id}: ${finding.message}`);
-		}
-	}
-
-	lines.push("", "## Metrics", "");
-	for (const metric of Object.values(gate.metrics)) {
-		lines.push(`- ${metric.label}: ${metric.value ?? "n/a"}`);
-	}
-	lines.push("");
-
-	return lines.join("\n");
 }
 
 function gateAdoptionReport(options = {}) {
@@ -172,7 +151,7 @@ function gateAdoptionReport(options = {}) {
 
 	if (outputPath) {
 		fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-		fs.writeFileSync(outputPath, buildAdoptionGateContent(gate));
+		fs.writeFileSync(outputPath, renderAdoptionGateDocument(gate));
 	}
 
 	return gate;
@@ -186,52 +165,9 @@ function nextAdoptionStatusAction(status) {
 		return "Fix adoption index links before relying on this status.";
 	}
 	if (status.gate.decision === "wait") {
-		return "Review adoption gate findings before initializing or changing the target project.";
+		return MESSAGES.adoptionReviewBeforeChange;
 	}
-	return "Ready for human approval of the next safe Harness action.";
-}
-
-function buildAdoptionStatusContent(status) {
-	const lines = [
-		"# Adoption Status",
-		"",
-		`Reports directory: ${status.reportsDir}`,
-		`Reports: ${status.reports.count}`,
-		`Latest report: ${status.latestReport ? status.latestReport.file : "none"}`,
-		`Index checked: ${status.index.checked}`,
-		`Index valid: ${status.index.valid ?? "n/a"}`,
-		`Gate decision: ${status.gate.decision}`,
-		`Next safe action: ${status.nextSafeAction}`,
-		"",
-		"## Blockers",
-		"",
-	];
-
-	if (status.blockers.length === 0) {
-		lines.push("- none");
-	} else {
-		for (const blocker of status.blockers) {
-			lines.push(`- ${blocker.id}: ${blocker.message}`);
-		}
-	}
-
-	lines.push("", "## Compare Summary", "");
-	if (!status.compare) {
-		lines.push("- Not enough reports to compare.");
-	} else {
-		lines.push(`- Base: ${status.compare.base.file}`);
-		lines.push(`- Head: ${status.compare.head.file}`);
-		lines.push(
-			`- Missing Amber starter files delta: ${status.compare.metrics.missingHarnessFiles.delta ?? "n/a"}`,
-		);
-		lines.push(
-			`- Candidate commands added: ${status.compare.candidateCommands.added.length}`,
-		);
-		lines.push(`- Unknowns removed: ${status.compare.unknowns.removed.length}`);
-	}
-
-	lines.push("");
-	return lines.join("\n");
+	return MESSAGES.adoptionReadyForApproval;
 }
 
 function statusAdoptionReports(options = {}) {
@@ -323,7 +259,7 @@ function statusAdoptionReports(options = {}) {
 
 	if (outputPath && errors.length === 0) {
 		fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-		fs.writeFileSync(outputPath, buildAdoptionStatusContent(status));
+		fs.writeFileSync(outputPath, renderAdoptionStatusDocument(status));
 	}
 
 	return status;
@@ -331,9 +267,7 @@ function statusAdoptionReports(options = {}) {
 
 module.exports = {
 	adoptionGateFindings,
-	buildAdoptionGateContent,
 	gateAdoptionReport,
 	nextAdoptionStatusAction,
-	buildAdoptionStatusContent,
 	statusAdoptionReports,
 };

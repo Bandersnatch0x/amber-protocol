@@ -18,6 +18,10 @@ const {
 	writeJson,
 } = require("./fs-utils");
 
+const {
+	MESSAGES,
+} = require("./terminology");
+
 function resolveRegistryPath(registryPath) {
 	if (!registryPath) {
 		return DEFAULT_TEAM_REGISTRY;
@@ -265,7 +269,7 @@ function installTeamDistribution(target, options = {}) {
 
 	if (pathExists(paths.lockPath)) {
 		errors.push(
-			"Team Harness is already installed; use team update or team rollback.",
+			MESSAGES.teamAlreadyInstalled,
 		);
 	}
 	if (!selected.release) {
@@ -356,7 +360,7 @@ function updateTeamDistribution(target, options = {}) {
 	const selected = findTeamVersion(loaded.registry, options.version);
 
 	if (!lock) {
-		errors.push("Team Harness is not installed; use team install first.");
+		errors.push(MESSAGES.teamNotInstalled);
 	}
 	if (!options.dryRun && !options.confirm) {
 		errors.push("team update requires --dry-run or --confirm.");
@@ -418,7 +422,7 @@ function pinTeamDistribution(target, options = {}) {
 	const selected = findTeamVersion(loaded.registry, options.version);
 
 	if (!lock) {
-		errors.push("Team Harness is not installed; use team install first.");
+		errors.push(MESSAGES.teamNotInstalled);
 	}
 	if (!options.version) {
 		errors.push("team pin requires --version <semver>.");
@@ -447,7 +451,7 @@ function rollbackTeamDistribution(target, options = {}) {
 	const version = options.version;
 
 	if (!lock) {
-		errors.push("Team Harness is not installed; use team install first.");
+		errors.push(MESSAGES.teamNotInstalled);
 	}
 	if (!version) {
 		errors.push("team rollback requires --version <semver>.");

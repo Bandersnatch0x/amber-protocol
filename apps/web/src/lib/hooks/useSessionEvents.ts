@@ -3,6 +3,24 @@ import { SessionEvent, SessionStatus, SessionEventSchema } from '@/lib/types/ses
 
 type ConnectionState = 'connecting' | 'open' | 'closed' | 'error';
 
+// Declarative map from a session event type to the session status it implies.
+// Events not in this map (session_created, task_progress, error, heartbeat)
+// leave the status unchanged. Previously a 5-branch if/else inside the hook's
+// onmessage handler.
+const EVENT_STATUS_MAP: Partial<Record<SessionEvent['type'], SessionStatus>> = {
+  session_started: 'running',
+  session_resumed: 'running',
+  session_paused: 'paused',
+  session_completed: 'completed',
+  session_aborted: 'aborted',
+};
+
+export function statusFromEventType(
+  type: SessionEvent['type'],
+): SessionStatus | null {
+  return EVENT_STATUS_MAP[type] ?? null;
+}
+
 interface UseSessionEventsReturn {
   status: SessionStatus | null;
   connectionState: ConnectionState;
@@ -60,11 +78,8 @@ export function useSessionEvents(sessionId: string | null): UseSessionEventsRetu
             });
           }
 
-          if (event.type === 'session_started') setStatus('running');
-          else if (event.type === 'session_paused') setStatus('paused');
-          else if (event.type === 'session_resumed') setStatus('running');
-          else if (event.type === 'session_completed') setStatus('completed');
-          else if (event.type === 'session_aborted') setStatus('aborted');
+          const nextStatus = statusFromEventType(event.type);
+          if (nextStatus) setStatus(nextStatus);
         } catch (err) {
           console.error('Failed to parse event:', err);
         }

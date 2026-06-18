@@ -48,6 +48,19 @@ export interface EventSummary {
   details: { label: string; value: string }[];
 }
 
+// Shared extraction for state-transition events: prefer toState, fall back to
+// status, then push a single detail row under the given label. Previously
+// duplicated verbatim across session_started/resumed/paused/completed.
+function stateTransitionDetails(
+  event: SessionEvent,
+  label: string,
+): { details: { label: string; value: string }[] } {
+  const details: { label: string; value: string }[] = [];
+  const state = getString(event, 'toState') ?? getString(event, 'status');
+  if (state) details.push({ label, value: state });
+  return { details };
+}
+
 export function getEventSummary(event: SessionEvent): EventSummary {
   const type = event.type;
   const details: { label: string; value: string }[] = [];
@@ -62,23 +75,12 @@ export function getEventSummary(event: SessionEvent): EventSummary {
     }
 
     case 'session_started':
-    case 'session_resumed': {
-      const state = getString(event, 'toState') ?? getString(event, 'status');
-      if (state) details.push({ label: 'State', value: state });
-      return { details };
-    }
+    case 'session_resumed':
+    case 'session_paused':
+      return stateTransitionDetails(event, 'State');
 
-    case 'session_paused': {
-      const state = getString(event, 'toState') ?? getString(event, 'status');
-      if (state) details.push({ label: 'State', value: state });
-      return { details };
-    }
-
-    case 'session_completed': {
-      const state = getString(event, 'toState') ?? getString(event, 'status');
-      if (state) details.push({ label: 'Final State', value: state });
-      return { details };
-    }
+    case 'session_completed':
+      return stateTransitionDetails(event, 'Final State');
 
     case 'session_aborted': {
       const fromState = getString(event, 'fromState');

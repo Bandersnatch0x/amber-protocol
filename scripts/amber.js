@@ -208,7 +208,7 @@ async function run(argv = process.argv.slice(2)) {
 		const acceptResult = acceptPlan(args.target, args.plan);
 		result = acceptResult;
 		if (args.session) {
-			const { buildCompletionResult } = require("./lib/completion-gate");
+			const { buildCompletionResult } = require("./lib/completion-check");
 			const completionResult = buildCompletionResult(
 				args.target || process.cwd(),
 				args.session,
@@ -583,7 +583,7 @@ async function run(argv = process.argv.slice(2)) {
 					exitCode: 1,
 				};
 			} else {
-				const { buildCompletionResult } = require("./lib/completion-gate");
+				const { buildCompletionResult } = require("./lib/completion-check");
 				const completion = buildCompletionResult(
 					args.target || process.cwd(),
 					args.session,

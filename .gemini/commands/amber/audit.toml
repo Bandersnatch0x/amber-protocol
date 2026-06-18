@@ -1,5 +1,5 @@
 # GENERATED — edit skills/ instead. Run: npm run gen:agents
-description = "Inspect an existing repository for Harness readiness without modifying project files."
+description = "Inspect an existing repository for Amber Setup readiness without modifying project files."
 prompt = """
 Run the Amber amber-audit workflow for the target repository.
 If no target is provided, use the current repository root (.).

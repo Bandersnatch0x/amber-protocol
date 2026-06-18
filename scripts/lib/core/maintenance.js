@@ -22,6 +22,10 @@ const {
 } = require("./team");
 
 const {
+	MESSAGES,
+} = require("./terminology");
+
+const {
 	validateWiki,
 } = require("./validators");
 
@@ -148,7 +152,12 @@ function buildMigrationAssistant(targetRoot, registry) {
 	};
 }
 
-function extractEvolutionFindings(targetRoot) {
+// Shared core: count "Finding: <text>" occurrences in harness-evolution.md and
+// return them sorted by count (desc) then text (asc). Both extractEvolutionFindings
+// and rollupEvolutionFindings previously duplicated this read+match+count+sort;
+// it lives here once. Returns [] when the file is absent. Does not filter by
+// threshold — each caller applies its own cutoff.
+function countEvolutionFindings(targetRoot) {
 	const filePath = path.join(
 		targetRoot,
 		"docs",
@@ -171,33 +180,22 @@ function extractEvolutionFindings(targetRoot) {
 
 	return [...counts.entries()]
 		.map(([finding, count]) => ({ finding, count }))
-		.filter((item) => item.count > 1)
 		.sort(
 			(left, right) =>
 				right.count - left.count || left.finding.localeCompare(right.finding),
 		);
 }
 
+function extractEvolutionFindings(targetRoot) {
+	return countEvolutionFindings(targetRoot).filter(
+		(item) => item.count > 1,
+	);
+}
+
 function rollupEvolutionFindings(projectRoot) {
-	const filePath = path.join(projectRoot, "docs", "wiki", "engineering", "harness-evolution.md");
-	if (!pathExists(filePath)) {
-		return { findings: [], threshold: 2 };
-	}
-
-	const counts = new Map();
-	for (const line of readText(filePath).split(/\r?\n/)) {
-		const match = line.match(/Finding:\s*(.+?)\s*$/);
-		if (match) {
-			const text = match[1].trim();
-			counts.set(text, (counts.get(text) || 0) + 1);
-		}
-	}
-
-	const findings = [...counts.entries()]
-		.filter(([, count]) => count >= 2)
-		.map(([text, count]) => ({ text, count }))
-		.sort((a, b) => b.count - a.count || a.text.localeCompare(b.text));
-
+	const findings = countEvolutionFindings(projectRoot)
+		.filter((item) => item.count >= 2)
+		.map(({ finding, count }) => ({ text: finding, count }));
 	return { findings, threshold: 2 };
 }
 
@@ -289,7 +287,7 @@ function inspectMaintenance(target, options = {}) {
 
 function buildMaintenanceProposalContent(inspection) {
 	const lines = [
-		"# Harness Maintenance Proposal",
+		MESSAGES.maintenanceProposalTitle,
 		"",
 		`Target: ${inspection.target}`,
 		`Generated: ${new Date().toISOString()}`,
@@ -550,7 +548,7 @@ function generateMaintenanceProposal(projectRoot, outputPath) {
 	actions.sort((a, b) => sortOrder[a.impact] - sortOrder[b.impact]);
 
 	const lines = [
-		"# Harness Maintenance Proposal",
+		MESSAGES.maintenanceProposalTitle,
 		"",
 		`Generated: ${new Date().toISOString()}`,
 		`Target: ${targetRoot}`,
@@ -610,6 +608,7 @@ module.exports = {
 	detectRulePackDrift,
 	buildUpgradeAssistant,
 	buildMigrationAssistant,
+	countEvolutionFindings,
 	extractEvolutionFindings,
 	rollupEvolutionFindings,
 	readRegressionProposal,
@@ -621,5 +620,4 @@ module.exports = {
 	fixWikiMarkers,
 	detectPackDrift,
 	previewUpgrade,
-	generateMaintenanceProposal,
 };

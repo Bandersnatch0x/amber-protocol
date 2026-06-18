@@ -33,8 +33,6 @@ function evaluateCompletion(projectRoot, sessionId) {
 	const timelineEvents = readTimeline(timelinePath);
 	const eventTypes = new Set(timelineEvents.map((event) => event.type));
 
-	// Each check contributes its `reason` when satisfied, or its `missing`
-	// label when not. Adding completion evidence is a one-line edit here.
 	const checks = [
 		{
 			reason: "goal present",
@@ -87,7 +85,7 @@ function evaluateCompletion(projectRoot, sessionId) {
 
 function formatCompletion(evalResult) {
 	const lines = [
-		`Completion status: ${evalResult.status}`,
+		`Completion check status: ${evalResult.status}`,
 		`Reasons: ${evalResult.reasons.join(", ") || "none"}`,
 	];
 	if (evalResult.missing.length > 0) {

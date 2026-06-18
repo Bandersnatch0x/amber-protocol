@@ -42,10 +42,39 @@ function getSessionDirForCreate(projectRoot, sessionId) {
 }
 
 function findMostRecentSession(projectRoot, { excludeCompleted = false } = {}) {
-	const sessionsDir = getSessionsDir(projectRoot);
-	if (!fs.existsSync(sessionsDir)) return null;
+	const manifests = loadAllSessionManifests(projectRoot).filter(
+		(m) =>
+			!excludeCompleted ||
+			(m.status !== "completed" &&
+				m.status !== "aborted" &&
+				m.status !== "failed"),
+	);
 
-	const manifests = fs
+	return manifests.length > 0 ? manifests[0].sessionId : null;
+}
+
+function loadSessionManifest(projectRoot, sessionId) {
+	// Centralized read+parse of a session manifest. Three commands previously
+	// each duplicated: build the path, check existence, JSON.parse the file.
+	// Returns { manifest, sessionDir, manifestPath } or null when missing.
+	const sessionDir = getSessionDir(projectRoot, sessionId);
+	const manifestPath = path.join(sessionDir, "manifest.json");
+	if (!fs.existsSync(manifestPath)) {
+		return null;
+	}
+	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	return { manifest, sessionDir, manifestPath };
+}
+
+function loadAllSessionManifests(projectRoot) {
+	// Enumerate every session manifest under the state dir, newest first. Both
+	// findMostRecentSession and listSessions previously duplicated this
+	// readdir+filter+parse+sort. Returns [] when there are no sessions.
+	const sessionsDir = getSessionsDir(projectRoot);
+	if (!fs.existsSync(sessionsDir)) {
+		return [];
+	}
+	return fs
 		.readdirSync(sessionsDir)
 		.filter((name) =>
 			fs.existsSync(path.join(sessionsDir, name, "manifest.json")),
@@ -55,16 +84,7 @@ function findMostRecentSession(projectRoot, { excludeCompleted = false } = {}) {
 				fs.readFileSync(path.join(sessionsDir, name, "manifest.json"), "utf8"),
 			),
 		)
-		.filter(
-			(m) =>
-				!excludeCompleted ||
-				(m.status !== "completed" &&
-					m.status !== "aborted" &&
-					m.status !== "failed"),
-		)
 		.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-	return manifests.length > 0 ? manifests[0].sessionId : null;
 }
 
 async function startSession(projectRoot, options) {
@@ -162,15 +182,11 @@ function statusSession(projectRoot, options) {
 		}
 	}
 
-	const manifestPath = path.join(
-		getSessionDir(projectRoot, sessionId),
-		"manifest.json",
-	);
-	if (!fs.existsSync(manifestPath)) {
+	const loaded = loadSessionManifest(projectRoot, sessionId);
+	if (!loaded) {
 		return result(`Session not found: ${sessionId}`, 1);
 	}
-
-	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	const { manifest } = loaded;
 
 	const lines = [
 		`Session: ${manifest.sessionId}`,
@@ -205,23 +221,7 @@ function statusSession(projectRoot, options) {
 }
 
 function listSessions(projectRoot, _options) {
-	const sessionsDir = getSessionsDir(projectRoot);
-	if (!fs.existsSync(sessionsDir)) {
-		return result("No sessions found", 0);
-	}
-
-	const sessions = fs
-		.readdirSync(sessionsDir)
-		.filter((name) =>
-			fs.existsSync(path.join(sessionsDir, name, "manifest.json")),
-		)
-		.map((name) => {
-			const manifest = JSON.parse(
-				fs.readFileSync(path.join(sessionsDir, name, "manifest.json"), "utf8"),
-			);
-			return manifest;
-		})
-		.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+	const sessions = loadAllSessionManifests(projectRoot);
 
 	if (sessions.length === 0) {
 		return result("No sessions found", 0);
@@ -243,14 +243,12 @@ async function abortSession(projectRoot, options) {
 		return result("Error: --session-id is required", 1);
 	}
 
-	const sessionDir = getSessionDir(projectRoot, sessionId);
-	const manifestPath = path.join(sessionDir, "manifest.json");
-
-	if (!fs.existsSync(manifestPath)) {
+	const loaded = loadSessionManifest(projectRoot, sessionId);
+	if (!loaded) {
 		return result(`Session not found: ${sessionId}`, 1);
 	}
+	const { manifest, sessionDir, manifestPath } = loaded;
 
-	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 	const sm = new SessionStateMachine(manifest.status);
 	const transition = sm.transition(STATES.ABORTED);
 
@@ -284,14 +282,11 @@ async function continueSession(projectRoot, options) {
 		}
 	}
 
-	const sessionDir = getSessionDir(projectRoot, sessionId);
-	const manifestPath = path.join(sessionDir, "manifest.json");
-
-	if (!fs.existsSync(manifestPath)) {
+	const loaded = loadSessionManifest(projectRoot, sessionId);
+	if (!loaded) {
 		return result(`Session not found: ${sessionId}`, 1);
 	}
-
-	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	const { manifest, sessionDir, manifestPath } = loaded;
 
 	const versionCheck = checkSchemaVersion(manifest);
 	if (!versionCheck.valid) {
@@ -411,4 +406,6 @@ module.exports = {
 	abortSession,
 	continueSession,
 	getSessionsDir,
+	loadSessionManifest,
+	loadAllSessionManifests,
 };

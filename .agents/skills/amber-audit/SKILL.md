@@ -1,6 +1,6 @@
 ---
 name: amber-audit
-description: Inspect an existing repository for Harness readiness without modifying project files.
+description: Inspect an existing repository for Amber Setup readiness without modifying project files.
 x-amber-json: {"command":"node scripts/amber.js audit --target {{target}}","args":[{"name":"target","hint":"repo path","default":"."}],"manualName":"amber-audit"}
 ---
 

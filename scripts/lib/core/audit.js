@@ -21,6 +21,10 @@ const {
 } = require("./fs-utils");
 
 const {
+	MESSAGES,
+} = require("./terminology");
+
+const {
 	getSectionBody,
 	hasSectionWithBody,
 } = require("./text-utils");
@@ -179,7 +183,7 @@ function buildSuggestedPatches(conflicts) {
 		requiresApproval: true,
 		reason: "Existing project instruction file must be merged by a human.",
 		suggestion:
-			"Review the Harness template and add a link to docs/wiki/index.md if appropriate.",
+			MESSAGES.wikiTemplateLinkHint,
 	}));
 }
 

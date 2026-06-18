@@ -410,22 +410,43 @@ function validateWorkflowPackReferences(packPath, data) {
 	return errors;
 }
 
-function inspectWorkflowPack(filePath) {
+// Deep module: the shared "read and parse a workflow pack file" prelude used
+// by both pack inspectors. Resolves the path and parses the JSON; on a read or
+// parse failure it returns { ok: false, result } where result carries the
+// caller-specific error shape (passed in as executionOnError). On success it
+// returns { ok: true, packPath, data }. The duplicate ~11-line try/catch that
+// lived in both inspectors now lives here once.
+function readWorkflowPackFile(filePath, { executionOnError } = {}) {
 	const packPath = path.resolve(filePath);
-	const errors = [];
-	const warnings = [];
 	let data = null;
 
 	try {
 		data = readJson(packPath);
 	} catch (error) {
 		return {
-			file: packPath,
-			errors: [`Cannot read workflow pack: ${error.message}`],
-			warnings,
-			execution: { executesAnything: false },
+			ok: false,
+			result: {
+				file: packPath,
+				errors: [`Cannot read workflow pack: ${error.message}`],
+				warnings: [],
+				execution: executionOnError,
+			},
 		};
 	}
+
+	return { ok: true, packPath, data };
+}
+
+function inspectWorkflowPack(filePath) {
+	const read = readWorkflowPackFile(filePath, {
+		executionOnError: { executesAnything: false },
+	});
+	if (!read.ok) {
+		return read.result;
+	}
+	const { packPath, data } = read;
+	const errors = [];
+	const warnings = [];
 
 	const validation = validateWorkflowPackData(data);
 	errors.push(...validation.errors);
@@ -467,25 +488,19 @@ function inspectWorkflowPack(filePath) {
 }
 
 function inspectWorkflowPackReadiness(filePath) {
-	const packPath = path.resolve(filePath);
+	const read = readWorkflowPackFile(filePath, {
+		executionOnError: {
+			executesAnything: false,
+			schedulesJobs: false,
+			callsExternalSystems: false,
+		},
+	});
+	if (!read.ok) {
+		return read.result;
+	}
+	const { packPath, data } = read;
 	const errors = [];
 	const warnings = [];
-	let data = null;
-
-	try {
-		data = readJson(packPath);
-	} catch (error) {
-		return {
-			file: packPath,
-			errors: [`Cannot read workflow pack: ${error.message}`],
-			warnings,
-			execution: {
-				executesAnything: false,
-				schedulesJobs: false,
-				callsExternalSystems: false,
-			},
-		};
-	}
 
 	const validation = validateWorkflowPackData(data);
 	errors.push(...validation.errors);
@@ -511,6 +526,7 @@ module.exports = {
 	describeLoopContracts,
 	inspectLoopReadiness,
 	validateWorkflowPackReferences,
+	readWorkflowPackFile,
 	inspectWorkflowPack,
 	inspectWorkflowPackReadiness,
 };
