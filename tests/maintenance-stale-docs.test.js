@@ -77,3 +77,40 @@ test("amber maintenance stale-docs - flags doc without marker", () => {
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
+test("amber maintenance stale-docs - reports thresholdDays as a number for an explicit value", () => {
+	const target = tempDir("numeric");
+	fs.mkdirSync(path.join(target, "docs", "wiki"), { recursive: true });
+
+	const result = runAmber([
+		"maintenance",
+		"stale-docs",
+		"--target",
+		target,
+		"--threshold-days",
+		"90",
+		"--json",
+	]);
+
+	assert.strictEqual(result.status, 0);
+	const json = JSON.parse(result.stdout);
+	// The threshold echoed back must be a number, matching the default path.
+	assert.strictEqual(json.thresholdDays, 90);
+});
+
+test("amber maintenance stale-docs - defaults thresholdDays to 180 when omitted", () => {
+	const target = tempDir("default");
+	fs.mkdirSync(path.join(target, "docs", "wiki"), { recursive: true });
+
+	const result = runAmber([
+		"maintenance",
+		"stale-docs",
+		"--target",
+		target,
+		"--json",
+	]);
+
+	assert.strictEqual(result.status, 0);
+	const json = JSON.parse(result.stdout);
+	assert.strictEqual(json.thresholdDays, 180);
+});
+

@@ -372,7 +372,14 @@ async function run(argv = process.argv.slice(2)) {
 			const { detectStaleDocs } = require("./lib/core/maintenance");
 			const { resolveTarget } = require("./lib/core/fs-utils");
 			const targetRoot = resolveTarget(args.target);
-			const thresholdDays = args.thresholdDays || 180;
+			const parsedDays = args.thresholdDays
+				? Number.parseInt(args.thresholdDays, 10)
+				: undefined;
+			// A non-integer arg falls back to detectStaleDocs's own default, the
+			// single source for the threshold rather than a duplicated literal.
+			const thresholdDays = Number.isInteger(parsedDays)
+				? parsedDays
+				: undefined;
 			const staleResult = detectStaleDocs(targetRoot, thresholdDays);
 			result = {
 				target: targetRoot,
