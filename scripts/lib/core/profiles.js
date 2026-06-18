@@ -77,6 +77,16 @@ function inspectProjectProfile(filePath) {
 	const validation = validateProjectProfileData(data);
 	errors.push(...validation.errors);
 	warnings.push(...validation.warnings);
+
+	// readJson returns whatever the file parses to, so a body of valid JSON
+	// `null`/scalar/array parses cleanly but is not a profile object. Bail before
+	// the data.standards / data.id reads below would throw on it, surfacing the
+	// validation errors instead of crashing — same posture as the manifest/ledger
+	// readers that survive a corrupt file.
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
+		return { file: profilePath, errors, warnings };
+	}
+
 	const standards = new Set(discoverStandards().map((standard) => standard.id));
 	for (const standard of data.standards || []) {
 		if (!standards.has(standard)) {
