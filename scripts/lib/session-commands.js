@@ -79,11 +79,21 @@ function loadAllSessionManifests(projectRoot) {
 		.filter((name) =>
 			fs.existsSync(path.join(sessionsDir, name, "manifest.json")),
 		)
-		.map((name) =>
-			JSON.parse(
-				fs.readFileSync(path.join(sessionsDir, name, "manifest.json"), "utf8"),
-			),
-		)
+		.map((name) => {
+			try {
+				return JSON.parse(
+					fs.readFileSync(
+						path.join(sessionsDir, name, "manifest.json"),
+						"utf8",
+					),
+				);
+			} catch {
+				// A half-written or corrupt manifest is unreadable; skip it so one
+				// bad file cannot crash enumeration for the healthy sessions.
+				return null;
+			}
+		})
+		.filter(Boolean)
 		.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 

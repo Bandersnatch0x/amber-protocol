@@ -58,3 +58,18 @@ test("skips directories without a manifest.json", () => {
 		["real"],
 	);
 });
+
+test("skips a manifest that is not valid JSON instead of throwing", () => {
+	const root = tempProject();
+	writeManifest(root, "healthy", "2025-01-01T00:00:00Z");
+	// A half-written/corrupt manifest (e.g. process killed mid-write) must not
+	// crash enumeration for the healthy sessions alongside it.
+	const corruptDir = path.join(root, ".amber", "sessions", "corrupt");
+	fs.mkdirSync(corruptDir, { recursive: true });
+	fs.writeFileSync(path.join(corruptDir, "manifest.json"), "{ broken json");
+	const sessions = loadAllSessionManifests(root);
+	assert.deepEqual(
+		sessions.map((s) => s.sessionId),
+		["healthy"],
+	);
+});
