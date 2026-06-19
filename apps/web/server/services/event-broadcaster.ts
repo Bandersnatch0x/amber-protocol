@@ -39,8 +39,12 @@ class EventBroadcaster {
 
   removeConnection(sessionId: string, res: Response): void {
     const sessionConns = this.connections.get(sessionId);
-    if (sessionConns) {
-      sessionConns.delete(res);
+    if (sessionConns && sessionConns.delete(res)) {
+      // Only decrement when this res was actually present. A dead socket is
+      // removed by both the broadcast/heartbeat sweep and its own 'close' event;
+      // gating on delete()'s result keeps removeConnection idempotent so the
+      // count cannot drift below the true value (and break the total-connection
+      // limit).
       this.totalConnections--;
 
       if (sessionConns.size === 0) {

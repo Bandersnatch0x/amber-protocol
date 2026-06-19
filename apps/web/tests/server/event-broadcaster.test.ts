@@ -87,4 +87,29 @@ describe('EventBroadcaster', () => {
 
     expect(eventBroadcaster.connectionCount('session-1')).toBe(0);
   });
+
+  it('does not double-count when a dead connection is removed twice', async () => {
+    // A dead socket is typically removed by BOTH the broadcast/heartbeat sweep
+    // AND its own 'close' event. removeConnection must be idempotent: the second
+    // call must not decrement totalConnections again, or the count drifts below
+    // the true value (eventually negative) and the MAX_TOTAL_CONNECTIONS guard
+    // silently breaks.
+    const live = createMockResponse();
+    const dead = createMockResponse();
+    eventBroadcaster.addConnection('session-1', live);
+    eventBroadcaster.addConnection('session-1', dead);
+    expect(eventBroadcaster.totalConnectionCount()).toBe(2);
+
+    dead.write = vi.fn((_data: string, cb?: Function) => {
+      if (cb) setTimeout(() => cb(new Error('write failed')), 0);
+      return false;
+    });
+    await eventBroadcaster.broadcast('session-1', { type: 'heartbeat', timestamp: Date.now() });
+    // The same dead socket now also fires its close event.
+    dead.emit('close');
+
+    // Exactly the one live connection remains; the count must not under-count it.
+    expect(eventBroadcaster.connectionCount('session-1')).toBe(1);
+    expect(eventBroadcaster.totalConnectionCount()).toBe(1);
+  });
 });
