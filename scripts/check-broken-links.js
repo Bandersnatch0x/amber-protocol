@@ -27,14 +27,20 @@ function collectMarkdownFiles(dir) {
 }
 
 /**
- * 从 markdown 内容中提取链接
+ * 从 markdown 内容中提取链接（跳过代码块）
  */
 function extractLinks(content) {
+  // 移除代码块（``` 包围的内容）
+  const contentWithoutCodeBlocks = content.replace(/```[\s\S]*?```/g, '');
+
+  // 移除行内代码（` 包围的内容）
+  const contentWithoutInlineCode = contentWithoutCodeBlocks.replace(/`[^`]+`/g, '');
+
   const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
   const links = [];
   let match;
 
-  while ((match = linkRegex.exec(content)) !== null) {
+  while ((match = linkRegex.exec(contentWithoutInlineCode)) !== null) {
     const url = match[2];
     // 只检查相对路径链接，跳过 http/https 和锚点
     if (!url.startsWith("http") && !url.startsWith("#")) {

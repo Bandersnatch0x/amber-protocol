@@ -34,7 +34,7 @@
 
 - [ ] M2.1: Add `validateWikiStructure(projectRoot)` in `scripts/lib/core/maintenance.js`
   - Check `docs/wiki/index.md` exists + links to product/architecture/engineering/agent
-  - Validate internal `[text](../path.md)` links resolve to real files
+  - Validate internal `[text](relative-path.md)` links resolve to real files
   - Check required sections per SPEC: overview, system-map, module-boundaries, runbook, verification, amber, failure-patterns
   - Flag missing Last Reviewed markers (reuse M1 logic)
 - [ ] M2.2: Wire `amber maintenance wiki-lint --target <repo> [--json]`

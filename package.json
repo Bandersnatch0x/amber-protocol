@@ -2,14 +2,26 @@
   "name": "amber-protocol",
   "version": "1.0.0",
   "description": "Amber Protocol: repository-local governance kit for coding agents — install, audit, validate, and hand off agent-facing project state.",
-  "private": true,
   "type": "commonjs",
   "bin": {
     "amber": "scripts/amber.js",
     "coding-harness": "scripts/compat/coding-harness.js"
   },
+  "files": [
+    "scripts/",
+    "templates/",
+    "routes/",
+    "schemas/",
+    "workflow-packs/",
+    "profiles/",
+    "src/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "test": "node scripts/run-tests.js",
+    "test:coverage": "c8 --reporter=text --reporter=html --reporter=json-summary node scripts/run-tests.js",
     "check": "node scripts/run-tests.js",
     "doctor": "node scripts/amber.js doctor --target .",
     "handoff": "node scripts/amber.js handoff --target .",
@@ -22,13 +34,32 @@
     "format": "echo 'Format: no formatter configured. Add prettier to devDependencies to enable.'",
     "typecheck": "cd apps/web && npx tsc --noEmit"
   },
-  "engines": {
-    "node": ">=18.17"
+  "c8": {
+    "exclude": [
+      "tests/**",
+      "coverage/**",
+      "apps/web/**",
+      "docs/**",
+      "templates/**",
+      "scripts/compat/**"
+    ],
+    "check-coverage": true,
+    "lines": 60,
+    "functions": 55,
+    "branches": 50,
+    "statements": 60
   },
-  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18.17.0",
+    "npm": ">=9.0.0"
+  },
+  "license": "MIT",
   "dependencies": {
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "nodemailer": "^8.0.11"
+  },
+  "devDependencies": {
+    "c8": "^11.0.0"
   }
 }
