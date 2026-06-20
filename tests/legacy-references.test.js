@@ -35,6 +35,7 @@ const ALLOWLIST = [
 	"docs/superpowers/plans/",
 	"docs/superpowers/specs/",
 	"docs/examples/", // historical review artifacts generated from real read-only trials
+	"docs/adoption-self/", // self-adoption report (auto-generated, contains legacy project path)
 	"docs/wiki/PHASE_B_ALPHA_TASKS.md", // era-noted historical task list
 	".workflow/",
 	".mimocode/",
