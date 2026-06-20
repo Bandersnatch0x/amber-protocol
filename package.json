@@ -17,7 +17,10 @@
     "test:load": "node scripts/run-tests.js tests/load/sequential-sessions.test.js",
     "test:e2e": "node scripts/run-tests.js tests/e2e/",
     "gen:agents": "node scripts/gen-agent-commands.js",
-    "gen:agents:check": "node scripts/gen-agent-commands.js --check"
+    "gen:agents:check": "node scripts/gen-agent-commands.js --check",
+    "lint": "echo 'Lint: no linter configured. Add eslint to devDependencies to enable.'",
+    "format": "echo 'Format: no formatter configured. Add prettier to devDependencies to enable.'",
+    "typecheck": "cd apps/web && npx tsc --noEmit"
   },
   "engines": {
     "node": ">=18.17"
