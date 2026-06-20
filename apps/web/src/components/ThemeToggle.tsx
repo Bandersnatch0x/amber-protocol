@@ -1,5 +1,5 @@
 
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/lib/theme-provider';
 import { useEffect, useState } from 'react';
 
 export function ThemeToggle() {
@@ -12,7 +12,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <button className="p-2 rounded-md border border-gray-300 bg-white">
+      <button aria-label="Toggle theme" className="p-2 rounded-md border border-gray-300 bg-white">
         <span className="h-5 w-5 block">🌓</span>
       </button>
     );
@@ -21,6 +21,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      aria-label="Toggle theme"
       className="p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:bg-gray-700 transition-colors"
       title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
     >
