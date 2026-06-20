@@ -65,16 +65,12 @@ describe('sessionControlRouter', () => {
       );
     });
 
-    // Characterization: the guard only checks whether 'running' is a reachable
-    // target, so start() from paused is permitted and emits session_started
-    // (not session_resumed). Documents current behavior, not necessarily ideal.
-    it('treats start from paused as a legal transition to running', async () => {
+    it('rejects illegal transition from paused', async () => {
       mockSessionWithStatus('paused');
 
-      const result = await caller.start({ sessionId: 'session-1' });
-
-      expect(sessionEvents.emitSessionStarted).toHaveBeenCalledWith('session-1');
-      expect(result.status).toBe('running');
+      await expect(caller.start({ sessionId: 'session-1' })).rejects.toThrow(
+        'Cannot start from status: paused'
+      );
     });
 
     it('throws Session not found when session does not exist', async () => {
@@ -163,6 +159,14 @@ describe('sessionControlRouter', () => {
 
       await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
         'Cannot resume from status: completed'
+      );
+    });
+
+    it('rejects illegal transition from idle', async () => {
+      mockSessionWithStatus('idle');
+
+      await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
+        'Cannot resume from status: idle'
       );
     });
 
