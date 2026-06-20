@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { redactSecrets } from '../lib/redaction';
+import { redactSecrets, redactDeep } from '../lib/redaction';
 import { forwardError, ErrorReportPayload } from '../lib/error-forwarder';
 
 // Cap field sizes so a misbehaving (or hostile) client can't push large
@@ -32,7 +32,7 @@ export function handleErrorReport(req: Request, res: Response): void {
         : undefined,
     context:
       body.context && typeof body.context === 'object'
-        ? (body.context as Record<string, unknown>)
+        ? (redactDeep(body.context) as Record<string, unknown>)
         : undefined,
     timestamp: new Date().toISOString(),
     userAgent:
