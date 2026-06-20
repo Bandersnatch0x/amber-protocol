@@ -1,29 +1,26 @@
 import { test, expect } from '@playwright/test';
 
+// Force a known starting scheme so "click → dark" is deterministic across the
+// chromium/firefox/webkit projects (otherwise the OS/browser default decides
+// the initial resolved theme and the toggle direction flips).
+test.use({ colorScheme: 'light' });
+
 test.describe('Theme Toggle', () => {
   test('should toggle to dark mode', async ({ page }) => {
     await page.goto('/');
-    const themeButton = page.locator('[aria-label*="theme" i], button:has-text("Theme")').first();
-    if (await themeButton.count() > 0) {
-      await themeButton.click();
-      await page.waitForTimeout(500);
-      const html = page.locator('html');
-      const className = await html.getAttribute('class');
-      expect(className).toContain('dark');
-    }
+    const themeButton = page.getByRole('button', { name: /toggle theme/i });
+    await expect(themeButton).toBeVisible();
+    await themeButton.click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
   });
 
   test('should persist dark mode on reload', async ({ page }) => {
     await page.goto('/');
-    const themeButton = page.locator('[aria-label*="theme" i], button:has-text("Theme")').first();
-    if (await themeButton.count() > 0) {
-      await themeButton.click();
-      await page.waitForTimeout(500);
-      await page.reload();
-      await page.waitForLoadState('networkidle');
-      const html = page.locator('html');
-      const className = await html.getAttribute('class');
-      expect(className).toContain('dark');
-    }
+    const themeButton = page.getByRole('button', { name: /toggle theme/i });
+    await themeButton.click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+
+    await page.reload();
+    await expect(page.locator('html')).toHaveClass(/dark/);
   });
 });

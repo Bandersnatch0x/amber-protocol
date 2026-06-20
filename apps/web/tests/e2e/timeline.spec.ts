@@ -1,30 +1,20 @@
 import { test, expect } from '@playwright/test';
+import { FIXTURE_SESSION_ID } from './fixtures/seed';
 
+// The timeline lives at /sessions/<id>/timeline (a separate route), NOT on the
+// session detail page — the old spec looked for it on the detail page and so
+// never asserted. globalSetup seeds FIXTURE_SESSION_ID with 3 events.
 test.describe('Timeline', () => {
-  test('should display timeline on session page', async ({ page }) => {
-    await page.goto('/sessions');
+  test('renders the timeline page for the seeded session', async ({ page }) => {
+    await page.goto(`/sessions/${FIXTURE_SESSION_ID}/timeline`);
     await page.waitForLoadState('networkidle');
-    const firstSession = page.locator('a[href*="/sessions/"]').first();
-    if (await firstSession.count() > 0) {
-      await firstSession.click();
-      await page.waitForLoadState('networkidle');
-      const timeline = page.locator('[class*="timeline"], [data-testid="timeline"]');
-      if (await timeline.count() > 0) {
-        await expect(timeline.first()).toBeVisible();
-      }
-    }
+    await expect(page.locator('h1')).toContainText('Timeline');
+    await expect(page.locator('[data-testid="timeline"]')).toBeVisible();
   });
 
-  test('should scroll timeline events', async ({ page }) => {
-    await page.goto('/sessions');
+  test('shows the event count for the seeded session', async ({ page }) => {
+    await page.goto(`/sessions/${FIXTURE_SESSION_ID}/timeline`);
     await page.waitForLoadState('networkidle');
-    const firstSession = page.locator('a[href*="/sessions/"]').first();
-    if (await firstSession.count() > 0) {
-      await firstSession.click();
-      await page.waitForLoadState('networkidle');
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.waitForTimeout(500);
-      expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-    }
+    await expect(page.getByText(/of \d+ events?/i)).toBeVisible();
   });
 });
