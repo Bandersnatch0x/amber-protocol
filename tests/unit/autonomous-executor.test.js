@@ -98,4 +98,22 @@ describe("autonomous-executor", () => {
 		assert.strictEqual(result.success, false);
 		assert.strictEqual(result.exitCode, 1);
 	});
+
+	it("should fail gracefully on a corrupt manifest instead of crashing", async () => {
+		const corruptDir = path.join(
+			testRoot,
+			".amber",
+			"sessions",
+			"corrupt-session-id",
+		);
+		fs.mkdirSync(corruptDir, { recursive: true });
+		fs.writeFileSync(path.join(corruptDir, "manifest.json"), "{not valid json");
+
+		const result = await executeAutonomous(testRoot, "corrupt-session-id", {
+			dryRun: true,
+		});
+		assert.strictEqual(result.success, false);
+		assert.strictEqual(result.exitCode, 1);
+		assert.match(result.error, /corrupt/i);
+	});
 });

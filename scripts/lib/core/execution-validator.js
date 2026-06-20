@@ -141,6 +141,25 @@ function validateWorkflowPack(packPath) {
 	return { valid: errors.length === 0, errors, warnings, unsafePatterns };
 }
 
+
+// Extract all string values from a nested object (recursive).
+// Used by validateIntegration to scan only values, not keys.
+function collectStringValues(obj, seen = new Set()) {
+	const values = [];
+	if (!obj || typeof obj !== "object") return values;
+	// Prevent infinite recursion on circular refs
+	if (seen.has(obj)) return values;
+	seen.add(obj);
+	for (const value of Object.values(obj)) {
+		if (typeof value === "string") {
+			values.push(value);
+		} else if (typeof value === "object" && value !== null) {
+			values.push(...collectStringValues(value, seen));
+		}
+	}
+	return values;
+}
+
 function validateIntegration(integrationPath, options = {}) {
 	const warnings = [];
 	const sideEffects = [];
@@ -190,22 +209,32 @@ function validateIntegration(integrationPath, options = {}) {
 		};
 	}
 
+	// Side-effect signals (urls, file paths, shell commands) live in string
+	// VALUES, not field names. Scanning only values — via collectStringValues —
+	// avoids false positives from a field merely NAMED "network" or a
+	// description that mentions "fetch". (Previously this scanned
+	// JSON.stringify(config), which matched keys too.)
+	const valueText = collectStringValues(config).join("\n");
+
+	// Credentials and permissions are conventionally signaled by FIELD NAMES
+	// (apiKey, token, secret, permissions) as much as by values, so those two
+	// checks still scan the full serialized config including keys.
 	const configStr = JSON.stringify(config);
 
 	// Detect side effects
-	if (/\bfile[:.]write|writeFile|createWriteStream|fs\.write/i.test(configStr)) {
+	if (/\bfile[:.]write|writeFile|createWriteStream|fs\.write/i.test(valueText)) {
 		sideEffects.push("file_write");
 		if (options.explain) explanations.push("Detected file write operations in integration config.");
 	}
-	if (/\bnetwork|http[s]?:|fetch|axios|request\b/i.test(configStr)) {
+	if (/\bnetwork|http[s]?:|fetch|axios|request\b/i.test(valueText)) {
 		sideEffects.push("network_call");
 		if (options.explain) explanations.push("Detected network/HTTP calls in integration config.");
 	}
-	if (/\bspawn|exec|child_process|shell\b/i.test(configStr)) {
+	if (/\bspawn|exec|child_process|shell\b/i.test(valueText)) {
 		sideEffects.push("process_spawn");
 		if (options.explain) explanations.push("Detected process spawning or shell execution in integration config.");
 	}
-	if (/\bdb|database|sql|query|transaction\b/i.test(configStr)) {
+	if (/\bdb|database|sql|query|transaction\b/i.test(valueText)) {
 		sideEffects.push("database_operation");
 		if (options.explain) explanations.push("Detected database operations in integration config.");
 	}
@@ -445,6 +474,7 @@ function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 	};
 }
 
+	collectStringValues,
 module.exports = {
 	validateLoopContract,
 	validateWorkflowPack,

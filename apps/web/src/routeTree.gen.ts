@@ -68,7 +68,9 @@ const TranscriptsIdRoute = TranscriptsIdRouteImport.update({
   id: '/transcripts/$id',
   path: '/transcripts/$id',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() =>
+  import('./routes/transcripts/$id.lazy').then((d) => d.Route),
+)
 const SessionsIdRouteRoute = SessionsIdRouteRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -83,7 +85,9 @@ const SessionsIdIndexRoute = SessionsIdIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => SessionsIdRouteRoute,
-} as any)
+} as any).lazy(() =>
+  import('./routes/sessions/$id/index.lazy').then((d) => d.Route),
+)
 const RoutesIdIndexRoute = RoutesIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -93,7 +97,9 @@ const SessionsIdTimelineRoute = SessionsIdTimelineRouteImport.update({
   id: '/timeline',
   path: '/timeline',
   getParentRoute: () => SessionsIdRouteRoute,
-} as any)
+} as any).lazy(() =>
+  import('./routes/sessions/$id/timeline.lazy').then((d) => d.Route),
+)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute

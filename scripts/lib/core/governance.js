@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { readTimeline } = require('../timeline-reader');
 const { loadPolicy } = require('../autonomous-policy');
+const { readJsonSafe } = require('./fs-utils');
 
 function getDefaultPolicy() {
   return {
@@ -173,20 +174,6 @@ function exportSessionEvidence(sessionId, targetRoot, outputPath) {
   fs.writeFileSync(output, lines.join('\n'));
 
   return { exported: true, events: events.length, outputPath: output };
-}
-
-// Read JSON without throwing. Returns the parsed value, or records a parse
-// error so callers can degrade gracefully instead of crashing — important for
-// evidence export, where a corrupt state file is itself an audit signal.
-function readJsonSafe(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return { value: null, error: null };
-  }
-  try {
-    return { value: JSON.parse(fs.readFileSync(filePath, 'utf8')), error: null };
-  } catch (error) {
-    return { value: null, error: error.message };
-  }
 }
 
 function exportExecutionEvidence(taskId, targetRoot, outputPath) {

@@ -120,25 +120,21 @@ test("validateWorkflowPackData flags skills when present but not an array", () =
 
 // ---- validateLoopContracts ----
 
-test("validateLoopContracts is a no-op when loopContracts is undefined", () => {
-	const errors = [];
-	const warnings = [];
-	validateLoopContracts(undefined, errors, warnings);
+test("validateLoopContracts returns empty arrays when loopContracts is undefined", () => {
+	const { errors, warnings } = validateLoopContracts(undefined);
 	assert.deepEqual(errors, []);
 	assert.deepEqual(warnings, []);
 });
 
 test("validateLoopContracts rejects a non-array loopContracts value", () => {
-	const errors = [];
-	validateLoopContracts("not-an-array", errors, []);
+	const { errors } = validateLoopContracts("not-an-array");
 	assert.deepEqual(errors, [
 		"Workflow pack loopContracts must be an array when present.",
 	]);
 });
 
 test("validateLoopContracts accepts a fully valid contract", () => {
-	const errors = [];
-	validateLoopContracts(
+	const { errors } = validateLoopContracts(
 		[
 			{
 				id: "loop-1",
@@ -160,15 +156,12 @@ test("validateLoopContracts accepts a fully valid contract", () => {
 				},
 			},
 		],
-		errors,
-		[],
 	);
 	assert.deepEqual(errors, []);
 });
 
 test("validateLoopContracts flags an invalid trigger type", () => {
-	const errors = [];
-	validateLoopContracts(
+	const { errors } = validateLoopContracts(
 		[
 			{
 				id: "loop-1",
@@ -184,8 +177,6 @@ test("validateLoopContracts flags an invalid trigger type", () => {
 				execution: { executesAnything: false },
 			},
 		],
-		errors,
-		[],
 	);
 	assert.ok(
 		errors.includes(
@@ -195,11 +186,8 @@ test("validateLoopContracts flags an invalid trigger type", () => {
 });
 
 test("validateLoopContracts reports both missing hardStops and the budget fallback", () => {
-	const errors = [];
-	validateLoopContracts(
+	const { errors } = validateLoopContracts(
 		[{ id: "loop-1", goal: "g", stateSpine: "ss", reviewGates: ["g"] }],
-		errors,
-		[],
 	);
 	assert.deepEqual(errors, [
 		"Loop contract [0].hardStops is required.",
@@ -208,8 +196,7 @@ test("validateLoopContracts reports both missing hardStops and the budget fallba
 });
 
 test("validateLoopContracts rejects maxIterations of zero or less", () => {
-	const errors = [];
-	validateLoopContracts(
+	const { errors } = validateLoopContracts(
 		[
 			{
 				id: "l",
@@ -224,8 +211,6 @@ test("validateLoopContracts rejects maxIterations of zero or less", () => {
 				execution: { executesAnything: false },
 			},
 		],
-		errors,
-		[],
 	);
 	assert.deepEqual(errors, [
 		"Loop contract [0].hardStops.maxIterations must be greater than 0.",
