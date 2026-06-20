@@ -1,12 +1,13 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Gate, GateStatus, GateFilters, GateDecision } from './types/gate';
+import { AMBER_STATE_DIR } from './state-dir';
 
 // Filesystem layout: .amber/sessions/{sessionId}/gates/{gateId}.gate.json
 // Decision files: .amber/sessions/{sessionId}/gates/{gateId}.decision.json
 
 function getSessionsPath(): string {
-  return path.join(process.cwd(), '..', '..', '.amber', 'sessions');
+  return path.join(process.cwd(), '..', '..', AMBER_STATE_DIR, 'sessions');
 }
 
 function validateSessionId(sessionId: string): boolean {
@@ -159,8 +160,8 @@ export async function writeGateDecision(
   try {
     await fs.access(decisionPath);
     throw new Error('Gate already resolved');
-  } catch (error: any) {
-    if (error.message === 'Gate already resolved') {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'Gate already resolved') {
       throw error;
     }
     // File doesn't exist, proceed
