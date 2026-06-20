@@ -89,4 +89,4 @@ Stage Changes → Pre-Commit → Commit → Pre-Push → Push
 
 ---
 
-See also: [Hooks API Reference](../api/hooks-api.md)
+See also: [Hooks API Reference](../../api/hooks-api.md)

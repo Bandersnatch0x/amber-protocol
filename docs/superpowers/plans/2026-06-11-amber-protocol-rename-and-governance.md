@@ -497,7 +497,7 @@ test("migrateWiki renames harness.md to amber.md and updates index links", () =>
 	fs.mkdirSync(path.join(root, "docs", "wiki"), { recursive: true });
 	fs.writeFileSync(
 		path.join(root, "docs", "wiki", "index.md"),
-		"[Agent](./agent/harness.md)\n",
+		"[Agent](./agent/amber.md)\n",
 	);
 	const result = migrateWiki(root);
 	assert.ok(fs.existsSync(path.join(agentDir, "amber.md")));

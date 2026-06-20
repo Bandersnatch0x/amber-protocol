@@ -80,4 +80,4 @@ amber-protocol skill test code-reviewer --input "review this code: function foo(
 
 ---
 
-See also: [Skill API Reference](../api/skill-api.md)
+See also: [Skill API Reference](../../api/skill-api.md)

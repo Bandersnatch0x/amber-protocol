@@ -32,11 +32,11 @@ See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for the deployment guide.
 
 ## ✅ Current Status
 
-- **Amber core (V1–V5.5 command surface):** implemented and tested
-- **Phase B (routes, sessions, autonomous mode, migration):** implemented and tested
-- **Phase C (Web Viewer):** implemented; unit-tested, Playwright e2e specs wired into CI via the `web` job
-- **Phase D (production hardening):** implemented — SSE token auth (401 on missing/invalid; production requires `SSE_AUTH_SECRET`), loopback-only bind by default, server-side error monitoring (client → `/api/errors` → Sentry/webhook, secrets redacted), and graceful shutdown; auth, monitoring, and shutdown unit-tested
-- **Governance surfaces:** implemented and tested
+- **Core commands:** Repository onboarding, adoption review, governance surfaces — implemented and tested
+- **Route engine:** Goal-driven workflow selection and execution — implemented and tested
+- **Session lifecycle:** State machine, checkpoints, autonomous mode — implemented and tested
+- **Web viewer:** Vite + React dashboard with session visualization — implemented; unit-tested, Playwright e2e specs wired into CI
+- **Production hardening:** SSE token auth, loopback-only bind, error monitoring, graceful shutdown — implemented and tested
 
 Run `npm test` (root suite) and `cd apps/web && npm test` (web suite) for current counts.
 
@@ -78,6 +78,10 @@ These are the real CLI commands; the "Service package" column is a documentation
 
 ## Architecture
 
+Amber Protocol is organized into clear architectural layers and domain modules.
+
+### System Layers
+
 ```mermaid
 flowchart LR
   CLI["scripts/amber.js<br/>Unified CLI"] --> Core["scripts/lib/amber-core.js<br/>Deterministic operations"]
@@ -89,32 +93,48 @@ flowchart LR
   Core --> Validators["scripts/validate-*<br/>Manifest/wiki checks"]
   Core --> Routes["routes/*.route.json<br/>Delivery route definitions"]
   Core --> Schemas["schemas/*.schema.json<br/>JSON Schema drafts"]
-  Core --> PhaseB["src/migration/ src/security/<br/>Migration tools + Security scanners"]
-  Core -.-> Web["apps/web/<br/>Phase C web viewer"]
+  Core --> Migration["src/migration/<br/>Migration tools"]
+  Core -.-> Web["apps/web/<br/>Web viewer"]
   Tests["tests/<br/>Node test suite"] --> CLI
 
   Target["Target repository"] -. "init/wiki create missing files only" .-> Templates
   Target -. "audit/adoption read target state" .-> CLI
 ```
 
-Core boundaries:
+### Core Boundaries
 
-- `scripts/amber.js` handles command routing and user-facing output.
-- `scripts/lib/amber-core.js` contains deterministic scaffold, audit, adoption, planning, review, team, and maintenance logic.
-- `templates/`, `skills/`, `workflow-packs/`, and `profiles/` are declarative inputs.
-- `tests/` protect idempotency, output safety, schema validation, and V1 boundaries.
-- `docs/examples/` contains review artifacts generated from real read-only trials.
+- `scripts/amber.js` handles command routing and user-facing output
+- `scripts/lib/amber-core.js` contains deterministic scaffold, audit, adoption, planning, review, team, and maintenance logic
+- `templates/`, `skills/`, `workflow-packs/`, and `profiles/` are declarative inputs
+- `tests/` protect idempotency, output safety, schema validation, and boundaries
+- `docs/examples/` contains review artifacts generated from real read-only trials
 
-Control-plane emphasis:
+### Control Layers
 
-- **Governance:** approvals, adoption gates, safety boundaries, maintenance proposals, and explicit non-goals.
-- **Verification:** doctor, audits, schema validation, review artifacts, and dry-run proof surfaces.
-- **Observability:** session timelines, ledgers, manifests, reports, and other inspectable records.
-- **Lifecycle:** routes, sessions, checkpoints, and worktrees remain local control mechanisms rather than a full orchestration platform.
+| Layer | Current role | Priority |
+| --- | --- | --- |
+| `Execution` | Minimal. Avoids becoming a general execution runtime or live agent platform. | Low |
+| `Tooling` | CLI commands, schemas, validators, workflow packs, and profiles expose explicit interfaces. | Medium |
+| `Context` | Starter docs, wiki scaffolds, manifests, and handoff artifacts keep project context explicit. | Medium |
+| `Lifecycle` | Routes, sessions, checkpoints, worktrees, and continuation flows organize work locally. | Medium |
+| `Observability` | Timelines, manifests, ledgers, reports, and maintenance artifacts make behavior inspectable. | High |
+| `Verification` | Doctor, audit, validation, review, and gate surfaces provide explicit checks. | High |
+| `Governance` | Approval records, safe defaults, policy boundaries, and adoption controls constrain behavior. | Highest |
+
+This is the architectural through-line: strengthen `Governance`, `Verification`, and `Observability`; keep `Lifecycle` repository-local; avoid drifting into a full agent platform.
+
+### Key Architectural Components
+
+For detailed architecture documentation, see:
+
+- [Route Engine](./docs/architecture/route-engine.md) - Goal-driven workflow selection and execution
+- [Session Lifecycle](./docs/architecture/session-lifecycle.md) - State management, checkpoints, autonomous mode
+- [Web Viewer](./docs/architecture/web-viewer.md) - Dashboard visualization and real-time updates
+- [Governance Model](./docs/architecture/governance-model.md) - Policy, evidence, audit trails
 
 ## Command Surface
 
-### V1–V5.5 Commands
+### Core Commands
 
 Safe bootstrap:
 
@@ -125,8 +145,6 @@ node scripts/amber.js wiki --target path/to/project --dry-run
 node scripts/amber.js doctor --target path/to/project
 node scripts/amber.js handoff --target path/to/project
 ```
-
-### Phase B Commands
 
 Route engine:
 
@@ -260,26 +278,24 @@ Adoption commands are for old or existing projects that should not be modified a
 
 Sample adoption artifacts live under `docs/examples/` and are review-only. They do not imply the target project was initialized, modified, or tested.
 
-## Short Roadmap
+## Development Roadmap
 
-| Phase | Status | Scope |
+| Milestone | Status | Scope |
 | --- | --- | --- |
-| V1 – V5.5 | Implemented | `init`, `audit`, `wiki`, `doctor`, `handoff`, plans, gates, reviews, packs, teams, maintenance, loops |
-| **Phase B Alpha W1** | Implemented | Schema foundation: route/session timeline schemas + validators |
-| **Phase B Alpha W2** | Implemented | Route engine: route-loader, route-selector, `route` CLI |
-| **Phase B Alpha W3** | Implemented | Session lifecycle: state machine, worktree manager, `session` CLI |
-| **Phase B Alpha W4** | Implemented | Interactive execution: stage executor, gate handler, budget tracker |
-| **Phase B Alpha W5** | Implemented | Checkpoint & continue: checkpoint-manager, migrate CLI |
-| **Phase B Beta** | Implemented | Autonomous mode: executor, policy, daemon, logger, notifier, session-lock |
-| **Phase B RC** | Implemented | Integration testing: e2e/load/migration/security test suites |
-| **Phase B GA** | Implemented | Release: publish/release scripts, migration tools (dry-run, rollback, schema-validator) |
-| **Phase C** | Implemented | Web Viewer — Vite + React + TanStack Router; unit-tested; Playwright e2e specs wired into CI via the `web` job |
-| **Phase D** | Implemented | Production hardening — SSE token auth (401 on missing/invalid; `SSE_AUTH_SECRET` required in production), loopback-only bind, server-side error monitoring (client → `/api/errors` → Sentry/webhook, secrets redacted), graceful shutdown; auth/monitoring/shutdown unit-tested |
-| Future Live Loop Scheduling | Not implemented | future-only readiness track |
+| Core Bootstrap | Implemented | `init`, `audit`, `wiki`, `doctor`, `handoff` |
+| Planning & Review | Implemented | Plans, gates, reviews, packs, teams, maintenance |
+| Route Engine | Implemented | Schema foundation, route loader, selector, CLI commands |
+| Session Lifecycle | Implemented | State machine, worktree manager, interactive execution |
+| Checkpoints & Migration | Implemented | Checkpoint manager, state migration tools |
+| Autonomous Mode | Implemented | Executor, policy, daemon, logger, notifier, session-lock |
+| Integration Testing | Implemented | E2E, load, migration, security test suites |
+| Web Viewer | Implemented | Vite + React + TanStack Router; unit + E2E tested |
+| Production Hardening | Implemented | SSE auth, loopback bind, error monitoring, graceful shutdown |
+| Loop Scheduling | Not implemented | Future-only readiness track |
 
 Loop readiness is available as a static, record-only surface. `pack readiness` checks declarative controls without running jobs, dispatching live agents, writing external systems, or opening PRs. `loop inspect`, `loop run --dry-run`, `loop record`, and `loop status` resolve contracts and write or inspect ledger records only; `readyForLiveScheduling` remains `false` by product boundary.
 
-For the full boundary and phase notes, see [SPEC.md](./SPEC.md) and [ROADMAP.md](./ROADMAP.md).
+For the full boundary notes, see [SPEC.md](./SPEC.md) and [ROADMAP.md](./ROADMAP.md).
 
 ## CI/CD
 

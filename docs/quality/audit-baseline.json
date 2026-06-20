@@ -1,0 +1,23 @@
+{
+  "note": "npm audit unavailable due to registry mirror not supporting audit endpoint",
+  "registry": "https://registry.npmmirror.com",
+  "error": "[NOT_IMPLEMENTED] /-/npm/v1/security/* not implemented yet",
+  "baseline_date": "2026-06-21",
+  "workaround": "CI will use official npm registry (registry.npmjs.org) for audit checks",
+  "manual_review": {
+    "dependencies": {
+      "ajv": "^8.20.0",
+      "ajv-formats": "^3.0.1",
+      "nodemailer": "^8.0.11"
+    },
+    "devDependencies": {
+      "c8": "^11.0.0"
+    },
+    "notes": [
+      "All dependencies are widely-used, stable packages",
+      "ajv: JSON Schema validator (5M+ weekly downloads)",
+      "nodemailer: Email sending (2M+ weekly downloads)",
+      "c8: Code coverage tool (1M+ weekly downloads)"
+    ]
+  }
+}
