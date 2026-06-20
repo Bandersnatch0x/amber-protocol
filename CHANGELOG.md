@@ -36,12 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Path traversal protection in session/gate readers
 - Secret redaction in client error reports
 
-## [1.0.0-rc.1] - YYYY-MM-DD
+## [1.0.0-rc.1] - 2026-06-21
 
 ### Added
 - Release candidate for community testing
+- Release checklist documentation for quality assurance
 - Docker isolation testing for npm package
 - GPG-signed release tags
+- RC validation report template
 
 ---
 
