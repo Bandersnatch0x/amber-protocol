@@ -72,6 +72,20 @@ function loadSessionManifest(projectRoot, sessionId) {
 	}
 }
 
+function requireSession(projectRoot, sessionId) {
+	// Validates that a session exists and its manifest is readable.
+	// Used by statusSession, abortSession, and continueSession — previously
+	// each duplicated this 6-line not-found/corrupt check.
+	const loaded = loadSessionManifest(projectRoot, sessionId);
+	if (!loaded) {
+		return result(`Session not found: ${sessionId}`, 1);
+	}
+	if (loaded.corrupt) {
+		return result(`Session manifest is corrupt: ${sessionId}`, 1);
+	}
+	return loaded;
+}
+
 function loadAllSessionManifests(projectRoot) {
 	// Enumerate every session manifest under the state dir, newest first. Both
 	// findMostRecentSession and listSessions previously duplicated this
@@ -198,13 +212,8 @@ function statusSession(projectRoot, options) {
 		}
 	}
 
-	const loaded = loadSessionManifest(projectRoot, sessionId);
-	if (!loaded) {
-		return result(`Session not found: ${sessionId}`, 1);
-	}
-	if (loaded.corrupt) {
-		return result(`Session manifest is corrupt: ${sessionId}`, 1);
-	}
+	const loaded = requireSession(projectRoot, sessionId);
+	if (loaded.exitCode !== undefined) return loaded; // error result from requireSession
 	const { manifest } = loaded;
 
 	const lines = [
@@ -262,13 +271,8 @@ async function abortSession(projectRoot, options) {
 		return result("Error: --session-id is required", 1);
 	}
 
-	const loaded = loadSessionManifest(projectRoot, sessionId);
-	if (!loaded) {
-		return result(`Session not found: ${sessionId}`, 1);
-	}
-	if (loaded.corrupt) {
-		return result(`Session manifest is corrupt: ${sessionId}`, 1);
-	}
+	const loaded = requireSession(projectRoot, sessionId);
+	if (loaded.exitCode !== undefined) return loaded;
 	const { manifest, sessionDir, manifestPath } = loaded;
 
 	const sm = new SessionStateMachine(manifest.status);
@@ -304,13 +308,8 @@ async function continueSession(projectRoot, options) {
 		}
 	}
 
-	const loaded = loadSessionManifest(projectRoot, sessionId);
-	if (!loaded) {
-		return result(`Session not found: ${sessionId}`, 1);
-	}
-	if (loaded.corrupt) {
-		return result(`Session manifest is corrupt: ${sessionId}`, 1);
-	}
+	const loaded = requireSession(projectRoot, sessionId);
+	if (loaded.exitCode !== undefined) return loaded;
 	const { manifest, sessionDir, manifestPath } = loaded;
 
 	const versionCheck = checkSchemaVersion(manifest);
@@ -433,4 +432,5 @@ module.exports = {
 	getSessionsDir,
 	loadSessionManifest,
 	loadAllSessionManifests,
+	requireSession,
 };
