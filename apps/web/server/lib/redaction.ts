@@ -37,3 +37,32 @@ export function redactSecrets(text: string): string {
   }
   return RULES.reduce((acc, rule) => acc.replace(rule.pattern, rule.replacement), text);
 }
+
+/**
+ * Recursively redact secrets from an arbitrary value before it leaves the
+ * process (e.g. a client-supplied `context` object forwarded to monitoring).
+ *
+ * - Strings are passed through {@link redactSecrets}.
+ * - Arrays and plain objects are walked, producing new containers (the input
+ *   is never mutated).
+ * - All other values (number, boolean, null, undefined, etc.) are returned
+ *   unchanged.
+ */
+export function redactDeep(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return redactSecrets(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactDeep(item));
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).map(
+      ([key, val]) => [key, redactDeep(val)] as const,
+    );
+    return Object.fromEntries(entries);
+  }
+
+  return value;
+}

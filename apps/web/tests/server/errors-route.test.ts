@@ -81,4 +81,36 @@ describe('handleErrorReport', () => {
     );
     expect(lastPayload().userAgent).toBe('Mozilla/5.0');
   });
+
+  it('redacts secrets in the context object before forwarding', () => {
+    const res = mockRes();
+    handleErrorReport(
+      mockReq({
+        message: 'm',
+        context: { apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl', nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' } },
+      }) as Request,
+      res as Response,
+    );
+    const payload = lastPayload();
+    const ctx = payload.context as Record<string, unknown>;
+    expect(JSON.stringify(ctx)).not.toContain('sk-ant-api03-AbC123_def456GHI789jkl');
+    expect(JSON.stringify(ctx)).not.toContain('ghp_1234567890abcdefABCDEF1234567890abcd');
+    expect(ctx.apiKey).toContain('[REDACTED]');
+    expect((ctx.nested as Record<string, unknown>).token).toContain('[REDACTED]');
+  });
+
+  it('preserves non-secret context values while redacting secrets', () => {
+    const res = mockRes();
+    handleErrorReport(
+      mockReq({
+        message: 'm',
+        context: { route: '/dashboard', retryCount: 3, ok: true },
+      }) as Request,
+      res as Response,
+    );
+    const ctx = lastPayload().context as Record<string, unknown>;
+    expect(ctx.route).toBe('/dashboard');
+    expect(ctx.retryCount).toBe(3);
+    expect(ctx.ok).toBe(true);
+  });
 });
