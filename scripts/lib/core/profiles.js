@@ -8,6 +8,7 @@ const {
 
 const {
 	readJson,
+	isMissingPath,
 } = require("./fs-utils");
 
 const {
@@ -59,6 +60,13 @@ function validateProjectProfileData(data) {
 }
 
 function inspectProjectProfile(filePath) {
+	if (isMissingPath(filePath)) {
+		return {
+			file: "",
+			errors: ["No project profile file specified. Pass --file <path>."],
+			warnings: [],
+		};
+	}
 	const profilePath = path.resolve(filePath);
 	const errors = [];
 	const warnings = [];

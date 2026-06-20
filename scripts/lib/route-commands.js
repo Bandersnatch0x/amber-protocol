@@ -6,9 +6,6 @@ const { result } = require("./result");
 
 const DEFAULT_ROUTES_DIR = path.join(__dirname, "../../routes");
 
-function stageCount(route) {
-	return Array.isArray(route.stages) ? route.stages.length : 0;
-}
 
 function findRoute(routeId, routesDir) {
 	const { routes } = loadRoutes(routesDir);
@@ -26,7 +23,7 @@ function listRoutes(routesDir = DEFAULT_ROUTES_DIR) {
 		const version = route.version || "0.0.0";
 		const description = route.description || "";
 		lines.push(
-			`  ${route.routeId} (v${version}) — ${stageCount(route)} stages — ${description}`,
+			`  ${route.routeId} (v${version}) — ${Array.isArray(route.stages) ? route.stages.length : 0} stages — ${description}`,
 		);
 	}
 	return result(lines.join("\n"));

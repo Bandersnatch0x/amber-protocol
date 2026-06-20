@@ -38,8 +38,35 @@ function readText(filePath) {
 	return fs.readFileSync(filePath, "utf8");
 }
 
+// True when a path argument is absent or blank. Used by command readers to
+// reject a missing --file/--contract/--ledger up front with a clear message,
+// instead of letting path.resolve(undefined) throw a raw TypeError or
+// path.resolve("") fall through to an EISDIR on the current directory.
+function isMissingPath(value) {
+	return typeof value !== "string" || value.trim() === "";
+}
+
 function readJson(filePath) {
-	return JSON.parse(readText(filePath));
+	let text;
+	try {
+		text = readText(filePath);
+	} catch (e) {
+		if (e.code === "ENOENT") {
+			throw new Error(`File not found: ${filePath}.`);
+		}
+		throw e;
+	}
+	try {
+		return JSON.parse(text);
+	} catch (e) {
+		if (e instanceof SyntaxError) {
+			throw new Error(
+				`Failed to parse JSON file: ${filePath}. ${e.message}. ` +
+				"The file may be corrupted or contain invalid JSON.",
+			);
+		}
+		throw e;
+	}
 }
 
 function writeJson(filePath, data) {
@@ -156,6 +183,7 @@ module.exports = {
 	resolveTarget,
 	pathExists,
 	readText,
+	isMissingPath,
 	readJson,
 	writeJson,
 	collectFilesBySuffix,

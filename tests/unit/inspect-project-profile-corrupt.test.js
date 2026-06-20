@@ -43,3 +43,15 @@ test("inspectProjectProfile reports an error instead of throwing on a JSON array
 	const result = inspectProjectProfile(filePath);
 	assert.ok(result.errors.length > 0);
 });
+
+test("inspectProjectProfile reports a clear error for a missing file path", () => {
+	// A missing --file previously fell through to path.resolve("") → readdir on
+	// cwd → a cryptic EISDIR. The guard must name the missing input instead.
+	for (const missing of [undefined, "", "   "]) {
+		const result = inspectProjectProfile(missing);
+		assert.ok(
+			result.errors.some((e) => /specified|--file/.test(e)),
+			`expected a missing-path error for ${JSON.stringify(missing)}, got: ${JSON.stringify(result.errors)}`,
+		);
+	}
+});

@@ -21,7 +21,15 @@ async function executeAutonomous(projectRoot, sessionId, options = {}) {
 		return { success: false, exitCode: 1, error: "Session not found" };
 	}
 
-	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	let manifest;
+	try {
+		manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	} catch {
+		// A present but unparseable manifest fails gracefully, symmetric with the
+		// missing case above and every other manifest reader, instead of crashing
+		// the autonomous run with a raw SyntaxError.
+		return { success: false, exitCode: 1, error: "Session manifest is corrupt" };
+	}
 	const policy = loadPolicy(projectRoot);
 
 	const routesDir = path.join(projectRoot, "routes");
