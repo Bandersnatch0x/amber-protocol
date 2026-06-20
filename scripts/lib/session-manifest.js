@@ -9,7 +9,15 @@ const schemaPath = path.join(
 	__dirname,
 	"../../schemas/session-manifest.schema.json",
 );
-const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+let schema;
+try {
+  schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+} catch (e) {
+  throw new Error(
+    `Failed to load session manifest schema from ${schemaPath}: ${e.message}. ` +
+    "Re-run 'node scripts/amber.js init' to restore missing schema files.",
+  );
+}
 
 const ajv = new Ajv();
 addFormats(ajv);

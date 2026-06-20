@@ -35,7 +35,7 @@ See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for the deployment guide.
 - **Amber core (V1–V5.5 command surface):** implemented and tested
 - **Phase B (routes, sessions, autonomous mode, migration):** implemented and tested
 - **Phase C (Web Viewer):** implemented; unit-tested, Playwright e2e specs wired into CI via the `web` job
-- **Phase D (production hardening):** partial — SSE auth helpers and error logging exist, SSE endpoint enforcement and external monitoring are not wired
+- **Phase D (production hardening):** implemented — SSE token auth (401 on missing/invalid; production requires `SSE_AUTH_SECRET`), loopback-only bind by default, server-side error monitoring (client → `/api/errors` → Sentry/webhook, secrets redacted), and graceful shutdown; auth, monitoring, and shutdown unit-tested
 - **Governance surfaces:** implemented and tested
 
 Run `npm test` (root suite) and `cd apps/web && npm test` (web suite) for current counts.
@@ -204,6 +204,28 @@ node scripts/amber.js maintenance inspect --target path/to/project
 node scripts/amber.js maintenance propose --target path/to/project
 ```
 
+Governance surfaces:
+
+```sh
+node scripts/amber.js governance docs --target path/to/project
+node scripts/amber.js governance policy --target path/to/project
+node scripts/amber.js governance evidence --session <id> --output evidence.md
+node scripts/amber.js governance audit --target path/to/project --output audit.md
+```
+
+Execution boundary validation (declarative, no execution):
+
+```sh
+node scripts/amber.js execution validate-integration --contract path/to/contract.json
+node scripts/amber.js execution readiness --target path/to/project --plan docs/plans/F001-small-slice.md
+```
+
+Security audit:
+
+```sh
+node scripts/amber.js security audit --target path/to/project
+```
+
 Run `node scripts/amber.js <command> --help` for scoped command help.
 
 Additional commands `task`, `result`, `agent`, and `loop` exist but are
@@ -252,7 +274,7 @@ Sample adoption artifacts live under `docs/examples/` and are review-only. They 
 | **Phase B RC** | Implemented | Integration testing: e2e/load/migration/security test suites |
 | **Phase B GA** | Implemented | Release: publish/release scripts, migration tools (dry-run, rollback, schema-validator) |
 | **Phase C** | Implemented | Web Viewer — Vite + React + TanStack Router; unit-tested; Playwright e2e specs wired into CI via the `web` job |
-| **Phase D** | Partial | Production hardening — SSE auth helpers and error logging exist; SSE endpoint enforcement and external monitoring are not wired |
+| **Phase D** | Implemented | Production hardening — SSE token auth (401 on missing/invalid; `SSE_AUTH_SECRET` required in production), loopback-only bind, server-side error monitoring (client → `/api/errors` → Sentry/webhook, secrets redacted), graceful shutdown; auth/monitoring/shutdown unit-tested |
 | Future Live Loop Scheduling | Not implemented | future-only readiness track |
 
 Loop readiness is available as a static, record-only surface. `pack readiness` checks declarative controls without running jobs, dispatching live agents, writing external systems, or opening PRs. `loop inspect`, `loop run --dry-run`, `loop record`, and `loop status` resolve contracts and write or inspect ledger records only; `readyForLiveScheduling` remains `false` by product boundary.

@@ -184,3 +184,29 @@ test("loop inspect explains contract readiness without writing a ledger", () => 
   assert.equal(payload.readiness.readyForLiveScheduling, false);
   assert.equal(payload.execution.executesAnything, false);
 });
+
+// Missing required path args previously produced a raw TypeError
+// ("paths[0] must be of type string") or a cryptic EISDIR, AND exited 0 —
+// reporting failure as success. Each must now give a clear message and exit 1.
+test("loop/pack/profile commands reject a missing path arg clearly and exit non-zero", () => {
+  const cases = [
+    { args: ["pack", "inspect", "--json"], match: /specified|--file/ },
+    { args: ["pack", "readiness", "--json"], match: /specified|--file/ },
+    { args: ["profile", "inspect", "--json"], match: /specified|--file/ },
+    { args: ["loop", "inspect", "--json"], match: /specified|--file/ },
+    { args: ["loop", "record", "--json"], match: /specified|--file/ },
+    { args: ["loop", "status", "--json"], match: /specified|--ledger/ },
+  ];
+  for (const { args, match } of cases) {
+    const result = runHarness(args);
+    assert.notEqual(result.status, 0, `expected non-zero exit for: ${args.join(" ")}`);
+    const payload = JSON.parse(result.stdout);
+    assert.match(
+      payload.errors.join("\n"),
+      match,
+      `expected a clear missing-arg error for: ${args.join(" ")}`,
+    );
+    // The old raw failures leaked these into the message.
+    assert.doesNotMatch(payload.errors.join("\n"), /paths\[0\]|EISDIR|TypeError/);
+  }
+});

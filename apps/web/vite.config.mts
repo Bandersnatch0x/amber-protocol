@@ -20,4 +20,27 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    target: 'esnext',
+    minify: 'esbuild',
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+            return 'vendor';
+          }
+          if (id.includes('node_modules/@tanstack/react-router')) {
+            return 'router';
+          }
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'query';
+          }
+          if (id.includes('node_modules/@trpc/')) {
+            return 'trpc';
+          }
+        },
+      },
+    },
+  },
 });

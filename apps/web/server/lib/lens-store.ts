@@ -11,6 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { readRepoTranscript, type TranscriptDetail } from './claude-transcript-reader';
+import { AMBER_STATE_DIR } from './state-dir';
 
 export interface LensSaveOptions {
   repoPath: string;
@@ -25,7 +26,7 @@ export interface LensSaveResult {
 }
 
 function ensureLensDir(repoRoot: string): string {
-  const lensDir = path.join(repoRoot, '.amber', 'lens');
+  const lensDir = path.join(repoRoot, AMBER_STATE_DIR, 'lens');
   fs.mkdirSync(lensDir, { recursive: true });
   // Defense in depth: ignore everything in this directory so a redacted
   // digest still cannot be committed.

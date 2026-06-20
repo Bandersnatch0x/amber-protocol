@@ -535,18 +535,24 @@ function printResult(result, options = {}) {
 			);
 		}
 	}
-	if (result.errors.length === 0) {
+	// Some command results (e.g. execution validate-integration) carry their
+	// own shape without an errors/warnings envelope; default to empty arrays so
+	// the generic footer never crashes on a missing field.
+	const errors = Array.isArray(result.errors) ? result.errors : [];
+	const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+
+	if (errors.length === 0) {
 		console.log("Errors: 0");
 	} else {
-		console.log(`Errors: ${result.errors.length}`);
-		for (const error of result.errors) {
+		console.log(`Errors: ${errors.length}`);
+		for (const error of errors) {
 			console.log(`  - ${error}`);
 		}
 	}
 
-	if (result.warnings.length > 0) {
-		console.log(`Warnings: ${result.warnings.length}`);
-		for (const warning of result.warnings) {
+	if (warnings.length > 0) {
+		console.log(`Warnings: ${warnings.length}`);
+		for (const warning of warnings) {
 			console.log(`  - ${warning}`);
 		}
 	}

@@ -79,3 +79,23 @@ test("inspectWorkflowPackReadiness runs readiness analysis on a valid pack", () 
 	assert.equal(result.execution.schedulesJobs, false);
 	assert.ok(result.readiness && typeof result.readiness === "object");
 });
+
+test("a missing --file path is reported clearly, not as a cryptic EISDIR", () => {
+	// readWorkflowPackFile previously resolved "" to cwd and tried to readJson a
+	// directory, surfacing "EISDIR: illegal operation on a directory". The guard
+	// must name the missing input instead.
+	for (const missing of [undefined, "", "   "]) {
+		const read = readWorkflowPackFile(missing, { executionOnError: {} });
+		assert.equal(read.ok, false);
+		assert.ok(
+			read.result.errors.some((e) => /specified|--file/.test(e)),
+			`expected a missing-path error for ${JSON.stringify(missing)}, got: ${JSON.stringify(read.result.errors)}`,
+		);
+	}
+});
+
+test("inspectWorkflowPack surfaces a missing-path error without throwing", () => {
+	const result = inspectWorkflowPack("");
+	assert.ok(result.errors.some((e) => /specified|--file/.test(e)));
+	assert.equal(result.execution.executesAnything, false);
+});

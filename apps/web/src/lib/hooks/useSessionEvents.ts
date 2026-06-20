@@ -81,12 +81,12 @@ export function useSessionEvents(sessionId: string | null): UseSessionEventsRetu
           const nextStatus = statusFromEventType(event.type);
           if (nextStatus) setStatus(nextStatus);
         } catch (err) {
-          console.error('Failed to parse event:', err);
+          // Event parse failures are non-fatal; skip malformed events
         }
       };
 
-      es.onerror = (err) => {
-        console.error('SSE connection error:', err);
+      es.onerror = () => {
+        // SSE reconnection handled by backoff below
         setConnectionState('error');
         setError('Connection lost. Reconnecting...');
         es.close();

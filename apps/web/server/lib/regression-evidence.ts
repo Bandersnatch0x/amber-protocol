@@ -17,6 +17,7 @@ import {
   resolveClaudeProjectsDir,
   type TranscriptFailure,
 } from './claude-transcript-reader';
+import { AMBER_STATE_DIR } from './state-dir';
 
 export interface RegressionEvidenceOptions {
   repoPath: string;
@@ -64,7 +65,7 @@ export function proposeRegressionsFromTranscript(
     return { transcriptId: id, proposedCount: 0, files: [] };
   }
 
-  const executionsRoot = path.join(opts.repoRoot, '.amber', 'executions');
+  const executionsRoot = path.join(opts.repoRoot, AMBER_STATE_DIR, 'executions');
   const files: string[] = [];
 
   failures.forEach((failure, index) => {
