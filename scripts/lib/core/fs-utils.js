@@ -69,6 +69,31 @@ function readJson(filePath) {
 	}
 }
 
+// Read JSON without throwing. Returns {value, error} so callers can degrade
+// gracefully instead of crashing. File-not-found returns {value: null, error: null}
+// (not an error, just absent). Parse failure returns {value: null, error: string}.
+// IMPORTANT: A file containing literal `null` parses successfully and returns
+// {value: null, error: null}, so callers must check `!value || typeof value !== 'object'`
+// in addition to `error` when expecting an object.
+function readJsonSafe(filePath) {
+	if (!pathExists(filePath)) {
+		return { value: null, error: null };
+	}
+	try {
+		const text = readText(filePath);
+		const value = JSON.parse(text);
+		return { value, error: null };
+	} catch (e) {
+		if (e instanceof SyntaxError) {
+			return {
+				value: null,
+				error: `Failed to parse JSON file: ${filePath}. ${e.message}. The file may be corrupted.`,
+			};
+		}
+		return { value: null, error: e.message || String(e) };
+	}
+}
+
 function writeJson(filePath, data) {
 	fs.mkdirSync(path.dirname(filePath), { recursive: true });
 	fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
@@ -185,6 +210,7 @@ module.exports = {
 	readText,
 	isMissingPath,
 	readJson,
+	readJsonSafe,
 	writeJson,
 	collectFilesBySuffix,
 	walkFiles,

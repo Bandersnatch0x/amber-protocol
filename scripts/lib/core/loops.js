@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const {
 	readJson,
+	readJsonSafe,
 	isMissingPath,
 } = require("./fs-utils");
 
@@ -63,7 +64,23 @@ function inspectLoopContract(options = {}) {
 		};
 	}
 	const absolutePath = path.resolve(options.file);
-	const data = readJson(absolutePath);
+	const { value: data, error } = readJsonSafe(absolutePath);
+	if (error) {
+		return {
+			file: absolutePath,
+			errors: [error],
+			warnings: [],
+			...noOpExecution(),
+		};
+	}
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
+		return {
+			file: absolutePath,
+			errors: [`Workflow pack file is not a valid object: ${absolutePath}`],
+			warnings: [],
+			...noOpExecution(),
+		};
+	}
 	const contract = findLoopContract(data, options.contract);
 	return {
 		file: absolutePath,
@@ -81,7 +98,13 @@ function inspectLoopContract(options = {}) {
 
 function readContractAndBuildLedger(options, ledgerOptions) {
 	const absolutePath = path.resolve(options.file);
-	const data = readJson(absolutePath);
+	const { value: data, error } = readJsonSafe(absolutePath);
+	if (error) {
+		throw new Error(error);
+	}
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
+		throw new Error(`Workflow pack file is not a valid object: ${absolutePath}`);
+	}
 	const contract = findLoopContract(data, options.contract);
 	const ledgerRecord = buildLoopLedgerRecord(data, contract, ledgerOptions);
 
@@ -153,7 +176,21 @@ function inspectLoopLedger(options = {}) {
 		};
 	}
 	const ledgerPath = path.resolve(options.ledger);
-	const record = readJson(ledgerPath);
+	const { value: record, error } = readJsonSafe(ledgerPath);
+	if (error) {
+		return {
+			ledger: ledgerPath,
+			errors: [error],
+			warnings: [],
+		};
+	}
+	if (!record || typeof record !== "object" || Array.isArray(record)) {
+		return {
+			ledger: ledgerPath,
+			errors: [`Ledger file is not a valid object: ${ledgerPath}`],
+			warnings: [],
+		};
+	}
 	return { ledger: ledgerPath, record, errors: [], warnings: [] };
 }
 
