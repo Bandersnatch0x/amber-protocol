@@ -4,12 +4,14 @@ import { sessionEvents } from '../services/session-events';
 import { readSessionById } from '../lib/session-reader';
 import { SessionStatusSchema } from '../types/session-events';
 
-const statusTransitions: Record<string, string[]> = {
-  idle: ['running'],
-  running: ['paused', 'aborted', 'completed'],
-  paused: ['running', 'aborted'],
-  completed: [],
-  aborted: [],
+// Action-centric guard: each action declares which statuses it can be invoked from.
+// This prevents semantic confusion where start/resume both target 'running' but mean
+// different things (start=first execution, resume=continue after pause).
+const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+  start: ['idle'],
+  pause: ['running'],
+  resume: ['paused'],
+  abort: ['running', 'paused'],
 };
 
 export const sessionControlRouter = router({
@@ -22,9 +24,10 @@ export const sessionControlRouter = router({
       }
 
       const currentStatus = session.status;
-      if (!statusTransitions[currentStatus]?.includes('running')) {
+      const action = 'start';
+      if (!ALLOWED_TRANSITIONS[action].includes(currentStatus)) {
         if (currentStatus === 'running') return { status: currentStatus, timestamp: Date.now() };
-        throw new Error(`Cannot start from status: ${currentStatus}`);
+        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
       sessionEvents.emitSessionStarted(input.sessionId);
@@ -40,9 +43,10 @@ export const sessionControlRouter = router({
       }
 
       const currentStatus = session.status;
-      if (!statusTransitions[currentStatus]?.includes('paused')) {
+      const action = 'pause';
+      if (!ALLOWED_TRANSITIONS[action].includes(currentStatus)) {
         if (currentStatus === 'paused') return { status: currentStatus, timestamp: Date.now() };
-        throw new Error(`Cannot pause from status: ${currentStatus}`);
+        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
       sessionEvents.emitSessionPaused(input.sessionId);
@@ -58,9 +62,10 @@ export const sessionControlRouter = router({
       }
 
       const currentStatus = session.status;
-      if (!statusTransitions[currentStatus]?.includes('running')) {
+      const action = 'resume';
+      if (!ALLOWED_TRANSITIONS[action].includes(currentStatus)) {
         if (currentStatus === 'running') return { status: currentStatus, timestamp: Date.now() };
-        throw new Error(`Cannot resume from status: ${currentStatus}`);
+        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
       sessionEvents.emitSessionResumed(input.sessionId);
@@ -76,9 +81,10 @@ export const sessionControlRouter = router({
       }
 
       const currentStatus = session.status;
-      if (!statusTransitions[currentStatus]?.includes('aborted')) {
+      const action = 'abort';
+      if (!ALLOWED_TRANSITIONS[action].includes(currentStatus)) {
         if (currentStatus === 'aborted') return { status: currentStatus, timestamp: Date.now() };
-        throw new Error(`Cannot abort from status: ${currentStatus}`);
+        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
       sessionEvents.emitSessionAborted(input.sessionId, input.reason);
