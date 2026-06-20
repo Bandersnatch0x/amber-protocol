@@ -7,6 +7,7 @@ const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-d
 const {
 	pathExists,
 	readJson,
+	readJsonSafe,
 	readText,
 	relativeSlash,
 	resolveTarget,
@@ -479,8 +480,22 @@ function detectPackDrift(projectRoot, registryPath) {
 		return { drifted: false, installed: [], latest: [], diff: [] };
 	}
 
-	const lock = readJson(paths.lockPath);
-	const registry = readJson(registryPath);
+	const { value: lock, error: lockError } = readJsonSafe(paths.lockPath);
+	if (lockError) {
+		throw new Error(lockError);
+	}
+	if (!lock || typeof lock !== "object" || Array.isArray(lock)) {
+		throw new Error(`Team lock file is not a valid object: ${paths.lockPath}`);
+	}
+
+	const { value: registry, error: registryError } = readJsonSafe(registryPath);
+	if (registryError) {
+		throw new Error(registryError);
+	}
+	if (!registry || typeof registry !== "object" || Array.isArray(registry)) {
+		throw new Error(`Team registry is not a valid object: ${registryPath}`);
+	}
+
 	const installed = Array.isArray(lock.rulePacks) ? lock.rulePacks : [];
 	const latestVer = latestTeamVersion(registry);
 	const latest = registry.versions?.[latestVer]?.rulePacks || [];
@@ -533,7 +548,13 @@ function fixWikiMarkers(projectRoot) {
 function previewUpgrade(projectRoot, version, registryPath) {
 	const paths = teamStatePaths(projectRoot);
 	const lock = loadTeamLock(paths);
-	const registry = readJson(registryPath);
+	const { value: registry, error: registryError } = readJsonSafe(registryPath);
+	if (registryError) {
+		throw new Error(registryError);
+	}
+	if (!registry || typeof registry !== "object" || Array.isArray(registry)) {
+		throw new Error(`Team registry is not a valid object: ${registryPath}`);
+	}
 	const targetVersion = version || latestTeamVersion(registry);
 	const targetRelease = registry.versions?.[targetVersion];
 
