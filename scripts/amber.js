@@ -100,6 +100,11 @@ async function run(argv = process.argv.slice(2)) {
     return 0;
   }
 
+  if (command === "--version" || command === "-v") {
+    console.log(require("../package.json").version);
+    return 0;
+  }
+
   if (!COMMANDS.includes(command)) {
     console.error(`Unknown command: ${command}`);
     console.error(`Expected one of: ${COMMANDS.join(", ")}`);

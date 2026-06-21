@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated tooling for document migration and link checking
 - Core use cases definition for integration testing
 
-## [1.0.0] - YYYY-MM-DD
+## [1.0.0] - 2026-06-22
 
 ### Added
 - Core Amber Protocol engine (init, audit, doctor, adoption)
@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Path traversal protection in session/gate readers
 - Secret redaction in client error reports
+- Upgraded Nodemailer to 9.0.1 to resolve GHSA-p6gq-j5cr-w38f
 
 ## [1.0.0-rc.1] - 2026-06-21
 

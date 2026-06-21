@@ -1,74 +1,73 @@
-# Release Notes — Phase B v1.0.0
+# Release Notes - Amber Protocol v1.0.0
 
-**June 10, 2026** — The Coding Harness team is excited to announce the General Availability release of Phase B!
+**June 22, 2026** - Amber Protocol v1.0.0 is the first stable release of the repository-local governance layer for agent-assisted engineering.
 
-## What is Phase B?
+## What Is Amber Protocol?
 
-Phase B is a complete reimagining of Coding Harness, introducing a modular framework for building, extending, and securing your AI-powered development workflows.
+Amber Protocol helps teams prepare, review, validate, hand off, and audit AI-assisted engineering work inside a repository. It exposes one CLI entry point, `amber`, with read-only checks first and explicit guardrails around generated project state.
 
-## Top 5 Features
+## Highlights
 
-### 1. 🔒 Built-in Security Audit
-Run `coding-harness security audit` to scan your project for:
-- **Dependency vulnerabilities** (via npm audit integration)
-- **Hardcoded secrets** (API keys, tokens, passwords)
-- **Permission issues** (overly broad access, unused permissions)
+### Repository-Local Governance
 
-### 2. 🔄 One-Click Migration
-Migrate from V5.5 with a single command. Dry-run mode shows you exactly what changes before you commit. Rollback if needed.
+Install a durable project scaffold with `amber init`, then validate it with `amber doctor`. The scaffold includes agent instructions, continuity files, a wiki skeleton, task templates, and verification guidance.
 
-### 3. 🎯 Skill System
-Create reusable AI capabilities with simple Markdown files. Share skills across your team. Programmatic API available for complex logic.
+### Read-Only Adoption Workflow
 
-### 4. ⚡ Agent Profiles
-Configure specialized AI agents with specific models, skills, and permissions. Worker/reviewer patterns for multi-agent workflows.
+Use `amber audit` and `amber adoption report` to inspect existing projects without modifying them. Reports identify missing starter files, tooling evidence, existing agent docs, and safe next actions.
 
-### 5. 🪝 Lifecycle Hooks
-Intercept tool calls, git events, and session lifecycles. Validate inputs, audit outputs, and enforce policies automatically.
+### Route And Session Lifecycle
 
-## Performance Improvements
+Reference routes cover feature work, bug fixes, and refactors. Session commands create traceable manifests, timelines, checkpoints, and handoff surfaces for agent-assisted work.
 
-- 40% faster startup with lazy skill loading
-- Token budgeting prevents runaway consumption
-- Parallel hook execution for large projects
+### Multi-Agent Skill Distribution
 
-## Breaking Changes
+Amber skills are maintained under `skills/` and generated into platform-specific surfaces for Claude Code, Codex, Cursor, and Gemini CLI. `npm run gen:agents:check` guards against generated drift.
 
-We've streamlined the configuration format. Key changes from V5.5:
-- `version` changes from `"5.5"` to `"1.0.0"`
-- New required `framework` field: `"phase-b"`
-- Deprecated V5.5-only fields are removed
-- Skills and profiles are now first-class concepts
+### Security And Release Hardening
 
+The v1.0.0 release includes path traversal protections, secret redaction in client error reports, package manifest validation, coverage gates, link checks, and an updated Nodemailer dependency resolving GHSA-p6gq-j5cr-w38f.
 
 ## Getting Started
 
 ```bash
-npm install -g coding-harness
-coding-harness init my-project
-cd my-project
-coding-harness doctor
+npm install -g amber-protocol
+amber init --target my-project
+amber doctor --target my-project
 ```
 
-## Upgrade from V5.5
+Inspect an existing repository without writing files:
 
 ```bash
-coding-harness migrate --dry-run  # Preview
-coding-harness migrate            # Apply
-coding-harness validate           # Verify
+amber audit --target my-project
+amber adoption report --target my-project --output-dir docs/examples/adoptions
 ```
 
-## What's Next
+## Compatibility Notes
 
-Phase C development is already underway, focusing on:
-- Web-based project viewer
-- Team collaboration features
-- Cloud integration
+- Node.js 18.17.0 or newer is required.
+- npm 9.0.0 or newer is required.
+- The legacy `coding-harness` bin remains as a compatibility alias.
+- Session manifest schema compatibility remains at `1.0.0-rc.1`; package version and data-contract version are intentionally decoupled until the manifest format changes.
 
-## Thank You
+## Verification Snapshot
 
-To all our alpha testers, RC participants, and community contributors — this release wouldn't be possible without you. Special thanks to everyone who reported bugs, suggested improvements, and helped test the migration tool.
+Release validation for this build includes:
+
+- `npm test`
+- `npm run test:coverage`
+- `npm run test:load`
+- `npm run gen:agents:check`
+- `npm run manifests`
+- `node scripts/amber.js doctor --target .`
+- `node scripts/check-broken-links.js`
+- `npm audit --audit-level=high --registry=https://registry.npmjs.org`
+- `node scripts/publish.js --dry-run`
+
+## Known Operational Requirements
+
+Before public publication, maintainers must still verify npm account access, configure the Git remote, push the v1.0.0 tag, and create the GitHub release from the committed release artifact.
 
 ---
 
-[Documentation](../user-guide/getting-started.md) · [Changelog](./CHANGELOG.md)
+[Documentation](../user-guide/getting-started.md) | [Changelog](../../CHANGELOG.md)

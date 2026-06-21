@@ -1473,6 +1473,17 @@ test("help scopes dry-run to commands that support it", () => {
 	assert.doesNotMatch(executionHelp.stdout, /validate-loop/);
 });
 
+test("version command prints the package version", () => {
+	const packageJson = JSON.parse(
+		fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
+	);
+
+	const result = runHarness(["--version"]);
+
+	assert.equal(result.status, 0, result.stderr);
+	assert.equal(result.stdout.trim(), packageJson.version);
+});
+
 test("package exposes amber as primary bin with a legacy coding-harness alias", () => {
 	const packageJson = JSON.parse(
 		fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
