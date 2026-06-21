@@ -164,8 +164,8 @@ Add `<prefix>/bin` to your PATH environment variable.
 ## Next Steps
 
 - Read [Architecture Overview](../architecture/overview.md)
-- Explore [Route Documentation](../routes/README.md)
-- Learn about [Session Lifecycle](../sessions/lifecycle.md)
+- Explore [Route Engine](../architecture/route-engine.md)
+- Learn about [Session Lifecycle](../architecture/session-lifecycle.md)
 - Review [Agent Instructions](../../AGENTS.md)
 
 ## Feedback
