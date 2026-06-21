@@ -13,7 +13,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/npm/v/amber-protocol)
 
-**Status:** Release Candidate | **Version:** 1.0.0-rc.1
+**Status:** Stable | **Version:** 1.0.0
 
 Amber Protocol is a repo-local AI coding governance console for engineering teams. It helps teams prepare, review, verify, hand off, and audit AI-assisted coding work inside a repository.
 

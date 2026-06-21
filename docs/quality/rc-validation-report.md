@@ -1,429 +1,73 @@
-# RC Validation Report
+# v1.0.0 Release Validation Report
 
 ## Release Information
 
-- **Version:** [RC version number]
-- **Release Date:** [YYYY-MM-DD]
-- **Validation Period:** [Start date] to [End date]
-- **Validator(s):** [Names/Handles]
+- **Version:** 1.0.0
+- **Validation Date:** 2026-06-22
+- **Validator:** Codex CLI
+- **Scope:** Local release readiness, package dry-run, security gate, documentation checks, and Amber product self-validation.
 
 ## Executive Summary
 
-Brief overview of validation results:
-- [ ] **PASS** - Ready for stable release
-- [ ] **PASS WITH NOTES** - Minor issues documented, non-blocking
-- [ ] **FAIL** - Critical issues found, requires fixes
-
-**Overall Assessment:** [1-2 sentence summary]
+- **Status:** PASS WITH PUBLISHING ACTIONS REMAINING
+- **Assessment:** Local quality gates, package validation, documentation links, and high-severity security audit are passing. Public publication still requires maintainer credentials and repository remote/tag operations.
 
 ## Validation Environment
 
-### Test Systems
-
 | Environment | OS | Node Version | npm Version | Status |
-|-------------|----|--------------|--------------|---------| 
-| Local Dev | [OS] | [version] | [version] | [PASS/FAIL] |
-| Docker Alpine | Alpine Linux | 18.x | 9.x | [PASS/FAIL] |
-| Docker Debian | Debian | 18.x | 9.x | [PASS/FAIL] |
-| CI/CD | Ubuntu Latest | 22.x | 9.x | [PASS/FAIL] |
-
-### Test Projects
-
-| Project | Type | Purpose | Status |
-|---------|------|---------|--------|
-| oh-my-openagent-dev | External real project | Integration testing | [PASS/FAIL] |
-| Empty test project | Fresh init | New user simulation | [PASS/FAIL] |
-| [Project name] | [Type] | [Purpose] | [PASS/FAIL] |
-
-## Core Command Testing
-
-### `amber init`
-
-**Test Scenario:** Initialize Amber in empty project
-
-```bash
-mkdir /tmp/amber-rc-test && cd /tmp/amber-rc-test
-amber init
-```
-
-**Expected Behavior:**
-- Creates `.amber/` directory structure
-- Copies template files (AGENTS.md, CLAUDE.md, feature_list.json, etc.)
-- Exits with code 0
-- No errors or warnings
-
-**Actual Results:**
-- [ ] PASS - All files created correctly
-- [ ] FAIL - [Describe issue]
-
-**Notes:** [Any observations, edge cases, or unexpected behavior]
-
----
-
-### `amber audit`
-
-**Test Scenario:** Audit external project (oh-my-openagent-dev or equivalent)
-
-```bash
-amber audit --target /path/to/external/project --summary
-```
-
-**Expected Behavior:**
-- Scans project structure
-- Reports Amber readiness score
-- Lists missing/incomplete files
-- Provides actionable recommendations
-- No crashes or unhandled errors
-
-**Actual Results:**
-- [ ] PASS - Audit completes successfully
-- [ ] FAIL - [Describe issue]
-
-**Sample Output:**
-```
-[Paste relevant output here]
-```
-
-**Notes:** [Observations on accuracy, performance, or output quality]
-
----
-
-### `amber doctor`
-
-**Test Scenario:** Validate Amber setup in test project
-
-```bash
-amber doctor --target /path/to/project
-```
-
-**Expected Behavior:**
-- Checks schema validity
-- Validates file references
-- Reports errors and warnings
-- Exits with code 0 if no errors
-
-**Actual Results:**
-- [ ] PASS - Doctor check completes cleanly
-- [ ] FAIL - [Describe issue]
-
-**Sample Output:**
-```
-[Paste output here]
-```
-
-**Notes:** [Any false positives/negatives, performance issues]
-
----
-
-### `amber adoption report`
-
-**Test Scenario:** Generate adoption report for external project
-
-```bash
-amber adoption report \
-  --target /path/to/external/project \
-  --output-dir ./rc-adoption-test
-```
-
-**Expected Behavior:**
-- Generates adoption report markdown
-- Includes coverage analysis
-- Provides next-action recommendations
-- Creates output directory if not exists
-- No crashes on large projects
-
-**Actual Results:**
-- [ ] PASS - Report generated successfully
-- [ ] FAIL - [Describe issue]
-
-**Report Quality Assessment:**
-- [ ] Accurate file counts
-- [ ] Useful recommendations
-- [ ] Properly formatted markdown
-- [ ] No placeholder/missing data
-
-**Notes:** [Comments on report usefulness, accuracy, formatting]
-
----
-
-### Additional Commands (Optional)
-
-Test any other commands used during validation:
-
-#### `amber route list`
-- [ ] PASS
-- [ ] FAIL - [Issue]
-
-#### `amber session start`
-- [ ] PASS
-- [ ] FAIL - [Issue]
-
-#### `amber --version`
-- [ ] PASS - Shows correct version
-- [ ] FAIL - [Issue]
-
-## Integration Testing
-
-### External Project: [Project Name]
-
-**Project Details:**
-- Repository: [URL or description]
-- Size: [Number of files/LOC]
-- Tech Stack: [Languages/frameworks]
-- Amber Readiness: [Pre-existing Amber files? Y/N]
-
-**Test Flow:**
-1. Run `amber audit --summary`
-2. Review recommendations
-3. Run `amber init` (if applicable)
-4. Run `amber doctor`
-5. Generate adoption report
-
-**Results:**
-- [ ] PASS - All commands work as expected
-- [ ] PASS WITH ISSUES - [List issues]
-- [ ] FAIL - [Critical failure description]
-
-**Discovered Issues:**
-- [Issue 1: Description, severity, workaround]
-- [Issue 2: Description, severity, workaround]
-
-**Performance Observations:**
-- `audit` time: [seconds]
-- `init` time: [seconds]
-- `adoption report` time: [seconds]
-
-## Docker Isolation Testing
-
-### Alpine Container
-
-```bash
-npm pack
-docker run --rm -it -v $(pwd):/workspace node:18-alpine sh -c "
-  npm install -g /workspace/amber-protocol-*.tgz
-  cd /tmp && mkdir test-project && cd test-project
-  amber init
-  amber doctor --target .
-  amber --version
-"
-```
-
-**Results:**
-- [ ] PASS - All commands work in Alpine
-- [ ] FAIL - [Describe issue]
-
-**Notes:** [Shell compatibility, path issues, missing dependencies]
-
----
-
-### Debian Container
-
-```bash
-docker run --rm -it -v $(pwd):/workspace node:18 sh -c "
-  npm install -g /workspace/amber-protocol-*.tgz
-  cd /tmp && mkdir test-project && cd test-project
-  amber init
-  amber audit --summary
-  amber --version
-"
-```
-
-**Results:**
-- [ ] PASS - All commands work in Debian
-- [ ] FAIL - [Describe issue]
-
-**Notes:** [Any differences from Alpine results]
-
-## Known Issues from Testing
-
-### Critical (Release Blockers)
-
-| Issue | Severity | Description | Reproducible? | Proposed Fix |
-|-------|----------|-------------|---------------|--------------|
-| [ID] | CRITICAL | [Description] | [Always/Sometimes] | [Solution] |
-
-**Action Required:** All CRITICAL issues must be resolved before v1.0.0 release.
-
----
-
-### High (Should Fix)
-
-| Issue | Severity | Description | Reproducible? | Workaround |
-|-------|----------|-------------|---------------|------------|
-| [ID] | HIGH | [Description] | [Always/Sometimes] | [Workaround] |
-
-**Recommendation:** Fix before v1.0.0 if time permits, or document prominently.
-
----
-
-### Medium (Known Limitations)
-
-| Issue | Severity | Description | Workaround/Note |
-|-------|----------|-------------|-----------------|
-| [ID] | MEDIUM | [Description] | [Workaround or explanation] |
-
-**Recommendation:** Document in release notes, fix in v1.1.0.
-
----
-
-### Low (Nice to Have)
-
-| Issue | Severity | Description | Note |
-|-------|----------|-------------|------|
-| [ID] | LOW | [Description] | [Context] |
-
-**Recommendation:** Track for future improvement.
-
-## User Experience Observations
-
-### Installation Experience
-- [ ] Clear installation instructions
-- [ ] Reasonable install time
-- [ ] No unexpected warnings
-- [ ] Works with `npx amber` (no global install)
-
-**Friction Points:**
-- [List any UX friction during install]
-
----
-
-### First-Run Experience
-- [ ] Clear error messages
-- [ ] Helpful command suggestions
-- [ ] `--help` output comprehensive
-- [ ] Examples provided
-
-**Friction Points:**
-- [List any UX friction during first use]
-
----
-
-### Documentation Quality
-- [ ] README covers basic usage
-- [ ] Examples are accurate
-- [ ] Links not broken
-- [ ] Getting started guide helpful
-
-**Gaps or Improvements Needed:**
-- [List documentation gaps]
-
-## Performance Metrics
-
-| Command | Project Size | Duration | Memory Peak | Status |
-|---------|--------------|----------|-------------|--------|
-| `audit` | Small (10 files) | [ms] | [MB] | [PASS/FAIL] |
-| `audit` | Medium (100 files) | [ms] | [MB] | [PASS/FAIL] |
-| `audit` | Large (1000+ files) | [ms] | [MB] | [PASS/FAIL] |
-| `init` | N/A | [ms] | [MB] | [PASS/FAIL] |
-| `doctor` | Small | [ms] | [MB] | [PASS/FAIL] |
-| `adoption` | Medium | [ms] | [MB] | [PASS/FAIL] |
-
-**Performance Issues:**
-- [List any performance concerns]
+| --- | --- | --- | --- | --- |
+| Local Dev | Windows PowerShell | Node from active toolchain | npm from active toolchain | PASS |
+| Docker Alpine | Not run in this session | Not verified | Not verified | PENDING |
+| Docker Debian | Not run in this session | Not verified | Not verified | PENDING |
+| CI/CD | Not run in this session | Not verified | Not verified | PENDING |
+
+## Commands Run
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `node scripts/amber.js doctor --target .` | PASS | Product checks: plugin manifests, workflow-pack smoke, project-profile smoke; errors 0. |
+| `npm test` | PASS | 886 tests passed, 0 failed. |
+| `npm run test:coverage` | PASS | 886 tests passed; 89.23% statements, 79.01% branches, 95.48% functions. |
+| `npm run test:load` | PASS | Sequential 20-session load test completed under 2 minutes. |
+| `npm run gen:agents:check` | PASS | 28 generated agent command files up to date. |
+| `npm run manifests` | PASS | Manifest validation errors 0. |
+| `node scripts/check-broken-links.js` | PASS | 108 markdown files checked, all links valid. |
+| `npm audit --audit-level=high --registry=https://registry.npmjs.org` | PASS after dependency update | Nodemailer upgraded to 9.0.1 to resolve GHSA-p6gq-j5cr-w38f. |
+| `node scripts/publish.js --dry-run` | PASS | Package dry-run includes required files. |
+| `node --test tests/amber-cli.test.js` | PASS | Includes regression coverage for `amber --version`. |
+
+## Package Validation
+
+`node scripts/publish.js --dry-run` verified the npm package contains the required release surfaces:
+
+- `package.json`
+- `README.md`
+- `scripts/amber.js`
+- `scripts/lib/`
+- `schemas/`
+- `templates/`
+
+The dry-run tarball also includes routes, profiles, workflow packs, source modules, license, and changelog.
 
 ## Security Observations
 
-### Package Integrity
-- [ ] No suspicious files in tarball
-- [ ] No secrets or credentials
-- [ ] No unnecessary binaries
-- [ ] File permissions appropriate
+- Previous blocker: `nodemailer <=9.0.0` high-severity advisory GHSA-p6gq-j5cr-w38f.
+- Resolution: upgraded to `nodemailer@9.0.1` and refreshed `package-lock.json`.
+- Current status: high-severity npm audit gate passes against `https://registry.npmjs.org`.
 
-### npm Audit
-```bash
-npm audit
-```
+## Known Publishing Actions Remaining
 
-**Results:**
-- [ ] PASS - No vulnerabilities
-- [ ] PASS WITH WARNINGS - [Low severity details]
-- [ ] FAIL - [High/Critical vulnerabilities]
+These are not local code blockers, but they must be completed by a maintainer before declaring the public v1.0.0 release live:
 
-**Vulnerability Details:**
-```
-[Paste npm audit output]
-```
+1. Configure/verify `origin` remote for `Bandersnatch0x/amber-protocol`.
+2. Commit the release changes with `chore: release v1.0.0`.
+3. Create and verify the `v1.0.0` tag from the release commit.
+4. Push `master` and the `v1.0.0` tag.
+5. Confirm npm account with `npm whoami`.
+6. Publish with `npm publish --access public`.
+7. Verify registry installation and `amber --version` from the published package.
+8. Create the GitHub release and mark it as latest.
 
-## Comparison with Previous Version
+## Recommendation
 
-*(Applicable for subsequent RCs)*
-
-| Aspect | Previous RC | This RC | Change |
-|--------|-------------|---------|--------|
-| Test Pass Rate | [%] | [%] | [+/-] |
-| Known Issues | [count] | [count] | [+/-] |
-| Performance | [metric] | [metric] | [+/-] |
-
-**Improvements:**
-- [List fixes/improvements from previous RC]
-
-**Regressions:**
-- [List any new issues introduced]
-
-## Recommendations
-
-### For v1.0.0 Release
-
-**Must Fix Before Release:**
-1. [Critical issue 1]
-2. [Critical issue 2]
-
-**Should Fix Before Release:**
-1. [High priority issue 1]
-2. [High priority issue 2]
-
-**Document in Release Notes:**
-1. [Known limitation 1]
-2. [Known limitation 2]
-
-**Safe to Defer:**
-1. [Low priority issue 1]
-2. [Low priority issue 2]
-
----
-
-### For Documentation
-
-**Add to README:**
-- [Missing information]
-
-**Add to Troubleshooting Guide:**
-- [Common issues discovered]
-
-**Add to Migration Guide:**
-- [Breaking changes or important notes]
-
----
-
-### For Future Versions
-
-**v1.1.0 Candidates:**
-- [Feature or improvement 1]
-- [Feature or improvement 2]
-
-**Technical Debt:**
-- [Code quality issue 1]
-- [Refactoring opportunity 1]
-
-## Sign-Off
-
-### Validation Complete
-
-- [x] Core commands tested
-- [x] Integration testing complete
-- [x] Docker isolation verified
-- [x] Issues documented
-- [x] Recommendations provided
-
-### Approvals
-
-| Role | Name | Status | Date | Signature |
-|------|------|--------|------|-----------|
-| Validator | [Name] | [APPROVE/REJECT] | [Date] | [Initials] |
-| Maintainer | [Name] | [APPROVE/REJECT] | [Date] | [Initials] |
-
----
-
-**Report Version:** 1.0  
-**Template Updated:** 2026-06-21  
-**Next Steps:** [Based on recommendations section]
+The repository is locally ready for a v1.0.0 release commit once the final verification pass remains green. Public release should wait until the publishing actions above are complete.

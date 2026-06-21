@@ -13,7 +13,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/npm/v/amber-protocol)
 
-**状态：** 发布候选版 | **版本：** 1.0.0-rc.1
+**状态：** 稳定版 | **版本：** 1.0.0
 
 Amber Protocol 是一个面向工程团队的仓库本地 AI 编码治理控制台。它帮助团队在仓库内准备、审查、验证、交接和审计由 AI 辅助的编码工作。
 

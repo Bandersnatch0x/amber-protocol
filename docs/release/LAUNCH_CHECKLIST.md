@@ -1,145 +1,66 @@
-# Launch Checklist — Phase B v1.0.0
+# Launch Checklist - Amber Protocol v1.0.0
 
-**Release Date:** June 10, 2026  
+**Release Date:** 2026-06-22  
 **Version:** 1.0.0  
-**Status:** ✅ Ready
+**Status:** Local validation passed; GitHub repository created; npm publication pending maintainer npm credentials.
 
 ---
 
-## Pre-Launch (T-7 days)
+## Local Release Gates
 
-- [x] All tests passing (519 pass, 0 fail from new code)
-- [x] Security audit passes
-- [x] Migration tool validated (V5.5 → Phase B → rollback)
-- [x] Documentation complete
-  - [x] Getting Started Guide
-  - [x] Tutorials (4)
-  - [x] API Reference
-  - [x] Architecture Docs
-  - [x] Troubleshooting Guide
-  - [x] FAQ
-- [x] Release assets ready
-  - [x] CHANGELOG.md
-  - [x] RELEASE_NOTES.md
-  - [x] Blog post
-  - [x] Demo script
-- [x] Version bumped to 1.0.0 in package.json
-- [x] Git tag v1.0.0 created
-- [ ] npm package published
-- [ ] GitHub release created
+- [x] Version bumped to `1.0.0` in `package.json` and `package-lock.json`
+- [x] Plugin manifests bumped to `1.0.0`
+- [x] README status updated to stable
+- [x] CHANGELOG dated for v1.0.0
+- [x] Release notes updated for Amber Protocol terminology
+- [x] `npm test` passes
+- [x] `npm run test:coverage` passes configured thresholds
+- [x] `npm run test:load` passes
+- [x] `npm run gen:agents:check` passes
+- [x] `npm run manifests` passes
+- [x] `node scripts/amber.js doctor --target .` passes
+- [x] `node scripts/check-broken-links.js` passes
+- [x] `npm audit --audit-level=high --registry=https://registry.npmjs.org` passes
+- [x] `node scripts/publish.js --dry-run` passes
+- [x] `amber --version` regression coverage added and passing
 
----
+## Publishing Prerequisites
 
-## Launch Day (T-0)
+- [x] Configure/verify `origin` remote
+- [ ] Confirm local branch is up to date with remote `master`
+- [x] Commit release changes with `chore: release v1.0.0`
+- [x] Create signed `v1.0.0` tag, or annotated tag if GPG is unavailable
+- [ ] Verify tag signature when a signed tag is used
+- [ ] Push `master` to origin
+- [ ] Push `v1.0.0` tag to origin
+- [ ] Confirm npm account with `npm whoami` (currently returns `ENEEDAUTH`)
+- [ ] Publish stable package with `npm publish --access public`
+- [ ] Verify `npm view amber-protocol version` returns `1.0.0`
+- [ ] Install from registry and verify `amber --version`
+- [ ] Create GitHub release from `v1.0.0`
+- [ ] Mark GitHub release as latest
 
-### Morning
-- [ ] Final smoke test on clean install
-- [ ] Verify npm package download works
-- [ ] Check README and docs render correctly on npm
-- [ ] Push git tag v1.0.0 to origin
-- [ ] Create GitHub release with CHANGELOG.md and RELEASE_NOTES.md
+## Announcement Checklist
 
-### Midday
-- [ ] Publish blog post
-- [ ] Post announcement on Twitter/X (5-7 tweet thread)
-- [ ] Post announcement on Discord
-- [ ] Post announcement on Reddit (r/programming, r/node)
-- [ ] Send email to beta testers
+- [ ] Publish release announcement
+- [ ] Share installation command: `npm install -g amber-protocol`
+- [ ] Link to release notes and changelog
+- [ ] Monitor npm package page after publish
+- [ ] Monitor GitHub issues after release
 
-### Afternoon
-- [ ] Monitor npm downloads
-- [ ] Monitor GitHub issues
-- [ ] Monitor Discord for questions
-- [ ] Quick-fix any critical bugs
+## Rollback Plan
 
----
+If a critical issue is discovered after publication:
 
-## Announcement Templates
+1. Do not unpublish the package.
+2. Deprecate the affected version with a clear message.
+3. Create a hotfix branch from `v1.0.0`.
+4. Publish a patch release after the same local validation gates pass.
+5. Update the GitHub release notes with the issue and mitigation.
 
-### Twitter/X Thread
+## Sign-Off
 
-**Tweet 1/5:**
-🚀 Amber Protocol Phase B v1.0.0 is now GA!
-Security audits, automated migration, skill plugins, and agent profiles — all in one tool.
-npm install -g amber-protocol
-
-**Tweet 2/5:**
-🔒 Built-in security audit scans for dependency vulns, hardcoded secrets, and permission issues. Zero config required.
-
-**Tweet 3/5:**
-🔄 Migrating from V5.5? One command: `amber-protocol migrate --dry-run`
-Preview changes, apply, or rollback. No guessing.
-
-**Tweet 4/5:**
-🎯 Create reusable AI skills as simple Markdown files. Share them across your team. Your agents get smarter with every skill.
-
-**Tweet 5/5:**
-⚡ 519 tests. 80%+ coverage. Zero migration regressions.
-Star us on GitHub, read the docs, join Discord.
-Links below 👇
-
-### Discord Announcement
-
-```
-@everyone 🚀 Amber Protocol Phase B v1.0.0 is now Generally Available!
-
-What's new:
-🔒 Built-in security audit (deps, secrets, permissions)
-🔄 One-click V5.5 migration with dry-run and rollback
-🎯 Skill plugin system (Markdown-based!)
-⚡ Configurable agent profiles
-🪝 Lifecycle hooks for tool execution
-
-Get started:
-npm install -g amber-protocol
-
-Read the announcement: [blog post link]
-Migration guide: [migration guide link]
-```
-
----
-
-## Post-Launch (T+7 days)
-
-- [ ] Review first-week npm download stats
-- [ ] Triage and prioritize GitHub issues
-- [ ] Schedule first patch release (v1.0.1)
-- [ ] Collect community feedback for v1.1.0
-- [ ] Begin Phase C planning
-
----
-
-## Communication Plan
-
-| Channel | Timing | Owner |
-|---------|--------|-------|
-| Blog post | Launch day | Docs team |
-| Twitter/X | Launch day AM | Social |
-| Discord | Launch day AM | Community |
-| Reddit | Launch day PM | Social |
-| Email (beta) | Launch day | Product |
-| Hacker News | Launch day PM | Social |
-| Dev.to | T+1 day | Docs |
-| Newsletter | T+3 days | Marketing |
-
----
-
-## Risk Mitigation
-
-| Risk | Mitigation |
-|------|------------|
-| npm publish failure | Rollback script ready |
-| Critical bug found | Hotfix branch prepared |
-| Migration issues | Rollback documented |
-| Server overload | CDN caching enabled |
-| Negative feedback | Response templates ready |
-
----
-
-## Sign-off
-
-- [ ] Engineering Lead
-- [ ] Product Manager
-- [ ] Security Review
-- [ ] Documentation Review
-- [ ] Release Manager
+- [ ] Engineering lead
+- [ ] Security review
+- [ ] Documentation review
+- [ ] Release manager

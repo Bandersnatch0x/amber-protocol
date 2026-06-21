@@ -1,20 +1,11 @@
 "use strict";
 
-const path = require("path");
-const fs = require("fs");
-
-let packageJson;
-try {
-  packageJson = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "../../package.json"), "utf8"),
-  );
-} catch (e) {
-  throw new Error(
-    `Failed to read package.json: ${e.message}. ` +
-    "Ensure the file exists and contains valid JSON.",
-  );
-}
-const SCHEMA_VERSION = packageJson.version;
+// SCHEMA_VERSION is the data-contract version for session manifests. It is
+// intentionally decoupled from package.json's version: release-candidate bumps
+// (e.g. rc.1 -> rc.2) do not change the manifest format, so the contract stays
+// fixed until the format itself changes. Keep this value in sync with the
+// `schemaVersion` const in schemas/session-manifest.schema.json.
+const SCHEMA_VERSION = "1.0.0-rc.1";
 const SUPPORTED_VERSIONS = [SCHEMA_VERSION];
 
 function checkSchemaVersion(manifest) {

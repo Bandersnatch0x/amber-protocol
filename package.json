@@ -1,6 +1,6 @@
 {
   "name": "amber-protocol",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0",
   "description": "Amber Protocol: repository-local governance kit for coding agents — install, audit, validate, and hand off agent-facing project state.",
   "type": "commonjs",
   "bin": {
@@ -58,7 +58,7 @@
   "dependencies": {
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
-    "nodemailer": "^8.0.11"
+    "nodemailer": "^9.0.1"
   },
   "devDependencies": {
     "c8": "^11.0.0"
