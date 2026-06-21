@@ -31,8 +31,8 @@
 - [x] Commit release changes with `chore: release v1.0.0`
 - [x] Create signed `v1.0.0` tag, or annotated tag if GPG is unavailable
 - [ ] Verify tag signature when a signed tag is used
-- [ ] Push `master` to origin
-- [ ] Push `v1.0.0` tag to origin
+- [x] Push `master` to origin
+- [x] Push `v1.0.0` tag to origin
 - [ ] Confirm npm account with `npm whoami` (currently returns `ENEEDAUTH`)
 - [ ] Publish stable package with `npm publish --access public`
 - [ ] Verify `npm view amber-protocol version` returns `1.0.0`

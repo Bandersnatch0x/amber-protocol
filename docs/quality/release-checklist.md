@@ -113,9 +113,9 @@ docker run --rm -it -v $(pwd):/workspace node:18 sh -c "
 - [x] If GPG is unavailable, create an annotated tag and document the exception: `git tag -a v1.0.0 -m "Release v1.0.0"`
 
 ### Push Operations
-- [ ] Push commits: `git push origin master`
-- [ ] Push tag: `git push origin v1.0.0`
-- [ ] Verify tag visible on GitHub
+- [x] Push commits: `git push origin master`
+- [x] Push tag: `git push origin v1.0.0`
+- [x] Verify tag visible on GitHub
 
 ## Publishing
 
