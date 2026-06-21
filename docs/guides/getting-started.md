@@ -1,85 +1,98 @@
-# Getting Started with Amber Protocol
+# Amber Protocol 快速开始
 
-Welcome to **Amber Protocol** — a repository-local governance kit for AI-assisted coding. This guide will help you install, configure, and start using Amber in your projects.
-
-## What is Amber Protocol?
-
-Amber Protocol helps engineering teams prepare, review, verify, hand off, and audit AI-assisted coding work. It provides:
-
-- **CLI tools** for repository onboarding, auditing, and session management
-- **Route engine** for goal-driven workflow selection
-- **Web viewer** for visualizing sessions, routes, and gates
-- **Governance surfaces** for approval records and policy boundaries
+Amber Protocol is a repository-local governance and control layer for agent-assisted engineering. It provides installation, auditing, validation, and maintenance capabilities for project files that help agents understand codebases, track feature state, and hand off work cleanly.
 
 ## Installation
 
-### From npm (Recommended)
+### Option 1: Install from npm (Recommended)
 
 ```bash
 npm install -g amber-protocol
-amber --version
+amber init --target path/to/your/project
 ```
 
-### From Source
+### Option 2: Install from Source
 
 ```bash
 git clone https://github.com/Bandersnatch0x/amber-protocol.git
 cd amber-protocol
 npm install
-node scripts/amber.js --version
+
+# Run commands directly
+node scripts/amber.js init --target path/to/your/project
 ```
 
-## Quick Start
+## Basic Usage
 
-### 1. Initialize a Repository
+### Initialize a Project
 
-Add Amber Protocol files to your project:
+Install Amber files in your repository (idempotent, skips existing files):
 
 ```bash
-amber init --target path/to/your/repo
+amber init --target path/to/repo
 ```
 
 This creates:
-- `.amber/` directory with session state
-- `AGENTS.md` agent collaboration guide
-- `CLAUDE.md` codebase instructions
-- `feature_list.json` feature tracking
+- `AGENTS.md` - Agent instructions
+- `CLAUDE.md` - Claude-specific guidance
+- `.amber/` - Session and timeline storage
+- `docs/wiki/` - Project context skeleton
 
-### 2. Audit an Existing Project
+### Audit an Existing Project
 
-Generate a read-only adoption report:
-
-```bash
-amber audit --target path/to/your/repo --summary
-```
-
-### 3. Start a Session
-
-Begin working on a feature with session tracking:
+Generate a read-only adoption report for an existing project:
 
 ```bash
-amber session start --goal "implement user authentication" --route feature-standard
+amber audit --target path/to/repo --summary
 ```
 
-### 4. Check Session Status
+### Validate Your Setup
+
+Check that your Amber installation is correct and usable:
+
+```bash
+amber doctor --target path/to/repo
+```
+
+### Working with Routes
+
+List available workflow routes:
+
+```bash
+amber route list
+```
+
+Inspect a specific route:
+
+```bash
+amber route inspect feature-standard
+```
+
+### Session Management
+
+Start a new development session:
+
+```bash
+amber session start --goal "fix login bug"
+```
+
+Check current session status:
 
 ```bash
 amber session status
 ```
 
-### 5. Generate Handoff Report
-
-Create a comprehensive handoff document for session continuity:
+List all sessions:
 
 ```bash
-amber handoff --target .
+amber session list
 ```
 
 ## Web Viewer
 
-The web viewer provides a visual dashboard for monitoring sessions, routes, and gates.
+Amber includes a web-based viewer for monitoring sessions, routes, and gates.
 
-### Start the Web Viewer
+### Starting the Web Viewer
 
 ```bash
 cd apps/web
@@ -87,113 +100,46 @@ npm install --legacy-peer-deps
 npm run dev
 ```
 
-Visit **http://localhost:3001** (dev server) or **http://localhost:3000** (production build).
+The web viewer runs at `http://localhost:3001` (backend) and `http://localhost:5173` (frontend).
 
-### Key Features
+### Features
 
-- **Real-time session updates** via Server-Sent Events (SSE)
-- **Timeline viewer** with virtual scrolling for performance
-- **Route explorer** organized by category
-- **Gate monitoring** with approval/rejection tracking
-- **Dark mode** with persistent theme preference
+**Sessions**: Browse active and completed sessions, view timeline events
 
-### Web Viewer Screens
+**Routes**: Explore available workflow routes organized by category
 
-- **Dashboard** - Overview of active sessions and system health
-- **Sessions** - Browse active and completed sessions with detailed timelines
-- **Routes** - Explore available workflow routes
-- **Gates** - Monitor approval gates and decisions
-- **Settings** - Configure auto-refresh, intervals, and notifications
+**Gates**: Monitor gate status (Pending, Approved, Rejected) and decisions
 
-## Common Commands
+**Real-time Updates**: Session status updates automatically via Server-Sent Events
 
-### Session Management
+**Timeline Viewer**: Virtual scrolling, event filtering, and search capabilities
 
-```bash
-# Start new session
-amber session start --goal "fix login bug"
+### Web Viewer Controls
 
-# List all sessions
-amber session list
+- **Start**: Begin a new session
+- **Pause**: Temporarily pause execution
+- **Resume**: Continue paused session
+- **Abort**: Stop with confirmation
+- **Theme Toggle**: Switch between light and dark mode (top-right)
+- **Settings**: Configure auto-refresh, intervals, and notifications
 
-# Abort session
-amber session abort <session-id>
-
-# Continue from checkpoint
-amber session continue
-```
-
-### Route Operations
+## Common Commands Reference
 
 ```bash
-# List available routes
-amber route list
+# Adoption workflow
+amber adoption report --target path/to/project --output-dir reports
+amber adoption gate --reports-dir reports
 
-# Inspect route definition
-amber route inspect feature-standard
+# Migration from legacy .harness
+amber migrate --target . --dry-run
+amber migrate --target .
 
-# Validate route file
-amber route validate routes/feature-standard.route.json
+# Generate handoff artifacts
+amber handoff --target path/to/repo
+
+# Create/validate wiki
+amber wiki --target path/to/repo --dry-run
 ```
-
-### Repository Operations
-
-```bash
-# Create wiki skeleton
-amber wiki --target . --dry-run
-
-# Validate Amber setup
-amber doctor --target .
-
-# Generate handoff report
-amber handoff --target .
-```
-
-### Adoption (Existing Projects)
-
-```bash
-# Generate adoption report
-amber adoption report --target path/to/project --output-dir docs/examples/adoptions
-
-# Gate check
-amber adoption gate --reports-dir docs/examples/adoptions
-```
-
-## Directory Structure
-
-After initialization, your repository will contain:
-
-```
-your-repo/
-├── .amber/                      # Session state and metadata
-│   ├── sessions/               # Active and completed sessions
-│   ├── approvals/              # Approval records
-│   └── gate-log.jsonl         # Gate decision log
-├── AGENTS.md                   # Agent collaboration guide
-├── CLAUDE.md                   # Codebase instructions
-├── feature_list.json           # Feature tracking
-└── docs/
-    └── wiki/                   # Project context (optional)
-        ├── architecture.md
-        ├── runbook.md
-        └── verification.md
-```
-
-## Configuration
-
-Amber Protocol uses sensible defaults but can be customized through:
-
-- **Route definitions** (`routes/*.route.json`) - Workflow templates
-- **Workflow packs** (`workflow-packs/`) - Declarative workflows
-- **Profiles** (`profiles/`) - Project-specific configurations
-
-## Next Steps
-
-- **Read the [CLI Reference](../CLI_REFERENCE.md)** for complete command documentation
-- **Explore [Architecture](../architecture/)** to understand system design
-- **Check [Quality Documentation](../quality/)** for testing and release standards
-- **Review [Examples](../examples/)** for real-world usage patterns
-- **Deploy the [Web Viewer](../DEPLOYMENT.md)** for production monitoring
 
 ## Troubleshooting
 
@@ -201,39 +147,29 @@ Amber Protocol uses sensible defaults but can be customized through:
 
 If you see "Disconnected", the SSE connection was lost. It will automatically reconnect with exponential backoff.
 
-### No Data Showing
+### No Data Showing (Web Viewer)
 
-Ensure the Amber Protocol backend is running and accessible. Check the browser console for errors.
+Ensure the Amber Protocol backend is running at `localhost:3001`. Check the browser console for errors.
 
-### Port Already in Use
+### Command Not Found
 
-The dev server uses port 3001. If it's occupied, set a custom port:
-
-```bash
-PORT=3002 npm run dev
-```
-
-### Installation Issues
-
-For dependency conflicts, use the `--legacy-peer-deps` flag:
+If `amber` command is not found after npm installation, ensure your npm global bin directory is in your PATH:
 
 ```bash
-cd apps/web
-npm install --legacy-peer-deps
+npm config get prefix
 ```
 
-## Getting Help
+Add `<prefix>/bin` to your PATH environment variable.
 
-- **Documentation**: [docs/](../)
-- **Report bugs**: [GitHub Issues](https://github.com/Bandersnatch0x/amber-protocol/issues)
-- **Feature requests**: [GitHub Discussions](https://github.com/Bandersnatch0x/amber-protocol/discussions)
+## Next Steps
 
-## Version
+- Read [Architecture Overview](../architecture/overview.md)
+- Explore [Route Documentation](../routes/README.md)
+- Learn about [Session Lifecycle](../sessions/lifecycle.md)
+- Review [Agent Instructions](../../AGENTS.md)
 
-**Current Version**: 1.0.0-rc.1  
-**Status**: Release Candidate  
-**Last Updated**: 2026-06-21
+## Feedback
 
----
+For issues or feature requests, please file an issue at `https://github.com/Bandersnatch0x/amber-protocol`.
 
-**Amber Protocol** - Repository-local AI coding governance for engineering teams.
+**Last Updated:** 2026-06-21
