@@ -8,7 +8,52 @@
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
+![CI](https://github.com/Bandersnatch0x/amber-protocol/workflows/CI/badge.svg)
+![Node Version](https://img.shields.io/badge/node-%3E%3D18.17-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/npm/v/amber-protocol)
+
+**状态：** 发布候选版 | **版本：** 1.0.0-rc.1
+
 Amber Protocol 是一个面向工程团队的仓库本地 AI 编码治理控制台。它帮助团队在仓库内准备、审查、验证、交接和审计由 AI 辅助的编码工作。
+
+## 📦 安装
+
+### 从 npm 安装（推荐）
+```bash
+npm install -g amber-protocol
+amber --version
+```
+
+### 从源码安装
+```bash
+git clone https://github.com/Bandersnatch0x/amber-protocol.git
+cd amber-protocol
+npm install
+node scripts/amber.js --version
+```
+
+## 🚀 快速开始
+
+### CLI 工具
+```bash
+node scripts/amber.js init --target path/to/repo
+node scripts/amber.js audit --target path/to/repo
+```
+
+### Web 查看器
+```bash
+cd apps/web
+npm install --legacy-peer-deps
+npm run dev
+# 访问 http://localhost:3001
+```
+
+查看 [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) 获取部署指南。
+
+---
+
+## 产品定位
 
 当前产品刻意保持保守。它会创建审查产物、dry-run 计划、审批记录、workflow-pack 元数据和维护提案。它不会运行 Dynamic Workflow，不会调用真实 subagent，不会执行目标项目命令，也不会自动重写旧项目文件。
 
@@ -197,3 +242,23 @@ node scripts/amber.js --help
 - 不发布到外部 marketplace。
 - 不自动重写已有目标项目文档。
 - 当前产品不执行 scheduled loop。
+
+---
+
+## 🤝 贡献
+
+查看 [CONTRIBUTING.md](./CONTRIBUTING.md) 了解开发设置、发布流程和贡献指南。
+
+## 💬 支持
+
+- 📖 文档：[docs/](./docs/)
+- 🐛 报告问题：[GitHub Issues](https://github.com/Bandersnatch0x/amber-protocol/issues)
+- 💡 功能建议：[GitHub Discussions](https://github.com/Bandersnatch0x/amber-protocol/discussions)
+
+## 📄 许可证
+
+MIT License - 查看 [LICENSE](./LICENSE) 了解详情。
+
+---
+
+**Amber Protocol** - 为工程团队提供仓库本地 AI 编码治理。
