@@ -8,7 +8,7 @@ const path = require("node:path");
 
 const {
 	writeAdoptionBundleArtifact,
-} = require("../../scripts/lib/core/adoption-bundle-artifact");
+} = require("../../scripts/lib/core/adoption-composer/index");
 
 function tempDir(prefix) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));

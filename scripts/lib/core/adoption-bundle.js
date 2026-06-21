@@ -39,11 +39,8 @@ const {
 	renderAdoptionReportDiff,
 	renderAdoptionReportsIndex,
 	renderAdoptionStatusDocument,
-} = require("./adoption-artifact-composer");
-
-const {
 	writeAdoptionBundleArtifact,
-} = require("./adoption-bundle-artifact");
+} = require("./adoption-composer/index");
 
 function adoptionBundleBoundaries() {
 	return defaultAdoptionBoundaries();
