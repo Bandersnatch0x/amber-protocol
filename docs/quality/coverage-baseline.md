@@ -18,7 +18,7 @@
 ### High Coverage (≥90%)
 
 - `scripts/lib/amber-core.js`: 100% all metrics
-- `scripts/lib/harness-core.js`: 100% all metrics
+- `scripts/lib/amber-core.js`: 100% all metrics
 - `scripts/lib/core/scaffold.js`: 100% all metrics
 - `scripts/lib/core/target-classification.js`: 100% all metrics
 - `scripts/lib/core/adoption-metrics.js`: 100% all metrics

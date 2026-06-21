@@ -4,7 +4,7 @@
   "required": ["sessionId", "schemaVersion", "createdAt", "route", "goal", "status"],
   "properties": {
     "sessionId": { "type": "string", "format": "uuid" },
-    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "schemaVersion": { "type": "string", "const": "1.0.0-rc.1" },
     "createdAt": { "type": "string", "format": "date-time" },
     "updatedAt": { "type": "string", "format": "date-time" },
     "route": {

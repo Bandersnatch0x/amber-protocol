@@ -8,11 +8,11 @@ const {
 describe("session-manifest", () => {
 	it("should create valid manifest", () => {
 		const manifest = createManifest({
-			route: { id: "feature-standard", version: "1.0.0" },
+			route: { id: "feature-standard", version: "1.0.0-rc.1" },
 			goal: "test feature",
 		});
 		assert.ok(manifest.sessionId);
-		assert.strictEqual(manifest.schemaVersion, "1.0.0");
+		assert.strictEqual(manifest.schemaVersion, "1.0.0-rc.1");
 		assert.strictEqual(manifest.status, "created");
 		assert.ok(manifest.createdAt);
 		assert.ok(manifest.updatedAt);
@@ -20,7 +20,7 @@ describe("session-manifest", () => {
 
 	it("should validate manifest", () => {
 		const manifest = createManifest({
-			route: { id: "test", version: "1.0.0" },
+			route: { id: "test", version: "1.0.0-rc.1" },
 			goal: "test",
 		});
 		const result = validateManifest(manifest);
@@ -30,9 +30,9 @@ describe("session-manifest", () => {
 	it("should reject invalid status", () => {
 		const manifest = {
 			sessionId: "123",
-			schemaVersion: "1.0.0",
+			schemaVersion: "1.0.0-rc.1",
 			createdAt: new Date().toISOString(),
-			route: { id: "test", version: "1.0.0" },
+			route: { id: "test", version: "1.0.0-rc.1" },
 			goal: "test",
 			status: "invalid",
 		};
@@ -42,9 +42,9 @@ describe("session-manifest", () => {
 
 	it("should reject manifest without sessionId", () => {
 		const manifest = {
-			schemaVersion: "1.0.0",
+			schemaVersion: "1.0.0-rc.1",
 			createdAt: new Date().toISOString(),
-			route: { id: "test", version: "1.0.0" },
+			route: { id: "test", version: "1.0.0-rc.1" },
 			goal: "test",
 			status: "created",
 		};
@@ -54,7 +54,7 @@ describe("session-manifest", () => {
 
 	it("should create manifest with budget", () => {
 		const manifest = createManifest({
-			route: { id: "test", version: "1.0.0" },
+			route: { id: "test", version: "1.0.0-rc.1" },
 			goal: "budget test",
 			budget: 1000,
 		});
@@ -64,7 +64,7 @@ describe("session-manifest", () => {
 
 	it("should set createdAt and updatedAt to the same timestamp", () => {
 		const manifest = createManifest({
-			route: { id: "test", version: "1.0.0" },
+			route: { id: "test", version: "1.0.0-rc.1" },
 			goal: "timestamp test",
 		});
 		assert.strictEqual(manifest.createdAt, manifest.updatedAt);
@@ -72,7 +72,7 @@ describe("session-manifest", () => {
 
 	it("should omit budget when not provided", () => {
 		const manifest = createManifest({
-			route: { id: "test", version: "1.0.0" },
+			route: { id: "test", version: "1.0.0-rc.1" },
 			goal: "no budget",
 		});
 		assert.strictEqual(manifest.budget, undefined);

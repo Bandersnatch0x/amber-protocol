@@ -42,7 +42,7 @@ describe("Continue Recovery", () => {
 		manifest.status = "paused";
 		manifest.currentStage = "plan";
 		manifest.completedStages = ["capture"];
-		manifest.schemaVersion = "1.0.0";
+		manifest.schemaVersion = "1.0.0-rc.1";
 		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
 		saveCheckpoint(testDir, sessionId, "plan", manifest, {
