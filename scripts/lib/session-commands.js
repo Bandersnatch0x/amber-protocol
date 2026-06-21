@@ -334,20 +334,16 @@ async function continueSession(projectRoot, options) {
 		return result(`Cannot continue session with status: ${manifest.status}`, 1);
 	}
 
-	// Autonomous mode: delegate to autonomous executor
+	// Autonomous mode: EXPERIMENTAL - moved to src/experimental/execution/
+	// Removed from V1 to align with ADR-0001 (governance-first, no live execution)
+	// See src/experimental/execution/README.md for V2 considerations
 	if (manifest.mode === "autonomous") {
-		const { executeAutonomous } = require("./autonomous-executor");
-		const autoResult = await executeAutonomous(projectRoot, sessionId, options);
-
-		if (autoResult.exitCode === 2) {
-			return result("Session paused due to budget", 2);
-		}
-
-		if (!autoResult.success) {
-			return result(`Session failed: ${autoResult.error}`, 1);
-		}
-
-		return result(`Session completed: ${autoResult.stagesCompleted} stages`, 0);
+		return result(
+			"Error: Autonomous execution is experimental and not available in V1. " +
+			"Amber V1 focuses on governance (audit, gate, inspect) without live execution. " +
+			"See src/experimental/execution/README.md for details.",
+			1
+		);
 	}
 
 	let checkpoint;

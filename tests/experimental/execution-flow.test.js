@@ -3,7 +3,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { Readable } = require("stream");
-const { executeSession } = require("../../scripts/lib/execution-engine");
+const { executeSession } = require("../../src/experimental/execution/execution-engine");
 const { createManifest } = require("../../scripts/lib/session-manifest");
 
 describe("Execution Flow", () => {
