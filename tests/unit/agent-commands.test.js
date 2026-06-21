@@ -303,7 +303,7 @@ describe("plugin manifests", () => {
 		assert.deepStrictEqual(result.errors, []);
 	});
 
-	it("declare version 1.0.0 matching package.json", () => {
+	it("declare version matching package.json", () => {
 		const pkg = readJson(path.join(repoRoot, "package.json"));
 		const claude = readJson(path.join(repoRoot, ".claude-plugin/plugin.json"));
 		const codex = readJson(path.join(repoRoot, ".codex-plugin/plugin.json"));

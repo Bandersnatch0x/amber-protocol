@@ -50,7 +50,7 @@ describe("Kill Recovery", () => {
 			manifest.status = "paused";
 			manifest.currentStage = point.stage;
 			manifest.completedStages = point.completedStages;
-			manifest.schemaVersion = "1.0.0";
+			manifest.schemaVersion = "1.0.0-rc.1";
 			fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
 			saveCheckpoint(testDir, sessionId, point.stage, manifest, {
@@ -86,7 +86,7 @@ describe("Kill Recovery", () => {
 		manifest.status = "paused";
 		manifest.currentStage = "implement";
 		manifest.completedStages = ["capture", "plan"];
-		manifest.schemaVersion = "1.0.0";
+		manifest.schemaVersion = "1.0.0-rc.1";
 		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
 		saveCheckpoint(testDir, sessionId, "implement", manifest, {

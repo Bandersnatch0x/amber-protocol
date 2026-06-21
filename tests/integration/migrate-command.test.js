@@ -39,7 +39,7 @@ describe("Migrate Command", () => {
 		const updated = JSON.parse(
 			fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"),
 		);
-		assert.strictEqual(updated.schemaVersion, "1.0.0");
+		assert.strictEqual(updated.schemaVersion, "1.0.0-rc.1");
 
 		const backup = path.join(sessionDir, "manifest.json.backup");
 		assert.ok(fs.existsSync(backup));
@@ -52,7 +52,7 @@ describe("Migrate Command", () => {
 
 		const manifest = {
 			sessionId,
-			schemaVersion: "1.0.0",
+			schemaVersion: "1.0.0-rc.1",
 			status: "completed",
 			goal: "test",
 		};

@@ -6,8 +6,8 @@ const {
 } = require("../../scripts/lib/schema-version-checker");
 
 describe("Schema Version Checker", () => {
-	it("passes for supported version 1.0.0", () => {
-		const manifest = { schemaVersion: "1.0.0", sessionId: "test" };
+	it("passes for supported version 1.0.0-rc.1", () => {
+		const manifest = { schemaVersion: "1.0.0-rc.1", sessionId: "test" };
 		const result = checkSchemaVersion(manifest);
 		assert.strictEqual(result.valid, true);
 	});
@@ -30,11 +30,11 @@ describe("Schema Version Checker", () => {
 	it("includes supported versions in error message", () => {
 		const manifest = { schemaVersion: "2.0.0", sessionId: "test" };
 		const result = checkSchemaVersion(manifest);
-		assert.match(result.error, /1.0.0/);
+		assert.match(result.error, /1.0.0-rc.1/);
 	});
 
 	it("exports the supported versions list", () => {
 		assert.ok(Array.isArray(SUPPORTED_VERSIONS));
-		assert.ok(SUPPORTED_VERSIONS.includes("1.0.0"));
+		assert.ok(SUPPORTED_VERSIONS.includes("1.0.0-rc.1"));
 	});
 });
