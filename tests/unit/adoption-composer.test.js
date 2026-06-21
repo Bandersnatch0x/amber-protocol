@@ -8,10 +8,11 @@ const {
 	renderAdoptionNextActionsDocument,
 	renderAdoptionBundleReadme,
 	renderAdoptionReport,
-} = require("../../scripts/lib/core/adoption-artifact-composer");
+} = require("../../scripts/lib/core/adoption-composer/index");
 
 const { defaultAdoptionBoundaries } = require("../../scripts/lib/core/terminology");
 const {
+	buildAdoptionAuditMetrics,
 	parseAdoptionMetricsBlock,
 } = require("../../scripts/lib/core/adoption-metrics");
 
@@ -65,6 +66,16 @@ test("renderAdoptionReport includes adoption report header and no-init notice", 
 			unknowns: [],
 			nextSafeCommand: "node scripts/amber.js init --target . --dry-run",
 		},
+		metrics: {
+			existingHarnessFiles: 0,
+			missingHarnessFiles: 1,
+			templateStarterFilesPresent: 0,
+			templateStarterFilesMissing: 0,
+			existingDocs: 0,
+			wikiLikeFiles: 0,
+			conflicts: 0,
+			staleDocs: 0,
+		},
 		initDryRun: { created: [], skipped: [], notApplicable: false },
 		team: {
 			installed: false,
@@ -99,6 +110,16 @@ test("renderAdoptionReport embeds a machine-readable metrics block with staleDoc
 			unknowns: [],
 			nextSafeCommand: "node scripts/amber.js init --target . --dry-run",
 		},
+		metrics: {
+			existingHarnessFiles: 2,
+			missingHarnessFiles: 1,
+			templateStarterFilesPresent: 0,
+			templateStarterFilesMissing: 0,
+			existingDocs: 1,
+			wikiLikeFiles: 1,
+			conflicts: 1,
+			staleDocs: 2,
+		},
 		initDryRun: { created: [], skipped: [], notApplicable: false },
 		team: {
 			installed: false,
@@ -121,6 +142,46 @@ test("renderAdoptionReport embeds a machine-readable metrics block with staleDoc
 		wikiLikeFiles: 1,
 		conflicts: 1,
 		staleDocs: 2,
+	});
+});
+
+test("renderAdoptionReport derives metrics from audit when metrics are omitted", () => {
+	const audit = {
+		readOnly: true,
+		classification: { type: "target-repo" },
+		auditMode: "target-repo",
+		existing: ["AGENTS.md", "feature_list.json"],
+		missing: ["PROGRESS.md"],
+		docs: ["README.md"],
+		wikiLikeFiles: ["docs/wiki/index.md"],
+		conflicts: ["CLAUDE.md"],
+		candidateCommands: [],
+		unknowns: [],
+		nextSafeCommand: "node scripts/amber.js init --target . --dry-run",
+	};
+	const maintenance = {
+		staleDocs: [{ path: "docs/old.md" }, { path: "docs/older.md" }],
+		rulePackDrift: { drifted: false },
+		upgradeAssistant: { currentVersion: null, latestVersion: "1.0.0" },
+	};
+	// No `metrics` field: the renderer must derive them from `audit` instead of
+	// throwing on metrics.* access.
+	const markdown = renderAdoptionReport({
+		targetRoot: "/tmp/repo",
+		audit,
+		initDryRun: { created: [], skipped: [], notApplicable: false },
+		team: {
+			installed: false,
+			registry: { name: "test-registry", versions: {} },
+			lock: null,
+		},
+		teamUpdatePreview: null,
+		maintenance,
+	});
+	assert.match(markdown, /# Amber Protocol Adoption Report/);
+	assert.deepEqual(parseAdoptionMetricsBlock(markdown), {
+		...buildAdoptionAuditMetrics(audit),
+		staleDocs: maintenance.staleDocs.length,
 	});
 });
 

@@ -22,7 +22,7 @@ const {
 const {
 	renderAdoptionGateDocument,
 	renderAdoptionStatusDocument,
-} = require("./adoption-artifact-composer");
+} = require("./adoption-composer/index");
 
 function adoptionGateFindings(report) {
 	const findings = [];

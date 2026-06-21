@@ -30,7 +30,7 @@ const {
 	renderAdoptionReport,
 	renderAdoptionReportDiff,
 	renderAdoptionReportsIndex,
-} = require("./adoption-artifact-composer");
+} = require("./adoption-composer/index");
 
 const {
 	inspectTeamDistribution,
@@ -570,9 +570,16 @@ function generateAdoptionReport(target, options = {}) {
 		return { target: targetRoot, reportPath: outputPath, errors, warnings };
 	}
 
+	// Calculate metrics at the engine layer (business logic)
+	const metrics = {
+		...buildAdoptionAuditMetrics(audit),
+		staleDocs: maintenance.staleDocs.length,
+	};
+
 	const content = renderAdoptionReport({
 		targetRoot,
 		audit,
+		metrics,
 		initDryRun,
 		team,
 		teamUpdatePreview,

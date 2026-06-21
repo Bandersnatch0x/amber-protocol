@@ -26,11 +26,8 @@ const {
 	renderAdoptionApplyPlan,
 	renderAdoptionDecisionRecord,
 	renderAdoptionSelectedFiles,
-} = require("./adoption-artifact-composer");
-
-const {
 	writeAdoptionBundleArtifact,
-} = require("./adoption-bundle-artifact");
+} = require("./adoption-composer/index");
 
 const ADOPTION_DECISION_GATE_IDS = new Set([
 	"command-confirmation",
