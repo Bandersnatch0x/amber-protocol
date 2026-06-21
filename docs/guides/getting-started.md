@@ -1,17 +1,26 @@
-# Amber Protocol 快速开始
+# Getting Started with Amber Protocol
 
-欢迎使用 Amber Protocol！本指南帮助你在 5 分钟内上手。
+Welcome to **Amber Protocol** — a repository-local governance kit for AI-assisted coding. This guide will help you install, configure, and start using Amber in your projects.
 
-## 📦 安装
+## What is Amber Protocol?
 
-### 从 npm 安装（推荐）
+Amber Protocol helps engineering teams prepare, review, verify, hand off, and audit AI-assisted coding work. It provides:
+
+- **CLI tools** for repository onboarding, auditing, and session management
+- **Route engine** for goal-driven workflow selection
+- **Web viewer** for visualizing sessions, routes, and gates
+- **Governance surfaces** for approval records and policy boundaries
+
+## Installation
+
+### From npm (Recommended)
 
 ```bash
 npm install -g amber-protocol
 amber --version
 ```
 
-### 从源码安装
+### From Source
 
 ```bash
 git clone https://github.com/Bandersnatch0x/amber-protocol.git
@@ -20,75 +29,57 @@ npm install
 node scripts/amber.js --version
 ```
 
----
+## Quick Start
 
-## 🚀 基础用法
+### 1. Initialize a Repository
 
-### 1. 初始化项目
-
-为你的仓库创建 Amber Protocol 结构：
+Add Amber Protocol files to your project:
 
 ```bash
-# 初始化当前目录
-amber init --target .
-
-# 或初始化其他目录
-amber init --target /path/to/your/project
+amber init --target path/to/your/repo
 ```
 
-**输出：**
-- `.amber/` 目录
-- `AGENTS.md` - Agent 配置
-- `CLAUDE.md` - Claude 指令
-- Feature state 文件
+This creates:
+- `.amber/` directory with session state
+- `AGENTS.md` agent collaboration guide
+- `CLAUDE.md` codebase instructions
+- `feature_list.json` feature tracking
 
-### 2. 审计项目
+### 2. Audit an Existing Project
 
-检查项目的 Amber 就绪度：
+Generate a read-only adoption report:
 
 ```bash
-amber audit --target . --summary
+amber audit --target path/to/your/repo --summary
 ```
 
-**输出：**
-- 缺失文件报告
-- 配置错误警告
-- 建议的改进措施
+### 3. Start a Session
 
-### 3. 健康检查
-
-验证 `.amber/` 状态一致性：
+Begin working on a feature with session tracking:
 
 ```bash
-amber doctor --target .
+amber session start --goal "implement user authentication" --route feature-standard
 ```
 
-**输出：**
-- Schema 验证结果
-- 孤立文件检测
-- 配置完整性检查
-
-### 4. 生成采纳报告
-
-为现有项目生成就绪度评估：
+### 4. Check Session Status
 
 ```bash
-amber adoption report --target . --output-dir ./adoption-report
+amber session status
 ```
 
-**输出：**
-- 依赖分析
-- 测试覆盖率评估
-- 缺失文件清单
-- 可操作建议
+### 5. Generate Handoff Report
 
----
+Create a comprehensive handoff document for session continuity:
 
-## 🌐 使用 Web 查看器
+```bash
+amber handoff --target .
+```
 
-Amber Protocol 提供可视化界面，用于查看会话、路由和治理门禁。
+## Web Viewer
 
-### 启动 Web 服务
+The web viewer provides a visual dashboard for monitoring sessions, routes, and gates.
+
+### Start the Web Viewer
 
 ```bash
 cd apps/web
@@ -96,48 +87,153 @@ npm install --legacy-peer-deps
 npm run dev
 ```
 
-### 访问界面
+Visit **http://localhost:3001** (dev server) or **http://localhost:3000** (production build).
 
-打开浏览器访问：**http://localhost:3001**
+### Key Features
 
-### 主要功能
+- **Real-time session updates** via Server-Sent Events (SSE)
+- **Timeline viewer** with virtual scrolling for performance
+- **Route explorer** organized by category
+- **Gate monitoring** with approval/rejection tracking
+- **Dark mode** with persistent theme preference
 
-- **会话管理** - 查看活动和历史会话
-- **路由浏览** - 按类别浏览工作流
-- **门禁监控** - 过滤和查看治理决策
-- **实时更新** - SSE 推送状态变化
-- **主题切换** - 明暗模式支持
+### Web Viewer Screens
+
+- **Dashboard** - Overview of active sessions and system health
+- **Sessions** - Browse active and completed sessions with detailed timelines
+- **Routes** - Explore available workflow routes
+- **Gates** - Monitor approval gates and decisions
+- **Settings** - Configure auto-refresh, intervals, and notifications
+
+## Common Commands
+
+### Session Management
+
+```bash
+# Start new session
+amber session start --goal "fix login bug"
+
+# List all sessions
+amber session list
+
+# Abort session
+amber session abort <session-id>
+
+# Continue from checkpoint
+amber session continue
+```
+
+### Route Operations
+
+```bash
+# List available routes
+amber route list
+
+# Inspect route definition
+amber route inspect feature-standard
+
+# Validate route file
+amber route validate routes/feature-standard.route.json
+```
+
+### Repository Operations
+
+```bash
+# Create wiki skeleton
+amber wiki --target . --dry-run
+
+# Validate Amber setup
+amber doctor --target .
+
+# Generate handoff report
+amber handoff --target .
+```
+
+### Adoption (Existing Projects)
+
+```bash
+# Generate adoption report
+amber adoption report --target path/to/project --output-dir docs/examples/adoptions
+
+# Gate check
+amber adoption gate --reports-dir docs/examples/adoptions
+```
+
+## Directory Structure
+
+After initialization, your repository will contain:
+
+```
+your-repo/
+├── .amber/                      # Session state and metadata
+│   ├── sessions/               # Active and completed sessions
+│   ├── approvals/              # Approval records
+│   └── gate-log.jsonl         # Gate decision log
+├── AGENTS.md                   # Agent collaboration guide
+├── CLAUDE.md                   # Codebase instructions
+├── feature_list.json           # Feature tracking
+└── docs/
+    └── wiki/                   # Project context (optional)
+        ├── architecture.md
+        ├── runbook.md
+        └── verification.md
+```
+
+## Configuration
+
+Amber Protocol uses sensible defaults but can be customized through:
+
+- **Route definitions** (`routes/*.route.json`) - Workflow templates
+- **Workflow packs** (`workflow-packs/`) - Declarative workflows
+- **Profiles** (`profiles/`) - Project-specific configurations
+
+## Next Steps
+
+- **Read the [CLI Reference](../CLI_REFERENCE.md)** for complete command documentation
+- **Explore [Architecture](../architecture/)** to understand system design
+- **Check [Quality Documentation](../quality/)** for testing and release standards
+- **Review [Examples](../examples/)** for real-world usage patterns
+- **Deploy the [Web Viewer](../DEPLOYMENT.md)** for production monitoring
+
+## Troubleshooting
+
+### Connection Issues (Web Viewer)
+
+If you see "Disconnected", the SSE connection was lost. It will automatically reconnect with exponential backoff.
+
+### No Data Showing
+
+Ensure the Amber Protocol backend is running and accessible. Check the browser console for errors.
+
+### Port Already in Use
+
+The dev server uses port 3001. If it's occupied, set a custom port:
+
+```bash
+PORT=3002 npm run dev
+```
+
+### Installation Issues
+
+For dependency conflicts, use the `--legacy-peer-deps` flag:
+
+```bash
+cd apps/web
+npm install --legacy-peer-deps
+```
+
+## Getting Help
+
+- **Documentation**: [docs/](../)
+- **Report bugs**: [GitHub Issues](https://github.com/Bandersnatch0x/amber-protocol/issues)
+- **Feature requests**: [GitHub Discussions](https://github.com/Bandersnatch0x/amber-protocol/discussions)
+
+## Version
+
+**Current Version**: 1.0.0-rc.1  
+**Status**: Release Candidate  
+**Last Updated**: 2026-06-21
 
 ---
 
-## 📚 下一步
-
-### 深入学习
-
-- [CLI 参考](../CLI_REFERENCE.md) - 完整的命令列表
-- [架构概览](../architecture/overview.md) - 理解系统设计
-- [自主模式](../AUTONOMOUS_MODE_GUIDE.md) - 自动化工作流
-
-### 常见任务
-
-- [部署到生产环境](../DEPLOYMENT.md)
-- [配置监控](../MONITORING_SETUP.md)
-- [创建自定义技能](../user-guide/tutorials/creating-first-skill.md)
-
-### 遇到问题？
-
-- [故障排查指南](../TROUBLESHOOTING.md)
-- [常见问题](../user-guide/faq.md)
-- [GitHub Issues](https://github.com/Bandersnatch0x/amber-protocol/issues)
-
----
-
-## 📖 其他资源
-
-- **完整文档：** [docs/](../)
-- **贡献指南：** [CONTRIBUTING.md](../../CONTRIBUTING.md)
-- **变更日志：** [CHANGELOG.md](../../CHANGELOG.md)
-
----
-
-**🎉 恭喜！你已经掌握 Amber Protocol 基础操作。** 开始探索更多功能吧！
+**Amber Protocol** - Repository-local AI coding governance for engineering teams.
