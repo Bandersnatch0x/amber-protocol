@@ -1,151 +1,99 @@
-# Amber Protocol Documentation
+# 📚 Amber Protocol 文档中心
 
-Welcome to the **Amber Protocol** documentation. This is your central navigation hub for all project documentation.
+欢迎来到 Amber Protocol 的文档中心。Amber Protocol 是一个为 AI 辅助开发设计的仓库级治理与控制层。
 
-## 📚 Documentation Index
+## 🚀 新用户入门
 
-### 🚀 Getting Started
+**第一次使用？从这里开始：**
 
-New to Amber Protocol? Start here:
+- [快速开始指南](guides/getting-started.md) - 安装、初始化和基本使用
+- [常见问题 FAQ](user-guide/faq.md) - 常见问题解答
+- [故障排查](user-guide/troubleshooting.md) - 问题诊断与解决
 
-- **[Getting Started Guide](./guides/getting-started.md)** - Installation, quick start, and basic usage
-- **[CLI Reference](./CLI_REFERENCE.md)** - Complete command-line interface documentation
-- **[Deployment Guide](./DEPLOYMENT.md)** - Web viewer deployment instructions
+## 🏗️ 架构与设计
 
-### 🏗️ Architecture & Design
+**深入理解 Amber Protocol：**
 
-Understand how Amber Protocol works:
+- [架构总览](architecture/overview.md) - 系统整体架构
+- [治理模型](architecture/governance-model.md) - 治理优先的设计理念
+- [路由引擎](architecture/route-engine.md) - 工作流路由机制
+- [会话生命周期](architecture/session-lifecycle.md) - 会话管理与状态
+- [数据流](architecture/data-flow.md) - 数据流向与处理
+- [扩展点](architecture/extension-points.md) - 扩展机制
+- [Web 查看器](architecture/web-viewer.md) - Web 界面架构
 
-- **[Architecture Overview](./architecture/)** - System design and control layers
-- **[Architecture Decision Records (ADRs)](./adr/)** - Design decisions and rationale
-- **[Specifications](./specs/)** - Technical specifications and contracts
-- **[Ubiquitous Language](../UBIQUITOUS_LANGUAGE.md)** - Domain terminology and concepts
+**架构决策记录 (ADR)：**
 
-### 📖 User Guides
+- [ADR-0001: 治理优先，制品优先](adr/0001-governance-first-artifact-first.md)
 
-Detailed guides for specific use cases:
+## 🛠️ 部署与运维
 
-- **[Autonomous Mode Guide](./AUTONOMOUS_MODE_GUIDE.md)** - Using autonomous session execution
-- **[Policy Configuration](./POLICY_CONFIGURATION.md)** - Configuring governance policies
-- **[Notification Setup](./NOTIFICATION_SETUP.md)** - Setting up notifications
-- **[Monitoring Setup](./MONITORING_SETUP.md)** - Production monitoring configuration
-- **[Troubleshooting](./TROUBLESHOOTING.md)** - Common issues and solutions
+**生产环境部署：**
 
-### 🔧 Development
+- [部署指南](DEPLOYMENT.md) - 生产环境部署步骤
+- [监控设置](MONITORING_SETUP.md) - 监控系统配置
+- [通知设置](NOTIFICATION_SETUP.md) - 告警通知配置
+- [策略配置](POLICY_CONFIGURATION.md) - 治理策略设置
+- [回滚流程](quality/rollback-procedures.md) - 回滚操作指南
 
-For contributors and advanced users:
+## 📖 API 参考
 
-- **[Contributing Guide](../CONTRIBUTING.md)** - Development setup and contribution guidelines
-- **[Release Guide](../RELEASE_GUIDE.md)** - Release process and versioning
-- **[Agent Instructions](./agents/)** - Agent-facing documentation
-- **[Superpowers](./superpowers/)** - Advanced workflow capabilities
+**命令行与 API 文档：**
 
-### 🧪 Quality & Testing
+- [CLI 命令参考](CLI_REFERENCE.md) - 完整命令行文档
+- [CLI 命令详解](api/cli-commands.md) - 命令详细说明
+- [Hooks API](api/hooks-api.md) - 钩子系统 API
+- [Skill API](api/skill-api.md) - 技能系统 API
 
-Quality standards and release criteria:
+## ✅ 质量保障
 
-- **[Core Use Cases](./quality/core-use-cases.md)** - Critical functionality requirements
-- **[Coverage Baseline](./quality/coverage-baseline.md)** - Test coverage standards
-- **[RC Validation Report](./quality/rc-validation-report.md)** - Release candidate validation
-- **[Release Checklist](./quality/release-checklist.md)** - Pre-release verification steps
-- **[Rollback Procedures](./quality/rollback-procedures.md)** - Emergency rollback procedures
+**测试与发布：**
 
-### 📋 Reference
+- [核心用例](quality/core-use-cases.md) - 核心功能用例
+- [覆盖率基准](quality/coverage-baseline.md) - 测试覆盖率要求
+- [RC 验证报告](quality/rc-validation-report.md) - 候选版本验证
+- [发布检查清单](quality/release-checklist.md) - 发布前检查项
 
-Technical references and specifications:
+## 📝 示例与实践
 
-- **[API Reference](./api/)** - API documentation and schemas
-- **[Route System](./reference/)** - Route engine and workflow definitions
-- **[Wiki Template](./wiki/)** - Project context documentation structure
-- **[Examples](./examples/)** - Real-world usage examples and patterns
+**实际应用案例：**
 
-### 🔍 Reviews & Analysis
+- [示例总览](examples/README.md) - 示例文档索引
+- [采纳报告示例](examples/adoptions-index.md) - 项目采纳报告
+- [集成测试示例](examples/integration-tests/) - 集成测试案例
 
-Architecture reviews and design analysis:
+## 🤖 Agent 指南
 
-- **[Reviews Directory](./reviews/)** - Architecture and code reviews
-- **[Product Definition](../PRODUCT.md)** - Product vision and boundaries
-- **[Roadmap](../ROADMAP.md)** - Future development plans
+**为 AI Agent 准备的文档：**
 
-### 🕰️ Legacy & Migration
+- [领域文档规范](agents/domain.md) - 领域知识组织
+- [Issue 追踪器](agents/issue-tracker.md) - Issue 管理指南
+- [分类标签](agents/triage-labels.md) - Issue 分类体系
+- [自主模式指南](AUTONOMOUS_MODE_GUIDE.md) - Agent 自主执行模式
 
-Historical context and migration guides:
+## 🔧 维护指南
 
-- **[Legacy Documentation](./legacy/)** - Archived documentation from coding-harness era
-- **[Migration Guides](../src/migration/)** - Migrating from legacy formats
+**项目维护者文档：**
 
-## 📦 Quick Links
+- [提案精简](maintenance/distill-proposals.md) - 提案管理流程
 
-### Common Tasks
+## 📜 历史文档
 
-- **Install Amber**: `npm install -g amber-protocol`
-- **Initialize repo**: `amber init --target .`
-- **Start session**: `amber session start --goal "your goal"`
-- **Launch web viewer**: `cd apps/web && npm run dev`
-- **Run tests**: `npm test`
-- **Generate handoff**: `amber handoff --target .`
+**历史归档：**
 
-### Key Files
+- [Legacy 文档](legacy/README.md) - 迁移前的历史文档 ⚠️
 
-- **[README.md](../README.md)** - Project overview and quick start
-- **[CHANGELOG.md](../CHANGELOG.md)** - Version history and changes
-- **[CLAUDE.md](../CLAUDE.md)** - Claude Code integration instructions
-- **[AGENTS.md](../AGENTS.md)** - Agent collaboration guidelines
+## 🔗 快速链接
 
-## 🎯 Documentation by Role
-
-### For End Users
-
-1. [Getting Started](./guides/getting-started.md)
-2. [CLI Reference](./CLI_REFERENCE.md)
-3. [Troubleshooting](./TROUBLESHOOTING.md)
-
-### For Project Adopters
-
-1. [Getting Started](./guides/getting-started.md)
-2. [Adoption Examples](./examples/)
-3. [Policy Configuration](./POLICY_CONFIGURATION.md)
-4. [Wiki Template](./wiki/)
-
-### For Contributors
-
-1. [Contributing Guide](../CONTRIBUTING.md)
-2. [Architecture Overview](./architecture/)
-3. [Quality Standards](./quality/)
-4. [ADRs](./adr/)
-
-### For DevOps/SREs
-
-1. [Deployment Guide](./DEPLOYMENT.md)
-2. [Monitoring Setup](./MONITORING_SETUP.md)
-3. [Troubleshooting](./TROUBLESHOOTING.md)
-4. [Rollback Procedures](./quality/rollback-procedures.md)
-
-## 📊 Documentation Statistics
-
-- **Total documentation files**: 106 markdown files
-- **Current version**: 1.0.0-rc.1
-- **Status**: Release Candidate
-- **Last updated**: 2026-06-21
-
-## 🔄 Documentation Maintenance
-
-This documentation is actively maintained. If you find:
-
-- **Broken links** - Run `node scripts/check-broken-links.js`
-- **Outdated content** - File an issue or submit a PR
-- **Missing documentation** - Open a GitHub discussion
-
-## 📞 Support
-
-- **Documentation issues**: [GitHub Issues](https://github.com/Bandersnatch0x/amber-protocol/issues)
-- **Feature requests**: [GitHub Discussions](https://github.com/Bandersnatch0x/amber-protocol/discussions)
-- **Community chat**: Coming soon
-
-## 📄 License
-
-All documentation is licensed under MIT. See [LICENSE](../LICENSE) for details.
+| 资源 | 链接 |
+|------|------|
+| **GitHub 仓库** | [Bandersnatch0x/amber-protocol](https://github.com/Bandersnatch0x/amber-protocol) |
+| **Issue 追踪** | [GitHub Issues](https://github.com/Bandersnatch0x/amber-protocol/issues) |
+| **发布日志** | [CHANGELOG](release/CHANGELOG.md) |
+| **发布说明** | [RELEASE_NOTES](release/RELEASE_NOTES.md) |
 
 ---
 
-**Amber Protocol** - Repository-local AI coding governance for engineering teams.
+**最后更新：** 2026-06-21
+
+**文档版本：** 与 Amber Protocol v1.0.0-rc.1 同步
