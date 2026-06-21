@@ -8,9 +8,30 @@
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
-**Status:** Beta | **Version:** 1.0.0-beta
+![CI](https://github.com/Bandersnatch0x/amber-protocol/workflows/CI/badge.svg)
+![Node Version](https://img.shields.io/badge/node-%3E%3D18.17-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/npm/v/amber-protocol)
+
+**Status:** Release Candidate | **Version:** 1.0.0-rc.1
 
 Amber Protocol is a repo-local AI coding governance console for engineering teams. It helps teams prepare, review, verify, hand off, and audit AI-assisted coding work inside a repository.
+
+## 📦 Installation
+
+### From npm (Recommended)
+```bash
+npm install -g amber-protocol
+amber --version
+```
+
+### From source
+```bash
+git clone https://github.com/Bandersnatch0x/amber-protocol.git
+cd amber-protocol
+npm install
+node scripts/amber.js --version
+```
 
 ## 🚀 Quick Start
 
@@ -25,7 +46,7 @@ node scripts/amber.js audit --target path/to/repo
 cd apps/web
 npm install --legacy-peer-deps
 npm run dev
-# Visit http://localhost:3000
+# Visit http://localhost:3001
 ```
 
 See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for the deployment guide.
@@ -311,13 +332,14 @@ CI runs on pushes and pull requests:
 - smoke-check CLI help with `node scripts/amber.js --help`
 - build, unit-test, and e2e-test the web viewer in `apps/web` (Node 20.x, Playwright)
 
-Release dry-run runs when a tag like `v1.2.3` is pushed:
+Release workflow automatically publishes to npm when a stable version tag (e.g., `v1.0.0`) is pushed:
 
-- depends on both the `test` and `web` CI jobs
-- runs `npm pack --dry-run`
-- uploads the generated package preview as an artifact
+- depends on all quality gates (test, web, coverage, security, performance)
+- validates package contents before publishing
+- publishes to npm using `NPM_TOKEN` secret
+- creates GitHub Release with installation instructions
 
-No workflow publishes packages, creates releases, or uses repository secrets.
+Release dry-run runs for pre-release tags (`-rc`, `-beta`) to test the workflow without publishing.
 
 ## Local Verification
 
@@ -344,3 +366,23 @@ npm run test:load
 - No external marketplace publishing.
 - No automatic rewrite of existing target project docs.
 - No scheduled loop execution in the current product.
+
+---
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, release process, and contribution guidelines.
+
+## 💬 Support
+
+- 📖 Documentation: [docs/](./docs/)
+- 🐛 Report bugs: [GitHub Issues](https://github.com/Bandersnatch0x/amber-protocol/issues)
+- 💡 Feature requests: [GitHub Discussions](https://github.com/Bandersnatch0x/amber-protocol/discussions)
+
+## 📄 License
+
+MIT License - see [LICENSE](./LICENSE) for details.
+
+---
+
+**Amber Protocol** - Repository-local AI coding governance for engineering teams.
