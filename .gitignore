@@ -44,6 +44,9 @@ agent-tools/
 terminals/
 .archive/
 
+# Superpowers workflow artifacts (plans, specs, session handoffs)
+docs/superpowers/
+
 # Logs
 *.log
 npm-debug.log*
