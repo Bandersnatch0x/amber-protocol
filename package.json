@@ -22,6 +22,7 @@
   "scripts": {
     "test": "node scripts/run-tests.js",
     "test:coverage": "c8 --reporter=text --reporter=html --reporter=json-summary node scripts/run-tests.js",
+    "test:experimental": "node scripts/run-tests.js tests/experimental/",
     "check": "node scripts/run-tests.js",
     "doctor": "node scripts/amber.js doctor --target .",
     "handoff": "node scripts/amber.js handoff --target .",
