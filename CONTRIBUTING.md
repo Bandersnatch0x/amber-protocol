@@ -176,6 +176,15 @@ When contributing, keep these principles in mind:
 
 ## Release Process
 
+### Quality Documentation
+
+Before releasing, review the quality assurance documentation:
+
+- [Core Use Cases](./docs/quality/core-use-cases.md) - Essential functionality validation
+- [Coverage Baseline](./docs/quality/coverage-baseline.md) - Test coverage requirements
+- [Release Checklist](./docs/quality/release-checklist.md) - Pre-release verification steps
+- [Rollback Procedures](./docs/quality/rollback-procedures.md) - Emergency rollback guide
+
 ### Automated Release (Default)
 
 Amber Protocol uses automated releases via GitHub Actions. When a version tag is pushed, the CI pipeline automatically publishes to npm and creates a GitHub Release.
