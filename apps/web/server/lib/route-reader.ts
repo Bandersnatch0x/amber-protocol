@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { resolveWithin } from './safe-path';
+import { resolveRepoRoot } from './repo-root';
 
 export interface Route {
   id: string;
@@ -16,7 +17,7 @@ export interface Route {
 }
 
 function getAmberRoutesPath(): string {
-  return path.join(process.cwd(), '..', '..', 'routes');
+  return path.join(resolveRepoRoot(), 'routes');
 }
 
 export function listRoutes(): Route[] {

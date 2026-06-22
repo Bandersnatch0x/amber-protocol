@@ -2,12 +2,13 @@ import fs from 'fs/promises';
 import path from 'path';
 import { Gate, GateStatus, GateFilters, GateDecision } from './types/gate';
 import { AMBER_STATE_DIR } from './state-dir';
+import { resolveRepoRoot } from './repo-root';
 
 // Filesystem layout: .amber/sessions/{sessionId}/gates/{gateId}.gate.json
 // Decision files: .amber/sessions/{sessionId}/gates/{gateId}.decision.json
 
 function getSessionsPath(): string {
-  return path.join(process.cwd(), '..', '..', AMBER_STATE_DIR, 'sessions');
+  return path.join(resolveRepoRoot(), AMBER_STATE_DIR, 'sessions');
 }
 
 function validateSessionId(sessionId: string): boolean {

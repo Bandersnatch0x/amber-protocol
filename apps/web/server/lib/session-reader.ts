@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { resolveWithin } from './safe-path';
 import { AMBER_STATE_DIR } from './state-dir';
+import { resolveRepoRoot } from './repo-root';
 import type { SessionEvent } from '../types/session-events';
 
 export interface Session {
@@ -30,8 +31,7 @@ export interface SessionDetail extends Session {
 }
 
 function getAmberSessionsPath(): string {
-  // From apps/web, go up to project root, then into .amber/sessions
-  return path.join(process.cwd(), '..', '..', AMBER_STATE_DIR, 'sessions');
+  return path.join(resolveRepoRoot(), AMBER_STATE_DIR, 'sessions');
 }
 
 export function readSessionList(): Session[] {
