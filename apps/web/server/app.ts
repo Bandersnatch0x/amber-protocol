@@ -23,7 +23,11 @@ export function createApp() {
   app.post('/api/errors', express.json({ limit: '64kb' }), handleErrorReport);
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      cwd: process.cwd(),
+      amberRepoRoot: process.env.AMBER_REPO_ROOT || null,
+    });
   });
 
   return app;
