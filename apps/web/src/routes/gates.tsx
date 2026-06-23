@@ -24,6 +24,14 @@ function GatesPage() {
     statusFilter ? { status: statusFilter } : undefined
   );
 
+  // Debug logging for E2E tests
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[GatesPage] isLoading:', isLoading);
+    console.log('[GatesPage] error:', error);
+    console.log('[GatesPage] gates:', gates);
+    console.log('[GatesPage] statusFilter:', statusFilter);
+  }
+
   return (
     <div className="page-container">
       <div className="mb-6">
