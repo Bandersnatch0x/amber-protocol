@@ -113,6 +113,14 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
     filtered = gates.filter(g => g.status === filters.status);
   }
 
+  if (process.env.AMBER_REPO_ROOT) {
+    console.log('[gate-reader] listGates: total gates found =', gates.length);
+    console.log('[gate-reader] listGates: after filter =', filtered.length);
+    if (filtered.length > 0) {
+      console.log('[gate-reader] listGates: first gate =', JSON.stringify(filtered[0]));
+    }
+  }
+
   // Sort by triggered time (newest first)
   return filtered.sort((a, b) =>
     new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime()

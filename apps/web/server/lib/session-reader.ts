@@ -62,10 +62,13 @@ export function readSessionList(): Session[] {
     console.log('[session-reader] readSessionList: dirs =', dirs);
   }
 
-  return dirs
+  const sessions = dirs
     .map(id => {
       const manifestPath = path.join(sessionsDir, id, 'manifest.json');
       if (!fs.existsSync(manifestPath)) {
+        if (process.env.AMBER_REPO_ROOT) {
+          console.log('[session-reader] manifest not found for:', id);
+        }
         return null;
       }
 
@@ -87,6 +90,15 @@ export function readSessionList(): Session[] {
     })
     .filter((s): s is Session => s !== null)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  if (process.env.AMBER_REPO_ROOT) {
+    console.log('[session-reader] readSessionList: returning', sessions.length, 'sessions');
+    if (sessions.length > 0) {
+      console.log('[session-reader] readSessionList: first session =', JSON.stringify(sessions[0]));
+    }
+  }
+
+  return sessions;
 }
 
 export function readSessionById(id: string): SessionDetail | null {

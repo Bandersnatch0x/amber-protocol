@@ -49,7 +49,7 @@ export function listRoutes(): Route[] {
     console.log('[route-reader] listRoutes: found', routeFiles.length, 'route files');
   }
 
-  return routeFiles
+  const routes = routeFiles
     .map(file => {
       try {
         const filePath = path.join(routesDir, file);
@@ -71,6 +71,15 @@ export function listRoutes(): Route[] {
     })
     .filter((r): r is Route => r !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (process.env.AMBER_REPO_ROOT) {
+    console.log('[route-reader] listRoutes: returning', routes.length, 'routes');
+    if (routes.length > 0) {
+      console.log('[route-reader] listRoutes: first route =', routes[0].name);
+    }
+  }
+
+  return routes;
 }
 
 export function getRouteById(id: string): Route | null {
