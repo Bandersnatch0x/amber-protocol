@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import { getE2ERepoRoot } from './tests/e2e/fixtures/repo-root';
+
+// Compute and set AMBER_REPO_ROOT early so webServer processes inherit it
+if (!process.env.AMBER_REPO_ROOT) {
+  process.env.AMBER_REPO_ROOT = getE2ERepoRoot();
+}
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -38,9 +44,6 @@ export default defineConfig({
       command: 'npm run dev:server',
       port: 3001,
       reuseExistingServer: !process.env.CI,
-      env: {
-        ...process.env,
-      },
     },
     {
       command: 'npm run dev:client',
