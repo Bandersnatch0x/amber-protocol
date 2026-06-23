@@ -1,5 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
-import { getE2ERepoRoot } from './tests/e2e/fixtures/repo-root';
+import os from 'os';
+import path from 'path';
+
+// Inline getE2ERepoRoot to avoid import issues
+function getE2ERepoRoot(): string {
+  const override = process.env.AMBER_E2E_REPO_ROOT;
+  if (override) return path.resolve(override);
+
+  const repoKey = path.resolve(process.cwd(), '..', '..').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(os.tmpdir(), `amber-web-e2e-${repoKey}`);
+}
 
 // Compute and set AMBER_REPO_ROOT early so webServer processes inherit it
 if (!process.env.AMBER_REPO_ROOT) {
