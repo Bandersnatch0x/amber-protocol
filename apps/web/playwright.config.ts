@@ -1,20 +1,20 @@
 import { defineConfig, devices } from '@playwright/test';
-import path from 'path';
-
-const repoRoot = path.resolve(process.cwd(), '..', '..');
 
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: '**/*.spec.ts',
   globalSetup: './tests/e2e/globalSetup.ts',
   globalTeardown: './tests/e2e/globalTeardown.ts',
+  expect: {
+    timeout: 15_000,
+  },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -40,7 +40,6 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       env: {
         ...process.env,
-        AMBER_REPO_ROOT: repoRoot,
       },
     },
     {
