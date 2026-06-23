@@ -17,7 +17,18 @@ export interface Route {
 }
 
 function getAmberRoutesPath(): string {
-  return path.join(resolveRepoRoot(), 'routes');
+  const repoRoot = resolveRepoRoot();
+  const routesPath = path.join(repoRoot, 'routes');
+
+  // Debug logging for E2E tests
+  if (process.env.AMBER_REPO_ROOT) {
+    console.log('[route-reader] AMBER_REPO_ROOT:', process.env.AMBER_REPO_ROOT);
+    console.log('[route-reader] Resolved repo root:', repoRoot);
+    console.log('[route-reader] Routes path:', routesPath);
+    console.log('[route-reader] Routes dir exists:', fs.existsSync(routesPath));
+  }
+
+  return routesPath;
 }
 
 export function listRoutes(): Route[] {

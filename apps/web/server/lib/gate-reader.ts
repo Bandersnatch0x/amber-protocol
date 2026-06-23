@@ -8,7 +8,17 @@ import { resolveRepoRoot } from './repo-root';
 // Decision files: .amber/sessions/{sessionId}/gates/{gateId}.decision.json
 
 function getSessionsPath(): string {
-  return path.join(resolveRepoRoot(), AMBER_STATE_DIR, 'sessions');
+  const repoRoot = resolveRepoRoot();
+  const sessionsPath = path.join(repoRoot, AMBER_STATE_DIR, 'sessions');
+
+  // Debug logging for E2E tests
+  if (process.env.AMBER_REPO_ROOT) {
+    console.log('[gate-reader] AMBER_REPO_ROOT:', process.env.AMBER_REPO_ROOT);
+    console.log('[gate-reader] Resolved repo root:', repoRoot);
+    console.log('[gate-reader] Sessions path:', sessionsPath);
+  }
+
+  return sessionsPath;
 }
 
 function validateSessionId(sessionId: string): boolean {
