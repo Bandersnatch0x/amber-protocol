@@ -33,15 +33,6 @@ export interface SessionDetail extends Session {
 function getAmberSessionsPath(): string {
   const repoRoot = resolveRepoRoot();
   const sessionsPath = path.join(repoRoot, AMBER_STATE_DIR, 'sessions');
-
-  // Debug logging for E2E tests
-  if (process.env.AMBER_REPO_ROOT) {
-    console.log('[session-reader] AMBER_REPO_ROOT:', process.env.AMBER_REPO_ROOT);
-    console.log('[session-reader] Resolved repo root:', repoRoot);
-    console.log('[session-reader] Sessions path:', sessionsPath);
-    console.log('[session-reader] Sessions dir exists:', fs.existsSync(sessionsPath));
-  }
-
   return sessionsPath;
 }
 
@@ -49,26 +40,15 @@ export function readSessionList(): Session[] {
   const sessionsDir = getAmberSessionsPath();
 
   if (!fs.existsSync(sessionsDir)) {
-    if (process.env.AMBER_REPO_ROOT) {
-      console.log('[session-reader] readSessionList: sessions dir does not exist');
-    }
     return [];
   }
 
   const dirs = fs.readdirSync(sessionsDir);
 
-  if (process.env.AMBER_REPO_ROOT) {
-    console.log('[session-reader] readSessionList: found', dirs.length, 'directories');
-    console.log('[session-reader] readSessionList: dirs =', dirs);
-  }
-
   const sessions = dirs
     .map(id => {
       const manifestPath = path.join(sessionsDir, id, 'manifest.json');
       if (!fs.existsSync(manifestPath)) {
-        if (process.env.AMBER_REPO_ROOT) {
-          console.log('[session-reader] manifest not found for:', id);
-        }
         return null;
       }
 
@@ -90,13 +70,6 @@ export function readSessionList(): Session[] {
     })
     .filter((s): s is Session => s !== null)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  if (process.env.AMBER_REPO_ROOT) {
-    console.log('[session-reader] readSessionList: returning', sessions.length, 'sessions');
-    if (sessions.length > 0) {
-      console.log('[session-reader] readSessionList: first session =', JSON.stringify(sessions[0]));
-    }
-  }
 
   return sessions;
 }

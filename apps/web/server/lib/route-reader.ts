@@ -19,15 +19,6 @@ export interface Route {
 function getAmberRoutesPath(): string {
   const repoRoot = resolveRepoRoot();
   const routesPath = path.join(repoRoot, 'routes');
-
-  // Debug logging for E2E tests
-  if (process.env.AMBER_REPO_ROOT) {
-    console.log('[route-reader] AMBER_REPO_ROOT:', process.env.AMBER_REPO_ROOT);
-    console.log('[route-reader] Resolved repo root:', repoRoot);
-    console.log('[route-reader] Routes path:', routesPath);
-    console.log('[route-reader] Routes dir exists:', fs.existsSync(routesPath));
-  }
-
   return routesPath;
 }
 
@@ -35,19 +26,11 @@ export function listRoutes(): Route[] {
   const routesDir = getAmberRoutesPath();
 
   if (!fs.existsSync(routesDir)) {
-    if (process.env.AMBER_REPO_ROOT) {
-      console.log('[route-reader] listRoutes: routes dir does not exist');
-    }
     return [];
   }
 
   const files = fs.readdirSync(routesDir);
   const routeFiles = files.filter(f => f.endsWith('.route.json'));
-
-  if (process.env.AMBER_REPO_ROOT) {
-    console.log('[route-reader] listRoutes: found', files.length, 'total files');
-    console.log('[route-reader] listRoutes: found', routeFiles.length, 'route files');
-  }
 
   const routes = routeFiles
     .map(file => {
@@ -71,13 +54,6 @@ export function listRoutes(): Route[] {
     })
     .filter((r): r is Route => r !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
-
-  if (process.env.AMBER_REPO_ROOT) {
-    console.log('[route-reader] listRoutes: returning', routes.length, 'routes');
-    if (routes.length > 0) {
-      console.log('[route-reader] listRoutes: first route =', routes[0].name);
-    }
-  }
 
   return routes;
 }
