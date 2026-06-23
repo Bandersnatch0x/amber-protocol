@@ -35,11 +35,19 @@ export function listRoutes(): Route[] {
   const routesDir = getAmberRoutesPath();
 
   if (!fs.existsSync(routesDir)) {
+    if (process.env.AMBER_REPO_ROOT) {
+      console.log('[route-reader] listRoutes: routes dir does not exist');
+    }
     return [];
   }
 
   const files = fs.readdirSync(routesDir);
   const routeFiles = files.filter(f => f.endsWith('.route.json'));
+
+  if (process.env.AMBER_REPO_ROOT) {
+    console.log('[route-reader] listRoutes: found', files.length, 'total files');
+    console.log('[route-reader] listRoutes: found', routeFiles.length, 'route files');
+  }
 
   return routeFiles
     .map(file => {

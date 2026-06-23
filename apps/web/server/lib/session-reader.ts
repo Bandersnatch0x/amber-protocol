@@ -49,10 +49,18 @@ export function readSessionList(): Session[] {
   const sessionsDir = getAmberSessionsPath();
 
   if (!fs.existsSync(sessionsDir)) {
+    if (process.env.AMBER_REPO_ROOT) {
+      console.log('[session-reader] readSessionList: sessions dir does not exist');
+    }
     return [];
   }
 
   const dirs = fs.readdirSync(sessionsDir);
+
+  if (process.env.AMBER_REPO_ROOT) {
+    console.log('[session-reader] readSessionList: found', dirs.length, 'directories');
+    console.log('[session-reader] readSessionList: dirs =', dirs);
+  }
 
   return dirs
     .map(id => {

@@ -65,6 +65,9 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
   try {
     await fs.access(sessionsDir);
   } catch {
+    if (process.env.AMBER_REPO_ROOT) {
+      console.log('[gate-reader] listGates: sessions dir not accessible');
+    }
     return [];
   }
 
@@ -72,6 +75,11 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
   const sessionDirs = filters.sessionId
     ? [filters.sessionId]
     : await fs.readdir(sessionsDir);
+
+  if (process.env.AMBER_REPO_ROOT) {
+    console.log('[gate-reader] listGates: found', sessionDirs.length, 'session directories');
+    console.log('[gate-reader] listGates: sessionDirs =', sessionDirs);
+  }
 
   for (const sessionId of sessionDirs) {
     if (!validateSessionId(sessionId)) continue;
