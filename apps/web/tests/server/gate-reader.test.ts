@@ -7,7 +7,7 @@ import os from 'os';
 // getSessionsPath() resolves to ../../.amber/sessions from cwd.
 // We create that structure in a temp dir and change cwd for each test.
 
-const originalCwd = process.cwd;
+const originalRepoRoot = process.env.AMBER_REPO_ROOT;
 let testRoot: string;
 
 function ensureDir(dir: string): void {
@@ -19,7 +19,7 @@ function writeJson(filePath: string, data: unknown): void {
 }
 
 function createTestSetup(): string {
-  const root = path.join(os.tmpdir(), `amber-gate-test-${Date.now()}`);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'amber-gate-test-'));
   const amberSessions = path.join(root, '.amber', 'sessions');
   ensureDir(amberSessions);
   return root;
@@ -39,9 +39,15 @@ describe('gate-reader', () => {
     // If cwd = apps/web, then ../../.amber = repoRoot/.amber
     // We mimic this: testRoot/.amber/sessions
     sessionsDir = path.join(testRoot, '.amber', 'sessions');
+    process.env.AMBER_REPO_ROOT = testRoot;
   });
 
   afterEach(() => {
+    if (originalRepoRoot === undefined) {
+      delete process.env.AMBER_REPO_ROOT;
+    } else {
+      process.env.AMBER_REPO_ROOT = originalRepoRoot;
+    }
     fs.rmSync(testRoot, { recursive: true, force: true });
   });
 
@@ -98,13 +104,12 @@ describe('gate-reader', () => {
 
   describe('listGates', () => {
     it('returns empty array when sessions dir does not exist', async () => {
-      // With cwd unchanged and no .amber dir, should return []
+      fs.rmSync(sessionsDir, { recursive: true, force: true });
+
       const { listGates } = await import('@server/lib/gate-reader');
-      // The default getSessionsPath will look for ../../.amber from cwd
-      // In the test environment, this may or may not exist.
-      // We just verify it returns an array (might be empty or contain data).
+
       const gates = await listGates();
-      expect(Array.isArray(gates)).toBe(true);
+      expect(gates).toEqual([]);
     });
 
     it('filters by status', async () => {

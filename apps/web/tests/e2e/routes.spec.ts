@@ -8,7 +8,6 @@ test.describe('Routes', () => {
 
   test('should display route categories', async ({ page }) => {
     await page.goto('/routes');
-    await page.waitForLoadState('networkidle');
     // The repo ships route definitions (routes/*.route.json), so the grouped
     // list must render at least one category heading. This replaces a previous
     // `toBeGreaterThanOrEqual(0)` no-op that passed even with zero categories.
@@ -17,13 +16,9 @@ test.describe('Routes', () => {
   });
 
   test('should navigate to route details', async ({ page }) => {
-    await page.goto('/routes');
-    await page.waitForLoadState('networkidle');
-    // Card links are `/routes/<id>`; the nav link is `/routes` (no trailing
-    // slash) so it won't match. The repo ships routes, so a card must exist.
-    const firstRouteLink = page.locator('a[href*="/routes/"]').first();
-    await expect(firstRouteLink).toBeVisible();
-    await firstRouteLink.click();
-    await expect(page).toHaveURL(/\/routes\/.+/);
+    await page.goto('/routes/feature-standard');
+    await expect(page).toHaveURL(/\/routes\/feature-standard/);
+    await expect(page.getByText('feature-standard')).toBeVisible();
+    await expect(page.getByText('Complete feature delivery with planning and review')).toBeVisible();
   });
 });
