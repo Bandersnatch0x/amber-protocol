@@ -7,6 +7,13 @@ export const Route = createFileRoute('/sessions/')({ component: SessionsPage });
 function SessionsPage() {
   const { data: sessions, isLoading, error } = trpc.session.list.useQuery();
 
+  // Debug logging for E2E tests
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[SessionsPage] isLoading:', isLoading);
+    console.log('[SessionsPage] error:', error);
+    console.log('[SessionsPage] sessions:', sessions);
+  }
+
   return (
     <div className="page-container">
       <div className="mb-6">
