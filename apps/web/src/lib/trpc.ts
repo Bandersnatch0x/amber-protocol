@@ -11,10 +11,10 @@ function getBaseUrl() {
 
 export function getTRPCClient() {
   return trpc.createClient({
+    transformer: superjson,
     links: [
       httpBatchLink({
         url: `${getBaseUrl()}/api/trpc`,
-        transformer: superjson,
       }),
     ],
   });
