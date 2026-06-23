@@ -52,13 +52,19 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run dev:server',
-      port: 3001,
+      url: 'http://127.0.0.1:3001/api/health',
       reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
     {
       command: 'npm run dev:client',
-      port: 5173,
+      url: 'http://127.0.0.1:5173',
       reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
     },
   ],
 });
