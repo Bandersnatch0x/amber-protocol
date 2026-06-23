@@ -31,7 +31,18 @@ export interface SessionDetail extends Session {
 }
 
 function getAmberSessionsPath(): string {
-  return path.join(resolveRepoRoot(), AMBER_STATE_DIR, 'sessions');
+  const repoRoot = resolveRepoRoot();
+  const sessionsPath = path.join(repoRoot, AMBER_STATE_DIR, 'sessions');
+
+  // Debug logging for E2E tests
+  if (process.env.AMBER_REPO_ROOT) {
+    console.log('[session-reader] AMBER_REPO_ROOT:', process.env.AMBER_REPO_ROOT);
+    console.log('[session-reader] Resolved repo root:', repoRoot);
+    console.log('[session-reader] Sessions path:', sessionsPath);
+    console.log('[session-reader] Sessions dir exists:', fs.existsSync(sessionsPath));
+  }
+
+  return sessionsPath;
 }
 
 export function readSessionList(): Session[] {
