@@ -10,14 +10,6 @@ import { resolveRepoRoot } from './repo-root';
 function getSessionsPath(): string {
   const repoRoot = resolveRepoRoot();
   const sessionsPath = path.join(repoRoot, AMBER_STATE_DIR, 'sessions');
-
-  // Debug logging for E2E tests
-  if (process.env.AMBER_REPO_ROOT) {
-    console.log('[gate-reader] AMBER_REPO_ROOT:', process.env.AMBER_REPO_ROOT);
-    console.log('[gate-reader] Resolved repo root:', repoRoot);
-    console.log('[gate-reader] Sessions path:', sessionsPath);
-  }
-
   return sessionsPath;
 }
 
@@ -65,9 +57,6 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
   try {
     await fs.access(sessionsDir);
   } catch {
-    if (process.env.AMBER_REPO_ROOT) {
-      console.log('[gate-reader] listGates: sessions dir not accessible');
-    }
     return [];
   }
 
@@ -75,11 +64,6 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
   const sessionDirs = filters.sessionId
     ? [filters.sessionId]
     : await fs.readdir(sessionsDir);
-
-  if (process.env.AMBER_REPO_ROOT) {
-    console.log('[gate-reader] listGates: found', sessionDirs.length, 'session directories');
-    console.log('[gate-reader] listGates: sessionDirs =', sessionDirs);
-  }
 
   for (const sessionId of sessionDirs) {
     if (!validateSessionId(sessionId)) continue;
@@ -111,14 +95,6 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
   let filtered = gates;
   if (filters.status && filters.status !== 'all') {
     filtered = gates.filter(g => g.status === filters.status);
-  }
-
-  if (process.env.AMBER_REPO_ROOT) {
-    console.log('[gate-reader] listGates: total gates found =', gates.length);
-    console.log('[gate-reader] listGates: after filter =', filtered.length);
-    if (filtered.length > 0) {
-      console.log('[gate-reader] listGates: first gate =', JSON.stringify(filtered[0]));
-    }
   }
 
   // Sort by triggered time (newest first)
