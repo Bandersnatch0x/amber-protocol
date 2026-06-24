@@ -7,7 +7,8 @@
 const fs = require("fs");
 const path = require("path");
 
-const BACKUP_PATTERN = /^\.backup-(\d{4}-\d{2}-\d{2}-\d{6}(?:-\d{3})?)\.json$/;
+const BACKUP_PATTERN =
+	/^\.backup-(\d{4}-\d{2}-\d{2}-\d{6}(?:-\d{3})*)\.json$/;
 
 /**
  * Find all backup files in a directory, sorted newest first.
@@ -59,13 +60,21 @@ function createBackup(settingsPath) {
 		String(now.getMilliseconds()).padStart(3, "0"),
 	].join("");
 
-	const backupName = `.backup-${stamp}.json`;
-	const backupPath = path.join(dir, backupName);
-
 	const content = fs.readFileSync(settingsPath);
-	fs.writeFileSync(backupPath, content);
+	let suffix = "";
+	let backupPath;
 
-	return backupPath;
+	for (let attempt = 0; attempt < 1000; attempt++) {
+		const backupName = `.backup-${stamp}${suffix}.json`;
+		backupPath = path.join(dir, backupName);
+		if (!fs.existsSync(backupPath)) {
+			fs.writeFileSync(backupPath, content);
+			return backupPath;
+		}
+		suffix = `-${String(attempt + 1).padStart(3, "0")}`;
+	}
+
+	throw new Error(`Unable to create unique backup in ${dir}`);
 }
 
 /**
