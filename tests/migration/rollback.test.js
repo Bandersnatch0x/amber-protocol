@@ -99,11 +99,44 @@ describe("createBackup", () => {
 		fs.writeFileSync(settingsPath, "{}");
 		const backupPath = createBackup(settingsPath);
 
-		const pattern = /\.backup-\d{4}-\d{2}-\d{2}-\d{6}(?:-\d{3})?\.json$/;
+		const pattern = /\.backup-\d{4}-\d{2}-\d{2}-\d{6}(?:-\d{3})*\.json$/;
 		assert.ok(
 			pattern.test(backupPath),
 			`Backup filename should match pattern: ${backupPath}`,
 		);
+	});
+
+	it("creates unique filenames when a backup with the same stamp already exists", () => {
+		const settingsPath = path.join(tmpDir, "settings.json");
+		fs.writeFileSync(settingsPath, JSON.stringify({ version: "5.5", pass: 1 }));
+
+		const stamp = "2026-06-01-120000-000";
+		fs.writeFileSync(
+			path.join(tmpDir, `.backup-${stamp}.json`),
+			JSON.stringify({ version: "5.5", pass: 0 }),
+		);
+
+		const fixed = new Date(2026, 5, 1, 12, 0, 0, 0);
+		const OriginalDate = global.Date;
+		global.Date = class extends OriginalDate {
+			constructor(...args) {
+				super(...(args.length ? args : [fixed]));
+			}
+			static now() {
+				return fixed.getTime();
+			}
+		};
+
+		try {
+			const backupPath = createBackup(settingsPath);
+			assert.ok(
+				backupPath.endsWith("-001.json"),
+				`Expected collision suffix, got ${backupPath}`,
+			);
+			assert.strictEqual(findBackups(tmpDir).length, 2);
+		} finally {
+			global.Date = OriginalDate;
+		}
 	});
 });
 
