@@ -6,7 +6,7 @@
 
 **第一次使用？从这里开始：**
 
-- [快速开始指南](guides/getting-started.md) - 安装、初始化和基本使用
+- [快速开始指南](user-guide/getting-started.md) - 安装、初始化和基本使用
 - [常见问题 FAQ](user-guide/faq.md) - 常见问题解答
 - [故障排查](user-guide/troubleshooting.md) - 问题诊断与解决
 
