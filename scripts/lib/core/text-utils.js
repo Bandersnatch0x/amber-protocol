@@ -3,10 +3,12 @@
 const path = require("node:path");
 
 function slugify(value) {
+	// Preserve original case so that plan titles, task ids, and report
+	// filenames match what the user typed. Only replace runs of characters
+	// that are not alphanumeric (both cases) with a single dash.
 	return (
 		String(value || "")
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/[^a-zA-Z0-9]+/g, "-")
 			.replace(/^-+|-+$/g, "")
 			.slice(0, 80) || "plan"
 	);

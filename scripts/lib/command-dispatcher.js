@@ -16,6 +16,7 @@ const path = require("node:path");
 const amberCore = require("./amber-core");
 const routeCommands = require("./route-commands");
 const sessionCommands = require("./session-commands");
+const featureCommands = require("./feature-commands");
 const { migrateManifests } = require("./migrate-command");
 const { migrateState, migrateWiki } = require("./state-migration");
 const { validateWorkflowPack } = require("./core/execution-validator");
@@ -74,6 +75,9 @@ function handlePlan(args) {
 }
 
 function handleGate(args) {
+  if (args.confirm) {
+    return { result: amberCore.confirmPlanGate(args.target, args.plan) };
+  }
   return { result: amberCore.validatePlanGate(args.target, args.plan) };
 }
 
@@ -300,8 +304,28 @@ async function handleSession(args) {
       const completion = buildCompletionResult(targetRoot, args.session, args);
       sessionResult = { text: completion.text, exitCode: completion.errors.length > 0 ? 1 : 0 };
     }
+  } else if (action === "verify") {
+    if (!args.session) {
+      sessionResult = { text: "session verify requires --session <id>.", exitCode: 1 };
+    } else {
+      sessionResult = await sessionCommands.verifySession(targetRoot, {
+        sessionId: args.session,
+        stage: args.stage,
+        command: args.command,
+        result: args.result,
+      });
+    }
+  } else if (action === "approve") {
+    if (!args.session) {
+      sessionResult = { text: "session approve requires --session <id>.", exitCode: 1 };
+    } else {
+      sessionResult = await sessionCommands.approveSession(targetRoot, {
+        sessionId: args.session,
+        gate: args.gate || args._?.[1],
+      });
+    }
   } else {
-    sessionResult = { text: "session requires start, status, list, abort, continue, or complete-check.", exitCode: 1 };
+    sessionResult = { text: "session requires start, status, list, abort, continue, complete-check, verify, or approve.", exitCode: 1 };
   }
 
   const r = {
@@ -414,6 +438,120 @@ function handleSecurity(args) {
   return { result: generateSecurityAuditReport(args.target || ".", args) };
 }
 
+function handleFeature(args) {
+  const action = args._?.[0];
+  const targetRoot = resolveTarget(args);
+  let featureResult;
+
+  if (action === "add") {
+    featureResult = featureCommands.addFeature(targetRoot, {
+      id: args.id || args._?.[1],
+      title: args.title || args._?.[2],
+      priority: args.priority,
+      area: args.area,
+    });
+  } else if (action === "list") {
+    featureResult = featureCommands.listFeatures(targetRoot);
+  } else if (action === "remove") {
+    featureResult = featureCommands.removeFeature(targetRoot, {
+      id: args.id || args._?.[1],
+    });
+  } else if (action === "verify") {
+    featureResult = featureCommands.recordFeatureEvidence(targetRoot, {
+      feature: args.feature || args._?.[1],
+      command: args.command,
+      result: args.result,
+      notes: args.notes,
+    });
+  } else if (action === "evidence") {
+    featureResult = featureCommands.listFeatureEvidence(targetRoot, {
+      feature: args.feature || args._?.[1],
+    });
+  } else {
+    featureResult = { errors: ["feature requires add, list, remove, verify, or evidence."], warnings: [] };
+  }
+
+  // Build text output from the result
+  if (action === "list") {
+    const features = featureResult.features || [];
+    if (features.length === 0) {
+      featureResult.text = "No features registered.";
+    } else {
+      featureResult.text = features
+        .map(
+          (f) =>
+            `  ${f.id} [${f.status || "not_started"}] ${f.title}${f.priority ? ` (P${f.priority})` : ""}`,
+        )
+        .join("\n");
+      featureResult.text = `Features:\n${featureResult.text}`;
+    }
+  } else if (action === "add") {
+    if (featureResult.feature) {
+      featureResult.text = `Feature added: ${featureResult.feature.id} — ${featureResult.feature.title}`;
+    }
+  } else if (action === "remove") {
+    if (featureResult.removed) {
+      featureResult.text = `Feature removed: ${featureResult.removed.id} — ${featureResult.removed.title}`;
+    }
+  } else if (action === "verify") {
+    if (featureResult.entry) {
+      featureResult.text = [
+        `Evidence recorded for feature: ${featureResult.featureId}`,
+        `  Command: ${featureResult.entry.command}`,
+        `  Result: ${featureResult.entry.result}`,
+        `  Date: ${featureResult.entry.date}`,
+      ].join("\n");
+    }
+  } else if (action === "evidence") {
+    const evidence = featureResult.evidence || [];
+    if (evidence.length === 0) {
+      featureResult.text = `No evidence recorded for feature: ${featureResult.featureId}`;
+    } else {
+      featureResult.text = evidence
+        .map(
+          (e, i) =>
+            `  [${i + 1}] ${e.date} | ${e.command} → ${e.result}`,
+        )
+        .join("\n");
+      featureResult.text = `Evidence for ${featureResult.featureId}:\n${featureResult.text}`;
+    }
+  }
+
+  return {
+    result: {
+      target: args.target,
+      text: featureResult.text || "",
+      errors: featureResult.errors || [],
+      warnings: featureResult.warnings || [],
+    },
+    exitCode: (featureResult.errors || []).length > 0 ? 1 : 0,
+    bypassPrint: !args.json,
+  };
+}
+
+function handleClean(args) {
+  const { cleanAmber } = require("./clean-command");
+  const cleanResult = cleanAmber(args.target, { dryRun: args.dryRun });
+  const lines = [];
+  if (cleanResult.dryRun) {
+    lines.push("[DRY RUN] Would remove:");
+  } else {
+    lines.push("Removed:");
+  }
+  for (const item of cleanResult.removed) {
+    lines.push(`  - ${item}`);
+  }
+  return {
+    result: {
+      target: args.target,
+      text: lines.join("\n"),
+      errors: cleanResult.errors,
+      warnings: cleanResult.warnings,
+    },
+    bypassPrint: !args.json,
+  };
+}
+
 // ── Command registry ────────────────────────────────────────────────────────
 
 const HANDLERS = {
@@ -442,6 +580,8 @@ const HANDLERS = {
   governance:  handleGovernance,
   execution:   handleExecution,
   security:    handleSecurity,
+  feature:     handleFeature,
+  clean:       handleClean,
 };
 
 // ── Dispatcher ──────────────────────────────────────────────────────────────

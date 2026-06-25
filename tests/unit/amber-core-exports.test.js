@@ -124,12 +124,12 @@ describe("amber-core exports snapshot", () => {
 	});
 
 	// ── Export count ───────────────────────────────────────────────────
-	it("exports exactly 69 symbols", () => {
+	it("exports exactly 70 symbols", () => {
 		const keys = Object.keys(harnessCore).sort();
 		assert.strictEqual(
 			keys.length,
-			69,
-			`Expected 69 exports, got ${keys.length}. ` +
+			70,
+			`Expected 70 exports, got ${keys.length}. ` +
 				`If you intentionally added/removed an export, update this count. ` +
 				`New exports: ${keys.filter((k) => !KNOWN_EXPORTS.has(k)).join(", ")}`,
 		);

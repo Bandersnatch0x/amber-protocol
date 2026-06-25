@@ -31,64 +31,82 @@ const COMMANDS = [
   "governance",
   "execution",
   "security",
+  "feature",
+  "clean",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
 
+// Per-command usage lines that override the generic "--target <repo>" template.
+// Used for commands whose required parameters don't fit the default shape.
+const PER_COMMAND_USAGE = {
+  plan: "Usage: amber plan --target <repo> --feature <id> --title <title> [--json] [--dry-run]",
+  gate: "Usage: amber gate --target <repo> --plan <relative-plan-path> [--confirm] [--json]",
+  review: "Usage: amber review --target <repo> --plan <relative-plan-path> [--json]",
+  accept: "Usage: amber accept --target <repo> --plan <relative-plan-path> [--session <id>] [--strict] [--json]",
+};
+
 function usage(command) {
   if (command && COMMANDS.includes(command)) {
-    const options = ["[--json]"];
-    if (DRY_RUN_COMMANDS.has(command)) {
-      options.push("[--dry-run]");
-    }
-    if (SUMMARY_COMMANDS.has(command)) {
-      options.push("[--summary]");
+    // Use the per-command override when it exists; otherwise build a generic line.
+    let usageLine;
+    if (PER_COMMAND_USAGE[command]) {
+      usageLine = PER_COMMAND_USAGE[command];
+    } else {
+      const options = ["[--json]"];
+      if (DRY_RUN_COMMANDS.has(command)) {
+        options.push("[--dry-run]");
+      }
+      if (SUMMARY_COMMANDS.has(command)) {
+        options.push("[--summary]");
+      }
+      usageLine = `Usage: amber ${command} --target <repo> ${options.join(" ")}`;
     }
 
     return [
-      `Usage: node scripts/amber.js ${command} --target <repo> ${options.join(" ")}`,
+      usageLine,
       "",
       commandSummary(command),
     ].join("\n");
   }
 
   return [
-    "Usage: node scripts/amber.js <command> --target <repo> [--json]",
+    "Usage: amber <command> --target <repo> [--json]",
     "",
     `Commands: ${COMMANDS.join(", ")}`,
-    "Run `node scripts/amber.js <command> --help` for command-specific options.",
+    "Run `amber <command> --help` for command-specific options.",
     "",
     "Examples:",
-    "  node scripts/amber.js init --target path/to/repo",
-    "  node scripts/amber.js audit --target path/to/repo",
-    "  node scripts/amber.js wiki --target path/to/repo",
-    "  node scripts/amber.js handoff --target path/to/repo",
-    "  node scripts/amber.js doctor --target path/to/repo",
-    '  node scripts/amber.js plan --target path/to/repo --feature F001 --title "Small slice"',
-    "  node scripts/amber.js gate --target path/to/repo --plan docs/plans/F001-small-slice.md",
-    "  node scripts/amber.js review --target path/to/repo --plan docs/plans/F001-small-slice.md",
-    "  node scripts/amber.js accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
-    "  node scripts/amber.js pack inspect --file workflow-packs/safe-amber-bootstrap.pack.json",
-    "  node scripts/amber.js pack readiness --file workflow-packs/safe-amber-bootstrap.pack.json --json",
-    "  node scripts/amber.js pack validate-execution --file workflow-packs/safe-amber-bootstrap.pack.json --json",
-    "  node scripts/amber.js profile inspect --file profiles/default.profile.json",
-    "  node scripts/amber.js task prepare --target path/to/repo --plan docs/plans/F001-small-slice.md --task slice-1",
-    "  node scripts/amber.js result inspect --target path/to/repo --task slice-1",
-    "  node scripts/amber.js agent dispatch --target path/to/repo --task slice-1 --worker worker-a --reviewer reviewer-b",
-    "  node scripts/amber.js team install --target path/to/repo --version 1.0.0 --preset safe-bootstrap",
-    "  node scripts/amber.js maintenance inspect --target path/to/repo",
-    "  node scripts/amber.js adoption report --target path/to/repo --output docs/examples/project-adoption-report.md",
-    "  node scripts/amber.js adoption report --target path/to/repo --output-dir docs/examples",
-    "  node scripts/amber.js adoption list --reports-dir docs/examples/adoptions",
-    "  node scripts/amber.js adoption index --reports-dir docs/examples/adoptions --output docs/examples/adoptions-index.md",
-    "  node scripts/amber.js adoption validate --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md",
-    "  node scripts/amber.js adoption compare --reports-dir docs/examples/adoptions",
-    "  node scripts/amber.js adoption gate --reports-dir docs/examples/adoptions",
-    "  node scripts/amber.js adoption status --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md",
-    "  node scripts/amber.js adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/sample-adoption-bundle",
-    "  node scripts/amber.js adoption next-actions --bundle-dir docs/examples/sample-adoption-bundle --output docs/examples/sample-adoption-next-actions.md",
-    "  node scripts/amber.js adoption decision-record --bundle-dir docs/examples/sample-adoption-bundle --output docs/examples/sample-adoption-decision-record.md",
-    "  node scripts/amber.js adoption selected-files --bundle-dir docs/examples/sample-adoption-bundle --output docs/examples/sample-adoption-selected-files.md --include AGENTS.md",
+    "  amber init --target path/to/repo",
+    "  amber audit --target path/to/repo",
+    "  amber wiki --target path/to/repo",
+    "  amber handoff --target path/to/repo",
+    "  amber doctor --target path/to/repo",
+    '  amber plan --target path/to/repo --feature F001 --title "Small slice"',
+    "  amber gate --target path/to/repo --plan docs/plans/F001-small-slice.md",
+    "  amber review --target path/to/repo --plan docs/plans/F001-small-slice.md",
+    "  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
+    "  amber pack inspect --file workflow-packs/safe-amber-bootstrap.pack.json",
+    "  amber pack readiness --file workflow-packs/safe-amber-bootstrap.pack.json --json",
+    "  amber pack validate-execution --file workflow-packs/safe-amber-bootstrap.pack.json --json",
+    "  amber profile inspect --file profiles/default.profile.json",
+    "  amber task prepare --target path/to/repo --plan docs/plans/F001-small-slice.md --task slice-1",
+    "  amber result inspect --target path/to/repo --task slice-1",
+    "  amber agent dispatch --target path/to/repo --task slice-1 --worker worker-a --reviewer reviewer-b",
+    "  amber team install --target path/to/repo --version 1.0.0 --preset safe-bootstrap",
+    "  amber maintenance inspect --target path/to/repo",
+    "  amber adoption report --target path/to/repo --output docs/examples/project-adoption-report.md",
+    "  amber adoption report --target path/to/repo --output-dir docs/examples",
+    "  amber adoption list --reports-dir docs/examples/adoptions",
+    "  amber adoption index --reports-dir docs/examples/adoptions --output docs/examples/adoptions-index.md",
+    "  amber adoption validate --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md",
+    "  amber adoption compare --reports-dir docs/examples/adoptions",
+    "  amber adoption gate --reports-dir docs/examples/adoptions",
+    "  amber adoption status --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md",
+    "  amber adoption bundle --reports-dir docs/examples/adoptions --index docs/examples/adoptions-index.md --output-dir docs/examples/sample-adoption-bundle",
+    "  amber adoption next-actions --bundle-dir docs/examples/sample-adoption-bundle --output docs/examples/sample-adoption-next-actions.md",
+    "  amber adoption decision-record --bundle-dir docs/examples/sample-adoption-bundle --output docs/examples/sample-adoption-decision-record.md",
+    "  amber adoption selected-files --bundle-dir docs/examples/sample-adoption-bundle --output docs/examples/sample-adoption-selected-files.md --include AGENTS.md",
   ].join("\n");
 }
 

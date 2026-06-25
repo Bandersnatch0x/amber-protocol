@@ -132,7 +132,16 @@ async function startSession(projectRoot, options) {
 		const match = selectRoute(goal, routes);
 
 		if (!match.matched) {
-			return result("Error: No matching route found for goal", 1);
+			const availableRoutes = routes
+						.map(
+							(r) =>
+								`  ${r.routeId} — matches goals matching: ${r.trigger.goalPattern}`,
+						)
+						.join("\n");
+				return result(
+					`Error: No matching route found for goal "${goal}".\n\nAvailable routes:\n${availableRoutes}\n\nTip: pass --route <id> to select a route explicitly.`,
+					1,
+				);
 		}
 
 		selectedRouteId = match.routeId;
@@ -142,10 +151,36 @@ async function startSession(projectRoot, options) {
 		const { routes } = loadRoutes(ROUTES_DIR);
 		const route = routes.find((r) => r.routeId === selectedRouteId);
 		if (!route) {
-			return result(`Error: Route "${selectedRouteId}" not found`, 1);
+			const routeList = routes.map((r) => `  ${r.routeId}`).join("\n");
+				return result(
+					`Error: Route "${selectedRouteId}" not found.\n\nAvailable routes:\n${routeList}`,
+					1,
+				);
 		}
 		routeVersion = route.version || SCHEMA_VERSION;
 	}
+
+		// When the user explicitly passes --route, warn if the goal does not match
+		// the route's own goalPattern — the session will work, but the route may
+		// not fit the stated intent.
+		let goalMismatchWarning = null;
+		if (routeId) {
+			const { routes: allRoutes } = loadRoutes(ROUTES_DIR);
+			const selected = allRoutes.find((r) => r.routeId === selectedRouteId);
+			if (selected && selected.trigger && selected.trigger.goalPattern) {
+				try {
+					const pattern = new RegExp(selected.trigger.goalPattern, "i");
+					if (!pattern.test(goal)) {
+						goalMismatchWarning =
+							`Warning: goal "${goal}" does not match the route pattern ` +
+							`"${selected.trigger.goalPattern}". The session will proceed ` +
+							`but the route may not fit the stated intent.`;
+					}
+				} catch (_) {
+					// Invalid goalPattern regex — skip the warning but don't crash.
+				}
+			}
+		}
 
 	const manifest = createManifest({
 		route: { id: selectedRouteId, version: routeVersion },
@@ -183,6 +218,11 @@ async function startSession(projectRoot, options) {
 		lines.push(`Mode: ${mode}`);
 	}
 
+	if (goalMismatchWarning) {
+		lines.push("");
+		lines.push(goalMismatchWarning);
+	}
+
 	const finalManifest = { ...manifest, ...extras };
 	const manifestPath = path.join(sessionDir, "manifest.json");
 	writeJson(manifestPath, finalManifest);
@@ -214,7 +254,7 @@ function statusSession(projectRoot, options) {
 
 	const loaded = requireSession(projectRoot, sessionId);
 	if (loaded.exitCode !== undefined) return loaded; // error result from requireSession
-	const { manifest } = loaded;
+	const { manifest, sessionDir } = loaded;
 
 	const lines = [
 		`Session: ${manifest.sessionId}`,
@@ -222,6 +262,7 @@ function statusSession(projectRoot, options) {
 		`Goal: ${manifest.goal}`,
 		`Route: ${manifest.route.id} (v${manifest.route.version})`,
 		`Created: ${manifest.createdAt}`,
+		`Data dir: ${sessionDir}`,
 	];
 
 	if (manifest.currentStage) {
@@ -415,6 +456,179 @@ async function continueSession(projectRoot, options) {
 	return result(lines.join("\n"), 0);
 }
 
+async function verifySession(projectRoot, options) {
+	const { sessionId, stage: stageName } = options;
+
+	if (!sessionId) {
+		return result("Error: session verify requires --session <id>.", 1);
+	}
+
+	const loaded = requireSession(projectRoot, sessionId);
+	if (loaded.exitCode !== undefined) return loaded;
+	const { manifest, sessionDir } = loaded;
+
+	if (manifest.status === "completed" || manifest.status === "aborted") {
+		return result(
+			`Cannot verify: session is already ${manifest.status}.`,
+			1,
+		);
+	}
+
+	// Resolve the route definition to find verification stage metadata.
+	const { routes } = loadRoutes(ROUTES_DIR);
+	const route = routes.find((r) => r.routeId === manifest.route.id);
+	const verifyStage = route
+		? route.stages.find((s) => s.name === (stageName || "verify"))
+		: null;
+
+	const actualStageName = (verifyStage && verifyStage.name) || (stageName || "verify");
+	const stageDisplayName =
+		(verifyStage && verifyStage.displayName) || actualStageName;
+
+	// Record the stage_completed event so complete-check can see it.
+	const timelinePath = path.join(sessionDir, "timeline.jsonl");
+	const writer = new TimelineWriter(timelinePath);
+	await writer.append({
+		type: "stage_completed",
+		data: {
+			stage: actualStageName,
+			displayName: stageDisplayName,
+			command: options.command || null,
+			result: options.result || null,
+		},
+	});
+	await writer.close();
+
+	// Update the manifest's completedStages so complete-check also finds it there.
+	const manifestPath = path.join(sessionDir, "manifest.json");
+	const completedStages = Array.isArray(manifest.completedStages)
+		? [...manifest.completedStages]
+		: [];
+	if (!completedStages.includes(actualStageName)) {
+		completedStages.push(actualStageName);
+	}
+	const updatedManifest = {
+		...manifest,
+		completedStages,
+		updatedAt: new Date().toISOString(),
+	};
+	fs.writeFileSync(manifestPath, JSON.stringify(updatedManifest, null, 2));
+
+	const lines = [
+		`Verification recorded for session: ${sessionId}`,
+		`Stage: ${stageDisplayName}`,
+	];
+	if (verifyStage && verifyStage.target) {
+		lines.push(
+			`Suggested verification command: ${verifyStage.target}`,
+		);
+	}
+	lines.push(
+		"",
+		"Tip: run `amber session approve --session " + sessionId + "` to record gate approval.",
+	);
+
+	return result(lines.join("\n"), 0);
+}
+
+async function approveSession(projectRoot, options) {
+	const { sessionId, gate: gateId } = options;
+
+	if (!sessionId) {
+		return result("Error: session approve requires --session <id>.", 1);
+	}
+
+	const loaded = requireSession(projectRoot, sessionId);
+	if (loaded.exitCode !== undefined) return loaded;
+	const { manifest, sessionDir } = loaded;
+
+	if (manifest.status === "completed" || manifest.status === "aborted") {
+		return result(
+			`Cannot approve: session is already ${manifest.status}.`,
+			1,
+		);
+	}
+
+	// Resolve route gates so we can name the gate being approved.
+	const { routes } = loadRoutes(ROUTES_DIR);
+	const route = routes.find((r) => r.routeId === manifest.route.id);
+
+	const resolvedGateId = gateId || (route && route.gates.length === 1
+		? route.gates[0].id
+		: "user-approval");
+
+	// Record gate_passed event so complete-check can see it.
+	const timelinePath = path.join(sessionDir, "timeline.jsonl");
+	const writer = new TimelineWriter(timelinePath);
+	await writer.append({
+		type: "gate_passed",
+		data: {
+			gateId: resolvedGateId,
+			approvedBy: "user",
+		},
+	});
+	await writer.close();
+
+	// If all route gates have now been approved, complete the session.
+	const gateEvents = (
+		require("./timeline-reader").readTimeline(timelinePath)
+	).filter((e) => e.type === "gate_passed");
+	const routeGateIds = route ? route.gates.map((g) => g.id) : [];
+	const allGatesPassed =
+		routeGateIds.length > 0 &&
+		routeGateIds.every((id) =>
+			gateEvents.some(
+				(e) => e.data && e.data.gateId === id,
+			),
+		);
+
+	const sm = new SessionStateMachine(manifest.status);
+	let completionEvent = null;
+	let newStatus = manifest.status;
+	if (allGatesPassed) {
+		const transition = sm.transition(STATES.COMPLETED);
+		if (transition.success && transition.event) {
+			completionEvent = transition.event;
+			newStatus = STATES.COMPLETED;
+			const completionWriter = new TimelineWriter(timelinePath);
+			await completionWriter.append(completionEvent);
+			await completionWriter.close();
+		}
+	}
+
+	const manifestPath = path.join(sessionDir, "manifest.json");
+	const updatedManifest = {
+		...manifest,
+		status: newStatus,
+		updatedAt: new Date().toISOString(),
+	};
+	fs.writeFileSync(manifestPath, JSON.stringify(updatedManifest, null, 2));
+
+	const lines = [
+		`Approval recorded for session: ${sessionId}`,
+		`Gate: ${resolvedGateId}`,
+	];
+	if (allGatesPassed) {
+		lines.push("All gates passed — session marked completed.");
+	} else if (route && route.gates.length > 1) {
+		const pending = route.gates.filter(
+			(g) =>
+				!gateEvents.some(
+					(e) => e.data && e.data.gateId === g.id,
+				),
+		);
+		lines.push(
+			`Pending gates: ${pending.map((g) => g.id).join(", ")}`,
+		);
+	}
+	lines.push(
+		"",
+		"Tip: run `amber session complete-check --session " + sessionId + "` to verify all evidence.",
+	);
+
+	return result(lines.join("\n"), 0);
+}
+
 function findMostRecentNonCompletedSession(projectRoot) {
 	return findMostRecentSession(projectRoot, { excludeCompleted: true });
 }
@@ -425,6 +639,8 @@ module.exports = {
 	listSessions,
 	abortSession,
 	continueSession,
+	verifySession,
+	approveSession,
 	getSessionsDir,
 	loadSessionManifest,
 	loadAllSessionManifests,

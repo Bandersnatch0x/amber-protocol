@@ -430,6 +430,68 @@ function reviewPlan(target, planRelativePath) {
 	});
 }
 
+function confirmPlanGate(target, planRelativePath) {
+	const targetRoot = resolveTarget(target);
+
+	if (!planRelativePath) {
+		return {
+			target: targetRoot,
+			plan: null,
+			confirmed: false,
+			errors: ["confirm requires --plan <relative-plan-path>."],
+			warnings: [],
+		};
+	}
+
+	const planPath = path.resolve(targetRoot, planRelativePath);
+	if (!planPath.startsWith(targetRoot)) {
+		return {
+			target: targetRoot,
+			plan: planRelativePath,
+			confirmed: false,
+			errors: ["Plan path must stay inside the target repository."],
+			warnings: [],
+		};
+	}
+	if (!pathExists(planPath)) {
+		return {
+			target: targetRoot,
+			plan: planRelativePath,
+			confirmed: false,
+			errors: [`Plan file is missing: ${planRelativePath}`],
+			warnings: [],
+		};
+	}
+
+	let content = readText(planPath);
+	const updated = content.replace(
+		/^User\s*Confirmation\s*:\s*.+$/m,
+		"User Confirmation: confirmed",
+	);
+
+	if (updated === content) {
+		return {
+			target: targetRoot,
+			plan: planRelativePath,
+			confirmed: false,
+			errors: [
+				"Plan does not contain a 'User Confirmation:' field to confirm.",
+			],
+			warnings: [],
+		};
+	}
+
+	fs.writeFileSync(planPath, updated);
+
+	return {
+		target: targetRoot,
+		plan: planRelativePath,
+		confirmed: true,
+		errors: [],
+		warnings: [],
+	};
+}
+
 function acceptPlan(target, planRelativePath) {
 	const targetRoot = resolveTarget(target);
 	const review = reviewPlan(targetRoot, planRelativePath);
@@ -442,6 +504,53 @@ function acceptPlan(target, planRelativePath) {
 			warnings: review.warnings,
 			review,
 		};
+	}
+
+	const planPath = path.join(targetRoot, planRelativePath);
+	const planContent = readText(planPath);
+	const featureId = readPlanField(planContent, "Feature");
+	let featureUpdated = false;
+
+	// Update feature_list.json with immutable pattern.
+	if (featureId) {
+		try {
+			const feature = findFeatureById(targetRoot, featureId);
+			if (feature) {
+				const featureListPath = path.join(targetRoot, "feature_list.json");
+				const data = readJson(featureListPath);
+				const idx = data.features.findIndex(
+					(f) => f && f.id === featureId,
+				);
+				if (idx !== -1 && data.features[idx].status !== "accepted") {
+					const updatedFeatures = data.features.map((f, i) =>
+						i === idx
+							? { ...f, status: "accepted", updated: new Date().toISOString().slice(0, 10) }
+							: f,
+					);
+					fs.writeFileSync(
+						featureListPath,
+						JSON.stringify({ ...data, features: updatedFeatures }, null, 2) + "\n",
+					);
+					featureUpdated = true;
+				}
+			}
+		} catch (err) {
+			// If feature_list.json is missing or corrupt, accept still succeeds
+			// — the evolution log is the durable record.
+		}
+	}
+
+	// Update the plan's own Status field to reflect acceptance.
+	try {
+		const updatedPlan = planContent.replace(
+			/^Status:\s*.+$/m,
+			"Status: accepted",
+		);
+		if (updatedPlan !== planContent) {
+			fs.writeFileSync(planPath, updatedPlan);
+		}
+	} catch (err) {
+		// Non-critical — the plan update is cosmetic.
 	}
 
 	const evolutionRelativePath = path.join(
@@ -458,7 +567,9 @@ function acceptPlan(target, planRelativePath) {
 		"",
 		`- Plan: \`${planRelativePath}\``,
 		"- Review status: ready",
-		"- Required user action: none",
+		featureUpdated
+			? `- Feature: ${featureId} status → accepted in feature_list.json`
+			: "- Required user action: none",
 		"",
 	].join("\n");
 
@@ -473,6 +584,8 @@ function acceptPlan(target, planRelativePath) {
 		target: targetRoot,
 		plan: planRelativePath,
 		accepted: true,
+		featureId: featureId || null,
+		featureUpdated,
 		evolutionLog: evolutionRelativePath,
 		errors: [],
 		warnings: review.warnings,
@@ -486,6 +599,7 @@ module.exports = {
 	readPlanField,
 	validatePlanContent,
 	validatePlanGate,
+	confirmPlanGate,
 	discoverStandards,
 	evaluateStandardChecks,
 	buildReviewResult,
