@@ -20,6 +20,13 @@ const FLAG_SPECS = {
 	"--file": { key: "file" },
 	"--task": { key: "task" },
 	"--session": { key: "session" },
+	"--gate": { key: "gate" },
+	"--stage": { key: "stage" },
+	"--command": { key: "command" },
+	"--result": { key: "result" },
+	"--id": { key: "id" },
+	"--area": { key: "area" },
+	"--notes": { key: "notes" },
 	"--worker": { key: "worker" },
 	"--reviewer": { key: "reviewer" },
 	"--backend": { key: "backend" },
@@ -118,6 +125,11 @@ function printAuditStarterSummary(result) {
 
 	console.log(`Existing Amber starter files: ${result.existing.length}`);
 	console.log(`Missing Amber starter files: ${result.missing.length}`);
+	if (typeof result.workflowArtifactCount === "number" && result.workflowArtifactCount > 0) {
+		console.log(
+			`Historical .workflow/ artifacts: ${result.workflowArtifactCount} feature directory(s)`,
+		);
+	}
 }
 
 function printAuditStarterDetails(result) {
@@ -240,6 +252,20 @@ function printResult(result, options = {}) {
 		console.log(`Skipped: ${skipped.length}`);
 		for (const item of skipped) {
 			console.log(`  - ${item}`);
+		}
+
+		if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+			console.log("");
+			for (const warning of result.warnings) {
+				console.log(`WARNING: ${warning}`);
+			}
+		}
+		if (Array.isArray(result.nextSteps) && result.nextSteps.length > 0) {
+			console.log("");
+			console.log("Next steps:");
+			for (const step of result.nextSteps) {
+				console.log(`  ${step}`);
+			}
 		}
 		if (Array.isArray(result.errors)) {
 			if (result.errors.length === 0) {
@@ -527,6 +553,30 @@ function printResult(result, options = {}) {
 	if (result.classification && result.classification.type) {
 		console.log(`Target type: ${result.classification.type}`);
 	}
+	if (Array.isArray(result.checks) && result.checks.length > 0) {
+		console.log("Checks:");
+		for (const check of result.checks) {
+			const status = check.passed ? "PASS" : "FAIL";
+			const detail = check.detail ? ` (${check.detail})` : "";
+			console.log(`  [${status}] ${check.name}${detail}`);
+		}
+	}
+	// Review-specific output: show which standards and checks were evaluated
+	if (Array.isArray(result.loadedStandards) && result.loadedStandards.length > 0) {
+		console.log(`Standards applied: ${result.loadedStandards.join(", ")}`);
+	}
+	if (Array.isArray(result.applicableChecks) && result.applicableChecks.length > 0) {
+		console.log("Checks evaluated:");
+		for (const check of result.applicableChecks) {
+			console.log(`  - ${check.id}: ${check.description || "(no description)"}`);
+		}
+	}
+	if (result.releaseReadiness && result.releaseReadiness.status) {
+		const statusLabel =
+			result.releaseReadiness.status === "ready" ? "READY" : "BLOCKED";
+		console.log(`Release readiness: ${statusLabel}`);
+	}
+
 	if (Array.isArray(result.productChecks) && result.productChecks.length > 0) {
 		console.log("Product checks:");
 		for (const check of result.productChecks) {

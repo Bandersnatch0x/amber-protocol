@@ -44,6 +44,22 @@ function evaluateCompletion(projectRoot, sessionId) {
 	const timelineEvents = readTimeline(timelinePath);
 	const eventTypes = new Set(timelineEvents.map((event) => event.type));
 
+	// Check feature_list.json for supplementary evidence (bridges the two systems).
+	let hasFeatureEvidence = false;
+	try {
+		const featureListPath = path.join(projectRoot, "feature_list.json");
+		if (fs.existsSync(featureListPath)) {
+			const featureData = JSON.parse(fs.readFileSync(featureListPath, "utf8"));
+			if (Array.isArray(featureData.features)) {
+				hasFeatureEvidence = featureData.features.some(
+					(f) => f && Array.isArray(f.evidence) && f.evidence.length > 0,
+				);
+			}
+		}
+	} catch (_) {
+		// feature_list.json is optional — skip if missing or corrupt.
+	}
+
 	const checks = [
 		{
 			reason: "goal present",
@@ -68,6 +84,16 @@ function evaluateCompletion(projectRoot, sessionId) {
 			missing: "approval",
 			satisfied:
 				eventTypes.has("gate_passed") || manifest.status === "completed",
+		},
+		{
+			reason: "feature evidence present",
+			missing: "feature evidence",
+			satisfied:
+				// Satisfied if session has verification OR feature_list.json has evidence.
+				eventTypes.has("stage_completed") ||
+				(Array.isArray(manifest.completedStages) &&
+					manifest.completedStages.length > 0) ||
+				hasFeatureEvidence,
 		},
 		{
 			reason: "handoff present",

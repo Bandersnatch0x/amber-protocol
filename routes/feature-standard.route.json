@@ -12,7 +12,7 @@
     { "name": "capture", "displayName": "Capture Requirements", "type": "skill", "target": "requirement-clarification", "gateAfter": "user-approval-plan" },
     { "name": "plan", "displayName": "Create Plan", "type": "pack", "target": "feature-planning", "gateAfter": "user-approval-implement" },
     { "name": "implement", "displayName": "Implement Feature", "type": "pack", "target": "tdd-implementation" },
-    { "name": "verify", "displayName": "Run Verification", "type": "command", "target": "npm test" }
+    { "name": "verify", "displayName": "Run Verification", "type": "command", "target": "npm test", "note": "V1: command is a suggestion. Run manually, then record with `amber session verify`." }
   ],
   "gates": [
     { "id": "user-approval-plan", "type": "user-approval", "description": "Approve plan before implementation?" },

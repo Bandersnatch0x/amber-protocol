@@ -300,6 +300,20 @@ function auditTargetRepo(targetRoot, classification) {
 		["AGENTS.md", "CLAUDE.md"].includes(fileName),
 	);
 
+	// Count historical .workflow/ artifacts beyond continuous-improvement.
+	let workflowArtifactCount = 0;
+	try {
+		const workflowDir = path.join(targetRoot, ".workflow");
+		if (pathExists(workflowDir)) {
+			const entries = require("node:fs").readdirSync(workflowDir, { withFileTypes: true });
+			workflowArtifactCount = entries.filter(
+				(e) => e.isDirectory() && e.name !== "continuous-improvement",
+			).length;
+		}
+	} catch (_) {
+		// .workflow/ is optional — skip if unreadable.
+	}
+
 	return {
 		target: targetRoot,
 		readOnly: true,
@@ -309,6 +323,7 @@ function auditTargetRepo(targetRoot, classification) {
 		missing,
 		agentDocs,
 		conflicts,
+		workflowArtifactCount,
 		suggestedAdditions: missing,
 		suggestedPatches: buildSuggestedPatches(conflicts),
 		untouchedFiles: conflicts,

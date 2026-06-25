@@ -9,6 +9,7 @@ const {
 
 const {
 	pathExists,
+	readText,
 	relativeSlash,
 	resolveTarget,
 	walkFiles,
@@ -47,19 +48,90 @@ function copyTemplateFiles(targetRoot, items, options = {}) {
 	return { created, skipped };
 }
 
+function checkGitignoreConflicts(targetRoot, createdFiles) {
+	// Check if .gitignore rules would hide any of the newly created amber files.
+	const gitignorePath = path.join(targetRoot, ".gitignore");
+	if (!pathExists(gitignorePath)) return [];
+
+	const conflicts = [];
+	let raw;
+	try {
+		raw = readText(gitignorePath);
+	} catch {
+		return [];
+	}
+
+	const patterns = raw
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line && !line.startsWith("#"));
+
+	for (const file of createdFiles) {
+		for (const pattern of patterns) {
+			// Simple glob matching: `docs/` matches `docs/**`, `.*/ `matches `.amber/...`
+			const escaped = pattern
+				.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+				.replace(/\*/g, ".*")
+				.replace(/\?/g, ".");
+			const regex = new RegExp("^" + escaped);
+			if (regex.test(file)) {
+				conflicts.push({ file, rule: pattern });
+				break;
+			}
+		}
+	}
+	return conflicts;
+}
+
 function scaffoldHarness(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const templateRoot = options.templateRoot || TEMPLATE_ROOT;
-	const result = copyTemplateFiles(
-		targetRoot,
-		listTemplateFiles(templateRoot),
-		options,
-	);
+	const items = listTemplateFiles(templateRoot);
+	const result = copyTemplateFiles(targetRoot, items, options);
+
+	const warnings = [];
+	const created = result.created;
+
+	// Warn if CLAUDE.md was created — it changes agent behavior immediately.
+	if (created.some((f) => f === "CLAUDE.md")) {
+		warnings.push(
+			"CLAUDE.md was created. Claude Code will read it on the next session " +
+				"and follow its instructions — review it before your next chat.",
+		);
+	}
+
+	// Detect gitignore rules that hide amber governance files.
+	if (!options.dryRun && created.length > 0) {
+		const conflicts = checkGitignoreConflicts(targetRoot, created);
+		if (conflicts.length > 0) {
+			const rules = [...new Set(conflicts.map((c) => c.rule))];
+			warnings.push(
+				`${conflicts.length} of ${created.length} created files are hidden by .gitignore rules: ` +
+					rules.join(", ") +
+					". These governance files should be committed for team visibility. " +
+					"Consider updating .gitignore.",
+			);
+		}
+	}
+
+	// Next-steps guidance for first-time users.
+	const nextSteps = [];
+	if (created.length > 0) {
+		nextSteps.push(
+			"1. Review CLAUDE.md and AGENTS.md — they control agent behavior.",
+			"2. Customize feature_list.json with your project's features.",
+			"3. Fill in docs/wiki/product/overview.md with project context.",
+			"4. Add a verification command in docs/wiki/engineering/verification.md.",
+			"5. Run `amber doctor --target .` to verify the setup.",
+		);
+	}
 
 	return {
 		target: targetRoot,
 		created: result.created,
 		skipped: result.skipped,
+		warnings,
+		nextSteps,
 	};
 }
 
