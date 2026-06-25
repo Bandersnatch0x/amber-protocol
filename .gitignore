@@ -71,3 +71,11 @@ Desktop.ini
 
 # Vite writes a temp file next to a TS/MTS config while loading it
 *.timestamp-*.mjs
+
+# Local working files (notes, checklists, scratch data)
+notes.md
+MEMORY.md
+.release-checklist.md
+tasks/
+feature_list.json
+问题清单.md
