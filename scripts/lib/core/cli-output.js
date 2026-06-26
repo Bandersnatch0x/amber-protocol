@@ -64,6 +64,8 @@ const FLAG_SPECS = {
 	"--worktree": { key: "worktree", kind: "boolean" },
 	"--json": { key: "json", kind: "boolean" },
 	"--dry-run": { key: "dryRun", kind: "boolean" },
+	"--with-wiki": { key: "withWiki", kind: "boolean" },
+	"--skip-detection": { key: "skipDetection", kind: "boolean" },
 	"--confirm": { key: "confirm", kind: "boolean" },
 	"--summary": { key: "summary", kind: "boolean" },
 	"--all": { key: "all", kind: "boolean" },
@@ -236,6 +238,66 @@ function printWarningFooter(result) {
 	}
 }
 
+// Init/scaffold extras: wiki readiness and Git-workflow/governance detection.
+// Every field is optional — prints nothing when a section is absent, so plain
+// `init` (no --with-wiki, non-git target) renders exactly as before.
+function printInitInsights(result) {
+	const wiki = result.wikiReadiness;
+	if (wiki) {
+		console.log("");
+		console.log(`Wiki readiness: ${wiki.present}/${wiki.total} files present`);
+		if (Array.isArray(wiki.missing) && wiki.missing.length > 0) {
+			console.log(`  Missing: ${wiki.missing.length}`);
+			for (const file of wiki.missing.slice(0, 5)) {
+				console.log(`    - ${file}`);
+			}
+		}
+		if (
+			Array.isArray(wiki.contextPlaceholders) &&
+			wiki.contextPlaceholders.length > 0
+		) {
+			console.log(
+				`  Still placeholder (fill these in): ${wiki.contextPlaceholders.length}`,
+			);
+			for (const file of wiki.contextPlaceholders.slice(0, 8)) {
+				console.log(`    ! ${file}`);
+			}
+		}
+	}
+
+	const detection = result.detection;
+	if (detection && detection.workflow) {
+		const wf = detection.workflow;
+		console.log("");
+		console.log(`Git workflow: ${wf.detected} (${wf.confidence} confidence)`);
+		if (Array.isArray(wf.evidence) && wf.evidence.length > 0) {
+			console.log("  Evidence:");
+			for (const item of wf.evidence.slice(0, 4)) {
+				console.log(`    - ${item}`);
+			}
+		}
+	}
+	if (detection && detection.governance) {
+		const g = detection.governance;
+		const review = g.recommendations && g.recommendations.codeReview;
+		const missing =
+			g.recommendations && g.recommendations.gitignore
+				? g.recommendations.gitignore.missing
+				: [];
+		console.log("");
+		console.log(`Team size: ${g.teamSize} (${g.contributors} contributor(s))`);
+		if (review) {
+			console.log(`  Code review: ${review.strategy}`);
+		}
+		if (Array.isArray(missing) && missing.length > 0) {
+			console.log("  Suggested .gitignore additions:");
+			for (const pattern of missing) {
+				console.log(`    - ${pattern}`);
+			}
+		}
+	}
+}
+
 function printResult(result, options = {}) {
 	if (options.json) {
 		process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -267,6 +329,7 @@ function printResult(result, options = {}) {
 				console.log(`  ${step}`);
 			}
 		}
+		printInitInsights(result);
 		if (Array.isArray(result.errors)) {
 			if (result.errors.length === 0) {
 				console.log("Errors: 0");
