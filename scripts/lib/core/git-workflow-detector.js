@@ -102,24 +102,29 @@ function analyzeCommitHistory(targetRoot) {
 	const scores = emptyScores();
 	const evidence = [];
 
-	const hashesOut = git(targetRoot, ["log", "-n", "100", "--pretty=%H"]);
-	if (!hashesOut) return { scores, evidence };
-	const total = hashesOut.split("\n").filter(Boolean).length;
+	// One row per commit: "<parents>\x1f<subject>" so merge-ness and subject stay
+	// aligned. Counting squashes only for single-parent commits prevents a merge
+	// whose subject ends in "(#n)" (e.g. "Merge pull request ... (#5)") from being
+	// tallied as both a merge and a squash.
+	const logOut = git(targetRoot, ["log", "-n", "100", "--pretty=%P%x1f%s"]);
+	if (logOut === null) return { scores, evidence };
+	const rows = logOut.split("\n").filter((line) => line.includes("\x1f"));
+	const total = rows.length;
 	if (total === 0) return { scores, evidence };
 
-	const parentsOut = git(targetRoot, ["log", "-n", "100", "--pretty=%P"]) || "";
-	const subjectsOut = git(targetRoot, ["log", "-n", "100", "--pretty=%s"]) || "";
-
-	let mergeCount = 0;
-	for (const line of parentsOut.split("\n")) {
-		const parents = line.trim() ? line.trim().split(/\s+/) : [];
-		if (parents.length >= 2) mergeCount += 1;
-	}
-
 	const squashRe = /\(#\d+\)\s*$/;
+	let mergeCount = 0;
 	let squashCount = 0;
-	for (const subject of subjectsOut.split("\n")) {
-		if (squashRe.test(subject)) squashCount += 1;
+	for (const row of rows) {
+		const sep = row.indexOf("\x1f");
+		const parentField = row.slice(0, sep).trim();
+		const subject = row.slice(sep + 1);
+		const parentCount = parentField ? parentField.split(/\s+/).length : 0;
+		if (parentCount >= 2) {
+			mergeCount += 1;
+		} else if (squashRe.test(subject)) {
+			squashCount += 1;
+		}
 	}
 
 	const directCount = Math.max(0, total - mergeCount - squashCount);

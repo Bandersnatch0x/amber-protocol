@@ -104,14 +104,24 @@ function generateCodeReviewAdvice(teamMetrics, workflowDetection) {
 	return { strategy: base.strategy, tooling: [...base.tooling] };
 }
 
+// A gitignore line covers a pattern when it matches exactly, or when it is a
+// parent directory rule — `.amber/` (or `.amber`) covers `.amber/sessions/`.
+function isCovered(pattern, rules) {
+	return rules.some((rule) => {
+		if (rule === pattern) return true;
+		const dir = rule.endsWith("/") ? rule : `${rule}/`;
+		return pattern.startsWith(dir);
+	});
+}
+
 function generateGitignoreAdvice(gitignoreContent) {
-	const covered = new Set(
-		String(gitignoreContent || "")
-			.split("\n")
-			.map((line) => line.trim())
-			.filter((line) => line && !line.startsWith("#")),
+	const rules = String(gitignoreContent || "")
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line && !line.startsWith("#"));
+	const missing = PERSONAL_PATTERNS.filter(
+		(pattern) => !isCovered(pattern, rules),
 	);
-	const missing = PERSONAL_PATTERNS.filter((pattern) => !covered.has(pattern));
 	const patch = missing.length
 		? `# Amber personal state\n${missing.join("\n")}\n`
 		: "";
