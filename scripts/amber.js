@@ -40,6 +40,7 @@ const SUMMARY_COMMANDS = new Set(["audit"]);
 // Per-command usage lines that override the generic "--target <repo>" template.
 // Used for commands whose required parameters don't fit the default shape.
 const PER_COMMAND_USAGE = {
+  init: "Usage: amber init --target <repo> [--with-wiki] [--skip-detection] [--json] [--dry-run]",
   plan: "Usage: amber plan --target <repo> --feature <id> --title <title> [--json] [--dry-run]",
   gate: "Usage: amber gate --target <repo> --plan <relative-plan-path> [--confirm] [--json]",
   review: "Usage: amber review --target <repo> --plan <relative-plan-path> [--json]",

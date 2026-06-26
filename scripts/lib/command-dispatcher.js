@@ -38,7 +38,13 @@ function resolveTarget(args) {
 // ── Simple command wrappers ─────────────────────────────────────────────────
 
 function handleInit(args) {
-  return { result: amberCore.scaffoldHarness(args.target, { dryRun: args.dryRun }) };
+  return {
+    result: amberCore.scaffoldHarness(args.target, {
+      dryRun: args.dryRun,
+      withWiki: args.withWiki,
+      skipDetection: args.skipDetection,
+    }),
+  };
 }
 
 function handleAudit(args) {
