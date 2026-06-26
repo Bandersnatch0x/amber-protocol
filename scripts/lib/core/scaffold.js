@@ -166,18 +166,21 @@ function scaffoldHarness(target, options = {}) {
 	}
 
 	// Persist the detection report so downstream commands can read it. Never
-	// written during a dry run, and only when there is something to record.
+	// written during a dry run, and only when there is something to record. The
+	// report is intentionally timestamp-free so re-running init on an unchanged
+	// repo produces byte-identical output (idempotency).
 	if (!options.dryRun && (detection || wikiReadiness)) {
 		saveInitReport(targetRoot, {
 			version: "1.0.0",
-			timestamp: new Date().toISOString(),
 			target: targetRoot,
 			workflow: detection ? detection.workflow : null,
 			governance: detection ? detection.governance : null,
 			wikiReadiness,
 			installation: {
-				templatesCreated: created,
-				skipped: result.skipped,
+				// All template files Amber manages (created ∪ skipped). Recorded as
+				// repo state rather than this run's delta, so re-running init on an
+				// unchanged repo yields a byte-identical report.
+				templates: [...created, ...result.skipped].sort(),
 			},
 		});
 	}

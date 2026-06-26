@@ -76,6 +76,13 @@ describe("team-governance-advisor", () => {
 		assert.equal(patch, "");
 	});
 
+	it("treats a broad .amber/ rule as covering .amber/sessions/", () => {
+		const { missing } = generateGitignoreAdvice(".amber/\n");
+		assert.ok(!missing.includes(".amber/sessions/"));
+		// A directory rule must not falsely cover unrelated file patterns.
+		assert.ok(missing.includes("PROGRESS.md"));
+	});
+
 	it("recommends CONTRIBUTING.md only when it is absent", () => {
 		const small = { category: "small", count: 3 };
 
