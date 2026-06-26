@@ -9,9 +9,9 @@
 // git call in analyzeTeamSize, which degrades to a count of 0 on any failure.
 
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 
 const { pathExists, readText, resolveTarget } = require("./fs-utils");
+const { gitOutput } = require("./git-exec");
 
 // Personal, per-developer Amber state that should not be committed to a shared
 // repository. The advisor flags any of these not already covered by .gitignore.
@@ -55,27 +55,18 @@ function categorize(count) {
 }
 
 // Count distinct commit authors. `git log --format=%ae` is used instead of
-// `git shortlog` because shortlog reads from stdin when not attached to a TTY,
-// which would hang under spawnSync. Any failure (no git, zero commits) -> 0.
+// `git shortlog`, which reads from stdin when not attached to a TTY and would
+// hang under a non-interactive child process. Absent git / zero commits -> 0.
 function analyzeTeamSize(targetRoot) {
-	const root = resolveTarget(targetRoot);
-	let count = 0;
-	try {
-		const res = spawnSync(
-			"git",
-			["log", "--all", "--no-merges", "--format=%ae"],
-			{ cwd: root, encoding: "utf8" },
-		);
-		if (res && res.status === 0 && typeof res.stdout === "string") {
-			const emails = res.stdout
-				.split("\n")
-				.map((line) => line.trim())
-				.filter(Boolean);
-			count = new Set(emails).size;
-		}
-	} catch {
-		count = 0;
-	}
+	const out = gitOutput(resolveTarget(targetRoot), [
+		"log",
+		"--all",
+		"--no-merges",
+		"--format=%ae",
+	]);
+	const count = out
+		? new Set(out.split("\n").map((line) => line.trim()).filter(Boolean)).size
+		: 0;
 	return { count, category: categorize(count) };
 }
 
@@ -128,28 +119,35 @@ function generateGitignoreAdvice(gitignoreContent) {
 	return { missing, patch };
 }
 
-function generateDocAdvice(teamMetrics, existingConfig) {
-	const required = [...REQUIRED_DOCS];
-	let recommended;
-	if (teamMetrics.category === "medium") {
-		recommended = [
+// Consensus docs to author, keyed by team size. `required` is the must-have
+// baseline; `recommended` scales up with team size. CONTRIBUTING.md is filtered
+// out of `recommended` when the repo already has one.
+const DOC_ADVICE = {
+	single: { recommended: ["CONTRIBUTING.md"] },
+	small: { recommended: ["CONTRIBUTING.md"] },
+	medium: {
+		recommended: [
 			"docs/wiki/architecture/module-boundaries.md",
 			"CONTRIBUTING.md",
 			"docs/wiki/agent/working-rules.md",
-		];
-	} else if (teamMetrics.category === "large") {
-		recommended = [
+		],
+	},
+	large: {
+		recommended: [
 			"docs/wiki/architecture/decisions/",
 			"docs/wiki/engineering/release.md",
 			"per-module CLAUDE.md",
-		];
-	} else {
-		recommended = ["CONTRIBUTING.md"];
-	}
+		],
+	},
+};
+
+function generateDocAdvice(teamMetrics, existingConfig) {
+	const entry = DOC_ADVICE[teamMetrics.category] || DOC_ADVICE.single;
+	let recommended = [...entry.recommended];
 	if (existingConfig && existingConfig.hasContributing) {
 		recommended = recommended.filter((doc) => doc !== "CONTRIBUTING.md");
 	}
-	return { required, recommended };
+	return { required: [...REQUIRED_DOCS], recommended };
 }
 
 function generateGovernanceAdvice(targetRoot, workflowDetection) {

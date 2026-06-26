@@ -10,9 +10,9 @@
 // a best-effort enhancement that can never block installation.
 
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 
 const { pathExists, readText, resolveTarget } = require("./fs-utils");
+const { gitOutput } = require("./git-exec");
 
 const WORKFLOWS = ["gitflow", "github-flow", "trunk-based"];
 
@@ -20,28 +20,17 @@ function emptyScores() {
 	return { gitflow: 0, "github-flow": 0, "trunk-based": 0 };
 }
 
-// Run a git command in targetRoot. Returns trimmed stdout on success, or null on
-// any failure (non-zero exit, missing binary, thrown error). Never throws.
-function git(targetRoot, args) {
-	try {
-		const res = spawnSync("git", args, { cwd: targetRoot, encoding: "utf8" });
-		if (!res || res.status !== 0 || typeof res.stdout !== "string") {
-			return null;
-		}
-		return res.stdout.trim();
-	} catch {
-		return null;
-	}
-}
-
 function isGitRepository(targetRoot) {
-	return git(resolveTarget(targetRoot), ["rev-parse", "--is-inside-work-tree"]) === "true";
+	return (
+		gitOutput(resolveTarget(targetRoot), ["rev-parse", "--is-inside-work-tree"]) ===
+		"true"
+	);
 }
 
 // ── Branch helpers ───────────────────────────────────────────────────────────
 
 function listBranches(targetRoot) {
-	const out = git(targetRoot, ["branch", "-a", "--format=%(refname:short)"]);
+	const out = gitOutput(targetRoot, ["branch", "-a", "--format=%(refname:short)"]);
 	if (!out) return [];
 	return out
 		.split("\n")
@@ -106,7 +95,7 @@ function analyzeCommitHistory(targetRoot) {
 	// aligned. Counting squashes only for single-parent commits prevents a merge
 	// whose subject ends in "(#n)" (e.g. "Merge pull request ... (#5)") from being
 	// tallied as both a merge and a squash.
-	const logOut = git(targetRoot, ["log", "-n", "100", "--pretty=%P%x1f%s"]);
+	const logOut = gitOutput(targetRoot, ["log", "-n", "100", "--pretty=%P%x1f%s"]);
 	if (logOut === null) return { scores, evidence };
 	const rows = logOut.split("\n").filter((line) => line.includes("\x1f"));
 	const total = rows.length;
@@ -200,7 +189,7 @@ function analyzeReleasePattern(targetRoot) {
 	const scores = emptyScores();
 	const evidence = [];
 
-	const tagsOut = git(targetRoot, ["tag"]);
+	const tagsOut = gitOutput(targetRoot, ["tag"]);
 	if (tagsOut) {
 		const tags = tagsOut.split("\n").map((t) => t.trim()).filter(Boolean);
 		if (tags.some((t) => /^v?\d+\.\d+\.\d+/.test(t))) {
