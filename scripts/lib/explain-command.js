@@ -44,9 +44,11 @@ function renderMarkdown() {
 		"| Code | Layer | Symptom | Fix |",
 		"| --- | --- | --- | --- |",
 	];
+	// Escape pipes so a remedy like "<pass|fail>" doesn't break the table column.
+	const cell = (s) => String(s).replace(/\|/g, "\\|");
 	const rows = listCodes().map((code) => {
 		const e = CATALOG[code];
-		return `| \`${code}\` | ${e.layer} | ${e.title} | \`${e.remedy}\` |`;
+		return `| \`${code}\` | ${cell(e.layer)} | ${cell(e.title)} | \`${cell(e.remedy)}\` |`;
 	});
 	return [...header, ...rows, ""].join("\n");
 }

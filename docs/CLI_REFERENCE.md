@@ -540,6 +540,51 @@ Watch timeline in real-time:
 tail -f .amber/sessions/<session-id>/timeline.jsonl
 ```
 
+## Enforcement Commands (opt-in)
+
+The `hooks` command manages an opt-in git `pre-commit` guard. It reads governance **metadata only**
+and never runs target-project build/test commands. It is never installed automatically.
+
+### hooks install
+
+```bash
+node scripts/amber.js hooks install --target .
+node scripts/amber.js hooks install --target . --warn-only   # surface findings, never block
+node scripts/amber.js hooks install --target . --force       # overwrite a foreign pre-commit hook
+```
+
+Writes `.git/hooks/pre-commit` (a portable `#!/bin/sh` shim, marked `# amber-managed-hook`). An
+existing non-Amber hook is backed up to `pre-commit.amber-backup` unless `--force` is given.
+
+### hooks check
+
+```bash
+node scripts/amber.js hooks check --target .
+```
+
+Runs the governance checks now (this is what the hook invokes). Exits non-zero on a violation.
+Default check: a feature with status `passing`/`accepted`/`done` must not have an empty `evidence`
+array (`AMBER_E_FEATURE_NO_EVIDENCE`). Bypass once with `AMBER_SKIP_HOOKS=1 git commit ...`.
+
+### hooks status / uninstall
+
+```bash
+node scripts/amber.js hooks status --target .      # installed (blocking|warn-only) / not installed
+node scripts/amber.js hooks uninstall --target .   # removes the Amber guard; restores any backup
+```
+
+## Error Codes
+
+```bash
+node scripts/amber.js explain                                  # list every code with its layer
+node scripts/amber.js explain AMBER_E_FEATURE_NO_EVIDENCE      # cause + fix for one code
+node scripts/amber.js explain feature_no_evidence             # bare suffix also works
+node scripts/amber.js explain --markdown docs/wiki/engineering/troubleshooting.md
+```
+
+Blocking errors render with their stable code inline (`<message> [CODE] → fix: <remedy>`). The
+catalog is the single source of truth; `--markdown` regenerates the reference table.
+
 ## Next Steps
 
 - Return to [Autonomous Mode Guide](AUTONOMOUS_MODE_GUIDE.md)
