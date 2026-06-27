@@ -645,4 +645,5 @@ module.exports = {
 	loadSessionManifest,
 	loadAllSessionManifests,
 	requireSession,
+	findMostRecentSession,
 };
