@@ -91,6 +91,16 @@ test("install writes a marked pre-commit shim with LF + forward-slash node path"
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("shim skips (does not block) when node or the amber entry is absent", () => {
+	const dir = tmpGitRepo();
+	installHook(dir, {});
+	const body = fs.readFileSync(path.join(dir, ".git", "hooks", "pre-commit"), "utf8");
+	assert.ok(body.includes('command -v node'), "guards missing node");
+	assert.ok(/\[ -f ".*" \] \|\| \{ echo "amber hooks: amber not found/.test(body), "guards missing entry");
+	assert.ok(body.includes('AMBER_SKIP_HOOKS'), "honours the skip env var");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("install --warn-only bakes the literal flag into the shim", () => {
 	const dir = tmpGitRepo();
 	installHook(dir, { warnOnly: true });

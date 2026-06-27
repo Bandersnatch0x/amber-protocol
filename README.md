@@ -89,7 +89,8 @@ findings without blocking, bypass once with `AMBER_SKIP_HOOKS=1 git commit ...`,
 `amber hooks uninstall`.
 
 Every blocking error carries a stable code (e.g. `AMBER_E_FEATURE_NO_EVIDENCE`). Run
-`amber explain <code>` for its cause and fix, or `amber explain` to list them all.
+`amber explain <code>` for its cause and fix, `amber explain` to list them all, or
+`amber explain --markdown docs/ERROR_CODES.md` to write a standalone reference table.
 
 ## Core Concepts
 

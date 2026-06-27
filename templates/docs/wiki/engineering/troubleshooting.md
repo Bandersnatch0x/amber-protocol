@@ -16,8 +16,8 @@ updated: 2026-06-28
 
 ## Amber Error Codes
 
-> Generated from the error catalog. Regenerate with `amber explain --markdown <path>`,
-> or run `amber explain <code>` for the full cause + fix of a single code.
+> Snapshot of the Amber error catalog. Run `amber explain <code>` for the full cause + fix of a
+> single code, or `amber explain --markdown docs/ERROR_CODES.md` to write a standalone reference.
 
 | Code | Layer | Symptom | Fix |
 | --- | --- | --- | --- |

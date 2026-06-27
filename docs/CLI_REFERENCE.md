@@ -579,11 +579,12 @@ node scripts/amber.js hooks uninstall --target .   # removes the Amber guard; re
 node scripts/amber.js explain                                  # list every code with its layer
 node scripts/amber.js explain AMBER_E_FEATURE_NO_EVIDENCE      # cause + fix for one code
 node scripts/amber.js explain feature_no_evidence             # bare suffix also works
-node scripts/amber.js explain --markdown docs/wiki/engineering/troubleshooting.md
+node scripts/amber.js explain --markdown docs/ERROR_CODES.md  # write a standalone reference table
 ```
 
 Blocking errors render with their stable code inline (`<message> [CODE] → fix: <remedy>`). The
-catalog is the single source of truth; `--markdown` regenerates the reference table.
+catalog is the single source of truth. `--markdown` writes a standalone reference file (don't point
+it at a doc with hand-written front-matter — it writes only the generated table).
 
 ## Next Steps
 
