@@ -47,4 +47,134 @@ function checkGovernance(target, { warnOnly = false } = {}) {
 	return { target: targetRoot, errors, warnings };
 }
 
-module.exports = { checkGovernance };
+const HOOK_MARKER = "# amber-managed-hook v1";
+
+function amberEntryPosix() {
+	// Absolute path to scripts/amber.js, normalised to forward slashes for sh.
+	const abs = path.resolve(__dirname, "..", "amber.js");
+	return abs.split(path.sep).join("/");
+}
+
+function hooksDir(targetRoot) {
+	return path.join(targetRoot, ".git", "hooks");
+}
+
+function buildShim(targetRoot, { warnOnly = false } = {}) {
+	const entry = amberEntryPosix();
+	const root = path.resolve(targetRoot).split(path.sep).join("/");
+	const modeFlag = warnOnly ? " --warn-only" : "";
+	return [
+		"#!/bin/sh",
+		HOOK_MARKER + "  (opt-in governance guard — remove with: amber hooks uninstall)",
+		'[ "$AMBER_SKIP_HOOKS" = "1" ] && exit 0',
+		'command -v node >/dev/null 2>&1 || { echo "amber hooks: node not found, skipping"; exit 0; }',
+		`node "${entry}" hooks check --target "${root}"${modeFlag} || exit 1`,
+		"exit 0",
+		"",
+	].join("\n");
+}
+
+function installHook(target, { warnOnly = false, force = false } = {}) {
+	const targetRoot = resolveTarget(target);
+	if (!fs.existsSync(path.join(targetRoot, ".git"))) {
+		return {
+			target: targetRoot,
+			text: "",
+			errors: [
+				codedError(
+					"AMBER_E_MISSING_PATH_ARG",
+					"No .git directory found — run inside a git repository",
+				),
+			],
+			warnings: [],
+		};
+	}
+	const dir = hooksDir(targetRoot);
+	fs.mkdirSync(dir, { recursive: true });
+	const hookPath = path.join(dir, "pre-commit");
+	const warnings = [];
+
+	if (fs.existsSync(hookPath)) {
+		const existing = fs.readFileSync(hookPath, "utf8");
+		if (!existing.includes(HOOK_MARKER) && !force) {
+			const backup = hookPath + ".amber-backup";
+			fs.writeFileSync(backup, existing);
+			warnings.push(`Existing pre-commit hook backed up to ${path.basename(backup)}.`);
+		}
+	}
+
+	fs.writeFileSync(hookPath, buildShim(targetRoot, { warnOnly }));
+	try {
+		fs.chmodSync(hookPath, 0o755);
+	} catch (_) {
+		// chmod is a no-op effect on Windows; ignore failures there.
+	}
+	return {
+		target: targetRoot,
+		text: `Installed Amber pre-commit guard${warnOnly ? " (warn-only)" : ""}.`,
+		errors: [],
+		warnings,
+	};
+}
+
+function uninstallHook(target) {
+	const targetRoot = resolveTarget(target);
+	const hookPath = path.join(hooksDir(targetRoot), "pre-commit");
+	if (!fs.existsSync(hookPath)) {
+		return { target: targetRoot, text: "No pre-commit hook to remove.", errors: [], warnings: [] };
+	}
+	const body = fs.readFileSync(hookPath, "utf8");
+	if (!body.includes(HOOK_MARKER)) {
+		return {
+			target: targetRoot,
+			text: "pre-commit hook is not Amber-managed; left untouched.",
+			errors: [],
+			warnings: [],
+		};
+	}
+	const backup = hookPath + ".amber-backup";
+	if (fs.existsSync(backup)) {
+		fs.writeFileSync(hookPath, fs.readFileSync(backup, "utf8"));
+		fs.rmSync(backup, { force: true });
+		return {
+			target: targetRoot,
+			text: "Removed Amber guard; restored prior hook.",
+			errors: [],
+			warnings: [],
+		};
+	}
+	fs.rmSync(hookPath, { force: true });
+	return { target: targetRoot, text: "Removed Amber pre-commit guard.", errors: [], warnings: [] };
+}
+
+function statusHook(target) {
+	const targetRoot = resolveTarget(target);
+	const hookPath = path.join(hooksDir(targetRoot), "pre-commit");
+	if (!fs.existsSync(hookPath)) {
+		return {
+			target: targetRoot,
+			text: "Amber pre-commit guard: not installed.",
+			errors: [],
+			warnings: [],
+		};
+	}
+	const body = fs.readFileSync(hookPath, "utf8");
+	if (body.includes(HOOK_MARKER)) {
+		const mode = body.includes("--warn-only") ? "warn-only" : "blocking";
+		return {
+			target: targetRoot,
+			text: `Amber pre-commit guard: installed (${mode}).`,
+			errors: [],
+			warnings: [],
+		};
+	}
+	return {
+		target: targetRoot,
+		text: "A non-Amber pre-commit hook is present.",
+		errors: [],
+		warnings: [],
+	};
+}
+
+module.exports = { checkGovernance, installHook, uninstallHook, statusHook, HOOK_MARKER };
+
