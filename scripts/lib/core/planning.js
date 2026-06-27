@@ -95,7 +95,10 @@ function scaffoldPlan(target, options = {}) {
 	}
 
 	if (!feature) {
-		errors.push(`Feature ${featureId} was not found in feature_list.json.`);
+		errors.push(
+			`Feature ${featureId} was not found in feature_list.json. ` +
+				`→ fix: amber feature add --id ${featureId} --title "..."`,
+		);
 		return { target: targetRoot, created, skipped, errors, warnings };
 	}
 
@@ -368,13 +371,16 @@ function buildReviewResult({
 	standards,
 	content = "",
 }) {
-	const gateFindings = gateResult.errors.map((message) => ({
-		severity: "error",
-		checkId: /User confirmation/.test(message)
+	const gateFindings = gateResult.errors.map((message) => {
+		const checkId = /User confirmation/.test(message)
 			? "user-confirmation"
-			: "plan-gate",
-		message,
-	}));
+			: "plan-gate";
+		const finding = { severity: "error", checkId, message };
+		if (checkId === "user-confirmation") {
+			finding.remedy = `amber gate --confirm --target . --plan ${planRelativePath}`;
+		}
+		return finding;
+	});
 	const gateCheckIds = new Set(gateFindings.map((finding) => finding.checkId));
 	const standardFindings = content
 		? evaluateStandardChecks({ content, standards }).filter(
