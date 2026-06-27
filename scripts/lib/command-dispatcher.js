@@ -17,6 +17,7 @@ const amberCore = require("./amber-core");
 const routeCommands = require("./route-commands");
 const sessionCommands = require("./session-commands");
 const featureCommands = require("./feature-commands");
+const { inferNext } = require("./next-command");
 const { migrateManifests } = require("./migrate-command");
 const { migrateState, migrateWiki } = require("./state-migration");
 const { validateWorkflowPack } = require("./core/execution-validator");
@@ -558,6 +559,11 @@ function handleClean(args) {
   };
 }
 
+function handleNext(args) {
+  const nextResult = inferNext(args.target, { feature: args.feature, session: args.session });
+  return { result: nextResult, exitCode: 0, bypassPrint: !args.json };
+}
+
 // ── Command registry ────────────────────────────────────────────────────────
 
 const HANDLERS = {
@@ -588,6 +594,7 @@ const HANDLERS = {
   security:    handleSecurity,
   feature:     handleFeature,
   clean:       handleClean,
+  next:        handleNext,
 };
 
 // ── Dispatcher ──────────────────────────────────────────────────────────────

@@ -33,6 +33,7 @@ const COMMANDS = [
   "security",
   "feature",
   "clean",
+  "next",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
