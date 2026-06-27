@@ -72,6 +72,26 @@ feature, else the first unstarted feature — and always says which it chose plu
 items are pending. The same actionable `remedy` hints surface inline in `doctor` checks and
 `review` findings, so a failed check tells you the exact command to fix it.
 
+### Mechanical enforcement (opt-in)
+
+Amber's gates are advisory by default — a markdown field someone flips. To enforce them at commit
+time, install the opt-in guard:
+
+```bash
+amber hooks install --target .     # writes .git/hooks/pre-commit (opt-in; never auto-installed)
+amber hooks status --target .
+amber hooks check --target .       # what the hook runs; exits non-zero on a violation
+```
+
+The guard reads governance **metadata only** (e.g. a feature must not be marked complete with an
+empty `evidence` array) — it never runs your build or tests. Install with `--warn-only` to surface
+findings without blocking, bypass once with `AMBER_SKIP_HOOKS=1 git commit ...`, or remove it with
+`amber hooks uninstall`.
+
+Every blocking error carries a stable code (e.g. `AMBER_E_FEATURE_NO_EVIDENCE`). Run
+`amber explain <code>` for its cause and fix, `amber explain` to list them all, or
+`amber explain --markdown docs/ERROR_CODES.md` to write a standalone reference table.
+
 ## Core Concepts
 
 Amber organizes governance into seven control layers, weighted toward safety — the higher the priority, the more of Amber's surface that layer gets:
