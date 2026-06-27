@@ -47,9 +47,30 @@ amber init --target my-project
 
 # 3. Verify the repo now has the expected agent-facing surfaces
 amber doctor --target my-project
+
+# 4. Ask Amber what to do next — it reads live state and prints one command
+amber next --target my-project
 ```
 
 `init` and `wiki` never overwrite existing files. See the [CLI reference](./docs/CLI_REFERENCE.md) for the full command surface.
+
+### `amber next` — guided next step
+
+`amber next` is read-only: it infers where the repo sits in the Amber delivery lifecycle
+(`init → feature → plan → gate → verify/approve → complete-check → accept`) and prints the single
+most relevant next command — it never runs anything itself.
+
+```bash
+amber next --target .                 # auto-selects a focus and states which it chose
+amber next --target . --feature F001  # focus one feature's lifecycle
+amber next --target . --session <id>  # focus a session's verify → approve → complete-check
+amber next --target . --json          # machine-readable envelope (focus, nextStep, remedy)
+```
+
+When a focus is omitted, `next` picks the active session, else the most-recently-touched plan's
+feature, else the first unstarted feature — and always says which it chose plus how many other
+items are pending. The same actionable `remedy` hints surface inline in `doctor` checks and
+`review` findings, so a failed check tells you the exact command to fix it.
 
 ## Core Concepts
 

@@ -285,6 +285,24 @@ Reports:
 - Configuration issues
 - Compatibility warnings
 
+Failing checks carry an actionable `→ fix:` remedy (e.g. missing harness files → `amber init`).
+
+### next
+
+Infer the repo's position in the Amber lifecycle and print the single next command to run
+(read-only — never executes anything):
+
+```bash
+node scripts/amber.js next --target .                 # auto-select a focus
+node scripts/amber.js next --target . --feature F001  # focus a feature
+node scripts/amber.js next --target . --session <id>  # focus a session
+node scripts/amber.js next --target . --json          # machine-readable envelope
+```
+
+Lifecycle: `init → feature → plan → gate → verify/approve → complete-check → accept`. With no
+`--feature`/`--session`, `next` auto-selects (active session → most-recent plan's feature → first
+unstarted feature) and reports the chosen focus plus how many other items are pending.
+
 ### migrate
 
 Migrate from Harness to Amber:
