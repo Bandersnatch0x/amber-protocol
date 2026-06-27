@@ -35,6 +35,8 @@ const {
 	inspectWorkflowPack,
 } = require("./workflow-packs");
 
+const { remedyFor } = require("./lifecycle");
+
 function hasPluginManifestDirectory(targetRoot) {
 	return (
 		pathExists(path.join(targetRoot, ".codex-plugin")) ||
@@ -105,8 +107,10 @@ function doctor(target, options = {}) {
 	const warnings = [];
 	const checks = [];
 
-	function addCheck(name, passed, detail) {
-		checks.push({ name, passed, detail: detail || null });
+	function addCheck(name, passed, detail, remedy) {
+		const check = { name, passed, detail: detail || null };
+		if (!passed && remedy) check.remedy = remedy;
+		checks.push(check);
 	}
 
 	// Required harness files
@@ -127,7 +131,8 @@ function doctor(target, options = {}) {
 		}
 	}
 	addCheck("Required harness files", missingFiles === 0,
-		missingFiles === 0 ? "all present" : `${missingFiles} missing`);
+		missingFiles === 0 ? "all present" : `${missingFiles} missing`,
+		remedyFor("init", { targetDisplay: target || "." }));
 
 	// Feature list validation
 	const featureResult = validateFeatureListFile(

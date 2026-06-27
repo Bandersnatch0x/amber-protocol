@@ -622,6 +622,9 @@ function printResult(result, options = {}) {
 			const status = check.passed ? "PASS" : "FAIL";
 			const detail = check.detail ? ` (${check.detail})` : "";
 			console.log(`  [${status}] ${check.name}${detail}`);
+			if (!check.passed && check.remedy) {
+				console.log(`         → fix: ${check.remedy}`);
+			}
 		}
 	}
 	// Review-specific output: show which standards and checks were evaluated
