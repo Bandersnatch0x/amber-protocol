@@ -161,6 +161,12 @@ npm run test:e2e         # Run Playwright tests
 - ❌ Automatic rewrite of existing target project docs
 - ❌ Scheduled loop execution (current product boundary)
 
+> **Boundary note (governance enforcement):** Amber MAY install an **opt-in** git pre-commit guard
+> (`amber hooks install`) that enforces governance *metadata* at commit time (e.g. a feature marked
+> complete must carry evidence). This is Governance-layer enforcement, not execution — the guard
+> reads metadata only and still does **not** run target project build/test commands or dispatch
+> agents. It is never installed automatically.
+
 ### File Conventions
 
 - **Templates** (`templates/`): Safe defaults for AGENTS.md, CLAUDE.md, feature_list.json, etc.
