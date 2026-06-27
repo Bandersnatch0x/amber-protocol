@@ -71,6 +71,7 @@ function buildShim(targetRoot, { warnOnly = false } = {}) {
 		HOOK_MARKER + "  (opt-in governance guard — remove with: amber hooks uninstall)",
 		'[ "$AMBER_SKIP_HOOKS" = "1" ] && exit 0',
 		'command -v node >/dev/null 2>&1 || { echo "amber hooks: node not found, skipping"; exit 0; }',
+		`[ -f "${entry}" ] || { echo "amber hooks: amber not found, skipping"; exit 0; }`,
 		`node "${entry}" hooks check --target "${root}"${modeFlag} || exit 1`,
 		"exit 0",
 		"",
