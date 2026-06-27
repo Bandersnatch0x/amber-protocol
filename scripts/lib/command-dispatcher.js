@@ -564,6 +564,16 @@ function handleNext(args) {
   return { result: nextResult, exitCode: 0, bypassPrint: !args.json };
 }
 
+function handleExplain(args) {
+  const { explain } = require("./explain-command");
+  const r = explain(args);
+  return {
+    result: { target: args.target, text: r.text, errors: r.errors, warnings: r.warnings },
+    exitCode: r.errors.length > 0 ? 1 : 0,
+    bypassPrint: !args.json,
+  };
+}
+
 // ── Command registry ────────────────────────────────────────────────────────
 
 const HANDLERS = {
@@ -595,6 +605,7 @@ const HANDLERS = {
   feature:     handleFeature,
   clean:       handleClean,
   next:        handleNext,
+  explain:     handleExplain,
 };
 
 // ── Dispatcher ──────────────────────────────────────────────────────────────
