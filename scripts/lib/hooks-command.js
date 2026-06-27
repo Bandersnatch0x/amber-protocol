@@ -62,6 +62,13 @@ function hooksDir(targetRoot) {
 	return path.join(targetRoot, ".git", "hooks");
 }
 
+// Escape a string for safe embedding inside a double-quoted POSIX sh literal.
+// Guards against paths containing ", $, `, or \ (rare, but they would otherwise
+// break out of the quoting or trigger shell expansion).
+function shDquote(s) {
+	return String(s).replace(/(["$`\\])/g, "\\$1");
+}
+
 function buildShim(targetRoot, { warnOnly = false } = {}) {
 	const entry = amberEntryPosix();
 	const root = path.resolve(targetRoot).split(path.sep).join("/");
@@ -71,8 +78,8 @@ function buildShim(targetRoot, { warnOnly = false } = {}) {
 		HOOK_MARKER + "  (opt-in governance guard — remove with: amber hooks uninstall)",
 		'[ "$AMBER_SKIP_HOOKS" = "1" ] && exit 0',
 		'command -v node >/dev/null 2>&1 || { echo "amber hooks: node not found, skipping"; exit 0; }',
-		`[ -f "${entry}" ] || { echo "amber hooks: amber not found, skipping"; exit 0; }`,
-		`node "${entry}" hooks check --target "${root}"${modeFlag} || exit 1`,
+		`[ -f "${shDquote(entry)}" ] || { echo "amber hooks: amber not found, skipping"; exit 0; }`,
+		`node "${shDquote(entry)}" hooks check --target "${shDquote(root)}"${modeFlag} || exit 1`,
 		"exit 0",
 		"",
 	].join("\n");
@@ -180,5 +187,5 @@ function statusHook(target) {
 	};
 }
 
-module.exports = { checkGovernance, installHook, uninstallHook, statusHook, HOOK_MARKER };
+module.exports = { checkGovernance, installHook, uninstallHook, statusHook, HOOK_MARKER, shDquote };
 

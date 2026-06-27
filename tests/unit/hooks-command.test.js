@@ -13,6 +13,7 @@ const {
 	uninstallHook,
 	statusHook,
 	HOOK_MARKER,
+	shDquote,
 } = require("../../scripts/lib/hooks-command");
 
 function tmpGitRepo() {
@@ -152,4 +153,12 @@ test("install errors clearly when there is no .git dir", () => {
 	const r = installHook(dir, {});
 	assert.ok(r.errors.length > 0);
 	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("shDquote escapes characters dangerous inside a double-quoted sh literal", () => {
+	assert.equal(shDquote("/home/user/repo"), "/home/user/repo");
+	assert.equal(shDquote('a"b'), 'a\\"b');
+	assert.equal(shDquote("a$b"), "a\\$b");
+	assert.equal(shDquote("a`b"), "a\\`b");
+	assert.equal(shDquote("a\\b"), "a\\\\b");
 });
