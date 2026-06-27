@@ -44,7 +44,10 @@ function checkGovernance(target, { warnOnly = false } = {}) {
 		);
 		for (const f of findings) bucket.push(f);
 	}
-	return { target: targetRoot, errors, warnings };
+	// bypassPrint (non-JSON) only echoes `text`, so surface the lines there too.
+	const lines = [...errors, ...warnings];
+	const text = lines.length > 0 ? lines.join("\n") : "Governance checks passed.";
+	return { target: targetRoot, text, errors, warnings };
 }
 
 const HOOK_MARKER = "# amber-managed-hook v1";
