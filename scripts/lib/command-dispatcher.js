@@ -574,6 +574,23 @@ function handleExplain(args) {
   };
 }
 
+function handleHooks(args) {
+  const hooks = require("./hooks-command");
+  const action = args._?.[0];
+  let r;
+  if (action === "check") r = hooks.checkGovernance(args.target, { warnOnly: args.warnOnly });
+  else if (action === "install") r = hooks.installHook(args.target, { warnOnly: args.warnOnly, force: args.force });
+  else if (action === "uninstall") r = hooks.uninstallHook(args.target);
+  else if (action === "status") r = hooks.statusHook(args.target);
+  else return { result: unknownAction("hooks", ["check", "install", "uninstall", "status"]) };
+
+  return {
+    result: { target: args.target, text: r.text || "", errors: r.errors || [], warnings: r.warnings || [] },
+    exitCode: (r.errors || []).length > 0 ? 1 : 0,
+    bypassPrint: !args.json,
+  };
+}
+
 // ── Command registry ────────────────────────────────────────────────────────
 
 const HANDLERS = {
@@ -606,6 +623,7 @@ const HANDLERS = {
   clean:       handleClean,
   next:        handleNext,
   explain:     handleExplain,
+  hooks:       handleHooks,
 };
 
 // ── Dispatcher ──────────────────────────────────────────────────────────────

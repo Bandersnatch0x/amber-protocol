@@ -35,6 +35,7 @@ const COMMANDS = [
   "clean",
   "next",
   "explain",
+  "hooks",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
@@ -48,6 +49,7 @@ const PER_COMMAND_USAGE = {
   review: "Usage: amber review --target <repo> --plan <relative-plan-path> [--json]",
   accept: "Usage: amber accept --target <repo> --plan <relative-plan-path> [--session <id>] [--strict] [--json]",
   explain: "Usage: amber explain [<code>] [--markdown <path>] [--json]",
+  hooks: "Usage: amber hooks <check|install|uninstall|status> --target <repo> [--warn-only] [--force] [--json]",
 };
 
 function usage(command) {
