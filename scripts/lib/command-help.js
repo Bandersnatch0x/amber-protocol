@@ -266,13 +266,14 @@ const COMMAND_HELP = {
 		"  amber hooks uninstall --target .",
 	],
 	governance: [
-		"Create governance documentation for a target repository.",
+		"Create, inspect, and report governance controls for a target repository.",
 		"",
 		"Subcommands:",
 		"  docs         Generate governance documents (CODE_OF_CONDUCT.md, CONTRIBUTING.md, GOVERNANCE.md).",
 		"  evidence     Export governance evidence from sessions or tasks.",
 		"  policy       Show governance policy (defaults and overrides).",
 		"  audit        Generate comprehensive audit report with policy, sessions, and executions.",
+		"  readiness    Report local governance readiness for higher-autonomy agent work.",
 		"",
 		"Examples:",
 		"  amber governance docs --target path/to/repo",
@@ -284,6 +285,8 @@ const COMMAND_HELP = {
 		"  amber governance audit --target path/to/repo --output audit.md",
 		"  amber governance audit --target path/to/repo --output audit.md --since 2025-01-01",
 		"  amber governance audit --target path/to/repo --output audit.md --json",
+		"  amber governance readiness --target path/to/repo --json",
+		"  amber governance readiness --target path/to/repo --output docs/governance-readiness.md",
 	],
 };
 
