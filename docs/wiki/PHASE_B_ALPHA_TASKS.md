@@ -1,5 +1,7 @@
 > Historical Phase B Alpha task list predating the Amber Protocol rename; command and file names reflect the era.
 
+Last Reviewed: 2026-06-29
+
 # Phase B Alpha - 完整任务清单
 
 **时间**: 5周（W1-W5）  
