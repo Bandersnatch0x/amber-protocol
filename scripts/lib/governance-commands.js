@@ -9,6 +9,11 @@ const {
   inspectPolicy,
   generateAuditReport
 } = require("./core/governance");
+const {
+  inspectGovernanceReadiness,
+  renderReadinessText,
+  writeReadinessMarkdown
+} = require("./core/governance-readiness");
 
 function createGovernanceDocs(target) {
   if (!target) {
@@ -194,9 +199,39 @@ function auditGovernance(target, options = {}) {
   }
 }
 
+function inspectGovernanceReadinessCommand(target, options = {}) {
+  if (!target) {
+    return {
+      target,
+      errors: ["--target is required"],
+      warnings: [],
+    };
+  }
+
+  try {
+    const result = inspectGovernanceReadiness(target);
+    const outputPath = options.output
+      ? writeReadinessMarkdown(result, options.output)
+      : undefined;
+
+    return {
+      ...result,
+      outputPath,
+      text: renderReadinessText(result),
+    };
+  } catch (error) {
+    return {
+      target,
+      errors: [error.message],
+      warnings: [],
+    };
+  }
+}
+
 module.exports = {
   createGovernanceDocs,
   exportGovernanceEvidence,
   inspectGovernancePolicy,
-  auditGovernance
+  auditGovernance,
+  inspectGovernanceReadinessCommand
 };

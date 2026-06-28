@@ -408,13 +408,20 @@ function handleDaemon(args) {
 
 function handleGovernance(args) {
   const action = args._?.[0];
-  const { createGovernanceDocs, exportGovernanceEvidence, inspectGovernancePolicy, auditGovernance } = require("./governance-commands");
+  const {
+    createGovernanceDocs,
+    exportGovernanceEvidence,
+    inspectGovernancePolicy,
+    auditGovernance,
+    inspectGovernanceReadinessCommand,
+  } = require("./governance-commands");
 
   if (action === "docs")     return { result: createGovernanceDocs(args.target) };
   if (action === "evidence") return { result: exportGovernanceEvidence(resolveTarget(args), { session: args.session, task: args.task, all: args.all, output: args.output, json: args.json }) };
   if (action === "policy")   return { result: inspectGovernancePolicy(args.target) };
   if (action === "audit")    return { result: auditGovernance(args.target, { output: args.output, since: args.since }) };
-  return { result: unknownAction("governance", ["docs", "evidence", "policy", "audit"]) };
+  if (action === "readiness") return { result: inspectGovernanceReadinessCommand(args.target, { output: args.output }) };
+  return { result: unknownAction("governance", ["docs", "evidence", "policy", "audit", "readiness"]) };
 }
 
 function handleExecution(args) {
