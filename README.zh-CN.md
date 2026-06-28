@@ -54,6 +54,19 @@ amber doctor --target my-project
 
 `init` 和 `wiki` 永不覆盖已有文件。完整命令面见 [CLI 参考](./docs/CLI_REFERENCE.md)。
 
+### `amber loop recommend` —— 安全的持续改进入口
+
+`amber loop recommend` 是只读命令：它扫描本地 workflow-pack 里的 loop contract，
+按维护目标打分，并输出最适合人工审查的 dry-run 命令。它不会调度任务、执行 workflow
+步骤、派发 agent，也不会写外部系统。
+
+```bash
+amber loop recommend --target . --goal "continuous improvement" --json
+amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json
+```
+
+当前产品边界仍不支持 live scheduling；`loop run` 必须带 `--dry-run`。
+
 ## 核心概念
 
 Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级越高，Amber 投入该层的表面就越多：

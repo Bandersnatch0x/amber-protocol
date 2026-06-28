@@ -348,6 +348,72 @@ node scripts/amber.js profile inspect \
   --file profiles/default.profile.json
 ```
 
+### loop recommend
+
+Select the safest local loop contract for a maintenance goal. This command is read-only and
+returns a `nextCommand`; it never schedules work or executes workflow steps.
+
+```bash
+node scripts/amber.js loop recommend \
+  --target . \
+  --goal "continuous improvement" \
+  --json
+```
+
+For the default project packs, continuous improvement recommends `daily-amber-triage` and a
+dry-run command like:
+
+```bash
+node scripts/amber.js loop run \
+  --file workflow-packs/safe-amber-bootstrap.pack.json \
+  --contract daily-amber-triage \
+  --dry-run \
+  --json
+```
+
+### loop inspect
+
+Inspect one loop contract and its readiness without writing a ledger:
+
+```bash
+node scripts/amber.js loop inspect \
+  --file workflow-packs/safe-amber-bootstrap.pack.json \
+  --contract daily-amber-triage \
+  --json
+```
+
+### loop run
+
+Build a ledger preview for a loop contract. Live scheduling is disabled by product boundary,
+so `--dry-run` is required.
+
+```bash
+node scripts/amber.js loop run \
+  --file workflow-packs/safe-amber-bootstrap.pack.json \
+  --contract daily-amber-triage \
+  --dry-run \
+  --json
+```
+
+### loop record / status
+
+Record caller-supplied manual loop evidence, then inspect the resulting ledger. These commands
+do not execute workflow steps; they only write or read review artifacts supplied by the caller.
+
+```bash
+node scripts/amber.js loop record \
+  --file workflow-packs/safe-amber-bootstrap.pack.json \
+  --contract daily-amber-triage \
+  --trigger-source manual \
+  --stop-reason reviewer-gate-required \
+  --output .amber/loops/daily-amber-triage/manual-ledger.json \
+  --json
+
+node scripts/amber.js loop status \
+  --ledger .amber/loops/daily-amber-triage/manual-ledger.json \
+  --json
+```
+
 ### task prepare
 
 Prepare task execution:
