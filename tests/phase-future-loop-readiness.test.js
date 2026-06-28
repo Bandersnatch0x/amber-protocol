@@ -185,6 +185,91 @@ test("loop inspect explains contract readiness without writing a ledger", () => 
   assert.equal(payload.execution.executesAnything, false);
 });
 
+test("loop recommend selects the safest continuous-improvement loop", () => {
+  const result = runHarness([
+    "loop",
+    "recommend",
+    "--target",
+    ROOT,
+    "--goal",
+    "continuous improvement",
+    "--json"
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(payload.selected.contractId, "daily-amber-triage");
+  assert.equal(payload.selected.packId, "safe-amber-bootstrap");
+  assert.match(payload.selected.nextCommand, /loop run/);
+  assert.match(payload.selected.nextCommand, /--dry-run/);
+  assert.equal(payload.executesAnything, false);
+  assert.equal(payload.schedulesJobs, false);
+  assert.equal(payload.callsExternalSystems, false);
+  assert.ok(payload.candidates.length >= 4);
+  assert.ok(
+    payload.selected.reasons.some((reason) => reason.includes("daily cadence")),
+    "expected recommendation to explain the maintenance cadence",
+  );
+});
+
+test("loop recommend respects a security-specific goal", () => {
+  const result = runHarness([
+    "loop",
+    "recommend",
+    "--target",
+    ROOT,
+    "--goal",
+    "security audit",
+    "--json"
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(payload.selected.contractId, "scheduled-security-audit");
+  assert.equal(payload.selected.packId, "security-audit");
+  assert.ok(
+    payload.selected.reasons.some((reason) => reason.includes("security")),
+    "expected recommendation to explain the security goal match",
+  );
+});
+
+test("loop recommend reports a missing workflow pack directory clearly", () => {
+  const dir = tempDir("no-packs");
+  const result = runHarness([
+    "loop",
+    "recommend",
+    "--target",
+    dir,
+    "--json"
+  ]);
+
+  assert.notEqual(result.status, 0);
+  const payload = JSON.parse(result.stdout);
+  assert.match(payload.errors.join("\n"), /No workflow pack files/);
+  assert.match(payload.warnings.join("\n"), /No workflow-packs directory/);
+  assert.equal(payload.selected, null);
+});
+
+test("loop recommend rejects a workflow-packs file instead of throwing", () => {
+  const dir = tempDir("packs-file");
+  fs.writeFileSync(path.join(dir, "workflow-packs"), "not a directory");
+  const result = runHarness([
+    "loop",
+    "recommend",
+    "--target",
+    dir,
+    "--json"
+  ]);
+
+  assert.notEqual(result.status, 0);
+  const payload = JSON.parse(result.stdout);
+  assert.match(payload.errors.join("\n"), /No workflow pack files/);
+  assert.match(payload.warnings.join("\n"), /not a directory/);
+  assert.equal(payload.selected, null);
+});
+
 // Missing required path args previously produced a raw TypeError
 // ("paths[0] must be of type string") or a cryptic EISDIR, AND exited 0 —
 // reporting failure as success. Each must now give a clear message and exit 1.

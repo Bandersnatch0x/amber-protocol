@@ -73,6 +73,7 @@ const COMMAND_HELP = {
 		"",
 		"Examples:",
 		"  amber loop inspect --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --json",
+		"  amber loop recommend --target . --goal \"continuous improvement\" --json",
 		"  amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --output .amber/loops/daily-amber-triage/ledger-preview.json --json",
 		"  amber loop record --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --trigger-source manual --stop-reason reviewer-gate-required --output .amber/loops/daily-amber-triage/manual-ledger.json --json",
 		"  amber loop status --ledger .amber/loops/daily-amber-triage/manual-ledger.json --json",

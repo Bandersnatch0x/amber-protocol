@@ -45,6 +45,7 @@ describe("amber-core exports snapshot", () => {
 			"auditProject",
 			"buildOkfGraph",
 			"classifyTarget",
+			"confirmPlanGate",
 			"dispatchAgentTask",
 			"doctor",
 			"exportOkfBundle",
@@ -64,6 +65,7 @@ describe("amber-core exports snapshot", () => {
 			"prepareTaskExecution",
 			"printResult",
 			"proposeMaintenance",
+			"recommendLoopContract",
 			"recordAgentReview",
 			"recordLoopContract",
 			"reviewPlan",
@@ -124,12 +126,12 @@ describe("amber-core exports snapshot", () => {
 	});
 
 	// ── Export count ───────────────────────────────────────────────────
-	it("exports exactly 70 symbols", () => {
+	it("exports exactly 71 symbols", () => {
 		const keys = Object.keys(harnessCore).sort();
 		assert.strictEqual(
 			keys.length,
-			70,
-			`Expected 70 exports, got ${keys.length}. ` +
+			71,
+			`Expected 71 exports, got ${keys.length}. ` +
 				`If you intentionally added/removed an export, update this count. ` +
 				`New exports: ${keys.filter((k) => !KNOWN_EXPORTS.has(k)).join(", ")}`,
 		);
@@ -151,6 +153,7 @@ const KNOWN_EXPORTS = new Set([
 	"bundleAdoptionArtifacts",
 	"classifyTarget",
 	"compareAdoptionReports",
+	"confirmPlanGate",
 	"dispatchAgentTask",
 	"doctor",
 	"dryRunLoopContract",
@@ -179,6 +182,7 @@ const KNOWN_EXPORTS = new Set([
 	"prepareTaskExecution",
 	"printResult",
 	"proposeMaintenance",
+	"recommendLoopContract",
 	"recordAgentReview",
 	"recordLoopContract",
 	"reviewPlan",
