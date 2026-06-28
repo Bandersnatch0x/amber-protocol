@@ -72,6 +72,19 @@ feature, else the first unstarted feature — and always says which it chose plu
 items are pending. The same actionable `remedy` hints surface inline in `doctor` checks and
 `review` findings, so a failed check tells you the exact command to fix it.
 
+### `amber loop recommend` — safe continuous improvement
+
+`amber loop recommend` is read-only: it scans local workflow-pack loop contracts, scores them
+against a maintenance goal, and prints the safest dry-run command to review next. It does not
+schedule jobs, execute workflow steps, dispatch agents, or write external systems.
+
+```bash
+amber loop recommend --target . --goal "continuous improvement" --json
+amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json
+```
+
+Live scheduling remains outside the current product boundary; `loop run` requires `--dry-run`.
+
 ### Mechanical enforcement (opt-in)
 
 Amber's gates are advisory by default — a markdown field someone flips. To enforce them at commit

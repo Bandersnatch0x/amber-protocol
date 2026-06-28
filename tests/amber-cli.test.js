@@ -1473,6 +1473,24 @@ test("help scopes dry-run to commands that support it", () => {
 	assert.doesNotMatch(executionHelp.stdout, /validate-loop/);
 });
 
+test("primary docs expose the safe loop recommendation path", () => {
+	const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+	const readmeZh = fs.readFileSync(path.join(ROOT, "README.zh-CN.md"), "utf8");
+	const cliReference = fs.readFileSync(
+		path.join(ROOT, "docs", "CLI_REFERENCE.md"),
+		"utf8",
+	);
+
+	for (const content of [readme, readmeZh, cliReference]) {
+		assert.match(content, /loop recommend/);
+		assert.match(content, /continuous improvement/);
+		assert.match(content, /daily-amber-triage/);
+		assert.match(content, /--dry-run/);
+	}
+	assert.match(cliReference, /never schedules work or executes workflow steps/);
+	assert.match(cliReference, /Live scheduling is disabled/);
+});
+
 test("version command prints the package version", () => {
 	const packageJson = JSON.parse(
 		fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
