@@ -163,6 +163,9 @@ function handleLoop(args) {
   if (action === "inspect") {
     return { result: amberCore.inspectLoopContract({ file: args.file, contract: args.contract }) };
   }
+  if (action === "recommend") {
+    return { result: amberCore.recommendLoopContract({ target: args.target, file: args.file, goal: args.goal }) };
+  }
   if (action === "run") {
     return { result: amberCore.dryRunLoopContract({ file: args.file, contract: args.contract, dryRun: args.dryRun, output: args.output }) };
   }
@@ -175,7 +178,7 @@ function handleLoop(args) {
   if (action === "validate-loop") {
     return { result: amberCore.validateLoopContract(args.contract) };
   }
-  return { result: unknownAction("loop", ["inspect", "run", "record", "status", "validate-loop"]) };
+  return { result: unknownAction("loop", ["inspect", "recommend", "run", "record", "status", "validate-loop"]) };
 }
 
 function handleTeam(args) {
