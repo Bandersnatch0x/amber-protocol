@@ -63,9 +63,11 @@ Create a feature-linked vertical-slice plan without overwriting existing files.
 amber-protocol plan --target <dir> --feature <id> --title "<title>" [--dry-run]
 ```
 
+Generated plans include Goal, High Level Design, Vertical Slices, Resume Checkpoint, Acceptance Criteria, Verification, and Evidence Schema sections. The Resume Checkpoint records the continuation state for future sessions and must define `Resume Point`, `Blockers`, `Next Action`, and `Recovery Instructions` fields.
+
 ### `gate`
 
-Validate that a plan is tied to feature state and has user confirmation.
+Validate that a plan is tied to feature state, includes the required plan sections, has complete Resume Checkpoint fields, and has user confirmation.
 
 ```bash
 amber-protocol gate --target <dir> --plan <relative-path>
