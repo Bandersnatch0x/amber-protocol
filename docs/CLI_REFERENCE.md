@@ -7,7 +7,7 @@ Complete command reference for Amber Protocol CLI.
 ```bash
 --target <path>   # Project root directory
 --json            # Output JSON format
---dry-run         # Preview without making changes (init, wiki, plan)
+--dry-run         # Preview without making changes where supported (init, wiki, plan, team install/update, loop run)
 --help            # Show command help
 ```
 
