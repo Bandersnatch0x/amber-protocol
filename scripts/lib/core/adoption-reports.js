@@ -62,6 +62,11 @@ const ADOPTION_COMPARE_METRICS = [
 	["staleDocs", "Stale docs"],
 ];
 
+const ADOPTION_REPORT_TITLES = new Set([
+	"# Amber Protocol Adoption Report",
+	"# Coding Harness Adoption Report",
+]);
+
 function uniqueAdoptionReportPath(targetRoot, outputDir) {
 	const directory = path.resolve(outputDir);
 	const baseName = `${slugify(path.basename(targetRoot))}-adoption-report-${timestampForFileName()}`;
@@ -79,9 +84,7 @@ function uniqueAdoptionReportPath(targetRoot, outputDir) {
 function parseAdoptionReportMetadata(filePath) {
 	const content = readText(filePath);
 	const lines = content.split(/\r?\n/).slice(0, 40);
-	if (
-		!lines.some((line) => line.trim() === "# Amber Protocol Adoption Report")
-	) {
+	if (!lines.some((line) => ADOPTION_REPORT_TITLES.has(line.trim()))) {
 		return null;
 	}
 
