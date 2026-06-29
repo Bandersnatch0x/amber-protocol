@@ -54,7 +54,11 @@ const COMMAND_HELP = {
 	task: "Prepare isolated task ledger, evidence, replay, and worktree artifacts.",
 	result: "Inspect replayable task result artifacts without relying on chat history.",
 	agent: "Create and control auditable worker/reviewer dispatch records without executing agent work.",
-	team: "Inspect, install, pin, update, and roll back local team distribution metadata.",
+	team: [
+		"Inspect, install, pin, update, and roll back local team distribution metadata.",
+		"",
+		"Use install --dry-run to preview .amber/team metadata writes before creating local state.",
+	],
 	maintenance:
 		"Inspect stale docs, wiki lint readiness, upgrade guidance, drift, distill candidates, and reviewable maintenance proposals.",
 	adoption: [

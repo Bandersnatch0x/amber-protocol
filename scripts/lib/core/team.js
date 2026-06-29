@@ -277,6 +277,21 @@ function validateInstallRequest({ loaded, selected, preset, lockExists }) {
 	return { errors, warnings: loaded.warnings };
 }
 
+function buildTeamInstallPreview(targetRoot, version, release, preset) {
+	return {
+		toVersion: version,
+		preset,
+		willWrite: false,
+		targetWrites: [
+			".amber/team/lock.json",
+			`.amber/team/snapshots/${version}.json`,
+		],
+		projectFileWrites: release.managedProjectFiles,
+		customizationsPreserved: release.managedProjectFiles.length === 0,
+		target: targetRoot,
+	};
+}
+
 function installTeamDistribution(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const paths = teamStatePaths(targetRoot, { forCreate: true });
@@ -293,6 +308,20 @@ function installTeamDistribution(target, options = {}) {
 	});
 	if (errors.length > 0) {
 		return { target: targetRoot, errors, warnings };
+	}
+
+	if (options.dryRun) {
+		return {
+			target: targetRoot,
+			preview: buildTeamInstallPreview(
+				targetRoot,
+				selected.version,
+				selected.release,
+				preset,
+			),
+			errors,
+			warnings,
+		};
 	}
 
 	const lock = buildTeamLock(
@@ -540,6 +569,7 @@ module.exports = {
 	inspectTeamDistribution,
 	installTeamDistribution,
 	diffArtifactLists,
+	buildTeamInstallPreview,
 	buildTeamUpdatePreview,
 	buildRollbackLock,
 	validateInstallRequest,

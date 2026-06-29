@@ -54,6 +54,18 @@ test("maintenance inspect detects stale docs upgrade guidance and rule-pack drif
   assert.match(payload.upgradeAssistant.previewCommand, /team update .*--dry-run/);
 });
 
+test("maintenance inspect recommends a dry-run team install before writing local state", () => {
+  const target = tempDir("uninstalled");
+
+  const result = runHarness(["maintenance", "inspect", "--target", target, "--json"]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.migrationAssistant.needed, true);
+  assert.match(payload.migrationAssistant.nextCommand, /team install .*--dry-run --json/);
+  assert.match(payload.upgradeAssistant.installCommand, /team install .*--dry-run --json/);
+});
+
 test("maintenance propose writes reviewable gardening proposal without changing source docs", () => {
   const target = initializedTeamTarget("propose");
   const evolutionPath = path.join(target, "docs", "wiki", "engineering", "harness-evolution.md");
