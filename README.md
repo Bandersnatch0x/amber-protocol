@@ -85,6 +85,17 @@ amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract d
 
 Live scheduling remains outside the current product boundary; `loop run` requires `--dry-run`.
 
+**Loop Engineering companion**
+
+Amber provides the **governance and contract layer** (loop contracts, ledgers, hard stops, review gates, skills harness). Pair it with the [loop-engineering](https://github.com/cobusgreyling/loop-engineering) patterns and CLIs for operational readiness:
+
+- `npx @cobusgreyling/loop-audit . --suggest` — scores loop readiness (L1/L2/L3) and gives concrete suggestions
+- `npx @cobusgreyling/loop-cost` — token/cost estimation before scheduling
+- `LOOP.md` (this repo) — describes Amber's active loops using loop-engineering vocabulary
+- Simple `STATE.md` (optional overlay) — human + agent friendly memory spine compatible with daily-triage etc.
+
+See [LOOP.md](./LOOP.md) for Amber's self-described loops (Daily Amber Triage, CI validation, adoption flows) and how the two systems complement each other. Phased rollout (report → assisted → governed) is encouraged.
+
 ### Mechanical enforcement (opt-in)
 
 Amber's gates are advisory by default — a markdown field someone flips. To enforce them at commit

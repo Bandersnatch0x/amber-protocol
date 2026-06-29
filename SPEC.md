@@ -64,6 +64,15 @@ Loop-inspired capabilities such as scheduled discovery, goal loops, connector-ba
 
 Live loop scheduling is outside the current product boundary. The Amber setup may define readiness requirements for a future execution layer, but it must not imply support for always-on agents, daemonized work, hook-triggered mutation, autonomous notifications, or scheduled external-system updates until loop contracts, execution ledgers, replay evidence, approval policy, connector contracts, no-progress detection, isolated workspaces, budget ceilings, and human/reviewer gates are stable.
 
+### Governed execution (ADR-0003, 2026-06-30)
+
+A first governance-gated execution path now exists: `amber loop run --execute` may run a loop
+contract's `governed.command` after a policy gate (`.amber/governance/rules.json`), an explicit
+`amber loop approve` (one approval authorizes one run), git-worktree isolation, and a tamper-evident
+hash-chain ledger. This is human-triggered and gated; it does NOT enable scheduling, daemons,
+external writes, auto-PRs, auto-approval, or agent tool-call interception, which remain outside the
+boundary. See `docs/adr/0003-governance-gated-execution.md`.
+
 ## Service packages
 
 Service packages are documentation and navigation groupings over existing artifact-first CLI commands. They do not introduce new CLI command namespaces, hosted execution, external automation, live agent dispatch, or automatic PR creation. Running a service package means running the real CLI commands documented under that package, such as `init`, `doctor`, `adoption report`, `plan`, `session`, or `security audit`.
