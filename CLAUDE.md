@@ -161,11 +161,21 @@ npm run test:e2e         # Run Playwright tests
 - Not allowed:  Automatic rewrite of existing target project docs
 - Not allowed:  Scheduled loop execution (current product boundary)
 
+See `LOOP.md` for the operational description of Amber's loops (daily-amber-triage via contract + CI dogfooding + continuous improvement). Amber implements governed loop engineering — pair it with external `npx @cobusgreyling/loop-audit` and loop patterns for readiness scoring and simple STATE.md overlays.
+
 > **Boundary note (governance enforcement):** Amber MAY install an **opt-in** git pre-commit guard
 > (`amber hooks install`) that enforces governance *metadata* at commit time (e.g. a feature marked
 > complete must carry evidence). This is Governance-layer enforcement, not execution - the guard
 > reads metadata only and still does **not** run target project build/test commands or dispatch
 > agents. It is never installed automatically.
+
+> **Boundary note (governed execution, ADR-0003):** Amber MAY run a loop contract's declared
+> `governed.command` via `amber loop run --execute`, but ONLY behind four gates — policy
+> (`.amber/governance/rules.json`), an explicit `amber loop approve` (one approval ⇒ one run),
+> an isolated git worktree, and a tamper-evident ledger (`amber loop verify-ledger`). This is
+> governance-gated, human-triggered execution, NOT autonomous or scheduled work. Cron/daemon
+> scheduling, external writes, auto-approval, and agent tool-call interception remain disallowed.
+> `loop run` is dry-run unless `--execute` is passed and an approval exists.
 
 ### File Conventions
 
