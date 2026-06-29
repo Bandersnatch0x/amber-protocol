@@ -26,6 +26,7 @@
     "check": "node scripts/run-tests.js",
     "doctor": "node scripts/amber.js doctor --target .",
     "handoff": "node scripts/amber.js handoff --target .",
+    "encoding": "node scripts/validate-encoding.js",
     "manifests": "node scripts/validate-manifests.js --target .",
     "test:load": "node scripts/run-tests.js tests/load/sequential-sessions.test.js",
     "test:e2e": "node scripts/run-tests.js tests/e2e/",
