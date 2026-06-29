@@ -1464,7 +1464,9 @@ test("help scopes dry-run to commands that support it", () => {
 	assert.equal(teamHelp.status, 0);
 	assert.equal(doctorHelp.status, 0);
 	assert.equal(executionHelp.status, 0);
-	assert.doesNotMatch(globalHelp.stdout, /--dry-run/);
+	assert.match(globalHelp.stdout, /^Usage: amber <command> --target <repo> \[--json\]$/m);
+	assert.match(globalHelp.stdout, /team install --target path\/to\/repo --version 1\.0\.0 --preset safe-bootstrap --dry-run --json/);
+	assert.match(globalHelp.stdout, /maintenance inspect --target path\/to\/repo --json/);
 	assert.match(adoptionHelp.stdout, /adoption apply-plan/);
 	assert.match(adoptionHelp.stdout, /--dry-run/);
 	assert.match(initHelp.stdout, /--dry-run/);
