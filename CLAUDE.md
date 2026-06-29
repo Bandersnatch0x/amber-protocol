@@ -13,19 +13,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Module Organization
 
 ```
-scripts/amber.js              → Unified CLI entry point
-scripts/lib/amber-core.js     → Facade re-exporting public surface from scripts/lib/core/*
-scripts/lib/core/             → Domain modules (adoption-*, loops, doctor, profiles, etc.)
-scripts/lib/route-commands.js → Route engine (loader, selector, inspector)
-scripts/lib/session-commands.js → Session lifecycle (start, status, list, abort, continue)
-templates/                    → Amber starter files (AGENTS.md, CLAUDE.md, feature_list.json, etc.)
-routes/                       → Route definitions (feature-standard, bugfix-quick, refactor-safe)
-schemas/                      → JSON Schema validation (route, session-manifest, timeline-event)
-workflow-packs/               → Declarative workflow packs
-skills/                       → Agent-facing skill instructions (amber-init, amber-audit, etc.)
-profiles/                     → Project profiles
-src/migration/                → Migration utilities (dry-run, rollback, schema-validator)
-apps/web/                     → Phase C web viewer (Vite + React + tRPC)
+scripts/amber.js              -> Unified CLI entry point
+scripts/lib/amber-core.js     -> Facade re-exporting public surface from scripts/lib/core/*
+scripts/lib/core/             -> Domain modules (adoption-*, loops, doctor, profiles, etc.)
+scripts/lib/route-commands.js -> Route engine (loader, selector, inspector)
+scripts/lib/session-commands.js -> Session lifecycle (start, status, list, abort, continue)
+templates/                    -> Amber starter files (AGENTS.md, CLAUDE.md, feature_list.json, etc.)
+routes/                       -> Route definitions (feature-standard, bugfix-quick, refactor-safe)
+schemas/                      -> JSON Schema validation (route, session-manifest, timeline-event)
+workflow-packs/               -> Declarative workflow packs
+skills/                       -> Agent-facing skill instructions (amber-init, amber-audit, etc.)
+profiles/                     -> Project profiles
+src/migration/                -> Migration utilities (dry-run, rollback, schema-validator)
+apps/web/                     -> Phase C web viewer (Vite + React + tRPC)
 ```
 
 ### Control Layers (Priority Order)
@@ -154,16 +154,16 @@ npm run test:e2e         # Run Playwright tests
 
 ### Non-Goals (Critical)
 
-- ❌ Dynamic Workflow execution
-- ❌ Live subagent runner invocation  
-- ❌ Automatic target project command execution
-- ❌ External marketplace publishing
-- ❌ Automatic rewrite of existing target project docs
-- ❌ Scheduled loop execution (current product boundary)
+- Not allowed:  Dynamic Workflow execution
+- Not allowed:  Live subagent runner invocation  
+- Not allowed:  Automatic target project command execution
+- Not allowed:  External marketplace publishing
+- Not allowed:  Automatic rewrite of existing target project docs
+- Not allowed:  Scheduled loop execution (current product boundary)
 
 > **Boundary note (governance enforcement):** Amber MAY install an **opt-in** git pre-commit guard
 > (`amber hooks install`) that enforces governance *metadata* at commit time (e.g. a feature marked
-> complete must carry evidence). This is Governance-layer enforcement, not execution — the guard
+> complete must carry evidence). This is Governance-layer enforcement, not execution - the guard
 > reads metadata only and still does **not** run target project build/test commands or dispatch
 > agents. It is never installed automatically.
 
