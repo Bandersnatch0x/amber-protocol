@@ -1,0 +1,91 @@
+{
+  "framework": "owasp-agentic-2026",
+  "title": "OWASP Top 10 for Agentic Applications 2026 (ASI01–ASI10)",
+  "source": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+  "disclaimer": "Self-assessment mapping of Amber's governance-layer controls, NOT a certification or third-party audit. Amber is a static, non-runtime layer; most ASI risks require a runtime control plane (e.g. microsoft/agent-governance-toolkit) and are honestly marked out-of-scope.",
+  "risks": [
+    {
+      "id": "ASI01",
+      "title": "Agent Goal Hijack",
+      "risk": "Adversarial input overrides an agent's intended goal.",
+      "amberCoverage": "out-of-scope",
+      "amberControls": [],
+      "note": "Requires runtime inbound-prompt filtering; Amber does not sit in the agent's execution path."
+    },
+    {
+      "id": "ASI02",
+      "title": "Tool Misuse and Exploitation",
+      "risk": "An agent invokes tools/commands in dangerous ways.",
+      "amberCoverage": "partial",
+      "amberControls": ["governed.command policy gate denies dangerous commands (deny-wins, default-deny)"],
+      "note": "Covers the command a governed loop may run; no runtime wrapping of arbitrary tool calls."
+    },
+    {
+      "id": "ASI03",
+      "title": "Identity and Privilege Abuse",
+      "risk": "Agents acquire privileges beyond their role.",
+      "amberCoverage": "out-of-scope",
+      "amberControls": [],
+      "note": "Requires runtime identity / RBAC / PII redaction."
+    },
+    {
+      "id": "ASI04",
+      "title": "Agentic Supply Chain",
+      "risk": "Compromised tools or sub-agents inject malicious behaviour.",
+      "amberCoverage": "partial",
+      "amberControls": ["rules.json allow-list pins the exact commands a governed loop may run"],
+      "note": "No SBOM or dependency vulnerability scanning."
+    },
+    {
+      "id": "ASI05",
+      "title": "Unexpected Code Execution",
+      "risk": "Agent-driven paths achieve arbitrary code execution.",
+      "amberCoverage": "out-of-scope",
+      "amberControls": [],
+      "note": "Requires runtime static analysis / sandboxing of agent code, which Amber does not perform."
+    },
+    {
+      "id": "ASI06",
+      "title": "Memory and Context Poisoning",
+      "risk": "Persistent state is manipulated to corrupt future decisions.",
+      "amberCoverage": "partial",
+      "amberControls": ["hash-chain ledger gives tamper detection for governance/execution records"],
+      "note": "Detection, not prevention; no memory-store sandbox. See ledger limitation in the design spec."
+    },
+    {
+      "id": "ASI07",
+      "title": "Insecure Inter-Agent Communication",
+      "risk": "Untrusted messages flow between agents.",
+      "amberCoverage": "out-of-scope",
+      "amberControls": [],
+      "note": "Requires a runtime trust-gate / DID verification."
+    },
+    {
+      "id": "ASI08",
+      "title": "Cascading Agent Failures",
+      "risk": "One failure cascades across an agent system.",
+      "amberCoverage": "out-of-scope",
+      "amberControls": [],
+      "note": "Requires runtime circuit breakers / rate limiting. Amber's hardStops are declarative, not enforced at runtime."
+    },
+    {
+      "id": "ASI09",
+      "title": "Human-Agent Trust Exploitation",
+      "risk": "Humans are misled into trusting unsafe agent actions.",
+      "amberCoverage": "governance",
+      "amberControls": [
+        "approval gate forces an explicit human sign-off before any governed execution",
+        "tamper-evident ledger records who approved and what was executed"
+      ],
+      "note": "Governance-time human control, not UI-level guardrails."
+    },
+    {
+      "id": "ASI10",
+      "title": "Rogue Agents",
+      "risk": "An agent behaves maliciously or goes out of control.",
+      "amberCoverage": "out-of-scope",
+      "amberControls": [],
+      "note": "Requires runtime behaviour monitoring / quarantine."
+    }
+  ]
+}
