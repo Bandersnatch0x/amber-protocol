@@ -111,6 +111,39 @@
         "dispatchesAgents": false,
         "writesExternalSystems": false
       }
+    },
+    {
+      "id": "amber-doctor-check",
+      "title": "Amber Doctor Check (governed)",
+      "trigger": {
+        "type": "manual",
+        "cadence": "on-demand",
+        "enabled": false
+      },
+      "cadence": "on-demand",
+      "goal": "Run amber doctor under governance gates as the GLX dogfood execution unit.",
+      "stateSpine": ".amber/loops/amber-doctor-check/state.json",
+      "hardStops": {
+        "maxIterations": 1,
+        "timeoutMinutes": 5,
+        "noProgressDetection": true
+      },
+      "budget": {
+        "maxMinutes": 5
+      },
+      "reviewGates": [
+        "human-approval"
+      ],
+      "governed": {
+        "command": "node scripts/amber.js doctor --target .",
+        "requiresApproval": true
+      },
+      "execution": {
+        "executesAnything": false,
+        "schedulesJobs": false,
+        "dispatchesAgents": false,
+        "writesExternalSystems": false
+      }
     }
   ]
 }

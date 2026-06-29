@@ -134,6 +134,21 @@
           "const": false
         }
       }
+    },
+    "governed": {
+      "type": "object",
+      "description": "Optional human-triggered, governance-gated command. Orthogonal to execution.executesAnything (which stays false — the loop never runs anything on its own). Run only by `amber loop run --execute` after policy + approval gates.",
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Shell command executed after the policy and approval gates pass."
+        },
+        "requiresApproval": {
+          "type": "boolean",
+          "default": true
+        }
+      }
     }
   }
 }
