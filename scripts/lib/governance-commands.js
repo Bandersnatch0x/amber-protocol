@@ -14,6 +14,7 @@ const {
   renderReadinessText,
   writeReadinessMarkdown
 } = require("./core/governance-readiness");
+const { mapStandards } = require("./core/standards");
 
 function createGovernanceDocs(target) {
   if (!target) {
@@ -228,10 +229,35 @@ function inspectGovernanceReadinessCommand(target, options = {}) {
   }
 }
 
+function mapStandardsCommand(target, options = {}) {
+  if (!target) {
+    return { target, errors: ["--target is required"], warnings: [] };
+  }
+  const result = mapStandards(target, options.framework || "owasp-agentic");
+  if (result.errors && result.errors.length) {
+    return result;
+  }
+  const lines = [
+    `Standards coverage: ${result.framework}`,
+    `governance ${result.summary.governance} / partial ${result.summary.partial} / out-of-scope ${result.summary.outOfScope}`,
+    "",
+  ];
+  for (const risk of result.risks) {
+    const ctrl =
+      risk.amberControls && risk.amberControls.length
+        ? ` — ${risk.amberControls.join("; ")}`
+        : "";
+    lines.push(`  ${risk.id} ${risk.title}: ${risk.amberCoverage}${ctrl}`);
+  }
+  lines.push("", `Note: ${result.disclaimer}`);
+  return { ...result, text: lines.join("\n") };
+}
+
 module.exports = {
   createGovernanceDocs,
   exportGovernanceEvidence,
   inspectGovernancePolicy,
   auditGovernance,
-  inspectGovernanceReadinessCommand
+  inspectGovernanceReadinessCommand,
+  mapStandardsCommand
 };
