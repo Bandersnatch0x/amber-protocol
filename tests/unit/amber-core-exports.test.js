@@ -130,8 +130,8 @@ describe("amber-core exports snapshot", () => {
 		const keys = Object.keys(harnessCore).sort();
 		assert.strictEqual(
 			keys.length,
-			71,
-			`Expected 71 exports, got ${keys.length}. ` +
+			74,
+			`Expected 74 exports, got ${keys.length}. ` +
 				`If you intentionally added/removed an export, update this count. ` +
 				`New exports: ${keys.filter((k) => !KNOWN_EXPORTS.has(k)).join(", ")}`,
 		);
@@ -157,6 +157,9 @@ const KNOWN_EXPORTS = new Set([
 	"dispatchAgentTask",
 	"doctor",
 	"dryRunLoopContract",
+	"approveLoopContract",
+	"executeLoopContract",
+	"verifyLoopLedger",
 	"exportExecutionEvidence",
 	"exportOkfBundle",
 	"exportSessionEvidence",
