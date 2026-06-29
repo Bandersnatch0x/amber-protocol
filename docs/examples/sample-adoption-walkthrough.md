@@ -10,7 +10,7 @@ Use a real existing project to verify that Coding Harness adoption stays conserv
 
 - audit is read-only
 - init can be previewed before writing
-- team distribution writes only `.harness/team/`
+- team distribution can be previewed before writing and writes only `.harness/team/` after approval
 - doctor correctly classifies a non-Harness target
 - maintenance inspection can run without requiring full init
 
@@ -23,6 +23,7 @@ node scripts/harness.js adoption report --target "D:\code_space\trae-project\sam
 node scripts/harness.js adoption report --target "D:\code_space\trae-project\sample" --output-dir docs/examples --json
 node scripts/harness.js init --target "D:\code_space\trae-project\sample" --dry-run --json
 node scripts/harness.js team inspect --target "D:\code_space\trae-project\sample" --json
+node scripts/harness.js team install --target "D:\code_space\trae-project\sample" --version 1.0.0 --preset safe-bootstrap --dry-run --json
 node scripts/harness.js team install --target "D:\code_space\trae-project\sample" --version 1.0.0 --preset safe-bootstrap --json
 node scripts/harness.js team update --target "D:\code_space\trae-project\sample" --version 1.1.0 --dry-run --json
 node scripts/harness.js doctor --target "D:\code_space\trae-project\sample" --json
@@ -45,7 +46,8 @@ node scripts/harness.js maintenance inspect --target "D:\code_space\trae-project
 - `adoption report --output-dir` generated a non-conflicting timestamped filename and left the sample root uninitialized.
 - `init --dry-run` previewed 30 files and wrote none.
 - `team inspect` reported the local registry with versions `1.0.0` and `1.1.0`.
-- `team install` wrote only:
+- `team install --dry-run` previewed the `safe-bootstrap` writes with `willWrite=false`.
+- `team install` followed the dry-run preview and explicit approval, then wrote only:
   - `.harness/team/lock.json`
   - `.harness/team/snapshots/1.0.0.json`
 - `team update --dry-run` previewed `1.0.0 -> 1.1.0` with `willWrite=false`.
@@ -63,4 +65,4 @@ sample should not receive a full Harness init automatically. It already has subs
 
 ## Boundary Confirmation
 
-This trial did not overwrite any existing sample project files. The only intentional write was the V5 team metadata under `.harness/team/`.
+This trial did not overwrite any existing sample project files. The only intentional write followed a dry-run preview and explicit approval for the V5 team metadata under `.harness/team/`.
