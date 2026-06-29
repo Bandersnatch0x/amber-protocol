@@ -61,6 +61,32 @@ test("installTeamDistribution refuses to install over an existing lock", () => {
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
+test("installTeamDistribution --dry-run previews without writing team state", () => {
+	const target = tempTarget();
+	const result = installTeamDistribution(target, {
+		registry: REGISTRY,
+		version: "1.0.0",
+		preset: "safe-bootstrap",
+		dryRun: true,
+	});
+
+	assert.deepEqual(result.errors, []);
+	assert.equal(result.preview.willWrite, false);
+	assert.equal(result.preview.toVersion, "1.0.0");
+	assert.equal(result.preview.preset, "safe-bootstrap");
+	assert.deepEqual(result.preview.targetWrites, [
+		".amber/team/lock.json",
+		".amber/team/snapshots/1.0.0.json",
+	]);
+	assert.equal(fs.existsSync(path.join(target, LOCK_REL)), false);
+	assert.equal(
+		fs.existsSync(path.join(target, ".amber", "team", "snapshots", "1.0.0.json")),
+		false,
+	);
+
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
 test("updateTeamDistribution --dry-run previews without writing the new version", () => {
 	const target = tempTarget();
 	installTeamDistribution(target, { registry: REGISTRY, version: "1.0.0" });
@@ -204,5 +230,4 @@ test("pinTeamDistribution errors when the version is not in the registry", () =>
 
 	fs.rmSync(target, { recursive: true, force: true });
 });
-
 

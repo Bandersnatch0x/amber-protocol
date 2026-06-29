@@ -45,6 +45,11 @@ const SUMMARY_COMMANDS = new Set(["audit"]);
 const PER_COMMAND_USAGE = {
   init: "Usage: amber init --target <repo> [--with-wiki] [--skip-detection] [--json] [--dry-run]",
   plan: "Usage: amber plan --target <repo> --feature <id> --title <title> [--json] [--dry-run]",
+  team: [
+    "Usage: amber team <inspect|install|pin|update|rollback> --target <repo> [--json]",
+    "       amber team install --target <repo> --version <version> --preset <preset> [--dry-run] [--json]",
+    "       amber team update --target <repo> --version <version> [--dry-run|--confirm] [--json]",
+  ].join("\n"),
   gate: "Usage: amber gate --target <repo> --plan <relative-plan-path> [--confirm] [--json]",
   review: "Usage: amber review --target <repo> --plan <relative-plan-path> [--json]",
   accept: "Usage: amber accept --target <repo> --plan <relative-plan-path> [--session <id>] [--strict] [--json]",

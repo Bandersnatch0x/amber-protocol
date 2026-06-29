@@ -119,7 +119,7 @@ function buildUpgradeAssistant(targetRoot, registry) {
 			installed: false,
 			currentVersion: null,
 			latestVersion,
-			installCommand: `node scripts/amber.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap`,
+			installCommand: `node scripts/amber.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap --dry-run --json`,
 		};
 	}
 
@@ -143,7 +143,7 @@ function buildMigrationAssistant(targetRoot, registry) {
 		return {
 			needed: true,
 			reason: "team distribution is not installed",
-			nextCommand: `node scripts/amber.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap`,
+			nextCommand: `node scripts/amber.js team install --target ${JSON.stringify(targetRoot)} --version ${latestVersion} --preset safe-bootstrap --dry-run --json`,
 		};
 	}
 

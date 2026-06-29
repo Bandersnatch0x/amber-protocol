@@ -38,6 +38,30 @@ test("team inspect exposes registry metadata and compatibility matrix", () => {
   assert.ok(payload.compatibilityMatrix.os.includes("windows"));
 });
 
+test("team install --dry-run previews without writing team state", () => {
+  const target = tempDir("install-dry-run");
+
+  const preview = runHarness([
+    "team",
+    "install",
+    "--target",
+    target,
+    "--version",
+    "1.0.0",
+    "--preset",
+    "safe-bootstrap",
+    "--dry-run",
+    "--json"
+  ]);
+
+  assert.equal(preview.status, 0, preview.stderr);
+  const payload = JSON.parse(preview.stdout);
+  assert.equal(payload.preview.willWrite, false);
+  assert.equal(payload.preview.toVersion, "1.0.0");
+  assert.deepEqual(payload.preview.projectFileWrites, []);
+  assert.equal(fs.existsSync(path.join(target, ".amber", "team", "lock.json")), false);
+});
+
 test("team install update rollback and pin preserve target customizations", () => {
   const target = tempDir("flows");
   const readmePath = path.join(target, "README.md");

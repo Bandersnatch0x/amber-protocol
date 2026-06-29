@@ -1453,6 +1453,7 @@ test("help scopes dry-run to commands that support it", () => {
 	const adoptionHelp = runHarness(["adoption", "--help"]);
 	const initHelp = runHarness(["init", "--help"]);
 	const wikiHelp = runHarness(["wiki", "--help"]);
+	const teamHelp = runHarness(["team", "--help"]);
 	const doctorHelp = runHarness(["doctor", "--help"]);
 	const executionHelp = runHarness(["execution", "--help"]);
 
@@ -1460,6 +1461,7 @@ test("help scopes dry-run to commands that support it", () => {
 	assert.equal(adoptionHelp.status, 0);
 	assert.equal(initHelp.status, 0);
 	assert.equal(wikiHelp.status, 0);
+	assert.equal(teamHelp.status, 0);
 	assert.equal(doctorHelp.status, 0);
 	assert.equal(executionHelp.status, 0);
 	assert.doesNotMatch(globalHelp.stdout, /--dry-run/);
@@ -1467,6 +1469,7 @@ test("help scopes dry-run to commands that support it", () => {
 	assert.match(adoptionHelp.stdout, /--dry-run/);
 	assert.match(initHelp.stdout, /--dry-run/);
 	assert.match(wikiHelp.stdout, /--dry-run/);
+	assert.match(teamHelp.stdout, /install --dry-run/);
 	assert.doesNotMatch(doctorHelp.stdout, /--dry-run/);
 	assert.match(executionHelp.stdout, /validate-integration/);
 	assert.match(executionHelp.stdout, /readiness/);
