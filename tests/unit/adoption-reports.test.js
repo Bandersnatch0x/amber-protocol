@@ -11,6 +11,7 @@ const {
 	readAdoptionReportMetric,
 	compareStringLists,
 	buildMetricComparison,
+	parseAdoptionReportMetadata,
 	parseAdoptionReportForComparison,
 } = require("../../scripts/lib/core/adoption-reports");
 const {
@@ -23,6 +24,21 @@ function writeTempReport(body) {
 	fs.writeFileSync(file, body);
 	return file;
 }
+test("parseAdoptionReportMetadata accepts legacy Coding Harness report title", () => {
+	const file = writeTempReport(
+		[
+			"# Coding Harness Adoption Report",
+			"",
+			"Target: /legacy-repo",
+			"Generated: 2026-06-09T01:36:09.558Z",
+			"",
+		].join("\n"),
+	);
+
+	const metadata = parseAdoptionReportMetadata(file);
+	assert.equal(metadata.target, "/legacy-repo");
+	assert.equal(metadata.generatedAt, "2026-06-09T01:36:09.558Z");
+});
 
 // Characterization tests for the pure comparison/parsing helpers exported from
 // adoption-reports.js. These functions had zero coverage; they are the testable

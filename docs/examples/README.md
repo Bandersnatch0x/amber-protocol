@@ -2,6 +2,11 @@
 
 This directory contains real-project adoption artifacts.
 
+Some files in this directory are preserved historical snapshots from earlier `harness.js`
+runs. Treat those files as evidence artifacts, not as the current command reference. For
+current usage, prefer the `node ../../scripts/amber.js ...` examples in this README and
+start with read-only or `--dry-run` commands before approving any target write.
+
 - `sample-adoption-walkthrough.md`: narrative walkthrough for a sample adoption trial.
 - `sample-adoption-report.md`: fixed-path report generated with `adoption report --output`.
 - `adoptions/`: timestamped reports generated with `adoption report --output-dir`.
