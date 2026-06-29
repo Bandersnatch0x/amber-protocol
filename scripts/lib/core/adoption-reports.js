@@ -64,7 +64,7 @@ const ADOPTION_COMPARE_METRICS = [
 
 const ADOPTION_REPORT_TITLES = new Set([
 	"# Amber Protocol Adoption Report",
-	"# Coding Harness Adoption Report",
+	"# Coding Harness Adoption Report", // legacy title
 ]);
 
 function uniqueAdoptionReportPath(targetRoot, outputDir) {

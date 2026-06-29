@@ -23,6 +23,12 @@ const {
 } = require("./text-utils");
 
 const EVIDENCE_SCHEMA_FIELDS = ["Command", "Result", "Date"];
+const RESUME_CHECKPOINT_FIELDS = [
+	"Resume Point",
+	"Blockers",
+	"Next Action",
+	"Recovery Instructions",
+];
 
 const {
 	findFeatureById,
@@ -32,7 +38,8 @@ const {
 	MESSAGES,
 } = require("./terminology");
 
-function buildPlanContent(feature, title) {
+function buildPlanContent(feature, title, options = {}) {
+	const planReference = options.planPath || "this plan file";
 	return [
 		`# Plan: ${title}`,
 		"",
@@ -53,6 +60,13 @@ function buildPlanContent(feature, title) {
 		"## Vertical Slices",
 		"",
 		"- [ ] Slice 1: make the smallest safe change that advances the feature.",
+		"",
+		"## Resume Checkpoint",
+		"",
+		"- Resume Point: plan scaffolded; implementation has not started.",
+		"- Blockers: user confirmation is pending.",
+		`- Next Action: review ${planReference}, then confirm it before implementation.`,
+		"- Recovery Instructions: reopen this plan and continue at the first unchecked vertical slice; do not regenerate unless the plan file is missing.",
 		"",
 		"## Acceptance Criteria",
 		"",
@@ -128,7 +142,12 @@ function scaffoldPlan(target, options = {}) {
 		created.push(relativePath);
 		if (!options.dryRun) {
 			fs.mkdirSync(path.dirname(destination), { recursive: true });
-			fs.writeFileSync(destination, buildPlanContent(feature, title));
+			fs.writeFileSync(
+				destination,
+				buildPlanContent(feature, title, {
+					planPath: relativeSlash(targetRoot, destination),
+				}),
+			);
 		}
 	}
 
@@ -179,12 +198,26 @@ function validatePlanContent({ content, resolveFeature }) {
 	for (const section of [
 		"High Level Design",
 		"Vertical Slices",
+		"Resume Checkpoint",
 		"Acceptance Criteria",
 		"Verification",
 		"Evidence Schema",
 	]) {
 		if (!hasSectionWithBody(content, section)) {
 			errors.push(`Plan must include a non-empty ${section} section.`);
+		}
+	}
+
+	const checkpointBody = getSectionBody(content, "Resume Checkpoint");
+	if (checkpointBody !== null) {
+		const missingFields = RESUME_CHECKPOINT_FIELDS.filter(
+			(field) =>
+				!new RegExp(`^\\s*-\\s*${field}:`, "im").test(checkpointBody),
+		);
+		if (missingFields.length > 0) {
+			errors.push(
+				`Resume Checkpoint must define ${missingFields.join(", ")} fields.`,
+			);
 		}
 	}
 

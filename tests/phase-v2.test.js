@@ -35,7 +35,10 @@ test("plan creates a feature-linked vertical-slice plan without overwriting", ()
   assert.match(second.stdout, /Skipped:/);
   assert.match(fs.readFileSync(planPath, "utf8"), /Feature: F001/);
   assert.match(fs.readFileSync(planPath, "utf8"), /## Vertical Slices/);
-  assert.match(fs.readFileSync(planPath, "utf8"), /## Verification/);
+  const content = fs.readFileSync(planPath, "utf8");
+  assert.match(content, /## Verification/);
+  assert.match(content, /## Resume Checkpoint/);
+  assert.match(content, /Next Action: review docs\/plans\/F001-Starter-customization\.md/);
 });
 
 test("gate blocks implementation-ready plans without user confirmation", () => {

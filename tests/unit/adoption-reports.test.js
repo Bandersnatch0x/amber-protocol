@@ -27,7 +27,7 @@ function writeTempReport(body) {
 test("parseAdoptionReportMetadata accepts legacy Coding Harness report title", () => {
 	const file = writeTempReport(
 		[
-			"# Coding Harness Adoption Report",
+			"# Coding Harness Adoption Report", // legacy title
 			"",
 			"Target: /legacy-repo",
 			"Generated: 2026-06-09T01:36:09.558Z",
