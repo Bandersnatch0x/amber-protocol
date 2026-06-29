@@ -74,6 +74,8 @@ const FLAG_SPECS = {
 	"--fix-markers": { key: "fixMarkers", kind: "boolean" },
 	"--okf": { key: "okf", kind: "boolean" },
 	"--markdown": { key: "markdown" },
+	"--framework": { key: "framework" },
+	"--execute": { key: "execute", kind: "boolean" },
 	"--warn-only": { key: "warnOnly", kind: "boolean" },
 	"--force": { key: "force", kind: "boolean" },
 	"--help": { key: "help", kind: "boolean" },

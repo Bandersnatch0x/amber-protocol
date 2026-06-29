@@ -75,6 +75,11 @@ const {
 	inspectLoopLedger,
 } = require("./core/loops");
 const {
+	approveLoopContract,
+	executeLoopContract,
+	verifyLoopLedger,
+} = require("./core/loop-execution");
+const {
 	validateLoopContract,
 	validateIntegration,
 } = require("./core/execution-validator");
@@ -256,6 +261,9 @@ module.exports = {
 	dispatchAgentTask,
 	doctor,
 	dryRunLoopContract,
+	approveLoopContract,
+	executeLoopContract,
+	verifyLoopLedger,
 	exportExecutionEvidence,
 	exportOkfBundle,
 	exportSessionEvidence,

@@ -167,7 +167,13 @@ function handleLoop(args) {
     return { result: amberCore.recommendLoopContract({ target: args.target, file: args.file, goal: args.goal }) };
   }
   if (action === "run") {
-    return { result: amberCore.dryRunLoopContract({ file: args.file, contract: args.contract, dryRun: args.dryRun, output: args.output }) };
+    return { result: amberCore.executeLoopContract({ file: args.file, contract: args.contract, target: args.target, execute: args.execute, dryRun: args.dryRun, output: args.output }) };
+  }
+  if (action === "approve") {
+    return { result: amberCore.approveLoopContract({ file: args.file, contract: args.contract, target: args.target, reviewer: args.reviewer }) };
+  }
+  if (action === "verify-ledger") {
+    return { result: amberCore.verifyLoopLedger({ target: args.target, contract: args.contract }) };
   }
   if (action === "record") {
     return { result: amberCore.recordLoopContract({ file: args.file, contract: args.contract, triggerSource: args.triggerSource, stopReason: args.stopReason, output: args.output }) };
@@ -178,7 +184,7 @@ function handleLoop(args) {
   if (action === "validate-loop") {
     return { result: amberCore.validateLoopContract(args.contract) };
   }
-  return { result: unknownAction("loop", ["inspect", "recommend", "run", "record", "status", "validate-loop"]) };
+  return { result: unknownAction("loop", ["inspect", "recommend", "run", "approve", "verify-ledger", "record", "status", "validate-loop"]) };
 }
 
 function handleTeam(args) {
