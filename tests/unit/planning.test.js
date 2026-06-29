@@ -27,6 +27,14 @@ function validPlanContent(overrides = {}) {
 		"## Vertical Slices",
 		overrides.verticalSlices ?? "- slice 1",
 		"",
+		"## Resume Checkpoint",
+		overrides.resumeCheckpoint ?? [
+			"- Resume Point: test plan is ready to resume.",
+			"- Blockers: none.",
+			"- Next Action: run the next verification step.",
+			"- Recovery Instructions: reopen this plan and continue from the first unchecked slice.",
+		].join("\n"),
+		"",
 		"## Acceptance Criteria",
 		overrides.acceptanceCriteria ?? "- criterion",
 		"",
@@ -55,7 +63,9 @@ test("buildPlanContent renders a titled plan for a fully-populated feature", () 
 		user_visible_behavior: "Users can log in with SSO.",
 		verification: ["Run npm test", "Manual smoke test"],
 	};
-	const out = buildPlanContent(feature, "SSO Login");
+	const out = buildPlanContent(feature, "SSO Login", {
+		planPath: "docs/plans/F-001-sso-login.md",
+	});
 
 	assert.equal(out.split("\n")[0], "# Plan: SSO Login");
 	assert.ok(out.includes("Feature: F-001"));
@@ -68,6 +78,12 @@ test("buildPlanContent renders a titled plan for a fully-populated feature", () 
 	assert.ok(out.includes("- Manual smoke test"));
 	// guardrails check message from terminology is embedded verbatim.
 	assert.ok(out.includes("- Existing Amber guardrails still pass."));
+	// Durable resume metadata gives a fresh agent the exact continuation point.
+	assert.ok(out.includes("## Resume Checkpoint"));
+	assert.ok(out.includes("- Resume Point:"));
+	assert.ok(out.includes("- Blockers:"));
+	assert.ok(out.includes("- Next Action: review docs/plans/F-001-sso-login.md"));
+	assert.ok(out.includes("- Recovery Instructions:"));
 });
 
 test("buildPlanContent falls back to default goal text when user_visible_behavior is missing", () => {
@@ -211,6 +227,39 @@ test("validatePlanContent flags each missing required section", () => {
 	);
 });
 
+test("validatePlanContent requires every Resume Checkpoint field", () => {
+	const result = validatePlanContent({
+		content: validPlanContent({
+			resumeCheckpoint: [
+				"- Resume Point: ready",
+				"- Blockers: none",
+				"- Next Action: continue",
+			].join("\n"),
+		}),
+		resolveFeature: foundResolver,
+	});
+	assert.ok(
+		result.errors.some((e) =>
+			e === "Resume Checkpoint must define Recovery Instructions fields."),
+	);
+});
+
+test("validatePlanContent requires fields for an empty Resume Checkpoint section", () => {
+	const result = validatePlanContent({
+		content: validPlanContent({ resumeCheckpoint: "" }),
+		resolveFeature: foundResolver,
+	});
+	assert.ok(
+		result.errors.includes(
+			"Plan must include a non-empty Resume Checkpoint section.",
+		),
+	);
+	assert.ok(
+		result.errors.includes(
+			"Resume Checkpoint must define Resume Point, Blockers, Next Action, Recovery Instructions fields.",
+		),
+	);
+});
 test("validatePlanContent requires the User Confirmation to be confirmed (case-insensitive)", () => {
 	const result = validatePlanContent({
 		content: validPlanContent({ userConfirmation: "pending" }),
