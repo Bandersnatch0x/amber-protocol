@@ -77,6 +77,16 @@ function findLoopContract(data, contractId) {
 	return contract;
 }
 
+function loopInputSources(contract) {
+	if (Array.isArray(contract.inputSources)) {
+		return contract.inputSources;
+	}
+	if (Array.isArray(contract.inputs)) {
+		return contract.inputs;
+	}
+	return [];
+}
+
 function buildLoopLedgerRecord(data, contract, options = {}) {
 	const now = new Date().toISOString();
 	return {
@@ -88,9 +98,7 @@ function buildLoopLedgerRecord(data, contract, options = {}) {
 		contractId: contract.id,
 		contractVersion: contract.version || data.version || null,
 		inputSnapshot: {
-			sources: Array.isArray(contract.inputSources)
-				? contract.inputSources
-				: [],
+			sources: loopInputSources(contract),
 			capturedAt: now,
 		},
 		actionSummary:

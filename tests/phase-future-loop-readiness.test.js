@@ -127,6 +127,11 @@ test("loop run only writes a dry-run ledger preview", () => {
   assert.equal(payload.executesAnything, false);
   assert.equal(payload.schedulesJobs, false);
   assert.equal(payload.ledgerPreview.contractId, "daily-amber-triage");
+  assert.deepEqual(payload.ledgerPreview.inputSnapshot.sources, [
+    "doctor report",
+    "maintenance inspect",
+    "recent evolution findings"
+  ]);
   assert.equal(payload.ledgerPreview.stopReason, "dry-run-only");
   assert.equal(fs.existsSync(ledger), true);
 });
