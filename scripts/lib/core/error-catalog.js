@@ -59,6 +59,27 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_FEATURE_NO_EVIDENCE"],
 	},
+	AMBER_E_POLICY_DENY: {
+		title: "Command blocked by governance policy",
+		cause: "A loop governed.command matched a deny rule (or no allow rule under defaultAction=deny).",
+		remedy: "Adjust .amber/governance/rules.json or change the contract's governed.command.",
+		layer: "Governance",
+		related: ["AMBER_E_LOOP_NOT_APPROVED"],
+	},
+	AMBER_E_LOOP_NOT_APPROVED: {
+		title: "Governed loop execution not approved",
+		cause: "loop run --execute requires a prior, unconsumed approval record for the contract.",
+		remedy: "amber loop approve --file <pack> --contract <id> --reviewer <name>",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_DENY"],
+	},
+	AMBER_E_LEDGER_TAMPERED: {
+		title: "Loop ledger hash chain is broken",
+		cause: "verify-ledger recomputed a record hash that does not match the stored chain.",
+		remedy: "Investigate the flagged record; restore it from version control if it was edited.",
+		layer: "Observability",
+		related: [],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing
