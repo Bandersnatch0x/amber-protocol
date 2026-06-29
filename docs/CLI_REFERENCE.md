@@ -397,7 +397,8 @@ node scripts/amber.js loop inspect \
 
 Build a ledger preview for a loop contract (default, requires `--dry-run`), OR — since
 [ADR-0003](../adr/0003-governance-gated-execution.md) — execute the contract's `governed.command`
-under governance gates with `--execute`.
+under governance gates with `--execute`. Live scheduling is disabled by product boundary; `--execute`
+is a human-triggered one-shot (with approval), not scheduled or unattended work.
 
 ```bash
 # dry-run preview (default; nothing executes)
