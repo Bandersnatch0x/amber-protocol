@@ -146,11 +146,26 @@ All starter files are safe defaults. `init` and `wiki` skip existing files and r
 
 These boundaries are part of the product, not TODOs:
 
-- No dynamic workflow execution
-- No live subagent runner invocation
-- No automatic execution of target project commands
+- No dynamic workflow execution or live subagent dispatch
+- No automatic / unattended execution — see "Governed loop execution" below for the one gated exception
+- No scheduled / cron / hook-triggered execution
+- No external writes (PRs, issue trackers, notifications) or agent tool-call interception
 - No automatic rewrite of existing project docs
-- No scheduled loop execution in the current product
+
+### Governed loop execution (opt-in, gated)
+
+Since [ADR-0003](./docs/adr/0003-governance-gated-execution.md), Amber can run a loop contract's
+declared `governed.command` — but only behind four gates: a declarative policy check
+(`.amber/governance/rules.json`, deny-wins / default-deny), an explicit `amber loop approve` (one
+approval authorizes one run), an isolated git worktree (your main checkout is never the cwd), and a
+tamper-evident hash-chain ledger. Default `loop run` is still dry-run; execution needs `--execute`.
+
+```bash
+amber loop approve --file <pack> --contract <id> --reviewer <name>
+amber loop run --file <pack> --contract <id> --execute
+amber loop verify-ledger --contract <id>
+amber governance standards --target .   # honest OWASP-ASI coverage of what this does (and doesn't) cover
+```
 
 For the full boundary notes, see [SPEC.md](./SPEC.md).
 
