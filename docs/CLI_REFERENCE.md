@@ -166,6 +166,17 @@ node scripts/amber.js governance audit \
   --output audit-report.md
 ```
 
+### governance standards
+
+Honest, read-only coverage report of Amber's governance controls against the OWASP Top 10 for
+Agentic Applications 2026 (ASI01–ASI10). Amber is a static layer, so most ASI risks are reported as
+`out-of-scope` (runtime-only) rather than overclaimed as covered.
+
+```bash
+node scripts/amber.js governance standards --target . --framework owasp-agentic
+node scripts/amber.js governance standards --target . --json
+```
+
 ## Maintenance Commands
 
 ### maintenance inspect
@@ -384,15 +395,47 @@ node scripts/amber.js loop inspect \
 
 ### loop run
 
-Build a ledger preview for a loop contract. Live scheduling is disabled by product boundary,
-so `--dry-run` is required.
+Build a ledger preview for a loop contract (default, requires `--dry-run`), OR — since
+[ADR-0003](../adr/0003-governance-gated-execution.md) — execute the contract's `governed.command`
+under governance gates with `--execute`.
 
 ```bash
+# dry-run preview (default; nothing executes)
 node scripts/amber.js loop run \
   --file workflow-packs/safe-amber-bootstrap.pack.json \
   --contract daily-amber-triage \
-  --dry-run \
-  --json
+  --dry-run --json
+
+# governed execution (needs a prior `loop approve`; runs in an isolated worktree)
+node scripts/amber.js loop run \
+  --file workflow-packs/safe-amber-bootstrap.pack.json \
+  --contract amber-doctor-check \
+  --execute
+```
+
+`--execute` runs only if all gates pass: the contract declares a `governed.command`, that command
+passes the policy gate (`.amber/governance/rules.json`, deny-wins / default-deny), an unconsumed
+approval exists, the target is a git repo (worktree isolation), and the attempt is appended to the
+tamper-evident ledger.
+
+### loop approve
+
+Record an explicit human approval authorizing ONE governed execution. One approval is consumed by one
+`loop run --execute`; re-running requires re-approval.
+
+```bash
+node scripts/amber.js loop approve \
+  --file workflow-packs/safe-amber-bootstrap.pack.json \
+  --contract amber-doctor-check \
+  --reviewer your-name
+```
+
+### loop verify-ledger
+
+Recompute the hash chain of a contract's execution ledger and report any tampering.
+
+```bash
+node scripts/amber.js loop verify-ledger --contract amber-doctor-check --json
 ```
 
 ### loop record / status
