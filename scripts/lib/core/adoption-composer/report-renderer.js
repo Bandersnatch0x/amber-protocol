@@ -121,7 +121,7 @@ function renderAdoptionReport(parts) {
 	} else {
 		lines.push("- Current version: not installed");
 		lines.push(
-			"- Suggested install: `node scripts/amber.js team install --target <target> --version 1.0.0 --preset safe-bootstrap`",
+			"- Suggested install: `node scripts/amber.js team install --target <target> --version 1.0.0 --preset safe-bootstrap --dry-run --json`",
 		);
 	}
 

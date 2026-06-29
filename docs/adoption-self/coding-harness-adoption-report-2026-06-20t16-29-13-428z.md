@@ -34,7 +34,7 @@ No target-repository files were initialized by this report.
 - Available versions: 1.0.0, 1.1.0
 
 - Current version: not installed
-- Suggested install: `node scripts/amber.js team install --target <target> --version 1.0.0 --preset safe-bootstrap`
+- Suggested install: `node scripts/amber.js team install --target <target> --version 1.0.0 --preset safe-bootstrap --dry-run --json`
 
 ## Maintenance
 

@@ -185,6 +185,45 @@ test("renderAdoptionReport derives metrics from audit when metrics are omitted",
 	});
 });
 
+test("renderAdoptionReport recommends a dry-run team install first", () => {
+	const markdown = renderAdoptionReport({
+		targetRoot: "/tmp/repo",
+		audit: {
+			readOnly: true,
+			classification: { type: "target-repo" },
+			auditMode: "target-repo",
+			existing: [],
+			missing: [],
+			docs: [],
+			wikiLikeFiles: [],
+			conflicts: [],
+			candidateCommands: [],
+			unknowns: [],
+		},
+		initDryRun: { created: [], skipped: [], notApplicable: false },
+		team: {
+			installed: false,
+			registry: { name: "test-registry", versions: { "1.0.0": {} } },
+			lock: null,
+		},
+		teamUpdatePreview: null,
+		maintenance: {
+			staleDocs: [],
+			rulePackDrift: { drifted: false },
+			upgradeAssistant: { currentVersion: null, latestVersion: "1.0.0" },
+		},
+	});
+
+	assert.match(
+		markdown,
+		/team install --target <target> --version 1\.0\.0 --preset safe-bootstrap --dry-run --json/,
+	);
+	assert.doesNotMatch(
+		markdown,
+		/team install --target <target> --version 1\.0\.0 --preset safe-bootstrap`/,
+	);
+});
+
 test("renderAdoptionNextActionsDocument does not duplicate boundary lines", () => {
 	const markdown = renderAdoptionNextActionsDocument({
 		target: "/tmp/repo",
