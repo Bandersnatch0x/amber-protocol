@@ -1,8 +1,8 @@
 {
   "id": "safe-amber-bootstrap",
-  "title": "Safe Harness Bootstrap",
+  "title": "Safe Amber Bootstrap",
   "version": "0.1.0",
-  "description": "Declarative smoke pack for inspecting the V1 Safe Harness Bootstrap workflow without executing scripts.",
+  "description": "Declarative smoke pack for inspecting the V1 Safe Amber Bootstrap workflow without executing scripts.",
   "skills": [],
   "standards": [
     "amber-delivery"
@@ -29,7 +29,7 @@
   },
   "loopLedger": {
     "required": true,
-    "pathTemplate": ".harness/loops/{contractId}/ledger.json",
+    "pathTemplate": ".amber/loops/{contractId}/ledger.json",
     "chatHistoryRequired": false,
     "recordsInputSnapshot": true,
     "recordsToolSummary": true,
@@ -53,11 +53,11 @@
       "id": "initialize-or-skip",
       "title": "Initialize Or Skip",
       "kind": "manual",
-      "description": "Create missing Harness files only when the target has no conflicting files."
+      "description": "Create missing Amber starter files only when the target has no conflicting files."
     },
     {
-      "id": "validate-harness",
-      "title": "Validate Harness",
+      "id": "validate-amber",
+      "title": "Validate Amber",
       "kind": "manual",
       "description": "Run wiki, handoff, and doctor validation; record command output as evidence."
     }
@@ -65,21 +65,21 @@
   "loopContracts": [
     {
       "id": "daily-amber-triage",
-      "title": "Daily Harness Triage",
+      "title": "Daily Amber Triage",
       "trigger": {
         "type": "scheduled",
         "cadence": "daily",
         "enabled": false
       },
-      "goal": "Inspect Harness health and produce reviewable candidate work without executing it.",
-      "stateSpine": ".harness/loops/daily-amber-triage/state.json",
+      "goal": "Inspect Amber health and produce reviewable candidate work without executing it.",
+      "stateSpine": ".amber/loops/daily-amber-triage/state.json",
       "inputs": [
         "doctor report",
         "maintenance inspect",
         "recent evolution findings"
       ],
       "skills": [
-        "harness-maintenance"
+        "amber-continuous-improvement"
       ],
       "connectors": [
         "local-docs"
