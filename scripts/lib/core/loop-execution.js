@@ -8,18 +8,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { spawnSync } = require("node:child_process");
 const { readJsonSafe, resolveTarget } = require("./fs-utils");
 const { findLoopContract, dryRunLoopContract } = require("./loops");
-const { evaluateCommandPolicy, loadPolicyRules } = require("./loop-policy");
-const {
-	appendLedgerRecord,
-	readLedger,
-	latestUnconsumedApproval,
-	verifyLedgerChain,
-} = require("./loop-ledger");
+const { appendLedgerRecord, verifyLedgerChain } = require("./loop-ledger");
 const { codedError } = require("./error-catalog");
-const { createWorktree, removeWorktree } = require("../worktree-manager");
+const { runGovernedCommand } = require("./governed-runner");
 
 function ledgerPath(targetRoot, contractId) {
 	return path.join(resolveTarget(targetRoot), ".amber", "loops", contractId, "ledger.jsonl");
@@ -88,81 +81,29 @@ function executeLoopContract({ file, contract: contractId, target, execute, dryR
 
 	const lp = ledgerPath(targetRoot, contractId);
 
-	// Gate 1 — policy
-	const verdict = evaluateCommandPolicy(command, loadPolicyRules(targetRoot));
-	if (!verdict.allowed) {
-		appendLedgerRecord(lp, {
-			schemaVersion: 2,
-			kind: "denied",
-			contractId,
-			command,
-			reason: verdict.reason,
-			recordedAt: new Date().toISOString(),
-			executesAnything: false,
-		});
-		return { target: targetRoot, errors: [codedError("AMBER_E_POLICY_DENY", verdict.reason)], warnings: [] };
-	}
-
-	// Gate 2 — approval (unconsumed)
-	const approval = latestUnconsumedApproval(readLedger(lp));
-	if (!approval) {
-		return {
-			target: targetRoot,
-			errors: [codedError("AMBER_E_LOOP_NOT_APPROVED", `No unconsumed approval for ${contractId}`)],
-			warnings: [],
-		};
-	}
-
-	// Gate 3 — git precondition + isolated worktree (reuse worktree-manager)
-	if (!fs.existsSync(path.join(targetRoot, ".git"))) {
-		return {
-			target: targetRoot,
-			errors: [codedError("AMBER_E_MISSING_PATH_ARG", "not a git repository")],
-			warnings: [],
-		};
-	}
-	const runId = `glx-${contractId}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
-	const wt = createWorktree(targetRoot, runId);
-	if (!wt.success) {
-		return { target: targetRoot, errors: [`Failed to create isolated worktree: ${wt.error}`], warnings: [] };
-	}
-	const timeoutMs =
-		(contract.budget?.maxMinutes || contract.hardStops?.timeoutMinutes || 5) * 60_000;
-	let exec;
-	try {
-		const res = spawnSync(command, { shell: true, cwd: wt.path, encoding: "utf8", timeout: timeoutMs });
-		exec = {
-			command,
-			exitCode: res.status,
-			stdout: (res.stdout || "").slice(0, 4000),
-			stderr: (res.stderr || "").slice(0, 2000),
-		};
-	} catch (e) {
-		exec = { command, exitCode: -1, stderr: String(e.message).slice(0, 2000) };
-	} finally {
-		removeWorktree(targetRoot, runId);
-	}
-
-	// Gate 4 — tamper-evident executed record (consumes the approval)
-	const record = appendLedgerRecord(lp, {
-		schemaVersion: 2,
-		kind: "executed",
-		approvalState: "executed",
-		contractId,
-		consumedApprovalKey: approval.approvalKey,
-		action: exec,
-		recordedAt: new Date().toISOString(),
-		executesAnything: true,
-		stopReason: exec.exitCode === 0 ? "completed" : "command-failed",
+	// Gates 1–4 delegated to the reusable governed runner (policy, approval,
+	// worktree isolation, tamper-evident ledger). The loop's identity (contractId)
+	// is passed as `subject` so it is recorded on every ledger entry.
+	const budgetMinutes = contract.budget?.maxMinutes || contract.hardStops?.timeoutMinutes || 5;
+	const outcome = runGovernedCommand({
+		target: targetRoot,
+		command,
+		ledgerPath: lp,
+		budgetMinutes,
+		subject: { contractId },
+		label: contractId,
 	});
+	if (outcome.errors.length > 0) {
+		return { target: targetRoot, errors: outcome.errors, warnings: outcome.warnings };
+	}
 	return {
 		target: targetRoot,
 		executed: true,
-		exitCode: exec.exitCode,
-		ledgerRecord: record,
-		text: `Executed ${contractId} -> exit ${exec.exitCode}. Ledger: ${path.relative(targetRoot, lp)}`,
-		errors: exec.exitCode === 0 ? [] : [`Command exited ${exec.exitCode}`],
-		warnings: [],
+		exitCode: outcome.exitCode,
+		ledgerRecord: outcome.ledgerRecord,
+		text: `Executed ${contractId} -> exit ${outcome.exitCode}. Ledger: ${path.relative(targetRoot, lp)}`,
+		errors: outcome.errors,
+		warnings: outcome.warnings,
 	};
 }
 
