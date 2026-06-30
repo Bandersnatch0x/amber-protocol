@@ -19,15 +19,17 @@ test("maps all 10 ASI risks with honest, valid coverage labels", () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("a present rules.json referencing a risk marks it present", () => {
+test("a rules.json with a deny rule marks ASI02 (not ASI04) present — control-specific", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-std-"));
   fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
   fs.writeFileSync(
     path.join(dir, ".amber", "governance", "rules.json"),
-    JSON.stringify({ rules: [{ id: "x", action: "deny", mapsTo: ["ASI04"] }] }),
+    JSON.stringify({ rules: [{ id: "x", action: "deny", match: "regex", pattern: "rm", mapsTo: ["ASI04"] }] }),
   );
   const r = mapStandards(dir, "owasp-agentic");
-  assert.equal(r.risks.find((x) => x.id === "ASI04").present, true);
+  // A deny rule backs ASI02 (tool-misuse denial), NOT ASI04 (which needs an allow/pinning rule).
+  assert.equal(r.risks.find((x) => x.id === "ASI02").present, true);
+  assert.equal(r.risks.find((x) => x.id === "ASI04").present, false);
   assert.equal(r.risks.find((x) => x.id === "ASI01").present, false);
   fs.rmSync(dir, { recursive: true, force: true });
 });
