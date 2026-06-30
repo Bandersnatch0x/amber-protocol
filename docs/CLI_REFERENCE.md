@@ -103,13 +103,29 @@ node scripts/amber.js route validate <route-file> --target .
 
 ### route test
 
-Test route with sample goal:
+Print a route's dry-run stage sequence, OR — since [ADR-0003](../adr/0003-governance-gated-execution.md)
+Phase 3 — execute one `command`-type stage under the four governance gates.
 
 ```bash
-node scripts/amber.js route test \
-  --route feature-standard \
-  --goal "add login endpoint" \
-  --target .
+# dry-run stage sequence (default; no execution)
+node scripts/amber.js route test feature-standard --target .
+
+# governed execution of one command stage (needs a prior `route approve`; runs in an isolated worktree)
+node scripts/amber.js route test feature-standard --execute --stage verify --target .
+```
+
+`--execute --stage <name>` runs only `command`-type stages' `target`, after the policy gate, an
+unconsumed approval, git-worktree isolation, and a tamper-evident ledger entry. Non-`command` stages
+refuse `--execute`.
+
+### route approve / verify-ledger
+
+Record a human approval authorizing ONE governed execution of a route stage, then verify the
+route-scoped hash-chain ledger.
+
+```bash
+node scripts/amber.js route approve feature-standard --stage verify --reviewer your-name --target .
+node scripts/amber.js route verify-ledger feature-standard --target .
 ```
 
 ## Governance Commands

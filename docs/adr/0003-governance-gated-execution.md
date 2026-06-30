@@ -68,6 +68,20 @@ a full-file rewrite (needs external anchoring — out of scope; stated honestly 
 
 **Neutral:** default `loop run` remains dry-run; nothing executes without `--execute` + approval.
 
+## Addendum (2026-06-30) — Phase 3: route command-stages as a second consumer
+
+The four gates were extracted into a reusable `runGovernedCommand` primitive
+(`scripts/lib/core/governed-runner.js`). Loop governed execution now calls it (zero behaviour
+change), and **route `command`-stage execution** is the second consumer: `amber route test <route>
+--execute --stage <name>` runs a stage's `target` under the same policy / approval / worktree /
+ledger gates, recorded in a route-scoped ledger (`.amber/routes/<routeId>/ledger.jsonl`).
+
+This changes **nothing** about the boundary: the five preconditions still all hold (declared =
+`stage.target`; policy; approval; worktree; ledger). It only proves the gates are general
+infrastructure rather than loop-specific. Non-`command` stages (pack/skill/gate) refuse `--execute`.
+The session `verify`/`approve` human-record flow is untouched; whole-route or whole-session
+auto-execution remains disallowed.
+
 ## Related
 
 - ADR-0001 (governance-first, artifact-first)
