@@ -19,6 +19,8 @@ const { loadRoutes } = require("./route-loader");
 const { result } = require("./result");
 const { ensureContinuitySurfaces } = require("./continuity-surfaces");
 const { writeJson } = require("./core/fs-utils");
+const { codedError } = require("./core/error-catalog");
+const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
 const {
 	resolveStateDirForRead,
 	resolveStateDirForCreate,
@@ -499,6 +501,18 @@ async function verifySession(projectRoot, options) {
 	});
 	await writer.close();
 
+	// Mirror the governance-critical event into a tamper-evident hash-chain ledger
+	// (alongside the timeline, which remains the state-machine source of truth).
+	appendLedgerRecord(path.join(sessionDir, "ledger.jsonl"), {
+		schemaVersion: 2,
+		kind: "stage_completed",
+		sessionId,
+		stage: actualStageName,
+		command: options.command || null,
+		result: options.result || null,
+		recordedAt: new Date().toISOString(),
+	});
+
 	// Update the manifest's completedStages so complete-check also finds it there.
 	const manifestPath = path.join(sessionDir, "manifest.json");
 	const completedStages = Array.isArray(manifest.completedStages)
@@ -569,6 +583,16 @@ async function approveSession(projectRoot, options) {
 	});
 	await writer.close();
 
+	// Mirror the gate approval into the tamper-evident ledger.
+	appendLedgerRecord(path.join(sessionDir, "ledger.jsonl"), {
+		schemaVersion: 2,
+		kind: "gate_passed",
+		sessionId,
+		gateId: resolvedGateId,
+		approvedBy: "user",
+		recordedAt: new Date().toISOString(),
+	});
+
 	// If all route gates have now been approved, complete the session.
 	const gateEvents = (
 		require("./timeline-reader").readTimeline(timelinePath)
@@ -629,6 +653,24 @@ async function approveSession(projectRoot, options) {
 	return result(lines.join("\n"), 0);
 }
 
+function verifyLedgerSession(projectRoot, sessionId) {
+	const loaded = requireSession(projectRoot, sessionId);
+	if (loaded.exitCode !== undefined) return loaded;
+	const { sessionDir } = loaded;
+	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
+	if (!fs.existsSync(ledgerPath)) {
+		return result(`No governance ledger found for session ${sessionId}.`, 1);
+	}
+	const v = verifyLedgerChain(ledgerPath);
+	if (v.intact) {
+		return result(`Session ledger intact (${v.records} records).`, 0);
+	}
+	return result(
+		codedError("AMBER_E_LEDGER_TAMPERED", `broken at record ${v.brokenAt}: ${v.reason}`),
+		1,
+	);
+}
+
 function findMostRecentNonCompletedSession(projectRoot) {
 	return findMostRecentSession(projectRoot, { excludeCompleted: true });
 }
@@ -641,6 +683,7 @@ module.exports = {
 	continueSession,
 	verifySession,
 	approveSession,
+	verifyLedgerSession,
 	getSessionsDir,
 	loadSessionManifest,
 	loadAllSessionManifests,

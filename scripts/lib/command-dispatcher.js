@@ -360,8 +360,14 @@ async function handleSession(args) {
         gate: args.gate || args._?.[1],
       });
     }
+  } else if (action === "verify-ledger") {
+    if (!args.session) {
+      sessionResult = { text: "session verify-ledger requires --session <id>.", exitCode: 1 };
+    } else {
+      sessionResult = sessionCommands.verifyLedgerSession(targetRoot, args.session);
+    }
   } else {
-    sessionResult = { text: "session requires start, status, list, abort, continue, complete-check, verify, or approve.", exitCode: 1 };
+    sessionResult = { text: "session requires start, status, list, abort, continue, complete-check, verify, verify-ledger, or approve.", exitCode: 1 };
   }
 
   const r = {
