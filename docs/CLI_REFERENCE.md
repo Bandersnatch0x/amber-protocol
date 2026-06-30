@@ -75,6 +75,21 @@ node scripts/amber.js session continue [<session-id>] --target .
 
 Resumes from last checkpoint.
 
+### session verify / approve / verify-ledger
+
+Record human-run verification evidence and gate approvals, and verify the session's tamper-evident
+ledger. `verify` and `approve` also mirror the event into a hash-chain ledger
+(`.amber/sessions/<id>/ledger.jsonl`) so a later edit to a recorded result is detectable.
+
+```bash
+node scripts/amber.js session verify   --session <id> --command "npm test" --result pass  --target .
+node scripts/amber.js session approve  --session <id> [--gate <gate-id>]                  --target .
+node scripts/amber.js session verify-ledger --session <id>                                --target .
+```
+
+`verify-ledger` recomputes the session ledger's hash chain and reports `AMBER_E_LEDGER_TAMPERED` on
+any broken link.
+
 ## Route Commands
 
 ### route list
