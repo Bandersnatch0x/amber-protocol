@@ -46,13 +46,13 @@ test("gate blocks implementation-ready plans without user confirmation", () => {
   assert.equal(runHarness(["init", "--target", target]).status, 0);
   assert.equal(runHarness(["plan", "--target", target, "--feature", "F001", "--title", "Gate check"]).status, 0);
 
-  const blocked = runHarness(["gate", "--target", target, "--plan", "docs/plans/F001-gate-check.md", "--json"]);
-  const planPath = path.join(target, "docs", "plans", "F001-gate-check.md");
+  const blocked = runHarness(["gate", "--target", target, "--plan", "docs/plans/F001-Gate-check.md", "--json"]);
+  const planPath = path.join(target, "docs", "plans", "F001-Gate-check.md");
   fs.writeFileSync(
     planPath,
     fs.readFileSync(planPath, "utf8").replace("User Confirmation: pending", "User Confirmation: confirmed")
   );
-  const accepted = runHarness(["gate", "--target", target, "--plan", "docs/plans/F001-gate-check.md", "--json"]);
+  const accepted = runHarness(["gate", "--target", target, "--plan", "docs/plans/F001-Gate-check.md", "--json"]);
 
   assert.notEqual(blocked.status, 0);
   assert.match(JSON.parse(blocked.stdout).errors.join("\n"), /User confirmation is required/);
