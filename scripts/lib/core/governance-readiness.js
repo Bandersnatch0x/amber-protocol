@@ -6,7 +6,7 @@ const { inspectPolicy } = require("./governance");
 const { readJsonSafe } = require("./fs-utils");
 const { loadRoutes } = require("../route-loader");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
-const { verifyLedgerChain } = require("./loop-ledger");
+const { walkLedgers, verifyLedgerChain } = require("./loop-ledger");
 
 const GOVERNANCE_DOCS = [
 	"POLICY.md",
@@ -398,18 +398,12 @@ function inspectGlxControls(targetRoot) {
 		}
 	}
 
-	// Scan every hash-chain ledger home for tampering.
+	// Scan every hash-chain ledger home for tampering via the canonical walker.
 	const tamperedLedgers = [];
-	for (const home of ["loops", "routes", "sessions"]) {
-		const homeDir = path.join(stateDir, home);
-		if (!fs.existsSync(homeDir)) continue;
-		for (const sub of fs.readdirSync(homeDir)) {
-			const ledgerPath = path.join(homeDir, sub, "ledger.jsonl");
-			if (!fs.existsSync(ledgerPath)) continue;
-			const v = verifyLedgerChain(ledgerPath);
-			if (!v.intact) tamperedLedgers.push({ home, id: sub, brokenAt: v.brokenAt, reason: v.reason });
-		}
-	}
+	walkLedgers(stateDir, ({ home, sub, ledgerPath }) => {
+		const v = verifyLedgerChain(ledgerPath);
+		if (!v.intact) tamperedLedgers.push({ home, id: sub, brokenAt: v.brokenAt, reason: v.reason });
+	});
 	return { rulesMissing, unsafeDefaultAllow, tamperedLedgers };
 }
 

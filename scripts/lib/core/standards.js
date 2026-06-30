@@ -7,6 +7,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
+const { walkLedgers } = require("./loop-ledger");
 
 const FRAMEWORK_FILES = {
 	"owasp-agentic": "owasp-agentic-2026",
@@ -39,34 +40,22 @@ function inspectControls(targetRoot) {
 	const hasDenyRule = rules.some((r) => r && r.action === "deny");
 	const hasAllowRule = rules.some((r) => r && r.action === "allow");
 
-	// Scan all hash-chain ledger homes: loops, routes, AND sessions.
+	// Scan all hash-chain ledger homes via the canonical walker.
 	let hasHashChainLedger = false;
 	let hasApprovalRecord = false;
-	const ledgerHomes = [
-		path.join(stateDir, "loops"), // .amber/loops/<contract>/ledger.jsonl
-		path.join(stateDir, "routes"), // .amber/routes/<routeId>/ledger.jsonl
-		path.join(stateDir, "sessions"), // .amber/sessions/<id>/ledger.jsonl
-	];
-	for (const home of ledgerHomes) {
-		if (!fs.existsSync(home)) continue;
-		for (const sub of fs.readdirSync(home)) {
-			const ledgerPath = path.join(home, sub, "ledger.jsonl");
-			if (!fs.existsSync(ledgerPath)) continue;
-			const raw = fs.readFileSync(ledgerPath, "utf8");
-			const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
-			if (lines.length > 0) hasHashChainLedger = true;
-			for (const line of lines) {
-				try {
-					const rec = JSON.parse(line);
-					if (rec.kind === "approved" || rec.kind === "gate_passed") hasApprovalRecord = true;
-				} catch {
-					/* skip unparseable ledger line */
-				}
+	walkLedgers(stateDir, ({ ledgerPath }) => {
+		const raw = fs.readFileSync(ledgerPath, "utf8");
+		const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+		if (lines.length > 0) hasHashChainLedger = true;
+		for (const line of lines) {
+			try {
+				const rec = JSON.parse(line);
+				if (rec.kind === "approved" || rec.kind === "gate_passed") hasApprovalRecord = true;
+			} catch {
+				/* skip unparseable ledger line */
 			}
-			if (hasApprovalRecord) break;
 		}
-		if (hasApprovalRecord) break;
-	}
+	});
 
 	return {
 		hasPolicyRules: rules.length > 0,
