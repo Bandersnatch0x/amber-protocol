@@ -15,6 +15,11 @@ const {
   writeReadinessMarkdown
 } = require("./core/governance-readiness");
 const { mapStandards } = require("./core/standards");
+const {
+  DEFAULT_RULES,
+  loadPolicyRules,
+  evaluateCommandPolicy,
+} = require("./core/loop-policy");
 
 function createGovernanceDocs(target) {
   if (!target) {
@@ -253,11 +258,90 @@ function mapStandardsCommand(target, options = {}) {
   return { ...result, text: lines.join("\n") };
 }
 
+// GLX policy surface (B): scaffold and inspect the declarative command policy.
+// init writes DEFAULT_RULES idempotently; inspect shows the active rules; check
+// runs a sample command through evaluateCommandPolicy (read-only, no execution).
+function governanceRulesCommand(action, target, options = {}) {
+  if (!target) {
+    return { target, errors: ["--target is required"], warnings: [] };
+  }
+  const { resolveStateDirForRead, resolveStateDirForCreate } = require("./state-dir-resolver");
+
+  if (action === "init") {
+    const governanceDir = path.join(resolveStateDirForCreate(target), "governance");
+    const rulesPath = path.join(governanceDir, "rules.json");
+    if (fs.existsSync(rulesPath)) {
+      return {
+        target,
+        skipped: true,
+        text: `rules.json already exists: ${path.relative(target, rulesPath)} (left untouched).`,
+        errors: [],
+        warnings: [],
+      };
+    }
+    fs.mkdirSync(governanceDir, { recursive: true });
+    fs.writeFileSync(rulesPath, JSON.stringify(DEFAULT_RULES, null, 2) + "\n");
+    return {
+      target,
+      skipped: false,
+      text: `Wrote safe-default rules.json: ${path.relative(target, rulesPath)} (defaultAction=deny, ${DEFAULT_RULES.rules.length} rules).`,
+      errors: [],
+      warnings: [],
+    };
+  }
+
+  if (action === "inspect") {
+    const stateDir = resolveStateDirForRead(target);
+    const rulesPath = path.join(stateDir, "governance", "rules.json");
+    const fromDefaults = !fs.existsSync(rulesPath);
+    const rules = fromDefaults ? DEFAULT_RULES : loadPolicyRules(target);
+    const lines = [
+      `Policy source: ${fromDefaults ? "defaults (no rules.json)" : path.relative(target, rulesPath)}`,
+      `defaultAction: ${rules.defaultAction}`,
+      `rules: ${rules.rules.length}`,
+      "",
+    ];
+    for (const rule of rules.rules) {
+      lines.push(`  [${rule.action}] ${rule.id} (${rule.match}: ${rule.pattern})`);
+    }
+    return {
+      target,
+      source: fromDefaults ? "defaults" : "rules.json",
+      defaultAction: rules.defaultAction,
+      ruleCount: rules.rules.length,
+      text: lines.join("\n"),
+      errors: [],
+      warnings: [],
+    };
+  }
+
+  if (action === "check") {
+    if (!options.command) {
+      return { target, errors: ["rules check requires --command <string>"], warnings: [] };
+    }
+    const rules = loadPolicyRules(target);
+    const verdict = evaluateCommandPolicy(options.command, rules);
+    return {
+      target,
+      command: options.command,
+      allowed: verdict.allowed,
+      matchedRule: verdict.matchedRule,
+      reason: verdict.reason,
+      text: `${verdict.allowed ? "ALLOW" : "DENY"}: ${verdict.reason}`,
+      errors: [],
+      warnings: [],
+    };
+  }
+
+  return { target, errors: [`governance rules requires init, inspect, or check.`], warnings: [] };
+}
+
 module.exports = {
   createGovernanceDocs,
   exportGovernanceEvidence,
   inspectGovernancePolicy,
   auditGovernance,
   inspectGovernanceReadinessCommand,
-  mapStandardsCommand
+  mapStandardsCommand,
+  governanceRulesCommand
 };
