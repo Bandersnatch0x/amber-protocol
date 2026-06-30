@@ -59,6 +59,9 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# npm auth (contains GitHub tokens — use .github/npmrc-github-packages as template)
+.npmrc
+
 # OS and editor files
 .DS_Store
 Thumbs.db

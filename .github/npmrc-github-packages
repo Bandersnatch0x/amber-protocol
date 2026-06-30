@@ -1,0 +1,20 @@
+# .npmrc — authentication and scope-to-registry mapping for GitHub Packages
+#
+# LOCAL DEVELOPMENT:
+#   1. Copy to .npmrc (which is gitignored — never commit tokens):
+#        cp .github/npmrc-github-packages .npmrc
+#   2. Replace ${GITHUB_TOKEN} with a GitHub personal access token (PAT)
+#      that has read:packages scope:
+#        https://github.com/settings/tokens
+#   3. npm install @bandersnatch0x/amber-protocol
+#
+# CI (GitHub Actions):
+#   The publish workflow (publish-github-packages.yml) builds this
+#   configuration on the fly using secrets.GITHUB_TOKEN — no setup needed.
+#
+# NPM packages with the @bandersnatch0x scope are resolved from GitHub
+# Packages instead of the default npm registry. All other packages
+# continue to use the npm registry.
+
+@bandersnatch0x:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
