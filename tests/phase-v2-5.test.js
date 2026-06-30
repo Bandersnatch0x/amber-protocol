@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { slugify } = require("../scripts/lib/core/text-utils");
 const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -24,7 +25,7 @@ function runHarness(args) {
 function createPlan(target, title) {
   const result = runHarness(["plan", "--target", target, "--feature", "F001", "--title", title]);
   assert.equal(result.status, 0, result.stderr);
-  return path.join("docs", "plans", `F001-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.md`);
+  return path.join("docs", "plans", `F001-${slugify(title)}.md`);
 }
 
 function confirmPlan(target, relativePath) {
@@ -62,6 +63,6 @@ test("review passes confirmed plans and accept appends evolution log", () => {
   assert.equal(JSON.parse(review.stdout).releaseReadiness.status, "ready");
   assert.equal(accept.status, 0, accept.stderr);
   assert.equal(JSON.parse(accept.stdout).accepted, true);
-  assert.match(fs.readFileSync(evolutionPath, "utf8"), /F001-accept-ready\.md/);
+  assert.match(fs.readFileSync(evolutionPath, "utf8"), /F001-Accept-ready\.md/);
 });
 
