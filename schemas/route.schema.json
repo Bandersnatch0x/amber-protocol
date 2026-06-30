@@ -35,7 +35,23 @@
         "type": { "enum": ["pack", "skill", "command", "gate"] },
         "target": { "type": "string" },
         "gateAfter": { "type": "string" },
-        "optional": { "type": "boolean", "default": false }
+        "optional": { "type": "boolean", "default": false },
+        "note": { "type": "string" },
+        "rules": {
+          "type": "array",
+          "description": "Extra fixed-predicate rules composed with global rules.json for this stage's command only. deny-wins is absolute.",
+          "items": {
+            "type": "object",
+            "required": ["id", "action", "match", "pattern"],
+            "properties": {
+              "id": { "type": "string" },
+              "action": { "enum": ["allow", "deny"] },
+              "match": { "enum": ["exact", "prefix", "regex"] },
+              "pattern": { "type": "string" },
+              "mapsTo": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
       }
     },
     "Gate": {

@@ -92,6 +92,7 @@ function executeLoopContract({ file, contract: contractId, target, execute, dryR
 		budgetMinutes,
 		subject: { contractId },
 		label: contractId,
+		contextRules: contract.governed && contract.governed.rules,
 	});
 	if (outcome.errors.length > 0) {
 		return { target: targetRoot, errors: outcome.errors, warnings: outcome.warnings };

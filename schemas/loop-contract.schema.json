@@ -147,6 +147,21 @@
         "requiresApproval": {
           "type": "boolean",
           "default": true
+        },
+        "rules": {
+          "type": "array",
+          "description": "Extra fixed-predicate rules composed with the global rules.json for this command only. deny-wins is absolute: a context allow can never override any deny.",
+          "items": {
+            "type": "object",
+            "required": ["id", "action", "match", "pattern"],
+            "properties": {
+              "id": { "type": "string" },
+              "action": { "enum": ["allow", "deny"] },
+              "match": { "enum": ["exact", "prefix", "regex"] },
+              "pattern": { "type": "string" },
+              "mapsTo": { "type": "array", "items": { "type": "string" } }
+            }
+          }
         }
       }
     }

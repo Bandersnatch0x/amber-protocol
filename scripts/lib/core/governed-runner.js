@@ -14,11 +14,20 @@ const { appendLedgerRecord, readLedger, latestUnconsumedApproval } = require("./
 const { codedError } = require("./error-catalog");
 const { createWorktree, removeWorktree } = require("../worktree-manager");
 
-function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5, subject = {}, label = "command" }) {
+function mergeRules(globalRules, contextRules) {
+	const g = Array.isArray(globalRules?.rules) ? globalRules.rules : [];
+	const c = Array.isArray(contextRules) ? contextRules : [];
+	// Context rules are appended; evaluateCommandPolicy checks ALL deny rules first
+	// (deny-wins), so a context allow can never override a global OR context deny.
+	return { defaultAction: globalRules?.defaultAction ?? "deny", rules: [...g, ...c] };
+}
+
+function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5, subject = {}, label = "command", contextRules }) {
 	const targetRoot = resolveTarget(target);
 
-	// Gate 1 — policy
-	const verdict = evaluateCommandPolicy(command, loadPolicyRules(targetRoot));
+	// Gate 1 — policy (global rules.json composed with per-context rules; deny-wins is absolute)
+	const ruleset = mergeRules(loadPolicyRules(targetRoot), contextRules);
+	const verdict = evaluateCommandPolicy(command, ruleset);
 	if (!verdict.allowed) {
 		appendLedgerRecord(lp, {
 			schemaVersion: 2,
@@ -90,4 +99,4 @@ function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5
 	};
 }
 
-module.exports = { runGovernedCommand };
+module.exports = { runGovernedCommand, mergeRules };
