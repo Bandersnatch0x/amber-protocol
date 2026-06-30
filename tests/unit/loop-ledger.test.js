@@ -19,8 +19,8 @@ test("canonicalize is key-order independent and drops hash", () => {
 
 test("append builds a continuous chain; verify is intact", () => {
   const p = tmpLedger();
-  L.appendLedgerRecord(p, { kind: "approved", approvalId: "ap1" });
-  L.appendLedgerRecord(p, { kind: "executed", consumedApprovalId: "ap1" });
+  L.appendLedgerRecord(p, { kind: "approved", approvalKey: "ap1" });
+  L.appendLedgerRecord(p, { kind: "executed", consumedApprovalKey: "ap1" });
   const recs = L.readLedger(p);
   assert.equal(recs.length, 2);
   assert.equal(recs[0].prevHash, "0".repeat(64));
@@ -30,8 +30,8 @@ test("append builds a continuous chain; verify is intact", () => {
 
 test("tampering a record body breaks verify at its index", () => {
   const p = tmpLedger();
-  L.appendLedgerRecord(p, { kind: "approved", approvalId: "ap1" });
-  L.appendLedgerRecord(p, { kind: "executed", consumedApprovalId: "ap1" });
+  L.appendLedgerRecord(p, { kind: "approved", approvalKey: "ap1" });
+  L.appendLedgerRecord(p, { kind: "executed", consumedApprovalKey: "ap1" });
   const lines = fs.readFileSync(p, "utf8").trim().split("\n");
   const r0 = JSON.parse(lines[0]);
   r0.kind = "tampered";
@@ -44,9 +44,9 @@ test("tampering a record body breaks verify at its index", () => {
 
 test("latestUnconsumedApproval finds an approval not yet executed", () => {
   const p = tmpLedger();
-  L.appendLedgerRecord(p, { kind: "approved", approvalId: "ap1" });
-  assert.equal(L.latestUnconsumedApproval(L.readLedger(p))?.approvalId, "ap1");
-  L.appendLedgerRecord(p, { kind: "executed", consumedApprovalId: "ap1" });
+  L.appendLedgerRecord(p, { kind: "approved", approvalKey: "ap1" });
+  assert.equal(L.latestUnconsumedApproval(L.readLedger(p))?.approvalKey, "ap1");
+  L.appendLedgerRecord(p, { kind: "executed", consumedApprovalKey: "ap1" });
   assert.equal(L.latestUnconsumedApproval(L.readLedger(p)), null);
 });
 

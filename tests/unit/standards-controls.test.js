@@ -50,7 +50,7 @@ test("rules.json with an allow rule marks ASI04 present (command pinning)", () =
 test("a non-empty hash-chain ledger marks ASI06 present", () => {
   const dir = tmpDir();
   fs.mkdirSync(path.join(dir, ".amber", "loops", "c1"), { recursive: true });
-  appendLedgerRecord(path.join(dir, ".amber", "loops", "c1", "ledger.jsonl"), { kind: "approved", approvalId: "ap1" });
+  appendLedgerRecord(path.join(dir, ".amber", "loops", "c1", "ledger.jsonl"), { kind: "approved", approvalKey: "ap1" });
   const r = mapStandards(dir, "owasp-agentic");
   assert.equal(r.risks.find((x) => x.id === "ASI06").present, true);
   fs.rmSync(dir, { recursive: true, force: true });
@@ -59,7 +59,7 @@ test("a non-empty hash-chain ledger marks ASI06 present", () => {
 test("an approved ledger record marks ASI09 present", () => {
   const dir = tmpDir();
   fs.mkdirSync(path.join(dir, ".amber", "loops", "c1"), { recursive: true });
-  appendLedgerRecord(path.join(dir, ".amber", "loops", "c1", "ledger.jsonl"), { kind: "approved", approvalId: "ap1" });
+  appendLedgerRecord(path.join(dir, ".amber", "loops", "c1", "ledger.jsonl"), { kind: "approved", approvalKey: "ap1" });
   const r = mapStandards(dir, "owasp-agentic");
   assert.equal(r.risks.find((x) => x.id === "ASI09").present, true);
   fs.rmSync(dir, { recursive: true, force: true });

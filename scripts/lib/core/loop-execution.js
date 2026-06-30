@@ -41,22 +41,22 @@ function approveLoopContract({ file, contract: contractId, target, reviewer }) {
 	} catch (e) {
 		return { target: targetRoot, errors: [e.message], warnings: [] };
 	}
-	const approvalId = crypto.randomUUID();
+	const approvalKey = crypto.randomUUID();
 	const record = appendLedgerRecord(ledgerPath(targetRoot, contractId), {
 		schemaVersion: 2,
 		kind: "approved",
 		approvalState: "approved",
 		contractId,
-		approvalId,
+		approvalKey,
 		reviewer: reviewer || "unknown",
 		recordedAt: new Date().toISOString(),
 		executesAnything: false,
 	});
 	return {
 		target: targetRoot,
-		approvalId,
+		approvalKey,
 		record,
-		text: `Approved ${contractId} (approvalId ${approvalId}). Now run: amber loop run --file <pack> --contract ${contractId} --execute`,
+		text: `Approved ${contractId} (approvalKey ${approvalKey}). Now run: amber loop run --file <pack> --contract ${contractId} --execute`,
 		errors: [],
 		warnings: [],
 	};
@@ -149,7 +149,7 @@ function executeLoopContract({ file, contract: contractId, target, execute, dryR
 		kind: "executed",
 		approvalState: "executed",
 		contractId,
-		consumedApprovalId: approval.approvalId,
+		consumedApprovalKey: approval.approvalKey,
 		action: exec,
 		recordedAt: new Date().toISOString(),
 		executesAnything: true,
