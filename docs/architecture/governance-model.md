@@ -4,7 +4,7 @@
 
 The governance model provides policy definition, evidence export, audit trails, and boundary enforcement for agent-assisted workflows. It implements a control-first approach where projects explicitly define what autonomous agents MAY and MAY NOT do.
 
-**Design Principle:** Governance surfaces are read-only or write-to-governance-dir-only. They never execute agent work, modify session state, or auto-approve gates.
+**Design Principle:** Governance surfaces are read-only or write-to-governance-dir-only. They never modify session state or auto-approve gates. Since [ADR-0003](../adr/0003-governance-gated-execution.md), Amber may execute a loop contract's declared `governed.command` (or a route command-stage's `target`) under four explicit gates — policy, approval, worktree isolation, and a tamper-evident ledger. This is governance-gated, human-triggered execution, NOT autonomous or scheduled work.
 
 ## Core Concepts
 
@@ -33,11 +33,20 @@ Compliance Verification
 ├── POLICY.md               # Agent permission defaults
 ├── BOUNDARIES.md           # Explicit restrictions
 ├── AUDIT_LOG.md           # Inspection and retention guide
+├── rules.json             # Declarative command policy (GLX gate 1, deny-wins/default-deny)
 └── evidence/              # Exported evidence reports
     └── 2026-06-21/
-        ├── session-abc-123.md
-        ├── task-xyz-789.md
-        └── audit-report.md
+
+.amber/loops/<contractId>/
+└── ledger.jsonl           # Hash-chain governed-execution ledger (GLX gate 4)
+
+.amber/routes/<routeId>/
+└── ledger.jsonl           # Route-stage governed-execution ledger
+
+.amber/sessions/<id>/
+├── timeline.jsonl         # Session event timeline (state-machine source of truth)
+├── manifest.json          # Session manifest
+└── ledger.jsonl           # Tamper-evident mirror of verify/approve events
 ```
 
 ## Architecture Components
@@ -302,6 +311,24 @@ amber governance docs --target <repo>
 - Idempotent (skips existing files)
 - Optional (doctor doesn't require governance/ directory)
 - Customizable templates
+
+### 6. Governed Loop Execution — GLX ([ADR-0003](../adr/0003-governance-gated-execution.md))
+
+The GLX subsystem adds governance-gated, human-triggered command execution for loop contracts and route command-stages. It extends the governance model from pure inspection into governed, gated action without becoming an agent runtime.
+
+**Four gates** — every governed execution must pass all four:
+
+1. **Policy gate (`.amber/governance/rules.json`)** — declarative allow/deny rules with deny-wins and `defaultAction: deny`. A command matching any deny rule is rejected; a command with no allow match under default-deny is also rejected. Loop contracts and route stages may declare per-context rules that compose with the global policy.
+
+2. **Approval gate (`amber loop approve` / `amber route approve`)** — an explicit human sign-off recorded in the hash-chain ledger. One approval authorises exactly one execution (replay protection via `approvalKey`/`consumedApprovalKey` pairing).
+
+3. **Isolation gate (git worktree)** — the command runs in a dedicated worktree under `.amber/worktrees/`. The user's main checkout is never the cwd. The worktree is cleaned up after execution.
+
+4. **Evidence gate (hash-chain ledger)** — every attempt (allowed, denied, executed) appends a record to a per-context ledger (`.amber/loops/<id>/ledger.jsonl`, `.amber/routes/<id>/ledger.jsonl`). Each record carries the previous record's SHA-256 hash, so any edit breaks the chain (`amber loop verify-ledger` detects it). Session verify/approve events are also mirrored to `.amber/sessions/<id>/ledger.jsonl` for tamper-evidence.
+
+**Honest standards mapping** — `amber governance standards` reports each OWASP ASI risk as `governance` / `partial` / `out-of-scope` based on which controls are actually deployed in the target repo. Runtime-only risks are never falsely claimed as covered.
+
+**Readiness integration** — `amber governance readiness` inspects GLX state: missing or unsafe `rules.json` triggers a warning / block; tampered hash-chain ledgers trigger a hard block.
 
 ## CLI Commands
 

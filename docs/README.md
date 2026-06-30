@@ -25,6 +25,8 @@
 **架构决策记录 (ADR)：**
 
 - [ADR-0001: 治理优先，制品优先](adr/0001-governance-first-artifact-first.md)
+- [ADR-0002: V2 执行范围 — 实验性隔离](adr/0002-v2-execution-scope.md)
+- [ADR-0003: 治理门控执行 — 受控 Loop/Rouute/会话命令](adr/0003-governance-gated-execution.md)
 
 ## 🛠️ 部署与运维
 
@@ -94,6 +96,6 @@
 
 ---
 
-**最后更新：** 2026-06-22
+**最后更新：** 2026-06-30
 
-**文档版本：** 与 Amber Protocol v1.0.0 同步
+**文档版本：** 与 Amber Protocol v1.1.0 同步

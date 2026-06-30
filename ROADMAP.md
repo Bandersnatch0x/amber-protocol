@@ -4,6 +4,8 @@ Implementation status: V1 through V5.5 are implemented in this repository as loc
 
 Live loop scheduling is a future execution track, not an implied part of V5.5 maintenance. The current product may describe, validate, dry-run, and record loops, but it must not run always-on scheduled agents until the isolation, evidence, approval, connector, and no-progress controls below are stable.
 
+**V1.1/GLX (2026-06-30):** Governed one-shot loop and route command-stage execution is now available ([ADR-0003](docs/adr/0003-governance-gated-execution.md)). `amber loop run --execute` and `amber route test --execute --stage` run a declared command behind four governance gates (declarative policy, human approval, git worktree isolation, tamper-evident hash-chain ledger). Default `loop run` is still dry-run; execution requires `--execute` + an `amber loop approve`. Per-context rules, honest OWASP-ASI coverage reporting, and session tamper-evidence are also included. This is human-triggered gated execution — NOT scheduling, NOT autonomous loops.
+
 ## V1: Safe Amber Bootstrap
 
 Goal: safely install and validate a minimal repository-local Amber setup.
