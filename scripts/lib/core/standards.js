@@ -39,26 +39,33 @@ function inspectControls(targetRoot) {
 	const hasDenyRule = rules.some((r) => r && r.action === "deny");
 	const hasAllowRule = rules.some((r) => r && r.action === "allow");
 
-	// Scan .amber/loops/*/ledger.jsonl for ledger + approval evidence.
-	const loopsDir = path.join(stateDir, "loops");
+	// Scan all hash-chain ledger homes: loops, routes, AND sessions.
 	let hasHashChainLedger = false;
 	let hasApprovalRecord = false;
-	if (fs.existsSync(loopsDir)) {
-		for (const contract of fs.readdirSync(loopsDir)) {
-			const ledgerPath = path.join(loopsDir, contract, "ledger.jsonl");
+	const ledgerHomes = [
+		path.join(stateDir, "loops"), // .amber/loops/<contract>/ledger.jsonl
+		path.join(stateDir, "routes"), // .amber/routes/<routeId>/ledger.jsonl
+		path.join(stateDir, "sessions"), // .amber/sessions/<id>/ledger.jsonl
+	];
+	for (const home of ledgerHomes) {
+		if (!fs.existsSync(home)) continue;
+		for (const sub of fs.readdirSync(home)) {
+			const ledgerPath = path.join(home, sub, "ledger.jsonl");
 			if (!fs.existsSync(ledgerPath)) continue;
 			const raw = fs.readFileSync(ledgerPath, "utf8");
 			const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
 			if (lines.length > 0) hasHashChainLedger = true;
 			for (const line of lines) {
 				try {
-					if (JSON.parse(line).kind === "approved") hasApprovalRecord = true;
+					const rec = JSON.parse(line);
+					if (rec.kind === "approved" || rec.kind === "gate_passed") hasApprovalRecord = true;
 				} catch {
 					/* skip unparseable ledger line */
 				}
 			}
-			if (hasApprovalRecord) break; // both flags are now true if applicable
+			if (hasApprovalRecord) break;
 		}
+		if (hasApprovalRecord) break;
 	}
 
 	return {
