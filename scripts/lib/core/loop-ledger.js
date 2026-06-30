@@ -74,14 +74,14 @@ function verifyLedgerChain(ledgerPath) {
 	return { intact: true, brokenAt: null, records: records.length };
 }
 
-// An approval is consumable until an `executed` record references its approvalId.
+// An approval is consumable until an `executed` record references its approvalKey.
 function latestUnconsumedApproval(records) {
 	const consumed = new Set(
 		records
-			.filter((r) => r.kind === "executed" && r.consumedApprovalId)
-			.map((r) => r.consumedApprovalId),
+			.filter((r) => r.kind === "executed" && r.consumedApprovalKey)
+			.map((r) => r.consumedApprovalKey),
 	);
-	const open = records.filter((r) => r.kind === "approved" && r.approvalId && !consumed.has(r.approvalId));
+	const open = records.filter((r) => r.kind === "approved" && r.approvalKey && !consumed.has(r.approvalKey));
 	return open.length ? open[open.length - 1] : null;
 }
 

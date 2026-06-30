@@ -42,3 +42,23 @@ Review findings:
 Skipped checks:
 Next candidate:
 ```
+
+## Loop Triage Compatible Output (when used inside a daily-triage loop)
+
+When invoked as part of a loop (e.g. via `/loop` or `amber loop run`), prefer producing output in this structure so it can be directly merged into a `STATE.md` or loop ledger:
+
+### High-Priority Items
+- ...
+
+### Watch Items
+- ...
+
+### Noise / Ignore
+- ...
+
+### State Updates
+- Last run: <timestamp>
+- Amber health score / doctor summary
+- Candidate next actions (with links to commands)
+
+This aligns Amber continuous improvement with loop-engineering `loop-triage` skill conventions while respecting Amber's governance and dry-run boundaries.

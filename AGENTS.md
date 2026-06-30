@@ -20,6 +20,7 @@ node scripts/amber.js <command> --target <repo>
 - `node scripts/amber.js session status` - inspect the current session.
 - `node scripts/amber.js adoption report --target <repo> --output-dir docs/examples/adoptions` - generate an adoption report.
 - `node scripts/amber.js plan --target <repo> --feature <feature-id> --title "<title>"` - scaffold a feature plan.
+- `node scripts/amber.js loop recommend` / `loop run --dry-run` — safe continuous improvement entrypoints (see LOOP.md).
 
 ## Safety boundaries
 
@@ -27,11 +28,15 @@ node scripts/amber.js <command> --target <repo>
 - Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
 - Never overwrite user-authored files without explicit approval.
 
+See also `LOOP.md` (loop engineering self-description) and the explicit `execution: { executesAnything: false }` rule in all Amber loop contracts.
+
 ## Skills & commands
 
 `skills/<name>/SKILL.md` is the single source of truth. Run `npm run gen:agents` to
 regenerate every platform product (edit `skills/`, never the generated files;
-`npm run gen:agents:check` guards against drift in CI):
+`npm run gen:agents:check` guards against drift in CI).
+
+This repo also follows loop-engineering patterns (see LOOP.md). Skills in `skills/` can be used directly from Grok `/loop`, Claude `$skill`, etc. The `amber-continuous-improvement` skill implements a governed form of daily triage.
 
 - **Claude Code** - loaded via `.claude-plugin/` -> `skills/`; manual slash commands in `.claude/commands/`.
 - **Codex & Cursor** - skills mirrored to `.agents/skills/` (the shared open-standard location both read natively).
