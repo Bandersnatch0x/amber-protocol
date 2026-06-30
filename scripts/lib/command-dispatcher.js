@@ -271,12 +271,32 @@ function handleAdoption(args) {
 
 function handleRoute(args) {
   const action = args._?.[0];
+  const routeId = args._?.[1] || "";
+  const targetRoot = resolveTarget(args);
   let routeResult;
-  if (action === "list")      routeResult = routeCommands.listRoutes();
-  else if (action === "inspect")   routeResult = routeCommands.inspectRoute(args._?.[1] || "");
-  else if (action === "validate")  routeResult = routeCommands.validateRouteFile(args._?.[1] || args.file || "");
-  else if (action === "test")      routeResult = routeCommands.testRoute(args._?.[1] || "");
-  else routeResult = { text: "route requires list, inspect, validate, or test.", exitCode: 1 };
+
+  if (action === "list") routeResult = routeCommands.listRoutes();
+  else if (action === "inspect") routeResult = routeCommands.inspectRoute(routeId);
+  else if (action === "validate") routeResult = routeCommands.validateRouteFile(args.file || routeId);
+  else if (action === "test") {
+    // Governed execution of a single command stage (GLX Phase 3); default stays dry-run.
+    if (args.execute && args.stage) {
+      const er = routeCommands.executeRouteStage(routeId, args.stage, targetRoot);
+      routeResult = { text: er.text, exitCode: er.exitCode };
+    } else {
+      routeResult = routeCommands.testRoute(routeId);
+    }
+  } else if (action === "approve") {
+    if (!args.stage) {
+      routeResult = { text: "route approve requires --stage <name>.", exitCode: 1 };
+    } else {
+      routeResult = routeCommands.approveRouteStage(routeId, args.stage, targetRoot, args.reviewer);
+    }
+  } else if (action === "verify-ledger") {
+    routeResult = routeCommands.verifyRouteLedger(routeId, targetRoot);
+  } else {
+    routeResult = { text: "route requires list, inspect, validate, test, approve, or verify-ledger.", exitCode: 1 };
+  }
 
   const r = { target: args.target, text: routeResult.text, errors: routeResult.exitCode === 0 ? [] : [routeResult.text], warnings: [] };
   return { result: r, exitCode: routeResult.exitCode, bypassPrint: !args.json };

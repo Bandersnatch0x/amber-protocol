@@ -1,8 +1,16 @@
 "use strict";
 
+const fs = require("fs");
 const path = require("path");
 const { loadRoutes, loadRouteFile } = require("./route-loader");
 const { result } = require("./result");
+const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
+const { runGovernedCommand } = require("./core/governed-runner");
+const { codedError } = require("./core/error-catalog");
+const {
+	resolveStateDirForRead,
+	resolveStateDirForCreate,
+} = require("./state-dir-resolver");
 
 const DEFAULT_ROUTES_DIR = path.join(__dirname, "../../routes");
 
@@ -99,4 +107,85 @@ function testRoute(routeId, routesDir = DEFAULT_ROUTES_DIR) {
 	return result(lines.join("\n"));
 }
 
-module.exports = { listRoutes, inspectRoute, validateRouteFile, testRoute };
+// GLX Phase 3 — governed route-stage execution. A route `command` stage's target
+// runs under the same four gates as a loop governed.command (policy, approval,
+// worktree isolation, hash-chain ledger), recorded in a route-scoped ledger.
+function routeLedgerPath(targetRoot, routeId) {
+	return path.join(resolveStateDirForCreate(targetRoot), "routes", routeId, "ledger.jsonl");
+}
+
+function findStage(route, stageName) {
+	return (route.stages || []).find((s) => s.name === stageName) || null;
+}
+
+function approveRouteStage(routeId, stageName, targetRoot, reviewer, routesDir = DEFAULT_ROUTES_DIR) {
+	const route = findRoute(routeId, routesDir);
+	if (!route) return result(`Route "${routeId}" not found.`, 1);
+	const stage = findStage(route, stageName);
+	if (!stage) return result(`Stage "${stageName}" not found in route ${routeId}.`, 1);
+
+	const lp = routeLedgerPath(targetRoot, routeId);
+	const rec = appendLedgerRecord(lp, {
+		schemaVersion: 2,
+		kind: "approved",
+		approvalState: "approved",
+		approvalKey: `${routeId}:${stageName}`,
+		routeId,
+		stageName,
+		reviewer: reviewer || "unknown",
+		recordedAt: new Date().toISOString(),
+		executesAnything: false,
+	});
+	return result(
+		`Approved stage ${stageName} in ${routeId} (approvalKey ${rec.approvalKey}). ` +
+			`Now run: amber route test ${routeId} --execute --stage ${stageName}`,
+	);
+}
+
+function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_ROUTES_DIR) {
+	const route = findRoute(routeId, routesDir);
+	if (!route) return { text: `Route "${routeId}" not found.`, errors: [`Route "${routeId}" not found.`], exitCode: 1 };
+	const stage = findStage(route, stageName);
+	if (!stage) return { text: `Stage "${stageName}" not found.`, errors: [`Stage "${stageName}" not found in route ${routeId}.`], exitCode: 1 };
+	if (stage.type !== "command") {
+		const msg = `Only command stages can be executed; "${stageName}" is type "${stage.type}".`;
+		return { text: msg, errors: [msg], exitCode: 1 };
+	}
+
+	const lp = routeLedgerPath(targetRoot, routeId);
+	const outcome = runGovernedCommand({
+		target: targetRoot,
+		command: stage.target,
+		ledgerPath: lp,
+		budgetMinutes: 5,
+		subject: { routeId, stageName },
+		label: `${routeId}:${stageName}`,
+	});
+	if (outcome.errors.length > 0) {
+		return { text: outcome.errors.join("\n"), errors: outcome.errors, exitCode: 1 };
+	}
+	return {
+		text: `Executed ${routeId}/${stageName} -> exit ${outcome.exitCode}. Ledger: .amber/routes/${routeId}/ledger.jsonl`,
+		errors: [],
+		exitCode: 0,
+	};
+}
+
+function verifyRouteLedger(routeId, targetRoot) {
+	const lp = path.join(resolveStateDirForRead(targetRoot), "routes", routeId, "ledger.jsonl");
+	if (!fs.existsSync(lp)) return result(`No ledger found for route ${routeId}.`, 1);
+	const v = verifyLedgerChain(lp);
+	if (v.intact) return result(`Ledger intact (${v.records} records).`);
+	return result(codedError("AMBER_E_LEDGER_TAMPERED", `broken at record ${v.brokenAt}: ${v.reason}`), 1);
+}
+
+module.exports = {
+	listRoutes,
+	inspectRoute,
+	validateRouteFile,
+	testRoute,
+	approveRouteStage,
+	executeRouteStage,
+	verifyRouteLedger,
+	routeLedgerPath,
+};
