@@ -424,6 +424,7 @@ function handleGovernance(args) {
     auditGovernance,
     inspectGovernanceReadinessCommand,
     mapStandardsCommand,
+    governanceRulesCommand,
   } = require("./governance-commands");
 
   if (action === "docs")     return { result: createGovernanceDocs(args.target) };
@@ -432,7 +433,8 @@ function handleGovernance(args) {
   if (action === "audit")    return { result: auditGovernance(args.target, { output: args.output, since: args.since }) };
   if (action === "readiness") return { result: inspectGovernanceReadinessCommand(args.target, { output: args.output }) };
   if (action === "standards") return { result: mapStandardsCommand(args.target, { framework: args.framework, json: args.json }) };
-  return { result: unknownAction("governance", ["docs", "evidence", "policy", "audit", "readiness", "standards"]) };
+  if (action === "rules")    return { result: governanceRulesCommand(args._?.[1], args.target, { command: args.command, json: args.json }) };
+  return { result: unknownAction("governance", ["docs", "evidence", "policy", "audit", "readiness", "standards", "rules"]) };
 }
 
 function handleExecution(args) {
