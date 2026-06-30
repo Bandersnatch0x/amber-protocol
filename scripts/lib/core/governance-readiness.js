@@ -6,6 +6,7 @@ const { inspectPolicy } = require("./governance");
 const { readJsonSafe } = require("./fs-utils");
 const { loadRoutes } = require("../route-loader");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
+const { verifyLedgerChain } = require("./loop-ledger");
 
 const GOVERNANCE_DOCS = [
 	"POLICY.md",
@@ -319,6 +320,29 @@ function collectFindings(sections) {
 			"No session or execution evidence found for audit review.",
 		));
 	}
+	// GLX (governed execution) controls.
+	if (sections.glx.rulesMissing) {
+		findings.push(finding(
+			"warning",
+			"missing-governance-rules",
+			"No .amber/governance/rules.json found; governed execution will use built-in defaults.",
+		));
+	}
+	if (sections.glx.unsafeDefaultAllow) {
+		findings.push(finding(
+			"error",
+			"unsafe-default-allow",
+			"rules.json defaultAction=allow is unsafe — unlisted commands would be permitted.",
+		));
+	}
+	for (const t of sections.glx.tamperedLedgers) {
+		findings.push(finding(
+			"error",
+			"ledger-tampered",
+			`Hash-chain ledger tampered: ${t.home}/${t.id} (broken at record ${t.brokenAt}: ${t.reason})`,
+			t,
+		));
+	}
 
 	return findings;
 }
@@ -347,11 +371,46 @@ function buildNextActions(findings) {
 		"missing-security-standard": "Restore standards/security-governance.json before relying on security packs.",
 		"security-pack-not-linked": "Link security workflow packs to the security-governance standard.",
 		"no-audit-evidence": "Run governed sessions and export evidence when work completes.",
+		"missing-governance-rules": "Run amber governance rules init --target <repo> to scaffold a safe-default policy.",
+		"unsafe-default-allow": "Set rules.json defaultAction to 'deny' — unlisted commands must not be permitted.",
+		"ledger-tampered": "Investigate the flagged ledger record; restore it from version control if it was edited.",
 	};
 	const actions = findings
 		.map((item) => actionsByFinding[item.id])
 		.filter(Boolean);
 	return [...new Set(actions)];
+}
+
+// GLX controls: is the declarative policy present and safe, and are all
+// hash-chain ledgers intact? A tampered ledger is a hard block (evidence is
+// unreliable); a missing/unsafe rules.json is a warning/block respectively.
+function inspectGlxControls(targetRoot) {
+	const stateDir = resolveStateDirForRead(targetRoot);
+	const rulesPath = path.join(stateDir, "governance", "rules.json");
+	const rulesMissing = !fs.existsSync(rulesPath);
+	let unsafeDefaultAllow = false;
+	if (!rulesMissing) {
+		try {
+			const parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
+			if (parsed && parsed.defaultAction === "allow") unsafeDefaultAllow = true;
+		} catch {
+			/* unparseable rules.json counts as missing for readiness */
+		}
+	}
+
+	// Scan every hash-chain ledger home for tampering.
+	const tamperedLedgers = [];
+	for (const home of ["loops", "routes", "sessions"]) {
+		const homeDir = path.join(stateDir, home);
+		if (!fs.existsSync(homeDir)) continue;
+		for (const sub of fs.readdirSync(homeDir)) {
+			const ledgerPath = path.join(homeDir, sub, "ledger.jsonl");
+			if (!fs.existsSync(ledgerPath)) continue;
+			const v = verifyLedgerChain(ledgerPath);
+			if (!v.intact) tamperedLedgers.push({ home, id: sub, brokenAt: v.brokenAt, reason: v.reason });
+		}
+	}
+	return { rulesMissing, unsafeDefaultAllow, tamperedLedgers };
 }
 
 function inspectGovernanceReadiness(targetRoot) {
@@ -364,6 +423,7 @@ function inspectGovernanceReadiness(targetRoot) {
 		workflowPacks,
 		security: inspectSecurityGovernance(target, workflowPacks),
 		evidence: inspectAuditEvidence(target),
+		glx: inspectGlxControls(target),
 	};
 	const findings = collectFindings(sections);
 	const decision = decideReadiness(findings);
@@ -449,6 +509,7 @@ function writeReadinessMarkdown(result, outputPath) {
 module.exports = {
 	GOVERNANCE_DOCS,
 	inspectGovernanceReadiness,
+	inspectGlxControls,
 	renderReadinessText,
 	renderReadinessMarkdown,
 	writeReadinessMarkdown,
