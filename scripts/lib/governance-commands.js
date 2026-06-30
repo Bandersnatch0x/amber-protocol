@@ -252,7 +252,8 @@ function mapStandardsCommand(target, options = {}) {
       risk.amberControls && risk.amberControls.length
         ? ` — ${risk.amberControls.join("; ")}`
         : "";
-    lines.push(`  ${risk.id} ${risk.title}: ${risk.amberCoverage}${ctrl}`);
+    const status = risk.present ? " [PRESENT]" : " [absent]";
+    lines.push(`  ${risk.id} ${risk.title}: ${risk.amberCoverage}${status}${ctrl}`);
   }
   lines.push("", `Note: ${result.disclaimer}`);
   return { ...result, text: lines.join("\n") };

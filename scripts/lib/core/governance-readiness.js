@@ -484,6 +484,10 @@ function renderReadinessMarkdown(result) {
 	lines.push(`- Security standard present: ${result.sections.security.standardExists ? "yes" : "no"}`);
 	lines.push(`- Sessions: ${result.sections.evidence.sessionCount}`);
 	lines.push(`- Executions: ${result.sections.evidence.executionCount}`);
+	const glx = result.sections.glx || {};
+	const glxRulesStatus = glx.rulesMissing ? "missing" : glx.unsafeDefaultAllow ? "unsafe (defaultAction=allow)" : "present (safe)";
+	lines.push(`- GLX rules: ${glxRulesStatus}`);
+	lines.push(`- GLX tampered ledgers: ${(glx.tamperedLedgers || []).length}`);
 	lines.push("");
 
 	lines.push("## Next Actions", "");
