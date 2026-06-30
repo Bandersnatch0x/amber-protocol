@@ -18,6 +18,7 @@
       "risk": "An agent invokes tools/commands in dangerous ways.",
       "amberCoverage": "partial",
       "amberControls": ["governed.command policy gate denies dangerous commands (deny-wins, default-deny)"],
+      "control": "hasDenyRule",
       "note": "Covers the command a governed loop may run; no runtime wrapping of arbitrary tool calls."
     },
     {
@@ -34,6 +35,7 @@
       "risk": "Compromised tools or sub-agents inject malicious behaviour.",
       "amberCoverage": "partial",
       "amberControls": ["rules.json allow-list pins the exact commands a governed loop may run"],
+      "control": "hasAllowRule",
       "note": "No SBOM or dependency vulnerability scanning."
     },
     {
@@ -50,6 +52,7 @@
       "risk": "Persistent state is manipulated to corrupt future decisions.",
       "amberCoverage": "partial",
       "amberControls": ["hash-chain ledger gives tamper detection for governance/execution records"],
+      "control": "hasHashChainLedger",
       "note": "Detection, not prevention; no memory-store sandbox. See ledger limitation in the design spec."
     },
     {
@@ -77,6 +80,7 @@
         "approval gate forces an explicit human sign-off before any governed execution",
         "tamper-evident ledger records who approved and what was executed"
       ],
+      "control": "hasApprovalRecord",
       "note": "Governance-time human control, not UI-level guardrails."
     },
     {

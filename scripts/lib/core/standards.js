@@ -19,21 +19,55 @@ function loadFramework(framework) {
 	return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
-// Which ASI ids does the target's own rules.json reference via rule.mapsTo?
-function referencedRiskIds(targetRoot) {
+// Inspect the ACTUAL governance controls deployed in the target repo (not just
+// labels). Each control backs one or more ASI risks; a risk is `present` only if
+// its specific control is genuinely in place. Runtime-only risks carry no
+// `control` field and are therefore never present (Amber cannot deploy them).
+function inspectControls(targetRoot) {
 	const stateDir = resolveStateDirForRead(targetRoot);
 	const rulesPath = path.join(stateDir, "governance", "rules.json");
-	const ids = new Set();
-	if (!fs.existsSync(rulesPath)) return ids;
-	try {
-		const parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
-		for (const rule of parsed.rules || []) {
-			for (const id of rule.mapsTo || []) ids.add(id);
+
+	let rules = [];
+	if (fs.existsSync(rulesPath)) {
+		try {
+			const parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
+			if (parsed && Array.isArray(parsed.rules)) rules = parsed.rules;
+		} catch {
+			/* unparseable rules count as no rules */
 		}
-	} catch {
-		/* ignore unparseable rules */
 	}
-	return ids;
+	const hasDenyRule = rules.some((r) => r && r.action === "deny");
+	const hasAllowRule = rules.some((r) => r && r.action === "allow");
+
+	// Scan .amber/loops/*/ledger.jsonl for ledger + approval evidence.
+	const loopsDir = path.join(stateDir, "loops");
+	let hasHashChainLedger = false;
+	let hasApprovalRecord = false;
+	if (fs.existsSync(loopsDir)) {
+		for (const contract of fs.readdirSync(loopsDir)) {
+			const ledgerPath = path.join(loopsDir, contract, "ledger.jsonl");
+			if (!fs.existsSync(ledgerPath)) continue;
+			const raw = fs.readFileSync(ledgerPath, "utf8");
+			const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+			if (lines.length > 0) hasHashChainLedger = true;
+			for (const line of lines) {
+				try {
+					if (JSON.parse(line).kind === "approved") hasApprovalRecord = true;
+				} catch {
+					/* skip unparseable ledger line */
+				}
+			}
+			if (hasApprovalRecord) break; // both flags are now true if applicable
+		}
+	}
+
+	return {
+		hasPolicyRules: rules.length > 0,
+		hasDenyRule,
+		hasAllowRule,
+		hasHashChainLedger,
+		hasApprovalRecord,
+	};
 }
 
 function mapStandards(targetRoot, framework = "owasp-agentic") {
@@ -43,13 +77,19 @@ function mapStandards(targetRoot, framework = "owasp-agentic") {
 	} catch (e) {
 		return { target: targetRoot, framework, risks: [], errors: [`Unknown framework: ${framework}`], warnings: [] };
 	}
-	const referenced = referencedRiskIds(targetRoot);
-	const risks = def.risks.map((r) => ({ ...r, present: referenced.has(r.id) }));
+	const controls = inspectControls(targetRoot);
+	const risks = def.risks.map((r) => {
+		// A risk is "present" only if it declares a control AND that control is deployed.
+		// Runtime-only risks (no `control` field) are never present.
+		const present = r.control ? Boolean(controls[r.control]) : false;
+		return { ...r, present };
+	});
 	return {
 		target: targetRoot,
 		framework: def.framework,
 		disclaimer: def.disclaimer,
 		source: def.source,
+		controls,
 		risks,
 		summary: {
 			governance: risks.filter((r) => r.amberCoverage === "governance").length,
@@ -61,4 +101,4 @@ function mapStandards(targetRoot, framework = "owasp-agentic") {
 	};
 }
 
-module.exports = { mapStandards, loadFramework };
+module.exports = { mapStandards, loadFramework, inspectControls };
