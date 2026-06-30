@@ -10,7 +10,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/npm/v/amber-protocol)
 
-**Status:** Stable | **Version:** 1.0.0 · [Milestones & test status →](./ROADMAP.md)
+**Status:** Stable | **Version:** 1.1.0 · [Milestones & test status →](./ROADMAP.md)
 
 Amber Protocol is a repository-local governance layer for AI-assisted engineering. When a team lets an AI agent work inside a repo, the hard parts are no longer writing the code — they're knowing what was done, whether it's safe to keep, how to hand it off, and how to prove it was reviewed. Amber makes those parts explicit: it prepares agent-facing context, records approvals and gates, verifies state with read-only checks, and produces handoff and audit artifacts — all as files inside your repository.
 
