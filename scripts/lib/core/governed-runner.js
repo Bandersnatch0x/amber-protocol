@@ -46,7 +46,9 @@ function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5
 	if (!fs.existsSync(path.join(targetRoot, ".git"))) {
 		return { target: targetRoot, errors: [codedError("AMBER_E_MISSING_PATH_ARG", "not a git repository")], warnings: [] };
 	}
-	const runId = `glx-${label}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+	// Sanitize the label for use as a git branch-name suffix (git forbids :, ~, ^, etc.).
+	const safeLabel = String(label).replace(/[^A-Za-z0-9._-]/g, "-");
+	const runId = `glx-${safeLabel}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
 	const wt = createWorktree(targetRoot, runId);
 	if (!wt.success) {
 		return { target: targetRoot, errors: [`Failed to create isolated worktree: ${wt.error}`], warnings: [] };
