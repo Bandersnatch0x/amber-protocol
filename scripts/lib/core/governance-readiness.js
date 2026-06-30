@@ -340,7 +340,7 @@ function collectFindings(sections) {
 			"error",
 			"ledger-tampered",
 			`Hash-chain ledger tampered: ${t.home}/${t.id} (broken at record ${t.brokenAt}: ${t.reason})`,
-			t,
+			{ ledgerHome: t.home, ledgerSub: t.id, brokenAt: t.brokenAt },
 		));
 	}
 
