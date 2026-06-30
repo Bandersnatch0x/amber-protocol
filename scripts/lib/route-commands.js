@@ -160,6 +160,7 @@ function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_R
 		budgetMinutes: 5,
 		subject: { routeId, stageName },
 		label: `${routeId}:${stageName}`,
+		contextRules: stage.rules,
 	});
 	if (outcome.errors.length > 0) {
 		return { text: outcome.errors.join("\n"), errors: outcome.errors, exitCode: 1 };
