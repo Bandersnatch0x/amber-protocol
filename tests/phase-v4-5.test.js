@@ -25,7 +25,7 @@ function preparedTarget(name) {
   const target = tempDir(name);
   assert.equal(runHarness(["init", "--target", target]).status, 0);
   assert.equal(runHarness(["plan", "--target", target, "--feature", "F001", "--title", "Agent slice"]).status, 0);
-  const plan = path.join("docs", "plans", "F001-agent-slice.md");
+  const plan = path.join("docs", "plans", "F001-Agent-slice.md");
   const planPath = path.join(target, plan);
   fs.writeFileSync(planPath, fs.readFileSync(planPath, "utf8").replace("User Confirmation: pending", "User Confirmation: confirmed"));
   assert.equal(runHarness(["task", "prepare", "--target", target, "--plan", plan, "--task", "slice-1"]).status, 0);

@@ -110,14 +110,14 @@ test("Governed Delivery: plan, gate, review, and session complete-check", () => 
 	]);
 	assert.equal(plan.status, 0, plan.stderr);
 
-	const planPath = path.join(target, "docs", "plans", "F001-small-slice.md");
+	const planPath = path.join(target, "docs", "plans", "F001-Small-slice.md");
 	assert.ok(fs.existsSync(planPath));
 
-	const gate = runAmber(["gate", "--target", target, "--plan", "docs/plans/F001-small-slice.md"]);
+	const gate = runAmber(["gate", "--target", target, "--plan", "docs/plans/F001-Small-slice.md"]);
 	assert.notEqual(gate.status, 0);
 	assert.match(gate.stdout, /User confirmation/);
 
-	const review = runAmber(["review", "--target", target, "--plan", "docs/plans/F001-small-slice.md"]);
+	const review = runAmber(["review", "--target", target, "--plan", "docs/plans/F001-Small-slice.md"]);
 	assert.notEqual(review.status, 0);
 	assert.match(review.stdout, /User confirmation/);
 

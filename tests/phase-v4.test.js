@@ -24,7 +24,7 @@ function runHarness(args) {
 function createConfirmedPlan(target) {
   assert.equal(runHarness(["init", "--target", target]).status, 0);
   assert.equal(runHarness(["plan", "--target", target, "--feature", "F001", "--title", "Isolated result"]).status, 0);
-  const plan = path.join("docs", "plans", "F001-isolated-result.md");
+  const plan = path.join("docs", "plans", "F001-Isolated-result.md");
   const planPath = path.join(target, plan);
   fs.writeFileSync(planPath, fs.readFileSync(planPath, "utf8").replace("User Confirmation: pending", "User Confirmation: confirmed"));
   return plan;
@@ -59,7 +59,7 @@ test("task prepare blocks unconfirmed plans", () => {
     "--target",
     target,
     "--plan",
-    "docs/plans/F001-blocked-result.md",
+    "docs/plans/F001-Blocked-result.md",
     "--task",
     "slice-1",
     "--json"
@@ -73,7 +73,7 @@ test("task prepare records trace-derived replay and regression proposal", () => 
   const target = tempDir("trace-regression");
   assert.equal(runHarness(["init", "--target", target]).status, 0);
   assert.equal(runHarness(["plan", "--target", target, "--feature", "F001", "--title", "Trace regression"]).status, 0);
-  const plan = "docs/plans/F001-trace-regression.md";
+  const plan = "docs/plans/F001-Trace-regression.md";
   const planPath = path.join(target, plan);
   fs.writeFileSync(planPath, fs.readFileSync(planPath, "utf8").replace("User Confirmation: pending", "User Confirmation: confirmed"));
 

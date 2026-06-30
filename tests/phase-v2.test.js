@@ -27,7 +27,7 @@ test("plan creates a feature-linked vertical-slice plan without overwriting", ()
 
   const result = runHarness(["plan", "--target", target, "--feature", "F001", "--title", "Starter customization"]);
   const second = runHarness(["plan", "--target", target, "--feature", "F001", "--title", "Starter customization"]);
-  const planPath = path.join(target, "docs", "plans", "F001-starter-customization.md");
+  const planPath = path.join(target, "docs", "plans", "F001-Starter-customization.md");
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(second.status, 0, second.stderr);
