@@ -85,6 +85,24 @@ function latestUnconsumedApproval(records) {
 	return open.length ? open[open.length - 1] : null;
 }
 
+// Walk all GLX ledger homes (loops / routes / sessions) and call cb({ home, sub, ledgerPath })
+// for each existing ledger.jsonl. Returns the count of ledgers walked. A single canonical
+// scan loop so standards.js and governance-readiness.js don't each duplicate it.
+function walkLedgers(stateDir, cb) {
+	let count = 0;
+	for (const home of ["loops", "routes", "sessions"]) {
+		const homeDir = path.join(stateDir, home);
+		if (!fs.existsSync(homeDir)) continue;
+		for (const sub of fs.readdirSync(homeDir)) {
+			const lp = path.join(homeDir, sub, "ledger.jsonl");
+			if (!fs.existsSync(lp)) continue;
+			count++;
+			cb({ home, sub, ledgerPath: lp });
+		}
+	}
+	return count;
+}
+
 module.exports = {
 	canonicalize,
 	hashRecord,
@@ -92,5 +110,6 @@ module.exports = {
 	appendLedgerRecord,
 	verifyLedgerChain,
 	latestUnconsumedApproval,
+	walkLedgers,
 	GENESIS,
 };

@@ -7,10 +7,7 @@ const { result } = require("./result");
 const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
 const { runGovernedCommand } = require("./core/governed-runner");
 const { codedError } = require("./core/error-catalog");
-const {
-	resolveStateDirForRead,
-	resolveStateDirForCreate,
-} = require("./state-dir-resolver");
+const { resolveStateDirForCreate } = require("./state-dir-resolver");
 
 const DEFAULT_ROUTES_DIR = path.join(__dirname, "../../routes");
 
@@ -173,7 +170,7 @@ function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_R
 }
 
 function verifyRouteLedger(routeId, targetRoot) {
-	const lp = path.join(resolveStateDirForRead(targetRoot), "routes", routeId, "ledger.jsonl");
+	const lp = routeLedgerPath(targetRoot, routeId);
 	if (!fs.existsSync(lp)) return result(`No ledger found for route ${routeId}.`, 1);
 	const v = verifyLedgerChain(lp);
 	if (v.intact) return result(`Ledger intact (${v.records} records).`);
