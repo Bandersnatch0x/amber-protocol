@@ -39,10 +39,17 @@ jobs:
       - name: Scope package for GitHub Packages
         run: npm pkg set name="@bandersnatch0x/amber-protocol"
 
+      # Write GitHub Packages auth to .npmrc. NODE_AUTH_TOKEN from setup-node
+      # only covers registry.npmjs.org; GitHub Packages needs its own entry.
+      - name: Authenticate with GitHub Packages
+        run: |
+          echo "@bandersnatch0x:registry=https://npm.pkg.github.com" >> .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${NPM_GH_TOKEN}" >> .npmrc
+        env:
+          NPM_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish to GitHub Packages
         run: npm publish --registry=https://npm.pkg.github.com
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Restore the unscoped name after publishing so the working tree is clean.
       - name: Restore package name
