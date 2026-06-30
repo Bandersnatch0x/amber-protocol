@@ -170,11 +170,30 @@ node scripts/amber.js governance audit \
 
 Honest, read-only coverage report of Amber's governance controls against the OWASP Top 10 for
 Agentic Applications 2026 (ASI01–ASI10). Amber is a static layer, so most ASI risks are reported as
-`out-of-scope` (runtime-only) rather than overclaimed as covered.
+`out-of-scope` (runtime-only) rather than overclaimed as covered. Each risk's `present` flag reflects
+whether its *specific* control is actually deployed in the target repo (a deny rule for ASI02, an
+allow rule for ASI04, a non-empty hash-chain ledger for ASI06, an approval record for ASI09) — not
+just a label.
 
 ```bash
 node scripts/amber.js governance standards --target . --framework owasp-agentic
 node scripts/amber.js governance standards --target . --json
+```
+
+### governance rules
+
+Scaffold and inspect the declarative command policy (`.amber/governance/rules.json`) that the
+governed-execution policy gate uses. All subcommands are read-only or idempotent scaffolding.
+
+```bash
+# write safe defaults (deny-wins / default-deny); skips if rules.json already exists
+node scripts/amber.js governance rules init --target .
+
+# show the active policy surface (rules.json, or built-in defaults if absent)
+node scripts/amber.js governance rules inspect --target .
+
+# try a command against the policy without executing it (read-only verdict)
+node scripts/amber.js governance rules check --target . --command "rm -rf /tmp/x"
 ```
 
 ## Maintenance Commands
