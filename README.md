@@ -34,6 +34,31 @@ npm install
 node scripts/amber.js --version
 ```
 
+### From GitHub Packages
+
+Amber Protocol is also published as a scoped package on GitHub Packages
+(`@bandersnatch0x/amber-protocol`). Consuming it requires a one-time `.npmrc`
+setup:
+
+```bash
+# 1. Create a GitHub PAT with read:packages scope at https://github.com/settings/tokens
+
+# 2. Copy the template and replace the token
+cp .github/npmrc-github-packages .npmrc
+# Edit .npmrc: replace ${GITHUB_TOKEN} with your PAT
+
+# 3. Install
+npm install -g @bandersnatch0x/amber-protocol
+amber --version
+```
+
+Other `@bandersnatch0x/*` packages (if any are added as dependencies) will also
+resolve from GitHub Packages automatically.
+
+For CI (GitHub Actions), `secrets.GITHUB_TOKEN` is available automatically — the
+publish workflow (`.github/workflows/publish-github-packages.yml`) builds the
+`.npmrc` on the fly.
+
 ## Quick Start
 
 Bring Amber into an existing repository in three safe steps:

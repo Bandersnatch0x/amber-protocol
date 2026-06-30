@@ -1,0 +1,49 @@
+name: Publish to GitHub Packages
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: # manual trigger for testing
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish @bandersnatch0x/amber-protocol
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Validate package contents
+        run: npm pack --dry-run
+
+      # GitHub Packages requires scoped package names.
+      # Temporarily scope the name for publication — the source stays unscoped.
+      - name: Scope package for GitHub Packages
+        run: npm pkg set name="@bandersnatch0x/amber-protocol"
+
+      - name: Publish to GitHub Packages
+        run: npm publish --registry=https://npm.pkg.github.com
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Restore the unscoped name after publishing so the working tree is clean.
+      - name: Restore package name
+        run: npm pkg set name="amber-protocol"
