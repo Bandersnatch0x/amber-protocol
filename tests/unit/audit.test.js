@@ -143,7 +143,7 @@ test("buildAuditUnknowns formats parse issues and candidate-command notices in o
 		buildAuditUnknowns([], [], [], [{ command: "python -m pytest" }]),
 		[
 			"No package, test, build, or verification command detected.",
-			"Python candidate verification commands require confirmation before being treated as project commands.",
+			"Candidate verification commands require confirmation before being treated as project commands.",
 		],
 	);
 	// All four channels together preserve insertion order: missing-cmd, parse,
@@ -159,7 +159,7 @@ test("buildAuditUnknowns formats parse issues and candidate-command notices in o
 			"No package, test, build, or verification command detected.",
 			"p could not be parsed: m",
 			"Tooling evidence found (x), but the exact verification command is unknown.",
-			"Python candidate verification commands require confirmation before being treated as project commands.",
+			"Candidate verification commands require confirmation before being treated as project commands.",
 		],
 	);
 });
@@ -168,7 +168,7 @@ test("buildAuditUnknowns emits only the candidate notice when a command exists b
 	assert.deepEqual(
 		buildAuditUnknowns([{ command: "x" }], [], [], [{ command: "c" }]),
 		[
-			"Python candidate verification commands require confirmation before being treated as project commands.",
+			"Candidate verification commands require confirmation before being treated as project commands.",
 		],
 	);
 });

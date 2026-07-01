@@ -15,6 +15,10 @@ const {
 } = require("./fs-utils");
 
 const {
+	TEMPLATE_ROOT,
+} = require("./constants");
+
+const {
 	compareSemver,
 	latestTeamVersion,
 	loadTeamLock,
@@ -35,12 +39,42 @@ function listWikiMarkdownFiles(targetRoot) {
 	return walkFiles(wikiRoot).filter((filePath) => filePath.endsWith(".md"));
 }
 
+// An init-generated wiki file that still matches its template byte-for-byte is an
+// unfilled placeholder, not a reviewed doc that has gone stale. Flagging all of
+// them the moment `init` runs produces pure noise (a fresh install reports every
+// wiki file as stale). We treat a file as a pristine placeholder only when its
+// bytes are identical to the shipped template; the moment a team edits it, it
+// re-enters staleness tracking and a missing/old Last Reviewed marker is fair game.
+function isUneditedWikiTemplate(targetRoot, filePath) {
+	const relativeFromWiki = relativeSlash(
+		path.join(targetRoot, "docs", "wiki"),
+		filePath,
+	);
+	const templatePath = path.join(
+		TEMPLATE_ROOT,
+		"docs",
+		"wiki",
+		...relativeFromWiki.split("/"),
+	);
+	if (!pathExists(templatePath)) {
+		return false;
+	}
+	try {
+		return readText(filePath) === readText(templatePath);
+	} catch {
+		return false;
+	}
+}
+
 function detectStaleDocs(projectRoot, thresholdDays = 180) {
 	const now = Date.now();
 	const thresholdMs = thresholdDays * 24 * 60 * 60 * 1000;
 	const staleDocs = [];
 
 	for (const filePath of listWikiMarkdownFiles(projectRoot)) {
+		if (isUneditedWikiTemplate(projectRoot, filePath)) {
+			continue;
+		}
 		const content = readText(filePath);
 		const relativePath = relativeSlash(projectRoot, filePath);
 		const match = content.match(/^Last Reviewed:\s*(\d{4}-\d{2}-\d{2})\s*$/m);

@@ -173,7 +173,7 @@ function doctor(target, options = {}) {
 		errors.push("CLAUDE.md does not route agents to docs/wiki.");
 	}
 	addCheck("CLAUDE.md → wiki routing", !claudeExists || claudeRoutesWiki,
-		!claudeExists ? "CLAUDE.md not present" : claudeRoutesWiki ? "routes to wiki" : "missing wiki routing");
+		!claudeExists ? "CLAUDE.md not present (routing check skipped)" : claudeRoutesWiki ? "routes to wiki" : "missing wiki routing");
 
 	// Verification command
 	const hasVerify = hasVerificationCommand(targetRoot);
