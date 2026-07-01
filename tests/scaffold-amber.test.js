@@ -147,7 +147,7 @@ test("audit suggests Python candidate verification commands without confirming t
     ["python -m pytest", "python -m ruff check ."]
   );
   assert.ok(result.candidateCommands.every((command) => command.confidence === "candidate"));
-  assert.ok(result.unknowns.some((unknown) => /candidate verification commands require confirmation/.test(unknown)));
+  assert.ok(result.unknowns.some((unknown) => /candidate verification commands require confirmation/i.test(unknown)));
 });
 
 test("audit reports invalid package json as an unknown without commands", () => {

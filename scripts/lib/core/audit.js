@@ -67,6 +67,8 @@ function detectToolingEvidence(targetRoot) {
 		{ source: "bun.lockb", name: "bun" },
 		{ source: "pyproject.toml", name: "python" },
 		{ source: "requirements.txt", name: "python" },
+		{ source: "go.mod", name: "go" },
+		{ source: "Cargo.toml", name: "rust" },
 	];
 
 	return candidates.filter((candidate) =>
@@ -130,31 +132,90 @@ function buildPythonCandidates({
 	return candidateCommands;
 }
 
+// Pure decision core for Go candidates. `go.mod` is enough to propose the
+// standard `go test ./...`; a Wails project (wails.json present) additionally
+// gets a `wails build` candidate. Both stay confidence:"candidate" — Amber
+// proposes, the project owner confirms.
+function buildGoCandidates({ hasWailsConfig }) {
+	const candidateCommands = [];
+	addCandidateCommand(candidateCommands, {
+		source: "go.mod",
+		name: "go-test",
+		command: "go test ./...",
+		confidence: "candidate",
+		reason:
+			"A go.mod was found, but the verification command must be confirmed by the project owner.",
+	});
+	if (hasWailsConfig) {
+		addCandidateCommand(candidateCommands, {
+			source: "wails.json",
+			name: "wails-build",
+			command: "wails build",
+			confidence: "candidate",
+			reason:
+				"A wails.json was found, but the build command must be confirmed by the project owner.",
+		});
+	}
+	return candidateCommands;
+}
+
+// Pure decision core for Rust candidates. A Cargo.toml is enough to propose the
+// standard `cargo test`; confirmation remains with the project owner.
+function buildRustCandidates() {
+	const candidateCommands = [];
+	addCandidateCommand(candidateCommands, {
+		source: "Cargo.toml",
+		name: "cargo-test",
+		command: "cargo test",
+		confidence: "candidate",
+		reason:
+			"A Cargo.toml was found, but the verification command must be confirmed by the project owner.",
+	});
+	return candidateCommands;
+}
+
 function detectCandidateCommands(targetRoot, toolingEvidence = []) {
-	const hasPythonEvidence = toolingEvidence.some(
-		(item) => item.name === "python",
-	);
-	if (!hasPythonEvidence) {
-		return [];
+	const hasEvidence = (name) =>
+		toolingEvidence.some((item) => item.name === name);
+
+	const candidateCommands = [];
+
+	if (hasEvidence("python")) {
+		const hasTestsDirectory =
+			pathExists(path.join(targetRoot, "tests")) ||
+			pathExists(path.join(targetRoot, "test"));
+		const hasPytestEvidence =
+			hasTestsDirectory ||
+			pathExists(path.join(targetRoot, "pytest.ini")) ||
+			fileContains(targetRoot, "requirements.txt", /^pytest(?:[<>=~! ]|$)/im) ||
+			fileContains(targetRoot, "pyproject.toml", /\[tool\.pytest/i);
+		const hasRuffEvidence =
+			fileContains(targetRoot, "requirements.txt", /^ruff(?:[<>=~! ]|$)/im) ||
+			fileContains(targetRoot, "pyproject.toml", /\[tool\.ruff/i);
+
+		for (const candidate of buildPythonCandidates({
+			hasTestsDirectory,
+			hasPytestEvidence,
+			hasRuffEvidence,
+		})) {
+			addCandidateCommand(candidateCommands, candidate);
+		}
 	}
 
-	const hasTestsDirectory =
-		pathExists(path.join(targetRoot, "tests")) ||
-		pathExists(path.join(targetRoot, "test"));
-	const hasPytestEvidence =
-		hasTestsDirectory ||
-		pathExists(path.join(targetRoot, "pytest.ini")) ||
-		fileContains(targetRoot, "requirements.txt", /^pytest(?:[<>=~! ]|$)/im) ||
-		fileContains(targetRoot, "pyproject.toml", /\[tool\.pytest/i);
-	const hasRuffEvidence =
-		fileContains(targetRoot, "requirements.txt", /^ruff(?:[<>=~! ]|$)/im) ||
-		fileContains(targetRoot, "pyproject.toml", /\[tool\.ruff/i);
+	if (hasEvidence("go")) {
+		const hasWailsConfig = pathExists(path.join(targetRoot, "wails.json"));
+		for (const candidate of buildGoCandidates({ hasWailsConfig })) {
+			addCandidateCommand(candidateCommands, candidate);
+		}
+	}
 
-	return buildPythonCandidates({
-		hasTestsDirectory,
-		hasPytestEvidence,
-		hasRuffEvidence,
-	});
+	if (hasEvidence("rust")) {
+		for (const candidate of buildRustCandidates()) {
+			addCandidateCommand(candidateCommands, candidate);
+		}
+	}
+
+	return candidateCommands;
 }
 
 function isLikelyDocumentation(relativePath) {
@@ -227,7 +288,7 @@ function buildAuditUnknowns(
 
 	if (candidateCommands.length > 0) {
 		unknowns.push(
-			"Python candidate verification commands require confirmation before being treated as project commands.",
+			"Candidate verification commands require confirmation before being treated as project commands.",
 		);
 	}
 
@@ -465,6 +526,8 @@ module.exports = {
 	addCandidateCommand,
 	detectCandidateCommands,
 	buildPythonCandidates,
+	buildGoCandidates,
+	buildRustCandidates,
 	isLikelyDocumentation,
 	listProjectDocs,
 	isWikiLike,

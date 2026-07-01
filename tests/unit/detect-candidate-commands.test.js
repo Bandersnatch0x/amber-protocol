@@ -95,3 +95,49 @@ test("pyproject.toml [tool.pytest.ini_options] is recognised as pytest evidence"
 	const candidates = detectCandidateCommands(root, PYTHON_EVIDENCE);
 	assert.equal(candidates[0].name, "pytest");
 });
+
+const GO_EVIDENCE = [{ source: "go.mod", name: "go" }];
+const RUST_EVIDENCE = [{ source: "Cargo.toml", name: "rust" }];
+
+test("go evidence yields a go test candidate sourced from go.mod", () => {
+	const root = tempTarget();
+	const candidates = detectCandidateCommands(root, GO_EVIDENCE);
+	assert.equal(candidates.length, 1);
+	assert.equal(candidates[0].name, "go-test");
+	assert.equal(candidates[0].command, "go test ./...");
+	assert.equal(candidates[0].source, "go.mod");
+	assert.equal(candidates[0].confidence, "candidate");
+});
+
+test("a wails.json alongside go.mod adds a wails build candidate", () => {
+	const root = tempTarget();
+	write(root, "wails.json", "{\n  \"name\": \"app\"\n}\n");
+	const candidates = detectCandidateCommands(root, GO_EVIDENCE);
+	assert.deepEqual(
+		candidates.map((c) => c.name),
+		["go-test", "wails-build"],
+	);
+	assert.equal(candidates[1].command, "wails build");
+	assert.equal(candidates[1].source, "wails.json");
+});
+
+test("rust evidence yields a cargo test candidate sourced from Cargo.toml", () => {
+	const root = tempTarget();
+	const candidates = detectCandidateCommands(root, RUST_EVIDENCE);
+	assert.equal(candidates.length, 1);
+	assert.equal(candidates[0].name, "cargo-test");
+	assert.equal(candidates[0].command, "cargo test");
+	assert.equal(candidates[0].source, "Cargo.toml");
+	assert.equal(candidates[0].confidence, "candidate");
+});
+
+test("mixed go + python evidence accumulates candidates from both languages", () => {
+	const root = tempTarget();
+	const candidates = detectCandidateCommands(root, [
+		...PYTHON_EVIDENCE,
+		...GO_EVIDENCE,
+	]);
+	const names = candidates.map((c) => c.name);
+	assert.ok(names.includes("pytest"));
+	assert.ok(names.includes("go-test"));
+});
