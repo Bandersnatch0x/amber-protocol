@@ -79,6 +79,13 @@ describe("session-commands", () => {
 			assert.ok(fs.existsSync(path.join(sessionDir, "timeline.jsonl")));
 		});
 
+		it("falls back to feature-standard with a warning when no route matches", async () => {
+			const result = await startSession(TEST_ROOT, { goal: "tweak the footer" });
+			assert.strictEqual(result.exitCode, 0);
+			assert.ok(result.sessionId);
+			assert.match(result.text, /defaulting to feature-standard/);
+		});
+
 		it("writes a valid manifest with created status", async () => {
 			const result = await startSession(TEST_ROOT, {
 				goal: "test",
