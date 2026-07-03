@@ -1,6 +1,5 @@
 # Amber Protocol
 
-
 [简体中文](./README.zh-CN.md)
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
@@ -12,10 +11,56 @@
 
 **Status:** Stable | **Version:** 1.1.0 · [Milestones & test status →](./ROADMAP.md)
 
-Amber Protocol is a repository-local governance layer for AI-assisted engineering. When a team lets an AI agent work inside a repo, the hard parts are no longer writing the code — they're knowing what was done, whether it's safe to keep, how to hand it off, and how to prove it was reviewed. Amber makes those parts explicit: it prepares agent-facing context, records approvals and gates, verifies state with read-only checks, and produces handoff and audit artifacts — all as files inside your repository.
+**Make AI coding sessions reviewable, gated, and handoff-ready.**
+
+[Getting started](./docs/user-guide/getting-started.md) · [CLI reference](./docs/CLI_REFERENCE.md) · [Governance model](./docs/architecture/governance-model.md) · [Examples](./docs/examples/README.md) · [Roadmap](./ROADMAP.md)
+
+## What is Amber?
+
+Amber Protocol is a repository-local governance layer for AI-assisted engineering. When a team lets an AI agent work inside a repo, the hard parts are no longer just writing the code. The hard parts are knowing what was done, whether it is safe to keep, how to hand it off, and how to prove it was reviewed.
+
+Amber makes those parts explicit: it prepares agent-facing context, records approvals and gates, verifies state with read-only checks, and produces handoff and audit artifacts as files inside your repository.
 
 It is deliberately conservative. Amber creates review artifacts, dry-run plans, and approval records. It does **not** run dynamic workflows, invoke live subagents, execute your project's commands, or rewrite your existing docs.
 
+## Why Amber?
+
+AI coding work becomes easier to trust when the workflow leaves inspectable evidence:
+
+- **Reviewable by default:** plans, gates, ledgers, and handoffs live in the repo instead of in a chat transcript.
+- **Dry-run first:** setup, audit, route, and loop commands expose intent before changing state.
+- **Human gates stay explicit:** approvals are records a reviewer can inspect, not hidden runtime assumptions.
+- **Agent context is local:** `AGENTS.md`, wiki files, feature plans, and session handoffs travel with the codebase.
+
+## Lifecycle map
+
+```text
+audit -> init -> plan -> gate -> verify -> approve -> handoff
+```
+
+| Stage | Command | What you get |
+| --- | --- | --- |
+| Inspect | `amber audit --target <repo> --summary` | Read-only readiness findings |
+| Install | `amber init --target <repo>` | Starter governance files without overwrites |
+| Plan | `amber plan --target <repo> --feature F001 --title "..."` | A feature plan and review surface |
+| Gate | `amber next --target <repo>` | The next safe lifecycle command |
+| Verify | `amber doctor --target <repo>` | Checks for required agent-facing surfaces |
+| Handoff | `amber handoff --target <repo>` | Session state another human or agent can continue |
+
+## Repository artifacts
+
+Amber is meant to be inspected as files:
+
+```text
+AGENTS.md
+CLAUDE.md
+feature_list.json
+PROGRESS.md
+session-handoff.md
+clean-state-checklist.md
+docs/wiki/
+.workflow/continuous-improvement/state.json
+```
 ## Installation
 
 ### From npm (Recommended)
