@@ -18,6 +18,7 @@ const { selectRoute } = require("./route-selector");
 const { loadRoutes } = require("./route-loader");
 const { result } = require("./result");
 const { ensureContinuitySurfaces } = require("./continuity-surfaces");
+const { writeRouteGates, writeGateDecision } = require("./gate-writer");
 const { writeJson } = require("./core/fs-utils");
 const { codedError } = require("./core/error-catalog");
 const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
@@ -129,8 +130,11 @@ async function startSession(projectRoot, options) {
 	let selectedRouteId = routeId;
 	let routeVersion = SCHEMA_VERSION;
 
+	// Load routes once — reused for version, goal-mismatch warning, and gate persistence.
+	const { routes } = loadRoutes(ROUTES_DIR);
+	let route;
+
 	if (!selectedRouteId) {
-		const { routes } = loadRoutes(ROUTES_DIR);
 		const match = selectRoute(goal, routes);
 
 		if (!match.matched) {
@@ -147,11 +151,10 @@ async function startSession(projectRoot, options) {
 		}
 
 		selectedRouteId = match.routeId;
-		const route = routes.find((r) => r.routeId === selectedRouteId);
-		routeVersion = route.version || "1.0.0";
+		route = routes.find((r) => r.routeId === selectedRouteId);
+		routeVersion = (route && route.version) || "1.0.0";
 	} else {
-		const { routes } = loadRoutes(ROUTES_DIR);
-		const route = routes.find((r) => r.routeId === selectedRouteId);
+		route = routes.find((r) => r.routeId === selectedRouteId);
 		if (!route) {
 			const routeList = routes.map((r) => `  ${r.routeId}`).join("\n");
 				return result(
@@ -166,21 +169,17 @@ async function startSession(projectRoot, options) {
 		// the route's own goalPattern — the session will work, but the route may
 		// not fit the stated intent.
 		let goalMismatchWarning = null;
-		if (routeId) {
-			const { routes: allRoutes } = loadRoutes(ROUTES_DIR);
-			const selected = allRoutes.find((r) => r.routeId === selectedRouteId);
-			if (selected && selected.trigger && selected.trigger.goalPattern) {
-				try {
-					const pattern = new RegExp(selected.trigger.goalPattern, "i");
-					if (!pattern.test(goal)) {
-						goalMismatchWarning =
-							`Warning: goal "${goal}" does not match the route pattern ` +
-							`"${selected.trigger.goalPattern}". The session will proceed ` +
-							`but the route may not fit the stated intent.`;
-					}
-				} catch (_) {
-					// Invalid goalPattern regex — skip the warning but don't crash.
+		if (routeId && route.trigger && route.trigger.goalPattern) {
+			try {
+				const pattern = new RegExp(route.trigger.goalPattern, "i");
+				if (!pattern.test(goal)) {
+					goalMismatchWarning =
+						`Warning: goal "${goal}" does not match the route pattern ` +
+						`"${route.trigger.goalPattern}". The session will proceed ` +
+						`but the route may not fit the stated intent.`;
 				}
+			} catch (_) {
+				// Invalid goalPattern regex — skip the warning but don't crash.
 			}
 		}
 
@@ -236,6 +235,19 @@ async function startSession(projectRoot, options) {
 		data: { sessionId: finalManifest.sessionId, goal },
 	});
 	await writer.close();
+
+	// Materialize route gates as pending .gate.json files for the web viewer.
+	if (route) {
+		const gateCount = writeRouteGates(sessionDir, finalManifest.sessionId, route);
+		const declared = (route.gates || []).length;
+		if (declared > 0 && gateCount < declared) {
+			lines.push("");
+			lines.push(
+				`Warning: ${declared - gateCount} of ${declared} route gates could not be written ` +
+				"(check route definition for invalid gate IDs).",
+			);
+		}
+	}
 
 	return {
 		text: lines.join("\n"),
@@ -479,8 +491,9 @@ async function verifySession(projectRoot, options) {
 	// Resolve the route definition to find verification stage metadata.
 	const { routes } = loadRoutes(ROUTES_DIR);
 	const route = routes.find((r) => r.routeId === manifest.route.id);
+	const stages = route && Array.isArray(route.stages) ? route.stages : [];
 	const verifyStage = route
-		? route.stages.find((s) => s.name === (stageName || "verify"))
+		? stages.find((s) => s.name === (stageName || "verify"))
 		: null;
 
 	const actualStageName = (verifyStage && verifyStage.name) || (stageName || "verify");
@@ -567,9 +580,30 @@ async function approveSession(projectRoot, options) {
 	const { routes } = loadRoutes(ROUTES_DIR);
 	const route = routes.find((r) => r.routeId === manifest.route.id);
 
-	const resolvedGateId = gateId || (route && route.gates.length === 1
-		? route.gates[0].id
-		: "user-approval");
+	const gates = route && Array.isArray(route.gates) ? route.gates : [];
+	if (!gateId && gates.length !== 1) {
+		if (gates.length === 0) {
+			return result(
+				`Error: route "${manifest.route.id}" has no gates to approve.`,
+				1,
+			);
+		}
+		return result(
+			`Error: route has ${gates.length} gates — specify one with --gate <id>.\n` +
+			`Available: ${gates.map((g) => g.id).join(", ")}`,
+			1,
+		);
+	}
+
+	if (gateId && !gates.some((g) => g.id === gateId)) {
+			return result(
+				`Error: gate "${gateId}" not found in route "${manifest.route.id}".\n` +
+				`Available: ${gates.map((g) => g.id).join(", ") || "(none)"}`,
+				1,
+			);
+		}
+
+		const resolvedGateId = gateId || gates[0].id;
 
 	// Record gate_passed event so complete-check can see it.
 	const timelinePath = path.join(sessionDir, "timeline.jsonl");
@@ -593,11 +627,20 @@ async function approveSession(projectRoot, options) {
 		recordedAt: new Date().toISOString(),
 	});
 
+	// Persist a .decision.json for the web viewer.
+	const isRealGate = gates.some((g) => g.id === resolvedGateId);
+	let gateWarning = null;
+	if (isRealGate) {
+		if (!writeGateDecision(sessionDir, resolvedGateId, "approved")) {
+			gateWarning = `Warning: could not write decision for gate "${resolvedGateId}".`;
+		}
+	}
+
 	// If all route gates have now been approved, complete the session.
 	const gateEvents = (
 		require("./timeline-reader").readTimeline(timelinePath)
 	).filter((e) => e.type === "gate_passed");
-	const routeGateIds = route ? route.gates.map((g) => g.id) : [];
+	const routeGateIds = gates.map((g) => g.id);
 	const allGatesPassed =
 		routeGateIds.length > 0 &&
 		routeGateIds.every((id) =>
@@ -634,8 +677,8 @@ async function approveSession(projectRoot, options) {
 	];
 	if (allGatesPassed) {
 		lines.push("All gates passed — session marked completed.");
-	} else if (route && route.gates.length > 1) {
-		const pending = route.gates.filter(
+	} else if (gates.length > 1) {
+		const pending = gates.filter(
 			(g) =>
 				!gateEvents.some(
 					(e) => e.data && e.data.gateId === g.id,
@@ -644,6 +687,9 @@ async function approveSession(projectRoot, options) {
 		lines.push(
 			`Pending gates: ${pending.map((g) => g.id).join(", ")}`,
 		);
+	}
+	if (gateWarning) {
+		lines.push(gateWarning);
 	}
 	lines.push(
 		"",

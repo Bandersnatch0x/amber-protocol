@@ -8,6 +8,7 @@ const {
 	statusSession,
 	listSessions,
 	abortSession,
+	approveSession,
 } = require("../../scripts/lib/session-commands");
 
 const TEST_ROOT = path.join(__dirname, "../fixtures/session-test-repo");
@@ -272,6 +273,77 @@ describe("session-commands", () => {
 			const result = await abortSession(TEST_ROOT, {});
 
 			assert.notEqual(result.exitCode, 0);
+		});
+	});
+
+	describe("gate persistence", () => {
+		function gatesDir(sessionId) {
+			return path.join(
+				TEST_ROOT,
+				".amber",
+				"sessions",
+				sessionId,
+				"gates",
+			);
+		}
+
+		it("materializes route gates as pending .gate.json files on start", async () => {
+			const start = await startSession(TEST_ROOT, {
+				goal: "test",
+				route: "feature-standard",
+			});
+
+			// feature-standard declares two user-approval gates; each must be
+			// written as a pending definition (no decision file yet) so the web
+			// viewer can list them.
+			const dir = gatesDir(start.sessionId);
+			assert.ok(fs.existsSync(dir));
+
+			const planPath = path.join(dir, "user-approval-plan.gate.json");
+			const implPath = path.join(dir, "user-approval-implement.gate.json");
+			assert.ok(fs.existsSync(planPath));
+			assert.ok(fs.existsSync(implPath));
+
+			const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
+			assert.strictEqual(plan.gateId, "user-approval-plan");
+			assert.strictEqual(plan.sessionId, start.sessionId);
+			assert.strictEqual(plan.type, "user-approval");
+			// stage is resolved from the stage whose gateAfter points at this gate.
+			assert.strictEqual(plan.stage, "capture");
+			assert.ok(plan.description);
+			assert.ok(plan.triggeredAt);
+
+			// No decision yet → the web reads these as "pending".
+			assert.ok(!fs.existsSync(path.join(dir, "user-approval-plan.decision.json")));
+		});
+
+		it("writes a .decision.json when a gate is approved", async () => {
+			const start = await startSession(TEST_ROOT, {
+				goal: "test",
+				route: "feature-standard",
+			});
+
+			const result = await approveSession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				gate: "user-approval-plan",
+			});
+			assert.strictEqual(result.exitCode, 0);
+
+			const decisionPath = path.join(
+				gatesDir(start.sessionId),
+				"user-approval-plan.decision.json",
+			);
+			assert.ok(fs.existsSync(decisionPath));
+
+			const decision = JSON.parse(fs.readFileSync(decisionPath, "utf8"));
+			assert.strictEqual(decision.decision, "approved");
+			assert.strictEqual(decision.resolvedBy, "human");
+			assert.ok(decision.resolvedAt);
+
+			// The other gate stays pending — no decision file.
+			assert.ok(!fs.existsSync(
+				path.join(gatesDir(start.sessionId), "user-approval-implement.decision.json"),
+			));
 		});
 	});
 });

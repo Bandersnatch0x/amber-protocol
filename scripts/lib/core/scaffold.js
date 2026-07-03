@@ -31,15 +31,30 @@ function listTemplateFiles(templateRoot = TEMPLATE_ROOT) {
 	}));
 }
 
+// Agent doc files that Amber should back up before skipping, so the user
+// retains a copy of their original content for manual merge.
+const AGENT_DOC_FILES = new Set(["AGENTS.md", "CLAUDE.md"]);
+
 function copyTemplateFiles(targetRoot, items, options = {}) {
 	const dryRun = Boolean(options.dryRun);
 	const created = [];
 	const skipped = [];
+	const backups = [];
 
 	for (const item of items) {
 		const destination = path.join(targetRoot, item.relativePath);
 		if (pathExists(destination)) {
 			skipped.push(item.relativePath);
+
+			// Create a .bak backup for agent doc files so the user can
+			// compare the original with the Amber template after init.
+			if (AGENT_DOC_FILES.has(item.relativePath)) {
+				const bakPath = destination + ".bak";
+				if (!pathExists(bakPath) && !dryRun) {
+					fs.copyFileSync(destination, bakPath);
+				}
+				backups.push(item.relativePath);
+			}
 			continue;
 		}
 
@@ -50,7 +65,7 @@ function copyTemplateFiles(targetRoot, items, options = {}) {
 		}
 	}
 
-	return { created, skipped };
+	return { created, skipped, backups };
 }
 
 function checkGitignoreConflicts(targetRoot, createdFiles) {
@@ -90,13 +105,21 @@ function checkGitignoreConflicts(targetRoot, createdFiles) {
 
 // Warnings raised by an install: CLAUDE.md changes agent behavior immediately,
 // and .gitignore rules can hide governance files from the team.
-function buildScaffoldWarnings(targetRoot, created, options) {
+function buildScaffoldWarnings(targetRoot, created, backups, options) {
 	const warnings = [];
 
 	if (created.some((f) => f === "CLAUDE.md")) {
 		warnings.push(
 			"CLAUDE.md was created. Claude Code will read it on the next session " +
 				"and follow its instructions — review it before your next chat.",
+		);
+	}
+
+	if (backups.length > 0) {
+		warnings.push(
+			`${backups.length} existing agent doc(s) backed up as .bak: ` +
+				backups.join(", ") +
+				". Compare with the Amber template and merge manually.",
 		);
 	}
 
@@ -191,7 +214,7 @@ function scaffoldHarness(target, options = {}) {
 	const result = copyTemplateFiles(targetRoot, items, options);
 
 	const created = result.created;
-	const warnings = buildScaffoldWarnings(targetRoot, created, options);
+	const warnings = buildScaffoldWarnings(targetRoot, created, result.backups, options);
 
 	const { wikiReadiness, detection } = gatherInitInsights(targetRoot, options);
 	const nextSteps = buildInitNextSteps(created, wikiReadiness, detection);
@@ -209,6 +232,7 @@ function scaffoldHarness(target, options = {}) {
 		target: targetRoot,
 		created: result.created,
 		skipped: result.skipped,
+		backups: result.backups,
 		wikiReadiness,
 		detection,
 		warnings,
