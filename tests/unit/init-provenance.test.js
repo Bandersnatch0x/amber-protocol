@@ -58,3 +58,29 @@ test("init on a pre-existing install without provenance migrates with inferred:t
 	assert.equal(p.provenanceInferred, true, "pre-existing install stamped inferred");
 	fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("first init with a pre-existing CONTROLLED file marks provenance inferred (data-loss guard)", () => {
+	const dir = freshTarget();
+	// User pre-created a CONTROLLED reference doc with their own content.
+	fs.mkdirSync(path.join(dir, "docs/wiki"), { recursive: true });
+	fs.writeFileSync(path.join(dir, "docs/wiki/glossary.md"), "my custom glossary terms\n");
+	scaffoldHarness(dir, {});
+	const p = loadProvenance(dir);
+	assert.ok(p, "provenance written");
+	// Other files were created (created.length > 0), but a controlled file was
+	// skipped → inferred must be true so the detector later treats that file as
+	// ambiguous, never stale, and refresh never overwrites it.
+	assert.equal(p.provenanceInferred, true, "pre-existing controlled file forces inferred");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("first init with only a pre-existing AUTHORED file stays inferred:false", () => {
+	const dir = freshTarget();
+	// Only an authored starter pre-exists (the common case) — controlled files
+	// are all created fresh, so the baseline is reliable.
+	fs.writeFileSync(path.join(dir, "AGENTS.md"), "pre-existing agents\n");
+	scaffoldHarness(dir, {});
+	const p = loadProvenance(dir);
+	assert.equal(p.provenanceInferred, false, "authored-only pre-existing stays reliable");
+	fs.rmSync(dir, { recursive: true, force: true });
+});

@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const {
 	TEMPLATE_ROOT,
+	AMBER_CONTROLLED_CONTENT_FILES,
 	WIKI_CONTEXT_STARTER_FILES,
 } = require("./constants");
 
@@ -234,12 +235,21 @@ function scaffoldHarness(target, options = {}) {
 	// provenance already exists we leave it untouched (re-running init is
 	// idempotent and never resets the drift baseline). A pre-existing install with
 	// no provenance (created.length === 0) gets an inferred migration baseline.
+	// A pre-existing CONTROLLED file (user-authored content in a reference doc
+	// Amber owns) cannot be distinguished from a pristine old template at first
+	// init — its current bytes get hashed as the baseline. Treat such installs as
+	// inferred so the detector refuses to call the file "stale" and refresh never
+	// clobbers the user's content. Authored files pre-existing (AGENTS.md, etc.)
+	// do NOT trigger this: they are never overwritten by refresh regardless.
+	const skippedControlled = result.skipped.some((rel) =>
+		AMBER_CONTROLLED_CONTENT_FILES.has(rel),
+	);
 	if (!options.dryRun) {
 		const { loadProvenance, buildProvenance, writeProvenance } = require("./scaffold-provenance");
 		if (!loadProvenance(targetRoot)) {
 			writeProvenance(
 				targetRoot,
-				buildProvenance(targetRoot, { inferred: created.length === 0 }),
+				buildProvenance(targetRoot, { inferred: created.length === 0 || skippedControlled }),
 			);
 		}
 	}
