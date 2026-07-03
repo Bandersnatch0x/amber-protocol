@@ -44,6 +44,7 @@ function handleInit(args) {
       dryRun: args.dryRun,
       withWiki: args.withWiki,
       skipDetection: args.skipDetection,
+      refreshAmberOwned: args.refreshAmberOwned,
     }),
   };
 }
@@ -213,6 +214,11 @@ function handleMaintenance(args) {
     const stale = detectStaleDocs(targetRoot, thresholdDays);
     return { result: { target: targetRoot, staleDocs: stale.staleDocs, thresholdDays: stale.thresholdDays, errors: [], warnings: [] } };
   }
+  if (action === "scaffold-drift") {
+    const { detectScaffoldDrift } = require("./core/scaffold-version-drift");
+    const drift = detectScaffoldDrift(targetRoot);
+    return { result: { target: targetRoot, scaffoldDrift: drift, errors: [], warnings: [] } };
+  }
   if (action === "wiki-lint") {
     const { validateWikiStructure, fixWikiMarkers } = require("./core/maintenance");
     let fixResult = null;
@@ -249,7 +255,7 @@ function handleMaintenance(args) {
     const proposal = writeDistillProposal(targetRoot, outputPath, args);
     return { result: { target: targetRoot, outputPath: proposal.outputPath, candidateCount: proposal.candidateCount, errors: [], warnings: [] } };
   }
-  return { result: unknownAction("maintenance", ["inspect", "propose", "stale-docs", "wiki-lint", "pack-drift", "upgrade-preview", "evolution-rollup", "regression-proposals", "distill"]) };
+  return { result: unknownAction("maintenance", ["inspect", "propose", "stale-docs", "scaffold-drift", "wiki-lint", "pack-drift", "upgrade-preview", "evolution-rollup", "regression-proposals", "distill"]) };
 }
 
 function handleAdoption(args) {

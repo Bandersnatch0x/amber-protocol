@@ -76,6 +76,7 @@ const FLAG_SPECS = {
 	"--markdown": { key: "markdown" },
 	"--framework": { key: "framework" },
 	"--execute": { key: "execute", kind: "boolean" },
+	"--refresh-amber-owned": { key: "refreshAmberOwned", kind: "boolean" },
 	"--warn-only": { key: "warnOnly", kind: "boolean" },
 	"--force": { key: "force", kind: "boolean" },
 	"--help": { key: "help", kind: "boolean" },
