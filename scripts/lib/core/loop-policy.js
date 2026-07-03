@@ -79,12 +79,25 @@ function loadPolicyRules(targetRoot) {
 	const stateDir = resolveStateDirForRead(targetRoot);
 	const rulesPath = path.join(stateDir, "governance", "rules.json");
 	if (!fs.existsSync(rulesPath)) return DEFAULT_RULES;
+	let parsed;
 	try {
-		const parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
-		if (parsed && Array.isArray(parsed.rules)) return parsed;
-	} catch {
-		/* fall through to defaults on unparseable rules */
+		parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
+	} catch (e) {
+		// Fail safe to DEFAULT_RULES (deny-wins, narrow allow-list), but SURFACE it:
+		// a silently-ignored custom policy is a real diagnostic trap (a project with
+		// a typo'd rules.json gets verify --execute denials with no indication their
+		// allow rules are being ignored).
+		process.stderr.write(
+			`[amber] governance rules.json at ${rulesPath} is unparseable (${e.message}); ` +
+				"using built-in defaults — your custom allow/deny rules are being ignored. Fix the JSON.\n",
+		);
+		return DEFAULT_RULES;
 	}
+	if (parsed && Array.isArray(parsed.rules)) return parsed;
+	process.stderr.write(
+		`[amber] governance rules.json at ${rulesPath} is missing a top-level 'rules' array; ` +
+			"using built-in defaults.\n",
+	);
 	return DEFAULT_RULES;
 }
 

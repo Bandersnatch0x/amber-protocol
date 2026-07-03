@@ -110,3 +110,23 @@ test("no provenance → installed:false with a guidance note, no crash", () => {
 	fs.rmSync(tpl, { recursive: true, force: true });
 	fs.rmSync(target, { recursive: true, force: true });
 });
+
+test("a template file added AFTER provenance was stamped → ambiguous (no baseline entry, never stale)", () => {
+	const tpl = fakeTemplateRoot();
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-tgt-"));
+	install(tpl, target);
+	withProvenance(target, tpl, false); // baseline covers only the v1 set (no working-rules.md)
+	// A later release ships a NEW managed file the install never saw. The user has a
+	// (non-shipped) version of it on disk. There is no provenance entry for it, so the
+	// detector cannot prove "stale" — it must classify ambiguous (safe: never overwritten).
+	fs.mkdirSync(path.join(tpl, "docs/wiki/agent"), { recursive: true });
+	fs.writeFileSync(path.join(tpl, "docs/wiki/agent/working-rules.md"), "shipped v1\n");
+	fs.mkdirSync(path.join(target, "docs/wiki/agent"), { recursive: true });
+	fs.writeFileSync(path.join(target, "docs/wiki/agent/working-rules.md"), "my version\n");
+	const drift = detectScaffoldDrift(target, { templateRoot: tpl });
+	const wr = drift.files.find((f) => f.path === "docs/wiki/agent/working-rules.md");
+	assert.ok(wr, "new template file is iterated");
+	assert.equal(wr.classification, "ambiguous", "no entry → ambiguous, never stale");
+	fs.rmSync(tpl, { recursive: true, force: true });
+	fs.rmSync(target, { recursive: true, force: true });
+});
