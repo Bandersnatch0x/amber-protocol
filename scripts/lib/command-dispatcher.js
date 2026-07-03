@@ -359,6 +359,7 @@ async function handleSession(args) {
       sessionResult = await sessionCommands.approveSession(targetRoot, {
         sessionId: args.session,
         gate: args.gate || args._?.[1],
+        yes: args.yes,
       });
     }
   } else if (action === "verify-ledger") {
