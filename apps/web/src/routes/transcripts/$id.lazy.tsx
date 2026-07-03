@@ -18,8 +18,11 @@ function TranscriptDetailPage() {
   return (
     <div className="page-container">
       <div className="mb-6">
-        <Link to="/transcripts" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-          ← Transcripts
+        <Link to="/transcripts" className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 mb-3 inline-flex items-center gap-1">
+          <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Transcripts
         </Link>
         <h1 className="mt-2 text-xl font-bold text-slate-900 dark:text-white font-mono">
           {id.slice(0, 8)}
@@ -33,7 +36,7 @@ function TranscriptDetailPage() {
               type="button"
               onClick={() => saveDigest.mutate({ id })}
               disabled={saveDigest.isLoading}
-              className="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
+              className="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
             >
               {saveDigest.isLoading ? 'Saving…' : 'Save digest'}
             </button>
@@ -49,7 +52,7 @@ function TranscriptDetailPage() {
               type="button"
               onClick={() => proposeRegressions.mutate({ id })}
               disabled={proposeRegressions.isLoading}
-              className="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
+              className="text-xs px-2.5 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
             >
               {proposeRegressions.isLoading ? 'Scanning…' : 'Propose regressions'}
             </button>
@@ -71,7 +74,14 @@ function TranscriptDetailPage() {
       )}
 
       {detail && (
-        <div className="space-y-3">
+        <div className={detail.turns.length > 50 ? 'space-y-4' : 'space-y-3'}>
+          {detail.turns.length > 50 && (
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-2">
+              <span className="font-medium">{detail.turns.length} turns</span>
+              <span className="text-slate-300 dark:text-slate-600">|</span>
+              <span>Scroll to review the full conversation</span>
+            </div>
+          )}
           {detail.turns.map((turn, i) => (
             <div key={i} className="card p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -84,7 +94,7 @@ function TranscriptDetailPage() {
                   </span>
                 ))}
                 {turn.timestamp && (
-                  <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">
+                  <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">
                     {new Date(turn.timestamp).toLocaleTimeString()}
                   </span>
                 )}

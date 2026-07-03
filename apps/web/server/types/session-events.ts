@@ -1,6 +1,20 @@
 import { z } from 'zod';
 
-export const SessionStatusSchema = z.enum(['idle', 'running', 'paused', 'completed', 'aborted']);
+// Mirrors the CLI session state machine (scripts/lib/session-state-machine.js)
+// plus the legacy 'idle'/'running' values the web UI already used. The CLI
+// writes 'created'/'routed'/'executing'/'failed' to manifests, so the schema
+// must accept them or session reads fail validation.
+export const SessionStatusSchema = z.enum([
+  'idle',
+  'running',
+  'created',
+  'routed',
+  'executing',
+  'paused',
+  'completed',
+  'failed',
+  'aborted',
+]);
 export type SessionStatus = z.infer<typeof SessionStatusSchema>;
 
 const SessionEventBaseSchema = z.object({
@@ -8,15 +22,34 @@ const SessionEventBaseSchema = z.object({
   data: z.record(z.unknown()).optional(),
 });
 
+// sessionId is optional on every variant: events read back from timeline.jsonl
+// (via normalizeEvent, which flattens `data` onto the top level) do not always
+// carry it, and the SSE stream emits raw events where it lives under `data`.
+// Keeping it optional lets one schema validate both paths without dropping
+// events.
 export const SessionEventSchema = z.discriminatedUnion('type', [
   SessionEventBaseSchema.extend({ type: z.literal('session_created'), sessionId: z.string().optional(), goal: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_started'), sessionId: z.string() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_paused'), sessionId: z.string() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_resumed'), sessionId: z.string() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_completed'), sessionId: z.string() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_aborted'), sessionId: z.string(), reason: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('task_progress'), sessionId: z.string(), task: z.string(), progress: z.number() }),
-  SessionEventBaseSchema.extend({ type: z.literal('error'), sessionId: z.string(), error: z.string() }),
+  SessionEventBaseSchema.extend({ type: z.literal('session_started'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('session_paused'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('session_resumed'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('session_completed'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('session_aborted'), sessionId: z.string().optional(), reason: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('session_failed'), sessionId: z.string().optional() }),
+  // State-machine transition events. data carries { fromState, toState }.
+  SessionEventBaseSchema.extend({ type: z.literal('route_selected'), sessionId: z.string().optional() }),
+  // Stage lifecycle. data carries { stage, displayName, command, result }.
+  SessionEventBaseSchema.extend({ type: z.literal('stage_started'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('stage_completed'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('stage_failed'), sessionId: z.string().optional() }),
+  // Gate lifecycle. data carries { gateId, approvedBy } / { gateId, type }.
+  SessionEventBaseSchema.extend({ type: z.literal('gate_triggered'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('gate_passed'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('gate_failed'), sessionId: z.string().optional() }),
+  // Budget signals. data carries { used, total, percentage }.
+  SessionEventBaseSchema.extend({ type: z.literal('budget_warning'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('budget_exceeded'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({ type: z.literal('task_progress'), sessionId: z.string().optional(), task: z.string(), progress: z.number() }),
+  SessionEventBaseSchema.extend({ type: z.literal('error'), sessionId: z.string().optional(), error: z.string() }),
   SessionEventBaseSchema.extend({ type: z.literal('heartbeat') }),
 ]);
 

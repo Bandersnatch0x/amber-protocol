@@ -25,7 +25,7 @@ function RouteDetailPage() {
       <div className="page-container">
         <div className="card p-6 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 max-w-md">
           <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Route not found</h3>
-          <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error?.message || 'Route does not exist'}</p>
+          <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error?.message || 'This route may have been removed or the link is incorrect.'}</p>
           <Link to="/routes" className="btn-secondary mt-4 text-sm">
             Back to routes
           </Link>
@@ -37,8 +37,8 @@ function RouteDetailPage() {
   return (
     <div className="page-container">
       <div className="mb-6">
-        <Link to="/routes" className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 mb-3 inline-flex items-center gap-1">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <Link to="/routes" className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 mb-3 inline-flex items-center gap-1">
+          <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
           Routes
@@ -60,7 +60,7 @@ function RouteDetailPage() {
         <div className="lg:col-span-2 space-y-4">
           <div className="card p-5">
             <h2 className="section-title mb-4">Description</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed break-words">
               {route.description}
             </p>
           </div>
@@ -74,7 +74,17 @@ function RouteDetailPage() {
                     <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                       <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{index + 1}</span>
                     </div>
-                    <p className="text-sm text-slate-700 dark:text-slate-300">{stage.displayName}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">{stage.displayName}</p>
+                      {stage.gateAfter && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
+                          <svg aria-hidden="true" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                          Gate: {stage.gateAfter}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

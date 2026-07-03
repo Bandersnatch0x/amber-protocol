@@ -1,4 +1,5 @@
 import { createRootRoute, Link, Outlet, useRouterState } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { TRPCProvider } from '@/lib/trpc-provider';
 import { ThemeProvider } from '@/lib/theme-provider';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -23,7 +24,7 @@ function NavLink({ to, label }: { to: string; label: string }) {
     <Link
       to={to}
       className={`
-        inline-flex items-center px-3 py-1 border-b-2 text-sm font-medium transition-colors duration-150
+        inline-flex items-center px-3 py-2 border-b-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-sm min-h-[44px]
         ${isActive
           ? 'border-blue-500 text-slate-900 dark:text-white'
           : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
@@ -37,6 +38,16 @@ function NavLink({ to, label }: { to: string; label: string }) {
 
 function RootLayout() {
   const routerState = useRouterState();
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && document.activeElement) {
+        (document.activeElement as HTMLElement).blur();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   return (
     <ThemeProvider>
@@ -60,7 +71,15 @@ function RootLayout() {
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
+                  <a
+                    href="https://github.com/Bandersnatch0x/amber-protocol/tree/master/docs"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                  >
+                    Docs
+                  </a>
                   <ThemeToggle />
                 </div>
               </div>
