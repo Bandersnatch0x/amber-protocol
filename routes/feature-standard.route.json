@@ -5,7 +5,7 @@
   "displayName": "Standard Feature Development",
   "description": "Complete feature delivery with planning and review",
   "trigger": {
-    "goalPattern": "^(add|implement|create|build)\\s+.*feature",
+    "goalPattern": "^(add|implement|create|build|support)\\b",
     "complexity": "medium"
   },
   "stages": [
