@@ -82,6 +82,35 @@ const WIKI_CONTEXT_STARTER_FILES = new Set([
 	"docs/wiki/features/F001-example-feature.md",
 ]);
 
+// The CLI's own version, stamped into install provenance so a later
+// `amber maintenance scaffold-drift` can report "installed by Amber X.Y.Z".
+const CLI_VERSION = require("../../../package.json").version;
+
+// Amber-controlled content: reference docs Amber ships AND owns the canonical
+// content for. The project should not author these. Safe to overwrite when
+// provenance proves the file is stale (unchanged since install). The hash guard
+// reclassifies any user-edited file as "customized" so it is never clobbered.
+// NOTE: "optional to install" (OPTIONAL_STARTER_WIKI_FILES) and "who owns the
+// content" are ORTHOGONAL axes — some files here are also optional starters.
+const AMBER_CONTROLLED_CONTENT_FILES = new Set([
+	"clean-state-checklist.md",
+	"evaluator-rubric.md",
+	"docs/wiki/index.md",
+	"docs/wiki/glossary.md",
+	"docs/wiki/agent/amber.md",
+	"docs/wiki/agent/continuous-improvement.md",
+	"docs/wiki/agent/workflow-packets.md",
+	"docs/wiki/agent/working-rules.md",
+	"docs/wiki/agent/prompt-recipes.md",
+	"docs/wiki/agent/failure-patterns.md",
+]);
+
+// Runtime state files Amber's init scaffolds but must NEVER overwrite — refreshing
+// these would destroy accumulated project state.
+const AMBER_STATE_FILES = new Set([
+	".workflow/continuous-improvement/state.json",
+]);
+
 const SEMVER_PATTERN =
 	/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:[-+][0-9A-Za-z.-]+)?$/;
 
@@ -95,5 +124,8 @@ module.exports = {
 	VALID_STATUSES,
 	REQUIRED_HANDOFF_SECTIONS,
 	WIKI_CONTEXT_STARTER_FILES,
+	CLI_VERSION,
+	AMBER_CONTROLLED_CONTENT_FILES,
+	AMBER_STATE_FILES,
 	SEMVER_PATTERN,
 };
