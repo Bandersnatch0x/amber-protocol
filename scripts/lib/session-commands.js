@@ -17,6 +17,7 @@ const { createWorktree, removeWorktree } = require("./worktree-manager");
 const { selectRoute } = require("./route-selector");
 const { loadRoutes } = require("./route-loader");
 const { result } = require("./result");
+const { promptYesNo } = require("./prompt");
 const { ensureContinuitySurfaces } = require("./continuity-surfaces");
 const { writeRouteGates, writeGateDecision } = require("./gate-writer");
 const { writeJson } = require("./core/fs-utils");
@@ -647,6 +648,26 @@ async function approveSession(projectRoot, options) {
 
 		const resolvedGateId = gateId || gates[0].id;
 
+	// Identity gate: a "user-approval" gate must be approved by a human, not by an
+	// agent piping commands. In a non-interactive shell we refuse unless --yes is
+	// explicitly passed; templates/CLAUDE.md instructs agents never to pass --yes.
+	let approvedBy;
+	if (options.yes) {
+		approvedBy = "flag (--yes)";
+	} else if (process.stdin.isTTY) {
+		const ok = await promptYesNo(`Approve gate "${resolvedGateId}"? [y/N] `);
+		if (!ok) {
+			return result(`Approval declined for gate "${resolvedGateId}".`, 1);
+		}
+		approvedBy = "user (interactive)";
+	} else {
+		return result(
+			`Error: gate "${resolvedGateId}" needs human approval.\n` +
+				"Run this in an interactive terminal, or pass --yes to approve non-interactively.",
+			1,
+		);
+	}
+
 	// Record gate_passed event so complete-check can see it.
 	const timelinePath = path.join(sessionDir, "timeline.jsonl");
 	const writer = new TimelineWriter(timelinePath);
@@ -654,7 +675,7 @@ async function approveSession(projectRoot, options) {
 		type: "gate_passed",
 		data: {
 			gateId: resolvedGateId,
-			approvedBy: "user",
+			approvedBy,
 		},
 	});
 	await writer.close();
@@ -665,7 +686,7 @@ async function approveSession(projectRoot, options) {
 		kind: "gate_passed",
 		sessionId,
 		gateId: resolvedGateId,
-		approvedBy: "user",
+		approvedBy,
 		recordedAt: new Date().toISOString(),
 	});
 
