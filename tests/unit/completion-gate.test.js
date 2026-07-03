@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const { execSync } = require("node:child_process");
 const {
 	evaluateCompletion,
 	formatCompletion,
@@ -161,4 +162,63 @@ test("formatCompletion produces readable output", () => {
 	});
 	assert.match(text, /Completion check status: fail/);
 	assert.match(text, /Missing: timeline/);
+});
+
+test("fails when the session did no work in a git repo (strict)", () => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-work-"));
+	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: root });
+	fs.writeFileSync(path.join(root, "README.md"), "# x\n");
+	execSync("git add -A && git commit -qm init", { cwd: root });
+
+	const sessionId = "no-work";
+	buildSession(
+		root,
+		sessionId,
+		{
+			sessionId,
+			goal: "add feature",
+			status: "completed",
+			createdAt: new Date().toISOString(),
+			handoff: { path: "session-handoff.md" },
+			completedStages: ["verify"],
+		},
+		[{ type: "stage_completed", data: { executed: false } }, { type: "gate_passed" }],
+	);
+
+	// A clean tree with no commits since createdAt has no work evidence.
+	const relaxed = evaluateCompletion(root, sessionId);
+	assert.ok(relaxed.missing.includes("work"), "work missing in default mode");
+
+	// Strict additionally rejects claim-only verification.
+	const strict = evaluateCompletion(root, sessionId, { strict: true });
+	assert.equal(strict.status, "fail");
+	assert.ok(strict.missing.includes("verification"), "strict rejects executed:false");
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("passes work check when the tree is dirty", () => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-work2-"));
+	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: root });
+	fs.writeFileSync(path.join(root, "README.md"), "# x\n");
+	execSync("git add -A && git commit -qm init", { cwd: root });
+	fs.writeFileSync(path.join(root, "feature.js"), "// new work\n"); // dirty tree
+
+	const sessionId = "dirty";
+	buildSession(
+		root,
+		sessionId,
+		{
+			sessionId,
+			goal: "add feature",
+			status: "completed",
+			createdAt: new Date().toISOString(),
+			handoff: { path: "session-handoff.md" },
+			completedStages: ["verify"],
+		},
+		[{ type: "stage_completed", data: { executed: true, exitCode: 0 } }, { type: "gate_passed" }],
+	);
+
+	const strict = evaluateCompletion(root, sessionId, { strict: true });
+	assert.equal(strict.status, "pass");
+	fs.rmSync(root, { recursive: true, force: true });
 });
