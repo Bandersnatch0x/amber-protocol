@@ -326,6 +326,7 @@ describe("session-commands", () => {
 			const result = await approveSession(TEST_ROOT, {
 				sessionId: start.sessionId,
 				gate: "user-approval-plan",
+				yes: true,
 			});
 			assert.strictEqual(result.exitCode, 0);
 
