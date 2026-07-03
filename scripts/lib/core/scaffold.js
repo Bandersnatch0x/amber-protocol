@@ -228,6 +228,22 @@ function scaffoldHarness(target, options = {}) {
 		);
 	}
 
+	// Stamp install provenance (.amber/provenance.json) on every real install. This
+	// is decoupled from the init-report gate above: provenance must exist even on a
+	// minimal `init --skip-detection` non-git path so drift detection can work. If
+	// provenance already exists we leave it untouched (re-running init is
+	// idempotent and never resets the drift baseline). A pre-existing install with
+	// no provenance (created.length === 0) gets an inferred migration baseline.
+	if (!options.dryRun) {
+		const { loadProvenance, buildProvenance, writeProvenance } = require("./scaffold-provenance");
+		if (!loadProvenance(targetRoot)) {
+			writeProvenance(
+				targetRoot,
+				buildProvenance(targetRoot, { inferred: created.length === 0 }),
+			);
+		}
+	}
+
 	return {
 		target: targetRoot,
 		created: result.created,
