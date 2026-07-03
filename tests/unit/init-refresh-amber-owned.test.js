@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { scaffoldHarness } = require("../../scripts/lib/core/scaffold");
-const { detectScaffoldDrift } = require("../../scripts/lib/core/scaffold-version-drift");
+const { detectScaffoldDrift, refreshAmberOwnedFiles } = require("../../scripts/lib/core/scaffold-version-drift");
 const { TEMPLATE_ROOT } = require("../../scripts/lib/core/constants");
 
 const REL = "docs/wiki/glossary.md"; // controlled file that ships with the repo
@@ -99,6 +99,51 @@ test("--refresh-amber-owned never touches authored or state files", () => {
 		scaffoldHarness(dir, { refreshAmberOwned: true, templateRoot: tpl });
 		assert.equal(fs.readFileSync(installedPath, "utf8"), before, "authored file untouched");
 		assert.ok(!fs.existsSync(installedPath + ".bak"), "no backup created for authored file");
+	} finally {
+		fs.rmSync(tpl, { recursive: true, force: true });
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("--refresh-amber-owned re-stamps so a refreshed file stays refreshable on the NEXT release (not stuck customized)", () => {
+	const tpl = copyTemplates();
+	const dir = installDir(tpl);
+	try {
+		const shippedPath = path.join(tpl, REL);
+		const installedPath = path.join(dir, REL);
+		const original = fs.readFileSync(shippedPath, "utf8");
+
+		// Release v2: refresh overwrites the file AND re-stamps its provenance baseline to v2.
+		fs.writeFileSync(shippedPath, original + "\n# v2\n");
+		scaffoldHarness(dir, { refreshAmberOwned: true, templateRoot: tpl });
+		assert.ok(fs.readFileSync(installedPath, "utf8").includes("# v2"));
+
+		// Release v3: file is still v2 (unchanged since the v2 refresh).
+		// WITHOUT re-stamp, provenance baseline would still be v1 → installed(v2) !=
+		// baseline(v1) → "customized" (stuck, never auto-refreshable again).
+		// WITH re-stamp, baseline is v2, file is v2, shipped is v3 → "stale".
+		fs.writeFileSync(shippedPath, original + "\n# v2\n\n# v3\n");
+		const drift = detectScaffoldDrift(dir, { templateRoot: tpl });
+		const file = drift.files.find((f) => f.path === REL);
+		assert.equal(file.classification, "stale", "re-stamp keeps the file refreshable, not stuck customized");
+	} finally {
+		fs.rmSync(tpl, { recursive: true, force: true });
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("--refresh-amber-owned on a target with no provenance is a safe no-op", () => {
+	const tpl = copyTemplates();
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-refresh-"));
+	try {
+		// Install templates, then remove provenance entirely.
+		scaffoldHarness(dir, { templateRoot: tpl });
+		fs.unlinkSync(path.join(dir, ".amber", "provenance.json"));
+		// Refresh must NOT crash or overwrite anything; it returns empty lists + a note.
+		const result = refreshAmberOwnedFiles(dir, { templateRoot: tpl });
+		assert.deepEqual(result.refreshed, []);
+		assert.deepEqual(result.proposals, []);
+		assert.ok(result.note, "guidance note present on no-provenance refresh");
 	} finally {
 		fs.rmSync(tpl, { recursive: true, force: true });
 		fs.rmSync(dir, { recursive: true, force: true });
