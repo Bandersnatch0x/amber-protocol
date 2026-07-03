@@ -172,8 +172,10 @@ function doctor(target, options = {}) {
 	if (claudeExists && !claudeRoutesWiki) {
 		errors.push("CLAUDE.md does not route agents to docs/wiki.");
 	}
-	addCheck("CLAUDE.md → wiki routing", !claudeExists || claudeRoutesWiki,
-		!claudeExists ? "CLAUDE.md not present (routing check skipped)" : claudeRoutesWiki ? "routes to wiki" : "missing wiki routing");
+	// When the file doesn't exist, report as not-applicable (null) rather than
+	// passing — a missing file is not the same as a validated routing link.
+	addCheck("CLAUDE.md → wiki routing", claudeExists ? claudeRoutesWiki : null,
+		!claudeExists ? "file not present — check skipped" : claudeRoutesWiki ? "routes to wiki" : "missing wiki routing");
 
 	// Verification command
 	const hasVerify = hasVerificationCommand(targetRoot);

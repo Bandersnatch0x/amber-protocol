@@ -131,7 +131,7 @@ test("audit reports tooling evidence without inventing commands", () => {
   assert.ok(result.toolingEvidence.some((item) => item.source === "package-lock.json" && item.name === "npm"));
   assert.ok(result.toolingEvidence.some((item) => item.source === "pnpm-lock.yaml" && item.name === "pnpm"));
   assert.ok(result.toolingEvidence.some((item) => item.source === "pyproject.toml" && item.name === "python"));
-  assert.ok(result.unknowns.some((unknown) => /exact verification command is unknown/.test(unknown)));
+  assert.ok(result.unknowns.some((unknown) => /candidate commands proposed below require project-owner confirmation/.test(unknown)));
 });
 
 test("audit suggests Python candidate verification commands without confirming them", () => {

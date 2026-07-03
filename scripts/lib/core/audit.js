@@ -271,7 +271,7 @@ function buildAuditUnknowns(
 	candidateCommands = [],
 ) {
 	const unknowns = [];
-	if (commands.length === 0) {
+	if (commands.length === 0 && candidateCommands.length === 0) {
 		unknowns.push("No package, test, build, or verification command detected.");
 	}
 
@@ -281,9 +281,15 @@ function buildAuditUnknowns(
 
 	if (commands.length === 0 && toolingEvidence.length > 0) {
 		const sources = toolingEvidence.map((item) => item.source).join(", ");
-		unknowns.push(
-			`Tooling evidence found (${sources}), but the exact verification command is unknown.`,
-		);
+		if (candidateCommands.length > 0) {
+			unknowns.push(
+				`Tooling evidence found (${sources}); candidate commands proposed below require project-owner confirmation.`,
+			);
+		} else {
+			unknowns.push(
+				`Tooling evidence found (${sources}), but the exact verification command is unknown.`,
+			);
+		}
 	}
 
 	if (candidateCommands.length > 0) {
@@ -509,15 +515,55 @@ function validateHandoff(target) {
 	}
 
 	const content = readText(handoffPath);
+	const missingSections = [];
 	for (const section of REQUIRED_HANDOFF_SECTIONS) {
 		if (!hasSectionWithBody(content, section)) {
+			missingSections.push(section);
 			errors.push(
 				`session-handoff.md must include a non-empty ${section} section.`,
 			);
 		}
 	}
 
-	return { target: targetRoot, errors, warnings };
+	// Extract actionable content from the handoff file.
+	const nextActionBody =
+		getSectionBody(content, "Next Action") ??
+		getSectionBody(content, "Next Actions");
+	const nextSteps = nextActionBody
+		? nextActionBody
+				.split(/\r?\n/)
+				.map((line) => line.trim())
+				.filter((line) => line && !/^<!--.*-->$/.test(line))
+				.map((line) => line.replace(/^[-*]\s+/, ""))
+		: [];
+
+	const lastUpdatedMatch = content.match(
+		/Last Updated:\s*(.+)/i,
+	);
+	const lastUpdated = lastUpdatedMatch ? lastUpdatedMatch[1].trim() : null;
+
+	// Count session directories when present.
+	let sessionCount = 0;
+	try {
+		const sessionsDir = path.join(targetRoot, ".amber", "sessions");
+		if (pathExists(sessionsDir)) {
+			sessionCount = require("node:fs")
+				.readdirSync(sessionsDir, { withFileTypes: true })
+				.filter((entry) => entry.isDirectory()).length;
+		}
+	} catch (_) {
+		// .amber/sessions is optional — skip if unreadable.
+	}
+
+	return {
+		target: targetRoot,
+		errors,
+		warnings,
+		missingSections,
+		nextSteps,
+		lastUpdated,
+		sessionCount,
+	};
 }
 
 module.exports = {

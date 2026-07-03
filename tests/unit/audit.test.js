@@ -138,16 +138,16 @@ test("buildAuditUnknowns formats parse issues and candidate-command notices in o
 			"package.json could not be parsed: boom",
 		],
 	);
-	// Candidate commands append a confirmation notice even with an empty commands list.
+	// Candidate commands suppress the missing-command notice — the candidates
+	// themselves are the partial detection, so "no command detected" is misleading.
 	assert.deepEqual(
 		buildAuditUnknowns([], [], [], [{ command: "python -m pytest" }]),
 		[
-			"No package, test, build, or verification command detected.",
 			"Candidate verification commands require confirmation before being treated as project commands.",
 		],
 	);
-	// All four channels together preserve insertion order: missing-cmd, parse,
-	// tooling, candidates.
+	// All four channels together preserve insertion order: parse, tooling,
+	// candidates.  The missing-command notice is suppressed when candidates exist.
 	assert.deepEqual(
 		buildAuditUnknowns(
 			[],
@@ -156,9 +156,8 @@ test("buildAuditUnknowns formats parse issues and candidate-command notices in o
 			[{ command: "c" }],
 		),
 		[
-			"No package, test, build, or verification command detected.",
 			"p could not be parsed: m",
-			"Tooling evidence found (x), but the exact verification command is unknown.",
+			"Tooling evidence found (x); candidate commands proposed below require project-owner confirmation.",
 			"Candidate verification commands require confirmation before being treated as project commands.",
 		],
 	);

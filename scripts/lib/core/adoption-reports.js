@@ -519,11 +519,12 @@ function generateAdoptionReport(target, options = {}) {
 		if (options.outputDir) {
 			return uniqueAdoptionReportPath(targetRoot, options.outputDir);
 		}
-		return path.join(
-			REPO_ROOT,
-			"docs",
-			"examples",
-			`${slugify(path.basename(targetRoot))}-adoption-report.md`,
+		// Default: write to the target's .amber/reports/ so the adoption report
+		// stays co-located with the project's governance state instead of
+		// polluting the Amber tooling repository.
+		return uniqueAdoptionReportPath(
+			targetRoot,
+			path.join(targetRoot, ".amber", "reports"),
 		);
 	})();
 	const warnings = [];
