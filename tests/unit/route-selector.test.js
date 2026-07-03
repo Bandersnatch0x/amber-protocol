@@ -38,6 +38,12 @@ describe("selectRoute — feature goals", () => {
 			"feature-standard",
 		);
 	});
+	it("routes 'add login' to feature-standard (no literal 'feature' word)", () => {
+		assert.strictEqual(pick("add login").routeId, "feature-standard");
+	});
+	it("routes 'implement OAuth' to feature-standard", () => {
+		assert.strictEqual(pick("implement OAuth").routeId, "feature-standard");
+	});
 });
 
 describe("selectRoute — bugfix goals", () => {
