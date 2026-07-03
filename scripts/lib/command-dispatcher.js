@@ -355,6 +355,7 @@ async function handleSession(args) {
         stage: args.stage,
         command: args.command,
         result: args.result,
+        execute: args.execute,
       });
     }
   } else if (action === "approve") {
@@ -364,6 +365,7 @@ async function handleSession(args) {
       sessionResult = await sessionCommands.approveSession(targetRoot, {
         sessionId: args.session,
         gate: args.gate || args._?.[1],
+        yes: args.yes,
       });
     }
   } else if (action === "verify-ledger") {

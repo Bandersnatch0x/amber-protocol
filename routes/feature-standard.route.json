@@ -5,14 +5,14 @@
   "displayName": "Standard Feature Development",
   "description": "Complete feature delivery with planning and review",
   "trigger": {
-    "goalPattern": "^(add|implement|create|build)\\s+.*feature",
+    "goalPattern": "^(add|implement|create|build|support)\\b",
     "complexity": "medium"
   },
   "stages": [
     { "name": "capture", "displayName": "Capture Requirements", "type": "skill", "target": "requirement-clarification", "gateAfter": "user-approval-plan" },
     { "name": "plan", "displayName": "Create Plan", "type": "pack", "target": "feature-planning", "gateAfter": "user-approval-implement" },
     { "name": "implement", "displayName": "Implement Feature", "type": "pack", "target": "tdd-implementation" },
-    { "name": "verify", "displayName": "Run Verification", "type": "command", "target": "npm test", "note": "V1: command is a suggestion. Run manually, then record with `amber session verify`." }
+    { "name": "verify", "displayName": "Run Verification", "type": "command", "target": "npm test", "note": "Record a claim with `amber session verify`, or run the real command and record its exit code with `amber session verify --execute` (policy-gated)." }
   ],
   "gates": [
     { "id": "user-approval-plan", "type": "user-approval", "description": "Approve plan before implementation?" },
