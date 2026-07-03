@@ -135,26 +135,34 @@ async function startSession(projectRoot, options) {
 	// Load routes once — reused for version, goal-mismatch warning, and gate persistence.
 	const { routes } = loadRoutes(ROUTES_DIR);
 	let route;
+	let fallbackWarning = null;
 
 	if (!selectedRouteId) {
 		const match = selectRoute(goal, routes);
 
 		if (!match.matched) {
-			const availableRoutes = routes
-						.map(
-							(r) =>
-								`  ${r.routeId} — matches goals matching: ${r.trigger.goalPattern}`,
-						)
-						.join("\n");
+			// No trigger matched. Rather than hard-error on a first-time user, default
+			// to feature-standard with a low-confidence warning. --route still overrides.
+			selectedRouteId = "feature-standard";
+			route = routes.find((r) => r.routeId === selectedRouteId);
+			if (!route) {
+				const availableRoutes = routes
+					.map((r) => `  ${r.routeId} — matches goals matching: ${r.trigger.goalPattern}`)
+					.join("\n");
 				return result(
-					`Error: No matching route found for goal "${goal}".\n\nAvailable routes:\n${availableRoutes}\n\nTip: pass --route <id> to select a route explicitly.`,
+					`Error: No route matched goal "${goal}" and the default route "feature-standard" is missing.\n\nAvailable routes:\n${availableRoutes}\n\nTip: pass --route <id> to select a route explicitly.`,
 					1,
 				);
+			}
+			routeVersion = route.version || "1.0.0";
+			fallbackWarning =
+				`No route matched goal "${goal}"; defaulting to feature-standard (low confidence). ` +
+				"Pass --route to choose explicitly.";
+		} else {
+			selectedRouteId = match.routeId;
+			route = routes.find((r) => r.routeId === selectedRouteId);
+			routeVersion = (route && route.version) || "1.0.0";
 		}
-
-		selectedRouteId = match.routeId;
-		route = routes.find((r) => r.routeId === selectedRouteId);
-		routeVersion = (route && route.version) || "1.0.0";
 	} else {
 		route = routes.find((r) => r.routeId === selectedRouteId);
 		if (!route) {
@@ -221,6 +229,10 @@ async function startSession(projectRoot, options) {
 		lines.push(`Mode: ${mode}`);
 	}
 
+	if (fallbackWarning) {
+		lines.push("");
+		lines.push(fallbackWarning);
+	}
 	if (goalMismatchWarning) {
 		lines.push("");
 		lines.push(goalMismatchWarning);
