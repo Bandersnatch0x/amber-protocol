@@ -22,6 +22,7 @@ const { writeRouteGates, writeGateDecision } = require("./gate-writer");
 const { writeJson } = require("./core/fs-utils");
 const { codedError } = require("./core/error-catalog");
 const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
+const { runEvidenceCommand } = require("./core/evidence-runner");
 const {
 	resolveStateDirForRead,
 	resolveStateDirForCreate,
@@ -492,69 +493,110 @@ async function verifySession(projectRoot, options) {
 	const { routes } = loadRoutes(ROUTES_DIR);
 	const route = routes.find((r) => r.routeId === manifest.route.id);
 	const stages = route && Array.isArray(route.stages) ? route.stages : [];
-	const verifyStage = route
-		? stages.find((s) => s.name === (stageName || "verify"))
-		: null;
-
+	const verifyStage = route ? stages.find((s) => s.name === (stageName || "verify")) : null;
 	const actualStageName = (verifyStage && verifyStage.name) || (stageName || "verify");
-	const stageDisplayName =
-		(verifyStage && verifyStage.displayName) || actualStageName;
+	const stageDisplayName = (verifyStage && verifyStage.displayName) || actualStageName;
+
+	const timelinePath = path.join(sessionDir, "timeline.jsonl");
+	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
+
+	// --execute: actually run the verification command and record its real exit
+	// code as evidence. Without --execute, verify records a self-reported claim
+	// (executed:false) — kept for backward compatibility.
+	let executed = false;
+	let execResult = null;
+	if (options.execute) {
+		const command = options.command || (verifyStage && verifyStage.target);
+		if (!command) {
+			return result(
+				'Error: --execute needs a command. Pass --command "<cmd>" or use a route whose verify stage declares one.',
+				1,
+			);
+		}
+		execResult = runEvidenceCommand({
+			target: projectRoot,
+			command,
+			ledgerPath,
+			subject: { sessionId, stage: actualStageName },
+		});
+		if (execResult.denied) {
+			return result(
+				`Verification command denied by policy: ${execResult.reason}\nCommand: ${command}`,
+				1,
+			);
+		}
+		executed = true;
+		if (execResult.exitCode !== 0) {
+			// Negative evidence: record the failure on the timeline, do NOT mark the
+			// stage complete, and fail the command.
+			const failWriter = new TimelineWriter(timelinePath);
+			await failWriter.append({
+				type: "verification_failed",
+				data: {
+					stage: actualStageName,
+					displayName: stageDisplayName,
+					command,
+					exitCode: execResult.exitCode,
+					durationMs: execResult.durationMs,
+				},
+			});
+			await failWriter.close();
+			return result(
+				`Verification FAILED (exit ${execResult.exitCode}) for session: ${sessionId}\n` +
+					`Command: ${command}\n` +
+					(execResult.stderrTail ? `stderr (tail):\n${execResult.stderrTail}\n` : "") +
+					"The stage was NOT marked complete.",
+				1,
+			);
+		}
+	}
 
 	// Record the stage_completed event so complete-check can see it.
-	const timelinePath = path.join(sessionDir, "timeline.jsonl");
 	const writer = new TimelineWriter(timelinePath);
 	await writer.append({
 		type: "stage_completed",
 		data: {
 			stage: actualStageName,
 			displayName: stageDisplayName,
-			command: options.command || null,
-			result: options.result || null,
+			command: options.command || (executed ? execResult.ledgerRecord.command : null),
+			result: options.result || (executed ? "passed" : null),
+			executed,
+			...(executed ? { exitCode: 0, durationMs: execResult.durationMs } : {}),
 		},
 	});
 	await writer.close();
 
-	// Mirror the governance-critical event into a tamper-evident hash-chain ledger
-	// (alongside the timeline, which remains the state-machine source of truth).
-	appendLedgerRecord(path.join(sessionDir, "ledger.jsonl"), {
-		schemaVersion: 2,
-		kind: "stage_completed",
-		sessionId,
-		stage: actualStageName,
-		command: options.command || null,
-		result: options.result || null,
-		recordedAt: new Date().toISOString(),
-	});
+	// In --execute mode the evidence-runner already wrote the tamper-evident ledger
+	// record. In legacy (claim) mode, mirror the claim into the ledger here.
+	if (!executed) {
+		appendLedgerRecord(ledgerPath, {
+			schemaVersion: 2,
+			kind: "stage_completed",
+			sessionId,
+			stage: actualStageName,
+			command: options.command || null,
+			result: options.result || null,
+			recordedAt: new Date().toISOString(),
+		});
+	}
 
 	// Update the manifest's completedStages so complete-check also finds it there.
 	const manifestPath = path.join(sessionDir, "manifest.json");
-	const completedStages = Array.isArray(manifest.completedStages)
-		? [...manifest.completedStages]
-		: [];
+	const completedStages = Array.isArray(manifest.completedStages) ? [...manifest.completedStages] : [];
 	if (!completedStages.includes(actualStageName)) {
 		completedStages.push(actualStageName);
 	}
-	const updatedManifest = {
-		...manifest,
-		completedStages,
-		updatedAt: new Date().toISOString(),
-	};
+	const updatedManifest = { ...manifest, completedStages, updatedAt: new Date().toISOString() };
 	fs.writeFileSync(manifestPath, JSON.stringify(updatedManifest, null, 2));
 
-	const lines = [
-		`Verification recorded for session: ${sessionId}`,
-		`Stage: ${stageDisplayName}`,
-	];
-	if (verifyStage && verifyStage.target) {
-		lines.push(
-			`Suggested verification command: ${verifyStage.target}`,
-		);
+	const lines = [`Verification recorded for session: ${sessionId}`, `Stage: ${stageDisplayName}`];
+	if (executed) {
+		lines.push(`Executed: ${execResult.ledgerRecord.command} (exit 0, ${execResult.durationMs}ms)`);
+	} else if (verifyStage && verifyStage.target) {
+		lines.push(`Suggested verification command: ${verifyStage.target}`);
+		lines.push("(claim only — re-run with --execute to record real evidence)");
 	}
-	lines.push(
-		"",
-		"Tip: run `amber session approve --session " + sessionId + "` to record gate approval.",
-	);
-
+	lines.push("", "Tip: run `amber session approve --session " + sessionId + "` to record gate approval.");
 	return result(lines.join("\n"), 0);
 }
 

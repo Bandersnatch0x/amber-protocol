@@ -82,3 +82,61 @@ test("verifyLedgerSession on a session with no ledger reports an error", async (
   assert.equal(r.exitCode, 1);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("verify --execute runs an allowed command and marks the stage complete", async () => {
+  const dir = tmpRepo();
+  // Allow "node " commands so the evidence-runner policy gate passes.
+  const gov = path.join(dir, ".amber", "governance");
+  fs.mkdirSync(gov, { recursive: true });
+  fs.writeFileSync(
+    path.join(gov, "rules.json"),
+    JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [{ id: "n", action: "allow", match: "prefix", pattern: "node " }] }),
+  );
+  const s = await start(dir);
+  const r = await verifySession(dir, {
+    sessionId: s.sessionId,
+    execute: true,
+    command: 'node -e "process.exit(0)"',
+  });
+  assert.equal(r.exitCode, 0);
+  const tl = path.join(dir, ".amber", "sessions", s.sessionId, "timeline.jsonl");
+  const events = fs.readFileSync(tl, "utf8").trim().split("\n").map(JSON.parse);
+  const stage = events.find((e) => e.type === "stage_completed");
+  assert.ok(stage, "stage_completed present");
+  assert.equal(stage.data.executed, true);
+  assert.equal(stage.data.exitCode, 0);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("verify --execute on a failing command records verification_failed and does NOT complete the stage", async () => {
+  const dir = tmpRepo();
+  const gov = path.join(dir, ".amber", "governance");
+  fs.mkdirSync(gov, { recursive: true });
+  fs.writeFileSync(
+    path.join(gov, "rules.json"),
+    JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [{ id: "n", action: "allow", match: "prefix", pattern: "node " }] }),
+  );
+  const s = await start(dir);
+  const r = await verifySession(dir, {
+    sessionId: s.sessionId,
+    execute: true,
+    command: 'node -e "process.exit(1)"',
+  });
+  assert.equal(r.exitCode, 1);
+  const tl = path.join(dir, ".amber", "sessions", s.sessionId, "timeline.jsonl");
+  const events = fs.readFileSync(tl, "utf8").trim().split("\n").map(JSON.parse);
+  assert.ok(events.some((e) => e.type === "verification_failed"), "verification_failed present");
+  assert.ok(!events.some((e) => e.type === "stage_completed"), "no stage_completed on failure");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("verify --execute with no command available errors", async () => {
+  const dir = tmpRepo();
+  const s = await start(dir);
+  // feature-standard's verify stage declares "npm test", so pass an explicit empty
+  // command by overriding the stage lookup: use a stage that has no target.
+  const r = await verifySession(dir, { sessionId: s.sessionId, execute: true, stage: "nonexistent-stage" });
+  assert.equal(r.exitCode, 1);
+  assert.match(r.text, /--execute needs a command/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
