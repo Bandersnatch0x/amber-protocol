@@ -34,6 +34,9 @@ apps/web/.playwright-cli/
 apps/web/.tanstack/
 apps/web/screenshots/
 
+# Local design-skill (impeccable) working artifacts
+.impeccable/
+
 # Package dry-run and local archive output
 npm-pack-dry-run.json
 *.tgz
@@ -82,3 +85,7 @@ MEMORY.md
 tasks/
 feature_list.json
 问题清单.md
+
+# Local regression-test scratch (go-stock analysis reports and ad-hoc test scripts)
+test-reports/
+test-workflows/
