@@ -349,6 +349,7 @@ async function handleSession(args) {
         stage: args.stage,
         command: args.command,
         result: args.result,
+        execute: args.execute,
       });
     }
   } else if (action === "approve") {
