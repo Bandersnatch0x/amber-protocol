@@ -327,6 +327,8 @@ function inspectMaintenance(target, options = {}) {
 	const loaded = loadTeamRegistry(options.registry);
 	const wikiValidation = validateWiki(targetRoot);
 	const staleDocsResult = detectStaleDocs(targetRoot);
+	const { detectScaffoldDrift } = require("./scaffold-version-drift");
+	const scaffoldDriftResult = detectScaffoldDrift(targetRoot);
 
 	return {
 		target: targetRoot,
@@ -342,6 +344,7 @@ function inspectMaintenance(target, options = {}) {
 		upgradeAssistant: buildUpgradeAssistant(targetRoot, loaded.registry),
 		evolutionRollup: extractEvolutionFindings(targetRoot),
 		regressionProposals: extractRegressionProposals(targetRoot),
+		scaffoldDrift: scaffoldDriftResult,
 		errors: loaded.errors,
 		warnings: loaded.warnings,
 	};
