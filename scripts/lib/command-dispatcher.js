@@ -44,6 +44,7 @@ function handleInit(args) {
       dryRun: args.dryRun,
       withWiki: args.withWiki,
       skipDetection: args.skipDetection,
+      refreshAmberOwned: args.refreshAmberOwned,
     }),
   };
 }

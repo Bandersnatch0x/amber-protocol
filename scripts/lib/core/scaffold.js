@@ -49,7 +49,11 @@ function copyTemplateFiles(targetRoot, items, options = {}) {
 
 			// Create a .bak backup for agent doc files so the user can
 			// compare the original with the Amber template after init.
-			if (AGENT_DOC_FILES.has(item.relativePath)) {
+			// Suppressed during --refresh-amber-owned: a refresh pass must not
+			// touch authored files at all (the backup is a first-init safety net
+			// for capturing a pre-existing AGENTS.md, irrelevant when refreshing
+			// only controlled content).
+			if (!options.refreshAmberOwned && AGENT_DOC_FILES.has(item.relativePath)) {
 				const bakPath = destination + ".bak";
 				if (!pathExists(bakPath) && !dryRun) {
 					fs.copyFileSync(destination, bakPath);
@@ -254,6 +258,15 @@ function scaffoldHarness(target, options = {}) {
 		}
 	}
 
+	let refreshSummary = null;
+	if (options.refreshAmberOwned && !options.dryRun) {
+		const { refreshAmberOwnedFiles } = require("./scaffold-version-drift");
+		// Forward templateRoot (already bound at the top of scaffoldHarness) so a
+		// caller-supplied template root is honored — refresh must read the SAME
+		// templates the install used, not always the default TEMPLATE_ROOT.
+		refreshSummary = refreshAmberOwnedFiles(targetRoot, { templateRoot });
+	}
+
 	return {
 		target: targetRoot,
 		created: result.created,
@@ -263,6 +276,7 @@ function scaffoldHarness(target, options = {}) {
 		detection,
 		warnings,
 		nextSteps,
+		refreshSummary,
 	};
 }
 
