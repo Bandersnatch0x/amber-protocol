@@ -39,7 +39,7 @@ test("approveSession appends a gate_passed ledger record; chain stays valid", as
   const dir = tmpRepo();
   const s = await start(dir);
   await verifySession(dir, { sessionId: s.sessionId, command: "npm test", result: "pass" });
-  await approveSession(dir, { sessionId: s.sessionId, gate: "user-approval-plan" });
+  await approveSession(dir, { sessionId: s.sessionId, gate: "user-approval-plan", yes: true });
   const lp = path.join(dir, ".amber", "sessions", s.sessionId, "ledger.jsonl");
   const recs = fs.readFileSync(lp, "utf8").trim().split("\n").map(JSON.parse);
   assert.equal(recs.length, 2);
