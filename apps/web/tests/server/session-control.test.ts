@@ -50,7 +50,7 @@ describe('SessionEventSchema', () => {
   });
 
   it('should reject event with missing required field', () => {
-    expect(() => SessionEventSchema.parse({ type: 'session_started', timestamp: 1000 })).toThrow();
+    expect(() => SessionEventSchema.parse({ type: 'task_progress', timestamp: 1000 })).toThrow();
   });
 
   it('should reject event with unknown type', () => {

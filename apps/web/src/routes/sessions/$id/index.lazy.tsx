@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { createLazyFileRoute, Link } from '@tanstack/react-router';
 import { trpc } from '@/lib/trpc';
 import { StatusBadge } from '@/components/session/StatusBadge';
@@ -9,8 +10,9 @@ export const Route = createLazyFileRoute('/sessions/$id/')({ component: SessionD
 
 function SessionDetailPage() {
   const { id } = Route.useParams();
-  const { data: session, isLoading, error } = trpc.session.byId.useQuery({ id });
+  const { data: session, isLoading, error, refetch } = trpc.session.byId.useQuery({ id });
   const { status, connectionState, lastEvent } = useSessionEvents(id);
+  const [manifestExpanded, setManifestExpanded] = useState(false);
 
   if (isLoading) {
     return (
@@ -35,10 +37,13 @@ function SessionDetailPage() {
       <div className="page-container">
         <div className="card p-6 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 max-w-md">
           <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Session not found</h3>
-          <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error?.message || 'Session does not exist'}</p>
-          <Link to="/sessions" className="btn-secondary mt-4 text-sm">
-            Back to sessions
-          </Link>
+          <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error?.message || 'This session may have been deleted or the link is incorrect.'}</p>
+          <div className="flex gap-3 mt-4">
+            <Link to="/sessions" className="btn-secondary text-sm">
+              Back to sessions
+            </Link>
+            <button onClick={() => refetch()} className="btn-secondary text-xs">Retry</button>
+          </div>
         </div>
       </div>
     );
@@ -47,8 +52,8 @@ function SessionDetailPage() {
   return (
     <div className="page-container">
       <div className="mb-6">
-        <Link to="/sessions" className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 mb-3 inline-flex items-center gap-1">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <Link to="/sessions" className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 mb-3 inline-flex items-center gap-1">
+          <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
           Sessions
@@ -57,9 +62,17 @@ function SessionDetailPage() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <StatusBadge status={session.status} />
+              {session.status === 'completed' && (
+                <span className="inline-flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400">
+                  <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Session completed successfully
+                </span>
+              )}
               <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{session.id}</span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{session.goal}</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white line-clamp-3 break-words">{session.goal}</h1>
           </div>
         </div>
       </div>
@@ -154,25 +167,41 @@ function SessionDetailPage() {
             </div>
           )}
 
-          <div className="card p-5">
-            <h2 className="section-title mb-4">Actions</h2>
-            <div className="flex gap-3">
-              <Link
-                to="/sessions/$id/timeline"
-                params={{ id: session.id }}
-                className="btn-primary"
-              >
-                View Timeline
-              </Link>
-            </div>
+          <div className="mt-2">
+            <Link
+              to="/sessions/$id/timeline"
+              params={{ id: session.id }}
+              className="btn-primary"
+            >
+              View Timeline
+            </Link>
           </div>
         </div>
 
         <div className="card p-5 lg:col-span-1">
-          <h2 className="section-title mb-4">Manifest</h2>
-          <pre className="text-xs font-mono text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-md overflow-auto max-h-96 whitespace-pre-wrap leading-relaxed">
-            {JSON.stringify(session.manifest, null, 2)}
-          </pre>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="section-title">Manifest</h2>
+            <button
+              type="button"
+              aria-expanded={manifestExpanded}
+              onClick={() => setManifestExpanded(!manifestExpanded)}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded flex-shrink-0"
+            >
+              {manifestExpanded ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          {manifestExpanded ? (
+            <pre className="text-xs font-mono text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-md overflow-auto max-h-96 whitespace-pre-wrap leading-relaxed">
+              {JSON.stringify(session.manifest, null, 2)}
+            </pre>
+          ) : (
+            <>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Session configuration and metadata snapshot</p>
+              <p className="font-mono text-xs text-slate-500 dark:text-slate-400 truncate">
+                {JSON.stringify(session.manifest, null, 2).slice(0, 120)}...
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

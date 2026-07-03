@@ -20,7 +20,7 @@ const statusStyles: Record<string, string> = {
 
 function GatesPage() {
   const [statusFilter, setStatusFilter] = useState<GateStatus | ''>('');
-  const { data: gates, isLoading, error } = trpc.gate.list.useQuery(
+  const { data: gates, isLoading, error, refetch } = trpc.gate.list.useQuery(
     statusFilter ? { status: statusFilter } : undefined
   );
 
@@ -28,7 +28,8 @@ function GatesPage() {
     <div className="page-container">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Gates</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Approval checkpoints that require human review before an agent can proceed.</p>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
           {Array.isArray(gates) ? `${gates.length} gate${gates.length !== 1 ? 's' : ''}` : 'Loading...'}
         </p>
       </div>
@@ -61,27 +62,25 @@ function GatesPage() {
         <div className="card p-5 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
           <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Failed to load gates</h3>
           <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error.message}</p>
+          <button onClick={() => refetch()} className="btn-secondary text-xs mt-2">Retry</button>
         </div>
       )}
 
       {gates && gates.length === 0 && (
         <div className="card p-12 text-center">
-          <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-1">No gates found</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {statusFilter ? `No ${statusFilter} gates` : 'No gates have been created yet'}
-          </p>
-        </div>
-      )}
-
-      {gates && gates.length === 0 && (
-        <div className="card p-12 text-center">
-          <svg className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg aria-hidden="true" className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
           </svg>
           <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-1">No gates found</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {statusFilter ? `No ${statusFilter} gates` : 'No gates have been created yet'}
-          </p>
+          {statusFilter ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              No {statusFilter} gates
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Gates are approval checkpoints. When an agent reaches a gate, it pauses for human review before continuing.
+            </p>
+          )}
         </div>
       )}
 
@@ -99,7 +98,7 @@ function GatesPage() {
                       {gate.status}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">{gate.description}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 break-words">{gate.description}</p>
                   <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                     <span>Stage: {gate.stage}</span>
                     <span className="text-slate-300 dark:text-slate-600">·</span>

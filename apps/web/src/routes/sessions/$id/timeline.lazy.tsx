@@ -18,11 +18,13 @@ function TimelinePage() {
   const metrics = useMemo(() => computeTimelineMetrics(events), [events]);
 
   const filteredEvents = useMemo(() => {
-    return events?.filter(event => {
+    if (!events) return events;
+    const q = searchQuery.toLowerCase();
+    return events.filter(event => {
       const eventType = event.type || '';
       const matchesType = !selectedType || eventType === selectedType;
-      const matchesSearch = !searchQuery ||
-        JSON.stringify(event).toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = !q ||
+        JSON.stringify(event).toLowerCase().includes(q);
       return matchesType && matchesSearch;
     });
   }, [events, selectedType, searchQuery]);
@@ -55,9 +57,9 @@ function TimelinePage() {
         <Link
           to="/sessions/$id"
           params={{ id }}
-          className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 mb-3 inline-flex items-center gap-1"
+          className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 mb-3 inline-flex items-center gap-1"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
           Session
@@ -66,28 +68,28 @@ function TimelinePage() {
         {session && (
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{session.goal}</p>
         )}
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
           {filteredEvents?.length || 0} of {events?.length || 0} event{events?.length !== 1 ? 's' : ''}
         </p>
       </div>
 
       {events && events.length > 1 && metrics.duration !== null && metrics.duration > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div className="card p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Duration</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{formatDuration(metrics.duration)}</p>
+        <dl className="card p-5 grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+          <div>
+            <dt className="label">Total Duration</dt>
+            <dd className="value">{formatDuration(metrics.duration)}</dd>
           </div>
-          <div className="card p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Started At</p>
-            <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{metrics.startTime !== null ? new Date(metrics.startTime).toLocaleString() : '-'}</p>
+          <div>
+            <dt className="label">Started At</dt>
+            <dd className="value">{metrics.startTime !== null ? new Date(metrics.startTime).toLocaleString() : '-'}</dd>
           </div>
-          <div className="card p-4">
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">Event Types</p>
-            <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+          <div>
+            <dt className="label">Event Types</dt>
+            <dd className="value">
               {Object.entries(metrics.typeCounts).map(([type, count]) => `${getTimelineEventConfig(type).label}: ${count}`).join(', ')}
-            </p>
+            </dd>
           </div>
-        </div>
+        </dl>
       )}
 
       <TimelineFilter
@@ -105,7 +107,7 @@ function TimelinePage() {
           {events && events.length > 0 && selectedType && (
             <button
               onClick={() => { setSelectedType(''); setSearchQuery(''); }}
-              className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
             >
               Clear filters
             </button>

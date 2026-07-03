@@ -28,8 +28,8 @@ describe('StatusBadge status -> label mapping', () => {
     expect(screen.getByText('--')).toBeTruthy();
   });
 
-  it('falls back to the raw status text for an unknown status', () => {
+  it('falls back to a title-cased label for an unknown status', () => {
     render(<StatusBadge status="mystery" />);
-    expect(screen.getByText('mystery')).toBeTruthy();
+    expect(screen.getByText('Mystery')).toBeTruthy();
   });
 });

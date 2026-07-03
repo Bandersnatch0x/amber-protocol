@@ -52,7 +52,8 @@
   }
 
   .card-hover {
-    @apply card hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all duration-150;
+    @apply card hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-[border-color,box-shadow] duration-150
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2;
   }
 
   .section-title {
