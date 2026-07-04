@@ -26,6 +26,8 @@ const COMMANDS = [
   "loop",
   "route",
   "session",
+  "status",
+  "sync",
   "migrate",
   "daemon",
   "governance",
@@ -62,6 +64,8 @@ const PER_COMMAND_USAGE = {
   ].join("\n"),
   route: "Usage: amber route <list|inspect|validate|test|approve|verify-ledger> <route-id> [--target <repo>] [--execute] [--stage <name>] [--reviewer <name>] [--json]",
   session: "Usage: amber session <start|status|list|abort|continue|complete-check|verify|approve|verify-ledger> [--target <repo>] [--session <id>] [--goal <goal>] [--json]",
+  status: "Usage: amber status --target <repo> [--json]",
+  sync: "Usage: amber sync --target <repo> [--execute] [--json]",
 };
 
 function usage(command) {
