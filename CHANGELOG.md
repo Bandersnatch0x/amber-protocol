@@ -5,7 +5,7 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-07-04
 
 ### Changed — Direct core imports, facade removed (#4, PR2)
 - All facade consumers (`command-dispatcher`, 8 entry scripts, 12 tests) now import directly from `scripts/lib/core/*`; `grep` once again equals the dependency graph.
@@ -107,7 +107,8 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 
 ---
 
-[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Bandersnatch0x/amber-protocol/releases/tag/v1.0.0
