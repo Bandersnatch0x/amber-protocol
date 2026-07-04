@@ -618,6 +618,22 @@ function handleNext(args) {
   return { result: nextResult, exitCode: 0, bypassPrint: !args.json };
 }
 
+function handleStatus(args) {
+  const statusCommand = require("./status-command");
+  const targetRoot = resolveTarget(args);
+  const status = statusCommand.buildStatus(targetRoot);
+  return {
+    result: {
+      target: args.target,
+      text: statusCommand.renderStatus(status),
+      status,
+      errors: [],
+      warnings: [],
+    },
+    bypassPrint: !args.json,
+  };
+}
+
 function handleExplain(args) {
   const { explain } = require("./explain-command");
   const r = explain(args);
@@ -659,6 +675,7 @@ const HANDLERS = {
   accept:      handleAccept,
   pack:        handlePack,
   profile:     handleProfile,
+  status:      handleStatus,
   task:        handleTask,
   result:      handleResult,
   agent:       handleAgent,
