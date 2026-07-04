@@ -9,7 +9,7 @@
 // loop-policy + loop-ledger with governed-runner.
 const { spawnSync } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
-const { evaluateCommandPolicy, loadPolicyRules } = require("./loop-policy");
+const { evaluateCommandPolicy, loadVerifyPolicyRules } = require("./loop-policy");
 const { appendLedgerRecord } = require("./loop-ledger");
 
 const STDOUT_CAP = 4000;
@@ -18,9 +18,10 @@ const STDERR_CAP = 2000;
 function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes = 5, subject = {} }) {
 	const targetRoot = resolveTarget(target);
 
-	// Gate — policy (global rules.json; deny-wins, default-deny). Only allow-listed
-	// verification commands run, so `verify --execute --command "rm -rf /"` is refused.
-	const verdict = evaluateCommandPolicy(command, loadPolicyRules(targetRoot));
+	// Gate — verification policy (verify-rules.json; deny-wins, default-deny). Only
+	// allow-listed verification commands run, so `verify --execute --command "rm -rf /"`
+	// is refused even if the global governance rules.json has been relaxed.
+	const verdict = evaluateCommandPolicy(command, loadVerifyPolicyRules(targetRoot));
 	if (!verdict.allowed) {
 		const record = appendLedgerRecord(ledgerPath, {
 			schemaVersion: 2,

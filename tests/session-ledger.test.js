@@ -85,11 +85,11 @@ test("verifyLedgerSession on a session with no ledger reports an error", async (
 
 test("verify --execute runs an allowed command and marks the stage complete", async () => {
   const dir = tmpRepo();
-  // Allow "node " commands so the evidence-runner policy gate passes.
+  // Allow "node " commands so the evidence-runner verification policy gate passes.
   const gov = path.join(dir, ".amber", "governance");
   fs.mkdirSync(gov, { recursive: true });
   fs.writeFileSync(
-    path.join(gov, "rules.json"),
+    path.join(gov, "verify-rules.json"),
     JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [{ id: "n", action: "allow", match: "prefix", pattern: "node " }] }),
   );
   const s = await start(dir);
@@ -113,7 +113,7 @@ test("verify --execute on a failing command records verification_failed and does
   const gov = path.join(dir, ".amber", "governance");
   fs.mkdirSync(gov, { recursive: true });
   fs.writeFileSync(
-    path.join(gov, "rules.json"),
+    path.join(gov, "verify-rules.json"),
     JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [{ id: "n", action: "allow", match: "prefix", pattern: "node " }] }),
   );
   const s = await start(dir);

@@ -101,4 +101,26 @@ function loadPolicyRules(targetRoot) {
 	return DEFAULT_RULES;
 }
 
-module.exports = { evaluateCommandPolicy, loadPolicyRules, DEFAULT_RULES, matches };
+function loadVerifyPolicyRules(targetRoot) {
+	const stateDir = resolveStateDirForRead(targetRoot);
+	const rulesPath = path.join(stateDir, "governance", "verify-rules.json");
+	if (!fs.existsSync(rulesPath)) return DEFAULT_RULES;
+	let parsed;
+	try {
+		parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
+	} catch (e) {
+		process.stderr.write(
+			`[amber] governance verify-rules.json at ${rulesPath} is unparseable (${e.message}); ` +
+				"using built-in defaults — your custom verification allow/deny rules are being ignored. Fix the JSON.\n",
+		);
+		return DEFAULT_RULES;
+	}
+	if (parsed && Array.isArray(parsed.rules)) return parsed;
+	process.stderr.write(
+		`[amber] governance verify-rules.json at ${rulesPath} is missing a top-level 'rules' array; ` +
+			"using built-in defaults.\n",
+	);
+	return DEFAULT_RULES;
+}
+
+module.exports = { evaluateCommandPolicy, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES, matches };
