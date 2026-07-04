@@ -82,7 +82,7 @@ function renderStatus(s) {
 			s.init.provenance.present
 				? `, provenance ${s.init.provenance.inferred ? "inferred" : "present"}`
 				: ", no provenance"
-		}})`,
+		})`,
 	);
 	if (s.scaffoldDrift.installed === false && s.scaffoldDrift.note) {
 		// Harnessed but no provenance: the all-zero counts are noise; the note is the signal.

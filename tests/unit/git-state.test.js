@@ -16,7 +16,10 @@ test("getRepoSnapshot reports branch/dirty/lastCommit in a git repo", () => {
 	fs.writeFileSync(path.join(dir, "dirty.txt"), "x"); // dirty tree, untracked
 	const snap = getRepoSnapshot(dir);
 	assert.equal(snap.isGit, true);
-	assert.ok(typeof snap.branch === "string" && snap.branch.length > 0);
+	assert.ok(
+		snap.branch && !snap.branch.includes(" "),
+		`branch is a real name, not a flag echo: ${JSON.stringify(snap.branch)}`,
+	);
 	assert.equal(snap.dirty, true);
 	assert.ok(typeof snap.lastCommit === "string" && snap.lastCommit.length > 0);
 	assert.equal(isGitRepository(dir), true);
