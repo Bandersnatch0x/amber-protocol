@@ -10,12 +10,10 @@ const test = require("node:test");
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
 
-const {
-  classifyTarget,
-  inspectProjectProfile,
-  inspectWorkflowPack,
-  scaffoldHarness
-} = require("../scripts/lib/amber-core");
+const { classifyTarget } = require("../scripts/lib/core/target-classification");
+const { inspectProjectProfile } = require("../scripts/lib/core/profiles");
+const { inspectWorkflowPack } = require("../scripts/lib/core/workflow-packs");
+const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
 
 function tempDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `amber-v1-5-${name}-`));

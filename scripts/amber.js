@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-const { parseArgs, printResult } = require("./lib/amber-core");
+const { parseArgs, printResult } = require("./lib/core/cli-output");
 const { commandSummary } = require("./lib/command-help");
 const { dispatch } = require("./lib/command-dispatcher");
 

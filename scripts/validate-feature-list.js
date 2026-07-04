@@ -2,7 +2,8 @@
 "use strict";
 
 const path = require("node:path");
-const { parseArgs, printResult, validateFeatureListFile } = require("./lib/amber-core");
+const { parseArgs, printResult } = require("./lib/core/cli-output");
+const { validateFeatureListFile } = require("./lib/core/validators");
 
 function main() {
   const args = parseArgs(process.argv.slice(2));

@@ -6,7 +6,8 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { scaffoldHarness, validateHandoff } = require("../scripts/lib/amber-core");
+const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
+const { validateHandoff } = require("../scripts/lib/core/audit");
 
 function tempDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `amber-handoff-${name}-`));

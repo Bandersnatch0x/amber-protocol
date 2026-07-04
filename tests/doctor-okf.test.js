@@ -6,7 +6,8 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { doctor, scaffoldHarness } = require("../scripts/lib/amber-core");
+const { doctor } = require("../scripts/lib/core/doctor");
+const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
 
 function tempDir(name) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-doctor-okf-${name}-`));
