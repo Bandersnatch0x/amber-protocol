@@ -131,6 +131,14 @@ function validateFeatureListData(data) {
 		) {
 			warnings.push(`${prefix} is blocked but has no notes.`);
 		}
+
+		if (
+			Array.isArray(feature.evidence) &&
+			feature.evidence.length > 0 &&
+			feature.status === "not_started"
+		) {
+			warnings.push(`${prefix} has evidence but status is still not_started.`);
+		}
 	});
 
 	if (inProgressCount > 1) {

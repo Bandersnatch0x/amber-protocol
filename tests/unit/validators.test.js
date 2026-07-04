@@ -17,7 +17,7 @@ function validFeature(overrides = {}) {
 		area: "auth",
 		title: "Login",
 		user_visible_behavior: "user can log in",
-		status: "not_started",
+		status: "passing",
 		priority: 1,
 		verification: ["run login flow"],
 		evidence: ["e1"],
