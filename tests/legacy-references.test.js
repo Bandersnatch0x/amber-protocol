@@ -25,7 +25,6 @@ const LINE_EXEMPT = /legacy|deprecated|formerly|historical|预迁移|旧名|曾�
 const ALLOWLIST = [
 	"scripts/harness.js",
 	"scripts/compat/coding-harness.js",
-	"scripts/lib/harness-core.js",
 	"scripts/lib/state-dir-resolver.js",
 	"scripts/lib/state-migration.js",
 	"docs/legacy/",
@@ -41,8 +40,7 @@ const ALLOWLIST = [
 	".mimocode/",
 	"tests/fixtures/",
 	"tests/legacy-references.test.js",
-	"tests/amber-core-structure.test.js", // guard asserts core never requires the legacy facade name
-	"tests/unit/amber-core-exports.test.js",
+	"tests/unit/no-facade-reintroduction.test.js", // guard mentions the removed facade names by design
 	"tests/unit/state-dir-resolver.test.js",
 	"tests/unit/state-migration.test.js",
 	"tests/amber-cli.test.js", // shim-forwarding subtest spawns legacy entrypoints
@@ -64,7 +62,6 @@ const MUST_BE_CLEAN = ["docs/examples/README.md"];
 const SELF_IDENTIFYING_SHIMS = [
 	"scripts/harness.js",
 	"scripts/compat/coding-harness.js",
-	"scripts/lib/harness-core.js",
 ];
 
 const SCAN_DIRS = ["scripts", "tests", "docs", "templates", "skills", "registry",

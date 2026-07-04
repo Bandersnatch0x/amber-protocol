@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 
-const { auditProject, parseArgs, printResult } = require("./lib/amber-core");
+const { parseArgs, printResult } = require("./lib/core/cli-output");
+const { auditProject } = require("./lib/core/audit");
 
 function main() {
   const args = parseArgs(process.argv.slice(2));

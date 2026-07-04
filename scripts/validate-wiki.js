@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 
-const { parseArgs, printResult, validateWiki } = require("./lib/amber-core");
+const { parseArgs, printResult } = require("./lib/core/cli-output");
+const { validateWiki } = require("./lib/core/validators");
 
 function main() {
   const args = parseArgs(process.argv.slice(2));

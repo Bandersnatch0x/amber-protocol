@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Direct core imports, facade removed (#4, PR2)
+- All facade consumers (`command-dispatcher`, 8 entry scripts, 12 tests) now import directly from `scripts/lib/core/*`; `grep` once again equals the dependency graph.
+- Removed `scripts/lib/amber-core.js` (322-line zero-logic re-export facade) and `scripts/lib/harness-core.js` (its alias).
+- New permanent guard `tests/unit/no-facade-reintroduction.test.js` prevents the facade/backdoor from returning (the old `lint` echo-shell enforced nothing).
+- `templates/feature_list.json` F001 verification now points to `node scripts/amber.js doctor`.
+
 ### Removed — Zombie execution platform & experimental scope (#4, PR1)
 - Five execution-platform peripheral modules (`scripts/lib/{daemon,notifier,health-checker,budget-tracker,error-recovery}.js`) and their unit tests — zero production references, kept alive only by self-tests.
 - `amber daemon <status|stop>` CLI command — hidden command with no help/docs/start path; removal is bug-equivalent (minor).

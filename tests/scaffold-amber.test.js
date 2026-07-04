@@ -6,14 +6,11 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const {
-  auditProject,
-  doctor,
-  MINIMUM_HARNESS_FILES,
-  OPTIONAL_STARTER_WIKI_FILES,
-  scaffoldHarness,
-  validateContinuousImprovementStateFile
-} = require("../scripts/lib/amber-core");
+const { auditProject } = require("../scripts/lib/core/audit");
+const { doctor } = require("../scripts/lib/core/doctor");
+const { MINIMUM_HARNESS_FILES, OPTIONAL_STARTER_WIKI_FILES } = require("../scripts/lib/core/constants");
+const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
+const { validateContinuousImprovementStateFile } = require("../scripts/lib/core/validators");
 
 function tempDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `amber-${name}-`));
