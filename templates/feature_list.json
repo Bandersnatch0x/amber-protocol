@@ -11,7 +11,7 @@
       "verification": [
         "Read docs/wiki/index.md and confirm core project pages are linked.",
         "Run the standard verification command recorded in docs/wiki/engineering/verification.md.",
-        "Run node scripts/doctor.js --target . from the Amber Protocol toolkit."
+        "Run node scripts/amber.js doctor --target . from the Amber Protocol toolkit."
       ],
       "evidence": [],
       "notes": [

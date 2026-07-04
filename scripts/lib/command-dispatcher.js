@@ -13,14 +13,32 @@
 const path = require("node:path");
 
 // ── Barrel imports ──────────────────────────────────────────────────────────
-const amberCore = require("./amber-core");
+// Direct core imports (the amber-core facade was removed — ADR-0005, #4 PR2).
+const { scaffoldHarness, scaffoldWiki } = require("./core/scaffold");
+const { auditProject, validateHandoff } = require("./core/audit");
+const { doctor } = require("./core/doctor");
+const { scaffoldPlan, validatePlanGate, confirmPlanGate, reviewPlan, acceptPlan } = require("./core/planning");
+const { validateWiki } = require("./core/validators");
+const { exportOkfBundle } = require("./core/okf-export");
+const { inspectWorkflowPack, inspectWorkflowPackReadiness } = require("./core/workflow-packs");
+const { inspectProjectProfile } = require("./core/profiles");
+const { prepareTaskExecution, inspectTaskResult } = require("./core/task-execution");
+const { dispatchAgentTask, setAgentDispatchStatus, recordAgentReview } = require("./core/agent-orchestration");
+const { inspectLoopContract, recommendLoopContract, recordLoopContract, inspectLoopLedger } = require("./core/loops");
+const { executeLoopContract, approveLoopContract, verifyLoopLedger } = require("./core/loop-execution");
+const { inspectTeamDistribution, installTeamDistribution, pinTeamDistribution, updateTeamDistribution, rollbackTeamDistribution } = require("./core/team");
+const { inspectMaintenance, proposeMaintenance } = require("./core/maintenance");
+const { generateAdoptionReport, listAdoptionReports, writeAdoptionReportsIndex, validateAdoptionReports, compareAdoptionReports } = require("./core/adoption-reports");
+const { gateAdoptionReport, statusAdoptionReports } = require("./core/adoption-gate");
+const { bundleAdoptionArtifacts, writeAdoptionNextActions } = require("./core/adoption-bundle");
+const { writeAdoptionDecisionRecord, writeAdoptionApplyPlan, writeAdoptionSelectedFiles } = require("./core/adoption-proposals");
 const routeCommands = require("./route-commands");
 const sessionCommands = require("./session-commands");
 const featureCommands = require("./feature-commands");
 const { inferNext } = require("./next-command");
 const { migrateManifests } = require("./migrate-command");
 const { migrateState, migrateWiki } = require("./state-migration");
-const { validateWorkflowPack } = require("./core/execution-validator");
+const { validateWorkflowPack, validateLoopContract } = require("./core/execution-validator");
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -40,7 +58,7 @@ function resolveTarget(args) {
 
 function handleInit(args) {
   return {
-    result: amberCore.scaffoldHarness(args.target, {
+    result: scaffoldHarness(args.target, {
       dryRun: args.dryRun,
       withWiki: args.withWiki,
       skipDetection: args.skipDetection,
@@ -50,31 +68,31 @@ function handleInit(args) {
 }
 
 function handleAudit(args) {
-  return { result: amberCore.auditProject(args.target) };
+  return { result: auditProject(args.target) };
 }
 
 function handleWiki(args) {
   const action = args._?.[0];
   if (action === "export") {
-    return { result: amberCore.exportOkfBundle(args.target, { outputDir: args.outputDir }) };
+    return { result: exportOkfBundle(args.target, { outputDir: args.outputDir }) };
   }
   if (args.okf) {
-    return { result: amberCore.validateWiki(args.target, { okf: true }) };
+    return { result: validateWiki(args.target, { okf: true }) };
   }
-  return { result: amberCore.scaffoldWiki(args.target, { dryRun: args.dryRun }) };
+  return { result: scaffoldWiki(args.target, { dryRun: args.dryRun }) };
 }
 
 function handleDoctor(args) {
-  return { result: amberCore.doctor(args.target, { okf: args.okf }) };
+  return { result: doctor(args.target, { okf: args.okf }) };
 }
 
 function handleHandoff(args) {
-  return { result: amberCore.validateHandoff(args.target) };
+  return { result: validateHandoff(args.target) };
 }
 
 function handlePlan(args) {
   return {
-    result: amberCore.scaffoldPlan(args.target, {
+    result: scaffoldPlan(args.target, {
       feature: args.feature,
       title: args.title,
       dryRun: args.dryRun,
@@ -84,17 +102,17 @@ function handlePlan(args) {
 
 function handleGate(args) {
   if (args.confirm) {
-    return { result: amberCore.confirmPlanGate(args.target, args.plan) };
+    return { result: confirmPlanGate(args.target, args.plan) };
   }
-  return { result: amberCore.validatePlanGate(args.target, args.plan) };
+  return { result: validatePlanGate(args.target, args.plan) };
 }
 
 function handleReview(args) {
-  return { result: amberCore.reviewPlan(args.target, args.plan) };
+  return { result: reviewPlan(args.target, args.plan) };
 }
 
 function handleAccept(args) {
-  const acceptResult = amberCore.acceptPlan(args.target, args.plan);
+  const acceptResult = acceptPlan(args.target, args.plan);
   if (!args.session) return { result: acceptResult };
 
   const { buildCompletionResult } = require("./completion-check");
@@ -114,12 +132,12 @@ function handleAccept(args) {
 function handlePack(args) {
   const action = args._?.[0];
   if (action === "inspect" || action === "validate") {
-    const r = amberCore.inspectWorkflowPack(args.file || "");
+    const r = inspectWorkflowPack(args.file || "");
     if (action === "validate") r.valid = r.errors.length === 0;
     return { result: r };
   }
   if (action === "readiness") {
-    return { result: amberCore.inspectWorkflowPackReadiness(args.file || args._?.[1] || "") };
+    return { result: inspectWorkflowPackReadiness(args.file || args._?.[1] || "") };
   }
   if (action === "validate-execution") {
     const packPath = args.file || args.pack || args._?.[1] || "";
@@ -133,75 +151,75 @@ function handleProfile(args) {
   if (args._?.[0] !== "inspect") {
     return { result: unknownAction("profile", ["inspect"]) };
   }
-  return { result: amberCore.inspectProjectProfile(args.file || "") };
+  return { result: inspectProjectProfile(args.file || "") };
 }
 
 function handleTask(args) {
   if (args._?.[0] !== "prepare") {
     return { result: unknownAction("task", ["prepare"]) };
   }
-  return { result: amberCore.prepareTaskExecution(args.target, args.plan, args.task, args) };
+  return { result: prepareTaskExecution(args.target, args.plan, args.task, args) };
 }
 
 function handleResult(args) {
   if (args._?.[0] !== "inspect") {
     return { result: unknownAction("result", ["inspect"]) };
   }
-  return { result: amberCore.inspectTaskResult(args.target, args.task) };
+  return { result: inspectTaskResult(args.target, args.task) };
 }
 
 function handleAgent(args) {
   const action = args._?.[0];
-  if (action === "dispatch") return { result: amberCore.dispatchAgentTask(args.target, args) };
-  if (action === "stop") return { result: amberCore.setAgentDispatchStatus(args.target, args.task, "stopped") };
-  if (action === "resume") return { result: amberCore.setAgentDispatchStatus(args.target, args.task, "dispatched") };
-  if (action === "review") return { result: amberCore.recordAgentReview(args.target, args) };
+  if (action === "dispatch") return { result: dispatchAgentTask(args.target, args) };
+  if (action === "stop") return { result: setAgentDispatchStatus(args.target, args.task, "stopped") };
+  if (action === "resume") return { result: setAgentDispatchStatus(args.target, args.task, "dispatched") };
+  if (action === "review") return { result: recordAgentReview(args.target, args) };
   return { result: unknownAction("agent", ["dispatch", "stop", "resume", "review"]) };
 }
 
 function handleLoop(args) {
   const action = args._?.[0];
   if (action === "inspect") {
-    return { result: amberCore.inspectLoopContract({ file: args.file, contract: args.contract }) };
+    return { result: inspectLoopContract({ file: args.file, contract: args.contract }) };
   }
   if (action === "recommend") {
-    return { result: amberCore.recommendLoopContract({ target: args.target, file: args.file, goal: args.goal }) };
+    return { result: recommendLoopContract({ target: args.target, file: args.file, goal: args.goal }) };
   }
   if (action === "run") {
-    return { result: amberCore.executeLoopContract({ file: args.file, contract: args.contract, target: args.target, execute: args.execute, dryRun: args.dryRun, output: args.output }) };
+    return { result: executeLoopContract({ file: args.file, contract: args.contract, target: args.target, execute: args.execute, dryRun: args.dryRun, output: args.output }) };
   }
   if (action === "approve") {
-    return { result: amberCore.approveLoopContract({ file: args.file, contract: args.contract, target: args.target, reviewer: args.reviewer }) };
+    return { result: approveLoopContract({ file: args.file, contract: args.contract, target: args.target, reviewer: args.reviewer }) };
   }
   if (action === "verify-ledger") {
-    return { result: amberCore.verifyLoopLedger({ target: args.target, contract: args.contract }) };
+    return { result: verifyLoopLedger({ target: args.target, contract: args.contract }) };
   }
   if (action === "record") {
-    return { result: amberCore.recordLoopContract({ file: args.file, contract: args.contract, triggerSource: args.triggerSource, stopReason: args.stopReason, output: args.output }) };
+    return { result: recordLoopContract({ file: args.file, contract: args.contract, triggerSource: args.triggerSource, stopReason: args.stopReason, output: args.output }) };
   }
   if (action === "status") {
-    return { result: amberCore.inspectLoopLedger({ ledger: args.ledger }) };
+    return { result: inspectLoopLedger({ ledger: args.ledger }) };
   }
   if (action === "validate-loop") {
-    return { result: amberCore.validateLoopContract(args.contract) };
+    return { result: validateLoopContract(args.contract) };
   }
   return { result: unknownAction("loop", ["inspect", "recommend", "run", "approve", "verify-ledger", "record", "status", "validate-loop"]) };
 }
 
 function handleTeam(args) {
   const action = args._?.[0];
-  if (action === "inspect")  return { result: amberCore.inspectTeamDistribution(args.target, args) };
-  if (action === "install")  return { result: amberCore.installTeamDistribution(args.target, args) };
-  if (action === "pin")      return { result: amberCore.pinTeamDistribution(args.target, args) };
-  if (action === "update")   return { result: amberCore.updateTeamDistribution(args.target, args) };
-  if (action === "rollback") return { result: amberCore.rollbackTeamDistribution(args.target, args) };
+  if (action === "inspect")  return { result: inspectTeamDistribution(args.target, args) };
+  if (action === "install")  return { result: installTeamDistribution(args.target, args) };
+  if (action === "pin")      return { result: pinTeamDistribution(args.target, args) };
+  if (action === "update")   return { result: updateTeamDistribution(args.target, args) };
+  if (action === "rollback") return { result: rollbackTeamDistribution(args.target, args) };
   return { result: unknownAction("team", ["inspect", "install", "pin", "update", "rollback"]) };
 }
 
 function handleMaintenance(args) {
   const action = args._?.[0];
-  if (action === "inspect")  return { result: amberCore.inspectMaintenance(args.target, args) };
-  if (action === "propose" || action === "proposal") return { result: amberCore.proposeMaintenance(args.target, args) };
+  if (action === "inspect")  return { result: inspectMaintenance(args.target, args) };
+  if (action === "propose" || action === "proposal") return { result: proposeMaintenance(args.target, args) };
 
   // Actions that need lazy-loaded maintenance helpers
   const { resolveTarget: resolve } = require("./core/fs-utils");
@@ -260,18 +278,18 @@ function handleMaintenance(args) {
 
 function handleAdoption(args) {
   const action = args._?.[0];
-  if (action === "report")           return { result: amberCore.generateAdoptionReport(args.target, args) };
-  if (action === "list")             return { result: amberCore.listAdoptionReports(args) };
-  if (action === "index")            return { result: amberCore.writeAdoptionReportsIndex(args) };
-  if (action === "validate")         return { result: amberCore.validateAdoptionReports(args) };
-  if (action === "compare")          return { result: amberCore.compareAdoptionReports(args) };
-  if (action === "gate")             return { result: amberCore.gateAdoptionReport(args) };
-  if (action === "status")           return { result: amberCore.statusAdoptionReports(args) };
-  if (action === "bundle")           return { result: amberCore.bundleAdoptionArtifacts(args) };
-  if (action === "next-actions")     return { result: amberCore.writeAdoptionNextActions(args) };
-  if (action === "decision-record")  return { result: amberCore.writeAdoptionDecisionRecord(args) };
-  if (action === "apply-plan")       return { result: amberCore.writeAdoptionApplyPlan(args) };
-  if (action === "selected-files")   return { result: amberCore.writeAdoptionSelectedFiles(args) };
+  if (action === "report")           return { result: generateAdoptionReport(args.target, args) };
+  if (action === "list")             return { result: listAdoptionReports(args) };
+  if (action === "index")            return { result: writeAdoptionReportsIndex(args) };
+  if (action === "validate")         return { result: validateAdoptionReports(args) };
+  if (action === "compare")          return { result: compareAdoptionReports(args) };
+  if (action === "gate")             return { result: gateAdoptionReport(args) };
+  if (action === "status")           return { result: statusAdoptionReports(args) };
+  if (action === "bundle")           return { result: bundleAdoptionArtifacts(args) };
+  if (action === "next-actions")     return { result: writeAdoptionNextActions(args) };
+  if (action === "decision-record")  return { result: writeAdoptionDecisionRecord(args) };
+  if (action === "apply-plan")       return { result: writeAdoptionApplyPlan(args) };
+  if (action === "selected-files")   return { result: writeAdoptionSelectedFiles(args) };
   return { result: unknownAction("adoption", ["report", "list", "index", "validate", "compare", "gate", "status", "bundle", "next-actions", "decision-record", "apply-plan", "selected-files"]) };
 }
 
@@ -418,34 +436,6 @@ function handleMigrate(args) {
         for (const log of migrateResult.logs) console.log(`  ${log}`);
       }
     },
-  };
-}
-
-function handleDaemon(args) {
-  const action = args._?.[0];
-  const { stopDaemon, getDaemonStatus } = require("./daemon");
-
-  if (action === "status") {
-    const status = getDaemonStatus(process.cwd());
-    const text = status.running ? `Daemon running (PID: ${status.pid})` : "Daemon not running";
-    return {
-      result: { target: args.target, text, errors: [], warnings: [] },
-      exitCode: status.running ? 0 : 1,
-      bypassPrint: !args.json,
-    };
-  }
-  if (action === "stop") {
-    const stop = stopDaemon(process.cwd());
-    return {
-      result: { target: args.target, text: stop.success ? "Daemon stopped" : stop.error, errors: stop.success ? [] : [stop.error], warnings: [] },
-      exitCode: stop.success ? 0 : 1,
-      bypassPrint: !args.json,
-    };
-  }
-  return {
-    result: { target: args.target, text: "Usage: harness daemon <status|stop>", errors: ["Unknown daemon subcommand"], warnings: [] },
-    exitCode: 1,
-    bypassPrint: !args.json,
   };
 }
 
@@ -729,7 +719,6 @@ const HANDLERS = {
   route:       handleRoute,
   session:     handleSession,
   migrate:     handleMigrate,
-  daemon:      handleDaemon,
   governance:  handleGovernance,
   execution:   handleExecution,
   security:    handleSecurity,

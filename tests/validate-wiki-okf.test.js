@@ -6,7 +6,8 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { validateWiki, scaffoldHarness } = require("../scripts/lib/amber-core");
+const { validateWiki } = require("../scripts/lib/core/validators");
+const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
 const { run } = require("../scripts/amber.js");
 
 async function runQuiet(argv) {

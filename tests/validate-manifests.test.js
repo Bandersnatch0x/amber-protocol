@@ -7,7 +7,7 @@ const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
 
-const { validateManifests } = require("../scripts/lib/amber-core");
+const { validateManifests } = require("../scripts/lib/core/manifests");
 
 function fixture(name) {
   return path.join(__dirname, "fixtures", name);

@@ -5,6 +5,23 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-04
+
+### Changed — Direct core imports, facade removed (#4, PR2)
+- All facade consumers (`command-dispatcher`, 8 entry scripts, 12 tests) now import directly from `scripts/lib/core/*`; `grep` once again equals the dependency graph.
+- Removed `scripts/lib/amber-core.js` (322-line zero-logic re-export facade) and `scripts/lib/harness-core.js` (its alias).
+- New permanent guard `tests/unit/no-facade-reintroduction.test.js` prevents the facade/backdoor from returning (the old `lint` echo-shell enforced nothing).
+- `templates/feature_list.json` F001 verification now points to `node scripts/amber.js doctor`.
+
+### Removed — Zombie execution platform & experimental scope (#4, PR1)
+- Five execution-platform peripheral modules (`scripts/lib/{daemon,notifier,health-checker,budget-tracker,error-recovery}.js`) and their unit tests — zero production references, kept alive only by self-tests.
+- `amber daemon <status|stop>` CLI command — hidden command with no help/docs/start path; removal is bug-equivalent (minor).
+- `src/experimental/execution/` and `tests/experimental/` — the cold-stored execution engine was unreachable, broken-chained (5+ dangling requires incl. `checkpoint-manager`), `test:experimental` failed 3/5, yet shipped to every installer via `files:["src/"]`. See ADR-0005.
+- `test:experimental` npm script.
+
+### Fixed
+- `session start --mode autonomous` now refuses at the gate (exit 1, no manifest written), matching ADR-0002's stated intent. Previously it accepted the mode and only `session continue` refused — leaving an unreachable autonomous manifest behind.
+
 ## [1.2.0] - 2026-07-04
 
 ### Added — State-aware drift detection (`amber status` + `amber sync`)
@@ -93,7 +110,9 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 
 ---
 
-[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Bandersnatch0x/amber-protocol/releases/tag/v1.0.0
 [1.0.0-rc.1]: https://github.com/Bandersnatch0x/amber-protocol/releases/tag/v1.0.0-rc.1
