@@ -22,6 +22,48 @@ test("buildStatus on an installed harnessed git target reports repo + init + pro
 	assert.equal(s.init.provenance.present, true);
 	assert.ok(s.scaffoldDrift.counts, "scaffold drift counts present");
 	assert.ok(typeof s.scaffoldDrift.counts.fresh === "number");
+	assert.ok(s.artifactDrift.available);
+	assert.ok(typeof s.artifactDrift.counts.drifted === "number");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("status surfaces artifact drift counts and honesty caveat", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-st-"));
+	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
+	fs.writeFileSync(path.join(dir, ".gitignore"), ".amber/\n");
+	execSync("git add -A && git commit -qm init", { cwd: dir });
+	scaffoldHarness(dir, {});
+	const text = renderStatus(buildStatus(dir));
+	assert.match(text, /Artifact drift:/);
+	assert.match(text, /not a re-verification/);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("status nextStep points to feature verify when drifted > 0", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-st-"));
+	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
+	fs.writeFileSync(path.join(dir, ".gitignore"), ".amber/\n");
+	fs.mkdirSync(path.join(dir, "src"), { recursive: true });
+	fs.writeFileSync(path.join(dir, "src", "a.js"), "x");
+	execSync("git add -A && git commit -qm init", { cwd: dir });
+	scaffoldHarness(dir, {});
+	const featureList = JSON.parse(fs.readFileSync(path.join(dir, "feature_list.json"), "utf8"));
+	featureList.features.push({
+		id: "F900",
+		priority: 2,
+		area: "test",
+		title: "Drifted feature",
+		user_visible_behavior: "b",
+		status: "passing",
+		verification: ["v"],
+		paths: ["src/a.js"],
+		evidence: [{ command: "c", result: "pass", date: "2020-01-01" }],
+		notes: [],
+	});
+	fs.writeFileSync(path.join(dir, "feature_list.json"), JSON.stringify(featureList, null, 2));
+	const s = buildStatus(dir);
+	assert.ok(s.artifactDrift.counts.drifted > 0);
+	assert.match(s.nextStep, /amber feature verify/);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 

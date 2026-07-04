@@ -638,12 +638,16 @@ function handleStatus(args) {
 function handleSync(args) {
   const targetRoot = resolveTarget(args);
   const { detectScaffoldDrift, refreshAmberOwnedFiles } = require("./core/scaffold-version-drift");
+  const { detectArtifactDrift } = require("./core/artifact-drift");
   // Forward a caller-supplied templateRoot (mirrors scaffoldHarness's option) so
   // the shipped-template source is the SAME one used at install time. Undefined
   // in the real CLI → both helpers fall back to the default TEMPLATE_ROOT.
   const opts = args.templateRoot ? { templateRoot: args.templateRoot } : {};
   const drift = detectScaffoldDrift(targetRoot, opts);
-  const note = "Artifact drift: run `amber status`. Reconciliation is SP2 (not yet available).";
+  const artifact = detectArtifactDrift(targetRoot);
+  const note = artifact.available && artifact.counts.drifted > 0
+    ? `Artifact drift: ${artifact.counts.drifted} drifted — re-verify with \`amber feature verify --feature <id>\`.`
+    : "Artifact drift: none detected. (aligned = code not newer than evidence; not a re-verification)";
   let refresh = null;
   if (args.execute) refresh = refreshAmberOwnedFiles(targetRoot, opts);
 
