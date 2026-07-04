@@ -6,7 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { validateFeatureListData, validateFeatureListFile } = require("../scripts/lib/amber-core");
+const { validateFeatureListData, validateFeatureListFile } = require("../scripts/lib/core/validators");
 
 function validFeature(overrides = {}) {
   return {

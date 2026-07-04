@@ -6,7 +6,8 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { scaffoldHarness, validateWiki } = require("../scripts/lib/amber-core");
+const { scaffoldHarness } = require("../scripts/lib/core/scaffold");
+const { validateWiki } = require("../scripts/lib/core/validators");
 
 function tempDir(name) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `amber-wiki-${name}-`));

@@ -6,7 +6,8 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { buildOkfGraph, exportOkfBundle, OKF_VERSION } = require("../scripts/lib/amber-core");
+const { buildOkfGraph, exportOkfBundle } = require("../scripts/lib/core/okf-export");
+const { OKF_VERSION } = require("../scripts/lib/core/okf-frontmatter");
 
 function tempDir(name) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-okfx-${name}-`));

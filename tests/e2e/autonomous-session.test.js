@@ -26,7 +26,7 @@ describe("autonomous session E2E", () => {
     if (fs.existsSync(testRoot)) fs.rmSync(testRoot, { recursive: true });
   });
 
-  it("should start an autonomous session", () => {
+  it("refuses autonomous mode at session start (ADR-0005)", () => {
     const start = spawnSync(process.execPath, [
       path.join(ROOT, "scripts/amber.js"),
       "session", "start",
@@ -35,15 +35,17 @@ describe("autonomous session E2E", () => {
       "--json"
     ], { cwd: testRoot, encoding: "utf8", timeout: 15000 });
 
-    assert.strictEqual(start.status, 0, `start failed: ${start.stderr}`);
-
-    const startResult = JSON.parse(start.stdout);
-    assert.ok(startResult.sessionId);
-    assert.ok(startResult.text.includes("Mode: autonomous"));
+    // Autonomous execution is removed (ADR-0005): start must refuse at the gate,
+    // not accept and defer the refusal to continue.
+    assert.notStrictEqual(start.status, 0, `expected non-zero exit, got ${start.status}`);
+    assert.ok(
+      /Autonomous execution is not available/.test(start.stdout + start.stderr),
+      `expected refusal message, got: ${start.stdout}${start.stderr}`,
+    );
   });
 
-  it("should store autonomous mode in manifest", () => {
-    const start = spawnSync(process.execPath, [
+  it("does not create a session for autonomous mode", () => {
+    spawnSync(process.execPath, [
       path.join(ROOT, "scripts/amber.js"),
       "session", "start",
       "--goal", "implement test feature",
@@ -51,11 +53,9 @@ describe("autonomous session E2E", () => {
       "--json"
     ], { cwd: testRoot, encoding: "utf8", timeout: 15000 });
 
-    const startResult = JSON.parse(start.stdout);
-    const manifestPath = path.join(testRoot, ".amber", "sessions", startResult.sessionId, "manifest.json");
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-
-    assert.strictEqual(manifest.mode, "autonomous");
-    assert.strictEqual(manifest.sessionId, startResult.sessionId);
+    // A refused mode must not write a manifest.
+    const sessionsDir = path.join(testRoot, ".amber", "sessions");
+    const created = fs.existsSync(sessionsDir) ? fs.readdirSync(sessionsDir) : [];
+    assert.deepEqual(created, [], `expected no session, found: ${created.join(", ")}`);
   });
 });

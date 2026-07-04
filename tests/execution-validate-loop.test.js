@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { validateLoopContract } = require('../scripts/lib/amber-core');
+const { validateLoopContract } = require("../scripts/lib/core/execution-validator");
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');

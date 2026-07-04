@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
-const { proposeMaintenance } = require("../scripts/lib/amber-core");
+const { proposeMaintenance } = require("../scripts/lib/core/maintenance");
 
 function tempDir() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "maintenance-proposal-"));
