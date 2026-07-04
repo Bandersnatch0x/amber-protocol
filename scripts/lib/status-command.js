@@ -13,6 +13,7 @@ const { getRepoSnapshot } = require("./core/git-state");
 const { detectScaffoldDrift } = require("./core/scaffold-version-drift");
 const { loadProvenance } = require("./core/scaffold-provenance");
 const { detectArtifactDrift } = require("./core/artifact-drift");
+const { detectWikiDrift } = require("./core/wiki-drift");
 
 function buildStatus(target) {
 	const targetRoot = resolveTarget(target);
@@ -37,6 +38,7 @@ function buildStatus(target) {
 	}
 
 	const artifactDrift = detectArtifactDrift(targetRoot);
+	const wikiDrift = detectWikiDrift(targetRoot);
 
 	let nextStep;
 	if (classification.type === "unharnessed-target-repo") {
@@ -74,6 +76,7 @@ function buildStatus(target) {
 		},
 		scaffoldDrift,
 		artifactDrift,
+		wikiDrift,
 		nextStep,
 	};
 }
@@ -109,6 +112,17 @@ function renderStatus(s) {
 		lines.push("  (aligned = code not newer than evidence; not a re-verification)");
 	} else if (s.artifactDrift.note) {
 		lines.push(`Artifact drift: ${s.artifactDrift.note}`);
+	}
+	if (s.wikiDrift.available) {
+		const c = s.wikiDrift.counts;
+		lines.push(`Wiki drift: staleDocs=${c.staleDocs} missingRequired=${c.missingRequired} controlledDrifted=${c.controlledDrifted}`);
+		const hints = [];
+		if (c.missingRequired > 0) hints.push("amber wiki --dry-run (re-scaffold missing pages)");
+		if (c.staleDocs > 0) hints.push("amber maintenance stale-docs");
+		if (c.controlledDrifted > 0) hints.push("amber sync");
+		if (hints.length) lines.push(`  hint: ${hints.join("; ")}`);
+	} else if (s.wikiDrift.note) {
+		lines.push(`Wiki drift: ${s.wikiDrift.note}`);
 	}
 	lines.push(`Next: ${s.nextStep}`);
 	return lines.join("\n");
