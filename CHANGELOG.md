@@ -5,6 +5,31 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-04
+
+### Added — State-aware drift detection (`amber status` + `amber sync`)
+- **`amber status`** — a curated state front-door: repo? / initialised? / fresh?, plus three drift surfaces in one glance. Read-only; does not duplicate `doctor` (validity) or `maintenance inspect` (full dump).
+- **Scaffold-version drift (SP1)** — `.amber/provenance.json` (per-file sha256 + ownership tier; hash strips YAML `updated:`) and a four-class classifier (fresh / stale / customized / ambiguous / missing). `amber sync --execute` and `init --refresh-amber-owned` overwrite only `controlled + stale` files (after a `.bak` backup); `customized`/`ambiguous` controlled files are cached as proposals, never clobbered.
+- **Artifact-vs-reality drift (SP2)** — optional per-feature `paths` field (`feature add --paths`) and a git-anchored `detectArtifactDrift` with six classes (drifted / aligned + skipped: no-evidence / untracked / path-unknown / anchor-invalid). Comparison is timezone-homogeneous (`Date.parse` ms); an empty pathspec is surfaced as `path-unknown` rather than swallowed into `aligned`.
+- **Wiki drift (SP3)** — `detectWikiDrift` aggregates stale docs (`Last Reviewed` marker), missing required wiki pages, and controlled-wiki template drift. Surfaced in `amber status`; non-git projects are NOT skipped (wiki drift is marker/file/provenance based, not git-anchored).
+- **`amber sync`** — standalone scaffold-drift resolution (dry-run by default; `--execute` applies).
+
+### Added — Evidence-grade sessions
+- **`session verify --execute`** runs the verification command in the working copy behind the policy gate and records its real exit code to the session hash-chain ledger (`verification_passed/failed/denied`).
+- **`session approve`** identity gate — records who approved (interactive TTY prompt or `--yes`); the agent must not self-approve.
+- **Honest `completion-check`** — `hasWorkEvidence` excludes `.amber/`/`.harness/` bookkeeping and compares the latest commit to `createdAt` at ms precision; `--strict` requires executed verification.
+- Evidence ledger records now persist `stdoutTail`/`stderrTail` (passed/failed; denied omits them).
+- Verification uses a dedicated `governance/verify-rules.json` allow-list (absent → built-in defaults; unparseable → stderr warn) — widening the global `rules.json` can no longer relax verification.
+
+### Changed
+- `maintenance inspect` now includes artifact drift alongside scaffold drift.
+- `loadPolicyRules` now stderr-warns on an unparseable/shape-invalid `rules.json` instead of silently falling back (was a diagnostic trap).
+
+### Fixed
+- GitHub Packages publish workflow is now idempotent — a re-pointed tag or a re-run skips an already-published version instead of failing with `E409 Cannot publish over existing version`.
+
+Baseline tests 1038 → 1136 (+98), zero regressions.
+
 ## [1.1.0] - 2026-06-30
 
 ### Added — Governed Loop Execution (GLX)
