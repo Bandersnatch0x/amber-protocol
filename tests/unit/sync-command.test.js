@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { execSync } = require("node:child_process");
 const { dispatch } = require("../../scripts/lib/command-dispatcher");
 const { scaffoldHarness } = require("../../scripts/lib/core/scaffold");
 const { detectScaffoldDrift } = require("../../scripts/lib/core/scaffold-version-drift");
@@ -54,7 +55,7 @@ test("sync dry-run reports the plan and makes NO filesystem changes", () => {
 		assert.ok(!fs.existsSync(installedPath + ".bak"), "no backup created in dry-run");
 		// Plan + artifact note surfaced.
 		assert.match(result.text, /dry-run/i);
-		assert.match(result.text, /SP2/i);
+		assert.match(result.text, /Artifact drift/i);
 	} finally {
 		fs.rmSync(tpl, { recursive: true, force: true });
 		fs.rmSync(dir, { recursive: true, force: true });
@@ -74,7 +75,7 @@ test("sync --execute overwrites the stale controlled file and re-stamps (detecto
 		const drift = detectScaffoldDrift(dir, { templateRoot: tpl });
 		assert.equal(drift.files.find((f) => f.path === REL).classification, "fresh");
 		assert.match(result.text, /execute/i);
-		assert.match(result.text, /SP2/i);
+		assert.match(result.text, /Artifact drift/i);
 	} finally {
 		fs.rmSync(tpl, { recursive: true, force: true });
 		fs.rmSync(dir, { recursive: true, force: true });
@@ -86,7 +87,35 @@ test("sync never resolves artifact drift (flags it as SP2)", () => {
 	try {
 		const { result } = dispatch("sync", parseArgs(["--target", dir]));
 		assert.match(result.text, /Artifact drift/i);
-		assert.match(result.text, /SP2/i);
+	} finally {
+		fs.rmSync(tpl, { recursive: true, force: true });
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("sync note reflects drifted count when artifact drift present", () => {
+	const { tpl, dir } = fixture();
+	try {
+		execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
+		fs.mkdirSync(path.join(dir, "src"), { recursive: true });
+		fs.writeFileSync(path.join(dir, "src", "a.js"), "x");
+		execSync("git add -A && git commit -qm add-src", { cwd: dir });
+		const featureList = JSON.parse(fs.readFileSync(path.join(dir, "feature_list.json"), "utf8"));
+		featureList.features.push({
+			id: "F900",
+			priority: 2,
+			area: "test",
+			title: "Drifted feature",
+			user_visible_behavior: "b",
+			status: "passing",
+			verification: ["v"],
+			paths: ["src/a.js"],
+			evidence: [{ command: "c", result: "pass", date: "2020-01-01" }],
+			notes: [],
+		});
+		fs.writeFileSync(path.join(dir, "feature_list.json"), JSON.stringify(featureList, null, 2));
+		const { result } = dispatch("sync", parseArgs(["--target", dir]));
+		assert.match(result.text, /Artifact drift:.*drifted.*feature verify/);
 	} finally {
 		fs.rmSync(tpl, { recursive: true, force: true });
 		fs.rmSync(dir, { recursive: true, force: true });
