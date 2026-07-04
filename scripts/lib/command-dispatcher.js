@@ -510,6 +510,7 @@ function handleFeature(args) {
       title: args.title || args._?.[2],
       priority: args.priority,
       area: args.area,
+      paths: args.paths,
     });
   } else if (action === "list") {
     featureResult = featureCommands.listFeatures(targetRoot);

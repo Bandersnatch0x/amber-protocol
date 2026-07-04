@@ -31,7 +31,7 @@ function saveFeatures(data) {
 
 function addFeature(target, options) {
 	const targetRoot = resolveTarget(target);
-	const { id, title, priority, area } = options;
+	const { id, title, priority, area, paths } = options;
 
 	if (!id) {
 		return {
@@ -80,6 +80,9 @@ function addFeature(target, options) {
 		evidence: [],
 		notes: [],
 	};
+	if (typeof paths === "string" && paths.trim() !== "") {
+		feature.paths = paths.split(",").map((p) => p.trim()).filter(Boolean);
+	}
 
 	data.features.push(feature);
 	saveFeatures(data);
