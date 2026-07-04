@@ -57,6 +57,9 @@ test("renderStatus produces a readable multi-line report", () => {
 	assert.match(text, /Init:/);
 	assert.match(text, /Scaffold drift:/);
 	assert.match(text, /Next:/);
+	const initLine = text.split("\n").find((l) => l.startsWith("Init:"));
+	assert.ok(initLine, "Init line present");
+	assert.ok(!initLine.includes("})"), `no stray brace in Init line: ${initLine}`);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 

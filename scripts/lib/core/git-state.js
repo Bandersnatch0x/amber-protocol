@@ -13,7 +13,7 @@ function getRepoSnapshot(targetRoot) {
 	if (!isGitRepository(targetRoot)) {
 		return { isGit: false, branch: null, dirty: false, lastCommit: null };
 	}
-	const branch = gitOutput(targetRoot, ["rev-parse", "--abbrev-ref HEAD"]) || null;
+	const branch = gitOutput(targetRoot, ["rev-parse", "--abbrev-ref", "HEAD"]) || null;
 	const dirtyRaw = gitOutput(targetRoot, ["status", "--porcelain"]);
 	const dirty = Boolean(dirtyRaw && dirtyRaw.length > 0);
 	const lastCommit = gitOutput(targetRoot, ["log", "-1", "--format=%h %s"]) || null;
