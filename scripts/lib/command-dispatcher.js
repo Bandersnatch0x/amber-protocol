@@ -421,34 +421,6 @@ function handleMigrate(args) {
   };
 }
 
-function handleDaemon(args) {
-  const action = args._?.[0];
-  const { stopDaemon, getDaemonStatus } = require("./daemon");
-
-  if (action === "status") {
-    const status = getDaemonStatus(process.cwd());
-    const text = status.running ? `Daemon running (PID: ${status.pid})` : "Daemon not running";
-    return {
-      result: { target: args.target, text, errors: [], warnings: [] },
-      exitCode: status.running ? 0 : 1,
-      bypassPrint: !args.json,
-    };
-  }
-  if (action === "stop") {
-    const stop = stopDaemon(process.cwd());
-    return {
-      result: { target: args.target, text: stop.success ? "Daemon stopped" : stop.error, errors: stop.success ? [] : [stop.error], warnings: [] },
-      exitCode: stop.success ? 0 : 1,
-      bypassPrint: !args.json,
-    };
-  }
-  return {
-    result: { target: args.target, text: "Usage: harness daemon <status|stop>", errors: ["Unknown daemon subcommand"], warnings: [] },
-    exitCode: 1,
-    bypassPrint: !args.json,
-  };
-}
-
 function handleGovernance(args) {
   const action = args._?.[0];
   const {
@@ -729,7 +701,6 @@ const HANDLERS = {
   route:       handleRoute,
   session:     handleSession,
   migrate:     handleMigrate,
-  daemon:      handleDaemon,
   governance:  handleGovernance,
   execution:   handleExecution,
   security:    handleSecurity,

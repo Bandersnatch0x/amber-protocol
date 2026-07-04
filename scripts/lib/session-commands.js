@@ -403,14 +403,13 @@ async function continueSession(projectRoot, options) {
 		return result(`Cannot continue session with status: ${manifest.status}`, 1);
 	}
 
-	// Autonomous mode: EXPERIMENTAL - moved to src/experimental/execution/
-	// Removed from V1 to align with ADR-0001 (governance-first, no live execution)
-	// See src/experimental/execution/README.md for V2 considerations
+	// Autonomous mode removed in 1.3.0 (ADR-0005): the experimental execution
+	// engine was deleted — unreachable, broken-chained, and shipping dead code.
+	// Amber remains governance-first (ADR-0001): no live execution.
 	if (manifest.mode === "autonomous") {
 		return result(
-			"Error: Autonomous execution is experimental and not available in V1. " +
-			"Amber V1 focuses on governance (audit, gate, inspect) without live execution. " +
-			"See src/experimental/execution/README.md for details.",
+			"Error: Autonomous execution is not available. " +
+			"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
 			1
 		);
 	}

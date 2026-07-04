@@ -29,7 +29,6 @@ const COMMANDS = [
   "status",
   "sync",
   "migrate",
-  "daemon",
   "governance",
   "execution",
   "security",
