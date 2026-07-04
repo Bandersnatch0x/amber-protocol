@@ -97,6 +97,16 @@ function validateFeatureListData(data) {
 			errors.push(`${prefix}.evidence must be an array.`);
 		}
 
+		if (feature.paths !== undefined) {
+			if (!Array.isArray(feature.paths) || feature.paths.length === 0) {
+				errors.push(`${prefix}.paths must be a non-empty array if present.`);
+			} else if (
+				feature.paths.some((p) => typeof p !== "string" || p.trim() === "")
+			) {
+				errors.push(`${prefix}.paths entries must be non-empty strings.`);
+			}
+		}
+
 		if (!Array.isArray(feature.notes)) {
 			errors.push(`${prefix}.notes must be an array.`);
 		}

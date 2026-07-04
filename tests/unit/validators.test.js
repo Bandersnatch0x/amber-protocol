@@ -128,6 +128,36 @@ test("errors on an empty verification array and on a blank step", () => {
 	]);
 });
 
+test("paths is optional — feature without paths is valid", () => {
+	const r = validateFeatureListData({ features: [validFeature()] });
+	assert.strictEqual(r.errors.length, 0);
+});
+
+test("paths present and valid is accepted", () => {
+	const r = validateFeatureListData({
+		features: [validFeature({ paths: ["src/auth", "docs/auth.md"] })],
+	});
+	assert.strictEqual(r.errors.length, 0);
+});
+
+test("paths must be a non-empty array if present", () => {
+	const r1 = validateFeatureListData({
+		features: [validFeature({ paths: "src/auth" })],
+	});
+	assert.ok(r1.errors.some((e) => e.includes("paths must be a non-empty array")));
+	const r2 = validateFeatureListData({
+		features: [validFeature({ paths: [] })],
+	});
+	assert.ok(r2.errors.some((e) => e.includes("paths must be a non-empty array")));
+});
+
+test("paths entries must be non-empty strings", () => {
+	const r = validateFeatureListData({
+		features: [validFeature({ paths: ["ok", "  "] })],
+	});
+	assert.ok(r.errors.some((e) => e.includes("paths entries must be non-empty strings")));
+});
+
 test("accumulates every field error for an empty feature object", () => {
 	const result = validateFeatureListData({ features: [{}] });
 	assert.deepEqual(result.errors, [
