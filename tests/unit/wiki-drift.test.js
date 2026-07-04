@@ -29,15 +29,25 @@ test("no wiki dir -> available:false with note", () => {
   assert.match(r.note, /wiki/);
 });
 
-test("missingRequired counts absent required pages", () => {
+test("missingRequired counts absent required WIKI pages", () => {
   const dir = mkWikiDir();
   seedRequired(dir);
-  // Delete one required page -> should be detected.
-  fs.unlinkSync(path.join(dir, REQUIRED_HARNESS_FILES[0]));
+  // Delete one required WIKI page -> should be detected.
+  const wikiPage = "docs/wiki/index.md";
+  fs.unlinkSync(path.join(dir, wikiPage));
   const r = detectWikiDrift(dir);
   assert.strictEqual(r.available, true);
   assert.ok(r.counts.missingRequired >= 1);
-  assert.ok(r.missingRequired.includes(REQUIRED_HARNESS_FILES[0]));
+  assert.ok(r.missingRequired.includes(wikiPage));
+});
+
+test("missingRequired ignores non-wiki harness files (AGENTS.md etc.)", () => {
+  const dir = mkWikiDir();
+  seedRequired(dir);
+  // A missing NON-wiki required file must NOT count as wiki missingRequired.
+  fs.unlinkSync(path.join(dir, "AGENTS.md"));
+  const r = detectWikiDrift(dir);
+  assert.strictEqual(r.counts.missingRequired, 0);
 });
 
 test("staleDocs flags wiki md missing the Last Reviewed marker", () => {

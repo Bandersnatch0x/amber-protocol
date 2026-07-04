@@ -27,7 +27,12 @@ function detectWikiDrift(target) {
 	}
 
 	const stale = detectStaleDocs(targetRoot);
-	const missingRequired = REQUIRED_HARNESS_FILES.filter(
+	// Only the wiki subset of required harness files belongs in WIKI drift — a
+	// missing AGENTS.md/feature_list.json is a harness gap, not wiki drift.
+	const wikiRequired = REQUIRED_HARNESS_FILES.filter((rel) =>
+		rel.startsWith("docs/wiki/"),
+	);
+	const missingRequired = wikiRequired.filter(
 		(rel) => !pathExists(path.join(targetRoot, rel)),
 	);
 
