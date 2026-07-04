@@ -9,6 +9,60 @@ const { execSync } = require("node:child_process");
 const { scaffoldHarness } = require("../../scripts/lib/core/scaffold");
 const { buildStatus, renderStatus } = require("../../scripts/lib/status-command");
 
+function seedWiki(dir) {
+  const { REQUIRED_HARNESS_FILES } = require("../../scripts/lib/core/constants");
+  for (const rel of REQUIRED_HARNESS_FILES) {
+    if (!rel.startsWith("docs/wiki/")) continue;
+    const p = path.join(dir, rel);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, "# stub\n");
+  }
+}
+
+test("status surfaces wiki drift counts when available", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-st-"));
+  execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
+  fs.writeFileSync(path.join(dir, ".gitignore"), ".amber/\n");
+  execSync("git add -A && git commit -qm init", { cwd: dir });
+  scaffoldHarness(dir, {});
+  seedWiki(dir);
+  const status = buildStatus(dir);
+  assert.ok(status.wikiDrift.available);
+  assert.ok(typeof status.wikiDrift.counts.missingRequired === "number");
+  const text = renderStatus(status);
+  assert.match(text, /Wiki drift:/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("status renders a local hint when wiki signals are non-zero", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-st-"));
+  execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
+  fs.writeFileSync(path.join(dir, ".gitignore"), ".amber/\n");
+  execSync("git add -A && git commit -qm init", { cwd: dir });
+  scaffoldHarness(dir, {});
+  seedWiki(dir);
+  // Remove one required wiki page to create a non-zero signal.
+  const { REQUIRED_HARNESS_FILES } = require("../../scripts/lib/core/constants");
+  const missingRel = REQUIRED_HARNESS_FILES.find((r) => r.startsWith("docs/wiki/"));
+  fs.unlinkSync(path.join(dir, missingRel));
+  const text = renderStatus(buildStatus(dir));
+  assert.match(text, /Wiki drift:/);
+  assert.match(text, /hint:/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("status top-level nextStep is unchanged shape (still present)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-st-"));
+  execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
+  fs.writeFileSync(path.join(dir, ".gitignore"), ".amber/\n");
+  execSync("git add -A && git commit -qm init", { cwd: dir });
+  scaffoldHarness(dir, {});
+  seedWiki(dir);
+  const status = buildStatus(dir);
+  assert.ok(typeof status.nextStep === "string" && status.nextStep.length > 0);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("buildStatus on an installed harnessed git target reports repo + init + provenance + drift counts", () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-st-"));
 	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
