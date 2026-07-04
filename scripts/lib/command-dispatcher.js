@@ -618,6 +618,59 @@ function handleNext(args) {
   return { result: nextResult, exitCode: 0, bypassPrint: !args.json };
 }
 
+function handleStatus(args) {
+  const statusCommand = require("./status-command");
+  const targetRoot = resolveTarget(args);
+  const status = statusCommand.buildStatus(targetRoot);
+  return {
+    result: {
+      target: args.target,
+      text: statusCommand.renderStatus(status),
+      status,
+      errors: [],
+      warnings: [],
+    },
+    bypassPrint: !args.json,
+  };
+}
+
+function handleSync(args) {
+  const targetRoot = resolveTarget(args);
+  const { detectScaffoldDrift, refreshAmberOwnedFiles } = require("./core/scaffold-version-drift");
+  // Forward a caller-supplied templateRoot (mirrors scaffoldHarness's option) so
+  // the shipped-template source is the SAME one used at install time. Undefined
+  // in the real CLI → both helpers fall back to the default TEMPLATE_ROOT.
+  const opts = args.templateRoot ? { templateRoot: args.templateRoot } : {};
+  const drift = detectScaffoldDrift(targetRoot, opts);
+  const note = "Artifact drift: run `amber status`. Reconciliation is SP2 (not yet available).";
+  let refresh = null;
+  if (args.execute) refresh = refreshAmberOwnedFiles(targetRoot, opts);
+
+  const lines = [`Target: ${targetRoot}`, `Mode: ${args.execute ? "execute" : "dry-run (no changes made)"}`];
+  if (drift.installed) {
+    const c = drift.counts;
+    lines.push(`Scaffold drift: fresh=${c.fresh} stale=${c.stale} customized=${c.customized} ambiguous=${c.ambiguous} missing=${c.missing}`);
+  } else {
+    lines.push(`Scaffold drift: ${drift.note || "no provenance"}`);
+  }
+  if (refresh) {
+    lines.push(`Refreshed (stale controlled): ${refresh.refreshed.length} — ${refresh.refreshed.join(", ") || "(none)"}`);
+    lines.push(`Proposals cached (customized/ambiguous): ${refresh.proposals.length} — ${refresh.proposals.join(", ") || "(none)"}`);
+  }
+  lines.push(note);
+
+  return {
+    result: {
+      target: args.target,
+      text: lines.join("\n"),
+      sync: { executed: Boolean(args.execute), drift, refresh, note },
+      errors: [],
+      warnings: [],
+    },
+    bypassPrint: !args.json,
+  };
+}
+
 function handleExplain(args) {
   const { explain } = require("./explain-command");
   const r = explain(args);
@@ -659,6 +712,8 @@ const HANDLERS = {
   accept:      handleAccept,
   pack:        handlePack,
   profile:     handleProfile,
+  status:      handleStatus,
+  sync:        handleSync,
   task:        handleTask,
   result:      handleResult,
   agent:       handleAgent,
