@@ -4,6 +4,7 @@
       "id": "F001",
       "priority": 1,
       "area": "harness",
+      "paths": ["docs/wiki/index.md"],
       "title": "Customize the repository Harness",
       "user_visible_behavior": "A fresh agent can understand the project, run verification, and hand off work safely.",
       "status": "not_started",
