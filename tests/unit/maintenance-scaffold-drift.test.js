@@ -39,3 +39,12 @@ test("maintenance inspect rolls scaffoldDrift into its report", () => {
 	assert.ok(result.scaffoldDrift, "inspect includes scaffoldDrift");
 	fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("maintenance inspect includes artifactDrift and survives a non-git target", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-main-"));
+	scaffoldHarness(dir, {}); // tmpdir is not a git repo
+	const { result } = dispatch("maintenance", parseArgs(["inspect", "--target", dir]));
+	assert.ok("artifactDrift" in result, "inspect includes artifactDrift key");
+	assert.equal(result.artifactDrift.available, false); // non-git → unavailable, no crash
+	fs.rmSync(dir, { recursive: true, force: true });
+});

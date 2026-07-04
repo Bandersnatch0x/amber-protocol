@@ -329,6 +329,7 @@ function inspectMaintenance(target, options = {}) {
 	const staleDocsResult = detectStaleDocs(targetRoot);
 	const { detectScaffoldDrift } = require("./scaffold-version-drift");
 	const scaffoldDriftResult = detectScaffoldDrift(targetRoot);
+	const { detectArtifactDrift } = require("./artifact-drift");
 
 	return {
 		target: targetRoot,
@@ -345,6 +346,7 @@ function inspectMaintenance(target, options = {}) {
 		evolutionRollup: extractEvolutionFindings(targetRoot),
 		regressionProposals: extractRegressionProposals(targetRoot),
 		scaffoldDrift: scaffoldDriftResult,
+		artifactDrift: detectArtifactDrift(targetRoot),
 		errors: loaded.errors,
 		warnings: loaded.warnings,
 	};
