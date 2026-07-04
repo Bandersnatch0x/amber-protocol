@@ -12,6 +12,7 @@ const { classifyTarget } = require("./core/target-classification");
 const { getRepoSnapshot } = require("./core/git-state");
 const { detectScaffoldDrift } = require("./core/scaffold-version-drift");
 const { loadProvenance } = require("./core/scaffold-provenance");
+const { detectArtifactDrift } = require("./core/artifact-drift");
 
 function buildStatus(target) {
 	const targetRoot = resolveTarget(target);
@@ -35,9 +36,15 @@ function buildStatus(target) {
 		scaffoldDrift = detectScaffoldDrift(targetRoot);
 	}
 
+	const artifactDrift = detectArtifactDrift(targetRoot);
+
 	let nextStep;
 	if (classification.type === "unharnessed-target-repo") {
 		nextStep = "Run `amber init --target .` to install Amber.";
+	} else if (artifactDrift.available && artifactDrift.counts.drifted > 0) {
+		nextStep = "Run `amber feature verify --feature <id>` to re-record evidence for drifted features.";
+	} else if (artifactDrift.available && artifactDrift.skippedBreakdown.pathUnknown > 0) {
+		nextStep = "Some features declare paths git has never touched — fix feature_list paths.";
 	} else if (scaffoldDrift.installed === false) {
 		nextStep = "Run `amber init --target .` to enable scaffold-drift detection (stamps install provenance).";
 	} else if (
@@ -66,6 +73,7 @@ function buildStatus(target) {
 				: { present: false },
 		},
 		scaffoldDrift,
+		artifactDrift,
 		nextStep,
 	};
 }
@@ -94,6 +102,13 @@ function renderStatus(s) {
 		);
 	} else if (s.scaffoldDrift.note) {
 		lines.push(`Scaffold drift: ${s.scaffoldDrift.note}`);
+	}
+	if (s.artifactDrift.available) {
+		const c = s.artifactDrift.counts;
+		lines.push(`Artifact drift: drifted=${c.drifted} aligned=${c.aligned} skipped=${c.skipped}`);
+		lines.push("  (aligned = code not newer than evidence; not a re-verification)");
+	} else if (s.artifactDrift.note) {
+		lines.push(`Artifact drift: ${s.artifactDrift.note}`);
 	}
 	lines.push(`Next: ${s.nextStep}`);
 	return lines.join("\n");
