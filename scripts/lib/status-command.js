@@ -19,11 +19,11 @@ function buildStatus(target) {
 	const classification = classifyTarget(targetRoot);
 
 	const amberDir = path.join(targetRoot, ".amber");
-	const harnessDir = path.join(targetRoot, ".harness");
+	const harnessDir = path.join(targetRoot, ".harness"); // legacy state dir (pre-.amber Amber)
 	const stateDir = fs.existsSync(amberDir)
 		? ".amber"
 		: fs.existsSync(harnessDir)
-			? ".harness"
+			? ".harness" // .amber preferred; legacy .harness fallback
 			: "none";
 	const provenance = loadProvenance(targetRoot);
 
