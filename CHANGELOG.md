@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src/experimental/execution/` and `tests/experimental/` — the cold-stored execution engine was unreachable, broken-chained (5+ dangling requires incl. `checkpoint-manager`), `test:experimental` failed 3/5, yet shipped to every installer via `files:["src/"]`. See ADR-0005.
 - `test:experimental` npm script.
 
+### Fixed
+- `session start --mode autonomous` now refuses at the gate (exit 1, no manifest written), matching ADR-0002's stated intent. Previously it accepted the mode and only `session continue` refused — leaving an unreachable autonomous manifest behind.
+
 ## [1.2.0] - 2026-07-04
 
 ### Added — State-aware drift detection (`amber status` + `amber sync`)
