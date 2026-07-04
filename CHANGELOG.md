@@ -5,6 +5,14 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed — Zombie execution platform & experimental scope (#4, PR1)
+- Five execution-platform peripheral modules (`scripts/lib/{daemon,notifier,health-checker,budget-tracker,error-recovery}.js`) and their unit tests — zero production references, kept alive only by self-tests.
+- `amber daemon <status|stop>` CLI command — hidden command with no help/docs/start path; removal is bug-equivalent (minor).
+- `src/experimental/execution/` and `tests/experimental/` — the cold-stored execution engine was unreachable, broken-chained (5+ dangling requires incl. `checkpoint-manager`), `test:experimental` failed 3/5, yet shipped to every installer via `files:["src/"]`. See ADR-0005.
+- `test:experimental` npm script.
+
 ## [1.2.0] - 2026-07-04
 
 ### Added — State-aware drift detection (`amber status` + `amber sync`)
@@ -93,7 +101,8 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 
 ---
 
-[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Bandersnatch0x/amber-protocol/releases/tag/v1.0.0
 [1.0.0-rc.1]: https://github.com/Bandersnatch0x/amber-protocol/releases/tag/v1.0.0-rc.1

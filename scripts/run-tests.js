@@ -8,7 +8,7 @@ const { collectFilesBySuffix } = require("./lib/core/fs-utils");
 
 const ROOT = path.resolve(__dirname, "..");
 const TESTS_DIR = path.join(ROOT, "tests");
-const TEST_IGNORED_DIRS = new Set(["node_modules", "fixtures", "experimental"]);
+const TEST_IGNORED_DIRS = new Set(["node_modules", "fixtures"]);
 
 function resolveRequestedFiles(patterns) {
 	const files = [];
