@@ -50,8 +50,18 @@ jobs:
         env:
           NPM_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Idempotent publish: a re-pointed tag or a re-run must not fail the
+      # workflow with E409 "Cannot publish over existing version". If this
+      # version is already on GitHub Packages, skip. All other failures (auth,
+      # network, package shape) still surface as real errors.
       - name: Publish to GitHub Packages
-        run: npm publish --registry=https://npm.pkg.github.com
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@bandersnatch0x/amber-protocol@$VERSION" --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "::notice::@bandersnatch0x/amber-protocol@$VERSION already published — skipping."
+          else
+            npm publish --registry=https://npm.pkg.github.com
+          fi
 
       # Restore the unscoped name after publishing so the working tree is clean.
       - name: Restore package name
