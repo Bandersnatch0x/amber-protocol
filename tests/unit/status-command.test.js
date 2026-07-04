@@ -59,3 +59,18 @@ test("renderStatus produces a readable multi-line report", () => {
 	assert.match(text, /Next:/);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("buildStatus surfaces the no-provenance note and points to init when provenance is missing", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-st-"));
+	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
+	fs.writeFileSync(path.join(dir, ".gitignore"), ".amber/\n");
+	execSync("git add -A && git commit -qm init", { cwd: dir });
+	scaffoldHarness(dir, {});
+	fs.unlinkSync(path.join(dir, ".amber", "provenance.json")); // harnessed, no provenance
+	const s = buildStatus(dir);
+	assert.equal(s.scaffoldDrift.installed, false);
+	assert.match(s.nextStep, /amber init/);
+	const text = renderStatus(s);
+	assert.match(text, /No install provenance/i); // the note is surfaced, not an all-zero line
+	fs.rmSync(dir, { recursive: true, force: true });
+});

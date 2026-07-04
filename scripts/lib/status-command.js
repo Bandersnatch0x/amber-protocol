@@ -38,6 +38,8 @@ function buildStatus(target) {
 	let nextStep;
 	if (classification.type === "unharnessed-target-repo") {
 		nextStep = "Run `amber init --target .` to install Amber.";
+	} else if (scaffoldDrift.installed === false) {
+		nextStep = "Run `amber init --target .` to enable scaffold-drift detection (stamps install provenance).";
 	} else if (
 		classification.type !== "product-repo" &&
 		scaffoldDrift.counts &&
@@ -82,7 +84,10 @@ function renderStatus(s) {
 				: ", no provenance"
 		}})`,
 	);
-	if (s.scaffoldDrift.counts) {
+	if (s.scaffoldDrift.installed === false && s.scaffoldDrift.note) {
+		// Harnessed but no provenance: the all-zero counts are noise; the note is the signal.
+		lines.push(`Scaffold drift: ${s.scaffoldDrift.note}`);
+	} else if (s.scaffoldDrift.counts) {
 		const c = s.scaffoldDrift.counts;
 		lines.push(
 			`Scaffold drift: fresh=${c.fresh} stale=${c.stale} customized=${c.customized} ambiguous=${c.ambiguous} missing=${c.missing}`,
