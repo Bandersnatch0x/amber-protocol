@@ -129,6 +129,17 @@ async function startSession(projectRoot, options) {
 		return result("Error: --goal is required", 1);
 	}
 
+	// Autonomous mode removed in 1.3.0 (ADR-0005): refuse at start, not just at
+	// continue, so no autonomous session manifest is ever written. (continueSession
+	// still guards legacy manifests created before this gate.)
+	if (mode === "autonomous") {
+		return result(
+			"Error: Autonomous execution is not available. " +
+			"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
+			1,
+		);
+	}
+
 	let selectedRouteId = routeId;
 	let routeVersion = SCHEMA_VERSION;
 
