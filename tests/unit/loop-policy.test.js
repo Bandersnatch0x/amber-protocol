@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { evaluateCommandPolicy, loadPolicyRules, DEFAULT_RULES } = require("../../scripts/lib/core/loop-policy");
+const { evaluateCommandPolicy, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES } = require("../../scripts/lib/core/loop-policy");
 
 // Capture process.stderr.write during a call (loadPolicyRules warns on a bad rules.json).
 function captureStderr(fn) {
@@ -87,6 +87,63 @@ test("loadPolicyRules warns + falls back when rules.json lacks a rules array", (
   });
   assert.equal(rules, DEFAULT_RULES);
   assert.match(captured, /missing a top-level/i);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadVerifyPolicyRules warns + falls back to defaults when verify-rules.json is unparseable", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-verify-policy-"));
+  const gov = path.join(dir, ".amber", "governance");
+  fs.mkdirSync(gov, { recursive: true });
+  fs.writeFileSync(path.join(gov, "verify-rules.json"), "{ broken json");
+  let rules;
+  const captured = captureStderr(() => {
+    rules = loadVerifyPolicyRules(dir);
+  });
+  assert.equal(rules, DEFAULT_RULES, "falls back to built-in defaults (safe)");
+  assert.match(captured, /unparseable/i, "a warning is surfaced so the silent-ignore trap is avoided");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadVerifyPolicyRules warns + falls back when verify-rules.json lacks a rules array", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-verify-policy-"));
+  const gov = path.join(dir, ".amber", "governance");
+  fs.mkdirSync(gov, { recursive: true });
+  fs.writeFileSync(path.join(gov, "verify-rules.json"), JSON.stringify({ schemaVersion: 1, defaultAction: "deny" }));
+  let rules;
+  const captured = captureStderr(() => {
+    rules = loadVerifyPolicyRules(dir);
+  });
+  assert.equal(rules, DEFAULT_RULES);
+  assert.match(captured, /missing a top-level/i);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadVerifyPolicyRules returns the parsed rules silently when verify-rules.json is valid", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-verify-policy-"));
+  const gov = path.join(dir, ".amber", "governance");
+  fs.mkdirSync(gov, { recursive: true });
+  const custom = { schemaVersion: 1, defaultAction: "deny", rules: [{ id: "allow-node", action: "allow", match: "prefix", pattern: "node " }] };
+  fs.writeFileSync(path.join(gov, "verify-rules.json"), JSON.stringify(custom));
+  let rules;
+  const captured = captureStderr(() => {
+    rules = loadVerifyPolicyRules(dir);
+  });
+  assert.notEqual(rules, DEFAULT_RULES, "custom verify rules loaded");
+  assert.equal(rules.rules[0].id, "allow-node");
+  assert.equal(captured, "", "no warning when the file is valid");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadVerifyPolicyRules falls back to defaults when verify-rules.json is missing", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-verify-policy-"));
+  const gov = path.join(dir, ".amber", "governance");
+  fs.mkdirSync(gov, { recursive: true });
+  let rules;
+  const captured = captureStderr(() => {
+    rules = loadVerifyPolicyRules(dir);
+  });
+  assert.equal(rules, DEFAULT_RULES);
+  assert.equal(captured, "", "no warning when the file is simply absent");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
