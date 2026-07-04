@@ -32,7 +32,7 @@ test("runs an allowed command and records verification_passed on exit 0", () => 
 	const ledgerPath = path.join(dir, ".amber", "sessions", "s1", "ledger.jsonl");
 	const r = runEvidenceCommand({
 		target: dir,
-		command: 'node -e "process.exit(0)"',
+		command: 'node -e "process.stdout.write(\\"hello\\"); process.exit(0)"',
 		ledgerPath,
 		subject: { sessionId: "s1", stage: "verify" },
 	});
@@ -44,6 +44,7 @@ test("runs an allowed command and records verification_passed on exit 0", () => 
 	assert.equal(recs[0].kind, "verification_passed");
 	assert.equal(recs[0].exitCode, 0);
 	assert.ok(recs[0].hash);
+	assert.match(recs[0].stdoutTail, /hello/);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -52,7 +53,7 @@ test("records verification_failed on a non-zero exit", () => {
 	const ledgerPath = path.join(dir, ".amber", "sessions", "s2", "ledger.jsonl");
 	const r = runEvidenceCommand({
 		target: dir,
-		command: 'node -e "process.exit(3)"',
+		command: 'node -e "process.stderr.write(\\"boom\\"); process.exit(3)"',
 		ledgerPath,
 		subject: { sessionId: "s2", stage: "verify" },
 	});
@@ -60,6 +61,7 @@ test("records verification_failed on a non-zero exit", () => {
 	assert.equal(r.exitCode, 3);
 	const recs = fs.readFileSync(ledgerPath, "utf8").trim().split("\n").map(JSON.parse);
 	assert.equal(recs[0].kind, "verification_failed");
+	assert.match(recs[0].stderrTail, /boom/);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -98,5 +100,7 @@ test("denies a command the policy does not allow; nothing runs", () => {
 	const recs = fs.readFileSync(ledgerPath, "utf8").trim().split("\n").map(JSON.parse);
 	assert.equal(recs[0].kind, "verification_denied");
 	assert.equal(recs[0].executesAnything, false);
+	assert.equal(recs[0].stdoutTail, undefined);
+	assert.equal(recs[0].stderrTail, undefined);
 	fs.rmSync(dir, { recursive: true, force: true });
 });

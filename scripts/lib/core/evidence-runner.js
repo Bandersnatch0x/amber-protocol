@@ -64,6 +64,8 @@ function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes = 5, su
 		command,
 		exitCode: exec.exitCode,
 		durationMs,
+		stdoutTail: exec.stdoutTail,
+		stderrTail: exec.stderrTail,
 		recordedAt: new Date().toISOString(),
 		executesAnything: true,
 		...subject,
