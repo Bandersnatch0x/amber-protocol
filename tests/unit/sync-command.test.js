@@ -45,8 +45,10 @@ test("sync dry-run reports the plan and makes NO filesystem changes", () => {
 		fs.writeFileSync(path.join(tpl, REL), fs.readFileSync(path.join(tpl, REL), "utf8") + "\n# new\n");
 		const installedPath = path.join(dir, REL);
 		const before = fs.readFileSync(installedPath, "utf8");
-		const { result, exitCode } = dispatch("sync", parseArgs(["--target", dir]));
+		const { result, exitCode } = dispatch("sync", parseArgs(["--target", dir, "--template-root", tpl]));
 		assert.equal(exitCode ?? 0, 0);
+		// The plan reports the one stale controlled file (guards against garbage counts).
+		assert.match(result.text, /stale=1/);
 		// No changes made.
 		assert.equal(fs.readFileSync(installedPath, "utf8"), before, "dry-run did not touch files");
 		assert.ok(!fs.existsSync(installedPath + ".bak"), "no backup created in dry-run");
