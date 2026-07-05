@@ -309,6 +309,22 @@ function handleLedger(args) {
     if (args.json) return { result: { target: args.target, ...r, errors: r.errors, warnings: r.warnings } };
     return { result: { target: args.target, text: r.payload, errors: r.errors, warnings: r.warnings }, bypassPrint: true };
   }
+  if (action === "seal") {
+    const { sealLedger } = require("./core/ledger-seal");
+    const r = sealLedger(targetRoot, { reviewer: args.reviewer });
+    const text = r.sealed
+      ? `Sealed ${r.ledgerCount} ledger(s) to tag ${r.tagName} at HEAD ${r.head}.`
+      : `Seal failed: ${r.errors.join("; ")}`;
+    return { result: { target: args.target, text, ...r, errors: r.errors, warnings: r.warnings }, exitCode: r.sealed ? 0 : 1, bypassPrint: !args.json };
+  }
+  if (action === "verify-anchoring") {
+    const { verifyAnchoring } = require("./core/ledger-seal");
+    const r = verifyAnchoring(targetRoot);
+    const text = r.anchored
+      ? `Anchored: all ledgers match seal tag ${r.sealTag}.`
+      : `NOT anchored: ${r.ledgerChangedSinceSeal} ledger(s) changed since seal tag ${r.sealTag}.`;
+    return { result: { target: args.target, text, ...r, errors: r.errors, warnings: r.warnings }, exitCode: r.anchored ? 0 : 1, bypassPrint: !args.json };
+  }
   return { result: { target: args.target, errors: ["ledger requires export, seal, or verify-anchoring."], warnings: [] } };
 }
 
