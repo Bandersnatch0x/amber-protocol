@@ -10,6 +10,7 @@ const COMMAND_HELP = {
 	wiki: "Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run.",
 	handoff: "Validate session-handoff.md required V1 sections.",
 	doctor: "Run Amber guardrail checks and target classification.",
+	drift: "CI-native drift gate. Exit 1 if any artifact/wiki/scaffold drift. Supports --scope, --format gh-annotations, --no-fail.",
 	plan: [
 			"Create a feature-linked vertical-slice plan from a registered feature.",
 			"",
