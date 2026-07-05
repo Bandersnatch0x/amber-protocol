@@ -24,6 +24,7 @@ const COMMANDS = [
   "maintenance",
   "adoption",
   "loop",
+  "ledger",
   "route",
   "session",
   "status",
@@ -58,6 +59,7 @@ const PER_COMMAND_USAGE = {
   explain: "Usage: amber explain [<code>] [--markdown <path>] [--json]",
   hooks: "Usage: amber hooks <check|install|uninstall|status> --target <repo> [--warn-only] [--force] [--json]",
   loop: "Usage: amber loop <inspect|recommend|run|approve|verify-ledger|record|status|validate-loop> [--target <repo>] [--file <pack>] [--contract <id>] [--dry-run|--execute] [--reviewer <name>] [--json]",
+  ledger: "Usage: amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|otlp-json] [--home loops|routes|sessions|all] [--out <path>] [--reviewer <name>] [--json]",
   governance: [
     "Usage: amber governance <docs|evidence|policy|audit|readiness|standards|rules> [--target <repo>] [--json]",
     "       amber governance rules <init|inspect|check> --target <repo> [--command <cmd>]",
