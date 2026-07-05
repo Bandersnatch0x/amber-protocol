@@ -609,6 +609,23 @@ function handleNext(args) {
   return { result: nextResult, exitCode: 0, bypassPrint: !args.json };
 }
 
+function handleDrift(args) {
+  const { runDrift, renderDrift } = require("./drift-command");
+  const result = runDrift(args.target, {
+    scope: args.scope,
+    noFail: args.noFail,
+  });
+  if (args.json) {
+    return { result: { target: args.target, ...result, errors: [], warnings: [] }, exitCode: result.exitCode, bypassPrint: false };
+  }
+  const text = args.format === "gh-annotations" ? renderDrift(result, { format: "gh-annotations" }) : renderDrift(result);
+  return {
+    result: { target: args.target, text, drift: result, errors: [], warnings: [] },
+    exitCode: result.exitCode,
+    bypassPrint: true,
+  };
+}
+
 function handleStatus(args) {
   const statusCommand = require("./status-command");
   const targetRoot = resolveTarget(args);
@@ -708,6 +725,7 @@ const HANDLERS = {
   pack:        handlePack,
   profile:     handleProfile,
   status:      handleStatus,
+  drift:       handleDrift,
   sync:        handleSync,
   task:        handleTask,
   result:      handleResult,
