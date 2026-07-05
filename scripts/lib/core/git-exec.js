@@ -18,4 +18,19 @@ function gitOutput(targetRoot, args) {
 	}
 }
 
-module.exports = { gitOutput };
+// Canonical write git invocation (tag/commit/etc). Returns {ok, stdout, stderr}.
+// ok mirrors exit status; never throws — callers decide how to surface failure.
+function gitRun(targetRoot, args) {
+	try {
+		const res = spawnSync("git", args, { cwd: targetRoot, encoding: "utf8" });
+		return {
+			ok: !!(res && res.status === 0),
+			stdout: (res && res.stdout && res.stdout.trim()) || "",
+			stderr: (res && res.stderr && res.stderr.trim()) || "",
+		};
+	} catch (e) {
+		return { ok: false, stdout: "", stderr: String((e && e.message) || e) };
+	}
+}
+
+module.exports = { gitOutput, gitRun };

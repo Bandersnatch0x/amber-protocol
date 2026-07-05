@@ -293,6 +293,41 @@ function handleAdoption(args) {
   return { result: unknownAction("adoption", ["report", "list", "index", "validate", "compare", "gate", "status", "bundle", "next-actions", "decision-record", "apply-plan", "selected-files"]) };
 }
 
+function handleLedger(args) {
+  const action = args._ && args._[0];
+  const targetRoot = resolveTarget(args);
+  if (action === "export") {
+    const { exportLedger } = require("./core/ledger-export");
+    const r = exportLedger(targetRoot, { format: args.format, home: args.home });
+    if (args.out) {
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const outPath = path.resolve(targetRoot, args.out);
+      fs.writeFileSync(outPath, r.payload + "\n");
+      return { result: { target: args.target, text: `Wrote ${r.ledgers.length} ledger(s) to ${outPath} (intact=${r.intactCount}, broken=${r.brokenCount})`, errors: r.errors, warnings: r.warnings }, bypassPrint: !args.json };
+    }
+    if (args.json) return { result: { target: args.target, ...r, errors: r.errors, warnings: r.warnings } };
+    return { result: { target: args.target, text: r.payload, errors: r.errors, warnings: r.warnings }, bypassPrint: true };
+  }
+  if (action === "seal") {
+    const { sealLedger } = require("./core/ledger-seal");
+    const r = sealLedger(targetRoot, { reviewer: args.reviewer });
+    const text = r.sealed
+      ? `Sealed ${r.ledgerCount} ledger(s) to tag ${r.tagName} at HEAD ${r.head}.`
+      : `Seal failed: ${r.errors.join("; ")}`;
+    return { result: { target: args.target, text, ...r, errors: r.errors, warnings: r.warnings }, exitCode: r.sealed ? 0 : 1, bypassPrint: !args.json };
+  }
+  if (action === "verify-anchoring") {
+    const { verifyAnchoring } = require("./core/ledger-seal");
+    const r = verifyAnchoring(targetRoot);
+    const text = r.anchored
+      ? `Anchored: all ledgers match seal tag ${r.sealTag}.`
+      : `NOT anchored: ${r.ledgerChangedSinceSeal} ledger(s) changed since seal tag ${r.sealTag}.`;
+    return { result: { target: args.target, text, ...r, errors: r.errors, warnings: r.warnings }, exitCode: r.anchored ? 0 : 1, bypassPrint: !args.json };
+  }
+  return { result: { target: args.target, errors: ["ledger requires export, seal, or verify-anchoring."], warnings: [] } };
+}
+
 function handleRoute(args) {
   const action = args._?.[0];
   const routeId = args._?.[1] || "";
@@ -609,6 +644,23 @@ function handleNext(args) {
   return { result: nextResult, exitCode: 0, bypassPrint: !args.json };
 }
 
+function handleDrift(args) {
+  const { runDrift, renderDrift } = require("./drift-command");
+  const result = runDrift(args.target, {
+    scope: args.scope,
+    noFail: args.noFail,
+  });
+  if (args.json) {
+    return { result: { target: args.target, ...result, errors: [], warnings: [] }, exitCode: result.exitCode, bypassPrint: false };
+  }
+  const text = args.format === "gh-annotations" ? renderDrift(result, { format: "gh-annotations" }) : renderDrift(result);
+  return {
+    result: { target: args.target, text, drift: result, errors: [], warnings: [] },
+    exitCode: result.exitCode,
+    bypassPrint: true,
+  };
+}
+
 function handleStatus(args) {
   const statusCommand = require("./status-command");
   const targetRoot = resolveTarget(args);
@@ -708,11 +760,13 @@ const HANDLERS = {
   pack:        handlePack,
   profile:     handleProfile,
   status:      handleStatus,
+  drift:       handleDrift,
   sync:        handleSync,
   task:        handleTask,
   result:      handleResult,
   agent:       handleAgent,
   loop:        handleLoop,
+  ledger:      handleLedger,
   team:        handleTeam,
   maintenance: handleMaintenance,
   adoption:    handleAdoption,
