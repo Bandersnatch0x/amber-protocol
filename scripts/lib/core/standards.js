@@ -8,16 +8,35 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { walkLedgers } = require("./loop-ledger");
+const { pathExists, readJsonSafe } = require("./fs-utils");
 
 const FRAMEWORK_FILES = {
 	"owasp-agentic": "owasp-agentic-2026",
 	"owasp-agentic-2026": "owasp-agentic-2026",
 };
 
-function loadFramework(framework) {
+const DEFAULT_STANDARDS_DIR = path.join(__dirname, "..", "..", "..", "standards");
+
+// Load a framework definition, distinguishing "not found" from "corrupt" so a
+// broken framework file surfaces an honest error instead of masquerading as an
+// unknown framework name. Throws an Error with .code FRAMEWORK_NOT_FOUND or
+// FRAMEWORK_CORRUPT. `standardsDir` is injectable for tests.
+function loadFramework(framework, standardsDir = DEFAULT_STANDARDS_DIR) {
 	const base = FRAMEWORK_FILES[framework] || framework;
-	const file = path.join(__dirname, "..", "..", "..", "standards", `${base}.json`);
-	return JSON.parse(fs.readFileSync(file, "utf8"));
+	const file = path.join(standardsDir, `${base}.json`);
+	if (!pathExists(file)) {
+		const err = new Error(`Framework file not found: ${file}`);
+		err.code = "FRAMEWORK_NOT_FOUND";
+		throw err;
+	}
+	const { value, error } = readJsonSafe(file);
+	if (error || !value || typeof value !== "object" || Array.isArray(value)) {
+		const detail = error || "not a JSON object";
+		const err = new Error(`Framework file is corrupt: ${file} — ${detail}`);
+		err.code = "FRAMEWORK_CORRUPT";
+		throw err;
+	}
+	return value;
 }
 
 // Inspect the ACTUAL governance controls deployed in the target repo (not just
@@ -66,12 +85,15 @@ function inspectControls(targetRoot) {
 	};
 }
 
-function mapStandards(targetRoot, framework = "owasp-agentic") {
+function mapStandards(targetRoot, framework = "owasp-agentic", standardsDir = DEFAULT_STANDARDS_DIR) {
 	let def;
 	try {
-		def = loadFramework(framework);
+		def = loadFramework(framework, standardsDir);
 	} catch (e) {
-		return { target: targetRoot, framework, risks: [], errors: [`Unknown framework: ${framework}`], warnings: [] };
+		const msg = e && e.code === "FRAMEWORK_CORRUPT" && e.message
+			? e.message
+			: `Unknown framework: ${framework}`;
+		return { target: targetRoot, framework, risks: [], errors: [msg], warnings: [] };
 	}
 	const controls = inspectControls(targetRoot);
 	const risks = def.risks.map((r) => {
