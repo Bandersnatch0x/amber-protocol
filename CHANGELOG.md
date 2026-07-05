@@ -5,6 +5,19 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-07-05
+
+### Added — Artifact-first evidence layer, Phase 1
+Three boundary-safe, zero-new-dependency commands that make Amber's drift detection CI-deployable and its tamper-evident ledger SIEM-consumable and git-anchored. Design: `docs/superpowers/specs/2026-07-05-amber-artifact-first-evidence-layer-design.md`.
+
+- **`amber drift`** — CI-native drift gate aggregating the artifact / wiki / scaffold detectors into one exit code (`0` clean / `1` any actionable drift). Supports `--scope`, `--format gh-annotations` (GitHub Actions `::warning` lines), and `--no-fail` for informational CI steps. Read-only, Verification-layer (same shape as `doctor`).
+- **`amber ledger export`** — SIEM/compliance bridge. Walks every `ledger.jsonl` (loops / routes / sessions) via `walkLedgers`, verifies each chain, and emits `json` (default), `csv`, or `otlp-json` (valid OTLP JSON encoding — no protobuf, no dependency). A broken chain is exported as `intact:false` and counted in `brokenCount` rather than refused.
+- **`amber ledger seal` + `amber ledger verify-anchoring`** — anchors each ledger's tail hash into an annotated git tag (`amber-ledger-seal-<head-sha>`), so forging a ledger then requires rewriting git tag history too. Closes the gap ADR-0003 and `loop-ledger.js` both self-admit ("hash chain detects tampering but does not prevent a full-file rewrite"). Human-triggered; no push, no scheduling. Ed25519 signing deliberately deferred until key management is real.
+- New CLI flags (`--scope`, `--format`, `--home`, `--out`, `--no-fail`) registered in the `parseArgs` `FLAG_SPECS` table, with a regression guard in `tests/unit/parse-args.test.js`.
+- CI dogfoods `amber drift` (non-blocking) on every build.
+
+Adds 17 tests (5 drift, 5 ledger-export, 4 ledger-seal, 2 git-exec, 1 parse-args guard); full suite 1053 passing, zero regressions.
+
 ## [1.3.0] - 2026-07-04
 
 ### Changed — Direct core imports, facade removed (#4, PR2)
