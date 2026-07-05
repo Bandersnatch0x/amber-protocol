@@ -39,3 +39,18 @@ test("unknown framework returns an error envelope, no throw", () => {
   assert.ok(r.errors.length > 0);
   assert.equal(r.risks.length, 0);
 });
+
+test("a corrupt framework file reports corruption, not 'unknown framework'", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-std-"));
+  const stdDir = path.join(dir, "standards");
+  fs.mkdirSync(stdDir, { recursive: true });
+  // FRAMEWORK_FILES maps "owasp-agentic" -> "owasp-agentic-2026"
+  fs.writeFileSync(path.join(stdDir, "owasp-agentic-2026.json"), "{ not valid json");
+  const r = mapStandards(dir, "owasp-agentic", stdDir);
+  assert.ok(r.errors.length > 0, "expected an error envelope");
+  assert.equal(r.risks.length, 0);
+  const msg = r.errors.join(" ");
+  assert.ok(/corrupt|invalid|parse|syntax/i.test(msg), `expected a corruption hint, got: ${msg}`);
+  assert.ok(!/unknown framework/i.test(msg), `should not say 'Unknown framework' for a corrupt file, got: ${msg}`);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
