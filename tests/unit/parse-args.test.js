@@ -70,6 +70,24 @@ test("unknown tokens collect into _", () => {
 	assert.deepEqual(args._, ["list", "inspect"]);
 });
 
+test("drift/ledger flags are registered (not silently dropped to _)", () => {
+	// Regression guard: a new command flag MUST be added to FLAG_SPECS, else
+	// parseArgs silently drops it into args._ and the handler never sees it.
+	const args = parseArgs([
+		"--scope", "artifact",
+		"--format", "gh-annotations",
+		"--no-fail",
+		"--home", "sessions",
+		"--out", "audits/ledger.csv",
+	]);
+	assert.equal(args.scope, "artifact");
+	assert.equal(args.format, "gh-annotations");
+	assert.equal(args.noFail, true);
+	assert.equal(args.home, "sessions");
+	assert.equal(args.out, "audits/ledger.csv");
+	assert.deepEqual(args._ || [], []);
+});
+
 test("a value flag at the end of argv yields undefined", () => {
 	const args = parseArgs(["--output"]);
 	assert.equal("output" in args, true);
