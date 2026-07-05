@@ -1,5 +1,16 @@
 # JSON.parse Consolidation — Design
 
+> **⚠ SUPERSEDED (2026-07-05) — premise invalidated by code-reading.**
+> This spec was written from the `JSON.parse(fs.readFileSync(...))` *grep pattern*,
+> but reading every site revealed all 19 shipped-CLI call sites are already wrapped
+> in `try/catch` (most also guarded by `fs.existsSync`) with deliberate degradation.
+> None produce raw `ENOENT`/`SyntaxError` stack traces at runtime, so the
+> consolidation is cosmetic — and a regression at module-load schema sites (loses
+> the "re-run `amber init`" hint). The refactor was **abandoned**. The one genuine
+> defect found (`standards.js` `loadFramework` → misleading "Unknown framework"
+> error on a corrupt framework file) is tracked separately as a small TDD fix.
+> Kept for the reasoning trail; do **not** implement as written.
+
 **Date:** 2026-07-05
 **Target:** Amber Protocol, `scripts/lib/` (shipped CLI logic)
 **HEAD at authoring:** `82ecdc1`
