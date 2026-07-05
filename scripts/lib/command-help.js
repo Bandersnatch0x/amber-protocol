@@ -51,6 +51,7 @@ const COMMAND_HELP = {
 		"  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md --session <session-id>",
 	],
 	pack: "Inspect or validate declarative workflow packs without executing them.",
+	ledger: "Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emits JSON/CSV/OTLP-JSON for SIEM.",
 	profile: "Inspect declarative project profiles.",
 	task: "Prepare isolated task ledger, evidence, replay, and worktree artifacts.",
 	result: "Inspect replayable task result artifacts without relying on chat history.",

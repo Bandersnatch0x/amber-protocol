@@ -293,6 +293,25 @@ function handleAdoption(args) {
   return { result: unknownAction("adoption", ["report", "list", "index", "validate", "compare", "gate", "status", "bundle", "next-actions", "decision-record", "apply-plan", "selected-files"]) };
 }
 
+function handleLedger(args) {
+  const action = args._ && args._[0];
+  const targetRoot = resolveTarget(args);
+  if (action === "export") {
+    const { exportLedger } = require("./core/ledger-export");
+    const r = exportLedger(targetRoot, { format: args.format, home: args.home });
+    if (args.out) {
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const outPath = path.resolve(targetRoot, args.out);
+      fs.writeFileSync(outPath, r.payload + "\n");
+      return { result: { target: args.target, text: `Wrote ${r.ledgers.length} ledger(s) to ${outPath} (intact=${r.intactCount}, broken=${r.brokenCount})`, errors: r.errors, warnings: r.warnings }, bypassPrint: !args.json };
+    }
+    if (args.json) return { result: { target: args.target, ...r, errors: r.errors, warnings: r.warnings } };
+    return { result: { target: args.target, text: r.payload, errors: r.errors, warnings: r.warnings }, bypassPrint: true };
+  }
+  return { result: { target: args.target, errors: ["ledger requires export, seal, or verify-anchoring."], warnings: [] } };
+}
+
 function handleRoute(args) {
   const action = args._?.[0];
   const routeId = args._?.[1] || "";
@@ -731,6 +750,7 @@ const HANDLERS = {
   result:      handleResult,
   agent:       handleAgent,
   loop:        handleLoop,
+  ledger:      handleLedger,
   team:        handleTeam,
   maintenance: handleMaintenance,
   adoption:    handleAdoption,
