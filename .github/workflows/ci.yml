@@ -47,6 +47,10 @@ jobs:
       - name: Run repository doctor
         run: npm run doctor
 
+      - name: Amber drift gate (dogfood, non-blocking)
+        run: node scripts/amber.js drift --target . --format gh-annotations --no-fail
+        continue-on-error: true
+
       - name: Check generated agents are up to date
         run: npm run gen:agents:check
 

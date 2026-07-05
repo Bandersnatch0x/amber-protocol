@@ -24,9 +24,11 @@ const COMMANDS = [
   "maintenance",
   "adoption",
   "loop",
+  "ledger",
   "route",
   "session",
   "status",
+  "drift",
   "sync",
   "migrate",
   "governance",
@@ -57,6 +59,7 @@ const PER_COMMAND_USAGE = {
   explain: "Usage: amber explain [<code>] [--markdown <path>] [--json]",
   hooks: "Usage: amber hooks <check|install|uninstall|status> --target <repo> [--warn-only] [--force] [--json]",
   loop: "Usage: amber loop <inspect|recommend|run|approve|verify-ledger|record|status|validate-loop> [--target <repo>] [--file <pack>] [--contract <id>] [--dry-run|--execute] [--reviewer <name>] [--json]",
+  ledger: "Usage: amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|otlp-json] [--home loops|routes|sessions|all] [--out <path>] [--reviewer <name>] [--json]",
   governance: [
     "Usage: amber governance <docs|evidence|policy|audit|readiness|standards|rules> [--target <repo>] [--json]",
     "       amber governance rules <init|inspect|check> --target <repo> [--command <cmd>]",
@@ -64,6 +67,7 @@ const PER_COMMAND_USAGE = {
   route: "Usage: amber route <list|inspect|validate|test|approve|verify-ledger> <route-id> [--target <repo>] [--execute] [--stage <name>] [--reviewer <name>] [--json]",
   session: "Usage: amber session <start|status|list|abort|continue|complete-check|verify|approve|verify-ledger> [--target <repo>] [--session <id>] [--goal <goal>] [--json]",
   status: "Usage: amber status --target <repo> [--json]",
+  drift: "Usage: amber drift --target <repo> [--scope artifact|wiki|scaffold|all] [--format text|json|gh-annotations] [--no-fail] [--json]",
   sync: "Usage: amber sync --target <repo> [--execute] [--json]",
 };
 

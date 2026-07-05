@@ -10,6 +10,7 @@ const COMMAND_HELP = {
 	wiki: "Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run.",
 	handoff: "Validate session-handoff.md required V1 sections.",
 	doctor: "Run Amber guardrail checks and target classification.",
+	drift: "CI-native drift gate. Exit 1 if any artifact/wiki/scaffold drift. Supports --scope, --format gh-annotations, --no-fail.",
 	plan: [
 			"Create a feature-linked vertical-slice plan from a registered feature.",
 			"",
@@ -50,6 +51,7 @@ const COMMAND_HELP = {
 		"  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md --session <session-id>",
 	],
 	pack: "Inspect or validate declarative workflow packs without executing them.",
+	ledger: "Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emits JSON/CSV/OTLP-JSON for SIEM.",
 	profile: "Inspect declarative project profiles.",
 	task: "Prepare isolated task ledger, evidence, replay, and worktree artifacts.",
 	result: "Inspect replayable task result artifacts without relying on chat history.",

@@ -37,6 +37,10 @@ const FLAG_SPECS = {
 	"--registry": { key: "registry" },
 	"--output": { key: "output" },
 	"--output-dir": { key: "outputDir" },
+	"--out": { key: "out" },
+	"--format": { key: "format" },
+	"--scope": { key: "scope" },
+	"--home": { key: "home" },
 	"--bundle-dir": { key: "bundleDir" },
 	"--report": { key: "report" },
 	"--base": { key: "base" },
@@ -81,6 +85,7 @@ const FLAG_SPECS = {
 	"--yes": { key: "yes", kind: "boolean" },
 	"--warn-only": { key: "warnOnly", kind: "boolean" },
 	"--force": { key: "force", kind: "boolean" },
+	"--no-fail": { key: "noFail", kind: "boolean" },
 	"--help": { key: "help", kind: "boolean" },
 	"-h": { key: "help", kind: "boolean" },
 };
