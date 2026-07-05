@@ -738,6 +738,50 @@ node scripts/amber.js hooks status --target .      # installed (blocking|warn-on
 node scripts/amber.js hooks uninstall --target .   # removes the Amber guard; restores any backup
 ```
 
+## Drift Commands
+
+`amber drift` is a CI-native drift gate. It aggregates the artifact, wiki, and scaffold drift
+detectors into one exit code: `0` if no actionable drift, `1` if any. Read-only; no execution.
+
+```bash
+node scripts/amber.js drift --target .                           # human text, exit 0/1
+node scripts/amber.js drift --target . --json                    # machine envelope (exitCode field)
+node scripts/amber.js drift --target . --format gh-annotations   # GitHub Actions ::warning lines
+node scripts/amber.js drift --target . --scope artifact          # one scope only
+node scripts/amber.js drift --target . --no-fail                 # always exit 0 (informational CI step)
+```
+
+GitHub Actions snippet (add as a step in any workflow that runs on PRs):
+
+```yaml
+- name: Amber drift gate
+  run: |
+    npm install -g amber-protocol
+    amber drift --target . --format gh-annotations --no-fail
+```
+
+## Ledger Commands
+
+`amber ledger` exports, seals, or verifies the anchoring of Amber's tamper-evident ledgers.
+
+```bash
+# SIEM/compliance export (JSON default; csv and otlp-json — the latter is valid OTLP JSON)
+node scripts/amber.js ledger export --target . --format json                  # pipe to your collector
+node scripts/amber.js ledger export --target . --format csv --out audits/ledger.csv
+node scripts/amber.js ledger export --target . --format otlp-json
+node scripts/amber.js ledger export --target . --home sessions                # one ledger home
+
+# Git-anchor ledger tail hashes (closes the ADR-0003 full-rewrite gap)
+node scripts/amber.js ledger seal --target . --reviewer <name>
+node scripts/amber.js ledger verify-anchoring --target .     # exit 1 if any ledger changed since the last seal
+```
+
+`export` emits a broken chain as `intact:false` (data, not refusal) and counts it in `brokenCount`.
+`seal` writes an annotated git tag `amber-ledger-seal-<head-sha>` carrying each ledger's tail hash,
+so forging a ledger then requires rewriting git tag history. No Ed25519 signing yet — deferred per
+the Phase 1 spec until key management (HSM / OS keystore) is a real capability rather than a key in
+the repo.
+
 ## Error Codes
 
 ```bash
