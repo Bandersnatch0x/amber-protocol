@@ -2,8 +2,13 @@
 
 const fs = require("fs");
 const path = require("path");
-const { createManifest } = require("./session-manifest");
-const { TimelineWriter } = require("./timeline-writer");
+const {
+	createManifest,
+	readSessionManifest,
+	readAllSessionManifests,
+	writeSessionManifest,
+} = require("./session-manifest");
+const { appendSessionEvent, readSessionEvents } = require("./session-timeline");
 const { SessionStateMachine, STATES } = require("./session-state-machine");
 const {
 	loadLatestCheckpoint,
@@ -59,22 +64,10 @@ function findMostRecentSession(projectRoot, { excludeCompleted = false } = {}) {
 }
 
 function loadSessionManifest(projectRoot, sessionId) {
-	// Centralized read+parse of a session manifest. Three commands previously
-	// each duplicated: build the path, check existence, JSON.parse the file.
-	// Returns { manifest, sessionDir, manifestPath } or null when missing.
-	const sessionDir = getSessionDir(projectRoot, sessionId);
-	const manifestPath = path.join(sessionDir, "manifest.json");
-	if (!fs.existsSync(manifestPath)) {
-		return null;
-	}
-	try {
-		const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-		return { manifest, sessionDir, manifestPath };
-	} catch {
-		// Present but unparseable (e.g. half-written). Distinguished from missing
-		// (null) so callers report it precisely instead of crashing on a bare parse.
-		return { manifest: null, sessionDir, manifestPath, corrupt: true };
-	}
+	// Thin projectRoot-flavoured wrapper over session-manifest.readSessionManifest
+	// (the deep module owning the read). Returns { manifest, sessionDir,
+	// manifestPath }, { ... corrupt: true }, or null — see that module.
+	return readSessionManifest(getSessionDir(projectRoot, sessionId));
 }
 
 function requireSession(projectRoot, sessionId) {
@@ -92,34 +85,8 @@ function requireSession(projectRoot, sessionId) {
 }
 
 function loadAllSessionManifests(projectRoot) {
-	// Enumerate every session manifest under the state dir, newest first. Both
-	// findMostRecentSession and listSessions previously duplicated this
-	// readdir+filter+parse+sort. Returns [] when there are no sessions.
-	const sessionsDir = getSessionsDir(projectRoot);
-	if (!fs.existsSync(sessionsDir)) {
-		return [];
-	}
-	return fs
-		.readdirSync(sessionsDir)
-		.filter((name) =>
-			fs.existsSync(path.join(sessionsDir, name, "manifest.json")),
-		)
-		.map((name) => {
-			try {
-				return JSON.parse(
-					fs.readFileSync(
-						path.join(sessionsDir, name, "manifest.json"),
-						"utf8",
-					),
-				);
-			} catch {
-				// A half-written or corrupt manifest is unreadable; skip it so one
-				// bad file cannot crash enumeration for the healthy sessions.
-				return null;
-			}
-		})
-		.filter(Boolean)
-		.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+	// Thin wrapper over session-manifest.readAllSessionManifests.
+	return readAllSessionManifests(getSessionsDir(projectRoot));
 }
 
 async function startSession(projectRoot, options) {
@@ -253,13 +220,10 @@ async function startSession(projectRoot, options) {
 	const manifestPath = path.join(sessionDir, "manifest.json");
 	writeJson(manifestPath, finalManifest);
 
-	const timelinePath = path.join(sessionDir, "timeline.jsonl");
-	const writer = new TimelineWriter(timelinePath);
-	await writer.append({
+	appendSessionEvent(sessionDir, {
 		type: "session_created",
 		data: { sessionId: finalManifest.sessionId, goal },
 	});
-	await writer.close();
 
 	// Materialize route gates as pending .gate.json files for the web viewer.
 	if (route) {
@@ -353,7 +317,7 @@ async function abortSession(projectRoot, options) {
 
 	const loaded = requireSession(projectRoot, sessionId);
 	if (loaded.exitCode !== undefined) return loaded;
-	const { manifest, sessionDir, manifestPath } = loaded;
+	const { manifest, sessionDir } = loaded;
 
 	const sm = new SessionStateMachine(manifest.status);
 	const transition = sm.transition(STATES.ABORTED);
@@ -362,14 +326,9 @@ async function abortSession(projectRoot, options) {
 		return result(`Cannot abort: ${transition.error}`, 1);
 	}
 
-	manifest.status = STATES.ABORTED;
-	manifest.updatedAt = new Date().toISOString();
-	fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+	writeSessionManifest(sessionDir, { ...manifest, status: STATES.ABORTED });
 
-	const timelinePath = path.join(sessionDir, "timeline.jsonl");
-	const writer = new TimelineWriter(timelinePath);
-	await writer.append(transition.event);
-	await writer.close();
+	appendSessionEvent(sessionDir, transition.event);
 
 	if (manifest.worktree) {
 		removeWorktree(projectRoot, sessionId);
@@ -390,7 +349,7 @@ async function continueSession(projectRoot, options) {
 
 	const loaded = requireSession(projectRoot, sessionId);
 	if (loaded.exitCode !== undefined) return loaded;
-	const { manifest, sessionDir, manifestPath } = loaded;
+	const { manifest, sessionDir } = loaded;
 
 	const versionCheck = checkSchemaVersion(manifest);
 	if (!versionCheck.valid) {
@@ -451,15 +410,9 @@ async function continueSession(projectRoot, options) {
 		if (!routeTransition.success) {
 			return result(`Cannot route session: ${routeTransition.error}`, 1);
 		}
-		manifest.status = STATES.ROUTED;
-		manifest.updatedAt = new Date().toISOString();
-		fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+		writeSessionManifest(sessionDir, { ...manifest, status: STATES.ROUTED });
 
-		const routeTimeline = new TimelineWriter(
-			path.join(sessionDir, "timeline.jsonl"),
-		);
-		await routeTimeline.append(routeTransition.event);
-		await routeTimeline.close();
+		appendSessionEvent(sessionDir, routeTransition.event);
 
 		sm.currentState = STATES.ROUTED;
 	}
@@ -469,17 +422,12 @@ async function continueSession(projectRoot, options) {
 		return result(`Cannot resume: ${transition.error}`, 1);
 	}
 
-	manifest.status = STATES.EXECUTING;
-	manifest.updatedAt = new Date().toISOString();
-	fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+	writeSessionManifest(sessionDir, { ...manifest, status: STATES.EXECUTING });
 
-	const timelinePath = path.join(sessionDir, "timeline.jsonl");
-	const writer = new TimelineWriter(timelinePath);
-	await writer.append({
+	appendSessionEvent(sessionDir, {
 		type: "session_resumed",
 		data: { sessionId, fromCheckpoint: checkpoint?.stage || null },
 	});
-	await writer.close();
 
 	const lines = [
 		`Session resumed: ${sessionId}`,
@@ -520,7 +468,6 @@ async function verifySession(projectRoot, options) {
 	const actualStageName = (verifyStage && verifyStage.name) || (stageName || "verify");
 	const stageDisplayName = (verifyStage && verifyStage.displayName) || actualStageName;
 
-	const timelinePath = path.join(sessionDir, "timeline.jsonl");
 	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
 
 	// --execute: actually run the verification command and record its real exit
@@ -552,8 +499,7 @@ async function verifySession(projectRoot, options) {
 		if (execResult.exitCode !== 0) {
 			// Negative evidence: record the failure on the timeline, do NOT mark the
 			// stage complete, and fail the command.
-			const failWriter = new TimelineWriter(timelinePath);
-			await failWriter.append({
+			appendSessionEvent(sessionDir, {
 				type: "verification_failed",
 				data: {
 					stage: actualStageName,
@@ -563,7 +509,6 @@ async function verifySession(projectRoot, options) {
 					durationMs: execResult.durationMs,
 				},
 			});
-			await failWriter.close();
 			return result(
 				`Verification FAILED (exit ${execResult.exitCode}) for session: ${sessionId}\n` +
 					`Command: ${command}\n` +
@@ -575,8 +520,7 @@ async function verifySession(projectRoot, options) {
 	}
 
 	// Record the stage_completed event so complete-check can see it.
-	const writer = new TimelineWriter(timelinePath);
-	await writer.append({
+	appendSessionEvent(sessionDir, {
 		type: "stage_completed",
 		data: {
 			stage: actualStageName,
@@ -587,7 +531,6 @@ async function verifySession(projectRoot, options) {
 			...(executed ? { exitCode: 0, durationMs: execResult.durationMs } : {}),
 		},
 	});
-	await writer.close();
 
 	// In --execute mode the evidence-runner already wrote the tamper-evident ledger
 	// record. In legacy (claim) mode, mirror the claim into the ledger here.
@@ -604,13 +547,11 @@ async function verifySession(projectRoot, options) {
 	}
 
 	// Update the manifest's completedStages so complete-check also finds it there.
-	const manifestPath = path.join(sessionDir, "manifest.json");
 	const completedStages = Array.isArray(manifest.completedStages) ? [...manifest.completedStages] : [];
 	if (!completedStages.includes(actualStageName)) {
 		completedStages.push(actualStageName);
 	}
-	const updatedManifest = { ...manifest, completedStages, updatedAt: new Date().toISOString() };
-	fs.writeFileSync(manifestPath, JSON.stringify(updatedManifest, null, 2));
+	writeSessionManifest(sessionDir, { ...manifest, completedStages });
 
 	const lines = [`Verification recorded for session: ${sessionId}`, `Stage: ${stageDisplayName}`];
 	if (executed) {
@@ -691,16 +632,13 @@ async function approveSession(projectRoot, options) {
 	}
 
 	// Record gate_passed event so complete-check can see it.
-	const timelinePath = path.join(sessionDir, "timeline.jsonl");
-	const writer = new TimelineWriter(timelinePath);
-	await writer.append({
+	appendSessionEvent(sessionDir, {
 		type: "gate_passed",
 		data: {
 			gateId: resolvedGateId,
 			approvedBy,
 		},
 	});
-	await writer.close();
 
 	// Mirror the gate approval into the tamper-evident ledger.
 	appendLedgerRecord(path.join(sessionDir, "ledger.jsonl"), {
@@ -722,9 +660,9 @@ async function approveSession(projectRoot, options) {
 	}
 
 	// If all route gates have now been approved, complete the session.
-	const gateEvents = (
-		require("./timeline-reader").readTimeline(timelinePath)
-	).filter((e) => e.type === "gate_passed");
+	const gateEvents = readSessionEvents(sessionDir).filter(
+		(e) => e.type === "gate_passed",
+	);
 	const routeGateIds = gates.map((g) => g.id);
 	const allGatesPassed =
 		routeGateIds.length > 0 &&
@@ -742,19 +680,11 @@ async function approveSession(projectRoot, options) {
 		if (transition.success && transition.event) {
 			completionEvent = transition.event;
 			newStatus = STATES.COMPLETED;
-			const completionWriter = new TimelineWriter(timelinePath);
-			await completionWriter.append(completionEvent);
-			await completionWriter.close();
+			appendSessionEvent(sessionDir, completionEvent);
 		}
 	}
 
-	const manifestPath = path.join(sessionDir, "manifest.json");
-	const updatedManifest = {
-		...manifest,
-		status: newStatus,
-		updatedAt: new Date().toISOString(),
-	};
-	fs.writeFileSync(manifestPath, JSON.stringify(updatedManifest, null, 2));
+	writeSessionManifest(sessionDir, { ...manifest, status: newStatus });
 
 	const lines = [
 		`Approval recorded for session: ${sessionId}`,

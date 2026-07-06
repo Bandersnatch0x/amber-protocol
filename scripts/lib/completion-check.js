@@ -2,7 +2,8 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { readTimeline } = require("./timeline-reader");
+const { readSessionEvents } = require("./session-timeline");
+const { readSessionManifest } = require("./session-manifest");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
 const { gitOutput } = require("./core/git-exec");
 
@@ -61,30 +62,23 @@ function hasWorkEvidence(projectRoot, manifest) {
 function evaluateCompletion(projectRoot, sessionId, options = {}) {
 	const strict = Boolean(options.strict);
 	const sessionDir = getSessionDir(projectRoot, sessionId);
-	const manifestPath = path.join(sessionDir, "manifest.json");
-	const timelinePath = path.join(sessionDir, "timeline.jsonl");
-
-	if (!fs.existsSync(manifestPath)) {
+	const loaded = readSessionManifest(sessionDir);
+	if (loaded === null) {
 		return {
 			status: "fail",
 			reasons: [],
 			missing: ["manifest not found"],
 		};
 	}
-
-	let manifest;
-	try {
-		manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-	} catch {
-		// A present but unparseable manifest fails the gate, symmetric with the
-		// missing case above, instead of crashing the completion check.
+	if (loaded.corrupt) {
 		return {
 			status: "fail",
 			reasons: [],
 			missing: ["manifest is corrupt"],
 		};
 	}
-	const timelineEvents = readTimeline(timelinePath);
+	const manifest = loaded.manifest;
+	const timelineEvents = readSessionEvents(sessionDir);
 	const eventTypes = new Set(timelineEvents.map((event) => event.type));
 
 	// In strict mode, verification counts only if a command actually ran (executed:true).
