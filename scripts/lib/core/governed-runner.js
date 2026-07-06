@@ -67,12 +67,16 @@ function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5
 		const res = spawnSync(command, { shell: true, cwd: wt.path, encoding: "utf8", timeout: budgetMinutes * 60_000 });
 		exec = {
 			command,
-			exitCode: res.status,
-			stdout: (res.stdout || "").slice(0, 4000),
-			stderr: (res.stderr || "").slice(0, 2000),
+			// A null status means the process was killed (timeout/signal) — record -1
+			// so a timed-out governed run is never stored as exit 0. Matches evidence-runner.
+			exitCode: res.status === null ? -1 : res.status,
+			// Keep the TAIL: on long build/test logs the failure surfaces at the end,
+			// so the head is setup noise. Matches evidence-runner's slice(-N).
+			stdout: (res.stdout || "").slice(-4000),
+			stderr: (res.stderr || "").slice(-2000),
 		};
 	} catch (e) {
-		exec = { command, exitCode: -1, stderr: String(e.message).slice(0, 2000) };
+		exec = { command, exitCode: -1, stdout: "", stderr: String(e.message).slice(-2000) };
 	} finally {
 		removeWorktree(targetRoot, runId);
 	}
