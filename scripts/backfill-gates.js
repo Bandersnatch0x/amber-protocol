@@ -22,7 +22,7 @@
 const fs = require("fs");
 const path = require("path");
 const { loadRoutes } = require("./lib/route-loader");
-const { readTimeline } = require("./lib/timeline-reader");
+const { readSessionEvents } = require("./lib/session-timeline");
 const { resolveStateDirForRead } = require("./lib/state-dir-resolver");
 const { readJsonSafe } = require("./lib/core/fs-utils");
 const {
@@ -48,9 +48,9 @@ function parseArgv(argv) {
 // Collect the gateIds that were approved, with the timestamp of the approval
 // event. A gate may legitimately appear more than once across resumes; the
 // first occurrence wins since that is when the approval actually happened.
-function approvedGatesFromTimeline(timelinePath) {
+function approvedGatesFromTimeline(sessionDir) {
 	const approvals = new Map();
-	for (const event of readTimeline(timelinePath)) {
+	for (const event of readSessionEvents(sessionDir)) {
 		if (event.type !== "gate_passed") continue;
 		const gateId = event.data && event.data.gateId;
 		if (typeof gateId !== "string" || approvals.has(gateId)) continue;
@@ -79,9 +79,7 @@ function backfillSession(sessionDir, routesById) {
 	const sessionId = manifest.sessionId || path.basename(sessionDir);
 	const gatesDir = path.join(sessionDir, "gates");
 	const stageMap = buildGateStageMap(route);
-	const approvals = approvedGatesFromTimeline(
-		path.join(sessionDir, "timeline.jsonl"),
-	);
+	const approvals = approvedGatesFromTimeline(sessionDir);
 
 	for (const gate of route.gates) {
 		const gatePath = path.join(gatesDir, `${gate.id}.gate.json`);
@@ -138,9 +136,7 @@ function planSession(sessionDir, routesById) {
 	}
 
 	const gatesDir = path.join(sessionDir, "gates");
-	const approvals = approvedGatesFromTimeline(
-		path.join(sessionDir, "timeline.jsonl"),
-	);
+	const approvals = approvedGatesFromTimeline(sessionDir);
 	for (const gate of route.gates) {
 		if (!fs.existsSync(path.join(gatesDir, `${gate.id}.gate.json`))) {
 			stats.gatesWritten++;

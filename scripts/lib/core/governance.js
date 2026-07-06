@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const { readTimeline } = require('../timeline-reader');
+const { readSessionEvents } = require('../session-timeline');
 const { loadPolicy } = require('../autonomous-policy');
 const { readJsonSafe } = require('./fs-utils');
 
@@ -117,9 +117,9 @@ Execution evidence: \`.amber/executions/*/evidence.json\`
 
 function exportSessionEvidence(sessionId, targetRoot, outputPath) {
   const target = path.resolve(targetRoot);
-  const timelinePath = path.join(target, '.amber', 'sessions', sessionId, 'timeline.jsonl');
+  const sessionDir = path.join(target, '.amber', 'sessions', sessionId);
 
-  const events = readTimeline(timelinePath);
+  const events = readSessionEvents(sessionDir);
   const output = path.resolve(outputPath);
 
   const lines = ['# Session Evidence', '', `**Session ID:** ${sessionId}`, ''];
@@ -257,10 +257,10 @@ function summarizeSessions(sessionsDir, options = {}) {
 
   const sessionIds = fs.readdirSync(sessionsDir).filter(f => fs.statSync(path.join(sessionsDir, f)).isDirectory());
   for (const id of sessionIds) {
-    const timelinePath = path.join(sessionsDir, id, 'timeline.jsonl');
-    if (!fs.existsSync(timelinePath)) continue;
+    const sessionDir = path.join(sessionsDir, id);
+    if (!fs.existsSync(path.join(sessionDir, 'timeline.jsonl'))) continue;
 
-    const events = readTimeline(timelinePath);
+    const events = readSessionEvents(sessionDir);
     const created = events.find(e => e.type === 'session_created');
     const end = events.find(e => e.type === 'session_completed' || e.type === 'session_aborted');
     const commands = events.filter(e => e.type === 'command_executed').length;
