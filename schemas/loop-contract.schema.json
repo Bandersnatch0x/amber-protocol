@@ -3,7 +3,7 @@
   "title": "Loop Contract",
   "description": "Declarative description of a repeatable agent workflow: trigger, cadence, state spine, hard stops, and review gates.",
   "type": "object",
-  "required": ["id", "trigger", "cadence", "stateSpine", "hardStops"],
+  "required": ["id", "trigger", "stateSpine", "hardStops"],
   "properties": {
     "id": {
       "type": "string",

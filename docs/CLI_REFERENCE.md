@@ -270,16 +270,6 @@ node scripts/amber.js execution validate-integration \
   --target .
 ```
 
-### execution validate-loop
-
-Validate loop contract:
-
-```bash
-node scripts/amber.js execution validate-loop \
-  --contract loop.json \
-  --target .
-```
-
 ### execution readiness
 
 Check execution readiness:
@@ -412,6 +402,16 @@ Inspect project profile:
 ```bash
 node scripts/amber.js profile inspect \
   --file profiles/default.profile.json
+```
+
+### loop validate-loop
+
+Validate a loop contract file (read-only):
+
+```bash
+node scripts/amber.js loop validate-loop \
+  --contract loop.json \
+  --target .
 ```
 
 ### loop recommend

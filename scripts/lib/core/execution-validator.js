@@ -40,7 +40,9 @@ function validateLoopContract(contractPath) {
 
 	// Validate required fields
 	if (!contract.trigger) errors.push("Missing required field: trigger");
-	if (!contract.cadence) errors.push("Missing required field: cadence");
+	// Top-level cadence is deprecated in favor of trigger.cadence (see loop-contract.schema.json),
+	// so its absence is a warning, not an error — a contract using trigger.cadence is still valid.
+	if (!contract.cadence) warnings.push("Top-level cadence not set; prefer trigger.cadence");
 	if (!contract.stateSpine) errors.push("Missing required field: stateSpine");
 	if (!contract.hardStops) {
 		errors.push("Missing required field: hardStops");
