@@ -2,6 +2,7 @@
 import { useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SessionEvent } from '@/lib/types/session-events';
+import { useI18n } from '@/lib/i18n';
 import { TimelineRow } from './TimelineRow';
 
 interface VirtualTimelineProps {
@@ -11,6 +12,7 @@ interface VirtualTimelineProps {
 }
 
 export function VirtualTimeline({ events, onEventClick, autoScroll = true }: VirtualTimelineProps) {
+  const { t } = useI18n();
   const parentRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -33,7 +35,7 @@ export function VirtualTimeline({ events, onEventClick, autoScroll = true }: Vir
   if (events.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400">
-        No events yet
+        {t('sessions.timeline.empty')}
       </div>
     );
   }

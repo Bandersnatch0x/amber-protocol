@@ -1,6 +1,7 @@
 import { router, publicProcedure } from '../trpc';
 import { z } from 'zod';
 import { readSessionList, readSessionById, readTimelineEvents } from '../lib/session-reader';
+import { readSessionAuditSummary } from '../lib/session-audit-writer';
 
 export const sessionRouter = router({
   list: publicProcedure.query(() => {
@@ -26,5 +27,11 @@ export const sessionRouter = router({
     )
     .query(({ input }) => {
       return readTimelineEvents(input.sessionId, input.limit);
+    }),
+
+  auditSummary: publicProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(({ input }) => {
+      return readSessionAuditSummary(input.sessionId);
     }),
 });

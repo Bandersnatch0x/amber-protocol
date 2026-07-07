@@ -37,6 +37,10 @@ describe('transcript-service', () => {
     const list = listTranscripts({ repoPath, claudeHome });
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe('sess-1');
+    expect(list[0].repoPath).toBe(repoPath);
+    expect(list[0].sourceDirectory).toContain(encoded);
+    expect(list[0].outline).toContain('echo DATABASE_PASSWORD');
+    expect(list[0].outline).not.toContain('secret-val-123');
   });
 
   it('redacts secrets by default at the web service boundary', () => {

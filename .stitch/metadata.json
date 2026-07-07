@@ -1,0 +1,31 @@
+﻿{
+  "title": "Amber Protocol Web Viewer",
+  "projectId": "13148335678122809815",
+  "projectUrl": "https://stitch.withgoogle.com/projects/13148335678122809815?pli=1",
+  "stitchMcpAvailable": false,
+  "stitchConnectionMode": "browser-harness",
+  "designSystem": {
+    "path": ".stitch/DESIGN.md",
+    "name": "Amber Protocol Web Viewer",
+    "source": "PRODUCT.md, DESIGN.md, apps/web/src"
+  },
+  "screens": [
+    { "slug": "home", "route": "/", "title": "Home / Repository Control Surface", "promptSection": "01 - Home / Repository Control Surface", "status": "review-passed-generated" },
+    { "slug": "sessions-list", "route": "/sessions", "title": "Sessions List", "promptSection": "02 - Sessions List", "status": "review-passed-generated" },
+    { "slug": "session-detail", "route": "/sessions/$id", "title": "Session Detail", "promptSection": "03 - Session Detail", "status": "review-passed-generated" },
+    { "slug": "session-timeline", "route": "/sessions/$id/timeline", "title": "Session Timeline", "promptSection": "04 - Session Timeline", "status": "review-passed-generated" },
+    { "slug": "routes-list", "route": "/routes", "title": "Routes List", "promptSection": "05 - Routes List", "status": "review-passed-generated" },
+    { "slug": "route-detail", "route": "/routes/$id", "title": "Route Detail", "promptSection": "06 - Route Detail", "status": "review-passed-generated" },
+    { "slug": "gates", "route": "/gates", "title": "Gates", "promptSection": "07 - Gates", "status": "review-passed-generated" },
+    { "slug": "transcripts-list", "route": "/transcripts", "title": "Transcripts List", "promptSection": "08 - Transcripts List", "status": "review-passed-generated" },
+    { "slug": "transcript-detail", "route": "/transcripts/$id", "title": "Transcript Detail", "promptSection": "09 - Transcript Detail", "status": "review-passed-generated" },
+    { "slug": "settings", "route": "/settings", "title": "Settings", "promptSection": "10 - Settings", "status": "review-passed-generated" }
+  ],
+  "notes": [
+    "Stitch project was created through browser automation because Stitch MCP project tools were not exposed in this session.",
+    "All 10 screen prompts have passed grill-me-style subagent review.",
+    "Generated screens confirmed in the Stitch project: Home, Sessions Index, Session Detail, Session Timeline, Routes Index, Route Detail, Gates Inbox, Transcripts Index, Transcript Detail, and Settings.",
+    "Some screens currently appear as desktop-only nodes while others have both desktop and mobile nodes; per-screen prompts remain the source of truth for further refinement.",
+    "Per-screen prompts continue to omit colors, fonts, and radius values because the design system is attached at the project level."
+  ]
+}

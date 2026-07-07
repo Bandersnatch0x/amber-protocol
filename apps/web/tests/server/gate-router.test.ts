@@ -3,6 +3,7 @@ import { gateRouter } from '@server/routers/gate';
 import * as gateReader from '@server/lib/gate-reader';
 import * as sessionReader from '@server/lib/session-reader';
 import * as sessionWriter from '@server/lib/session-writer';
+import * as sessionAuditWriter from '@server/lib/session-audit-writer';
 import { sessionEvents } from '@server/services/session-events';
 
 vi.mock('@server/lib/gate-reader', () => ({
@@ -20,6 +21,12 @@ vi.mock('@server/lib/session-writer', () => ({
   persistSessionStatus: vi.fn(),
 }));
 
+vi.mock('@server/lib/session-audit-writer', () => ({
+  appendSessionLedgerRecord: vi.fn(),
+  appendSessionTimelineEvent: vi.fn(),
+  readSessionAuditSummary: vi.fn(),
+}));
+
 vi.mock('@server/services/session-events', () => ({
   sessionEvents: {
     emitGateFailed: vi.fn(),
@@ -34,6 +41,9 @@ const approveGate = gateReader.approveGate as ReturnType<typeof vi.fn>;
 const rejectGate = gateReader.rejectGate as ReturnType<typeof vi.fn>;
 const readSessionByIdMock = sessionReader.readSessionById as ReturnType<typeof vi.fn>;
 const persistSessionStatus = sessionWriter.persistSessionStatus as ReturnType<typeof vi.fn>;
+const appendSessionLedgerRecord = sessionAuditWriter.appendSessionLedgerRecord as ReturnType<typeof vi.fn>;
+const appendSessionTimelineEvent = sessionAuditWriter.appendSessionTimelineEvent as ReturnType<typeof vi.fn>;
+const readSessionAuditSummary = sessionAuditWriter.readSessionAuditSummary as ReturnType<typeof vi.fn>;
 const emitGateFailed = sessionEvents.emitGateFailed as ReturnType<typeof vi.fn>;
 const emitGatePassed = sessionEvents.emitGatePassed as ReturnType<typeof vi.fn>;
 const emitSessionResumed = sessionEvents.emitSessionResumed as ReturnType<typeof vi.fn>;
@@ -55,7 +65,15 @@ describe('gateRouter', () => {
     emitGateFailed.mockImplementation(() => undefined);
     emitGatePassed.mockImplementation(() => undefined);
     emitSessionResumed.mockImplementation(() => undefined);
-    persistSessionStatus.mockResolvedValue({ id: 'session-1', status: 'running' });
+    persistSessionStatus.mockResolvedValue({ id: 'session-1', status: 'executing' });
+    appendSessionLedgerRecord.mockResolvedValue({});
+    appendSessionTimelineEvent.mockResolvedValue(undefined);
+    readSessionAuditSummary.mockResolvedValue({
+      sessionId: 'session-1',
+      gateId: 'gate-1',
+      ledger: { path: '.amber/sessions/session-1/ledger.jsonl', exists: true, verified: true, recordCount: 1 },
+      timeline: { path: '.amber/sessions/session-1/timeline.jsonl', exists: true, eventCount: 1 },
+    });
   });
 
   describe('list', () => {
@@ -90,6 +108,34 @@ describe('gateRouter', () => {
     });
   });
 
+  describe('auditSummary', () => {
+    it('returns the durable audit summary for a gate', async () => {
+      const summary = {
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        ledger: {
+          path: '.amber/sessions/session-1/ledger.jsonl',
+          exists: true,
+          verified: true,
+          recordCount: 2,
+          latestForGate: { kind: 'gate_passed', gateId: 'gate-1', hash: 'a'.repeat(64) },
+        },
+        timeline: {
+          path: '.amber/sessions/session-1/timeline.jsonl',
+          exists: true,
+          eventCount: 3,
+          latestForGate: { type: 'gate_passed', gateId: 'gate-1' },
+        },
+      };
+      readSessionAuditSummary.mockResolvedValue(summary);
+
+      const result = await caller.auditSummary({ sessionId: 'session-1', gateId: 'gate-1' });
+
+      expect(readSessionAuditSummary).toHaveBeenCalledWith('session-1', 'gate-1');
+      expect(result).toBe(summary);
+    });
+  });
+
   describe('approve', () => {
     it('delegates to approveGate and returns success', async () => {
       approveGate.mockResolvedValue(undefined);
@@ -102,6 +148,17 @@ describe('gateRouter', () => {
 
       expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', 'looks good');
       expect(emitGatePassed).toHaveBeenCalledWith('session-1', 'gate-1');
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
+        type: 'gate_passed',
+        data: { sessionId: 'session-1', gateId: 'gate-1', approvedBy: 'web' },
+      });
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
+        schemaVersion: 2,
+        kind: 'gate_passed',
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        approvedBy: 'web',
+      });
       expect(result).toEqual({ success: true });
     });
 
@@ -115,6 +172,15 @@ describe('gateRouter', () => {
 
       expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined);
       expect(result).toEqual({ success: true, eventWarning: 'event stream unavailable' });
+    });
+
+    it('keeps approval successful when durable audit cannot be written', async () => {
+      approveGate.mockResolvedValue(undefined);
+      appendSessionTimelineEvent.mockRejectedValue(new Error('timeline locked'));
+
+      const result = await caller.approve({ sessionId: 'session-1', gateId: 'gate-1' });
+
+      expect(result).toEqual({ success: true, eventWarning: 'timeline locked' });
     });
   });
 
@@ -133,21 +199,25 @@ describe('gateRouter', () => {
       expect(readSessionByIdMock).toHaveBeenCalledWith('session-1');
       expect(getGate).toHaveBeenCalledWith('session-1', 'gate-1');
       expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', 'reviewed');
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'running');
+      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'executing');
       expect(emitGatePassed).toHaveBeenCalledWith('session-1', 'gate-1');
       expect(emitSessionResumed).toHaveBeenCalledWith('session-1');
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
+        type: 'session_resumed',
+        data: { sessionId: 'session-1', source: 'web-gate-approval' },
+      });
       expect(result).toMatchObject({
         success: true,
         gateStatus: 'approved',
-        sessionStatus: 'running',
+        sessionStatus: 'executing',
         resumeRequested: true,
         resumeConfirmed: true,
         resumed: true,
-        message: 'Session status persisted as running',
+        message: 'Session status persisted as executing',
       });
     });
 
-    it('approves without emitting resume when the session is already running', async () => {
+    it('approves without emitting resume and normalizes a legacy running session', async () => {
       readSessionByIdMock.mockReturnValue({ id: 'session-1', status: 'running' });
       mockPendingGate();
       approveGate.mockResolvedValue(undefined);
@@ -160,11 +230,30 @@ describe('gateRouter', () => {
       expect(result).toMatchObject({
         success: true,
         gateStatus: 'approved',
-        sessionStatus: 'running',
+        sessionStatus: 'executing',
         resumeRequested: false,
         resumeConfirmed: true,
         resumed: true,
-        message: 'Session is already running',
+        message: 'Legacy running status normalized to executing',
+      });
+    });
+
+    it('does not confirm a legacy running session when normalization is not persisted', async () => {
+      readSessionByIdMock.mockReturnValue({ id: 'session-1', status: 'running' });
+      persistSessionStatus.mockResolvedValue({ id: 'session-1', status: 'running' });
+      mockPendingGate();
+      approveGate.mockResolvedValue(undefined);
+
+      const result = await caller.approveAndResume({ sessionId: 'session-1', gateId: 'gate-1' });
+
+      expect(result).toMatchObject({
+        success: true,
+        gateStatus: 'approved',
+        sessionStatus: 'running',
+        resumeRequested: false,
+        resumeConfirmed: false,
+        resumed: false,
+        message: 'Session status persistence was not confirmed: expected executing, got running',
       });
     });
 
@@ -203,11 +292,11 @@ describe('gateRouter', () => {
       expect(result).toMatchObject({
         success: true,
         gateStatus: 'approved',
-        sessionStatus: 'running',
+        sessionStatus: 'executing',
         resumeRequested: true,
         resumeConfirmed: true,
         resumed: true,
-        message: 'Session status persisted as running',
+        message: 'Session status persisted as executing',
         resumeEventWarning: 'SSE unavailable',
       });
     });
@@ -269,6 +358,17 @@ describe('gateRouter', () => {
 
       expect(rejectGate).toHaveBeenCalledWith('session-1', 'gate-1', 'needs work');
       expect(emitGateFailed).toHaveBeenCalledWith('session-1', 'gate-1', 'needs work');
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
+        type: 'gate_failed',
+        data: { sessionId: 'session-1', gateId: 'gate-1', reason: 'needs work' },
+      });
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
+        schemaVersion: 2,
+        kind: 'gate_failed',
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        reason: 'needs work',
+      });
       expect(result).toEqual({ success: true });
     });
 

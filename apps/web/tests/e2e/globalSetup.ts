@@ -12,8 +12,19 @@ function getE2ERepoRoot(): string {
   return path.join(os.tmpdir(), `amber-web-e2e-${repoKey}`);
 }
 
+function assertTempFixtureRoot(fixtureRoot: string): string {
+  const tmpRoot = path.resolve(os.tmpdir());
+  const resolvedFixture = path.resolve(fixtureRoot);
+
+  if (!resolvedFixture.startsWith(tmpRoot + path.sep)) {
+    throw new Error(`Refusing to prepare non-temp E2E fixture root: ${resolvedFixture}`);
+  }
+
+  return resolvedFixture;
+}
+
 function prepareE2ERepoRoot(): string {
-  const fixtureRoot = getE2ERepoRoot();
+  const fixtureRoot = assertTempFixtureRoot(getE2ERepoRoot());
   const sourceRoot = path.resolve(process.cwd(), '..', '..');
 
   fs.rmSync(fixtureRoot, { recursive: true, force: true });

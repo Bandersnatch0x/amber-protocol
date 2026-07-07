@@ -1,4 +1,5 @@
 
+import { useI18n, type I18nKey } from '@/lib/i18n';
 import { SessionEvent } from '@/lib/types/session-events';
 
 interface TimelineRowProps {
@@ -6,18 +7,8 @@ interface TimelineRowProps {
   onClick?: (event: SessionEvent) => void;
 }
 
-const eventLabels: Record<SessionEvent['type'], string> = {
-  session_started: 'Session Started',
-  session_paused: 'Session Paused',
-  session_resumed: 'Session Resumed',
-  session_completed: 'Session Completed',
-  session_aborted: 'Session Aborted',
-  task_progress: 'Task Progress',
-  error: 'Error',
-  heartbeat: 'Heartbeat',
-};
-
 export function TimelineRow({ event, onClick }: TimelineRowProps) {
+  const { t } = useI18n();
   const timestamp = 'timestamp' in event ? new Date(event.timestamp).toLocaleTimeString() : '';
 
   return (
@@ -27,7 +18,7 @@ export function TimelineRow({ event, onClick }: TimelineRowProps) {
     >
       <div className="flex-1">
         <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-          {eventLabels[event.type]}
+          {t(`timeline.event.${event.type}` as I18nKey)}
         </div>
         <div className="text-xs text-gray-500 dark:text-gray-400">
           {timestamp}

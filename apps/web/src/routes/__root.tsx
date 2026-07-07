@@ -3,20 +3,23 @@ import { useEffect } from 'react';
 import { TRPCProvider } from '@/lib/trpc-provider';
 import { ThemeProvider } from '@/lib/theme-provider';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { LanguageToggle } from '@/components/LanguageToggle';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { I18nProvider, useI18n, type I18nKey } from '@/lib/i18n';
 
 export const Route = createRootRoute({ component: RootLayout });
 
 const navItems = [
-  { to: '/sessions', label: 'Sessions' },
-  { to: '/transcripts', label: 'Transcripts' },
-  { to: '/routes', label: 'Routes' },
-  { to: '/gates', label: 'Gates' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/sessions', labelKey: 'nav.sessions' },
+  { to: '/transcripts', labelKey: 'nav.transcripts' },
+  { to: '/routes', labelKey: 'nav.routes' },
+  { to: '/gates', labelKey: 'nav.gates' },
+  { to: '/settings', labelKey: 'nav.settings' },
 ] as const;
 
-function NavLink({ to, label }: { to: string; label: string }) {
+function NavLink({ to, labelKey, compact = false }: { to: string; labelKey: I18nKey; compact?: boolean }) {
   const routerState = useRouterState();
+  const { t } = useI18n();
   const isActive = routerState.location.pathname === to ||
     routerState.location.pathname.startsWith(to);
 
@@ -24,20 +27,33 @@ function NavLink({ to, label }: { to: string; label: string }) {
     <Link
       to={to}
       className={`
-        inline-flex items-center px-3 py-2 border-b-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-sm min-h-[44px]
+        inline-flex shrink-0 items-center ${compact ? 'px-2.5' : 'px-3'} py-2 border-b-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-sm min-h-[44px]
         ${isActive
           ? 'border-blue-500 text-slate-900 dark:text-white'
           : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
         }
       `}
     >
-      {label}
+      {t(labelKey)}
     </Link>
   );
 }
 
 function RootLayout() {
+  return (
+    <ThemeProvider>
+      <I18nProvider>
+        <TRPCProvider>
+          <AppShell />
+        </TRPCProvider>
+      </I18nProvider>
+    </ThemeProvider>
+  );
+}
+
+function AppShell() {
   const routerState = useRouterState();
+  const { t } = useI18n();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -50,8 +66,6 @@ function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <TRPCProvider>
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
           <nav className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-40">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -78,8 +92,9 @@ function RootLayout() {
                     rel="noopener noreferrer"
                     className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                   >
-                    Docs
+                    {t('nav.docs')}
                   </a>
+                  <LanguageToggle />
                   <ThemeToggle />
                 </div>
               </div>
@@ -87,10 +102,10 @@ function RootLayout() {
           </nav>
 
           {/* Mobile nav */}
-          <nav aria-label="Mobile navigation" className="sm:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-            <div className="flex px-4 py-2 gap-1 overflow-x-auto">
+          <nav aria-label={t('nav.mobile')} className="sm:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex max-w-full gap-0.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {navItems.map((item) => (
-                <NavLink key={item.to} {...item} />
+                <NavLink key={item.to} {...item} compact />
               ))}
             </div>
           </nav>
@@ -101,7 +116,5 @@ function RootLayout() {
             </main>
           </ErrorBoundary>
         </div>
-      </TRPCProvider>
-    </ThemeProvider>
   );
 }

@@ -20,6 +20,7 @@ const FLAG_SPECS = {
 	"--file": { key: "file" },
 	"--task": { key: "task" },
 	"--session": { key: "session" },
+	"--request-id": { key: "requestId" },
 	"--gate": { key: "gate" },
 	"--stage": { key: "stage" },
 	"--command": { key: "command" },

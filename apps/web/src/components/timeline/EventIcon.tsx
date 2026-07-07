@@ -1,11 +1,11 @@
-import { getTimelineEventConfig } from './timeline-config';
+﻿import { getTimelineEventConfig } from './timeline-config';
 
 export function EventIcon({ type }: { type: string }) {
   const config = getTimelineEventConfig(type);
 
   return (
-    <div className={`flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 ${config.color}`}>
-      <span className="text-xl">{config.icon}</span>
+    <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-[10px] font-semibold uppercase tracking-wide dark:bg-slate-800 ${config.color}`}>
+      <span>{config.icon}</span>
     </div>
   );
 }

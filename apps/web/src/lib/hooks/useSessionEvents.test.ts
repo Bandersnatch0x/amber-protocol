@@ -7,12 +7,12 @@ import { statusFromEventType } from '@/lib/hooks/useSessionEvents';
 // React hook.
 
 describe('statusFromEventType', () => {
-  it('maps session_started to running', () => {
-    expect(statusFromEventType('session_started')).toBe('running');
+  it('maps session_started to executing', () => {
+    expect(statusFromEventType('session_started')).toBe('executing');
   });
 
-  it('maps session_resumed to running', () => {
-    expect(statusFromEventType('session_resumed')).toBe('running');
+  it('maps session_resumed to executing', () => {
+    expect(statusFromEventType('session_resumed')).toBe('executing');
   });
 
   it('maps session_paused to paused', () => {
