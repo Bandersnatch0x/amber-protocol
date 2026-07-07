@@ -1,7 +1,5 @@
-import fs from 'fs';
-import path from 'path';
-import { resolveWithin } from './safe-path';
-import { resolveRepoRoot } from './repo-root';
+﻿import fs from 'fs';
+import { resolveRepoPath, readJsonSafe, readJsonDir } from './artifact-store';
 
 export interface RouteStage {
   name: string;
@@ -9,6 +7,7 @@ export interface RouteStage {
   type?: string;
   target?: string;
   gateAfter?: string;
+  note?: string;
 }
 
 export interface RouteGate {
@@ -35,21 +34,33 @@ export interface Route {
   };
 }
 
-function getAmberRoutesPath(): string {
-  const repoRoot = resolveRepoRoot();
-  const routesPath = path.join(repoRoot, 'routes');
-  return routesPath;
+export function listRoutes(): Route[] {
+  const routesDir = resolveRepoPath('routes');
+
+  if (!routesDir) {
+    return [];
+  }
+
+  return readJsonDir(routesDir, { suffix: '.route.json' })
+    .map(({ name, value }) => mapRoute(value as Record<string, unknown>, name))
+    .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-// Map a raw `.route.json` (the on-disk amber schema) to the UI's Route shape.
-// The disk schema and the viewer were written against different field names;
-// this is the single place that reconciles them:
-//   routeId      -> id        (UI used route.id, which never existed on disk)
-//   displayName  -> name      (UI used route.name; disk has displayName)
-//   version      -> metadata.version (disk keeps version at the root)
-//   trigger.complexity -> category   (disk has no category; complexity is the
-//                                      natural grouping dimension)
-// stages/gates are passed through as the structured objects they already are.
+export function getRouteById(id: string): Route | null {
+  const routePath = resolveRepoPath('routes', `${id}.route.json`);
+  if (!routePath || !fs.existsSync(routePath)) {
+    return null;
+  }
+
+  const { value, error } = readJsonSafe(routePath);
+  if (error) {
+    console.error(`Failed to read route ${id}:`, error);
+    return null;
+  }
+
+  return mapRoute(value as Record<string, unknown>, id);
+}
+
 function mapRoute(raw: Record<string, unknown>, fallbackId: string): Route {
   const trigger = (raw.trigger as Route['trigger']) || undefined;
   const rawMetadata = (raw.metadata as Route['metadata']) || {};
@@ -68,55 +79,6 @@ function mapRoute(raw: Record<string, unknown>, fallbackId: string): Route {
       version: rawMetadata.version || (raw.version as string),
     },
   };
-}
-
-export function listRoutes(): Route[] {
-  const routesDir = getAmberRoutesPath();
-
-  if (!fs.existsSync(routesDir)) {
-    return [];
-  }
-
-  const files = fs.readdirSync(routesDir);
-  const routeFiles = files.filter(f => f.endsWith('.route.json'));
-
-  const routes = routeFiles
-    .map(file => {
-      try {
-        const filePath = path.join(routesDir, file);
-        const content = fs.readFileSync(filePath, 'utf8');
-        const route = JSON.parse(content);
-
-        return mapRoute(route, file.replace('.route.json', ''));
-      } catch (error) {
-        console.error(`Failed to read route ${file}:`, error);
-        return null;
-      }
-    })
-    .filter((r): r is Route => r !== null)
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  return routes;
-}
-
-export function getRouteById(id: string): Route | null {
-  const routesDir = getAmberRoutesPath();
-  // `id` is an unconstrained tRPC input; embed it in the filename only after a
-  // traversal guard so `../`-style ids cannot read files outside routes/.
-  const routePath = resolveWithin(routesDir, `${id}.route.json`);
-  if (!routePath || !fs.existsSync(routePath)) {
-    return null;
-  }
-
-  try {
-    const content = fs.readFileSync(routePath, 'utf8');
-    const route = JSON.parse(content);
-
-    return mapRoute(route, id);
-  } catch (error) {
-    console.error(`Failed to read route ${id}:`, error);
-    return null;
-  }
 }
 
 export function groupRoutesByCategory(routes: Route[]): Record<string, Route[]> {

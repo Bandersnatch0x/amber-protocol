@@ -1,8 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { resolveWithin } from './safe-path';
-import { AMBER_STATE_DIR } from './state-dir';
-import { resolveRepoRoot } from './repo-root';
+import { resolveStatePath, readJsonSafe } from './artifact-store';
 import type { SessionEvent } from '../types/session-events';
 
 export interface Session {
@@ -30,16 +28,22 @@ export interface SessionDetail extends Session {
   };
 }
 
-function getAmberSessionsPath(): string {
-  const repoRoot = resolveRepoRoot();
-  const sessionsPath = path.join(repoRoot, AMBER_STATE_DIR, 'sessions');
-  return sessionsPath;
+function toSession(id: string, manifest: Record<string, unknown>): Session {
+  return {
+    id,
+    goal: (manifest.goal as string) || 'Unknown goal',
+    status: (manifest.status as string) || 'unknown',
+    route: (manifest.route as Session['route']) || { id: 'unknown', name: 'Unknown' },
+    createdAt: (manifest.createdAt as string) || new Date().toISOString(),
+    updatedAt: manifest.updatedAt as string | undefined,
+    budget: manifest.budget as Session['budget'],
+  };
 }
 
 export function readSessionList(): Session[] {
-  const sessionsDir = getAmberSessionsPath();
+  const sessionsDir = resolveStatePath('sessions');
 
-  if (!fs.existsSync(sessionsDir)) {
+  if (!sessionsDir || !fs.existsSync(sessionsDir)) {
     return [];
   }
 
@@ -52,21 +56,12 @@ export function readSessionList(): Session[] {
         return null;
       }
 
-      try {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-        return {
-          id,
-          goal: manifest.goal || 'Unknown goal',
-          status: manifest.status || 'unknown',
-          route: manifest.route || { id: 'unknown', name: 'Unknown' },
-          createdAt: manifest.createdAt || new Date().toISOString(),
-          updatedAt: manifest.updatedAt,
-          budget: manifest.budget,
-        };
-      } catch (error) {
+      const { value: manifest, error } = readJsonSafe(manifestPath);
+      if (error) {
         console.error(`Failed to read session ${id}:`, error);
         return null;
       }
+      return toSession(id, manifest as Record<string, unknown>);
     })
     .filter((s): s is Session => s !== null)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -75,11 +70,10 @@ export function readSessionList(): Session[] {
 }
 
 export function readSessionById(id: string): SessionDetail | null {
-  const sessionsDir = getAmberSessionsPath();
-  // `id` arrives from the tRPC input (z.string(), unconstrained), so guard
-  // against path traversal before touching the filesystem — a malicious id is
-  // treated as a missing session.
-  const sessionDir = resolveWithin(sessionsDir, id);
+  // `id` arrives from the tRPC input (z.string(), unconstrained), so the
+  // traversal guard inside resolveStatePath treats a malicious id exactly
+  // like a missing session.
+  const sessionDir = resolveStatePath('sessions', id);
   if (!sessionDir) {
     return null;
   }
@@ -89,33 +83,27 @@ export function readSessionById(id: string): SessionDetail | null {
     return null;
   }
 
-  try {
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-
-    // Count timeline events
-    const timelinePath = path.join(sessionDir, 'timeline.jsonl');
-    let timelineEvents = 0;
-    if (fs.existsSync(timelinePath)) {
-      const content = fs.readFileSync(timelinePath, 'utf8');
-      timelineEvents = content.trim().split('\n').length;
-    }
-
-    return {
-      id,
-      goal: manifest.goal || 'Unknown goal',
-      status: manifest.status || 'unknown',
-      route: manifest.route || { id: 'unknown', name: 'Unknown' },
-      createdAt: manifest.createdAt || new Date().toISOString(),
-      updatedAt: manifest.updatedAt,
-      budget: manifest.budget,
-      manifest,
-      timelineEvents,
-      worktree: manifest.worktree,
-    };
-  } catch (error) {
+  const { value, error } = readJsonSafe(manifestPath);
+  if (error) {
     console.error(`Failed to read session ${id}:`, error);
     return null;
   }
+  const manifest = value as Record<string, unknown>;
+
+  // Count timeline events
+  const timelinePath = path.join(sessionDir, 'timeline.jsonl');
+  let timelineEvents = 0;
+  if (fs.existsSync(timelinePath)) {
+    const content = fs.readFileSync(timelinePath, 'utf8');
+    timelineEvents = content.trim().split('\n').length;
+  }
+
+  return {
+    ...toSession(id, manifest),
+    manifest,
+    timelineEvents,
+    worktree: manifest.worktree as SessionDetail['worktree'],
+  };
 }
 
 function normalizeEvent(raw: unknown): SessionEvent | null {
@@ -136,8 +124,7 @@ function normalizeEvent(raw: unknown): SessionEvent | null {
 }
 
 export function readTimelineEvents(sessionId: string, limit?: number): SessionEvent[] {
-  const sessionsDir = getAmberSessionsPath();
-  const sessionDir = resolveWithin(sessionsDir, sessionId);
+  const sessionDir = resolveStatePath('sessions', sessionId);
   if (!sessionDir) {
     return [];
   }
