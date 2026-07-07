@@ -27,6 +27,10 @@ export interface TranscriptSummary {
   firstTimestamp?: string;
   lastTimestamp?: string;
   gitBranch?: string;
+  outline: string;
+  repoPath: string;
+  sourceDirectory: string;
+  sourceFile: string;
 }
 
 export interface TranscriptDetail extends TranscriptSummary {
@@ -259,8 +263,35 @@ function findGitBranch(content: string): string | undefined {
   return undefined;
 }
 
-function summarize(id: string, content: string): TranscriptSummary {
-  const turns = parseTranscript(content, { redact: false });
+function truncateOutline(value: string, maxLength = 220): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
+}
+
+function buildOutline(turns: TranscriptTurn[]): string {
+  const firstUserText = turns.find((turn) => (turn.role ?? turn.type) === 'user' && turn.text.trim())?.text;
+  if (firstUserText) {
+    return truncateOutline(firstUserText);
+  }
+
+  const firstAssistantText = turns.find((turn) => (turn.role ?? turn.type) === 'assistant' && turn.text.trim())?.text;
+  if (firstAssistantText) {
+    return truncateOutline(firstAssistantText);
+  }
+
+  const tools = Array.from(new Set(turns.flatMap((turn) => turn.tools))).slice(0, 4);
+  if (tools.length > 0) {
+    return `Tool calls: ${tools.join(', ')}`;
+  }
+
+  return 'No readable message text; this file only contains low-level session records.';
+}
+
+function summarize(id: string, content: string, source: { repoPath: string; sourceDirectory: string; sourceFile: string }): TranscriptSummary {
+  const turns = parseTranscript(content, { redact: true });
   const timestamps = turns
     .map((t) => t.timestamp)
     .filter((t): t is string => typeof t === 'string');
@@ -271,6 +302,10 @@ function summarize(id: string, content: string): TranscriptSummary {
     firstTimestamp: timestamps[0],
     lastTimestamp: timestamps[timestamps.length - 1],
     gitBranch: findGitBranch(content),
+    outline: buildOutline(turns),
+    repoPath: source.repoPath,
+    sourceDirectory: source.sourceDirectory,
+    sourceFile: source.sourceFile,
   };
 }
 
@@ -288,11 +323,16 @@ export function listRepoTranscripts(repoPath: string, opts: RepoOptions = {}): T
     .readdirSync(dir)
     .filter((file) => file.toLowerCase().endsWith('.jsonl'))
     .map((file) => {
-      const content = readTextFile(path.join(dir, file));
+      const sourceFile = path.join(dir, file);
+      const content = readTextFile(sourceFile);
       if (content === null) {
         return null;
       }
-      return summarize(file.replace(/\.jsonl$/i, ''), content);
+      return summarize(file.replace(/\.jsonl$/i, ''), content, {
+        repoPath,
+        sourceDirectory: dir,
+        sourceFile,
+      });
     })
     .filter((s): s is TranscriptSummary => s !== null)
     .sort((a, b) => (b.lastTimestamp ?? '').localeCompare(a.lastTimestamp ?? ''));
@@ -318,5 +358,12 @@ export function readRepoTranscript(
   }
 
   const turns = parseTranscript(content, { redact: opts.redact !== false, limit: opts.limit });
-  return { ...summarize(transcriptId, content), turns };
+  return {
+    ...summarize(transcriptId, content, {
+      repoPath,
+      sourceDirectory: repoTranscriptDir(repoPath, opts.claudeHome),
+      sourceFile: filePath,
+    }),
+    turns,
+  };
 }

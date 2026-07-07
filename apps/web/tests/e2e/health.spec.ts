@@ -2,12 +2,16 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
+const apiPort = Number(process.env.AMBER_E2E_API_PORT ?? process.env.API_PORT ?? 3101);
+const clientPort = Number(process.env.AMBER_E2E_CLIENT_PORT ?? process.env.VITE_DEV_PORT ?? 5273);
+
 test.describe('Server availability', () => {
   test('Express health endpoint returns debug info', async ({ request }) => {
-    const resp = await request.get('http://localhost:3001/api/health');
+    const resp = await request.get(`http://127.0.0.1:${apiPort}/api/health`);
     expect(resp.ok()).toBeTruthy();
     const body = await resp.json();
     expect(body.ok).toBe(true);
+    expect(path.resolve(body.amberRepoRoot)).toBe(path.resolve(process.env.AMBER_REPO_ROOT ?? ''));
 
     console.log('[health] cwd:', body.cwd);
     console.log('[health] AMBER_REPO_ROOT:', body.amberRepoRoot);
@@ -38,7 +42,7 @@ test.describe('Server availability', () => {
   });
 
   test('Vite dev server is reachable', async ({ request }) => {
-    const resp = await request.get('http://localhost:5173');
+    const resp = await request.get(`http://127.0.0.1:${clientPort}`);
     expect(resp.ok()).toBeTruthy();
   });
 });

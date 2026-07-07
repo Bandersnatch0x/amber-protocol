@@ -37,6 +37,21 @@ describe('schema parity (CLI schemas ⊆ web types)', () => {
     expect(rejected).toEqual([]);
   });
 
+  it('accepts web control-plane runner ACK timeline events', () => {
+    for (const type of ['runner_control_requested', 'runner_ack', 'runner_rejected', 'runner_timeout']) {
+      const result = SessionEventSchema.safeParse({
+        type,
+        timestamp: new Date().toISOString(),
+        sessionId: 'session-1',
+        requestId: 'request-1',
+        action: 'resume',
+        requestedStatus: 'executing',
+      });
+
+      expect(result.success, `${type} should be accepted`).toBe(true);
+    }
+  });
+
   it('the Session DTO field names are a subset of the manifest schema properties', () => {
     const schema = readSchema('session-manifest.schema.json');
     const manifestProps = new Set(Object.keys(schema.properties));

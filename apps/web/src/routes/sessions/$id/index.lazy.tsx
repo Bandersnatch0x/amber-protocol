@@ -1,31 +1,73 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createLazyFileRoute, Link } from '@tanstack/react-router';
 import { trpc } from '@/lib/trpc';
 import { StatusBadge } from '@/components/session/StatusBadge';
 import { SessionControls } from '@/components/session/SessionControls';
 import { SessionStatus } from '@/components/session/SessionStatus';
+import { CodeBlock } from '@/components/code/CodeBlock';
+import { AuditEvidenceCard } from '@/components/session/AuditEvidenceCard';
 import { useSessionEvents } from '@/lib/hooks/useSessionEvents';
+import { useI18n, type I18nKey } from '@/lib/i18n';
+import type { SessionEvent, SessionStatus as SessionStatusType } from '@/lib/types/session-events';
 
 export const Route = createLazyFileRoute('/sessions/$id/')({ component: SessionDetailPage });
 
+function formatDateTime(value: string | undefined): string {
+  if (!value) return '-';
+  return new Date(value).toLocaleString();
+}
+
+function formatBudget(session: {
+  budget?: {
+    maxTokens: number;
+    tokensUsed?: number;
+  };
+}, t: (key: I18nKey, params?: Record<string, string | number>) => string): string | null {
+  if (!session.budget) return null;
+  const used = session.budget.tokensUsed ?? 0;
+  const max = session.budget.maxTokens;
+  if (max <= 0) return t('sessions.detail.tokensUsed', { used: used.toLocaleString() });
+  const percent = ((used / max) * 100).toFixed(1);
+  return t('sessions.detail.tokensUsedOfMax', { used: used.toLocaleString(), max: max.toLocaleString(), percent });
+}
+
+function notFoundMessage(message: string | undefined): boolean {
+  return !message || /not found/i.test(message);
+}
+
 function SessionDetailPage() {
+  const { t } = useI18n();
   const { id } = Route.useParams();
   const { data: session, isLoading, error, refetch } = trpc.session.byId.useQuery({ id });
-  const { status, connectionState, lastEvent } = useSessionEvents(id);
+  const { data: timeline } = trpc.session.timeline.useQuery({ sessionId: id });
+  const auditSummary = trpc.session.auditSummary.useQuery({ sessionId: id });
+  const { status: liveStatus, connectionState, lastEvent } = useSessionEvents(id);
   const [manifestExpanded, setManifestExpanded] = useState(false);
+
+  const effectiveStatus = (liveStatus ?? session?.status ?? null) as SessionStatusType | null;
+  const latestEvent = useMemo<SessionEvent | null>(() => {
+    if (lastEvent) return lastEvent;
+    if (!timeline || timeline.length === 0) return null;
+    return timeline[timeline.length - 1] ?? null;
+  }, [lastEvent, timeline]);
+  const manifestJson = useMemo(() => (session ? JSON.stringify(session.manifest, null, 2) : ''), [session]);
+  const manifestPreview = useMemo(() => manifestJson.replace(/\s+/g, ' ').slice(0, 140), [manifestJson]);
+  const budgetText = session ? formatBudget(session, t) : null;
+  const eventCount = timeline?.length ?? session?.timelineEvents ?? 0;
 
   if (isLoading) {
     return (
       <div className="page-container">
         <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-24"></div>
-          <div className="h-7 bg-slate-200 dark:bg-slate-700 rounded w-2/3"></div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-4">
-              <div className="card p-6 h-48"></div>
-              <div className="card p-6 h-32"></div>
+          <div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="h-7 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="h-28 rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              <div className="card h-64 p-6" />
+              <div className="card h-16 p-6" />
             </div>
-            <div className="card p-6 h-64"></div>
+            <div className="card h-56 p-6" />
           </div>
         </div>
       </div>
@@ -33,16 +75,28 @@ function SessionDetailPage() {
   }
 
   if (error || !session) {
+    const isNotFound = notFoundMessage(error?.message);
+
     return (
       <div className="page-container">
-        <div className="card p-6 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 max-w-md">
-          <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Session not found</h3>
-          <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error?.message || 'This session may have been deleted or the link is incorrect.'}</p>
-          <div className="flex gap-3 mt-4">
+        <div className="card max-w-xl p-6">
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+            {isNotFound ? t('sessions.detail.notFound') : t('sessions.detail.failed')}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+            {isNotFound
+              ? t('sessions.detail.notFoundDetail')
+              : error?.message}
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
             <Link to="/sessions" className="btn-secondary text-sm">
-              Back to sessions
+              {t('sessions.detail.back')}
             </Link>
-            <button onClick={() => refetch()} className="btn-secondary text-xs">Retry</button>
+            {!isNotFound && (
+              <button onClick={() => refetch()} className="btn-secondary text-sm">
+                {t('common.retry')}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -50,159 +104,149 @@ function SessionDetailPage() {
   }
 
   return (
-    <div className="page-container">
-      <div className="mb-6">
-        <Link to="/sessions" className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 mb-3 inline-flex items-center gap-1">
-          <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <div className="page-container space-y-6">
+      <header className="space-y-3">
+        <Link to="/sessions" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200">
+          <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
-          Sessions
+          {t('nav.sessions')}
         </Link>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <StatusBadge status={session.status} />
-              {session.status === 'completed' && (
-                <span className="inline-flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400">
-                  <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  Session completed successfully
-                </span>
-              )}
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{session.id}</span>
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white line-clamp-3 break-words">{session.goal}</h1>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusBadge status={effectiveStatus ?? session.status} />
+          <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{session.id}</span>
+          {effectiveStatus === 'completed' && (
+            <span className="text-sm text-emerald-600 dark:text-emerald-400">{t('sessions.detail.completedSuccessfully')}</span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">{session.goal}</h1>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="card p-4 mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SessionStatus status={status} connectionState={connectionState} lastEvent={lastEvent} />
-          <SessionControls sessionId={id} status={status} />
+      <section className="card p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex-1">
+            <SessionStatus status={effectiveStatus} connectionState={connectionState} lastEvent={latestEvent} />
+          </div>
+          <div className="lg:pl-6">
+            <SessionControls
+              sessionId={id}
+              status={effectiveStatus}
+              onActionSettled={async () => {
+                await Promise.all([auditSummary.refetch(), refetch()]);
+              }}
+            />
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
-          <div className="card p-5">
-            <h2 className="section-title mb-4">Details</h2>
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <section className="card p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <dt className="label">Status</dt>
-                <dd className="value">{session.status}</dd>
+                <h2 className="section-title">{t('sessions.detail.details')}</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('sessions.detail.metadataDetail')}</p>
+              </div>
+              <Link to="/sessions/$id/timeline" params={{ id: session.id }} className="btn-primary text-sm">
+                {t('sessions.detail.viewTimeline')}
+              </Link>
+            </div>
+
+            <dl className="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              <div>
+                <dt className="label">{t('sessions.detail.route')}</dt>
+                <dd className="mt-1 text-sm text-slate-900 dark:text-white">{session.route.name}</dd>
+                <p className="mt-1 font-mono text-xs text-slate-500 dark:text-slate-400">{session.route.id}</p>
               </div>
               <div>
-                <dt className="label">Route</dt>
-                <dd className="value font-mono text-xs">{session.route.id}</dd>
+                <dt className="label">{t('sessions.detail.timelineEvents')}</dt>
+                <dd className="value">{eventCount}</dd>
               </div>
               <div>
-                <dt className="label">Created</dt>
-                <dd className="value">{new Date(session.createdAt).toLocaleString()}</dd>
+                <dt className="label">{t('sessions.detail.created')}</dt>
+                <dd className="value">{formatDateTime(session.createdAt)}</dd>
               </div>
-              {session.updatedAt && (
+              <div>
+                <dt className="label">{t('sessions.detail.updated')}</dt>
+                <dd className="value">{formatDateTime(session.updatedAt)}</dd>
+              </div>
+              <div>
+                <dt className="label">{t('sessions.detail.worktree')}</dt>
+                <dd className="value">{session.worktree?.active ? t('sessions.detail.worktreeActive') : t('sessions.detail.worktreeInactive')}</dd>
+                {session.worktree?.path && (
+                  <p className="mt-1 break-all font-mono text-xs text-slate-500 dark:text-slate-400">{session.worktree.path}</p>
+                )}
+              </div>
+              {budgetText && (
                 <div>
-                  <dt className="label">Updated</dt>
-                  <dd className="value">{new Date(session.updatedAt).toLocaleString()}</dd>
-                </div>
-              )}
-              <div>
-                <dt className="label">Timeline Events</dt>
-                <dd className="value">{session.timelineEvents}</dd>
-              </div>
-              {session.worktree && (
-                <div>
-                  <dt className="label">Worktree</dt>
-                  <dd className="value">
-                    <span className={session.worktree.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}>
-                      {session.worktree.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </dd>
+                  <dt className="label">{t('sessions.detail.budget')}</dt>
+                  <dd className="value">{budgetText}</dd>
                 </div>
               )}
             </dl>
-          </div>
-
-          {session.budget && (
-            <div className="card p-5">
-              <h2 className="section-title mb-4">Budget</h2>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 dark:text-slate-400">Used</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
-                    {session.budget.tokensUsed?.toLocaleString() || 0}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 dark:text-slate-400">Max</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
-                    {session.budget.maxTokens.toLocaleString()}
-                  </span>
-                </div>
-                {session.budget.tokensUsed !== undefined && (
-                  <>
-                    <div
-                      role="progressbar"
-                      aria-valuenow={session.budget.tokensUsed}
-                      aria-valuemin={0}
-                      aria-valuemax={session.budget.maxTokens}
-                      aria-label="Token budget usage"
-                      className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5"
-                    >
-                      <div
-                        className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full transition-all duration-300"
-                        style={{
-                          width: `${Math.min(100, (session.budget.tokensUsed / session.budget.maxTokens) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                      <span>{((session.budget.tokensUsed / session.budget.maxTokens) * 100).toFixed(1)}% used</span>
-                      <span>{(session.budget.maxTokens - session.budget.tokensUsed).toLocaleString()} remaining</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-2">
-            <Link
-              to="/sessions/$id/timeline"
-              params={{ id: session.id }}
-              className="btn-primary"
-            >
-              View Timeline
-            </Link>
-          </div>
+          </section>
         </div>
 
-        <div className="card p-5 lg:col-span-1">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="section-title">Manifest</h2>
+        <aside className="space-y-6">
+        <section className="card p-5">
+          <AuditEvidenceCard
+            summary={auditSummary.data}
+            isLoading={auditSummary.isLoading}
+            error={auditSummary.error}
+            className="mt-4"
+            labels={{
+              loading: t('sessions.audit.loading'),
+              failed: t('sessions.audit.failed'),
+              title: t('sessions.audit.title'),
+              detail: t('sessions.audit.detail'),
+              ledgerMissing: t('sessions.audit.ledgerMissing'),
+              ledgerVerified: t('sessions.audit.ledgerVerified'),
+              ledgerBroken: t('sessions.audit.ledgerBroken'),
+              latestLedger: t('sessions.audit.latestLedger'),
+              emptyLedger: t('sessions.audit.noLedgerRecord'),
+              latestTimeline: t('sessions.audit.latestTimeline'),
+              emptyTimeline: t('sessions.audit.noTimelineEvent'),
+              hash: t('sessions.audit.hash'),
+              counts: t('sessions.audit.counts'),
+              countValue: t('sessions.audit.countValues', { ledger: '{ledger}', timeline: '{timeline}' }),
+            }}
+          />
+        </section>
+
+        <section className="card p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="section-title">{t('sessions.detail.manifest')}</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('sessions.detail.manifestDetail')}</p>
+            </div>
             <button
               type="button"
               aria-expanded={manifestExpanded}
-              onClick={() => setManifestExpanded(!manifestExpanded)}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded flex-shrink-0"
+              onClick={() => setManifestExpanded((current) => !current)}
+              className="text-sm text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-400 rounded"
             >
-              {manifestExpanded ? 'Hide' : 'Show'}
+              {manifestExpanded ? t('common.hide') : t('common.show')}
             </button>
           </div>
+
           {manifestExpanded ? (
-            <pre className="text-xs font-mono text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-md overflow-auto max-h-96 whitespace-pre-wrap leading-relaxed">
-              {JSON.stringify(session.manifest, null, 2)}
-            </pre>
+            <CodeBlock code={manifestJson} language="json" title="manifest.json" collapseAfterLines={24} />
           ) : (
-            <>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Session configuration and metadata snapshot</p>
-              <p className="font-mono text-xs text-slate-500 dark:text-slate-400 truncate">
-                {JSON.stringify(session.manifest, null, 2).slice(0, 120)}...
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400">{t('sessions.detail.manifestCollapsed')}</p>
+              <p className="rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                {manifestPreview}...
               </p>
-            </>
+            </div>
           )}
-        </div>
+        </section>
+        </aside>
       </div>
     </div>
   );

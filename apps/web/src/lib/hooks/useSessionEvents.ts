@@ -8,8 +8,8 @@ type ConnectionState = 'connecting' | 'open' | 'closed' | 'error';
 // leave the status unchanged. Previously a 5-branch if/else inside the hook's
 // onmessage handler.
 const EVENT_STATUS_MAP: Partial<Record<SessionEvent['type'], SessionStatus>> = {
-  session_started: 'running',
-  session_resumed: 'running',
+  session_started: 'executing',
+  session_resumed: 'executing',
   session_paused: 'paused',
   session_completed: 'completed',
   session_aborted: 'aborted',

@@ -28,6 +28,7 @@ const { writeRouteGates, writeGateDecision } = require("./gate-writer");
 const { codedError } = require("./core/error-catalog");
 const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
 const { runEvidenceCommand } = require("./core/evidence-runner");
+const { writeRunnerAck } = require("./runner-ack");
 const {
 	resolveStateDirForRead,
 	resolveStateDirForCreate,
@@ -81,6 +82,24 @@ function requireSession(projectRoot, sessionId) {
 		return result(`Session manifest is corrupt: ${sessionId}`, 1);
 	}
 	return loaded;
+}
+
+function writeRunnerAckWarning(projectRoot, sessionId, ack) {
+	if (!ack.requestId) return null;
+	try {
+		writeRunnerAck(projectRoot, sessionId, ack);
+		return null;
+	} catch (error) {
+		return `Warning: could not write runner ACK for request "${ack.requestId}": ${error.message}`;
+	}
+}
+
+function withOptionalWarning(baseResult, warning) {
+	if (!warning) return baseResult;
+	return {
+		...baseResult,
+		text: `${baseResult.text}\n${warning}`,
+	};
 }
 
 function loadAllSessionManifests(projectRoot) {
@@ -320,7 +339,15 @@ async function abortSession(projectRoot, options) {
 	const transition = sm.transition(STATES.ABORTED);
 
 	if (!transition.success) {
-		return result(`Cannot abort: ${transition.error}`, 1);
+		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+			requestId: options.requestId,
+			action: "abort",
+			status: "rejected",
+			requestedStatus: STATES.ABORTED,
+			source: "amber-session-abort",
+			message: `Cannot abort: ${transition.error}`,
+		});
+		return withOptionalWarning(result(`Cannot abort: ${transition.error}`, 1), warning);
 	}
 
 	writeSessionManifest(sessionDir, { ...manifest, status: STATES.ABORTED });
@@ -331,7 +358,15 @@ async function abortSession(projectRoot, options) {
 		removeWorktree(projectRoot, sessionId);
 	}
 
-	return result(`Session aborted: ${sessionId}`, 0);
+	const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+		requestId: options.requestId,
+		action: "abort",
+		status: "acked",
+		requestedStatus: STATES.ABORTED,
+		source: "amber-session-abort",
+		message: "Session aborted by Amber CLI.",
+	});
+	return withOptionalWarning(result(`Session aborted: ${sessionId}`, 0), warning);
 }
 
 async function continueSession(projectRoot, options) {
@@ -354,11 +389,27 @@ async function continueSession(projectRoot, options) {
 	}
 
 	if (manifest.status === "completed") {
-		return result("Session already completed", 1);
+		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+			requestId: options.requestId,
+			action: "resume",
+			status: "rejected",
+			requestedStatus: STATES.EXECUTING,
+			source: "amber-session-continue",
+			message: "Session already completed",
+		});
+		return withOptionalWarning(result("Session already completed", 1), warning);
 	}
 
 	if (manifest.status === "aborted") {
-		return result("Session was aborted", 1);
+		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+			requestId: options.requestId,
+			action: "resume",
+			status: "rejected",
+			requestedStatus: STATES.EXECUTING,
+			source: "amber-session-continue",
+			message: "Session was aborted",
+		});
+		return withOptionalWarning(result("Session was aborted", 1), warning);
 	}
 
 	if (
@@ -367,25 +418,50 @@ async function continueSession(projectRoot, options) {
 		manifest.status !== "created" &&
 		manifest.status !== "routed"
 	) {
-		return result(`Cannot continue session with status: ${manifest.status}`, 1);
+		const message = `Cannot continue session with status: ${manifest.status}`;
+		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+			requestId: options.requestId,
+			action: "resume",
+			status: "rejected",
+			requestedStatus: STATES.EXECUTING,
+			source: "amber-session-continue",
+			message,
+		});
+		return withOptionalWarning(result(message, 1), warning);
 	}
 
 	// Autonomous mode removed in 1.3.0 (ADR-0005): the experimental execution
 	// engine was deleted — unreachable, broken-chained, and shipping dead code.
 	// Amber remains governance-first (ADR-0001): no live execution.
 	if (manifest.mode === "autonomous") {
-		return result(
+		const message =
 			"Error: Autonomous execution is not available. " +
-			"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
-			1
-		);
+			"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).";
+		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+			requestId: options.requestId,
+			action: "resume",
+			status: "rejected",
+			requestedStatus: STATES.EXECUTING,
+			source: "amber-session-continue",
+			message,
+		});
+		return withOptionalWarning(result(message, 1), warning);
 	}
 
 	let checkpoint;
 	if (fromCheckpoint) {
 		checkpoint = loadCheckpointByStage(projectRoot, sessionId, fromCheckpoint);
 		if (!checkpoint) {
-			return result(`Checkpoint not found: ${fromCheckpoint}`, 1);
+			const message = `Checkpoint not found: ${fromCheckpoint}`;
+			const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+				requestId: options.requestId,
+				action: "resume",
+				status: "rejected",
+				requestedStatus: STATES.EXECUTING,
+				source: "amber-session-continue",
+				message,
+			});
+			return withOptionalWarning(result(message, 1), warning);
 		}
 	} else {
 		checkpoint = loadLatestCheckpoint(projectRoot, sessionId);
@@ -405,7 +481,16 @@ async function continueSession(projectRoot, options) {
 	if (sm.currentState === STATES.CREATED) {
 		const routeTransition = sm.transition(STATES.ROUTED);
 		if (!routeTransition.success) {
-			return result(`Cannot route session: ${routeTransition.error}`, 1);
+			const message = `Cannot route session: ${routeTransition.error}`;
+			const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+				requestId: options.requestId,
+				action: "resume",
+				status: "rejected",
+				requestedStatus: STATES.EXECUTING,
+				source: "amber-session-continue",
+				message,
+			});
+			return withOptionalWarning(result(message, 1), warning);
 		}
 		writeSessionManifest(sessionDir, { ...manifest, status: STATES.ROUTED });
 
@@ -416,7 +501,16 @@ async function continueSession(projectRoot, options) {
 
 	const transition = sm.transition(STATES.EXECUTING);
 	if (!transition.success) {
-		return result(`Cannot resume: ${transition.error}`, 1);
+		const message = `Cannot resume: ${transition.error}`;
+		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+			requestId: options.requestId,
+			action: "resume",
+			status: "rejected",
+			requestedStatus: STATES.EXECUTING,
+			source: "amber-session-continue",
+			message,
+		});
+		return withOptionalWarning(result(message, 1), warning);
 	}
 
 	writeSessionManifest(sessionDir, { ...manifest, status: STATES.EXECUTING });
@@ -435,6 +529,16 @@ async function continueSession(projectRoot, options) {
 	if (checkpoint) {
 		lines.push(`Restored from checkpoint: ${checkpoint.stage}`);
 	}
+
+	const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+		requestId: options.requestId,
+		action: "resume",
+		status: "acked",
+		requestedStatus: STATES.EXECUTING,
+		source: "amber-session-continue",
+		message: "Session resumed by Amber CLI.",
+	});
+	if (warning) lines.push(warning);
 
 	return result(lines.join("\n"), 0);
 }

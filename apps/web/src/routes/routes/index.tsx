@@ -1,138 +1,147 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
+﻿import { createFileRoute, Link } from '@tanstack/react-router';
 import { trpc } from '@/lib/trpc';
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useI18n, type I18nKey } from '@/lib/i18n';
 
 export const Route = createFileRoute('/routes/')({ component: RoutesPage });
 
+const categoryOrder = ['simple', 'medium', 'complex', 'uncategorized'] as const;
+const categoryLabelKeys: Record<string, I18nKey> = {
+  simple: 'routes.category.simple',
+  medium: 'routes.category.medium',
+  complex: 'routes.category.complex',
+  uncategorized: 'routes.category.uncategorized',
+};
+
 function RoutesPage() {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const { data: grouped, isLoading, error, refetch } = trpc.route.grouped.useQuery();
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === '/' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement) && !(e.target instanceof HTMLSelectElement)) {
-        e.preventDefault();
+    const handler = (event: KeyboardEvent) => {
+      if (
+        event.key === '/'
+        && !(event.target instanceof HTMLInputElement)
+        && !(event.target instanceof HTMLTextAreaElement)
+        && !(event.target instanceof HTMLSelectElement)
+      ) {
+        event.preventDefault();
         searchRef.current?.focus();
       }
     };
+
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  const filteredGrouped = useMemo(() => {
-    if (!grouped || typeof grouped !== 'object') return {};
-    const q = searchQuery.toLowerCase();
-    return Object.fromEntries(
-      Object.entries(grouped)
-        .filter(([, routes]) => Array.isArray(routes))
-        .map(([category, routes]) => [
-          category,
-          routes.filter(
-            (route: { name?: string; id?: string }) =>
-              (route.name || '').toLowerCase().includes(q) ||
-              (route.id || '').toLowerCase().includes(q)
-          ),
-        ])
-        .filter(([, routes]) => routes.length > 0)
-    );
+  const filteredSections = useMemo(() => {
+    if (!grouped) return [] as Array<{ key: string; labelKey: I18nKey; routes: typeof grouped[string] }>;
+    const query = searchQuery.trim().toLowerCase();
+
+    return categoryOrder
+      .map((key) => {
+        const routes = (grouped[key] ?? []).filter((route) => {
+          if (!query) return true;
+          return route.name.toLowerCase().includes(query)
+            || route.id.toLowerCase().includes(query)
+            || route.description.toLowerCase().includes(query);
+        });
+
+        return {
+          key,
+          labelKey: categoryLabelKeys[key],
+          routes,
+        };
+      })
+      .filter((section) => section.routes.length > 0);
   }, [grouped, searchQuery]);
 
-  const totalRoutes = useMemo(
-    () => Object.values(filteredGrouped).reduce((sum, routes) => sum + routes.length, 0),
-    [filteredGrouped]
-  );
+  const totalRoutes = filteredSections.reduce((sum, section) => sum + section.routes.length, 0);
 
   return (
-    <div className="page-container">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Routes</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          {totalRoutes} route{totalRoutes !== 1 ? 's' : ''}
+    <div className="page-container space-y-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">{t('routes.title')}</h1>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          {t(totalRoutes === 1 ? 'routes.countOne' : 'routes.count', { count: totalRoutes })}
         </p>
-      </div>
+      </header>
 
-      <div className="mb-6">
+      <div className="relative max-w-xl rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
         <input
           ref={searchRef}
           type="text"
-          placeholder="Search routes..."
+          placeholder={t('routes.searchPlaceholder')}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label="Search routes"
-          className="w-full max-w-md px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          onChange={(event) => setSearchQuery(event.target.value)}
+          aria-label={t('routes.searchAria')}
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder-slate-400"
         />
+        <span className="pointer-events-none absolute right-7 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-slate-500">/</span>
       </div>
 
       {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="card p-5 animate-pulse">
-              <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mb-2"></div>
-              <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mb-3"></div>
-              <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-full"></div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {[1, 2, 3, 4, 5, 6].map((index) => (
+            <div key={index} className="card p-5 animate-pulse">
+              <div className="space-y-3">
+                <div className="h-4 w-2/3 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-4 w-1/3 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-4 w-full rounded bg-slate-200 dark:bg-slate-700" />
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {error && (
-        <div className="card p-5 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
-          <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Failed to load routes</h3>
-          <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error.message}</p>
-          <button onClick={() => refetch()} className="btn-secondary text-xs mt-2">Retry</button>
+        <div className="card p-5">
+          <h2 className="text-sm font-medium text-slate-900 dark:text-white">{t('routes.failed')}</h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
+          <button onClick={() => refetch()} className="btn-secondary mt-4 text-sm">{t('common.retry')}</button>
         </div>
       )}
 
-      {totalRoutes === 0 && !isLoading && (
+      {!isLoading && !error && totalRoutes === 0 && (
         <div className="card p-12 text-center">
-          <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-1">No routes found</h3>
-          {searchQuery ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Try a different search term
-            </p>
-          ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Routes define the workflow stages an agent follows during a session.
-            </p>
-          )}
+          <h2 className="text-sm font-medium text-slate-900 dark:text-white">
+            {searchQuery ? t('routes.empty.filtered.title') : t('routes.empty.all.title')}
+          </h2>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            {searchQuery ? t('routes.empty.filtered.detail') : t('routes.empty.all.detail')}
+          </p>
         </div>
       )}
 
-      {totalRoutes > 0 && (
+      {!isLoading && !error && totalRoutes > 0 && (
         <div className="space-y-8">
-          {Object.entries(filteredGrouped).map(([category, routes]) => (
-            <div key={category}>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-3">
-                {category}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {routes.map((route) => (
-                  <Link
-                    key={route.id}
-                    to="/routes/$id"
-                    params={{ id: route.id }}
-                    className="card-hover p-5 block"
-                  >
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1 truncate">
-                      {route.name}
-                    </h3>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{route.id}</span>
-                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
-                      {route.description}
-                    </p>
-                    {route.stages && route.stages.length > 0 && (
-                      <div className="mt-3 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                        <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        {route.stages.length} stage{route.stages.length !== 1 ? 's' : ''}
+          {filteredSections.map((section) => (
+            <section key={section.key} className="space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="label">{t(section.labelKey)}</h2>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{section.routes.length}</span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {section.routes.map((route) => (
+                  <Link key={route.id} to="/routes/$id" params={{ id: route.id }} className="card-hover block p-4">
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-medium text-slate-900 dark:text-white">{route.name}</h3>
+                          <p className="mt-1 font-mono text-xs text-slate-500 dark:text-slate-400">{route.id}</p>
+                        </div>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {t((route.stages?.length ?? 0) === 1 ? 'routes.stagesOne' : 'routes.stages', { count: route.stages?.length ?? 0 })}
+                        </span>
                       </div>
-                    )}
+                      <p className="line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-400">{route.description}</p>
+                    </div>
                   </Link>
                 ))}
               </div>
-            </div>
+            </section>
           ))}
         </div>
       )}

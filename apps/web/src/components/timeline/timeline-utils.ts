@@ -99,6 +99,25 @@ export function getEventSummary(event: SessionEvent): EventSummary {
       return { title: task, details };
     }
 
+    case 'runner_control_requested':
+    case 'runner_ack':
+    case 'runner_rejected':
+    case 'runner_timeout': {
+      const requestId = getString(event, 'requestId');
+      const action = getString(event, 'action');
+      const requestedStatus = getString(event, 'requestedStatus');
+      const runnerStatus = getString(event, 'runnerStatus');
+      const source = getString(event, 'source');
+      const message = getString(event, 'message');
+      if (requestId) details.push({ label: 'Request ID', value: requestId });
+      if (action) details.push({ label: 'Action', value: action });
+      if (requestedStatus) details.push({ label: 'Requested Status', value: requestedStatus });
+      if (runnerStatus) details.push({ label: 'Runner Status', value: runnerStatus });
+      if (source) details.push({ label: 'Source', value: source });
+      if (message) details.push({ label: 'Message', value: message });
+      return { title: message ?? requestId, details };
+    }
+
     case 'error': {
       const error = getString(event, 'error') ?? getString(event, 'message');
       if (error) details.push({ label: 'Error', value: error });

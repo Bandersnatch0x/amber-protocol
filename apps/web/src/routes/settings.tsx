@@ -1,14 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { hasSettingsChanges, normalizeSettings, type Settings } from '@/features/settings/settings-model';
+import { useI18n } from '@/lib/i18n';
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage });
-
-interface Settings {
-  autoRefresh: boolean;
-  refreshInterval: number;
-  showNotifications: boolean;
-  compactView: boolean;
-}
 
 const STORAGE_KEY = 'amber-web-settings';
 
@@ -23,127 +18,132 @@ function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaults;
-    const parsed = JSON.parse(raw);
-    return { ...defaults, ...parsed };
+    return normalizeSettings({ ...defaults, ...JSON.parse(raw) });
   } catch {
     return defaults;
   }
 }
 
 function SettingsPage() {
-  const [settings, setSettings] = useState<Settings>(loadSettings);
+  const { t } = useI18n();
+  const [persistedSettings, setPersistedSettings] = useState<Settings>(loadSettings);
+  const [settings, setSettings] = useState<Settings>(persistedSettings);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const isDirty = useMemo(() => hasSettingsChanges(settings, persistedSettings), [settings, persistedSettings]);
 
   const update = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+    setSettings((previous) => normalizeSettings({ ...previous, [key]: value }));
     setSaved(false);
+    setSaveError(null);
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     setSaveError(null);
+    setSaved(false);
+    setIsSaving(true);
+
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      const normalized = normalizeSettings(settings);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      setPersistedSettings(normalized);
+      setSettings(normalized);
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
     } catch {
-      setSaveError('Failed to save settings. Storage may be full or unavailable.');
-      setTimeout(() => setSaveError(null), 4000);
+      setSaveError(t('settings.saveError'));
+    } finally {
+      setIsSaving(false);
     }
-  }, [settings]);
+  }, [settings, t]);
 
   return (
-    <div className="page-container max-w-2xl">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Settings</h1>
+    <div className="page-container max-w-3xl space-y-6">
+      <header>
+        <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">{t('settings.title')}</h1>
+      </header>
 
-      <div className="space-y-4">
-        <div className="card p-5">
-          <h2 className="section-title mb-4">Display</h2>
-          <label className="flex items-center justify-between py-2">
-            <div>
-              <span className="text-sm text-slate-700 dark:text-slate-300">Compact View</span>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Reduce padding and spacing in lists</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={settings.compactView}
-              onChange={(e) => update('compactView', e.target.checked)}
-              className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-blue-600 focus:ring-blue-500"
-            />
-          </label>
-        </div>
-
-        <div className="card p-5">
-          <h2 className="section-title mb-4">Updates</h2>
-          <div className="space-y-4">
-            <label className="flex items-center justify-between py-2">
-              <div>
-                <span className="text-sm text-slate-700 dark:text-slate-300">Auto Refresh</span>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Poll for new data at a regular interval</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.autoRefresh}
-                onChange={(e) => update('autoRefresh', e.target.checked)}
-                className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-blue-600 focus:ring-blue-500"
-              />
-            </label>
-            {settings.autoRefresh && (
-              <div>
-                <label htmlFor="refresh-interval" className="block text-sm text-slate-700 dark:text-slate-300 mb-2">
-                  Refresh Interval (seconds)
-                </label>
-                <input
-                  id="refresh-interval"
-                  type="range"
-                  min="1"
-                  max="60"
-                  step="1"
-                  value={settings.refreshInterval}
-                  onChange={(e) => update('refreshInterval', parseInt(e.target.value))}
-                  className="w-full accent-blue-600"
-                  aria-label="Refresh interval in seconds"
-                />
-                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  <span>1s</span>
-                  <span className="font-medium text-slate-700 dark:text-slate-300">{settings.refreshInterval}s</span>
-                  <span>60s</span>
-                </div>
-              </div>
-            )}
+      <section className="card p-5">
+        <h2 className="section-title">{t('settings.display')}</h2>
+        <label className="mt-4 flex items-start justify-between gap-4">
+          <div>
+            <span className="text-sm text-slate-900 dark:text-white">{t('settings.compactView')}</span>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('settings.compactViewDetail')}</p>
           </div>
-        </div>
+          <input
+            type="checkbox"
+            checked={settings.compactView}
+            onChange={(event) => update('compactView', event.target.checked)}
+            className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+          />
+        </label>
+      </section>
 
-        <div className="card p-5">
-          <h2 className="section-title mb-4">Notifications</h2>
-          <label className="flex items-center justify-between py-2">
+      <section className="card p-5">
+        <h2 className="section-title">{t('settings.updates')}</h2>
+        <div className="mt-4 space-y-4">
+          <label className="flex items-start justify-between gap-4">
             <div>
-              <span className="text-sm text-slate-700 dark:text-slate-300">Show Notifications</span>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Alerts when sessions complete or fail</p>
+              <span className="text-sm text-slate-900 dark:text-white">{t('settings.autoRefresh')}</span>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('settings.autoRefreshDetail')}</p>
             </div>
             <input
               type="checkbox"
-              checked={settings.showNotifications}
-              onChange={(e) => update('showNotifications', e.target.checked)}
-              className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-blue-600 focus:ring-blue-500"
+              checked={settings.autoRefresh}
+              onChange={(event) => update('autoRefresh', event.target.checked)}
+              className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
             />
           </label>
-        </div>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-          {saved && (
-            <span className="text-sm text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-              Saved
-            </span>
+          {settings.autoRefresh && (
+            <div>
+              <label htmlFor="refresh-interval" className="block text-sm text-slate-900 dark:text-white">
+                {t('settings.refreshInterval')}
+              </label>
+              <input
+                id="refresh-interval"
+                type="range"
+                min="1"
+                max="60"
+                step="1"
+                value={settings.refreshInterval}
+                onChange={(event) => update('refreshInterval', Number(event.target.value))}
+                className="mt-3 w-full accent-blue-600"
+                aria-label={t('settings.refreshIntervalAria')}
+              />
+              <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span>1s</span>
+                <span className="font-medium text-slate-700 dark:text-slate-300">{settings.refreshInterval}s</span>
+                <span>60s</span>
+              </div>
+            </div>
           )}
-          {saveError && (
-            <span className="text-sm text-red-600 dark:text-red-400">{saveError}</span>
-          )}
-          <button className="btn-primary" onClick={handleSave}>Save Settings</button>
         </div>
+      </section>
+
+      <section className="card p-5">
+        <h2 className="section-title">{t('settings.notifications')}</h2>
+        <label className="mt-4 flex items-start justify-between gap-4">
+          <div>
+            <span className="text-sm text-slate-900 dark:text-white">{t('settings.showNotifications')}</span>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('settings.showNotificationsDetail')}</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={settings.showNotifications}
+            onChange={(event) => update('showNotifications', event.target.checked)}
+            className="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+          />
+        </label>
+      </section>
+
+      <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700" aria-live="polite">
+        {saved && <span className="text-sm text-emerald-600 dark:text-emerald-400">{t('common.saved')}</span>}
+        {saveError && <span className="text-sm text-red-600 dark:text-red-400">{saveError}</span>}
+        <button className="btn-primary" onClick={handleSave} disabled={!isDirty || isSaving}>
+          {isSaving ? t('common.saving') : t('settings.save')}
+        </button>
       </div>
     </div>
   );

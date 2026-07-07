@@ -54,6 +54,29 @@ class SessionEvents {
     eventBroadcaster.broadcast(sessionId, event);
   }
 
+  emitGatePassed(sessionId: string, gateId: string): void {
+    const event: SessionEvent = {
+      type: 'gate_passed',
+      sessionId,
+      gateId,
+      timestamp: Date.now(),
+    };
+    eventStore.addEvent(sessionId, event);
+    eventBroadcaster.broadcast(sessionId, event);
+  }
+
+  emitGateFailed(sessionId: string, gateId: string, reason?: string): void {
+    const event: SessionEvent = {
+      type: 'gate_failed',
+      sessionId,
+      gateId,
+      reason,
+      timestamp: Date.now(),
+    };
+    eventStore.addEvent(sessionId, event);
+    eventBroadcaster.broadcast(sessionId, event);
+  }
+
   emitTaskProgress(sessionId: string, task: string, progress: number): void {
     const event: SessionEvent = {
       type: 'task_progress',

@@ -21,4 +21,13 @@ test.describe('Gates', () => {
       await expect(page.getByText('e2e-approval-gate')).toBeVisible();
     }
   });
+
+  test('shows gate-scoped evidence trail from the fixture ledger', async ({ page }) => {
+    await page.goto('/gates');
+    await page.getByRole('button', { name: 'Review' }).first().click();
+
+    await expect(page.getByText('Evidence trail')).toBeVisible();
+    await expect(page.getByText('Ledger verified')).toBeVisible();
+    await expect(page.getByText(/gate_triggered/i).first()).toBeVisible();
+  });
 });

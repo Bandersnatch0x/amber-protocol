@@ -93,6 +93,69 @@
       disabled:opacity-50 disabled:cursor-not-allowed
       transition-colors duration-150;
   }
+
+  .markdown-message > :first-child {
+    @apply mt-3;
+  }
+
+  .markdown-message > :last-child {
+    @apply mb-0;
+  }
+
+  .hljs-comment,
+  .hljs-quote {
+    @apply text-slate-500 dark:text-slate-400;
+  }
+
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-subst {
+    @apply font-semibold text-blue-700 dark:text-blue-300;
+  }
+
+  .hljs-string,
+  .hljs-doctag,
+  .hljs-regexp {
+    @apply text-emerald-700 dark:text-emerald-300;
+  }
+
+  .hljs-number,
+  .hljs-literal,
+  .hljs-variable,
+  .hljs-template-variable,
+  .hljs-attribute {
+    @apply text-sky-700 dark:text-sky-300;
+  }
+
+  .hljs-title,
+  .hljs-section,
+  .hljs-name,
+  .hljs-selector-id,
+  .hljs-selector-class {
+    @apply font-medium text-indigo-700 dark:text-indigo-300;
+  }
+
+  .hljs-type,
+  .hljs-class .hljs-title,
+  .hljs-built_in,
+  .hljs-builtin-name {
+    @apply text-cyan-700 dark:text-cyan-300;
+  }
+
+  .hljs-symbol,
+  .hljs-bullet,
+  .hljs-link,
+  .hljs-meta {
+    @apply text-slate-600 dark:text-slate-300;
+  }
+
+  .hljs-deletion {
+    @apply text-red-700 dark:text-red-300;
+  }
+
+  .hljs-addition {
+    @apply text-emerald-700 dark:text-emerald-300;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

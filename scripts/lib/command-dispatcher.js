@@ -394,9 +394,9 @@ async function handleSession(args) {
   } else if (action === "list") {
     sessionResult = sessionCommands.listSessions(targetRoot, {});
   } else if (action === "abort") {
-    sessionResult = await sessionCommands.abortSession(targetRoot, { sessionId: args._?.[1] });
+    sessionResult = await sessionCommands.abortSession(targetRoot, { sessionId: args._?.[1] || args.session, requestId: args.requestId });
   } else if (action === "continue") {
-    sessionResult = await sessionCommands.continueSession(targetRoot, { sessionId: args._?.[1] });
+    sessionResult = await sessionCommands.continueSession(targetRoot, { sessionId: args._?.[1] || args.session, requestId: args.requestId });
   } else if (action === "complete-check") {
     if (!args.session) {
       sessionResult = { text: "session complete-check requires --session <id>.", exitCode: 1 };

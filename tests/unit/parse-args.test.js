@@ -28,11 +28,14 @@ test("hyphenated flags map to camelCase keys", () => {
 		"30",
 		"--review-gate-status",
 		"pass",
+		"--request-id",
+		"resume-request-1",
 	]);
 	assert.equal(args.outputDir, "out");
 	assert.equal(args.bundleDir, "bundle");
 	assert.equal(args.thresholdDays, "30");
 	assert.equal(args.reviewGateStatus, "pass");
+	assert.equal(args.requestId, "resume-request-1");
 });
 
 test("boolean flags set true without consuming a token", () => {

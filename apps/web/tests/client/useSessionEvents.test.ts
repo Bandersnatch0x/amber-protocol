@@ -65,7 +65,7 @@ describe('useSessionEvents', () => {
         }),
       });
     });
-    expect(result.current.status).toBe('running');
+    expect(result.current.status).toBe('executing');
     expect(result.current.events).toHaveLength(1);
   });
 

@@ -105,6 +105,12 @@ describe('repo transcript filesystem layer', () => {
     expect(summaries).toHaveLength(1);
     expect(summaries[0].id).toBe('sess-1');
     expect(summaries[0].turnCount).toBe(3);
+    expect(summaries[0].repoPath).toBe(repoPath);
+    expect(summaries[0].sourceDirectory).toBe(path.join(claudeHome, '.claude', 'projects', encoded));
+    expect(summaries[0].sourceFile).toBe(path.join(claudeHome, '.claude', 'projects', encoded, 'sess-1.jsonl'));
+    expect(summaries[0].outline).toContain('print DATABASE_PASSWORD');
+    expect(summaries[0].outline).not.toContain('secret-val-123');
+    expect(summaries[0].outline).toContain('[REDACTED');
   });
 
   it('reads a transcript and redacts secrets by default', () => {

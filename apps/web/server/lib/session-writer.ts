@@ -8,6 +8,7 @@
 import fsp from 'fs/promises';
 import path from 'path';
 import { resolveStatePath, readJsonSafe } from './artifact-store';
+import { readSessionById } from './session-reader';
 import type { SessionStatus } from '../types/session-events';
 import type { SessionDetail } from './session-reader';
 
@@ -33,8 +34,6 @@ export async function persistSessionStatus(id: string, status: SessionStatus): P
   await fsp.writeFile(tempPath, `${JSON.stringify(updatedManifest, null, 2)}\n`, 'utf8');
   await fsp.rename(tempPath, manifestPath);
 
-  // Re-read via session-reader to get a consistent SessionDetail back.
-  const { readSessionById } = require('./session-reader');
   const confirmed = readSessionById(id);
 
   if (!confirmed) {
