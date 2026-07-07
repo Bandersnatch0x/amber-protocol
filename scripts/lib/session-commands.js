@@ -25,7 +25,6 @@ const { result } = require("./result");
 const { promptYesNo } = require("./prompt");
 const { ensureContinuitySurfaces } = require("./continuity-surfaces");
 const { writeRouteGates, writeGateDecision } = require("./gate-writer");
-const { writeJson } = require("./core/fs-utils");
 const { codedError } = require("./core/error-catalog");
 const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
 const { runEvidenceCommand } = require("./core/evidence-runner");
@@ -216,9 +215,7 @@ async function startSession(projectRoot, options) {
 		lines.push(goalMismatchWarning);
 	}
 
-	const finalManifest = { ...manifest, ...extras };
-	const manifestPath = path.join(sessionDir, "manifest.json");
-	writeJson(manifestPath, finalManifest);
+	const finalManifest = writeSessionManifest(sessionDir, { ...manifest, ...extras });
 
 	appendSessionEvent(sessionDir, {
 		type: "session_created",

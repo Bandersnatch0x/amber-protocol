@@ -8,6 +8,12 @@
  * and returns `{ result, exitCode }`. The dispatcher standardises the output
  * envelope (`{ target, errors, warnings, ... }`) so the CLI run() function
  * becomes a thin parser → dispatch → print pipeline.
+ *
+ * Watch item (architecture review 2026-07-07): the envelope standardisation is
+ * load-bearing and the thin handlers are deliberate — do not delete them. But
+ * if this file grows past ~1000 lines, move each switch-based sub-command
+ * family (team/loop/adoption/maintenance) into its own module owning its
+ * envelope mapping.
  */
 
 const path = require("node:path");

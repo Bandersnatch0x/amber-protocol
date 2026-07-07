@@ -2,7 +2,8 @@ import { router, publicProcedure } from '../trpc';
 import { z } from 'zod';
 import { sessionEvents } from '../services/session-events';
 import { readSessionById } from '../lib/session-reader';
-import { SessionStatusSchema } from '../types/session-events';
+import { persistSessionStatus } from '../lib/session-writer';
+import type { SessionStatus } from '../types/session-events';
 
 // Action-centric guard: each action declares which statuses it can be invoked from.
 // This prevents semantic confusion where start/resume both target 'running' but mean
@@ -14,10 +15,18 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   abort: ['running', 'paused'],
 };
 
+async function persistAndConfirmStatus(sessionId: string, status: SessionStatus): Promise<SessionStatus> {
+  const confirmed = await persistSessionStatus(sessionId, status);
+  if (confirmed.status !== status) {
+    throw new Error(`Session status persistence was not confirmed: expected ${status}, got ${confirmed.status}`);
+  }
+  return confirmed.status as SessionStatus;
+}
+
 export const sessionControlRouter = router({
   start: publicProcedure
     .input(z.object({ sessionId: z.string() }))
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       const session = readSessionById(input.sessionId);
       if (!session) {
         throw new Error('Session not found');
@@ -30,13 +39,14 @@ export const sessionControlRouter = router({
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
+      const status = await persistAndConfirmStatus(input.sessionId, 'running');
       sessionEvents.emitSessionStarted(input.sessionId);
-      return { status: 'running', timestamp: Date.now() };
+      return { status, timestamp: Date.now(), persisted: true, confirmed: true };
     }),
 
   pause: publicProcedure
     .input(z.object({ sessionId: z.string() }))
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       const session = readSessionById(input.sessionId);
       if (!session) {
         throw new Error('Session not found');
@@ -49,13 +59,14 @@ export const sessionControlRouter = router({
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
+      const status = await persistAndConfirmStatus(input.sessionId, 'paused');
       sessionEvents.emitSessionPaused(input.sessionId);
-      return { status: 'paused', timestamp: Date.now() };
+      return { status, timestamp: Date.now(), persisted: true, confirmed: true };
     }),
 
   resume: publicProcedure
     .input(z.object({ sessionId: z.string() }))
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       const session = readSessionById(input.sessionId);
       if (!session) {
         throw new Error('Session not found');
@@ -68,13 +79,14 @@ export const sessionControlRouter = router({
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
+      const status = await persistAndConfirmStatus(input.sessionId, 'running');
       sessionEvents.emitSessionResumed(input.sessionId);
-      return { status: 'running', timestamp: Date.now() };
+      return { status, timestamp: Date.now(), persisted: true, confirmed: true };
     }),
 
   abort: publicProcedure
     .input(z.object({ sessionId: z.string(), reason: z.string().optional() }))
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       const session = readSessionById(input.sessionId);
       if (!session) {
         throw new Error('Session not found');
@@ -87,7 +99,8 @@ export const sessionControlRouter = router({
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
+      const status = await persistAndConfirmStatus(input.sessionId, 'aborted');
       sessionEvents.emitSessionAborted(input.sessionId, input.reason);
-      return { status: 'aborted', timestamp: Date.now() };
+      return { status, timestamp: Date.now(), persisted: true, confirmed: true };
     }),
 });

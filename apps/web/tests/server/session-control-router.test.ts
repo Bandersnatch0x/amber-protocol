@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { sessionControlRouter } from '@server/routers/session-control';
 import * as sessionReader from '@server/lib/session-reader';
+import * as sessionWriter from '@server/lib/session-writer';
 import { sessionEvents } from '@server/services/session-events';
 
 vi.mock('@server/lib/session-reader', () => ({
   readSessionById: vi.fn(),
+}));
+
+vi.mock('@server/lib/session-writer', () => ({
+  persistSessionStatus: vi.fn(),
 }));
 
 vi.mock('@server/services/session-events', () => ({
@@ -17,9 +22,15 @@ vi.mock('@server/services/session-events', () => ({
 }));
 
 const readSessionById = sessionReader.readSessionById as ReturnType<typeof vi.fn>;
+const persistSessionStatus = sessionWriter.persistSessionStatus as ReturnType<typeof vi.fn>;
 
 function mockSessionWithStatus(status: string): void {
   readSessionById.mockReturnValue({ id: 'session-1', goal: 'test', status });
+  persistSessionStatus.mockImplementation(async (_sessionId: string, nextStatus: string) => ({
+    id: 'session-1',
+    goal: 'test',
+    status: nextStatus,
+  }));
 }
 
 const caller = sessionControlRouter.createCaller({});
@@ -35,8 +46,10 @@ describe('sessionControlRouter', () => {
 
       const result = await caller.start({ sessionId: 'session-1' });
 
+      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'running');
       expect(sessionEvents.emitSessionStarted).toHaveBeenCalledWith('session-1');
       expect(result.status).toBe('running');
+      expect(result.confirmed).toBe(true);
     });
 
     it('is idempotent: returns running without emitting when already running', async () => {
@@ -89,8 +102,10 @@ describe('sessionControlRouter', () => {
 
       const result = await caller.pause({ sessionId: 'session-1' });
 
+      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'paused');
       expect(sessionEvents.emitSessionPaused).toHaveBeenCalledWith('session-1');
       expect(result.status).toBe('paused');
+      expect(result.confirmed).toBe(true);
     });
 
     it('is idempotent: returns paused without emitting when already paused', async () => {
@@ -128,13 +143,25 @@ describe('sessionControlRouter', () => {
   });
 
   describe('resume', () => {
-    it('emits session_resumed and returns running when transitioning from paused', async () => {
+    it('persists, confirms, emits session_resumed, and returns running from paused', async () => {
       mockSessionWithStatus('paused');
 
       const result = await caller.resume({ sessionId: 'session-1' });
 
+      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'running');
       expect(sessionEvents.emitSessionResumed).toHaveBeenCalledWith('session-1');
       expect(result.status).toBe('running');
+      expect(result.confirmed).toBe(true);
+    });
+
+    it('rejects resume when persisted status cannot be confirmed', async () => {
+      mockSessionWithStatus('paused');
+      persistSessionStatus.mockResolvedValue({ id: 'session-1', goal: 'test', status: 'paused' });
+
+      await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
+        'Session status persistence was not confirmed: expected running, got paused'
+      );
+      expect(sessionEvents.emitSessionResumed).not.toHaveBeenCalled();
     });
 
     it('is idempotent: returns running without emitting when already running', async () => {
@@ -185,8 +212,10 @@ describe('sessionControlRouter', () => {
 
       const result = await caller.abort({ sessionId: 'session-1', reason: 'manual' });
 
+      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'aborted');
       expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith('session-1', 'manual');
       expect(result.status).toBe('aborted');
+      expect(result.confirmed).toBe(true);
     });
 
     it('emits session_aborted when transitioning from paused', async () => {
@@ -194,6 +223,7 @@ describe('sessionControlRouter', () => {
 
       const result = await caller.abort({ sessionId: 'session-1' });
 
+      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'aborted');
       expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith('session-1', undefined);
       expect(result.status).toBe('aborted');
     });
