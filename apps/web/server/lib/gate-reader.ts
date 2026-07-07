@@ -1,16 +1,14 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Gate, GateStatus, GateFilters, GateDecision } from './types/gate';
-import { AMBER_STATE_DIR } from './state-dir';
-import { resolveRepoRoot } from './repo-root';
+import { resolveStatePath, readJsonSafeAsync } from './artifact-store';
 
 // Filesystem layout: .amber/sessions/{sessionId}/gates/{gateId}.gate.json
 // Decision files: .amber/sessions/{sessionId}/gates/{gateId}.decision.json
 
 function getSessionsPath(): string {
-  const repoRoot = resolveRepoRoot();
-  const sessionsPath = path.join(repoRoot, AMBER_STATE_DIR, 'sessions');
-  return sessionsPath;
+  // 'sessions' is a fixed segment, so resolveStatePath can never return null here.
+  return resolveStatePath('sessions') as string;
 }
 
 function validateSessionId(sessionId: string): boolean {
@@ -21,34 +19,77 @@ function validateGateId(gateId: string): boolean {
   return /^[a-zA-Z0-9_-]+$/.test(gateId);
 }
 
-async function readGateFile(gatePath: string, decisionPath: string): Promise<Gate | null> {
-  try {
-    const gateData = JSON.parse(await fs.readFile(gatePath, 'utf8'));
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
 
-    let decision: GateDecision | null = null;
-    try {
-      const decisionData = await fs.readFile(decisionPath, 'utf8');
-      decision = JSON.parse(decisionData);
-    } catch {
-      // No decision file yet
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
     }
+  }));
 
-    return {
-      gateId: gateData.gateId,
-      sessionId: gateData.sessionId,
-      type: gateData.type || 'user-approval',
-      stage: gateData.stage || 'unknown',
-      description: gateData.description || '',
-      status: decision ? (decision.decision === 'approved' ? 'approved' : 'rejected') : 'pending',
-      triggeredAt: gateData.triggeredAt,
-      resolvedAt: decision?.resolvedAt,
-      resolvedBy: decision ? 'human' : undefined,
-      reason: decision?.reason,
-    };
-  } catch (error) {
+  return results;
+}
+
+/** Coerce unknown JSON value to string with a fallback for nullish. */
+function str(v: unknown, fallback: string): string {
+  return v != null ? String(v) : fallback;
+}
+
+async function readGateFile(gatePath: string, decisionPath: string): Promise<Gate | null> {
+  const { value, error } = await readJsonSafeAsync(gatePath);
+  if (error) {
     console.error(`Failed to read gate file ${gatePath}:`, error);
     return null;
   }
+  const gateData = value as Record<string, unknown>;
+
+  const decision = (await readJsonSafeAsync(decisionPath)).value as GateDecision | null;
+
+  return {
+    gateId: str(gateData.gateId, ''),
+    sessionId: str(gateData.sessionId, ''),
+    type: str(gateData.type, 'user-approval'),
+    stage: str(gateData.stage, 'unknown'),
+    description: str(gateData.description, ''),
+    status: decision ? (decision.decision === 'approved' ? 'approved' : 'rejected') : 'pending',
+    triggeredAt: str(gateData.triggeredAt, ''),
+    resolvedAt: decision?.resolvedAt,
+    resolvedBy: decision ? 'human' : undefined,
+    reason: decision?.reason,
+  };
+}
+
+async function listSessionGates(sessionsDir: string, sessionId: string): Promise<Gate[]> {
+  if (!validateSessionId(sessionId)) return [];
+
+  const gatesDir = path.join(sessionsDir, sessionId, 'gates');
+
+  let files: string[];
+  try {
+    files = await fs.readdir(gatesDir);
+  } catch {
+    return [];
+  }
+
+  const gateFiles = files.filter(f => f.endsWith('.gate.json'));
+  const gates = await mapWithConcurrency(gateFiles, 16, async (file) => {
+    const gateId = file.replace('.gate.json', '');
+    const gatePath = path.join(gatesDir, file);
+    const decisionPath = path.join(gatesDir, `${gateId}.decision.json`);
+
+    return readGateFile(gatePath, decisionPath);
+  });
+
+  return gates.filter((gate): gate is Gate => gate !== null);
 }
 
 export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
@@ -65,31 +106,10 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
     ? [filters.sessionId]
     : await fs.readdir(sessionsDir);
 
-  for (const sessionId of sessionDirs) {
-    if (!validateSessionId(sessionId)) continue;
-
-    const gatesDir = path.join(sessionsDir, sessionId, 'gates');
-
-    try {
-      await fs.access(gatesDir);
-    } catch {
-      continue;
-    }
-
-    const files = await fs.readdir(gatesDir);
-    const gateFiles = files.filter(f => f.endsWith('.gate.json'));
-
-    for (const file of gateFiles) {
-      const gateId = file.replace('.gate.json', '');
-      const gatePath = path.join(gatesDir, file);
-      const decisionPath = path.join(gatesDir, `${gateId}.decision.json`);
-
-      const gate = await readGateFile(gatePath, decisionPath);
-      if (gate) {
-        gates.push(gate);
-      }
-    }
-  }
+  const sessionGates = await mapWithConcurrency(sessionDirs, 32, (sessionId) =>
+    listSessionGates(sessionsDir, sessionId)
+  );
+  gates.push(...sessionGates.flat());
 
   // Apply status filter
   let filtered = gates;
