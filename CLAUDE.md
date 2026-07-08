@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, gates, evidence, and routing rules; read before nontrivial tasks.
+
 ## Project Overview
 
 **Amber Protocol** (formerly Coding Harness) is a repository-local governance and control layer for agent-assisted engineering. It provides installation, auditing, validation, and maintenance capabilities for project files that help agents understand codebases, track feature state, and hand off work cleanly.
@@ -233,7 +235,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on pushes and PRs:
 - Manifest validation
 - Doctor checks
 - CLI smoke tests
-- Release dry-run on version tags (does NOT auto-publish)
+- Release dry-run on all `v*` tags; stable `v*.*.*` tags (no `-rc`/`-beta` suffix) auto-publish to npm after all jobs pass
 
 ## Agent skills
 
