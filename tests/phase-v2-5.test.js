@@ -54,6 +54,11 @@ test("review passes confirmed plans and accept appends evolution log", () => {
   assert.equal(runHarness(["init", "--target", target]).status, 0);
   const plan = createPlan(target, "Accept ready");
   confirmPlan(target, plan);
+  // Since #23, accept requires verification evidence — record it first.
+  assert.equal(
+    runHarness(["feature", "verify", "--target", target, "--feature", "F001", "--command", "npm test", "--result", "ok"]).status,
+    0,
+  );
 
   const review = runHarness(["review", "--target", target, "--plan", plan, "--json"]);
   const accept = runHarness(["accept", "--target", target, "--plan", plan, "--json"]);

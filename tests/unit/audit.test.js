@@ -93,16 +93,16 @@ test("buildSuggestedPatches maps each conflict to a human-approval patch", () =>
 test("buildNextSafeCommand wraps the target in JSON.stringify so spaces and backslashes are quoted", () => {
 	assert.equal(
 		buildNextSafeCommand("/some/repo"),
-		'node scripts/amber.js audit --target "/some/repo" --json',
+		'node scripts/amber.js init --target "/some/repo"',
 	);
 	assert.equal(
 		buildNextSafeCommand("a b"),
-		'node scripts/amber.js audit --target "a b" --json',
+		'node scripts/amber.js init --target "a b"',
 	);
 	// Backslashes survive JSON stringification (escaped as \\).
 	assert.equal(
 		buildNextSafeCommand("C:\\proj\\x"),
-		'node scripts/amber.js audit --target "C:\\\\proj\\\\x" --json',
+		'node scripts/amber.js init --target "C:\\\\proj\\\\x"',
 	);
 });
 

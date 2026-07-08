@@ -243,6 +243,7 @@ amber-protocol skill test <name> --input "<text>"
 ```
 
 ## Adoption Commands
+> ⚠️ **DEPRECATED** — will be removed in v2. Use `amber governance audit` instead.
 
 ### `adoption report`
 

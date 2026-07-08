@@ -28,6 +28,7 @@ const { writeRouteGates, writeGateDecision } = require("./gate-writer");
 const { codedError } = require("./core/error-catalog");
 const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
 const { runEvidenceCommand } = require("./core/evidence-runner");
+const { recordFeatureEvidence } = require("./feature-commands");
 const { writeRunnerAck } = require("./runner-ack");
 const {
 	resolveStateDirForRead,
@@ -108,7 +109,7 @@ function loadAllSessionManifests(projectRoot) {
 }
 
 async function startSession(projectRoot, options) {
-	const { goal, route: routeId, budget, worktree, mode } = options;
+	const { goal, route: routeId, budget, worktree, mode, feature } = options;
 
 	if (!goal) {
 		return result("Error: --goal is required", 1);
@@ -193,6 +194,7 @@ async function startSession(projectRoot, options) {
 		route: { id: selectedRouteId, version: routeVersion },
 		goal,
 		budget,
+		feature,
 	});
 	const sessionDir = getSessionDirForCreate(projectRoot, manifest.sessionId);
 	fs.mkdirSync(sessionDir, { recursive: true });
@@ -202,6 +204,9 @@ async function startSession(projectRoot, options) {
 		`Route: ${selectedRouteId}`,
 		`Goal: ${goal}`,
 	];
+	if (feature) {
+		lines.push(`Feature: ${feature}`);
+	}
 
 	const extras = {
 		continuitySurfaces: ensureContinuitySurfaces(projectRoot),
@@ -367,6 +372,65 @@ async function abortSession(projectRoot, options) {
 		message: "Session aborted by Amber CLI.",
 	});
 	return withOptionalWarning(result(`Session aborted: ${sessionId}`, 0), warning);
+}
+
+// Mark a session completed — the governance terminal state. Gated on
+// complete-check passing (verification + approval evidence present), so a
+// session cannot be declared done without proof. This closes the loop L9: a
+// complete-check pass no longer leaves the session stranded in `created`,
+// which previously let `continue` resurrect it.
+async function completeSession(projectRoot, options) {
+	const { sessionId } = options;
+
+	if (!sessionId) {
+		return result("Error: session complete requires --session <id>.", 1);
+	}
+
+	const loaded = requireSession(projectRoot, sessionId);
+	if (loaded.exitCode !== undefined) return loaded;
+	const { manifest, sessionDir } = loaded;
+
+	if (manifest.status === STATES.COMPLETED) {
+		return result(`Session already completed: ${sessionId}`, 0);
+	}
+	if (manifest.status === STATES.ABORTED) {
+		return result(`Cannot complete an aborted session: ${sessionId}`, 1);
+	}
+
+	const { evaluateCompletion } = require("./completion-check");
+	const completion = evaluateCompletion(projectRoot, sessionId, {
+		strict: options.strict !== false,
+	});
+	if (completion.status !== "pass") {
+		const missing = (completion.missing || []).join(", ") || "evidence";
+		return result(
+			`Cannot complete session: complete-check failed (missing: ${missing}).\n` +
+				`Run: amber session complete-check --session ${sessionId} --strict`,
+			1,
+		);
+	}
+
+	const sm = new SessionStateMachine(manifest.status);
+	const transition = sm.transition(STATES.COMPLETED);
+	if (!transition.success) {
+		return result(`Cannot complete: ${transition.error}`, 1);
+	}
+
+	writeSessionManifest(sessionDir, { ...manifest, status: STATES.COMPLETED });
+	appendSessionEvent(sessionDir, transition.event);
+
+	const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+		requestId: options.requestId,
+		action: "complete",
+		status: "acked",
+		requestedStatus: STATES.COMPLETED,
+		source: "amber-session-complete",
+		message: "Session marked completed after complete-check passed.",
+	});
+	return withOptionalWarning(
+		result(`Session completed: ${sessionId}`, 0),
+		warning,
+	);
 }
 
 async function continueSession(projectRoot, options) {
@@ -654,12 +718,35 @@ async function verifySession(projectRoot, options) {
 	}
 	writeSessionManifest(sessionDir, { ...manifest, completedStages });
 
+	// Evidence reflux: a real (--execute) verification is the session's proof of
+	// work. When the session is bound to a feature, mirror that proof into
+	// feature_list.json so `accept`/completion see real evidence instead of a
+	// self-reported claim. Claim-only verifications are not real evidence, so
+	// they do not reflux.
+	const effectiveFeature = options.feature || manifest.feature;
+	let refluxedFeature = null;
+	if (executed && effectiveFeature) {
+		const reflux = recordFeatureEvidence(projectRoot, {
+			feature: effectiveFeature,
+			command: execResult.ledgerRecord.command,
+			result: `passed (exit 0, ${execResult.durationMs}ms)`,
+			notes: `session ${sessionId} stage ${actualStageName}`,
+			sessionId,
+		});
+		if (!reflux.errors || reflux.errors.length === 0) {
+			refluxedFeature = effectiveFeature;
+		}
+	}
+
 	const lines = [`Verification recorded for session: ${sessionId}`, `Stage: ${stageDisplayName}`];
 	if (executed) {
 		lines.push(`Executed: ${execResult.ledgerRecord.command} (exit 0, ${execResult.durationMs}ms)`);
 	} else if (verifyStage && verifyStage.target) {
 		lines.push(`Suggested verification command: ${verifyStage.target}`);
 		lines.push("(claim only — re-run with --execute to record real evidence)");
+	}
+	if (refluxedFeature) {
+		lines.push(`Evidence recorded for feature ${refluxedFeature}.`);
 	}
 	lines.push("", "Tip: run `amber session approve --session " + sessionId + "` to record gate approval.");
 	return result(lines.join("\n"), 0);
@@ -842,6 +929,7 @@ module.exports = {
 	statusSession,
 	listSessions,
 	abortSession,
+	completeSession,
 	continueSession,
 	verifySession,
 	approveSession,

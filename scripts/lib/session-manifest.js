@@ -24,7 +24,7 @@ const ajv = new Ajv();
 addFormats(ajv);
 const validate = ajv.compile(schema);
 
-function createManifest({ route, goal, budget }) {
+function createManifest({ route, goal, budget, feature }) {
 	const now = new Date().toISOString();
 	return {
 		sessionId: crypto.randomUUID(),
@@ -35,6 +35,7 @@ function createManifest({ route, goal, budget }) {
 		goal,
 		status: "created",
 		completedStages: [],
+		...(feature ? { feature } : {}),
 		...(budget != null && { budget: { total: budget, used: 0 } }),
 	};
 }

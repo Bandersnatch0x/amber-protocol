@@ -2,9 +2,16 @@
 
 ## Overview
 
-The web viewer is a Next.js-based dashboard for visualizing and controlling Amber Protocol sessions, routes, timelines, and wiki documentation. It provides a read-only view of local filesystem state with real-time updates and session control capabilities.
+The web viewer is a Next.js-based dashboard for visualizing Amber Protocol sessions,
+routes, timelines, and wiki documentation. It is a **supervised action viewer** —
+read-only dashboards combined with a constrained set of audited, non-arbitrary
+mutations (session start/pause/resume/abort and verification command execution).
 
-**Status:** Scaffold only (Phase C deferred). Configuration and tooling set up; UI components not implemented.
+See [ADR-0007](../adr/0007-web-viewer-role.md) for the formal boundary between
+allowed web actions and CLI-only actions.
+
+**Status:** Scaffold with server-side session control and verification. UI
+components partially implemented.
 
 ## Tech Stack
 
@@ -21,7 +28,11 @@ The web viewer is a Next.js-based dashboard for visualizing and controlling Ambe
 
 ## Architecture Principles
 
-1. **Read-Only by Default:** Web viewer reads `.amber/` filesystem but never writes
+1. **Supervised Action Viewer:** Web viewer reads `.amber/` filesystem. It may
+   write to `timeline.jsonl`, `ledger.jsonl`, and `manifest.json` for session
+   control and verification — see [ADR-0007](../adr/0007-web-viewer-role.md) for
+   the complete allow list. It never creates/deletes files or modifies
+   `feature_list.json`.
 2. **No Database:** All data comes from filesystem state (manifest.json, timeline.jsonl)
 3. **Real-Time Updates:** SSE streams filesystem changes to connected clients
 4. **Stateless Server:** tRPC procedures are pure functions reading current state
@@ -424,7 +435,9 @@ apps/web/
 
 1. **Local-Only:** Server binds to localhost only (no external access)
 2. **No Authentication:** Assumes single-user local development environment
-3. **Read-Only Default:** Web viewer never writes to `.amber/` (session controls via CLI spawn)
+3. **Audited Mutations Only:** Web viewer writes only to `timeline.jsonl`,
+   `ledger.jsonl`, and `manifest.json` — all appended, never overridden. See
+   [ADR-0007](../adr/0007-web-viewer-role.md) for the allowed mutation list.
 4. **Input Validation:** All API inputs validated via Zod schemas
 5. **Path Traversal:** Filesystem reads restricted to `.amber/` directory
 

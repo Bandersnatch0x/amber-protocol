@@ -302,7 +302,7 @@ function buildAuditUnknowns(
 }
 
 function buildNextSafeCommand(targetRoot) {
-	return `node scripts/amber.js audit --target ${JSON.stringify(targetRoot)} --json`;
+	return `node scripts/amber.js init --target ${JSON.stringify(targetRoot)}`;
 }
 
 function listStarterFileStatus(rootDir, relativePaths) {

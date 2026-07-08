@@ -396,6 +396,7 @@ node scripts/amber.js pack readiness \
 ```
 
 ### profile inspect
+> ⚠️ **DEPRECATED** — will be removed in v2. Use `amber governance policy` instead.
 
 Inspect project profile:
 
@@ -514,6 +515,7 @@ node scripts/amber.js loop status \
 ```
 
 ### task prepare
+> ⚠️ **DEPRECATED** — will be removed in v2.
 
 Prepare task execution:
 
@@ -525,6 +527,7 @@ node scripts/amber.js task prepare \
 ```
 
 ### result inspect
+> ⚠️ **DEPRECATED** — will be removed in v2.
 
 Inspect task result:
 

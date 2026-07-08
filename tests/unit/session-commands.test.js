@@ -9,7 +9,9 @@ const {
 	listSessions,
 	abortSession,
 	approveSession,
+	verifySession,
 } = require("../../scripts/lib/session-commands");
+const { addFeature, listFeatureEvidence } = require("../../scripts/lib/feature-commands");
 
 const TEST_ROOT = path.join(__dirname, "../fixtures/session-test-repo");
 
@@ -352,6 +354,71 @@ describe("session-commands", () => {
 			assert.ok(!fs.existsSync(
 				path.join(gatesDir(start.sessionId), "user-approval-implement.decision.json"),
 			));
+		});
+	});
+
+	describe("feature binding + evidence reflux", () => {
+		it("stores the bound feature in the manifest", async () => {
+			addFeature(TEST_ROOT, { id: "F001", title: "greeting", area: "core" });
+			const start = await startSession(TEST_ROOT, {
+				goal: "add greeting feature",
+				route: "feature-standard",
+				feature: "F001",
+			});
+			assert.strictEqual(start.exitCode, 0);
+			assert.match(start.text, /Feature: F001/);
+
+			const manifest = JSON.parse(fs.readFileSync(
+				path.join(TEST_ROOT, ".amber", "sessions", start.sessionId, "manifest.json"),
+				"utf8",
+			));
+			assert.strictEqual(manifest.feature, "F001");
+		});
+
+		it("refluxes real (--execute) verification evidence into the bound feature", async () => {
+			addFeature(TEST_ROOT, { id: "F001", title: "greeting", area: "core" });
+			// The default verify policy only allow-lists `npm test`, so seed a
+			// package.json with a passing test script.
+			fs.writeFileSync(
+				path.join(TEST_ROOT, "package.json"),
+				JSON.stringify({ name: "s", scripts: { test: "node -e \"process.exit(0)\"" } }),
+			);
+			const start = await startSession(TEST_ROOT, {
+				goal: "add greeting feature",
+				route: "feature-standard",
+				feature: "F001",
+			});
+
+			const verify = await verifySession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				command: "npm test",
+				execute: true,
+			});
+			assert.strictEqual(verify.exitCode, 0);
+			assert.match(verify.text, /Evidence recorded for feature F001/);
+
+			const { evidence } = listFeatureEvidence(TEST_ROOT, { feature: "F001" });
+			assert.strictEqual(evidence.length, 1);
+			assert.strictEqual(evidence[0].sessionId, start.sessionId);
+			assert.match(evidence[0].result, /passed \(exit 0/);
+		});
+
+		it("does NOT reflux a claim-only verification", async () => {
+			addFeature(TEST_ROOT, { id: "F001", title: "greeting", area: "core" });
+			const start = await startSession(TEST_ROOT, {
+				goal: "add greeting feature",
+				route: "feature-standard",
+				feature: "F001",
+			});
+
+			await verifySession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				command: "npm test",
+				result: "claimed",
+			});
+
+			const { evidence } = listFeatureEvidence(TEST_ROOT, { feature: "F001" });
+			assert.strictEqual(evidence.length, 0);
 		});
 	});
 });

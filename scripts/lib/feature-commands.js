@@ -166,7 +166,7 @@ function removeFeature(target, options) {
 
 function recordFeatureEvidence(target, options) {
 	const targetRoot = resolveTarget(target);
-	const { feature: featureId, command, result, notes } = options;
+	const { feature: featureId, command, result, notes, sessionId } = options;
 
 	if (!featureId) {
 		return {
@@ -204,6 +204,7 @@ function recordFeatureEvidence(target, options) {
 		result: result || "",
 		date: new Date().toISOString().slice(0, 10),
 		notes: notes || "",
+		...(sessionId ? { sessionId } : {}),
 	};
 
 	if (!Array.isArray(feature.evidence)) {
