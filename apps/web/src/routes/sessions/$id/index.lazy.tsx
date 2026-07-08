@@ -6,6 +6,7 @@ import { SessionControls } from '@/components/session/SessionControls';
 import { SessionStatus } from '@/components/session/SessionStatus';
 import { CodeBlock } from '@/components/code/CodeBlock';
 import { AuditEvidenceCard } from '@/components/session/AuditEvidenceCard';
+import { SessionCompletionWorkbench } from '@/components/session/SessionCompletionWorkbench';
 import { useSessionEvents } from '@/lib/hooks/useSessionEvents';
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import type { SessionEvent, SessionStatus as SessionStatusType } from '@/lib/types/session-events';
@@ -35,25 +36,50 @@ function notFoundMessage(message: string | undefined): boolean {
   return !message || /not found/i.test(message);
 }
 
+function lifecycleFromNext(data: unknown): unknown {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return undefined;
+  return (data as { lifecycle?: unknown }).lifecycle;
+}
+
 function SessionDetailPage() {
   const { t } = useI18n();
   const { id } = Route.useParams();
   const { data: session, isLoading, error, refetch } = trpc.session.byId.useQuery({ id });
-  const { data: timeline } = trpc.session.timeline.useQuery({ sessionId: id });
+  const timelineQuery = trpc.session.timeline.useQuery({ sessionId: id });
   const auditSummary = trpc.session.auditSummary.useQuery({ sessionId: id });
+  const lifecycleNext = trpc.lifecycle.next.useQuery({ session: id, strict: true });
+  const completionCheck = trpc.lifecycle.completionCheck.useQuery({ sessionId: id, strict: true });
+  const runVerification = trpc.lifecycle.runVerification.useMutation();
   const { status: liveStatus, connectionState, lastEvent } = useSessionEvents(id);
   const [manifestExpanded, setManifestExpanded] = useState(false);
 
   const effectiveStatus = (liveStatus ?? session?.status ?? null) as SessionStatusType | null;
   const latestEvent = useMemo<SessionEvent | null>(() => {
     if (lastEvent) return lastEvent;
+    const timeline = timelineQuery.data;
     if (!timeline || timeline.length === 0) return null;
     return timeline[timeline.length - 1] ?? null;
-  }, [lastEvent, timeline]);
+  }, [lastEvent, timelineQuery.data]);
   const manifestJson = useMemo(() => (session ? JSON.stringify(session.manifest, null, 2) : ''), [session]);
   const manifestPreview = useMemo(() => manifestJson.replace(/\s+/g, ' ').slice(0, 140), [manifestJson]);
   const budgetText = session ? formatBudget(session, t) : null;
-  const eventCount = timeline?.length ?? session?.timelineEvents ?? 0;
+  const eventCount = timelineQuery.data?.length ?? session?.timelineEvents ?? 0;
+
+  async function handleRunVerification(input: { command?: string }) {
+    try {
+      await runVerification.mutateAsync({ sessionId: id, command: input.command });
+    } catch {
+      // React Query keeps the mutation error for display; still refresh evidence.
+    } finally {
+      await Promise.all([
+        refetch(),
+        timelineQuery.refetch(),
+        auditSummary.refetch(),
+        lifecycleNext.refetch(),
+        completionCheck.refetch(),
+      ]);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -194,58 +220,69 @@ function SessionDetailPage() {
         </div>
 
         <aside className="space-y-6">
-        <section className="card p-5">
-          <AuditEvidenceCard
-            summary={auditSummary.data}
-            isLoading={auditSummary.isLoading}
-            error={auditSummary.error}
-            className="mt-4"
-            labels={{
-              loading: t('sessions.audit.loading'),
-              failed: t('sessions.audit.failed'),
-              title: t('sessions.audit.title'),
-              detail: t('sessions.audit.detail'),
-              ledgerMissing: t('sessions.audit.ledgerMissing'),
-              ledgerVerified: t('sessions.audit.ledgerVerified'),
-              ledgerBroken: t('sessions.audit.ledgerBroken'),
-              latestLedger: t('sessions.audit.latestLedger'),
-              emptyLedger: t('sessions.audit.noLedgerRecord'),
-              latestTimeline: t('sessions.audit.latestTimeline'),
-              emptyTimeline: t('sessions.audit.noTimelineEvent'),
-              hash: t('sessions.audit.hash'),
-              counts: t('sessions.audit.counts'),
-              countValue: t('sessions.audit.countValues', { ledger: '{ledger}', timeline: '{timeline}' }),
-            }}
+          <SessionCompletionWorkbench
+            completion={completionCheck.data}
+            lifecycle={lifecycleFromNext(lifecycleNext.data)}
+            isLoading={completionCheck.isLoading || lifecycleNext.isLoading}
+            error={completionCheck.error ?? lifecycleNext.error}
+            isVerifying={runVerification.isLoading}
+            verificationError={runVerification.error?.message ?? null}
+            verificationResult={runVerification.data}
+            onRunVerification={handleRunVerification}
           />
-        </section>
 
-        <section className="card p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="section-title">{t('sessions.detail.manifest')}</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('sessions.detail.manifestDetail')}</p>
-            </div>
-            <button
-              type="button"
-              aria-expanded={manifestExpanded}
-              onClick={() => setManifestExpanded((current) => !current)}
-              className="text-sm text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-400 rounded"
-            >
-              {manifestExpanded ? t('common.hide') : t('common.show')}
-            </button>
-          </div>
+          <section className="card p-5">
+            <AuditEvidenceCard
+              summary={auditSummary.data}
+              isLoading={auditSummary.isLoading}
+              error={auditSummary.error}
+              className="mt-4"
+              labels={{
+                loading: t('sessions.audit.loading'),
+                failed: t('sessions.audit.failed'),
+                title: t('sessions.audit.title'),
+                detail: t('sessions.audit.detail'),
+                ledgerMissing: t('sessions.audit.ledgerMissing'),
+                ledgerVerified: t('sessions.audit.ledgerVerified'),
+                ledgerBroken: t('sessions.audit.ledgerBroken'),
+                latestLedger: t('sessions.audit.latestLedger'),
+                emptyLedger: t('sessions.audit.noLedgerRecord'),
+                latestTimeline: t('sessions.audit.latestTimeline'),
+                emptyTimeline: t('sessions.audit.noTimelineEvent'),
+                hash: t('sessions.audit.hash'),
+                counts: t('sessions.audit.counts'),
+                countValue: t('sessions.audit.countValues', { ledger: '{ledger}', timeline: '{timeline}' }),
+              }}
+            />
+          </section>
 
-          {manifestExpanded ? (
-            <CodeBlock code={manifestJson} language="json" title="manifest.json" collapseAfterLines={24} />
-          ) : (
-            <div className="mt-4 space-y-2">
-              <p className="text-sm text-slate-600 dark:text-slate-400">{t('sessions.detail.manifestCollapsed')}</p>
-              <p className="rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                {manifestPreview}...
-              </p>
+          <section className="card p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="section-title">{t('sessions.detail.manifest')}</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('sessions.detail.manifestDetail')}</p>
+              </div>
+              <button
+                type="button"
+                aria-expanded={manifestExpanded}
+                onClick={() => setManifestExpanded((current) => !current)}
+                className="text-sm text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-400 rounded"
+              >
+                {manifestExpanded ? t('common.hide') : t('common.show')}
+              </button>
             </div>
-          )}
-        </section>
+
+            {manifestExpanded ? (
+              <CodeBlock code={manifestJson} language="json" title="manifest.json" collapseAfterLines={24} />
+            ) : (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm text-slate-600 dark:text-slate-400">{t('sessions.detail.manifestCollapsed')}</p>
+                <p className="rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  {manifestPreview}...
+                </p>
+              </div>
+            )}
+          </section>
         </aside>
       </div>
     </div>

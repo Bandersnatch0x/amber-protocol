@@ -33,6 +33,7 @@ const RESUME_CHECKPOINT_FIELDS = [
 const {
 	findFeatureById,
 } = require("./validators");
+const { codedError } = require("./error-catalog");
 
 const {
 	MESSAGES,
@@ -531,7 +532,7 @@ function confirmPlanGate(target, planRelativePath) {
 	};
 }
 
-function acceptPlan(target, planRelativePath) {
+function acceptPlan(target, planRelativePath, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const review = reviewPlan(targetRoot, planRelativePath);
 	if (review.errors.length > 0) {
@@ -549,6 +550,37 @@ function acceptPlan(target, planRelativePath) {
 	const planContent = readText(planPath);
 	const featureId = readPlanField(planContent, "Feature");
 	let featureUpdated = false;
+
+	// Governance gate: a feature cannot be accepted without verification
+	// evidence. Evidence is produced by `session verify --execute` (which
+	// refluxes into feature_list.json) or `feature verify`. --force bypasses
+	// with a recorded warning.
+	if (featureId) {
+		const feature = findFeatureById(targetRoot, featureId);
+		const hasEvidence =
+			feature && Array.isArray(feature.evidence) && feature.evidence.length > 0;
+		if (feature && !hasEvidence) {
+			if (!options.force) {
+				return {
+					target: targetRoot,
+					plan: planRelativePath,
+					accepted: false,
+					featureId,
+					errors: [
+						codedError(
+							"AMBER_E_FEATURE_NO_EVIDENCE",
+							`Cannot accept ${featureId}: no verification evidence is recorded.`,
+						),
+					],
+					warnings: review.warnings,
+					review,
+				};
+			}
+			review.warnings.push(
+				`Accepted ${featureId} with --force despite no verification evidence.`,
+			);
+		}
+	}
 
 	// Update feature_list.json with immutable pattern.
 	if (featureId) {

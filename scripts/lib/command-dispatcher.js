@@ -93,7 +93,26 @@ function handleDoctor(args) {
 }
 
 function handleHandoff(args) {
-  return { result: validateHandoff(args.target) };
+  const { writeHandoff } = require("./handoff-command");
+  const rel = "session-handoff.md";
+  const written = writeHandoff(args.target, { dryRun: args.dryRun });
+  const validation = validateHandoff(args.target);
+  const wrote = written.changed && !args.dryRun;
+  return {
+    result: {
+      target: validation.target,
+      created: wrote ? [rel] : [],
+      skipped: written.changed ? [] : [rel],
+      nextSteps: validation.nextSteps || [],
+      warnings: [
+        ...(validation.warnings || []),
+        ...(args.dryRun && written.changed
+          ? [`Dry-run: ${rel} would be regenerated from live state (not written).`]
+          : []),
+      ],
+      errors: validation.errors || [],
+    },
+  };
 }
 
 function handlePlan(args) {
@@ -118,7 +137,7 @@ function handleReview(args) {
 }
 
 function handleAccept(args) {
-  const acceptResult = acceptPlan(args.target, args.plan);
+  const acceptResult = acceptPlan(args.target, args.plan, { force: args.force });
   if (!args.session) return { result: acceptResult };
 
   const { buildCompletionResult } = require("./completion-check");
@@ -387,6 +406,7 @@ async function handleSession(args) {
         budget: parsedBudget,
         worktree: args.worktree,
         mode: args.mode,
+        feature: args.feature,
       });
     }
   } else if (action === "status") {
@@ -405,6 +425,16 @@ async function handleSession(args) {
       const completion = buildCompletionResult(targetRoot, args.session, args);
       sessionResult = { text: completion.text, exitCode: completion.errors.length > 0 ? 1 : 0 };
     }
+  } else if (action === "complete") {
+    if (!args.session) {
+      sessionResult = { text: "session complete requires --session <id>.", exitCode: 1 };
+    } else {
+      sessionResult = await sessionCommands.completeSession(targetRoot, {
+        sessionId: args.session,
+        strict: args.strict,
+        requestId: args.requestId,
+      });
+    }
   } else if (action === "verify") {
     if (!args.session) {
       sessionResult = { text: "session verify requires --session <id>.", exitCode: 1 };
@@ -415,6 +445,7 @@ async function handleSession(args) {
         command: args.command,
         result: args.result,
         execute: args.execute,
+        feature: args.feature,
       });
     }
   } else if (action === "approve") {
@@ -434,7 +465,7 @@ async function handleSession(args) {
       sessionResult = sessionCommands.verifyLedgerSession(targetRoot, args.session);
     }
   } else {
-    sessionResult = { text: "session requires start, status, list, abort, continue, complete-check, verify, verify-ledger, or approve.", exitCode: 1 };
+    sessionResult = { text: "session requires start, status, list, abort, continue, complete-check, complete, verify, verify-ledger, or approve.", exitCode: 1 };
   }
 
   const r = {
@@ -789,6 +820,18 @@ const HANDLERS = {
   hooks:       handleHooks,
 };
 
+// ── Deprecated commands ─────────────────────────────────────────────────────
+// These commands are isolated from the core governance flow and will be removed
+// in v2. Users should migrate to equivalent governance commands.
+const DEPRECATED_COMMANDS = new Set([
+  "profile",
+  "task",
+  "result",
+  "agent",
+  "team",
+  "adoption",
+]);
+
 // ── Dispatcher ──────────────────────────────────────────────────────────────
 
 /**
@@ -803,7 +846,14 @@ function dispatch(command, args) {
   if (!handler) {
     return { result: { errors: [`No handler registered for command: ${command}`], warnings: [] }, exitCode: 1 };
   }
-  return handler(args);
+  const response = handler(args);
+  if (DEPRECATED_COMMANDS.has(command)) {
+    const msg =
+      `⚠️  DEPRECATED: 'amber ${command}' will be removed in a future version. ` +
+      "Use 'amber governance' or 'amber maintenance' for equivalent functionality.";
+    response.result.warnings = [...(response.result.warnings || []), msg];
+  }
+  return response;
 }
 
 module.exports = { dispatch, HANDLERS };

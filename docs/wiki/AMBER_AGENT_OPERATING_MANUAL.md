@@ -35,7 +35,7 @@ When choices conflict, higher wins: 1 Governance, 2 Verification, 3 Observabilit
 
 - `CONTEXT.md` at repo root is the canonical glossary; `UBIQUITOUS_LANGUAGE.md` is deprecated.
   Use glossary terms in issues, plans, and code; avoid the listed banned aliases
-  (e.g. say "Amber Protocol", never "Coding Harness"; "Route", never "workflow/pipeline").
+  (e.g. say "Amber Protocol", never the deprecated name "Coding Harness"; "Route", never "workflow/pipeline").
 - Before working in an area, read `CONTEXT.md` (in multi-context repos, `CONTEXT-MAP.md` at the
   root routes to per-context `CONTEXT.md` files) and the relevant `docs/adr/` entries. If these
   files are absent, proceed silently — `/domain-modeling` creates them lazily; do not flag their

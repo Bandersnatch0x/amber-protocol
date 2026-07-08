@@ -27,7 +27,11 @@ function runScript(script, args) {
 }
 
 test("unified CLI validator commands return non-zero parseable JSON on failures", () => {
-  for (const command of ["wiki", "handoff", "doctor"]) {
+  // `handoff` is intentionally absent: since #22 it is a GENERATOR — it
+  // regenerates session-handoff.md from live state (self-healing a broken
+  // file) rather than validating it. Its validator counterpart is still
+  // covered below via the standalone validate-handoff.js wrapper.
+  for (const command of ["wiki", "doctor"]) {
     const target = copyFixture("broken-harness");
     const result = runScript("harness.js", [command, "--target", target, "--json"]);
 
@@ -36,6 +40,18 @@ test("unified CLI validator commands return non-zero parseable JSON on failures"
     assert.ok(Array.isArray(payload.errors), `${command} did not return errors array`);
     assert.ok(payload.errors.length > 0, `${command} returned empty errors array`);
   }
+});
+
+test("handoff regenerates a valid session-handoff.md even from a broken fixture", () => {
+  const target = copyFixture("broken-harness");
+  const result = runScript("harness.js", ["handoff", "--target", target, "--json"]);
+
+  assert.equal(result.status, 0, "handoff should self-heal, not fail");
+  const payload = JSON.parse(result.stdout);
+  assert.deepEqual(payload.errors, []);
+  // The regenerated file now passes the handoff validator.
+  const validated = runScript("validate-handoff.js", ["--target", target, "--json"]);
+  assert.equal(validated.status, 0);
 });
 
 test("standalone validator wrappers return non-zero on broken fixtures", () => {

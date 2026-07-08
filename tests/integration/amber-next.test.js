@@ -87,4 +87,35 @@ describe("amber next progression (feature path, no session)", () => {
 		assert.equal(out.complete, true);
 		assert.equal(out.nextStep, null);
 	});
+
+	it("accept refuses a feature with no verification evidence (gated by AMBER_E_FEATURE_NO_EVIDENCE)", () => {
+		const dir = tmpRepo();
+		amber(dir, ["init", "--target", "."]);
+		amber(dir, ["plan", "--target", ".", "--feature", "F001", "--title", "Login slice"]);
+		const planFile = fs
+			.readdirSync(path.join(dir, "docs", "plans"))
+			.find((f) => f.endsWith(".md"));
+		const planPath = `docs/plans/${planFile}`;
+		// Fill the Verification section so reviewPlan's own gate passes, leaving
+		// only the new evidence gate to trip.
+		const abs = path.join(dir, planPath);
+		fs.writeFileSync(
+			abs,
+			fs.readFileSync(abs, "utf8").replace(
+				"## Verification\n\n\n",
+				"## Verification\n\n- Run npm test.\n\n",
+			),
+		);
+		amber(dir, ["gate", "--confirm", "--target", ".", "--plan", planPath]);
+
+		// No `feature verify` yet → accept must refuse with the coded error.
+		const r = amber(dir, ["accept", "--target", ".", "--plan", planPath]);
+		assert.notEqual(r.status, 0, "accept should fail without evidence");
+		assert.match(r.stdout, /AMBER_E_FEATURE_NO_EVIDENCE/);
+
+		// --force bypasses with a recorded warning.
+		const forced = amber(dir, ["accept", "--target", ".", "--plan", planPath, "--force"]);
+		assert.equal(forced.status, 0, forced.stderr);
+		assert.match(forced.stdout, /--force despite no verification evidence/);
+	});
 });

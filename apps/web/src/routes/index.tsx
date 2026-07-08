@@ -39,10 +39,76 @@ function formatRefresh(value: number, fallback: string): string {
   return new Date(value).toLocaleString();
 }
 
+interface NextActionView {
+  focusLabel: string;
+  sessionId: string | null;
+  nextStep: string;
+  reason: string;
+  remedy: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function firstString(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return '';
+}
+
+function sessionIdFromFocus(value: unknown): string | null {
+  if (typeof value === 'string') {
+    if (/^session[-_.A-Za-z0-9]+$/i.test(value.trim())) return value.trim();
+    const match = value.match(/session[:/ ]([A-Za-z0-9._-]+)/i);
+    return match?.[1] ?? null;
+  }
+  if (!isRecord(value)) return null;
+  const type = firstString(value, ['type', 'kind', 'scope']).toLowerCase();
+  const id = firstString(value, ['sessionId', 'session', 'id']);
+  return type === 'session' && id ? id : firstString(value, ['sessionId', 'session']) || null;
+}
+
+function labelFromFocus(value: unknown, fallback: string): string {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (!isRecord(value)) return fallback;
+  return firstString(value, ['label', 'name', 'title', 'id', 'sessionId', 'session', 'feature']) || fallback;
+}
+
+function rowText(value: unknown, keys: string[], fallback = '-'): string {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (!isRecord(value)) return fallback;
+  return firstString(value, keys) || fallback;
+}
+
+function buildNextActionView(data: unknown, repositoryFallback: string, noActionFallback: string): NextActionView {
+  const record = isRecord(data) ? data : {};
+  const focus = record.focus;
+  const nextStep = record.nextStep;
+  const completion = record.completion;
+  const sessionId = sessionIdFromFocus(focus) ?? (isRecord(nextStep) ? sessionIdFromFocus(nextStep) : null);
+
+  return {
+    focusLabel: labelFromFocus(focus, repositoryFallback),
+    sessionId,
+    nextStep: rowText(nextStep, ['title', 'label', 'name', 'action', 'command', 'id'], noActionFallback),
+    reason: rowText(nextStep, ['reason', 'why', 'detail', 'message'], rowText(record, ['reason', 'why', 'detail', 'message'])),
+    remedy: rowText(
+      nextStep,
+      ['remedy', 'recommendation', 'nextCommand', 'command', 'fix'],
+      rowText(record, ['remedy', 'recommendation', 'nextCommand', 'command', 'fix'], rowText(completion, ['reason', 'message', 'text'])),
+    ),
+  };
+}
+
 function HomePage() {
   const { t } = useI18n();
   const sessionsQuery = trpc.session.list.useQuery();
   const gatesQuery = trpc.gate.list.useQuery();
+  const nextActionQuery = trpc.lifecycle.next.useQuery({});
   const [lifecycleExpanded, setLifecycleExpanded] = useState(false);
 
   const activeSessions = useMemo(() => {
@@ -54,6 +120,11 @@ function HomePage() {
     if (!Array.isArray(gatesQuery.data)) return 0;
     return gatesQuery.data.filter((gate) => gate.status === 'pending').length;
   }, [gatesQuery.data]);
+
+  const nextAction = useMemo(
+    () => buildNextActionView(nextActionQuery.data, t('home.nextAction.repositoryFocus'), t('home.nextAction.noAction')),
+    [nextActionQuery.data, t],
+  );
 
   return (
     <div className="page-container space-y-8">
@@ -92,6 +163,44 @@ function HomePage() {
             </div>
           </dl>
         </div>
+      </section>
+
+      <section className="card p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="section-title">{t('home.nextAction.title')}</h2>
+            <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
+              {nextActionQuery.isLoading ? t('home.nextAction.loading') : nextAction.nextStep}
+            </p>
+          </div>
+          {nextAction.sessionId && (
+            <Link to="/sessions/$id" params={{ id: nextAction.sessionId }} className="btn-primary text-sm">
+              {t('home.nextAction.openSession')}
+            </Link>
+          )}
+        </div>
+
+        {nextActionQuery.error ? (
+          <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+            <p className="font-medium">{t('home.nextAction.unavailable')}</p>
+            {nextActionQuery.error.message && <p className="mt-1 break-words">{nextActionQuery.error.message}</p>}
+          </div>
+        ) : (
+          <dl className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+              <dt className="label">{t('home.nextAction.focus')}</dt>
+              <dd className="value break-words">{nextAction.focusLabel}</dd>
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+              <dt className="label">{t('home.nextAction.reason')}</dt>
+              <dd className="value break-words">{nextAction.reason}</dd>
+            </div>
+            <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+              <dt className="label">{t('home.nextAction.remedy')}</dt>
+              <dd className="value break-words">{nextAction.remedy}</dd>
+            </div>
+          </dl>
+        )}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">

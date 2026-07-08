@@ -148,7 +148,7 @@ const STEPS = [
 		isDone: (ctx) => featureHasEvidence(ctx),
 		why: () => "no verification evidence is recorded for this feature yet.",
 		remedy: (ctx) =>
-			`amber feature verify --target ${ctx.targetDisplay} --feature ${ctx.focus.id} --command "..." --result "..."`,
+			`amber session start --target ${ctx.targetDisplay} --goal "..." --feature ${ctx.focus.id}`,
 	},
 	{
 		id: "verify",
@@ -229,7 +229,9 @@ function buildContext(targetRoot, options = {}) {
 	let completion = null;
 	if (focus.type === "session") {
 		const { evaluateCompletion } = require("../completion-check");
-		completion = evaluateCompletion(targetRoot, focus.id);
+		// Always use strict evaluation in the lifecycle context so `next` reports
+		// the same completeness picture as `complete-check --strict`.
+		completion = evaluateCompletion(targetRoot, focus.id, { strict: true });
 	}
 	return { state, focus, completion, targetDisplay: options.target || "." };
 }
