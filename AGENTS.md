@@ -3,6 +3,8 @@
 Amber Protocol is a repository-local governance layer for agent-assisted engineering.
 All capability is exposed through one CLI entry point.
 
+Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, gates, evidence, and routing rules; read before nontrivial tasks.
+
 ## Entry point
 
 ```bash
