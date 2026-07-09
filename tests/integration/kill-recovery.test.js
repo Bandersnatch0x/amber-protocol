@@ -1,6 +1,7 @@
 const { describe, it, beforeEach, afterEach } = require("node:test");
 const assert = require("assert");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const {
 	startSession,
@@ -9,17 +10,17 @@ const {
 const { saveCheckpoint } = require("../../scripts/lib/checkpoint-manager");
 
 describe("Kill Recovery", () => {
-	const testDir = path.join(__dirname, "../fixtures/kill-recovery");
+	// Unique temp dir per test: a shared fixed path under tests/fixtures collides
+	// across parallel test processes (rmSync/mkdirSync/manifest writes clobber each
+	// other), which was the "flaky under full-suite load" failure.
+	let testDir;
 
 	beforeEach(() => {
-		if (fs.existsSync(testDir)) {
-			fs.rmSync(testDir, { recursive: true, force: true });
-		}
-		fs.mkdirSync(testDir, { recursive: true });
+		testDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-kill-recovery-"));
 	});
 
 	afterEach(() => {
-		if (fs.existsSync(testDir)) {
+		if (testDir && fs.existsSync(testDir)) {
 			fs.rmSync(testDir, { recursive: true, force: true });
 		}
 	});
