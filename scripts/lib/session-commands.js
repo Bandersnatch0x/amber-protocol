@@ -25,8 +25,7 @@ const { result } = require("./result");
 const { promptYesNo } = require("./prompt");
 const { ensureContinuitySurfaces } = require("./continuity-surfaces");
 const { writeRouteGates, writeGateDecision } = require("./gate-writer");
-const { codedError } = require("./core/error-catalog");
-const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
+const { appendLedgerRecord, verifyLedgerOutcome } = require("./core/loop-ledger");
 const { runEvidenceCommand } = require("./core/evidence-runner");
 const { recordFeatureEvidence } = require("./feature-commands");
 const { writeRunnerAck } = require("./runner-ack");
@@ -101,6 +100,20 @@ function withOptionalWarning(baseResult, warning) {
 		...baseResult,
 		text: `${baseResult.text}\n${warning}`,
 	};
+}
+
+// Every continue/resume guard clause rejects with the same ACK envelope, differing
+// only in the message — single home so the reject contract can't drift per guard.
+function rejectResume(projectRoot, sessionId, options, message) {
+	const warning = writeRunnerAckWarning(projectRoot, sessionId, {
+		requestId: options.requestId,
+		action: "resume",
+		status: "rejected",
+		requestedStatus: STATES.EXECUTING,
+		source: "amber-session-continue",
+		message,
+	});
+	return withOptionalWarning(result(message, 1), warning);
 }
 
 function loadAllSessionManifests(projectRoot) {
@@ -453,27 +466,11 @@ async function continueSession(projectRoot, options) {
 	}
 
 	if (manifest.status === "completed") {
-		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-			requestId: options.requestId,
-			action: "resume",
-			status: "rejected",
-			requestedStatus: STATES.EXECUTING,
-			source: "amber-session-continue",
-			message: "Session already completed",
-		});
-		return withOptionalWarning(result("Session already completed", 1), warning);
+		return rejectResume(projectRoot, sessionId, options, "Session already completed");
 	}
 
 	if (manifest.status === "aborted") {
-		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-			requestId: options.requestId,
-			action: "resume",
-			status: "rejected",
-			requestedStatus: STATES.EXECUTING,
-			source: "amber-session-continue",
-			message: "Session was aborted",
-		});
-		return withOptionalWarning(result("Session was aborted", 1), warning);
+		return rejectResume(projectRoot, sessionId, options, "Session was aborted");
 	}
 
 	if (
@@ -482,50 +479,32 @@ async function continueSession(projectRoot, options) {
 		manifest.status !== "created" &&
 		manifest.status !== "routed"
 	) {
-		const message = `Cannot continue session with status: ${manifest.status}`;
-		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-			requestId: options.requestId,
-			action: "resume",
-			status: "rejected",
-			requestedStatus: STATES.EXECUTING,
-			source: "amber-session-continue",
-			message,
-		});
-		return withOptionalWarning(result(message, 1), warning);
+		return rejectResume(
+			projectRoot,
+			sessionId,
+			options,
+			`Cannot continue session with status: ${manifest.status}`,
+		);
 	}
 
 	// Autonomous mode removed in 1.3.0 (ADR-0005): the experimental execution
 	// engine was deleted — unreachable, broken-chained, and shipping dead code.
 	// Amber remains governance-first (ADR-0001): no live execution.
 	if (manifest.mode === "autonomous") {
-		const message =
+		return rejectResume(
+			projectRoot,
+			sessionId,
+			options,
 			"Error: Autonomous execution is not available. " +
-			"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).";
-		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-			requestId: options.requestId,
-			action: "resume",
-			status: "rejected",
-			requestedStatus: STATES.EXECUTING,
-			source: "amber-session-continue",
-			message,
-		});
-		return withOptionalWarning(result(message, 1), warning);
+				"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
+		);
 	}
 
 	let checkpoint;
 	if (fromCheckpoint) {
 		checkpoint = loadCheckpointByStage(projectRoot, sessionId, fromCheckpoint);
 		if (!checkpoint) {
-			const message = `Checkpoint not found: ${fromCheckpoint}`;
-			const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-				requestId: options.requestId,
-				action: "resume",
-				status: "rejected",
-				requestedStatus: STATES.EXECUTING,
-				source: "amber-session-continue",
-				message,
-			});
-			return withOptionalWarning(result(message, 1), warning);
+			return rejectResume(projectRoot, sessionId, options, `Checkpoint not found: ${fromCheckpoint}`);
 		}
 	} else {
 		checkpoint = loadLatestCheckpoint(projectRoot, sessionId);
@@ -545,16 +524,7 @@ async function continueSession(projectRoot, options) {
 	if (sm.currentState === STATES.CREATED) {
 		const routeTransition = sm.transition(STATES.ROUTED);
 		if (!routeTransition.success) {
-			const message = `Cannot route session: ${routeTransition.error}`;
-			const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-				requestId: options.requestId,
-				action: "resume",
-				status: "rejected",
-				requestedStatus: STATES.EXECUTING,
-				source: "amber-session-continue",
-				message,
-			});
-			return withOptionalWarning(result(message, 1), warning);
+			return rejectResume(projectRoot, sessionId, options, `Cannot route session: ${routeTransition.error}`);
 		}
 		writeSessionManifest(sessionDir, { ...manifest, status: STATES.ROUTED });
 
@@ -565,16 +535,7 @@ async function continueSession(projectRoot, options) {
 
 	const transition = sm.transition(STATES.EXECUTING);
 	if (!transition.success) {
-		const message = `Cannot resume: ${transition.error}`;
-		const warning = writeRunnerAckWarning(projectRoot, sessionId, {
-			requestId: options.requestId,
-			action: "resume",
-			status: "rejected",
-			requestedStatus: STATES.EXECUTING,
-			source: "amber-session-continue",
-			message,
-		});
-		return withOptionalWarning(result(message, 1), warning);
+		return rejectResume(projectRoot, sessionId, options, `Cannot resume: ${transition.error}`);
 	}
 
 	writeSessionManifest(sessionDir, { ...manifest, status: STATES.EXECUTING });
@@ -906,18 +867,14 @@ function verifyLedgerSession(projectRoot, sessionId) {
 	const loaded = requireSession(projectRoot, sessionId);
 	if (loaded.exitCode !== undefined) return loaded;
 	const { sessionDir } = loaded;
-	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
-	if (!fs.existsSync(ledgerPath)) {
+	const o = verifyLedgerOutcome(path.join(sessionDir, "ledger.jsonl"));
+	if (!o.found) {
 		return result(`No governance ledger found for session ${sessionId}.`, 1);
 	}
-	const v = verifyLedgerChain(ledgerPath);
-	if (v.intact) {
-		return result(`Session ledger intact (${v.records} records).`, 0);
+	if (o.intact) {
+		return result(`Session ledger intact (${o.records} records).`, 0);
 	}
-	return result(
-		codedError("AMBER_E_LEDGER_TAMPERED", `broken at record ${v.brokenAt}: ${v.reason}`),
-		1,
-	);
+	return result(o.tamperedMessage, 1);
 }
 
 function findMostRecentNonCompletedSession(projectRoot) {
