@@ -13,6 +13,8 @@ test.describe('Timeline', () => {
 
   test('shows the event count for the seeded session', async ({ page }) => {
     await page.goto(`/sessions/${FIXTURE_SESSION_ID}/timeline`);
-    await expect(page.getByText(/of \d+ events?/i)).toBeVisible();
+    // Default (no filters) renders timeline.count ("N events"); the "Showing X of
+    // Y events" form only appears once a filter is active. Match either.
+    await expect(page.getByText(/\d+ events?/i).first()).toBeVisible();
   });
 });
