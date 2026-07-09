@@ -3,7 +3,9 @@ import { z } from 'zod';
 // Mirrors the CLI session state machine (scripts/lib/session-state-machine.js)
 // plus the legacy 'idle'/'running' values the web UI already used. The CLI
 // writes 'created'/'routed'/'executing'/'failed' to manifests, so the schema
-// must accept them or session reads fail validation.
+// must accept them or session reads fail validation. Parity with the CLI STATES
+// is guarded by tests/server/session-status-parity.test.ts — that test goes red
+// if the CLI adds or renames a state, so this list can't silently drift.
 export const SessionStatusSchema = z.enum([
   'idle',
   'running',
