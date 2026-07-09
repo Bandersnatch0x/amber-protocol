@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { trpc } from '@/lib/trpc';
 import { useI18n, type I18nKey } from '@/lib/i18n';
+import { isActiveStatus } from '@/features/sessions/sessions-view-model';
 
 export const Route = createFileRoute('/')({ component: HomePage });
 
@@ -113,7 +114,7 @@ function HomePage() {
 
   const activeSessions = useMemo(() => {
     if (!Array.isArray(sessionsQuery.data)) return 0;
-    return sessionsQuery.data.filter((session) => ['idle', 'created', 'routed', 'running', 'executing', 'paused'].includes(session.status)).length;
+    return sessionsQuery.data.filter((session) => isActiveStatus(session.status)).length;
   }, [sessionsQuery.data]);
 
   const pendingGates = useMemo(() => {
