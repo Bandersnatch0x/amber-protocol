@@ -229,9 +229,10 @@ function buildContext(targetRoot, options = {}) {
 	let completion = null;
 	if (focus.type === "session") {
 		const { evaluateCompletion } = require("../completion-check");
-		// Always use strict evaluation in the lifecycle context so `next` reports
-		// the same completeness picture as `complete-check --strict`.
-		completion = evaluateCompletion(targetRoot, focus.id, { strict: true });
+		// Honor the caller's strict flag (default relaxed). `next --strict` /
+		// `complete-check --strict` opt into requiring an *executed* verification;
+		// the default relaxed pass accepts a recorded stage_completed as evidence.
+		completion = evaluateCompletion(targetRoot, focus.id, { strict: Boolean(options.strict) });
 	}
 	return { state, focus, completion, targetDisplay: options.target || "." };
 }
