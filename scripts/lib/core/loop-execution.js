@@ -5,13 +5,11 @@
 // approval gate (2) pass; it runs inside an isolated worktree (3) and every
 // attempt is recorded in the tamper-evident ledger (4). Without --execute this
 // delegates to the unchanged dry-run path.
-const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { readJsonSafe, resolveTarget } = require("./fs-utils");
 const { findLoopContract, dryRunLoopContract } = require("./loops");
-const { appendLedgerRecord, verifyLedgerChain } = require("./loop-ledger");
-const { codedError } = require("./error-catalog");
+const { appendLedgerRecord, verifyLedgerOutcome } = require("./loop-ledger");
 const { runGovernedCommand } = require("./governed-runner");
 
 function ledgerPath(targetRoot, contractId) {
@@ -110,18 +108,17 @@ function executeLoopContract({ file, contract: contractId, target, execute, dryR
 
 function verifyLoopLedger({ target, contract: contractId }) {
 	const targetRoot = resolveTarget(target);
-	const lp = ledgerPath(targetRoot, contractId);
-	if (!fs.existsSync(lp)) {
+	const o = verifyLedgerOutcome(ledgerPath(targetRoot, contractId));
+	if (!o.found) {
 		return { target: targetRoot, errors: [`No ledger found for contract ${contractId}`], warnings: [] };
 	}
-	const v = verifyLedgerChain(lp);
-	if (v.intact) {
-		return { target: targetRoot, intact: true, text: `Ledger intact (${v.records} records).`, errors: [], warnings: [] };
+	if (o.intact) {
+		return { target: targetRoot, intact: true, text: `Ledger intact (${o.records} records).`, errors: [], warnings: [] };
 	}
 	return {
 		target: targetRoot,
 		intact: false,
-		errors: [codedError("AMBER_E_LEDGER_TAMPERED", `broken at record ${v.brokenAt}: ${v.reason}`)],
+		errors: [o.tamperedMessage],
 		warnings: [],
 	};
 }

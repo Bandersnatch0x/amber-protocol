@@ -7,6 +7,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { codedError } = require("./error-catalog");
 
 const GENESIS = "0".repeat(64);
 
@@ -103,12 +104,27 @@ function walkLedgers(stateDir, cb) {
 	return count;
 }
 
+// Shared verify → outcome mapping so the not-found gating and the
+// AMBER_E_LEDGER_TAMPERED phrasing can't drift between the three governance
+// homes (loops / routes / sessions). Callers map this onto their own envelope.
+function verifyLedgerOutcome(ledgerPath) {
+	if (!fs.existsSync(ledgerPath)) return { found: false, intact: false };
+	const v = verifyLedgerChain(ledgerPath);
+	if (v.intact) return { found: true, intact: true, records: v.records };
+	return {
+		found: true,
+		intact: false,
+		tamperedMessage: codedError("AMBER_E_LEDGER_TAMPERED", `broken at record ${v.brokenAt}: ${v.reason}`),
+	};
+}
+
 module.exports = {
 	canonicalize,
 	hashRecord,
 	readLedger,
 	appendLedgerRecord,
 	verifyLedgerChain,
+	verifyLedgerOutcome,
 	latestUnconsumedApproval,
 	walkLedgers,
 	GENESIS,

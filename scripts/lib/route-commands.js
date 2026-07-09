@@ -1,12 +1,10 @@
 "use strict";
 
-const fs = require("fs");
 const path = require("path");
 const { loadRoutes, loadRouteFile } = require("./route-loader");
 const { result } = require("./result");
-const { appendLedgerRecord, verifyLedgerChain } = require("./core/loop-ledger");
+const { appendLedgerRecord, verifyLedgerOutcome } = require("./core/loop-ledger");
 const { runGovernedCommand } = require("./core/governed-runner");
-const { codedError } = require("./core/error-catalog");
 const { resolveStateDirForCreate } = require("./state-dir-resolver");
 
 const DEFAULT_ROUTES_DIR = path.join(__dirname, "../../routes");
@@ -170,11 +168,10 @@ function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_R
 }
 
 function verifyRouteLedger(routeId, targetRoot) {
-	const lp = routeLedgerPath(targetRoot, routeId);
-	if (!fs.existsSync(lp)) return result(`No ledger found for route ${routeId}.`, 1);
-	const v = verifyLedgerChain(lp);
-	if (v.intact) return result(`Ledger intact (${v.records} records).`);
-	return result(codedError("AMBER_E_LEDGER_TAMPERED", `broken at record ${v.brokenAt}: ${v.reason}`), 1);
+	const o = verifyLedgerOutcome(routeLedgerPath(targetRoot, routeId));
+	if (!o.found) return result(`No ledger found for route ${routeId}.`, 1);
+	if (o.intact) return result(`Ledger intact (${o.records} records).`);
+	return result(o.tamperedMessage, 1);
 }
 
 module.exports = {
