@@ -22,8 +22,14 @@ function latestActivityTimestamp(session: SessionListItem): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+// Single source of truth for the session "active set". Any view that counts or
+// sorts active sessions must use this — don't re-inline the status literal.
+export function isActiveStatus(status: string): boolean {
+  return ACTIVE_STATUSES.has(status);
+}
+
 function isActive(session: SessionListItem): boolean {
-  return ACTIVE_STATUSES.has(session.status);
+  return isActiveStatus(session.status);
 }
 
 export function filterAndSortSessions(
