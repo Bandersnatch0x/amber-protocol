@@ -190,6 +190,54 @@ async function rejectedControlResult(
   };
 }
 
+interface ControlledTransitionParams {
+  sessionId: string;
+  action: RunnerControlAction;
+  currentStatus: SessionStatus;
+  targetStatus: SessionStatus;
+  eventType: 'session_started' | 'session_paused' | 'session_resumed' | 'session_aborted';
+  eventData?: Record<string, unknown>;
+  emit: () => void;
+}
+
+// Shared happy-path pipeline for all control mutations: runner confirm -> reject
+// short-circuit -> persist -> ack/audit records -> emit. Disallowed-status fallbacks
+// stay in each mutation because they genuinely differ per action.
+async function runControlledTransition({
+  sessionId,
+  action,
+  currentStatus,
+  targetStatus,
+  eventType,
+  eventData = {},
+  emit,
+}: ControlledTransitionParams) {
+  const runner = await confirmRunnerControl({
+    sessionId,
+    action,
+    requestedStatus: targetStatus,
+  });
+  if (runner.runnerAck.status === 'rejected') {
+    return rejectedControlResult(currentStatus, runner);
+  }
+  const status = await persistAndConfirmStatus(sessionId, targetStatus);
+  const runnerWarning = await tryRecordRunnerAckOutcome(runner.runnerAck);
+  const auditWarning = await tryRecordSessionEvent(sessionId, eventType, status, {
+    source: 'web-control',
+    ...eventData,
+  });
+  emit();
+  return {
+    status,
+    timestamp: Date.now(),
+    persisted: true,
+    confirmed: true,
+    runnerAck: runner.runnerAck,
+    confirmation: confirmation(runner.requestPersisted, true, runner.runnerAck),
+    auditWarning: mergeWarnings(auditWarning, runner.warning, runnerWarning),
+  };
+}
+
 export const sessionControlRouter = router({
   start: publicProcedure
     .input(controlInputSchema)
@@ -210,27 +258,14 @@ export const sessionControlRouter = router({
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
-      const runner = await confirmRunnerControl({
+      return runControlledTransition({
         sessionId: input.sessionId,
         action,
-        requestedStatus: 'executing',
+        currentStatus: currentStatus as SessionStatus,
+        targetStatus: 'executing',
+        eventType: 'session_started',
+        emit: () => sessionEvents.emitSessionStarted(input.sessionId),
       });
-      if (runner.runnerAck.status === 'rejected') {
-        return rejectedControlResult(currentStatus as SessionStatus, runner);
-      }
-      const status = await persistAndConfirmStatus(input.sessionId, 'executing');
-      const runnerWarning = await tryRecordRunnerAckOutcome(runner.runnerAck);
-      const auditWarning = await tryRecordSessionEvent(input.sessionId, 'session_started', status, { source: 'web-control' });
-      sessionEvents.emitSessionStarted(input.sessionId);
-      return {
-        status,
-        timestamp: Date.now(),
-        persisted: true,
-        confirmed: true,
-        runnerAck: runner.runnerAck,
-        confirmation: confirmation(runner.requestPersisted, true, runner.runnerAck),
-        auditWarning: mergeWarnings(auditWarning, runner.warning, runnerWarning),
-      };
     }),
 
   pause: publicProcedure
@@ -248,27 +283,14 @@ export const sessionControlRouter = router({
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
-      const runner = await confirmRunnerControl({
+      return runControlledTransition({
         sessionId: input.sessionId,
         action,
-        requestedStatus: 'paused',
+        currentStatus: currentStatus as SessionStatus,
+        targetStatus: 'paused',
+        eventType: 'session_paused',
+        emit: () => sessionEvents.emitSessionPaused(input.sessionId),
       });
-      if (runner.runnerAck.status === 'rejected') {
-        return rejectedControlResult(currentStatus as SessionStatus, runner);
-      }
-      const status = await persistAndConfirmStatus(input.sessionId, 'paused');
-      const runnerWarning = await tryRecordRunnerAckOutcome(runner.runnerAck);
-      const auditWarning = await tryRecordSessionEvent(input.sessionId, 'session_paused', status, { source: 'web-control' });
-      sessionEvents.emitSessionPaused(input.sessionId);
-      return {
-        status,
-        timestamp: Date.now(),
-        persisted: true,
-        confirmed: true,
-        runnerAck: runner.runnerAck,
-        confirmation: confirmation(runner.requestPersisted, true, runner.runnerAck),
-        auditWarning: mergeWarnings(auditWarning, runner.warning, runnerWarning),
-      };
     }),
 
   resume: publicProcedure
@@ -290,27 +312,14 @@ export const sessionControlRouter = router({
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
-      const runner = await confirmRunnerControl({
+      return runControlledTransition({
         sessionId: input.sessionId,
         action,
-        requestedStatus: 'executing',
+        currentStatus: currentStatus as SessionStatus,
+        targetStatus: 'executing',
+        eventType: 'session_resumed',
+        emit: () => sessionEvents.emitSessionResumed(input.sessionId),
       });
-      if (runner.runnerAck.status === 'rejected') {
-        return rejectedControlResult(currentStatus as SessionStatus, runner);
-      }
-      const status = await persistAndConfirmStatus(input.sessionId, 'executing');
-      const runnerWarning = await tryRecordRunnerAckOutcome(runner.runnerAck);
-      const auditWarning = await tryRecordSessionEvent(input.sessionId, 'session_resumed', status, { source: 'web-control' });
-      sessionEvents.emitSessionResumed(input.sessionId);
-      return {
-        status,
-        timestamp: Date.now(),
-        persisted: true,
-        confirmed: true,
-        runnerAck: runner.runnerAck,
-        confirmation: confirmation(runner.requestPersisted, true, runner.runnerAck),
-        auditWarning: mergeWarnings(auditWarning, runner.warning, runnerWarning),
-      };
     }),
 
   abort: publicProcedure
@@ -328,29 +337,14 @@ export const sessionControlRouter = router({
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
-      const runner = await confirmRunnerControl({
+      return runControlledTransition({
         sessionId: input.sessionId,
         action,
-        requestedStatus: 'aborted',
+        currentStatus: currentStatus as SessionStatus,
+        targetStatus: 'aborted',
+        eventType: 'session_aborted',
+        eventData: { reason: input.reason },
+        emit: () => sessionEvents.emitSessionAborted(input.sessionId, input.reason),
       });
-      if (runner.runnerAck.status === 'rejected') {
-        return rejectedControlResult(currentStatus as SessionStatus, runner);
-      }
-      const status = await persistAndConfirmStatus(input.sessionId, 'aborted');
-      const runnerWarning = await tryRecordRunnerAckOutcome(runner.runnerAck);
-      const auditWarning = await tryRecordSessionEvent(input.sessionId, 'session_aborted', status, {
-        source: 'web-control',
-        reason: input.reason,
-      });
-      sessionEvents.emitSessionAborted(input.sessionId, input.reason);
-      return {
-        status,
-        timestamp: Date.now(),
-        persisted: true,
-        confirmed: true,
-        runnerAck: runner.runnerAck,
-        confirmation: confirmation(runner.requestPersisted, true, runner.runnerAck),
-        auditWarning: mergeWarnings(auditWarning, runner.warning, runnerWarning),
-      };
     }),
 });
