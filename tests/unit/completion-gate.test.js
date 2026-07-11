@@ -9,13 +9,51 @@ const { execSync } = require("node:child_process");
 const {
 	evaluateCompletion,
 	formatCompletion,
+	isScaffoldHandoffContent,
+	isLiveHandoff,
 } = require("../../scripts/lib/completion-check");
 
 function tempRoot() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-completion-"));
 }
 
-function buildSession(root, sessionId, manifest, timelineEvents = []) {
+/** Non-scaffold handoff content (matches generator shape, not init template). */
+const LIVE_HANDOFF = `# Session Handoff
+
+## Summary
+
+Active session \`abc\` — "goal" (executing). 1 feature(s): 1 passing
+
+## Repo State
+
+- Branch: main
+- Uncommitted changes: clean
+- Last commit: abc123 work
+
+## Runtime / Verification State
+
+- Command: npm test
+- Result: passed (exit 0, 10ms)
+- When: 2026-07-11
+
+## Feature State
+
+- F001 [passing] Demo
+
+## Verification Evidence
+
+- F001: \`npm test\` → passed
+
+## Blockers
+
+None recorded.
+
+## Next Actions
+
+1. Accept the plan
+`;
+
+function buildSession(root, sessionId, manifest, timelineEvents = [], opts = {}) {
 	const sessionDir = path.join(root, ".amber", "sessions", sessionId);
 	fs.mkdirSync(sessionDir, { recursive: true });
 	fs.writeFileSync(
@@ -27,6 +65,10 @@ function buildSession(root, sessionId, manifest, timelineEvents = []) {
 			.map((event) => JSON.stringify({ timestamp: new Date().toISOString(), ...event }))
 			.join("\n");
 		fs.writeFileSync(path.join(sessionDir, "timeline.jsonl"), `${lines}\n`);
+	}
+	if (opts.handoff !== false) {
+		const content = opts.handoffContent != null ? opts.handoffContent : LIVE_HANDOFF;
+		fs.writeFileSync(path.join(root, "session-handoff.md"), content);
 	}
 }
 
@@ -164,10 +206,93 @@ test("formatCompletion produces readable output", () => {
 	assert.match(text, /Missing: timeline/);
 });
 
+test("init scaffold handoff is not live (G2)", () => {
+	const scaffold = `# Session Handoff
+
+## Summary
+
+The repository-local Harness has been scaffolded and is ready for project-specific customization.
+
+## Repo State
+
+- Branch: not recorded
+- Uncommitted changes: not recorded
+
+## Runtime / Verification State
+
+- Command: not run yet
+- Result: pending
+`;
+	assert.equal(isScaffoldHandoffContent(scaffold), true);
+	assert.equal(isScaffoldHandoffContent(LIVE_HANDOFF), false);
+
+	const root = tempRoot();
+	fs.writeFileSync(path.join(root, "session-handoff.md"), scaffold);
+	assert.equal(isLiveHandoff(root), false);
+	fs.writeFileSync(path.join(root, "session-handoff.md"), LIVE_HANDOFF);
+	assert.equal(isLiveHandoff(root), true);
+});
+
+test("fails complete-check when handoff is still the init scaffold (G2)", () => {
+	const root = tempRoot();
+	const sessionId = "scaffold-handoff";
+	const scaffold = fs.readFileSync(
+		path.join(__dirname, "..", "..", "templates", "session-handoff.md"),
+		"utf8",
+	);
+	buildSession(
+		root,
+		sessionId,
+		{
+			sessionId,
+			goal: "Fix login bug",
+			status: "executing",
+			completedStages: ["verify"],
+		},
+		[
+			{ type: "session_created" },
+			{ type: "stage_completed", data: { executed: true, exitCode: 0 } },
+			{ type: "gate_passed", data: { gate: "final" } },
+		],
+		{ handoffContent: scaffold },
+	);
+
+	const result = evaluateCompletion(root, sessionId, { strict: true });
+	assert.equal(result.status, "fail");
+	assert.ok(result.missing.includes("handoff"), `missing=${result.missing.join(",")}`);
+});
+
+test("manifest.handoff.path alone does not pass when file is scaffold", () => {
+	const root = tempRoot();
+	const sessionId = "manifest-only-scaffold";
+	const scaffold = `# Session Handoff\n\nThe repository-local Harness has been scaffolded.\n\n- Command: not run yet\n- Result: pending\n`;
+	buildSession(
+		root,
+		sessionId,
+		{
+			sessionId,
+			goal: "Fix login bug",
+			status: "completed",
+			handoff: { path: "session-handoff.md" },
+			completedStages: ["verify"],
+		},
+		[
+			{ type: "stage_completed", data: { executed: true } },
+			{ type: "gate_passed" },
+		],
+		{ handoffContent: scaffold },
+	);
+	const result = evaluateCompletion(root, sessionId);
+	assert.equal(result.status, "fail");
+	assert.ok(result.missing.includes("handoff"));
+});
+
 test("fails when the session did no work in a git repo (strict)", () => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-work-"));
 	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: root });
 	fs.writeFileSync(path.join(root, "README.md"), "# x\n");
+	// Commit live handoff with the scaffold so writing it later does not count as session work.
+	fs.writeFileSync(path.join(root, "session-handoff.md"), LIVE_HANDOFF);
 	execSync("git add -A && git commit -qm init", { cwd: root });
 
 	const sessionId = "no-work";
@@ -183,6 +308,7 @@ test("fails when the session did no work in a git repo (strict)", () => {
 			completedStages: ["verify"],
 		},
 		[{ type: "stage_completed", data: { executed: false } }, { type: "gate_passed" }],
+		{ handoff: false }, // already committed above
 	);
 
 	// A clean tree with no commits since createdAt has no work evidence.

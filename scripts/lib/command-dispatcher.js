@@ -677,7 +677,13 @@ function handleClean(args) {
 }
 
 function handleNext(args) {
-  const nextResult = inferNext(args.target, { feature: args.feature, session: args.session });
+  // strict defaults true inside lifecycle.buildContext so next matches
+  // complete-check --strict / session complete (last-mile terminal steps).
+  const nextResult = inferNext(args.target, {
+    feature: args.feature,
+    session: args.session,
+    strict: args.strict !== false,
+  });
   return { result: nextResult, exitCode: 0, bypassPrint: !args.json };
 }
 

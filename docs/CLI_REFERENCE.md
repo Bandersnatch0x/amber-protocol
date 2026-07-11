@@ -355,9 +355,13 @@ node scripts/amber.js next --target . --session <id>  # focus a session
 node scripts/amber.js next --target . --json          # machine-readable envelope
 ```
 
-Lifecycle: `init → feature → plan → gate → verify/approve → complete-check → accept`. With no
+Lifecycle: `[audit on existing repos] → init → feature → plan → gate → verify → approve → handoff → complete-check → session complete → accept` (handoff may refresh after accept). With no
 `--feature`/`--session`, `next` auto-selects (active session → most-recent plan's feature → first
-unstarted feature) and reports the chosen focus plus how many other items are pending.
+unstarted feature) and reports the chosen focus plus how many other items are pending. Session
+completion evaluation matches `complete-check --strict` (executed verification + live handoff, not
+the init scaffold). Approve remedies include the concrete `--gate <id>` from the session route.
+Existing non-empty targets get `amber audit` first; audit writes `.amber/last-audit.json` so `next`
+can advance to `init`.
 
 ### migrate
 

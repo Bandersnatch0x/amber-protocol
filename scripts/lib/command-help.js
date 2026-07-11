@@ -229,6 +229,10 @@ const COMMAND_HELP = {
 		next: [
 			"Infer the repo's position in the Amber lifecycle and print the next command to run (read-only).",
 			"",
+			"Lifecycle: [audit on existing] → init → … → verify → approve(--gate id) → handoff → complete-check --strict → session complete → accept.",
+			"Session evaluation matches complete-check --strict (executed verification + live handoff, not init scaffold).",
+			"Existing projects: next recommends audit first; audit stamps .amber/last-audit.json so next advances to init.",
+			"",
 			"Options:",
 			"  --target <dir>     Path to the target repository.",
 			"  --feature <id>     Focus a specific feature's lifecycle.",

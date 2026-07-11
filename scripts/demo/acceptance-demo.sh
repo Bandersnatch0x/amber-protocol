@@ -73,21 +73,23 @@ step 8/11 session approve
 "${AMBER[@]}" session approve --session "$SID" --gate "user-approval-implement" --yes --target . > /dev/null 2>&1
 ok "session approved"
 
-# 9. complete-check + complete
-step 9/11 session complete
+# 9. handoff before complete-check (live handoff required — not init scaffold)
+step 9/11 handoff
+"${AMBER[@]}" handoff --target . > /dev/null 2>&1
+ok "handoff generated"
+
+# 10. complete-check + complete
+step 10/11 session complete
 "${AMBER[@]}" session complete-check --session "$SID" --strict --target . > /dev/null 2>&1
 "${AMBER[@]}" session complete --session "$SID" --target . > /dev/null 2>&1
 ok "session completed"
 
-# 10. accept
-step 10/11 accept
+# 11. accept (+ optional handoff refresh for accepted feature state)
+step 11/11 accept
 "${AMBER[@]}" accept --target . --plan "$PLAN_REL" --session "$SID" > /dev/null 2>&1
 ok "plan accepted"
-
-# 11. handoff + next verification
-step 11/11 handoff
 "${AMBER[@]}" handoff --target . > /dev/null 2>&1
-ok "handoff generated"
+ok "handoff refreshed"
 
 NEXT=$("${AMBER[@]}" next --target . --json)
 COMPLETE=$(echo "$NEXT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).complete?'yes':'no'))")

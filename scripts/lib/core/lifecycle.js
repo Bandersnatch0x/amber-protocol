@@ -40,6 +40,29 @@ function gatherPlans(targetRoot) {
 	);
 }
 
+const EXISTING_PROJECT_MARKERS = [
+	"package.json",
+	"go.mod",
+	"pyproject.toml",
+	"Cargo.toml",
+	"pom.xml",
+	"src",
+	"lib",
+	"app",
+	"docs",
+	"README.md",
+	"AGENTS.md",
+	"CLAUDE.md",
+];
+
+function hasExistingProjectSignals(targetRoot) {
+	return EXISTING_PROJECT_MARKERS.some((rel) => pathExists(path.join(targetRoot, rel)));
+}
+
+function hasAuditStamp(targetRoot) {
+	return pathExists(path.join(targetRoot, ".amber", "last-audit.json"));
+}
+
 function gatherState(targetRoot) {
 	// Readers are required lazily so that importing this module for remedyFor()
 	// (e.g. from doctor.js) does not pull in the heavy session-commands graph.
@@ -65,7 +88,41 @@ function gatherState(targetRoot) {
 		features,
 		plans: gatherPlans(targetRoot),
 		activeSessionId,
+		existingProject: hasExistingProjectSignals(targetRoot),
+		auditSeen: hasAuditStamp(targetRoot),
 	};
+}
+
+/** Resolve next unapproved gate id for a session (N2). */
+function resolvePendingGate(targetRoot, sessionId) {
+	try {
+		const { loadSessionManifest } = require("../session-commands");
+		const { readSessionEvents } = require("../session-timeline");
+		const { loadRoutes } = require("../route-loader");
+		const pathMod = require("node:path");
+		const routesDir = pathMod.join(__dirname, "../../../routes");
+		const loaded = loadSessionManifest(targetRoot, sessionId);
+		if (!loaded || !loaded.manifest) return { gates: [], pendingGateId: null, routeId: null };
+		const manifest = loaded.manifest;
+		const routeId =
+			(manifest.route && (manifest.route.id || manifest.route.routeId)) || null;
+		const { routes } = loadRoutes(routesDir);
+		const route = routes.find((r) => r.routeId === routeId);
+		const gates = route && Array.isArray(route.gates) ? route.gates : [];
+		const events = readSessionEvents(loaded.sessionDir || path.join(targetRoot, ".amber", "sessions", sessionId));
+		const passed = new Set(
+			events
+				.filter((e) => e && e.type === "gate_passed" && e.data)
+				.map((e) => e.data.gateId || e.data.gate)
+				.filter(Boolean),
+		);
+		const pending = gates.filter((g) => !passed.has(g.id));
+		const pendingGateId =
+			(pending[0] && pending[0].id) || (gates[0] && gates[0].id) || null;
+		return { gates, pendingGateId, routeId, pendingCount: pending.length };
+	} catch {
+		return { gates: [], pendingGateId: null, routeId: null, pendingCount: 0 };
+	}
 }
 
 // ── State-derived helpers (operate on the context built below) ───────────────
@@ -104,15 +161,39 @@ function sessionMissing(ctx) {
 	return ctx.completion ? ctx.completion.missing : [];
 }
 
+function sessionVerifyDone(ctx) {
+	return !sessionMissing(ctx).includes("verification");
+}
+
+function sessionApproveDone(ctx) {
+	return !sessionMissing(ctx).includes("approval");
+}
+
 // ── Declarative lifecycle steps (ordered) ────────────────────────────────────
 
 const STEPS = [
+	// A1: existing non-Amber repos audit (and optional adoption report) before init.
+	{
+		id: "audit",
+		label: "Audit existing repository",
+		appliesTo: (ctx) =>
+			ctx.focus.type !== "session" &&
+			!ctx.state.amberInstalled &&
+			Boolean(ctx.state.existingProject),
+		isDone: (ctx) => Boolean(ctx.state.amberInstalled || ctx.state.auditSeen),
+		why: () =>
+			"this looks like an existing project — inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber adoption report.",
+		remedy: (ctx) => `amber audit --target ${ctx.targetDisplay}`,
+	},
 	{
 		id: "init",
 		label: "Install Amber",
 		appliesTo: (ctx) => ctx.focus.type !== "session",
 		isDone: (ctx) => ctx.state.amberInstalled,
-		why: () => "Amber starter files are not all present.",
+		why: (ctx) =>
+			ctx.state.existingProject
+				? "Amber starter files are not all present (audit done or skipped) — safe next install is init."
+				: "Amber starter files are not all present.",
 		remedy: (ctx) => `amber init --target ${ctx.targetDisplay}`,
 	},
 	{
@@ -154,25 +235,75 @@ const STEPS = [
 		id: "verify",
 		label: "Record session verification",
 		appliesTo: (ctx) => ctx.focus.type === "session",
-		isDone: (ctx) => !sessionMissing(ctx).includes("verification"),
+		isDone: (ctx) => sessionVerifyDone(ctx),
 		why: () => "the session has no verification evidence yet.",
-		remedy: (ctx) => `amber session verify --session ${ctx.focus.id}`,
+		remedy: (ctx) =>
+			`amber session verify --session ${ctx.focus.id} --execute --command "npm test"`,
 	},
 	{
 		id: "approve",
 		label: "Approve the session",
 		appliesTo: (ctx) => ctx.focus.type === "session",
-		isDone: (ctx) => !sessionMissing(ctx).includes("approval"),
-		why: () => "the session has no approval evidence yet.",
-		remedy: (ctx) => `amber session approve --session ${ctx.focus.id}`,
+		isDone: (ctx) => sessionApproveDone(ctx),
+		why: (ctx) => {
+			const pending = ctx.pendingGateId;
+			const n = (ctx.sessionGates && ctx.sessionGates.length) || 0;
+			if (n > 1 && pending) {
+				return `the session has no approval evidence yet (next gate: ${pending}; ${n} gates on route).`;
+			}
+			return "the session has no approval evidence yet.";
+		},
+		remedy: (ctx) => {
+			const gate = ctx.pendingGateId;
+			if (gate) {
+				return `amber session approve --session ${ctx.focus.id} --gate ${gate}`;
+			}
+			return `amber session approve --session ${ctx.focus.id} --gate <gate-id>`;
+		},
+	},
+	// G1/G2: regenerate live handoff before complete-check so scaffold files
+	// cannot satisfy the handoff gate (see completion-check.isLiveHandoff).
+	{
+		id: "handoff",
+		label: "Regenerate session handoff",
+		appliesTo: (ctx) => {
+			if (ctx.focus.type === "session") {
+				return sessionVerifyDone(ctx) && sessionApproveDone(ctx);
+			}
+			// After accept, ensure continuity artifact reflects accepted work.
+			if (ctx.focus.type === "feature" && Boolean(planFor(ctx)) && acceptLogged(ctx)) {
+				return true;
+			}
+			return false;
+		},
+		isDone: (ctx) => Boolean(ctx.liveHandoff),
+		why: () =>
+			"session-handoff.md is missing or still the init scaffold — regenerate from live state.",
+		remedy: (ctx) => `amber handoff --target ${ctx.targetDisplay}`,
 	},
 	{
 		id: "complete-check",
 		label: "Run completion check",
 		appliesTo: (ctx) => ctx.focus.type === "session",
 		isDone: (ctx) => Boolean(ctx.completion && ctx.completion.status === "pass"),
-		why: () => "the session is not yet complete (evidence still missing).",
+		why: (ctx) => {
+			const missing = sessionMissing(ctx);
+			if (missing.length > 0) {
+				return `the session is not yet complete (missing: ${missing.join(", ")}).`;
+			}
+			return "the session is not yet complete (evidence still missing).";
+		},
 		remedy: (ctx) => `amber session complete-check --session ${ctx.focus.id} --strict`,
+	},
+	{
+		id: "session-complete",
+		label: "Mark session completed",
+		appliesTo: (ctx) =>
+			ctx.focus.type === "session" &&
+			Boolean(ctx.completion && ctx.completion.status === "pass"),
+		isDone: (ctx) => ctx.sessionStatus === "completed",
+		why: () => "complete-check passed but the session is not marked completed yet.",
+		remedy: (ctx) => `amber session complete --session ${ctx.focus.id}`,
 	},
 	{
 		id: "accept",
@@ -226,15 +357,40 @@ function resolveFocus(state, options) {
 function buildContext(targetRoot, options = {}) {
 	const state = gatherState(targetRoot);
 	const focus = resolveFocus(state, options);
+	const { isLiveHandoff, evaluateCompletion } = require("../completion-check");
+	const liveHandoff = isLiveHandoff(targetRoot);
 	let completion = null;
+	let sessionStatus = null;
+	let pendingGateId = null;
+	let sessionGates = [];
 	if (focus.type === "session") {
-		const { evaluateCompletion } = require("../completion-check");
-		// Honor the caller's strict flag (default relaxed). `next --strict` /
-		// `complete-check --strict` opt into requiring an *executed* verification;
-		// the default relaxed pass accepts a recorded stage_completed as evidence.
-		completion = evaluateCompletion(targetRoot, focus.id, { strict: Boolean(options.strict) });
+		// Default strict so `amber next` aligns with `session complete-check --strict`
+		// and `session complete` (G1 last-mile). Callers may pass strict:false.
+		const strict = options.strict !== false;
+		completion = evaluateCompletion(targetRoot, focus.id, { strict });
+		try {
+			const { loadSessionManifest } = require("../session-commands");
+			const loaded = loadSessionManifest(targetRoot, focus.id);
+			if (loaded && loaded.manifest) {
+				sessionStatus = loaded.manifest.status || null;
+			}
+		} catch {
+			sessionStatus = null;
+		}
+		const gateInfo = resolvePendingGate(targetRoot, focus.id);
+		pendingGateId = gateInfo.pendingGateId;
+		sessionGates = gateInfo.gates;
 	}
-	return { state, focus, completion, targetDisplay: options.target || "." };
+	return {
+		state,
+		focus,
+		completion,
+		sessionStatus,
+		liveHandoff,
+		pendingGateId,
+		sessionGates,
+		targetDisplay: options.target || ".",
+	};
 }
 
 function describeStep(step, ctx) {
@@ -270,5 +426,7 @@ module.exports = {
 	inferNextStep,
 	evaluateLifecycle,
 	remedyFor,
+	resolvePendingGate,
+	hasExistingProjectSignals,
 	STEPS,
 };

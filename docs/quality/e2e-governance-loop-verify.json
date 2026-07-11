@@ -1,0 +1,617 @@
+{
+  "meta": {
+    "productRoot": "D:\\code_space\\coding-harness",
+    "productVersion": "1.3.1",
+    "startedAt": "2026-07-10T17:50:23.151Z",
+    "platform": "win32",
+    "node": "v24.2.0",
+    "finishedAt": "2026-07-10T17:50:55.066Z"
+  },
+  "paths": {
+    "success": {
+      "target": "C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-success-qL7ZoE",
+      "sessionId": "2e5245e9-96fd-4db9-be83-d896cfa99111",
+      "planRel": "docs/plans/F001-E2E-plan.md",
+      "featureStatus": "accepted",
+      "evidenceCount": 1,
+      "acceptExit": 0,
+      "handoffExit": 0,
+      "handoffContainsEvidence": true,
+      "handoffContainsSession": true,
+      "nextAfterApproveComplete": true,
+      "nextRecommendsCompleteOrHandoff": false,
+      "completeCheckPassedOnTemplateHandoff": true,
+      "isTemplateHandoffAtCompleteCheck": true,
+      "closed": true,
+      "log": [
+        {
+          "name": "audit",
+          "exitCode": 0,
+          "stdoutHead": "{\n  \"target\": \"C:\\\\Users\\\\AMSTER~1\\\\AppData\\\\Local\\\\Temp\\\\amber-e2e-success-qL7ZoE\",\n  \"readOnly\": true,\n  \"auditMode\": \"target-repo\",\n  \"classification\": {\n    \"type\": \"unharnessed-target-repo\",\n    \"evidence\": []\n  },\n  \"existing\": [],\n  \"missing\": [\n    \"AGENTS.md\",\n    \"CLAUDE.md\",\n    \"feature_list.json\",\n    \"PROGRESS.md\",\n    \"session-handoff.md\",\n    \"clean-state-checklist.md\",\n    \"evalua",
+          "stderrHead": ""
+        },
+        {
+          "name": "next@empty",
+          "next": {
+            "target": ".",
+            "focus": {
+              "type": "bootstrap",
+              "id": null,
+              "autoSelected": true,
+              "othersPending": 0
+            },
+            "nextStep": {
+              "id": "init",
+              "label": "Install Amber",
+              "why": "Amber starter files are not all present.",
+              "remedy": "amber init --target ."
+            },
+            "complete": false,
+            "errors": [],
+            "warnings": [],
+            "text": "Context: project bootstrap (auto-selected)\nNext step: Install Amber\n  Why: Amber starter files are not all present.\n  Run: amber init --target ."
+          }
+        },
+        {
+          "name": "init",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-success-qL7ZoE\nCreated: 33\n  + .workflow/continuous-improvement/packets/README.md\n  + .workflow/continuous-improvement/state.json\n  + AGENTS.md\n  + CLAUDE.md\n  + clean-state-checklist.md\n  + docs/wiki/agent/amber.md\n  + docs/wiki/agent/continuous-improvement.md\n  + docs/wiki/agent/failure-patterns.md\n  + docs/wiki/agent/prompt-recipes.md\n  + d",
+          "stderrHead": ""
+        },
+        {
+          "name": "next@init",
+          "next": {
+            "target": ".",
+            "focus": {
+              "type": "feature",
+              "id": "F001",
+              "autoSelected": true,
+              "othersPending": 0
+            },
+            "nextStep": {
+              "id": "plan",
+              "label": "Create a plan",
+              "why": "feature F001 has no plan yet.",
+              "remedy": "amber plan --target . --feature F001 --title \"...\""
+            },
+            "complete": false,
+            "errors": [],
+            "warnings": [],
+            "text": "Context: feature F001 (auto-selected)\nNext step: Create a plan\n  Why: feature F001 has no plan yet.\n  Run: amber plan --target . --feature F001 --title \"...\""
+          }
+        },
+        {
+          "name": "plan",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-success-qL7ZoE\nCreated: 1\n  + docs\\plans\\F001-E2E-plan.md\nSkipped: 0\nErrors: 0",
+          "stderrHead": ""
+        },
+        {
+          "name": "next@plan",
+          "next": {
+            "target": ".",
+            "focus": {
+              "type": "feature",
+              "id": "F001",
+              "autoSelected": true,
+              "othersPending": 0
+            },
+            "nextStep": {
+              "id": "gate",
+              "label": "Confirm the plan",
+              "why": "the plan exists but User Confirmation is still \"pending\".",
+              "remedy": "amber gate --confirm --target . --plan docs/plans/F001-E2E-plan.md"
+            },
+            "complete": false,
+            "errors": [],
+            "warnings": [],
+            "text": "Context: feature F001 (auto-selected)\nNext step: Confirm the plan\n  Why: the plan exists but User Confirmation is still \"pending\".\n  Run: amber gate --confirm --target . --plan docs/plans/F001-E2E-plan.md"
+          }
+        },
+        {
+          "name": "gate --confirm",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-success-qL7ZoE\nErrors: 0",
+          "stderrHead": ""
+        },
+        {
+          "name": "next@gate",
+          "next": {
+            "target": ".",
+            "focus": {
+              "type": "feature",
+              "id": "F001",
+              "autoSelected": true,
+              "othersPending": 0
+            },
+            "nextStep": {
+              "id": "feature-evidence",
+              "label": "Record feature verification evidence",
+              "why": "no verification evidence is recorded for this feature yet.",
+              "remedy": "amber session start --target . --goal \"...\" --feature F001"
+            },
+            "complete": false,
+            "errors": [],
+            "warnings": [],
+            "text": "Context: feature F001 (auto-selected)\nNext step: Record feature verification evidence\n  Why: no verification evidence is recorded for this feature yet.\n  Run: amber session start --target . --goal \"...\" --feature F001"
+          }
+        },
+        {
+          "name": "session start",
+          "exitCode": 0,
+          "stdoutHead": "{\n  \"target\": \".\",\n  \"text\": \"Session created: 2e5245e9-96fd-4db9-be83-d896cfa99111\\nRoute: feature-standard\\nGoal: e2e success path\\nFeature: F001\\nContinuity surfaces: MEMORY.md, notes.md, tasks/README.md\\n\\nNo route matched goal \\\"e2e success path\\\"; defaulting to feature-standard (low confidence). Pass --route to choose explicitly.\",\n  \"errors\": [],\n  \"warnings\": [],\n  \"sessionId\": \"2e5245e9-9",
+          "stderrHead": ""
+        },
+        {
+          "name": "next@session-start",
+          "sessionId": "2e5245e9-96fd-4db9-be83-d896cfa99111",
+          "next": {
+            "target": ".",
+            "focus": {
+              "type": "session",
+              "id": "2e5245e9-96fd-4db9-be83-d896cfa99111",
+              "autoSelected": true,
+              "othersPending": 0
+            },
+            "nextStep": {
+              "id": "verify",
+              "label": "Record session verification",
+              "why": "the session has no verification evidence yet.",
+              "remedy": "amber session verify --session 2e5245e9-96fd-4db9-be83-d896cfa99111"
+            },
+            "complete": false,
+            "errors": [],
+            "warnings": [],
+            "text": "Context: session 2e5245e9-96fd-4db9-be83-d896cfa99111 (auto-selected)\nNext step: Record session verification\n  Why: the session has no verification evidence yet.\n  Run: amber session verify --session 2e5245e9-96fd-4db9-be83-d896cfa99111"
+          }
+        },
+        {
+          "name": "session verify --execute",
+          "exitCode": 0,
+          "stdoutHead": "Verification recorded for session: 2e5245e9-96fd-4db9-be83-d896cfa99111\nStage: Run Verification\nExecuted: npm test (exit 0, 798ms)\nEvidence recorded for feature F001.\n\nTip: run `amber session approve --session 2e5245e9-96fd-4db9-be83-d896cfa99111` to record gate approval.",
+          "stderrHead": ""
+        },
+        {
+          "name": "next@verify",
+          "next": {
+            "target": ".",
+            "focus": {
+              "type": "session",
+              "id": "2e5245e9-96fd-4db9-be83-d896cfa99111",
+              "autoSelected": true,
+              "othersPending": 0
+            },
+            "nextStep": {
+              "id": "approve",
+              "label": "Approve the session",
+              "why": "the session has no approval evidence yet.",
+              "remedy": "amber session approve --session 2e5245e9-96fd-4db9-be83-d896cfa99111"
+            },
+            "complete": false,
+            "errors": [],
+            "warnings": [],
+            "text": "Context: session 2e5245e9-96fd-4db9-be83-d896cfa99111 (auto-selected)\nNext step: Approve the session\n  Why: the session has no approval evidence yet.\n  Run: amber session approve --session 2e5245e9-96fd-4db9-be83-d896cfa99111"
+          }
+        },
+        {
+          "name": "session approve",
+          "exitCode": 0,
+          "stdoutHead": "Approval recorded for session: 2e5245e9-96fd-4db9-be83-d896cfa99111\nGate: user-approval-implement\nPending gates: user-approval-plan\n\nTip: run `amber session complete-check --session 2e5245e9-96fd-4db9-be83-d896cfa99111` to verify all evidence.",
+          "stderrHead": ""
+        },
+        {
+          "name": "next@approve",
+          "next": {
+            "target": ".",
+            "focus": {
+              "type": "session",
+              "id": "2e5245e9-96fd-4db9-be83-d896cfa99111",
+              "autoSelected": true,
+              "othersPending": 0
+            },
+            "nextStep": null,
+            "complete": true,
+            "errors": [],
+            "warnings": [],
+            "text": "Context: session 2e5245e9-96fd-4db9-be83-d896cfa99111 (auto-selected)\n✓ All lifecycle steps complete for this focus."
+          }
+        },
+        {
+          "name": "complete-check --strict (before live handoff)",
+          "exitCode": 0,
+          "stdoutHead": "Completion check status: pass\nReasons: goal present, timeline present, verification present, approval present, work present, handoff present, no open blockers",
+          "stderrHead": ""
+        },
+        {
+          "name": "handoff-template-check",
+          "isTemplateHandoff": true,
+          "completeCheckPassed": true,
+          "completeCheckOut": "Completion check status: pass\nReasons: goal present, timeline present, verification present, approval present, work present, handoff present, no open blockers"
+        },
+        {
+          "name": "session complete",
+          "exitCode": 0,
+          "stdoutHead": "Session completed: 2e5245e9-96fd-4db9-be83-d896cfa99111",
+          "stderrHead": ""
+        },
+        {
+          "name": "next@session-complete",
+          "next": {
+            "target": ".",
+            "focus": {
+              "type": "feature",
+              "id": "F001",
+              "autoSelected": true,
+              "othersPending": 0
+            },
+            "nextStep": {
+              "id": "accept",
+              "label": "Accept the plan",
+              "why": "the plan is ready to accept and append to the evolution log.",
+              "remedy": "amber accept --target . --plan docs/plans/F001-E2E-plan.md"
+            },
+            "complete": false,
+            "errors": [],
+            "warnings": [],
+            "text": "Context: feature F001 (auto-selected)\nNext step: Accept the plan\n  Why: the plan is ready to accept and append to the evolution log.\n  Run: amber accept --target . --plan docs/plans/F001-E2E-plan.md"
+          }
+        },
+        {
+          "name": "accept",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-success-qL7ZoE\n\nCompletion check status: pass\nReasons: goal present, timeline present, verification present, approval present, work present, handoff present, no open blockers\nErrors: 0",
+          "stderrHead": ""
+        },
+        {
+          "name": "handoff",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-success-qL7ZoE\nCreated: 1\n  + session-handoff.md\nSkipped: 0\n\nNext steps:\n  1. All lifecycle steps complete for the current focus — start the next feature.\nErrors: 0",
+          "stderrHead": ""
+        },
+        {
+          "name": "next@handoff",
+          "next": {
+            "target": ".",
+            "focus": {
+              "type": "feature",
+              "id": "F001",
+              "autoSelected": true,
+              "othersPending": 0
+            },
+            "nextStep": null,
+            "complete": true,
+            "errors": [],
+            "warnings": [],
+            "text": "Context: feature F001 (auto-selected)\n✓ All lifecycle steps complete for this focus."
+          }
+        }
+      ]
+    },
+    "rejections": {
+      "target": "C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-reject-v7V5z4",
+      "sessionId": "dbda5624-ab9f-4064-a677-54295eba7281",
+      "policyDenyWorks": true,
+      "claimOnlyStrictFails": true,
+      "acceptWithoutEvidenceBlocked": true,
+      "approveRequiresGateId": true,
+      "log": [
+        {
+          "name": "init",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-reject-v7V5z4\nCreated: 33\n  + .workflow/continuous-improvement/packets/README.md\n  + .workflow/continuous-improvement/state.json\n  + AGENTS.md\n  + CLAUDE.md\n  + clean-state-checklist.md\n  + docs/wiki/agent/amber.md\n  + docs/wiki/agent/continuous-improvement.md\n  + docs/wiki/agent/failure-patterns.md\n  + docs/wiki/agent/prompt-recipes.md\n  + docs/wiki/agent/workflow-packets.md\n  + docs/wiki/agent/working-rules.md\n  + docs/wiki/architecture/da",
+          "stderrHead": ""
+        },
+        {
+          "name": "plan",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-reject-v7V5z4\nCreated: 1\n  + docs\\plans\\F001-Reject-path.md\nSkipped: 0\nErrors: 0",
+          "stderrHead": ""
+        },
+        {
+          "name": "gate",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-reject-v7V5z4\nErrors: 0",
+          "stderrHead": ""
+        },
+        {
+          "name": "session start",
+          "exitCode": 0,
+          "stdoutHead": "{\n  \"target\": \".\",\n  \"text\": \"Session created: dbda5624-ab9f-4064-a677-54295eba7281\\nRoute: feature-standard\\nGoal: reject path\\nFeature: F001\\nContinuity surfaces: MEMORY.md, notes.md, tasks/README.md\\n\\nNo route matched goal \\\"reject path\\\"; defaulting to feature-standard (low confidence). Pass --route to choose explicitly.\",\n  \"errors\": [],\n  \"warnings\": [],\n  \"sessionId\": \"dbda5624-ab9f-4064-a677-54295eba7281\"\n}",
+          "stderrHead": ""
+        },
+        {
+          "name": "verify --execute denied command",
+          "exitCode": 1,
+          "stdoutHead": "Verification command denied by policy: no allow rule matched; defaultAction=deny\nCommand: echo should-deny",
+          "stderrHead": ""
+        },
+        {
+          "name": "verify claim-only",
+          "exitCode": 0,
+          "stdoutHead": "Verification recorded for session: dbda5624-ab9f-4064-a677-54295eba7281\nStage: Run Verification\nSuggested verification command: npm test\n(claim only — re-run with --execute to record real evidence)\n\nTip: run `amber session approve --session dbda5624-ab9f-4064-a677-54295eba7281` to record gate approval.",
+          "stderrHead": ""
+        },
+        {
+          "name": "complete-check --strict after claim",
+          "exitCode": 1,
+          "stdoutHead": "Completion check status: fail\nReasons: goal present, timeline present, work present, handoff present, no open blockers\nMissing: verification, approval",
+          "stderrHead": ""
+        },
+        {
+          "name": "feature add F-NOEV",
+          "exitCode": 0,
+          "stdoutHead": "Feature added: F-NOEV — No evidence",
+          "stderrHead": ""
+        },
+        {
+          "name": "plan F-NOEV",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-reject-v7V5z4\nCreated: 1\n  + docs\\plans\\F-NOEV-No-evidence-plan.md\nSkipped: 0\nErrors: 0",
+          "stderrHead": ""
+        },
+        {
+          "name": "gate F-NOEV",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-reject-v7V5z4\nErrors: 0",
+          "stderrHead": ""
+        },
+        {
+          "name": "accept without evidence",
+          "exitCode": 1,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-reject-v7V5z4\nErrors: 1\n  - Cannot accept F-NOEV: no verification evidence is recorded. [AMBER_E_FEATURE_NO_EVIDENCE] → fix: amber feature verify --feature <ID> --command \"<cmd>\" --result <pass|fail>",
+          "stderrHead": ""
+        },
+        {
+          "name": "approve without --gate",
+          "exitCode": 1,
+          "stdoutHead": "Error: route has 2 gates — specify one with --gate <id>.\nAvailable: user-approval-plan, user-approval-implement",
+          "stderrHead": ""
+        }
+      ]
+    },
+    "verifyFailRecover": {
+      "target": "C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-fail-recover-8I4NfF",
+      "sessionId": "56a45854-f02f-404e-9957-ab200ae4b8cd",
+      "failExit": 1,
+      "failRecorded": true,
+      "recoverExit": 0,
+      "completeCheckPass": true,
+      "hasFailedEvent": true,
+      "hasPassedEvent": true,
+      "recovered": true,
+      "log": [
+        {
+          "name": "init",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-fail-recover-8I4NfF\nCreated: 33\n  + .workflow/continuous-improvement/packets/README.md\n  + .workflow/continuous-improvement/state.json\n  + AGENTS.md\n  + CLAUDE.md\n  + clean-state-checklist.md\n  + docs/wiki/agent/amber.md\n  + docs/wiki/agent/continuous-improvement.md\n  + docs/wiki/agent/failure-patterns.md\n  + docs/wiki/agent/prompt-recipes.md\n"
+        },
+        {
+          "name": "plan",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-fail-recover-8I4NfF\nCreated: 1\n  + docs\\plans\\F001-Fail-recover.md\nSkipped: 0\nErrors: 0"
+        },
+        {
+          "name": "gate",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-fail-recover-8I4NfF\nErrors: 0"
+        },
+        {
+          "name": "session start",
+          "exitCode": 0,
+          "stdoutHead": "{\n  \"target\": \".\",\n  \"text\": \"Session created: 56a45854-f02f-404e-9957-ab200ae4b8cd\\nRoute: feature-standard\\nGoal: fail then recover\\nFeature: F001\\nContinuity surfaces: MEMORY.md, notes.md, tasks/README.md\\n\\nNo route matched goal \\\"fail then recover\\\"; defaulting to feature-standard (low confidence). Pass --route to choose explicitly.\",\n  \"errors\": [],\n  \"warnings\": [],\n  \"sessionId\": \"56a45854"
+        },
+        {
+          "name": "verify --execute failing",
+          "exitCode": 1,
+          "stdoutHead": "Verification FAILED (exit 1) for session: 56a45854-f02f-404e-9957-ab200ae4b8cd\nCommand: npm test\nThe stage was NOT marked complete."
+        },
+        {
+          "name": "verify --execute after fix",
+          "exitCode": 0,
+          "stdoutHead": "Verification recorded for session: 56a45854-f02f-404e-9957-ab200ae4b8cd\nStage: Run Verification\nExecuted: npm test (exit 0, 701ms)\nEvidence recorded for feature F001.\n\nTip: run `amber session approve --session 56a45854-f02f-404e-9957-ab200ae4b8cd` to record gate approval."
+        },
+        {
+          "name": "approve",
+          "exitCode": 0,
+          "stdoutHead": "Approval recorded for session: 56a45854-f02f-404e-9957-ab200ae4b8cd\nGate: user-approval-implement\nPending gates: user-approval-plan\n\nTip: run `amber session complete-check --session 56a45854-f02f-404e-9957-ab200ae4b8cd` to verify all evidence."
+        },
+        {
+          "name": "complete-check --strict",
+          "exitCode": 0,
+          "stdoutHead": "Completion check status: pass\nReasons: goal present, timeline present, verification present, approval present, work present, handoff present, no open blockers"
+        }
+      ]
+    },
+    "crossSessionHandoff": {
+      "target": "C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-handoff-Zzs3fN",
+      "sid1": "7b710b34-8b01-43ef-ace1-3c5cec06593b",
+      "sid2": "ab2027af-cd24-430a-8c7b-88f18f21fb94",
+      "handoffUseful": true,
+      "refuseResurrectCompleted": true,
+      "recheckCompletedPass": true,
+      "feature1Status": "accepted",
+      "feature1Evidence": 1,
+      "session2Started": true,
+      "log": [
+        {
+          "name": "init",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-handoff-Zzs3fN\nCreated: 33\n  + .workflow/continuous-improvement/packets/README.md\n  + .workflow/continuous-improvement/state.json\n  + AGENTS.md\n  + CLAUDE.md\n  + clean-state-checklist.md\n  + docs/wiki/agent/amber.md\n  + docs/wiki/agent/continuou"
+        },
+        {
+          "name": "plan",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-handoff-Zzs3fN\nCreated: 1\n  + docs\\plans\\F001-Handoff-path.md\nSkipped: 0\nErrors: 0"
+        },
+        {
+          "name": "gate",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-handoff-Zzs3fN\nErrors: 0"
+        },
+        {
+          "name": "session1 start",
+          "exitCode": 0,
+          "stdoutHead": "{\n  \"target\": \".\",\n  \"text\": \"Session created: 7b710b34-8b01-43ef-ace1-3c5cec06593b\\nRoute: feature-standard\\nGoal: session one work\\nFeature: F001\\nContinuity surfaces: MEMORY.md, notes.md, tasks/README.md\\n\\nNo route matched goal \\\"session one work\\\"; defaulting to feature-standard (low confidence"
+        },
+        {
+          "name": "verify",
+          "exitCode": 0,
+          "stdoutHead": "Verification recorded for session: 7b710b34-8b01-43ef-ace1-3c5cec06593b\nStage: Run Verification\nExecuted: npm test (exit 0, 677ms)\nEvidence recorded for feature F001.\n\nTip: run `amber session approve --session 7b710b34-8b01-43ef-ace1-3c5cec06593b` to record gate approval."
+        },
+        {
+          "name": "approve",
+          "exitCode": 0,
+          "stdoutHead": "Approval recorded for session: 7b710b34-8b01-43ef-ace1-3c5cec06593b\nGate: user-approval-implement\nPending gates: user-approval-plan\n\nTip: run `amber session complete-check --session 7b710b34-8b01-43ef-ace1-3c5cec06593b` to verify all evidence."
+        },
+        {
+          "name": "complete",
+          "exitCode": 0,
+          "stdoutHead": "Session completed: 7b710b34-8b01-43ef-ace1-3c5cec06593b"
+        },
+        {
+          "name": "accept",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-handoff-Zzs3fN\n\nCompletion check status: pass\nReasons: goal present, timeline present, verification present, approval present, work present, handoff present, no open blockers\nErrors: 0"
+        },
+        {
+          "name": "handoff regenerate",
+          "exitCode": 0,
+          "stdoutHead": "Target: C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-e2e-handoff-Zzs3fN\nCreated: 1\n  + session-handoff.md\nSkipped: 0\n\nNext steps:\n  1. All lifecycle steps complete for the current focus — start the next feature.\nErrors: 0"
+        },
+        {
+          "name": "feature add F2",
+          "exitCode": 0,
+          "stdoutHead": "Feature added: F2 — Second slice"
+        },
+        {
+          "name": "session2 start",
+          "exitCode": 0,
+          "stdoutHead": "{\n  \"target\": \".\",\n  \"text\": \"Session created: ab2027af-cd24-430a-8c7b-88f18f21fb94\\nRoute: feature-standard\\nGoal: continue from handoff\\nFeature: F2\\nContinuity surfaces: MEMORY.md, notes.md, tasks/README.md\\n\\nNo route matched goal \\\"continue from handoff\\\"; defaulting to feature-standard (low co"
+        },
+        {
+          "name": "session continue on completed s1",
+          "exitCode": 1,
+          "stdoutHead": "Session already completed"
+        },
+        {
+          "name": "complete-check on completed s1",
+          "exitCode": 0,
+          "stdoutHead": "Completion check status: pass\nReasons: goal present, timeline present, verification present, approval present, work present, handoff present, no open blockers"
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "id": "S1",
+      "severity": "info",
+      "text": "Success path closed: init→plan→gate→session→verify--execute→approve→complete-check→complete→accept→handoff with feature evidence.",
+      "evidence": {
+        "sessionId": "2e5245e9-96fd-4db9-be83-d896cfa99111",
+        "featureStatus": "accepted"
+      }
+    },
+    {
+      "id": "G1",
+      "severity": "high",
+      "text": "Reproduced: after approve, amber next reports focus complete without recommending session complete / accept / handoff.",
+      "evidence": {
+        "next": {
+          "target": ".",
+          "focus": {
+            "type": "session",
+            "id": "2e5245e9-96fd-4db9-be83-d896cfa99111",
+            "autoSelected": true,
+            "othersPending": 0
+          },
+          "nextStep": null,
+          "complete": true,
+          "errors": [],
+          "warnings": [],
+          "text": "Context: session 2e5245e9-96fd-4db9-be83-d896cfa99111 (auto-selected)\n✓ All lifecycle steps complete for this focus."
+        }
+      }
+    },
+    {
+      "id": "G2",
+      "severity": "high",
+      "text": "Reproduced: complete-check --strict passes while session-handoff.md is still the init template.",
+      "evidence": {
+        "handoffHead": "# Session Handoff\n\n## Summary\n\nThe repository-local Harness has been scaffolded and is ready for project-specific customization.\n\n## Repo State\n\n- Branch: not recorded\n- Uncommitted changes: not recorded\n\n## Runtime / Verification State\n\n- "
+      }
+    },
+    {
+      "id": "R1",
+      "severity": "info",
+      "text": "Rejection path: non-allowlisted verify --execute is denied by policy.",
+      "evidence": {
+        "command": "echo should-deny"
+      }
+    },
+    {
+      "id": "R2",
+      "severity": "info",
+      "text": "Rejection path: claim-only verify does not satisfy complete-check --strict.",
+      "evidence": {
+        "out": "Completion check status: fail\nReasons: goal present, timeline present, work present, handoff present, no open blockers\nMissing: verification, approval"
+      }
+    },
+    {
+      "id": "R3",
+      "severity": "info",
+      "text": "Rejection path: accept without feature evidence is blocked.",
+      "evidence": {
+        "exit": 1
+      }
+    },
+    {
+      "id": "R4",
+      "severity": "info",
+      "text": "Rejection path: multi-gate route requires --gate on session approve.",
+      "evidence": {}
+    },
+    {
+      "id": "F1",
+      "severity": "info",
+      "text": "Verify-fail recovery works: failure recorded, session stays open, re-verify can pass strict complete-check.",
+      "evidence": {
+        "sid": "56a45854-f02f-404e-9957-ab200ae4b8cd"
+      }
+    },
+    {
+      "id": "H1",
+      "severity": "info",
+      "text": "Cross-session handoff works: live handoff carries evidence/next actions; completed session cannot be resurrected; new session can start.",
+      "evidence": {
+        "sid1": "7b710b34-8b01-43ef-ace1-3c5cec06593b",
+        "sid2": "ab2027af-cd24-430a-8c7b-88f18f21fb94"
+      }
+    }
+  ],
+  "summary": {
+    "successClosed": true,
+    "rejections": {
+      "policyDeny": true,
+      "claimStrict": true,
+      "acceptNoEvidence": true,
+      "approveNeedsGate": true
+    },
+    "verifyFailRecovered": true,
+    "crossSessionHandoff": true,
+    "highFindings": [
+      "G1",
+      "G2"
+    ],
+    "infoFindings": [
+      "S1",
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "F1",
+      "H1"
+    ],
+    "loopJudgementHint": "partial",
+    "loopJudgementReason": "Command-level success, reject, fail-recover, and handoff close under controlled fresh-repo conditions, but G1/G2 navigational and evidence-integrity gaps reproduce outside the product repo."
+  }
+}
