@@ -1,0 +1,86 @@
+{
+  "mapIssue": 27,
+  "mapTitle": "验证 Amber 的运行闭环与实际价值",
+  "adjudicatedAt": "2026-07-11",
+  "productVersionEvidenceWindow": "1.3.1",
+  "grillingPass": true,
+  "loopVerdict": "部分闭环",
+  "valueVerdict": "有合理价值但未验证",
+  "loopConfidence": "high",
+  "valueConfidence": "medium",
+  "dualVerdictLine": "运行闭环: 部分闭环 | 实际价值: 有合理价值但未验证",
+  "evidenceTickets": [28, 29, 30, 31, 32],
+  "evidenceAssets": [
+    "docs/quality/user-journey-adoption-to-handoff.md",
+    "docs/quality/e2e-governance-loop-verify.md",
+    "docs/quality/e2e-governance-loop-verify.json",
+    "docs/quality/governance-overhead-measure.md",
+    "docs/quality/governance-overhead-measure.json",
+    "docs/quality/external-adoption-evidence.md",
+    "docs/quality/external-adoption-evidence.json",
+    "docs/quality/baseline-net-value-comparison.md"
+  ],
+  "loopRationale": {
+    "forPartial": [
+      "Success path closes with accept + executed evidence + live handoff when full CLI sequence is followed (#29)",
+      "Rejection paths hold: policy deny, claim-only vs strict, accept without evidence, multi-gate --gate (#29)",
+      "Verify-fail recovery works with audit trail (#29)",
+      "Cross-session handoff works after explicit handoff (#29)",
+      "loopJudgementHint partial from e2e machine log"
+    ],
+    "againstFull": [
+      "G1: amber next after approve says complete; does not recommend complete/accept/handoff (#28/#29)",
+      "G2: init template handoff passes complete-check --strict (#28/#29)",
+      "Adoption path not in next; Web intentional partial ADR-0007 (#28)"
+    ],
+    "againstUnclosed": [
+      "Command graph success/reject/recover/handoff independently re-checkable on fresh non-product git targets (#29)"
+    ]
+  },
+  "valueRationale": {
+    "forReasonableUnverified": [
+      "Unique vs baseline: executed vs claim, hash-chain ledger, dual gates, accept evidence gate, policy-deny verify, live handoff (#32)",
+      "Modeled median governance overhead 8.17 min <= 10 min bar (#30)",
+      "Operability of guarantees on fresh targets (#29)"
+    ],
+    "againstVerified": [
+      "0 independent repos with repeated real tasks; 2x10 bar not met (#31)",
+      "Review/handoff -30% not measured (#31)",
+      "Evidence completeness >=90% not measured in field; G2 undermines complete-check-only measurement (#28/#31)",
+      "Net benefit positive not proven (#30/#32)",
+      "Stars/downloads are interest only (#31)"
+    ],
+    "againstInsufficient": [
+      "Core governance guarantees are real and not pure AGENTS/Issue re-wrap (#32)",
+      "Overhead model does not show hard fail above 10 min median (#30)"
+    ]
+  },
+  "mapBars": {
+    "reviewHandoffMinus30pct": { "met": false, "status": "not_measured" },
+    "evidenceCompleteness90pct": { "met": false, "status": "not_measured_field; product G2 weakens proxy" },
+    "medianGovernanceOverheadLe10min": { "met": true, "status": "modeled_only", "medianMin": 8.17 },
+    "netBenefitPositive": { "met": false, "status": "not_proven" },
+    "independentRepos2": { "met": false, "observed": 0 },
+    "realTasks10": { "met": false, "observed": 0 },
+    "starsDownloadsCountAsVerified": false
+  },
+  "gaps": [
+    { "id": "G1", "impact": "high", "cost": "low-med", "blocks": "完整" },
+    { "id": "G2", "impact": "high", "cost": "low-med", "blocks": "完整, Evidence>=90 honest measure" },
+    { "id": "V1", "impact": "critical", "cost": "high", "blocks": "已验证 (2x10)" },
+    { "id": "V2", "impact": "critical", "cost": "high", "blocks": "已验证 (-30% baseline)" },
+    { "id": "V3", "impact": "high", "cost": "high", "blocks": "已验证 (net benefit)" },
+    { "id": "N1", "impact": "med", "cost": "med", "blocks": "overhead realism / 10min field" },
+    { "id": "N2", "impact": "med", "cost": "low-med", "blocks": "navigability partial" },
+    { "id": "A1", "impact": "low-med", "cost": "med", "blocks": "adoption secondary journey" },
+    { "id": "W1", "impact": "low", "cost": "n/a-by-design", "blocks": "full web loop only" }
+  ],
+  "falsifiers": {
+    "toFullLoop": ["G1 closed", "G2 closed", "e2e success/reject/recover/handoff still pass"],
+    "toUnclosedLoop": ["success cannot accept with executed evidence", "gates bypassable", "no recoverable verify-fail", "handoff cannot leave scaffold"],
+    "toVerifiedValue": ["2 repos", "10 real tasks", "measured -30% review/handoff", "Evidence>=90 G2-aware", "overhead<=10 field AND net positive"],
+    "toInsufficientValue": ["field net negative", "unique guarantees unused/dropped", "only re-wrap remains", "pilots require constant maintainer intervention"]
+  },
+  "externalAdoptionInvented": false,
+  "markdownReport": "docs/quality/adjudication-loop-and-value.md"
+}

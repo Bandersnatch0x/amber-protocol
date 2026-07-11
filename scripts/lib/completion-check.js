@@ -18,6 +18,49 @@ function hasOpenBlockers(manifest) {
 	return blockers.some((b) => b && b.status !== "resolved" && b.status !== "closed");
 }
 
+// Init installs a scaffold session-handoff.md. Existence alone must not satisfy
+// completion: only a regenerated, non-scaffold handoff counts as continuity evidence.
+function isScaffoldHandoffContent(content) {
+	if (content == null || !String(content).trim()) return true;
+	const text = String(content);
+	if (/repository-local Harness has been scaffolded/i.test(text)) return true;
+	if (/Command:\s*not run yet/i.test(text)) return true;
+	if (/No project-specific verification has been run yet/i.test(text)) return true;
+	// Template repo-state lines ("not recorded") with pending runtime state.
+	if (/not recorded/i.test(text) && /Result:\s*pending/i.test(text)) return true;
+	return false;
+}
+
+function isLiveHandoff(projectRoot) {
+	const handoffPath = path.join(projectRoot, "session-handoff.md");
+	if (!fs.existsSync(handoffPath)) return false;
+	try {
+		const content = fs.readFileSync(handoffPath, "utf8");
+		return !isScaffoldHandoffContent(content);
+	} catch {
+		return false;
+	}
+}
+
+function hasHandoffEvidence(projectRoot, manifest) {
+	// Prefer on-disk live handoff. A bare manifest.handoff.path pointing at a
+	// missing or scaffold file must not pass (G2).
+	if (isLiveHandoff(projectRoot)) return true;
+	if (manifest.handoff && manifest.handoff.path) {
+		const rel = String(manifest.handoff.path).replace(/\\/g, "/");
+		const abs = path.isAbsolute(rel)
+			? rel
+			: path.join(projectRoot, rel);
+		if (!fs.existsSync(abs)) return false;
+		try {
+			return !isScaffoldHandoffContent(fs.readFileSync(abs, "utf8"));
+		} catch {
+			return false;
+		}
+	}
+	return false;
+}
+
 // Work evidence: did anything actually change during this session? In a git repo,
 // that means a dirty tree OR at least one commit since the session was created.
 // Non-git targets cannot be assessed, so they are not blocked (best-effort git,
@@ -118,10 +161,7 @@ function evaluateCompletion(projectRoot, sessionId, options = {}) {
 		{
 			reason: "handoff present",
 			missing: "handoff",
-			satisfied: Boolean(
-				(manifest.handoff && manifest.handoff.path) ||
-					fs.existsSync(path.join(projectRoot, "session-handoff.md")),
-			),
+			satisfied: hasHandoffEvidence(projectRoot, manifest),
 		},
 		{
 			reason: "no open blockers",
@@ -161,4 +201,11 @@ function buildCompletionResult(projectRoot, sessionId, options = {}) {
 	};
 }
 
-module.exports = { evaluateCompletion, formatCompletion, buildCompletionResult };
+module.exports = {
+	evaluateCompletion,
+	formatCompletion,
+	buildCompletionResult,
+	isScaffoldHandoffContent,
+	isLiveHandoff,
+	hasHandoffEvidence,
+};

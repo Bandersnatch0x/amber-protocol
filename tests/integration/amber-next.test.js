@@ -35,6 +35,61 @@ describe("amber next (integration)", () => {
 		assert.equal(out.nextStep.id, "init");
 	});
 
+	it("existing project: audit → stamp → init (A1)", () => {
+		const dir = tmpRepo();
+		fs.writeFileSync(path.join(dir, "package.json"), '{"name":"x"}\n');
+		fs.writeFileSync(path.join(dir, "README.md"), "# existing\n");
+		assert.equal(nextId(dir), "audit");
+		assert.equal(amber(dir, ["audit", "--target", "."]).status, 0);
+		assert.ok(fs.existsSync(path.join(dir, ".amber", "last-audit.json")));
+		assert.equal(nextId(dir), "init");
+	});
+
+	it("session approve remedy names a real gate id (N2)", () => {
+		const dir = tmpRepo();
+		const { execSync } = require("node:child_process");
+		execSync("git init -q && git config user.email a@b.c && git config user.name t", {
+			cwd: dir,
+		});
+		assert.equal(amber(dir, ["init", "--target", "."]).status, 0);
+		fs.writeFileSync(
+			path.join(dir, "package.json"),
+			JSON.stringify({ scripts: { test: "node -e \"console.log(1)\"" } }) + "\n",
+		);
+		execSync("git add -A && git commit -qm init", { cwd: dir });
+		const start = amber(dir, [
+			"session",
+			"start",
+			"--target",
+			".",
+			"--goal",
+			"n2",
+			"--feature",
+			"F001",
+			"--json",
+		]);
+		assert.equal(start.status, 0, start.stderr);
+		const { sessionId } = JSON.parse(start.stdout);
+		assert.equal(
+			amber(dir, [
+				"session",
+				"verify",
+				"--session",
+				sessionId,
+				"--execute",
+				"--command",
+				"npm test",
+				"--target",
+				".",
+			]).status,
+			0,
+		);
+		const out = nextOut(dir);
+		assert.equal(out.nextStep.id, "approve");
+		assert.match(out.nextStep.remedy, /--gate user-approval-/);
+		assert.doesNotMatch(out.nextStep.remedy, /<gate-id>/);
+	});
+
 	it("prints a human context + Run line in text mode", () => {
 		const dir = tmpRepo();
 		fs.writeFileSync(
@@ -80,12 +135,109 @@ describe("amber next progression (feature path, no session)", () => {
 		assert.equal(r.status, 0, r.stderr);
 		assert.equal(nextId(dir, ["--feature", "F001"]), "accept");
 
-		// 6. accept → complete
+		// 6. accept → handoff (live, not init scaffold) → complete
 		r = amber(dir, ["accept", "--target", ".", "--plan", planPath]);
+		assert.equal(r.status, 0, r.stderr);
+		assert.equal(nextId(dir, ["--feature", "F001"]), "handoff");
+		r = amber(dir, ["handoff", "--target", "."]);
 		assert.equal(r.status, 0, r.stderr);
 		const out = nextOut(dir, ["--feature", "F001"]);
 		assert.equal(out.complete, true);
 		assert.equal(out.nextStep, null);
+	});
+
+	it("session last-mile: after approve, next recommends handoff then complete-check (G1)", () => {
+		const dir = tmpRepo();
+		// Minimal git so work evidence can pass later if needed.
+		const { execSync } = require("node:child_process");
+		execSync("git init -q && git config user.email a@b.c && git config user.name t", {
+			cwd: dir,
+		});
+		assert.equal(amber(dir, ["init", "--target", "."]).status, 0);
+		fs.writeFileSync(
+			path.join(dir, "package.json"),
+			JSON.stringify({ scripts: { test: "node -e \"console.log(1)\"" } }) + "\n",
+		);
+		execSync("git add -A && git commit -qm init", { cwd: dir });
+
+		const start = amber(dir, [
+			"session",
+			"start",
+			"--target",
+			".",
+			"--goal",
+			"last mile",
+			"--feature",
+			"F001",
+			"--json",
+		]);
+		assert.equal(start.status, 0, start.stderr);
+		const { sessionId } = JSON.parse(start.stdout);
+
+		assert.equal(
+			amber(dir, [
+				"session",
+				"verify",
+				"--session",
+				sessionId,
+				"--execute",
+				"--command",
+				"npm test",
+				"--target",
+				".",
+			]).status,
+			0,
+		);
+		assert.equal(
+			amber(dir, [
+				"session",
+				"approve",
+				"--session",
+				sessionId,
+				"--gate",
+				"user-approval-implement",
+				"--yes",
+				"--target",
+				".",
+			]).status,
+			0,
+		);
+
+		// Init scaffold is still on disk → next must not say "complete".
+		const afterApprove = nextOut(dir);
+		assert.equal(afterApprove.complete, false);
+		assert.equal(afterApprove.nextStep.id, "handoff");
+		assert.match(afterApprove.nextStep.remedy, /amber handoff/);
+
+		assert.equal(amber(dir, ["handoff", "--target", "."]).status, 0);
+		// Real work so complete-check can pass.
+		fs.writeFileSync(path.join(dir, "app.js"), "module.exports=1\n");
+		execSync("git add app.js && git commit -qm work", { cwd: dir });
+
+		const afterHandoff = nextOut(dir);
+		assert.equal(afterHandoff.complete, false);
+		// May be complete-check or session-complete depending on whether
+		// complete-check already passes when evaluated inline.
+		assert.ok(
+			["complete-check", "session-complete"].includes(afterHandoff.nextStep.id),
+			`expected complete-check or session-complete, got ${afterHandoff.nextStep && afterHandoff.nextStep.id}`,
+		);
+
+		assert.equal(
+			amber(dir, [
+				"session",
+				"complete-check",
+				"--session",
+				sessionId,
+				"--strict",
+				"--target",
+				".",
+			]).status,
+			0,
+		);
+		const afterCc = nextOut(dir);
+		assert.equal(afterCc.nextStep.id, "session-complete");
+		assert.match(afterCc.nextStep.remedy, /session complete/);
 	});
 
 	it("accept refuses a feature with no verification evidence (gated by AMBER_E_FEATURE_NO_EVIDENCE)", () => {

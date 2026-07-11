@@ -1,5 +1,6 @@
 "use strict";
 
+const fs = require("node:fs");
 const path = require("node:path");
 
 const {
@@ -305,6 +306,28 @@ function buildNextSafeCommand(targetRoot) {
 	return `node scripts/amber.js init --target ${JSON.stringify(targetRoot)}`;
 }
 
+/** Lightweight navigation stamp so `amber next` can advance existing repos past audit (A1). */
+function writeAuditStamp(targetRoot) {
+	try {
+		const dir = path.join(targetRoot, ".amber");
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(
+			path.join(dir, "last-audit.json"),
+			JSON.stringify(
+				{
+					auditedAt: new Date().toISOString(),
+					purpose: "navigation-stamp-for-amber-next",
+				},
+				null,
+				2,
+			) + "\n",
+		);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 function listStarterFileStatus(rootDir, relativePaths) {
 	const existing = [];
 	const missing = [];
@@ -381,8 +404,11 @@ function auditTargetRepo(targetRoot, classification) {
 		// .workflow/ is optional — skip if unreadable.
 	}
 
+	const stampWritten = writeAuditStamp(targetRoot);
 	return {
 		target: targetRoot,
+		// Project source files are not modified; only a tiny .amber/last-audit.json
+		// navigation stamp is written so `amber next` can advance to init (A1).
 		readOnly: true,
 		auditMode: "target-repo",
 		classification,
@@ -394,8 +420,13 @@ function auditTargetRepo(targetRoot, classification) {
 		suggestedAdditions: missing,
 		suggestedPatches: buildSuggestedPatches(conflicts),
 		untouchedFiles: conflicts,
+		auditStampWritten: stampWritten,
 		...buildAuditDetection(targetRoot),
 		nextSafeCommand: buildNextSafeCommand(targetRoot),
+		// After audit on an existing unharnessed repo, next is init (or adoption report).
+		nextAfterAudit: `node scripts/amber.js init --target ${JSON.stringify(targetRoot)}`,
+		adoptionHint:
+			"amber adoption report --target . --output-dir docs/examples/adoptions",
 	};
 }
 

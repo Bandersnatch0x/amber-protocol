@@ -101,15 +101,62 @@ function ctxOf(stateOverrides, focusOverrides) {
 		},
 		focus: { type: "feature", id: "F001", autoSelected: false, othersPending: 0, ...focusOverrides },
 		completion: null,
+		sessionStatus: null,
+		// Default true so feature-path accept tests are not blocked by handoff step.
+		liveHandoff: true,
 		targetDisplay: ".",
 	};
 }
 
 describe("inferNextStep (synthetic ctx)", () => {
-	it("recommends init when amber is not installed", () => {
-		const step = inferNextStep(ctxOf({ amberInstalled: false }, { type: "bootstrap", id: null }));
+	it("recommends init when amber is not installed on a bare bootstrap", () => {
+		const step = inferNextStep(
+			ctxOf(
+				{ amberInstalled: false, existingProject: false, auditSeen: false },
+				{ type: "bootstrap", id: null },
+			),
+		);
 		assert.equal(step.id, "init");
 		assert.match(step.remedy, /^amber init --target \./);
+	});
+
+	it("recommends audit before init on an existing unharnessed project (A1)", () => {
+		const step = inferNextStep(
+			ctxOf(
+				{ amberInstalled: false, existingProject: true, auditSeen: false },
+				{ type: "bootstrap", id: null },
+			),
+		);
+		assert.equal(step.id, "audit");
+		assert.match(step.remedy, /^amber audit --target \./);
+	});
+
+	it("recommends init after audit stamp on an existing project (A1)", () => {
+		const step = inferNextStep(
+			ctxOf(
+				{ amberInstalled: false, existingProject: true, auditSeen: true },
+				{ type: "bootstrap", id: null },
+			),
+		);
+		assert.equal(step.id, "init");
+	});
+
+	it("approve remedy uses concrete pending gate id (N2)", () => {
+		const base = {
+			...ctxOf({}, { type: "session", id: "sess-1" }),
+			liveHandoff: false,
+			sessionStatus: "executing",
+			pendingGateId: "user-approval-implement",
+			sessionGates: [
+				{ id: "user-approval-plan" },
+				{ id: "user-approval-implement" },
+			],
+			completion: { status: "fail", missing: ["approval", "handoff"] },
+		};
+		const step = inferNextStep(base);
+		assert.equal(step.id, "approve");
+		assert.match(step.remedy, /--gate user-approval-implement/);
+		assert.doesNotMatch(step.remedy, /<gate-id>/);
 	});
 
 	it("recommends feature when installed but no features", () => {
@@ -158,12 +205,60 @@ describe("inferNextStep (synthetic ctx)", () => {
 		assert.match(step.remedy, /amber accept .* --plan docs\/plans\/F001-login\.md/);
 	});
 
-	it("walks session focus through verify → approve → complete-check, then complete", () => {
-		const base = ctxOf({}, { type: "session", id: "sess-1" });
-		assert.equal(inferNextStep({ ...base, completion: { status: "fail", missing: ["verification", "approval"] } }).id, "verify");
-		assert.equal(inferNextStep({ ...base, completion: { status: "fail", missing: ["approval"] } }).id, "approve");
-		assert.equal(inferNextStep({ ...base, completion: { status: "fail", missing: ["handoff"] } }).id, "complete-check");
-		assert.equal(inferNextStep({ ...base, completion: { status: "pass", missing: [] } }), null);
+	it("walks session focus through verify → approve → handoff → complete-check → session-complete", () => {
+		const base = {
+			...ctxOf({}, { type: "session", id: "sess-1" }),
+			liveHandoff: false,
+			sessionStatus: "executing",
+		};
+		assert.equal(
+			inferNextStep({
+				...base,
+				completion: { status: "fail", missing: ["verification", "approval", "handoff"] },
+			}).id,
+			"verify",
+		);
+		assert.equal(
+			inferNextStep({
+				...base,
+				completion: { status: "fail", missing: ["approval", "handoff"] },
+			}).id,
+			"approve",
+		);
+		// After verify+approve, scaffold handoff must be regenerated before complete-check (G1/G2).
+		assert.equal(
+			inferNextStep({
+				...base,
+				completion: { status: "fail", missing: ["handoff"] },
+			}).id,
+			"handoff",
+		);
+		assert.equal(
+			inferNextStep({
+				...base,
+				liveHandoff: true,
+				completion: { status: "fail", missing: ["work"] },
+			}).id,
+			"complete-check",
+		);
+		assert.equal(
+			inferNextStep({
+				...base,
+				liveHandoff: true,
+				completion: { status: "pass", missing: [] },
+				sessionStatus: "executing",
+			}).id,
+			"session-complete",
+		);
+		assert.equal(
+			inferNextStep({
+				...base,
+				liveHandoff: true,
+				completion: { status: "pass", missing: [] },
+				sessionStatus: "completed",
+			}),
+			null,
+		);
 	});
 
 	it("does not propose feature/init for a session focus on a feature-less repo", () => {

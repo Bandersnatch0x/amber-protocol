@@ -1,0 +1,635 @@
+{
+  "meta": {
+    "productVersion": "1.3.1",
+    "startedAt": "2026-07-10T17:59:22.095Z",
+    "finishedAt": "2026-07-10T17:59:57.222Z",
+    "method": "CLI wall-clock from real amber.js on temp git targets + structured human-judgment estimates for governance-only ops (excludes coding/implement time).",
+    "humanJudgmentModel": {
+      "read_and_fill_plan_sections": 180,
+      "gate_confirm_after_read": 60,
+      "session_approve_after_read": 45,
+      "discover_gate_id_if_needed": 30,
+      "discover_session_complete_when_next_done": 45,
+      "run_handoff_explicitly": 15,
+      "review_complete_check_output": 20
+    }
+  },
+  "routes": [
+    {
+      "routeId": "bugfix-quick",
+      "featureId": "F-BUG",
+      "sessionId": "ad668648-4f0d-4cb2-a6e2-91d0d5fed6c0",
+      "gateId": "user-approval-fix",
+      "gateCount": 1,
+      "target": "C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-oh-bugfix-quick-repESw",
+      "steps": [
+        {
+          "name": "init",
+          "kind": "cli",
+          "ms": 943,
+          "exitCode": 0
+        },
+        {
+          "name": "feature add",
+          "kind": "cli",
+          "ms": 347,
+          "exitCode": 0
+        },
+        {
+          "name": "plan scaffold",
+          "kind": "cli",
+          "ms": 378,
+          "exitCode": 0
+        },
+        {
+          "name": "fill plan sections (scripted stand-in)",
+          "kind": "hybrid",
+          "ms": 4,
+          "exitCode": 0
+        },
+        {
+          "name": "gate --confirm",
+          "kind": "cli",
+          "ms": 410,
+          "exitCode": 0
+        },
+        {
+          "name": "session start",
+          "kind": "cli",
+          "ms": 6628,
+          "exitCode": 0
+        },
+        {
+          "name": "next after start",
+          "kind": "cli",
+          "ms": 549,
+          "exitCode": 0
+        },
+        {
+          "name": "session verify --execute",
+          "kind": "cli",
+          "ms": 4107,
+          "exitCode": 0
+        },
+        {
+          "name": "session approve",
+          "kind": "cli",
+          "ms": 308,
+          "exitCode": 0
+        },
+        {
+          "name": "next after approve",
+          "kind": "cli",
+          "ms": 372,
+          "exitCode": 0
+        },
+        {
+          "name": "complete-check --strict",
+          "kind": "cli",
+          "ms": 463,
+          "exitCode": 0
+        },
+        {
+          "name": "session complete",
+          "kind": "cli",
+          "ms": 236,
+          "exitCode": 0
+        },
+        {
+          "name": "accept",
+          "kind": "cli",
+          "ms": 438,
+          "exitCode": 0
+        },
+        {
+          "name": "handoff",
+          "kind": "cli",
+          "ms": 558,
+          "exitCode": 0
+        }
+      ],
+      "humanOps": [
+        {
+          "id": "init_review_scaffold",
+          "label": "Skim init-created AGENTS/feature_list (first install only)",
+          "activeHuman": true,
+          "judgmentS": 60,
+          "repeatEntry": false,
+          "amortized": true
+        },
+        {
+          "id": "feature_add",
+          "label": "Choose feature id/title",
+          "activeHuman": true,
+          "judgmentS": 30,
+          "repeatEntry": true
+        },
+        {
+          "id": "fill_plan",
+          "label": "Human fills Verification / design sections (generator leaves blanks)",
+          "activeHuman": true,
+          "judgmentS": 180,
+          "repeatEntry": true
+        },
+        {
+          "id": "plan_gate",
+          "label": "Human plan confirmation",
+          "activeHuman": true,
+          "judgmentS": 60,
+          "repeatEntry": false
+        },
+        {
+          "id": "session_start",
+          "label": "Choose goal/route/feature binding",
+          "activeHuman": true,
+          "judgmentS": 20,
+          "repeatEntry": true
+        },
+        {
+          "id": "verify_execute",
+          "label": "Choose/allow verification command (policy-gated)",
+          "activeHuman": true,
+          "judgmentS": 15,
+          "repeatEntry": true
+        },
+        {
+          "id": "session_approve",
+          "label": "Human session gate approval",
+          "activeHuman": true,
+          "judgmentS": 45,
+          "repeatEntry": false
+        },
+        {
+          "id": "recover_from_g1",
+          "label": "When next says complete, still run complete-check/complete/accept/handoff",
+          "activeHuman": true,
+          "judgmentS": 45,
+          "repeatEntry": false,
+          "gap": "G1"
+        },
+        {
+          "id": "read_complete_check",
+          "label": "Read complete-check reasons/missing",
+          "activeHuman": true,
+          "judgmentS": 20,
+          "repeatEntry": false
+        },
+        {
+          "id": "accept",
+          "label": "Human accept plan into evolution log",
+          "activeHuman": true,
+          "judgmentS": 30,
+          "repeatEntry": false
+        },
+        {
+          "id": "handoff",
+          "label": "Explicit handoff regenerate (not forced by next)",
+          "activeHuman": true,
+          "judgmentS": 15,
+          "repeatEntry": false,
+          "gap": "G1/G2"
+        }
+      ],
+      "metrics": {
+        "cliWallMs": 15741,
+        "cliWallMin": 0.262,
+        "humanJudgmentS_all": 520,
+        "humanJudgmentS_steady": 460,
+        "humanJudgmentMin_steady": 7.67,
+        "activeHumanOpCount": 10,
+        "repeatEntryOpCount": 4,
+        "under10MinSteady": true,
+        "nextCompleteAfterApprove": false
+      },
+      "netBenefitAssumptions": {
+        "baselineReviewWithoutAmberMin": null,
+        "note": "Net benefit cannot be proven positive without baseline pilot timing; overhead median is estimated from human ops + judgment model."
+      }
+    },
+    {
+      "routeId": "feature-standard",
+      "featureId": "F-FEAT",
+      "sessionId": "d9aedb00-8f19-411c-b46a-15afcde8e705",
+      "gateId": "user-approval-implement",
+      "gateCount": 2,
+      "target": "C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-oh-feature-standard-Jc3JCt",
+      "steps": [
+        {
+          "name": "init",
+          "kind": "cli",
+          "ms": 932,
+          "exitCode": 0
+        },
+        {
+          "name": "feature add",
+          "kind": "cli",
+          "ms": 304,
+          "exitCode": 0
+        },
+        {
+          "name": "plan scaffold",
+          "kind": "cli",
+          "ms": 293,
+          "exitCode": 0
+        },
+        {
+          "name": "fill plan sections (scripted stand-in)",
+          "kind": "hybrid",
+          "ms": 3,
+          "exitCode": 0
+        },
+        {
+          "name": "gate --confirm",
+          "kind": "cli",
+          "ms": 266,
+          "exitCode": 0
+        },
+        {
+          "name": "session start",
+          "kind": "cli",
+          "ms": 289,
+          "exitCode": 0
+        },
+        {
+          "name": "next after start",
+          "kind": "cli",
+          "ms": 582,
+          "exitCode": 0
+        },
+        {
+          "name": "session verify --execute",
+          "kind": "cli",
+          "ms": 1200,
+          "exitCode": 0
+        },
+        {
+          "name": "approve without --gate (expect fail)",
+          "kind": "cli",
+          "ms": 318,
+          "exitCode": 1
+        },
+        {
+          "name": "session approve",
+          "kind": "cli",
+          "ms": 319,
+          "exitCode": 0
+        },
+        {
+          "name": "next after approve",
+          "kind": "cli",
+          "ms": 455,
+          "exitCode": 0
+        },
+        {
+          "name": "complete-check --strict",
+          "kind": "cli",
+          "ms": 445,
+          "exitCode": 0
+        },
+        {
+          "name": "session complete",
+          "kind": "cli",
+          "ms": 429,
+          "exitCode": 0
+        },
+        {
+          "name": "accept",
+          "kind": "cli",
+          "ms": 474,
+          "exitCode": 0
+        },
+        {
+          "name": "handoff",
+          "kind": "cli",
+          "ms": 591,
+          "exitCode": 0
+        }
+      ],
+      "humanOps": [
+        {
+          "id": "init_review_scaffold",
+          "label": "Skim init-created AGENTS/feature_list (first install only)",
+          "activeHuman": true,
+          "judgmentS": 60,
+          "repeatEntry": false,
+          "amortized": true
+        },
+        {
+          "id": "feature_add",
+          "label": "Choose feature id/title",
+          "activeHuman": true,
+          "judgmentS": 30,
+          "repeatEntry": true
+        },
+        {
+          "id": "fill_plan",
+          "label": "Human fills Verification / design sections (generator leaves blanks)",
+          "activeHuman": true,
+          "judgmentS": 180,
+          "repeatEntry": true
+        },
+        {
+          "id": "plan_gate",
+          "label": "Human plan confirmation",
+          "activeHuman": true,
+          "judgmentS": 60,
+          "repeatEntry": false
+        },
+        {
+          "id": "session_start",
+          "label": "Choose goal/route/feature binding",
+          "activeHuman": true,
+          "judgmentS": 20,
+          "repeatEntry": true
+        },
+        {
+          "id": "verify_execute",
+          "label": "Choose/allow verification command (policy-gated)",
+          "activeHuman": true,
+          "judgmentS": 15,
+          "repeatEntry": true
+        },
+        {
+          "id": "discover_gate",
+          "label": "Discover correct --gate id (next often omits it)",
+          "activeHuman": true,
+          "judgmentS": 30,
+          "repeatEntry": false
+        },
+        {
+          "id": "session_approve",
+          "label": "Human session gate approval",
+          "activeHuman": true,
+          "judgmentS": 45,
+          "repeatEntry": false
+        },
+        {
+          "id": "recover_from_g1",
+          "label": "When next says complete, still run complete-check/complete/accept/handoff",
+          "activeHuman": true,
+          "judgmentS": 45,
+          "repeatEntry": false,
+          "gap": "G1"
+        },
+        {
+          "id": "read_complete_check",
+          "label": "Read complete-check reasons/missing",
+          "activeHuman": true,
+          "judgmentS": 20,
+          "repeatEntry": false
+        },
+        {
+          "id": "accept",
+          "label": "Human accept plan into evolution log",
+          "activeHuman": true,
+          "judgmentS": 30,
+          "repeatEntry": false
+        },
+        {
+          "id": "handoff",
+          "label": "Explicit handoff regenerate (not forced by next)",
+          "activeHuman": true,
+          "judgmentS": 15,
+          "repeatEntry": false,
+          "gap": "G1/G2"
+        }
+      ],
+      "metrics": {
+        "cliWallMs": 6900,
+        "cliWallMin": 0.115,
+        "humanJudgmentS_all": 550,
+        "humanJudgmentS_steady": 490,
+        "humanJudgmentMin_steady": 8.17,
+        "activeHumanOpCount": 11,
+        "repeatEntryOpCount": 4,
+        "under10MinSteady": true,
+        "nextCompleteAfterApprove": true
+      },
+      "netBenefitAssumptions": {
+        "baselineReviewWithoutAmberMin": null,
+        "note": "Net benefit cannot be proven positive without baseline pilot timing; overhead median is estimated from human ops + judgment model."
+      }
+    },
+    {
+      "routeId": "refactor-safe",
+      "featureId": "F-REF",
+      "sessionId": "98cd7e20-fab6-4b59-bbb1-f46380f5290c",
+      "gateId": "user-approval-merge",
+      "gateCount": 2,
+      "target": "C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\amber-oh-refactor-safe-vMbKsP",
+      "steps": [
+        {
+          "name": "init",
+          "kind": "cli",
+          "ms": 806,
+          "exitCode": 0
+        },
+        {
+          "name": "feature add",
+          "kind": "cli",
+          "ms": 294,
+          "exitCode": 0
+        },
+        {
+          "name": "plan scaffold",
+          "kind": "cli",
+          "ms": 282,
+          "exitCode": 0
+        },
+        {
+          "name": "fill plan sections (scripted stand-in)",
+          "kind": "hybrid",
+          "ms": 4,
+          "exitCode": 0
+        },
+        {
+          "name": "gate --confirm",
+          "kind": "cli",
+          "ms": 296,
+          "exitCode": 0
+        },
+        {
+          "name": "session start",
+          "kind": "cli",
+          "ms": 348,
+          "exitCode": 0
+        },
+        {
+          "name": "next after start",
+          "kind": "cli",
+          "ms": 543,
+          "exitCode": 0
+        },
+        {
+          "name": "session verify --execute",
+          "kind": "cli",
+          "ms": 962,
+          "exitCode": 0
+        },
+        {
+          "name": "approve without --gate (expect fail)",
+          "kind": "cli",
+          "ms": 290,
+          "exitCode": 1
+        },
+        {
+          "name": "session approve",
+          "kind": "cli",
+          "ms": 302,
+          "exitCode": 0
+        },
+        {
+          "name": "next after approve",
+          "kind": "cli",
+          "ms": 439,
+          "exitCode": 0
+        },
+        {
+          "name": "complete-check --strict",
+          "kind": "cli",
+          "ms": 483,
+          "exitCode": 0
+        },
+        {
+          "name": "session complete",
+          "kind": "cli",
+          "ms": 516,
+          "exitCode": 0
+        },
+        {
+          "name": "accept",
+          "kind": "cli",
+          "ms": 685,
+          "exitCode": 0
+        },
+        {
+          "name": "handoff",
+          "kind": "cli",
+          "ms": 748,
+          "exitCode": 0
+        }
+      ],
+      "humanOps": [
+        {
+          "id": "init_review_scaffold",
+          "label": "Skim init-created AGENTS/feature_list (first install only)",
+          "activeHuman": true,
+          "judgmentS": 60,
+          "repeatEntry": false,
+          "amortized": true
+        },
+        {
+          "id": "feature_add",
+          "label": "Choose feature id/title",
+          "activeHuman": true,
+          "judgmentS": 30,
+          "repeatEntry": true
+        },
+        {
+          "id": "fill_plan",
+          "label": "Human fills Verification / design sections (generator leaves blanks)",
+          "activeHuman": true,
+          "judgmentS": 180,
+          "repeatEntry": true
+        },
+        {
+          "id": "plan_gate",
+          "label": "Human plan confirmation",
+          "activeHuman": true,
+          "judgmentS": 60,
+          "repeatEntry": false
+        },
+        {
+          "id": "session_start",
+          "label": "Choose goal/route/feature binding",
+          "activeHuman": true,
+          "judgmentS": 20,
+          "repeatEntry": true
+        },
+        {
+          "id": "verify_execute",
+          "label": "Choose/allow verification command (policy-gated)",
+          "activeHuman": true,
+          "judgmentS": 15,
+          "repeatEntry": true
+        },
+        {
+          "id": "discover_gate",
+          "label": "Discover correct --gate id (next often omits it)",
+          "activeHuman": true,
+          "judgmentS": 30,
+          "repeatEntry": false
+        },
+        {
+          "id": "session_approve",
+          "label": "Human session gate approval",
+          "activeHuman": true,
+          "judgmentS": 45,
+          "repeatEntry": false
+        },
+        {
+          "id": "recover_from_g1",
+          "label": "When next says complete, still run complete-check/complete/accept/handoff",
+          "activeHuman": true,
+          "judgmentS": 45,
+          "repeatEntry": false,
+          "gap": "G1"
+        },
+        {
+          "id": "read_complete_check",
+          "label": "Read complete-check reasons/missing",
+          "activeHuman": true,
+          "judgmentS": 20,
+          "repeatEntry": false
+        },
+        {
+          "id": "accept",
+          "label": "Human accept plan into evolution log",
+          "activeHuman": true,
+          "judgmentS": 30,
+          "repeatEntry": false
+        },
+        {
+          "id": "handoff",
+          "label": "Explicit handoff regenerate (not forced by next)",
+          "activeHuman": true,
+          "judgmentS": 15,
+          "repeatEntry": false,
+          "gap": "G1/G2"
+        }
+      ],
+      "metrics": {
+        "cliWallMs": 6998,
+        "cliWallMin": 0.117,
+        "humanJudgmentS_all": 550,
+        "humanJudgmentS_steady": 490,
+        "humanJudgmentMin_steady": 8.17,
+        "activeHumanOpCount": 11,
+        "repeatEntryOpCount": 4,
+        "under10MinSteady": true,
+        "nextCompleteAfterApprove": true
+      },
+      "netBenefitAssumptions": {
+        "baselineReviewWithoutAmberMin": null,
+        "note": "Net benefit cannot be proven positive without baseline pilot timing; overhead median is estimated from human ops + judgment model."
+      }
+    }
+  ],
+  "summary": {
+    "steadyGovernanceMinByRoute": {
+      "bugfix-quick": 7.67,
+      "feature-standard": 8.17,
+      "refactor-safe": 8.17
+    },
+    "medianSteadyGovernanceMin": 8.17,
+    "allUnder10Min": true,
+    "medianActiveHumanOps": 11,
+    "repeatEntryOpsTypical": 4,
+    "g1ObservedOnAll": false,
+    "answer": {
+      "medianUnder10Min": true,
+      "netBenefitPositiveProven": false,
+      "reason": "Modeled steady human governance overhead median ≤10 minutes for ordinary tasks, but net benefit vs no-Amber baseline is unproven without pilot timing of review/handoff savings."
+    }
+  }
+}

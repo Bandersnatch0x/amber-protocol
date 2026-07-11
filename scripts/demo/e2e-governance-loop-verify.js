@@ -1,0 +1,945 @@
+#!/usr/bin/env node
+"use strict";
+
+/**
+ * AFK verification for wayfinder ticket:
+ * "在全新目标仓库验证 Amber 治理闭环"
+ *
+ * Creates a fresh non-Amber git target and exercises:
+ *   A) success path
+ *   B) rejection paths (policy deny, claim-only vs strict, accept without evidence)
+ *   C) verify-fail recovery
+ *   D) cross-session handoff
+ *
+ * Read-only w.r.t. the product repo: only mutates a temp target.
+ * Usage: node scripts/demo/e2e-governance-loop-verify.js
+ */
+
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
+
+const REPO_ROOT = path.resolve(__dirname, "..", "..");
+const AMBER = path.join(REPO_ROOT, "scripts", "amber.js");
+
+const results = {
+	meta: {
+		productRoot: REPO_ROOT,
+		productVersion: require(path.join(REPO_ROOT, "package.json")).version,
+		startedAt: new Date().toISOString(),
+		platform: process.platform,
+		node: process.version,
+	},
+	paths: {},
+	findings: [],
+};
+
+function run(cwd, args, opts = {}) {
+	const res = spawnSync(process.execPath, [AMBER, ...args], {
+		cwd,
+		encoding: "utf8",
+		env: { ...process.env, ...(opts.env || {}) },
+		timeout: opts.timeout || 120_000,
+	});
+	return {
+		args,
+		exitCode: res.status === null ? -1 : res.status,
+		stdout: (res.stdout || "").trim(),
+		stderr: (res.stderr || "").trim(),
+	};
+}
+
+function git(cwd, args) {
+	const res = spawnSync("git", args, { cwd, encoding: "utf8" });
+	return {
+		exitCode: res.status === null ? -1 : res.status,
+		stdout: (res.stdout || "").trim(),
+		stderr: (res.stderr || "").trim(),
+	};
+}
+
+function note(id, severity, text, evidence) {
+	results.findings.push({ id, severity, text, evidence });
+}
+
+function ensurePlanReady(target, planRel) {
+	const planPath = path.join(target, planRel);
+	let c = fs.readFileSync(planPath, "utf8");
+	// Ensure every required section has a non-empty body for accept validation.
+	const required = [
+		"High Level Design",
+		"Vertical Slices",
+		"Resume Checkpoint",
+		"Acceptance Criteria",
+		"Verification",
+		"Evidence Schema",
+	];
+	for (const section of required) {
+		const re = new RegExp(`## ${section}\\n\\n\\s*\\n`, "m");
+		if (re.test(c) || new RegExp(`## ${section}\\n\\n$`, "m").test(c)) {
+			c = c.replace(
+				new RegExp(`## ${section}\\n\\n`),
+				`## ${section}\n\n- Filled by e2e harness for section ${section}.\n\n`,
+			);
+		}
+	}
+	// Verification must be non-empty for accept; feature seed may leave it empty.
+	if (!/## Verification\n\n- /.test(c)) {
+		c = c.replace(
+			/## Verification\n\n/,
+			"## Verification\n\n- Run npm test.\n\n",
+		);
+	}
+	// Resume Checkpoint fields
+	if (!/- Resume Point:/i.test(c)) {
+		c = c.replace(
+			/## Resume Checkpoint\n\n/,
+			"## Resume Checkpoint\n\n- Resume Point: e2e\n- Blockers: none\n- Next Action: implement\n- Recovery Instructions: reopen plan\n\n",
+		);
+	}
+	fs.writeFileSync(planPath, c);
+}
+
+function parseJsonOut(r) {
+	try {
+		return JSON.parse(r.stdout);
+	} catch {
+		// Some commands mix logs; try last JSON object.
+		const m = r.stdout.match(/\{[\s\S]*\}\s*$/);
+		if (m) {
+			try {
+				return JSON.parse(m[0]);
+			} catch {
+				return null;
+			}
+		}
+		return null;
+	}
+}
+
+function nextText(target, extra = []) {
+	const r = run(target, ["next", "--target", ".", ...extra]);
+	return { exitCode: r.exitCode, text: r.stdout, json: null };
+}
+
+function nextJson(target, extra = []) {
+	const r = run(target, ["next", "--target", ".", "--json", ...extra]);
+	return { exitCode: r.exitCode, text: r.stdout, json: parseJsonOut(r) };
+}
+
+function mkTarget(label) {
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), `amber-e2e-${label}-`));
+	git(target, ["init"]);
+	git(target, ["config", "user.email", "e2e@amber.test"]);
+	git(target, ["config", "user.name", "Amber E2E"]);
+	fs.writeFileSync(
+		path.join(target, "package.json"),
+		JSON.stringify(
+			{
+				name: "amber-e2e-target",
+				version: "0.0.0",
+				private: true,
+				scripts: { test: "node -e \"console.log('ok')\"" },
+			},
+			null,
+			2,
+		) + "\n",
+	);
+	fs.writeFileSync(path.join(target, "README.md"), `# ${label}\n\nNon-Amber target for governance loop e2e.\n`);
+	git(target, ["add", "."]);
+	git(target, ["commit", "-m", "chore: initial non-amber target"]);
+	return target;
+}
+
+function pathSuccess() {
+	const target = mkTarget("success");
+	const log = [];
+	const step = (name, r) => {
+		log.push({
+			name,
+			exitCode: r.exitCode,
+			stdoutHead: (r.stdout || "").slice(0, 400),
+			stderrHead: (r.stderr || "").slice(0, 200),
+		});
+		return r;
+	};
+
+	step("audit", run(target, ["audit", "--target", ".", "--json"]));
+	const n0 = nextJson(target);
+	log.push({ name: "next@empty", next: n0.json || n0.text });
+
+	step("init", run(target, ["init", "--target", "."]));
+	const n1 = nextJson(target);
+	log.push({ name: "next@init", next: n1.json || n1.text });
+
+	// Prefer seeded F001 if present; else add F002.
+	const fl = JSON.parse(fs.readFileSync(path.join(target, "feature_list.json"), "utf8"));
+	const featureId = fl.features?.[0]?.id || "F002";
+	if (!fl.features?.length) {
+		step(
+			"feature add",
+			run(target, [
+				"feature",
+				"add",
+				"--target",
+				".",
+				"--id",
+				"F002",
+				"--title",
+				"E2E feature",
+				"--priority",
+				"1",
+				"--area",
+				"e2e",
+			]),
+		);
+	}
+
+	step(
+		"plan",
+		run(target, ["plan", "--target", ".", "--feature", featureId, "--title", "E2E plan"]),
+	);
+	const plans = fs.readdirSync(path.join(target, "docs", "plans")).filter((f) => f.endsWith(".md"));
+	const planRel = `docs/plans/${plans[0]}`;
+	ensurePlanReady(target, planRel);
+
+	const n2 = nextJson(target);
+	log.push({ name: "next@plan", next: n2.json || n2.text });
+
+	step("gate --confirm", run(target, ["gate", "--confirm", "--target", ".", "--plan", planRel]));
+	const n3 = nextJson(target);
+	log.push({ name: "next@gate", next: n3.json || n3.text });
+
+	// Real work outside .amber so complete-check "work present" is meaningful.
+	fs.writeFileSync(path.join(target, "src-app.js"), "module.exports = { ok: true };\n");
+	git(target, ["add", "src-app.js"]);
+	git(target, ["commit", "-m", "feat: app stub for e2e work evidence"]);
+
+	const start = step(
+		"session start",
+		run(target, [
+			"session",
+			"start",
+			"--target",
+			".",
+			"--goal",
+			"e2e success path",
+			"--feature",
+			featureId,
+			"--json",
+		]),
+	);
+	const sid = parseJsonOut(start)?.sessionId;
+	const n4 = nextJson(target);
+	log.push({ name: "next@session-start", sessionId: sid, next: n4.json || n4.text });
+
+	step(
+		"session verify --execute",
+		run(target, [
+			"session",
+			"verify",
+			"--session",
+			sid,
+			"--execute",
+			"--command",
+			"npm test",
+			"--target",
+			".",
+		]),
+	);
+	const n5 = nextJson(target);
+	log.push({ name: "next@verify", next: n5.json || n5.text });
+
+	// Approve one session gate (demo uses implement gate).
+	step(
+		"session approve",
+		run(target, [
+			"session",
+			"approve",
+			"--session",
+			sid,
+			"--gate",
+			"user-approval-implement",
+			"--yes",
+			"--target",
+			".",
+		]),
+	);
+	const n6 = nextJson(target);
+	log.push({ name: "next@approve", next: n6.json || n6.text });
+
+	const handoffBefore = fs.readFileSync(path.join(target, "session-handoff.md"), "utf8");
+	const isTemplateHandoff =
+		/scaffolded|not run yet|not recorded/i.test(handoffBefore) ||
+		handoffBefore.includes("Command: not run yet");
+
+	// G2: complete-check must FAIL while handoff is still the init scaffold.
+	const ccOnTemplate = step(
+		"complete-check --strict (scaffold handoff)",
+		run(target, ["session", "complete-check", "--session", sid, "--strict", "--target", "."]),
+	);
+	const nextAfterApprove = n6.json;
+	const nextRecommendsHandoff =
+		(nextAfterApprove && nextAfterApprove.nextStep && nextAfterApprove.nextStep.id === "handoff") ||
+		/handoff/i.test(JSON.stringify(nextAfterApprove || n6.text));
+	const nextSaysDone =
+		(nextAfterApprove && nextAfterApprove.complete === true) ||
+		/All lifecycle steps complete/i.test(n6.text || "");
+
+	// G1 path: handoff → complete-check → session complete → accept
+	const handoff = step("handoff", run(target, ["handoff", "--target", "."]));
+	const handoffAfter = fs.readFileSync(path.join(target, "session-handoff.md"), "utf8");
+	const nH = nextJson(target);
+	log.push({ name: "next@handoff", next: nH.json || nH.text });
+
+	const ccStrict = step(
+		"complete-check --strict (after live handoff)",
+		run(target, ["session", "complete-check", "--session", sid, "--strict", "--target", "."]),
+	);
+	log.push({
+		name: "handoff-template-check",
+		isTemplateHandoff,
+		completeCheckFailedOnTemplate:
+			ccOnTemplate.exitCode !== 0 || /status: fail/i.test(ccOnTemplate.stdout),
+		completeCheckPassedAfterLive: /status: pass/i.test(ccStrict.stdout),
+		completeCheckOut: ccStrict.stdout,
+	});
+
+	step(
+		"session complete",
+		run(target, ["session", "complete", "--session", sid, "--target", "."]),
+	);
+	const n7 = nextJson(target);
+	log.push({ name: "next@session-complete", next: n7.json || n7.text });
+
+	const accept = step(
+		"accept",
+		run(target, ["accept", "--target", ".", "--plan", planRel, "--session", sid]),
+	);
+	step("handoff after accept", run(target, ["handoff", "--target", "."]));
+	const n8 = nextJson(target);
+	log.push({ name: "next@done", next: n8.json || n8.text });
+
+	const flAfter = JSON.parse(fs.readFileSync(path.join(target, "feature_list.json"), "utf8"));
+	const feature = flAfter.features.find((f) => f.id === featureId);
+
+	const success = {
+		target,
+		sessionId: sid,
+		planRel,
+		featureStatus: feature?.status,
+		evidenceCount: feature?.evidence?.length || 0,
+		acceptExit: accept.exitCode,
+		handoffExit: handoff.exitCode,
+		handoffContainsEvidence: /npm test/i.test(handoffAfter),
+		handoffContainsSession: handoffAfter.includes(String(sid).slice(0, 8)),
+		nextAfterApproveComplete: nextSaysDone,
+		nextRecommendsHandoff,
+		completeCheckFailedOnTemplateHandoff:
+			ccOnTemplate.exitCode !== 0 || /status: fail/i.test(ccOnTemplate.stdout),
+		completeCheckPassedAfterLiveHandoff: /status: pass/i.test(ccStrict.stdout),
+		isTemplateHandoffBeforeRegen: isTemplateHandoff,
+		closed:
+			accept.exitCode === 0 &&
+			handoff.exitCode === 0 &&
+			(feature?.evidence?.length || 0) > 0,
+		log,
+	};
+
+	if (success.closed) {
+		note(
+			"S1",
+			"info",
+			"Success path closed: init→plan→gate→session→verify--execute→approve→handoff→complete-check→complete→accept with feature evidence.",
+			{ sessionId: sid, featureStatus: feature?.status },
+		);
+	} else {
+		note("S1", "high", "Success path did not fully close.", success);
+	}
+	// G1 fixed: next should recommend handoff after approve (not "all complete").
+	if (nextSaysDone || !nextRecommendsHandoff) {
+		note(
+			"G1",
+			"high",
+			"Regression: after approve, amber next did not recommend handoff last-mile.",
+			{ next: nextAfterApprove || n6.text },
+		);
+	} else {
+		note("G1", "info", "G1 fixed: after approve, next recommends handoff.", {
+			next: nextAfterApprove,
+		});
+	}
+	// G2 fixed: complete-check must fail on scaffold handoff.
+	if (isTemplateHandoff && success.completeCheckFailedOnTemplateHandoff) {
+		note(
+			"G2",
+			"info",
+			"G2 fixed: complete-check --strict fails while session-handoff.md is still the init template.",
+			{ handoffHead: handoffBefore.slice(0, 240) },
+		);
+	} else if (isTemplateHandoff) {
+		note(
+			"G2",
+			"high",
+			"Regression: complete-check --strict still passes on init template handoff.",
+			{ out: ccOnTemplate.stdout },
+		);
+	}
+
+	results.paths.success = success;
+	return success;
+}
+
+function pathRejections() {
+	const target = mkTarget("reject");
+	const log = [];
+	const step = (name, r) => {
+		log.push({
+			name,
+			exitCode: r.exitCode,
+			stdoutHead: (r.stdout || "").slice(0, 500),
+			stderrHead: (r.stderr || "").slice(0, 200),
+		});
+		return r;
+	};
+
+	step("init", run(target, ["init", "--target", "."]));
+	const fl = JSON.parse(fs.readFileSync(path.join(target, "feature_list.json"), "utf8"));
+	const featureId = fl.features[0].id;
+	step(
+		"plan",
+		run(target, ["plan", "--target", ".", "--feature", featureId, "--title", "Reject path"]),
+	);
+	const plans = fs.readdirSync(path.join(target, "docs", "plans")).filter((f) => f.endsWith(".md"));
+	const planRel = `docs/plans/${plans[0]}`;
+	ensurePlanReady(target, planRel);
+	step("gate", run(target, ["gate", "--confirm", "--target", ".", "--plan", planRel]));
+
+	const start = step(
+		"session start",
+		run(target, [
+			"session",
+			"start",
+			"--target",
+			".",
+			"--goal",
+			"reject path",
+			"--feature",
+			featureId,
+			"--json",
+		]),
+	);
+	const sid = parseJsonOut(start)?.sessionId;
+
+	// B1: policy deny for non-allowlisted command
+	const denied = step(
+		"verify --execute denied command",
+		run(target, [
+			"session",
+			"verify",
+			"--session",
+			sid,
+			"--execute",
+			"--command",
+			"echo should-deny",
+			"--target",
+			".",
+		]),
+	);
+	const denyOk = denied.exitCode !== 0 && /denied|policy/i.test(denied.stdout + denied.stderr);
+
+	// B2: claim-only verify then strict complete-check must fail on verification
+	const claim = step(
+		"verify claim-only",
+		run(target, ["session", "verify", "--session", sid, "--target", "."]),
+	);
+	const claimCc = step(
+		"complete-check --strict after claim",
+		run(target, ["session", "complete-check", "--session", sid, "--strict", "--target", "."]),
+	);
+	const claimStrictFails =
+		claimCc.exitCode !== 0 ||
+		/status: fail/i.test(claimCc.stdout) ||
+		/Missing:.*verification/i.test(claimCc.stdout);
+
+	// B3: accept without evidence (fresh feature without executed verify reflux)
+	// Use a second feature that has plan confirmed but no evidence.
+	step(
+		"feature add F-NOEV",
+		run(target, [
+			"feature",
+			"add",
+			"--target",
+			".",
+			"--id",
+			"F-NOEV",
+			"--title",
+			"No evidence",
+			"--priority",
+			"2",
+			"--area",
+			"e2e",
+		]),
+	);
+	step(
+		"plan F-NOEV",
+		run(target, ["plan", "--target", ".", "--feature", "F-NOEV", "--title", "No evidence plan"]),
+	);
+	const plans2 = fs
+		.readdirSync(path.join(target, "docs", "plans"))
+		.filter((f) => f.includes("F-NOEV") || f.includes("No-evidence"));
+	let planNoEv = plans2[0]
+		? `docs/plans/${plans2[0]}`
+		: `docs/plans/${fs
+				.readdirSync(path.join(target, "docs", "plans"))
+				.filter((f) => f.endsWith(".md"))
+				.sort()
+				.pop()}`;
+	// Find plan that references F-NOEV
+	for (const f of fs.readdirSync(path.join(target, "docs", "plans"))) {
+		const p = path.join(target, "docs", "plans", f);
+		if (fs.readFileSync(p, "utf8").includes("Feature: F-NOEV")) {
+			planNoEv = `docs/plans/${f}`;
+			break;
+		}
+	}
+	ensurePlanReady(target, planNoEv);
+	step("gate F-NOEV", run(target, ["gate", "--confirm", "--target", ".", "--plan", planNoEv]));
+	const acceptNoEv = step(
+		"accept without evidence",
+		run(target, ["accept", "--target", ".", "--plan", planNoEv]),
+	);
+	const acceptBlocked =
+		acceptNoEv.exitCode !== 0 &&
+		(/NO_EVIDENCE|no verification evidence/i.test(acceptNoEv.stdout + acceptNoEv.stderr) ||
+			/Cannot accept/i.test(acceptNoEv.stdout));
+
+	// B4: approve without --gate when multiple gates
+	const approveNoGate = step(
+		"approve without --gate",
+		run(target, ["session", "approve", "--session", sid, "--yes", "--target", "."]),
+	);
+	const needsGate =
+		approveNoGate.exitCode !== 0 && /specify one with --gate|gates/i.test(approveNoGate.stdout);
+
+	const out = {
+		target,
+		sessionId: sid,
+		policyDenyWorks: denyOk,
+		claimOnlyStrictFails: claimStrictFails,
+		acceptWithoutEvidenceBlocked: acceptBlocked,
+		approveRequiresGateId: needsGate,
+		log,
+	};
+
+	if (denyOk) {
+		note("R1", "info", "Rejection path: non-allowlisted verify --execute is denied by policy.", {
+			command: "echo should-deny",
+		});
+	} else {
+		note("R1", "high", "Expected policy deny for non-allowlisted command did not fire.", denied);
+	}
+	if (claimStrictFails) {
+		note(
+			"R2",
+			"info",
+			"Rejection path: claim-only verify does not satisfy complete-check --strict.",
+			{ out: claimCc.stdout },
+		);
+	} else {
+		note("R2", "high", "claim-only verify incorrectly passed complete-check --strict.", claimCc);
+	}
+	if (acceptBlocked) {
+		note("R3", "info", "Rejection path: accept without feature evidence is blocked.", {
+			exit: acceptNoEv.exitCode,
+		});
+	} else {
+		note("R3", "high", "accept without evidence was allowed.", acceptNoEv);
+	}
+	if (needsGate) {
+		note("R4", "info", "Rejection path: multi-gate route requires --gate on session approve.", {});
+	} else {
+		note(
+			"R4",
+			"medium",
+			"session approve without --gate did not require gate id (route may have single gate).",
+			approveNoGate,
+		);
+	}
+
+	results.paths.rejections = out;
+	return out;
+}
+
+function pathVerifyFailRecover() {
+	const target = mkTarget("fail-recover");
+	const log = [];
+	const step = (name, r) => {
+		log.push({
+			name,
+			exitCode: r.exitCode,
+			stdoutHead: (r.stdout || "").slice(0, 400),
+		});
+		return r;
+	};
+
+	// Start with failing test script.
+	fs.writeFileSync(
+		path.join(target, "package.json"),
+		JSON.stringify(
+			{
+				name: "amber-e2e-fail",
+				version: "0.0.0",
+				private: true,
+				scripts: { test: "node -e \"process.exit(1)\"" },
+			},
+			null,
+			2,
+		) + "\n",
+	);
+	git(target, ["add", "package.json"]);
+	git(target, ["commit", "-m", "chore: failing tests"]);
+
+	step("init", run(target, ["init", "--target", "."]));
+	const fl = JSON.parse(fs.readFileSync(path.join(target, "feature_list.json"), "utf8"));
+	const featureId = fl.features[0].id;
+	step(
+		"plan",
+		run(target, ["plan", "--target", ".", "--feature", featureId, "--title", "Fail recover"]),
+	);
+	const plans = fs.readdirSync(path.join(target, "docs", "plans")).filter((f) => f.endsWith(".md"));
+	const planRel = `docs/plans/${plans[0]}`;
+	ensurePlanReady(target, planRel);
+	step("gate", run(target, ["gate", "--confirm", "--target", ".", "--plan", planRel]));
+	fs.writeFileSync(path.join(target, "work.js"), "exports.x=1\n");
+	git(target, ["add", "work.js"]);
+	git(target, ["commit", "-m", "feat: work"]);
+
+	const start = step(
+		"session start",
+		run(target, [
+			"session",
+			"start",
+			"--target",
+			".",
+			"--goal",
+			"fail then recover",
+			"--feature",
+			featureId,
+			"--json",
+		]),
+	);
+	const sid = parseJsonOut(start)?.sessionId;
+
+	const fail = step(
+		"verify --execute failing",
+		run(target, [
+			"session",
+			"verify",
+			"--session",
+			sid,
+			"--execute",
+			"--command",
+			"npm test",
+			"--target",
+			".",
+		]),
+	);
+	const failRecorded =
+		fail.exitCode !== 0 && /FAILED|verification_failed|NOT marked complete/i.test(fail.stdout);
+
+	// Session still open; fix tests and re-verify.
+	fs.writeFileSync(
+		path.join(target, "package.json"),
+		JSON.stringify(
+			{
+				name: "amber-e2e-fail",
+				version: "0.0.0",
+				private: true,
+				scripts: { test: "node -e \"console.log('ok')\"" },
+			},
+			null,
+			2,
+		) + "\n",
+	);
+	git(target, ["add", "package.json"]);
+	git(target, ["commit", "-m", "fix: tests pass"]);
+
+	const ok = step(
+		"verify --execute after fix",
+		run(target, [
+			"session",
+			"verify",
+			"--session",
+			sid,
+			"--execute",
+			"--command",
+			"npm test",
+			"--target",
+			".",
+		]),
+	);
+	step(
+		"approve",
+		run(target, [
+			"session",
+			"approve",
+			"--session",
+			sid,
+			"--gate",
+			"user-approval-implement",
+			"--yes",
+			"--target",
+			".",
+		]),
+	);
+	step("handoff", run(target, ["handoff", "--target", "."]));
+	const cc = step(
+		"complete-check --strict",
+		run(target, ["session", "complete-check", "--session", sid, "--strict", "--target", "."]),
+	);
+	const recovered =
+		ok.exitCode === 0 && (/status: pass/i.test(cc.stdout) || cc.exitCode === 0);
+
+	// Inspect timeline for failure then success events.
+	const sessionDir = path.join(target, ".amber", "sessions", sid);
+	const timeline = fs.existsSync(path.join(sessionDir, "timeline.jsonl"))
+		? fs.readFileSync(path.join(sessionDir, "timeline.jsonl"), "utf8")
+		: "";
+	const hasFailedEvent = /verification_failed/.test(timeline);
+	const hasPassedEvent = /stage_completed/.test(timeline);
+
+	const out = {
+		target,
+		sessionId: sid,
+		failExit: fail.exitCode,
+		failRecorded,
+		recoverExit: ok.exitCode,
+		completeCheckPass: /status: pass/i.test(cc.stdout),
+		hasFailedEvent,
+		hasPassedEvent,
+		recovered: recovered && hasFailedEvent && hasPassedEvent,
+		log,
+	};
+
+	if (out.recovered) {
+		note(
+			"F1",
+			"info",
+			"Verify-fail recovery works: failure recorded, session stays open, re-verify can pass strict complete-check.",
+			{ sid },
+		);
+	} else {
+		note("F1", "high", "Verify-fail recovery incomplete.", out);
+	}
+
+	results.paths.verifyFailRecover = out;
+	return out;
+}
+
+function pathCrossSessionHandoff() {
+	const target = mkTarget("handoff");
+	const log = [];
+	const step = (name, r) => {
+		log.push({ name, exitCode: r.exitCode, stdoutHead: (r.stdout || "").slice(0, 300) });
+		return r;
+	};
+
+	step("init", run(target, ["init", "--target", "."]));
+	const fl = JSON.parse(fs.readFileSync(path.join(target, "feature_list.json"), "utf8"));
+	const featureId = fl.features[0].id;
+	step(
+		"plan",
+		run(target, ["plan", "--target", ".", "--feature", featureId, "--title", "Handoff path"]),
+	);
+	const plans = fs.readdirSync(path.join(target, "docs", "plans")).filter((f) => f.endsWith(".md"));
+	const planRel = `docs/plans/${plans[0]}`;
+	ensurePlanReady(target, planRel);
+	step("gate", run(target, ["gate", "--confirm", "--target", ".", "--plan", planRel]));
+	fs.writeFileSync(path.join(target, "lib.js"), "exports.v=1\n");
+	git(target, ["add", "lib.js"]);
+	git(target, ["commit", "-m", "feat: lib"]);
+
+	const s1 = step(
+		"session1 start",
+		run(target, [
+			"session",
+			"start",
+			"--target",
+			".",
+			"--goal",
+			"session one work",
+			"--feature",
+			featureId,
+			"--json",
+		]),
+	);
+	const sid1 = parseJsonOut(s1)?.sessionId;
+	step(
+		"verify",
+		run(target, [
+			"session",
+			"verify",
+			"--session",
+			sid1,
+			"--execute",
+			"--command",
+			"npm test",
+			"--target",
+			".",
+		]),
+	);
+	step(
+		"approve",
+		run(target, [
+			"session",
+			"approve",
+			"--session",
+			sid1,
+			"--gate",
+			"user-approval-implement",
+			"--yes",
+			"--target",
+			".",
+		]),
+	);
+	step("handoff before complete", run(target, ["handoff", "--target", "."]));
+	step("complete", run(target, ["session", "complete", "--session", sid1, "--target", "."]));
+	step("accept", run(target, ["accept", "--target", ".", "--plan", planRel, "--session", sid1]));
+	step("handoff regenerate", run(target, ["handoff", "--target", "."]));
+
+	const handoff1 = fs.readFileSync(path.join(target, "session-handoff.md"), "utf8");
+	const handoffUseful =
+		/npm test/i.test(handoff1) &&
+		(/Next Actions/i.test(handoff1) || /next/i.test(handoff1)) &&
+		!handoff1.includes("Command: not run yet");
+
+	// Second session: new feature work, should be able to start and see prior evidence via handoff/features.
+	step(
+		"feature add F2",
+		run(target, [
+			"feature",
+			"add",
+			"--target",
+			".",
+			"--id",
+			"F2",
+			"--title",
+			"Second slice",
+			"--priority",
+			"2",
+			"--area",
+			"e2e",
+		]),
+	);
+	const s2 = step(
+		"session2 start",
+		run(target, [
+			"session",
+			"start",
+			"--target",
+			".",
+			"--goal",
+			"continue from handoff",
+			"--feature",
+			"F2",
+			"--json",
+		]),
+	);
+	const sid2 = parseJsonOut(s2)?.sessionId;
+	const continueCompleted = step(
+		"session continue on completed s1",
+		run(target, ["session", "continue", "--session", sid1, "--target", "."]),
+	);
+	const refuseResurrect =
+		continueCompleted.exitCode !== 0 ||
+		/already completed|handoff|new session/i.test(continueCompleted.stdout);
+
+	// Independent reviewer can re-run complete-check on completed session artifacts.
+	const recheck = step(
+		"complete-check on completed s1",
+		run(target, ["session", "complete-check", "--session", sid1, "--strict", "--target", "."]),
+	);
+	const recheckPass = /status: pass/i.test(recheck.stdout);
+
+	const flAfter = JSON.parse(fs.readFileSync(path.join(target, "feature_list.json"), "utf8"));
+	const f1 = flAfter.features.find((f) => f.id === featureId);
+
+	const out = {
+		target,
+		sid1,
+		sid2,
+		handoffUseful,
+		refuseResurrectCompleted: refuseResurrect,
+		recheckCompletedPass: recheckPass,
+		feature1Status: f1?.status,
+		feature1Evidence: f1?.evidence?.length || 0,
+		session2Started: Boolean(sid2),
+		log,
+	};
+
+	if (handoffUseful && refuseResurrect && sid2) {
+		note(
+			"H1",
+			"info",
+			"Cross-session handoff works: live handoff carries evidence/next actions; completed session cannot be resurrected; new session can start.",
+			{ sid1, sid2 },
+		);
+	} else {
+		note("H1", "high", "Cross-session handoff incomplete.", out);
+	}
+
+	results.paths.crossSessionHandoff = out;
+	return out;
+}
+
+function summarize() {
+	const highs = results.findings.filter((f) => f.severity === "high");
+	const infos = results.findings.filter((f) => f.severity === "info");
+	results.meta.finishedAt = new Date().toISOString();
+	results.summary = {
+		successClosed: Boolean(results.paths.success?.closed),
+		rejections: {
+			policyDeny: Boolean(results.paths.rejections?.policyDenyWorks),
+			claimStrict: Boolean(results.paths.rejections?.claimOnlyStrictFails),
+			acceptNoEvidence: Boolean(results.paths.rejections?.acceptWithoutEvidenceBlocked),
+			approveNeedsGate: Boolean(results.paths.rejections?.approveRequiresGateId),
+		},
+		verifyFailRecovered: Boolean(results.paths.verifyFailRecover?.recovered),
+		crossSessionHandoff: Boolean(
+			results.paths.crossSessionHandoff?.handoffUseful &&
+				results.paths.crossSessionHandoff?.session2Started,
+		),
+		highFindings: highs.map((f) => f.id),
+		infoFindings: infos.map((f) => f.id),
+		// After G1/G2 product fix: navigation last-mile + live handoff gate closed for CLI path.
+		loopJudgementHint: highs.length === 0 ? "closed-cli" : "partial",
+		loopJudgementReason:
+			highs.length === 0
+				? "Success/reject/recover/handoff close on fresh targets; next recommends handoff after approve; complete-check rejects scaffold handoff."
+				: "Remaining high findings: " + highs.map((f) => f.id).join(", "),
+	};
+}
+
+function main() {
+	console.log("Amber e2e governance-loop verify — fresh targets only");
+	pathSuccess();
+	pathRejections();
+	pathVerifyFailRecover();
+	pathCrossSessionHandoff();
+	summarize();
+
+	const outDir = path.join(REPO_ROOT, "docs", "quality");
+	fs.mkdirSync(outDir, { recursive: true });
+	const jsonPath = path.join(outDir, "e2e-governance-loop-verify.json");
+	fs.writeFileSync(jsonPath, JSON.stringify(results, null, 2) + "\n");
+	console.log(JSON.stringify(results.summary, null, 2));
+	console.log("Wrote", jsonPath);
+	if (results.summary.highFindings.length) {
+		console.log("High findings:", results.summary.highFindings.join(", "));
+		process.exitCode = 0; // investigation success even if product gaps found
+	}
+}
+
+main();

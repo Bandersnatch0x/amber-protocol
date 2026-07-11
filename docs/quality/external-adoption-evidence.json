@@ -1,0 +1,64 @@
+{
+  "collectedAt": "2026-07-10T18:02:47.849Z",
+  "githubSummary": {
+    "created": "2026-06-21T17:25:15Z",
+    "forks": 0,
+    "open_issues": 7,
+    "pushed": "2026-07-09T13:16:40Z",
+    "stars": 0,
+    "watchers": 0
+  },
+  "issueAuthors": [
+    "Bandersnatch0x"
+  ],
+  "externalIssues": [],
+  "issueCount": 31,
+  "npmVersion": "1.3.0",
+  "npmDownloadsLastMonth": {
+    "downloads": 720,
+    "start": "2026-06-09",
+    "end": "2026-07-08",
+    "package": "amber-protocol"
+  },
+  "npmDownloadsLastWeek": {
+    "downloads": 425,
+    "start": "2026-07-02",
+    "end": "2026-07-08",
+    "package": "amber-protocol"
+  },
+  "adoptionArtifacts": [
+    "docs/examples/adoptions/stockagents-adoption-report-2026-06-09t01-36-09-558z.md",
+    "docs/examples/adoptions/stockagents-adoption-report-2026-06-09t01-36-11-331z.md",
+    "docs/examples/adoptions-index.md",
+    "docs/examples/coding-harness-adoption-report.md",
+    "docs/examples/coding-harness-cli-adoption-output-dir-target-viec7g-adoption-report.md",
+    "docs/examples/go-stock-dev-adoption-report.md",
+    "docs/examples/sample-adoption-apply-plan.md",
+    "docs/examples/sample-adoption-decision-record-decisions.md",
+    "docs/examples/sample-adoption-decision-record.md",
+    "docs/examples/sample-adoption-diff.md",
+    "docs/examples/sample-adoption-gate.md",
+    "docs/examples/sample-adoption-next-actions-cli.md",
+    "docs/examples/sample-adoption-next-actions.md",
+    "docs/examples/sample-adoption-report.md",
+    "docs/examples/sample-adoption-selected-files.md",
+    "docs/examples/sample-adoption-status.md",
+    "docs/examples/sample-adoption-walkthrough.md"
+  ],
+  "localProductSessions": 2817,
+  "assessment": {
+    "independentTargetReposWithRepeatedRealUse": 0,
+    "realTasksOutsideProductDogfood": 0,
+    "adoptionReportsAreReadOnlyAuditsNotUsage": true,
+    "interest": {
+      "stars": 0,
+      "forks": 0,
+      "npmVersion": "1.3.0",
+      "downloadsLastMonth": 720,
+      "downloadsLastWeek": 425
+    },
+    "externalIssueAuthors": 0,
+    "meets2Repo10TaskBar": false,
+    "note": "Adoption reports under docs/examples are generator outputs against local paths (read-only audit), not evidence of sustained multi-task use by independent teams. Stars/downloads are interest signals only per map Notes."
+  }
+}
