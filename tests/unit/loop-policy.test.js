@@ -190,6 +190,29 @@ test("evaluateVerifyPolicy enforces deny-destructive even when custom rules omit
   assert.equal(r.matchedRule, "builtin-deny-destructive");
 });
 
+test("evaluateVerifyPolicy blocks destructive verbs case-insensitively and across flag variants", () => {
+  // defaultAction allow would otherwise let these through; the built-in must
+  // catch uppercase, reordered flags, separated flags, --force at line end.
+  const allowAll = { schemaVersion: 1, defaultAction: "allow", rules: [] };
+  for (const cmd of [
+    "rm -rf /x",
+    "RM -RF /x",
+    "rm -fr /x",
+    "rm -r -f /x",
+    "git push origin main --force",
+    "GIT PUSH --force",
+    "drop table users",
+    "DROP TABLE users",
+    "mkfs /dev/sda",
+    "MKFS /dev/sda",
+    "dd if=/dev/zero of=/x",
+  ]) {
+    const r = evaluateVerifyPolicy(cmd, allowAll);
+    assert.equal(r.allowed, false, `should block: ${cmd}`);
+    assert.equal(r.matchedRule, "builtin-deny-destructive", `destructive rule: ${cmd}`);
+  }
+});
+
 test("evaluateVerifyPolicy allows a metacharacter INSIDE a quoted argument (no false positive)", () => {
   const allowNode = { schemaVersion: 1, defaultAction: "deny", rules: [{ id: "allow-node", action: "allow", match: "prefix", pattern: "node " }] };
   const r = evaluateVerifyPolicy('node -e "process.stdout.write(\\"hi\\"); process.exit(0)"', allowNode);
