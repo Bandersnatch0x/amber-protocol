@@ -19,11 +19,11 @@
 | **V3** net benefit unproven | 已验证 | time-saved − governance overhead |
 | **G2-aware Evidence ≥90%** | honest 完整率 | scorecard not complete-check alone |
 | **N1** overhead only modeled | field ≤10 min | wall-clock human ops log |
-| G1/product fixes | 完整 loop | **out of pilot** (map forbids product work); note as confounder |
+| G1/product fixes | was 完整 loop | **Shipped in `2193583`** (next last-mile + live handoff). Pilot should use current master; scorecard still checks live handoff. |
 
 ## Design principles (minimal intervention)
 
-1. **No product changes** — use Amber as shipped (document G1/G2 workarounds in operator card).  
+1. **No further product changes required for G1/G2** — pilot Amber at/after `2193583`; follow `amber next` (see `pilot-value-validation-HANDOFF.md` operator card).  
 2. **Two repos only** — already agent-using teams, not greenfield toys.  
 3. **Ten tasks total** — split 5+5 across repos (or 6+4 if one is busier).  
 4. **Paired baseline** — each task has Amber path **or** matched no-Amber twin on similar work; prefer **within-team A/B by week**, not synthetic microbench only.  
@@ -60,7 +60,7 @@ Tag each task: `bugfix-quick` | `feature-standard` | `refactor-safe` (or baselin
 
 1. Read-only `amber adoption report` (optional).  
 2. `amber init` only with team consent; do not overwrite user AGENTS without approval.  
-3. Operator card one-pager: full command sequence including **session complete → accept → handoff** (G1 workaround); regenerate handoff before calling complete-check honest (G2).  
+3. Operator card: follow `amber next` on current master (handoff before complete-check is recommended by next). Full card in `pilot-value-validation-HANDOFF.md`.  
 4. Train one **timer role** (can be same as author) and one **reviewer role**.
 
 ### Phase 1 — Baseline week (no Amber) — 4 tasks (2 per repo)

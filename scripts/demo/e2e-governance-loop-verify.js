@@ -25,7 +25,8 @@ const AMBER = path.join(REPO_ROOT, "scripts", "amber.js");
 
 const results = {
 	meta: {
-		productRoot: REPO_ROOT,
+		// Redact absolute repo path so committed logs never contain forbidden legacy name segments.
+		productRoot: "<product-root>",
 		productVersion: require(path.join(REPO_ROOT, "package.json")).version,
 		startedAt: new Date().toISOString(),
 		platform: process.platform,
