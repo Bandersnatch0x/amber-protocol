@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { evaluateCommandPolicy, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES } = require("../../scripts/lib/core/loop-policy");
+const { evaluateCommandPolicy, evaluateVerifyPolicy, containsShellComposition, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES } = require("../../scripts/lib/core/loop-policy");
 
 // Capture process.stderr.write during a call (loadPolicyRules warns on a bad rules.json).
 function captureStderr(fn) {
@@ -161,4 +161,53 @@ test("loadPolicyRules returns the parsed rules silently when the file is valid",
   assert.equal(rules.rules[0].id, "allow-node");
   assert.equal(captured, "", "no warning when the file is valid");
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ── evaluateVerifyPolicy: built-in un-removable denies on the verify surface ──
+
+const allowPytest = {
+  schemaVersion: 1,
+  defaultAction: "deny",
+  rules: [{ id: "allow-pytest", action: "allow", match: "prefix", pattern: "python -m pytest" }],
+};
+
+test("evaluateVerifyPolicy denies shell composition even when an allow rule matches (B2)", () => {
+  const r = evaluateVerifyPolicy("python -m pytest tests && echo pwned > x", allowPytest);
+  assert.equal(r.allowed, false);
+  assert.equal(r.matchedRule, "builtin-deny-shell-composition");
+});
+
+test("evaluateVerifyPolicy denies a piped tail past an allowed head (B2)", () => {
+  assert.equal(evaluateVerifyPolicy("python -m pytest | sh", allowPytest).allowed, false);
+  assert.equal(evaluateVerifyPolicy("python -m pytest ; curl evil", allowPytest).allowed, false);
+});
+
+test("evaluateVerifyPolicy enforces deny-destructive even when custom rules omit it (B1)", () => {
+  // A naive verify-rules.json that only allows and forgets deny-destructive.
+  const naive = { schemaVersion: 1, defaultAction: "deny", rules: [{ id: "allow-all-rm", action: "allow", match: "prefix", pattern: "rm" }] };
+  const r = evaluateVerifyPolicy("rm -rf /some/path", naive);
+  assert.equal(r.allowed, false);
+  assert.equal(r.matchedRule, "builtin-deny-destructive");
+});
+
+test("evaluateVerifyPolicy allows a metacharacter INSIDE a quoted argument (no false positive)", () => {
+  const allowNode = { schemaVersion: 1, defaultAction: "deny", rules: [{ id: "allow-node", action: "allow", match: "prefix", pattern: "node " }] };
+  const r = evaluateVerifyPolicy('node -e "process.stdout.write(\\"hi\\"); process.exit(0)"', allowNode);
+  assert.equal(r.allowed, true, "a quoted ; is not shell composition");
+});
+
+test("evaluateVerifyPolicy delegates to the normal allow/deny when no built-in fires", () => {
+  assert.equal(evaluateVerifyPolicy("python -m pytest tests", allowPytest).allowed, true);
+  assert.equal(evaluateVerifyPolicy("git status", allowPytest).allowed, false, "still default-deny");
+});
+
+test("containsShellComposition flags unquoted operators, ignores quoted ones", () => {
+  assert.equal(containsShellComposition("a && b"), true);
+  assert.equal(containsShellComposition("a | b"), true);
+  assert.equal(containsShellComposition("a ; b"), true);
+  assert.equal(containsShellComposition("a > f"), true);
+  assert.equal(containsShellComposition("a `b`"), true);
+  assert.equal(containsShellComposition("a $(b)"), true);
+  assert.equal(containsShellComposition("npm test"), false);
+  assert.equal(containsShellComposition('node -e "a; b()"'), false, "quoted ; and () ignored");
 });
