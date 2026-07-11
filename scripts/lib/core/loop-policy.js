@@ -12,8 +12,10 @@ const MAX_PATTERN_LEN = 200;
 // Shared destructive-command pattern. Referenced by the DEFAULT_RULES deny rule
 // AND enforced as an un-removable built-in on the verify surface (see
 // evaluateVerifyPolicy) so a custom verify-rules.json cannot silently drop it.
+// Applied case-insensitively so `RM -RF`, `DROP table`, `MKFS` cannot bypass it.
+// rm flags: covers -rf, -fr, -r -f, -Rf, etc.; git push --force anywhere on the line.
 const DESTRUCTIVE_PATTERN =
-	"rm\\s+-rf|git\\s+push\\s+--force|:\\s*>\\s*/|DROP\\s+TABLE|mkfs|dd\\s+if=";
+	"rm\\s+(?:-\\w*[rRfF]\\w*\\s*)+|git\\s+push\\s.*--force|:\\s*>\\s*/|DROP\\s+TABLE|mkfs|dd\\s+if=";
 
 const DEFAULT_RULES = {
 	schemaVersion: 1,
@@ -106,7 +108,7 @@ function containsShellComposition(command) {
 // is enforced even if the user's rules omit it) nor be defeated by shell
 // composition (`pytest && rm -rf`, `pytest | sh`, `pytest; curl ...`).
 function evaluateVerifyPolicy(command, rules = DEFAULT_RULES) {
-	if (new RegExp(DESTRUCTIVE_PATTERN).test(String(command || ""))) {
+	if (new RegExp(DESTRUCTIVE_PATTERN, "i").test(String(command || ""))) {
 		return {
 			allowed: false,
 			matchedRule: "builtin-deny-destructive",
