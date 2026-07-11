@@ -104,3 +104,21 @@ test("denies a command the policy does not allow; nothing runs", () => {
 	assert.equal(recs[0].stderrTail, undefined);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("denies a shell-composite command even when its head is allow-listed; nothing runs (B2)", () => {
+	const dir = tmp(); // policy allows the "node " prefix
+	const sideEffect = path.join(dir, "pwned.txt");
+	const ledgerPath = path.join(dir, ".amber", "sessions", "s5", "ledger.jsonl");
+	const r = runEvidenceCommand({
+		target: dir,
+		command: `node -e "process.exit(0)" && node -e "require('fs').writeFileSync(${JSON.stringify(sideEffect)},'x')"`,
+		ledgerPath,
+		subject: { sessionId: "s5", stage: "verify" },
+	});
+	assert.equal(r.executed, false, "the composite is refused before anything runs");
+	assert.equal(r.denied, true);
+	assert.equal(fs.existsSync(sideEffect), false, "the chained side effect never ran");
+	const recs = fs.readFileSync(ledgerPath, "utf8").trim().split("\n").map(JSON.parse);
+	assert.equal(recs[0].kind, "verification_denied");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
