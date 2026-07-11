@@ -397,10 +397,17 @@ function handleLedger(args) {
   if (action === "verify-anchoring") {
     const { verifyAnchoring } = require("./core/ledger-seal");
     const r = verifyAnchoring(targetRoot);
-    const text = r.anchored
-      ? `Anchored: all ledgers match seal tag ${r.sealTag}.`
-      : `NOT anchored: ${r.ledgerChangedSinceSeal} ledger(s) changed since seal tag ${r.sealTag}.`;
-    return { result: { target: args.target, text, ...r, errors: r.errors, warnings: r.warnings }, exitCode: r.anchored ? 0 : 1, bypassPrint: !args.json };
+    let text;
+    if (r.errors && r.errors.length > 0) {
+      // Surface the domain layer error first (e.g. "no seal tag found") instead
+      // of printing "NOT anchored: undefined ledger(s) changed since seal tag undefined"
+      text = r.errors.join("; ");
+    } else if (r.anchored) {
+      text = `Anchored: all ledgers match seal tag ${r.sealTag}.`;
+    } else {
+      text = `NOT anchored: ${r.ledgerChangedSinceSeal} ledger(s) changed since seal tag ${r.sealTag}.`;
+    }
+    return { result: { target: args.target, text, ...r, errors: r.errors, warnings: r.warnings }, exitCode: r.errors?.length ? 1 : r.anchored ? 0 : 1, bypassPrint: !args.json };
   }
   return { result: { target: args.target, errors: ["ledger requires export, seal, or verify-anchoring."], warnings: [] } };
 }
