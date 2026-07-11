@@ -9,6 +9,12 @@ const { resolveStateDirForRead } = require("../state-dir-resolver");
 
 const MAX_PATTERN_LEN = 200;
 
+// Shared destructive-command pattern. Referenced by the DEFAULT_RULES deny rule
+// AND enforced as an un-removable built-in on the verify surface (see
+// evaluateVerifyPolicy) so a custom verify-rules.json cannot silently drop it.
+const DESTRUCTIVE_PATTERN =
+	"rm\\s+-rf|git\\s+push\\s+--force|:\\s*>\\s*/|DROP\\s+TABLE|mkfs|dd\\s+if=";
+
 const DEFAULT_RULES = {
 	schemaVersion: 1,
 	defaultAction: "deny",
@@ -17,7 +23,7 @@ const DEFAULT_RULES = {
 			id: "deny-destructive",
 			action: "deny",
 			match: "regex",
-			pattern: "rm\\s+-rf|git\\s+push\\s+--force|:\\s*>\\s*/|DROP\\s+TABLE|mkfs|dd\\s+if=",
+			pattern: DESTRUCTIVE_PATTERN,
 			mapsTo: ["ASI02", "ASI04"],
 		},
 		{
@@ -75,6 +81,49 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
 	};
 }
 
+// Shell control operators that chain, background, or redirect a SECOND action
+// onto an otherwise-allowed verify command. The verify surface runs ONE
+// read-only command, so these are refused regardless of the allow-list: an
+// allow rule matching the head of `pytest && curl | sh` must not let the tail
+// run. Quoted spans are stripped first so a metacharacter *inside* an argument
+// (e.g. `node -e "a(); b()"`) is not a false positive.
+const SHELL_COMPOSITION = /[&|;<>`\n\r]|\$\(|\$\{/;
+
+function stripQuotedSpans(command) {
+	return String(command || "")
+		.replace(/"(?:[^"\\]|\\.)*"/g, "")
+		.replace(/'(?:[^'\\]|\\.)*'/g, "");
+}
+
+function containsShellComposition(command) {
+	return SHELL_COMPOSITION.test(stripQuotedSpans(command));
+}
+
+// Verify-surface policy: built-in, un-removable denies applied BEFORE any user
+// allow rule, then the normal (default or custom) rules. This is what
+// evidence-runner uses instead of evaluateCommandPolicy so that a custom
+// verify-rules.json can neither drop destructive protection (deny-destructive
+// is enforced even if the user's rules omit it) nor be defeated by shell
+// composition (`pytest && rm -rf`, `pytest | sh`, `pytest; curl ...`).
+function evaluateVerifyPolicy(command, rules = DEFAULT_RULES) {
+	if (new RegExp(DESTRUCTIVE_PATTERN).test(String(command || ""))) {
+		return {
+			allowed: false,
+			matchedRule: "builtin-deny-destructive",
+			reason: "denied by built-in rule builtin-deny-destructive (un-removable on the verify surface)",
+		};
+	}
+	if (containsShellComposition(command)) {
+		return {
+			allowed: false,
+			matchedRule: "builtin-deny-shell-composition",
+			reason:
+				"verify runs a single command; shell operators (&& || | ; > < ` $()) are not allowed — put multi-step logic in a script and allow-list that",
+		};
+	}
+	return evaluateCommandPolicy(command, rules);
+}
+
 function loadPolicyRules(targetRoot) {
 	const stateDir = resolveStateDirForRead(targetRoot);
 	const rulesPath = path.join(stateDir, "governance", "rules.json");
@@ -123,4 +172,4 @@ function loadVerifyPolicyRules(targetRoot) {
 	return DEFAULT_RULES;
 }
 
-module.exports = { evaluateCommandPolicy, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES, matches };
+module.exports = { evaluateCommandPolicy, evaluateVerifyPolicy, containsShellComposition, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES, matches };
