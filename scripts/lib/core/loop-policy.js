@@ -101,18 +101,22 @@ function containsShellComposition(command) {
 	return SHELL_COMPOSITION.test(stripQuotedSpans(command));
 }
 
-// Verify-surface policy: built-in, un-removable denies applied BEFORE any user
-// allow rule, then the normal (default or custom) rules. This is what
-// evidence-runner uses instead of evaluateCommandPolicy so that a custom
-// verify-rules.json can neither drop destructive protection (deny-destructive
-// is enforced even if the user's rules omit it) nor be defeated by shell
-// composition (`pytest && rm -rf`, `pytest | sh`, `pytest; curl ...`).
-function evaluateVerifyPolicy(command, rules = DEFAULT_RULES) {
+// Built-in, un-removable denies applied BEFORE any user allow rule on BOTH the
+// verify surface (evidence-runner) and the governed-command surface
+// (governed-runner). A custom rules.json / verify-rules.json can neither drop
+// destructive protection (deny-destructive is enforced even if the user's rules
+// omit it) nor be defeated by shell composition (`pytest && rm -rf`,
+// `pytest | sh`, `pytest; curl ...`). Extracted so the two surfaces share one
+// implementation — without it the governed surface missed both checks (G1+G2):
+// a prefix allow let `node ... x && <non-destructive evil>` past the gate, and
+// an uppercase `RM -RF` slipped the case-sensitive deny rule. Returns null when
+// no built-in fires so the caller falls through to its normal allow/deny.
+function applyBuiltinDenies(command) {
 	if (new RegExp(DESTRUCTIVE_PATTERN, "i").test(String(command || ""))) {
 		return {
 			allowed: false,
 			matchedRule: "builtin-deny-destructive",
-			reason: "denied by built-in rule builtin-deny-destructive (un-removable on the verify surface)",
+			reason: "denied by built-in rule builtin-deny-destructive (un-removable on the verify and governed surfaces)",
 		};
 	}
 	if (containsShellComposition(command)) {
@@ -120,10 +124,26 @@ function evaluateVerifyPolicy(command, rules = DEFAULT_RULES) {
 			allowed: false,
 			matchedRule: "builtin-deny-shell-composition",
 			reason:
-				"verify runs a single command; shell operators (&& || | ; > < ` $()) are not allowed — put multi-step logic in a script and allow-list that",
+				"the gate runs a single command; shell operators (&& || | ; > < ` $()) are not allowed — put multi-step logic in a script and allow-list that",
 		};
 	}
-	return evaluateCommandPolicy(command, rules);
+	return null;
+}
+
+// Verify-surface policy: built-in, un-removable denies applied before any user
+// allow rule, then the normal (default or custom) verify-rules.json. Used by
+// evidence-runner instead of evaluateCommandPolicy.
+function evaluateVerifyPolicy(command, rules = DEFAULT_RULES) {
+	return applyBuiltinDenies(command) ?? evaluateCommandPolicy(command, rules);
+}
+
+// Governed-command surface policy: SAME built-in, un-removable denies as the
+// verify surface, then the normal (default or custom) rules.json. Used by
+// governed-runner (loops + route command-stages) instead of evaluateCommandPolicy
+// so a custom rules.json cannot be defeated the same way a custom verify-rules.json
+// cannot. Mirrors evaluateVerifyPolicy so the two surfaces enforce one baseline.
+function evaluateGovernedPolicy(command, rules = DEFAULT_RULES) {
+	return applyBuiltinDenies(command) ?? evaluateCommandPolicy(command, rules);
 }
 
 function loadPolicyRules(targetRoot) {
@@ -174,4 +194,4 @@ function loadVerifyPolicyRules(targetRoot) {
 	return DEFAULT_RULES;
 }
 
-module.exports = { evaluateCommandPolicy, evaluateVerifyPolicy, containsShellComposition, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES, matches };
+module.exports = { evaluateCommandPolicy, evaluateVerifyPolicy, evaluateGovernedPolicy, containsShellComposition, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES, matches };
