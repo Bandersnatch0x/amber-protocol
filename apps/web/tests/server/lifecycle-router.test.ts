@@ -78,6 +78,23 @@ function seedVerifyPolicy(): void {
   });
 }
 
+function seedLiveHandoff(): void {
+  // G2: bare manifest.handoff.path is not enough; content must not look like the
+  // init scaffold or completion still fails with missing:handoff.
+  fs.writeFileSync(
+    path.join(repoRoot, 'session-handoff.md'),
+    [
+      '# Session Handoff',
+      '',
+      'Command: npm test',
+      'Result: pass',
+      'Notes: regenerated for lifecycle fixture',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+}
+
 function seedSession(sessionId: string, overrides: Record<string, unknown> = {}): void {
   const now = '2026-07-08T00:00:00.000Z';
   writeJson(path.join(repoRoot, '.amber', 'sessions', sessionId, 'manifest.json'), {
@@ -101,6 +118,7 @@ describe('lifecycleRouter', () => {
     writeJson(path.join(repoRoot, 'package.json'), { name: 'amber-protocol' });
     seedRoute();
     seedVerifyPolicy();
+    seedLiveHandoff();
     seedSession('session-1');
     appendTimeline('session-1', {
       type: 'session_started',
@@ -159,11 +177,15 @@ describe('lifecycleRouter', () => {
       data: { sessionId: 'session-1' },
     });
 
-    const relaxed = await caller.next({ session: 'session-1' });
-    const strict = await caller.next({ session: 'session-1', strict: true });
+    // buildContext defaults strict:true (G1 last-mile: next matches complete-check
+    // --strict). Explicit strict:false is the only way to get relaxed semantics.
+    const relaxed = await caller.next({ session: 'session-1', strict: false });
+    const strict = await caller.next({ session: 'session-1' });
 
     expect(relaxed.completion?.status).toBe('pass');
-    expect(relaxed.nextStep).toBeNull();
+    // After last-mile guidance, a passed complete-check still surfaces the
+    // terminal `session complete` step until the session is marked completed.
+    expect(relaxed.nextStep).toMatchObject({ id: 'session-complete' });
     expect(relaxed.lifecycle.find(step => step.id === 'verify')).toMatchObject({ done: true });
     expect(strict.completion?.status).toBe('fail');
     expect(strict.completion?.missing).toContain('verification');
