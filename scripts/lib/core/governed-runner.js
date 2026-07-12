@@ -9,7 +9,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
-const { evaluateCommandPolicy, loadPolicyRules } = require("./loop-policy");
+const { evaluateGovernedPolicy, loadPolicyRules } = require("./loop-policy");
 const { appendLedgerRecord, readLedger, latestUnconsumedApproval } = require("./loop-ledger");
 const { codedError } = require("./error-catalog");
 const { createWorktree, removeWorktree } = require("../worktree-manager");
@@ -17,17 +17,20 @@ const { createWorktree, removeWorktree } = require("../worktree-manager");
 function mergeRules(globalRules, contextRules) {
 	const g = Array.isArray(globalRules?.rules) ? globalRules.rules : [];
 	const c = Array.isArray(contextRules) ? contextRules : [];
-	// Context rules are appended; evaluateCommandPolicy checks ALL deny rules first
-	// (deny-wins), so a context allow can never override a global OR context deny.
+	// Context rules are appended; evaluateGovernedPolicy checks ALL deny rules first
+	// (deny-wins, including un-removable built-ins), so a context allow can never
+	// override a global OR context deny.
 	return { defaultAction: globalRules?.defaultAction ?? "deny", rules: [...g, ...c] };
 }
 
 function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5, subject = {}, label = "command", contextRules }) {
 	const targetRoot = resolveTarget(target);
 
-	// Gate 1 — policy (global rules.json composed with per-context rules; deny-wins is absolute)
+	// Gate 1 — policy (global rules.json composed with per-context rules; deny-wins
+	// is absolute). Built-in deny-destructive + shell-composition fire BEFORE
+	// user rules so a custom rules.json cannot drop them (mirrors verify surface).
 	const ruleset = mergeRules(loadPolicyRules(targetRoot), contextRules);
-	const verdict = evaluateCommandPolicy(command, ruleset);
+	const verdict = evaluateGovernedPolicy(command, ruleset);
 	if (!verdict.allowed) {
 		appendLedgerRecord(lp, {
 			schemaVersion: 2,
