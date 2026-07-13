@@ -2,6 +2,18 @@
 
 const path = require("node:path");
 
+// Quote a single shell argument so an emitted remedy stays one argument when a
+// user copies it into a POSIX shell. Bare safe strings (incl. "." and relative
+// paths without spaces) pass through unquoted; anything with spaces or shell
+// metacharacters is single-quoted with embedded quotes escaped. Used so target
+// and artifact paths containing spaces cannot split a remedy into two args.
+function shellQuote(value) {
+	const s = String(value ?? "");
+	if (s === "") return "''";
+	if (/^[A-Za-z0-9@%+=:,./_-]+$/.test(s)) return s;
+	return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
 function slugify(value) {
 	// Preserve original case so that plan titles, task ids, and report
 	// filenames match what the user typed. Only replace runs of characters
@@ -126,6 +138,7 @@ function extractMarkdownListUnderSubheading(markdown, heading) {
 }
 
 module.exports = {
+	shellQuote,
 	slugify,
 	formatList,
 	formatCommandList,

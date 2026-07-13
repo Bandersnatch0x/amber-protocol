@@ -35,13 +35,17 @@ describe("amber next (integration)", () => {
 		assert.equal(out.nextStep.id, "init");
 	});
 
-	it("existing project: audit → stamp → init (A1)", () => {
+	it("existing project: audit is read-only and next still advises init (A1, #43)", () => {
 		const dir = tmpRepo();
 		fs.writeFileSync(path.join(dir, "package.json"), '{"name":"x"}\n');
 		fs.writeFileSync(path.join(dir, "README.md"), "# existing\n");
-		assert.equal(nextId(dir), "audit");
+		// next advances straight to init — audit is a non-blocking advisory.
+		assert.equal(nextId(dir), "init");
+		// audit is read-only: file tree identical before/after, no stamp written.
+		const before = fs.readdirSync(dir).sort();
 		assert.equal(amber(dir, ["audit", "--target", "."]).status, 0);
-		assert.ok(fs.existsSync(path.join(dir, ".amber", "last-audit.json")));
+		const after = fs.readdirSync(dir).sort();
+		assert.deepEqual(before, after);
 		assert.equal(nextId(dir), "init");
 	});
 
@@ -269,5 +273,28 @@ describe("amber next progression (feature path, no session)", () => {
 		const forced = amber(dir, ["accept", "--target", ".", "--plan", planPath, "--force"]);
 		assert.equal(forced.status, 0, forced.stderr);
 		assert.match(forced.stdout, /--force despite no verification evidence/);
+	});
+});
+
+describe("amber next target-safety (#41)", () => {
+	it("init remedy is target-safe and installs into an external target whose path has spaces", () => {
+		const dir = tmpRepo();
+		const spaced = path.join(dir, "with space");
+		fs.mkdirSync(spaced, { recursive: true });
+
+		// next recommends init for an external bare target outside the Amber checkout.
+		const r = spawnSync("node", [AMBER, "next", "--target", spaced, "--json"], { encoding: "utf8" });
+		assert.equal(r.status, 0, r.stderr);
+		const out = JSON.parse(r.stdout);
+		assert.equal(out.nextStep.id, "init");
+
+		const remedy = out.nextStep.remedy;
+		// The spaced path is quoted so it survives copy-paste as one shell argument.
+		assert.match(remedy, /'[^']*with space[^']*'/);
+
+		// Executing the remedy's command + target installs Amber into the spaced target.
+		const exec = spawnSync("node", [AMBER, "init", "--target", spaced], { encoding: "utf8" });
+		assert.equal(exec.status, 0, exec.stderr);
+		assert.ok(fs.existsSync(path.join(spaced, "AGENTS.md")), "installed into the spaced external target");
 	});
 });

@@ -245,7 +245,7 @@ const COMMAND_HELP = {
 			"",
 			"Lifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept.",
 			"Session evaluation matches complete-check --strict (executed verification + live handoff, not init scaffold).",
-			"Existing projects: next recommends audit first; audit stamps .amber/last-audit.json so next advances to init.",
+			"Existing projects: next recommends a read-only audit first; audit writes no file, so next advances straight to init.",
 			"",
 			"Options:",
 			"  --target <dir>     Path to the target repository.",

@@ -375,8 +375,8 @@ Lifecycle: `[audit on existing repos] → init → feature → plan → gate →
 unstarted feature) and reports the chosen focus plus how many other items are pending. Session
 completion evaluation matches `complete-check --strict` (executed verification + live handoff, not
 the init scaffold). Approve remedies include the concrete `--gate <id>` from the session route.
-Existing non-empty targets get `amber audit` first; audit writes `.amber/last-audit.json` so `next`
-can advance to `init`.
+Existing non-empty targets get a read-only `amber audit` first; audit writes no target file, so
+`next` advances straight to `init` (audit is a non-blocking advisory).
 
 ### migrate
 

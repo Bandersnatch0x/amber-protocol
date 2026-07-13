@@ -62,3 +62,53 @@ test("validateHandoffBundle reports missing required files", () => {
 	assert.ok(validation.errors.some((error) => error.includes("manifest.json is missing")));
 	assert.ok(validation.errors.some((error) => error.includes("session-summary.md is missing")));
 });
+
+test("writeHandoffBundle distinguishes structure validity from delivery readiness (#44 AC2)", () => {
+	const target = tempDir("block");
+	scaffoldHarness(target);
+	addFeature(target, { id: "F004", title: "blocked delivery", area: "product" });
+	// Force a governance block (unsafe defaultAction=allow) while keeping the
+	// bundle structurally complete — structure valid, delivery NOT ready.
+	fs.mkdirSync(path.join(target, ".amber", "governance"), { recursive: true });
+	fs.writeFileSync(
+		path.join(target, ".amber", "governance", "rules.json"),
+		JSON.stringify({ defaultAction: "allow", rules: [] }) + "\n",
+	);
+
+	const result = writeHandoffBundle(target);
+
+	assert.equal(result.structureValid, true, "all bundle files present + manifest well-formed");
+	assert.equal(result.valid, true, "valid remains a structure-valid alias");
+	assert.equal(result.decision, "block", "governance decision is block");
+	assert.equal(result.deliveryReady, false, "not delivery-ready despite valid structure");
+});
+
+test("writeHandoffBundle surfaces recent failed verification attempts with bounded context (#44 AC3)", () => {
+	const target = tempDir("failures");
+	scaffoldHarness(target);
+	addFeature(target, { id: "F005", title: "failing verify", area: "product" });
+	// Record a failed verification attempt on a session timeline.
+	const sessionDir = path.join(target, ".amber", "sessions", "sess-fail");
+	fs.mkdirSync(sessionDir, { recursive: true });
+	const { appendSessionEvent } = require("../../scripts/lib/session-timeline");
+	appendSessionEvent(sessionDir, {
+		type: "verification_failed",
+		data: { stage: "verify", command: "npm test", exitCode: 2, stderr: "AssertionError: boom" },
+	});
+
+	const result = writeHandoffBundle(target);
+
+	assert.ok(Array.isArray(result.failedVerifications));
+	assert.equal(result.failedVerifications.length, 1);
+	const fv = result.failedVerifications[0];
+	assert.equal(fv.sessionId, "sess-fail");
+	assert.equal(fv.command, "npm test");
+	assert.equal(fv.exitCode, 2);
+	assert.equal(fv.error, "AssertionError: boom");
+	assert.equal(typeof fv.timestamp, "string");
+
+	// The failure also appears in the bundle's verification-evidence.md.
+	const evidence = fs.readFileSync(path.join(result.outputDir, "verification-evidence.md"), "utf8");
+	assert.match(evidence, /Recent Failed Verification Attempts/);
+	assert.match(evidence, /npm test/);
+});
