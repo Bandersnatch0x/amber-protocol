@@ -13,16 +13,17 @@ This checklist ensures quality and consistency for Amber Protocol releases.
 - [x] Doctor check passes (`npm run doctor`)
 
 ### Documentation
-- [x] CHANGELOG.md updated with release notes
+- [x] CHANGELOG.md generated via `npm run changelog` (from conventional commits) and lightly reviewed
 - [x] README badges show correct version
 - [x] All documentation links validated (no broken links)
 - [x] Migration guides updated (if breaking changes)
 - [x] API reference updated (if new commands/options)
 
 ### Version Management
-- [x] package.json version updated to target version
+- [x] package.json version updated to target version (minimal bump preferred)
+- [x] `npm run version:sync` executed (plugin manifests)
 - [x] Version follows Semantic Versioning (MAJOR.MINOR.PATCH)
-- [x] CHANGELOG.md dates updated (replace YYYY-MM-DD)
+- [x] CHANGELOG.md section generated for the version (no hand authoring required)
 - [ ] No unresolved CRITICAL/HIGH GitHub issues in milestone (requires GitHub milestone review)
 
 ### Package Validation

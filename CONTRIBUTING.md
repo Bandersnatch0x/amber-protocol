@@ -187,39 +187,67 @@ Before releasing, review the quality assurance documentation:
 
 ### Automated Release (Default)
 
-Amber Protocol uses automated releases via GitHub Actions. When a version tag is pushed, the CI pipeline automatically publishes to npm and creates a GitHub Release.
+Amber Protocol uses automated releases via GitHub Actions. When a stable version tag (`vX.Y.Z`) is pushed, CI runs the full test matrix and publishes to **GitHub Packages** (not npmjs.org). See `.github/workflows/publish-github-packages.yml`.
 
-**Workflow:**
+**Core invariants (never bypass):**
+- `npm run version:sync` MUST be executed during prep (it keeps `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` in lockstep with `package.json`).
+- `npm run release:verify` MUST be run after the tag is pushed and the publish workflow has completed (terminal guard against the v1.3.1 ghost-version class from #46).
+- Prefer the smallest increment (patch) unless the changes warrant minor/major.
 
-1. Update version in `package.json`
-2. Update `CHANGELOG.md` with changes
-3. Commit changes: `git commit -m "chore: release vX.Y.Z"`
-4. Create and push tag: `git tag -s vX.Y.Z -m "Release vX.Y.Z" && git push origin master vX.Y.Z`
-5. CI automatically publishes to npm and creates GitHub Release
+**Zero-dependency changelog automation:**
+CHANGELOG.md is now generated from conventional commits by `node scripts/changelog.js` (pure Node + git, modeled on `sync-version.js` / `verify-release.js`). No external release-please or additional dependencies. This fulfills #47: the next release cut requires no hand-written CHANGELOG.
+
+**Release cut workflow:**
+
+1. Ensure working tree clean and on `master`. All changes landed as conventional commits (`feat:`, `fix:`, `chore:`, etc.).
+2. Choose minimal bump and update `package.json`:
+   ```bash
+   npm version --no-git-tag-version patch   # or minor / major
+   ```
+3. Sync plugin manifests (mandatory):
+   ```bash
+   npm run version:sync
+   ```
+4. Generate the release section in CHANGELOG.md from commits since the prior tag:
+   ```bash
+   npm run changelog
+   ```
+   Review the inserted `## [X.Y.Z] - YYYY-MM-DD` section. Light narrative polish is acceptable; the commit list is authoritative.
+5. Stage and commit (version files + changelog):
+   ```bash
+   git add package.json .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
+   git commit -m "chore(release): vX.Y.Z"
+   ```
+6. Create annotated tag:
+   ```bash
+   git tag -a vX.Y.Z -m "Release vX.Y.Z"
+   ```
+7. Push:
+   ```bash
+   git push origin master
+   git push origin vX.Y.Z
+   ```
+8. CI runs tests + publishes to GitHub Packages (idempotent; re-runs are safe).
+9. After the publish workflow succeeds, run the terminal verifier:
+   ```bash
+   npm run release:verify
+   ```
+   This asserts every stable tag is on the remote and present in the GH Packages registry.
 
 **Version Tag Format:**
 
-- Stable releases: `v1.0.0`, `v1.1.0`, `v2.0.0` (triggers automatic publish)
-- Release candidates: `v1.0.0-rc.1`, `v1.0.0-rc.2` (skips automatic publish)
-- Beta releases: `v1.0.0-beta`, `v1.0.0-beta.1` (skips automatic publish)
+- Stable releases: `v1.0.0`, `v1.1.0`, `v2.0.0` (triggers publish to GitHub Packages)
+- Release candidates: `v1.0.0-rc.1`, `v1.0.0-rc.2` (skips publish)
+- Beta releases: `v1.0.0-beta`, `v1.0.0-beta.1` (skips publish)
 
-**Release Job Requirements:**
+**Publish workflow notes:**
 
-The `release` job in CI runs only when:
-- All test, coverage, security, performance, and web jobs pass
-- A version tag matching `v*.*.*` is pushed
-- The tag does NOT contain `-rc` or `-beta`
-
-**Package Validation:**
-
-Before publishing, the release job validates:
-- ✅ Critical files included: `scripts/`, `templates/`, `routes/`, `schemas/`, `README.md`, `LICENSE`
-- ❌ Test files excluded: `tests/`, `.github/`
-- ❌ Internal docs excluded: `docs/superpowers/`
+- Active flow: `.github/workflows/publish-github-packages.yml` (on tag push `v*`, runs tests, scopes temporarily for `@bandersnatch0x/amber-protocol`, publishes idempotently to `https://npm.pkg.github.com`).
+- A legacy `release` job exists in `ci.yml` for historical reference; the GitHub Packages workflow is authoritative for this repo.
 
 ### Manual Release (Emergency Fallback)
 
-If automated release fails or is unavailable, use manual publish:
+If automated release fails or is unavailable, use manual publish. Follow the invariants above (version:sync + changelog generator + release:verify).
 
 ```bash
 # 1. Ensure all checks pass
@@ -229,15 +257,18 @@ npm run doctor
 
 # 2. Validate package contents
 npm pack --dry-run
-tar -tzf *.tgz | grep -E '^package/(scripts|templates|routes|schemas)/'
 
-# 3. Publish to npm
-npm publish
+# 3. (If needed) Publish to GitHub Packages manually (rare)
+# npm pkg set name="@bandersnatch0x/amber-protocol"
+# echo "@bandersnatch0x:registry=https://npm.pkg.github.com" >> .npmrc
+# echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> .npmrc
+# npm publish --registry=https://npm.pkg.github.com
+# npm pkg set name="amber-protocol"
 
-# 4. Create GitHub Release manually
+# 4. Create GitHub Release manually (body should reference the generated CHANGELOG)
 gh release create vX.Y.Z \
   --title "Release vX.Y.Z" \
-  --notes "See CHANGELOG.md" \
+  --notes "See [CHANGELOG.md](https://github.com/Bandersnatch0x/amber-protocol/blob/master/CHANGELOG.md)" \
   --latest
 ```
 
@@ -251,36 +282,28 @@ Amber Protocol follows [Semantic Versioning](https://semver.org/):
 
 ### Pre-release Tags
 
-For testing releases before stable publish:
+For testing releases before stable publish (these do not trigger the GitHub Packages publish):
 
 ```bash
-# Publish release candidate
+# Prepare RC (use generator for changelog even for RCs)
 npm version 1.1.0-rc.1 --no-git-tag-version
-git commit -am "chore: release v1.1.0-rc.1"
-git tag -s v1.1.0-rc.1 -m "Release Candidate 1"
+npm run version:sync
+npm run changelog
+git add package.json .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
+git commit -m "chore(release): v1.1.0-rc.1"
+git tag -a v1.1.0-rc.1 -m "Release Candidate 1"
 git push origin master v1.1.0-rc.1
-npm publish --tag rc
 
-# Publish beta
-npm version 1.1.0-beta --no-git-tag-version
-git commit -am "chore: release v1.1.0-beta"
-git tag -s v1.1.0-beta -m "Beta Release"
-git push origin master v1.1.0-beta
-npm publish --tag beta
+# Beta example follows identical pattern (no publish triggered)
 ```
 
-Install pre-releases with: `npm install -g amber-protocol@rc` or `npm install -g amber-protocol@beta`
+Install pre-releases with: `npm install -g amber-protocol@rc` or `npm install -g amber-protocol@beta` (from GitHub Packages).
 
-### GitHub Secrets Configuration
+### GitHub Secrets / Permissions
 
-The automated release requires `NPM_TOKEN` secret configured in GitHub repository settings:
+The GitHub Packages publish workflow (`.github/workflows/publish-github-packages.yml`) uses the built-in `GITHUB_TOKEN` (with `packages: write` permission). No `NPM_TOKEN` is required for the primary publish path.
 
-1. Generate npm token: `npm token create --type automation`
-2. Add to GitHub: Settings → Secrets → Actions → New repository secret
-3. Name: `NPM_TOKEN`
-4. Value: `<your-npm-token>`
-
-**Note:** `GITHUB_TOKEN` is automatically provided by GitHub Actions for creating releases.
+For any legacy npmjs paths, a separate `NPM_TOKEN` would be needed (currently unused for normal releases).
 
 ## License
 
