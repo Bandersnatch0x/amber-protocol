@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
+const { execSync } = require("node:child_process");
 
 const {
 	parseConventional,
@@ -200,6 +201,41 @@ test("generateChangelog (dryRun) returns correct shape and does not mutate", () 
 	// changelog file untouched
 	const before = fs.readFileSync(path.join(dir, "CHANGELOG.md"), "utf8");
 	assert.ok(!before.includes("1.3.3")); // we didn't insert because dry + may have no real commits
+
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("generateChangelog null-tag path (first release / tagless repo) returns full history with commitCount > 1", () => {
+	const dir = makeTempDir();
+	writeTempPackage(dir, "0.0.1");
+	// deliberately no CHANGELOG.md write; dryRun will not touch fs for it
+
+	// Real git fixture: multiple commits, ZERO stable tags -> exercises the null tag fix
+	execSync("git init -q", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+	execSync("git config user.email \"test@example.com\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+	execSync("git config user.name \"Test User\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+
+	fs.writeFileSync(path.join(dir, "file.txt"), "v1");
+	execSync("git add file.txt && git commit -q -m \"feat: first commit in tagless repo\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+
+	fs.writeFileSync(path.join(dir, "file.txt"), "v2");
+	execSync("git add file.txt && git commit -q -m \"fix: second commit (#53)\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+
+	fs.writeFileSync(path.join(dir, "file.txt"), "v3");
+	execSync("git add file.txt && git commit -q -m \"docs: third commit for full history test\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+
+	// verify fixture precondition: no v* tags
+	const tagOut = execSync("git tag -l \"v*\"", { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+	assert.equal(tagOut, "", "precondition: fixture repo must have no stable tags");
+
+	const res = generateChangelog({ root: dir, dryRun: true, version: "0.0.1" });
+	assert.equal(res.version, "0.0.1");
+	assert.equal(res.tag, null, "should have used null tag for first-release");
+	assert.ok(res.commitCount > 1, `null-tag path must return >1 commits (full history), got ${res.commitCount}`);
+	// ensure at least the conventional messages from early history are present (not just HEAD)
+	const flat = [...res.groups.Added, ...res.groups.Fixed, ...res.groups.Changed, ...res.groups.Other].join("\n");
+	assert.ok(/first commit in tagless repo/.test(flat), "must include first commit (not just HEAD)");
+	assert.ok(/second commit/.test(flat), "must include middle commit from full history");
 
 	fs.rmSync(dir, { recursive: true, force: true });
 });

@@ -75,29 +75,41 @@ function getLatestStableTag(root = ROOT) {
 }
 
 function getCommitsSince(tag, root = ROOT) {
-	const range = tag ? `${tag}..HEAD` : "HEAD";
+	// When no prior tag (first release / tagless repo), use empty range for
+	// unbounded git log over full history. Using "HEAD" only ever surfaced
+	// the single HEAD commit in the parsed result (see #53).
+	const range = tag ? `${tag}..HEAD` : "";
 	try {
 		// %x00 is safe delimiter; capture subject + body for refs
 		const format = "%H%x00%s%x00%b%x00%x00";
-		const out = execSync(`git log --pretty=format:${format} --no-merges ${range}`, {
+		const gitCmd = `git log --pretty=format:${format} --no-merges ${range}`.trim();
+		const out = execSync(gitCmd, {
 			cwd: root,
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "ignore"],
 			maxBuffer: 2 * 1024 * 1024,
 		}).trim();
 		if (!out) return [];
-		return out
-			.split("\x00\x00")
-			.filter(Boolean)
-			.map((block) => {
-				const [hash = "", subject = "", body = ""] = block.split("\x00");
-				return {
+		// Robust token parse: git inserts \n between records + empty-body produces
+		// extra \x00 so we walk the \x00-split tokens and skip empties / ws noise.
+		const tokens = out.split("\x00");
+		const commits = [];
+		let i = 0;
+		while (i < tokens.length) {
+			let hash = (tokens[i++] || "").replace(/^\s+/, "");
+			if (!hash || hash.length < 10) continue;
+			let subject = (tokens[i++] || "").trim();
+			let body = (tokens[i++] || "").trim();
+			while (i < tokens.length && (tokens[i] === "" || tokens[i].trim() === "")) i++;
+			if (subject) {
+				commits.push({
 					hash: hash.slice(0, 7),
-					subject: subject.trim(),
-					body: body.trim(),
-				};
-			})
-			.filter((c) => c.subject);
+					subject,
+					body,
+				});
+			}
+		}
+		return commits;
 	} catch {
 		return [];
 	}
