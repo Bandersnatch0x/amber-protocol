@@ -5,6 +5,46 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-07-13
+
+### Added — Closed-loop governance lifecycle
+The full 11-step lifecycle (audit→init→feature→plan→gate→session→verify→approve→complete→accept→handoff) now works end-to-end. Wayfinder maps #14/#27/#35.
+
+- `session start --feature <id>` binds the feature into the manifest; `session complete` is the governance terminal state (all non-terminal states may transition).
+- `session verify --execute` refluxes real execution evidence back to `feature_list.json` — claim-only verify does NOT reflux.
+- `accept` evidence gate — refuses a plan whose feature has no evidence (`AMBER_E_FEATURE_NO_EVIDENCE`; `--force` bypasses with a ledger warning), and validates the plan's feature matches the session's feature (#37).
+- **`governance standards init`** — scaffolds `standards/security-governance.json` so the missing-security-standard remediation actually clears the finding (#44).
+- `handoff` regenerates from live repo state (not template); bundle distinguishes `structureValid` vs `deliveryReady` and surfaces bounded `failedVerifications` (legacy `.harness` repos included).
+- **ADR-0007** — web console boundary: supervised action viewer with an explicit allow-list (session start/pause/resume/abort, runVerification) vs CLI-only (approve/complete/accept/handoff/feature management).
+- Redesigned web session console: SessionCompletionWorkbench, lifecycleRouter endpoints (next/completionCheck/runVerification), i18n, runner ACK persistence.
+- Web artifact-store — centralizes TS artifact path resolution and JSON reading, traversal-guarded, skip-corrupt (TS twin of `core/fs-utils`).
+- `scripts/demo/acceptance-demo.sh` — idempotent full-lifecycle acceptance demo.
+
+### Security — verify-surface hardening (#36, #40–#44)
+- `evaluateVerifyPolicy`: un-removable built-in denies (destructive patterns + quote-aware shell-composition operators) applied before user rules — a custom `verify-rules.json` can no longer drop destructive protection, and an allow-listed head can no longer smuggle chained commands (`pytest && rm -rf`, `pytest | sh`).
+- Closed case-sensitivity bypass (`RM -RF`, `DROP TABLE`, …) and variant bypass (`rm -fr`, `rm -r -f`, `git push … --force` at line end) on the built-in destructive check.
+- Governed surface (`loop run --execute`) aligned with the same built-in denies.
+- Target-safe lifecycle remedies: `shellQuote` on target/plan/command paths; session verify/approve/complete-check/complete carry `--target` (#41).
+- Verify command is discovered from disk (package.json `scripts.test` → `npm test`, else toolchain candidate, else explicit placeholder) — never a silent `npm test` for an unknown toolchain (#42).
+- `audit` is strictly read-only: no `.amber/last-audit.json` stamp written to the target (#43).
+
+### Fixed
+- `ledger verify-anchoring` surfaces its domain error instead of printing `undefined`.
+- `next` last-mile: guides session terminal steps (handoff → complete-check → complete); strict completion rejects init-scaffold handoff; audit-before-init for existing repos.
+- `buildContext` honors the strict flag instead of hardcoding strict evaluation.
+- governed-runner captures the error tail and normalizes the timeout exit code.
+- standards loader distinguishes a corrupt framework file from an unknown framework.
+- Cross-language event parity: web event types aligned with the CLI state machine, guarded by parity tests (schema, SessionStatusSchema, command registry).
+- `verification_failed` events carry stderr.
+
+### Deprecated
+- `profile`, `task`, `result`, `agent`, `team`, `adoption` commands now emit runtime deprecation warnings and are marked DEPRECATED in help and CLI reference (#26).
+
+### Changed
+- timeline-event and session-manifest deepened into single modules; session write concern extracted from session-reader; resume-reject ACK envelope and ledger verify outcome single-sourced; web session control unified behind a shared `runControlledTransition` pipeline; orphan loop-contract schema validator dropped.
+
+Full suite 1134 passing (CLI) + web Vitest green; manifests/doctor/gen:agents green.
+
 ## [1.3.1] - 2026-07-05
 
 ### Added — Artifact-first evidence layer, Phase 1
