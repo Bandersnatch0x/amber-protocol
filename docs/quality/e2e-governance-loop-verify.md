@@ -20,9 +20,9 @@
 | **Rejection paths** | **Hold:** policy deny, claim-only vs `--strict`, accept without evidence, multi-gate approve without `--gate`. |
 | **Verify-fail recovery** | **Works:** `verification_failed` then successful re-verify; strict complete-check can pass. |
 | **Cross-session handoff** | **Works** after explicit `amber handoff`: useful handoff file, completed session not resurrected, second session starts. |
-| **Strict Completion Check / Evidence purity** | **Partial:** executed evidence + accept gates are real; **G1/G2 reproduce** on a non-product repo (same as journey research). |
+| **Strict Completion Check / Evidence purity** | **Yes:** executed evidence + accept gates are real; **G1/G2 closed** on non-product target (2026-07-14 dogfood ritual confirmed; see updated Path A). |
 
-**Loop integrity for adjudication:** **partial closed loop** — command graph is repeatable and independently re-checkable for success/reject/recover/handoff, but navigation and handoff-evidence semantics are not fully closed.
+**Loop integrity for adjudication:** **partial closed loop** — command graph repeatable; as of 2026-07-14 dogfood on real target, navigation (G1) and handoff-evidence (G2) are closed for target path (internal product-repo special case no longer the only verification).
 
 ## Method
 
@@ -44,12 +44,13 @@ Sequence exercised:
 | Evidence count | `1` (executed `npm test`) |
 | accept / handoff exit | `0` / `0` |
 | Live handoff contains evidence + session | yes |
-| `next` after approve | `complete: true` (“All lifecycle steps complete for this focus”) |
-| `next` recommends complete/accept/handoff after approve | **no** |
-| `complete-check --strict` while handoff still init template | **pass** |
+| `next` after approve | recommends "Regenerate session handoff" (then complete after) |
+| `next` recommends complete/accept/handoff after approve | **yes** (via handoff step in STEPS + inferNextStep) |
+| `complete-check --strict` while handoff still init template | **fail** (Missing: handoff) |
+| `complete-check --strict` after live `handoff` | **pass** |
 
-**Finding G1 (high):** navigational last-mile gap reproduces outside the product repo.  
-**Finding G2 (high):** template handoff satisfies complete-check handoff presence.
+**Finding G1 (high):** navigational last-mile now guides on target (handoff step surfaced post-approve). Verified closed in real dogfood run 2026-07-14.  
+**Finding G2 (high):** template handoff is rejected by complete-check --strict; only live handoff satisfies. Verified closed on target-repo.
 
 ## Path B — Rejections
 
@@ -96,20 +97,20 @@ Cross-person continuity is achievable **if** someone runs `amber handoff` after 
 
 ## Comparison to journey research (#28)
 
-| #28 claim | #29 fresh-repo result |
-|-----------|------------------------|
-| Commands can close the loop | **Confirmed** (`successClosed: true`) |
-| G1 `next` last-mile | **Reproduced** |
-| G2 template handoff | **Reproduced** |
-| Dual gates / accept evidence | **Confirmed** on reject path |
-| Demo-only optimism | Reduced: same result on **non-product, git** target, not only `acceptance-demo.sh` temp non-git |
+| #28 claim | #29 fresh-repo result | #54 dogfood target result (2026-07-14) |
+|-----------|------------------------|---------------------------------------|
+| Commands can close the loop | **Confirmed** (`successClosed: true`) | **Confirmed** (full manual run) |
+| G1 `next` last-mile | **Reproduced** | **Closed** (next guides to handoff post-approve) |
+| G2 template handoff | **Reproduced** | **Closed** (strict rejects scaffold, passes only after live handoff) |
+| Dual gates / accept evidence | **Confirmed** on reject path | **Confirmed** |
+| Demo-only optimism | Reduced: same result on **non-product, git** target, not only `acceptance-demo.sh` temp non-git | Further reduced: manual lifecycle on fresh target matches product behavior for G1/G2. |
 
 ## Implications for map adjudication (#34)
 
-- Do **not** mark runtime loop as **完整**: G1 + G2 are product-behavior gaps on the target-team path, not demo artifacts.  
-- Do **not** mark as **未闭环**: success, reject, recover, and handoff are command-repeatable with inspectable artifacts.  
-- Best fit remains **部分闭环**, with higher confidence than #28 alone (fresh-repo e2e + machine log).  
-- Value verification still requires external tasks/repos (#30–#33); this ticket only proves **operability** under controlled AFK conditions.
+- G1 + G2 **closed on target-repo** per 2026-07-14 dogfood ritual (issue #54): `amber next` surfaces handoff step; `complete-check --strict` enforces live handoff. Update prior "reproduces" claims.
+- Do **not** mark as **未闭环**: success, reject, recover, and handoff are command-repeatable with inspectable artifacts. Full lifecycle (plan→...→handoff) exercised end-to-end on external git target.
+- Best fit remains **部分闭环** (or stronger for governance loop), with higher confidence (real target + dogfood ritual, not only scripted pilot or product self-run).
+- Value verification still requires external tasks/repos (#30–#33); this run proves **G1/G2 navigation+evidence integrity hold for target-team path**.
 
 ## Reproduce
 
@@ -117,7 +118,38 @@ Cross-person continuity is achievable **if** someone runs `amber handoff` after 
 # from amber-protocol product root
 node scripts/demo/e2e-governance-loop-verify.js
 # writes docs/quality/e2e-governance-loop-verify.json
+
+# Or run the canonical manual dogfood ritual on a fresh target (as in #54):
+# 1. mkdir -p /tmp/target && cd /tmp/target && git init && ... (package.json with test)
+# 2. (from product) node scripts/amber.js init --target /tmp/target
+# 3. node scripts/amber.js feature add --target /tmp/target --id F054 ...
+# 4. (real edit + commit), plan, gate, session start --feature, verify --execute, approve, next, complete-check --strict (pre/post handoff), ...
 ```
+
+**2026-07-14 dogfood evidence (issue #54):** full lifecycle executed on `D:\code_space\amber-dogfood-target-54` (external, fresh git, Windows). SID: b4a14cbe-bb72-4e41-a12e-5209240d07d6. Confirmed (A).
+
+Key commands + observations (from product root):
+- `node scripts/amber.js init --target D:\code_space\amber-dogfood-target-54`
+- `node scripts/amber.js feature add --target ... --id F054 --title "Verify G1/G2..."`
+- real change + `git commit` (README + plan fill)  [work evidence]
+- `node scripts/amber.js plan --target ... --feature F054 ...`
+- `node scripts/amber.js gate --target ... --plan ... --confirm`
+- `node scripts/amber.js session start --target ... --goal "..." --feature F054 --route feature-standard` → SID b4a14cbe-...
+- post-start commit (to ensure during-session work)
+- `node scripts/amber.js session verify --target ... --session $SID --execute --command "npm test"` → executed evidence reflux to F054 (status:passing)
+- `node scripts/amber.js session approve ... --gate user-approval-plan --yes`
+- `node scripts/amber.js session approve ... --gate user-approval-implement --yes`
+  After approve: `next --session $SID` → "Next step: Regenerate session handoff"   <--- G1 guided, no premature complete
+- `node scripts/amber.js session complete-check --target ... --session $SID --strict` → "status: fail ... Missing: handoff" (exit 1)  <--- G2 rejects scaffold
+- `node scripts/amber.js handoff --target ...`  (live content written, no more scaffold markers)
+- `node scripts/amber.js session complete-check --target ... --session $SID --strict` → "status: pass ... handoff present" (exit 0)
+- `node scripts/amber.js session complete ...` → "Session already completed" (auto on final gate)
+- `node scripts/amber.js accept --target ... --plan ... --session $SID` → feature status: accepted; evolution log written
+- `node scripts/amber.js handoff bundle --target ... && handoff validate --target ...` → 0
+- ledger: `session verify-ledger` → "Session ledger intact (3 records)"
+- final `next --feature F054` → "All lifecycle steps complete for this focus."
+
+This run exercised the exact sequence required by dogfood-weekly.md §4 and closed G1/G2 on a genuine target-repo (product self was not used as target). No code changes needed; docs updated for reality.
 
 ## Primary artifacts
 
