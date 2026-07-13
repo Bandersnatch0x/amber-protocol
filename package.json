@@ -28,6 +28,7 @@
     "encoding": "node scripts/validate-encoding.js",
     "manifests": "node scripts/validate-manifests.js --target .",
     "version:sync": "node scripts/sync-version.js",
+    "release:verify": "node scripts/verify-release.js",
     "test:load": "node scripts/run-tests.js tests/load/sequential-sessions.test.js",
     "test:e2e": "node scripts/run-tests.js tests/e2e/",
     "gen:agents": "node scripts/gen-agent-commands.js",
