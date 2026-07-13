@@ -115,8 +115,8 @@ node scripts/amber.js route inspect <route-id>
 ```json
 {
   "gates": {
-    "user-approval": "auto-approve",  // Not "auto_approve"
-    "security-review": "require-approval"  // Not "require_review"
+    "user-approval": "block",  // Not "user_approval"
+    "security-review": "block"
   }
 }
 ```
@@ -381,68 +381,30 @@ test.afterEach(() => {
 await new Promise(resolve => setTimeout(resolve, 100));
 ```
 
-## Daemon Issues
+## Background Execution Issues
 
-### Daemon Won't Start
+Amber V1 does not provide daemon commands. If a workflow expects `amber daemon start`, replace it with explicit read-only or governed commands.
+
+### CI Job Starts Unsupported Background Work
 
 **Diagnosis:**
-```bash
-# Check if already running
-cat .amber/daemon.pid
-ps -p $(cat .amber/daemon.pid)
 
-# Check logs
-cat .amber/logs/daemon.log
+```bash
+node scripts/amber.js doctor --target .
+node scripts/amber.js governance report --target .
 ```
 
 **Solutions:**
 
-1. **Remove stale PID file**:
+1. Remove `amber daemon ...` and `session start --mode autonomous` from CI jobs.
+2. Use `doctor`, `governance report`, `handoff bundle`, and `handoff validate` for automated checks.
+3. Let a human start and approve governed sessions when work needs mutation or external writes.
+
+### Session Needs Manual Stop
+
 ```bash
-rm .amber/daemon.pid
-node scripts/amber.js daemon start
-```
-
-2. **Check permissions**:
-```bash
-ls -la .amber/
-chmod 755 .amber/
-```
-
-### Daemon Stops Unexpectedly
-
-**Diagnosis:**
-```bash
-# Check system logs
-journalctl -u amber  # systemd
-tail /var/log/syslog  # Linux
-tail /var/log/system.log  # macOS
-```
-
-**Solutions:**
-
-1. **Increase system limits**:
-```bash
-# /etc/security/limits.conf
-amber soft nofile 4096
-amber hard nofile 8192
-```
-
-2. **Monitor with systemd**:
-```ini
-[Unit]
-Description=Amber Daemon
-After=network.target
-
-[Service]
-Type=simple
-User=amber
-WorkingDirectory=/project
-ExecStart=/usr/bin/node scripts/amber.js daemon start
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
+node scripts/amber.js session status --target . <session-id>
+node scripts/amber.js session abort --target . <session-id>
 ```
 
 ## Getting Help
@@ -464,8 +426,8 @@ node scripts/amber.js doctor --target .
 node scripts/amber.js session status
 node scripts/amber.js governance policy
 
-# Logs
-tail -100 .amber/logs/harness.log
+# Governance report
+node scripts/amber.js governance report --target .
 ```
 
 ### Report Issues

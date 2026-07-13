@@ -2,6 +2,7 @@
 
 const { resolveTarget } = require("./core/fs-utils");
 const { buildContext, inferNextStep } = require("./core/lifecycle");
+const { buildGovernanceReport } = require("./core/governance-report");
 
 function focusLabel(focus) {
 	if (focus.type === "session") return `session ${focus.id}`;
@@ -18,18 +19,36 @@ function renderContext(focus) {
 }
 
 function renderText(envelope) {
-	const header = renderContext(envelope.focus);
+	const lines = [renderContext(envelope.focus)];
 	if (envelope.complete || !envelope.nextStep) {
-		return `${header}\n✓ All lifecycle steps complete for this focus.`;
+		lines.push("All lifecycle steps complete for this focus.");
+	} else {
+		const { label, why, remedy } = envelope.nextStep;
+		lines.push(`Next step: ${label}`, `  Why: ${why}`, `  Run: ${remedy}`);
 	}
-	const { label, why, remedy } = envelope.nextStep;
-	return [header, `Next step: ${label}`, `  Why: ${why}`, `  Run: ${remedy}`].join("\n");
+
+	if (Array.isArray(envelope.governanceActions) && envelope.governanceActions.length > 0) {
+		const action = envelope.governanceActions[0];
+		lines.push("Governance action:");
+		lines.push(`  [${action.severity}] ${action.id}: ${action.why}`);
+		lines.push(`  Run: ${action.command}`);
+	}
+
+	return lines.join("\n");
 }
 
 function inferNext(target, options = {}) {
 	const targetRoot = resolveTarget(target);
-	const ctx = buildContext(targetRoot, { ...options, target: target || "." });
+	const targetDisplay = target || ".";
+	const ctx = buildContext(targetRoot, { ...options, target: targetDisplay });
 	const nextStep = inferNextStep(ctx);
+	let governanceActions = [];
+	try {
+		governanceActions = buildGovernanceReport(targetRoot, { targetDisplay }).nextActions.slice(0, 3);
+	} catch {
+		governanceActions = [];
+	}
+
 	const envelope = {
 		target,
 		focus: {
@@ -39,6 +58,7 @@ function inferNext(target, options = {}) {
 			othersPending: ctx.focus.othersPending,
 		},
 		nextStep: nextStep || null,
+		governanceActions,
 		complete: nextStep === null,
 		errors: [],
 		warnings: [],

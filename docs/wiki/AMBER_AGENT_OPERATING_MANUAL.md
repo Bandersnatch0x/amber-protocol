@@ -45,13 +45,17 @@ When choices conflict, higher wins: 1 Governance, 2 Verification, 3 Observabilit
 ## 4. Standard Lifecycle
 
 ```text
-audit -> init -> plan -> gate -> verify -> approve -> handoff
+audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate
 ```
 
 - Inspect before mutating; prefer read-only/dry-run commands first.
 - `init` and `wiki` are idempotent and never overwrite existing files.
 - Treat gates as real checkpoints; record evidence before claiming pass/done.
 - Leave handoff state before ending a session.
+- Use `node scripts/amber.js governance report --target .` as the primary product-loop report: it
+  scores readiness, names risks, and emits structured next actions.
+- Use `node scripts/amber.js handoff bundle --target .` for the portable continuation artifact, then
+  `node scripts/amber.js handoff validate --target .` before handing work to another agent or human.
 
 ## 5. Task Routes (routes/*.route.json)
 
@@ -94,7 +98,9 @@ Worker output never approves itself: worker, reviewer, approval, and acceptance 
 
 A session is handoff-ready only when someone can continue without the chat transcript:
 goal, work done, feature/session status, verification evidence, blockers, next action, recovery
-instructions. Validate with `node scripts/amber.js handoff --target .`.
+instructions. Regenerate the live handoff with `node scripts/amber.js handoff --target .`, produce the
+portable bundle with `node scripts/amber.js handoff bundle --target .`, and validate it with
+`node scripts/amber.js handoff validate --target .`.
 
 ## 9. State Vs Docs
 

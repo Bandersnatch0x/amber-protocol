@@ -184,8 +184,8 @@ Load Stage → Pre-Gate Check → Execute Stage → Post-Gate Check → Next Sta
 {
   "gates": {
     "auto": "approve",
-    "user-approval": "approve",
-    "step-confirm": "skip"
+    "user-approval": "block",
+    "step-confirm": "block"
   },
   "retry": {
     "maxAttempts": 3,

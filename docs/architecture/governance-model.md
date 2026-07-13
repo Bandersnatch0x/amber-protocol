@@ -62,8 +62,8 @@ Compliance Verification
 {
   "gates": {
     "auto": "approve",
-    "user-approval": "approve|skip|reject",
-    "step-confirm": "approve|skip|reject"
+    "user-approval": "block",
+    "step-confirm": "block"
   },
   "retry": {
     "maxAttempts": 3,
@@ -99,7 +99,7 @@ Compliance Verification
 
 **Sections:**
 - Agent permissions (what agents may do autonomously)
-- Gate approval rules (which gates auto-approve)
+- Gate approval rules (which low-risk gates may approve automatically)
 - Retry budgets (how many retries per stage)
 - Budget limits (token/time thresholds)
 - Notification channels (email/Slack webhooks)
@@ -235,13 +235,13 @@ Policy Inspection: /path/to/project
 
 Defaults:
   gates.auto: approve
-  gates.user-approval: skip
-  gates.step-confirm: skip
+  gates.user-approval: block
+  gates.step-confirm: block
   retry.maxAttempts: 3
   budget.onExceed: pause
 
 Overrides:
-  gates.user-approval: approve [⚠️  WARNING: Auto-approves user gates]
+  gates.user-approval: block [OK]
   retry.maxAttempts: 5 [OK]
 
 Errors:
@@ -250,7 +250,7 @@ Errors:
        Remove from .amber/autonomous-policy.json
 
 Recommendations:
-  - Consider gates.user-approval: "skip" for production safety
+  - Keep gates.user-approval: "block" unless a live approval process exists
   - Add notification channels for critical failures
 ```
 

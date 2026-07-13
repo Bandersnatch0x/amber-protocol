@@ -7,7 +7,7 @@ Complete reference for `.amber/autonomous-policy.json` configuration.
 ```json
 {
   "gates": {
-    "<gate-type>": "auto-approve" | "require-approval"
+    "<gate-type>": "approve" | "block"
   },
   "retry": {
     "maxAttempts": 1-10,
@@ -34,36 +34,36 @@ Complete reference for `.amber/autonomous-policy.json` configuration.
 
 | Gate Type | Description | Default |
 |-----------|-------------|---------|
-| `user-approval` | General human approval gate | `require-approval` |
-| `security-review` | Security-sensitive changes | `require-approval` |
-| `deployment` | Production deployment | `require-approval` |
-| `breaking-change` | API breaking changes | `require-approval` |
-| `data-migration` | Database schema changes | `require-approval` |
-| `budget-check` | Token budget verification | `auto-approve` |
+| `user-approval` | General human approval gate | `block` |
+| `security-review` | Security-sensitive changes | `block` |
+| `deployment` | Production deployment | `block` |
+| `breaking-change` | API breaking changes | `block` |
+| `data-migration` | Database schema changes | `block` |
+| `budget-check` | Token budget verification | `approve` |
 
 ### Gate Approval Modes
 
-#### `auto-approve`
+#### `approve`
 
-Gates pass automatically without human intervention.
+Low-risk automatic gates can pass without human intervention. Do not use this for `user-approval`, deployment, security review, data migration, or breaking-change gates.
 
 **Use for:**
-- Low-risk changes (linting, formatting)
-- Pre-approved workflows
-- Trusted automation
+- Low-risk checks such as linting or formatting
+- Pre-approved local verification gates
+- Trusted read-only automation
 
 **Example:**
 ```json
 {
   "gates": {
-    "user-approval": "auto-approve"
+    "budget-check": "approve"
   }
 }
 ```
 
-#### `require-approval`
+#### `block`
 
-Session pauses, awaiting manual approval.
+Session pauses until a real human approval or manual follow-up occurs.
 
 **Use for:**
 - Security-sensitive changes
@@ -74,7 +74,7 @@ Session pauses, awaiting manual approval.
 ```json
 {
   "gates": {
-    "deployment": "require-approval"
+    "deployment": "block"
   }
 }
 ```
@@ -86,14 +86,14 @@ Add route-specific gates:
 ```json
 {
   "gates": {
-    "code-review": "auto-approve",
-    "license-check": "auto-approve",
-    "performance-test": "require-approval"
+    "code-review": "approve",
+    "license-check": "approve",
+    "performance-test": "block"
   }
 }
 ```
 
-Gates not in policy default to `require-approval`.
+Gates not in policy default to `block`.
 
 ## Retry Configuration
 
@@ -199,7 +199,9 @@ Session cannot be resumed.
 
 ## Notifications
 
-### Email Configuration
+Amber V1 treats notification settings as policy metadata. The CLI can inspect the policy, but it does not send email or Slack messages by itself; external notifications require explicit approval or an approved downstream integration.
+
+### Email Preferences
 
 ```json
 {
@@ -207,136 +209,47 @@ Session cannot be resumed.
     "email": {
       "enabled": true,
       "to": "team@example.com",
-      "from": "amber@example.com",
-      "events": [
-        "session-started",
-        "session-completed",
-        "session-failed",
-        "gate-blocked",
-        "budget-exceeded"
+      "triggers": [
+        "session_created",
+        "session_completed",
+        "session_failed",
+        "gate_blocked",
+        "budget_exceeded"
       ]
     }
   }
 }
 ```
 
-**Environment variables:**
-```bash
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=sender@example.com
-EMAIL_PASS=app-password
-EMAIL_TLS=true  # Optional, default true
-```
+Keep SMTP credentials in the approved downstream notifier, not in the Amber policy file.
 
-### Slack Configuration
+### Slack Preferences
 
 ```json
 {
   "notifications": {
     "slack": {
       "enabled": true,
-      "webhookUrl": "https://hooks.slack.com/services/T00/B00/XXX",
-      "channel": "#amber-notifications",  // Optional
-      "username": "Amber Bot",            // Optional
-      "events": ["session-completed", "session-failed"]
+      "webhook": "${SLACK_WEBHOOK_URL}",
+      "channel": "#amber-notifications",
+      "username": "Amber Bot",
+      "triggers": ["session_completed", "session_failed"]
     }
   }
 }
 ```
 
-**Webhook setup:**
-1. Go to https://api.slack.com/apps
-2. Create app → Incoming Webhooks
-3. Add to workspace
-4. Copy webhook URL
+Store real webhook URLs in environment or secret-management systems used by the approved notifier.
 
-### Event Types
+### Trigger Names
 
-| Event | Trigger | Recommended |
-|-------|---------|-------------|
-| `session-started` | Session begins | Optional |
-| `session-completed` | Session succeeds | **Yes** |
-| `session-failed` | Session fails | **Yes** |
-| `gate-blocked` | Gate requires approval | **Yes** |
-| `budget-exceeded` | Token limit hit | **Yes** |
-| `checkpoint-saved` | Checkpoint created | Optional |
-
-## Worktree Settings
-
-### Configuration
-
-```json
-{
-  "worktree": {
-    "enabled": true,
-    "cleanupOnSuccess": true,
-    "cleanupOnFailure": false
-  }
-}
-```
-
-### Fields
-
-- **enabled**: Use git worktree isolation
-- **cleanupOnSuccess**: Remove worktree after successful completion
-- **cleanupOnFailure**: Remove worktree after failure (loses work)
-
-### When to Enable
-
-**Enable for:**
-- Parallel sessions
-- Experimental changes
-- High-risk operations
-
-**Disable for:**
-- Single-session workflows
-- Direct branch work
-- Debugging
-
-## Complete Example
-
-Production-ready configuration:
-
-```json
-{
-  "gates": {
-    "user-approval": "auto-approve",
-    "security-review": "require-approval",
-    "deployment": "require-approval",
-    "breaking-change": "require-approval",
-    "data-migration": "require-approval",
-    "budget-check": "auto-approve",
-    "code-review": "auto-approve",
-    "test-validation": "auto-approve"
-  },
-  "retry": {
-    "maxAttempts": 3,
-    "backoffMs": [2000, 10000, 30000]
-  },
-  "budget": {
-    "maxTokens": 150000,
-    "onExceed": "pause"
-  },
-  "notifications": {
-    "email": {
-      "enabled": true,
-      "to": "dev-team@example.com",
-      "events": ["session-completed", "session-failed", "gate-blocked"]
-    },
-    "slack": {
-      "enabled": true,
-      "webhookUrl": "${SLACK_WEBHOOK_URL}",
-      "events": ["session-completed", "session-failed"]
-    }
-  },
-  "worktree": {
-    "enabled": true,
-    "cleanupOnSuccess": true,
-    "cleanupOnFailure": false
-  }
-}
-```
+| Trigger | Meaning | Recommended |
+|---------|---------|-------------|
+| `session_created` | Session manifest created | Optional |
+| `session_completed` | Session marked completed | Yes |
+| `session_failed` | Session marked failed | Yes |
+| `gate_blocked` | Human or policy gate blocked progress | Yes |
+| `budget_exceeded` | Budget threshold exceeded | Yes |
 
 ## Validation
 
@@ -390,7 +303,7 @@ Use environment variables:
 {
   "notifications": {
     "slack": {
-      "webhookUrl": "${SLACK_WEBHOOK_URL}"
+      "webhook": "${SLACK_WEBHOOK_URL}"
     }
   }
 }
@@ -409,8 +322,8 @@ Start restrictive, gradually relax:
 
 1. **Week 1:** All gates require approval
 2. **Week 2:** Auto-approve `code-review`
-3. **Week 3:** Auto-approve `user-approval`
-4. **Never:** Auto-approve `deployment`, `security-review`
+3. **Week 3:** Auto-approve only low-risk verification gates
+4. **Never:** Auto-approve `user-approval`, `deployment`, `security-review`, or data-migration gates
 
 ## Next Steps
 

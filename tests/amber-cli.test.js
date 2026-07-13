@@ -1406,6 +1406,107 @@ test("wiki, handoff, and doctor commands validate a scaffolded Harness", () => {
 	}
 });
 
+test("governance report command exposes the complete product value loop", () => {
+	const target = tempDir("governance-report-cli");
+	const output = path.join("docs", "governance-report.md");
+	const outputPath = path.join(target, output);
+	assert.equal(runHarness(["init", "--target", target]).status, 0);
+
+	const textResult = runHarness(["governance", "report", "--target", target]);
+	assert.equal(textResult.status, 0, textResult.stderr);
+	assert.match(textResult.stdout, /Amber Governance Report:/);
+	assert.match(textResult.stdout, /Amber Readiness Score:/);
+	assert.match(textResult.stdout, /Product Value Loop: Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle/);
+	assert.match(textResult.stdout, /Next Actions:/);
+
+	const jsonResult = runHarness([
+		"governance",
+		"report",
+		"--target",
+		target,
+		"--output",
+		output,
+		"--json",
+	]);
+	assert.equal(jsonResult.status, 0, jsonResult.stderr);
+	const payload = JSON.parse(jsonResult.stdout);
+	assert.equal(payload.target, target);
+	assert.equal(payload.outputPath, outputPath);
+	assert.equal(typeof payload.scores.overall, "number");
+	assert.ok(payload.nextActions.length > 0);
+	assert.ok(payload.nextActions.every((action) => action.command.includes("node scripts/amber.js")));
+	assert.equal(fs.existsSync(outputPath), true);
+	assert.match(fs.readFileSync(outputPath, "utf8"), /# Amber Governance Report/);
+});
+
+test("next command combines lifecycle guidance with top governance action", () => {
+	const target = tempDir("next-governance-action");
+	assert.equal(runHarness(["init", "--target", target]).status, 0);
+
+	const textResult = runHarness(["next", "--target", target]);
+	assert.equal(textResult.status, 0, textResult.stderr);
+	assert.match(textResult.stdout, /Context:/);
+	assert.match(textResult.stdout, /Governance action:/);
+	assert.match(textResult.stdout, /Run: node scripts\/amber\.js/);
+
+	const jsonResult = runHarness(["next", "--target", target, "--json"]);
+	assert.equal(jsonResult.status, 0, jsonResult.stderr);
+	const payload = JSON.parse(jsonResult.stdout);
+	assert.ok(Array.isArray(payload.governanceActions));
+	assert.ok(payload.governanceActions.length > 0);
+	assert.match(payload.governanceActions[0].command, /node scripts\/amber\.js/);
+});
+
+test("handoff bundle and validate commands produce a portable continuation artifact", () => {
+	const target = tempDir("handoff-bundle-cli");
+	const bundleDir = path.join(".amber", "handoff", "latest");
+	const bundlePath = path.join(target, bundleDir);
+	assert.equal(runHarness(["init", "--target", target]).status, 0);
+
+	const bundleResult = runHarness([
+		"handoff",
+		"bundle",
+		"--target",
+		target,
+		"--output-dir",
+		bundleDir,
+		"--json",
+	]);
+	assert.equal(bundleResult.status, 0, bundleResult.stderr);
+	const bundle = JSON.parse(bundleResult.stdout);
+	assert.equal(bundle.outputDir, bundlePath);
+	assert.equal(bundle.valid, true);
+	assert.equal(bundle.files.length, 7);
+	assert.deepEqual(bundle.errors, []);
+
+	for (const rel of [
+		"README.md",
+		"session-summary.md",
+		"verification-evidence.md",
+		"next-actions.md",
+		"risks.md",
+		"recovery-commands.md",
+		"manifest.json",
+	]) {
+		assert.equal(fs.existsSync(path.join(bundlePath, rel)), true, `${rel} exists`);
+	}
+
+	const validateResult = runHarness([
+		"handoff",
+		"validate",
+		"--target",
+		target,
+		"--bundle-dir",
+		bundleDir,
+		"--json",
+	]);
+	assert.equal(validateResult.status, 0, validateResult.stderr);
+	const validation = JSON.parse(validateResult.stdout);
+	assert.equal(validation.valid, true);
+	assert.deepEqual(validation.errors, []);
+	assert.equal(validation.manifest.artifactType, "amber-handoff-bundle");
+});
+
 test("wiki command creates missing wiki files without overwriting existing pages", () => {
 	const target = tempDir("wiki");
 	const wikiRoot = path.join(target, "docs", "wiki");
@@ -1544,6 +1645,31 @@ test("migrate state copies legacy .harness into .amber via the CLI", () => {
 	assert.equal(
 		fs.existsSync(
 			path.join(target, ".harness", "sessions", "legacy-1", "manifest.json"),
+		),
+		true,
+	);
+});
+
+test("migrate state can archive legacy .harness via the CLI after a clean copy", () => {
+	const target = tempDir("migrate-state-archive");
+	const legacySession = path.join(target, ".harness", "sessions", "legacy-1");
+	fs.mkdirSync(legacySession, { recursive: true });
+	fs.writeFileSync(
+		path.join(legacySession, "manifest.json"),
+		JSON.stringify({ sessionId: "legacy-1" }),
+	);
+
+	const result = runHarness(["migrate", "state", "--target", target, "--archive-legacy", "--json"]);
+
+	assert.equal(result.status, 0, result.stderr);
+	const payload = JSON.parse(result.stdout);
+	assert.equal(payload.errors.length, 0);
+	assert.equal(payload.archivedLegacy, true);
+	assert.equal(fs.existsSync(path.join(target, ".harness")), false);
+	assert.ok(payload.legacyBackupPath.includes(".amber-legacy-harness-backup-"));
+	assert.equal(
+		fs.existsSync(
+			path.join(target, ".amber", "sessions", "legacy-1", "manifest.json"),
 		),
 		true,
 	);

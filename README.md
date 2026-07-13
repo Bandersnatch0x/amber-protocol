@@ -35,17 +35,18 @@ AI coding work becomes easier to trust when the workflow leaves inspectable evid
 ## Lifecycle map
 
 ```text
-audit -> init -> plan -> gate -> verify -> approve -> handoff
+audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate
 ```
 
 | Stage | Command | What you get |
 | --- | --- | --- |
 | Inspect | `amber audit --target <repo> --summary` | Read-only readiness findings |
 | Install | `amber init --target <repo>` | Starter governance files without overwrites |
+| Score | `amber governance report --target <repo>` | Readiness score, risks, and structured next actions |
 | Plan | `amber plan --target <repo> --feature F001 --title "..."` | A feature plan and review surface |
 | Gate | `amber next --target <repo>` | The next safe lifecycle command |
 | Verify | `amber doctor --target <repo>` | Checks for required agent-facing surfaces |
-| Handoff | `amber handoff --target <repo>` | Session state another human or agent can continue |
+| Handoff | `amber handoff bundle --target <repo>` | Portable continuation bundle another human or agent can continue |
 
 ## Repository artifacts
 
@@ -106,7 +107,7 @@ publish workflow (`.github/workflows/publish-github-packages.yml`) builds the
 
 ## Quick Start
 
-Bring Amber into an existing repository in three safe steps:
+Bring Amber into an existing repository and produce a handoff-ready delivery bundle:
 
 ```bash
 # 1. Read-only audit of the target repo (changes nothing)
@@ -118,11 +119,40 @@ amber init --target my-project
 # 3. Verify the repo now has the expected agent-facing surfaces
 amber doctor --target my-project
 
-# 4. Ask Amber what to do next — it reads live state and prints one command
+# 4. Score the delivery loop and risks
+amber governance report --target my-project
+
+# 5. Ask Amber what to do next: it reads live state and prints one command
 amber next --target my-project
+
+# 6. Produce and validate the portable handoff bundle
+amber handoff bundle --target my-project
+amber handoff validate --target my-project
 ```
 
 `init` and `wiki` never overwrite existing files. See the [CLI reference](./docs/CLI_REFERENCE.md) for the full command surface.
+
+### `amber governance report` - readiness score and next actions
+
+`amber governance report` is the primary product-loop report. It scores governance, evidence,
+continuity, safety, and maintenance; names risks; and emits structured next actions with the exact
+command and expected outcome.
+
+```bash
+amber governance report --target .
+amber governance report --target . --output docs/quality/amber-governance-report.md
+```
+
+### `amber handoff bundle` - portable continuation artifact
+
+`amber handoff bundle` writes a complete handoff directory with the session summary, verification
+evidence, risks, next actions, recovery commands, and manifest. `handoff validate` checks that the
+bundle is complete before another human or agent continues.
+
+```bash
+amber handoff bundle --target .
+amber handoff validate --target .
+```
 
 ### `amber next` — guided next step
 

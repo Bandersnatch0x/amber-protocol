@@ -1,123 +1,73 @@
-# Notification Setup
+# Notification Policy Configuration
 
-Configure email and Slack notifications for Amber Protocol autonomous sessions.
+Amber V1 records notification preferences in `.amber/autonomous-policy.json`, but it does not send email or Slack messages by itself. External writes and notifications require explicit approval under the Amber operating manual, so this file is a governance/configuration surface for human-triggered or downstream integrations.
 
-## Email Notifications
+## Notification Preferences
 
-### Quick Setup
+### Email Preferences
 
 1. **Add to policy** (`.amber/autonomous-policy.json`):
+
 ```json
 {
   "notifications": {
     "email": {
       "enabled": true,
       "to": "team@example.com",
-      "events": ["session-completed", "session-failed", "gate-blocked"]
+      "triggers": ["session_completed", "session_failed", "gate_blocked"]
     }
   }
 }
 ```
 
-2. **Set environment variables**:
+2. **Validate the policy can be inspected**:
+
 ```bash
-export EMAIL_HOST=smtp.gmail.com
-export EMAIL_PORT=587
-export EMAIL_USER=your-email@gmail.com
-export EMAIL_PASS=your-app-password
+node scripts/amber.js governance policy --target .
+node scripts/amber.js governance report --target .
 ```
 
-3. **Test**:
-```bash
-node scripts/amber.js session start --goal "test notification" --mode autonomous
-```
+Amber V1 will not send a test email from these commands. Use an approved downstream notifier to read this policy and send messages.
 
-### Gmail Setup
+### Slack Preferences
 
-1. Enable 2FA: https://myaccount.google.com/security
-2. Create App Password: https://myaccount.google.com/apppasswords
-3. Use app password as `EMAIL_PASS`
+1. **Store the webhook outside the policy file**:
 
-### Other Providers
-
-**Outlook:**
-```bash
-EMAIL_HOST=smtp-mail.outlook.com
-EMAIL_PORT=587
-```
-
-**SendGrid:**
-```bash
-EMAIL_HOST=smtp.sendgrid.net
-EMAIL_PORT=587
-EMAIL_USER=apikey
-EMAIL_PASS=<sendgrid-api-key>
-```
-
-## Slack Notifications
-
-### Quick Setup
-
-1. **Create Incoming Webhook**:
-   - Go to https://api.slack.com/apps
-   - Create New App → From Scratch
-   - Enable "Incoming Webhooks"
-   - Add New Webhook to Workspace
-   - Copy webhook URL
-
-2. **Add to policy**:
-```json
-{
-  "notifications": {
-    "slack": {
-      "enabled": true,
-      "webhookUrl": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
-      "events": ["session-completed", "session-failed"]
-    }
-  }
-}
-```
-
-3. **Test**:
-```bash
-node scripts/amber.js session start --goal "test slack" --mode autonomous
-```
-
-### Advanced Configuration
-
-```json
-{
-  "notifications": {
-    "slack": {
-      "enabled": true,
-      "webhookUrl": "${SLACK_WEBHOOK_URL}",
-      "channel": "#amber-notifications",
-      "username": "Amber Bot",
-      "iconEmoji": ":robot_face:",
-      "events": ["session-completed", "session-failed", "gate-blocked", "budget-exceeded"]
-    }
-  }
-}
-```
-
-Use environment variable:
 ```bash
 export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T00/B00/XXX
 ```
 
-## Event Types
+2. **Reference the approved secret in policy**:
 
-| Event | When Triggered | Severity |
-|-------|----------------|----------|
-| `session-started` | Session begins | Info |
-| `session-completed` | Session succeeds | Success |
-| `session-failed` | Session fails | Error |
-| `gate-blocked` | Gate needs approval | Warning |
-| `budget-exceeded` | Token limit hit | Warning |
+```json
+{
+  "notifications": {
+    "slack": {
+      "enabled": true,
+      "webhook": "${SLACK_WEBHOOK_URL}",
+      "channel": "#amber-notifications",
+      "username": "Amber Bot",
+      "triggers": ["session_completed", "session_failed", "gate_blocked"]
+    }
+  }
+}
+```
 
-## Notification Content
+Amber V1 will not post to Slack from these commands. External notifications require explicit approval or an approved downstream integration.
 
-### Email Format
+## Trigger Names
+
+| Trigger | When Triggered | Severity |
+|---------|----------------|----------|
+| `session_created` | Session manifest is created | Info |
+| `session_completed` | Session is marked completed | Success |
+| `session_failed` | Session is marked failed | Error |
+| `gate_blocked` | Gate needs human or policy approval | Warning |
+| `budget_exceeded` | Budget threshold is exceeded | Warning |
+
+## Downstream Notification Content
+
+### Email Example
 
 ```
 Subject: [Amber] Session Completed: implement-user-auth
@@ -125,54 +75,32 @@ Subject: [Amber] Session Completed: implement-user-auth
 Session ID: abc123def
 Goal: implement user authentication
 Status: completed
-Duration: 15m 23s
-Tokens Used: 45,230 / 100,000
-
-Timeline: .amber/sessions/abc123def/timeline.jsonl
+Readiness: governance report passed
 ```
 
-### Slack Format
+### Slack Example
 
 ```
-✅ Session Completed
+Session completed
 Goal: implement user authentication
-Duration: 15m 23s
-Tokens: 45,230 / 100,000
 Session: abc123def
+Next: validate handoff bundle
 ```
 
 ## Troubleshooting
 
-### Email Not Sending
+### Policy Not Reflected In Reports
 
-**Check credentials**:
 ```bash
-echo $EMAIL_HOST $EMAIL_USER
+node scripts/amber.js governance policy --target .
+node scripts/amber.js doctor --target .
 ```
 
-**Test SMTP connection**:
-```bash
-telnet smtp.gmail.com 587
-```
+Confirm the policy lives at `.amber/autonomous-policy.json` and uses `triggers`, not the legacy `events` field.
 
-**Check logs**:
-```bash
-cat .amber/logs/harness.log | grep email
-```
+### Downstream Notifier Does Not Send
 
-### Slack Not Receiving
-
-**Verify webhook URL**:
-```bash
-curl -X POST -H 'Content-type: application/json' \
-  --data '{"text":"Test from Amber"}' \
-  $SLACK_WEBHOOK_URL
-```
-
-**Check policy syntax**:
-```bash
-node scripts/amber.js governance policy
-```
+Check the approved notifier, secret store, and delivery logs outside Amber. The Amber CLI only records and inspects notification preferences in V1.
 
 ## Security
 
@@ -195,8 +123,9 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/...
 
 Load with:
 ```bash
-source .env
-node scripts/amber.js session start --mode autonomous
+. ./.env
+node scripts/amber.js governance policy --target .
+node scripts/amber.js governance report --target .
 ```
 
 ### Rotate Credentials
@@ -206,10 +135,12 @@ node scripts/amber.js session start --mode autonomous
 
 ## CI/CD Integration
 
+CI should run read-only checks and reports. It must not start autonomous sessions or send external notifications without an explicit approved integration.
+
 ### GitHub Actions
 
 ```yaml
-name: Autonomous Session
+name: Amber Governance Checks
 on: push
 
 jobs:
@@ -217,16 +148,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Run Amber
-        env:
-          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
-          EMAIL_USER: ${{ secrets.EMAIL_USER }}
-          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Run Amber checks
         run: |
-          node scripts/amber.js session start \
-            --goal "automated fix" \
-            --mode autonomous
+          node scripts/amber.js doctor --target .
+          node scripts/amber.js governance report --target .
 ```
 
 ### GitLab CI
@@ -234,18 +159,14 @@ jobs:
 ```yaml
 amber:
   script:
-    - export EMAIL_HOST=$EMAIL_HOST
-    - export EMAIL_USER=$EMAIL_USER
-    - export EMAIL_PASS=$EMAIL_PASS
-    - node scripts/amber.js session start --mode autonomous
-  variables:
-    EMAIL_HOST: smtp.gmail.com
+    - node scripts/amber.js doctor --target .
+    - node scripts/amber.js governance report --target .
   only:
     - main
 ```
 
 ## Next Steps
 
-- Return to [Autonomous Mode Guide](AUTONOMOUS_MODE_GUIDE.md)
+- Return to [Autonomous Mode Boundary](AUTONOMOUS_MODE_GUIDE.md)
 - Review [Policy Configuration](POLICY_CONFIGURATION.md)
 - Check [Troubleshooting Guide](TROUBLESHOOTING.md)

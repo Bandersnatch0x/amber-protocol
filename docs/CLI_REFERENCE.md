@@ -24,7 +24,6 @@ node scripts/amber.js session start \
   --route feature-standard \
   [--budget 100000] \
   [--worktree] \
-  [--mode autonomous]
 ```
 
 **Options:**
@@ -32,7 +31,7 @@ node scripts/amber.js session start \
 - `--route`: Route ID (default: feature-standard)
 - `--budget`: Token limit (default: from route)
 - `--worktree`: Use git worktree isolation
-- `--mode`: `interactive` (default) or `autonomous`
+- `--mode autonomous`: refused in V1 by ADR-0001/0005; use the default governed session flow.
 
 ### session status
 
@@ -145,6 +144,17 @@ node scripts/amber.js route verify-ledger feature-standard --target .
 
 ## Governance Commands
 
+### governance report
+
+Score the repository's product delivery loop and emit structured next actions.
+
+```bash
+node scripts/amber.js governance report --target .
+node scripts/amber.js governance report --target . --output docs/quality/amber-governance-report.md
+```
+
+The report covers the product loop `Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle`, with scores for governance, evidence, continuity, safety, and maintenance.
+
 ### governance docs
 
 Generate governance documents:
@@ -232,6 +242,29 @@ declare an extra `rules` array (same `{ id, action, match, pattern }` shape). Th
 the global `rules.json` for that one command only — a context `allow` can supplement the global
 policy, but **deny-wins is absolute**: no context `allow` can override a global or context `deny`.
 
+## Handoff Commands
+
+### handoff
+
+Regenerate `session-handoff.md` from live repository state.
+
+```bash
+node scripts/amber.js handoff --target .
+```
+
+### handoff bundle / validate
+
+Produce and validate the portable continuation artifact set.
+
+```bash
+node scripts/amber.js handoff bundle --target .
+node scripts/amber.js handoff bundle --target . --output-dir .amber/handoff/latest
+node scripts/amber.js handoff validate --target .
+node scripts/amber.js handoff validate --target . --bundle-dir .amber/handoff/latest
+```
+
+The bundle contains `README.md`, `session-summary.md`, `verification-evidence.md`, `next-actions.md`, `risks.md`, `recovery-commands.md`, and `manifest.json`.
+
 ## Maintenance Commands
 
 ### maintenance inspect
@@ -280,32 +313,14 @@ node scripts/amber.js execution readiness \
   --target .
 ```
 
-## Daemon Commands
+## Daemon Boundary
 
-### daemon start
-
-Start background daemon:
+Amber V1 has no daemon command surface. Do not use Amber as a background autonomous worker. Use explicit, human-triggered commands such as:
 
 ```bash
-node scripts/amber.js daemon start --target .
-```
-
-PID stored in `.amber/daemon.pid`.
-
-### daemon status
-
-Check daemon status:
-
-```bash
-node scripts/amber.js daemon status --target .
-```
-
-### daemon stop
-
-Stop daemon:
-
-```bash
-node scripts/amber.js daemon stop --target .
+node scripts/amber.js doctor --target .
+node scripts/amber.js governance report --target .
+node scripts/amber.js handoff validate --target . --bundle-dir .amber/handoff/latest
 ```
 
 ## Utility Commands
@@ -368,8 +383,11 @@ can advance to `init`.
 Migrate from Harness to Amber:
 
 ```bash
-# Migrate state directory
+# Merge legacy state into .amber without overwriting existing files
 node scripts/amber.js migrate state --target .
+
+# After a clean merge, rename .harness to a timestamped backup to remove coexistence
+node scripts/amber.js migrate state --target . --archive-legacy
 
 # Migrate wiki
 node scripts/amber.js migrate wiki --target .
@@ -552,16 +570,9 @@ node scripts/amber.js session start \
   --route bugfix-quick
 ```
 
-### Start Autonomous Session
+### Autonomous Mode Boundary
 
-```bash
-node scripts/amber.js session start \
-  --target . \
-  --goal "add email validation" \
-  --route feature-standard \
-  --mode autonomous \
-  --budget 50000
-```
+`--mode autonomous` is intentionally refused in V1. Use governed sessions, explicit approvals, and handoff validation instead.
 
 ### Continue After Budget Exceeded
 
@@ -647,7 +658,7 @@ Output:
 Session execution policy:
 ```json
 {
-  "gates": { "user-approval": "auto-approve" },
+  "gates": { "auto": "approve", "user-approval": "block", "step-confirm": "block" },
   "retry": { "maxAttempts": 3 },
   "budget": { "maxTokens": 100000 }
 }

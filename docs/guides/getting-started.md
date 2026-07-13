@@ -126,16 +126,17 @@ The web viewer runs at `http://localhost:3001` (backend) and `http://localhost:5
 ## Common Commands Reference
 
 ```bash
-# Adoption workflow
-amber adoption report --target path/to/project --output-dir reports
-amber adoption gate --reports-dir reports
+# Governance report and next action
+amber governance report --target path/to/project
+amber next --target path/to/project
 
 # Migration from legacy .harness
 amber migrate --target . --dry-run
 amber migrate --target .
 
-# Generate handoff artifacts
-amber handoff --target path/to/repo
+# Generate and validate handoff artifacts
+amber handoff bundle --target path/to/repo
+amber handoff validate --target path/to/repo
 
 # Create/validate wiki
 amber wiki --target path/to/repo --dry-run

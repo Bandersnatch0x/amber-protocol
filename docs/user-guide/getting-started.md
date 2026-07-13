@@ -14,9 +14,9 @@ Amber Protocol is organized into five service packages. Each package is a docume
 | Service package | Start here | Outcome |
 | --- | --- | --- |
 | Repository Onboarding | `node scripts/amber.js doctor --target .` | Confirm the repo has agent-facing rules, wiki, feature state, handoff, and verification surfaces. |
-| Adoption Review | `node scripts/amber.js adoption report --target . --output-dir docs/examples/adoptions` | Produce read-only readiness evidence before changing an existing repo. |
+| Governance Report | `node scripts/amber.js governance report --target .` | Score readiness, risks, and structured next actions before changing an existing repo. |
 | Governed Delivery | `node scripts/amber.js plan --target . --feature F001 --title "Small slice"` | Move one task through plan, gate, review, accept, and completion evidence. |
-| Continuity Layer | `node scripts/amber.js session start --goal "fix login bug"` | Start or resume work with session, checkpoint, timeline, and continuity-surface references. |
+| Continuity Layer | `node scripts/amber.js handoff bundle --target .` | Produce a portable handoff bundle with evidence, risks, next actions, recovery commands, and a manifest. |
 | Security Governance | `node scripts/amber.js security audit --target . --output docs/examples/security-audit.md` | Review dependency, secret, permission, and secure-review evidence. |
 
 ## First-Time Setup
@@ -46,7 +46,25 @@ Re-running `init` skips existing files, so it is safe to call more than once.
 node scripts/amber.js doctor --target .
 ```
 
-### 3. Explore a service package
+### 3. Produce the delivery-loop report
+
+```bash
+node scripts/amber.js governance report --target .
+node scripts/amber.js next --target .
+```
+
+The report scores the loop `Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle` and prints the highest-value next actions.
+
+### 4. Produce a handoff bundle
+
+```bash
+node scripts/amber.js handoff bundle --target .
+node scripts/amber.js handoff validate --target .
+```
+
+The bundle is the continuation artifact another human or agent can use without reading the chat transcript.
+
+### 5. Explore a service package
 
 Pick the package closest to your current goal and run the real commands documented for it. For example, Security Governance:
 
