@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const { pathExists, readText, collectFilesBySuffix } = require("./fs-utils");
 const { REQUIRED_HARNESS_FILES } = require("./constants");
+const { shellQuote } = require("./text-utils");
 
 // ── State gathering ──────────────────────────────────────────────────────────
 
@@ -59,8 +60,20 @@ function hasExistingProjectSignals(targetRoot) {
 	return EXISTING_PROJECT_MARKERS.some((rel) => pathExists(path.join(targetRoot, rel)));
 }
 
-function hasAuditStamp(targetRoot) {
-	return pathExists(path.join(targetRoot, ".amber", "last-audit.json"));
+// Resolve the project's verification command from on-disk evidence (NOT a
+// hardcoded default). package.json scripts.test wins as a confirmed command;
+// otherwise fall back to an audit candidate (python/go/rust); otherwise null,
+// which the verify remedy renders as an explicit placeholder. Amber never
+// silently substitutes `npm test` for an unknown toolchain (#42).
+function resolveVerifyCommand(targetRoot) {
+	const { detectCommands, detectCandidateCommands, detectToolingEvidence } = require("./audit");
+	const commands = detectCommands(targetRoot);
+	if (commands.some((c) => c.source === "package.json" && c.name === "test")) {
+		return "npm test";
+	}
+	const candidates = detectCandidateCommands(targetRoot, detectToolingEvidence(targetRoot));
+	if (candidates.length > 0) return candidates[0].command;
+	return null;
 }
 
 function gatherState(targetRoot) {
@@ -89,7 +102,7 @@ function gatherState(targetRoot) {
 		plans: gatherPlans(targetRoot),
 		activeSessionId,
 		existingProject: hasExistingProjectSignals(targetRoot),
-		auditSeen: hasAuditStamp(targetRoot),
+		verifyCommand: resolveVerifyCommand(targetRoot),
 	};
 }
 
@@ -172,18 +185,21 @@ function sessionApproveDone(ctx) {
 // ── Declarative lifecycle steps (ordered) ────────────────────────────────────
 
 const STEPS = [
-	// A1: existing non-Amber repos audit (and optional adoption report) before init.
+	// A1: audit is a read-only advisory for existing non-Amber repos. It NEVER
+	// writes a target file (#43) and never blocks progression, so isDone is
+	// always true — `amber next` advances straight to init. The step is kept so
+	// evaluateLifecycle still surfaces audit as a recommended pre-install check.
 	{
 		id: "audit",
-		label: "Audit existing repository",
+		label: "Audit existing repository (read-only advisory)",
 		appliesTo: (ctx) =>
 			ctx.focus.type !== "session" &&
 			!ctx.state.amberInstalled &&
 			Boolean(ctx.state.existingProject),
-		isDone: (ctx) => Boolean(ctx.state.amberInstalled || ctx.state.auditSeen),
+		isDone: () => true,
 		why: () =>
-			"this looks like an existing project — inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber adoption report.",
-		remedy: (ctx) => `amber audit --target ${ctx.targetDisplay}`,
+			"this looks like an existing project — optionally inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber adoption report.",
+		remedy: (ctx) => `amber audit --target ${shellQuote(ctx.targetDisplay)}`,
 	},
 	{
 		id: "init",
@@ -194,7 +210,7 @@ const STEPS = [
 			ctx.state.existingProject
 				? "Amber starter files are not all present (audit done or skipped) — safe next install is init."
 				: "Amber starter files are not all present.",
-		remedy: (ctx) => `amber init --target ${ctx.targetDisplay}`,
+		remedy: (ctx) => `amber init --target ${shellQuote(ctx.targetDisplay)}`,
 	},
 	{
 		id: "feature",
@@ -202,7 +218,7 @@ const STEPS = [
 		appliesTo: (ctx) => ctx.focus.type !== "session",
 		isDone: (ctx) => ctx.state.features.length >= 1,
 		why: () => "no feature is registered in feature_list.json.",
-		remedy: (ctx) => `amber feature add --target ${ctx.targetDisplay} --id F001 --title "..."`,
+		remedy: (ctx) => `amber feature add --target ${shellQuote(ctx.targetDisplay)} --id F001 --title "..."`,
 	},
 	{
 		id: "plan",
@@ -211,7 +227,7 @@ const STEPS = [
 		isDone: (ctx) => Boolean(planFor(ctx)),
 		why: (ctx) => `feature ${ctx.focus.id} has no plan yet.`,
 		remedy: (ctx) =>
-			`amber plan --target ${ctx.targetDisplay} --feature ${ctx.focus.id} --title "..."`,
+			`amber plan --target ${shellQuote(ctx.targetDisplay)} --feature ${ctx.focus.id} --title "..."`,
 	},
 	{
 		id: "gate",
@@ -220,7 +236,7 @@ const STEPS = [
 		isDone: (ctx) => Boolean(planFor(ctx) && planFor(ctx).confirmed),
 		why: () => 'the plan exists but User Confirmation is still "pending".',
 		remedy: (ctx) =>
-			`amber gate --confirm --target ${ctx.targetDisplay} --plan ${planFor(ctx).path}`,
+			`amber gate --confirm --target ${shellQuote(ctx.targetDisplay)} --plan ${shellQuote(planFor(ctx).path)}`,
 	},
 	{
 		id: "feature-evidence",
@@ -229,7 +245,7 @@ const STEPS = [
 		isDone: (ctx) => featureHasEvidence(ctx),
 		why: () => "no verification evidence is recorded for this feature yet.",
 		remedy: (ctx) =>
-			`amber session start --target ${ctx.targetDisplay} --goal "..." --feature ${ctx.focus.id}`,
+			`amber session start --target ${shellQuote(ctx.targetDisplay)} --goal "..." --feature ${ctx.focus.id}`,
 	},
 	{
 		id: "verify",
@@ -237,8 +253,13 @@ const STEPS = [
 		appliesTo: (ctx) => ctx.focus.type === "session",
 		isDone: (ctx) => sessionVerifyDone(ctx),
 		why: () => "the session has no verification evidence yet.",
-		remedy: (ctx) =>
-			`amber session verify --session ${ctx.focus.id} --execute --command "npm test"`,
+		remedy: (ctx) => {
+			// Use the project's confirmed/candidate verification command discovered
+			// from disk; never silently fall back to `npm test` for an unknown
+			// toolchain (#42). Unknown -> explicit placeholder.
+			const cmd = ctx.state.verifyCommand || "<confirm-verification-command>";
+			return `amber session verify --session ${ctx.focus.id} --execute --target ${shellQuote(ctx.targetDisplay)} --command ${shellQuote(cmd)}`;
+		},
 	},
 	{
 		id: "approve",
@@ -255,10 +276,11 @@ const STEPS = [
 		},
 		remedy: (ctx) => {
 			const gate = ctx.pendingGateId;
+			const target = shellQuote(ctx.targetDisplay);
 			if (gate) {
-				return `amber session approve --session ${ctx.focus.id} --gate ${gate}`;
+				return `amber session approve --session ${ctx.focus.id} --gate ${gate} --target ${target}`;
 			}
-			return `amber session approve --session ${ctx.focus.id} --gate <gate-id>`;
+			return `amber session approve --session ${ctx.focus.id} --gate <gate-id> --target ${target}`;
 		},
 	},
 	// G1/G2: regenerate live handoff before complete-check so scaffold files
@@ -279,7 +301,7 @@ const STEPS = [
 		isDone: (ctx) => Boolean(ctx.liveHandoff),
 		why: () =>
 			"session-handoff.md is missing or still the init scaffold — regenerate from live state.",
-		remedy: (ctx) => `amber handoff --target ${ctx.targetDisplay}`,
+		remedy: (ctx) => `amber handoff --target ${shellQuote(ctx.targetDisplay)}`,
 	},
 	{
 		id: "complete-check",
@@ -293,7 +315,8 @@ const STEPS = [
 			}
 			return "the session is not yet complete (evidence still missing).";
 		},
-		remedy: (ctx) => `amber session complete-check --session ${ctx.focus.id} --strict`,
+		remedy: (ctx) =>
+			`amber session complete-check --session ${ctx.focus.id} --strict --target ${shellQuote(ctx.targetDisplay)}`,
 	},
 	{
 		id: "session-complete",
@@ -303,7 +326,8 @@ const STEPS = [
 			Boolean(ctx.completion && ctx.completion.status === "pass"),
 		isDone: (ctx) => ctx.sessionStatus === "completed",
 		why: () => "complete-check passed but the session is not marked completed yet.",
-		remedy: (ctx) => `amber session complete --session ${ctx.focus.id}`,
+		remedy: (ctx) =>
+			`amber session complete --session ${ctx.focus.id} --target ${shellQuote(ctx.targetDisplay)}`,
 	},
 	{
 		id: "accept",
@@ -316,7 +340,7 @@ const STEPS = [
 			const sessionSuffix = ctx.state.activeSessionId
 				? ` --session ${ctx.state.activeSessionId}`
 				: "";
-			return `amber accept --target ${ctx.targetDisplay} --plan ${plan.path}${sessionSuffix}`;
+			return `amber accept --target ${shellQuote(ctx.targetDisplay)} --plan ${shellQuote(plan.path)}${sessionSuffix}`;
 		},
 	},
 ];

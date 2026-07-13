@@ -7,6 +7,7 @@ const { inspectMaintenance } = require("./maintenance");
 const { inspectGovernanceReadiness } = require("./governance-readiness");
 const { resolveTarget } = require("./fs-utils");
 const { gatherState, buildContext, inferNextStep } = require("./lifecycle");
+const { shellQuote } = require("./text-utils");
 
 const PRODUCT_VALUE_LOOP = "Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle";
 
@@ -77,8 +78,8 @@ const ACTION_LIBRARY = {
 	"missing-security-standard": {
 		severity: "medium",
 		why: "Security pack claims need an auditable standard to map controls and gaps.",
-		command: "node scripts/amber.js governance standards --target <repo>",
-		expectedOutcome: "standards/security-governance.json exists and can be mapped.",
+		command: "node scripts/amber.js governance standards init --target <repo>",
+		expectedOutcome: "Creates standards/security-governance.json (declarative security-governance standard), clearing this finding. Re-run `governance standards` to map coverage.",
 		blocks: ["safety-score", "governance-score"],
 	},
 	"security-pack-not-linked": {
@@ -201,7 +202,7 @@ function actionFromFinding(finding, targetDisplay) {
 		id: finding.id,
 		severity: template.severity,
 		why: template.why,
-		command: template.command.replace(/<repo>/g, targetDisplay),
+		command: template.command.replace(/<repo>/g, shellQuote(targetDisplay)),
 		expectedOutcome: template.expectedOutcome,
 		blocks: [...template.blocks],
 		finding: finding.message,

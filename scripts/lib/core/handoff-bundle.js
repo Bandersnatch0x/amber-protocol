@@ -7,6 +7,9 @@ const { validateHandoff } = require("./audit");
 const { resolveTarget } = require("./fs-utils");
 const { buildGovernanceReport } = require("./governance-report");
 const { renderHandoff } = require("../handoff-command");
+const { shellQuote } = require("./text-utils");
+const { readSessionEvents } = require("../session-timeline");
+const { resolveStateDirForRead } = require("../state-dir-resolver");
 
 const REQUIRED_BUNDLE_FILES = [
 	"README.md",
@@ -64,9 +67,9 @@ function renderReadme({ targetRoot, generatedAt, report }) {
 	].join("\n");
 }
 
-function renderVerificationEvidence(handoffContent, report) {
+function renderVerificationEvidence(handoffContent, report, failures) {
 	const evidence = section(handoffContent, "Verification Evidence");
-	return [
+	const lines = [
 		"# Verification Evidence",
 		"",
 		evidence.trim(),
@@ -76,7 +79,54 @@ function renderVerificationEvidence(handoffContent, report) {
 		`- Evidence: ${report.scores.evidence}/100`,
 		`- Feature evidence records: ${report.summary.featureEvidence}`,
 		"",
-	].join("\n");
+	];
+	const recent = Array.isArray(failures) ? failures : [];
+	if (recent.length > 0) {
+		lines.push("## Recent Failed Verification Attempts", "");
+		for (const f of recent) {
+			lines.push(
+				`- session ${f.sessionId}: \`${f.command || "(none)"}\` exit ${f.exitCode ?? "?"} at ${f.timestamp || "?"}`,
+			);
+			if (f.error) {
+				const tail = String(f.error).split(/\r?\n/).filter(Boolean).slice(-3).join(" | ");
+				lines.push(`  - error: ${tail}`);
+			}
+		}
+		lines.push("");
+	}
+	return lines.join("\n");
+}
+
+// Collect the most recent failed verification attempts recorded across session
+// timelines, bounded to FAILED_VERIFICATION_LIMIT. Each carries the bounded
+// command, exit code, timestamp, and stderr error context (#44 AC3). Newest
+// first; ISO-8601 timestamps sort lexicographically == chronologically.
+const FAILED_VERIFICATION_LIMIT = 5;
+function collectFailedVerifications(targetRoot, limit = FAILED_VERIFICATION_LIMIT) {
+	const sessionsDir = path.join(resolveStateDirForRead(targetRoot), "sessions");
+	if (!fs.existsSync(sessionsDir)) return [];
+	const failures = [];
+	for (const name of fs.readdirSync(sessionsDir)) {
+		const sessionDir = path.join(sessionsDir, name);
+		try {
+			if (!fs.statSync(sessionDir).isDirectory()) continue;
+		} catch {
+			continue;
+		}
+		for (const event of readSessionEvents(sessionDir)) {
+			if (event && event.type === "verification_failed" && event.data) {
+				failures.push({
+					sessionId: name,
+					command: event.data.command || null,
+					exitCode: typeof event.data.exitCode === "number" ? event.data.exitCode : null,
+					timestamp: event.timestamp || null,
+					error: event.data.stderr || null,
+				});
+			}
+		}
+	}
+	failures.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+	return failures.slice(0, limit);
 }
 
 function renderNextActions(report) {
@@ -119,17 +169,18 @@ function renderRisks(report) {
 }
 
 function renderRecoveryCommands(targetDisplay) {
+	const t = shellQuote(targetDisplay);
 	return [
 		"# Recovery Commands",
 		"",
 		"Run these from the Amber repository root unless your installation documents a different entry point.",
 		"",
-		`- Validate setup: \`node scripts/amber.js doctor --target ${targetDisplay}\``,
-		`- Rebuild governance report: \`node scripts/amber.js governance report --target ${targetDisplay}\``,
-		`- Inspect next action: \`node scripts/amber.js next --target ${targetDisplay}\``,
-		`- Regenerate live handoff: \`node scripts/amber.js handoff --target ${targetDisplay}\``,
-		`- Rebuild bundle: \`node scripts/amber.js handoff bundle --target ${targetDisplay}\``,
-		`- Validate bundle: \`node scripts/amber.js handoff validate --target ${targetDisplay}\``,
+		`- Validate setup: \`node scripts/amber.js doctor --target ${t}\``,
+		`- Rebuild governance report: \`node scripts/amber.js governance report --target ${t}\``,
+		`- Inspect next action: \`node scripts/amber.js next --target ${t}\``,
+		`- Regenerate live handoff: \`node scripts/amber.js handoff --target ${t}\``,
+		`- Rebuild bundle: \`node scripts/amber.js handoff bundle --target ${t}\``,
+		`- Validate bundle: \`node scripts/amber.js handoff validate --target ${t}\``,
 		"",
 	].join("\n");
 }
@@ -161,11 +212,12 @@ function writeHandoffBundle(target, options = {}) {
 	const generatedAt = options.generatedAt || new Date().toISOString();
 	const report = buildGovernanceReport(targetRoot, { targetDisplay });
 	const handoffContent = renderHandoff(targetRoot);
+	const failedVerifications = collectFailedVerifications(targetRoot);
 
 	const files = [];
 	files.push(writeFile(outputDir, "README.md", renderReadme({ targetRoot, generatedAt, report })));
 	files.push(writeFile(outputDir, "session-summary.md", handoffContent));
-	files.push(writeFile(outputDir, "verification-evidence.md", renderVerificationEvidence(handoffContent, report)));
+	files.push(writeFile(outputDir, "verification-evidence.md", renderVerificationEvidence(handoffContent, report, failedVerifications)));
 	files.push(writeFile(outputDir, "next-actions.md", renderNextActions(report)));
 	files.push(writeFile(outputDir, "risks.md", renderRisks(report)));
 	files.push(writeFile(outputDir, "recovery-commands.md", renderRecoveryCommands(targetDisplay)));
@@ -173,14 +225,26 @@ function writeHandoffBundle(target, options = {}) {
 
 	const validation = validateHandoffBundle(outputDir);
 	const handoffValidation = validateHandoff(targetRoot);
+	// Distinguish bundle structure validity (required files present + manifest
+	// well-formed) from delivery readiness (also requires a coherent live
+	// handoff and a non-blocking governance decision). #44 AC2. The manifest
+	// itself stays schemaVersion 1; these are bundle-result fields only (#44 AC4).
+	const structureValid = validation.valid;
+	const deliveryReady =
+		structureValid &&
+		(handoffValidation.errors || []).length === 0 &&
+		report.decision !== "block";
 	return {
 		target: targetRoot,
 		outputDir,
 		files: files.map((filePath) => slash(path.relative(outputDir, filePath))),
 		manifestPath: path.join(outputDir, "manifest.json"),
-		valid: validation.valid,
+		valid: structureValid,
+		structureValid,
+		deliveryReady,
 		readinessScore: report.scores.overall,
 		decision: report.decision,
+		failedVerifications,
 		text: `Handoff bundle written: ${outputDir}\nFiles: ${files.length}\nReadiness score: ${report.scores.overall}/100 (${report.decision})`,
 		errors: [...validation.errors, ...(handoffValidation.errors || [])],
 		warnings: [...validation.warnings, ...(handoffValidation.warnings || [])],
@@ -243,8 +307,10 @@ function validateHandoffBundle(bundleDir) {
 
 module.exports = {
 	REQUIRED_BUNDLE_FILES,
+	FAILED_VERIFICATION_LIMIT,
 	defaultBundleDir,
 	resolveTargetRelativePath,
 	writeHandoffBundle,
 	validateHandoffBundle,
+	collectFailedVerifications,
 };

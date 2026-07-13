@@ -112,7 +112,7 @@ describe("inferNextStep (synthetic ctx)", () => {
 	it("recommends init when amber is not installed on a bare bootstrap", () => {
 		const step = inferNextStep(
 			ctxOf(
-				{ amberInstalled: false, existingProject: false, auditSeen: false },
+				{ amberInstalled: false, existingProject: false },
 				{ type: "bootstrap", id: null },
 			),
 		);
@@ -120,24 +120,15 @@ describe("inferNextStep (synthetic ctx)", () => {
 		assert.match(step.remedy, /^amber init --target \./);
 	});
 
-	it("recommends audit before init on an existing unharnessed project (A1)", () => {
+	it("recommends init on an existing unharnessed project (audit is read-only advisory, never blocks — #43)", () => {
 		const step = inferNextStep(
 			ctxOf(
-				{ amberInstalled: false, existingProject: true, auditSeen: false },
+				{ amberInstalled: false, existingProject: true },
 				{ type: "bootstrap", id: null },
 			),
 		);
-		assert.equal(step.id, "audit");
-		assert.match(step.remedy, /^amber audit --target \./);
-	});
-
-	it("recommends init after audit stamp on an existing project (A1)", () => {
-		const step = inferNextStep(
-			ctxOf(
-				{ amberInstalled: false, existingProject: true, auditSeen: true },
-				{ type: "bootstrap", id: null },
-			),
-		);
+		// audit step is advisory (isDone always true) so progression reaches init
+		// without depending on any written target stamp.
 		assert.equal(step.id, "init");
 	});
 
@@ -306,5 +297,84 @@ describe("focus auto-selection", () => {
 
 	it("remedyFor returns the feature add command from a minimal ctx", () => {
 		assert.match(remedyFor("feature", { targetDisplay: "." }), /^amber feature add --target \. --id F001/);
+	});
+});
+
+describe("verify command discovery (#42)", () => {
+	it("uses npm test when package.json declares a test script", () => {
+		const dir = tmpRepo();
+		fs.writeFileSync(
+			path.join(dir, "package.json"),
+			JSON.stringify({ scripts: { test: "node -e 1" } }) + "\n",
+		);
+		assert.equal(gatherState(dir).verifyCommand, "npm test");
+	});
+
+	it("uses a python candidate when pytest evidence is present and there is no npm test", () => {
+		const dir = tmpRepo();
+		fs.writeFileSync(path.join(dir, "pyproject.toml"), "[tool.pytest]\n");
+		fs.mkdirSync(path.join(dir, "tests"), { recursive: true });
+		assert.equal(gatherState(dir).verifyCommand, "python -m pytest");
+	});
+
+	it("returns null for an unknown toolchain — never a silent npm test", () => {
+		const dir = tmpRepo();
+		assert.equal(gatherState(dir).verifyCommand, null);
+	});
+
+	it("verify remedy renders the discovered command and stays target-safe", () => {
+		const step = inferNextStep({
+			...ctxOf({ verifyCommand: "npm test" }, { type: "session", id: "sess-1" }),
+			completion: { status: "fail", missing: ["verification"] },
+		});
+		assert.equal(step.id, "verify");
+		assert.match(step.remedy, /--command 'npm test'/);
+		assert.match(step.remedy, /--target \./);
+	});
+
+	it("verify remedy uses an explicit placeholder for an unknown command, never npm test", () => {
+		const step = inferNextStep({
+			...ctxOf({ verifyCommand: null }, { type: "session", id: "sess-1" }),
+			completion: { status: "fail", missing: ["verification"] },
+		});
+		assert.equal(step.id, "verify");
+		assert.match(step.remedy, /<confirm-verification-command>/);
+		assert.doesNotMatch(step.remedy, /npm test/);
+	});
+});
+
+describe("session continuation remedies carry the selected target (#41)", () => {
+	const session = (completion, extra = {}) => ({
+		...ctxOf({ verifyCommand: "npm test" }, { type: "session", id: "sess-1" }),
+		completion,
+		sessionStatus: "executing",
+		pendingGateId: "user-approval-implement",
+		sessionGates: [{ id: "user-approval-implement" }],
+		liveHandoff: true,
+		...extra,
+	});
+
+	it("verify remedy includes --target", () => {
+		const step = inferNextStep(session({ status: "fail", missing: ["verification"] }));
+		assert.equal(step.id, "verify");
+		assert.match(step.remedy, /--target \./);
+	});
+
+	it("approve remedy includes --target", () => {
+		const step = inferNextStep(session({ status: "fail", missing: ["approval"] }));
+		assert.equal(step.id, "approve");
+		assert.match(step.remedy, /--target \./);
+	});
+
+	it("complete-check remedy includes --target", () => {
+		const step = inferNextStep(session({ status: "fail", missing: ["evidence"] }));
+		assert.equal(step.id, "complete-check");
+		assert.match(step.remedy, /--target \./);
+	});
+
+	it("session-complete remedy includes --target", () => {
+		const step = inferNextStep(session({ status: "pass", missing: [] }));
+		assert.equal(step.id, "session-complete");
+		assert.match(step.remedy, /--target \./);
 	});
 });

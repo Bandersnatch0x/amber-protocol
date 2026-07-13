@@ -368,7 +368,7 @@ function buildNextActions(findings) {
 		"route-without-gates": "Add route gates around planning, implementation, review, or merge stages.",
 		"pack-missing-review-gates": "Add reviewGates to each workflow pack loop contract.",
 		"pack-missing-worktree-isolation": "Require worktree isolation for mutating workflow-pack loops.",
-		"missing-security-standard": "Restore standards/security-governance.json before relying on security packs.",
+		"missing-security-standard": "Run amber governance standards init to create standards/security-governance.json, then map coverage with amber governance standards.",
 		"security-pack-not-linked": "Link security workflow packs to the security-governance standard.",
 		"no-audit-evidence": "Run governed sessions and export evidence when work completes.",
 		"missing-governance-rules": "Run amber governance rules init --target <repo> to scaffold a safe-default policy.",

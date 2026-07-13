@@ -296,6 +296,43 @@ function mapStandardsCommand(target, options = {}) {
   return { ...result, text: lines.join("\n") };
 }
 
+// Scaffold standards/security-governance.json — the declarative security-governance
+// standard that inspectSecurityGovernance looks for. Idempotent (leaves an existing
+// file untouched). Mirrors `governance rules init`. NOTE: the repo's own standards/
+// dir is NOT shipped in the npm package (see package.json files), so the starter is
+// served from templates/standards/ instead — init never reads Amber's own standards/.
+function standardsInitCommand(target) {
+  if (!target) {
+    return { target, errors: ["--target is required"], warnings: [] };
+  }
+  const targetRoot = path.resolve(target);
+  const standardsDir = path.join(targetRoot, "standards");
+  const standardPath = path.join(standardsDir, "security-governance.json");
+  if (fs.existsSync(standardPath)) {
+    return {
+      target,
+      skipped: true,
+      text: `standards/security-governance.json already exists: ${path.relative(targetRoot, standardPath)} (left untouched).`,
+      errors: [],
+      warnings: [],
+    };
+  }
+  const templatePath = path.join(__dirname, "..", "..", "templates", "standards", "security-governance.json");
+  if (!fs.existsSync(templatePath)) {
+    return { target, errors: [`Security-standard template missing: ${templatePath}`], warnings: [] };
+  }
+  const content = fs.readFileSync(templatePath, "utf8");
+  fs.mkdirSync(standardsDir, { recursive: true });
+  fs.writeFileSync(standardPath, content);
+  return {
+    target,
+    skipped: false,
+    text: `Wrote standards/security-governance.json: declarative security-governance standard (6 review categories). Re-run \`amber governance standards\` to map coverage.`,
+    errors: [],
+    warnings: [],
+  };
+}
+
 // GLX policy surface (B): scaffold and inspect the declarative command policy.
 // init writes DEFAULT_RULES idempotently; inspect shows the active rules; check
 // runs a sample command through evaluateCommandPolicy (read-only, no execution).
@@ -382,5 +419,6 @@ module.exports = {
   inspectGovernanceReadinessCommand,
   generateGovernanceReportCommand,
   mapStandardsCommand,
+  standardsInitCommand,
   governanceRulesCommand
 };

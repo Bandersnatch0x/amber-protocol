@@ -633,6 +633,7 @@ async function verifySession(projectRoot, options) {
 					command,
 					exitCode: execResult.exitCode,
 					durationMs: execResult.durationMs,
+					stderr: execResult.stderrTail || null,
 				},
 			});
 			return result(
