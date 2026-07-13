@@ -16,8 +16,7 @@ This is a **process / ritual** document. It adds nothing to code or `package.jso
 |--------|---------------|
 | Pilot #35 → 5 real bugs | Real usage finds what CI can't, but only episodically |
 | CI only runs `amber drift` | Non-blocking; no feature actually traverses the lifecycle |
-| `amber next` last-mile gap (G1) | Operators who trust `next` skip `complete → accept → handoff` |
-| `complete-check` accepts template handoff (G2) | The evidence gate can be greenwashed without anyone walking the path |
+| `complete-check` rejects template handoff (G2) | Code layer (isLiveHandoff / hasHandoffEvidence in evaluateCompletion) refuses init-scaffold; only live-regenerated handoff from `handoff` satisfies the gate (verified; 2193583 anchor). |
 
 A weekly ritual keeps the **real** lifecycle exercised continuously, so the path that ships to users is the path we actually walk.
 
@@ -38,7 +37,7 @@ A good dogfood target is:
 
 1. **Real** — work that would ship anyway (a bugfix, small feature, safe refactor, or a doc/governance fix that closes a known gap). Not a synthetic "touch README".
 2. **Lifecycle-shaped** — small enough to finish in one session, real enough to exercise every stage `plan → gate → verify --execute → approve → complete → accept → handoff`.
-3. **High-friction-yield** — preferably a known Amber weakness (G1/G2 from `docs/quality/`), because fixing it *through* the lifecycle is self-referentially dogfooding the path it improves.
+3. **High-friction-yield** — preferably a known Amber weakness (G2 from `docs/quality/`), because fixing it *through* the lifecycle is self-referentially dogfooding the path it improves.
 4. **Non-destructive** by default — doc/governance/skill tasks are safest to drive end-to-end first; code tasks after.
 5. **Avoid** targets owned by a parallel task that is mid-flight (e.g. another issue's branch). Pick unclaimed work.
 
@@ -48,7 +47,7 @@ Pick the route that fits (`feature-standard` | `bugfix-quick` | `refactor-safe`)
 
 ## 4. The full lifecycle command template
 
-This is the **canonical, e2e-verified** path (matches `docs/quality/e2e-governance-loop-verify.md`). Run it top-to-bottom. Do not let `amber next` skip the tail — the tail (`complete → accept → handoff`) is exactly what this ritual protects.
+This is the **canonical, e2e-verified** path (matches `docs/quality/e2e-governance-loop-verify.md`). Run it top-to-bottom. The tail (`complete → accept → handoff`) is exercised explicitly; `amber next` now includes the terminal sequence steps (handoff / complete-check / session-complete / accept) per the lifecycle definition.
 
 > Replace `<FID>` with a feature id registered in `feature_list.json`, `<SID>` with the session id printed by step 4, and `<GATE>` with the route's gate id (find with `amber route inspect feature-standard`).
 
@@ -158,7 +157,7 @@ The ritual itself has a graduation bar. It stops being a separate ritual (and be
 1. **Path walked fully** — every weekly target reached `accepted` via `verify --execute` (not claim) + live handoff validated `0`. No skipped tail.
 2. **No gate bypassed** — policy deny, claim-only-on-strict, accept-without-evidence, and multi-gate `--gate` all held as designed.
 3. **Friction trending down** — fewer than 2 new `next-up` friction issues per week, and the open friction queue is shrinking.
-4. **Navigation closed** — `amber next` recommends the full terminal sequence after `approve` (closes G1); operators no longer have to memorize the tail.
+4. **Navigation closed** — `amber next` recommends the full terminal sequence after `approve` (handoff / complete-check / session-complete / accept); operators no longer have to memorize the tail. (G1 verified closed on HEAD.)
 5. **Evidence honesty** — `complete-check --strict` rejects init/template handoff (closes G2); no greenwashed completions.
 
 Until all five hold for four weeks, the ritual stays weekly. If a regression appears (a gate becomes bypassable, `next` drops the tail again), the ritual resumes.
@@ -167,19 +166,13 @@ Until all five hold for four weeks, the ritual stays weekly. If a regression app
 
 ## 7. First-round dogfood candidate list
 
-Candidates are drawn from the current backlog (`gh issue list --label next-up`) and the documented Amber weaknesses in `docs/quality/`. Each is small enough for one session and exercises the full lifecycle. Ranked; the recommended **first run** is Candidate A.
+Candidates are drawn from the current backlog (`gh issue list --label next-up`) and the documented Amber weaknesses in `docs/quality/`. Each is small enough for one session and exercises the full lifecycle. Ranked; the recommended **first run** is Candidate B (G1 last-mile was verified closed by #50; see lifecycle STEPS + inferNextStep).
 
-### Candidate A — `amber next` terminal-sequence last-mile (G1)  ← recommended first run
-
-- **Source:** `docs/quality/adjudication-loop-and-value.md` (gap **G1**, High priority / Low–Med effort). Currently open backlog items #47/#48 are excluded (parallel scope).
-- **Why suitable:** The lifecycle's hardest part is precisely the `complete → accept → handoff` tail that `next` drops after `approve`. Fixing it *while following the lifecycle* is the most self-referential dogfood: the ritual's own command template is the thing that's broken. Small, high-yield, and it makes every future run cheaper.
-- **Shape:** code + doc fix in `scripts/lib/core/lifecycle.js` STEPS / focus rules; route `feature-standard`.
-
-### Candidate B — `complete-check` rejects template/scaffold handoff (G2)
+### Candidate B — `complete-check` rejects template/scaffold handoff (G2)  ← recommended first run (G1 verified closed)
 
 - **Source:** `docs/quality/adjudication-loop-and-value.md` (gap **G2**, High priority / Evidence integrity).
-- **Why suitable:** `complete-check --strict` is the evidence gate this ritual relies on at step 7. Today it accepts the `init` scaffold/template handoff as evidence, which greenwashes completion — the exact failure mode the ritual exists to prevent. Tightening presence → freshness/content/hash makes the ritual's own checkpoint honest.
-- **Shape:** code fix in completion-check; route `bugfix-quick` (reproduce the greenwash, then fix).
+- **Why suitable:** `complete-check --strict` is the evidence gate this ritual relies on at step 7. Code-level verification (completionCheck via hasHandoffEvidence + isScaffoldHandoffContent; see session-commands complete path + evaluate) already refuses a handoff never live-regenerated by `handoff` (template/scaffold from init is rejected; agents get no bypass). G2 closed in code (anchor 2193583); doc lagged. Ritual exercises the path to guard against regression. No instruction-layer-only hole at HEAD.
+- **Shape:** verified code gate + doc correction (G2); no code change needed; route `bugfix-quick` for future regression tests if any.
 
 ### Candidate C — recurring "dogfood `amber status` / orient" (deferred until #48 lands)
 
@@ -191,8 +184,7 @@ Candidates are drawn from the current backlog (`gh issue list --label next-up`) 
 
 | Week | Candidate | Route | Expected friction yield |
 |------|-----------|-------|-------------------------|
-| 1 (first run) | A — G1 last-mile | feature-standard | navigation/tail-step clarity |
-| 2 | B — G2 evidence honesty | bugfix-quick | complete-check messaging |
-| 3+ | C — orient dogfood (post-#48) | feature-standard | drift/orientation UX |
+| 1 (first run) | B — G2 evidence honesty (G1 closed per #50) | bugfix-quick | complete-check messaging |
+| 2+ | C — orient dogfood (post-#48) | feature-standard | drift/orientation UX |
 
 Record each completed run in `session-handoff.md` (regenerated at step 10) and the friction issues opened in the GitHub `next-up` queue — together these make the four-week graduation bar in §6 auditable without a new state file.
