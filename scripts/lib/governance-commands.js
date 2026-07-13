@@ -14,6 +14,11 @@ const {
   renderReadinessText,
   writeReadinessMarkdown
 } = require("./core/governance-readiness");
+const {
+  buildGovernanceReport,
+  renderGovernanceReportText,
+  writeGovernanceReportMarkdown,
+} = require("./core/governance-report");
 const { mapStandards } = require("./core/standards");
 const {
   DEFAULT_RULES,
@@ -234,6 +239,38 @@ function inspectGovernanceReadinessCommand(target, options = {}) {
   }
 }
 
+function generateGovernanceReportCommand(target, options = {}) {
+  if (!target) {
+    return {
+      target,
+      errors: ["--target is required"],
+      warnings: [],
+    };
+  }
+
+  try {
+    const report = buildGovernanceReport(target, { targetDisplay: options.targetDisplay || target });
+    const output = options.output && !path.isAbsolute(options.output)
+      ? path.resolve(target, options.output)
+      : options.output;
+    const outputPath = options.output
+      ? writeGovernanceReportMarkdown(report, output)
+      : undefined;
+
+    return {
+      ...report,
+      outputPath,
+      text: renderGovernanceReportText(report),
+    };
+  } catch (error) {
+    return {
+      target,
+      errors: [error.message],
+      warnings: [],
+    };
+  }
+}
+
 function mapStandardsCommand(target, options = {}) {
   if (!target) {
     return { target, errors: ["--target is required"], warnings: [] };
@@ -343,6 +380,7 @@ module.exports = {
   inspectGovernancePolicy,
   auditGovernance,
   inspectGovernanceReadinessCommand,
+  generateGovernanceReportCommand,
   mapStandardsCommand,
   governanceRulesCommand
 };

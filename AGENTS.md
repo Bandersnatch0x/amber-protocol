@@ -18,9 +18,12 @@ node scripts/amber.js <command> --target <repo>
 - `node scripts/amber.js wiki --target <repo>` - create/validate the wiki skeleton.
 - `node scripts/amber.js doctor --target <repo>` - validate the Amber setup.
 - `node scripts/amber.js handoff --target <repo>` - validate session handoff state.
+- `node scripts/amber.js governance report --target <repo>` - score readiness, risks, and structured next actions.
+- `node scripts/amber.js handoff bundle --target <repo>` - produce the portable continuation bundle.
+- `node scripts/amber.js handoff validate --target <repo>` - verify the handoff bundle is complete.
 - `node scripts/amber.js route list` - list available routes.
 - `node scripts/amber.js session status` - inspect the current session.
-- `node scripts/amber.js adoption report --target <repo> --output-dir docs/examples/adoptions` - generate an adoption report.
+- `node scripts/amber.js adoption report --target <repo> --output-dir docs/examples/adoptions` - generate a legacy adoption report.
 - `node scripts/amber.js plan --target <repo> --feature <feature-id> --title "<title>"` - scaffold a feature plan.
 - `node scripts/amber.js loop recommend` / `loop run --dry-run` — safe continuous improvement entrypoints (see LOOP.md).
 

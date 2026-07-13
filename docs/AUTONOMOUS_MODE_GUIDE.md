@@ -1,6 +1,6 @@
-# Autonomous Mode Guide
+# Autonomous Mode Boundary
 
-**Amber Protocol** autonomous mode enables fully automated session execution without human intervention. Sessions run with policy-driven gate approval, automatic retries, and budget management.
+**Amber Protocol does not run fully autonomous sessions in V1.** The policy file is retained for governance inspection and safe defaults, but `session start/continue --mode autonomous` is intentionally refused by ADR-0001/0005. Use governed, human-triggered routes instead.
 
 ## Quick Start
 
@@ -11,9 +11,11 @@ Create `.amber/autonomous-policy.json`:
 ```json
 {
   "gates": {
-    "user-approval": "auto-approve",
-    "security-review": "auto-approve",
-    "deployment": "require-approval"
+    "auto": "approve",
+    "user-approval": "block",
+    "step-confirm": "block",
+    "security-review": "block",
+    "deployment": "block"
   },
   "retry": {
     "maxAttempts": 3,
@@ -26,26 +28,28 @@ Create `.amber/autonomous-policy.json`:
 }
 ```
 
-### 2. Start Autonomous Session
+### 2. Start A Governed Session
 
 ```bash
 node scripts/amber.js session start \
   --goal "implement user authentication" \
-  --route feature-standard \
-  --mode autonomous
+  --route feature-standard
 ```
+
+Do not pass `--mode autonomous`; Amber refuses that mode so human approval gates remain real.
+
 
 ### 3. Monitor Progress
 
 ```bash
-# Check session status
-node scripts/amber.js session status
+# Check the latest session status
+node scripts/amber.js session status --target .
 
-# View timeline
-cat .amber/sessions/<session-id>/timeline.jsonl
+# Check a specific session
+node scripts/amber.js session status --target . <session-id>
 
-# Check logs
-cat .amber/logs/harness.log
+# Recompute readiness and next actions
+node scripts/amber.js governance report --target .
 ```
 
 ## Policy Configuration
@@ -57,16 +61,17 @@ Control which gates require human approval:
 ```json
 {
   "gates": {
-    "user-approval": "auto-approve",      // Always approve
-    "security-review": "require-approval", // Always prompt
-    "deployment": "auto-approve"
+    "auto": "approve",              // Low-risk automatic gates
+    "user-approval": "block",       // Human approval remains required
+    "security-review": "block",     // Manual review required
+    "deployment": "block"
   }
 }
 ```
 
 **Options:**
-- `auto-approve`: Gates pass automatically
-- `require-approval`: Pause for human review
+- `approve`: Low-risk automatic gates pass
+- `block`: Pause for human review or manual follow-up
 
 ### Retry Strategy
 
@@ -100,28 +105,21 @@ Set token limits and overflow behavior:
 - `pause`: Stop and save checkpoint
 - `abort`: Terminate session immediately
 
-## Daemon Mode
+## Background Execution Boundary
 
-Run sessions in the background:
+Amber V1 has no daemon mode. Do not run Amber as a background autonomous worker or scheduled session starter. For CI or recurring maintenance, run read-only checks and reports:
 
 ```bash
-# Start daemon
-node scripts/amber.js daemon start
-
-# Check status
-node scripts/amber.js daemon status
-
-# Stop daemon
-node scripts/amber.js daemon stop
+node scripts/amber.js doctor --target .
+node scripts/amber.js governance report --target .
+node scripts/amber.js handoff validate --target . --bundle-dir .amber/handoff/latest
 ```
 
-Daemon PID stored in `.amber/daemon.pid`.
+## Notification Preferences
 
-## Notifications
+Notification settings are policy metadata only. Amber V1 does not send email or Slack messages by itself because external notifications are external writes and require explicit approval.
 
-Enable email/Slack alerts for key events.
-
-### Email Setup
+### Email Preferences
 
 ```json
 {
@@ -129,29 +127,21 @@ Enable email/Slack alerts for key events.
     "email": {
       "enabled": true,
       "to": "team@example.com",
-      "events": ["session-completed", "session-failed", "gate-blocked"]
+      "triggers": ["session_completed", "session_failed", "gate_blocked"]
     }
   }
 }
 ```
 
-Requires environment variables:
-```bash
-export EMAIL_HOST=smtp.gmail.com
-export EMAIL_PORT=587
-export EMAIL_USER=your@email.com
-export EMAIL_PASS=your-password
-```
-
-### Slack Setup
+### Slack Preferences
 
 ```json
 {
   "notifications": {
     "slack": {
       "enabled": true,
-      "webhookUrl": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
-      "events": ["session-completed", "session-failed"]
+      "webhook": "${SLACK_WEBHOOK_URL}",
+      "triggers": ["session_completed", "session_failed"]
     }
   }
 }
@@ -161,26 +151,26 @@ export EMAIL_PASS=your-password
 
 ### Start Small
 
-Begin with low-risk tasks:
+Begin with low-risk governed tasks:
 - Bug fixes
 - Documentation updates
 - Test additions
 
-### Gradual Automation
+### Keep Human Gates Real
 
-Progressively enable gate auto-approval:
+Do not progress toward full autonomous mode in V1. Keep these gates blocked unless a future ADR explicitly changes the boundary:
+- `user-approval`
+- `step-confirm`
+- `deployment`
+- `security-review`
+- `data-migration`
 
-1. Week 1: All gates require approval
-2. Week 2: Auto-approve low-risk gates
-3. Week 3: Auto-approve most gates
-4. Week 4: Full autonomous mode
+### Monitor With CLI Surfaces
 
-### Monitor Closely
-
-First autonomous runs:
-- Check logs frequently
-- Review timeline events
-- Validate output quality
+During early governed sessions:
+- Check `session status` frequently
+- Re-run `governance report` after meaningful changes
+- Validate handoff bundles before ending work
 
 ### Set Conservative Budgets
 
@@ -189,34 +179,24 @@ Start with lower token limits:
 - Medium tasks: 50k-100k tokens
 - Complex tasks: 100k-500k tokens
 
-### Use Checkpoints
-
-Enable checkpoint/continue for long-running sessions:
-
-```bash
-node scripts/amber.js session start \
-  --goal "large refactoring" \
-  --checkpoint-interval 5  # Every 5 stages
-```
-
 ## Troubleshooting
 
-### Session Stuck in "Running"
+### Session Appears Stuck
 
 ```bash
-# Check if process is alive
-ps aux | grep amber
+# Check current state
+node scripts/amber.js session status --target . <session-id>
 
-# Abort stuck session
-node scripts/amber.js session abort <session-id>
+# Check lifecycle readiness
+node scripts/amber.js session complete-check --target . --session <session-id> --strict
 
-# Continue from checkpoint
-node scripts/amber.js session continue <session-id>
+# Abort if the governed session should stop
+node scripts/amber.js session abort --target . <session-id>
 ```
 
 ### Budget Exceeded Immediately
 
-Increase budget or use simpler routes:
+Increase the budget only if the task is still worth continuing, or split the goal into a smaller governed session:
 
 ```json
 {
@@ -226,80 +206,56 @@ Increase budget or use simpler routes:
 }
 ```
 
-Or switch to lightweight route:
-```bash
---route bugfix-quick  # Lower token usage
-```
-
 ### All Gates Failing
 
-Check policy syntax:
+Check policy syntax and route definitions:
 
 ```bash
-node scripts/amber.js governance policy
-```
-
-Ensure gates match route definitions:
-```bash
+node scripts/amber.js governance policy --target .
 node scripts/amber.js route inspect feature-standard
 ```
 
 ## Examples
 
-### Automated Bug Fix
+### Governed Bug Fix
 
 ```bash
 node scripts/amber.js session start \
   --goal "fix login timeout issue #123" \
   --route bugfix-quick \
-  --mode autonomous \
   --budget 25000
+
+node scripts/amber.js session status --target .
+node scripts/amber.js session approve --target . --session <session-id> --gate user-approval-fix --yes
+node scripts/amber.js session verify --target . --session <session-id> --execute --command "npm test"
 ```
 
-### Scheduled Refactoring
+### Scheduled Or CI Work
+
+Do not schedule Amber sessions or CI jobs that start autonomous work. For recurring maintenance, generate a report or recommendation, then let a human trigger the governed route and approvals.
 
 ```bash
-# Run via cron every Sunday at 2am
-0 2 * * 0 cd /project && node scripts/amber.js session start \
-  --goal "weekly code cleanup" \
-  --route refactor-safe \
-  --mode autonomous
-```
-
-### CI/CD Integration
-
-```yaml
-# .github/workflows/autonomous-fixes.yml
-name: Autonomous Fixes
-on:
-  schedule:
-    - cron: '0 0 * * *'  # Daily at midnight
-
-jobs:
-  auto-fix:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: node scripts/amber.js session start \
-          --goal "fix linting issues" \
-          --mode autonomous \
-          --budget 10000
+node scripts/amber.js loop recommend --target .
+node scripts/amber.js governance report --target .
 ```
 
 ## Security Considerations
 
 ### Dangerous Gate Auto-Approval
 
-**Never auto-approve:**
+**Never configure `approve` for:**
+- `user-approval` gates (human identity boundary)
 - `deployment` gates (production changes)
 - `security-review` gates (auth/permissions)
 - `data-migration` gates (database changes)
 
 ### Audit Trail
 
-All autonomous decisions are logged:
+Use CLI evidence surfaces instead of treating chat history as durable proof:
 ```bash
-cat .amber/sessions/<session-id>/timeline.jsonl | grep gate-decision
+node scripts/amber.js session status --target . <session-id>
+node scripts/amber.js handoff bundle --target . --output-dir .amber/handoff/latest
+node scripts/amber.js handoff validate --target . --bundle-dir .amber/handoff/latest
 ```
 
 ### Token Budget as Safety Net
@@ -316,6 +272,6 @@ Set conservative budgets to limit blast radius:
 ## Next Steps
 
 - Read [Policy Configuration Guide](POLICY_CONFIGURATION.md)
-- Set up [Notifications](NOTIFICATION_SETUP.md)
+- Review [Notification Policy Configuration](NOTIFICATION_SETUP.md)
 - Review [Troubleshooting Guide](TROUBLESHOOTING.md)
 - Explore [CLI Reference](CLI_REFERENCE.md)

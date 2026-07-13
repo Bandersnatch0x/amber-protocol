@@ -18,10 +18,10 @@ The commands below are organized into service packages. Service packages are doc
 
 | Service package | Existing commands |
 | --- | --- |
-| Repository Onboarding | [`init`](#init), [`doctor`](#doctor), `wiki` |
+| Repository Onboarding | [`init`](#init), [`doctor`](#doctor), `wiki`, `governance report` |
 | Adoption Review | [`adoption report`](#adoption-report), `adoption bundle`, [`adoption gate`](#adoption-gate) |
 | Governed Delivery | [`plan`](#plan), [`gate`](#gate), [`review`](#review), [`accept`](#accept), [`session complete-check`](#session-complete-check) |
-| Continuity Layer | [`session start`](#session-start), [`session status`](#session-status), `session continue` |
+| Continuity Layer | [`session start`](#session-start), [`session status`](#session-status), `session continue`, `handoff bundle`, `handoff validate` |
 | Security Governance | [`security audit`](#security-audit), security governance packs |
 
 ## Core Commands

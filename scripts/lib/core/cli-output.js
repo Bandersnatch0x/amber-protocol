@@ -83,6 +83,7 @@ const FLAG_SPECS = {
 	"--framework": { key: "framework" },
 	"--execute": { key: "execute", kind: "boolean" },
 	"--refresh-amber-owned": { key: "refreshAmberOwned", kind: "boolean" },
+	"--archive-legacy": { key: "archiveLegacy", kind: "boolean" },
 	"--yes": { key: "yes", kind: "boolean" },
 	"--warn-only": { key: "warnOnly", kind: "boolean" },
 	"--force": { key: "force", kind: "boolean" },

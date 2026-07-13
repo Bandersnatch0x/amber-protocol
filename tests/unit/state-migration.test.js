@@ -29,12 +29,52 @@ test("migrateState copies .harness into .amber and keeps the source", () => {
 	assert.equal(result.validated.timelines, 1);
 });
 
-test("migrateState refuses to overwrite an existing .amber", () => {
+test("migrateState merges into an existing .amber without overwriting files", () => {
 	const root = rootWithLegacyState();
-	fs.mkdirSync(path.join(root, ".amber"));
+	const existing = path.join(root, ".amber", "sessions", "s1");
+	fs.mkdirSync(existing, { recursive: true });
+	fs.writeFileSync(path.join(existing, "manifest.json"), JSON.stringify({ sessionId: "canonical" }));
 	const result = migrateState(root);
-	assert.ok(result.errors.length >= 1);
-	assert.match(result.errors[0], /\.amber already exists/);
+	assert.equal(result.errors.length, 0);
+	assert.deepEqual(result.conflicts, ["sessions/s1/manifest.json"]);
+	assert.ok(fs.existsSync(path.join(root, ".amber", "sessions", "s1", "timeline.jsonl")));
+	assert.match(
+		fs.readFileSync(path.join(root, ".amber", "sessions", "s1", "manifest.json"), "utf8"),
+		/canonical/,
+	);
+});
+
+test("migrateState is a no-op when legacy state is already archived", () => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-migrate-"));
+	fs.mkdirSync(path.join(root, ".amber"), { recursive: true });
+	const result = migrateState(root, { archiveLegacy: true });
+	assert.equal(result.errors.length, 0);
+	assert.equal(result.archivedLegacy, false);
+	assert.match(result.text, /Already consolidated/);
+});
+
+test("migrateState archives legacy source after a clean migration when requested", () => {
+	const root = rootWithLegacyState();
+	const result = migrateState(root, {
+		archiveLegacy: true,
+		now: new Date("2026-07-13T01:02:03.004Z"),
+	});
+	assert.equal(result.errors.length, 0);
+	assert.equal(result.archivedLegacy, true);
+	assert.ok(result.legacyBackupPath.endsWith(".amber-legacy-harness-backup-2026-07-13T01-02-03-004Z"));
+	assert.equal(fs.existsSync(path.join(root, ".harness")), false);
+	assert.ok(fs.existsSync(path.join(result.legacyBackupPath, "sessions", "s1", "manifest.json")));
+});
+
+test("migrateState refuses to archive legacy source when conflicts remain", () => {
+	const root = rootWithLegacyState();
+	const existing = path.join(root, ".amber", "sessions", "s1");
+	fs.mkdirSync(existing, { recursive: true });
+	fs.writeFileSync(path.join(existing, "manifest.json"), JSON.stringify({ sessionId: "canonical" }));
+	const result = migrateState(root, { archiveLegacy: true });
+	assert.equal(result.archivedLegacy, false);
+	assert.ok(fs.existsSync(path.join(root, ".harness")));
+	assert.match(result.errors.join("\n"), /Refusing to archive/);
 });
 
 test("migrateState reports corrupt manifests as failed validation, still copies", () => {

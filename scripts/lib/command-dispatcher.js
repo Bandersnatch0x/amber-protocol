@@ -93,6 +93,19 @@ function handleDoctor(args) {
 }
 
 function handleHandoff(args) {
+  const action = args._?.[0];
+  if (action === "bundle") {
+    const { writeHandoffBundle } = require("./core/handoff-bundle");
+    return { result: writeHandoffBundle(resolveTarget(args), { outputDir: args.outputDir || args.bundleDir, targetDisplay: args.target || "." }) };
+  }
+  if (action === "validate") {
+    const { defaultBundleDir, resolveTargetRelativePath, validateHandoffBundle } = require("./core/handoff-bundle");
+    const targetRoot = resolveTarget(args);
+    const bundleDir = args.bundleDir || args.outputDir
+      ? resolveTargetRelativePath(targetRoot, args.bundleDir || args.outputDir)
+      : defaultBundleDir(targetRoot);
+    return { result: { target: targetRoot, ...validateHandoffBundle(bundleDir) } };
+  }
   const { writeHandoff } = require("./handoff-command");
   const rel = "session-handoff.md";
   const written = writeHandoff(args.target, { dryRun: args.dryRun });
@@ -542,7 +555,7 @@ function handleMigrate(args) {
   const targetRoot = resolveTarget(args);
 
   if (action === "state") {
-    const stateResult = migrateState(targetRoot);
+    const stateResult = migrateState(targetRoot, { archiveLegacy: args.archiveLegacy });
     return {
       result: {
         ...stateResult,
@@ -578,6 +591,7 @@ function handleGovernance(args) {
     inspectGovernancePolicy,
     auditGovernance,
     inspectGovernanceReadinessCommand,
+    generateGovernanceReportCommand,
     mapStandardsCommand,
     governanceRulesCommand,
   } = require("./governance-commands");
@@ -587,9 +601,10 @@ function handleGovernance(args) {
   if (action === "policy")   return { result: inspectGovernancePolicy(args.target) };
   if (action === "audit")    return { result: auditGovernance(args.target, { output: args.output, since: args.since }) };
   if (action === "readiness") return { result: inspectGovernanceReadinessCommand(args.target, { output: args.output }) };
+  if (action === "report") return { result: generateGovernanceReportCommand(args.target, { output: args.output, targetDisplay: args.target || "." }) };
   if (action === "standards") return { result: mapStandardsCommand(args.target, { framework: args.framework, json: args.json }) };
   if (action === "rules")    return { result: governanceRulesCommand(args._?.[1], args.target, { command: args.command, json: args.json }) };
-  return { result: unknownAction("governance", ["docs", "evidence", "policy", "audit", "readiness", "standards", "rules"]) };
+  return { result: unknownAction("governance", ["docs", "evidence", "policy", "audit", "readiness", "report", "standards", "rules"]) };
 }
 
 function handleExecution(args) {
