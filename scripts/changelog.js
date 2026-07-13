@@ -103,16 +103,23 @@ function getCommitsSince(tag, root = ROOT) {
 	}
 }
 
-function parseConventional(subject) {
+function hasBreakingFooter(body) {
+	// Conventional Commits: a "BREAKING CHANGE:" or "BREAKING-CHANGE:" footer
+	// in the commit body signals a breaking change, independent of the subject.
+	return /^BREAKING[ -]CHANGE:/m.test(body || "");
+}
+
+function parseConventional(subject, body = "") {
 	// Supports: type(scope)!?: message
-	// Breaking can be indicated by ! or "BREAKING CHANGE:" in body (we check subject for simplicity)
+	// Breaking can be indicated by `!` after the scope, a BREAKING token in the
+	// subject, or a "BREAKING CHANGE:" / "BREAKING-CHANGE:" footer in the body.
 	const match = subject.match(/^(\w+)(?:\(([^)]+)\))?(!)?:\s*(.+)$/);
 	if (!match) {
 		return { type: "other", scope: null, breaking: false, subject };
 	}
 	const [, typeRaw, scope, bang, msg] = match;
 	const type = typeRaw.toLowerCase();
-	const breaking = Boolean(bang) || /BREAKING/i.test(subject);
+	const breaking = Boolean(bang) || /BREAKING/i.test(subject) || hasBreakingFooter(body);
 	return {
 		type,
 		scope: scope || null,
@@ -146,7 +153,7 @@ function groupCommits(commits) {
 		Other: [],
 	};
 	for (const c of commits) {
-		const p = parseConventional(c.subject);
+		const p = parseConventional(c.subject, c.body);
 		const ref = extractReference(c.subject) || extractReference(c.body);
 		let entry = formatEntry(p, ref);
 		if (p.breaking) {
@@ -290,6 +297,7 @@ module.exports = {
 	getLatestStableTag,
 	getCommitsSince,
 	parseConventional,
+	hasBreakingFooter,
 	groupCommits,
 	formatReleaseSection,
 	updateChangelogFile,

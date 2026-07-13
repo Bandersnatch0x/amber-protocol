@@ -8,6 +8,7 @@ const os = require("node:os");
 
 const {
 	parseConventional,
+	hasBreakingFooter,
 	groupCommits,
 	formatReleaseSection,
 	getPackageVersion,
@@ -77,6 +78,28 @@ test("extractReference pulls (#123) from subject or body", () => {
 	// indirect: exercised via groupCommits below
 });
 
+test("hasBreakingFooter detects the BREAKING CHANGE footer in either form", () => {
+	assert.equal(hasBreakingFooter("BREAKING CHANGE: drops old API"), true);
+	assert.equal(hasBreakingFooter("BREAKING-CHANGE: behavior altered"), true);
+	// footer must be at a line start
+	assert.equal(hasBreakingFooter("see BREAKING CHANGE: maybe"), false);
+	// prose body without the footer token does not trigger
+	assert.equal(hasBreakingFooter("This breaks nothing in the public API."), false);
+	assert.equal(hasBreakingFooter(""), false);
+});
+
+test("parseConventional flags breaking via body footer, not just subject", () => {
+	// clean subject + body footer => breaking (#52)
+	assert.equal(parseConventional("feat: add foo", "BREAKING CHANGE: drops old API").breaking, true);
+	// hyphen-variant footer
+	assert.equal(parseConventional("fix: patch", "BREAKING-CHANGE: behavior altered").breaking, true);
+	// prose body without footer syntax => NOT breaking (no false trigger)
+	assert.equal(parseConventional("feat: add foo", "This breaks nothing in the public API.").breaking, false);
+	// single-arg call (no body) still works as before
+	assert.equal(parseConventional("feat: add foo").breaking, false);
+	assert.equal(parseConventional("feat!: x").breaking, true);
+});
+
 test("groupCommits maps types to sections and preserves refs + scopes", () => {
 	const commits = [
 		{ subject: "feat: new governance lifecycle", body: "" },
@@ -85,12 +108,18 @@ test("groupCommits maps types to sections and preserves refs + scopes", () => {
 		{ subject: "chore(release): v1.3.2", body: "" },
 		{ subject: "refactor(lib): extract pipeline", body: "" },
 		{ subject: "feat(api)!: new flag", body: "" },
+		{ subject: "feat: new endpoint", body: "BREAKING CHANGE: removed v1\n\nLong explanation." },
 	];
 	const g = groupCommits(commits);
 	assert.ok(g.Added.length >= 1);
 	assert.ok(g.Fixed.some((e) => e.includes("harden verify") && e.includes("#40")));
 	assert.ok(g.Changed.some((e) => e.includes("update release process") && e.includes("#47")));
 	assert.ok(g.Changed.some((e) => e.includes("**BREAKING**")));
+	// body-footer breaking (clean subject, footer in body) lands in Changed with the marker (#52)
+	assert.ok(
+		g.Changed.some((e) => e.includes("**BREAKING**") && e.includes("new endpoint")),
+		"body-footer breaking commit must be marked BREAKING in Changed",
+	);
 	// chore goes to Changed
 	assert.ok(g.Changed.some((e) => e.includes("chore(release): v1.3.2") === false || true)); // may be present
 });
