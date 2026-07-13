@@ -30,6 +30,7 @@
     "version:sync": "node scripts/sync-version.js",
     "changelog": "node scripts/changelog.js",
     "release:verify": "node scripts/verify-release.js",
+    "orient": "node scripts/orient.js",
     "test:load": "node scripts/run-tests.js tests/load/sequential-sessions.test.js",
     "test:e2e": "node scripts/run-tests.js tests/e2e/",
     "gen:agents": "node scripts/gen-agent-commands.js",
