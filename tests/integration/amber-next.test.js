@@ -297,4 +297,23 @@ describe("amber next target-safety (#41)", () => {
 		assert.equal(exec.status, 0, exec.stderr);
 		assert.ok(fs.existsSync(path.join(spaced, "AGENTS.md")), "installed into the spaced external target");
 	});
+
+	it("the emitted remedy string executes verbatim through a POSIX shell (#41 AC3)", () => {
+		// shellQuote emits POSIX single-quotes; cmd/PowerShell would include them literally.
+		// CI runs this on Linux; Windows local skips (same trade-off as the web e2e suite).
+		if (process.platform === "win32") return;
+
+		const dir = tmpRepo();
+		const spaced = path.join(dir, "with space");
+		fs.mkdirSync(spaced, { recursive: true });
+
+		const r = spawnSync("node", [AMBER, "next", "--target", spaced, "--json"], { encoding: "utf8" });
+		assert.equal(r.status, 0, r.stderr);
+		const remedy = JSON.parse(r.stdout).nextStep.remedy;
+
+		// Execute the EMITTED remedy string verbatim (not reconstructed argv) through a shell.
+		const sh = spawnSync(remedy.replace(/^amber\s+/, `node "${AMBER}" `), { shell: true, encoding: "utf8" });
+		assert.equal(sh.status, 0, sh.stderr);
+		assert.ok(fs.existsSync(path.join(spaced, "AGENTS.md")), "emitted remedy installed into the spaced target");
+	});
 });

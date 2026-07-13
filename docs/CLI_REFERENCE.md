@@ -216,7 +216,16 @@ whether its *specific* control is actually deployed in the target repo (a deny r
 allow rule for ASI04, a non-empty hash-chain ledger for ASI06, an approval record for ASI09) — not
 just a label.
 
+The `init` subcommand scaffolds the declarative security-governance standard
+(`standards/security-governance.json`) the report maps against — idempotent, it skips when the file
+already exists. The starter ships via `templates/`, so it is written from the Amber install, not
+read from the target's own `standards/`.
+
 ```bash
+# scaffold the security-governance standard (idempotent; skips if present)
+node scripts/amber.js governance standards init --target .
+
+# read-only coverage report
 node scripts/amber.js governance standards --target . --framework owasp-agentic
 node scripts/amber.js governance standards --target . --json
 ```

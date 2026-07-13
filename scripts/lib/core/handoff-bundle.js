@@ -9,6 +9,7 @@ const { buildGovernanceReport } = require("./governance-report");
 const { renderHandoff } = require("../handoff-command");
 const { shellQuote } = require("./text-utils");
 const { readSessionEvents } = require("../session-timeline");
+const { resolveStateDirForRead } = require("../state-dir-resolver");
 
 const REQUIRED_BUNDLE_FILES = [
 	"README.md",
@@ -102,7 +103,7 @@ function renderVerificationEvidence(handoffContent, report, failures) {
 // first; ISO-8601 timestamps sort lexicographically == chronologically.
 const FAILED_VERIFICATION_LIMIT = 5;
 function collectFailedVerifications(targetRoot, limit = FAILED_VERIFICATION_LIMIT) {
-	const sessionsDir = path.join(targetRoot, ".amber", "sessions");
+	const sessionsDir = path.join(resolveStateDirForRead(targetRoot), "sessions");
 	if (!fs.existsSync(sessionsDir)) return [];
 	const failures = [];
 	for (const name of fs.readdirSync(sessionsDir)) {
