@@ -5,6 +5,28 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.3.3] - 2026-07-14
+
+### Added
+- changelog: detect BREAKING CHANGE in commit body footer (#52)
+- cli: add npm run orient for session-start orientation (dogfood amber status) (#48)
+- release: add zero-dependency changelog generator + release process automation for #47
+
+### Fixed
+- changelog: breaking flag requires ! or body footer, not subject text
+- changelog: use full history (empty range) on null getLatestStableTag; robust parser for first-release (#53)
+- release: terminal release assertion — catch local-only tags and registry ghosts (#46)
+
+### Changed
+- add regression tests for complete-check --strict rejecting init-scaffold/template handoff (G2, #56)
+- verify apps/web E2E succeeds on Windows local (127.0.0.1 + NO_PROXY; stale 'proxy trap' memory resolved)
+- update e2e-governance-loop-verify.md with #54 target-repo dogfood results (G1/G2 closed on external target; outcome A)
+- refresh dogfood-weekly.md §7 candidate list to point at live open next-up (G1/G2 target-repo verification from adjudication gaps)
+- verify amber next last-mile closed at HEAD (STEPS + strict + inferNextStep); drop G1 weakness from dogfood-weekly.md (closes #50)
+- correct G2 evidence honesty section after verifying complete-check rejects template handoff at code layer (closes #51)
+- dogfood: define weekly self-dogfood ritual and first-round candidates
+
 ## [1.3.2] - 2026-07-13
 
 ### Added — Closed-loop governance lifecycle

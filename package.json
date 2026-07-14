@@ -1,6 +1,6 @@
 {
   "name": "amber-protocol",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Amber Protocol: repository-local governance kit for coding agents — install, audit, validate, and hand off agent-facing project state.",
   "type": "commonjs",
   "bin": {
