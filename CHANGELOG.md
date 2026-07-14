@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.3.5] - 2026-07-14
+
+### Added
+- wiki: add declarative Knowledge Plan capability with tests
+
+### Fixed
+- regenerate agent commands after amber-wiki SKILL change
+
+### Changed
+- clear lint warnings, sync README version, ignore local IDE dirs
+- add lint/format tooling, leak guard, and dogfood feature_list
+
 ## [1.3.4] - 2026-07-14
 
 ### Fixed
