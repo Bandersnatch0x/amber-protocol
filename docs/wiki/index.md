@@ -21,3 +21,18 @@ do not execute workflows or mutate repository state.
   and links.
 - Run `node scripts/amber.js maintenance inspect --target . --json` to surface
   stale docs and wiki lint findings.
+
+## Knowledge Plan & Structured Knowledge Base
+
+This repository supports a declarative Knowledge Plan capability.
+
+- Plan file: `docs/wiki/knowledge-plan.json` (or `.yaml`). Supports common external plan file formats for interoperability.
+- `amber wiki knowledge build` materializes structured knowledge pages under
+  `docs/wiki/knowledge/`.
+- Commands:
+  - `node scripts/amber.js wiki knowledge plan --target .`
+  - `node scripts/amber.js wiki knowledge build --target .`
+  - `node scripts/amber.js wiki knowledge report --target .`
+
+The plan's notes and documents are treated as the source of truth for high-signal
+architecture understanding.

@@ -47,3 +47,9 @@ This Wiki is the stable map for agents and humans working in the repository.
 ## Glossary
 
 - [Glossary](glossary.md)
+
+## Knowledge Plan & Structured Knowledge
+
+- Knowledge Plan (declarative): [knowledge-plan.json](knowledge-plan.json) or .yaml
+- Use `amber wiki knowledge plan` / `build` to manage and generate structured knowledge pages.
+- The plan defines high-value documents and notes for the knowledge base.

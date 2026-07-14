@@ -1,0 +1,84 @@
+# Amber Knowledge Plan (compatible with external plan yaml formats)
+# This file declares the high-value architecture documentation and knowledge
+# cards that should exist for the repository.
+#
+# Amber can read this (or the .json variant), and also reads
+# Supports common external plan file formats for interoperability.
+
+version: 1
+
+scope:
+  include: []
+  exclude:
+    - "node_modules/**"
+    - "apps/web/node_modules/**"
+    - "coverage/**"
+    - ".tmp/**"
+    - ".archive/**"
+    - "agent-tools/**"
+    - ".amber-legacy-harness-backup-*/**"
+    - ".amber/worktrees/**"
+    - "test-fixtures/**"
+    - "test-adoption/**"
+    - "test-workflows/**"
+    - "mcps/**"
+    - ".tmp-*/**"
+
+knowledgePlan:
+  template: architecture
+  notes:
+    - text: "Amber Protocol is a repository-local governance layer for AI-assisted engineering, NOT a runtime framework or agent platform. It produces review artifacts, dry-run plans, and approval records as files inside the target repo."
+    - text: "The CLI entry point is scripts/amber.js. All business logic lives in scripts/lib/. The scripts/lib/core/ directory is the core engine; files matching scripts/lib/*-commands.js are thin CLI wrappers that delegate to core functions."
+    - text: "Seven governance control layers in priority order: Governance (highest) > Verification > Observability > Lifecycle > Context > Tooling > Execution (lowest/avoid). This priority weighting shapes the entire codebase."
+    - text: "The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command."
+    - text: "Safety boundary: read-only/dry-run first. 'init' and 'wiki' never overwrite existing files. Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows."
+    - text: "Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead."
+    - text: "Dependencies are intentionally minimal: ajv for JSON Schema validation, ajv-formats for format validation, nodemailer for notifications. No Express, no database, no ORM in the CLI package."
+    - text: "src/ contains auxiliary utilities only (migration + security scanners), not the main CLI logic. Do not confuse src/ with scripts/lib/core/."
+    - text: "apps/web/ is a standalone React 18 + Vite + tRPC + TanStack Router application with its own package.json (@amber-protocol/web). It is NOT part of the published amber-protocol npm package."
+    - text: "Governed loop execution (ADR-0003) requires four gates: declarative policy check, explicit 'amber loop approve', isolated git worktree, and tamper-evident hash-chain ledger. Default 'loop run' is still dry-run."
+    - text: "The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required."
+    - text: "JSON Schemas in schemas/ define contracts for loop-contract, route, session-manifest, and timeline-event (plus knowledge-plan). All validated with ajv."
+  documents:
+    - title: "CLI Architecture & Command Dispatch"
+      goal: "Document how scripts/amber.js dispatches commands through command-dispatcher.js to handler modules and the core engine in scripts/lib/core/."
+      hints: "Cover the command-dispatcher pattern, how *-commands.js files wrap core logic, and the separation between CLI surface and business logic. Include Mermaid diagram for flow if helpful."
+    - title: "Governance Model & Seven Layers"
+      goal: "Map the seven governance control layers to concrete commands, data structures, and enforcement points."
+      hints: "Governance > Verification > Observability > Lifecycle > Context > Tooling > Execution. Reference governance.js, governance-report.js, governance-readiness.js, and the standards/ JSON files."
+    - title: "Session & Lifecycle Management"
+      goal: "Document routes, sessions, checkpoints, worktrees, and the lifecycle state machine."
+      hints: "Cover session-commands.js, session-state-machine.js, session-manifest.js, route-commands.js, route-loader.js, checkpoint-manager.js, worktree-manager.js, and lifecycle.js."
+    - title: "Adoption System"
+      goal: "Explain the adoption report pipeline: proposals, gates, metrics, and the composer sub-module."
+      hints: "Cover adoption-reports.js, adoption-proposals.js, adoption-gate.js, adoption-metrics.js, adoption-bundle.js, and the adoption-composer/ sub-module with its renderers."
+    - title: "Loop Engineering & Governed Execution"
+      goal: "Document loop contracts, ledgers, dry-run mode, and the four-gate governed execution path."
+      hints: "Cover loops.js, loop-execution.js, loop-ledger.js, loop-policy.js, governed-runner.js, execution-validator.js."
+    - title: "Skills & Platform Generation"
+      goal: "Explain the skill system: SKILL.md as source of truth, gen:agents generation, and platform integrations."
+      hints: "Cover skills/*/SKILL.md, scripts/gen-agent-commands.js, and the .claude/, .agents/skills/, .gemini/commands/ output directories."
+    - title: "Web Dashboard"
+      goal: "Document the apps/web React dashboard architecture: tRPC API, TanStack Router routes, and session/timeline components."
+      hints: "Separate package.json (@amber-protocol/web). Cover routes/, components/session/, components/timeline/, features/, lib/trpc.ts, and the Express server."
+    - title: "Schema & Validation Layer"
+      goal: "Document the JSON Schema contracts and runtime validation with ajv."
+      hints: "Cover schemas/*.schema.json, validators.js, schema-version-checker.js, and how ajv is used across the codebase."
+    - title: "Handoff & Continuity"
+      goal: "Explain the handoff bundle, session handoff, and continuity surfaces that make work transferable."
+      hints: "Cover handoff-bundle.js, handoff-command.js, continuity-surfaces.js, session-handoff.md template, and the handoff validate flow."
+    - title: "Security & Migration Utilities"
+      goal: "Document the auxiliary security scanners and state migration tools in src/."
+      hints: "Cover src/security/ (audit-report, dependency-scan, permission-review, secret-scan) and src/migration/ (dry-run, rollback, schema-validator)."
+
+knowledgecard:
+  notes:
+    - text: "scripts/lib/core/ is the core engine — treat as one knowledge module. It contains audit, doctor, governance, planning, lifecycle, loops, handoff, adoption, scaffold, maintenance, team, and workflow-pack logic."
+    - text: "scripts/lib/core/adoption-composer/ is a sub-module with dedicated renderers (bundle, decision, gate, report) for composing adoption reports."
+    - text: "scripts/lib/*-commands.js files are thin CLI command handlers. They parse arguments and delegate to scripts/lib/core/ functions."
+    - text: "src/migration/ and src/security/ are auxiliary utility modules separate from the CLI core."
+    - text: "skills/ contains platform-agnostic skill definitions. Platform files are generated from skills/."
+    - text: "apps/web/ is a standalone React+Vite+tRPC application with its own package.json."
+    - text: "templates/ contains starter file templates that 'amber init' and 'amber wiki' scaffold."
+    - text: "schemas/ defines the authoritative JSON Schema contracts used by the CLI."
+    - text: "scripts/lib/command-dispatcher.js is the central command registry and router."

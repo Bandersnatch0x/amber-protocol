@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://amber-protocol.dev/schemas/knowledge-plan.schema.json",
+  "title": "Amber Knowledge Plan",
+  "description": "Declarative plan describing high-signal architecture documentation and knowledge cards (structured knowledge base) for a repository. Amber's wiki tooling uses this to drive coverage analysis, proposals, and maintenance of stable project understanding.",
+  "type": "object",
+  "required": ["schemaVersion", "knowledgePlan"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Schema version for this plan file."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "User-managed plan version (bump on meaningful changes)."
+    },
+    "scope": {
+      "type": "object",
+      "description": "Glob patterns controlling what source is in/out of scope for knowledge plan analysis and synthesis.",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "knowledgePlan": {
+      "type": "object",
+      "required": ["documents"],
+      "properties": {
+        "template": {
+          "type": "string",
+          "description": "High-level template or style for the knowledge base (e.g. 'architecture', 'domain-first').",
+          "default": "architecture"
+        },
+        "notes": {
+          "type": "array",
+          "description": "High-level distilled understanding of the repository (strong priors for the wiki/knowledge build). Each is a short, authoritative instruction to the generator.",
+          "items": {
+            "type": "object",
+            "required": ["text"],
+            "properties": {
+              "text": { "type": "string", "minLength": 1 },
+              "author": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "documents": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Desired knowledge documents. Each represents a stable, high-value page or section that should exist (or be proposed) under docs/wiki or docs/architecture.",
+          "items": {
+            "$ref": "#/definitions/KnowledgeDocument"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "knowledgeCards": {
+      "type": "array",
+      "description": "Concise, high-signal knowledge units (cards). Agents and humans can consult these for rapid orientation. Derived from or aligned with knowledgePlan.notes and code facts.",
+      "items": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Optional stable identifier for the card (e.g. 'core-engine', 'governance-layers')."
+          },
+          "text": { "type": "string", "minLength": 1 },
+          "author": { "type": "string" },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "KnowledgeDocument": {
+      "type": "object",
+      "required": ["title", "goal"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human title for the document (becomes category)."
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What this document must achieve."
+        },
+        "parent": {
+          "type": "string",
+          "default": "",
+          "description": "Optional parent (top-level when empty). One level nesting supported."
+        },
+        "hints": {
+          "type": "string",
+          "description": "Authoring or analysis hints — key areas, modules, or files to cover."
+        },
+        "template": {
+          "type": "string",
+          "description": "Optional per-document H2 section skeleton template name (overrides global knowledgePlan.template)."
+        },
+        "path": {
+          "type": "string",
+          "description": "Suggested relative path under docs/wiki (optional override)."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

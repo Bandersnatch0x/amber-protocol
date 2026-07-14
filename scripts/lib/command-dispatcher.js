@@ -21,6 +21,14 @@ const path = require("node:path");
 // ── Barrel imports ──────────────────────────────────────────────────────────
 // Direct core imports (the amber-core facade was removed — ADR-0005, #4 PR2).
 const { scaffoldHarness, scaffoldWiki } = require("./core/scaffold");
+const {
+	scaffoldKnowledgePlan,
+	loadKnowledgePlan,
+	buildKnowledgeReport,
+	formatKnowledgeReportText,
+	materializeKnowledgeBase,
+	proposeKnowledgePlan,
+} = require("./core/knowledge-plan");
 const { auditProject, validateHandoff } = require("./core/audit");
 const { doctor } = require("./core/doctor");
 const { scaffoldPlan, validatePlanGate, confirmPlanGate, reviewPlan, acceptPlan, readPlanField } = require("./core/planning");
@@ -79,12 +87,85 @@ function handleAudit(args) {
 
 function handleWiki(args) {
   const action = args._?.[0];
+
   if (action === "export") {
     return { result: exportOkfBundle(args.target, { outputDir: args.outputDir }) };
   }
+
+  // Knowledge Plan support (declarative architecture + knowledge cards, integrated for Amber)
+  if (action === "knowledge") {
+    const sub = args._?.[1]; // e.g. scaffold | inspect | report
+    const dryRun = Boolean(args.dryRun);
+
+    if (sub === "scaffold" || !sub) {
+      // default "amber wiki knowledge" scaffolds the plan (idempotent)
+      const res = scaffoldKnowledgePlan(args.target, { dryRun, yaml: args.yaml || args.yml });
+      return { result: res };
+    }
+
+    if (sub === "inspect") {
+      const loaded = loadKnowledgePlan(args.target);
+      return { result: loaded, bypassPrint: !args.json, onBypass: () => {
+        if (loaded.found && loaded.plan) {
+          console.log(JSON.stringify(loaded.plan, null, 2));
+        } else {
+          console.log(loaded.errors?.length ? loaded.errors.join("\n") : "No knowledge-plan.json found.");
+        }
+      }};
+    }
+
+    if (sub === "report") {
+      const report = buildKnowledgeReport(args.target);
+      return {
+        result: report,
+        bypassPrint: !args.json,
+        onBypass: () => {
+          console.log(formatKnowledgeReportText(report));
+        },
+      };
+    }
+
+    if (sub === "validate") {
+      const loaded = loadKnowledgePlan(args.target);
+      const result = {
+        target: loaded.target,
+        found: loaded.found,
+        valid: loaded.errors.length === 0,
+        errors: loaded.errors,
+        warnings: loaded.warnings,
+      };
+      return { result };
+    }
+
+    if (sub === "build" || sub === "materialize") {
+      const res = materializeKnowledgeBase(args.target, { dryRun: args.dryRun });
+      return { result: res };
+    }
+
+    if (sub === "plan") {
+      const res = proposeKnowledgePlan(args.target, { dryRun: args.dryRun, force: args.force });
+      return {
+        result: res,
+        bypassPrint: !args.json,
+        onBypass: () => {
+          console.log(`Knowledge Plan proposal for ${res.target}`);
+          console.log(`Inspection: ${res.inspectionSummary}`);
+          if (res.created.length) console.log(`Wrote: ${res.created.join(", ")}`);
+          if (res.skipped.length) console.log(`Skipped (existing): ${res.skipped.join(", ")}`);
+          if (args.json) {
+            console.log(JSON.stringify(res.suggestedPlan, null, 2));
+          }
+        },
+      };
+    }
+
+    return { result: { target: args.target, errors: [`Unknown knowledge action: ${sub || ""}. Supported: plan, scaffold, inspect, report, validate, build.`], warnings: [] } };
+  }
+
   if (args.okf) {
     return { result: validateWiki(args.target, { okf: true }) };
   }
+
   return { result: scaffoldWiki(args.target, { dryRun: args.dryRun }) };
 }
 

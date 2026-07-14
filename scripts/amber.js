@@ -111,6 +111,8 @@ function usage(command) {
     "  amber init --target path/to/repo",
     "  amber audit --target path/to/repo",
     "  amber wiki --target path/to/repo",
+  "  amber wiki knowledge plan --target path/to/repo",
+  "  amber wiki knowledge build --target path/to/repo",
     "  amber handoff --target path/to/repo",
     "  amber handoff bundle --target path/to/repo",
     "  amber handoff validate --target path/to/repo",
