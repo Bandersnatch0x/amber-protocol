@@ -35,8 +35,10 @@
     "test:e2e": "node scripts/run-tests.js tests/e2e/",
     "gen:agents": "node scripts/gen-agent-commands.js",
     "gen:agents:check": "node scripts/gen-agent-commands.js --check",
-    "lint": "echo 'Lint: no linter configured. Add eslint to devDependencies to enable.'",
-    "format": "echo 'Format: no formatter configured. Add prettier to devDependencies to enable.'",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "cd apps/web && npx tsc --noEmit"
   },
   "c8": {
@@ -65,6 +67,10 @@
     "nodemailer": "^9.0.1"
   },
   "devDependencies": {
-    "c8": "^11.0.0"
+    "@eslint/js": "^9.39.5",
+    "c8": "^11.0.0",
+    "eslint": "^9.39.5",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.5"
   }
 }

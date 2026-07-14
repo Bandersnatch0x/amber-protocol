@@ -1,0 +1,109 @@
+{
+  "features": [
+    {
+      "id": "F001",
+      "priority": 1,
+      "area": "context",
+      "paths": ["scripts/lib/core/scaffolding.js", "scripts/amber.js"],
+      "title": "Amber scaffold install (init)",
+      "user_visible_behavior": "A project gains AGENTS.md/CLAUDE.md, feature_list.json, and a wiki skeleton, with existing files preserved (idempotent).",
+      "status": "completed",
+      "verification": [
+        "node scripts/amber.js init --target <repo> is idempotent and skips existing files",
+        "npm test (init/scaffolding suites green)"
+      ],
+      "evidence": ["npm test: 1158/0 passing across Node 18/20/22 CI matrix"],
+      "notes": ["Self-dogfooded: amber init runs against this repo's own layout."]
+    },
+    {
+      "id": "F002",
+      "priority": 2,
+      "area": "verification",
+      "paths": ["scripts/lib/core/"],
+      "title": "Doctor validation",
+      "user_visible_behavior": "amber doctor reports whether a repo's Amber setup is usable and internally consistent.",
+      "status": "completed",
+      "verification": ["node scripts/amber.js doctor --target .", "npm run doctor"],
+      "evidence": ["npm test: doctor suites green"],
+      "notes": []
+    },
+    {
+      "id": "F003",
+      "priority": 3,
+      "area": "lifecycle",
+      "paths": ["scripts/lib/route-commands.js", "routes/"],
+      "title": "Route engine",
+      "user_visible_behavior": "Routes (feature-standard, bugfix-quick, refactor-safe) can be listed, inspected, validated, and dry-run tested; session goals auto-match via goalPattern.",
+      "status": "completed",
+      "verification": [
+        "node scripts/amber.js route list",
+        "node scripts/amber.js route test bugfix-quick --dry-run"
+      ],
+      "evidence": ["npm test: route suites green"],
+      "notes": ["goalPattern auto-matching documented in command-help."]
+    },
+    {
+      "id": "F004",
+      "priority": 4,
+      "area": "lifecycle",
+      "paths": ["scripts/lib/session-commands.js"],
+      "title": "Session lifecycle",
+      "user_visible_behavior": "Sessions can be started, listed, status-checked, aborted, and continued from checkpoints.",
+      "status": "completed",
+      "verification": ["node scripts/amber.js session list", "npm run test:load"],
+      "evidence": ["sequential load test: 20 sessions completed <2min", "npm test: session suites green"],
+      "notes": ["Test-suite leak guard (run-tests.js) prevents root .amber/sessions accumulation."]
+    },
+    {
+      "id": "F005",
+      "priority": 5,
+      "area": "governance",
+      "paths": ["scripts/lib/governance-commands.js"],
+      "title": "Governance report & approval gates",
+      "user_visible_behavior": "amber governance report scores the delivery loop and emits structured next actions; gates enforce human approval before completion.",
+      "status": "completed",
+      "verification": ["node scripts/amber.js governance report --target .", "npm test: governance suites green"],
+      "evidence": ["governance report <1s after session-state cleanup"],
+      "notes": []
+    },
+    {
+      "id": "F006",
+      "priority": 6,
+      "area": "observability",
+      "paths": ["scripts/lib/core/handoff-bundle.js"],
+      "title": "Handoff reports",
+      "user_visible_behavior": "amber handoff produces a portable handoff bundle for clean session continuity.",
+      "status": "completed",
+      "verification": ["node scripts/amber.js handoff --target .", "npm test: handoff suites green"],
+      "evidence": ["npm test: handoff suites green"],
+      "notes": []
+    },
+    {
+      "id": "F007",
+      "priority": 7,
+      "area": "governance",
+      "paths": ["scripts/lib/core/loops/", "src/migration/"],
+      "title": "Governed loop execution (ADR-0003)",
+      "user_visible_behavior": "Loop contracts run only behind four gates: policy rules, explicit one-shot approval, isolated worktree, and a tamper-evident ledger.",
+      "status": "in_progress",
+      "verification": [
+        "node scripts/amber.js loop run --dry-run",
+        "node scripts/amber.js loop verify-ledger"
+      ],
+      "evidence": ["readyForLiveScheduling=false by product boundary; human-triggered --execute only"],
+      "notes": ["No autonomous or scheduled execution; cron/daemon and auto-approval disallowed."]
+    },
+    {
+      "id": "F008",
+      "priority": 8,
+      "area": "execution",
+      "paths": ["apps/web/"],
+      "title": "Web viewer (Phase C)",
+      "user_visible_behavior": "A Vite + React + tRPC viewer renders sessions, timelines, ledgers, and governance state.",
+      "status": "in_progress",
+      "verification": ["cd apps/web && npm test", "cd apps/web && npm run build"],
+      "evidence": ["web vitest 382/0 passing"],
+      "notes": ["Owns its TS toolchain; excluded from root eslint."]
+    }
+  ]
+}

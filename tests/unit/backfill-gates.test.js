@@ -18,7 +18,7 @@ describe("approvedGatesFromTimeline", () => {
 	});
 	afterEach(() => {
 		if (fs.existsSync(sessionDir)) {
-			try { fs.rmSync(sessionDir, { recursive: true }); } catch {}
+			try { fs.rmSync(sessionDir, { recursive: true }); } catch { /* ignore cleanup failure */ }
 		}
 	});
 

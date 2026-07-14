@@ -222,7 +222,7 @@ function inspectPolicy(targetRoot) {
   const errors = [];
   const warnings = [];
 
-  if (policy.hasOwnProperty('auto-approve-all')) {
+  if (Object.prototype.hasOwnProperty.call(policy, 'auto-approve-all')) {
     errors.push("auto-approve-all is a CLI flag, not a policy setting");
   }
 

@@ -47,9 +47,40 @@ if (files.length === 0) {
 	process.exit(1);
 }
 
+// Leak guard: tests must isolate session state via --target / mkdtemp /
+// fixtures, never write into the repo-root .amber/sessions/. Snapshot before
+// the run, diff after; any new session dir is a leak we clean up and fail on.
+// (The prior 6082-session accumulation — and the 9s governance scan it caused
+// — came from exactly this kind of leak piling up across runs.)
+const SESSIONS_DIR = path.join(ROOT, ".amber", "sessions");
+function listRootSessions() {
+	if (!fs.existsSync(SESSIONS_DIR)) return [];
+	return fs.readdirSync(SESSIONS_DIR).filter((name) =>
+		fs.statSync(path.join(SESSIONS_DIR, name)).isDirectory(),
+	);
+}
+const sessionsBefore = new Set(listRootSessions());
+
 const result = spawnSync(process.execPath, ["--test", ...files], {
 	stdio: "inherit",
 	cwd: ROOT,
 });
+
+const leaked = listRootSessions().filter((id) => !sessionsBefore.has(id));
+if (leaked.length > 0) {
+	console.error("");
+	console.error(
+		`[amber] test-suite leak guard: ${leaked.length} session(s) written to repo-root .amber/sessions/ during this run.`,
+	);
+	console.error(
+		"Tests must isolate session state via --target / mkdtemp / fixtures, never the repo root.",
+	);
+	for (const id of leaked) {
+		console.error(`  ${id}`);
+		fs.rmSync(path.join(SESSIONS_DIR, id), { recursive: true, force: true });
+	}
+	console.error("[amber] cleaned up leaked sessions; failing the run.");
+	process.exit(1);
+}
 
 process.exit(result.status ?? 1);

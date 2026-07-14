@@ -1,0 +1,6 @@
+node_modules/
+apps/web/
+coverage/
+tests/fixtures/
+package-lock.json
+*.min.js

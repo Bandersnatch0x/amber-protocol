@@ -85,6 +85,7 @@ MEMORY.md
 .release-checklist.md
 tasks/
 feature_list.json
+!/feature_list.json
 问题清单.md
 
 # Local regression-test scratch (go-stock analysis reports and ad-hoc test scripts)

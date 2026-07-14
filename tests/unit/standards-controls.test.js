@@ -15,7 +15,7 @@ test("empty repo: every risk present=false (no controls deployed)", () => {
   const dir = tmpDir();
   const r = mapStandards(dir, "owasp-agentic");
   assert.ok(r.risks.every((x) => x.present === false), "no controls in an empty repo");
-  assert.equal(r.controls, undefined || r.controls); // controls object may exist
+  assert.ok(r.controls === undefined || typeof r.controls === "object", "controls object may exist");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
