@@ -182,7 +182,7 @@
 Root suite:  900 tests passed
 Web suite:   269 tests passed (+78 since 2026-06-20)
 Typecheck:   0 errors (web)
-E2E:         未在本地跑(Windows proxy trap),CI gate
+E2E:         18 passed on Windows local (127.0.0.1 + NO_PROXY, verified #57 2026-07-14); CI gate (stale "proxy trap" memory resolved)
 ```
 
 ### 已验证的守卫
@@ -208,3 +208,14 @@ Amber Protocol 代码库经过本次质量提升,已达到**Production-Ready**�
 1. 立即开 PR 合并当前分支(web 强化 + root 守卫)
 2. 剩余 LOW 优先级项(二次守卫清理 / VirtualTimeline 测试)另开分支逐步推进
 3. 生成 adoption report 展示整体成熟度(下一步)
+
+## Post-review verification (2026-07-14, #57)
+
+**Windows-local E2E re-verified:** `cd apps/web && npm install --legacy-peer-deps && npm run test:e2e`
+
+- Result: **18 passed (0 failed)** in ~28-57s (real run, exit 0).
+- Servers: API bound `http://127.0.0.1:3101`, Vite `http://127.0.0.1:5273`.
+- All health checks, UI flows, fixture assertions used `127.0.0.1` explicitly (no localhost resolution, no IPv6).
+- `playwright.config.ts` (NO_PROXY + 127.0.0.1 baseURL/webServer) + `vite.config.mts` (host: '127.0.0.1') effective.
+- Old "Windows proxy trap" / "未在本地跑" claim is stale/outdated. Local E2E now viable on Windows.
+- Only doc updated: this file (historical note). No production code changes.
