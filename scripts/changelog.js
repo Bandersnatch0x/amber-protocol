@@ -123,15 +123,18 @@ function hasBreakingFooter(body) {
 
 function parseConventional(subject, body = "") {
 	// Supports: type(scope)!?: message
-	// Breaking can be indicated by `!` after the scope, a BREAKING token in the
-	// subject, or a "BREAKING CHANGE:" / "BREAKING-CHANGE:" footer in the body.
+	// Breaking is indicated ONLY by `!` after the scope or a
+	// "BREAKING CHANGE:" / "BREAKING-CHANGE:" footer in the body — NOT by the
+	// word "BREAKING" appearing in the subject, which is usually descriptive
+	// (e.g. "detect BREAKING CHANGE in footer") and caused a false-positive
+	// when this generator first dogfooded itself (v1.3.3 release).
 	const match = subject.match(/^(\w+)(?:\(([^)]+)\))?(!)?:\s*(.+)$/);
 	if (!match) {
 		return { type: "other", scope: null, breaking: false, subject };
 	}
 	const [, typeRaw, scope, bang, msg] = match;
 	const type = typeRaw.toLowerCase();
-	const breaking = Boolean(bang) || /BREAKING/i.test(subject) || hasBreakingFooter(body);
+	const breaking = Boolean(bang) || hasBreakingFooter(body);
 	return {
 		type,
 		scope: scope || null,

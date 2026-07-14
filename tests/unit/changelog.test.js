@@ -101,6 +101,15 @@ test("parseConventional flags breaking via body footer, not just subject", () =>
 	assert.equal(parseConventional("feat!: x").breaking, true);
 });
 
+test("parseConventional does NOT flag breaking on a descriptive subject mentioning BREAKING", () => {
+	// v1.3.3 dogfood: "detect BREAKING CHANGE in footer" is a description, not
+	// a breaking marker — only `!` or a body footer signals breaking.
+	assert.equal(parseConventional("feat(changelog): detect BREAKING CHANGE in commit body footer (#52)").breaking, false);
+	assert.equal(parseConventional("fix: handle BREAKING changes").breaking, false);
+	// `!` still wins even if the subject also mentions breaking
+	assert.equal(parseConventional("feat(api)!: BREAKING change to API").breaking, true);
+});
+
 test("groupCommits maps types to sections and preserves refs + scopes", () => {
 	const commits = [
 		{ subject: "feat: new governance lifecycle", body: "" },
