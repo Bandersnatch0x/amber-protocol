@@ -49,6 +49,21 @@ function doctorProductRepo(targetRoot, classification) {
 	const warnings = [];
 	const productChecks = [];
 
+	// Product-repo still owns a feature_list.json (self-dogfood). Enforce the
+	// same feature-list invariants as target-repo doctor — including at most
+	// one in_progress — so product-repo doctor can't print Errors:0 while the
+	// list violates Operating Manual §6 (#66).
+	const featureResult = validateFeatureListFile(
+		path.join(targetRoot, "feature_list.json"),
+	);
+	errors.push(...featureResult.errors);
+	warnings.push(...featureResult.warnings);
+	productChecks.push({
+		name: "feature_list.json",
+		errors: featureResult.errors.length,
+		warnings: featureResult.warnings.length,
+	});
+
 	if (hasPluginManifestDirectory(targetRoot)) {
 		const manifestResult = validateManifests(targetRoot);
 		errors.push(...manifestResult.errors);

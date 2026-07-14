@@ -10,7 +10,7 @@
       ],
       "title": "Amber scaffold install (init)",
       "user_visible_behavior": "A project gains AGENTS.md/CLAUDE.md, feature_list.json, and a wiki skeleton, with existing files preserved (idempotent).",
-      "status": "completed",
+      "status": "passing",
       "verification": [
         "node scripts/amber.js init --target <repo> is idempotent and skips existing files",
         "npm test (init/scaffolding suites green)"
@@ -31,7 +31,7 @@
       ],
       "title": "Doctor validation",
       "user_visible_behavior": "amber doctor reports whether a repo's Amber setup is usable and internally consistent.",
-      "status": "completed",
+      "status": "passing",
       "verification": [
         "node scripts/amber.js doctor --target .",
         "npm run doctor"
@@ -51,7 +51,7 @@
       ],
       "title": "Route engine",
       "user_visible_behavior": "Routes (feature-standard, bugfix-quick, refactor-safe) can be listed, inspected, validated, and dry-run tested; session goals auto-match via goalPattern.",
-      "status": "completed",
+      "status": "passing",
       "verification": [
         "node scripts/amber.js route list",
         "node scripts/amber.js route test bugfix-quick --dry-run"
@@ -72,7 +72,7 @@
       ],
       "title": "Session lifecycle",
       "user_visible_behavior": "Sessions can be started, listed, status-checked, aborted, and continued from checkpoints.",
-      "status": "completed",
+      "status": "passing",
       "verification": [
         "node scripts/amber.js session list",
         "npm run test:load"
@@ -94,7 +94,7 @@
       ],
       "title": "Governance report & approval gates",
       "user_visible_behavior": "amber governance report scores the delivery loop and emits structured next actions; gates enforce human approval before completion.",
-      "status": "completed",
+      "status": "passing",
       "verification": [
         "node scripts/amber.js governance report --target .",
         "npm test: governance suites green"
@@ -113,7 +113,7 @@
       ],
       "title": "Handoff reports",
       "user_visible_behavior": "amber handoff produces a portable handoff bundle for clean session continuity.",
-      "status": "completed",
+      "status": "passing",
       "verification": [
         "node scripts/amber.js handoff --target .",
         "npm test: handoff suites green"
@@ -154,7 +154,7 @@
       ],
       "title": "Web viewer (Phase C)",
       "user_visible_behavior": "A Vite + React + tRPC viewer renders sessions, timelines, ledgers, and governance state.",
-      "status": "in_progress",
+      "status": "passing",
       "verification": [
         "cd apps/web && npm test",
         "cd apps/web && npm run build"

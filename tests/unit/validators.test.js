@@ -101,7 +101,7 @@ test("errors on an invalid status using the canonical set order", () => {
 		features: [validFeature({ status: "done" })],
 	});
 	assert.deepEqual(result.errors, [
-		"features[0].status must be one of not_started, in_progress, blocked, passing.",
+		"features[0].status must be one of not_started, in_progress, blocked, passing, accepted.",
 	]);
 });
 
@@ -170,6 +170,6 @@ test("accumulates every field error for an empty feature object", () => {
 		"features[0].verification must contain at least one step.",
 		"features[0].evidence must be an array.",
 		"features[0].notes must be an array.",
-		"features[0].status must be one of not_started, in_progress, blocked, passing.",
+		"features[0].status must be one of not_started, in_progress, blocked, passing, accepted.",
 	]);
 });

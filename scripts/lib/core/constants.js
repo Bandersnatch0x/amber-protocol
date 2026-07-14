@@ -49,11 +49,15 @@ const OPTIONAL_STARTER_WIKI_FILES = [
 
 const REQUIRED_HARNESS_FILES = MINIMUM_HARNESS_FILES;
 
+// Feature lifecycle statuses. `accepted` is written by `amber accept` (planning.js);
+// `passing` is written by feature verify evidence. `completed` is NOT valid —
+// use passing/accepted. Doctor + validate-feature-list enforce at-most-one in_progress.
 const VALID_STATUSES = new Set([
 	"not_started",
 	"in_progress",
 	"blocked",
 	"passing",
+	"accepted",
 ]);
 
 const REQUIRED_HANDOFF_SECTIONS = [
