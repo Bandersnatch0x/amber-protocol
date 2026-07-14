@@ -1,5 +1,5 @@
 ---
-description: Create or validate the repository-local Amber Protocol Wiki skeleton.
+description: Create or validate the repository-local Amber Protocol Wiki skeleton. Also manages the declarative Knowledge Plan and structured knowledge base.
 argument-hint: [target]
 ---
 
