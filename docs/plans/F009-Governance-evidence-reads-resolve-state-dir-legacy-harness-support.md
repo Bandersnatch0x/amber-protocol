@@ -1,7 +1,7 @@
 # Plan: Governance evidence reads resolve state dir (legacy .harness support)
 
 Feature: F009
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
