@@ -24,8 +24,17 @@ const ajv = new Ajv();
 addFormats(ajv);
 const validate = ajv.compile(schema);
 
+// Monotonic createdAt: two manifests created in the same millisecond (fast CLI
+// sequences / tests) must not share a timestamp, else the "newest session" sort
+// in readAllSessionManifests ties and falls back to readdirSync order — which
+// differs across filesystems and caused the continue-recovery flake (#58). Bump
+// by 1ms in-process so a later manifest always sorts strictly after an earlier one.
+let lastCreatedAtMs = 0;
 function createManifest({ route, goal, budget, feature }) {
-	const now = new Date().toISOString();
+	let nowMs = Date.now();
+	if (nowMs <= lastCreatedAtMs) nowMs = lastCreatedAtMs + 1;
+	lastCreatedAtMs = nowMs;
+	const now = new Date(nowMs).toISOString();
 	return {
 		sessionId: crypto.randomUUID(),
 		schemaVersion: SCHEMA_VERSION,
@@ -88,7 +97,14 @@ function readAllSessionManifests(sessionsDir) {
 			}
 		})
 		.filter(Boolean)
-		.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+		.sort((a, b) => {
+			// Newest createdAt first; a deterministic sessionId tiebreak ensures
+			// equal timestamps (cross-process same-ms) never fall back to
+			// readdirSync order, which differs across filesystems (#58).
+			const t = new Date(b.createdAt) - new Date(a.createdAt);
+			if (t !== 0) return t;
+			return a.sessionId < b.sessionId ? 1 : a.sessionId > b.sessionId ? -1 : 0;
+		});
 }
 
 // Persist a session manifest, stamping updatedAt immutably. Replaces the

@@ -24,6 +24,17 @@ describe("session-manifest", () => {
 		assert.ok(manifest.updatedAt);
 	});
 
+	it("should produce strictly increasing createdAt across rapid successive calls (#58)", () => {
+		// Same-millisecond creation must still order strictly, else
+		// readAllSessionManifests ties and falls back to readdirSync order
+		// (cross-filesystem flake in continue-recovery).
+		const m1 = createManifest({ route: { id: "r", version: "1.0.0-rc.1" }, goal: "g1" });
+		const m2 = createManifest({ route: { id: "r", version: "1.0.0-rc.1" }, goal: "g2" });
+		const m3 = createManifest({ route: { id: "r", version: "1.0.0-rc.1" }, goal: "g3" });
+		assert.ok(new Date(m2.createdAt) > new Date(m1.createdAt), "m2 createdAt must strictly follow m1");
+		assert.ok(new Date(m3.createdAt) > new Date(m2.createdAt), "m3 createdAt must strictly follow m2");
+	});
+
 	it("should validate manifest", () => {
 		const manifest = createManifest({
 			route: { id: "test", version: "1.0.0-rc.1" },
