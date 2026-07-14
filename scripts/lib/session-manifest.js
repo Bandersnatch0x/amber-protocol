@@ -24,17 +24,22 @@ const ajv = new Ajv();
 addFormats(ajv);
 const validate = ajv.compile(schema);
 
-// Monotonic createdAt: two manifests created in the same millisecond (fast CLI
-// sequences / tests) must not share a timestamp, else the "newest session" sort
-// in readAllSessionManifests ties and falls back to readdirSync order — which
-// differs across filesystems and caused the continue-recovery flake (#58). Bump
-// by 1ms in-process so a later manifest always sorts strictly after an earlier one.
-let lastCreatedAtMs = 0;
-function createManifest({ route, goal, budget, feature }) {
+let lastTimestampMs = 0;
+// Monotonic timestamp: stamps in the same millisecond (fast CLI sequences /
+// tests) must not share a value, else the "newest session" sort in
+// readAllSessionManifests ties and falls back to readdirSync order — which
+// differs across filesystems and caused the continue-recovery flake (#58).
+// Bump +1ms in-process so a later stamp always exceeds an earlier one. Shared
+// by createManifest (createdAt) AND writeSessionManifest (updatedAt) so an
+// updatedAt never lands before its own createdAt.
+function monotonicNowMs() {
 	let nowMs = Date.now();
-	if (nowMs <= lastCreatedAtMs) nowMs = lastCreatedAtMs + 1;
-	lastCreatedAtMs = nowMs;
-	const now = new Date(nowMs).toISOString();
+	if (nowMs <= lastTimestampMs) nowMs = lastTimestampMs + 1;
+	lastTimestampMs = nowMs;
+	return nowMs;
+}
+function createManifest({ route, goal, budget, feature }) {
+	const now = new Date(monotonicNowMs()).toISOString();
 	return {
 		sessionId: crypto.randomUUID(),
 		schemaVersion: SCHEMA_VERSION,
@@ -112,7 +117,7 @@ function readAllSessionManifests(sessionsDir) {
 // that 5 call sites used (bypassing writeJson). Does not mutate the input.
 // Returns the persisted manifest.
 function writeSessionManifest(sessionDir, manifest) {
-	const persisted = { ...manifest, updatedAt: new Date().toISOString() };
+	const persisted = { ...manifest, updatedAt: new Date(monotonicNowMs()).toISOString() };
 	writeJson(path.join(sessionDir, "manifest.json"), persisted);
 	return persisted;
 }
