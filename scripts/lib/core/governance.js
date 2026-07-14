@@ -35,28 +35,38 @@ function governanceDocs(targetRoot, _options = {}) {
   const templates = [
     { name: 'POLICY.md', content: `# Agent Policy
 
+> Boundary (ADR-0001 / ADR-0005): Amber does **not** run autonomous sessions.
+> \`session start/continue --mode autonomous\` is refused. This document records
+> the human-approval posture and non-goals; it is not a toggle for auto-execution.
+
 ## Approval Gates
+
+Human approval is required for user-facing gates. Defaults:
 
 \`\`\`json
 {
   "gates": {
-    "auto": "approve",
     "user-approval": "block",
     "step-confirm": "block"
   }
 }
 \`\`\`
 
-## Retry Budget
+- \`user-approval\`: always **block** unless an explicit live approval process exists.
+- There is no auto-approve executor. A leftover \`.amber/autonomous-policy.json\` is
+  inspected by \`amber governance policy\` for audit only.
 
-- Max attempts: 3
-- Backoff: 1s, 5s, 15s
-- Retryable stages: implement, verify
+## Governed Execution (human-triggered)
 
-## Notification Channels
+Loop / route command execution is only available behind four gates (policy,
+one-shot approval, isolated worktree, tamper-evident ledger). See ADR-0003.
+Cron, daemon scheduling, and auto-approval remain disallowed.
 
-- Email: disabled
-- Slack: disabled
+## Non-Goals (do not reintroduce)
+
+- Autonomous session mode
+- Auto-approve of user-approval gates
+- Unattended cron / scheduled loop execution
 ` },
     { name: 'BOUNDARIES.md', content: `# Execution Boundaries
 

@@ -49,7 +49,22 @@ Pick the route that fits (`feature-standard` | `bugfix-quick` | `refactor-safe`)
 
 This is the **canonical, e2e-verified** path (matches `docs/quality/e2e-governance-loop-verify.md`). Run it top-to-bottom. The tail (`complete → accept → handoff`) is exercised explicitly; `amber next` now includes the terminal sequence steps (handoff / complete-check / session-complete / accept) per the lifecycle definition.
 
-> Replace `<FID>` with a feature id registered in `feature_list.json`, `<SID>` with the session id printed by step 4, and `<GATE>` with the route's gate id (find with `amber route inspect feature-standard`).
+### 4.0 Pick the route first
+
+| Work shape | Route | Typical goal verbs | Gates (inspect, don't memorize) |
+|------------|-------|--------------------|---------------------------------|
+| New capability / feature | `feature-standard` | add, implement, create, build, support | `user-approval-plan`, `user-approval-implement` |
+| Bug / defect fix | `bugfix-quick` | fix, repair, resolve, close | inspect with `route inspect bugfix-quick` |
+| Safe refactor | `refactor-safe` | refactor, restructure, extract | inspect with `route inspect refactor-safe` |
+
+```bash
+# Always list gates for the chosen route before approve:
+node scripts/amber.js route inspect <ROUTE>
+```
+
+Using `feature-standard` with a goal that starts with `fix …` will warn that the goal does not match the route pattern — that is intentional; switch to `bugfix-quick` for fix work (#64).
+
+> Replace `<FID>` with a feature id in `feature_list.json`, `<SID>` with the session id from step 4, `<ROUTE>` with the chosen route, and `<GATE>` with **each** gate id from `route inspect <ROUTE>` (not a single hardcoded gate).
 
 ```bash
 # ── 0. Orient (read-only): know where you are before you start ─────────────
@@ -71,10 +86,11 @@ node scripts/amber.js gate --target . --plan docs/plans/<FID>-<slug>.md --confir
 # ── 4. Start a governed session BOUND to the feature ──────────────────────
 node scripts/amber.js session start \
   --target . \
-  --goal "<goal echoing the plan>" \
-  --route feature-standard \
+  --goal "<goal echoing the plan; match route goalPattern>" \
+  --route <ROUTE> \
   --feature <FID>
 #    prints: Session created: <SID>
+#    Then: node scripts/amber.js route inspect <ROUTE>  → list every gate id
 
 # ── 5. Verify with REAL execution evidence (never a claim-only verify) ─────
 node scripts/amber.js session verify \
@@ -86,19 +102,32 @@ node scripts/amber.js session verify \
 #    ledger, and (because the session is bound to <FID>) refluxes evidence into
 #    feature_list.json. A claim-only verify (no --execute) is NOT acceptable here.
 
-# ── 6. Approve the gate (human; separate from the worker) ─────────────────
+# ── 6. Approve EVERY remaining gate (human; separate from the worker) ──────
+#    feature-standard has TWO gates — approve each once, in order:
 node scripts/amber.js session approve \
   --target . \
   --session <SID> \
-  --gate <GATE> \
+  --gate <GATE_1> \
   --yes
+node scripts/amber.js session approve \
+  --target . \
+  --session <SID> \
+  --gate <GATE_2> \
+  --yes
+#    …repeat for any further gates from `route inspect <ROUTE>`.
 #    In a real TTY, drop --yes for the interactive prompt. Worker output never
 #    approves itself (Operating Manual §7).
+#    Note: approving the LAST pending gate may auto-mark the session completed.
+#    Step 8 is then a no-op (harmless). Do not skip earlier gates because of this.
 
 # ── 7. Complete-check (strict: needs executed evidence + live handoff) ─────
+#    Regenerate live handoff first so complete-check --strict is not satisfied by
+#    an init-scaffold handoff (G2).
+node scripts/amber.js handoff --target .
 node scripts/amber.js session complete-check --target . --session <SID> --strict
 
 # ── 8. Mark the session complete (governance terminal state) ───────────────
+#    May print "Session already completed" if step 6 auto-completed on last gate.
 node scripts/amber.js session complete --target . --session <SID>
 
 # ── 9. Accept the plan into the evolution log ─────────────────────────────

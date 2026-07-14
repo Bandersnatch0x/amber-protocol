@@ -2,35 +2,15 @@ const fs = require("fs");
 const path = require("path");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
 
-function loadPolicy(projectRoot = process.cwd()) {
-	const policyPath = path.join(resolveStateDirForRead(projectRoot), "autonomous-policy.json");
-
-	if (!fs.existsSync(policyPath)) {
-		return getDefaultPolicy();
-	}
-
-	// A present-but-corrupt policy must not crash callers (inspectPolicy and the
-	// autonomous executor dereference the result without their own guard). Fail
-	// safe to the defaults: they block user-approval, so a broken security policy
-	// can only ever stop autonomous actions, never silently auto-approve them.
-	let parsed;
-	try {
-		parsed = JSON.parse(fs.readFileSync(policyPath, "utf8"));
-	} catch {
-		return getDefaultPolicy();
-	}
-	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-		return getDefaultPolicy();
-	}
-	return parsed;
-}
+// Compat read of optional `.amber/autonomous-policy.json`.
+// Autonomous *execution* was removed (ADR-0001 / ADR-0005); this file is retained
+// only so `governance policy` can still inspect/warn on a leftover policy on disk.
+// There is no auto-approve executor that consumes these helpers.
 
 function getDefaultPolicy() {
 	return {
-		// Gates: user-approval gates are blocked by default —
-		// autonomous mode must not silently bypass human decisions.
-		// Users can override in .amber/autonomous-policy.json
-		// with --auto-approve-all or per-gate rules.
+		// Fail-safe defaults: user-approval stays blocked. Even if a leftover
+		// policy file is present, a corrupt/missing file degrades to this.
 		gates: {
 			auto: "approve",
 			"user-approval": "block",
@@ -46,26 +26,29 @@ function getDefaultPolicy() {
 	};
 }
 
-function shouldAutoApproveGate(gateType, policy) {
-	return policy.gates[gateType] === "approve";
-}
+function loadPolicy(projectRoot = process.cwd()) {
+	const policyPath = path.join(resolveStateDirForRead(projectRoot), "autonomous-policy.json");
 
-function getRetryConfig(policy) {
-	return policy.retry;
-}
+	if (!fs.existsSync(policyPath)) {
+		return getDefaultPolicy();
+	}
 
-function getBudgetPolicy(policy) {
-	return policy.budget;
-}
-
-function getNotificationConfig(policy) {
-	return policy.notifications;
+	// Present-but-corrupt policy must not crash callers (inspectPolicy). Fail
+	// safe to defaults: they block user-approval, so a broken security policy
+	// can only ever stop autonomous-style claims, never silently auto-approve.
+	let parsed;
+	try {
+		parsed = JSON.parse(fs.readFileSync(policyPath, "utf8"));
+	} catch {
+		return getDefaultPolicy();
+	}
+	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+		return getDefaultPolicy();
+	}
+	return parsed;
 }
 
 module.exports = {
 	loadPolicy,
-	shouldAutoApproveGate,
-	getRetryConfig,
-	getBudgetPolicy,
-	getNotificationConfig,
+	getDefaultPolicy,
 };
