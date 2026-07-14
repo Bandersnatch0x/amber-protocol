@@ -378,3 +378,34 @@ describe("session continuation remedies carry the selected target (#41)", () => 
 		assert.match(step.remedy, /--target \./);
 	});
 });
+
+describe("product-repo classification (#65)", () => {
+	// Regression: on the Amber product-repo itself, amberInstalled must be true
+	// even when REQUIRED_HARNESS_FILES aren't all present (the product-repo IS
+	// the template source and doesn't install itself). Otherwise handoff/next
+	// recommend `amber init` as the terminal step, contradicting the lifecycle.
+	function productRepoLayout(dir) {
+		fs.writeFileSync(path.join(dir, "SPEC.md"), "# spec");
+		fs.writeFileSync(path.join(dir, "ROADMAP.md"), "# roadmap");
+		fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
+		fs.writeFileSync(path.join(dir, "scripts", "amber.js"), "// cli");
+		fs.mkdirSync(path.join(dir, "templates"), { recursive: true });
+	}
+
+	it("gatherState marks a product-repo as amberInstalled even without required files", () => {
+		const dir = tmpRepo();
+		productRepoLayout(dir);
+		const state = gatherState(dir);
+		assert.equal(state.isProductRepo, true);
+		assert.equal(state.amberInstalled, true);
+	});
+
+	it("inferNextStep does not recommend init on a product-repo", () => {
+		const dir = tmpRepo();
+		productRepoLayout(dir);
+		writeFeatureList(dir, [{ id: "F001", title: "x", status: "completed" }]);
+		const ctx = buildContext(dir, { target: "." });
+		const step = inferNextStep(ctx);
+		if (step) assert.notEqual(step.id, "init");
+	});
+});

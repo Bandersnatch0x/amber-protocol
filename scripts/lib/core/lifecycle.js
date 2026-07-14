@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const { pathExists, readText, collectFilesBySuffix } = require("./fs-utils");
 const { REQUIRED_HARNESS_FILES } = require("./constants");
+const { classifyTarget } = require("./target-classification");
 const { shellQuote } = require("./text-utils");
 
 // ── State gathering ──────────────────────────────────────────────────────────
@@ -85,6 +86,11 @@ function gatherState(targetRoot) {
 	const amberInstalled = REQUIRED_HARNESS_FILES.every((rel) =>
 		pathExists(path.join(targetRoot, rel)),
 	);
+	// The product-repo IS the source-of-truth for the template set — it doesn't
+	// need to install itself. Without this, `amber handoff`/`next` on Amber's own
+	// tree recommends `amber init` as the terminal step, contradicting the
+	// lifecycle it's meant to close (#65).
+	const isProductRepo = classifyTarget(targetRoot).type === "product-repo";
 	const featureData = loadFeatures(targetRoot);
 	const features = Array.isArray(featureData.features)
 		? featureData.features.filter(Boolean)
@@ -96,7 +102,8 @@ function gatherState(targetRoot) {
 
 	return {
 		targetRoot,
-		amberInstalled,
+		amberInstalled: amberInstalled || isProductRepo,
+		isProductRepo,
 		featureCorrupt: Boolean(featureData._corrupt),
 		features,
 		plans: gatherPlans(targetRoot),
