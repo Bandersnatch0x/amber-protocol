@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
-const { execSync } = require("node:child_process");
+const { execSync, spawnSync } = require("node:child_process");
 const {
 	evaluateCompletion,
 	formatCompletion,
@@ -346,5 +346,75 @@ test("passes work check when the tree is dirty", () => {
 
 	const strict = evaluateCompletion(root, sessionId, { strict: true });
 	assert.equal(strict.status, "pass");
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
+// test: regression #56 - complete-check --strict must reject template/scaffold handoff (via CLI path too); live handoff passes. Tests only.
+test("complete-check --strict rejects init-scaffold/template handoff via CLI (G2)", () => {
+	const root = tempRoot();
+	const sessionId = "cli-template-reject-56";
+	const scaffold = fs.readFileSync(
+		path.join(__dirname, "..", "..", "templates", "session-handoff.md"),
+		"utf8",
+	);
+	buildSession(
+		root,
+		sessionId,
+		{
+			sessionId,
+			goal: "regression test template handoff reject",
+			status: "executing",
+			completedStages: ["verify"],
+		},
+		[
+			{ type: "session_created" },
+			{ type: "stage_completed", data: { executed: true, exitCode: 0 } },
+			{ type: "gate_passed", data: { gate: "final" } },
+		],
+		{ handoffContent: scaffold },
+	);
+
+	const AMBER = path.join(__dirname, "..", "..", "scripts", "amber.js");
+	const check = spawnSync(
+		process.execPath,
+		[AMBER, "session", "complete-check", "--target", root, "--session", sessionId, "--strict"],
+		{ encoding: "utf8" },
+	);
+	assert.equal(check.status, 1, "CLI scaffold reject exit code");
+	assert.match(check.stdout || "", /Completion check status: fail/);
+	assert.match(check.stdout || "", /Missing:.*handoff/);
+	const direct = evaluateCompletion(root, sessionId, { strict: true });
+	assert.equal(direct.status, "fail");
+	assert.ok(direct.missing.includes("handoff"));
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("complete-check --strict passes for live handoff via CLI", () => {
+	const root = tempRoot();
+	const sessionId = "cli-live-handoff-pass-56";
+	buildSession(
+		root,
+		sessionId,
+		{
+			sessionId,
+			goal: "regression test live handoff pass",
+			status: "executing",
+			completedStages: ["verify"],
+		},
+		[
+			{ type: "session_created" },
+			{ type: "stage_completed", data: { executed: true, exitCode: 0 } },
+			{ type: "gate_passed", data: { gate: "final" } },
+		],
+	);
+
+	const AMBER = path.join(__dirname, "..", "..", "scripts", "amber.js");
+	const check = spawnSync(
+		process.execPath,
+		[AMBER, "session", "complete-check", "--target", root, "--session", sessionId, "--strict"],
+		{ encoding: "utf8" },
+	);
+	assert.equal(check.status, 0, "CLI live pass exit");
+	assert.match(check.stdout || "", /Completion check status: pass/);
 	fs.rmSync(root, { recursive: true, force: true });
 });
