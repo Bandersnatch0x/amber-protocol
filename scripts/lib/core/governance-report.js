@@ -4,120 +4,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { inspectMaintenance } = require("./maintenance");
-const { inspectGovernanceReadiness } = require("./governance-readiness");
+const { inspectGovernanceReadiness, ACTION_LIBRARY } = require("./governance-readiness");
 const { resolveTarget } = require("./fs-utils");
 const { gatherState, buildContext, inferNextStep } = require("./lifecycle");
 const { shellQuote } = require("./text-utils");
 
 const PRODUCT_VALUE_LOOP = "Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle";
-
-const ACTION_LIBRARY = {
-	"policy-error": {
-		severity: "high",
-		why: "Governance policy errors make the repository unsafe to route through governed workflows.",
-		command: "node scripts/amber.js governance policy --target <repo>",
-		expectedOutcome: "Policy errors are fixed or recorded as explicit owner-approved exceptions.",
-		blocks: ["governance-score", "governed-workflow"],
-	},
-	"unsafe-user-approval": {
-		severity: "high",
-		why: "User approval gates must block unless a real approval process exists.",
-		command: "node scripts/amber.js governance policy --target <repo>",
-		expectedOutcome: "Approval gates are blocking or exceptions are documented.",
-		blocks: ["safety-score", "governed-workflow"],
-	},
-	"policy-warning": {
-		severity: "medium",
-		why: "Policy warnings reduce trust in governed automation boundaries.",
-		command: "node scripts/amber.js governance policy --target <repo>",
-		expectedOutcome: "Warnings are resolved or consciously accepted.",
-		blocks: ["governance-score"],
-	},
-	"route-error": {
-		severity: "high",
-		why: "Invalid routes cannot be used as repeatable delivery workflows.",
-		command: "node scripts/amber.js route validate <route-file> --target <repo>",
-		expectedOutcome: "Route definitions validate cleanly.",
-		blocks: ["governed-workflow", "continuity-score"],
-	},
-	"workflow-pack-read-error": {
-		severity: "high",
-		why: "Unreadable workflow packs cannot provide trustworthy execution constraints.",
-		command: "node scripts/amber.js pack validate --file <pack-file>",
-		expectedOutcome: "Workflow pack JSON can be parsed and inspected.",
-		blocks: ["governance-score", "safety-score"],
-	},
-	"missing-governance-doc": {
-		severity: "medium",
-		why: "Missing governance documents leave policy, boundary, or audit context invisible.",
-		command: "node scripts/amber.js governance docs --target <repo>",
-		expectedOutcome: "Required governance documents exist under .amber/governance.",
-		blocks: ["governance-score", "handoff-readiness"],
-	},
-	"route-without-gates": {
-		severity: "medium",
-		why: "Routes without gates do not enforce review or approval checkpoints.",
-		command: "node scripts/amber.js route inspect <route-id> --target <repo>",
-		expectedOutcome: "Routes include gates around planning, implementation, review, or merge stages.",
-		blocks: ["safety-score", "governed-workflow"],
-	},
-	"pack-missing-review-gates": {
-		severity: "medium",
-		why: "Loop contracts without review gates cannot prove independent review.",
-		command: "node scripts/amber.js pack inspect --file <pack-file>",
-		expectedOutcome: "Each loop contract defines review gates.",
-		blocks: ["safety-score", "governed-workflow"],
-	},
-	"pack-missing-worktree-isolation": {
-		severity: "medium",
-		why: "Mutating loops need worktree isolation to avoid accidental main checkout changes.",
-		command: "node scripts/amber.js pack readiness --file <pack-file>",
-		expectedOutcome: "Mutating loop contracts require isolated worktrees and forbid main checkout mutation.",
-		blocks: ["safety-score"],
-	},
-	"missing-security-standard": {
-		severity: "medium",
-		why: "Security pack claims need an auditable standard to map controls and gaps.",
-		command: "node scripts/amber.js governance standards init --target <repo>",
-		expectedOutcome: "Creates standards/security-governance.json (declarative security-governance standard), clearing this finding. Re-run `governance standards` to map coverage.",
-		blocks: ["safety-score", "governance-score"],
-	},
-	"security-pack-not-linked": {
-		severity: "medium",
-		why: "Security-named workflow packs should link to the security governance standard.",
-		command: "node scripts/amber.js governance standards --target <repo>",
-		expectedOutcome: "Security workflow packs reference security-governance.",
-		blocks: ["safety-score"],
-	},
-	"no-audit-evidence": {
-		severity: "medium",
-		why: "A complete product loop needs verification evidence before handoff is trustworthy.",
-		command: "node scripts/amber.js session start --target <repo> --goal \"verify current delivery\"",
-		expectedOutcome: "A governed session or execution records verification evidence that can be exported.",
-		blocks: ["evidence-score", "handoff-readiness"],
-	},
-	"missing-governance-rules": {
-		severity: "medium",
-		why: "Built-in defaults are safe, but a repository-local policy is easier to inspect and hand off.",
-		command: "node scripts/amber.js governance rules init --target <repo>",
-		expectedOutcome: ".amber/governance/rules.json exists with defaultAction=deny.",
-		blocks: ["governance-score", "safety-score"],
-	},
-	"unsafe-default-allow": {
-		severity: "high",
-		why: "defaultAction=allow permits unlisted commands and breaks deny-by-default governance.",
-		command: "node scripts/amber.js governance rules inspect --target <repo>",
-		expectedOutcome: "rules.json uses defaultAction=deny and deny-wins command policy.",
-		blocks: ["governance-score", "safety-score", "governed-workflow"],
-	},
-	"ledger-tampered": {
-		severity: "high",
-		why: "A tampered ledger means evidence continuity cannot be trusted.",
-		command: "node scripts/amber.js ledger verify-anchoring --target <repo>",
-		expectedOutcome: "Tampered ledger records are investigated and restored from version control if appropriate.",
-		blocks: ["evidence-score", "handoff-readiness"],
-	},
-};
 
 function clampScore(value) {
 	return Math.max(0, Math.min(100, Math.round(value)));

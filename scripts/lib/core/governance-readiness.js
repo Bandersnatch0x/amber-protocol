@@ -357,26 +357,134 @@ function decideReadiness(findings) {
 	return "ready";
 }
 
+// Single source of truth for finding-id → remediation (#61).
+// readiness.buildNextActions uses `summary`; governance-report uses the rich fields.
+const ACTION_LIBRARY = {
+	"policy-error": {
+		severity: "high",
+		summary: "Fix autonomous-policy.json errors before increasing agent autonomy.",
+		why: "Governance policy errors make the repository unsafe to route through governed workflows.",
+		command: "node scripts/amber.js governance policy --target <repo>",
+		expectedOutcome: "Policy errors are fixed or recorded as explicit owner-approved exceptions.",
+		blocks: ["governance-score", "governed-workflow"],
+	},
+	"unsafe-user-approval": {
+		severity: "high",
+		summary: "Set gates['user-approval'] to 'block' unless an explicit live approval process exists.",
+		why: "User approval gates must block unless a real approval process exists.",
+		command: "node scripts/amber.js governance policy --target <repo>",
+		expectedOutcome: "Approval gates are blocking or exceptions are documented.",
+		blocks: ["safety-score", "governed-workflow"],
+	},
+	"policy-warning": {
+		severity: "medium",
+		summary: "Review policy warnings and record the owner-approved exception if intentional.",
+		why: "Policy warnings reduce trust in governed automation boundaries.",
+		command: "node scripts/amber.js governance policy --target <repo>",
+		expectedOutcome: "Warnings are resolved or consciously accepted.",
+		blocks: ["governance-score"],
+	},
+	"route-error": {
+		severity: "high",
+		summary: "Fix unreadable or invalid route definitions before using governed delivery routes.",
+		why: "Invalid routes cannot be used as repeatable delivery workflows.",
+		command: "node scripts/amber.js route validate <route-file> --target <repo>",
+		expectedOutcome: "Route definitions validate cleanly.",
+		blocks: ["governed-workflow", "continuity-score"],
+	},
+	"workflow-pack-read-error": {
+		severity: "high",
+		summary: "Fix unreadable workflow pack JSON before relying on workflow-pack controls.",
+		why: "Unreadable workflow packs cannot provide trustworthy execution constraints.",
+		command: "node scripts/amber.js pack validate --file <pack-file>",
+		expectedOutcome: "Workflow pack JSON can be parsed and inspected.",
+		blocks: ["governance-score", "safety-score"],
+	},
+	"missing-governance-doc": {
+		severity: "medium",
+		summary: "Run amber governance docs --target <repo> or add the missing governance documents.",
+		why: "Missing governance documents leave policy, boundary, or audit context invisible.",
+		command: "node scripts/amber.js governance docs --target <repo>",
+		expectedOutcome: "Required governance documents exist under .amber/governance.",
+		blocks: ["governance-score", "handoff-readiness"],
+	},
+	"route-without-gates": {
+		severity: "medium",
+		summary: "Add route gates around planning, implementation, review, or merge stages.",
+		why: "Routes without gates do not enforce review or approval checkpoints.",
+		command: "node scripts/amber.js route inspect <route-id> --target <repo>",
+		expectedOutcome: "Routes include gates around planning, implementation, review, or merge stages.",
+		blocks: ["safety-score", "governed-workflow"],
+	},
+	"pack-missing-review-gates": {
+		severity: "medium",
+		summary: "Add reviewGates to each workflow pack loop contract.",
+		why: "Loop contracts without review gates cannot prove independent review.",
+		command: "node scripts/amber.js pack inspect --file <pack-file>",
+		expectedOutcome: "Each loop contract defines review gates.",
+		blocks: ["safety-score", "governed-workflow"],
+	},
+	"pack-missing-worktree-isolation": {
+		severity: "medium",
+		summary: "Require worktree isolation for mutating workflow-pack loops.",
+		why: "Mutating loops need worktree isolation to avoid accidental main checkout changes.",
+		command: "node scripts/amber.js pack readiness --file <pack-file>",
+		expectedOutcome: "Mutating loop contracts require isolated worktrees and forbid main checkout mutation.",
+		blocks: ["safety-score"],
+	},
+	"missing-security-standard": {
+		severity: "medium",
+		summary: "Run amber governance standards init to create standards/security-governance.json, then map coverage with amber governance standards.",
+		why: "Security pack claims need an auditable standard to map controls and gaps.",
+		command: "node scripts/amber.js governance standards init --target <repo>",
+		expectedOutcome: "Creates standards/security-governance.json (declarative security-governance standard), clearing this finding. Re-run `governance standards` to map coverage.",
+		blocks: ["safety-score", "governance-score"],
+	},
+	"security-pack-not-linked": {
+		severity: "medium",
+		summary: "Link security workflow packs to the security-governance standard.",
+		why: "Security-named workflow packs should link to the security governance standard.",
+		command: "node scripts/amber.js governance standards --target <repo>",
+		expectedOutcome: "Security workflow packs reference security-governance.",
+		blocks: ["safety-score"],
+	},
+	"no-audit-evidence": {
+		severity: "medium",
+		summary: "Run governed sessions and export evidence when work completes.",
+		why: "A complete product loop needs verification evidence before handoff is trustworthy.",
+		command: "node scripts/amber.js session start --target <repo> --goal \"verify current delivery\"",
+		expectedOutcome: "A governed session or execution records verification evidence that can be exported.",
+		blocks: ["evidence-score", "handoff-readiness"],
+	},
+	"missing-governance-rules": {
+		severity: "medium",
+		summary: "Run amber governance rules init --target <repo> to scaffold a safe-default policy.",
+		why: "Built-in defaults are safe, but a repository-local policy is easier to inspect and hand off.",
+		command: "node scripts/amber.js governance rules init --target <repo>",
+		expectedOutcome: ".amber/governance/rules.json exists with defaultAction=deny.",
+		blocks: ["governance-score", "safety-score"],
+	},
+	"unsafe-default-allow": {
+		severity: "high",
+		summary: "Set rules.json defaultAction to 'deny' — unlisted commands must not be permitted.",
+		why: "defaultAction=allow permits unlisted commands and breaks deny-by-default governance.",
+		command: "node scripts/amber.js governance rules inspect --target <repo>",
+		expectedOutcome: "rules.json uses defaultAction=deny and deny-wins command policy.",
+		blocks: ["governance-score", "safety-score", "governed-workflow"],
+	},
+	"ledger-tampered": {
+		severity: "high",
+		summary: "Investigate the flagged ledger record; restore it from version control if it was edited.",
+		why: "A tampered ledger means evidence continuity cannot be trusted.",
+		command: "node scripts/amber.js ledger verify-anchoring --target <repo>",
+		expectedOutcome: "Tampered ledger records are investigated and restored from version control if appropriate.",
+		blocks: ["evidence-score", "handoff-readiness"],
+	},
+};
+
 function buildNextActions(findings) {
-	const actionsByFinding = {
-		"policy-error": "Fix autonomous-policy.json errors before increasing agent autonomy.",
-		"unsafe-user-approval": "Set gates['user-approval'] to 'block' unless an explicit live approval process exists.",
-		"policy-warning": "Review policy warnings and record the owner-approved exception if intentional.",
-		"route-error": "Fix unreadable or invalid route definitions before using governed delivery routes.",
-		"workflow-pack-read-error": "Fix unreadable workflow pack JSON before relying on workflow-pack controls.",
-		"missing-governance-doc": "Run amber governance docs --target <repo> or add the missing governance documents.",
-		"route-without-gates": "Add route gates around planning, implementation, review, or merge stages.",
-		"pack-missing-review-gates": "Add reviewGates to each workflow pack loop contract.",
-		"pack-missing-worktree-isolation": "Require worktree isolation for mutating workflow-pack loops.",
-		"missing-security-standard": "Run amber governance standards init to create standards/security-governance.json, then map coverage with amber governance standards.",
-		"security-pack-not-linked": "Link security workflow packs to the security-governance standard.",
-		"no-audit-evidence": "Run governed sessions and export evidence when work completes.",
-		"missing-governance-rules": "Run amber governance rules init --target <repo> to scaffold a safe-default policy.",
-		"unsafe-default-allow": "Set rules.json defaultAction to 'deny' — unlisted commands must not be permitted.",
-		"ledger-tampered": "Investigate the flagged ledger record; restore it from version control if it was edited.",
-	};
 	const actions = findings
-		.map((item) => actionsByFinding[item.id])
+		.map((item) => ACTION_LIBRARY[item.id]?.summary)
 		.filter(Boolean);
 	return [...new Set(actions)];
 }
@@ -506,6 +614,7 @@ function writeReadinessMarkdown(result, outputPath) {
 
 module.exports = {
 	GOVERNANCE_DOCS,
+	ACTION_LIBRARY,
 	inspectGovernanceReadiness,
 	inspectGlxControls,
 	renderReadinessText,
