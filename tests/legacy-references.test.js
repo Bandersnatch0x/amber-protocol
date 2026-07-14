@@ -43,6 +43,7 @@ const ALLOWLIST = [
 	"tests/unit/no-facade-reintroduction.test.js", // guard mentions the removed facade names by design
 	"tests/unit/state-dir-resolver.test.js",
 	"tests/unit/state-migration.test.js",
+	"tests/unit/governance-legacy-state-dir.test.js", // regression #60: exercises legacy .harness fallback
 	"tests/amber-cli.test.js", // shim-forwarding subtest spawns legacy entrypoints
 	"package.json", // legacy bin alias
 	"package-lock.json",

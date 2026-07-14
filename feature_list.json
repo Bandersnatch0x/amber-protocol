@@ -104,6 +104,21 @@
       "verification": ["cd apps/web && npm test", "cd apps/web && npm run build"],
       "evidence": ["web vitest 382/0 passing"],
       "notes": ["Owns its TS toolchain; excluded from root eslint."]
+    },
+    {
+      "id": "F009",
+      "priority": 9,
+      "area": "governance",
+      "paths": ["scripts/lib/core/governance.js"],
+      "title": "Governance evidence reads resolve the state dir (legacy .harness support)",
+      "user_visible_behavior": "amber governance audit / evidence read session + execution evidence through the state-dir resolver, so legacy .harness state is visible alongside .amber instead of being silently missed.",
+      "status": "not_started",
+      "verification": [
+        "node scripts/amber.js governance audit --target <legacy .harness repo> finds sessions/executions",
+        "npm test: governance + audit suites green"
+      ],
+      "evidence": [],
+      "notes": ["Closes #60; weekly dogfood carrier 2026-07-14."]
     }
   ]
 }

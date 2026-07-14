@@ -3,6 +3,7 @@ const fs = require('fs');
 const { readSessionEvents } = require('../session-timeline');
 const { loadPolicy } = require('../autonomous-policy');
 const { readJsonSafe } = require('./fs-utils');
+const { resolveStateDirForRead, resolveStateDirForCreate } = require('../state-dir-resolver');
 
 function getDefaultPolicy() {
   return {
@@ -23,7 +24,11 @@ function getDefaultPolicy() {
 
 function governanceDocs(targetRoot, _options = {}) {
   const target = path.resolve(targetRoot);
-  const govDir = path.join(target, '.amber', 'governance');
+  // Governance docs are NEW entities -> always under the canonical .amber state dir
+  // (resolveStateDirForCreate), never the legacy .harness fallback. The read surfaces
+  // (audit / evidence-export below) use resolveStateDirForRead so legacy .harness state
+  // is visible; the write surface must not scatter new docs into a legacy dir.
+  const govDir = path.join(resolveStateDirForCreate(target), 'governance');
 
   fs.mkdirSync(govDir, { recursive: true });
 
@@ -117,7 +122,7 @@ Execution evidence: \`.amber/executions/*/evidence.json\`
 
 function exportSessionEvidence(sessionId, targetRoot, outputPath) {
   const target = path.resolve(targetRoot);
-  const sessionDir = path.join(target, '.amber', 'sessions', sessionId);
+  const sessionDir = path.join(resolveStateDirForRead(target), 'sessions', sessionId);
 
   const events = readSessionEvents(sessionDir);
   const output = path.resolve(outputPath);
@@ -178,7 +183,7 @@ function exportSessionEvidence(sessionId, targetRoot, outputPath) {
 
 function exportExecutionEvidence(taskId, targetRoot, outputPath) {
   const target = path.resolve(targetRoot);
-  const execDir = path.join(target, '.amber', 'executions', taskId);
+  const execDir = path.join(resolveStateDirForRead(target), 'executions', taskId);
 
   const ledgerRead = readJsonSafe(path.join(execDir, 'ledger.json'));
   const evidenceRead = readJsonSafe(path.join(execDir, 'evidence.json'));
@@ -322,8 +327,9 @@ function summarizeExecutions(executionsDir) {
 
 function generateAuditReport(targetRoot, outputPath, options = {}) {
   const target = path.resolve(targetRoot);
-  const sessionsDir = path.join(target, '.amber', 'sessions');
-  const executionsDir = path.join(target, '.amber', 'executions');
+  const stateDir = resolveStateDirForRead(target);
+  const sessionsDir = path.join(stateDir, 'sessions');
+  const executionsDir = path.join(stateDir, 'executions');
   const output = path.resolve(outputPath);
 
   const lines = ['# Audit Report', '', `**Generated:** ${new Date().toISOString()}`, ''];
