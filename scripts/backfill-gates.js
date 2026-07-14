@@ -62,7 +62,7 @@ function approvedGatesFromTimeline(sessionDir) {
 function backfillSession(sessionDir, routesById) {
 	const stats = { gatesWritten: 0, decisionsWritten: 0, skipped: false };
 
-	const { value: manifest, error: manifestError } = readJsonSafe(path.join(sessionDir, "manifest.json"));
+	const { value: manifest } = readJsonSafe(path.join(sessionDir, "manifest.json"));
 	if (!manifest || !manifest.route || !manifest.route.id) {
 		stats.skipped = true;
 		stats.reason = "no manifest / route";
@@ -124,7 +124,7 @@ function backfillSession(sessionDir, routesById) {
 function planSession(sessionDir, routesById) {
 	const stats = { gatesWritten: 0, decisionsWritten: 0, skipped: false };
 
-	const { value: manifest, error: manifestError } = readJsonSafe(path.join(sessionDir, "manifest.json"));
+	const { value: manifest } = readJsonSafe(path.join(sessionDir, "manifest.json"));
 	if (!manifest || !manifest.route || !manifest.route.id) {
 		stats.skipped = true;
 		return stats;

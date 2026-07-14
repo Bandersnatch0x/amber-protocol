@@ -31,8 +31,12 @@ export default [
 		},
 		rules: {
 			// Mature CommonJS codebase; keep recommended but don't let style-adjacent
-			// noise block the lint gate. Tighten over time.
-			"no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+			// noise block the lint gate. catch parameters are not checked (commonly
+			// unused; the block body is what matters). Tighten over time.
+			"no-unused-vars": [
+				"warn",
+				{ argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none" },
+			],
 		},
 	},
 ];

@@ -5,7 +5,6 @@
 // against the currently-shipped template to classify each file as
 // fresh / stale / customized / ambiguous. Lives in `.amber/provenance.json`
 // (NOT init-report.json, which is only written when detection/wiki insights exist).
-const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const {

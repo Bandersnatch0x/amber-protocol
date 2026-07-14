@@ -4,19 +4,6 @@
  * Schema validator — detects version and validates upgrade compatibility.
  */
 
-const V55_KNOWN_FIELDS = new Set(["version", "agents", "routes", "skills"]);
-
-const PHASE_B_KNOWN_FIELDS = new Set([
-	"version",
-	"framework",
-	"agents",
-	"skills",
-	"routes",
-	"profiles",
-	"migratedAt",
-	"migrationId",
-]);
-
 const DEPRECATED_FIELDS = new Set([
 	"deprecated_field",
 	"legacy_api",
@@ -47,10 +34,10 @@ function detectVersion(settings) {
 
 /**
  * @param {object} settings - V5.5 settings
- * @param {string} targetVersion - target framework version
+ * @param {string} _targetVersion - target framework version (reserved)
  * @returns {{ compatible: boolean, breakingChanges: Array, deprecatedFields: Array, warnings: Array }}
  */
-function validateUpgrade(settings, targetVersion) {
+function validateUpgrade(settings, _targetVersion) {
 	const breakingChanges = [];
 	const deprecatedFields = [];
 	const warnings = [];

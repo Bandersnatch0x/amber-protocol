@@ -24,6 +24,7 @@ build/
 # Claude Code local settings (personal config, not team-shared)
 .claude/settings.local.json
 .claude/worktrees/
+.claude/plans/
 
 # Test temp output
 tests/.tmp/
@@ -72,6 +73,7 @@ Thumbs.db
 Desktop.ini
 .idea/
 .vscode/
+.qoder/
 *.swp
 *.swo
 *~

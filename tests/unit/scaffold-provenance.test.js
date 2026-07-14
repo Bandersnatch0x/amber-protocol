@@ -14,7 +14,6 @@ const {
 	loadProvenance,
 	writeProvenance,
 } = require("../../scripts/lib/core/scaffold-provenance");
-const { writeJson } = require("../../scripts/lib/core/fs-utils");
 
 // A tiny fake template root with one controlled, one authored, one state file.
 function fakeTemplateRoot() {

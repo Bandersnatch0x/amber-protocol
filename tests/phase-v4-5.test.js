@@ -125,7 +125,6 @@ test("agent dispatch supports stop resume and separate reviewer evidence", () =>
   assert.equal(dispatchPayload.dispatch.loop.reviewBandwidthStatus, "available");
   assert.equal(dispatchPayload.dispatch.loop.reviewGateStatus, "pending");
 
-  const reviewPayload = JSON.parse(review.stdout);
   const dispatchData = JSON.parse(fs.readFileSync(dispatchPath, "utf8"));
   assert.equal(dispatchData.loop.reviewGateStatus, "satisfied");
 });

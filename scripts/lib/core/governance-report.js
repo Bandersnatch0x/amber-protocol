@@ -123,10 +123,6 @@ function clampScore(value) {
 	return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function countBySeverity(findings, severity) {
-	return findings.filter((finding) => finding.severity === severity).length;
-}
-
 function penaltyFor(ids, findings, { warning = 8, error = 24 } = {}) {
 	const set = new Set(ids);
 	return findings

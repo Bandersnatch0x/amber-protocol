@@ -21,7 +21,7 @@ function getDefaultPolicy() {
   };
 }
 
-function governanceDocs(targetRoot, options = {}) {
+function governanceDocs(targetRoot, _options = {}) {
   const target = path.resolve(targetRoot);
   const govDir = path.join(target, '.amber', 'governance');
 

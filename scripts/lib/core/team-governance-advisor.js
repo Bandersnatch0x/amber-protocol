@@ -90,7 +90,7 @@ function checkPRTemplate(targetRoot) {
 
 // workflowDetection is accepted for future workflow-specific tuning and may be
 // null; it is intentionally not dereferenced here.
-function generateCodeReviewAdvice(teamMetrics, workflowDetection) {
+function generateCodeReviewAdvice(teamMetrics, _workflowDetection) {
 	const base = CODE_REVIEW[teamMetrics.category] || CODE_REVIEW.single;
 	return { strategy: base.strategy, tooling: [...base.tooling] };
 }

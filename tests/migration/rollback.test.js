@@ -11,7 +11,6 @@ const {
 
 describe("findBackups", () => {
 	const tmpDir = path.join(os.tmpdir(), "migration-test-" + Date.now());
-	const backupDir = tmpDir;
 
 	beforeEach(() => {
 		fs.mkdirSync(tmpDir, { recursive: true });

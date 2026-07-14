@@ -49,3 +49,25 @@ test("syncVersions skips a manifest that does not exist (no crash)", () => {
 	assert.deepEqual(r.synced, [".claude-plugin/plugin.json"]);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("syncVersions also updates the README version badge text", () => {
+	const dir = fixture("9.9.9", "1.0.0");
+	fs.writeFileSync(
+		path.join(dir, "README.md"),
+		"**Status:** Stable | **Version:** 1.0.0 · [Milestones ->](./ROADMAP.md)\n",
+	);
+	const r = syncVersions(dir);
+	assert.ok(r.synced.includes("README.md"), "README.md in synced");
+	const readme = fs.readFileSync(path.join(dir, "README.md"), "utf8");
+	assert.match(readme, /\*\*Version:\*\* 9\.9\.9/);
+	assert.doesNotMatch(readme, /\*\*Version:\*\* 1\.0\.0/);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("syncVersions leaves README alone when the badge already matches", () => {
+	const dir = fixture("9.9.9", "1.0.0");
+	fs.writeFileSync(path.join(dir, "README.md"), "**Version:** 9.9.9 · other\n");
+	const r = syncVersions(dir);
+	assert.ok(!r.synced.includes("README.md"), "README not re-synced");
+	fs.rmSync(dir, { recursive: true, force: true });
+});

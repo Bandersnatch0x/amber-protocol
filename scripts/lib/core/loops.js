@@ -4,7 +4,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const {
-	readJson,
 	readJsonSafe,
 	isMissingPath,
 } = require("./fs-utils");

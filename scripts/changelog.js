@@ -36,7 +36,6 @@ const path = require("node:path");
 const { execSync } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
-const PKG_PATH = path.join(ROOT, "package.json");
 const CHANGELOG_PATH = path.join(ROOT, "CHANGELOG.md");
 
 const STABLE_TAG_RE = /^v\d+\.\d+\.\d+$/;

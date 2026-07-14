@@ -845,7 +845,7 @@ function getDefaultKnowledgePlanSkeleton() {
 	};
 }
 
-function mergeInspectionIntoPlan(base, inspection, targetRoot) {
+function mergeInspectionIntoPlan(base, inspection, _targetRoot) {
 	const plan = JSON.parse(JSON.stringify(base)); // deep clone
 
 	if (!plan.knowledgePlan) plan.knowledgePlan = { template: "architecture", notes: [], documents: [] };

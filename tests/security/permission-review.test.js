@@ -65,6 +65,7 @@ describe("reviewPermissions", () => {
 			(f) => f.issue === "unused_permission",
 		);
 		// No errors expected when scopes match
+		assert.strictEqual(unused.length, 0, "no unused permissions expected");
 		assert.strictEqual(result.pass, true);
 	});
 

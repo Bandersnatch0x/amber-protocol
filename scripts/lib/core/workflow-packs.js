@@ -101,17 +101,6 @@ function validateLoopContracts(loopContracts) {
 		"blocked",
 		"regression-test-proposal",
 	]);
-	const VALID_HARD_STOP_STATUSES = new Set([
-		"not-recorded",
-		"within-limits",
-		"hit-limit",
-	]);
-	const VALID_BUDGET_STATUSES = new Set([
-		"not-recorded",
-		"within-budget",
-		"over-budget",
-	]);
-
 	loopContracts.forEach((contract, index) => {
 		const prefix = `Loop contract [${index}]`;
 

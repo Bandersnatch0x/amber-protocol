@@ -57,7 +57,7 @@ describe("Continue Recovery", () => {
 	});
 
 	it("finds most recent non-completed session when no id provided", async () => {
-		const result1 = await startSession(testDir, {
+		await startSession(testDir, {
 			goal: "goal 1",
 			route: "feature-standard",
 		});

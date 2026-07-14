@@ -23,6 +23,21 @@ const TARGETS = [
 	".codex-plugin/plugin.json",
 ];
 
+// README carries a human-readable version badge (e.g. "**Version:** 1.3.4").
+// Keep it in lockstep with package.json via regex replacement so the badge
+// text never drifts between releases (it is not a static manifest JSON).
+function syncReadme(root, version) {
+	const abs = path.join(root, "README.md");
+	if (!fs.existsSync(abs)) return false;
+	const text = fs.readFileSync(abs, "utf8");
+	const re = /(\*\*Version:\*\*\s*)\d+\.\d+\.\d+/;
+	if (!re.test(text)) return false;
+	const updated = text.replace(re, `$1${version}`);
+	if (updated === text) return false;
+	fs.writeFileSync(abs, updated);
+	return true;
+}
+
 function syncVersions(root) {
 	const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 	if (!pkg || typeof pkg.version !== "string" || pkg.version.trim() === "") {
@@ -37,6 +52,9 @@ function syncVersions(root) {
 		data.version = pkg.version;
 		fs.writeFileSync(abs, JSON.stringify(data, null, 2) + "\n");
 		synced.push(rel);
+	}
+	if (syncReadme(root, pkg.version)) {
+		synced.push("README.md");
 	}
 	return { version: pkg.version, synced };
 }

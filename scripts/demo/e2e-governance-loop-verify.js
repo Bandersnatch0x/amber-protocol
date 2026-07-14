@@ -119,11 +119,6 @@ function parseJsonOut(r) {
 	}
 }
 
-function nextText(target, extra = []) {
-	const r = run(target, ["next", "--target", ".", ...extra]);
-	return { exitCode: r.exitCode, text: r.stdout, json: null };
-}
-
 function nextJson(target, extra = []) {
 	const r = run(target, ["next", "--target", ".", "--json", ...extra]);
 	return { exitCode: r.exitCode, text: r.stdout, json: parseJsonOut(r) };
@@ -451,7 +446,7 @@ function pathRejections() {
 	const denyOk = denied.exitCode !== 0 && /denied|policy/i.test(denied.stdout + denied.stderr);
 
 	// B2: claim-only verify then strict complete-check must fail on verification
-	const claim = step(
+	step(
 		"verify claim-only",
 		run(target, ["session", "verify", "--session", sid, "--target", "."]),
 	);

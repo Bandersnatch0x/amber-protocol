@@ -55,7 +55,7 @@ function inspectRoute(routeId, routesDir = DEFAULT_ROUTES_DIR) {
 		return result(`Route "${routeId}" not found.`, 1);
 	}
 
-	const { filePath, ...clean } = route;
+	const { filePath: _filePath, ...clean } = route;
 	const lines = [
 		`Route: ${route.routeId}`,
 		"",

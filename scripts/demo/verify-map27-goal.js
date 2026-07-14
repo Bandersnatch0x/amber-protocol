@@ -71,9 +71,6 @@ check("33 stop conditions", /停止|stop|Accept|Reject|accept|reject/i.test(i33)
 // 5. git status — no scripts/lib product changes required; demo scripts ok under scripts/demo and docs/quality
 const status = sh("git status --short");
 fs.writeFileSync(path.join(SCRATCH, "git-status.txt"), status);
-const libChanges = status
-	.split(/\r?\n/)
-	.filter((l) => /scripts\/lib\//.test(l) && !/^\?\?/.test(l) === false);
 // any modified scripts/lib
 const badLib = status
 	.split(/\r?\n/)

@@ -6,8 +6,6 @@ const path = require("node:path");
 const {
 	parseSkillFrontmatter,
 	extractCommandName,
-	applyPositionalArgs,
-	applyGeminiArgs,
 	renderClaudeCommand,
 	renderGeminiCommand,
 	collectAmberSkills,

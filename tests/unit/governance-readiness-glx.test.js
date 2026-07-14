@@ -4,7 +4,6 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execSync } = require("node:child_process");
 const { inspectGovernanceReadiness } = require("../../scripts/lib/core/governance-readiness");
 const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
 

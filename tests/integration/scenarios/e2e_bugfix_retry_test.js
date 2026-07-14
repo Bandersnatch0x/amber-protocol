@@ -7,10 +7,9 @@
  * Node.js CommonJS – runs with `node --test`.
  */
 
-const { describe, it, beforeEach, afterEach } = require("node:test");
+const { describe, it, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("path");
-const fs = require("fs");
 
 const { ensureDir, removeDir } = require("../../scripts/lib");
 const { IntegrationTestHarness } = require("./test-harness");

@@ -8,13 +8,8 @@ const {
 } = require("./audit");
 
 const {
-	REPO_ROOT,
-} = require("./constants");
-
-const {
 	pathExists,
 	readText,
-	relativeSlash,
 	resolveTarget,
 } = require("./fs-utils");
 
