@@ -75,6 +75,11 @@
     { "id": "A1", "impact": "low-med", "cost": "med", "blocks": "adoption secondary journey" },
     { "id": "W1", "impact": "low", "cost": "n/a-by-design", "blocks": "full web loop only" }
   ],
+  "postAdjudicationClosures": {
+    "note": "G1/G2 were open at adjudication time (2026-07-11, evidence window 1.3.1). They were subsequently verified CLOSED on a real non-product target repo via the weekly dogfood ritual. The gaps array above is the frozen 2026-07-11 verdict; read this closure note for current status.",
+    "G1": { "closedAt": "2026-07-14", "ref": "issue #54 dogfood ritual; see docs/quality/e2e-governance-loop-verify.md (Finding G1)" },
+    "G2": { "closedAt": "2026-07-14", "ref": "issue #54 dogfood ritual; see docs/quality/e2e-governance-loop-verify.md (Finding G2)" }
+  },
   "falsifiers": {
     "toFullLoop": ["G1 closed", "G2 closed", "e2e success/reject/recover/handoff still pass"],
     "toUnclosedLoop": ["success cannot accept with executed evidence", "gates bypassable", "no recoverable verify-fail", "handoff cannot leave scaffold"],

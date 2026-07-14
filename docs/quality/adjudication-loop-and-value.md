@@ -6,6 +6,8 @@
 **Machine summary:** [`adjudication-loop-and-value.json`](./adjudication-loop-and-value.json)  
 **Date:** 2026-07-11  
 
+> **Post-adjudication update (2026-07-14):** G1 (`next` last-mile) and G2 (template handoff) — the two gaps that block 完整 below — were subsequently **verified CLOSED** on a real non-product target repo via the weekly dogfood ritual (issue #54). See [`e2e-governance-loop-verify.md`](./e2e-governance-loop-verify.md) Findings G1/G2. The body below is the frozen 2026-07-11 adjudication; read it as the verdict at that date, not current status. The machine summary carries the matching `postAdjudicationClosures` note.
+
 ## Scope and rules
 
 - Target: 3–30 person engineering teams that use coding agents heavily, need cross-session/person continuity, and require human review.
