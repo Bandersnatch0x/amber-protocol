@@ -10,10 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.6] - 2026-07-15
 
+### Fixed
+- session-lock: eliminate TOCTOU race in `acquireLock` via atomic `link(2)`; the old `existsSync`+`writeFileSync` check-then-act let concurrent acquirers all succeed (verified 10/10 winners pre-fix, exactly 1 post-fix)
+
 ### Changed
 - remove unused nodemailer dependency (no code requires it)
 - remove 7.4M legacy `.harness` backup directory
 - use `structuredClone` instead of hand-rolled `JSON.parse(JSON.stringify())` deep clone (Node 18+ stdlib)
+- collapse `walkFiles` into `collectFilesBySuffix` to dedupe the recursive file-walk implementation
 
 ## [1.3.5] - 2026-07-14
 
