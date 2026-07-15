@@ -29,8 +29,8 @@ function saveCheckpoint(
 		sessionId,
 		stage,
 		timestamp: new Date().toISOString(),
-		manifest: JSON.parse(JSON.stringify(manifest)),
-		worktreeState: JSON.parse(JSON.stringify(worktreeState || {})),
+		manifest: structuredClone(manifest),
+		worktreeState: structuredClone(worktreeState || {}),
 	};
 
 	const filename = `${stage}-${Date.now()}.json`;
