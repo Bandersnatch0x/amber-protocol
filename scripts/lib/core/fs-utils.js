@@ -113,7 +113,7 @@ function collectFilesBySuffix(root, suffix, ignoredDirNames = new Set()) {
 				if (!ignoredDirNames.has(entry.name)) {
 					walk(fullPath);
 				}
-			} else if (entry.isFile() && fullPath.endsWith(suffix)) {
+			} else if (entry.isFile() && (suffix === undefined || fullPath.endsWith(suffix))) {
 				files.push(fullPath);
 			}
 		}
@@ -123,24 +123,10 @@ function collectFilesBySuffix(root, suffix, ignoredDirNames = new Set()) {
 	return files;
 }
 
+// walkFiles is collectFilesBySuffix with no suffix filter and no directory
+// ignores - delegate instead of carrying a second recursive walk implementation.
 function walkFiles(root) {
-	if (!pathExists(root)) {
-		return [];
-	}
-
-	const entries = fs.readdirSync(root, { withFileTypes: true });
-	const files = [];
-
-	for (const entry of entries) {
-		const fullPath = path.join(root, entry.name);
-		if (entry.isDirectory()) {
-			files.push(...walkFiles(fullPath));
-		} else if (entry.isFile()) {
-			files.push(fullPath);
-		}
-	}
-
-	return files;
+	return collectFilesBySuffix(root);
 }
 
 function isIgnoredAuditPath(relativePath) {
