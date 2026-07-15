@@ -219,30 +219,24 @@ async function handleSession(args) {
 
 function handleGovernance(args) {
   const action = args._?.[0];
-  const {
-    createGovernanceDocs,
-    exportGovernanceEvidence,
-    inspectGovernancePolicy,
-    auditGovernance,
-    inspectGovernanceReadinessCommand,
-    generateGovernanceReportCommand,
-    mapStandardsCommand,
-    standardsInitCommand,
-    governanceRulesCommand,
-  } = require("./governance-commands");
-
-  if (action === "docs")     return { result: createGovernanceDocs(args.target) };
-  if (action === "evidence") return { result: exportGovernanceEvidence(resolveTarget(args), { session: args.session, task: args.task, all: args.all, output: args.output, json: args.json }) };
-  if (action === "policy")   return { result: inspectGovernancePolicy(args.target) };
-  if (action === "audit")    return { result: auditGovernance(args.target, { output: args.output, since: args.since }) };
-  if (action === "readiness") return { result: inspectGovernanceReadinessCommand(args.target, { output: args.output }) };
-  if (action === "report") return { result: generateGovernanceReportCommand(args.target, { output: args.output, targetDisplay: args.target || "." }) };
-  if (action === "standards") {
-    if (args._?.[1] === "init") return { result: standardsInitCommand(args.target) };
-    return { result: mapStandardsCommand(args.target, { framework: args.framework, json: args.json }) };
-  }
-  if (action === "rules")    return { result: governanceRulesCommand(args._?.[1], args.target, { command: args.command, json: args.json }) };
-  return { result: unknownAction("governance", ["docs", "evidence", "policy", "audit", "readiness", "report", "standards", "rules"]) };
+  const { governanceDispatch } = require("./governance-commands");
+  // Single chokepoint owns the 8-action switch, requireTarget guard, and
+  // shared try/catch. Sub-actions (standards init, rules init/inspect/check)
+  // travel as options.action from args._[1].
+  return {
+    result: governanceDispatch(action, args.target, {
+      session: args.session,
+      task: args.task,
+      all: args.all,
+      output: args.output,
+      since: args.since,
+      framework: args.framework,
+      json: args.json,
+      targetDisplay: args.target || ".",
+      action: args._?.[1],
+      command: args.command,
+    }),
+  };
 }
 
 module.exports = {

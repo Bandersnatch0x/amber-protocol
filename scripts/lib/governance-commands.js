@@ -26,6 +26,17 @@ const {
   evaluateCommandPolicy,
 } = require("./core/loop-policy");
 
+const GOVERNANCE_ACTIONS = [
+  "docs",
+  "evidence",
+  "policy",
+  "audit",
+  "readiness",
+  "report",
+  "standards",
+  "rules",
+];
+
 // Shared --target guard. Every governance subcommand refuses without a target;
 // consolidating the message + envelope shape here means a wording or shape
 // change lands in one place, not nine. Returns null when the target is present
@@ -39,34 +50,40 @@ function requireTarget(target, extra = {}) {
   return null;
 }
 
-function createGovernanceDocs(target) {
-  const badTarget = requireTarget(target, { created: [], skipped: [] });
+// Shared requireTarget + try/catch envelope for every governance action.
+// Pure success-path extras (created/skipped on docs) are only on the guard
+// miss; catch always returns the minimal {target, errors, warnings} shape.
+function runGuarded(target, extra, fn) {
+  if (typeof extra === "function") {
+    fn = extra;
+    extra = {};
+  }
+  const badTarget = requireTarget(target, extra);
   if (badTarget) return badTarget;
-
   try {
-    const result = governanceDocs(target);
-    return {
-      target,
-      created: result.created,
-      skipped: result.skipped,
-      errors: [],
-      warnings: [],
-    };
+    return fn();
   } catch (error) {
     return {
       target,
-      created: [],
-      skipped: [],
       errors: [error.message],
       warnings: [],
     };
   }
 }
 
-function exportGovernanceEvidence(target, options = {}) {
-  const badTarget = requireTarget(target);
-  if (badTarget) return badTarget;
+function unknownGovernanceAction() {
+  const actions = GOVERNANCE_ACTIONS.slice();
+  const last = actions.pop();
+  return {
+    target: undefined,
+    errors: [`governance requires ${actions.join(", ")}, or ${last}.`],
+    warnings: [],
+  };
+}
 
+// --- Substantive action bodies (no requireTarget / try-catch; dispatch owns those) ---
+
+function exportGovernanceEvidenceBody(target, options = {}) {
   if (!options.output && !options.all) {
     return {
       target,
@@ -75,101 +92,71 @@ function exportGovernanceEvidence(target, options = {}) {
     };
   }
 
-  try {
-    let result;
-    if (options.all) {
-      // Batch export all sessions and executions
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const batchDir = path.join(target, '.amber', 'governance', 'evidence', timestamp);
-      fs.mkdirSync(batchDir, { recursive: true });
+  let result;
+  if (options.all) {
+    // Batch export all sessions and executions
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const batchDir = path.join(target, '.amber', 'governance', 'evidence', timestamp);
+    fs.mkdirSync(batchDir, { recursive: true });
 
-      const { resolveStateDirForRead } = require('./state-dir-resolver');
-      const stateDir = resolveStateDirForRead(target);
-      const sessionsDir = path.join(stateDir, 'sessions');
-      const executionsDir = path.join(stateDir, 'executions');
+    const { resolveStateDirForRead } = require('./state-dir-resolver');
+    const stateDir = resolveStateDirForRead(target);
+    const sessionsDir = path.join(stateDir, 'sessions');
+    const executionsDir = path.join(stateDir, 'executions');
 
-      let exported = 0;
-      const errors = [];
+    let exported = 0;
+    const errors = [];
 
-      // Export all sessions
-      if (fs.existsSync(sessionsDir)) {
-        const sessions = fs.readdirSync(sessionsDir);
-        for (const sessionId of sessions) {
-          try {
-            const outputPath = path.join(batchDir, `session-${sessionId}.md`);
-            exportSessionEvidence(sessionId, target, outputPath);
-            exported++;
-          } catch (err) {
-            errors.push(`Session ${sessionId}: ${err.message}`);
-          }
+    // Export all sessions
+    if (fs.existsSync(sessionsDir)) {
+      const sessions = fs.readdirSync(sessionsDir);
+      for (const sessionId of sessions) {
+        try {
+          const outputPath = path.join(batchDir, `session-${sessionId}.md`);
+          exportSessionEvidence(sessionId, target, outputPath);
+          exported++;
+        } catch (err) {
+          errors.push(`Session ${sessionId}: ${err.message}`);
         }
       }
-
-      // Export all executions
-      if (fs.existsSync(executionsDir)) {
-        const tasks = fs.readdirSync(executionsDir);
-        for (const taskId of tasks) {
-          try {
-            const outputPath = path.join(batchDir, `execution-${taskId}.md`);
-            exportExecutionEvidence(taskId, target, outputPath);
-            exported++;
-          } catch (err) {
-            errors.push(`Execution ${taskId}: ${err.message}`);
-          }
-        }
-      }
-
-      result = { batchDir, count: exported, errors };
-    } else if (options.session) {
-      result = exportSessionEvidence(options.session, target, options.output);
-    } else if (options.task) {
-      result = exportExecutionEvidence(options.task, target, options.output);
-    } else {
-      return {
-        target,
-        errors: ["Must specify --session <id>, --task <id>, or --all"],
-        warnings: [],
-      };
     }
 
-    return {
-      target,
-      ...result,
-      errors: result.errors || [],
-      warnings: [],
-    };
-  } catch (error) {
-    return {
-      target,
-      errors: [error.message],
-      warnings: [],
-    };
-  }
-}
+    // Export all executions
+    if (fs.existsSync(executionsDir)) {
+      const tasks = fs.readdirSync(executionsDir);
+      for (const taskId of tasks) {
+        try {
+          const outputPath = path.join(batchDir, `execution-${taskId}.md`);
+          exportExecutionEvidence(taskId, target, outputPath);
+          exported++;
+        } catch (err) {
+          errors.push(`Execution ${taskId}: ${err.message}`);
+        }
+      }
+    }
 
-function inspectGovernancePolicy(target) {
-  const badTarget = requireTarget(target);
-  if (badTarget) return badTarget;
-
-  try {
-    const result = inspectPolicy(target);
+    result = { batchDir, count: exported, errors };
+  } else if (options.session) {
+    result = exportSessionEvidence(options.session, target, options.output);
+  } else if (options.task) {
+    result = exportExecutionEvidence(options.task, target, options.output);
+  } else {
     return {
       target,
-      ...result,
-    };
-  } catch (error) {
-    return {
-      target,
-      errors: [error.message],
+      errors: ["Must specify --session <id>, --task <id>, or --all"],
       warnings: [],
     };
   }
+
+  return {
+    target,
+    ...result,
+    errors: result.errors || [],
+    warnings: [],
+  };
 }
 
-function auditGovernance(target, options = {}) {
-  const badTarget = requireTarget(target);
-  if (badTarget) return badTarget;
-
+function auditGovernanceBody(target, options = {}) {
   if (!options.output) {
     return {
       target,
@@ -178,83 +165,51 @@ function auditGovernance(target, options = {}) {
     };
   }
 
-  try {
-    const auditOptions = {};
-    if (options.since) {
-      auditOptions.since = options.since;
-    }
-
-    const result = generateAuditReport(target, options.output, auditOptions);
-
-    return {
-      target,
-      ...result,
-      errors: [],
-      warnings: [],
-    };
-  } catch (error) {
-    return {
-      target,
-      errors: [error.message],
-      warnings: [],
-    };
+  const auditOptions = {};
+  if (options.since) {
+    auditOptions.since = options.since;
   }
+
+  const result = generateAuditReport(target, options.output, auditOptions);
+
+  return {
+    target,
+    ...result,
+    errors: [],
+    warnings: [],
+  };
 }
 
-function inspectGovernanceReadinessCommand(target, options = {}) {
-  const badTarget = requireTarget(target);
-  if (badTarget) return badTarget;
+function inspectGovernanceReadinessBody(target, options = {}) {
+  const result = inspectGovernanceReadiness(target);
+  const outputPath = options.output
+    ? writeReadinessMarkdown(result, options.output)
+    : undefined;
 
-  try {
-    const result = inspectGovernanceReadiness(target);
-    const outputPath = options.output
-      ? writeReadinessMarkdown(result, options.output)
-      : undefined;
-
-    return {
-      ...result,
-      outputPath,
-      text: renderReadinessText(result),
-    };
-  } catch (error) {
-    return {
-      target,
-      errors: [error.message],
-      warnings: [],
-    };
-  }
+  return {
+    ...result,
+    outputPath,
+    text: renderReadinessText(result),
+  };
 }
 
-function generateGovernanceReportCommand(target, options = {}) {
-  const badTarget = requireTarget(target);
-  if (badTarget) return badTarget;
+function generateGovernanceReportBody(target, options = {}) {
+  const report = buildGovernanceReport(target, { targetDisplay: options.targetDisplay || target });
+  const output = options.output && !path.isAbsolute(options.output)
+    ? path.resolve(target, options.output)
+    : options.output;
+  const outputPath = options.output
+    ? writeGovernanceReportMarkdown(report, output)
+    : undefined;
 
-  try {
-    const report = buildGovernanceReport(target, { targetDisplay: options.targetDisplay || target });
-    const output = options.output && !path.isAbsolute(options.output)
-      ? path.resolve(target, options.output)
-      : options.output;
-    const outputPath = options.output
-      ? writeGovernanceReportMarkdown(report, output)
-      : undefined;
-
-    return {
-      ...report,
-      outputPath,
-      text: renderGovernanceReportText(report),
-    };
-  } catch (error) {
-    return {
-      target,
-      errors: [error.message],
-      warnings: [],
-    };
-  }
+  return {
+    ...report,
+    outputPath,
+    text: renderGovernanceReportText(report),
+  };
 }
 
-function mapStandardsCommand(target, options = {}) {
-  const badTarget = requireTarget(target);
-  if (badTarget) return badTarget;
+function mapStandardsBody(target, options = {}) {
   const result = mapStandards(target, options.framework || "owasp-agentic");
   if (result.errors && result.errors.length) {
     return result;
@@ -281,9 +236,7 @@ function mapStandardsCommand(target, options = {}) {
 // file untouched). Mirrors `governance rules init`. NOTE: the repo's own standards/
 // dir is NOT shipped in the npm package (see package.json files), so the starter is
 // served from templates/standards/ instead — init never reads Amber's own standards/.
-function standardsInitCommand(target) {
-  const badTarget = requireTarget(target);
-  if (badTarget) return badTarget;
+function standardsInitBody(target) {
   const targetRoot = path.resolve(target);
   const standardsDir = path.join(targetRoot, "standards");
   const standardPath = path.join(standardsDir, "security-governance.json");
@@ -315,9 +268,7 @@ function standardsInitCommand(target) {
 // GLX policy surface (B): scaffold and inspect the declarative command policy.
 // init writes DEFAULT_RULES idempotently; inspect shows the active rules; check
 // runs a sample command through evaluateCommandPolicy (read-only, no execution).
-function governanceRulesCommand(action, target, options = {}) {
-  const badTarget = requireTarget(target);
-  if (badTarget) return badTarget;
+function governanceRulesBody(action, target, options = {}) {
   const { resolveStateDirForRead, resolveStateDirForCreate } = require("./state-dir-resolver");
 
   if (action === "init") {
@@ -389,14 +340,86 @@ function governanceRulesCommand(action, target, options = {}) {
   return { target, errors: [`governance rules requires init, inspect, or check.`], warnings: [] };
 }
 
+/**
+ * Single governance-dispatch chokepoint. Owns the switch over all 8 actions,
+ * the shared requireTarget guard, and the shared try/catch (runGuarded).
+ *
+ * Pure forwards (docs, policy, and the standards map path) are inlined as
+ * branches. Substantive bodies are internal helpers called from branches.
+ *
+ * @param {string} action
+ * @param {string} target
+ * @param {object} [options]
+ */
+function governanceDispatch(action, target, options = {}) {
+  switch (action) {
+    case "docs":
+      // Pure forward of governanceDocs — success extras preserved.
+      return runGuarded(target, { created: [], skipped: [] }, () => {
+        const result = governanceDocs(target);
+        return {
+          target,
+          created: result.created,
+          skipped: result.skipped,
+          errors: [],
+          warnings: [],
+        };
+      });
+
+    case "evidence":
+      return runGuarded(target, () => exportGovernanceEvidenceBody(target, options));
+
+    case "policy":
+      // Pure forward of inspectPolicy.
+      return runGuarded(target, () => {
+        const result = inspectPolicy(target);
+        return {
+          target,
+          ...result,
+        };
+      });
+
+    case "audit":
+      return runGuarded(target, () => auditGovernanceBody(target, options));
+
+    case "readiness":
+      return runGuarded(target, () => inspectGovernanceReadinessBody(target, options));
+
+    case "report":
+      return runGuarded(target, () => generateGovernanceReportBody(target, options));
+
+    case "standards":
+      // init sub-action stays a substantive helper; map path is the pure forward.
+      return runGuarded(target, () => {
+        if (options.action === "init") {
+          return standardsInitBody(target);
+        }
+        return mapStandardsBody(target, options);
+      });
+
+    case "rules":
+      return runGuarded(target, () =>
+        governanceRulesBody(options.action, target, options),
+      );
+
+    default:
+      return unknownGovernanceAction();
+  }
+}
+
+// Compatibility wrappers for tests that still import named entry points.
+// These go through the dispatch chokepoint so guard/catch stay shared.
+function exportGovernanceEvidence(target, options = {}) {
+  return governanceDispatch("evidence", target, options);
+}
+
+function standardsInitCommand(target) {
+  return governanceDispatch("standards", target, { action: "init" });
+}
+
 module.exports = {
-  createGovernanceDocs,
+  governanceDispatch,
+  // Kept for existing tests that call the raw entry points.
   exportGovernanceEvidence,
-  inspectGovernancePolicy,
-  auditGovernance,
-  inspectGovernanceReadinessCommand,
-  generateGovernanceReportCommand,
-  mapStandardsCommand,
   standardsInitCommand,
-  governanceRulesCommand
 };

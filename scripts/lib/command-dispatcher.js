@@ -480,82 +480,7 @@ function handleSecurity(args) {
 function handleFeature(args) {
   const action = args._?.[0];
   const targetRoot = resolveTarget(args);
-  let featureResult;
-
-  if (action === "add") {
-    featureResult = featureCommands.addFeature(targetRoot, {
-      id: args.id || args._?.[1],
-      title: args.title || args._?.[2],
-      priority: args.priority,
-      area: args.area,
-      paths: args.paths,
-    });
-  } else if (action === "list") {
-    featureResult = featureCommands.listFeatures(targetRoot);
-  } else if (action === "remove") {
-    featureResult = featureCommands.removeFeature(targetRoot, {
-      id: args.id || args._?.[1],
-    });
-  } else if (action === "verify") {
-    featureResult = featureCommands.recordFeatureEvidence(targetRoot, {
-      feature: args.feature || args._?.[1],
-      command: args.command,
-      result: args.result,
-      notes: args.notes,
-    });
-  } else if (action === "evidence") {
-    featureResult = featureCommands.listFeatureEvidence(targetRoot, {
-      feature: args.feature || args._?.[1],
-    });
-  } else {
-    featureResult = { errors: ["feature requires add, list, remove, verify, or evidence."], warnings: [] };
-  }
-
-  // Build text output from the result
-  if (action === "list") {
-    const features = featureResult.features || [];
-    if (features.length === 0) {
-      featureResult.text = "No features registered.";
-    } else {
-      featureResult.text = features
-        .map(
-          (f) =>
-            `  ${f.id} [${f.status || "not_started"}] ${f.title}${f.priority ? ` (P${f.priority})` : ""}`,
-        )
-        .join("\n");
-      featureResult.text = `Features:\n${featureResult.text}`;
-    }
-  } else if (action === "add") {
-    if (featureResult.feature) {
-      featureResult.text = `Feature added: ${featureResult.feature.id} — ${featureResult.feature.title}`;
-    }
-  } else if (action === "remove") {
-    if (featureResult.removed) {
-      featureResult.text = `Feature removed: ${featureResult.removed.id} — ${featureResult.removed.title}`;
-    }
-  } else if (action === "verify") {
-    if (featureResult.entry) {
-      featureResult.text = [
-        `Evidence recorded for feature: ${featureResult.featureId}`,
-        `  Command: ${featureResult.entry.command}`,
-        `  Result: ${featureResult.entry.result}`,
-        `  Date: ${featureResult.entry.date}`,
-      ].join("\n");
-    }
-  } else if (action === "evidence") {
-    const evidence = featureResult.evidence || [];
-    if (evidence.length === 0) {
-      featureResult.text = `No evidence recorded for feature: ${featureResult.featureId}`;
-    } else {
-      featureResult.text = evidence
-        .map(
-          (e, i) =>
-            `  [${i + 1}] ${e.date} | ${e.command} → ${e.result}`,
-        )
-        .join("\n");
-      featureResult.text = `Evidence for ${featureResult.featureId}:\n${featureResult.text}`;
-    }
-  }
+  const featureResult = featureCommands.runFeatureAction(action, targetRoot, args);
 
   return {
     result: {
@@ -638,19 +563,14 @@ function handleStatus(args) {
 
 function handleSync(args) {
   const targetRoot = resolveTarget(args);
-  const { detectScaffoldDrift, refreshAmberOwnedFiles } = require("./core/scaffold-version-drift");
-  const { detectArtifactDrift } = require("./core/artifact-drift");
-  // Forward a caller-supplied templateRoot (mirrors scaffoldHarness's option) so
-  // the shipped-template source is the SAME one used at install time. Undefined
-  // in the real CLI → both helpers fall back to the default TEMPLATE_ROOT.
-  const opts = args.templateRoot ? { templateRoot: args.templateRoot } : {};
-  const drift = detectScaffoldDrift(targetRoot, opts);
-  const artifact = detectArtifactDrift(targetRoot);
-  const note = artifact.available && artifact.counts.drifted > 0
-    ? `Artifact drift: ${artifact.counts.drifted} drifted — re-verify with \`amber feature verify --feature <id>\`.`
-    : "Artifact drift: none detected. (aligned = code not newer than evidence; not a re-verification)";
-  let refresh = null;
-  if (args.execute) refresh = refreshAmberOwnedFiles(targetRoot, opts);
+  // Orchestration (scaffold + artifact drift + conditional refresh + note) lives
+  // in core/sync-project. Handler keeps the lines[] text builder and result.sync
+  // envelope byte-identical — artifact is intentionally NOT in result.sync.
+  const { syncProject } = require("./core/sync-project");
+  const { drift, refresh, note } = syncProject(targetRoot, {
+    execute: Boolean(args.execute),
+    templateRoot: args.templateRoot,
+  });
 
   const lines = [`Target: ${targetRoot}`, `Mode: ${args.execute ? "execute" : "dry-run (no changes made)"}`];
   if (drift.installed) {

@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { createGovernanceDocs } = require("../scripts/lib/governance-commands");
+const { governanceDispatch } = require("../scripts/lib/governance-commands");
 
 function usesGovernanceDir(filePath) {
 	return filePath.split(path.sep).includes(".amber") &&
@@ -26,7 +26,7 @@ describe("governance docs", () => {
 	});
 
 	it("empty repo → creates 3 files", () => {
-		const result = createGovernanceDocs(tmpDir);
+		const result = governanceDispatch("docs", tmpDir);
 
 		assert.strictEqual(result.errors.length, 0);
 		assert.strictEqual(result.created.length, 3);
@@ -45,10 +45,10 @@ describe("governance docs", () => {
 		const tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "governance-test2-"));
 
 		try {
-			const firstRun = createGovernanceDocs(tmpDir2);
+			const firstRun = governanceDispatch("docs", tmpDir2);
 			assert.strictEqual(firstRun.created.length, 3);
 
-			const secondRun = createGovernanceDocs(tmpDir2);
+			const secondRun = governanceDispatch("docs", tmpDir2);
 			assert.strictEqual(secondRun.errors.length, 0);
 			assert.strictEqual(secondRun.created.length, 0);
 			assert.strictEqual(secondRun.skipped.length, 3);
