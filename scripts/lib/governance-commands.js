@@ -26,16 +26,22 @@ const {
   evaluateCommandPolicy,
 } = require("./core/loop-policy");
 
-function createGovernanceDocs(target) {
+// Shared --target guard. Every governance subcommand refuses without a target;
+// consolidating the message + envelope shape here means a wording or shape
+// change lands in one place, not nine. Returns null when the target is present
+// so the caller falls through to its real body. `extra` spreads extra empty
+// fields a caller promises in its success shape (e.g. created/skipped) so the
+// error envelope still type-matches.
+function requireTarget(target, extra = {}) {
   if (!target) {
-    return {
-      target,
-      errors: ["--target is required"],
-      warnings: [],
-      created: [],
-      skipped: [],
-    };
+    return { target, errors: ["--target is required"], warnings: [], ...extra };
   }
+  return null;
+}
+
+function createGovernanceDocs(target) {
+  const badTarget = requireTarget(target, { created: [], skipped: [] });
+  if (badTarget) return badTarget;
 
   try {
     const result = governanceDocs(target);
@@ -58,13 +64,8 @@ function createGovernanceDocs(target) {
 }
 
 function exportGovernanceEvidence(target, options = {}) {
-  if (!target) {
-    return {
-      target,
-      errors: ["--target is required"],
-      warnings: [],
-    };
-  }
+  const badTarget = requireTarget(target);
+  if (badTarget) return badTarget;
 
   if (!options.output && !options.all) {
     return {
@@ -147,13 +148,8 @@ function exportGovernanceEvidence(target, options = {}) {
 }
 
 function inspectGovernancePolicy(target) {
-  if (!target) {
-    return {
-      target,
-      errors: ["--target is required"],
-      warnings: [],
-    };
-  }
+  const badTarget = requireTarget(target);
+  if (badTarget) return badTarget;
 
   try {
     const result = inspectPolicy(target);
@@ -171,13 +167,8 @@ function inspectGovernancePolicy(target) {
 }
 
 function auditGovernance(target, options = {}) {
-  if (!target) {
-    return {
-      target,
-      errors: ["--target is required"],
-      warnings: [],
-    };
-  }
+  const badTarget = requireTarget(target);
+  if (badTarget) return badTarget;
 
   if (!options.output) {
     return {
@@ -211,13 +202,8 @@ function auditGovernance(target, options = {}) {
 }
 
 function inspectGovernanceReadinessCommand(target, options = {}) {
-  if (!target) {
-    return {
-      target,
-      errors: ["--target is required"],
-      warnings: [],
-    };
-  }
+  const badTarget = requireTarget(target);
+  if (badTarget) return badTarget;
 
   try {
     const result = inspectGovernanceReadiness(target);
@@ -240,13 +226,8 @@ function inspectGovernanceReadinessCommand(target, options = {}) {
 }
 
 function generateGovernanceReportCommand(target, options = {}) {
-  if (!target) {
-    return {
-      target,
-      errors: ["--target is required"],
-      warnings: [],
-    };
-  }
+  const badTarget = requireTarget(target);
+  if (badTarget) return badTarget;
 
   try {
     const report = buildGovernanceReport(target, { targetDisplay: options.targetDisplay || target });
@@ -272,9 +253,8 @@ function generateGovernanceReportCommand(target, options = {}) {
 }
 
 function mapStandardsCommand(target, options = {}) {
-  if (!target) {
-    return { target, errors: ["--target is required"], warnings: [] };
-  }
+  const badTarget = requireTarget(target);
+  if (badTarget) return badTarget;
   const result = mapStandards(target, options.framework || "owasp-agentic");
   if (result.errors && result.errors.length) {
     return result;
@@ -302,9 +282,8 @@ function mapStandardsCommand(target, options = {}) {
 // dir is NOT shipped in the npm package (see package.json files), so the starter is
 // served from templates/standards/ instead — init never reads Amber's own standards/.
 function standardsInitCommand(target) {
-  if (!target) {
-    return { target, errors: ["--target is required"], warnings: [] };
-  }
+  const badTarget = requireTarget(target);
+  if (badTarget) return badTarget;
   const targetRoot = path.resolve(target);
   const standardsDir = path.join(targetRoot, "standards");
   const standardPath = path.join(standardsDir, "security-governance.json");
@@ -337,9 +316,8 @@ function standardsInitCommand(target) {
 // init writes DEFAULT_RULES idempotently; inspect shows the active rules; check
 // runs a sample command through evaluateCommandPolicy (read-only, no execution).
 function governanceRulesCommand(action, target, options = {}) {
-  if (!target) {
-    return { target, errors: ["--target is required"], warnings: [] };
-  }
+  const badTarget = requireTarget(target);
+  if (badTarget) return badTarget;
   const { resolveStateDirForRead, resolveStateDirForCreate } = require("./state-dir-resolver");
 
   if (action === "init") {

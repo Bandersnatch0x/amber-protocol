@@ -53,6 +53,8 @@ const {
   handleLedger,
   handleSession,
   handleGovernance,
+  unknownAction,
+  resolveTarget,
 } = require("./command-handler-families");
 const { inferNext } = require("./next-command");
 const { migrateManifests } = require("./migrate-command");
@@ -60,18 +62,8 @@ const { migrateState, migrateWiki } = require("./state-migration");
 const { validateWorkflowPack, validateLoopContract } = require("./core/execution-validator");
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function unknownAction(command, actions) {
-  return {
-    target: undefined,
-    errors: [`${command} requires ${actions.join(", ")}, or ${actions.pop()}.`],
-    warnings: [],
-  };
-}
-
-function resolveTarget(args) {
-  return args.target || process.cwd();
-}
+// unknownAction + resolveTarget are imported from command-handler-families.js
+// (above) so the two handler files share one copy and cannot diverge.
 
 // ── Simple command wrappers ─────────────────────────────────────────────────
 
