@@ -39,7 +39,7 @@ Ponytail audit and cleanup — no active feature session. Next-up queue was empt
    - `nodemailer` dependency (unused) — removed from package.json
    - adoption-composer split into 6 files (okay, not changed)
 
-2. **Cleanup completed** — 1.3.6 released (version bump only)
+2. **Cleanup completed** — 1.3.6 staged (version + CHANGELOG), NOT released (pending decision to batch with next user-facing version)
 
 ## Blockers
 
