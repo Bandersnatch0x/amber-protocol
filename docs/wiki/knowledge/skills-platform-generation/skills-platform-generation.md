@@ -8,53 +8,57 @@ updated_at: "2026-07-14T07:07:21.804Z"
 
 # Skills & Platform Generation
 
-Explain the skill system: SKILL.md as source of truth, gen:agents generation, and platform integrations.
+Last Reviewed: 2026-07-16
 
-## Analysis Focus (from plan)
-Cover skills/*/SKILL.md, scripts/gen-agent-commands.js, and the .claude/, .agents/skills/, .gemini/commands/ output directories.
+Amber maintains one canonical skill definition per capability and generates the
+platform-specific surfaces from it. The ten directories under `skills/` are authored
+inputs. Claude Code, Codex/Cursor, and Gemini files are products of the generator and
+must remain reproducible from those inputs.
 
-## Grounding Notes (from knowledge plan)
-- Amber Protocol is a repository-local governance layer for AI-assisted engineering, NOT a runtime framework or agent platform. It produces review artifacts, dry-run plans, and approval records as files inside the target repo.
-- The CLI entry point is scripts/amber.js. All business logic lives in scripts/lib/. The scripts/lib/core/ directory is the core engine; files matching scripts/lib/*-commands.js are thin CLI wrappers that delegate to core functions.
-- Seven governance control layers in priority order: Governance (highest) > Verification > Observability > Lifecycle > Context > Tooling > Execution (lowest/avoid). This priority weighting shapes the entire codebase.
-- The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command.
-- Safety boundary: read-only/dry-run first. 'init' and 'wiki' never overwrite existing files. Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
-- Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead.
-- Dependencies are intentionally minimal: ajv for JSON Schema validation, ajv-formats for format validation, nodemailer for notifications. No Express, no database, no ORM in the CLI package.
-- src/ contains auxiliary utilities only (migration + security scanners), not the main CLI logic. Do not confuse src/ with scripts/lib/core/.
-- apps/web/ is a standalone React 18 + Vite + tRPC + TanStack Router application with its own package.json (@amber-protocol/web). It is NOT part of the published amber-protocol npm package.
-- Governed loop execution (ADR-0003) requires four gates: declarative policy check, explicit 'amber loop approve', isolated git worktree, and tamper-evident hash-chain ledger. Default 'loop run' is still dry-run.
-- The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required.
-- JSON Schemas in schemas/ define contracts for loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime.
-- The project follows loop-engineering patterns. Continuous improvement is governed (see LOOP.md and amber-continuous-improvement skill).
-- Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, PROGRESS.md, session manifests, and ledgers.
+## Source and Outputs
 
-## What system/approach is used
+- `skills/<name>/SKILL.md` is the source of truth for each Amber capability. Current
+  skills cover adoption, audit, continuous improvement, doctor, handoff, init, plan,
+  route, session, and wiki operations.
+- `scripts/gen-agent-commands.js` is the CLI entry for generation and check mode; it
+  delegates generation to the shared agent-command generator.
+- `.claude-plugin/` exposes the canonical skills to Claude as a plugin, while generated
+  command surfaces are written under `.claude/`.
+- `.agents/skills/` is the generated open-standard skill location consumed by Codex
+  and Cursor.
+- `.gemini/commands/amber/` contains generated Gemini command definitions.
+- `package.json` scripts `gen:agents` and `gen:agents:check` write products and detect
+  drift respectively.
 
-- 
-
-## Key files / modules / packages
-
-- 
-
-## Architecture and conventions
-
-- 
-
-## Diagrams
+## Generation Flow
 
 ```mermaid
-%% Suggested: system map, data flow, module boundaries, etc.
-graph TD
-    A[Entry] --> B[Core]
+flowchart LR
+    Source["skills/*/SKILL.md"] --> Generator["scripts/gen-agent-commands.js"]
+    Source --> Plugin[".claude-plugin references canonical skills"]
+    Generator --> Claude[".claude/commands"]
+    Generator --> Agents[".agents/skills"]
+    Generator --> Gemini[".gemini/commands/amber"]
+    Claude --> Drift["gen:agents:check"]
+    Agents --> Drift
+    Gemini --> Drift
 ```
 
-*(Mermaid diagrams are supported in the generated knowledge; the original implementation had dedicated fix tooling.)*
+The generator interprets skill metadata and body content, then renders the format each
+platform expects. Check mode computes the same products without accepting drift, which
+makes the canonical skill and generated outputs a single tested contract.
 
-## Rules developers should follow
+## Development Rules
 
-- 
-
-## Unknowns / Needs Confirmation
-
-- 
+- Edit `skills/<name>/SKILL.md`, then run `npm run gen:agents`. Do not directly edit
+  generated platform files.
+- Run `npm run gen:agents:check` before completion and in CI to prove all mirrors match
+  the canonical skills.
+- Keep capability semantics in the canonical skill. Platform renderers may adapt
+  syntax and metadata, but must not introduce a different workflow.
+- Add a new Amber skill as a source directory first and update generator tests for all
+  supported outputs in the same change.
+- Treat generation as deterministic repository maintenance; generated output should
+  not depend on machine-specific paths, clocks, or mutable external services.
+- Skill instructions expose governed CLI behavior. They must not imply that Amber
+  dispatches live agents or bypasses approvals on the user's behalf.

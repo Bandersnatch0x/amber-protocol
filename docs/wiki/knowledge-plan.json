@@ -41,7 +41,7 @@
         "text": "Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead."
       },
       {
-        "text": "Dependencies are intentionally minimal: ajv for JSON Schema validation, ajv-formats for format validation, nodemailer for notifications. No Express, no database, no ORM in the CLI package."
+        "text": "Dependencies are intentionally minimal: ajv for JSON Schema validation and ajv-formats for format validation. No Express, no database, no ORM in the CLI package."
       },
       {
         "text": "src/ contains auxiliary utilities only (migration + security scanners), not the main CLI logic. Do not confuse src/ with scripts/lib/core/."
@@ -56,13 +56,13 @@
         "text": "The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required."
       },
       {
-        "text": "JSON Schemas in schemas/ define contracts for loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime."
+        "text": "JSON Schemas in schemas/ define contracts for knowledge-plan, loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime."
       },
       {
         "text": "The project follows loop-engineering patterns. Continuous improvement is governed (see LOOP.md and amber-continuous-improvement skill)."
       },
       {
-        "text": "Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, PROGRESS.md, session manifests, and ledgers."
+        "text": "Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, session-handoff.md, session manifests, and ledgers."
       }
     ],
     "documents": [
@@ -70,31 +70,31 @@
         "title": "CLI Architecture & Command Dispatch",
         "goal": "Document how scripts/amber.js dispatches commands through command-dispatcher.js to handler modules and the core engine in scripts/lib/core/.",
         "parent": "",
-        "hints": "Cover the command-dispatcher pattern, how *-commands.js files wrap core logic, and the separation between CLI surface and business logic."
+        "hints": "Cover scripts/lib/command-dispatcher.js, scripts/lib/command-handler-families.js, how scripts/lib/*-commands.js files wrap core logic, and the separation between CLI surface and scripts/lib/core/."
       },
       {
         "title": "Governance Model & Seven Layers",
         "goal": "Map the seven governance control layers to concrete commands, data structures, and enforcement points.",
         "parent": "",
-        "hints": "Governance > Verification > Observability > Lifecycle > Context > Tooling > Execution. Reference governance.js, governance-report.js, governance-readiness.js, and the standards/ JSON files."
+        "hints": "Governance > Verification > Observability > Lifecycle > Context > Tooling > Execution. Reference scripts/lib/core/governance.js, scripts/lib/core/governance-report.js, scripts/lib/core/governance-readiness.js, and standards/*.json."
       },
       {
         "title": "Session & Lifecycle Management",
         "goal": "Document routes, sessions, checkpoints, worktrees, and the lifecycle state machine.",
         "parent": "",
-        "hints": "Cover session-commands.js, session-state-machine.js, session-manifest.js, route-commands.js, route-loader.js, checkpoint-manager.js, worktree-manager.js, and lifecycle.js."
+        "hints": "Cover scripts/lib/session-commands.js, scripts/lib/session-state-machine.js, scripts/lib/session-manifest.js, scripts/lib/route-commands.js, scripts/lib/route-loader.js, scripts/lib/checkpoint-manager.js, scripts/lib/worktree-manager.js, and scripts/lib/core/lifecycle.js."
       },
       {
         "title": "Adoption System",
         "goal": "Explain the adoption report pipeline: proposals, gates, metrics, and the composer sub-module.",
         "parent": "",
-        "hints": "Cover adoption-reports.js, adoption-proposals.js, adoption-gate.js, adoption-metrics.js, adoption-bundle.js, and the adoption-composer/ sub-module with its renderers."
+        "hints": "Cover scripts/lib/core/adoption-reports.js, adoption-proposals.js, adoption-gate.js, adoption-metrics.js, adoption-bundle.js, and scripts/lib/core/adoption-composer/ with its renderers."
       },
       {
         "title": "Loop Engineering & Governed Execution",
         "goal": "Document loop contracts, ledgers, dry-run mode, and the four-gate governed execution path.",
         "parent": "",
-        "hints": "Cover loops.js, loop-execution.js, loop-ledger.js, loop-policy.js, governed-runner.js, execution-validator.js, and autonomous-policy.json."
+        "hints": "Cover scripts/lib/core/loops.js, loop-execution.js, loop-ledger.js, loop-policy.js, governed-runner.js, execution-validator.js, and .amber/autonomous-policy.json."
       },
       {
         "title": "Skills & Platform Generation",
@@ -106,19 +106,19 @@
         "title": "Web Dashboard",
         "goal": "Document the apps/web React dashboard architecture: tRPC API, TanStack Router routes, and session/timeline components.",
         "parent": "",
-        "hints": "Separate package.json (@amber-protocol/web). Cover routes/, components/session/, components/timeline/, features/, lib/trpc.ts, and the Express server."
+        "hints": "Treat apps/web/package.json (@amber-protocol/web) as a separate package. Cover apps/web/src/routes/, components/session/, components/timeline/, features/, lib/trpc.ts, and apps/web/server/."
       },
       {
         "title": "Schema & Validation Layer",
         "goal": "Document the JSON Schema contracts and runtime validation with ajv.",
         "parent": "",
-        "hints": "Cover schemas/*.schema.json, validators.js, schema-version-checker.js, and how ajv is used across the codebase."
+        "hints": "Cover schemas/*.schema.json, scripts/lib/core/validators.js, scripts/lib/schema-version-checker.js, and the AJV consumers in knowledge-plan.js, validate-route.js, and session-manifest.js."
       },
       {
         "title": "Handoff & Continuity",
         "goal": "Explain the handoff bundle, session handoff, and continuity surfaces that make work transferable.",
         "parent": "",
-        "hints": "Cover handoff-bundle.js, handoff-command.js, continuity-surfaces.js, session-handoff.md template, and the handoff validate flow."
+        "hints": "Cover scripts/lib/core/handoff-bundle.js, scripts/lib/handoff-command.js, scripts/lib/continuity-surfaces.js, templates/session-handoff.md, and the handoff validate flow."
       },
       {
         "title": "Security & Migration Utilities",
@@ -166,7 +166,7 @@
     },
     {
       "id": "schemas-contracts",
-      "text": "schemas/ defines four JSON Schema contracts: loop-contract, route, session-manifest, timeline-event. These are the authoritative validation contracts used across the CLI (plus knowledge-plan).",
+      "text": "schemas/ defines five JSON Schema contracts: knowledge-plan, loop-contract, route, session-manifest, and timeline-event. These are the authoritative validation contracts used across the CLI.",
       "tags": ["validation", "schema"]
     },
     {

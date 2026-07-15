@@ -6,6 +6,8 @@ generated_by: "amber wiki knowledge"
 
 # Repository Knowledge
 
+Last Reviewed: 2026-07-16
+
 This knowledge base is derived from the declarative knowledge plan.
 
 ## Grounding Notes
@@ -15,14 +17,14 @@ This knowledge base is derived from the declarative knowledge plan.
 - The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command.
 - Safety boundary: read-only/dry-run first. 'init' and 'wiki' never overwrite existing files. Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
 - Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead.
-- Dependencies are intentionally minimal: ajv for JSON Schema validation, ajv-formats for format validation, nodemailer for notifications. No Express, no database, no ORM in the CLI package.
+- Dependencies are intentionally minimal: ajv for JSON Schema validation and ajv-formats for format validation. No Express, no database, no ORM in the CLI package.
 - src/ contains auxiliary utilities only (migration + security scanners), not the main CLI logic. Do not confuse src/ with scripts/lib/core/.
 - apps/web/ is a standalone React 18 + Vite + tRPC + TanStack Router application with its own package.json (@amber-protocol/web). It is NOT part of the published amber-protocol npm package.
 - Governed loop execution (ADR-0003) requires four gates: declarative policy check, explicit 'amber loop approve', isolated git worktree, and tamper-evident hash-chain ledger. Default 'loop run' is still dry-run.
 - The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required.
-- JSON Schemas in schemas/ define contracts for loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime.
+- JSON Schemas in schemas/ define contracts for knowledge-plan, loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime.
 - The project follows loop-engineering patterns. Continuous improvement is governed (see LOOP.md and amber-continuous-improvement skill).
-- Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, PROGRESS.md, session manifests, and ledgers.
+- Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, session-handoff.md, session manifests, and ledgers.
 
 ## Categories
 

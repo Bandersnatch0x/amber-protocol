@@ -8,53 +8,61 @@ updated_at: "2026-07-14T07:07:21.799Z"
 
 # Adoption System
 
-Explain the adoption report pipeline: proposals, gates, metrics, and the composer sub-module.
+Last Reviewed: 2026-07-16
 
-## Analysis Focus (from plan)
-Cover adoption-reports.js, adoption-proposals.js, adoption-gate.js, adoption-metrics.js, adoption-bundle.js, and the adoption-composer/ sub-module with its renderers.
+The adoption system evaluates an existing repository and produces a reviewable path
+for adopting Amber. It separates observation, proposal, human decision, gating, and
+artifact packaging. The pipeline writes reports and plans; it does not silently apply
+the proposed repository changes.
 
-## Grounding Notes (from knowledge plan)
-- Amber Protocol is a repository-local governance layer for AI-assisted engineering, NOT a runtime framework or agent platform. It produces review artifacts, dry-run plans, and approval records as files inside the target repo.
-- The CLI entry point is scripts/amber.js. All business logic lives in scripts/lib/. The scripts/lib/core/ directory is the core engine; files matching scripts/lib/*-commands.js are thin CLI wrappers that delegate to core functions.
-- Seven governance control layers in priority order: Governance (highest) > Verification > Observability > Lifecycle > Context > Tooling > Execution (lowest/avoid). This priority weighting shapes the entire codebase.
-- The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command.
-- Safety boundary: read-only/dry-run first. 'init' and 'wiki' never overwrite existing files. Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
-- Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead.
-- Dependencies are intentionally minimal: ajv for JSON Schema validation, ajv-formats for format validation, nodemailer for notifications. No Express, no database, no ORM in the CLI package.
-- src/ contains auxiliary utilities only (migration + security scanners), not the main CLI logic. Do not confuse src/ with scripts/lib/core/.
-- apps/web/ is a standalone React 18 + Vite + tRPC + TanStack Router application with its own package.json (@amber-protocol/web). It is NOT part of the published amber-protocol npm package.
-- Governed loop execution (ADR-0003) requires four gates: declarative policy check, explicit 'amber loop approve', isolated git worktree, and tamper-evident hash-chain ledger. Default 'loop run' is still dry-run.
-- The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required.
-- JSON Schemas in schemas/ define contracts for loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime.
-- The project follows loop-engineering patterns. Continuous improvement is governed (see LOOP.md and amber-continuous-improvement skill).
-- Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, PROGRESS.md, session manifests, and ledgers.
+## Key Files
 
-## What system/approach is used
+- `scripts/lib/core/adoption-reports.js` generates uniquely named reports, indexes and
+  validates report sets, parses report metadata and metrics, and compares reports.
+- `scripts/lib/core/adoption-metrics.js` builds the audit metrics block and provides a
+  stable serialize/parse boundary for report comparisons.
+- `scripts/lib/core/adoption-gate.js` converts report findings into a gate decision,
+  status, and next action.
+- `scripts/lib/core/adoption-proposals.js` writes decision records, apply plans, and
+  selected-file manifests while enforcing safe selectable paths.
+- `scripts/lib/core/adoption-bundle.js` assembles report, gate, decision, diff, and
+  next-action artifacts into a portable review bundle.
+- `scripts/lib/core/adoption-composer/` contains focused Markdown renderers for
+  reports, gates, decisions, selected files, bundles, and shared sections.
+- `scripts/lib/command-handler-families.js` contains the CLI adapter for the core
+  adoption APIs.
 
-- 
-
-## Key files / modules / packages
-
-- 
-
-## Architecture and conventions
-
-- 
-
-## Diagrams
+## Pipeline
 
 ```mermaid
-%% Suggested: system map, data flow, module boundaries, etc.
-graph TD
-    A[Entry] --> B[Core]
+flowchart LR
+    Target["Existing repository"] --> Audit["Adoption audit and metrics"]
+    Audit --> Report["Versioned adoption report"]
+    Report --> Gate["Findings and gate decision"]
+    Gate --> Decision["Human decision record"]
+    Decision --> Plan["Apply plan and selected files"]
+    Plan --> Bundle["Portable adoption bundle"]
+    Report --> Compare["Report comparison"]
 ```
 
-*(Mermaid diagrams are supported in the generated knowledge; the original implementation had dedicated fix tooling.)*
+Reports preserve the measured repository state and a machine-readable metrics block.
+Gate evaluation derives blockers and next actions from that report. Proposal writers
+then capture the human decision and the exact candidate file set. The composer layer
+only renders domain data; it does not perform repository inspection or approval.
 
-## Rules developers should follow
+## Boundaries and Invariants
 
-- 
-
-## Unknowns / Needs Confirmation
-
-- 
+- Audit output is evidence for a decision, not permission to mutate the target.
+- A gate finding must remain visible in status, next-action, and bundle output; do not
+  discard blockers while changing presentation.
+- Selected adoption paths must pass the safe-path boundary before they are written to
+  an apply plan or bundle.
+- Metrics serialization and parsing form a compatibility boundary for comparisons;
+  change them together and preserve older report readability.
+- Keep report generation, decision capture, apply planning, and bundling separately
+  callable so a reviewer can stop at any approval point.
+- Add shared Markdown structure in
+  `scripts/lib/core/adoption-composer/shared-helpers.js`; keep domain decisions in the
+  core adoption modules rather than embedding them in renderers.
+- Apply steps remain human-reviewed and explicit. Amber does not use the adoption
+  pipeline as an unattended installer.

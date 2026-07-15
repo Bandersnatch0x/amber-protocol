@@ -8,53 +8,68 @@ updated_at: "2026-07-14T07:07:21.797Z"
 
 # Governance Model & Seven Layers
 
-Map the seven governance control layers to concrete commands, data structures, and enforcement points.
+Last Reviewed: 2026-07-16
 
-## Analysis Focus (from plan)
-Governance > Verification > Observability > Lifecycle > Context > Tooling > Execution. Reference governance.js, governance-report.js, governance-readiness.js, and the standards/ JSON files.
+Amber orders controls from highest to lowest priority as Governance, Verification,
+Observability, Lifecycle, Context, Tooling, and Execution. This is a decision rule,
+not seven independent runtimes: lower layers may act only within the constraints and
+evidence requirements established above them. The result is a repository-local
+governance system whose primary outputs are inspectable files and decisions.
 
-## Grounding Notes (from knowledge plan)
-- Amber Protocol is a repository-local governance layer for AI-assisted engineering, NOT a runtime framework or agent platform. It produces review artifacts, dry-run plans, and approval records as files inside the target repo.
-- The CLI entry point is scripts/amber.js. All business logic lives in scripts/lib/. The scripts/lib/core/ directory is the core engine; files matching scripts/lib/*-commands.js are thin CLI wrappers that delegate to core functions.
-- Seven governance control layers in priority order: Governance (highest) > Verification > Observability > Lifecycle > Context > Tooling > Execution (lowest/avoid). This priority weighting shapes the entire codebase.
-- The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command.
-- Safety boundary: read-only/dry-run first. 'init' and 'wiki' never overwrite existing files. Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
-- Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead.
-- Dependencies are intentionally minimal: ajv for JSON Schema validation, ajv-formats for format validation, nodemailer for notifications. No Express, no database, no ORM in the CLI package.
-- src/ contains auxiliary utilities only (migration + security scanners), not the main CLI logic. Do not confuse src/ with scripts/lib/core/.
-- apps/web/ is a standalone React 18 + Vite + tRPC + TanStack Router application with its own package.json (@amber-protocol/web). It is NOT part of the published amber-protocol npm package.
-- Governed loop execution (ADR-0003) requires four gates: declarative policy check, explicit 'amber loop approve', isolated git worktree, and tamper-evident hash-chain ledger. Default 'loop run' is still dry-run.
-- The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required.
-- JSON Schemas in schemas/ define contracts for loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime.
-- The project follows loop-engineering patterns. Continuous improvement is governed (see LOOP.md and amber-continuous-improvement skill).
-- Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, PROGRESS.md, session manifests, and ledgers.
+## Layer Map
 
-## What system/approach is used
+| Layer | Purpose | Concrete surfaces |
+| --- | --- | --- |
+| Governance | Define allowed behavior and readiness criteria | `.amber/governance/rules.json`, `standards/amber-delivery.json`, `standards/owasp-agentic-2026.json`, `standards/security-governance.json` |
+| Verification | Prove claims with executed checks and schema validation | evidence records, validators, `verify`, `complete-check --strict` |
+| Observability | Make state and decisions inspectable | governance reports, readiness findings, session summaries, execution summaries, ledgers |
+| Lifecycle | Order work and enforce checkpoints | `scripts/lib/core/lifecycle.js`, plans, gates, approvals, sessions |
+| Context | Preserve stable knowledge and recovery state | `docs/wiki/`, handoff artifacts, session manifests, continuity surfaces |
+| Tooling | Expose governed operations | CLI handlers, routes, skills, scaffold and maintenance commands |
+| Execution | Run an approved command | `scripts/lib/core/governed-runner.js` inside an isolated worktree |
 
-- 
+## Key Files
 
-## Key files / modules / packages
+- `scripts/lib/core/governance.js` inspects policy and summarizes session and
+  execution evidence for audit reporting.
+- `scripts/lib/core/governance-readiness.js` inspects policy, governance docs,
+  routes, workflow packs, security, audit evidence, and GLX controls. It returns a
+  readiness decision, findings, errors, warnings, and structured next actions.
+- `scripts/lib/core/governance-report.js` combines readiness and repository state
+  into machine-readable data plus Markdown and text reports.
+- `scripts/lib/governance-commands.js` is the CLI-facing dispatch boundary for the
+  governance command family.
+- `standards/*.json` stores versioned delivery and security control definitions used
+  by governance checks and reports.
 
-- 
-
-## Architecture and conventions
-
-- 
-
-## Diagrams
+## Control Flow
 
 ```mermaid
-%% Suggested: system map, data flow, module boundaries, etc.
-graph TD
-    A[Entry] --> B[Core]
+flowchart TD
+    G["Governance: policy and standards"] --> V["Verification: evidence and validation"]
+    V --> O["Observability: reports and ledgers"]
+    O --> L["Lifecycle: plans, gates, sessions"]
+    L --> C["Context: wiki and handoff state"]
+    C --> T["Tooling: CLI, routes, skills"]
+    T --> E["Execution: isolated governed command"]
+    E --> O
 ```
 
-*(Mermaid diagrams are supported in the generated knowledge; the original implementation had dedicated fix tooling.)*
+The normal delivery sequence reflects the same ordering:
+`audit -> init -> governance report -> next -> plan -> gate -> verify -> approve ->
+handoff bundle -> handoff validate`. Readiness inspection identifies missing controls;
+it does not silently repair them or claim that work was executed.
 
-## Rules developers should follow
+## Development Rules
 
-- 
-
-## Unknowns / Needs Confirmation
-
-- 
+- Treat policy and standards as constraints on every lower layer. Convenience at the
+  tooling or execution layer cannot override a governance denial.
+- Record the command, result, artifact or session identifier, and remaining risk for
+  every completion, pass, or safety claim.
+- Keep worker output, review, approval, and acceptance as separate records.
+- Prefer inspections and dry-runs before mutation. A report or recommendation is not
+  evidence that the recommended command ran.
+- Add new readiness checks to the structured findings model so text, Markdown, and
+  JSON consumers receive the same decision.
+- Keep temporary status out of the wiki; store it in plans, manifests, ledgers, and
+  handoff state while keeping the wiki for reviewed knowledge.

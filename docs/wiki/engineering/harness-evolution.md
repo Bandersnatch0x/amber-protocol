@@ -1,5 +1,7 @@
 # Amber Evolution Log
 
+Last Reviewed: 2026-07-16
+
 ## 2026-07-14 docs/plans/F009-Governance-evidence-reads-resolve-state-dir-legacy-harness-support.md
 
 - Plan: `docs/plans/F009-Governance-evidence-reads-resolve-state-dir-legacy-harness-support.md`

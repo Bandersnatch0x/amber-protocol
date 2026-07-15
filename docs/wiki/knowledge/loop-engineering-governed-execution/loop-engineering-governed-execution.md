@@ -8,53 +8,65 @@ updated_at: "2026-07-14T07:07:21.802Z"
 
 # Loop Engineering & Governed Execution
 
-Document loop contracts, ledgers, dry-run mode, and the four-gate governed execution path.
+Last Reviewed: 2026-07-16
 
-## Analysis Focus (from plan)
-Cover loops.js, loop-execution.js, loop-ledger.js, loop-policy.js, governed-runner.js, execution-validator.js, and autonomous-policy.json.
+Loop contracts describe bounded improvement work, but do not schedule or execute it
+by themselves. Inspection, recommendation, and `loop run` default to read-only or
+dry-run behavior. Real command execution is an explicit alternate path protected by
+policy, one-shot approval, worktree isolation, and a tamper-evident ledger.
 
-## Grounding Notes (from knowledge plan)
-- Amber Protocol is a repository-local governance layer for AI-assisted engineering, NOT a runtime framework or agent platform. It produces review artifacts, dry-run plans, and approval records as files inside the target repo.
-- The CLI entry point is scripts/amber.js. All business logic lives in scripts/lib/. The scripts/lib/core/ directory is the core engine; files matching scripts/lib/*-commands.js are thin CLI wrappers that delegate to core functions.
-- Seven governance control layers in priority order: Governance (highest) > Verification > Observability > Lifecycle > Context > Tooling > Execution (lowest/avoid). This priority weighting shapes the entire codebase.
-- The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command.
-- Safety boundary: read-only/dry-run first. 'init' and 'wiki' never overwrite existing files. Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
-- Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead.
-- Dependencies are intentionally minimal: ajv for JSON Schema validation, ajv-formats for format validation, nodemailer for notifications. No Express, no database, no ORM in the CLI package.
-- src/ contains auxiliary utilities only (migration + security scanners), not the main CLI logic. Do not confuse src/ with scripts/lib/core/.
-- apps/web/ is a standalone React 18 + Vite + tRPC + TanStack Router application with its own package.json (@amber-protocol/web). It is NOT part of the published amber-protocol npm package.
-- Governed loop execution (ADR-0003) requires four gates: declarative policy check, explicit 'amber loop approve', isolated git worktree, and tamper-evident hash-chain ledger. Default 'loop run' is still dry-run.
-- The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required.
-- JSON Schemas in schemas/ define contracts for loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime.
-- The project follows loop-engineering patterns. Continuous improvement is governed (see LOOP.md and amber-continuous-improvement skill).
-- Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, PROGRESS.md, session manifests, and ledgers.
+## Key Files
 
-## What system/approach is used
+- `schemas/loop-contract.schema.json` defines the declarative contract shape,
+  including its state spine and hard stops.
+- `scripts/lib/core/loops.js` finds, inspects, recommends, dry-runs, and records loop
+  contracts and inspects their ledgers.
+- `scripts/lib/core/execution-validator.js` validates loop contracts, workflow packs,
+  integrations, and overall execution readiness.
+- `scripts/lib/core/loop-policy.js` applies built-in destructive-command denials and
+  project policy. Deny wins and the safe default is restrictive.
+- `scripts/lib/core/loop-execution.js` creates one-shot approvals and orchestrates
+  dry-run or governed execution.
+- `scripts/lib/core/governed-runner.js` provides the reusable policy, approval,
+  isolated worktree, execution budget, and ledger boundary.
+- `scripts/lib/core/loop-ledger.js` canonicalizes and hashes records, appends the JSONL
+  hash chain, finds unconsumed approvals, and verifies chain and outcome integrity.
+- `.amber/autonomous-policy.json` records declarative autonomy bounds; it is not a
+  scheduler and does not make a loop self-authorizing.
 
-- 
-
-## Key files / modules / packages
-
-- 
-
-## Architecture and conventions
-
-- 
-
-## Diagrams
+## Four Execution Gates
 
 ```mermaid
-%% Suggested: system map, data flow, module boundaries, etc.
-graph TD
-    A[Entry] --> B[Core]
+flowchart TD
+    Contract["Validated loop contract"] --> DryRun{"--execute requested?"}
+    DryRun -- No --> Preview["Dry-run plan only"]
+    DryRun -- Yes --> Policy["1. Policy allows command"]
+    Policy --> Approval["2. Unconsumed one-shot approval"]
+    Approval --> Worktree["3. Isolated git worktree"]
+    Worktree --> Run["Run with time budget"]
+    Run --> Ledger["4. Append hash-chain outcome"]
+    Ledger --> Verify["Verify chain and outcome"]
 ```
 
-*(Mermaid diagrams are supported in the generated knowledge; the original implementation had dedicated fix tooling.)*
+`loop approve` records a reviewer and a unique approval key in the contract ledger.
+`loop run --execute` can consume only a valid unconsumed approval. The raw command is
+reached only after policy and approval pass, and it runs in an isolated worktree. Every
+policy denial and executed outcome is recorded in the ledger; missing approval,
+repository, or worktree prerequisites return a structured error before execution.
 
-## Rules developers should follow
+## Development Rules
 
-- 
-
-## Unknowns / Needs Confirmation
-
-- 
+- Keep `loop run` dry-run by default. Never infer execution intent from a contract,
+  recommendation, prior approval, or autonomous policy file.
+- Apply built-in destructive-command denials before project allow rules. Custom policy
+  must not be able to remove the baseline deny set.
+- One approval authorizes one attempt. Do not reuse, synthesize, or self-issue an
+  approval from worker output.
+- Never run governed mutation in the main checkout.
+- Append and verify ledger records through `loop-ledger.js`; do not hand-edit ledger
+  JSONL or bypass canonical hashing.
+- Preserve `execution: { executesAnything: false }` in declarative loop contracts.
+  Contracts and recommendations describe work; the governed runner is the only
+  execution boundary.
+- Failure at any gate must stop before command execution and remain visible in the
+  structured result and ledger evidence.

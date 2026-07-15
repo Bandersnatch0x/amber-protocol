@@ -8,53 +8,82 @@ updated_at: "2026-07-14T07:07:21.798Z"
 
 # Session & Lifecycle Management
 
-Document routes, sessions, checkpoints, worktrees, and the lifecycle state machine.
+Last Reviewed: 2026-07-16
 
-## Analysis Focus (from plan)
-Cover session-commands.js, session-state-machine.js, session-manifest.js, route-commands.js, route-loader.js, checkpoint-manager.js, worktree-manager.js, and lifecycle.js.
+A session is a durable execution context selected from a declarative Route. Its
+manifest, event stream, checkpoints, verification evidence, and optional worktree make
+the current state recoverable without relying on chat history. The lifecycle engine is
+read-only guidance over repository state; session commands perform explicit legal
+state transitions.
 
-## Grounding Notes (from knowledge plan)
-- Amber Protocol is a repository-local governance layer for AI-assisted engineering, NOT a runtime framework or agent platform. It produces review artifacts, dry-run plans, and approval records as files inside the target repo.
-- The CLI entry point is scripts/amber.js. All business logic lives in scripts/lib/. The scripts/lib/core/ directory is the core engine; files matching scripts/lib/*-commands.js are thin CLI wrappers that delegate to core functions.
-- Seven governance control layers in priority order: Governance (highest) > Verification > Observability > Lifecycle > Context > Tooling > Execution (lowest/avoid). This priority weighting shapes the entire codebase.
-- The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command.
-- Safety boundary: read-only/dry-run first. 'init' and 'wiki' never overwrite existing files. Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
-- Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead.
-- Dependencies are intentionally minimal: ajv for JSON Schema validation, ajv-formats for format validation, nodemailer for notifications. No Express, no database, no ORM in the CLI package.
-- src/ contains auxiliary utilities only (migration + security scanners), not the main CLI logic. Do not confuse src/ with scripts/lib/core/.
-- apps/web/ is a standalone React 18 + Vite + tRPC + TanStack Router application with its own package.json (@amber-protocol/web). It is NOT part of the published amber-protocol npm package.
-- Governed loop execution (ADR-0003) requires four gates: declarative policy check, explicit 'amber loop approve', isolated git worktree, and tamper-evident hash-chain ledger. Default 'loop run' is still dry-run.
-- The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required.
-- JSON Schemas in schemas/ define contracts for loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime.
-- The project follows loop-engineering patterns. Continuous improvement is governed (see LOOP.md and amber-continuous-improvement skill).
-- Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, PROGRESS.md, session manifests, and ledgers.
+## Key Files
 
-## What system/approach is used
+- `scripts/lib/session-commands.js` implements start, status, list, continue, verify,
+  approve, complete, abort, and ledger verification operations.
+- `scripts/lib/session-state-machine.js` defines the legal states and transitions.
+- `scripts/lib/session-manifest.js` creates, validates, reads, and writes manifests
+  using `schemas/session-manifest.schema.json`; writes stamp a monotonic `updatedAt`.
+- `scripts/lib/route-loader.js` discovers and selects Route definitions;
+  `scripts/lib/route-commands.js` exposes route inspection and execution operations.
+- `scripts/lib/checkpoint-manager.js` stores and retrieves stage checkpoints inside a
+  session's state directory.
+- `scripts/lib/worktree-manager.js` creates and removes isolated git worktrees for
+  session execution.
+- `scripts/lib/core/lifecycle.js` gathers plans and repository signals, evaluates the
+  standard lifecycle, and recommends the next governed step.
 
-- 
+## State Model
 
-## Key files / modules / packages
-
-- 
-
-## Architecture and conventions
-
-- 
-
-## Diagrams
+The states are `created`, `routed`, `executing`, `paused`, `completed`, `failed`, and
+`aborted`. `completed`, `failed`, and `aborted` are final. The normal path is
+`created -> routed -> executing`, with `executing <-> paused`; active states may also
+move to a final state where the transition table permits it.
 
 ```mermaid
-%% Suggested: system map, data flow, module boundaries, etc.
-graph TD
-    A[Entry] --> B[Core]
+stateDiagram-v2
+    [*] --> created
+    created --> routed
+    routed --> executing
+    executing --> paused
+    paused --> executing
+    created --> completed
+    routed --> completed
+    executing --> completed
+    paused --> completed
+    created --> failed
+    routed --> failed
+    executing --> failed
+    paused --> failed
+    created --> aborted
+    routed --> aborted
+    executing --> aborted
+    paused --> aborted
 ```
 
-*(Mermaid diagrams are supported in the generated knowledge; the original implementation had dedicated fix tooling.)*
+## Runtime Flow
 
-## Rules developers should follow
+1. `session start` selects a Route from an explicit choice or goal matching, creates a
+   manifest, records the initial events, and establishes the session directory.
+2. Route stages define ordered work and gates. Continuing a session restores the
+   latest checkpoint and advances only through a legal transition.
+3. Mutating execution can use a session-specific worktree so the main checkout is not
+   the execution environment.
+4. Verification appends evidence rather than trusting self-reported completion.
+   Approval and completion remain explicit operations.
+5. `lifecycle` inspection reads plans, gates, and project signals to recommend a next
+   action; it does not execute that action.
 
-- 
+## Development Rules
 
-## Unknowns / Needs Confirmation
-
-- 
+- Add or change states only through the transition table and update manifest schema,
+  renderers, recovery behavior, and tests together.
+- Never mutate a final session. Start a new session or use the documented recovery
+  path instead.
+- Persist a checkpoint before a stage boundary that must be resumable, and append a
+  timeline event for material state changes.
+- Validate Route and manifest data before using it. Do not infer missing required
+  fields at execution time.
+- Keep route selection, state transition, checkpoint recovery, worktree isolation,
+  verification, and approval as distinct responsibilities.
+- A session status or dry-run is not proof of target-project execution; use recorded
+  verification evidence for completion claims.

@@ -8,53 +8,65 @@ updated_at: "2026-07-14T07:07:21.794Z"
 
 # CLI Architecture & Command Dispatch
 
-Document how scripts/amber.js dispatches commands through command-dispatcher.js to handler modules and the core engine in scripts/lib/core/.
+Last Reviewed: 2026-07-16
 
-## Analysis Focus (from plan)
-Cover the command-dispatcher pattern, how *-commands.js files wrap core logic, and the separation between CLI surface and business logic.
+Amber exposes one CommonJS CLI entry point and keeps command parsing, command routing,
+and domain work in separate layers. The entry point validates the top-level command,
+parses flags once, delegates to a registered handler, and owns result printing and the
+process exit code. Handler modules translate CLI options into calls to reusable core
+functions; durable behavior and artifact generation live under `scripts/lib/core/`.
 
-## Grounding Notes (from knowledge plan)
-- Amber Protocol is a repository-local governance layer for AI-assisted engineering, NOT a runtime framework or agent platform. It produces review artifacts, dry-run plans, and approval records as files inside the target repo.
-- The CLI entry point is scripts/amber.js. All business logic lives in scripts/lib/. The scripts/lib/core/ directory is the core engine; files matching scripts/lib/*-commands.js are thin CLI wrappers that delegate to core functions.
-- Seven governance control layers in priority order: Governance (highest) > Verification > Observability > Lifecycle > Context > Tooling > Execution (lowest/avoid). This priority weighting shapes the entire codebase.
-- The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command.
-- Safety boundary: read-only/dry-run first. 'init' and 'wiki' never overwrite existing files. Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
-- Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead.
-- Dependencies are intentionally minimal: ajv for JSON Schema validation, ajv-formats for format validation, nodemailer for notifications. No Express, no database, no ORM in the CLI package.
-- src/ contains auxiliary utilities only (migration + security scanners), not the main CLI logic. Do not confuse src/ with scripts/lib/core/.
-- apps/web/ is a standalone React 18 + Vite + tRPC + TanStack Router application with its own package.json (@amber-protocol/web). It is NOT part of the published amber-protocol npm package.
-- Governed loop execution (ADR-0003) requires four gates: declarative policy check, explicit 'amber loop approve', isolated git worktree, and tamper-evident hash-chain ledger. Default 'loop run' is still dry-run.
-- The project uses CommonJS ('type': 'commonjs' in package.json). Node >= 18.17 required.
-- JSON Schemas in schemas/ define contracts for loop-contract, route, session-manifest, and timeline-event. All are validated with ajv at runtime.
-- The project follows loop-engineering patterns. Continuous improvement is governed (see LOOP.md and amber-continuous-improvement skill).
-- Stable knowledge lives under docs/wiki/ (and docs/architecture/). Current work state lives in feature_list.json, PROGRESS.md, session manifests, and ledgers.
+## Key Files
 
-## What system/approach is used
+- `scripts/amber.js` defines the supported top-level commands, parses arguments, calls
+  `dispatch()`, prints text or JSON results, and returns non-zero when `result.errors`
+  is non-empty.
+- `scripts/lib/command-dispatcher.js` owns the central `HANDLERS` registry, thin
+  wrappers for command families, and deprecation warnings.
+- `scripts/lib/command-handler-families.js` contains the maintenance, adoption,
+  ledger, session, and governance family adapters. For example, governance arguments
+  are normalized before they reach `governanceDispatch()`.
+- `scripts/lib/*-commands.js` modules own command-specific option handling, target
+  guards, and presentation-oriented result shaping.
+- `scripts/lib/core/` contains reusable inspections, validators, report builders,
+  lifecycle logic, governed execution, and artifact writers.
+- `scripts/lib/core/cli-output.js` provides the shared argument and output boundaries
+  used by the entry point.
 
-- 
+## Dispatch Flow
 
-## Key files / modules / packages
-
-- 
-
-## Architecture and conventions
-
-- 
-
-## Diagrams
+1. `run()` handles help and version requests, rejects unknown top-level commands, and
+   parses the remaining arguments.
+2. `dispatch(command, args)` looks up the command in `HANDLERS`; an unregistered
+   command produces a structured error and exit code 1.
+3. The selected wrapper delegates either to a command-family dispatcher or directly
+   to a focused command module.
+4. Command modules call core functions and return a result with `errors` and
+   `warnings`. Async handlers are supported because `run()` awaits the dispatch result.
+5. `scripts/amber.js` is the single output boundary unless a handler explicitly uses
+   the `bypassPrint` contract for streaming or custom output.
 
 ```mermaid
-%% Suggested: system map, data flow, module boundaries, etc.
-graph TD
-    A[Entry] --> B[Core]
+flowchart LR
+    Shell["node scripts/amber.js"] --> Entry["parse args and validate command"]
+    Entry --> Registry["command-dispatcher HANDLERS"]
+    Registry --> Family["family or *-commands adapter"]
+    Family --> Core["scripts/lib/core domain logic"]
+    Core --> Artifacts["repository artifacts and structured result"]
+    Artifacts --> Output["text or JSON output and exit code"]
 ```
 
-*(Mermaid diagrams are supported in the generated knowledge; the original implementation had dedicated fix tooling.)*
+## Development Rules
 
-## Rules developers should follow
-
-- 
-
-## Unknowns / Needs Confirmation
-
-- 
+- Add a top-level command to the supported command list and `HANDLERS` registry; do
+  not add a second CLI entry point.
+- Keep wrappers focused on CLI concerns. Put reusable inspection, validation, state
+  transition, and rendering logic in an appropriate core module.
+- Preserve the structured result contract. Expected failures belong in `errors` or
+  `warnings`, not in ad hoc process exits inside core functions.
+- Route mutating commands through the existing policy, approval, isolation, and
+  evidence controls. A new handler must not become an execution bypass.
+- Keep read-only and dry-run behavior as the default, and retain idempotent,
+  non-overwriting behavior for scaffold commands such as `init` and `wiki`.
+- The root CLI package intentionally depends only on `ajv` and `ajv-formats`; Web
+  dependencies remain isolated in `apps/web/package.json`.
