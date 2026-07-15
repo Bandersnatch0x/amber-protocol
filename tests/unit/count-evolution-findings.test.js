@@ -12,7 +12,7 @@ const path = require("node:path");
 const {
 	countEvolutionFindings,
 	extractEvolutionFindings,
-	rollupEvolutionFindings,
+	runMaintenanceAction,
 } = require("../../scripts/lib/core/maintenance");
 
 function tempTarget() {
@@ -65,7 +65,7 @@ test("extractEvolutionFindings filters to count > 1 and keeps the finding key", 
 test("rollupEvolutionFindings filters to count >= 2, renames to text, and reports threshold", () => {
 	const root = tempTarget();
 	writeEvolution(root, "Finding: dup\nFinding: dup\nFinding: solo\n");
-	const result = rollupEvolutionFindings(root);
+	const result = runMaintenanceAction("evolution-rollup", root);
 	assert.equal(result.threshold, 2);
 	assert.deepEqual(
 		result.findings.map((r) => [r.text, r.count]),
@@ -74,10 +74,9 @@ test("rollupEvolutionFindings filters to count >= 2, renames to text, and report
 });
 
 test("rollupEvolutionFindings returns empty findings with threshold when the file is missing", () => {
-	assert.deepEqual(rollupEvolutionFindings(tempTarget()), {
-		findings: [],
-		threshold: 2,
-	});
+	const result = runMaintenanceAction("evolution-rollup", tempTarget());
+	assert.equal(result.threshold, 2);
+	assert.deepEqual(result.findings, []);
 });
 
 test("extractEvolutionFindings and rollupEvolutionFindings apply the same significance cutoff", () => {
@@ -90,7 +89,7 @@ test("extractEvolutionFindings and rollupEvolutionFindings apply the same signif
 		"Finding: thrice\nFinding: thrice\nFinding: thrice\nFinding: twice\nFinding: twice\nFinding: once\n",
 	);
 	const extracted = extractEvolutionFindings(root).map((r) => r.finding);
-	const rolled = rollupEvolutionFindings(root).findings.map((r) => r.text);
+	const rolled = runMaintenanceAction("evolution-rollup", root).findings.map((r) => r.text);
 	assert.deepEqual(rolled, extracted);
 	assert.deepEqual(rolled, ["thrice", "twice"]);
 });
@@ -98,7 +97,7 @@ test("extractEvolutionFindings and rollupEvolutionFindings apply the same signif
 test("rollupEvolutionFindings honours an explicit minCount below the default", () => {
 	const root = tempTarget();
 	writeEvolution(root, "Finding: dup\nFinding: dup\nFinding: solo\n");
-	const result = rollupEvolutionFindings(root, 1);
+	const result = runMaintenanceAction("evolution-rollup", root, { threshold: 1 });
 	assert.equal(result.threshold, 1);
 	assert.deepEqual(
 		result.findings.map((r) => [r.text, r.count]),
@@ -112,7 +111,7 @@ test("rollupEvolutionFindings honours an explicit minCount below the default", (
 test("rollupEvolutionFindings honours an explicit minCount above the default", () => {
 	const root = tempTarget();
 	writeEvolution(root, "Finding: thrice\nFinding: thrice\nFinding: thrice\nFinding: twice\nFinding: twice\n");
-	const result = rollupEvolutionFindings(root, 3);
+	const result = runMaintenanceAction("evolution-rollup", root, { threshold: 3 });
 	assert.equal(result.threshold, 3);
 	assert.deepEqual(
 		result.findings.map((r) => r.text),

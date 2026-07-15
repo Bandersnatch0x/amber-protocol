@@ -14,7 +14,7 @@ const path = require("node:path");
 
 const {
 	readRegressionProposal,
-	extractRegressionProposals,
+	runMaintenanceAction,
 } = require("../../scripts/lib/core/maintenance");
 
 function tempTarget() {
@@ -52,7 +52,7 @@ test("extractRegressionProposals skips a corrupt evidence file instead of crashi
 			regressionProposal: { status: "proposed", assertion: "must not regress" },
 		}),
 	);
-	const proposals = extractRegressionProposals(root);
+	const proposals = runMaintenanceAction("regression-proposals", root).proposals;
 	assert.deepEqual(
 		proposals.map((p) => p.taskId),
 		["good"],

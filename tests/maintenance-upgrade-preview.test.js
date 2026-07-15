@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
-const { previewUpgrade } = require("../scripts/lib/core/maintenance");
+const { runMaintenanceAction } = require("../scripts/lib/core/maintenance");
 
 test("previewUpgrade shows pack changes from 1.0.0 to 1.1.0", () => {
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-test-"));
@@ -37,7 +37,7 @@ test("previewUpgrade shows pack changes from 1.0.0 to 1.1.0", () => {
 		}),
 	);
 
-	const preview = previewUpgrade(tmpDir, "1.1.0", registryPath);
+	const preview = runMaintenanceAction("upgrade-preview", tmpDir, { version: "1.1.0", registry: registryPath });
 
 	assert.equal(preview.currentVersion, "1.0.0");
 	assert.equal(preview.targetVersion, "1.1.0");

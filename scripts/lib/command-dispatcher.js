@@ -39,7 +39,6 @@ const { dispatchAgentTask, setAgentDispatchStatus, recordAgentReview } = require
 const { inspectLoopContract, recommendLoopContract, recordLoopContract, inspectLoopLedger } = require("./core/loops");
 const { executeLoopContract, approveLoopContract, verifyLoopLedger } = require("./core/loop-execution");
 const { inspectTeamDistribution, installTeamDistribution, pinTeamDistribution, updateTeamDistribution, rollbackTeamDistribution } = require("./core/team");
-const { inspectMaintenance, proposeMaintenance } = require("./core/maintenance");
 const { generateAdoptionReport, listAdoptionReports, writeAdoptionReportsIndex, validateAdoptionReports, compareAdoptionReports } = require("./core/adoption-reports");
 const { gateAdoptionReport, statusAdoptionReports } = require("./core/adoption-gate");
 const { bundleAdoptionArtifacts, writeAdoptionNextActions } = require("./core/adoption-bundle");

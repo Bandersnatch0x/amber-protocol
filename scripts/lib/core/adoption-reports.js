@@ -30,6 +30,7 @@ const {
 const {
 	inspectTeamDistribution,
 	latestTeamVersion,
+	resolveRegistryPath,
 	updateTeamDistribution,
 } = require("./team");
 
@@ -557,7 +558,7 @@ function generateAdoptionReport(target, options = {}) {
 			dryRun: true,
 		});
 	}
-	const maintenance = inspectMaintenance(targetRoot, options);
+	const maintenance = inspectMaintenance(targetRoot, resolveRegistryPath(options.registry));
 
 	errors.push(...(team.errors || []), ...(maintenance.errors || []));
 	warnings.push(...(team.warnings || []), ...(maintenance.warnings || []));

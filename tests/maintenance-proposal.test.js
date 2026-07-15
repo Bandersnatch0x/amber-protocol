@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
-const { proposeMaintenance } = require("../scripts/lib/core/maintenance");
+const { runMaintenanceAction } = require("../scripts/lib/core/maintenance");
 
 function tempDir() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "maintenance-proposal-"));
@@ -38,7 +38,7 @@ test("project with stale docs + drift → proposal.md has 2+ sections", () => {
 		JSON.stringify({ version: "0.2.0" })
 	);
 
-	const result = proposeMaintenance(fixtureRoot, {});
+	const result = runMaintenanceAction("propose", fixtureRoot, {});
 
 	assert.deepEqual(result.errors, []);
 	assert.ok(result.proposalPath);
@@ -66,7 +66,7 @@ test("unknown --priority value errors instead of silently emptying the proposal"
 		"Last Reviewed: 2000-01-01\n"
 	);
 
-	const result = proposeMaintenance(fixtureRoot, { priority: "bogus" });
+	const result = runMaintenanceAction("propose", fixtureRoot, { priority: "bogus" });
 
 	assert.ok(
 		result.errors.some((e) => /priority/i.test(e)),
@@ -88,7 +88,7 @@ test("valid --priority values are accepted and write a proposal", () => {
 	);
 
 	for (const priority of ["high", "medium", "low"]) {
-		const result = proposeMaintenance(fixtureRoot, { priority });
+		const result = runMaintenanceAction("propose", fixtureRoot, { priority });
 		assert.deepEqual(result.errors, [], `priority ${priority} should be accepted`);
 		assert.ok(result.proposalPath, `priority ${priority} should write a proposal`);
 	}

@@ -8,7 +8,7 @@
 
 const path = require("node:path");
 
-const { inspectMaintenance, proposeMaintenance } = require("./core/maintenance");
+const { runMaintenanceAction } = require("./core/maintenance");
 const {
   generateAdoptionReport,
   listAdoptionReports,
@@ -39,62 +39,31 @@ function resolveTarget(args) {
 
 function handleMaintenance(args) {
   const action = args._?.[0];
-  if (action === "inspect")  return { result: inspectMaintenance(args.target, args) };
-  if (action === "propose" || action === "proposal") return { result: proposeMaintenance(args.target, args) };
 
-  // Actions that need lazy-loaded maintenance helpers
-  const { resolveTarget: resolve } = require("./core/fs-utils");
-  const targetRoot = resolve(args.target);
-
-  if (action === "stale-docs") {
-    const { detectStaleDocs } = require("./core/maintenance");
-    const parsed = args.thresholdDays ? Number.parseInt(args.thresholdDays, 10) : undefined;
-    const thresholdDays = Number.isInteger(parsed) ? parsed : undefined;
-    const stale = detectStaleDocs(targetRoot, thresholdDays);
-    return { result: { target: targetRoot, staleDocs: stale.staleDocs, thresholdDays: stale.thresholdDays, errors: [], warnings: [] } };
-  }
+  // Two sibling actions stay handler-routed: they live in their own modules
+  // (scaffold-version-drift, distill-candidates) and are NOT owned by the
+  // maintenance-dispatch chokepoint.
   if (action === "scaffold-drift") {
+    const { resolveTarget } = require("./core/fs-utils");
     const { detectScaffoldDrift } = require("./core/scaffold-version-drift");
+    const targetRoot = resolveTarget(args.target);
     const drift = detectScaffoldDrift(targetRoot);
     return { result: { target: targetRoot, scaffoldDrift: drift, errors: [], warnings: [] } };
   }
-  if (action === "wiki-lint") {
-    const { validateWikiStructure, fixWikiMarkers } = require("./core/maintenance");
-    let fixResult = null;
-    if (args.fixMarkers) fixResult = fixWikiMarkers(targetRoot);
-    const r = validateWikiStructure(targetRoot);
-    if (fixResult) { r.fixedMarkers = fixResult.fixed; r.fixedMarkerCount = fixResult.fixedCount; }
-    return { result: r };
-  }
-  if (action === "pack-drift") {
-    const { detectPackDrift } = require("./core/maintenance");
-    const { resolveRegistryPath } = require("./core/team");
-    const drift = detectPackDrift(targetRoot, resolveRegistryPath(args.registry));
-    return { result: { target: targetRoot, ...drift, errors: [], warnings: [] } };
-  }
-  if (action === "upgrade-preview") {
-    const { previewUpgrade } = require("./core/maintenance");
-    const { resolveRegistryPath } = require("./core/team");
-    const preview = previewUpgrade(targetRoot, args.version, resolveRegistryPath(args.registry));
-    return { result: { target: targetRoot, ...preview, errors: [], warnings: [] } };
-  }
-  if (action === "evolution-rollup") {
-    const { rollupEvolutionFindings } = require("./core/maintenance");
-    const parsed = args.threshold ? Number.parseInt(args.threshold, 10) : undefined;
-    const rollup = rollupEvolutionFindings(targetRoot, Number.isInteger(parsed) ? parsed : undefined);
-    return { result: { target: targetRoot, findings: rollup.findings, threshold: rollup.threshold, errors: [], warnings: [] } };
-  }
-  if (action === "regression-proposals") {
-    const { extractRegressionProposals } = require("./core/maintenance");
-    return { result: { target: targetRoot, proposals: extractRegressionProposals(targetRoot), errors: [], warnings: [] } };
-  }
   if (action === "distill") {
+    const { resolveTarget } = require("./core/fs-utils");
     const { writeDistillProposal } = require("./distill-candidates");
+    const targetRoot = resolveTarget(args.target);
     const outputPath = args.output || path.join(targetRoot, "docs", "maintenance", "distill-proposals.md");
     const proposal = writeDistillProposal(targetRoot, outputPath, args);
     return { result: { target: targetRoot, outputPath: proposal.outputPath, candidateCount: proposal.candidateCount, errors: [], warnings: [] } };
   }
-  return { result: unknownAction("maintenance", ["inspect", "propose", "stale-docs", "scaffold-drift", "wiki-lint", "pack-drift", "upgrade-preview", "evolution-rollup", "regression-proposals", "distill"]) };
+
+  // The 8 own-actions (inspect, propose, stale-docs, wiki-lint, pack-drift,
+  // upgrade-preview, evolution-rollup, regression-proposals) - plus the unknown
+  // case - route through the single maintenance-dispatch chokepoint, which owns
+  // per-branch arg shaping and the registry -> registryPath resolution.
+  return { result: runMaintenanceAction(action, args.target, args) };
 }
 
 function handleAdoption(args) {

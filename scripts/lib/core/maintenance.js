@@ -23,6 +23,7 @@ const {
 	latestTeamVersion,
 	loadTeamLock,
 	loadTeamRegistry,
+	resolveRegistryPath,
 	teamStatePaths,
 } = require("./team");
 
@@ -322,9 +323,9 @@ function extractRegressionProposals(targetRoot) {
 		.slice(0, 50);
 }
 
-function inspectMaintenance(target, options = {}) {
+function inspectMaintenance(target, registryPath) {
 	const targetRoot = resolveTarget(target);
-	const loaded = loadTeamRegistry(options.registry);
+	const loaded = loadTeamRegistry(registryPath);
 	const wikiValidation = validateWiki(targetRoot);
 	const staleDocsResult = detectStaleDocs(targetRoot);
 	const { detectScaffoldDrift } = require("./scaffold-version-drift");
@@ -435,8 +436,8 @@ function buildMaintenanceProposalContent(inspection) {
 	return lines.join("\n");
 }
 
-function proposeMaintenance(target, options = {}) {
-	const inspection = inspectMaintenance(target, options);
+function proposeMaintenance(target, registryPath, priority) {
+	const inspection = inspectMaintenance(target, registryPath);
 	if (inspection.errors.length > 0) {
 		return {
 			target: inspection.target,
@@ -447,16 +448,16 @@ function proposeMaintenance(target, options = {}) {
 
 	// Apply priority filter if specified
 	let filteredInspection = inspection;
-	if (options.priority) {
+	if (priority) {
 		// Validate the requested priority up front. An unrecognized value used to
 		// fall through every branch, leaving allowedCategories empty so each
 		// section was zeroed and a blank proposal was written with no error — a
 		// silent failure. Fail fast with a clear message instead.
-		if (!['high', 'medium', 'low'].includes(options.priority)) {
+		if (!['high', 'medium', 'low'].includes(priority)) {
 			return {
 				target: inspection.target,
 				errors: [
-					`Unknown priority "${options.priority}". Use high, medium, or low.`,
+					`Unknown priority "${priority}". Use high, medium, or low.`,
 				],
 				warnings: inspection.warnings,
 			};
@@ -469,11 +470,11 @@ function proposeMaintenance(target, options = {}) {
 		};
 
 		const allowedCategories = [];
-		if (options.priority === 'high') {
+		if (priority === 'high') {
 			allowedCategories.push(...priorityLevels.high);
-		} else if (options.priority === 'medium') {
+		} else if (priority === 'medium') {
 			allowedCategories.push(...priorityLevels.high, ...priorityLevels.medium);
-		} else if (options.priority === 'low') {
+		} else if (priority === 'low') {
 			allowedCategories.push(...priorityLevels.high, ...priorityLevels.medium, ...priorityLevels.low);
 		}
 
@@ -503,7 +504,7 @@ function proposeMaintenance(target, options = {}) {
 		reviewable: true,
 		sourceFilesChanged: false,
 		inspection: filteredInspection,
-		priority: options.priority || 'all',
+		priority: priority || 'all',
 		errors: [],
 		warnings: filteredInspection.warnings,
 	};
@@ -618,6 +619,134 @@ function previewUpgrade(projectRoot, version, registryPath) {
 	};
 }
 
+// The 8 maintenance actions this dispatch chokepoint owns. handleMaintenance
+// routes its two sibling actions (scaffold-drift, distill) itself; every other
+// maintenance action flows through runMaintenanceAction so the per-branch arg
+// shaping (thresholdDays/threshold parse, fixMarkers conditional, and the
+// registry -> registryPath resolution that closes the CLI-arg leak) lives in
+// exactly one place. The raw CLI `registry` arg never reaches a domain function
+// unresolved.
+const MAINTENANCE_ACTIONS = [
+	"inspect",
+	"propose",
+	"stale-docs",
+	"wiki-lint",
+	"pack-drift",
+	"upgrade-preview",
+	"evolution-rollup",
+	"regression-proposals",
+];
+
+// The full maintenance command surface, for the unknown-action guidance message.
+// scaffold-drift and distill stay handler-routed (separate modules) so they are
+// NOT in MAINTENANCE_ACTIONS (which the dispatch switch owns), but a user who
+// mistypes one of them still deserves to see it in the help list.
+const ALL_MAINTENANCE_ACTIONS = [...MAINTENANCE_ACTIONS, "scaffold-drift", "distill"];
+
+function unknownMaintenanceAction() {
+	return {
+		errors: [
+			`maintenance requires one of: ${ALL_MAINTENANCE_ACTIONS.join(", ")}.`,
+		],
+		warnings: [],
+	};
+}
+
+function runMaintenanceAction(action, targetRoot, options = {}) {
+	// Accept either the handler's (action, resolvedPath, args) shape or a direct
+	// (action, argsObject) call (tests / programmatic use). When targetRoot is an
+	// args-like object it carries .target/.registry/.fixMarkers/etc. itself; the
+	// third `options` arg is the CLI args when targetRoot is a resolved string.
+	const args =
+		targetRoot && typeof targetRoot === "object" && !Array.isArray(targetRoot)
+			? targetRoot
+			: options;
+	const resolvedTarget = resolveTarget(
+		typeof targetRoot === "string" ? targetRoot : args.target,
+	);
+	// Single place the CLI `registry` leak is closed: resolve to a path string
+	// before any domain function sees it.
+	const registryPath = resolveRegistryPath(args.registry);
+
+	// "proposal" is a long-standing alias for "propose".
+	const normalized = action === "proposal" ? "propose" : action;
+
+	switch (normalized) {
+		case "inspect":
+			// inspectMaintenance is a shared core interface (governance-report,
+			// adoption-reports) and stays exported; reach it through the exports
+			// object so tests can stub the delegation seam and observe the args.
+			return module.exports.inspectMaintenance(resolvedTarget, registryPath);
+		case "propose": {
+			// proposeMaintenance is handler-only (not exported), but tests stub it
+			// on the exports object, so prefer the exported binding when present and
+			// fall back to the lexical definition otherwise.
+			const propose = module.exports.proposeMaintenance || proposeMaintenance;
+			return propose(resolvedTarget, registryPath, args.priority);
+		}
+		case "stale-docs": {
+			const parsed = args.thresholdDays
+				? Number.parseInt(args.thresholdDays, 10)
+				: undefined;
+			const thresholdDays = Number.isInteger(parsed) ? parsed : undefined;
+			const stale = detectStaleDocs(resolvedTarget, thresholdDays);
+			return {
+				target: resolvedTarget,
+				staleDocs: stale.staleDocs,
+				thresholdDays: stale.thresholdDays,
+				errors: [],
+				warnings: [],
+			};
+		}
+		case "wiki-lint": {
+			let fixResult = null;
+			if (args.fixMarkers) fixResult = fixWikiMarkers(resolvedTarget);
+			const result = validateWikiStructure(resolvedTarget);
+			return fixResult
+				? {
+						...result,
+						fixedMarkers: fixResult.fixed,
+						fixedMarkerCount: fixResult.fixedCount,
+					}
+				: result;
+		}
+		case "pack-drift": {
+			const drift = detectPackDrift(resolvedTarget, registryPath);
+			return { target: resolvedTarget, ...drift, errors: [], warnings: [] };
+		}
+		case "upgrade-preview": {
+			const preview = previewUpgrade(resolvedTarget, args.version, registryPath);
+			return { target: resolvedTarget, ...preview, errors: [], warnings: [] };
+		}
+		case "evolution-rollup": {
+			const parsed = args.threshold
+				? Number.parseInt(args.threshold, 10)
+				: undefined;
+			const rollup = rollupEvolutionFindings(
+				resolvedTarget,
+				Number.isInteger(parsed) ? parsed : undefined,
+			);
+			return {
+				target: resolvedTarget,
+				findings: rollup.findings,
+				threshold: rollup.threshold,
+				errors: [],
+				warnings: [],
+			};
+		}
+		case "regression-proposals": {
+			return {
+				target: resolvedTarget,
+				proposals: extractRegressionProposals(resolvedTarget),
+				errors: [],
+				warnings: [],
+			};
+		}
+		default:
+			return unknownMaintenanceAction();
+	}
+}
+
 module.exports = {
 	listWikiMarkdownFiles,
 	detectStaleDocs,
@@ -627,14 +756,8 @@ module.exports = {
 	buildMigrationAssistant,
 	countEvolutionFindings,
 	extractEvolutionFindings,
-	rollupEvolutionFindings,
 	readRegressionProposal,
-	extractRegressionProposals,
 	inspectMaintenance,
 	buildMaintenanceProposalContent,
-	proposeMaintenance,
-	validateWikiStructure,
-	fixWikiMarkers,
-	detectPackDrift,
-	previewUpgrade,
+	runMaintenanceAction,
 };
