@@ -11,13 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.6] - 2026-07-15
 
 ### Fixed
-- session-lock: eliminate TOCTOU race in `acquireLock` via atomic `link(2)`; the old `existsSync`+`writeFileSync` check-then-act let concurrent acquirers all succeed (verified 10/10 winners pre-fix, exactly 1 post-fix)
+- session-lock: eliminate TOCTOU race in `acquireLock` via atomic `link(2)` (old `existsSync`+`writeFileSync` let concurrent acquirers all succeed; verified 10/10 → 1)
+- web session-control: `resume` is pause-only (`paused → executing`); `routed → executing` stays `start`, not `resume`
+- sync: artifact-unavailable note no longer falls through to misleading "none detected" (product-repo / non-git now report `n/a`)
 
 ### Changed
-- remove unused nodemailer dependency (no code requires it)
+- remove unused nodemailer dependency
 - remove 7.4M legacy `.harness` backup directory
-- use `structuredClone` instead of hand-rolled `JSON.parse(JSON.stringify())` deep clone (Node 18+ stdlib)
-- collapse `walkFiles` into `collectFilesBySuffix` to dedupe the recursive file-walk implementation
+- use `structuredClone` instead of hand-rolled `JSON.parse(JSON.stringify())` deep clone
+- collapse `walkFiles` into `collectFilesBySuffix`
+- command layer: dedupe `unknownAction`/`resolveTarget`; governance `requireTarget` SSOT
+- architecture deepening (Batch A+B):
+  - maintenance owns `runMaintenanceAction`; `registry` → `registryPath` at the seam
+  - governance owns `governanceDispatch` + `runGuarded`
+  - feature owns `runFeatureAction` presentation (structured fns stay exported)
+  - extract `core/syncProject` for scaffold/artifact/refresh orchestration
+  - web adapter seam (`scripts/lib/web-adapter.js` + `.d.ts`); ADR-0007 Consequences updated
+  - session transition SSOT (`isLegalTransition` / `legalTargets` / `isFinal`); web drops `ALLOWED_TRANSITIONS`
 
 ## [1.3.5] - 2026-07-14
 
