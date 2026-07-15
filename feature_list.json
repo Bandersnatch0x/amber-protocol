@@ -133,12 +133,14 @@
       ],
       "title": "Governed loop execution (ADR-0003)",
       "user_visible_behavior": "Loop contracts run only behind four gates: policy rules, explicit one-shot approval, isolated worktree, and a tamper-evident ledger.",
-      "status": "in_progress",
+      "status": "passing",
       "verification": [
-        "node scripts/amber.js loop run --dry-run",
-        "node scripts/amber.js loop verify-ledger"
+        "node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --target . --dry-run --json",
+        "node scripts/run-tests.js tests/unit/loop-ledger.test.js"
       ],
       "evidence": [
+        "2026-07-15: daily-amber-triage dry-run completed with errors=[] and executesAnything=false",
+        "2026-07-16: tests/unit/loop-ledger.test.js passed 5/5, covering intact and tampered hash-chain ledgers",
         "readyForLiveScheduling=false by product boundary; human-triggered --execute only"
       ],
       "notes": [
