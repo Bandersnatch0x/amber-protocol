@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [1.3.6] - 2026-07-15
+
+### Changed
+- remove unused nodemailer dependency (no code requires it)
+- remove 7.4M legacy `.harness` backup directory
+- use `structuredClone` instead of hand-rolled `JSON.parse(JSON.stringify())` deep clone (Node 18+ stdlib)
+
 ## [1.3.5] - 2026-07-14
 
 ### Added
