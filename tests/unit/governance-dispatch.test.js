@@ -1,12 +1,8 @@
 "use strict";
 
-// Red tests driving T2 (architecture-deepening candidate #5): extract a single
-// governance-dispatch chokepoint `governanceDispatch` out of the inline switch in
-// scripts/lib/command-handler-families.js#handleGovernance, with shared
-// requireTarget guard + shared try/catch (runGuarded) for every action.
-//
-// These MUST fail red now: `governanceDispatch` does not exist yet in
-// scripts/lib/governance-commands.js. See .scratch/architecture-deepening/plan.md.
+// Unit tests for the governance-dispatch chokepoint `governanceDispatch`
+// (scripts/lib/governance-commands.js): action routing, shared requireTarget
+// guard, and shared try/catch (runGuarded).
 
 const { describe, it, afterEach } = require("node:test");
 const assert = require("assert");

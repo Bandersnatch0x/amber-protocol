@@ -1,13 +1,8 @@
 "use strict";
 
-// Red tests driving T1 (architecture-deepening candidate #1): extract a single
-// maintenance-dispatch chokepoint `runMaintenanceAction` out of the inline
-// `switch` in scripts/lib/command-handler-families.js#handleMaintenance, and
-// narrow the systemic CLI-arg leak (`options.registry`) into a resolved
-// `registryPath` string before it reaches the domain functions.
-//
-// These MUST fail red now: `runMaintenanceAction` does not exist yet in
-// scripts/lib/core/maintenance.js. See .scratch/architecture-deepening/plan.md.
+// Unit tests for the maintenance-dispatch chokepoint `runMaintenanceAction`
+// (scripts/lib/core/maintenance.js) and the registry→registryPath leak closure
+// at that seam. Sibling actions scaffold-drift/distill stay handler-routed.
 
 const { describe, it } = require("node:test");
 const assert = require("assert");

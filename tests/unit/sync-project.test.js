@@ -1,10 +1,7 @@
 "use strict";
 
-// RED tests for scripts/lib/core/sync-project.js (T4 / architecture deepening #2).
-// Module does not exist yet — these pin the desired syncProject surface:
-//   syncProject(targetRoot, { execute, templateRoot }) ->
-//     { note, refresh, artifact, drift, ... }
-// Note semantics fix the handleSync latent bug: unavailable artifact must NOT
+// Unit tests for scripts/lib/core/sync-project.js.
+// Pins syncProject surface and note semantics: unavailable artifact must NOT
 // fall through to the misleading "none detected" aligned message.
 
 const { test } = require("node:test");

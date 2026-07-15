@@ -1,14 +1,8 @@
 "use strict";
 
-// Red tests driving T3 (architecture-deepening candidate #3): extract a single
-// feature presentation entry `runFeatureAction(action, target, options)` that
-// owns the 44-line render currently inline in handleFeature
-// (scripts/lib/command-dispatcher.js). The 5 structured action fns
-// (addFeature/listFeatures/removeFeature/recordFeatureEvidence/listFeatureEvidence)
-// stay exported; this entry only absorbs presentation.
-//
-// These MUST fail red now: `runFeatureAction` does not exist yet in
-// scripts/lib/feature-commands.js. See .scratch/architecture-deepening/plan.md.
+// Unit tests for `runFeatureAction` presentation entry in feature-commands.js.
+// The 5 structured action fns stay exported for lifecycle/session callers;
+// this entry only absorbs presentation + arg-shaping.
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");

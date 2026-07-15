@@ -48,8 +48,11 @@ function normalizeStatus(status: string): string {
 
 /**
  * Whether the control action may be invoked from the (possibly legacy) status.
- * start is action-semantic: only created/routed (resume owns paused→executing).
- * Other actions use pure SSOT edges after normalization.
+ *
+ * Action semantics are NOT pure graph edges:
+ * - start: only created/routed (created goes via routed first; never pause→executing)
+ * - resume: only paused (routed→executing is a legal CLI edge, but that is start, not resume)
+ * - pause/abort: pure SSOT edges after idle/running pre-normalization
  */
 function canInvokeAction(action: RunnerControlAction, status: string): boolean {
   const from = normalizeStatus(status);
@@ -58,6 +61,12 @@ function canInvokeAction(action: RunnerControlAction, status: string): boolean {
   if (action === 'start') {
     // start path: created (via routed) or already routed — never pause→executing
     return from === STATES.CREATED || from === STATES.ROUTED;
+  }
+
+  if (action === 'resume') {
+    // resume is only "continue after pause". Do not treat routed→executing as resume
+    // even though that edge is legal in the CLI SSOT graph (start owns that path).
+    return from === STATES.PAUSED;
   }
 
   return isLegalTransition(from, target);

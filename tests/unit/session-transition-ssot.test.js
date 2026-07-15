@@ -1,9 +1,9 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
 
-// SSOT predicates for session status transitions. Must be pure functions
-// exported from scripts/lib/session-state-machine.js (not class methods only).
-// RED until isLegalTransition / legalTargets / isFinal are implemented.
+// SSOT predicates for session status transitions. Pure functions exported from
+// scripts/lib/session-state-machine.js. Web action semantics (start/resume)
+// live in the web router and must not invent a second edge table.
 const {
 	STATES,
 	isLegalTransition,

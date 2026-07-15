@@ -486,6 +486,16 @@ describe('sessionControlRouter', () => {
       );
     });
 
+    it('rejects resume from routed (start owns routed→executing; resume is pause-only)', async () => {
+      mockSessionWithStatus('routed');
+
+      await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
+        'Cannot resume from status: routed'
+      );
+      expect(persistSessionStatus).not.toHaveBeenCalled();
+      expect(sessionEvents.emitSessionResumed).not.toHaveBeenCalled();
+    });
+
     it('throws Session not found when session does not exist', async () => {
       readSessionById.mockReturnValue(null);
 

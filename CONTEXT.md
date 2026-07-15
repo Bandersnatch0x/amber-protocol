@@ -37,8 +37,8 @@ A repository-local continuity record for one unit of governed work: goal, select
 _Avoid_: chat session, agent session, execution session
 
 **Session transition (edge graph)**:
-Canonical states and edges live in `scripts/lib/session-state-machine.js` (`STATES`, `TRANSITIONS`, `isLegalTransition` / `legalTargets` / `isFinal`). CLI is authoritative: `created → executing` is illegal (must go `created → routed → executing`). The web console must not keep a second allow-table; it may hold only a local action→target map and pre-normalize legacy `idle`/`running` before calling the SSOT.
-_Avoid_: ALLOWED_TRANSITIONS (web-local copy), dual state machines
+Canonical states and edges live in `scripts/lib/session-state-machine.js` (`STATES`, `TRANSITIONS`, `isLegalTransition` / `legalTargets` / `isFinal`). CLI is authoritative: `created → executing` is illegal (must go `created → routed → executing`). The web console must not keep a second allow-table; it may hold only a local action→target map and pre-normalize legacy `idle`/`running` before calling the SSOT. Action semantics still matter on the web: `resume` is pause-only (`paused → executing`); `routed → executing` is `start`, not `resume`, even though that edge is legal in the graph.
+_Avoid_: ALLOWED_TRANSITIONS (web-local copy), dual state machines, resume-from-routed
 
 **Route**:
 A declarative delivery template that defines the stages and approval gates for a class of work goals. Selected when a session starts; describes structure, does not execute stage content.
