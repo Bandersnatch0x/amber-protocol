@@ -36,6 +36,35 @@ const EVENT_TYPES = {
 	[STATES.ABORTED]: "session_aborted",
 };
 
+/**
+ * Pure SSOT predicate: whether `from` → `to` is an allowed edge.
+ * @param {string} from
+ * @param {string} to
+ * @returns {boolean}
+ */
+function isLegalTransition(from, to) {
+	const allowed = TRANSITIONS[from] || [];
+	return allowed.includes(to);
+}
+
+/**
+ * Pure SSOT: legal target states from `from` (copy, not the live array).
+ * @param {string} from
+ * @returns {string[]}
+ */
+function legalTargets(from) {
+	return [...(TRANSITIONS[from] || [])];
+}
+
+/**
+ * Pure SSOT: whether `state` is a terminal/final status.
+ * @param {string} state
+ * @returns {boolean}
+ */
+function isFinal(state) {
+	return FINAL_STATES.has(state);
+}
+
 class SessionStateMachine {
 	constructor(initialState = STATES.CREATED) {
 		this.currentState = initialState;
@@ -43,9 +72,8 @@ class SessionStateMachine {
 
 	transition(toState) {
 		const fromState = this.currentState;
-		const allowed = TRANSITIONS[fromState] || [];
 
-		if (!allowed.includes(toState)) {
+		if (!isLegalTransition(fromState, toState)) {
 			return {
 				success: false,
 				error: `Cannot transition from ${fromState} to ${toState}`,
@@ -66,8 +94,16 @@ class SessionStateMachine {
 	}
 
 	isFinal() {
-		return FINAL_STATES.has(this.currentState);
+		return isFinal(this.currentState);
 	}
 }
 
-module.exports = { SessionStateMachine, STATES, TRANSITIONS };
+module.exports = {
+	SessionStateMachine,
+	STATES,
+	TRANSITIONS,
+	FINAL_STATES,
+	isLegalTransition,
+	legalTargets,
+	isFinal,
+};

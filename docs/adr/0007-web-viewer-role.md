@@ -100,10 +100,17 @@ actions. The architecture doc can be corrected from "Read-Only by Default" to
 web mutations must first check this ADR's allow list.
 
 **Negative:** The web console has a dependency on the CLI core modules
-(`evidence-runner.js`, `lifecycle.js`, `completion-check.js`). These are loaded
-via `createRequire` from `server/routers/lifecycle.ts`. A breaking change to
-the CLI module API could silently break the web server. This is handled by
-narrow import surfaces and TypeScript types for the module interfaces.
+(`evidence-runner.js`, `lifecycle.js`, `completion-check.js`). These are no
+longer imported directly by the web router: `server/routers/lifecycle.ts` loads
+a single deep adapter (`scripts/lib/web-adapter.js`) via `createRequire`, typed
+by `scripts/lib/web-adapter.d.ts` as the SSOT. The adapter folds
+`buildContext` → `inferNextStep` → `evaluateLifecycle` into
+`evaluateLifecycleNext`, folds completion evaluation + formatting into
+`getCompletionStatus`, and re-exports `runEvidenceCommand` (type SSOT only —
+no extra runtime depth). LifecycleContext and the primitive builders are not
+exported across the seam, so the web cannot recompose them. A breaking change
+to the adapter surface (not the internal primitives) is what the web is pinned
+to.
 
 **Neutral:** Some actions that seem natural as web buttons (`approve`,
 `complete`) are intentionally withheld. This is consistent with Amber's

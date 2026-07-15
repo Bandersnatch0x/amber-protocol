@@ -9,77 +9,10 @@ import { readSessionById } from '../lib/session-reader';
 import { getRouteById, type RouteStage } from '../lib/route-reader';
 import { appendSessionTimelineEvent } from '../lib/session-audit-writer';
 import { persistCompletedStage } from '../lib/session-writer';
-
-type LifecycleFocus = {
-  type: string;
-  id: string | null;
-  autoSelected: boolean;
-  othersPending: number;
-};
-
-type CompletionEvaluation = {
-  status: 'pass' | 'fail';
-  reasons: string[];
-  missing: string[];
-};
-
-type LifecycleContext = {
-  focus: LifecycleFocus;
-  completion: CompletionEvaluation | null;
-};
-
-type LifecycleStep = {
-  id: string;
-  label: string;
-  done?: boolean;
-  why?: string;
-  remedy?: string;
-};
-
-type LifecycleCore = {
-  buildContext: (
-    targetRoot: string,
-    options?: { feature?: string; session?: string; strict?: boolean },
-  ) => LifecycleContext;
-  inferNextStep: (ctx: LifecycleContext) => LifecycleStep | null;
-  evaluateLifecycle: (ctx: LifecycleContext) => LifecycleStep[];
-};
-
-type CompletionCore = {
-  evaluateCompletion: (
-    projectRoot: string,
-    sessionId: string,
-    options?: { strict?: boolean },
-  ) => CompletionEvaluation;
-  formatCompletion: (result: CompletionEvaluation) => string;
-};
-
-type EvidenceResult = {
-  target: string;
-  executed: boolean;
-  denied: boolean;
-  reason?: string;
-  exitCode?: number;
-  stdoutTail?: string;
-  stderrTail?: string;
-  durationMs?: number;
-  ledgerRecord: Record<string, unknown>;
-};
-
-type EvidenceRunner = {
-  runEvidenceCommand: (input: {
-    target: string;
-    command: string;
-    ledgerPath: string;
-    budgetMinutes?: number;
-    subject?: Record<string, unknown>;
-  }) => EvidenceResult;
-};
+import type { WebAdapter } from '../../../../scripts/lib/web-adapter';
 
 const requireCli = createRequire(import.meta.url);
-const lifecycleCore = requireCli('../../../../scripts/lib/core/lifecycle.js') as LifecycleCore;
-const completionCore = requireCli('../../../../scripts/lib/completion-check.js') as CompletionCore;
-const evidenceRunner = requireCli('../../../../scripts/lib/core/evidence-runner.js') as EvidenceRunner;
+const adapter = requireCli('../../../../scripts/lib/web-adapter.js') as WebAdapter;
 
 const nextInputSchema = z.object({
   feature: z.string().optional(),
@@ -99,14 +32,9 @@ const runVerificationInputSchema = z.object({
   budgetMinutes: z.number().positive().optional(),
 });
 
-function completionStatus(sessionId: string, strict = true) {
+function completionStatus(sessionId: string, strict = true): CompletionStatusResult {
   const repoRoot = resolveRepoRoot();
-  const evaluation = completionCore.evaluateCompletion(repoRoot, sessionId, { strict });
-  return {
-    ...evaluation,
-    strict,
-    text: completionCore.formatCompletion(evaluation),
-  };
+  return adapter.getCompletionStatus(repoRoot, sessionId, { strict });
 }
 
 function getRouteId(manifest: Record<string, unknown>): string | null {
@@ -162,13 +90,7 @@ export const lifecycleRouter = router({
     .input(nextInputSchema)
     .query(({ input }) => {
       const repoRoot = resolveRepoRoot();
-      const context = lifecycleCore.buildContext(repoRoot, input ?? {});
-      return {
-        focus: context.focus,
-        nextStep: lifecycleCore.inferNextStep(context),
-        lifecycle: lifecycleCore.evaluateLifecycle(context),
-        ...(context.completion ? { completion: context.completion } : {}),
-      };
+      return adapter.evaluateLifecycleNext(repoRoot, input ?? {});
     }),
 
   completionCheck: publicProcedure
@@ -201,7 +123,7 @@ export const lifecycleRouter = router({
 
       const repoRoot = resolveRepoRoot();
       const ledgerPath = path.join(sessionDirFor(input.sessionId), 'ledger.jsonl');
-      const evidence = evidenceRunner.runEvidenceCommand({
+      const evidence = adapter.runEvidenceCommand({
         target: repoRoot,
         command,
         ledgerPath,

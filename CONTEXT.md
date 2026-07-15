@@ -36,6 +36,10 @@ _Avoid_: setup, bootstrap files, harness files
 A repository-local continuity record for one unit of governed work: goal, selected route, stage progress, timeline events, and checkpoints, stored under `.amber/sessions/`. Evidence for handoff and complete-check, not a live agent runtime or chat session.
 _Avoid_: chat session, agent session, execution session
 
+**Session transition (edge graph)**:
+Canonical states and edges live in `scripts/lib/session-state-machine.js` (`STATES`, `TRANSITIONS`, `isLegalTransition` / `legalTargets` / `isFinal`). CLI is authoritative: `created → executing` is illegal (must go `created → routed → executing`). The web console must not keep a second allow-table; it may hold only a local action→target map and pre-normalize legacy `idle`/`running` before calling the SSOT.
+_Avoid_: ALLOWED_TRANSITIONS (web-local copy), dual state machines
+
 **Route**:
 A declarative delivery template that defines the stages and approval gates for a class of work goals. Selected when a session starts; describes structure, does not execute stage content.
 _Avoid_: workflow, pipeline, playbook, path

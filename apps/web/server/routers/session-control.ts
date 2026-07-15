@@ -1,3 +1,4 @@
+import { createRequire } from 'module';
 import { router, publicProcedure } from '../trpc';
 import { z } from 'zod';
 import { sessionEvents } from '../services/session-events';
@@ -13,15 +14,54 @@ import {
   type RunnerControlRequest,
 } from '../lib/runner-ack';
 
-// Action-centric guard: each action declares which statuses it can be invoked from.
-// This prevents semantic confusion where start/resume both target 'running' but mean
-// different things (start=first execution, resume=continue after pause).
-const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  start: ['idle', 'created', 'routed'],
-  pause: ['running', 'executing'],
-  resume: ['paused'],
-  abort: ['running', 'executing', 'paused'],
+// CLI session transition SSOT (ADR-blessed createRequire seam). Web does not keep
+// a second ALLOWED_TRANSITIONS table; legality comes from isLegalTransition.
+const requireCli = createRequire(import.meta.url);
+const {
+  isLegalTransition,
+  STATES,
+} = requireCli('../../../../scripts/lib/session-state-machine.js') as {
+  isLegalTransition: (from: string, to: string) => boolean;
+  STATES: Record<string, string>;
 };
+
+// Web-local action → target status. Sources are not listed here; legality is
+// checked via isLegalTransition after idle/running pre-normalization.
+// start is special: from created it must go created→routed→executing (not a
+// direct created→executing jump — matches continueSession).
+const ACTION_TARGET: Record<RunnerControlAction, SessionStatus> = {
+  start: 'executing',
+  pause: 'paused',
+  resume: 'executing',
+  abort: 'aborted',
+};
+
+/**
+ * Map legacy web-only statuses onto CLI vocabulary for legality checks.
+ * idle → created, running → executing. Canonical statuses pass through.
+ */
+function normalizeStatus(status: string): string {
+  if (status === 'idle') return STATES.CREATED;
+  if (status === 'running') return STATES.EXECUTING;
+  return status;
+}
+
+/**
+ * Whether the control action may be invoked from the (possibly legacy) status.
+ * start is action-semantic: only created/routed (resume owns paused→executing).
+ * Other actions use pure SSOT edges after normalization.
+ */
+function canInvokeAction(action: RunnerControlAction, status: string): boolean {
+  const from = normalizeStatus(status);
+  const target = ACTION_TARGET[action];
+
+  if (action === 'start') {
+    // start path: created (via routed) or already routed — never pause→executing
+    return from === STATES.CREATED || from === STATES.ROUTED;
+  }
+
+  return isLegalTransition(from, target);
+}
 
 const controlInputSchema = z.object({ sessionId: z.string() });
 const abortInputSchema = controlInputSchema.extend({ reason: z.string().optional() });
@@ -67,6 +107,46 @@ async function tryRecordSessionEvent(
     return undefined;
   } catch (error) {
     return error instanceof Error ? error.message : 'Session audit write failed';
+  }
+}
+
+/**
+ * Intermediate created→routed bookkeeping for web start (mirrors continueSession).
+ * No runner handshake — routing is local metadata before start→executing.
+ */
+async function transitionCreatedToRouted(sessionId: string): Promise<{
+  status: SessionStatus;
+  warning?: string;
+}> {
+  if (!isLegalTransition(STATES.CREATED, STATES.ROUTED)) {
+    throw new Error(`Cannot start from status: ${STATES.CREATED}`);
+  }
+
+  const status = await persistAndConfirmStatus(sessionId, STATES.ROUTED as SessionStatus);
+
+  try {
+    const data = {
+      sessionId,
+      fromState: STATES.CREATED,
+      toState: STATES.ROUTED,
+      source: 'web-control',
+    };
+    await appendSessionTimelineEvent(sessionId, {
+      type: 'route_selected',
+      data,
+    });
+    await appendSessionLedgerRecord(sessionId, {
+      schemaVersion: 2,
+      kind: 'route_selected',
+      ...data,
+      status: STATES.ROUTED,
+    });
+    return { status };
+  } catch (error) {
+    return {
+      status,
+      warning: error instanceof Error ? error.message : 'Route audit write failed',
+    };
   }
 }
 
@@ -248,24 +328,48 @@ export const sessionControlRouter = router({
       }
 
       const currentStatus = session.status;
-      const action = 'start';
-      if (!ALLOWED_TRANSITIONS[action].includes(currentStatus)) {
-        if (currentStatus === 'running') {
-          const status = await persistAndConfirmStatus(input.sessionId, 'executing');
-          return { status, timestamp: Date.now(), persisted: true, confirmed: true };
-        }
-        if (currentStatus === 'executing') return { status: currentStatus, timestamp: Date.now(), persisted: true, confirmed: true };
+      const action: RunnerControlAction = 'start';
+
+      // Legacy recovery: running is treated as executing (already started).
+      if (currentStatus === 'running') {
+        const status = await persistAndConfirmStatus(input.sessionId, 'executing');
+        return { status, timestamp: Date.now(), persisted: true, confirmed: true };
+      }
+      if (currentStatus === 'executing') {
+        return { status: currentStatus, timestamp: Date.now(), persisted: true, confirmed: true };
+      }
+
+      if (!canInvokeAction(action, currentStatus)) {
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
-      return runControlledTransition({
+      // created (and legacy idle) must not jump to executing — route first, then execute.
+      let routeWarning: string | undefined;
+      let statusForTransition: SessionStatus = currentStatus as SessionStatus;
+      if (normalizeStatus(currentStatus) === STATES.CREATED) {
+        const routed = await transitionCreatedToRouted(input.sessionId);
+        statusForTransition = routed.status;
+        routeWarning = routed.warning;
+        if (!isLegalTransition(STATES.ROUTED, STATES.EXECUTING)) {
+          throw new Error(`Cannot ${action} from status: ${statusForTransition}`);
+        }
+      } else if (!isLegalTransition(normalizeStatus(currentStatus), ACTION_TARGET.start)) {
+        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
+      }
+
+      const result = await runControlledTransition({
         sessionId: input.sessionId,
         action,
-        currentStatus: currentStatus as SessionStatus,
-        targetStatus: 'executing',
+        currentStatus: statusForTransition,
+        targetStatus: ACTION_TARGET.start,
         eventType: 'session_started',
         emit: () => sessionEvents.emitSessionStarted(input.sessionId),
       });
+
+      return {
+        ...result,
+        auditWarning: mergeWarnings(routeWarning, result.auditWarning),
+      };
     }),
 
   pause: publicProcedure
@@ -277,8 +381,8 @@ export const sessionControlRouter = router({
       }
 
       const currentStatus = session.status;
-      const action = 'pause';
-      if (!ALLOWED_TRANSITIONS[action].includes(currentStatus)) {
+      const action: RunnerControlAction = 'pause';
+      if (!canInvokeAction(action, currentStatus)) {
         if (currentStatus === 'paused') return { status: currentStatus, timestamp: Date.now() };
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
@@ -287,7 +391,7 @@ export const sessionControlRouter = router({
         sessionId: input.sessionId,
         action,
         currentStatus: currentStatus as SessionStatus,
-        targetStatus: 'paused',
+        targetStatus: ACTION_TARGET.pause,
         eventType: 'session_paused',
         emit: () => sessionEvents.emitSessionPaused(input.sessionId),
       });
@@ -302,13 +406,18 @@ export const sessionControlRouter = router({
       }
 
       const currentStatus = session.status;
-      const action = 'resume';
-      if (!ALLOWED_TRANSITIONS[action].includes(currentStatus)) {
-        if (currentStatus === 'running') {
-          const status = await persistAndConfirmStatus(input.sessionId, 'executing');
-          return { status, timestamp: Date.now(), persisted: true, confirmed: true };
-        }
-        if (currentStatus === 'executing') return { status: currentStatus, timestamp: Date.now(), persisted: true, confirmed: true };
+      const action: RunnerControlAction = 'resume';
+
+      // Legacy recovery: running is already-executing vocabulary drift.
+      if (currentStatus === 'running') {
+        const status = await persistAndConfirmStatus(input.sessionId, 'executing');
+        return { status, timestamp: Date.now(), persisted: true, confirmed: true };
+      }
+      if (currentStatus === 'executing') {
+        return { status: currentStatus, timestamp: Date.now(), persisted: true, confirmed: true };
+      }
+
+      if (!canInvokeAction(action, currentStatus)) {
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
 
@@ -316,7 +425,7 @@ export const sessionControlRouter = router({
         sessionId: input.sessionId,
         action,
         currentStatus: currentStatus as SessionStatus,
-        targetStatus: 'executing',
+        targetStatus: ACTION_TARGET.resume,
         eventType: 'session_resumed',
         emit: () => sessionEvents.emitSessionResumed(input.sessionId),
       });
@@ -331,8 +440,8 @@ export const sessionControlRouter = router({
       }
 
       const currentStatus = session.status;
-      const action = 'abort';
-      if (!ALLOWED_TRANSITIONS[action].includes(currentStatus)) {
+      const action: RunnerControlAction = 'abort';
+      if (!canInvokeAction(action, currentStatus)) {
         if (currentStatus === 'aborted') return { status: currentStatus, timestamp: Date.now() };
         throw new Error(`Cannot ${action} from status: ${currentStatus}`);
       }
@@ -341,7 +450,7 @@ export const sessionControlRouter = router({
         sessionId: input.sessionId,
         action,
         currentStatus: currentStatus as SessionStatus,
-        targetStatus: 'aborted',
+        targetStatus: ACTION_TARGET.abort,
         eventType: 'session_aborted',
         eventData: { reason: input.reason },
         emit: () => sessionEvents.emitSessionAborted(input.sessionId, input.reason),

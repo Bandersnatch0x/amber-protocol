@@ -83,12 +83,23 @@ describe('sessionControlRouter', () => {
   });
 
   describe('start', () => {
-    it('emits session_started and returns running when transitioning from idle', async () => {
+    it('emits session_started and returns executing when transitioning from idle (via routed)', async () => {
       mockSessionWithStatus('idle');
 
       const result = await caller.start({ sessionId: 'session-1' });
 
+      // idle→created pre-normalization then created→routed→executing (CLI SSOT)
+      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'routed');
       expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'executing');
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
+        type: 'route_selected',
+        data: {
+          sessionId: 'session-1',
+          fromState: 'created',
+          toState: 'routed',
+          source: 'web-control',
+        },
+      });
       expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
         type: 'session_started',
         data: { sessionId: 'session-1', source: 'web-control' },
@@ -146,8 +157,50 @@ describe('sessionControlRouter', () => {
       });
     });
 
+    it('from created routes through routed before executing (no direct created→executing)', async () => {
+      mockSessionWithStatus('created');
+
+      const result = await caller.start({ sessionId: 'session-1' });
+
+      const persistCalls = persistSessionStatus.mock.calls.map(([, status]) => status);
+      expect(persistCalls).toEqual(['routed', 'executing']);
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
+        type: 'route_selected',
+        data: {
+          sessionId: 'session-1',
+          fromState: 'created',
+          toState: 'routed',
+          source: 'web-control',
+        },
+      });
+      // Runner handshake only targets executing after routed is persisted
+      expect(createRunnerControlRequest).toHaveBeenCalledWith({
+        sessionId: 'session-1',
+        action: 'start',
+        requestedStatus: 'executing',
+      });
+      expect(createRunnerControlRequest).not.toHaveBeenCalledWith(
+        expect.objectContaining({ requestedStatus: 'created' }),
+      );
+      expect(result.status).toBe('executing');
+    });
+
+    it('from routed goes directly to executing without an intermediate route step', async () => {
+      mockSessionWithStatus('routed');
+
+      const result = await caller.start({ sessionId: 'session-1' });
+
+      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'executing');
+      expect(persistSessionStatus).not.toHaveBeenCalledWith('session-1', 'routed');
+      expect(appendSessionTimelineEvent).not.toHaveBeenCalledWith(
+        'session-1',
+        expect.objectContaining({ type: 'route_selected' }),
+      );
+      expect(result.status).toBe('executing');
+    });
+
     it('generates its own request id instead of accepting a caller-supplied id', async () => {
-      mockSessionWithStatus('idle');
+      mockSessionWithStatus('routed');
 
       await caller.start({ sessionId: 'session-1', requestId: 'replay-request' } as never);
 
@@ -175,7 +228,7 @@ describe('sessionControlRouter', () => {
     });
 
     it('records a timeout outcome when no runner ACK is observed', async () => {
-      mockSessionWithStatus('idle');
+      mockSessionWithStatus('routed');
       waitForRunnerAck.mockImplementation(async (request: Record<string, unknown>) => ({
         ...request,
         status: 'timeout',
@@ -210,7 +263,7 @@ describe('sessionControlRouter', () => {
     });
 
     it('does not transition when the runner control request cannot be persisted to timeline', async () => {
-      mockSessionWithStatus('idle');
+      mockSessionWithStatus('routed');
       appendSessionTimelineEvent.mockRejectedValueOnce(new Error('timeline locked'));
 
       await expect(caller.start({ sessionId: 'session-1' })).rejects.toThrow('timeline locked');
@@ -505,12 +558,14 @@ describe('sessionControlRouter', () => {
       expect(sessionEvents.emitSessionAborted).not.toHaveBeenCalled();
     });
 
-    it('rejects illegal transition from idle', async () => {
+    it('allows abort from idle via created→aborted (CLI SSOT after idle→created normalize)', async () => {
       mockSessionWithStatus('idle');
 
-      await expect(caller.abort({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot abort from status: idle'
-      );
+      const result = await caller.abort({ sessionId: 'session-1' });
+
+      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'aborted');
+      expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith('session-1', undefined);
+      expect(result.status).toBe('aborted');
     });
 
     it('rejects illegal transition from completed', async () => {
