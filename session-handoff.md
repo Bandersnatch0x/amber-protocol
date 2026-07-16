@@ -1,50 +1,54 @@
 # Session Handoff
 
+Last Updated: 2026-07-16
+
 ## Summary
 
-Ponytail audit and cleanup — no active feature session. Next-up queue was empty, ran ponytail audit to find cleanup opportunities.
+Repository state is reconciled after completing the governed loop feature status cleanup and refreshing the repository knowledge base. There is no active Amber feature session.
 
 ## Repo State
 
-- Branch: master
-- Uncommitted changes: session-handoff.md only
-- Last commit: (pending)
+- Branch: `master`
+- Handoff base commit: `7a92662` (`docs: refresh repository knowledge base`)
+- Before this handoff commit, `master` was 2 commits ahead of `origin/master`
+- This handoff is the third local commit, leaving `master` 3 commits ahead of `origin/master`
+- Handoff slice contents: `session-handoff.md` only
+- Untracked `.scratch/` is user-owned and was not inspected or modified
 
 ## Runtime / Verification State
 
-- Command: npm test
-- Result: passed (exit 0, 80585ms)
-- When: 2026-07-15
-
-## Feature State
-
-- F001 [passing] Amber scaffold install (init)
-- F002 [passing] Doctor validation
-- F003 [passing] Route engine
-- F004 [passing] Session lifecycle
-- F005 [passing] Governance report & approval gates
-- F006 [passing] Handoff reports
-- F007 [in_progress] Governed loop execution (ADR-0003)
-- F008 [passing] Web viewer (Phase C)
-- F009 [accepted] Governance evidence reads resolve the state dir (legacy .harness support)
+- `npm test`: passed with exit code 0
+- `npm run gen:agents:check`: 28 generated files are up to date
+- Knowledge Plan tests: 14 of 14 passed
+- Knowledge build dry-run, wiki validation, and Amber doctor: no errors
+- Maintenance report: `staleDocs: []`
+- Governance report: ready, score 100/100
 
 ## Verification Evidence
 
-- All tests: `npm test` → passed (exit 0, 80585ms) (2026-07-15)
+- `npm test`: exit code 0
+- `npm run gen:agents:check`: 28 generated files up to date
+- Knowledge Plan tests: 14 of 14 passed
+- `node scripts/amber.js doctor --target . --json`: no errors or warnings
+- `node scripts/validate-handoff.js --target . --json`: no errors or warnings
+
+## Feature State
+
+- F001 through F008: `passing`
+- F009: `accepted`
 
 ## What Was Done
 
-1. **Ponytail audit ran** — found:
-   - `.amber-legacy-harness-backup-2026-07-13/` (7.4M) — deleted
-   - `nodemailer` dependency (unused) — removed from package.json
-   - adoption-composer split into 6 files (okay, not changed)
-
-2. **Cleanup completed** — 1.3.6 staged (version + CHANGELOG), NOT released (pending decision to batch with next user-facing version)
+1. Commit `2db55f0` reconciled F007 governed loop status to `passing`.
+2. Commit `7a92662` refreshed the repository knowledge base and corrected stale paths.
+3. Confirmed release tag `v1.3.6` exists at `03f9f53`.
+4. Ran the `daily-amber-triage` loop in dry-run mode; it executed nothing and wrote no state.
 
 ## Blockers
 
-None.
+None. The untracked `.scratch/` directory remains explicitly out of scope.
 
 ## Next Actions
 
-1. Run `git push` if ready to share.
+1. Push the three local commits when they are ready to share.
+2. Start the next governed triage slice from the clean tracked worktree.
