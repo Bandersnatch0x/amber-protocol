@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "mode": "manual",
+  "activeWorkflow": null,
+  "queue": [
+    {
+      "id": "share-local-commits",
+      "title": "Review and push the four local commits",
+      "status": "approval-required",
+      "command": "git push"
+    },
+    {
+      "id": "next-governed-triage",
+      "title": "Run the next read-only daily Amber triage",
+      "status": "ready",
+      "command": "node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json"
+    }
+  ],
+  "approvalGates": [
+    "delete files or directories",
+    "run destructive git operations",
+    "change secrets, credentials, billing, production data, or external accounts",
+    "publish, deploy, post, email, or write to external systems",
+    "add, remove, or upgrade dependencies",
+    "create or modify database migrations",
+    "perform broad codemods, mass renames, or cross-domain rewrites",
+    "change primary product behavior, major UI flows, or security boundaries"
+  ],
+  "resultNotes": [
+    "2026-07-16: daily-amber-triage dry-run completed with no errors or warnings and executed no actions.",
+    "2026-07-16: Amber doctor and governance report found no errors, warnings, stale docs, or readiness findings.",
+    "2026-07-16: Continuous improvement state initialized from the repository template."
+  ]
+}
