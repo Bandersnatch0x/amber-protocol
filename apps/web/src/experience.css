@@ -1,0 +1,62 @@
+/* Compact WebGL control-loop panel — supports Operator Console home only. */
+
+.amber-loop-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.amber-loop-card__field {
+  position: relative;
+  height: 11.5rem;
+  background: #0f172a;
+}
+
+.amber-field,
+.amber-field__canvas,
+.amber-field__fallback,
+.amber-field__scan {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.amber-field__canvas {
+  display: block;
+}
+
+.amber-field--fallback .amber-field__canvas {
+  display: none;
+}
+
+.amber-field__fallback {
+  display: none;
+  background:
+    radial-gradient(circle at 55% 45%, rgba(37, 99, 235, 0.22), transparent 42%),
+    linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+.amber-field--fallback .amber-field__fallback {
+  display: block;
+}
+
+.amber-field__scan {
+  pointer-events: none;
+  opacity: 0.08;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 2px,
+    rgba(255, 255, 255, 0.08) 2px 3px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .amber-field__scan {
+    display: none;
+  }
+}
+
+.dark .amber-loop-card__field {
+  background: #020617;
+}
