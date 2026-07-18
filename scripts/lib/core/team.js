@@ -53,7 +53,8 @@ function validateTeamRegistryData(data) {
 	if (
 		!data.versions ||
 		typeof data.versions !== "object" ||
-		Array.isArray(data.versions)
+		Array.isArray(data.versions) ||
+		Object.keys(data.versions).length === 0
 	) {
 		errors.push("Team registry must define versions.");
 	} else {

@@ -26,12 +26,26 @@ test("previewUpgrade shows pack changes from 1.0.0 to 1.1.0", () => {
 	fs.writeFileSync(
 		registryPath,
 		JSON.stringify({
+			name: "amber-protocol-team-registry",
+			presets: [{ id: "safe-bootstrap" }],
+			rulePacks: [{ id: "amber-delivery" }],
+			profiles: [{ id: "default" }],
 			versions: {
 				"1.0.0": {
+					preset: "safe-bootstrap",
+					profile: "default",
+					workflowPacks: [],
 					rulePacks: ["pack-a", "pack-b"],
+					managedProjectFiles: [],
+					compatibility: {},
 				},
 				"1.1.0": {
+					preset: "safe-bootstrap",
+					profile: "default",
+					workflowPacks: [],
 					rulePacks: ["pack-a", "pack-b", "pack-c"],
+					managedProjectFiles: [],
+					compatibility: {},
 				},
 			},
 		}),
@@ -44,6 +58,22 @@ test("previewUpgrade shows pack changes from 1.0.0 to 1.1.0", () => {
 	assert.deepEqual(preview.changes.addedPacks, ["pack-c"]);
 	assert.deepEqual(preview.changes.removedPacks, []);
 	assert.deepEqual(preview.changes.updatedPacks, ["pack-a", "pack-b"]);
+
+	fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test("previewUpgrade rejects a schema-invalid registry before computing changes", () => {
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-test-invalid-registry-"));
+	const registryPath = path.join(tmpDir, "registry.json");
+	fs.writeFileSync(registryPath, "{}\n");
+
+	const preview = runMaintenanceAction("upgrade-preview", tmpDir, {
+		registry: registryPath,
+	});
+
+	assert.ok(preview.errors.includes("Team registry must define versions."));
+	assert.deepEqual(preview.warnings, []);
+	assert.equal("changes" in preview, false);
 
 	fs.rmSync(tmpDir, { recursive: true, force: true });
 });

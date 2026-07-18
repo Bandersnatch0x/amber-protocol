@@ -26,6 +26,7 @@ const {
 	loadTeamRegistry,
 	resolveRegistryPath,
 	teamStatePaths,
+	validateTeamRegistryData,
 } = require("./team");
 
 const {
@@ -545,6 +546,10 @@ function proposeMaintenance(target, registryPath, priority) {
 // compares against the installed version's own spec, not the latest.
 function detectPackDrift(projectRoot, registryPath) {
 	const paths = teamStatePaths(projectRoot);
+	const loaded = loadMaintenanceRegistry(registryPath);
+	if (!isTeamRegistryValid(loaded)) {
+		return { errors: loaded.errors, warnings: loaded.warnings };
+	}
 	if (!pathExists(paths.lockPath)) {
 		return { drifted: false, installed: [], latest: [], diff: [] };
 	}
@@ -557,17 +562,9 @@ function detectPackDrift(projectRoot, registryPath) {
 		throw new Error(`Team lock file is not a valid object: ${paths.lockPath}`);
 	}
 
-	const { value: registry, error: registryError } = readJsonSafe(registryPath);
-	if (registryError) {
-		throw new Error(registryError);
-	}
-	if (!registry || typeof registry !== "object" || Array.isArray(registry)) {
-		throw new Error(`Team registry is not a valid object: ${registryPath}`);
-	}
-
 	const installed = Array.isArray(lock.rulePacks) ? lock.rulePacks : [];
-	const latestVer = latestTeamVersion(registry);
-	const latest = registry.versions?.[latestVer]?.rulePacks || [];
+	const latestVer = latestTeamVersion(loaded.registry);
+	const latest = loaded.registry.versions[latestVer].rulePacks;
 	const diff = latest.filter(p => !installed.includes(p));
 
 	return {
@@ -575,6 +572,19 @@ function detectPackDrift(projectRoot, registryPath) {
 		installed,
 		latest,
 		diff,
+	};
+}
+
+function loadMaintenanceRegistry(registryPath) {
+	const { value: registry, error } = readJsonSafe(registryPath);
+	if (error) {
+		throw new Error(error);
+	}
+	const validation = validateTeamRegistryData(registry);
+	return {
+		registry,
+		errors: validation.errors,
+		warnings: validation.warnings,
 	};
 }
 
@@ -615,17 +625,14 @@ function fixWikiMarkers(projectRoot) {
 }
 
 function previewUpgrade(projectRoot, version, registryPath) {
+	const loaded = loadMaintenanceRegistry(registryPath);
+	if (!isTeamRegistryValid(loaded)) {
+		return { errors: loaded.errors, warnings: loaded.warnings };
+	}
 	const paths = teamStatePaths(projectRoot);
 	const lock = loadTeamLock(paths);
-	const { value: registry, error: registryError } = readJsonSafe(registryPath);
-	if (registryError) {
-		throw new Error(registryError);
-	}
-	if (!registry || typeof registry !== "object" || Array.isArray(registry)) {
-		throw new Error(`Team registry is not a valid object: ${registryPath}`);
-	}
-	const targetVersion = version || latestTeamVersion(registry);
-	const targetRelease = registry.versions?.[targetVersion];
+	const targetVersion = version || latestTeamVersion(loaded.registry);
+	const targetRelease = loaded.registry.versions[targetVersion];
 
 	if (!lock) {
 		return {
@@ -741,11 +748,21 @@ function runMaintenanceAction(action, targetRoot, options = {}) {
 		}
 		case "pack-drift": {
 			const drift = detectPackDrift(resolvedTarget, registryPath);
-			return { target: resolvedTarget, ...drift, errors: [], warnings: [] };
+			return {
+				target: resolvedTarget,
+				...drift,
+				errors: drift.errors || [],
+				warnings: drift.warnings || [],
+			};
 		}
 		case "upgrade-preview": {
 			const preview = previewUpgrade(resolvedTarget, args.version, registryPath);
-			return { target: resolvedTarget, ...preview, errors: [], warnings: [] };
+			return {
+				target: resolvedTarget,
+				...preview,
+				errors: preview.errors || [],
+				warnings: preview.warnings || [],
+			};
 		}
 		case "evolution-rollup": {
 			const parsed = args.threshold

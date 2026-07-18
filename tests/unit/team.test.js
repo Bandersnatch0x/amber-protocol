@@ -143,6 +143,21 @@ test("validateTeamRegistryData reports every missing top-level field for an empt
 	});
 });
 
+test("validateTeamRegistryData rejects an empty versions object", () => {
+	const result = validateTeamRegistryData({
+		name: "amber-protocol-team-registry",
+		presets: [{ id: "p" }],
+		rulePacks: [{ id: "r" }],
+		profiles: [{ id: "pr" }],
+		versions: {},
+	});
+
+	assert.deepEqual(result, {
+		errors: ["Team registry must define versions."],
+		warnings: [],
+	});
+});
+
 test("invalid registries stop install validation before registry-derived checks", () => {
 	const loaded = {
 		registry: null,

@@ -38,12 +38,25 @@ test("amber maintenance pack-drift - installed != latest", () => {
 		registryPath,
 		JSON.stringify({
 			name: "amber-protocol-team-registry",
+			presets: [{ id: "safe-bootstrap" }],
+			rulePacks: [{ id: "amber-delivery" }],
+			profiles: [{ id: "default" }],
 			versions: {
 				"1.0.0": {
+					preset: "safe-bootstrap",
+					profile: "default",
+					workflowPacks: [],
 					rulePacks: ["standards/amber-delivery.json"],
+					managedProjectFiles: [],
+					compatibility: {},
 				},
 				"1.1.0": {
+					preset: "safe-bootstrap",
+					profile: "default",
+					workflowPacks: [],
 					rulePacks: ["rule-packs/amber-delivery.rule-pack.json", "standards/amber-delivery.json"],
+					managedProjectFiles: [],
+					compatibility: {},
 				},
 			},
 		})
@@ -64,6 +77,37 @@ test("amber maintenance pack-drift - installed != latest", () => {
 	assert.strictEqual(json.drifted, true);
 	assert.deepStrictEqual(json.installed, ["standards/amber-delivery.json"]);
 	assert.deepStrictEqual(json.latest, ["rule-packs/amber-delivery.rule-pack.json", "standards/amber-delivery.json"]);
+
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("amber maintenance pack-drift rejects a schema-invalid registry", () => {
+	const target = tempDir("invalid-registry");
+	const amberDir = path.join(target, ".amber", "team");
+	const registryPath = path.join(target, "registry.json");
+
+	fs.mkdirSync(amberDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(amberDir, "lock.json"),
+		JSON.stringify({ installedVersion: "1.0.0", rulePacks: [] }),
+	);
+	fs.writeFileSync(registryPath, "{}\n");
+
+	const result = runAmber([
+		"maintenance",
+		"pack-drift",
+		"--target",
+		target,
+		"--registry",
+		registryPath,
+		"--json",
+	]);
+
+	assert.equal(result.status, 1, result.stderr);
+	const payload = JSON.parse(result.stdout);
+	assert.ok(payload.errors.includes("Team registry must define versions."));
+	assert.equal("drifted" in payload, false);
+	assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /TypeError|Cannot read properties/);
 
 	fs.rmSync(target, { recursive: true, force: true });
 });
