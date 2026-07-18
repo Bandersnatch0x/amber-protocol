@@ -146,12 +146,14 @@ function buildGovernanceReport(target, options = {}) {
 	const nextActions = buildStructuredNextActions(readiness, targetRoot, targetDisplay);
 	const state = gatherState(targetRoot);
 	const evidenceCount = state.features.reduce((total, feature) => total + (Array.isArray(feature.evidence) ? feature.evidence.length : 0), 0);
+	const errors = [...(readiness.errors || []), ...(maintenance.errors || [])];
+	const readinessDecision = errors.length > 0 ? "block" : readiness.decision;
 
 	return {
 		target: targetRoot,
 		generatedAt: options.generatedAt || new Date().toISOString(),
 		productValueLoop: PRODUCT_VALUE_LOOP,
-		decision: decisionFromScore(scores.overall, readiness.decision),
+		decision: decisionFromScore(scores.overall, readinessDecision),
 		scores,
 		summary: {
 			features: state.features.length,
@@ -175,7 +177,7 @@ function buildGovernanceReport(target, options = {}) {
 			warnings: maintenance.warnings || [],
 		},
 		nextActions,
-		errors: readiness.errors || [],
+		errors,
 		warnings: [...(readiness.warnings || []), ...(maintenance.warnings || [])],
 	};
 }

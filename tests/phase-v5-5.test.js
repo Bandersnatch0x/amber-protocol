@@ -66,6 +66,58 @@ test("maintenance inspect recommends a dry-run team install before writing local
   assert.match(payload.upgradeAssistant.installCommand, /team install .*--dry-run --json/);
 });
 
+test("maintenance inspect reports an invalid team registry without running registry assistants", () => {
+  const target = tempDir("invalid-registry");
+  const registryPath = path.join(target, "team-registry.json");
+  fs.writeFileSync(registryPath, "{}\n");
+
+  const result = runHarness([
+    "maintenance",
+    "inspect",
+    "--target",
+    target,
+    "--registry",
+    registryPath,
+    "--json"
+  ]);
+
+  assert.equal(result.status, 1, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.ok(payload.errors.includes("Team registry must define versions."));
+  assert.deepEqual(payload.rulePackDrift, {
+    available: false,
+    reason: "team registry validation failed",
+    installed: false,
+    drifted: false,
+    expected: [],
+    actual: []
+  });
+  assert.equal(payload.migrationAssistant.available, false);
+  assert.equal(payload.migrationAssistant.nextCommand, null);
+  assert.equal(payload.upgradeAssistant.available, false);
+  assert.equal(payload.upgradeAssistant.latestVersion, null);
+  assert.doesNotMatch(result.stderr, /TypeError/);
+
+  const install = runHarness([
+    "team",
+    "install",
+    "--target",
+    target,
+    "--registry",
+    registryPath,
+    "--version",
+    "1.0.0",
+    "--preset",
+    "safe-bootstrap",
+    "--dry-run",
+    "--json"
+  ]);
+  assert.equal(install.status, 1, install.stderr);
+  const installPayload = JSON.parse(install.stdout);
+  assert.ok(installPayload.errors.includes("Team registry must define versions."));
+  assert.doesNotMatch(`${install.stdout}\n${install.stderr}`, /TypeError|Cannot read properties/);
+});
+
 test("maintenance propose writes reviewable gardening proposal without changing source docs", () => {
   const target = initializedTeamTarget("propose");
   const evolutionPath = path.join(target, "docs", "wiki", "engineering", "harness-evolution.md");

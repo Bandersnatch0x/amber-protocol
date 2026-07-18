@@ -46,6 +46,20 @@ test("renderGovernanceReportMarkdown exposes the product loop", () => {
 	assert.match(markdown, /## Next Actions/);
 });
 
+test("buildGovernanceReport blocks when the team registry is invalid", () => {
+	const target = tempDir("invalid-registry");
+	const registry = path.join(target, "team-registry.json");
+	scaffoldHarness(target);
+	fs.writeFileSync(registry, "{}\n");
+
+	const report = buildGovernanceReport(target, { registry });
+
+	assert.equal(report.decision, "block");
+	assert.ok(report.errors.includes("Team registry must define versions."));
+	assert.equal(report.summary.maintenanceErrors, report.maintenance.errors.length);
+	assert.equal(report.maintenance.rulePackDrift.available, false);
+});
+
 test("security-standard remediation creates the standard and clears the finding (#44 AC1)", () => {
 	const target = tempDir("secstd");
 	scaffoldHarness(target);

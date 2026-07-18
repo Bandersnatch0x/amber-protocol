@@ -245,6 +245,17 @@ function inspectTeamDistribution(target, options = {}) {
 	const paths = teamStatePaths(targetRoot);
 	const loaded = loadTeamRegistry(options.registry);
 	const lock = loadTeamLock(paths);
+	if (!isTeamRegistryValid(loaded)) {
+		return {
+			target: targetRoot,
+			installed: Boolean(lock),
+			lock,
+			registry: null,
+			compatibilityMatrix: null,
+			errors: loaded.errors,
+			warnings: loaded.warnings,
+		};
+	}
 
 	return {
 		target: targetRoot,
@@ -263,6 +274,9 @@ function inspectTeamDistribution(target, options = {}) {
 // Extracted so the install preconditions are unit-testable.
 function validateInstallRequest({ loaded, selected, preset, lockExists }) {
 	const errors = [...loaded.errors];
+	if (!isTeamRegistryValid(loaded)) {
+		return { errors, warnings: loaded.warnings };
+	}
 	if (lockExists) {
 		errors.push(MESSAGES.teamAlreadyInstalled);
 	}
@@ -292,10 +306,21 @@ function buildTeamInstallPreview(targetRoot, version, release, preset) {
 	};
 }
 
+function isTeamRegistryValid(loaded) {
+	return loaded.errors.length === 0;
+}
+
 function installTeamDistribution(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const paths = teamStatePaths(targetRoot, { forCreate: true });
 	const loaded = loadTeamRegistry(options.registry);
+	if (!isTeamRegistryValid(loaded)) {
+		return {
+			target: targetRoot,
+			errors: loaded.errors,
+			warnings: loaded.warnings,
+		};
+	}
 	const selected = findTeamVersion(loaded.registry, options.version);
 	const preset =
 		options.preset || (selected.release && selected.release.preset);
@@ -396,6 +421,9 @@ function updateTeamDistribution(target, options = {}) {
 	const loaded = loadTeamRegistry(options.registry);
 	const errors = [...loaded.errors];
 	const warnings = [...loaded.warnings];
+	if (!isTeamRegistryValid(loaded)) {
+		return { target: targetRoot, errors, warnings };
+	}
 	const lock = loadTeamLock(paths);
 	const selected = findTeamVersion(loaded.registry, options.version);
 
@@ -458,6 +486,9 @@ function pinTeamDistribution(target, options = {}) {
 	const loaded = loadTeamRegistry(options.registry);
 	const errors = [...loaded.errors];
 	const warnings = [...loaded.warnings];
+	if (!isTeamRegistryValid(loaded)) {
+		return { target: targetRoot, errors, warnings };
+	}
 	const lock = loadTeamLock(paths);
 	const selected = findTeamVersion(loaded.registry, options.version);
 
@@ -557,6 +588,7 @@ module.exports = {
 	resolveRegistryPath,
 	validateTeamRegistryData,
 	loadTeamRegistry,
+	isTeamRegistryValid,
 	compareSemver,
 	latestTeamVersion,
 	findTeamVersion,

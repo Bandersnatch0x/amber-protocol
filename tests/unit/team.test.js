@@ -7,6 +7,8 @@ const path = require("node:path");
 const {
 	resolveRegistryPath,
 	validateTeamRegistryData,
+	isTeamRegistryValid,
+	validateInstallRequest,
 	compareSemver,
 	latestTeamVersion,
 	findTeamVersion,
@@ -139,6 +141,28 @@ test("validateTeamRegistryData reports every missing top-level field for an empt
 		],
 		warnings: [],
 	});
+});
+
+test("invalid registries stop install validation before registry-derived checks", () => {
+	const loaded = {
+		registry: null,
+		errors: ["Team registry must contain an object."],
+		warnings: [],
+	};
+
+	assert.equal(isTeamRegistryValid(loaded), false);
+	assert.deepEqual(
+		validateInstallRequest({
+			loaded,
+			selected: { version: "1.0.0", release: undefined },
+			preset: "safe-bootstrap",
+			lockExists: true,
+		}),
+		{
+			errors: ["Team registry must contain an object."],
+			warnings: [],
+		},
+	);
 });
 
 test("validateTeamRegistryData flags a non-semver version key", () => {

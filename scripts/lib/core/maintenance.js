@@ -20,6 +20,7 @@ const {
 
 const {
 	compareSemver,
+	isTeamRegistryValid,
 	latestTeamVersion,
 	loadTeamLock,
 	loadTeamRegistry,
@@ -326,6 +327,10 @@ function extractRegressionProposals(targetRoot) {
 function inspectMaintenance(target, registryPath) {
 	const targetRoot = resolveTarget(target);
 	const loaded = loadTeamRegistry(registryPath);
+	const registryValid = isTeamRegistryValid(loaded);
+	const unavailableReason = registryValid
+		? null
+		: "team registry validation failed";
 	const wikiValidation = validateWiki(targetRoot);
 	const staleDocsResult = detectStaleDocs(targetRoot);
 	const { detectScaffoldDrift } = require("./scaffold-version-drift");
@@ -341,9 +346,33 @@ function inspectMaintenance(target, registryPath) {
 			errors: wikiValidation.errors,
 			warnings: wikiValidation.warnings,
 		},
-		rulePackDrift: detectRulePackDrift(targetRoot, loaded.registry),
-		migrationAssistant: buildMigrationAssistant(targetRoot, loaded.registry),
-		upgradeAssistant: buildUpgradeAssistant(targetRoot, loaded.registry),
+		rulePackDrift: registryValid
+			? detectRulePackDrift(targetRoot, loaded.registry)
+			: {
+					available: false,
+					reason: unavailableReason,
+					installed: false,
+					drifted: false,
+					expected: [],
+					actual: [],
+				},
+		migrationAssistant: registryValid
+			? buildMigrationAssistant(targetRoot, loaded.registry)
+			: {
+					available: false,
+					reason: unavailableReason,
+					needed: false,
+					nextCommand: null,
+				},
+		upgradeAssistant: registryValid
+			? buildUpgradeAssistant(targetRoot, loaded.registry)
+			: {
+					available: false,
+					reason: unavailableReason,
+					installed: false,
+					currentVersion: null,
+					latestVersion: null,
+				},
 		evolutionRollup: extractEvolutionFindings(targetRoot),
 		regressionProposals: extractRegressionProposals(targetRoot),
 		scaffoldDrift: scaffoldDriftResult,
