@@ -238,7 +238,7 @@ For Each Stage:
     ├─→ Execute Stage (pack/skill/command)
     ├─→ Post-Gate Check
     ├─→ Create Checkpoint (optional)
-    └─→ Record Events (timeline-writer.js)
+    └─→ Record Events (session-timeline.js / appendSessionEvent)
     ↓
 Budget Check (budget-tracker.js)
     ↓

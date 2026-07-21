@@ -53,11 +53,22 @@ Compliance Verification
 
 ### 1. Policy Definition
 
-#### Autonomous Policy (`autonomous-policy.json`)
+#### Governed command policy (`rules.json` / `verify-rules.json`) — primary
 
-**Purpose:** Machine-readable policy configuration for autonomous execution.
+**Purpose:** Declarative allow/deny rules for the two live execution surfaces:
 
-**Schema:**
+| File | Surface | Evaluator |
+|------|---------|-----------|
+| `.amber/governance/rules.json` | `governed-runner` (loop / route command stages) | `evaluateGovernedPolicy` |
+| `.amber/governance/verify-rules.json` | `evidence-runner` (`session verify --execute`) | `evaluateVerifyPolicy` |
+
+Both surfaces apply **un-removable built-in denies** first (destructive patterns + shell composition), then the file's rules, then `defaultAction` (safe default: `deny`). Scaffold with `amber governance rules init`. Dry-run a command with `amber governance rules check --command "…"` — same verdict as governed execution.
+
+#### Leftover autonomous policy (`autonomous-policy.json`) — compat only
+
+**Purpose:** Optional on-disk remnant from pre-ADR-0005 autonomous execution. **There is no auto-approve executor.** `loadPolicy` still reads `.amber/autonomous-policy.json` so `governance policy` can warn on unsafe leftovers; missing file degrades to fail-safe defaults (`user-approval: block`).
+
+**Schema (historical / leftover):**
 ```json
 {
   "gates": {
@@ -89,9 +100,10 @@ Compliance Verification
 ```
 
 **Key Constraints:**
-- `auto-approve-all` is a CLI flag, NOT a policy file setting (security boundary)
-- `user-approval: "approve"` triggers a warning (unsafe for production)
+- `auto-approve-all` is a CLI flag, NOT a policy file setting (security boundary); `inspectPolicy` errors if the key appears in the file
+- `user-approval: "approve"` on a leftover file triggers a warning (cannot auto-approve; executor removed)
 - Policy files are config, not executable code
+- Do not require `autonomous-policy.json` for execution readiness — that check keys off `rules.json` (see `checkExecutionReadiness`)
 
 #### Human-Readable Policy (`POLICY.md`)
 
@@ -146,52 +158,34 @@ amber governance evidence --all --output-dir <dir>
 
 **Purpose:** Export session timelines into reviewable Markdown.
 
-**Exported Data:**
-- Session metadata (ID, goal, start time, end time)
-- Command sequence (all shell commands executed)
-- Tool calls (all API calls made)
-- Approval decisions (gates approved/rejected with timestamps)
-- Errors and failures (with stack traces)
-- Budget usage (tokens, time, API calls)
+**Exported Data (from live `timeline.jsonl`):**
+- Session metadata (goal, start, end) from `session_created` / terminal session events
+- Commands / verification from `stage_completed` and `verification_failed` that carry `data.command` (what `session verify --execute` actually writes). Legacy `command_executed` / `tool_call` lines are still recognized if present in old timelines
+- Approval gates: `gate_triggered` / `gate_passed` / `gate_failed` (gate id from `data.gate` or `data.gateId`)
+- Errors: `error`, `stage_failed`, `verification_failed`
+- Budget: `budget_warning` / `budget_exceeded` when present
 
-**Output Format (Markdown):**
+**Output Format (Markdown, simplified):**
 ```markdown
-# Session Evidence Report
+# Session Evidence
 
 **Session ID:** abc-123
 **Goal:** Fix login bug
 **Started:** 2026-06-21T10:00:00Z
-**Completed:** 2026-06-21T10:30:00Z
-**Status:** success
+**Ended:** 2026-06-21T10:30:00Z
+**Status:** session_completed
 
-## Command Sequence
+## Commands / Verification
 
-1. `git status` (10:00:01) → exit 0
-2. `npm test` (10:01:05) → exit 1 (3 failures)
-3. `git add src/login.ts` (10:15:30) → exit 0
-4. `git commit -m "fix: login validation"` (10:15:32) → exit 0
+- `npm test` (executed, exit 0) (2026-06-21T10:01:05Z)
 
-## Tool Calls
+## Approval Gates
 
-- `Read(src/login.ts)` (10:02:10)
-- `Edit(src/login.ts, ...)` (10:14:22)
-- `Bash(npm test, ...)` (10:15:40)
-
-## Approval Decisions
-
-- `user-approval-fix` (10:05:00) → APPROVED (user)
-- `user-approval-merge` (10:20:00) → APPROVED (auto-policy)
-
-## Errors
-
-- Stage `verify` failed (10:08:30): AssertionError: Expected 3 passing tests
-
-## Budget Usage
-
-- Tokens: 15,420
-- Duration: 1800 seconds
-- API Calls: 42
+- gate_passed: user-approval-plan (2026-06-21T10:05:00Z)
+- gate_passed: user-approval-implement (2026-06-21T10:20:00Z)
 ```
+
+Amber does **not** currently write agent tool-call traces (`Read`/`Edit`/`Bash`) into the session timeline — only governed stage/gate/session events from the CLI surface.
 
 #### Execution Evidence Export
 
@@ -408,67 +402,80 @@ amber governance audit --target <repo> --output <file> [--since <date>]
 
 ## Integration with Other Systems
 
-### Policy Enforcement
+### Policy Enforcement (live)
 
-Policy is loaded by autonomous executor:
+Autonomous execution was **removed** (ADR-0001 / ADR-0005). There is no
+`executeAutonomous` / `shouldAutoApproveGate` path. Live enforcement is:
+
+```javascript
+// Governed loop / route command stage (four gates: policy, approval, worktree, ledger)
+const { evaluateGovernedPolicy, loadPolicyRules } = require('./loop-policy');
+const verdict = evaluateGovernedPolicy(command, loadPolicyRules(projectRoot));
+
+// Session verify --execute
+const { evaluateVerifyPolicy, loadVerifyPolicyRules } = require('./loop-policy');
+const verifyVerdict = evaluateVerifyPolicy(command, loadVerifyPolicyRules(projectRoot));
+```
+
+`amber session approve --gate <id> --yes` records human approval; workers cannot
+self-approve. Optional leftover `.amber/autonomous-policy.json` is inspected only:
+
 ```javascript
 const { loadPolicy } = require('./autonomous-policy');
-const { executeAutonomous } = require('./autonomous-executor');
-
-const policy = loadPolicy(projectRoot);
-await executeAutonomous(sessionId, { policy });
+const policy = loadPolicy(projectRoot); // fail-safe defaults if missing/corrupt
+// inspectPolicy warns if gates['user-approval'] === 'approve' — no executor consumes it
 ```
 
-Gate handler checks policy for auto-approval:
+### Evidence Collection (live)
+
+Timeline events are appended via the deep module `session-timeline.js`
+(`appendSessionEvent` / `readSessionEvents`). `timeline-writer.js` /
+`timeline-reader.js` were deleted. Verification evidence looks like:
+
 ```javascript
-const { shouldAutoApproveGate } = require('./autonomous-policy');
+const { appendSessionEvent } = require('./session-timeline');
 
-if (shouldAutoApproveGate(gate.type, policy)) {
-  approveGate(sessionId, gate.id);
-} else {
-  pauseForUserApproval(sessionId, gate.id);
-}
-```
-
-### Evidence Collection
-
-Timeline writer automatically records all events:
-```javascript
-const { appendEvent } = require('./timeline-writer');
-
-appendEvent(sessionId, {
-  type: 'command_executed',
-  command: 'npm test',
-  exitCode: 0,
-  timestamp: new Date().toISOString()
+// session verify --execute success
+appendSessionEvent(sessionDir, {
+  type: 'stage_completed',
+  data: {
+    stage: 'verify',
+    command: 'npm test',
+    result: 'passed',
+    executed: true,
+    exitCode: 0,
+    durationMs: 83527,
+  },
 });
 ```
 
-Evidence export reads timeline and formats:
-```javascript
-const { getTimeline } = require('./timeline-reader');
-const { exportSessionEvidence } = require('./governance');
+Evidence export:
 
-const timeline = getTimeline(sessionId);
-await exportSessionEvidence(sessionId, outputPath);
+```javascript
+const { exportSessionEvidence } = require('./governance');
+exportSessionEvidence(sessionId, projectRoot, outputPath);
+// Counts stage_completed / verification_failed with data.command (and legacy types)
 ```
+
+Audit summaries use the same `isCommandLikeEvent` predicate so live dogfood
+sessions no longer report `commands: 0`.
 
 ## Security Boundaries
 
 1. **CLI Flag vs Policy File:**
-   - `auto-approve-all` is CLI flag only (explicit user intent)
-   - Policy files cannot enable blanket auto-approval
-   - G3 validation rejects `auto-approve-all` in policy files
+   - `auto-approve-all` must not appear in policy files (`inspectPolicy` errors)
+   - Built-in deny-destructive + shell-composition cannot be dropped by custom rules
+   - Human gate approval is explicit (`session approve`); no policy auto-approve executor
 
 2. **Read-Only by Default:**
-   - Governance commands never modify session state
+   - Governance inspect/audit/evidence never mutate session state
    - Evidence export is read-only
-   - Audit reports are write-once
+   - Audit reports are write-once artifacts
 
 3. **Boundary Enforcement:**
-   - BOUNDARIES.md documents restrictions
-   - Enforcement happens at execution layer (not governance layer)
-   - Violations logged to timeline
+   - Product boundaries live in Operating Manual / ADR-0003 (policy, approval, worktree, ledger)
+   - Enforcement is at the governed/evidence runners, not only in docs
+   - Policy denials and verification failures are ledgered / timeline-recorded
 
 ## Design Principles
 
