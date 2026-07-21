@@ -63,3 +63,66 @@ test("writeHandoff dryRun does not write", () => {
 	assert.equal(res.changed, true);
 	assert.equal(fs.readFileSync(path.join(target, "session-handoff.md"), "utf8"), before);
 });
+
+// Free-text evidence strings are valid in feature_list (validators only require
+// a non-empty array for passing). Spreading a string into an object used to
+// produce character-index keys and render every entry as `(none)`.
+test("writeHandoff renders free-text string evidence instead of (none)", () => {
+	const target = tempDir("string-evidence");
+	scaffoldHarness(target);
+
+	const featureListPath = path.join(target, "feature_list.json");
+	const data = JSON.parse(fs.readFileSync(featureListPath, "utf8"));
+	// Scaffold seeds F001; attach a free-text evidence string the way many
+	// early "passing" features record it.
+	const f001 = data.features.find((f) => f.id === "F001");
+	assert.ok(f001, "scaffold seeds F001");
+	f001.status = "passing";
+	f001.evidence = ["npm test: 1158/0 passing across Node 18/20/22 CI matrix"];
+	// Also keep one structured record so both shapes coexist.
+	data.features.push({
+		id: "F010",
+		title: "structured evidence",
+		status: "passing",
+		area: "core",
+		verification: ["x"],
+		evidence: [
+			{
+				command: "npm test",
+				result: "passed (exit 0)",
+				date: "2026-07-22",
+				sessionId: "deadbeef-0000-0000-0000-000000000001",
+			},
+		],
+	});
+	fs.writeFileSync(featureListPath, JSON.stringify(data, null, 2) + "\n");
+
+	const res = writeHandoff(target);
+	assert.equal(res.changed, true);
+	const content = fs.readFileSync(path.join(target, "session-handoff.md"), "utf8");
+
+	assert.match(
+		content,
+		/F001: npm test: 1158\/0 passing across Node 18\/20\/22 CI matrix/,
+		"free-text evidence must appear verbatim",
+	);
+	assert.doesNotMatch(
+		content,
+		/F001: `\(none\)` → \(none\)/,
+		"must not greenwash string evidence as empty structured fields",
+	);
+	assert.match(content, /F010: `npm test` → passed \(exit 0\)/);
+	assert.match(content, /session deadbeef/);
+
+	assert.deepEqual(require("../../scripts/lib/core/audit").validateHandoff(target).errors, []);
+});
+
+test("normalizeEvidenceEntry does not spread string characters", () => {
+	const { normalizeEvidenceEntry } = require("../../scripts/lib/handoff-command");
+	const n = normalizeEvidenceEntry("F001", "npm test green");
+	assert.equal(n.feature, "F001");
+	assert.equal(n.result, "npm test green");
+	assert.equal(n.command, null);
+	assert.equal(n.freeText, true);
+	assert.equal(n["0"], undefined, "must not enumerate string indices");
+});

@@ -28,14 +28,55 @@ function gitInfo(targetRoot) {
 	return { branch, dirty, lastCommit };
 }
 
+/**
+ * Normalize one feature_list evidence entry to a display record.
+ *
+ * feature_list allows BOTH free-text strings (common for early "passing"
+ * evidence) and structured objects from recordFeatureEvidence / session verify.
+ * Spreading a string (`{ ... "npm test: ok" }`) enumerates character indices
+ * and drops command/result — every string entry then renders as `(none)`.
+ */
+function normalizeEvidenceEntry(featureId, entry) {
+	if (typeof entry === "string") {
+		const text = entry.trim();
+		if (!text) return null;
+		return {
+			feature: featureId,
+			command: null,
+			result: text,
+			date: null,
+			sessionId: null,
+			freeText: true,
+		};
+	}
+	if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+	return {
+		feature: featureId,
+		command: entry.command || null,
+		result: entry.result || entry.notes || null,
+		date: entry.date || null,
+		sessionId: entry.sessionId || null,
+		freeText: false,
+	};
+}
+
 function collectEvidence(features) {
 	const all = [];
 	for (const f of features) {
 		for (const e of Array.isArray(f.evidence) ? f.evidence : []) {
-			all.push({ feature: f.id, ...e });
+			const normalized = normalizeEvidenceEntry(f.id, e);
+			if (normalized) all.push(normalized);
 		}
 	}
 	return all;
+}
+
+function formatEvidenceLine(e) {
+	if (e.freeText || (!e.command && e.result)) {
+		return `- ${e.feature}: ${e.result}`;
+	}
+	const sid = e.sessionId ? `, session ${String(e.sessionId).slice(0, 8)}` : "";
+	return `- ${e.feature}: \`${e.command || "(none)"}\` → ${e.result || "(none)"} (${e.date || "?"}${sid})`;
 }
 
 function renderHandoff(targetRoot) {
@@ -67,16 +108,26 @@ function renderHandoff(targetRoot) {
 			Object.entries(statusCounts).map(([s, n]) => `${n} ${s}`).join(", ")
 		: "No features registered.";
 
+	// Completed/failed/aborted sessions are history, not "active".
+	const terminal = new Set(["completed", "failed", "aborted", "accepted"]);
 	const summary = session
-		? `Active session \`${session.sessionId}\` — "${session.goal}" (${session.status}). ${featureSummary}`
+		? terminal.has(String(session.status || ""))
+			? `Latest session \`${session.sessionId}\` — "${session.goal}" (${session.status}). ${featureSummary}`
+			: `Active session \`${session.sessionId}\` — "${session.goal}" (${session.status}). ${featureSummary}`
 		: `No active session. ${featureSummary}`;
 
 	const runtime = lastEvidence
-		? [
-				`- Command: ${lastEvidence.command || "(none)"}`,
-				`- Result: ${lastEvidence.result || "(none)"}`,
-				`- When: ${lastEvidence.date || "unknown"}`,
-			]
+		? lastEvidence.freeText || (!lastEvidence.command && lastEvidence.result)
+			? [
+					`- Command: (free-text evidence)`,
+					`- Result: ${lastEvidence.result}`,
+					`- When: ${lastEvidence.date || "unknown"}`,
+				]
+			: [
+					`- Command: ${lastEvidence.command || "(none)"}`,
+					`- Result: ${lastEvidence.result || "(none)"}`,
+					`- When: ${lastEvidence.date || "unknown"}`,
+				]
 		: ["- Command: not run yet", "- Result: pending"];
 
 	const featureState = features.length
@@ -84,10 +135,7 @@ function renderHandoff(targetRoot) {
 		: ["None."];
 
 	const evidenceLines = evidence.length
-		? evidence.map((e) => {
-				const sid = e.sessionId ? `, session ${String(e.sessionId).slice(0, 8)}` : "";
-				return `- ${e.feature}: \`${e.command || "(none)"}\` → ${e.result || "(none)"} (${e.date || "?"}${sid})`;
-			})
+		? evidence.map(formatEvidenceLine)
 		: ["- No verification evidence recorded yet."];
 
 	const failing = features.filter((f) => (f.status || "") === "failing");
@@ -150,4 +198,4 @@ function writeHandoff(target, options = {}) {
 	return { path: handoffPath, changed };
 }
 
-module.exports = { writeHandoff, renderHandoff };
+module.exports = { writeHandoff, renderHandoff, normalizeEvidenceEntry, collectEvidence };
