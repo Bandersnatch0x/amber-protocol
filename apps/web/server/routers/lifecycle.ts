@@ -9,7 +9,7 @@ import { readSessionById } from '../lib/session-reader';
 import { getRouteById, type RouteStage } from '../lib/route-reader';
 import { appendSessionTimelineEvent } from '../lib/session-audit-writer';
 import { persistCompletedStage } from '../lib/session-writer';
-import type { WebAdapter } from '../../../../scripts/lib/web-adapter';
+import type { CompletionStatusResult, WebAdapter } from '../../../../scripts/lib/web-adapter';
 
 const requireCli = createRequire(import.meta.url);
 const adapter = requireCli('../../../../scripts/lib/web-adapter.js') as WebAdapter;
