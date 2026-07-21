@@ -158,6 +158,34 @@ test("validateTeamRegistryData rejects an empty versions object", () => {
 	});
 });
 
+test("validateTeamRegistryData rejects malformed catalog entries", () => {
+	const result = validateTeamRegistryData({
+		name: "amber-protocol-team-registry",
+		presets: [null],
+		rulePacks: ["not-an-object"],
+		profiles: [{ id: "" }],
+		versions: {
+			"1.0.0": {
+				preset: "p",
+				profile: "pr",
+				workflowPacks: [],
+				rulePacks: [],
+				managedProjectFiles: [],
+				compatibility: {},
+			},
+		},
+	});
+
+	assert.deepEqual(result, {
+		errors: [
+			"Team registry presets[0] must be an object.",
+			"Team registry rulePacks[0] must be an object.",
+			"Team registry profiles[0] must declare a non-empty id.",
+		],
+		warnings: [],
+	});
+});
+
 test("invalid registries stop install validation before registry-derived checks", () => {
 	const loaded = {
 		registry: null,

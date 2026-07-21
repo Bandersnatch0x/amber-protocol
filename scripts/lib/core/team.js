@@ -31,6 +31,26 @@ function resolveRegistryPath(registryPath) {
 		: path.join(REPO_ROOT, registryPath);
 }
 
+function validateCatalogEntries(errors, entries, fieldName, emptyMessage) {
+	if (!Array.isArray(entries) || entries.length === 0) {
+		errors.push(emptyMessage);
+		return;
+	}
+
+	for (let index = 0; index < entries.length; index += 1) {
+		const entry = entries[index];
+		if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+			errors.push(`Team registry ${fieldName}[${index}] must be an object.`);
+			continue;
+		}
+		if (typeof entry.id !== "string" || entry.id.length === 0) {
+			errors.push(
+				`Team registry ${fieldName}[${index}] must declare a non-empty id.`,
+			);
+		}
+	}
+}
+
 function validateTeamRegistryData(data) {
 	const errors = [];
 	const warnings = [];
@@ -41,15 +61,24 @@ function validateTeamRegistryData(data) {
 	if (data.name !== "amber-protocol-team-registry") {
 		errors.push("Team registry name must be amber-protocol-team-registry.");
 	}
-	if (!Array.isArray(data.presets) || data.presets.length === 0) {
-		errors.push("Team registry must define at least one preset.");
-	}
-	if (!Array.isArray(data.rulePacks) || data.rulePacks.length === 0) {
-		errors.push("Team registry must define at least one rule pack.");
-	}
-	if (!Array.isArray(data.profiles) || data.profiles.length === 0) {
-		errors.push("Team registry must define at least one project profile.");
-	}
+	validateCatalogEntries(
+		errors,
+		data.presets,
+		"presets",
+		"Team registry must define at least one preset.",
+	);
+	validateCatalogEntries(
+		errors,
+		data.rulePacks,
+		"rulePacks",
+		"Team registry must define at least one rule pack.",
+	);
+	validateCatalogEntries(
+		errors,
+		data.profiles,
+		"profiles",
+		"Team registry must define at least one project profile.",
+	);
 	if (
 		!data.versions ||
 		typeof data.versions !== "object" ||

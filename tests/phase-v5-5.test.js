@@ -118,6 +118,50 @@ test("maintenance inspect reports an invalid team registry without running regis
   assert.doesNotMatch(`${install.stdout}\n${install.stderr}`, /TypeError|Cannot read properties/);
 });
 
+test("team install rejects nested-malformed registry entries without TypeError", () => {
+  const target = tempDir("nested-malformed-registry");
+  const registryPath = path.join(target, "team-registry.json");
+  fs.writeFileSync(
+    registryPath,
+    `${JSON.stringify({
+      name: "amber-protocol-team-registry",
+      presets: [null],
+      rulePacks: [{ id: "amber-delivery" }],
+      profiles: [{ id: "default" }],
+      versions: {
+        "1.0.0": {
+          preset: "safe-bootstrap",
+          profile: "default",
+          workflowPacks: [],
+          rulePacks: [],
+          managedProjectFiles: [],
+          compatibility: {}
+        }
+      }
+    })}\n`
+  );
+
+  const result = runHarness([
+    "team",
+    "install",
+    "--target",
+    target,
+    "--registry",
+    registryPath,
+    "--version",
+    "1.0.0",
+    "--preset",
+    "safe-bootstrap",
+    "--dry-run",
+    "--json"
+  ]);
+
+  assert.equal(result.status, 1, result.stderr);
+  const payload = JSON.parse(result.stdout);
+  assert.ok(payload.errors.includes("Team registry presets[0] must be an object."));
+  assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /TypeError|Cannot read properties/);
+});
+
 test("maintenance propose writes reviewable gardening proposal without changing source docs", () => {
   const target = initializedTeamTarget("propose");
   const evolutionPath = path.join(target, "docs", "wiki", "engineering", "harness-evolution.md");
