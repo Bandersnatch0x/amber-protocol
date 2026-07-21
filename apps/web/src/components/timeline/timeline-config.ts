@@ -16,6 +16,9 @@ export const TIMELINE_EVENT_CONFIG: Record<string, TimelineEventConfig> = {
   stage_started: { label: 'Stage Started', icon: 'ST', color: 'text-blue-600 dark:text-blue-400' },
   stage_completed: { label: 'Stage Completed', icon: 'OK', color: 'text-emerald-600 dark:text-emerald-400' },
   stage_failed: { label: 'Stage Failed', icon: 'FL', color: 'text-red-600 dark:text-red-400' },
+  // Written by session verify --execute on non-zero exit (CLI SSOT).
+  verification_failed: { label: 'Verification Failed', icon: 'VF', color: 'text-red-600 dark:text-red-400' },
+  checkpoint_created: { label: 'Checkpoint Created', icon: 'CP', color: 'text-blue-600 dark:text-blue-400' },
   gate_triggered: { label: 'Gate Triggered', icon: 'GT', color: 'text-amber-600 dark:text-amber-400' },
   gate_passed: { label: 'Gate Passed', icon: 'GP', color: 'text-emerald-600 dark:text-emerald-400' },
   gate_failed: { label: 'Gate Failed', icon: 'GF', color: 'text-red-600 dark:text-red-400' },
