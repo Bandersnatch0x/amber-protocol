@@ -204,26 +204,26 @@ function listDirectories(dir) {
 		});
 }
 
-function countMatches(value, pattern) {
-	return (value.match(pattern) || []).length;
-}
-
 function summarizeTimelineEvidence(sessionDirs) {
+	// Parse real timeline events. Live verify writes stage_completed /
+	// verification_failed with data.command — counting only the phantom
+	// command_executed type under-counted every real dogfood session.
+	const { readSessionEvents } = require("../session-timeline");
+	const { isCommandLikeEvent } = require("./governance");
 	let commandCount = 0;
 	let approvalCount = 0;
 	for (const sessionDir of sessionDirs) {
-		const timelinePath = path.join(sessionDir, "timeline.jsonl");
-		if (!fs.existsSync(timelinePath)) {
-			continue;
+		const events = readSessionEvents(sessionDir);
+		for (const event of events) {
+			if (isCommandLikeEvent(event)) commandCount += 1;
+			if (
+				event.type === "gate_triggered" ||
+				event.type === "gate_passed" ||
+				event.type === "gate_failed"
+			) {
+				approvalCount += 1;
+			}
 		}
-		let raw = "";
-		try {
-			raw = fs.readFileSync(timelinePath, "utf8");
-		} catch {
-			continue;
-		}
-		commandCount += countMatches(raw, /"type"\s*:\s*"command_executed"/g);
-		approvalCount += countMatches(raw, /"type"\s*:\s*"gate_(triggered|passed|failed)"/g);
 	}
 	return { commandCount, approvalCount };
 }

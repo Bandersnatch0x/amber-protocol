@@ -77,6 +77,57 @@ describe("governance evidence", () => {
 		assert.ok(content.includes("npm test"));
 	});
 
+	it("session export surfaces live stage_completed verification commands", () => {
+		const sessionId = "live-verify-session";
+		const sessionsDir = path.join(tmpDir, ".amber", "sessions", sessionId);
+		fs.mkdirSync(sessionsDir, { recursive: true });
+		const timeline = [
+			{
+				type: "session_created",
+				timestamp: "2026-07-14T16:00:00Z",
+				data: { goal: "fix governance audit hardcode" },
+			},
+			{
+				type: "stage_completed",
+				timestamp: "2026-07-14T16:02:13Z",
+				data: {
+					stage: "verify",
+					command: "npm test",
+					result: "passed",
+					executed: true,
+					exitCode: 0,
+					durationMs: 83527,
+				},
+			},
+			{
+				type: "gate_passed",
+				timestamp: "2026-07-14T16:03:00Z",
+				data: { gateId: "user-approval-plan" },
+			},
+			{
+				type: "session_completed",
+				timestamp: "2026-07-14T16:05:00Z",
+				data: {},
+			},
+		];
+		fs.writeFileSync(
+			path.join(sessionsDir, "timeline.jsonl"),
+			timeline.map((e) => JSON.stringify(e)).join("\n"),
+		);
+
+		const outputPath = path.join(tmpDir, "live-session-evidence.md");
+		const result = exportGovernanceEvidence(tmpDir, {
+			session: sessionId,
+			output: outputPath,
+		});
+		assert.strictEqual(result.errors.length, 0, JSON.stringify(result.errors));
+		const content = fs.readFileSync(outputPath, "utf8");
+		assert.match(content, /npm test/);
+		assert.match(content, /executed/);
+		assert.match(content, /gate_passed/);
+		assert.doesNotMatch(content, /## Commands\n\n$/);
+	});
+
 	it("execution export → markdown contains plan + worktree", () => {
 		const taskId = "test-task-001";
 		const taskDir = path.join(tmpDir, ".amber", "executions", taskId);

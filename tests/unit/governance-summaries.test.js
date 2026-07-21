@@ -56,6 +56,49 @@ test("summarizeSessions summarizes goal, counts, and completed status", () => {
 	assert.equal(session.status, "completed");
 });
 
+// Live session verify --execute writes stage_completed with data.command, not
+// the phantom command_executed type. Audit must count those or every real
+// dogfood session reports commands=0.
+test("summarizeSessions counts stage_completed verification commands", () => {
+	const sessionsDir = tempDir("gov-live-verify");
+	writeSession(sessionsDir, "dogfood", [
+		{ type: "session_created", timestamp: "2026-07-14T16:00:00Z", data: { goal: "fix governance" } },
+		{
+			type: "stage_completed",
+			timestamp: "2026-07-14T16:02:00Z",
+			data: {
+				stage: "verify",
+				command: "npm test",
+				result: "passed",
+				executed: true,
+				exitCode: 0,
+				durationMs: 83527,
+			},
+		},
+		{ type: "gate_passed", timestamp: "2026-07-14T16:03:00Z", data: { gateId: "user-approval-plan" } },
+		{ type: "gate_passed", timestamp: "2026-07-14T16:04:00Z", data: { gateId: "user-approval-implement" } },
+		{ type: "session_completed", timestamp: "2026-07-14T16:05:00Z", data: {} },
+	]);
+
+	const [session] = summarizeSessions(sessionsDir);
+	assert.equal(session.commands, 1);
+	assert.equal(session.approvals, 2);
+	assert.equal(session.status, "completed");
+});
+
+test("summarizeSessions counts verification_failed as a command observation", () => {
+	const sessionsDir = tempDir("gov-verify-fail");
+	writeSession(sessionsDir, "s1", [
+		{ type: "session_created", timestamp: "2026-07-14T16:00:00Z", data: { goal: "fail path" } },
+		{
+			type: "verification_failed",
+			timestamp: "2026-07-14T16:01:00Z",
+			data: { stage: "verify", command: "npm test", exitCode: 1 },
+		},
+	]);
+	assert.equal(summarizeSessions(sessionsDir)[0].commands, 1);
+});
+
 test("summarizeSessions reports running when there is no end event", () => {
 	const sessionsDir = tempDir("gov-running");
 	writeSession(sessionsDir, "s1", [

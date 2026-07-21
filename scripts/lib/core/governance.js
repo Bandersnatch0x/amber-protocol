@@ -130,6 +130,29 @@ Execution evidence: \`.amber/executions/*/evidence.json\`
   return { created, skipped };
 }
 
+/**
+ * Events that represent a command/verification observation on a session timeline.
+ *
+ * Live writers (session verify --execute) emit `stage_completed` / `verification_failed`
+ * with `data.command`. Older fixtures and pre-GLX timelines used phantom
+ * `command_executed` / `tool_call` types that no current writer emits — still
+ * recognized so historical exports do not go blank.
+ */
+function isCommandLikeEvent(event) {
+  if (!event || typeof event !== 'object') return false;
+  if (event.type === 'command_executed' || event.type === 'tool_call') return true;
+  if (event.type === 'stage_completed' || event.type === 'verification_failed') {
+    return Boolean(event.data && event.data.command);
+  }
+  return false;
+}
+
+function commandLabelFromEvent(event) {
+  if (!event || !event.data) return 'N/A';
+  if (event.type === 'tool_call') return event.data.tool || event.data.command || 'N/A';
+  return event.data.command || 'N/A';
+}
+
 function exportSessionEvidence(sessionId, targetRoot, outputPath) {
   const target = path.resolve(targetRoot);
   const sessionDir = path.join(resolveStateDirForRead(target), 'sessions', sessionId);
@@ -145,36 +168,56 @@ function exportSessionEvidence(sessionId, targetRoot, outputPath) {
     lines.push(`**Started:** ${sessionCreated.timestamp}`, '');
   }
 
-  const sessionEnd = events.find(e => e.type === 'session_completed' || e.type === 'session_aborted');
+  const sessionEnd = events.find(e =>
+    e.type === 'session_completed' || e.type === 'session_aborted' || e.type === 'session_failed'
+  );
   if (sessionEnd) {
     lines.push(`**Ended:** ${sessionEnd.timestamp}`, `**Status:** ${sessionEnd.type}`, '');
   }
 
-  const commands = events.filter(e => e.type === 'command_executed');
+  const commands = events.filter(isCommandLikeEvent);
   if (commands.length) {
-    lines.push('## Commands', '');
-    commands.forEach(e => lines.push(`- \`${e.data.command}\` (${e.timestamp})`));
-    lines.push('');
-  }
-
-  const toolCalls = events.filter(e => e.type === 'tool_call');
-  if (toolCalls.length) {
-    lines.push('## Tool Calls', '');
-    toolCalls.forEach(e => lines.push(`- ${e.data.tool} (${e.timestamp})`));
+    lines.push('## Commands / Verification', '');
+    commands.forEach(e => {
+      const cmd = commandLabelFromEvent(e);
+      const executed =
+        e.type === 'verification_failed'
+          ? 'failed'
+          : e.data && e.data.executed === false
+            ? 'claim'
+            : e.data && e.data.executed === true
+              ? 'executed'
+              : e.type;
+      const exit =
+        e.data && e.data.exitCode !== undefined && e.data.exitCode !== null
+          ? `, exit ${e.data.exitCode}`
+          : '';
+      lines.push(`- \`${cmd}\` (${executed}${exit}) (${e.timestamp})`);
+    });
     lines.push('');
   }
 
   const gates = events.filter(e => ['gate_triggered', 'gate_passed', 'gate_failed'].includes(e.type));
   if (gates.length) {
     lines.push('## Approval Gates', '');
-    gates.forEach(e => lines.push(`- ${e.type}: ${e.data?.gate || 'N/A'} (${e.timestamp})`));
+    gates.forEach(e => lines.push(`- ${e.type}: ${e.data?.gate || e.data?.gateId || 'N/A'} (${e.timestamp})`));
     lines.push('');
   }
 
-  const errors = events.filter(e => e.type === 'error' || e.type === 'stage_failed');
+  const errors = events.filter(e =>
+    e.type === 'error' || e.type === 'stage_failed' || e.type === 'verification_failed'
+  );
   if (errors.length) {
     lines.push('## Errors', '');
-    errors.forEach(e => lines.push(`- ${e.data?.message || e.data?.error || 'Unknown error'} (${e.timestamp})`));
+    errors.forEach(e => {
+      const msg =
+        e.data?.message ||
+        e.data?.error ||
+        (e.type === 'verification_failed'
+          ? `verification failed: ${e.data?.command || 'unknown command'} (exit ${e.data?.exitCode ?? '?'})`
+          : 'Unknown error');
+      lines.push(`- ${msg} (${e.timestamp})`);
+    });
     lines.push('');
   }
 
@@ -277,9 +320,15 @@ function summarizeSessions(sessionsDir, options = {}) {
 
     const events = readSessionEvents(sessionDir);
     const created = events.find(e => e.type === 'session_created');
-    const end = events.find(e => e.type === 'session_completed' || e.type === 'session_aborted');
-    const commands = events.filter(e => e.type === 'command_executed').length;
-    const approvals = events.filter(e => e.type === 'gate_triggered' || e.type === 'gate_passed').length;
+    const end = events.find(e =>
+      e.type === 'session_completed' || e.type === 'session_aborted' || e.type === 'session_failed'
+    );
+    // Live verify writes stage_completed/verification_failed with data.command;
+    // keep counting legacy command_executed so old fixtures still score.
+    const commands = events.filter(isCommandLikeEvent).length;
+    const approvals = events.filter(e =>
+      e.type === 'gate_triggered' || e.type === 'gate_passed' || e.type === 'gate_failed'
+    ).length;
 
     if (options.since && created?.timestamp) {
       if (new Date(created.timestamp) < new Date(options.since)) continue;
@@ -421,4 +470,14 @@ function generateAuditReport(targetRoot, outputPath, options = {}) {
   };
 }
 
-module.exports = { governanceDocs, exportSessionEvidence, exportExecutionEvidence, inspectPolicy, summarizeSessions, summarizeExecutions, generateAuditReport };
+module.exports = {
+  governanceDocs,
+  exportSessionEvidence,
+  exportExecutionEvidence,
+  inspectPolicy,
+  summarizeSessions,
+  summarizeExecutions,
+  generateAuditReport,
+  isCommandLikeEvent,
+  commandLabelFromEvent,
+};
