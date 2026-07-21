@@ -14,9 +14,47 @@ permissions:
   contents: read
 
 jobs:
+  identity:
+    name: Commit identity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout commit history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20.x
+
+      - name: Validate introduced commit identities
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          zero_sha="0000000000000000000000000000000000000000"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            node scripts/validate-git-identity.js --range "$BASE_SHA..$HEAD_SHA"
+          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "$zero_sha" ]; then
+            node scripts/validate-git-identity.js --range "$BEFORE_SHA..$HEAD_SHA"
+          elif [ "$REF_TYPE" = "branch" ]; then
+            merge_base="$(git merge-base "origin/$DEFAULT_BRANCH" "$HEAD_SHA")"
+            node scripts/validate-git-identity.js --range "$merge_base..$HEAD_SHA"
+          else
+            node scripts/validate-git-identity.js --commit "$HEAD_SHA"
+          fi
+
   test:
     name: Node ${{ matrix.node-version }}
     runs-on: ubuntu-latest
+    needs: identity
 
     strategy:
       fail-fast: false
@@ -172,6 +210,7 @@ jobs:
     name: Release dry-run
     runs-on: ubuntu-latest
     needs:
+      - identity
       - test
       - coverage
       - security
@@ -205,6 +244,7 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     needs:
+      - identity
       - test
       - coverage
       - security
@@ -223,7 +263,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22.x
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         run: npm install

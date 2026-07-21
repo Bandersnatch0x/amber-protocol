@@ -43,6 +43,32 @@ npm run doctor
 - Write tests for new features
 - Document command-line interfaces
 
+### Git Commit Identity
+
+This repository requires a single author/committer identity on new commits:
+
+- name: `Bandersnatch0x`
+- email: `xihalele@gmail.com` (or the GitHub noreply form `13325067+bandersnatch0x@users.noreply.github.com`)
+
+Local setup:
+
+```bash
+git config --local user.name "Bandersnatch0x"
+git config --local user.email "xihalele@gmail.com"
+npm run dev:hooks:install   # points core.hooksPath at .githooks (pre-commit identity check)
+npm run identity:check      # validate the effective author/committer now
+```
+
+CI runs the same checker on introduced commits (`identity` job). Release jobs and the test matrix wait on it.
+
+CLI:
+
+```bash
+npm run identity:check
+node scripts/validate-git-identity.js --range <base>..<head>
+node scripts/validate-git-identity.js --commit <sha>   # exactly one revision (git log -1)
+```
+
 ### Commit Messages
 
 Use conventional commit format:

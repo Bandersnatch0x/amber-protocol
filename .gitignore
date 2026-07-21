@@ -6,6 +6,7 @@ coverage/
 .nyc_output/
 test-results/
 playwright-report/
+output/playwright/
 
 # Build and cache output
 dist/

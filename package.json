@@ -33,6 +33,8 @@
     "orient": "node scripts/orient.js",
     "test:load": "node scripts/run-tests.js tests/load/sequential-sessions.test.js",
     "test:e2e": "node scripts/run-tests.js tests/e2e/",
+    "identity:check": "node scripts/validate-git-identity.js",
+    "dev:hooks:install": "git config --local core.hooksPath .githooks",
     "gen:agents": "node scripts/gen-agent-commands.js",
     "gen:agents:check": "node scripts/gen-agent-commands.js --check",
     "lint": "eslint .",

@@ -167,14 +167,14 @@ function HomePage() {
       </header>
 
       <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="card p-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="card min-w-0 p-5">
+          <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="label">{t('home.repository')}</p>
               <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{t('home.repositoryName')}</h2>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t('home.repositoryDetail')}</p>
             </div>
-            <dl className="grid gap-4 sm:grid-cols-3 md:min-w-[420px]">
+            <dl className="grid min-w-0 gap-4 sm:grid-cols-3">
               <div>
                 <dt className="label">{t('home.lastRefresh')}</dt>
                 <dd className="value">{formatRefresh(sessionsQuery.dataUpdatedAt, t('home.notRefreshed'))}</dd>
@@ -191,7 +191,7 @@ function HomePage() {
           </div>
         </div>
 
-        <div className="amber-loop-card card overflow-hidden">
+        <div className="amber-loop-card card min-w-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
             <div>
               <h2 className="text-sm font-medium text-slate-900 dark:text-white">{t('home.governanceReference')}</h2>
@@ -282,7 +282,7 @@ function HomePage() {
                   <Link
                     to="/sessions/$id"
                     params={{ id: session.id }}
-                    className="-mx-2 flex items-start justify-between gap-3 rounded-md px-2 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/40"
+                    className="-mx-2 flex min-w-0 items-start justify-between gap-3 rounded-md px-2 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/40"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{session.goal || session.id}</p>
@@ -315,7 +315,7 @@ function HomePage() {
             <ul className="mt-4 divide-y divide-slate-200 dark:divide-slate-700">
               {pendingGates.slice(0, 4).map((gate) => (
                 <li key={`${gate.sessionId}:${gate.gateId}`} className="py-3">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
                         {gate.description || gate.gateId}

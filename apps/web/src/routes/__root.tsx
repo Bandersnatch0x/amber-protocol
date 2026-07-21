@@ -66,31 +66,31 @@ function AppShell() {
   }, []);
 
   return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+        <div className="min-h-screen overflow-x-hidden bg-slate-50 dark:bg-slate-900">
           <nav className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-40">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between h-14">
-                <div className="flex items-center gap-8">
-                  <Link to="/" className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">A</span>
+              <div className="flex h-14 min-w-0 items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-3 sm:gap-8">
+                  <Link to="/" className="flex min-w-0 items-center gap-2">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-blue-600">
+                      <span className="text-xs font-bold text-white">A</span>
                     </div>
-                    <span className="text-base font-semibold text-slate-900 dark:text-white">
+                    <span className="truncate text-base font-semibold text-slate-900 dark:text-white">
                       Amber
                     </span>
                   </Link>
-                  <div className="hidden sm:flex items-center gap-1">
+                  <div className="hidden items-center gap-1 sm:flex">
                     {navItems.map((item) => (
                       <NavLink key={item.to} {...item} />
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center gap-2 sm:gap-4">
                   <a
                     href="https://github.com/Bandersnatch0x/amber-protocol/tree/master/docs"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                    className="hidden text-sm text-slate-500 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded sm:inline dark:text-slate-400 dark:hover:text-slate-200"
                   >
                     {t('nav.docs')}
                   </a>
@@ -102,8 +102,8 @@ function AppShell() {
           </nav>
 
           {/* Mobile nav */}
-          <nav aria-label={t('nav.mobile')} className="sm:hidden bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-            <div className="flex max-w-full gap-0.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav aria-label={t('nav.mobile')} className="overflow-x-hidden border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 sm:hidden">
+            <div className="flex w-full max-w-full gap-0.5 overflow-x-auto overscroll-x-contain px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {navItems.map((item) => (
                 <NavLink key={item.to} {...item} compact />
               ))}
