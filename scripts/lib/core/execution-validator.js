@@ -440,30 +440,54 @@ function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 		checks.worktree = true;
 	}
 
-	// Load policy
-	const policyPath = path.join(projectRoot, "autonomous-policy.json");
-	let policy = null;
-	if (fs.existsSync(policyPath)) {
-		try {
-			policy = JSON.parse(fs.readFileSync(policyPath, "utf8"));
-			checks.policy = true;
-		} catch (e) {
-			warnings.push(`Cannot load policy: ${e.message}`);
-		}
-	} else {
-		warnings.push("No autonomous-policy.json found");
+	// Policy surface (post ADR-0001/0005): governed command policy is
+	// `.amber/governance/rules.json` with built-in defaults. Autonomous
+	// execution is gone — do not require or search for a root-level
+	// autonomous-policy.json (that path never matched the real state dir).
+	const { resolveStateDirForRead } = require("../state-dir-resolver");
+	const { loadPolicyRules } = require("./loop-policy");
+	const stateDir = resolveStateDirForRead(projectRoot);
+	const rulesPath = path.join(stateDir, "governance", "rules.json");
+	const rules = loadPolicyRules(projectRoot);
+	// Defaults always load; presence of rules.json is the explicit on-disk surface.
+	checks.policy = true;
+	if (!fs.existsSync(rulesPath)) {
+		warnings.push(
+			"No .amber/governance/rules.json — using built-in deny-wins defaults (run `amber governance rules init`)",
+		);
+	} else if (!rules || !Array.isArray(rules.rules)) {
+		warnings.push("governance rules.json is present but has no rules array");
+		checks.policy = false;
 	}
 
-	// Strict mode: additional environment checks
+	// Leftover autonomous-policy.json is optional compat only. Inspect for
+	// unsafe gate claims; never block readiness solely for its absence.
+	const autoPath = path.join(stateDir, "autonomous-policy.json");
+	if (fs.existsSync(autoPath)) {
+		try {
+			const autoPolicy = JSON.parse(fs.readFileSync(autoPath, "utf8"));
+			if (autoPolicy && autoPolicy.gates && autoPolicy.gates["user-approval"] === "approve") {
+				warnings.push(
+					"Leftover autonomous-policy.json sets gates['user-approval']=approve — autonomous execution is removed; this cannot auto-approve work",
+				);
+			}
+		} catch (e) {
+			warnings.push(`Leftover autonomous-policy.json is unreadable: ${e.message}`);
+		}
+	}
+
+	// Strict mode: require an explicit on-disk rules.json (not silent defaults).
 	if (options.strict) {
-		if (!checks.policy) {
-			blockers.push("Strict: Policy file (autonomous-policy.json) required");
+		if (!fs.existsSync(rulesPath)) {
+			blockers.push(
+				"Strict: governance rules.json required (run `amber governance rules init`)",
+			);
+			checks.policy = false;
 		}
-		if (policy && !policy.gates) {
-			warnings.push("Strict: Policy missing 'gates' configuration");
-		}
-		if (policy && !policy.budget) {
-			warnings.push("Strict: Policy missing 'budget' configuration");
+		if (rules && rules.defaultAction === "allow") {
+			warnings.push(
+				"Strict: rules.json defaultAction=allow is unsafe for governed execution",
+			);
 		}
 	}
 

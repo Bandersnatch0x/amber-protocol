@@ -185,25 +185,80 @@ test("a non-git project root is treated as a clean worktree", () => {
 	assert.equal(result.checks.worktree, true);
 });
 
-test("missing autonomous-policy.json produces a warning and skips the policy check", () => {
+test("missing rules.json warns but policy check still passes via built-in defaults", () => {
 	const root = tempProject();
 	const planPath = writePlan(root, "plan.md", approvedPlan());
 	const result = checkExecutionReadiness(root, planPath);
-	assert.equal(result.checks.policy, false);
+	// Defaults always apply — absence of autonomous-policy is not a gap.
+	assert.equal(result.checks.policy, true);
 	assert.ok(
-		result.warnings.some((w) => w.includes("autonomous-policy.json")),
+		result.warnings.some((w) => w.includes("rules.json")),
+		`expected rules.json default warning, got: ${result.warnings.join("; ")}`,
+	);
+	assert.ok(
+		!result.warnings.some((w) => w.includes("No autonomous-policy.json found")),
+		"must not require removed autonomous-policy surface",
 	);
 });
 
-test("a present autonomous-policy.json sets the policy check", () => {
+test("a present governance rules.json keeps policy check true without autonomous-policy", () => {
 	const root = tempProject();
 	const planPath = writePlan(root, "plan.md", approvedPlan());
+	const rulesDir = path.join(root, ".amber", "governance");
+	fs.mkdirSync(rulesDir, { recursive: true });
 	fs.writeFileSync(
-		path.join(root, "autonomous-policy.json"),
-		JSON.stringify({ gates: {}, budget: {} }),
+		path.join(rulesDir, "rules.json"),
+		JSON.stringify({
+			schemaVersion: 1,
+			defaultAction: "deny",
+			rules: [{ id: "allow-npm", action: "allow", match: "prefix", pattern: "npm " }],
+		}),
 	);
 	const result = checkExecutionReadiness(root, planPath);
 	assert.equal(result.checks.policy, true);
+	assert.ok(!result.warnings.some((w) => w.includes("No .amber/governance/rules.json")));
+});
+
+test("strict mode requires on-disk rules.json, not autonomous-policy.json", () => {
+	const root = tempProject();
+	const planPath = writePlan(
+		root,
+		"plan.md",
+		approvedPlan("## Goals\n## Implementation\n## Test\n"),
+	);
+	const missing = checkExecutionReadiness(root, planPath, { strict: true });
+	assert.ok(
+		missing.blockers.some((b) => /rules\.json required/.test(b)),
+		`expected rules.json strict blocker, got: ${missing.blockers.join("; ")}`,
+	);
+	assert.ok(!missing.blockers.some((b) => /autonomous-policy/.test(b)));
+
+	const rulesDir = path.join(root, ".amber", "governance");
+	fs.mkdirSync(rulesDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(rulesDir, "rules.json"),
+		JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [] }),
+	);
+	const present = checkExecutionReadiness(root, planPath, { strict: true });
+	assert.ok(!present.blockers.some((b) => /rules\.json required/.test(b)));
+	assert.equal(present.checks.policy, true);
+});
+
+test("leftover autonomous-policy with auto user-approval is a warning only", () => {
+	const root = tempProject();
+	const planPath = writePlan(root, "plan.md", approvedPlan());
+	const autoDir = path.join(root, ".amber");
+	fs.mkdirSync(autoDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(autoDir, "autonomous-policy.json"),
+		JSON.stringify({ gates: { "user-approval": "approve" } }),
+	);
+	const result = checkExecutionReadiness(root, planPath);
+	assert.ok(
+		result.warnings.some((w) => /Leftover autonomous-policy/.test(w)),
+		`expected leftover policy warning, got: ${result.warnings.join("; ")}`,
+	);
+	assert.equal(result.ready, true);
 });
 
 test("a fully ready plan returns ready true with no blockers", () => {
@@ -213,9 +268,11 @@ test("a fully ready plan returns ready true with no blockers", () => {
 		"plan.md",
 		approvedPlan("## Goals\n## Implementation\n## Test\n"),
 	);
+	const rulesDir = path.join(root, ".amber", "governance");
+	fs.mkdirSync(rulesDir, { recursive: true });
 	fs.writeFileSync(
-		path.join(root, "autonomous-policy.json"),
-		JSON.stringify({ gates: {}, budget: {} }),
+		path.join(rulesDir, "rules.json"),
+		JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [] }),
 	);
 	const result = withEnv({}, () =>
 		checkExecutionReadiness(root, planPath),
