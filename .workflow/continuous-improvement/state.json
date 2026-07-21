@@ -4,16 +4,22 @@
   "activeWorkflow": null,
   "queue": [
     {
-      "id": "share-local-commits",
-      "title": "Review and push the four local commits",
-      "status": "approval-required",
-      "command": "git push"
+      "id": "governed-rules-check-parity",
+      "title": "Align governance rules check with evaluateGovernedPolicy (built-in denies)",
+      "status": "done",
+      "command": "node scripts/run-tests.js tests/governance-rules.test.js"
     },
     {
       "id": "next-governed-triage",
       "title": "Run the next read-only daily Amber triage",
       "status": "ready",
       "command": "node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json"
+    },
+    {
+      "id": "weekly-dogfood",
+      "title": "Drive one real lifecycle slice via docs/dogfood-weekly.md",
+      "status": "ready",
+      "command": "node scripts/amber.js next --target ."
     }
   ],
   "approvalGates": [
@@ -27,8 +33,10 @@
     "change primary product behavior, major UI flows, or security boundaries"
   ],
   "resultNotes": [
+    "2026-07-22: Fixed governance rules check false-ALLOW on shell composition — now uses evaluateGovernedPolicy (same surface as governed-runner).",
+    "2026-07-22: Corrected BACKLOG Phase C/D claims (e2e is in CI; SSE auth + server-side error forwarding are wired).",
+    "2026-07-22: Cleared stale share-local-commits queue item (master already synced with origin).",
     "2026-07-16: daily-amber-triage dry-run completed with no errors or warnings and executed no actions.",
-    "2026-07-16: Amber doctor and governance report found no errors, warnings, stale docs, or readiness findings.",
     "2026-07-16: Continuous improvement state initialized from the repository template."
   ]
 }

