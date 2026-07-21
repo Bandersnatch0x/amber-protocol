@@ -62,6 +62,14 @@ test("DEFAULT_RULES allows the amber CLI prefix", () => {
   assert.equal(evaluateCommandPolicy("node scripts/amber.js doctor --target .", DEFAULT_RULES).allowed, true);
 });
 
+test("DEFAULT_RULES allows npm test with optional trailing FD redirects", () => {
+  assert.equal(evaluateVerifyPolicy("npm test", DEFAULT_RULES).allowed, true);
+  assert.equal(evaluateVerifyPolicy("npm test 2>&1", DEFAULT_RULES).allowed, true);
+  assert.equal(evaluateVerifyPolicy("npm run doctor 2>&1", DEFAULT_RULES).allowed, true);
+  assert.equal(evaluateVerifyPolicy("npm test --watch", DEFAULT_RULES).allowed, false, "extra args still denied");
+  assert.equal(evaluateVerifyPolicy("npm test 2>err.log", DEFAULT_RULES).allowed, false, "file redirect still denied");
+});
+
 test("loadPolicyRules warns + falls back to defaults when rules.json is unparseable", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-policy-"));
   const gov = path.join(dir, ".amber", "governance");

@@ -166,20 +166,17 @@ Load Stage → Pre-Gate Check → Execute Stage → Post-Gate Check → Next Sta
   - Returns all checkpoints for session
   - Includes timestamp, label, size
 
-### 5. Autonomous Executor (`scripts/lib/autonomous-executor.js`)
+### 5. Autonomous Executor — removed (ADR-0001 / ADR-0005)
 
-**Purpose:** Execute sessions without human intervention (autonomous mode).
+`scripts/lib/autonomous-executor.js` and live autonomous session mode are **gone**.
+`session start/continue --mode autonomous` is refused. Optional leftover
+`.amber/autonomous-policy.json` is inspect-only (see [governance-model.md](./governance-model.md)).
 
-**Function:**
-- `executeAutonomous(projectRoot, sessionId, options)`
-  - Loads autonomous policy configuration
-  - Executes session with policy-driven gate approval
-  - Implements retry logic for failed stages
-  - Handles budget exhaustion (pause vs abort)
-  - Sends notifications on key events
-  - Returns final exit code: 0=success, 1=failure, 2=paused
+**Governed execution (current):** use `amber loop run --execute` / route command
+stages behind policy + one-shot approval + worktree + ledger (ADR-0003), or
+`session verify --execute` on the evidence-runner surface.
 
-**Autonomous Policy (`autonomous-policy.json`):**
+**Historical leftover policy shape (`autonomous-policy.json`) — not executed:**
 ```json
 {
   "gates": {

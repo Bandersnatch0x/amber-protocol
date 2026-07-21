@@ -39,7 +39,9 @@ const DEFAULT_RULES = {
 			id: "allow-npm-checks",
 			action: "allow",
 			match: "regex",
-			pattern: "^npm (test|run (doctor|manifests))$",
+			// Optional trailing FD-to-FD redirects (2>&1) only — file redirects and
+			// extra args still fail. Mirrors containsShellComposition's FD strip.
+			pattern: "^npm (test|run (doctor|manifests))(?:\\s+\\d*>&\\d+)*\\s*$",
 			mapsTo: ["ASI04"],
 		},
 	],
