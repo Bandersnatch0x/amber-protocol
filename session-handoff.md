@@ -9,8 +9,8 @@ Latest session `df0c5d07-c518-4b30-9811-c957928fb698` — "fix governance audit/
 ## Repo State
 
 - Branch: master
-- Uncommitted changes: 6 file(s) uncommitted
-- Last commit: 4ae95fb fix(handoff): render free-text feature evidence instead of (none)
+- Uncommitted changes: 2 file(s) uncommitted
+- Last commit: 020d6cb fix(execution): drop autonomous-policy hard dependency from readiness
 
 ## Runtime / Verification State
 

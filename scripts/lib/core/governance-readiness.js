@@ -362,7 +362,9 @@ function decideReadiness(findings) {
 const ACTION_LIBRARY = {
 	"policy-error": {
 		severity: "high",
-		summary: "Fix autonomous-policy.json errors before increasing agent autonomy.",
+		// Not "increase autonomy" — autonomous execution was removed (ADR-0001/0005).
+		// This finding is about a leftover/corrupt policy file or governance policy surface.
+		summary: "Fix governance policy errors (or remove a corrupt leftover autonomous-policy.json).",
 		why: "Governance policy errors make the repository unsafe to route through governed workflows.",
 		command: "node scripts/amber.js governance policy --target <repo>",
 		expectedOutcome: "Policy errors are fixed or recorded as explicit owner-approved exceptions.",
@@ -370,10 +372,10 @@ const ACTION_LIBRARY = {
 	},
 	"unsafe-user-approval": {
 		severity: "high",
-		summary: "Set gates['user-approval'] to 'block' unless an explicit live approval process exists.",
-		why: "User approval gates must block unless a real approval process exists.",
+		summary: "Set leftover autonomous-policy gates['user-approval'] to 'block' (auto-approve is not supported).",
+		why: "A leftover policy claiming user-approval=approve contradicts the removed autonomous executor and confuses operators.",
 		command: "node scripts/amber.js governance policy --target <repo>",
-		expectedOutcome: "Approval gates are blocking or exceptions are documented.",
+		expectedOutcome: "Leftover policy is fixed, removed, or documented as non-executing config only.",
 		blocks: ["safety-score", "governed-workflow"],
 	},
 	"policy-warning": {
