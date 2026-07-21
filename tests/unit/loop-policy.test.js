@@ -235,6 +235,17 @@ test("containsShellComposition flags unquoted operators, ignores quoted ones", (
   assert.equal(containsShellComposition('node -e "a; b()"'), false, "quoted ; and () ignored");
 });
 
+// FD-to-FD redirects rebind the same process's streams — not a second action.
+// Operators still block file redirects and post-redirect chains.
+test("containsShellComposition allows pure FD redirects like 2>&1", () => {
+  assert.equal(containsShellComposition("npm test 2>&1"), false);
+  assert.equal(containsShellComposition("npm test 1>&2"), false);
+  assert.equal(containsShellComposition("node scripts/amber.js doctor --target . 2>&1"), false);
+  assert.equal(containsShellComposition("npm test 2>err.log"), true, "file redirect still blocked");
+  assert.equal(containsShellComposition("npm test 2>&1 | tee log"), true, "pipe after FD redirect still blocked");
+  assert.equal(containsShellComposition("npm test 2>&1 && curl evil"), true, "chain after FD redirect still blocked");
+});
+
 // ── evaluateGovernedPolicy: built-in un-removable denies on the governed surface ──
 
 const allowAmber = {
@@ -242,6 +253,22 @@ const allowAmber = {
   defaultAction: "deny",
   rules: [{ id: "allow-amber", action: "allow", match: "prefix", pattern: "node scripts/amber.js " }],
 };
+
+test("evaluateGovernedPolicy allows an allow-listed command with trailing 2>&1", () => {
+  const r = evaluateGovernedPolicy("node scripts/amber.js doctor --target . 2>&1", allowAmber);
+  assert.equal(r.allowed, true, "FD redirect alone must not trip shell-composition deny");
+  assert.equal(r.matchedRule, "allow-amber");
+});
+
+test("evaluateVerifyPolicy allows an allow-listed command with trailing 2>&1", () => {
+  const allowNpm = {
+    schemaVersion: 1,
+    defaultAction: "deny",
+    rules: [{ id: "allow-npm", action: "allow", match: "prefix", pattern: "npm " }],
+  };
+  const r = evaluateVerifyPolicy("npm test 2>&1", allowNpm);
+  assert.equal(r.allowed, true);
+});
 
 test("evaluateCommandPolicy still lets a non-destructive shell composite past a prefix allow (G2 anchor)", () => {
   // Anchor: the bare evaluator is NOT the governed gate. A prefix allow matching

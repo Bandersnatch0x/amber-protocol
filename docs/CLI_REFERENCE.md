@@ -248,8 +248,10 @@ node scripts/amber.js governance rules check --target . --command "rm -rf /tmp/x
 
 `rules check` uses the **same policy surface as `governed-runner`** (`evaluateGovernedPolicy`):
 un-removable built-in denies for destructive commands and shell composition (`&&`, `|`, `;`,
-redirects, etc.) run **before** user `rules.json` allows. A prefix allow cannot smuggle a
+file redirects, etc.) run **before** user `rules.json` allows. A prefix allow cannot smuggle a
 composite tail past the dry-run check — the verdict matches what `--execute` would enforce.
+Pure FD-to-FD redirects (`2>&1`, `1>&2`) are allowed; they rebind streams of the same process
+and are not a second command.
 
 **Per-context rules:** a loop contract's `governed` block and a route `command` stage may each
 declare an extra `rules` array (same `{ id, action, match, pattern }` shape). These compose with

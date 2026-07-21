@@ -91,14 +91,25 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
 // (e.g. `node -e "a(); b()"`) is not a false positive.
 const SHELL_COMPOSITION = /[&|;<>`\n\r]|\$\(|\$\{/;
 
+// Pure FD-to-FD redirects (2>&1, 1>&2, >&1) rebind streams of the SAME process;
+// they do not introduce a second command. They still contain `&` and `>` which
+// would otherwise false-positive SHELL_COMPOSITION and block common verify
+// idioms like `npm test 2>&1`. File redirects (`> out`, `2>err.log`) and
+// chains (`2>&1 | tee`) remain blocked.
+const FD_TO_FD_REDIRECT = /(?:\d*)>&\d+/g;
+
 function stripQuotedSpans(command) {
 	return String(command || "")
 		.replace(/"(?:[^"\\]|\\.)*"/g, "")
 		.replace(/'(?:[^'\\]|\\.)*'/g, "");
 }
 
+function stripFdToFdRedirects(command) {
+	return String(command || "").replace(FD_TO_FD_REDIRECT, " ");
+}
+
 function containsShellComposition(command) {
-	return SHELL_COMPOSITION.test(stripQuotedSpans(command));
+	return SHELL_COMPOSITION.test(stripFdToFdRedirects(stripQuotedSpans(command)));
 }
 
 // Built-in, un-removable denies applied BEFORE any user allow rule on BOTH the
