@@ -138,6 +138,46 @@ describe('getEventSummary', () => {
   it('unknown types return no details', () => {
     expect(getEventSummary(event({ type: 'mystery' } as never))).toEqual({ details: [] });
   });
+
+  it('stage_completed surfaces command and exit code from flattened data', () => {
+    const summary = getEventSummary(
+      event({
+        type: 'stage_completed',
+        stage: 'verify',
+        command: 'npm test',
+        result: 'passed',
+        exitCode: 0,
+        durationMs: 1200,
+      } as never),
+    );
+    expect(summary.title).toBe('npm test');
+    expect(summary.details).toContainEqual({ label: 'Stage', value: 'verify' });
+    expect(summary.details).toContainEqual({ label: 'Command', value: 'npm test' });
+    expect(summary.details).toContainEqual({ label: 'Exit Code', value: '0' });
+  });
+
+  it('verification_failed surfaces command and exit code', () => {
+    const summary = getEventSummary(
+      event({
+        type: 'verification_failed',
+        stage: 'verify',
+        command: 'npm test',
+        exitCode: 1,
+      } as never),
+    );
+    expect(summary.title).toBe('npm test');
+    expect(summary.details).toContainEqual({ label: 'Command', value: 'npm test' });
+    expect(summary.details).toContainEqual({ label: 'Exit Code', value: '1' });
+  });
+
+  it('gate_passed surfaces gate id from gateId or gate', () => {
+    expect(
+      getEventSummary(event({ type: 'gate_passed', gateId: 'user-approval-plan' } as never)).title,
+    ).toBe('user-approval-plan');
+    expect(
+      getEventSummary(event({ type: 'gate_passed', gate: 'user-approval-implement' } as never)).title,
+    ).toBe('user-approval-implement');
+  });
 });
 
 describe('computeTimelineMetrics', () => {

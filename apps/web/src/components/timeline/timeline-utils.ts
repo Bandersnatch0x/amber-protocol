@@ -33,13 +33,20 @@ export function formatDuration(ms: number): string {
   return `${ms}ms`;
 }
 
-function getString(event: SessionEvent, key: keyof SessionEvent): string | undefined {
-  const value = event[key];
+// SessionEvent is a discriminated union; after normalizeEvent flattens `data`
+// onto the top level, stage/command/gateId/etc. are present at runtime but not
+// always on every union member's static type. Index via a record view.
+function field(event: SessionEvent, key: string): unknown {
+  return (event as unknown as Record<string, unknown>)[key];
+}
+
+function getString(event: SessionEvent, key: string): string | undefined {
+  const value = field(event, key);
   return typeof value === 'string' ? value : undefined;
 }
 
-function getNumber(event: SessionEvent, key: keyof SessionEvent): number | undefined {
-  const value = event[key];
+function getNumber(event: SessionEvent, key: string): number | undefined {
+  const value = field(event, key);
   return typeof value === 'number' ? value : undefined;
 }
 
@@ -122,6 +129,41 @@ export function getEventSummary(event: SessionEvent): EventSummary {
       const error = getString(event, 'error') ?? getString(event, 'message');
       if (error) details.push({ label: 'Error', value: error });
       return { title: error, details };
+    }
+
+    // CLI session verify --execute writes these; normalizeEvent flattens data.*
+    // onto the event so command/result/exitCode are top-level fields here.
+    case 'stage_completed':
+    case 'stage_started':
+    case 'stage_failed':
+    case 'verification_failed': {
+      const stage = getString(event, 'stage') ?? getString(event, 'displayName');
+      const command = getString(event, 'command');
+      const result = getString(event, 'result');
+      const exitCode = getNumber(event, 'exitCode');
+      const durationMs = getNumber(event, 'durationMs');
+      if (stage) details.push({ label: 'Stage', value: stage });
+      if (command) details.push({ label: 'Command', value: command });
+      if (result) details.push({ label: 'Result', value: result });
+      if (exitCode !== undefined) details.push({ label: 'Exit Code', value: String(exitCode) });
+      if (durationMs !== undefined) details.push({ label: 'Duration', value: formatDuration(durationMs) });
+      return { title: command ?? stage, details };
+    }
+
+    case 'gate_triggered':
+    case 'gate_passed':
+    case 'gate_failed': {
+      const gateId = getString(event, 'gateId') ?? getString(event, 'gate');
+      if (gateId) details.push({ label: 'Gate', value: gateId });
+      const reason = getString(event, 'reason');
+      if (reason) details.push({ label: 'Reason', value: reason });
+      return { title: gateId, details };
+    }
+
+    case 'checkpoint_created': {
+      const label = getString(event, 'label') ?? getString(event, 'checkpointId');
+      if (label) details.push({ label: 'Checkpoint', value: label });
+      return { title: label, details };
     }
 
     case 'heartbeat':
