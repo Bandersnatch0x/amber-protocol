@@ -147,8 +147,19 @@ function renderHandoff(targetRoot) {
 		? [`1. ${next.label} — ${next.why}`, `   \`${next.remedy}\``]
 		: ["1. All lifecycle steps complete for the current focus — start the next feature."];
 
+	// Local calendar date — matches operator "today" (UTC ISO can lag behind
+	// evening Asia/local sessions) and validateHandoff's "Last Updated:" scrape.
+	const now = new Date();
+	const lastUpdated = [
+		now.getFullYear(),
+		String(now.getMonth() + 1).padStart(2, "0"),
+		String(now.getDate()).padStart(2, "0"),
+	].join("-");
+
 	return [
 		"# Session Handoff",
+		"",
+		`Last Updated: ${lastUpdated}`,
 		"",
 		"## Summary",
 		"",

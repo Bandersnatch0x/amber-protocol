@@ -1,5 +1,7 @@
 # Session Handoff
 
+Last Updated: 2026-07-22
+
 ## Summary
 
 Latest session `df0c5d07-c518-4b30-9811-c957928fb698` — "fix governance audit/evidence-export .amber hardcode (#60)" (completed). 9 feature(s): 8 passing, 1 accepted
@@ -7,8 +9,8 @@ Latest session `df0c5d07-c518-4b30-9811-c957928fb698` — "fix governance audit/
 ## Repo State
 
 - Branch: master
-- Uncommitted changes: 5 file(s) uncommitted
-- Last commit: eb935b3 fix(governance): align rules check with governed-runner policy surface
+- Uncommitted changes: 6 file(s) uncommitted
+- Last commit: 4ae95fb fix(handoff): render free-text feature evidence instead of (none)
 
 ## Runtime / Verification State
 

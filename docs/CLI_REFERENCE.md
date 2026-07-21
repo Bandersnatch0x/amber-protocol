@@ -246,10 +246,16 @@ node scripts/amber.js governance rules inspect --target .
 node scripts/amber.js governance rules check --target . --command "rm -rf /tmp/x"
 ```
 
+`rules check` uses the **same policy surface as `governed-runner`** (`evaluateGovernedPolicy`):
+un-removable built-in denies for destructive commands and shell composition (`&&`, `|`, `;`,
+redirects, etc.) run **before** user `rules.json` allows. A prefix allow cannot smuggle a
+composite tail past the dry-run check — the verdict matches what `--execute` would enforce.
+
 **Per-context rules:** a loop contract's `governed` block and a route `command` stage may each
 declare an extra `rules` array (same `{ id, action, match, pattern }` shape). These compose with
 the global `rules.json` for that one command only — a context `allow` can supplement the global
-policy, but **deny-wins is absolute**: no context `allow` can override a global or context `deny`.
+policy, but **deny-wins is absolute**: no context `allow` can override a global or context `deny`
+(or a built-in deny).
 
 ## Handoff Commands
 

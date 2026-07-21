@@ -37,11 +37,14 @@ test("writeHandoff regenerates session-handoff.md from live state (not the templ
 	assert.match(content, /F002 \[passing\] greeting output/);
 	assert.match(content, /F002: `npm test` → passed/);
 	assert.match(content, /session abc12345/);
+	assert.match(content, /^Last Updated: \d{4}-\d{2}-\d{2}$/m);
 	assert.doesNotMatch(content, /Branch: not recorded/);
 	assert.doesNotMatch(content, /Feature State\s*\n\s*\nNone\./);
 
 	// The regenerated file still satisfies the handoff validator.
-	assert.deepEqual(validateHandoff(target).errors, []);
+	const validated = validateHandoff(target);
+	assert.deepEqual(validated.errors, []);
+	assert.match(String(validated.lastUpdated || ""), /^\d{4}-\d{2}-\d{2}$/);
 });
 
 test("writeHandoff is idempotent when state is unchanged", () => {
