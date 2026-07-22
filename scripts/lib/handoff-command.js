@@ -7,25 +7,26 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 const { resolveTarget } = require("./core/fs-utils");
+const { getRepoSnapshot } = require("./core/git-state");
 
+/** Display strings for handoff Repo State — reuses status's git snapshot. */
 function gitInfo(targetRoot) {
-	const run = (args) => {
-		try {
-			const res = spawnSync("git", args, { cwd: targetRoot, encoding: "utf8" });
-			return res.status === 0 ? (res.stdout || "").trim() : "";
-		} catch {
-			return "";
-		}
+	const snap = getRepoSnapshot(targetRoot);
+	if (!snap.isGit) {
+		return { branch: "unknown", dirty: "not a git repository", lastCommit: "none" };
+	}
+	let dirty = "clean";
+	if (snap.dirty) {
+		dirty = snap.dirtyUntrackedOnly
+			? "untracked only (no tracked edits)"
+			: "dirty (tracked and/or untracked changes)";
+	}
+	return {
+		branch: snap.branch || "unknown",
+		dirty,
+		lastCommit: snap.lastCommit || "none",
 	};
-	const branch = run(["rev-parse", "--abbrev-ref", "HEAD"]) || "unknown";
-	const porcelain = run(["status", "--porcelain"]);
-	const dirty = porcelain
-		? `${porcelain.split(/\r?\n/).filter(Boolean).length} file(s) uncommitted`
-		: "clean";
-	const lastCommit = run(["log", "-1", "--format=%h %s"]) || "none";
-	return { branch, dirty, lastCommit };
 }
 
 /**

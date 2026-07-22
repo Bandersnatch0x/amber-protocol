@@ -9,8 +9,8 @@ Latest session `df0c5d07-c518-4b30-9811-c957928fb698` — "fix governance audit/
 ## Repo State
 
 - Branch: master
-- Uncommitted changes: 2 file(s) uncommitted
-- Last commit: ba476ab fix(policy): allow npm test 2>&1 under default allow-npm-checks rule
+- Uncommitted changes: dirty (tracked and/or untracked changes)
+- Last commit: d493a44 feat(status): label untracked-only trees as dirty (untracked only)
 
 ## Runtime / Verification State
 

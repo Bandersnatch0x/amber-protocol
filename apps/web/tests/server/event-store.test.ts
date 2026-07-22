@@ -94,4 +94,21 @@ describe('EventStore', () => {
     expect(recentEvents[0].type).toBe('session_started');
     expect(recentEvents[1].type).toBe('session_resumed');
   });
+
+  it('should filter ISO string timestamps against a numeric since cursor', () => {
+    const since = Date.parse('2026-07-14T16:01:00.000Z');
+    eventStore.addEvent('session-1', {
+      type: 'session_created',
+      sessionId: 'session-1',
+      timestamp: '2026-07-14T16:00:00.000Z',
+    });
+    eventStore.addEvent('session-1', {
+      type: 'stage_completed',
+      sessionId: 'session-1',
+      timestamp: '2026-07-14T16:02:00.000Z',
+    });
+    const events = eventStore.getEvents('session-1', since);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('stage_completed');
+  });
 });
