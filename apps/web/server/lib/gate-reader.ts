@@ -111,10 +111,11 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
   );
   gates.push(...sessionGates.flat());
 
-  // Apply status filter
+  // Apply status filter. Undefined status means all; UI sends '' and omits the field.
+  // Do not compare against 'all' — GateStatus has no such member (tsc TS2367).
   let filtered = gates;
-  if (filters.status && filters.status !== 'all') {
-    filtered = gates.filter(g => g.status === filters.status);
+  if (filters.status) {
+    filtered = gates.filter((g) => g.status === filters.status);
   }
 
   // Sort by triggered time (newest first)

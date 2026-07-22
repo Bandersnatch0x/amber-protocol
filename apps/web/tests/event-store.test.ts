@@ -52,4 +52,27 @@ describe('EventStore', () => {
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe('session_paused');
   });
+
+  it('should filter ISO string timestamps against a numeric since cursor', () => {
+    // CLI timelines write ISO strings; SSE `?since=` is epoch ms. Comparing
+    // string > number is a TypeScript/runtime landmine — must parse first.
+    const early = '2026-07-14T16:00:00.000Z';
+    const late = '2026-07-14T16:02:00.000Z';
+    const since = Date.parse('2026-07-14T16:01:00.000Z');
+
+    eventStore.addEvent('test-session', {
+      type: 'session_created',
+      sessionId: 'test-session',
+      timestamp: early,
+    });
+    eventStore.addEvent('test-session', {
+      type: 'stage_completed',
+      sessionId: 'test-session',
+      timestamp: late,
+    });
+
+    const events = eventStore.getEvents('test-session', since);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('stage_completed');
+  });
 });
