@@ -14,6 +14,7 @@ const ALLOW_AUTONOMOUS_MODE = new Set([
 	"docs/TROUBLESHOOTING.md",
 	"docs/adr/0002-v2-execution-scope.md",
 	"docs/adr/0005-experimental-execution-removal.md",
+	"docs/architecture/session-lifecycle.md",
 	"docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md",
 ]);
 
