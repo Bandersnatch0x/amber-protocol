@@ -1,7 +1,7 @@
 # Plan: Ship 1.3.8 after interrupted 1.3.7 release
 
 Feature: F010
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
@@ -20,10 +20,10 @@ Complete the interrupted `v1.3.7` ship: tag CI failed after the version bump, so
 
 ## Resume Checkpoint
 
-- Resume Point: slice 1 implemented (1.3.8 CHANGELOG + version + version:sync); awaiting session verify --execute and terminal lifecycle.
+- Resume Point: accepted. Session `c1485d45-b03f-45c7-b27f-931bcddfb7b7` completed with `verify --execute` (npm test exit 0) + live handoff + ledger intact.
 - Blockers: none.
-- Next Action: commit, `session start` bound to F010, `session verify --execute`, approve gates, handoff, complete-check --strict, complete, accept.
-- Recovery Instructions: reopen this plan and continue at the first unchecked vertical slice; do not regenerate unless the plan file is missing.
+- Next Action: optional human follow-up — tag `v1.3.8` and confirm Publish / GitHub Release (do not retag `v1.3.7`).
+- Recovery Instructions: plan is accepted; for a new slice register a new feature/plan rather than regenerating this one.
 
 ## Acceptance Criteria
 

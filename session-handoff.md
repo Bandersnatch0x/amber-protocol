@@ -4,19 +4,19 @@ Last Updated: 2026-07-22
 
 ## Summary
 
-Latest session `df0c5d07-c518-4b30-9811-c957928fb698` — "fix governance audit/evidence-export .amber hardcode (#60)" (completed). 9 feature(s): 8 passing, 1 accepted
+Latest session `c1485d45-b03f-45c7-b27f-931bcddfb7b7` — "add 1.3.8 changelog and version for post-tag CI recovery" (completed). 10 feature(s): 8 passing, 2 accepted
 
 ## Repo State
 
 - Branch: master
 - Uncommitted changes: dirty (tracked and/or untracked changes)
-- Last commit: d493a44 feat(status): label untracked-only trees as dirty (untracked only)
+- Last commit: 334e77e fix(docs): rephrase autonomous mode notes so boundary scan passes
 
 ## Runtime / Verification State
 
 - Command: npm test
-- Result: passed (exit 0, 83527ms)
-- When: 2026-07-14
+- Result: passed (exit 0, 67340ms)
+- When: 2026-07-22
 
 ## Feature State
 
@@ -29,6 +29,7 @@ Latest session `df0c5d07-c518-4b30-9811-c957928fb698` — "fix governance audit/
 - F007 [passing] Governed loop execution (ADR-0003)
 - F008 [passing] Web viewer (Phase C)
 - F009 [accepted] Governance evidence reads resolve the state dir (legacy .harness support)
+- F010 [accepted] Ship 1.3.8 after interrupted 1.3.7 release (CHANGELOG + version)
 
 ## Verification Evidence
 
@@ -44,6 +45,7 @@ Latest session `df0c5d07-c518-4b30-9811-c957928fb698` — "fix governance audit/
 - F007: readyForLiveScheduling=false by product boundary; human-triggered --execute only
 - F008: web vitest 382/0 passing
 - F009: `npm test` → passed (exit 0, 83527ms) (2026-07-14, session df0c5d07)
+- F010: `npm test` → passed (exit 0, 67340ms) (2026-07-22, session c1485d45)
 
 ## Blockers
 
