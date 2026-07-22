@@ -1,6 +1,10 @@
 > Historical Phase B Alpha task list predating the Amber Protocol rename; command and file names reflect the era.
+> **Post-ship note (2026-07-22):** `timeline-writer.js` / `timeline-reader.js` were replaced by
+> `scripts/lib/session-timeline.js` (`appendSessionEvent` / `readSessionEvents`). Autonomous executor
+> surfaces listed below are removed (ADR-0001/0005). Treat unchecked boxes as historical planning,
+> not a live backlog.
 
-Last Reviewed: 2026-06-29
+Last Reviewed: 2026-07-22
 
 # Phase B Alpha - 完整任务清单
 
