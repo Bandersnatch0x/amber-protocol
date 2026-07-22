@@ -17,6 +17,9 @@ const ALLOW_AUTONOMOUS_MODE = new Set([
 	"docs/architecture/session-lifecycle.md",
 	"docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md",
 ]);
+// Session history (plans) may quote the refused flag when documenting refusals/fixes (#67).
+// Other boundary patterns below still apply to these directories.
+const ALLOW_AUTONOMOUS_MODE_DIRS = ["docs/plans/"];
 
 function listMarkdown(dir) {
 	const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -40,7 +43,10 @@ test("current docs do not advertise unsupported autonomous runtime commands", ()
 	for (const file of listMarkdown(DOC_ROOT)) {
 		const relative = rel(file);
 		const text = fs.readFileSync(file, "utf8");
-		if (!ALLOW_AUTONOMOUS_MODE.has(relative) && /--mode autonomous/.test(text)) {
+		const allowAutonomous =
+			ALLOW_AUTONOMOUS_MODE.has(relative) ||
+			ALLOW_AUTONOMOUS_MODE_DIRS.some((dir) => relative.startsWith(dir));
+		if (!allowAutonomous && /--mode autonomous/.test(text)) {
 			offenders.push(`${relative}: contains --mode autonomous`);
 		}
 		for (const pattern of [/amber\.js daemon (start|status|stop)/, /--checkpoint-interval/, /webhookUrl/, /"events"\s*:/]) {
