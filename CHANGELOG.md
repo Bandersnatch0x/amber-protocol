@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **deps**: bump transitive `fast-uri` to 3.1.4 (via lockfile) clearing high advisories GHSA-4c8g-83qw-93j6 / GHSA-v2hh-gcrm-f6hx that failed the CI Security job after the 1.3.7 tag
-- **docs boundary test**: allow `docs/architecture/session-lifecycle.md` to mention refused `--mode autonomous` (refusal note, not product advertising)
+- **docs boundary test**: allow `docs/architecture/session-lifecycle.md` to document refused autonomous session mode (refusal note, not product advertising)
 
 ### Notes
 - Completes the interrupted `v1.3.7` ship path: tag CI failed before Publish / GitHub Release; do not retag `v1.3.7` — publish from `v1.3.8` instead.

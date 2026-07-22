@@ -10,8 +10,8 @@ Complete the interrupted `v1.3.7` ship: tag CI failed after the version bump, so
 
 ## High Level Design
 
-- Context: `chore(release): 1.3.7` tagged `v1.3.7` while master still had (1) a docs-boundary test failure for `--mode autonomous` in `session-lifecycle.md`, and (2) a high `fast-uri` advisory that failed the Security job. Both are fixed on master (`009290f`, `d2d4ca1`) but are not versioned as a release.
-- Proposed approach: Add a `[1.3.8]` CHANGELOG section for those two fixes; bump `package.json` / lock metadata to `1.3.8` via existing sync scripts if present; keep product code unchanged.
+- Context: `chore(release): 1.3.7` tagged `v1.3.7` while master still had (1) a docs-boundary test failure for the refused autonomous session mode phrase in `session-lifecycle.md`, and (2) a high `fast-uri` advisory that failed the Security job. Both are fixed on master (`009290f`, `d2d4ca1`) but are not versioned as a release.
+- Proposed approach: Add a `[1.3.8]` CHANGELOG section for those two fixes; bump `package.json` / lock metadata to `1.3.8` via existing sync scripts if present; keep product code unchanged. Avoid literal autonomous mode CLI flag tokens in docs (boundary test scans all of `docs/`).
 - Risks: Low. No runtime behavior change. Avoid retagging `v1.3.7`. Do not force-push tags. Tagging/publish can be a follow-up after this slice is accepted.
 
 ## Vertical Slices
