@@ -159,6 +159,22 @@ test("renderStatus produces a readable multi-line report", () => {
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("renderStatus labels untracked-only trees distinctly from tracked dirty", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-st-ut-"));
+	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
+	fs.writeFileSync(path.join(dir, "README.md"), "# x\n");
+	execSync("git add -A && git commit -qm init", { cwd: dir });
+	fs.writeFileSync(path.join(dir, "scratch.tmp"), "noise\n"); // ?? only
+	const untrackedOnly = renderStatus(buildStatus(dir));
+	assert.match(untrackedOnly, /dirty \(untracked only\)/);
+
+	fs.writeFileSync(path.join(dir, "README.md"), "# changed\n");
+	const trackedDirty = renderStatus(buildStatus(dir));
+	assert.match(trackedDirty, /dirty/);
+	assert.doesNotMatch(trackedDirty, /untracked only/);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("buildStatus surfaces the no-provenance note and points to init when provenance is missing", () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-st-"));
 	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
