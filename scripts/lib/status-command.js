@@ -83,8 +83,13 @@ function buildStatus(target) {
 
 function renderStatus(s) {
 	const lines = [`Target: ${s.target}`];
+	const dirtyLabel = !s.repo.dirty
+		? ""
+		: s.repo.dirtyUntrackedOnly
+			? ", dirty (untracked only)"
+			: ", dirty";
 	lines.push(
-		`Repo: ${s.repo.isGit ? `git (${s.repo.branch || "detached"}${s.repo.dirty ? ", dirty" : ""})` : "non-git"}`,
+		`Repo: ${s.repo.isGit ? `git (${s.repo.branch || "detached"}${dirtyLabel})` : "non-git"}`,
 	);
 	if (s.repo.isGit && s.repo.lastCommit)
 		lines.push(`Last commit: ${s.repo.lastCommit}`);
