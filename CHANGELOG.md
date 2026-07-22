@@ -5,8 +5,32 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2026-07-22
 
+### Fixed
+- **governance rules check**: dry-run uses `evaluateGovernedPolicy` (same built-in denies as governed-runner) so shell composites past a prefix allow no longer report false ALLOW
+- **policy**: pure FD redirects (`2>&1`, `1>&2`) no longer trip shell-composition deny; default `allow-npm-checks` accepts optional trailing FD redirects (`npm test 2>&1`)
+- **handoff**: free-text string evidence in `feature_list.json` renders correctly (no more `(none)` from string-spread); stamp `Last Updated`; reuse `getRepoSnapshot` for dirty labeling
+- **governance audit / evidence / readiness**: count live `stage_completed` / `verification_failed` with `data.command` (phantom `command_executed`-only counting under-reported real dogfood sessions)
+- **execution readiness**: stop requiring root-level `autonomous-policy.json` (wrong path + removed execution model); key off `.amber/governance/rules.json` with built-in defaults; strict mode requires on-disk rules.json
+- **web EventStore**: compare SSE `since` against timestamps as epoch ms so ISO CLI timelines resume correctly
+- **web gate-reader**: remove invalid `status !== 'all'` compare (not a `GateStatus`)
+- **web lifecycle**: import `CompletionStatusResult` for completion helper typing
+- **web timeline**: label `verification_failed` / `checkpoint_created`; show command/stage/exit details on stage and gate events
+- **team registry**: reject malformed catalog entries; validate maintenance consumers; handle invalid registries
+- **deps**: clear brace-expansion high advisory (GHSA-3jxr-9vmj-r5cp)
 
+### Added
+- **status**: `dirty (untracked only)` when the tree has only `??`/`!!` noise (e.g. local `.scratch/`)
+- **ci**: guard commit identity; home visual e2e coverage
+- **web**: realign home as data-first operator console
+
+### Changed
+- architecture docs: align governance model and session-lifecycle with live policy surfaces (`evaluateGovernedPolicy` / `session-timeline`) and removed autonomous executor
+- readiness ACTION_LIBRARY: stop promoting “increase agent autonomy” for leftover policy findings
+- BACKLOG: Phase C e2e is in CI; Phase D SSE auth + server-side error forwarding marked implemented for the local viewer boundary
+- dogfood-weekly §7 candidates refreshed for empty `next-up` queues
+- Phase B wiki task list: note `timeline-writer` superseded by `session-timeline.js`
 
 ## [1.3.6] - 2026-07-15
 
