@@ -143,10 +143,12 @@ jobs:
         run: npm audit --audit-level=moderate
         continue-on-error: true
 
-      - name: Check for known vulnerabilities
+      - name: Check production dependencies for known vulnerabilities
         run: |
           echo "Security scan completed"
-          npm audit --audit-level=high
+          # Release gate covers dependencies shipped to users. The full dependency
+          # tree is still scanned above so development-tool advisories stay visible.
+          npm audit --omit=dev --audit-level=high
 
   performance:
     name: Performance
