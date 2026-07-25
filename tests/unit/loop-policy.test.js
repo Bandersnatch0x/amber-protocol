@@ -81,6 +81,15 @@ test("loadPolicyRules warns + falls back to defaults when rules.json is unparsea
   });
   assert.equal(rules, DEFAULT_RULES, "falls back to built-in defaults (safe)");
   assert.match(captured, /unparseable/i, "a warning is surfaced so the silent-ignore trap is avoided");
+  // Pin surface-specific wording so a future fold cannot silently merge
+  // governed vs verify diagnostics (grok L3 residual coverage gap).
+  assert.match(captured, /rules\.json/, "names the governed rules file");
+  assert.match(
+    captured,
+    /your custom allow\/deny rules are being ignored/,
+    "governed surface omits the 'verification ' scope prefix",
+  );
+  assert.doesNotMatch(captured, /verification allow\/deny/, "must not use the verify-surface wording");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -95,6 +104,7 @@ test("loadPolicyRules warns + falls back when rules.json lacks a rules array", (
   });
   assert.equal(rules, DEFAULT_RULES);
   assert.match(captured, /missing a top-level/i);
+  assert.match(captured, /rules\.json/, "names the governed rules file");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -109,6 +119,14 @@ test("loadVerifyPolicyRules warns + falls back to defaults when verify-rules.jso
   });
   assert.equal(rules, DEFAULT_RULES, "falls back to built-in defaults (safe)");
   assert.match(captured, /unparseable/i, "a warning is surfaced so the silent-ignore trap is avoided");
+  // Pin the verify-surface wording (with the 'verification ' scope prefix)
+  // so it cannot silently collapse into the governed-surface message.
+  assert.match(captured, /verify-rules\.json/, "names the verify rules file");
+  assert.match(
+    captured,
+    /your custom verification allow\/deny rules are being ignored/,
+    "verify surface keeps the 'verification ' scope prefix",
+  );
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -123,6 +141,7 @@ test("loadVerifyPolicyRules warns + falls back when verify-rules.json lacks a ru
   });
   assert.equal(rules, DEFAULT_RULES);
   assert.match(captured, /missing a top-level/i);
+  assert.match(captured, /verify-rules\.json/, "names the verify rules file");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

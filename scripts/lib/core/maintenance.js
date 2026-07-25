@@ -2,7 +2,9 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-dir-resolver");
+// resolveStateDirForCreate moved with proposeMaintenance into
+// maintenance-propose.js; only the read path remains here.
+const { resolveStateDirForRead } = require("../state-dir-resolver");
 
 const {
 	pathExists,
@@ -29,9 +31,7 @@ const {
 	validateTeamRegistryData,
 } = require("./team");
 
-const {
-	MESSAGES,
-} = require("./terminology");
+// MESSAGES moved with buildMaintenanceProposalContent into maintenance-propose.js.
 
 const {
 	validateWiki,
@@ -383,161 +383,28 @@ function inspectMaintenance(target, registryPath) {
 	};
 }
 
-function buildMaintenanceProposalContent(inspection) {
-	const lines = [
-		MESSAGES.maintenanceProposalTitle,
-		"",
-		`Target: ${inspection.target}`,
-		`Generated: ${new Date().toISOString()}`,
-		"",
-		"## Stale Docs",
-		"",
-	];
-
-	if (inspection.staleDocs.length === 0) {
-		lines.push("- None detected.");
-	} else {
-		for (const doc of inspection.staleDocs) {
-			lines.push(`- ${doc.path}: ${doc.reason}`);
-		}
-	}
-
-	lines.push("", "## Upgrade Assistant", "");
-	lines.push(
-		`- Current: ${inspection.upgradeAssistant.currentVersion || "not installed"}`,
-	);
-	lines.push(`- Latest: ${inspection.upgradeAssistant.latestVersion}`);
-	if (inspection.upgradeAssistant.previewCommand) {
-		lines.push(`- Preview: \`${inspection.upgradeAssistant.previewCommand}\``);
-	}
-
-	lines.push("", "## Rule-Pack Drift", "");
-	lines.push(`- Drifted: ${inspection.rulePackDrift.drifted}`);
-	lines.push(
-		`- Expected: ${(inspection.rulePackDrift.expected || []).join(", ") || "none"}`,
-	);
-	lines.push(
-		`- Actual: ${(inspection.rulePackDrift.actual || []).join(", ") || "none"}`,
-	);
-
-	lines.push("", "## Evolution Rollup", "");
-	if (inspection.evolutionRollup.length === 0) {
-		lines.push("- No repeated findings detected.");
-	} else {
-		for (const item of inspection.evolutionRollup) {
-			lines.push(`- ${item.finding} (${item.count} occurrences)`);
-		}
-	}
-
-	lines.push("", "## Regression Proposals", "");
-	if (
-		!Array.isArray(inspection.regressionProposals) ||
-		inspection.regressionProposals.length === 0
-	) {
-		lines.push("- No trace-derived regression proposals detected.");
-	} else {
-		for (const proposal of inspection.regressionProposals) {
-			lines.push(`- ${proposal.taskId}: ${proposal.assertion}`);
-			lines.push(`  - Trace input: ${proposal.traceInput}`);
-			lines.push(`  - Agent config: ${proposal.agentConfig}`);
-			lines.push(`  - Source: ${proposal.source}`);
-			lines.push(`  - Modifies tests: ${proposal.modifiesTests}`);
-			lines.push(`  - Approval required: ${proposal.approvalRequired}`);
-		}
-	}
-
-	lines.push("", "## Suggested Standards Diff", "", "```diff");
-	if (inspection.evolutionRollup.length === 0) {
-		lines.push("# No repeated delivery findings to promote.");
-	} else {
-		lines.push("--- standards/amber-delivery.json");
-		lines.push("+++ standards/amber-delivery.json");
-		for (const item of inspection.evolutionRollup) {
-			lines.push(`+ delivery finding: ${item.finding}`);
-		}
-	}
-	lines.push(
-		"```",
-		"",
-		"No source docs or standards were changed by this proposal.",
-		"",
-	);
-
-	return lines.join("\n");
-}
+// buildMaintenanceProposalContent + proposeMaintenance were extracted to
+// maintenance-propose.js (architecture review #5). inspectMaintenance is NOT
+// moved (shared core seam for governance-report/adoption-reports), so propose
+// receives it by injection. proposeMaintenance stays HANDLER-ONLY (not on
+// module.exports) — dispatch uses `module.exports.proposeMaintenance ||
+// proposeMaintenance` so a test can stub the export and fall back to this
+// lexical wrapper, which late-binds inspect via module.exports so the inspect
+// stub seam also stays intact.
+const {
+	buildMaintenanceProposalContent,
+	proposeMaintenance: proposeMaintenanceImpl,
+} = require("./maintenance-propose");
 
 function proposeMaintenance(target, registryPath, priority) {
-	const inspection = inspectMaintenance(target, registryPath);
-	if (inspection.errors.length > 0) {
-		return {
-			target: inspection.target,
-			errors: inspection.errors,
-			warnings: inspection.warnings,
-		};
-	}
-
-	// Apply priority filter if specified
-	let filteredInspection = inspection;
-	if (priority) {
-		// Validate the requested priority up front. An unrecognized value used to
-		// fall through every branch, leaving allowedCategories empty so each
-		// section was zeroed and a blank proposal was written with no error — a
-		// silent failure. Fail fast with a clear message instead.
-		if (!['high', 'medium', 'low'].includes(priority)) {
-			return {
-				target: inspection.target,
-				errors: [
-					`Unknown priority "${priority}". Use high, medium, or low.`,
-				],
-				warnings: inspection.warnings,
-			};
-		}
-
-		const priorityLevels = {
-			high: ['staleDocs', 'rulePackDrift'],
-			medium: ['upgradeAssistant', 'evolutionRollup'],
-			low: ['regressionProposals'],
-		};
-
-		const allowedCategories = [];
-		if (priority === 'high') {
-			allowedCategories.push(...priorityLevels.high);
-		} else if (priority === 'medium') {
-			allowedCategories.push(...priorityLevels.high, ...priorityLevels.medium);
-		} else if (priority === 'low') {
-			allowedCategories.push(...priorityLevels.high, ...priorityLevels.medium, ...priorityLevels.low);
-		}
-
-		filteredInspection = { ...inspection };
-		if (!allowedCategories.includes('staleDocs')) filteredInspection.staleDocs = [];
-		if (!allowedCategories.includes('rulePackDrift')) filteredInspection.rulePackDrift = { drifted: false, expected: [], actual: [] };
-		if (!allowedCategories.includes('upgradeAssistant')) filteredInspection.upgradeAssistant = { currentVersion: null, latestVersion: null };
-		if (!allowedCategories.includes('evolutionRollup')) filteredInspection.evolutionRollup = [];
-		if (!allowedCategories.includes('regressionProposals')) filteredInspection.regressionProposals = [];
-	}
-
-	const proposalRoot = path.join(
-		resolveStateDirForCreate(filteredInspection.target),
-		"maintenance",
-		"proposals",
+	// Reach inspect through module.exports so a test stub on
+	// maintenance.inspectMaintenance is still observed by propose.
+	return proposeMaintenanceImpl(
+		target,
+		registryPath,
+		priority,
+		module.exports.inspectMaintenance,
 	);
-	const proposalPath = path.join(
-		proposalRoot,
-		`${new Date().toISOString().replace(/[:.]/g, "-")}-maintenance-proposal.md`,
-	);
-	fs.mkdirSync(proposalRoot, { recursive: true });
-	fs.writeFileSync(proposalPath, buildMaintenanceProposalContent(filteredInspection));
-
-	return {
-		target: filteredInspection.target,
-		proposalPath: relativeSlash(filteredInspection.target, proposalPath),
-		reviewable: true,
-		sourceFilesChanged: false,
-		inspection: filteredInspection,
-		priority: priority || 'all',
-		errors: [],
-		warnings: filteredInspection.warnings,
-	};
 }
 
 // Upgrade-gap drift: how do the installed rulePacks compare to the LATEST

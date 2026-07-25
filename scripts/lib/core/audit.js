@@ -174,47 +174,50 @@ function buildRustCandidates() {
 	return candidateCommands;
 }
 
+// One row per detected language. Each detector closure gathers that language's
+// fs evidence and calls the pure decision-core builder. Order is load-bearing:
+// python → go → rust — candidate-ordering tests assert this sequence. Builder
+// signatures stay heterogeneous (they are exported and unit-tested as-is); the
+// registry replaces the if/for ladder without forcing a signature normalization
+// that would churn tests for no behavior payoff.
+const DETECTORS = [
+	{
+		name: "python",
+		detect: (root) => {
+			const hasTestsDirectory =
+				pathExists(path.join(root, "tests")) ||
+				pathExists(path.join(root, "test"));
+			const hasPytestEvidence =
+				hasTestsDirectory ||
+				pathExists(path.join(root, "pytest.ini")) ||
+				fileContains(root, "requirements.txt", /^pytest(?:[<>=~! ]|$)/im) ||
+				fileContains(root, "pyproject.toml", /\[tool\.pytest/i);
+			const hasRuffEvidence =
+				fileContains(root, "requirements.txt", /^ruff(?:[<>=~! ]|$)/im) ||
+				fileContains(root, "pyproject.toml", /\[tool\.ruff/i);
+			return buildPythonCandidates({ hasTestsDirectory, hasPytestEvidence, hasRuffEvidence });
+		},
+	},
+	{
+		name: "go",
+		detect: (root) =>
+			buildGoCandidates({ hasWailsConfig: pathExists(path.join(root, "wails.json")) }),
+	},
+	{
+		name: "rust",
+		detect: () => buildRustCandidates(),
+	},
+];
+
 function detectCandidateCommands(targetRoot, toolingEvidence = []) {
-	const hasEvidence = (name) =>
-		toolingEvidence.some((item) => item.name === name);
-
+	const present = (name) => toolingEvidence.some((item) => item.name === name);
 	const candidateCommands = [];
-
-	if (hasEvidence("python")) {
-		const hasTestsDirectory =
-			pathExists(path.join(targetRoot, "tests")) ||
-			pathExists(path.join(targetRoot, "test"));
-		const hasPytestEvidence =
-			hasTestsDirectory ||
-			pathExists(path.join(targetRoot, "pytest.ini")) ||
-			fileContains(targetRoot, "requirements.txt", /^pytest(?:[<>=~! ]|$)/im) ||
-			fileContains(targetRoot, "pyproject.toml", /\[tool\.pytest/i);
-		const hasRuffEvidence =
-			fileContains(targetRoot, "requirements.txt", /^ruff(?:[<>=~! ]|$)/im) ||
-			fileContains(targetRoot, "pyproject.toml", /\[tool\.ruff/i);
-
-		for (const candidate of buildPythonCandidates({
-			hasTestsDirectory,
-			hasPytestEvidence,
-			hasRuffEvidence,
-		})) {
+	for (const detector of DETECTORS) {
+		if (!present(detector.name)) continue;
+		for (const candidate of detector.detect(targetRoot)) {
 			addCandidateCommand(candidateCommands, candidate);
 		}
 	}
-
-	if (hasEvidence("go")) {
-		const hasWailsConfig = pathExists(path.join(targetRoot, "wails.json"));
-		for (const candidate of buildGoCandidates({ hasWailsConfig })) {
-			addCandidateCommand(candidateCommands, candidate);
-		}
-	}
-
-	if (hasEvidence("rust")) {
-		for (const candidate of buildRustCandidates()) {
-			addCandidateCommand(candidateCommands, candidate);
-		}
-	}
-
 	return candidateCommands;
 }
 

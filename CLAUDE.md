@@ -16,8 +16,9 @@ Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, ga
 
 ```
 scripts/amber.js              -> Unified CLI entry point
-scripts/lib/amber-core.js     -> Facade re-exporting public surface from scripts/lib/core/*
-scripts/lib/core/             -> Domain modules (adoption-*, loops, doctor, profiles, etc.)
+scripts/lib/command-dispatcher.js -> Command lookup-table (parse -> dispatch -> print); thin wrappers + registry
+scripts/lib/command-handler-families.js -> Switch-based families (maintenance/adoption/ledger/session/governance)
+scripts/lib/core/             -> Domain modules (adoption-*, loops, doctor, profiles, etc.); imported directly (no facade — ADR-0005)
 scripts/lib/route-commands.js -> Route engine (loader, selector, inspector)
 scripts/lib/session-commands.js -> Session lifecycle (start, status, list, abort, continue)
 templates/                    -> Amber starter files (AGENTS.md, CLAUDE.md, feature_list.json, etc.)

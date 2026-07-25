@@ -96,4 +96,62 @@ test("valid --priority values are accepted and write a proposal", () => {
 	fs.rmSync(fixtureRoot, { recursive: true, force: true });
 });
 
+// Pin the priority → category matrix so a future filter-table edit cannot
+// pass "accepted" tests while changing which sections land in the proposal
+// (grok L3 residual coverage gap). Uses the extracted propose with an
+// injected inspect so we control every category without scaffolding disk.
+test("priority filter keeps the documented category matrix", () => {
+	const { proposeMaintenance } = require("../scripts/lib/core/maintenance-propose");
+	const fixtureRoot = tempDir();
+	const full = {
+		target: fixtureRoot,
+		errors: [],
+		warnings: [],
+		staleDocs: [{ path: "docs/wiki/a.md", reason: "old" }],
+		rulePackDrift: { drifted: true, expected: ["pack-a"], actual: [] },
+		upgradeAssistant: {
+			currentVersion: "1.0.0",
+			latestVersion: "1.1.0",
+			previewCommand: "amber team upgrade-preview",
+		},
+		evolutionRollup: [{ finding: "repeated finding", count: 3 }],
+		regressionProposals: [
+			{
+				taskId: "t1",
+				assertion: "assert X",
+				traceInput: "trace.json",
+				agentConfig: "agent.json",
+				source: "evidence",
+				modifiesTests: false,
+				approvalRequired: true,
+			},
+		],
+	};
+	const inspect = () => full;
 
+	const high = proposeMaintenance(fixtureRoot, null, "high", inspect);
+	assert.deepEqual(high.errors, []);
+	assert.equal(high.inspection.staleDocs.length, 1, "high keeps staleDocs");
+	assert.equal(high.inspection.rulePackDrift.drifted, true, "high keeps rulePackDrift");
+	assert.deepEqual(
+		high.inspection.upgradeAssistant,
+		{ currentVersion: null, latestVersion: null },
+		"high zeros upgradeAssistant",
+	);
+	assert.deepEqual(high.inspection.evolutionRollup, [], "high zeros evolutionRollup");
+	assert.deepEqual(high.inspection.regressionProposals, [], "high zeros regressionProposals");
+
+	const medium = proposeMaintenance(fixtureRoot, null, "medium", inspect);
+	assert.equal(medium.inspection.staleDocs.length, 1, "medium keeps staleDocs");
+	assert.equal(medium.inspection.upgradeAssistant.currentVersion, "1.0.0", "medium keeps upgradeAssistant");
+	assert.equal(medium.inspection.evolutionRollup.length, 1, "medium keeps evolutionRollup");
+	assert.deepEqual(medium.inspection.regressionProposals, [], "medium zeros regressionProposals");
+
+	const low = proposeMaintenance(fixtureRoot, null, "low", inspect);
+	assert.equal(low.inspection.staleDocs.length, 1, "low keeps staleDocs");
+	assert.equal(low.inspection.upgradeAssistant.currentVersion, "1.0.0", "low keeps upgradeAssistant");
+	assert.equal(low.inspection.evolutionRollup.length, 1, "low keeps evolutionRollup");
+	assert.equal(low.inspection.regressionProposals.length, 1, "low keeps regressionProposals");
+
+	fs.rmSync(fixtureRoot, { recursive: true, force: true });
+});

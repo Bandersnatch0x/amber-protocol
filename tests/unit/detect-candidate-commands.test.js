@@ -141,3 +141,23 @@ test("mixed go + python evidence accumulates candidates from both languages", ()
 	assert.ok(names.includes("pytest"));
 	assert.ok(names.includes("go-test"));
 });
+
+// DETECTORS order is load-bearing (python → go → rust). The mixed-language
+// test above only asserts membership; pin the sequence so a registry reorder
+// cannot silently reshuffle the audit candidate list (grok L3 residual gap).
+test("multi-language candidates preserve DETECTORS order: python before go before rust", () => {
+	const root = tempTarget();
+	// Feed evidence out of order — DETECTORS order, not input order, must win.
+	const candidates = detectCandidateCommands(root, [
+		...RUST_EVIDENCE,
+		...GO_EVIDENCE,
+		...PYTHON_EVIDENCE,
+	]);
+	const names = candidates.map((c) => c.name);
+	const py = names.indexOf("pytest");
+	const go = names.indexOf("go-test");
+	const rust = names.indexOf("cargo-test");
+	assert.ok(py >= 0 && go >= 0 && rust >= 0, `expected all three, got ${names.join(",")}`);
+	assert.ok(py < go, `python must precede go (got ${names.join(",")})`);
+	assert.ok(go < rust, `go must precede rust (got ${names.join(",")})`);
+});

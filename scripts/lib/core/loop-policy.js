@@ -143,68 +143,52 @@ function applyBuiltinDenies(command) {
 	return null;
 }
 
-// Verify-surface policy: built-in, un-removable denies applied before any user
-// allow rule, then the normal (default or custom) verify-rules.json. Used by
-// evidence-runner instead of evaluateCommandPolicy.
-function evaluateVerifyPolicy(command, rules = DEFAULT_RULES) {
+// Both policy surfaces (verify + governed) share one baseline: the built-in,
+// un-removable denies applied before any user allow rule, then the normal
+// (default or custom) rules file. evaluateVerifyPolicy / evaluateGovernedPolicy
+// are intentional semantic aliases over this single implementation — named
+// surfaces for evidence-runner vs governed-runner (loops + route command-stages),
+// not divergent logic. They were previously two byte-identical bodies that could
+// drift apart; one baseline cannot drift from itself.
+function evaluateWithBaseline(command, rules = DEFAULT_RULES) {
 	return applyBuiltinDenies(command) ?? evaluateCommandPolicy(command, rules);
 }
+const evaluateVerifyPolicy = evaluateWithBaseline;
+const evaluateGovernedPolicy = evaluateWithBaseline;
 
-// Governed-command surface policy: SAME built-in, un-removable denies as the
-// verify surface, then the normal (default or custom) rules.json. Used by
-// governed-runner (loops + route command-stages) instead of evaluateCommandPolicy
-// so a custom rules.json cannot be defeated the same way a custom verify-rules.json
-// cannot. Mirrors evaluateVerifyPolicy so the two surfaces enforce one baseline.
-function evaluateGovernedPolicy(command, rules = DEFAULT_RULES) {
-	return applyBuiltinDenies(command) ?? evaluateCommandPolicy(command, rules);
+// Load a governance rules file (rules.json / verify-rules.json), failing safe to
+// DEFAULT_RULES but SURFACING the problem: a silently-ignored custom policy is a
+// real diagnostic trap (a project with a typo'd rules.json gets verify --execute
+// denials with no indication their allow rules are being ignored). `scope` is ""
+// for the governed surface and "verification " for the verify surface, preserving
+// each surface's historical message wording exactly.
+function loadRulesFile(stateDir, filename, scope) {
+	const rulesPath = path.join(stateDir, "governance", filename);
+	if (!fs.existsSync(rulesPath)) return DEFAULT_RULES;
+	let parsed;
+	try {
+		parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
+	} catch (e) {
+		process.stderr.write(
+			`[amber] governance ${filename} at ${rulesPath} is unparseable (${e.message}); ` +
+				`using built-in defaults — your custom ${scope}allow/deny rules are being ignored. Fix the JSON.\n`,
+		);
+		return DEFAULT_RULES;
+	}
+	if (parsed && Array.isArray(parsed.rules)) return parsed;
+	process.stderr.write(
+		`[amber] governance ${filename} at ${rulesPath} is missing a top-level 'rules' array; ` +
+			"using built-in defaults.\n",
+	);
+	return DEFAULT_RULES;
 }
 
 function loadPolicyRules(targetRoot) {
-	const stateDir = resolveStateDirForRead(targetRoot);
-	const rulesPath = path.join(stateDir, "governance", "rules.json");
-	if (!fs.existsSync(rulesPath)) return DEFAULT_RULES;
-	let parsed;
-	try {
-		parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
-	} catch (e) {
-		// Fail safe to DEFAULT_RULES (deny-wins, narrow allow-list), but SURFACE it:
-		// a silently-ignored custom policy is a real diagnostic trap (a project with
-		// a typo'd rules.json gets verify --execute denials with no indication their
-		// allow rules are being ignored).
-		process.stderr.write(
-			`[amber] governance rules.json at ${rulesPath} is unparseable (${e.message}); ` +
-				"using built-in defaults — your custom allow/deny rules are being ignored. Fix the JSON.\n",
-		);
-		return DEFAULT_RULES;
-	}
-	if (parsed && Array.isArray(parsed.rules)) return parsed;
-	process.stderr.write(
-		`[amber] governance rules.json at ${rulesPath} is missing a top-level 'rules' array; ` +
-			"using built-in defaults.\n",
-	);
-	return DEFAULT_RULES;
+	return loadRulesFile(resolveStateDirForRead(targetRoot), "rules.json", "");
 }
 
 function loadVerifyPolicyRules(targetRoot) {
-	const stateDir = resolveStateDirForRead(targetRoot);
-	const rulesPath = path.join(stateDir, "governance", "verify-rules.json");
-	if (!fs.existsSync(rulesPath)) return DEFAULT_RULES;
-	let parsed;
-	try {
-		parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
-	} catch (e) {
-		process.stderr.write(
-			`[amber] governance verify-rules.json at ${rulesPath} is unparseable (${e.message}); ` +
-				"using built-in defaults — your custom verification allow/deny rules are being ignored. Fix the JSON.\n",
-		);
-		return DEFAULT_RULES;
-	}
-	if (parsed && Array.isArray(parsed.rules)) return parsed;
-	process.stderr.write(
-		`[amber] governance verify-rules.json at ${rulesPath} is missing a top-level 'rules' array; ` +
-			"using built-in defaults.\n",
-	);
-	return DEFAULT_RULES;
+	return loadRulesFile(resolveStateDirForRead(targetRoot), "verify-rules.json", "verification ");
 }
 
 module.exports = { evaluateCommandPolicy, evaluateVerifyPolicy, evaluateGovernedPolicy, containsShellComposition, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES, matches };

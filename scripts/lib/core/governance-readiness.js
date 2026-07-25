@@ -622,4 +622,13 @@ module.exports = {
 	renderReadinessText,
 	renderReadinessMarkdown,
 	writeReadinessMarkdown,
+	// Pure per-concern collectors. Already filesystem-in / plain-object-out; the
+	// deepening (#6) only exposes them so each readiness concern is testable
+	// through its own seam instead of only through the aggregate
+	// inspectGovernanceReadiness. No behaviour change.
+	inspectGovernanceDocs,
+	inspectRoutes,
+	inspectWorkflowPacks,
+	inspectSecurityGovernance,
+	inspectAuditEvidence,
 };
