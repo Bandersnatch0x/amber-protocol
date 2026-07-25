@@ -49,6 +49,7 @@ npm-pack-dry-run.json
 agent-tools/
 terminals/
 .archive/
+.scratch/
 
 # Superpowers workflow artifacts (plans, specs, session handoffs)
 docs/superpowers/
