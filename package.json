@@ -59,7 +59,7 @@
     "statements": 60
   },
   "engines": {
-    "node": ">=18.17.0",
+    "node": "^20.19.0 || ^22.12.0 || >=23",
     "npm": ">=9.0.0"
   },
   "license": "MIT",
@@ -68,9 +68,9 @@
     "ajv-formats": "^3.0.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
-    "c8": "^11.0.0",
-    "eslint": "^9.39.5",
+    "@eslint/js": "^10.0.1",
+    "c8": "^12.0.0",
+    "eslint": "^10.8.0",
     "globals": "^17.7.0",
     "prettier": "^3.9.6"
   }

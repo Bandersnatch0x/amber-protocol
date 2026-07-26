@@ -9,7 +9,7 @@
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
 ![CI](https://github.com/Bandersnatch0x/amber-protocol/workflows/CI/badge.svg)
-![Node Version](https://img.shields.io/badge/node-%3E%3D18.17-brightgreen)
+![Node Version](https://img.shields.io/badge/node-%5E20.19%20%7C%7C%20%5E22.12%20%7C%7C%20%3E%3D23-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/npm/v/amber-protocol)
 

@@ -59,8 +59,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # eslint 10 / c8 12 require Node ^20.19 || ^22.12 || >=23 (no Node 18).
         node-version:
-          - 18.x
           - 20.x
           - 22.x
 

@@ -37,6 +37,11 @@ export default [
 				"warn",
 				{ argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none" },
 			],
+			// ESLint 10 recommended additions. Existing code has many intentional
+			// reassignments and rethrow-without-cause patterns; land the major first,
+			// then tighten in follow-up cleanups rather than block the upgrade.
+			"no-useless-assignment": "off",
+			"preserve-caught-error": "off",
 		},
 	},
 ];
