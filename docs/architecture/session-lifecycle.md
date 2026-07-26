@@ -347,32 +347,14 @@ Session Complete/Failed/Paused
 
 ## Observability
 
-### Structured Logging (`scripts/lib/logger.js`)
+Amber surfaces operational state through CLI commands rather than a runtime log/metrics pipeline:
 
-**Purpose:** JSON-structured logging for production debugging.
+- `amber status` / `amber doctor` / `amber audit` — readiness and validity
+- `amber governance report` — scored readiness, risks, next actions
+- `amber session status` / handoff bundle — session continuation evidence
+- `amber maintenance inspect` — drift report
 
-**Log Format:**
-```json
-{
-  "timestamp": "2026-06-21T10:00:00Z",
-  "level": "info",
-  "component": "execution-engine",
-  "sessionId": "abc-123",
-  "message": "Stage completed",
-  "metadata": { "stage": "implement", "durationMs": 45000 }
-}
-```
-
-### Metrics Collection (`scripts/lib/metrics-collector.js`)
-
-**Purpose:** Track session performance and success rates.
-
-**Metrics:**
-- Session duration (p50, p95, p99)
-- Stage execution times
-- Success/failure rates by route
-- Gate approval rates
-- Retry counts
+A structured file logger and metrics collector were sketched in early plans but never wired into production command paths; they are not part of the current surface.
 
 ## Testing Strategy
 
