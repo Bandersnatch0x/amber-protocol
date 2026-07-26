@@ -1,6 +1,6 @@
 {
   "name": "amber-protocol",
-  "version": "1.3.8",
+  "version": "1.3.9",
   "description": "Amber Protocol: repository-local governance kit for coding agents — install, audit, validate, and hand off agent-facing project state.",
   "type": "commonjs",
   "bin": {
@@ -14,11 +14,23 @@
     "schemas/",
     "workflow-packs/",
     "profiles/",
+    "skills/",
     "src/",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
+  "keywords": [
+    "agent",
+    "governance",
+    "agent-skills",
+    "pi-package"
+  ],
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
   "scripts": {
     "test": "node scripts/run-tests.js",
     "test:coverage": "c8 --reporter=text --reporter=html --reporter=json-summary node scripts/run-tests.js",
