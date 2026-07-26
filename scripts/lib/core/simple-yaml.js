@@ -111,7 +111,7 @@ function loadYamlFile(filePath) {
 	try {
 		return parseSimpleYaml(text);
 	} catch (e) {
-		throw new Error(`Failed to parse YAML at ${filePath}: ${e.message}`);
+		throw new Error(`Failed to parse YAML at ${filePath}: ${e.message}`, { cause: e });
 	}
 }
 

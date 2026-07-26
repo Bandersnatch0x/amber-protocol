@@ -70,7 +70,7 @@ function inspectProjectProfile(filePath) {
 	const profilePath = path.resolve(filePath);
 	const errors = [];
 	const warnings = [];
-	let data = null;
+	let data;
 
 	try {
 		data = readJson(profilePath);

@@ -10,6 +10,7 @@ try {
   throw new Error(
     `Failed to load route schema from ${schemaPath}: ${e.message}. ` +
     "Re-run 'node scripts/amber.js init' to restore missing schema files.",
+    { cause: e },
   );
 }
 

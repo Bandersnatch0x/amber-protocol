@@ -434,7 +434,7 @@ function readWorkflowPackFile(filePath, { executionOnError, includeValidation = 
 		};
 	}
 	const packPath = path.resolve(filePath);
-	let data = null;
+	let data;
 
 	try {
 		data = readJson(packPath);

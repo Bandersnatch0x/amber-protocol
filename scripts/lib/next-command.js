@@ -42,7 +42,7 @@ function inferNext(target, options = {}) {
 	const targetDisplay = target || ".";
 	const ctx = buildContext(targetRoot, { ...options, target: targetDisplay });
 	const nextStep = inferNextStep(ctx);
-	let governanceActions = [];
+	let governanceActions;
 	try {
 		governanceActions = buildGovernanceReport(targetRoot, { targetDisplay }).nextActions.slice(0, 3);
 	} catch {

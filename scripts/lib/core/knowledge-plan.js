@@ -38,6 +38,7 @@ try {
 	throw new Error(
 		`Failed to load knowledge-plan schema from ${schemaPath}: ${e.message}. ` +
 			"Re-run 'node scripts/amber.js init' (or npm install) to restore schema files.",
+		{ cause: e },
 	);
 }
 

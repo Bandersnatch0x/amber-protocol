@@ -44,6 +44,7 @@ function parseSkillFrontmatter(markdown) {
 			} catch (error) {
 				throw new Error(
 					`Invalid x-amber-json in frontmatter: ${error.message}`,
+					{ cause: error },
 				);
 			}
 		}

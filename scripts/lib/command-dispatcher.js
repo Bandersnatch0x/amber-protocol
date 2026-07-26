@@ -40,7 +40,6 @@ const { inspectLoopContract, recommendLoopContract, recordLoopContract, inspectL
 const { executeLoopContract, approveLoopContract, verifyLoopLedger } = require("./core/loop-execution");
 const { inspectTeamDistribution, installTeamDistribution, pinTeamDistribution, updateTeamDistribution, rollbackTeamDistribution } = require("./core/team");
 const routeCommands = require("./route-commands");
-const sessionCommands = require("./session-commands");
 const featureCommands = require("./feature-commands");
 const {
   handleMaintenance,

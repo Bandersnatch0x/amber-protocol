@@ -52,7 +52,7 @@ function readJson(filePath) {
 		text = readText(filePath);
 	} catch (e) {
 		if (e.code === "ENOENT") {
-			throw new Error(`File not found: ${filePath}.`);
+			throw new Error(`File not found: ${filePath}.`, { cause: e });
 		}
 		throw e;
 	}
@@ -63,6 +63,7 @@ function readJson(filePath) {
 			throw new Error(
 				`Failed to parse JSON file: ${filePath}. ${e.message}. ` +
 				"The file may be corrupted or contain invalid JSON.",
+				{ cause: e },
 			);
 		}
 		throw e;

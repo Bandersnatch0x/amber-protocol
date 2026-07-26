@@ -19,7 +19,7 @@ function safeMtimeMs(filePath) {
 }
 
 function parsePlanFile(targetRoot, filePath) {
-	let content = "";
+	let content;
 	try {
 		content = readText(filePath);
 	} catch {

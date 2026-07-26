@@ -140,7 +140,7 @@ async function startSession(projectRoot, options) {
 	}
 
 	let selectedRouteId = routeId;
-	let routeVersion = SCHEMA_VERSION;
+	let routeVersion;
 
 	// Load routes once — reused for version, goal-mismatch warning, and gate persistence.
 	const { routes } = loadRoutes(ROUTES_DIR);
@@ -823,7 +823,7 @@ async function approveSession(projectRoot, options) {
 		);
 
 	const sm = new SessionStateMachine(manifest.status);
-	let completionEvent = null;
+	let completionEvent;
 	let newStatus = manifest.status;
 	if (allGatesPassed) {
 		const transition = sm.transition(STATES.COMPLETED);

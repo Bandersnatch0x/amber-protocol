@@ -41,53 +41,38 @@ function runCapture(cmd, args) {
 }
 
 function main() {
-	let statusText = "";
-	let issuesText = "";
-	let gitStatusText = "";
-	let gitLogText = "";
-
 	// (a)
 	try {
 		console.log("=== Amber Status ===");
-		statusText = runCapture(SECTIONS[0].cmd, SECTIONS[0].args);
-		process.stdout.write(statusText);
+		process.stdout.write(runCapture(SECTIONS[0].cmd, SECTIONS[0].args));
 	} catch (err) {
-		const msg = `amber status failed: ${err.message || err}`;
-		console.error(msg);
-		statusText = msg;
+		console.error(`amber status failed: ${err.message || err}`);
 	}
 	console.log("\n");
 
 	// (b)
 	try {
 		console.log("=== Next-up Issues ===");
-		issuesText = runCapture(SECTIONS[1].cmd, SECTIONS[1].args);
-		process.stdout.write(issuesText);
+		process.stdout.write(runCapture(SECTIONS[1].cmd, SECTIONS[1].args));
 	} catch (err) {
-		const msg = `gh issue list failed (gh installed + auth + network?): ${err.message || err}`;
-		console.error(msg);
-		issuesText = msg;
+		console.error(
+			`gh issue list failed (gh installed + auth + network?): ${err.message || err}`,
+		);
 	}
 	console.log("\n");
 
 	// (c)
 	console.log("=== Git State ===");
 	try {
-		gitStatusText = runCapture(GIT_PARTS[0].cmd, GIT_PARTS[0].args);
-		process.stdout.write(gitStatusText);
+		process.stdout.write(runCapture(GIT_PARTS[0].cmd, GIT_PARTS[0].args));
 	} catch (err) {
-		const msg = `git status failed: ${err.message || err}`;
-		console.error(msg);
-		gitStatusText = msg;
+		console.error(`git status failed: ${err.message || err}`);
 	}
 	console.log(""); // blank line between status and log for scannability
 	try {
-		gitLogText = runCapture(GIT_PARTS[1].cmd, GIT_PARTS[1].args);
-		process.stdout.write(gitLogText);
+		process.stdout.write(runCapture(GIT_PARTS[1].cmd, GIT_PARTS[1].args));
 	} catch (err) {
-		const msg = `git log failed: ${err.message || err}`;
-		console.error(msg);
-		gitLogText = msg;
+		console.error(`git log failed: ${err.message || err}`);
 	}
 
 	return 0;

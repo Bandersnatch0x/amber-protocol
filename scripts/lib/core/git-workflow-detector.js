@@ -147,7 +147,7 @@ function analyzeConfigFiles(targetRoot) {
 
 	const contributing = path.join(targetRoot, "CONTRIBUTING.md");
 	if (pathExists(contributing)) {
-		let text = "";
+		let text;
 		try {
 			text = readText(contributing);
 		} catch {

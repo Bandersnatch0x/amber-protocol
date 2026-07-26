@@ -245,7 +245,7 @@ function measureRoute(route) {
 		route.id,
 		"--json",
 	]);
-	let sid = null;
+	let sid;
 	try {
 		sid = JSON.parse(r.stdout).sessionId;
 	} catch {
@@ -381,7 +381,7 @@ function measureRoute(route) {
 	const governanceOverheadMin = judgmentSSteady / 60;
 	const cliMin = cliMs / 60000;
 
-	let nextAfterApprove = null;
+	let nextAfterApprove;
 	try {
 		nextAfterApprove = JSON.parse(n2.stdout);
 	} catch {

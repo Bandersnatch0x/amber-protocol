@@ -252,7 +252,7 @@ function discoverPackFiles(targetRoot) {
 			warnings: [`No workflow-packs directory found at ${packDir}.`],
 		};
 	}
-	let entries = [];
+	let entries;
 	try {
 		const stats = fs.statSync(packDir);
 		if (!stats.isDirectory()) {

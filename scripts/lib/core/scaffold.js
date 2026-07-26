@@ -303,7 +303,7 @@ function checkWikiReadiness(target) {
 			continue;
 		}
 		presentFiles.push(wikiRel);
-		let identical = false;
+		let identical;
 		try {
 			identical = readText(dest) === readText(item.source);
 		} catch {
