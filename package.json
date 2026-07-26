@@ -65,10 +65,10 @@
       "scripts/compat/**"
     ],
     "check-coverage": true,
-    "lines": 60,
-    "functions": 55,
-    "branches": 50,
-    "statements": 60
+    "lines": 84,
+    "functions": 90,
+    "branches": 73,
+    "statements": 84
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=23",
