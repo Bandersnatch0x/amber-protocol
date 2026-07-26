@@ -8,9 +8,11 @@ x-amber-json: {"command":"node scripts/amber.js doctor --target {{target}}","arg
 
 Use when a user asks whether a repository Amber Protocol setup is usable.
 
+> Command prefix: in an Amber checkout run `node scripts/amber.js`; when Amber is installed as a package (npm, pi, Claude Code) run `npx -p amber-protocol amber`.
+
 ## Workflow
 
-1. Run `node scripts/amber.js doctor --target <repo>`.
+1. Run `amber doctor --target <repo>`.
 2. Summarize errors before warnings.
 3. Treat missing evidence, multiple active features, missing next action, and broken Wiki links as blockers.
 

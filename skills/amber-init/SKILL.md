@@ -8,10 +8,12 @@ x-amber-json: {"command":"node scripts/amber.js init --target {{target}}","args"
 
 Use when a user asks to initialize or install the Amber Protocol in a repository.
 
+> Command prefix: in an Amber checkout run `node scripts/amber.js`; when Amber is installed as a package (npm, pi, Claude Code) run `npx -p amber-protocol amber`.
+
 ## Workflow
 
 1. Confirm the target repository path.
-2. Run `node scripts/amber.js init --target <repo>`.
+2. Run `amber init --target <repo>`.
 3. Report created and skipped files.
 4. Do not overwrite existing files.
 5. Do not merge old `AGENTS.md`, `CLAUDE.md`, or docs automatically.

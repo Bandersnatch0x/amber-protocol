@@ -8,12 +8,14 @@ x-amber-json: {"command":"node scripts/amber.js plan --target {{target}} --featu
 
 Use when a user asks to create a new plan for a feature slice.
 
+> Command prefix: in an Amber checkout run `node scripts/amber.js`; when Amber is installed as a package (npm, pi, Claude Code) run `npx -p amber-protocol amber`.
+
 ## Workflow
 
 1. Confirm the target repository, feature id, and plan title.
-2. Run `node scripts/amber.js plan --target <repo> --feature <feature-id> --title "<title>"`.
+2. Run `amber plan --target <repo> --feature <feature-id> --title "<title>"`.
 3. Report the generated plan file path and a brief summary of its sections, including the Resume Checkpoint.
-4. Optionally run `node scripts/amber.js gate --target <repo> --plan <plan-path>` to validate the plan.
+4. Optionally run `amber gate --target <repo> --plan <plan-path>` to validate the plan.
 
 ## Resume Checkpoint
 
