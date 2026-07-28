@@ -231,11 +231,14 @@
     {
       "id": "F011",
       "priority": 11,
-      "area": "",
+      "area": "docs",
       "title": "CLI_REFERENCE covers all 33 commands (fill 14 missing sections)",
-      "user_visible_behavior": "",
+      "user_visible_behavior": "docs/CLI_REFERENCE.md documents every command in the CLI COMMANDS array (33/33); previously 14 commands (feature, plan, gate, review, accept, wiki, status, sync, security, clean, explain, and deprecated agent/team/adoption) had no section.",
       "status": "not_started",
-      "verification": [],
+      "verification": [
+        "npm test (docs boundary + CLI reference phrase guards)",
+        "inventory check: every COMMANDS entry has a heading-level section in docs/CLI_REFERENCE.md (33/33)"
+      ],
       "evidence": [],
       "notes": []
     }
