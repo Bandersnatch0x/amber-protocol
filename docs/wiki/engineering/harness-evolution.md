@@ -13,3 +13,9 @@ Last Reviewed: 2026-07-16
 - Plan: `docs/plans/F010-Ship-1-3-8-after-interrupted-1-3-7-release.md`
 - Review status: ready
 - Feature: F010 status → accepted in feature_list.json
+
+## 2026-07-28 docs/plans/F011-Fill-missing-CLI-REFERENCE-command-sections.md
+
+- Plan: `docs/plans/F011-Fill-missing-CLI-REFERENCE-command-sections.md`
+- Review status: ready
+- Feature: F011 status → accepted in feature_list.json

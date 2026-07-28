@@ -1,7 +1,7 @@
 # Plan: Fill missing CLI_REFERENCE command sections
 
 Feature: F011
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
@@ -19,7 +19,7 @@ User Confirmation: confirmed
 - [x] Slice 1: inventory the exact gap on HEAD (which of the 33 COMMANDS lack a `##`/`###` section) and confirm the 14-command list.
 - [x] Slice 2: add sections for the non-deprecated missing commands (wiki incl. knowledge subcommands, plan, gate, review, accept, status, sync, security, feature, clean, explain) with usage line + description + example each.
 - [x] Slice 3: add short deprecated-command sections (agent, team, adoption) mirroring their `--help` deprecation text.
-- [ ] Slice 4: run `npm test` to confirm the docs guards and CLI assertions stay green.
+- [x] Slice 4: run `npm test` to confirm the docs guards and CLI assertions stay green.
 
 ## Resume Checkpoint
 

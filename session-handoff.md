@@ -1,22 +1,22 @@
 # Session Handoff
 
-Last Updated: 2026-07-22
+Last Updated: 2026-07-28
 
 ## Summary
 
-Latest session `c1485d45-b03f-45c7-b27f-931bcddfb7b7` — "add 1.3.8 changelog and version for post-tag CI recovery" (completed). 10 feature(s): 8 passing, 2 accepted
+Latest session `64eb8c99-973c-480f-9b48-a3002c8939fd` — "fix CLI_REFERENCE documentation gap issue: 14 commands missing sections" (completed). 11 feature(s): 8 passing, 3 accepted
 
 ## Repo State
 
 - Branch: master
 - Uncommitted changes: dirty (tracked and/or untracked changes)
-- Last commit: 334e77e fix(docs): rephrase autonomous mode notes so boundary scan passes
+- Last commit: 65ef51b fix(dogfood): fill F011 required product-repo fields (area/behavior/verification)
 
 ## Runtime / Verification State
 
 - Command: npm test
-- Result: passed (exit 0, 67340ms)
-- When: 2026-07-22
+- Result: passed (exit 0, 85388ms)
+- When: 2026-07-28
 
 ## Feature State
 
@@ -30,6 +30,7 @@ Latest session `c1485d45-b03f-45c7-b27f-931bcddfb7b7` — "add 1.3.8 changelog a
 - F008 [passing] Web viewer (Phase C)
 - F009 [accepted] Governance evidence reads resolve the state dir (legacy .harness support)
 - F010 [accepted] Ship 1.3.8 after interrupted 1.3.7 release (CHANGELOG + version)
+- F011 [accepted] CLI_REFERENCE covers all 33 commands (fill 14 missing sections)
 
 ## Verification Evidence
 
@@ -46,6 +47,7 @@ Latest session `c1485d45-b03f-45c7-b27f-931bcddfb7b7` — "add 1.3.8 changelog a
 - F008: web vitest 382/0 passing
 - F009: `npm test` → passed (exit 0, 83527ms) (2026-07-14, session df0c5d07)
 - F010: `npm test` → passed (exit 0, 67340ms) (2026-07-22, session c1485d45)
+- F011: `npm test` → passed (exit 0, 85388ms) (2026-07-28, session 64eb8c99)
 
 ## Blockers
 
