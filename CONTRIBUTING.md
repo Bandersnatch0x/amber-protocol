@@ -61,6 +61,8 @@ npm run identity:check      # validate the effective author/committer now
 
 CI runs the same checker on introduced commits (`identity` job). Release jobs and the test matrix wait on it.
 
+**Automation exception (CI only):** when validating already-made commits (`--range` / `--commit`), the checker also accepts exact name+email pairs for Dependabot, GitHub’s bot committer, and `github-actions[bot]`. Local pre-commit (`npm run identity:check` with no args) stays human-only so accidental bot spoofing cannot land from a workstation.
+
 CLI:
 
 ```bash

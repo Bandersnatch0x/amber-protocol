@@ -9,6 +9,39 @@ const ALLOWED_EMAILS = new Set([
 	"13325067+bandersnatch0x@users.noreply.github.com",
 ]);
 
+/**
+ * Trusted automation identities allowed only when validating already-made
+ * commits (`--range` / `--commit`), so Dependabot PRs and GitHub-authored bot
+ * commits can pass CI. Local pre-commit (`current` mode) stays human-only.
+ *
+ * Each entry is an exact name+email pair (email match is case-insensitive).
+ */
+const ALLOWED_BOT_IDENTITIES = [
+	{
+		name: "dependabot[bot]",
+		email: "49699333+dependabot[bot]@users.noreply.github.com",
+	},
+	// Dependabot commits are often authored by the bot and committed by GitHub.
+	{ name: "GitHub", email: "noreply@github.com" },
+	{
+		name: "github-actions[bot]",
+		email: "41898282+github-actions[bot]@users.noreply.github.com",
+	},
+];
+
+function isHumanIdentity(identity) {
+	return (
+		identity.name === ALLOWED_NAME && ALLOWED_EMAILS.has(identity.email.toLowerCase())
+	);
+}
+
+function isBotIdentity(identity) {
+	const email = identity.email.toLowerCase();
+	return ALLOWED_BOT_IDENTITIES.some(
+		(bot) => bot.name === identity.name && bot.email.toLowerCase() === email,
+	);
+}
+
 function runGit(args, cwd = process.cwd()) {
 	const result = spawnSync("git", args, {
 		cwd,
@@ -74,14 +107,17 @@ function commitIdentities(revision, cwd = process.cwd(), git = runGit, options =
 	});
 }
 
-function validateIdentities(identities) {
-	return identities.filter(
-		(identity) =>
-			identity.name !== ALLOWED_NAME || !ALLOWED_EMAILS.has(identity.email.toLowerCase()),
-	);
+function validateIdentities(identities, options = {}) {
+	const allowBots = options.allowBots === true;
+	return identities.filter((identity) => {
+		if (isHumanIdentity(identity)) return false;
+		if (allowBots && isBotIdentity(identity)) return false;
+		return true;
+	});
 }
 
-function formatFailure(invalid) {
+function formatFailure(invalid, options = {}) {
+	const allowBots = options.allowBots === true;
 	const lines = ["Git identity check failed:"];
 	for (const identity of invalid) {
 		lines.push(`  ${identity.scope} ${identity.role}: ${identity.name} <${identity.email}>`);
@@ -89,6 +125,12 @@ function formatFailure(invalid) {
 	lines.push("");
 	lines.push(`Required name: ${ALLOWED_NAME}`);
 	lines.push(`Allowed emails: ${[...ALLOWED_EMAILS].join(", ")}`);
+	if (allowBots) {
+		lines.push("Allowed automation (exact name+email pairs):");
+		for (const bot of ALLOWED_BOT_IDENTITIES) {
+			lines.push(`  ${bot.name} <${bot.email}>`);
+		}
+	}
 	lines.push("");
 	lines.push(`Fix this repository with:`);
 	lines.push(`  git config --local user.name "${ALLOWED_NAME}"`);
@@ -117,6 +159,9 @@ function parseArgs(argv) {
 function main(argv = process.argv.slice(2), cwd = process.cwd()) {
 	try {
 		const args = parseArgs(argv);
+		// Local pre-commit validates the next human commit only.
+		// CI range/commit modes also accept known automation authors (Dependabot, etc.).
+		const allowBots = args.mode !== "current";
 		let identities;
 		if (args.mode === "current") {
 			identities = currentIdentities(cwd);
@@ -125,10 +170,10 @@ function main(argv = process.argv.slice(2), cwd = process.cwd()) {
 		} else {
 			identities = commitIdentities(args.revision, cwd);
 		}
-		const invalid = validateIdentities(identities);
+		const invalid = validateIdentities(identities, { allowBots });
 
 		if (invalid.length > 0) {
-			console.error(formatFailure(invalid));
+			console.error(formatFailure(invalid, { allowBots }));
 			return 1;
 		}
 
@@ -146,11 +191,14 @@ if (require.main === module) {
 }
 
 module.exports = {
+	ALLOWED_BOT_IDENTITIES,
 	ALLOWED_EMAILS,
 	ALLOWED_NAME,
 	commitIdentities,
 	currentIdentities,
 	formatFailure,
+	isBotIdentity,
+	isHumanIdentity,
 	main,
 	parseArgs,
 	parseGitIdent,

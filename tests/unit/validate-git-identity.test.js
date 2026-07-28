@@ -49,6 +49,72 @@ test("rejects known forbidden historical identities by name and email", () => {
 	assert.deepEqual(validateIdentities(forbidden), forbidden);
 });
 
+test("rejects Dependabot identities in human-only mode (pre-commit)", () => {
+	const dependabotAuthor = {
+		scope: "current commit",
+		role: "author",
+		name: "dependabot[bot]",
+		email: "49699333+dependabot[bot]@users.noreply.github.com",
+	};
+	const githubCommitter = {
+		scope: "current commit",
+		role: "committer",
+		name: "GitHub",
+		email: "noreply@github.com",
+	};
+
+	assert.deepEqual(validateIdentities([dependabotAuthor, githubCommitter]), [
+		dependabotAuthor,
+		githubCommitter,
+	]);
+});
+
+test("accepts Dependabot + GitHub automation pairs when allowBots is set (CI)", () => {
+	const dependabotAuthor = {
+		scope: "commit abc",
+		role: "author",
+		name: "dependabot[bot]",
+		email: "49699333+dependabot[bot]@users.noreply.github.com",
+	};
+	const githubCommitter = {
+		scope: "commit abc",
+		role: "committer",
+		name: "GitHub",
+		email: "noreply@github.com",
+	};
+	const actionsBot = {
+		scope: "commit def",
+		role: "author",
+		name: "github-actions[bot]",
+		email: "41898282+github-actions[bot]@users.noreply.github.com",
+	};
+
+	assert.deepEqual(
+		validateIdentities([dependabotAuthor, githubCommitter, actionsBot, PRIMARY], {
+			allowBots: true,
+		}),
+		[],
+	);
+});
+
+test("allowBots still rejects unknown bots and partial spoofs", () => {
+	const spoofedName = {
+		...PRIMARY,
+		name: "dependabot[bot]",
+		email: "xihalele@gmail.com",
+	};
+	const unknownBot = {
+		...PRIMARY,
+		name: "renovate[bot]",
+		email: "29139614+renovate[bot]@users.noreply.github.com",
+	};
+
+	assert.deepEqual(validateIdentities([spoofedName, unknownBot], { allowBots: true }), [
+		spoofedName,
+		unknownBot,
+	]);
+});
+
 test("reads effective author and committer identities through the injected git runner", () => {
 	const calls = [];
 	const git = (args, cwd) => {
@@ -119,6 +185,24 @@ test("failure output identifies the commit role and exact remediation", () => {
 	assert.match(output, /commit abc123 author/);
 	assert.match(output, /git config --local user\.name "Bandersnatch0x"/);
 	assert.match(output, /git config --local user\.email "xihalele@gmail\.com"/);
+	assert.doesNotMatch(output, /Allowed automation/);
+});
+
+test("failure output lists trusted bots when allowBots is set", () => {
+	const output = formatFailure(
+		[
+			{
+				scope: "commit abc123",
+				role: "author",
+				name: "Unexpected User",
+				email: "unexpected@example.com",
+			},
+		],
+		{ allowBots: true },
+	);
+
+	assert.match(output, /Allowed automation/);
+	assert.match(output, /dependabot\[bot]/);
 });
 
 test("CLI arguments require one explicit revision value", () => {
