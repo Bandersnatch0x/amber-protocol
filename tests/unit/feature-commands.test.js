@@ -28,3 +28,70 @@ test("addFeature omits paths when not provided", () => {
 	const r = addFeature(dir, { id: "F11", title: "T" });
 	assert.strictEqual("paths" in r.feature, false);
 });
+
+test("addFeature stores user_visible_behavior from --behavior (#75)", () => {
+	const dir = tmpDir();
+	const r = addFeature(dir, {
+		id: "F12",
+		title: "T",
+		area: "core",
+		behavior: "User sees a clear result.",
+	});
+	assert.strictEqual(r.feature.user_visible_behavior, "User sees a clear result.");
+	assert.deepStrictEqual(r.errors, []);
+});
+
+test("addFeature stores verification array from repeatable --verify (#75)", () => {
+	const dir = tmpDir();
+	const r = addFeature(dir, {
+		id: "F13",
+		title: "T",
+		area: "core",
+		behavior: "User sees X.",
+		verify: ["npm test", "npm run build"],
+	});
+	assert.deepStrictEqual(r.feature.verification, ["npm test", "npm run build"]);
+	assert.deepStrictEqual(r.errors, []);
+	assert.deepStrictEqual(r.warnings, []);
+});
+
+test("addFeature accepts comma-separated --verify string (#75)", () => {
+	const dir = tmpDir();
+	const r = addFeature(dir, {
+		id: "F14",
+		title: "T",
+		area: "core",
+		behavior: "User sees X.",
+		verify: "npm test,npm run build",
+	});
+	assert.deepStrictEqual(r.feature.verification, ["npm test", "npm run build"]);
+});
+
+test("addFeature warns when fields doctor requires are missing (#75)", () => {
+	const dir = tmpDir();
+	const r = addFeature(dir, { id: "F15", title: "T", area: "core" });
+	const joined = (r.warnings || []).join(" ");
+	assert.ok(
+		joined.includes("--behavior"),
+		`expected warning to mention --behavior, got: ${joined}`,
+	);
+	assert.ok(
+		joined.includes("--verify"),
+		`expected warning to mention --verify, got: ${joined}`,
+	);
+});
+
+test("addFeature produces a doctor-valid feature when all flags are passed (#75)", () => {
+	const dir = tmpDir();
+	const r = addFeature(dir, {
+		id: "F16",
+		title: "T",
+		area: "core",
+		behavior: "User sees X.",
+		verify: ["npm test"],
+	});
+	assert.deepStrictEqual(r.warnings, []);
+	const { validateFeatureListData } = require("../../scripts/lib/core/validators");
+	const v = validateFeatureListData({ features: [r.feature] });
+	assert.deepStrictEqual(v.errors, []);
+});

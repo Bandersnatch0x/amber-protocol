@@ -27,6 +27,8 @@ const FLAG_SPECS = {
 	"--result": { key: "result" },
 	"--id": { key: "id" },
 	"--area": { key: "area" },
+	"--behavior": { key: "behavior" },
+	"--verify": { key: "verifyVal", accumulate: "verify" },
 	"--notes": { key: "notes" },
 	"--worker": { key: "worker" },
 	"--reviewer": { key: "reviewer" },

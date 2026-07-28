@@ -106,3 +106,39 @@ test("runFeatureAction unknown action errors list valid actions", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("runFeatureAction add surfaces a doctor-valid hint warning when behavior/verify omitted (#75)", () => {
+  const dir = emptyFeatureDir();
+  try {
+    const result = runFeatureAction("add", dir, { id: "F1", title: "T", area: "a" });
+    assert.strictEqual(result.text, "Feature added: F1 — T");
+    const joined = (result.warnings || []).join(" ");
+    assert.ok(
+      joined.includes("--behavior"),
+      `expected warning to mention --behavior, got: ${joined}`,
+    );
+    assert.ok(
+      joined.includes("--verify"),
+      `expected warning to mention --verify, got: ${joined}`,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runFeatureAction add with --behavior/--verify produces no warning (#75)", () => {
+  const dir = emptyFeatureDir();
+  try {
+    const result = runFeatureAction("add", dir, {
+      id: "F2",
+      title: "T",
+      area: "a",
+      behavior: "User sees X.",
+      verify: ["npm test"],
+    });
+    assert.strictEqual(result.text, "Feature added: F2 — T");
+    assert.deepStrictEqual(result.warnings, []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -177,7 +177,17 @@ async function run(argv = process.argv.slice(2)) {
 
   if (bypassPrint) {
     if (onBypass) onBypass();
-    else console.log(resolved.text);
+    else {
+      console.log(resolved.text);
+      if (Array.isArray(resolved.warnings) && resolved.warnings.length > 0) {
+        console.log("");
+        for (const w of resolved.warnings) console.log(`WARNING: ${w}`);
+      }
+      if (Array.isArray(resolved.errors) && resolved.errors.length > 0) {
+        console.log("");
+        for (const e of resolved.errors) console.log(`ERROR: ${e}`);
+      }
+    }
     return exitCode ?? 0;
   }
 

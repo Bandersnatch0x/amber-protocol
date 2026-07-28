@@ -20,7 +20,7 @@ The governed delivery flow starts here: register a feature, plan a slice, gate t
 Add, list, remove features in `feature_list.json` and record verification evidence:
 
 ```bash
-node scripts/amber.js feature add --id F001 --title "User login" --priority 1 --area auth --paths src/auth --target .
+node scripts/amber.js feature add --id F001 --title "User login" --priority 1 --area auth --behavior "User logs in with email and receives a session token." --verify "npm test" --paths src/auth --target .
 node scripts/amber.js feature list --target .
 node scripts/amber.js feature remove --id F001 --target .
 node scripts/amber.js feature verify --feature F001 --command "npm test" --result "42 passed" --target .

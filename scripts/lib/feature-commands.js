@@ -31,7 +31,7 @@ function saveFeatures(data) {
 
 function addFeature(target, options) {
 	const targetRoot = resolveTarget(target);
-	const { id, title, priority, area, paths } = options;
+	const { id, title, priority, area, paths, behavior, verify } = options;
 
 	if (!id) {
 		return {
@@ -69,14 +69,22 @@ function addFeature(target, options) {
 		};
 	}
 
+	const behaviorText =
+		typeof behavior === "string" ? behavior.trim() : "";
+	const verifySteps = Array.isArray(verify)
+		? verify.map((v) => (typeof v === "string" ? v.trim() : "")).filter(Boolean)
+		: typeof verify === "string" && verify.trim() !== ""
+				? verify.split(",").map((v) => v.trim()).filter(Boolean)
+				: [];
+
 	const feature = {
 		id,
 		priority: priority ? parseInt(priority, 10) : data.features.length + 1,
 		area: area || "",
 		title,
-		user_visible_behavior: "",
+		user_visible_behavior: behaviorText,
 		status: "not_started",
-		verification: [],
+		verification: verifySteps,
 		evidence: [],
 		notes: [],
 	};
@@ -87,11 +95,22 @@ function addFeature(target, options) {
 	data.features.push(feature);
 	saveFeatures(data);
 
+	const warnings = [];
+	const missingHints = [];
+	if (!feature.area) missingHints.push("--area <area>");
+	if (!feature.user_visible_behavior) missingHints.push("--behavior <text>");
+	if (feature.verification.length === 0) missingHints.push("--verify <step> (repeatable)");
+	if (missingHints.length > 0) {
+		warnings.push(
+			`Feature ${id} is not doctor-valid yet. Run doctor with --target . once these fields are set via: ${missingHints.join(" ")}`,
+		);
+	}
+
 	return {
 		target: targetRoot,
 		feature,
 		errors: [],
-		warnings: [],
+		warnings,
 	};
 }
 
@@ -294,6 +313,8 @@ function runFeatureAction(action, target, options = {}) {
 			priority: opts.priority,
 			area: opts.area,
 			paths: opts.paths,
+			behavior: opts.behavior,
+			verify: opts.verify,
 		});
 	} else if (action === "list") {
 		structured = listFeatures(target);
