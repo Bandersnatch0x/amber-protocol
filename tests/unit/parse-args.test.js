@@ -91,6 +91,17 @@ test("drift/ledger flags are registered (not silently dropped to _)", () => {
 	assert.deepEqual(args._ || [], []);
 });
 
+test("feature add flags are registered (#75: --behavior, repeatable --verify)", () => {
+	const args = parseArgs([
+		"--behavior", "User sees a clear result.",
+		"--verify", "npm test",
+		"--verify", "npm run build",
+	]);
+	assert.equal(args.behavior, "User sees a clear result.");
+	assert.deepEqual(args.verify, ["npm test", "npm run build"]);
+	assert.deepEqual(args._ || [], []);
+});
+
 test("a value flag at the end of argv yields undefined", () => {
 	const args = parseArgs(["--output"]);
 	assert.equal("output" in args, true);
