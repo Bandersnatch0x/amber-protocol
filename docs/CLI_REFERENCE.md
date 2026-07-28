@@ -11,6 +11,70 @@ Complete command reference for Amber Protocol CLI.
 --help            # Show command help
 ```
 
+## Feature & Plan Commands
+
+The governed delivery flow starts here: register a feature, plan a slice, gate the plan, review it, then accept it after the session completes. `amber next` walks this lifecycle step by step.
+
+### feature
+
+Add, list, remove features in `feature_list.json` and record verification evidence:
+
+```bash
+node scripts/amber.js feature add --id F001 --title "User login" --priority 1 --area auth --paths src/auth --target .
+node scripts/amber.js feature list --target .
+node scripts/amber.js feature remove --id F001 --target .
+node scripts/amber.js feature verify --feature F001 --command "npm test" --result "42 passed" --target .
+node scripts/amber.js feature evidence --feature F001 --target .
+```
+
+### plan
+
+Create a feature-linked vertical-slice plan from a registered feature:
+
+```bash
+node scripts/amber.js plan --target . --feature F001 --title "Small slice" [--dry-run]
+```
+
+**Options:**
+- `--feature`: Feature id (e.g. F001) — must already exist in `feature_list.json` (required)
+- `--title`: Short human-readable title for the plan (required)
+- `--dry-run`: Preview without writing files
+
+### gate
+
+Validate that a plan is tied to feature state and has user confirmation, or confirm it:
+
+```bash
+node scripts/amber.js gate --target . --plan docs/plans/F001-small-slice.md            # gate-check
+node scripts/amber.js gate --target . --plan docs/plans/F001-small-slice.md --confirm  # set User Confirmation
+```
+
+Plan-level and session-level approvals are two layers: `gate --confirm` edits the plan's User Confirmation field, while `session approve` records `gate_passed` in the session timeline. Both layers must be satisfied for `complete-check --strict` to pass.
+
+### review
+
+Review a plan against static Amber standards and release-readiness checks:
+
+```bash
+node scripts/amber.js review --target . --plan docs/plans/F001-small-slice.md
+```
+
+### accept
+
+Accept a reviewed plan and append an Amber evolution record:
+
+```bash
+node scripts/amber.js accept --target . --plan docs/plans/F001-small-slice.md
+node scripts/amber.js accept --target . --plan docs/plans/F001-small-slice.md --session <session-id>
+```
+
+**Options:**
+- `--plan`: Relative path to the plan to accept
+- `--session`: Optional session id; prints completion-check status as a warning
+- `--strict`: With `--session`, turn missing completion-check evidence into errors
+
+With `--session`, the plan's `Feature:` header must match the session's feature — a definite mismatch blocks the accept.
+
 ## Session Commands
 
 ### session start
@@ -413,6 +477,59 @@ node scripts/amber.js migrate wiki --target .
 node scripts/amber.js migrate manifests --target .
 ```
 
+### wiki
+
+Create missing Wiki starter files, skip existing files, then validate links (idempotent):
+
+```bash
+node scripts/amber.js wiki --target . [--dry-run]
+```
+
+Knowledge Plan subcommands (declarative plan + structured knowledge base):
+
+```bash
+node scripts/amber.js wiki knowledge plan --target .      # pre-flight inspection + propose or update the plan
+node scripts/amber.js wiki knowledge scaffold --target .  # scaffold docs/wiki/knowledge-plan.json (or --yaml)
+node scripts/amber.js wiki knowledge inspect --target .   # dump the loaded plan
+node scripts/amber.js wiki knowledge report --target .    # coverage report against declared documents
+node scripts/amber.js wiki knowledge validate --target .  # schema validation of the plan
+node scripts/amber.js wiki knowledge build --target .     # materialize pages under docs/wiki/knowledge/
+```
+
+### status
+
+Show a curated one-line overview of repo state: git branch, Amber init status, install freshness, and scaffold/artifact/wiki drift counts. Read-only thin front-door — does not duplicate `doctor` or `maintenance inspect`:
+
+```bash
+node scripts/amber.js status --target . [--json]
+```
+
+### sync
+
+Detect scaffold and artifact drift between installed files and shipped templates. Dry-run by default (no changes made); with `--execute`, refreshes stale Amber-owned scaffold files and caches customized/ambiguous proposals:
+
+```bash
+node scripts/amber.js sync --target .
+node scripts/amber.js sync --target . --execute
+```
+
+### clean
+
+Remove amber-generated files from the target repository (reverse of `init`):
+
+```bash
+node scripts/amber.js clean --target . [--dry-run]
+```
+
+### security audit
+
+Run security governance checks in report-only mode (never mutates target code):
+
+```bash
+node scripts/amber.js security audit --target .
+node scripts/amber.js security audit --target . --output docs/security-audit.md
+```
+
 ## Advanced Commands
 
 ### pack inspect
@@ -574,6 +691,38 @@ Inspect task result:
 node scripts/amber.js result inspect \
   --target . \
   --task task-1
+```
+
+### agent
+> ⚠️ **DEPRECATED** — will be removed in v2.
+
+Create and control auditable worker/reviewer dispatch records without executing agent work:
+
+```bash
+node scripts/amber.js agent dispatch --target . --task task-1 --worker worker-a --reviewer reviewer-b
+node scripts/amber.js agent stop --target . --task task-1
+node scripts/amber.js agent resume --target . --task task-1
+node scripts/amber.js agent review --target . --task task-1
+```
+
+### team
+> ⚠️ **DEPRECATED** — will be removed in v2.
+
+Inspect, install, pin, update, and roll back local team distribution metadata. Use `install --dry-run` to preview `.amber/team` metadata writes before creating local state:
+
+```bash
+node scripts/amber.js team inspect --target .
+node scripts/amber.js team install --target . --version 1.0.0 --preset safe-bootstrap --dry-run --json
+```
+
+### adoption
+> ⚠️ **DEPRECATED** — will be removed in v2. Use `amber governance audit` instead.
+
+Generate, list, or index safe adoption report artifacts without modifying target repositories:
+
+```bash
+node scripts/amber.js adoption report --target . --output-dir docs/examples/adoptions
+node scripts/amber.js adoption gate --reports-dir docs/examples/adoptions
 ```
 
 ## Examples
@@ -818,6 +967,10 @@ the Phase 1 spec until key management (HSM / OS keystore) is a real capability r
 the repo.
 
 ## Error Codes
+
+### explain
+
+Look up Amber error codes, or regenerate the troubleshooting reference:
 
 ```bash
 node scripts/amber.js explain                                  # list every code with its layer

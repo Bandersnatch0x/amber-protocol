@@ -227,6 +227,17 @@
         "package-lock.json"
       ],
       "updated": "2026-07-22"
+    },
+    {
+      "id": "F011",
+      "priority": 11,
+      "area": "",
+      "title": "CLI_REFERENCE covers all 33 commands (fill 14 missing sections)",
+      "user_visible_behavior": "",
+      "status": "not_started",
+      "verification": [],
+      "evidence": [],
+      "notes": []
     }
   ]
 }
