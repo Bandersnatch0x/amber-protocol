@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "target": ".",
+  "generatedAt": "2026-07-30T00:00:00Z",
+  "scope": { "repository": true, "sessions": "not-applicable", "providers": ["amber-native"] },
+  "coverage": { "repository": "partial", "session": "unavailable", "delivery": "partial", "agentAssets": "covered" },
+  "dimensions": {
+    "contextAdequacy": {
+      "score": 60, "confidence": "low", "coverage": "partial",
+      "evidenceRefs": ["repo:feature:F011"],
+      "checks": [
+        { "id": "ca-1-feature-observable", "status": "pass", "evidenceRefs": ["feature_list.json"], "confidenceImpact": "medium" },
+        { "id": "ca-2-plan-goal-acceptance", "status": "partial", "evidenceRefs": ["docs/plans/"], "confidenceImpact": "low", "note": "Plans present but acceptance criteria section empty in one plan." },
+        { "id": "ca-3-route-trigger", "status": "pass", "evidenceRefs": ["routes/"], "confidenceImpact": "medium" }
+      ]
+    },
+    "lifecycleDiscipline": {
+      "score": 50, "confidence": "low", "coverage": "partial",
+      "evidenceRefs": ["routes/"],
+      "checks": [
+        { "id": "ld-1-route-gate", "status": "partial", "evidenceRefs": ["routes/"], "confidenceImpact": "low", "note": "Gates declared but none is user-approval." },
+        { "id": "ld-2-deny-by-default", "status": "pass", "evidenceRefs": [".amber/governance/rules.json"], "confidenceImpact": "high" },
+        { "id": "ld-3-worktree-isolation", "status": "not-applicable", "confidenceImpact": "low", "note": "No workflow packs present." }
+      ]
+    },
+    "verificationCoverage": {
+      "score": null, "confidence": "low", "coverage": "partial",
+      "evidenceRefs": [],
+      "checks": [
+        { "id": "vc-1-verify-discoverable", "status": "pass", "evidenceRefs": ["package.json"], "confidenceImpact": "medium" },
+        { "id": "vc-2-execution-commands", "status": "not-applicable", "confidenceImpact": "low", "note": "No executions recorded." }
+      ],
+      "note": "Insufficient evidence: verify command is discoverable but no execution evidence confirms it ran."
+    },
+    "deliveryIntegrity": {
+      "score": 40, "confidence": "low", "coverage": "partial",
+      "evidenceRefs": [".amber/handoff/latest/"],
+      "checks": [
+        { "id": "di-1-handoff-complete", "status": "partial", "evidenceRefs": [".amber/handoff/latest/"], "confidenceImpact": "low", "note": "Bundle missing one required file." },
+        { "id": "di-2-risks-recorded", "status": "fail", "evidenceRefs": [".amber/handoff/latest/risks.md"], "confidenceImpact": "low" }
+      ]
+    },
+    "improvementLoop": {
+      "score": null, "confidence": "low", "coverage": "unavailable",
+      "evidenceRefs": [],
+      "checks": [
+        { "id": "il-1-evolution-recurrent", "status": "not-applicable", "confidenceImpact": "low", "note": "Evolution log not found." },
+        { "id": "il-2-regression-traceable", "status": "not-applicable", "confidenceImpact": "low" }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "id": "delivery-risks-unrecorded",
+      "dimension": "deliveryIntegrity",
+      "severity": "warning",
+      "confidence": "low",
+      "summary": "Handoff bundle records no residual risks.",
+      "evidenceRefs": [".amber/handoff/latest/risks.md"],
+      "owner": "handoff",
+      "verifier": "A later handoff bundle contains a non-empty risks section.",
+      "actionKind": "plan-input"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0.0",
+  "target": ".",
+  "generatedAt": "2026-07-30T00:00:00Z",
+  "scope": { "repository": true, "sessions": "unavailable", "providers": ["amber-native"] },
+  "coverage": { "repository": "unavailable", "session": "unavailable", "delivery": "unavailable", "agentAssets": "unavailable" },
+  "dimensions": {
+    "contextAdequacy": {
+      "score": null, "confidence": "low", "coverage": "unavailable",
+      "evidenceRefs": [],
+      "checks": [
+        { "id": "ca-1-feature-observable", "status": "not-applicable", "confidenceImpact": "low", "note": "feature_list.json not found." },
+        { "id": "ca-2-plan-goal-acceptance", "status": "not-applicable", "confidenceImpact": "low", "note": "docs/plans/ empty." },
+        { "id": "ca-3-route-trigger", "status": "not-applicable", "confidenceImpact": "low", "note": "routes/ empty." }
+      ],
+      "note": "Insufficient evidence: no repository assessment artifacts found."
+    },
+    "lifecycleDiscipline": {
+      "score": null, "confidence": "low", "coverage": "unavailable",
+      "evidenceRefs": [],
+      "checks": [
+        { "id": "ld-1-route-gate", "status": "not-applicable", "confidenceImpact": "low" },
+        { "id": "ld-2-deny-by-default", "status": "not-applicable", "confidenceImpact": "low", "note": "rules.json not found." },
+        { "id": "ld-3-worktree-isolation", "status": "not-applicable", "confidenceImpact": "low" }
+      ]
+    },
+    "verificationCoverage": {
+      "score": null, "confidence": "low", "coverage": "unavailable",
+      "evidenceRefs": [],
+      "checks": [
+        { "id": "vc-1-verify-discoverable", "status": "not-applicable", "confidenceImpact": "low", "note": "No toolchain evidence." },
+        { "id": "vc-2-execution-commands", "status": "not-applicable", "confidenceImpact": "low" }
+      ]
+    },
+    "deliveryIntegrity": {
+      "score": null, "confidence": "low", "coverage": "unavailable",
+      "evidenceRefs": [],
+      "checks": [
+        { "id": "di-1-handoff-complete", "status": "not-applicable", "confidenceImpact": "low" },
+        { "id": "di-2-risks-recorded", "status": "not-applicable", "confidenceImpact": "low" }
+      ]
+    },
+    "improvementLoop": {
+      "score": null, "confidence": "low", "coverage": "unavailable",
+      "evidenceRefs": [],
+      "checks": [
+        { "id": "il-1-evolution-recurrent", "status": "not-applicable", "confidenceImpact": "low" },
+        { "id": "il-2-regression-traceable", "status": "not-applicable", "confidenceImpact": "low" }
+      ]
+    }
+  },
+  "findings": []
+}

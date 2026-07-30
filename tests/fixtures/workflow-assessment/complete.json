@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "1.0.0",
+  "target": ".",
+  "generatedAt": "2026-07-30T00:00:00Z",
+  "scope": { "repository": true, "sessions": "not-applicable", "providers": ["amber-native"] },
+  "coverage": { "repository": "covered", "session": "unavailable", "delivery": "covered", "agentAssets": "covered" },
+  "dimensions": {
+    "contextAdequacy": {
+      "score": 78, "confidence": "medium", "coverage": "covered",
+      "evidenceRefs": ["repo:feature:F011"],
+      "checks": [
+        { "id": "ca-1-feature-observable", "status": "pass", "evidenceRefs": ["feature_list.json"], "confidenceImpact": "medium" },
+        { "id": "ca-2-plan-goal-acceptance", "status": "pass", "evidenceRefs": ["docs/plans/F011"], "confidenceImpact": "medium" },
+        { "id": "ca-3-route-trigger", "status": "pass", "evidenceRefs": ["routes/"], "confidenceImpact": "medium" }
+      ]
+    },
+    "lifecycleDiscipline": {
+      "score": 82, "confidence": "high", "coverage": "covered",
+      "evidenceRefs": ["routes/", ".amber/governance/rules.json"],
+      "checks": [
+        { "id": "ld-1-route-gate", "status": "pass", "evidenceRefs": ["routes/"], "confidenceImpact": "high" },
+        { "id": "ld-2-deny-by-default", "status": "pass", "evidenceRefs": [".amber/governance/rules.json"], "confidenceImpact": "high" },
+        { "id": "ld-3-worktree-isolation", "status": "pass", "evidenceRefs": ["workflow-packs/"], "confidenceImpact": "high" }
+      ]
+    },
+    "verificationCoverage": {
+      "score": 70, "confidence": "medium", "coverage": "covered",
+      "evidenceRefs": ["package.json", ".amber/executions/"],
+      "checks": [
+        { "id": "vc-1-verify-discoverable", "status": "pass", "evidenceRefs": ["package.json"], "confidenceImpact": "medium" },
+        { "id": "vc-2-execution-commands", "status": "pass", "evidenceRefs": [".amber/executions/"], "confidenceImpact": "medium" }
+      ]
+    },
+    "deliveryIntegrity": {
+      "score": 75, "confidence": "medium", "coverage": "covered",
+      "evidenceRefs": [".amber/handoff/latest/"],
+      "checks": [
+        { "id": "di-1-handoff-complete", "status": "pass", "evidenceRefs": [".amber/handoff/latest/"], "confidenceImpact": "medium" },
+        { "id": "di-2-risks-recorded", "status": "pass", "evidenceRefs": [".amber/handoff/latest/risks.md"], "confidenceImpact": "medium" }
+      ]
+    },
+    "improvementLoop": {
+      "score": 60, "confidence": "high", "coverage": "covered",
+      "evidenceRefs": ["docs/wiki/engineering/harness-evolution.md", ".amber/executions/"],
+      "checks": [
+        { "id": "il-1-evolution-recurrent", "status": "pass", "evidenceRefs": ["docs/wiki/engineering/harness-evolution.md"], "confidenceImpact": "high" },
+        { "id": "il-2-regression-traceable", "status": "pass", "evidenceRefs": [".amber/executions/"], "confidenceImpact": "high" }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "id": "learning-intervention-not-validated",
+      "dimension": "improvementLoop",
+      "severity": "warning",
+      "confidence": "high",
+      "summary": "Recurring failures produce proposals but no later outcome check.",
+      "evidenceRefs": ["amber:maintenance:regression-proposals"],
+      "owner": "maintenance",
+      "verifier": "A later assessment links the intervention to a changed outcome.",
+      "actionKind": "maintenance-proposal"
+    }
+  ]
+}

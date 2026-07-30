@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0.0",
+  "target": ".",
+  "generatedAt": "2026-07-30T00:00:00Z",
+  "scope": { "repository": true, "sessions": "not-applicable", "providers": ["amber-native"] },
+  "coverage": { "repository": "not-applicable", "session": "not-applicable", "delivery": "not-applicable", "agentAssets": "not-applicable" },
+  "dimensions": {
+    "contextAdequacy": {
+      "score": null, "confidence": "high", "coverage": "not-applicable",
+      "evidenceRefs": [],
+      "checks": [],
+      "note": "No features declared; context-adequacy checks are not-applicable rather than failed."
+    },
+    "lifecycleDiscipline": {
+      "score": null, "confidence": "high", "coverage": "not-applicable",
+      "evidenceRefs": [],
+      "checks": [],
+      "note": "No routes declared; lifecycle-discipline checks are not-applicable."
+    },
+    "verificationCoverage": {
+      "score": null, "confidence": "high", "coverage": "not-applicable",
+      "evidenceRefs": [],
+      "checks": [],
+      "note": "No verification surface declared; verification-coverage checks are not-applicable."
+    },
+    "deliveryIntegrity": {
+      "score": null, "confidence": "high", "coverage": "not-applicable",
+      "evidenceRefs": [],
+      "checks": [],
+      "note": "No handoff surface declared; delivery-integrity checks are not-applicable."
+    },
+    "improvementLoop": {
+      "score": null, "confidence": "high", "coverage": "not-applicable",
+      "evidenceRefs": [],
+      "checks": [],
+      "note": "No evolution log or regression proposals present; improvement-loop checks are not-applicable and do not penalize."
+    }
+  },
+  "findings": []
+}
