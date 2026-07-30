@@ -411,6 +411,65 @@ function handleRoute(args) {
   return { result: r, exitCode: routeResult.exitCode, bypassPrint: !args.json };
 }
 
+function handleWorkflow(args) {
+  const action = args._?.[0];
+  const { workflowDispatch } = require("./workflow-assessment/workflow-commands");
+  const targetRoot = resolveTarget(args);
+  const result = workflowDispatch(action, targetRoot, {
+    ...args,
+    target: targetRoot,
+  });
+  // Only assess supports --output-dir (writes report to disk). findings/plan/
+  // compare reject it; everything else emits raw JSON/Markdown to stdout
+  // (parser-safe) with diagnostics on stderr. bypassPrint avoids the "Target:" envelope.
+  const SUPPORTS_OUTPUT_DIR = action === "assess";
+  if (args.outputDir && !SUPPORTS_OUTPUT_DIR) {
+    // Reject --output-dir for non-assess actions. Diagnostics go to stderr and
+    // stdout stays empty (parser-safe). onBypass prints the error itself
+    // because the bypass+onBypass path skips the dispatcher's error printing.
+    const msg = `'amber workflow ${action}' does not support --output-dir (only assess writes a report file).`;
+    return {
+      result: { target: targetRoot, errors: [msg], warnings: [] },
+      bypassPrint: true,
+      onBypass: () => { console.error(`ERROR: ${msg}`); },
+      exitCode: 1,
+    };
+  }
+  if (args.outputDir && action === "assess") {
+    // Report written to disk; print only a one-line confirmation, not the body.
+    for (const e of result.errors || []) console.error(`ERROR: ${e}`);
+    return {
+      result,
+      bypassPrint: true,
+      onBypass: () => { if (result.outputPath) console.log(`Wrote ${result.outputPath}`); },
+      exitCode: (result.errors || []).length > 0 ? 1 : 0,
+    };
+  }
+  if (action === "assess" || action === "findings" || action === "compare" || action === "plan") {
+    let text;
+    if (action === "assess") {
+      const { renderJson, renderMarkdown } = require("./workflow-assessment/renderers");
+      text = args.format === "markdown" ? renderMarkdown(result.report) : renderJson(result.report);
+    } else if (action === "plan") {
+      text = JSON.stringify({ findingId: result.findingId, draft: result.draft, dryRun: true, notice: result.notice }, null, 2);
+    } else {
+      // findings/compare: emit the result envelope as JSON minus non-data keys
+      const out = action === "findings"
+        ? { findings: result.findings, count: result.count }
+        : { dimensionDeltas: result.dimensionDeltas, findingsAdded: result.findingsAdded, findingsResolved: result.findingsResolved, suspiciousImprovements: result.suspiciousImprovements, schemaVersionBaseline: result.schemaVersionBaseline, schemaVersionCurrent: result.schemaVersionCurrent, versionMismatch: result.versionMismatch, coverageBaseline: result.coverageBaseline, coverageCurrent: result.coverageCurrent };
+      text = JSON.stringify(out, null, 2);
+    }
+    if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+      for (const w of result.warnings) console.error(`WARNING: ${w}`);
+    }
+    if (Array.isArray(result.errors) && result.errors.length > 0) {
+      for (const e of result.errors) console.error(`ERROR: ${e}`);
+    }
+    return { result: { ...result, text }, bypassPrint: true, exitCode: result.errors.length > 0 ? 1 : 0 };
+  }
+  return { result };
+}
+
 function handleMigrate(args) {
   const action = args._?.[0];
   const targetRoot = resolveTarget(args);
@@ -655,6 +714,7 @@ const HANDLERS = {
   next:        handleNext,
   explain:     handleExplain,
   hooks:       handleHooks,
+  workflow:    handleWorkflow,
 };
 
 // ── Deprecated commands ─────────────────────────────────────────────────────

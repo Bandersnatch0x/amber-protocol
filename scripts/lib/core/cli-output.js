@@ -46,6 +46,9 @@ const FLAG_SPECS = {
 	"--home": { key: "home" },
 	"--bundle-dir": { key: "bundleDir" },
 	"--report": { key: "report" },
+	"--finding": { key: "finding" },
+	"--baseline": { key: "baseline" },
+	"--current": { key: "current" },
 	"--base": { key: "base" },
 	"--head": { key: "head" },
 	"--index": { key: "index" },
@@ -90,6 +93,7 @@ const FLAG_SPECS = {
 	"--warn-only": { key: "warnOnly", kind: "boolean" },
 	"--force": { key: "force", kind: "boolean" },
 	"--no-fail": { key: "noFail", kind: "boolean" },
+	"--no-sessions": { key: "noSessions", kind: "boolean" },
 	"--help": { key: "help", kind: "boolean" },
 	"-h": { key: "help", kind: "boolean" },
 };

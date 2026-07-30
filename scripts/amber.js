@@ -39,6 +39,7 @@ const COMMANDS = [
   "next",
   "explain",
   "hooks",
+  "workflow",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);
@@ -75,6 +76,10 @@ const PER_COMMAND_USAGE = {
   status: "Usage: amber status --target <repo> [--json]",
   drift: "Usage: amber drift --target <repo> [--scope artifact|wiki|scaffold|all] [--format text|json|gh-annotations] [--no-fail] [--json]",
   sync: "Usage: amber sync --target <repo> [--execute] [--json]",
+  workflow: [
+    "Usage: amber workflow <assess|findings|plan|compare> --target <repo> [--format json|markdown] [--output-dir <path>] [--no-sessions]",
+    "       amber workflow assess --target <repo> [--format json|markdown] [--output-dir <path>] [--no-sessions]",
+  ].join("\n"),
 };
 
 function usage(command) {
