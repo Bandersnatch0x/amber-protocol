@@ -669,6 +669,7 @@ module.exports = {
 	buildMigrationAssistant,
 	countEvolutionFindings,
 	extractEvolutionFindings,
+	extractRegressionProposals,
 	readRegressionProposal,
 	inspectMaintenance,
 	buildMaintenanceProposalContent,
