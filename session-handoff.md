@@ -1,6 +1,6 @@
 # Session Handoff
 
-Last Updated: 2026-07-28
+Last Updated: 2026-08-01
 
 ## Summary
 
@@ -9,8 +9,8 @@ Latest session `64eb8c99-973c-480f-9b48-a3002c8939fd` — "fix CLI_REFERENCE doc
 ## Repo State
 
 - Branch: master
-- Uncommitted changes: dirty (tracked and/or untracked changes)
-- Last commit: 65ef51b fix(dogfood): fill F011 required product-repo fields (area/behavior/verification)
+- Uncommitted changes: clean
+- Last commit: b98f0fc chore(release): v1.3.11
 
 ## Runtime / Verification State
 
