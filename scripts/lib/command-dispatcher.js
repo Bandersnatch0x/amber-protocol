@@ -413,7 +413,7 @@ function handleRoute(args) {
 
 function handleWorkflow(args) {
   const action = args._?.[0];
-  const { workflowDispatch } = require("./workflow-assessment/workflow-commands");
+  const { workflowDispatch } = require("./workflow-assessment/adapters/command");
   const targetRoot = resolveTarget(args);
   const result = workflowDispatch(action, targetRoot, {
     ...args,
@@ -454,7 +454,7 @@ function handleWorkflow(args) {
     // report body when present (schema-valid even with findings).
     if (errors.length === 0 || action === "assess") {
       if (action === "assess" && result.report) {
-        const { renderJson, renderMarkdown } = require("./workflow-assessment/renderers");
+        const { renderJson, renderMarkdown } = require("./workflow-assessment/adapters/renderers");
         text = args.format === "markdown" ? renderMarkdown(result.report) : renderJson(result.report);
       } else if (action === "plan") {
         text = JSON.stringify({ findingId: result.findingId, draft: result.draft, dryRun: true, notice: result.notice }, null, 2);

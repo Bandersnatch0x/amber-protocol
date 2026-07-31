@@ -14,7 +14,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
-const { redactDeep } = require("../../core/redaction");
+const { redactDeep } = require("../../../core/redaction");
 
 function encodeProjectPath(repoPath) {
 	return repoPath.replace(/[^a-zA-Z0-9]/g, "-");

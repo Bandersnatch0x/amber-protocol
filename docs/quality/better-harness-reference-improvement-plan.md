@@ -261,7 +261,7 @@ Suggested ownership:
 | Owner | Responsibility |
 | --- | --- |
 | `scripts/lib/workflow-assessment/` | Evidence contracts, checks, scoring, findings, and report assembly |
-| `scripts/lib/workflow-commands.js` | CLI orchestration and output selection |
+| `scripts/lib/workflow-assessment/adapters/command.js` | CLI orchestration and output selection |
 | `schemas/workflow-assessment.schema.json` | Public report contract |
 | `scripts/lib/workflow-assessment/providers/` | Capability-scoped evidence providers |
 | `apps/web/` | Read-only report visualization and comparison |

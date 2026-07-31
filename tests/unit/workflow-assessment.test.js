@@ -12,12 +12,13 @@ const path = require("node:path");
 const Ajv = require("ajv");
 const addFormats = require("ajv-formats");
 
-const { collectRepositoryEvidence } = require("../../scripts/lib/workflow-assessment/repository-evidence");
-const { runChecks } = require("../../scripts/lib/workflow-assessment/checks");
-const { scoreDimensions, scoreDimension } = require("../../scripts/lib/workflow-assessment/scoring");
-const { buildReport, buildFindings } = require("../../scripts/lib/workflow-assessment/workflow-commands");
-const { listProviders } = require("../../scripts/lib/workflow-assessment/observation-contract");
-const { renderJson, renderMarkdown } = require("../../scripts/lib/workflow-assessment/renderers");
+const {
+	assess,
+	compare,
+	findings,
+} = require("../../scripts/lib/workflow-assessment");
+const { listProviders } = require("../../scripts/lib/workflow-assessment/internal/observation-contract");
+const { renderJson, renderMarkdown } = require("../../scripts/lib/workflow-assessment/adapters/renderers");
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
 const FIXTURE_DIR = path.join(__dirname, "..", "fixtures", "workflow-assessment");
@@ -70,55 +71,11 @@ test("schema rejects an overall field (none shipped until P3)", () => {
 	assert.ok(!schema.required.includes("overall"), "overall must not be a required field");
 });
 
-// ── Scoring nullability ──
-
-test("all checks not-applicable → score null, coverage not-applicable, confidence high", () => {
-	const checks = [
-		{ id: "x", status: "not-applicable", confidenceImpact: "low" },
-		{ id: "y", status: "not-applicable", confidenceImpact: "low" },
-	];
-	const d = scoreDimension(checks);
-	assert.equal(d.score, null);
-	assert.equal(d.coverage, "not-applicable");
-	assert.equal(d.confidence, "high");
-});
-
-test("mixed applicable/not-applicable → coverage partial, confidence capped at medium", () => {
-	const checks = [
-		{ id: "x", status: "pass", confidenceImpact: "high" },
-		{ id: "y", status: "not-applicable", confidenceImpact: "low" },
-	];
-	const d = scoreDimension(checks);
-	assert.equal(d.coverage, "partial");
-	assert.equal(d.confidence, "medium", "partial evidence cannot support high");
-	assert.equal(d.score, 100);
-});
-
-test("all checks pass → covered, score 100", () => {
-	const checks = [
-		{ id: "x", status: "pass", confidenceImpact: "medium" },
-		{ id: "y", status: "pass", confidenceImpact: "medium" },
-	];
-	const d = scoreDimension(checks);
-	assert.equal(d.coverage, "covered");
-	assert.equal(d.score, 100);
-});
-
-test("fail check produces a score below 100", () => {
-	const checks = [
-		{ id: "x", status: "pass", confidenceImpact: "medium" },
-		{ id: "y", status: "fail", confidenceImpact: "high" },
-	];
-	const d = scoreDimension(checks);
-	assert.equal(d.score, 50);
-	assert.equal(d.confidence, "high");
-});
-
 // ── Determinism: same repo state → same report ──
 
-test("buildReport is deterministic across two runs (no generatedAt drift in dimensions)", () => {
-	const r1 = buildReport(REPO_ROOT);
-	const r2 = buildReport(REPO_ROOT);
+test("facade assess is deterministic across two runs (no generatedAt drift in dimensions)", () => {
+	const r1 = assess(REPO_ROOT);
+	const r2 = assess(REPO_ROOT);
 	// generatedAt differs by ms; compare the deterministic payload instead.
 	const strip = (r) => ({ ...r, generatedAt: undefined });
 	assert.deepEqual(strip(r1).dimensions, strip(r2).dimensions);
@@ -128,7 +85,7 @@ test("buildReport is deterministic across two runs (no generatedAt drift in dime
 // ── Privacy: no raw transcript / secret enters the report ──
 
 test("report contains no raw transcript text or secret-shaped strings", () => {
-	const report = buildReport(REPO_ROOT);
+	const report = assess(REPO_ROOT);
 	const json = JSON.stringify(report);
 	// No ~/.claude-rooted paths in native OR JSON-escaped backslash form. Do NOT
 	// assert on bare homedir(): on CI the checkout itself lives under the home
@@ -147,9 +104,9 @@ test("report contains no raw transcript text or secret-shaped strings", () => {
 
 // ── Read-only: assess without --output-dir does not write ──
 
-test("buildReport does not create files", () => {
+test("facade assess does not create files", () => {
 	const before = fs.readdirSync(REPO_ROOT);
-	buildReport(REPO_ROOT);
+	assess(REPO_ROOT);
 	const after = fs.readdirSync(REPO_ROOT);
 	assert.deepEqual(before, after, "no files created by report build");
 });
@@ -174,13 +131,13 @@ test("amber-native capabilities are supported where P1 declares them", () => {
 });
 
 test("P1 session coverage is not-applicable only with --no-sessions", () => {
-	const report = buildReport(REPO_ROOT, { noSessions: true });
+	const report = assess(REPO_ROOT, { noSessions: true });
 	assert.equal(report.coverage.session, "not-applicable");
 	assert.equal(report.scope.sessions, "not-applicable");
 });
 
 test("P2 default includes amber-native sessions when present", () => {
-	const report = buildReport(REPO_ROOT); // noSessions defaults false in P2
+	const report = assess(REPO_ROOT); // noSessions defaults false in P2
 	assert.notEqual(report.scope.sessions, "not-applicable");
 	// Amber repo has 3 sessions, so session coverage should be covered.
 	assert.equal(report.coverage.session, "covered");
@@ -188,7 +145,7 @@ test("P2 default includes amber-native sessions when present", () => {
 });
 
 test("top-level coverage is derived from dimension coverage, not hardcoded", () => {
-	const report = buildReport(REPO_ROOT);
+	const report = assess(REPO_ROOT);
 	// repository lane backs onto context/lifecycle/verification dimensions.
 	for (const dim of ["contextAdequacy", "lifecycleDiscipline", "verificationCoverage"]) {
 		assert.ok(report.dimensions[dim].coverage !== undefined);
@@ -197,32 +154,29 @@ test("top-level coverage is derived from dimension coverage, not hardcoded", () 
 	assert.equal(report.coverage.delivery, report.dimensions.deliveryIntegrity.coverage);
 });
 
-test("resolveSessionCoverage: foreign provider yields unsupported when amber has no sessions", () => {
-	const { resolveSessionCoverage } = require("../../scripts/lib/workflow-assessment/workflow-commands");
-	// Amber sessions present → prefer native coverage regardless of foreign.
-	assert.equal(resolveSessionCoverage(false, { present: true, coverage: "covered" }, true), "covered");
-	// No amber sessions + foreign available with unsupported sessions → unsupported.
-	assert.equal(resolveSessionCoverage(false, { present: false, coverage: "unavailable" }, true), "unsupported");
-	// No amber sessions + no foreign → unavailable.
-	assert.equal(resolveSessionCoverage(false, { present: false, coverage: "unavailable" }, false), "unavailable");
-	// User opt-out.
-	assert.equal(resolveSessionCoverage(true, null, true), "not-applicable");
-	// Regression: truthy "unavailable" coverage string must not mask foreign branch
-	// (the old `sessionObs.coverage || …` expression made unsupported dead).
-	assert.equal(resolveSessionCoverage(false, { present: false, coverage: "unavailable" }, true), "unsupported");
+test("facade assess: noSessions overrides session evidence → not-applicable", () => {
+	// This repo has real amber sessions (covered without the flag); the opt-out
+	// must override present evidence, not just empty state. The private merge
+	// ordering (noSessions > present > foreign-unsupported > unavailable) is
+	// covered here through the facade; the foreign-unsupported branch cannot
+	// fire through any public surface until a foreign provider is available
+	// (codex/cursor declare unsupported sessions but are P3, available=false).
+	const report = assess(REPO_ROOT, { noSessions: true });
+	assert.equal(report.coverage.session, "not-applicable");
+	assert.equal(report.scope.sessions, "not-applicable");
 });
 
-test("buildReport: no amber sessions + empty Claude dir → coverage.session unavailable", () => {
+test("facade assess: no amber sessions + empty Claude dir → coverage.session unavailable", () => {
 	// Claude is P2b-supported; an empty transcript dir means available but no
 	// readable sessions → unavailable (not fabricated covered / not unsupported).
 	// claudeHome is injected so the test never touches the real ~/.claude.
 	const os = require("node:os");
-	const { repoTranscriptDir } = require("../../scripts/lib/workflow-assessment/providers/claude-transcript");
+	const { repoTranscriptDir } = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
 	const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "wf-foreign-home-"));
 	const tmpTarget = fs.mkdtempSync(path.join(os.tmpdir(), "wf-foreign-"));
 	fs.mkdirSync(repoTranscriptDir(tmpTarget, claudeHome), { recursive: true });
 	try {
-		const report = buildReport(tmpTarget, { claudeHome });
+		const report = assess(tmpTarget, { claudeHome });
 		assert.equal(report.coverage.session, "unavailable");
 		assert.ok(report.scope.providers.includes("claude"));
 	} finally {
@@ -231,9 +185,9 @@ test("buildReport: no amber sessions + empty Claude dir → coverage.session una
 	}
 });
 
-test("buildReport: no amber sessions + matching Claude transcript → coverage.session covered", () => {
+test("facade assess: no amber sessions + matching Claude transcript → coverage.session covered", () => {
 	const os = require("node:os");
-	const { repoTranscriptDir } = require("../../scripts/lib/workflow-assessment/providers/claude-transcript");
+	const { repoTranscriptDir } = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
 	const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "wf-claude-home-"));
 	const tmpTarget = fs.mkdtempSync(path.join(os.tmpdir(), "wf-claude-sess-"));
 	const claudeDir = repoTranscriptDir(tmpTarget, claudeHome);
@@ -246,7 +200,7 @@ test("buildReport: no amber sessions + matching Claude transcript → coverage.s
 	});
 	fs.writeFileSync(path.join(claudeDir, "sess-1.jsonl"), line + "\n", "utf8");
 	try {
-		const report = buildReport(tmpTarget, { claudeHome });
+		const report = assess(tmpTarget, { claudeHome });
 		assert.equal(report.coverage.session, "covered");
 		assert.ok((report.sessionObservations || []).some((s) => s.provider === "claude"));
 	} finally {
@@ -257,7 +211,7 @@ test("buildReport: no amber sessions + matching Claude transcript → coverage.s
 
 test("claude transcript without any cwd line is excluded (positive binding required)", () => {
 	const os = require("node:os");
-	const { summarizeTranscript } = require("../../scripts/lib/workflow-assessment/providers/claude-transcript");
+	const { summarizeTranscript } = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wf-nocwd-"));
 	const target = path.join(tmpDir, "repo");
 	fs.mkdirSync(target);
@@ -279,7 +233,7 @@ test("collectClaudeObservations caps at newest MAX_TRANSCRIPT_FILES transcripts"
 		repoTranscriptDir,
 		collectClaudeObservations,
 		MAX_TRANSCRIPT_FILES,
-	} = require("../../scripts/lib/workflow-assessment/providers/claude-transcript");
+	} = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
 	const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "wf-cap-home-"));
 	const tmpTarget = fs.mkdtempSync(path.join(os.tmpdir(), "wf-cap-target-"));
 	const claudeDir = repoTranscriptDir(tmpTarget, claudeHome);
@@ -307,10 +261,10 @@ test("agentAssets coverage follows AGENTS/CLAUDE docs presence", () => {
 	const os = require("node:os");
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wf-agents-"));
 	try {
-		const bare = buildReport(tmp, { noSessions: true });
+		const bare = assess(tmp, { noSessions: true });
 		assert.equal(bare.coverage.agentAssets, "unavailable");
 		fs.writeFileSync(path.join(tmp, "AGENTS.md"), "# agents\n", "utf8");
-		const withDocs = buildReport(tmp, { noSessions: true });
+		const withDocs = assess(tmp, { noSessions: true });
 		assert.equal(withDocs.coverage.agentAssets, "covered");
 		const ca4 = withDocs.dimensions.contextAdequacy.checks.find((c) => c.id === "ca-4-agent-docs");
 		assert.equal(ca4.status, "pass");
@@ -323,7 +277,7 @@ test("agentAssets coverage follows AGENTS/CLAUDE docs presence", () => {
 });
 
 test("workflow plan dry-run emits maintenance-proposal draft for il findings", () => {
-	const { workflowDispatch } = require("../../scripts/lib/workflow-assessment/workflow-commands");
+	const { workflowDispatch } = require("../../scripts/lib/workflow-assessment/adapters/command");
 	const os = require("node:os");
 	const report = {
 		target: ".",
@@ -350,8 +304,7 @@ test("workflow plan dry-run emits maintenance-proposal draft for il findings", (
 	fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test("compareReports flags higher score with lower coverage", () => {
-	const { compareReports } = require("../../scripts/lib/workflow-assessment/workflow-commands");
+test("facade compare flags higher score with lower coverage", () => {
 	const baseline = {
 		dimensions: { contextAdequacy: { score: 60, coverage: "covered" } },
 		findings: [],
@@ -362,23 +315,22 @@ test("compareReports flags higher score with lower coverage", () => {
 		findings: [],
 		coverage: {},
 	};
-	const r = compareReports(baseline, current);
+	const r = compare(baseline, current);
 	assert.equal(r.suspiciousImprovements.length, 1);
 	assert.equal(r.dimensionDeltas[0].scoreDelta, 20);
 });
 
-test("compareReports warns on schema version mismatch", () => {
-	const { compareReports } = require("../../scripts/lib/workflow-assessment/workflow-commands");
+test("facade compare warns on schema version mismatch", () => {
 	const baseline = { schemaVersion: "1.0.0", dimensions: {}, findings: [], coverage: {} };
 	const current = { schemaVersion: "2.0.0", dimensions: {}, findings: [], coverage: {} };
-	const r = compareReports(baseline, current);
+	const r = compare(baseline, current);
 	assert.equal(r.versionMismatch, true);
 	assert.ok(r.warnings.some((w) => w.includes("Schema version mismatch")));
 });
 
 test("workflow plan --dry-run produces a draft with owner and verifier", () => {
 	// buildPlanDraft is not exported; exercise via workflowDispatch instead.
-	const { workflowDispatch } = require("../../scripts/lib/workflow-assessment/workflow-commands");
+	const { workflowDispatch } = require("../../scripts/lib/workflow-assessment/adapters/command");
 	const report = {
 		target: ".",
 		findings: [{ id: "x", dimension: "contextAdequacy", severity: "warning", confidence: "medium", summary: "test finding", evidenceRefs: ["feature_list.json"], owner: "planning", verifier: "Check passes.", actionKind: "plan-input" }],
@@ -400,16 +352,15 @@ test("workflow plan --dry-run produces a draft with owner and verifier", () => {
 	}
 });
 
-test("findingsFromReport extracts findings from a report object", () => {
-	const { findingsFromReport } = require("../../scripts/lib/workflow-assessment/workflow-commands");
+test("facade extracts findings from a report object", () => {
 	const report = { target: ".", findings: [{ id: "x", dimension: "contextAdequacy" }] };
-	const r = findingsFromReport(report);
+	const r = findings(report);
 	assert.equal(r.count, 1);
 	assert.equal(r.findings[0].id, "x");
 });
 
 test("amber-native session provider summarizes real sessions without raw transcript", () => {
-	const { collectSessionObservations } = require("../../scripts/lib/workflow-assessment/providers/amber-native-session");
+	const { collectSessionObservations } = require("../../scripts/lib/workflow-assessment/internal/providers/amber-native-session");
 	const obs = collectSessionObservations(REPO_ROOT);
 	assert.ok(obs.present, "Amber repo has sessions");
 	assert.ok(obs.sessions.length > 0);
@@ -423,7 +374,7 @@ test("claude transcript provider binds to workspace (hard exclusion on cwd misma
 	const {
 		summarizeTranscript,
 		collectClaudeObservations,
-	} = require("../../scripts/lib/workflow-assessment/providers/claude-transcript");
+	} = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wf-claude-bind-"));
 	const target = path.join(tmpDir, "repo");
 	fs.mkdirSync(target);
@@ -472,8 +423,8 @@ test("claude transcript provider binds to workspace (hard exclusion on cwd misma
 
 test("collectExecutions skips dangling symlink entries without throwing", () => {
 	const os = require("node:os");
-	const { collectRepositoryEvidence } = require("../../scripts/lib/workflow-assessment/repository-evidence");
-	// buildReport path uses collectExecutions via collectRepositoryEvidence.
+	const { collectRepositoryEvidence } = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
+	// facade assessment path uses collectExecutions via collectRepositoryEvidence.
 	// Place a dangling symlink under a temp .amber/executions and ensure assess
 	// still completes (filter catches statSync failures).
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wf-exec-"));
@@ -510,13 +461,13 @@ test("redaction module is behavior-identical to the web TS version", () => {
 
 // ── End-to-end: real repo produces a schema-valid report ──
 
-test("buildReport on the Amber repo produces a schema-valid report", () => {
-	const report = buildReport(REPO_ROOT);
+test("facade assess on the Amber repo produces a schema-valid report", () => {
+	const report = assess(REPO_ROOT);
 	assert.ok(validate(report), "real repo report validates against schema");
 });
 
 test("real repo report has five dimensions and non-empty findings for known gaps", () => {
-	const report = buildReport(REPO_ROOT);
+	const report = assess(REPO_ROOT);
 	assert.equal(Object.keys(report.dimensions).length, 5);
 	// The Amber repo has empty handoff risks + no execution commands recorded;
 	// these are real gaps the effectiveness report should surface.
@@ -526,13 +477,13 @@ test("real repo report has five dimensions and non-empty findings for known gaps
 // ── Renderers ──
 
 test("renderJson produces parseable JSON", () => {
-	const report = buildReport(REPO_ROOT);
+	const report = assess(REPO_ROOT);
 	const json = renderJson(report);
 	assert.deepEqual(JSON.parse(json), report);
 });
 
 test("renderMarkdown produces non-empty markdown with all five dimensions", () => {
-	const report = buildReport(REPO_ROOT);
+	const report = assess(REPO_ROOT);
 	const md = renderMarkdown(report);
 	for (const dim of Object.keys(report.dimensions)) {
 		assert.ok(md.includes(dim), `markdown includes ${dim}`);

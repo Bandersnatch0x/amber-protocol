@@ -10,9 +10,9 @@
 // only event types and structured fields. Privacy by default.
 
 const path = require("node:path");
-const { readSessionEvents } = require("../../session-timeline");
-const { readAllSessionManifests } = require("../../session-manifest");
-const { getSessionsDir } = require("../../session-commands");
+const { readSessionEvents } = require("../../../session-timeline");
+const { readAllSessionManifests } = require("../../../session-manifest");
+const { getSessionsDir } = require("../../../session-commands");
 
 // Map timeline events to normalized observation signals.
 function summarizeSession(manifest, events) {

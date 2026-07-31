@@ -14,19 +14,19 @@ const {
 	inspectRoutes,
 	inspectWorkflowPacks,
 	inspectGlxControls,
-} = require("../core/governance-readiness");
+} = require("../../core/governance-readiness");
 const {
 	countEvolutionFindings,
 	extractEvolutionFindings,
 	extractRegressionProposals,
-} = require("../core/maintenance");
-const { detectCommands } = require("../core/audit");
+} = require("../../core/maintenance");
+const { detectCommands } = require("../../core/audit");
 const {
 	REQUIRED_BUNDLE_FILES,
 	defaultBundleDir,
-} = require("../core/handoff-bundle");
-const { getSectionBody, hasSectionWithBody } = require("../core/text-utils");
-const { resolveStateDirForRead } = require("../state-dir-resolver");
+} = require("../../core/handoff-bundle");
+const { getSectionBody, hasSectionWithBody } = require("../../core/text-utils");
+const { resolveStateDirForRead } = require("../../state-dir-resolver");
 
 function slash(p) {
 	return p.split(path.sep).join("/");

@@ -106,7 +106,7 @@ reference's expression. Concretely:
    Amber's own coverage decomposition keyed to Amber's control layers; the
    reference's project/session/delivery/configured-agent lane names are not
    imported. Session observations flow through a provider-neutral observation
-   contract (`scripts/lib/workflow-assessment/observation-contract.js`) whose
+   contract (`scripts/lib/workflow-assessment/internal/observation-contract.js`) whose
    field names are Amber's, not the reference's.
 5. **Learning intervention linkage** (P3) reuses Amber's evolution log +
    feature_list `accepted` state as the intervention→outcome trail, not a
