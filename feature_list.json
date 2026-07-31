@@ -250,6 +250,23 @@
       ],
       "notes": [],
       "updated": "2026-07-28"
+    },
+    {
+      "id": "F012",
+      "priority": 12,
+      "area": "verification",
+      "title": "Pre-push hook rejects pi-rewind checkpoint refs",
+      "user_visible_behavior": "git push --mirror or a direct push of refs/pi-checkpoints/* is blocked by .githooks/pre-push with a clear error; normal branch/tag pushes are unaffected",
+      "status": "not_started",
+      "verification": [
+        "npm test"
+      ],
+      "evidence": [],
+      "notes": [],
+      "paths": [
+        ".githooks/pre-push",
+        "tests/unit/pre-push-hook.test.js"
+      ]
     }
   ]
 }
