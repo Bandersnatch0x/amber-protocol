@@ -7,6 +7,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 
 const Ajv = require("ajv");
@@ -28,6 +29,47 @@ const ajv = new Ajv({ allErrors: true });
 addFormats(ajv);
 const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, "utf8"));
 const validate = ajv.compile(schema);
+
+// Fixture: a tmp target repo with gitignored-state evidence seeded
+// (.amber/sessions, .amber/executions, .amber/handoff/latest) so the
+// workflow-effectiveness tests run identically on CI (fresh checkout has no
+// .amber/ because it is gitignored) and locally.
+function createSeededAmberRepo(t) {
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "wf-seeded-amber-"));
+	t.after(() => fs.rmSync(target, { recursive: true, force: true }));
+	const sessionDir = path.join(target, ".amber", "sessions", "seeded-session");
+	fs.mkdirSync(sessionDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(sessionDir, "manifest.json"),
+		JSON.stringify(
+			{
+				sessionId: "seeded-session",
+				id: "seeded-session",
+				goal: "seed goal",
+				status: "completed",
+				route: { id: "seed-route" },
+			},
+			null,
+			2,
+		),
+	);
+	const execDir = path.join(target, ".amber", "executions", "seed-task");
+	fs.mkdirSync(execDir, { recursive: true });
+	fs.writeFileSync(path.join(execDir, "evidence.json"), JSON.stringify({ commands: [] }));
+	const handoffDir = path.join(target, ".amber", "handoff", "latest");
+	fs.mkdirSync(handoffDir, { recursive: true });
+	for (const name of [
+		"README.md",
+		"session-summary.md",
+		"verification-evidence.md",
+		"next-actions.md",
+		"risks.md",
+		"recovery-commands.md",
+	]) {
+		fs.writeFileSync(path.join(handoffDir, name), "");
+	}
+	return target;
+}
 
 // Each fixture locks one coverage shape against the schema. Note: the
 // `unavailable` fixture carries dimension-level coverage: "unavailable" which
@@ -136,10 +178,11 @@ test("P1 session coverage is not-applicable only with --no-sessions", () => {
 	assert.equal(report.scope.sessions, "not-applicable");
 });
 
-test("P2 default includes amber-native sessions when present", () => {
-	const report = assess(REPO_ROOT); // noSessions defaults false in P2
+test("P2 default includes amber-native sessions when present", (t) => {
+	const target = createSeededAmberRepo(t);
+	const report = assess(target); // noSessions defaults false in P2
 	assert.notEqual(report.scope.sessions, "not-applicable");
-	// Amber repo has 3 sessions, so session coverage should be covered.
+	// Seeded amber session → session coverage covered (CI checkout has no .amber/).
 	assert.equal(report.coverage.session, "covered");
 	assert.ok((report.sessionObservations || []).length > 0);
 });
@@ -359,10 +402,11 @@ test("facade extracts findings from a report object", () => {
 	assert.equal(r.findings[0].id, "x");
 });
 
-test("amber-native session provider summarizes real sessions without raw transcript", () => {
+test("amber-native session provider summarizes seeded sessions without raw transcript", (t) => {
 	const { collectSessionObservations } = require("../../scripts/lib/workflow-assessment/internal/providers/amber-native-session");
-	const obs = collectSessionObservations(REPO_ROOT);
-	assert.ok(obs.present, "Amber repo has sessions");
+	const target = createSeededAmberRepo(t);
+	const obs = collectSessionObservations(target);
+	assert.ok(obs.present, "seeded amber repo has sessions");
 	assert.ok(obs.sessions.length > 0);
 	const json = JSON.stringify(obs);
 	assert.ok(!json.includes("transcript"), "no transcript content in observations");
@@ -466,12 +510,13 @@ test("facade assess on the Amber repo produces a schema-valid report", () => {
 	assert.ok(validate(report), "real repo report validates against schema");
 });
 
-test("real repo report has five dimensions and non-empty findings for known gaps", () => {
-	const report = assess(REPO_ROOT);
+test("seeded amber repo report has five dimensions and non-empty findings for known gaps", (t) => {
+	const target = createSeededAmberRepo(t);
+	const report = assess(target);
 	assert.equal(Object.keys(report.dimensions).length, 5);
-	// The Amber repo has empty handoff risks + no execution commands recorded;
-	// these are real gaps the effectiveness report should surface.
-	assert.ok(report.findings.length >= 1, "expected findings for real gaps");
+	// Seeded executions without commands + empty handoff risks are real gaps
+	// the effectiveness report should surface (CI has no gitignored .amber state).
+	assert.ok(report.findings.length >= 1, "expected findings for known gaps");
 });
 
 // ── Renderers ──
