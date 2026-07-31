@@ -1,0 +1,28 @@
+#!/bin/sh
+# Pre-push guard: never push pi-rewind checkpoint refs.
+#
+# pi-rewind (npm:pi-rewind) stores per-turn undo snapshots under
+# refs/pi-checkpoints/* — full working-tree snapshots that are local-only
+# by design. A `git push --mirror` (or an explicit push of those refs)
+# would leak every snapshot to the remote, including any untracked files
+# captured at snapshot time. Normal branch/tag pushes are unaffected.
+
+refs_to_guard='refs/pi-checkpoints/'
+
+blocked=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_ref" in
+    refs/pi-checkpoints/*)
+      echo "error: refusing to push pi-rewind checkpoint ref '$local_ref'" >&2
+      blocked=1
+      ;;
+  esac
+done
+
+if [ "$blocked" -eq 1 ]; then
+  echo "error: pi-rewind snapshots are local undo checkpoints (refs/pi-checkpoints/*)." >&2
+  echo "error: use /rewind to restore; never push them to a remote." >&2
+  exit 1
+fi
+
+exit 0
