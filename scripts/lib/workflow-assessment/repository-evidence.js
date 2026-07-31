@@ -81,7 +81,15 @@ function collectExecutions(targetRoot) {
 	const taskDirs = fs
 		.readdirSync(execRoot)
 		.map((name) => path.join(execRoot, name))
-		.filter((p) => fs.statSync(p).isDirectory());
+		.filter((p) => {
+			// Dangling symlinks / unreadable entries throw on statSync; skip them
+			// so a single bad entry cannot crash the whole assess pass.
+			try {
+				return fs.statSync(p).isDirectory();
+			} catch {
+				return false;
+			}
+		});
 	let hasCommands = false;
 	const executions = taskDirs.map((taskDir) => {
 		const evidencePath = path.join(taskDir, "evidence.json");
@@ -116,7 +124,48 @@ function collectHandoff(targetRoot, bundleDir) {
 	};
 }
 
+// Agent-facing docs listed in ADR-0008 P1 in-scope artifacts (docs/AGENTS.md
+// plus common root companions). Presence only — content quality is out of scope.
+const AGENT_DOC_CANDIDATES = [
+	"AGENTS.md",
+	"Agents.md",
+	"CLAUDE.md",
+	"Claude.md",
+	"docs/AGENTS.md",
+	"docs/Agents.md",
+];
+
+function collectAgentAssets(targetRoot) {
+	const files = [];
+	const seen = new Set();
+	for (const rel of AGENT_DOC_CANDIDATES) {
+		const abs = path.join(targetRoot, rel);
+		try {
+			if (!fs.statSync(abs).isFile()) continue;
+		} catch {
+			// Missing or unreadable candidate is simply not evidence.
+			continue;
+		}
+		// Case-insensitive filesystems (NTFS, default APFS) resolve AGENTS.md
+		// and Agents.md to the SAME file; dedupe by the on-disk real path so the
+		// evidence list never cites phantom variants of one file. Must be the
+		// .native realpath — the JS implementation preserves caller casing.
+		let key;
+		try {
+			key = fs.realpathSync.native(abs);
+		} catch {
+			key = abs;
+		}
+		if (seen.has(key)) continue;
+		seen.add(key);
+		files.push(slash(rel));
+	}
+	return { present: files.length > 0, files };
+}
+
 // Aggregate all repository-only evidence. Pure: filesystem-in, plain-object-out.
+// options.sessions: optional P2 session observations merged in by buildReport
+// so checks can correlate runtime signals without re-reading timelines here.
 function collectRepositoryEvidence(targetRoot, options = {}) {
 	const routes = inspectRoutes(targetRoot);
 	const workflowPacks = inspectWorkflowPacks(targetRoot);
@@ -125,6 +174,7 @@ function collectRepositoryEvidence(targetRoot, options = {}) {
 	const plans = collectPlans(targetRoot);
 	const executions = collectExecutions(targetRoot);
 	const handoff = collectHandoff(targetRoot, options.handoffBundleDir);
+	const agentAssets = collectAgentAssets(targetRoot);
 	const evolution = {
 		findings: countEvolutionFindings(targetRoot),
 		significant: extractEvolutionFindings(targetRoot),
@@ -151,6 +201,8 @@ function collectRepositoryEvidence(targetRoot, options = {}) {
 		plans,
 		executions,
 		handoff,
+		agentAssets,
+		sessions: Array.isArray(options.sessions) ? options.sessions : [],
 		evolution,
 		regressionProposals,
 		verifyCommand,
@@ -163,4 +215,5 @@ module.exports = {
 	collectPlans,
 	collectExecutions,
 	collectHandoff,
+	collectAgentAssets,
 };

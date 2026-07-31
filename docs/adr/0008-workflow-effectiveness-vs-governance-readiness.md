@@ -4,7 +4,7 @@
 **Date:** 2026-07-30
 **Builds on:** ADR-0003 (governance-gated execution), ADR-0004 (evidence-grade verification), ADR-0005 (experimental execution removal), ADR-0007 (web viewer role)
 
-**Status detail:** P0 (ADR/schema/fixtures), P1 (repository-only assessment), P2a (amber-native session provider, findings/compare), P2b (Claude transcript provider, redaction extraction) are implemented. P2 web visualization in `apps/web` is deferred. P3 structured intervention ledger (mechanism + validation-state vocabulary) is deferred; `il-3-intervention-validated` reports `not-applicable` honestly until the ledger lands. Longitudinal `compare` includes schema-version-mismatch detection. The `workflow plan --dry-run` finding bridge is implemented.
+**Status detail:** P0 (ADR/schema/fixtures), P1 (repository-only assessment), P2a (amber-native session provider + session-correlated LD/VC checks, findings/compare), P2b (Claude transcript provider wired into `buildReport`; cwd positive binding — mismatch is a hard exclusion AND at least one matching cwd line is required; newest-20 transcript cap; redaction on summary fields) are implemented. P2 web visualization in `apps/web` is deferred. P3 structured intervention ledger (mechanism + validation-state vocabulary) is deferred; `il-3-intervention-validated` reports `not-applicable` honestly until the ledger lands. Longitudinal `compare` includes schema-version-mismatch detection and suspicious score↑/coverage↓ flags. The `workflow plan --dry-run` bridge emits plan-input or maintenance-proposal drafts.
 
 ---
 

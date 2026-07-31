@@ -78,6 +78,7 @@ function summarizeSession(manifest, events) {
 
 	return {
 		sessionId: manifest.sessionId,
+		provider: "amber-native",
 		goal,
 		routeId,
 		status,

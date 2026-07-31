@@ -48,7 +48,7 @@
     },
     "sessionObservations": {
       "type": "array",
-      "description": "P2: normalized amber-native session observations. Absent when --no-sessions.",
+      "description": "P2: normalized session observations (amber-native and/or Claude host transcripts). Absent when --no-sessions.",
       "items": { "$ref": "#/definitions/SessionObservation" }
     }
   },
@@ -118,6 +118,7 @@
       "required": ["sessionId", "status"],
       "properties": {
         "sessionId": { "type": "string" },
+        "provider": { "type": "string", "description": "amber-native | claude | …" },
         "goal": { "type": ["string", "null"] },
         "routeId": { "type": ["string", "null"] },
         "status": { "type": "string" },
@@ -129,7 +130,8 @@
         "approvals": { "type": "integer", "minimum": 0 },
         "denials": { "type": "integer", "minimum": 0 },
         "durationMs": { "type": ["integer", "null"], "minimum": 0 }
-      }
+      },
+      "additionalProperties": true
     }
   }
 }

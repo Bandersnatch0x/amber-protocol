@@ -23,7 +23,7 @@ const PROVIDERS = [
 		providerId: "amber-native",
 		capabilities: {
 			agentAssets: "supported",
-			sessions: "supported", // declared supported; P1 assess does not consume session events
+			sessions: "supported", // P2+: buildReport consumes amber-native sessions by default
 			usage: "unsupported",
 			permissions: "supported",
 			outputs: "supported",
@@ -35,21 +35,24 @@ const PROVIDERS = [
 		providerId: "claude",
 		capabilities: {
 			agentAssets: "unsupported",
-			sessions: "unsupported", // P2b wiring pending: buildReport consumes amber-native only; declared unsupported until claude session evidence is actually merged into coverage (fail-closed per ADR-0008 §Consequences).
+			// P2b: buildReport merges Claude transcript observations (cwd-bound)
+			// when amber-native sessions are absent or as additional host evidence.
+			sessions: "supported",
 			usage: "unsupported",
 			permissions: "unsupported",
 			outputs: "supported",
 			mutation: "unsupported",
 		},
-		available: (targetRoot) => {
+		available: (targetRoot, opts) => {
 			// Detect ~/.claude/projects/<encoded-target> existence, bound to the
 			// assessed target (not process.cwd()) so cross-repo assessment reports
-			// availability for the right repo.
+			// availability for the right repo. opts.claudeHome overrides the home
+			// root for tests — same injection point as collectClaudeObservations.
 			const { repoTranscriptDir } = require("./providers/claude-transcript");
 			const fs = require("node:fs");
 			const path = require("node:path");
 			try {
-				return fs.existsSync(repoTranscriptDir(path.resolve(targetRoot || process.cwd())));
+				return fs.existsSync(repoTranscriptDir(path.resolve(targetRoot || process.cwd()), opts?.claudeHome));
 			} catch {
 				return false;
 			}
@@ -81,21 +84,21 @@ const PROVIDERS = [
 	},
 ];
 
-function listProviders(targetRoot) {
+function listProviders(targetRoot, opts) {
 	return PROVIDERS.map((p) => ({
 		providerId: p.providerId,
 		capabilities: { ...p.capabilities },
-		available: p.available(targetRoot),
+		available: p.available(targetRoot, opts),
 	}));
 }
 
-function providerById(providerId, targetRoot) {
+function providerById(providerId, targetRoot, opts) {
 	const p = PROVIDERS.find((x) => x.providerId === providerId);
 	if (!p) return null;
 	return {
 		providerId: p.providerId,
 		capabilities: { ...p.capabilities },
-		available: p.available(targetRoot),
+		available: p.available(targetRoot, opts),
 	};
 }
 

@@ -77,8 +77,11 @@ const PER_COMMAND_USAGE = {
   drift: "Usage: amber drift --target <repo> [--scope artifact|wiki|scaffold|all] [--format text|json|gh-annotations] [--no-fail] [--json]",
   sync: "Usage: amber sync --target <repo> [--execute] [--json]",
   workflow: [
-    "Usage: amber workflow <assess|findings|plan|compare> --target <repo> [--format json|markdown] [--output-dir <path>] [--no-sessions]",
+    "Usage: amber workflow <assess|findings|plan|compare> --target <repo>",
     "       amber workflow assess --target <repo> [--format json|markdown] [--output-dir <path>] [--no-sessions]",
+    "       amber workflow findings --target <repo> --report <path>",
+    "       amber workflow plan --target <repo> --report <path> --finding <id>",
+    "       amber workflow compare --target <repo> --baseline <path> --current <path>",
   ].join("\n"),
 };
 

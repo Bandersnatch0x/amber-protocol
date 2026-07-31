@@ -944,6 +944,44 @@ GitHub Actions snippet (add as a step in any workflow that runs on PRs):
     amber drift --target . --format gh-annotations --no-fail
 ```
 
+## Workflow Commands
+
+`amber workflow` is the ADR-0008 workflow-effectiveness assessment surface. Read-only by default:
+`assess` builds a report from repository evidence plus session observations (amber-native sessions
+and cwd-bound Claude host transcripts, capped to the newest 20 transcript files) unless
+`--no-sessions`; `findings` / `plan` / `compare` operate on prior report files. `assess` writes a
+report file only when `--output-dir` is given. Diagnostics go to **stderr**; stdout stays
+parser-safe JSON (or Markdown for assess).
+
+```bash
+# Build a report (stdout JSON by default)
+node scripts/amber.js workflow assess --target .
+node scripts/amber.js workflow assess --target . --format markdown
+node scripts/amber.js workflow assess --target . --output-dir .amber/workflow-reports
+node scripts/amber.js workflow assess --target . --no-sessions   # repository-only baseline
+
+# Extract findings from a prior report
+node scripts/amber.js workflow findings --target . --report path/to/report.json
+
+# Dry-run plan draft for one finding (never mutates the target)
+node scripts/amber.js workflow plan --target . --report path/to/report.json --finding ca-1-feature-observable
+
+# Longitudinal compare of two reports
+node scripts/amber.js workflow compare --target . --baseline path/to/old.json --current path/to/new.json
+```
+
+Subcommands:
+
+| Action | Purpose | Key flags |
+|--------|---------|-----------|
+| `assess` | Score dimensions + findings from live repo evidence | `--format json\|markdown`, `--output-dir`, `--no-sessions` |
+| `findings` | List findings from a saved report | `--report` (required) |
+| `plan` | Dry-run plan draft for one finding | `--report`, `--finding` (required) |
+| `compare` | Diff baseline vs current report | `--baseline`, `--current` (required) |
+
+Only `assess` accepts `--output-dir`. `findings` / `plan` / `compare` reject it with exit code 1
+and an empty stdout. No action schedules work or executes target-project commands.
+
 ## Ledger Commands
 
 `amber ledger` exports, seals, or verifies the anchoring of Amber's tamper-evident ledgers.

@@ -446,26 +446,36 @@ function handleWorkflow(args) {
     };
   }
   if (action === "assess" || action === "findings" || action === "compare" || action === "plan") {
-    let text;
-    if (action === "assess") {
-      const { renderJson, renderMarkdown } = require("./workflow-assessment/renderers");
-      text = args.format === "markdown" ? renderMarkdown(result.report) : renderJson(result.report);
-    } else if (action === "plan") {
-      text = JSON.stringify({ findingId: result.findingId, draft: result.draft, dryRun: true, notice: result.notice }, null, 2);
-    } else {
-      // findings/compare: emit the result envelope as JSON minus non-data keys
-      const out = action === "findings"
-        ? { findings: result.findings, count: result.count }
-        : { dimensionDeltas: result.dimensionDeltas, findingsAdded: result.findingsAdded, findingsResolved: result.findingsResolved, suspiciousImprovements: result.suspiciousImprovements, schemaVersionBaseline: result.schemaVersionBaseline, schemaVersionCurrent: result.schemaVersionCurrent, versionMismatch: result.versionMismatch, coverageBaseline: result.coverageBaseline, coverageCurrent: result.coverageCurrent };
-      text = JSON.stringify(out, null, 2);
+    const errors = Array.isArray(result.errors) ? result.errors : [];
+    const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+    let text = "";
+    // On hard errors for findings/plan/compare, leave stdout empty so a bare
+    // `{}` is not mistaken for a valid empty result. assess still renders the
+    // report body when present (schema-valid even with findings).
+    if (errors.length === 0 || action === "assess") {
+      if (action === "assess" && result.report) {
+        const { renderJson, renderMarkdown } = require("./workflow-assessment/renderers");
+        text = args.format === "markdown" ? renderMarkdown(result.report) : renderJson(result.report);
+      } else if (action === "plan") {
+        text = JSON.stringify({ findingId: result.findingId, draft: result.draft, dryRun: true, notice: result.notice }, null, 2);
+      } else if (action === "findings" || action === "compare") {
+        // findings/compare: emit the result envelope as JSON minus non-data keys
+        const out = action === "findings"
+          ? { findings: result.findings, count: result.count }
+          : { dimensionDeltas: result.dimensionDeltas, findingsAdded: result.findingsAdded, findingsResolved: result.findingsResolved, suspiciousImprovements: result.suspiciousImprovements, schemaVersionBaseline: result.schemaVersionBaseline, schemaVersionCurrent: result.schemaVersionCurrent, versionMismatch: result.versionMismatch, coverageBaseline: result.coverageBaseline, coverageCurrent: result.coverageCurrent };
+        text = JSON.stringify(out, null, 2);
+      }
     }
-    if (Array.isArray(result.warnings) && result.warnings.length > 0) {
-      for (const w of result.warnings) console.error(`WARNING: ${w}`);
-    }
-    if (Array.isArray(result.errors) && result.errors.length > 0) {
-      for (const e of result.errors) console.error(`ERROR: ${e}`);
-    }
-    return { result: { ...result, text }, bypassPrint: true, exitCode: result.errors.length > 0 ? 1 : 0 };
+    for (const w of warnings) console.error(`WARNING: ${w}`);
+    for (const e of errors) console.error(`ERROR: ${e}`);
+    // onBypass prints body only so amber.js does not re-emit warnings/errors
+    // onto stdout (diagnostics already went to stderr; stdout stays parser-safe).
+    return {
+      result: { ...result, text },
+      bypassPrint: true,
+      onBypass: () => { if (text) console.log(text); },
+      exitCode: errors.length > 0 ? 1 : 0,
+    };
   }
   return { result };
 }

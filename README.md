@@ -43,6 +43,7 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
 | Inspect | `amber audit --target <repo> --summary` | Read-only readiness findings |
 | Install | `amber init --target <repo>` | Starter governance files without overwrites |
 | Score | `amber governance report --target <repo>` | Readiness score, risks, and structured next actions |
+| Effectiveness | `amber workflow assess --target <repo>` | Workflow-effectiveness dimensions (separate from readiness; ADR-0008) |
 | Plan | `amber plan --target <repo> --feature F001 --title "..."` | A feature plan and review surface |
 | Gate | `amber next --target <repo>` | The next safe lifecycle command |
 | Verify | `amber doctor --target <repo>` | Checks for required agent-facing surfaces |
@@ -142,6 +143,29 @@ command and expected outcome.
 amber governance report --target .
 amber governance report --target . --output docs/quality/amber-governance-report.md
 ```
+
+### `amber workflow` — workflow effectiveness (ADR-0008)
+
+`amber workflow` is a **separate** read-only assessment from governance readiness. It scores five
+Amber dimensions (Context Adequacy, Lifecycle Discipline, Verification Coverage, Delivery Integrity,
+Improvement Loop) from repository evidence and optional session observations. Diagnostics go to
+**stderr**; stdout stays parser-safe JSON (or Markdown). Never merges into readiness's overall score.
+
+```bash
+# Assess the target (stdout JSON; sessions included by default)
+amber workflow assess --target .
+amber workflow assess --target . --format markdown
+amber workflow assess --target . --output-dir .amber/workflow-reports
+amber workflow assess --target . --no-sessions
+
+# Operate on a saved report
+amber workflow findings --target . --report path/to/report.json
+amber workflow plan --target . --report path/to/report.json --finding ca-1-feature-observable
+amber workflow compare --target . --baseline path/to/old.json --current path/to/new.json
+```
+
+`plan` is dry-run only (plan-input or maintenance-proposal draft). Only `assess` accepts
+`--output-dir`. Full flag list: [CLI reference — Workflow Commands](./docs/CLI_REFERENCE.md#workflow-commands).
 
 ### `amber handoff bundle` - portable continuation artifact
 

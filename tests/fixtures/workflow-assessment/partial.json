@@ -18,7 +18,7 @@
       "score": 50, "confidence": "low", "coverage": "partial",
       "evidenceRefs": ["routes/"],
       "checks": [
-        { "id": "ld-1-route-gate", "status": "partial", "evidenceRefs": ["routes/"], "confidenceImpact": "low", "note": "Gates declared but none is user-approval." },
+        { "id": "ld-1-route-gate", "status": "partial", "evidenceRefs": ["routes/"], "confidenceImpact": "low", "note": "Gates declared; only 1/3 route(s) have a user-approval gate." },
         { "id": "ld-2-deny-by-default", "status": "pass", "evidenceRefs": [".amber/governance/rules.json"], "confidenceImpact": "high" },
         { "id": "ld-3-worktree-isolation", "status": "not-applicable", "confidenceImpact": "low", "note": "No workflow packs present." }
       ]

@@ -14,6 +14,7 @@ const { scoreDimensions } = require("./scoring");
 const { listProviders } = require("./observation-contract");
 const { renderJson, renderMarkdown } = require("./renderers");
 const { collectSessionObservations } = require("./providers/amber-native-session");
+const { collectClaudeObservations } = require("./providers/claude-transcript");
 
 const DIMENSION_LABELS = {
 	contextAdequacy: "Context Adequacy",
@@ -27,18 +28,37 @@ const DIMENSION_LABELS = {
 const CHECK_FOLLOWUP = {
 	"ca-1-feature-observable": { owner: "feature-list", verifier: "feature_list.json features all carry user_visible_behavior and verification.", actionKind: "plan-input" },
 	"ca-2-plan-goal-acceptance": { owner: "planning", verifier: "Every plan has non-empty Goal and Acceptance Criteria sections.", actionKind: "plan-input" },
-	"ca-3-route-trigger": { owner: "routes", verifier: "At least one route declares a trigger matching task type.", actionKind: "plan-input" },
+	// P1 only asserts route files exist — trigger-content matching is not inspected.
+	"ca-3-route-trigger": { owner: "routes", verifier: "At least one route file is declared under routes/.", actionKind: "plan-input" },
+	"ca-4-agent-docs": { owner: "agent-docs", verifier: "AGENTS.md, CLAUDE.md, or docs/AGENTS.md is present.", actionKind: "plan-input" },
 	"ld-1-route-gate": { owner: "routes", verifier: "Every route declares a user-approval gate.", actionKind: "plan-input" },
 	"ld-2-deny-by-default": { owner: "governance", verifier: "rules.json defaultAction is deny.", actionKind: "plan-input" },
 	"ld-3-worktree-isolation": { owner: "workflow-packs", verifier: "Every mutating loop uses worktree isolation with review gates.", actionKind: "plan-input" },
+	"ld-4-session-gate-evidence": { owner: "sessions", verifier: "Lifecycle sessions record gate approvals or denials.", actionKind: "plan-input" },
 	"vc-1-verify-discoverable": { owner: "toolchain", verifier: "A verify command is discoverable from the toolchain.", actionKind: "plan-input" },
 	"vc-2-execution-commands": { owner: "execution", verifier: "At least one execution evidence file records commands.", actionKind: "plan-input" },
+	"vc-3-session-validation": { owner: "sessions", verifier: "Sessions record stage transitions or validation failure counts.", actionKind: "plan-input" },
 	"di-1-handoff-complete": { owner: "handoff", verifier: "Handoff bundle contains all required files.", actionKind: "plan-input" },
 	"di-2-risks-recorded": { owner: "handoff", verifier: "Handoff bundle records residual risks and recovery commands.", actionKind: "plan-input" },
 	"il-1-evolution-recurrent": { owner: "maintenance", verifier: "Evolution log records a recurrent finding (count>=2).", actionKind: "maintenance-proposal" },
 	"il-2-regression-traceable": { owner: "maintenance", verifier: "A regression proposal with assertion exists.", actionKind: "maintenance-proposal" },
 	"il-3-intervention-validated": { owner: "maintenance", verifier: "At least one feature reached accepted state after an evolution-log intervention.", actionKind: "maintenance-proposal" },
 };
+
+/**
+ * Resolve top-level coverage.session (ADR-0008 §Consequences).
+ * - noSessions: user opt-out → not-applicable
+ * - amber-native has sessions → that provider's coverage (covered)
+ * - no amber sessions + foreign provider available with sessions unsupported
+ *   → unsupported (evidence may exist elsewhere but cannot be read)
+ * - otherwise → unavailable
+ */
+function resolveSessionCoverage(noSessions, sessionObs, foreignSessionUnsupported) {
+	if (noSessions) return "not-applicable";
+	if (sessionObs?.present) return sessionObs.coverage || "covered";
+	if (foreignSessionUnsupported) return "unsupported";
+	return "unavailable";
+}
 
 function buildFindings(dimensionResults) {
 	const findings = [];
@@ -68,11 +88,41 @@ function buildFindings(dimensionResults) {
 	return findings;
 }
 
+/**
+ * Collect amber-native + Claude host transcript observations for P2.
+ * The two sources are concatenated as-is — no cross-provider dedup: they
+ * observe different planes (amber-native = lifecycle/gate events, claude =
+ * host tool telemetry), so one work item may legitimately appear in both.
+ * Returns { present, sessions, coverage, sources }.
+ */
+function collectMergedSessionObservations(targetRoot, options = {}) {
+	const amber = collectSessionObservations(targetRoot);
+	const claude = collectClaudeObservations(targetRoot, { claudeHome: options.claudeHome });
+	const sessions = [];
+	if (amber.present) sessions.push(...(amber.sessions || []));
+	if (claude.present) sessions.push(...(claude.sessions || []));
+	const present = sessions.length > 0;
+	// covered if any provider contributed; partial never used at this layer.
+	const coverage = present ? "covered" : "unavailable";
+	const sources = [];
+	if (amber.present) sources.push("amber-native");
+	if (claude.present) sources.push("claude");
+	return { present, sessions, coverage, sources };
+}
+
 function buildReport(targetRoot, options = {}) {
-	// Sessions are read from amber-native and included by default. --no-sessions
-	// excludes them, reproducing the original repository-only baseline shape.
+	// Sessions are read from amber-native + Claude (P2b) by default.
+	// --no-sessions excludes them, reproducing the repository-only baseline.
+	// options.claudeHome overrides the Claude home root (test injection only —
+	// not exposed as a CLI flag).
 	const noSessions = options.noSessions === true;
-	const evidence = collectRepositoryEvidence(targetRoot, { handoffBundleDir: options.handoffBundleDir });
+	const sessionObs = noSessions
+		? null
+		: collectMergedSessionObservations(targetRoot, { claudeHome: options.claudeHome });
+	const evidence = collectRepositoryEvidence(targetRoot, {
+		handoffBundleDir: options.handoffBundleDir,
+		sessions: sessionObs?.sessions || [],
+	});
 	const checksByDimension = runChecks(evidence);
 	const dimensions = scoreDimensions(checksByDimension);
 	const findings = buildFindings(dimensions);
@@ -101,26 +151,25 @@ function buildReport(targetRoot, options = {}) {
 		if (lanes.some((c) => c === "covered") || lanes.some((c) => c === "partial")) return "partial";
 		return "unavailable";
 	};
-	const providers = listProviders(targetRoot);
+	const providers = listProviders(targetRoot, { claudeHome: options.claudeHome });
 	const availableProviders = providers.filter((p) => p.available);
 	// A foreign provider that is available but cannot supply sessions. When
-	// amber-native has no sessions and such a provider exists, session coverage
-	// is "unsupported" (evidence exists but cannot be read) rather than
-	// "unavailable" (no evidence at all) — ADR-0008 §Consequences.
+	// no readable session evidence exists and such a provider exists, session
+	// coverage is "unsupported" rather than "unavailable" — ADR-0008.
+	// Currently only reachable in unit tests: claude declares sessions
+	// supported (P2b) and codex/cursor are never available until P3. Kept for
+	// the P3 providers; resolveSessionCoverage locks the semantics via tests.
 	const foreignSessionUnsupported = providers.some(
 		(p) => p.providerId !== "amber-native" && p.available && p.capabilities.sessions === "unsupported",
 	);
 
-	// Sessions are read from amber-native unless --no-sessions excludes them.
-	// --no-sessions is a user opt-out → "not-applicable" (dimension not assessed),
-	// distinct from unsupported (cannot read) / unavailable (no evidence).
-	const sessionObs = noSessions ? null : collectSessionObservations(targetRoot);
-	const sessionCoverage = noSessions
-		? "not-applicable"
-		: (sessionObs?.coverage || (foreignSessionUnsupported ? "unsupported" : "unavailable"));
+	const sessionCoverage = resolveSessionCoverage(noSessions, sessionObs, foreignSessionUnsupported);
 	const sessionScope = noSessions
 		? "not-applicable"
 		: (sessionObs?.present ? "covered" : "unavailable");
+
+	// agentAssets lane: driven by dedicated agent-doc evidence, not Context Adequacy.
+	const agentAssetsCoverage = evidence.agentAssets?.present ? "covered" : "unavailable";
 
 	return {
 		schemaVersion: "1.0.0",
@@ -139,9 +188,7 @@ function buildReport(targetRoot, options = {}) {
 			]),
 			session: sessionCoverage,
 			delivery: aggregateCoverage([dimensions.deliveryIntegrity.coverage]),
-			agentAssets: aggregateCoverage([
-				dimensions.contextAdequacy.coverage,
-			]),
+			agentAssets: agentAssetsCoverage,
 		},
 		dimensions: dimensionsWithNotes,
 		findings,
@@ -177,7 +224,46 @@ function buildPlanDraft(target, finding) {
 		"",
 		"`amber workflow plan --dry-run` — review before applying via `amber plan`.",
 	];
-	return { target, content: lines.join("\n"), finding };
+	return { target, content: lines.join("\n"), finding, kind: "plan-input" };
+}
+
+/** Dry-run bridge for actionKind=maintenance-proposal (ADR-0008). */
+function buildMaintenanceDraft(target, finding) {
+	const lines = [
+		`# Maintenance proposal draft: ${finding.id}`,
+		"",
+		"## Summary",
+		"",
+		finding.summary,
+		"",
+		"## Proposed maintenance action",
+		"",
+		`- Owner: ${finding.owner}`,
+		`- Verifier: ${finding.verifier}`,
+		`- Action kind: maintenance-proposal`,
+		"",
+		"## Evidence",
+		"",
+		...((finding.evidenceRefs || []).map((r) => `- ${r}`)),
+		"",
+		"## Next command (human-triggered)",
+		"",
+		"```bash",
+		`amber maintenance propose --target "${target}" --output maintenance-plan.md`,
+		"```",
+		"",
+		"## Generated by",
+		"",
+		"`amber workflow plan --dry-run` — review before applying via `amber maintenance propose`.",
+	];
+	return { target, content: lines.join("\n"), finding, kind: "maintenance-proposal" };
+}
+
+function buildFindingDraft(target, finding) {
+	if (finding.actionKind === "maintenance-proposal") {
+		return buildMaintenanceDraft(target, finding);
+	}
+	return buildPlanDraft(target, finding);
 }
 
 function readReportFile(filePath) {
@@ -325,9 +411,12 @@ function workflowDispatch(action, target, args) {
 		if (!finding) {
 			return { target: target || ".", errors: [`Finding ${findingId} not found in ${reportPath}`], warnings: [] };
 		}
-		// ADR-0008: plan bridge is dry-run only — produces a proposed plan draft,
-		// never edits target code/config. The draft names owner + verifier + action.
-		const draft = buildPlanDraft(report.target || target || ".", finding);
+		// ADR-0008: plan bridge is dry-run only — plan-input or maintenance-proposal
+		// drafts; never edits target code/config.
+		const draft = buildFindingDraft(report.target || target || ".", finding);
+		const applyHint = draft.kind === "maintenance-proposal"
+			? "Dry-run only. Apply the draft via 'amber maintenance propose' after review."
+			: "Dry-run only. Apply the draft via 'amber plan' after review.";
 		return {
 			target: target || ".",
 			findingId,
@@ -335,14 +424,27 @@ function workflowDispatch(action, target, args) {
 			dryRun: true,
 			errors: [],
 			warnings: [], // kept empty so bypass-print stdout stays parser-safe
-			notice: "Dry-run only. Apply the draft via 'amber plan' after review.",
+			notice: applyHint,
 		};
 	}
+	const label = action == null || action === "" ? "(none)" : String(action);
 	return {
 		target: target || ".",
-		errors: [`Unknown workflow action: ${action}. Known: assess, findings, plan, compare.`],
+		errors: [`Unknown workflow action: ${label}. Known: assess, findings, plan, compare.`],
 		warnings: [],
 	};
 }
 
-module.exports = { workflowDispatch, assessWorkflow, buildReport, buildFindings, findingsFromReport, compareReports };
+module.exports = {
+	workflowDispatch,
+	assessWorkflow,
+	buildReport,
+	buildFindings,
+	findingsFromReport,
+	compareReports,
+	resolveSessionCoverage,
+	buildPlanDraft,
+	buildMaintenanceDraft,
+	buildFindingDraft,
+	collectMergedSessionObservations,
+};

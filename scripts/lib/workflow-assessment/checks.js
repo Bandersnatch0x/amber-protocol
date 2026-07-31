@@ -55,6 +55,26 @@ function ca3RouteTrigger(evidence) {
 	return { id: "ca-3-route-trigger", status: "pass", evidenceRefs: ["routes/"], confidenceImpact: "medium", note: `${routes.count} routes declared (trigger content not inspected in P1).` };
 }
 
+function ca4AgentDocs(evidence) {
+	const assets = evidence.agentAssets || { present: false, files: [] };
+	if (!assets.present || !assets.files || assets.files.length === 0) {
+		return {
+			id: "ca-4-agent-docs",
+			status: "fail",
+			evidenceRefs: ["AGENTS.md", "docs/AGENTS.md"],
+			confidenceImpact: "medium",
+			note: "No agent-facing docs found (AGENTS.md / CLAUDE.md / docs/AGENTS.md).",
+		};
+	}
+	return {
+		id: "ca-4-agent-docs",
+		status: "pass",
+		evidenceRefs: assets.files,
+		confidenceImpact: "medium",
+		note: `${assets.files.length} agent doc(s): ${assets.files.join(", ")}.`,
+	};
+}
+
 // Dimension: Lifecycle Discipline
 
 function ld1RouteGate(evidence) {
@@ -68,7 +88,12 @@ function ld1RouteGate(evidence) {
 	if (routes.withUserApprovalGates.length === routes.count) {
 		return { id: "ld-1-route-gate", status: "pass", evidenceRefs: ["routes/"], confidenceImpact: "high" };
 	}
-	return { id: "ld-1-route-gate", status: "partial", evidenceRefs: ["routes/"], confidenceImpact: "medium", note: "Gates declared but none is user-approval." };
+	// All routes have some gate, but not every route has a user-approval gate.
+	const approved = routes.withUserApprovalGates.length;
+	const note = approved === 0
+		? "Gates declared but none is user-approval."
+		: `Gates declared; only ${approved}/${routes.count} route(s) have a user-approval gate.`;
+	return { id: "ld-1-route-gate", status: "partial", evidenceRefs: ["routes/"], confidenceImpact: "medium", note };
 }
 
 function ld2DenyByDefault(evidence) {
@@ -94,7 +119,105 @@ function ld3WorktreeIsolation(evidence) {
 	return { id: "ld-3-worktree-isolation", status: "partial", evidenceRefs: ["workflow-packs/"], confidenceImpact: "medium", note: `${workflowPacks.missingWorktreeIsolation.length} pack(s) missing worktree isolation, ${workflowPacks.missingReviewGates.length} missing review gates.` };
 }
 
+// P2: correlate amber-native session gate events with lifecycle discipline.
+// Host-transcript-only sessions (no stage/gate signals) stay not-applicable.
+function ld4SessionGateEvidence(evidence) {
+	const sessions = evidence.sessions || [];
+	if (sessions.length === 0) {
+		return {
+			id: "ld-4-session-gate-evidence",
+			status: "not-applicable",
+			evidenceRefs: [],
+			confidenceImpact: "low",
+			note: "No session observations.",
+		};
+	}
+	const withLifecycle = sessions.filter(
+		(s) => (s.stageTransitions || 0) > 0 || (s.approvals || 0) > 0 || (s.denials || 0) > 0,
+	);
+	if (withLifecycle.length === 0) {
+		return {
+			id: "ld-4-session-gate-evidence",
+			status: "not-applicable",
+			evidenceRefs: [".amber/sessions/"],
+			confidenceImpact: "low",
+			note: "Session observations present but no stage/gate events (host transcript-only).",
+		};
+	}
+	const withGate = withLifecycle.filter((s) => (s.approvals || 0) > 0 || (s.denials || 0) > 0);
+	if (withGate.length === withLifecycle.length) {
+		return {
+			id: "ld-4-session-gate-evidence",
+			status: "pass",
+			evidenceRefs: [".amber/sessions/"],
+			confidenceImpact: "high",
+			note: `${withGate.length} session(s) record gate approvals or denials.`,
+		};
+	}
+	if (withGate.length > 0) {
+		return {
+			id: "ld-4-session-gate-evidence",
+			status: "partial",
+			evidenceRefs: [".amber/sessions/"],
+			confidenceImpact: "medium",
+			note: `${withGate.length}/${withLifecycle.length} lifecycle session(s) record gate events.`,
+		};
+	}
+	return {
+		id: "ld-4-session-gate-evidence",
+		status: "fail",
+		evidenceRefs: [".amber/sessions/"],
+		confidenceImpact: "medium",
+		note: "Sessions show stage transitions but no gate approvals/denials.",
+	};
+}
+
 // Dimension: Verification Coverage
+
+// P2: session-level validation/failure signals when lifecycle sessions exist.
+function vc3SessionValidationEvidence(evidence) {
+	const sessions = evidence.sessions || [];
+	if (sessions.length === 0) {
+		return {
+			id: "vc-3-session-validation",
+			status: "not-applicable",
+			evidenceRefs: [],
+			confidenceImpact: "low",
+			note: "No session observations.",
+		};
+	}
+	const withSignal = sessions.filter(
+		(s) =>
+			(s.stageTransitions || 0) > 0 ||
+			(s.validationFailures || 0) > 0 ||
+			(s.failures || 0) > 0,
+	);
+	if (withSignal.length === 0) {
+		return {
+			id: "vc-3-session-validation",
+			status: "not-applicable",
+			evidenceRefs: [".amber/sessions/"],
+			confidenceImpact: "low",
+			note: "Session observations present but no stage/validation failure signals (host transcript-only).",
+		};
+	}
+	const withFailures = withSignal.filter(
+		(s) => (s.validationFailures || 0) > 0 || (s.failures || 0) > 0,
+	);
+	// Failures preserved is good evidence; stage transitions without failures
+	// also pass (successful runs leave stage events). Sessions with no signal
+	// at all already returned not-applicable above — this check observes
+	// capability and never fails; defect detection is ld-4's job.
+	return {
+		id: "vc-3-session-validation",
+		status: "pass",
+		evidenceRefs: [".amber/sessions/"],
+		confidenceImpact: "medium",
+		note: withFailures.length > 0
+			? `${withFailures.length} session(s) preserve validation/runtime failure counts; ${withSignal.length} with lifecycle signal.`
+			: `${withSignal.length} session(s) record stage transitions (no validation failures recorded).`,
+	};
+}
 
 function vc1VerifyDiscoverable(evidence) {
 	const cmd = evidence.verifyCommand;
@@ -196,9 +319,9 @@ function il3InterventionValidated(evidence) {
 }
 
 const CHECKS_BY_DIMENSION = {
-	contextAdequacy: [ca1FeatureObservable, ca2PlanGoalAcceptance, ca3RouteTrigger],
-	lifecycleDiscipline: [ld1RouteGate, ld2DenyByDefault, ld3WorktreeIsolation],
-	verificationCoverage: [vc1VerifyDiscoverable, vc2ExecutionCommands],
+	contextAdequacy: [ca1FeatureObservable, ca2PlanGoalAcceptance, ca3RouteTrigger, ca4AgentDocs],
+	lifecycleDiscipline: [ld1RouteGate, ld2DenyByDefault, ld3WorktreeIsolation, ld4SessionGateEvidence],
+	verificationCoverage: [vc1VerifyDiscoverable, vc2ExecutionCommands, vc3SessionValidationEvidence],
 	deliveryIntegrity: [di1HandoffComplete, di2RisksRecorded],
 	improvementLoop: [il1EvolutionRecurrent, il2RegressionTraceable, il3InterventionValidated],
 };
@@ -214,9 +337,9 @@ function runChecks(evidence) {
 module.exports = {
 	CHECKS_BY_DIMENSION,
 	runChecks,
-	ca1FeatureObservable, ca2PlanGoalAcceptance, ca3RouteTrigger,
-	ld1RouteGate, ld2DenyByDefault, ld3WorktreeIsolation,
-	vc1VerifyDiscoverable, vc2ExecutionCommands,
+	ca1FeatureObservable, ca2PlanGoalAcceptance, ca3RouteTrigger, ca4AgentDocs,
+	ld1RouteGate, ld2DenyByDefault, ld3WorktreeIsolation, ld4SessionGateEvidence,
+	vc1VerifyDiscoverable, vc2ExecutionCommands, vc3SessionValidationEvidence,
 	di1HandoffComplete, di2RisksRecorded,
 	il1EvolutionRecurrent, il2RegressionTraceable, il3InterventionValidated,
 };
