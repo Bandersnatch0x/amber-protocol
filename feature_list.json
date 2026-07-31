@@ -257,16 +257,25 @@
       "area": "verification",
       "title": "Pre-push hook rejects pi-rewind checkpoint refs",
       "user_visible_behavior": "git push --mirror or a direct push of refs/pi-checkpoints/* is blocked by .githooks/pre-push with a clear error; normal branch/tag pushes are unaffected",
-      "status": "not_started",
+      "status": "accepted",
       "verification": [
         "npm test"
       ],
-      "evidence": [],
+      "evidence": [
+        {
+          "command": "npm test",
+          "result": "passed (exit 0, 129058ms)",
+          "date": "2026-07-31",
+          "notes": "session 908b925d-0e6f-42f9-a6a1-4050a4d5d0f5 stage verify",
+          "sessionId": "908b925d-0e6f-42f9-a6a1-4050a4d5d0f5"
+        }
+      ],
       "notes": [],
       "paths": [
         ".githooks/pre-push",
         "tests/unit/pre-push-hook.test.js"
-      ]
+      ],
+      "updated": "2026-07-31"
     }
   ]
 }

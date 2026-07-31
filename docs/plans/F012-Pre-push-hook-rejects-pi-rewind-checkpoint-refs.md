@@ -1,7 +1,7 @@
 # Plan: Pre-push hook rejects pi-rewind checkpoint refs
 
 Feature: F012
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal

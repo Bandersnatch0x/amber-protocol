@@ -4,19 +4,19 @@ Last Updated: 2026-08-01
 
 ## Summary
 
-Latest session `64eb8c99-973c-480f-9b48-a3002c8939fd` — "fix CLI_REFERENCE documentation gap issue: 14 commands missing sections" (completed). 11 feature(s): 8 passing, 3 accepted
+Latest session `908b925d-0e6f-42f9-a6a1-4050a4d5d0f5` — "add automated test coverage for the pre-push hook guard that rejects pi-rewind checkpoint refs" (completed). 12 feature(s): 9 passing, 3 accepted
 
 ## Repo State
 
 - Branch: master
-- Uncommitted changes: clean
-- Last commit: b98f0fc chore(release): v1.3.11
+- Uncommitted changes: dirty (tracked and/or untracked changes)
+- Last commit: d230a21 test(hooks): cover pre-push pi-rewind checkpoint guard (F012)
 
 ## Runtime / Verification State
 
 - Command: npm test
-- Result: passed (exit 0, 85388ms)
-- When: 2026-07-28
+- Result: passed (exit 0, 129058ms)
+- When: 2026-07-31
 
 ## Feature State
 
@@ -31,6 +31,7 @@ Latest session `64eb8c99-973c-480f-9b48-a3002c8939fd` — "fix CLI_REFERENCE doc
 - F009 [accepted] Governance evidence reads resolve the state dir (legacy .harness support)
 - F010 [accepted] Ship 1.3.8 after interrupted 1.3.7 release (CHANGELOG + version)
 - F011 [accepted] CLI_REFERENCE covers all 33 commands (fill 14 missing sections)
+- F012 [passing] Pre-push hook rejects pi-rewind checkpoint refs
 
 ## Verification Evidence
 
@@ -48,6 +49,7 @@ Latest session `64eb8c99-973c-480f-9b48-a3002c8939fd` — "fix CLI_REFERENCE doc
 - F009: `npm test` → passed (exit 0, 83527ms) (2026-07-14, session df0c5d07)
 - F010: `npm test` → passed (exit 0, 67340ms) (2026-07-22, session c1485d45)
 - F011: `npm test` → passed (exit 0, 85388ms) (2026-07-28, session 64eb8c99)
+- F012: `npm test` → passed (exit 0, 129058ms) (2026-07-31, session 908b925d)
 
 ## Blockers
 
@@ -55,4 +57,5 @@ None recorded.
 
 ## Next Actions
 
-1. All lifecycle steps complete for the current focus — start the next feature.
+1. Accept the plan — the plan is ready to accept and append to the evolution log.
+   `amber accept --target . --plan docs/plans/F012-Pre-push-hook-rejects-pi-rewind-checkpoint-refs.md`

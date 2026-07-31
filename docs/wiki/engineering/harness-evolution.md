@@ -19,3 +19,9 @@ Last Reviewed: 2026-07-16
 - Plan: `docs/plans/F011-Fill-missing-CLI-REFERENCE-command-sections.md`
 - Review status: ready
 - Feature: F011 status → accepted in feature_list.json
+
+## 2026-07-31 docs/plans/F012-Pre-push-hook-rejects-pi-rewind-checkpoint-refs.md
+
+- Plan: `docs/plans/F012-Pre-push-hook-rejects-pi-rewind-checkpoint-refs.md`
+- Review status: ready
+- Feature: F012 status → accepted in feature_list.json
