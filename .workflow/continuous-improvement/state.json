@@ -47,7 +47,7 @@
     {
       "id": "weekly-dogfood",
       "title": "Drive one real lifecycle slice via docs/dogfood-weekly.md",
-      "status": "ready",
+      "status": "done",
       "command": "node scripts/amber.js next --target ."
     }
   ],
