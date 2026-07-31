@@ -5,6 +5,29 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.10] - 2026-07-31
+
+### Fixed
+- **workflow-assessment CI regression**: privacy assertion (`!json.includes(homedir())`) failed on Linux CI where checkout path lives under `/home/runner`. Now checks `~/.claude` root paths in both native and JSON-escaped forms, which catches real claude-home leaks while tolerating legitimate target paths under homedir
+- **workflow-assessment M1**: `collectAgentAssets` dedupes by `realpathSync.native` (Windows case-insensitive filesystems no longer report phantom `AGENTS.md` + `Agents.md` duplicates of the same on-disk file)
+- **workflow-assessment M2**: removed dead `vc-3` fail branch (check only observes capability; defect detection is `ld-4`'s job)
+- **workflow-assessment M3**: `MAX_TRANSCRIPT_FILES=20` cap (mtime newest-first); `claudeHome` injection through `buildReport` → `listProviders`; two tests now use injected `claudeHome` instead of writing real `~/.claude`
+- **workflow-assessment M4**: `summarizeTranscript` requires at least one positive cwd match (lossy directory name alone no longer binds; prevents transcript trust on lossy path encoding collisions)
+- **workflow-assessment L1**: `collectMergedSessionObservations` comment updated to accurately describe no cross-provider dedup (amber-native and claude observe different planes)
+- **workflow-assessment L2**: `foreignSessionUnsupported` noted as test-only (claude declared supported in P2b, codex/cursor unavailable until P3)
+- **workflow-assessment L3**: `--target "\${target}"` quoted in draft templates (paths with spaces now render correctly)
+
+### Performance
+- **workflow-assessment suite**: 8.6s → 2.7s (MAX_TRANSCRIPT_FILES cap reduces unbounded transcript scans from 119MB to newest 20 files)
+- **assess stdout**: 84.5KB → 18.3KB (108→17 observations; 105 claude transcripts capped to 14)
+
+### Added
+- **workflow-assessment tests**: cap regression (25 files → 20), no-cwd negative case, case-insensitive dedup regression
+
+### Notes
+- All 1295 tests pass; workflow-assessment coverage unchanged (cap only reduces historical noise, not signal)
+- `realpathSync.native` required for case dedup — JS implementation preserves caller casing and misses Windows on-disk truth
+
 ## [1.3.9] - 2026-07-27
 
 ### Added
