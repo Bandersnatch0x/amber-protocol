@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Added
+- **Knowledge Plan deep module (F013)**: read-only (`inspect`/`report`/`validate`)
+  and write-capable (`scaffold`/`build`/`plan`) use cases now cross a root facade
+  (`scripts/lib/knowledge-plan`) and Governance Console command adapter
+  (`scripts/lib/knowledge-plan/adapters/command`). Parsing, schema validation,
+  lookup precedence, report mechanics, page materialization, and proposal
+  inspection live behind an internal seam (`scripts/lib/knowledge-plan/internal`).
+  An interface contract test prevents production modules and ordinary tests from
+  importing internals directly.
+
+### Deprecated
+- **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):
+  retained helper exports (`loadKnowledgePlan`, `buildKnowledgeReport`, parser,
+  serializer, and related helpers) are forwarded for one deprecation cycle.
+  New code must use the root facade or command adapter. Removal is deferred to a
+  declared major release; no runtime import warnings are emitted.
+
 ## [1.3.11] - 2026-07-31
 
 ### Changed
