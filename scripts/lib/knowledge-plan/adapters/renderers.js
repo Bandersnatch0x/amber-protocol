@@ -1,6 +1,6 @@
 "use strict";
 
-// Governance Console presentation for Knowledge Plan read flows.
+// Governance Console presentation for Knowledge Plan flows.
 // Renderers consume structured facade outcomes and produce strings only —
 // they never write to the console themselves.
 
@@ -38,9 +38,37 @@ function renderReportText(report) {
 	return formatKnowledgeReportText(report);
 }
 
+/**
+ * Human-readable presentation for `wiki knowledge plan` when not --json.
+ *
+ * Matches the historical multi-line operator output from the dispatcher
+ * (proposal header, inspection summary, wrote/skipped lines).
+ *
+ * @param {{
+ *   target: string,
+ *   inspectionSummary?: string,
+ *   created?: string[],
+ *   skipped?: string[],
+ * }} result structured plan/proposal outcome from the facade
+ * @returns {string}
+ */
+function renderPlanText(result) {
+	const lines = [];
+	lines.push(`Knowledge Plan proposal for ${result.target}`);
+	lines.push(`Inspection: ${result.inspectionSummary}`);
+	if (result.created?.length) {
+		lines.push(`Wrote: ${result.created.join(", ")}`);
+	}
+	if (result.skipped?.length) {
+		lines.push(`Skipped (existing): ${result.skipped.join(", ")}`);
+	}
+	return lines.join("\n");
+}
+
 module.exports = {
 	renderInspectText,
 	renderReportText,
+	renderPlanText,
 	// Re-export for adapters/tests that want the report formatter by name.
 	formatKnowledgeReportText,
 };

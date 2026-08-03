@@ -9,10 +9,13 @@ const path = require("node:path");
 const {
 	knowledgeDispatch,
 	isKnowledgeReadAction,
+	isKnowledgeWriteAction,
+	SUPPORTED_ACTIONS_LIST,
 } = require("../../scripts/lib/knowledge-plan/adapters/command");
 const {
 	renderInspectText,
 	renderReportText,
+	renderPlanText,
 } = require("../../scripts/lib/knowledge-plan/adapters/renderers");
 
 function makeTempTarget() {
@@ -67,7 +70,7 @@ function captureBypass(dispatchResult) {
 }
 
 describe("knowledge-plan command adapter: action mapping", () => {
-	it("recognizes only inspect/report/validate as read actions", () => {
+	it("recognizes inspect/report/validate as read actions", () => {
 		assert.equal(isKnowledgeReadAction("inspect"), true);
 		assert.equal(isKnowledgeReadAction("report"), true);
 		assert.equal(isKnowledgeReadAction("validate"), true);
@@ -77,11 +80,176 @@ describe("knowledge-plan command adapter: action mapping", () => {
 		assert.equal(isKnowledgeReadAction(undefined), false);
 	});
 
-	it("returns unknown read-action error for unsupported action", () => {
+	it("recognizes write actions and default (empty) as write", () => {
+		assert.equal(isKnowledgeWriteAction("scaffold"), true);
+		assert.equal(isKnowledgeWriteAction("build"), true);
+		assert.equal(isKnowledgeWriteAction("materialize"), true);
+		assert.equal(isKnowledgeWriteAction("plan"), true);
+		assert.equal(isKnowledgeWriteAction(undefined), true);
+		assert.equal(isKnowledgeWriteAction(""), true);
+		assert.equal(isKnowledgeWriteAction("inspect"), false);
+	});
+
+	it("returns unknown-action error with full supported list", () => {
 		const out = knowledgeDispatch("explode", { target: "." });
 		assert.ok(Array.isArray(out.result.errors));
-		assert.ok(out.result.errors[0].includes("Unknown knowledge read action"));
-		assert.ok(out.result.errors[0].includes("inspect, report, validate"));
+		assert.ok(out.result.errors[0].includes("Unknown knowledge action"));
+		assert.ok(out.result.errors[0].includes(SUPPORTED_ACTIONS_LIST));
+		assert.ok(out.result.errors[0].includes("plan, scaffold, inspect, report, validate, build"));
+	});
+});
+
+describe("knowledge-plan command adapter: default scaffold", () => {
+	it("default (undefined) action scaffolds JSON plan", () => {
+		const tmp = makeTempTarget();
+		try {
+			const out = knowledgeDispatch(undefined, { target: tmp });
+			assert.ok(out.result.created.length > 0 || out.result.skipped.length > 0);
+			assert.ok(
+				(out.result.created.concat(out.result.skipped)).some((p) =>
+					p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.json"),
+				),
+			);
+			assert.equal(out.bypassPrint, undefined);
+		} finally {
+			cleanup(tmp);
+		}
+	});
+
+	it("explicit scaffold maps options (yaml + dryRun)", () => {
+		const tmp = makeTempTarget();
+		try {
+			const out = knowledgeDispatch("scaffold", {
+				target: tmp,
+				yaml: true,
+				dryRun: true,
+			});
+			assert.ok(out.result.created.length > 0);
+			assert.ok(
+				out.result.created.some((p) => p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.yaml")),
+			);
+			assert.equal(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.yaml")), false);
+		} finally {
+			cleanup(tmp);
+		}
+	});
+
+	it("yml alias selects yaml template", () => {
+		const tmp = makeTempTarget();
+		try {
+			const out = knowledgeDispatch("scaffold", {
+				target: tmp,
+				yml: true,
+				dryRun: false,
+			});
+			assert.ok(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.yaml")));
+			assert.equal(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.json")), false);
+			assert.ok(out.result.created.length > 0);
+		} finally {
+			cleanup(tmp);
+		}
+	});
+});
+
+describe("knowledge-plan command adapter: build / materialize", () => {
+	it("build materializes knowledge tree", () => {
+		const tmp = makeTempTarget();
+		try {
+			writeJsonPlan(tmp, VALID_MINIMAL);
+			const out = knowledgeDispatch("build", { target: tmp, dryRun: false });
+			assert.ok(out.result.created.length > 0);
+			assert.ok(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge", "index.md")));
+			assert.equal(out.bypassPrint, undefined);
+		} finally {
+			cleanup(tmp);
+		}
+	});
+
+	it("materialize is an alias of build", () => {
+		const tmp = makeTempTarget();
+		try {
+			writeJsonPlan(tmp, VALID_MINIMAL);
+			const out = knowledgeDispatch("materialize", { target: tmp, dryRun: true });
+			assert.ok(out.result.created.length > 0);
+			assert.equal(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge")), false);
+		} finally {
+			cleanup(tmp);
+		}
+	});
+
+	it("build dryRun does not write", () => {
+		const tmp = makeTempTarget();
+		try {
+			writeJsonPlan(tmp, VALID_MINIMAL);
+			const out = knowledgeDispatch("build", { target: tmp, dryRun: true });
+			assert.ok(out.result.created.length > 0);
+			assert.equal(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge")), false);
+		} finally {
+			cleanup(tmp);
+		}
+	});
+});
+
+describe("knowledge-plan command adapter: plan", () => {
+	it("returns structured proposal and human text on bypass", () => {
+		const tmp = makeTempTarget();
+		try {
+			const out = knowledgeDispatch("plan", { target: tmp, dryRun: false });
+			assert.ok(out.result.suggestedPlan);
+			assert.equal(out.bypassPrint, true);
+			const text = captureBypass(out);
+			assert.ok(text.includes("Knowledge Plan proposal for"));
+			assert.ok(text.includes("Inspection:"));
+			// First write should report Wrote:
+			if (out.result.created.length) {
+				assert.ok(text.includes("Wrote:"));
+			}
+		} finally {
+			cleanup(tmp);
+		}
+	});
+
+	it("json mode keeps structured result without bypass", () => {
+		const tmp = makeTempTarget();
+		try {
+			const out = knowledgeDispatch("plan", { target: tmp, dryRun: true, json: true });
+			assert.equal(out.bypassPrint, false);
+			assert.ok(out.result.suggestedPlan);
+			assert.equal(out.result.created.length, 0);
+		} finally {
+			cleanup(tmp);
+		}
+	});
+
+	it("force maps through and rewrites existing plan", () => {
+		const tmp = makeTempTarget();
+		try {
+			writeJsonPlan(tmp, VALID_MINIMAL);
+			const skipped = knowledgeDispatch("plan", { target: tmp, dryRun: false });
+			assert.ok(skipped.result.skipped.length > 0);
+			assert.equal(skipped.result.created.length, 0);
+
+			const forced = knowledgeDispatch("plan", {
+				target: tmp,
+				dryRun: false,
+				force: true,
+			});
+			assert.ok(forced.result.created.length > 0);
+		} finally {
+			cleanup(tmp);
+		}
+	});
+
+	it("dryRun maps through without writes", () => {
+		const tmp = makeTempTarget();
+		try {
+			const out = knowledgeDispatch("plan", { target: tmp, dryRun: true });
+			assert.equal(out.result.wouldWrite, false);
+			assert.equal(out.result.created.length, 0);
+			assert.equal(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.yaml")), false);
+		} finally {
+			cleanup(tmp);
+		}
 	});
 });
 
@@ -254,5 +422,27 @@ describe("knowledge-plan renderers", () => {
 		});
 		assert.ok(text.startsWith("Knowledge Plan Report — "));
 		assert.ok(text.includes("No knowledge-plan.json present."));
+	});
+
+	it("renderPlanText includes proposal header and inspection", () => {
+		const text = renderPlanText({
+			target: "/tmp/proj",
+			inspectionSummary: "Top-level directories (filtered): scripts",
+			created: ["docs/wiki/knowledge-plan.yaml"],
+			skipped: [],
+		});
+		assert.ok(text.includes("Knowledge Plan proposal for /tmp/proj"));
+		assert.ok(text.includes("Inspection: Top-level directories (filtered): scripts"));
+		assert.ok(text.includes("Wrote: docs/wiki/knowledge-plan.yaml"));
+	});
+
+	it("renderPlanText includes skipped line when present", () => {
+		const text = renderPlanText({
+			target: "/tmp/proj",
+			inspectionSummary: "ok",
+			created: [],
+			skipped: ["docs/wiki/knowledge-plan.yaml"],
+		});
+		assert.ok(text.includes("Skipped (existing): docs/wiki/knowledge-plan.yaml"));
 	});
 });

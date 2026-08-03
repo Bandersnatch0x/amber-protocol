@@ -4,15 +4,19 @@
  * Knowledge Plan root facade (F013).
  *
  * Exposes explicit use cases that return structured outcomes and never write
- * to the console. Parsing, schema validation, lookup precedence, and report
- * mechanics live under internal/ and are not part of this public surface.
+ * to the console. Parsing, schema validation, lookup precedence, scaffold,
+ * materialize, and proposal mechanics live under internal/ and are not part
+ * of this public surface.
  *
  * F013-K1: read-only use cases (inspect, report, validate).
- * Write-capable use cases (scaffold, build, plan) land in a later slice.
+ * F013-K2: write-capable use cases (scaffold, build, plan).
  */
 
 const { loadKnowledgePlan } = require("./internal/load");
 const { buildKnowledgeReport } = require("./internal/report");
+const { scaffoldKnowledgePlan } = require("./internal/scaffold");
+const { materializeKnowledgeBase } = require("./internal/build");
+const { proposeKnowledgePlan } = require("./internal/propose");
 
 /**
  * Inspect the Knowledge Plan for a target repository.
@@ -65,8 +69,45 @@ function validate(target) {
 	};
 }
 
+/**
+ * Scaffold a Knowledge Plan file (JSON by default; YAML when options.yaml/yml).
+ *
+ * @param {string} target
+ * @param {{ dryRun?: boolean, yaml?: boolean, yml?: boolean, force?: boolean }} [options]
+ * @returns {object} structured scaffold outcome (no console I/O)
+ */
+function scaffold(target, options = {}) {
+	return scaffoldKnowledgePlan(target, options);
+}
+
+/**
+ * Materialize knowledge pages under docs/wiki/knowledge/ from the plan.
+ * Single use case for both `build` and `materialize` CLI aliases.
+ *
+ * @param {string} target
+ * @param {{ dryRun?: boolean }} [options]
+ * @returns {object} structured materialize outcome (no console I/O)
+ */
+function build(target, options = {}) {
+	return materializeKnowledgeBase(target, options);
+}
+
+/**
+ * Propose (and optionally write) a Knowledge Plan from native project inspection.
+ *
+ * @param {string} target
+ * @param {{ dryRun?: boolean, force?: boolean }} [options]
+ * @returns {object} structured proposal outcome (no console I/O)
+ */
+function plan(target, options = {}) {
+	return proposeKnowledgePlan(target, options);
+}
+
 module.exports = {
 	inspect,
 	report,
 	validate,
+	scaffold,
+	build,
+	plan,
 };

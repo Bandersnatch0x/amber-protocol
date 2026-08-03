@@ -19,11 +19,6 @@ const path = require("node:path");
 // ── Barrel imports ──────────────────────────────────────────────────────────
 // Direct core imports (the amber-core facade was removed — ADR-0005, #4 PR2).
 const { scaffoldHarness, scaffoldWiki } = require("./core/scaffold");
-const {
-	scaffoldKnowledgePlan,
-	materializeKnowledgeBase,
-	proposeKnowledgePlan,
-} = require("./core/knowledge-plan");
 const { auditProject, validateHandoff } = require("./core/audit");
 const { doctor } = require("./core/doctor");
 const { scaffoldPlan, validatePlanGate, confirmPlanGate, reviewPlan, acceptPlan, readPlanField } = require("./core/planning");
@@ -80,49 +75,12 @@ function handleWiki(args) {
     return { result: exportOkfBundle(args.target, { outputDir: args.outputDir }) };
   }
 
-  // Knowledge Plan support (declarative architecture + knowledge cards, integrated for Amber)
+  // Knowledge Plan support (declarative architecture + knowledge cards, integrated for Amber).
+  // F013-K1/K2: all knowledge subcommands cross the command adapter + root facade.
+  // Adapter owns option mapping, aliases, unknown-action guidance, and rendering.
   if (action === "knowledge") {
-    const sub = args._?.[1]; // e.g. scaffold | inspect | report
-    const dryRun = Boolean(args.dryRun);
-
-    // F013-K1: read-only flows cross the dedicated command adapter + root facade.
-    const {
-      knowledgeDispatch,
-      isKnowledgeReadAction,
-    } = require("./knowledge-plan/adapters/command");
-    if (isKnowledgeReadAction(sub)) {
-      return knowledgeDispatch(sub, args);
-    }
-
-    if (sub === "scaffold" || !sub) {
-      // default "amber wiki knowledge" scaffolds the plan (idempotent)
-      const res = scaffoldKnowledgePlan(args.target, { dryRun, yaml: args.yaml || args.yml });
-      return { result: res };
-    }
-
-    if (sub === "build" || sub === "materialize") {
-      const res = materializeKnowledgeBase(args.target, { dryRun: args.dryRun });
-      return { result: res };
-    }
-
-    if (sub === "plan") {
-      const res = proposeKnowledgePlan(args.target, { dryRun: args.dryRun, force: args.force });
-      return {
-        result: res,
-        bypassPrint: !args.json,
-        onBypass: () => {
-          console.log(`Knowledge Plan proposal for ${res.target}`);
-          console.log(`Inspection: ${res.inspectionSummary}`);
-          if (res.created.length) console.log(`Wrote: ${res.created.join(", ")}`);
-          if (res.skipped.length) console.log(`Skipped (existing): ${res.skipped.join(", ")}`);
-          if (args.json) {
-            console.log(JSON.stringify(res.suggestedPlan, null, 2));
-          }
-        },
-      };
-    }
-
-    return { result: { target: args.target, errors: [`Unknown knowledge action: ${sub || ""}. Supported: plan, scaffold, inspect, report, validate, build.`], warnings: [] } };
+    const { knowledgeDispatch } = require("./knowledge-plan/adapters/command");
+    return knowledgeDispatch(args._?.[1], args);
   }
 
   if (args.okf) {
