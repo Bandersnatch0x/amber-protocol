@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependency. Corrupt or unreadable evidence records are skipped, retained valid
   records are preserved, the outcome is marked `partial`, and redacted warnings
   are emitted (warning-only; never a blocking error).
+- **Maintenance partial-state propagation (F014-M2)**: full Maintenance
+  inspection now composes the focused evidence outcome, and partial evidence
+  warnings propagate as redacted non-blocking warnings through Governance Report
+  and Adoption Report while retained valid data keeps both reports on their
+  normal completion paths. Amber Evolution collectors move to
+  `scripts/lib/core/evolution-findings.js` for shared use without circular
+  requires.
 
 ### Deprecated
 - **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):

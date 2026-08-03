@@ -16,6 +16,15 @@ const {
 	walkFiles,
 } = require("./fs-utils");
 
+// Amber Evolution finding collectors moved to evolution-findings.js (F014-M2)
+// so the Maintenance evidence facade can share them without a circular require.
+const {
+	EVOLUTION_FINDING_MIN_COUNT,
+	countEvolutionFindings,
+	extractEvolutionFindings,
+	significantEvolutionFindings,
+} = require("./evolution-findings");
+
 const {
 	TEMPLATE_ROOT,
 } = require("./constants");
@@ -194,57 +203,6 @@ function buildMigrationAssistant(targetRoot, registry) {
 	};
 }
 
-// Shared core: count "Finding: <text>" occurrences in harness-evolution.md and
-// return them sorted by count (desc) then text (asc). Both extractEvolutionFindings
-// and rollupEvolutionFindings previously duplicated this read+match+count+sort;
-// it lives here once. Returns [] when the file is absent. Does not filter by
-// threshold — each caller applies its own cutoff.
-// A finding is "significant" once it recurs. Both lineage adapters
-// (extractEvolutionFindings, rollupEvolutionFindings) share this single cutoff
-// so the threshold can never drift between them.
-const EVOLUTION_FINDING_MIN_COUNT = 2;
-
-function countEvolutionFindings(targetRoot) {
-	const filePath = path.join(
-		targetRoot,
-		"docs",
-		"wiki",
-		"engineering",
-		"harness-evolution.md",
-	);
-	if (!pathExists(filePath)) {
-		return [];
-	}
-
-	const counts = new Map();
-	for (const line of readText(filePath).split(/\r?\n/)) {
-		const match = line.match(/Finding:\s*(.+?)\s*$/);
-		if (match) {
-			const finding = match[1].trim();
-			counts.set(finding, (counts.get(finding) || 0) + 1);
-		}
-	}
-
-	return [...counts.entries()]
-		.map(([finding, count]) => ({ finding, count }))
-		.sort(
-			(left, right) =>
-				right.count - left.count || left.finding.localeCompare(right.finding),
-		);
-}
-
-// Findings that recur at least minCount times. The single filtering point for
-// both lineage adapters and the CLI rollup, so the cutoff lives in one place.
-function significantEvolutionFindings(targetRoot, minCount) {
-	return countEvolutionFindings(targetRoot).filter(
-		(item) => item.count >= minCount,
-	);
-}
-
-function extractEvolutionFindings(targetRoot) {
-	return significantEvolutionFindings(targetRoot, EVOLUTION_FINDING_MIN_COUNT);
-}
-
 function rollupEvolutionFindings(
 	projectRoot,
 	minCount = EVOLUTION_FINDING_MIN_COUNT,
@@ -337,6 +295,10 @@ function inspectMaintenance(target, registryPath) {
 	const { detectScaffoldDrift } = require("./scaffold-version-drift");
 	const scaffoldDriftResult = detectScaffoldDrift(targetRoot);
 	const { detectArtifactDrift } = require("./artifact-drift");
+	// F014-M2: full inspection composes the focused evidence outcome (evolution
+	// findings + regression proposals) so raw collectors are not duplicated here.
+	const { collectEvidence } = require("../maintenance/internal/evidence");
+	const evidenceOutcome = collectEvidence(targetRoot);
 
 	return {
 		target: targetRoot,
@@ -374,12 +336,13 @@ function inspectMaintenance(target, registryPath) {
 					currentVersion: null,
 					latestVersion: null,
 				},
-		evolutionRollup: extractEvolutionFindings(targetRoot),
-		regressionProposals: extractRegressionProposals(targetRoot),
+		evolutionRollup: evidenceOutcome.evolution.significant,
+		regressionProposals: evidenceOutcome.regressionProposals,
+		evidenceAvailability: evidenceOutcome.availability,
 		scaffoldDrift: scaffoldDriftResult,
 		artifactDrift: detectArtifactDrift(targetRoot),
 		errors: loaded.errors,
-		warnings: loaded.warnings,
+		warnings: [...(loaded.warnings || []), ...(evidenceOutcome.warnings || [])],
 	};
 }
 

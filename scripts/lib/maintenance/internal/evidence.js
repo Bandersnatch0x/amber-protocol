@@ -24,7 +24,7 @@ const {
 const {
 	countEvolutionFindings,
 	extractEvolutionFindings,
-} = require("../../core/maintenance");
+} = require("../../core/evolution-findings");
 const { resolveStateDirForRead } = require("../../state-dir-resolver");
 
 const MAX_REGRESSION_PROPOSALS = 50;
