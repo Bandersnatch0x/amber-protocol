@@ -6,9 +6,6 @@
  * Each handler owns its arg → envelope mapping; the dispatcher only registers them.
  */
 
-const path = require("node:path");
-
-const { runMaintenanceAction } = require("./core/maintenance");
 const {
   generateAdoptionReport,
   listAdoptionReports,
@@ -38,32 +35,9 @@ function resolveTarget(args) {
 }
 
 function handleMaintenance(args) {
-  const action = args._?.[0];
-
-  // Two sibling actions stay handler-routed: they live in their own modules
-  // (scaffold-version-drift, distill-candidates) and are NOT owned by the
-  // maintenance-dispatch chokepoint.
-  if (action === "scaffold-drift") {
-    const { resolveTarget } = require("./core/fs-utils");
-    const { detectScaffoldDrift } = require("./core/scaffold-version-drift");
-    const targetRoot = resolveTarget(args.target);
-    const drift = detectScaffoldDrift(targetRoot);
-    return { result: { target: targetRoot, scaffoldDrift: drift, errors: [], warnings: [] } };
-  }
-  if (action === "distill") {
-    const { resolveTarget } = require("./core/fs-utils");
-    const { writeDistillProposal } = require("./distill-candidates");
-    const targetRoot = resolveTarget(args.target);
-    const outputPath = args.output || path.join(targetRoot, "docs", "maintenance", "distill-proposals.md");
-    const proposal = writeDistillProposal(targetRoot, outputPath, args);
-    return { result: { target: targetRoot, outputPath: proposal.outputPath, candidateCount: proposal.candidateCount, errors: [], warnings: [] } };
-  }
-
-  // The 8 own-actions (inspect, propose, stale-docs, wiki-lint, pack-drift,
-  // upgrade-preview, evolution-rollup, regression-proposals) - plus the unknown
-  // case - route through the single maintenance-dispatch chokepoint, which owns
-  // per-branch arg shaping and the registry -> registryPath resolution.
-  return { result: runMaintenanceAction(action, args.target, args) };
+  // F014-M3: the Maintenance command adapter owns all ten subcommands.
+  const { maintenanceDispatch } = require("./maintenance/adapters/command");
+  return maintenanceDispatch(args._?.[0], args);
 }
 
 function handleAdoption(args) {

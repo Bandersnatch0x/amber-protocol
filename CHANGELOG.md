@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   normal completion paths. Amber Evolution collectors move to
   `scripts/lib/core/evolution-findings.js` for shared use without circular
   requires.
+- **Unified Maintenance command adapter (F014-M3)**: all ten Maintenance
+  subcommands (inspect, propose, stale-docs, wiki-lint, pack-drift,
+  upgrade-preview, evolution-rollup, regression-proposals, scaffold-drift,
+  distill) route through one Governance Console command adapter
+  (`scripts/lib/maintenance/adapters/command`); the outer handler no longer
+  owns subcommand knowledge. Aliases, envelopes, registry-path closure, and
+  unknown-action guidance are unchanged.
 
 ### Deprecated
 - **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):
