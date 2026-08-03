@@ -21,9 +21,6 @@ const path = require("node:path");
 const { scaffoldHarness, scaffoldWiki } = require("./core/scaffold");
 const {
 	scaffoldKnowledgePlan,
-	loadKnowledgePlan,
-	buildKnowledgeReport,
-	formatKnowledgeReportText,
 	materializeKnowledgeBase,
 	proposeKnowledgePlan,
 } = require("./core/knowledge-plan");
@@ -88,44 +85,19 @@ function handleWiki(args) {
     const sub = args._?.[1]; // e.g. scaffold | inspect | report
     const dryRun = Boolean(args.dryRun);
 
+    // F013-K1: read-only flows cross the dedicated command adapter + root facade.
+    const {
+      knowledgeDispatch,
+      isKnowledgeReadAction,
+    } = require("./knowledge-plan/adapters/command");
+    if (isKnowledgeReadAction(sub)) {
+      return knowledgeDispatch(sub, args);
+    }
+
     if (sub === "scaffold" || !sub) {
       // default "amber wiki knowledge" scaffolds the plan (idempotent)
       const res = scaffoldKnowledgePlan(args.target, { dryRun, yaml: args.yaml || args.yml });
       return { result: res };
-    }
-
-    if (sub === "inspect") {
-      const loaded = loadKnowledgePlan(args.target);
-      return { result: loaded, bypassPrint: !args.json, onBypass: () => {
-        if (loaded.found && loaded.plan) {
-          console.log(JSON.stringify(loaded.plan, null, 2));
-        } else {
-          console.log(loaded.errors?.length ? loaded.errors.join("\n") : "No knowledge-plan.json found.");
-        }
-      }};
-    }
-
-    if (sub === "report") {
-      const report = buildKnowledgeReport(args.target);
-      return {
-        result: report,
-        bypassPrint: !args.json,
-        onBypass: () => {
-          console.log(formatKnowledgeReportText(report));
-        },
-      };
-    }
-
-    if (sub === "validate") {
-      const loaded = loadKnowledgePlan(args.target);
-      const result = {
-        target: loaded.target,
-        found: loaded.found,
-        valid: loaded.errors.length === 0,
-        errors: loaded.errors,
-        warnings: loaded.warnings,
-      };
-      return { result };
     }
 
     if (sub === "build" || sub === "materialize") {

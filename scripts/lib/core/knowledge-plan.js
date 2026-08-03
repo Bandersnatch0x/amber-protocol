@@ -1,15 +1,24 @@
 "use strict";
 
+/**
+ * Knowledge Plan compatibility module (legacy CommonJS surface).
+ *
+ * F013-K1 moved read-only load/validate/report into scripts/lib/knowledge-plan/.
+ * This file remains the documented require path for package consumers and for
+ * write-capable helpers (scaffold / materialize / propose) during the expand
+ * step. Prefer the root facade (`scripts/lib/knowledge-plan`) for new call sites.
+ *
+ * Deprecated helper exports (loadKnowledgePlan, buildKnowledgeReport, etc.) are
+ * forwarded without runtime deprecation noise for one major cycle.
+ */
+
 const fs = require("node:fs");
 const path = require("node:path");
-
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
 
 // Minimal YAML loader/escaper for plan files lives in ./simple-yaml (extracted
 // so YAML mechanics stay out of plan/knowledge-base domain logic). Re-exported
 // below for existing direct importers.
-const { parseSimpleYaml, loadYamlFile, escapeYaml } = require("./simple-yaml");
+const { parseSimpleYaml, escapeYaml } = require("./simple-yaml");
 
 const {
 	TEMPLATE_ROOT,
@@ -20,135 +29,21 @@ const {
 	readJson,
 	relativeSlash,
 	resolveTarget,
-	walkFiles,
 } = require("./fs-utils");
 
 const { listTemplateFiles, copyTemplateFiles } = require("./scaffold");
 
-const KNOWLEDGE_PLAN_RELATIVE = path.join("docs", "wiki", "knowledge-plan.json");
-const KNOWLEDGE_PLAN_YAML_RELATIVE = path.join("docs", "wiki", "knowledge-plan.yaml");
-const AMBER_KNOWLEDGE_PLAN_YAML = path.join(".amber", "knowledge-plan.yaml");
-
-// Load schema once at require time (fail fast on broken install).
-const schemaPath = path.join(__dirname, "../../../schemas/knowledge-plan.schema.json");
-let knowledgePlanSchema;
-try {
-	knowledgePlanSchema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
-} catch (e) {
-	throw new Error(
-		`Failed to load knowledge-plan schema from ${schemaPath}: ${e.message}. ` +
-			"Re-run 'node scripts/amber.js init' (or npm install) to restore schema files.",
-		{ cause: e },
-	);
-}
-
-const ajv = new Ajv({ allErrors: true });
-addFormats(ajv);
-const validateKnowledgePlan = ajv.compile(knowledgePlanSchema);
-
-/**
- * Validate raw plan data against the schema.
- * @param {unknown} data
- * @returns {{valid: boolean, errors: string[]}}
- */
-function validateKnowledgePlanData(data) {
-	const valid = validateKnowledgePlan(data);
-	if (!valid) {
-		const errors = (validateKnowledgePlan.errors || []).map((err) => {
-			const path = err.instancePath || "(root)";
-			return `${path} ${err.message}`;
-		});
-		return { valid: false, errors };
-	}
-	return { valid: true, errors: [] };
-}
-
-/**
- * Normalize a parsed (yaml or json) plan into the internal shape we validate against.
- */
-function normalizePlan(raw) {
-	if (!raw) return null;
-	// Support our canonical "knowledgePlan" section
-	let planSection = raw.knowledgePlan;
-	if (planSection && Array.isArray(planSection.documents)) {
-		// also support knowledgecard -> knowledgeCards alias
-		if (raw.knowledgecard && !raw.knowledgeCards) {
-			raw = { ...raw, knowledgeCards: raw.knowledgecard };
-		}
-		return raw;
-	}
-	return raw;
-}
-
-/**
- * Load and validate the Knowledge Plan from the target repo (if present).
- * Checks (in order):
- *   docs/wiki/knowledge-plan.json
- *   docs/wiki/knowledge-plan.yaml
- *   .amber/knowledge-plan.yaml
- */
-function loadKnowledgePlan(target) {
-	const targetRoot = resolveTarget(target);
-
-	const candidates = [
-		{ path: path.join(targetRoot, KNOWLEDGE_PLAN_RELATIVE), kind: "json" },
-		{ path: path.join(targetRoot, KNOWLEDGE_PLAN_YAML_RELATIVE), kind: "yaml" },
-		{ path: path.join(targetRoot, AMBER_KNOWLEDGE_PLAN_YAML), kind: "yaml" },
-	];
-
-	let chosen = null;
-	for (const c of candidates) {
-		if (pathExists(c.path)) {
-			chosen = c;
-			break;
-		}
-	}
-
-	if (!chosen) {
-		return { target: targetRoot, found: false, plan: null, errors: [], warnings: [], source: null };
-	}
-
-	let raw;
-	try {
-		if (chosen.kind === "json") {
-			raw = readJson(chosen.path);
-		} else {
-			raw = loadYamlFile(chosen.path);
-		}
-	} catch (e) {
-		return {
-			target: targetRoot,
-			found: true,
-			plan: null,
-			errors: [`Failed to read or parse ${path.relative(targetRoot, chosen.path)}: ${e.message}`],
-			warnings: [],
-			source: chosen.path,
-		};
-	}
-
-	raw = normalizePlan(raw);
-
-	const validation = validateKnowledgePlanData(raw);
-	if (!validation.valid) {
-		return {
-			target: targetRoot,
-			found: true,
-			plan: raw,
-			errors: validation.errors.map((e) => `${path.relative(targetRoot, chosen.path)}: ${e}`),
-			warnings: [],
-			source: chosen.path,
-		};
-	}
-
-	return {
-		target: targetRoot,
-		found: true,
-		plan: raw,
-		errors: [],
-		warnings: [],
-		source: chosen.path,
-	};
-}
+// Read-path implementation lives in the deep Knowledge Plan module (F013-K1).
+const {
+	KNOWLEDGE_PLAN_RELATIVE,
+	KNOWLEDGE_PLAN_YAML_RELATIVE,
+	loadKnowledgePlan,
+} = require("../knowledge-plan/internal/load");
+const { validateKnowledgePlanData } = require("../knowledge-plan/internal/validate");
+const {
+	buildKnowledgeReport,
+	formatKnowledgeReportText,
+} = require("../knowledge-plan/internal/report");
 
 /**
  * Scaffold the Knowledge Plan (JSON by default, or yaml if requested).
@@ -193,180 +88,6 @@ function scaffoldKnowledgePlan(target, options = {}) {
 		errors: validation.errors,
 		warnings: validation.warnings,
 	};
-}
-
-/**
- * Simple coverage heuristic: does a wiki document with a similar title exist?
- * We check both docs/wiki/*.md and docs/architecture/*.md (case-insensitive contains).
- */
-function computeDocumentCoverage(targetRoot, documents = []) {
-	const wikiRoot = path.join(targetRoot, "docs", "wiki");
-	const archRoot = path.join(targetRoot, "docs", "architecture");
-
-	const existingFiles = [];
-	if (pathExists(wikiRoot)) {
-		walkFiles(wikiRoot)
-			.filter((p) => p.toLowerCase().endsWith(".md"))
-			.forEach((p) => existingFiles.push(relativeSlash(targetRoot, p)));
-	}
-	if (pathExists(archRoot)) {
-		walkFiles(archRoot)
-			.filter((p) => p.toLowerCase().endsWith(".md"))
-			.forEach((p) => existingFiles.push(relativeSlash(targetRoot, p)));
-	}
-
-	const coverage = documents.map((doc) => {
-		const titleLower = (doc.title || "").toLowerCase();
-		const goalLower = (doc.goal || "").toLowerCase();
-		const matched = existingFiles.find((rel) => {
-			const base = path.basename(rel, ".md").toLowerCase().replace(/[-_]/g, " ");
-			return (
-				base.includes(titleLower) ||
-				titleLower.includes(base) ||
-				goalLower.includes(base)
-			);
-		});
-		return {
-			title: doc.title,
-			goal: doc.goal,
-			parent: doc.parent || "",
-			hints: doc.hints || "",
-			suggestedPath: doc.path || `docs/wiki/${titleToSlug(doc.title)}.md`,
-			exists: Boolean(matched),
-			matchedFile: matched || null,
-		};
-	});
-
-	const present = coverage.filter((c) => c.exists).length;
-	const total = coverage.length;
-
-	return {
-		total,
-		present,
-		missing: total - present,
-		items: coverage,
-	};
-}
-
-function titleToSlug(title) {
-	return (title || "document")
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "");
-}
-
-/**
- * Build a read-only Knowledge Plan report for the target.
- * Includes the plan (if present), notes, declared documents, knowledge cards,
- * and basic coverage against existing wiki/architecture content.
- */
-function buildKnowledgeReport(target) {
-	const targetRoot = resolveTarget(target);
-	const loaded = loadKnowledgePlan(targetRoot);
-
-	const report = {
-		target: targetRoot,
-		planFound: loaded.found,
-		planPath: loaded.found ? KNOWLEDGE_PLAN_RELATIVE : null,
-		errors: [...loaded.errors],
-		warnings: [...loaded.warnings],
-		plan: null,
-		knowledgeCards: [],
-		coverage: null,
-		summary: "",
-	};
-
-	if (!loaded.found || !loaded.plan) {
-		report.summary = "No knowledge-plan.json found. Run `amber wiki knowledge plan --target .` to create one.";
-		return report;
-	}
-
-	const plan = loaded.plan;
-	report.plan = {
-		template: plan.knowledgePlan?.template || "architecture",
-		notes: Array.isArray(plan.knowledgePlan?.notes) ? plan.knowledgePlan.notes.map((n) => n.text) : [],
-		documents: Array.isArray(plan.knowledgePlan?.documents) ? plan.knowledgePlan.documents : [],
-	};
-
-	report.knowledgeCards = Array.isArray(plan.knowledgeCards)
-		? plan.knowledgeCards.map((c) => ({
-				id: c.id || null,
-				text: c.text,
-				tags: Array.isArray(c.tags) ? c.tags : [],
-		  }))
-		: [];
-
-	report.coverage = computeDocumentCoverage(targetRoot, report.plan?.documents || []);
-
-	const cov = report.coverage;
-	report.summary = `Knowledge Plan v${plan.version || 1} (${report.plan.template}). ` +
-		`${cov.present}/${cov.total} declared documents appear to have coverage in docs/wiki or docs/architecture. ` +
-		`${report.knowledgeCards.length} knowledge cards defined.`;
-
-	return report;
-}
-
-/**
- * Format a human-readable text report (used when not --json).
- */
-function formatKnowledgeReportText(report) {
-	const lines = [];
-	lines.push(`Knowledge Plan Report — ${report.target}`);
-	lines.push("");
-
-	if (!report.planFound) {
-		lines.push("No knowledge-plan.json present.");
-		lines.push("Run: amber wiki knowledge plan --target .");
-		return lines.join("\n");
-	}
-
-	lines.push(`Plan: ${report.planPath}`);
-	lines.push(`Template: ${report.plan?.template || 'default'}`);
-	lines.push(`Summary: ${report.summary}`);
-	lines.push("");
-
-	if (report.errors.length > 0) {
-		lines.push("Errors:");
-		for (const e of report.errors) lines.push(`  - ${e}`);
-		lines.push("");
-	}
-
-	lines.push("Knowledge Plan Notes (high-signal understanding):");
-	if (!report.plan?.notes || report.plan.notes.length === 0) {
-		lines.push("  (none)");
-	} else {
-		for (const note of report.plan.notes) {
-			lines.push(`  • ${note}`);
-		}
-	}
-	lines.push("");
-
-	lines.push("Declared Documents:");
-	for (const item of report.coverage.items) {
-		const status = item.exists ? "[present]" : "[missing]";
-		lines.push(`  ${status} ${item.title}`);
-		if (item.matchedFile) {
-			lines.push(`           matched: ${item.matchedFile}`);
-		} else {
-			lines.push(`           suggested: ${item.suggestedPath}`);
-		}
-		if (item.goal) {
-			lines.push(`           goal: ${item.goal}`);
-		}
-	}
-	lines.push("");
-
-	lines.push("Knowledge Cards:");
-	if (report.knowledgeCards.length === 0) {
-		lines.push("  (none)");
-	} else {
-		for (const card of report.knowledgeCards) {
-			const tagStr = card.tags && card.tags.length ? ` [${card.tags.join(", ")}]` : "";
-			lines.push(`  - ${card.id ? card.id + ": " : ""}${card.text}${tagStr}`);
-		}
-	}
-
-	return lines.join("\n");
 }
 
 /**
