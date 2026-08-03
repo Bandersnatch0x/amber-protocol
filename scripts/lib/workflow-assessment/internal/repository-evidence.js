@@ -15,11 +15,7 @@ const {
 	inspectWorkflowPacks,
 	inspectGlxControls,
 } = require("../../core/governance-readiness");
-const {
-	countEvolutionFindings,
-	extractEvolutionFindings,
-	extractRegressionProposals,
-} = require("../../core/maintenance");
+const { evidence: collectMaintenanceEvidence } = require("../../maintenance");
 const { detectCommands } = require("../../core/audit");
 const {
 	REQUIRED_BUNDLE_FILES,
@@ -175,11 +171,11 @@ function collectRepositoryEvidence(targetRoot, options = {}) {
 	const executions = collectExecutions(targetRoot);
 	const handoff = collectHandoff(targetRoot, options.handoffBundleDir);
 	const agentAssets = collectAgentAssets(targetRoot);
-	const evolution = {
-		findings: countEvolutionFindings(targetRoot),
-		significant: extractEvolutionFindings(targetRoot),
-	};
-	const regressionProposals = extractRegressionProposals(targetRoot);
+	const maintenanceEvidence = collectMaintenanceEvidence(targetRoot);
+	const evolution = maintenanceEvidence.evolution;
+	const regressionProposals = maintenanceEvidence.regressionProposals;
+	const maintenanceEvidenceAvailability = maintenanceEvidence.availability;
+	const maintenanceEvidenceWarnings = maintenanceEvidence.warnings;
 	const verifyCommand = (() => {
 		const commands = detectCommands(targetRoot);
 		if (commands.some((c) => c.source === "package.json" && c.name === "test")) {
@@ -205,6 +201,8 @@ function collectRepositoryEvidence(targetRoot, options = {}) {
 		sessions: Array.isArray(options.sessions) ? options.sessions : [],
 		evolution,
 		regressionProposals,
+		maintenanceEvidenceAvailability,
+		maintenanceEvidenceWarnings,
 		verifyCommand,
 	};
 }

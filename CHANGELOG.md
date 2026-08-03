@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inspection live behind an internal seam (`scripts/lib/knowledge-plan/internal`).
   An interface contract test prevents production modules and ordinary tests from
   importing internals directly.
+- **Maintenance focused evidence outcome (F014-M1)**: a root facade
+  (`scripts/lib/maintenance`) exposes a read-only `evidence` outcome for Amber
+  Evolution findings and Regression Proposals. Workflow Effectiveness consumes
+  it instead of raw Maintenance collectors, with no Team Distribution registry
+  dependency. Corrupt or unreadable evidence records are skipped, retained valid
+  records are preserved, the outcome is marked `partial`, and redacted warnings
+  are emitted (warning-only; never a blocking error).
 
 ### Deprecated
 - **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):

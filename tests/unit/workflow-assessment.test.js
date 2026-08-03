@@ -535,3 +535,56 @@ test("renderMarkdown produces non-empty markdown with all five dimensions", () =
 	}
 	assert.ok(md.includes("# Workflow Effectiveness Assessment"));
 });
+
+// ── F014-M1: Maintenance evidence facade integration ──
+
+test("collectRepositoryEvidence consumes the Maintenance evidence facade", () => {
+	const os = require("node:os");
+	const { collectRepositoryEvidence } = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
+	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wf-ev-facade-"));
+	const execDir = path.join(tmp, ".amber", "executions", "seed");
+	fs.mkdirSync(execDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(execDir, "evidence.json"),
+		JSON.stringify({
+			taskId: "seed",
+			regressionProposal: { status: "proposed", assertion: "seed assert" },
+		}),
+		"utf8",
+	);
+	const evidence = collectRepositoryEvidence(tmp);
+	assert.equal(evidence.maintenanceEvidenceAvailability, "complete");
+	assert.deepEqual(evidence.maintenanceEvidenceWarnings, []);
+	assert.equal(
+		evidence.regressionProposals.map((p) => p.taskId).join(","),
+		"seed",
+	);
+	assert.ok(Array.isArray(evidence.evolution.findings));
+	assert.ok(Array.isArray(evidence.evolution.significant));
+	fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test("collectRepositoryEvidence surfaces partial availability from corrupt evidence", () => {
+	const os = require("node:os");
+	const { collectRepositoryEvidence } = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
+	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wf-ev-partial-"));
+	const execDir = path.join(tmp, ".amber", "executions", "broken");
+	fs.mkdirSync(execDir, { recursive: true });
+	fs.writeFileSync(path.join(execDir, "evidence.json"), "{ nope", "utf8");
+	const evidence = collectRepositoryEvidence(tmp);
+	assert.equal(evidence.maintenanceEvidenceAvailability, "partial");
+	assert.equal(evidence.maintenanceEvidenceWarnings.length, 1);
+	fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test("assess tolerates corrupt Maintenance evidence and still validates against schema", (t) => {
+	const os = require("node:os");
+	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wf-ev-assess-"));
+	t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+	const execDir = path.join(tmp, ".amber", "executions", "broken");
+	fs.mkdirSync(execDir, { recursive: true });
+	fs.writeFileSync(path.join(execDir, "evidence.json"), "null", "utf8");
+	assert.doesNotThrow(() => assess(tmp));
+	const report = assess(tmp);
+	assert.ok(validate(report), "assess output validates against schema");
+});
