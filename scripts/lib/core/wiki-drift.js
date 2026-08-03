@@ -13,7 +13,7 @@ const path = require("node:path");
 const { resolveTarget, pathExists } = require("./fs-utils");
 const { classifyTarget } = require("./target-classification");
 const { REQUIRED_HARNESS_FILES } = require("./constants");
-const { detectStaleDocs } = require("./maintenance");
+const { staleDocs: detectStaleDocs } = require("../maintenance");
 const { detectScaffoldDrift } = require("./scaffold-version-drift");
 
 function detectWikiDrift(target) {

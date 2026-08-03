@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { inspectMaintenance } = require("./maintenance");
+const { inspect: inspectMaintenance } = require("../maintenance");
 const { resolveRegistryPath } = require("./team");
 const { inspectGovernanceReadiness, ACTION_LIBRARY } = require("./governance-readiness");
 const { resolveTarget } = require("./fs-utils");

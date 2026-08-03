@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`scripts/lib/maintenance/adapters/command`); the outer handler no longer
   owns subcommand knowledge. Aliases, envelopes, registry-path closure, and
   unknown-action guidance are unchanged.
+- **Maintenance interface seal (F014-M4)**: Governance Report, Adoption Report,
+  and wiki drift consume the root facade (`inspect` / `evidence` / `staleDocs`
+  outcomes); Workflow Effectiveness already used `evidence`; the Governance
+  Console uses the command adapter. No production caller imports raw
+  Maintenance helpers, delegation tests no longer monkey-patch exported
+  bindings, and an interface contract prevents importing
+  `maintenance/internal` directly. The legacy `core/maintenance.js` surface
+  remains a documented forwarding compatibility adapter for one deprecation
+  cycle, with removal deferred to a declared major release.
 
 ### Deprecated
 - **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):

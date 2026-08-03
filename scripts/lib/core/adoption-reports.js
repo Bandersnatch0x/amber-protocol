@@ -14,8 +14,8 @@ const {
 } = require("./fs-utils");
 
 const {
-	inspectMaintenance,
-} = require("./maintenance");
+	inspect: inspectMaintenance,
+} = require("../maintenance");
 
 const {
 	scaffoldHarness,

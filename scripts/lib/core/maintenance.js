@@ -1,5 +1,16 @@
 "use strict";
 
+/**
+ * Maintenance legacy CommonJS surface (F014).
+ *
+ * Production consumers now use the root facade (`scripts/lib/maintenance`,
+ * exposing inspect / evidence / staleDocs outcomes) or the Governance Console
+ * command adapter (`scripts/lib/maintenance/adapters/command`). This file
+ * remains the documented require path for package consumers during the
+ * deprecation cycle and forwards retained helper exports without runtime
+ * deprecation noise. Removal is deferred to a declared major release.
+ */
+
 const fs = require("node:fs");
 const path = require("node:path");
 // resolveStateDirForCreate moved with proposeMaintenance into

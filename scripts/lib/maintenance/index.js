@@ -11,6 +11,11 @@
 // NOT depend on Team Distribution registry availability.
 
 const { collectEvidence } = require("./internal/evidence");
+const {
+	inspectMaintenance,
+	detectStaleDocs,
+} = require("../core/maintenance");
+const { resolveTarget } = require("../core/fs-utils");
 
 /**
  * Focused read-only Maintenance evidence: Amber Evolution findings and
@@ -36,6 +41,37 @@ function evidence(target) {
 	return collectEvidence(target);
 }
 
+/**
+ * Complete Maintenance inspection: stale Wiki, Wiki lint, Team Distribution
+ * guidance, Rule Pack drift, scaffold drift, artifact drift, Amber Evolution,
+ * Regression Proposals, and redacted partial-evidence warnings.
+ *
+ * Full inspection composes the focused evidence outcome (F014-M2), so
+ * consumers reading both get one consistent evidence truth.
+ *
+ * @param {string} target
+ * @param {string} [registryPath]
+ * @returns {object} structured inspection outcome
+ */
+function inspect(target, registryPath) {
+	return inspectMaintenance(target, registryPath);
+}
+
+/**
+ * Stale Wiki document detection: files whose Last Reviewed marker is missing
+ * or older than the threshold. Exposed as a narrow facade use case so
+ * consumers do not import raw Maintenance helpers directly (F014-M4).
+ *
+ * @param {string} target
+ * @param {number} [thresholdDays]
+ * @returns {{ staleDocs: object[], thresholdDays: number }}
+ */
+function staleDocs(target, thresholdDays) {
+	return detectStaleDocs(resolveTarget(target), thresholdDays);
+}
+
 module.exports = {
 	evidence,
+	inspect,
+	staleDocs,
 };

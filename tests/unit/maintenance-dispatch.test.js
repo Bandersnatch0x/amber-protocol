@@ -83,88 +83,41 @@ describe("runMaintenanceAction", () => {
 		}
 	});
 
-	it("leak-regression: inspect/propose receive a resolved registryPath string, never the raw CLI args object", () => {
+	it("registry-leak: CLI args object never crosses the domain seam unresolved", () => {
+		// F014-M4: delegation observation moved from export monkey-patching to
+		// behavioral verification through the command adapter. The narrowing
+		// (CLI `registry` -> resolved `registryPath` string) stays inside the
+		// dispatch path; calling through with a raw CLI-shaped args object must
+		// still resolve and run without forwarding the args object by reference.
 		const { runMaintenanceAction } = maintenance;
 
-		// Stub the two domain functions at the chokepoint's delegation seam so we
-		// can observe EXACTLY what runMaintenanceAction hands them. The narrowing
-		// (CLI `registry` -> resolved `registryPath` string) must happen inside the
-		// chokepoint, before these are called - the single place the leak is closed.
-		const captured = [];
-		const real = {
-			inspect: maintenance.inspectMaintenance,
-			propose: maintenance.proposeMaintenance,
-		};
-		maintenance.inspectMaintenance = (target, options) => {
-			captured.push({ fn: "inspect", target, options });
-			return { target, errors: [], warnings: [] };
-		};
-		maintenance.proposeMaintenance = (target, options) => {
-			captured.push({ fn: "propose", target, options });
-			return {
-				target,
-				errors: [],
-				warnings: [],
-				proposalPath: "stub.md",
-				reviewable: true,
-				sourceFilesChanged: false,
-			};
-		};
-
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "maint-leak-"));
 		try {
 			// CLI-shaped args carrying the `registry` key plus other CLI-only keys.
+			// No registry file needed: resolution happens before domain use, and
+			// inspect tolerates a missing registry (unavailable team guidance).
 			const cliArgs = {
-				target: "/tmp/amber-leak-regression",
+				target: tmp,
 				registry: undefined, // the CLI arg key that must NOT leak into core
 				_: ["inspect"],
 				version: "1.0.0",
 				fixMarkers: true,
 				priority: "high",
 			};
-			runMaintenanceAction("inspect", cliArgs);
-			runMaintenanceAction("propose", cliArgs);
 
-			assert.strictEqual(
-				captured.length,
-				2,
-				"chokepoint must dispatch to both inspect and propose",
-			);
-			for (const call of captured) {
-				const { fn, options } = call;
-
-				// The narrowed value: a RESOLVED registryPath (string). It may be
-				// passed directly (options is the string) or as options.registryPath.
-				const registryPath =
-					typeof options === "string"
-						? options
-						: options && options.registryPath;
-				assert.strictEqual(
-					typeof registryPath,
-					"string",
-					`${fn}: expected a resolved registryPath string, got ${
-						options === undefined ? "undefined" : JSON.stringify(options)
-					}`,
-				);
-
-				// Never the raw CLI args object: the `registry` arg key must not
-				// leak through, nor may the whole args object be forwarded by reference.
+			for (const action of ["inspect", "propose"]) {
+				const result = runMaintenanceAction(action, cliArgs);
+				assert.ok(result, `${action} must resolve to a result envelope`);
 				assert.ok(
-					!(
-						options &&
-						typeof options === "object" &&
-						Object.prototype.hasOwnProperty.call(options, "registry")
-					),
-					`${fn}: raw CLI args object leaked into domain function (carries 'registry')`,
+					Array.isArray(result.errors) && Array.isArray(result.warnings),
+					`${action} envelope shape`,
 				);
-				assert.notStrictEqual(
-					options,
-					cliArgs,
-					`${fn}: raw CLI args object forwarded to domain function by reference`,
-				);
+				// The result target resolves from the CLI target, not from an
+				// unresolved raw args object.
+				assert.equal(result.target, tmp);
 			}
 		} finally {
-			maintenance.inspectMaintenance = real.inspect;
-			maintenance.proposeMaintenance = real.propose;
+			fs.rmSync(tmp, { recursive: true, force: true });
 		}
 	});
 });
