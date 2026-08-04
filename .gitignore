@@ -31,6 +31,7 @@ build/
 tests/.tmp/
 
 # Local tool / screenshot artifacts
+.grok/
 .mimocode/
 .playwright-cli/
 apps/web/.playwright-cli/
