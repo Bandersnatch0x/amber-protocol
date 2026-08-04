@@ -10,7 +10,7 @@ Latest session `595182bf-419e-45f8-8e89-63ea810a688e` — "implement feature F01
 
 - Branch: master
 - Uncommitted changes: clean
-- Last commit: 5b533b0 feat(loop): report bounded no-progress history (F015)
+- Last commit: 411ec19 chore(release): seal 1.3.12 metadata (version sync, CHANGELOG, readiness)
 
 ## Runtime / Verification State
 
