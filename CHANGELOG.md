@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [1.3.12] - 2026-08-04
+
 ### Added
 - **Loop no-progress reporting (F015)**: `loop status --ledger` now accepts a
   single ledger JSON file or a directory of recorded history. Directory reads
@@ -55,6 +58,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `maintenance/internal` directly. The legacy `core/maintenance.js` surface
   remains a documented forwarding compatibility adapter for one deprecation
   cycle, with removal deferred to a declared major release.
+- **Pre-push pi-rewind checkpoint guard (F012)**: the repository pre-push hook
+  refuses to push `refs/pi-checkpoints/*` refs, the local-only per-turn undo
+  snapshots written by pi-rewind. A `git push --mirror` or explicit push of
+  those refs would leak full working-tree snapshots (including captured
+  untracked files) to the remote; normal branch and tag pushes are unaffected.
+  Hook behavior is covered by unit tests.
 
 ### Fixed
 - **Review standard labels**: `amber review` now gives JSON standards without an
@@ -68,6 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependency security**: bump transitive `brace-expansion` 5.0.8 -> 5.0.9 in
   the lockfile, resolving HIGH advisory GHSA-rgw5-rvv9-x895 without changing
   the parent dependency graph.
+- **Dependency security**: bump transitive `fast-uri` 3.1.4 -> 3.1.5 in the
+  lockfile, resolving advisory GHSA-7p8r-x3mc-p8w7 without changing the parent
+  dependency graph.
 
 ### Deprecated
 - **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):
