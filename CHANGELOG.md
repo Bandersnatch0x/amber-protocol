@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remains a documented forwarding compatibility adapter for one deprecation
   cycle, with removal deferred to a declared major release.
 
+### Fixed
+- **Review standard labels**: `amber review` now gives JSON standards without an
+  explicit `id` a deterministic filename-based identifier and labels the list
+  as loaded standards. Human output no longer renders a blank standard between
+  `amber-delivery` and `security-governance`.
+
 ### Deprecated
 - **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):
   retained helper exports (`loadKnowledgePlan`, `buildKnowledgeReport`, parser,

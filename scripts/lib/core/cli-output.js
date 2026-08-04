@@ -650,7 +650,7 @@ function printResult(result, options = {}) {
 	}
 	// Review-specific output: show which standards and checks were evaluated
 	if (Array.isArray(result.loadedStandards) && result.loadedStandards.length > 0) {
-		console.log(`Standards applied: ${result.loadedStandards.join(", ")}`);
+		console.log(`Standards loaded: ${result.loadedStandards.join(", ")}`);
 	}
 	if (Array.isArray(result.applicableChecks) && result.applicableChecks.length > 0) {
 		console.log("Checks evaluated:");

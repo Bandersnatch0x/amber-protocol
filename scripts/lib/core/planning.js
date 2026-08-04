@@ -289,7 +289,10 @@ function discoverStandards() {
 			try {
 				const data = readJson(filePath);
 				return {
-					id: data.id,
+					id:
+						typeof data.id === "string" && data.id.trim()
+							? data.id.trim()
+							: path.basename(filePath, ".json"),
 					title: data.title,
 					checks: Array.isArray(data.checks) ? data.checks : [],
 					file: relativeSlash(REPO_ROOT, filePath),

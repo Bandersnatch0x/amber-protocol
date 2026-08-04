@@ -43,6 +43,12 @@ test("review reports standards, findings, and required user action", () => {
   assert.notEqual(result.status, 0);
   const payload = JSON.parse(result.stdout);
   assert.ok(payload.loadedStandards.includes("amber-delivery"));
+  assert.ok(payload.loadedStandards.includes("owasp-agentic-2026"));
+  assert.ok(
+    payload.loadedStandards.every(
+      (standardId) => typeof standardId === "string" && standardId.length > 0,
+    ),
+  );
   assert.ok(payload.applicableChecks.some((check) => check.id === "user-confirmation"));
   assert.ok(payload.findings.some((finding) => /User confirmation is required/.test(finding.message)));
   assert.ok(payload.requiredUserAction.some((action) => /confirm/i.test(action)));
