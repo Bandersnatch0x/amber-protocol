@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Loop no-progress reporting (F015)**: `loop status --ledger` now accepts a
+  single ledger JSON file or a directory of recorded history. Directory reads
+  retain valid records when individual files are corrupt, deterministically
+  analyze at most the newest 100 files, and report conservative
+  `insufficient-history`, `progressing`, or `stalled` outcomes with explicit
+  repeated-observation, empty-evidence, stop-reason, and budget signals. Status
+  remains read-only and reports execution, scheduling, and external-call flags
+  as false.
 - **Knowledge Plan deep module (F013)**: read-only (`inspect`/`report`/`validate`)
   and write-capable (`scaffold`/`build`/`plan`) use cases now cross a root facade
   (`scripts/lib/knowledge-plan`) and Governance Console command adapter

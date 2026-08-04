@@ -107,6 +107,7 @@ const COMMAND_HELP = {
 	],
 	loop: [
 		"Inspect loop contracts, write dry-run ledger previews, and record manual loop evidence without live scheduling.",
+		"Loop status accepts one ledger JSON file or a directory and reports bounded no-progress signals without executing anything.",
 		"",
 		"Examples:",
 		"  amber loop inspect --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --json",
@@ -114,6 +115,7 @@ const COMMAND_HELP = {
 		"  amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --output .amber/loops/daily-amber-triage/ledger-preview.json --json",
 		"  amber loop record --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --trigger-source manual --stop-reason reviewer-gate-required --output .amber/loops/daily-amber-triage/manual-ledger.json --json",
 		"  amber loop status --ledger .amber/loops/daily-amber-triage/manual-ledger.json --json",
+		"  amber loop status --ledger .amber/loops/daily-amber-triage/history --json",
 		"  amber loop validate-loop --contract path/to/contract.json --json",
 	],
 	route: [

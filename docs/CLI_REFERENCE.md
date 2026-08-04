@@ -655,6 +655,12 @@ node scripts/amber.js loop verify-ledger --contract amber-doctor-check --json
 
 Record caller-supplied manual loop evidence, then inspect the resulting ledger. These commands
 do not execute workflow steps; they only write or read review artifacts supplied by the caller.
+`loop status --ledger` accepts either one ledger JSON file or a directory containing ledger
+JSON records. Directory status considers at most the newest 100 files by modification time,
+retains valid records when individual files are corrupt, orders loaded records chronologically,
+and reports `insufficient-history`, `progressing`, or `stalled` with explicit no-progress signals
+and remedies. Status never executes commands, schedules jobs, calls external systems, or rewrites
+the supplied ledger history.
 
 ```bash
 node scripts/amber.js loop record \
@@ -667,6 +673,11 @@ node scripts/amber.js loop record \
 
 node scripts/amber.js loop status \
   --ledger .amber/loops/daily-amber-triage/manual-ledger.json \
+  --json
+
+# assess bounded no-progress signals from recorded history
+node scripts/amber.js loop status \
+  --ledger .amber/loops/daily-amber-triage/history \
   --json
 ```
 

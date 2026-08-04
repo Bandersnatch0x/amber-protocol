@@ -13,6 +13,9 @@ const {
 } = require("./workflow-packs");
 
 const DEFAULT_RECOMMENDATION_GOAL = "continuous improvement";
+const MAX_LOOP_HISTORY_RECORDS = 100;
+const MIN_NO_PROGRESS_REPEATS = 2;
+const REPEATED_STOP_REASON_STALL_THRESHOLD = 3;
 
 const GOAL_KEYWORDS = {
 	"continuous improvement": [
@@ -496,39 +499,353 @@ function recordLoopContract(options = {}) {
 	};
 }
 
+function isLoopLedgerRecord(value) {
+	return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function recordArray(record, key) {
+	return Array.isArray(record[key]) ? record[key] : [];
+}
+
+function observationFingerprint(record) {
+	const inputSnapshot = isLoopLedgerRecord(record.inputSnapshot)
+		? record.inputSnapshot
+		: {};
+	return JSON.stringify({
+		contractId: record.contractId || "",
+		inputSources: Array.isArray(inputSnapshot.sources)
+			? inputSnapshot.sources
+			: [],
+		actionSummary: record.actionSummary || "",
+		producedArtifacts: recordArray(record, "producedArtifacts"),
+		replayEvidence: recordArray(record, "replayEvidence"),
+	});
+}
+
+function countEquivalentTail(records, selector, options = {}) {
+	if (records.length === 0) return 0;
+	const expected = selector(records[records.length - 1]);
+	if (options.requireValue && (expected === null || expected === undefined || expected === "")) {
+		return 0;
+	}
+	let count = 0;
+	for (let index = records.length - 1; index >= 0; index -= 1) {
+		if (selector(records[index]) !== expected) break;
+		count += 1;
+	}
+	return count;
+}
+
+function countMatchingTail(records, predicate) {
+	let count = 0;
+	for (let index = records.length - 1; index >= 0; index -= 1) {
+		if (!predicate(records[index])) break;
+		count += 1;
+	}
+	return count;
+}
+
+function hasEmptyEvidenceDelta(record) {
+	return (
+		recordArray(record, "producedArtifacts").length === 0 &&
+		recordArray(record, "replayEvidence").length === 0
+	);
+}
+
+function hasBudgetExhaustion(record) {
+	return /budget.*(?:exhaust|limit)/i.test(String(record.stopReason || ""));
+}
+
+/**
+ * Assess bounded loop history without executing, scheduling, or writing.
+ * Decisions use only tail repetition so older resolved stalls do not poison
+ * current progress. One ordinary record is always insufficient evidence.
+ */
+function assessLoopProgress(records = []) {
+	const history = Array.isArray(records)
+		? records.filter(isLoopLedgerRecord)
+		: [];
+	const latest = history[history.length - 1] || null;
+	const equivalentObservationTail = countEquivalentTail(
+		history,
+		observationFingerprint,
+	);
+	const emptyEvidenceDeltaTail = countMatchingTail(
+		history,
+		hasEmptyEvidenceDelta,
+	);
+	const sameStopReasonTail = countEquivalentTail(
+		history,
+		(record) => record.stopReason || "",
+		{ requireValue: true },
+	);
+	const budgetExhausted = latest && hasBudgetExhaustion(latest) ? 1 : 0;
+	const repeatedEmptyObservation =
+		equivalentObservationTail >= MIN_NO_PROGRESS_REPEATS &&
+		emptyEvidenceDeltaTail >= MIN_NO_PROGRESS_REPEATS;
+	const repeatedStopReason =
+		sameStopReasonTail >= REPEATED_STOP_REASON_STALL_THRESHOLD;
+
+	const signals = [];
+	if (equivalentObservationTail >= MIN_NO_PROGRESS_REPEATS) {
+		signals.push({
+			id: "repeated-observation",
+			count: equivalentObservationTail,
+			description: "Equivalent observations repeat at the end of loop history.",
+		});
+	}
+	if (emptyEvidenceDeltaTail >= MIN_NO_PROGRESS_REPEATS) {
+		signals.push({
+			id: "empty-evidence-delta",
+			count: emptyEvidenceDeltaTail,
+			description: "Recent runs produced no artifacts or replay evidence.",
+		});
+	}
+	if (sameStopReasonTail >= MIN_NO_PROGRESS_REPEATS) {
+		signals.push({
+			id: "repeated-stop-reason",
+			count: sameStopReasonTail,
+			description: "The same stop reason repeats at the end of loop history.",
+		});
+	}
+	if (budgetExhausted) {
+		signals.push({
+			id: "budget-exhausted",
+			count: 1,
+			description: "The latest run stopped because its budget was exhausted.",
+		});
+	}
+
+	const stalled = Boolean(
+		budgetExhausted || repeatedEmptyObservation || repeatedStopReason,
+	);
+	let state = "progressing";
+	if (stalled) {
+		state = "stalled";
+	} else if (history.length < MIN_NO_PROGRESS_REPEATS) {
+		state = "insufficient-history";
+	}
+
+	const remedies = [];
+	if (state === "insufficient-history") {
+		remedies.push("Record at least two loop runs before evaluating no-progress.");
+	}
+	if (repeatedEmptyObservation) {
+		remedies.push(
+			"Review loop inputs or stop conditions before retrying; record artifacts or replay evidence only when they materially change.",
+		);
+	}
+	if (sameStopReasonTail >= MIN_NO_PROGRESS_REPEATS && latest) {
+		remedies.push(
+			`Resolve or explicitly acknowledge repeated stop reason "${latest.stopReason}" before retrying.`,
+		);
+	}
+	if (budgetExhausted) {
+		remedies.push(
+			"Reduce loop scope or obtain explicit approval before increasing the budget.",
+		);
+	}
+
+	return {
+		state,
+		sampleSize: history.length,
+		counts: {
+			equivalentObservationTail,
+			emptyEvidenceDeltaTail,
+			sameStopReasonTail,
+			budgetExhausted,
+		},
+		signals,
+		remedies,
+	};
+}
+
+function loopRecordSortTime(record, fallback) {
+	const parsed = Date.parse(record.recordedAt || "");
+	return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function inspectLoopLedgerDirectory(ledgerPath) {
+	let directoryEntries;
+	try {
+		directoryEntries = fs
+			.readdirSync(ledgerPath, { withFileTypes: true })
+			.filter((entry) => entry.isFile() && entry.name.endsWith(".json"));
+	} catch (error) {
+		return {
+			ledger: ledgerPath,
+			errors: [`Cannot read loop ledger directory ${ledgerPath}: ${error.message}`],
+			warnings: [],
+			...noOpExecution(),
+		};
+	}
+
+	const warnings = [];
+	const entries = [];
+	for (const entry of directoryEntries) {
+		const filePath = path.join(ledgerPath, entry.name);
+		try {
+			entries.push({
+				filePath,
+				name: entry.name,
+				modifiedAt: fs.statSync(filePath).mtimeMs,
+			});
+		} catch {
+			warnings.push(
+				`Loop ledger record ${entry.name} is unreadable or invalid; skipped.`,
+			);
+		}
+	}
+
+	const availableCount = directoryEntries.length;
+	entries.sort(
+		(left, right) =>
+			right.modifiedAt - left.modifiedAt || left.name.localeCompare(right.name),
+	);
+	const selected = entries.slice(0, MAX_LOOP_HISTORY_RECORDS);
+	if (availableCount > MAX_LOOP_HISTORY_RECORDS) {
+		warnings.push(
+			`Loop history has ${availableCount} JSON records; only the newest ${MAX_LOOP_HISTORY_RECORDS} were considered.`,
+		);
+	}
+
+	const loaded = [];
+	for (const entry of selected) {
+		const { value, error } = readJsonSafe(entry.filePath);
+		if (error || !isLoopLedgerRecord(value)) {
+			warnings.push(
+				`Loop ledger record ${entry.name} is unreadable or invalid; skipped.`,
+			);
+			continue;
+		}
+		loaded.push({
+			record: value,
+			name: entry.name,
+			sortTime: loopRecordSortTime(value, entry.modifiedAt),
+		});
+	}
+
+	loaded.sort(
+		(left, right) =>
+			left.sortTime - right.sortTime || left.name.localeCompare(right.name),
+	);
+	const records = loaded.map((entry) => entry.record);
+	if (records.length === 0) {
+		return {
+			ledger: ledgerPath,
+			records: [],
+			history: {
+				source: "directory",
+				available: availableCount,
+				considered: selected.length,
+				loaded: 0,
+				truncated: availableCount > MAX_LOOP_HISTORY_RECORDS,
+				partial: warnings.length > 0,
+			},
+			progress: assessLoopProgress([]),
+			errors: [`No valid loop ledger records found in directory: ${ledgerPath}`],
+			warnings,
+			...noOpExecution(),
+		};
+	}
+
+	return {
+		ledger: ledgerPath,
+		record: records[records.length - 1],
+		records,
+		history: {
+			source: "directory",
+			available: availableCount,
+			considered: selected.length,
+			loaded: records.length,
+			truncated: availableCount > MAX_LOOP_HISTORY_RECORDS,
+			partial: warnings.length > 0,
+		},
+		progress: assessLoopProgress(records),
+		errors: [],
+		warnings,
+		...noOpExecution(),
+	};
+}
+
 function inspectLoopLedger(options = {}) {
 	if (isMissingPath(options.ledger)) {
 		return {
 			ledger: "",
 			errors: ["No ledger file specified. Pass --ledger <path>."],
 			warnings: [],
+			...noOpExecution(),
 		};
 	}
 	const ledgerPath = path.resolve(options.ledger);
+	let stats;
+	try {
+		stats = fs.statSync(ledgerPath);
+	} catch {
+		const { error } = readJsonSafe(ledgerPath);
+		return {
+			ledger: ledgerPath,
+			errors: [error || `Cannot read loop ledger path: ${ledgerPath}`],
+			warnings: [],
+			...noOpExecution(),
+		};
+	}
+	if (stats.isDirectory()) {
+		return inspectLoopLedgerDirectory(ledgerPath);
+	}
+	if (!stats.isFile()) {
+		return {
+			ledger: ledgerPath,
+			errors: [`Loop ledger path is not a file or directory: ${ledgerPath}`],
+			warnings: [],
+			...noOpExecution(),
+		};
+	}
 	const { value: record, error } = readJsonSafe(ledgerPath);
 	if (error) {
 		return {
 			ledger: ledgerPath,
 			errors: [error],
 			warnings: [],
+			...noOpExecution(),
 		};
 	}
-	if (!record || typeof record !== "object" || Array.isArray(record)) {
+	if (!isLoopLedgerRecord(record)) {
 		return {
 			ledger: ledgerPath,
 			errors: [`Ledger file is not a valid object: ${ledgerPath}`],
 			warnings: [],
+			...noOpExecution(),
 		};
 	}
-	return { ledger: ledgerPath, record, errors: [], warnings: [] };
+	const records = [record];
+	return {
+		ledger: ledgerPath,
+		record,
+		records,
+		history: {
+			source: "file",
+			available: 1,
+			considered: 1,
+			loaded: 1,
+			truncated: false,
+			partial: false,
+		},
+		progress: assessLoopProgress(records),
+		errors: [],
+		warnings: [],
+		...noOpExecution(),
+	};
 }
 
 module.exports = {
+	MAX_LOOP_HISTORY_RECORDS,
 	findLoopContract,
 	buildLoopLedgerRecord,
 	inspectLoopContract,
 	recommendLoopContract,
 	dryRunLoopContract,
 	recordLoopContract,
+	assessLoopProgress,
 	inspectLoopLedger,
 };

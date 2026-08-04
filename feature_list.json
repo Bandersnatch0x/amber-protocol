@@ -276,6 +276,41 @@
         "tests/unit/pre-push-hook.test.js"
       ],
       "updated": "2026-07-31"
+    },
+    {
+      "id": "F015",
+      "priority": 15,
+      "area": "loop-governance",
+      "title": "Loop no-progress reporting",
+      "user_visible_behavior": "Loop status reports bounded no-progress signals from recorded ledger history without executing or scheduling work.",
+      "status": "accepted",
+      "verification": [
+        "node --test tests/phase-future-loop-readiness.test.js",
+        "npm test"
+      ],
+      "evidence": [
+        {
+          "command": "node --test tests/unit/loops.test.js tests/phase-future-loop-readiness.test.js",
+          "result": "20 passed, 0 failed",
+          "date": "2026-08-04",
+          "notes": "Session 595182bf-419e-45f8-8e89-63ea810a688e"
+        },
+        {
+          "command": "npm test",
+          "result": "exit 0; 1416 total, 1412 passed, 4 skipped",
+          "date": "2026-08-04",
+          "notes": "Executed via session 595182bf-419e-45f8-8e89-63ea810a688e"
+        }
+      ],
+      "notes": [],
+      "paths": [
+        "scripts/lib/core/loops.js",
+        "scripts/lib/command-help.js",
+        "docs/CLI_REFERENCE.md",
+        "tests/phase-future-loop-readiness.test.js",
+        "tests/unit/loops.test.js"
+      ],
+      "updated": "2026-08-04"
     }
   ]
 }

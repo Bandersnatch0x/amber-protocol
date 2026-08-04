@@ -177,6 +177,50 @@ test("loop record stores manual loop evidence and loop status can inspect it", (
   const status = JSON.parse(statusResult.stdout);
   assert.equal(status.record.stopReason, "reviewer-gate-required");
   assert.equal(status.record.executesAnything, false);
+  assert.equal(status.progress.state, "insufficient-history");
+  assert.equal(status.history.source, "file");
+  assert.equal(status.executesAnything, false);
+  assert.equal(status.schedulesJobs, false);
+  assert.equal(status.callsExternalSystems, false);
+});
+
+test("loop status reports bounded no-progress signals from a ledger directory", () => {
+  const dir = tempDir("loop-history");
+  const ledgerDir = path.join(dir, "history");
+  const pack = path.join(ROOT, "workflow-packs", "safe-amber-bootstrap.pack.json");
+
+  for (const name of ["01.json", "02.json"]) {
+    const result = runHarness([
+      "loop",
+      "record",
+      "--file",
+      pack,
+      "--contract",
+      "daily-amber-triage",
+      "--trigger-source",
+      "manual",
+      "--stop-reason",
+      "reviewer-gate-required",
+      "--output",
+      path.join(ledgerDir, name),
+      "--json"
+    ]);
+    assert.equal(result.status, 0, result.stderr);
+  }
+
+  const statusResult = runHarness(["loop", "status", "--ledger", ledgerDir, "--json"]);
+  assert.equal(statusResult.status, 0, statusResult.stderr);
+  const status = JSON.parse(statusResult.stdout);
+  assert.equal(status.records.length, 2);
+  assert.equal(status.history.source, "directory");
+  assert.equal(status.history.loaded, 2);
+  assert.equal(status.history.truncated, false);
+  assert.equal(status.progress.state, "stalled");
+  assert.ok(status.progress.signals.some((signal) => signal.id === "repeated-observation"));
+  assert.ok(status.progress.signals.some((signal) => signal.id === "empty-evidence-delta"));
+  assert.equal(status.executesAnything, false);
+  assert.equal(status.schedulesJobs, false);
+  assert.equal(status.callsExternalSystems, false);
 });
 
 test("loop inspect explains contract readiness without writing a ledger", () => {
