@@ -61,6 +61,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   explicit `id` a deterministic filename-based identifier and labels the list
   as loaded standards. Human output no longer renders a blank standard between
   `amber-delivery` and `security-governance`.
+- **Release documentation links**: correct two ADR-0003 links in the CLI
+  reference and replace a stale `error-recovery.js` implementation link with
+  the actual boundary: retry settings are governance metadata and never imply
+  autonomous target-command retries.
 
 ### Deprecated
 - **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):

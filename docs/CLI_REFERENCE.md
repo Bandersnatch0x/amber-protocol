@@ -181,7 +181,7 @@ node scripts/amber.js route validate <route-file> --target .
 
 ### route test
 
-Print a route's dry-run stage sequence, OR — since [ADR-0003](../adr/0003-governance-gated-execution.md)
+Print a route's dry-run stage sequence, OR — since [ADR-0003](adr/0003-governance-gated-execution.md)
 Phase 3 — execute one `command`-type stage under the four governance gates.
 
 ```bash
@@ -608,7 +608,7 @@ node scripts/amber.js loop inspect \
 ### loop run
 
 Build a ledger preview for a loop contract (default, requires `--dry-run`), OR — since
-[ADR-0003](../adr/0003-governance-gated-execution.md) — execute the contract's `governed.command`
+[ADR-0003](adr/0003-governance-gated-execution.md) — execute the contract's `governed.command`
 under governance gates with `--execute`. Live scheduling is disabled by product boundary; `--execute`
 is a human-triggered one-shot (with approval), not scheduled or unattended work.
 

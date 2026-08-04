@@ -140,7 +140,7 @@ Gates not in policy default to `block`.
 - **Permanent errors** (schema, config): Fail immediately
 - **Resource errors** (disk, memory): Fail immediately
 
-See [error-recovery.js](../scripts/lib/error-recovery.js) for classification logic.
+Retry settings are governance metadata used by readiness and reporting surfaces. Amber does not autonomously retry target-project commands; any governed execution remains subject to explicit policy, approval, isolation, and evidence gates.
 
 ## Budget Management
 
