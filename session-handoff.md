@@ -1,22 +1,22 @@
 # Session Handoff
 
-Last Updated: 2026-08-01
+Last Updated: 2026-08-04
 
 ## Summary
 
-Latest session `908b925d-0e6f-42f9-a6a1-4050a4d5d0f5` — "add automated test coverage for the pre-push hook guard that rejects pi-rewind checkpoint refs" (completed). 12 feature(s): 9 passing, 3 accepted
+Latest session `595182bf-419e-45f8-8e89-63ea810a688e` — "implement feature F015 loop no-progress reporting" (completed). 13 feature(s): 8 passing, 5 accepted
 
 ## Repo State
 
 - Branch: master
-- Uncommitted changes: dirty (tracked and/or untracked changes)
-- Last commit: d230a21 test(hooks): cover pre-push pi-rewind checkpoint guard (F012)
+- Uncommitted changes: clean
+- Last commit: 5b533b0 feat(loop): report bounded no-progress history (F015)
 
 ## Runtime / Verification State
 
 - Command: npm test
-- Result: passed (exit 0, 129058ms)
-- When: 2026-07-31
+- Result: exit 0; 1416 total, 1412 passed, 4 skipped
+- When: 2026-08-04
 
 ## Feature State
 
@@ -31,7 +31,8 @@ Latest session `908b925d-0e6f-42f9-a6a1-4050a4d5d0f5` — "add automated test co
 - F009 [accepted] Governance evidence reads resolve the state dir (legacy .harness support)
 - F010 [accepted] Ship 1.3.8 after interrupted 1.3.7 release (CHANGELOG + version)
 - F011 [accepted] CLI_REFERENCE covers all 33 commands (fill 14 missing sections)
-- F012 [passing] Pre-push hook rejects pi-rewind checkpoint refs
+- F012 [accepted] Pre-push hook rejects pi-rewind checkpoint refs
+- F015 [accepted] Loop no-progress reporting
 
 ## Verification Evidence
 
@@ -50,6 +51,8 @@ Latest session `908b925d-0e6f-42f9-a6a1-4050a4d5d0f5` — "add automated test co
 - F010: `npm test` → passed (exit 0, 67340ms) (2026-07-22, session c1485d45)
 - F011: `npm test` → passed (exit 0, 85388ms) (2026-07-28, session 64eb8c99)
 - F012: `npm test` → passed (exit 0, 129058ms) (2026-07-31, session 908b925d)
+- F015: `node --test tests/unit/loops.test.js tests/phase-future-loop-readiness.test.js` → 20 passed, 0 failed (2026-08-04)
+- F015: `npm test` → exit 0; 1416 total, 1412 passed, 4 skipped (2026-08-04)
 
 ## Blockers
 
@@ -57,5 +60,4 @@ None recorded.
 
 ## Next Actions
 
-1. Accept the plan — the plan is ready to accept and append to the evolution log.
-   `amber accept --target . --plan docs/plans/F012-Pre-push-hook-rejects-pi-rewind-checkpoint-refs.md`
+1. All lifecycle steps complete for the current focus — start the next feature.
