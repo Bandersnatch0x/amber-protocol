@@ -10,14 +10,24 @@ const TEST_PROJECT = path.join(ROOT, ".amber-test-interactive");
 describe("Interactive Session Integration", () => {
 	beforeEach(() => {
 		if (fs.existsSync(TEST_PROJECT)) {
-			fs.rmSync(TEST_PROJECT, { recursive: true, force: true });
+			fs.rmSync(TEST_PROJECT, {
+				recursive: true,
+				force: true,
+				maxRetries: 5,
+				retryDelay: 50,
+			});
 		}
 		fs.mkdirSync(TEST_PROJECT, { recursive: true });
 	});
 
 	afterEach(() => {
 		if (fs.existsSync(TEST_PROJECT)) {
-			fs.rmSync(TEST_PROJECT, { recursive: true, force: true });
+			fs.rmSync(TEST_PROJECT, {
+				recursive: true,
+				force: true,
+				maxRetries: 5,
+				retryDelay: 50,
+			});
 		}
 	});
 

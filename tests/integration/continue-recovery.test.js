@@ -13,14 +13,24 @@ describe("Continue Recovery", () => {
 
 	beforeEach(() => {
 		if (fs.existsSync(testDir)) {
-			fs.rmSync(testDir, { recursive: true, force: true });
+			fs.rmSync(testDir, {
+				recursive: true,
+				force: true,
+				maxRetries: 5,
+				retryDelay: 50,
+			});
 		}
 		fs.mkdirSync(testDir, { recursive: true });
 	});
 
 	afterEach(() => {
 		if (fs.existsSync(testDir)) {
-			fs.rmSync(testDir, { recursive: true, force: true });
+			fs.rmSync(testDir, {
+				recursive: true,
+				force: true,
+				maxRetries: 5,
+				retryDelay: 50,
+			});
 		}
 	});
 
