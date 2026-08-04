@@ -65,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reference and replace a stale `error-recovery.js` implementation link with
   the actual boundary: retry settings are governance metadata and never imply
   autonomous target-command retries.
+- **Dependency security**: bump transitive `brace-expansion` 5.0.8 -> 5.0.9 in
+  the lockfile, resolving HIGH advisory GHSA-rgw5-rvv9-x895 without changing
+  the parent dependency graph.
 
 ### Deprecated
 - **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):
