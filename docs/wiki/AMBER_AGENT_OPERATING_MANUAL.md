@@ -116,7 +116,8 @@ never invent architecture, commands, or business rules — mark unknowns as "nee
 - Before claiming done, all of these must pass (CI runs them on every push/PR):
   `npm test`, `npm run manifests`, `npm run doctor`, `npm run gen:agents:check`.
   Wiki changes: `node scripts/validate-wiki.js --target .`.
-- New CLI command -> `COMMANDS` in `scripts/amber.js` + module in `scripts/lib/`. Schema change ->
+- New CLI command -> one definition in `scripts/lib/command-help.js` plus its handler binding in
+  `scripts/lib/command-dispatcher.js`; startup rejects missing or orphaned handlers. Schema change ->
   sync `schemas/*.schema.json` with `scripts/validate-*.js`. New template -> `templates/` +
   `scripts/lib/core/scaffolding.js`. New route -> `routes/*.route.json` per `schemas/route.schema.json`.
 - Commits use conventional format: `feat|fix|refactor|docs|test|chore|perf|ci: <description>`.

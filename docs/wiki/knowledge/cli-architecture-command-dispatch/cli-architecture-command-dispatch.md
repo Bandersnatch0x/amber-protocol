@@ -3,12 +3,12 @@ kind: "knowledge"
 category: "cli-architecture-command-dispatch"
 title: "CLI Architecture & Command Dispatch"
 template: "architecture"
-updated_at: "2026-07-14T07:07:21.794Z"
+updated_at: "2026-08-08T00:00:00.000Z"
 ---
 
 # CLI Architecture & Command Dispatch
 
-Last Reviewed: 2026-07-16
+Last Reviewed: 2026-08-08
 
 Amber exposes one CommonJS CLI entry point and keeps command parsing, command routing,
 and domain work in separate layers. The entry point validates the top-level command,
@@ -18,14 +18,14 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
 
 ## Key Files
 
-- `scripts/amber.js` defines the supported top-level commands, parses arguments, calls
-  `dispatch()`, prints text or JSON results, and returns non-zero when `result.errors`
-  is non-empty.
-- `scripts/lib/command-dispatcher.js` owns the central `HANDLERS` registry, thin
-  wrappers for command families, and deprecation warnings.
-- `scripts/lib/command-handler-families.js` contains the maintenance, adoption,
-  ledger, session, and governance family adapters. For example, governance arguments
-  are normalized before they reach `governanceDispatch()`.
+- `scripts/amber.js` derives supported top-level commands from the Command definitions,
+  parses arguments, calls `dispatch()`, prints text or JSON results, and returns non-zero
+  when `result.errors` is non-empty.
+- `scripts/lib/command-help.js` owns each Command definition: identity, help knowledge,
+  and output policy. It also binds definitions to handlers and rejects missing or
+  orphaned handlers at startup.
+- `scripts/lib/command-dispatcher.js` owns handler implementation, the bound runtime
+  registry, family argument mapping, and deprecation warnings.
 - `scripts/lib/*-commands.js` modules own command-specific option handling, target
   guards, and presentation-oriented result shaping.
 - `scripts/lib/core/` contains reusable inspections, validators, report builders,
@@ -37,7 +37,7 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
 
 1. `run()` handles help and version requests, rejects unknown top-level commands, and
    parses the remaining arguments.
-2. `dispatch(command, args)` looks up the command in `HANDLERS`; an unregistered
+2. `dispatch(command, args)` looks up the command in the bound runtime registry; an unregistered
    command produces a structured error and exit code 1.
 3. The selected wrapper delegates either to a command-family dispatcher or directly
    to a focused command module.
@@ -49,7 +49,8 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
 ```mermaid
 flowchart LR
     Shell["node scripts/amber.js"] --> Entry["parse args and validate command"]
-    Entry --> Registry["command-dispatcher HANDLERS"]
+    Entry --> Definition["Command definitions: help + output policy"]
+    Definition --> Registry["bound runtime registry"]
     Registry --> Family["family or *-commands adapter"]
     Family --> Core["scripts/lib/core domain logic"]
     Core --> Artifacts["repository artifacts and structured result"]
@@ -58,8 +59,8 @@ flowchart LR
 
 ## Development Rules
 
-- Add a top-level command to the supported command list and `HANDLERS` registry; do
-  not add a second CLI entry point.
+- Add one top-level Command definition and bind its handler implementation; do not add
+  another command list or a second CLI entry point.
 - Keep wrappers focused on CLI concerns. Put reusable inspection, validation, state
   transition, and rendering logic in an appropriate core module.
 - Preserve the structured result contract. Expected failures belong in `errors` or

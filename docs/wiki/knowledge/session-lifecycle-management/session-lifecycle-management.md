@@ -3,12 +3,12 @@ kind: "knowledge"
 category: "session-lifecycle-management"
 title: "Session & Lifecycle Management"
 template: "architecture"
-updated_at: "2026-07-14T07:07:21.798Z"
+updated_at: "2026-08-08T00:00:00.000Z"
 ---
 
 # Session & Lifecycle Management
 
-Last Reviewed: 2026-07-16
+Last Reviewed: 2026-08-08
 
 A session is a durable execution context selected from a declarative Route. Its
 manifest, event stream, checkpoints, verification evidence, and optional worktree make
@@ -23,6 +23,8 @@ state transitions.
 - `scripts/lib/session-state-machine.js` defines the legal states and transitions.
 - `scripts/lib/session-manifest.js` creates, validates, reads, and writes manifests
   using `schemas/session-manifest.schema.json`; writes stamp a monotonic `updatedAt`.
+- `scripts/lib/session-evidence.js` associates Session manifests and timelines with
+  Execution Ledger and Task Evidence artifacts behind one read interface.
 - `scripts/lib/route-loader.js` discovers and selects Route definitions;
   `scripts/lib/route-commands.js` exposes route inspection and execution operations.
 - `scripts/lib/checkpoint-manager.js` stores and retrieves stage checkpoints inside a
@@ -70,7 +72,9 @@ stateDiagram-v2
    the execution environment.
 4. Verification appends evidence rather than trusting self-reported completion.
    Approval and completion remain explicit operations.
-5. `lifecycle` inspection reads plans, gates, and project signals to recommend a next
+5. Governance Report and Workflow Effectiveness read normalized Session evidence from
+   the same module while retaining separate decisions under ADR-0008.
+6. `lifecycle` inspection reads plans, gates, and project signals to recommend a next
    action; it does not execute that action.
 
 ## Development Rules

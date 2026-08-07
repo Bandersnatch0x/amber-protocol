@@ -70,7 +70,7 @@
         "title": "CLI Architecture & Command Dispatch",
         "goal": "Document how scripts/amber.js dispatches commands through command-dispatcher.js to handler modules and the core engine in scripts/lib/core/.",
         "parent": "",
-        "hints": "Cover scripts/lib/command-dispatcher.js, scripts/lib/command-handler-families.js, how scripts/lib/*-commands.js files wrap core logic, and the separation between CLI surface and scripts/lib/core/."
+        "hints": "Cover Command definitions in scripts/lib/command-help.js, runtime binding in scripts/lib/command-dispatcher.js, how scripts/lib/*-commands.js files wrap core logic, and the separation between CLI surface and scripts/lib/core/."
       },
       {
         "title": "Governance Model & Seven Layers",
@@ -82,7 +82,7 @@
         "title": "Session & Lifecycle Management",
         "goal": "Document routes, sessions, checkpoints, worktrees, and the lifecycle state machine.",
         "parent": "",
-        "hints": "Cover scripts/lib/session-commands.js, scripts/lib/session-state-machine.js, scripts/lib/session-manifest.js, scripts/lib/route-commands.js, scripts/lib/route-loader.js, scripts/lib/checkpoint-manager.js, scripts/lib/worktree-manager.js, and scripts/lib/core/lifecycle.js."
+        "hints": "Cover scripts/lib/session-commands.js, scripts/lib/session-state-machine.js, scripts/lib/session-manifest.js, scripts/lib/session-evidence.js, scripts/lib/route-commands.js, scripts/lib/route-loader.js, scripts/lib/checkpoint-manager.js, scripts/lib/worktree-manager.js, and scripts/lib/core/lifecycle.js."
       },
       {
         "title": "Adoption System",
