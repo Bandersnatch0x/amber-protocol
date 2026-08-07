@@ -25,13 +25,14 @@ The Context, Loadout, governed execution, routing, migration, workflow assessmen
 - [x] Slice 5: extract `core/handoff-layout.js`, remove the workflow facade cycle, and retain existing `handoff-bundle` re-exports.
 - [x] Slice 6: wire version backfill into migration, resolve `next --objective` from the target, scope no-progress to the current session, and repair schema-format, generated-skill, and facade boundary regressions.
 - [x] Slice 7: update ADR/wiki/CLI/skill surfaces, regenerate platform products, pass every repository gate, perform the final two-axis review, and generate a working-tree-patch-bound architecture assessment.
-- [x] Finalization: bind the assessment to implementation commit `c628c763fe76b1b24b3357e16ff9c05ac811fbae` without changing the reviewed product behavior.
+- [x] Slice 8: close the follow-up review gaps in ledger verification, explicit policy and confidence gating, swarm approval/degradation, and migration artifact discovery.
+- [x] Finalization: bind the assessment to implementation commit `e2f7431799739d6f531a46a7753139c9584e5905` without changing the reviewed product behavior.
 
 ## Resume Checkpoint
 
-- Resume Point: Slices 1-7 and commit-SHA finalization are complete; 1613 full tests, all repository gates, and both final review axes pass with no unresolved finding.
+- Resume Point: Slices 1-8 and commit-SHA finalization are complete; 1621 full tests, all repository gates, and both final review axes pass with no unresolved finding.
 - Blockers: none for F016 implementation, verification, or evidence binding.
-- Next Action: no F016 action remains; release versioning, tagging, and publication are outside this plan and remain frozen pending a version decision.
+- Next Action: prepare and verify the approved `1.4.0` release without modifying the excluded user-owned worktree files.
 - Recovery Instructions: reopen this plan and ADR-0015, inspect `git status`, and continue at the first unchecked vertical slice; preserve user-owned release-readiness, handoff, `.workbuddy`, and historical output changes.
 
 ## Acceptance Criteria
@@ -61,6 +62,6 @@ The Context, Loadout, governed execution, routing, migration, workflow assessmen
 ## Evidence Schema
 
 - Command: `npm test`
-- Result: 1613 total, 1609 passed, 4 skipped, 0 failed.
+- Result: 1621 total, 1617 passed, 4 skipped, 0 failed.
 - Date: 2026-08-07
-- Notes: Final exact-patch run. Manifests, doctor, generated-agent drift, wiki, ESLint, and `git diff --check origin/master` also exited 0. Final Specification and Standards reviews reported blocker 0, high 0, P2 0, and P3 0.
+- Notes: Final governance-hardening run. Manifests, doctor, generated-agent drift, wiki, ESLint, packaging, and `git diff --check` also exited 0. Final Specification and Standards reviews reported blocker 0, high 0, P2 0, and P3 0.

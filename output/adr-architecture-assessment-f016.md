@@ -3,13 +3,13 @@
 - 评估日期：2026-08-07
 - 远端基线：`origin/master@ef0ea4576291bad466dd89a7e2ee33a8d051e6b6`
 - 评审前本地 HEAD：`ef57fc533ab4b342b1980f3752edc68b9825ac33`
-- F016 补丁指纹：`19d836cf7ff79db9d04a2a1df9919d3d3b6968bb`
-- 指纹覆盖：91 个路径
-- 最终实现提交 SHA：`c628c763fe76b1b24b3357e16ff9c05ac811fbae`
+- F016 补丁指纹：`404823002e78c8989b9510b254f086aea2dac18a`
+- 指纹覆盖：94 个路径
+- 最终实现提交 SHA：`e2f7431799739d6f531a46a7753139c9584e5905`
 
 ## 结论
 
-F016 已提交并保持 `passing`。针对 `origin/master...c628c763fe76b1b24b3357e16ff9c05ac811fbae` 的最终双轴复评结果为：blocker 0、high 0、P2 0、P3 0。
+F016 已提交并保持 `passing`。针对 `origin/master...e2f7431799739d6f531a46a7753139c9584e5905` 的最终双轴复评结果为：blocker 0、high 0、P2 0、P3 0。
 
 本评估通过远端基线、评审前 HEAD、补丁指纹和最终实现提交 SHA 绑定到已测试的确切内容。承载本报告最终化文本的 evidence 提交不作为实现提交，避免报告对自身提交 SHA 形成不可满足的自引用。
 
@@ -32,9 +32,10 @@ F016 已提交并保持 `passing`。针对 `origin/master...c628c763fe76b1b24b33
 | Context ingest | 每个 ingest 结局都绑定已存在 request；scope 只来自 request；`no-change` 不能绕过绑定或 source 完整性 | 通过 |
 | Source 快照 | mutable source 必须由 request bundling 且请求后未变化；immutable source 的 `ref`、`excerpt`、`excerptHash` 必须一致 | 通过 |
 | Loadout | `schemaVersion: 1.0.0`；三个 Required Artifacts 为 target-local、预算内且 fail closed 校验 | 通过 |
-| Governed execution | deny-wins policy 与 confidence gate 在 `spawnSync` 前执行；非 high confidence 不进入真实执行 | 通过 |
+| Governed execution | ledger hash chain 首先验证；必须存在显式有效 policy；deny-wins policy 与 confidence gate 在 `spawnSync` 前执行；只有 high confidence 可进入真实执行 | 通过 |
 | Handoff | layout 逻辑由 `core/handoff-layout.js` 持有；workflow assessment 仅经公共 facade 使用，无新增循环依赖 | 通过 |
-| Migration | 默认 migrate 接入 ADR-0012 version backfill，并保留 dry-run、备份与幂等语义 | 通过 |
+| Migration | 默认 migrate 扫描 `.amber/`、`routes/` 与 `workflow-packs/`；只改写已识别 artifact，并保留 dry-run、备份与幂等语义 | 通过 |
+| Agent orchestration | 多 worker dispatch 自动要求审批；low-confidence swarm 的有效并发降为 1 | 通过 |
 | Routing | `next --objective` 从目标仓库解析状态，不再读取工具仓库状态 | 通过 |
 | Workflow assessment | no-progress timeline 与 result evidence 只按 active Session 消费 | 通过 |
 | Task evidence producer | `task prepare` 在任何写入前要求 target-local、合法、非终态 Session；显式缺值/空白/未知/冲突均 fail closed | 通过 |
@@ -48,6 +49,8 @@ F016 已提交并保持 `passing`。针对 `origin/master...c628c763fe76b1b24b33
 - Loadout schema、Required Artifacts、预算和 fail-closed 校验缺口。
 - `--since` 将纯 `request-created` 错算为新增或重哈希。
 - confidence gating 丢失、handoff facade cycle、migration 未接线与 target-insensitive routing。
+- governed execution 未验证 ledger chain、缺失显式 policy 或 high-confidence gate 时仍可能继续。
+- swarm 未自动标记审批且 low-confidence dispatch 未降级；migration 根目录不完整并可能改写未知 JSON。
 - no-progress 与 execution evidence 跨 Session 污染。
 - `task prepare` 无 Session、伪 Session、终态 Session及显式空值时仍写入的 fail-open 行为。
 - Context、governance、migration 与 task execution 中本轮引入或扩大的长函数、参数簇和重复持久化逻辑。
@@ -57,7 +60,7 @@ F016 已提交并保持 `passing`。针对 `origin/master...c628c763fe76b1b24b33
 | 检查 | 结果 |
 | --- | --- |
 | Focused Session/producer/governance/structure tests | 23 passed, 0 failed |
-| `npm test` | 1613 total, 1609 passed, 4 skipped, 0 failed；53.3 秒 |
+| `npm test` | 1621 total, 1617 passed, 4 skipped, 0 failed；84.5 秒 |
 | `npm run manifests` | Errors: 0 |
 | `npm run doctor` | Errors: 0；Warnings: 0 |
 | `npm run gen:agents:check` | 31 files current |
@@ -78,4 +81,4 @@ F016 已提交并保持 `passing`。针对 `origin/master...c628c763fe76b1b24b33
 
 ## 最终化状态
 
-commit-SHA binding 已完成：实现与测试由 `c628c763fe76b1b24b3357e16ff9c05ac811fbae` 承载。报告、计划与 feature 记录的 evidence 最终化不改变产品行为；当前未执行 push、版本升级、标签或发布。
+commit-SHA binding 已完成：实现与测试由 `e2f7431799739d6f531a46a7753139c9584e5905` 承载。报告、计划与 feature 记录的 evidence 最终化不改变产品行为；当前未执行 push、版本升级、标签或发布。
