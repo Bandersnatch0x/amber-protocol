@@ -61,12 +61,13 @@ function dispatchAgentTask(target, options = {}) {
 	const warnings = [];
 	const worker = options.worker;
 	const reviewer = options.reviewer;
-	const concurrency = Number.parseInt(options.concurrency || "1", 10);
-	// requiresApproval (T1, ADR-0011): swarm-class dispatches — or any dispatch
-	// whose caller deems human approval a precondition — carry this marker on the
-	// dispatch record so consumers (report/audit/handoff) can see it. Strictly
-	// boolean: only an explicit `true` opts in; everything else stays false.
-	const requiresApproval = options.requiresApproval === true;
+	const requestedConcurrency = Number.parseInt(options.concurrency || "1", 10);
+	const isSwarm = requestedConcurrency > 1;
+	const belowHighConfidence = Boolean(options.confidence) && options.confidence !== "high";
+	const concurrency = isSwarm && options.confidence === "low" ? 1 : requestedConcurrency;
+	// Swarm-class dispatches always expose their approval precondition; callers
+	// may also require approval for a single-worker dispatch explicitly.
+	const requiresApproval = isSwarm || belowHighConfidence || options.requiresApproval === true;
 
 	if (!options.task) {
 		errors.push("agent dispatch requires --task <task-id>.");
@@ -82,7 +83,11 @@ function dispatchAgentTask(target, options = {}) {
 			"Workers cannot self-approve; worker and reviewer must be different.",
 		);
 	}
-	if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4) {
+	if (
+		!Number.isInteger(requestedConcurrency) ||
+		requestedConcurrency < 1 ||
+		requestedConcurrency > 4
+	) {
 		errors.push(
 			"agent dispatch concurrency must be an integer between 1 and 4.",
 		);

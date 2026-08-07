@@ -10,7 +10,12 @@ const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
 const { evaluateGovernedPolicy, loadPolicyRules } = require("./loop-policy");
-const { appendLedgerRecord, readLedger, latestUnconsumedApproval } = require("./loop-ledger");
+const {
+	appendLedgerRecord,
+	readLedger,
+	verifyLedgerChain,
+	latestUnconsumedApproval,
+} = require("./loop-ledger");
 const { codedError } = require("./error-catalog");
 const { createWorktree, removeWorktree } = require("../worktree-manager");
 
@@ -60,11 +65,25 @@ function confidenceDenial(targetRoot, ledgerPath, command, verdict, subject) {
 }
 
 function evaluateExecutionPolicy(targetRoot, ledgerPath, command, subject, contextRules) {
-	const ruleset = mergeRules(loadPolicyRules(targetRoot), contextRules);
+	const globalRules = loadPolicyRules(targetRoot, { required: true });
+	if (!globalRules) {
+		return policyDenial(
+			targetRoot,
+			ledgerPath,
+			command,
+			"governance rules.json is missing or invalid; governed execution requires an explicit policy",
+			subject,
+		);
+	}
+	const ruleset = mergeRules(globalRules, contextRules);
 	const verdict = evaluateGovernedPolicy(command, ruleset);
 	if (!verdict.allowed) return policyDenial(targetRoot, ledgerPath, command, verdict.reason, subject);
-	if (verdict.confidence && verdict.confidence !== "high") {
-		return confidenceDenial(targetRoot, ledgerPath, command, verdict, subject);
+	if (verdict.confidence !== "high") {
+		const governedVerdict = {
+			...verdict,
+			confidence: verdict.confidence === "medium" ? "medium" : "low",
+		};
+		return confidenceDenial(targetRoot, ledgerPath, command, governedVerdict, subject);
 	}
 	return null;
 }
@@ -115,6 +134,11 @@ function recordGovernedExecution(targetRoot, ledgerPath, approval, execution, su
 
 function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5, subject = {}, label = "command", contextRules }) {
 	const targetRoot = resolveTarget(target);
+	const chain = verifyLedgerChain(lp);
+	if (!chain.intact) {
+		const reason = `Ledger chain is broken at record ${chain.brokenAt}: ${chain.reason}`;
+		return { target: targetRoot, errors: [codedError("AMBER_E_LEDGER_TAMPERED", reason)], warnings: [] };
+	}
 	const policyResult = evaluateExecutionPolicy(targetRoot, lp, command, subject, contextRules);
 	if (policyResult) return policyResult;
 	const approval = latestUnconsumedApproval(readLedger(lp));

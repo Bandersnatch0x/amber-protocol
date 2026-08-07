@@ -21,6 +21,25 @@ function tmpRepoWithRoute() {
   return dir;
 }
 
+function writeHighNpmPolicy(dir) {
+  fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, ".amber", "governance", "rules.json"),
+    JSON.stringify({
+      schemaVersion: 1,
+      defaultAction: "deny",
+      confidence_gating: {
+        enabled: true,
+        byRule: { "allow-npm-test": "high" },
+        defaultConfidence: "low",
+      },
+      rules: [
+        { id: "allow-npm-test", action: "allow", match: "exact", pattern: "npm test" },
+      ],
+    }),
+  );
+}
+
 test("approveRouteStage writes an approved ledger record keyed by route:stage", () => {
   const dir = tmpRepoWithRoute();
   const r = approveRouteStage("feature-standard", "verify", dir, "me");
@@ -50,6 +69,7 @@ test("verifyRouteLedger reports intact on a fresh ledger", () => {
 
 test("executeRouteStage without approval is blocked", () => {
   const dir = tmpRepoWithRoute();
+  writeHighNpmPolicy(dir);
   const r = executeRouteStage("feature-standard", "verify", dir);
   assert.equal(r.exitCode, 1);
   assert.ok(r.errors.join("\n").includes("AMBER_E_LOOP_NOT_APPROVED"), r.errors.join("\n"));
@@ -66,12 +86,7 @@ test("executeRouteStage on a non-command stage is rejected", () => {
 
 test("approved + allowed route stage executes, main checkout clean, ledger gains executed record", () => {
   const dir = tmpRepoWithRoute();
-  fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
-  fs.writeFileSync(
-    path.join(dir, ".amber", "governance", "rules.json"),
-    JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [
-      { id: "allow-npm-test", action: "allow", match: "exact", pattern: "npm test" }] }),
-  );
+  writeHighNpmPolicy(dir);
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ scripts: { test: "node -e 0" } }));
   execSync("git add -A && git commit -qm pkg", { cwd: dir });
   approveRouteStage("feature-standard", "verify", dir, "me");
@@ -87,12 +102,7 @@ test("approved + allowed route stage executes, main checkout clean, ledger gains
 
 test("second execute is blocked — one approval, one execution (replay protection)", () => {
   const dir = tmpRepoWithRoute();
-  fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
-  fs.writeFileSync(
-    path.join(dir, ".amber", "governance", "rules.json"),
-    JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [
-      { id: "allow-npm-test", action: "allow", match: "exact", pattern: "npm test" }] }),
-  );
+  writeHighNpmPolicy(dir);
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ scripts: { test: "node -e 0" } }));
   execSync("git add -A && git commit -qm pkg", { cwd: dir });
   approveRouteStage("feature-standard", "verify", dir, "me");

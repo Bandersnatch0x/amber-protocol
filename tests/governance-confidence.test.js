@@ -165,6 +165,70 @@ function governedTarget(confidence) {
 	return { root, ledgerPath };
 }
 
+test("tampered approval ledger refuses governed execution", () => {
+	const { root, ledgerPath } = governedTarget("high");
+	const [line] = fs.readFileSync(ledgerPath, "utf8").trim().split("\n");
+	const approval = JSON.parse(line);
+	approval.reviewer = "tampered-reviewer";
+	fs.writeFileSync(ledgerPath, `${JSON.stringify(approval)}\n`);
+
+	const result = runGovernedCommand({
+		target: root,
+		command: "node --version",
+		ledgerPath,
+		label: "confidence-test",
+	});
+
+	assert.match(result.errors.join("\n"), /AMBER_E_LEDGER_TAMPERED/);
+	assert.equal(result.executed, undefined);
+	assert.equal(readLedger(ledgerPath).length, 1, "tampered ledgers must not receive new records");
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("missing governed policy refuses an otherwise built-in allowed command", () => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "governed-missing-policy-"));
+	const ledgerPath = path.join(root, ".amber", "loops", "missing-policy", "ledger.jsonl");
+	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "missing-policy:test" });
+
+	const result = runGovernedCommand({
+		target: root,
+		command: "node scripts/amber.js doctor",
+		ledgerPath,
+		label: "missing-policy-test",
+	});
+
+	assert.match(result.errors.join("\n"), /AMBER_E_POLICY_DENY/);
+	assert.match(result.errors.join("\n"), /rules\.json/);
+	assert.equal(result.executed, undefined);
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("governed execution refuses an allow rule without confidence gating", () => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "governed-missing-confidence-"));
+	const governanceDir = path.join(root, ".amber", "governance");
+	const ledgerPath = path.join(root, ".amber", "loops", "missing-confidence", "ledger.jsonl");
+	fs.mkdirSync(governanceDir, { recursive: true });
+	fs.writeFileSync(path.join(governanceDir, "rules.json"), JSON.stringify({
+		schemaVersion: 1,
+		defaultAction: "deny",
+		rules: [
+			{ id: "allow-node-version", action: "allow", match: "exact", pattern: "node --version" },
+		],
+	}));
+	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "missing-confidence:test" });
+
+	const result = runGovernedCommand({
+		target: root,
+		command: "node --version",
+		ledgerPath,
+		label: "missing-confidence-test",
+	});
+
+	assert.match(result.errors.join("\n"), /AMBER_E_CONFIDENCE_GATE/);
+	assert.equal(result.executed, undefined);
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
 test("medium confidence refuses governed execution before worktree creation", () => {
 	const { root, ledgerPath } = governedTarget("medium");
 	const result = runGovernedCommand({
@@ -326,6 +390,27 @@ test("dispatchAgentTask sets requiresApproval true when options.requiresApproval
 	seedLedger(root, "task-1");
 	const result = dispatchAgentTask(root, validDispatch({ requiresApproval: true }));
 	assert.deepEqual(result.errors, [], JSON.stringify(result.errors));
+	assert.equal(result.dispatch.requiresApproval, true);
+});
+
+test("dispatchAgentTask marks multi-worker dispatches as requiring approval", () => {
+	const root = tempTarget();
+	seedLedger(root, "task-1");
+	const result = dispatchAgentTask(root, validDispatch({ concurrency: "2" }));
+	assert.deepEqual(result.errors, [], JSON.stringify(result.errors));
+	assert.equal(result.dispatch.concurrencyLimit, 2);
+	assert.equal(result.dispatch.requiresApproval, true);
+});
+
+test("dispatchAgentTask degrades a low-confidence swarm to one worker", () => {
+	const root = tempTarget();
+	seedLedger(root, "task-1");
+	const result = dispatchAgentTask(
+		root,
+		validDispatch({ concurrency: "3", confidence: "low" }),
+	);
+	assert.deepEqual(result.errors, [], JSON.stringify(result.errors));
+	assert.equal(result.dispatch.concurrencyLimit, 1);
 	assert.equal(result.dispatch.requiresApproval, true);
 });
 

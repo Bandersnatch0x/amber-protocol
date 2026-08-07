@@ -34,10 +34,21 @@ test("context allow rule permits a command the global rules.json does not allow"
   // global rules.json: default-deny, NO allow for `node --version`
   fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
   fs.writeFileSync(path.join(dir, ".amber", "governance", "rules.json"),
-    JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [] }));
+    JSON.stringify({
+      schemaVersion: 1,
+      defaultAction: "deny",
+      confidence_gating: { enabled: true, defaultConfidence: "low" },
+      rules: [],
+    }));
   const packPath = path.join(dir, "pack.json");
   fs.writeFileSync(packPath, JSON.stringify(loopPackWith([
-    { id: "ctx-allow-node-ver", action: "allow", match: "exact", pattern: "node --version" }])));
+    {
+      id: "ctx-allow-node-ver",
+      action: "allow",
+      match: "exact",
+      pattern: "node --version",
+      mapsTo: ["ASI04"],
+    }])));
   execSync("git add -A && git commit -qm pkg", { cwd: dir });
   approveLoopContract({ file: packPath, contract: "c1", target: dir, reviewer: "me" });
   const r = executeLoopContract({ file: packPath, contract: "c1", target: dir, execute: true });
@@ -100,13 +111,24 @@ test("route stage with rules composes the same way (context allow supplements gl
   const dir = tmpGitRepo();
   fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
   fs.writeFileSync(path.join(dir, ".amber", "governance", "rules.json"),
-    JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [] }));
+    JSON.stringify({
+      schemaVersion: 1,
+      defaultAction: "deny",
+      confidence_gating: { enabled: true, defaultConfidence: "low" },
+      rules: [],
+    }));
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ scripts: { test: "node -e 0" } }));
   // a route with a command stage that carries its own allow rule
   const route = {
     routeId: "r1", schemaVersion: "1.0.0", version: "1.0.0",
     stages: [{ name: "verify", type: "command", target: "npm test",
-      rules: [{ id: "ctx-allow-npm-test", action: "allow", match: "exact", pattern: "npm test" }] }],
+      rules: [{
+        id: "ctx-allow-npm-test",
+        action: "allow",
+        match: "exact",
+        pattern: "npm test",
+        mapsTo: ["ASI04"],
+      }] }],
     gates: [],
   };
   fs.mkdirSync(path.join(dir, "routes"), { recursive: true });

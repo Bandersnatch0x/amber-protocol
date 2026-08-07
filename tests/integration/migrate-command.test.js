@@ -141,4 +141,65 @@ describe("Migrate Command", () => {
 		assert.strictEqual(typeof updated.created_at, "string");
 		assert.match(response.result.text, /Backfilled 1 artifact/);
 	});
+
+	it("default migrate dispatch backfills root route artifacts", () => {
+		const routesDir = path.join(testDir, "routes");
+		const routePath = path.join(routesDir, "feature.route.json");
+		fs.mkdirSync(routesDir, { recursive: true });
+		fs.writeFileSync(routePath, JSON.stringify({
+			routeId: "feature",
+			stages: [{ id: "build" }],
+		}));
+
+		const response = dispatch("migrate", { target: testDir, _: [], json: true });
+		const updated = JSON.parse(fs.readFileSync(routePath, "utf8"));
+
+		assert.strictEqual(response.exitCode, 0);
+		assert.strictEqual(updated.artifact_type, "route");
+		assert.strictEqual(typeof updated.amber_protocol_version, "string");
+		assert.strictEqual(updated.artifact_sequence, 0);
+		assert.strictEqual(typeof updated.created_at, "string");
+		assert.match(response.result.text, /Backfilled 1 artifact/);
+	});
+
+	it("default migrate dispatch leaves unrecognized JSON untouched", () => {
+		const configDir = path.join(testDir, ".amber");
+		const configPath = path.join(configDir, "config.json");
+		const original = { customSetting: true };
+		fs.mkdirSync(configDir, { recursive: true });
+		fs.writeFileSync(configPath, JSON.stringify(original));
+
+		const response = dispatch("migrate", { target: testDir, _: [], json: true });
+		const unchanged = JSON.parse(fs.readFileSync(configPath, "utf8"));
+
+		assert.strictEqual(response.exitCode, 0);
+		assert.deepStrictEqual(unchanged, original);
+		assert.match(response.result.text, /Backfilled 0 artifacts/);
+	});
+
+	it("default migrate dispatch backfills loop contracts inside workflow packs", () => {
+		const packsDir = path.join(testDir, "workflow-packs");
+		const packPath = path.join(packsDir, "review.pack.json");
+		fs.mkdirSync(packsDir, { recursive: true });
+		fs.writeFileSync(packPath, JSON.stringify({
+			id: "review-pack",
+			loopContracts: [{
+				id: "review-loop",
+				trigger: { type: "manual" },
+				hardStops: { maxIterations: 1 },
+			}],
+		}));
+
+		const response = dispatch("migrate", { target: testDir, _: [], json: true });
+		const updated = JSON.parse(fs.readFileSync(packPath, "utf8"));
+		const [contract] = updated.loopContracts;
+
+		assert.strictEqual(response.exitCode, 0);
+		assert.strictEqual(contract.artifact_type, "loop-contract");
+		assert.strictEqual(typeof contract.amber_protocol_version, "string");
+		assert.strictEqual(contract.artifact_sequence, 0);
+		assert.strictEqual(typeof contract.created_at, "string");
+		assert.strictEqual(updated.artifact_type, undefined);
+		assert.match(response.result.text, /Backfilled 1 artifact/);
+	});
 });

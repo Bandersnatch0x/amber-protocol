@@ -97,9 +97,13 @@ function inferArtifactType(obj) {
 	return null;
 }
 
-function collectJsonArtifacts(amberDir) {
+function collectJsonArtifacts(projectRoot) {
 	const files = [];
-	const queue = [amberDir];
+	const queue = [
+		path.join(projectRoot, ".amber"),
+		path.join(projectRoot, "routes"),
+		path.join(projectRoot, "workflow-packs"),
+	].filter((root) => fs.existsSync(root));
 	while (queue.length > 0) {
 		const dir = queue.shift();
 		let entries;
@@ -120,7 +124,7 @@ function collectJsonArtifacts(amberDir) {
 	return files;
 }
 
-function addMissingVersionFields(content, filePath) {
+function addMissingVersionFields(content, filePath, artifactType) {
 	const missing = [];
 	if (content.amber_protocol_version === undefined) {
 		content.amber_protocol_version = CLI_VERSION;
@@ -139,13 +143,24 @@ function addMissingVersionFields(content, filePath) {
 		}
 	}
 	if (content.artifact_type === undefined) {
-		const inferred = inferArtifactType(content);
-		if (inferred) {
-			content.artifact_type = inferred;
-			missing.push("artifact_type");
-		}
+		content.artifact_type = artifactType;
+		missing.push("artifact_type");
 	}
 	return missing;
+}
+
+function versioningTargets(content) {
+	const candidates = Array.isArray(content.loopContracts)
+		? content.loopContracts
+		: [content];
+	return candidates.flatMap((candidate) => {
+		if (!candidate || typeof candidate !== "object") return [];
+		const declaredType = typeof candidate.artifact_type === "string"
+			? candidate.artifact_type.trim()
+			: "";
+		const artifactType = declaredType || inferArtifactType(candidate);
+		return artifactType ? [{ content: candidate, artifactType }] : [];
+	});
 }
 
 function backfillJsonArtifact(projectRoot, filePath, dryRun) {
@@ -156,14 +171,19 @@ function backfillJsonArtifact(projectRoot, filePath, dryRun) {
 		return null;
 	}
 	if (!content || typeof content !== "object") return null;
-	const missing = addMissingVersionFields(content, filePath);
-	if (missing.length === 0) return { skipped: true };
+	const targets = versioningTargets(content);
+	if (targets.length === 0) return null;
+	const changes = targets
+		.map((target) => addMissingVersionFields(target.content, filePath, target.artifactType))
+		.filter((missing) => missing.length > 0);
+	if (changes.length === 0) return { skipped: targets.length };
 	const relative = path.relative(projectRoot, filePath);
+	const fields = [...new Set(changes.flat())].join(", ");
 	if (dryRun) {
-		return { backfilled: true, log: `Would backfill ${relative}: add ${missing.join(", ")}` };
+		return { backfilled: changes.length, log: `Would backfill ${relative}: add ${fields}` };
 	}
 	writeJsonWithBackup(filePath, content);
-	return { backfilled: true, log: `Backfilled ${relative}: added ${missing.join(", ")}` };
+	return { backfilled: changes.length, log: `Backfilled ${relative}: added ${fields}` };
 }
 
 /**
@@ -177,27 +197,27 @@ function backfillJsonArtifact(projectRoot, filePath, dryRun) {
  */
 function backfillVersioning(projectRoot, options = {}) {
 	const { dryRun = false } = options;
-	const amberDir = path.join(projectRoot, ".amber");
+	const artifactPaths = collectJsonArtifacts(projectRoot);
 
-	if (!fs.existsSync(amberDir)) {
+	if (artifactPaths.length === 0) {
 		return {
 			success: true,
 			backfilled: 0,
 			skipped: 0,
 			wouldBackfill: 0,
 			logs: [],
-			message: "No .amber directory found",
+			message: "No Amber artifacts found",
 		};
 	}
 
 	let backfilled = 0;
 	let skipped = 0;
 	const logs = [];
-	for (const filePath of collectJsonArtifacts(amberDir)) {
+	for (const filePath of artifactPaths) {
 		const result = backfillJsonArtifact(projectRoot, filePath, dryRun);
 		if (!result) continue;
-		if (result.skipped) skipped++;
-		if (result.backfilled) backfilled++;
+		if (result.skipped) skipped += result.skipped;
+		if (result.backfilled) backfilled += result.backfilled;
 		if (result.log) logs.push(result.log);
 	}
 

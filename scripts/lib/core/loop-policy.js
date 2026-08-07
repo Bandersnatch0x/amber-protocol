@@ -208,29 +208,34 @@ const evaluateGovernedPolicy = evaluateWithBaseline;
 // denials with no indication their allow rules are being ignored). `scope` is ""
 // for the governed surface and "verification " for the verify surface, preserving
 // each surface's historical message wording exactly.
-function loadRulesFile(stateDir, filename, scope) {
+function rulesFallback(filename, rulesPath, scope, problem, required) {
+	const action = required
+		? "governed execution will refuse until the policy is fixed"
+		: `using built-in defaults — your custom ${scope}allow/deny rules are being ignored`;
+	process.stderr.write(`[amber] governance ${filename} at ${rulesPath} ${problem}; ${action}.\n`);
+	return required ? null : DEFAULT_RULES;
+}
+
+function loadRulesFile(stateDir, filename, scope, required = false) {
 	const rulesPath = path.join(stateDir, "governance", filename);
-	if (!fs.existsSync(rulesPath)) return DEFAULT_RULES;
+	if (!fs.existsSync(rulesPath)) return required ? null : DEFAULT_RULES;
 	let parsed;
 	try {
 		parsed = JSON.parse(fs.readFileSync(rulesPath, "utf8"));
 	} catch (e) {
-		process.stderr.write(
-			`[amber] governance ${filename} at ${rulesPath} is unparseable (${e.message}); ` +
-				`using built-in defaults — your custom ${scope}allow/deny rules are being ignored. Fix the JSON.\n`,
-		);
-		return DEFAULT_RULES;
+		return rulesFallback(filename, rulesPath, scope, `is unparseable (${e.message})`, required);
 	}
 	if (parsed && Array.isArray(parsed.rules)) return parsed;
-	process.stderr.write(
-		`[amber] governance ${filename} at ${rulesPath} is missing a top-level 'rules' array; ` +
-			"using built-in defaults.\n",
-	);
-	return DEFAULT_RULES;
+	return rulesFallback(filename, rulesPath, scope, "is missing a top-level 'rules' array", required);
 }
 
-function loadPolicyRules(targetRoot) {
-	return loadRulesFile(resolveStateDirForRead(targetRoot), "rules.json", "");
+function loadPolicyRules(targetRoot, options = {}) {
+	return loadRulesFile(
+		resolveStateDirForRead(targetRoot),
+		"rules.json",
+		"",
+		options.required === true,
+	);
 }
 
 function loadVerifyPolicyRules(targetRoot) {

@@ -33,6 +33,11 @@ function tmpGitRepoWithPack(governedCommand, rules) {
 
 const ALLOW_NODE = {
   schemaVersion: 1, defaultAction: "deny",
+  confidence_gating: {
+    enabled: true,
+    byRule: { "allow-node": "high" },
+    defaultConfidence: "low",
+  },
   rules: [{ id: "allow-node", action: "allow", match: "prefix", pattern: "node " }],
 };
 
