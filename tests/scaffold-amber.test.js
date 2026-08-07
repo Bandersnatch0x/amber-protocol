@@ -32,6 +32,21 @@ test("scaffold creates a valid Harness in an empty repo", () => {
   assert.equal(result.skipped.length, 0);
   assert.equal(fs.existsSync(path.join(target, "feature_list.json")), true);
   assert.equal(fs.existsSync(path.join(target, ".workflow", "continuous-improvement", "packets", "README.md")), true);
+  assert.match(
+    fs.readFileSync(path.join(target, "docs", "wiki", "agent", "amber.md"), "utf8"),
+    /Operating Manual/
+  );
+  assert.equal(
+    fs.existsSync(path.join(target, "docs", "wiki", "agent", "context-loadout.md")),
+    true
+  );
+  for (const routeId of ["bugfix-quick", "feature-standard", "refactor-safe"]) {
+    assert.equal(
+      fs.existsSync(path.join(target, "routes", `${routeId}.route.json`)),
+      true,
+      `${routeId} route was not installed`
+    );
+  }
 
   const doctorResult = doctor(target);
   assert.deepEqual(doctorResult.errors, []);

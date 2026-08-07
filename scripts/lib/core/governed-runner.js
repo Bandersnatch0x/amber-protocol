@@ -20,31 +20,103 @@ function mergeRules(globalRules, contextRules) {
 	// Context rules are appended; evaluateGovernedPolicy checks ALL deny rules first
 	// (deny-wins, including un-removable built-ins), so a context allow can never
 	// override a global OR context deny.
-	return { defaultAction: globalRules?.defaultAction ?? "deny", rules: [...g, ...c] };
+	return {
+		...globalRules,
+		defaultAction: globalRules?.defaultAction ?? "deny",
+		rules: [...g, ...c],
+	};
+}
+
+function policyDenial(targetRoot, ledgerPath, command, reason, subject) {
+	appendLedgerRecord(ledgerPath, {
+		schemaVersion: 2,
+		kind: "denied",
+		command,
+		reason,
+		recordedAt: new Date().toISOString(),
+		executesAnything: false,
+		...subject,
+	});
+	return { target: targetRoot, errors: [codedError("AMBER_E_POLICY_DENY", reason)], warnings: [] };
+}
+
+function confidenceDenial(targetRoot, ledgerPath, command, verdict, subject) {
+	const reason = verdict.confidence === "medium"
+		? "medium confidence permits dry-run only; governed execution requires high confidence"
+		: "low confidence requires human review; governed execution requires high confidence";
+	appendLedgerRecord(ledgerPath, {
+		schemaVersion: 2,
+		kind: "denied",
+		gate: "confidence",
+		command,
+		confidence: verdict.confidence,
+		matchedRule: verdict.matchedRule,
+		reason,
+		recordedAt: new Date().toISOString(),
+		executesAnything: false,
+		...subject,
+	});
+	return { target: targetRoot, errors: [codedError("AMBER_E_CONFIDENCE_GATE", reason)], warnings: [] };
+}
+
+function evaluateExecutionPolicy(targetRoot, ledgerPath, command, subject, contextRules) {
+	const ruleset = mergeRules(loadPolicyRules(targetRoot), contextRules);
+	const verdict = evaluateGovernedPolicy(command, ruleset);
+	if (!verdict.allowed) return policyDenial(targetRoot, ledgerPath, command, verdict.reason, subject);
+	if (verdict.confidence && verdict.confidence !== "high") {
+		return confidenceDenial(targetRoot, ledgerPath, command, verdict, subject);
+	}
+	return null;
+}
+
+function executeInWorktree(targetRoot, command, label, budgetMinutes) {
+	const safeLabel = String(label).replace(/[^A-Za-z0-9._-]/g, "-");
+	const runId = `glx-${safeLabel}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+	const worktree = createWorktree(targetRoot, runId);
+	if (!worktree.success) return { error: `Failed to create isolated worktree: ${worktree.error}` };
+	let result;
+	try {
+		const spawned = spawnSync(command, { shell: true, cwd: worktree.path, encoding: "utf8", timeout: budgetMinutes * 60_000 });
+		result = {
+			command,
+			exitCode: spawned.status === null ? -1 : spawned.status,
+			stdout: (spawned.stdout || "").slice(-4000),
+			stderr: (spawned.stderr || "").slice(-2000),
+		};
+	} catch (error) {
+		result = { command, exitCode: -1, stdout: "", stderr: String(error.message).slice(-2000) };
+	} finally {
+		removeWorktree(targetRoot, runId);
+	}
+	return { result };
+}
+
+function recordGovernedExecution(targetRoot, ledgerPath, approval, execution, subject) {
+	const record = appendLedgerRecord(ledgerPath, {
+		schemaVersion: 2,
+		kind: "executed",
+		approvalState: "executed",
+		consumedApprovalKey: approval.approvalKey,
+		action: execution,
+		recordedAt: new Date().toISOString(),
+		executesAnything: true,
+		stopReason: execution.exitCode === 0 ? "completed" : "command-failed",
+		...subject,
+	});
+	return {
+		target: targetRoot,
+		executed: true,
+		exitCode: execution.exitCode,
+		ledgerRecord: record,
+		errors: execution.exitCode === 0 ? [] : [`Command exited ${execution.exitCode}`],
+		warnings: [],
+	};
 }
 
 function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5, subject = {}, label = "command", contextRules }) {
 	const targetRoot = resolveTarget(target);
-
-	// Gate 1 — policy (global rules.json composed with per-context rules; deny-wins
-	// is absolute). Built-in deny-destructive + shell-composition fire BEFORE
-	// user rules so a custom rules.json cannot drop them (mirrors verify surface).
-	const ruleset = mergeRules(loadPolicyRules(targetRoot), contextRules);
-	const verdict = evaluateGovernedPolicy(command, ruleset);
-	if (!verdict.allowed) {
-		appendLedgerRecord(lp, {
-			schemaVersion: 2,
-			kind: "denied",
-			command,
-			reason: verdict.reason,
-			recordedAt: new Date().toISOString(),
-			executesAnything: false,
-			...subject,
-		});
-		return { target: targetRoot, errors: [codedError("AMBER_E_POLICY_DENY", verdict.reason)], warnings: [] };
-	}
-
-	// Gate 2 — approval (unconsumed)
+	const policyResult = evaluateExecutionPolicy(targetRoot, lp, command, subject, contextRules);
+	if (policyResult) return policyResult;
 	const approval = latestUnconsumedApproval(readLedger(lp));
 	if (!approval) {
 		return {
@@ -54,56 +126,12 @@ function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5
 		};
 	}
 
-	// Gate 3 — git precondition + isolated worktree
 	if (!fs.existsSync(path.join(targetRoot, ".git"))) {
 		return { target: targetRoot, errors: [codedError("AMBER_E_MISSING_PATH_ARG", "not a git repository")], warnings: [] };
 	}
-	// Sanitize the label for use as a git branch-name suffix (git forbids :, ~, ^, etc.).
-	const safeLabel = String(label).replace(/[^A-Za-z0-9._-]/g, "-");
-	const runId = `glx-${safeLabel}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
-	const wt = createWorktree(targetRoot, runId);
-	if (!wt.success) {
-		return { target: targetRoot, errors: [`Failed to create isolated worktree: ${wt.error}`], warnings: [] };
-	}
-	let exec;
-	try {
-		const res = spawnSync(command, { shell: true, cwd: wt.path, encoding: "utf8", timeout: budgetMinutes * 60_000 });
-		exec = {
-			command,
-			// A null status means the process was killed (timeout/signal) — record -1
-			// so a timed-out governed run is never stored as exit 0. Matches evidence-runner.
-			exitCode: res.status === null ? -1 : res.status,
-			// Keep the TAIL: on long build/test logs the failure surfaces at the end,
-			// so the head is setup noise. Matches evidence-runner's slice(-N).
-			stdout: (res.stdout || "").slice(-4000),
-			stderr: (res.stderr || "").slice(-2000),
-		};
-	} catch (e) {
-		exec = { command, exitCode: -1, stdout: "", stderr: String(e.message).slice(-2000) };
-	} finally {
-		removeWorktree(targetRoot, runId);
-	}
-
-	// Gate 4 — tamper-evident executed record (consumes the approval)
-	const record = appendLedgerRecord(lp, {
-		schemaVersion: 2,
-		kind: "executed",
-		approvalState: "executed",
-		consumedApprovalKey: approval.approvalKey,
-		action: exec,
-		recordedAt: new Date().toISOString(),
-		executesAnything: true,
-		stopReason: exec.exitCode === 0 ? "completed" : "command-failed",
-		...subject,
-	});
-	return {
-		target: targetRoot,
-		executed: true,
-		exitCode: exec.exitCode,
-		ledgerRecord: record,
-		errors: exec.exitCode === 0 ? [] : [`Command exited ${exec.exitCode}`],
-		warnings: [],
-	};
+	const execution = executeInWorktree(targetRoot, command, label, budgetMinutes);
+	if (execution.error) return { target: targetRoot, errors: [execution.error], warnings: [] };
+	return recordGovernedExecution(targetRoot, lp, approval, execution.result, subject);
 }
 
 module.exports = { runGovernedCommand, mergeRules };

@@ -1,0 +1,20 @@
+{
+  "routeId": "bugfix-quick",
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "displayName": "Quick Bug Fix",
+  "description": "Short path for fixing a defect: reproduce, fix, then verify",
+  "objective": "Fix a bug or defect quickly: reproduce the failure, apply the smallest fix, then verify the fix with tests.",
+  "trigger": {
+    "goalPattern": "^(fix|resolve|patch|repair)\\s+.*(bug|defect|issue|error|crash)",
+    "complexity": "simple"
+  },
+  "stages": [
+    { "name": "reproduce", "displayName": "Reproduce Bug", "type": "skill", "target": "bug-reproduction", "gateAfter": "user-approval-fix" },
+    { "name": "fix", "displayName": "Apply Fix", "type": "pack", "target": "tdd-implementation" },
+    { "name": "verify", "displayName": "Run Verification", "type": "command", "target": "npm test" }
+  ],
+  "gates": [
+    { "id": "user-approval-fix", "type": "user-approval", "description": "Reproduction confirmed. Proceed to apply the fix?" }
+  ]
+}

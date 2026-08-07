@@ -28,6 +28,7 @@ function preparedTarget(name) {
   const plan = path.join("docs", "plans", "F001-Agent-slice.md");
   const planPath = path.join(target, plan);
   fs.writeFileSync(planPath, fs.readFileSync(planPath, "utf8").replace("User Confirmation: pending", "User Confirmation: confirmed"));
+	assert.equal(runHarness(["session", "start", "--target", target, "--goal", "prepare agent slice", "--route", "bugfix-quick"]).status, 0);
   assert.equal(runHarness(["task", "prepare", "--target", target, "--plan", plan, "--task", "slice-1"]).status, 0);
   return target;
 }

@@ -448,6 +448,7 @@ Infer the repo's position in the Amber lifecycle and print the single next comma
 node scripts/amber.js next --target .                 # auto-select a focus
 node scripts/amber.js next --target . --feature F001  # focus a feature
 node scripts/amber.js next --target . --session <id>  # focus a session
+node scripts/amber.js next --target . --objective "fix login timeout" # match a target-local Route
 node scripts/amber.js next --target . --json          # machine-readable envelope
 ```
 
@@ -458,6 +459,11 @@ completion evaluation matches `complete-check --strict` (executed verification +
 the init scaffold). Approve remedies include the concrete `--gate <id>` from the session route.
 Existing non-empty targets get a read-only `amber audit` first; audit writes no target file, so
 `next` advances straight to `init` (audit is a non-blocking advisory).
+
+With `--objective`, `next` resolves Route manifests and Workflow Packs from the target repository,
+not Amber's installation directory. A matching Route selects the governed path for that objective;
+when no Route matches, the recommendation remains behind the plan gate instead of guessing an
+execution path.
 
 ### migrate
 
@@ -473,9 +479,17 @@ node scripts/amber.js migrate state --target . --archive-legacy
 # Migrate wiki
 node scripts/amber.js migrate wiki --target .
 
-# Migrate manifests
+# Migrate session manifest schemas and backfill ADR-0012 version fields
 node scripts/amber.js migrate manifests --target .
+
+# Preview both manifest migration and version-field backfill without writing
+node scripts/amber.js migrate manifests --target . --dry-run
 ```
+
+`migrate` with no subcommand is equivalent to `migrate manifests`. It updates Session manifest
+schemas and backfills missing ADR-0012 version fields in JSON artifacts under `.amber/`; existing
+version fields are never overwritten. Before the first write to each changed JSON file, Amber keeps
+a sibling `.backup` copy and preserves that original backup on later runs.
 
 ### wiki
 
@@ -690,8 +704,13 @@ Prepare task execution:
 node scripts/amber.js task prepare \
   --target . \
   --plan docs/plans/feature.md \
-  --task task-1
+  --task task-1 \
+  --session <id>
 ```
+
+The execution ledger and evidence always bind to a target-local, non-terminal Session. Amber validates
+an explicit `--session`; when it is omitted, Amber uses the most recent incomplete Session. The command
+fails before creating execution or worktree directories when no valid Session can be resolved.
 
 ### result inspect
 > ⚠️ **DEPRECATED** — will be removed in v2.
@@ -1037,6 +1056,11 @@ node scripts/amber.js context show   --target . --page <id>
 node scripts/amber.js context refresh --target .          # absorbs cosmetic changes; requests real ones
 node scripts/amber.js context delete --target . --page <id>
 
+# Task-scoped Loadout
+node scripts/amber.js context load --target . --route feature-standard
+node scripts/amber.js context load --target . --route feature-standard --feature F016 --budget 4000 --page governed-execution
+node scripts/amber.js context verify --target . --loadout .amber/context/loadouts/feature-standard-F016.json
+
 # Observability
 node scripts/amber.js context stats --target .            # lifetime
 node scripts/amber.js context stats --target . --window 50   # last 50 events
@@ -1046,6 +1070,12 @@ Sources are mutable by default (raw+normalized hash; cosmetic changes absorbed s
 immutable under `.amber/` and `docs/adr/` (excerpt-snapshotted; tamper detected). A payload must
 reproduce the request's bundled source hashes verbatim — re-bundling is rejected as stale.
 Failures carry the `AMBER_E_CONTEXT_*` codes (see `amber explain`).
+
+Loadouts use `schemaVersion: 1.0.0`. `artifacts.required[]` always records and budgets the
+target-local Operating Manual (`docs/wiki/agent/amber.md`), selected Route manifest, and Loadout
+Definition (`docs/wiki/agent/context-loadout.md`); Context Page accounting remains in `references`.
+Missing, escaped, or hash-changed Required Artifacts fail closed. `verify --loadout` rechecks them
+and any required-tier Pages immediately before the host agent loads the artifact.
 
 ## Error Codes
 

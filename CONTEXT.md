@@ -69,8 +69,12 @@ The two source classes a Context Page may cite. Mutable sources (code, live docu
 _Avoid_: static/dynamic source, fixed reference
 
 **Loadout**:
-The task-scoped context artifact Amber assembles at `.amber/context/loadouts/<route>[-<feature>].json`: a deterministic, budgeted selection of pinned + fresh knowledge pages (plus wiki/handoff references), each carrying its `rawHash` for load-time verification. Amber governs the agent's context window without retrieving semantically — the host agent loads the contract. (ADR-0010)
+The task-scoped context artifact Amber assembles at `.amber/context/loadouts/<route>[-<feature>].json`: a deterministic, budgeted set of Required Artifacts plus pinned and fresh Context Pages, with separate accounting and hashes for load-time verification. Amber governs the agent's context window without retrieving semantically — the host agent loads the contract. (ADR-0010, ADR-0015)
 _Avoid_: prompt bundle, context pack, RAG result
+
+**Required Artifact**:
+A target-local governance artifact that every Loadout must include and verify: the Operating Manual, the selected Route manifest, and the Loadout Definition. Required Artifacts are not Context Pages and fail closed when missing, changed, or outside the target repository. (ADR-0015)
+_Avoid_: pinned page, required reference, built-in context
 
 **Context Budget**:
 The word-count cap (default ≈ 4000, `--budget`) that bounds a Loadout. Pages fill tiers in stable order — required → priority → recency → pageId — and out-of-budget exclusions are recorded with reasons; a required-tier overflow fails fast. (ADR-0010)

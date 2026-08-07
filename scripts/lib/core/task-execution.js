@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-dir-resolver");
+const { TRANSITIONS, isFinal } = require("../session-state-machine");
 
 const {
 	pathExists,
@@ -67,62 +68,83 @@ function buildReplayContent(taskId, planRelativePath, worktreeRelativePath, evid
 	return replayLines.join("\n");
 }
 
-function prepareTaskExecution(
-	target,
-	planRelativePath,
-	taskIdInput,
-	options = {},
-) {
-	const targetRoot = resolveTarget(target);
-	const taskId = slugify(taskIdInput);
-	const errors = [];
-	const warnings = [];
+const SESSION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
-	if (!taskIdInput) {
-		errors.push("task prepare requires --task <task-id>.");
-		return { target: targetRoot, task: null, errors, warnings };
+function explicitExecutionSession(options) {
+	const keys = ["session", "sessionId"].filter((key) => Object.hasOwn(options, key));
+	if (keys.length === 0) return { provided: false };
+	const values = [];
+	for (const key of keys) {
+		const value = options[key];
+		if (typeof value !== "string" || !value.trim()) {
+			return { error: `task prepare requires a non-empty Session ID in --${key}.` };
+		}
+		const sessionId = value.trim();
+		if (!SESSION_ID_RE.test(sessionId)) {
+			return { error: `Invalid Session ID for task prepare: ${sessionId}` };
+		}
+		values.push(sessionId);
 	}
-
-	const review = reviewPlan(targetRoot, planRelativePath);
-	if (review.errors.length > 0) {
-		return {
-			target: targetRoot,
-			task: taskId,
-			plan: planRelativePath,
-			errors: review.errors,
-			warnings: review.warnings,
-			review,
-		};
+	if (new Set(values).size > 1) {
+		return { error: "task prepare received conflicting session and sessionId values." };
 	}
+	return { provided: true, sessionId: values[0] };
+}
 
-	const worktreeRelativePath = path.join(".amber", "worktrees", taskId);
-	const executionRelativePath = path.join(".amber", "executions", taskId);
-	const worktreePath = path.join(targetRoot, worktreeRelativePath);
-	const executionPath = path.join(targetRoot, executionRelativePath);
-	fs.mkdirSync(worktreePath, { recursive: true });
-	fs.mkdirSync(executionPath, { recursive: true });
+function resolveExecutionSession(targetRoot, options) {
+	const { findMostRecentSession, loadSessionManifest } = require("../session-commands");
+	const explicit = explicitExecutionSession(options);
+	if (explicit.error) return explicit;
+	const sessionId = explicit.provided
+		? explicit.sessionId
+		: findMostRecentSession(targetRoot, { excludeCompleted: true });
+	if (!sessionId) {
+		return { error: "task prepare requires an active non-terminal Session in the target repository." };
+	}
+	if (!SESSION_ID_RE.test(sessionId)) {
+		return { error: `Invalid Session ID for task prepare: ${sessionId}` };
+	}
+	const loaded = loadSessionManifest(targetRoot, sessionId);
+	if (!loaded) return { error: `Session not found in target repository: ${sessionId}` };
+	if (loaded.corrupt) return { error: `Session manifest is corrupt: ${sessionId}` };
+	const manifest = loaded.manifest;
+	if (manifest.sessionId !== sessionId) {
+		return { error: `Session manifest ID mismatch for task prepare: ${sessionId}` };
+	}
+	if (!Object.hasOwn(TRANSITIONS, manifest.status)) {
+		return { error: `Session ${sessionId} has invalid status: ${manifest.status}` };
+	}
+	if (isFinal(manifest.status)) {
+		return { error: `Session ${sessionId} is terminal (${manifest.status}); task prepare requires a non-terminal Session.` };
+	}
+	return { sessionId };
+}
 
-	const ledger = {
+function buildExecutionLedger(coordinates, worktreeRelativePath, options) {
+	const { taskId, sessionId, planRelativePath } = coordinates;
+	return {
 		taskId,
+		sessionId,
 		plan: planRelativePath,
 		status: "prepared",
-		worktree: {
-			type: "directory-worktree",
-			path: worktreeRelativePath,
-		},
+		worktree: { type: "directory-worktree", path: worktreeRelativePath },
 		commands: [],
 		failureAttribution: null,
 		traceDerived: Boolean(options.traceInput || options.regressionAssertion),
 		createdAt: new Date().toISOString(),
 	};
+}
+
+function buildExecutionEvidence(coordinates, options) {
+	const { taskId, sessionId, planRelativePath } = coordinates;
 	const evidence = {
 		taskId,
+		sessionId,
 		plan: planRelativePath,
 		evidence: [],
 		requiredForReplay: ["ledger.json", "evidence.json", "replay.md"],
 		chatHistoryRequired: false,
 	};
-
 	if (options.traceInput || options.agentConfig) {
 		evidence.traceReplay = {
 			traceInput: options.traceInput || "",
@@ -130,7 +152,6 @@ function prepareTaskExecution(
 			exactReplayRequired: Boolean(options.traceInput),
 		};
 	}
-
 	if (options.regressionAssertion) {
 		evidence.regressionProposal = {
 			assertion: options.regressionAssertion,
@@ -139,43 +160,80 @@ function prepareTaskExecution(
 			approvalRequired: true,
 		};
 	}
+	return evidence;
+}
 
-	const replay = buildReplayContent(
-		taskId,
-		planRelativePath,
-		worktreeRelativePath,
-		evidence,
-	);
+function persistExecutionArtifacts(coordinates, artifacts) {
+	const { targetRoot, taskId } = coordinates;
+	const worktreeRelativePath = path.join(".amber", "worktrees", taskId);
+	const executionRelativePath = path.join(".amber", "executions", taskId);
+	const worktreePath = path.join(targetRoot, worktreeRelativePath);
+	const executionPath = path.join(targetRoot, executionRelativePath);
+	fs.mkdirSync(worktreePath, { recursive: true });
+	fs.mkdirSync(executionPath, { recursive: true });
+	fs.writeFileSync(path.join(executionPath, "ledger.json"), JSON.stringify(artifacts.ledger, null, 2));
+	fs.writeFileSync(path.join(executionPath, "evidence.json"), JSON.stringify(artifacts.evidence, null, 2));
+	fs.writeFileSync(path.join(executionPath, "replay.md"), artifacts.replay);
+	return { worktreeRelativePath, executionRelativePath };
+}
 
-	fs.writeFileSync(
-		path.join(executionPath, "ledger.json"),
-		JSON.stringify(ledger, null, 2),
-	);
-	fs.writeFileSync(
-		path.join(executionPath, "evidence.json"),
-		JSON.stringify(evidence, null, 2),
-	);
-	fs.writeFileSync(path.join(executionPath, "replay.md"), replay);
-
+function buildPreparationResult(coordinates, paths, evidence) {
+	const { targetRoot, taskId, planRelativePath } = coordinates;
 	const result = {
 		target: targetRoot,
 		task: taskId,
 		plan: planRelativePath,
-		worktree: worktreeRelativePath,
-		execution: executionRelativePath,
+		worktree: paths.worktreeRelativePath,
+		execution: paths.executionRelativePath,
+		errors: [],
+		warnings: [],
+	};
+	if (evidence.traceReplay) result.traceReplay = evidence.traceReplay;
+	if (evidence.regressionProposal) result.regressionProposal = evidence.regressionProposal;
+	return result;
+}
+
+function preparationFailure(coordinates, errors, warnings, review) {
+	return {
+		target: coordinates.targetRoot,
+		task: coordinates.taskId,
+		plan: coordinates.planRelativePath,
 		errors,
 		warnings,
+		review,
 	};
+}
 
-	if (evidence.traceReplay) {
-		result.traceReplay = evidence.traceReplay;
+function prepareTaskExecution(
+	target,
+	planRelativePath,
+	taskIdInput,
+	options = {},
+) {
+	const targetRoot = resolveTarget(target);
+	const taskId = slugify(taskIdInput);
+	const coordinates = { targetRoot, taskId, planRelativePath };
+	if (!taskIdInput) {
+		return { target: targetRoot, task: null, errors: ["task prepare requires --task <task-id>."], warnings: [] };
 	}
-
-	if (evidence.regressionProposal) {
-		result.regressionProposal = evidence.regressionProposal;
+	const review = reviewPlan(targetRoot, planRelativePath);
+	if (review.errors.length > 0) {
+		return preparationFailure(coordinates, review.errors, review.warnings, review);
 	}
-
-	return result;
+	const session = resolveExecutionSession(targetRoot, options);
+	if (session.error) {
+		return preparationFailure(coordinates, [session.error], [], review);
+	}
+	const boundCoordinates = { ...coordinates, sessionId: session.sessionId };
+	const worktreeRelativePath = path.join(".amber", "worktrees", taskId);
+	const evidence = buildExecutionEvidence(boundCoordinates, options);
+	const artifacts = {
+		evidence,
+		ledger: buildExecutionLedger(boundCoordinates, worktreeRelativePath, options),
+		replay: buildReplayContent(taskId, planRelativePath, worktreeRelativePath, evidence),
+	};
+	const paths = persistExecutionArtifacts(boundCoordinates, artifacts);
+	return buildPreparationResult(boundCoordinates, paths, evidence);
 }
 
 function inspectTaskResult(target, taskIdInput) {

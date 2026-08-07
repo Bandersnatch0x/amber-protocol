@@ -75,6 +75,43 @@ describe("bundleSources", () => {
 		}
 	});
 
+	it("rejects a source path that lexically escapes the target", () => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-req-outside-"));
+		try {
+			const outsideFile = path.join(outsideRoot, "secret.md");
+			fs.writeFileSync(outsideFile, "outside\n", "utf8");
+			const ref = path.relative(root, outsideFile).split(path.sep).join("/");
+			const { sources, errors } = bundleSources(root, [{ ref }]);
+			assert.deepEqual(sources, []);
+			assert.match(errors.join("\n"), /outside the target/i);
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
+		}
+	});
+
+	it("rejects a source path whose symlink or junction escapes the target", () => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-req-link-"));
+		try {
+			fs.writeFileSync(path.join(outsideRoot, "secret.md"), "outside\n", "utf8");
+			fs.symlinkSync(
+				outsideRoot,
+				path.join(root, "linked"),
+				process.platform === "win32" ? "junction" : "dir",
+			);
+			const { sources, errors } = bundleSources(root, [
+				{ ref: "linked/secret.md" },
+			]);
+			assert.deepEqual(sources, []);
+			assert.match(errors.join("\n"), /outside the target/i);
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
+		}
+	});
+
 	it("auto-bundles the most recent session ledger when no sources given", () => {
 		const root = makeTarget();
 		try {

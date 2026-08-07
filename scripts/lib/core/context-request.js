@@ -13,6 +13,7 @@ const addFormats = require("ajv-formats");
 
 const { hashFile, sha256 } = require("./context-hash");
 const { requestsDir, appendEvent } = require("./context-store");
+const { resolvePathWithin } = require("./fs-utils");
 
 const SCHEMA_VERSION = "1.0.0";
 const PAGE_SCHEMA = "schemas/context-page.schema.json";
@@ -63,7 +64,7 @@ function bundleSource(targetRoot, spec) {
 	const parsed = parseRef(spec);
 	if (!parsed) return null;
 	const raw = typeof spec === "string" ? spec : spec && spec.ref;
-	const full = path.resolve(targetRoot, parsed.ref);
+	const full = resolvePathWithin(targetRoot, parsed.ref, { label: "Context source" });
 	if (!fs.existsSync(full)) return null;
 
 	const mutable = !isImmutable(parsed.ref);
@@ -136,7 +137,13 @@ function bundleSources(targetRoot, sourceSpecs = []) {
 	const sources = [];
 	const errors = [];
 	for (const spec of list) {
-		const bundled = bundleSource(targetRoot, spec);
+		let bundled;
+		try {
+			bundled = bundleSource(targetRoot, spec);
+		} catch (error) {
+			errors.push(error.message || String(error));
+			continue;
+		}
 		if (bundled) sources.push(bundled);
 		else {
 			const parsed = parseRef(spec);
@@ -186,42 +193,35 @@ function normalizeScope(scope) {
 	return out;
 }
 
-/**
- * Create a distillation contract.
- * @param {string} targetRoot
- * @param {{ pageId: string, title?: string, reason?: string, sources?: Array, force?: boolean, scope?: string[]|string }} opts
- */
-function createRequest(targetRoot, opts = {}) {
+function validateRequestInput(targetRoot, opts) {
 	const pageId = opts.pageId;
 	const errors = [];
 	if (!pageId || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(pageId)) {
 		errors.push(`invalid pageId: ${pageId} (kebab-case required)`);
 	}
-	const title = opts.title || pageId;
-
-	// Duplicate guard: refuse when an open request exists for the page unless forced.
 	if (errors.length === 0 && !opts.force && latestRequestForPage(targetRoot, pageId)) {
 		errors.push(`open request already exists for page "${pageId}" (use --force to supersede)`);
 	}
+	const bundled = bundleSources(targetRoot, opts.sources);
+	for (const error of bundled.errors) errors.push(`bundle: ${error}`);
+	if (bundled.sources.length === 0) errors.push("no sources bundled — nothing to distil");
+	return { pageId, title: opts.title || pageId, sources: bundled.sources, errors };
+}
 
-	const { sources, errors: sourceErrors } = bundleSources(targetRoot, opts.sources);
-	errors.push(...sourceErrors.map((e) => `bundle: ${e}`));
-	if (sources.length === 0) errors.push("no sources bundled — nothing to distil");
-
-	if (errors.length > 0) {
-		return { requestId: null, requestPath: null, errors, warnings: [] };
-	}
-
+function buildRequest(opts, input) {
 	const scope = normalizeScope(opts.scope);
-	const requestId = makeRequestId();
-	const target = { pageId, title, reason: opts.reason || "explicit" };
+	const target = {
+		pageId: input.pageId,
+		title: input.title,
+		reason: opts.reason || "explicit",
+	};
 	if (scope.length > 0) target.scope = scope;
-	const request = {
+	return {
 		schemaVersion: SCHEMA_VERSION,
-		requestId,
+		requestId: makeRequestId(),
 		createdAt: new Date().toISOString(),
 		target,
-		sources,
+		sources: input.sources,
 		contract: {
 			outputSchema: PAGE_SCHEMA,
 			instructions: DEFAULT_INSTRUCTIONS,
@@ -233,25 +233,40 @@ function createRequest(targetRoot, opts = {}) {
 		},
 		acceptance: ACCEPTANCE,
 	};
+}
 
-	// Self-validate the contract against its schema before writing.
+function persistRequest(targetRoot, request) {
+	const dir = requestsDir(targetRoot);
+	fs.mkdirSync(dir, { recursive: true });
+	const requestPath = path.join(dir, `${request.requestId}.json`);
+	fs.writeFileSync(requestPath, JSON.stringify(request, null, 2) + "\n", "utf8");
+	appendEvent(targetRoot, {
+		kind: "request-created",
+		requestId: request.requestId,
+		pageId: request.target.pageId,
+		trigger: request.target.reason,
+		sourceCount: request.sources.length,
+	});
+	return requestPath;
+}
+
+/**
+ * Create a distillation contract.
+ * @param {string} targetRoot
+ * @param {{ pageId: string, title?: string, reason?: string, sources?: Array, force?: boolean, scope?: string[]|string }} opts
+ */
+function createRequest(targetRoot, opts = {}) {
+	const input = validateRequestInput(targetRoot, opts);
+	if (input.errors.length > 0) {
+		return { requestId: null, requestPath: null, errors: input.errors, warnings: [] };
+	}
+	const request = buildRequest(opts, input);
 	const requestValidation = validateRequestSchema(request);
 	if (requestValidation.errors.length > 0) {
 		return { requestId: null, requestPath: null, errors: requestValidation.errors, warnings: [] };
 	}
-
-	const dir = requestsDir(targetRoot);
-	fs.mkdirSync(dir, { recursive: true });
-	const requestPath = path.join(dir, `${requestId}.json`);
-	fs.writeFileSync(requestPath, JSON.stringify(request, null, 2) + "\n", "utf8");
-	appendEvent(targetRoot, {
-		kind: "request-created",
-		requestId,
-		pageId,
-		trigger: opts.reason || "explicit",
-		sourceCount: sources.length,
-	});
-	return { requestId, requestPath, errors: [], warnings: [], request };
+	const requestPath = persistRequest(targetRoot, request);
+	return { requestId: request.requestId, requestPath, errors: [], warnings: [], request };
 }
 
 /** Load a request by id, or null. */

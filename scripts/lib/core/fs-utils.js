@@ -30,6 +30,68 @@ function resolveTarget(target) {
 	return path.resolve(target || process.cwd());
 }
 
+function relativeEscapesRoot(relative) {
+	return (
+		path.isAbsolute(relative) ||
+		relative === ".." ||
+		relative.startsWith(`..${path.sep}`)
+	);
+}
+
+function lstatIfPresent(filePath) {
+	try {
+		return fs.lstatSync(filePath);
+	} catch (error) {
+		if (error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return null;
+		throw error;
+	}
+}
+
+function realPathForPotential(filePath, seenLinks = new Set()) {
+	let existing = path.resolve(filePath);
+	const missingSegments = [];
+	let stat = lstatIfPresent(existing);
+	while (!stat) {
+		const parent = path.dirname(existing);
+		if (parent === existing) break;
+		missingSegments.unshift(path.basename(existing));
+		existing = parent;
+		stat = lstatIfPresent(existing);
+	}
+	if (stat && stat.isSymbolicLink()) {
+		if (seenLinks.has(existing)) {
+			throw new Error(`Symbolic link cycle detected at ${existing}`);
+		}
+		seenLinks.add(existing);
+		const linked = fs.readlinkSync(existing);
+		const linkedPath = path.resolve(path.dirname(existing), linked);
+		return path.join(realPathForPotential(linkedPath, seenLinks), ...missingSegments);
+	}
+	const realpath = fs.realpathSync.native || fs.realpathSync;
+	return path.join(realpath(existing), ...missingSegments);
+}
+
+function resolvePathWithin(root, candidate, options = {}) {
+	const { label = "Path", allowRoot = false } = options;
+	if (typeof candidate !== "string" || candidate.trim() === "") {
+		throw new Error(`${label} is required.`);
+	}
+	const resolvedRoot = path.resolve(root);
+	const resolved = path.resolve(resolvedRoot, candidate);
+	const relative = path.relative(resolvedRoot, resolved);
+	if (relativeEscapesRoot(relative) || (!allowRoot && relative === "")) {
+		throw new Error(`${label} is outside the target root: ${candidate}`);
+	}
+
+	const realRoot = realPathForPotential(resolvedRoot);
+	const realCandidate = realPathForPotential(resolved);
+	const realRelative = path.relative(realRoot, realCandidate);
+	if (relativeEscapesRoot(realRelative) || (!allowRoot && realRelative === "")) {
+		throw new Error(`${label} is outside the target root: ${candidate}`);
+	}
+	return resolved;
+}
+
 function pathExists(filePath) {
 	return fs.existsSync(filePath);
 }
@@ -193,6 +255,7 @@ function fileContains(targetRoot, relativePath, pattern) {
 module.exports = {
 	AUDIT_IGNORED_DIRECTORY_NAMES,
 	resolveTarget,
+	resolvePathWithin,
 	pathExists,
 	readText,
 	isMissingPath,

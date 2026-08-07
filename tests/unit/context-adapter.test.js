@@ -20,6 +20,17 @@ function makeTarget() {
 		JSON.stringify({ routeId: "feature-standard", schemaVersion: "1.0.0", stages: [] }),
 		"utf8",
 	);
+	fs.mkdirSync(path.join(root, "docs", "wiki", "agent"), { recursive: true });
+	fs.writeFileSync(
+		path.join(root, "docs", "wiki", "agent", "amber.md"),
+		"# Amber Operating Manual\n",
+		"utf8",
+	);
+	fs.writeFileSync(
+		path.join(root, "docs", "wiki", "agent", "context-loadout.md"),
+		"# Context Loadout Definition\n",
+		"utf8",
+	);
 	return root;
 }
 
@@ -195,17 +206,22 @@ describe("amber context end-to-end through the adapter", () => {
 			}));
 			assert.equal(r3.exitCode, 0, JSON.stringify(r3.result.errors));
 			assert.ok(r3.result.loadoutPath.includes("feature-standard.json"), r3.result.loadoutPath);
+			assert.match(r3.result.text, /required artifacts: 3/);
+			assert.match(r3.result.text, /docs\/wiki\/agent\/amber\.md/);
+			assert.match(r3.result.text, /routes\/feature-standard\.route\.json/);
+			assert.match(r3.result.text, /docs\/wiki\/agent\/context-loadout\.md/);
 			const loadout = JSON.parse(fs.readFileSync(r3.result.loadoutPath, "utf8"));
 			assert.ok(loadout.pages["governed-execution"], "page should be in the loadout");
 			assert.ok(loadout.references.some((ref) => ref.pageId === "governed-execution"));
 			assert.ok(loadout.excluded.length === 0, JSON.stringify(loadout.excluded));
 
-			// verify --loadout passes (required tier empty; nothing to re-check)
+			// verify --loadout passes for Required Artifacts and required-tier Pages.
 			const r4 = contextDispatch("verify", args({
 				_: ["context", "verify"],
 				loadout: r3.result.loadoutPath,
 			}));
 			assert.equal(r4.exitCode, 0, r4.result.text);
+			assert.match(r4.result.text, /required artifacts and required-tier pages fresh/);
 
 			// stale detection: mutate the source, rebuild, page now excluded as stale
 			fs.appendFileSync(

@@ -143,6 +143,30 @@ describe("verifyPages", () => {
 			cleanup(root);
 		}
 	});
+
+	it("fails closed when a persisted source ref escapes the target", () => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-ver-outside-"));
+		try {
+			const outsideFile = path.join(outsideRoot, "source.js");
+			fs.writeFileSync(outsideFile, "const secret = true;\n", "utf8");
+			const ref = path.relative(root, outsideFile).split(path.sep).join("/");
+			writePage(root, pageWithSource(ref));
+			regenerateIndex(root);
+			const result = verifyPages(root);
+			assert.ok(
+				result.pages[0].findings.some(
+					(f) =>
+						f.code === "AMBER_E_CONTEXT_SOURCE_MISSING" &&
+						/outside the target/i.test(f.detail),
+				),
+				JSON.stringify(result.pages[0].findings),
+			);
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
+		}
+	});
 });
 
 describe("verifyPages excerpt integrity (D5a outcome 1)", () => {
@@ -180,6 +204,29 @@ describe("verifyPages excerpt integrity (D5a outcome 1)", () => {
 });
 
 describe("refreshPages", () => {
+	it("refuses to refresh a persisted source outside the target", () => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-refresh-outside-"));
+		try {
+			const outsideFile = path.join(outsideRoot, "source.js");
+			fs.writeFileSync(outsideFile, "const secret = true; // external\n", "utf8");
+			const ref = path.relative(root, outsideFile).split(path.sep).join("/");
+			const { hashFile } = require("../../scripts/lib/core/context-hash");
+			const externalHash = hashFile(outsideFile);
+			const page = pageWithSource(ref);
+			page.sources.s1.normHash = externalHash.normHash;
+			writePage(root, page);
+			regenerateIndex(root);
+			const result = refreshPages(root);
+			assert.deepEqual(result.requests, []);
+			assert.deepEqual(result.rawOnlyRebases, []);
+			assert.match(result.errors.join("\n"), /outside the target/i);
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
+		}
+	});
+
 	it("creates refresh requests for stale pages and rebases raw-only changes silently", () => {
 		const root = makeTarget();
 		try {

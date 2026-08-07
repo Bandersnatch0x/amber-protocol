@@ -531,72 +531,40 @@ function inspectGlxControls(targetRoot) {
 //            fuzzy matcher (regex) whose matching confidence is only partial.
 //   low    → cannot be evaluated or cannot ever fire: missing explicit action,
 //            missing pattern, or a non-object rule entry.
+function confidenceClass(confidence, ruleId, reason) {
+	return { ruleId, confidence, reason };
+}
+
+function classifyConfidenceRule(rule, index) {
+	const ruleId = rule && typeof rule.id === "string" && rule.id.length > 0
+		? rule.id
+		: `rule-${index + 1}`;
+	if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+		return confidenceClass("low", ruleId, `Rule ${ruleId} is not an object; it cannot be matched or gated.`);
+	}
+	const action = rule.action;
+	if (action !== "allow" && action !== "deny") {
+		return confidenceClass("low", ruleId, `Rule ${ruleId} has no explicit allow/deny action; it cannot be evaluated with confidence.`);
+	}
+	if (typeof rule.pattern !== "string" || rule.pattern.length === 0) {
+		return confidenceClass("low", ruleId, `Rule ${ruleId} has no pattern to match; it can never fire.`);
+	}
+	const match = typeof rule.match === "string" ? rule.match : "";
+	const mapsTo = Array.isArray(rule.mapsTo)
+		? rule.mapsTo.filter((item) => typeof item === "string" && item.length > 0)
+		: [];
+	if (mapsTo.length > 0 && (match === "exact" || match === "prefix")) {
+		return confidenceClass("high", ruleId, `Rule ${ruleId} declares action "${action}", a deterministic ${match} matcher, and maps to ${mapsTo.join(", ")}; traceable for governed execution.`);
+	}
+	if (mapsTo.length === 0) {
+		return confidenceClass("medium", ruleId, `Rule ${ruleId} declares action "${action}" but no mapsTo; intent is clear but not traceable to a governance claim.`);
+	}
+	return confidenceClass("medium", ruleId, `Rule ${ruleId} uses a fuzzy ${match} matcher; matching confidence is partial.`);
+}
+
 function computeConfidenceClasses(rules) {
 	const list = Array.isArray(rules?.rules) ? rules.rules : [];
-	const confidences = [];
-	for (let index = 0; index < list.length; index += 1) {
-		const rule = list[index];
-		const ruleId =
-			rule && typeof rule.id === "string" && rule.id.length > 0
-				? rule.id
-				: `rule-${index + 1}`;
-		if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
-			confidences.push({
-				ruleId,
-				confidence: "low",
-				reason: `Rule ${ruleId} is not an object; it cannot be matched or gated.`,
-			});
-			continue;
-		}
-		const action = rule.action;
-		const hasExplicitAction = action === "allow" || action === "deny";
-		const hasPattern =
-			typeof rule.pattern === "string" && rule.pattern.length > 0;
-		const match = typeof rule.match === "string" ? rule.match : "";
-		const isDeterministicMatch = match === "exact" || match === "prefix";
-		const mapsTo = Array.isArray(rule.mapsTo)
-			? rule.mapsTo.filter((item) => typeof item === "string" && item.length > 0)
-			: [];
-
-		if (!hasExplicitAction) {
-			confidences.push({
-				ruleId,
-				confidence: "low",
-				reason: `Rule ${ruleId} has no explicit allow/deny action; it cannot be evaluated with confidence.`,
-			});
-			continue;
-		}
-		if (!hasPattern) {
-			confidences.push({
-				ruleId,
-				confidence: "low",
-				reason: `Rule ${ruleId} has no pattern to match; it can never fire.`,
-			});
-			continue;
-		}
-		if (mapsTo.length > 0 && isDeterministicMatch) {
-			confidences.push({
-				ruleId,
-				confidence: "high",
-				reason: `Rule ${ruleId} declares action "${action}", a deterministic ${match} matcher, and maps to ${mapsTo.join(", ")}; traceable for governed execution.`,
-			});
-			continue;
-		}
-		if (mapsTo.length === 0) {
-			confidences.push({
-				ruleId,
-				confidence: "medium",
-				reason: `Rule ${ruleId} declares action "${action}" but no mapsTo; intent is clear but not traceable to a governance claim.`,
-			});
-			continue;
-		}
-		confidences.push({
-			ruleId,
-			confidence: "medium",
-			reason: `Rule ${ruleId} uses a fuzzy ${match} matcher; matching confidence is partial.`,
-		});
-	}
-	return confidences;
+	return list.map(classifyConfidenceRule);
 }
 
 function inspectGovernanceReadiness(targetRoot) {

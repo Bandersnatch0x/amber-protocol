@@ -1,7 +1,12 @@
 "use strict";
 
 const { buildFindingDraft, buildReport, compareReports } = require("./internal/review");
-const { detectNoProgress } = require("./internal/no-progress");
+const {
+	DEFAULT_REPEAT_THRESHOLD,
+	detectNoProgress,
+	detectRepeatedToolCalls,
+	toolTargetFromEvent,
+} = require("./internal/no-progress");
 
 function assess(targetRoot, options = {}) {
 	return buildReport(targetRoot, options);
@@ -37,9 +42,12 @@ function buildDraft(report, findingId, targetFallback = ".") {
 }
 
 module.exports = {
+	DEFAULT_REPEAT_THRESHOLD,
 	assess,
 	buildDraft,
 	compare,
 	detectNoProgress,
+	detectRepeatedToolCalls,
 	findings,
+	toolTargetFromEvent,
 };

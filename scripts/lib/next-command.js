@@ -12,9 +12,6 @@ const { loadRoutes } = require("./route-loader");
 // Route advisor (T5.8, ADR-0014): read-only keyword matching over route
 // manifest objective/description metadata. Amber never executes or creates
 // anything here — it only reads declarative manifests and prints advice.
-const ROUTES_DIR = path.join(__dirname, "../../routes");
-const WORKFLOW_PACKS_DIR = path.join(REPO_ROOT, "workflow-packs");
-
 // Objectives carrying any of these tokens are routed to a security/review pack
 // (e.g. secure-code-review) regardless of generic token overlap, so money flows,
 // credentials, and external surfaces get a review suggestion up front.
@@ -101,8 +98,8 @@ function packMetadata(pack) {
 		.toLowerCase();
 }
 
-function suggestWorkflowPack(tokens, objective) {
-	const packs = loadWorkflowPacks(WORKFLOW_PACKS_DIR);
+function suggestWorkflowPack(tokens, objective, packsDir) {
+	const packs = loadWorkflowPacks(packsDir);
 	if (packs.length === 0) {
 		return null;
 	}
@@ -140,9 +137,10 @@ function suggestWorkflowPack(tokens, objective) {
 // Produce the read-only routing suggestion for a stated objective. When no
 // route matches, degrades to "run the plan gate first" advice instead of
 // guessing a route.
-function suggestRouting(objective) {
+function suggestRouting(objective, target = REPO_ROOT) {
+	const targetRoot = resolveTarget(target);
 	const tokens = tokenize(objective);
-	const { routes } = loadRoutes(ROUTES_DIR);
+	const { routes } = loadRoutes(path.join(targetRoot, "routes"));
 	const scored = routes
 		.map((route) => ({ route, score: scoreRoute(route, tokens, objective) }))
 		.filter((entry) => entry.score > 0)
@@ -167,7 +165,7 @@ function suggestRouting(objective) {
 		matched: true,
 		routeId: best.route.routeId,
 		confidence: Math.min(1, Math.round((best.score / 4) * 100) / 100),
-		workflowPackId: suggestWorkflowPack(tokens, objective) || null,
+		workflowPackId: suggestWorkflowPack(tokens, objective, path.join(targetRoot, "workflow-packs")) || null,
 		matches: scored.map((entry) => ({
 			routeId: entry.route.routeId,
 			score: entry.score,
@@ -250,7 +248,7 @@ function inferNext(target, options = {}) {
 	// T5.8 / ADR-0014: routing advisor. Only present when --objective is given;
 	// absent (not null) so the no-flag envelope is byte-identical to before.
 	if (typeof options.objective === "string" && options.objective.trim() !== "") {
-		envelope.routingSuggestion = suggestRouting(options.objective.trim());
+		envelope.routingSuggestion = suggestRouting(options.objective.trim(), targetRoot);
 	}
 	envelope.text = renderText(envelope);
 	return envelope;

@@ -31,6 +31,7 @@ const ALLOWLIST = [
 	"docs/reviews/", // historical review records
 	"docs/release/CHANGELOG.md",
 	"docs/release/RELEASE_NOTES.md",
+	"docs/quality/release-readiness-1.3.12.md", // historical release-readiness record
 	"docs/superpowers/plans/",
 	"docs/superpowers/specs/",
 	"docs/examples/", // historical review artifacts generated from real read-only trials

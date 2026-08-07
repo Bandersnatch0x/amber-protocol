@@ -2,6 +2,10 @@
 
 **Status:** Accepted
 **Date:** 2026-08-07
+**Amended by:** [ADR-0015](0015-review-blocker-remediation-contracts.md) separates the Operating
+Manual, selected Route manifest, and Loadout Definition into `artifacts.required[]`; they are
+Required Artifacts, not Context Pages. The corrected pre-release contract remains
+`schemaVersion: 1.0.0` and verifies these artifacts fail closed.
 **Builds on:** [ADR-0009](0009-contract-driven-context-distillation.md) (the write path — the
 loadout's pages and freshness hashes are its upstream), [ADR-0001](0001-governance-first-artifact-first.md)
 (governance-first, artifact-first), [ADR-0004](0004-evidence-grade-verification.md) (evidence grading).

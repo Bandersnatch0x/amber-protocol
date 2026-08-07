@@ -24,6 +24,18 @@ function runHarness(args, options = {}) {
 	});
 }
 
+function writeTargetJson(target, relativePath, value) {
+	const filePath = path.join(target, ...relativePath.split("/"));
+	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function copyProductAsset(target, relativePath) {
+	const destination = path.join(target, ...relativePath.split("/"));
+	fs.mkdirSync(path.dirname(destination), { recursive: true });
+	fs.copyFileSync(path.join(ROOT, ...relativePath.split("/")), destination);
+}
+
 test("next without --objective is byte-compatible with the prior envelope", () => {
 	const target = tempDir("no-objective");
 	const envelope = inferNext(target);
@@ -42,6 +54,7 @@ test("next without --objective is byte-compatible with the prior envelope", () =
 
 test("next --objective matches bugfix-quick for a bug-fixing objective", () => {
 	const target = tempDir("match-bugfix");
+	copyProductAsset(target, "routes/bugfix-quick.route.json");
 	const envelope = inferNext(target, { objective: "fix login bug" });
 	const suggestion = envelope.routingSuggestion;
 	assert.equal(suggestion.matched, true);
@@ -72,8 +85,23 @@ test("next --objective matches bugfix-quick for a bug-fixing objective", () => {
 	assert.match(textResult.stdout, /Route suggestion: bugfix-quick/);
 });
 
+test("next --objective resolves routes from the Target Repository", () => {
+	const target = tempDir("target-route");
+	const route = JSON.parse(fs.readFileSync(path.join(ROOT, "routes", "feature-standard.route.json"), "utf8"));
+	route.routeId = "lunar-calibration";
+	route.objective = "lunar calibration";
+	route.description = "Calibrate lunar instruments.";
+	writeTargetJson(target, "routes/lunar-calibration.route.json", route);
+
+	const suggestion = inferNext(target, { objective: "perform lunar calibration" }).routingSuggestion;
+	assert.equal(suggestion.matched, true);
+	assert.equal(suggestion.routeId, "lunar-calibration");
+});
+
 test("next --objective matches feature-standard plus secure-code-review pack", () => {
 	const target = tempDir("match-feature");
+	copyProductAsset(target, "routes/feature-standard.route.json");
+	copyProductAsset(target, "workflow-packs/secure-code-review.pack.json");
 	const envelope = inferNext(target, { objective: "add payment integration" });
 	const suggestion = envelope.routingSuggestion;
 	assert.equal(suggestion.matched, true);

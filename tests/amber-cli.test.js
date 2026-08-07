@@ -99,7 +99,7 @@ test("audit summary limits long docs output while preserving actions", () => {
 	assert.match(result.stdout, /Audit summary/);
 	assert.match(result.stdout, /Existing docs: 20/);
 	assert.match(result.stdout, /Wiki-like files: 20/);
-	assert.match(result.stdout, /Suggested additions: 17/);
+	assert.match(result.stdout, /Suggested additions: 21/);
 	assert.match(result.stdout, /Candidate commands requiring confirmation:/);
 	assert.match(result.stdout, /python -m pytest/);
 	assert.match(result.stdout, /Unknowns:/);

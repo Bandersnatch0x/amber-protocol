@@ -7,6 +7,54 @@
 
 const { readEvents, listPages, readPage } = require("./context-store");
 
+function ratio(numerator, denominator) {
+	return denominator > 0 ? Math.round((numerator / denominator) * 1000) / 1000 : null;
+}
+
+function summarizeEvents(events) {
+	const requests = { total: 0, byTrigger: {} };
+	const ingests = { total: 0, accepted: 0, rejected: 0, noChange: 0 };
+	const errorCodes = {};
+	let rawOnlyChanges = 0;
+	for (const event of events) {
+		if (event.kind === "request-created") {
+			requests.total += 1;
+			const trigger = event.trigger || "explicit";
+			requests.byTrigger[trigger] = (requests.byTrigger[trigger] || 0) + 1;
+		} else if (event.kind === "ingest") {
+			ingests.total += 1;
+			if (event.outcome === "accepted") ingests.accepted += 1;
+			else if (event.outcome === "no-change") ingests.noChange += 1;
+			else if (event.outcome === "rejected") {
+				ingests.rejected += 1;
+				errorCodes[event.code || "unknown"] = (errorCodes[event.code || "unknown"] || 0) + 1;
+			}
+		} else if (event.kind === "source-raw-only-change") {
+			rawOnlyChanges += 1;
+		}
+	}
+	return { requests, ingests, errorCodes, rawOnlyChanges };
+}
+
+function summarizePageQuality(targetRoot) {
+	const pages = listPages(targetRoot)
+		.map(({ pageId }) => readPage(targetRoot, pageId))
+		.filter(Boolean);
+	let blocks = 0;
+	let unknown = 0;
+	let sourceRefs = 0;
+	for (const page of pages) {
+		blocks += (page.blocks || []).length;
+		unknown += (page.blocks || []).filter((block) => block.type === "unknown").length;
+		sourceRefs += Object.keys(page.sources || {}).length;
+	}
+	return {
+		pages: pages.length,
+		unknownShare: ratio(unknown, blocks),
+		meanSourcesPerBlock: ratio(sourceRefs, blocks),
+	};
+}
+
 /**
  * @returns {{
  *   requests: { total: number, byTrigger: Object },
@@ -24,61 +72,15 @@ function computeStats(targetRoot, options = {}) {
 	// trend regressions — lifetime aggregates plateau and hide them).
 	const window = Number.isInteger(options.window) && options.window > 0 ? options.window : null;
 	const events = window ? allEvents.slice(-window) : allEvents;
-	const requests = { total: 0, byTrigger: {} };
-	const ingests = { total: 0, accepted: 0, rejected: 0, noChange: 0 };
-	const errorCodes = {};
-	let rawOnlyChanges = 0;
-
-	for (const ev of events) {
-		switch (ev.kind) {
-			case "request-created": {
-				requests.total += 1;
-				const t = ev.trigger || "explicit";
-				requests.byTrigger[t] = (requests.byTrigger[t] || 0) + 1;
-				break;
-			}
-			case "ingest": {
-				ingests.total += 1;
-				if (ev.outcome === "accepted") ingests.accepted += 1;
-				else if (ev.outcome === "no-change") ingests.noChange += 1;
-				else if (ev.outcome === "rejected") {
-					ingests.rejected += 1;
-					errorCodes[ev.code || "unknown"] = (errorCodes[ev.code || "unknown"] || 0) + 1;
-				}
-				break;
-			}
-			case "source-raw-only-change":
-				rawOnlyChanges += 1;
-				break;
-		}
-	}
+	const { requests, ingests, errorCodes, rawOnlyChanges } = summarizeEvents(events);
 
 	// Filter rate: raw-only rebases / (raw-only rebases + refresh requests).
 	// Requests with trigger "source-change" are the normalized changes.
 	const staleTriggers = requests.byTrigger["source-change"] || 0;
-	const filterRate =
-		rawOnlyChanges + staleTriggers > 0
-			? Math.round((rawOnlyChanges / (rawOnlyChanges + staleTriggers)) * 1000) / 1000
-			: null;
-
-	// Quality signals from current pages.
-	const pages = listPages(targetRoot).map(({ pageId }) => readPage(targetRoot, pageId)).filter(Boolean);
-	let blocks = 0;
-	let unknown = 0;
-	let sourceRefs = 0;
-	for (const p of pages) {
-		blocks += (p.blocks || []).length;
-		unknown += (p.blocks || []).filter((b) => b.type === "unknown").length;
-		sourceRefs += Object.keys(p.sources || {}).length;
-	}
-
-	const passRate =
-		ingests.total > 0 ? Math.round((ingests.accepted / ingests.total) * 1000) / 1000 : null;
-	const noChangeRate =
-		ingests.total > 0 ? Math.round((ingests.noChange / ingests.total) * 1000) / 1000 : null;
-	const unknownShare = blocks > 0 ? Math.round((unknown / blocks) * 1000) / 1000 : null;
-	const meanSourcesPerBlock =
-		blocks > 0 ? Math.round((sourceRefs / blocks) * 1000) / 1000 : null;
+	const filterRate = ratio(rawOnlyChanges, rawOnlyChanges + staleTriggers);
+	const quality = summarizePageQuality(targetRoot);
+	const passRate = ratio(ingests.accepted, ingests.total);
+	const noChangeRate = ratio(ingests.noChange, ingests.total);
 
 	return {
 		requests,
@@ -86,9 +88,9 @@ function computeStats(targetRoot, options = {}) {
 		errorCodes,
 		rawOnlyChanges,
 		filterRate,
-		unknownShare,
-		meanSourcesPerBlock,
-		pages: pages.length,
+		unknownShare: quality.unknownShare,
+		meanSourcesPerBlock: quality.meanSourcesPerBlock,
+		pages: quality.pages,
 		window,
 	};
 }

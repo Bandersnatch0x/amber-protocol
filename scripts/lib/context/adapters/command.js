@@ -168,7 +168,7 @@ function handleVerify(args, targetRoot) {
 		}
 		const lines = [`loadout: ${args.loadout}`];
 		if (result.ok) {
-			lines.push("  required-tier pages fresh.");
+			lines.push("  required artifacts and required-tier pages fresh.");
 		} else {
 			for (const f of result.findings) lines.push(`  ${f.code}: ${f.detail}`);
 		}
@@ -195,7 +195,14 @@ function renderLoadout(loadout, loadoutPath) {
 	const label = loadout.feature ? `${loadout.route} / ${loadout.feature}` : loadout.route;
 	lines.push(`Loadout ${label} (budget ${loadout.budgetWords} words)`);
 	lines.push(`  written:  ${loadoutPath}`);
-	lines.push(`  required: ${loadout.tiers.required.length} page(s)`);
+	const requiredArtifacts = Array.isArray(loadout.artifacts?.required)
+		? loadout.artifacts.required
+		: [];
+	lines.push(`  required artifacts: ${requiredArtifacts.length}`);
+	for (const artifact of requiredArtifacts) {
+		lines.push(`    - ${artifact.kind}: ${artifact.path}`);
+	}
+	lines.push(`  required pages: ${loadout.tiers.required.length}`);
 	lines.push(`  priority: ${loadout.tiers.priority.length} page(s)`);
 	lines.push(`  optional: ${loadout.tiers.optional.length} page(s)`);
 	if (loadout.excluded.length > 0) {
@@ -205,7 +212,7 @@ function renderLoadout(loadout, loadoutPath) {
 	}
 	if (loadout.deltaSince) lines.push(`  delta since ${loadout.deltaSince}`);
 	lines.push("");
-	lines.push("  Load it: point your agent at the file above; run `amber context verify --loadout <file>` right before loading (required tier only).");
+	lines.push("  Load it: point your agent at the file above; run `amber context verify --loadout <file>` right before loading (Required Artifacts and required-tier Pages).");
 	return lines.join("\n");
 }
 

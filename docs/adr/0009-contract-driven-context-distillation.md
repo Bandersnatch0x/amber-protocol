@@ -219,4 +219,6 @@ distribution, `unknown`-block share, and mean sources-per-block (quality).
 ---
 
 **Approved by:** Project lead
-**Implementation:** pending — planned via the Wayfinder map "Compounding context: closing the write path"
+**Implementation:** Complete — the ADR-0009 write path ships through `amber context request`,
+`ingest`, `verify`, `list`, `show`, `refresh`, `stats`, and `delete`; ADR-0010/0015 add the
+task-scoped `load` path and Required Artifact contract.

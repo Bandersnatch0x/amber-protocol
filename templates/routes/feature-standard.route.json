@@ -1,0 +1,22 @@
+{
+  "routeId": "feature-standard",
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "displayName": "Standard Feature Development",
+  "description": "Complete feature delivery with planning and review",
+  "objective": "Implement a complete feature end-to-end: capture requirements, plan, implement, verify, and review - for example adding a payment integration or a new API endpoint.",
+  "trigger": {
+    "goalPattern": "^(add|implement|create|build|support)\\b",
+    "complexity": "medium"
+  },
+  "stages": [
+    { "name": "capture", "displayName": "Capture Requirements", "type": "skill", "target": "requirement-clarification", "gateAfter": "user-approval-plan" },
+    { "name": "plan", "displayName": "Create Plan", "type": "pack", "target": "feature-planning", "gateAfter": "user-approval-implement" },
+    { "name": "implement", "displayName": "Implement Feature", "type": "pack", "target": "tdd-implementation" },
+    { "name": "verify", "displayName": "Run Verification", "type": "command", "target": "npm test", "note": "Record a claim with `amber session verify`, or run the real command and record its exit code with `amber session verify --execute` (policy-gated)." }
+  ],
+  "gates": [
+    { "id": "user-approval-plan", "type": "user-approval", "description": "Approve plan before implementation?" },
+    { "id": "user-approval-implement", "type": "user-approval", "description": "Proceed with implementation?" }
+  ]
+}

@@ -55,3 +55,15 @@ test("listCodes returns all codes sorted", () => {
 	assert.deepEqual(codes, [...codes].sort());
 	assert.ok(codes.includes("AMBER_E_HOOK_PRECOMMIT_BLOCKED"));
 });
+
+test("every public Context Loadout error code is registered", () => {
+	for (const code of [
+		"AMBER_E_CONTEXT_LOADOUT_ROUTE",
+		"AMBER_E_CONTEXT_LOADOUT_REQUIRED",
+		"AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW",
+		"AMBER_E_CONTEXT_LOADOUT_MISSING",
+		"AMBER_E_CONTEXT_LOADOUT_CORRUPT",
+	]) {
+		assert.ok(getEntry(code), `${code} must be explainable`);
+	}
+});

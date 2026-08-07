@@ -81,6 +81,41 @@ describe("ingestPayload", () => {
 		}
 	});
 
+	it("rejects a full payload when no request id is supplied", () => {
+		const root = makeTarget();
+		try {
+			seedSources(root);
+			const req = makeRequest(root);
+			const result = ingestPayload(root, { payload: validPayload(req) });
+			assert.equal(result.accepted, false);
+			assert.equal(result.code, "AMBER_E_CONTEXT_REQUEST_MISSING");
+			assert.equal(readPage(root, "governed-execution"), null);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("rejects a payload file outside the target", () => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-payload-outside-"));
+		try {
+			seedSources(root);
+			const req = makeRequest(root);
+			const payloadPath = path.join(outsideRoot, "payload.json");
+			fs.writeFileSync(payloadPath, JSON.stringify(validPayload(req)), "utf8");
+			const result = ingestPayload(root, {
+				requestId: req.requestId,
+				payloadPath,
+			});
+			assert.equal(result.accepted, false);
+			assert.equal(result.code, "AMBER_E_CONTEXT_SCHEMA_INVALID");
+			assert.match(result.errors.join("\n"), /outside the target/i);
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
+		}
+	});
+
 	it("rejects a payload whose block cites a nonexistent source id", () => {
 		const root = makeTarget();
 		try {
@@ -160,25 +195,24 @@ describe("ingestPayload", () => {
 		const root = makeTarget();
 		try {
 			seedSources(root);
+			fs.mkdirSync(path.join(root, "scripts", "lib", "core"), { recursive: true });
+			const sourcePath = path.join(root, "scripts", "lib", "core", "governed-runner.js");
+			fs.writeFileSync(sourcePath, "const gates = 5;\n", "utf8");
 			// First, accept a page
-			const req = makeRequest(root);
+			const req = makeRequest(root, "scripts/lib/core/governed-runner.js");
 			let result = ingestPayload(root, { requestId: req.requestId, payload: validPayload(req) });
 			assert.equal(result.accepted, true);
 			const before = readPage(root, "governed-execution");
 
 			// Simulate a real (non-cosmetic) change to the source
-			fs.writeFileSync(
-				path.join(root, "docs", "adr", "0003-governance-gated-execution.md"),
-				"# ADR-0003\n\nFive preconditions gate execution.\n\nAmended: gates are shared.\n",
-				"utf8",
-			);
+			fs.writeFileSync(sourcePath, "const gates = 5;\nconst shared = true;\n", "utf8");
 
 			// Agent judges it doesn't affect the page claims -> no-change
 			const req2 = createRequest(root, {
 				pageId: "governed-execution",
 				title: "Governed execution",
 				reason: "refresh",
-				sources: [{ ref: "docs/adr/0003-governance-gated-execution.md" }],
+				sources: [{ ref: "scripts/lib/core/governed-runner.js" }],
 				force: true,
 			});
 			assert.equal(req2.errors.length, 0);
@@ -193,6 +227,164 @@ describe("ingestPayload", () => {
 			assert.equal(after.blocks.length, before.blocks.length);
 		} finally {
 			cleanup(root);
+		}
+	});
+
+	it("rejects no-change when an immutable request excerpt differs from the persisted source", () => {
+		const root = makeTarget();
+		try {
+			seedSources(root);
+			const initial = makeRequest(root);
+			assert.equal(
+				ingestPayload(root, {
+					requestId: initial.requestId,
+					payload: validPayload(initial),
+				}).accepted,
+				true,
+			);
+			fs.appendFileSync(
+				path.join(root, "docs", "adr", "0003-governance-gated-execution.md"),
+				"\nAmended: gates are shared.\n",
+				"utf8",
+			);
+			const refreshRequest = createRequest(root, {
+				pageId: "governed-execution",
+				title: "Governed execution",
+				sources: [{ ref: "docs/adr/0003-governance-gated-execution.md" }],
+				force: true,
+			});
+			const result = ingestPayload(root, {
+				requestId: refreshRequest.requestId,
+				payload: { outcome: "no-change", pageId: "governed-execution" },
+			});
+			assert.equal(result.accepted, false);
+			assert.equal(result.code, "AMBER_E_CONTEXT_SOURCE_TAMPERED");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("binds no-change to the request before rebasing an existing page", () => {
+		const root = makeTarget();
+		try {
+			seedSources(root);
+			fs.mkdirSync(path.join(root, "scripts", "lib", "core"), { recursive: true });
+			fs.writeFileSync(
+				path.join(root, "scripts", "lib", "core", "governed-runner.js"),
+				"const gates = 5;\n",
+				"utf8",
+			);
+			const initial = makeRequest(root, "scripts/lib/core/governed-runner.js");
+			assert.equal(
+				ingestPayload(root, {
+					requestId: initial.requestId,
+					payload: validPayload(initial),
+				}).accepted,
+				true,
+			);
+			const wrongRequest = createRequest(root, {
+				pageId: "other-page",
+				title: "Other page",
+				sources: [{ ref: "docs/adr/0003-governance-gated-execution.md" }],
+			});
+			assert.equal(wrongRequest.errors.length, 0);
+			const result = ingestPayload(root, {
+				requestId: wrongRequest.requestId,
+				payload: { outcome: "no-change", pageId: "governed-execution" },
+			});
+			assert.equal(result.accepted, false);
+			assert.equal(result.code, "AMBER_E_CONTEXT_REQUEST_MISMATCH");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("rejects no-change when a same-page request did not bundle the persisted sources", () => {
+		const root = makeTarget();
+		try {
+			seedSources(root);
+			fs.mkdirSync(path.join(root, "scripts", "lib", "core"), { recursive: true });
+			fs.writeFileSync(
+				path.join(root, "scripts", "lib", "core", "governed-runner.js"),
+				"const gates = 5;\n",
+				"utf8",
+			);
+			const initial = makeRequest(root, "scripts/lib/core/governed-runner.js");
+			assert.equal(
+				ingestPayload(root, {
+					requestId: initial.requestId,
+					payload: validPayload(initial),
+				}).accepted,
+				true,
+			);
+			const unrelatedRequest = createRequest(root, {
+				pageId: "governed-execution",
+				title: "Governed execution",
+				sources: [{ ref: "docs/adr/0003-governance-gated-execution.md" }],
+				force: true,
+			});
+			assert.equal(unrelatedRequest.errors.length, 0);
+			const result = ingestPayload(root, {
+				requestId: unrelatedRequest.requestId,
+				payload: { outcome: "no-change", pageId: "governed-execution" },
+			});
+			assert.equal(result.accepted, false);
+			assert.equal(result.code, "AMBER_E_CONTEXT_REQUEST_MISMATCH");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("refuses no-change when the persisted page source escapes the target", () => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-no-change-outside-"));
+		try {
+			seedSources(root);
+			fs.mkdirSync(path.join(root, "scripts", "lib", "core"), { recursive: true });
+			fs.writeFileSync(
+				path.join(root, "scripts", "lib", "core", "governed-runner.js"),
+				"const gates = 5;\n",
+				"utf8",
+			);
+			const initial = makeRequest(root, "scripts/lib/core/governed-runner.js");
+			assert.equal(
+				ingestPayload(root, {
+					requestId: initial.requestId,
+					payload: validPayload(initial),
+				}).accepted,
+				true,
+			);
+			const outsideFile = path.join(outsideRoot, "source.md");
+			fs.writeFileSync(outsideFile, "outside\n", "utf8");
+			const pageFile = path.join(
+				root,
+				".amber",
+				"context",
+				"pages",
+				"governed-execution.json",
+			);
+			const persisted = JSON.parse(fs.readFileSync(pageFile, "utf8"));
+			persisted.sources.s1.ref = path
+				.relative(root, outsideFile)
+				.split(path.sep)
+				.join("/");
+			fs.writeFileSync(pageFile, JSON.stringify(persisted, null, 2), "utf8");
+			const refreshRequest = createRequest(root, {
+				pageId: "governed-execution",
+				title: "Governed execution",
+				sources: [{ ref: "docs/adr/0003-governance-gated-execution.md" }],
+				force: true,
+			});
+			const result = ingestPayload(root, {
+				requestId: refreshRequest.requestId,
+				payload: { outcome: "no-change", pageId: "governed-execution" },
+			});
+			assert.equal(result.accepted, false);
+			assert.equal(result.code, "AMBER_E_CONTEXT_SOURCE_MISSING");
+			assert.match(result.errors.join("\n"), /outside the target/i);
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
 		}
 	});
 
@@ -220,7 +412,7 @@ describe("ingestPayload", () => {
 			payload.pageId = "some-other-page";
 			const result = ingestPayload(root, { requestId: req.requestId, payload });
 			assert.equal(result.accepted, false);
-			assert.equal(result.code, "AMBER_E_CONTEXT_SCHEMA_INVALID");
+			assert.equal(result.code, "AMBER_E_CONTEXT_REQUEST_MISMATCH");
 		} finally {
 			cleanup(root);
 		}
@@ -309,8 +501,8 @@ describe("ingestPayload scope binding (ADR-0010 D5)", () => {
 			payload.scope = ["feature-standard", "undeclared-scope"];
 			const result = ingestPayload(root, { requestId: req.requestId, payload });
 			assert.equal(result.accepted, false);
-			assert.equal(result.code, "AMBER_E_CONTEXT_SCHEMA_INVALID");
-			assert.ok(result.findings.some((f) => f.code === "AMBER_E_CONTEXT_SCHEMA_INVALID" && f.detail.includes("undeclared-scope")));
+			assert.equal(result.code, "AMBER_E_CONTEXT_REQUEST_MISMATCH");
+			assert.ok(result.findings.some((f) => f.code === "AMBER_E_CONTEXT_REQUEST_MISMATCH" && f.detail.includes("undeclared-scope")));
 		} finally {
 			cleanup(root);
 		}
@@ -338,7 +530,7 @@ describe("ingestPayload scope binding (ADR-0010 D5)", () => {
 		}
 	});
 
-	it("accepts a payload with scope when the request declares no target.scope", () => {
+	it("rejects a payload that self-grants scope absent from the request", () => {
 		const root = makeTarget();
 		try {
 			seedSources(root);
@@ -347,9 +539,9 @@ describe("ingestPayload scope binding (ADR-0010 D5)", () => {
 			const payload = validPayload(req);
 			payload.scope = ["feature-standard"];
 			const result = ingestPayload(root, { requestId: req.requestId, payload });
-			assert.equal(result.accepted, true, JSON.stringify(result.findings));
-			const page = readPage(root, "governed-execution");
-			assert.deepEqual(page.scope, ["feature-standard"]);
+			assert.equal(result.accepted, false);
+			assert.equal(result.code, "AMBER_E_CONTEXT_REQUEST_MISMATCH");
+			assert.equal(readPage(root, "governed-execution"), null);
 		} finally {
 			cleanup(root);
 		}

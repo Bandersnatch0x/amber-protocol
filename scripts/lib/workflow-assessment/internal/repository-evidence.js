@@ -20,7 +20,7 @@ const { detectCommands } = require("../../core/audit");
 const {
 	REQUIRED_BUNDLE_FILES,
 	defaultBundleDir,
-} = require("../../core/handoff-bundle");
+} = require("../../core/handoff-layout");
 const { getSectionBody, hasSectionWithBody } = require("../../core/text-utils");
 const { resolveStateDirForRead } = require("../../state-dir-resolver");
 

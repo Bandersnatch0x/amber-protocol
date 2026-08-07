@@ -43,7 +43,7 @@ const {
   resolveTarget,
 } = require("./command-handler-families");
 const { inferNext } = require("./next-command");
-const { migrateManifests } = require("./migrate-command");
+const { backfillVersioning, migrateManifests } = require("./migrate-command");
 const { migrateState, migrateWiki } = require("./state-migration");
 const { validateWorkflowPack, validateLoopContract } = require("./core/execution-validator");
 
@@ -430,14 +430,24 @@ function handleMigrate(args) {
 
   // Default: migrate manifests
   const migrateResult = migrateManifests(targetRoot, { dryRun: args.dryRun });
+  const versioningResult = backfillVersioning(targetRoot, { dryRun: args.dryRun });
+  const message = `${migrateResult.message}\n${versioningResult.message}`;
+  const logs = [...(migrateResult.logs || []), ...(versioningResult.logs || [])];
   return {
-    result: { target: args.target, text: migrateResult.message, errors: [], warnings: [] },
+    result: {
+      target: targetRoot,
+      migration: migrateResult,
+      versioning: versioningResult,
+      text: message,
+      errors: [],
+      warnings: [],
+    },
     exitCode: 0,
     bypassPrint: !args.json,
     onBypass: () => {
-      console.log(migrateResult.message);
-      if (migrateResult.logs?.length > 0) {
-        for (const log of migrateResult.logs) console.log(`  ${log}`);
+      console.log(message);
+      if (logs.length > 0) {
+        for (const log of logs) console.log(`  ${log}`);
       }
     },
   };

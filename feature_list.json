@@ -311,6 +311,75 @@
         "tests/unit/loops.test.js"
       ],
       "updated": "2026-08-04"
+    },
+    {
+      "id": "F016",
+      "priority": 16,
+      "area": "governance",
+      "title": "Review blocker remediation",
+      "user_visible_behavior": "The Context, Loadout, governed execution, routing, migration, workflow assessment, and handoff surfaces introduced after origin/master fail closed at their public boundaries and pass the repository's complete verification gates.",
+      "status": "passing",
+      "verification": [
+        "node --test tests/unit/context-*.test.js tests/governance-confidence.test.js tests/next-objective.test.js tests/no-progress-detector.test.js tests/schema-versioning.test.js",
+        "npm test",
+        "npm run manifests",
+        "npm run doctor",
+        "npm run gen:agents:check",
+        "node scripts/validate-wiki.js --target ."
+      ],
+      "evidence": [
+        {
+          "command": "node --test tests/phase-v4.test.js tests/phase-v4-5.test.js tests/unit/build-replay-content.test.js tests/unit/governance-report.test.js",
+          "result": "23 passed, 0 failed",
+          "date": "2026-08-07",
+          "notes": "Covers strict task Session binding, producer-to-governance evidence, replay compatibility, and preparation-coordinate refactoring."
+        },
+        {
+          "command": "npm test",
+          "result": "exit 0; 1613 total, 1609 passed, 4 skipped, 0 failed",
+          "date": "2026-08-07",
+          "notes": "Final run against the exact reviewed F016 working-tree patch."
+        },
+        {
+          "command": "npm run manifests && npm run doctor && npm run gen:agents:check && node scripts/validate-wiki.js --target .",
+          "result": "exit 0; manifest errors 0; doctor errors 0 warnings 0; 31 generated files current; wiki errors 0",
+          "date": "2026-08-07",
+          "notes": "Repository governance and generated-surface gates."
+        },
+        {
+          "command": "npm run lint && git diff --check origin/master",
+          "result": "exit 0; no lint or whitespace errors",
+          "date": "2026-08-07",
+          "notes": "Final code-quality and patch-integrity gates."
+        },
+        {
+          "command": "two-axis final review: specification and standards",
+          "result": "blocker 0; high 0; P2 0; P3 0",
+          "date": "2026-08-07",
+          "notes": "Specification and maintainability reviewers both cleared the final working tree."
+        }
+      ],
+      "notes": [
+        "Remediates blockers found by reviewing origin/master...HEAD after commits d607d65 and ef57fc5.",
+        "output/adr-architecture-assessment.md is a pre-ef57fc5 historical input, not F016 acceptance evidence; regenerate an assessment bound to the final commit SHA."
+      ],
+      "paths": [
+        "scripts/lib/core/context-*.js",
+        "scripts/lib/context/adapters/command.js",
+        "scripts/lib/core/fs-utils.js",
+        "scripts/lib/core/governed-runner.js",
+        "scripts/lib/core/handoff-*.js",
+        "scripts/lib/workflow-assessment/",
+        "scripts/lib/migrate-command.js",
+        "scripts/lib/command-dispatcher.js",
+        "scripts/lib/next-command.js",
+        "schemas/",
+        "templates/",
+        "routes/",
+        "tests/",
+        "docs/"
+      ],
+      "updated": "2026-08-07"
     }
   ]
 }

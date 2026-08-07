@@ -79,6 +79,44 @@ function validRequest(overrides = {}) {
 	};
 }
 
+function validLoadout(overrides = {}) {
+	return {
+		schemaVersion: "1.0.0",
+		route: "bugfix-quick",
+		feature: null,
+		generatedAt: "2026-08-07T01:20:00Z",
+		budgetWords: 4000,
+		artifacts: {
+			required: [
+				{
+					kind: "operating-manual",
+					path: "docs/wiki/agent/amber.md",
+					rawHash: "sha256:" + "a".repeat(64),
+					words: 100,
+				},
+				{
+					kind: "route-manifest",
+					path: "routes/bugfix-quick.route.json",
+					rawHash: "sha256:" + "b".repeat(64),
+					words: 50,
+				},
+				{
+					kind: "loadout-definition",
+					path: "docs/wiki/agent/context-loadout.md",
+					rawHash: "sha256:" + "c".repeat(64),
+					words: 80,
+				},
+			],
+		},
+		tiers: { required: [], priority: [], optional: [] },
+		pages: {},
+		references: [],
+		excluded: [],
+		deltaSince: null,
+		...overrides,
+	};
+}
+
 describe("context-page schema", () => {
 	const validate = ajv.compile(loadSchema("context-page.schema.json"));
 
@@ -187,5 +225,23 @@ describe("context-request schema", () => {
 		const req = validRequest();
 		req.sources[0].rawHash = "md5:abc";
 		assert.equal(validate(req), false);
+	});
+});
+
+describe("context-loadout schema", () => {
+	const validate = ajv.compile(loadSchema("context-loadout.schema.json"));
+
+	it("accepts the final 1.0.0 shape with independent required artifacts", () => {
+		assert.equal(validate(validLoadout()), true, JSON.stringify(validate.errors));
+	});
+
+	it("rejects the incorrect local compatibility version", () => {
+		assert.equal(validate(validLoadout({ schemaVersion: "1.1.0" })), false);
+	});
+
+	it("rejects a loadout without artifacts.required", () => {
+		const loadout = validLoadout();
+		delete loadout.artifacts;
+		assert.equal(validate(loadout), false);
 	});
 });

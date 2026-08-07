@@ -1,0 +1,21 @@
+{
+  "routeId": "refactor-safe",
+  "schemaVersion": "1.0.0",
+  "version": "1.0.0",
+  "displayName": "Safe Refactor",
+  "description": "Refactor under a safety net: characterize behavior, refactor, then verify nothing changed",
+  "objective": "Refactor existing code under a safety net: characterize current behavior with tests, refactor, then verify nothing changed.",
+  "trigger": {
+    "goalPattern": "^(refactor|restructure|clean\\s*up|simplify|extract)\\b",
+    "complexity": "complex"
+  },
+  "stages": [
+    { "name": "characterize", "displayName": "Characterize Behavior", "type": "pack", "target": "characterization-tests", "gateAfter": "user-approval-refactor" },
+    { "name": "refactor", "displayName": "Refactor Code", "type": "pack", "target": "tdd-implementation", "gateAfter": "user-approval-merge" },
+    { "name": "verify", "displayName": "Run Verification", "type": "command", "target": "npm test" }
+  ],
+  "gates": [
+    { "id": "user-approval-refactor", "type": "user-approval", "description": "Characterization tests are green. Proceed to refactor?" },
+    { "id": "user-approval-merge", "type": "user-approval", "description": "Refactor complete and tests still green. Approve for merge?" }
+  ]
+}

@@ -15,7 +15,19 @@ function makeTarget() {
 	fs.mkdirSync(path.join(root, "docs", "wiki"), { recursive: true });
 	fs.mkdirSync(path.join(root, "scripts", "lib", "core"), { recursive: true });
 	seedRoutes(root, ["bugfix-quick", "feature-standard"]);
+	seedRequiredArtifacts(root);
 	return root;
+}
+
+function seedRequiredArtifacts(root) {
+	const agentDir = path.join(root, "docs", "wiki", "agent");
+	fs.mkdirSync(agentDir, { recursive: true });
+	fs.writeFileSync(path.join(agentDir, "amber.md"), "# Amber Operating Manual\n\nStay governed.\n", "utf8");
+	fs.writeFileSync(
+		path.join(agentDir, "context-loadout.md"),
+		"# Context Loadout Definition\n\nLoad required artifacts first.\n",
+		"utf8",
+	);
 }
 
 // The allocator validates --route against routes/*.route.json (D1), so the
@@ -273,8 +285,8 @@ describe("buildLoadout — budget exclusion with recorded reasons (D3)", () => {
 				{ kind: "page-written", pageId: "big-page", at: "2026-08-05T12:00:00.000Z" },
 			]);
 
-			// Tight budget: small (~3 words) fits; big (~600 words) overflows.
-			const result = buildLoadout(root, { route: "bugfix-quick", budget: 10 });
+			// Tight budget after required artifacts: small fits; big overflows.
+			const result = buildLoadout(root, { route: "bugfix-quick", budget: 50 });
 			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
 			const overBudget = result.loadout.excluded.filter((e) => e.reason === "over-budget");
 			assert.ok(overBudget.length >= 1, "expected at least one over-budget exclusion");
@@ -538,6 +550,7 @@ describe("buildLoadout — delta-since semantics (D6)", () => {
 			regenerateIndex(root);
 			writeEvents(root, [
 				{ kind: "page-written", pageId: "page-a", at: "2026-08-01T10:00:00.000Z" },
+				{ kind: "request-created", pageId: "page-a", at: "2026-08-05T11:00:00.000Z" },
 				{ kind: "page-written", pageId: "page-b", at: "2026-08-05T12:00:00.000Z" },
 			]);
 
@@ -545,7 +558,7 @@ describe("buildLoadout — delta-since semantics (D6)", () => {
 			const result = buildLoadout(root, { route: "bugfix-quick", since, budget: 1000 });
 			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
 			assert.equal(result.loadout.deltaSince, since);
-			// Only page-b has an event at >= since.
+			// Only page-b was added or re-hashed at >= since; a request alone is not a delta.
 			assert.deepEqual(result.loadout.tiers.priority, ["page-b"]);
 			assert.deepEqual(result.loadout.tiers.optional, []);
 		} finally {
@@ -784,6 +797,190 @@ describe("buildLoadout — rawHash determinism (D2/D7 contract)", () => {
 			};
 			const recomputed = sha256(recurse(page));
 			assert.equal(result.loadout.pages["page-a"].rawHash, recomputed);
+		} finally {
+			cleanup(root);
+		}
+	});
+});
+
+describe("buildLoadout required artifacts", () => {
+	it("returns a structured error when a required artifact is not a file", () => {
+		const root = makeTarget();
+		try {
+			const manualPath = path.join(root, "docs", "wiki", "agent", "amber.md");
+			fs.rmSync(manualPath);
+			fs.mkdirSync(manualPath);
+
+			const result = buildLoadout(root, { route: "bugfix-quick" });
+			assert.equal(result.loadout, null);
+			assert.equal(result.errors[0].code, "AMBER_E_CONTEXT_LOADOUT_REQUIRED");
+			assert.match(result.errors[0].detail, /not a readable file/);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("keeps required governance artifacts separate from Context Page references", () => {
+		const root = makeTarget();
+		try {
+			const result = buildLoadout(root, { route: "bugfix-quick" });
+			assert.equal(result.errors.length, 0, JSON.stringify(result.errors));
+			assert.equal(result.loadout.schemaVersion, "1.0.0");
+			assert.deepEqual(
+				result.loadout.artifacts.required.map((artifact) => artifact.kind),
+				["operating-manual", "route-manifest", "loadout-definition"],
+			);
+			assert.deepEqual(result.loadout.references, []);
+			for (const artifact of result.loadout.artifacts.required) {
+				assert.match(artifact.path, /^(docs|routes)\//);
+				assert.match(artifact.rawHash, /^sha256:[0-9a-f]{64}$/);
+			}
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("counts required artifact words in required-tier overflow", () => {
+		const root = makeTarget();
+		try {
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				budget: 1,
+			});
+			assert.equal(result.loadout, null);
+			assert.equal(result.loadoutPath, null);
+			assert.equal(
+				result.errors[0].code,
+				"AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW",
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("fails verification when a required artifact changes", () => {
+		const root = makeTarget();
+		try {
+			const built = buildLoadout(root, { route: "bugfix-quick" });
+			assert.equal(built.errors.length, 0, JSON.stringify(built.errors));
+			fs.appendFileSync(
+				path.join(root, "docs", "wiki", "agent", "amber.md"),
+				"\nChanged after generation.\n",
+				"utf8",
+			);
+			const result = verifyLoadoutFile(root, built.loadoutPath);
+			assert.equal(result.ok, false);
+			assert.ok(
+				result.findings.some(
+					(finding) =>
+						finding.code === "AMBER_E_CONTEXT_LOADOUT_REQUIRED" &&
+						finding.kind === "operating-manual",
+				),
+				JSON.stringify(result.findings),
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("rejects a loadout that does not match the final 1.0.0 schema", () => {
+		const root = makeTarget();
+		try {
+			const built = buildLoadout(root, { route: "bugfix-quick" });
+			assert.equal(built.errors.length, 0, JSON.stringify(built.errors));
+			const loadout = JSON.parse(fs.readFileSync(built.loadoutPath, "utf8"));
+			loadout.schemaVersion = "1.1.0";
+			fs.writeFileSync(
+				built.loadoutPath,
+				JSON.stringify(loadout, null, 2) + "\n",
+				"utf8",
+			);
+			const result = verifyLoadoutFile(root, built.loadoutPath);
+			assert.equal(result.ok, false);
+			assert.ok(
+				result.findings.some(
+					(finding) => finding.code === "AMBER_E_CONTEXT_LOADOUT_CORRUPT",
+				),
+				JSON.stringify(result.findings),
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("rejects an unsafe feature identifier before constructing the output path", () => {
+		const root = makeTarget();
+		try {
+			const result = buildLoadout(root, {
+				route: "bugfix-quick",
+				feature: "x/../../../../package",
+			});
+			assert.equal(result.loadout, null);
+			assert.equal(result.loadoutPath, null);
+			assert.equal(result.errors[0].code, "AMBER_E_CONTEXT_SCHEMA_INVALID");
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("returns an error when the Loadouts directory junction escapes the target", () => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-loadout-link-"));
+		try {
+			const linkedDir = loadoutsDir(root);
+			fs.mkdirSync(path.dirname(linkedDir), { recursive: true });
+			fs.symlinkSync(
+				outsideRoot,
+				linkedDir,
+				process.platform === "win32" ? "junction" : "dir",
+			);
+			const result = buildLoadout(root, { route: "bugfix-quick" });
+			assert.equal(result.loadout, null);
+			assert.equal(result.loadoutPath, null);
+			assert.match(result.errors[0].detail, /outside the target/i);
+			assert.deepEqual(fs.readdirSync(outsideRoot), []);
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
+		}
+	});
+
+	it("fails verification when a required artifact is missing", () => {
+		const root = makeTarget();
+		try {
+			const built = buildLoadout(root, { route: "bugfix-quick" });
+			fs.rmSync(
+				path.join(root, "docs", "wiki", "agent", "context-loadout.md"),
+				{ force: true },
+			);
+			const result = verifyLoadoutFile(root, built.loadoutPath);
+			assert.equal(result.ok, false);
+			assert.ok(
+				result.findings.some(
+					(finding) =>
+						finding.code === "AMBER_E_CONTEXT_LOADOUT_REQUIRED" &&
+						finding.kind === "loadout-definition",
+				),
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("fails verification when a required artifact path escapes the target", () => {
+		const root = makeTarget();
+		try {
+			const built = buildLoadout(root, { route: "bugfix-quick" });
+			const loadout = JSON.parse(fs.readFileSync(built.loadoutPath, "utf8"));
+			loadout.artifacts.required[0].path = "../outside.md";
+			fs.writeFileSync(
+				built.loadoutPath,
+				JSON.stringify(loadout, null, 2) + "\n",
+				"utf8",
+			);
+			const result = verifyLoadoutFile(root, built.loadoutPath);
+			assert.equal(result.ok, false);
+			assert.match(result.findings[0].detail, /outside the target/i);
 		} finally {
 			cleanup(root);
 		}

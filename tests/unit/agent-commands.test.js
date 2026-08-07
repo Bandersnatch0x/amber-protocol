@@ -268,6 +268,7 @@ describe("real skills integration", () => {
 		assert.deepStrictEqual(names, [
 			"amber-adoption",
 			"amber-audit",
+			"amber-context",
 			"amber-doctor",
 			"amber-handoff",
 			"amber-init",

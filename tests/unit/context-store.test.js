@@ -14,6 +14,7 @@ const {
 	listPages,
 	readPage,
 	writePage,
+	deletePage,
 	regenerateIndex,
 	appendEvent,
 	readEvents,
@@ -94,6 +95,24 @@ describe("writePage / listPages / readPage", () => {
 		}
 	});
 
+	it("surfaces a malformed persisted page instead of hiding it as missing", () => {
+		const root = makeTarget();
+		try {
+			fs.mkdirSync(pagesDir(root), { recursive: true });
+			fs.writeFileSync(
+				path.join(pagesDir(root), "broken-page.json"),
+				"{not-json\n",
+				"utf8",
+			);
+			assert.throws(
+				() => readPage(root, "broken-page"),
+				/failed to parse JSON file/i,
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
 	it("overwrites an existing page id", () => {
 		const root = makeTarget();
 		try {
@@ -104,6 +123,71 @@ describe("writePage / listPages / readPage", () => {
 			assert.equal(readPage(root, "governed-execution").title, "v2");
 		} finally {
 			cleanup(root);
+		}
+	});
+
+	it("rejects traversal page ids before read, write, or delete", () => {
+		const root = makeTarget();
+		try {
+			const unsafeId = "../../../../outside";
+			assert.throws(() => readPage(root, unsafeId), /invalid Context Page id/i);
+			assert.throws(
+				() => writePage(root, samplePage({ pageId: unsafeId })),
+				/invalid Context Page id/i,
+			);
+			assert.throws(() => deletePage(root, unsafeId), /invalid Context Page id/i);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("rejects a pages directory junction that escapes the target", () => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-ctx-link-"));
+		try {
+			const linkedPages = pagesDir(root);
+			fs.mkdirSync(path.dirname(linkedPages), { recursive: true });
+			fs.symlinkSync(
+				outsideRoot,
+				linkedPages,
+				process.platform === "win32" ? "junction" : "dir",
+			);
+			assert.throws(
+				() => writePage(root, samplePage()),
+				/outside the target/i,
+			);
+			assert.equal(fs.existsSync(path.join(outsideRoot, "governed-execution.json")), false);
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
+		}
+	});
+
+	it("rejects a dangling page-file symlink that points outside the target", (t) => {
+		const root = makeTarget();
+		const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-ctx-dangling-"));
+		try {
+			const linkedPages = pagesDir(root);
+			fs.mkdirSync(linkedPages, { recursive: true });
+			const outsideFile = path.join(outsideRoot, "missing-page.json");
+			const linkedFile = path.join(linkedPages, "governed-execution.json");
+			try {
+				fs.symlinkSync(outsideFile, linkedFile, "file");
+			} catch (error) {
+				if (error && (error.code === "EPERM" || error.code === "EACCES")) {
+					t.skip("file symlink creation is not permitted on this host");
+					return;
+				}
+				throw error;
+			}
+			assert.throws(
+				() => writePage(root, samplePage()),
+				/outside the target/i,
+			);
+			assert.equal(fs.existsSync(outsideFile), false);
+		} finally {
+			cleanup(root);
+			cleanup(outsideRoot);
 		}
 	});
 });

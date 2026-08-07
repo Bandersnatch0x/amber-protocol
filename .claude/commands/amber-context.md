@@ -1,5 +1,5 @@
 ---
-description: Run the Amber Protocol Context layer (ADR-0009) — emit distillation contracts, execute them with your own model, and gate the result at ingest. Closes the write path so session evidence becomes provenance-backed knowledge pages instead of sinking.
+description: Run Amber Context when distilling provenance-backed Context Pages, refreshing stale knowledge, or assembling a task-scoped Loadout with verified Required Artifacts.
 argument-hint: [action] [target]
 ---
 

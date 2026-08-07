@@ -6,10 +6,10 @@
 // semantics cannot drift between the two callers.
 
 const fs = require("node:fs");
-const path = require("node:path");
 
 const { hashFile, sha256 } = require("./context-hash");
 const { getEntry } = require("./error-catalog");
+const { resolvePathWithin } = require("./fs-utils");
 
 const RANGE_RE = /^(.+)#L(\d+)(?:-L(\d+))?$/;
 
@@ -38,6 +38,42 @@ function finding(code, detail, pageId, sid) {
 	return { code, title: entry ? entry.title : code, detail, pageId, sid: sid || null };
 }
 
+function checkMutableSource(full, src, pageId, sid) {
+	if (!fs.existsSync(full)) {
+		return {
+			blocked: true,
+			findings: [finding("AMBER_E_CONTEXT_SOURCE_MISSING", `mutable source ${src.ref} is missing`, pageId, sid)],
+		};
+	}
+	const current = hashFile(full);
+	if (current.normHash === src.normHash) return { blocked: false, findings: [] };
+	return {
+		blocked: true,
+		findings: [finding("AMBER_E_CONTEXT_SOURCE_STALE", `source ${src.ref} changed (normHash mismatch)`, pageId, sid)],
+	};
+}
+
+function checkImmutableSource(full, src, pageId, sid) {
+	if (src.excerpt && src.excerptHash && sha256(src.excerpt) !== src.excerptHash) {
+		return {
+			blocked: true,
+			findings: [finding("AMBER_E_CONTEXT_SOURCE_TAMPERED", `embedded excerpt of ${src.ref} fails its own hash — page file may be corrupted`, pageId, sid)],
+		};
+	}
+	if (!fs.existsSync(full)) {
+		return {
+			blocked: false,
+			findings: [finding("AMBER_E_CONTEXT_SOURCE_MISSING", `immutable source ${src.ref} is gone; page stands on its excerpt`, pageId, sid)],
+		};
+	}
+	const live = extractSpan(fs.readFileSync(full, "utf8"), src.ref);
+	if (!src.excerptHash || sha256(live) === src.excerptHash) return { blocked: false, findings: [] };
+	return {
+		blocked: true,
+		findings: [finding("AMBER_E_CONTEXT_SOURCE_TAMPERED", `immutable source ${src.ref} no longer matches the excerpt`, pageId, sid)],
+	};
+}
+
 /**
  * Mechanical health check of a page's sources against disk (ADR-0009 D8).
  *
@@ -53,40 +89,28 @@ function checkSourceHealth(targetRoot, sources, pageId = null) {
 	const findings = [];
 	let blocked = false;
 	for (const [sid, src] of Object.entries(sources || {})) {
-		const full = path.resolve(targetRoot, stripRange(src.ref));
-		if (src.mutable) {
-			if (!fs.existsSync(full)) {
-				blocked = true;
-				findings.push(finding("AMBER_E_CONTEXT_SOURCE_MISSING", `mutable source ${src.ref} is missing`, pageId, sid));
-				continue;
-			}
-			const current = hashFile(full);
-			if (current.normHash !== src.normHash) {
-				blocked = true;
-				findings.push(finding("AMBER_E_CONTEXT_SOURCE_STALE", `source ${src.ref} changed (normHash mismatch)`, pageId, sid));
-			}
-			continue;
-		}
-
-		// Immutable: D5a outcome 1 — the embedded excerpt must match its own
-		// recorded hash. Checked first so page-file corruption is caught even
-		// when the live source is gone.
-		if (src.excerpt && src.excerptHash && sha256(src.excerpt) !== src.excerptHash) {
+		let full;
+		try {
+			full = resolvePathWithin(targetRoot, stripRange(src.ref), {
+				label: "Context source",
+			});
+		} catch (error) {
 			blocked = true;
-			findings.push(finding("AMBER_E_CONTEXT_SOURCE_TAMPERED", `embedded excerpt of ${src.ref} fails its own hash — page file may be corrupted`, pageId, sid));
+			findings.push(
+				finding(
+					"AMBER_E_CONTEXT_SOURCE_MISSING",
+					error.message || String(error),
+					pageId,
+					sid,
+				),
+			);
 			continue;
 		}
-		if (!fs.existsSync(full)) {
-			// D5a outcome 3: source gone; page stands on its snapshot.
-			findings.push(finding("AMBER_E_CONTEXT_SOURCE_MISSING", `immutable source ${src.ref} is gone; page stands on its excerpt`, pageId, sid));
-			continue;
-		}
-		// D5a outcome 2: live source, when present, must match the excerpt.
-		const live = extractSpan(fs.readFileSync(full, "utf8"), src.ref);
-		if (src.excerptHash && sha256(live) !== src.excerptHash) {
-			blocked = true;
-			findings.push(finding("AMBER_E_CONTEXT_SOURCE_TAMPERED", `immutable source ${src.ref} no longer matches the excerpt`, pageId, sid));
-		}
+		const health = src.mutable
+			? checkMutableSource(full, src, pageId, sid)
+			: checkImmutableSource(full, src, pageId, sid);
+		findings.push(...health.findings);
+		blocked ||= health.blocked;
 	}
 	return { findings, blocked };
 }

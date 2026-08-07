@@ -3,6 +3,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { migrateManifests } = require("../../scripts/lib/migrate-command");
+const { dispatch } = require("../../scripts/lib/command-dispatcher");
 
 describe("Migrate Command", () => {
 	const testDir = path.join(__dirname, "../fixtures/migrate-test");
@@ -118,5 +119,26 @@ describe("Migrate Command", () => {
 		const result = migrateManifests(testDir, {});
 		assert.strictEqual(result.success, true);
 		assert.strictEqual(result.migrated, 0);
+	});
+
+	it("default migrate dispatch also backfills artifact versioning", () => {
+		const pageDir = path.join(testDir, ".amber", "context", "pages");
+		const pagePath = path.join(pageDir, "test-page.json");
+		fs.mkdirSync(pageDir, { recursive: true });
+		fs.writeFileSync(pagePath, JSON.stringify({
+			pageId: "test-page",
+			sources: {},
+			blocks: [],
+		}));
+
+		const response = dispatch("migrate", { target: testDir, _: [], json: true });
+		const updated = JSON.parse(fs.readFileSync(pagePath, "utf8"));
+
+		assert.strictEqual(response.exitCode, 0);
+		assert.strictEqual(updated.artifact_type, "context-page");
+		assert.strictEqual(typeof updated.amber_protocol_version, "string");
+		assert.strictEqual(updated.artifact_sequence, 0);
+		assert.strictEqual(typeof updated.created_at, "string");
+		assert.match(response.result.text, /Backfilled 1 artifact/);
 	});
 });

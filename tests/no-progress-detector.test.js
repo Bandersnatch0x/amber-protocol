@@ -8,8 +8,7 @@ const {
 	detectNoProgress,
 	detectRepeatedToolCalls,
 	toolTargetFromEvent,
-} = require("../scripts/lib/workflow-assessment/internal/no-progress");
-const { detectNoProgress: detectNoProgressPublic } = require("../scripts/lib/workflow-assessment");
+} = require("../scripts/lib/workflow-assessment");
 
 function toolEvent(command) {
 	return { type: "tool_call", data: { tool: "bash", command }, timestamp: "2026-08-07T00:00:00.000Z" };
@@ -147,6 +146,6 @@ test("detectNoProgress with no input returns an empty array", () => {
 });
 
 test("detectNoProgress is re-exported from the workflow-assessment index", () => {
-	assert.equal(typeof detectNoProgressPublic, "function");
-	assert.deepEqual(detectNoProgressPublic(), []);
+	assert.equal(typeof detectNoProgress, "function");
+	assert.deepEqual(detectNoProgress(), []);
 });

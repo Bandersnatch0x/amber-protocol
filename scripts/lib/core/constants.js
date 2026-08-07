@@ -26,8 +26,12 @@ const MINIMUM_HARNESS_FILES = [
 	"docs/wiki/engineering/runbook.md",
 	"docs/wiki/engineering/verification.md",
 	"docs/wiki/agent/amber.md",
+	"docs/wiki/agent/context-loadout.md",
 	"docs/wiki/agent/continuous-improvement.md",
 	"docs/wiki/agent/workflow-packets.md",
+	"routes/bugfix-quick.route.json",
+	"routes/feature-standard.route.json",
+	"routes/refactor-safe.route.json",
 	".workflow/continuous-improvement/state.json",
 	"docs/wiki/glossary.md",
 ];
@@ -102,11 +106,15 @@ const AMBER_CONTROLLED_CONTENT_FILES = new Set([
 	"docs/wiki/index.md",
 	"docs/wiki/glossary.md",
 	"docs/wiki/agent/amber.md",
+	"docs/wiki/agent/context-loadout.md",
 	"docs/wiki/agent/continuous-improvement.md",
 	"docs/wiki/agent/workflow-packets.md",
 	"docs/wiki/agent/working-rules.md",
 	"docs/wiki/agent/prompt-recipes.md",
 	"docs/wiki/agent/failure-patterns.md",
+	"routes/bugfix-quick.route.json",
+	"routes/feature-standard.route.json",
+	"routes/refactor-safe.route.json",
 ]);
 
 // Runtime state files Amber's init scaffolds but must NEVER overwrite — refreshing

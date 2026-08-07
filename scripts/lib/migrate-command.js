@@ -6,6 +6,32 @@ const { getSessionsDir } = require("./session-commands");
 const { SCHEMA_VERSION } = require("./schema-version-checker");
 const { CLI_VERSION } = require("./core/constants");
 
+function writeJsonWithBackup(filePath, value) {
+	const backupPath = `${filePath}.backup`;
+	if (!fs.existsSync(backupPath)) fs.copyFileSync(filePath, backupPath);
+	fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+}
+
+function migrateSessionManifest(sessionsDir, sessionDirName, dryRun) {
+	const manifestPath = path.join(sessionsDir, sessionDirName, "manifest.json");
+	let manifest;
+	try {
+		manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	} catch {
+		return { skipped: true, log: `Skipped ${sessionDirName}: manifest is corrupt` };
+	}
+	if (manifest.schemaVersion === SCHEMA_VERSION) {
+		return { skipped: true, log: `Skipped ${sessionDirName}: already at ${SCHEMA_VERSION}` };
+	}
+	const originalVersion = manifest.schemaVersion || null;
+	if (dryRun) {
+		return { migrated: true, log: `Would migrate ${sessionDirName}: ${originalVersion || "missing"} → ${SCHEMA_VERSION}` };
+	}
+	manifest.schemaVersion = SCHEMA_VERSION;
+	writeJsonWithBackup(manifestPath, manifest);
+	return { migrated: true, log: `Migrated ${sessionDirName}: ${originalVersion || "missing"} → ${SCHEMA_VERSION}` };
+}
+
 function migrateManifests(projectRoot, options = {}) {
 	const { dryRun = false } = options;
 	const sessionsDir = getSessionsDir(projectRoot);
@@ -31,46 +57,10 @@ function migrateManifests(projectRoot, options = {}) {
 	const logs = [];
 
 	for (const sessionDirName of sessionDirs) {
-		const manifestPath = path.join(
-			sessionsDir,
-			sessionDirName,
-			"manifest.json",
-		);
-		let manifest;
-		try {
-			manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-		} catch {
-			// A corrupt manifest cannot be migrated; skip and log it rather than
-			// aborting migration for the healthy sessions beside it.
-			skipped++;
-			logs.push(`Skipped ${sessionDirName}: manifest is corrupt`);
-			continue;
-		}
-
-		if (manifest.schemaVersion === SCHEMA_VERSION) {
-			skipped++;
-			logs.push(`Skipped ${sessionDirName}: already at ${SCHEMA_VERSION}`);
-			continue;
-		}
-
-		const originalVersion = manifest.schemaVersion || null;
-
-		if (!dryRun) {
-			const backupPath = manifestPath + ".backup";
-			fs.copyFileSync(manifestPath, backupPath);
-
-			manifest.schemaVersion = SCHEMA_VERSION;
-			fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-			logs.push(
-				`Migrated ${sessionDirName}: ${originalVersion || "missing"} → ${SCHEMA_VERSION}`,
-			);
-		} else {
-			logs.push(
-				`Would migrate ${sessionDirName}: ${manifest.schemaVersion || "missing"} → ${SCHEMA_VERSION}`,
-			);
-		}
-
-		migrated++;
+		const result = migrateSessionManifest(sessionsDir, sessionDirName, dryRun);
+		if (result.skipped) skipped++;
+		if (result.migrated) migrated++;
+		logs.push(result.log);
 	}
 
 	return {
@@ -107,6 +97,75 @@ function inferArtifactType(obj) {
 	return null;
 }
 
+function collectJsonArtifacts(amberDir) {
+	const files = [];
+	const queue = [amberDir];
+	while (queue.length > 0) {
+		const dir = queue.shift();
+		let entries;
+		try {
+			entries = fs.readdirSync(dir, { withFileTypes: true });
+		} catch {
+			continue;
+		}
+		for (const entry of entries) {
+			const full = path.join(dir, entry.name);
+			if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
+				queue.push(full);
+			} else if (entry.isFile() && entry.name.endsWith(".json")) {
+				files.push(full);
+			}
+		}
+	}
+	return files;
+}
+
+function addMissingVersionFields(content, filePath) {
+	const missing = [];
+	if (content.amber_protocol_version === undefined) {
+		content.amber_protocol_version = CLI_VERSION;
+		missing.push("amber_protocol_version");
+	}
+	if (content.artifact_sequence === undefined) {
+		content.artifact_sequence = 0;
+		missing.push("artifact_sequence");
+	}
+	if (content.created_at === undefined) {
+		try {
+			content.created_at = new Date(fs.statSync(filePath).mtimeMs).toISOString();
+			missing.push("created_at");
+		} catch {
+			// Leave created_at absent when the source timestamp is unreadable.
+		}
+	}
+	if (content.artifact_type === undefined) {
+		const inferred = inferArtifactType(content);
+		if (inferred) {
+			content.artifact_type = inferred;
+			missing.push("artifact_type");
+		}
+	}
+	return missing;
+}
+
+function backfillJsonArtifact(projectRoot, filePath, dryRun) {
+	let content;
+	try {
+		content = JSON.parse(fs.readFileSync(filePath, "utf8"));
+	} catch {
+		return null;
+	}
+	if (!content || typeof content !== "object") return null;
+	const missing = addMissingVersionFields(content, filePath);
+	if (missing.length === 0) return { skipped: true };
+	const relative = path.relative(projectRoot, filePath);
+	if (dryRun) {
+		return { backfilled: true, log: `Would backfill ${relative}: add ${missing.join(", ")}` };
+	}
+	writeJsonWithBackup(filePath, content);
+	return { backfilled: true, log: `Backfilled ${relative}: added ${missing.join(", ")}` };
+}
+
 /**
  * Backfill the four optional versioning fields (ADR-0012) into Amber artifacts.
  * Only sets fields that are absent — idempotent, never overwrites existing values.
@@ -134,74 +193,12 @@ function backfillVersioning(projectRoot, options = {}) {
 	let backfilled = 0;
 	let skipped = 0;
 	const logs = [];
-	const queue = [amberDir];
-
-	while (queue.length > 0) {
-		const dir = queue.shift();
-		let entries;
-		try {
-			entries = fs.readdirSync(dir, { withFileTypes: true });
-		} catch {
-			continue;
-		}
-		for (const entry of entries) {
-			const full = path.join(dir, entry.name);
-			if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
-				queue.push(full);
-			} else if (entry.isFile() && entry.name.endsWith(".json")) {
-				let content;
-				try {
-					content = JSON.parse(fs.readFileSync(full, "utf8"));
-				} catch {
-					continue;
-				}
-				if (!content || typeof content !== "object") continue;
-
-				const missing = [];
-				if (content.amber_protocol_version === undefined) {
-					content.amber_protocol_version = CLI_VERSION;
-					missing.push("amber_protocol_version");
-				}
-				if (content.artifact_sequence === undefined) {
-					content.artifact_sequence = 0;
-					missing.push("artifact_sequence");
-				}
-				if (content.created_at === undefined) {
-					try {
-						const stat = fs.statSync(full);
-						content.created_at = new Date(stat.mtimeMs).toISOString();
-						missing.push("created_at");
-					} catch {
-						// stat failed — leave it absent
-					}
-				}
-				if (content.artifact_type === undefined) {
-					const inferred = inferArtifactType(content);
-					if (inferred) {
-						content.artifact_type = inferred;
-						missing.push("artifact_type");
-					}
-				}
-
-				if (missing.length === 0) {
-					skipped++;
-					continue;
-				}
-
-				if (!dryRun) {
-					const backupPath = full + ".backup";
-					fs.copyFileSync(full, backupPath);
-					fs.writeFileSync(full, JSON.stringify(content, null, 2));
-					const rel = path.relative(projectRoot, full);
-					logs.push(`Backfilled ${rel}: added ${missing.join(", ")}`);
-				} else {
-					const rel = path.relative(projectRoot, full);
-					logs.push(`Would backfill ${rel}: add ${missing.join(", ")}`);
-				}
-
-				backfilled++;
-			}
-		}
+	for (const filePath of collectJsonArtifacts(amberDir)) {
+		const result = backfillJsonArtifact(projectRoot, filePath, dryRun);
+		if (!result) continue;
+		if (result.skipped) skipped++;
+		if (result.backfilled) backfilled++;
+		if (result.log) logs.push(result.log);
 	}
 
 	return {

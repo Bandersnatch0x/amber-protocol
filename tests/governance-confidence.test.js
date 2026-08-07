@@ -26,6 +26,16 @@ const {
 	dispatchAgentTask,
 } = require("../scripts/lib/core/agent-orchestration");
 
+const {
+	mergeRules,
+	runGovernedCommand,
+} = require("../scripts/lib/core/governed-runner");
+
+const {
+	appendLedgerRecord,
+	readLedger,
+} = require("../scripts/lib/core/loop-ledger");
+
 // ── computeConfidenceClasses: three confidence outputs ──
 
 test("computeConfidenceClasses grades a deterministic action + mapsTo rule as high", () => {
@@ -121,6 +131,86 @@ const GATED_RULES = {
 		{ id: "allow-amber", action: "allow", match: "prefix", pattern: "node scripts/amber.js ", mapsTo: ["ASI04"] },
 	],
 };
+
+test("governed rule composition preserves confidence gating", () => {
+	const merged = mergeRules(GATED_RULES, [
+		{ id: "context-deny", action: "deny", match: "exact", pattern: "node unsafe.js" },
+	]);
+	assert.deepEqual(merged.confidence_gating, GATED_RULES.confidence_gating);
+	assert.deepEqual(merged.rules.map((rule) => rule.id), [
+		"deny-destructive",
+		"allow-amber",
+		"context-deny",
+	]);
+});
+
+function governedTarget(confidence) {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "governed-confidence-"));
+	const governanceDir = path.join(root, ".amber", "governance");
+	const ledgerPath = path.join(root, ".amber", "loops", "confidence", "ledger.jsonl");
+	fs.mkdirSync(governanceDir, { recursive: true });
+	fs.writeFileSync(path.join(governanceDir, "rules.json"), JSON.stringify({
+		schemaVersion: 1,
+		defaultAction: "deny",
+		confidence_gating: {
+			enabled: true,
+			byRule: { "allow-node-version": confidence },
+			defaultConfidence: "low",
+		},
+		rules: [
+			{ id: "allow-node-version", action: "allow", match: "exact", pattern: "node --version", mapsTo: ["ASI04"] },
+		],
+	}));
+	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "confidence:test" });
+	return { root, ledgerPath };
+}
+
+test("medium confidence refuses governed execution before worktree creation", () => {
+	const { root, ledgerPath } = governedTarget("medium");
+	const result = runGovernedCommand({
+		target: root,
+		command: "node --version",
+		ledgerPath,
+		label: "confidence-test",
+	});
+	assert.match(result.errors.join("\n"), /AMBER_E_CONFIDENCE_GATE/);
+	assert.equal(result.executed, undefined);
+	const records = readLedger(ledgerPath);
+	assert.equal(records.at(-1).kind, "denied");
+	assert.equal(records.at(-1).gate, "confidence");
+	assert.equal(records.at(-1).confidence, "medium");
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("low confidence refuses governed execution for human review", () => {
+	const { root, ledgerPath } = governedTarget("low");
+	const result = runGovernedCommand({
+		target: root,
+		command: "node --version",
+		ledgerPath,
+		label: "confidence-test",
+	});
+	assert.match(result.errors.join("\n"), /AMBER_E_CONFIDENCE_GATE/);
+	const record = readLedger(ledgerPath).at(-1);
+	assert.equal(record.gate, "confidence");
+	assert.equal(record.confidence, "low");
+	assert.match(record.reason, /human review/);
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
+test("high confidence continues to the next governed execution gate", () => {
+	const { root, ledgerPath } = governedTarget("high");
+	const result = runGovernedCommand({
+		target: root,
+		command: "node --version",
+		ledgerPath,
+		label: "confidence-test",
+	});
+	assert.match(result.errors.join("\n"), /AMBER_E_MISSING_PATH_ARG/);
+	assert.doesNotMatch(result.errors.join("\n"), /AMBER_E_CONFIDENCE_GATE/);
+	assert.equal(readLedger(ledgerPath).length, 1, "confidence gate must not add a denial record");
+	fs.rmSync(root, { recursive: true, force: true });
+});
 
 test("confidence_gating absent → policy output has no confidence field (backward compatible)", () => {
 	const plain = { ...GATED_RULES, confidence_gating: undefined };

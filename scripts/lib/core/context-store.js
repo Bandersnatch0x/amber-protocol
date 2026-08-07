@@ -9,24 +9,44 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { readJson, resolvePathWithin } = require("./fs-utils");
 
 const SCHEMA_VERSION = "1.0.0";
 const INDEX_REL = path.join("docs", "wiki", "context-index.md");
+const PAGE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function pagesDir(targetRoot) {
-	return path.join(targetRoot, ".amber", "context", "pages");
+	return resolvePathWithin(targetRoot, path.join(".amber", "context", "pages"), {
+		label: "Context Pages directory",
+	});
 }
 
 function requestsDir(targetRoot) {
-	return path.join(targetRoot, ".amber", "context", "requests");
+	return resolvePathWithin(targetRoot, path.join(".amber", "context", "requests"), {
+		label: "Context requests directory",
+	});
 }
 
 function eventsPath(targetRoot) {
-	return path.join(targetRoot, ".amber", "context", "events.jsonl");
+	return resolvePathWithin(targetRoot, path.join(".amber", "context", "events.jsonl"), {
+		label: "Context events file",
+	});
 }
 
 function indexPath(targetRoot) {
-	return path.join(targetRoot, INDEX_REL);
+	return resolvePathWithin(targetRoot, INDEX_REL, { label: "Context index file" });
+}
+
+function pagePath(targetRoot, pageId) {
+	if (typeof pageId !== "string" || !PAGE_ID_RE.test(pageId)) {
+		throw new Error(`Invalid Context Page id: ${pageId}. Expected kebab-case.`);
+	}
+	pagesDir(targetRoot);
+	return resolvePathWithin(
+		targetRoot,
+		path.join(".amber", "context", "pages", `${pageId}.json`),
+		{ label: "Context Page file" },
+	);
 }
 
 /** List accepted pages as [{ pageId, filePath }] via directory scan. */
@@ -40,15 +60,11 @@ function listPages(targetRoot) {
 		.sort((a, b) => a.pageId.localeCompare(b.pageId));
 }
 
-/** Read a page object, or null when missing or malformed. */
+/** Read a page object, or null when missing. Malformed persisted pages are errors. */
 function readPage(targetRoot, pageId) {
-	const file = path.join(pagesDir(targetRoot), `${pageId}.json`);
+	const file = pagePath(targetRoot, pageId);
 	if (!fs.existsSync(file)) return null;
-	try {
-		return JSON.parse(fs.readFileSync(file, "utf8"));
-	} catch {
-		return null;
-	}
+	return readJson(file);
 }
 
 function ensureDir(dir) {
@@ -59,7 +75,7 @@ function ensureDir(dir) {
 function writePage(targetRoot, page, event = {}) {
 	const dir = pagesDir(targetRoot);
 	ensureDir(dir);
-	const file = path.join(dir, `${page.pageId}.json`);
+	const file = pagePath(targetRoot, page.pageId);
 	fs.writeFileSync(file, JSON.stringify(page, null, 2) + "\n", "utf8");
 	appendEvent(targetRoot, {
 		kind: "page-written",
@@ -71,7 +87,7 @@ function writePage(targetRoot, page, event = {}) {
 
 /** Remove a page file, returning true when it existed. */
 function deletePage(targetRoot, pageId) {
-	const file = path.join(pagesDir(targetRoot), `${pageId}.json`);
+	const file = pagePath(targetRoot, pageId);
 	if (!fs.existsSync(file)) return false;
 	fs.rmSync(file, { force: true });
 	appendEvent(targetRoot, { kind: "page-deleted", pageId });
@@ -144,6 +160,7 @@ module.exports = {
 	requestsDir,
 	eventsPath,
 	indexPath,
+	pagePath,
 	listPages,
 	readPage,
 	writePage,

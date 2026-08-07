@@ -10,11 +10,7 @@ const { readJsonSafe, resolveTarget } = require("./fs-utils");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { gatherState, buildContext, inferNextStep } = require("./lifecycle");
 const { shellQuote } = require("./text-utils");
-// Import the leaf detector directly: requiring the workflow-assessment index
-// would pull in its review -> repository-evidence -> handoff-bundle graph,
-// creating a require cycle back into this module and silently breaking
-// handoff-bundle's destructured buildGovernanceReport binding.
-const { detectNoProgress } = require("../workflow-assessment/internal/no-progress");
+const { detectNoProgress } = require("../workflow-assessment");
 
 const PRODUCT_VALUE_LOOP = "Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle";
 
@@ -161,21 +157,19 @@ function listDirectories(dir) {
 		});
 }
 
-function collectTimelineEvents(targetRoot) {
+function collectTimelineEvents(targetRoot, sessionId) {
+	if (!sessionId) return [];
 	const stateDir = resolveStateDirForRead(targetRoot);
-	const sessionsDir = path.join(stateDir, "sessions");
-	if (!fs.existsSync(sessionsDir)) return [];
+	const sessionDir = path.join(stateDir, "sessions", sessionId);
+	if (!fs.existsSync(sessionDir)) return [];
 	// Lazy require: session-timeline is a leaf module; keeping it out of the
 	// top of this file avoids pulling the session graph into every report.
 	const { readSessionEvents } = require("../session-timeline");
-	const events = [];
-	for (const sessionDir of listDirectories(sessionsDir)) {
-		events.push(...readSessionEvents(sessionDir));
-	}
-	return events;
+	return readSessionEvents(sessionDir);
 }
 
-function collectResultEvidence(targetRoot) {
+function collectResultEvidence(targetRoot, sessionId) {
+	if (!sessionId) return [];
 	const stateDir = resolveStateDirForRead(targetRoot);
 	const executionsDir = path.join(stateDir, "executions");
 	if (!fs.existsSync(executionsDir)) return [];
@@ -184,7 +178,9 @@ function collectResultEvidence(targetRoot) {
 		const evidencePath = path.join(executionDir, "evidence.json");
 		if (!fs.existsSync(evidencePath)) continue;
 		const value = readJsonSafe(evidencePath).value;
-		if (value && typeof value === "object") results.push(value);
+		if (value && typeof value === "object" && value.sessionId === sessionId) {
+			results.push(value);
+		}
 	}
 	return results;
 }
@@ -244,6 +240,17 @@ function collectConfidenceSummary(targetRoot) {
 	}
 }
 
+function collectWorkflowEffectiveness(targetRoot, sessionId) {
+	return {
+		noProgress: detectNoProgress({
+			timelineEvents: collectTimelineEvents(targetRoot, sessionId),
+			resultEvidence: collectResultEvidence(targetRoot, sessionId),
+			loopContract: collectLoopContract(targetRoot),
+		}),
+		confidence: collectConfidenceSummary(targetRoot),
+	};
+}
+
 function buildGovernanceReport(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const targetDisplay = options.targetDisplay || target || ".";
@@ -255,12 +262,6 @@ function buildGovernanceReport(target, options = {}) {
 	const evidenceCount = state.features.reduce((total, feature) => total + (Array.isArray(feature.evidence) ? feature.evidence.length : 0), 0);
 	const errors = [...(readiness.errors || []), ...(maintenance.errors || [])];
 	const readinessDecision = errors.length > 0 ? "block" : readiness.decision;
-	const noProgress = detectNoProgress({
-		timelineEvents: collectTimelineEvents(targetRoot),
-		resultEvidence: collectResultEvidence(targetRoot),
-		loopContract: collectLoopContract(targetRoot),
-	});
-	const confidence = collectConfidenceSummary(targetRoot);
 
 	return {
 		target: targetRoot,
@@ -289,10 +290,7 @@ function buildGovernanceReport(target, options = {}) {
 			errors: maintenance.errors || [],
 			warnings: maintenance.warnings || [],
 		},
-		workflowEffectiveness: {
-			noProgress,
-			confidence,
-		},
+		workflowEffectiveness: collectWorkflowEffectiveness(targetRoot, state.activeSessionId),
 		nextActions,
 		errors,
 		warnings: [...(readiness.warnings || []), ...(maintenance.warnings || [])],
@@ -308,6 +306,39 @@ function renderScores(scores) {
 		`- Safety: ${scores.safety}/100`,
 		`- Maintenance: ${scores.maintenance}/100`,
 	];
+}
+
+function renderNextActionsMarkdown(actions) {
+	if (actions.length === 0) {
+		return ["- None. The repository is ready to produce or validate a handoff bundle."];
+	}
+	const lines = [];
+	for (const action of actions) {
+		lines.push(`- **${action.severity}** \`${action.id}\`: ${action.why}`);
+		lines.push(`  - Run: \`${action.command}\``);
+		lines.push(`  - Expected outcome: ${action.expectedOutcome}`);
+		lines.push(`  - Blocks: ${action.blocks.join(", ")}`);
+	}
+	return lines;
+}
+
+function renderFindingsMarkdown(findings) {
+	if (findings.length === 0) return ["- None."];
+	return findings.map((finding) => `- **${finding.severity}** \`${finding.id}\`: ${finding.message}`);
+}
+
+function renderWorkflowEffectivenessMarkdown(effectiveness = {}) {
+	const lines = [`- ${effectiveness.confidence?.summary || "confidence gating: unavailable"}`];
+	const noProgress = effectiveness.noProgress || [];
+	if (noProgress.length === 0) {
+		lines.push("- No-progress findings: none.");
+		return lines;
+	}
+	lines.push(`- No-progress findings: ${noProgress.length}`);
+	for (const finding of noProgress) {
+		lines.push(`  - **${finding.severity}** \`${finding.id}\`: ${finding.title} — ${finding.detail}`);
+	}
+	return lines;
 }
 
 function renderGovernanceReportMarkdown(report) {
@@ -335,43 +366,17 @@ function renderGovernanceReportMarkdown(report) {
 		"",
 		"## Next Actions",
 		"",
+		...renderNextActionsMarkdown(report.nextActions),
+		"",
+		"## Findings",
+		"",
+		...renderFindingsMarkdown(report.readiness.findings),
+		"",
+		"## Workflow Effectiveness",
+		"",
+		...renderWorkflowEffectivenessMarkdown(report.workflowEffectiveness),
+		"",
 	];
-
-	if (report.nextActions.length === 0) {
-		lines.push("- None. The repository is ready to produce or validate a handoff bundle.");
-	} else {
-		for (const action of report.nextActions) {
-			lines.push(`- **${action.severity}** \`${action.id}\`: ${action.why}`);
-			lines.push(`  - Run: \`${action.command}\``);
-			lines.push(`  - Expected outcome: ${action.expectedOutcome}`);
-			lines.push(`  - Blocks: ${action.blocks.join(", ")}`);
-		}
-	}
-
-	lines.push("", "## Findings", "");
-	if (report.readiness.findings.length === 0) {
-		lines.push("- None.");
-	} else {
-		for (const finding of report.readiness.findings) {
-			lines.push(`- **${finding.severity}** \`${finding.id}\`: ${finding.message}`);
-		}
-	}
-
-	// ADR-0013: workflow-effectiveness risk items (no-progress detection +
-	// confidence-class summary). Read-only; does not feed the readiness score.
-	const effectiveness = report.workflowEffectiveness || {};
-	lines.push("", "## Workflow Effectiveness", "");
-	lines.push(`- ${effectiveness.confidence?.summary || "confidence gating: unavailable"}`);
-	const noProgress = effectiveness.noProgress || [];
-	if (noProgress.length === 0) {
-		lines.push("- No-progress findings: none.");
-	} else {
-		lines.push(`- No-progress findings: ${noProgress.length}`);
-		for (const finding of noProgress) {
-			lines.push(`  - **${finding.severity}** \`${finding.id}\`: ${finding.title} — ${finding.detail}`);
-		}
-	}
-	lines.push("");
 	return lines.join("\n");
 }
 

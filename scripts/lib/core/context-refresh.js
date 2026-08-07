@@ -7,12 +7,77 @@
 // Immutable sources are never staleness-checked here.
 
 const fs = require("node:fs");
-const path = require("node:path");
 
 const { hashFile } = require("./context-hash");
+const { resolvePathWithin } = require("./fs-utils");
 const { listPages, readPage, writePage, regenerateIndex, appendEvent } = require("./context-store");
 const { createRequest } = require("./context-request");
 const { statusMap } = require("./context-verify");
+
+function scanPageSources(targetRoot, page) {
+	const rebased = { ...page, sources: { ...page.sources } };
+	const changedRefs = [];
+	const errors = [];
+	let rebaseChanged = false;
+	for (const [sid, source] of Object.entries(page.sources || {})) {
+		if (!source.mutable) continue;
+		let full;
+		try {
+			full = resolvePathWithin(targetRoot, source.ref, { label: "Context source" });
+		} catch (error) {
+			errors.push(`${page.pageId}: ${error.message || String(error)}`);
+			continue;
+		}
+		if (!fs.existsSync(full)) continue;
+		const current = hashFile(full);
+		if (current.normHash !== source.normHash) {
+			changedRefs.push(source.ref);
+			continue;
+		}
+		if (current.rawHash !== source.rawHash) {
+			rebased.sources[sid] = { ...source, rawHash: current.rawHash, normHash: current.normHash };
+			rebaseChanged = true;
+			appendEvent(targetRoot, { kind: "source-raw-only-change", pageId: page.pageId, sid: source.ref });
+		}
+	}
+	return { rebased, changedRefs, errors, rebaseChanged };
+}
+
+function createPageRefreshRequest(targetRoot, page, changedRefs) {
+	if (changedRefs.length === 0) return { request: null, errors: [] };
+	const created = createRequest(targetRoot, {
+		pageId: page.pageId,
+		title: page.title,
+		reason: "source-change",
+		sources: Object.values(page.sources).map((source) => ({ ref: source.ref })),
+		force: true,
+	});
+	if (created.errors.length > 0) {
+		return { request: null, errors: created.errors.map((error) => `${page.pageId}: ${error}`) };
+	}
+	return {
+		request: { pageId: page.pageId, requestId: created.requestId, changedSources: changedRefs },
+		errors: [],
+	};
+}
+
+function refreshPage(targetRoot, page) {
+	const scan = scanPageSources(targetRoot, page);
+	let rawOnlyRebase = null;
+	if (scan.rebaseChanged) {
+		writePage(targetRoot, scan.rebased, { outcome: "raw-only-rebase", reason: "cosmetic" });
+		rawOnlyRebase = {
+			pageId: page.pageId,
+			sources: Object.keys(scan.rebased.sources).filter((sid) => scan.rebased.sources[sid].mutable),
+		};
+	}
+	const requestResult = createPageRefreshRequest(targetRoot, page, scan.changedRefs);
+	return {
+		request: requestResult.request,
+		rawOnlyRebase,
+		errors: [...scan.errors, ...requestResult.errors],
+	};
+}
 
 /**
  * Refresh pass.
@@ -28,46 +93,10 @@ function refreshPages(targetRoot) {
 		.filter(Boolean);
 
 	for (const page of pages) {
-		const rebased = { ...page, sources: { ...page.sources } };
-		let rebaseChanged = false;
-		const changedRefs = [];
-
-		for (const [sid, src] of Object.entries(page.sources || {})) {
-			if (!src.mutable) continue;
-			const full = path.resolve(targetRoot, src.ref);
-			if (!fs.existsSync(full)) continue; // handled by verify (MISSING/OBSOLETE)
-			const current = hashFile(full);
-			if (current.normHash === src.normHash) {
-				if (current.rawHash !== src.rawHash) {
-					// Cosmetic change only: rebase silently, count it.
-					rebased.sources[sid] = { ...src, rawHash: current.rawHash, normHash: current.normHash };
-					rebaseChanged = true;
-					appendEvent(targetRoot, { kind: "source-raw-only-change", pageId: page.pageId, sid: src.ref });
-				}
-			} else {
-				changedRefs.push(src.ref);
-			}
-		}
-
-		if (rebaseChanged) {
-			writePage(targetRoot, rebased, { outcome: "raw-only-rebase", reason: "cosmetic" });
-			rawOnlyRebases.push({ pageId: page.pageId, sources: Object.keys(rebased.sources).filter((sid) => rebased.sources[sid].mutable) });
-		}
-
-		if (changedRefs.length > 0) {
-			const created = createRequest(targetRoot, {
-				pageId: page.pageId,
-				title: page.title,
-				reason: "source-change",
-				sources: Object.values(page.sources).map((s) => ({ ref: s.ref })),
-				force: true, // refresh supersedes any open request for the page
-			});
-			if (created.errors.length > 0) {
-				errors.push(...created.errors.map((e) => `${page.pageId}: ${e}`));
-			} else {
-				requests.push({ pageId: page.pageId, requestId: created.requestId, changedSources: changedRefs });
-			}
-		}
+		const result = refreshPage(targetRoot, page);
+		if (result.request) requests.push(result.request);
+		if (result.rawOnlyRebase) rawOnlyRebases.push(result.rawOnlyRebase);
+		errors.push(...result.errors);
 	}
 
 	regenerateIndex(targetRoot, statusMap(targetRoot));

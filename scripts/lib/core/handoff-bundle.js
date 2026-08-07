@@ -10,29 +10,12 @@ const { renderHandoff } = require("../handoff-command");
 const { shellQuote } = require("./text-utils");
 const { readSessionEvents } = require("../session-timeline");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
-
-const REQUIRED_BUNDLE_FILES = [
-	"README.md",
-	"session-summary.md",
-	"verification-evidence.md",
-	"next-actions.md",
-	"risks.md",
-	"recovery-commands.md",
-	"manifest.json",
-];
-
-function slash(value) {
-	return value.split(path.sep).join("/");
-}
-
-function defaultBundleDir(targetRoot) {
-	return path.join(targetRoot, ".amber", "handoff", "latest");
-}
-
-function resolveTargetRelativePath(targetRoot, candidate) {
-	if (!candidate) return defaultBundleDir(targetRoot);
-	return path.isAbsolute(candidate) ? candidate : path.resolve(targetRoot, candidate);
-}
+const {
+	REQUIRED_BUNDLE_FILES,
+	defaultBundleDir,
+	resolveTargetRelativePath,
+	slash,
+} = require("./handoff-layout");
 
 function section(content, title) {
 	const pattern = new RegExp(`^##\\s+${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "im");

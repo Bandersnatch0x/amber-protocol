@@ -95,3 +95,41 @@ test("standards init is idempotent — a second run leaves the file untouched (#
 	const second = standardsInitCommand(target);
 	assert.equal(second.skipped, true);
 });
+
+test("no-progress assessment ignores timelines and execution evidence from older sessions", () => {
+	const target = tempDir("session-local-no-progress");
+	scaffoldHarness(target);
+	const sessionsDir = path.join(target, ".amber", "sessions");
+
+	function writeSession(sessionId, createdAt, events) {
+		const sessionDir = path.join(sessionsDir, sessionId);
+		fs.mkdirSync(sessionDir, { recursive: true });
+		fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify({
+			sessionId,
+			schemaVersion: "1.0.0-rc.1",
+			createdAt,
+			route: { id: "feature-standard", version: "1.0.0" },
+			goal: `Goal for ${sessionId}`,
+			status: "created",
+		}));
+		fs.writeFileSync(path.join(sessionDir, "timeline.jsonl"), `${events.map(JSON.stringify).join("\n")}\n`);
+	}
+
+	writeSession("older", "2026-08-07T00:00:00.000Z", [
+		{ type: "tool_call", data: { tool: "Read", command: "read stale.log" } },
+		{ type: "tool_call", data: { tool: "Read", command: "read stale.log" } },
+		{ type: "tool_call", data: { tool: "Read", command: "read stale.log" } },
+	]);
+	writeSession("current", "2026-08-07T01:00:00.000Z", [
+		{ type: "tool_call", data: { tool: "Read", command: "read current.log" } },
+	]);
+	const oldExecutionDir = path.join(target, ".amber", "executions", "older-task");
+	fs.mkdirSync(oldExecutionDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(oldExecutionDir, "evidence.json"),
+		JSON.stringify({ sessionId: "older", diff: {} }),
+	);
+
+	const report = buildGovernanceReport(target);
+	assert.deepEqual(report.workflowEffectiveness.noProgress, []);
+});
