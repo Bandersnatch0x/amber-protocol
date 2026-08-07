@@ -116,9 +116,9 @@ node scripts/amber.js adoption next-actions --bundle-dir docs/examples/project-a
 
 ### Migration
 ```bash
-# Migrate from legacy .harness to .amber
-node scripts/amber.js migrate --target . --dry-run
-node scripts/amber.js migrate --target .
+# Inspect the repository without writing, then merge legacy .harness into .amber
+node scripts/amber.js audit --target .
+node scripts/amber.js migrate state --target .
 ```
 
 ### Testing & Validation
@@ -214,7 +214,7 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 - Legacy `.harness/` state is readable via built-in shims
 - `coding-harness` entrypoint remains available via `scripts/compat/coding-harness.js`
 - `scripts/harness.js` is aliased to `scripts/amber.js`
-- Use `node scripts/amber.js migrate` to convert legacy state to new format
+- Use `node scripts/amber.js migrate state --target .` to convert legacy state to the Amber layout
 
 ### Web Viewer Architecture
 
