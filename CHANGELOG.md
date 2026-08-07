@@ -5,8 +5,9 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [Unreleased]
+
+## [1.4.0] - 2026-08-08
 
 ### Added
 - **Context layer — contract-driven distillation (ADR-0009)**: new `amber context`
@@ -27,6 +28,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     and mean sources per block, with an optional `--window` for trend regression.
   - `amber-context` skill (mirrored to Claude Code, Codex/Cursor, Gemini) teaches
     host agents how to run the loop.
+- **Context Loadouts (ADR-0010)**: deterministic, budgeted context selection now
+  produces auditable Loadout artifacts with required, priority, and optional tiers.
+  The Operating Manual, selected Route manifest, and Loadout Definition are pinned
+  as target-local Required Artifacts and verified fail-closed.
+- **Governance metadata and advisors (ADR-0011–0014)**: add explicit confidence
+  bands, machine-readable dispatch approval requirements, protocol/schema version
+  metadata, execution-routing taxonomy, artifact migration backfill, session-scoped
+  no-progress findings, and objective-driven `amber next` route advice.
+
+### Fixed
+- Enforce lexical and real-path target confinement across Context sources, Pages,
+  requests, payloads, and Loadouts; bind every ingest outcome to an existing request
+  and reject stale or mismatched source snapshots.
+- Verify the execution ledger hash chain before policy evaluation, require an
+  explicit valid policy, preserve deny-wins behavior, and permit real execution
+  only at high confidence after all governance gates pass.
+- Require approval for every multi-worker dispatch and degrade low-confidence swarm
+  requests to a single bounded loop instead of parallel execution.
+- Make migration discover only recognized artifacts across `.amber/`, `routes/`,
+  and `workflow-packs/`; scope routing and no-progress evidence to the target and
+  active Session; retain fail-closed task/session/plan coordinate validation.
+
+### Changed
+- Split dispatch policy, validation, and persistence responsibilities into focused
+  modules while preserving the public handoff and workflow-assessment facades.
+- Align CLI, ADR, wiki, migration, and generated-agent guidance with the corrected
+  governance contracts, including explicit `migrate state` legacy conversion.
 
 ## [1.3.12] - 2026-08-04
 
@@ -404,7 +432,20 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 
 ---
 
-[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.12...v1.4.0
+[1.3.12]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.11...v1.3.12
+[1.3.11]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.10...v1.3.11
+[1.3.10]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.9...v1.3.10
+[1.3.9]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.8...v1.3.9
+[1.3.8]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.7...v1.3.8
+[1.3.7]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.6...v1.3.7
+[1.3.6]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.5...v1.3.6
+[1.3.5]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.4...v1.3.5
+[1.3.4]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.3...v1.3.4
+[1.3.3]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.2...v1.3.3
+[1.3.2]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.1...v1.3.2
+[1.3.1]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.0.0...v1.1.0
