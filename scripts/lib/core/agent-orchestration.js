@@ -54,20 +54,21 @@ function statusFieldErrors(options) {
 	return errors;
 }
 
-function dispatchAgentTask(target, options = {}) {
-	const targetRoot = resolveTarget(target);
-	const taskId = slugify(options.task);
-	const errors = [];
-	const warnings = [];
-	const worker = options.worker;
-	const reviewer = options.reviewer;
+function deriveDispatchPolicy(options) {
 	const requestedConcurrency = Number.parseInt(options.concurrency || "1", 10);
 	const isSwarm = requestedConcurrency > 1;
 	const belowHighConfidence = Boolean(options.confidence) && options.confidence !== "high";
-	const concurrency = isSwarm && options.confidence === "low" ? 1 : requestedConcurrency;
-	// Swarm-class dispatches always expose their approval precondition; callers
-	// may also require approval for a single-worker dispatch explicitly.
-	const requiresApproval = isSwarm || belowHighConfidence || options.requiresApproval === true;
+	return {
+		requestedConcurrency,
+		concurrencyLimit: isSwarm && options.confidence === "low" ? 1 : requestedConcurrency,
+		requiresApproval: isSwarm || belowHighConfidence || options.requiresApproval === true,
+	};
+}
+
+function validateDispatchOptions(targetRoot, taskId, options, requestedConcurrency) {
+	const errors = [];
+	const worker = options.worker;
+	const reviewer = options.reviewer;
 
 	if (!options.task) {
 		errors.push("agent dispatch requires --task <task-id>.");
@@ -100,27 +101,23 @@ function dispatchAgentTask(target, options = {}) {
 		errors.push(`Prepared task ledger is missing for ${taskId}.`);
 	}
 
-	// Validate loop contract status values
 	errors.push(...statusFieldErrors(options));
+	return errors;
+}
 
-	if (errors.length > 0) {
-		return { target: targetRoot, task: taskId || null, errors, warnings };
-	}
-
-	const paths = orchestrationPaths(targetRoot, taskId, { forCreate: true });
-	fs.mkdirSync(paths.root, { recursive: true });
-	const dispatch = {
+function buildDispatch(taskId, options, policy) {
+	return {
 		taskId,
 		status: "dispatched",
-		worker: { id: worker },
-		reviewer: { id: reviewer },
+		worker: { id: options.worker },
+		reviewer: { id: options.reviewer },
 		backend: { name: options.backend || "local" },
-		concurrencyLimit: concurrency,
+		concurrencyLimit: policy.concurrencyLimit,
 		workerOutput: null,
 		reviewerEvidence: null,
 		controls: { stop: true, resume: true },
 		workersCannotSelfApprove: true,
-		requiresApproval,
+		requiresApproval: policy.requiresApproval,
 		loop: {
 			contractId: options.loopContract || null,
 			hardStopStatus: options.hardStopStatus || "not-recorded",
@@ -130,6 +127,27 @@ function dispatchAgentTask(target, options = {}) {
 		},
 		createdAt: new Date().toISOString(),
 	};
+}
+
+function dispatchAgentTask(target, options = {}) {
+	const targetRoot = resolveTarget(target);
+	const taskId = slugify(options.task);
+	const warnings = [];
+	const policy = deriveDispatchPolicy(options);
+	const errors = validateDispatchOptions(
+		targetRoot,
+		taskId,
+		options,
+		policy.requestedConcurrency,
+	);
+
+	if (errors.length > 0) {
+		return { target: targetRoot, task: taskId || null, errors, warnings };
+	}
+
+	const paths = orchestrationPaths(targetRoot, taskId, { forCreate: true });
+	fs.mkdirSync(paths.root, { recursive: true });
+	const dispatch = buildDispatch(taskId, options, policy);
 	fs.writeFileSync(paths.dispatchPath, JSON.stringify(dispatch, null, 2));
 
 	return { target: targetRoot, task: taskId, dispatch, errors, warnings };

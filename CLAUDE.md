@@ -19,6 +19,10 @@ scripts/amber.js              -> Unified CLI entry point
 scripts/lib/command-dispatcher.js -> Command lookup-table (parse -> dispatch -> print); thin wrappers + registry
 scripts/lib/command-handler-families.js -> Switch-based families (maintenance/adoption/ledger/session/governance)
 scripts/lib/core/             -> Domain modules (adoption-*, loops, doctor, profiles, etc.); imported directly (no facade — ADR-0005)
+scripts/lib/core/context-*.js -> Contract-driven Context Page ingestion, verification, refresh, and Loadout assembly
+scripts/lib/core/governed-runner.js -> Governed execution gates (ledger, policy, confidence, approval, worktree)
+scripts/lib/core/agent-orchestration.js -> Artifact-only worker/reviewer dispatch records and approval markers
+scripts/lib/migrate-command.js -> Schema migration and ADR-0012 version backfill for recognized artifacts
 scripts/lib/route-commands.js -> Route engine (loader, selector, inspector)
 scripts/lib/session-commands.js -> Session lifecycle (start, status, list, abort, continue)
 templates/                    -> Amber starter files (AGENTS.md, CLAUDE.md, feature_list.json, etc.)

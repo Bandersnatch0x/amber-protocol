@@ -189,6 +189,7 @@ most relevant next command — it never runs anything itself.
 amber next --target .                 # auto-selects a focus and states which it chose
 amber next --target . --feature F001  # focus one feature's lifecycle
 amber next --target . --session <id>  # focus a session's verify → approve → complete-check
+amber next --target . --objective "fix login timeout" # suggest a target-local Route and Workflow Pack
 amber next --target . --json          # machine-readable envelope (focus, nextStep, remedy)
 ```
 
@@ -196,6 +197,8 @@ When a focus is omitted, `next` picks the active session, else the most-recently
 feature, else the first unstarted feature — and always says which it chose plus how many other
 items are pending. The same actionable `remedy` hints surface inline in `doctor` checks and
 `review` findings, so a failed check tells you the exact command to fix it.
+With `--objective`, `next` deterministically scores target-local Route and Workflow Pack metadata;
+when nothing matches, it advises the plan gate instead of guessing an execution path.
 
 ### `amber loop recommend` — safe continuous improvement
 
@@ -221,7 +224,7 @@ Amber provides the **governance and contract layer** (loop contracts, ledgers, h
 
 See [LOOP.md](./LOOP.md) for Amber's self-described loops (Daily Amber Triage, CI validation, adoption flows) and how the two systems complement each other. Phased rollout (report → assisted → governed) is encouraged.
 
-### `amber context` — contract-driven distillation (write path)
+### `amber context` — contract-driven distillation and Loadouts
 
 `amber context` closes the gap between session evidence and project knowledge (ADR-0009). Amber
 emits a distillation contract; a host agent executes it; Amber validates and persists the result —
@@ -232,12 +235,15 @@ amber context request --target . --page governed-execution     # write a distill
 amber context ingest --target . --request <id> --payload out.json   # judge the agent's output
 amber context verify --target . --json                         # page health (stale/tampered/obsolete)
 amber context refresh --target .                               # regenerate requests for stale sources
+amber context load --target . --route feature-standard --feature F016 # assemble a governed Loadout
+amber context verify --target . --loadout .amber/context/loadouts/feature-standard-F016.json
 amber context stats --target . --window 50                     # filter rate, pass rate, unknown share
 ```
 
 Every claim on an accepted page carries provenance; pages live in `.amber/context/pages/` and are
 indexed in `docs/wiki/context-index.md`. See `skills/amber-context/SKILL.md` for the full loop an
-agent should run.
+agent should run. Loadouts separately include target-local Required Artifacts and fresh Context
+Pages, enforce the configured budget, and fail closed when required inputs are missing or changed.
 
 ### Mechanical enforcement (opt-in)
 

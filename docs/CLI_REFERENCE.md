@@ -487,9 +487,11 @@ node scripts/amber.js migrate manifests --target . --dry-run
 ```
 
 `migrate` with no subcommand is equivalent to `migrate manifests`. It updates Session manifest
-schemas and backfills missing ADR-0012 version fields in JSON artifacts under `.amber/`; existing
-version fields are never overwritten. Before the first write to each changed JSON file, Amber keeps
-a sibling `.backup` copy and preserves that original backup on later runs.
+schemas and backfills missing ADR-0012 version fields in recognized JSON artifacts under `.amber/`,
+`routes/`, and `workflow-packs/`; existing version fields are never overwritten. Unknown JSON is
+left untouched, and Workflow Pack containers migrate only their recognized `loopContracts[]`.
+Before the first write to each changed JSON file, Amber keeps a sibling `.backup` copy and preserves
+that original backup on later runs.
 
 ### wiki
 
