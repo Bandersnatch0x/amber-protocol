@@ -16,12 +16,7 @@ const addFormats = require("ajv-formats");
 const { loadRequest } = require("./context-request");
 const { checkSourceHealth, finding, stripRange } = require("./context-sources");
 const { resolvePathWithin } = require("./fs-utils");
-const {
-	writePage,
-	regenerateIndex,
-	appendEvent,
-	readPage,
-} = require("./context-store");
+const { writePage, regenerateIndex, appendEvent, readPage } = require("./context-store");
 
 const ajv = new Ajv({ allErrors: true });
 addFormats(ajv);
@@ -60,17 +55,30 @@ function checkRequestBinding(targetRoot, request, payload) {
 	const reqSources = new Map((request.sources || []).map((s) => [s.ref, s]));
 
 	if (payload.pageId !== request.target.pageId) {
-		findings.push(finding("AMBER_E_CONTEXT_REQUEST_MISMATCH", `payload pageId "${payload.pageId}" does not match request target "${request.target.pageId}"`, payload.pageId));
+		findings.push(
+			finding(
+				"AMBER_E_CONTEXT_REQUEST_MISMATCH",
+				`payload pageId "${payload.pageId}" does not match request target "${request.target.pageId}"`,
+				payload.pageId,
+			),
+		);
 		return { findings, blocked: true };
 	}
 
 	// Scope binding (ADR-0010 D5): payload scope ⊆ request target.scope.
-	const reqScope = request.target && Array.isArray(request.target.scope) ? request.target.scope : [];
+	const reqScope =
+		request.target && Array.isArray(request.target.scope) ? request.target.scope : [];
 	if (Array.isArray(payload.scope) && payload.scope.length > 0) {
 		const allowed = new Set(reqScope);
 		for (const id of payload.scope) {
 			if (!allowed.has(id)) {
-				findings.push(finding("AMBER_E_CONTEXT_REQUEST_MISMATCH", `payload scope "${id}" was not declared by the request target.scope`, payload.pageId));
+				findings.push(
+					finding(
+						"AMBER_E_CONTEXT_REQUEST_MISMATCH",
+						`payload scope "${id}" was not declared by the request target.scope`,
+						payload.pageId,
+					),
+				);
 			}
 		}
 	}
@@ -78,14 +86,35 @@ function checkRequestBinding(targetRoot, request, payload) {
 	for (const [, src] of Object.entries(payload.sources || {})) {
 		const bundled = reqSources.get(src.ref);
 		if (!bundled) {
-			findings.push(finding("AMBER_E_CONTEXT_REQUEST_MISMATCH", `payload source ${src.ref} was not bundled by the request`, payload.pageId));
+			findings.push(
+				finding(
+					"AMBER_E_CONTEXT_REQUEST_MISMATCH",
+					`payload source ${src.ref} was not bundled by the request`,
+					payload.pageId,
+				),
+			);
 			continue;
 		}
 		if (bundled.mutable && (src.rawHash !== bundled.rawHash || src.normHash !== bundled.normHash)) {
-			findings.push(finding("AMBER_E_CONTEXT_SOURCE_STALE", `payload re-bundled source ${src.ref} with fresh hashes — re-run the request`, payload.pageId));
+			findings.push(
+				finding(
+					"AMBER_E_CONTEXT_SOURCE_STALE",
+					`payload re-bundled source ${src.ref} with fresh hashes — re-run the request`,
+					payload.pageId,
+				),
+			);
 		}
-		if (!bundled.mutable && (src.excerptHash !== bundled.excerptHash || src.excerpt !== bundled.excerpt)) {
-			findings.push(finding("AMBER_E_CONTEXT_SOURCE_TAMPERED", `payload altered the excerpt of ${src.ref}`, payload.pageId));
+		if (
+			!bundled.mutable &&
+			(src.excerptHash !== bundled.excerptHash || src.excerpt !== bundled.excerpt)
+		) {
+			findings.push(
+				finding(
+					"AMBER_E_CONTEXT_SOURCE_TAMPERED",
+					`payload altered the excerpt of ${src.ref}`,
+					payload.pageId,
+				),
+			);
 		}
 	}
 	return { findings, blocked: findings.length > 0 };
@@ -106,11 +135,20 @@ function rebaseNoChangeSources(targetRoot, request, existing, pageId) {
 					label: "Context source",
 				});
 			} catch (error) {
-				findings.push(finding("AMBER_E_CONTEXT_SOURCE_MISSING", error.message || String(error), pageId, sid));
+				findings.push(
+					finding("AMBER_E_CONTEXT_SOURCE_MISSING", error.message || String(error), pageId, sid),
+				);
 				continue;
 			}
 			if (!fs.existsSync(full)) {
-				findings.push(finding("AMBER_E_CONTEXT_SOURCE_MISSING", `mutable source ${source.ref} is missing`, pageId, sid));
+				findings.push(
+					finding(
+						"AMBER_E_CONTEXT_SOURCE_MISSING",
+						`mutable source ${source.ref} is missing`,
+						pageId,
+						sid,
+					),
+				);
 				continue;
 			}
 			const { hashFile } = require("./context-hash");
@@ -119,17 +157,38 @@ function rebaseNoChangeSources(targetRoot, request, existing, pageId) {
 
 		const bundled = requested.get(source.ref);
 		if (!bundled) {
-			findings.push(finding("AMBER_E_CONTEXT_REQUEST_MISMATCH", `persisted source ${source.ref} was not bundled by the request`, pageId, sid));
+			findings.push(
+				finding(
+					"AMBER_E_CONTEXT_REQUEST_MISMATCH",
+					`persisted source ${source.ref} was not bundled by the request`,
+					pageId,
+					sid,
+				),
+			);
 			continue;
 		}
 		if (!source.mutable) {
 			if (source.excerptHash !== bundled.excerptHash || source.excerpt !== bundled.excerpt) {
-				findings.push(finding("AMBER_E_CONTEXT_SOURCE_TAMPERED", `request excerpt does not match persisted source ${source.ref}`, pageId, sid));
+				findings.push(
+					finding(
+						"AMBER_E_CONTEXT_SOURCE_TAMPERED",
+						`request excerpt does not match persisted source ${source.ref}`,
+						pageId,
+						sid,
+					),
+				);
 			}
 			continue;
 		}
 		if (current.rawHash !== bundled.rawHash || current.normHash !== bundled.normHash) {
-			findings.push(finding("AMBER_E_CONTEXT_SOURCE_STALE", `mutable source ${source.ref} changed after the request`, pageId, sid));
+			findings.push(
+				finding(
+					"AMBER_E_CONTEXT_SOURCE_STALE",
+					`mutable source ${source.ref} changed after the request`,
+					pageId,
+					sid,
+				),
+			);
 			continue;
 		}
 		rebased.sources[sid] = { ...source, rawHash: current.rawHash, normHash: current.normHash };
@@ -156,10 +215,18 @@ function resolveIngestInput(targetRoot, opts) {
 	}
 	const request = loadRequest(targetRoot, opts.requestId);
 	if (!request) {
-		return { error: inputRejection("AMBER_E_CONTEXT_REQUEST_MISSING", [`request not found: ${opts.requestId}`]) };
+		return {
+			error: inputRejection("AMBER_E_CONTEXT_REQUEST_MISSING", [
+				`request not found: ${opts.requestId}`,
+			]),
+		};
 	}
 	if (request.requestId !== opts.requestId) {
-		return { error: inputRejection("AMBER_E_CONTEXT_REQUEST_MISMATCH", ["request id does not match the persisted contract"]) };
+		return {
+			error: inputRejection("AMBER_E_CONTEXT_REQUEST_MISMATCH", [
+				"request id does not match the persisted contract",
+			]),
+		};
 	}
 	let payload = opts.payload;
 	if (!payload && opts.payloadPath) {
@@ -169,7 +236,11 @@ function resolveIngestInput(targetRoot, opts) {
 			});
 			payload = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
 		} catch (error) {
-			return { error: inputRejection("AMBER_E_CONTEXT_SCHEMA_INVALID", [`payload unreadable: ${error.message}`]) };
+			return {
+				error: inputRejection("AMBER_E_CONTEXT_SCHEMA_INVALID", [
+					`payload unreadable: ${error.message}`,
+				]),
+			};
 		}
 	}
 	if (!payload || typeof payload !== "object") {
@@ -206,7 +277,9 @@ function ingestNoChange(context) {
 			outcome: "rejected",
 			code: "AMBER_E_CONTEXT_PAGE_OBSOLETE",
 			errors: [`no-change but no existing page for "${pageId}"`],
-			findings: [finding("AMBER_E_CONTEXT_PAGE_OBSOLETE", `no existing page for ${pageId}`, pageId)],
+			findings: [
+				finding("AMBER_E_CONTEXT_PAGE_OBSOLETE", `no existing page for ${pageId}`, pageId),
+			],
 			pageId,
 		};
 	}
@@ -215,14 +288,30 @@ function ingestNoChange(context) {
 		return rejectFindings(context, sourceBinding.findings);
 	}
 	const { rebased, changed } = sourceBinding;
-	if (changed) writePage(targetRoot, rebased, { outcome: "no-change", requestId });
-	regenerateIndex(targetRoot, require("./context-verify").statusMap(targetRoot));
-	appendEvent(targetRoot, { kind: "ingest", requestId, pageId, outcome: "no-change", sourceCount: Object.keys(rebased.sources).length });
+	if (changed) {
+		writePage(targetRoot, rebased, { outcome: "no-change", requestId });
+	} else {
+		// writePage already regenerates the index; no-write path still refreshes status.
+		regenerateIndex(targetRoot);
+	}
+	appendEvent(targetRoot, {
+		kind: "ingest",
+		requestId,
+		pageId,
+		outcome: "no-change",
+		sourceCount: Object.keys(rebased.sources).length,
+	});
 	return {
 		accepted: true,
 		outcome: "no-change",
 		errors: [],
-		findings: [finding("AMBER_E_CONTEXT_SOURCE_STALE", "agent judged the change does not affect this page; hashes rebased", pageId)],
+		findings: [
+			finding(
+				"AMBER_E_CONTEXT_SOURCE_STALE",
+				"agent judged the change does not affect this page; hashes rebased",
+				pageId,
+			),
+		],
 		pageId,
 		requestId,
 	};
@@ -233,8 +322,12 @@ function validateFullPage(context, payload) {
 	const validate = getPageValidator();
 	if (!validate(payload)) {
 		return {
-			findings: [finding("AMBER_E_CONTEXT_SCHEMA_INVALID", "payload fails the page schema", pageId)],
-			errors: validate.errors.slice(0, 5).map((error) => `${error.instancePath || "/"} ${error.message}`),
+			findings: [
+				finding("AMBER_E_CONTEXT_SCHEMA_INVALID", "payload fails the page schema", pageId),
+			],
+			errors: validate.errors
+				.slice(0, 5)
+				.map((error) => `${error.instancePath || "/"} ${error.message}`),
 		};
 	}
 	const binding = checkRequestBinding(targetRoot, request, payload);
@@ -242,7 +335,13 @@ function validateFullPage(context, payload) {
 	const uncited = checkCitations(payload);
 	if (uncited.length > 0) {
 		return {
-			findings: [finding("AMBER_E_CONTEXT_CLAIM_UNCITED", `unknown source ids: ${uncited.join(", ")}`, pageId)],
+			findings: [
+				finding(
+					"AMBER_E_CONTEXT_CLAIM_UNCITED",
+					`unknown source ids: ${uncited.join(", ")}`,
+					pageId,
+				),
+			],
 			errors: [`blocks cite unknown source ids: ${uncited.join(", ")}`],
 		};
 	}
@@ -256,7 +355,6 @@ function ingestFullPage(context, payload) {
 		return rejectFindings(context, validation.findings, validation.errors);
 	}
 	writePage(targetRoot, payload, { outcome: "accepted", requestId });
-	regenerateIndex(targetRoot, require("./context-verify").statusMap(targetRoot));
 	appendEvent(targetRoot, {
 		kind: "ingest",
 		requestId,

@@ -12,7 +12,6 @@ const { hashFile } = require("./context-hash");
 const { resolvePathWithin } = require("./fs-utils");
 const { listPages, readPage, writePage, regenerateIndex, appendEvent } = require("./context-store");
 const { createRequest } = require("./context-request");
-const { statusMap } = require("./context-verify");
 
 function scanPageSources(targetRoot, page) {
 	const rebased = { ...page, sources: { ...page.sources } };
@@ -37,7 +36,11 @@ function scanPageSources(targetRoot, page) {
 		if (current.rawHash !== source.rawHash) {
 			rebased.sources[sid] = { ...source, rawHash: current.rawHash, normHash: current.normHash };
 			rebaseChanged = true;
-			appendEvent(targetRoot, { kind: "source-raw-only-change", pageId: page.pageId, sid: source.ref });
+			appendEvent(targetRoot, {
+				kind: "source-raw-only-change",
+				pageId: page.pageId,
+				sid: source.ref,
+			});
 		}
 	}
 	return { rebased, changedRefs, errors, rebaseChanged };
@@ -99,7 +102,8 @@ function refreshPages(targetRoot) {
 		errors.push(...result.errors);
 	}
 
-	regenerateIndex(targetRoot, statusMap(targetRoot));
+	// Final pass keeps index status accurate when sources changed without a page write.
+	regenerateIndex(targetRoot);
 
 	return { requests, rawOnlyRebases, errors };
 }

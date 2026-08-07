@@ -22,32 +22,22 @@ const TEXT_EXTENSIONS = new Set([
 	".yml",
 ]);
 const MOJIBAKE_PATTERNS = [
-	0xfffd,
-	0x00e2,
-	0x9210,
-	0x922b,
-	0x9241,
-	0x9242,
-	0x951b,
-	0x7ee0,
-	0x6d63,
-	0x6d93,
-	0x93b4,
-	0x59af,
-	0x7039,
-	0x9429,
-	0x95c2,
+	0xfffd, 0x00e2, 0x9210, 0x922b, 0x9241, 0x9242, 0x951b, 0x7ee0, 0x6d63, 0x6d93, 0x93b4, 0x59af,
+	0x7039, 0x9429, 0x95c2,
 ].map((codePoint) => String.fromCodePoint(codePoint));
 
-function trackedFiles() {
+function trackedFiles(root = ROOT) {
 	const result = spawnSync("git", ["ls-files"], {
-		cwd: ROOT,
+		cwd: root,
 		encoding: "utf8",
 	});
 	if (result.status !== 0) {
 		throw new Error(result.stderr || "git ls-files failed");
 	}
-	return result.stdout.split(/\r?\n/).filter(Boolean);
+	return result.stdout
+		.split(/\r?\n/)
+		.filter(Boolean)
+		.filter((filePath) => fs.existsSync(path.join(root, filePath)));
 }
 
 function isTextFile(filePath) {
@@ -102,4 +92,5 @@ if (require.main === module) {
 
 module.exports = {
 	findEncodingFindings,
+	trackedFiles,
 };

@@ -2,11 +2,12 @@
 
 // Per-command help text shown by `amber <command> --help`.
 // Single-line summaries are plain strings; multi-line summaries are arrays
-// joined with newlines. Adding a command's help is a one-line data edit here,
-// not a new branch in the CLI dispatcher.
+// joined with newlines. Command order is an external CLI contract, while help,
+// output policy, and handler binding remain owned by this registration module.
 const COMMAND_HELP = {
 	init: "Create missing Amber starter files without overwriting existing files. Supports --dry-run.",
-	audit: "Inspect an existing project without writing files. Supports --summary for bounded text output.",
+	audit:
+		"Inspect an existing project without writing files. Supports --summary for bounded text output.",
 	wiki: [
 		"Create missing Wiki starter files, skip existing files, then validate links. Supports --dry-run.",
 		"",
@@ -41,33 +42,34 @@ const COMMAND_HELP = {
 		"  amber handoff validate --target path/to/repo --bundle-dir .amber/handoff/latest",
 	],
 	doctor: "Run Amber guardrail checks and target classification.",
-	drift: "CI-native drift gate. Exit 1 if any artifact/wiki/scaffold drift. Supports --scope, --format gh-annotations, --no-fail.",
+	drift:
+		"CI-native drift gate. Exit 1 if any artifact/wiki/scaffold drift. Supports --scope, --format gh-annotations, --no-fail.",
 	plan: [
-			"Create a feature-linked vertical-slice plan from a registered feature.",
-			"",
-			"Required options:",
-			"  --target <dir>       Path to the target repository.",
-			"  --feature <id>       Feature id (e.g. F001) — must already exist in feature_list.json.",
-			"  --title <text>       Short human-readable title for the plan.",
-			"",
-			"Optional:",
-			"  --dry-run            Preview without writing files.",
-			"",
-			"Examples:",
-			"  amber plan --target . --feature F001 --title \"Small slice\"",
-			"  amber plan --target . --feature F002 --title \"AccountChargeDrawer dual-step\" --dry-run",
-		],
+		"Create a feature-linked vertical-slice plan from a registered feature.",
+		"",
+		"Required options:",
+		"  --target <dir>       Path to the target repository.",
+		"  --feature <id>       Feature id (e.g. F001) — must already exist in feature_list.json.",
+		"  --title <text>       Short human-readable title for the plan.",
+		"",
+		"Optional:",
+		"  --dry-run            Preview without writing files.",
+		"",
+		"Examples:",
+		'  amber plan --target . --feature F001 --title "Small slice"',
+		'  amber plan --target . --feature F002 --title "AccountChargeDrawer dual-step" --dry-run',
+	],
 	gate: [
-			"Validate that a plan is tied to feature state and has user confirmation, or confirm it.",
-			"",
-			"Options:",
-			"  --plan <path>       Relative path to the plan to gate-check or confirm.",
-			"  --confirm           Set the plan's User Confirmation field to confirmed.",
-			"",
-			"Examples:",
-			"  amber gate --target . --plan docs/plans/F001-small-slice.md",
-			"  amber gate --target . --plan docs/plans/F001-small-slice.md --confirm",
-		],
+		"Validate that a plan is tied to feature state and has user confirmation, or confirm it.",
+		"",
+		"Options:",
+		"  --plan <path>       Relative path to the plan to gate-check or confirm.",
+		"  --confirm           Set the plan's User Confirmation field to confirmed.",
+		"",
+		"Examples:",
+		"  amber gate --target . --plan docs/plans/F001-small-slice.md",
+		"  amber gate --target . --plan docs/plans/F001-small-slice.md --confirm",
+	],
 	review: "Review a plan against static Amber standards and release-readiness checks.",
 	accept: [
 		"Accept a reviewed plan and append an Amber evolution record.",
@@ -82,11 +84,15 @@ const COMMAND_HELP = {
 		"  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md --session <session-id>",
 	],
 	pack: "Inspect or validate declarative workflow packs without executing them.",
-	ledger: "Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emits JSON/CSV/OTLP-JSON for SIEM.",
-	profile: "⚠️  DEPRECATED: Inspect declarative project profiles. Will be removed in v2 — use 'amber governance' instead.",
+	ledger:
+		"Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emits JSON/CSV/OTLP-JSON for SIEM.",
+	profile:
+		"⚠️  DEPRECATED: Inspect declarative project profiles. Will be removed in v2 — use 'amber governance' instead.",
 	task: "⚠️  DEPRECATED: Prepare isolated task ledger, evidence, replay, and worktree artifacts. Will be removed in v2.",
-	result: "⚠️  DEPRECATED: Inspect replayable task result artifacts without relying on chat history. Will be removed in v2.",
-	agent: "⚠️  DEPRECATED: Create and control auditable worker/reviewer dispatch records without executing agent work. Will be removed in v2.",
+	result:
+		"⚠️  DEPRECATED: Inspect replayable task result artifacts without relying on chat history. Will be removed in v2.",
+	agent:
+		"⚠️  DEPRECATED: Create and control auditable worker/reviewer dispatch records without executing agent work. Will be removed in v2.",
 	team: [
 		"⚠️  DEPRECATED: Inspect, install, pin, update, and roll back local team distribution metadata. Will be removed in v2.",
 		"",
@@ -111,7 +117,7 @@ const COMMAND_HELP = {
 		"",
 		"Examples:",
 		"  amber loop inspect --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --json",
-		"  amber loop recommend --target . --goal \"continuous improvement\" --json",
+		'  amber loop recommend --target . --goal "continuous improvement" --json',
 		"  amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --output .amber/loops/daily-amber-triage/ledger-preview.json --json",
 		"  amber loop record --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --trigger-source manual --stop-reason reviewer-gate-required --output .amber/loops/daily-amber-triage/manual-ledger.json --json",
 		"  amber loop status --ledger .amber/loops/daily-amber-triage/manual-ledger.json --json",
@@ -151,31 +157,31 @@ const COMMAND_HELP = {
 		"      Report whether a session has enough evidence to be treated as complete.",
 		"  complete --session <id> [--strict]",
 		"      Mark a session completed (governance terminal state). Requires complete-check to pass.",
-			"  verify --session <id> [--stage <name>] [--command <cmd>] [--result <text>] [--execute]",
-			"      Record verification evidence. Without --execute, records a self-reported claim.",
-			"      With --execute, runs --command and records the real exit code.",
-			"  approve --session <id> [--gate <gate-id>]",
-			"      Record a gate_passed event so complete-check sees approval evidence.",
-			"",
-			"Session completion flow:",
-			'  amber session start --goal "..."',
-			"  amber session continue",
-			"  amber session verify --session <id>",
-			"  amber session approve --session <id> --gate <gate-id>",
-			"  amber session complete-check --session <id>",
-			"  amber session complete --session <id>",
-			"",
-			"Route auto-matching:",
-			"  Goals are matched against route trigger goalPattern regexes:",
-			"    bugfix-quick     — ^(fix|resolve|patch|repair)\\s+.*(bug|defect|issue|error|crash)",
-			"    feature-standard — ^(add|implement|create|build)\\s+.*feature",
-			"    refactor-safe    — ^(refactor|restructure|clean\\s*up|simplify|extract)\\b",
-			"  Pass --route <id> to bypass auto-matching.",
-			"",
-			"Two-layer approval gates:",
-			"  Plan-level:  amber gate --confirm  → edits User Confirmation in the plan .md file.",
-			"  Session-level: amber session approve → records gate_passed in the session timeline.",
-			"  Both layers must be satisfied for complete-check --strict to pass.",
+		"  verify --session <id> [--stage <name>] [--command <cmd>] [--result <text>] [--execute]",
+		"      Record verification evidence. Without --execute, records a self-reported claim.",
+		"      With --execute, runs --command and records the real exit code.",
+		"  approve --session <id> [--gate <gate-id>]",
+		"      Record a gate_passed event so complete-check sees approval evidence.",
+		"",
+		"Session completion flow:",
+		'  amber session start --goal "..."',
+		"  amber session continue",
+		"  amber session verify --session <id>",
+		"  amber session approve --session <id> --gate <gate-id>",
+		"  amber session complete-check --session <id>",
+		"  amber session complete --session <id>",
+		"",
+		"Route auto-matching:",
+		"  Goals are matched against route trigger goalPattern regexes:",
+		"    bugfix-quick     — ^(fix|resolve|patch|repair)\\s+.*(bug|defect|issue|error|crash)",
+		"    feature-standard — ^(add|implement|create|build)\\s+.*feature",
+		"    refactor-safe    — ^(refactor|restructure|clean\\s*up|simplify|extract)\\b",
+		"  Pass --route <id> to bypass auto-matching.",
+		"",
+		"Two-layer approval gates:",
+		"  Plan-level:  amber gate --confirm  → edits User Confirmation in the plan .md file.",
+		"  Session-level: amber session approve → records gate_passed in the session timeline.",
+		"  Both layers must be satisfied for complete-check --strict to pass.",
 		"",
 		"Examples:",
 		'  amber session start --goal "implement user auth"',
@@ -186,8 +192,8 @@ const COMMAND_HELP = {
 		"  amber session abort <session-id>",
 		"  amber session continue",
 		"  amber session complete-check --session <session-id>",
-			"  amber session verify --session <session-id>",
-			"  amber session approve --session <session-id>",
+		"  amber session verify --session <session-id>",
+		"  amber session approve --session <session-id>",
 	],
 	migrate: [
 		"Backfill version metadata in recognized Amber JSON artifacts, or migrate",
@@ -227,64 +233,64 @@ const COMMAND_HELP = {
 		"Examples:",
 		"  amber security audit --target path/to/repo",
 		"  amber security audit --target path/to/repo --output docs/security-audit.md",
-		],
-		feature: [
-			"Add, list, remove features in feature_list.json and record verification evidence.",
-			"",
-			"Subcommands:",
-			"  add    --id <id> --title <text> [--priority <n>] [--area <area>] [--behavior <text>] [--verify <step>...] [--paths <p,p>]",
-			"         Register a new feature in feature_list.json. To be doctor-valid, pass --area, --behavior, and at least one --verify.",
-			"  list",
-			"         List all registered features with status.",
-			"  remove --id <id>",
-			"         Remove a feature from feature_list.json.",
-			"  verify --feature <id> [--command <cmd>] [--result <text>] [--notes <text>]",
-			"         Record verification evidence for a feature.",
-			"  evidence --feature <id>",
-			"         List all recorded evidence for a feature.",
-			"",
-			"Examples:",
-			"  amber feature add --id F001 --title \"User login\" --priority 1 --area auth --behavior \"User logs in with email\" --verify \"npm test\" --paths src/auth",
-			"  amber feature list",
-			"  amber feature remove --id F001",
-			"  amber feature verify --feature F001 --command \"npm test\" --result \"42 passed\"",
-			"  amber feature evidence --feature F001",
-		],
-		clean: [
-			"Remove amber-generated files from the target repository (reverse of init).",
-			"",
-			"Options:",
-			"  --dry-run    Preview which files would be removed without deleting them.",
-			"",
-			"Examples:",
-			"  amber clean --target path/to/repo",
-			"  amber clean --target path/to/repo --dry-run",
 	],
-		next: [
-			"Infer the repo's position in the Amber lifecycle and print the next command to run (read-only).",
-			"",
-			"Lifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept.",
-			"Session evaluation matches complete-check --strict (executed verification + live handoff, not init scaffold).",
-			"Existing projects: next recommends a read-only audit first; audit writes no file, so next advances straight to init.",
-			"",
-			"Options:",
-			"  --target <dir>     Path to the target repository.",
-			"  --feature <id>     Focus a specific feature's lifecycle.",
-			"  --session <id>     Focus a specific session's lifecycle.",
-			"  --objective <text> Give an objective; next suggests a matching route and",
-			"                     workflow pack from route manifest metadata (read-only advisor).",
-			"  --json             Emit the machine-readable envelope.",
-			"",
-			"With no --feature/--session, next auto-selects a focus and states which it chose.",
-			"Without --objective, next is the pure lifecycle inference (unchanged).",
-			"",
-			"Examples:",
-			"  amber next --target .",
-			"  amber next --target . --feature F001",
-			"  amber next --target . --session <session-id> --json",
-			"  amber next --target . --objective \"add payment integration\"",
-			"  amber next --target . --objective \"fix login bug\" --json",
-		],
+	feature: [
+		"Add, list, remove features in feature_list.json and record verification evidence.",
+		"",
+		"Subcommands:",
+		"  add    --id <id> --title <text> [--priority <n>] [--area <area>] [--behavior <text>] [--verify <step>...] [--paths <p,p>]",
+		"         Register a new feature in feature_list.json. To be doctor-valid, pass --area, --behavior, and at least one --verify.",
+		"  list",
+		"         List all registered features with status.",
+		"  remove --id <id>",
+		"         Remove a feature from feature_list.json.",
+		"  verify --feature <id> [--command <cmd>] [--result <text>] [--notes <text>]",
+		"         Record verification evidence for a feature.",
+		"  evidence --feature <id>",
+		"         List all recorded evidence for a feature.",
+		"",
+		"Examples:",
+		'  amber feature add --id F001 --title "User login" --priority 1 --area auth --behavior "User logs in with email" --verify "npm test" --paths src/auth',
+		"  amber feature list",
+		"  amber feature remove --id F001",
+		'  amber feature verify --feature F001 --command "npm test" --result "42 passed"',
+		"  amber feature evidence --feature F001",
+	],
+	clean: [
+		"Remove amber-generated files from the target repository (reverse of init).",
+		"",
+		"Options:",
+		"  --dry-run    Preview which files would be removed without deleting them.",
+		"",
+		"Examples:",
+		"  amber clean --target path/to/repo",
+		"  amber clean --target path/to/repo --dry-run",
+	],
+	next: [
+		"Infer the repo's position in the Amber lifecycle and print the next command to run (read-only).",
+		"",
+		"Lifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept.",
+		"Session evaluation matches complete-check --strict (executed verification + live handoff, not init scaffold).",
+		"Existing projects: next recommends a read-only audit first; audit writes no file, so next advances straight to init.",
+		"",
+		"Options:",
+		"  --target <dir>     Path to the target repository.",
+		"  --feature <id>     Focus a specific feature's lifecycle.",
+		"  --session <id>     Focus a specific session's lifecycle.",
+		"  --objective <text> Give an objective; next suggests a matching route and",
+		"                     workflow pack from route manifest metadata (read-only advisor).",
+		"  --json             Emit the machine-readable envelope.",
+		"",
+		"With no --feature/--session, next auto-selects a focus and states which it chose.",
+		"Without --objective, next is the pure lifecycle inference (unchanged).",
+		"",
+		"Examples:",
+		"  amber next --target .",
+		"  amber next --target . --feature F001",
+		"  amber next --target . --session <session-id> --json",
+		'  amber next --target . --objective "add payment integration"',
+		'  amber next --target . --objective "fix login bug" --json',
+	],
 	explain: [
 		"Look up Amber error codes, or regenerate the troubleshooting reference.",
 		"",
@@ -345,51 +351,51 @@ const COMMAND_HELP = {
 		"  amber governance report --target path/to/repo",
 		"  amber governance report --target path/to/repo --output docs/governance-report.md",
 	],
-		status: [
-			"Show a curated one-line overview of repo state: git branch, Amber init status,",
-			"install freshness, and scaffold/artifact/wiki drift counts. Read-only, thin",
-			"front-door — does NOT duplicate doctor or maintenance inspect.",
-			"",
-			"Options:",
-			"  --target <dir>     Path to the target repository.",
-			"  --json             Emit machine-readable JSON.",
-			"",
-			"Examples:",
-			"  amber status --target .",
-			"  amber status --target . --json",
-		],
-		sync: [
-			"Detect scaffold and artifact drift between installed files and shipped templates.",
-			"Dry-run by default (no changes made). With --execute, refreshes stale",
-			"Amber-owned scaffold files and caches customized/ambiguous proposals.",
-			"",
-			"Options:",
-			"  --target <dir>     Path to the target repository.",
-			"  --execute          Actually refresh stale Amber-owned files (idempotent).",
-			"  --json             Emit machine-readable JSON.",
-			"",
-			"Examples:",
-			"  amber sync --target .",
-			"  amber sync --target . --execute",
-		],
-		workflow: [
-			"Assess agent-workflow effectiveness across five dimensions, separate from",
-			"governance readiness. Read-only by default. See ADR-0008.",
-			"",
-			"Subcommands:",
-			"  assess [--format json|markdown] [--output-dir <path>] [--no-sessions]",
-			"        Produce a workflow-effectiveness report. Sessions (amber-native)",
-			"        are included by default; --no-sessions emits a repository-only",
-			"        baseline. --format json is the default output. --output-dir writes",
-			"        the report to a file instead of stdout (assess only).",
-			"  findings   (P2) List findings from a prior report.",
-			"  plan --report <path> --finding <id> [--dry-run]",
-			"        Bridge a finding to a dry-run amber plan draft (review before applying).",
-			"  compare    (P3) Compare two reports across schema versions.",
-			"",
-			"Notes:",
-			"  --json has no effect on workflow output; use --format to pick json/markdown.",
-			"",
+	status: [
+		"Show a curated one-line overview of repo state: git branch, Amber init status,",
+		"install freshness, and scaffold/artifact/wiki drift counts. Read-only, thin",
+		"front-door — does NOT duplicate doctor or maintenance inspect.",
+		"",
+		"Options:",
+		"  --target <dir>     Path to the target repository.",
+		"  --json             Emit machine-readable JSON.",
+		"",
+		"Examples:",
+		"  amber status --target .",
+		"  amber status --target . --json",
+	],
+	sync: [
+		"Detect scaffold and artifact drift between installed files and shipped templates.",
+		"Dry-run by default (no changes made). With --execute, refreshes stale",
+		"Amber-owned scaffold files and caches customized/ambiguous proposals.",
+		"",
+		"Options:",
+		"  --target <dir>     Path to the target repository.",
+		"  --execute          Actually refresh stale Amber-owned files (idempotent).",
+		"  --json             Emit machine-readable JSON.",
+		"",
+		"Examples:",
+		"  amber sync --target .",
+		"  amber sync --target . --execute",
+	],
+	workflow: [
+		"Assess agent-workflow effectiveness across five dimensions, separate from",
+		"governance readiness. Read-only by default. See ADR-0008.",
+		"",
+		"Subcommands:",
+		"  assess [--format json|markdown] [--output-dir <path>] [--no-sessions]",
+		"        Produce a workflow-effectiveness report. Sessions (amber-native)",
+		"        are included by default; --no-sessions emits a repository-only",
+		"        baseline. --format json is the default output. --output-dir writes",
+		"        the report to a file instead of stdout (assess only).",
+		"  findings   (P2) List findings from a prior report.",
+		"  plan --report <path> --finding <id> [--dry-run]",
+		"        Bridge a finding to a dry-run amber plan draft (review before applying).",
+		"  compare    (P3) Compare two reports across schema versions.",
+		"",
+		"Notes:",
+		"  --json has no effect on workflow output; use --format to pick json/markdown.",
+		"",
 		"Examples:",
 		"  amber workflow assess --target . --format json",
 		"  amber workflow assess --target . --format markdown --output-dir docs/quality/",
@@ -410,7 +416,7 @@ const COMMAND_HELP = {
 		"        Judge the agent's output: schema, citation completeness, payload-to-request",
 		"        binding, request-owned scope, and source freshness. The matching request",
 		"        is required for every accepted or no-change outcome.",
-		"        A payload of {\"outcome\":\"no-change\"} rebases hashes without touching content.",
+		'        A payload of {"outcome":"no-change"} rebases hashes without touching content.',
 		"  verify [--json]",
 		"        Health-check every page: stale / tampered / missing / obsolete / orphaned,",
 		"        with AMBER_E_CONTEXT_* codes. This is the authority doctor points at.",
@@ -444,12 +450,186 @@ const COMMAND_HELP = {
 
 const DEFAULT_SUMMARY = "Run Amber Protocol command.";
 
+const COMMAND_OUTPUT = {
+	init: {
+		dryRun: true,
+		usage:
+			"Usage: amber init --target <repo> [--with-wiki] [--skip-detection] [--json] [--dry-run]",
+	},
+	audit: { summary: true },
+	wiki: { dryRun: true },
+	plan: {
+		dryRun: true,
+		usage: "Usage: amber plan --target <repo> --feature <id> --title <title> [--json] [--dry-run]",
+	},
+	team: {
+		usage: [
+			"Usage: amber team <inspect|install|pin|update|rollback> --target <repo> [--json]",
+			"       amber team install --target <repo> --version <version> --preset <preset> [--dry-run] [--json]",
+			"       amber team update --target <repo> --version <version> [--dry-run|--confirm] [--json]",
+		].join("\n"),
+	},
+	gate: {
+		usage: "Usage: amber gate --target <repo> --plan <relative-plan-path> [--confirm] [--json]",
+	},
+	review: { usage: "Usage: amber review --target <repo> --plan <relative-plan-path> [--json]" },
+	accept: {
+		usage:
+			"Usage: amber accept --target <repo> --plan <relative-plan-path> [--session <id>] [--strict] [--json]",
+	},
+	handoff: {
+		usage: [
+			"Usage: amber handoff --target <repo> [--json]",
+			"       amber handoff bundle --target <repo> [--output-dir <dir>] [--json]",
+			"       amber handoff validate --target <repo> [--bundle-dir <dir>] [--json]",
+		].join("\n"),
+	},
+	explain: { usage: "Usage: amber explain [<code>] [--markdown <path>] [--json]" },
+	hooks: {
+		usage:
+			"Usage: amber hooks <check|install|uninstall|status> --target <repo> [--warn-only] [--force] [--json]",
+	},
+	loop: {
+		usage:
+			"Usage: amber loop <inspect|recommend|run|approve|verify-ledger|record|status|validate-loop> [--target <repo>] [--file <pack>] [--contract <id>] [--dry-run|--execute] [--reviewer <name>] [--json]",
+	},
+	ledger: {
+		usage:
+			"Usage: amber ledger <export|seal|verify-anchoring> --target <repo> [--format json|csv|otlp-json] [--home loops|routes|sessions|all] [--out <path>] [--reviewer <name>] [--json]",
+	},
+	governance: {
+		usage: [
+			"Usage: amber governance <docs|evidence|policy|audit|readiness|report|standards|rules> [--target <repo>] [--json]",
+			"       amber governance report --target <repo> [--output <file>] [--json]",
+			"       amber governance rules <init|inspect|check> --target <repo> [--command <cmd>]",
+		].join("\n"),
+	},
+	route: {
+		usage:
+			"Usage: amber route <list|inspect|validate|test|approve|verify-ledger> <route-id> [--target <repo>] [--execute] [--stage <name>] [--reviewer <name>] [--json]",
+	},
+	session: {
+		usage:
+			"Usage: amber session <start|status|list|abort|continue|complete-check|verify|approve|verify-ledger> [--target <repo>] [--session <id>] [--goal <goal>] [--json]",
+	},
+	status: { usage: "Usage: amber status --target <repo> [--json]" },
+	drift: {
+		usage:
+			"Usage: amber drift --target <repo> [--scope artifact|wiki|scaffold|all] [--format text|json|gh-annotations] [--no-fail] [--json]",
+	},
+	sync: { usage: "Usage: amber sync --target <repo> [--execute] [--json]" },
+	workflow: {
+		usage: [
+			"Usage: amber workflow <assess|findings|plan|compare> --target <repo>",
+			"       amber workflow assess --target <repo> [--format json|markdown] [--output-dir <path>] [--no-sessions]",
+			"       amber workflow findings --target <repo> --report <path>",
+			"       amber workflow plan --target <repo> --report <path> --finding <id>",
+			"       amber workflow compare --target <repo> --baseline <path> --current <path>",
+		].join("\n"),
+	},
+};
+
+const DEFAULT_OUTPUT = Object.freeze({ dryRun: false, summary: false, usage: null });
+const COMMANDS = Object.freeze([
+	"init",
+	"audit",
+	"wiki",
+	"doctor",
+	"handoff",
+	"plan",
+	"gate",
+	"review",
+	"accept",
+	"pack",
+	"profile",
+	"task",
+	"result",
+	"agent",
+	"team",
+	"maintenance",
+	"adoption",
+	"loop",
+	"ledger",
+	"route",
+	"session",
+	"status",
+	"drift",
+	"sync",
+	"migrate",
+	"governance",
+	"execution",
+	"security",
+	"feature",
+	"clean",
+	"next",
+	"explain",
+	"hooks",
+	"workflow",
+	"context",
+]);
+const commandNames = new Set(COMMANDS);
+const missingHelp = COMMANDS.filter((name) => !Object.hasOwn(COMMAND_HELP, name));
+const orphanedHelp = Object.keys(COMMAND_HELP).filter((name) => !commandNames.has(name));
+const orphanedOutput = Object.keys(COMMAND_OUTPUT).filter((name) => !commandNames.has(name));
+if (missingHelp.length > 0 || orphanedHelp.length > 0 || orphanedOutput.length > 0) {
+	throw new Error(
+		`Invalid Command definitions: missing help [${missingHelp.join(", ")}], orphaned help [${orphanedHelp.join(", ")}], orphaned output [${orphanedOutput.join(", ")}].`,
+	);
+}
+const COMMAND_DEFINITIONS = Object.freeze(
+	Object.fromEntries(
+		COMMANDS.map((name) => [
+			name,
+			Object.freeze({
+				name,
+				help: COMMAND_HELP[name],
+				output: Object.freeze({ ...DEFAULT_OUTPUT, ...(COMMAND_OUTPUT[name] || {}) }),
+			}),
+		]),
+	),
+);
+
 function commandSummary(command) {
-	const help = COMMAND_HELP[command];
+	const help = COMMAND_DEFINITIONS[command]?.help;
 	if (help === undefined) {
 		return DEFAULT_SUMMARY;
 	}
 	return Array.isArray(help) ? help.join("\n") : help;
 }
 
-module.exports = { commandSummary, COMMAND_HELP };
+function commandUsageLine(command) {
+	const definition = COMMAND_DEFINITIONS[command];
+	if (!definition) return null;
+	if (definition.output.usage) return definition.output.usage;
+	const options = ["[--json]"];
+	if (definition.output.dryRun) options.push("[--dry-run]");
+	if (definition.output.summary) options.push("[--summary]");
+	return `Usage: amber ${command} --target <repo> ${options.join(" ")}`;
+}
+
+function bindCommandHandlers(handlers) {
+	const handlerNames = Object.keys(handlers);
+	const missing = COMMANDS.filter((name) => typeof handlers[name] !== "function");
+	const orphaned = handlerNames.filter((name) => !COMMAND_DEFINITIONS[name]);
+	if (missing.length > 0 || orphaned.length > 0) {
+		throw new Error(
+			`Invalid Command registration: missing handlers [${missing.join(", ")}], orphaned handlers [${orphaned.join(", ")}].`,
+		);
+	}
+	return Object.freeze(
+		Object.fromEntries(
+			COMMANDS.map((name) => [
+				name,
+				Object.freeze({ definition: COMMAND_DEFINITIONS[name], handler: handlers[name] }),
+			]),
+		),
+	);
+}
+
+module.exports = {
+	COMMANDS,
+	COMMAND_DEFINITIONS,
+	commandSummary,
+	commandUsageLine,
+	bindCommandHandlers,
+};

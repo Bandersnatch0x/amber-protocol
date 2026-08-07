@@ -20,8 +20,6 @@ const {
 	readEvents,
 } = require("../../scripts/lib/core/context-store");
 
-
-
 function makeTarget() {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-ctx-"));
 	fs.mkdirSync(path.join(root, "docs", "wiki"), { recursive: true });
@@ -86,6 +84,46 @@ describe("writePage / listPages / readPage", () => {
 		}
 	});
 
+	it("keeps the generated index synchronized across write and delete", () => {
+		const root = makeTarget();
+		try {
+			writePage(root, samplePage());
+			assert.match(fs.readFileSync(indexPath(root), "utf8"), /\| governed-execution \|/);
+
+			deletePage(root, "governed-execution");
+			const index = fs.readFileSync(indexPath(root), "utf8");
+			assert.doesNotMatch(index, /governed-execution/);
+			assert.match(index, /No context pages\./);
+		} finally {
+			cleanup(root);
+		}
+	});
+
+	it("preserves derived page health across write and delete", () => {
+		const root = makeTarget();
+		try {
+			writePage(root, samplePage({ pageId: "old-page", title: "Old page" }));
+			assert.match(
+				fs.readFileSync(indexPath(root), "utf8"),
+				/\| old-page \| Old page \| 1 \| 1 \| obsolete \|/,
+			);
+
+			writePage(root, samplePage({ pageId: "new-page", title: "New page" }));
+			assert.match(
+				fs.readFileSync(indexPath(root), "utf8"),
+				/\| old-page \| Old page \| 1 \| 1 \| obsolete \|/,
+			);
+
+			deletePage(root, "new-page");
+			assert.match(
+				fs.readFileSync(indexPath(root), "utf8"),
+				/\| old-page \| Old page \| 1 \| 1 \| obsolete \|/,
+			);
+		} finally {
+			cleanup(root);
+		}
+	});
+
 	it("returns null for a missing page", () => {
 		const root = makeTarget();
 		try {
@@ -99,15 +137,8 @@ describe("writePage / listPages / readPage", () => {
 		const root = makeTarget();
 		try {
 			fs.mkdirSync(pagesDir(root), { recursive: true });
-			fs.writeFileSync(
-				path.join(pagesDir(root), "broken-page.json"),
-				"{not-json\n",
-				"utf8",
-			);
-			assert.throws(
-				() => readPage(root, "broken-page"),
-				/failed to parse JSON file/i,
-			);
+			fs.writeFileSync(path.join(pagesDir(root), "broken-page.json"), "{not-json\n", "utf8");
+			assert.throws(() => readPage(root, "broken-page"), /failed to parse JSON file/i);
 		} finally {
 			cleanup(root);
 		}
@@ -147,15 +178,8 @@ describe("writePage / listPages / readPage", () => {
 		try {
 			const linkedPages = pagesDir(root);
 			fs.mkdirSync(path.dirname(linkedPages), { recursive: true });
-			fs.symlinkSync(
-				outsideRoot,
-				linkedPages,
-				process.platform === "win32" ? "junction" : "dir",
-			);
-			assert.throws(
-				() => writePage(root, samplePage()),
-				/outside the target/i,
-			);
+			fs.symlinkSync(outsideRoot, linkedPages, process.platform === "win32" ? "junction" : "dir");
+			assert.throws(() => writePage(root, samplePage()), /outside the target/i);
 			assert.equal(fs.existsSync(path.join(outsideRoot, "governed-execution.json")), false);
 		} finally {
 			cleanup(root);
@@ -180,10 +204,7 @@ describe("writePage / listPages / readPage", () => {
 				}
 				throw error;
 			}
-			assert.throws(
-				() => writePage(root, samplePage()),
-				/outside the target/i,
-			);
+			assert.throws(() => writePage(root, samplePage()), /outside the target/i);
 			assert.equal(fs.existsSync(outsideFile), false);
 		} finally {
 			cleanup(root);
@@ -197,10 +218,7 @@ describe("regenerateIndex", () => {
 		const root = makeTarget();
 		try {
 			writePage(root, samplePage({ pageId: "page-a", title: "Page A" }));
-			writePage(
-				root,
-				samplePage({ pageId: "page-b", title: "Page B", sources: {} }),
-			);
+			writePage(root, samplePage({ pageId: "page-b", title: "Page B", sources: {} }));
 			// page-b has no sources -> obsolete; page-a ok
 			const index = regenerateIndex(root);
 			const text = fs.readFileSync(index, "utf8");

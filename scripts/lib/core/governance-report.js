@@ -11,8 +11,10 @@ const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { gatherState, buildContext, inferNextStep } = require("./lifecycle");
 const { shellQuote } = require("./text-utils");
 const { detectNoProgress } = require("../workflow-assessment");
+const { loadSessionEvidence } = require("../session-evidence");
 
-const PRODUCT_VALUE_LOOP = "Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle";
+const PRODUCT_VALUE_LOOP =
+	"Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle";
 
 function clampScore(value) {
 	return Math.max(0, Math.min(100, Math.round(value)));
@@ -27,41 +29,51 @@ function penaltyFor(ids, findings, { warning = 8, error = 24 } = {}) {
 
 function scoreSections(readiness, maintenance) {
 	const findings = readiness.findings || [];
-	const governance = 100 - penaltyFor([
-		"policy-error",
-		"policy-warning",
-		"missing-governance-doc",
-		"missing-governance-rules",
-		"unsafe-default-allow",
-		"workflow-pack-read-error",
-	], findings);
+	const governance =
+		100 -
+		penaltyFor(
+			[
+				"policy-error",
+				"policy-warning",
+				"missing-governance-doc",
+				"missing-governance-rules",
+				"unsafe-default-allow",
+				"workflow-pack-read-error",
+			],
+			findings,
+		);
 
-	const evidence = 100 - penaltyFor([
-		"no-audit-evidence",
-		"ledger-tampered",
-	], findings, { warning: 35, error: 60 });
+	const evidence =
+		100 -
+		penaltyFor(["no-audit-evidence", "ledger-tampered"], findings, { warning: 35, error: 60 });
 
 	const continuityPenalty =
 		penaltyFor(["route-error", "workflow-pack-read-error"], findings, { warning: 10, error: 30 }) +
-		Math.min(30, ((maintenance.staleDocs || []).length) * 3) +
+		Math.min(30, (maintenance.staleDocs || []).length * 3) +
 		((maintenance.wikiLint?.errors || []).length > 0 ? 20 : 0);
 
-	const safety = 100 - penaltyFor([
-		"unsafe-user-approval",
-		"route-without-gates",
-		"pack-missing-review-gates",
-		"pack-missing-worktree-isolation",
-		"missing-security-standard",
-		"security-pack-not-linked",
-		"unsafe-default-allow",
-	], findings, { warning: 10, error: 35 });
+	const safety =
+		100 -
+		penaltyFor(
+			[
+				"unsafe-user-approval",
+				"route-without-gates",
+				"pack-missing-review-gates",
+				"pack-missing-worktree-isolation",
+				"missing-security-standard",
+				"security-pack-not-linked",
+				"unsafe-default-allow",
+			],
+			findings,
+			{ warning: 10, error: 35 },
+		);
 
 	const maintenancePenalty =
-		Math.min(35, ((maintenance.staleDocs || []).length) * 4) +
-		((maintenance.rulePackDrift?.drifted) ? 20 : 0) +
-		((maintenance.scaffoldDrift?.drifted) ? 20 : 0) +
-		((maintenance.artifactDrift?.drifted) ? 15 : 0) +
-		Math.min(20, ((maintenance.errors || []).length) * 10);
+		Math.min(35, (maintenance.staleDocs || []).length * 4) +
+		(maintenance.rulePackDrift?.drifted ? 20 : 0) +
+		(maintenance.scaffoldDrift?.drifted ? 20 : 0) +
+		(maintenance.artifactDrift?.drifted ? 15 : 0) +
+		Math.min(20, (maintenance.errors || []).length * 10);
 
 	const scores = {
 		governance: clampScore(governance),
@@ -72,10 +84,10 @@ function scoreSections(readiness, maintenance) {
 	};
 	scores.overall = clampScore(
 		scores.governance * 0.25 +
-		scores.evidence * 0.25 +
-		scores.continuity * 0.2 +
-		scores.safety * 0.2 +
-		scores.maintenance * 0.1,
+			scores.evidence * 0.25 +
+			scores.continuity * 0.2 +
+			scores.safety * 0.2 +
+			scores.maintenance * 0.1,
 	);
 	return scores;
 }
@@ -128,8 +140,9 @@ function buildStructuredNextActions(readiness, targetRoot, targetDisplay) {
 	if (lifecycle && !seen.has(lifecycle.id)) {
 		actions.push(lifecycle);
 	}
-	return actions.sort((left, right) =>
-		severityRank(left.severity) - severityRank(right.severity) || left.id.localeCompare(right.id),
+	return actions.sort(
+		(left, right) =>
+			severityRank(left.severity) - severityRank(right.severity) || left.id.localeCompare(right.id),
 	);
 }
 
@@ -142,48 +155,6 @@ function decisionFromScore(score, readinessDecision) {
 // ADR-0013 no-progress inputs: gather existing artifacts only. Missing state
 // dirs / files yield empty collectors — the detector then reports nothing,
 // which is the correct failure mode for a read-only assessor.
-
-function listDirectories(dir) {
-	if (!fs.existsSync(dir)) return [];
-	return fs
-		.readdirSync(dir)
-		.map((name) => path.join(dir, name))
-		.filter((entry) => {
-			try {
-				return fs.statSync(entry).isDirectory();
-			} catch {
-				return false;
-			}
-		});
-}
-
-function collectTimelineEvents(targetRoot, sessionId) {
-	if (!sessionId) return [];
-	const stateDir = resolveStateDirForRead(targetRoot);
-	const sessionDir = path.join(stateDir, "sessions", sessionId);
-	if (!fs.existsSync(sessionDir)) return [];
-	// Lazy require: session-timeline is a leaf module; keeping it out of the
-	// top of this file avoids pulling the session graph into every report.
-	const { readSessionEvents } = require("../session-timeline");
-	return readSessionEvents(sessionDir);
-}
-
-function collectResultEvidence(targetRoot, sessionId) {
-	if (!sessionId) return [];
-	const stateDir = resolveStateDirForRead(targetRoot);
-	const executionsDir = path.join(stateDir, "executions");
-	if (!fs.existsSync(executionsDir)) return [];
-	const results = [];
-	for (const executionDir of listDirectories(executionsDir)) {
-		const evidencePath = path.join(executionDir, "evidence.json");
-		if (!fs.existsSync(evidencePath)) continue;
-		const value = readJsonSafe(evidencePath).value;
-		if (value && typeof value === "object" && value.sessionId === sessionId) {
-			results.push(value);
-		}
-	}
-	return results;
-}
 
 function collectLoopContract(targetRoot) {
 	const packsDir = path.join(targetRoot, "workflow-packs");
@@ -241,10 +212,25 @@ function collectConfidenceSummary(targetRoot) {
 }
 
 function collectWorkflowEffectiveness(targetRoot, sessionId) {
+	let evidence;
+	try {
+		evidence = loadSessionEvidence(targetRoot, sessionId);
+	} catch {
+		// Shared session-evidence is fail-closed; the report degrades instead
+		// of aborting the whole governance surface.
+		return {
+			noProgress: detectNoProgress({
+				timelineEvents: [],
+				resultEvidence: [],
+				loopContract: collectLoopContract(targetRoot),
+			}),
+			confidence: collectConfidenceSummary(targetRoot),
+		};
+	}
 	return {
 		noProgress: detectNoProgress({
-			timelineEvents: collectTimelineEvents(targetRoot, sessionId),
-			resultEvidence: collectResultEvidence(targetRoot, sessionId),
+			timelineEvents: evidence.timelineEvents,
+			resultEvidence: evidence.resultEvidence,
 			loopContract: collectLoopContract(targetRoot),
 		}),
 		confidence: collectConfidenceSummary(targetRoot),
@@ -259,7 +245,10 @@ function buildGovernanceReport(target, options = {}) {
 	const scores = scoreSections(readiness, maintenance);
 	const nextActions = buildStructuredNextActions(readiness, targetRoot, targetDisplay);
 	const state = gatherState(targetRoot);
-	const evidenceCount = state.features.reduce((total, feature) => total + (Array.isArray(feature.evidence) ? feature.evidence.length : 0), 0);
+	const evidenceCount = state.features.reduce(
+		(total, feature) => total + (Array.isArray(feature.evidence) ? feature.evidence.length : 0),
+		0,
+	);
 	const errors = [...(readiness.errors || []), ...(maintenance.errors || [])];
 	const readinessDecision = errors.length > 0 ? "block" : readiness.decision;
 
@@ -324,7 +313,9 @@ function renderNextActionsMarkdown(actions) {
 
 function renderFindingsMarkdown(findings) {
 	if (findings.length === 0) return ["- None."];
-	return findings.map((finding) => `- **${finding.severity}** \`${finding.id}\`: ${finding.message}`);
+	return findings.map(
+		(finding) => `- **${finding.severity}** \`${finding.id}\`: ${finding.message}`,
+	);
 }
 
 function renderWorkflowEffectivenessMarkdown(effectiveness = {}) {
@@ -336,7 +327,9 @@ function renderWorkflowEffectivenessMarkdown(effectiveness = {}) {
 	}
 	lines.push(`- No-progress findings: ${noProgress.length}`);
 	for (const finding of noProgress) {
-		lines.push(`  - **${finding.severity}** \`${finding.id}\`: ${finding.title} — ${finding.detail}`);
+		lines.push(
+			`  - **${finding.severity}** \`${finding.id}\`: ${finding.title} — ${finding.detail}`,
+		);
 	}
 	return lines;
 }

@@ -116,7 +116,9 @@ describe("verifyPages", () => {
 						rawHash: "sha256:" + "c".repeat(64),
 						mutable: false,
 						excerpt: '{"action":"original"}',
-						excerptHash: require("../../scripts/lib/core/context-hash").sha256('{"action":"original"}'),
+						excerptHash: require("../../scripts/lib/core/context-hash").sha256(
+							'{"action":"original"}',
+						),
 					},
 				},
 			});
@@ -135,8 +137,11 @@ describe("verifyPages", () => {
 		try {
 			writeMutable(root, "scripts/lib/core/governed-runner.js", "const gates = 5;\n");
 			const page = pageWithSource("scripts/lib/core/governed-runner.js");
-			writePage(root, page);
-			// no regenerateIndex call -> orphaned
+			writeMutable(
+				root,
+				path.join(".amber", "context", "pages", "page-x.json"),
+				JSON.stringify(page, null, 2) + "\n",
+			);
 			const result = verifyPages(root);
 			assert.ok(result.pages[0].findings.some((f) => f.code === "AMBER_E_CONTEXT_PAGE_ORPHANED"));
 		} finally {
@@ -157,8 +162,7 @@ describe("verifyPages", () => {
 			assert.ok(
 				result.pages[0].findings.some(
 					(f) =>
-						f.code === "AMBER_E_CONTEXT_SOURCE_MISSING" &&
-						/outside the target/i.test(f.detail),
+						f.code === "AMBER_E_CONTEXT_SOURCE_MISSING" && /outside the target/i.test(f.detail),
 				),
 				JSON.stringify(result.pages[0].findings),
 			);
@@ -181,7 +185,9 @@ describe("verifyPages excerpt integrity (D5a outcome 1)", () => {
 						rawHash: "sha256:" + "c".repeat(64),
 						mutable: false,
 						excerpt: '{"action":"original"}',
-						excerptHash: require("../../scripts/lib/core/context-hash").sha256('{"action":"original"}'),
+						excerptHash: require("../../scripts/lib/core/context-hash").sha256(
+							'{"action":"original"}',
+						),
 					},
 				},
 			});
@@ -194,7 +200,9 @@ describe("verifyPages excerpt integrity (D5a outcome 1)", () => {
 			fs.writeFileSync(pagePath, JSON.stringify(raw, null, 2), "utf8");
 			const result = verifyPages(root);
 			assert.ok(
-				result.pages[0].findings.some((f) => f.code === "AMBER_E_CONTEXT_SOURCE_TAMPERED" && f.detail.includes("corrupted")),
+				result.pages[0].findings.some(
+					(f) => f.code === "AMBER_E_CONTEXT_SOURCE_TAMPERED" && f.detail.includes("corrupted"),
+				),
 				JSON.stringify(result.pages[0].findings),
 			);
 		} finally {
@@ -283,8 +291,20 @@ describe("computeStats", () => {
 		const root = makeTarget();
 		try {
 			appendEvent(root, { kind: "request-created", requestId: "r1", trigger: "explicit" });
-			appendEvent(root, { kind: "ingest", requestId: "r1", outcome: "accepted", blockCount: 3, unknownCount: 1, sourceCount: 2 });
-			appendEvent(root, { kind: "ingest", requestId: "r2", outcome: "rejected", code: "AMBER_E_CONTEXT_CLAIM_UNCITED" });
+			appendEvent(root, {
+				kind: "ingest",
+				requestId: "r1",
+				outcome: "accepted",
+				blockCount: 3,
+				unknownCount: 1,
+				sourceCount: 2,
+			});
+			appendEvent(root, {
+				kind: "ingest",
+				requestId: "r2",
+				outcome: "rejected",
+				code: "AMBER_E_CONTEXT_CLAIM_UNCITED",
+			});
 			appendEvent(root, { kind: "ingest", requestId: "r3", outcome: "no-change" });
 			appendEvent(root, { kind: "source-raw-only-change" });
 			appendEvent(root, { kind: "request-created", requestId: "r4", trigger: "source-change" });

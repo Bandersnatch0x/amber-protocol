@@ -17,12 +17,9 @@ const {
 } = require("../../core/governance-readiness");
 const { evidence: collectMaintenanceEvidence } = require("../../maintenance");
 const { detectCommands } = require("../../core/audit");
-const {
-	REQUIRED_BUNDLE_FILES,
-	defaultBundleDir,
-} = require("../../core/handoff-layout");
+const { REQUIRED_BUNDLE_FILES, defaultBundleDir } = require("../../core/handoff-layout");
 const { getSectionBody, hasSectionWithBody } = require("../../core/text-utils");
-const { resolveStateDirForRead } = require("../../state-dir-resolver");
+const { listExecutionEvidence } = require("../../session-evidence");
 
 function slash(p) {
 	return p.split(path.sep).join("/");
@@ -71,39 +68,34 @@ function collectPlans(targetRoot) {
 }
 
 // Execution evidence: commands recorded per execution.
+// listExecutionEvidence is fail-closed for direct session consumers; assessment
+// degrades to "no execution evidence" instead of aborting the whole report.
 function collectExecutions(targetRoot) {
-	const execRoot = path.join(resolveStateDirForRead(targetRoot), "executions");
-	if (!fs.existsSync(execRoot)) return { present: false, executions: [], hasCommands: false };
-	const taskDirs = fs
-		.readdirSync(execRoot)
-		.map((name) => path.join(execRoot, name))
-		.filter((p) => {
-			// Dangling symlinks / unreadable entries throw on statSync; skip them
-			// so a single bad entry cannot crash the whole assess pass.
-			try {
-				return fs.statSync(p).isDirectory();
-			} catch {
-				return false;
-			}
-		});
-	let hasCommands = false;
-	const executions = taskDirs.map((taskDir) => {
-		const evidencePath = path.join(taskDir, "evidence.json");
-		const data = readJsonSafe(evidencePath);
-		const commands = Array.isArray(data?.commands) ? data.commands : [];
-		if (commands.length > 0) hasCommands = true;
-		return { dir: path.basename(taskDir), commands };
-	});
-	return { present: executions.length > 0, executions, hasCommands };
+	let executions;
+	try {
+		executions = listExecutionEvidence(targetRoot).map(({ dir, commands }) => ({
+			dir,
+			commands,
+		}));
+	} catch {
+		return {
+			present: false,
+			executions: [],
+			hasCommands: false,
+		};
+	}
+	return {
+		present: executions.length > 0,
+		executions,
+		hasCommands: executions.some(({ commands }) => commands.length > 0),
+	};
 }
 
 // Handoff bundle: required files + risks/recovery body.
 function collectHandoff(targetRoot, bundleDir) {
 	const dir = bundleDir || defaultBundleDir(targetRoot);
 	if (!fs.existsSync(dir)) return { present: false, missing: [], risksBody: "", recoveryBody: "" };
-	const missing = REQUIRED_BUNDLE_FILES.filter(
-		(name) => !fs.existsSync(path.join(dir, name)),
-	);
+	const missing = REQUIRED_BUNDLE_FILES.filter((name) => !fs.existsSync(path.join(dir, name)));
 	const risksText = (() => {
 		const p = path.join(dir, "risks.md");
 		return fs.existsSync(p) ? fs.readFileSync(p, "utf8") : "";

@@ -13,13 +13,14 @@ const path = require("node:path");
 const Ajv = require("ajv");
 const addFormats = require("ajv-formats");
 
+const { assess, compare, findings } = require("../../scripts/lib/workflow-assessment");
 const {
-	assess,
-	compare,
-	findings,
-} = require("../../scripts/lib/workflow-assessment");
-const { listProviders } = require("../../scripts/lib/workflow-assessment/internal/observation-contract");
-const { renderJson, renderMarkdown } = require("../../scripts/lib/workflow-assessment/adapters/renderers");
+	listProviders,
+} = require("../../scripts/lib/workflow-assessment/internal/observation-contract");
+const {
+	renderJson,
+	renderMarkdown,
+} = require("../../scripts/lib/workflow-assessment/adapters/renderers");
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
 const FIXTURE_DIR = path.join(__dirname, "..", "fixtures", "workflow-assessment");
@@ -89,7 +90,10 @@ for (const name of FIXTURE_NAMES) {
 	test(`fixture ${name} validates against workflow-assessment schema`, () => {
 		const report = loadFixture(name);
 		const ok = validate(report);
-		assert.ok(ok, `schema errors: ${JSON.stringify(validate.errors?.map((e) => e.instancePath + " " + e.message))}`);
+		assert.ok(
+			ok,
+			`schema errors: ${JSON.stringify(validate.errors?.map((e) => e.instancePath + " " + e.message))}`,
+		);
 	});
 }
 
@@ -138,7 +142,10 @@ test("report contains no raw transcript text or secret-shaped strings", () => {
 	assert.ok(!json.includes(".claude/projects"), "no claude projects path");
 	assert.ok(!json.includes(".claude\\\\projects"), "no claude projects path (escaped)");
 	assert.ok(!json.includes(claudeHomeAbs), "no absolute claude-home path");
-	assert.ok(!json.includes(claudeHomeAbs.replace(/\\/g, "\\\\")), "no absolute claude-home path (escaped)");
+	assert.ok(
+		!json.includes(claudeHomeAbs.replace(/\\/g, "\\\\")),
+		"no absolute claude-home path (escaped)",
+	);
 	assert.ok(!/sk-[a-zA-Z0-9]{20}/.test(json), "no secret-shaped string");
 	assert.ok(!json.includes("Human:"), "no raw chat turns");
 	assert.ok(!json.includes("Assistant:"), "no raw chat turns");
@@ -214,7 +221,9 @@ test("facade assess: no amber sessions + empty Claude dir → coverage.session u
 	// readable sessions → unavailable (not fabricated covered / not unsupported).
 	// claudeHome is injected so the test never touches the real ~/.claude.
 	const os = require("node:os");
-	const { repoTranscriptDir } = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
+	const {
+		repoTranscriptDir,
+	} = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
 	const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "wf-foreign-home-"));
 	const tmpTarget = fs.mkdtempSync(path.join(os.tmpdir(), "wf-foreign-"));
 	fs.mkdirSync(repoTranscriptDir(tmpTarget, claudeHome), { recursive: true });
@@ -223,14 +232,24 @@ test("facade assess: no amber sessions + empty Claude dir → coverage.session u
 		assert.equal(report.coverage.session, "unavailable");
 		assert.ok(report.scope.providers.includes("claude"));
 	} finally {
-		try { fs.rmSync(claudeHome, { recursive: true, force: true }); } catch { /* ignore */ }
-		try { fs.rmSync(tmpTarget, { recursive: true, force: true }); } catch { /* ignore */ }
+		try {
+			fs.rmSync(claudeHome, { recursive: true, force: true });
+		} catch {
+			/* ignore */
+		}
+		try {
+			fs.rmSync(tmpTarget, { recursive: true, force: true });
+		} catch {
+			/* ignore */
+		}
 	}
 });
 
 test("facade assess: no amber sessions + matching Claude transcript → coverage.session covered", () => {
 	const os = require("node:os");
-	const { repoTranscriptDir } = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
+	const {
+		repoTranscriptDir,
+	} = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
 	const claudeHome = fs.mkdtempSync(path.join(os.tmpdir(), "wf-claude-home-"));
 	const tmpTarget = fs.mkdtempSync(path.join(os.tmpdir(), "wf-claude-sess-"));
 	const claudeDir = repoTranscriptDir(tmpTarget, claudeHome);
@@ -247,25 +266,39 @@ test("facade assess: no amber sessions + matching Claude transcript → coverage
 		assert.equal(report.coverage.session, "covered");
 		assert.ok((report.sessionObservations || []).some((s) => s.provider === "claude"));
 	} finally {
-		try { fs.rmSync(claudeHome, { recursive: true, force: true }); } catch { /* ignore */ }
-		try { fs.rmSync(tmpTarget, { recursive: true, force: true }); } catch { /* ignore */ }
+		try {
+			fs.rmSync(claudeHome, { recursive: true, force: true });
+		} catch {
+			/* ignore */
+		}
+		try {
+			fs.rmSync(tmpTarget, { recursive: true, force: true });
+		} catch {
+			/* ignore */
+		}
 	}
 });
 
 test("claude transcript without any cwd line is excluded (positive binding required)", () => {
 	const os = require("node:os");
-	const { summarizeTranscript } = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
+	const {
+		summarizeTranscript,
+	} = require("../../scripts/lib/workflow-assessment/internal/providers/claude-transcript");
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wf-nocwd-"));
 	const target = path.join(tmpDir, "repo");
 	fs.mkdirSync(target);
 	const f = path.join(tmpDir, "no-cwd.jsonl");
 	// Valid turns, but no line carries cwd — the lossy directory name alone
 	// must not bind the transcript to the target.
-	fs.writeFileSync(f, JSON.stringify({
-		type: "user",
-		timestamp: "2026-01-01T00:00:00.000Z",
-		message: { role: "user", content: [{ type: "tool_use", name: "Bash" }] },
-	}) + "\n", "utf8");
+	fs.writeFileSync(
+		f,
+		JSON.stringify({
+			type: "user",
+			timestamp: "2026-01-01T00:00:00.000Z",
+			message: { role: "user", content: [{ type: "tool_use", name: "Bash" }] },
+		}) + "\n",
+		"utf8",
+	);
 	assert.equal(summarizeTranscript(f, target), null);
 	fs.rmSync(tmpDir, { recursive: true, force: true });
 });
@@ -324,17 +357,19 @@ test("workflow plan dry-run emits maintenance-proposal draft for il findings", (
 	const os = require("node:os");
 	const report = {
 		target: ".",
-		findings: [{
-			id: "il-1-evolution-recurrent",
-			dimension: "improvementLoop",
-			severity: "warning",
-			confidence: "medium",
-			summary: "recurrent finding",
-			evidenceRefs: ["docs/wiki/engineering/harness-evolution.md"],
-			owner: "maintenance",
-			verifier: "Evolution log records a recurrent finding (count>=2).",
-			actionKind: "maintenance-proposal",
-		}],
+		findings: [
+			{
+				id: "il-1-evolution-recurrent",
+				dimension: "improvementLoop",
+				severity: "warning",
+				confidence: "medium",
+				summary: "recurrent finding",
+				evidenceRefs: ["docs/wiki/engineering/harness-evolution.md"],
+				owner: "maintenance",
+				verifier: "Evolution log records a recurrent finding (count>=2).",
+				actionKind: "maintenance-proposal",
+			},
+		],
 	};
 	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "wf-maint-"));
 	const tmp = path.join(tmpDir, "report.json");
@@ -376,7 +411,19 @@ test("workflow plan --dry-run produces a draft with owner and verifier", () => {
 	const { workflowDispatch } = require("../../scripts/lib/workflow-assessment/adapters/command");
 	const report = {
 		target: ".",
-		findings: [{ id: "x", dimension: "contextAdequacy", severity: "warning", confidence: "medium", summary: "test finding", evidenceRefs: ["feature_list.json"], owner: "planning", verifier: "Check passes.", actionKind: "plan-input" }],
+		findings: [
+			{
+				id: "x",
+				dimension: "contextAdequacy",
+				severity: "warning",
+				confidence: "medium",
+				summary: "test finding",
+				evidenceRefs: ["feature_list.json"],
+				owner: "planning",
+				verifier: "Check passes.",
+				actionKind: "plan-input",
+			},
+		],
 	};
 	// write report to an isolated temp dir (not REPO_ROOT) to avoid racing
 	// the git index / concurrent tests / watch processes.
@@ -403,7 +450,9 @@ test("facade extracts findings from a report object", () => {
 });
 
 test("amber-native session provider summarizes seeded sessions without raw transcript", (t) => {
-	const { collectSessionObservations } = require("../../scripts/lib/workflow-assessment/internal/providers/amber-native-session");
+	const {
+		collectSessionObservations,
+	} = require("../../scripts/lib/workflow-assessment/internal/providers/amber-native-session");
 	const target = createSeededAmberRepo(t);
 	const obs = collectSessionObservations(target);
 	assert.ok(obs.present, "seeded amber repo has sessions");
@@ -467,7 +516,9 @@ test("claude transcript provider binds to workspace (hard exclusion on cwd misma
 
 test("collectExecutions skips dangling symlink entries without throwing", () => {
 	const os = require("node:os");
-	const { collectRepositoryEvidence } = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
+	const {
+		collectRepositoryEvidence,
+	} = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
 	// facade assessment path uses collectExecutions via collectRepositoryEvidence.
 	// Place a dangling symlink under a temp .amber/executions and ensure assess
 	// still completes (filter catches statSync failures).
@@ -476,7 +527,11 @@ test("collectExecutions skips dangling symlink entries without throwing", () => 
 	fs.mkdirSync(execRoot, { recursive: true });
 	const good = path.join(execRoot, "task-ok");
 	fs.mkdirSync(good);
-	fs.writeFileSync(path.join(good, "evidence.json"), JSON.stringify({ commands: ["npm test"] }), "utf8");
+	fs.writeFileSync(
+		path.join(good, "evidence.json"),
+		JSON.stringify({ commands: ["npm test"] }),
+		"utf8",
+	);
 	const dangling = path.join(execRoot, "task-dangling");
 	try {
 		fs.symlinkSync(path.join(tmp, "missing-target"), dangling);
@@ -490,6 +545,34 @@ test("collectExecutions skips dangling symlink entries without throwing", () => 
 	assert.equal(evidence.executions.present, true);
 	assert.equal(evidence.executions.executions.length, 1);
 	assert.equal(evidence.executions.hasCommands, true);
+	fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test("collectExecutions reads commands from the Execution Ledger", () => {
+	const {
+		collectRepositoryEvidence,
+	} = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
+	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wf-exec-ledger-"));
+	const execDir = path.join(tmp, ".amber", "executions", "task-ledger");
+	fs.mkdirSync(execDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(execDir, "ledger.json"),
+		JSON.stringify({
+			taskId: "task-ledger",
+			sessionId: "session-current",
+			commands: ["npm test"],
+		}),
+		"utf8",
+	);
+	fs.writeFileSync(
+		path.join(execDir, "evidence.json"),
+		JSON.stringify({ taskId: "task-ledger", sessionId: "session-current" }),
+		"utf8",
+	);
+
+	const evidence = collectRepositoryEvidence(tmp);
+	assert.equal(evidence.executions.hasCommands, true);
+	assert.deepEqual(evidence.executions.executions[0].commands, ["npm test"]);
 	fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -540,7 +623,9 @@ test("renderMarkdown produces non-empty markdown with all five dimensions", () =
 
 test("collectRepositoryEvidence consumes the Maintenance evidence facade", () => {
 	const os = require("node:os");
-	const { collectRepositoryEvidence } = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
+	const {
+		collectRepositoryEvidence,
+	} = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wf-ev-facade-"));
 	const execDir = path.join(tmp, ".amber", "executions", "seed");
 	fs.mkdirSync(execDir, { recursive: true });
@@ -555,10 +640,7 @@ test("collectRepositoryEvidence consumes the Maintenance evidence facade", () =>
 	const evidence = collectRepositoryEvidence(tmp);
 	assert.equal(evidence.maintenanceEvidenceAvailability, "complete");
 	assert.deepEqual(evidence.maintenanceEvidenceWarnings, []);
-	assert.equal(
-		evidence.regressionProposals.map((p) => p.taskId).join(","),
-		"seed",
-	);
+	assert.equal(evidence.regressionProposals.map((p) => p.taskId).join(","), "seed");
 	assert.ok(Array.isArray(evidence.evolution.findings));
 	assert.ok(Array.isArray(evidence.evolution.significant));
 	fs.rmSync(tmp, { recursive: true, force: true });
@@ -566,7 +648,9 @@ test("collectRepositoryEvidence consumes the Maintenance evidence facade", () =>
 
 test("collectRepositoryEvidence surfaces partial availability from corrupt evidence", () => {
 	const os = require("node:os");
-	const { collectRepositoryEvidence } = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
+	const {
+		collectRepositoryEvidence,
+	} = require("../../scripts/lib/workflow-assessment/internal/repository-evidence");
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "wf-ev-partial-"));
 	const execDir = path.join(tmp, ".amber", "executions", "broken");
 	fs.mkdirSync(execDir, { recursive: true });

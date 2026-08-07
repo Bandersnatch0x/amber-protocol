@@ -9,10 +9,7 @@
 // Raw transcript content, prompts, and assistant text are never persisted —
 // only event types and structured fields. Privacy by default.
 
-const path = require("node:path");
-const { readSessionEvents } = require("../../../session-timeline");
-const { readAllSessionManifests } = require("../../../session-manifest");
-const { getSessionsDir } = require("../../../session-commands");
+const { listSessionEvidence } = require("../../../session-evidence");
 
 // Map timeline events to normalized observation signals.
 function summarizeSession(manifest, events) {
@@ -41,10 +38,18 @@ function summarizeSession(manifest, events) {
 				retries += 1;
 				break;
 			case "verification_failed":
-				validationOutcomes.push({ stage: e.stage || null, result: "failed", error: e.error?.message || null });
+				validationOutcomes.push({
+					stage: e.stage || null,
+					result: "failed",
+					error: e.error?.message || null,
+				});
 				break;
 			case "gate_triggered":
-				approvals.push({ stage: e.stage || null, gate: e.data?.gateId || null, phase: "triggered" });
+				approvals.push({
+					stage: e.stage || null,
+					gate: e.data?.gateId || null,
+					phase: "triggered",
+				});
 				break;
 			case "gate_passed":
 				approvals.push({ stage: e.stage || null, gate: e.data?.gateId || null, phase: "passed" });
@@ -94,16 +99,20 @@ function summarizeSession(manifest, events) {
 }
 
 function collectSessionObservations(targetRoot) {
-	const sessionsDir = getSessionsDir(targetRoot);
-	const manifests = readAllSessionManifests(sessionsDir);
-	if (manifests.length === 0) {
+	let evidence;
+	try {
+		evidence = listSessionEvidence(targetRoot);
+	} catch {
+		// Session evidence is fail-closed at the shared boundary; assessment
+		// reports unavailable coverage instead of aborting the report.
 		return { present: false, sessions: [], coverage: "unavailable" };
 	}
-	const sessions = manifests.map((manifest) => {
-		const sessionDir = path.join(sessionsDir, manifest.sessionId);
-		const events = readSessionEvents(sessionDir);
-		return summarizeSession(manifest, events);
-	});
+	if (evidence.length === 0) {
+		return { present: false, sessions: [], coverage: "unavailable" };
+	}
+	const sessions = evidence.map(({ manifest, timelineEvents }) =>
+		summarizeSession(manifest, timelineEvents),
+	);
 	return {
 		present: true,
 		sessions,
