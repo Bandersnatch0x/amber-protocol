@@ -46,6 +46,10 @@
           "text": { "type": "string", "minLength": 1 }
         }
       }
-    }
+    },
+    "amber_protocol_version": { "type": "string" },
+    "artifact_sequence": { "type": "integer" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "artifact_type": { "type": "string" }
   }
 }

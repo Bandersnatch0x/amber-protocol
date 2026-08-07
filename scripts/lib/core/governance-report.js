@@ -6,9 +6,15 @@ const path = require("node:path");
 const { inspect: inspectMaintenance } = require("../maintenance");
 const { resolveRegistryPath } = require("./team");
 const { inspectGovernanceReadiness, ACTION_LIBRARY } = require("./governance-readiness");
-const { resolveTarget } = require("./fs-utils");
+const { readJsonSafe, resolveTarget } = require("./fs-utils");
+const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { gatherState, buildContext, inferNextStep } = require("./lifecycle");
 const { shellQuote } = require("./text-utils");
+// Import the leaf detector directly: requiring the workflow-assessment index
+// would pull in its review -> repository-evidence -> handoff-bundle graph,
+// creating a require cycle back into this module and silently breaking
+// handoff-bundle's destructured buildGovernanceReport binding.
+const { detectNoProgress } = require("../workflow-assessment/internal/no-progress");
 
 const PRODUCT_VALUE_LOOP = "Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle";
 
@@ -137,6 +143,107 @@ function decisionFromScore(score, readinessDecision) {
 	return "ready";
 }
 
+// ADR-0013 no-progress inputs: gather existing artifacts only. Missing state
+// dirs / files yield empty collectors — the detector then reports nothing,
+// which is the correct failure mode for a read-only assessor.
+
+function listDirectories(dir) {
+	if (!fs.existsSync(dir)) return [];
+	return fs
+		.readdirSync(dir)
+		.map((name) => path.join(dir, name))
+		.filter((entry) => {
+			try {
+				return fs.statSync(entry).isDirectory();
+			} catch {
+				return false;
+			}
+		});
+}
+
+function collectTimelineEvents(targetRoot) {
+	const stateDir = resolveStateDirForRead(targetRoot);
+	const sessionsDir = path.join(stateDir, "sessions");
+	if (!fs.existsSync(sessionsDir)) return [];
+	// Lazy require: session-timeline is a leaf module; keeping it out of the
+	// top of this file avoids pulling the session graph into every report.
+	const { readSessionEvents } = require("../session-timeline");
+	const events = [];
+	for (const sessionDir of listDirectories(sessionsDir)) {
+		events.push(...readSessionEvents(sessionDir));
+	}
+	return events;
+}
+
+function collectResultEvidence(targetRoot) {
+	const stateDir = resolveStateDirForRead(targetRoot);
+	const executionsDir = path.join(stateDir, "executions");
+	if (!fs.existsSync(executionsDir)) return [];
+	const results = [];
+	for (const executionDir of listDirectories(executionsDir)) {
+		const evidencePath = path.join(executionDir, "evidence.json");
+		if (!fs.existsSync(evidencePath)) continue;
+		const value = readJsonSafe(evidencePath).value;
+		if (value && typeof value === "object") results.push(value);
+	}
+	return results;
+}
+
+function collectLoopContract(targetRoot) {
+	const packsDir = path.join(targetRoot, "workflow-packs");
+	if (!fs.existsSync(packsDir)) return null;
+	const files = fs
+		.readdirSync(packsDir)
+		.filter((name) => name.endsWith(".pack.json"))
+		.sort();
+	for (const name of files) {
+		const pack = readJsonSafe(path.join(packsDir, name)).value;
+		if (pack && Array.isArray(pack.loopContracts) && pack.loopContracts.length > 0) {
+			return pack.loopContracts[0];
+		}
+	}
+	return null;
+}
+
+function collectRules(targetRoot) {
+	const stateDir = resolveStateDirForRead(targetRoot);
+	const rulesPath = path.join(stateDir, "governance", "rules.json");
+	if (!fs.existsSync(rulesPath)) return [];
+	const value = readJsonSafe(rulesPath).value;
+	if (Array.isArray(value)) return value;
+	if (Array.isArray(value?.rules)) return value.rules;
+	return value && typeof value === "object" ? value : [];
+}
+
+// Confidence-class summary (issue #110). computeConfidenceClasses lives in
+// governance-readiness.js and is owned by a parallel agent; guard both the
+// lookup and the call so this report keeps building if it is not merged yet.
+function collectConfidenceSummary(targetRoot) {
+	try {
+		const { computeConfidenceClasses } = require("./governance-readiness");
+		if (typeof computeConfidenceClasses !== "function") {
+			return { available: false, summary: "confidence gating: unavailable" };
+		}
+		const classes = computeConfidenceClasses(collectRules(targetRoot));
+		if (!Array.isArray(classes) || classes.length === 0) {
+			return { available: false, summary: "confidence gating: unavailable" };
+		}
+		const counts = { high: 0, medium: 0, low: 0 };
+		for (const item of classes) {
+			if (item && typeof item.confidence === "string" && item.confidence in counts) {
+				counts[item.confidence] += 1;
+			}
+		}
+		return {
+			available: true,
+			classes,
+			summary: `confidence gating: high ${counts.high}, medium ${counts.medium}, low ${counts.low}`,
+		};
+	} catch {
+		return { available: false, summary: "confidence gating: unavailable" };
+	}
+}
+
 function buildGovernanceReport(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const targetDisplay = options.targetDisplay || target || ".";
@@ -148,6 +255,12 @@ function buildGovernanceReport(target, options = {}) {
 	const evidenceCount = state.features.reduce((total, feature) => total + (Array.isArray(feature.evidence) ? feature.evidence.length : 0), 0);
 	const errors = [...(readiness.errors || []), ...(maintenance.errors || [])];
 	const readinessDecision = errors.length > 0 ? "block" : readiness.decision;
+	const noProgress = detectNoProgress({
+		timelineEvents: collectTimelineEvents(targetRoot),
+		resultEvidence: collectResultEvidence(targetRoot),
+		loopContract: collectLoopContract(targetRoot),
+	});
+	const confidence = collectConfidenceSummary(targetRoot);
 
 	return {
 		target: targetRoot,
@@ -175,6 +288,10 @@ function buildGovernanceReport(target, options = {}) {
 			artifactDrift: maintenance.artifactDrift || {},
 			errors: maintenance.errors || [],
 			warnings: maintenance.warnings || [],
+		},
+		workflowEffectiveness: {
+			noProgress,
+			confidence,
 		},
 		nextActions,
 		errors,
@@ -239,6 +356,21 @@ function renderGovernanceReportMarkdown(report) {
 			lines.push(`- **${finding.severity}** \`${finding.id}\`: ${finding.message}`);
 		}
 	}
+
+	// ADR-0013: workflow-effectiveness risk items (no-progress detection +
+	// confidence-class summary). Read-only; does not feed the readiness score.
+	const effectiveness = report.workflowEffectiveness || {};
+	lines.push("", "## Workflow Effectiveness", "");
+	lines.push(`- ${effectiveness.confidence?.summary || "confidence gating: unavailable"}`);
+	const noProgress = effectiveness.noProgress || [];
+	if (noProgress.length === 0) {
+		lines.push("- No-progress findings: none.");
+	} else {
+		lines.push(`- No-progress findings: ${noProgress.length}`);
+		for (const finding of noProgress) {
+			lines.push(`  - **${finding.severity}** \`${finding.id}\`: ${finding.title} — ${finding.detail}`);
+		}
+	}
 	lines.push("");
 	return lines.join("\n");
 }
@@ -261,6 +393,12 @@ function renderGovernanceReportText(report) {
 			lines.push(`    Run: ${action.command}`);
 		}
 	}
+	const effectiveness = report.workflowEffectiveness || {};
+	lines.push(
+		"Workflow Effectiveness:",
+		`  ${effectiveness.confidence?.summary || "confidence gating: unavailable"}`,
+		`  No-progress findings: ${(effectiveness.noProgress || []).length}`,
+	);
 	return lines.join("\n");
 }
 

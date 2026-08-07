@@ -517,6 +517,88 @@ function inspectGlxControls(targetRoot) {
 	return { rulesMissing, unsafeDefaultAllow, tamperedLedgers };
 }
 
+// Confidence classification for .amber/governance/rules.json rules (T1,
+// ADR-0011). Each rule is graded high/medium/low so the safety philosophy can
+// decide the allowed execution shape: high → governed execution, medium →
+// dry-run only, low → human review and refusal. Pure function; takes the
+// parsed rules object ({ schemaVersion, defaultAction, rules: [...] }) and
+// returns one entry per rule: [{ ruleId, confidence, reason }].
+//
+// Classification (deterministic, fail-closed):
+//   high   → explicit allow/deny action + deterministic matcher (exact/prefix)
+//            + non-empty mapsTo (traceable to a governance/ASI claim).
+//   medium → explicit action but no mapsTo (intent clear, not traceable), or a
+//            fuzzy matcher (regex) whose matching confidence is only partial.
+//   low    → cannot be evaluated or cannot ever fire: missing explicit action,
+//            missing pattern, or a non-object rule entry.
+function computeConfidenceClasses(rules) {
+	const list = Array.isArray(rules?.rules) ? rules.rules : [];
+	const confidences = [];
+	for (let index = 0; index < list.length; index += 1) {
+		const rule = list[index];
+		const ruleId =
+			rule && typeof rule.id === "string" && rule.id.length > 0
+				? rule.id
+				: `rule-${index + 1}`;
+		if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+			confidences.push({
+				ruleId,
+				confidence: "low",
+				reason: `Rule ${ruleId} is not an object; it cannot be matched or gated.`,
+			});
+			continue;
+		}
+		const action = rule.action;
+		const hasExplicitAction = action === "allow" || action === "deny";
+		const hasPattern =
+			typeof rule.pattern === "string" && rule.pattern.length > 0;
+		const match = typeof rule.match === "string" ? rule.match : "";
+		const isDeterministicMatch = match === "exact" || match === "prefix";
+		const mapsTo = Array.isArray(rule.mapsTo)
+			? rule.mapsTo.filter((item) => typeof item === "string" && item.length > 0)
+			: [];
+
+		if (!hasExplicitAction) {
+			confidences.push({
+				ruleId,
+				confidence: "low",
+				reason: `Rule ${ruleId} has no explicit allow/deny action; it cannot be evaluated with confidence.`,
+			});
+			continue;
+		}
+		if (!hasPattern) {
+			confidences.push({
+				ruleId,
+				confidence: "low",
+				reason: `Rule ${ruleId} has no pattern to match; it can never fire.`,
+			});
+			continue;
+		}
+		if (mapsTo.length > 0 && isDeterministicMatch) {
+			confidences.push({
+				ruleId,
+				confidence: "high",
+				reason: `Rule ${ruleId} declares action "${action}", a deterministic ${match} matcher, and maps to ${mapsTo.join(", ")}; traceable for governed execution.`,
+			});
+			continue;
+		}
+		if (mapsTo.length === 0) {
+			confidences.push({
+				ruleId,
+				confidence: "medium",
+				reason: `Rule ${ruleId} declares action "${action}" but no mapsTo; intent is clear but not traceable to a governance claim.`,
+			});
+			continue;
+		}
+		confidences.push({
+			ruleId,
+			confidence: "medium",
+			reason: `Rule ${ruleId} uses a fuzzy ${match} matcher; matching confidence is partial.`,
+		});
+	}
+	return confidences;
+}
+
 function inspectGovernanceReadiness(targetRoot) {
 	const target = path.resolve(targetRoot || process.cwd());
 	const workflowPacks = inspectWorkflowPacks(target);
@@ -631,4 +713,8 @@ module.exports = {
 	inspectWorkflowPacks,
 	inspectSecurityGovernance,
 	inspectAuditEvidence,
+	// Pure rule-classification function (T1, ADR-0011). Exported separately so
+	// loop-policy's confidence_gating block and tests can grade rules without
+	// touching any filesystem or readiness aggregation.
+	computeConfidenceClasses,
 };

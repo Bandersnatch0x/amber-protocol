@@ -6,6 +6,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
+const { computeConfidenceClasses } = require("./governance-readiness");
 
 const MAX_PATTERN_LEN = 200;
 
@@ -67,12 +68,12 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
 	const list = Array.isArray(rules?.rules) ? rules.rules : [];
 	for (const rule of list) {
 		if (rule.action === "deny" && matches(rule, command)) {
-			return { allowed: false, matchedRule: rule.id, reason: `denied by rule ${rule.id}` };
+			return { allowed: false, matchedRule: rule.id, reason: `denied by rule ${rule.id}`, ...confidenceSpread(rules, rule.id) };
 		}
 	}
 	for (const rule of list) {
 		if (rule.action === "allow" && matches(rule, command)) {
-			return { allowed: true, matchedRule: rule.id, reason: `allowed by rule ${rule.id}` };
+			return { allowed: true, matchedRule: rule.id, reason: `allowed by rule ${rule.id}`, ...confidenceSpread(rules, rule.id) };
 		}
 	}
 	const allowByDefault = rules?.defaultAction === "allow";
@@ -82,7 +83,43 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
 		reason: allowByDefault
 			? "no rule matched; defaultAction=allow"
 			: "no allow rule matched; defaultAction=deny",
+		...confidenceSpread(rules, null),
 	};
+}
+
+// Optional confidence_gating block (T1, ADR-0011). When present AND enabled, the
+// policy evaluator attaches a `confidence` field (high|medium|low) to its output
+// so the caller can pick the execution shape: high → governed execution, medium →
+// dry-run only, low → human review and refusal. The block carries confidence
+// information two ways:
+//   - `byRule` pins explicit confidence per rule id, e.g. { "allow-amber-cli": "high" };
+//   - otherwise confidence is derived from the rule structure via
+//     computeConfidenceClasses (rules.json), and rules without an entry — plus
+//     unlisted (default-deny) commands — fall back to `defaultConfidence`.
+// When the block is absent or `enabled: false`, the output is byte-identical to
+// the pre-gating behaviour (no confidence key). Example:
+//   { schemaVersion: 1, defaultAction: "deny",
+//     confidence_gating: { enabled: true, byRule: { "allow-amber-cli": "high" }, defaultConfidence: "low" },
+//     rules: [...] }
+function confidenceSpread(rules, ruleId) {
+	const gating = rules?.confidence_gating;
+	if (!gating || gating.enabled === false) return {};
+	return { confidence: confidenceForRule(rules, ruleId) };
+}
+
+function confidenceForRule(rules, ruleId) {
+	const gating = rules?.confidence_gating;
+	const byRule = gating?.byRule;
+	if (ruleId && byRule && typeof byRule[ruleId] === "string") {
+		const pinned = byRule[ruleId];
+		if (pinned === "high" || pinned === "medium" || pinned === "low") return pinned;
+	}
+	if (ruleId) {
+		const entry = computeConfidenceClasses(rules).find((item) => item.ruleId === ruleId);
+		if (entry) return entry.confidence;
+	}
+	const fallback = gating?.defaultConfidence;
+	return fallback === "high" || fallback === "medium" || fallback === "low" ? fallback : "low";
 }
 
 // Shell control operators that chain, background, or redirect a SECOND action
@@ -151,7 +188,16 @@ function applyBuiltinDenies(command) {
 // not divergent logic. They were previously two byte-identical bodies that could
 // drift apart; one baseline cannot drift from itself.
 function evaluateWithBaseline(command, rules = DEFAULT_RULES) {
-	return applyBuiltinDenies(command) ?? evaluateCommandPolicy(command, rules);
+	const builtin = applyBuiltinDenies(command);
+	if (builtin) {
+		// Built-in un-removable denies are the most deterministic control on the
+		// surface; when confidence_gating is active they are graded high so a
+		// caller cannot misread a built-in refusal as low-confidence uncertainty.
+		const gating = rules?.confidence_gating;
+		if (gating && gating.enabled !== false) return { ...builtin, confidence: "high" };
+		return builtin;
+	}
+	return evaluateCommandPolicy(command, rules);
 }
 const evaluateVerifyPolicy = evaluateWithBaseline;
 const evaluateGovernedPolicy = evaluateWithBaseline;

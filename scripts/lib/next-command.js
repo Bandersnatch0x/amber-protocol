@@ -1,8 +1,179 @@
 "use strict";
 
-const { resolveTarget } = require("./core/fs-utils");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const { resolveTarget, readJsonSafe } = require("./core/fs-utils");
+const { REPO_ROOT } = require("./core/constants");
 const { buildContext, inferNextStep } = require("./core/lifecycle");
 const { buildGovernanceReport } = require("./core/governance-report");
+const { loadRoutes } = require("./route-loader");
+
+// Route advisor (T5.8, ADR-0014): read-only keyword matching over route
+// manifest objective/description metadata. Amber never executes or creates
+// anything here — it only reads declarative manifests and prints advice.
+const ROUTES_DIR = path.join(__dirname, "../../routes");
+const WORKFLOW_PACKS_DIR = path.join(REPO_ROOT, "workflow-packs");
+
+// Objectives carrying any of these tokens are routed to a security/review pack
+// (e.g. secure-code-review) regardless of generic token overlap, so money flows,
+// credentials, and external surfaces get a review suggestion up front.
+const SECURITY_KEYWORDS = [
+	"payment",
+	"payments",
+	"money",
+	"billing",
+	"checkout",
+	"charge",
+	"payout",
+	"credential",
+	"credentials",
+	"password",
+	"token",
+	"secret",
+	"auth",
+	"authentication",
+	"pii",
+	"privacy",
+	"security",
+	"external",
+	"integration",
+	"integrations",
+	"upload",
+	"download",
+];
+
+function tokenize(text) {
+	if (typeof text !== "string") return [];
+	return (text.toLowerCase().match(/[a-z0-9]+/g) || []).filter(
+		(token) => token.length >= 3,
+	);
+}
+
+// Score one route against the objective's tokens. Route-id keywords (e.g.
+// "bugfix", "feature", "refactor") are prioritised with a bonus so explicit
+// intent maps to the route's id, not just its prose.
+function scoreRoute(route, tokens, objective) {
+	const meta = [route.objective, route.description, route.displayName, route.routeId]
+		.filter((value) => typeof value === "string")
+		.join(" ")
+		.toLowerCase();
+	const textScore = tokens.reduce(
+		(count, token) => count + (meta.includes(token) ? 1 : 0),
+		0,
+	);
+	const objectiveText = objective.toLowerCase();
+	const idBonus = (route.routeId.split("-") || []).some((keyword) => {
+		if (keyword.length < 3) return false;
+		return (
+			objectiveText.includes(keyword) ||
+			tokens.some((token) => token.includes(keyword) || keyword.includes(token))
+		);
+	})
+		? 2
+		: 0;
+	return textScore + idBonus;
+}
+
+function loadWorkflowPacks(packsDir) {
+	if (!fs.existsSync(packsDir)) {
+		return [];
+	}
+	return fs
+		.readdirSync(packsDir)
+		.filter((name) => name.endsWith(".pack.json"))
+		.sort()
+		.map((name) => {
+			const result = readJsonSafe(path.join(packsDir, name));
+			return result.value &&
+				typeof result.value === "object" &&
+				!Array.isArray(result.value)
+				? result.value
+				: null;
+		})
+		.filter(Boolean);
+}
+
+function packMetadata(pack) {
+	return [pack.id, pack.title, pack.description]
+		.filter((value) => typeof value === "string")
+		.join(" ")
+		.toLowerCase();
+}
+
+function suggestWorkflowPack(tokens, objective) {
+	const packs = loadWorkflowPacks(WORKFLOW_PACKS_DIR);
+	if (packs.length === 0) {
+		return null;
+	}
+	const objectiveText = objective.toLowerCase();
+	const securityTriggered = SECURITY_KEYWORDS.some((keyword) =>
+		objectiveText.includes(keyword),
+	);
+	let candidates = packs;
+	if (securityTriggered) {
+		const securityPacks = packs.filter((pack) =>
+			/secure|security|review/.test(packMetadata(pack)),
+		);
+		if (securityPacks.length > 0) {
+			candidates = securityPacks;
+		}
+	}
+	const best = candidates
+		.map((pack) => ({
+			pack,
+			overlap: tokens.filter((token) => packMetadata(pack).includes(token)).length,
+		}))
+		.sort(
+			(a, b) =>
+				b.overlap - a.overlap || a.pack.id.localeCompare(b.pack.id),
+		)[0];
+	if (!best) {
+		return null;
+	}
+	if (securityTriggered || best.overlap >= 1) {
+		return best.pack.id;
+	}
+	return null;
+}
+
+// Produce the read-only routing suggestion for a stated objective. When no
+// route matches, degrades to "run the plan gate first" advice instead of
+// guessing a route.
+function suggestRouting(objective) {
+	const tokens = tokenize(objective);
+	const { routes } = loadRoutes(ROUTES_DIR);
+	const scored = routes
+		.map((route) => ({ route, score: scoreRoute(route, tokens, objective) }))
+		.filter((entry) => entry.score > 0)
+		.sort((a, b) => b.score - a.score || a.route.routeId.localeCompare(b.route.routeId));
+	const best = scored[0];
+
+	if (!best) {
+		return {
+			provided: true,
+			objective,
+			matched: false,
+			routeId: null,
+			confidence: 0,
+			workflowPackId: null,
+			suggestion: `No matching route for objective "${objective}". Suggest running the plan gate first: amber plan --feature <id> --title "<objective>", then amber session start --route <id> once a route fits.`,
+		};
+	}
+
+	return {
+		provided: true,
+		objective,
+		matched: true,
+		routeId: best.route.routeId,
+		confidence: Math.min(1, Math.round((best.score / 4) * 100) / 100),
+		workflowPackId: suggestWorkflowPack(tokens, objective) || null,
+		matches: scored.map((entry) => ({
+			routeId: entry.route.routeId,
+			score: entry.score,
+		})),
+	};
+}
 
 function focusLabel(focus) {
 	if (focus.type === "session") return `session ${focus.id}`;
@@ -34,6 +205,19 @@ function renderText(envelope) {
 		lines.push(`  Run: ${action.command}`);
 	}
 
+	if (envelope.routingSuggestion) {
+		const suggestion = envelope.routingSuggestion;
+		if (suggestion.matched) {
+			lines.push(`Route suggestion: ${suggestion.routeId}`);
+			if (suggestion.workflowPackId) {
+				lines.push(`  Workflow pack: ${suggestion.workflowPackId}`);
+			}
+			lines.push(`  Confidence: ${suggestion.confidence}`);
+		} else {
+			lines.push(`Route suggestion: ${suggestion.suggestion}`);
+		}
+	}
+
 	return lines.join("\n");
 }
 
@@ -63,8 +247,13 @@ function inferNext(target, options = {}) {
 		errors: [],
 		warnings: [],
 	};
+	// T5.8 / ADR-0014: routing advisor. Only present when --objective is given;
+	// absent (not null) so the no-flag envelope is byte-identical to before.
+	if (typeof options.objective === "string" && options.objective.trim() !== "") {
+		envelope.routingSuggestion = suggestRouting(options.objective.trim());
+	}
 	envelope.text = renderText(envelope);
 	return envelope;
 }
 
-module.exports = { inferNext, renderText, renderContext };
+module.exports = { inferNext, renderText, renderContext, suggestRouting };

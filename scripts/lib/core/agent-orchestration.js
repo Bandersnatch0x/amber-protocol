@@ -62,6 +62,11 @@ function dispatchAgentTask(target, options = {}) {
 	const worker = options.worker;
 	const reviewer = options.reviewer;
 	const concurrency = Number.parseInt(options.concurrency || "1", 10);
+	// requiresApproval (T1, ADR-0011): swarm-class dispatches — or any dispatch
+	// whose caller deems human approval a precondition — carry this marker on the
+	// dispatch record so consumers (report/audit/handoff) can see it. Strictly
+	// boolean: only an explicit `true` opts in; everything else stays false.
+	const requiresApproval = options.requiresApproval === true;
 
 	if (!options.task) {
 		errors.push("agent dispatch requires --task <task-id>.");
@@ -110,6 +115,7 @@ function dispatchAgentTask(target, options = {}) {
 		reviewerEvidence: null,
 		controls: { stop: true, resume: true },
 		workersCannotSelfApprove: true,
+		requiresApproval,
 		loop: {
 			contractId: options.loopContract || null,
 			hardStopStatus: options.hardStopStatus || "not-recorded",

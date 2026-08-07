@@ -1,6 +1,7 @@
 "use strict";
 
 const { buildFindingDraft, buildReport, compareReports } = require("./internal/review");
+const { detectNoProgress } = require("./internal/no-progress");
 
 function assess(targetRoot, options = {}) {
 	return buildReport(targetRoot, options);
@@ -39,5 +40,6 @@ module.exports = {
 	assess,
 	buildDraft,
 	compare,
+	detectNoProgress,
 	findings,
 };

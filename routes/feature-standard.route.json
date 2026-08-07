@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "displayName": "Standard Feature Development",
   "description": "Complete feature delivery with planning and review",
+  "objective": "Implement a complete feature end-to-end: capture requirements, plan, implement, verify, and review — for example adding a payment integration or a new API endpoint.",
   "trigger": {
     "goalPattern": "^(add|implement|create|build|support)\\b",
     "complexity": "medium"

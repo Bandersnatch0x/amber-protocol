@@ -1,5 +1,6 @@
 "use strict";
 
+const fs = require("node:fs");
 const path = require("node:path");
 
 const {
@@ -36,6 +37,8 @@ const {
 } = require("./workflow-packs");
 
 const { remedyFor } = require("./lifecycle");
+
+const { CLI_VERSION } = require("./constants");
 
 function hasPluginManifestDirectory(targetRoot) {
 	return (
@@ -222,6 +225,49 @@ function doctor(target, options = {}) {
 		warnings.push(...manifestResult.warnings);
 		addCheck("Plugin manifests", manifestResult.errors.length === 0,
 			manifestResult.errors.length === 0 ? "valid" : `${manifestResult.errors.length} errors`);
+	}
+
+	// Version drift — scan artifacts with amber_protocol_version against the
+	// installed package version. Only warn when the field is present and doesn't
+	// match; absent fields are legal legacy artifacts (ADR-0012).
+	const amberDir = path.join(targetRoot, ".amber");
+	if (pathExists(amberDir)) {
+		const driftArtifacts = [];
+		const queue = [amberDir];
+		while (queue.length > 0) {
+			const dir = queue.shift();
+			let entries;
+			try {
+				entries = fs.readdirSync(dir, { withFileTypes: true });
+			} catch {
+				continue;
+			}
+			for (const entry of entries) {
+				const full = path.join(dir, entry.name);
+				if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
+					queue.push(full);
+				} else if (entry.isFile() && entry.name.endsWith(".json")) {
+					try {
+						const content = JSON.parse(fs.readFileSync(full, "utf8"));
+						if (content && typeof content.amber_protocol_version === "string") {
+							if (content.amber_protocol_version !== CLI_VERSION) {
+								const rel = path.relative(targetRoot, full);
+								driftArtifacts.push(`${rel} (${content.amber_protocol_version})`);
+							}
+						}
+					} catch {
+						// Unparseable or non-object JSON; skip silently.
+					}
+				}
+			}
+		}
+		if (driftArtifacts.length > 0) {
+			const detail = `${driftArtifacts.length} artifact(s) at a different protocol version than installed (${CLI_VERSION}): ${driftArtifacts.join(", ")}`;
+			warnings.push(detail);
+			addCheck("Artifact protocol version", false, detail, "amber migrate --target .");
+		} else {
+			addCheck("Artifact protocol version", true, `all versioned artifacts match ${CLI_VERSION}`);
+		}
 	}
 
 	// Context pages (optional — only when the context layer is in use, ADR-0009 D8)

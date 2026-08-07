@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "displayName": "Quick Bug Fix",
   "description": "Short path for fixing a defect: reproduce, fix, then verify",
+  "objective": "Fix a bug or defect quickly: reproduce the failure, apply the smallest fix, then verify the fix with tests.",
   "trigger": {
     "goalPattern": "^(fix|resolve|patch|repair)\\s+.*(bug|defect|issue|error|crash)",
     "complexity": "simple"

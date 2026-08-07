@@ -1,4 +1,5 @@
 const Ajv = require("ajv");
+const addFormats = require("ajv-formats");
 const fs = require("fs");
 const path = require("path");
 
@@ -15,6 +16,7 @@ try {
 }
 
 const ajv = new Ajv();
+addFormats(ajv);
 const validate = ajv.compile(schema);
 
 function validateRoute(routeData) {

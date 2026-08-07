@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "displayName": "Safe Refactor",
   "description": "Refactor under a safety net: characterize behavior, refactor, then verify nothing changed",
+  "objective": "Refactor existing code under a safety net: characterize current behavior with tests, refactor, then verify nothing changed.",
   "trigger": {
     "goalPattern": "^(refactor|restructure|clean\\s*up|simplify|extract)\\b",
     "complexity": "complex"
