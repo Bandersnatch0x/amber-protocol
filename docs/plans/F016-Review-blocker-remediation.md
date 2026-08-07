@@ -25,13 +25,13 @@ The Context, Loadout, governed execution, routing, migration, workflow assessmen
 - [x] Slice 5: extract `core/handoff-layout.js`, remove the workflow facade cycle, and retain existing `handoff-bundle` re-exports.
 - [x] Slice 6: wire version backfill into migration, resolve `next --objective` from the target, scope no-progress to the current session, and repair schema-format, generated-skill, and facade boundary regressions.
 - [x] Slice 7: update ADR/wiki/CLI/skill surfaces, regenerate platform products, pass every repository gate, perform the final two-axis review, and generate a working-tree-patch-bound architecture assessment.
-- [ ] Finalization: after an explicitly authorized commit, bind the assessment to the resulting final commit SHA without changing its reviewed patch scope.
+- [x] Finalization: bind the assessment to implementation commit `c628c763fe76b1b24b3357e16ff9c05ac811fbae` without changing the reviewed product behavior.
 
 ## Resume Checkpoint
 
-- Resume Point: Slices 1-7 complete; 1613 full tests, all repository gates, and both final review axes pass with no unresolved finding.
-- Blockers: none for implementation or verification; the final commit SHA does not exist until a commit is explicitly authorized.
-- Next Action: after explicit commit authorization, commit the reviewed patch and replace the assessment's pending final commit marker with that SHA.
+- Resume Point: Slices 1-7 and commit-SHA finalization are complete; 1613 full tests, all repository gates, and both final review axes pass with no unresolved finding.
+- Blockers: none for F016 implementation, verification, or evidence binding.
+- Next Action: no F016 action remains; release versioning, tagging, and publication are outside this plan and remain frozen pending a version decision.
 - Recovery Instructions: reopen this plan and ADR-0015, inspect `git status`, and continue at the first unchecked vertical slice; preserve user-owned release-readiness, handoff, `.workbuddy`, and historical output changes.
 
 ## Acceptance Criteria
@@ -43,8 +43,8 @@ The Context, Loadout, governed execution, routing, migration, workflow assessmen
 - Workflow assessment imports only its public facade without a circular dependency; public handoff exports remain compatible.
 - Migration, target routing, no-progress, corrupt Page, Ajv format, generated skill, and facade regressions have focused tests.
 - `npm test`, manifests, doctor, generated-agent drift, and wiki validation all exit 0.
-- The final review has no unresolved findings, and the new architecture assessment names the exact baseline SHA, current HEAD SHA, and reviewed working-tree patch fingerprint.
-- The final commit-SHA binding remains intentionally pending until a commit is explicitly authorized; this plan does not claim that step is complete.
+- The final review has no unresolved findings, and the new architecture assessment names the exact baseline SHA, review HEAD SHA, reviewed patch fingerprint, and implementation commit SHA.
+- The commit-SHA binding identifies the implementation commit without requiring the evidence report to self-reference its own containing commit.
 - F016 does not modify `docs/quality/release-readiness-1.3.12.md`, `.workbuddy/*`, or the historical assessment as part of acceptance.
 
 ## Verification

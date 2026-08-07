@@ -1,17 +1,17 @@
-# F016 架构修复评估（工作树绑定）
+# F016 架构修复评估（实现提交绑定）
 
 - 评估日期：2026-08-07
 - 远端基线：`origin/master@ef0ea4576291bad466dd89a7e2ee33a8d051e6b6`
-- 本地 HEAD：`ef57fc533ab4b342b1980f3752edc68b9825ac33`
-- F016 补丁指纹：`be08fb8c8e8415341656603b0fc24cb283b7e1dc`
+- 评审前本地 HEAD：`ef57fc533ab4b342b1980f3752edc68b9825ac33`
+- F016 补丁指纹：`19d836cf7ff79db9d04a2a1df9919d3d3b6968bb`
 - 指纹覆盖：91 个路径
-最终提交 SHA：待显式授权提交后补充
+- 最终实现提交 SHA：`c628c763fe76b1b24b3357e16ff9c05ac811fbae`
 
 ## 结论
 
-F016 当前工作树可接受，状态为 `passing`。针对 `origin/master...HEAD` 与未提交 F016 补丁的最终双轴复评结果为：blocker 0、high 0、P2 0、P3 0。
+F016 已提交并保持 `passing`。针对 `origin/master...c628c763fe76b1b24b3357e16ff9c05ac811fbae` 的最终双轴复评结果为：blocker 0、high 0、P2 0、P3 0。
 
-本评估不把当前 HEAD 冒充最终提交。它通过远端基线、本地 HEAD 和工作树补丁指纹绑定到已测试的确切内容；最终 commit SHA 只有在用户显式授权提交后才能写入。
+本评估通过远端基线、评审前 HEAD、补丁指纹和最终实现提交 SHA 绑定到已测试的确切内容。承载本报告最终化文本的 evidence 提交不作为实现提交，避免报告对自身提交 SHA 形成不可满足的自引用。
 
 ## 指纹方法与边界
 
@@ -76,6 +76,6 @@ F016 当前工作树可接受，状态为 `passing`。针对 `origin/master...HE
 - ADR-0009/0010 的 Context 与 Loadout 不再只以功能存在为完成标准；F016 增加了 request ownership、真实路径限制、snapshot 完整性和 Required Artifacts 的 fail-closed 契约。
 - 历史报告中的 ADR-0008 web 可视化、结构化干预台账和 doctor 检查注册表等非 F016 尾项未被本次评估重新声明为完成，也不构成本次补丁的验收阻塞项。
 
-## 剩余步骤
+## 最终化状态
 
-唯一未完成的最终化步骤是 commit-SHA binding。获得显式提交授权后，应提交当前已评审补丁，确认提交内容仍产生同一 F016 补丁指纹，并将本报告顶部的“最终提交 SHA”替换为实际 SHA。当前未执行 commit 或 push。
+commit-SHA binding 已完成：实现与测试由 `c628c763fe76b1b24b3357e16ff9c05ac811fbae` 承载。报告、计划与 feature 记录的 evidence 最终化不改变产品行为；当前未执行 push、版本升级、标签或发布。
