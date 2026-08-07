@@ -3,13 +3,13 @@
 - 评估日期：2026-08-07
 - 远端基线：`origin/master@ef0ea4576291bad466dd89a7e2ee33a8d051e6b6`
 - 评审前本地 HEAD：`ef57fc533ab4b342b1980f3752edc68b9825ac33`
-- F016 补丁指纹：`18eba6eb9b365ab9e1cc986b34421824dee22033`
+- F016 补丁指纹：`c05b0d67aea3d0c174332d5e206ddc0370e7b731`
 - 指纹覆盖：95 个路径
-- 最终实现提交 SHA：`1d908f69676842efec0df459ee0eb28f4498d273`
+- 最终实现提交 SHA：`1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6`
 
 ## 结论
 
-F016 已提交并保持 `passing`。针对 `origin/master...1d908f69676842efec0df459ee0eb28f4498d273` 的最终双轴复评结果为：blocker 0、high 0、P2 0、P3 0。
+F016 已提交并保持 `passing`。针对 `origin/master...1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6` 的最终双轴复评结果为：blocker 0、high 0、P2 0、P3 0。
 
 本评估通过远端基线、评审前 HEAD、补丁指纹和最终实现提交 SHA 绑定到已测试的确切内容。承载本报告最终化文本的 evidence 提交不作为实现提交，避免报告对自身提交 SHA 形成不可满足的自引用。
 
@@ -51,7 +51,7 @@ F016 已提交并保持 `passing`。针对 `origin/master...1d908f69676842efec0d
 - confidence gating 丢失、handoff facade cycle、migration 未接线与 target-insensitive routing。
 - governed execution 未验证 ledger chain、缺失显式 policy 或 high-confidence gate 时仍可能继续。
 - swarm 未自动标记审批且 low-confidence dispatch 未降级；migration 根目录不完整并可能改写未知 JSON。
-- CLI/README/CLAUDE 文档未覆盖新增迁移写入范围、objective 路由、Loadout 和核心架构；dispatch 函数混合策略、校验与持久化职责。
+- CLI/README/CLAUDE 文档未覆盖新增迁移写入范围、objective 路由、Loadout 和核心架构，且 legacy 状态迁移遗漏 `state` 子命令；dispatch 函数混合策略、校验与持久化职责。
 - no-progress 与 execution evidence 跨 Session 污染。
 - `task prepare` 无 Session、伪 Session、终态 Session及显式空值时仍写入的 fail-open 行为。
 - Context、governance、migration 与 task execution 中本轮引入或扩大的长函数、参数簇和重复持久化逻辑。
@@ -82,4 +82,4 @@ F016 已提交并保持 `passing`。针对 `origin/master...1d908f69676842efec0d
 
 ## 最终化状态
 
-commit-SHA binding 已完成：实现与测试由 `1d908f69676842efec0df459ee0eb28f4498d273` 承载。报告、计划与 feature 记录的 evidence 最终化不改变产品行为；当前未执行 push、版本升级、标签或发布。
+commit-SHA binding 已完成：实现与测试由 `1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6` 承载。报告、计划与 feature 记录的 evidence 最终化不改变产品行为；当前未执行 push、版本升级、标签或发布。

@@ -27,11 +27,12 @@ The Context, Loadout, governed execution, routing, migration, workflow assessmen
 - [x] Slice 7: update ADR/wiki/CLI/skill surfaces, regenerate platform products, pass every repository gate, perform the final two-axis review, and generate a working-tree-patch-bound architecture assessment.
 - [x] Slice 8: close the follow-up review gaps in ledger verification, explicit policy and confidence gating, swarm approval/degradation, and migration artifact discovery.
 - [x] Slice 9: align migration, routing, Context, and architecture documentation with behavior and split dispatch policy, validation, and persistence responsibilities below the repository function-size guideline.
-- [x] Finalization: bind the assessment to implementation commit `1d908f69676842efec0df459ee0eb28f4498d273` without changing the reviewed product behavior.
+- [x] Slice 10: correct agent guidance so legacy `.harness` conversion explicitly uses `migrate state`, while no-subcommand migration remains artifact backfill.
+- [x] Finalization: bind the assessment to implementation commit `1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6` without changing the reviewed product behavior.
 
 ## Resume Checkpoint
 
-- Resume Point: Slices 1-9 and commit-SHA finalization are complete; 1621 full tests, all repository gates, and both final review axes pass with no unresolved finding.
+- Resume Point: Slices 1-10 and commit-SHA finalization are complete; 1621 full tests, all repository gates, and both final review axes pass with no unresolved finding.
 - Blockers: none for F016 implementation, verification, or evidence binding.
 - Next Action: prepare and verify the approved `1.4.0` release without modifying the excluded user-owned worktree files.
 - Recovery Instructions: reopen this plan and ADR-0015, inspect `git status`, and continue at the first unchecked vertical slice; preserve user-owned release-readiness, handoff, `.workbuddy`, and historical output changes.

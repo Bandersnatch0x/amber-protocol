@@ -338,7 +338,7 @@
           "command": "npm test",
           "result": "exit 0; 1621 total, 1617 passed, 4 skipped, 0 failed",
           "date": "2026-08-07",
-          "notes": "Final run against governance and standards remediation commit 1d908f69676842efec0df459ee0eb28f4498d273."
+          "notes": "Final run against governance, standards, and migration-guidance remediation commit 1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6."
         },
         {
           "command": "npm run manifests && npm run doctor && npm run gen:agents:check && node scripts/validate-wiki.js --target .",
@@ -361,7 +361,7 @@
       ],
       "notes": [
         "Remediates blockers found by reviewing origin/master...HEAD after commits d607d65 and ef57fc5.",
-        "output/adr-architecture-assessment.md is a pre-ef57fc5 historical input, not F016 acceptance evidence; output/adr-architecture-assessment-f016.md binds the reviewed patch to implementation commit 1d908f69676842efec0df459ee0eb28f4498d273."
+        "output/adr-architecture-assessment.md is a pre-ef57fc5 historical input, not F016 acceptance evidence; output/adr-architecture-assessment-f016.md binds the reviewed patch to implementation commit 1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6."
       ],
       "paths": [
         "scripts/lib/core/context-*.js",
