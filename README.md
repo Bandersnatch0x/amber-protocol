@@ -47,6 +47,7 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
 | Plan | `amber plan --target <repo> --feature F001 --title "..."` | A feature plan and review surface |
 | Gate | `amber next --target <repo>` | The next safe lifecycle command |
 | Verify | `amber doctor --target <repo>` | Checks for required agent-facing surfaces |
+| Context | `amber context request --target <repo> --page <id>` | Contract-driven distillation: turns session evidence into provenance-backed knowledge pages (ADR-0009) |
 | Handoff | `amber handoff bundle --target <repo>` | Portable continuation bundle another human or agent can continue |
 
 ## Repository artifacts
@@ -219,6 +220,24 @@ Amber provides the **governance and contract layer** (loop contracts, ledgers, h
 - Simple `STATE.md` (optional overlay) — human + agent friendly memory spine compatible with daily-triage etc.
 
 See [LOOP.md](./LOOP.md) for Amber's self-described loops (Daily Amber Triage, CI validation, adoption flows) and how the two systems complement each other. Phased rollout (report → assisted → governed) is encouraged.
+
+### `amber context` — contract-driven distillation (write path)
+
+`amber context` closes the gap between session evidence and project knowledge (ADR-0009). Amber
+emits a distillation contract; a host agent executes it; Amber validates and persists the result —
+Amber itself never calls a model.
+
+```bash
+amber context request --target . --page governed-execution     # write a distillation contract
+amber context ingest --target . --request <id> --payload out.json   # judge the agent's output
+amber context verify --target . --json                         # page health (stale/tampered/obsolete)
+amber context refresh --target .                               # regenerate requests for stale sources
+amber context stats --target . --window 50                     # filter rate, pass rate, unknown share
+```
+
+Every claim on an accepted page carries provenance; pages live in `.amber/context/pages/` and are
+indexed in `docs/wiki/context-index.md`. See `skills/amber-context/SKILL.md` for the full loop an
+agent should run.
 
 ### Mechanical enforcement (opt-in)
 

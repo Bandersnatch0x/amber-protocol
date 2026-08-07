@@ -518,6 +518,7 @@ function handleNext(args) {
     feature: args.feature,
     session: args.session,
     strict: args.strict !== false,
+    objective: args.objective,
   });
   return { result: nextResult, exitCode: 0, bypassPrint: !args.json };
 }
@@ -618,6 +619,11 @@ function handleHooks(args) {
   };
 }
 
+function handleContext(args) {
+	const { contextDispatch } = require("./context/adapters/command");
+	return contextDispatch(args._?.[0], args);
+}
+
 // ── Command registry ────────────────────────────────────────────────────────
 
 const HANDLERS = {
@@ -655,6 +661,7 @@ const HANDLERS = {
   explain:     handleExplain,
   hooks:       handleHooks,
   workflow:    handleWorkflow,
+  context:     handleContext,
 };
 
 // ── Deprecated commands ─────────────────────────────────────────────────────

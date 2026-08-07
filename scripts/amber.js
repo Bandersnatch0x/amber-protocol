@@ -40,6 +40,7 @@ const COMMANDS = [
   "explain",
   "hooks",
   "workflow",
+  "context",
 ];
 const DRY_RUN_COMMANDS = new Set(["init", "wiki", "plan"]);
 const SUMMARY_COMMANDS = new Set(["audit"]);

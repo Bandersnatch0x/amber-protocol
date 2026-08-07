@@ -21,6 +21,7 @@ node scripts/amber.js <command> --target <repo>
 - `node scripts/amber.js governance report --target <repo>` - score readiness, risks, and structured next actions.
 - `node scripts/amber.js handoff bundle --target <repo>` - produce the portable continuation bundle.
 - `node scripts/amber.js handoff validate --target <repo>` - verify the handoff bundle is complete.
+- `node scripts/amber.js context request --target <repo> --page <id>` - write a distillation contract; `ingest`/`verify`/`refresh`/`stats` close the loop (ADR-0009).
 - `node scripts/amber.js route list` - list available routes.
 - `node scripts/amber.js session status` - inspect the current session.
 - `node scripts/amber.js adoption report --target <repo> --output-dir docs/examples/adoptions` - generate a legacy adoption report.

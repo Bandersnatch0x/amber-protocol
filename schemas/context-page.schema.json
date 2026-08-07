@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Context Page",
+  "description": "A persisted unit of distilled project knowledge under .amber/context/pages/. Block-structured JSON where every block cites the sources it rests on. See ADR-0009.",
+  "type": "object",
+  "required": ["schemaVersion", "pageId", "title", "sources", "blocks"],
+  "properties": {
+    "schemaVersion": { "type": "string", "enum": ["1.0.0", "1.1.0"] },
+    "pageId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "title": { "type": "string", "minLength": 1 },
+    "scope": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "sources": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind", "ref", "rawHash", "mutable"],
+        "properties": {
+          "kind": { "type": "string" },
+          "ref": { "type": "string", "minLength": 1 },
+          "rawHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "normHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "mutable": { "type": "boolean" },
+          "excerpt": { "type": "string" },
+          "excerptHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+        },
+        "allOf": [
+          {
+            "description": "mutable sources carry normHash; immutable sources carry an excerpt snapshot (ADR-0009 D5/D5a)",
+            "if": { "properties": { "mutable": { "const": true } } },
+            "then": { "required": ["normHash"] },
+            "else": { "required": ["excerpt", "excerptHash"] }
+          }
+        ]
+      }
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["type", "sources", "text"],
+        "properties": {
+          "type": { "enum": ["prose", "unknown"] },
+          "sources": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "text": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

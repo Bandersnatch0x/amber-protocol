@@ -56,6 +56,30 @@ _Avoid_: prompt, spec, ticket, design doc
 The structured set of inputs that informed a plan, each with provenance, freshness, confidence, and inspection status.
 _Avoid_: context pile, attachments, references
 
+**Context Page**:
+A persisted unit of distilled project knowledge under `.amber/context/pages/`, stored as block-structured JSON where every block cites the sources it rests on. Produced by an agent under a Distillation Contract and admitted only by `amber context ingest`.
+_Avoid_: memory, note, doc, wiki page, article
+
+**Distillation Contract**:
+The request artifact Amber emits at `.amber/context/requests/<id>.json`: hash-bearing source references, the target schema, the instructions, the hard constraints, and the acceptance error codes. Amber writes it and judges the result; a host agent executes it. Amber never calls a model.
+_Avoid_: prompt, job, task, request payload
+
+**Mutable Source** / **Immutable Source**:
+The two source classes a Context Page may cite. Mutable sources (code, live documents) carry a `rawHash` and a `normHash` and are staleness-checked; only a `normHash` change raises a refresh. Immutable sources (append-only ledger ranges, archived sessions, accepted ADRs) are hashed for tamper detection only.
+_Avoid_: static/dynamic source, fixed reference
+
+**Loadout**:
+The task-scoped context artifact Amber assembles at `.amber/context/loadouts/<route>[-<feature>].json`: a deterministic, budgeted selection of pinned + fresh knowledge pages (plus wiki/handoff references), each carrying its `rawHash` for load-time verification. Amber governs the agent's context window without retrieving semantically — the host agent loads the contract. (ADR-0010)
+_Avoid_: prompt bundle, context pack, RAG result
+
+**Context Budget**:
+The word-count cap (default ≈ 4000, `--budget`) that bounds a Loadout. Pages fill tiers in stable order — required → priority → recency → pageId — and out-of-budget exclusions are recorded with reasons; a required-tier overflow fails fast. (ADR-0010)
+_Avoid_: token limit, truncation window
+
+**Scope Tag**:
+Optional per-page `scope` metadata (route or feature ids) stamped by `amber context ingest`, used by `amber context load` to select pages mechanically. Single source of truth lives in the page, not a sidecar. (ADR-0010)
+_Avoid_: category, label, tag cloud
+
 **Feature**:
 A tracked unit of user-visible work in `feature_list.json`, with status, verification steps, and evidence records.
 _Avoid_: task, story, ticket, work item

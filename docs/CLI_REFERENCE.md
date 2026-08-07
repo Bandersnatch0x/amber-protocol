@@ -1015,6 +1015,38 @@ so forging a ledger then requires rewriting git tag history. No Ed25519 signing 
 the Phase 1 spec until key management (HSM / OS keystore) is a real capability rather than a key in
 the repo.
 
+## Context Commands
+
+`amber context` is the ADR-0009 contract-driven distillation surface. **Amber never calls a model**:
+`request` writes a hash-bearing distillation contract; a host agent executes it; `ingest` judges the
+result (schema, citation completeness, payload-to-request binding, source freshness) and persists
+provenance-backed pages under `.amber/context/pages/`, indexed by `docs/wiki/context-index.md`.
+Run `amber context --help` for the full subcommand reference; `skills/amber-context/SKILL.md` is the
+agent-facing loop.
+
+```bash
+# Contract + gate
+node scripts/amber.js context request --target . --page governed-execution --title "Governed execution" --source docs/adr/0003-....md
+node scripts/amber.js context ingest  --target . --request kd-2026-08-07-a3f1 --payload out.json
+node scripts/amber.js context ingest  --target . --request <id> --payload no-change.json   # {"outcome":"no-change"} rebases hashes
+
+# Health and maintenance
+node scripts/amber.js context verify --target . --json
+node scripts/amber.js context list   --target .
+node scripts/amber.js context show   --target . --page <id>
+node scripts/amber.js context refresh --target .          # absorbs cosmetic changes; requests real ones
+node scripts/amber.js context delete --target . --page <id>
+
+# Observability
+node scripts/amber.js context stats --target .            # lifetime
+node scripts/amber.js context stats --target . --window 50   # last 50 events
+```
+
+Sources are mutable by default (raw+normalized hash; cosmetic changes absorbed silently) and
+immutable under `.amber/` and `docs/adr/` (excerpt-snapshotted; tamper detected). A payload must
+reproduce the request's bundled source hashes verbatim — re-bundling is rejected as stale.
+Failures carry the `AMBER_E_CONTEXT_*` codes (see `amber explain`).
+
 ## Error Codes
 
 ### explain

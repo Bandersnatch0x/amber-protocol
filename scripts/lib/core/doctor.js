@@ -224,6 +224,19 @@ function doctor(target, options = {}) {
 			manifestResult.errors.length === 0 ? "valid" : `${manifestResult.errors.length} errors`);
 	}
 
+	// Context pages (optional — only when the context layer is in use, ADR-0009 D8)
+	if (pathExists(path.join(targetRoot, ".amber", "context"))) {
+		const { verifyPages } = require("./context-verify");
+		const ctx = verifyPages(targetRoot);
+		if (ctx.summary.total > 0) {
+			const hardFailures = ctx.summary.tampered + ctx.summary.obsolete + ctx.summary.orphaned;
+			const detail = `${ctx.summary.total} pages: ok ${ctx.summary.ok}, stale ${ctx.summary.stale}, tampered ${ctx.summary.tampered}, obsolete ${ctx.summary.obsolete}, orphaned ${ctx.summary.orphaned}`;
+			addCheck("Context pages", hardFailures === 0, detail,
+				hardFailures === 0 ? null : "amber context verify --target .");
+			if (hardFailures > 0) errors.push(detail);
+		}
+	}
+
 	return { target: targetRoot, classification, checks, errors, warnings };
 }
 

@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Context layer — contract-driven distillation (ADR-0009)**: new `amber context`
+  command family (`request` / `ingest` / `verify` / `list` / `show` / `refresh` /
+  `stats` / `delete`) closes the write path between session evidence and project
+  knowledge. Amber emits hash-bearing distillation contracts; a host agent executes
+  them; Amber judges the result (schema, citation completeness, payload-to-request
+  binding, source freshness) and persists provenance-backed pages under
+  `.amber/context/pages/`, indexed by `docs/wiki/context-index.md`. Amber never
+  calls a model — zero new runtime dependencies beyond `ajv`/`ajv-formats`.
+  - Dual raw/normalized hashing absorbs cosmetic source changes silently;
+    `{"outcome":"no-change"}` rebases hashes without touching page content.
+  - Immutable sources (ledgers, ADRs, archived sessions) are excerpt-snapshotted
+    into pages; tamper and page-corruption detection included (D5a).
+  - Seven new `AMBER_E_CONTEXT_*` error codes; `doctor` gains an aggregate
+    context-pages finding.
+  - `stats` reports filter rate, pass rate, no-change rate, unknown-block share,
+    and mean sources per block, with an optional `--window` for trend regression.
+  - `amber-context` skill (mirrored to Claude Code, Codex/Cursor, Gemini) teaches
+    host agents how to run the loop.
 
 ## [1.3.12] - 2026-08-04
 
