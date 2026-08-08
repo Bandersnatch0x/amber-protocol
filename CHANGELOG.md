@@ -5,7 +5,25 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [Unreleased]
+
+## [1.4.1] - 2026-08-08
+
+### Fixed
+- Centralize CLI Command definitions, public order, help/output policy, and handler
+  binding in `command-help.js`; dispatcher owns runtime dispatch only.
+- Derive Context Page index status from page health at the store boundary (no
+  blank `statusMap` defaulting every page to `ok`).
+- Fail-closed session execution evidence for malformed JSON (including JSON
+  `null`) and ledger/evidence coordinate mismatches; governance reports mark
+  unavailable evidence explicitly instead of looking empty.
+- Encoding validation skips tracked files deleted from the working tree.
+- Align agent/wiki docs with the new registry and evidence paths.
+
+### Changed
+- Remove `command-handler-families.js`; assessment consumers degrade at their
+  boundary when the shared evidence reader throws.
 
 ## [1.4.0] - 2026-08-08
 
@@ -432,7 +450,8 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 
 ---
 
-[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.12...v1.4.0
 [1.3.12]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.11...v1.3.12
 [1.3.11]: https://github.com/Bandersnatch0x/amber-protocol/compare/v1.3.10...v1.3.11
