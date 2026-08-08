@@ -4,7 +4,7 @@ kind: "knowledge_cards"
 
 # Knowledge Cards
 
-Last Reviewed: 2026-07-16
+Last Reviewed: 2026-08-08
 
 Concise, high-signal facts for rapid orientation.
 
@@ -16,7 +16,8 @@ Concise, high-signal facts for rapid orientation.
 - **web-app-separate** — apps/web/ is a standalone React+Vite+tRPC application with its own package.json. Its src/ uses TanStack Router for file-based routing and tRPC for type-safe API calls to an Express server. _(web, viewer)_
 - **templates-purpose** — templates/ contains starter file templates that 'amber init' and 'amber wiki' scaffold into target repos. Includes AGENTS.md, CLAUDE.md, wiki skeleton, feature_list.json, and governance templates. _(scaffolding)_
 - **schemas-contracts** — schemas/ defines five JSON Schema contracts: knowledge-plan, loop-contract, route, session-manifest, and timeline-event. These are the authoritative validation contracts used across the CLI. _(validation, schema)_
-- **command-dispatcher** — scripts/lib/command-dispatcher.js is the central command registry and router — all CLI commands flow through it. _(cli, core)_
+- **command-help** — scripts/lib/command-help.js owns Command definitions, help knowledge, output policy, and stable public order; it binds definitions to handlers at startup. _(cli, core)_
+- **command-dispatcher** — scripts/lib/command-dispatcher.js owns handler implementations, the bound runtime registry, and dispatch — not the definition source of truth. _(cli, core)_
 
 ## Derived from these grounding notes
 - Amber Protocol is a repository-local governance layer for AI-assisted engineering, NOT a runtime framework or agent platform. It produces review artifacts, dry-run plans, and approval records as files inside the target repo.

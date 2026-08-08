@@ -215,10 +215,14 @@ function collectWorkflowEffectiveness(targetRoot, sessionId) {
 	let evidence;
 	try {
 		evidence = loadSessionEvidence(targetRoot, sessionId);
-	} catch {
-		// Shared session-evidence is fail-closed; the report degrades instead
-		// of aborting the whole governance surface.
+	} catch (error) {
+		// Shared session-evidence is fail-closed; the report degrades with an
+		// explicit unavailable signal so corrupt evidence is not mistaken for
+		// "no evidence".
 		return {
+			available: false,
+			reason: "session-evidence-unavailable",
+			detail: error && error.message ? error.message : String(error),
 			noProgress: detectNoProgress({
 				timelineEvents: [],
 				resultEvidence: [],
@@ -228,6 +232,7 @@ function collectWorkflowEffectiveness(targetRoot, sessionId) {
 		};
 	}
 	return {
+		available: true,
 		noProgress: detectNoProgress({
 			timelineEvents: evidence.timelineEvents,
 			resultEvidence: evidence.resultEvidence,

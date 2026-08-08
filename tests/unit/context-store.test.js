@@ -217,15 +217,15 @@ describe("regenerateIndex", () => {
 	it("writes a markdown table with one row per page and status", () => {
 		const root = makeTarget();
 		try {
+			// page-a: mutable source path missing on disk -> obsolete
 			writePage(root, samplePage({ pageId: "page-a", title: "Page A" }));
+			// page-b: no sources (nothing mutable) -> ok
 			writePage(root, samplePage({ pageId: "page-b", title: "Page B", sources: {} }));
-			// page-b has no sources -> obsolete; page-a ok
 			const index = regenerateIndex(root);
 			const text = fs.readFileSync(index, "utf8");
 			assert.ok(text.includes("| pageId | title | blocks | sources | status |"));
-			assert.ok(text.includes("page-a"));
-			assert.ok(text.includes("page-b"));
-			assert.ok(text.includes("ok") || text.includes("stale"));
+			assert.match(text, /\| page-a \| Page A \| 1 \| 1 \| obsolete \|/);
+			assert.match(text, /\| page-b \| Page B \| 1 \| 0 \| ok \|/);
 		} finally {
 			cleanup(root);
 		}

@@ -84,6 +84,19 @@ test("Execution evidence rejects malformed artifacts", (t) => {
 	assert.throws(() => listExecutionEvidence(target), /invalid Execution Ledger.*ledger\.json/i);
 });
 
+test("Execution evidence rejects JSON null ledger bodies as invalid", (t) => {
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-execution-null-"));
+	t.after(() => fs.rmSync(target, { recursive: true, force: true }));
+	const ledgerPath = path.join(target, ".amber", "executions", "task-null", "ledger.json");
+	fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
+	fs.writeFileSync(ledgerPath, "null\n", "utf8");
+
+	assert.throws(
+		() => listExecutionEvidence(target),
+		/invalid Execution Ledger.*ledger\.json.*expected a JSON object/i,
+	);
+});
+
 test("Execution evidence rejects conflicting Ledger and Task Evidence coordinates", (t) => {
 	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-execution-conflict-"));
 	t.after(() => fs.rmSync(target, { recursive: true, force: true }));

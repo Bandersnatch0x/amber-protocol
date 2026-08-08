@@ -235,7 +235,7 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 
 ### When Working on This Codebase
 
-- **Adding new commands**: Update `COMMANDS` array in `scripts/amber.js` and implement in `scripts/lib/` modules
+- **Adding new commands**: Add the Command definition (identity, help, output policy, public order) in `scripts/lib/command-help.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green
 - **Modifying schemas**: Update `schemas/*.schema.json` and ensure validators in `scripts/validate-*.js` are synced
 - **Adding templates**: Place in `templates/` and update `scripts/lib/core/scaffolding.js`
 - **Adding routes**: Create `.route.json` in `routes/` following `schemas/route.schema.json`

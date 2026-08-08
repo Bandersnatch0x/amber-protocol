@@ -34,8 +34,8 @@ function readArtifact(filePath, label) {
 	if (error) {
 		throw new Error(`invalid ${label} at ${filePath}: ${error}`);
 	}
-	if (value == null) return null;
-	if (typeof value !== "object" || Array.isArray(value)) {
+	// Present-but-null JSON is corrupt, not "missing": treat as fail-closed.
+	if (value == null || typeof value !== "object" || Array.isArray(value)) {
 		throw new Error(`invalid ${label} at ${filePath}: expected a JSON object`);
 	}
 	return value;
