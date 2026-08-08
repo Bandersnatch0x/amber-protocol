@@ -16,8 +16,8 @@ Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, ga
 
 ```
 scripts/amber.js              -> Unified CLI entry point
-scripts/lib/command-dispatcher.js -> Command lookup-table (parse -> dispatch -> print); thin wrappers + registry
-scripts/lib/command-handler-families.js -> Switch-based families (maintenance/adoption/ledger/session/governance)
+scripts/lib/command-help.js -> Command definitions, help, output policy, and stable public order
+scripts/lib/command-dispatcher.js -> Command handlers, startup registry binding, and dispatch
 scripts/lib/core/             -> Domain modules (adoption-*, loops, doctor, profiles, etc.); imported directly (no facade — ADR-0005)
 scripts/lib/core/context-*.js -> Contract-driven Context Page ingestion, verification, refresh, and Loadout assembly
 scripts/lib/core/governed-runner.js -> Governed execution gates (ledger, policy, confidence, approval, worktree)
@@ -235,7 +235,7 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 
 ### When Working on This Codebase
 
-- **Adding new commands**: Update `COMMANDS` array in `scripts/amber.js` and implement in `scripts/lib/` modules
+- **Adding new commands**: Add the Command definition (identity, help, output policy, public order) in `scripts/lib/command-help.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green
 - **Modifying schemas**: Update `schemas/*.schema.json` and ensure validators in `scripts/validate-*.js` are synced
 - **Adding templates**: Place in `templates/` and update `scripts/lib/core/scaffolding.js`
 - **Adding routes**: Create `.route.json` in `routes/` following `schemas/route.schema.json`

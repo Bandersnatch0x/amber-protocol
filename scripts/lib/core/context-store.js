@@ -10,6 +10,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { readJson, resolvePathWithin } = require("./fs-utils");
+const { inspectPageHealth } = require("./context-page-health");
 
 const SCHEMA_VERSION = "1.0.0";
 const INDEX_REL = path.join("docs", "wiki", "context-index.md");
@@ -42,11 +43,9 @@ function pagePath(targetRoot, pageId) {
 		throw new Error(`Invalid Context Page id: ${pageId}. Expected kebab-case.`);
 	}
 	pagesDir(targetRoot);
-	return resolvePathWithin(
-		targetRoot,
-		path.join(".amber", "context", "pages", `${pageId}.json`),
-		{ label: "Context Page file" },
-	);
+	return resolvePathWithin(targetRoot, path.join(".amber", "context", "pages", `${pageId}.json`), {
+		label: "Context Page file",
+	});
 }
 
 /** List accepted pages as [{ pageId, filePath }] via directory scan. */
@@ -71,12 +70,13 @@ function ensureDir(dir) {
 	fs.mkdirSync(dir, { recursive: true });
 }
 
-/** Persist a page and emit a page-write event. */
+/** Persist a page, synchronize the generated index, and emit a page-write event. */
 function writePage(targetRoot, page, event = {}) {
 	const dir = pagesDir(targetRoot);
 	ensureDir(dir);
 	const file = pagePath(targetRoot, page.pageId);
 	fs.writeFileSync(file, JSON.stringify(page, null, 2) + "\n", "utf8");
+	regenerateIndex(targetRoot);
 	appendEvent(targetRoot, {
 		kind: "page-written",
 		pageId: page.pageId,
@@ -90,16 +90,19 @@ function deletePage(targetRoot, pageId) {
 	const file = pagePath(targetRoot, pageId);
 	if (!fs.existsSync(file)) return false;
 	fs.rmSync(file, { force: true });
+	regenerateIndex(targetRoot);
 	appendEvent(targetRoot, { kind: "page-deleted", pageId });
 	return true;
 }
 
 /**
  * Regenerate docs/wiki/context-index.md from the directory scan.
+ * Status is derived at the store boundary via page health so write/delete
+ * never need a second caller-supplied statusMap pass.
  * @param {string} targetRoot
- * @param {Record<string,string>} [statusMap] pageId -> status; defaults to "ok"
+ * @param {Record<string,string>} [statusMap] optional pageId -> status override
  */
-function regenerateIndex(targetRoot, statusMap = {}) {
+function regenerateIndex(targetRoot, statusMap) {
 	const pages = listPages(targetRoot);
 	const file = indexPath(targetRoot);
 	ensureDir(path.dirname(file));
@@ -119,7 +122,10 @@ function regenerateIndex(targetRoot, statusMap = {}) {
 			if (!page) continue;
 			const blocks = Array.isArray(page.blocks) ? page.blocks.length : 0;
 			const sources = page.sources ? Object.keys(page.sources).length : 0;
-			const status = statusMap[pageId] || "ok";
+			const status =
+				statusMap && Object.prototype.hasOwnProperty.call(statusMap, pageId)
+					? statusMap[pageId]
+					: inspectPageHealth(targetRoot, page).status;
 			const title = (page.title || "").replace(/\|/g, "\\|");
 			lines.push(`| ${pageId} | ${title} | ${blocks} | ${sources} | ${status} |`);
 		}
@@ -132,7 +138,11 @@ function regenerateIndex(targetRoot, statusMap = {}) {
 function appendEvent(targetRoot, event) {
 	const file = eventsPath(targetRoot);
 	ensureDir(path.dirname(file));
-	fs.appendFileSync(file, JSON.stringify({ ...event, at: new Date().toISOString() }) + "\n", "utf8");
+	fs.appendFileSync(
+		file,
+		JSON.stringify({ ...event, at: new Date().toISOString() }) + "\n",
+		"utf8",
+	);
 }
 
 /** Read all events as objects. */

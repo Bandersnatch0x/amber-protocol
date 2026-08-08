@@ -1,42 +1,76 @@
 "use strict";
 
-// The CLI keys three separate maps by command name, in three files:
-//   - COMMANDS       (scripts/amber.js)               presence + dispatch gate
-//   - HANDLERS       (command-dispatcher.js)          name -> handler fn
-//   - COMMAND_HELP   (command-help.js)                name -> `--help` text
-// Nothing at runtime forces them to agree, so a command added to one and
-// forgotten in another drifts silently: a command with no handler ("No handler
-// registered"), an orphan handler unreachable from the CLI, or a command whose
-// `--help` silently falls back to the generic default. This guard makes any such
-// drift a red test instead. (It deliberately does NOT check the free-text
-// subcommand lists inside handlers/help — guarding those would need the very
-// command-descriptor registry this test lets us avoid building.)
+// Command registration is one interface: callers should not have to reconcile
+// separate command, help, policy, and handler maps.
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { COMMANDS } = require("../../scripts/amber.js");
-const { HANDLERS } = require("../../scripts/lib/command-dispatcher.js");
-const { COMMAND_HELP } = require("../../scripts/lib/command-help.js");
+const { COMMAND_REGISTRY } = require("../../scripts/lib/command-dispatcher.js");
+const { COMMAND_DEFINITIONS, bindCommandHandlers } = require("../../scripts/lib/command-help.js");
 
-const commands = new Set(COMMANDS);
-const handlers = new Set(Object.keys(HANDLERS));
-const help = new Set(Object.keys(COMMAND_HELP));
+const PUBLIC_COMMAND_ORDER = [
+	"init",
+	"audit",
+	"wiki",
+	"doctor",
+	"handoff",
+	"plan",
+	"gate",
+	"review",
+	"accept",
+	"pack",
+	"profile",
+	"task",
+	"result",
+	"agent",
+	"team",
+	"maintenance",
+	"adoption",
+	"loop",
+	"ledger",
+	"route",
+	"session",
+	"status",
+	"drift",
+	"sync",
+	"migrate",
+	"governance",
+	"execution",
+	"security",
+	"feature",
+	"clean",
+	"next",
+	"explain",
+	"hooks",
+	"workflow",
+	"context",
+];
 
-const missing = (from, into) => [...from].filter((c) => !into.has(c)).sort();
+test("one Command registry drives help, policy, dispatch, and the public command list", () => {
+	assert.ok(COMMAND_DEFINITIONS, "Command definitions must be exported from one module");
+	assert.ok(COMMAND_REGISTRY, "Command handlers must bind to the definitions at startup");
+	assert.deepEqual(COMMANDS, PUBLIC_COMMAND_ORDER);
+	assert.deepEqual(Object.keys(COMMAND_DEFINITIONS), COMMANDS);
+	assert.deepEqual(Object.keys(COMMAND_REGISTRY), COMMANDS);
 
-test("every registered command has a dispatch handler", () => {
-	assert.deepEqual(missing(commands, handlers), []);
+	for (const name of COMMANDS) {
+		const definition = COMMAND_DEFINITIONS[name];
+		const registration = COMMAND_REGISTRY[name];
+		assert.equal(definition.name, name);
+		assert.ok(definition.help, `${name} must own its help knowledge`);
+		assert.ok(definition.output, `${name} must own its output policy`);
+		assert.equal(registration.definition, definition);
+		assert.equal(typeof registration.handler, "function");
+	}
 });
 
-test("no orphan handler exists without a registered command", () => {
-	assert.deepEqual(missing(handlers, commands), []);
-});
-
-test("every registered command has help text (no generic-default fallback)", () => {
-	assert.deepEqual(missing(commands, help), []);
-});
-
-test("no orphan help entry exists without a registered command", () => {
-	assert.deepEqual(missing(help, commands), []);
+test("Command handler binding fails fast on missing or orphaned handlers", () => {
+	assert.throws(() => bindCommandHandlers({}), /missing handlers/i);
+	const handlers = Object.fromEntries(
+		Object.keys(COMMAND_DEFINITIONS).map((name) => [name, () => ({ result: {} })]),
+	);
+	handlers.orphaned = () => ({ result: {} });
+	assert.throws(() => bindCommandHandlers(handlers), /orphaned handlers/i);
 });

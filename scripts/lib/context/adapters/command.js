@@ -11,17 +11,26 @@ const { ingestPayload } = require("../../core/context-ingest");
 const { verifyPages } = require("../../core/context-verify");
 const { refreshPages } = require("../../core/context-refresh");
 const { computeStats } = require("../../core/context-stats");
-const {
-	listPages,
-	readPage,
-	deletePage,
-	regenerateIndex,
-} = require("../../core/context-store");
+const { listPages, readPage, deletePage } = require("../../core/context-store");
 
-const ACTIONS = ["request", "ingest", "verify", "list", "show", "refresh", "stats", "delete", "load"];
+const ACTIONS = [
+	"request",
+	"ingest",
+	"verify",
+	"list",
+	"show",
+	"refresh",
+	"stats",
+	"delete",
+	"load",
+];
 
 function errResult(action, message) {
-	return { result: { target: undefined, errors: [message], warnings: [] }, exitCode: 1, bypassPrint: false };
+	return {
+		result: { target: undefined, errors: [message], warnings: [] },
+		exitCode: 1,
+		bypassPrint: false,
+	};
 }
 
 function unknownAction(actual) {
@@ -51,11 +60,12 @@ function renderRequest(req, requestPath) {
 }
 
 function renderList(pages, statusMap) {
-	if (pages.length === 0) return "No context pages. Create one with `amber context request --page <id>`.";
+	if (pages.length === 0)
+		return "No context pages. Create one with `amber context request --page <id>`.";
 	const lines = ["pageId                    title                         blocks  sources  status"];
 	for (const p of pages) {
 		lines.push(
-			`${p.pageId.padEnd(26)} ${(p.title || "").slice(0, 26).padEnd(28)} ${String(p.blockCount || 0).padStart(6)} ${String(p.sourceCount || 0).padStart(8)}  ${(statusMap[p.pageId] || "ok")}`,
+			`${p.pageId.padEnd(26)} ${(p.title || "").slice(0, 26).padEnd(28)} ${String(p.blockCount || 0).padStart(6)} ${String(p.sourceCount || 0).padStart(8)}  ${statusMap[p.pageId] || "ok"}`,
 		);
 	}
 	return lines.join("\n");
@@ -64,7 +74,9 @@ function renderList(pages, statusMap) {
 function renderVerify(result) {
 	const lines = [];
 	const { summary, pages } = result;
-	lines.push(`context pages: ${summary.total} (ok ${summary.ok}, stale ${summary.stale}, tampered ${summary.tampered}, obsolete ${summary.obsolete}, orphaned ${summary.orphaned})`);
+	lines.push(
+		`context pages: ${summary.total} (ok ${summary.ok}, stale ${summary.stale}, tampered ${summary.tampered}, obsolete ${summary.obsolete}, orphaned ${summary.orphaned})`,
+	);
 	for (const p of pages) {
 		if (p.status === "ok") continue;
 		lines.push(`  [${p.status}] ${p.pageId}`);
@@ -76,14 +88,25 @@ function renderVerify(result) {
 
 function renderStats(stats) {
 	const lines = [];
-	lines.push(`requests: ${stats.requests.total} (explicit ${stats.requests.byTrigger.explicit || 0}, source-change ${stats.requests.byTrigger["source-change"] || 0})`);
+	lines.push(
+		`requests: ${stats.requests.total} (explicit ${stats.requests.byTrigger.explicit || 0}, source-change ${stats.requests.byTrigger["source-change"] || 0})`,
+	);
 	const windowLabel = stats.window ? ` (window: last ${stats.window} events)` : " (lifetime)";
-	lines.push(`ingests: ${stats.ingests.total} (accepted ${stats.ingests.accepted}, rejected ${stats.ingests.rejected}, no-change ${stats.ingests.noChange})${windowLabel}`);
-	if (stats.ingests.passRate !== null) lines.push(`pass rate: ${(stats.ingests.passRate * 100).toFixed(1)}%`);
-	if (stats.ingests.noChangeRate !== null) lines.push(`no-change rate: ${(stats.ingests.noChangeRate * 100).toFixed(1)}%`);
-	if (stats.filterRate !== null) lines.push(`raw-only filter rate: ${(stats.filterRate * 100).toFixed(1)}% (${stats.rawOnlyChanges} cosmetic changes absorbed)`);
-	if (stats.unknownShare !== null) lines.push(`unknown-block share: ${(stats.unknownShare * 100).toFixed(1)}%`);
-	if (stats.meanSourcesPerBlock !== null) lines.push(`mean sources per block: ${stats.meanSourcesPerBlock}`);
+	lines.push(
+		`ingests: ${stats.ingests.total} (accepted ${stats.ingests.accepted}, rejected ${stats.ingests.rejected}, no-change ${stats.ingests.noChange})${windowLabel}`,
+	);
+	if (stats.ingests.passRate !== null)
+		lines.push(`pass rate: ${(stats.ingests.passRate * 100).toFixed(1)}%`);
+	if (stats.ingests.noChangeRate !== null)
+		lines.push(`no-change rate: ${(stats.ingests.noChangeRate * 100).toFixed(1)}%`);
+	if (stats.filterRate !== null)
+		lines.push(
+			`raw-only filter rate: ${(stats.filterRate * 100).toFixed(1)}% (${stats.rawOnlyChanges} cosmetic changes absorbed)`,
+		);
+	if (stats.unknownShare !== null)
+		lines.push(`unknown-block share: ${(stats.unknownShare * 100).toFixed(1)}%`);
+	if (stats.meanSourcesPerBlock !== null)
+		lines.push(`mean sources per block: ${stats.meanSourcesPerBlock}`);
 	const codes = Object.entries(stats.errorCodes);
 	if (codes.length > 0) {
 		lines.push("rejected by code:");
@@ -95,7 +118,9 @@ function renderStats(stats) {
 function handleRequest(args, targetRoot) {
 	const pageId = args.page;
 	if (!pageId) return errResult("request", "context request requires --page <id> (kebab-case).");
-	const rawSources = args.sources || (args.source ? (Array.isArray(args.source) ? args.source : [args.source]) : undefined);
+	const rawSources =
+		args.sources ||
+		(args.source ? (Array.isArray(args.source) ? args.source : [args.source]) : undefined);
 	const created = createRequest(targetRoot, {
 		pageId,
 		title: args.title,
@@ -106,7 +131,11 @@ function handleRequest(args, targetRoot) {
 		maxWords: args.maxWords ? Number(args.maxWords) : undefined,
 	});
 	if (created.errors.length > 0) {
-		return { result: { target: args.target, errors: created.errors, warnings: [] }, exitCode: 1, bypassPrint: false };
+		return {
+			result: { target: args.target, errors: created.errors, warnings: [] },
+			exitCode: 1,
+			bypassPrint: false,
+		};
 	}
 	return {
 		result: {
@@ -124,7 +153,10 @@ function handleIngest(args, targetRoot) {
 	const requestId = args.request || args.requestId;
 	const payloadPath = args.payload;
 	if (!payloadPath && !args.json) {
-		return errResult("ingest", "context ingest requires --payload <file.json> (the agent's distilled output).");
+		return errResult(
+			"ingest",
+			"context ingest requires --payload <file.json> (the agent's distilled output).",
+		);
 	}
 	const result = ingestPayload(targetRoot, { requestId, payloadPath });
 	if (result.accepted) {
@@ -164,7 +196,11 @@ function handleVerify(args, targetRoot) {
 		const { verifyLoadoutFile } = require("../../core/context-loadout");
 		const result = verifyLoadoutFile(targetRoot, loadoutPath);
 		if (args.json) {
-			return { result: { target: args.target, ...result, errors: [], warnings: [] }, exitCode: result.ok ? 0 : 1, bypassPrint: false };
+			return {
+				result: { target: args.target, ...result, errors: [], warnings: [] },
+				exitCode: result.ok ? 0 : 1,
+				bypassPrint: false,
+			};
 		}
 		const lines = [`loadout: ${args.loadout}`];
 		if (result.ok) {
@@ -173,7 +209,12 @@ function handleVerify(args, targetRoot) {
 			for (const f of result.findings) lines.push(`  ${f.code}: ${f.detail}`);
 		}
 		return {
-			result: { target: args.target, text: lines.join("\n"), errors: result.ok ? [] : result.findings.map((f) => f.detail), warnings: [] },
+			result: {
+				target: args.target,
+				text: lines.join("\n"),
+				errors: result.ok ? [] : result.findings.map((f) => f.detail),
+				warnings: [],
+			},
 			exitCode: result.ok ? 0 : 1,
 			bypassPrint: !args.json,
 		};
@@ -181,7 +222,11 @@ function handleVerify(args, targetRoot) {
 
 	const result = verifyPages(targetRoot);
 	if (args.json) {
-		return { result: { target: args.target, ...result, errors: [], warnings: [] }, exitCode: 0, bypassPrint: false };
+		return {
+			result: { target: args.target, ...result, errors: [], warnings: [] },
+			exitCode: 0,
+			bypassPrint: false,
+		};
 	}
 	return {
 		result: { target: args.target, text: renderVerify(result), errors: [], warnings: [] },
@@ -208,11 +253,14 @@ function renderLoadout(loadout, loadoutPath) {
 	if (loadout.excluded.length > 0) {
 		lines.push(`  excluded: ${loadout.excluded.length} page(s)`);
 		for (const e of loadout.excluded.slice(0, 10)) lines.push(`    - ${e.pageId} (${e.reason})`);
-		if (loadout.excluded.length > 10) lines.push(`    ... and ${loadout.excluded.length - 10} more`);
+		if (loadout.excluded.length > 10)
+			lines.push(`    ... and ${loadout.excluded.length - 10} more`);
 	}
 	if (loadout.deltaSince) lines.push(`  delta since ${loadout.deltaSince}`);
 	lines.push("");
-	lines.push("  Load it: point your agent at the file above; run `amber context verify --loadout <file>` right before loading (Required Artifacts and required-tier Pages).");
+	lines.push(
+		"  Load it: point your agent at the file above; run `amber context verify --loadout <file>` right before loading (Required Artifacts and required-tier Pages).",
+	);
 	return lines.join("\n");
 }
 
@@ -241,7 +289,13 @@ function handleLoad(args, targetRoot) {
 	}
 	if (args.json) {
 		return {
-			result: { target: args.target, loadout: result.loadout, loadoutPath: result.loadoutPath, errors: [], warnings: [] },
+			result: {
+				target: args.target,
+				loadout: result.loadout,
+				loadoutPath: result.loadoutPath,
+				errors: [],
+				warnings: [],
+			},
 			exitCode: 0,
 			bypassPrint: false,
 		};
@@ -281,7 +335,9 @@ function handleShow(args, targetRoot) {
 	if (!page) return errResult("show", `page not found: ${pageId}`);
 	const lines = [`# ${page.title}`, `pageId: ${page.pageId}`, ""];
 	for (const [sid, src] of Object.entries(page.sources || {})) {
-		lines.push(`source ${sid}: [${src.kind}] ${src.ref} (${src.mutable ? "mutable" : "immutable"})`);
+		lines.push(
+			`source ${sid}: [${src.kind}] ${src.ref} (${src.mutable ? "mutable" : "immutable"})`,
+		);
 	}
 	lines.push("");
 	page.blocks.forEach((b) => {
@@ -301,12 +357,16 @@ function handleRefresh(args, targetRoot) {
 		result.requests.length > 0
 			? `${result.requests.length} refresh request(s) generated:`
 			: "no refresh requests needed",
-		...result.requests.map((r) => `  ${r.requestId} -> ${r.pageId} (changed: ${r.changedSources.join(", ")})`),
+		...result.requests.map(
+			(r) => `  ${r.requestId} -> ${r.pageId} (changed: ${r.changedSources.join(", ")})`,
+		),
 		result.rawOnlyRebases.length > 0
 			? `${result.rawOnlyRebases.length} cosmetic change(s) absorbed silently`
 			: "",
 		...result.errors.map((e) => `  error: ${e}`),
-	].filter(Boolean).join("\n");
+	]
+		.filter(Boolean)
+		.join("\n");
 	return {
 		result: { target: args.target, text, errors: result.errors, warnings: [] },
 		exitCode: result.errors.length > 0 ? 1 : 0,
@@ -329,7 +389,6 @@ function handleDelete(args, targetRoot) {
 	const pageId = args.page;
 	if (!pageId) return errResult("delete", "context delete requires --page <id>.");
 	const removed = deletePage(targetRoot, pageId);
-	regenerateIndex(targetRoot);
 	return {
 		result: {
 			target: args.target,

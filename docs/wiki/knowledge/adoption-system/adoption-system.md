@@ -3,12 +3,12 @@ kind: "knowledge"
 category: "adoption-system"
 title: "Adoption System"
 template: "architecture"
-updated_at: "2026-07-14T07:07:21.799Z"
+updated_at: "2026-08-08T00:00:00.000Z"
 ---
 
 # Adoption System
 
-Last Reviewed: 2026-07-16
+Last Reviewed: 2026-08-08
 
 The adoption system evaluates an existing repository and produces a reviewable path
 for adopting Amber. It separates observation, proposal, human decision, gating, and
@@ -29,8 +29,8 @@ the proposed repository changes.
   next-action artifacts into a portable review bundle.
 - `scripts/lib/core/adoption-composer/` contains focused Markdown renderers for
   reports, gates, decisions, selected files, bundles, and shared sections.
-- `scripts/lib/command-handler-families.js` contains the CLI adapter for the core
-  adoption APIs.
+- `scripts/lib/command-dispatcher.js` contains the CLI adapter for the core adoption
+  modules and binds it through the runtime Command registry.
 
 ## Pipeline
 

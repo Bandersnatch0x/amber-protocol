@@ -5,28 +5,14 @@
 // summary. Read-only — it never writes pages or the index.
 
 const fs = require("node:fs");
-const path = require("node:path");
 
 const { listPages, readPage, indexPath } = require("./context-store");
-const { checkSourceHealth, finding, stripRange } = require("./context-sources");
+const { inspectPageHealth } = require("./context-page-health");
+const { finding } = require("./context-sources");
 
 function checkPage(targetRoot, page) {
-	const findings = [];
 	const pageId = page.pageId;
-	const { findings: sourceFindings } = checkSourceHealth(targetRoot, page.sources, pageId);
-	findings.push(...sourceFindings);
-
-	let hasMutable = false;
-	let mutableMissing = 0;
-	let mutableTotal = 0;
-	for (const src of Object.values(page.sources || {})) {
-		if (!src.mutable) continue;
-		hasMutable = true;
-		mutableTotal += 1;
-		if (!fs.existsSync(path.resolve(targetRoot, stripRange(src.ref)))) {
-			mutableMissing += 1;
-		}
-	}
+	const health = inspectPageHealth(targetRoot, page);
 
 	// Orphan check: page must appear in the regenerated index.
 	const index = indexPath(targetRoot);
@@ -37,26 +23,27 @@ function checkPage(targetRoot, page) {
 	} else {
 		orphaned = true;
 	}
+	const findings = [...health.findings];
+	if (health.allMutableSourcesMissing) {
+		findings.push(
+			finding(
+				"AMBER_E_CONTEXT_PAGE_OBSOLETE",
+				`every mutable source of ${pageId} is missing`,
+				pageId,
+			),
+		);
+	}
 	if (orphaned) {
-		findings.push(finding("AMBER_E_CONTEXT_PAGE_ORPHANED", `page ${pageId} is missing from ${indexPath(targetRoot)}`, pageId));
+		findings.push(
+			finding("AMBER_E_CONTEXT_PAGE_ORPHANED", `page ${pageId} is missing from ${index}`, pageId),
+		);
 	}
 
-	const hasStale = findings.some((f) => f.code === "AMBER_E_CONTEXT_SOURCE_STALE");
-	const tampered = findings.some((f) => f.code === "AMBER_E_CONTEXT_SOURCE_TAMPERED");
-
-	let status = "ok";
-	if (hasMutable && mutableTotal > 0 && mutableMissing === mutableTotal) {
-		status = "obsolete";
-		findings.push(finding("AMBER_E_CONTEXT_PAGE_OBSOLETE", `every mutable source of ${pageId} is missing`, pageId));
-	} else if (tampered) {
-		status = "tampered";
-	} else if (hasStale || (hasMutable && mutableMissing > 0)) {
-		status = "stale";
-	} else if (orphaned) {
-		status = "orphaned";
-	}
-
-	return { pageId, title: page.title, status, findings, sourceCount: Object.keys(page.sources || {}).length, blockCount: (page.blocks || []).length };
+	return {
+		...health,
+		status: health.status === "ok" && orphaned ? "orphaned" : health.status,
+		findings,
+	};
 }
 
 /**
@@ -64,7 +51,9 @@ function checkPage(targetRoot, page) {
  * @returns {{ pages: Array, summary: Object }}
  */
 function verifyPages(targetRoot) {
-	const pages = listPages(targetRoot).map(({ pageId }) => readPage(targetRoot, pageId)).filter(Boolean);
+	const pages = listPages(targetRoot)
+		.map(({ pageId }) => readPage(targetRoot, pageId))
+		.filter(Boolean);
 	const checked = pages.map((page) => checkPage(targetRoot, page));
 	const summary = {
 		total: checked.length,
@@ -78,11 +67,4 @@ function verifyPages(targetRoot) {
 	return { pages: checked, summary };
 }
 
-/** pageId -> status map for index regeneration. */
-function statusMap(targetRoot) {
-	const map = {};
-	for (const p of verifyPages(targetRoot).pages) map[p.pageId] = p.status;
-	return map;
-}
-
-module.exports = { verifyPages, checkPage, statusMap };
+module.exports = { verifyPages, checkPage };

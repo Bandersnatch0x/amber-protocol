@@ -30,7 +30,7 @@ This knowledge base is derived from the declarative knowledge plan.
 
 | Category | Goal |
 | --- | --- |
-| [CLI Architecture & Command Dispatch](./cli-architecture-command-dispatch/cli-architecture-command-dispatch.md) | Document how scripts/amber.js dispatches commands through command-dispatcher.js to handler modules and the core engine in scripts/lib/core/. |
+| [CLI Architecture & Command Dispatch](./cli-architecture-command-dispatch/cli-architecture-command-dispatch.md) | Document how scripts/amber.js loads Command definitions from command-help.js, binds handlers in command-dispatcher.js, and delegates domain work to scripts/lib/core/. |
 | [Governance Model & Seven Layers](./governance-model-seven-layers/governance-model-seven-layers.md) | Map the seven governance control layers to concrete commands, data structures, and enforcement points. |
 | [Session & Lifecycle Management](./session-lifecycle-management/session-lifecycle-management.md) | Document routes, sessions, checkpoints, worktrees, and the lifecycle state machine. |
 | [Adoption System](./adoption-system/adoption-system.md) | Explain the adoption report pipeline: proposals, gates, metrics, and the composer sub-module. |
