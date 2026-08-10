@@ -5,8 +5,22 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [Unreleased]
+
+## [1.5.0] - 2026-08-10
+
+### Added
+- **Governed Context knowledge lifecycle (F017)**: classify knowledge by kind,
+  validate forward supersession lineage, and assemble current-only Loadouts and
+  derived projections without introducing a second writable source of truth.
+- Add deterministic Context benchmarks, opt-in source adapters, report-only
+  retention metrics, and dependency-boundary checks for external integrations.
+
+### Changed
+- Extend Context schemas, CLI help and output, verification errors, architecture
+  guidance, and lifecycle documentation for the new assurance capabilities.
+- Reconcile F016/F017 governance evidence: F016 remains accepted; F017 remains
+  passing because its implementation predates a governed plan and Session.
 
 ## [1.4.1] - 2026-08-08
 
