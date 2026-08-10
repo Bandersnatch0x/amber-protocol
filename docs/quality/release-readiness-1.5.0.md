@@ -1,7 +1,7 @@
 # Amber Protocol 1.5.0 Release Readiness
 
 Generated: 2026-08-10
-Status: READY FOR TAG/PUSH/PUBLISH AFTER WORKTREE CLEANUP
+Status: READY FOR TAG/PUSH/PUBLISH
 Scope: release preparation and local verification only.
 
 ## Release Baseline
@@ -12,9 +12,8 @@ Scope: release preparation and local verification only.
   aligned at `1.5.0`.
 - Latest local/remote stable tag and npm registry version: `v1.4.1` / `1.4.1`.
 - `v1.5.0` does not exist locally or remotely.
-- Candidate source contains three commits after `v1.4.1`; the release metadata
-  is committed at `61843c3`, and local `master` is two commits ahead of
-  `origin/master`.
+- The feature delta contains three commits after `v1.4.1`; release metadata is
+  committed locally, and the follow-up governance records are also committed.
 - Governance readiness: 100/100, with no next actions.
 
 ## Release Candidate Verification
@@ -60,15 +59,13 @@ Verified on Node `v24.2.0`:
 
 ## Remaining Release Steps
 
-1. Resolve the three unrelated user-owned working-tree changes separately:
-   `docs/quality/release-readiness-1.3.12.md`, `session-handoff.md`, and
-   `output/prd-context-knowledge-lifecycle.md`.
-2. Push the outstanding source and release commits to `origin/master`; require a
+1. Push the outstanding source, release, and governance commits to
+   `origin/master`; require a
    green CI run before tagging.
-3. After explicit human approval, create and push annotated tag `v1.5.0`.
-4. Let tag-triggered CI publish to npm and GitHub Packages; do not run a
+2. After explicit human approval, create and push annotated tag `v1.5.0`.
+3. Let tag-triggered CI publish to npm and GitHub Packages; do not run a
    competing manual `npm publish`.
-5. After the workflows complete, run `npm run release:verify`, confirm registry
+4. After the workflows complete, run `npm run release:verify`, confirm registry
    version `1.5.0`, perform clean-install CLI smoke tests, and verify the GitHub
    Release.
 

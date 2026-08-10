@@ -1,19 +1,19 @@
 # Amber Protocol 1.3.12 Release Readiness
 
-Generated: 2026-08-04 (refreshed after release-candidate gates)
-Status: READY FOR HUMAN RELEASE GATES (tag/push/publish intentionally deferred)
-Scope: readiness evidence only; no tag, push, or publish performed for 1.3.12.
+Generated: 2026-08-04 (final after tag/push/publish)
+Status: RELEASED
+Scope: release complete.
 
 ## Release Baseline
 
-- Current package version: `1.3.12` (local, uncommitted metadata).
-- Claude/Codex plugin manifests: `1.3.12` (aligned via `version:sync`).
-- Latest remote stable tag: `v1.3.11`.
-- Registry latest: `1.3.11`.
-- `release:verify`: 13 stable tags present remotely and published; no ghost or unpushed stable tags.
-- Local `master` is aligned with `origin/master` (`aheadOfOrigin=0`); all prior commits pushed.
-- CI green on the last pushed state: run 30894011845 (identity, test, coverage, security, performance, web).
+- Published package version: `1.3.12` (registry).
+- Claude/Codex plugin manifests: `1.3.12`.
+- Latest remote stable tag: `v1.3.12`.
+- Registry latest: `1.3.12`.
+- `release:verify`: 14 stable tags present remotely and published; no ghost or unpushed stable tags.
+- Local `master` is aligned with `origin/master`; release commits pushed and CI green.
 - Governance readiness: 100/100, zero findings, zero next actions.
+- GitHub Release `v1.3.12` exists, created by `github-actions[bot]`, not draft/prerelease.
 
 ## Release Candidate Verification (Node 22.19.0)
 
@@ -52,17 +52,19 @@ All gates rerun against the 1.3.12 release candidate after metadata sealing:
 - `package.json`, `package-lock.json`, README badge, and both plugin manifests read `1.3.12`.
 - CHANGELOG `[Unreleased]` content dated as `[1.3.12] - 2026-08-04`; fresh empty `[Unreleased]` section added.
 
-## Remaining Release Steps (all behind explicit human approval)
+## Post-Publish Verification
 
-1. Commit release metadata (5 version files + CHANGELOG + this readiness artifact).
-2. Human approval: create annotated tag `v1.3.12` and push commit + tag.
-3. Let tag-triggered CI publish to npm (`refs/tags/v*`); do not run a competing manual `npm publish`.
-4. Post-release:
-   - `npm run release:verify`
-   - `npm view amber-protocol version` -> `1.3.12`
-   - clean install smoke test and `amber --version` -> `1.3.12`
-   - verify GitHub Release exists.
-5. Refresh `session-handoff.md` (`amber handoff`) after the metadata commit.
+- [x] `npm run release:verify`: OK — 14 stable tags all published (latest registry: 1.3.12).
+- [x] `npm view amber-protocol version`: `1.3.12`.
+- [x] Clean-install smoke (`npm install amber-protocol@latest`):
+  - `amber --version` -> `1.3.12`.
+  - `coding-harness --version` -> `1.3.12`.
+- [x] GitHub Release `v1.3.12` exists at https://github.com/Bandersnatch0x/amber-protocol/releases/tag/v1.3.12.
+- [x] CI publish completed automatically from tag push; no manual `npm publish` was run.
+
+## Remaining Release Steps
+
+All release steps completed. No further action required for 1.3.12.
 
 ## Non-Blocking Observation
 
