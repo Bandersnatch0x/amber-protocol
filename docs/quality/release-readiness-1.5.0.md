@@ -1,19 +1,18 @@
 # Amber Protocol 1.5.0 Release Readiness
 
 Generated: 2026-08-10
-Status: READY FOR TAG/PUSH/PUBLISH
-Scope: release preparation and local verification only.
+Status: RELEASED
+Scope: release complete.
 
 ## Release Baseline
 
-- Candidate version: `1.5.0` (minor release for the governed Context knowledge
-  lifecycle introduced after `v1.4.1`).
+- Published package version: `1.5.0` (minor release for the governed Context
+  knowledge lifecycle introduced after `v1.4.1`).
 - `package.json`, `package-lock.json`, README, and both plugin manifests are
   aligned at `1.5.0`.
-- Latest local/remote stable tag and npm registry version: `v1.4.1` / `1.4.1`.
-- `v1.5.0` does not exist locally or remotely.
-- The feature delta contains three commits after `v1.4.1`; release metadata is
-  committed locally, and the follow-up governance records are also committed.
+- Latest local/remote stable tag and npm registry version: `v1.5.0` / `1.5.0`.
+- Annotated tag `v1.5.0` resolves to `029e07f`; the same commit was pushed to
+  `origin/master` before tagging.
 - Governance readiness: 100/100, with no next actions.
 
 ## Release Candidate Verification
@@ -57,17 +56,25 @@ Verified on Node `v24.2.0`:
 - F016/F017 governance evidence is reconciled without granting retrospective
   acceptance to F017.
 
+## Post-Publish Verification
+
+- [x] `master` push CI completed successfully at `029e07f`.
+- [x] Annotated tag `v1.5.0` was pushed and resolves to `029e07f` locally and
+  remotely.
+- [x] Tag-triggered CI completed successfully.
+- [x] GitHub Packages publish workflow completed successfully.
+- [x] `npm run release:verify`: 17 stable tags are published; latest registry
+  version is `1.5.0`.
+- [x] `npm view amber-protocol version`: `1.5.0`.
+- [x] Clean-install smoke test: package metadata, `amber --version`, and
+  `coding-harness --version` all report `1.5.0`.
+- [x] GitHub Release `v1.5.0` exists, is published, and is neither a draft nor a
+  prerelease.
+- [x] No competing manual `npm publish` was run.
+
 ## Remaining Release Steps
 
-1. Push the outstanding source, release, and governance commits to
-   `origin/master`; require a
-   green CI run before tagging.
-2. After explicit human approval, create and push annotated tag `v1.5.0`.
-3. Let tag-triggered CI publish to npm and GitHub Packages; do not run a
-   competing manual `npm publish`.
-4. After the workflows complete, run `npm run release:verify`, confirm registry
-   version `1.5.0`, perform clean-install CLI smoke tests, and verify the GitHub
-   Release.
+All release steps completed. No further action is required for `1.5.0`.
 
 ## Non-Blocking Observation
 
