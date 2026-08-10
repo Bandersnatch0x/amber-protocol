@@ -14,6 +14,8 @@ do not execute workflows or mutate repository state.
   predating the Amber Protocol rename; command and file names reflect that era.
 - [Schema specification](SCHEMA_SPEC.md) - route, session, and timeline schema
   design notes for the Phase B contract.
+- [Context threat model](../architecture/context-threat-model.md) - trust boundaries,
+  controls, residual risks, and report-only retention rules for Context artifacts.
 
 ## Maintenance
 

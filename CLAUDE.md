@@ -18,8 +18,9 @@ Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, ga
 scripts/amber.js              -> Unified CLI entry point
 scripts/lib/command-help.js -> Command definitions, help, output policy, and stable public order
 scripts/lib/command-dispatcher.js -> Command handlers, startup registry binding, and dispatch
+scripts/lib/context/          -> Public Context Interface and command adapter boundary
 scripts/lib/core/             -> Domain modules (adoption-*, loops, doctor, profiles, etc.); imported directly (no facade — ADR-0005)
-scripts/lib/core/context-*.js -> Contract-driven Context Page ingestion, verification, refresh, and Loadout assembly
+scripts/lib/core/context-*.js -> Context lifecycle, assurance evidence, projections, benchmarks, source adapters, retention, and Loadout assembly
 scripts/lib/core/governed-runner.js -> Governed execution gates (ledger, policy, confidence, approval, worktree)
 scripts/lib/core/agent-orchestration.js -> Artifact-only worker/reviewer dispatch records and approval markers
 scripts/lib/migrate-command.js -> Schema migration and ADR-0012 version backfill for recognized artifacts

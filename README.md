@@ -237,6 +237,10 @@ amber context verify --target . --json                         # page health (st
 amber context refresh --target .                               # regenerate requests for stale sources
 amber context load --target . --route feature-standard --feature F016 # assemble a governed Loadout
 amber context verify --target . --loadout .amber/context/loadouts/feature-standard-F016.json
+amber context projection status --target .                    # verify the derived index projection
+amber context benchmark --target . --fixture <fixture.json>   # deterministic Loadout quality report
+amber context source-adapter --target . --fixture <fixture.json> --enable # unaccepted local candidates
+amber context retention --target . --older-than-days 90       # report-only retention candidates
 amber context stats --target . --window 50                     # filter rate, pass rate, unknown share
 ```
 
@@ -244,6 +248,10 @@ Every claim on an accepted page carries provenance; pages live in `.amber/contex
 indexed in `docs/wiki/context-index.md`. See `skills/amber-context/SKILL.md` for the full loop an
 agent should run. Loadouts separately include target-local Required Artifacts and fresh Context
 Pages, enforce the configured budget, and fail closed when required inputs are missing or changed.
+Knowledge Kind, supersession lineage, and assurance are observational and never grant execution
+authority. Source adapters are opt-in, transcript import requires explicit redacted handling, and
+returned Source Bundles are hash-bound to the selected Target Repository. Retention never deletes
+artifacts. See the [Context threat model](docs/architecture/context-threat-model.md).
 
 ### Mechanical enforcement (opt-in)
 

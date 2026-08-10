@@ -1054,6 +1054,7 @@ node scripts/amber.js context ingest  --target . --request <id> --payload no-cha
 # Health and maintenance
 node scripts/amber.js context verify --target . --json
 node scripts/amber.js context list   --target .
+node scripts/amber.js context list   --target . --knowledge-kind decision
 node scripts/amber.js context show   --target . --page <id>
 node scripts/amber.js context refresh --target .          # absorbs cosmetic changes; requests real ones
 node scripts/amber.js context delete --target . --page <id>
@@ -1063,13 +1064,24 @@ node scripts/amber.js context load --target . --route feature-standard
 node scripts/amber.js context load --target . --route feature-standard --feature F016 --budget 4000 --page governed-execution
 node scripts/amber.js context verify --target . --loadout .amber/context/loadouts/feature-standard-F016.json
 
+# Rebuildable projections and deterministic quality checks
+node scripts/amber.js context projection status --target .
+node scripts/amber.js context projection rebuild --target .
+node scripts/amber.js context benchmark --target . --fixture fixtures/context-benchmark.json --mode smoke
+
+# Opt-in source candidates and report-only retention
+node scripts/amber.js context source-adapter --target . --fixture fixtures/context-source.json --enable
+node scripts/amber.js context source-adapter --target . --fixture fixtures/context-source.json --enable --allow-transcript
+node scripts/amber.js context retention --target . --older-than-days 90
+
 # Observability
 node scripts/amber.js context stats --target .            # lifetime
 node scripts/amber.js context stats --target . --window 50   # last 50 events
+node scripts/amber.js context stats --target . --knowledge-kind decision
 ```
 
 Sources are mutable by default (raw+normalized hash; cosmetic changes absorbed silently) and
-immutable under `.amber/` and `docs/adr/` (excerpt-snapshotted; tamper detected). A payload must
+immutable under `.amber/`, `docs/adr/`, and `docs/decisions/` (excerpt-snapshotted; tamper detected). A payload must
 reproduce the request's bundled source hashes verbatim — re-bundling is rejected as stale.
 Failures carry the `AMBER_E_CONTEXT_*` codes (see `amber explain`).
 
@@ -1078,6 +1090,21 @@ target-local Operating Manual (`docs/wiki/agent/amber.md`), selected Route manif
 Definition (`docs/wiki/agent/context-loadout.md`); Context Page accounting remains in `references`.
 Missing, escaped, or hash-changed Required Artifacts fail closed. `verify --loadout` rechecks them
 and any required-tier Pages immediately before the host agent loads the artifact.
+
+Context lifecycle metadata is observational. `knowledgeKind`, supersession lineage, assurance
+confidence, and maturity are displayed independently from source health. Successful ingest writes
+hash-bound verification evidence under `.amber/context/verification/`; mechanical verification time
+is derived from that evidence and becomes unavailable when the accepted page no longer matches it.
+Assurance never grants execution authority and does not weaken policy, approval, isolation, evidence,
+freshness, Required Artifact, or Loadout budget checks.
+
+`source-adapter` is disabled unless `--enable` is present and only returns unaccepted Source Bundle
+candidates. It never writes Context Pages or Loadouts. Transcript sources additionally require
+`--allow-transcript` and are redacted before being returned. Every returned bundle carries a hashed
+target binding; if a fixture declares `target`, the binding must match the selected Target Repository.
+`retention` is report-only: it identifies
+age and eligibility but does not delete or rewrite requests, payloads, pages, verification evidence,
+Loadouts, or projections. See the [Context threat model](architecture/context-threat-model.md).
 
 ## Error Codes
 
