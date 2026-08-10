@@ -92,6 +92,7 @@ Desktop.ini
 notes.md
 MEMORY.md
 .release-checklist.md
+session-handoff.md
 tasks/
 feature_list.json
 !/feature_list.json
