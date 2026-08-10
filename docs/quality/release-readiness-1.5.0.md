@@ -66,8 +66,8 @@ Verified on Node `v24.2.0`:
 - [x] `npm run release:verify`: 17 stable tags are published; latest registry
   version is `1.5.0`.
 - [x] `npm view amber-protocol version`: `1.5.0`.
-- [x] Clean-install smoke test: package metadata, `amber --version`, and
-  `coding-harness --version` all report `1.5.0`.
+- [x] Clean-install smoke test: package metadata, `amber --version`, and the
+  deprecated `coding-harness --version` compatibility alias all report `1.5.0`.
 - [x] GitHub Release `v1.5.0` exists, is published, and is neither a draft nor a
   prerelease.
 - [x] No competing manual `npm publish` was run.
