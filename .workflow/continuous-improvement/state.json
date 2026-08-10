@@ -42,13 +42,33 @@
       "id": "next-governed-triage",
       "title": "Run the next read-only daily Amber triage",
       "status": "ready",
-      "command": "node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json"
+      "command": "node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json",
+      "lastRun": "2026-08-10T09:20:14.831Z",
+      "lastResult": "clean dry-run; errors=0, warnings=0, executesAnything=false"
     },
     {
       "id": "weekly-dogfood",
       "title": "Drive one real lifecycle slice via docs/dogfood-weekly.md",
       "status": "done",
       "command": "node scripts/amber.js next --target ."
+    },
+    {
+      "id": "f017-lifecycle-plan",
+      "title": "Create and review the F017 lifecycle plan",
+      "status": "invalidated",
+      "lastResult": "Invalidated after review: retrospective artifacts cannot satisfy the prospective Amber lifecycle."
+    },
+    {
+      "id": "f017-lifecycle-accept",
+      "title": "Accept the reviewed F017 lifecycle plan",
+      "status": "invalidated",
+      "lastResult": "Acceptance reverted; F017 restored to passing and the evolution entry removed."
+    },
+    {
+      "id": "f017-source-isolation-review",
+      "title": "Record F017 retrospective and source-isolation evidence",
+      "status": "done",
+      "command": "Review docs/quality/f017-context-knowledge-lifecycle-retrospective.md"
     }
   ],
   "approvalGates": [
@@ -62,6 +82,12 @@
     "change primary product behavior, major UI flows, or security boundaries"
   ],
   "resultNotes": [
+    "2026-08-10: Post-review correction invalidated the retrospective F017 plan and acceptance, restored F017 to passing, removed the erroneous evolution entry, and recorded complete-range source-isolation evidence in docs/quality/f017-context-knowledge-lifecycle-retrospective.md. Final Standards and Spec review found no unresolved findings; 64 focused and 1649 full-suite tests passed with repository gates green.",
+    "2026-08-10 [superseded]: F017 was temporarily marked accepted; post-review found that retrospective artifacts cannot satisfy the prospective Amber lifecycle, so this state was invalidated.",
+    "2026-08-10 [superseded]: User confirmation was applied to the retrospective F017 draft; the draft was later removed from docs/plans because it could not authorize already-landed implementation.",
+    "2026-08-10 [superseded]: A retrospective F017 lifecycle draft was created; it was replaced by a non-governing quality evidence record after two-axis review.",
+    "2026-08-10: F016 review initially exposed a missing phase-boundary acknowledgment; added the explicit guardrail, reran review with no findings, formally accepted F016, and verified its plan, feature status, and evolution record agree. F017 lifecycle planning is the next ready candidate.",
+    "2026-08-10: Daily Amber triage and health checks were clean; registered the shipped governed Context knowledge lifecycle as F017 with 79 focused tests and the 1649-test full suite passing, plus manifests, doctor, generated-agent drift, and wiki validation green.",
     "2026-07-22: Continuous improvement batch (17 local commits): policy parity, handoff evidence, governance timeline, execution readiness, FD redirects, web timeline, SSE timestamps, status dirty labels.",
     "2026-07-22: master ahead of origin by ~17 commits; push when ready to share.",
     "2026-07-16: Continuous improvement state initialized from the repository template."

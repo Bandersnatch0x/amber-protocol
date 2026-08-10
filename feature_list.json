@@ -318,7 +318,7 @@
       "area": "governance",
       "title": "Review blocker remediation",
       "user_visible_behavior": "The Context, Loadout, governed execution, routing, migration, workflow assessment, and handoff surfaces introduced after origin/master fail closed at their public boundaries and pass the repository's complete verification gates.",
-      "status": "passing",
+      "status": "accepted",
       "verification": [
         "node --test tests/unit/context-*.test.js tests/governance-confidence.test.js tests/next-objective.test.js tests/no-progress-detector.test.js tests/schema-versioning.test.js",
         "npm test",
@@ -379,7 +379,63 @@
         "tests/",
         "docs/"
       ],
-      "updated": "2026-08-07"
+      "updated": "2026-08-10"
+    },
+    {
+      "id": "F017",
+      "priority": 17,
+      "area": "context",
+      "title": "Governed Context knowledge lifecycle",
+      "user_visible_behavior": "Context Pages carry governed knowledge classification and supersession lineage; Loadouts exclude superseded knowledge, derived indexes are rebuildable, benchmarks are deterministic, and optional source adapters remain behind the existing ingest boundary.",
+      "status": "passing",
+      "verification": [
+        "node --test tests/unit/context-adapter.test.js tests/unit/context-dependency-boundary.test.js tests/unit/context-schema.test.js tests/unit/context-verify-refresh-stats.test.js tests/unit/error-catalog.test.js tests/unit/parse-args.test.js",
+        "source-isolation review of git diff d75750f48b2fa9511ea87b127d4e361be48fd755 96d3cc1ec795c5ff322e049938601221f1b7df86",
+        "npm test",
+        "npm run manifests",
+        "node scripts/amber.js doctor --target .",
+        "node scripts/validate-wiki.js --target ."
+      ],
+      "evidence": [
+        {
+          "command": "node --test tests/unit/context-adapter.test.js tests/unit/context-dependency-boundary.test.js tests/unit/context-schema.test.js tests/unit/context-verify-refresh-stats.test.js tests/unit/error-catalog.test.js tests/unit/parse-args.test.js",
+          "result": "79 passed, 0 failed",
+          "date": "2026-08-10",
+          "notes": "Focused verification of Knowledge Kind and lineage binding, current-only Loadouts, projections, benchmarks, source adapters, retention reporting, dependency boundaries, schemas, error codes, and CLI parsing."
+        },
+        {
+          "command": "source-isolation review of git diff d75750f48b2fa9511ea87b127d4e361be48fd755 96d3cc1ec795c5ff322e049938601221f1b7df86",
+          "result": "passed; complete 36-file change set reviewed with no external project references, attribution markers, imported fixtures, package changes, or non-original source indicators found",
+          "date": "2026-08-10",
+          "notes": "Detailed mechanical and manual evidence: docs/quality/f017-context-knowledge-lifecycle-retrospective.md"
+        },
+        {
+          "command": "npm test",
+          "result": "1649 total, 1645 passed, 4 skipped, 0 failed",
+          "date": "2026-08-10",
+          "notes": "Full repository verification after registering F017 in the feature inventory."
+        },
+        {
+          "command": "npm run manifests; node scripts/amber.js doctor --target .; node scripts/validate-wiki.js --target .",
+          "result": "exit 0; manifest errors 0; doctor errors 0 warnings 0; wiki errors 0",
+          "date": "2026-08-10",
+          "notes": "Continuous-improvement health pass after the F017 implementation and documentation commits landed on master."
+        }
+      ],
+      "notes": [
+        "Implementation commit fbb9894ec00fedae699c2b299f76bcabbe954a60; documentation commit 96d3cc1.",
+        "Implementation predates any governed plan or Session, so F017 remains passing rather than accepted; see docs/quality/f017-context-knowledge-lifecycle-retrospective.md."
+      ],
+      "paths": [
+        "scripts/lib/core/context-*.js",
+        "scripts/lib/context/",
+        "schemas/context-*.schema.json",
+        "tests/unit/context-*.test.js",
+        "docs/architecture/context-threat-model.md",
+        "docs/CLI_REFERENCE.md",
+        "docs/quality/f017-context-knowledge-lifecycle-retrospective.md"
+      ],
+      "updated": "2026-08-10"
     }
   ]
 }

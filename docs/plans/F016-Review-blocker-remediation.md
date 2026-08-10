@@ -1,7 +1,7 @@
 # Plan: Review blocker remediation
 
 Feature: F016
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
@@ -49,6 +49,7 @@ The Context, Loadout, governed execution, routing, migration, workflow assessmen
 - The final review has no unresolved findings, and the new architecture assessment names the exact baseline SHA, review HEAD SHA, reviewed patch fingerprint, and implementation commit SHA.
 - The commit-SHA binding identifies the implementation commit without requiring the evidence report to self-reference its own containing commit.
 - F016 does not modify `docs/quality/release-readiness-1.3.12.md`, `.workbuddy/*`, or the historical assessment as part of acceptance.
+- F016 preserves the current Amber phase boundary: it adds no dynamic workflow execution, live subagent dispatch, automatic target-project commands, unattended scheduling, or external-system writes.
 
 ## Verification
 

@@ -45,3 +45,9 @@ Last Reviewed: 2026-08-04
 - Plan: `docs/plans/F015-Loop-no-progress-reporting.md`
 - Review status: ready
 - Feature: F015 status → accepted in feature_list.json
+
+## 2026-08-10 docs/plans/F016-Review-blocker-remediation.md
+
+- Plan: `docs/plans/F016-Review-blocker-remediation.md`
+- Review status: ready
+- Feature: F016 status → accepted in feature_list.json
