@@ -102,6 +102,25 @@ test("feature add flags are registered (#75: --behavior, repeatable --verify)", 
 	assert.deepEqual(args._ || [], []);
 });
 
+test("Context lifecycle, adapter, benchmark, and retention flags are registered", () => {
+	const args = parseArgs([
+		"--knowledge-kind", "decision",
+		"--supersedes", "old-rule",
+		"--supersedes", "older-rule",
+		"--fixture", "fixtures/context.json",
+		"--enable",
+		"--allow-transcript",
+		"--older-than-days", "30",
+	]);
+	assert.equal(args.knowledgeKind, "decision");
+	assert.deepEqual(args.supersedes, ["old-rule", "older-rule"]);
+	assert.equal(args.fixture, "fixtures/context.json");
+	assert.equal(args.enable, true);
+	assert.equal(args.allowTranscript, true);
+	assert.equal(args.olderThanDays, "30");
+	assert.deepEqual(args._ || [], []);
+});
+
 test("a value flag at the end of argv yields undefined", () => {
 	const args = parseArgs(["--output"]);
 	assert.equal("output" in args, true);

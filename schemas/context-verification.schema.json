@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Context Verification Evidence",
+  "description": "Amber-generated, hash-bound evidence that a persisted Context Page passed the ingest gate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "pageId", "requestId", "outcome", "pageHash", "ingestEventHash", "verifiedAt"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "pageId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "requestId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "outcome": { "enum": ["accepted", "no-change"] },
+    "pageHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "ingestEventHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "verifiedAt": { "type": "string", "format": "date-time" }
+  }
+}

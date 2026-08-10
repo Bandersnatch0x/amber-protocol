@@ -2,6 +2,8 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
 	CATALOG,
@@ -64,6 +66,26 @@ test("every public Context Loadout error code is registered", () => {
 		"AMBER_E_CONTEXT_LOADOUT_MISSING",
 		"AMBER_E_CONTEXT_LOADOUT_CORRUPT",
 	]) {
+		assert.ok(getEntry(code), `${code} must be explainable`);
+	}
+});
+
+test("every production Context error code is registered", () => {
+	const libRoot = path.join(__dirname, "..", "..", "scripts", "lib");
+	const discovered = new Set();
+	const visit = (dir) => {
+		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+			const full = path.join(dir, entry.name);
+			if (entry.isDirectory()) visit(full);
+			else if (entry.name.endsWith(".js") && entry.name !== "error-catalog.js") {
+				for (const match of fs.readFileSync(full, "utf8").matchAll(/AMBER_E_CONTEXT_[A-Z_]+/g)) {
+					discovered.add(match[0]);
+				}
+			}
+		}
+	};
+	visit(libRoot);
+	for (const code of [...discovered].sort()) {
 		assert.ok(getEntry(code), `${code} must be explainable`);
 	}
 });

@@ -6,12 +6,24 @@
 const path = require("node:path");
 
 const { resolveTarget } = require("../../core/fs-utils");
-const { createRequest } = require("../../core/context-request");
-const { ingestPayload } = require("../../core/context-ingest");
-const { verifyPages } = require("../../core/context-verify");
-const { refreshPages } = require("../../core/context-refresh");
-const { computeStats } = require("../../core/context-stats");
-const { listPages, readPage, deletePage } = require("../../core/context-store");
+const {
+	createRequest,
+	ingestPayload,
+	verifyPages,
+	refreshPages,
+	computeStats,
+	listPages,
+	readPage,
+	deletePage,
+	describeKnowledge,
+	buildLoadout,
+	verifyLoadoutFile,
+	projectionStatus,
+	rebuildProjection,
+	runBenchmark,
+	importSourceBundle,
+	retentionReport,
+} = require("../index");
 
 const ACTIONS = [
 	"request",
@@ -23,6 +35,10 @@ const ACTIONS = [
 	"stats",
 	"delete",
 	"load",
+	"projection",
+	"benchmark",
+	"source-adapter",
+	"retention",
 ];
 
 function errResult(action, message) {
@@ -62,27 +78,35 @@ function renderRequest(req, requestPath) {
 function renderList(pages, statusMap) {
 	if (pages.length === 0)
 		return "No context pages. Create one with `amber context request --page <id>`.";
-	const lines = ["pageId                    title                         blocks  sources  status"];
+	const lines = [
+		"pageId                    title                         kind                 lifecycle   assurance             verified at               blocks  sources  status",
+	];
 	for (const p of pages) {
+		const assurance = `${p.assurance.confidence || "-"}/${p.assurance.maturity || "-"}`;
 		lines.push(
-			`${p.pageId.padEnd(26)} ${(p.title || "").slice(0, 26).padEnd(28)} ${String(p.blockCount || 0).padStart(6)} ${String(p.sourceCount || 0).padStart(8)}  ${statusMap[p.pageId] || "ok"}`,
+			`${p.pageId.padEnd(26)} ${(p.title || "").slice(0, 26).padEnd(28)} ${(p.knowledgeKind || "unspecified").padEnd(20)} ${(p.lifecycle || "current").padEnd(11)} ${assurance.padEnd(21)} ${(p.assurance.verifiedAt || "-").padEnd(25)} ${String(p.blockCount || 0).padStart(6)} ${String(p.sourceCount || 0).padStart(8)}  ${statusMap[p.pageId] || "ok"}`,
 		);
 	}
 	return lines.join("\n");
 }
 
 function renderVerify(result) {
+	if (result.ok === false) {
+		return `context projection unavailable: ${result.code}: ${result.detail}`;
+	}
 	const lines = [];
 	const { summary, pages } = result;
 	lines.push(
 		`context pages: ${summary.total} (ok ${summary.ok}, stale ${summary.stale}, tampered ${summary.tampered}, obsolete ${summary.obsolete}, orphaned ${summary.orphaned})`,
 	);
 	for (const p of pages) {
-		if (p.status === "ok") continue;
-		lines.push(`  [${p.status}] ${p.pageId}`);
+		const assurance = `${p.assurance.confidence || "-"}/${p.assurance.maturity || "-"}`;
+		lines.push(
+			`  [${p.status}] ${p.pageId} (${p.knowledgeKind}, ${p.lifecycle}, assurance ${assurance}, verified ${p.assurance.verifiedAt || "unavailable"})`,
+		);
 		for (const f of p.findings) lines.push(`    ${f.code}: ${f.detail}`);
 	}
-	if (lines.length === 1) lines.push("  all pages healthy");
+	if (pages.length === 0) lines.push("  no accepted pages");
 	return lines.join("\n");
 }
 
@@ -107,6 +131,18 @@ function renderStats(stats) {
 		lines.push(`unknown-block share: ${(stats.unknownShare * 100).toFixed(1)}%`);
 	if (stats.meanSourcesPerBlock !== null)
 		lines.push(`mean sources per block: ${stats.meanSourcesPerBlock}`);
+	if (stats.knowledgeKind) lines.push(`knowledge kind: ${stats.knowledgeKind}`);
+	lines.push(`pages: ${stats.pages}`);
+	lines.push(
+		`lineage: current ${stats.lineage.current}, superseded ${stats.lineage.superseded}`,
+	);
+	lines.push(`assurance verified: ${stats.assurance.verified}/${stats.pages}`);
+	lines.push(
+		`confidence: high ${stats.assurance.confidence.high}, medium ${stats.assurance.confidence.medium}, low ${stats.assurance.confidence.low}, unspecified ${stats.assurance.confidence.unspecified}`,
+	);
+	lines.push(
+		`maturity: validated ${stats.assurance.maturity.validated}, reviewed ${stats.assurance.maturity.reviewed}, provisional ${stats.assurance.maturity.provisional}, unspecified ${stats.assurance.maturity.unspecified}`,
+	);
 	const codes = Object.entries(stats.errorCodes);
 	if (codes.length > 0) {
 		lines.push("rejected by code:");
@@ -129,6 +165,8 @@ function handleRequest(args, targetRoot) {
 		scope: args.scope,
 		force: Boolean(args.force),
 		maxWords: args.maxWords ? Number(args.maxWords) : undefined,
+		knowledgeKind: args.knowledgeKind,
+		supersedes: args.supersedes,
 	});
 	if (created.errors.length > 0) {
 		return {
@@ -193,7 +231,6 @@ function handleVerify(args, targetRoot) {
 	// Loadout re-verification (ADR-0010 D7): required-tier-only hash check.
 	if (args.loadout) {
 		const loadoutPath = path.resolve(targetRoot, args.loadout);
-		const { verifyLoadoutFile } = require("../../core/context-loadout");
 		const result = verifyLoadoutFile(targetRoot, loadoutPath);
 		if (args.json) {
 			return {
@@ -223,14 +260,25 @@ function handleVerify(args, targetRoot) {
 	const result = verifyPages(targetRoot);
 	if (args.json) {
 		return {
-			result: { target: args.target, ...result, errors: [], warnings: [] },
-			exitCode: 0,
+			result: {
+				target: args.target,
+				...result,
+				errors: result.ok ? [] : [`${result.code}: ${result.detail}`],
+				warnings: [],
+			},
+			exitCode: result.ok ? 0 : 1,
 			bypassPrint: false,
 		};
 	}
 	return {
-		result: { target: args.target, text: renderVerify(result), errors: [], warnings: [] },
-		exitCode: 0,
+		result: {
+			target: args.target,
+			code: result.code,
+			text: renderVerify(result),
+			errors: result.ok ? [] : [`${result.code}: ${result.detail}`],
+			warnings: [],
+		},
+		exitCode: result.ok ? 0 : 1,
 		bypassPrint: !args.json,
 	};
 }
@@ -265,7 +313,6 @@ function renderLoadout(loadout, loadoutPath) {
 }
 
 function handleLoad(args, targetRoot) {
-	const { buildLoadout } = require("../../core/context-loadout");
 	const result = buildLoadout(targetRoot, {
 		route: args.route,
 		feature: args.feature,
@@ -274,6 +321,7 @@ function handleLoad(args, targetRoot) {
 		// Repeatable --page pins pages into the required tier (D3 fail-fast
 		// and D7 verify --loadout become reachable from the CLI).
 		required: args.page ? (Array.isArray(args.page) ? args.page : [args.page]) : undefined,
+		knowledgeKinds: args.knowledgeKind,
 	});
 	if (result.errors.length > 0) {
 		return {
@@ -315,12 +363,31 @@ function handleLoad(args, targetRoot) {
 
 function handleList(args, targetRoot) {
 	const verify = verifyPages(targetRoot);
+	if (!verify.ok) {
+		return {
+			result: {
+				target: args.target,
+				code: verify.code,
+				errors: [`${verify.code}: ${verify.detail}`],
+				warnings: [],
+			},
+			exitCode: 1,
+			bypassPrint: false,
+		};
+	}
 	const statusMap = {};
 	for (const p of verify.pages) statusMap[p.pageId] = p.status;
-	const pages = listPages(targetRoot).map(({ pageId }) => {
-		const v = verify.pages.find((x) => x.pageId === pageId);
-		return v || { pageId, title: "", blockCount: 0, sourceCount: 0 };
-	});
+	const pages = listPages(targetRoot)
+		.map(({ pageId }) => {
+			const v = verify.pages.find((x) => x.pageId === pageId);
+			const page = readPage(targetRoot, pageId);
+			return {
+				...(v || { pageId, title: "", blockCount: 0, sourceCount: 0 }),
+				...describeKnowledge(targetRoot, page),
+				assurance: v ? v.assurance : { confidence: null, maturity: null, verifiedAt: null },
+			};
+		})
+		.filter((page) => !args.knowledgeKind || page.knowledgeKind === args.knowledgeKind);
 	return {
 		result: { target: args.target, text: renderList(pages, statusMap), errors: [], warnings: [] },
 		exitCode: 0,
@@ -333,7 +400,24 @@ function handleShow(args, targetRoot) {
 	if (!pageId) return errResult("show", "context show requires --page <id>.");
 	const page = readPage(targetRoot, pageId);
 	if (!page) return errResult("show", `page not found: ${pageId}`);
-	const lines = [`# ${page.title}`, `pageId: ${page.pageId}`, ""];
+	const knowledge = describeKnowledge(targetRoot, page);
+	const verified = verifyPages(targetRoot).pages.find((item) => item.pageId === pageId);
+	const assurance = verified
+		? verified.assurance
+		: { confidence: null, maturity: null, verifiedAt: null };
+	const lines = [
+		`# ${page.title}`,
+		`pageId: ${page.pageId}`,
+		`knowledge kind: ${knowledge.knowledgeKind}`,
+		`lifecycle: ${knowledge.lifecycle}`,
+		`assurance: ${assurance.confidence || "-"}/${assurance.maturity || "-"}`,
+		`mechanically verified at: ${assurance.verifiedAt || "unavailable"}`,
+		...(knowledge.supersedes.length > 0 ? [`supersedes: ${knowledge.supersedes.join(", ")}`] : []),
+		...(knowledge.supersededBy.length > 0
+			? [`superseded by: ${knowledge.supersededBy.join(", ")}`]
+			: []),
+		"",
+	];
 	for (const [sid, src] of Object.entries(page.sources || {})) {
 		lines.push(
 			`source ${sid}: [${src.kind}] ${src.ref} (${src.mutable ? "mutable" : "immutable"})`,
@@ -377,6 +461,7 @@ function handleRefresh(args, targetRoot) {
 function handleStats(args, targetRoot) {
 	const stats = computeStats(targetRoot, {
 		window: args.window ? Number(args.window) : undefined,
+		knowledgeKind: args.knowledgeKind,
 	});
 	return {
 		result: { target: args.target, text: renderStats(stats), errors: [], warnings: [] },
@@ -388,6 +473,16 @@ function handleStats(args, targetRoot) {
 function handleDelete(args, targetRoot) {
 	const pageId = args.page;
 	if (!pageId) return errResult("delete", "context delete requires --page <id>.");
+	const page = readPage(targetRoot, pageId);
+	if (page) {
+		const knowledge = describeKnowledge(targetRoot, page);
+		if (knowledge.supersedes.length > 0 || knowledge.supersededBy.length > 0) {
+			return errResult(
+				"delete",
+				`Context Page ${pageId} participates in supersession and cannot be deleted`,
+			);
+		}
+	}
 	const removed = deletePage(targetRoot, pageId);
 	return {
 		result: {
@@ -398,6 +493,125 @@ function handleDelete(args, targetRoot) {
 		},
 		exitCode: removed ? 0 : 1,
 		bypassPrint: !args.json,
+	};
+}
+
+function handleProjection(args, targetRoot) {
+	const subaction = Array.isArray(args._) ? args._[args._.length - 1] : null;
+	if (subaction === "rebuild") {
+		const rebuilt = rebuildProjection(targetRoot);
+		return {
+			result: {
+				target: args.target,
+				text: `rebuilt context-index (${rebuilt.manifest.pageCount} page(s))`,
+				errors: [],
+				warnings: [],
+				manifest: rebuilt.manifest,
+			},
+			exitCode: 0,
+			bypassPrint: !args.json,
+		};
+	}
+	if (subaction !== "status") {
+		return errResult("projection", "context projection requires status or rebuild");
+	}
+	const status = projectionStatus(targetRoot);
+	if (!status.ok) {
+		return {
+			result: {
+				target: args.target,
+				code: status.code,
+				errors: [`${status.code}: ${status.detail}`],
+				warnings: [],
+			},
+			exitCode: 1,
+			bypassPrint: false,
+		};
+	}
+	return {
+		result: {
+			target: args.target,
+			text: `context-index: ${status.detail} (${status.manifest.pageCount} page(s))`,
+			errors: [],
+			warnings: [],
+			manifest: status.manifest,
+		},
+		exitCode: 0,
+		bypassPrint: !args.json,
+	};
+}
+
+function handleBenchmark(args, targetRoot) {
+	if (!args.fixture) return errResult("benchmark", "context benchmark requires --fixture <file>");
+	const result = runBenchmark(targetRoot, { fixture: args.fixture, mode: args.mode });
+	const report = result.report;
+	const text = report
+		? [
+				`Context benchmark ${report.fixtureId}: ${report.passed ? "passed" : "failed"}`,
+				`  expected-page recall: ${(report.metrics.expectedPageRecall * 100).toFixed(1)}%`,
+				`  selection precision: ${(report.metrics.selectionPrecision * 100).toFixed(1)}%`,
+				`  freshness exclusion: ${(report.metrics.freshnessExclusion * 100).toFixed(1)}%`,
+				`  Required Artifact coverage: ${(report.metrics.requiredCoverage * 100).toFixed(1)}%`,
+				`  stability: ${(report.metrics.stability * 100).toFixed(1)}%`,
+			].join("\n")
+		: "";
+	return {
+		result: {
+			target: args.target,
+			text,
+			code: result.code,
+			report,
+			errors: result.ok ? [] : [`${result.code}: ${result.detail}`],
+			warnings: [],
+		},
+		exitCode: result.ok ? 0 : 1,
+		bypassPrint: !args.json && result.ok,
+	};
+}
+
+function handleSourceAdapter(args, targetRoot) {
+	if (!args.fixture) {
+		return errResult("source-adapter", "context source-adapter requires --fixture <file>");
+	}
+	const imported = importSourceBundle(targetRoot, {
+		fixture: args.fixture,
+		enable: args.enable,
+		allowTranscript: args.allowTranscript,
+	});
+	return {
+		result: {
+			target: args.target,
+			code: imported.code,
+			bundle: imported.bundle,
+			text: imported.ok
+				? `Imported ${imported.bundle.sources.length} Source Bundle candidate(s) from ${imported.bundle.adapterId}`
+				: "",
+			errors: imported.ok ? [] : [`${imported.code}: ${imported.detail}`],
+			warnings: [],
+		},
+		exitCode: imported.ok ? 0 : 1,
+		bypassPrint: !args.json && imported.ok,
+	};
+}
+
+function handleRetention(args, targetRoot) {
+	const retained = retentionReport(targetRoot, {
+		olderThanDays: args.olderThanDays == null ? undefined : Number(args.olderThanDays),
+	});
+	const report = retained.report;
+	return {
+		result: {
+			target: args.target,
+			code: retained.code,
+			report,
+			text: report
+				? `Context retention report: ${report.summary.eligible} candidate(s), ${report.summary.protected} protected artifact(s)`
+				: "",
+			errors: retained.ok ? [] : [`${retained.code}: ${retained.detail}`],
+			warnings: [],
+		},
+		exitCode: retained.ok ? 0 : 1,
+		bypassPrint: !args.json && retained.ok,
 	};
 }
 
@@ -412,6 +626,10 @@ function contextDispatch(action, args) {
 	if (action === "stats") return handleStats(args, targetRoot);
 	if (action === "delete") return handleDelete(args, targetRoot);
 	if (action === "load") return handleLoad(args, targetRoot);
+	if (action === "projection") return handleProjection(args, targetRoot);
+	if (action === "benchmark") return handleBenchmark(args, targetRoot);
+	if (action === "source-adapter") return handleSourceAdapter(args, targetRoot);
+	if (action === "retention") return handleRetention(args, targetRoot);
 	return unknownAction(action);
 }
 

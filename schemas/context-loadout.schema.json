@@ -31,6 +31,13 @@
     },
     "generatedAt": { "type": "string", "format": "date-time" },
     "budgetWords": { "type": "integer", "minimum": 1 },
+    "knowledgeKinds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": ["invariant", "decision", "pattern", "failure", "rejected-approach", "external-constraint", "unspecified"]
+      }
+    },
     "artifacts": {
       "type": "object",
       "additionalProperties": false,
@@ -125,7 +132,7 @@
         "properties": {
           "pageId": { "type": "string" },
           "reason": {
-            "enum": ["over-budget", "tampered", "obsolete", "stale"]
+            "enum": ["over-budget", "tampered", "obsolete", "stale", "superseded", "knowledge-kind"]
           },
           "detail": { "type": "string", "minLength": 1 }
         }

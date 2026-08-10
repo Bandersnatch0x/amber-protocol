@@ -5,10 +5,26 @@
   "type": "object",
   "required": ["schemaVersion", "pageId", "title", "sources", "blocks"],
   "properties": {
-    "schemaVersion": { "type": "string", "enum": ["1.0.0", "1.1.0"] },
+    "schemaVersion": { "type": "string", "enum": ["1.0.0", "1.1.0", "1.2.0"] },
     "pageId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
     "title": { "type": "string", "minLength": 1 },
     "scope": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "knowledgeKind": {
+      "enum": ["invariant", "decision", "pattern", "failure", "rejected-approach", "external-constraint", "unspecified"]
+    },
+    "supersedes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    },
+    "assurance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "confidence": { "enum": ["low", "medium", "high"] },
+        "maturity": { "enum": ["provisional", "reviewed", "validated"] }
+      }
+    },
     "sources": {
       "type": "object",
       "minProperties": 1,

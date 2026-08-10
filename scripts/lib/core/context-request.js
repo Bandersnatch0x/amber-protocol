@@ -14,8 +14,9 @@ const addFormats = require("ajv-formats");
 const { hashFile, sha256 } = require("./context-hash");
 const { requestsDir, appendEvent } = require("./context-store");
 const { resolvePathWithin } = require("./fs-utils");
+const { KNOWLEDGE_KINDS, normalizePageIds } = require("./context-knowledge");
 
-const SCHEMA_VERSION = "1.0.0";
+const SCHEMA_VERSION = "1.2.0";
 const PAGE_SCHEMA = "schemas/context-page.schema.json";
 
 // Immutable source roots: content that must not change. Cited spans are
@@ -199,6 +200,24 @@ function validateRequestInput(targetRoot, opts) {
 	if (!pageId || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(pageId)) {
 		errors.push(`invalid pageId: ${pageId} (kebab-case required)`);
 	}
+	if (opts.knowledgeKind != null && !KNOWLEDGE_KINDS.includes(opts.knowledgeKind)) {
+		errors.push(`invalid knowledgeKind: ${opts.knowledgeKind}`);
+	}
+	const supersedes = normalizePageIds(opts.supersedes);
+	const supersedesInputCount = Array.isArray(opts.supersedes)
+		? opts.supersedes.length
+		: opts.supersedes
+			? 1
+			: 0;
+	if (supersedes.length !== supersedesInputCount) {
+		errors.push("supersedes must contain unique Context Page identifiers");
+	}
+	for (const predecessor of supersedes) {
+		if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(predecessor)) {
+			errors.push(`invalid supersedes pageId: ${predecessor}`);
+		}
+		if (predecessor === pageId) errors.push(`Context Page ${pageId} cannot supersede itself`);
+	}
 	if (errors.length === 0 && !opts.force && latestRequestForPage(targetRoot, pageId)) {
 		errors.push(`open request already exists for page "${pageId}" (use --force to supersede)`);
 	}
@@ -216,6 +235,9 @@ function buildRequest(opts, input) {
 		reason: opts.reason || "explicit",
 	};
 	if (scope.length > 0) target.scope = scope;
+	if (opts.knowledgeKind) target.knowledgeKind = opts.knowledgeKind;
+	const supersedes = normalizePageIds(opts.supersedes);
+	if (supersedes.length > 0) target.supersedes = supersedes;
 	return {
 		schemaVersion: SCHEMA_VERSION,
 		requestId: makeRequestId(),

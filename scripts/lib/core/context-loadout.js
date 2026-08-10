@@ -39,6 +39,11 @@ const { verifyPages } = require("./context-verify");
 const { listPages, readPage, readEvents, appendEvent } = require("./context-store");
 const { sha256, canonicalJson } = require("./context-hash");
 const { relativeSlash, resolvePathWithin } = require("./fs-utils");
+const {
+	KNOWLEDGE_KINDS,
+	normalizeKnowledgeKind,
+	readKnowledgeGraph,
+} = require("./context-knowledge");
 
 const SCHEMA_VERSION = "1.0.0";
 const ROUTE_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/; // kebab-case, matching pageId
@@ -221,6 +226,22 @@ function loadBuildConfig(targetRoot, opts) {
 	}
 	const requiredArtifacts = collectRequiredArtifacts(targetRoot, route);
 	if (requiredArtifacts.errors.length > 0) return { errors: requiredArtifacts.errors };
+	const knowledgeKinds = Array.isArray(opts.knowledgeKinds)
+		? opts.knowledgeKinds
+		: opts.knowledgeKinds
+			? [opts.knowledgeKinds]
+			: [];
+	const invalidKind = knowledgeKinds.find((kind) => !KNOWLEDGE_KINDS.includes(kind));
+	if (invalidKind) {
+		return {
+			errors: [
+				{
+					code: "AMBER_E_CONTEXT_SCHEMA_INVALID",
+					detail: `invalid Knowledge Kind: ${invalidKind}`,
+				},
+			],
+		};
+	}
 	return {
 		errors: [],
 		route,
@@ -228,6 +249,7 @@ function loadBuildConfig(targetRoot, opts) {
 		budget: Number.isInteger(opts.budget) && opts.budget > 0 ? opts.budget : 4000,
 		since: opts.since || null,
 		requiredPins: Array.isArray(opts.required) ? opts.required.slice() : [],
+		knowledgeKinds: [...new Set(knowledgeKinds)].sort(),
 		requiredArtifacts,
 	};
 }
@@ -249,12 +271,23 @@ function summarizeEvents(events) {
 }
 
 function collectPageEntries(targetRoot, route, feature) {
-	const statusById = {};
-	for (const page of verifyPages(targetRoot).pages) statusById[page.pageId] = page.status;
+	const acceptedPages = listPages(targetRoot);
 	const activity = summarizeEvents(readEvents(targetRoot));
+	if (acceptedPages.length === 0) return { ...activity, pageEntries: [] };
+	const verified = verifyPages(targetRoot);
+	if (!verified.ok) {
+		return {
+			...activity,
+			pageEntries: [],
+			error: { code: verified.code, detail: verified.detail },
+		};
+	}
+	const statusById = {};
+	for (const page of verified.pages) statusById[page.pageId] = page.status;
 	const pageEntries = [];
+	const knowledgeGraph = readKnowledgeGraph(targetRoot);
 	let anyScope = false;
-	for (const { pageId } of listPages(targetRoot)) {
+	for (const { pageId } of acceptedPages) {
 		const page = readPage(targetRoot, pageId);
 		if (!page) continue;
 		const scope = Array.isArray(page.scope) ? page.scope.slice() : null;
@@ -267,6 +300,8 @@ function collectPageEntries(targetRoot, route, feature) {
 			rawHash: sha256(canonicalJson(JSON.stringify(page))),
 			latestAt: activity.latestAtByPage[pageId] || "",
 			scope,
+			knowledgeKind: normalizeKnowledgeKind(page.knowledgeKind),
+			supersededBy: knowledgeGraph.successorsByPage.get(pageId) || [],
 		});
 	}
 	for (const entry of pageEntries) {
@@ -288,6 +323,14 @@ function selectRequiredPages(pageEntries, requiredPins) {
 			state.excluded.push({ pageId: pin, reason: "obsolete", detail: "required-tier pin has no page on disk" });
 			continue;
 		}
+		if (entry.supersededBy.length > 0) {
+			state.excluded.push({
+				pageId: pin,
+				reason: "superseded",
+				detail: `superseded by ${entry.supersededBy.join(", ")}`,
+			});
+			continue;
+		}
 		const reason = reasonForStatus(entry.status);
 		if (reason === "tampered" || reason === "obsolete") {
 			state.excluded.push({ pageId: pin, reason, detail: `${entry.status} required-tier pin excluded (D4)` });
@@ -307,12 +350,23 @@ function selectRequiredPages(pageEntries, requiredPins) {
 
 function addBudgetedTiers(pageEntries, state, budget, requiredWords) {
 	const priorityCandidates = pageEntries
-		.filter((entry) => entry.status === "ok" && entry.matchesScope && !state.seen.has(entry.pageId))
+		.filter(
+			(entry) =>
+				entry.status === "ok" &&
+				entry.supersededBy.length === 0 &&
+				entry.matchesScope &&
+				!state.seen.has(entry.pageId),
+		)
 		.sort(comparePriority);
 	state.priorityPageIds = [];
 	const remaining = budgetedAdd(priorityCandidates, state.priorityPageIds, state.pagesMap, state.seen, state.excluded, budget - requiredWords);
 	const optionalCandidates = pageEntries
-		.filter((entry) => entry.status === "ok" && !state.seen.has(entry.pageId))
+		.filter(
+			(entry) =>
+				entry.status === "ok" &&
+				entry.supersededBy.length === 0 &&
+				!state.seen.has(entry.pageId),
+		)
 		.sort(comparePageIdAsc);
 	state.optionalPageIds = [];
 	budgetedAdd(optionalCandidates, state.optionalPageIds, state.pagesMap, state.seen, state.excluded, remaining);
@@ -326,6 +380,14 @@ function appendStatusExclusions(pageEntries, state) {
 	]);
 	for (const entry of pageEntries) {
 		if (included.has(entry.pageId)) continue;
+		if (entry.supersededBy.length > 0) {
+			state.excluded.push({
+				pageId: entry.pageId,
+				reason: "superseded",
+				detail: `superseded by ${entry.supersededBy.join(", ")}`,
+			});
+			continue;
+		}
 		const reason = reasonForStatus(entry.status);
 		if (!reason) continue;
 		state.excluded.push({
@@ -340,6 +402,26 @@ function appendStatusExclusions(pageEntries, state) {
 
 function selectPageTiers(pageEntries, config) {
 	const state = selectRequiredPages(pageEntries, config.requiredPins);
+	const supersededPin = state.excluded.find((entry) => entry.reason === "superseded");
+	if (supersededPin) {
+		return {
+			error: {
+				code: "AMBER_E_CONTEXT_PAGE_SUPERSEDED",
+				detail: `${supersededPin.pageId} is ${supersededPin.detail}`,
+			},
+		};
+	}
+	if (config.knowledgeKinds.length > 0) {
+		for (const entry of pageEntries) {
+			if (state.seen.has(entry.pageId) || config.knowledgeKinds.includes(entry.knowledgeKind)) continue;
+			state.seen.add(entry.pageId);
+			state.excluded.push({
+				pageId: entry.pageId,
+				reason: "knowledge-kind",
+				detail: `Knowledge Kind ${entry.knowledgeKind} not requested`,
+			});
+		}
+	}
 	const artifactWords = config.requiredArtifacts.artifacts.reduce(
 		(total, artifact) => total + artifact.words,
 		0,
@@ -392,6 +474,7 @@ function assembleLoadout(config, pageState, selection, delta) {
 		feature: config.feature,
 		generatedAt: pageState.generatedAt,
 		budgetWords: config.budget,
+		knowledgeKinds: config.knowledgeKinds,
 		artifacts: { required: config.requiredArtifacts.artifacts },
 		tiers: delta.tiers,
 		pages: delta.pages,
@@ -455,6 +538,10 @@ function buildLoadout(targetRoot, opts = {}) {
 	const errors = [];
 
 	const pageState = collectPageEntries(targetRoot, config.route, config.feature);
+	if (pageState.error) {
+		errors.push(pageState.error);
+		return { loadout: null, loadoutPath: null, errors, warnings };
+	}
 
 	// 4. Required tier (pinned). D4: tampered/obsolete excluded; stale included
 	//    with status "stale"; ok included with status "ok".

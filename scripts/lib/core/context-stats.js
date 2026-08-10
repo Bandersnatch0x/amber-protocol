@@ -6,6 +6,8 @@
 // mean sources per block.
 
 const { readEvents, listPages, readPage } = require("./context-store");
+const { deriveAssurance } = require("./context-assurance");
+const { readKnowledgeGraph } = require("./context-knowledge");
 
 function ratio(numerator, denominator) {
 	return denominator > 0 ? Math.round((numerator / denominator) * 1000) / 1000 : null;
@@ -36,22 +38,38 @@ function summarizeEvents(events) {
 	return { requests, ingests, errorCodes, rawOnlyChanges };
 }
 
-function summarizePageQuality(targetRoot) {
+function summarizePageQuality(targetRoot, knowledgeKind) {
+	const graph = readKnowledgeGraph(targetRoot);
 	const pages = listPages(targetRoot)
 		.map(({ pageId }) => readPage(targetRoot, pageId))
-		.filter(Boolean);
+		.filter(Boolean)
+		.filter(
+			(page) =>
+				!knowledgeKind || (page.knowledgeKind || "unspecified") === knowledgeKind,
+		);
 	let blocks = 0;
 	let unknown = 0;
 	let sourceRefs = 0;
+	let assuranceVerified = 0;
+	let superseded = 0;
+	const confidence = { high: 0, medium: 0, low: 0, unspecified: 0 };
+	const maturity = { validated: 0, reviewed: 0, provisional: 0, unspecified: 0 };
 	for (const page of pages) {
+		if ((graph.successorsByPage.get(page.pageId) || []).length > 0) superseded += 1;
 		blocks += (page.blocks || []).length;
 		unknown += (page.blocks || []).filter((block) => block.type === "unknown").length;
 		sourceRefs += Object.keys(page.sources || {}).length;
+		const assurance = deriveAssurance(targetRoot, page);
+		if (assurance.verifiedAt) assuranceVerified += 1;
+		confidence[assurance.confidence || "unspecified"] += 1;
+		maturity[assurance.maturity || "unspecified"] += 1;
 	}
 	return {
 		pages: pages.length,
 		unknownShare: ratio(unknown, blocks),
 		meanSourcesPerBlock: ratio(sourceRefs, blocks),
+		lineage: { current: pages.length - superseded, superseded },
+		assurance: { verified: assuranceVerified, confidence, maturity },
 	};
 }
 
@@ -78,7 +96,7 @@ function computeStats(targetRoot, options = {}) {
 	// Requests with trigger "source-change" are the normalized changes.
 	const staleTriggers = requests.byTrigger["source-change"] || 0;
 	const filterRate = ratio(rawOnlyChanges, rawOnlyChanges + staleTriggers);
-	const quality = summarizePageQuality(targetRoot);
+	const quality = summarizePageQuality(targetRoot, options.knowledgeKind);
 	const passRate = ratio(ingests.accepted, ingests.total);
 	const noChangeRate = ratio(ingests.noChange, ingests.total);
 
@@ -91,6 +109,9 @@ function computeStats(targetRoot, options = {}) {
 		unknownShare: quality.unknownShare,
 		meanSourcesPerBlock: quality.meanSourcesPerBlock,
 		pages: quality.pages,
+		lineage: quality.lineage,
+		assurance: quality.assurance,
+		knowledgeKind: options.knowledgeKind || null,
 		window,
 	};
 }

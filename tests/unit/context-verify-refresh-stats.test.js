@@ -349,4 +349,32 @@ describe("computeStats", () => {
 			cleanup(root);
 		}
 	});
+
+	it("reports current and superseded lineage counts after Knowledge Kind filtering", () => {
+		const root = makeTarget();
+		try {
+			writePage(root, pageWithSource("scripts/lib/core/old.js", null, {
+				pageId: "old-decision",
+				title: "Old decision",
+				knowledgeKind: "decision",
+				supersedes: [],
+			}));
+			writePage(root, pageWithSource("scripts/lib/core/current.js", null, {
+				pageId: "current-pattern",
+				title: "Current pattern",
+				knowledgeKind: "pattern",
+				supersedes: ["old-decision"],
+			}));
+
+			const all = computeStats(root);
+			assert.deepEqual(all.lineage, { current: 1, superseded: 1 });
+			const patterns = computeStats(root, { knowledgeKind: "pattern" });
+			assert.equal(patterns.pages, 1);
+			assert.deepEqual(patterns.lineage, { current: 1, superseded: 0 });
+			const decisions = computeStats(root, { knowledgeKind: "decision" });
+			assert.deepEqual(decisions.lineage, { current: 0, superseded: 1 });
+		} finally {
+			cleanup(root);
+		}
+	});
 });

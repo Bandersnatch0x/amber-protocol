@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const Ajv = require("ajv");
 const addFormats = require("ajv-formats");
+const { KNOWLEDGE_KINDS } = require("../../scripts/lib/core/context-knowledge");
 
 const SCHEMA_DIR = path.join(__dirname, "..", "..", "schemas");
 const ajv = new Ajv({ allErrors: true });
@@ -46,6 +47,16 @@ function validPage(overrides = {}) {
 		...(Array.isArray(scope) ? { scope } : {}),
 		...rest,
 	};
+}
+
+function findProperty(node, propertyName) {
+	if (!node || typeof node !== "object") return null;
+	if (node.properties && node.properties[propertyName]) return node.properties[propertyName];
+	for (const value of Object.values(node)) {
+		const found = findProperty(value, propertyName);
+		if (found) return found;
+	}
+	return null;
 }
 
 function validRequest(overrides = {}) {
@@ -117,11 +128,47 @@ function validLoadout(overrides = {}) {
 	};
 }
 
+describe("Context schema contracts", () => {
+	it("keeps Knowledge Kind enums aligned across schemas and the core vocabulary", () => {
+		for (const schemaName of [
+			"context-page.schema.json",
+			"context-request.schema.json",
+			"context-loadout.schema.json",
+			"context-benchmark.schema.json",
+		]) {
+			const schema = loadSchema(schemaName);
+			const property = findProperty(schema, schemaName === "context-loadout.schema.json" || schemaName === "context-benchmark.schema.json" ? "knowledgeKinds" : "knowledgeKind");
+			const enumValues = property?.enum || property?.items?.enum;
+			assert.deepEqual(enumValues, KNOWLEDGE_KINDS, schemaName);
+		}
+	});
+});
+
 describe("context-page schema", () => {
 	const validate = ajv.compile(loadSchema("context-page.schema.json"));
 
 	it("accepts a valid page", () => {
 		assert.equal(validate(validPage()), true, JSON.stringify(validate.errors));
+	});
+
+	it("accepts observational assurance without an authored verification time", () => {
+		const page = validPage({
+			schemaVersion: "1.2.0",
+			assurance: { confidence: "high", maturity: "validated" },
+		});
+		assert.equal(validate(page), true, JSON.stringify(validate.errors));
+	});
+
+	it("rejects a self-authored verification time in assurance", () => {
+		const page = validPage({
+			schemaVersion: "1.2.0",
+			assurance: {
+				confidence: "high",
+				maturity: "validated",
+				verifiedAt: "2026-08-10T00:00:00.000Z",
+			},
+		});
+		assert.equal(validate(page), false);
 	});
 
 	it("accepts a valid page with scope", () => {
@@ -243,5 +290,40 @@ describe("context-loadout schema", () => {
 		const loadout = validLoadout();
 		delete loadout.artifacts;
 		assert.equal(validate(loadout), false);
+	});
+});
+
+describe("context-verification schema", () => {
+	const validate = ajv.compile(loadSchema("context-verification.schema.json"));
+
+	it("accepts hash-bound verification evidence", () => {
+		assert.equal(
+			validate({
+				schemaVersion: "1.0.0",
+				pageId: "governed-execution",
+				requestId: "kd-2026-08-10-a3f1",
+				outcome: "accepted",
+				pageHash: "sha256:" + "a".repeat(64),
+				ingestEventHash: "sha256:" + "b".repeat(64),
+				verifiedAt: "2026-08-10T00:00:00.000Z",
+			}),
+			true,
+			JSON.stringify(validate.errors),
+		);
+	});
+
+	it("rejects evidence without a valid page hash", () => {
+		assert.equal(
+			validate({
+				schemaVersion: "1.0.0",
+				pageId: "governed-execution",
+				requestId: "kd-2026-08-10-a3f1",
+				outcome: "accepted",
+				pageHash: "sha256:invalid",
+				ingestEventHash: "sha256:" + "b".repeat(64),
+				verifiedAt: "2026-08-10T00:00:00.000Z",
+			}),
+			false,
+		);
 	});
 });

@@ -274,7 +274,11 @@ function doctor(target, options = {}) {
 	if (pathExists(path.join(targetRoot, ".amber", "context"))) {
 		const { verifyPages } = require("./context-verify");
 		const ctx = verifyPages(targetRoot);
-		if (ctx.summary.total > 0) {
+		if (!ctx.ok) {
+			const detail = `${ctx.code}: ${ctx.detail}`;
+			addCheck("Context projection", false, detail, "amber context projection rebuild --target .");
+			errors.push(detail);
+		} else if (ctx.summary.total > 0) {
 			const hardFailures = ctx.summary.tampered + ctx.summary.obsolete + ctx.summary.orphaned;
 			const detail = `${ctx.summary.total} pages: ok ${ctx.summary.ok}, stale ${ctx.summary.stale}, tampered ${ctx.summary.tampered}, obsolete ${ctx.summary.obsolete}, orphaned ${ctx.summary.orphaned}`;
 			addCheck("Context pages", hardFailures === 0, detail,

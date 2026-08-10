@@ -17,6 +17,12 @@ const { loadRequest } = require("./context-request");
 const { checkSourceHealth, finding, stripRange } = require("./context-sources");
 const { resolvePathWithin } = require("./fs-utils");
 const { writePage, regenerateIndex, appendEvent, readPage } = require("./context-store");
+const {
+	normalizeKnowledgeKind,
+	normalizePageIds,
+	validateKnowledgeGraph,
+} = require("./context-knowledge");
+const { writeVerificationEvidence } = require("./context-assurance");
 
 const ajv = new Ajv({ allErrors: true });
 addFormats(ajv);
@@ -63,6 +69,28 @@ function checkRequestBinding(targetRoot, request, payload) {
 			),
 		);
 		return { findings, blocked: true };
+	}
+	const requestedKind = normalizeKnowledgeKind(request.target.knowledgeKind);
+	const payloadKind = normalizeKnowledgeKind(payload.knowledgeKind);
+	if (payloadKind !== requestedKind) {
+		findings.push(
+			finding(
+				"AMBER_E_CONTEXT_REQUEST_MISMATCH",
+				`payload knowledgeKind "${payloadKind}" does not match request target "${requestedKind}"`,
+				payload.pageId,
+			),
+		);
+	}
+	const requestedSupersedes = normalizePageIds(request.target.supersedes);
+	const payloadSupersedes = normalizePageIds(payload.supersedes);
+	if (JSON.stringify(payloadSupersedes) !== JSON.stringify(requestedSupersedes)) {
+		findings.push(
+			finding(
+				"AMBER_E_CONTEXT_REQUEST_MISMATCH",
+				"payload supersedes does not match the Distillation Contract",
+				payload.pageId,
+			),
+		);
 	}
 
 	// Scope binding (ADR-0010 D5): payload scope ⊆ request target.scope.
@@ -294,13 +322,14 @@ function ingestNoChange(context) {
 		// writePage already regenerates the index; no-write path still refreshes status.
 		regenerateIndex(targetRoot);
 	}
-	appendEvent(targetRoot, {
+	const ingestEvent = appendEvent(targetRoot, {
 		kind: "ingest",
 		requestId,
 		pageId,
 		outcome: "no-change",
 		sourceCount: Object.keys(rebased.sources).length,
 	});
+	writeVerificationEvidence(targetRoot, pageId, { ingestEvent });
 	return {
 		accepted: true,
 		outcome: "no-change",
@@ -332,6 +361,16 @@ function validateFullPage(context, payload) {
 	}
 	const binding = checkRequestBinding(targetRoot, request, payload);
 	if (binding.blocked) return binding;
+	const graphErrors = validateKnowledgeGraph(targetRoot, payload);
+	if (graphErrors.length > 0) {
+		return {
+			blocked: true,
+			findings: graphErrors.map((detail) =>
+				finding("AMBER_E_CONTEXT_SCHEMA_INVALID", detail, payload.pageId),
+			),
+			errors: graphErrors,
+		};
+	}
 	const uncited = checkCitations(payload);
 	if (uncited.length > 0) {
 		return {
@@ -355,7 +394,7 @@ function ingestFullPage(context, payload) {
 		return rejectFindings(context, validation.findings, validation.errors);
 	}
 	writePage(targetRoot, payload, { outcome: "accepted", requestId });
-	appendEvent(targetRoot, {
+	const ingestEvent = appendEvent(targetRoot, {
 		kind: "ingest",
 		requestId,
 		pageId,
@@ -364,6 +403,7 @@ function ingestFullPage(context, payload) {
 		sourceCount: Object.keys(payload.sources).length,
 		unknownCount: payload.blocks.filter((block) => block.type === "unknown").length,
 	});
+	writeVerificationEvidence(targetRoot, pageId, { ingestEvent });
 	return {
 		accepted: true,
 		outcome: "accepted",
