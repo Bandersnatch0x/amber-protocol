@@ -1,10 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
 const { Readable } = require("stream");
-const {
-	checkGate,
-	createGateContext,
-} = require("../../scripts/lib/gate-handler");
+const { checkGate, createGateContext } = require("../../scripts/lib/gate-handler");
 
 describe("Gate Handler", () => {
 	it("auto gate with budget OK passes", async () => {

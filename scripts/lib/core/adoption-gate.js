@@ -11,13 +11,9 @@ const {
 	validateAdoptionReports,
 } = require("./adoption-reports");
 
-const {
-	pathExists,
-} = require("./fs-utils");
+const { pathExists } = require("./fs-utils");
 
-const {
-	MESSAGES,
-} = require("./terminology");
+const { MESSAGES } = require("./terminology");
 
 const {
 	renderAdoptionGateDocument,

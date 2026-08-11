@@ -230,4 +230,3 @@ test("pinTeamDistribution errors when the version is not in the registry", () =>
 
 	fs.rmSync(target, { recursive: true, force: true });
 });
-

@@ -1,158 +1,159 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Context Loadout",
-  "description": "A deterministic, target-local bundle of required governance artifacts and selected Context Pages. See ADR-0010 and ADR-0015.",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "route",
-    "feature",
-    "generatedAt",
-    "budgetWords",
-    "artifacts",
-    "tiers",
-    "pages",
-    "references",
-    "excluded",
-    "deltaSince"
-  ],
-  "properties": {
-    "schemaVersion": { "const": "1.0.0" },
-    "route": {
-      "type": "string",
-      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
-    },
-    "feature": {
-      "anyOf": [
-        { "type": "null" },
-        { "type": "string", "pattern": "^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$" }
-      ]
-    },
-    "generatedAt": { "type": "string", "format": "date-time" },
-    "budgetWords": { "type": "integer", "minimum": 1 },
-    "knowledgeKinds": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "enum": ["invariant", "decision", "pattern", "failure", "rejected-approach", "external-constraint", "unspecified"]
-      }
-    },
-    "artifacts": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["required"],
-      "properties": {
-        "required": {
-          "type": "array",
-          "minItems": 3,
-          "maxItems": 3,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["kind", "path", "rawHash", "words"],
-            "properties": {
-              "kind": {
-                "enum": [
-                  "operating-manual",
-                  "route-manifest",
-                  "loadout-definition"
-                ]
-              },
-              "path": { "type": "string", "minLength": 1 },
-              "rawHash": {
-                "type": "string",
-                "pattern": "^sha256:[0-9a-f]{64}$"
-              },
-              "words": { "type": "integer", "minimum": 0 }
-            }
-          }
-        }
-      }
-    },
-    "tiers": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["required", "priority", "optional"],
-      "properties": {
-        "required": { "$ref": "#/definitions/pageIds" },
-        "priority": { "$ref": "#/definitions/pageIds" },
-        "optional": { "$ref": "#/definitions/pageIds" }
-      }
-    },
-    "pages": {
-      "type": "object",
-      "propertyNames": {
-        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
-      },
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["title", "words", "rawHash", "status", "scope"],
-        "properties": {
-          "title": { "type": "string" },
-          "words": { "type": "integer", "minimum": 0 },
-          "rawHash": {
-            "type": "string",
-            "pattern": "^sha256:[0-9a-f]{64}$"
-          },
-          "status": { "enum": ["ok", "stale"] },
-          "scope": {
-            "type": "array",
-            "uniqueItems": true,
-            "items": { "type": "string" }
-          }
-        }
-      }
-    },
-    "references": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["pageId", "rawHash"],
-        "properties": {
-          "pageId": {
-            "type": "string",
-            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
-          },
-          "rawHash": {
-            "type": "string",
-            "pattern": "^sha256:[0-9a-f]{64}$"
-          }
-        }
-      }
-    },
-    "excluded": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["pageId", "reason", "detail"],
-        "properties": {
-          "pageId": { "type": "string" },
-          "reason": {
-            "enum": ["over-budget", "tampered", "obsolete", "stale", "superseded", "knowledge-kind"]
-          },
-          "detail": { "type": "string", "minLength": 1 }
-        }
-      }
-    },
-    "deltaSince": {
-      "anyOf": [
-        { "type": "null" },
-        { "type": "string", "format": "date-time" }
-      ]
-    }
-  },
-  "definitions": {
-    "pageIds": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
-      }
-    }
-  }
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Context Loadout",
+	"description": "A deterministic, target-local bundle of required governance artifacts and selected Context Pages. See ADR-0010 and ADR-0015.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"schemaVersion",
+		"route",
+		"feature",
+		"generatedAt",
+		"budgetWords",
+		"artifacts",
+		"tiers",
+		"pages",
+		"references",
+		"excluded",
+		"deltaSince"
+	],
+	"properties": {
+		"schemaVersion": { "const": "1.0.0" },
+		"route": {
+			"type": "string",
+			"pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+		},
+		"feature": {
+			"anyOf": [
+				{ "type": "null" },
+				{ "type": "string", "pattern": "^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$" }
+			]
+		},
+		"generatedAt": { "type": "string", "format": "date-time" },
+		"budgetWords": { "type": "integer", "minimum": 1 },
+		"knowledgeKinds": {
+			"type": "array",
+			"uniqueItems": true,
+			"items": {
+				"enum": [
+					"invariant",
+					"decision",
+					"pattern",
+					"failure",
+					"rejected-approach",
+					"external-constraint",
+					"unspecified"
+				]
+			}
+		},
+		"artifacts": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["required"],
+			"properties": {
+				"required": {
+					"type": "array",
+					"minItems": 3,
+					"maxItems": 3,
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["kind", "path", "rawHash", "words"],
+						"properties": {
+							"kind": {
+								"enum": ["operating-manual", "route-manifest", "loadout-definition"]
+							},
+							"path": { "type": "string", "minLength": 1 },
+							"rawHash": {
+								"type": "string",
+								"pattern": "^sha256:[0-9a-f]{64}$"
+							},
+							"words": { "type": "integer", "minimum": 0 }
+						}
+					}
+				}
+			}
+		},
+		"tiers": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["required", "priority", "optional"],
+			"properties": {
+				"required": { "$ref": "#/definitions/pageIds" },
+				"priority": { "$ref": "#/definitions/pageIds" },
+				"optional": { "$ref": "#/definitions/pageIds" }
+			}
+		},
+		"pages": {
+			"type": "object",
+			"propertyNames": {
+				"pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+			},
+			"additionalProperties": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["title", "words", "rawHash", "status", "scope"],
+				"properties": {
+					"title": { "type": "string" },
+					"words": { "type": "integer", "minimum": 0 },
+					"rawHash": {
+						"type": "string",
+						"pattern": "^sha256:[0-9a-f]{64}$"
+					},
+					"status": { "enum": ["ok", "stale"] },
+					"scope": {
+						"type": "array",
+						"uniqueItems": true,
+						"items": { "type": "string" }
+					}
+				}
+			}
+		},
+		"references": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["pageId", "rawHash"],
+				"properties": {
+					"pageId": {
+						"type": "string",
+						"pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+					},
+					"rawHash": {
+						"type": "string",
+						"pattern": "^sha256:[0-9a-f]{64}$"
+					}
+				}
+			}
+		},
+		"excluded": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["pageId", "reason", "detail"],
+				"properties": {
+					"pageId": { "type": "string" },
+					"reason": {
+						"enum": ["over-budget", "tampered", "obsolete", "stale", "superseded", "knowledge-kind"]
+					},
+					"detail": { "type": "string", "minLength": 1 }
+				}
+			}
+		},
+		"deltaSince": {
+			"anyOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+		}
+	},
+	"definitions": {
+		"pageIds": {
+			"type": "array",
+			"uniqueItems": true,
+			"items": {
+				"type": "string",
+				"pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+			}
+		}
+	}
 }

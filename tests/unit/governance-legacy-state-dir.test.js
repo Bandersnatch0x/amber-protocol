@@ -11,10 +11,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-	generateAuditReport,
-	exportSessionEvidence,
-} = require("../../scripts/lib/core/governance");
+const { generateAuditReport, exportSessionEvidence } = require("../../scripts/lib/core/governance");
 
 function tempDir(prefix) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));

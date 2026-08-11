@@ -19,7 +19,8 @@ const RULES = [
 	// Secret-looking environment assignments: FOO_PASSWORD=..., API_KEY: ...
 	// Case-sensitive on the secret word so ordinary lowercase "key" is untouched.
 	{
-		pattern: /(\b[A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|KEY|PWD|CREDENTIAL)[A-Z0-9_]*\s*[=:]\s*)(\S+)/g,
+		pattern:
+			/(\b[A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|KEY|PWD|CREDENTIAL)[A-Z0-9_]*\s*[=:]\s*)(\S+)/g,
 		replacement: `$1${PLACEHOLDER}`,
 	},
 ];

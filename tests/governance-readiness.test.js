@@ -37,8 +37,14 @@ function makeRepoWithGovernanceControls(options = {}) {
 		writeJson(path.join(amberDir, "autonomous-policy.json"), options.policy);
 	}
 
-	copyFixture("routes/feature-standard.route.json", path.join(dir, "routes", "feature-standard.route.json"));
-	copyFixture("standards/security-governance.json", path.join(dir, "standards", "security-governance.json"));
+	copyFixture(
+		"routes/feature-standard.route.json",
+		path.join(dir, "routes", "feature-standard.route.json"),
+	);
+	copyFixture(
+		"standards/security-governance.json",
+		path.join(dir, "standards", "security-governance.json"),
+	);
 
 	if (options.packWithoutReviewGates) {
 		writeJson(path.join(dir, "workflow-packs", "unsafe.pack.json"), {
@@ -145,15 +151,11 @@ test("governance readiness - unsafe policy blocks", async () => {
 test("governance readiness - missing governance docs are reported", async () => {
 	const dir = makeRepoWithGovernanceControls({ docs: false });
 	try {
-		const { payload } = await runJson([
-			"governance",
-			"readiness",
-			"--target",
-			dir,
-			"--json",
-		]);
+		const { payload } = await runJson(["governance", "readiness", "--target", dir, "--json"]);
 
-		const missingDocs = payload.findings.filter((finding) => finding.id === "missing-governance-doc");
+		const missingDocs = payload.findings.filter(
+			(finding) => finding.id === "missing-governance-doc",
+		);
 		assert.strictEqual(missingDocs.length, 3);
 		assert.strictEqual(payload.decision, "warn");
 	} finally {
@@ -164,13 +166,7 @@ test("governance readiness - missing governance docs are reported", async () => 
 test("governance readiness - workflow pack loop contract without review gates is reported", async () => {
 	const dir = makeRepoWithGovernanceControls({ packWithoutReviewGates: true });
 	try {
-		const { payload } = await runJson([
-			"governance",
-			"readiness",
-			"--target",
-			dir,
-			"--json",
-		]);
+		const { payload } = await runJson(["governance", "readiness", "--target", dir, "--json"]);
 
 		assert.ok(payload.findings.some((finding) => finding.id === "pack-missing-review-gates"));
 		assert.strictEqual(payload.decision, "warn");

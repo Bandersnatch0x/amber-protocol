@@ -49,7 +49,12 @@ test("current docs do not advertise unsupported autonomous runtime commands", ()
 		if (!allowAutonomous && /--mode autonomous/.test(text)) {
 			offenders.push(`${relative}: contains --mode autonomous`);
 		}
-		for (const pattern of [/amber\.js daemon (start|status|stop)/, /--checkpoint-interval/, /webhookUrl/, /"events"\s*:/]) {
+		for (const pattern of [
+			/amber\.js daemon (start|status|stop)/,
+			/--checkpoint-interval/,
+			/webhookUrl/,
+			/"events"\s*:/,
+		]) {
 			if (pattern.test(text)) offenders.push(`${relative}: matches ${pattern}`);
 		}
 	}

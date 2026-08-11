@@ -6,10 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-	summarizeSessions,
-	summarizeExecutions,
-} = require("../../scripts/lib/core/governance");
+const { summarizeSessions, summarizeExecutions } = require("../../scripts/lib/core/governance");
 
 function tempDir(prefix) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
@@ -62,7 +59,11 @@ test("summarizeSessions summarizes goal, counts, and completed status", () => {
 test("summarizeSessions counts stage_completed verification commands", () => {
 	const sessionsDir = tempDir("gov-live-verify");
 	writeSession(sessionsDir, "dogfood", [
-		{ type: "session_created", timestamp: "2026-07-14T16:00:00Z", data: { goal: "fix governance" } },
+		{
+			type: "session_created",
+			timestamp: "2026-07-14T16:00:00Z",
+			data: { goal: "fix governance" },
+		},
 		{
 			type: "stage_completed",
 			timestamp: "2026-07-14T16:02:00Z",
@@ -75,8 +76,16 @@ test("summarizeSessions counts stage_completed verification commands", () => {
 				durationMs: 83527,
 			},
 		},
-		{ type: "gate_passed", timestamp: "2026-07-14T16:03:00Z", data: { gateId: "user-approval-plan" } },
-		{ type: "gate_passed", timestamp: "2026-07-14T16:04:00Z", data: { gateId: "user-approval-implement" } },
+		{
+			type: "gate_passed",
+			timestamp: "2026-07-14T16:03:00Z",
+			data: { gateId: "user-approval-plan" },
+		},
+		{
+			type: "gate_passed",
+			timestamp: "2026-07-14T16:04:00Z",
+			data: { gateId: "user-approval-implement" },
+		},
 		{ type: "session_completed", timestamp: "2026-07-14T16:05:00Z", data: {} },
 	]);
 

@@ -51,7 +51,7 @@ test("governance policy - custom policy shows diff", async () => {
 	};
 	fs.writeFileSync(
 		path.join(amberDir, "autonomous-policy.json"),
-		JSON.stringify(customPolicy, null, 2)
+		JSON.stringify(customPolicy, null, 2),
 	);
 
 	let output = "";
@@ -71,7 +71,7 @@ test("governance policy - custom policy shows diff", async () => {
 		assert.ok(result.overrides.length > 0);
 
 		const userApprovalOverride = result.overrides.find(
-			(o) => o.type === "gate" && o.gate === "user-approval"
+			(o) => o.type === "gate" && o.gate === "user-approval",
 		);
 		assert.ok(userApprovalOverride);
 		assert.strictEqual(userApprovalOverride.default, "block");
@@ -80,9 +80,7 @@ test("governance policy - custom policy shows diff", async () => {
 		const retryOverride = result.overrides.find((o) => o.type === "retry");
 		assert.ok(retryOverride);
 
-		assert.ok(
-			result.warnings.some((w) => w.includes("user-approval"))
-		);
+		assert.ok(result.warnings.some((w) => w.includes("user-approval")));
 	} finally {
 		process.stdout.write = originalWrite;
 		fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -111,7 +109,7 @@ test("governance policy - auto-approve-all key errors", async () => {
 	};
 	fs.writeFileSync(
 		path.join(amberDir, "autonomous-policy.json"),
-		JSON.stringify(invalidPolicy, null, 2)
+		JSON.stringify(invalidPolicy, null, 2),
 	);
 
 	let output = "";
@@ -128,12 +126,9 @@ test("governance policy - auto-approve-all key errors", async () => {
 		const result = JSON.parse(output);
 		assert.strictEqual(result.target, tmpDir);
 		assert.ok(result.errors.length > 0);
-		assert.ok(
-			result.errors.some((e) => e.includes("auto-approve-all"))
-		);
+		assert.ok(result.errors.some((e) => e.includes("auto-approve-all")));
 	} finally {
 		process.stdout.write = originalWrite;
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 	}
 });
-

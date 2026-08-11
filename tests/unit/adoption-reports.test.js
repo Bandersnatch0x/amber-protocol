@@ -14,9 +14,7 @@ const {
 	parseAdoptionReportMetadata,
 	parseAdoptionReportForComparison,
 } = require("../../scripts/lib/core/adoption-reports");
-const {
-	serializeAdoptionMetricsBlock,
-} = require("../../scripts/lib/core/adoption-metrics");
+const { serializeAdoptionMetricsBlock } = require("../../scripts/lib/core/adoption-metrics");
 
 function writeTempReport(body) {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-report-"));

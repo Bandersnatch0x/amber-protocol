@@ -13,8 +13,14 @@ function parseArgs(argv) {
 	const args = { target: process.cwd(), _: [] };
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
-		if (a === "--target") { args.target = argv[++i]; continue; }
-		if (a.startsWith("--")) { args[a.slice(2)] = argv[++i]; continue; }
+		if (a === "--target") {
+			args.target = argv[++i];
+			continue;
+		}
+		if (a.startsWith("--")) {
+			args[a.slice(2)] = argv[++i];
+			continue;
+		}
 		args._.push(a);
 	}
 	return args;

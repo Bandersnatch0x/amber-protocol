@@ -115,7 +115,9 @@ function eligibleFailures(loadout, eligiblePages) {
 	const actual = [
 		...loadout.references.map((reference) => reference.pageId),
 		...loadout.excluded.map((entry) => entry.pageId),
-	].filter((pageId, index, all) => all.indexOf(pageId) === index).sort();
+	]
+		.filter((pageId, index, all) => all.indexOf(pageId) === index)
+		.sort();
 	const expected = eligiblePages.slice().sort();
 	return JSON.stringify(actual) === JSON.stringify(expected)
 		? []
@@ -242,7 +244,10 @@ function runBenchmark(targetRoot, options = {}) {
 		...eligibleFailures(loadout, fixture.expected.eligiblePages),
 		...exactFailures(fixture.expected.loadout, actualExactLoadout),
 	];
-	const fixtureRelativePath = path.relative(targetRoot, loaded.fixturePath).split(path.sep).join("/");
+	const fixtureRelativePath = path
+		.relative(targetRoot, loaded.fixturePath)
+		.split(path.sep)
+		.join("/");
 	const report = {
 		schemaVersion: "1.0.0",
 		fixtureId: fixture.fixtureId,
@@ -276,10 +281,10 @@ function runBenchmark(targetRoot, options = {}) {
 	return report.passed
 		? { ok: true, code: null, detail: "benchmark passed", report }
 		: benchmarkFailure(
-			"AMBER_E_CONTEXT_BENCHMARK_FAILED",
-			"one or more fail-closed benchmark metrics or exact Loadout fields did not match",
-			report,
-		);
+				"AMBER_E_CONTEXT_BENCHMARK_FAILED",
+				"one or more fail-closed benchmark metrics or exact Loadout fields did not match",
+				report,
+			);
 }
 
 module.exports = { RUN_COUNT, HARD_METRIC_THRESHOLDS, runBenchmark };

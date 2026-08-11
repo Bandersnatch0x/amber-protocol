@@ -9,6 +9,7 @@ We combine Amber's contracts + skills + ledgers with the operational patterns an
 ## Active Loops
 
 ### Daily Amber Triage (L1 — report + governance inspection)
+
 - **Cadence**: Daily (or on demand)
 - **Contract**: `daily-amber-triage` in [workflow-packs/safe-amber-bootstrap.pack.json](workflow-packs/safe-amber-bootstrap.pack.json)
 - **Skill**: `amber-continuous-improvement` (see `skills/amber-continuous-improvement/SKILL.md`)
@@ -22,18 +23,21 @@ We combine Amber's contracts + skills + ledgers with the operational patterns an
 - **Human gate**: All file changes, command execution, and external writes require explicit approval per the pack's `approvalPolicy`.
 
 ### CI / Validation Automation (always-on)
+
 - Runs on every push/PR via [.github/workflows/ci.yml](.github/workflows/ci.yml)
 - Includes: `npm test`, `npm run manifests`, `npm run doctor`, `npm run gen:agents:check`, CLI smoke tests, coverage, security.
 - This acts as a **CI Sweeper + Dependency + Post-Merge** verification layer (see loop-engineering patterns).
 - Failures surface in PRs and block merges where policy requires.
 
 ### Adoption & Continuous Improvement
+
 - `amber adoption report` (read-only) for onboarding existing projects.
 - `amber doctor`, `amber audit`, `amber handoff` — recurring health and readiness checks.
 - Feature work follows route contracts (`routes/*.route.json`) + session lifecycle.
 - `amber loop recommend` / `amber loop run --dry-run` for safe selection of maintenance loops.
 
 ### Handoff & Session Lifecycle (opportunistic)
+
 - Uses Amber session manifests, checkpoints, and `session-handoff.md` for clean work transfer between sessions/agents.
 - Aligns with loop-engineering "handoff to human with full context" principle.
 
@@ -62,6 +66,7 @@ The simple `STATE.md` (High Priority / Watch List / Recent Noise / Post-Run Crit
 ## Worktrees & Isolation
 
 Per Amber contracts (`workspaceIsolation` in workflow packs):
+
 - Mutating work uses isolated git worktrees.
 - Main checkout is never mutated directly by automated loops.
 
@@ -73,6 +78,7 @@ Per Amber contracts (`workspaceIsolation` in workflow packs):
 - Denylists and "no auto-execution" are core to the product (see CLAUDE.md and SPEC.md).
 
 When layering loop-engineering tools:
+
 - Use `npx @cobusgreyling/loop-budget.md` + `loop-run-log.md` for operational cost tracking.
 - Add token/minute budgets matching the Amber contract `budget` fields.
 
@@ -101,6 +107,7 @@ See full Amber loop commands in [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md).
 ## Phased Rollout (L1 → L2 → L3)
 
 Follow loop-engineering guidance:
+
 - **L1 (current for most Amber loops)**: Report-only, human reviews STATE.md / ledgers / doctor output.
 - **L2**: Assisted. **Now partly available** via governed execution (ADR-0003): `amber loop approve`
   then `amber loop run --execute` runs a contract's `governed.command` in an isolated worktree with a
@@ -113,6 +120,7 @@ Amber's explicit boundaries make it a **safe place to practice L1/L2 loops**.
 ## Evolution & Dogfooding
 
 This repo dogfoods its own governance:
+
 - CI runs doctor + manifest validation on every change.
 - Skills are regenerated via `npm run gen:agents` (never edit generated agent command surfaces directly).
 - Adoption reports and handoff validation are part of the offering.
@@ -129,4 +137,4 @@ Future: richer integration of loop-engineering patterns (PR Babysitter, Changelo
 
 ---
 
-*LOOP.md is both documentation and the seed for loops that help maintain Amber. Update it when cadence, contracts, or safety rules change.*
+_LOOP.md is both documentation and the seed for loops that help maintain Amber. Update it when cadence, contracts, or safety rules change._

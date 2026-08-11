@@ -20,7 +20,10 @@ function fakeTemplateRoot() {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "amber-tpl-"));
 	fs.mkdirSync(path.join(root, "docs/wiki/agent"), { recursive: true });
 	fs.mkdirSync(path.join(root, ".workflow/continuous-improvement"), { recursive: true });
-	fs.writeFileSync(path.join(root, "docs/wiki/agent/amber.md"), "---\nupdated: 2026-01-01\n---\n# Amber\n");
+	fs.writeFileSync(
+		path.join(root, "docs/wiki/agent/amber.md"),
+		"---\nupdated: 2026-01-01\n---\n# Amber\n",
+	);
 	fs.writeFileSync(path.join(root, "AGENTS.md"), "agent rules\n");
 	fs.writeFileSync(path.join(root, ".workflow/continuous-improvement/state.json"), "{}\n");
 	return root;
@@ -29,7 +32,11 @@ function fakeTemplateRoot() {
 test("normalizedContentForHash strips the YAML updated: line but keeps other content", () => {
 	const a = "---\nupdated: 2026-01-01\n---\nbody\n";
 	const b = "---\nupdated: 2026-02-02\n---\nbody\n";
-	assert.equal(normalizedContentForHash(a), normalizedContentForHash(b), "date-only diff normalizes equal");
+	assert.equal(
+		normalizedContentForHash(a),
+		normalizedContentForHash(b),
+		"date-only diff normalizes equal",
+	);
 	assert.ok(normalizedContentForHash(a).includes("body"));
 	assert.ok(!/updated:/.test(normalizedContentForHash(a)));
 });
@@ -91,7 +98,12 @@ test("buildProvenance stamps the on-disk hash per managed file with tier", () =>
 test("loadProvenance / writeProvenance round-trip; absent/corrupt → null", () => {
 	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-tgt-"));
 	assert.equal(loadProvenance(target), null);
-	const p = { schemaVersion: 1, amberVersion: "9.9.9", provenanceInferred: false, files: { "x.md": { templateHash: "h", tier: "controlled" } } };
+	const p = {
+		schemaVersion: 1,
+		amberVersion: "9.9.9",
+		provenanceInferred: false,
+		files: { "x.md": { templateHash: "h", tier: "controlled" } },
+	};
 	writeProvenance(target, p);
 	assert.deepEqual(loadProvenance(target).files["x.md"], { templateHash: "h", tier: "controlled" });
 	fs.writeFileSync(path.join(target, ".amber", "provenance.json"), "{ broken");

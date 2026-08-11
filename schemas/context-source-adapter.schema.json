@@ -1,49 +1,49 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Context Source Adapter Fixture",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schemaVersion", "adapterId", "sources"],
-  "properties": {
-    "schemaVersion": {
-      "const": "1.0.0"
-    },
-    "adapterId": {
-      "const": "local-fixture"
-    },
-    "target": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "sources": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["ref", "kind"],
-        "properties": {
-          "ref": {
-            "type": "string",
-            "minLength": 1
-          },
-          "kind": {
-            "enum": ["code", "document", "adr", "ledger", "transcript", "other"]
-          },
-          "rawHash": {
-            "type": "string",
-            "pattern": "^sha256:[0-9a-f]{64}$"
-          },
-          "normHash": {
-            "type": "string",
-            "pattern": "^sha256:[0-9a-f]{64}$"
-          },
-          "excerptHash": {
-            "type": "string",
-            "pattern": "^sha256:[0-9a-f]{64}$"
-          }
-        }
-      }
-    }
-  }
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Context Source Adapter Fixture",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schemaVersion", "adapterId", "sources"],
+	"properties": {
+		"schemaVersion": {
+			"const": "1.0.0"
+		},
+		"adapterId": {
+			"const": "local-fixture"
+		},
+		"target": {
+			"type": "string",
+			"pattern": "^sha256:[0-9a-f]{64}$"
+		},
+		"sources": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["ref", "kind"],
+				"properties": {
+					"ref": {
+						"type": "string",
+						"minLength": 1
+					},
+					"kind": {
+						"enum": ["code", "document", "adr", "ledger", "transcript", "other"]
+					},
+					"rawHash": {
+						"type": "string",
+						"pattern": "^sha256:[0-9a-f]{64}$"
+					},
+					"normHash": {
+						"type": "string",
+						"pattern": "^sha256:[0-9a-f]{64}$"
+					},
+					"excerptHash": {
+						"type": "string",
+						"pattern": "^sha256:[0-9a-f]{64}$"
+					}
+				}
+			}
+		}
+	}
 }

@@ -10,9 +10,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const GOVERNANCE_COMMANDS_PATH = require.resolve(
-	"../../scripts/lib/governance-commands",
-);
+const GOVERNANCE_COMMANDS_PATH = require.resolve("../../scripts/lib/governance-commands");
 
 const VALID_ACTIONS = [
 	"docs",
@@ -172,11 +170,7 @@ describe("governanceDispatch", () => {
 					["--target is required"],
 					`"${action}": shared guard error message`,
 				);
-				assert.deepStrictEqual(
-					result.warnings,
-					[],
-					`"${action}": warnings must be empty array`,
-				);
+				assert.deepStrictEqual(result.warnings, [], `"${action}": warnings must be empty array`);
 
 				const extra = GUARD_EXTRA_BY_ACTION[action];
 				if (extra) {
@@ -198,19 +192,14 @@ describe("governanceDispatch", () => {
 			for (const action of VALID_ACTIONS) {
 				const seam = CORE_THROW_SEAMS[action];
 				const boom = `forced-throw-${action}`;
-				const result = withCoreThrow(
-					seam.mod,
-					seam.exportName,
-					boom,
-					(governanceDispatch) => {
-						assert.strictEqual(
-							typeof governanceDispatch,
-							"function",
-							"governanceDispatch must be exported from governance-commands.js",
-						);
-						return governanceDispatch(action, tmp, seam.options || {});
-					},
-				);
+				const result = withCoreThrow(seam.mod, seam.exportName, boom, (governanceDispatch) => {
+					assert.strictEqual(
+						typeof governanceDispatch,
+						"function",
+						"governanceDispatch must be exported from governance-commands.js",
+					);
+					return governanceDispatch(action, tmp, seam.options || {});
+				});
 
 				assert.ok(result, `"${action}" must return a catch envelope, not throw`);
 				assert.strictEqual(result.target, tmp, `"${action}": target preserved`);

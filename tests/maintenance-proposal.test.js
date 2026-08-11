@@ -18,24 +18,21 @@ test("project with stale docs + drift → proposal.md has 2+ sections", () => {
 	fs.mkdirSync(path.join(fixtureRoot, "workflow-packs"), { recursive: true });
 
 	const oldDate = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString();
-	fs.writeFileSync(
-		path.join(fixtureRoot, "docs", "old-guide.md"),
-		"# Old Guide\nStale content"
-	);
+	fs.writeFileSync(path.join(fixtureRoot, "docs", "old-guide.md"), "# Old Guide\nStale content");
 	fs.utimesSync(
 		path.join(fixtureRoot, "docs", "old-guide.md"),
 		new Date(oldDate),
-		new Date(oldDate)
+		new Date(oldDate),
 	);
 
 	fs.writeFileSync(
 		path.join(fixtureRoot, ".amber", "team.json"),
-		JSON.stringify({ version: "0.1.0", preset: "safe-bootstrap" })
+		JSON.stringify({ version: "0.1.0", preset: "safe-bootstrap" }),
 	);
 
 	fs.writeFileSync(
 		path.join(fixtureRoot, "workflow-packs", "safe-bootstrap.pack.json"),
-		JSON.stringify({ version: "0.2.0" })
+		JSON.stringify({ version: "0.2.0" }),
 	);
 
 	const result = runMaintenanceAction("propose", fixtureRoot, {});
@@ -63,14 +60,14 @@ test("unknown --priority value errors instead of silently emptying the proposal"
 	});
 	fs.writeFileSync(
 		path.join(fixtureRoot, "docs", "wiki", "engineering", "verification.md"),
-		"Last Reviewed: 2000-01-01\n"
+		"Last Reviewed: 2000-01-01\n",
 	);
 
 	const result = runMaintenanceAction("propose", fixtureRoot, { priority: "bogus" });
 
 	assert.ok(
 		result.errors.some((e) => /priority/i.test(e)),
-		`expected a priority error, got: ${JSON.stringify(result.errors)}`
+		`expected a priority error, got: ${JSON.stringify(result.errors)}`,
 	);
 	assert.ok(!result.proposalPath, "no proposal should be written for a bad priority");
 
@@ -84,7 +81,7 @@ test("valid --priority values are accepted and write a proposal", () => {
 	});
 	fs.writeFileSync(
 		path.join(fixtureRoot, "docs", "wiki", "engineering", "verification.md"),
-		"Last Reviewed: 2000-01-01\n"
+		"Last Reviewed: 2000-01-01\n",
 	);
 
 	for (const priority of ["high", "medium", "low"]) {
@@ -143,13 +140,21 @@ test("priority filter keeps the documented category matrix", () => {
 
 	const medium = proposeMaintenance(fixtureRoot, null, "medium", inspect);
 	assert.equal(medium.inspection.staleDocs.length, 1, "medium keeps staleDocs");
-	assert.equal(medium.inspection.upgradeAssistant.currentVersion, "1.0.0", "medium keeps upgradeAssistant");
+	assert.equal(
+		medium.inspection.upgradeAssistant.currentVersion,
+		"1.0.0",
+		"medium keeps upgradeAssistant",
+	);
 	assert.equal(medium.inspection.evolutionRollup.length, 1, "medium keeps evolutionRollup");
 	assert.deepEqual(medium.inspection.regressionProposals, [], "medium zeros regressionProposals");
 
 	const low = proposeMaintenance(fixtureRoot, null, "low", inspect);
 	assert.equal(low.inspection.staleDocs.length, 1, "low keeps staleDocs");
-	assert.equal(low.inspection.upgradeAssistant.currentVersion, "1.0.0", "low keeps upgradeAssistant");
+	assert.equal(
+		low.inspection.upgradeAssistant.currentVersion,
+		"1.0.0",
+		"low keeps upgradeAssistant",
+	);
 	assert.equal(low.inspection.evolutionRollup.length, 1, "low keeps evolutionRollup");
 	assert.equal(low.inspection.regressionProposals.length, 1, "low keeps regressionProposals");
 

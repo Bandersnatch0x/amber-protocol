@@ -44,11 +44,13 @@ function buildStatus(target) {
 	if (classification.type === "unharnessed-target-repo") {
 		nextStep = "Run `amber init --target .` to install Amber.";
 	} else if (artifactDrift.available && artifactDrift.counts.drifted > 0) {
-		nextStep = "Run `amber feature verify --feature <id>` to re-record evidence for drifted features.";
+		nextStep =
+			"Run `amber feature verify --feature <id>` to re-record evidence for drifted features.";
 	} else if (artifactDrift.available && artifactDrift.skippedBreakdown.pathUnknown > 0) {
 		nextStep = "Some features declare paths git has never touched — fix feature_list paths.";
 	} else if (scaffoldDrift.installed === false) {
-		nextStep = "Run `amber init --target .` to enable scaffold-drift detection (stamps install provenance).";
+		nextStep =
+			"Run `amber init --target .` to enable scaffold-drift detection (stamps install provenance).";
 	} else if (
 		classification.type !== "product-repo" &&
 		scaffoldDrift.counts &&
@@ -91,8 +93,7 @@ function renderStatus(s) {
 	lines.push(
 		`Repo: ${s.repo.isGit ? `git (${s.repo.branch || "detached"}${dirtyLabel})` : "non-git"}`,
 	);
-	if (s.repo.isGit && s.repo.lastCommit)
-		lines.push(`Last commit: ${s.repo.lastCommit}`);
+	if (s.repo.isGit && s.repo.lastCommit) lines.push(`Last commit: ${s.repo.lastCommit}`);
 	lines.push(
 		`Init: ${s.init.classification} (state: ${s.init.stateDir}${
 			s.init.provenance.present
@@ -120,7 +121,9 @@ function renderStatus(s) {
 	}
 	if (s.wikiDrift.available) {
 		const c = s.wikiDrift.counts;
-		lines.push(`Wiki drift: staleDocs=${c.staleDocs} missingRequired=${c.missingRequired} controlledDrifted=${c.controlledDrifted}`);
+		lines.push(
+			`Wiki drift: staleDocs=${c.staleDocs} missingRequired=${c.missingRequired} controlledDrifted=${c.controlledDrifted}`,
+		);
 		const hints = [];
 		if (c.missingRequired > 0) hints.push("amber wiki --dry-run (re-scaffold missing pages)");
 		if (c.staleDocs > 0) hints.push("amber maintenance stale-docs");

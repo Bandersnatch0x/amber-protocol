@@ -18,10 +18,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const TARGETS = [
-	".claude-plugin/plugin.json",
-	".codex-plugin/plugin.json",
-];
+const TARGETS = [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"];
 
 // README carries a human-readable version badge (e.g. "**Version:** 1.3.4").
 // Keep it in lockstep with package.json via regex replacement so the badge

@@ -16,9 +16,13 @@ function verificationDir(targetRoot) {
 }
 
 function evidencePath(targetRoot, pageId) {
-	return resolvePathWithin(targetRoot, path.join(".amber", "context", "verification", `${pageId}.json`), {
-		label: "Context verification evidence file",
-	});
+	return resolvePathWithin(
+		targetRoot,
+		path.join(".amber", "context", "verification", `${pageId}.json`),
+		{
+			label: "Context verification evidence file",
+		},
+	);
 }
 
 function hashPersistedPage(targetRoot, pageId) {
@@ -44,7 +48,11 @@ function writeVerificationEvidence(targetRoot, pageId, details = {}) {
 		verifiedAt: ingestEvent.at,
 	};
 	fs.mkdirSync(verificationDir(targetRoot), { recursive: true });
-	fs.writeFileSync(evidencePath(targetRoot, pageId), `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
+	fs.writeFileSync(
+		evidencePath(targetRoot, pageId),
+		`${JSON.stringify(evidence, null, 2)}\n`,
+		"utf8",
+	);
 	return evidence;
 }
 
@@ -69,7 +77,7 @@ function readAcceptedEvidence(targetRoot, pageId) {
 		evidence.schemaVersion !== EVIDENCE_SCHEMA_VERSION ||
 		evidence.pageId !== pageId ||
 		typeof evidence.requestId !== "string" ||
-		!(["accepted", "no-change"].includes(evidence.outcome)) ||
+		!["accepted", "no-change"].includes(evidence.outcome) ||
 		!/^sha256:[0-9a-f]{64}$/.test(evidence.pageHash || "") ||
 		!/^sha256:[0-9a-f]{64}$/.test(evidence.ingestEventHash || "") ||
 		Number.isNaN(Date.parse(evidence.verifiedAt || "")) ||

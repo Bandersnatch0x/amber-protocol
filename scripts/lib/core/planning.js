@@ -3,9 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const {
-	REPO_ROOT,
-} = require("./constants");
+const { REPO_ROOT } = require("./constants");
 
 const {
 	pathExists,
@@ -16,11 +14,7 @@ const {
 	walkFiles,
 } = require("./fs-utils");
 
-const {
-	getSectionBody,
-	hasSectionWithBody,
-	slugify,
-} = require("./text-utils");
+const { getSectionBody, hasSectionWithBody, slugify } = require("./text-utils");
 
 const EVIDENCE_SCHEMA_FIELDS = ["Command", "Result", "Date"];
 const RESUME_CHECKPOINT_FIELDS = [
@@ -30,14 +24,10 @@ const RESUME_CHECKPOINT_FIELDS = [
 	"Recovery Instructions",
 ];
 
-const {
-	findFeatureById,
-} = require("./validators");
+const { findFeatureById } = require("./validators");
 const { codedError } = require("./error-catalog");
 
-const {
-	MESSAGES,
-} = require("./terminology");
+const { MESSAGES } = require("./terminology");
 
 function buildPlanContent(feature, title, options = {}) {
 	const planReference = options.planPath || "this plan file";
@@ -130,11 +120,7 @@ function scaffoldPlan(target, options = {}) {
 	}
 
 	const title = options.title || feature.title;
-	const relativePath = path.join(
-		"docs",
-		"plans",
-		`${feature.id}-${slugify(title)}.md`,
-	);
+	const relativePath = path.join("docs", "plans", `${feature.id}-${slugify(title)}.md`);
 	const destination = path.join(targetRoot, relativePath);
 
 	if (pathExists(destination)) {
@@ -163,10 +149,7 @@ function scaffoldPlan(target, options = {}) {
 }
 
 function readPlanField(content, field) {
-	const pattern = new RegExp(
-		`^${field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*(.+)$`,
-		"im",
-	);
+	const pattern = new RegExp(`^${field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*(.+)$`, "im");
 	const match = content.match(pattern);
 	return match ? match[1].trim() : "";
 }
@@ -190,9 +173,7 @@ function validatePlanContent({ content, resolveFeature }) {
 		if (error) {
 			errors.push(`Cannot read feature_list.json: ${error}`);
 		} else if (!found) {
-			errors.push(
-				`Plan feature ${featureId} was not found in feature_list.json.`,
-			);
+			errors.push(`Plan feature ${featureId} was not found in feature_list.json.`);
 		}
 	}
 
@@ -212,20 +193,15 @@ function validatePlanContent({ content, resolveFeature }) {
 	const checkpointBody = getSectionBody(content, "Resume Checkpoint");
 	if (checkpointBody !== null) {
 		const missingFields = RESUME_CHECKPOINT_FIELDS.filter(
-			(field) =>
-				!new RegExp(`^\\s*-\\s*${field}:`, "im").test(checkpointBody),
+			(field) => !new RegExp(`^\\s*-\\s*${field}:`, "im").test(checkpointBody),
 		);
 		if (missingFields.length > 0) {
-			errors.push(
-				`Resume Checkpoint must define ${missingFields.join(", ")} fields.`,
-			);
+			errors.push(`Resume Checkpoint must define ${missingFields.join(", ")} fields.`);
 		}
 	}
 
 	if (!/^confirmed$/i.test(userConfirmation)) {
-		errors.push(
-			"User confirmation is required before implementation-ready status.",
-		);
+		errors.push("User confirmation is required before implementation-ready status.");
 	}
 
 	return { feature: featureId || null, errors, warnings };
@@ -315,8 +291,7 @@ function evaluateStandardCheck(content, checkId) {
 			if (!/^confirmed$/i.test(readPlanField(content, "User Confirmation"))) {
 				return {
 					pass: false,
-					message:
-						"Implementation-ready plans require explicit user confirmation.",
+					message: "Implementation-ready plans require explicit user confirmation.",
 				};
 			}
 			return { pass: true };
@@ -324,21 +299,18 @@ function evaluateStandardCheck(content, checkId) {
 			if (!hasSectionWithBody(content, "Verification")) {
 				return {
 					pass: false,
-					message:
-						"Plans must define a non-empty Verification section before acceptance.",
+					message: "Plans must define a non-empty Verification section before acceptance.",
 				};
 			}
 			const evidenceBody = getSectionBody(content, "Evidence Schema");
 			if (!evidenceBody || !evidenceBody.trim()) {
 				return {
 					pass: false,
-					message:
-						"Plans must define an Evidence Schema section before acceptance.",
+					message: "Plans must define an Evidence Schema section before acceptance.",
 				};
 			}
 			const missingFields = EVIDENCE_SCHEMA_FIELDS.filter(
-				(field) =>
-					!new RegExp(`^\\s*-\\s*${field}:`, "im").test(evidenceBody),
+				(field) => !new RegExp(`^\\s*-\\s*${field}:`, "im").test(evidenceBody),
 			);
 			if (missingFields.length > 0) {
 				return {
@@ -358,8 +330,7 @@ function evaluateStandardCheck(content, checkId) {
 				};
 			}
 			const acknowledgesBoundary =
-				/guardrails/i.test(acceptanceBody) ||
-				/phase boundary/i.test(acceptanceBody);
+				/guardrails/i.test(acceptanceBody) || /phase boundary/i.test(acceptanceBody);
 			if (!acknowledgesBoundary) {
 				return {
 					pass: false,
@@ -401,17 +372,9 @@ function evaluateStandardChecks({ content, standards }) {
 // applicable checks, and compute the required user action and release readiness.
 // Extracted so the review assembly is unit-testable without discoverStandards/
 // validatePlanGate hitting disk.
-function buildReviewResult({
-	targetRoot,
-	planRelativePath,
-	gateResult,
-	standards,
-	content = "",
-}) {
+function buildReviewResult({ targetRoot, planRelativePath, gateResult, standards, content = "" }) {
 	const gateFindings = gateResult.errors.map((message) => {
-		const checkId = /User confirmation/.test(message)
-			? "user-confirmation"
-			: "plan-gate";
+		const checkId = /User confirmation/.test(message) ? "user-confirmation" : "plan-gate";
 		const finding = { severity: "error", checkId, message };
 		if (checkId === "user-confirmation") {
 			finding.remedy = `amber gate --confirm --target . --plan ${planRelativePath}`;
@@ -435,9 +398,7 @@ function buildReviewResult({
 	);
 
 	const requiredUserAction =
-		findings.length > 0
-			? ["Confirm the plan and resolve review findings before acceptance."]
-			: [];
+		findings.length > 0 ? ["Confirm the plan and resolve review findings before acceptance."] : [];
 
 	return {
 		target: targetRoot,
@@ -517,9 +478,7 @@ function confirmPlanGate(target, planRelativePath) {
 			target: targetRoot,
 			plan: planRelativePath,
 			confirmed: false,
-			errors: [
-				"Plan does not contain a 'User Confirmation:' field to confirm.",
-			],
+			errors: ["Plan does not contain a 'User Confirmation:' field to confirm."],
 			warnings: [],
 		};
 	}
@@ -560,8 +519,7 @@ function acceptPlan(target, planRelativePath, options = {}) {
 	// with a recorded warning.
 	if (featureId) {
 		const feature = findFeatureById(targetRoot, featureId);
-		const hasEvidence =
-			feature && Array.isArray(feature.evidence) && feature.evidence.length > 0;
+		const hasEvidence = feature && Array.isArray(feature.evidence) && feature.evidence.length > 0;
 		if (feature && !hasEvidence) {
 			if (!options.force) {
 				return {
@@ -579,9 +537,7 @@ function acceptPlan(target, planRelativePath, options = {}) {
 					review,
 				};
 			}
-			review.warnings.push(
-				`Accepted ${featureId} with --force despite no verification evidence.`,
-			);
+			review.warnings.push(`Accepted ${featureId} with --force despite no verification evidence.`);
 		}
 	}
 
@@ -592,9 +548,7 @@ function acceptPlan(target, planRelativePath, options = {}) {
 			if (feature) {
 				const featureListPath = path.join(targetRoot, "feature_list.json");
 				const data = readJson(featureListPath);
-				const idx = data.features.findIndex(
-					(f) => f && f.id === featureId,
-				);
+				const idx = data.features.findIndex((f) => f && f.id === featureId);
 				if (idx !== -1 && data.features[idx].status !== "accepted") {
 					const updatedFeatures = data.features.map((f, i) =>
 						i === idx
@@ -616,10 +570,7 @@ function acceptPlan(target, planRelativePath, options = {}) {
 
 	// Update the plan's own Status field to reflect acceptance.
 	try {
-		const updatedPlan = planContent.replace(
-			/^Status:\s*.+$/m,
-			"Status: accepted",
-		);
+		const updatedPlan = planContent.replace(/^Status:\s*.+$/m, "Status: accepted");
 		if (updatedPlan !== planContent) {
 			fs.writeFileSync(planPath, updatedPlan);
 		}
@@ -627,12 +578,7 @@ function acceptPlan(target, planRelativePath, options = {}) {
 		// Non-critical — the plan update is cosmetic.
 	}
 
-	const evolutionRelativePath = path.join(
-		"docs",
-		"wiki",
-		"engineering",
-		"harness-evolution.md",
-	);
+	const evolutionRelativePath = path.join("docs", "wiki", "engineering", "harness-evolution.md");
 	const evolutionPath = path.join(targetRoot, evolutionRelativePath);
 	const date = new Date().toISOString().slice(0, 10);
 	const entry = [

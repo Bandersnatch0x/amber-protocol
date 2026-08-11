@@ -137,7 +137,9 @@ function collapseWhitespace(text) {
  * @returns {string} normalized text
  */
 function normalizeForHash(text, ext) {
-	const extNorm = String(ext || "").replace(/^\./, "").toLowerCase();
+	const extNorm = String(ext || "")
+		.replace(/^\./, "")
+		.toLowerCase();
 	let t = text;
 	if (extNorm === "js" || extNorm === "mjs" || extNorm === "cjs") {
 		t = stripJsComments(t);

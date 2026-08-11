@@ -13,7 +13,9 @@ function renderMarkdown(report) {
 	lines.push("");
 	lines.push(`- **Target:** ${report.target}`);
 	lines.push(`- **Generated:** ${report.generatedAt || "(not set)"}`);
-	lines.push(`- **Scope:** repository=${report.scope.repository}, sessions=${report.scope.sessions}, providers=[${(report.scope.providers || []).join(", ")}]`);
+	lines.push(
+		`- **Scope:** repository=${report.scope.repository}, sessions=${report.scope.sessions}, providers=[${(report.scope.providers || []).join(", ")}]`,
+	);
 	lines.push("");
 	lines.push("## Coverage");
 	for (const [lane, state] of Object.entries(report.coverage)) {

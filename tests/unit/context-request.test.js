@@ -101,9 +101,7 @@ describe("bundleSources", () => {
 				path.join(root, "linked"),
 				process.platform === "win32" ? "junction" : "dir",
 			);
-			const { sources, errors } = bundleSources(root, [
-				{ ref: "linked/secret.md" },
-			]);
+			const { sources, errors } = bundleSources(root, [{ ref: "linked/secret.md" }]);
 			assert.deepEqual(sources, []);
 			assert.match(errors.join("\n"), /outside the target/i);
 		} finally {

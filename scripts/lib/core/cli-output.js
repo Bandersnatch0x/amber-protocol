@@ -155,9 +155,7 @@ function printAuditStarterSummary(result) {
 	if (result.auditMode === "product-repo") {
 		const template = result.templateStarterFiles;
 		const total = template.existing.length + template.missing.length;
-		console.log(
-			`Template starter files: ${template.existing.length}/${total} in templates/`,
-		);
+		console.log(`Template starter files: ${template.existing.length}/${total} in templates/`);
 		return;
 	}
 
@@ -194,41 +192,27 @@ function printAuditSummary(result) {
 	console.log(
 		`Suggested additions: ${Array.isArray(result.suggestedAdditions) ? result.suggestedAdditions.length : 0}`,
 	);
-	console.log(
-		`Existing docs: ${Array.isArray(result.docs) ? result.docs.length : 0}`,
-	);
+	console.log(`Existing docs: ${Array.isArray(result.docs) ? result.docs.length : 0}`);
 	console.log(
 		`Wiki-like files: ${Array.isArray(result.wikiLikeFiles) ? result.wikiLikeFiles.length : 0}`,
 	);
-	console.log(
-		`Conflicts: ${Array.isArray(result.conflicts) ? result.conflicts.length : 0}`,
-	);
+	console.log(`Conflicts: ${Array.isArray(result.conflicts) ? result.conflicts.length : 0}`);
 
 	if (Array.isArray(result.commands) && result.commands.length > 0) {
 		console.log("Detected commands:");
 		for (const command of result.commands) {
-			console.log(
-				`  - ${command.source}: ${command.name} -> ${command.command}`,
-			);
+			console.log(`  - ${command.source}: ${command.name} -> ${command.command}`);
 		}
 	}
 
-	if (
-		Array.isArray(result.candidateCommands) &&
-		result.candidateCommands.length > 0
-	) {
+	if (Array.isArray(result.candidateCommands) && result.candidateCommands.length > 0) {
 		console.log("Candidate commands requiring confirmation:");
 		for (const command of result.candidateCommands) {
-			console.log(
-				`  - ${command.source}: ${command.name} -> ${command.command}`,
-			);
+			console.log(`  - ${command.source}: ${command.name} -> ${command.command}`);
 		}
 	}
 
-	if (
-		Array.isArray(result.toolingEvidence) &&
-		result.toolingEvidence.length > 0
-	) {
+	if (Array.isArray(result.toolingEvidence) && result.toolingEvidence.length > 0) {
 		console.log("Tooling evidence:");
 		for (const item of result.toolingEvidence) {
 			console.log(`  - ${item.source}: ${item.name}`);
@@ -288,13 +272,8 @@ function printInitInsights(result) {
 				console.log(`    - ${file}`);
 			}
 		}
-		if (
-			Array.isArray(wiki.contextPlaceholders) &&
-			wiki.contextPlaceholders.length > 0
-		) {
-			console.log(
-				`  Still placeholder (fill these in): ${wiki.contextPlaceholders.length}`,
-			);
+		if (Array.isArray(wiki.contextPlaceholders) && wiki.contextPlaceholders.length > 0) {
+			console.log(`  Still placeholder (fill these in): ${wiki.contextPlaceholders.length}`);
 			for (const file of wiki.contextPlaceholders.slice(0, 8)) {
 				console.log(`    ! ${file}`);
 			}
@@ -317,9 +296,7 @@ function printInitInsights(result) {
 		const g = detection.governance;
 		const review = g.recommendations && g.recommendations.codeReview;
 		const missing =
-			g.recommendations && g.recommendations.gitignore
-				? g.recommendations.gitignore.missing
-				: [];
+			g.recommendations && g.recommendations.gitignore ? g.recommendations.gitignore.missing : [];
 		console.log("");
 		console.log(`Team size: ${g.teamSize} (${g.contributors} contributor(s))`);
 		if (review) {
@@ -396,10 +373,7 @@ function printResult(result, options = {}) {
 				console.log(`  - ${item}`);
 			}
 		}
-		if (
-			Array.isArray(result.suggestedAdditions) &&
-			result.suggestedAdditions.length > 0
-		) {
+		if (Array.isArray(result.suggestedAdditions) && result.suggestedAdditions.length > 0) {
 			console.log("Suggested additions:");
 			for (const item of result.suggestedAdditions) {
 				console.log(`  - ${item}`);
@@ -408,26 +382,16 @@ function printResult(result, options = {}) {
 		if (result.commands.length > 0) {
 			console.log("Detected commands:");
 			for (const command of result.commands) {
-				console.log(
-					`  - ${command.source}: ${command.name} -> ${command.command}`,
-				);
+				console.log(`  - ${command.source}: ${command.name} -> ${command.command}`);
 			}
 		}
-		if (
-			Array.isArray(result.candidateCommands) &&
-			result.candidateCommands.length > 0
-		) {
+		if (Array.isArray(result.candidateCommands) && result.candidateCommands.length > 0) {
 			console.log("Candidate commands requiring confirmation:");
 			for (const command of result.candidateCommands) {
-				console.log(
-					`  - ${command.source}: ${command.name} -> ${command.command}`,
-				);
+				console.log(`  - ${command.source}: ${command.name} -> ${command.command}`);
 			}
 		}
-		if (
-			Array.isArray(result.toolingEvidence) &&
-			result.toolingEvidence.length > 0
-		) {
+		if (Array.isArray(result.toolingEvidence) && result.toolingEvidence.length > 0) {
 			console.log("Tooling evidence:");
 			for (const item of result.toolingEvidence) {
 				console.log(`  - ${item.source}: ${item.name}`);
@@ -439,19 +403,13 @@ function printResult(result, options = {}) {
 				console.log(`  - ${item}`);
 			}
 		}
-		if (
-			Array.isArray(result.wikiLikeFiles) &&
-			result.wikiLikeFiles.length > 0
-		) {
+		if (Array.isArray(result.wikiLikeFiles) && result.wikiLikeFiles.length > 0) {
 			console.log("Wiki-like files:");
 			for (const item of result.wikiLikeFiles) {
 				console.log(`  - ${item}`);
 			}
 		}
-		if (
-			Array.isArray(result.suggestedPatches) &&
-			result.suggestedPatches.length > 0
-		) {
+		if (Array.isArray(result.suggestedPatches) && result.suggestedPatches.length > 0) {
 			console.log("Suggested patches requiring approval:");
 			for (const patch of result.suggestedPatches) {
 				console.log(`  - ${patch.file}: ${patch.suggestion}`);
@@ -493,9 +451,7 @@ function printResult(result, options = {}) {
 		}
 		console.log(`Reports: ${result.reports.length}`);
 		for (const report of result.reports) {
-			console.log(
-				`  - ${report.generatedAt}: ${path.basename(report.file)} -> ${report.target}`,
-			);
+			console.log(`  - ${report.generatedAt}: ${path.basename(report.file)} -> ${report.target}`);
 		}
 		printErrorFooter(result);
 		printWarningFooter(result);
@@ -515,9 +471,7 @@ function printResult(result, options = {}) {
 				`  - ${metric.label}: ${metric.base ?? "n/a"} -> ${metric.head ?? "n/a"} (${metric.delta ?? "n/a"})`,
 			);
 		}
-		console.log(
-			`Candidate commands added: ${result.candidateCommands.added.length}`,
-		);
+		console.log(`Candidate commands added: ${result.candidateCommands.added.length}`);
 		console.log(`Unknowns removed: ${result.unknowns.removed.length}`);
 		printErrorFooter(result);
 		return;
@@ -561,12 +515,8 @@ function printResult(result, options = {}) {
 		console.log(`Bundle directory: ${result.bundleDir || "n/a"}`);
 		console.log(`Dry run: ${result.dryRun}`);
 		console.log(`Apply ready: ${result.applyReady}`);
-		console.log(
-			`Created preview: ${result.preview ? result.preview.created.length : 0}`,
-		);
-		console.log(
-			`Skipped existing: ${result.preview ? result.preview.skipped.length : 0}`,
-		);
+		console.log(`Created preview: ${result.preview ? result.preview.created.length : 0}`);
+		console.log(`Skipped existing: ${result.preview ? result.preview.skipped.length : 0}`);
 		printErrorFooter(result);
 		return;
 	}
@@ -577,9 +527,7 @@ function printResult(result, options = {}) {
 		console.log(`Bundle directory: ${result.bundleDir || "n/a"}`);
 		console.log(`Gate decision: ${result.gateDecision}`);
 		console.log(`Approval status: ${result.approvalStatus}`);
-		console.log(
-			`Decisions: ${Array.isArray(result.decisions) ? result.decisions.length : 0}`,
-		);
+		console.log(`Decisions: ${Array.isArray(result.decisions) ? result.decisions.length : 0}`);
 		if (Array.isArray(result.decisions)) {
 			for (const decision of result.decisions) {
 				console.log(`  - ${decision.id}: ${decision.status}`);
@@ -611,9 +559,7 @@ function printResult(result, options = {}) {
 		console.log(`Target: ${result.target || "n/a"}`);
 		console.log(`Latest report: ${result.latestReport || "none"}`);
 		console.log(`Gate decision: ${result.gateDecision}`);
-		console.log(
-			`Files: ${Array.isArray(result.files) ? result.files.length : 0}`,
-		);
+		console.log(`Files: ${Array.isArray(result.files) ? result.files.length : 0}`);
 		if (Array.isArray(result.files)) {
 			for (const file of result.files) {
 				console.log(`  - ${file.relativePath}`);
@@ -627,9 +573,7 @@ function printResult(result, options = {}) {
 	if (result.kind === "adoption-status") {
 		console.log(`Reports directory: ${result.reportsDir || "n/a"}`);
 		console.log(`Reports: ${result.reports.count}`);
-		console.log(
-			`Latest report: ${result.latestReport ? result.latestReport.file : "none"}`,
-		);
+		console.log(`Latest report: ${result.latestReport ? result.latestReport.file : "none"}`);
 		console.log(`Index checked: ${result.index.checked}`);
 		console.log(`Index valid: ${result.index.valid ?? "n/a"}`);
 		console.log(`Gate decision: ${result.gate.decision}`);
@@ -674,17 +618,14 @@ function printResult(result, options = {}) {
 		}
 	}
 	if (result.releaseReadiness && result.releaseReadiness.status) {
-		const statusLabel =
-			result.releaseReadiness.status === "ready" ? "READY" : "BLOCKED";
+		const statusLabel = result.releaseReadiness.status === "ready" ? "READY" : "BLOCKED";
 		console.log(`Release readiness: ${statusLabel}`);
 	}
 
 	if (Array.isArray(result.productChecks) && result.productChecks.length > 0) {
 		console.log("Product checks:");
 		for (const check of result.productChecks) {
-			console.log(
-				`  - ${check.name}: errors=${check.errors}, warnings=${check.warnings}`,
-			);
+			console.log(`  - ${check.name}: errors=${check.errors}, warnings=${check.warnings}`);
 		}
 	}
 	// Some command results (e.g. execution validate-integration) carry their

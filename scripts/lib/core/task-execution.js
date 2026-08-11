@@ -5,25 +5,13 @@ const path = require("node:path");
 const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-dir-resolver");
 const { TRANSITIONS, isFinal } = require("../session-state-machine");
 
-const {
-	pathExists,
-	readJson,
-	relativeSlash,
-	resolveTarget,
-} = require("./fs-utils");
+const { pathExists, readJson, relativeSlash, resolveTarget } = require("./fs-utils");
 
-const {
-	reviewPlan,
-} = require("./planning");
+const { reviewPlan } = require("./planning");
 
-const {
-	slugify,
-} = require("./text-utils");
+const { slugify } = require("./text-utils");
 
-const {
-	MESSAGES,
-	cannotReadTaskEvidence,
-} = require("./terminology");
+const { MESSAGES, cannotReadTaskEvidence } = require("./terminology");
 
 // Pure renderer for replay.md: builds the replay document from the task
 // coordinates and the assembled evidence object. Extracted from
@@ -42,21 +30,15 @@ function buildReplayContent(taskId, planRelativePath, worktreeRelativePath, evid
 		replayLines.push("## Trace Replay", "");
 		replayLines.push(`- Trace input: ${evidence.traceReplay.traceInput}`);
 		replayLines.push(`- Agent config: ${evidence.traceReplay.agentConfig}`);
-		replayLines.push(
-			`- Exact replay required: ${evidence.traceReplay.exactReplayRequired}`,
-		);
+		replayLines.push(`- Exact replay required: ${evidence.traceReplay.exactReplayRequired}`);
 		replayLines.push("");
 	}
 
 	if (evidence.regressionProposal) {
 		replayLines.push("## Regression Proposal", "");
 		replayLines.push(`- Assertion: ${evidence.regressionProposal.assertion}`);
-		replayLines.push(
-			`- Modifies tests: ${evidence.regressionProposal.modifiesTests}`,
-		);
-		replayLines.push(
-			`- Approval required: ${evidence.regressionProposal.approvalRequired}`,
-		);
+		replayLines.push(`- Modifies tests: ${evidence.regressionProposal.modifiesTests}`);
+		replayLines.push(`- Approval required: ${evidence.regressionProposal.approvalRequired}`);
 		replayLines.push("");
 	}
 
@@ -99,7 +81,9 @@ function resolveExecutionSession(targetRoot, options) {
 		? explicit.sessionId
 		: findMostRecentSession(targetRoot, { excludeCompleted: true });
 	if (!sessionId) {
-		return { error: "task prepare requires an active non-terminal Session in the target repository." };
+		return {
+			error: "task prepare requires an active non-terminal Session in the target repository.",
+		};
 	}
 	if (!SESSION_ID_RE.test(sessionId)) {
 		return { error: `Invalid Session ID for task prepare: ${sessionId}` };
@@ -115,7 +99,9 @@ function resolveExecutionSession(targetRoot, options) {
 		return { error: `Session ${sessionId} has invalid status: ${manifest.status}` };
 	}
 	if (isFinal(manifest.status)) {
-		return { error: `Session ${sessionId} is terminal (${manifest.status}); task prepare requires a non-terminal Session.` };
+		return {
+			error: `Session ${sessionId} is terminal (${manifest.status}); task prepare requires a non-terminal Session.`,
+		};
 	}
 	return { sessionId };
 }
@@ -171,8 +157,14 @@ function persistExecutionArtifacts(coordinates, artifacts) {
 	const executionPath = path.join(targetRoot, executionRelativePath);
 	fs.mkdirSync(worktreePath, { recursive: true });
 	fs.mkdirSync(executionPath, { recursive: true });
-	fs.writeFileSync(path.join(executionPath, "ledger.json"), JSON.stringify(artifacts.ledger, null, 2));
-	fs.writeFileSync(path.join(executionPath, "evidence.json"), JSON.stringify(artifacts.evidence, null, 2));
+	fs.writeFileSync(
+		path.join(executionPath, "ledger.json"),
+		JSON.stringify(artifacts.ledger, null, 2),
+	);
+	fs.writeFileSync(
+		path.join(executionPath, "evidence.json"),
+		JSON.stringify(artifacts.evidence, null, 2),
+	);
 	fs.writeFileSync(path.join(executionPath, "replay.md"), artifacts.replay);
 	return { worktreeRelativePath, executionRelativePath };
 }
@@ -204,17 +196,17 @@ function preparationFailure(coordinates, errors, warnings, review) {
 	};
 }
 
-function prepareTaskExecution(
-	target,
-	planRelativePath,
-	taskIdInput,
-	options = {},
-) {
+function prepareTaskExecution(target, planRelativePath, taskIdInput, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const taskId = slugify(taskIdInput);
 	const coordinates = { targetRoot, taskId, planRelativePath };
 	if (!taskIdInput) {
-		return { target: targetRoot, task: null, errors: ["task prepare requires --task <task-id>."], warnings: [] };
+		return {
+			target: targetRoot,
+			task: null,
+			errors: ["task prepare requires --task <task-id>."],
+			warnings: [],
+		};
 	}
 	const review = reviewPlan(targetRoot, planRelativePath);
 	if (review.errors.length > 0) {
@@ -276,10 +268,7 @@ function inspectTaskResult(target, taskIdInput) {
 	}
 
 	const replayable =
-		errors.length === 0 &&
-		ledger &&
-		evidence &&
-		evidence.chatHistoryRequired === false;
+		errors.length === 0 && ledger && evidence && evidence.chatHistoryRequired === false;
 
 	return {
 		target: targetRoot,
@@ -288,9 +277,7 @@ function inspectTaskResult(target, taskIdInput) {
 		chatHistoryRequired: !replayable,
 		ledger,
 		evidence,
-		replay: pathExists(replayPath)
-			? relativeSlash(targetRoot, replayPath)
-			: null,
+		replay: pathExists(replayPath) ? relativeSlash(targetRoot, replayPath) : null,
 		errors,
 		warnings,
 	};

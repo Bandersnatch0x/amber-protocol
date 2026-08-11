@@ -176,7 +176,9 @@ describe("execution_mode validation", () => {
 		const data = { ...legacyLoopContract(), execution_mode: "invalid_mode" };
 		assert.strictEqual(validate(data), false);
 		assert.ok(
-			validate.errors.some((e) => e.keyword === "enum" && e.instancePath.endsWith("/execution_mode")),
+			validate.errors.some(
+				(e) => e.keyword === "enum" && e.instancePath.endsWith("/execution_mode"),
+			),
 			`expected enum error for execution_mode: ${JSON.stringify(validate.errors)}`,
 		);
 	});
@@ -194,7 +196,9 @@ describe("execution_mode validation", () => {
 		const data = { ...legacyRoute(), execution_mode: "bad" };
 		assert.strictEqual(validate(data), false);
 		assert.ok(
-			validate.errors.some((e) => e.keyword === "enum" && e.instancePath.endsWith("/execution_mode")),
+			validate.errors.some(
+				(e) => e.keyword === "enum" && e.instancePath.endsWith("/execution_mode"),
+			),
 			`expected enum error for execution_mode: ${JSON.stringify(validate.errors)}`,
 		);
 	});
@@ -242,10 +246,7 @@ describe("doctor version drift", () => {
 			status: "created",
 			amber_protocol_version: "1.0.0",
 		};
-		fs.writeFileSync(
-			path.join(sessionDir, "manifest.json"),
-			JSON.stringify(manifest, null, 2),
-		);
+		fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify(manifest, null, 2));
 
 		const result = doctor(target);
 		assert.ok(
@@ -270,10 +271,7 @@ describe("doctor version drift", () => {
 			status: "created",
 			amber_protocol_version: CLI_VERSION,
 		};
-		fs.writeFileSync(
-			path.join(sessionDir, "manifest.json"),
-			JSON.stringify(manifest, null, 2),
-		);
+		fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify(manifest, null, 2));
 
 		const result = doctor(target);
 		assert.ok(

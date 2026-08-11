@@ -114,9 +114,7 @@ function loadRouteGates(routeId) {
 	const gates = Array.isArray(j.gates) ? j.gates : [];
 	// Prefer implement/approve-style gate; else last gate; else first.
 	const prefer =
-		gates.find((g) => /implement|approve|merge/i.test(g.id)) ||
-		gates[gates.length - 1] ||
-		gates[0];
+		gates.find((g) => /implement|approve|merge/i.test(g.id)) || gates[gates.length - 1] || gates[0];
 	return { gates, approveGate: prefer ? prefer.id : null };
 }
 
@@ -210,13 +208,18 @@ function measureRoute(route) {
 	const tFill0 = Date.now();
 	ensurePlanReady(target, planRel);
 	const fillMs = Date.now() - tFill0;
-	rec("fill plan sections (scripted stand-in)", "hybrid", { ms: fillMs, exitCode: 0 }, {
-		id: "fill_plan",
-		label: "Human fills Verification / design sections (generator leaves blanks)",
-		activeHuman: true,
-		judgmentS: HUMAN_JUDGMENT_S.read_and_fill_plan_sections,
-		repeatEntry: true, // verification intent also on route + session verify command
-	});
+	rec(
+		"fill plan sections (scripted stand-in)",
+		"hybrid",
+		{ ms: fillMs, exitCode: 0 },
+		{
+			id: "fill_plan",
+			label: "Human fills Verification / design sections (generator leaves blanks)",
+			activeHuman: true,
+			judgmentS: HUMAN_JUDGMENT_S.read_and_fill_plan_sections,
+			repeatEntry: true, // verification intent also on route + session verify command
+		},
+	);
 
 	r = runTimed(target, ["gate", "--confirm", "--target", ".", "--plan", planRel]);
 	rec("gate --confirm", "cli", r, {
@@ -369,7 +372,9 @@ function measureRoute(route) {
 		repeatEntry: false,
 	});
 
-	const cliMs = steps.filter((s) => s.kind === "cli" || s.kind === "hybrid").reduce((a, s) => a + s.ms, 0);
+	const cliMs = steps
+		.filter((s) => s.kind === "cli" || s.kind === "hybrid")
+		.reduce((a, s) => a + s.ms, 0);
 	const humanOpsActive = humanOps.filter(Boolean).filter((h) => h.activeHuman);
 	const judgmentS = humanOpsActive.reduce((a, h) => a + (h.judgmentS || 0), 0);
 	const judgmentSSteady = humanOpsActive

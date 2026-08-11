@@ -25,14 +25,47 @@ test("empty repo cannot reach a passing complete-check --strict", () => {
 	assert.equal(amber(dir, ["init", "--target", "."]).status, 0);
 	execSync("git add -A && git commit -qm scaffold", { cwd: dir });
 
-	const start = amber(dir, ["session", "start", "--goal", "add login feature", "--route", "feature-standard", "--json"]);
+	const start = amber(dir, [
+		"session",
+		"start",
+		"--goal",
+		"add login feature",
+		"--route",
+		"feature-standard",
+		"--json",
+	]);
 	assert.equal(start.status, 0, start.stderr);
 	const { sessionId } = JSON.parse(start.stdout);
 
 	// Claim-only verification (no --execute) and both approvals via --yes.
-	amber(dir, ["session", "verify", "--session", sessionId, "--command", "npm test", "--result", "passed"]);
-	amber(dir, ["session", "approve", "--session", sessionId, "--gate", "user-approval-plan", "--yes"]);
-	amber(dir, ["session", "approve", "--session", sessionId, "--gate", "user-approval-implement", "--yes"]);
+	amber(dir, [
+		"session",
+		"verify",
+		"--session",
+		sessionId,
+		"--command",
+		"npm test",
+		"--result",
+		"passed",
+	]);
+	amber(dir, [
+		"session",
+		"approve",
+		"--session",
+		sessionId,
+		"--gate",
+		"user-approval-plan",
+		"--yes",
+	]);
+	amber(dir, [
+		"session",
+		"approve",
+		"--session",
+		sessionId,
+		"--gate",
+		"user-approval-implement",
+		"--yes",
+	]);
 
 	const check = amber(dir, ["session", "complete-check", "--session", sessionId, "--strict"]);
 	assert.equal(check.status, 1, "strict check must exit non-zero");

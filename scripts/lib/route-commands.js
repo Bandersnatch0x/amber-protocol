@@ -9,7 +9,6 @@ const { resolveStateDirForCreate } = require("./state-dir-resolver");
 
 const DEFAULT_ROUTES_DIR = path.join(__dirname, "../../routes");
 
-
 function findRoute(routeId, routesDir) {
 	const { routes } = loadRoutes(routesDir);
 	return routes.find((r) => r.routeId === routeId) || null;
@@ -113,7 +112,13 @@ function findStage(route, stageName) {
 	return (route.stages || []).find((s) => s.name === stageName) || null;
 }
 
-function approveRouteStage(routeId, stageName, targetRoot, reviewer, routesDir = DEFAULT_ROUTES_DIR) {
+function approveRouteStage(
+	routeId,
+	stageName,
+	targetRoot,
+	reviewer,
+	routesDir = DEFAULT_ROUTES_DIR,
+) {
 	const route = findRoute(routeId, routesDir);
 	if (!route) return result(`Route "${routeId}" not found.`, 1);
 	const stage = findStage(route, stageName);
@@ -139,9 +144,19 @@ function approveRouteStage(routeId, stageName, targetRoot, reviewer, routesDir =
 
 function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_ROUTES_DIR) {
 	const route = findRoute(routeId, routesDir);
-	if (!route) return { text: `Route "${routeId}" not found.`, errors: [`Route "${routeId}" not found.`], exitCode: 1 };
+	if (!route)
+		return {
+			text: `Route "${routeId}" not found.`,
+			errors: [`Route "${routeId}" not found.`],
+			exitCode: 1,
+		};
 	const stage = findStage(route, stageName);
-	if (!stage) return { text: `Stage "${stageName}" not found.`, errors: [`Stage "${stageName}" not found in route ${routeId}.`], exitCode: 1 };
+	if (!stage)
+		return {
+			text: `Stage "${stageName}" not found.`,
+			errors: [`Stage "${stageName}" not found in route ${routeId}.`],
+			exitCode: 1,
+		};
 	if (stage.type !== "command") {
 		const msg = `Only command stages can be executed; "${stageName}" is type "${stage.type}".`;
 		return { text: msg, errors: [msg], exitCode: 1 };

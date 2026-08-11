@@ -44,26 +44,14 @@ test("session start creates manifest and timeline", () => {
 	assert.ok(match);
 
 	const sessionId = match[1];
-	const manifestPath = path.join(
-		SESSION_ROOT,
-		".amber",
-		"sessions",
-		sessionId,
-		"manifest.json",
-	);
+	const manifestPath = path.join(SESSION_ROOT, ".amber", "sessions", sessionId, "manifest.json");
 	assert.ok(fs.existsSync(manifestPath));
 
 	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 	assert.equal(manifest.status, "created");
 	assert.equal(manifest.goal, "implement test feature");
 
-	const timelinePath = path.join(
-		SESSION_ROOT,
-		".amber",
-		"sessions",
-		sessionId,
-		"timeline.jsonl",
-	);
+	const timelinePath = path.join(SESSION_ROOT, ".amber", "sessions", sessionId, "timeline.jsonl");
 	assert.ok(fs.existsSync(timelinePath));
 });
 
@@ -143,13 +131,7 @@ test("session abort sets status to aborted", () => {
 	assert.equal(result.status, 0);
 	assert.match(result.stdout, /Session aborted/);
 
-	const manifestPath = path.join(
-		SESSION_ROOT,
-		".amber",
-		"sessions",
-		sessionId,
-		"manifest.json",
-	);
+	const manifestPath = path.join(SESSION_ROOT, ".amber", "sessions", sessionId, "manifest.json");
 	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 	assert.equal(manifest.status, "aborted");
 });
@@ -191,12 +173,7 @@ test("unknown session subcommand exits non-zero", () => {
 });
 
 test("session start with goal matching bugfix-quick route auto-selects route", () => {
-	const result = runHarness([
-		"session",
-		"start",
-		"--goal",
-		"fix critical login bug",
-	]);
+	const result = runHarness(["session", "start", "--goal", "fix critical login bug"]);
 	assert.equal(result.status, 0);
 	assert.match(result.stdout, /bugfix-quick/);
 });

@@ -30,15 +30,9 @@ const LEGACY_EXPORTS = [
 describe("knowledge-plan legacy compatibility surface", () => {
 	it("forwards every retained helper export", () => {
 		for (const name of LEGACY_EXPORTS) {
-			assert.ok(
-				name in legacy,
-				`legacy surface missing retained export: ${name}`,
-			);
+			assert.ok(name in legacy, `legacy surface missing retained export: ${name}`);
 			const type = typeof legacy[name];
-			assert.ok(
-				type === "function" || type === "string",
-				`unexpected type for ${name}: ${type}`,
-			);
+			assert.ok(type === "function" || type === "string", `unexpected type for ${name}: ${type}`);
 		}
 	});
 
@@ -50,10 +44,7 @@ describe("knowledge-plan legacy compatibility surface", () => {
 	});
 
 	it("legacy constants match facade-facing paths", () => {
-		assert.equal(
-			legacy.KNOWLEDGE_PLAN_RELATIVE,
-			path.join("docs", "wiki", "knowledge-plan.json"),
-		);
+		assert.equal(legacy.KNOWLEDGE_PLAN_RELATIVE, path.join("docs", "wiki", "knowledge-plan.json"));
 		assert.equal(
 			legacy.KNOWLEDGE_PLAN_YAML_RELATIVE,
 			path.join("docs", "wiki", "knowledge-plan.yaml"),

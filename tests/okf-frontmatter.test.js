@@ -3,7 +3,10 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { parseOkfFrontmatter, validateOkfFrontmatter } = require("../scripts/lib/core/okf-frontmatter");
+const {
+	parseOkfFrontmatter,
+	validateOkfFrontmatter,
+} = require("../scripts/lib/core/okf-frontmatter");
 
 const VALID_PAGE = [
 	"---",

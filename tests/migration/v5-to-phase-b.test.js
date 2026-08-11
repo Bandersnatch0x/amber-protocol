@@ -25,10 +25,7 @@ describe("migrateSettings", () => {
 
 		assert.strictEqual(result.version, "1.0.0");
 		assert.strictEqual(result.framework, "phase-b");
-		assert.ok(
-			Object.hasOwn(result, "migratedAt"),
-			"Should include migration timestamp",
-		);
+		assert.ok(Object.hasOwn(result, "migratedAt"), "Should include migration timestamp");
 	});
 
 	it("preserves custom user settings", () => {
@@ -38,10 +35,7 @@ describe("migrateSettings", () => {
 
 	it("renames deprecated fields", () => {
 		const result = migrateSettings(validV55);
-		assert.ok(
-			!Object.hasOwn(result, "deprecated_field"),
-			"Should remove deprecated_field",
-		);
+		assert.ok(!Object.hasOwn(result, "deprecated_field"), "Should remove deprecated_field");
 		assert.ok(!Object.hasOwn(result, "legacy_api"), "Should remove legacy_api");
 	});
 

@@ -72,8 +72,18 @@ test("inspectSecurityGovernance reports a security-named pack that is not linked
 	const workflowPacks = {
 		...packs,
 		packs: [
-			{ id: "secure-loop", title: "Security scan", file: "workflow-packs/secure-loop.pack.json", standards: [] },
-			{ id: "docs", title: "Docs", file: "workflow-packs/docs.pack.json", standards: ["security-governance"] },
+			{
+				id: "secure-loop",
+				title: "Security scan",
+				file: "workflow-packs/secure-loop.pack.json",
+				standards: [],
+			},
+			{
+				id: "docs",
+				title: "Docs",
+				file: "workflow-packs/docs.pack.json",
+				standards: ["security-governance"],
+			},
 		],
 	};
 

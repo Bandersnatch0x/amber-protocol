@@ -52,7 +52,9 @@ const PROVIDERS = [
 			const fs = require("node:fs");
 			const path = require("node:path");
 			try {
-				return fs.existsSync(repoTranscriptDir(path.resolve(targetRoot || process.cwd()), opts?.claudeHome));
+				return fs.existsSync(
+					repoTranscriptDir(path.resolve(targetRoot || process.cwd()), opts?.claudeHome),
+				);
 			} catch {
 				return false;
 			}

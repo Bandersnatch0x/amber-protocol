@@ -48,9 +48,7 @@ function hasHandoffEvidence(projectRoot, manifest) {
 	if (isLiveHandoff(projectRoot)) return true;
 	if (manifest.handoff && manifest.handoff.path) {
 		const rel = String(manifest.handoff.path).replace(/\\/g, "/");
-		const abs = path.isAbsolute(rel)
-			? rel
-			: path.join(projectRoot, rel);
+		const abs = path.isAbsolute(rel) ? rel : path.join(projectRoot, rel);
 		if (!fs.existsSync(abs)) return false;
 		try {
 			return !isScaffoldHandoffContent(fs.readFileSync(abs, "utf8"));

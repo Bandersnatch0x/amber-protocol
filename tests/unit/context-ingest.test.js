@@ -44,7 +44,9 @@ function makeRequest(root, sourceRef) {
 		pageId: "governed-execution",
 		title: "Governed execution",
 		reason: "explicit",
-		sources: sourceRef ? [{ ref: sourceRef }] : [{ ref: "docs/adr/0003-governance-gated-execution.md" }],
+		sources: sourceRef
+			? [{ ref: sourceRef }]
+			: [{ ref: "docs/adr/0003-governance-gated-execution.md" }],
 	});
 	assert.equal(r.errors.length, 0, r.errors.join(", "));
 	return r;
@@ -57,7 +59,9 @@ function validPayload(req) {
 		pageId: req.request.target.pageId,
 		title: req.request.target.title,
 		sources: { s1 },
-		blocks: [{ type: "prose", sources: ["s1"], text: "Five preconditions gate execution (ADR-0003)." }],
+		blocks: [
+			{ type: "prose", sources: ["s1"], text: "Five preconditions gate execution (ADR-0003)." },
+		],
 	};
 }
 
@@ -356,18 +360,9 @@ describe("ingestPayload", () => {
 			);
 			const outsideFile = path.join(outsideRoot, "source.md");
 			fs.writeFileSync(outsideFile, "outside\n", "utf8");
-			const pageFile = path.join(
-				root,
-				".amber",
-				"context",
-				"pages",
-				"governed-execution.json",
-			);
+			const pageFile = path.join(root, ".amber", "context", "pages", "governed-execution.json");
 			const persisted = JSON.parse(fs.readFileSync(pageFile, "utf8"));
-			persisted.sources.s1.ref = path
-				.relative(root, outsideFile)
-				.split(path.sep)
-				.join("/");
+			persisted.sources.s1.ref = path.relative(root, outsideFile).split(path.sep).join("/");
 			fs.writeFileSync(pageFile, JSON.stringify(persisted, null, 2), "utf8");
 			const refreshRequest = createRequest(root, {
 				pageId: "governed-execution",
@@ -502,7 +497,12 @@ describe("ingestPayload scope binding (ADR-0010 D5)", () => {
 			const result = ingestPayload(root, { requestId: req.requestId, payload });
 			assert.equal(result.accepted, false);
 			assert.equal(result.code, "AMBER_E_CONTEXT_REQUEST_MISMATCH");
-			assert.ok(result.findings.some((f) => f.code === "AMBER_E_CONTEXT_REQUEST_MISMATCH" && f.detail.includes("undeclared-scope")));
+			assert.ok(
+				result.findings.some(
+					(f) =>
+						f.code === "AMBER_E_CONTEXT_REQUEST_MISMATCH" && f.detail.includes("undeclared-scope"),
+				),
+			);
 		} finally {
 			cleanup(root);
 		}

@@ -5,15 +5,8 @@
 // buildContext → inferNextStep → evaluateLifecycle across the createRequire seam.
 // Does NOT re-export LifecycleContext or the primitive builders.
 
-const {
-	buildContext,
-	inferNextStep,
-	evaluateLifecycle,
-} = require("./core/lifecycle");
-const {
-	evaluateCompletion,
-	formatCompletion,
-} = require("./completion-check");
+const { buildContext, inferNextStep, evaluateLifecycle } = require("./core/lifecycle");
+const { evaluateCompletion, formatCompletion } = require("./completion-check");
 const { runEvidenceCommand } = require("./core/evidence-runner");
 
 /**
@@ -59,7 +52,7 @@ function getCompletionStatus(projectRoot, sessionId, options) {
 	// Callers may omit options; treat missing as {}.
 	const opts = options || {};
 	// strict defaults true to match the web router historical helper.
-		const strict = opts.strict !== false;
+	const strict = opts.strict !== false;
 	const evaluation = evaluateCompletion(projectRoot, sessionId, { strict });
 	return {
 		...evaluation,

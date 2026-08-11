@@ -17,7 +17,11 @@ describe("E2E Migration Flow", () => {
 	});
 
 	afterEach(() => {
-		try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) { /* ignore */ }
+		try {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
+		} catch (e) {
+			/* ignore */
+		}
 	});
 
 	it("full migrate → rollback → verify V5.5 restored", () => {
@@ -28,9 +32,7 @@ describe("E2E Migration Flow", () => {
 				default: { model: "claude" },
 				reviewer: { model: "gpt-4" },
 			},
-			routes: [
-				{ name: "default", stages: [{ name: "test", command: "npm test" }] },
-			],
+			routes: [{ name: "default", stages: [{ name: "test", command: "npm test" }] }],
 			customSetting: "keep-me",
 			deprecated_field: "remove-me",
 		};
@@ -47,7 +49,7 @@ describe("E2E Migration Flow", () => {
 		// Step 4: Dry-run migration
 		const preview = dryRun(original);
 		assert.ok(preview.diff.length > 0, "Dry-run should show changes");
-		assert.ok(preview.diff.some(d => d.field === "version" && d.after === "1.0.0"));
+		assert.ok(preview.diff.some((d) => d.field === "version" && d.after === "1.0.0"));
 
 		// Step 5: Create backup
 		const backupPath = createBackup(settingsPath);
@@ -128,7 +130,7 @@ describe("E2E Migration Flow", () => {
 		// Now find the pre-rollback backup (Phase B) and rollback to it
 		const backups = findBackups(tmpDir);
 		// The Phase B backup was created during rollback
-		const phaseBBackup = backups.find(b => {
+		const phaseBBackup = backups.find((b) => {
 			const content = JSON.parse(fs.readFileSync(b.path, "utf8"));
 			return content.version === "1.0.0";
 		});

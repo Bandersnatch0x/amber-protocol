@@ -133,9 +133,7 @@ function renderStats(stats) {
 		lines.push(`mean sources per block: ${stats.meanSourcesPerBlock}`);
 	if (stats.knowledgeKind) lines.push(`knowledge kind: ${stats.knowledgeKind}`);
 	lines.push(`pages: ${stats.pages}`);
-	lines.push(
-		`lineage: current ${stats.lineage.current}, superseded ${stats.lineage.superseded}`,
-	);
+	lines.push(`lineage: current ${stats.lineage.current}, superseded ${stats.lineage.superseded}`);
 	lines.push(`assurance verified: ${stats.assurance.verified}/${stats.pages}`);
 	lines.push(
 		`confidence: high ${stats.assurance.confidence.high}, medium ${stats.assurance.confidence.medium}, low ${stats.assurance.confidence.low}, unspecified ${stats.assurance.confidence.unspecified}`,

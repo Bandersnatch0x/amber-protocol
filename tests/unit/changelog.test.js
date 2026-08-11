@@ -29,7 +29,9 @@ function writeTempPackage(dir, version) {
 }
 
 function writeTempChangelog(dir, initial = "") {
-	const content = initial || `# Changelog
+	const content =
+		initial ||
+		`# Changelog
 
 All notable changes...
 
@@ -95,7 +97,10 @@ test("parseConventional flags breaking via body footer, not just subject", () =>
 	// hyphen-variant footer
 	assert.equal(parseConventional("fix: patch", "BREAKING-CHANGE: behavior altered").breaking, true);
 	// prose body without footer syntax => NOT breaking (no false trigger)
-	assert.equal(parseConventional("feat: add foo", "This breaks nothing in the public API.").breaking, false);
+	assert.equal(
+		parseConventional("feat: add foo", "This breaks nothing in the public API.").breaking,
+		false,
+	);
 	// single-arg call (no body) still works as before
 	assert.equal(parseConventional("feat: add foo").breaking, false);
 	assert.equal(parseConventional("feat!: x").breaking, true);
@@ -104,7 +109,11 @@ test("parseConventional flags breaking via body footer, not just subject", () =>
 test("parseConventional does NOT flag breaking on a descriptive subject mentioning BREAKING", () => {
 	// v1.3.3 dogfood: "detect BREAKING CHANGE in footer" is a description, not
 	// a breaking marker — only `!` or a body footer signals breaking.
-	assert.equal(parseConventional("feat(changelog): detect BREAKING CHANGE in commit body footer (#52)").breaking, false);
+	assert.equal(
+		parseConventional("feat(changelog): detect BREAKING CHANGE in commit body footer (#52)")
+			.breaking,
+		false,
+	);
 	assert.equal(parseConventional("fix: handle BREAKING changes").breaking, false);
 	// `!` still wins even if the subject also mentions breaking
 	assert.equal(parseConventional("feat(api)!: BREAKING change to API").breaking, true);
@@ -183,7 +192,10 @@ test("updateChangelogFile inserts new top section and supports re-run replace (w
 	assert.ok(content.includes("## [1.3.2]"));
 
 	// re-run replace for same version (idempotent)
-	const updatedSection = sectionV133.replace("automated changelog generator", "zero-dep changelog script");
+	const updatedSection = sectionV133.replace(
+		"automated changelog generator",
+		"zero-dep changelog script",
+	);
 	updateChangelogFile("1.3.3", updatedSection, changelogPath);
 	content = fs.readFileSync(changelogPath, "utf8");
 	assert.ok(content.includes("zero-dep changelog script"));
@@ -221,28 +233,52 @@ test("generateChangelog null-tag path (first release / tagless repo) returns ful
 
 	// Real git fixture: multiple commits, ZERO stable tags -> exercises the null tag fix
 	execSync("git init -q", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
-	execSync("git config user.email \"test@example.com\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
-	execSync("git config user.name \"Test User\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+	execSync('git config user.email "test@example.com"', {
+		cwd: dir,
+		stdio: ["ignore", "ignore", "ignore"],
+	});
+	execSync('git config user.name "Test User"', { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
 
 	fs.writeFileSync(path.join(dir, "file.txt"), "v1");
-	execSync("git add file.txt && git commit -q -m \"feat: first commit in tagless repo\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+	execSync('git add file.txt && git commit -q -m "feat: first commit in tagless repo"', {
+		cwd: dir,
+		stdio: ["ignore", "ignore", "ignore"],
+	});
 
 	fs.writeFileSync(path.join(dir, "file.txt"), "v2");
-	execSync("git add file.txt && git commit -q -m \"fix: second commit (#53)\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+	execSync('git add file.txt && git commit -q -m "fix: second commit (#53)"', {
+		cwd: dir,
+		stdio: ["ignore", "ignore", "ignore"],
+	});
 
 	fs.writeFileSync(path.join(dir, "file.txt"), "v3");
-	execSync("git add file.txt && git commit -q -m \"docs: third commit for full history test\"", { cwd: dir, stdio: ["ignore", "ignore", "ignore"] });
+	execSync('git add file.txt && git commit -q -m "docs: third commit for full history test"', {
+		cwd: dir,
+		stdio: ["ignore", "ignore", "ignore"],
+	});
 
 	// verify fixture precondition: no v* tags
-	const tagOut = execSync("git tag -l \"v*\"", { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+	const tagOut = execSync('git tag -l "v*"', {
+		cwd: dir,
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "ignore"],
+	}).trim();
 	assert.equal(tagOut, "", "precondition: fixture repo must have no stable tags");
 
 	const res = generateChangelog({ root: dir, dryRun: true, version: "0.0.1" });
 	assert.equal(res.version, "0.0.1");
 	assert.equal(res.tag, null, "should have used null tag for first-release");
-	assert.ok(res.commitCount > 1, `null-tag path must return >1 commits (full history), got ${res.commitCount}`);
+	assert.ok(
+		res.commitCount > 1,
+		`null-tag path must return >1 commits (full history), got ${res.commitCount}`,
+	);
 	// ensure at least the conventional messages from early history are present (not just HEAD)
-	const flat = [...res.groups.Added, ...res.groups.Fixed, ...res.groups.Changed, ...res.groups.Other].join("\n");
+	const flat = [
+		...res.groups.Added,
+		...res.groups.Fixed,
+		...res.groups.Changed,
+		...res.groups.Other,
+	].join("\n");
 	assert.ok(/first commit in tagless repo/.test(flat), "must include first commit (not just HEAD)");
 	assert.ok(/second commit/.test(flat), "must include middle commit from full history");
 

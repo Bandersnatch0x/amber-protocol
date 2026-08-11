@@ -3,9 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const {
-	REPO_ROOT,
-} = require("./constants");
+const { REPO_ROOT } = require("./constants");
 
 const AUDIT_IGNORED_DIRECTORY_NAMES = new Set([
 	".git",
@@ -31,11 +29,7 @@ function resolveTarget(target) {
 }
 
 function relativeEscapesRoot(relative) {
-	return (
-		path.isAbsolute(relative) ||
-		relative === ".." ||
-		relative.startsWith(`..${path.sep}`)
-	);
+	return path.isAbsolute(relative) || relative === ".." || relative.startsWith(`..${path.sep}`);
 }
 
 function lstatIfPresent(filePath) {
@@ -124,7 +118,7 @@ function readJson(filePath) {
 		if (e instanceof SyntaxError) {
 			throw new Error(
 				`Failed to parse JSON file: ${filePath}. ${e.message}. ` +
-				"The file may be corrupted or contain invalid JSON.",
+					"The file may be corrupted or contain invalid JSON.",
 				{ cause: e },
 			);
 		}
@@ -198,10 +192,7 @@ function isIgnoredAuditPath(relativePath) {
 	if (segments.some((segment) => AUDIT_IGNORED_DIRECTORY_NAMES.has(segment))) {
 		return true;
 	}
-	if (
-		normalized === ".claude/worktrees" ||
-		normalized.startsWith(".claude/worktrees/")
-	) {
+	if (normalized === ".claude/worktrees" || normalized.startsWith(".claude/worktrees/")) {
 		return true;
 	}
 	return (

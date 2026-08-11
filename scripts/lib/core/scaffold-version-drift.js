@@ -34,7 +34,8 @@ function detectScaffoldDrift(targetRoot, { templateRoot = TEMPLATE_ROOT } = {}) 
 	};
 
 	if (!provenance) {
-		result.note = "No install provenance found. Run `amber init` to enable scaffold-drift detection.";
+		result.note =
+			"No install provenance found. Run `amber init` to enable scaffold-drift detection.";
 		return result;
 	}
 

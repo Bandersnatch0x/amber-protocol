@@ -1,9 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
-const {
-	dependencyScan,
-	parseAuditOutput,
-} = require("../../src/security/dependency-scan");
+const { dependencyScan, parseAuditOutput } = require("../../src/security/dependency-scan");
 
 describe("dependencyScan", () => {
 	it("returns vulnerabilities with severity levels from valid audit JSON", () => {
@@ -51,14 +48,8 @@ describe("dependencyScan", () => {
 			{ package: "lodash", severity: "critical", title: "Prototype Pollution" },
 		];
 
-		const highCritical = result.filter(
-			(v) => v.severity === "high" || v.severity === "critical",
-		);
-		assert.strictEqual(
-			highCritical.length,
-			2,
-			"Should detect high/critical vulnerabilities",
-		);
+		const highCritical = result.filter((v) => v.severity === "high" || v.severity === "critical");
+		assert.strictEqual(highCritical.length, 2, "Should detect high/critical vulnerabilities");
 	});
 
 	it("returns empty array when no vulnerabilities", () => {

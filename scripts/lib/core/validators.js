@@ -2,10 +2,7 @@
 
 const path = require("node:path");
 
-const {
-	VALID_STATUSES,
-	WIKI_CONTEXT_STARTER_FILES,
-} = require("./constants");
+const { VALID_STATUSES, WIKI_CONTEXT_STARTER_FILES } = require("./constants");
 
 const {
 	pathExists,
@@ -34,9 +31,7 @@ function findFeatureById(targetRoot, featureId) {
 	if (!Array.isArray(data.features)) {
 		return null;
 	}
-	return (
-		data.features.find((feature) => feature && feature.id === featureId) || null
-	);
+	return data.features.find((feature) => feature && feature.id === featureId) || null;
 }
 
 function validateFeatureListData(data) {
@@ -64,13 +59,7 @@ function validateFeatureListData(data) {
 			return;
 		}
 
-		for (const field of [
-			"id",
-			"area",
-			"title",
-			"user_visible_behavior",
-			"status",
-		]) {
+		for (const field of ["id", "area", "title", "user_visible_behavior", "status"]) {
 			if (typeof feature[field] !== "string" || feature[field].trim() === "") {
 				errors.push(`${prefix}.${field} must be a non-empty string.`);
 			}
@@ -80,15 +69,10 @@ function validateFeatureListData(data) {
 			errors.push(`${prefix}.priority must be an integer.`);
 		}
 
-		if (
-			!Array.isArray(feature.verification) ||
-			feature.verification.length === 0
-		) {
+		if (!Array.isArray(feature.verification) || feature.verification.length === 0) {
 			errors.push(`${prefix}.verification must contain at least one step.`);
 		} else if (
-			feature.verification.some(
-				(step) => typeof step !== "string" || step.trim() === "",
-			)
+			feature.verification.some((step) => typeof step !== "string" || step.trim() === "")
 		) {
 			errors.push(`${prefix}.verification steps must be non-empty strings.`);
 		}
@@ -100,9 +84,7 @@ function validateFeatureListData(data) {
 		if (feature.paths !== undefined) {
 			if (!Array.isArray(feature.paths) || feature.paths.length === 0) {
 				errors.push(`${prefix}.paths must be a non-empty array if present.`);
-			} else if (
-				feature.paths.some((p) => typeof p !== "string" || p.trim() === "")
-			) {
+			} else if (feature.paths.some((p) => typeof p !== "string" || p.trim() === "")) {
 				errors.push(`${prefix}.paths entries must be non-empty strings.`);
 			}
 		}
@@ -119,9 +101,7 @@ function validateFeatureListData(data) {
 		}
 
 		if (!VALID_STATUSES.has(feature.status)) {
-			errors.push(
-				`${prefix}.status must be one of ${Array.from(VALID_STATUSES).join(", ")}.`,
-			);
+			errors.push(`${prefix}.status must be one of ${Array.from(VALID_STATUSES).join(", ")}.`);
 		}
 
 		if (feature.status === "in_progress") {
@@ -178,39 +158,29 @@ function validateContinuousImprovementStateFile(filePath) {
 		data = readJson(filePath);
 	} catch (error) {
 		return {
-			errors: [
-				`Cannot read .workflow/continuous-improvement/state.json: ${error.message}`,
-			],
+			errors: [`Cannot read .workflow/continuous-improvement/state.json: ${error.message}`],
 			warnings,
 		};
 	}
 
 	if (!data || typeof data !== "object" || Array.isArray(data)) {
 		return {
-			errors: [
-				".workflow/continuous-improvement/state.json must contain an object.",
-			],
+			errors: [".workflow/continuous-improvement/state.json must contain an object."],
 			warnings,
 		};
 	}
 
 	if (!Number.isInteger(data.version)) {
-		errors.push(
-			".workflow/continuous-improvement/state.json version must be an integer.",
-		);
+		errors.push(".workflow/continuous-improvement/state.json version must be an integer.");
 	}
 
 	if (typeof data.mode !== "string" || data.mode.trim() === "") {
-		errors.push(
-			".workflow/continuous-improvement/state.json mode must be a non-empty string.",
-		);
+		errors.push(".workflow/continuous-improvement/state.json mode must be a non-empty string.");
 	}
 
 	for (const field of ["queue", "approvalGates", "resultNotes"]) {
 		if (!Array.isArray(data[field])) {
-			errors.push(
-				`.workflow/continuous-improvement/state.json ${field} must be an array.`,
-			);
+			errors.push(`.workflow/continuous-improvement/state.json ${field} must be an array.`);
 		}
 	}
 
@@ -294,9 +264,7 @@ function validateWiki(target, options = {}) {
 			WIKI_CONTEXT_STARTER_FILES.has(relativePath) &&
 			!hasSectionWithBody(content, "Unknowns / Needs Confirmation")
 		) {
-			warnings.push(
-				`${relativePath} is missing an Unknowns / Needs Confirmation section.`,
-			);
+			warnings.push(`${relativePath} is missing an Unknowns / Needs Confirmation section.`);
 		}
 
 		if (checkOkf) {

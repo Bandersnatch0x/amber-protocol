@@ -16,10 +16,8 @@ function buildAdoptionAuditMetrics(audit) {
 	};
 
 	if (audit.auditMode === "product-repo") {
-		metrics.templateStarterFilesPresent =
-			audit.templateStarterFiles.existing.length;
-		metrics.templateStarterFilesMissing =
-			audit.templateStarterFiles.missing.length;
+		metrics.templateStarterFilesPresent = audit.templateStarterFiles.existing.length;
+		metrics.templateStarterFilesMissing = audit.templateStarterFiles.missing.length;
 	} else {
 		metrics.existingHarnessFiles = audit.existing.length;
 		metrics.missingHarnessFiles = audit.missing.length;
@@ -34,9 +32,7 @@ function buildAdoptionAuditMetrics(audit) {
 // label-drift bug that re-parsing prose was prone to.
 const ADOPTION_METRICS_BLOCK = "amber:metrics:v1";
 
-const METRICS_BLOCK_PATTERN = new RegExp(
-	`<!--\\s*${ADOPTION_METRICS_BLOCK}\\s*([\\s\\S]*?)-->`,
-);
+const METRICS_BLOCK_PATTERN = new RegExp(`<!--\\s*${ADOPTION_METRICS_BLOCK}\\s*([\\s\\S]*?)-->`);
 
 // Serialize a metrics object into an HTML comment so it carries structured data
 // without rendering in a markdown viewer. The block is the data seam: compare

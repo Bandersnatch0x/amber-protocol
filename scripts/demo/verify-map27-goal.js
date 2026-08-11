@@ -34,10 +34,16 @@ check("no open 30-34", openChildren.length === 0, JSON.stringify(openChildren));
 
 // also 28-29 should be closed
 const open28_34 = open.filter((i) => i.number >= 28 && i.number <= 34);
-check("no open 28-34 children", open28_34.length === 0, JSON.stringify(open28_34.map((i) => i.number)));
+check(
+	"no open 28-34 children",
+	open28_34.length === 0,
+	JSON.stringify(open28_34.map((i) => i.number)),
+);
 
 // 2. Map decisions 28-34
-const map = JSON.parse(sh("gh issue view 27 --repo Bandersnatch0x/amber-protocol --json body,state"));
+const map = JSON.parse(
+	sh("gh issue view 27 --repo Bandersnatch0x/amber-protocol --json body,state"),
+);
 fs.writeFileSync(path.join(SCRATCH, "map-27-decisions.md"), map.body);
 for (const n of [28, 29, 30, 31, 32, 33, 34]) {
 	check(`map links issues/${n}`, map.body.includes(`issues/${n}`), "");
@@ -47,10 +53,8 @@ check("map closed or open ok", true, map.state); // plan allows close after chil
 // 3. Issue 34 dual verdict
 const i34 = sh("gh issue view 34 --repo Bandersnatch0x/amber-protocol --comments");
 fs.writeFileSync(path.join(SCRATCH, "issue-34-resolution.md"), i34);
-const hasLoop =
-	/部分闭环/.test(i34) || /partial/i.test(i34);
-const hasValue =
-	/有合理价值但未验证/.test(i34) || /reasonable-but-unverified/i.test(i34);
+const hasLoop = /部分闭环/.test(i34) || /partial/i.test(i34);
+const hasValue = /有合理价值但未验证/.test(i34) || /reasonable-but-unverified/i.test(i34);
 check("34 has loop verdict 部分闭环", hasLoop, "");
 check("34 has value verdict 有合理价值但未验证", hasValue, "");
 check("34 has evidence language", /证据|evidence|反证|置信/i.test(i34), "");
@@ -72,9 +76,7 @@ check("33 stop conditions", /停止|stop|Accept|Reject|accept|reject/i.test(i33)
 const status = sh("git status --short");
 fs.writeFileSync(path.join(SCRATCH, "git-status.txt"), status);
 // any modified scripts/lib
-const badLib = status
-	.split(/\r?\n/)
-	.filter((l) => /scripts[\\/]lib[\\/]/.test(l));
+const badLib = status.split(/\r?\n/).filter((l) => /scripts[\\/]lib[\\/]/.test(l));
 check("no scripts/lib product edits", badLib.length === 0, badLib.join(" | "));
 
 // 6. assets index
@@ -98,7 +100,10 @@ for (const a of assets) {
 	index.push({ path: a, exists, bytes: exists ? fs.statSync(p).size : 0 });
 	check(`asset ${a}`, exists, exists ? String(fs.statSync(p).size) : "missing");
 }
-fs.writeFileSync(path.join(SCRATCH, "assets-index.md"), index.map((i) => `- ${i.exists ? "OK" : "MISSING"} ${i.path} (${i.bytes})`).join("\n") + "\n");
+fs.writeFileSync(
+	path.join(SCRATCH, "assets-index.md"),
+	index.map((i) => `- ${i.exists ? "OK" : "MISSING"} ${i.path} (${i.bytes})`).join("\n") + "\n",
+);
 
 // 7. adjudication JSON dual verdict
 const adj = JSON.parse(

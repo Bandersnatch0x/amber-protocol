@@ -50,8 +50,7 @@ function validateLoopContract(contractPath) {
 		// Validate hardStops structure
 		const { maxIterations, timeout, noProgress, budget } = contract.hardStops;
 
-		if (maxIterations === undefined)
-			errors.push("hardStops.maxIterations is required");
+		if (maxIterations === undefined) errors.push("hardStops.maxIterations is required");
 		else if (typeof maxIterations !== "number" || maxIterations <= 0)
 			errors.push("hardStops.maxIterations must be > 0");
 
@@ -123,8 +122,7 @@ function validateWorkflowPack(packPath) {
 	if (pack.files && Array.isArray(pack.files)) {
 		pack.files.forEach((file) => {
 			const filePath = path.resolve(packDir, file);
-			if (!fs.existsSync(filePath))
-				errors.push(`Referenced file not found: ${file}`);
+			if (!fs.existsSync(filePath)) errors.push(`Referenced file not found: ${file}`);
 		});
 	}
 
@@ -133,16 +131,13 @@ function validateWorkflowPack(packPath) {
 			if (step.script) {
 				const scriptPath = path.resolve(packDir, step.script);
 				if (!fs.existsSync(scriptPath))
-					errors.push(
-						`Workflow step ${i} references missing script: ${step.script}`,
-					);
+					errors.push(`Workflow step ${i} references missing script: ${step.script}`);
 			}
 		});
 	}
 
 	return { valid: errors.length === 0, errors, warnings, unsafePatterns };
 }
-
 
 // Extract all string values from a nested object (recursive).
 // Used by validateIntegration to scan only values, not keys.
@@ -234,7 +229,8 @@ function validateIntegration(integrationPath, options = {}) {
 	}
 	if (/\bspawn|exec|child_process|shell\b/i.test(valueText)) {
 		sideEffects.push("process_spawn");
-		if (options.explain) explanations.push("Detected process spawning or shell execution in integration config.");
+		if (options.explain)
+			explanations.push("Detected process spawning or shell execution in integration config.");
 	}
 	if (/\bdb|database|sql|query|transaction\b/i.test(valueText)) {
 		sideEffects.push("database_operation");
@@ -242,8 +238,9 @@ function validateIntegration(integrationPath, options = {}) {
 	}
 
 	// Check credentials requirement
-	const credentialsRequired =
-		/\bapi[_-]?key|token|secret|password|credential|auth\b/i.test(configStr);
+	const credentialsRequired = /\bapi[_-]?key|token|secret|password|credential|auth\b/i.test(
+		configStr,
+	);
 	if (credentialsRequired && options.explain) {
 		explanations.push("Integration requires credentials (API keys, tokens, or passwords).");
 	}
@@ -251,17 +248,24 @@ function validateIntegration(integrationPath, options = {}) {
 	// Detect permission gates
 	if (config.permissions || /\bpermission[s]?:|requires\b/i.test(configStr)) {
 		permissionGates.push("explicit_permissions_declared");
-		if (options.explain) explanations.push("Integration declares explicit permission requirements.");
+		if (options.explain)
+			explanations.push("Integration declares explicit permission requirements.");
 	}
 
 	// Warnings
 	if (sideEffects.length > 0 && !config.sideEffects) {
 		warnings.push("Side effects detected but not declared in config");
-		if (options.explain) explanations.push("Warning: Side effects found but not documented in the config file. Add a 'sideEffects' field.");
+		if (options.explain)
+			explanations.push(
+				"Warning: Side effects found but not documented in the config file. Add a 'sideEffects' field.",
+			);
 	}
 	if (credentialsRequired && !config.credentials && !config.auth) {
 		warnings.push("Credentials required but not documented in config");
-		if (options.explain) explanations.push("Warning: Credentials required but no 'credentials' or 'auth' field found in config.");
+		if (options.explain)
+			explanations.push(
+				"Warning: Credentials required but no 'credentials' or 'auth' field found in config.",
+			);
 	}
 
 	const result = {
@@ -273,9 +277,10 @@ function validateIntegration(integrationPath, options = {}) {
 	};
 
 	if (options.explain) {
-		result.explanation = explanations.length > 0
-			? explanations.join(" ")
-			: "Integration is valid with no issues detected.";
+		result.explanation =
+			explanations.length > 0
+				? explanations.join(" ")
+				: "Integration is valid with no issues detected.";
 	}
 
 	return result;
@@ -302,12 +307,9 @@ function analyzePlanContent(planContent, options = {}) {
 	const checks = { plan: false, env: false, integrations: false };
 
 	// Approval: either an inline marker or a sibling .approved file.
-	const hasMarker =
-		/<!-- gate: approved -->|<!-- approved -->/i.test(planContent);
+	const hasMarker = /<!-- gate: approved -->|<!-- approved -->/i.test(planContent);
 	if (!hasMarker && !hasApprovalFile()) {
-		blockers.push(
-			"Plan not approved (missing approval marker or .approved file)",
-		);
+		blockers.push("Plan not approved (missing approval marker or .approved file)");
 	} else {
 		checks.plan = true;
 	}
@@ -326,9 +328,7 @@ function analyzePlanContent(planContent, options = {}) {
 	}
 
 	// Referenced environment variables.
-	const envVars = [
-		...planContent.matchAll(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g),
-	].map((m) => m[1]);
+	const envVars = [...planContent.matchAll(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g)].map((m) => m[1]);
 	const missing = envVars.filter((v) => !hasEnvVar(v));
 	if (missing.length > 0) {
 		blockers.push(`Missing env vars: ${missing.join(", ")}`);
@@ -337,9 +337,7 @@ function analyzePlanContent(planContent, options = {}) {
 	}
 
 	// Referenced integrations.
-	const integrations = [
-		...planContent.matchAll(/integration:\s*([^\s,]+)/gi),
-	].map((m) => m[1]);
+	const integrations = [...planContent.matchAll(/integration:\s*([^\s,]+)/gi)].map((m) => m[1]);
 	if (integrations.length > 0) {
 		const invalid = integrations.filter((name) => !hasIntegrationFile(name));
 		if (invalid.length > 0) {
@@ -375,12 +373,9 @@ function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 			const analysis = analyzePlanContent(planContent, {
 				strict: options.strict,
 				hasEnvVar: (name) => Boolean(process.env[name]),
-				hasApprovalFile: () =>
-					fs.existsSync(planPath.replace(/\.md$/, ".approved")),
+				hasApprovalFile: () => fs.existsSync(planPath.replace(/\.md$/, ".approved")),
 				hasIntegrationFile: (name) =>
-					fs.existsSync(
-						path.join(projectRoot, "integrations", `${name}.json`),
-					),
+					fs.existsSync(path.join(projectRoot, "integrations", `${name}.json`)),
 			});
 			blockers.push(...analysis.blockers);
 			warnings.push(...analysis.warnings);
@@ -401,14 +396,8 @@ function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 			const rebaseApply = path.join(gitDir, "rebase-apply");
 			const rebaseMerge = path.join(gitDir, "rebase-merge");
 
-			if (
-				fs.existsSync(mergeHead) ||
-				fs.existsSync(rebaseApply) ||
-				fs.existsSync(rebaseMerge)
-			) {
-				warnings.push(
-					"Worktree has active merge/rebase (conflict state detected)",
-				);
+			if (fs.existsSync(mergeHead) || fs.existsSync(rebaseApply) || fs.existsSync(rebaseMerge)) {
+				warnings.push("Worktree has active merge/rebase (conflict state detected)");
 			} else {
 				// Check for uncommitted changes via .git/index mtime heuristic
 				// If index was modified within last 60s, assume recent changes
@@ -479,15 +468,11 @@ function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 	// Strict mode: require an explicit on-disk rules.json (not silent defaults).
 	if (options.strict) {
 		if (!fs.existsSync(rulesPath)) {
-			blockers.push(
-				"Strict: governance rules.json required (run `amber governance rules init`)",
-			);
+			blockers.push("Strict: governance rules.json required (run `amber governance rules init`)");
 			checks.policy = false;
 		}
 		if (rules && rules.defaultAction === "allow") {
-			warnings.push(
-				"Strict: rules.json defaultAction=allow is unsafe for governed execution",
-			);
+			warnings.push("Strict: rules.json defaultAction=allow is unsafe for governed execution");
 		}
 	}
 
@@ -500,11 +485,11 @@ function checkExecutionReadiness(projectRoot, planPath, options = {}) {
 	};
 }
 
-	collectStringValues,
-module.exports = {
-	validateLoopContract,
-	validateWorkflowPack,
-	validateIntegration,
-	analyzePlanContent,
-	checkExecutionReadiness,
-};
+(collectStringValues,
+	(module.exports = {
+		validateLoopContract,
+		validateWorkflowPack,
+		validateIntegration,
+		analyzePlanContent,
+		checkExecutionReadiness,
+	}));

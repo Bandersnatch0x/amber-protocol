@@ -5,9 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const {
-	exportGovernanceEvidence,
-} = require("../scripts/lib/governance-commands");
+const { exportGovernanceEvidence } = require("../scripts/lib/governance-commands");
 
 describe("governance evidence", () => {
 	let tmpDir;
@@ -33,10 +31,7 @@ describe("governance evidence", () => {
 			status: "active",
 			createdAt: new Date().toISOString(),
 		};
-		fs.writeFileSync(
-			path.join(sessionsDir, "manifest.json"),
-			JSON.stringify(manifest, null, 2),
-		);
+		fs.writeFileSync(path.join(sessionsDir, "manifest.json"), JSON.stringify(manifest, null, 2));
 
 		const timeline = [
 			{
@@ -138,18 +133,12 @@ describe("governance evidence", () => {
 			status: "completed",
 			worktree: "/path/to/worktree",
 		};
-		fs.writeFileSync(
-			path.join(taskDir, "ledger.json"),
-			JSON.stringify(ledger, null, 2),
-		);
+		fs.writeFileSync(path.join(taskDir, "ledger.json"), JSON.stringify(ledger, null, 2));
 
 		const evidence = {
 			commands: ["npm install", "npm test"],
 		};
-		fs.writeFileSync(
-			path.join(taskDir, "evidence.json"),
-			JSON.stringify(evidence, null, 2),
-		);
+		fs.writeFileSync(path.join(taskDir, "evidence.json"), JSON.stringify(evidence, null, 2));
 
 		const outputPath = path.join(tmpDir, "task-evidence.md");
 		const result = exportGovernanceEvidence(tmpDir, {
@@ -237,11 +226,7 @@ describe("governance evidence", () => {
 		// Only ledger.json, no evidence.json
 		fs.writeFileSync(
 			path.join(taskDir, "ledger.json"),
-			JSON.stringify(
-				{ plan: "# Simple Plan", status: "completed", worktree: "/tmp/wt" },
-				null,
-				2,
-			),
+			JSON.stringify({ plan: "# Simple Plan", status: "completed", worktree: "/tmp/wt" }, null, 2),
 		);
 
 		const outputPath = path.join(tmpDir, "task-no-evidence.md");

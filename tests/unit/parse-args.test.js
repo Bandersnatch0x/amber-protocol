@@ -52,12 +52,7 @@ test("-h and --help both set help", () => {
 });
 
 test("--decision sets the scalar and accumulates", () => {
-	const args = parseArgs([
-		"--decision",
-		"a=approved",
-		"--decision",
-		"b=rejected",
-	]);
+	const args = parseArgs(["--decision", "a=approved", "--decision", "b=rejected"]);
 	assert.equal(args.decision, "b=rejected");
 	assert.deepEqual(args.decisions, ["a=approved", "b=rejected"]);
 });
@@ -77,11 +72,15 @@ test("drift/ledger flags are registered (not silently dropped to _)", () => {
 	// Regression guard: a new command flag MUST be added to FLAG_SPECS, else
 	// parseArgs silently drops it into args._ and the handler never sees it.
 	const args = parseArgs([
-		"--scope", "artifact",
-		"--format", "gh-annotations",
+		"--scope",
+		"artifact",
+		"--format",
+		"gh-annotations",
 		"--no-fail",
-		"--home", "sessions",
-		"--out", "audits/ledger.csv",
+		"--home",
+		"sessions",
+		"--out",
+		"audits/ledger.csv",
 	]);
 	assert.equal(args.scope, "artifact");
 	assert.equal(args.format, "gh-annotations");
@@ -93,9 +92,12 @@ test("drift/ledger flags are registered (not silently dropped to _)", () => {
 
 test("feature add flags are registered (#75: --behavior, repeatable --verify)", () => {
 	const args = parseArgs([
-		"--behavior", "User sees a clear result.",
-		"--verify", "npm test",
-		"--verify", "npm run build",
+		"--behavior",
+		"User sees a clear result.",
+		"--verify",
+		"npm test",
+		"--verify",
+		"npm run build",
 	]);
 	assert.equal(args.behavior, "User sees a clear result.");
 	assert.deepEqual(args.verify, ["npm test", "npm run build"]);
@@ -104,13 +106,18 @@ test("feature add flags are registered (#75: --behavior, repeatable --verify)", 
 
 test("Context lifecycle, adapter, benchmark, and retention flags are registered", () => {
 	const args = parseArgs([
-		"--knowledge-kind", "decision",
-		"--supersedes", "old-rule",
-		"--supersedes", "older-rule",
-		"--fixture", "fixtures/context.json",
+		"--knowledge-kind",
+		"decision",
+		"--supersedes",
+		"old-rule",
+		"--supersedes",
+		"older-rule",
+		"--fixture",
+		"fixtures/context.json",
 		"--enable",
 		"--allow-transcript",
-		"--older-than-days", "30",
+		"--older-than-days",
+		"30",
 	]);
 	assert.equal(args.knowledgeKind, "decision");
 	assert.deepEqual(args.supersedes, ["old-rule", "older-rule"]);

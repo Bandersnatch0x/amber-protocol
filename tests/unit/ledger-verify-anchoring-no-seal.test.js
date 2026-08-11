@@ -13,9 +13,18 @@ function setupNoSeal() {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-no-seal-"));
 	// Init git (required for seal/verify-anchoring)
 	require("child_process").execFileSync("git", ["init"], { cwd: dir, stdio: "ignore" });
-	require("child_process").execFileSync("git", ["config", "user.name", "Test"], { cwd: dir, stdio: "ignore" });
-	require("child_process").execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir, stdio: "ignore" });
-	require("child_process").execFileSync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: dir, stdio: "ignore" });
+	require("child_process").execFileSync("git", ["config", "user.name", "Test"], {
+		cwd: dir,
+		stdio: "ignore",
+	});
+	require("child_process").execFileSync("git", ["config", "user.email", "test@example.com"], {
+		cwd: dir,
+		stdio: "ignore",
+	});
+	require("child_process").execFileSync("git", ["commit", "--allow-empty", "-m", "init"], {
+		cwd: dir,
+		stdio: "ignore",
+	});
 	return dir;
 }
 

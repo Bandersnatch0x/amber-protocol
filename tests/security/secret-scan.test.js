@@ -54,30 +54,24 @@ describe("scanForSecrets", () => {
 
 	it("returns file path and line number", () => {
 		const filePath = "/tmp/test-secret.js";
-		const content =
-			'// line 1\nconst apiKey = "sk-abcdef1234567890123456"; // line 2\n// line 3';
+		const content = '// line 1\nconst apiKey = "sk-abcdef1234567890123456"; // line 2\n// line 3';
 		const results = scanForSecrets([{ path: filePath, content }]);
 
 		assert.ok(results.length > 0);
 		assert.strictEqual(results[0].file, filePath);
-		assert.ok(
-			typeof results[0].line === "number",
-			"Should include line number",
-		);
+		assert.ok(typeof results[0].line === "number", "Should include line number");
 		assert.ok(results[0].line >= 1, "Line number should be >= 1");
 	});
 
 	it("returns empty array for clean files", () => {
-		const content =
-			"const name = 'hello';\nconst value = 42;\nconsole.log('all clear');";
+		const content = "const name = 'hello';\nconst value = 42;\nconsole.log('all clear');";
 		const results = scanForSecrets([{ path: "/tmp/clean.js", content }]);
 
 		assert.strictEqual(results.length, 0);
 	});
 
 	it("does not flag false positives in comments about secrets", () => {
-		const content =
-			"// Never hardcode API keys in your code\n// Use environment variables instead";
+		const content = "// Never hardcode API keys in your code\n// Use environment variables instead";
 		const results = scanForSecrets([{ path: "/tmp/comment.js", content }]);
 
 		// Comments alone should not trigger - the patterns require actual values

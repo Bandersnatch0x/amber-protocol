@@ -2,18 +2,11 @@
 
 const path = require("node:path");
 
-const {
-	SEMVER_PATTERN,
-} = require("./constants");
+const { SEMVER_PATTERN } = require("./constants");
 
-const {
-	readJson,
-	isMissingPath,
-} = require("./fs-utils");
+const { readJson, isMissingPath } = require("./fs-utils");
 
-const {
-	discoverStandards,
-} = require("./planning");
+const { discoverStandards } = require("./planning");
 
 function validateProjectProfileData(data) {
 	const errors = [];
@@ -35,11 +28,7 @@ function validateProjectProfileData(data) {
 
 	if (!Array.isArray(data.packIds) || data.packIds.length === 0) {
 		errors.push("Project profile packIds must contain at least one pack id.");
-	} else if (
-		data.packIds.some(
-			(packId) => typeof packId !== "string" || packId.trim() === "",
-		)
-	) {
+	} else if (data.packIds.some((packId) => typeof packId !== "string" || packId.trim() === "")) {
 		errors.push("Project profile packIds must be non-empty strings.");
 	}
 
@@ -49,9 +38,7 @@ function validateProjectProfileData(data) {
 
 	if (
 		data.environment !== undefined &&
-		(!data.environment ||
-			typeof data.environment !== "object" ||
-			Array.isArray(data.environment))
+		(!data.environment || typeof data.environment !== "object" || Array.isArray(data.environment))
 	) {
 		errors.push("Project profile environment must be an object when present.");
 	}

@@ -36,10 +36,7 @@ test("Repository Onboarding: init and doctor", () => {
 test("Adoption Review: report, gate, and bundle", () => {
 	const target = tempDir("adoption");
 	const outputDir = tempDir("adoption-output");
-	fs.writeFileSync(
-		path.join(target, "package-lock.json"),
-		JSON.stringify({}),
-	);
+	fs.writeFileSync(path.join(target, "package-lock.json"), JSON.stringify({}));
 
 	const report = runAmber([
 		"adoption",
@@ -54,13 +51,7 @@ test("Adoption Review: report, gate, and bundle", () => {
 	const reportPayload = JSON.parse(report.stdout);
 	assert.ok(fs.existsSync(reportPayload.reportPath));
 
-	const gate = runAmber([
-		"adoption",
-		"gate",
-		"--report",
-		reportPayload.reportPath,
-		"--json",
-	]);
+	const gate = runAmber(["adoption", "gate", "--report", reportPayload.reportPath, "--json"]);
 	assert.equal(gate.status, 0, gate.stderr);
 	const gatePayload = JSON.parse(gate.stdout);
 	assert.ok(["ready", "wait"].includes(gatePayload.decision));
@@ -117,7 +108,13 @@ test("Governed Delivery: plan, gate, review, and session complete-check", () => 
 	assert.notEqual(gate.status, 0);
 	assert.match(gate.stdout, /User confirmation/);
 
-	const review = runAmber(["review", "--target", target, "--plan", "docs/plans/F001-Small-slice.md"]);
+	const review = runAmber([
+		"review",
+		"--target",
+		target,
+		"--plan",
+		"docs/plans/F001-Small-slice.md",
+	]);
 	assert.notEqual(review.status, 0);
 	assert.match(review.stdout, /User confirmation/);
 
@@ -166,13 +163,7 @@ test("Continuity Layer: session start and status", () => {
 	assert.equal(start.status, 0, start.stderr);
 	const { sessionId } = JSON.parse(start.stdout);
 
-	const status = runAmber([
-		"session",
-		"status",
-		"--target",
-		target,
-		sessionId,
-	]);
+	const status = runAmber(["session", "status", "--target", target, sessionId]);
 	assert.equal(status.status, 0, status.stderr);
 	assert.match(status.stdout, /fix login bug/);
 });
@@ -181,15 +172,7 @@ test("Security Governance: security audit and pack validation", () => {
 	const target = tempDir("security");
 	const output = path.join(target, "security-audit.md");
 
-	const audit = runAmber([
-		"security",
-		"audit",
-		"--target",
-		target,
-		"--output",
-		output,
-		"--json",
-	]);
+	const audit = runAmber(["security", "audit", "--target", target, "--output", output, "--json"]);
 	assert.equal(audit.status, 0, audit.stderr);
 	const payload = JSON.parse(audit.stdout);
 	assert.equal(payload.outputPath, output);

@@ -1,10 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
 const path = require("path");
-const {
-	selectRoute,
-	scoreRoutes,
-} = require("../../scripts/lib/route-selector");
+const { selectRoute, scoreRoutes } = require("../../scripts/lib/route-selector");
 const { loadRoutes } = require("../../scripts/lib/route-loader");
 
 const ROUTES = loadRoutes(path.join(__dirname, "../../routes")).routes;
@@ -15,28 +12,16 @@ function pick(goal) {
 
 describe("selectRoute — feature goals", () => {
 	it("routes 'implement a new export feature' to feature-standard", () => {
-		assert.strictEqual(
-			pick("implement a new export feature").routeId,
-			"feature-standard",
-		);
+		assert.strictEqual(pick("implement a new export feature").routeId, "feature-standard");
 	});
 	it("routes 'add a billing feature' to feature-standard", () => {
-		assert.strictEqual(
-			pick("add a billing feature").routeId,
-			"feature-standard",
-		);
+		assert.strictEqual(pick("add a billing feature").routeId, "feature-standard");
 	});
 	it("routes 'build the reporting feature' to feature-standard", () => {
-		assert.strictEqual(
-			pick("build the reporting feature").routeId,
-			"feature-standard",
-		);
+		assert.strictEqual(pick("build the reporting feature").routeId, "feature-standard");
 	});
 	it("routes 'create a dashboard feature' to feature-standard", () => {
-		assert.strictEqual(
-			pick("create a dashboard feature").routeId,
-			"feature-standard",
-		);
+		assert.strictEqual(pick("create a dashboard feature").routeId, "feature-standard");
 	});
 	it("routes 'add login' to feature-standard (no literal 'feature' word)", () => {
 		assert.strictEqual(pick("add login").routeId, "feature-standard");
@@ -51,22 +36,13 @@ describe("selectRoute — bugfix goals", () => {
 		assert.strictEqual(pick("fix the login bug").routeId, "bugfix-quick");
 	});
 	it("routes 'resolve crash on startup' to bugfix-quick", () => {
-		assert.strictEqual(
-			pick("resolve crash on startup").routeId,
-			"bugfix-quick",
-		);
+		assert.strictEqual(pick("resolve crash on startup").routeId, "bugfix-quick");
 	});
 	it("routes 'patch the null pointer error' to bugfix-quick", () => {
-		assert.strictEqual(
-			pick("patch the null pointer error").routeId,
-			"bugfix-quick",
-		);
+		assert.strictEqual(pick("patch the null pointer error").routeId, "bugfix-quick");
 	});
 	it("routes 'repair the broken export defect' to bugfix-quick", () => {
-		assert.strictEqual(
-			pick("repair the broken export defect").routeId,
-			"bugfix-quick",
-		);
+		assert.strictEqual(pick("repair the broken export defect").routeId, "bugfix-quick");
 	});
 	it("routes 'fix the timeout issue' to bugfix-quick", () => {
 		assert.strictEqual(pick("fix the timeout issue").routeId, "bugfix-quick");
@@ -75,16 +51,10 @@ describe("selectRoute — bugfix goals", () => {
 
 describe("selectRoute — refactor goals", () => {
 	it("routes 'refactor the auth module' to refactor-safe", () => {
-		assert.strictEqual(
-			pick("refactor the auth module").routeId,
-			"refactor-safe",
-		);
+		assert.strictEqual(pick("refactor the auth module").routeId, "refactor-safe");
 	});
 	it("routes 'restructure the payment service' to refactor-safe", () => {
-		assert.strictEqual(
-			pick("restructure the payment service").routeId,
-			"refactor-safe",
-		);
+		assert.strictEqual(pick("restructure the payment service").routeId, "refactor-safe");
 	});
 	it("routes 'clean up the parser' to refactor-safe", () => {
 		assert.strictEqual(pick("clean up the parser").routeId, "refactor-safe");
@@ -93,10 +63,7 @@ describe("selectRoute — refactor goals", () => {
 		assert.strictEqual(pick("simplify the router").routeId, "refactor-safe");
 	});
 	it("routes 'extract the validation helper' to refactor-safe", () => {
-		assert.strictEqual(
-			pick("extract the validation helper").routeId,
-			"refactor-safe",
-		);
+		assert.strictEqual(pick("extract the validation helper").routeId, "refactor-safe");
 	});
 });
 
@@ -109,10 +76,7 @@ describe("selectRoute — confidence and shape", () => {
 		assert.strictEqual(pick("fix the login bug").matched, true);
 	});
 	it("includes the route displayName on a match", () => {
-		assert.strictEqual(
-			pick("add a billing feature").displayName,
-			"Standard Feature Development",
-		);
+		assert.strictEqual(pick("add a billing feature").displayName, "Standard Feature Development");
 	});
 });
 

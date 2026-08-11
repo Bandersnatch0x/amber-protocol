@@ -83,9 +83,7 @@ function publish(options = {}) {
 				console.log(`   ⚠️  Registry shows ${info}, expected ${version}`);
 			}
 		} catch (e) {
-			console.log(
-				"   ℹ️  Verification skipped (may take a moment to propagate)",
-			);
+			console.log("   ℹ️  Verification skipped (may take a moment to propagate)");
 		}
 	}
 

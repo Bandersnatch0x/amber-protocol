@@ -22,10 +22,7 @@ describe("validateRoute", () => {
 	});
 
 	it("should accept valid route", () => {
-		const routeData = fs.readFileSync(
-			"routes/feature-standard.route.json",
-			"utf8",
-		);
+		const routeData = fs.readFileSync("routes/feature-standard.route.json", "utf8");
 		const route = JSON.parse(routeData);
 		const result = validateRoute(route);
 		assert.strictEqual(result.valid, true);

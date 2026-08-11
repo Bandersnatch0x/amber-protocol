@@ -6,7 +6,10 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { scaffoldHarness } = require("../../scripts/lib/core/scaffold");
-const { detectScaffoldDrift, refreshAmberOwnedFiles } = require("../../scripts/lib/core/scaffold-version-drift");
+const {
+	detectScaffoldDrift,
+	refreshAmberOwnedFiles,
+} = require("../../scripts/lib/core/scaffold-version-drift");
 const { TEMPLATE_ROOT } = require("../../scripts/lib/core/constants");
 
 const REL = "docs/wiki/glossary.md"; // controlled file that ships with the repo
@@ -77,7 +80,13 @@ test("--refresh-amber-owned does NOT overwrite a customized controlled file, but
 		scaffoldHarness(dir, { refreshAmberOwned: true, templateRoot: tpl });
 		assert.equal(fs.readFileSync(installedPath, "utf8"), before, "customized file untouched");
 		// New template cached for manual merge.
-		const proposal = path.join(dir, ".amber", "maintenance", "proposals", REL.replace(/\//g, "__") + ".new");
+		const proposal = path.join(
+			dir,
+			".amber",
+			"maintenance",
+			"proposals",
+			REL.replace(/\//g, "__") + ".new",
+		);
 		assert.ok(fs.existsSync(proposal), "proposal cached");
 	} finally {
 		fs.rmSync(tpl, { recursive: true, force: true });
@@ -125,7 +134,11 @@ test("--refresh-amber-owned re-stamps so a refreshed file stays refreshable on t
 		fs.writeFileSync(shippedPath, original + "\n# v2\n\n# v3\n");
 		const drift = detectScaffoldDrift(dir, { templateRoot: tpl });
 		const file = drift.files.find((f) => f.path === REL);
-		assert.equal(file.classification, "stale", "re-stamp keeps the file refreshable, not stuck customized");
+		assert.equal(
+			file.classification,
+			"stale",
+			"re-stamp keeps the file refreshable, not stuck customized",
+		);
 	} finally {
 		fs.rmSync(tpl, { recursive: true, force: true });
 		fs.rmSync(dir, { recursive: true, force: true });

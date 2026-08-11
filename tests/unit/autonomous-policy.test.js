@@ -25,14 +25,18 @@ describe("autonomous-policy (compat read only, ADR-0001/0005)", () => {
 		fs.mkdirSync(amberDir, { recursive: true });
 		fs.writeFileSync(
 			path.join(amberDir, "autonomous-policy.json"),
-			JSON.stringify({
-				"auto-approve-all": true,
-				gates: {
-					auto: "approve",
-					"user-approval": "block",
-					"step-confirm": "block",
+			JSON.stringify(
+				{
+					"auto-approve-all": true,
+					gates: {
+						auto: "approve",
+						"user-approval": "block",
+						"step-confirm": "block",
+					},
 				},
-			}, null, 2),
+				null,
+				2,
+			),
 		);
 
 		try {

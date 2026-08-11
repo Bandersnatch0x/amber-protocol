@@ -11,11 +11,7 @@
  */
 
 const { inspect, report, validate, scaffold, build, plan } = require("..");
-const {
-	renderInspectText,
-	renderReportText,
-	renderPlanText,
-} = require("./renderers");
+const { renderInspectText, renderReportText, renderPlanText } = require("./renderers");
 
 const READ_ACTIONS = new Set(["inspect", "report", "validate"]);
 const WRITE_ACTIONS = new Set(["scaffold", "build", "materialize", "plan"]);
@@ -118,9 +114,7 @@ function knowledgeDispatch(action, args) {
 	return {
 		result: {
 			target: args.target,
-			errors: [
-				`Unknown knowledge action: ${label}. Supported: ${SUPPORTED_ACTIONS_LIST}.`,
-			],
+			errors: [`Unknown knowledge action: ${label}. Supported: ${SUPPORTED_ACTIONS_LIST}.`],
 			warnings: [],
 		},
 	};

@@ -64,7 +64,10 @@ test("pre-push rejects a mixed mirror-style push", (t) => {
 	].join("\n");
 	const result = runHook(stdin);
 	assert.equal(result.status, 1);
-	assert.match(result.stderr, /refusing to push pi-rewind checkpoint ref 'refs\/pi-checkpoints\/turn-y'/);
+	assert.match(
+		result.stderr,
+		/refusing to push pi-rewind checkpoint ref 'refs\/pi-checkpoints\/turn-y'/,
+	);
 });
 
 test("pre-push allows a no-op (empty stdin) push", (t) => {

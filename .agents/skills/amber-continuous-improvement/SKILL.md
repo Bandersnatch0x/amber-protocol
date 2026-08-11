@@ -48,15 +48,19 @@ Next candidate:
 When invoked as part of a loop (e.g. via `/loop` or `amber loop run`), prefer producing output in this structure so it can be directly merged into a `STATE.md` or loop ledger:
 
 ### High-Priority Items
+
 - ...
 
 ### Watch Items
+
 - ...
 
 ### Noise / Ignore
+
 - ...
 
 ### State Updates
+
 - Last run: <timestamp>
 - Amber health score / doctor summary
 - Candidate next actions (with links to commands)

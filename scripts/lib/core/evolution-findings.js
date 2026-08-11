@@ -14,21 +14,12 @@
 
 const path = require("node:path");
 
-const {
-	pathExists,
-	readText,
-} = require("./fs-utils");
+const { pathExists, readText } = require("./fs-utils");
 
 const EVOLUTION_FINDING_MIN_COUNT = 2;
 
 function countEvolutionFindings(targetRoot) {
-	const filePath = path.join(
-		targetRoot,
-		"docs",
-		"wiki",
-		"engineering",
-		"harness-evolution.md",
-	);
+	const filePath = path.join(targetRoot, "docs", "wiki", "engineering", "harness-evolution.md");
 	if (!pathExists(filePath)) {
 		return [];
 	}
@@ -44,18 +35,13 @@ function countEvolutionFindings(targetRoot) {
 
 	return [...counts.entries()]
 		.map(([finding, count]) => ({ finding, count }))
-		.sort(
-			(left, right) =>
-				right.count - left.count || left.finding.localeCompare(right.finding),
-		);
+		.sort((left, right) => right.count - left.count || left.finding.localeCompare(right.finding));
 }
 
 // Findings that recur at least minCount times. The single filtering point for
 // both lineage adapters and the CLI rollup, so the cutoff lives in one place.
 function significantEvolutionFindings(targetRoot, minCount) {
-	return countEvolutionFindings(targetRoot).filter(
-		(item) => item.count >= minCount,
-	);
+	return countEvolutionFindings(targetRoot).filter((item) => item.count >= minCount);
 }
 
 function extractEvolutionFindings(targetRoot) {

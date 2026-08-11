@@ -9,9 +9,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-	checkExecutionReadiness,
-} = require("../../scripts/lib/core/execution-validator");
+const { checkExecutionReadiness } = require("../../scripts/lib/core/execution-validator");
 
 function tempProject() {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "readiness-"));
@@ -56,9 +54,7 @@ test("missing plan file adds a blocker and stays not ready", () => {
 	const root = tempProject();
 	const result = checkExecutionReadiness(root, path.join(root, "missing.md"));
 	assert.equal(result.ready, false);
-	assert.ok(
-		result.blockers.some((b) => b.startsWith("Plan file not found:")),
-	);
+	assert.ok(result.blockers.some((b) => b.startsWith("Plan file not found:")));
 });
 
 test("plan without approval marker is not ready", () => {
@@ -66,9 +62,7 @@ test("plan without approval marker is not ready", () => {
 	const planPath = writePlan(root, "plan.md", "# Plan\n");
 	const result = checkExecutionReadiness(root, planPath);
 	assert.equal(result.checks.plan, false);
-	assert.ok(
-		result.blockers.some((b) => b.includes("Plan not approved")),
-	);
+	assert.ok(result.blockers.some((b) => b.includes("Plan not approved")));
 });
 
 test("plan with an approval marker is approved", () => {
@@ -76,9 +70,7 @@ test("plan with an approval marker is approved", () => {
 	const planPath = writePlan(root, "plan.md", approvedPlan());
 	const result = checkExecutionReadiness(root, planPath);
 	assert.equal(result.checks.plan, true);
-	assert.ok(
-		!result.blockers.some((b) => b.includes("Plan not approved")),
-	);
+	assert.ok(!result.blockers.some((b) => b.includes("Plan not approved")));
 });
 
 test("a .approved sibling file also marks the plan approved", () => {
@@ -91,43 +83,25 @@ test("a .approved sibling file also marks the plan approved", () => {
 
 test("referenced env var present satisfies the env check", () => {
 	const root = tempProject();
-	const planPath = writePlan(
-		root,
-		"plan.md",
-		approvedPlan("Build with ${BUILD_TOKEN}\n"),
-	);
-	const result = withEnv({ BUILD_TOKEN: "abc" }, () =>
-		checkExecutionReadiness(root, planPath),
-	);
+	const planPath = writePlan(root, "plan.md", approvedPlan("Build with ${BUILD_TOKEN}\n"));
+	const result = withEnv({ BUILD_TOKEN: "abc" }, () => checkExecutionReadiness(root, planPath));
 	assert.equal(result.checks.env, true);
 	assert.ok(!result.blockers.some((b) => b.startsWith("Missing env vars")));
 });
 
 test("referenced env var missing is a blocker", () => {
 	const root = tempProject();
-	const planPath = writePlan(
-		root,
-		"plan.md",
-		approvedPlan("Use ${MISSING_TOKEN_XYZ}\n"),
-	);
+	const planPath = writePlan(root, "plan.md", approvedPlan("Use ${MISSING_TOKEN_XYZ}\n"));
 	const result = withEnv({ MISSING_TOKEN_XYZ: undefined }, () =>
 		checkExecutionReadiness(root, planPath),
 	);
 	assert.equal(result.checks.env, false);
-	assert.ok(
-		result.blockers.some((b) =>
-			b.startsWith("Missing env vars: MISSING_TOKEN_XYZ"),
-		),
-	);
+	assert.ok(result.blockers.some((b) => b.startsWith("Missing env vars: MISSING_TOKEN_XYZ")));
 });
 
 test("plan referencing an integration that exists passes the integration check", () => {
 	const root = tempProject();
-	const planPath = writePlan(
-		root,
-		"plan.md",
-		approvedPlan("integration: deploy\n"),
-	);
+	const planPath = writePlan(root, "plan.md", approvedPlan("integration: deploy\n"));
 	fs.mkdirSync(path.join(root, "integrations"), { recursive: true });
 	fs.writeFileSync(path.join(root, "integrations", "deploy.json"), "{}");
 	const result = checkExecutionReadiness(root, planPath);
@@ -136,18 +110,10 @@ test("plan referencing an integration that exists passes the integration check",
 
 test("plan referencing a missing integration is a blocker", () => {
 	const root = tempProject();
-	const planPath = writePlan(
-		root,
-		"plan.md",
-		approvedPlan("integration: ghost\n"),
-	);
+	const planPath = writePlan(root, "plan.md", approvedPlan("integration: ghost\n"));
 	const result = checkExecutionReadiness(root, planPath);
 	assert.equal(result.checks.integrations, false);
-	assert.ok(
-		result.blockers.some((b) =>
-			b.startsWith("Integration files not found: ghost"),
-		),
-	);
+	assert.ok(result.blockers.some((b) => b.startsWith("Integration files not found: ghost")));
 });
 
 test("strict mode blocks a plan without Goals and Implementation sections", () => {
@@ -155,27 +121,15 @@ test("strict mode blocks a plan without Goals and Implementation sections", () =
 	const planPath = writePlan(root, "plan.md", approvedPlan("# Plan\n"));
 	const result = checkExecutionReadiness(root, planPath, { strict: true });
 	assert.equal(result.strictMode, true);
-	assert.ok(
-		result.blockers.some((b) => b.includes("missing Goals or Objectives")),
-	);
-	assert.ok(
-		result.blockers.some((b) =>
-			b.includes("missing Implementation or Steps"),
-		),
-	);
+	assert.ok(result.blockers.some((b) => b.includes("missing Goals or Objectives")));
+	assert.ok(result.blockers.some((b) => b.includes("missing Implementation or Steps")));
 });
 
 test("strict mode warns when the Test section is absent", () => {
 	const root = tempProject();
-	const planPath = writePlan(
-		root,
-		"plan.md",
-		approvedPlan("## Goals\n## Implementation\n"),
-	);
+	const planPath = writePlan(root, "plan.md", approvedPlan("## Goals\n## Implementation\n"));
 	const result = checkExecutionReadiness(root, planPath, { strict: true });
-	assert.ok(
-		result.warnings.some((w) => w.includes("missing Test section")),
-	);
+	assert.ok(result.warnings.some((w) => w.includes("missing Test section")));
 });
 
 test("a non-git project root is treated as a clean worktree", () => {
@@ -274,9 +228,7 @@ test("a fully ready plan returns ready true with no blockers", () => {
 		path.join(rulesDir, "rules.json"),
 		JSON.stringify({ schemaVersion: 1, defaultAction: "deny", rules: [] }),
 	);
-	const result = withEnv({}, () =>
-		checkExecutionReadiness(root, planPath),
-	);
+	const result = withEnv({}, () => checkExecutionReadiness(root, planPath));
 	assert.equal(result.ready, true);
 	assert.deepEqual(result.blockers, []);
 });

@@ -200,11 +200,23 @@ function writeHandoffBundle(target, options = {}) {
 	const files = [];
 	files.push(writeFile(outputDir, "README.md", renderReadme({ targetRoot, generatedAt, report })));
 	files.push(writeFile(outputDir, "session-summary.md", handoffContent));
-	files.push(writeFile(outputDir, "verification-evidence.md", renderVerificationEvidence(handoffContent, report, failedVerifications)));
+	files.push(
+		writeFile(
+			outputDir,
+			"verification-evidence.md",
+			renderVerificationEvidence(handoffContent, report, failedVerifications),
+		),
+	);
 	files.push(writeFile(outputDir, "next-actions.md", renderNextActions(report)));
 	files.push(writeFile(outputDir, "risks.md", renderRisks(report)));
 	files.push(writeFile(outputDir, "recovery-commands.md", renderRecoveryCommands(targetDisplay)));
-	files.push(writeFile(outputDir, "manifest.json", `${JSON.stringify(buildManifest({ targetRoot, outputDir, generatedAt, report }), null, 2)}\n`));
+	files.push(
+		writeFile(
+			outputDir,
+			"manifest.json",
+			`${JSON.stringify(buildManifest({ targetRoot, outputDir, generatedAt, report }), null, 2)}\n`,
+		),
+	);
 
 	const validation = validateHandoffBundle(outputDir);
 	const handoffValidation = validateHandoff(targetRoot);
@@ -214,9 +226,7 @@ function writeHandoffBundle(target, options = {}) {
 	// itself stays schemaVersion 1; these are bundle-result fields only (#44 AC4).
 	const structureValid = validation.valid;
 	const deliveryReady =
-		structureValid &&
-		(handoffValidation.errors || []).length === 0 &&
-		report.decision !== "block";
+		structureValid && (handoffValidation.errors || []).length === 0 && report.decision !== "block";
 	return {
 		target: targetRoot,
 		outputDir,
@@ -282,9 +292,10 @@ function validateHandoffBundle(bundleDir) {
 		manifest,
 		errors,
 		warnings,
-		text: errors.length === 0
-			? `Handoff bundle valid: ${resolved}`
-			: `Handoff bundle invalid: ${resolved}\nErrors: ${errors.length}`,
+		text:
+			errors.length === 0
+				? `Handoff bundle valid: ${resolved}`
+				: `Handoff bundle invalid: ${resolved}\nErrors: ${errors.length}`,
 	};
 }
 

@@ -66,9 +66,7 @@ function validateLoadoutShape(loadout) {
 			"schemas",
 			"context-loadout.schema.json",
 		);
-		loadoutValidate = ajv.compile(
-			JSON.parse(fs.readFileSync(schemaPath, "utf8")),
-		);
+		loadoutValidate = ajv.compile(JSON.parse(fs.readFileSync(schemaPath, "utf8")));
 	}
 	if (loadoutValidate(loadout)) return [];
 	return loadoutValidate.errors
@@ -148,9 +146,7 @@ function collectRequiredArtifacts(targetRoot, route) {
 
 function pageText(page) {
 	const blocks = Array.isArray(page.blocks) ? page.blocks : [];
-	return blocks
-		.map((b) => (b && typeof b.text === "string" ? b.text : ""))
-		.join("\n");
+	return blocks.map((b) => (b && typeof b.text === "string" ? b.text : "")).join("\n");
 }
 
 // Stable comparator: recency desc (latestAt), then pageId asc.
@@ -206,7 +202,14 @@ function budgetedAdd(candidates, pageIds, pagesMap, seen, excluded, remaining) {
 function loadBuildConfig(targetRoot, opts) {
 	const route = opts.route;
 	if (!route || typeof route !== "string" || !ROUTE_RE.test(route)) {
-		return { errors: [{ code: "AMBER_E_CONTEXT_LOADOUT_ROUTE", detail: `route must be kebab-case (got ${JSON.stringify(route)})` }] };
+		return {
+			errors: [
+				{
+					code: "AMBER_E_CONTEXT_LOADOUT_ROUTE",
+					detail: `route must be kebab-case (got ${JSON.stringify(route)})`,
+				},
+			],
+		};
 	}
 	let routeManifest;
 	try {
@@ -218,11 +221,25 @@ function loadBuildConfig(targetRoot, opts) {
 		routeManifest = null;
 	}
 	if (!routeManifest || routeManifest.routeId !== route) {
-		return { errors: [{ code: "AMBER_E_CONTEXT_LOADOUT_ROUTE", detail: `route "${route}" not found in routes/*.route.json` }] };
+		return {
+			errors: [
+				{
+					code: "AMBER_E_CONTEXT_LOADOUT_ROUTE",
+					detail: `route "${route}" not found in routes/*.route.json`,
+				},
+			],
+		};
 	}
 	const feature = opts.feature || null;
 	if (feature && (typeof feature !== "string" || !FEATURE_RE.test(feature))) {
-		return { errors: [{ code: "AMBER_E_CONTEXT_SCHEMA_INVALID", detail: `feature must be a safe identifier (got ${JSON.stringify(feature)})` }] };
+		return {
+			errors: [
+				{
+					code: "AMBER_E_CONTEXT_SCHEMA_INVALID",
+					detail: `feature must be a safe identifier (got ${JSON.stringify(feature)})`,
+				},
+			],
+		};
 	}
 	const requiredArtifacts = collectRequiredArtifacts(targetRoot, route);
 	if (requiredArtifacts.errors.length > 0) return { errors: requiredArtifacts.errors };
@@ -305,10 +322,13 @@ function collectPageEntries(targetRoot, route, feature) {
 		});
 	}
 	for (const entry of pageEntries) {
-		entry.matchesScope = !anyScope || Boolean(
-			entry.scope && entry.scope.length > 0 &&
-			((feature && entry.scope.includes(feature)) || (route && entry.scope.includes(route))),
-		);
+		entry.matchesScope =
+			!anyScope ||
+			Boolean(
+				entry.scope &&
+				entry.scope.length > 0 &&
+				((feature && entry.scope.includes(feature)) || (route && entry.scope.includes(route))),
+			);
 	}
 	return { ...activity, pageEntries };
 }
@@ -320,7 +340,11 @@ function selectRequiredPages(pageEntries, requiredPins) {
 		state.seen.add(pin);
 		const entry = pageEntries.find((candidate) => candidate.pageId === pin);
 		if (!entry) {
-			state.excluded.push({ pageId: pin, reason: "obsolete", detail: "required-tier pin has no page on disk" });
+			state.excluded.push({
+				pageId: pin,
+				reason: "obsolete",
+				detail: "required-tier pin has no page on disk",
+			});
 			continue;
 		}
 		if (entry.supersededBy.length > 0) {
@@ -333,7 +357,11 @@ function selectRequiredPages(pageEntries, requiredPins) {
 		}
 		const reason = reasonForStatus(entry.status);
 		if (reason === "tampered" || reason === "obsolete") {
-			state.excluded.push({ pageId: pin, reason, detail: `${entry.status} required-tier pin excluded (D4)` });
+			state.excluded.push({
+				pageId: pin,
+				reason,
+				detail: `${entry.status} required-tier pin excluded (D4)`,
+			});
 			continue;
 		}
 		state.requiredPageIds.push(pin);
@@ -359,17 +387,29 @@ function addBudgetedTiers(pageEntries, state, budget, requiredWords) {
 		)
 		.sort(comparePriority);
 	state.priorityPageIds = [];
-	const remaining = budgetedAdd(priorityCandidates, state.priorityPageIds, state.pagesMap, state.seen, state.excluded, budget - requiredWords);
+	const remaining = budgetedAdd(
+		priorityCandidates,
+		state.priorityPageIds,
+		state.pagesMap,
+		state.seen,
+		state.excluded,
+		budget - requiredWords,
+	);
 	const optionalCandidates = pageEntries
 		.filter(
 			(entry) =>
-				entry.status === "ok" &&
-				entry.supersededBy.length === 0 &&
-				!state.seen.has(entry.pageId),
+				entry.status === "ok" && entry.supersededBy.length === 0 && !state.seen.has(entry.pageId),
 		)
 		.sort(comparePageIdAsc);
 	state.optionalPageIds = [];
-	budgetedAdd(optionalCandidates, state.optionalPageIds, state.pagesMap, state.seen, state.excluded, remaining);
+	budgetedAdd(
+		optionalCandidates,
+		state.optionalPageIds,
+		state.pagesMap,
+		state.seen,
+		state.excluded,
+		remaining,
+	);
 }
 
 function appendStatusExclusions(pageEntries, state) {
@@ -393,9 +433,10 @@ function appendStatusExclusions(pageEntries, state) {
 		state.excluded.push({
 			pageId: entry.pageId,
 			reason,
-			detail: reason === "stale"
-				? "stale page excluded from priority/optional (D4)"
-				: `${entry.status} page excluded at every tier (D4)`,
+			detail:
+				reason === "stale"
+					? "stale page excluded from priority/optional (D4)"
+					: `${entry.status} page excluded at every tier (D4)`,
 		});
 	}
 }
@@ -413,7 +454,8 @@ function selectPageTiers(pageEntries, config) {
 	}
 	if (config.knowledgeKinds.length > 0) {
 		for (const entry of pageEntries) {
-			if (state.seen.has(entry.pageId) || config.knowledgeKinds.includes(entry.knowledgeKind)) continue;
+			if (state.seen.has(entry.pageId) || config.knowledgeKinds.includes(entry.knowledgeKind))
+				continue;
 			state.seen.add(entry.pageId);
 			state.excluded.push({
 				pageId: entry.pageId,
@@ -489,7 +531,9 @@ function persistLoadout(targetRoot, loadout, route, feature) {
 	try {
 		loadoutPath = loadoutPathFor(targetRoot, route, feature);
 	} catch (error) {
-		return { error: { code: "AMBER_E_CONTEXT_LOADOUT_REQUIRED", detail: error.message || String(error) } };
+		return {
+			error: { code: "AMBER_E_CONTEXT_LOADOUT_REQUIRED", detail: error.message || String(error) },
+		};
 	}
 	const serialized = JSON.stringify(loadout, null, 2) + "\n";
 	let cached = false;
@@ -582,20 +626,37 @@ function readLoadoutForVerify(targetRoot, loadoutPath) {
 			label: "Context Loadout file",
 		});
 	} catch (error) {
-		return { finding: loadoutFinding("AMBER_E_CONTEXT_LOADOUT_MISSING", error.message || String(error)) };
+		return {
+			finding: loadoutFinding("AMBER_E_CONTEXT_LOADOUT_MISSING", error.message || String(error)),
+		};
 	}
 	if (!fs.existsSync(resolvedPath)) {
-		return { finding: loadoutFinding("AMBER_E_CONTEXT_LOADOUT_MISSING", `loadout file not found: ${resolvedPath}`) };
+		return {
+			finding: loadoutFinding(
+				"AMBER_E_CONTEXT_LOADOUT_MISSING",
+				`loadout file not found: ${resolvedPath}`,
+			),
+		};
 	}
 	let loadout;
 	try {
 		loadout = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
 	} catch (error) {
-		return { finding: loadoutFinding("AMBER_E_CONTEXT_LOADOUT_CORRUPT", `loadout JSON parse failed: ${error.message}`) };
+		return {
+			finding: loadoutFinding(
+				"AMBER_E_CONTEXT_LOADOUT_CORRUPT",
+				`loadout JSON parse failed: ${error.message}`,
+			),
+		};
 	}
 	const shapeErrors = validateLoadoutShape(loadout);
 	if (shapeErrors.length > 0) {
-		return { finding: loadoutFinding("AMBER_E_CONTEXT_LOADOUT_CORRUPT", `loadout schema validation failed: ${shapeErrors.join("; ")}`) };
+		return {
+			finding: loadoutFinding(
+				"AMBER_E_CONTEXT_LOADOUT_CORRUPT",
+				`loadout schema validation failed: ${shapeErrors.join("; ")}`,
+			),
+		};
 	}
 	return { loadout };
 }
@@ -614,13 +675,23 @@ function verifyRequiredArtifact(targetRoot, artifact, expected) {
 			label: `Required ${expected.kind}`,
 		});
 	} catch (error) {
-		return loadoutFinding("AMBER_E_CONTEXT_LOADOUT_REQUIRED", error.message || String(error), { kind: expected.kind });
+		return loadoutFinding("AMBER_E_CONTEXT_LOADOUT_REQUIRED", error.message || String(error), {
+			kind: expected.kind,
+		});
 	}
 	if (relativeSlash(targetRoot, artifactPath) !== expected.path) {
-		return loadoutFinding("AMBER_E_CONTEXT_LOADOUT_REQUIRED", `required ${expected.kind} path must be ${expected.path}`, { kind: expected.kind });
+		return loadoutFinding(
+			"AMBER_E_CONTEXT_LOADOUT_REQUIRED",
+			`required ${expected.kind} path must be ${expected.path}`,
+			{ kind: expected.kind },
+		);
 	}
 	if (!fs.existsSync(artifactPath)) {
-		return loadoutFinding("AMBER_E_CONTEXT_LOADOUT_REQUIRED", `required ${expected.kind} is missing: ${expected.path}`, { kind: expected.kind });
+		return loadoutFinding(
+			"AMBER_E_CONTEXT_LOADOUT_REQUIRED",
+			`required ${expected.kind} is missing: ${expected.path}`,
+			{ kind: expected.kind },
+		);
 	}
 	let currentHash;
 	try {
@@ -635,7 +706,11 @@ function verifyRequiredArtifact(targetRoot, artifact, expected) {
 	}
 	return currentHash === artifact.rawHash
 		? null
-		: loadoutFinding("AMBER_E_CONTEXT_LOADOUT_REQUIRED", `required ${expected.kind} changed since loadout generation`, { kind: expected.kind });
+		: loadoutFinding(
+				"AMBER_E_CONTEXT_LOADOUT_REQUIRED",
+				`required ${expected.kind} changed since loadout generation`,
+				{ kind: expected.kind },
+			);
 }
 
 function verifyRequiredArtifacts(targetRoot, loadout) {
@@ -655,13 +730,21 @@ function verifyRequiredPages(targetRoot, loadout) {
 	for (const pageId of required) {
 		const page = readPage(targetRoot, pageId);
 		if (!page) {
-			findings.push({ pageId, code: "AMBER_E_CONTEXT_SOURCE_STALE", detail: "required-tier page no longer on disk" });
+			findings.push({
+				pageId,
+				code: "AMBER_E_CONTEXT_SOURCE_STALE",
+				detail: "required-tier page no longer on disk",
+			});
 			continue;
 		}
 		const currentHash = sha256(canonicalJson(JSON.stringify(page)));
 		const recordedHash = loadout.pages?.[pageId]?.rawHash || null;
 		if (currentHash !== recordedHash) {
-			findings.push({ pageId, code: "AMBER_E_CONTEXT_SOURCE_STALE", detail: "required-tier page changed since loadout generation" });
+			findings.push({
+				pageId,
+				code: "AMBER_E_CONTEXT_SOURCE_STALE",
+				detail: "required-tier page changed since loadout generation",
+			});
 		}
 	}
 	return findings;

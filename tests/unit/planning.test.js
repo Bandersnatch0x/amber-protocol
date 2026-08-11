@@ -28,12 +28,13 @@ function validPlanContent(overrides = {}) {
 		overrides.verticalSlices ?? "- slice 1",
 		"",
 		"## Resume Checkpoint",
-		overrides.resumeCheckpoint ?? [
-			"- Resume Point: test plan is ready to resume.",
-			"- Blockers: none.",
-			"- Next Action: run the next verification step.",
-			"- Recovery Instructions: reopen this plan and continue from the first unchecked slice.",
-		].join("\n"),
+		overrides.resumeCheckpoint ??
+			[
+				"- Resume Point: test plan is ready to resume.",
+				"- Blockers: none.",
+				"- Next Action: run the next verification step.",
+				"- Recovery Instructions: reopen this plan and continue from the first unchecked slice.",
+			].join("\n"),
 		"",
 		"## Acceptance Criteria",
 		overrides.acceptanceCriteria ?? "- criterion",
@@ -102,9 +103,7 @@ test("buildPlanContent renders no verification bullets for an empty verification
 		verification: [],
 	};
 	const out = buildPlanContent(feature, "Empty");
-	const verificationSection = out.split("## Verification\n")[1].split(
-		"## Evidence Schema",
-	)[0];
+	const verificationSection = out.split("## Verification\n")[1].split("## Evidence Schema")[0];
 	// The section body contains only the surrounding blank lines; no bullets.
 	assert.ok(!verificationSection.includes("- "));
 });
@@ -197,10 +196,7 @@ test("validatePlanContent flags a feature that is not found", () => {
 		content: validPlanContent(),
 		resolveFeature: notFoundResolver,
 	});
-	assert.ok(
-		result.errors.some((e) =>
-			e === "Plan feature F1 was not found in feature_list.json."),
-	);
+	assert.ok(result.errors.some((e) => e === "Plan feature F1 was not found in feature_list.json."));
 });
 
 test("validatePlanContent surfaces a feature_list read error", () => {
@@ -208,10 +204,7 @@ test("validatePlanContent surfaces a feature_list read error", () => {
 		content: validPlanContent(),
 		resolveFeature: errorResolver,
 	});
-	assert.ok(
-		result.errors.some((e) =>
-			e === "Cannot read feature_list.json: disk on fire"),
-	);
+	assert.ok(result.errors.some((e) => e === "Cannot read feature_list.json: disk on fire"));
 });
 
 test("validatePlanContent flags each missing required section", () => {
@@ -221,10 +214,7 @@ test("validatePlanContent flags each missing required section", () => {
 		content,
 		resolveFeature: foundResolver,
 	});
-	assert.ok(
-		result.errors.some((e) =>
-			e === "Plan must include a non-empty Verification section."),
-	);
+	assert.ok(result.errors.some((e) => e === "Plan must include a non-empty Verification section."));
 });
 
 test("validatePlanContent requires every Resume Checkpoint field", () => {
@@ -239,8 +229,7 @@ test("validatePlanContent requires every Resume Checkpoint field", () => {
 		resolveFeature: foundResolver,
 	});
 	assert.ok(
-		result.errors.some((e) =>
-			e === "Resume Checkpoint must define Recovery Instructions fields."),
+		result.errors.some((e) => e === "Resume Checkpoint must define Recovery Instructions fields."),
 	);
 });
 
@@ -249,11 +238,7 @@ test("validatePlanContent requires fields for an empty Resume Checkpoint section
 		content: validPlanContent({ resumeCheckpoint: "" }),
 		resolveFeature: foundResolver,
 	});
-	assert.ok(
-		result.errors.includes(
-			"Plan must include a non-empty Resume Checkpoint section.",
-		),
-	);
+	assert.ok(result.errors.includes("Plan must include a non-empty Resume Checkpoint section."));
 	assert.ok(
 		result.errors.includes(
 			"Resume Checkpoint must define Resume Point, Blockers, Next Action, Recovery Instructions fields.",
@@ -266,8 +251,9 @@ test("validatePlanContent requires the User Confirmation to be confirmed (case-i
 		resolveFeature: foundResolver,
 	});
 	assert.ok(
-		result.errors.some((e) =>
-			e === "User confirmation is required before implementation-ready status."),
+		result.errors.some(
+			(e) => e === "User confirmation is required before implementation-ready status.",
+		),
 	);
 	// "Confirmed" with any casing satisfies the gate.
 	assert.deepEqual(
@@ -440,17 +426,13 @@ test("buildReviewResult merges standard findings without duplicating gate user-c
 		targetRoot: "/repo",
 		planRelativePath: "p.md",
 		gateResult: {
-			errors: [
-				"User confirmation is required before implementation-ready status.",
-			],
+			errors: ["User confirmation is required before implementation-ready status."],
 			warnings: [],
 		},
 		standards: [amberDeliveryStandard],
 		content,
 	});
-	const userConfirmationFindings = result.findings.filter(
-		(f) => f.checkId === "user-confirmation",
-	);
+	const userConfirmationFindings = result.findings.filter((f) => f.checkId === "user-confirmation");
 	assert.equal(userConfirmationFindings.length, 1);
 });
 

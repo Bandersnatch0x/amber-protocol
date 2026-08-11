@@ -31,10 +31,7 @@ test("init command scaffolds a Harness without overwriting existing files", () =
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /Created:/);
 	assert.match(result.stdout, /Skipped:/);
-	assert.equal(
-		fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"),
-		"# Existing rules\n",
-	);
+	assert.equal(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"), "# Existing rules\n");
 	assert.equal(fs.existsSync(path.join(target, "feature_list.json")), true);
 });
 
@@ -54,15 +51,9 @@ test("audit command is read-only and reports missing Amber starter files", () =>
 	assert.match(result.stdout, /docs\/README\.md/);
 	assert.match(result.stdout, /Suggested patches requiring approval:/);
 	assert.match(result.stdout, /Unknowns:/);
-	assert.match(
-		result.stdout,
-		/No package, test, build, or verification command detected/,
-	);
+	assert.match(result.stdout, /No package, test, build, or verification command detected/);
 	assert.match(result.stdout, /Next safe command:/);
-	assert.equal(
-		fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"),
-		"# Existing rules\n",
-	);
+	assert.equal(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"), "# Existing rules\n");
 });
 
 test("audit command reports tooling evidence without detected commands", () => {
@@ -80,17 +71,11 @@ test("audit command reports tooling evidence without detected commands", () => {
 
 test("audit summary limits long docs output while preserving actions", () => {
 	const target = tempDir("audit-summary");
-	fs.writeFileSync(
-		path.join(target, "pyproject.toml"),
-		"[project]\nname = 'example'\n",
-	);
+	fs.writeFileSync(path.join(target, "pyproject.toml"), "[project]\nname = 'example'\n");
 	fs.mkdirSync(path.join(target, "tests"), { recursive: true });
 	fs.mkdirSync(path.join(target, "docs"), { recursive: true });
 	for (let index = 0; index < 20; index += 1) {
-		fs.writeFileSync(
-			path.join(target, "docs", `page-${index}.md`),
-			`# Page ${index}\n`,
-		);
+		fs.writeFileSync(path.join(target, "docs", `page-${index}.md`), `# Page ${index}\n`);
 	}
 
 	const result = runHarness(["audit", "--target", target, "--summary"]);
@@ -105,20 +90,14 @@ test("audit summary limits long docs output while preserving actions", () => {
 	assert.match(result.stdout, /Unknowns:/);
 	assert.match(result.stdout, /Next safe command:/);
 	assert.equal(result.stdout.includes("docs/page-19.md"), false);
-	assert.doesNotMatch(
-		result.stdout,
-		/Suggested additions:\\n\\s+- AGENTS\\.md/,
-	);
+	assert.doesNotMatch(result.stdout, /Suggested additions:\\n\\s+- AGENTS\\.md/);
 });
 
 test("adoption report aggregates safe trial steps without initializing target", () => {
 	const target = tempDir("adoption-report-target");
 	const outputDir = tempDir("adoption-report-output");
 	const output = path.join(outputDir, "report.md");
-	fs.writeFileSync(
-		path.join(target, "pyproject.toml"),
-		"[project]\nname = 'example'\n",
-	);
+	fs.writeFileSync(path.join(target, "pyproject.toml"), "[project]\nname = 'example'\n");
 	fs.mkdirSync(path.join(target, "tests"), { recursive: true });
 	fs.mkdirSync(path.join(target, "docs"), { recursive: true });
 	fs.writeFileSync(path.join(target, "docs", "README.md"), "# Existing docs\n");
@@ -150,24 +129,15 @@ test("adoption report aggregates safe trial steps without initializing target", 
 	assert.match(report, /## Init Dry Run/);
 	assert.match(report, /## Team Distribution/);
 	assert.match(report, /## Maintenance/);
-	assert.match(
-		report,
-		/No target-repository files were initialized by this report/,
-	);
+	assert.match(report, /No target-repository files were initialized by this report/);
 	assert.equal(fs.existsSync(path.join(target, "AGENTS.md")), false);
-	assert.equal(
-		fs.existsSync(path.join(target, ".amber", "team", "lock.json")),
-		false,
-	);
+	assert.equal(fs.existsSync(path.join(target, ".amber", "team", "lock.json")), false);
 });
 
 test("adoption report output-dir creates non-conflicting timestamped reports", () => {
 	const target = tempDir("adoption-output-dir-target");
 	const outputDir = tempDir("adoption-output-dir");
-	fs.writeFileSync(
-		path.join(target, "pyproject.toml"),
-		"[project]\nname = 'example'\n",
-	);
+	fs.writeFileSync(path.join(target, "pyproject.toml"), "[project]\nname = 'example'\n");
 	fs.mkdirSync(path.join(target, "tests"), { recursive: true });
 
 	const first = runHarness([
@@ -222,10 +192,7 @@ test("adoption report rejects output and output-dir together", () => {
 	]);
 
 	assert.notEqual(result.status, 0);
-	assert.match(
-		JSON.parse(result.stdout).errors.join("\n"),
-		/Use either --output or --output-dir/,
-	);
+	assert.match(JSON.parse(result.stdout).errors.join("\n"), /Use either --output or --output-dir/);
 });
 
 test("adoption list reads report metadata without writing an index", () => {
@@ -241,13 +208,7 @@ test("adoption list reads report metadata without writing an index", () => {
 		"# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectB\nGenerated: 2026-06-09T02:00:00.000Z\n",
 	);
 
-	const result = runHarness([
-		"adoption",
-		"list",
-		"--reports-dir",
-		reportsDir,
-		"--json",
-	]);
+	const result = runHarness(["adoption", "list", "--reports-dir", reportsDir, "--json"]);
 
 	assert.equal(result.status, 0, result.stderr);
 	const payload = JSON.parse(result.stdout);
@@ -261,12 +222,7 @@ test("adoption list reads report metadata without writing an index", () => {
 	assert.equal(payload.reports[0].generatedAt, "2026-06-09T02:00:00.000Z");
 	assert.equal(fs.existsSync(path.join(reportsDir, "index.md")), false);
 
-	const textResult = runHarness([
-		"adoption",
-		"list",
-		"--reports-dir",
-		reportsDir,
-	]);
+	const textResult = runHarness(["adoption", "list", "--reports-dir", reportsDir]);
 	assert.equal(textResult.status, 0, textResult.stderr);
 	assert.match(textResult.stdout, /Reports: 2/);
 	assert.match(textResult.stdout, /project-b\.md/);
@@ -314,10 +270,7 @@ test("adoption index writes a markdown index and refuses to overwrite it", () =>
 		"--json",
 	]);
 	assert.notEqual(second.status, 0);
-	assert.match(
-		JSON.parse(second.stdout).errors.join("\n"),
-		/Index already exists|already exists/,
-	);
+	assert.match(JSON.parse(second.stdout).errors.join("\n"), /Index already exists|already exists/);
 });
 
 test("adoption validate checks report metadata without writing files", () => {
@@ -327,13 +280,7 @@ test("adoption validate checks report metadata without writing files", () => {
 		"# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n",
 	);
 
-	const result = runHarness([
-		"adoption",
-		"validate",
-		"--reports-dir",
-		reportsDir,
-		"--json",
-	]);
+	const result = runHarness(["adoption", "validate", "--reports-dir", reportsDir, "--json"]);
 
 	assert.equal(result.status, 0, result.stderr);
 	const payload = JSON.parse(result.stdout);
@@ -341,17 +288,9 @@ test("adoption validate checks report metadata without writing files", () => {
 	assert.equal(payload.valid, true);
 	assert.equal(payload.reports.length, 1);
 	assert.equal(payload.checkedIndex, false);
-	assert.equal(
-		fs.existsSync(path.join(reportsDir, "adoptions-index.md")),
-		false,
-	);
+	assert.equal(fs.existsSync(path.join(reportsDir, "adoptions-index.md")), false);
 
-	const textResult = runHarness([
-		"adoption",
-		"validate",
-		"--reports-dir",
-		reportsDir,
-	]);
+	const textResult = runHarness(["adoption", "validate", "--reports-dir", reportsDir]);
 	assert.equal(textResult.status, 0, textResult.stderr);
 	assert.match(textResult.stdout, /Valid: true/);
 	assert.match(textResult.stdout, /Reports: 1/);
@@ -388,26 +327,14 @@ test("adoption validate reports broken index links", () => {
 
 test("adoption validate reports invalid markdown in the reports directory", () => {
 	const reportsDir = tempDir("adoption-validate-invalid-reports");
-	fs.writeFileSync(
-		path.join(reportsDir, "notes.md"),
-		"# Notes\n\nNot an adoption report.\n",
-	);
+	fs.writeFileSync(path.join(reportsDir, "notes.md"), "# Notes\n\nNot an adoption report.\n");
 
-	const result = runHarness([
-		"adoption",
-		"validate",
-		"--reports-dir",
-		reportsDir,
-		"--json",
-	]);
+	const result = runHarness(["adoption", "validate", "--reports-dir", reportsDir, "--json"]);
 
 	assert.notEqual(result.status, 0);
 	const payload = JSON.parse(result.stdout);
 	assert.equal(payload.valid, false);
-	assert.match(
-		payload.errors.join("\n"),
-		/Invalid adoption report metadata: .*notes\.md/,
-	);
+	assert.match(payload.errors.join("\n"), /Invalid adoption report metadata: .*notes\.md/);
 });
 
 test("adoption compare auto-selects the latest two reports and reports deltas", () => {
@@ -478,13 +405,7 @@ test("adoption compare auto-selects the latest two reports and reports deltas", 
 		].join("\n"),
 	);
 
-	const result = runHarness([
-		"adoption",
-		"compare",
-		"--reports-dir",
-		reportsDir,
-		"--json",
-	]);
+	const result = runHarness(["adoption", "compare", "--reports-dir", reportsDir, "--json"]);
 
 	assert.equal(result.status, 0, result.stderr);
 	const payload = JSON.parse(result.stdout);
@@ -493,9 +414,7 @@ test("adoption compare auto-selects the latest two reports and reports deltas", 
 	assert.equal(payload.sameTarget, true);
 	assert.equal(payload.metrics.missingHarnessFiles.delta, -2);
 	assert.equal(payload.metrics.existingDocs.delta, 2);
-	assert.deepEqual(payload.candidateCommands.added, [
-		"package.json: lint -> npm run lint",
-	]);
+	assert.deepEqual(payload.candidateCommands.added, ["package.json: lint -> npm run lint"]);
 	assert.deepEqual(payload.unknowns.removed, ["exact lint command unknown"]);
 	assert.equal(fs.existsSync(path.join(reportsDir, "adoption-diff.md")), false);
 });
@@ -547,10 +466,7 @@ test("adoption compare writes markdown diff and refuses to overwrite it", () => 
 		"--json",
 	]);
 	assert.notEqual(second.status, 0);
-	assert.match(
-		JSON.parse(second.stdout).errors.join("\n"),
-		/Diff already exists|already exists/,
-	);
+	assert.match(JSON.parse(second.stdout).errors.join("\n"), /Diff already exists|already exists/);
 });
 
 test("adoption gate reports a conservative wait decision for risky reports", () => {
@@ -588,11 +504,7 @@ test("adoption gate reports a conservative wait decision for risky reports", () 
 	assert.equal(payload.report.file, report);
 	assert.deepEqual(
 		payload.findings.map((finding) => finding.id),
-		[
-			"missing-harness-files",
-			"candidate-commands-unconfirmed",
-			"unknowns-present",
-		],
+		["missing-harness-files", "candidate-commands-unconfirmed", "unknowns-present"],
 	);
 	assert.equal(fs.existsSync(path.join(reportsDir, "gate.md")), false);
 });
@@ -649,13 +561,7 @@ test("adoption gate selects the latest report from a reports directory", () => {
 		"# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T02:00:00.000Z\n\n## Audit Summary\n\n- Missing Amber starter files: 0\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n",
 	);
 
-	const result = runHarness([
-		"adoption",
-		"gate",
-		"--reports-dir",
-		reportsDir,
-		"--json",
-	]);
+	const result = runHarness(["adoption", "gate", "--reports-dir", reportsDir, "--json"]);
 
 	assert.equal(result.status, 0, result.stderr);
 	const payload = JSON.parse(result.stdout);
@@ -673,15 +579,7 @@ test("adoption gate writes markdown output and refuses to overwrite it", () => {
 		"# Amber Protocol Adoption Report\n\nTarget: C:\\tmp\\ProjectA\nGenerated: 2026-06-09T01:00:00.000Z\n\n## Audit Summary\n\n- Missing Amber starter files: 0\n- Conflicts: 0\n\n### Candidate Commands\n\n- none\n\n### Unknowns\n\n- none\n",
 	);
 
-	const result = runHarness([
-		"adoption",
-		"gate",
-		"--report",
-		report,
-		"--output",
-		output,
-		"--json",
-	]);
+	const result = runHarness(["adoption", "gate", "--report", report, "--output", output, "--json"]);
 
 	assert.equal(result.status, 0, result.stderr);
 	const payload = JSON.parse(result.stdout);
@@ -691,15 +589,7 @@ test("adoption gate writes markdown output and refuses to overwrite it", () => {
 	assert.match(gate, /# Adoption Gate Report/);
 	assert.match(gate, /Decision: ready/);
 
-	const second = runHarness([
-		"adoption",
-		"gate",
-		"--report",
-		report,
-		"--output",
-		output,
-		"--json",
-	]);
+	const second = runHarness(["adoption", "gate", "--report", report, "--output", output, "--json"]);
 	assert.notEqual(second.status, 0);
 	assert.match(
 		JSON.parse(second.stdout).errors.join("\n"),
@@ -744,11 +634,7 @@ test("adoption status summarizes reports index gate compare and next action", ()
 	assert.equal(payload.compare.metrics.missingHarnessFiles.delta, -2);
 	assert.deepEqual(
 		payload.blockers.map((blocker) => blocker.id),
-		[
-			"missing-harness-files",
-			"candidate-commands-unconfirmed",
-			"unknowns-present",
-		],
+		["missing-harness-files", "candidate-commands-unconfirmed", "unknowns-present"],
 	);
 	assert.match(payload.nextSafeAction, /Review adoption gate findings/);
 	assert.equal(fs.existsSync(path.join(reportsDir, "status.md")), false);
@@ -846,18 +732,13 @@ test("adoption bundle writes a review bundle with manifest and refuses overwrite
 	]) {
 		assert.equal(fs.existsSync(path.join(outputDir, relativePath)), true);
 	}
-	const manifest = JSON.parse(
-		fs.readFileSync(path.join(outputDir, "manifest.json"), "utf8"),
-	);
+	const manifest = JSON.parse(fs.readFileSync(path.join(outputDir, "manifest.json"), "utf8"));
 	assert.equal(manifest.target, "C:\\tmp\\ProjectA");
 	assert.equal(manifest.latestReport.endsWith("newer.md"), true);
 	assert.equal(manifest.gateDecision, "wait");
 	assert.equal(manifest.boundaries.targetProjectFilesCopied, false);
 	assert.equal(manifest.boundaries.targetProjectCommandsExecuted, false);
-	assert.match(
-		fs.readFileSync(path.join(outputDir, "README.md"), "utf8"),
-		/Next safe action/,
-	);
+	assert.match(fs.readFileSync(path.join(outputDir, "README.md"), "utf8"), /Next safe action/);
 
 	const second = runHarness([
 		"adoption",
@@ -1016,10 +897,7 @@ test("adoption decision-record writes pending approval gates from a bundle and r
 		payload.decisions.map((decision) => decision.id),
 		["command-confirmation", "bootstrap-write", "wiki-scope"],
 	);
-	assert.deepEqual(
-		[...new Set(payload.decisions.map((decision) => decision.status))],
-		["pending"],
-	);
+	assert.deepEqual([...new Set(payload.decisions.map((decision) => decision.status))], ["pending"]);
 	assert.equal(payload.boundaries.targetProjectFilesCopied, false);
 	assert.equal(payload.boundaries.targetProjectCommandsExecuted, false);
 	const content = fs.readFileSync(output, "utf8");
@@ -1119,10 +997,7 @@ test("adoption decision-record rejects unknown decision gates and statuses", () 
 		"--json",
 	]);
 	assert.notEqual(badGate.status, 0);
-	assert.match(
-		JSON.parse(badGate.stdout).errors.join("\n"),
-		/Unknown decision gate/,
-	);
+	assert.match(JSON.parse(badGate.stdout).errors.join("\n"), /Unknown decision gate/);
 	assert.equal(fs.existsSync(output), false);
 
 	const badStatus = runHarness([
@@ -1137,10 +1012,7 @@ test("adoption decision-record rejects unknown decision gates and statuses", () 
 		"--json",
 	]);
 	assert.notEqual(badStatus.status, 0);
-	assert.match(
-		JSON.parse(badStatus.stdout).errors.join("\n"),
-		/Unknown decision status/,
-	);
+	assert.match(JSON.parse(badStatus.stdout).errors.join("\n"), /Unknown decision status/);
 	assert.equal(fs.existsSync(output), false);
 });
 
@@ -1240,10 +1112,7 @@ test("adoption apply-plan requires dry-run in V1", () => {
 	]);
 
 	assert.notEqual(result.status, 0);
-	assert.match(
-		JSON.parse(result.stdout).errors.join("\n"),
-		/requires --dry-run/,
-	);
+	assert.match(JSON.parse(result.stdout).errors.join("\n"), /requires --dry-run/);
 	assert.equal(fs.existsSync(output), false);
 });
 
@@ -1350,10 +1219,7 @@ test("adoption selected-files rejects unknown included files", () => {
 	]);
 
 	assert.notEqual(result.status, 0);
-	assert.match(
-		JSON.parse(result.stdout).errors.join("\n"),
-		/Unknown selected file/,
-	);
+	assert.match(JSON.parse(result.stdout).errors.join("\n"), /Unknown selected file/);
 	assert.equal(fs.existsSync(output), false);
 });
 
@@ -1384,10 +1250,7 @@ test("adoption selected-files rejects unsafe included paths", () => {
 	]);
 
 	assert.notEqual(result.status, 0);
-	assert.match(
-		JSON.parse(result.stdout).errors.join("\n"),
-		/Unsafe selected file path/,
-	);
+	assert.match(JSON.parse(result.stdout).errors.join("\n"), /Unsafe selected file path/);
 	assert.equal(fs.existsSync(output), false);
 });
 
@@ -1397,11 +1260,7 @@ test("wiki, handoff, and doctor commands validate a scaffolded Harness", () => {
 
 	for (const command of ["wiki", "handoff", "doctor"]) {
 		const result = runHarness([command, "--target", target]);
-		assert.equal(
-			result.status,
-			0,
-			`${command} failed:\n${result.stdout}\n${result.stderr}`,
-		);
+		assert.equal(result.status, 0, `${command} failed:\n${result.stdout}\n${result.stderr}`);
 		assert.match(result.stdout, /Errors: 0/);
 	}
 });
@@ -1416,7 +1275,10 @@ test("governance report command exposes the complete product value loop", () => 
 	assert.equal(textResult.status, 0, textResult.stderr);
 	assert.match(textResult.stdout, /Amber Governance Report:/);
 	assert.match(textResult.stdout, /Amber Readiness Score:/);
-	assert.match(textResult.stdout, /Product Value Loop: Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle/);
+	assert.match(
+		textResult.stdout,
+		/Product Value Loop: Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle/,
+	);
 	assert.match(textResult.stdout, /Next Actions:/);
 
 	const jsonResult = runHarness([
@@ -1434,7 +1296,9 @@ test("governance report command exposes the complete product value loop", () => 
 	assert.equal(payload.outputPath, outputPath);
 	assert.equal(typeof payload.scores.overall, "number");
 	assert.ok(payload.nextActions.length > 0);
-	assert.ok(payload.nextActions.every((action) => action.command.includes("node scripts/amber.js")));
+	assert.ok(
+		payload.nextActions.every((action) => action.command.includes("node scripts/amber.js")),
+	);
 	assert.equal(fs.existsSync(outputPath), true);
 	assert.match(fs.readFileSync(outputPath, "utf8"), /# Amber Governance Report/);
 });
@@ -1518,14 +1382,8 @@ test("wiki command creates missing wiki files without overwriting existing pages
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /Created:/);
 	assert.match(result.stdout, /Skipped:/);
-	assert.equal(
-		fs.readFileSync(path.join(wikiRoot, "index.md"), "utf8"),
-		"# Custom Wiki\n",
-	);
-	assert.equal(
-		fs.existsSync(path.join(wikiRoot, "engineering", "verification.md")),
-		true,
-	);
+	assert.equal(fs.readFileSync(path.join(wikiRoot, "index.md"), "utf8"), "# Custom Wiki\n");
+	assert.equal(fs.existsSync(path.join(wikiRoot, "engineering", "verification.md")), true);
 });
 
 test("wiki command dry-run reports missing wiki files without writing them", () => {
@@ -1535,10 +1393,7 @@ test("wiki command dry-run reports missing wiki files without writing them", () 
 
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /Created:/);
-	assert.equal(
-		fs.existsSync(path.join(target, "docs", "wiki", "index.md")),
-		false,
-	);
+	assert.equal(fs.existsSync(path.join(target, "docs", "wiki", "index.md")), false);
 });
 
 test("unknown command returns a clear error", () => {
@@ -1566,7 +1421,10 @@ test("help scopes dry-run to commands that support it", () => {
 	assert.equal(doctorHelp.status, 0);
 	assert.equal(executionHelp.status, 0);
 	assert.match(globalHelp.stdout, /^Usage: amber <command> --target <repo> \[--json\]$/m);
-	assert.match(globalHelp.stdout, /team install --target path\/to\/repo --version 1\.0\.0 --preset safe-bootstrap --dry-run --json/);
+	assert.match(
+		globalHelp.stdout,
+		/team install --target path\/to\/repo --version 1\.0\.0 --preset safe-bootstrap --dry-run --json/,
+	);
 	assert.match(globalHelp.stdout, /maintenance inspect --target path\/to\/repo --json/);
 	assert.match(adoptionHelp.stdout, /adoption apply-plan/);
 	assert.match(adoptionHelp.stdout, /--dry-run/);
@@ -1582,10 +1440,7 @@ test("help scopes dry-run to commands that support it", () => {
 test("primary docs expose the safe loop recommendation path", () => {
 	const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
 	const readmeZh = fs.readFileSync(path.join(ROOT, "README.zh-CN.md"), "utf8");
-	const cliReference = fs.readFileSync(
-		path.join(ROOT, "docs", "CLI_REFERENCE.md"),
-		"utf8",
-	);
+	const cliReference = fs.readFileSync(path.join(ROOT, "docs", "CLI_REFERENCE.md"), "utf8");
 
 	for (const content of [readme, readmeZh, cliReference]) {
 		assert.match(content, /loop recommend/);
@@ -1598,9 +1453,7 @@ test("primary docs expose the safe loop recommendation path", () => {
 });
 
 test("version command prints the package version", () => {
-	const packageJson = JSON.parse(
-		fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
-	);
+	const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 
 	const result = runHarness(["--version"]);
 
@@ -1609,16 +1462,11 @@ test("version command prints the package version", () => {
 });
 
 test("package exposes amber as primary bin with a legacy coding-harness alias", () => {
-	const packageJson = JSON.parse(
-		fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
-	);
+	const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 
 	assert.equal(packageJson.name, "amber-protocol");
 	assert.equal(packageJson.bin.amber, "scripts/amber.js");
-	assert.equal(
-		packageJson.bin["coding-harness"],
-		"scripts/compat/coding-harness.js",
-	);
+	assert.equal(packageJson.bin["coding-harness"], "scripts/compat/coding-harness.js");
 });
 
 test("migrate state copies legacy .harness into .amber via the CLI", () => {
@@ -1637,15 +1485,11 @@ test("migrate state copies legacy .harness into .amber via the CLI", () => {
 	assert.equal(payload.errors.length, 0);
 	assert.ok(payload.copied.length >= 1);
 	assert.equal(
-		fs.existsSync(
-			path.join(target, ".amber", "sessions", "legacy-1", "manifest.json"),
-		),
+		fs.existsSync(path.join(target, ".amber", "sessions", "legacy-1", "manifest.json")),
 		true,
 	);
 	assert.equal(
-		fs.existsSync(
-			path.join(target, ".harness", "sessions", "legacy-1", "manifest.json"),
-		),
+		fs.existsSync(path.join(target, ".harness", "sessions", "legacy-1", "manifest.json")),
 		true,
 	);
 });
@@ -1668,25 +1512,16 @@ test("migrate state can archive legacy .harness via the CLI after a clean copy",
 	assert.equal(fs.existsSync(path.join(target, ".harness")), false);
 	assert.ok(payload.legacyBackupPath.includes(".amber-legacy-harness-backup-"));
 	assert.equal(
-		fs.existsSync(
-			path.join(target, ".amber", "sessions", "legacy-1", "manifest.json"),
-		),
+		fs.existsSync(path.join(target, ".amber", "sessions", "legacy-1", "manifest.json")),
 		true,
 	);
 });
 
 test("legacy entrypoints forward to the amber CLI", () => {
-	for (const entry of [
-		"scripts/harness.js",
-		"scripts/compat/coding-harness.js",
-	]) {
-		const result = spawnSync(
-			process.execPath,
-			[path.join(ROOT, entry), "--help"],
-			{
-				encoding: "utf8",
-			},
-		);
+	for (const entry of ["scripts/harness.js", "scripts/compat/coding-harness.js"]) {
+		const result = spawnSync(process.execPath, [path.join(ROOT, entry), "--help"], {
+			encoding: "utf8",
+		});
 		assert.equal(result.status, 0, `${entry} --help should exit 0`);
 		assert.match(result.stdout, /amber|harness/i);
 	}
@@ -1742,14 +1577,8 @@ test("maintenance distill writes a proposal from repeated plan headings", () => 
 	fs.mkdirSync(path.join(target, "docs", "superpowers", "plans"), {
 		recursive: true,
 	});
-	fs.writeFileSync(
-		path.join(target, "docs", "superpowers", "plans", "a.md"),
-		"# Refactor auth\n",
-	);
-	fs.writeFileSync(
-		path.join(target, "docs", "superpowers", "plans", "b.md"),
-		"# Refactor auth\n",
-	);
+	fs.writeFileSync(path.join(target, "docs", "superpowers", "plans", "a.md"), "# Refactor auth\n");
+	fs.writeFileSync(path.join(target, "docs", "superpowers", "plans", "b.md"), "# Refactor auth\n");
 	const output = path.join(target, "docs", "maintenance", "distill-proposals.md");
 
 	const result = runHarness([

@@ -45,9 +45,7 @@ function validateUpgrade(settings, _targetVersion) {
 	if (!settings || typeof settings !== "object") {
 		return {
 			compatible: false,
-			breakingChanges: [
-				{ field: "root", message: "Settings is not a valid object" },
-			],
+			breakingChanges: [{ field: "root", message: "Settings is not a valid object" }],
 			deprecatedFields: [],
 			warnings: [],
 		};

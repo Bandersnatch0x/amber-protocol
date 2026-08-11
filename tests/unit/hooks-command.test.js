@@ -96,9 +96,12 @@ test("shim skips (does not block) when node or the amber entry is absent", () =>
 	const dir = tmpGitRepo();
 	installHook(dir, {});
 	const body = fs.readFileSync(path.join(dir, ".git", "hooks", "pre-commit"), "utf8");
-	assert.ok(body.includes('command -v node'), "guards missing node");
-	assert.ok(/\[ -f ".*" \] \|\| \{ echo "amber hooks: amber not found/.test(body), "guards missing entry");
-	assert.ok(body.includes('AMBER_SKIP_HOOKS'), "honours the skip env var");
+	assert.ok(body.includes("command -v node"), "guards missing node");
+	assert.ok(
+		/\[ -f ".*" \] \|\| \{ echo "amber hooks: amber not found/.test(body),
+		"guards missing entry",
+	);
+	assert.ok(body.includes("AMBER_SKIP_HOOKS"), "honours the skip env var");
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 

@@ -106,7 +106,9 @@ function renderHandoff(targetRoot) {
 	}, {});
 	const featureSummary = features.length
 		? `${features.length} feature(s): ` +
-			Object.entries(statusCounts).map(([s, n]) => `${n} ${s}`).join(", ")
+			Object.entries(statusCounts)
+				.map(([s, n]) => `${n} ${s}`)
+				.join(", ")
 		: "No features registered.";
 
 	// Completed/failed/aborted sessions are history, not "active".

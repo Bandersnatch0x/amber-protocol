@@ -25,10 +25,7 @@ describe("dryRun", () => {
 		const result = dryRun(v55Settings);
 		assert.ok(result.diff.length > 0, "Should have diff entries");
 		assert.ok(
-			result.diff.some(
-				(d) =>
-					d.field === "version" && d.before === "5.5" && d.after === "1.0.0",
-			),
+			result.diff.some((d) => d.field === "version" && d.before === "5.5" && d.after === "1.0.0"),
 			"Should show version change from 5.5 to 1.0.0",
 		);
 	});
@@ -37,11 +34,7 @@ describe("dryRun", () => {
 		const original = JSON.parse(JSON.stringify(v55Settings));
 		dryRun(v55Settings);
 
-		assert.deepStrictEqual(
-			v55Settings,
-			original,
-			"Original should be unmodified",
-		);
+		assert.deepStrictEqual(v55Settings, original, "Original should be unmodified");
 		assert.strictEqual(v55Settings.version, "5.5", "Version should remain 5.5");
 	});
 
@@ -61,9 +54,7 @@ describe("dryRun", () => {
 
 	it("shows which fields will be renamed/removed", () => {
 		const result = dryRun(v55Settings);
-		const removedFields = result.diff.filter(
-			(d) => d.type === "removed" || d.type === "renamed",
-		);
+		const removedFields = result.diff.filter((d) => d.type === "removed" || d.type === "renamed");
 		assert.ok(removedFields.length > 0, "Should show removed/renamed fields");
 		assert.ok(
 			removedFields.some((f) => f.field === "deprecated_field"),
@@ -73,10 +64,7 @@ describe("dryRun", () => {
 
 	it("provides a human-readable summary", () => {
 		const result = dryRun(v55Settings);
-		assert.ok(
-			typeof result.summary === "string",
-			"Should have a summary string",
-		);
+		assert.ok(typeof result.summary === "string", "Should have a summary string");
 		assert.ok(result.summary.length > 0, "Summary should not be empty");
 	});
 

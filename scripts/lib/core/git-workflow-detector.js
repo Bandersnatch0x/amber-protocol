@@ -21,10 +21,7 @@ function emptyScores() {
 }
 
 function isGitRepository(targetRoot) {
-	return (
-		gitOutput(resolveTarget(targetRoot), ["rev-parse", "--is-inside-work-tree"]) ===
-		"true"
-	);
+	return gitOutput(resolveTarget(targetRoot), ["rev-parse", "--is-inside-work-tree"]) === "true";
 }
 
 // ── Branch helpers ───────────────────────────────────────────────────────────
@@ -191,7 +188,10 @@ function analyzeReleasePattern(targetRoot) {
 
 	const tagsOut = gitOutput(targetRoot, ["tag"]);
 	if (tagsOut) {
-		const tags = tagsOut.split("\n").map((t) => t.trim()).filter(Boolean);
+		const tags = tagsOut
+			.split("\n")
+			.map((t) => t.trim())
+			.filter(Boolean);
 		if (tags.some((t) => /^v?\d+\.\d+\.\d+/.test(t))) {
 			scores.gitflow += 5;
 			scores["github-flow"] += 5;

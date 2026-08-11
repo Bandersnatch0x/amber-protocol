@@ -31,10 +31,7 @@ const {
 	renderAdoptionReportDiff,
 } = require("./report-renderer");
 
-const {
-	renderAdoptionGateDocument,
-	renderAdoptionStatusDocument,
-} = require("./gate-renderer");
+const { renderAdoptionGateDocument, renderAdoptionStatusDocument } = require("./gate-renderer");
 
 const {
 	renderAdoptionBundleReadme,

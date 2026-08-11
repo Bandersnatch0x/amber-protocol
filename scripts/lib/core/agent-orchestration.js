@@ -4,20 +4,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 
-const {
-	pathExists,
-	readJson,
-	relativeSlash,
-	resolveTarget,
-} = require("./fs-utils");
+const { pathExists, readJson, relativeSlash, resolveTarget } = require("./fs-utils");
 
-const {
-	orchestrationPaths,
-} = require("./task-execution");
+const { orchestrationPaths } = require("./task-execution");
 
-const {
-	slugify,
-} = require("./text-utils");
+const { slugify } = require("./text-utils");
 
 // The accepted loop/dispatch status values, centralized so they cannot drift
 // between dispatchAgentTask and recordAgentReview. Each entry maps a status
@@ -46,9 +37,7 @@ function statusFieldErrors(options) {
 	for (const { field, set } of DISPATCH_STATUS_FIELDS) {
 		const value = options[field];
 		if (value && !set.has(value)) {
-			errors.push(
-				`Invalid ${field}: ${value}. Must be one of: ${[...set].join(", ")}.`,
-			);
+			errors.push(`Invalid ${field}: ${value}. Must be one of: ${[...set].join(", ")}.`);
 		}
 	}
 	return errors;
@@ -80,23 +69,17 @@ function validateDispatchOptions(targetRoot, taskId, options, requestedConcurren
 		errors.push("agent dispatch requires --reviewer <reviewer-id>.");
 	}
 	if (worker && reviewer && worker === reviewer) {
-		errors.push(
-			"Workers cannot self-approve; worker and reviewer must be different.",
-		);
+		errors.push("Workers cannot self-approve; worker and reviewer must be different.");
 	}
 	if (
 		!Number.isInteger(requestedConcurrency) ||
 		requestedConcurrency < 1 ||
 		requestedConcurrency > 4
 	) {
-		errors.push(
-			"agent dispatch concurrency must be an integer between 1 and 4.",
-		);
+		errors.push("agent dispatch concurrency must be an integer between 1 and 4.");
 	}
 	if (
-		!pathExists(
-			path.join(resolveStateDirForRead(targetRoot), "executions", taskId, "ledger.json"),
-		)
+		!pathExists(path.join(resolveStateDirForRead(targetRoot), "executions", taskId, "ledger.json"))
 	) {
 		errors.push(`Prepared task ledger is missing for ${taskId}.`);
 	}
@@ -134,12 +117,7 @@ function dispatchAgentTask(target, options = {}) {
 	const taskId = slugify(options.task);
 	const warnings = [];
 	const policy = deriveDispatchPolicy(options);
-	const errors = validateDispatchOptions(
-		targetRoot,
-		taskId,
-		options,
-		policy.requestedConcurrency,
-	);
+	const errors = validateDispatchOptions(targetRoot, taskId, options, policy.requestedConcurrency);
 
 	if (errors.length > 0) {
 		return { target: targetRoot, task: taskId || null, errors, warnings };
@@ -182,9 +160,7 @@ function recordAgentReview(target, options = {}) {
 		const paths = orchestrationPaths(targetRoot, taskId);
 		const dispatch = readJson(paths.dispatchPath);
 		if (dispatch.reviewer.id !== options.reviewer) {
-			errors.push(
-				"Reviewer evidence must be recorded by the assigned reviewer.",
-			);
+			errors.push("Reviewer evidence must be recorded by the assigned reviewer.");
 			return { target: targetRoot, task: taskId, errors, warnings };
 		}
 
@@ -207,14 +183,8 @@ function recordAgentReview(target, options = {}) {
 			workerOutputPath: dispatch.workerOutput,
 			recordedAt: new Date().toISOString(),
 		};
-		fs.writeFileSync(
-			paths.reviewerEvidencePath,
-			JSON.stringify(reviewerEvidence, null, 2),
-		);
-		dispatch.reviewerEvidence = relativeSlash(
-			targetRoot,
-			paths.reviewerEvidencePath,
-		);
+		fs.writeFileSync(paths.reviewerEvidencePath, JSON.stringify(reviewerEvidence, null, 2));
+		dispatch.reviewerEvidence = relativeSlash(targetRoot, paths.reviewerEvidencePath);
 		dispatch.status = "reviewed";
 
 		// Update loop reviewGateStatus if provided

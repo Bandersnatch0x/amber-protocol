@@ -1,92 +1,92 @@
 {
-  "name": "amber-protocol",
-  "version": "1.5.0",
-  "description": "Amber Protocol: repository-local governance kit for coding agents — install, audit, validate, and hand off agent-facing project state.",
-  "type": "commonjs",
-  "bin": {
-    "amber": "scripts/amber.js",
-    "coding-harness": "scripts/compat/coding-harness.js"
-  },
-  "files": [
-    "scripts/",
-    "templates/",
-    "routes/",
-    "schemas/",
-    "workflow-packs/",
-    "profiles/",
-    "skills/",
-    "src/",
-    "README.md",
-    "LICENSE",
-    "CHANGELOG.md"
-  ],
-  "keywords": [
-    "agent",
-    "governance",
-    "agent-skills",
-    "pi-package"
-  ],
-  "pi": {
-    "skills": [
-      "./skills"
-    ]
-  },
-  "scripts": {
-    "test": "node scripts/run-tests.js",
-    "test:coverage": "c8 --reporter=text --reporter=html --reporter=json-summary node scripts/run-tests.js",
-    "check": "node scripts/run-tests.js",
-    "doctor": "node scripts/amber.js doctor --target .",
-    "handoff": "node scripts/amber.js handoff --target .",
-    "encoding": "node scripts/validate-encoding.js",
-    "manifests": "node scripts/validate-manifests.js --target .",
-    "version:sync": "node scripts/sync-version.js",
-    "changelog": "node scripts/changelog.js",
-    "release:verify": "node scripts/verify-release.js",
-    "orient": "node scripts/orient.js",
-    "test:load": "node scripts/run-tests.js tests/load/sequential-sessions.test.js",
-    "test:e2e": "node scripts/run-tests.js tests/e2e/",
-    "identity:check": "node scripts/validate-git-identity.js",
-    "dev:hooks:install": "git config --local core.hooksPath .githooks",
-    "gen:agents": "node scripts/gen-agent-commands.js",
-    "gen:agents:check": "node scripts/gen-agent-commands.js --check",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "typecheck": "cd apps/web && npx tsc --noEmit"
-  },
-  "c8": {
-    "exclude": [
-      "tests/**",
-      "coverage/**",
-      "apps/web/**",
-      "docs/**",
-      "templates/**",
-      "scripts/compat/**"
-    ],
-    "check-coverage": true,
-    "lines": 84,
-    "functions": 90,
-    "branches": 73,
-    "statements": 84
-  },
-  "engines": {
-    "node": "^20.19.0 || ^22.12.0 || >=23",
-    "npm": ">=9.0.0"
-  },
-  "license": "MIT",
-  "dependencies": {
-    "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1"
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "c8": "^12.0.0",
-    "eslint": "^10.8.0",
-    "globals": "^17.8.0",
-    "prettier": "^3.9.6"
-  },
-  "volta": {
-    "node": "22.19.0"
-  }
+	"name": "amber-protocol",
+	"version": "1.5.0",
+	"description": "Amber Protocol: repository-local governance kit for coding agents — install, audit, validate, and hand off agent-facing project state.",
+	"type": "commonjs",
+	"bin": {
+		"amber": "scripts/amber.js",
+		"coding-harness": "scripts/compat/coding-harness.js"
+	},
+	"files": [
+		"scripts/",
+		"templates/",
+		"routes/",
+		"schemas/",
+		"workflow-packs/",
+		"profiles/",
+		"skills/",
+		"src/",
+		"README.md",
+		"LICENSE",
+		"CHANGELOG.md"
+	],
+	"keywords": [
+		"agent",
+		"governance",
+		"agent-skills",
+		"pi-package"
+	],
+	"pi": {
+		"skills": [
+			"./skills"
+		]
+	},
+	"scripts": {
+		"test": "node scripts/run-tests.js",
+		"test:coverage": "c8 --reporter=text --reporter=html --reporter=json-summary node scripts/run-tests.js",
+		"check": "node scripts/run-tests.js",
+		"doctor": "node scripts/amber.js doctor --target .",
+		"handoff": "node scripts/amber.js handoff --target .",
+		"encoding": "node scripts/validate-encoding.js",
+		"manifests": "node scripts/validate-manifests.js --target .",
+		"version:sync": "node scripts/sync-version.js",
+		"changelog": "node scripts/changelog.js",
+		"release:verify": "node scripts/verify-release.js",
+		"orient": "node scripts/orient.js",
+		"test:load": "node scripts/run-tests.js tests/load/sequential-sessions.test.js",
+		"test:e2e": "node scripts/run-tests.js tests/e2e/",
+		"identity:check": "node scripts/validate-git-identity.js",
+		"dev:hooks:install": "git config --local core.hooksPath .githooks",
+		"gen:agents": "node scripts/gen-agent-commands.js",
+		"gen:agents:check": "node scripts/gen-agent-commands.js --check",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"typecheck": "cd apps/web && npx tsc --noEmit"
+	},
+	"c8": {
+		"exclude": [
+			"tests/**",
+			"coverage/**",
+			"apps/web/**",
+			"docs/**",
+			"templates/**",
+			"scripts/compat/**"
+		],
+		"check-coverage": true,
+		"lines": 84,
+		"functions": 90,
+		"branches": 73,
+		"statements": 84
+	},
+	"engines": {
+		"node": "^20.19.0 || ^22.12.0 || >=23",
+		"npm": ">=9.0.0"
+	},
+	"license": "MIT",
+	"dependencies": {
+		"ajv": "^8.20.0",
+		"ajv-formats": "^3.0.1"
+	},
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"c8": "^12.0.0",
+		"eslint": "^10.8.0",
+		"globals": "^17.8.0",
+		"prettier": "^3.9.6"
+	},
+	"volta": {
+		"node": "22.19.0"
+	}
 }

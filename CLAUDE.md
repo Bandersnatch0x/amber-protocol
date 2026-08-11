@@ -49,6 +49,7 @@ apps/web/                     -> Phase C web viewer (Vite + React + tRPC)
 ## Common Commands
 
 ### Core Operations
+
 ```bash
 # Install Amber files (idempotent, skips existing files)
 node scripts/amber.js init --target path/to/repo
@@ -67,6 +68,7 @@ node scripts/amber.js handoff --target path/to/repo
 ```
 
 ### Route Engine
+
 ```bash
 # List available routes
 node scripts/amber.js route list
@@ -82,6 +84,7 @@ node scripts/amber.js route test bugfix-quick --dry-run
 ```
 
 ### Session Lifecycle
+
 ```bash
 # Start new session
 node scripts/amber.js session start --goal "fix login bug"
@@ -101,6 +104,7 @@ node scripts/amber.js session continue
 ```
 
 ### Adoption (for existing projects)
+
 ```bash
 # Generate adoption report
 node scripts/amber.js adoption report --target path/to/project --output-dir docs/examples/adoptions
@@ -116,6 +120,7 @@ node scripts/amber.js adoption next-actions --bundle-dir docs/examples/project-a
 ```
 
 ### Migration
+
 ```bash
 # Inspect the repository without writing, then merge legacy .harness into .amber
 node scripts/amber.js audit --target .
@@ -123,6 +128,7 @@ node scripts/amber.js migrate state --target .
 ```
 
 ### Testing & Validation
+
 ```bash
 # Run all tests
 npm test
@@ -139,6 +145,7 @@ npm run doctor
 ```
 
 ### Web Viewer (Phase C)
+
 ```bash
 cd apps/web
 npm install --legacy-peer-deps
@@ -170,17 +177,17 @@ the first-round candidate list live in **[`docs/dogfood-weekly.md`](docs/dogfood
 
 ### Non-Goals (Critical)
 
-- Not allowed:  Dynamic Workflow execution
-- Not allowed:  Live subagent runner invocation  
-- Not allowed:  Automatic target project command execution
-- Not allowed:  External marketplace publishing
-- Not allowed:  Automatic rewrite of existing target project docs
-- Not allowed:  Scheduled loop execution (current product boundary)
+- Not allowed: Dynamic Workflow execution
+- Not allowed: Live subagent runner invocation
+- Not allowed: Automatic target project command execution
+- Not allowed: External marketplace publishing
+- Not allowed: Automatic rewrite of existing target project docs
+- Not allowed: Scheduled loop execution (current product boundary)
 
 See `LOOP.md` for the operational description of Amber's loops (daily-amber-triage via contract + CI dogfooding + continuous improvement). Amber implements governed loop engineering — pair it with external `npx @cobusgreyling/loop-audit` and loop patterns for readiness scoring and simple STATE.md overlays.
 
 > **Boundary note (governance enforcement):** Amber MAY install an **opt-in** git pre-commit guard
-> (`amber hooks install`) that enforces governance *metadata* at commit time (e.g. a feature marked
+> (`amber hooks install`) that enforces governance _metadata_ at commit time (e.g. a feature marked
 > complete must carry evidence). This is Governance-layer enforcement, not execution - the guard
 > reads metadata only and still does **not** run target project build/test commands or dispatch
 > agents. It is never installed automatically.
@@ -245,6 +252,7 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 ### CI/CD
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on pushes and PRs:
+
 - Tests on Node 18.x, 20.x, 22.x
 - Manifest validation
 - Doctor checks

@@ -6,11 +6,7 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 
 const TEMPLATE_ROOT = path.join(REPO_ROOT, "templates");
 
-const DEFAULT_TEAM_REGISTRY = path.join(
-	REPO_ROOT,
-	"registry",
-	"amber-protocol.registry.json",
-);
+const DEFAULT_TEAM_REGISTRY = path.join(REPO_ROOT, "registry", "amber-protocol.registry.json");
 
 const MINIMUM_HARNESS_FILES = [
 	"AGENTS.md",
@@ -56,13 +52,7 @@ const REQUIRED_HARNESS_FILES = MINIMUM_HARNESS_FILES;
 // Feature lifecycle statuses. `accepted` is written by `amber accept` (planning.js);
 // `passing` is written by feature verify evidence. `completed` is NOT valid —
 // use passing/accepted. Doctor + validate-feature-list enforce at-most-one in_progress.
-const VALID_STATUSES = new Set([
-	"not_started",
-	"in_progress",
-	"blocked",
-	"passing",
-	"accepted",
-]);
+const VALID_STATUSES = new Set(["not_started", "in_progress", "blocked", "passing", "accepted"]);
 
 const REQUIRED_HANDOFF_SECTIONS = [
 	"Summary",
@@ -119,12 +109,9 @@ const AMBER_CONTROLLED_CONTENT_FILES = new Set([
 
 // Runtime state files Amber's init scaffolds but must NEVER overwrite — refreshing
 // these would destroy accumulated project state.
-const AMBER_STATE_FILES = new Set([
-	".workflow/continuous-improvement/state.json",
-]);
+const AMBER_STATE_FILES = new Set([".workflow/continuous-improvement/state.json"]);
 
-const SEMVER_PATTERN =
-	/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:[-+][0-9A-Za-z.-]+)?$/;
+const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:[-+][0-9A-Za-z.-]+)?$/;
 
 module.exports = {
 	REPO_ROOT,

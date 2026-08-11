@@ -31,8 +31,14 @@ describe("session-manifest", () => {
 		const m1 = createManifest({ route: { id: "r", version: "1.0.0-rc.1" }, goal: "g1" });
 		const m2 = createManifest({ route: { id: "r", version: "1.0.0-rc.1" }, goal: "g2" });
 		const m3 = createManifest({ route: { id: "r", version: "1.0.0-rc.1" }, goal: "g3" });
-		assert.ok(new Date(m2.createdAt) > new Date(m1.createdAt), "m2 createdAt must strictly follow m1");
-		assert.ok(new Date(m3.createdAt) > new Date(m2.createdAt), "m3 createdAt must strictly follow m2");
+		assert.ok(
+			new Date(m2.createdAt) > new Date(m1.createdAt),
+			"m2 createdAt must strictly follow m1",
+		);
+		assert.ok(
+			new Date(m3.createdAt) > new Date(m2.createdAt),
+			"m3 createdAt must strictly follow m2",
+		);
 	});
 
 	it("should validate manifest", () => {
@@ -139,9 +145,7 @@ describe("session-manifest store (read/write)", () => {
 
 		assert.strictEqual(manifest.status, "created");
 		assert.strictEqual(manifest.updatedAt, originalUpdatedAt);
-		const persisted = JSON.parse(
-			fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"),
-		);
+		const persisted = JSON.parse(fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"));
 		assert.strictEqual(persisted.status, "aborted");
 		assert.ok(persisted.updatedAt >= originalUpdatedAt);
 	});
@@ -181,9 +185,6 @@ describe("session-manifest store (read/write)", () => {
 	});
 
 	it("readAllSessionManifests returns [] for a missing dir", () => {
-		assert.deepStrictEqual(
-			readAllSessionManifests(path.join(sessionsDir, "nope")),
-			[],
-		);
+		assert.deepStrictEqual(readAllSessionManifests(path.join(sessionsDir, "nope")), []);
 	});
 });

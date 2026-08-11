@@ -32,7 +32,12 @@ function sealLedger(target, options = {}) {
 	}
 	const { stateDir, tails } = collectTails(targetRoot);
 	if (!stateDir) {
-		return { target: targetRoot, sealed: false, errors: ["no Amber state directory"], warnings: [] };
+		return {
+			target: targetRoot,
+			sealed: false,
+			errors: ["no Amber state directory"],
+			warnings: [],
+		};
 	}
 	const head = gitOutput(targetRoot, ["rev-parse", "HEAD"]);
 	const headShort = head ? head.slice(0, 12) : "no-head";
@@ -40,15 +45,33 @@ function sealLedger(target, options = {}) {
 	const message = JSON.stringify({ reviewer: options.reviewer || null, ledgers: tails });
 	const res = gitRun(targetRoot, ["tag", "-f", "-a", tagName, "-m", message]);
 	if (!res.ok) {
-		return { target: targetRoot, sealed: false, errors: [`failed to create seal tag: ${res.stderr || "git error"}`], warnings: [] };
+		return {
+			target: targetRoot,
+			sealed: false,
+			errors: [`failed to create seal tag: ${res.stderr || "git error"}`],
+			warnings: [],
+		};
 	}
-	return { target: targetRoot, sealed: true, tagName, head: headShort, ledgerCount: tails.length, errors: [], warnings: [] };
+	return {
+		target: targetRoot,
+		sealed: true,
+		tagName,
+		head: headShort,
+		ledgerCount: tails.length,
+		errors: [],
+		warnings: [],
+	};
 }
 
 function latestSealTag(targetRoot) {
 	const list = gitOutput(targetRoot, ["tag", "-l", `${SEAL_PREFIX}*`, "--sort=-creatordate"]);
 	if (!list) return null;
-	return list.split("\n").map((s) => s.trim()).filter(Boolean)[0] || null;
+	return (
+		list
+			.split("\n")
+			.map((s) => s.trim())
+			.filter(Boolean)[0] || null
+	);
 }
 
 function readSealMessage(targetRoot, tagName) {
@@ -59,14 +82,25 @@ function verifyAnchoring(target) {
 	const targetRoot = resolveTarget(target);
 	const tagName = latestSealTag(targetRoot);
 	if (!tagName) {
-		return { target: targetRoot, anchored: false, errors: ["no seal tag found — run `amber ledger seal`"], warnings: [] };
+		return {
+			target: targetRoot,
+			anchored: false,
+			errors: ["no seal tag found — run `amber ledger seal`"],
+			warnings: [],
+		};
 	}
 	const msg = readSealMessage(targetRoot, tagName);
 	let sealed;
 	try {
 		sealed = JSON.parse(msg);
 	} catch {
-		return { target: targetRoot, anchored: false, sealTag: tagName, errors: ["seal tag message is not valid JSON"], warnings: [] };
+		return {
+			target: targetRoot,
+			anchored: false,
+			sealTag: tagName,
+			errors: ["seal tag message is not valid JSON"],
+			warnings: [],
+		};
 	}
 	const current = collectTails(targetRoot).tails;
 	const byKey = new Map(current.map((t) => [`${t.home}/${t.sub}`, t]));
@@ -77,7 +111,13 @@ function verifyAnchoring(target) {
 		if (!cur) {
 			drift.push({ home: sealedTail.home, sub: sealedTail.sub, status: "ledger-removed" });
 		} else if (cur.tailHash !== sealedTail.tailHash) {
-			drift.push({ home: sealedTail.home, sub: sealedTail.sub, status: "tail-changed", sealedTail: sealedTail.tailHash, currentTail: cur.tailHash });
+			drift.push({
+				home: sealedTail.home,
+				sub: sealedTail.sub,
+				status: "tail-changed",
+				sealedTail: sealedTail.tailHash,
+				currentTail: cur.tailHash,
+			});
 		}
 	}
 	return {

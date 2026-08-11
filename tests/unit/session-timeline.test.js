@@ -22,13 +22,20 @@ describe("appendSessionEvent", () => {
 	});
 	afterEach(() => {
 		if (fs.existsSync(sessionDir)) {
-			try { fs.rmSync(sessionDir, { recursive: true }); } catch { /* ignore cleanup failure */ }
+			try {
+				fs.rmSync(sessionDir, { recursive: true });
+			} catch {
+				/* ignore cleanup failure */
+			}
 		}
 	});
 
 	it("writes one JSONL line stamped with timestamp + type + data", () => {
 		appendSessionEvent(sessionDir, { type: "session_created", data: { sessionId: "123" } });
-		const lines = fs.readFileSync(path.join(sessionDir, "timeline.jsonl"), "utf8").trim().split("\n");
+		const lines = fs
+			.readFileSync(path.join(sessionDir, "timeline.jsonl"), "utf8")
+			.trim()
+			.split("\n");
 		assert.strictEqual(lines.length, 1);
 		const event = JSON.parse(lines[0]);
 		assert.strictEqual(event.type, "session_created");
@@ -46,7 +53,10 @@ describe("appendSessionEvent", () => {
 	it("appends N events as N ordered lines", () => {
 		appendSessionEvent(sessionDir, { type: "session_created", data: {} });
 		appendSessionEvent(sessionDir, { type: "stage_started", stage: "capture", data: {} });
-		const lines = fs.readFileSync(path.join(sessionDir, "timeline.jsonl"), "utf8").trim().split("\n");
+		const lines = fs
+			.readFileSync(path.join(sessionDir, "timeline.jsonl"), "utf8")
+			.trim()
+			.split("\n");
 		assert.strictEqual(lines.length, 2);
 		assert.strictEqual(JSON.parse(lines[0]).type, "session_created");
 		assert.strictEqual(JSON.parse(lines[1]).stage, "capture");
@@ -82,7 +92,11 @@ describe("readSessionEvents", () => {
 	});
 	afterEach(() => {
 		if (fs.existsSync(sessionDir)) {
-			try { fs.rmSync(sessionDir, { recursive: true }); } catch { /* ignore cleanup failure */ }
+			try {
+				fs.rmSync(sessionDir, { recursive: true });
+			} catch {
+				/* ignore cleanup failure */
+			}
 		}
 	});
 
@@ -100,7 +114,11 @@ describe("readSessionEvents", () => {
 			timelinePath,
 			[
 				JSON.stringify({ timestamp: "2026-07-06T00:00:00.000Z", type: "session_created" }),
-				JSON.stringify({ timestamp: "2026-07-06T00:00:01.000Z", type: "stage_started", stage: "capture" }),
+				JSON.stringify({
+					timestamp: "2026-07-06T00:00:01.000Z",
+					type: "stage_started",
+					stage: "capture",
+				}),
 			].join("\n") + "\n",
 		);
 		const events = readSessionEvents(sessionDir);

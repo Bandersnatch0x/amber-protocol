@@ -17,9 +17,6 @@ test("terminology exposes canonical adoption boundary labels", () => {
 });
 
 test("terminology avoids legacy target project wording in adoption messages", () => {
-	assert.doesNotMatch(
-		MESSAGES.adoptionReviewBeforeChange,
-		/target project/i,
-	);
+	assert.doesNotMatch(MESSAGES.adoptionReviewBeforeChange, /target project/i);
 	assert.doesNotMatch(MESSAGES.adoptionReadOnlyBundleNotice, /target project/i);
 });

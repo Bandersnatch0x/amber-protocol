@@ -77,15 +77,13 @@ test("buildSuggestedPatches maps each conflict to a human-approval patch", () =>
 			file: "AGENTS.md",
 			requiresApproval: true,
 			reason: "Existing project instruction file must be merged by a human.",
-			suggestion:
-				"Review the Amber template and add a link to docs/wiki/index.md if appropriate.",
+			suggestion: "Review the Amber template and add a link to docs/wiki/index.md if appropriate.",
 		},
 		{
 			file: "CLAUDE.md",
 			requiresApproval: true,
 			reason: "Existing project instruction file must be merged by a human.",
-			suggestion:
-				"Review the Amber template and add a link to docs/wiki/index.md if appropriate.",
+			suggestion: "Review the Amber template and add a link to docs/wiki/index.md if appropriate.",
 		},
 	]);
 });
@@ -95,10 +93,7 @@ test("buildNextSafeCommand wraps the target in JSON.stringify so spaces and back
 		buildNextSafeCommand("/some/repo"),
 		'node scripts/amber.js init --target "/some/repo"',
 	);
-	assert.equal(
-		buildNextSafeCommand("a b"),
-		'node scripts/amber.js init --target "a b"',
-	);
+	assert.equal(buildNextSafeCommand("a b"), 'node scripts/amber.js init --target "a b"');
 	// Backslashes survive JSON stringification (escaped as \\).
 	assert.equal(
 		buildNextSafeCommand("C:\\proj\\x"),
@@ -120,32 +115,23 @@ test("buildAuditUnknowns surfaces tooling evidence only when no command is prese
 	);
 	// Without a command but with tooling evidence, both the missing-command and
 	// the tooling-evidence unknowns appear, joined by source name.
-	assert.deepEqual(
-		buildAuditUnknowns([], [{ source: "pyproject.toml", name: "python" }]),
-		[
-			"No package, test, build, or verification command detected.",
-			"Tooling evidence found (pyproject.toml), but the exact verification command is unknown.",
-		],
-	);
+	assert.deepEqual(buildAuditUnknowns([], [{ source: "pyproject.toml", name: "python" }]), [
+		"No package, test, build, or verification command detected.",
+		"Tooling evidence found (pyproject.toml), but the exact verification command is unknown.",
+	]);
 });
 
 test("buildAuditUnknowns formats parse issues and candidate-command notices in order", () => {
 	// Parse issues appear after the missing-command notice.
-	assert.deepEqual(
-		buildAuditUnknowns([], [], [{ source: "package.json", message: "boom" }]),
-		[
-			"No package, test, build, or verification command detected.",
-			"package.json could not be parsed: boom",
-		],
-	);
+	assert.deepEqual(buildAuditUnknowns([], [], [{ source: "package.json", message: "boom" }]), [
+		"No package, test, build, or verification command detected.",
+		"package.json could not be parsed: boom",
+	]);
 	// Candidate commands suppress the missing-command notice — the candidates
 	// themselves are the partial detection, so "no command detected" is misleading.
-	assert.deepEqual(
-		buildAuditUnknowns([], [], [], [{ command: "python -m pytest" }]),
-		[
-			"Candidate verification commands require confirmation before being treated as project commands.",
-		],
-	);
+	assert.deepEqual(buildAuditUnknowns([], [], [], [{ command: "python -m pytest" }]), [
+		"Candidate verification commands require confirmation before being treated as project commands.",
+	]);
 	// All four channels together preserve insertion order: parse, tooling,
 	// candidates.  The missing-command notice is suppressed when candidates exist.
 	assert.deepEqual(
@@ -164,12 +150,9 @@ test("buildAuditUnknowns formats parse issues and candidate-command notices in o
 });
 
 test("buildAuditUnknowns emits only the candidate notice when a command exists but candidates also exist", () => {
-	assert.deepEqual(
-		buildAuditUnknowns([{ command: "x" }], [], [], [{ command: "c" }]),
-		[
-			"Candidate verification commands require confirmation before being treated as project commands.",
-		],
-	);
+	assert.deepEqual(buildAuditUnknowns([{ command: "x" }], [], [], [{ command: "c" }]), [
+		"Candidate verification commands require confirmation before being treated as project commands.",
+	]);
 });
 
 test("buildAuditUnknowns throws when commands is omitted (no default on the first parameter)", () => {
@@ -273,14 +256,8 @@ test("hasNextActionInContent returns false when no Next Action section", () => {
 });
 
 test("hasNextActionInContent matches both Next Action and Next Actions headings", () => {
-	assert.equal(
-		hasNextActionInContent("## Next Action\n\n- Fix the bug\n"),
-		true,
-	);
-	assert.equal(
-		hasNextActionInContent("## Next Actions\n\n- Fix the bug\n"),
-		true,
-	);
+	assert.equal(hasNextActionInContent("## Next Action\n\n- Fix the bug\n"), true);
+	assert.equal(hasNextActionInContent("## Next Actions\n\n- Fix the bug\n"), true);
 });
 
 test("hasNextActionInContent treats sentinel placeholders as no action", () => {
@@ -294,21 +271,12 @@ test("hasNextActionInContent treats sentinel placeholders as no action", () => {
 });
 
 test("hasNextActionInContent ignores blank lines and HTML comments", () => {
-	assert.equal(
-		hasNextActionInContent("## Next Action\n\n<!-- todo later -->\n\n"),
-		false,
-	);
+	assert.equal(hasNextActionInContent("## Next Action\n\n<!-- todo later -->\n\n"), false);
 });
 
 test("hasNextActionInContent strips list markers and trailing dots before matching", () => {
-	assert.equal(
-		hasNextActionInContent("## Next Action\n\n- none.\n"),
-		false,
-	);
-	assert.equal(
-		hasNextActionInContent("## Next Action\n\n- Ship the feature.\n"),
-		true,
-	);
+	assert.equal(hasNextActionInContent("## Next Action\n\n- none.\n"), false);
+	assert.equal(hasNextActionInContent("## Next Action\n\n- Ship the feature.\n"), true);
 });
 
 test("hasNextActionInContent returns false for an empty section body", () => {
@@ -325,14 +293,8 @@ test("hasNextActionInContent recognizes the long-form 'no next actions recorded'
 // ---- hasVerificationCommandInContent: pure fenced-block detection ----
 
 test("hasVerificationCommandInContent detects a sh fenced block", () => {
-	assert.equal(
-		hasVerificationCommandInContent("```\n```"),
-		false,
-	);
-	assert.equal(
-		hasVerificationCommandInContent("```sh\nnpm test\n```"),
-		true,
-	);
+	assert.equal(hasVerificationCommandInContent("```\n```"), false);
+	assert.equal(hasVerificationCommandInContent("```sh\nnpm test\n```"), true);
 });
 
 test("hasVerificationCommandInContent detects bash/powershell/cmd fenced blocks", () => {
@@ -346,10 +308,7 @@ test("hasVerificationCommandInContent detects a lang-less fenced block with cont
 });
 
 test("hasVerificationCommandInContent returns false for plain text without a fence", () => {
-	assert.equal(
-		hasVerificationCommandInContent("Run npm test to verify.\n"),
-		false,
-	);
+	assert.equal(hasVerificationCommandInContent("Run npm test to verify.\n"), false);
 });
 
 test("hasVerificationCommandInContent returns false for an empty fence", () => {

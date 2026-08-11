@@ -28,11 +28,23 @@ addFormats(ajv);
 let requestValidate = null;
 function validateRequestSchema(request) {
 	if (!requestValidate) {
-		const schemaPath = path.join(__dirname, "..", "..", "..", "schemas", "context-request.schema.json");
+		const schemaPath = path.join(
+			__dirname,
+			"..",
+			"..",
+			"..",
+			"schemas",
+			"context-request.schema.json",
+		);
 		requestValidate = ajv.compile(JSON.parse(fs.readFileSync(schemaPath, "utf8")));
 	}
 	if (requestValidate(request)) return { valid: true, errors: [] };
-	return { valid: false, errors: requestValidate.errors.slice(0, 5).map((e) => `request schema: ${e.instancePath || "/"} ${e.message}`) };
+	return {
+		valid: false,
+		errors: requestValidate.errors
+			.slice(0, 5)
+			.map((e) => `request schema: ${e.instancePath || "/"} ${e.message}`),
+	};
 }
 
 function isImmutable(ref) {
@@ -112,7 +124,8 @@ function findLatestLedger(targetRoot) {
 			if (entry.isDirectory()) walk(full);
 			else if (entry.isFile() && entry.name === "ledger.jsonl") {
 				const stat = fs.statSync(full);
-				if (!best || stat.mtimeMs > best.mtimeMs) best = { full, rel: path.relative(targetRoot, full), mtimeMs: stat.mtimeMs };
+				if (!best || stat.mtimeMs > best.mtimeMs)
+					best = { full, rel: path.relative(targetRoot, full), mtimeMs: stat.mtimeMs };
 			}
 		}
 	};
@@ -165,7 +178,7 @@ const ACCEPTANCE = [
 const DEFAULT_INSTRUCTIONS =
 	"Extract claims about the target topic from the listed sources. Every block must cite at " +
 	"least one source id declared in the sources map. Anything the sources do not cover must be " +
-	"written as a type:\"unknown\" block — never invent a citation or a fact. Do not introduce new " +
+	'written as a type:"unknown" block — never invent a citation or a fact. Do not introduce new ' +
 	"facts beyond the sources. Return a payload matching the output schema exactly.";
 
 function makeRequestId() {

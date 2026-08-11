@@ -6,9 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-	writeAdoptionBundleArtifact,
-} = require("../../scripts/lib/core/adoption-composer/index");
+const { writeAdoptionBundleArtifact } = require("../../scripts/lib/core/adoption-composer/index");
 
 function tempDir(prefix) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
@@ -54,29 +52,20 @@ function spec(overrides = {}) {
 
 test("requires --bundle-dir", () => {
 	const result = writeAdoptionBundleArtifact({ output: outputPath() }, spec());
-	assert.ok(
-		result.errors.includes("adoption test-artifact requires --bundle-dir."),
-	);
+	assert.ok(result.errors.includes("adoption test-artifact requires --bundle-dir."));
 });
 
 test("requires --output", () => {
 	const dir = makeBundle({ target: "/tmp/repo" });
 	const result = writeAdoptionBundleArtifact({ bundleDir: dir }, spec());
-	assert.ok(
-		result.errors.includes("adoption test-artifact requires --output."),
-	);
+	assert.ok(result.errors.includes("adoption test-artifact requires --output."));
 });
 
 test("reports a non-existent bundle directory", () => {
 	const missing = path.join(tempDir("aba-missing"), "nope");
-	const result = writeAdoptionBundleArtifact(
-		{ bundleDir: missing, output: outputPath() },
-		spec(),
-	);
+	const result = writeAdoptionBundleArtifact({ bundleDir: missing, output: outputPath() }, spec());
 	assert.ok(
-		result.errors.some((message) =>
-			message.startsWith("Bundle directory does not exist:"),
-		),
+		result.errors.some((message) => message.startsWith("Bundle directory does not exist:")),
 	);
 });
 
@@ -84,42 +73,21 @@ test("refuses to overwrite an existing output", () => {
 	const dir = makeBundle({ target: "/tmp/repo" });
 	const out = outputPath();
 	fs.writeFileSync(out, "existing");
-	const result = writeAdoptionBundleArtifact(
-		{ bundleDir: dir, output: out },
-		spec(),
-	);
-	assert.ok(
-		result.errors.some((message) =>
-			message.startsWith("Test artifact already exists:"),
-		),
-	);
+	const result = writeAdoptionBundleArtifact({ bundleDir: dir, output: out }, spec());
+	assert.ok(result.errors.some((message) => message.startsWith("Test artifact already exists:")));
 });
 
 test("reports a missing bundle manifest", () => {
 	const dir = tempDir("aba-empty");
-	const result = writeAdoptionBundleArtifact(
-		{ bundleDir: dir, output: outputPath() },
-		spec(),
-	);
-	assert.ok(
-		result.errors.some((message) =>
-			message.startsWith("Bundle manifest is missing:"),
-		),
-	);
+	const result = writeAdoptionBundleArtifact({ bundleDir: dir, output: outputPath() }, spec());
+	assert.ok(result.errors.some((message) => message.startsWith("Bundle manifest is missing:")));
 });
 
 test("reports an unreadable bundle manifest", () => {
 	const dir = tempDir("aba-bad");
 	fs.writeFileSync(path.join(dir, "manifest.json"), "{not json");
-	const result = writeAdoptionBundleArtifact(
-		{ bundleDir: dir, output: outputPath() },
-		spec(),
-	);
-	assert.ok(
-		result.errors.some((message) =>
-			message.startsWith("Cannot read bundle manifest:"),
-		),
-	);
+	const result = writeAdoptionBundleArtifact({ bundleDir: dir, output: outputPath() }, spec());
+	assert.ok(result.errors.some((message) => message.startsWith("Cannot read bundle manifest:")));
 });
 
 test("runs the validate hook before the existence checks", () => {
@@ -134,10 +102,7 @@ test("runs the validate hook before the existence checks", () => {
 test("loads the manifest, writes rendered content, and returns the record", () => {
 	const dir = makeBundle({ target: "/tmp/repo" });
 	const out = path.join(tempDir("aba-out"), "nested", "artifact.md");
-	const record = writeAdoptionBundleArtifact(
-		{ bundleDir: dir, output: out },
-		spec(),
-	);
+	const record = writeAdoptionBundleArtifact({ bundleDir: dir, output: out }, spec());
 	assert.equal(record.kind, "test-artifact");
 	assert.equal(record.target, "/tmp/repo");
 	assert.equal(record.bundleDir, path.resolve(dir));

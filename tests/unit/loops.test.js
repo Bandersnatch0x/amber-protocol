@@ -103,9 +103,7 @@ test("assessLoopProgress surfaces repeated stop reasons conservatively", () => {
 });
 
 test("assessLoopProgress treats explicit budget exhaustion as stalled", () => {
-	const progress = assessLoopProgress([
-		loopRecord(0, { stopReason: "budget-exhausted" }),
-	]);
+	const progress = assessLoopProgress([loopRecord(0, { stopReason: "budget-exhausted" })]);
 
 	assert.equal(progress.state, "stalled");
 	assert.equal(progress.counts.budgetExhausted, 1);

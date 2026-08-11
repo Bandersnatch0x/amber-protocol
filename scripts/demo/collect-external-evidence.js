@@ -48,9 +48,7 @@ async function main() {
 			{ encoding: "utf8" },
 		),
 	);
-	out.issueAuthors = [
-		...new Set(issues.map((i) => i.author && i.author.login).filter(Boolean)),
-	];
+	out.issueAuthors = [...new Set(issues.map((i) => i.author && i.author.login).filter(Boolean))];
 	out.externalIssues = issues.filter(
 		(i) => i.author && !["Bandersnatch0x", "summersong"].includes(i.author.login),
 	);
@@ -86,15 +84,12 @@ async function main() {
 			stars: out.githubSummary.stars,
 			forks: out.githubSummary.forks,
 			npmVersion: out.npmVersion,
-			downloadsLastMonth:
-				out.npmDownloadsLastMonth && out.npmDownloadsLastMonth.downloads,
-			downloadsLastWeek:
-				out.npmDownloadsLastWeek && out.npmDownloadsLastWeek.downloads,
+			downloadsLastMonth: out.npmDownloadsLastMonth && out.npmDownloadsLastMonth.downloads,
+			downloadsLastWeek: out.npmDownloadsLastWeek && out.npmDownloadsLastWeek.downloads,
 		},
 		externalIssueAuthors: out.externalIssues.length,
 		meets2Repo10TaskBar: false,
-		note:
-			"Adoption reports under docs/examples are generator outputs against local paths (read-only audit), not evidence of sustained multi-task use by independent teams. Stars/downloads are interest signals only per map Notes.",
+		note: "Adoption reports under docs/examples are generator outputs against local paths (read-only audit), not evidence of sustained multi-task use by independent teams. Stars/downloads are interest signals only per map Notes.",
 	};
 	fs.mkdirSync(path.dirname(OUT), { recursive: true });
 	fs.writeFileSync(OUT, JSON.stringify(out, null, 2) + "\n");

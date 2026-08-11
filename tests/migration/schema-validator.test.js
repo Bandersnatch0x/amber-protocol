@@ -66,10 +66,7 @@ describe("validateUpgrade", () => {
 
 	it("flags breaking changes (removed fields)", () => {
 		const result = validateUpgrade(v55Settings, "phase-b");
-		assert.ok(
-			result.breakingChanges.length > 0,
-			"Should detect removed fields",
-		);
+		assert.ok(result.breakingChanges.length > 0, "Should detect removed fields");
 		assert.ok(
 			result.breakingChanges.some((c) => c.field === "deprecated_field"),
 			"Should flag deprecated_field as removed",
@@ -85,10 +82,7 @@ describe("validateUpgrade", () => {
 			old_config: { key: "value" },
 		};
 		const result = validateUpgrade(withDeprecated, "phase-b");
-		assert.ok(
-			result.deprecatedFields.length > 0,
-			"Should detect deprecated fields",
-		);
+		assert.ok(result.deprecatedFields.length > 0, "Should detect deprecated fields");
 	});
 
 	it("returns compatible=true when no issues", () => {

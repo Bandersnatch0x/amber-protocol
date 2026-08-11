@@ -68,12 +68,22 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
 	const list = Array.isArray(rules?.rules) ? rules.rules : [];
 	for (const rule of list) {
 		if (rule.action === "deny" && matches(rule, command)) {
-			return { allowed: false, matchedRule: rule.id, reason: `denied by rule ${rule.id}`, ...confidenceSpread(rules, rule.id) };
+			return {
+				allowed: false,
+				matchedRule: rule.id,
+				reason: `denied by rule ${rule.id}`,
+				...confidenceSpread(rules, rule.id),
+			};
 		}
 	}
 	for (const rule of list) {
 		if (rule.action === "allow" && matches(rule, command)) {
-			return { allowed: true, matchedRule: rule.id, reason: `allowed by rule ${rule.id}`, ...confidenceSpread(rules, rule.id) };
+			return {
+				allowed: true,
+				matchedRule: rule.id,
+				reason: `allowed by rule ${rule.id}`,
+				...confidenceSpread(rules, rule.id),
+			};
 		}
 	}
 	const allowByDefault = rules?.defaultAction === "allow";
@@ -166,7 +176,8 @@ function applyBuiltinDenies(command) {
 		return {
 			allowed: false,
 			matchedRule: "builtin-deny-destructive",
-			reason: "denied by built-in rule builtin-deny-destructive (un-removable on the verify and governed surfaces)",
+			reason:
+				"denied by built-in rule builtin-deny-destructive (un-removable on the verify and governed surfaces)",
 		};
 	}
 	if (containsShellComposition(command)) {
@@ -226,7 +237,13 @@ function loadRulesFile(stateDir, filename, scope, required = false) {
 		return rulesFallback(filename, rulesPath, scope, `is unparseable (${e.message})`, required);
 	}
 	if (parsed && Array.isArray(parsed.rules)) return parsed;
-	return rulesFallback(filename, rulesPath, scope, "is missing a top-level 'rules' array", required);
+	return rulesFallback(
+		filename,
+		rulesPath,
+		scope,
+		"is missing a top-level 'rules' array",
+		required,
+	);
 }
 
 function loadPolicyRules(targetRoot, options = {}) {
@@ -242,4 +259,13 @@ function loadVerifyPolicyRules(targetRoot) {
 	return loadRulesFile(resolveStateDirForRead(targetRoot), "verify-rules.json", "verification ");
 }
 
-module.exports = { evaluateCommandPolicy, evaluateVerifyPolicy, evaluateGovernedPolicy, containsShellComposition, loadPolicyRules, loadVerifyPolicyRules, DEFAULT_RULES, matches };
+module.exports = {
+	evaluateCommandPolicy,
+	evaluateVerifyPolicy,
+	evaluateGovernedPolicy,
+	containsShellComposition,
+	loadPolicyRules,
+	loadVerifyPolicyRules,
+	DEFAULT_RULES,
+	matches,
+};

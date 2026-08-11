@@ -10,12 +10,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-	installTeamDistribution,
-} = require("../scripts/lib/core/team");
-const {
-	buildMigrationAssistant,
-} = require("../scripts/lib/core/maintenance");
+const { installTeamDistribution } = require("../scripts/lib/core/team");
+const { buildMigrationAssistant } = require("../scripts/lib/core/maintenance");
 
 const ROOT = path.resolve(__dirname, "..");
 const REGISTRY = path.join(ROOT, "registry", "amber-protocol.registry.json");

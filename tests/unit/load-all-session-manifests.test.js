@@ -9,9 +9,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-	loadAllSessionManifests,
-} = require("../../scripts/lib/session-commands");
+const { loadAllSessionManifests } = require("../../scripts/lib/session-commands");
 
 function tempProject() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "session-all-"));
@@ -20,10 +18,7 @@ function tempProject() {
 function writeManifest(projectRoot, sessionId, createdAt) {
 	const dir = path.join(projectRoot, ".amber", "sessions", sessionId);
 	fs.mkdirSync(dir, { recursive: true });
-	fs.writeFileSync(
-		path.join(dir, "manifest.json"),
-		JSON.stringify({ sessionId, createdAt }),
-	);
+	fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ sessionId, createdAt }));
 }
 
 test("returns [] when there are no sessions", () => {

@@ -7,9 +7,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
-const {
-	analyzePlanContent,
-} = require("../../scripts/lib/core/execution-validator");
+const { analyzePlanContent } = require("../../scripts/lib/core/execution-validator");
 
 const resolvers = (overrides = {}) => ({
 	hasEnvVar: () => true,
@@ -41,9 +39,7 @@ test("missing env var referenced in the plan is a blocker", () => {
 		resolvers({ hasEnvVar: () => false }),
 	);
 	assert.equal(result.checks.env, false);
-	assert.ok(
-		result.blockers.some((b) => b.startsWith("Missing env vars: DEPLOY_TOKEN")),
-	);
+	assert.ok(result.blockers.some((b) => b.startsWith("Missing env vars: DEPLOY_TOKEN")));
 });
 
 test("a present env var satisfies the env check", () => {
@@ -73,11 +69,7 @@ test("a referenced integration that does not resolve is a blocker", () => {
 		resolvers({ hasIntegrationFile: () => false }),
 	);
 	assert.equal(result.checks.integrations, false);
-	assert.ok(
-		result.blockers.some((b) =>
-			b.startsWith("Integration files not found: ghost"),
-		),
-	);
+	assert.ok(result.blockers.some((b) => b.startsWith("Integration files not found: ghost")));
 });
 
 test("a plan with no integrations satisfies the integration check", () => {
@@ -91,20 +83,16 @@ test("strict mode blocks plans missing Goals and Implementation sections", () =>
 		...resolvers(),
 	});
 	assert.ok(result.blockers.some((b) => b.includes("missing Goals or Objectives")));
-	assert.ok(
-		result.blockers.some((b) => b.includes("missing Implementation or Steps")),
-	);
+	assert.ok(result.blockers.some((b) => b.includes("missing Implementation or Steps")));
 });
 
 test("strict mode warns when the Test section is absent", () => {
-	const result = analyzePlanContent(
-		"# Plan\n<!-- approved -->\n## Goals\n## Implementation\n",
-		{ strict: true, ...resolvers() },
-	);
+	const result = analyzePlanContent("# Plan\n<!-- approved -->\n## Goals\n## Implementation\n", {
+		strict: true,
+		...resolvers(),
+	});
 	assert.ok(result.warnings.some((w) => w.includes("missing Test section")));
-	assert.ok(
-		!result.blockers.some((b) => b.includes("missing Goals or Objectives")),
-	);
+	assert.ok(!result.blockers.some((b) => b.includes("missing Goals or Objectives")));
 });
 
 test("non-strict mode performs no section checks", () => {

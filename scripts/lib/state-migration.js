@@ -164,9 +164,7 @@ function migrateWiki(targetRoot) {
 			.replace(/\.\/harness\.md/g, "./amber.md");
 		if (updated !== content) {
 			fs.writeFileSync(file, updated);
-			result.linkUpdates.push(
-				path.relative(targetRoot, file).split(path.sep).join("/"),
-			);
+			result.linkUpdates.push(path.relative(targetRoot, file).split(path.sep).join("/"));
 		}
 	}
 	return result;

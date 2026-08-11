@@ -30,7 +30,10 @@ function parseRange(ref) {
 function extractSpan(content, ref) {
 	const { fromLine, toLine } = parseRange(ref);
 	if (!fromLine) return content;
-	return content.split("\n").slice(fromLine - 1, toLine).join("\n");
+	return content
+		.split("\n")
+		.slice(fromLine - 1, toLine)
+		.join("\n");
 }
 
 function finding(code, detail, pageId, sid) {
@@ -42,14 +45,28 @@ function checkMutableSource(full, src, pageId, sid) {
 	if (!fs.existsSync(full)) {
 		return {
 			blocked: true,
-			findings: [finding("AMBER_E_CONTEXT_SOURCE_MISSING", `mutable source ${src.ref} is missing`, pageId, sid)],
+			findings: [
+				finding(
+					"AMBER_E_CONTEXT_SOURCE_MISSING",
+					`mutable source ${src.ref} is missing`,
+					pageId,
+					sid,
+				),
+			],
 		};
 	}
 	const current = hashFile(full);
 	if (current.normHash === src.normHash) return { blocked: false, findings: [] };
 	return {
 		blocked: true,
-		findings: [finding("AMBER_E_CONTEXT_SOURCE_STALE", `source ${src.ref} changed (normHash mismatch)`, pageId, sid)],
+		findings: [
+			finding(
+				"AMBER_E_CONTEXT_SOURCE_STALE",
+				`source ${src.ref} changed (normHash mismatch)`,
+				pageId,
+				sid,
+			),
+		],
 	};
 }
 
@@ -57,20 +74,41 @@ function checkImmutableSource(full, src, pageId, sid) {
 	if (src.excerpt && src.excerptHash && sha256(src.excerpt) !== src.excerptHash) {
 		return {
 			blocked: true,
-			findings: [finding("AMBER_E_CONTEXT_SOURCE_TAMPERED", `embedded excerpt of ${src.ref} fails its own hash — page file may be corrupted`, pageId, sid)],
+			findings: [
+				finding(
+					"AMBER_E_CONTEXT_SOURCE_TAMPERED",
+					`embedded excerpt of ${src.ref} fails its own hash — page file may be corrupted`,
+					pageId,
+					sid,
+				),
+			],
 		};
 	}
 	if (!fs.existsSync(full)) {
 		return {
 			blocked: false,
-			findings: [finding("AMBER_E_CONTEXT_SOURCE_MISSING", `immutable source ${src.ref} is gone; page stands on its excerpt`, pageId, sid)],
+			findings: [
+				finding(
+					"AMBER_E_CONTEXT_SOURCE_MISSING",
+					`immutable source ${src.ref} is gone; page stands on its excerpt`,
+					pageId,
+					sid,
+				),
+			],
 		};
 	}
 	const live = extractSpan(fs.readFileSync(full, "utf8"), src.ref);
 	if (!src.excerptHash || sha256(live) === src.excerptHash) return { blocked: false, findings: [] };
 	return {
 		blocked: true,
-		findings: [finding("AMBER_E_CONTEXT_SOURCE_TAMPERED", `immutable source ${src.ref} no longer matches the excerpt`, pageId, sid)],
+		findings: [
+			finding(
+				"AMBER_E_CONTEXT_SOURCE_TAMPERED",
+				`immutable source ${src.ref} no longer matches the excerpt`,
+				pageId,
+				sid,
+			),
+		],
 	};
 }
 
@@ -97,12 +135,7 @@ function checkSourceHealth(targetRoot, sources, pageId = null) {
 		} catch (error) {
 			blocked = true;
 			findings.push(
-				finding(
-					"AMBER_E_CONTEXT_SOURCE_MISSING",
-					error.message || String(error),
-					pageId,
-					sid,
-				),
+				finding("AMBER_E_CONTEXT_SOURCE_MISSING", error.message || String(error), pageId, sid),
 			);
 			continue;
 		}

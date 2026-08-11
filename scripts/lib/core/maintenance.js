@@ -36,9 +36,7 @@ const {
 	significantEvolutionFindings,
 } = require("./evolution-findings");
 
-const {
-	TEMPLATE_ROOT,
-} = require("./constants");
+const { TEMPLATE_ROOT } = require("./constants");
 
 const {
 	compareSemver,
@@ -53,9 +51,7 @@ const {
 
 // MESSAGES moved with buildMaintenanceProposalContent into maintenance-propose.js.
 
-const {
-	validateWiki,
-} = require("./validators");
+const { validateWiki } = require("./validators");
 
 function listWikiMarkdownFiles(targetRoot) {
 	const wikiRoot = path.join(targetRoot, "docs", "wiki");
@@ -69,16 +65,8 @@ function listWikiMarkdownFiles(targetRoot) {
 // bytes are identical to the shipped template; the moment a team edits it, it
 // re-enters staleness tracking and a missing/old Last Reviewed marker is fair game.
 function isUneditedWikiTemplate(targetRoot, filePath) {
-	const relativeFromWiki = relativeSlash(
-		path.join(targetRoot, "docs", "wiki"),
-		filePath,
-	);
-	const templatePath = path.join(
-		TEMPLATE_ROOT,
-		"docs",
-		"wiki",
-		...relativeFromWiki.split("/"),
-	);
+	const relativeFromWiki = relativeSlash(path.join(targetRoot, "docs", "wiki"), filePath);
+	const templatePath = path.join(TEMPLATE_ROOT, "docs", "wiki", ...relativeFromWiki.split("/"));
 	if (!pathExists(templatePath)) {
 		return false;
 	}
@@ -149,13 +137,8 @@ function detectRulePackDrift(targetRoot, registry) {
 	}
 
 	const release = registry.versions && registry.versions[lock.installedVersion];
-	const expected =
-		release && Array.isArray(release.rulePacks)
-			? [...release.rulePacks].sort()
-			: [];
-	const actual = Array.isArray(lock.rulePacks)
-		? [...lock.rulePacks].sort()
-		: [];
+	const expected = release && Array.isArray(release.rulePacks) ? [...release.rulePacks].sort() : [];
+	const actual = Array.isArray(lock.rulePacks) ? [...lock.rulePacks].sort() : [];
 
 	return {
 		installed: true,
@@ -214,10 +197,7 @@ function buildMigrationAssistant(targetRoot, registry) {
 	};
 }
 
-function rollupEvolutionFindings(
-	projectRoot,
-	minCount = EVOLUTION_FINDING_MIN_COUNT,
-) {
+function rollupEvolutionFindings(projectRoot, minCount = EVOLUTION_FINDING_MIN_COUNT) {
 	const findings = significantEvolutionFindings(projectRoot, minCount).map(
 		({ finding, count }) => ({ text: finding, count }),
 	);
@@ -241,10 +221,7 @@ function readRegressionProposal(evidencePath, taskDir, targetRoot) {
 		return null;
 	}
 
-	if (
-		!data.regressionProposal ||
-		data.regressionProposal.status !== "proposed"
-	) {
+	if (!data.regressionProposal || data.regressionProposal.status !== "proposed") {
 		return null;
 	}
 	const assertion = data.regressionProposal.assertion;
@@ -289,18 +266,14 @@ function extractRegressionProposals(targetRoot) {
 		proposals.push(proposal);
 	}
 
-	return proposals
-		.sort((left, right) => left.taskId.localeCompare(right.taskId))
-		.slice(0, 50);
+	return proposals.sort((left, right) => left.taskId.localeCompare(right.taskId)).slice(0, 50);
 }
 
 function inspectMaintenance(target, registryPath) {
 	const targetRoot = resolveTarget(target);
 	const loaded = loadTeamRegistry(registryPath);
 	const registryValid = isTeamRegistryValid(loaded);
-	const unavailableReason = registryValid
-		? null
-		: "team registry validation failed";
+	const unavailableReason = registryValid ? null : "team registry validation failed";
 	const wikiValidation = validateWiki(targetRoot);
 	const staleDocsResult = detectStaleDocs(targetRoot);
 	const { detectScaffoldDrift } = require("./scaffold-version-drift");
@@ -373,12 +346,7 @@ const {
 function proposeMaintenance(target, registryPath, priority) {
 	// Reach inspect through module.exports so a test stub on
 	// maintenance.inspectMaintenance is still observed by propose.
-	return proposeMaintenanceImpl(
-		target,
-		registryPath,
-		priority,
-		module.exports.inspectMaintenance,
-	);
+	return proposeMaintenanceImpl(target, registryPath, priority, module.exports.inspectMaintenance);
 }
 
 // Upgrade-gap drift: how do the installed rulePacks compare to the LATEST
@@ -406,7 +374,7 @@ function detectPackDrift(projectRoot, registryPath) {
 	const installed = Array.isArray(lock.rulePacks) ? lock.rulePacks : [];
 	const latestVer = latestTeamVersion(loaded.registry);
 	const latest = loaded.registry.versions[latestVer].rulePacks;
-	const diff = latest.filter(p => !installed.includes(p));
+	const diff = latest.filter((p) => !installed.includes(p));
 
 	return {
 		drifted: JSON.stringify([...installed].sort()) !== JSON.stringify([...latest].sort()),
@@ -434,12 +402,8 @@ function validateWikiStructure(projectRoot) {
 }
 
 function fixWikiMarkers(projectRoot) {
-	const {
-		WIKI_CONTEXT_STARTER_FILES,
-	} = require("./constants");
-	const {
-		hasSectionWithBody,
-	} = require("./text-utils");
+	const { WIKI_CONTEXT_STARTER_FILES } = require("./constants");
+	const { hasSectionWithBody } = require("./text-utils");
 
 	const fixed = [];
 	for (const relativePath of WIKI_CONTEXT_STARTER_FILES) {
@@ -485,9 +449,9 @@ function previewUpgrade(projectRoot, version, registryPath) {
 
 	const current = Array.isArray(lock.rulePacks) ? lock.rulePacks : [];
 	const target = Array.isArray(targetRelease?.rulePacks) ? targetRelease.rulePacks : [];
-	const addedPacks = target.filter(p => !current.includes(p));
-	const removedPacks = current.filter(p => !target.includes(p));
-	const updatedPacks = target.filter(p => current.includes(p));
+	const addedPacks = target.filter((p) => !current.includes(p));
+	const removedPacks = current.filter((p) => !target.includes(p));
+	const updatedPacks = target.filter((p) => current.includes(p));
 
 	return {
 		currentVersion: lock.installedVersion,
@@ -522,9 +486,7 @@ const ALL_MAINTENANCE_ACTIONS = [...MAINTENANCE_ACTIONS, "scaffold-drift", "dist
 
 function unknownMaintenanceAction() {
 	return {
-		errors: [
-			`maintenance requires one of: ${ALL_MAINTENANCE_ACTIONS.join(", ")}.`,
-		],
+		errors: [`maintenance requires one of: ${ALL_MAINTENANCE_ACTIONS.join(", ")}.`],
 		warnings: [],
 	};
 }
@@ -538,9 +500,7 @@ function runMaintenanceAction(action, targetRoot, options = {}) {
 		targetRoot && typeof targetRoot === "object" && !Array.isArray(targetRoot)
 			? targetRoot
 			: options;
-	const resolvedTarget = resolveTarget(
-		typeof targetRoot === "string" ? targetRoot : args.target,
-	);
+	const resolvedTarget = resolveTarget(typeof targetRoot === "string" ? targetRoot : args.target);
 	// Single place the CLI `registry` leak is closed: resolve to a path string
 	// before any domain function sees it.
 	const registryPath = resolveRegistryPath(args.registry);
@@ -562,9 +522,7 @@ function runMaintenanceAction(action, targetRoot, options = {}) {
 			return propose(resolvedTarget, registryPath, args.priority);
 		}
 		case "stale-docs": {
-			const parsed = args.thresholdDays
-				? Number.parseInt(args.thresholdDays, 10)
-				: undefined;
+			const parsed = args.thresholdDays ? Number.parseInt(args.thresholdDays, 10) : undefined;
 			const thresholdDays = Number.isInteger(parsed) ? parsed : undefined;
 			const stale = detectStaleDocs(resolvedTarget, thresholdDays);
 			return {
@@ -606,9 +564,7 @@ function runMaintenanceAction(action, targetRoot, options = {}) {
 			};
 		}
 		case "evolution-rollup": {
-			const parsed = args.threshold
-				? Number.parseInt(args.threshold, 10)
-				: undefined;
+			const parsed = args.threshold ? Number.parseInt(args.threshold, 10) : undefined;
 			const rollup = rollupEvolutionFindings(
 				resolvedTarget,
 				Number.isInteger(parsed) ? parsed : undefined,

@@ -32,10 +32,7 @@ test("escapeMarkdownTableCell coerces null/undefined to an empty string", () => 
 test("extractMarkdownLinks pulls targets from inline and image links", () => {
 	assert.deepEqual(extractMarkdownLinks("see [docs](./guide.md) here"), ["./guide.md"]);
 	assert.deepEqual(extractMarkdownLinks("![alt](img.png)"), ["img.png"]);
-	assert.deepEqual(
-		extractMarkdownLinks("[a](one.md) and [b](two.md)"),
-		["one.md", "two.md"],
-	);
+	assert.deepEqual(extractMarkdownLinks("[a](one.md) and [b](two.md)"), ["one.md", "two.md"]);
 });
 
 test("extractMarkdownLinks strips titles and angle brackets, ignores empty targets", () => {
@@ -69,10 +66,10 @@ test("extractMarkdownListUnderSubheading treats a sole 'none' item as empty", ()
 });
 
 test("extractMarkdownListUnderSubheading matches the heading case-insensitively", () => {
-	assert.deepEqual(
-		extractMarkdownListUnderSubheading(REPORT, "candidate commands"),
-		["pytest", "ruff"],
-	);
+	assert.deepEqual(extractMarkdownListUnderSubheading(REPORT, "candidate commands"), [
+		"pytest",
+		"ruff",
+	]);
 });
 
 test("extractMarkdownListUnderSubheading returns [] when the heading is absent", () => {

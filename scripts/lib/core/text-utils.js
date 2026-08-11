@@ -37,9 +37,7 @@ function formatCommandList(commands, emptyText = "none") {
 	if (!Array.isArray(commands) || commands.length === 0) {
 		return [`- ${emptyText}`];
 	}
-	return commands.map(
-		(command) => `- ${command.source}: ${command.name} -> ${command.command}`,
-	);
+	return commands.map((command) => `- ${command.source}: ${command.name} -> ${command.command}`);
 }
 
 function timestampForFileName(date = new Date()) {
@@ -71,10 +69,7 @@ function extractMarkdownLinks(markdown) {
 
 function isInsideDirectory(parentDir, childPath) {
 	const relativePath = path.relative(parentDir, childPath);
-	return (
-		relativePath === "" ||
-		(!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
-	);
+	return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
 
 function isExternalLink(link) {

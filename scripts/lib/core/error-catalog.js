@@ -61,15 +61,18 @@ const CATALOG = {
 	},
 	AMBER_E_POLICY_DENY: {
 		title: "Command blocked by governance policy",
-		cause: "A loop governed.command matched a deny rule (or no allow rule under defaultAction=deny).",
+		cause:
+			"A loop governed.command matched a deny rule (or no allow rule under defaultAction=deny).",
 		remedy: "Adjust .amber/governance/rules.json or change the contract's governed.command.",
 		layer: "Governance",
 		related: ["AMBER_E_CONFIDENCE_GATE", "AMBER_E_LOOP_NOT_APPROVED"],
 	},
 	AMBER_E_CONFIDENCE_GATE: {
 		title: "Command blocked by confidence gate",
-		cause: "Governed execution was allowed by policy but its configured confidence is medium or low; only high confidence may execute.",
-		remedy: "Complete the required route and plan evidence, then configure the matched rule as high confidence; otherwise use dry-run or human review.",
+		cause:
+			"Governed execution was allowed by policy but its configured confidence is medium or low; only high confidence may execute.",
+		remedy:
+			"Complete the required route and plan evidence, then configure the matched rule as high confidence; otherwise use dry-run or human review.",
 		layer: "Governance",
 		related: ["AMBER_E_POLICY_DENY", "AMBER_E_LOOP_NOT_APPROVED"],
 	},
@@ -90,56 +93,69 @@ const CATALOG = {
 	AMBER_E_CONTEXT_SCHEMA_INVALID: {
 		title: "Context page payload fails the page schema",
 		cause: "ingest received a payload that does not satisfy schemas/context-page.schema.json.",
-		remedy: "Re-distil the page against the request's output schema; validate locally with `amber context verify`.",
+		remedy:
+			"Re-distil the page against the request's output schema; validate locally with `amber context verify`.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_CLAIM_UNCITED"],
 	},
 	AMBER_E_CONTEXT_REQUEST_MISSING: {
 		title: "Context ingest request is missing",
-		cause: "ingest was invoked without a readable Distillation Contract, so the payload has no authority or source binding.",
+		cause:
+			"ingest was invoked without a readable Distillation Contract, so the payload has no authority or source binding.",
 		remedy: "Create a request with `amber context request`, then ingest with its request id.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_REQUEST_MISMATCH"],
 	},
 	AMBER_E_CONTEXT_REQUEST_MISMATCH: {
 		title: "Context payload does not match its request",
-		cause: "the payload page, scope, or bundled sources differ from the Distillation Contract named by the ingest request id.",
-		remedy: "Return output for the exact request without changing its target, scope, sources, excerpts, or hashes.",
+		cause:
+			"the payload page, scope, or bundled sources differ from the Distillation Contract named by the ingest request id.",
+		remedy:
+			"Return output for the exact request without changing its target, scope, sources, excerpts, or hashes.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_REQUEST_MISSING"],
 	},
 	AMBER_E_CONTEXT_CLAIM_UNCITED: {
 		title: "Context page block cites an undeclared source",
-		cause: "A block's sources array names ids absent from the page's sources map, so its claims have no verifiable provenance. (Schema already forbids empty sources arrays.)",
-		remedy: "Reference only source ids the page declares; mark uncovered content as type \"unknown\" instead of inventing a citation.",
+		cause:
+			"A block's sources array names ids absent from the page's sources map, so its claims have no verifiable provenance. (Schema already forbids empty sources arrays.)",
+		remedy:
+			'Reference only source ids the page declares; mark uncovered content as type "unknown" instead of inventing a citation.',
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_SCHEMA_INVALID"],
 	},
 	AMBER_E_CONTEXT_SOURCE_MISSING: {
 		title: "Context page source no longer exists",
-		cause: "A referenced source path is absent on disk. For mutable sources this blocks refresh; for immutable sources re-verification is unavailable (the page stands on its embedded excerpt).",
-		remedy: "Restore the source, or re-request the page so sources are re-bundled; if every mutable source is gone the page becomes obsolete.",
+		cause:
+			"A referenced source path is absent on disk. For mutable sources this blocks refresh; for immutable sources re-verification is unavailable (the page stands on its embedded excerpt).",
+		remedy:
+			"Restore the source, or re-request the page so sources are re-bundled; if every mutable source is gone the page becomes obsolete.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_PAGE_OBSOLETE"],
 	},
 	AMBER_E_CONTEXT_SOURCE_INVALID: {
 		title: "External Context source candidate is invalid",
-		cause: "An opt-in source adapter returned malformed provenance, hashes, identifiers, or content.",
-		remedy: "Correct the target-local fixture and retry `amber context source-adapter --enable --fixture <file>`.",
+		cause:
+			"An opt-in source adapter returned malformed provenance, hashes, identifiers, or content.",
+		remedy:
+			"Correct the target-local fixture and retry `amber context source-adapter --enable --fixture <file>`.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_SOURCE_MISSING", "AMBER_E_CONTEXT_SCHEMA_INVALID"],
 	},
 	AMBER_E_CONTEXT_ADAPTER_DISABLED: {
 		title: "External Context source adapter is disabled",
 		cause: "Source adapters are opt-in and the command was invoked without explicit enablement.",
-		remedy: "Inspect the target-local fixture, then retry with `amber context source-adapter --enable --fixture <file>`.",
+		remedy:
+			"Inspect the target-local fixture, then retry with `amber context source-adapter --enable --fixture <file>`.",
 		layer: "Governance",
 		related: ["AMBER_E_CONTEXT_SOURCE_INVALID"],
 	},
 	AMBER_E_CONTEXT_TRANSCRIPT_OPT_IN: {
 		title: "Transcript source requires explicit opt-in",
-		cause: "A Source Bundle candidate contains transcript content, which is excluded by default because it may contain sensitive data.",
-		remedy: "Select and inspect the transcript explicitly, then retry with `--allow-transcript`; Amber applies redaction before returning the candidate.",
+		cause:
+			"A Source Bundle candidate contains transcript content, which is excluded by default because it may contain sensitive data.",
+		remedy:
+			"Select and inspect the transcript explicitly, then retry with `--allow-transcript`; Amber applies redaction before returning the candidate.",
 		layer: "Governance",
 		related: ["AMBER_E_CONTEXT_ADAPTER_DISABLED", "AMBER_E_CONTEXT_SOURCE_INVALID"],
 	},
@@ -152,92 +168,116 @@ const CATALOG = {
 	},
 	AMBER_E_CONTEXT_PAGE_SUPERSEDED: {
 		title: "Context Page has been superseded",
-		cause: "A Loadout explicitly requested retained historical knowledge that has one or more accepted successors.",
-		remedy: "Use the reported successor Context Page ids, or inspect the historical page with `amber context show --page <id>`.",
+		cause:
+			"A Loadout explicitly requested retained historical knowledge that has one or more accepted successors.",
+		remedy:
+			"Use the reported successor Context Page ids, or inspect the historical page with `amber context show --page <id>`.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_PAGE_OBSOLETE"],
 	},
 	AMBER_E_CONTEXT_PROJECTION_MISSING: {
 		title: "Context projection is unavailable",
-		cause: "The derived Context index projection is missing or unreadable, so consumers cannot prove it is complete.",
-		remedy: "Rebuild it with `amber context projection rebuild`, then check `amber context projection status`.",
+		cause:
+			"The derived Context index projection is missing or unreadable, so consumers cannot prove it is complete.",
+		remedy:
+			"Rebuild it with `amber context projection rebuild`, then check `amber context projection status`.",
 		layer: "Observability",
 		related: ["AMBER_E_CONTEXT_PROJECTION_DRIFT"],
 	},
 	AMBER_E_CONTEXT_PROJECTION_DRIFT: {
 		title: "Context projection does not match accepted pages",
-		cause: "The projection's recorded source hashes or content hash differ from the authoritative Context Pages.",
-		remedy: "Rebuild it with `amber context projection rebuild`; investigate unexpected repeated drift.",
+		cause:
+			"The projection's recorded source hashes or content hash differ from the authoritative Context Pages.",
+		remedy:
+			"Rebuild it with `amber context projection rebuild`; investigate unexpected repeated drift.",
 		layer: "Verification",
 		related: ["AMBER_E_CONTEXT_PROJECTION_MISSING"],
 	},
 	AMBER_E_CONTEXT_BENCHMARK_FAILED: {
 		title: "Context Loadout benchmark failed",
-		cause: "A deterministic fixture missed an expected page, admitted a forbidden page, lost Required Artifact coverage, or produced unstable output.",
-		remedy: "Inspect the report's metric-specific failure reasons, correct selection behavior, and rerun `amber context benchmark --fixture <file>`.",
+		cause:
+			"A deterministic fixture missed an expected page, admitted a forbidden page, lost Required Artifact coverage, or produced unstable output.",
+		remedy:
+			"Inspect the report's metric-specific failure reasons, correct selection behavior, and rerun `amber context benchmark --fixture <file>`.",
 		layer: "Verification",
 		related: ["AMBER_E_CONTEXT_LOADOUT_REQUIRED", "AMBER_E_CONTEXT_PROJECTION_DRIFT"],
 	},
 	AMBER_E_CONTEXT_LOADOUT_ROUTE: {
 		title: "Context loadout requires a valid route",
 		cause: "`amber context load` was invoked without --route, or the route id is not kebab-case.",
-		remedy: "Pass --route <id> matching a Route manifest in routes/*.route.json (e.g. --route feature-standard).",
+		remedy:
+			"Pass --route <id> matching a Route manifest in routes/*.route.json (e.g. --route feature-standard).",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW"],
 	},
 	AMBER_E_CONTEXT_LOADOUT_MISSING: {
 		title: "Context Loadout file is unavailable",
-		cause: "`amber context verify --loadout` received a missing path or a path that resolves outside the Target Repository.",
-		remedy: "Regenerate the Loadout with `amber context load --route <id>`, then verify its target-local path.",
+		cause:
+			"`amber context verify --loadout` received a missing path or a path that resolves outside the Target Repository.",
+		remedy:
+			"Regenerate the Loadout with `amber context load --route <id>`, then verify its target-local path.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_LOADOUT_CORRUPT", "AMBER_E_CONTEXT_LOADOUT_REQUIRED"],
 	},
 	AMBER_E_CONTEXT_LOADOUT_CORRUPT: {
 		title: "Context Loadout is corrupt",
 		cause: "The Loadout is not valid JSON or does not satisfy schemas/context-loadout.schema.json.",
-		remedy: "Discard the invalid artifact and regenerate it with `amber context load --route <id>`.",
+		remedy:
+			"Discard the invalid artifact and regenerate it with `amber context load --route <id>`.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_LOADOUT_MISSING", "AMBER_E_CONTEXT_SCHEMA_INVALID"],
 	},
 	AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW: {
 		title: "Context loadout required tier exceeds the budget",
-		cause: "Required Artifacts plus required-tier Pages exceed the budget, so the Loadout cannot be provably bounded.",
-		remedy: "Raise --budget, unpin optional required Pages, or reduce required input size. No Loadout file is written on this error.",
+		cause:
+			"Required Artifacts plus required-tier Pages exceed the budget, so the Loadout cannot be provably bounded.",
+		remedy:
+			"Raise --budget, unpin optional required Pages, or reduce required input size. No Loadout file is written on this error.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_LOADOUT_ROUTE"],
 	},
 	AMBER_E_CONTEXT_LOADOUT_REQUIRED: {
 		title: "Context loadout required artifact is invalid",
-		cause: "the target-local Operating Manual, selected Route manifest, or Loadout Definition is missing, outside the target, or no longer matches its recorded hash.",
-		remedy: "Run `amber init` to install the required artifacts, restore any missing file, then regenerate and verify the Loadout.",
+		cause:
+			"the target-local Operating Manual, selected Route manifest, or Loadout Definition is missing, outside the target, or no longer matches its recorded hash.",
+		remedy:
+			"Run `amber init` to install the required artifacts, restore any missing file, then regenerate and verify the Loadout.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW", "AMBER_E_CONTEXT_LOADOUT_MISSING"],
 	},
 	AMBER_E_CONTEXT_SOURCE_STALE: {
 		title: "Context page source is stale",
-		cause: "A mutable source's normalized hash no longer matches the stored normHash, so the page may describe outdated code.",
-		remedy: "Run `amber context refresh` to generate a refresh request, execute it, then ingest; or ingest {\"outcome\":\"no-change\"} to rebase hashes.",
+		cause:
+			"A mutable source's normalized hash no longer matches the stored normHash, so the page may describe outdated code.",
+		remedy:
+			'Run `amber context refresh` to generate a refresh request, execute it, then ingest; or ingest {"outcome":"no-change"} to rebase hashes.',
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_SOURCE_MISSING"],
 	},
 	AMBER_E_CONTEXT_SOURCE_TAMPERED: {
 		title: "Immutable context source has been modified",
-		cause: "An immutable source (append-only ledger, archived session, accepted ADR) no longer matches the page's embedded excerpt hash.",
-		remedy: "Investigate the source; append-only artifacts must not change. Restore from version control or re-request the page.",
+		cause:
+			"An immutable source (append-only ledger, archived session, accepted ADR) no longer matches the page's embedded excerpt hash.",
+		remedy:
+			"Investigate the source; append-only artifacts must not change. Restore from version control or re-request the page.",
 		layer: "Verification",
 		related: ["AMBER_E_LEDGER_TAMPERED"],
 	},
 	AMBER_E_CONTEXT_PAGE_ORPHANED: {
 		title: "Context page absent from the generated index",
-		cause: "A page under .amber/context/pages/ is missing from docs/wiki/context-index.md (or the index lists a page with no file).",
-		remedy: "Regenerate the index via `amber context ingest` / `amber context refresh` / `amber context delete`.",
+		cause:
+			"A page under .amber/context/pages/ is missing from docs/wiki/context-index.md (or the index lists a page with no file).",
+		remedy:
+			"Regenerate the index via `amber context ingest` / `amber context refresh` / `amber context delete`.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_PAGE_OBSOLETE"],
 	},
 	AMBER_E_CONTEXT_PAGE_OBSOLETE: {
 		title: "Context page's subject no longer exists",
-		cause: "Every mutable source of the page is missing on disk, so the page describes something that is gone.",
-		remedy: "Delete the page with `amber context delete --page <id>`, or re-request it against surviving evidence.",
+		cause:
+			"Every mutable source of the page is missing on disk, so the page describes something that is gone.",
+		remedy:
+			"Delete the page with `amber context delete --page <id>`, or re-request it against surviving evidence.",
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_SOURCE_MISSING"],
 	},

@@ -33,7 +33,10 @@ test("migrateState merges into an existing .amber without overwriting files", ()
 	const root = rootWithLegacyState();
 	const existing = path.join(root, ".amber", "sessions", "s1");
 	fs.mkdirSync(existing, { recursive: true });
-	fs.writeFileSync(path.join(existing, "manifest.json"), JSON.stringify({ sessionId: "canonical" }));
+	fs.writeFileSync(
+		path.join(existing, "manifest.json"),
+		JSON.stringify({ sessionId: "canonical" }),
+	);
 	const result = migrateState(root);
 	assert.equal(result.errors.length, 0);
 	assert.deepEqual(result.conflicts, ["sessions/s1/manifest.json"]);
@@ -61,7 +64,9 @@ test("migrateState archives legacy source after a clean migration when requested
 	});
 	assert.equal(result.errors.length, 0);
 	assert.equal(result.archivedLegacy, true);
-	assert.ok(result.legacyBackupPath.endsWith(".amber-legacy-harness-backup-2026-07-13T01-02-03-004Z"));
+	assert.ok(
+		result.legacyBackupPath.endsWith(".amber-legacy-harness-backup-2026-07-13T01-02-03-004Z"),
+	);
 	assert.equal(fs.existsSync(path.join(root, ".harness")), false);
 	assert.ok(fs.existsSync(path.join(result.legacyBackupPath, "sessions", "s1", "manifest.json")));
 });
@@ -70,7 +75,10 @@ test("migrateState refuses to archive legacy source when conflicts remain", () =
 	const root = rootWithLegacyState();
 	const existing = path.join(root, ".amber", "sessions", "s1");
 	fs.mkdirSync(existing, { recursive: true });
-	fs.writeFileSync(path.join(existing, "manifest.json"), JSON.stringify({ sessionId: "canonical" }));
+	fs.writeFileSync(
+		path.join(existing, "manifest.json"),
+		JSON.stringify({ sessionId: "canonical" }),
+	);
 	const result = migrateState(root, { archiveLegacy: true });
 	assert.equal(result.archivedLegacy, false);
 	assert.ok(fs.existsSync(path.join(root, ".harness")));
@@ -90,10 +98,7 @@ test("migrateWiki renames harness.md to amber.md and updates index links", () =>
 	const agentDir = path.join(root, "docs", "wiki", "agent");
 	fs.mkdirSync(agentDir, { recursive: true });
 	fs.writeFileSync(path.join(agentDir, "harness.md"), "# Harness\n");
-	fs.writeFileSync(
-		path.join(root, "docs", "wiki", "index.md"),
-		"[Agent](./agent/harness.md)\n",
-	);
+	fs.writeFileSync(path.join(root, "docs", "wiki", "index.md"), "[Agent](./agent/harness.md)\n");
 	const result = migrateWiki(root);
 	assert.ok(fs.existsSync(path.join(agentDir, "amber.md")));
 	assert.ok(!fs.existsSync(path.join(agentDir, "harness.md")));

@@ -46,9 +46,10 @@ function policyDenial(targetRoot, ledgerPath, command, reason, subject) {
 }
 
 function confidenceDenial(targetRoot, ledgerPath, command, verdict, subject) {
-	const reason = verdict.confidence === "medium"
-		? "medium confidence permits dry-run only; governed execution requires high confidence"
-		: "low confidence requires human review; governed execution requires high confidence";
+	const reason =
+		verdict.confidence === "medium"
+			? "medium confidence permits dry-run only; governed execution requires high confidence"
+			: "low confidence requires human review; governed execution requires high confidence";
 	appendLedgerRecord(ledgerPath, {
 		schemaVersion: 2,
 		kind: "denied",
@@ -61,7 +62,11 @@ function confidenceDenial(targetRoot, ledgerPath, command, verdict, subject) {
 		executesAnything: false,
 		...subject,
 	});
-	return { target: targetRoot, errors: [codedError("AMBER_E_CONFIDENCE_GATE", reason)], warnings: [] };
+	return {
+		target: targetRoot,
+		errors: [codedError("AMBER_E_CONFIDENCE_GATE", reason)],
+		warnings: [],
+	};
 }
 
 function evaluateExecutionPolicy(targetRoot, ledgerPath, command, subject, contextRules) {
@@ -77,7 +82,8 @@ function evaluateExecutionPolicy(targetRoot, ledgerPath, command, subject, conte
 	}
 	const ruleset = mergeRules(globalRules, contextRules);
 	const verdict = evaluateGovernedPolicy(command, ruleset);
-	if (!verdict.allowed) return policyDenial(targetRoot, ledgerPath, command, verdict.reason, subject);
+	if (!verdict.allowed)
+		return policyDenial(targetRoot, ledgerPath, command, verdict.reason, subject);
 	if (verdict.confidence !== "high") {
 		const governedVerdict = {
 			...verdict,
@@ -95,7 +101,12 @@ function executeInWorktree(targetRoot, command, label, budgetMinutes) {
 	if (!worktree.success) return { error: `Failed to create isolated worktree: ${worktree.error}` };
 	let result;
 	try {
-		const spawned = spawnSync(command, { shell: true, cwd: worktree.path, encoding: "utf8", timeout: budgetMinutes * 60_000 });
+		const spawned = spawnSync(command, {
+			shell: true,
+			cwd: worktree.path,
+			encoding: "utf8",
+			timeout: budgetMinutes * 60_000,
+		});
 		result = {
 			command,
 			exitCode: spawned.status === null ? -1 : spawned.status,
@@ -132,12 +143,24 @@ function recordGovernedExecution(targetRoot, ledgerPath, approval, execution, su
 	};
 }
 
-function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5, subject = {}, label = "command", contextRules }) {
+function runGovernedCommand({
+	target,
+	command,
+	ledgerPath: lp,
+	budgetMinutes = 5,
+	subject = {},
+	label = "command",
+	contextRules,
+}) {
 	const targetRoot = resolveTarget(target);
 	const chain = verifyLedgerChain(lp);
 	if (!chain.intact) {
 		const reason = `Ledger chain is broken at record ${chain.brokenAt}: ${chain.reason}`;
-		return { target: targetRoot, errors: [codedError("AMBER_E_LEDGER_TAMPERED", reason)], warnings: [] };
+		return {
+			target: targetRoot,
+			errors: [codedError("AMBER_E_LEDGER_TAMPERED", reason)],
+			warnings: [],
+		};
 	}
 	const policyResult = evaluateExecutionPolicy(targetRoot, lp, command, subject, contextRules);
 	if (policyResult) return policyResult;
@@ -151,7 +174,11 @@ function runGovernedCommand({ target, command, ledgerPath: lp, budgetMinutes = 5
 	}
 
 	if (!fs.existsSync(path.join(targetRoot, ".git"))) {
-		return { target: targetRoot, errors: [codedError("AMBER_E_MISSING_PATH_ARG", "not a git repository")], warnings: [] };
+		return {
+			target: targetRoot,
+			errors: [codedError("AMBER_E_MISSING_PATH_ARG", "not a git repository")],
+			warnings: [],
+		};
 	}
 	const execution = executeInWorktree(targetRoot, command, label, budgetMinutes);
 	if (execution.error) return { target: targetRoot, errors: [execution.error], warnings: [] };

@@ -2,25 +2,13 @@
 
 const path = require("node:path");
 
-const {
-	adoptionBundleBoundaries,
-	extractAdoptionGateFindings,
-} = require("./adoption-bundle");
+const { adoptionBundleBoundaries, extractAdoptionGateFindings } = require("./adoption-bundle");
 
-const {
-	OPTIONAL_STARTER_WIKI_FILES,
-	REQUIRED_HARNESS_FILES,
-} = require("./constants");
+const { OPTIONAL_STARTER_WIKI_FILES, REQUIRED_HARNESS_FILES } = require("./constants");
 
-const {
-	listTemplateFiles,
-	scaffoldHarness,
-} = require("./scaffold");
+const { listTemplateFiles, scaffoldHarness } = require("./scaffold");
 
-const {
-	MESSAGES,
-	defaultAdoptionWriteBoundaries,
-} = require("./terminology");
+const { MESSAGES, defaultAdoptionWriteBoundaries } = require("./terminology");
 
 const {
 	renderAdoptionApplyPlan,
@@ -35,12 +23,7 @@ const ADOPTION_DECISION_GATE_IDS = new Set([
 	"wiki-scope",
 ]);
 
-const ADOPTION_DECISION_STATUSES = new Set([
-	"pending",
-	"approved",
-	"rejected",
-	"deferred",
-]);
+const ADOPTION_DECISION_STATUSES = new Set(["pending", "approved", "rejected", "deferred"]);
 
 function adoptionDecisionRecordDecisions() {
 	return [
@@ -54,8 +37,7 @@ function adoptionDecisionRecordDecisions() {
 			id: "bootstrap-write",
 			title: "Gate B: Bootstrap Write",
 			status: "pending",
-			decision:
-				"Approve full init, selected manual patches, or keep the target read-only.",
+			decision: "Approve full init, selected manual patches, or keep the target read-only.",
 		},
 		{
 			id: "wiki-scope",
@@ -69,9 +51,7 @@ function adoptionDecisionRecordDecisions() {
 
 function applyAdoptionDecisionSpecs(decisions, specs) {
 	const errors = [];
-	const decisionById = new Map(
-		decisions.map((decision) => [decision.id, decision]),
-	);
+	const decisionById = new Map(decisions.map((decision) => [decision.id, decision]));
 
 	for (const spec of specs) {
 		const raw = String(spec || "").trim();
@@ -84,11 +64,8 @@ function applyAdoptionDecisionSpecs(decisions, specs) {
 		const gateId = raw.slice(0, separator).trim();
 		const value = raw.slice(separator + 1).trim();
 		const noteSeparator = value.indexOf(":");
-		const status = (
-			noteSeparator === -1 ? value : value.slice(0, noteSeparator)
-		).trim();
-		const note =
-			noteSeparator === -1 ? "" : value.slice(noteSeparator + 1).trim();
+		const status = (noteSeparator === -1 ? value : value.slice(0, noteSeparator)).trim();
+		const note = noteSeparator === -1 ? "" : value.slice(noteSeparator + 1).trim();
 
 		if (!ADOPTION_DECISION_GATE_IDS.has(gateId)) {
 			errors.push(`Unknown decision gate: ${gateId}`);
@@ -110,9 +87,7 @@ function applyAdoptionDecisionSpecs(decisions, specs) {
 }
 
 function adoptionDecisionApprovalStatus(decisions) {
-	return decisions.some(
-		(decision) => decision.status !== "pending" || decision.note,
-	)
+	return decisions.some((decision) => decision.status !== "pending" || decision.note)
 		? "recorded"
 		: "pending";
 }
@@ -125,8 +100,7 @@ function adoptionDecisionRecordErrorResult(fields, errors, warnings) {
 		outputPath: fields.outputPath || "",
 		latestReport: null,
 		gateDecision: "wait",
-		nextSafeAction:
-			"Fix adoption decision-record errors before sharing this record.",
+		nextSafeAction: "Fix adoption decision-record errors before sharing this record.",
 		approvalStatus: "pending",
 		decisions: adoptionDecisionRecordDecisions(),
 		findings: [],
@@ -162,13 +136,10 @@ function writeAdoptionDecisionRecord(options = {}) {
 				outputPath: ctx.outputPath,
 				latestReport: manifest.latestReport || null,
 				gateDecision: manifest.gateDecision || "wait",
-				nextSafeAction:
-					manifest.nextSafeAction || MESSAGES.adoptionReviewBeforeChange,
+				nextSafeAction: manifest.nextSafeAction || MESSAGES.adoptionReviewBeforeChange,
 				approvalStatus: adoptionDecisionApprovalStatus(decisions),
 				decisions,
-				findings: gateMarkdown
-					? extractAdoptionGateFindings(gateMarkdown)
-					: [],
+				findings: gateMarkdown ? extractAdoptionGateFindings(gateMarkdown) : [],
 				boundaries: {
 					...adoptionBundleBoundaries(),
 					...(manifest.boundaries || {}),
@@ -209,8 +180,7 @@ function writeAdoptionApplyPlan(options = {}) {
 		outputExistsLabel: "Apply plan",
 		emptyResult: (fields, errors, warnings) =>
 			adoptionApplyPlanErrorResult({ ...fields, dryRun }, errors, warnings),
-		validate: () =>
-			dryRun ? [] : ["adoption apply-plan requires --dry-run in V1."],
+		validate: () => (dryRun ? [] : ["adoption apply-plan requires --dry-run in V1."]),
 		render: renderAdoptionApplyPlan,
 		build: (manifest, ctx) => {
 			if (!manifest.target) {
@@ -282,9 +252,7 @@ function writeAdoptionSelectedFiles(options = {}) {
 			? [options.include]
 			: [];
 	const selectedFiles = [
-		...new Set(
-			included.map((item) => String(item || "").trim()).filter(Boolean),
-		),
+		...new Set(included.map((item) => String(item || "").trim()).filter(Boolean)),
 	];
 	return writeAdoptionBundleArtifact(options, {
 		command: "adoption selected-files",
@@ -318,15 +286,10 @@ function writeAdoptionSelectedFiles(options = {}) {
 				bundleDir: ctx.bundleDir,
 				outputPath: ctx.outputPath,
 				selectedFiles,
-				requiredSelected: selectedFiles.filter((filePath) =>
-					requiredSet.has(filePath),
-				),
-				optionalSelected: selectedFiles.filter((filePath) =>
-					optionalSet.has(filePath),
-				),
+				requiredSelected: selectedFiles.filter((filePath) => requiredSet.has(filePath)),
+				optionalSelected: selectedFiles.filter((filePath) => optionalSet.has(filePath)),
 				supportSelected: selectedFiles.filter(
-					(filePath) =>
-						!requiredSet.has(filePath) && !optionalSet.has(filePath),
+					(filePath) => !requiredSet.has(filePath) && !optionalSet.has(filePath),
 				),
 				requiredHarnessFiles: REQUIRED_HARNESS_FILES,
 				optionalStarterWikiFiles: OPTIONAL_STARTER_WIKI_FILES,

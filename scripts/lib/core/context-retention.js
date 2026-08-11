@@ -42,7 +42,8 @@ function pageIdOf(category, value) {
 
 function supersedesOf(category, value) {
 	if (!value || typeof value !== "object") return [];
-	const supersedes = category === "requests" ? value.target && value.target.supersedes : value.supersedes;
+	const supersedes =
+		category === "requests" ? value.target && value.target.supersedes : value.supersedes;
 	return Array.isArray(supersedes) ? supersedes : [];
 }
 
@@ -114,7 +115,8 @@ function retentionReport(targetRoot, options = {}) {
 		}
 		let currentProjectionPath = null;
 		try {
-			if (projectionStatus(targetRoot).ok) currentProjectionPath = projectionManifestPath(targetRoot);
+			if (projectionStatus(targetRoot).ok)
+				currentProjectionPath = projectionManifestPath(targetRoot);
 		} catch {
 			currentProjectionPath = null;
 		}

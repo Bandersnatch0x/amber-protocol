@@ -8,11 +8,7 @@ const { loadRoutes } = require("../route-loader");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { walkLedgers, verifyLedgerChain } = require("./loop-ledger");
 
-const GOVERNANCE_DOCS = [
-	"POLICY.md",
-	"BOUNDARIES.md",
-	"AUDIT_LOG.md",
-];
+const GOVERNANCE_DOCS = ["POLICY.md", "BOUNDARIES.md", "AUDIT_LOG.md"];
 
 function slash(value) {
 	return value.split(path.sep).join("/");
@@ -103,12 +99,15 @@ function readWorkflowPacks(targetRoot) {
 	const packsDir = path.join(targetRoot, "workflow-packs");
 	return listJsonFiles(packsDir, ".pack.json").map((filePath) => {
 		const read = readJsonSafe(filePath);
-		const pack = read.value && typeof read.value === "object" && !Array.isArray(read.value)
-			? read.value
-			: null;
+		const pack =
+			read.value && typeof read.value === "object" && !Array.isArray(read.value)
+				? read.value
+				: null;
 		const loopContracts = Array.isArray(pack?.loopContracts) ? pack.loopContracts : [];
 		const reviewGateIssues = loopContracts
-			.filter((contract) => !Array.isArray(contract.reviewGates) || contract.reviewGates.length === 0)
+			.filter(
+				(contract) => !Array.isArray(contract.reviewGates) || contract.reviewGates.length === 0,
+			)
 			.map((contract) => contract.id || "unknown-loop");
 		const workspaceIsolation = pack?.workspaceIsolation || null;
 		const hasWorktreeIsolation =
@@ -143,10 +142,12 @@ function inspectWorkflowPacks(targetRoot) {
 		missingWorktreeIsolation: packs
 			.filter((pack) => pack.loopContractCount > 0 && !pack.hasWorktreeIsolation)
 			.map((pack) => pack.id),
-		readErrors: packs.filter((pack) => pack.error).map((pack) => ({
-			pack: pack.id,
-			error: pack.error,
-		})),
+		readErrors: packs
+			.filter((pack) => pack.error)
+			.map((pack) => ({
+				pack: pack.id,
+				error: pack.error,
+			})),
 	};
 }
 
@@ -247,101 +248,115 @@ function collectFindings(sections) {
 		findings.push(finding("error", "policy-error", error));
 	}
 	for (const warning of sections.policy.warnings || []) {
-		const id = warning.includes("user-approval")
-			? "unsafe-user-approval"
-			: "policy-warning";
+		const id = warning.includes("user-approval") ? "unsafe-user-approval" : "policy-warning";
 		findings.push(finding("warning", id, warning));
 	}
 	for (const error of sections.routes.errors || []) {
 		findings.push(finding("error", "route-error", error));
 	}
 	for (const readError of sections.workflowPacks.readErrors) {
-		findings.push(finding(
-			"error",
-			"workflow-pack-read-error",
-			`Cannot inspect workflow pack ${readError.pack}: ${readError.error}`,
-			readError,
-		));
+		findings.push(
+			finding(
+				"error",
+				"workflow-pack-read-error",
+				`Cannot inspect workflow pack ${readError.pack}: ${readError.error}`,
+				readError,
+			),
+		);
 	}
 	for (const docPath of sections.docs.missing) {
-		findings.push(finding(
-			"warning",
-			"missing-governance-doc",
-			`Governance document is missing: ${docPath}`,
-			{ file: docPath },
-		));
+		findings.push(
+			finding("warning", "missing-governance-doc", `Governance document is missing: ${docPath}`, {
+				file: docPath,
+			}),
+		);
 	}
 	for (const routeId of sections.routes.withoutGates) {
-		findings.push(finding(
-			"warning",
-			"route-without-gates",
-			`Route has no approval gates: ${routeId}`,
-			{ routeId },
-		));
+		findings.push(
+			finding("warning", "route-without-gates", `Route has no approval gates: ${routeId}`, {
+				routeId,
+			}),
+		);
 	}
 	for (const issue of sections.workflowPacks.missingReviewGates) {
-		findings.push(finding(
-			"warning",
-			"pack-missing-review-gates",
-			`Workflow pack ${issue.pack} loop ${issue.contractId} has no review gates.`,
-			issue,
-		));
+		findings.push(
+			finding(
+				"warning",
+				"pack-missing-review-gates",
+				`Workflow pack ${issue.pack} loop ${issue.contractId} has no review gates.`,
+				issue,
+			),
+		);
 	}
 	for (const packId of sections.workflowPacks.missingWorktreeIsolation) {
-		findings.push(finding(
-			"warning",
-			"pack-missing-worktree-isolation",
-			`Workflow pack lacks required worktree isolation: ${packId}`,
-			{ pack: packId },
-		));
+		findings.push(
+			finding(
+				"warning",
+				"pack-missing-worktree-isolation",
+				`Workflow pack lacks required worktree isolation: ${packId}`,
+				{ pack: packId },
+			),
+		);
 	}
 	if (!sections.security.standardExists) {
-		findings.push(finding(
-			"warning",
-			"missing-security-standard",
-			"Security governance standard is missing: standards/security-governance.json",
-		));
+		findings.push(
+			finding(
+				"warning",
+				"missing-security-standard",
+				"Security governance standard is missing: standards/security-governance.json",
+			),
+		);
 	}
 	if (
 		sections.security.securityNamedPacks.length > 0 &&
 		sections.security.unlinkedSecurityPacks.length > 0
 	) {
-		findings.push(finding(
-			"warning",
-			"security-pack-not-linked",
-			`Security workflow packs do not all reference security-governance: ${sections.security.unlinkedSecurityPacks.join(", ")}`,
-			{ packs: sections.security.unlinkedSecurityPacks },
-		));
+		findings.push(
+			finding(
+				"warning",
+				"security-pack-not-linked",
+				`Security workflow packs do not all reference security-governance: ${sections.security.unlinkedSecurityPacks.join(", ")}`,
+				{ packs: sections.security.unlinkedSecurityPacks },
+			),
+		);
 	}
 	if (!sections.evidence.hasEvidence) {
-		findings.push(finding(
-			"warning",
-			"no-audit-evidence",
-			"No session or execution evidence found for audit review.",
-		));
+		findings.push(
+			finding(
+				"warning",
+				"no-audit-evidence",
+				"No session or execution evidence found for audit review.",
+			),
+		);
 	}
 	// GLX (governed execution) controls.
 	if (sections.glx.rulesMissing) {
-		findings.push(finding(
-			"warning",
-			"missing-governance-rules",
-			"No .amber/governance/rules.json found; governed execution will use built-in defaults.",
-		));
+		findings.push(
+			finding(
+				"warning",
+				"missing-governance-rules",
+				"No .amber/governance/rules.json found; governed execution will use built-in defaults.",
+			),
+		);
 	}
 	if (sections.glx.unsafeDefaultAllow) {
-		findings.push(finding(
-			"error",
-			"unsafe-default-allow",
-			"rules.json defaultAction=allow is unsafe — unlisted commands would be permitted.",
-		));
+		findings.push(
+			finding(
+				"error",
+				"unsafe-default-allow",
+				"rules.json defaultAction=allow is unsafe — unlisted commands would be permitted.",
+			),
+		);
 	}
 	for (const t of sections.glx.tamperedLedgers) {
-		findings.push(finding(
-			"error",
-			"ledger-tampered",
-			`Hash-chain ledger tampered: ${t.home}/${t.id} (broken at record ${t.brokenAt}: ${t.reason})`,
-			{ ledgerHome: t.home, ledgerSub: t.id, brokenAt: t.brokenAt },
-		));
+		findings.push(
+			finding(
+				"error",
+				"ledger-tampered",
+				`Hash-chain ledger tampered: ${t.home}/${t.id} (broken at record ${t.brokenAt}: ${t.reason})`,
+				{ ledgerHome: t.home, ledgerSub: t.id, brokenAt: t.brokenAt },
+			),
+		);
 	}
 
 	return findings;
@@ -372,10 +387,12 @@ const ACTION_LIBRARY = {
 	},
 	"unsafe-user-approval": {
 		severity: "high",
-		summary: "Set leftover autonomous-policy gates['user-approval'] to 'block' (auto-approve is not supported).",
+		summary:
+			"Set leftover autonomous-policy gates['user-approval'] to 'block' (auto-approve is not supported).",
 		why: "A leftover policy claiming user-approval=approve contradicts the removed autonomous executor and confuses operators.",
 		command: "node scripts/amber.js governance policy --target <repo>",
-		expectedOutcome: "Leftover policy is fixed, removed, or documented as non-executing config only.",
+		expectedOutcome:
+			"Leftover policy is fixed, removed, or documented as non-executing config only.",
 		blocks: ["safety-score", "governed-workflow"],
 	},
 	"policy-warning": {
@@ -415,7 +432,8 @@ const ACTION_LIBRARY = {
 		summary: "Add route gates around planning, implementation, review, or merge stages.",
 		why: "Routes without gates do not enforce review or approval checkpoints.",
 		command: "node scripts/amber.js route inspect <route-id> --target <repo>",
-		expectedOutcome: "Routes include gates around planning, implementation, review, or merge stages.",
+		expectedOutcome:
+			"Routes include gates around planning, implementation, review, or merge stages.",
 		blocks: ["safety-score", "governed-workflow"],
 	},
 	"pack-missing-review-gates": {
@@ -431,15 +449,18 @@ const ACTION_LIBRARY = {
 		summary: "Require worktree isolation for mutating workflow-pack loops.",
 		why: "Mutating loops need worktree isolation to avoid accidental main checkout changes.",
 		command: "node scripts/amber.js pack readiness --file <pack-file>",
-		expectedOutcome: "Mutating loop contracts require isolated worktrees and forbid main checkout mutation.",
+		expectedOutcome:
+			"Mutating loop contracts require isolated worktrees and forbid main checkout mutation.",
 		blocks: ["safety-score"],
 	},
 	"missing-security-standard": {
 		severity: "medium",
-		summary: "Run amber governance standards init to create standards/security-governance.json, then map coverage with amber governance standards.",
+		summary:
+			"Run amber governance standards init to create standards/security-governance.json, then map coverage with amber governance standards.",
 		why: "Security pack claims need an auditable standard to map controls and gaps.",
 		command: "node scripts/amber.js governance standards init --target <repo>",
-		expectedOutcome: "Creates standards/security-governance.json (declarative security-governance standard), clearing this finding. Re-run `governance standards` to map coverage.",
+		expectedOutcome:
+			"Creates standards/security-governance.json (declarative security-governance standard), clearing this finding. Re-run `governance standards` to map coverage.",
 		blocks: ["safety-score", "governance-score"],
 	},
 	"security-pack-not-linked": {
@@ -454,8 +475,9 @@ const ACTION_LIBRARY = {
 		severity: "medium",
 		summary: "Run governed sessions and export evidence when work completes.",
 		why: "A complete product loop needs verification evidence before handoff is trustworthy.",
-		command: "node scripts/amber.js session start --target <repo> --goal \"verify current delivery\"",
-		expectedOutcome: "A governed session or execution records verification evidence that can be exported.",
+		command: 'node scripts/amber.js session start --target <repo> --goal "verify current delivery"',
+		expectedOutcome:
+			"A governed session or execution records verification evidence that can be exported.",
 		blocks: ["evidence-score", "handoff-readiness"],
 	},
 	"missing-governance-rules": {
@@ -476,18 +498,18 @@ const ACTION_LIBRARY = {
 	},
 	"ledger-tampered": {
 		severity: "high",
-		summary: "Investigate the flagged ledger record; restore it from version control if it was edited.",
+		summary:
+			"Investigate the flagged ledger record; restore it from version control if it was edited.",
 		why: "A tampered ledger means evidence continuity cannot be trusted.",
 		command: "node scripts/amber.js ledger verify-anchoring --target <repo>",
-		expectedOutcome: "Tampered ledger records are investigated and restored from version control if appropriate.",
+		expectedOutcome:
+			"Tampered ledger records are investigated and restored from version control if appropriate.",
 		blocks: ["evidence-score", "handoff-readiness"],
 	},
 };
 
 function buildNextActions(findings) {
-	const actions = findings
-		.map((item) => ACTION_LIBRARY[item.id]?.summary)
-		.filter(Boolean);
+	const actions = findings.map((item) => ACTION_LIBRARY[item.id]?.summary).filter(Boolean);
 	return [...new Set(actions)];
 }
 
@@ -536,30 +558,53 @@ function confidenceClass(confidence, ruleId, reason) {
 }
 
 function classifyConfidenceRule(rule, index) {
-	const ruleId = rule && typeof rule.id === "string" && rule.id.length > 0
-		? rule.id
-		: `rule-${index + 1}`;
+	const ruleId =
+		rule && typeof rule.id === "string" && rule.id.length > 0 ? rule.id : `rule-${index + 1}`;
 	if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
-		return confidenceClass("low", ruleId, `Rule ${ruleId} is not an object; it cannot be matched or gated.`);
+		return confidenceClass(
+			"low",
+			ruleId,
+			`Rule ${ruleId} is not an object; it cannot be matched or gated.`,
+		);
 	}
 	const action = rule.action;
 	if (action !== "allow" && action !== "deny") {
-		return confidenceClass("low", ruleId, `Rule ${ruleId} has no explicit allow/deny action; it cannot be evaluated with confidence.`);
+		return confidenceClass(
+			"low",
+			ruleId,
+			`Rule ${ruleId} has no explicit allow/deny action; it cannot be evaluated with confidence.`,
+		);
 	}
 	if (typeof rule.pattern !== "string" || rule.pattern.length === 0) {
-		return confidenceClass("low", ruleId, `Rule ${ruleId} has no pattern to match; it can never fire.`);
+		return confidenceClass(
+			"low",
+			ruleId,
+			`Rule ${ruleId} has no pattern to match; it can never fire.`,
+		);
 	}
 	const match = typeof rule.match === "string" ? rule.match : "";
 	const mapsTo = Array.isArray(rule.mapsTo)
 		? rule.mapsTo.filter((item) => typeof item === "string" && item.length > 0)
 		: [];
 	if (mapsTo.length > 0 && (match === "exact" || match === "prefix")) {
-		return confidenceClass("high", ruleId, `Rule ${ruleId} declares action "${action}", a deterministic ${match} matcher, and maps to ${mapsTo.join(", ")}; traceable for governed execution.`);
+		return confidenceClass(
+			"high",
+			ruleId,
+			`Rule ${ruleId} declares action "${action}", a deterministic ${match} matcher, and maps to ${mapsTo.join(", ")}; traceable for governed execution.`,
+		);
 	}
 	if (mapsTo.length === 0) {
-		return confidenceClass("medium", ruleId, `Rule ${ruleId} declares action "${action}" but no mapsTo; intent is clear but not traceable to a governance claim.`);
+		return confidenceClass(
+			"medium",
+			ruleId,
+			`Rule ${ruleId} declares action "${action}" but no mapsTo; intent is clear but not traceable to a governance claim.`,
+		);
 	}
-	return confidenceClass("medium", ruleId, `Rule ${ruleId} uses a fuzzy ${match} matcher; matching confidence is partial.`);
+	return confidenceClass(
+		"medium",
+		ruleId,
+		`Rule ${ruleId} uses a fuzzy ${match} matcher; matching confidence is partial.`,
+	);
 }
 
 function computeConfidenceClasses(rules) {
@@ -594,10 +639,7 @@ function inspectGovernanceReadiness(targetRoot) {
 }
 
 function renderReadinessText(result) {
-	const lines = [
-		`Governance Readiness: ${result.decision}`,
-		`Findings: ${result.findings.length}`,
-	];
+	const lines = [`Governance Readiness: ${result.decision}`, `Findings: ${result.findings.length}`];
 	for (const item of result.findings) {
 		lines.push(`  - ${item.severity} ${item.id}: ${item.message}`);
 	}
@@ -632,14 +674,22 @@ function renderReadinessMarkdown(result) {
 
 	lines.push("## Sections", "");
 	lines.push(`- Policy overrides: ${result.sections.policy.overrides.length}`);
-	lines.push(`- Governance docs present: ${result.sections.docs.present.length}/${GOVERNANCE_DOCS.length}`);
+	lines.push(
+		`- Governance docs present: ${result.sections.docs.present.length}/${GOVERNANCE_DOCS.length}`,
+	);
 	lines.push(`- Routes: ${result.sections.routes.count}`);
 	lines.push(`- Workflow packs: ${result.sections.workflowPacks.count}`);
-	lines.push(`- Security standard present: ${result.sections.security.standardExists ? "yes" : "no"}`);
+	lines.push(
+		`- Security standard present: ${result.sections.security.standardExists ? "yes" : "no"}`,
+	);
 	lines.push(`- Sessions: ${result.sections.evidence.sessionCount}`);
 	lines.push(`- Executions: ${result.sections.evidence.executionCount}`);
 	const glx = result.sections.glx || {};
-	const glxRulesStatus = glx.rulesMissing ? "missing" : glx.unsafeDefaultAllow ? "unsafe (defaultAction=allow)" : "present (safe)";
+	const glxRulesStatus = glx.rulesMissing
+		? "missing"
+		: glx.unsafeDefaultAllow
+			? "unsafe (defaultAction=allow)"
+			: "present (safe)";
 	lines.push(`- GLX rules: ${glxRulesStatus}`);
 	lines.push(`- GLX tampered ledgers: ${(glx.tamperedLedgers || []).length}`);
 	lines.push("");

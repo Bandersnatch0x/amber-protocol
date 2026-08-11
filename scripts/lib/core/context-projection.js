@@ -4,11 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { canonicalJson, sha256 } = require("./context-hash");
-const {
-	indexPath,
-	listPages,
-	readPage,
-} = require("./context-store");
+const { indexPath, listPages, readPage } = require("./context-store");
 const { renderContextIndex, validateContextIndex } = require("./context-index");
 const { resolvePathWithin } = require("./fs-utils");
 
@@ -81,10 +77,7 @@ function projectionStatus(targetRoot) {
 	const output = fs.readFileSync(outputPath, "utf8");
 	const outputHash = sha256(output);
 	if (manifest.outputHash !== outputHash) {
-		return projectionFailure(
-			"AMBER_E_CONTEXT_PROJECTION_DRIFT",
-			"projection output hash mismatch",
-		);
+		return projectionFailure("AMBER_E_CONTEXT_PROJECTION_DRIFT", "projection output hash mismatch");
 	}
 	const completeness = validateContextIndex(state.pages, output);
 	if (!completeness.ok) {

@@ -9,9 +9,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-	loadSessionManifest,
-} = require("../../scripts/lib/session-commands");
+const { loadSessionManifest } = require("../../scripts/lib/session-commands");
 
 function tempProject() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "session-load-"));
@@ -20,10 +18,7 @@ function tempProject() {
 function writeManifest(projectRoot, sessionId, manifest) {
 	const sessionDir = path.join(projectRoot, ".amber", "sessions", sessionId);
 	fs.mkdirSync(sessionDir, { recursive: true });
-	fs.writeFileSync(
-		path.join(sessionDir, "manifest.json"),
-		JSON.stringify(manifest),
-	);
+	fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify(manifest));
 	return sessionDir;
 }
 

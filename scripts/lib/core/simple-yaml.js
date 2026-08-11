@@ -62,7 +62,10 @@ function parseSimpleYaml(text) {
 				const m = firstKv.match(/^(\w[\w-]*)\s*:\s*(.*)$/);
 				if (m) {
 					let val = m[2].trim();
-					if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+					if (
+						(val.startsWith('"') && val.endsWith('"')) ||
+						(val.startsWith("'") && val.endsWith("'"))
+					) {
 						val = val.slice(1, -1);
 					}
 					obj[m[1]] = val;
@@ -70,7 +73,11 @@ function parseSimpleYaml(text) {
 			} else {
 				// simple list of scalars
 				let val = itemText;
-				if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
+				if (
+					(val.startsWith('"') && val.endsWith('"')) ||
+					(val.startsWith("'") && val.endsWith("'"))
+				)
+					val = val.slice(1, -1);
 				listOwner[listKey].push(val);
 			}
 			continue;
@@ -89,7 +96,10 @@ function parseSimpleYaml(text) {
 				currentKey = null;
 				continue;
 			}
-			if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+			if (
+				(val.startsWith('"') && val.endsWith('"')) ||
+				(val.startsWith("'") && val.endsWith("'"))
+			) {
 				val = val.slice(1, -1);
 			} else if (val === "[]" || val === "{}") {
 				val = val === "[]" ? [] : {};

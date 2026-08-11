@@ -40,21 +40,14 @@ describe("worktree-manager", () => {
 		const result = createWorktree(TEST_ROOT, SESSION_ID);
 		assert.strictEqual(result.success, true);
 
-		const worktreePath = path.join(
-			TEST_ROOT,
-			".amber",
-			"worktrees",
-			SESSION_ID,
-		);
+		const worktreePath = path.join(TEST_ROOT, ".amber", "worktrees", SESSION_ID);
 		assert.ok(fs.existsSync(worktreePath));
 		assert.ok(fs.existsSync(path.join(worktreePath, "README.md")));
 	});
 
 	it("returns the worktree path on success", () => {
 		const result = createWorktree(TEST_ROOT, SESSION_ID);
-		assert.ok(
-			result.path.endsWith(path.join(".amber", "worktrees", SESSION_ID)),
-		);
+		assert.ok(result.path.endsWith(path.join(".amber", "worktrees", SESSION_ID)));
 	});
 
 	it("creates worktree based on current branch", () => {
@@ -67,12 +60,7 @@ describe("worktree-manager", () => {
 
 	it("removes a worktree and cleans up directories", () => {
 		createWorktree(TEST_ROOT, SESSION_ID);
-		const worktreePath = path.join(
-			TEST_ROOT,
-			".amber",
-			"worktrees",
-			SESSION_ID,
-		);
+		const worktreePath = path.join(TEST_ROOT, ".amber", "worktrees", SESSION_ID);
 
 		const result = removeWorktree(TEST_ROOT, SESSION_ID);
 		assert.strictEqual(result.success, true);
@@ -89,10 +77,7 @@ describe("worktree-manager", () => {
 
 	it("returns error when creating worktree in non-git directory", () => {
 		const os = require("os");
-		const nonGitDir = path.join(
-			os.tmpdir(),
-			"harness-non-git-test-" + Date.now(),
-		);
+		const nonGitDir = path.join(os.tmpdir(), "harness-non-git-test-" + Date.now());
 		fs.mkdirSync(nonGitDir, { recursive: true });
 
 		try {

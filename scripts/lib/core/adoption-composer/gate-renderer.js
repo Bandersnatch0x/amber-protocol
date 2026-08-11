@@ -3,12 +3,7 @@
 // gate-renderer.js
 // Renders adoption gate documents and status documents.
 
-const {
-	renderMarkdown,
-	pushGateFindings,
-	pushMetrics,
-	pushBlockers,
-} = require("./shared-helpers");
+const { renderMarkdown, pushGateFindings, pushMetrics, pushBlockers } = require("./shared-helpers");
 
 function renderAdoptionGateDocument(gate) {
 	const lines = [
@@ -48,9 +43,7 @@ function renderAdoptionStatusDocument(status) {
 		lines.push(
 			`- Missing Amber starter files delta: ${status.compare.metrics.missingHarnessFiles.delta ?? "n/a"}`,
 		);
-		lines.push(
-			`- Candidate commands added: ${status.compare.candidateCommands.added.length}`,
-		);
+		lines.push(`- Candidate commands added: ${status.compare.candidateCommands.added.length}`);
 		lines.push(`- Unknowns removed: ${status.compare.unknowns.removed.length}`);
 	}
 	lines.push("");

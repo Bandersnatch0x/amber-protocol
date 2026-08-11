@@ -8,9 +8,7 @@ const test = require("node:test");
 const { run } = require("../scripts/amber");
 
 function tempFixture(name) {
-	return fs.mkdtempSync(
-		path.join(os.tmpdir(), `amber-execution-readiness-${name}-`),
-	);
+	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-execution-readiness-${name}-`));
 }
 
 test("execution readiness - unapproved plan returns ready=false with blocker", async () => {
@@ -100,12 +98,7 @@ test("execution readiness - approved plan returns ready=true", async () => {
 			),
 		);
 
-		const planPath = path.join(
-			fixtureRoot,
-			"docs",
-			"plans",
-			"F001-approved.md",
-		);
+		const planPath = path.join(fixtureRoot, "docs", "plans", "F001-approved.md");
 		fs.writeFileSync(
 			planPath,
 			[

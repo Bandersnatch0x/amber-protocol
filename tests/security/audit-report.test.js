@@ -9,9 +9,7 @@ describe("generateAuditReport", () => {
 			summary: "1 vulnerability found",
 			pass: false,
 		};
-		const secretResult = [
-			{ file: "/tmp/test.js", line: 2, type: "API Key", match: "sk-abc" },
-		];
+		const secretResult = [{ file: "/tmp/test.js", line: 2, type: "API Key", match: "sk-abc" }];
 		const permResult = {
 			findings: [
 				{
@@ -26,15 +24,9 @@ describe("generateAuditReport", () => {
 		const report = generateAuditReport(depResult, secretResult, permResult);
 
 		assert.ok(report.includes("# Security Audit Report"), "Should have title");
-		assert.ok(
-			report.includes("## Dependency Scan"),
-			"Should have dependency section",
-		);
+		assert.ok(report.includes("## Dependency Scan"), "Should have dependency section");
 		assert.ok(report.includes("## Secret Scan"), "Should have secret section");
-		assert.ok(
-			report.includes("## Permission Review"),
-			"Should have permission section",
-		);
+		assert.ok(report.includes("## Permission Review"), "Should have permission section");
 	});
 
 	it("produces markdown report with severity sections", () => {
@@ -70,26 +62,16 @@ describe("generateAuditReport", () => {
 			summary: "1 vulnerability",
 			pass: false,
 		};
-		const secretResult = [
-			{ file: "src/config.js", line: 5, type: "API Key", match: "sk-abc" },
-		];
+		const secretResult = [{ file: "src/config.js", line: 5, type: "API Key", match: "sk-abc" }];
 		const permResult = {
-			findings: [
-				{ issue: "overly_broad", severity: "warning", message: "** pattern" },
-			],
+			findings: [{ issue: "overly_broad", severity: "warning", message: "** pattern" }],
 			pass: false,
 		};
 
 		const report = generateAuditReport(depResult, secretResult, permResult);
 
-		assert.ok(
-			report.includes("Remediation"),
-			"Should include remediation section",
-		);
-		assert.ok(
-			report.includes("update"),
-			"Should suggest updating dependencies (case-insensitive)",
-		);
+		assert.ok(report.includes("Remediation"), "Should include remediation section");
+		assert.ok(report.includes("update"), "Should suggest updating dependencies (case-insensitive)");
 	});
 
 	it("shows pass summary when all scans pass", () => {
@@ -105,17 +87,12 @@ describe("generateAuditReport", () => {
 
 	it("shows fail summary when any scan fails", () => {
 		const depResult = { vulnerabilities: [], summary: "ok", pass: true };
-		const secretResult = [
-			{ file: "x.js", line: 1, type: "Password", match: "pwd=123" },
-		];
+		const secretResult = [{ file: "x.js", line: 1, type: "Password", match: "pwd=123" }];
 		const permResult = { findings: [], pass: true };
 
 		const report = generateAuditReport(depResult, secretResult, permResult);
 
-		assert.ok(
-			report.includes("FAIL"),
-			"Should show FAIL when secret scan finds issues",
-		);
+		assert.ok(report.includes("FAIL"), "Should show FAIL when secret scan finds issues");
 	});
 
 	it("includes metadata section with timestamp", () => {
@@ -125,10 +102,7 @@ describe("generateAuditReport", () => {
 
 		const report = generateAuditReport(depResult, secretResult, permResult);
 
-		assert.ok(
-			report.includes("## Metadata"),
-			"Should include metadata section",
-		);
+		assert.ok(report.includes("## Metadata"), "Should include metadata section");
 		assert.ok(report.includes("Date:"), "Should include date");
 	});
 });

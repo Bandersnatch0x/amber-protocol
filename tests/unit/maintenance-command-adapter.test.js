@@ -63,10 +63,7 @@ describe("maintenance command adapter", () => {
 			const out = maintenanceDispatch("bogus", { target: tmp });
 			assert.ok(out.result.errors.length > 0);
 			for (const action of ALL_TEN) {
-				assert.ok(
-					out.result.errors.join(" ").includes(action),
-					`guidance lists ${action}`,
-				);
+				assert.ok(out.result.errors.join(" ").includes(action), `guidance lists ${action}`);
 			}
 		} finally {
 			fs.rmSync(tmp, { recursive: true, force: true });

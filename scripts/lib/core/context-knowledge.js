@@ -26,7 +26,8 @@ function normalizePageIds(value) {
 function readKnowledgeGraph(targetRoot, replacement) {
 	const pages = new Map();
 	for (const { pageId } of listPages(targetRoot)) {
-		const page = replacement && replacement.pageId === pageId ? replacement : readPage(targetRoot, pageId);
+		const page =
+			replacement && replacement.pageId === pageId ? replacement : readPage(targetRoot, pageId);
 		if (page) pages.set(pageId, page);
 	}
 	if (replacement && !pages.has(replacement.pageId)) pages.set(replacement.pageId, replacement);

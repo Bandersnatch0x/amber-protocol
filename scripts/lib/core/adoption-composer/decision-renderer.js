@@ -113,12 +113,7 @@ function renderAdoptionSelectedFiles(proposal) {
 		"## Optional Starter Wiki Files",
 	);
 	if (proposal.supportFiles.length > 0) {
-		pushCheckboxFileList(
-			lines,
-			proposal.supportFiles,
-			selected,
-			"## Support Files",
-		);
+		pushCheckboxFileList(lines, proposal.supportFiles, selected, "## Support Files");
 	}
 	lines.push(
 		"## Required User Action",

@@ -38,8 +38,6 @@ jobs:
       - name: Scope package for GitHub Packages
         run: npm pkg set name="@bandersnatch0x/amber-protocol"
 
-
-
       # Write GitHub Packages auth to .npmrc. NODE_AUTH_TOKEN from setup-node
       # only covers registry.npmjs.org; GitHub Packages needs its own entry.
 

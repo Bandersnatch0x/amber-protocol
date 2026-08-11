@@ -7,9 +7,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
-const {
-	buildReplayContent,
-} = require("../../scripts/lib/core/task-execution");
+const { buildReplayContent } = require("../../scripts/lib/core/task-execution");
 const { MESSAGES } = require("../../scripts/lib/core/terminology");
 
 const baseEvidence = { traceReplay: undefined, regressionProposal: undefined };

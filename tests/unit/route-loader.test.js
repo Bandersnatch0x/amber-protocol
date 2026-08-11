@@ -9,11 +9,7 @@ describe("loadRoutes", () => {
 	it("loads all three reference routes from the routes directory", () => {
 		const result = loadRoutes(ROUTES_DIR);
 		const ids = result.routes.map((r) => r.routeId).sort();
-		assert.deepStrictEqual(ids, [
-			"bugfix-quick",
-			"feature-standard",
-			"refactor-safe",
-		]);
+		assert.deepStrictEqual(ids, ["bugfix-quick", "feature-standard", "refactor-safe"]);
 	});
 
 	it("returns no errors for the reference routes", () => {

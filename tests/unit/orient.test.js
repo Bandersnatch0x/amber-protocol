@@ -3,10 +3,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
-const {
-	SECTIONS,
-	GIT_PARTS,
-} = require("../../scripts/orient");
+const { SECTIONS, GIT_PARTS } = require("../../scripts/orient");
 
 test("SECTIONS defines exactly the three required orientation steps in order", () => {
 	assert.ok(Array.isArray(SECTIONS));

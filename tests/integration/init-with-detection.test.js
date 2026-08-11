@@ -60,10 +60,7 @@ describe("init with workflow detection", () => {
 		const result = runInit(target);
 		assert.equal(result.status, 0, result.stderr);
 		assert.match(result.stdout, /Git workflow:/);
-		assert.equal(
-			fs.existsSync(path.join(target, ".amber", "init-report.json")),
-			true,
-		);
+		assert.equal(fs.existsSync(path.join(target, ".amber", "init-report.json")), true);
 	});
 
 	it("reports wiki readiness with --with-wiki", (t) => {
@@ -74,10 +71,7 @@ describe("init with workflow detection", () => {
 		const result = runInit(target, ["--with-wiki"]);
 		assert.equal(result.status, 0, result.stderr);
 		assert.match(result.stdout, /Wiki readiness: \d+\/\d+ files present/);
-		assert.equal(
-			fs.existsSync(path.join(target, "docs", "wiki", "index.md")),
-			true,
-		);
+		assert.equal(fs.existsSync(path.join(target, "docs", "wiki", "index.md")), true);
 	});
 
 	it("skips detection (no report, no workflow line) with --skip-detection", (t) => {
@@ -88,10 +82,7 @@ describe("init with workflow detection", () => {
 		const result = runInit(target, ["--skip-detection"]);
 		assert.equal(result.status, 0, result.stderr);
 		assert.doesNotMatch(result.stdout, /Git workflow:/);
-		assert.equal(
-			fs.existsSync(path.join(target, ".amber", "init-report.json")),
-			false,
-		);
+		assert.equal(fs.existsSync(path.join(target, ".amber", "init-report.json")), false);
 	});
 
 	it("emits JSON whose detection is present with --json", (t) => {
@@ -114,9 +105,6 @@ describe("init with workflow detection", () => {
 		assert.equal(result.status, 0, result.stderr);
 		assert.doesNotMatch(result.stdout, /Git workflow:/);
 		assert.match(result.stdout, /Created: \d+/);
-		assert.equal(
-			fs.existsSync(path.join(target, ".amber", "init-report.json")),
-			false,
-		);
+		assert.equal(fs.existsSync(path.join(target, ".amber", "init-report.json")), false);
 	});
 });

@@ -1,0 +1,36 @@
+# CODEOWNERS — code ownership and review routing
+# https://docs.github.com/en/repositories/managing-your-repositories-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for anything not explicitly listed
+*                           @Bandersnatch0x
+
+# Core CLI and library
+/scripts/                   @Bandersnatch0x
+/scripts/lib/               @Bandersnatch0x
+
+# Git hooks
+/.githooks/                  @Bandersnatch0x
+
+# CI/CD configuration
+/.github/workflows/         @Bandersnatch0x
+
+# Skills (single source of truth — regenerates platform products)
+/skills/                    @Bandersnatch0x
+
+# Scaffolding templates
+/templates/                 @Bandersnatch0x
+
+# JSON schemas
+/schemas/                   @Bandersnatch0x
+
+# Route definitions
+/routes/                    @Bandersnatch0x
+
+# Agent-facing rules
+/AGENTS.md                  @Bandersnatch0x
+/CLAUDE.md                  @Bandersnatch0x
+/DESIGN.md                  @Bandersnatch0x
+/LOOP.md                    @Bandersnatch0x
+
+# Package manifest
+/package.json               @Bandersnatch0x

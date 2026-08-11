@@ -1,9 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
-const {
-	SessionStateMachine,
-	STATES,
-} = require("../../scripts/lib/session-state-machine");
+const { SessionStateMachine, STATES } = require("../../scripts/lib/session-state-machine");
 
 describe("SessionStateMachine", () => {
 	it("starts in created state", () => {

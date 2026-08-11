@@ -10,21 +10,14 @@ const {
 	validateHandoff,
 } = require("./audit");
 
-const {
-	REQUIRED_HARNESS_FILES,
-} = require("./constants");
+const { REQUIRED_HARNESS_FILES } = require("./constants");
 
-const {
-	pathExists,
-	resolveTarget,
-} = require("./fs-utils");
+const { pathExists, resolveTarget } = require("./fs-utils");
 
 const { validateManifests } = require("./manifests");
 const { classifyTarget } = require("./target-classification");
 
-const {
-	inspectProjectProfile,
-} = require("./profiles");
+const { inspectProjectProfile } = require("./profiles");
 
 const {
 	validateContinuousImprovementStateFile,
@@ -32,9 +25,7 @@ const {
 	validateWiki,
 } = require("./validators");
 
-const {
-	inspectWorkflowPack,
-} = require("./workflow-packs");
+const { inspectWorkflowPack } = require("./workflow-packs");
 
 const { remedyFor } = require("./lifecycle");
 
@@ -56,9 +47,7 @@ function doctorProductRepo(targetRoot, classification) {
 	// same feature-list invariants as target-repo doctor — including at most
 	// one in_progress — so product-repo doctor can't print Errors:0 while the
 	// list violates Operating Manual §6 (#66).
-	const featureResult = validateFeatureListFile(
-		path.join(targetRoot, "feature_list.json"),
-	);
+	const featureResult = validateFeatureListFile(path.join(targetRoot, "feature_list.json"));
 	errors.push(...featureResult.errors);
 	warnings.push(...featureResult.warnings);
 	productChecks.push({
@@ -78,16 +67,8 @@ function doctorProductRepo(targetRoot, classification) {
 		});
 	}
 
-	const samplePackPath = path.join(
-		targetRoot,
-		"workflow-packs",
-		"safe-amber-bootstrap.pack.json",
-	);
-	const sampleProfilePath = path.join(
-		targetRoot,
-		"profiles",
-		"default.profile.json",
-	);
+	const samplePackPath = path.join(targetRoot, "workflow-packs", "safe-amber-bootstrap.pack.json");
+	const sampleProfilePath = path.join(targetRoot, "profiles", "default.profile.json");
 	const packResult = inspectWorkflowPack(samplePackPath);
 	const profileResult = inspectProjectProfile(sampleProfilePath);
 	errors.push(...packResult.errors);
@@ -148,18 +129,22 @@ function doctor(target, options = {}) {
 			errors.push(`Missing required file: ${relativePath}`);
 		}
 	}
-	addCheck("Required harness files", missingFiles === 0,
+	addCheck(
+		"Required harness files",
+		missingFiles === 0,
 		missingFiles === 0 ? "all present" : `${missingFiles} missing`,
-		remedyFor("init", { targetDisplay: target || "." }));
+		remedyFor("init", { targetDisplay: target || "." }),
+	);
 
 	// Feature list validation
-	const featureResult = validateFeatureListFile(
-		path.join(targetRoot, "feature_list.json"),
-	);
+	const featureResult = validateFeatureListFile(path.join(targetRoot, "feature_list.json"));
 	errors.push(...featureResult.errors);
 	warnings.push(...featureResult.warnings);
-	addCheck("feature_list.json", featureResult.errors.length === 0,
-		featureResult.errors.length === 0 ? "valid" : featureResult.errors[0]);
+	addCheck(
+		"feature_list.json",
+		featureResult.errors.length === 0,
+		featureResult.errors.length === 0 ? "valid" : featureResult.errors[0],
+	);
 
 	// Continuous improvement state
 	const continuousImprovementResult = validateContinuousImprovementStateFile(
@@ -167,15 +152,23 @@ function doctor(target, options = {}) {
 	);
 	errors.push(...continuousImprovementResult.errors);
 	warnings.push(...continuousImprovementResult.warnings);
-	addCheck("Continuous improvement state", continuousImprovementResult.errors.length === 0,
-		continuousImprovementResult.errors.length === 0 ? "valid" : continuousImprovementResult.errors[0]);
+	addCheck(
+		"Continuous improvement state",
+		continuousImprovementResult.errors.length === 0,
+		continuousImprovementResult.errors.length === 0
+			? "valid"
+			: continuousImprovementResult.errors[0],
+	);
 
 	// Wiki validation
 	const wikiResult = validateWiki(targetRoot, { okf: options.okf === true });
 	errors.push(...wikiResult.errors);
 	warnings.push(...wikiResult.warnings);
-	addCheck("Wiki structure", wikiResult.errors.length === 0,
-		wikiResult.errors.length === 0 ? "valid" : `${wikiResult.errors.length} errors`);
+	addCheck(
+		"Wiki structure",
+		wikiResult.errors.length === 0,
+		wikiResult.errors.length === 0 ? "valid" : `${wikiResult.errors.length} errors`,
+	);
 
 	// AGENTS.md wiki routing
 	const agentsRoutesWiki = fileMentionsWiki(path.join(targetRoot, "AGENTS.md"));
@@ -192,8 +185,15 @@ function doctor(target, options = {}) {
 	}
 	// When the file doesn't exist, report as not-applicable (null) rather than
 	// passing — a missing file is not the same as a validated routing link.
-	addCheck("CLAUDE.md → wiki routing", claudeExists ? claudeRoutesWiki : null,
-		!claudeExists ? "file not present — check skipped" : claudeRoutesWiki ? "routes to wiki" : "missing wiki routing");
+	addCheck(
+		"CLAUDE.md → wiki routing",
+		claudeExists ? claudeRoutesWiki : null,
+		!claudeExists
+			? "file not present — check skipped"
+			: claudeRoutesWiki
+				? "routes to wiki"
+				: "missing wiki routing",
+	);
 
 	// Verification command
 	const hasVerify = hasVerificationCommand(targetRoot);
@@ -215,16 +215,22 @@ function doctor(target, options = {}) {
 	const handoffResult = validateHandoff(targetRoot);
 	errors.push(...handoffResult.errors);
 	warnings.push(...handoffResult.warnings);
-	addCheck("Session handoff", handoffResult.errors.length === 0,
-		handoffResult.errors.length === 0 ? "valid" : `${handoffResult.errors.length} errors`);
+	addCheck(
+		"Session handoff",
+		handoffResult.errors.length === 0,
+		handoffResult.errors.length === 0 ? "valid" : `${handoffResult.errors.length} errors`,
+	);
 
 	// Plugin manifests (optional)
 	if (hasPluginManifestDirectory(targetRoot)) {
 		const manifestResult = validateManifests(targetRoot);
 		errors.push(...manifestResult.errors);
 		warnings.push(...manifestResult.warnings);
-		addCheck("Plugin manifests", manifestResult.errors.length === 0,
-			manifestResult.errors.length === 0 ? "valid" : `${manifestResult.errors.length} errors`);
+		addCheck(
+			"Plugin manifests",
+			manifestResult.errors.length === 0,
+			manifestResult.errors.length === 0 ? "valid" : `${manifestResult.errors.length} errors`,
+		);
 	}
 
 	// Version drift — scan artifacts with amber_protocol_version against the
@@ -281,8 +287,12 @@ function doctor(target, options = {}) {
 		} else if (ctx.summary.total > 0) {
 			const hardFailures = ctx.summary.tampered + ctx.summary.obsolete + ctx.summary.orphaned;
 			const detail = `${ctx.summary.total} pages: ok ${ctx.summary.ok}, stale ${ctx.summary.stale}, tampered ${ctx.summary.tampered}, obsolete ${ctx.summary.obsolete}, orphaned ${ctx.summary.orphaned}`;
-			addCheck("Context pages", hardFailures === 0, detail,
-				hardFailures === 0 ? null : "amber context verify --target .");
+			addCheck(
+				"Context pages",
+				hardFailures === 0,
+				detail,
+				hardFailures === 0 ? null : "amber context verify --target .",
+			);
 			if (hardFailures > 0) errors.push(detail);
 		}
 	}

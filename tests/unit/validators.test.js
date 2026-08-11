@@ -44,16 +44,12 @@ test("rejects a primitive string with the object error", () => {
 
 test("rejects an object without a features array", () => {
 	const result = validateFeatureListData({});
-	assert.deepEqual(result.errors, [
-		"feature_list.json must contain a features array.",
-	]);
+	assert.deepEqual(result.errors, ["feature_list.json must contain a features array."]);
 });
 
 test("rejects a non-array features field", () => {
 	const result = validateFeatureListData({ features: "not-an-array" });
-	assert.deepEqual(result.errors, [
-		"feature_list.json must contain a features array.",
-	]);
+	assert.deepEqual(result.errors, ["feature_list.json must contain a features array."]);
 });
 
 test("accepts a well-formed single feature with no errors or warnings", () => {
@@ -91,9 +87,7 @@ test("warns when a blocked feature has no notes", () => {
 		features: [validFeature({ status: "blocked", notes: [] })],
 	});
 	assert.deepEqual(result.errors, []);
-	assert.deepEqual(result.warnings, [
-		"features[0] is blocked but has no notes.",
-	]);
+	assert.deepEqual(result.warnings, ["features[0] is blocked but has no notes."]);
 });
 
 test("errors on an invalid status using the canonical set order", () => {
@@ -116,16 +110,12 @@ test("errors on an empty verification array and on a blank step", () => {
 	const empty = validateFeatureListData({
 		features: [validFeature({ verification: [] })],
 	});
-	assert.deepEqual(empty.errors, [
-		"features[0].verification must contain at least one step.",
-	]);
+	assert.deepEqual(empty.errors, ["features[0].verification must contain at least one step."]);
 
 	const blankStep = validateFeatureListData({
 		features: [validFeature({ verification: ["  "] })],
 	});
-	assert.deepEqual(blankStep.errors, [
-		"features[0].verification steps must be non-empty strings.",
-	]);
+	assert.deepEqual(blankStep.errors, ["features[0].verification steps must be non-empty strings."]);
 });
 
 test("paths is optional — feature without paths is valid", () => {

@@ -87,10 +87,7 @@ function ensurePlanReady(target, planRel) {
 	}
 	// Verification must be non-empty for accept; feature seed may leave it empty.
 	if (!/## Verification\n\n- /.test(c)) {
-		c = c.replace(
-			/## Verification\n\n/,
-			"## Verification\n\n- Run npm test.\n\n",
-		);
+		c = c.replace(/## Verification\n\n/, "## Verification\n\n- Run npm test.\n\n");
 	}
 	// Resume Checkpoint fields
 	if (!/- Resume Point:/i.test(c)) {
@@ -142,7 +139,10 @@ function mkTarget(label) {
 			2,
 		) + "\n",
 	);
-	fs.writeFileSync(path.join(target, "README.md"), `# ${label}\n\nNon-Amber target for governance loop e2e.\n`);
+	fs.writeFileSync(
+		path.join(target, "README.md"),
+		`# ${label}\n\nNon-Amber target for governance loop e2e.\n`,
+	);
 	git(target, ["add", "."]);
 	git(target, ["commit", "-m", "chore: initial non-amber target"]);
 	return target;
@@ -302,10 +302,7 @@ function pathSuccess() {
 		completeCheckOut: ccStrict.stdout,
 	});
 
-	step(
-		"session complete",
-		run(target, ["session", "complete", "--session", sid, "--target", "."]),
-	);
+	step("session complete", run(target, ["session", "complete", "--session", sid, "--target", "."]));
 	const n7 = nextJson(target);
 	log.push({ name: "next@session-complete", next: n7.json || n7.text });
 
@@ -336,10 +333,7 @@ function pathSuccess() {
 			ccOnTemplate.exitCode !== 0 || /status: fail/i.test(ccOnTemplate.stdout),
 		completeCheckPassedAfterLiveHandoff: /status: pass/i.test(ccStrict.stdout),
 		isTemplateHandoffBeforeRegen: isTemplateHandoff,
-		closed:
-			accept.exitCode === 0 &&
-			handoff.exitCode === 0 &&
-			(feature?.evidence?.length || 0) > 0,
+		closed: accept.exitCode === 0 && handoff.exitCode === 0 && (feature?.evidence?.length || 0) > 0,
 		log,
 	};
 
@@ -446,10 +440,7 @@ function pathRejections() {
 	const denyOk = denied.exitCode !== 0 && /denied|policy/i.test(denied.stdout + denied.stderr);
 
 	// B2: claim-only verify then strict complete-check must fail on verification
-	step(
-		"verify claim-only",
-		run(target, ["session", "verify", "--session", sid, "--target", "."]),
-	);
+	step("verify claim-only", run(target, ["session", "verify", "--session", sid, "--target", "."]));
 	const claimCc = step(
 		"complete-check --strict after claim",
 		run(target, ["session", "complete-check", "--session", sid, "--strict", "--target", "."]),
@@ -588,7 +579,7 @@ function pathVerifyFailRecover() {
 				name: "amber-e2e-fail",
 				version: "0.0.0",
 				private: true,
-				scripts: { test: "node -e \"process.exit(1)\"" },
+				scripts: { test: 'node -e "process.exit(1)"' },
 			},
 			null,
 			2,
@@ -695,8 +686,7 @@ function pathVerifyFailRecover() {
 		"complete-check --strict",
 		run(target, ["session", "complete-check", "--session", sid, "--strict", "--target", "."]),
 	);
-	const recovered =
-		ok.exitCode === 0 && (/status: pass/i.test(cc.stdout) || cc.exitCode === 0);
+	const recovered = ok.exitCode === 0 && (/status: pass/i.test(cc.stdout) || cc.exitCode === 0);
 
 	// Inspect timeline for failure then success events.
 	const sessionDir = path.join(target, ".amber", "sessions", sid);
@@ -905,7 +895,7 @@ function summarize() {
 		verifyFailRecovered: Boolean(results.paths.verifyFailRecover?.recovered),
 		crossSessionHandoff: Boolean(
 			results.paths.crossSessionHandoff?.handoffUseful &&
-				results.paths.crossSessionHandoff?.session2Started,
+			results.paths.crossSessionHandoff?.session2Started,
 		),
 		highFindings: highs.map((f) => f.id),
 		infoFindings: infos.map((f) => f.id),

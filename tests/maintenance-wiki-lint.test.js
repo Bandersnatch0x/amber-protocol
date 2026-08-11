@@ -25,18 +25,9 @@ test("amber maintenance wiki-lint - detects broken wikilink", () => {
 	const target = tempDir("broken");
 	const wikiDir = path.join(target, "docs", "wiki");
 	fs.mkdirSync(wikiDir, { recursive: true });
-	fs.writeFileSync(
-		path.join(wikiDir, "index.md"),
-		"# Index\n\n[Broken link](missing.md)\n"
-	);
+	fs.writeFileSync(path.join(wikiDir, "index.md"), "# Index\n\n[Broken link](missing.md)\n");
 
-	const result = runAmber([
-		"maintenance",
-		"wiki-lint",
-		"--target",
-		target,
-		"--json",
-	]);
+	const result = runAmber(["maintenance", "wiki-lint", "--target", target, "--json"]);
 
 	assert.strictEqual(result.status, 1);
 	const json = JSON.parse(result.stdout);
@@ -50,22 +41,10 @@ test("amber maintenance wiki-lint - valid wiki has no errors", () => {
 	const target = tempDir("valid");
 	const wikiDir = path.join(target, "docs", "wiki");
 	fs.mkdirSync(wikiDir, { recursive: true });
-	fs.writeFileSync(
-		path.join(wikiDir, "index.md"),
-		"# Index\n\n[Valid link](other.md)\n"
-	);
-	fs.writeFileSync(
-		path.join(wikiDir, "other.md"),
-		"# Other\n"
-	);
+	fs.writeFileSync(path.join(wikiDir, "index.md"), "# Index\n\n[Valid link](other.md)\n");
+	fs.writeFileSync(path.join(wikiDir, "other.md"), "# Other\n");
 
-	const result = runAmber([
-		"maintenance",
-		"wiki-lint",
-		"--target",
-		target,
-		"--json",
-	]);
+	const result = runAmber(["maintenance", "wiki-lint", "--target", target, "--json"]);
 
 	assert.strictEqual(result.status, 0);
 	const json = JSON.parse(result.stdout);
@@ -80,11 +59,11 @@ test("amber maintenance wiki-lint --fix-markers appends missing marker sections"
 	fs.mkdirSync(productDir, { recursive: true });
 	fs.writeFileSync(
 		path.join(target, "docs", "wiki", "index.md"),
-		"# Index\n\n[Overview](product/overview.md)\n"
+		"# Index\n\n[Overview](product/overview.md)\n",
 	);
 	fs.writeFileSync(
 		path.join(productDir, "overview.md"),
-		"# Product Overview\n\n## Goal\n\nSomething.\n"
+		"# Product Overview\n\n## Goal\n\nSomething.\n",
 	);
 
 	const result = runAmber([
@@ -103,10 +82,7 @@ test("amber maintenance wiki-lint --fix-markers appends missing marker sections"
 
 	const content = fs.readFileSync(path.join(productDir, "overview.md"), "utf8");
 	assert.match(content, /## Unknowns \/ Needs Confirmation/);
-	assert.strictEqual(
-		content.match(/## Unknowns \/ Needs Confirmation/g).length,
-		1,
-	);
+	assert.strictEqual(content.match(/## Unknowns \/ Needs Confirmation/g).length, 1);
 
 	// Second run is a no-op: the marker already exists.
 	const second = runAmber([

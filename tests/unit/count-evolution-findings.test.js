@@ -31,7 +31,10 @@ test("countEvolutionFindings returns [] when the evolution file is missing", () 
 
 test("countEvolutionFindings counts occurrences and sorts by count desc then text asc", () => {
 	const root = tempTarget();
-	writeEvolution(root, "Finding: beta\nFinding: beta\nFinding: alpha\nFinding: gamma\nFinding: gamma\nFinding: gamma\n");
+	writeEvolution(
+		root,
+		"Finding: beta\nFinding: beta\nFinding: alpha\nFinding: gamma\nFinding: gamma\nFinding: gamma\n",
+	);
 	const result = countEvolutionFindings(root);
 	assert.deepEqual(
 		result.map((r) => [r.finding, r.count]),
@@ -110,7 +113,10 @@ test("rollupEvolutionFindings honours an explicit minCount below the default", (
 
 test("rollupEvolutionFindings honours an explicit minCount above the default", () => {
 	const root = tempTarget();
-	writeEvolution(root, "Finding: thrice\nFinding: thrice\nFinding: thrice\nFinding: twice\nFinding: twice\n");
+	writeEvolution(
+		root,
+		"Finding: thrice\nFinding: thrice\nFinding: thrice\nFinding: twice\nFinding: twice\n",
+	);
 	const result = runMaintenanceAction("evolution-rollup", root, { threshold: 3 });
 	assert.equal(result.threshold, 3);
 	assert.deepEqual(

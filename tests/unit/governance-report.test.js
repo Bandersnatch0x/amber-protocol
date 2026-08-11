@@ -7,7 +7,10 @@ const path = require("node:path");
 const test = require("node:test");
 
 const { scaffoldHarness } = require("../../scripts/lib/core/scaffold");
-const { buildGovernanceReport, renderGovernanceReportMarkdown } = require("../../scripts/lib/core/governance-report");
+const {
+	buildGovernanceReport,
+	renderGovernanceReportMarkdown,
+} = require("../../scripts/lib/core/governance-report");
 
 function tempDir(name) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-governance-report-${name}-`));
@@ -42,7 +45,10 @@ test("renderGovernanceReportMarkdown exposes the product loop", () => {
 	assert.match(markdown, /# Amber Governance Report/);
 	assert.match(markdown, /Amber Readiness Score/);
 	assert.match(markdown, /Product Value Loop/);
-	assert.match(markdown, /Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle/);
+	assert.match(
+		markdown,
+		/Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle/,
+	);
 	assert.match(markdown, /## Next Actions/);
 });
 
@@ -104,15 +110,21 @@ test("no-progress assessment ignores timelines and execution evidence from older
 	function writeSession(sessionId, createdAt, events) {
 		const sessionDir = path.join(sessionsDir, sessionId);
 		fs.mkdirSync(sessionDir, { recursive: true });
-		fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify({
-			sessionId,
-			schemaVersion: "1.0.0-rc.1",
-			createdAt,
-			route: { id: "feature-standard", version: "1.0.0" },
-			goal: `Goal for ${sessionId}`,
-			status: "created",
-		}));
-		fs.writeFileSync(path.join(sessionDir, "timeline.jsonl"), `${events.map(JSON.stringify).join("\n")}\n`);
+		fs.writeFileSync(
+			path.join(sessionDir, "manifest.json"),
+			JSON.stringify({
+				sessionId,
+				schemaVersion: "1.0.0-rc.1",
+				createdAt,
+				route: { id: "feature-standard", version: "1.0.0" },
+				goal: `Goal for ${sessionId}`,
+				status: "created",
+			}),
+		);
+		fs.writeFileSync(
+			path.join(sessionDir, "timeline.jsonl"),
+			`${events.map(JSON.stringify).join("\n")}\n`,
+		);
 	}
 
 	writeSession("older", "2026-08-07T00:00:00.000Z", [

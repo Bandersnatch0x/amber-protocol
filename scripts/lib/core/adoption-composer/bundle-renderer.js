@@ -83,14 +83,7 @@ function renderAdoptionNextActionsDocument(nextActions) {
 }
 
 function writeAdoptionBundleArtifact(options = {}, spec) {
-	const {
-		command,
-		outputExistsLabel,
-		emptyResult,
-		validate,
-		build,
-		render,
-	} = spec;
+	const { command, outputExistsLabel, emptyResult, validate, build, render } = spec;
 
 	const bundleDir = options.bundleDir ? path.resolve(options.bundleDir) : "";
 	const outputPath = options.output ? path.resolve(options.output) : "";
@@ -106,10 +99,7 @@ function writeAdoptionBundleArtifact(options = {}, spec) {
 	if (typeof validate === "function") {
 		errors.push(...validate(options));
 	}
-	if (
-		bundleDir &&
-		(!pathExists(bundleDir) || !fs.statSync(bundleDir).isDirectory())
-	) {
+	if (bundleDir && (!pathExists(bundleDir) || !fs.statSync(bundleDir).isDirectory())) {
 		errors.push(`Bundle directory does not exist: ${bundleDir}`);
 	}
 	if (outputPath && pathExists(outputPath)) {
@@ -147,11 +137,7 @@ function writeAdoptionBundleArtifact(options = {}, spec) {
 
 	const record = build(manifest, ctx);
 	if (errors.length > 0) {
-		return emptyResult(
-			{ target: manifest.target, bundleDir, outputPath },
-			errors,
-			warnings,
-		);
+		return emptyResult({ target: manifest.target, bundleDir, outputPath }, errors, warnings);
 	}
 
 	fs.mkdirSync(path.dirname(outputPath), { recursive: true });

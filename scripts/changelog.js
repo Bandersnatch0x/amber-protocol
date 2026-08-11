@@ -253,10 +253,7 @@ function updateChangelogFile(version, sectionText, changelogPath) {
 			content = content.trimEnd() + "\n\n" + sectionText;
 		} else {
 			content =
-				content.slice(0, firstRelease + 1) +
-				"\n" +
-				sectionText +
-				content.slice(firstRelease + 1);
+				content.slice(0, firstRelease + 1) + "\n" + sectionText + content.slice(firstRelease + 1);
 		}
 	}
 
@@ -282,7 +279,9 @@ function generateChangelog(opts = {}) {
 function main() {
 	const dry = process.argv.includes("--dry-run") || process.argv.includes("-n");
 	const result = generateChangelog({ dryRun: dry });
-	console.log(`changelog: v${result.version} (since ${result.tag || "start"}) — ${result.commitCount} commits`);
+	console.log(
+		`changelog: v${result.version} (since ${result.tag || "start"}) — ${result.commitCount} commits`,
+	);
 	if (result.commitCount === 0) {
 		console.log("  (no new commits; section contains placeholder)");
 	}

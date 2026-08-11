@@ -8,18 +8,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const {
-	pathExists,
-	readText,
-	relativeSlash,
-	resolveTarget,
-	walkFiles,
-} = require("./fs-utils");
-const {
-	extractMarkdownLinks,
-	isExternalLink,
-	stripAnchorAndQuery,
-} = require("./text-utils");
+const { pathExists, readText, relativeSlash, resolveTarget, walkFiles } = require("./fs-utils");
+const { extractMarkdownLinks, isExternalLink, stripAnchorAndQuery } = require("./text-utils");
 const { parseOkfFrontmatter, OKF_VERSION } = require("./okf-frontmatter");
 
 function deriveTitle(data, body, fallbackId) {

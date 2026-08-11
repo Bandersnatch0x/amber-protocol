@@ -1,441 +1,373 @@
 {
-  "features": [
-    {
-      "id": "F001",
-      "priority": 1,
-      "area": "context",
-      "paths": [
-        "scripts/lib/core/scaffolding.js",
-        "scripts/amber.js"
-      ],
-      "title": "Amber scaffold install (init)",
-      "user_visible_behavior": "A project gains AGENTS.md/CLAUDE.md, feature_list.json, and a wiki skeleton, with existing files preserved (idempotent).",
-      "status": "passing",
-      "verification": [
-        "node scripts/amber.js init --target <repo> is idempotent and skips existing files",
-        "npm test (init/scaffolding suites green)"
-      ],
-      "evidence": [
-        "npm test: 1158/0 passing across Node 18/20/22 CI matrix"
-      ],
-      "notes": [
-        "Self-dogfooded: amber init runs against this repo's own layout."
-      ]
-    },
-    {
-      "id": "F002",
-      "priority": 2,
-      "area": "verification",
-      "paths": [
-        "scripts/lib/core/"
-      ],
-      "title": "Doctor validation",
-      "user_visible_behavior": "amber doctor reports whether a repo's Amber setup is usable and internally consistent.",
-      "status": "passing",
-      "verification": [
-        "node scripts/amber.js doctor --target .",
-        "npm run doctor"
-      ],
-      "evidence": [
-        "npm test: doctor suites green"
-      ],
-      "notes": []
-    },
-    {
-      "id": "F003",
-      "priority": 3,
-      "area": "lifecycle",
-      "paths": [
-        "scripts/lib/route-commands.js",
-        "routes/"
-      ],
-      "title": "Route engine",
-      "user_visible_behavior": "Routes (feature-standard, bugfix-quick, refactor-safe) can be listed, inspected, validated, and dry-run tested; session goals auto-match via goalPattern.",
-      "status": "passing",
-      "verification": [
-        "node scripts/amber.js route list",
-        "node scripts/amber.js route test bugfix-quick --dry-run"
-      ],
-      "evidence": [
-        "npm test: route suites green"
-      ],
-      "notes": [
-        "goalPattern auto-matching documented in command-help."
-      ]
-    },
-    {
-      "id": "F004",
-      "priority": 4,
-      "area": "lifecycle",
-      "paths": [
-        "scripts/lib/session-commands.js"
-      ],
-      "title": "Session lifecycle",
-      "user_visible_behavior": "Sessions can be started, listed, status-checked, aborted, and continued from checkpoints.",
-      "status": "passing",
-      "verification": [
-        "node scripts/amber.js session list",
-        "npm run test:load"
-      ],
-      "evidence": [
-        "sequential load test: 20 sessions completed <2min",
-        "npm test: session suites green"
-      ],
-      "notes": [
-        "Test-suite leak guard (run-tests.js) prevents root .amber/sessions accumulation."
-      ]
-    },
-    {
-      "id": "F005",
-      "priority": 5,
-      "area": "governance",
-      "paths": [
-        "scripts/lib/governance-commands.js"
-      ],
-      "title": "Governance report & approval gates",
-      "user_visible_behavior": "amber governance report scores the delivery loop and emits structured next actions; gates enforce human approval before completion.",
-      "status": "passing",
-      "verification": [
-        "node scripts/amber.js governance report --target .",
-        "npm test: governance suites green"
-      ],
-      "evidence": [
-        "governance report <1s after session-state cleanup"
-      ],
-      "notes": []
-    },
-    {
-      "id": "F006",
-      "priority": 6,
-      "area": "observability",
-      "paths": [
-        "scripts/lib/core/handoff-bundle.js"
-      ],
-      "title": "Handoff reports",
-      "user_visible_behavior": "amber handoff produces a portable handoff bundle for clean session continuity.",
-      "status": "passing",
-      "verification": [
-        "node scripts/amber.js handoff --target .",
-        "npm test: handoff suites green"
-      ],
-      "evidence": [
-        "npm test: handoff suites green"
-      ],
-      "notes": []
-    },
-    {
-      "id": "F007",
-      "priority": 7,
-      "area": "governance",
-      "paths": [
-        "scripts/lib/core/loops/",
-        "src/migration/"
-      ],
-      "title": "Governed loop execution (ADR-0003)",
-      "user_visible_behavior": "Loop contracts run only behind four gates: policy rules, explicit one-shot approval, isolated worktree, and a tamper-evident ledger.",
-      "status": "passing",
-      "verification": [
-        "node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --target . --dry-run --json",
-        "node scripts/run-tests.js tests/unit/loop-ledger.test.js"
-      ],
-      "evidence": [
-        "2026-07-15: daily-amber-triage dry-run completed with errors=[] and executesAnything=false",
-        "2026-07-16: tests/unit/loop-ledger.test.js passed 5/5, covering intact and tampered hash-chain ledgers",
-        "readyForLiveScheduling=false by product boundary; human-triggered --execute only"
-      ],
-      "notes": [
-        "No autonomous or scheduled execution; cron/daemon and auto-approval disallowed."
-      ]
-    },
-    {
-      "id": "F008",
-      "priority": 8,
-      "area": "execution",
-      "paths": [
-        "apps/web/"
-      ],
-      "title": "Web viewer (Phase C)",
-      "user_visible_behavior": "A Vite + React + tRPC viewer renders sessions, timelines, ledgers, and governance state.",
-      "status": "passing",
-      "verification": [
-        "cd apps/web && npm test",
-        "cd apps/web && npm run build"
-      ],
-      "evidence": [
-        "web vitest 382/0 passing"
-      ],
-      "notes": [
-        "Owns its TS toolchain; excluded from root eslint."
-      ]
-    },
-    {
-      "id": "F009",
-      "priority": 9,
-      "area": "governance",
-      "paths": [
-        "scripts/lib/core/governance.js"
-      ],
-      "title": "Governance evidence reads resolve the state dir (legacy .harness support)",
-      "user_visible_behavior": "amber governance audit / evidence read session + execution evidence through the state-dir resolver, so legacy .harness state is visible alongside .amber instead of being silently missed.",
-      "status": "accepted",
-      "verification": [
-        "node scripts/amber.js governance audit --target <legacy .harness repo> finds sessions/executions",
-        "npm test: governance + audit suites green"
-      ],
-      "evidence": [
-        {
-          "command": "npm test",
-          "result": "passed (exit 0, 83527ms)",
-          "date": "2026-07-14",
-          "notes": "session df0c5d07-c518-4b30-9811-c957928fb698 stage verify",
-          "sessionId": "df0c5d07-c518-4b30-9811-c957928fb698"
-        }
-      ],
-      "notes": [
-        "Closes #60; weekly dogfood carrier 2026-07-14."
-      ],
-      "updated": "2026-07-14"
-    },
-    {
-      "id": "F010",
-      "priority": 10,
-      "area": "tooling",
-      "title": "Ship 1.3.8 after interrupted 1.3.7 release (CHANGELOG + version)",
-      "user_visible_behavior": "Package and CHANGELOG present as 1.3.8 so a new tag can publish after the interrupted v1.3.7 ship (docs boundary + fast-uri CI fixes included).",
-      "status": "accepted",
-      "verification": [
-        "package.json version is 1.3.8",
-        "CHANGELOG has [1.3.8] covering fast-uri and docs boundary",
-        "npm test",
-        "npm audit --audit-level=high"
-      ],
-      "evidence": [
-        {
-          "command": "npm test",
-          "result": "passed (exit 0, 67340ms)",
-          "date": "2026-07-22",
-          "notes": "session c1485d45-b03f-45c7-b27f-931bcddfb7b7 stage verify",
-          "sessionId": "c1485d45-b03f-45c7-b27f-931bcddfb7b7"
-        }
-      ],
-      "notes": [
-        "Weekly dogfood carrier 2026-07-22; empty next-up → release recovery slice."
-      ],
-      "paths": [
-        "CHANGELOG.md",
-        "package.json",
-        "package-lock.json"
-      ],
-      "updated": "2026-07-22"
-    },
-    {
-      "id": "F011",
-      "priority": 11,
-      "area": "docs",
-      "title": "CLI_REFERENCE covers all 33 commands (fill 14 missing sections)",
-      "user_visible_behavior": "docs/CLI_REFERENCE.md documents every command in the CLI COMMANDS array (33/33); previously 14 commands (feature, plan, gate, review, accept, wiki, status, sync, security, clean, explain, and deprecated agent/team/adoption) had no section.",
-      "status": "accepted",
-      "verification": [
-        "npm test (docs boundary + CLI reference phrase guards)",
-        "inventory check: every COMMANDS entry has a heading-level section in docs/CLI_REFERENCE.md (33/33)"
-      ],
-      "evidence": [
-        {
-          "command": "npm test",
-          "result": "passed (exit 0, 85388ms)",
-          "date": "2026-07-28",
-          "notes": "session 64eb8c99-973c-480f-9b48-a3002c8939fd stage verify",
-          "sessionId": "64eb8c99-973c-480f-9b48-a3002c8939fd"
-        }
-      ],
-      "notes": [],
-      "updated": "2026-07-28"
-    },
-    {
-      "id": "F012",
-      "priority": 12,
-      "area": "verification",
-      "title": "Pre-push hook rejects pi-rewind checkpoint refs",
-      "user_visible_behavior": "git push --mirror or a direct push of refs/pi-checkpoints/* is blocked by .githooks/pre-push with a clear error; normal branch/tag pushes are unaffected",
-      "status": "accepted",
-      "verification": [
-        "npm test"
-      ],
-      "evidence": [
-        {
-          "command": "npm test",
-          "result": "passed (exit 0, 129058ms)",
-          "date": "2026-07-31",
-          "notes": "session 908b925d-0e6f-42f9-a6a1-4050a4d5d0f5 stage verify",
-          "sessionId": "908b925d-0e6f-42f9-a6a1-4050a4d5d0f5"
-        }
-      ],
-      "notes": [],
-      "paths": [
-        ".githooks/pre-push",
-        "tests/unit/pre-push-hook.test.js"
-      ],
-      "updated": "2026-07-31"
-    },
-    {
-      "id": "F015",
-      "priority": 15,
-      "area": "loop-governance",
-      "title": "Loop no-progress reporting",
-      "user_visible_behavior": "Loop status reports bounded no-progress signals from recorded ledger history without executing or scheduling work.",
-      "status": "accepted",
-      "verification": [
-        "node --test tests/phase-future-loop-readiness.test.js",
-        "npm test"
-      ],
-      "evidence": [
-        {
-          "command": "node --test tests/unit/loops.test.js tests/phase-future-loop-readiness.test.js",
-          "result": "20 passed, 0 failed",
-          "date": "2026-08-04",
-          "notes": "Session 595182bf-419e-45f8-8e89-63ea810a688e"
-        },
-        {
-          "command": "npm test",
-          "result": "exit 0; 1416 total, 1412 passed, 4 skipped",
-          "date": "2026-08-04",
-          "notes": "Executed via session 595182bf-419e-45f8-8e89-63ea810a688e"
-        }
-      ],
-      "notes": [],
-      "paths": [
-        "scripts/lib/core/loops.js",
-        "scripts/lib/command-help.js",
-        "docs/CLI_REFERENCE.md",
-        "tests/phase-future-loop-readiness.test.js",
-        "tests/unit/loops.test.js"
-      ],
-      "updated": "2026-08-04"
-    },
-    {
-      "id": "F016",
-      "priority": 16,
-      "area": "governance",
-      "title": "Review blocker remediation",
-      "user_visible_behavior": "The Context, Loadout, governed execution, routing, migration, workflow assessment, and handoff surfaces introduced after origin/master fail closed at their public boundaries and pass the repository's complete verification gates.",
-      "status": "accepted",
-      "verification": [
-        "node --test tests/unit/context-*.test.js tests/governance-confidence.test.js tests/next-objective.test.js tests/no-progress-detector.test.js tests/schema-versioning.test.js",
-        "npm test",
-        "npm run manifests",
-        "npm run doctor",
-        "npm run gen:agents:check",
-        "node scripts/validate-wiki.js --target ."
-      ],
-      "evidence": [
-        {
-          "command": "node --test tests/phase-v4.test.js tests/phase-v4-5.test.js tests/unit/build-replay-content.test.js tests/unit/governance-report.test.js",
-          "result": "23 passed, 0 failed",
-          "date": "2026-08-07",
-          "notes": "Covers strict task Session binding, producer-to-governance evidence, replay compatibility, and preparation-coordinate refactoring."
-        },
-        {
-          "command": "npm test",
-          "result": "exit 0; 1621 total, 1617 passed, 4 skipped, 0 failed",
-          "date": "2026-08-07",
-          "notes": "Final run against governance, standards, and migration-guidance remediation commit 1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6."
-        },
-        {
-          "command": "npm run manifests && npm run doctor && npm run gen:agents:check && node scripts/validate-wiki.js --target .",
-          "result": "exit 0; manifest errors 0; doctor errors 0 warnings 0; 31 generated files current; wiki errors 0",
-          "date": "2026-08-07",
-          "notes": "Repository governance and generated-surface gates."
-        },
-        {
-          "command": "npm run lint && git diff --check origin/master",
-          "result": "exit 0; no lint or whitespace errors",
-          "date": "2026-08-07",
-          "notes": "Final code-quality and patch-integrity gates."
-        },
-        {
-          "command": "two-axis final review: specification and standards",
-          "result": "blocker 0; high 0; P2 0; P3 0",
-          "date": "2026-08-07",
-          "notes": "Specification and maintainability reviewers both cleared the governance-hardening implementation and evidence patch."
-        }
-      ],
-      "notes": [
-        "Remediates blockers found by reviewing origin/master...HEAD after commits d607d65 and ef57fc5.",
-        "output/adr-architecture-assessment.md is a pre-ef57fc5 historical input, not F016 acceptance evidence; output/adr-architecture-assessment-f016.md binds the reviewed patch to implementation commit 1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6."
-      ],
-      "paths": [
-        "scripts/lib/core/context-*.js",
-        "scripts/lib/context/adapters/command.js",
-        "scripts/lib/core/fs-utils.js",
-        "scripts/lib/core/governed-runner.js",
-        "scripts/lib/core/handoff-*.js",
-        "scripts/lib/workflow-assessment/",
-        "scripts/lib/migrate-command.js",
-        "scripts/lib/command-dispatcher.js",
-        "scripts/lib/next-command.js",
-        "schemas/",
-        "templates/",
-        "routes/",
-        "tests/",
-        "docs/"
-      ],
-      "updated": "2026-08-10"
-    },
-    {
-      "id": "F017",
-      "priority": 17,
-      "area": "context",
-      "title": "Governed Context knowledge lifecycle",
-      "user_visible_behavior": "Context Pages carry governed knowledge classification and supersession lineage; Loadouts exclude superseded knowledge, derived indexes are rebuildable, benchmarks are deterministic, and optional source adapters remain behind the existing ingest boundary.",
-      "status": "passing",
-      "verification": [
-        "node --test tests/unit/context-adapter.test.js tests/unit/context-dependency-boundary.test.js tests/unit/context-schema.test.js tests/unit/context-verify-refresh-stats.test.js tests/unit/error-catalog.test.js tests/unit/parse-args.test.js",
-        "source-isolation review of git diff d75750f48b2fa9511ea87b127d4e361be48fd755 96d3cc1ec795c5ff322e049938601221f1b7df86",
-        "npm test",
-        "npm run manifests",
-        "node scripts/amber.js doctor --target .",
-        "node scripts/validate-wiki.js --target ."
-      ],
-      "evidence": [
-        {
-          "command": "node --test tests/unit/context-adapter.test.js tests/unit/context-dependency-boundary.test.js tests/unit/context-schema.test.js tests/unit/context-verify-refresh-stats.test.js tests/unit/error-catalog.test.js tests/unit/parse-args.test.js",
-          "result": "79 passed, 0 failed",
-          "date": "2026-08-10",
-          "notes": "Focused verification of Knowledge Kind and lineage binding, current-only Loadouts, projections, benchmarks, source adapters, retention reporting, dependency boundaries, schemas, error codes, and CLI parsing."
-        },
-        {
-          "command": "source-isolation review of git diff d75750f48b2fa9511ea87b127d4e361be48fd755 96d3cc1ec795c5ff322e049938601221f1b7df86",
-          "result": "passed; complete 36-file change set reviewed with no external project references, attribution markers, imported fixtures, package changes, or non-original source indicators found",
-          "date": "2026-08-10",
-          "notes": "Detailed mechanical and manual evidence: docs/quality/f017-context-knowledge-lifecycle-retrospective.md"
-        },
-        {
-          "command": "npm test",
-          "result": "1649 total, 1645 passed, 4 skipped, 0 failed",
-          "date": "2026-08-10",
-          "notes": "Full repository verification after registering F017 in the feature inventory."
-        },
-        {
-          "command": "npm run manifests; node scripts/amber.js doctor --target .; node scripts/validate-wiki.js --target .",
-          "result": "exit 0; manifest errors 0; doctor errors 0 warnings 0; wiki errors 0",
-          "date": "2026-08-10",
-          "notes": "Continuous-improvement health pass after the F017 implementation and documentation commits landed on master."
-        }
-      ],
-      "notes": [
-        "Implementation commit fbb9894ec00fedae699c2b299f76bcabbe954a60; documentation commit 96d3cc1.",
-        "Implementation predates any governed plan or Session, so F017 remains passing rather than accepted; see docs/quality/f017-context-knowledge-lifecycle-retrospective.md."
-      ],
-      "paths": [
-        "scripts/lib/core/context-*.js",
-        "scripts/lib/context/",
-        "schemas/context-*.schema.json",
-        "tests/unit/context-*.test.js",
-        "docs/architecture/context-threat-model.md",
-        "docs/CLI_REFERENCE.md",
-        "docs/quality/f017-context-knowledge-lifecycle-retrospective.md"
-      ],
-      "updated": "2026-08-10"
-    }
-  ]
+	"features": [
+		{
+			"id": "F001",
+			"priority": 1,
+			"area": "context",
+			"paths": ["scripts/lib/core/scaffolding.js", "scripts/amber.js"],
+			"title": "Amber scaffold install (init)",
+			"user_visible_behavior": "A project gains AGENTS.md/CLAUDE.md, feature_list.json, and a wiki skeleton, with existing files preserved (idempotent).",
+			"status": "passing",
+			"verification": [
+				"node scripts/amber.js init --target <repo> is idempotent and skips existing files",
+				"npm test (init/scaffolding suites green)"
+			],
+			"evidence": ["npm test: 1158/0 passing across Node 18/20/22 CI matrix"],
+			"notes": ["Self-dogfooded: amber init runs against this repo's own layout."]
+		},
+		{
+			"id": "F002",
+			"priority": 2,
+			"area": "verification",
+			"paths": ["scripts/lib/core/"],
+			"title": "Doctor validation",
+			"user_visible_behavior": "amber doctor reports whether a repo's Amber setup is usable and internally consistent.",
+			"status": "passing",
+			"verification": ["node scripts/amber.js doctor --target .", "npm run doctor"],
+			"evidence": ["npm test: doctor suites green"],
+			"notes": []
+		},
+		{
+			"id": "F003",
+			"priority": 3,
+			"area": "lifecycle",
+			"paths": ["scripts/lib/route-commands.js", "routes/"],
+			"title": "Route engine",
+			"user_visible_behavior": "Routes (feature-standard, bugfix-quick, refactor-safe) can be listed, inspected, validated, and dry-run tested; session goals auto-match via goalPattern.",
+			"status": "passing",
+			"verification": [
+				"node scripts/amber.js route list",
+				"node scripts/amber.js route test bugfix-quick --dry-run"
+			],
+			"evidence": ["npm test: route suites green"],
+			"notes": ["goalPattern auto-matching documented in command-help."]
+		},
+		{
+			"id": "F004",
+			"priority": 4,
+			"area": "lifecycle",
+			"paths": ["scripts/lib/session-commands.js"],
+			"title": "Session lifecycle",
+			"user_visible_behavior": "Sessions can be started, listed, status-checked, aborted, and continued from checkpoints.",
+			"status": "passing",
+			"verification": ["node scripts/amber.js session list", "npm run test:load"],
+			"evidence": [
+				"sequential load test: 20 sessions completed <2min",
+				"npm test: session suites green"
+			],
+			"notes": ["Test-suite leak guard (run-tests.js) prevents root .amber/sessions accumulation."]
+		},
+		{
+			"id": "F005",
+			"priority": 5,
+			"area": "governance",
+			"paths": ["scripts/lib/governance-commands.js"],
+			"title": "Governance report & approval gates",
+			"user_visible_behavior": "amber governance report scores the delivery loop and emits structured next actions; gates enforce human approval before completion.",
+			"status": "passing",
+			"verification": [
+				"node scripts/amber.js governance report --target .",
+				"npm test: governance suites green"
+			],
+			"evidence": ["governance report <1s after session-state cleanup"],
+			"notes": []
+		},
+		{
+			"id": "F006",
+			"priority": 6,
+			"area": "observability",
+			"paths": ["scripts/lib/core/handoff-bundle.js"],
+			"title": "Handoff reports",
+			"user_visible_behavior": "amber handoff produces a portable handoff bundle for clean session continuity.",
+			"status": "passing",
+			"verification": [
+				"node scripts/amber.js handoff --target .",
+				"npm test: handoff suites green"
+			],
+			"evidence": ["npm test: handoff suites green"],
+			"notes": []
+		},
+		{
+			"id": "F007",
+			"priority": 7,
+			"area": "governance",
+			"paths": ["scripts/lib/core/loops/", "src/migration/"],
+			"title": "Governed loop execution (ADR-0003)",
+			"user_visible_behavior": "Loop contracts run only behind four gates: policy rules, explicit one-shot approval, isolated worktree, and a tamper-evident ledger.",
+			"status": "passing",
+			"verification": [
+				"node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --target . --dry-run --json",
+				"node scripts/run-tests.js tests/unit/loop-ledger.test.js"
+			],
+			"evidence": [
+				"2026-07-15: daily-amber-triage dry-run completed with errors=[] and executesAnything=false",
+				"2026-07-16: tests/unit/loop-ledger.test.js passed 5/5, covering intact and tampered hash-chain ledgers",
+				"readyForLiveScheduling=false by product boundary; human-triggered --execute only"
+			],
+			"notes": ["No autonomous or scheduled execution; cron/daemon and auto-approval disallowed."]
+		},
+		{
+			"id": "F008",
+			"priority": 8,
+			"area": "execution",
+			"paths": ["apps/web/"],
+			"title": "Web viewer (Phase C)",
+			"user_visible_behavior": "A Vite + React + tRPC viewer renders sessions, timelines, ledgers, and governance state.",
+			"status": "passing",
+			"verification": ["cd apps/web && npm test", "cd apps/web && npm run build"],
+			"evidence": ["web vitest 382/0 passing"],
+			"notes": ["Owns its TS toolchain; excluded from root eslint."]
+		},
+		{
+			"id": "F009",
+			"priority": 9,
+			"area": "governance",
+			"paths": ["scripts/lib/core/governance.js"],
+			"title": "Governance evidence reads resolve the state dir (legacy .harness support)",
+			"user_visible_behavior": "amber governance audit / evidence read session + execution evidence through the state-dir resolver, so legacy .harness state is visible alongside .amber instead of being silently missed.",
+			"status": "accepted",
+			"verification": [
+				"node scripts/amber.js governance audit --target <legacy .harness repo> finds sessions/executions",
+				"npm test: governance + audit suites green"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 83527ms)",
+					"date": "2026-07-14",
+					"notes": "session df0c5d07-c518-4b30-9811-c957928fb698 stage verify",
+					"sessionId": "df0c5d07-c518-4b30-9811-c957928fb698"
+				}
+			],
+			"notes": ["Closes #60; weekly dogfood carrier 2026-07-14."],
+			"updated": "2026-07-14"
+		},
+		{
+			"id": "F010",
+			"priority": 10,
+			"area": "tooling",
+			"title": "Ship 1.3.8 after interrupted 1.3.7 release (CHANGELOG + version)",
+			"user_visible_behavior": "Package and CHANGELOG present as 1.3.8 so a new tag can publish after the interrupted v1.3.7 ship (docs boundary + fast-uri CI fixes included).",
+			"status": "accepted",
+			"verification": [
+				"package.json version is 1.3.8",
+				"CHANGELOG has [1.3.8] covering fast-uri and docs boundary",
+				"npm test",
+				"npm audit --audit-level=high"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 67340ms)",
+					"date": "2026-07-22",
+					"notes": "session c1485d45-b03f-45c7-b27f-931bcddfb7b7 stage verify",
+					"sessionId": "c1485d45-b03f-45c7-b27f-931bcddfb7b7"
+				}
+			],
+			"notes": ["Weekly dogfood carrier 2026-07-22; empty next-up → release recovery slice."],
+			"paths": ["CHANGELOG.md", "package.json", "package-lock.json"],
+			"updated": "2026-07-22"
+		},
+		{
+			"id": "F011",
+			"priority": 11,
+			"area": "docs",
+			"title": "CLI_REFERENCE covers all 33 commands (fill 14 missing sections)",
+			"user_visible_behavior": "docs/CLI_REFERENCE.md documents every command in the CLI COMMANDS array (33/33); previously 14 commands (feature, plan, gate, review, accept, wiki, status, sync, security, clean, explain, and deprecated agent/team/adoption) had no section.",
+			"status": "accepted",
+			"verification": [
+				"npm test (docs boundary + CLI reference phrase guards)",
+				"inventory check: every COMMANDS entry has a heading-level section in docs/CLI_REFERENCE.md (33/33)"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 85388ms)",
+					"date": "2026-07-28",
+					"notes": "session 64eb8c99-973c-480f-9b48-a3002c8939fd stage verify",
+					"sessionId": "64eb8c99-973c-480f-9b48-a3002c8939fd"
+				}
+			],
+			"notes": [],
+			"updated": "2026-07-28"
+		},
+		{
+			"id": "F012",
+			"priority": 12,
+			"area": "verification",
+			"title": "Pre-push hook rejects pi-rewind checkpoint refs",
+			"user_visible_behavior": "git push --mirror or a direct push of refs/pi-checkpoints/* is blocked by .githooks/pre-push with a clear error; normal branch/tag pushes are unaffected",
+			"status": "accepted",
+			"verification": ["npm test"],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 129058ms)",
+					"date": "2026-07-31",
+					"notes": "session 908b925d-0e6f-42f9-a6a1-4050a4d5d0f5 stage verify",
+					"sessionId": "908b925d-0e6f-42f9-a6a1-4050a4d5d0f5"
+				}
+			],
+			"notes": [],
+			"paths": [".githooks/pre-push", "tests/unit/pre-push-hook.test.js"],
+			"updated": "2026-07-31"
+		},
+		{
+			"id": "F015",
+			"priority": 15,
+			"area": "loop-governance",
+			"title": "Loop no-progress reporting",
+			"user_visible_behavior": "Loop status reports bounded no-progress signals from recorded ledger history without executing or scheduling work.",
+			"status": "accepted",
+			"verification": ["node --test tests/phase-future-loop-readiness.test.js", "npm test"],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/loops.test.js tests/phase-future-loop-readiness.test.js",
+					"result": "20 passed, 0 failed",
+					"date": "2026-08-04",
+					"notes": "Session 595182bf-419e-45f8-8e89-63ea810a688e"
+				},
+				{
+					"command": "npm test",
+					"result": "exit 0; 1416 total, 1412 passed, 4 skipped",
+					"date": "2026-08-04",
+					"notes": "Executed via session 595182bf-419e-45f8-8e89-63ea810a688e"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/loops.js",
+				"scripts/lib/command-help.js",
+				"docs/CLI_REFERENCE.md",
+				"tests/phase-future-loop-readiness.test.js",
+				"tests/unit/loops.test.js"
+			],
+			"updated": "2026-08-04"
+		},
+		{
+			"id": "F016",
+			"priority": 16,
+			"area": "governance",
+			"title": "Review blocker remediation",
+			"user_visible_behavior": "The Context, Loadout, governed execution, routing, migration, workflow assessment, and handoff surfaces introduced after origin/master fail closed at their public boundaries and pass the repository's complete verification gates.",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/context-*.test.js tests/governance-confidence.test.js tests/next-objective.test.js tests/no-progress-detector.test.js tests/schema-versioning.test.js",
+				"npm test",
+				"npm run manifests",
+				"npm run doctor",
+				"npm run gen:agents:check",
+				"node scripts/validate-wiki.js --target ."
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/phase-v4.test.js tests/phase-v4-5.test.js tests/unit/build-replay-content.test.js tests/unit/governance-report.test.js",
+					"result": "23 passed, 0 failed",
+					"date": "2026-08-07",
+					"notes": "Covers strict task Session binding, producer-to-governance evidence, replay compatibility, and preparation-coordinate refactoring."
+				},
+				{
+					"command": "npm test",
+					"result": "exit 0; 1621 total, 1617 passed, 4 skipped, 0 failed",
+					"date": "2026-08-07",
+					"notes": "Final run against governance, standards, and migration-guidance remediation commit 1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6."
+				},
+				{
+					"command": "npm run manifests && npm run doctor && npm run gen:agents:check && node scripts/validate-wiki.js --target .",
+					"result": "exit 0; manifest errors 0; doctor errors 0 warnings 0; 31 generated files current; wiki errors 0",
+					"date": "2026-08-07",
+					"notes": "Repository governance and generated-surface gates."
+				},
+				{
+					"command": "npm run lint && git diff --check origin/master",
+					"result": "exit 0; no lint or whitespace errors",
+					"date": "2026-08-07",
+					"notes": "Final code-quality and patch-integrity gates."
+				},
+				{
+					"command": "two-axis final review: specification and standards",
+					"result": "blocker 0; high 0; P2 0; P3 0",
+					"date": "2026-08-07",
+					"notes": "Specification and maintainability reviewers both cleared the governance-hardening implementation and evidence patch."
+				}
+			],
+			"notes": [
+				"Remediates blockers found by reviewing origin/master...HEAD after commits d607d65 and ef57fc5.",
+				"output/adr-architecture-assessment.md is a pre-ef57fc5 historical input, not F016 acceptance evidence; output/adr-architecture-assessment-f016.md binds the reviewed patch to implementation commit 1b50dfb28ac05cab9f3a60d11c1e15ed676d29e6."
+			],
+			"paths": [
+				"scripts/lib/core/context-*.js",
+				"scripts/lib/context/adapters/command.js",
+				"scripts/lib/core/fs-utils.js",
+				"scripts/lib/core/governed-runner.js",
+				"scripts/lib/core/handoff-*.js",
+				"scripts/lib/workflow-assessment/",
+				"scripts/lib/migrate-command.js",
+				"scripts/lib/command-dispatcher.js",
+				"scripts/lib/next-command.js",
+				"schemas/",
+				"templates/",
+				"routes/",
+				"tests/",
+				"docs/"
+			],
+			"updated": "2026-08-10"
+		},
+		{
+			"id": "F017",
+			"priority": 17,
+			"area": "context",
+			"title": "Governed Context knowledge lifecycle",
+			"user_visible_behavior": "Context Pages carry governed knowledge classification and supersession lineage; Loadouts exclude superseded knowledge, derived indexes are rebuildable, benchmarks are deterministic, and optional source adapters remain behind the existing ingest boundary.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/context-adapter.test.js tests/unit/context-dependency-boundary.test.js tests/unit/context-schema.test.js tests/unit/context-verify-refresh-stats.test.js tests/unit/error-catalog.test.js tests/unit/parse-args.test.js",
+				"source-isolation review of git diff d75750f48b2fa9511ea87b127d4e361be48fd755 96d3cc1ec795c5ff322e049938601221f1b7df86",
+				"npm test",
+				"npm run manifests",
+				"node scripts/amber.js doctor --target .",
+				"node scripts/validate-wiki.js --target ."
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/context-adapter.test.js tests/unit/context-dependency-boundary.test.js tests/unit/context-schema.test.js tests/unit/context-verify-refresh-stats.test.js tests/unit/error-catalog.test.js tests/unit/parse-args.test.js",
+					"result": "79 passed, 0 failed",
+					"date": "2026-08-10",
+					"notes": "Focused verification of Knowledge Kind and lineage binding, current-only Loadouts, projections, benchmarks, source adapters, retention reporting, dependency boundaries, schemas, error codes, and CLI parsing."
+				},
+				{
+					"command": "source-isolation review of git diff d75750f48b2fa9511ea87b127d4e361be48fd755 96d3cc1ec795c5ff322e049938601221f1b7df86",
+					"result": "passed; complete 36-file change set reviewed with no external project references, attribution markers, imported fixtures, package changes, or non-original source indicators found",
+					"date": "2026-08-10",
+					"notes": "Detailed mechanical and manual evidence: docs/quality/f017-context-knowledge-lifecycle-retrospective.md"
+				},
+				{
+					"command": "npm test",
+					"result": "1649 total, 1645 passed, 4 skipped, 0 failed",
+					"date": "2026-08-10",
+					"notes": "Full repository verification after registering F017 in the feature inventory."
+				},
+				{
+					"command": "npm run manifests; node scripts/amber.js doctor --target .; node scripts/validate-wiki.js --target .",
+					"result": "exit 0; manifest errors 0; doctor errors 0 warnings 0; wiki errors 0",
+					"date": "2026-08-10",
+					"notes": "Continuous-improvement health pass after the F017 implementation and documentation commits landed on master."
+				}
+			],
+			"notes": [
+				"Implementation commit fbb9894ec00fedae699c2b299f76bcabbe954a60; documentation commit 96d3cc1.",
+				"Implementation predates any governed plan or Session, so F017 remains passing rather than accepted; see docs/quality/f017-context-knowledge-lifecycle-retrospective.md."
+			],
+			"paths": [
+				"scripts/lib/core/context-*.js",
+				"scripts/lib/context/",
+				"schemas/context-*.schema.json",
+				"tests/unit/context-*.test.js",
+				"docs/architecture/context-threat-model.md",
+				"docs/CLI_REFERENCE.md",
+				"docs/quality/f017-context-knowledge-lifecycle-retrospective.md"
+			],
+			"updated": "2026-08-10"
+		}
+	]
 }

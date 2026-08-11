@@ -46,10 +46,11 @@ function appendSessionEvent(sessionDir, event) {
 	if (!fs.existsSync(sessionDir)) {
 		fs.mkdirSync(sessionDir, { recursive: true });
 	}
-	const line = JSON.stringify({
-		...event,
-		timestamp: new Date().toISOString(),
-	}) + "\n";
+	const line =
+		JSON.stringify({
+			...event,
+			timestamp: new Date().toISOString(),
+		}) + "\n";
 	fs.appendFileSync(path.join(sessionDir, FILENAME), line);
 }
 

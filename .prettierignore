@@ -1,6 +1,58 @@
+# Prettier ignore — aligns with eslint.config.mjs ignores + generated/non-code dirs
+
+# Dependencies
 node_modules/
-apps/web/
-coverage/
-tests/fixtures/
 package-lock.json
 *.min.js
+
+# Web app (own TS toolchain)
+apps/web/
+
+# Coverage output
+coverage/
+
+# Test fixtures and temp data
+tests/fixtures/
+test-fixtures/
+
+# Templates (shipped starters, not our code)
+templates/
+
+# Test workflows and reports
+test-workflows/
+test-reports/
+
+# Skills (SKILL.md uses single-line x-amber-json that prettier breaks)
+skills/
+
+# Generated/mirrored agent products (regenerated from skills/ via npm run gen:agents)
+.agents/
+.claude/
+.codex-plugin/
+
+# Workflow state and metadata (not code)
+.workflow/
+.stitch/
+
+# Documentation (has its own formatting conventions)
+docs/
+
+# Brand assets
+assets/
+
+# Output directory
+output/
+
+# Data files (JSON registries, standards, presets — not source code)
+registry/
+rule-packs/
+standards/
+team-presets/
+profiles/
+
+# Local scratch and archive
+.archive/
+.scratch/
+
+# Prettier config itself
+.prettierrc.json

@@ -27,7 +27,10 @@ function fixture(pkgVersion, manifestVersion) {
 test("syncVersions copies package.json version into the plugin manifests", () => {
 	const dir = fixture("9.9.9", "1.0.0");
 	const r = syncVersions(dir);
-	assert.deepEqual([...r.synced].sort(), [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"]);
+	assert.deepEqual([...r.synced].sort(), [
+		".claude-plugin/plugin.json",
+		".codex-plugin/plugin.json",
+	]);
 	for (const rel of [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"]) {
 		const data = JSON.parse(fs.readFileSync(path.join(dir, rel), "utf8"));
 		assert.equal(data.version, "9.9.9", `${rel} synced`);

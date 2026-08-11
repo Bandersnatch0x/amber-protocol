@@ -15,7 +15,11 @@ function tmpRepo() {
 function setupPendingPlan(dir) {
 	fs.writeFileSync(
 		path.join(dir, "feature_list.json"),
-		JSON.stringify({ features: [{ id: "F001", title: "Login", status: "not_started", verification: [], evidence: [] }] }) + "\n",
+		JSON.stringify({
+			features: [
+				{ id: "F001", title: "Login", status: "not_started", verification: [], evidence: [] },
+			],
+		}) + "\n",
 	);
 	const plansDir = path.join(dir, "docs", "plans");
 	fs.mkdirSync(plansDir, { recursive: true });
@@ -52,8 +56,14 @@ describe("error-site remedies", () => {
 		const result = reviewPlan(dir, planPath);
 		const finding = result.findings.find((f) => f.checkId === "user-confirmation");
 		assert.ok(finding, "expected a user-confirmation finding");
-		assert.match(finding.remedy, /amber gate --confirm --target \. --plan docs\/plans\/F001-login\.md/);
+		assert.match(
+			finding.remedy,
+			/amber gate --confirm --target \. --plan docs\/plans\/F001-login\.md/,
+		);
 		// message stays clean (no inline fix) — symmetric with doctor's structured remedy.
-		assert.equal(finding.message, "User confirmation is required before implementation-ready status.");
+		assert.equal(
+			finding.message,
+			"User confirmation is required before implementation-ready status.",
+		);
 	});
 });

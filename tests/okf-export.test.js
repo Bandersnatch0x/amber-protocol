@@ -23,12 +23,24 @@ function smallWiki(target) {
 	writeFile(
 		target,
 		"docs/wiki/index.md",
-		["---", "type: index", "title: Index", "description: Root.", "---", "", "# Index", "", "[A](a.md)"].join("\n"),
+		[
+			"---",
+			"type: index",
+			"title: Index",
+			"description: Root.",
+			"---",
+			"",
+			"# Index",
+			"",
+			"[A](a.md)",
+		].join("\n"),
 	);
 	writeFile(
 		target,
 		"docs/wiki/a.md",
-		["---", "type: concept", "title: Alpha", "description: A page.", "---", "", "# Alpha"].join("\n"),
+		["---", "type: concept", "title: Alpha", "description: A page.", "---", "", "# Alpha"].join(
+			"\n",
+		),
 	);
 }
 

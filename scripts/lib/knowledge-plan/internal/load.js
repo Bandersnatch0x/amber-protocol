@@ -3,11 +3,7 @@
 const path = require("node:path");
 
 const { loadYamlFile } = require("../../core/simple-yaml");
-const {
-	pathExists,
-	readJson,
-	resolveTarget,
-} = require("../../core/fs-utils");
+const { pathExists, readJson, resolveTarget } = require("../../core/fs-utils");
 const { validateKnowledgePlanData } = require("./validate");
 
 const KNOWLEDGE_PLAN_RELATIVE = path.join("docs", "wiki", "knowledge-plan.json");

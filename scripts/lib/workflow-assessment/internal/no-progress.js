@@ -122,12 +122,15 @@ function detectEmptyEvidenceIncrement(resultEvidence) {
 	const deltas = resultDeltasFrom(resultEvidence);
 	if (deltas.length === 0) return [];
 	if (deltas.every(isDeltaEmpty)) {
-		return [{
-			id: "no-progress-empty-evidence-increment",
-			severity: "warning",
-			title: "Empty evidence increment",
-			detail: "Result evidence records no change (diff/delta is empty); the step produced no new evidence.",
-		}];
+		return [
+			{
+				id: "no-progress-empty-evidence-increment",
+				severity: "warning",
+				title: "Empty evidence increment",
+				detail:
+					"Result evidence records no change (diff/delta is empty); the step produced no new evidence.",
+			},
+		];
 	}
 	return [];
 }
@@ -181,12 +184,14 @@ function detectBudgetExhausted(timelineEvents, resultEvidence, loopContract) {
 		usage += usageFromItem(resultEvidence);
 	}
 	if (usage > ceiling || exceededEvent) {
-		return [{
-			id: "no-progress-budget-exhausted",
-			severity: "error",
-			title: "Budget ceiling exhausted",
-			detail: `Observed usage ${usage} exceeds loop-contract budgetCeiling ${ceiling}; the loop should have stopped.`,
-		}];
+		return [
+			{
+				id: "no-progress-budget-exhausted",
+				severity: "error",
+				title: "Budget ceiling exhausted",
+				detail: `Observed usage ${usage} exceeds loop-contract budgetCeiling ${ceiling}; the loop should have stopped.`,
+			},
+		];
 	}
 	return [];
 }

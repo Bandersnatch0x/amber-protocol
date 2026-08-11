@@ -3,14 +3,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const {
-	readJsonSafe,
-	isMissingPath,
-} = require("./fs-utils");
+const { readJsonSafe, isMissingPath } = require("./fs-utils");
 
-const {
-	inspectLoopReadiness,
-} = require("./workflow-packs");
+const { inspectLoopReadiness } = require("./workflow-packs");
 
 const DEFAULT_RECOMMENDATION_GOAL = "continuous improvement";
 const MAX_LOOP_HISTORY_RECORDS = 100;
@@ -32,32 +27,9 @@ const GOAL_KEYWORDS = {
 		"amber",
 		"daily",
 	],
-	maintenance: [
-		"maintenance",
-		"triage",
-		"stale",
-		"doc",
-		"wiki",
-		"evolution",
-		"drift",
-		"candidate",
-	],
-	security: [
-		"security",
-		"secure",
-		"vulnerability",
-		"secret",
-		"permission",
-		"audit",
-	],
-	review: [
-		"review",
-		"code",
-		"accept",
-		"diff",
-		"changed",
-		"approval",
-	],
+	maintenance: ["maintenance", "triage", "stale", "doc", "wiki", "evolution", "drift", "candidate"],
+	security: ["security", "secure", "vulnerability", "secret", "permission", "audit"],
+	review: ["review", "code", "accept", "diff", "changed", "approval"],
 	"vulnerability repair": [
 		"vulnerability",
 		"vuln",
@@ -70,9 +42,7 @@ const GOAL_KEYWORDS = {
 
 function findLoopContract(data, contractId) {
 	const contracts = Array.isArray(data.loopContracts) ? data.loopContracts : [];
-	const contract = contracts.find(
-		(candidate) => candidate && candidate.id === contractId,
-	);
+	const contract = contracts.find((candidate) => candidate && candidate.id === contractId);
 	if (!contract) {
 		throw new Error(`Loop contract ${contractId} was not found.`);
 	}
@@ -103,8 +73,7 @@ function buildLoopLedgerRecord(data, contract, options = {}) {
 			sources: loopInputSources(contract),
 			capturedAt: now,
 		},
-		actionSummary:
-			options.actionSummary || "dry-run preview only; no actions executed",
+		actionSummary: options.actionSummary || "dry-run preview only; no actions executed",
 		producedArtifacts: [],
 		replayEvidence: [],
 		budgetUsage: { minutes: 0 },
@@ -508,14 +477,10 @@ function recordArray(record, key) {
 }
 
 function observationFingerprint(record) {
-	const inputSnapshot = isLoopLedgerRecord(record.inputSnapshot)
-		? record.inputSnapshot
-		: {};
+	const inputSnapshot = isLoopLedgerRecord(record.inputSnapshot) ? record.inputSnapshot : {};
 	return JSON.stringify({
 		contractId: record.contractId || "",
-		inputSources: Array.isArray(inputSnapshot.sources)
-			? inputSnapshot.sources
-			: [],
+		inputSources: Array.isArray(inputSnapshot.sources) ? inputSnapshot.sources : [],
 		actionSummary: record.actionSummary || "",
 		producedArtifacts: recordArray(record, "producedArtifacts"),
 		replayEvidence: recordArray(record, "replayEvidence"),
@@ -562,29 +527,18 @@ function hasBudgetExhaustion(record) {
  * current progress. One ordinary record is always insufficient evidence.
  */
 function assessLoopProgress(records = []) {
-	const history = Array.isArray(records)
-		? records.filter(isLoopLedgerRecord)
-		: [];
+	const history = Array.isArray(records) ? records.filter(isLoopLedgerRecord) : [];
 	const latest = history[history.length - 1] || null;
-	const equivalentObservationTail = countEquivalentTail(
-		history,
-		observationFingerprint,
-	);
-	const emptyEvidenceDeltaTail = countMatchingTail(
-		history,
-		hasEmptyEvidenceDelta,
-	);
-	const sameStopReasonTail = countEquivalentTail(
-		history,
-		(record) => record.stopReason || "",
-		{ requireValue: true },
-	);
+	const equivalentObservationTail = countEquivalentTail(history, observationFingerprint);
+	const emptyEvidenceDeltaTail = countMatchingTail(history, hasEmptyEvidenceDelta);
+	const sameStopReasonTail = countEquivalentTail(history, (record) => record.stopReason || "", {
+		requireValue: true,
+	});
 	const budgetExhausted = latest && hasBudgetExhaustion(latest) ? 1 : 0;
 	const repeatedEmptyObservation =
 		equivalentObservationTail >= MIN_NO_PROGRESS_REPEATS &&
 		emptyEvidenceDeltaTail >= MIN_NO_PROGRESS_REPEATS;
-	const repeatedStopReason =
-		sameStopReasonTail >= REPEATED_STOP_REASON_STALL_THRESHOLD;
+	const repeatedStopReason = sameStopReasonTail >= REPEATED_STOP_REASON_STALL_THRESHOLD;
 
 	const signals = [];
 	if (equivalentObservationTail >= MIN_NO_PROGRESS_REPEATS) {
@@ -616,9 +570,7 @@ function assessLoopProgress(records = []) {
 		});
 	}
 
-	const stalled = Boolean(
-		budgetExhausted || repeatedEmptyObservation || repeatedStopReason,
-	);
+	const stalled = Boolean(budgetExhausted || repeatedEmptyObservation || repeatedStopReason);
 	let state = "progressing";
 	if (stalled) {
 		state = "stalled";
@@ -641,9 +593,7 @@ function assessLoopProgress(records = []) {
 		);
 	}
 	if (budgetExhausted) {
-		remedies.push(
-			"Reduce loop scope or obtain explicit approval before increasing the budget.",
-		);
+		remedies.push("Reduce loop scope or obtain explicit approval before increasing the budget.");
 	}
 
 	return {
@@ -691,16 +641,13 @@ function inspectLoopLedgerDirectory(ledgerPath) {
 				modifiedAt: fs.statSync(filePath).mtimeMs,
 			});
 		} catch {
-			warnings.push(
-				`Loop ledger record ${entry.name} is unreadable or invalid; skipped.`,
-			);
+			warnings.push(`Loop ledger record ${entry.name} is unreadable or invalid; skipped.`);
 		}
 	}
 
 	const availableCount = directoryEntries.length;
 	entries.sort(
-		(left, right) =>
-			right.modifiedAt - left.modifiedAt || left.name.localeCompare(right.name),
+		(left, right) => right.modifiedAt - left.modifiedAt || left.name.localeCompare(right.name),
 	);
 	const selected = entries.slice(0, MAX_LOOP_HISTORY_RECORDS);
 	if (availableCount > MAX_LOOP_HISTORY_RECORDS) {
@@ -713,9 +660,7 @@ function inspectLoopLedgerDirectory(ledgerPath) {
 	for (const entry of selected) {
 		const { value, error } = readJsonSafe(entry.filePath);
 		if (error || !isLoopLedgerRecord(value)) {
-			warnings.push(
-				`Loop ledger record ${entry.name} is unreadable or invalid; skipped.`,
-			);
+			warnings.push(`Loop ledger record ${entry.name} is unreadable or invalid; skipped.`);
 			continue;
 		}
 		loaded.push({
@@ -726,8 +671,7 @@ function inspectLoopLedgerDirectory(ledgerPath) {
 	}
 
 	loaded.sort(
-		(left, right) =>
-			left.sortTime - right.sortTime || left.name.localeCompare(right.name),
+		(left, right) => left.sortTime - right.sortTime || left.name.localeCompare(right.name),
 	);
 	const records = loaded.map((entry) => entry.record);
 	if (records.length === 0) {

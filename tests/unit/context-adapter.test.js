@@ -86,19 +86,25 @@ describe("amber context end-to-end through the adapter", () => {
 			const args = (extra = {}) => ({ target: root, ...extra });
 
 			// 1. request
-			const r1 = contextDispatch("request", args({
-				_: ["context", "request"],
-				page: "governed-execution",
-				title: "Governed execution",
-				source: "scripts/lib/core/governed-runner.js",
-			}));
+			const r1 = contextDispatch(
+				"request",
+				args({
+					_: ["context", "request"],
+					page: "governed-execution",
+					title: "Governed execution",
+					source: "scripts/lib/core/governed-runner.js",
+				}),
+			);
 			assert.equal(r1.exitCode, 0, JSON.stringify(r1.result.errors));
 			const requestId = r1.result.text.match(/Request (\S+)/)[1];
 			assert.ok(requestId.startsWith("kd-"));
 
 			// 2. ingest — agent produces a valid page
 			const req = JSON.parse(
-				fs.readFileSync(path.join(root, ".amber", "context", "requests", `${requestId}.json`), "utf8"),
+				fs.readFileSync(
+					path.join(root, ".amber", "context", "requests", `${requestId}.json`),
+					"utf8",
+				),
 			);
 			const s1 = req.sources[0];
 			const payload = {
@@ -106,15 +112,24 @@ describe("amber context end-to-end through the adapter", () => {
 				pageId: "governed-execution",
 				title: "Governed execution",
 				sources: { s1 },
-				blocks: [{ type: "prose", sources: ["s1"], text: "Five gates are declared in governed-runner.js." }],
+				blocks: [
+					{
+						type: "prose",
+						sources: ["s1"],
+						text: "Five gates are declared in governed-runner.js.",
+					},
+				],
 			};
 			const payloadPath = path.join(root, ".amber", "context", "payload.json");
 			fs.writeFileSync(payloadPath, JSON.stringify(payload, null, 2), "utf8");
-			const r2 = contextDispatch("ingest", args({
-				_: ["context", "ingest"],
-				request: requestId,
-				payload: payloadPath,
-			}));
+			const r2 = contextDispatch(
+				"ingest",
+				args({
+					_: ["context", "ingest"],
+					request: requestId,
+					payload: payloadPath,
+				}),
+			);
 			assert.equal(r2.exitCode, 0, JSON.stringify(r2.result.errors));
 			assert.equal(r2.result.outcome, "accepted");
 
@@ -156,19 +171,25 @@ describe("amber context end-to-end through the adapter", () => {
 		try {
 			seed(root);
 			const args = (extra = {}) => ({ target: root, ...extra });
-			const r1 = contextDispatch("request", args({
-				_: ["context", "request"],
-				page: "p1",
-				source: "docs/adr/0003-governance-gated-execution.md",
-			}));
+			const r1 = contextDispatch(
+				"request",
+				args({
+					_: ["context", "request"],
+					page: "p1",
+					source: "docs/adr/0003-governance-gated-execution.md",
+				}),
+			);
 			const requestId = r1.result.text.match(/Request (\S+)/)[1];
 			const payloadPath = path.join(root, "bad.json");
 			fs.writeFileSync(payloadPath, JSON.stringify({ not: "a page" }), "utf8");
-			const r2 = contextDispatch("ingest", args({
-				_: ["context", "ingest"],
-				request: requestId,
-				payload: payloadPath,
-			}));
+			const r2 = contextDispatch(
+				"ingest",
+				args({
+					_: ["context", "ingest"],
+					request: requestId,
+					payload: payloadPath,
+				}),
+			);
 			assert.equal(r2.exitCode, 1);
 			assert.equal(r2.result.code, "AMBER_E_CONTEXT_SCHEMA_INVALID");
 		} finally {
@@ -181,12 +202,15 @@ describe("amber context end-to-end through the adapter", () => {
 		try {
 			seed(root);
 			const args = (extra = {}) => ({ target: root, ...extra });
-			const requested = contextDispatch("request", args({
-				_: ["context", "request"],
-				page: "assured-rule",
-				title: "Assured rule",
-				source: "scripts/lib/core/governed-runner.js",
-			}));
+			const requested = contextDispatch(
+				"request",
+				args({
+					_: ["context", "request"],
+					page: "assured-rule",
+					title: "Assured rule",
+					source: "scripts/lib/core/governed-runner.js",
+				}),
+			);
 			const requestId = requested.result.text.match(/Request (\S+)/)[1];
 			const request = JSON.parse(
 				fs.readFileSync(
@@ -205,11 +229,14 @@ describe("amber context end-to-end through the adapter", () => {
 			const payloadPath = path.join(root, "assured-rule.json");
 			fs.writeFileSync(payloadPath, JSON.stringify(payload, null, 2), "utf8");
 
-			const ingested = contextDispatch("ingest", args({
-				_: ["context", "ingest"],
-				request: requestId,
-				payload: payloadPath,
-			}));
+			const ingested = contextDispatch(
+				"ingest",
+				args({
+					_: ["context", "ingest"],
+					request: requestId,
+					payload: payloadPath,
+				}),
+			);
 			assert.equal(ingested.exitCode, 0, JSON.stringify(ingested.result.errors));
 			const evidence = JSON.parse(
 				fs.readFileSync(
@@ -275,18 +302,24 @@ describe("amber context end-to-end through the adapter", () => {
 			const args = (extra = {}) => ({ target: root, ...extra });
 
 			// request with scope
-			const r1 = contextDispatch("request", args({
-				_: ["context", "request"],
-				page: "governed-execution",
-				title: "Governed execution",
-				source: "scripts/lib/core/governed-runner.js",
-				scope: ["feature-standard", "F015"],
-			}));
+			const r1 = contextDispatch(
+				"request",
+				args({
+					_: ["context", "request"],
+					page: "governed-execution",
+					title: "Governed execution",
+					source: "scripts/lib/core/governed-runner.js",
+					scope: ["feature-standard", "F015"],
+				}),
+			);
 			assert.equal(r1.exitCode, 0, JSON.stringify(r1.result.errors));
 			const requestId = r1.result.text.match(/Request (\S+)/)[1];
 			// request file carries target.scope
 			const req = JSON.parse(
-				fs.readFileSync(path.join(root, ".amber", "context", "requests", `${requestId}.json`), "utf8"),
+				fs.readFileSync(
+					path.join(root, ".amber", "context", "requests", `${requestId}.json`),
+					"utf8",
+				),
 			);
 			assert.deepEqual(req.target.scope, ["feature-standard", "F015"]);
 
@@ -297,22 +330,34 @@ describe("amber context end-to-end through the adapter", () => {
 				title: "Governed execution",
 				scope: ["feature-standard", "F015"],
 				sources: { s1: req.sources[0] },
-				blocks: [{ type: "prose", sources: ["s1"], text: "Five gates are declared in governed-runner.js." }],
+				blocks: [
+					{
+						type: "prose",
+						sources: ["s1"],
+						text: "Five gates are declared in governed-runner.js.",
+					},
+				],
 			};
 			const payloadPath = path.join(root, "payload2.json");
 			fs.writeFileSync(payloadPath, JSON.stringify(payload, null, 2), "utf8");
-			const r2 = contextDispatch("ingest", args({
-				_: ["context", "ingest"],
-				request: requestId,
-				payload: payloadPath,
-			}));
+			const r2 = contextDispatch(
+				"ingest",
+				args({
+					_: ["context", "ingest"],
+					request: requestId,
+					payload: payloadPath,
+				}),
+			);
 			assert.equal(r2.exitCode, 0, JSON.stringify(r2.result.errors));
 
 			// load with the matching route
-			const r3 = contextDispatch("load", args({
-				_: ["context", "load"],
-				route: "feature-standard",
-			}));
+			const r3 = contextDispatch(
+				"load",
+				args({
+					_: ["context", "load"],
+					route: "feature-standard",
+				}),
+			);
 			assert.equal(r3.exitCode, 0, JSON.stringify(r3.result.errors));
 			assert.ok(r3.result.loadoutPath.includes("feature-standard.json"), r3.result.loadoutPath);
 			assert.match(r3.result.text, /required artifacts: 3/);
@@ -325,10 +370,13 @@ describe("amber context end-to-end through the adapter", () => {
 			assert.ok(loadout.excluded.length === 0, JSON.stringify(loadout.excluded));
 
 			// verify --loadout passes for Required Artifacts and required-tier Pages.
-			const r4 = contextDispatch("verify", args({
-				_: ["context", "verify"],
-				loadout: r3.result.loadoutPath,
-			}));
+			const r4 = contextDispatch(
+				"verify",
+				args({
+					_: ["context", "verify"],
+					loadout: r3.result.loadoutPath,
+				}),
+			);
 			assert.equal(r4.exitCode, 0, r4.result.text);
 			assert.match(r4.result.text, /required artifacts and required-tier pages fresh/);
 
@@ -338,13 +386,18 @@ describe("amber context end-to-end through the adapter", () => {
 				"\nconst shared = true;\n",
 				"utf8",
 			);
-			const r5 = contextDispatch("load", args({
-				_: ["context", "load"],
-				route: "feature-standard",
-			}));
+			const r5 = contextDispatch(
+				"load",
+				args({
+					_: ["context", "load"],
+					route: "feature-standard",
+				}),
+			);
 			assert.equal(r5.exitCode, 0, JSON.stringify(r5.result.errors));
 			const loadout2 = JSON.parse(fs.readFileSync(r5.result.loadoutPath, "utf8"));
-			assert.ok(loadout2.excluded.some((e) => e.pageId === "governed-execution" && e.reason === "stale"));
+			assert.ok(
+				loadout2.excluded.some((e) => e.pageId === "governed-execution" && e.reason === "stale"),
+			);
 		} finally {
 			cleanup(root);
 		}
@@ -559,9 +612,7 @@ describe("amber context end-to-end through the adapter", () => {
 				args({ _: ["context", "load"], route: "feature-standard" }),
 			);
 			assert.equal(afterSourceChange.exitCode, 0);
-			const loadout = JSON.parse(
-				fs.readFileSync(afterSourceChange.result.loadoutPath, "utf8"),
-			);
+			const loadout = JSON.parse(fs.readFileSync(afterSourceChange.result.loadoutPath, "utf8"));
 			assert.equal(loadout.pages["original-rule"], undefined);
 			assert.equal(loadout.pages["current-rule"], undefined);
 			assert.ok(
@@ -705,7 +756,11 @@ describe("amber context end-to-end through the adapter", () => {
 				"projection",
 				args({ _: ["context", "projection", "status"] }),
 			);
-			assert.equal(automaticallyCurrent.exitCode, 0, JSON.stringify(automaticallyCurrent.result.errors));
+			assert.equal(
+				automaticallyCurrent.exitCode,
+				0,
+				JSON.stringify(automaticallyCurrent.result.errors),
+			);
 			assert.match(automaticallyCurrent.result.text, /context-index: current/);
 
 			const rebuilt = contextDispatch(
@@ -735,11 +790,7 @@ describe("amber context end-to-end through the adapter", () => {
 			assert.equal(current.exitCode, 0);
 			assert.match(current.result.text, /context-index: current/);
 
-			fs.appendFileSync(
-				path.join(root, "docs", "wiki", "context-index.md"),
-				"\ncorrupt\n",
-				"utf8",
-			);
+			fs.appendFileSync(path.join(root, "docs", "wiki", "context-index.md"), "\ncorrupt\n", "utf8");
 			const corruptOutput = fs.readFileSync(
 				path.join(root, "docs", "wiki", "context-index.md"),
 				"utf8",
@@ -868,11 +919,7 @@ describe("amber context end-to-end through the adapter", () => {
 						eligiblePages: ["benchmark-page"],
 						pages: ["benchmark-page"],
 						excluded: [],
-						requiredArtifacts: [
-							"operating-manual",
-							"route-manifest",
-							"loadout-definition",
-						],
+						requiredArtifacts: ["operating-manual", "route-manifest", "loadout-definition"],
 						loadout: exactLoadout,
 					},
 				}),
@@ -956,9 +1003,7 @@ describe("amber context end-to-end through the adapter", () => {
 				JSON.stringify({
 					schemaVersion: "1.0.0",
 					adapterId: "local-fixture",
-					sources: [
-						{ ref: "scripts/lib/core/governed-runner.js", kind: "code" },
-					],
+					sources: [{ ref: "scripts/lib/core/governed-runner.js", kind: "code" }],
 				}),
 				"utf8",
 			);
@@ -997,11 +1042,7 @@ describe("amber context end-to-end through the adapter", () => {
 			);
 
 			const transcriptPath = path.join(root, "session-transcript.txt");
-			fs.writeFileSync(
-				transcriptPath,
-				"API_TOKEN=sk-1234567890abcdefghijklmnop\n",
-				"utf8",
-			);
+			fs.writeFileSync(transcriptPath, "API_TOKEN=sk-1234567890abcdefghijklmnop\n", "utf8");
 			fs.writeFileSync(
 				fixturePath,
 				JSON.stringify({
@@ -1034,10 +1075,7 @@ describe("amber context end-to-end through the adapter", () => {
 			);
 			assert.equal(transcriptAllowed.exitCode, 0);
 			assert.equal(transcriptAllowed.result.bundle.sources[0].excerpt, "API_TOKEN=[REDACTED]\n");
-			assert.match(
-				transcriptAllowed.result.bundle.sources[0].excerptHash,
-				/^sha256:[0-9a-f]{64}$/,
-			);
+			assert.match(transcriptAllowed.result.bundle.sources[0].excerptHash, /^sha256:[0-9a-f]{64}$/);
 
 			fs.writeFileSync(
 				fixturePath,
@@ -1074,10 +1112,17 @@ describe("amber context end-to-end through the adapter", () => {
 				}),
 			);
 			assert.equal(immutable.exitCode, 0, JSON.stringify(immutable.result.errors));
-			assert.equal(immutable.result.bundle.sources.every((source) => source.mutable === false), true);
+			assert.equal(
+				immutable.result.bundle.sources.every((source) => source.mutable === false),
+				true,
+			);
 			assert.deepEqual(
 				immutable.result.bundle.sources.map((source) => source.ref),
-				[".amber/sessions/s1/ledger.jsonl", "docs/adr/0003-governance-gated-execution.md", "docs/decisions/decision.md"],
+				[
+					".amber/sessions/s1/ledger.jsonl",
+					"docs/adr/0003-governance-gated-execution.md",
+					"docs/decisions/decision.md",
+				],
 			);
 			for (const source of immutable.result.bundle.sources) {
 				assert.match(source.excerptHash, /^sha256:[0-9a-f]{64}$/);
@@ -1120,11 +1165,13 @@ describe("amber context end-to-end through the adapter", () => {
 
 			const mismatched = run({
 				...base,
-				sources: [{
-					kind: "code",
-					ref: "scripts/lib/core/governed-runner.js",
-					rawHash: "sha256:" + "f".repeat(64),
-				}],
+				sources: [
+					{
+						kind: "code",
+						ref: "scripts/lib/core/governed-runner.js",
+						rawHash: "sha256:" + "f".repeat(64),
+					},
+				],
 			});
 			assert.equal(mismatched.result.code, "AMBER_E_CONTEXT_SOURCE_INVALID");
 			assert.match(mismatched.result.errors[0], /hash mismatch/i);
@@ -1139,10 +1186,12 @@ describe("amber context end-to-end through the adapter", () => {
 			fs.writeFileSync(outsideFile, "outside target\n", "utf8");
 			const escaped = run({
 				...base,
-				sources: [{
-					kind: "document",
-					ref: path.relative(root, outsideFile).split(path.sep).join("/"),
-				}],
+				sources: [
+					{
+						kind: "document",
+						ref: path.relative(root, outsideFile).split(path.sep).join("/"),
+					},
+				],
 			});
 			assert.equal(escaped.result.code, "AMBER_E_CONTEXT_SOURCE_INVALID");
 			assert.match(escaped.result.errors[0], /outside the target/i);

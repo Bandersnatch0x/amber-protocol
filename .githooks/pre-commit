@@ -1,4 +1,11 @@
 #!/bin/sh
 
 repo_root="$(git rev-parse --show-toplevel)" || exit 1
-exec node "$repo_root/scripts/validate-git-identity.js"
+
+# Validate commit identity first (fail fast on identity issues)
+node "$repo_root/scripts/validate-git-identity.js" || exit 1
+
+# Run lint and format checks for fast quality feedback at commit time
+cd "$repo_root" || exit 1
+npm run lint || { echo "Lint check failed. Fix with: npm run lint:fix"; exit 1; }
+npm run format:check || { echo "Format check failed. Fix with: npm run format"; exit 1; }

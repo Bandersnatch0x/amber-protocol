@@ -305,7 +305,9 @@ describe("knowledge-plan facade: scaffold", () => {
 		try {
 			const res = scaffold(tmp, { dryRun: false });
 			assert.ok(Array.isArray(res.created));
-			assert.ok(res.created.some((p) => p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.json")));
+			assert.ok(
+				res.created.some((p) => p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.json")),
+			);
 			assert.ok(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.json")));
 			assert.equal(res.errors.length, 0);
 		} finally {
@@ -317,7 +319,9 @@ describe("knowledge-plan facade: scaffold", () => {
 		const tmp = makeTempTarget();
 		try {
 			const res = scaffold(tmp, { dryRun: false, yaml: true });
-			assert.ok(res.created.some((p) => p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.yaml")));
+			assert.ok(
+				res.created.some((p) => p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.yaml")),
+			);
 			assert.ok(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.yaml")));
 			assert.equal(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.json")), false);
 		} finally {

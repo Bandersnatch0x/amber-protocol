@@ -26,9 +26,7 @@ describe("listRoutes", () => {
 	});
 
 	it("returns exitCode 0 and a message when no routes exist", () => {
-		const { text, exitCode } = listRoutes(
-			path.join(__dirname, "../../no-routes-here"),
-		);
+		const { text, exitCode } = listRoutes(path.join(__dirname, "../../no-routes-here"));
 		assert.strictEqual(exitCode, 0);
 		assert.match(text, /No routes found/);
 	});

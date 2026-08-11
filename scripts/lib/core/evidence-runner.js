@@ -35,7 +35,13 @@ function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes = 5, su
 			executesAnything: false,
 			...subject,
 		});
-		return { target: targetRoot, executed: false, denied: true, reason: verdict.reason, ledgerRecord: record };
+		return {
+			target: targetRoot,
+			executed: false,
+			denied: true,
+			reason: verdict.reason,
+			ledgerRecord: record,
+		};
 	}
 
 	const startedAt = Date.now();
@@ -57,7 +63,12 @@ function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes = 5, su
 			stderrTail: (res.stderr || "").slice(-STDERR_CAP),
 		};
 	} catch (e) {
-		exec = { command, exitCode: -1, stdoutTail: "", stderrTail: String(e.message).slice(-STDERR_CAP) };
+		exec = {
+			command,
+			exitCode: -1,
+			stdoutTail: "",
+			stderrTail: String(e.message).slice(-STDERR_CAP),
+		};
 	}
 	const durationMs = Date.now() - startedAt;
 

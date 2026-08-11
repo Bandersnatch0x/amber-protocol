@@ -20,24 +20,15 @@ describe("session transition SSOT predicates", () => {
 
 	describe("isLegalTransition", () => {
 		it("rejects created → executing (must route first)", () => {
-			assert.strictEqual(
-				isLegalTransition(STATES.CREATED, STATES.EXECUTING),
-				false,
-			);
+			assert.strictEqual(isLegalTransition(STATES.CREATED, STATES.EXECUTING), false);
 		});
 
 		it("allows created → routed", () => {
-			assert.strictEqual(
-				isLegalTransition(STATES.CREATED, STATES.ROUTED),
-				true,
-			);
+			assert.strictEqual(isLegalTransition(STATES.CREATED, STATES.ROUTED), true);
 		});
 
 		it("allows routed → executing", () => {
-			assert.strictEqual(
-				isLegalTransition(STATES.ROUTED, STATES.EXECUTING),
-				true,
-			);
+			assert.strictEqual(isLegalTransition(STATES.ROUTED, STATES.EXECUTING), true);
 		});
 	});
 
@@ -46,16 +37,8 @@ describe("session transition SSOT predicates", () => {
 			const targets = legalTargets(STATES.CREATED);
 			assert.ok(Array.isArray(targets), "legalTargets must return an array");
 
-			for (const expected of [
-				STATES.ROUTED,
-				STATES.COMPLETED,
-				STATES.FAILED,
-				STATES.ABORTED,
-			]) {
-				assert.ok(
-					targets.includes(expected),
-					`legalTargets(created) must include ${expected}`,
-				);
+			for (const expected of [STATES.ROUTED, STATES.COMPLETED, STATES.FAILED, STATES.ABORTED]) {
+				assert.ok(targets.includes(expected), `legalTargets(created) must include ${expected}`);
 			}
 
 			assert.ok(

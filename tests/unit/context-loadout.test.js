@@ -6,8 +6,17 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { buildLoadout, verifyLoadoutFile, loadoutsDir } = require("../../scripts/lib/core/context-loadout");
-const { writePage, regenerateIndex, pagesDir, eventsPath } = require("../../scripts/lib/core/context-store");
+const {
+	buildLoadout,
+	verifyLoadoutFile,
+	loadoutsDir,
+} = require("../../scripts/lib/core/context-loadout");
+const {
+	writePage,
+	regenerateIndex,
+	pagesDir,
+	eventsPath,
+} = require("../../scripts/lib/core/context-store");
 const { sha256 } = require("../../scripts/lib/core/context-hash");
 
 function makeTarget() {
@@ -22,7 +31,11 @@ function makeTarget() {
 function seedRequiredArtifacts(root) {
 	const agentDir = path.join(root, "docs", "wiki", "agent");
 	fs.mkdirSync(agentDir, { recursive: true });
-	fs.writeFileSync(path.join(agentDir, "amber.md"), "# Amber Operating Manual\n\nStay governed.\n", "utf8");
+	fs.writeFileSync(
+		path.join(agentDir, "amber.md"),
+		"# Amber Operating Manual\n\nStay governed.\n",
+		"utf8",
+	);
 	fs.writeFileSync(
 		path.join(agentDir, "context-loadout.md"),
 		"# Context Loadout Definition\n\nLoad required artifacts first.\n",
@@ -186,9 +199,18 @@ describe("buildLoadout — tier ordering (D3)", () => {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
 			writeMutable(root, "scripts/lib/core/b.js", "const b = 1;\n");
 			writeMutable(root, "scripts/lib/core/c.js", "const c = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
-			writePage(root, freshPage(root, { pageId: "page-b", title: "B", ref: "scripts/lib/core/b.js" }));
-			writePage(root, freshPage(root, { pageId: "page-c", title: "C", ref: "scripts/lib/core/c.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-b", title: "B", ref: "scripts/lib/core/b.js" }),
+			);
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-c", title: "C", ref: "scripts/lib/core/c.js" }),
+			);
 			regenerateIndex(root);
 			// page-b most recent, then page-a, then page-c (older).
 			writeEvents(root, [
@@ -210,8 +232,14 @@ describe("buildLoadout — tier ordering (D3)", () => {
 		try {
 			writeMutable(root, "scripts/lib/core/x.js", "const x = 1;\n");
 			writeMutable(root, "scripts/lib/core/y.js", "const y = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-y", title: "Y", ref: "scripts/lib/core/x.js" }));
-			writePage(root, freshPage(root, { pageId: "page-x", title: "X", ref: "scripts/lib/core/y.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-y", title: "Y", ref: "scripts/lib/core/x.js" }),
+			);
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-x", title: "X", ref: "scripts/lib/core/y.js" }),
+			);
 			regenerateIndex(root);
 			// Same `at` -> pageId asc tie-break: page-x before page-y.
 			writeEvents(root, [
@@ -232,8 +260,14 @@ describe("buildLoadout — tier ordering (D3)", () => {
 		try {
 			writeMutable(root, "scripts/lib/core/n1.js", "const n1 = 1;\n");
 			writeMutable(root, "scripts/lib/core/n2.js", "const n2 = 1;\n");
-			writePage(root, freshPage(root, { pageId: "zeta-page", title: "Zeta", ref: "scripts/lib/core/n1.js" }));
-			writePage(root, freshPage(root, { pageId: "alpha-page", title: "Alpha", ref: "scripts/lib/core/n2.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "zeta-page", title: "Zeta", ref: "scripts/lib/core/n1.js" }),
+			);
+			writePage(
+				root,
+				freshPage(root, { pageId: "alpha-page", title: "Alpha", ref: "scripts/lib/core/n2.js" }),
+			);
 			regenerateIndex(root);
 			writeEvents(root, [
 				{ kind: "page-written", pageId: "zeta-page", at: "2026-08-05T12:00:00.000Z" },
@@ -243,8 +277,24 @@ describe("buildLoadout — tier ordering (D3)", () => {
 			// Both pages fresh + no scope -> both are priority candidates with
 			// equal recency; tie-break by pageId asc -> alpha-page, zeta-page
 			// both go to priority. Use scope to push one to optional.
-			writePage(root, freshPage(root, { pageId: "zeta-page", title: "Zeta", ref: "scripts/lib/core/n1.js", scope: ["other-feature"] }));
-			writePage(root, freshPage(root, { pageId: "alpha-page", title: "Alpha", ref: "scripts/lib/core/n2.js", scope: ["bugfix-quick"] }));
+			writePage(
+				root,
+				freshPage(root, {
+					pageId: "zeta-page",
+					title: "Zeta",
+					ref: "scripts/lib/core/n1.js",
+					scope: ["other-feature"],
+				}),
+			);
+			writePage(
+				root,
+				freshPage(root, {
+					pageId: "alpha-page",
+					title: "Alpha",
+					ref: "scripts/lib/core/n2.js",
+					scope: ["bugfix-quick"],
+				}),
+			);
 			regenerateIndex(root);
 
 			const result = buildLoadout(root, { route: "bugfix-quick", budget: 1000 });
@@ -267,18 +317,24 @@ describe("buildLoadout — budget exclusion with recorded reasons (D3)", () => {
 			const bigText = "Big claim. " + "substantiation ".repeat(600);
 			writeMutable(root, "scripts/lib/core/small.js", "const s = 1;\n");
 			writeMutable(root, "scripts/lib/core/big.js", "const b = 1;\n");
-			writePage(root, freshPage(root, {
-				pageId: "small-page",
-				title: "Small",
-				ref: "scripts/lib/core/small.js",
-				blocks: [{ type: "prose", sources: ["s1"], text: smallText }],
-			}));
-			writePage(root, freshPage(root, {
-				pageId: "big-page",
-				title: "Big",
-				ref: "scripts/lib/core/big.js",
-				blocks: [{ type: "prose", sources: ["s1"], text: bigText }],
-			}));
+			writePage(
+				root,
+				freshPage(root, {
+					pageId: "small-page",
+					title: "Small",
+					ref: "scripts/lib/core/small.js",
+					blocks: [{ type: "prose", sources: ["s1"], text: smallText }],
+				}),
+			);
+			writePage(
+				root,
+				freshPage(root, {
+					pageId: "big-page",
+					title: "Big",
+					ref: "scripts/lib/core/big.js",
+					blocks: [{ type: "prose", sources: ["s1"], text: bigText }],
+				}),
+			);
 			regenerateIndex(root);
 			writeEvents(root, [
 				{ kind: "page-written", pageId: "small-page", at: "2026-08-05T12:00:00.000Z" },
@@ -304,14 +360,19 @@ describe("buildLoadout — required-tier overflow fail-fast (D3)", () => {
 		try {
 			const bigText = "Big claim. " + "substantiation ".repeat(600);
 			writeMutable(root, "scripts/lib/core/big.js", "const b = 1;\n");
-			writePage(root, freshPage(root, {
-				pageId: "big-page",
-				title: "Big",
-				ref: "scripts/lib/core/big.js",
-				blocks: [{ type: "prose", sources: ["s1"], text: bigText }],
-			}));
+			writePage(
+				root,
+				freshPage(root, {
+					pageId: "big-page",
+					title: "Big",
+					ref: "scripts/lib/core/big.js",
+					blocks: [{ type: "prose", sources: ["s1"], text: bigText }],
+				}),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "big-page", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "big-page", at: "2026-08-05T12:00:00.000Z" },
+			]);
 
 			const result = buildLoadout(root, {
 				route: "bugfix-quick",
@@ -323,7 +384,9 @@ describe("buildLoadout — required-tier overflow fail-fast (D3)", () => {
 			assert.equal(result.loadout, null);
 			assert.equal(result.loadoutPath, null);
 			// No file written.
-			assert.ok(!fs.existsSync(loadoutsDir(root)) || fs.readdirSync(loadoutsDir(root)).length === 0);
+			assert.ok(
+				!fs.existsSync(loadoutsDir(root)) || fs.readdirSync(loadoutsDir(root)).length === 0,
+			);
 		} finally {
 			cleanup(root);
 		}
@@ -356,7 +419,9 @@ describe("buildLoadout — freshness gate per tier (D4)", () => {
 			};
 			writePage(root, page);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "ledger-page", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "ledger-page", at: "2026-08-05T12:00:00.000Z" },
+			]);
 			// Tamper the live ledger — excerptHash no longer matches live content.
 			writeMutable(root, ".amber/sessions/s1/ledger.jsonl", '{"action":"tampered"}\n');
 
@@ -379,9 +444,14 @@ describe("buildLoadout — freshness gate per tier (D4)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/gone.js", "const x = 1;\n");
-			writePage(root, freshPage(root, { pageId: "gone-page", title: "Gone", ref: "scripts/lib/core/gone.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "gone-page", title: "Gone", ref: "scripts/lib/core/gone.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "gone-page", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "gone-page", at: "2026-08-05T12:00:00.000Z" },
+			]);
 			// Delete the only mutable source — page becomes obsolete.
 			fs.rmSync(path.join(root, "scripts", "lib", "core", "gone.js"), { force: true });
 
@@ -403,9 +473,14 @@ describe("buildLoadout — freshness gate per tier (D4)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/stale.js", "const x = 1;\n");
-			writePage(root, freshPage(root, { pageId: "stale-page", title: "Stale", ref: "scripts/lib/core/stale.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "stale-page", title: "Stale", ref: "scripts/lib/core/stale.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "stale-page", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "stale-page", at: "2026-08-05T12:00:00.000Z" },
+			]);
 			// Mutate the source — page becomes stale (normHash mismatch).
 			writeMutable(root, "scripts/lib/core/stale.js", "const x = 2;\n");
 
@@ -430,9 +505,14 @@ describe("buildLoadout — freshness gate per tier (D4)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/stale.js", "const x = 1;\n");
-			writePage(root, freshPage(root, { pageId: "stale-page", title: "Stale", ref: "scripts/lib/core/stale.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "stale-page", title: "Stale", ref: "scripts/lib/core/stale.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "stale-page", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "stale-page", at: "2026-08-05T12:00:00.000Z" },
+			]);
 			writeMutable(root, "scripts/lib/core/stale.js", "const x = 2;\n");
 
 			const result = buildLoadout(root, { route: "bugfix-quick", budget: 1000 });
@@ -453,8 +533,14 @@ describe("buildLoadout — no-scope pre-retrofit compatibility (D5)", () => {
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
 			writeMutable(root, "scripts/lib/core/b.js", "const b = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
-			writePage(root, freshPage(root, { pageId: "page-b", title: "B", ref: "scripts/lib/core/b.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-b", title: "B", ref: "scripts/lib/core/b.js" }),
+			);
 			regenerateIndex(root);
 			writeEvents(root, [
 				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
@@ -476,18 +562,24 @@ describe("buildLoadout — no-scope pre-retrofit compatibility (D5)", () => {
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
 			writeMutable(root, "scripts/lib/core/b.js", "const b = 1;\n");
-			writePage(root, freshPage(root, {
-				pageId: "page-a",
-				title: "A",
-				ref: "scripts/lib/core/a.js",
-				scope: ["bugfix-quick"],
-			}));
-			writePage(root, freshPage(root, {
-				pageId: "page-b",
-				title: "B",
-				ref: "scripts/lib/core/b.js",
-				scope: ["other-route"],
-			}));
+			writePage(
+				root,
+				freshPage(root, {
+					pageId: "page-a",
+					title: "A",
+					ref: "scripts/lib/core/a.js",
+					scope: ["bugfix-quick"],
+				}),
+			);
+			writePage(
+				root,
+				freshPage(root, {
+					pageId: "page-b",
+					title: "B",
+					ref: "scripts/lib/core/b.js",
+					scope: ["other-route"],
+				}),
+			);
 			regenerateIndex(root);
 			writeEvents(root, [
 				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
@@ -510,18 +602,24 @@ describe("buildLoadout — no-scope pre-retrofit compatibility (D5)", () => {
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
 			writeMutable(root, "scripts/lib/core/b.js", "const b = 1;\n");
-			writePage(root, freshPage(root, {
-				pageId: "page-a",
-				title: "A",
-				ref: "scripts/lib/core/a.js",
-				scope: ["F015"],
-			}));
-			writePage(root, freshPage(root, {
-				pageId: "page-b",
-				title: "B",
-				ref: "scripts/lib/core/b.js",
-				scope: ["F020"],
-			}));
+			writePage(
+				root,
+				freshPage(root, {
+					pageId: "page-a",
+					title: "A",
+					ref: "scripts/lib/core/a.js",
+					scope: ["F015"],
+				}),
+			);
+			writePage(
+				root,
+				freshPage(root, {
+					pageId: "page-b",
+					title: "B",
+					ref: "scripts/lib/core/b.js",
+					scope: ["F020"],
+				}),
+			);
 			regenerateIndex(root);
 			writeEvents(root, [
 				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
@@ -545,8 +643,14 @@ describe("buildLoadout — delta-since semantics (D6)", () => {
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
 			writeMutable(root, "scripts/lib/core/b.js", "const b = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
-			writePage(root, freshPage(root, { pageId: "page-b", title: "B", ref: "scripts/lib/core/b.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-b", title: "B", ref: "scripts/lib/core/b.js" }),
+			);
 			regenerateIndex(root);
 			writeEvents(root, [
 				{ kind: "page-written", pageId: "page-a", at: "2026-08-01T10:00:00.000Z" },
@@ -570,9 +674,14 @@ describe("buildLoadout — delta-since semantics (D6)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "page-a", at: "2026-08-01T10:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "page-a", at: "2026-08-01T10:00:00.000Z" },
+			]);
 
 			const result = buildLoadout(root, { route: "bugfix-quick", budget: 1000 });
 			assert.equal(result.errors.length, 0);
@@ -589,8 +698,14 @@ describe("buildLoadout — loadout shape and references (D2/D6)", () => {
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
 			writeMutable(root, "scripts/lib/core/b.js", "const b = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-b", title: "B", ref: "scripts/lib/core/b.js" }));
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-b", title: "B", ref: "scripts/lib/core/b.js" }),
+			);
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
 			regenerateIndex(root);
 			writeEvents(root, [
 				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
@@ -626,9 +741,14 @@ describe("buildLoadout — loadout shape and references (D2/D6)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
+			]);
 
 			const before = require("../../scripts/lib/core/context-store").readEvents(root);
 			buildLoadout(root, { route: "bugfix-quick", budget: 1000 });
@@ -650,9 +770,14 @@ describe("verifyLoadoutFile — required-tier re-check (D7)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
+			]);
 
 			const built = buildLoadout(root, {
 				route: "bugfix-quick",
@@ -673,9 +798,14 @@ describe("verifyLoadoutFile — required-tier re-check (D7)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
+			]);
 
 			const built = buildLoadout(root, {
 				route: "bugfix-quick",
@@ -693,7 +823,9 @@ describe("verifyLoadoutFile — required-tier re-check (D7)", () => {
 			const verify = verifyLoadoutFile(root, built.loadoutPath);
 			assert.equal(verify.ok, false);
 			assert.ok(
-				verify.findings.some((f) => f.code === "AMBER_E_CONTEXT_SOURCE_STALE" && f.pageId === "page-a"),
+				verify.findings.some(
+					(f) => f.code === "AMBER_E_CONTEXT_SOURCE_STALE" && f.pageId === "page-a",
+				),
 				JSON.stringify(verify.findings),
 			);
 		} finally {
@@ -705,9 +837,14 @@ describe("verifyLoadoutFile — required-tier re-check (D7)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
+			]);
 
 			const built = buildLoadout(root, {
 				route: "bugfix-quick",
@@ -731,9 +868,14 @@ describe("verifyLoadoutFile — required-tier re-check (D7)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
+			]);
 
 			const built = buildLoadout(root, { route: "bugfix-quick", budget: 1000 });
 			assert.equal(built.errors.length, 0);
@@ -774,18 +916,21 @@ describe("buildLoadout — rawHash determinism (D2/D7 contract)", () => {
 		const root = makeTarget();
 		try {
 			writeMutable(root, "scripts/lib/core/a.js", "const a = 1;\n");
-			writePage(root, freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }));
+			writePage(
+				root,
+				freshPage(root, { pageId: "page-a", title: "A", ref: "scripts/lib/core/a.js" }),
+			);
 			regenerateIndex(root);
-			writeEvents(root, [{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" }]);
+			writeEvents(root, [
+				{ kind: "page-written", pageId: "page-a", at: "2026-08-05T12:00:00.000Z" },
+			]);
 
 			const result = buildLoadout(root, { route: "bugfix-quick", budget: 1000 });
 			assert.equal(result.errors.length, 0);
 
 			// Recompute the page's identity hash directly from disk using the
 			// same canonical-Json-over-page approach documented in the module.
-			const page = JSON.parse(
-				fs.readFileSync(path.join(pagesDir(root), "page-a.json"), "utf8"),
-			);
+			const page = JSON.parse(fs.readFileSync(path.join(pagesDir(root), "page-a.json"), "utf8"));
 			// Local canonical JSON mirror (must match the module's helper).
 			const recurse = (v) => {
 				if (Array.isArray(v)) return `[${v.map(recurse).join(",")}]`;
@@ -849,10 +994,7 @@ describe("buildLoadout required artifacts", () => {
 			});
 			assert.equal(result.loadout, null);
 			assert.equal(result.loadoutPath, null);
-			assert.equal(
-				result.errors[0].code,
-				"AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW",
-			);
+			assert.equal(result.errors[0].code, "AMBER_E_CONTEXT_LOADOUT_REQUIRED_OVERFLOW");
 		} finally {
 			cleanup(root);
 		}
@@ -890,17 +1032,11 @@ describe("buildLoadout required artifacts", () => {
 			assert.equal(built.errors.length, 0, JSON.stringify(built.errors));
 			const loadout = JSON.parse(fs.readFileSync(built.loadoutPath, "utf8"));
 			loadout.schemaVersion = "1.1.0";
-			fs.writeFileSync(
-				built.loadoutPath,
-				JSON.stringify(loadout, null, 2) + "\n",
-				"utf8",
-			);
+			fs.writeFileSync(built.loadoutPath, JSON.stringify(loadout, null, 2) + "\n", "utf8");
 			const result = verifyLoadoutFile(root, built.loadoutPath);
 			assert.equal(result.ok, false);
 			assert.ok(
-				result.findings.some(
-					(finding) => finding.code === "AMBER_E_CONTEXT_LOADOUT_CORRUPT",
-				),
+				result.findings.some((finding) => finding.code === "AMBER_E_CONTEXT_LOADOUT_CORRUPT"),
 				JSON.stringify(result.findings),
 			);
 		} finally {
@@ -929,11 +1065,7 @@ describe("buildLoadout required artifacts", () => {
 		try {
 			const linkedDir = loadoutsDir(root);
 			fs.mkdirSync(path.dirname(linkedDir), { recursive: true });
-			fs.symlinkSync(
-				outsideRoot,
-				linkedDir,
-				process.platform === "win32" ? "junction" : "dir",
-			);
+			fs.symlinkSync(outsideRoot, linkedDir, process.platform === "win32" ? "junction" : "dir");
 			const result = buildLoadout(root, { route: "bugfix-quick" });
 			assert.equal(result.loadout, null);
 			assert.equal(result.loadoutPath, null);
@@ -949,10 +1081,7 @@ describe("buildLoadout required artifacts", () => {
 		const root = makeTarget();
 		try {
 			const built = buildLoadout(root, { route: "bugfix-quick" });
-			fs.rmSync(
-				path.join(root, "docs", "wiki", "agent", "context-loadout.md"),
-				{ force: true },
-			);
+			fs.rmSync(path.join(root, "docs", "wiki", "agent", "context-loadout.md"), { force: true });
 			const result = verifyLoadoutFile(root, built.loadoutPath);
 			assert.equal(result.ok, false);
 			assert.ok(
@@ -973,11 +1102,7 @@ describe("buildLoadout required artifacts", () => {
 			const built = buildLoadout(root, { route: "bugfix-quick" });
 			const loadout = JSON.parse(fs.readFileSync(built.loadoutPath, "utf8"));
 			loadout.artifacts.required[0].path = "../outside.md";
-			fs.writeFileSync(
-				built.loadoutPath,
-				JSON.stringify(loadout, null, 2) + "\n",
-				"utf8",
-			);
+			fs.writeFileSync(built.loadoutPath, JSON.stringify(loadout, null, 2) + "\n", "utf8");
 			const result = verifyLoadoutFile(root, built.loadoutPath);
 			assert.equal(result.ok, false);
 			assert.match(result.findings[0].detail, /outside the target/i);

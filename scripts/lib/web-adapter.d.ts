@@ -6,43 +6,43 @@
  */
 
 export type LifecycleFocus = {
-  type: string;
-  id: string | null;
-  autoSelected: boolean;
-  othersPending: number;
+	type: string;
+	id: string | null;
+	autoSelected: boolean;
+	othersPending: number;
 };
 
 export type LifecycleNextStep = {
-  id: string;
-  label: string;
-  why?: string;
-  remedy?: string;
+	id: string;
+	label: string;
+	why?: string;
+	remedy?: string;
 };
 
 export type LifecycleStepStatus = {
-  id: string;
-  label: string;
-  done: boolean;
+	id: string;
+	label: string;
+	done: boolean;
 };
 
 export type CompletionEvaluation = {
-  status: 'pass' | 'fail';
-  reasons: string[];
-  missing: string[];
+	status: "pass" | "fail";
+	reasons: string[];
+	missing: string[];
 };
 
 export type LifecycleNextResult = {
-  focus: LifecycleFocus;
-  nextStep: LifecycleNextStep | null;
-  lifecycle: LifecycleStepStatus[];
-  completion?: CompletionEvaluation;
+	focus: LifecycleFocus;
+	nextStep: LifecycleNextStep | null;
+	lifecycle: LifecycleStepStatus[];
+	completion?: CompletionEvaluation;
 };
 
 export type LifecycleNextOptions = {
-  feature?: string;
-  session?: string;
-  strict?: boolean;
-  target?: string;
+	feature?: string;
+	session?: string;
+	strict?: boolean;
+	target?: string;
 };
 
 /**
@@ -50,21 +50,21 @@ export type LifecycleNextOptions = {
  * Never returns a raw LifecycleContext handle.
  */
 export function evaluateLifecycleNext(
-  targetRoot: string,
-  options?: LifecycleNextOptions,
+	targetRoot: string,
+	options?: LifecycleNextOptions,
 ): LifecycleNextResult;
 
 export type CompletionStatusOptions = {
-  strict?: boolean;
-  target?: string;
+	strict?: boolean;
+	target?: string;
 };
 
 export type CompletionStatusResult = {
-  status: 'pass' | 'fail';
-  reasons: string[];
-  missing: string[];
-  text: string;
-  strict: boolean;
+	status: "pass" | "fail";
+	reasons: string[];
+	missing: string[];
+	text: string;
+	strict: boolean;
 };
 
 /**
@@ -72,29 +72,29 @@ export type CompletionStatusResult = {
  * Target-first form preferred by adapter / CLI-side callers.
  */
 export function getCompletionStatus(
-  projectRoot: string,
-  sessionId: string,
-  options?: CompletionStatusOptions,
+	projectRoot: string,
+	sessionId: string,
+	options?: CompletionStatusOptions,
 ): CompletionStatusResult;
 
 export type EvidenceCommandInput = {
-  target: string;
-  command: string;
-  ledgerPath: string;
-  budgetMinutes?: number;
-  subject?: Record<string, unknown>;
+	target: string;
+	command: string;
+	ledgerPath: string;
+	budgetMinutes?: number;
+	subject?: Record<string, unknown>;
 };
 
 export type EvidenceCommandResult = {
-  target: string;
-  executed: boolean;
-  denied: boolean;
-  reason?: string;
-  exitCode?: number;
-  stdoutTail?: string;
-  stderrTail?: string;
-  durationMs?: number;
-  ledgerRecord: Record<string, unknown>;
+	target: string;
+	executed: boolean;
+	denied: boolean;
+	reason?: string;
+	exitCode?: number;
+	stdoutTail?: string;
+	stderrTail?: string;
+	durationMs?: number;
+	ledgerRecord: Record<string, unknown>;
 };
 
 /**
@@ -104,7 +104,7 @@ export function runEvidenceCommand(input: EvidenceCommandInput): EvidenceCommand
 
 /** Runtime module shape for createRequire cast — single SSOT with the functions above. */
 export type WebAdapter = {
-  evaluateLifecycleNext: typeof evaluateLifecycleNext;
-  getCompletionStatus: typeof getCompletionStatus;
-  runEvidenceCommand: typeof runEvidenceCommand;
+	evaluateLifecycleNext: typeof evaluateLifecycleNext;
+	getCompletionStatus: typeof getCompletionStatus;
+	runEvidenceCommand: typeof runEvidenceCommand;
 };

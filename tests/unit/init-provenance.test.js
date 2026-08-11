@@ -42,7 +42,11 @@ test("re-running init does not overwrite an existing provenance baseline", () =>
 	fs.writeFileSync(path.join(dir, ".amber", "provenance.json"), JSON.stringify(parsed, null, 2));
 	scaffoldHarness(dir, {});
 	const after = loadProvenance(dir);
-	assert.equal(after.files["AGENTS.md"].templateHash, "SENTINEL", "existing baseline preserved on re-init");
+	assert.equal(
+		after.files["AGENTS.md"].templateHash,
+		"SENTINEL",
+		"existing baseline preserved on re-init",
+	);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 

@@ -7,27 +7,15 @@ const path = require("node:path");
 
 const { MESSAGES } = require("../terminology");
 const { relativeSlash } = require("../fs-utils");
-const {
-	escapeMarkdownTableCell,
-	formatCommandList,
-	formatList,
-} = require("../text-utils");
+const { escapeMarkdownTableCell, formatCommandList, formatList } = require("../text-utils");
 
-const {
-	buildAdoptionAuditMetrics,
-	serializeAdoptionMetricsBlock,
-} = require("../adoption-metrics");
+const { buildAdoptionAuditMetrics, serializeAdoptionMetricsBlock } = require("../adoption-metrics");
 
 const { renderMarkdown } = require("./shared-helpers");
 
 function buildInitDryRunSection(initDryRun) {
 	if (initDryRun.notApplicable) {
-		return [
-			"## Init Dry Run",
-			"",
-			`- Not applicable: ${initDryRun.reason}`,
-			"",
-		];
+		return ["## Init Dry Run", "", `- Not applicable: ${initDryRun.reason}`, ""];
 	}
 
 	return [
@@ -44,10 +32,7 @@ function buildInitDryRunSection(initDryRun) {
 }
 
 function buildAuditSummaryLines(audit, metrics) {
-	const lines = [
-		`- Read-only: ${audit.readOnly}`,
-		`- Target type: ${audit.classification.type}`,
-	];
+	const lines = [`- Read-only: ${audit.readOnly}`, `- Target type: ${audit.classification.type}`];
 
 	if (audit.auditMode === "product-repo") {
 		lines.push(
@@ -71,14 +56,7 @@ function buildAuditSummaryLines(audit, metrics) {
 }
 
 function renderAdoptionReport(parts) {
-	const {
-		targetRoot,
-		audit,
-		initDryRun,
-		team,
-		teamUpdatePreview,
-		maintenance,
-	} = parts;
+	const { targetRoot, audit, initDryRun, team, teamUpdatePreview, maintenance } = parts;
 	// Defensive default: the engine layer normally passes precomputed metrics.
 	// Fall back to deriving them here so a caller that omits metrics degrades
 	// gracefully instead of throwing on metrics.* access. Mirrors the inline
@@ -129,12 +107,8 @@ function renderAdoptionReport(parts) {
 		lines.push(
 			`- Update preview: ${teamUpdatePreview.preview.fromVersion} -> ${teamUpdatePreview.preview.toVersion}`,
 		);
-		lines.push(
-			`- Update would write immediately: ${teamUpdatePreview.preview.willWrite}`,
-		);
-		lines.push(
-			`- Customizations preserved: ${teamUpdatePreview.preview.customizationsPreserved}`,
-		);
+		lines.push(`- Update would write immediately: ${teamUpdatePreview.preview.willWrite}`);
+		lines.push(`- Customizations preserved: ${teamUpdatePreview.preview.customizationsPreserved}`);
 	}
 
 	lines.push(

@@ -24,7 +24,9 @@ test("renderAdoptionGateDocument includes findings and metrics", () => {
 			generatedAt: "2026-06-18",
 		},
 		decision: "wait",
-		findings: [{ id: "missing-harness-files", message: "2 Amber starter files are still missing." }],
+		findings: [
+			{ id: "missing-harness-files", message: "2 Amber starter files are still missing." },
+		],
 		metrics: {
 			conflicts: { label: "Conflicts", value: 0 },
 		},

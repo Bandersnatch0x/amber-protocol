@@ -17,8 +17,7 @@ const { TEMPLATE_ROOT } = require("../../scripts/lib/core/constants");
 
 const ALIGNED_NOTE =
 	"Artifact drift: none detected. (aligned = code not newer than evidence; not a re-verification)";
-const DRIFTED_RE =
-	/Artifact drift:\s*\d+\s+drifted.*re-verify.*feature verify/i;
+const DRIFTED_RE = /Artifact drift:\s*\d+\s+drifted.*re-verify.*feature verify/i;
 
 function copyTemplates() {
 	const tpl = fs.mkdtempSync(path.join(os.tmpdir(), "amber-sync-proj-tpl-"));
@@ -53,9 +52,7 @@ test("note drifted: artifact.available && counts.drifted>0 -> note matches drift
 		fs.writeFileSync(path.join(dir, "src", "a.js"), "x");
 		execSync("git add -A && git commit -qm add-src", { cwd: dir });
 
-		const featureList = JSON.parse(
-			fs.readFileSync(path.join(dir, "feature_list.json"), "utf8"),
-		);
+		const featureList = JSON.parse(fs.readFileSync(path.join(dir, "feature_list.json"), "utf8"));
 		featureList.features.push({
 			id: "F900",
 			priority: 2,
@@ -68,10 +65,7 @@ test("note drifted: artifact.available && counts.drifted>0 -> note matches drift
 			evidence: [{ command: "c", result: "pass", date: "2020-01-01" }],
 			notes: [],
 		});
-		fs.writeFileSync(
-			path.join(dir, "feature_list.json"),
-			JSON.stringify(featureList, null, 2),
-		);
+		fs.writeFileSync(path.join(dir, "feature_list.json"), JSON.stringify(featureList, null, 2));
 
 		const result = syncProject(dir, { execute: false, templateRoot: tpl });
 		assert.ok(result.artifact && result.artifact.available === true);
@@ -95,9 +89,7 @@ test("note aligned: no drift -> aligned = code not newer than evidence message",
 		fs.writeFileSync(path.join(dir, "src", "a.js"), "x");
 		execSync("git add -A && git commit -qm add-src", { cwd: dir });
 
-		const featureList = JSON.parse(
-			fs.readFileSync(path.join(dir, "feature_list.json"), "utf8"),
-		);
+		const featureList = JSON.parse(fs.readFileSync(path.join(dir, "feature_list.json"), "utf8"));
 		featureList.features.push({
 			id: "F901",
 			priority: 2,
@@ -111,10 +103,7 @@ test("note aligned: no drift -> aligned = code not newer than evidence message",
 			evidence: [{ command: "c", result: "pass", date: "2099-01-01" }],
 			notes: [],
 		});
-		fs.writeFileSync(
-			path.join(dir, "feature_list.json"),
-			JSON.stringify(featureList, null, 2),
-		);
+		fs.writeFileSync(path.join(dir, "feature_list.json"), JSON.stringify(featureList, null, 2));
 
 		const result = syncProject(dir, { execute: false, templateRoot: tpl });
 		assert.ok(result.artifact && result.artifact.available === true);
@@ -177,10 +166,7 @@ test("note unavailable missing feature_list.json: explicit not-available note, n
 
 		const result = syncProject(dir, { execute: false });
 		assert.ok(result.artifact && result.artifact.available === false);
-		assert.match(
-			result.note,
-			/not available|n\/a|unavailable|feature_list|not found|unreadable/i,
-		);
+		assert.match(result.note, /not available|n\/a|unavailable|feature_list|not found|unreadable/i);
 		assert.ok(
 			!/none detected/i.test(result.note),
 			"unavailable must not fall through to aligned 'none detected'",
@@ -201,10 +187,7 @@ test("execute=false -> refresh is null; execute=true -> refresh populated", () =
 		const rel = "docs/wiki/glossary.md";
 		const shipped = path.join(tpl, rel);
 		if (fs.existsSync(shipped)) {
-			fs.writeFileSync(
-				shipped,
-				fs.readFileSync(shipped, "utf8") + "\n# sync-project red\n",
-			);
+			fs.writeFileSync(shipped, fs.readFileSync(shipped, "utf8") + "\n# sync-project red\n");
 		}
 
 		const execResult = syncProject(dir, { execute: true, templateRoot: tpl });

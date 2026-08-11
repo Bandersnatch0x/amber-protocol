@@ -116,21 +116,12 @@ describe("git-workflow-detector", () => {
 	});
 
 	it("scores helpers: argmax and confidence bands", () => {
-		assert.equal(
-			getTopWorkflow({ gitflow: 65, "github-flow": 10, "trunk-based": 0 }),
-			"gitflow",
-		);
-		assert.equal(
-			calculateConfidence({ gitflow: 65, "github-flow": 10, "trunk-based": 0 }),
-			"high",
-		);
+		assert.equal(getTopWorkflow({ gitflow: 65, "github-flow": 10, "trunk-based": 0 }), "gitflow");
+		assert.equal(calculateConfidence({ gitflow: 65, "github-flow": 10, "trunk-based": 0 }), "high");
 		assert.equal(
 			calculateConfidence({ gitflow: 45, "github-flow": 30, "trunk-based": 0 }),
 			"medium",
 		);
-		assert.equal(
-			calculateConfidence({ gitflow: 20, "github-flow": 15, "trunk-based": 0 }),
-			"low",
-		);
+		assert.equal(calculateConfidence({ gitflow: 20, "github-flow": 15, "trunk-based": 0 }), "low");
 	});
 });

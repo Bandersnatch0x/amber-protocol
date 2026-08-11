@@ -53,13 +53,7 @@ describe("Interactive Session Integration", () => {
 		// Verify manifest contains mode
 		const match = result.stdout.match(/Session created: ([a-f0-9-]+)/);
 		const sessionId = match[1];
-		const manifestPath = path.join(
-			TEST_PROJECT,
-			".amber",
-			"sessions",
-			sessionId,
-			"manifest.json",
-		);
+		const manifestPath = path.join(TEST_PROJECT, ".amber", "sessions", sessionId, "manifest.json");
 		const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 		assert.strictEqual(manifest.mode, "interactive");
 	});
@@ -83,13 +77,7 @@ describe("Interactive Session Integration", () => {
 
 		const statusResult = spawnSync(
 			process.execPath,
-			[
-				path.join(ROOT, "scripts/amber.js"),
-				"session",
-				"status",
-				"--target",
-				TEST_PROJECT,
-			],
+			[path.join(ROOT, "scripts/amber.js"), "session", "status", "--target", TEST_PROJECT],
 			{ encoding: "utf8", cwd: ROOT },
 		);
 		assert.match(statusResult.stdout, /interactive/i);
@@ -112,13 +100,7 @@ describe("Interactive Session Integration", () => {
 
 		const continueResult = spawnSync(
 			process.execPath,
-			[
-				path.join(ROOT, "scripts/amber.js"),
-				"session",
-				"continue",
-				"--target",
-				TEST_PROJECT,
-			],
+			[path.join(ROOT, "scripts/amber.js"), "session", "continue", "--target", TEST_PROJECT],
 			{ encoding: "utf8", cwd: ROOT },
 		);
 		assert.strictEqual(continueResult.status, 0);

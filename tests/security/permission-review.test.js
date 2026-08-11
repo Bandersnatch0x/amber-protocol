@@ -36,10 +36,7 @@ describe("reviewPermissions", () => {
 		);
 
 		assert.ok(broadFindings.length > 0, "Should flag overly broad ** patterns");
-		assert.ok(
-			broadFindings[0].message.includes("**"),
-			"Message should reference the pattern",
-		);
+		assert.ok(broadFindings[0].message.includes("**"), "Message should reference the pattern");
 	});
 
 	it("validates permission scopes match actual usage", () => {
@@ -61,9 +58,7 @@ describe("reviewPermissions", () => {
 
 		const result = reviewPermissions(settings, usageLog);
 		// All usage should be covered by permissions
-		const unused = result.findings.filter(
-			(f) => f.issue === "unused_permission",
-		);
+		const unused = result.findings.filter((f) => f.issue === "unused_permission");
 		// No errors expected when scopes match
 		assert.strictEqual(unused.length, 0, "no unused permissions expected");
 		assert.strictEqual(result.pass, true);
@@ -82,15 +77,10 @@ describe("reviewPermissions", () => {
 		const usageLog = [{ tool: "read", path: "src/file.js" }];
 
 		const result = reviewPermissions(settings, usageLog);
-		const unused = result.findings.filter(
-			(f) => f.issue === "unused_permission",
-		);
+		const unused = result.findings.filter((f) => f.issue === "unused_permission");
 
 		assert.ok(unused.length > 0, "Should flag unused delete permission");
-		assert.ok(
-			unused[0].message.includes("delete"),
-			"Should mention the unused tool",
-		);
+		assert.ok(unused[0].message.includes("delete"), "Should mention the unused tool");
 	});
 
 	it("returns pass=true when no issues found", () => {
@@ -100,26 +90,17 @@ describe("reviewPermissions", () => {
 			},
 		};
 
-		const result = reviewPermissions(settings, [
-			{ tool: "read", path: "src/main.js" },
-		]);
+		const result = reviewPermissions(settings, [{ tool: "read", path: "src/main.js" }]);
 		assert.strictEqual(result.pass, true);
 		assert.strictEqual(result.findings.length, 0);
 	});
 
 	it("handles empty permissions gracefully", () => {
 		const settings = { permissions: { allow: [] } };
-		const result = reviewPermissions(settings, [
-			{ tool: "read", path: "src/x.js" },
-		]);
+		const result = reviewPermissions(settings, [{ tool: "read", path: "src/x.js" }]);
 
-		const missingPerms = result.findings.filter(
-			(f) => f.issue === "missing_permission",
-		);
-		assert.ok(
-			missingPerms.length > 0,
-			"Should flag usage without matching permissions",
-		);
+		const missingPerms = result.findings.filter((f) => f.issue === "missing_permission");
+		assert.ok(missingPerms.length > 0, "Should flag usage without matching permissions");
 	});
 
 	it("flags write access to sensitive paths", () => {
@@ -135,13 +116,8 @@ describe("reviewPermissions", () => {
 		};
 
 		const result = reviewPermissions(settings, []);
-		const sensitive = result.findings.filter(
-			(f) => f.issue === "sensitive_path",
-		);
+		const sensitive = result.findings.filter((f) => f.issue === "sensitive_path");
 
-		assert.ok(
-			sensitive.length > 0,
-			"Should flag write access to sensitive paths",
-		);
+		assert.ok(sensitive.length > 0, "Should flag write access to sensitive paths");
 	});
 });

@@ -3,23 +3,13 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const {
-	auditProject,
-} = require("./audit");
+const { auditProject } = require("./audit");
 
-const {
-	pathExists,
-	readText,
-	resolveTarget,
-} = require("./fs-utils");
+const { pathExists, readText, resolveTarget } = require("./fs-utils");
 
-const {
-	inspect: inspectMaintenance,
-} = require("../maintenance");
+const { inspect: inspectMaintenance } = require("../maintenance");
 
-const {
-	scaffoldHarness,
-} = require("./scaffold");
+const { scaffoldHarness } = require("./scaffold");
 
 const {
 	renderAdoptionReport,
@@ -34,10 +24,7 @@ const {
 	updateTeamDistribution,
 } = require("./team");
 
-const {
-	buildAdoptionAuditMetrics,
-	parseAdoptionMetricsBlock,
-} = require("./adoption-metrics");
+const { buildAdoptionAuditMetrics, parseAdoptionMetricsBlock } = require("./adoption-metrics");
 
 const {
 	extractMarkdownLinks,
@@ -87,18 +74,14 @@ function parseAdoptionReportMetadata(filePath) {
 	const targetLine = lines.find((line) => line.startsWith("Target:"));
 	const generatedLine = lines.find((line) => line.startsWith("Generated:"));
 	const fallbackGeneratedAt = fs.statSync(filePath).mtime.toISOString();
-	const parsedGeneratedAt = generatedLine
-		? generatedLine.replace(/^Generated:\s*/, "").trim()
-		: "";
+	const parsedGeneratedAt = generatedLine ? generatedLine.replace(/^Generated:\s*/, "").trim() : "";
 	const generatedAt = Number.isNaN(Date.parse(parsedGeneratedAt))
 		? fallbackGeneratedAt
 		: parsedGeneratedAt;
 
 	return {
 		file: path.resolve(filePath),
-		target: targetLine
-			? targetLine.replace(/^Target:\s*/, "").trim()
-			: "unknown",
+		target: targetLine ? targetLine.replace(/^Target:\s*/, "").trim() : "unknown",
 		generatedAt,
 	};
 }
@@ -146,8 +129,7 @@ function listAdoptionReports(options = {}) {
 	}
 
 	reports.sort((left, right) => {
-		const byGeneratedAt =
-			Date.parse(right.generatedAt) - Date.parse(left.generatedAt);
+		const byGeneratedAt = Date.parse(right.generatedAt) - Date.parse(left.generatedAt);
 		if (byGeneratedAt !== 0) {
 			return byGeneratedAt;
 		}
@@ -196,10 +178,7 @@ function writeAdoptionReportsIndex(options = {}) {
 	}
 
 	fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-	fs.writeFileSync(
-		outputPath,
-		renderAdoptionReportsIndex(listing, outputPath),
-	);
+	fs.writeFileSync(outputPath, renderAdoptionReportsIndex(listing, outputPath));
 
 	return {
 		...listing,
@@ -257,33 +236,23 @@ function validateAdoptionReports(options = {}) {
 		if (!pathExists(indexPath)) {
 			errors.push(`Index does not exist: ${indexPath}`);
 		} else {
-			const reportFiles = new Set(
-				listing.reports.map((report) => path.resolve(report.file)),
-			);
+			const reportFiles = new Set(listing.reports.map((report) => path.resolve(report.file)));
 			for (const linkTarget of extractMarkdownLinks(readText(indexPath))) {
 				const cleanTarget = linkTarget.split(/[?#]/)[0];
 				const resolvedLink = path.resolve(path.dirname(indexPath), cleanTarget);
 				indexLinks.push({ target: linkTarget, file: resolvedLink });
 
 				if (!isInsideDirectory(reportsDir, resolvedLink)) {
-					errors.push(
-						`Index link points outside reports directory: ${linkTarget}`,
-					);
+					errors.push(`Index link points outside reports directory: ${linkTarget}`);
 				} else if (!pathExists(resolvedLink)) {
 					errors.push(`Index link target does not exist: ${linkTarget}`);
 				} else if (!reportFiles.has(resolvedLink)) {
-					errors.push(
-						`Index link target is not a valid adoption report: ${linkTarget}`,
-					);
+					errors.push(`Index link target is not a valid adoption report: ${linkTarget}`);
 				}
 			}
 
 			for (const report of listing.reports) {
-				if (
-					!indexLinks.some(
-						(link) => path.resolve(link.file) === path.resolve(report.file),
-					)
-				) {
+				if (!indexLinks.some((link) => path.resolve(link.file) === path.resolve(report.file))) {
 					errors.push(`Index is missing report: ${path.basename(report.file)}`);
 				}
 			}
@@ -305,9 +274,7 @@ function validateAdoptionReports(options = {}) {
 
 function readAdoptionReportMetric(markdown, label) {
 	const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const match = markdown.match(
-		new RegExp(`^\\s*-\\s+${escapedLabel}:\\s+(.+?)\\s*$`, "im"),
-	);
+	const match = markdown.match(new RegExp(`^\\s*-\\s+${escapedLabel}:\\s+(.+?)\\s*$`, "im"));
 	if (!match) {
 		return null;
 	}
@@ -335,9 +302,7 @@ function parseAdoptionReportForComparison(filePath) {
 	const metrics = {};
 	for (const [key, label] of ADOPTION_COMPARE_METRICS) {
 		metrics[key] =
-			embedded && key in embedded
-				? embedded[key]
-				: readAdoptionReportMetric(markdown, label);
+			embedded && key in embedded ? embedded[key] : readAdoptionReportMetric(markdown, label);
 	}
 
 	const targetType = readAdoptionReportMetric(markdown, "Target type");
@@ -347,10 +312,7 @@ function parseAdoptionReportForComparison(filePath) {
 			...metadata,
 			targetType,
 			metrics,
-			candidateCommands: extractMarkdownListUnderSubheading(
-				markdown,
-				"Candidate Commands",
-			),
+			candidateCommands: extractMarkdownListUnderSubheading(markdown, "Candidate Commands"),
 			unknowns: extractMarkdownListUnderSubheading(markdown, "Unknowns"),
 			rulePackDrift: readAdoptionReportMetric(markdown, "Rule-pack drift"),
 			teamInstalled: readAdoptionReportMetric(markdown, "Installed"),
@@ -403,9 +365,7 @@ function compareAdoptionReports(options = {}) {
 		errors.push(...listing.errors);
 		warnings.push(...listing.warnings);
 		if (listing.reports.length < 2) {
-			errors.push(
-				`Need at least two adoption reports to compare in: ${reportsDir}`,
-			);
+			errors.push(`Need at least two adoption reports to compare in: ${reportsDir}`);
 		} else {
 			headPath = listing.reports[0].file;
 			basePath = listing.reports[1].file;
@@ -413,9 +373,7 @@ function compareAdoptionReports(options = {}) {
 	}
 
 	if (!basePath || !headPath) {
-		errors.push(
-			"adoption compare requires --reports-dir or both --base and --head.",
-		);
+		errors.push("adoption compare requires --reports-dir or both --base and --head.");
 	}
 
 	if (errors.length > 0) {
@@ -472,10 +430,7 @@ function compareAdoptionReports(options = {}) {
 				? "head-after-base"
 				: "head-before-base",
 		metrics: buildMetricComparison(base.metrics, head.metrics),
-		candidateCommands: compareStringLists(
-			base.candidateCommands,
-			head.candidateCommands,
-		),
+		candidateCommands: compareStringLists(base.candidateCommands, head.candidateCommands),
 		unknowns: compareStringLists(base.unknowns, head.unknowns),
 		statusChanges: {
 			teamInstalled: {
@@ -518,10 +473,7 @@ function generateAdoptionReport(target, options = {}) {
 		// Default: write to the target's .amber/reports/ so the adoption report
 		// stays co-located with the project's governance state instead of
 		// polluting the Amber tooling repository.
-		return uniqueAdoptionReportPath(
-			targetRoot,
-			path.join(targetRoot, ".amber", "reports"),
-		);
+		return uniqueAdoptionReportPath(targetRoot, path.join(targetRoot, ".amber", "reports"));
 	})();
 	const warnings = [];
 
@@ -548,9 +500,7 @@ function generateAdoptionReport(target, options = {}) {
 	const team = inspectTeamDistribution(targetRoot, options);
 	let teamUpdatePreview = null;
 	const previewVersion =
-		team.installed && team.lock && team.registry
-			? latestTeamVersion(team.registry)
-			: null;
+		team.installed && team.lock && team.registry ? latestTeamVersion(team.registry) : null;
 	if (previewVersion && team.registry.versions[previewVersion]) {
 		teamUpdatePreview = updateTeamDistribution(targetRoot, {
 			...options,

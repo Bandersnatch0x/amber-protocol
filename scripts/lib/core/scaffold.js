@@ -18,9 +18,7 @@ const {
 	writeJson,
 } = require("./fs-utils");
 
-const {
-	validateWiki,
-} = require("./validators");
+const { validateWiki } = require("./validators");
 
 const { detectGitWorkflow } = require("./git-workflow-detector");
 const { generateGovernanceAdvice } = require("./team-governance-advisor");
@@ -154,9 +152,7 @@ function gatherInitInsights(targetRoot, options) {
 	let detection = null;
 	if (!options.skipDetection) {
 		const workflow = detectGitWorkflow(targetRoot);
-		const governance = workflow
-			? generateGovernanceAdvice(targetRoot, workflow)
-			: null;
+		const governance = workflow ? generateGovernanceAdvice(targetRoot, workflow) : null;
 		if (workflow || governance) {
 			detection = { workflow, governance };
 		}
@@ -187,9 +183,7 @@ function buildInitNextSteps(created, wikiReadiness, detection) {
 		detection.governance &&
 		detection.governance.recommendations.gitignore.missing.length > 0
 	) {
-		steps.push(
-			"Update .gitignore to ignore personal Amber state (see .amber/init-report.json).",
-		);
+		steps.push("Update .gitignore to ignore personal Amber state (see .amber/init-report.json).");
 	}
 
 	return steps;
@@ -245,9 +239,7 @@ function scaffoldHarness(target, options = {}) {
 	// inferred so the detector refuses to call the file "stale" and refresh never
 	// clobbers the user's content. Authored files pre-existing (AGENTS.md, etc.)
 	// do NOT trigger this: they are never overwritten by refresh regardless.
-	const skippedControlled = result.skipped.some((rel) =>
-		AMBER_CONTROLLED_CONTENT_FILES.has(rel),
-	);
+	const skippedControlled = result.skipped.some((rel) => AMBER_CONTROLLED_CONTENT_FILES.has(rel));
 	if (!options.dryRun) {
 		const { loadProvenance, buildProvenance, writeProvenance } = require("./scaffold-provenance");
 		if (!loadProvenance(targetRoot)) {
@@ -312,9 +304,7 @@ function checkWikiReadiness(target) {
 		(identical ? placeholders : customized).push(wikiRel);
 	}
 
-	const contextPlaceholders = placeholders.filter((p) =>
-		WIKI_CONTEXT_STARTER_FILES.has(p),
-	);
+	const contextPlaceholders = placeholders.filter((p) => WIKI_CONTEXT_STARTER_FILES.has(p));
 
 	return {
 		total: items.length,
@@ -342,9 +332,7 @@ function scaffoldWiki(target, options = {}) {
 		relativePath: path.join("docs", "wiki", item.relativePath),
 	}));
 	const result = copyTemplateFiles(targetRoot, items, options);
-	const validation = options.dryRun
-		? { errors: [], warnings: [] }
-		: validateWiki(targetRoot);
+	const validation = options.dryRun ? { errors: [], warnings: [] } : validateWiki(targetRoot);
 
 	return {
 		target: targetRoot,

@@ -2,20 +2,11 @@
 
 const path = require("node:path");
 
-const {
-	REPO_ROOT,
-	SEMVER_PATTERN,
-} = require("./constants");
+const { REPO_ROOT, SEMVER_PATTERN } = require("./constants");
 
-const {
-	pathExists,
-	readJson,
-	isMissingPath,
-} = require("./fs-utils");
+const { pathExists, readJson, isMissingPath } = require("./fs-utils");
 
-const {
-	discoverStandards,
-} = require("./planning");
+const { discoverStandards } = require("./planning");
 
 function validateWorkflowPackData(data) {
 	const errors = [];
@@ -55,9 +46,7 @@ function validateWorkflowPackData(data) {
 				step.command !== undefined ||
 				step.script !== undefined
 			) {
-				errors.push(
-					`${prefix} must not declare executable scripts in smoke validation.`,
-				);
+				errors.push(`${prefix} must not declare executable scripts in smoke validation.`);
 			}
 		});
 	}
@@ -88,12 +77,7 @@ function validateLoopContracts(loopContracts) {
 		return { errors, warnings };
 	}
 
-	const VALID_TRIGGER_TYPES = new Set([
-		"manual",
-		"scheduled",
-		"goal",
-		"external-signal",
-	]);
+	const VALID_TRIGGER_TYPES = new Set(["manual", "scheduled", "goal", "external-signal"]);
 	const VALID_TRIAGE_OUTPUTS = new Set([
 		"archive",
 		"candidate-task",
@@ -110,10 +94,7 @@ function validateLoopContracts(loopContracts) {
 		}
 
 		for (const field of ["id", "goal", "stateSpine"]) {
-			if (
-				typeof contract[field] !== "string" ||
-				contract[field].trim() === ""
-			) {
+			if (typeof contract[field] !== "string" || contract[field].trim() === "") {
 				errors.push(`${prefix}.${field} must be a non-empty string.`);
 			}
 		}
@@ -140,9 +121,7 @@ function validateLoopContracts(loopContracts) {
 		if (contract.hardStops && typeof contract.hardStops === "object") {
 			const maxIterations = contract.hardStops.maxIterations;
 			if (typeof maxIterations === "number" && maxIterations <= 0) {
-				errors.push(
-					`${prefix}.hardStops.maxIterations must be greater than 0.`,
-				);
+				errors.push(`${prefix}.hardStops.maxIterations must be greater than 0.`);
 			} else if (maxIterations === undefined) {
 				errors.push(`${prefix}.hardStops.maxIterations is required.`);
 			}
@@ -154,15 +133,10 @@ function validateLoopContracts(loopContracts) {
 			errors.push(`${prefix}.hardStops is required.`);
 		}
 
-		const hasTimeout =
-			contract.hardStops &&
-			typeof contract.hardStops.timeoutMinutes === "number";
-		const hasMinuteBudget =
-			contract.budget && typeof contract.budget.maxMinutes === "number";
-		const hasTokenBudget =
-			contract.budget && typeof contract.budget.maxTokens === "number";
-		const hasUsdBudget =
-			contract.budget && typeof contract.budget.maxUsd === "number";
+		const hasTimeout = contract.hardStops && typeof contract.hardStops.timeoutMinutes === "number";
+		const hasMinuteBudget = contract.budget && typeof contract.budget.maxMinutes === "number";
+		const hasTokenBudget = contract.budget && typeof contract.budget.maxTokens === "number";
+		const hasUsdBudget = contract.budget && typeof contract.budget.maxUsd === "number";
 
 		if (!hasTimeout && !hasMinuteBudget && !hasTokenBudget && !hasUsdBudget) {
 			errors.push(
@@ -170,10 +144,7 @@ function validateLoopContracts(loopContracts) {
 			);
 		}
 
-		if (
-			!Array.isArray(contract.reviewGates) ||
-			contract.reviewGates.length === 0
-		) {
+		if (!Array.isArray(contract.reviewGates) || contract.reviewGates.length === 0) {
 			errors.push(`${prefix}.reviewGates must contain at least one entry.`);
 		}
 
@@ -192,7 +163,7 @@ function validateLoopContracts(loopContracts) {
 			}
 		}
 	});
-		return { errors, warnings };
+	return { errors, warnings };
 }
 
 function describeLoopContracts(data) {
@@ -203,25 +174,15 @@ function describeLoopContracts(data) {
 				trigger: contract.trigger || null,
 				goal: contract.goal || "",
 				stateSpine: contract.stateSpine || "",
-				triageOutputs: Array.isArray(contract.triageOutputs)
-					? contract.triageOutputs
-					: [],
+				triageOutputs: Array.isArray(contract.triageOutputs) ? contract.triageOutputs : [],
 				hardStops: contract.hardStops || {},
 				budget: contract.budget || {},
-				connectors: Array.isArray(contract.connectors)
-					? contract.connectors
-					: [],
-				reviewGates: Array.isArray(contract.reviewGates)
-					? contract.reviewGates
-					: [],
+				connectors: Array.isArray(contract.connectors) ? contract.connectors : [],
+				reviewGates: Array.isArray(contract.reviewGates) ? contract.reviewGates : [],
 				execution: {
 					executesAnything: false,
-					schedulesJobs: Boolean(
-						contract.execution && contract.execution.schedulesJobs,
-					),
-					dispatchesAgents: Boolean(
-						contract.execution && contract.execution.dispatchesAgents,
-					),
+					schedulesJobs: Boolean(contract.execution && contract.execution.schedulesJobs),
+					dispatchesAgents: Boolean(contract.execution && contract.execution.dispatchesAgents),
 					writesExternalSystems: Boolean(
 						contract.execution && contract.execution.writesExternalSystems,
 					),
@@ -239,17 +200,10 @@ const LIVE_SCHEDULING_BLOCKER = "live scheduling is disabled by product boundary
 function extractReadinessInputs(data) {
 	return {
 		loopContracts: Array.isArray(data.loopContracts) ? data.loopContracts : [],
-		connectorContracts: Array.isArray(data.connectorContracts)
-			? data.connectorContracts
-			: [],
+		connectorContracts: Array.isArray(data.connectorContracts) ? data.connectorContracts : [],
 		approvalPolicy:
-			data.approvalPolicy && typeof data.approvalPolicy === "object"
-				? data.approvalPolicy
-				: null,
-		loopLedger:
-			data.loopLedger && typeof data.loopLedger === "object"
-				? data.loopLedger
-				: null,
+			data.approvalPolicy && typeof data.approvalPolicy === "object" ? data.approvalPolicy : null,
+		loopLedger: data.loopLedger && typeof data.loopLedger === "object" ? data.loopLedger : null,
 		workspaceIsolation:
 			data.workspaceIsolation && typeof data.workspaceIsolation === "object"
 				? data.workspaceIsolation
@@ -260,7 +214,8 @@ function extractReadinessInputs(data) {
 // Check the pack-level controls (loop contract present, approval policy, ledger,
 // workspace isolation). Pushes to controls/blockers.
 function checkPackLevelControls(inputs, controls, blockers) {
-	const { loopContracts, connectorContracts, approvalPolicy, loopLedger, workspaceIsolation } = inputs;
+	const { loopContracts, connectorContracts, approvalPolicy, loopLedger, workspaceIsolation } =
+		inputs;
 
 	if (loopContracts.length > 0) {
 		controls.push("loop contract");
@@ -383,9 +338,7 @@ function validateWorkflowPackReferences(packPath, data) {
 		}
 		const skillPath = path.join(REPO_ROOT, "skills", skill, "SKILL.md");
 		if (!pathExists(skillPath)) {
-			errors.push(
-				`Workflow pack references missing skill: skills/${skill}/SKILL.md.`,
-			);
+			errors.push(`Workflow pack references missing skill: skills/${skill}/SKILL.md.`);
 		}
 	}
 
@@ -397,11 +350,7 @@ function validateWorkflowPackReferences(packPath, data) {
 
 	const declaredIntegrations = new Set(data.externalIntegrations || []);
 	for (const step of data.steps || []) {
-		if (
-			step &&
-			typeof step === "object" &&
-			typeof step.externalIntegration === "string"
-		) {
+		if (step && typeof step === "object" && typeof step.externalIntegration === "string") {
 			if (!declaredIntegrations.has(step.externalIntegration)) {
 				errors.push(
 					`Workflow pack step ${step.id || "(unknown)"} uses undeclared external integration ${step.externalIntegration}.`,

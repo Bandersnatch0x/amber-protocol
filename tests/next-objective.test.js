@@ -74,26 +74,24 @@ test("next --objective matches bugfix-quick for a bug-fixing objective", () => {
 	assert.equal(payload.routingSuggestion.matched, true);
 	assert.equal(payload.routingSuggestion.routeId, "bugfix-quick");
 
-	const textResult = runHarness([
-		"next",
-		"--target",
-		target,
-		"--objective",
-		"fix login bug",
-	]);
+	const textResult = runHarness(["next", "--target", target, "--objective", "fix login bug"]);
 	assert.equal(textResult.status, 0, textResult.stderr);
 	assert.match(textResult.stdout, /Route suggestion: bugfix-quick/);
 });
 
 test("next --objective resolves routes from the Target Repository", () => {
 	const target = tempDir("target-route");
-	const route = JSON.parse(fs.readFileSync(path.join(ROOT, "routes", "feature-standard.route.json"), "utf8"));
+	const route = JSON.parse(
+		fs.readFileSync(path.join(ROOT, "routes", "feature-standard.route.json"), "utf8"),
+	);
 	route.routeId = "lunar-calibration";
 	route.objective = "lunar calibration";
 	route.description = "Calibrate lunar instruments.";
 	writeTargetJson(target, "routes/lunar-calibration.route.json", route);
 
-	const suggestion = inferNext(target, { objective: "perform lunar calibration" }).routingSuggestion;
+	const suggestion = inferNext(target, {
+		objective: "perform lunar calibration",
+	}).routingSuggestion;
 	assert.equal(suggestion.matched, true);
 	assert.equal(suggestion.routeId, "lunar-calibration");
 });
@@ -118,13 +116,7 @@ test("next --objective degrades to plan-gate advice when nothing matches", () =>
 	assert.equal(suggestion.routeId, null);
 	assert.match(suggestion.suggestion, /plan gate/);
 
-	const textResult = runHarness([
-		"next",
-		"--target",
-		target,
-		"--objective",
-		"write documentation",
-	]);
+	const textResult = runHarness(["next", "--target", target, "--objective", "write documentation"]);
 	assert.equal(textResult.status, 0, textResult.stderr);
 	assert.match(textResult.stdout, /Route suggestion:/);
 	assert.match(textResult.stdout, /plan gate/);

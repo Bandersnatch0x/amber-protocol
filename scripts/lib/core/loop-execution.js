@@ -110,10 +110,20 @@ function verifyLoopLedger({ target, contract: contractId }) {
 	const targetRoot = resolveTarget(target);
 	const o = verifyLedgerOutcome(ledgerPath(targetRoot, contractId));
 	if (!o.found) {
-		return { target: targetRoot, errors: [`No ledger found for contract ${contractId}`], warnings: [] };
+		return {
+			target: targetRoot,
+			errors: [`No ledger found for contract ${contractId}`],
+			warnings: [],
+		};
 	}
 	if (o.intact) {
-		return { target: targetRoot, intact: true, text: `Ledger intact (${o.records} records).`, errors: [], warnings: [] };
+		return {
+			target: targetRoot,
+			intact: true,
+			text: `Ledger intact (${o.records} records).`,
+			errors: [],
+			warnings: [],
+		};
 	}
 	return {
 		target: targetRoot,

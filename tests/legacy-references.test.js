@@ -61,16 +61,36 @@ const MUST_BE_CLEAN = ["docs/examples/README.md"];
 
 // Code shims allowed to carry old names must self-identify as legacy so the
 // allowlist cannot silently become a hiding place for active code.
-const SELF_IDENTIFYING_SHIMS = [
-	"scripts/harness.js",
-	"scripts/compat/coding-harness.js",
-];
+const SELF_IDENTIFYING_SHIMS = ["scripts/harness.js", "scripts/compat/coding-harness.js"];
 
-const SCAN_DIRS = ["scripts", "tests", "docs", "templates", "skills", "registry",
-	"rule-packs", "standards", "workflow-packs", "team-presets", "profiles",
-	"routes", "schemas", "src", "apps", ".claude-plugin", ".codex-plugin"];
-const ROOT_FILES = ["README.md", "README.zh-CN.md", "SPEC.md", "ROADMAP.md",
-	"BACKLOG.md", "UBIQUITOUS_LANGUAGE.md", "package.json"];
+const SCAN_DIRS = [
+	"scripts",
+	"tests",
+	"docs",
+	"templates",
+	"skills",
+	"registry",
+	"rule-packs",
+	"standards",
+	"workflow-packs",
+	"team-presets",
+	"profiles",
+	"routes",
+	"schemas",
+	"src",
+	"apps",
+	".claude-plugin",
+	".codex-plugin",
+];
+const ROOT_FILES = [
+	"README.md",
+	"README.zh-CN.md",
+	"SPEC.md",
+	"ROADMAP.md",
+	"BACKLOG.md",
+	"UBIQUITOUS_LANGUAGE.md",
+	"package.json",
+];
 
 function isAllowed(rel) {
 	const slash = rel.split(path.sep).join("/");
@@ -103,7 +123,8 @@ function* walk(dir) {
 				entry.name === ".next" ||
 				entry.name === "dist" ||
 				entry.name === "coverage"
-			) continue;
+			)
+				continue;
 			yield* walk(full);
 		} else yield full;
 	}
@@ -111,9 +132,7 @@ function* walk(dir) {
 
 test("legacy harness references appear only in the allowlist or on labeled lines", () => {
 	const offenders = [];
-	const files = [
-		...ROOT_FILES.map((f) => path.join(REPO, f)).filter(fs.existsSync),
-	];
+	const files = [...ROOT_FILES.map((f) => path.join(REPO, f)).filter(fs.existsSync)];
 	for (const dir of SCAN_DIRS) {
 		const abs = path.join(REPO, dir);
 		if (fs.existsSync(abs)) files.push(...walk(abs));
@@ -142,20 +161,12 @@ test("legacy harness references appear only in the allowlist or on labeled lines
 			}
 		}
 	}
-	assert.deepEqual(
-		offenders,
-		[],
-		`legacy references outside allowlist:\n${offenders.join("\n")}`,
-	);
+	assert.deepEqual(offenders, [], `legacy references outside allowlist:\n${offenders.join("\n")}`);
 });
 
 test("code shims in the allowlist self-identify as legacy", () => {
 	for (const shim of SELF_IDENTIFYING_SHIMS) {
 		const content = fs.readFileSync(path.join(REPO, shim), "utf8");
-		assert.match(
-			content,
-			/legacy|deprecated/i,
-			`${shim} must carry a legacy/deprecated note`,
-		);
+		assert.match(content, /legacy|deprecated/i, `${shim} must carry a legacy/deprecated note`);
 	}
 });

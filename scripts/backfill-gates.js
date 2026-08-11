@@ -25,11 +25,7 @@ const { loadRoutes } = require("./lib/route-loader");
 const { readSessionEvents } = require("./lib/session-timeline");
 const { resolveStateDirForRead } = require("./lib/state-dir-resolver");
 const { readJsonSafe } = require("./lib/core/fs-utils");
-const {
-	buildGateStageMap,
-	writeGateDefinition,
-	writeGateDecision,
-} = require("./lib/gate-writer");
+const { buildGateStageMap, writeGateDefinition, writeGateDecision } = require("./lib/gate-writer");
 
 const ROUTES_DIR = path.join(__dirname, "../routes");
 
@@ -88,13 +84,7 @@ function backfillSession(sessionDir, routesById) {
 		// Pending definition: only write if absent (idempotent).
 		if (!fs.existsSync(gatePath)) {
 			if (
-				writeGateDefinition(
-					sessionDir,
-					sessionId,
-					gate,
-					stageMap.get(gate.id),
-					manifest.createdAt,
-				)
+				writeGateDefinition(sessionDir, sessionId, gate, stageMap.get(gate.id), manifest.createdAt)
 			) {
 				stats.gatesWritten++;
 			}
@@ -141,10 +131,7 @@ function planSession(sessionDir, routesById) {
 		if (!fs.existsSync(path.join(gatesDir, `${gate.id}.gate.json`))) {
 			stats.gatesWritten++;
 		}
-		if (
-			approvals.has(gate.id) &&
-			!fs.existsSync(path.join(gatesDir, `${gate.id}.decision.json`))
-		) {
+		if (approvals.has(gate.id) && !fs.existsSync(path.join(gatesDir, `${gate.id}.decision.json`))) {
 			stats.decisionsWritten++;
 		}
 	}
@@ -162,10 +149,7 @@ function main() {
 		return;
 	}
 
-	const sessionsDir = path.join(
-		resolveStateDirForRead(args.target),
-		"sessions",
-	);
+	const sessionsDir = path.join(resolveStateDirForRead(args.target), "sessions");
 	if (!fs.existsSync(sessionsDir)) {
 		console.error(`No sessions directory found at ${sessionsDir}`);
 		process.exitCode = 1;
@@ -177,9 +161,7 @@ function main() {
 
 	const sessionIds = fs
 		.readdirSync(sessionsDir)
-		.filter((name) =>
-			fs.existsSync(path.join(sessionsDir, name, "manifest.json")),
-		);
+		.filter((name) => fs.existsSync(path.join(sessionsDir, name, "manifest.json")));
 
 	const totals = {
 		sessions: sessionIds.length,

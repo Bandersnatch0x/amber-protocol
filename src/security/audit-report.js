@@ -12,8 +12,7 @@
  */
 function generateAuditReport(depResult, secretResult, permResult) {
 	const date = new Date().toISOString().split("T")[0];
-	const overallPass =
-		depResult.pass && secretResult.length === 0 && permResult.pass;
+	const overallPass = depResult.pass && secretResult.length === 0 && permResult.pass;
 	const status = overallPass ? "✅ **PASS**" : "❌ **FAIL**";
 
 	let report = "";
@@ -64,8 +63,7 @@ function generateAuditReport(depResult, secretResult, permResult) {
 
 	if (permResult.findings.length > 0) {
 		for (const f of permResult.findings) {
-			const icon =
-				f.severity === "error" ? "❌" : f.severity === "warning" ? "⚠️" : "ℹ️";
+			const icon = f.severity === "error" ? "❌" : f.severity === "warning" ? "⚠️" : "ℹ️";
 			report += `- ${icon} **${f.issue}** — ${f.message}\n`;
 		}
 		report += "\n";
@@ -92,12 +90,10 @@ function generateAuditReport(depResult, secretResult, permResult) {
 
 		if (secretResult.length > 0) {
 			report += "### Exposed Secrets\n";
-			report +=
-				"- Remove all hardcoded secrets from source code immediately.\n";
+			report += "- Remove all hardcoded secrets from source code immediately.\n";
 			report += "- Use environment variables or a secrets manager.\n";
 			report += "- Rotate any credentials that may have been exposed.\n";
-			report +=
-				"- Add the relevant files to `.gitignore` if they contain secrets.\n\n";
+			report += "- Add the relevant files to `.gitignore` if they contain secrets.\n\n";
 		}
 
 		if (!permResult.pass) {

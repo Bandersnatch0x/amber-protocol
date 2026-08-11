@@ -4,11 +4,7 @@ const path = require("node:path");
 
 const { SEMVER_PATTERN } = require("./constants");
 
-const {
-	pathExists,
-	readJson,
-	resolveTarget,
-} = require("./fs-utils");
+const { pathExists, readJson, resolveTarget } = require("./fs-utils");
 
 function loadManifest(pluginRoot, relativePath, errors) {
 	const manifestPath = path.join(pluginRoot, relativePath);
@@ -34,8 +30,7 @@ function requireManifestString(manifest, relativePath, field, errors) {
 	const value = field
 		.split(".")
 		.reduce(
-			(current, key) =>
-				current && current[key] !== undefined ? current[key] : undefined,
+			(current, key) => (current && current[key] !== undefined ? current[key] : undefined),
 			manifest,
 		);
 	if (typeof value !== "string" || value.trim() === "") {
@@ -45,13 +40,7 @@ function requireManifestString(manifest, relativePath, field, errors) {
 	return value;
 }
 
-function validateSkillsPath(
-	pluginRoot,
-	manifestDir,
-	relativePath,
-	rawSkillsPath,
-	errors,
-) {
+function validateSkillsPath(pluginRoot, manifestDir, relativePath, rawSkillsPath, errors) {
 	if (typeof rawSkillsPath !== "string" || rawSkillsPath.trim() === "") {
 		errors.push(`${relativePath} field skills must be a non-empty string.`);
 		return;
@@ -69,24 +58,13 @@ function validateSkillsPath(
 function validateCommonManifest(pluginRoot, relativePath, manifest, errors) {
 	const manifestDir = path.dirname(path.join(pluginRoot, relativePath));
 	requireManifestString(manifest, relativePath, "name", errors);
-	const version = requireManifestString(
-		manifest,
-		relativePath,
-		"version",
-		errors,
-	);
+	const version = requireManifestString(manifest, relativePath, "version", errors);
 	if (version && !SEMVER_PATTERN.test(version)) {
 		errors.push(`${relativePath} field version must be semver.`);
 	}
 	requireManifestString(manifest, relativePath, "description", errors);
 	requireManifestString(manifest, relativePath, "author.name", errors);
-	validateSkillsPath(
-		pluginRoot,
-		manifestDir,
-		relativePath,
-		manifest.skills,
-		errors,
-	);
+	validateSkillsPath(pluginRoot, manifestDir, relativePath, manifest.skills, errors);
 }
 
 function validateCodexManifest(pluginRoot, manifest, errors) {
@@ -116,9 +94,7 @@ function validateCodexManifest(pluginRoot, manifest, errors) {
 		!Array.isArray(manifest.interface.capabilities) ||
 		manifest.interface.capabilities.some((value) => typeof value !== "string")
 	) {
-		errors.push(
-			`${relativePath} field interface.capabilities must be an array of strings.`,
-		);
+		errors.push(`${relativePath} field interface.capabilities must be an array of strings.`);
 	}
 
 	if (
@@ -136,27 +112,14 @@ function validateManifests(target) {
 	const errors = [];
 	const warnings = [];
 
-	const codexManifest = loadManifest(
-		pluginRoot,
-		".codex-plugin/plugin.json",
-		errors,
-	);
-	const claudeManifest = loadManifest(
-		pluginRoot,
-		".claude-plugin/plugin.json",
-		errors,
-	);
+	const codexManifest = loadManifest(pluginRoot, ".codex-plugin/plugin.json", errors);
+	const claudeManifest = loadManifest(pluginRoot, ".claude-plugin/plugin.json", errors);
 
 	if (codexManifest) {
 		validateCodexManifest(pluginRoot, codexManifest, errors);
 	}
 	if (claudeManifest) {
-		validateCommonManifest(
-			pluginRoot,
-			".claude-plugin/plugin.json",
-			claudeManifest,
-			errors,
-		);
+		validateCommonManifest(pluginRoot, ".claude-plugin/plugin.json", claudeManifest, errors);
 	}
 
 	return { target: pluginRoot, errors, warnings };

@@ -30,10 +30,7 @@ const {
 } = require("../knowledge-plan/internal/report");
 const { scaffoldKnowledgePlan } = require("../knowledge-plan/internal/scaffold");
 const { materializeKnowledgeBase } = require("../knowledge-plan/internal/build");
-const {
-	proposeKnowledgePlan,
-	planToSimpleYaml,
-} = require("../knowledge-plan/internal/propose");
+const { proposeKnowledgePlan, planToSimpleYaml } = require("../knowledge-plan/internal/propose");
 
 module.exports = {
 	KNOWLEDGE_PLAN_RELATIVE,

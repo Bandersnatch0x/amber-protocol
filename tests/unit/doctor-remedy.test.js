@@ -38,7 +38,6 @@ describe("doctor remedies", () => {
 	});
 });
 
-
 describe("product-repo doctor feature_list (#66)", () => {
 	it("surfaces feature_list invariant errors on product-repo (not just target-repo)", () => {
 		const dir = tmpRepo();

@@ -18,10 +18,14 @@ test("governance audit - project with 2 sessions and 1 execution generates full 
 		path.join(amberDir, "autonomous-policy.json"),
 		JSON.stringify({
 			gates: { auto: "approve", "user-approval": "block", "step-confirm": "block" },
-			retry: { maxAttempts: 3, backoffMs: [1000, 5000, 15000], retryableStages: ["implement", "verify"] },
+			retry: {
+				maxAttempts: 3,
+				backoffMs: [1000, 5000, 15000],
+				retryableStages: ["implement", "verify"],
+			},
 			budget: { onExceed: "pause" },
 			notifications: { email: { enabled: false }, slack: { enabled: false } },
-		})
+		}),
 	);
 
 	// Session 1
@@ -34,7 +38,10 @@ test("governance audit - project with 2 sessions and 1 execution generates full 
 		{ type: "gate_triggered", timestamp: "2025-01-01T10:10:00Z", data: { gate: "user-approval" } },
 		{ type: "session_completed", timestamp: "2025-01-01T10:15:00Z", data: {} },
 	];
-	fs.writeFileSync(path.join(session1Dir, "timeline.jsonl"), timeline1.map(e => JSON.stringify(e)).join("\n"));
+	fs.writeFileSync(
+		path.join(session1Dir, "timeline.jsonl"),
+		timeline1.map((e) => JSON.stringify(e)).join("\n"),
+	);
 
 	// Session 2
 	const session2Id = "session-002";
@@ -42,11 +49,22 @@ test("governance audit - project with 2 sessions and 1 execution generates full 
 	fs.mkdirSync(session2Dir, { recursive: true });
 	const timeline2 = [
 		{ type: "session_created", timestamp: "2025-01-02T11:00:00Z", data: { goal: "Fix bug B" } },
-		{ type: "command_executed", timestamp: "2025-01-02T11:05:00Z", data: { command: "npm run build" } },
-		{ type: "command_executed", timestamp: "2025-01-02T11:10:00Z", data: { command: "git commit" } },
+		{
+			type: "command_executed",
+			timestamp: "2025-01-02T11:05:00Z",
+			data: { command: "npm run build" },
+		},
+		{
+			type: "command_executed",
+			timestamp: "2025-01-02T11:10:00Z",
+			data: { command: "git commit" },
+		},
 		{ type: "session_completed", timestamp: "2025-01-02T11:20:00Z", data: {} },
 	];
-	fs.writeFileSync(path.join(session2Dir, "timeline.jsonl"), timeline2.map(e => JSON.stringify(e)).join("\n"));
+	fs.writeFileSync(
+		path.join(session2Dir, "timeline.jsonl"),
+		timeline2.map((e) => JSON.stringify(e)).join("\n"),
+	);
 
 	// Execution 1
 	const exec1Id = "exec-001";
@@ -54,24 +72,17 @@ test("governance audit - project with 2 sessions and 1 execution generates full 
 	fs.mkdirSync(exec1Dir, { recursive: true });
 	fs.writeFileSync(
 		path.join(exec1Dir, "ledger.json"),
-		JSON.stringify({ plan: "docs/plans/feature-a.md", status: "completed" })
+		JSON.stringify({ plan: "docs/plans/feature-a.md", status: "completed" }),
 	);
 	fs.writeFileSync(
 		path.join(exec1Dir, "evidence.json"),
-		JSON.stringify({ commands: ["npm test", "git add ."] })
+		JSON.stringify({ commands: ["npm test", "git add ."] }),
 	);
 
 	const outputPath = path.join(tmpDir, "audit.md");
 
 	try {
-		const exitCode = await run([
-			"governance",
-			"audit",
-			"--target",
-			tmpDir,
-			"--output",
-			outputPath,
-		]);
+		const exitCode = await run(["governance", "audit", "--target", tmpDir, "--output", outputPath]);
 		assert.strictEqual(exitCode, 0);
 
 		assert.ok(fs.existsSync(outputPath));
@@ -108,10 +119,14 @@ test("governance audit - --since filter works", async () => {
 		path.join(amberDir, "autonomous-policy.json"),
 		JSON.stringify({
 			gates: { auto: "approve", "user-approval": "block", "step-confirm": "block" },
-			retry: { maxAttempts: 3, backoffMs: [1000, 5000, 15000], retryableStages: ["implement", "verify"] },
+			retry: {
+				maxAttempts: 3,
+				backoffMs: [1000, 5000, 15000],
+				retryableStages: ["implement", "verify"],
+			},
 			budget: { onExceed: "pause" },
 			notifications: { email: { enabled: false }, slack: { enabled: false } },
-		})
+		}),
 	);
 
 	// Old session (before cutoff)
@@ -122,7 +137,10 @@ test("governance audit - --since filter works", async () => {
 		{ type: "session_created", timestamp: "2024-12-01T10:00:00Z", data: { goal: "Old task" } },
 		{ type: "session_completed", timestamp: "2024-12-01T10:15:00Z", data: {} },
 	];
-	fs.writeFileSync(path.join(session1Dir, "timeline.jsonl"), timeline1.map(e => JSON.stringify(e)).join("\n"));
+	fs.writeFileSync(
+		path.join(session1Dir, "timeline.jsonl"),
+		timeline1.map((e) => JSON.stringify(e)).join("\n"),
+	);
 
 	// New session (after cutoff)
 	const session2Id = "session-new";
@@ -132,7 +150,10 @@ test("governance audit - --since filter works", async () => {
 		{ type: "session_created", timestamp: "2025-01-15T11:00:00Z", data: { goal: "New task" } },
 		{ type: "session_completed", timestamp: "2025-01-15T11:20:00Z", data: {} },
 	];
-	fs.writeFileSync(path.join(session2Dir, "timeline.jsonl"), timeline2.map(e => JSON.stringify(e)).join("\n"));
+	fs.writeFileSync(
+		path.join(session2Dir, "timeline.jsonl"),
+		timeline2.map((e) => JSON.stringify(e)).join("\n"),
+	);
 
 	const outputPath = path.join(tmpDir, "audit.md");
 

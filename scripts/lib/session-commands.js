@@ -10,14 +10,8 @@ const {
 } = require("./session-manifest");
 const { appendSessionEvent, readSessionEvents } = require("./session-timeline");
 const { SessionStateMachine, STATES } = require("./session-state-machine");
-const {
-	loadLatestCheckpoint,
-	loadCheckpointByStage,
-} = require("./checkpoint-manager");
-const {
-	checkSchemaVersion,
-	SCHEMA_VERSION,
-} = require("./schema-version-checker");
+const { loadLatestCheckpoint, loadCheckpointByStage } = require("./checkpoint-manager");
+const { checkSchemaVersion, SCHEMA_VERSION } = require("./schema-version-checker");
 const { createWorktree, removeWorktree } = require("./worktree-manager");
 const { selectRoute } = require("./route-selector");
 const { loadRoutes } = require("./route-loader");
@@ -55,9 +49,7 @@ function findMostRecentSession(projectRoot, { excludeCompleted = false } = {}) {
 	const manifests = loadAllSessionManifests(projectRoot).filter(
 		(m) =>
 			!excludeCompleted ||
-			(m.status !== "completed" &&
-				m.status !== "aborted" &&
-				m.status !== "failed"),
+			(m.status !== "completed" && m.status !== "aborted" && m.status !== "failed"),
 	);
 
 	return manifests.length > 0 ? manifests[0].sessionId : null;
@@ -134,7 +126,7 @@ async function startSession(projectRoot, options) {
 	if (mode === "autonomous") {
 		return result(
 			"Error: Autonomous execution is not available. " +
-			"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
+				"Amber focuses on governance (audit, gate, inspect) without live execution (ADR-0001, ADR-0005).",
 			1,
 		);
 	}
@@ -177,31 +169,31 @@ async function startSession(projectRoot, options) {
 		route = routes.find((r) => r.routeId === selectedRouteId);
 		if (!route) {
 			const routeList = routes.map((r) => `  ${r.routeId}`).join("\n");
-				return result(
-					`Error: Route "${selectedRouteId}" not found.\n\nAvailable routes:\n${routeList}`,
-					1,
-				);
+			return result(
+				`Error: Route "${selectedRouteId}" not found.\n\nAvailable routes:\n${routeList}`,
+				1,
+			);
 		}
 		routeVersion = route.version || SCHEMA_VERSION;
 	}
 
-		// When the user explicitly passes --route, warn if the goal does not match
-		// the route's own goalPattern — the session will work, but the route may
-		// not fit the stated intent.
-		let goalMismatchWarning = null;
-		if (routeId && route.trigger && route.trigger.goalPattern) {
-			try {
-				const pattern = new RegExp(route.trigger.goalPattern, "i");
-				if (!pattern.test(goal)) {
-					goalMismatchWarning =
-						`Warning: goal "${goal}" does not match the route pattern ` +
-						`"${route.trigger.goalPattern}". The session will proceed ` +
-						`but the route may not fit the stated intent.`;
-				}
-			} catch (_) {
-				// Invalid goalPattern regex — skip the warning but don't crash.
+	// When the user explicitly passes --route, warn if the goal does not match
+	// the route's own goalPattern — the session will work, but the route may
+	// not fit the stated intent.
+	let goalMismatchWarning = null;
+	if (routeId && route.trigger && route.trigger.goalPattern) {
+		try {
+			const pattern = new RegExp(route.trigger.goalPattern, "i");
+			if (!pattern.test(goal)) {
+				goalMismatchWarning =
+					`Warning: goal "${goal}" does not match the route pattern ` +
+					`"${route.trigger.goalPattern}". The session will proceed ` +
+					`but the route may not fit the stated intent.`;
 			}
+		} catch (_) {
+			// Invalid goalPattern regex — skip the warning but don't crash.
 		}
+	}
 
 	const manifest = createManifest({
 		route: { id: selectedRouteId, version: routeVersion },
@@ -267,7 +259,7 @@ async function startSession(projectRoot, options) {
 			lines.push("");
 			lines.push(
 				`Warning: ${declared - gateCount} of ${declared} route gates could not be written ` +
-				"(check route definition for invalid gate IDs).",
+					"(check route definition for invalid gate IDs).",
 			);
 		}
 	}
@@ -315,12 +307,8 @@ function statusSession(projectRoot, options) {
 	}
 
 	if (manifest.budget) {
-		const pct = Math.round(
-			(manifest.budget.used / manifest.budget.total) * 100,
-		);
-		lines.push(
-			`Budget: ${manifest.budget.used}/${manifest.budget.total} (${pct}%)`,
-		);
+		const pct = Math.round((manifest.budget.used / manifest.budget.total) * 100);
+		lines.push(`Budget: ${manifest.budget.used}/${manifest.budget.total} (${pct}%)`);
 	}
 
 	return result(lines.join("\n"), 0);
@@ -440,10 +428,7 @@ async function completeSession(projectRoot, options) {
 		source: "amber-session-complete",
 		message: "Session marked completed after complete-check passed.",
 	});
-	return withOptionalWarning(
-		result(`Session completed: ${sessionId}`, 0),
-		warning,
-	);
+	return withOptionalWarning(result(`Session completed: ${sessionId}`, 0), warning);
 }
 
 async function continueSession(projectRoot, options) {
@@ -504,15 +489,19 @@ async function continueSession(projectRoot, options) {
 	if (fromCheckpoint) {
 		checkpoint = loadCheckpointByStage(projectRoot, sessionId, fromCheckpoint);
 		if (!checkpoint) {
-			return rejectResume(projectRoot, sessionId, options, `Checkpoint not found: ${fromCheckpoint}`);
+			return rejectResume(
+				projectRoot,
+				sessionId,
+				options,
+				`Checkpoint not found: ${fromCheckpoint}`,
+			);
 		}
 	} else {
 		checkpoint = loadLatestCheckpoint(projectRoot, sessionId);
 	}
 
 	if (checkpoint) {
-		manifest.currentStage =
-			checkpoint.manifest.currentStage || manifest.currentStage;
+		manifest.currentStage = checkpoint.manifest.currentStage || manifest.currentStage;
 		manifest.completedStages =
 			checkpoint.manifest.completedStages || manifest.completedStages || [];
 		manifest.budget = checkpoint.manifest.budget || manifest.budget;
@@ -524,7 +513,12 @@ async function continueSession(projectRoot, options) {
 	if (sm.currentState === STATES.CREATED) {
 		const routeTransition = sm.transition(STATES.ROUTED);
 		if (!routeTransition.success) {
-			return rejectResume(projectRoot, sessionId, options, `Cannot route session: ${routeTransition.error}`);
+			return rejectResume(
+				projectRoot,
+				sessionId,
+				options,
+				`Cannot route session: ${routeTransition.error}`,
+			);
 		}
 		writeSessionManifest(sessionDir, { ...manifest, status: STATES.ROUTED });
 
@@ -580,10 +574,7 @@ async function verifySession(projectRoot, options) {
 	const { manifest, sessionDir } = loaded;
 
 	if (manifest.status === "completed" || manifest.status === "aborted") {
-		return result(
-			`Cannot verify: session is already ${manifest.status}.`,
-			1,
-		);
+		return result(`Cannot verify: session is already ${manifest.status}.`, 1);
 	}
 
 	// Resolve the route definition to find verification stage metadata.
@@ -591,7 +582,7 @@ async function verifySession(projectRoot, options) {
 	const route = routes.find((r) => r.routeId === manifest.route.id);
 	const stages = route && Array.isArray(route.stages) ? route.stages : [];
 	const verifyStage = route ? stages.find((s) => s.name === (stageName || "verify")) : null;
-	const actualStageName = (verifyStage && verifyStage.name) || (stageName || "verify");
+	const actualStageName = (verifyStage && verifyStage.name) || stageName || "verify";
 	const stageDisplayName = (verifyStage && verifyStage.displayName) || actualStageName;
 
 	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
@@ -674,7 +665,9 @@ async function verifySession(projectRoot, options) {
 	}
 
 	// Update the manifest's completedStages so complete-check also finds it there.
-	const completedStages = Array.isArray(manifest.completedStages) ? [...manifest.completedStages] : [];
+	const completedStages = Array.isArray(manifest.completedStages)
+		? [...manifest.completedStages]
+		: [];
 	if (!completedStages.includes(actualStageName)) {
 		completedStages.push(actualStageName);
 	}
@@ -710,7 +703,10 @@ async function verifySession(projectRoot, options) {
 	if (refluxedFeature) {
 		lines.push(`Evidence recorded for feature ${refluxedFeature}.`);
 	}
-	lines.push("", "Tip: run `amber session approve --session " + sessionId + "` to record gate approval.");
+	lines.push(
+		"",
+		"Tip: run `amber session approve --session " + sessionId + "` to record gate approval.",
+	);
 	return result(lines.join("\n"), 0);
 }
 
@@ -726,10 +722,7 @@ async function approveSession(projectRoot, options) {
 	const { manifest, sessionDir } = loaded;
 
 	if (manifest.status === "completed" || manifest.status === "aborted") {
-		return result(
-			`Cannot approve: session is already ${manifest.status}.`,
-			1,
-		);
+		return result(`Cannot approve: session is already ${manifest.status}.`, 1);
 	}
 
 	// Resolve route gates so we can name the gate being approved.
@@ -739,27 +732,24 @@ async function approveSession(projectRoot, options) {
 	const gates = route && Array.isArray(route.gates) ? route.gates : [];
 	if (!gateId && gates.length !== 1) {
 		if (gates.length === 0) {
-			return result(
-				`Error: route "${manifest.route.id}" has no gates to approve.`,
-				1,
-			);
+			return result(`Error: route "${manifest.route.id}" has no gates to approve.`, 1);
 		}
 		return result(
 			`Error: route has ${gates.length} gates — specify one with --gate <id>.\n` +
-			`Available: ${gates.map((g) => g.id).join(", ")}`,
+				`Available: ${gates.map((g) => g.id).join(", ")}`,
 			1,
 		);
 	}
 
 	if (gateId && !gates.some((g) => g.id === gateId)) {
-			return result(
-				`Error: gate "${gateId}" not found in route "${manifest.route.id}".\n` +
+		return result(
+			`Error: gate "${gateId}" not found in route "${manifest.route.id}".\n` +
 				`Available: ${gates.map((g) => g.id).join(", ") || "(none)"}`,
-				1,
-			);
-		}
+			1,
+		);
+	}
 
-		const resolvedGateId = gateId || gates[0].id;
+	const resolvedGateId = gateId || gates[0].id;
 
 	// Identity gate: a "user-approval" gate must be approved by a human, not by an
 	// agent piping commands. In a non-interactive shell we refuse unless --yes is
@@ -810,17 +800,11 @@ async function approveSession(projectRoot, options) {
 	}
 
 	// If all route gates have now been approved, complete the session.
-	const gateEvents = readSessionEvents(sessionDir).filter(
-		(e) => e.type === "gate_passed",
-	);
+	const gateEvents = readSessionEvents(sessionDir).filter((e) => e.type === "gate_passed");
 	const routeGateIds = gates.map((g) => g.id);
 	const allGatesPassed =
 		routeGateIds.length > 0 &&
-		routeGateIds.every((id) =>
-			gateEvents.some(
-				(e) => e.data && e.data.gateId === id,
-			),
-		);
+		routeGateIds.every((id) => gateEvents.some((e) => e.data && e.data.gateId === id));
 
 	const sm = new SessionStateMachine(manifest.status);
 	let completionEvent;
@@ -836,22 +820,12 @@ async function approveSession(projectRoot, options) {
 
 	writeSessionManifest(sessionDir, { ...manifest, status: newStatus });
 
-	const lines = [
-		`Approval recorded for session: ${sessionId}`,
-		`Gate: ${resolvedGateId}`,
-	];
+	const lines = [`Approval recorded for session: ${sessionId}`, `Gate: ${resolvedGateId}`];
 	if (allGatesPassed) {
 		lines.push("All gates passed — session marked completed.");
 	} else if (gates.length > 1) {
-		const pending = gates.filter(
-			(g) =>
-				!gateEvents.some(
-					(e) => e.data && e.data.gateId === g.id,
-				),
-		);
-		lines.push(
-			`Pending gates: ${pending.map((g) => g.id).join(", ")}`,
-		);
+		const pending = gates.filter((g) => !gateEvents.some((e) => e.data && e.data.gateId === g.id));
+		lines.push(`Pending gates: ${pending.map((g) => g.id).join(", ")}`);
 	}
 	if (gateWarning) {
 		lines.push(gateWarning);

@@ -21,10 +21,22 @@ function parseArgs(argv) {
 	const args = { target: process.cwd(), _: [] };
 	for (let i = 0; i < argv.length; i++) {
 		const a = argv[i];
-		if (a === "--target") { args.target = argv[++i]; continue; }
-		if (a === "--execute") { args.execute = true; continue; }
-		if (a === "--json") { args.json = true; continue; }
-		if (a === "--template-root") { args.templateRoot = argv[++i]; continue; }
+		if (a === "--target") {
+			args.target = argv[++i];
+			continue;
+		}
+		if (a === "--execute") {
+			args.execute = true;
+			continue;
+		}
+		if (a === "--json") {
+			args.json = true;
+			continue;
+		}
+		if (a === "--template-root") {
+			args.templateRoot = argv[++i];
+			continue;
+		}
 		args._.push(a);
 	}
 	return args;
@@ -43,10 +55,16 @@ test("sync dry-run reports the plan and makes NO filesystem changes", () => {
 	const { tpl, dir } = fixture();
 	try {
 		// Ship a new controlled template version → one stale controlled file.
-		fs.writeFileSync(path.join(tpl, REL), fs.readFileSync(path.join(tpl, REL), "utf8") + "\n# new\n");
+		fs.writeFileSync(
+			path.join(tpl, REL),
+			fs.readFileSync(path.join(tpl, REL), "utf8") + "\n# new\n",
+		);
 		const installedPath = path.join(dir, REL);
 		const before = fs.readFileSync(installedPath, "utf8");
-		const { result, exitCode } = dispatch("sync", parseArgs(["--target", dir, "--template-root", tpl]));
+		const { result, exitCode } = dispatch(
+			"sync",
+			parseArgs(["--target", dir, "--template-root", tpl]),
+		);
 		assert.equal(exitCode ?? 0, 0);
 		// The plan reports the one stale controlled file (guards against garbage counts).
 		assert.match(result.text, /stale=1/);
@@ -65,9 +83,15 @@ test("sync dry-run reports the plan and makes NO filesystem changes", () => {
 test("sync --execute overwrites the stale controlled file and re-stamps (detector then fresh)", () => {
 	const { tpl, dir } = fixture();
 	try {
-		fs.writeFileSync(path.join(tpl, REL), fs.readFileSync(path.join(tpl, REL), "utf8") + "\n# new\n");
+		fs.writeFileSync(
+			path.join(tpl, REL),
+			fs.readFileSync(path.join(tpl, REL), "utf8") + "\n# new\n",
+		);
 		const installedPath = path.join(dir, REL);
-		const { result } = dispatch("sync", parseArgs(["--target", dir, "--template-root", tpl, "--execute"]));
+		const { result } = dispatch(
+			"sync",
+			parseArgs(["--target", dir, "--template-root", tpl, "--execute"]),
+		);
 		assert.ok(fs.readFileSync(installedPath, "utf8").includes("# new"), "stale file overwritten");
 		assert.ok(fs.existsSync(installedPath + ".bak"), "backed up");
 		// Detector now classifies the refreshed file as fresh (provenance re-stamped).

@@ -4,16 +4,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { escapeYaml } = require("../../core/simple-yaml");
-const {
-	pathExists,
-	readJson,
-	relativeSlash,
-	resolveTarget,
-} = require("../../core/fs-utils");
-const {
-	KNOWLEDGE_PLAN_YAML_RELATIVE,
-	loadKnowledgePlan,
-} = require("./load");
+const { pathExists, readJson, relativeSlash, resolveTarget } = require("../../core/fs-utils");
+const { KNOWLEDGE_PLAN_YAML_RELATIVE, loadKnowledgePlan } = require("./load");
 
 /**
  * Pre-flight inspection + plan proposal.
@@ -35,7 +27,8 @@ function proposeKnowledgePlan(target, options = {}) {
 	const inspection = performNativeInspection(targetRoot);
 
 	// Start from existing plan if present and not forcing, otherwise from template defaults
-	const basePlan = existing.found && existing.plan ? { ...existing.plan } : getDefaultKnowledgePlanSkeleton();
+	const basePlan =
+		existing.found && existing.plan ? { ...existing.plan } : getDefaultKnowledgePlanSkeleton();
 
 	// Merge smart suggestions
 	const suggested = mergeInspectionIntoPlan(basePlan, inspection, targetRoot);
@@ -78,12 +71,17 @@ function performNativeInspection(targetRoot) {
 	try {
 		const entries = fs.readdirSync(targetRoot, { withFileTypes: true });
 		for (const e of entries) {
-			if (e.name.startsWith(".") || ["node_modules", "coverage", "dist", "build"].includes(e.name)) continue;
+			if (e.name.startsWith(".") || ["node_modules", "coverage", "dist", "build"].includes(e.name))
+				continue;
 			if (e.isDirectory()) topLevel.push(e.name);
 		}
-	} catch (err) { void err; }
+	} catch (err) {
+		void err;
+	}
 
-	summary.push(`Top-level directories (filtered): ${topLevel.slice(0, 12).join(", ")}${topLevel.length > 12 ? " ..." : ""}`);
+	summary.push(
+		`Top-level directories (filtered): ${topLevel.slice(0, 12).join(", ")}${topLevel.length > 12 ? " ..." : ""}`,
+	);
 
 	let pkg = null;
 	const pkgPath = path.join(targetRoot, "package.json");
@@ -91,7 +89,9 @@ function performNativeInspection(targetRoot) {
 		try {
 			pkg = readJson(pkgPath);
 			summary.push(`package.json: name=${pkg.name || "?"}, type=${pkg.type || "commonjs"}`);
-		} catch (err) { void err; }
+		} catch (err) {
+			void err;
+		}
 	}
 
 	const hasScriptsLibCore = pathExists(path.join(targetRoot, "scripts", "lib", "core"));
@@ -99,7 +99,9 @@ function performNativeInspection(targetRoot) {
 	const hasDocsWiki = pathExists(path.join(targetRoot, "docs", "wiki"));
 	const hasArchitecture = pathExists(path.join(targetRoot, "docs", "architecture"));
 	const hasAppsWeb = pathExists(path.join(targetRoot, "apps", "web"));
-	const externalIgnore = pathExists(path.join(targetRoot, ".amberignore")) || pathExists(path.join(targetRoot, "ignore"));
+	const externalIgnore =
+		pathExists(path.join(targetRoot, ".amberignore")) ||
+		pathExists(path.join(targetRoot, "ignore"));
 
 	if (hasScriptsLibCore) summary.push("Detected core engine at scripts/lib/core/");
 	if (hasSkills) summary.push("Detected skills/ (SKILL.md source of truth pattern)");
@@ -137,15 +139,28 @@ function getDefaultKnowledgePlanSkeleton() {
 function mergeInspectionIntoPlan(base, inspection, _targetRoot) {
 	const plan = structuredClone(base); // deep clone
 
-	if (!plan.knowledgePlan) plan.knowledgePlan = { template: "architecture", notes: [], documents: [] };
+	if (!plan.knowledgePlan)
+		plan.knowledgePlan = { template: "architecture", notes: [], documents: [] };
 	if (!plan.knowledgeCards) plan.knowledgeCards = [];
 
 	// Seed some high-value documents if the plan is nearly empty
 	if (plan.knowledgePlan.documents.length < 3) {
 		const commonDocs = [
-			{ title: "Project Structure & Module Boundaries", goal: "Map top-level directories, ownership, and cross-cutting concerns.", hints: "Focus on scripts/, src/, apps/, templates/, schemas/, skills/." },
-			{ title: "Core Engine", goal: "Describe the main business logic location and its responsibilities.", hints: "scripts/lib/core/ is usually the heart." },
-			{ title: "CLI Surface vs Core", goal: "Explain how thin command handlers delegate to the core engine.", hints: "Look at *-commands.js and command-dispatcher.js." },
+			{
+				title: "Project Structure & Module Boundaries",
+				goal: "Map top-level directories, ownership, and cross-cutting concerns.",
+				hints: "Focus on scripts/, src/, apps/, templates/, schemas/, skills/.",
+			},
+			{
+				title: "Core Engine",
+				goal: "Describe the main business logic location and its responsibilities.",
+				hints: "scripts/lib/core/ is usually the heart.",
+			},
+			{
+				title: "CLI Surface vs Core",
+				goal: "Explain how thin command handlers delegate to the core engine.",
+				hints: "Look at *-commands.js and command-dispatcher.js.",
+			},
 		];
 		for (const d of commonDocs) {
 			if (!plan.knowledgePlan.documents.some((x) => x.title === d.title)) {

@@ -56,9 +56,7 @@ function scoreDimension(checks) {
 	// confidence: the strongest confidenceImpact among applicable checks,
 	// capped at medium when coverage is partial (partial evidence cannot
 	// support high per ADR-0008).
-	const confidences = applicable
-		.map((c) => c.confidenceImpact)
-		.filter(Boolean);
+	const confidences = applicable.map((c) => c.confidenceImpact).filter(Boolean);
 	let confidence = maxConfidence(confidences);
 	if (coverage === "partial" && confidence === "high") confidence = "medium";
 

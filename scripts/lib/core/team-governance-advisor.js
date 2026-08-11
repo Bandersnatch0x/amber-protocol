@@ -15,17 +15,9 @@ const { gitOutput } = require("./git-exec");
 
 // Personal, per-developer Amber state that should not be committed to a shared
 // repository. The advisor flags any of these not already covered by .gitignore.
-const PERSONAL_PATTERNS = [
-	".amber/sessions/",
-	"PROGRESS.md",
-	"session-handoff.md",
-	"notes.md",
-];
+const PERSONAL_PATTERNS = [".amber/sessions/", "PROGRESS.md", "session-handoff.md", "notes.md"];
 
-const REQUIRED_DOCS = [
-	"docs/wiki/product/overview.md",
-	"docs/wiki/engineering/verification.md",
-];
+const REQUIRED_DOCS = ["docs/wiki/product/overview.md", "docs/wiki/engineering/verification.md"];
 
 const CODE_REVIEW = {
 	single: {
@@ -58,14 +50,14 @@ function categorize(count) {
 // `git shortlog`, which reads from stdin when not attached to a TTY and would
 // hang under a non-interactive child process. Absent git / zero commits -> 0.
 function analyzeTeamSize(targetRoot) {
-	const out = gitOutput(resolveTarget(targetRoot), [
-		"log",
-		"--all",
-		"--no-merges",
-		"--format=%ae",
-	]);
+	const out = gitOutput(resolveTarget(targetRoot), ["log", "--all", "--no-merges", "--format=%ae"]);
 	const count = out
-		? new Set(out.split("\n").map((line) => line.trim()).filter(Boolean)).size
+		? new Set(
+				out
+					.split("\n")
+					.map((line) => line.trim())
+					.filter(Boolean),
+			).size
 		: 0;
 	return { count, category: categorize(count) };
 }
@@ -110,12 +102,8 @@ function generateGitignoreAdvice(gitignoreContent) {
 		.split("\n")
 		.map((line) => line.trim())
 		.filter((line) => line && !line.startsWith("#"));
-	const missing = PERSONAL_PATTERNS.filter(
-		(pattern) => !isCovered(pattern, rules),
-	);
-	const patch = missing.length
-		? `# Amber personal state\n${missing.join("\n")}\n`
-		: "";
+	const missing = PERSONAL_PATTERNS.filter((pattern) => !isCovered(pattern, rules));
+	const patch = missing.length ? `# Amber personal state\n${missing.join("\n")}\n` : "";
 	return { missing, patch };
 }
 

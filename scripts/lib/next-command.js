@@ -42,9 +42,7 @@ const SECURITY_KEYWORDS = [
 
 function tokenize(text) {
 	if (typeof text !== "string") return [];
-	return (text.toLowerCase().match(/[a-z0-9]+/g) || []).filter(
-		(token) => token.length >= 3,
-	);
+	return (text.toLowerCase().match(/[a-z0-9]+/g) || []).filter((token) => token.length >= 3);
 }
 
 // Score one route against the objective's tokens. Route-id keywords (e.g.
@@ -55,10 +53,7 @@ function scoreRoute(route, tokens, objective) {
 		.filter((value) => typeof value === "string")
 		.join(" ")
 		.toLowerCase();
-	const textScore = tokens.reduce(
-		(count, token) => count + (meta.includes(token) ? 1 : 0),
-		0,
-	);
+	const textScore = tokens.reduce((count, token) => count + (meta.includes(token) ? 1 : 0), 0);
 	const objectiveText = objective.toLowerCase();
 	const idBonus = (route.routeId.split("-") || []).some((keyword) => {
 		if (keyword.length < 3) return false;
@@ -82,9 +77,7 @@ function loadWorkflowPacks(packsDir) {
 		.sort()
 		.map((name) => {
 			const result = readJsonSafe(path.join(packsDir, name));
-			return result.value &&
-				typeof result.value === "object" &&
-				!Array.isArray(result.value)
+			return result.value && typeof result.value === "object" && !Array.isArray(result.value)
 				? result.value
 				: null;
 		})
@@ -104,14 +97,10 @@ function suggestWorkflowPack(tokens, objective, packsDir) {
 		return null;
 	}
 	const objectiveText = objective.toLowerCase();
-	const securityTriggered = SECURITY_KEYWORDS.some((keyword) =>
-		objectiveText.includes(keyword),
-	);
+	const securityTriggered = SECURITY_KEYWORDS.some((keyword) => objectiveText.includes(keyword));
 	let candidates = packs;
 	if (securityTriggered) {
-		const securityPacks = packs.filter((pack) =>
-			/secure|security|review/.test(packMetadata(pack)),
-		);
+		const securityPacks = packs.filter((pack) => /secure|security|review/.test(packMetadata(pack)));
 		if (securityPacks.length > 0) {
 			candidates = securityPacks;
 		}
@@ -121,10 +110,7 @@ function suggestWorkflowPack(tokens, objective, packsDir) {
 			pack,
 			overlap: tokens.filter((token) => packMetadata(pack).includes(token)).length,
 		}))
-		.sort(
-			(a, b) =>
-				b.overlap - a.overlap || a.pack.id.localeCompare(b.pack.id),
-		)[0];
+		.sort((a, b) => b.overlap - a.overlap || a.pack.id.localeCompare(b.pack.id))[0];
 	if (!best) {
 		return null;
 	}
@@ -165,7 +151,8 @@ function suggestRouting(objective, target = REPO_ROOT) {
 		matched: true,
 		routeId: best.route.routeId,
 		confidence: Math.min(1, Math.round((best.score / 4) * 100) / 100),
-		workflowPackId: suggestWorkflowPack(tokens, objective, path.join(targetRoot, "workflow-packs")) || null,
+		workflowPackId:
+			suggestWorkflowPack(tokens, objective, path.join(targetRoot, "workflow-packs")) || null,
 		matches: scored.map((entry) => ({
 			routeId: entry.route.routeId,
 			score: entry.score,
@@ -226,7 +213,10 @@ function inferNext(target, options = {}) {
 	const nextStep = inferNextStep(ctx);
 	let governanceActions;
 	try {
-		governanceActions = buildGovernanceReport(targetRoot, { targetDisplay }).nextActions.slice(0, 3);
+		governanceActions = buildGovernanceReport(targetRoot, { targetDisplay }).nextActions.slice(
+			0,
+			3,
+		);
 	} catch {
 		governanceActions = [];
 	}

@@ -6,11 +6,7 @@ const path = require("path");
 const { resolveStateDirForRead, resolveStateDirForCreate } = require("./state-dir-resolver");
 
 function createWorktree(projectRoot, sessionId) {
-	const worktreePath = path.join(
-		resolveStateDirForCreate(projectRoot),
-		"worktrees",
-		sessionId,
-	);
+	const worktreePath = path.join(resolveStateDirForCreate(projectRoot), "worktrees", sessionId);
 
 	const currentBranchResult = spawnSync("git", ["branch", "--show-current"], {
 		cwd: projectRoot,
@@ -49,11 +45,7 @@ function createWorktree(projectRoot, sessionId) {
 }
 
 function removeWorktree(projectRoot, sessionId) {
-	const worktreePath = path.join(
-		resolveStateDirForRead(projectRoot),
-		"worktrees",
-		sessionId,
-	);
+	const worktreePath = path.join(resolveStateDirForRead(projectRoot), "worktrees", sessionId);
 
 	if (!fs.existsSync(worktreePath)) {
 		return {
@@ -62,14 +54,10 @@ function removeWorktree(projectRoot, sessionId) {
 		};
 	}
 
-	const removeResult = spawnSync(
-		"git",
-		["worktree", "remove", worktreePath, "--force"],
-		{
-			cwd: projectRoot,
-			encoding: "utf8",
-		},
-	);
+	const removeResult = spawnSync("git", ["worktree", "remove", worktreePath, "--force"], {
+		cwd: projectRoot,
+		encoding: "utf8",
+	});
 
 	if (removeResult.status !== 0) {
 		return {

@@ -11,9 +11,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-	detectCandidateCommands,
-} = require("../../scripts/lib/core/audit");
+const { detectCandidateCommands } = require("../../scripts/lib/core/audit");
 
 const PYTHON_EVIDENCE = [{ source: "pyproject.toml", name: "python" }];
 
@@ -91,7 +89,7 @@ test("pyproject.toml [tool.ruff] alone yields only the ruff candidate (no defaul
 
 test("pyproject.toml [tool.pytest.ini_options] is recognised as pytest evidence", () => {
 	const root = tempTarget();
-	write(root, "pyproject.toml", "[tool.pytest.ini_options]\nminversion = \"7.0\"\n");
+	write(root, "pyproject.toml", '[tool.pytest.ini_options]\nminversion = "7.0"\n');
 	const candidates = detectCandidateCommands(root, PYTHON_EVIDENCE);
 	assert.equal(candidates[0].name, "pytest");
 });
@@ -111,7 +109,7 @@ test("go evidence yields a go test candidate sourced from go.mod", () => {
 
 test("a wails.json alongside go.mod adds a wails build candidate", () => {
 	const root = tempTarget();
-	write(root, "wails.json", "{\n  \"name\": \"app\"\n}\n");
+	write(root, "wails.json", '{\n  "name": "app"\n}\n');
 	const candidates = detectCandidateCommands(root, GO_EVIDENCE);
 	assert.deepEqual(
 		candidates.map((c) => c.name),
@@ -133,10 +131,7 @@ test("rust evidence yields a cargo test candidate sourced from Cargo.toml", () =
 
 test("mixed go + python evidence accumulates candidates from both languages", () => {
 	const root = tempTarget();
-	const candidates = detectCandidateCommands(root, [
-		...PYTHON_EVIDENCE,
-		...GO_EVIDENCE,
-	]);
+	const candidates = detectCandidateCommands(root, [...PYTHON_EVIDENCE, ...GO_EVIDENCE]);
 	const names = candidates.map((c) => c.name);
 	assert.ok(names.includes("pytest"));
 	assert.ok(names.includes("go-test"));

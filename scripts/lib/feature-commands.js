@@ -53,9 +53,7 @@ function addFeature(target, options) {
 	if (data._corrupt) {
 		return {
 			target: targetRoot,
-			errors: [
-				"feature_list.json is missing or corrupt. Run `amber init` first.",
-			],
+			errors: ["feature_list.json is missing or corrupt. Run `amber init` first."],
 			warnings: [],
 		};
 	}
@@ -69,13 +67,15 @@ function addFeature(target, options) {
 		};
 	}
 
-	const behaviorText =
-		typeof behavior === "string" ? behavior.trim() : "";
+	const behaviorText = typeof behavior === "string" ? behavior.trim() : "";
 	const verifySteps = Array.isArray(verify)
 		? verify.map((v) => (typeof v === "string" ? v.trim() : "")).filter(Boolean)
 		: typeof verify === "string" && verify.trim() !== ""
-				? verify.split(",").map((v) => v.trim()).filter(Boolean)
-				: [];
+			? verify
+					.split(",")
+					.map((v) => v.trim())
+					.filter(Boolean)
+			: [];
 
 	const feature = {
 		id,
@@ -89,7 +89,10 @@ function addFeature(target, options) {
 		notes: [],
 	};
 	if (typeof paths === "string" && paths.trim() !== "") {
-		feature.paths = paths.split(",").map((p) => p.trim()).filter(Boolean);
+		feature.paths = paths
+			.split(",")
+			.map((p) => p.trim())
+			.filter(Boolean);
 	}
 
 	data.features.push(feature);
@@ -122,9 +125,7 @@ function listFeatures(target) {
 		return {
 			target: targetRoot,
 			features: [],
-			errors: [
-				"feature_list.json is missing or corrupt. Run `amber init` first.",
-			],
+			errors: ["feature_list.json is missing or corrupt. Run `amber init` first."],
 			warnings: [],
 		};
 	}
@@ -155,9 +156,7 @@ function removeFeature(target, options) {
 	if (data._corrupt) {
 		return {
 			target: targetRoot,
-			errors: [
-				"feature_list.json is missing or corrupt. Run `amber init` first.",
-			],
+			errors: ["feature_list.json is missing or corrupt. Run `amber init` first."],
 			warnings: [],
 		};
 	}
@@ -200,9 +199,7 @@ function recordFeatureEvidence(target, options) {
 	if (data._corrupt) {
 		return {
 			target: targetRoot,
-			errors: [
-				"feature_list.json is missing or corrupt. Run `amber init` first.",
-			],
+			errors: ["feature_list.json is missing or corrupt. Run `amber init` first."],
 			warnings: [],
 		};
 	}
@@ -211,9 +208,7 @@ function recordFeatureEvidence(target, options) {
 	if (!feature) {
 		return {
 			target: targetRoot,
-			errors: [
-				`Feature ${featureId} was not found in feature_list.json.`,
-			],
+			errors: [`Feature ${featureId} was not found in feature_list.json.`],
 			warnings: [],
 		};
 	}
@@ -264,9 +259,7 @@ function listFeatureEvidence(target, options) {
 	if (data._corrupt) {
 		return {
 			target: targetRoot,
-			errors: [
-				"feature_list.json is missing or corrupt. Run `amber init` first.",
-			],
+			errors: ["feature_list.json is missing or corrupt. Run `amber init` first."],
 			warnings: [],
 		};
 	}
@@ -275,9 +268,7 @@ function listFeatureEvidence(target, options) {
 	if (!feature) {
 		return {
 			target: targetRoot,
-			errors: [
-				`Feature ${featureId} was not found in feature_list.json.`,
-			],
+			errors: [`Feature ${featureId} was not found in feature_list.json.`],
 			warnings: [],
 		};
 	}
@@ -384,10 +375,7 @@ function runFeatureAction(action, target, options = {}) {
 			text = `No evidence recorded for feature: ${structured.featureId}`;
 		} else {
 			const rows = evidence
-				.map(
-					(e, i) =>
-						`  [${i + 1}] ${e.date} | ${e.command} → ${e.result}`,
-				)
+				.map((e, i) => `  [${i + 1}] ${e.date} | ${e.command} → ${e.result}`)
 				.join("\n");
 			text = `Evidence for ${structured.featureId}:\n${rows}`;
 		}

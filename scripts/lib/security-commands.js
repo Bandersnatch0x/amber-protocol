@@ -25,8 +25,7 @@ function generateSecurityAuditReport(targetRoot, options = {}) {
 	};
 	const secretResult = [];
 	const permResult = { pass: true, findings: [] };
-	const report =
-		REPORT_ONLY_NOTICE + generateAuditReport(depResult, secretResult, permResult);
+	const report = REPORT_ONLY_NOTICE + generateAuditReport(depResult, secretResult, permResult);
 
 	if (options.output) {
 		const outputPath = path.resolve(options.output);

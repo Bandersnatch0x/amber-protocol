@@ -33,9 +33,7 @@ test("detects a Makefile as a make command", () => {
 	const root = tempTarget();
 	fs.writeFileSync(path.join(root, "Makefile"), "test:\n\tnode --test\n");
 	const commands = detectCommands(root);
-	assert.deepEqual(commands, [
-		{ source: "Makefile", name: "make", command: "make <target>" },
-	]);
+	assert.deepEqual(commands, [{ source: "Makefile", name: "make", command: "make <target>" }]);
 });
 
 test("records a parse issue for a malformed package.json instead of throwing", () => {

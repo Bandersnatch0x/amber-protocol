@@ -71,15 +71,15 @@ amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract d
 
 Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级越高，Amber 投入该层的表面就越多：
 
-| 层 | 在 Amber 中的角色 | 优先级 |
-| --- | --- | --- |
-| `Governance` | 审批记录、安全默认值、策略边界和采纳控制约束行为。 | 最高 |
-| `Verification` | doctor、audit、校验、review 和 gate 表面提供显式检查。 | 高 |
-| `Observability` | 时间线、manifest、ledger 和报告让行为可检视。 | 高 |
-| `Lifecycle` | route、session、checkpoint 和 worktree 在本地组织工作。 | 中 |
-| `Context` | starter 文档、wiki 骨架、manifest 和交接产物保持项目上下文显式。 | 中 |
-| `Tooling` | CLI 命令、schema、validator、workflow pack 和 profile 暴露显式接口。 | 中 |
-| `Execution` | 最小化——Amber 避免成为通用执行运行时或真实 agent 平台。 | 低 |
+| 层              | 在 Amber 中的角色                                                    | 优先级 |
+| --------------- | -------------------------------------------------------------------- | ------ |
+| `Governance`    | 审批记录、安全默认值、策略边界和采纳控制约束行为。                   | 最高   |
+| `Verification`  | doctor、audit、校验、review 和 gate 表面提供显式检查。               | 高     |
+| `Observability` | 时间线、manifest、ledger 和报告让行为可检视。                        | 高     |
+| `Lifecycle`     | route、session、checkpoint 和 worktree 在本地组织工作。              | 中     |
+| `Context`       | starter 文档、wiki 骨架、manifest 和交接产物保持项目上下文显式。     | 中     |
+| `Tooling`       | CLI 命令、schema、validator、workflow pack 和 profile 暴露显式接口。 | 中     |
+| `Execution`     | 最小化——Amber 避免成为通用执行运行时或真实 agent 平台。              | 低     |
 
 主线：强化 `Governance`、`Verification` 和 `Observability`；让 `Lifecycle` 保持仓库本地；避免漂移成完整的 agent 平台。[治理模型文档](./docs/architecture/governance-model.md)把每一层映射到具体命令。
 
@@ -107,17 +107,17 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 
 ## 文档
 
-| 主题 | 链接 |
-| --- | --- |
-| 完整 CLI 参考 | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md) |
-| 快速开始指南 | [docs/user-guide/getting-started.md](./docs/user-guide/getting-started.md) |
-| 架构与治理模型 | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md) |
-| 部署与运维 | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) |
+| 主题               | 链接                                                                                                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 完整 CLI 参考      | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md)                                                                                                                      |
+| 快速开始指南       | [docs/user-guide/getting-started.md](./docs/user-guide/getting-started.md)                                                                                            |
+| 架构与治理模型     | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md)                                                                                      |
+| 部署与运维         | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)                                                                                                                            |
 | 监控 / 通知 / 策略 | [MONITORING_SETUP.md](./docs/MONITORING_SETUP.md) · [NOTIFICATION_SETUP.md](./docs/NOTIFICATION_SETUP.md) · [POLICY_CONFIGURATION.md](./docs/POLICY_CONFIGURATION.md) |
-| 故障排查 | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) |
-| 完整文档索引 | [docs/README.md](./docs/README.md) |
-| 规格与路线图 | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md) |
-| 贡献指南 | [CONTRIBUTING.md](./CONTRIBUTING.md) |
+| 故障排查           | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)                                                                                                                  |
+| 完整文档索引       | [docs/README.md](./docs/README.md)                                                                                                                                    |
+| 规格与路线图       | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                     |
+| 贡献指南           | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                  |
 
 Web 查看器（`apps/web`）为会话和时间线提供一个仪表盘：
 

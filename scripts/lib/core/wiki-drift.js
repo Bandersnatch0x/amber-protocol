@@ -29,21 +29,15 @@ function detectWikiDrift(target) {
 	const stale = detectStaleDocs(targetRoot);
 	// Only the wiki subset of required harness files belongs in WIKI drift — a
 	// missing AGENTS.md/feature_list.json is a harness gap, not wiki drift.
-	const wikiRequired = REQUIRED_HARNESS_FILES.filter((rel) =>
-		rel.startsWith("docs/wiki/"),
-	);
-	const missingRequired = wikiRequired.filter(
-		(rel) => !pathExists(path.join(targetRoot, rel)),
-	);
+	const wikiRequired = REQUIRED_HARNESS_FILES.filter((rel) => rel.startsWith("docs/wiki/"));
+	const missingRequired = wikiRequired.filter((rel) => !pathExists(path.join(targetRoot, rel)));
 
 	let controlledDriftedFiles = [];
 	const scaffold = detectScaffoldDrift(targetRoot);
 	if (scaffold.installed && Array.isArray(scaffold.files)) {
 		controlledDriftedFiles = scaffold.files.filter(
 			(f) =>
-				f.tier === "controlled" &&
-				f.classification === "stale" &&
-				f.path.startsWith("docs/wiki/"),
+				f.tier === "controlled" && f.classification === "stale" && f.path.startsWith("docs/wiki/"),
 		);
 	}
 

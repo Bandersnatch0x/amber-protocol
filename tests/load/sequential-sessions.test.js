@@ -45,13 +45,7 @@ describe("sequential sessions load test", () => {
 		const duration = Date.now() - startTime;
 		const avgTime = duration / total;
 
-		assert.ok(
-			successCount >= total * 0.9,
-			`Only ${successCount}/${total} succeeded`,
-		);
-		assert.ok(
-			avgTime < 6000,
-			`Average time ${avgTime.toFixed(0)}ms exceeds 6s target`,
-		);
+		assert.ok(successCount >= total * 0.9, `Only ${successCount}/${total} succeeded`);
+		assert.ok(avgTime < 6000, `Average time ${avgTime.toFixed(0)}ms exceeds 6s target`);
 	});
 });

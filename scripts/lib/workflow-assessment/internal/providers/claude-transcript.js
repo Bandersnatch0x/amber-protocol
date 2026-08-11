@@ -85,7 +85,12 @@ function summarizeTranscript(filePath, expectedRepoPath, options = {}) {
 			}
 		}
 		turns.push({
-			type: typeof obj.type === "string" ? obj.type : (typeof message.role === "string" ? message.role : "unknown"),
+			type:
+				typeof obj.type === "string"
+					? obj.type
+					: typeof message.role === "string"
+						? message.role
+						: "unknown",
 			tools: toolNames,
 			timestamp: typeof obj.timestamp === "string" ? obj.timestamp : null,
 		});
@@ -95,12 +100,16 @@ function summarizeTranscript(filePath, expectedRepoPath, options = {}) {
 	// target — the lossy directory name alone is not sufficient evidence.
 	if (turns.length === 0 || !cwdBound) return null;
 
-	const timestamps = turns.map((t) => t.timestamp).filter(Boolean).sort();
+	const timestamps = turns
+		.map((t) => t.timestamp)
+		.filter(Boolean)
+		.sort();
 	const allTools = turns.flatMap((t) => t.tools);
 	const uniqueTools = [...new Set(allTools)];
-	const durationMs = timestamps.length >= 2
-		? new Date(timestamps[timestamps.length - 1]) - new Date(timestamps[0])
-		: null;
+	const durationMs =
+		timestamps.length >= 2
+			? new Date(timestamps[timestamps.length - 1]) - new Date(timestamps[0])
+			: null;
 
 	const summary = {
 		// SessionObservation-compatible core + host transcript extras

@@ -43,10 +43,7 @@ function summarizePageQuality(targetRoot, knowledgeKind) {
 	const pages = listPages(targetRoot)
 		.map(({ pageId }) => readPage(targetRoot, pageId))
 		.filter(Boolean)
-		.filter(
-			(page) =>
-				!knowledgeKind || (page.knowledgeKind || "unspecified") === knowledgeKind,
-		);
+		.filter((page) => !knowledgeKind || (page.knowledgeKind || "unspecified") === knowledgeKind);
 	let blocks = 0;
 	let unknown = 0;
 	let sourceRefs = 0;

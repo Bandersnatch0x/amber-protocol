@@ -77,7 +77,10 @@ function tmpRepo() {
 function seedMinimalProject(dir) {
 	fs.writeFileSync(
 		path.join(dir, "package.json"),
-		JSON.stringify({ name: "web-adapter-fixture", scripts: { test: "node -e \"process.exit(0)\"" } }) + "\n",
+		JSON.stringify({
+			name: "web-adapter-fixture",
+			scripts: { test: 'node -e "process.exit(0)"' },
+		}) + "\n",
 	);
 	fs.writeFileSync(
 		path.join(dir, "feature_list.json"),
@@ -87,10 +90,7 @@ function seedMinimalProject(dir) {
 
 describe("web-adapter module surface", () => {
 	it("exists and loads from scripts/lib/web-adapter.js", () => {
-		assert.ok(
-			fs.existsSync(ADAPTER_PATH),
-			`expected adapter module at ${ADAPTER_PATH}`,
-		);
+		assert.ok(fs.existsSync(ADAPTER_PATH), `expected adapter module at ${ADAPTER_PATH}`);
 		const adapter = loadAdapter();
 		assert.equal(typeof adapter, "object");
 		assert.ok(adapter !== null);
@@ -157,7 +157,8 @@ describe("evaluateLifecycleNext", () => {
 		assert.ok(result.focus !== null);
 		assert.equal(typeof result.focus.type, "string");
 		assert.ok(
-			result.nextStep === null || (typeof result.nextStep === "object" && typeof result.nextStep.id === "string"),
+			result.nextStep === null ||
+				(typeof result.nextStep === "object" && typeof result.nextStep.id === "string"),
 			"nextStep must be null or a step with id",
 		);
 		assert.ok(Array.isArray(result.lifecycle), "lifecycle must be an array of steps");

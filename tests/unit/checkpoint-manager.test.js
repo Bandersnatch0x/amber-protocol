@@ -34,13 +34,7 @@ describe("Checkpoint Manager", () => {
 			uncommittedFiles: [],
 		};
 
-		const result = saveCheckpoint(
-			testDir,
-			sessionId,
-			"plan",
-			manifest,
-			worktreeState,
-		);
+		const result = saveCheckpoint(testDir, sessionId, "plan", manifest, worktreeState);
 
 		assert.strictEqual(result.success, true);
 		assert.ok(fs.existsSync(result.path));

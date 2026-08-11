@@ -72,9 +72,7 @@ function scanForSecrets(files) {
 					const matchedText = match[0];
 					// Truncate long matches for readability
 					const displayMatch =
-						matchedText.length > 60
-							? matchedText.slice(0, 57) + "..."
-							: matchedText;
+						matchedText.length > 60 ? matchedText.slice(0, 57) + "..." : matchedText;
 
 					findings.push({
 						file: file.path,

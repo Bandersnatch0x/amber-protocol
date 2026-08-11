@@ -1,5 +1,5 @@
 {
-  "name": "amber-protocol",
-  "version": "0.1.0",
-  "description": "Minimal Claude adapter placeholder for V1 Safe Amber Bootstrap."
+	"name": "amber-protocol",
+	"version": "0.1.0",
+	"description": "Minimal Claude adapter placeholder for V1 Safe Amber Bootstrap."
 }

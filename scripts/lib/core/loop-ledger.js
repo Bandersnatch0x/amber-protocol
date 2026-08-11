@@ -67,9 +67,11 @@ function verifyLedgerChain(ledgerPath) {
 	for (let i = 0; i < records.length; i++) {
 		const record = records[i];
 		if (record._unparseable) return { intact: false, brokenAt: i, reason: "unparseable record" };
-		if (record.prevHash !== prev) return { intact: false, brokenAt: i, reason: "prevHash mismatch" };
+		if (record.prevHash !== prev)
+			return { intact: false, brokenAt: i, reason: "prevHash mismatch" };
 		const { hash, ...body } = record;
-		if (hashRecord(body, prev) !== hash) return { intact: false, brokenAt: i, reason: "hash mismatch" };
+		if (hashRecord(body, prev) !== hash)
+			return { intact: false, brokenAt: i, reason: "hash mismatch" };
 		prev = hash;
 	}
 	return { intact: true, brokenAt: null, records: records.length };
@@ -82,7 +84,9 @@ function latestUnconsumedApproval(records) {
 			.filter((r) => r.kind === "executed" && r.consumedApprovalKey)
 			.map((r) => r.consumedApprovalKey),
 	);
-	const open = records.filter((r) => r.kind === "approved" && r.approvalKey && !consumed.has(r.approvalKey));
+	const open = records.filter(
+		(r) => r.kind === "approved" && r.approvalKey && !consumed.has(r.approvalKey),
+	);
 	return open.length ? open[open.length - 1] : null;
 }
 
@@ -114,7 +118,10 @@ function verifyLedgerOutcome(ledgerPath) {
 	return {
 		found: true,
 		intact: false,
-		tamperedMessage: codedError("AMBER_E_LEDGER_TAMPERED", `broken at record ${v.brokenAt}: ${v.reason}`),
+		tamperedMessage: codedError(
+			"AMBER_E_LEDGER_TAMPERED",
+			`broken at record ${v.brokenAt}: ${v.reason}`,
+		),
 	};
 }
 

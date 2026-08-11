@@ -42,9 +42,7 @@ class RetryConfig {
 				return await fn();
 			} catch (e) {
 				if (this.currentAttempt >= this.maxAttempts) throw e;
-				await new Promise((r) =>
-					setTimeout(r, this.backoffMs * this.currentAttempt),
-				);
+				await new Promise((r) => setTimeout(r, this.backoffMs * this.currentAttempt));
 			}
 		}
 	}
@@ -96,11 +94,7 @@ describe("E2E Bugfix Retry", { concurrency: false }, () => {
 			1,
 			"retryCount should be 1 (one retry, zero-based count of actual retries)",
 		);
-		assert.strictEqual(
-			result.success,
-			true,
-			"final success should be true after retry",
-		);
+		assert.strictEqual(result.success, true, "final success should be true after retry");
 		assert.strictEqual(
 			verifyCalls,
 			2,
@@ -130,16 +124,8 @@ describe("E2E Bugfix Retry", { concurrency: false }, () => {
 
 			assert.ok(thrown, "should have thrown after exhausting attempts");
 			assert.strictEqual(thrown.message, "always fails");
-			assert.strictEqual(
-				calls,
-				3,
-				"fn should be called exactly maxAttempts times",
-			);
-			assert.strictEqual(
-				rc.currentAttempt,
-				3,
-				"currentAttempt should equal maxAttempts",
-			);
+			assert.strictEqual(calls, 3, "fn should be called exactly maxAttempts times");
+			assert.strictEqual(rc.currentAttempt, 3, "currentAttempt should equal maxAttempts");
 		});
 
 		it("backoff delay scales linearly with currentAttempt", async () => {
@@ -164,20 +150,11 @@ describe("E2E Bugfix Retry", { concurrency: false }, () => {
 			const gap2 = timestamps[2] - timestamps[1];
 
 			// First retry delay ≈ backoffMs * 1 = 30ms (allow ±30ms tolerance)
-			assert.ok(
-				gap1 >= 20 && gap1 <= 80,
-				`first backoff delay ~30ms, got ${gap1}ms`,
-			);
+			assert.ok(gap1 >= 20 && gap1 <= 80, `first backoff delay ~30ms, got ${gap1}ms`);
 			// Second retry delay ≈ backoffMs * 2 = 60ms
-			assert.ok(
-				gap2 >= 40 && gap2 <= 110,
-				`second backoff delay ~60ms, got ${gap2}ms`,
-			);
+			assert.ok(gap2 >= 40 && gap2 <= 110, `second backoff delay ~60ms, got ${gap2}ms`);
 			// Second gap should be larger than first (linear scaling)
-			assert.ok(
-				gap2 > gap1,
-				`second gap (${gap2}ms) should be larger than first (${gap1}ms)`,
-			);
+			assert.ok(gap2 > gap1, `second gap (${gap2}ms) should be larger than first (${gap1}ms)`);
 		});
 
 		it("succeeds on first attempt without retry", async () => {
@@ -227,11 +204,7 @@ describe("E2E Bugfix Retry", { concurrency: false }, () => {
 
 		assert.ok(manifest, "manifest should be populated after route completion");
 		assert.ok(manifest.metadata, "manifest should have metadata");
-		assert.strictEqual(
-			manifest.metadata.retryCount,
-			2,
-			"retryCount should be 2 after two retries",
-		);
+		assert.strictEqual(manifest.metadata.retryCount, 2, "retryCount should be 2 after two retries");
 		assert.strictEqual(manifest.metadata.success, true);
 		assert.strictEqual(manifest.metadata.totalAttempts, 3);
 
@@ -274,14 +247,8 @@ describe("E2E Bugfix Retry", { concurrency: false }, () => {
 		// Verify each retry_attempt has expected shape
 		for (const evt of retryEvents) {
 			assert.ok(evt.timestamp, "retry_attempt event must have timestamp");
-			assert.ok(
-				typeof evt.attempt === "number",
-				"retry_attempt event must have attempt number",
-			);
-			assert.ok(
-				typeof evt.error === "string",
-				"retry_attempt event must have error string",
-			);
+			assert.ok(typeof evt.attempt === "number", "retry_attempt event must have attempt number");
+			assert.ok(typeof evt.error === "string", "retry_attempt event must have error string");
 		}
 
 		// Verify event sequence: plan → implement → verify → retry_attempt (x2) → plan → implement → verify (success)

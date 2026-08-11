@@ -27,19 +27,14 @@ describe("Migrate Command", () => {
 		fs.mkdirSync(sessionDir, { recursive: true });
 
 		const oldManifest = { sessionId, status: "completed", goal: "test" };
-		fs.writeFileSync(
-			path.join(sessionDir, "manifest.json"),
-			JSON.stringify(oldManifest, null, 2),
-		);
+		fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify(oldManifest, null, 2));
 
 		const result = migrateManifests(testDir, { dryRun: false });
 
 		assert.strictEqual(result.success, true);
 		assert.strictEqual(result.migrated, 1);
 
-		const updated = JSON.parse(
-			fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"),
-		);
+		const updated = JSON.parse(fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"));
 		assert.strictEqual(updated.schemaVersion, "1.0.0-rc.1");
 
 		const backup = path.join(sessionDir, "manifest.json.backup");
@@ -57,10 +52,7 @@ describe("Migrate Command", () => {
 			status: "completed",
 			goal: "test",
 		};
-		fs.writeFileSync(
-			path.join(sessionDir, "manifest.json"),
-			JSON.stringify(manifest, null, 2),
-		);
+		fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify(manifest, null, 2));
 
 		const result = migrateManifests(testDir, { dryRun: false });
 
@@ -74,11 +66,7 @@ describe("Migrate Command", () => {
 		fs.mkdirSync(healthyDir, { recursive: true });
 		fs.writeFileSync(
 			path.join(healthyDir, "manifest.json"),
-			JSON.stringify(
-				{ sessionId: "healthy", status: "completed", goal: "x" },
-				null,
-				2,
-			),
+			JSON.stringify({ sessionId: "healthy", status: "completed", goal: "x" }, null, 2),
 		);
 		const corruptDir = path.join(testDir, ".amber", "sessions", "broken");
 		fs.mkdirSync(corruptDir, { recursive: true });
@@ -99,19 +87,14 @@ describe("Migrate Command", () => {
 		fs.mkdirSync(sessionDir, { recursive: true });
 
 		const oldManifest = { sessionId, status: "completed", goal: "test" };
-		fs.writeFileSync(
-			path.join(sessionDir, "manifest.json"),
-			JSON.stringify(oldManifest, null, 2),
-		);
+		fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify(oldManifest, null, 2));
 
 		const result = migrateManifests(testDir, { dryRun: true });
 
 		assert.strictEqual(result.success, true);
 		assert.strictEqual(result.wouldMigrate, 1);
 
-		const unchanged = JSON.parse(
-			fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"),
-		);
+		const unchanged = JSON.parse(fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"));
 		assert.strictEqual(unchanged.schemaVersion, undefined);
 	});
 
@@ -125,11 +108,14 @@ describe("Migrate Command", () => {
 		const pageDir = path.join(testDir, ".amber", "context", "pages");
 		const pagePath = path.join(pageDir, "test-page.json");
 		fs.mkdirSync(pageDir, { recursive: true });
-		fs.writeFileSync(pagePath, JSON.stringify({
-			pageId: "test-page",
-			sources: {},
-			blocks: [],
-		}));
+		fs.writeFileSync(
+			pagePath,
+			JSON.stringify({
+				pageId: "test-page",
+				sources: {},
+				blocks: [],
+			}),
+		);
 
 		const response = dispatch("migrate", { target: testDir, _: [], json: true });
 		const updated = JSON.parse(fs.readFileSync(pagePath, "utf8"));
@@ -146,10 +132,13 @@ describe("Migrate Command", () => {
 		const routesDir = path.join(testDir, "routes");
 		const routePath = path.join(routesDir, "feature.route.json");
 		fs.mkdirSync(routesDir, { recursive: true });
-		fs.writeFileSync(routePath, JSON.stringify({
-			routeId: "feature",
-			stages: [{ id: "build" }],
-		}));
+		fs.writeFileSync(
+			routePath,
+			JSON.stringify({
+				routeId: "feature",
+				stages: [{ id: "build" }],
+			}),
+		);
 
 		const response = dispatch("migrate", { target: testDir, _: [], json: true });
 		const updated = JSON.parse(fs.readFileSync(routePath, "utf8"));
@@ -181,14 +170,19 @@ describe("Migrate Command", () => {
 		const packsDir = path.join(testDir, "workflow-packs");
 		const packPath = path.join(packsDir, "review.pack.json");
 		fs.mkdirSync(packsDir, { recursive: true });
-		fs.writeFileSync(packPath, JSON.stringify({
-			id: "review-pack",
-			loopContracts: [{
-				id: "review-loop",
-				trigger: { type: "manual" },
-				hardStops: { maxIterations: 1 },
-			}],
-		}));
+		fs.writeFileSync(
+			packPath,
+			JSON.stringify({
+				id: "review-pack",
+				loopContracts: [
+					{
+						id: "review-loop",
+						trigger: { type: "manual" },
+						hardStops: { maxIterations: 1 },
+					},
+				],
+			}),
+		);
 
 		const response = dispatch("migrate", { target: testDir, _: [], json: true });
 		const updated = JSON.parse(fs.readFileSync(packPath, "utf8"));

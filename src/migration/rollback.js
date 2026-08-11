@@ -7,8 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const BACKUP_PATTERN =
-	/^\.backup-(\d{4}-\d{2}-\d{2}-\d{6}(?:-\d{3})*)\.json$/;
+const BACKUP_PATTERN = /^\.backup-(\d{4}-\d{2}-\d{2}-\d{6}(?:-\d{3})*)\.json$/;
 
 /**
  * Find all backup files in a directory, sorted newest first.

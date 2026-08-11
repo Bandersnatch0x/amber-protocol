@@ -5,22 +5,22 @@ const { parseArgs, printResult } = require("./lib/core/cli-output");
 const { validateWiki } = require("./lib/core/validators");
 
 function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.help) {
-    console.log("Usage: node scripts/validate-wiki.js --target <repo> [--json]");
-    return;
-  }
+	const args = parseArgs(process.argv.slice(2));
+	if (args.help) {
+		console.log("Usage: node scripts/validate-wiki.js --target <repo> [--json]");
+		return;
+	}
 
-  const result = {
-    target: args.target,
-    ...validateWiki(args.target)
-  };
-  printResult(result, { json: args.json });
-  if (result.errors.length > 0) {
-    process.exitCode = 1;
-  }
+	const result = {
+		target: args.target,
+		...validateWiki(args.target),
+	};
+	printResult(result, { json: args.json });
+	if (result.errors.length > 0) {
+		process.exitCode = 1;
+	}
 }
 
 if (require.main === module) {
-  main();
+	main();
 }

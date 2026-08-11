@@ -36,7 +36,7 @@ function buildGateStageMap(route) {
 			// route definition error that should be fixed there.
 			console.error(
 				`route gate "${stage.gateAfter}" is referenced by stage "${stage.name}" ` +
-				`but is already owned by stage "${map.get(stage.gateAfter)}" (ignoring duplicate)`,
+					`but is already owned by stage "${map.get(stage.gateAfter)}" (ignoring duplicate)`,
 			);
 			continue;
 		}
@@ -82,15 +82,7 @@ function writeRouteGates(sessionDir, sessionId, route, triggeredAt) {
 	const stageMap = buildGateStageMap(route);
 	let written = 0;
 	for (const gate of gates) {
-		if (
-			writeGateDefinition(
-				sessionDir,
-				sessionId,
-				gate,
-				stageMap.get(gate.id),
-				triggeredAt,
-			)
-		) {
+		if (writeGateDefinition(sessionDir, sessionId, gate, stageMap.get(gate.id), triggeredAt)) {
 			written++;
 		}
 	}

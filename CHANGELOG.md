@@ -7,9 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `.gitattributes` enforces LF line endings cross-platform (`* text=auto eol=lf`) with a binary-file allowlist.
+- `.github/CODEOWNERS` routes review by directory.
+- CI runs `npm run lint` and `npm run format:check` before tests; the opt-in `pre-commit` hook runs the same two gates after identity validation.
+
+### Changed
+
+- Apply Prettier across the repository against `.prettierrc.json` (tabs, double quotes, trailing commas, 100-col width, LF) - unifies mixed 2-space/tab indentation and quote styles.
+- Expand `.prettierignore` to exclude generated agent products (`.agents/`, `.claude/`, `.codex-plugin/`), skills, docs, templates, and data directories so Prettier only touches first-party source.
+
 ## [1.5.0] - 2026-08-10
 
 ### Added
+
 - **Governed Context knowledge lifecycle (F017)**: classify knowledge by kind,
   validate forward supersession lineage, and assemble current-only Loadouts and
   derived projections without introducing a second writable source of truth.
@@ -17,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retention metrics, and dependency-boundary checks for external integrations.
 
 ### Changed
+
 - Extend Context schemas, CLI help and output, verification errors, architecture
   guidance, and lifecycle documentation for the new assurance capabilities.
 - Reconcile F016/F017 governance evidence: F016 remains accepted; F017 remains
@@ -25,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.1] - 2026-08-08
 
 ### Fixed
+
 - Centralize CLI Command definitions, public order, help/output policy, and handler
   binding in `command-help.js`; dispatcher owns runtime dispatch only.
 - Derive Context Page index status from page health at the store boundary (no
@@ -36,12 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Align agent/wiki docs with the new registry and evidence paths.
 
 ### Changed
+
 - Remove `command-handler-families.js`; assessment consumers degrade at their
   boundary when the shared evidence reader throws.
 
 ## [1.4.0] - 2026-08-08
 
 ### Added
+
 - **Context layer — contract-driven distillation (ADR-0009)**: new `amber context`
   command family (`request` / `ingest` / `verify` / `list` / `show` / `refresh` /
   `stats` / `delete`) closes the write path between session evidence and project
@@ -70,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no-progress findings, and objective-driven `amber next` route advice.
 
 ### Fixed
+
 - Enforce lexical and real-path target confinement across Context sources, Pages,
   requests, payloads, and Loadouts; bind every ingest outcome to an existing request
   and reject stale or mismatched source snapshots.
@@ -83,6 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   active Session; retain fail-closed task/session/plan coordinate validation.
 
 ### Changed
+
 - Split dispatch policy, validation, and persistence responsibilities into focused
   modules while preserving the public handoff and workflow-assessment facades.
 - Align CLI, ADR, wiki, migration, and generated-agent guidance with the corrected
@@ -91,6 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.12] - 2026-08-04
 
 ### Added
+
 - **Loop no-progress reporting (F015)**: `loop status --ledger` now accepts a
   single ledger JSON file or a directory of recorded history. Directory reads
   retain valid records when individual files are corrupt, deterministically
@@ -145,6 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Hook behavior is covered by unit tests.
 
 ### Fixed
+
 - **Review standard labels**: `amber review` now gives JSON standards without an
   explicit `id` a deterministic filename-based identifier and labels the list
   as loaded standards. Human output no longer renders a blank standard between
@@ -161,6 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependency graph.
 
 ### Deprecated
+
 - **Legacy Knowledge Plan CommonJS surface** (`scripts/lib/core/knowledge-plan.js`):
   retained helper exports (`loadKnowledgePlan`, `buildKnowledgeReport`, parser,
   serializer, and related helpers) are forwarded for one deprecation cycle.
@@ -170,11 +191,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.11] - 2026-07-31
 
 ### Changed
+
 - workflow-assessment: single facade with internal seams
 
 ## [1.3.10] - 2026-07-31
 
 ### Fixed
+
 - **workflow-assessment CI regression**: privacy assertion (`!json.includes(homedir())`) failed on Linux CI where checkout path lives under `/home/runner`. Now checks `~/.claude` root paths in both native and JSON-escaped forms, which catches real claude-home leaks while tolerating legitimate target paths under homedir
 - **workflow-assessment M1**: `collectAgentAssets` dedupes by `realpathSync.native` (Windows case-insensitive filesystems no longer report phantom `AGENTS.md` + `Agents.md` duplicates of the same on-disk file)
 - **workflow-assessment M2**: removed dead `vc-3` fail branch (check only observes capability; defect detection is `ld-4`'s job)
@@ -185,40 +208,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **workflow-assessment L3**: `--target "\${target}"` quoted in draft templates (paths with spaces now render correctly)
 
 ### Performance
+
 - **workflow-assessment suite**: 8.6s → 2.7s (MAX_TRANSCRIPT_FILES cap reduces unbounded transcript scans from 119MB to newest 20 files)
 - **assess stdout**: 84.5KB → 18.3KB (108→17 observations; 105 claude transcripts capped to 14)
 
 ### Added
+
 - **workflow-assessment tests**: cap regression (25 files → 20), no-cwd negative case, case-insensitive dedup regression
 
 ### Notes
+
 - All 1295 tests pass; workflow-assessment coverage unchanged (cap only reduces historical noise, not signal)
 - `realpathSync.native` required for case dedup — JS implementation preserves caller casing and misses Windows on-disk truth
 
 ## [1.3.9] - 2026-07-27
 
 ### Added
+
 - **pi harness compatibility**: publish `skills/` in the npm package and declare a `pi` manifest (`{"skills": ["./skills"]}`) plus the `pi-package` keyword, so `pi install npm:amber-protocol` resolves all 10 Amber skills and the package is indexed by the [pi.dev package catalog](https://pi.dev/packages)
 
 ### Fixed
+
 - **skill command prefix**: skill bodies now call `amber <cmd>` and carry an explicit prefix note — `node scripts/amber.js` in an Amber checkout, `npx -p amber-protocol amber` when Amber is installed as a package. Package-installed agents previously followed a checkout-only path that does not exist for them. Repo-local slash commands (`.claude/commands`, `.gemini/commands`) keep the checkout path via the unchanged `x-amber-json` frontmatter.
 
 ### Notes
+
 - Repo-local pi support already worked without changes: pi reads `AGENTS.md`/`CLAUDE.md` as context files and discovers `.agents/skills/` (generated by `npm run gen:agents`) natively. The `x-amber-json` frontmatter key is ignored by pi's Agent Skills validator, so skills load unmodified.
 - `npx amber-protocol` alone cannot resolve a bin (the package ships two: `amber` and `coding-harness`); `npx -p amber-protocol amber` is the working form.
 
 ## [1.3.8] - 2026-07-22
 
 ### Fixed
+
 - **deps**: bump transitive `fast-uri` to 3.1.4 (via lockfile) clearing high advisories GHSA-4c8g-83qw-93j6 / GHSA-v2hh-gcrm-f6hx that failed the CI Security job after the 1.3.7 tag
 - **docs boundary test**: allow `docs/architecture/session-lifecycle.md` to document refused autonomous session mode (refusal note, not product advertising)
 
 ### Notes
+
 - Completes the interrupted `v1.3.7` ship path: tag CI failed before Publish / GitHub Release; do not retag `v1.3.7` — publish from `v1.3.8` instead.
 
 ## [1.3.7] - 2026-07-22
 
 ### Fixed
+
 - **governance rules check**: dry-run uses `evaluateGovernedPolicy` (same built-in denies as governed-runner) so shell composites past a prefix allow no longer report false ALLOW
 - **policy**: pure FD redirects (`2>&1`, `1>&2`) no longer trip shell-composition deny; default `allow-npm-checks` accepts optional trailing FD redirects (`npm test 2>&1`)
 - **handoff**: free-text string evidence in `feature_list.json` renders correctly (no more `(none)` from string-spread); stamp `Last Updated`; reuse `getRepoSnapshot` for dirty labeling
@@ -232,11 +264,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **deps**: clear brace-expansion high advisory (GHSA-3jxr-9vmj-r5cp)
 
 ### Added
+
 - **status**: `dirty (untracked only)` when the tree has only `??`/`!!` noise (e.g. local `.scratch/`)
 - **ci**: guard commit identity; home visual e2e coverage
 - **web**: realign home as data-first operator console
 
 ### Changed
+
 - architecture docs: align governance model and session-lifecycle with live policy surfaces (`evaluateGovernedPolicy` / `session-timeline`) and removed autonomous executor
 - readiness ACTION_LIBRARY: stop promoting “increase agent autonomy” for leftover policy findings
 - BACKLOG: Phase C e2e is in CI; Phase D SSE auth + server-side error forwarding marked implemented for the local viewer boundary
@@ -246,11 +280,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.6] - 2026-07-15
 
 ### Fixed
+
 - session-lock: eliminate TOCTOU race in `acquireLock` via atomic `link(2)` (old `existsSync`+`writeFileSync` let concurrent acquirers all succeed; verified 10/10 → 1)
 - web session-control: `resume` is pause-only (`paused → executing`); `routed → executing` stays `start`, not `resume`
 - sync: artifact-unavailable note no longer falls through to misleading "none detected" (product-repo / non-git now report `n/a`)
 
 ### Changed
+
 - remove unused nodemailer dependency
 - remove 7.4M legacy `.harness` backup directory
 - use `structuredClone` instead of hand-rolled `JSON.parse(JSON.stringify())` deep clone
@@ -267,37 +303,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.5] - 2026-07-14
 
 ### Added
+
 - wiki: add declarative Knowledge Plan capability with tests
 
 ### Fixed
+
 - regenerate agent commands after amber-wiki SKILL change
 
 ### Changed
+
 - clear lint warnings, sync README version, ignore local IDE dirs
 - add lint/format tooling, leak guard, and dogfood feature_list
 
 ## [1.3.4] - 2026-07-14
 
 ### Fixed
+
 - session: writeSessionManifest uses monotonic timestamp too (#58)
 - session: monotonic createdAt + deterministic sort tiebreak (#58)
 
 ### Changed
+
 - quality: mark G1/G2 post-adjudication closures (#59)
 
 ## [1.3.3] - 2026-07-14
 
 ### Added
+
 - changelog: detect BREAKING CHANGE in commit body footer (#52)
 - cli: add npm run orient for session-start orientation (dogfood amber status) (#48)
 - release: add zero-dependency changelog generator + release process automation for #47
 
 ### Fixed
+
 - changelog: breaking flag requires ! or body footer, not subject text
 - changelog: use full history (empty range) on null getLatestStableTag; robust parser for first-release (#53)
 - release: terminal release assertion — catch local-only tags and registry ghosts (#46)
 
 ### Changed
+
 - add regression tests for complete-check --strict rejecting init-scaffold/template handoff (G2, #56)
 - verify apps/web E2E succeeds on Windows local (127.0.0.1 + NO_PROXY; stale 'proxy trap' memory resolved)
 - update e2e-governance-loop-verify.md with #54 target-repo dogfood results (G1/G2 closed on external target; outcome A)
@@ -309,6 +353,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.2] - 2026-07-13
 
 ### Added — Closed-loop governance lifecycle
+
 The full 11-step lifecycle (audit→init→feature→plan→gate→session→verify→approve→complete→accept→handoff) now works end-to-end. Wayfinder maps #14/#27/#35.
 
 - `session start --feature <id>` binds the feature into the manifest; `session complete` is the governance terminal state (all non-terminal states may transition).
@@ -322,6 +367,7 @@ The full 11-step lifecycle (audit→init→feature→plan→gate→session→ver
 - `scripts/demo/acceptance-demo.sh` — idempotent full-lifecycle acceptance demo.
 
 ### Security — verify-surface hardening (#36, #40–#44)
+
 - `evaluateVerifyPolicy`: un-removable built-in denies (destructive patterns + quote-aware shell-composition operators) applied before user rules — a custom `verify-rules.json` can no longer drop destructive protection, and an allow-listed head can no longer smuggle chained commands (`pytest && rm -rf`, `pytest | sh`).
 - Closed case-sensitivity bypass (`RM -RF`, `DROP TABLE`, …) and variant bypass (`rm -fr`, `rm -r -f`, `git push … --force` at line end) on the built-in destructive check.
 - Governed surface (`loop run --execute`) aligned with the same built-in denies.
@@ -330,6 +376,7 @@ The full 11-step lifecycle (audit→init→feature→plan→gate→session→ver
 - `audit` is strictly read-only: no `.amber/last-audit.json` stamp written to the target (#43).
 
 ### Fixed
+
 - `ledger verify-anchoring` surfaces its domain error instead of printing `undefined`.
 - `next` last-mile: guides session terminal steps (handoff → complete-check → complete); strict completion rejects init-scaffold handoff; audit-before-init for existing repos.
 - `buildContext` honors the strict flag instead of hardcoding strict evaluation.
@@ -339,9 +386,11 @@ The full 11-step lifecycle (audit→init→feature→plan→gate→session→ver
 - `verification_failed` events carry stderr.
 
 ### Deprecated
+
 - `profile`, `task`, `result`, `agent`, `team`, `adoption` commands now emit runtime deprecation warnings and are marked DEPRECATED in help and CLI reference (#26).
 
 ### Changed
+
 - timeline-event and session-manifest deepened into single modules; session write concern extracted from session-reader; resume-reject ACK envelope and ledger verify outcome single-sourced; web session control unified behind a shared `runControlledTransition` pipeline; orphan loop-contract schema validator dropped.
 
 Full suite 1134 passing (CLI) + web Vitest green; manifests/doctor/gen:agents green.
@@ -349,6 +398,7 @@ Full suite 1134 passing (CLI) + web Vitest green; manifests/doctor/gen:agents gr
 ## [1.3.1] - 2026-07-05
 
 ### Added — Artifact-first evidence layer, Phase 1
+
 Three boundary-safe, zero-new-dependency commands that make Amber's drift detection CI-deployable and its tamper-evident ledger SIEM-consumable and git-anchored. Design: `docs/superpowers/specs/2026-07-05-amber-artifact-first-evidence-layer-design.md`.
 
 - **`amber drift`** — CI-native drift gate aggregating the artifact / wiki / scaffold detectors into one exit code (`0` clean / `1` any actionable drift). Supports `--scope`, `--format gh-annotations` (GitHub Actions `::warning` lines), and `--no-fail` for informational CI steps. Read-only, Verification-layer (same shape as `doctor`).
@@ -362,23 +412,27 @@ Adds 17 tests (5 drift, 5 ledger-export, 4 ledger-seal, 2 git-exec, 1 parse-args
 ## [1.3.0] - 2026-07-04
 
 ### Changed — Direct core imports, facade removed (#4, PR2)
+
 - All facade consumers (`command-dispatcher`, 8 entry scripts, 12 tests) now import directly from `scripts/lib/core/*`; `grep` once again equals the dependency graph.
 - Removed `scripts/lib/amber-core.js` (322-line zero-logic re-export facade) and `scripts/lib/harness-core.js` (its alias).
 - New permanent guard `tests/unit/no-facade-reintroduction.test.js` prevents the facade/backdoor from returning (the old `lint` echo-shell enforced nothing).
 - `templates/feature_list.json` F001 verification now points to `node scripts/amber.js doctor`.
 
 ### Removed — Zombie execution platform & experimental scope (#4, PR1)
+
 - Five execution-platform peripheral modules (`scripts/lib/{daemon,notifier,health-checker,budget-tracker,error-recovery}.js`) and their unit tests — zero production references, kept alive only by self-tests.
 - `amber daemon <status|stop>` CLI command — hidden command with no help/docs/start path; removal is bug-equivalent (minor).
 - `src/experimental/execution/` and `tests/experimental/` — the cold-stored execution engine was unreachable, broken-chained (5+ dangling requires incl. `checkpoint-manager`), `test:experimental` failed 3/5, yet shipped to every installer via `files:["src/"]`. See ADR-0005.
 - `test:experimental` npm script.
 
 ### Fixed
+
 - `session start --mode autonomous` now refuses at the gate (exit 1, no manifest written), matching ADR-0002's stated intent. Previously it accepted the mode and only `session continue` refused — leaving an unreachable autonomous manifest behind.
 
 ## [1.2.0] - 2026-07-04
 
 ### Added — State-aware drift detection (`amber status` + `amber sync`)
+
 - **`amber status`** — a curated state front-door: repo? / initialised? / fresh?, plus three drift surfaces in one glance. Read-only; does not duplicate `doctor` (validity) or `maintenance inspect` (full dump).
 - **Scaffold-version drift (SP1)** — `.amber/provenance.json` (per-file sha256 + ownership tier; hash strips YAML `updated:`) and a four-class classifier (fresh / stale / customized / ambiguous / missing). `amber sync --execute` and `init --refresh-amber-owned` overwrite only `controlled + stale` files (after a `.bak` backup); `customized`/`ambiguous` controlled files are cached as proposals, never clobbered.
 - **Artifact-vs-reality drift (SP2)** — optional per-feature `paths` field (`feature add --paths`) and a git-anchored `detectArtifactDrift` with six classes (drifted / aligned + skipped: no-evidence / untracked / path-unknown / anchor-invalid). Comparison is timezone-homogeneous (`Date.parse` ms); an empty pathspec is surfaced as `path-unknown` rather than swallowed into `aligned`.
@@ -386,6 +440,7 @@ Adds 17 tests (5 drift, 5 ledger-export, 4 ledger-seal, 2 git-exec, 1 parse-args
 - **`amber sync`** — standalone scaffold-drift resolution (dry-run by default; `--execute` applies).
 
 ### Added — Evidence-grade sessions
+
 - **`session verify --execute`** runs the verification command in the working copy behind the policy gate and records its real exit code to the session hash-chain ledger (`verification_passed/failed/denied`).
 - **`session approve`** identity gate — records who approved (interactive TTY prompt or `--yes`); the agent must not self-approve.
 - **Honest `completion-check`** — `hasWorkEvidence` excludes `.amber/`/`.harness/` bookkeeping and compares the latest commit to `createdAt` at ms precision; `--strict` requires executed verification.
@@ -393,10 +448,12 @@ Adds 17 tests (5 drift, 5 ledger-export, 4 ledger-seal, 2 git-exec, 1 parse-args
 - Verification uses a dedicated `governance/verify-rules.json` allow-list (absent → built-in defaults; unparseable → stderr warn) — widening the global `rules.json` can no longer relax verification.
 
 ### Changed
+
 - `maintenance inspect` now includes artifact drift alongside scaffold drift.
 - `loadPolicyRules` now stderr-warns on an unparseable/shape-invalid `rules.json` instead of silently falling back (was a diagnostic trap).
 
 ### Fixed
+
 - GitHub Packages publish workflow is now idempotent — a re-pointed tag or a re-run skips an already-published version instead of failing with `E409 Cannot publish over existing version`.
 
 Baseline tests 1038 → 1136 (+98), zero regressions.
@@ -404,6 +461,7 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 ## [1.1.0] - 2026-06-30
 
 ### Added — Governed Loop Execution (GLX)
+
 - **Governed execution of loop contract commands** via `amber loop run --execute`. A command declared in a contract's `governed` block runs behind four gates: a declarative policy check (`.amber/governance/rules.json`, deny-wins / default-deny), an explicit `amber loop approve` (one approval authorises one run), an isolated git worktree, and a tamper-evident hash-chain ledger. Default `loop run` is still dry-run; `--execute` needs an approval. (#ADR-0003)
 - **Extracted reusable governed runner** (`runGovernedCommand` primitive) — the four gates are one call site, shared by loops AND route command-stages.
 - **Governed route-stage execution** via `amber route test <route> --execute --stage <name>`. A route `command`-type stage's `target` can be governed-executed with the same four gates, recorded in a route-scoped ledger. Non-`command` stages refuse `--execute`.
@@ -417,20 +475,24 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 - 27 new tests; baseline 978→1038, zero regressions.
 
 ### Changed
+
 - Refactored README.md and README.zh-CN.md for adopter-first clarity (388→134 lines, −65%)
 - Amended `README.md` / `SPEC.md` / `CLAUDE.md` non-goal sections: the blanket "no execution" is replaced by the precise ADR-0003 statement (governance-gated, human-triggered, loop/route command-stages only).
 - Added `docs/adr/0003-governance-gated-execution.md` (with Phase 3 addendum for route stages).
 - Approvals in hash-chain ledgers unified under the `approvalKey` / `consumedApprovalKey` field pair (was `approvalId`).
 
 ### Fixed
+
 - Corrected `docs/README.md` path reference: `guides/getting-started.md` → `user-guide/getting-started.md`
 
 ### Added
+
 - Banner regeneration prompt at `assets/readme/BANNER_PROMPT.md`
 
 ## [1.0.0] - 2026-06-22
 
 ### Added
+
 - Core Amber Protocol engine (init, audit, doctor, adoption)
 - Route definitions for feature/bugfix/refactor workflows
 - Session lifecycle management with checkpoints and timelines
@@ -439,16 +501,19 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 - CI/CD pipeline with quality gates (coverage, security, performance)
 
 ### Changed
+
 - Rebranded from Coding Harness to Amber Protocol
 - Reorganized documentation by functional topics (removed phase concept)
 
 ### Documentation
+
 - Getting started guide
 - Architecture documentation (route engine, session lifecycle, governance)
 - Adoption workflow for existing projects
 - API reference
 
 ### Security
+
 - Path traversal protection in session/gate readers
 - Secret redaction in client error reports
 - Upgraded Nodemailer to 9.0.1 to resolve GHSA-p6gq-j5cr-w38f
@@ -456,6 +521,7 @@ Baseline tests 1038 → 1136 (+98), zero regressions.
 ## [1.0.0-rc.1] - 2026-06-21
 
 ### Added
+
 - Release candidate for community testing
 - Release checklist documentation for quality assurance
 - Docker isolation testing for npm package

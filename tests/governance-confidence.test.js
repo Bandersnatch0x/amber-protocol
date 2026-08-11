@@ -11,9 +11,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-	computeConfidenceClasses,
-} = require("../scripts/lib/core/governance-readiness");
+const { computeConfidenceClasses } = require("../scripts/lib/core/governance-readiness");
 
 const {
 	evaluateCommandPolicy,
@@ -22,19 +20,11 @@ const {
 	DEFAULT_RULES,
 } = require("../scripts/lib/core/loop-policy");
 
-const {
-	dispatchAgentTask,
-} = require("../scripts/lib/core/agent-orchestration");
+const { dispatchAgentTask } = require("../scripts/lib/core/agent-orchestration");
 
-const {
-	mergeRules,
-	runGovernedCommand,
-} = require("../scripts/lib/core/governed-runner");
+const { mergeRules, runGovernedCommand } = require("../scripts/lib/core/governed-runner");
 
-const {
-	appendLedgerRecord,
-	readLedger,
-} = require("../scripts/lib/core/loop-ledger");
+const { appendLedgerRecord, readLedger } = require("../scripts/lib/core/loop-ledger");
 
 // ── computeConfidenceClasses: three confidence outputs ──
 
@@ -43,7 +33,13 @@ test("computeConfidenceClasses grades a deterministic action + mapsTo rule as hi
 		schemaVersion: 1,
 		defaultAction: "deny",
 		rules: [
-			{ id: "allow-amber-cli", action: "allow", match: "prefix", pattern: "node scripts/amber.js ", mapsTo: ["ASI04"] },
+			{
+				id: "allow-amber-cli",
+				action: "allow",
+				match: "prefix",
+				pattern: "node scripts/amber.js ",
+				mapsTo: ["ASI04"],
+			},
 		],
 	};
 	const classes = computeConfidenceClasses(rules);
@@ -57,9 +53,7 @@ test("computeConfidenceClasses grades an action-only rule (no mapsTo) as medium"
 	const rules = {
 		schemaVersion: 1,
 		defaultAction: "deny",
-		rules: [
-			{ id: "allow-node", action: "allow", match: "prefix", pattern: "node " },
-		],
+		rules: [{ id: "allow-node", action: "allow", match: "prefix", pattern: "node " }],
 	};
 	const [entry] = computeConfidenceClasses(rules);
 	assert.equal(entry.ruleId, "allow-node");
@@ -72,7 +66,13 @@ test("computeConfidenceClasses grades a fuzzy (regex) matcher as medium even wit
 		schemaVersion: 1,
 		defaultAction: "deny",
 		rules: [
-			{ id: "allow-npm-checks", action: "allow", match: "regex", pattern: "^npm test$", mapsTo: ["ASI04"] },
+			{
+				id: "allow-npm-checks",
+				action: "allow",
+				match: "regex",
+				pattern: "^npm test$",
+				mapsTo: ["ASI04"],
+			},
 		],
 	};
 	const [entry] = computeConfidenceClasses(rules);
@@ -104,7 +104,10 @@ test("computeConfidenceClasses grades rules missing an action or pattern as low"
 test("computeConfidenceClasses handles missing or empty rule lists", () => {
 	assert.deepEqual(computeConfidenceClasses(null), []);
 	assert.deepEqual(computeConfidenceClasses({}), []);
-	assert.deepEqual(computeConfidenceClasses({ schemaVersion: 1, defaultAction: "deny", rules: [] }), []);
+	assert.deepEqual(
+		computeConfidenceClasses({ schemaVersion: 1, defaultAction: "deny", rules: [] }),
+		[],
+	);
 });
 
 test("computeConfidenceClasses grades the built-in DEFAULT_RULES without throwing", () => {
@@ -128,7 +131,13 @@ const GATED_RULES = {
 	},
 	rules: [
 		{ id: "deny-destructive", action: "deny", match: "regex", pattern: "rm\\s+-rf" },
-		{ id: "allow-amber", action: "allow", match: "prefix", pattern: "node scripts/amber.js ", mapsTo: ["ASI04"] },
+		{
+			id: "allow-amber",
+			action: "allow",
+			match: "prefix",
+			pattern: "node scripts/amber.js ",
+			mapsTo: ["ASI04"],
+		},
 	],
 };
 
@@ -137,11 +146,10 @@ test("governed rule composition preserves confidence gating", () => {
 		{ id: "context-deny", action: "deny", match: "exact", pattern: "node unsafe.js" },
 	]);
 	assert.deepEqual(merged.confidence_gating, GATED_RULES.confidence_gating);
-	assert.deepEqual(merged.rules.map((rule) => rule.id), [
-		"deny-destructive",
-		"allow-amber",
-		"context-deny",
-	]);
+	assert.deepEqual(
+		merged.rules.map((rule) => rule.id),
+		["deny-destructive", "allow-amber", "context-deny"],
+	);
 });
 
 function governedTarget(confidence) {
@@ -149,18 +157,27 @@ function governedTarget(confidence) {
 	const governanceDir = path.join(root, ".amber", "governance");
 	const ledgerPath = path.join(root, ".amber", "loops", "confidence", "ledger.jsonl");
 	fs.mkdirSync(governanceDir, { recursive: true });
-	fs.writeFileSync(path.join(governanceDir, "rules.json"), JSON.stringify({
-		schemaVersion: 1,
-		defaultAction: "deny",
-		confidence_gating: {
-			enabled: true,
-			byRule: { "allow-node-version": confidence },
-			defaultConfidence: "low",
-		},
-		rules: [
-			{ id: "allow-node-version", action: "allow", match: "exact", pattern: "node --version", mapsTo: ["ASI04"] },
-		],
-	}));
+	fs.writeFileSync(
+		path.join(governanceDir, "rules.json"),
+		JSON.stringify({
+			schemaVersion: 1,
+			defaultAction: "deny",
+			confidence_gating: {
+				enabled: true,
+				byRule: { "allow-node-version": confidence },
+				defaultConfidence: "low",
+			},
+			rules: [
+				{
+					id: "allow-node-version",
+					action: "allow",
+					match: "exact",
+					pattern: "node --version",
+					mapsTo: ["ASI04"],
+				},
+			],
+		}),
+	);
 	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "confidence:test" });
 	return { root, ledgerPath };
 }
@@ -208,13 +225,16 @@ test("governed execution refuses an allow rule without confidence gating", () =>
 	const governanceDir = path.join(root, ".amber", "governance");
 	const ledgerPath = path.join(root, ".amber", "loops", "missing-confidence", "ledger.jsonl");
 	fs.mkdirSync(governanceDir, { recursive: true });
-	fs.writeFileSync(path.join(governanceDir, "rules.json"), JSON.stringify({
-		schemaVersion: 1,
-		defaultAction: "deny",
-		rules: [
-			{ id: "allow-node-version", action: "allow", match: "exact", pattern: "node --version" },
-		],
-	}));
+	fs.writeFileSync(
+		path.join(governanceDir, "rules.json"),
+		JSON.stringify({
+			schemaVersion: 1,
+			defaultAction: "deny",
+			rules: [
+				{ id: "allow-node-version", action: "allow", match: "exact", pattern: "node --version" },
+			],
+		}),
+	);
 	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "missing-confidence:test" });
 
 	const result = runGovernedCommand({
@@ -280,7 +300,11 @@ test("confidence_gating absent → policy output has no confidence field (backwa
 	const plain = { ...GATED_RULES, confidence_gating: undefined };
 	const r = evaluateCommandPolicy("node scripts/amber.js doctor", plain);
 	assert.equal(r.allowed, true);
-	assert.equal("confidence" in r, false, "no confidence_gating block must not add a confidence key");
+	assert.equal(
+		"confidence" in r,
+		false,
+		"no confidence_gating block must not add a confidence key",
+	);
 	const d = evaluateCommandPolicy("git status", plain);
 	assert.equal(d.allowed, false);
 	assert.equal("confidence" in d, false);
@@ -343,7 +367,11 @@ test("confidence_gating enabled → built-in un-removable denies are graded high
 test("confidence_gating enabled with invalid byRule pin falls back to derived/default", () => {
 	const bogusPin = {
 		...GATED_RULES,
-		confidence_gating: { enabled: true, byRule: { "allow-amber": "ultra" }, defaultConfidence: "medium" },
+		confidence_gating: {
+			enabled: true,
+			byRule: { "allow-amber": "ultra" },
+			defaultConfidence: "medium",
+		},
 	};
 	// "ultra" is not a valid grade → falls through to structural derivation.
 	const r = evaluateCommandPolicy("node scripts/amber.js doctor", bogusPin);
@@ -405,10 +433,7 @@ test("dispatchAgentTask marks multi-worker dispatches as requiring approval", ()
 test("dispatchAgentTask degrades a low-confidence swarm to one worker", () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
-	const result = dispatchAgentTask(
-		root,
-		validDispatch({ concurrency: "3", confidence: "low" }),
-	);
+	const result = dispatchAgentTask(root, validDispatch({ concurrency: "3", confidence: "low" }));
 	assert.deepEqual(result.errors, [], JSON.stringify(result.errors));
 	assert.equal(result.dispatch.concurrencyLimit, 1);
 	assert.equal(result.dispatch.requiresApproval, true);

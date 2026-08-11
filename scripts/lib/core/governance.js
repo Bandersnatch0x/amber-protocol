@@ -1,39 +1,41 @@
-const path = require('path');
-const fs = require('fs');
-const { readSessionEvents } = require('../session-timeline');
-const { loadPolicy } = require('../autonomous-policy');
-const { readJsonSafe } = require('./fs-utils');
-const { resolveStateDirForRead, resolveStateDirForCreate } = require('../state-dir-resolver');
+const path = require("path");
+const fs = require("fs");
+const { readSessionEvents } = require("../session-timeline");
+const { loadPolicy } = require("../autonomous-policy");
+const { readJsonSafe } = require("./fs-utils");
+const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-dir-resolver");
 
 function getDefaultPolicy() {
-  return {
-    gates: {
-      auto: "approve",
-      "user-approval": "block",
-      "step-confirm": "block",
-    },
-    retry: {
-      maxAttempts: 3,
-      backoffMs: [1000, 5000, 15000],
-      retryableStages: ["implement", "verify"],
-    },
-    budget: { onExceed: "pause" },
-    notifications: { email: { enabled: false }, slack: { enabled: false } },
-  };
+	return {
+		gates: {
+			auto: "approve",
+			"user-approval": "block",
+			"step-confirm": "block",
+		},
+		retry: {
+			maxAttempts: 3,
+			backoffMs: [1000, 5000, 15000],
+			retryableStages: ["implement", "verify"],
+		},
+		budget: { onExceed: "pause" },
+		notifications: { email: { enabled: false }, slack: { enabled: false } },
+	};
 }
 
 function governanceDocs(targetRoot, _options = {}) {
-  const target = path.resolve(targetRoot);
-  // Governance docs are NEW entities -> always under the canonical .amber state dir
-  // (resolveStateDirForCreate), never the legacy .harness fallback. The read surfaces
-  // (audit / evidence-export below) use resolveStateDirForRead so legacy .harness state
-  // is visible; the write surface must not scatter new docs into a legacy dir.
-  const govDir = path.join(resolveStateDirForCreate(target), 'governance');
+	const target = path.resolve(targetRoot);
+	// Governance docs are NEW entities -> always under the canonical .amber state dir
+	// (resolveStateDirForCreate), never the legacy .harness fallback. The read surfaces
+	// (audit / evidence-export below) use resolveStateDirForRead so legacy .harness state
+	// is visible; the write surface must not scatter new docs into a legacy dir.
+	const govDir = path.join(resolveStateDirForCreate(target), "governance");
 
-  fs.mkdirSync(govDir, { recursive: true });
+	fs.mkdirSync(govDir, { recursive: true });
 
-  const templates = [
-    { name: 'POLICY.md', content: `# Agent Policy
+	const templates = [
+		{
+			name: "POLICY.md",
+			content: `# Agent Policy
 
 > Boundary (ADR-0001 / ADR-0005): Amber does **not** run autonomous sessions.
 > \`session start/continue --mode autonomous\` is refused. This document records
@@ -67,8 +69,11 @@ Cron, daemon scheduling, and auto-approval remain disallowed.
 - Autonomous session mode
 - Auto-approve of user-approval gates
 - Unattended cron / scheduled loop execution
-` },
-    { name: 'BOUNDARIES.md', content: `# Execution Boundaries
+`,
+		},
+		{
+			name: "BOUNDARIES.md",
+			content: `# Execution Boundaries
 
 ## Non-Goals
 
@@ -92,8 +97,11 @@ Cron, daemon scheduling, and auto-approval remain disallowed.
 
 - Allow: public registries (npm, PyPI)
 - Block: unknown APIs without integration contract
-` },
-    { name: 'AUDIT_LOG.md', content: `# Audit Log Guide
+`,
+		},
+		{
+			name: "AUDIT_LOG.md",
+			content: `# Audit Log Guide
 
 ## Timeline Inspection
 
@@ -111,23 +119,24 @@ Execution evidence: \`.amber/executions/*/evidence.json\`
 - Sessions: 90 days
 - Executions: 180 days
 - Audit reports: 1 year
-` }
-  ];
+`,
+		},
+	];
 
-  const created = [];
-  const skipped = [];
+	const created = [];
+	const skipped = [];
 
-  for (const tmpl of templates) {
-    const dest = path.join(govDir, tmpl.name);
-    if (fs.existsSync(dest)) {
-      skipped.push(dest);
-    } else {
-      fs.writeFileSync(dest, tmpl.content);
-      created.push(dest);
-    }
-  }
+	for (const tmpl of templates) {
+		const dest = path.join(govDir, tmpl.name);
+		if (fs.existsSync(dest)) {
+			skipped.push(dest);
+		} else {
+			fs.writeFileSync(dest, tmpl.content);
+			created.push(dest);
+		}
+	}
 
-  return { created, skipped };
+	return { created, skipped };
 }
 
 /**
@@ -139,345 +148,359 @@ Execution evidence: \`.amber/executions/*/evidence.json\`
  * recognized so historical exports do not go blank.
  */
 function isCommandLikeEvent(event) {
-  if (!event || typeof event !== 'object') return false;
-  if (event.type === 'command_executed' || event.type === 'tool_call') return true;
-  if (event.type === 'stage_completed' || event.type === 'verification_failed') {
-    return Boolean(event.data && event.data.command);
-  }
-  return false;
+	if (!event || typeof event !== "object") return false;
+	if (event.type === "command_executed" || event.type === "tool_call") return true;
+	if (event.type === "stage_completed" || event.type === "verification_failed") {
+		return Boolean(event.data && event.data.command);
+	}
+	return false;
 }
 
 function commandLabelFromEvent(event) {
-  if (!event || !event.data) return 'N/A';
-  if (event.type === 'tool_call') return event.data.tool || event.data.command || 'N/A';
-  return event.data.command || 'N/A';
+	if (!event || !event.data) return "N/A";
+	if (event.type === "tool_call") return event.data.tool || event.data.command || "N/A";
+	return event.data.command || "N/A";
 }
 
 function exportSessionEvidence(sessionId, targetRoot, outputPath) {
-  const target = path.resolve(targetRoot);
-  const sessionDir = path.join(resolveStateDirForRead(target), 'sessions', sessionId);
+	const target = path.resolve(targetRoot);
+	const sessionDir = path.join(resolveStateDirForRead(target), "sessions", sessionId);
 
-  const events = readSessionEvents(sessionDir);
-  const output = path.resolve(outputPath);
+	const events = readSessionEvents(sessionDir);
+	const output = path.resolve(outputPath);
 
-  const lines = ['# Session Evidence', '', `**Session ID:** ${sessionId}`, ''];
+	const lines = ["# Session Evidence", "", `**Session ID:** ${sessionId}`, ""];
 
-  const sessionCreated = events.find(e => e.type === 'session_created');
-  if (sessionCreated) {
-    lines.push(`**Goal:** ${sessionCreated.data.goal || 'N/A'}`);
-    lines.push(`**Started:** ${sessionCreated.timestamp}`, '');
-  }
+	const sessionCreated = events.find((e) => e.type === "session_created");
+	if (sessionCreated) {
+		lines.push(`**Goal:** ${sessionCreated.data.goal || "N/A"}`);
+		lines.push(`**Started:** ${sessionCreated.timestamp}`, "");
+	}
 
-  const sessionEnd = events.find(e =>
-    e.type === 'session_completed' || e.type === 'session_aborted' || e.type === 'session_failed'
-  );
-  if (sessionEnd) {
-    lines.push(`**Ended:** ${sessionEnd.timestamp}`, `**Status:** ${sessionEnd.type}`, '');
-  }
+	const sessionEnd = events.find(
+		(e) =>
+			e.type === "session_completed" || e.type === "session_aborted" || e.type === "session_failed",
+	);
+	if (sessionEnd) {
+		lines.push(`**Ended:** ${sessionEnd.timestamp}`, `**Status:** ${sessionEnd.type}`, "");
+	}
 
-  const commands = events.filter(isCommandLikeEvent);
-  if (commands.length) {
-    lines.push('## Commands / Verification', '');
-    commands.forEach(e => {
-      const cmd = commandLabelFromEvent(e);
-      const executed =
-        e.type === 'verification_failed'
-          ? 'failed'
-          : e.data && e.data.executed === false
-            ? 'claim'
-            : e.data && e.data.executed === true
-              ? 'executed'
-              : e.type;
-      const exit =
-        e.data && e.data.exitCode !== undefined && e.data.exitCode !== null
-          ? `, exit ${e.data.exitCode}`
-          : '';
-      lines.push(`- \`${cmd}\` (${executed}${exit}) (${e.timestamp})`);
-    });
-    lines.push('');
-  }
+	const commands = events.filter(isCommandLikeEvent);
+	if (commands.length) {
+		lines.push("## Commands / Verification", "");
+		commands.forEach((e) => {
+			const cmd = commandLabelFromEvent(e);
+			const executed =
+				e.type === "verification_failed"
+					? "failed"
+					: e.data && e.data.executed === false
+						? "claim"
+						: e.data && e.data.executed === true
+							? "executed"
+							: e.type;
+			const exit =
+				e.data && e.data.exitCode !== undefined && e.data.exitCode !== null
+					? `, exit ${e.data.exitCode}`
+					: "";
+			lines.push(`- \`${cmd}\` (${executed}${exit}) (${e.timestamp})`);
+		});
+		lines.push("");
+	}
 
-  const gates = events.filter(e => ['gate_triggered', 'gate_passed', 'gate_failed'].includes(e.type));
-  if (gates.length) {
-    lines.push('## Approval Gates', '');
-    gates.forEach(e => lines.push(`- ${e.type}: ${e.data?.gate || e.data?.gateId || 'N/A'} (${e.timestamp})`));
-    lines.push('');
-  }
+	const gates = events.filter((e) =>
+		["gate_triggered", "gate_passed", "gate_failed"].includes(e.type),
+	);
+	if (gates.length) {
+		lines.push("## Approval Gates", "");
+		gates.forEach((e) =>
+			lines.push(`- ${e.type}: ${e.data?.gate || e.data?.gateId || "N/A"} (${e.timestamp})`),
+		);
+		lines.push("");
+	}
 
-  const errors = events.filter(e =>
-    e.type === 'error' || e.type === 'stage_failed' || e.type === 'verification_failed'
-  );
-  if (errors.length) {
-    lines.push('## Errors', '');
-    errors.forEach(e => {
-      const msg =
-        e.data?.message ||
-        e.data?.error ||
-        (e.type === 'verification_failed'
-          ? `verification failed: ${e.data?.command || 'unknown command'} (exit ${e.data?.exitCode ?? '?'})`
-          : 'Unknown error');
-      lines.push(`- ${msg} (${e.timestamp})`);
-    });
-    lines.push('');
-  }
+	const errors = events.filter(
+		(e) => e.type === "error" || e.type === "stage_failed" || e.type === "verification_failed",
+	);
+	if (errors.length) {
+		lines.push("## Errors", "");
+		errors.forEach((e) => {
+			const msg =
+				e.data?.message ||
+				e.data?.error ||
+				(e.type === "verification_failed"
+					? `verification failed: ${e.data?.command || "unknown command"} (exit ${e.data?.exitCode ?? "?"})`
+					: "Unknown error");
+			lines.push(`- ${msg} (${e.timestamp})`);
+		});
+		lines.push("");
+	}
 
-  const budget = events.filter(e => ['budget_warning', 'budget_exceeded'].includes(e.type));
-  if (budget.length) {
-    lines.push('## Budget', '');
-    budget.forEach(e => lines.push(`- ${e.type}: ${e.data?.message || 'N/A'} (${e.timestamp})`));
-    lines.push('');
-  }
+	const budget = events.filter((e) => ["budget_warning", "budget_exceeded"].includes(e.type));
+	if (budget.length) {
+		lines.push("## Budget", "");
+		budget.forEach((e) => lines.push(`- ${e.type}: ${e.data?.message || "N/A"} (${e.timestamp})`));
+		lines.push("");
+	}
 
-  fs.mkdirSync(path.dirname(output), { recursive: true });
-  fs.writeFileSync(output, lines.join('\n'));
+	fs.mkdirSync(path.dirname(output), { recursive: true });
+	fs.writeFileSync(output, lines.join("\n"));
 
-  return { exported: true, events: events.length, outputPath: output };
+	return { exported: true, events: events.length, outputPath: output };
 }
 
 function exportExecutionEvidence(taskId, targetRoot, outputPath) {
-  const target = path.resolve(targetRoot);
-  const execDir = path.join(resolveStateDirForRead(target), 'executions', taskId);
+	const target = path.resolve(targetRoot);
+	const execDir = path.join(resolveStateDirForRead(target), "executions", taskId);
 
-  const ledgerRead = readJsonSafe(path.join(execDir, 'ledger.json'));
-  const evidenceRead = readJsonSafe(path.join(execDir, 'evidence.json'));
-  const ledger = ledgerRead.value;
-  const evidence = evidenceRead.value;
+	const ledgerRead = readJsonSafe(path.join(execDir, "ledger.json"));
+	const evidenceRead = readJsonSafe(path.join(execDir, "evidence.json"));
+	const ledger = ledgerRead.value;
+	const evidence = evidenceRead.value;
 
-  const output = path.resolve(outputPath);
-  const lines = ['# Execution Evidence', '', `**Task ID:** ${taskId}`, ''];
+	const output = path.resolve(outputPath);
+	const lines = ["# Execution Evidence", "", `**Task ID:** ${taskId}`, ""];
 
-  // Record any unparseable state file in the artifact rather than discarding
-  // the whole export when one file is corrupt.
-  if (ledgerRead.error) {
-    lines.push(`> WARNING: ledger.json could not be parsed: ${ledgerRead.error}`, '');
-  }
-  if (evidenceRead.error) {
-    lines.push(`> WARNING: evidence.json could not be parsed: ${evidenceRead.error}`, '');
-  }
+	// Record any unparseable state file in the artifact rather than discarding
+	// the whole export when one file is corrupt.
+	if (ledgerRead.error) {
+		lines.push(`> WARNING: ledger.json could not be parsed: ${ledgerRead.error}`, "");
+	}
+	if (evidenceRead.error) {
+		lines.push(`> WARNING: evidence.json could not be parsed: ${evidenceRead.error}`, "");
+	}
 
-  if (ledger) {
-    if (ledger.plan) lines.push(`**Plan:** ${ledger.plan}`, '');
-    if (ledger.status) lines.push(`**Status:** ${ledger.status}`, '');
-    if (ledger.worktree) lines.push(`**Worktree:** ${ledger.worktree}`, '');
-  }
+	if (ledger) {
+		if (ledger.plan) lines.push(`**Plan:** ${ledger.plan}`, "");
+		if (ledger.status) lines.push(`**Status:** ${ledger.status}`, "");
+		if (ledger.worktree) lines.push(`**Worktree:** ${ledger.worktree}`, "");
+	}
 
-  if (evidence?.commands?.length) {
-    lines.push('## Commands', '');
-    evidence.commands.forEach(cmd => lines.push(`- \`${cmd}\``));
-    lines.push('');
-  }
+	if (evidence?.commands?.length) {
+		lines.push("## Commands", "");
+		evidence.commands.forEach((cmd) => lines.push(`- \`${cmd}\``));
+		lines.push("");
+	}
 
-  fs.mkdirSync(path.dirname(output), { recursive: true });
-  fs.writeFileSync(output, lines.join('\n'));
+	fs.mkdirSync(path.dirname(output), { recursive: true });
+	fs.writeFileSync(output, lines.join("\n"));
 
-  return { exported: true, outputPath: output };
+	return { exported: true, outputPath: output };
 }
 
 function inspectPolicy(targetRoot) {
-  const policy = loadPolicy(targetRoot);
-  const defaults = getDefaultPolicy();
-  const overrides = [];
-  const errors = [];
-  const warnings = [];
+	const policy = loadPolicy(targetRoot);
+	const defaults = getDefaultPolicy();
+	const overrides = [];
+	const errors = [];
+	const warnings = [];
 
-  if (Object.prototype.hasOwnProperty.call(policy, 'auto-approve-all')) {
-    errors.push("auto-approve-all is a CLI flag, not a policy setting");
-  }
+	if (Object.prototype.hasOwnProperty.call(policy, "auto-approve-all")) {
+		errors.push("auto-approve-all is a CLI flag, not a policy setting");
+	}
 
-  if (policy.gates) {
-    for (const [gate, action] of Object.entries(policy.gates)) {
-      if (defaults.gates[gate] && defaults.gates[gate] !== action) {
-        overrides.push({ type: 'gate', gate, default: defaults.gates[gate], override: action });
-      }
-      if (gate === "user-approval" && action === "approve") {
-        warnings.push("Unsafe: gates['user-approval'] === 'approve' bypasses human approval");
-      }
-    }
-  }
+	if (policy.gates) {
+		for (const [gate, action] of Object.entries(policy.gates)) {
+			if (defaults.gates[gate] && defaults.gates[gate] !== action) {
+				overrides.push({ type: "gate", gate, default: defaults.gates[gate], override: action });
+			}
+			if (gate === "user-approval" && action === "approve") {
+				warnings.push("Unsafe: gates['user-approval'] === 'approve' bypasses human approval");
+			}
+		}
+	}
 
-  if (policy.retry && JSON.stringify(policy.retry) !== JSON.stringify(defaults.retry)) {
-    overrides.push({ type: 'retry', default: defaults.retry, override: policy.retry });
-  }
+	if (policy.retry && JSON.stringify(policy.retry) !== JSON.stringify(defaults.retry)) {
+		overrides.push({ type: "retry", default: defaults.retry, override: policy.retry });
+	}
 
-  if (policy.budget && JSON.stringify(policy.budget) !== JSON.stringify(defaults.budget)) {
-    overrides.push({ type: 'budget', default: defaults.budget, override: policy.budget });
-  }
+	if (policy.budget && JSON.stringify(policy.budget) !== JSON.stringify(defaults.budget)) {
+		overrides.push({ type: "budget", default: defaults.budget, override: policy.budget });
+	}
 
-  return { policy, defaults, overrides, errors, warnings };
+	return { policy, defaults, overrides, errors, warnings };
 }
 
 // Gather one summary row per session under sessionsDir by parsing each
 // timeline.jsonl. Extracted from generateAuditReport so the state-reading is
 // testable on its own, not only through the rendered audit markdown.
 function summarizeSessions(sessionsDir, options = {}) {
-  const sessions = [];
-  if (!fs.existsSync(sessionsDir)) return sessions;
+	const sessions = [];
+	if (!fs.existsSync(sessionsDir)) return sessions;
 
-  const sessionIds = fs.readdirSync(sessionsDir).filter(f => fs.statSync(path.join(sessionsDir, f)).isDirectory());
-  for (const id of sessionIds) {
-    const sessionDir = path.join(sessionsDir, id);
-    if (!fs.existsSync(path.join(sessionDir, 'timeline.jsonl'))) continue;
+	const sessionIds = fs
+		.readdirSync(sessionsDir)
+		.filter((f) => fs.statSync(path.join(sessionsDir, f)).isDirectory());
+	for (const id of sessionIds) {
+		const sessionDir = path.join(sessionsDir, id);
+		if (!fs.existsSync(path.join(sessionDir, "timeline.jsonl"))) continue;
 
-    const events = readSessionEvents(sessionDir);
-    const created = events.find(e => e.type === 'session_created');
-    const end = events.find(e =>
-      e.type === 'session_completed' || e.type === 'session_aborted' || e.type === 'session_failed'
-    );
-    // Live verify writes stage_completed/verification_failed with data.command;
-    // keep counting legacy command_executed so old fixtures still score.
-    const commands = events.filter(isCommandLikeEvent).length;
-    const approvals = events.filter(e =>
-      e.type === 'gate_triggered' || e.type === 'gate_passed' || e.type === 'gate_failed'
-    ).length;
+		const events = readSessionEvents(sessionDir);
+		const created = events.find((e) => e.type === "session_created");
+		const end = events.find(
+			(e) =>
+				e.type === "session_completed" ||
+				e.type === "session_aborted" ||
+				e.type === "session_failed",
+		);
+		// Live verify writes stage_completed/verification_failed with data.command;
+		// keep counting legacy command_executed so old fixtures still score.
+		const commands = events.filter(isCommandLikeEvent).length;
+		const approvals = events.filter(
+			(e) => e.type === "gate_triggered" || e.type === "gate_passed" || e.type === "gate_failed",
+		).length;
 
-    if (options.since && created?.timestamp) {
-      if (new Date(created.timestamp) < new Date(options.since)) continue;
-    }
+		if (options.since && created?.timestamp) {
+			if (new Date(created.timestamp) < new Date(options.since)) continue;
+		}
 
-    sessions.push({
-      id,
-      goal: created?.data?.goal || 'N/A',
-      start: created?.timestamp || 'N/A',
-      end: end?.timestamp || 'N/A',
-      commands,
-      approvals,
-      status: end ? end.type.replace('session_', '') : 'running'
-    });
-  }
+		sessions.push({
+			id,
+			goal: created?.data?.goal || "N/A",
+			start: created?.timestamp || "N/A",
+			end: end?.timestamp || "N/A",
+			commands,
+			approvals,
+			status: end ? end.type.replace("session_", "") : "running",
+		});
+	}
 
-  return sessions;
+	return sessions;
 }
 
 // Gather one summary row per execution under executionsDir from its ledger and
 // evidence files. Extracted alongside summarizeSessions for the same reason.
 function summarizeExecutions(executionsDir) {
-  const executions = [];
-  if (!fs.existsSync(executionsDir)) return executions;
+	const executions = [];
+	if (!fs.existsSync(executionsDir)) return executions;
 
-  const taskIds = fs.readdirSync(executionsDir).filter(f => fs.statSync(path.join(executionsDir, f)).isDirectory());
-  for (const id of taskIds) {
-    const ledgerPath = path.join(executionsDir, id, 'ledger.json');
-    const evidencePath = path.join(executionsDir, id, 'evidence.json');
+	const taskIds = fs
+		.readdirSync(executionsDir)
+		.filter((f) => fs.statSync(path.join(executionsDir, f)).isDirectory());
+	for (const id of taskIds) {
+		const ledgerPath = path.join(executionsDir, id, "ledger.json");
+		const evidencePath = path.join(executionsDir, id, "evidence.json");
 
-    if (!fs.existsSync(ledgerPath)) continue;
+		if (!fs.existsSync(ledgerPath)) continue;
 
-    const { value: ledger, error: ledgerError } = readJsonSafe(ledgerPath);
-    if (ledgerError || !ledger || typeof ledger !== 'object' || Array.isArray(ledger)) {
-      // A corrupt OR non-object ledger (e.g. a literal `null` body, which parses
-      // without error) is itself an audit signal — surface the task as corrupt
-      // rather than letting one bad file throw away the whole report.
-      executions.push({ id, plan: 'N/A', status: 'corrupt', commands: 0 });
-      continue;
-    }
+		const { value: ledger, error: ledgerError } = readJsonSafe(ledgerPath);
+		if (ledgerError || !ledger || typeof ledger !== "object" || Array.isArray(ledger)) {
+			// A corrupt OR non-object ledger (e.g. a literal `null` body, which parses
+			// without error) is itself an audit signal — surface the task as corrupt
+			// rather than letting one bad file throw away the whole report.
+			executions.push({ id, plan: "N/A", status: "corrupt", commands: 0 });
+			continue;
+		}
 
-    const evidence = readJsonSafe(evidencePath).value;
-    const commands = evidence?.commands?.length || 0;
+		const evidence = readJsonSafe(evidencePath).value;
+		const commands = evidence?.commands?.length || 0;
 
-    executions.push({
-      id,
-      plan: ledger.plan || 'N/A',
-      status: ledger.status || 'N/A',
-      commands
-    });
-  }
+		executions.push({
+			id,
+			plan: ledger.plan || "N/A",
+			status: ledger.status || "N/A",
+			commands,
+		});
+	}
 
-  return executions;
+	return executions;
 }
 
 function generateAuditReport(targetRoot, outputPath, options = {}) {
-  const target = path.resolve(targetRoot);
-  const stateDir = resolveStateDirForRead(target);
-  const sessionsDir = path.join(stateDir, 'sessions');
-  const executionsDir = path.join(stateDir, 'executions');
-  const output = path.resolve(outputPath);
+	const target = path.resolve(targetRoot);
+	const stateDir = resolveStateDirForRead(target);
+	const sessionsDir = path.join(stateDir, "sessions");
+	const executionsDir = path.join(stateDir, "executions");
+	const output = path.resolve(outputPath);
 
-  const lines = ['# Audit Report', '', `**Generated:** ${new Date().toISOString()}`, ''];
+	const lines = ["# Audit Report", "", `**Generated:** ${new Date().toISOString()}`, ""];
 
-  // Section 1: Policy snapshot
-  lines.push('## 1. Policy Snapshot', '');
-  const { policy, overrides, errors, warnings } = inspectPolicy(targetRoot);
-  lines.push('```json', JSON.stringify(policy, null, 2), '```', '');
-  if (overrides.length) {
-    lines.push('**Overrides:**', '');
-    overrides.forEach(o => lines.push(`- ${o.type}: ${JSON.stringify(o.override)}`));
-    lines.push('');
-  }
-  if (errors.length) {
-    lines.push('**Errors:**', '');
-    errors.forEach(e => lines.push(`- ${e}`));
-    lines.push('');
-  }
-  if (warnings.length) {
-    lines.push('**Warnings:**', '');
-    warnings.forEach(w => lines.push(`- ${w}`));
-    lines.push('');
-  }
+	// Section 1: Policy snapshot
+	lines.push("## 1. Policy Snapshot", "");
+	const { policy, overrides, errors, warnings } = inspectPolicy(targetRoot);
+	lines.push("```json", JSON.stringify(policy, null, 2), "```", "");
+	if (overrides.length) {
+		lines.push("**Overrides:**", "");
+		overrides.forEach((o) => lines.push(`- ${o.type}: ${JSON.stringify(o.override)}`));
+		lines.push("");
+	}
+	if (errors.length) {
+		lines.push("**Errors:**", "");
+		errors.forEach((e) => lines.push(`- ${e}`));
+		lines.push("");
+	}
+	if (warnings.length) {
+		lines.push("**Warnings:**", "");
+		warnings.forEach((w) => lines.push(`- ${w}`));
+		lines.push("");
+	}
 
-  // Section 2: Session summary
-  lines.push('## 2. Session Summary', '');
-  const sessions = summarizeSessions(sessionsDir, options);
+	// Section 2: Session summary
+	lines.push("## 2. Session Summary", "");
+	const sessions = summarizeSessions(sessionsDir, options);
 
-  lines.push('| ID | Goal | Start | End | Commands | Approvals | Status |');
-  lines.push('|----|------|-------|-----|----------|-----------|--------|');
-  sessions.forEach(s => {
-    const shortId = s.id.slice(0, 8);
-    const shortGoal = s.goal.length > 30 ? s.goal.slice(0, 27) + '...' : s.goal;
-    lines.push(`| ${shortId} | ${shortGoal} | ${s.start} | ${s.end} | ${s.commands} | ${s.approvals} | ${s.status} |`);
-  });
-  lines.push('');
+	lines.push("| ID | Goal | Start | End | Commands | Approvals | Status |");
+	lines.push("|----|------|-------|-----|----------|-----------|--------|");
+	sessions.forEach((s) => {
+		const shortId = s.id.slice(0, 8);
+		const shortGoal = s.goal.length > 30 ? s.goal.slice(0, 27) + "..." : s.goal;
+		lines.push(
+			`| ${shortId} | ${shortGoal} | ${s.start} | ${s.end} | ${s.commands} | ${s.approvals} | ${s.status} |`,
+		);
+	});
+	lines.push("");
 
-  // Section 3: Execution summary
-  lines.push('## 3. Execution Summary', '');
-  const executions = summarizeExecutions(executionsDir);
+	// Section 3: Execution summary
+	lines.push("## 3. Execution Summary", "");
+	const executions = summarizeExecutions(executionsDir);
 
-  lines.push('| Task ID | Plan | Status | Commands |');
-  lines.push('|---------|------|--------|----------|');
-  executions.forEach(e => {
-    const shortId = e.id.slice(0, 8);
-    const shortPlan = e.plan.length > 40 ? e.plan.slice(0, 37) + '...' : e.plan;
-    lines.push(`| ${shortId} | ${shortPlan} | ${e.status} | ${e.commands} |`);
-  });
-  lines.push('');
+	lines.push("| Task ID | Plan | Status | Commands |");
+	lines.push("|---------|------|--------|----------|");
+	executions.forEach((e) => {
+		const shortId = e.id.slice(0, 8);
+		const shortPlan = e.plan.length > 40 ? e.plan.slice(0, 37) + "..." : e.plan;
+		lines.push(`| ${shortId} | ${shortPlan} | ${e.status} | ${e.commands} |`);
+	});
+	lines.push("");
 
-  // Section 4: Retention compliance
-  lines.push('## 4. Retention Compliance', '');
-  const retentionDays = policy.retention?.sessionDays;
-  if (retentionDays) {
-    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-    const oldSessions = sessions.filter(s => s.start !== 'N/A' && new Date(s.start) < cutoff);
-    const oldExecutions = executions.filter(e => {
-      const ledgerPath = path.join(executionsDir, e.id, 'ledger.json');
-      const stat = fs.statSync(ledgerPath);
-      return stat.mtime < cutoff;
-    });
+	// Section 4: Retention compliance
+	lines.push("## 4. Retention Compliance", "");
+	const retentionDays = policy.retention?.sessionDays;
+	if (retentionDays) {
+		const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+		const oldSessions = sessions.filter((s) => s.start !== "N/A" && new Date(s.start) < cutoff);
+		const oldExecutions = executions.filter((e) => {
+			const ledgerPath = path.join(executionsDir, e.id, "ledger.json");
+			const stat = fs.statSync(ledgerPath);
+			return stat.mtime < cutoff;
+		});
 
-    lines.push(`**Retention policy:** ${retentionDays} days`, '');
-    lines.push(`- Sessions older than cutoff: ${oldSessions.length}`);
-    lines.push(`- Executions older than cutoff: ${oldExecutions.length}`);
-  } else {
-    lines.push('**No retention policy set.**');
-  }
-  lines.push('');
+		lines.push(`**Retention policy:** ${retentionDays} days`, "");
+		lines.push(`- Sessions older than cutoff: ${oldSessions.length}`);
+		lines.push(`- Executions older than cutoff: ${oldExecutions.length}`);
+	} else {
+		lines.push("**No retention policy set.**");
+	}
+	lines.push("");
 
-  fs.mkdirSync(path.dirname(output), { recursive: true });
-  fs.writeFileSync(output, lines.join('\n'));
+	fs.mkdirSync(path.dirname(output), { recursive: true });
+	fs.writeFileSync(output, lines.join("\n"));
 
-  return {
-    sections: 4,
-    sessions: sessions.length,
-    executions: executions.length,
-    outputPath: output
-  };
+	return {
+		sections: 4,
+		sessions: sessions.length,
+		executions: executions.length,
+		outputPath: output,
+	};
 }
 
 module.exports = {
-  governanceDocs,
-  exportSessionEvidence,
-  exportExecutionEvidence,
-  inspectPolicy,
-  summarizeSessions,
-  summarizeExecutions,
-  generateAuditReport,
-  isCommandLikeEvent,
-  commandLabelFromEvent,
+	governanceDocs,
+	exportSessionEvidence,
+	exportExecutionEvidence,
+	inspectPolicy,
+	summarizeSessions,
+	summarizeExecutions,
+	generateAuditReport,
+	isCommandLikeEvent,
+	commandLabelFromEvent,
 };

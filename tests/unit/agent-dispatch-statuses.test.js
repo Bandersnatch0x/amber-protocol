@@ -40,11 +40,7 @@ test("dispatch rejects an unknown hardStopStatus", () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
 	const result = dispatchAgentTask(root, valid({ hardStopStatus: "bogus" }));
-	assert.ok(
-		result.errors.some((e) =>
-			e.startsWith("Invalid hardStopStatus: bogus"),
-		),
-	);
+	assert.ok(result.errors.some((e) => e.startsWith("Invalid hardStopStatus: bogus")));
 });
 
 test("dispatch accepts each valid hardStopStatus", () => {
@@ -64,32 +60,21 @@ test("dispatch rejects an unknown budgetStatus", () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
 	const result = dispatchAgentTask(root, valid({ budgetStatus: "nope" }));
-	assert.ok(
-		result.errors.some((e) => e.startsWith("Invalid budgetStatus: nope")),
-	);
+	assert.ok(result.errors.some((e) => e.startsWith("Invalid budgetStatus: nope")));
 });
 
 test("dispatch rejects an unknown reviewBandwidthStatus", () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
-	const result = dispatchAgentTask(
-		root,
-		valid({ reviewBandwidthStatus: "nope" }),
-	);
-	assert.ok(
-		result.errors.some((e) =>
-			e.startsWith("Invalid reviewBandwidthStatus: nope"),
-		),
-	);
+	const result = dispatchAgentTask(root, valid({ reviewBandwidthStatus: "nope" }));
+	assert.ok(result.errors.some((e) => e.startsWith("Invalid reviewBandwidthStatus: nope")));
 });
 
 test("dispatch rejects an unknown reviewGateStatus", () => {
 	const root = tempTarget();
 	seedLedger(root, "task-1");
 	const result = dispatchAgentTask(root, valid({ reviewGateStatus: "nope" }));
-	assert.ok(
-		result.errors.some((e) => e.startsWith("Invalid reviewGateStatus: nope")),
-	);
+	assert.ok(result.errors.some((e) => e.startsWith("Invalid reviewGateStatus: nope")));
 });
 
 test("dispatch accepts each valid reviewGateStatus", () => {
@@ -116,9 +101,7 @@ test("recordAgentReview rejects an invalid reviewGateStatus", () => {
 		reviewer: "reviewer-b",
 		reviewGateStatus: "nope",
 	});
-	assert.ok(
-		result.errors.some((e) => e.startsWith("Invalid reviewGateStatus: nope")),
-	);
+	assert.ok(result.errors.some((e) => e.startsWith("Invalid reviewGateStatus: nope")));
 });
 
 test("recordAgentReview accepts a valid reviewGateStatus and records it", () => {

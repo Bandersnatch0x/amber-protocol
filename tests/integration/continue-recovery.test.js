@@ -2,10 +2,7 @@ const { describe, it, beforeEach, afterEach } = require("node:test");
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const {
-	startSession,
-	continueSession,
-} = require("../../scripts/lib/session-commands");
+const { startSession, continueSession } = require("../../scripts/lib/session-commands");
 const { saveCheckpoint } = require("../../scripts/lib/checkpoint-manager");
 
 describe("Continue Recovery", () => {
@@ -41,13 +38,7 @@ describe("Continue Recovery", () => {
 		});
 		const sessionId = result.sessionId;
 
-		const manifestPath = path.join(
-			testDir,
-			".amber",
-			"sessions",
-			sessionId,
-			"manifest.json",
-		);
+		const manifestPath = path.join(testDir, ".amber", "sessions", sessionId, "manifest.json");
 		const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 		manifest.status = "paused";
 		manifest.currentStage = "plan";

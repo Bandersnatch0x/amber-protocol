@@ -10,9 +10,7 @@
 
 const path = require("node:path");
 
-const {
-	resolveTarget,
-} = require("../../core/fs-utils");
+const { resolveTarget } = require("../../core/fs-utils");
 const { runMaintenanceAction } = require("../../core/maintenance");
 const { detectScaffoldDrift } = require("../../core/scaffold-version-drift");
 const { writeDistillProposal } = require("../../distill-candidates");

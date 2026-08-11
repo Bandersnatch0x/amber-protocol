@@ -106,9 +106,9 @@ describe("knowledge-plan command adapter: default scaffold", () => {
 			const out = knowledgeDispatch(undefined, { target: tmp });
 			assert.ok(out.result.created.length > 0 || out.result.skipped.length > 0);
 			assert.ok(
-				(out.result.created.concat(out.result.skipped)).some((p) =>
-					p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.json"),
-				),
+				out.result.created
+					.concat(out.result.skipped)
+					.some((p) => p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.json")),
 			);
 			assert.equal(out.bypassPrint, undefined);
 		} finally {
@@ -126,7 +126,9 @@ describe("knowledge-plan command adapter: default scaffold", () => {
 			});
 			assert.ok(out.result.created.length > 0);
 			assert.ok(
-				out.result.created.some((p) => p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.yaml")),
+				out.result.created.some((p) =>
+					p.replace(/\\/g, "/").endsWith("docs/wiki/knowledge-plan.yaml"),
+				),
 			);
 			assert.equal(fs.existsSync(path.join(tmp, "docs", "wiki", "knowledge-plan.yaml")), false);
 		} finally {

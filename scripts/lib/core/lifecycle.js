@@ -37,9 +37,7 @@ function parsePlanFile(targetRoot, filePath) {
 
 function gatherPlans(targetRoot) {
 	const plansDir = path.join(targetRoot, "docs", "plans");
-	return collectFilesBySuffix(plansDir, ".md").map((file) =>
-		parsePlanFile(targetRoot, file),
-	);
+	return collectFilesBySuffix(plansDir, ".md").map((file) => parsePlanFile(targetRoot, file));
 }
 
 const EXISTING_PROJECT_MARKERS = [
@@ -92,9 +90,7 @@ function gatherState(targetRoot) {
 	// lifecycle it's meant to close (#65).
 	const isProductRepo = classifyTarget(targetRoot).type === "product-repo";
 	const featureData = loadFeatures(targetRoot);
-	const features = Array.isArray(featureData.features)
-		? featureData.features.filter(Boolean)
-		: [];
+	const features = Array.isArray(featureData.features) ? featureData.features.filter(Boolean) : [];
 	// No try/catch around findMostRecentSession: it returns null when there are
 	// no sessions and tolerates a missing state dir, so any throw here is a real
 	// bug (e.g. an unexported function) that must surface, not be swallowed.
@@ -124,12 +120,13 @@ function resolvePendingGate(targetRoot, sessionId) {
 		const loaded = loadSessionManifest(targetRoot, sessionId);
 		if (!loaded || !loaded.manifest) return { gates: [], pendingGateId: null, routeId: null };
 		const manifest = loaded.manifest;
-		const routeId =
-			(manifest.route && (manifest.route.id || manifest.route.routeId)) || null;
+		const routeId = (manifest.route && (manifest.route.id || manifest.route.routeId)) || null;
 		const { routes } = loadRoutes(routesDir);
 		const route = routes.find((r) => r.routeId === routeId);
 		const gates = route && Array.isArray(route.gates) ? route.gates : [];
-		const events = readSessionEvents(loaded.sessionDir || path.join(targetRoot, ".amber", "sessions", sessionId));
+		const events = readSessionEvents(
+			loaded.sessionDir || path.join(targetRoot, ".amber", "sessions", sessionId),
+		);
 		const passed = new Set(
 			events
 				.filter((e) => e && e.type === "gate_passed" && e.data)
@@ -137,8 +134,7 @@ function resolvePendingGate(targetRoot, sessionId) {
 				.filter(Boolean),
 		);
 		const pending = gates.filter((g) => !passed.has(g.id));
-		const pendingGateId =
-			(pending[0] && pending[0].id) || (gates[0] && gates[0].id) || null;
+		const pendingGateId = (pending[0] && pending[0].id) || (gates[0] && gates[0].id) || null;
 		return { gates, pendingGateId, routeId, pendingCount: pending.length };
 	} catch {
 		return { gates: [], pendingGateId: null, routeId: null, pendingCount: 0 };
@@ -225,7 +221,8 @@ const STEPS = [
 		appliesTo: (ctx) => ctx.focus.type !== "session",
 		isDone: (ctx) => ctx.state.features.length >= 1,
 		why: () => "no feature is registered in feature_list.json.",
-		remedy: (ctx) => `amber feature add --target ${shellQuote(ctx.targetDisplay)} --id F001 --title "..."`,
+		remedy: (ctx) =>
+			`amber feature add --target ${shellQuote(ctx.targetDisplay)} --id F001 --title "..."`,
 	},
 	{
 		id: "plan",
@@ -329,8 +326,7 @@ const STEPS = [
 		id: "session-complete",
 		label: "Mark session completed",
 		appliesTo: (ctx) =>
-			ctx.focus.type === "session" &&
-			Boolean(ctx.completion && ctx.completion.status === "pass"),
+			ctx.focus.type === "session" && Boolean(ctx.completion && ctx.completion.status === "pass"),
 		isDone: (ctx) => ctx.sessionStatus === "completed",
 		why: () => "complete-check passed but the session is not marked completed yet.",
 		remedy: (ctx) =>
@@ -363,7 +359,12 @@ function resolveFocus(state, options) {
 		return { type: "session", id: options.session, autoSelected: false, othersPending: 0 };
 	}
 	if (options.feature) {
-		return { type: "feature", id: options.feature, autoSelected: false, othersPending: countOthers(state, options.feature) };
+		return {
+			type: "feature",
+			id: options.feature,
+			autoSelected: false,
+			othersPending: countOthers(state, options.feature),
+		};
 	}
 	if (state.activeSessionId) {
 		return { type: "session", id: state.activeSessionId, autoSelected: true, othersPending: 0 };
@@ -372,13 +373,22 @@ function resolveFocus(state, options) {
 		.filter((p) => p.featureId)
 		.sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
 	if (recentPlan) {
-		return { type: "feature", id: recentPlan.featureId, autoSelected: true, othersPending: countOthers(state, recentPlan.featureId) };
+		return {
+			type: "feature",
+			id: recentPlan.featureId,
+			autoSelected: true,
+			othersPending: countOthers(state, recentPlan.featureId),
+		};
 	}
 	const feature =
-		state.features.find((f) => (f.status || "not_started") === "not_started") ||
-		state.features[0];
+		state.features.find((f) => (f.status || "not_started") === "not_started") || state.features[0];
 	if (feature) {
-		return { type: "feature", id: feature.id, autoSelected: true, othersPending: countOthers(state, feature.id) };
+		return {
+			type: "feature",
+			id: feature.id,
+			autoSelected: true,
+			othersPending: countOthers(state, feature.id),
+		};
 	}
 	return { type: "bootstrap", id: null, autoSelected: true, othersPending: 0 };
 }

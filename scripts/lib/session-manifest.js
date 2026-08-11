@@ -6,19 +6,16 @@ const path = require("path");
 const { SCHEMA_VERSION } = require("./schema-version-checker");
 const { writeJson } = require("./core/fs-utils");
 
-const schemaPath = path.join(
-	__dirname,
-	"../../schemas/session-manifest.schema.json",
-);
+const schemaPath = path.join(__dirname, "../../schemas/session-manifest.schema.json");
 let schema;
 try {
-  schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+	schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
 } catch (e) {
-  throw new Error(
-    `Failed to load session manifest schema from ${schemaPath}: ${e.message}. ` +
-    "Re-run 'node scripts/amber.js init' to restore missing schema files.",
-    { cause: e },
-  );
+	throw new Error(
+		`Failed to load session manifest schema from ${schemaPath}: ${e.message}. ` +
+			"Re-run 'node scripts/amber.js init' to restore missing schema files.",
+		{ cause: e },
+	);
 }
 
 const ajv = new Ajv();
@@ -95,9 +92,7 @@ function readAllSessionManifests(sessionsDir) {
 		.filter((name) => fs.existsSync(path.join(sessionsDir, name, "manifest.json")))
 		.map((name) => {
 			try {
-				return JSON.parse(
-					fs.readFileSync(path.join(sessionsDir, name, "manifest.json"), "utf8"),
-				);
+				return JSON.parse(fs.readFileSync(path.join(sessionsDir, name, "manifest.json"), "utf8"));
 			} catch {
 				return null;
 			}

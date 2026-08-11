@@ -2,10 +2,7 @@
 
 const path = require("node:path");
 
-const {
-	REQUIRED_HANDOFF_SECTIONS,
-	REQUIRED_HARNESS_FILES,
-} = require("./constants");
+const { REQUIRED_HANDOFF_SECTIONS, REQUIRED_HARNESS_FILES } = require("./constants");
 
 const { classifyTarget } = require("./target-classification");
 
@@ -20,14 +17,9 @@ const {
 	walkProjectFiles,
 } = require("./fs-utils");
 
-const {
-	MESSAGES,
-} = require("./terminology");
+const { MESSAGES } = require("./terminology");
 
-const {
-	getSectionBody,
-	hasSectionWithBody,
-} = require("./text-utils");
+const { getSectionBody, hasSectionWithBody } = require("./text-utils");
 
 function detectCommands(targetRoot, parseIssues = []) {
 	const commands = [];
@@ -71,17 +63,11 @@ function detectToolingEvidence(targetRoot) {
 		{ source: "Cargo.toml", name: "rust" },
 	];
 
-	return candidates.filter((candidate) =>
-		pathExists(path.join(targetRoot, candidate.source)),
-	);
+	return candidates.filter((candidate) => pathExists(path.join(targetRoot, candidate.source)));
 }
 
 function addCandidateCommand(candidateCommands, command) {
-	if (
-		!candidateCommands.some(
-			(candidate) => candidate.command === command.command,
-		)
-	) {
+	if (!candidateCommands.some((candidate) => candidate.command === command.command)) {
 		candidateCommands.push(command);
 	}
 }
@@ -90,11 +76,7 @@ function addCandidateCommand(candidateCommands, command) {
 // evidence flags already gathered from disk, emit the candidate verification
 // commands. Extracted so the pytest/ruff/default branching is testable without
 // touching the filesystem.
-function buildPythonCandidates({
-	hasTestsDirectory,
-	hasPytestEvidence,
-	hasRuffEvidence,
-}) {
+function buildPythonCandidates({ hasTestsDirectory, hasPytestEvidence, hasRuffEvidence }) {
 	const candidateCommands = [];
 	if (hasPytestEvidence) {
 		addCandidateCommand(candidateCommands, {
@@ -124,8 +106,7 @@ function buildPythonCandidates({
 			name: "pytest",
 			command: "python -m pytest",
 			confidence: "candidate",
-			reason:
-				"Python project files were found, but no explicit verification command was declared.",
+			reason: "Python project files were found, but no explicit verification command was declared.",
 		});
 	}
 
@@ -185,8 +166,7 @@ const DETECTORS = [
 		name: "python",
 		detect: (root) => {
 			const hasTestsDirectory =
-				pathExists(path.join(root, "tests")) ||
-				pathExists(path.join(root, "test"));
+				pathExists(path.join(root, "tests")) || pathExists(path.join(root, "test"));
 			const hasPytestEvidence =
 				hasTestsDirectory ||
 				pathExists(path.join(root, "pytest.ini")) ||
@@ -262,8 +242,7 @@ function buildSuggestedPatches(conflicts) {
 		file,
 		requiresApproval: true,
 		reason: "Existing project instruction file must be merged by a human.",
-		suggestion:
-			MESSAGES.wikiTemplateLinkHint,
+		suggestion: MESSAGES.wikiTemplateLinkHint,
 	}));
 }
 
@@ -324,12 +303,9 @@ function listStarterFileStatus(rootDir, relativePaths) {
 }
 
 function listAgentDocs(targetRoot) {
-	return [
-		"AGENTS.md",
-		"CLAUDE.md",
-		".cursorrules",
-		".windsurfrules",
-	].filter((fileName) => pathExists(path.join(targetRoot, fileName)));
+	return ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules"].filter((fileName) =>
+		pathExists(path.join(targetRoot, fileName)),
+	);
 }
 
 function buildAuditDetection(targetRoot) {
@@ -338,16 +314,8 @@ function buildAuditDetection(targetRoot) {
 	const parseIssues = [];
 	const commands = detectCommands(targetRoot, parseIssues);
 	const toolingEvidence = detectToolingEvidence(targetRoot);
-	const candidateCommands = detectCandidateCommands(
-		targetRoot,
-		toolingEvidence,
-	);
-	const unknowns = buildAuditUnknowns(
-		commands,
-		toolingEvidence,
-		parseIssues,
-		candidateCommands,
-	);
+	const candidateCommands = detectCandidateCommands(targetRoot, toolingEvidence);
+	const unknowns = buildAuditUnknowns(commands, toolingEvidence, parseIssues, candidateCommands);
 
 	return {
 		docs,
@@ -361,14 +329,9 @@ function buildAuditDetection(targetRoot) {
 }
 
 function auditTargetRepo(targetRoot, classification) {
-	const { existing, missing } = listStarterFileStatus(
-		targetRoot,
-		REQUIRED_HARNESS_FILES,
-	);
+	const { existing, missing } = listStarterFileStatus(targetRoot, REQUIRED_HARNESS_FILES);
 	const agentDocs = listAgentDocs(targetRoot);
-	const conflicts = agentDocs.filter((fileName) =>
-		["AGENTS.md", "CLAUDE.md"].includes(fileName),
-	);
+	const conflicts = agentDocs.filter((fileName) => ["AGENTS.md", "CLAUDE.md"].includes(fileName));
 
 	// Count historical .workflow/ artifacts beyond continuous-improvement.
 	let workflowArtifactCount = 0;
@@ -404,17 +367,13 @@ function auditTargetRepo(targetRoot, classification) {
 		nextSafeCommand: buildNextSafeCommand(targetRoot),
 		// After audit on an existing unharnessed repo, next is init (or adoption report).
 		nextAfterAudit: `node scripts/amber.js init --target ${JSON.stringify(targetRoot)}`,
-		adoptionHint:
-			"amber adoption report --target . --output-dir docs/examples/adoptions",
+		adoptionHint: "amber adoption report --target . --output-dir docs/examples/adoptions",
 	};
 }
 
 function auditProductRepo(targetRoot, classification) {
 	const templateRoot = path.join(targetRoot, "templates");
-	const templateStarterFiles = listStarterFileStatus(
-		templateRoot,
-		REQUIRED_HARNESS_FILES,
-	);
+	const templateStarterFiles = listStarterFileStatus(templateRoot, REQUIRED_HARNESS_FILES);
 
 	return {
 		target: targetRoot,
@@ -449,9 +408,7 @@ function fileMentionsWiki(filePath) {
 	if (!pathExists(filePath)) {
 		return false;
 	}
-	return /docs[\\/]+wiki|docs\/wiki|Project Wiki|wiki\/index/i.test(
-		readText(filePath),
-	);
+	return /docs[\\/]+wiki|docs\/wiki|Project Wiki|wiki\/index/i.test(readText(filePath));
 }
 
 // Pure core of hasNextAction: given the handoff file's full content, extract
@@ -459,9 +416,7 @@ function fileMentionsWiki(filePath) {
 // Lines that are blank, HTML comments, or sentinel placeholders (none/n/a/tbd/
 // todo/pending/...) are ignored. Extracted so the line-analysis is testable.
 function hasNextActionInContent(content) {
-	const body =
-		getSectionBody(content, "Next Action") ??
-		getSectionBody(content, "Next Actions");
+	const body = getSectionBody(content, "Next Action") ?? getSectionBody(content, "Next Actions");
 	if (!body) {
 		return false;
 	}
@@ -497,13 +452,7 @@ function hasVerificationCommandInContent(content) {
 }
 
 function hasVerificationCommand(targetRoot) {
-	const verificationPath = path.join(
-		targetRoot,
-		"docs",
-		"wiki",
-		"engineering",
-		"verification.md",
-	);
+	const verificationPath = path.join(targetRoot, "docs", "wiki", "engineering", "verification.md");
 	if (!pathExists(verificationPath)) {
 		return false;
 	}
@@ -529,16 +478,13 @@ function validateHandoff(target) {
 	for (const section of REQUIRED_HANDOFF_SECTIONS) {
 		if (!hasSectionWithBody(content, section)) {
 			missingSections.push(section);
-			errors.push(
-				`session-handoff.md must include a non-empty ${section} section.`,
-			);
+			errors.push(`session-handoff.md must include a non-empty ${section} section.`);
 		}
 	}
 
 	// Extract actionable content from the handoff file.
 	const nextActionBody =
-		getSectionBody(content, "Next Action") ??
-		getSectionBody(content, "Next Actions");
+		getSectionBody(content, "Next Action") ?? getSectionBody(content, "Next Actions");
 	const nextSteps = nextActionBody
 		? nextActionBody
 				.split(/\r?\n/)
@@ -547,9 +493,7 @@ function validateHandoff(target) {
 				.map((line) => line.replace(/^[-*]\s+/, ""))
 		: [];
 
-	const lastUpdatedMatch = content.match(
-		/Last Updated:\s*(.+)/i,
-	);
+	const lastUpdatedMatch = content.match(/Last Updated:\s*(.+)/i);
 	const lastUpdated = lastUpdatedMatch ? lastUpdatedMatch[1].trim() : null;
 
 	// Count session directories when present.

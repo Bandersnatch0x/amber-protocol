@@ -1,177 +1,189 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Context Loadout Benchmark Fixture",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schemaVersion", "fixtureId", "fixtureRevision", "mode", "signal", "expected"],
-  "properties": {
-    "schemaVersion": { "const": "1.0.0" },
-    "fixtureId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
-    "fixtureRevision": { "type": "string", "minLength": 1 },
-    "mode": { "enum": ["smoke", "full"] },
-    "signal": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["route"],
-      "properties": {
-        "route": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
-        "feature": { "type": "string" },
-        "budget": { "type": "integer", "minimum": 1 },
-        "since": { "type": "string", "format": "date-time" },
-        "knowledgeKinds": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "enum": ["invariant", "decision", "pattern", "failure", "rejected-approach", "external-constraint", "unspecified"]
-          }
-        },
-        "requiredPages": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
-        }
-      }
-    },
-    "expected": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["eligiblePages", "pages", "excluded", "requiredArtifacts", "loadout"],
-      "properties": {
-        "eligiblePages": {
-          "$ref": "#/definitions/pageIds"
-        },
-        "pages": {
-          "$ref": "#/definitions/pageIds"
-        },
-        "excluded": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["pageId", "reason"],
-            "properties": {
-              "pageId": { "type": "string" },
-              "reason": { "type": "string" }
-            }
-          }
-        },
-        "requiredArtifacts": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "type": "string" }
-        },
-        "loadout": {
-          "$ref": "#/definitions/expectedLoadout"
-        }
-      }
-    }
-  },
-  "definitions": {
-    "pageIds": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
-    },
-    "hash": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    },
-    "expectedLoadout": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "budgetWords",
-        "tiers",
-        "pages",
-        "references",
-        "requiredArtifacts",
-        "excluded",
-        "deltaSince"
-      ],
-      "properties": {
-        "budgetWords": { "type": "integer", "minimum": 1 },
-        "tiers": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["required", "priority", "optional"],
-          "properties": {
-            "required": { "$ref": "#/definitions/pageIds" },
-            "priority": { "$ref": "#/definitions/pageIds" },
-            "optional": { "$ref": "#/definitions/pageIds" }
-          }
-        },
-        "pages": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["pageId", "title", "words", "rawHash", "status", "scope"],
-            "properties": {
-              "pageId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
-              "title": { "type": "string" },
-              "words": { "type": "integer", "minimum": 0 },
-              "rawHash": { "$ref": "#/definitions/hash" },
-              "status": { "enum": ["ok", "stale"] },
-              "scope": {
-                "type": "array",
-                "uniqueItems": true,
-                "items": { "type": "string" }
-              }
-            }
-          }
-        },
-        "references": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["pageId", "rawHash"],
-            "properties": {
-              "pageId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
-              "rawHash": { "$ref": "#/definitions/hash" }
-            }
-          }
-        },
-        "requiredArtifacts": {
-          "type": "array",
-          "minItems": 3,
-          "maxItems": 3,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["kind", "path", "rawHash", "words"],
-            "properties": {
-              "kind": {
-                "enum": ["operating-manual", "route-manifest", "loadout-definition"]
-              },
-              "path": { "type": "string", "minLength": 1 },
-              "rawHash": { "$ref": "#/definitions/hash" },
-              "words": { "type": "integer", "minimum": 0 }
-            }
-          }
-        },
-        "excluded": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["pageId", "reason", "detail"],
-            "properties": {
-              "pageId": { "type": "string" },
-              "reason": {
-                "enum": ["over-budget", "tampered", "obsolete", "stale", "superseded", "knowledge-kind"]
-              },
-              "detail": { "type": "string", "minLength": 1 }
-            }
-          }
-        },
-        "deltaSince": {
-          "anyOf": [
-            { "type": "null" },
-            { "type": "string", "format": "date-time" }
-          ]
-        }
-      }
-    }
-  }
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Context Loadout Benchmark Fixture",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schemaVersion", "fixtureId", "fixtureRevision", "mode", "signal", "expected"],
+	"properties": {
+		"schemaVersion": { "const": "1.0.0" },
+		"fixtureId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+		"fixtureRevision": { "type": "string", "minLength": 1 },
+		"mode": { "enum": ["smoke", "full"] },
+		"signal": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["route"],
+			"properties": {
+				"route": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+				"feature": { "type": "string" },
+				"budget": { "type": "integer", "minimum": 1 },
+				"since": { "type": "string", "format": "date-time" },
+				"knowledgeKinds": {
+					"type": "array",
+					"uniqueItems": true,
+					"items": {
+						"enum": [
+							"invariant",
+							"decision",
+							"pattern",
+							"failure",
+							"rejected-approach",
+							"external-constraint",
+							"unspecified"
+						]
+					}
+				},
+				"requiredPages": {
+					"type": "array",
+					"uniqueItems": true,
+					"items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+				}
+			}
+		},
+		"expected": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["eligiblePages", "pages", "excluded", "requiredArtifacts", "loadout"],
+			"properties": {
+				"eligiblePages": {
+					"$ref": "#/definitions/pageIds"
+				},
+				"pages": {
+					"$ref": "#/definitions/pageIds"
+				},
+				"excluded": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["pageId", "reason"],
+						"properties": {
+							"pageId": { "type": "string" },
+							"reason": { "type": "string" }
+						}
+					}
+				},
+				"requiredArtifacts": {
+					"type": "array",
+					"uniqueItems": true,
+					"items": { "type": "string" }
+				},
+				"loadout": {
+					"$ref": "#/definitions/expectedLoadout"
+				}
+			}
+		}
+	},
+	"definitions": {
+		"pageIds": {
+			"type": "array",
+			"uniqueItems": true,
+			"items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" }
+		},
+		"hash": {
+			"type": "string",
+			"pattern": "^sha256:[0-9a-f]{64}$"
+		},
+		"expectedLoadout": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"budgetWords",
+				"tiers",
+				"pages",
+				"references",
+				"requiredArtifacts",
+				"excluded",
+				"deltaSince"
+			],
+			"properties": {
+				"budgetWords": { "type": "integer", "minimum": 1 },
+				"tiers": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["required", "priority", "optional"],
+					"properties": {
+						"required": { "$ref": "#/definitions/pageIds" },
+						"priority": { "$ref": "#/definitions/pageIds" },
+						"optional": { "$ref": "#/definitions/pageIds" }
+					}
+				},
+				"pages": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["pageId", "title", "words", "rawHash", "status", "scope"],
+						"properties": {
+							"pageId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+							"title": { "type": "string" },
+							"words": { "type": "integer", "minimum": 0 },
+							"rawHash": { "$ref": "#/definitions/hash" },
+							"status": { "enum": ["ok", "stale"] },
+							"scope": {
+								"type": "array",
+								"uniqueItems": true,
+								"items": { "type": "string" }
+							}
+						}
+					}
+				},
+				"references": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["pageId", "rawHash"],
+						"properties": {
+							"pageId": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+							"rawHash": { "$ref": "#/definitions/hash" }
+						}
+					}
+				},
+				"requiredArtifacts": {
+					"type": "array",
+					"minItems": 3,
+					"maxItems": 3,
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["kind", "path", "rawHash", "words"],
+						"properties": {
+							"kind": {
+								"enum": ["operating-manual", "route-manifest", "loadout-definition"]
+							},
+							"path": { "type": "string", "minLength": 1 },
+							"rawHash": { "$ref": "#/definitions/hash" },
+							"words": { "type": "integer", "minimum": 0 }
+						}
+					}
+				},
+				"excluded": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["pageId", "reason", "detail"],
+						"properties": {
+							"pageId": { "type": "string" },
+							"reason": {
+								"enum": [
+									"over-budget",
+									"tampered",
+									"obsolete",
+									"stale",
+									"superseded",
+									"knowledge-kind"
+								]
+							},
+							"detail": { "type": "string", "minLength": 1 }
+						}
+					}
+				},
+				"deltaSince": {
+					"anyOf": [{ "type": "null" }, { "type": "string", "format": "date-time" }]
+				}
+			}
+		}
+	}
 }

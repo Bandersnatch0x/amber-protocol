@@ -353,18 +353,24 @@ describe("computeStats", () => {
 	it("reports current and superseded lineage counts after Knowledge Kind filtering", () => {
 		const root = makeTarget();
 		try {
-			writePage(root, pageWithSource("scripts/lib/core/old.js", null, {
-				pageId: "old-decision",
-				title: "Old decision",
-				knowledgeKind: "decision",
-				supersedes: [],
-			}));
-			writePage(root, pageWithSource("scripts/lib/core/current.js", null, {
-				pageId: "current-pattern",
-				title: "Current pattern",
-				knowledgeKind: "pattern",
-				supersedes: ["old-decision"],
-			}));
+			writePage(
+				root,
+				pageWithSource("scripts/lib/core/old.js", null, {
+					pageId: "old-decision",
+					title: "Old decision",
+					knowledgeKind: "decision",
+					supersedes: [],
+				}),
+			);
+			writePage(
+				root,
+				pageWithSource("scripts/lib/core/current.js", null, {
+					pageId: "current-pattern",
+					title: "Current pattern",
+					knowledgeKind: "pattern",
+					supersedes: ["old-decision"],
+				}),
+			);
 
 			const all = computeStats(root);
 			assert.deepEqual(all.lineage, { current: 1, superseded: 1 });

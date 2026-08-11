@@ -25,11 +25,17 @@ function migrateSessionManifest(sessionsDir, sessionDirName, dryRun) {
 	}
 	const originalVersion = manifest.schemaVersion || null;
 	if (dryRun) {
-		return { migrated: true, log: `Would migrate ${sessionDirName}: ${originalVersion || "missing"} → ${SCHEMA_VERSION}` };
+		return {
+			migrated: true,
+			log: `Would migrate ${sessionDirName}: ${originalVersion || "missing"} → ${SCHEMA_VERSION}`,
+		};
 	}
 	manifest.schemaVersion = SCHEMA_VERSION;
 	writeJsonWithBackup(manifestPath, manifest);
-	return { migrated: true, log: `Migrated ${sessionDirName}: ${originalVersion || "missing"} → ${SCHEMA_VERSION}` };
+	return {
+		migrated: true,
+		log: `Migrated ${sessionDirName}: ${originalVersion || "missing"} → ${SCHEMA_VERSION}`,
+	};
 }
 
 function migrateManifests(projectRoot, options = {}) {
@@ -86,11 +92,24 @@ function inferArtifactType(obj) {
 	if (obj.contract && Array.isArray(obj.acceptance)) return "context-request";
 	if (obj.timestamp && typeof obj.type === "string") {
 		const eventTypes = [
-			"session_created", "route_selected", "stage_started", "stage_completed",
-			"stage_failed", "verification_failed", "gate_triggered", "gate_passed",
-			"gate_failed", "checkpoint_created", "session_paused", "session_resumed",
-			"session_completed", "session_failed", "session_aborted", "budget_warning",
-			"budget_exceeded", "error",
+			"session_created",
+			"route_selected",
+			"stage_started",
+			"stage_completed",
+			"stage_failed",
+			"verification_failed",
+			"gate_triggered",
+			"gate_passed",
+			"gate_failed",
+			"checkpoint_created",
+			"session_paused",
+			"session_resumed",
+			"session_completed",
+			"session_failed",
+			"session_aborted",
+			"budget_warning",
+			"budget_exceeded",
+			"error",
 		];
 		if (eventTypes.includes(obj.type)) return "timeline-event";
 	}
@@ -150,14 +169,11 @@ function addMissingVersionFields(content, filePath, artifactType) {
 }
 
 function versioningTargets(content) {
-	const candidates = Array.isArray(content.loopContracts)
-		? content.loopContracts
-		: [content];
+	const candidates = Array.isArray(content.loopContracts) ? content.loopContracts : [content];
 	return candidates.flatMap((candidate) => {
 		if (!candidate || typeof candidate !== "object") return [];
-		const declaredType = typeof candidate.artifact_type === "string"
-			? candidate.artifact_type.trim()
-			: "";
+		const declaredType =
+			typeof candidate.artifact_type === "string" ? candidate.artifact_type.trim() : "";
 		const artifactType = declaredType || inferArtifactType(candidate);
 		return artifactType ? [{ content: candidate, artifactType }] : [];
 	});

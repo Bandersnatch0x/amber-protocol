@@ -3,11 +3,7 @@
 const path = require("node:path");
 const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-dir-resolver");
 
-const {
-	DEFAULT_TEAM_REGISTRY,
-	REPO_ROOT,
-	SEMVER_PATTERN,
-} = require("./constants");
+const { DEFAULT_TEAM_REGISTRY, REPO_ROOT, SEMVER_PATTERN } = require("./constants");
 
 const {
 	pathExists,
@@ -18,17 +14,13 @@ const {
 	writeJson,
 } = require("./fs-utils");
 
-const {
-	MESSAGES,
-} = require("./terminology");
+const { MESSAGES } = require("./terminology");
 
 function resolveRegistryPath(registryPath) {
 	if (!registryPath) {
 		return DEFAULT_TEAM_REGISTRY;
 	}
-	return path.isAbsolute(registryPath)
-		? registryPath
-		: path.join(REPO_ROOT, registryPath);
+	return path.isAbsolute(registryPath) ? registryPath : path.join(REPO_ROOT, registryPath);
 }
 
 function validateCatalogEntries(errors, entries, fieldName, emptyMessage) {
@@ -44,9 +36,7 @@ function validateCatalogEntries(errors, entries, fieldName, emptyMessage) {
 			continue;
 		}
 		if (typeof entry.id !== "string" || entry.id.length === 0) {
-			errors.push(
-				`Team registry ${fieldName}[${index}] must declare a non-empty id.`,
-			);
+			errors.push(`Team registry ${fieldName}[${index}] must declare a non-empty id.`);
 		}
 	}
 }
@@ -108,9 +98,7 @@ function validateTeamRegistryData(data) {
 				errors.push(`Registry version ${version} must declare rulePacks.`);
 			}
 			if (!Array.isArray(release.managedProjectFiles)) {
-				errors.push(
-					`Registry version ${version} must declare managedProjectFiles.`,
-				);
+				errors.push(`Registry version ${version} must declare managedProjectFiles.`);
 			}
 			if (!release.compatibility || typeof release.compatibility !== "object") {
 				errors.push(`Registry version ${version} must declare compatibility.`);
@@ -196,8 +184,7 @@ function buildCompatibilityMatrix(registry) {
 	const profileVersions = new Set();
 
 	for (const release of releases) {
-		for (const name of (release.compatibility && release.compatibility.os) ||
-			[]) {
+		for (const name of (release.compatibility && release.compatibility.os) || []) {
 			os.add(name);
 		}
 		if (release.compatibility && release.compatibility.profileVersion) {
@@ -214,14 +201,7 @@ function buildCompatibilityMatrix(registry) {
 	};
 }
 
-function buildTeamLock(
-	registryPath,
-	registry,
-	version,
-	release,
-	preset,
-	previousLock = null,
-) {
+function buildTeamLock(registryPath, registry, version, release, preset, previousLock = null) {
 	return {
 		schemaVersion: "1.0.0",
 		registry: {
@@ -236,20 +216,12 @@ function buildTeamLock(
 		rulePacks: release.rulePacks,
 		managedProjectFiles: release.managedProjectFiles,
 		customizationsPreserved: release.managedProjectFiles.length === 0,
-		installedAt: previousLock
-			? previousLock.installedAt
-			: new Date().toISOString(),
+		installedAt: previousLock ? previousLock.installedAt : new Date().toISOString(),
 		updatedAt: new Date().toISOString(),
 	};
 }
 
-function writeTeamSnapshot(
-	targetRoot,
-	registryPath,
-	registry,
-	version,
-	release,
-) {
+function writeTeamSnapshot(targetRoot, registryPath, registry, version, release) {
 	const paths = teamStatePaths(targetRoot);
 	const snapshotPath = path.join(paths.snapshotsRoot, `${version}.json`);
 	const snapshot = {
@@ -311,9 +283,7 @@ function validateInstallRequest({ loaded, selected, preset, lockExists }) {
 		errors.push(MESSAGES.teamAlreadyInstalled);
 	}
 	if (!selected.release) {
-		errors.push(
-			`Team registry version ${selected.version || "<latest>"} is not available.`,
-		);
+		errors.push(`Team registry version ${selected.version || "<latest>"} is not available.`);
 	}
 	if (preset && !loaded.registry.presets.some((item) => item.id === preset)) {
 		errors.push(`Team preset ${preset} is not registered.`);
@@ -326,10 +296,7 @@ function buildTeamInstallPreview(targetRoot, version, release, preset) {
 		toVersion: version,
 		preset,
 		willWrite: false,
-		targetWrites: [
-			".amber/team/lock.json",
-			`.amber/team/snapshots/${version}.json`,
-		],
+		targetWrites: [".amber/team/lock.json", `.amber/team/snapshots/${version}.json`],
 		projectFileWrites: release.managedProjectFiles,
 		customizationsPreserved: release.managedProjectFiles.length === 0,
 		target: targetRoot,
@@ -352,8 +319,7 @@ function installTeamDistribution(target, options = {}) {
 		};
 	}
 	const selected = findTeamVersion(loaded.registry, options.version);
-	const preset =
-		options.preset || (selected.release && selected.release.preset);
+	const preset = options.preset || (selected.release && selected.release.preset);
 
 	const { errors, warnings } = validateInstallRequest({
 		loaded,
@@ -368,12 +334,7 @@ function installTeamDistribution(target, options = {}) {
 	if (options.dryRun) {
 		return {
 			target: targetRoot,
-			preview: buildTeamInstallPreview(
-				targetRoot,
-				selected.version,
-				selected.release,
-				preset,
-			),
+			preview: buildTeamInstallPreview(targetRoot, selected.version, selected.release, preset),
 			errors,
 			warnings,
 		};
@@ -434,10 +395,7 @@ function buildTeamUpdatePreview(targetRoot, lock, version, release) {
 		fromVersion: lock.installedVersion,
 		toVersion: version,
 		willWrite: false,
-		targetWrites: [
-			".amber/team/lock.json",
-			`.amber/team/snapshots/${version}.json`,
-		],
+		targetWrites: [".amber/team/lock.json", `.amber/team/snapshots/${version}.json`],
 		projectFileWrites: release.managedProjectFiles,
 		customizationsPreserved: release.managedProjectFiles.length === 0,
 		changedArtifacts: [...new Set(changedArtifacts)].sort(),
@@ -464,20 +422,13 @@ function updateTeamDistribution(target, options = {}) {
 		errors.push("team update requires --dry-run or --confirm.");
 	}
 	if (!selected.release) {
-		errors.push(
-			`Team registry version ${selected.version || "<latest>"} is not available.`,
-		);
+		errors.push(`Team registry version ${selected.version || "<latest>"} is not available.`);
 	}
 	if (errors.length > 0) {
 		return { target: targetRoot, errors, warnings };
 	}
 
-	const preview = buildTeamUpdatePreview(
-		targetRoot,
-		lock,
-		selected.version,
-		selected.release,
-	);
+	const preview = buildTeamUpdatePreview(targetRoot, lock, selected.version, selected.release);
 	if (options.dryRun) {
 		return { target: targetRoot, lock, preview, errors, warnings };
 	}
@@ -529,9 +480,7 @@ function pinTeamDistribution(target, options = {}) {
 		errors.push("team pin requires --version <semver>.");
 	}
 	if (!selected.release) {
-		errors.push(
-			`Team registry version ${selected.version || "<latest>"} is not available.`,
-		);
+		errors.push(`Team registry version ${selected.version || "<latest>"} is not available.`);
 	}
 	if (errors.length > 0) {
 		return { target: targetRoot, errors, warnings };
@@ -578,9 +527,7 @@ function rollbackTeamDistribution(target, options = {}) {
 	if (!options.confirm) {
 		errors.push("team rollback requires --confirm.");
 	}
-	const snapshotPath = version
-		? path.join(paths.snapshotsRoot, `${version}.json`)
-		: null;
+	const snapshotPath = version ? path.join(paths.snapshotsRoot, `${version}.json`) : null;
 	if (snapshotPath && !pathExists(snapshotPath)) {
 		errors.push(`No team snapshot exists for ${version}.`);
 	}
@@ -593,9 +540,7 @@ function rollbackTeamDistribution(target, options = {}) {
 	const nextLock = buildRollbackLock({ lock, snapshot, version, now });
 	writeJson(paths.lockPath, nextLock);
 
-	const ledger = pathExists(paths.rollbackLedgerPath)
-		? readJson(paths.rollbackLedgerPath)
-		: [];
+	const ledger = pathExists(paths.rollbackLedgerPath) ? readJson(paths.rollbackLedgerPath) : [];
 	ledger.push({
 		fromVersion: nextLock.previousVersion,
 		toVersion: version,

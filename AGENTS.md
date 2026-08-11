@@ -1,3 +1,15 @@
+---
+module: amber-protocol
+role: governance-layer
+entry_point: scripts/amber.js
+boundary: repository-local
+scope: root
+safety:
+  - read-only-first
+  - never-overwrite-user-files
+  - executesAnything: false
+---
+
 # AGENTS.md
 
 Amber Protocol is a repository-local governance layer for agent-assisted engineering.

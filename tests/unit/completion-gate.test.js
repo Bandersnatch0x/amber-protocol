@@ -56,10 +56,7 @@ None recorded.
 function buildSession(root, sessionId, manifest, timelineEvents = [], opts = {}) {
 	const sessionDir = path.join(root, ".amber", "sessions", sessionId);
 	fs.mkdirSync(sessionDir, { recursive: true });
-	fs.writeFileSync(
-		path.join(sessionDir, "manifest.json"),
-		JSON.stringify(manifest, null, 2),
-	);
+	fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify(manifest, null, 2));
 	if (timelineEvents.length > 0) {
 		const lines = timelineEvents
 			.map((event) => JSON.stringify({ timestamp: new Date().toISOString(), ...event }))
@@ -276,10 +273,7 @@ test("manifest.handoff.path alone does not pass when file is scaffold", () => {
 			handoff: { path: "session-handoff.md" },
 			completedStages: ["verify"],
 		},
-		[
-			{ type: "stage_completed", data: { executed: true } },
-			{ type: "gate_passed" },
-		],
+		[{ type: "stage_completed", data: { executed: true } }, { type: "gate_passed" }],
 		{ handoffContent: scaffold },
 	);
 	const result = evaluateCompletion(root, sessionId);

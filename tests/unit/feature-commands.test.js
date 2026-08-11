@@ -75,10 +75,7 @@ test("addFeature warns when fields doctor requires are missing (#75)", () => {
 		joined.includes("--behavior"),
 		`expected warning to mention --behavior, got: ${joined}`,
 	);
-	assert.ok(
-		joined.includes("--verify"),
-		`expected warning to mention --verify, got: ${joined}`,
-	);
+	assert.ok(joined.includes("--verify"), `expected warning to mention --verify, got: ${joined}`);
 });
 
 test("addFeature produces a doctor-valid feature when all flags are passed (#75)", () => {

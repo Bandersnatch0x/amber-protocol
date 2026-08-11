@@ -21,7 +21,9 @@ function safe(fallback, fn) {
 }
 
 function scopeArtifact(targetRoot) {
-	const a = safe({ available: false, note: "detector error" }, () => detectArtifactDrift(targetRoot));
+	const a = safe({ available: false, note: "detector error" }, () =>
+		detectArtifactDrift(targetRoot),
+	);
 	if (!a.available) return { available: false, note: a.note };
 	const driftedFeatures = (a.features || []).filter((f) => f.classification === "drifted");
 	return { available: true, counts: a.counts, drifted: a.counts.drifted, driftedFeatures };
@@ -38,8 +40,11 @@ function scopeScaffold(targetRoot) {
 	if (classifyTarget(targetRoot).type === "product-repo") {
 		return { available: false, note: "n/a (product-repo ships the templates)" };
 	}
-	const s = safe({ installed: false, note: "detector error" }, () => detectScaffoldDrift(targetRoot));
-	if (!s.installed || !s.counts) return { available: false, note: s.note || "no install provenance" };
+	const s = safe({ installed: false, note: "detector error" }, () =>
+		detectScaffoldDrift(targetRoot),
+	);
+	if (!s.installed || !s.counts)
+		return { available: false, note: s.note || "no install provenance" };
 	return { available: true, counts: s.counts, drifted: s.counts.stale };
 }
 
@@ -68,9 +73,16 @@ function renderText(result) {
 			continue;
 		}
 		const c = s.counts;
-		if (name === "artifact") lines.push(`artifact: drifted=${c.drifted} aligned=${c.aligned} skipped=${c.skipped}`);
-		else if (name === "wiki") lines.push(`wiki: staleDocs=${c.staleDocs} missingRequired=${c.missingRequired} controlledDrifted=${c.controlledDrifted}`);
-		else if (name === "scaffold") lines.push(`scaffold: fresh=${c.fresh} stale=${c.stale} customized=${c.customized} ambiguous=${c.ambiguous} missing=${c.missing}`);
+		if (name === "artifact")
+			lines.push(`artifact: drifted=${c.drifted} aligned=${c.aligned} skipped=${c.skipped}`);
+		else if (name === "wiki")
+			lines.push(
+				`wiki: staleDocs=${c.staleDocs} missingRequired=${c.missingRequired} controlledDrifted=${c.controlledDrifted}`,
+			);
+		else if (name === "scaffold")
+			lines.push(
+				`scaffold: fresh=${c.fresh} stale=${c.stale} customized=${c.customized} ambiguous=${c.ambiguous} missing=${c.missing}`,
+			);
 	}
 	lines.push(`Total drifted: ${result.totalDrifted}`);
 	lines.push(`Exit: ${result.exitCode}`);
@@ -83,17 +95,23 @@ function renderGh(result) {
 	if (art && art.available) {
 		for (const f of art.driftedFeatures || []) {
 			const file = (f.paths && f.paths[0]) || "feature_list.json";
-			lines.push(`::warning file=${file}::feature ${f.id} drifted — code newer than last evidence (${f.lastCommitDate} > ${f.anchorDate})`);
+			lines.push(
+				`::warning file=${file}::feature ${f.id} drifted — code newer than last evidence (${f.lastCommitDate} > ${f.anchorDate})`,
+			);
 		}
 	}
 	const wiki = result.scopes.wiki;
 	if (wiki && wiki.available) {
-		if (wiki.counts.staleDocs > 0) lines.push(`::warning::wiki drift: ${wiki.counts.staleDocs} stale doc(s)`);
-		if (wiki.counts.missingRequired > 0) lines.push(`::warning::wiki drift: ${wiki.counts.missingRequired} missing required page(s)`);
+		if (wiki.counts.staleDocs > 0)
+			lines.push(`::warning::wiki drift: ${wiki.counts.staleDocs} stale doc(s)`);
+		if (wiki.counts.missingRequired > 0)
+			lines.push(`::warning::wiki drift: ${wiki.counts.missingRequired} missing required page(s)`);
 	}
 	const scaf = result.scopes.scaffold;
 	if (scaf && scaf.available && scaf.counts.stale > 0) {
-		lines.push(`::warning::scaffold drift: ${scaf.counts.stale} stale scaffold file(s) — run \`amber sync\``);
+		lines.push(
+			`::warning::scaffold drift: ${scaf.counts.stale} stale scaffold file(s) — run \`amber sync\``,
+		);
 	}
 	return lines.join("\n");
 }

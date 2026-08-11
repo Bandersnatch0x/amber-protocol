@@ -3,34 +3,17 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const {
-	gateAdoptionReport,
-	statusAdoptionReports,
-} = require("./adoption-gate");
+const { gateAdoptionReport, statusAdoptionReports } = require("./adoption-gate");
 
-const {
-	listAdoptionReports,
-	parseAdoptionReportForComparison,
-} = require("./adoption-reports");
+const { listAdoptionReports, parseAdoptionReportForComparison } = require("./adoption-reports");
 
-const {
-	OPTIONAL_STARTER_WIKI_FILES,
-	REQUIRED_HARNESS_FILES,
-} = require("./constants");
+const { OPTIONAL_STARTER_WIKI_FILES, REQUIRED_HARNESS_FILES } = require("./constants");
 
-const {
-	pathExists,
-	writeJson,
-} = require("./fs-utils");
+const { pathExists, writeJson } = require("./fs-utils");
 
-const {
-	getSectionBody,
-} = require("./text-utils");
+const { getSectionBody } = require("./text-utils");
 
-const {
-	MESSAGES,
-	defaultAdoptionBoundaries,
-} = require("./terminology");
+const { MESSAGES, defaultAdoptionBoundaries } = require("./terminology");
 
 const {
 	renderAdoptionBundleReadme,
@@ -110,11 +93,7 @@ function bundleAdoptionArtifacts(options = {}) {
 		errors.push(`Bundle output directory already exists: ${outputDir}`);
 	}
 	if (errors.length > 0) {
-		return adoptionBundleErrorResult(
-			{ reportsDir, indexPath, outputDir },
-			errors,
-			warnings,
-		);
+		return adoptionBundleErrorResult({ reportsDir, indexPath, outputDir }, errors, warnings);
 	}
 
 	const status = statusAdoptionReports({ reportsDir, index: indexPath });
@@ -210,14 +189,8 @@ function bundleAdoptionArtifacts(options = {}) {
 
 	fs.mkdirSync(path.dirname(outputDir), { recursive: true });
 	fs.mkdirSync(outputDir);
-	fs.writeFileSync(
-		path.join(outputDir, "README.md"),
-		renderAdoptionBundleReadme(bundle),
-	);
-	fs.writeFileSync(
-		path.join(outputDir, "status.md"),
-		renderAdoptionStatusDocument(status),
-	);
+	fs.writeFileSync(path.join(outputDir, "README.md"), renderAdoptionBundleReadme(bundle));
+	fs.writeFileSync(path.join(outputDir, "status.md"), renderAdoptionStatusDocument(status));
 	fs.writeFileSync(
 		path.join(outputDir, "index.md"),
 		renderAdoptionReportsIndex(listing, path.join(outputDir, "index.md")),
@@ -275,13 +248,11 @@ function adoptionNextActionsApprovalGates() {
 	return [
 		{
 			id: "command-confirmation",
-			question:
-				"Confirm, replace, or reject the candidate verification command.",
+			question: "Confirm, replace, or reject the candidate verification command.",
 		},
 		{
 			id: "bootstrap-write",
-			question:
-				"Approve full init, selected manual patches, or keep the target read-only.",
+			question: "Approve full init, selected manual patches, or keep the target read-only.",
 		},
 		{
 			id: "wiki-scope",
@@ -299,8 +270,7 @@ function adoptionNextActionsErrorResult(fields, errors, warnings) {
 		outputPath: fields.outputPath || "",
 		latestReport: null,
 		gateDecision: "wait",
-		nextSafeAction:
-			"Fix adoption next-actions errors before sharing this checklist.",
+		nextSafeAction: "Fix adoption next-actions errors before sharing this checklist.",
 		findings: [],
 		metrics: [],
 		requiredHarnessFiles: REQUIRED_HARNESS_FILES,
@@ -341,12 +311,8 @@ function writeAdoptionNextActions(options = {}) {
 			}
 
 			const gateMarkdown = ctx.readBundleFile("gate.md");
-			const findings = gateMarkdown
-				? extractAdoptionGateFindings(gateMarkdown)
-				: [];
-			const metrics = gateMarkdown
-				? extractAdoptionGateMetrics(gateMarkdown)
-				: [];
+			const findings = gateMarkdown ? extractAdoptionGateFindings(gateMarkdown) : [];
+			const metrics = gateMarkdown ? extractAdoptionGateMetrics(gateMarkdown) : [];
 			return {
 				kind: "adoption-next-actions",
 				target: manifest.target || "unknown",
@@ -354,8 +320,7 @@ function writeAdoptionNextActions(options = {}) {
 				outputPath: ctx.outputPath,
 				latestReport: latestReport || null,
 				gateDecision: manifest.gateDecision || "wait",
-				nextSafeAction:
-					manifest.nextSafeAction || MESSAGES.adoptionReviewBeforeChange,
+				nextSafeAction: manifest.nextSafeAction || MESSAGES.adoptionReviewBeforeChange,
 				findings,
 				metrics,
 				requiredHarnessFiles: REQUIRED_HARNESS_FILES,

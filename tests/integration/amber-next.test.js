@@ -58,7 +58,7 @@ describe("amber next (integration)", () => {
 		assert.equal(amber(dir, ["init", "--target", "."]).status, 0);
 		fs.writeFileSync(
 			path.join(dir, "package.json"),
-			JSON.stringify({ scripts: { test: "node -e \"console.log(1)\"" } }) + "\n",
+			JSON.stringify({ scripts: { test: 'node -e "console.log(1)"' } }) + "\n",
 		);
 		execSync("git add -A && git commit -qm init", { cwd: dir });
 		const start = amber(dir, [
@@ -98,7 +98,9 @@ describe("amber next (integration)", () => {
 		const dir = tmpRepo();
 		fs.writeFileSync(
 			path.join(dir, "feature_list.json"),
-			JSON.stringify({ features: [{ id: "F001", title: "Login", status: "not_started", evidence: [] }] }) + "\n",
+			JSON.stringify({
+				features: [{ id: "F001", title: "Login", status: "not_started", evidence: [] }],
+			}) + "\n",
 		);
 		const r = amber(dir, ["next", "--target", ".", "--feature", "F001"]);
 		assert.equal(r.status, 0, r.stderr);
@@ -126,16 +128,25 @@ describe("amber next progression (feature path, no session)", () => {
 		assert.equal(nextId(dir, ["--feature", "F001"]), "gate");
 
 		// 4. confirm the plan (discover the real filename — case preserved) → feature-evidence
-		const planFile = fs
-			.readdirSync(path.join(dir, "docs", "plans"))
-			.find((f) => f.endsWith(".md"));
+		const planFile = fs.readdirSync(path.join(dir, "docs", "plans")).find((f) => f.endsWith(".md"));
 		const planPath = `docs/plans/${planFile}`;
 		r = amber(dir, ["gate", "--confirm", "--target", ".", "--plan", planPath]);
 		assert.equal(r.status, 0, r.stderr);
 		assert.equal(nextId(dir, ["--feature", "F001"]), "feature-evidence");
 
 		// 5. record feature evidence → accept
-		r = amber(dir, ["feature", "verify", "--target", ".", "--feature", "F001", "--command", "npm test", "--result", "ok"]);
+		r = amber(dir, [
+			"feature",
+			"verify",
+			"--target",
+			".",
+			"--feature",
+			"F001",
+			"--command",
+			"npm test",
+			"--result",
+			"ok",
+		]);
 		assert.equal(r.status, 0, r.stderr);
 		assert.equal(nextId(dir, ["--feature", "F001"]), "accept");
 
@@ -160,7 +171,7 @@ describe("amber next progression (feature path, no session)", () => {
 		assert.equal(amber(dir, ["init", "--target", "."]).status, 0);
 		fs.writeFileSync(
 			path.join(dir, "package.json"),
-			JSON.stringify({ scripts: { test: "node -e \"console.log(1)\"" } }) + "\n",
+			JSON.stringify({ scripts: { test: 'node -e "console.log(1)"' } }) + "\n",
 		);
 		execSync("git add -A && git commit -qm init", { cwd: dir });
 
@@ -228,15 +239,8 @@ describe("amber next progression (feature path, no session)", () => {
 		);
 
 		assert.equal(
-			amber(dir, [
-				"session",
-				"complete-check",
-				"--session",
-				sessionId,
-				"--strict",
-				"--target",
-				".",
-			]).status,
+			amber(dir, ["session", "complete-check", "--session", sessionId, "--strict", "--target", "."])
+				.status,
 			0,
 		);
 		const afterCc = nextOut(dir);
@@ -248,19 +252,16 @@ describe("amber next progression (feature path, no session)", () => {
 		const dir = tmpRepo();
 		amber(dir, ["init", "--target", "."]);
 		amber(dir, ["plan", "--target", ".", "--feature", "F001", "--title", "Login slice"]);
-		const planFile = fs
-			.readdirSync(path.join(dir, "docs", "plans"))
-			.find((f) => f.endsWith(".md"));
+		const planFile = fs.readdirSync(path.join(dir, "docs", "plans")).find((f) => f.endsWith(".md"));
 		const planPath = `docs/plans/${planFile}`;
 		// Fill the Verification section so reviewPlan's own gate passes, leaving
 		// only the new evidence gate to trip.
 		const abs = path.join(dir, planPath);
 		fs.writeFileSync(
 			abs,
-			fs.readFileSync(abs, "utf8").replace(
-				"## Verification\n\n\n",
-				"## Verification\n\n- Run npm test.\n\n",
-			),
+			fs
+				.readFileSync(abs, "utf8")
+				.replace("## Verification\n\n\n", "## Verification\n\n- Run npm test.\n\n"),
 		);
 		amber(dir, ["gate", "--confirm", "--target", ".", "--plan", planPath]);
 
@@ -283,7 +284,9 @@ describe("amber next target-safety (#41)", () => {
 		fs.mkdirSync(spaced, { recursive: true });
 
 		// next recommends init for an external bare target outside the Amber checkout.
-		const r = spawnSync("node", [AMBER, "next", "--target", spaced, "--json"], { encoding: "utf8" });
+		const r = spawnSync("node", [AMBER, "next", "--target", spaced, "--json"], {
+			encoding: "utf8",
+		});
 		assert.equal(r.status, 0, r.stderr);
 		const out = JSON.parse(r.stdout);
 		assert.equal(out.nextStep.id, "init");
@@ -295,7 +298,10 @@ describe("amber next target-safety (#41)", () => {
 		// Executing the remedy's command + target installs Amber into the spaced target.
 		const exec = spawnSync("node", [AMBER, "init", "--target", spaced], { encoding: "utf8" });
 		assert.equal(exec.status, 0, exec.stderr);
-		assert.ok(fs.existsSync(path.join(spaced, "AGENTS.md")), "installed into the spaced external target");
+		assert.ok(
+			fs.existsSync(path.join(spaced, "AGENTS.md")),
+			"installed into the spaced external target",
+		);
 	});
 
 	it("the emitted remedy string executes verbatim through a POSIX shell (#41 AC3)", () => {
@@ -307,13 +313,21 @@ describe("amber next target-safety (#41)", () => {
 		const spaced = path.join(dir, "with space");
 		fs.mkdirSync(spaced, { recursive: true });
 
-		const r = spawnSync("node", [AMBER, "next", "--target", spaced, "--json"], { encoding: "utf8" });
+		const r = spawnSync("node", [AMBER, "next", "--target", spaced, "--json"], {
+			encoding: "utf8",
+		});
 		assert.equal(r.status, 0, r.stderr);
 		const remedy = JSON.parse(r.stdout).nextStep.remedy;
 
 		// Execute the EMITTED remedy string verbatim (not reconstructed argv) through a shell.
-		const sh = spawnSync(remedy.replace(/^amber\s+/, `node "${AMBER}" `), { shell: true, encoding: "utf8" });
+		const sh = spawnSync(remedy.replace(/^amber\s+/, `node "${AMBER}" `), {
+			shell: true,
+			encoding: "utf8",
+		});
 		assert.equal(sh.status, 0, sh.stderr);
-		assert.ok(fs.existsSync(path.join(spaced, "AGENTS.md")), "emitted remedy installed into the spaced target");
+		assert.ok(
+			fs.existsSync(path.join(spaced, "AGENTS.md")),
+			"emitted remedy installed into the spaced target",
+		);
 	});
 });

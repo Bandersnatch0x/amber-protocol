@@ -3,17 +3,13 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
-const {
-	stableTags,
-	findUnpushedTags,
-	findGhostTags,
-} = require("../../scripts/verify-release");
+const { stableTags, findUnpushedTags, findGhostTags } = require("../../scripts/verify-release");
 
 test("stableTags keeps vX.Y.Z and drops prerelease/garbage refs", () => {
-	assert.deepEqual(
-		stableTags(["v1.0.0", "v1.0.0-rc.1", "v1.0.0^{}", "imgbot", "v2.10.3"]),
-		["v1.0.0", "v2.10.3"],
-	);
+	assert.deepEqual(stableTags(["v1.0.0", "v1.0.0-rc.1", "v1.0.0^{}", "imgbot", "v2.10.3"]), [
+		"v1.0.0",
+		"v2.10.3",
+	]);
 });
 
 // Regression #46: the actual v1.3.1 incident — tag created locally,

@@ -25,10 +25,7 @@ test("amber maintenance stale-docs - flags doc with old Last Reviewed", () => {
 	const target = tempDir("old");
 	const wikiDir = path.join(target, "docs", "wiki");
 	fs.mkdirSync(wikiDir, { recursive: true });
-	fs.writeFileSync(
-		path.join(wikiDir, "old.md"),
-		"# Old Doc\n\nLast Reviewed: 2020-01-01\n"
-	);
+	fs.writeFileSync(path.join(wikiDir, "old.md"), "# Old Doc\n\nLast Reviewed: 2020-01-01\n");
 
 	const result = runAmber([
 		"maintenance",
@@ -53,10 +50,7 @@ test("amber maintenance stale-docs - flags doc without marker", () => {
 	const target = tempDir("missing");
 	const wikiDir = path.join(target, "docs", "wiki");
 	fs.mkdirSync(wikiDir, { recursive: true });
-	fs.writeFileSync(
-		path.join(wikiDir, "missing.md"),
-		"# Missing Doc\n\nNo Last Reviewed marker.\n"
-	);
+	fs.writeFileSync(path.join(wikiDir, "missing.md"), "# Missing Doc\n\nNo Last Reviewed marker.\n");
 
 	const result = runAmber([
 		"maintenance",
@@ -101,13 +95,7 @@ test("amber maintenance stale-docs - defaults thresholdDays to 180 when omitted"
 	const target = tempDir("default");
 	fs.mkdirSync(path.join(target, "docs", "wiki"), { recursive: true });
 
-	const result = runAmber([
-		"maintenance",
-		"stale-docs",
-		"--target",
-		target,
-		"--json",
-	]);
+	const result = runAmber(["maintenance", "stale-docs", "--target", target, "--json"]);
 
 	assert.strictEqual(result.status, 0);
 	const json = JSON.parse(result.stdout);
@@ -121,22 +109,10 @@ test("amber maintenance stale-docs - skips an unedited wiki template placeholder
 
 	// Copy a real template verbatim. It has no Last Reviewed marker, so the old
 	// behaviour would flag it; the placeholder-skip rule should exempt it.
-	const templateGlossary = path.join(
-		ROOT,
-		"templates",
-		"docs",
-		"wiki",
-		"glossary.md",
-	);
+	const templateGlossary = path.join(ROOT, "templates", "docs", "wiki", "glossary.md");
 	fs.copyFileSync(templateGlossary, path.join(wikiDir, "glossary.md"));
 
-	const result = runAmber([
-		"maintenance",
-		"stale-docs",
-		"--target",
-		target,
-		"--json",
-	]);
+	const result = runAmber(["maintenance", "stale-docs", "--target", target, "--json"]);
 
 	assert.strictEqual(result.status, 0);
 	const json = JSON.parse(result.stdout);
@@ -152,30 +128,17 @@ test("amber maintenance stale-docs - flags a wiki template once it is edited", (
 	const wikiDir = path.join(target, "docs", "wiki");
 	fs.mkdirSync(wikiDir, { recursive: true });
 
-	const templateGlossary = path.join(
-		ROOT,
-		"templates",
-		"docs",
-		"wiki",
-		"glossary.md",
-	);
+	const templateGlossary = path.join(ROOT, "templates", "docs", "wiki", "glossary.md");
 	const dest = path.join(wikiDir, "glossary.md");
 	fs.copyFileSync(templateGlossary, dest);
 	// Edit the file so it no longer matches the template byte-for-byte. Now the
 	// missing Last Reviewed marker is a fair signal again.
 	fs.appendFileSync(dest, "\n- project-specific term added by the team\n");
 
-	const result = runAmber([
-		"maintenance",
-		"stale-docs",
-		"--target",
-		target,
-		"--json",
-	]);
+	const result = runAmber(["maintenance", "stale-docs", "--target", target, "--json"]);
 
 	assert.strictEqual(result.status, 0);
 	const json = JSON.parse(result.stdout);
 	assert.strictEqual(json.staleDocs.length, 1);
 	assert.strictEqual(json.staleDocs[0].reason, "missing Last Reviewed marker");
 });
-

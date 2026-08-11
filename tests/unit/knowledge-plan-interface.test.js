@@ -95,8 +95,6 @@ test("only the legacy compatibility module may import Knowledge Plan internals o
 
 test("ordinary tests cannot import Knowledge Plan internals", () => {
 	const testsRoot = path.join(REPO_ROOT, "tests");
-	const consumers = internalConsumers(testsRoot)
-		.map(relative)
-		.sort();
+	const consumers = internalConsumers(testsRoot).map(relative).sort();
 	assert.deepEqual(consumers, []);
 });

@@ -12,9 +12,7 @@ const PACKS = [
 ];
 
 function load(relativePath) {
-	return JSON.parse(
-		fs.readFileSync(path.join(__dirname, "..", "..", relativePath), "utf8"),
-	);
+	return JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", relativePath), "utf8"));
 }
 
 function isSemver(version) {
@@ -36,10 +34,7 @@ for (const packPath of PACKS) {
 			pack.standards.includes("security-governance"),
 			"must reference security-governance standard",
 		);
-		assert.ok(
-			!pack.gates,
-			"must not use a top-level gates field; use loopContracts[].reviewGates",
-		);
+		assert.ok(!pack.gates, "must not use a top-level gates field; use loopContracts[].reviewGates");
 
 		assert.ok(
 			Array.isArray(pack.loopContracts) && pack.loopContracts.length > 0,

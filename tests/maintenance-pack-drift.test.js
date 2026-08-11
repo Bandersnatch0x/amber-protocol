@@ -32,7 +32,7 @@ test("amber maintenance pack-drift - installed != latest", () => {
 		JSON.stringify({
 			installedVersion: "1.0.0",
 			rulePacks: ["standards/amber-delivery.json"],
-		})
+		}),
 	);
 	fs.writeFileSync(
 		registryPath,
@@ -59,7 +59,7 @@ test("amber maintenance pack-drift - installed != latest", () => {
 					compatibility: {},
 				},
 			},
-		})
+		}),
 	);
 
 	const result = runAmber([
@@ -76,7 +76,10 @@ test("amber maintenance pack-drift - installed != latest", () => {
 	const json = JSON.parse(result.stdout);
 	assert.strictEqual(json.drifted, true);
 	assert.deepStrictEqual(json.installed, ["standards/amber-delivery.json"]);
-	assert.deepStrictEqual(json.latest, ["rule-packs/amber-delivery.rule-pack.json", "standards/amber-delivery.json"]);
+	assert.deepStrictEqual(json.latest, [
+		"rule-packs/amber-delivery.rule-pack.json",
+		"standards/amber-delivery.json",
+	]);
 
 	fs.rmSync(target, { recursive: true, force: true });
 });

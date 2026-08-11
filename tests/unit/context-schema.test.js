@@ -36,7 +36,7 @@ function validPage(overrides = {}) {
 				ref: ".amber/sessions/4f2a/ledger.jsonl#L12-L48",
 				rawHash: "sha256:" + "c".repeat(64),
 				mutable: false,
-				excerpt: "{\"action\":\"governed-command\",\"result\":\"pass\"}",
+				excerpt: '{"action":"governed-command","result":"pass"}',
 				excerptHash: "sha256:" + "d".repeat(64),
 			},
 		},
@@ -61,7 +61,11 @@ function findProperty(node, propertyName) {
 
 function validRequest(overrides = {}) {
 	const { scope, ...rest } = overrides;
-	const target = { pageId: "governed-execution", title: "Governed execution", reason: "wiki-drift" };
+	const target = {
+		pageId: "governed-execution",
+		title: "Governed execution",
+		reason: "wiki-drift",
+	};
 	if (Array.isArray(scope)) target.scope = scope;
 	return {
 		schemaVersion: "1.0.0",
@@ -137,7 +141,13 @@ describe("Context schema contracts", () => {
 			"context-benchmark.schema.json",
 		]) {
 			const schema = loadSchema(schemaName);
-			const property = findProperty(schema, schemaName === "context-loadout.schema.json" || schemaName === "context-benchmark.schema.json" ? "knowledgeKinds" : "knowledgeKind");
+			const property = findProperty(
+				schema,
+				schemaName === "context-loadout.schema.json" ||
+					schemaName === "context-benchmark.schema.json"
+					? "knowledgeKinds"
+					: "knowledgeKind",
+			);
 			const enumValues = property?.enum || property?.items?.enum;
 			assert.deepEqual(enumValues, KNOWLEDGE_KINDS, schemaName);
 		}
@@ -172,15 +182,27 @@ describe("context-page schema", () => {
 	});
 
 	it("accepts a valid page with scope", () => {
-		assert.equal(validate(validPage({ scope: ["feature-standard", "bugfix-quick"] })), true, JSON.stringify(validate.errors));
+		assert.equal(
+			validate(validPage({ scope: ["feature-standard", "bugfix-quick"] })),
+			true,
+			JSON.stringify(validate.errors),
+		);
 	});
 
 	it("accepts a valid 1.1.0 page without scope", () => {
-		assert.equal(validate(validPage({ schemaVersion: "1.1.0" })), true, JSON.stringify(validate.errors));
+		assert.equal(
+			validate(validPage({ schemaVersion: "1.1.0" })),
+			true,
+			JSON.stringify(validate.errors),
+		);
 	});
 
 	it("accepts a page with scope but schemaVersion 1.0.0 (legacy compat via enum)", () => {
-		assert.equal(validate(validPage({ schemaVersion: "1.0.0", scope: ["feature-standard"] })), true, JSON.stringify(validate.errors));
+		assert.equal(
+			validate(validPage({ schemaVersion: "1.0.0", scope: ["feature-standard"] })),
+			true,
+			JSON.stringify(validate.errors),
+		);
 	});
 
 	it("rejects a page with a non-string scope entry", () => {
@@ -244,11 +266,19 @@ describe("context-request schema", () => {
 	});
 
 	it("accepts a valid request with target.scope", () => {
-		assert.equal(validate(validRequest({ scope: ["feature-standard", "F015"] })), true, JSON.stringify(validate.errors));
+		assert.equal(
+			validate(validRequest({ scope: ["feature-standard", "F015"] })),
+			true,
+			JSON.stringify(validate.errors),
+		);
 	});
 
 	it("accepts a 1.1.0 request with target.scope", () => {
-		assert.equal(validate(validRequest({ schemaVersion: "1.1.0", scope: ["feature-standard"] })), true, JSON.stringify(validate.errors));
+		assert.equal(
+			validate(validRequest({ schemaVersion: "1.1.0", scope: ["feature-standard"] })),
+			true,
+			JSON.stringify(validate.errors),
+		);
 	});
 
 	it("rejects a request with duplicate target.scope entries (uniqueItems)", () => {

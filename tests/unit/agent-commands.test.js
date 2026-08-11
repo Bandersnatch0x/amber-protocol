@@ -46,18 +46,13 @@ describe("parseSkillFrontmatter", () => {
 		const result = parseSkillFrontmatter(md);
 		assert.strictEqual(result.name, "amber-init");
 		assert.strictEqual(result.description, "Install the scaffold.");
-		assert.strictEqual(
-			result.amber.command,
-			"node scripts/amber.js init --target {{target}}",
-		);
+		assert.strictEqual(result.amber.command, "node scripts/amber.js init --target {{target}}");
 		assert.strictEqual(result.amber.args[0].name, "target");
 		assert.strictEqual(result.amber.manualName, "amber-init");
 	});
 
 	it("returns amber:null when x-amber-json is absent", () => {
-		const md = ["---", "name: amber-x", "description: No amber.", "---"].join(
-			"\n",
-		);
+		const md = ["---", "name: amber-x", "description: No amber.", "---"].join("\n");
 		const result = parseSkillFrontmatter(md);
 		assert.strictEqual(result.name, "amber-x");
 		assert.strictEqual(result.amber, null);
@@ -96,10 +91,7 @@ describe("renderClaudeCommand", () => {
 	const output = renderClaudeCommand(SAMPLE_SKILL);
 
 	it("starts with YAML frontmatter carrying the description", () => {
-		assert.match(
-			output,
-			/^---\ndescription: Install the V1 Amber Protocol scaffold\.\n/,
-		);
+		assert.match(output, /^---\ndescription: Install the V1 Amber Protocol scaffold\.\n/);
 	});
 
 	it("includes an argument-hint and a GENERATED marker", () => {
@@ -121,10 +113,7 @@ describe("renderGeminiCommand", () => {
 	});
 
 	it("emits a quoted description field", () => {
-		assert.match(
-			output,
-			/description = "Install the V1 Amber Protocol scaffold\."/,
-		);
+		assert.match(output, /description = "Install the V1 Amber Protocol scaffold\."/);
 	});
 
 	it("emits a triple-quoted prompt containing {{args}}", () => {
@@ -147,11 +136,7 @@ describe("renderGeminiCommand", () => {
 			amber: {
 				command:
 					"node scripts/amber.js plan --target {{target}} --feature {{feature}} --title {{title}}",
-				args: [
-					{ name: "target" },
-					{ name: "feature" },
-					{ name: "title" },
-				],
+				args: [{ name: "target" }, { name: "feature" }, { name: "title" }],
 				manualName: "amber-plan",
 			},
 		});
@@ -164,14 +149,8 @@ describe("renderGeminiCommand", () => {
 describe("collectAmberSkills", () => {
 	it("returns only skills that declare x-amber-json, sorted by name", () => {
 		const root = makeTempSkills({
-			"amber-wiki": skillMd(
-				"amber-wiki",
-				"node scripts/amber.js wiki --target {{target}}",
-			),
-			"amber-init": skillMd(
-				"amber-init",
-				"node scripts/amber.js init --target {{target}}",
-			),
+			"amber-wiki": skillMd("amber-wiki", "node scripts/amber.js wiki --target {{target}}"),
+			"amber-init": skillMd("amber-init", "node scripts/amber.js init --target {{target}}"),
 			"amber-plain": "---\nname: amber-plain\ndescription: No amber.\n---\n",
 		});
 		const skills = collectAmberSkills(root);
@@ -190,10 +169,7 @@ describe("collectAmberSkills", () => {
 describe("generateAgentCommands", () => {
 	function setup() {
 		const skillsRoot = makeTempSkills({
-			"amber-init": skillMd(
-				"amber-init",
-				"node scripts/amber.js init --target {{target}}",
-			),
+			"amber-init": skillMd("amber-init", "node scripts/amber.js init --target {{target}}"),
 		});
 		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
 		return { skillsRoot, repoRoot };
@@ -205,12 +181,8 @@ describe("generateAgentCommands", () => {
 		// 1 amber skill → claude .md + gemini .toml + .agents/skills mirror
 		assert.strictEqual(result.changed.length, 3);
 		assert.deepStrictEqual(result.paths, result.changed);
-		assert.ok(
-			fs.existsSync(path.join(repoRoot, ".claude/commands/amber-init.md")),
-		);
-		assert.ok(
-			fs.existsSync(path.join(repoRoot, ".gemini/commands/amber/init.toml")),
-		);
+		assert.ok(fs.existsSync(path.join(repoRoot, ".claude/commands/amber-init.md")));
+		assert.ok(fs.existsSync(path.join(repoRoot, ".gemini/commands/amber/init.toml")));
 	});
 
 	it("is idempotent — second run reports nothing changed", () => {
@@ -225,10 +197,7 @@ describe("generateAgentCommands", () => {
 		const { skillsRoot, repoRoot } = setup();
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
 		assert.ok(result.changed.length > 0);
-		assert.strictEqual(
-			fs.existsSync(path.join(repoRoot, ".claude/commands/amber-init.md")),
-			false,
-		);
+		assert.strictEqual(fs.existsSync(path.join(repoRoot, ".claude/commands/amber-init.md")), false);
 	});
 
 	it("treats CRLF-only differences as unchanged", () => {
@@ -282,10 +251,7 @@ describe("real skills integration", () => {
 	it("every skill command targets a real amber.js subcommand", () => {
 		for (const skill of skills) {
 			const name = extractCommandName(skill.amber.command);
-			assert.ok(
-				COMMANDS.includes(name),
-				`${skill.name} → unknown command "${name}"`,
-			);
+			assert.ok(COMMANDS.includes(name), `${skill.name} → unknown command "${name}"`);
 			assert.match(skill.amber.command, /^node scripts\/amber\.js /);
 		}
 	});
@@ -326,11 +292,7 @@ describe("root AGENTS.md", () => {
 		const skills = collectAmberSkills(path.join(repoRoot, "skills"));
 		for (const skill of skills) {
 			const name = extractCommandName(skill.amber.command);
-			assert.match(
-				text,
-				new RegExp(`amber\\.js ${name}\\b`),
-				`AGENTS.md missing command: ${name}`,
-			);
+			assert.match(text, new RegExp(`amber\\.js ${name}\\b`), `AGENTS.md missing command: ${name}`);
 		}
 	});
 });
@@ -338,10 +300,7 @@ describe("root AGENTS.md", () => {
 describe("listSkillDirs + .agents/skills mirror", () => {
 	it("lists all directories containing SKILL.md, sorted", () => {
 		const root = makeTempSkills({
-			"b-skill": skillMd(
-				"b-skill",
-				"node scripts/amber.js doctor --target {{target}}",
-			),
+			"b-skill": skillMd("b-skill", "node scripts/amber.js doctor --target {{target}}"),
 			"a-skill": "---\nname: a-skill\ndescription: plain.\n---\n",
 		});
 		fs.mkdirSync(path.join(root, "empty-dir"));
@@ -350,10 +309,7 @@ describe("listSkillDirs + .agents/skills mirror", () => {
 
 	it("mirrors every skill (amber or not) to .agents/skills", () => {
 		const skillsRoot = makeTempSkills({
-			"amber-init": skillMd(
-				"amber-init",
-				"node scripts/amber.js init --target {{target}}",
-			),
+			"amber-init": skillMd("amber-init", "node scripts/amber.js init --target {{target}}"),
 			"plain-skill": "---\nname: plain-skill\ndescription: plain.\n---\n",
 		});
 		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
@@ -364,8 +320,6 @@ describe("listSkillDirs + .agents/skills mirror", () => {
 			fs.readFileSync(mirrored, "utf8"),
 			fs.readFileSync(path.join(skillsRoot, "amber-init/SKILL.md"), "utf8"),
 		);
-		assert.ok(
-			fs.existsSync(path.join(repoRoot, ".agents/skills/plain-skill/SKILL.md")),
-		);
+		assert.ok(fs.existsSync(path.join(repoRoot, ".agents/skills/plain-skill/SKILL.md")));
 	});
 });

@@ -20,9 +20,7 @@ function detail(code) {
 function suggestionsFor(query) {
 	const q = String(query || "").toLowerCase();
 	return listCodes().filter(
-		(code) =>
-			code.toLowerCase().includes(q) ||
-			CATALOG[code].title.toLowerCase().includes(q),
+		(code) => code.toLowerCase().includes(q) || CATALOG[code].title.toLowerCase().includes(q),
 	);
 }
 
@@ -30,9 +28,7 @@ function listAll() {
 	const rows = listCodes().map(
 		(code) => `  ${code}  [${CATALOG[code].layer}]  ${CATALOG[code].title}`,
 	);
-	return ["Amber error codes:", ...rows, "", "Run `amber explain <code>` for detail."].join(
-		"\n",
-	);
+	return ["Amber error codes:", ...rows, "", "Run `amber explain <code>` for detail."].join("\n");
 }
 
 function renderMarkdown() {

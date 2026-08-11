@@ -84,6 +84,7 @@ Use conventional commit format:
 Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
 
 Example:
+
 ```
 feat: add session pause command
 
@@ -218,6 +219,7 @@ Before releasing, review the quality assurance documentation:
 Amber Protocol uses automated releases via GitHub Actions. When a stable version tag (`vX.Y.Z`) is pushed, CI runs the full test matrix and publishes to **GitHub Packages** (not npmjs.org). See `.github/workflows/publish-github-packages.yml`.
 
 **Core invariants (never bypass):**
+
 - `npm run version:sync` MUST be executed during prep (it keeps `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` in lockstep with `package.json`).
 - `npm run release:verify` MUST be run after the tag is pushed and the publish workflow has completed (terminal guard against the v1.3.1 ghost-version class from #46).
 - Prefer the smallest increment (patch) unless the changes warrant minor/major.

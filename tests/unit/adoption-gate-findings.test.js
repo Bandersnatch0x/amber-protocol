@@ -53,10 +53,7 @@ test("unconfirmed candidate commands and unresolved unknowns each raise a wait f
 	const findings = adoptionGateFindings(
 		report({ candidateCommands: ["pytest"], unknowns: ["which test runner?"] }),
 	);
-	assert.deepEqual(ids(findings), [
-		"candidate-commands-unconfirmed",
-		"unknowns-present",
-	]);
+	assert.deepEqual(ids(findings), ["candidate-commands-unconfirmed", "unknowns-present"]);
 	assert.ok(findings.every((f) => f.severity === "wait"));
 });
 

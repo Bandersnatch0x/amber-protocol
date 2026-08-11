@@ -18,9 +18,7 @@ function main(argv = process.argv.slice(2)) {
 			}
 			return 1;
 		}
-		console.log(
-			`Agent command files up to date (${result.paths.length} files).`,
-		);
+		console.log(`Agent command files up to date (${result.paths.length} files).`);
 		return 0;
 	}
 

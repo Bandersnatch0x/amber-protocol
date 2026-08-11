@@ -5,21 +5,10 @@ const path = require("path");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
 
 function getCheckpointsDir(projectRoot, sessionId) {
-	return path.join(
-		resolveStateDirForRead(projectRoot),
-		"sessions",
-		sessionId,
-		"checkpoints",
-	);
+	return path.join(resolveStateDirForRead(projectRoot), "sessions", sessionId, "checkpoints");
 }
 
-function saveCheckpoint(
-	projectRoot,
-	sessionId,
-	stage,
-	manifest,
-	worktreeState,
-) {
+function saveCheckpoint(projectRoot, sessionId, stage, manifest, worktreeState) {
 	const checkpointsDir = getCheckpointsDir(projectRoot, sessionId);
 	if (!fs.existsSync(checkpointsDir)) {
 		fs.mkdirSync(checkpointsDir, { recursive: true });
@@ -53,24 +42,18 @@ function listCheckpoints(projectRoot, sessionId) {
 		return [];
 	}
 
-	const files = fs
-		.readdirSync(checkpointsDir)
-		.filter((f) => f.endsWith(".json"));
+	const files = fs.readdirSync(checkpointsDir).filter((f) => f.endsWith(".json"));
 	const checkpoints = [];
 	for (const f of files) {
 		try {
 			const content = fs.readFileSync(path.join(checkpointsDir, f), "utf8");
 			checkpoints.push(JSON.parse(content));
 		} catch (err) {
-			console.error(
-				`Warning: skipping corrupt checkpoint ${f}: ${err.message}`,
-			);
+			console.error(`Warning: skipping corrupt checkpoint ${f}: ${err.message}`);
 		}
 	}
 
-	return checkpoints.sort(
-		(a, b) => new Date(a.timestamp) - new Date(b.timestamp),
-	);
+	return checkpoints.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 }
 
 function loadCheckpointByStage(projectRoot, sessionId, stage) {

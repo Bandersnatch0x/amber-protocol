@@ -8,8 +8,9 @@ const os = require("os");
 const { governanceDispatch } = require("../scripts/lib/governance-commands");
 
 function usesGovernanceDir(filePath) {
-	return filePath.split(path.sep).includes(".amber") &&
-		filePath.split(path.sep).includes("governance");
+	return (
+		filePath.split(path.sep).includes(".amber") && filePath.split(path.sep).includes("governance")
+	);
 }
 
 describe("governance docs", () => {
@@ -31,14 +32,14 @@ describe("governance docs", () => {
 		assert.strictEqual(result.errors.length, 0);
 		assert.strictEqual(result.created.length, 3);
 		assert.ok(result.created.every(usesGovernanceDir));
-		assert.ok(result.created.some(p => p.endsWith('POLICY.md')));
-		assert.ok(result.created.some(p => p.endsWith('BOUNDARIES.md')));
-		assert.ok(result.created.some(p => p.endsWith('AUDIT_LOG.md')));
+		assert.ok(result.created.some((p) => p.endsWith("POLICY.md")));
+		assert.ok(result.created.some((p) => p.endsWith("BOUNDARIES.md")));
+		assert.ok(result.created.some((p) => p.endsWith("AUDIT_LOG.md")));
 		assert.strictEqual(result.skipped.length, 0);
 
-		assert.ok(fs.existsSync(path.join(tmpDir, '.amber', 'governance', 'POLICY.md')));
-		assert.ok(fs.existsSync(path.join(tmpDir, '.amber', 'governance', 'BOUNDARIES.md')));
-		assert.ok(fs.existsSync(path.join(tmpDir, '.amber', 'governance', 'AUDIT_LOG.md')));
+		assert.ok(fs.existsSync(path.join(tmpDir, ".amber", "governance", "POLICY.md")));
+		assert.ok(fs.existsSync(path.join(tmpDir, ".amber", "governance", "BOUNDARIES.md")));
+		assert.ok(fs.existsSync(path.join(tmpDir, ".amber", "governance", "AUDIT_LOG.md")));
 	});
 
 	it("re-run → skips existing files", () => {
@@ -53,9 +54,9 @@ describe("governance docs", () => {
 			assert.strictEqual(secondRun.created.length, 0);
 			assert.strictEqual(secondRun.skipped.length, 3);
 			assert.ok(secondRun.skipped.every(usesGovernanceDir));
-			assert.ok(secondRun.skipped.some(p => p.endsWith('POLICY.md')));
-			assert.ok(secondRun.skipped.some(p => p.endsWith('BOUNDARIES.md')));
-			assert.ok(secondRun.skipped.some(p => p.endsWith('AUDIT_LOG.md')));
+			assert.ok(secondRun.skipped.some((p) => p.endsWith("POLICY.md")));
+			assert.ok(secondRun.skipped.some((p) => p.endsWith("BOUNDARIES.md")));
+			assert.ok(secondRun.skipped.some((p) => p.endsWith("AUDIT_LOG.md")));
 		} finally {
 			fs.rmSync(tmpDir2, { recursive: true, force: true });
 		}

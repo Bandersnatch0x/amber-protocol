@@ -33,7 +33,15 @@ function writeFile(root, relativePath, content) {
 	fs.writeFileSync(filePath, content);
 }
 
-const INDEX = ["---", "type: index", "title: Index", "description: Root page.", "---", "", "# Index"].join("\n");
+const INDEX = [
+	"---",
+	"type: index",
+	"title: Index",
+	"description: Root page.",
+	"---",
+	"",
+	"# Index",
+].join("\n");
 
 test("OKF mode errors on a wiki page missing the required type field", () => {
 	const target = tempDir("missing-type");
@@ -51,13 +59,19 @@ test("OKF mode errors on a wiki page missing the required type field", () => {
 test("OKF mode warns when a page has type but lacks recommended fields", () => {
 	const target = tempDir("missing-recommended");
 	writeFile(target, "docs/wiki/index.md", INDEX);
-	writeFile(target, "docs/wiki/sparse.md", ["---", "type: concept", "---", "", "# Sparse"].join("\n"));
+	writeFile(
+		target,
+		"docs/wiki/sparse.md",
+		["---", "type: concept", "---", "", "# Sparse"].join("\n"),
+	);
 
 	const result = validateWiki(target, { okf: true });
 
 	assert.deepEqual(result.errors, []);
 	assert.ok(
-		result.warnings.some((warning) => /sparse\.md/.test(warning) && /title|description/.test(warning)),
+		result.warnings.some(
+			(warning) => /sparse\.md/.test(warning) && /title|description/.test(warning),
+		),
 		`expected an OKF recommended-field warning for sparse.md, got: ${JSON.stringify(result.warnings)}`,
 	);
 });

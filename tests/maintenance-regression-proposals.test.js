@@ -32,22 +32,16 @@ test("amber maintenance regression-proposals - extracts proposed regression", ()
 			plan: "docs/plans/F001.md",
 			regressionProposal: {
 				status: "proposed",
-				assertion: "user authentication succeeds"
+				assertion: "user authentication succeeds",
 			},
 			traceReplay: {
 				traceInput: "login flow",
-				agentConfig: "worker-a"
-			}
-		})
+				agentConfig: "worker-a",
+			},
+		}),
 	);
 
-	const result = runAmber([
-		"maintenance",
-		"regression-proposals",
-		"--target",
-		target,
-		"--json",
-	]);
+	const result = runAmber(["maintenance", "regression-proposals", "--target", target, "--json"]);
 
 	assert.strictEqual(result.status, 0);
 	const json = JSON.parse(result.stdout);
@@ -66,17 +60,11 @@ test("amber maintenance regression-proposals - empty list without proposals", ()
 		path.join(executionsDir, "evidence.json"),
 		JSON.stringify({
 			taskId: "task-2",
-			plan: "docs/plans/F002.md"
-		})
+			plan: "docs/plans/F002.md",
+		}),
 	);
 
-	const result = runAmber([
-		"maintenance",
-		"regression-proposals",
-		"--target",
-		target,
-		"--json",
-	]);
+	const result = runAmber(["maintenance", "regression-proposals", "--target", target, "--json"]);
 
 	assert.strictEqual(result.status, 0);
 	const json = JSON.parse(result.stdout);

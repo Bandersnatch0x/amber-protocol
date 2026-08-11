@@ -11,7 +11,11 @@ const {
 } = require("../scripts/lib/workflow-assessment");
 
 function toolEvent(command) {
-	return { type: "tool_call", data: { tool: "bash", command }, timestamp: "2026-08-07T00:00:00.000Z" };
+	return {
+		type: "tool_call",
+		data: { tool: "bash", command },
+		timestamp: "2026-08-07T00:00:00.000Z",
+	};
 }
 
 test("repeated tool calls: raw targets differing only by digits stay distinct", () => {
@@ -27,11 +31,7 @@ test("repeated tool calls: raw targets differing only by digits stay distinct", 
 });
 
 test("repeated tool calls: same raw target three times is a repeated finding", () => {
-	const events = [
-		toolEvent("cat log1.txt"),
-		toolEvent("cat log1.txt"),
-		toolEvent("cat log1.txt"),
-	];
+	const events = [toolEvent("cat log1.txt"), toolEvent("cat log1.txt"), toolEvent("cat log1.txt")];
 	const findings = detectNoProgress({ timelineEvents: events });
 	assert.equal(findings.length, 1);
 	assert.equal(findings[0].id, "no-progress-repeated-tool-call");
@@ -57,18 +57,36 @@ test("repeated tool calls: log1 and log2 each repeated are two separate findings
 });
 
 test("toolTargetFromEvent extracts targets from the supported event shapes", () => {
-	assert.equal(toolTargetFromEvent({ type: "tool_call", data: { tool: "bash", command: "ls -la" } }), "ls -la");
+	assert.equal(
+		toolTargetFromEvent({ type: "tool_call", data: { tool: "bash", command: "ls -la" } }),
+		"ls -la",
+	);
 	assert.equal(toolTargetFromEvent({ type: "tool_call", data: { tool: "Read" } }), "Read");
-	assert.equal(toolTargetFromEvent({ type: "command_executed", data: { command: "npm test" } }), "npm test");
-	assert.equal(toolTargetFromEvent({ type: "stage_completed", data: { command: "node run" } }), "node run");
-	assert.equal(toolTargetFromEvent({ type: "verification_failed", data: { command: "node verify" } }), "node verify");
+	assert.equal(
+		toolTargetFromEvent({ type: "command_executed", data: { command: "npm test" } }),
+		"npm test",
+	);
+	assert.equal(
+		toolTargetFromEvent({ type: "stage_completed", data: { command: "node run" } }),
+		"node run",
+	);
+	assert.equal(
+		toolTargetFromEvent({ type: "verification_failed", data: { command: "node verify" } }),
+		"node verify",
+	);
 	assert.equal(toolTargetFromEvent({ type: "session_created", data: { goal: "x" } }), null);
 	assert.equal(toolTargetFromEvent({ type: "tool_call", data: {} }), null);
 	assert.equal(toolTargetFromEvent(null), null);
 });
 
 test("empty evidence increment: empty diff reports one warning", () => {
-	for (const resultEvidence of [{ diff: [] }, { diff: "" }, { diff: null }, { delta: { changes: 0 } }, { changes: 0 }]) {
+	for (const resultEvidence of [
+		{ diff: [] },
+		{ diff: "" },
+		{ diff: null },
+		{ delta: { changes: 0 } },
+		{ changes: 0 },
+	]) {
 		const findings = detectNoProgress({ resultEvidence });
 		assert.equal(findings.length, 1, `expected a finding for ${JSON.stringify(resultEvidence)}`);
 		assert.equal(findings[0].id, "no-progress-empty-evidence-increment");
@@ -102,7 +120,10 @@ test("budget exhausted: cumulative usage over budgetCeiling reports an error", (
 		{ type: "stage_completed", data: { tokens: 60 } },
 		{ type: "stage_completed", data: { tokens: 70 } },
 	];
-	const findings = detectNoProgress({ timelineEvents: events, loopContract: { budgetCeiling: 100 } });
+	const findings = detectNoProgress({
+		timelineEvents: events,
+		loopContract: { budgetCeiling: 100 },
+	});
 	assert.equal(findings.length, 1);
 	assert.equal(findings[0].id, "no-progress-budget-exhausted");
 	assert.equal(findings[0].severity, "error");
@@ -111,12 +132,18 @@ test("budget exhausted: cumulative usage over budgetCeiling reports an error", (
 
 test("budget exhausted: usage within ceiling reports nothing", () => {
 	const events = [{ type: "stage_completed", data: { tokens: 60 } }];
-	assert.deepEqual(detectNoProgress({ timelineEvents: events, loopContract: { budgetCeiling: 100 } }), []);
+	assert.deepEqual(
+		detectNoProgress({ timelineEvents: events, loopContract: { budgetCeiling: 100 } }),
+		[],
+	);
 });
 
 test("budget exhausted: no budgetCeiling skips the signal", () => {
 	const events = [{ type: "stage_completed", data: { tokens: 1000 } }];
-	assert.deepEqual(detectNoProgress({ timelineEvents: events, loopContract: { budget: { maxTokens: 10 } } }), []);
+	assert.deepEqual(
+		detectNoProgress({ timelineEvents: events, loopContract: { budget: { maxTokens: 10 } } }),
+		[],
+	);
 	assert.deepEqual(detectNoProgress({ timelineEvents: events, loopContract: null }), []);
 });
 
@@ -142,7 +169,10 @@ test("budget exhausted: budget.ceiling is accepted and result evidence usage cou
 test("detectNoProgress with no input returns an empty array", () => {
 	assert.deepEqual(detectNoProgress(), []);
 	assert.deepEqual(detectNoProgress({}), []);
-	assert.deepEqual(detectNoProgress({ timelineEvents: [], resultEvidence: null, loopContract: null }), []);
+	assert.deepEqual(
+		detectNoProgress({ timelineEvents: [], resultEvidence: null, loopContract: null }),
+		[],
+	);
 });
 
 test("detectNoProgress is re-exported from the workflow-assessment index", () => {

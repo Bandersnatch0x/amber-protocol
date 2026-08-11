@@ -21,20 +21,31 @@ function makeTempTarget() {
 }
 
 function cleanup(dir) {
-	try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { void e; }
+	try {
+		fs.rmSync(dir, { recursive: true, force: true });
+	} catch (e) {
+		void e;
+	}
 }
 
 function writeJsonPlan(targetRoot, planData) {
 	const planDir = path.join(targetRoot, "docs", "wiki");
 	fs.mkdirSync(planDir, { recursive: true });
-	const p = { schemaVersion: "1.0.0", version: 1, scope: { include: [], exclude: [] }, knowledgePlan: { template: "architecture", notes: [], documents: [] }, knowledgeCards: [], ...planData };
+	const p = {
+		schemaVersion: "1.0.0",
+		version: 1,
+		scope: { include: [], exclude: [] },
+		knowledgePlan: { template: "architecture", notes: [], documents: [] },
+		knowledgeCards: [],
+		...planData,
+	};
 	fs.writeFileSync(path.join(planDir, "knowledge-plan.json"), JSON.stringify(p, null, 2), "utf8");
 	return path.join(planDir, "knowledge-plan.json");
 }
 
 describe("knowledge-plan parseSimpleYaml", () => {
 	it("parses basic key-value", () => {
-		const y = "schemaVersion: \"1.0.0\"\nversion: 3\nfoo: bar";
+		const y = 'schemaVersion: "1.0.0"\nversion: 3\nfoo: bar';
 		const p = parseSimpleYaml(y);
 		assert.strictEqual(p.schemaVersion, "1.0.0");
 		assert.strictEqual(p.version, 3); // we coerce simple integers for schema
@@ -42,7 +53,7 @@ describe("knowledge-plan parseSimpleYaml", () => {
 	});
 
 	it("parses lists (- items) of scalars and objects", () => {
-		const y = "items:\n  - \"a\"\n  - b\nobjs:\n  - title: \"T1\"\n    goal: \"G1\"\n  - title: \"T2\"";
+		const y = 'items:\n  - "a"\n  - b\nobjs:\n  - title: "T1"\n    goal: "G1"\n  - title: "T2"';
 		const p = parseSimpleYaml(y);
 		assert.deepStrictEqual(p.items, ["a", "b"]);
 		assert.strictEqual(p.objs.length, 2);
@@ -51,7 +62,7 @@ describe("knowledge-plan parseSimpleYaml", () => {
 	});
 
 	it("parses nested objects", () => {
-		const y = "knowledgePlan:\n  template: \"arch\"\n  notes:\n    - text: \"n1\"";
+		const y = 'knowledgePlan:\n  template: "arch"\n  notes:\n    - text: "n1"';
 		const p = parseSimpleYaml(y);
 		assert.ok(p.knowledgePlan);
 		assert.strictEqual(p.knowledgePlan.template, "arch");
@@ -97,7 +108,9 @@ describe("knowledge-plan loadKnowledgePlan", () => {
 			const res = loadKnowledgePlan(tmp);
 			assert.strictEqual(res.found, false);
 			assert.strictEqual(res.plan, null);
-		} finally { cleanup(tmp); }
+		} finally {
+			cleanup(tmp);
+		}
 	});
 
 	it("loads and validates a json plan successfully", () => {
@@ -105,7 +118,11 @@ describe("knowledge-plan loadKnowledgePlan", () => {
 		try {
 			const plan = {
 				schemaVersion: "1.0.0",
-				knowledgePlan: { template: "architecture", notes: [{ text: "note" }], documents: [{ title: "T", goal: "G" }] },
+				knowledgePlan: {
+					template: "architecture",
+					notes: [{ text: "note" }],
+					documents: [{ title: "T", goal: "G" }],
+				},
 				knowledgeCards: [{ id: "c1", text: "card", tags: ["t"] }],
 			};
 			writeJsonPlan(tmp, plan);
@@ -115,7 +132,9 @@ describe("knowledge-plan loadKnowledgePlan", () => {
 			assert.ok(res.plan);
 			assert.strictEqual(res.plan.knowledgeCards.length, 1);
 			assert.strictEqual(res.plan.knowledgeCards[0].text, "card");
-		} finally { cleanup(tmp); }
+		} finally {
+			cleanup(tmp);
+		}
 	});
 
 	it("reports errors for corrupt plan file", () => {
@@ -128,7 +147,9 @@ describe("knowledge-plan loadKnowledgePlan", () => {
 			assert.strictEqual(res.found, true);
 			assert.ok(res.errors.length > 0);
 			assert.ok(res.errors[0].includes("Failed to read or parse"));
-		} finally { cleanup(tmp); }
+		} finally {
+			cleanup(tmp);
+		}
 	});
 });
 
@@ -151,7 +172,9 @@ describe("knowledge-plan materializeKnowledgeBase", () => {
 			const r2 = materializeKnowledgeBase(tmp, { dryRun: false });
 			assert.strictEqual(r2.created.length, 0);
 			assert.ok(r2.skipped.length >= r1.created.length);
-		} finally { cleanup(tmp); }
+		} finally {
+			cleanup(tmp);
+		}
 	});
 
 	it("dryRun does not write any files", () => {
@@ -159,7 +182,11 @@ describe("knowledge-plan materializeKnowledgeBase", () => {
 		try {
 			const plan = {
 				schemaVersion: "1.0.0",
-				knowledgePlan: { template: "architecture", notes: [], documents: [{ title: "D", goal: "g" }] },
+				knowledgePlan: {
+					template: "architecture",
+					notes: [],
+					documents: [{ title: "D", goal: "g" }],
+				},
 				knowledgeCards: [{ text: "c" }],
 			};
 			writeJsonPlan(tmp, plan);
@@ -169,7 +196,9 @@ describe("knowledge-plan materializeKnowledgeBase", () => {
 			assert.strictEqual(before, false);
 			assert.strictEqual(after, false);
 			assert.ok(r.created.length > 0); // would have
-		} finally { cleanup(tmp); }
+		} finally {
+			cleanup(tmp);
+		}
 	});
 });
 
@@ -180,7 +209,9 @@ describe("knowledge-plan buildKnowledgeReport", () => {
 			const rep = buildKnowledgeReport(tmp);
 			assert.strictEqual(rep.planFound, false);
 			assert.ok(rep.summary.includes("No knowledge-plan.json"));
-		} finally { cleanup(tmp); }
+		} finally {
+			cleanup(tmp);
+		}
 	});
 
 	it("includes coverage when plan present", () => {
@@ -188,7 +219,11 @@ describe("knowledge-plan buildKnowledgeReport", () => {
 		try {
 			const plan = {
 				schemaVersion: "1.0.0",
-				knowledgePlan: { template: "architecture", notes: [], documents: [{ title: "Sample Doc", goal: "goal" }] },
+				knowledgePlan: {
+					template: "architecture",
+					notes: [],
+					documents: [{ title: "Sample Doc", goal: "goal" }],
+				},
 				knowledgeCards: [{ text: "c1", tags: [] }],
 			};
 			writeJsonPlan(tmp, plan);
@@ -197,7 +232,9 @@ describe("knowledge-plan buildKnowledgeReport", () => {
 			assert.ok(rep.coverage);
 			assert.ok(typeof rep.coverage.total === "number");
 			assert.ok(rep.summary.includes("knowledge cards"));
-		} finally { cleanup(tmp); }
+		} finally {
+			cleanup(tmp);
+		}
 	});
 });
 
@@ -226,6 +263,8 @@ describe("knowledge-plan F4 roundtrip via propose + load", () => {
 			// also verify yaml file exists at expected relative
 			const yamlPath = path.join(tmp, KNOWLEDGE_PLAN_YAML_RELATIVE);
 			assert.ok(fs.existsSync(yamlPath));
-		} finally { cleanup(tmp); }
+		} finally {
+			cleanup(tmp);
+		}
 	});
 });

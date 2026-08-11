@@ -55,9 +55,7 @@ function main() {
 		console.log("=== Next-up Issues ===");
 		process.stdout.write(runCapture(SECTIONS[1].cmd, SECTIONS[1].args));
 	} catch (err) {
-		console.error(
-			`gh issue list failed (gh installed + auth + network?): ${err.message || err}`,
-		);
+		console.error(`gh issue list failed (gh installed + auth + network?): ${err.message || err}`);
 	}
 	console.log("\n");
 

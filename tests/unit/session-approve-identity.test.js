@@ -30,7 +30,11 @@ test("refuses approval in a non-interactive shell without --yes", async () => {
 test("--yes approves and records the approval source", async () => {
 	const dir = tmpRepo();
 	const s = await startSession(dir, { goal: "add login feature", route: "feature-standard" });
-	const r = await approveSession(dir, { sessionId: s.sessionId, gate: "user-approval-plan", yes: true });
+	const r = await approveSession(dir, {
+		sessionId: s.sessionId,
+		gate: "user-approval-plan",
+		yes: true,
+	});
 	assert.equal(r.exitCode, 0);
 	const tl = path.join(dir, ".amber", "sessions", s.sessionId, "timeline.jsonl");
 	const events = fs.readFileSync(tl, "utf8").trim().split("\n").map(JSON.parse);

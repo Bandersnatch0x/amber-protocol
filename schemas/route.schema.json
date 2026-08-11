@@ -1,73 +1,73 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "required": ["routeId", "schemaVersion", "stages"],
-  "properties": {
-    "routeId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-    "schemaVersion": { "type": "string", "const": "1.0.0" },
-    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
-    "displayName": { "type": "string" },
-    "description": { "type": "string" },
-    "trigger": {
-      "type": "object",
-      "properties": {
-        "goalPattern": { "type": "string" },
-        "complexity": { "enum": ["simple", "medium", "complex"] }
-      }
-    },
-    "stages": {
-      "type": "array",
-      "minItems": 1,
-      "items": { "$ref": "#/definitions/Stage" }
-    },
-    "gates": {
-      "type": "array",
-      "items": { "$ref": "#/definitions/Gate" }
-    },
-    "amber_protocol_version": { "type": "string" },
-    "artifact_sequence": { "type": "integer" },
-    "created_at": { "type": "string", "format": "date-time" },
-    "artifact_type": { "type": "string" },
-    "execution_mode": { "enum": ["direct", "bounded_loop", "swarm", "dag"] },
-    "objective": { "type": "string" }
-  },
-  "definitions": {
-    "Stage": {
-      "type": "object",
-      "required": ["name", "type"],
-      "properties": {
-        "name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-        "displayName": { "type": "string" },
-        "type": { "enum": ["pack", "skill", "command", "gate"] },
-        "target": { "type": "string" },
-        "gateAfter": { "type": "string" },
-        "optional": { "type": "boolean", "default": false },
-        "note": { "type": "string" },
-        "rules": {
-          "type": "array",
-          "description": "Extra fixed-predicate rules composed with global rules.json for this stage's command only. deny-wins is absolute.",
-          "items": {
-            "type": "object",
-            "required": ["id", "action", "match", "pattern"],
-            "properties": {
-              "id": { "type": "string" },
-              "action": { "enum": ["allow", "deny"] },
-              "match": { "enum": ["exact", "prefix", "regex"] },
-              "pattern": { "type": "string" },
-              "mapsTo": { "type": "array", "items": { "type": "string" } }
-            }
-          }
-        }
-      }
-    },
-    "Gate": {
-      "type": "object",
-      "required": ["id", "type"],
-      "properties": {
-        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-        "type": { "enum": ["auto", "user-approval", "step-confirm"] },
-        "description": { "type": "string" }
-      }
-    }
-  }
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"type": "object",
+	"required": ["routeId", "schemaVersion", "stages"],
+	"properties": {
+		"routeId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+		"schemaVersion": { "type": "string", "const": "1.0.0" },
+		"version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+		"displayName": { "type": "string" },
+		"description": { "type": "string" },
+		"trigger": {
+			"type": "object",
+			"properties": {
+				"goalPattern": { "type": "string" },
+				"complexity": { "enum": ["simple", "medium", "complex"] }
+			}
+		},
+		"stages": {
+			"type": "array",
+			"minItems": 1,
+			"items": { "$ref": "#/definitions/Stage" }
+		},
+		"gates": {
+			"type": "array",
+			"items": { "$ref": "#/definitions/Gate" }
+		},
+		"amber_protocol_version": { "type": "string" },
+		"artifact_sequence": { "type": "integer" },
+		"created_at": { "type": "string", "format": "date-time" },
+		"artifact_type": { "type": "string" },
+		"execution_mode": { "enum": ["direct", "bounded_loop", "swarm", "dag"] },
+		"objective": { "type": "string" }
+	},
+	"definitions": {
+		"Stage": {
+			"type": "object",
+			"required": ["name", "type"],
+			"properties": {
+				"name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+				"displayName": { "type": "string" },
+				"type": { "enum": ["pack", "skill", "command", "gate"] },
+				"target": { "type": "string" },
+				"gateAfter": { "type": "string" },
+				"optional": { "type": "boolean", "default": false },
+				"note": { "type": "string" },
+				"rules": {
+					"type": "array",
+					"description": "Extra fixed-predicate rules composed with global rules.json for this stage's command only. deny-wins is absolute.",
+					"items": {
+						"type": "object",
+						"required": ["id", "action", "match", "pattern"],
+						"properties": {
+							"id": { "type": "string" },
+							"action": { "enum": ["allow", "deny"] },
+							"match": { "enum": ["exact", "prefix", "regex"] },
+							"pattern": { "type": "string" },
+							"mapsTo": { "type": "array", "items": { "type": "string" } }
+						}
+					}
+				}
+			}
+		},
+		"Gate": {
+			"type": "object",
+			"required": ["id", "type"],
+			"properties": {
+				"id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+				"type": { "enum": ["auto", "user-approval", "step-confirm"] },
+				"description": { "type": "string" }
+			}
+		}
+	}
 }

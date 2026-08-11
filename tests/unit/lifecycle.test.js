@@ -43,7 +43,11 @@ describe("gatherState", () => {
 	it("reads features and parses plan Feature + User Confirmation lines", () => {
 		const dir = tmpRepo();
 		writeFeatureList(dir, [{ id: "F001", title: "Login", status: "not_started", evidence: [] }]);
-		writePlan(dir, "F001-login.md", "Feature: F001\nStatus: implementation-ready\nUser Confirmation: confirmed\n");
+		writePlan(
+			dir,
+			"F001-login.md",
+			"Feature: F001\nStatus: implementation-ready\nUser Confirmation: confirmed\n",
+		);
 		const state = gatherState(dir);
 		assert.equal(state.features.length, 1);
 		assert.equal(state.plans.length, 1);
@@ -99,7 +103,13 @@ function ctxOf(stateOverrides, focusOverrides) {
 			activeSessionId: null,
 			...stateOverrides,
 		},
-		focus: { type: "feature", id: "F001", autoSelected: false, othersPending: 0, ...focusOverrides },
+		focus: {
+			type: "feature",
+			id: "F001",
+			autoSelected: false,
+			othersPending: 0,
+			...focusOverrides,
+		},
 		completion: null,
 		sessionStatus: null,
 		// Default true so feature-path accept tests are not blocked by handoff step.
@@ -111,10 +121,7 @@ function ctxOf(stateOverrides, focusOverrides) {
 describe("inferNextStep (synthetic ctx)", () => {
 	it("recommends init when amber is not installed on a bare bootstrap", () => {
 		const step = inferNextStep(
-			ctxOf(
-				{ amberInstalled: false, existingProject: false },
-				{ type: "bootstrap", id: null },
-			),
+			ctxOf({ amberInstalled: false, existingProject: false }, { type: "bootstrap", id: null }),
 		);
 		assert.equal(step.id, "init");
 		assert.match(step.remedy, /^amber init --target \./);
@@ -122,10 +129,7 @@ describe("inferNextStep (synthetic ctx)", () => {
 
 	it("recommends init on an existing unharnessed project (audit is read-only advisory, never blocks — #43)", () => {
 		const step = inferNextStep(
-			ctxOf(
-				{ amberInstalled: false, existingProject: true },
-				{ type: "bootstrap", id: null },
-			),
+			ctxOf({ amberInstalled: false, existingProject: true }, { type: "bootstrap", id: null }),
 		);
 		// audit step is advisory (isDone always true) so progression reaches init
 		// without depending on any written target stamp.
@@ -138,10 +142,7 @@ describe("inferNextStep (synthetic ctx)", () => {
 			liveHandoff: false,
 			sessionStatus: "executing",
 			pendingGateId: "user-approval-implement",
-			sessionGates: [
-				{ id: "user-approval-plan" },
-				{ id: "user-approval-implement" },
-			],
+			sessionGates: [{ id: "user-approval-plan" }, { id: "user-approval-implement" }],
 			completion: { status: "fail", missing: ["approval", "handoff"] },
 		};
 		const step = inferNextStep(base);
@@ -168,7 +169,9 @@ describe("inferNextStep (synthetic ctx)", () => {
 		const step = inferNextStep(
 			ctxOf({
 				features: [{ id: "F001", status: "not_started", evidence: [] }],
-				plans: [{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: false, mtimeMs: 1 }],
+				plans: [
+					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: false, mtimeMs: 1 },
+				],
 			}),
 		);
 		assert.equal(step.id, "gate");
@@ -179,7 +182,9 @@ describe("inferNextStep (synthetic ctx)", () => {
 		const step = inferNextStep(
 			ctxOf({
 				features: [{ id: "F001", status: "not_started", evidence: [] }],
-				plans: [{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 }],
+				plans: [
+					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 },
+				],
 			}),
 		);
 		assert.equal(step.id, "feature-evidence");
@@ -188,8 +193,16 @@ describe("inferNextStep (synthetic ctx)", () => {
 	it("recommends accept when plan confirmed and evidence recorded", () => {
 		const step = inferNextStep(
 			ctxOf({
-				features: [{ id: "F001", status: "passing", evidence: [{ command: "x", result: "y", date: "2026-06-27" }] }],
-				plans: [{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 }],
+				features: [
+					{
+						id: "F001",
+						status: "passing",
+						evidence: [{ command: "x", result: "y", date: "2026-06-27" }],
+					},
+				],
+				plans: [
+					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 },
+				],
 			}),
 		);
 		assert.equal(step.id, "accept");
@@ -253,9 +266,7 @@ describe("inferNextStep (synthetic ctx)", () => {
 	});
 
 	it("does not propose feature/init for a session focus on a feature-less repo", () => {
-		const step = inferNextStep(
-			ctxOf({ features: [] }, { type: "session", id: "sess-1" }),
-		);
+		const step = inferNextStep(ctxOf({ features: [] }, { type: "session", id: "sess-1" }));
 		// init/feature are guarded to non-session focus, so verify wins (no completion → missing []).
 		assert.notEqual(step && step.id, "feature");
 		assert.notEqual(step && step.id, "init");
@@ -267,12 +278,23 @@ describe("acceptLogged via synthetic ctx + real evolution log", () => {
 		const dir = tmpRepo();
 		const evoDir = path.join(dir, "docs", "wiki", "engineering");
 		fs.mkdirSync(evoDir, { recursive: true });
-		fs.writeFileSync(path.join(evoDir, "harness-evolution.md"), "## 2026-06-27 docs/plans/F001-login.md\n");
+		fs.writeFileSync(
+			path.join(evoDir, "harness-evolution.md"),
+			"## 2026-06-27 docs/plans/F001-login.md\n",
+		);
 		const ctx = ctxOf(
 			{
 				targetRoot: dir,
-				features: [{ id: "F001", status: "passing", evidence: [{ command: "x", result: "y", date: "2026-06-27" }] }],
-				plans: [{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 }],
+				features: [
+					{
+						id: "F001",
+						status: "passing",
+						evidence: [{ command: "x", result: "y", date: "2026-06-27" }],
+					},
+				],
+				plans: [
+					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 },
+				],
 			},
 			{ type: "feature", id: "F001" },
 		);
@@ -296,7 +318,10 @@ describe("focus auto-selection", () => {
 	});
 
 	it("remedyFor returns the feature add command from a minimal ctx", () => {
-		assert.match(remedyFor("feature", { targetDisplay: "." }), /^amber feature add --target \. --id F001/);
+		assert.match(
+			remedyFor("feature", { targetDisplay: "." }),
+			/^amber feature add --target \. --id F001/,
+		);
 	});
 });
 

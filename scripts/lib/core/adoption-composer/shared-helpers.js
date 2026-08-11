@@ -3,11 +3,7 @@
 // shared-helpers.js
 // Common rendering utilities used across all adoption artifact renderers.
 
-const {
-	ADOPTION_BOUNDARY_KEYS,
-	MESSAGES,
-	formatAdoptionBoundaryLines,
-} = require("../terminology");
+const { ADOPTION_BOUNDARY_KEYS, MESSAGES, formatAdoptionBoundaryLines } = require("../terminology");
 
 function renderMarkdown(lines) {
 	return lines.join("\n");
@@ -29,11 +25,7 @@ function pushBulletList(lines, items, options = {}) {
 }
 
 function pushBoundaryBlock(lines, boundaries, options = {}) {
-	const {
-		heading = "Boundary",
-		keys = ADOPTION_BOUNDARY_KEYS,
-		preamble,
-	} = options;
+	const { heading = "Boundary", keys = ADOPTION_BOUNDARY_KEYS, preamble } = options;
 	pushSection(lines, heading);
 	if (preamble) {
 		lines.push(preamble, "");

@@ -32,9 +32,20 @@ function exportLedger(target, options = {}) {
 	const brokenCount = filtered.length - intactCount;
 	const errors = [];
 	if (!stateDir) errors.push("no .amber or .harness state directory");
-	if (brokenCount > 0) errors.push(`${brokenCount} ledger(s) have a broken hash chain (exported with intact:false).`);
+	if (brokenCount > 0)
+		errors.push(`${brokenCount} ledger(s) have a broken hash chain (exported with intact:false).`);
 	const payload = buildPayload(format, filtered);
-	return { target: targetRoot, stateDir, format, ledgers: filtered, intactCount, brokenCount, payload, errors, warnings: [] };
+	return {
+		target: targetRoot,
+		stateDir,
+		format,
+		ledgers: filtered,
+		intactCount,
+		brokenCount,
+		payload,
+		errors,
+		warnings: [],
+	};
 }
 
 function buildPayload(format, ledgers) {
@@ -69,7 +80,9 @@ function toCsv(ledgers) {
 	const rows = [cols.join(",")];
 	for (const l of ledgers) {
 		l.records.forEach((r, i) => {
-			rows.push([l.home, l.sub, i, r.kind || "", r.prevHash || "", r.hash || ""].map(csvField).join(","));
+			rows.push(
+				[l.home, l.sub, i, r.kind || "", r.prevHash || "", r.hash || ""].map(csvField).join(","),
+			);
 		});
 	}
 	return rows.join("\n");

@@ -64,7 +64,10 @@ function inspectControls(targetRoot) {
 	let hasApprovalRecord = false;
 	walkLedgers(stateDir, ({ ledgerPath }) => {
 		const raw = fs.readFileSync(ledgerPath, "utf8");
-		const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+		const lines = raw
+			.split("\n")
+			.map((l) => l.trim())
+			.filter(Boolean);
 		if (lines.length > 0) hasHashChainLedger = true;
 		for (const line of lines) {
 			try {
@@ -85,14 +88,19 @@ function inspectControls(targetRoot) {
 	};
 }
 
-function mapStandards(targetRoot, framework = "owasp-agentic", standardsDir = DEFAULT_STANDARDS_DIR) {
+function mapStandards(
+	targetRoot,
+	framework = "owasp-agentic",
+	standardsDir = DEFAULT_STANDARDS_DIR,
+) {
 	let def;
 	try {
 		def = loadFramework(framework, standardsDir);
 	} catch (e) {
-		const msg = e && e.code === "FRAMEWORK_CORRUPT" && e.message
-			? e.message
-			: `Unknown framework: ${framework}`;
+		const msg =
+			e && e.code === "FRAMEWORK_CORRUPT" && e.message
+				? e.message
+				: `Unknown framework: ${framework}`;
 		return { target: targetRoot, framework, risks: [], errors: [msg], warnings: [] };
 	}
 	const controls = inspectControls(targetRoot);

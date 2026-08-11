@@ -1,149 +1,134 @@
 {
-  "id": "safe-amber-bootstrap",
-  "title": "Safe Amber Bootstrap",
-  "version": "0.1.0",
-  "description": "Declarative smoke pack for inspecting the V1 Safe Amber Bootstrap workflow without executing scripts.",
-  "skills": [],
-  "standards": [
-    "amber-delivery"
-  ],
-  "externalIntegrations": [],
-  "connectorContracts": [
-    {
-      "id": "local-docs",
-      "type": "filesystem",
-      "mode": "read-only",
-      "credentials": "none",
-      "redaction": "not-required",
-      "externalWrites": false
-    }
-  ],
-  "approvalPolicy": {
-    "readOnlyInspection": "allowed",
-    "reportGeneration": "allowed",
-    "fileMutation": "requires-human-approval",
-    "commandExecution": "requires-human-approval",
-    "externalNotification": "requires-human-approval",
-    "issueCreation": "requires-human-approval",
-    "selfApprovalAllowed": false
-  },
-  "loopLedger": {
-    "required": true,
-    "pathTemplate": ".amber/loops/{contractId}/ledger.json",
-    "chatHistoryRequired": false,
-    "recordsInputSnapshot": true,
-    "recordsToolSummary": true,
-    "recordsBudgetUsage": true,
-    "recordsStopReason": true,
-    "recordsApprovalState": true,
-    "recordsReviewerOutcome": true
-  },
-  "workspaceIsolation": {
-    "mutatingLoopsUseWorktree": true,
-    "mainCheckoutMutation": false
-  },
-  "steps": [
-    {
-      "id": "audit-target",
-      "title": "Audit Target",
-      "kind": "manual",
-      "description": "Run the read-only audit command and inspect missing files, conflicts, unknowns, and next safe command."
-    },
-    {
-      "id": "initialize-or-skip",
-      "title": "Initialize Or Skip",
-      "kind": "manual",
-      "description": "Create missing Amber starter files only when the target has no conflicting files."
-    },
-    {
-      "id": "validate-amber",
-      "title": "Validate Amber",
-      "kind": "manual",
-      "description": "Run wiki, handoff, and doctor validation; record command output as evidence."
-    }
-  ],
-  "loopContracts": [
-    {
-      "id": "daily-amber-triage",
-      "title": "Daily Amber Triage",
-      "trigger": {
-        "type": "scheduled",
-        "cadence": "daily",
-        "enabled": false
-      },
-      "goal": "Inspect Amber health and produce reviewable candidate work without executing it.",
-      "stateSpine": ".amber/loops/daily-amber-triage/state.json",
-      "inputs": [
-        "doctor report",
-        "maintenance inspect",
-        "recent evolution findings"
-      ],
-      "skills": [
-        "amber-continuous-improvement"
-      ],
-      "connectors": [
-        "local-docs"
-      ],
-      "triageOutputs": [
-        "archive",
-        "candidate-task",
-        "needs-human",
-        "blocked",
-        "regression-test-proposal"
-      ],
-      "hardStops": {
-        "maxIterations": 3,
-        "timeoutMinutes": 30,
-        "noProgressDetection": true
-      },
-      "budget": {
-        "maxMinutes": 30,
-        "maxTokens": 200000,
-        "maxUsd": 25
-      },
-      "reviewGates": [
-        "human-approval",
-        "reviewer-evidence"
-      ],
-      "execution": {
-        "executesAnything": false,
-        "schedulesJobs": false,
-        "dispatchesAgents": false,
-        "writesExternalSystems": false
-      }
-    },
-    {
-      "id": "amber-doctor-check",
-      "title": "Amber Doctor Check (governed)",
-      "trigger": {
-        "type": "manual",
-        "cadence": "on-demand",
-        "enabled": false
-      },
-      "cadence": "on-demand",
-      "goal": "Run amber doctor under governance gates as the GLX dogfood execution unit.",
-      "stateSpine": ".amber/loops/amber-doctor-check/state.json",
-      "hardStops": {
-        "maxIterations": 1,
-        "timeoutMinutes": 5,
-        "noProgressDetection": true
-      },
-      "budget": {
-        "maxMinutes": 5
-      },
-      "reviewGates": [
-        "human-approval"
-      ],
-      "governed": {
-        "command": "node scripts/amber.js doctor --target .",
-        "requiresApproval": true
-      },
-      "execution": {
-        "executesAnything": false,
-        "schedulesJobs": false,
-        "dispatchesAgents": false,
-        "writesExternalSystems": false
-      }
-    }
-  ]
+	"id": "safe-amber-bootstrap",
+	"title": "Safe Amber Bootstrap",
+	"version": "0.1.0",
+	"description": "Declarative smoke pack for inspecting the V1 Safe Amber Bootstrap workflow without executing scripts.",
+	"skills": [],
+	"standards": ["amber-delivery"],
+	"externalIntegrations": [],
+	"connectorContracts": [
+		{
+			"id": "local-docs",
+			"type": "filesystem",
+			"mode": "read-only",
+			"credentials": "none",
+			"redaction": "not-required",
+			"externalWrites": false
+		}
+	],
+	"approvalPolicy": {
+		"readOnlyInspection": "allowed",
+		"reportGeneration": "allowed",
+		"fileMutation": "requires-human-approval",
+		"commandExecution": "requires-human-approval",
+		"externalNotification": "requires-human-approval",
+		"issueCreation": "requires-human-approval",
+		"selfApprovalAllowed": false
+	},
+	"loopLedger": {
+		"required": true,
+		"pathTemplate": ".amber/loops/{contractId}/ledger.json",
+		"chatHistoryRequired": false,
+		"recordsInputSnapshot": true,
+		"recordsToolSummary": true,
+		"recordsBudgetUsage": true,
+		"recordsStopReason": true,
+		"recordsApprovalState": true,
+		"recordsReviewerOutcome": true
+	},
+	"workspaceIsolation": {
+		"mutatingLoopsUseWorktree": true,
+		"mainCheckoutMutation": false
+	},
+	"steps": [
+		{
+			"id": "audit-target",
+			"title": "Audit Target",
+			"kind": "manual",
+			"description": "Run the read-only audit command and inspect missing files, conflicts, unknowns, and next safe command."
+		},
+		{
+			"id": "initialize-or-skip",
+			"title": "Initialize Or Skip",
+			"kind": "manual",
+			"description": "Create missing Amber starter files only when the target has no conflicting files."
+		},
+		{
+			"id": "validate-amber",
+			"title": "Validate Amber",
+			"kind": "manual",
+			"description": "Run wiki, handoff, and doctor validation; record command output as evidence."
+		}
+	],
+	"loopContracts": [
+		{
+			"id": "daily-amber-triage",
+			"title": "Daily Amber Triage",
+			"trigger": {
+				"type": "scheduled",
+				"cadence": "daily",
+				"enabled": false
+			},
+			"goal": "Inspect Amber health and produce reviewable candidate work without executing it.",
+			"stateSpine": ".amber/loops/daily-amber-triage/state.json",
+			"inputs": ["doctor report", "maintenance inspect", "recent evolution findings"],
+			"skills": ["amber-continuous-improvement"],
+			"connectors": ["local-docs"],
+			"triageOutputs": [
+				"archive",
+				"candidate-task",
+				"needs-human",
+				"blocked",
+				"regression-test-proposal"
+			],
+			"hardStops": {
+				"maxIterations": 3,
+				"timeoutMinutes": 30,
+				"noProgressDetection": true
+			},
+			"budget": {
+				"maxMinutes": 30,
+				"maxTokens": 200000,
+				"maxUsd": 25
+			},
+			"reviewGates": ["human-approval", "reviewer-evidence"],
+			"execution": {
+				"executesAnything": false,
+				"schedulesJobs": false,
+				"dispatchesAgents": false,
+				"writesExternalSystems": false
+			}
+		},
+		{
+			"id": "amber-doctor-check",
+			"title": "Amber Doctor Check (governed)",
+			"trigger": {
+				"type": "manual",
+				"cadence": "on-demand",
+				"enabled": false
+			},
+			"cadence": "on-demand",
+			"goal": "Run amber doctor under governance gates as the GLX dogfood execution unit.",
+			"stateSpine": ".amber/loops/amber-doctor-check/state.json",
+			"hardStops": {
+				"maxIterations": 1,
+				"timeoutMinutes": 5,
+				"noProgressDetection": true
+			},
+			"budget": {
+				"maxMinutes": 5
+			},
+			"reviewGates": ["human-approval"],
+			"governed": {
+				"command": "node scripts/amber.js doctor --target .",
+				"requiresApproval": true
+			},
+			"execution": {
+				"executesAnything": false,
+				"schedulesJobs": false,
+				"dispatchesAgents": false,
+				"writesExternalSystems": false
+			}
+		}
+	]
 }

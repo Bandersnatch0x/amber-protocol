@@ -9,10 +9,7 @@ const SAFETY_NOTE =
 
 function stripQuotes(value) {
 	const t = String(value).trim();
-	if (
-		(t.startsWith('"') && t.endsWith('"')) ||
-		(t.startsWith("'") && t.endsWith("'"))
-	) {
+	if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
 		return t.slice(1, -1);
 	}
 	return t;
@@ -42,10 +39,7 @@ function parseSkillFrontmatter(markdown) {
 			try {
 				result.amber = JSON.parse(amberMatch[1]);
 			} catch (error) {
-				throw new Error(
-					`Invalid x-amber-json in frontmatter: ${error.message}`,
-					{ cause: error },
-				);
+				throw new Error(`Invalid x-amber-json in frontmatter: ${error.message}`, { cause: error });
 			}
 		}
 	}
@@ -155,9 +149,7 @@ function listSkillDirs(skillsRoot) {
 	return fs
 		.readdirSync(skillsRoot, { withFileTypes: true })
 		.filter(
-			(entry) =>
-				entry.isDirectory() &&
-				pathExists(path.join(skillsRoot, entry.name, "SKILL.md")),
+			(entry) => entry.isDirectory() && pathExists(path.join(skillsRoot, entry.name, "SKILL.md")),
 		)
 		.map((entry) => entry.name)
 		.sort();
@@ -173,22 +165,11 @@ function planOutputs(skills, repoRoot) {
 		const manualName = path.basename(skill.amber.manualName);
 		const shortName = extractCommandName(skill.amber.command);
 		outputs.push({
-			path: path.join(
-				repoRoot,
-				".claude",
-				"commands",
-				`${manualName}.md`,
-			),
+			path: path.join(repoRoot, ".claude", "commands", `${manualName}.md`),
 			content: renderClaudeCommand(skill),
 		});
 		outputs.push({
-			path: path.join(
-				repoRoot,
-				".gemini",
-				"commands",
-				"amber",
-				`${shortName}.toml`,
-			),
+			path: path.join(repoRoot, ".gemini", "commands", "amber", `${shortName}.toml`),
 			content: renderGeminiCommand(skill),
 		});
 	}
@@ -210,9 +191,7 @@ function generateAgentCommands({ skillsRoot, repoRoot, check = false }) {
 		const relativePath = relativeSlash(repoRoot, output.path);
 		paths.push(relativePath);
 		const existing = pathExists(output.path) ? readText(output.path) : null;
-		const isStale =
-			existing === null ||
-			normalizeEol(existing) !== normalizeEol(output.content);
+		const isStale = existing === null || normalizeEol(existing) !== normalizeEol(output.content);
 		if (isStale) {
 			changed.push(relativePath);
 			if (!check) {

@@ -30,9 +30,7 @@ const ALLOWED_BOT_IDENTITIES = [
 ];
 
 function isHumanIdentity(identity) {
-	return (
-		identity.name === ALLOWED_NAME && ALLOWED_EMAILS.has(identity.email.toLowerCase())
-	);
+	return identity.name === ALLOWED_NAME && ALLOWED_EMAILS.has(identity.email.toLowerCase());
 }
 
 function isBotIdentity(identity) {

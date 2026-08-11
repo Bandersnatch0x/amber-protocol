@@ -3,11 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const {
-	pathExists,
-	relativeSlash,
-	resolveTarget,
-} = require("../../core/fs-utils");
+const { pathExists, relativeSlash, resolveTarget } = require("../../core/fs-utils");
 const { loadKnowledgePlan } = require("./load");
 
 /**
@@ -166,7 +162,8 @@ function buildKnowledgeIndex(plan, documents, cards) {
 
 function buildKnowledgePage(doc, notes, plan) {
 	const lines = [];
-	const effectiveTemplate = doc.template || (plan.knowledgePlan && plan.knowledgePlan.template) || "architecture";
+	const effectiveTemplate =
+		doc.template || (plan.knowledgePlan && plan.knowledgePlan.template) || "architecture";
 
 	lines.push("---");
 	lines.push(`kind: "knowledge"`);
@@ -221,7 +218,9 @@ function buildKnowledgePage(doc, notes, plan) {
 		lines.push("    A[Entry] --> B[Core]");
 		lines.push("```");
 		lines.push("");
-		lines.push("*(Mermaid diagrams are supported in the generated knowledge; the original implementation had dedicated fix tooling.)*");
+		lines.push(
+			"*(Mermaid diagrams are supported in the generated knowledge; the original implementation had dedicated fix tooling.)*",
+		);
 		lines.push("");
 		lines.push("## Rules developers should follow");
 		lines.push("");

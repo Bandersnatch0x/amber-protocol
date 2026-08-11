@@ -2,16 +2,8 @@
 
 const path = require("node:path");
 
-const {
-	pathExists,
-	relativeSlash,
-	resolveTarget,
-	walkFiles,
-} = require("../../core/fs-utils");
-const {
-	KNOWLEDGE_PLAN_RELATIVE,
-	loadKnowledgePlan,
-} = require("./load");
+const { pathExists, relativeSlash, resolveTarget, walkFiles } = require("../../core/fs-utils");
+const { KNOWLEDGE_PLAN_RELATIVE, loadKnowledgePlan } = require("./load");
 
 /**
  * Simple coverage heuristic: does a wiki document with a similar title exist?
@@ -38,11 +30,7 @@ function computeDocumentCoverage(targetRoot, documents = []) {
 		const goalLower = (doc.goal || "").toLowerCase();
 		const matched = existingFiles.find((rel) => {
 			const base = path.basename(rel, ".md").toLowerCase().replace(/[-_]/g, " ");
-			return (
-				base.includes(titleLower) ||
-				titleLower.includes(base) ||
-				goalLower.includes(base)
-			);
+			return base.includes(titleLower) || titleLower.includes(base) || goalLower.includes(base);
 		});
 		return {
 			title: doc.title,
@@ -95,14 +83,17 @@ function buildKnowledgeReport(target) {
 	};
 
 	if (!loaded.found || !loaded.plan) {
-		report.summary = "No knowledge-plan.json found. Run `amber wiki knowledge plan --target .` to create one.";
+		report.summary =
+			"No knowledge-plan.json found. Run `amber wiki knowledge plan --target .` to create one.";
 		return report;
 	}
 
 	const plan = loaded.plan;
 	report.plan = {
 		template: plan.knowledgePlan?.template || "architecture",
-		notes: Array.isArray(plan.knowledgePlan?.notes) ? plan.knowledgePlan.notes.map((n) => n.text) : [],
+		notes: Array.isArray(plan.knowledgePlan?.notes)
+			? plan.knowledgePlan.notes.map((n) => n.text)
+			: [],
 		documents: Array.isArray(plan.knowledgePlan?.documents) ? plan.knowledgePlan.documents : [],
 	};
 
@@ -111,13 +102,14 @@ function buildKnowledgeReport(target) {
 				id: c.id || null,
 				text: c.text,
 				tags: Array.isArray(c.tags) ? c.tags : [],
-		  }))
+			}))
 		: [];
 
 	report.coverage = computeDocumentCoverage(targetRoot, report.plan?.documents || []);
 
 	const cov = report.coverage;
-	report.summary = `Knowledge Plan v${plan.version || 1} (${report.plan.template}). ` +
+	report.summary =
+		`Knowledge Plan v${plan.version || 1} (${report.plan.template}). ` +
 		`${cov.present}/${cov.total} declared documents appear to have coverage in docs/wiki or docs/architecture. ` +
 		`${report.knowledgeCards.length} knowledge cards defined.`;
 

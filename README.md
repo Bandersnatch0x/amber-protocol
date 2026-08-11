@@ -38,17 +38,17 @@ AI coding work becomes easier to trust when the workflow leaves inspectable evid
 audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate
 ```
 
-| Stage | Command | What you get |
-| --- | --- | --- |
-| Inspect | `amber audit --target <repo> --summary` | Read-only readiness findings |
-| Install | `amber init --target <repo>` | Starter governance files without overwrites |
-| Score | `amber governance report --target <repo>` | Readiness score, risks, and structured next actions |
-| Effectiveness | `amber workflow assess --target <repo>` | Workflow-effectiveness dimensions (separate from readiness; ADR-0008) |
-| Plan | `amber plan --target <repo> --feature F001 --title "..."` | A feature plan and review surface |
-| Gate | `amber next --target <repo>` | The next safe lifecycle command |
-| Verify | `amber doctor --target <repo>` | Checks for required agent-facing surfaces |
-| Context | `amber context request --target <repo> --page <id>` | Contract-driven distillation: turns session evidence into provenance-backed knowledge pages (ADR-0009) |
-| Handoff | `amber handoff bundle --target <repo>` | Portable continuation bundle another human or agent can continue |
+| Stage         | Command                                                   | What you get                                                                                           |
+| ------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Inspect       | `amber audit --target <repo> --summary`                   | Read-only readiness findings                                                                           |
+| Install       | `amber init --target <repo>`                              | Starter governance files without overwrites                                                            |
+| Score         | `amber governance report --target <repo>`                 | Readiness score, risks, and structured next actions                                                    |
+| Effectiveness | `amber workflow assess --target <repo>`                   | Workflow-effectiveness dimensions (separate from readiness; ADR-0008)                                  |
+| Plan          | `amber plan --target <repo> --feature F001 --title "..."` | A feature plan and review surface                                                                      |
+| Gate          | `amber next --target <repo>`                              | The next safe lifecycle command                                                                        |
+| Verify        | `amber doctor --target <repo>`                            | Checks for required agent-facing surfaces                                                              |
+| Context       | `amber context request --target <repo> --page <id>`       | Contract-driven distillation: turns session evidence into provenance-backed knowledge pages (ADR-0009) |
+| Handoff       | `amber handoff bundle --target <repo>`                    | Portable continuation bundle another human or agent can continue                                       |
 
 ## Repository artifacts
 
@@ -64,6 +64,7 @@ clean-state-checklist.md
 docs/wiki/
 .workflow/continuous-improvement/state.json
 ```
+
 ## Installation
 
 ### From npm (Recommended)
@@ -277,15 +278,15 @@ Every blocking error carries a stable code (e.g. `AMBER_E_FEATURE_NO_EVIDENCE`).
 
 Amber organizes governance into seven control layers, weighted toward safety — the higher the priority, the more of Amber's surface that layer gets:
 
-| Layer | Role in Amber | Priority |
-| --- | --- | --- |
-| `Governance` | Approval records, safe defaults, policy boundaries, and adoption controls constrain behavior. | Highest |
-| `Verification` | Doctor, audit, validation, review, and gate surfaces provide explicit checks. | High |
-| `Observability` | Timelines, manifests, ledgers, and reports make behavior inspectable. | High |
-| `Lifecycle` | Routes, sessions, checkpoints, and worktrees organize work locally. | Medium |
-| `Context` | Starter docs, wiki scaffolds, manifests, and handoff artifacts keep project context explicit. | Medium |
-| `Tooling` | CLI commands, schemas, validators, workflow packs, and profiles expose explicit interfaces. | Medium |
-| `Execution` | Minimal — Amber avoids becoming a general execution runtime or live agent platform. | Low |
+| Layer           | Role in Amber                                                                                 | Priority |
+| --------------- | --------------------------------------------------------------------------------------------- | -------- |
+| `Governance`    | Approval records, safe defaults, policy boundaries, and adoption controls constrain behavior. | Highest  |
+| `Verification`  | Doctor, audit, validation, review, and gate surfaces provide explicit checks.                 | High     |
+| `Observability` | Timelines, manifests, ledgers, and reports make behavior inspectable.                         | High     |
+| `Lifecycle`     | Routes, sessions, checkpoints, and worktrees organize work locally.                           | Medium   |
+| `Context`       | Starter docs, wiki scaffolds, manifests, and handoff artifacts keep project context explicit. | Medium   |
+| `Tooling`       | CLI commands, schemas, validators, workflow packs, and profiles expose explicit interfaces.   | Medium   |
+| `Execution`     | Minimal — Amber avoids becoming a general execution runtime or live agent platform.           | Low      |
 
 The through-line: strengthen `Governance`, `Verification`, and `Observability`; keep `Lifecycle` repository-local; avoid drifting into a full agent platform. The [governance model](./docs/architecture/governance-model.md) maps each layer to concrete commands.
 
@@ -297,7 +298,7 @@ The through-line: strengthen `Governance`, `Verification`, and `Observability`; 
 - `.workflow/continuous-improvement/state.json`
 - a minimal `docs/wiki/` — project context, system map, runbook, verification, glossary
 
-All starter files are safe defaults. `init` and `wiki` skip existing files and report what *would* be created in dry-run mode.
+All starter files are safe defaults. `init` and `wiki` skip existing files and report what _would_ be created in dry-run mode.
 
 ## What It Won't Do
 
@@ -328,17 +329,17 @@ For the full boundary notes, see [SPEC.md](./SPEC.md).
 
 ## Documentation
 
-| Topic | Link |
-| --- | --- |
-| Full CLI reference | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md) |
-| Getting started guide | [docs/user-guide/getting-started.md](./docs/user-guide/getting-started.md) |
-| Architecture & governance model | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md) |
-| Deployment & ops | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) |
+| Topic                               | Link                                                                                                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full CLI reference                  | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md)                                                                                                                      |
+| Getting started guide               | [docs/user-guide/getting-started.md](./docs/user-guide/getting-started.md)                                                                                            |
+| Architecture & governance model     | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md)                                                                                      |
+| Deployment & ops                    | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)                                                                                                                            |
 | Monitoring / notifications / policy | [MONITORING_SETUP.md](./docs/MONITORING_SETUP.md) · [NOTIFICATION_SETUP.md](./docs/NOTIFICATION_SETUP.md) · [POLICY_CONFIGURATION.md](./docs/POLICY_CONFIGURATION.md) |
-| Troubleshooting | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) |
-| Full docs index | [docs/README.md](./docs/README.md) |
-| Spec & roadmap | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md) |
-| Contributing | [CONTRIBUTING.md](./CONTRIBUTING.md) |
+| Troubleshooting                     | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)                                                                                                                  |
+| Full docs index                     | [docs/README.md](./docs/README.md)                                                                                                                                    |
+| Spec & roadmap                      | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                     |
+| Contributing                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                  |
 
 The web viewer (`apps/web`) provides a dashboard for sessions and timelines:
 

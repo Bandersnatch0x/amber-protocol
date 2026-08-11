@@ -25,8 +25,7 @@ function getRepoSnapshot(targetRoot) {
 	// porcelain: "?? path" / "!! path" are untracked/ignored; anything else is
 	// a tracked-file change (M/A/D/R/C/U in the first two columns).
 	const untrackedOnly =
-		lines.length > 0 &&
-		lines.every((line) => line.startsWith("??") || line.startsWith("!!"));
+		lines.length > 0 && lines.every((line) => line.startsWith("??") || line.startsWith("!!"));
 	const dirty = lines.length > 0;
 	const lastCommit = gitOutput(targetRoot, ["log", "-1", "--format=%h %s"]) || null;
 	return {

@@ -71,12 +71,7 @@ describe("session-commands", () => {
 			assert.strictEqual(result.exitCode, 0);
 			assert.ok(result.sessionId);
 
-			const sessionDir = path.join(
-				TEST_ROOT,
-				".amber",
-				"sessions",
-				result.sessionId,
-			);
+			const sessionDir = path.join(TEST_ROOT, ".amber", "sessions", result.sessionId);
 			assert.ok(fs.existsSync(path.join(sessionDir, "manifest.json")));
 			assert.ok(fs.existsSync(path.join(sessionDir, "timeline.jsonl")));
 		});
@@ -159,12 +154,7 @@ describe("session-commands", () => {
 
 			assert.strictEqual(result.exitCode, 0);
 
-			const worktreePath = path.join(
-				TEST_ROOT,
-				".amber",
-				"worktrees",
-				result.sessionId,
-			);
+			const worktreePath = path.join(TEST_ROOT, ".amber", "worktrees", result.sessionId);
 			assert.ok(fs.existsSync(worktreePath));
 		});
 
@@ -287,13 +277,7 @@ describe("session-commands", () => {
 
 	describe("gate persistence", () => {
 		function gatesDir(sessionId) {
-			return path.join(
-				TEST_ROOT,
-				".amber",
-				"sessions",
-				sessionId,
-				"gates",
-			);
+			return path.join(TEST_ROOT, ".amber", "sessions", sessionId, "gates");
 		}
 
 		it("materializes route gates as pending .gate.json files on start", async () => {
@@ -339,10 +323,7 @@ describe("session-commands", () => {
 			});
 			assert.strictEqual(result.exitCode, 0);
 
-			const decisionPath = path.join(
-				gatesDir(start.sessionId),
-				"user-approval-plan.decision.json",
-			);
+			const decisionPath = path.join(gatesDir(start.sessionId), "user-approval-plan.decision.json");
 			assert.ok(fs.existsSync(decisionPath));
 
 			const decision = JSON.parse(fs.readFileSync(decisionPath, "utf8"));
@@ -351,9 +332,11 @@ describe("session-commands", () => {
 			assert.ok(decision.resolvedAt);
 
 			// The other gate stays pending — no decision file.
-			assert.ok(!fs.existsSync(
-				path.join(gatesDir(start.sessionId), "user-approval-implement.decision.json"),
-			));
+			assert.ok(
+				!fs.existsSync(
+					path.join(gatesDir(start.sessionId), "user-approval-implement.decision.json"),
+				),
+			);
 		});
 	});
 
@@ -368,10 +351,12 @@ describe("session-commands", () => {
 			assert.strictEqual(start.exitCode, 0);
 			assert.match(start.text, /Feature: F001/);
 
-			const manifest = JSON.parse(fs.readFileSync(
-				path.join(TEST_ROOT, ".amber", "sessions", start.sessionId, "manifest.json"),
-				"utf8",
-			));
+			const manifest = JSON.parse(
+				fs.readFileSync(
+					path.join(TEST_ROOT, ".amber", "sessions", start.sessionId, "manifest.json"),
+					"utf8",
+				),
+			);
 			assert.strictEqual(manifest.feature, "F001");
 		});
 
@@ -381,7 +366,7 @@ describe("session-commands", () => {
 			// package.json with a passing test script.
 			fs.writeFileSync(
 				path.join(TEST_ROOT, "package.json"),
-				JSON.stringify({ name: "s", scripts: { test: "node -e \"process.exit(0)\"" } }),
+				JSON.stringify({ name: "s", scripts: { test: 'node -e "process.exit(0)"' } }),
 			);
 			const start = await startSession(TEST_ROOT, {
 				goal: "add greeting feature",

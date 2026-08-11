@@ -136,11 +136,7 @@ test("reads effective author and committer identities through the injected git r
 
 test("reads author and committer metadata for every commit in a revision", () => {
 	const git = (args) => {
-		assert.deepEqual(args, [
-			"log",
-			"--format=%H%x09%an%x09%ae%x09%cn%x09%ce",
-			"base..head",
-		]);
+		assert.deepEqual(args, ["log", "--format=%H%x09%an%x09%ae%x09%cn%x09%ce", "base..head"]);
 		return [
 			"aaaa\tBandersnatch0x\txihalele@gmail.com\tBandersnatch0x\txihalele@gmail.com",
 			"bbbb\tUnexpected User\tunexpected@example.com\tBandersnatch0x\txihalele@gmail.com",
@@ -156,12 +152,7 @@ test("reads author and committer metadata for every commit in a revision", () =>
 
 test("single-commit mode limits git log to one revision", () => {
 	const git = (args) => {
-		assert.deepEqual(args, [
-			"log",
-			"--format=%H%x09%an%x09%ae%x09%cn%x09%ce",
-			"-1",
-			"headsha",
-		]);
+		assert.deepEqual(args, ["log", "--format=%H%x09%an%x09%ae%x09%cn%x09%ce", "-1", "headsha"]);
 		return "headsha\tBandersnatch0x\txihalele@gmail.com\tBandersnatch0x\txihalele@gmail.com";
 	};
 

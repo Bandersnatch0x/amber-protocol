@@ -7,18 +7,13 @@ const path = require("node:path");
 const os = require("node:os");
 const { execSync } = require("node:child_process");
 
-const {
-	detectArtifactDrift,
-} = require("../../scripts/lib/core/artifact-drift");
+const { detectArtifactDrift } = require("../../scripts/lib/core/artifact-drift");
 
 function mkRepo(features, touchPath = null) {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-art-"));
 	execSync("git init -q", { cwd: dir });
 	execSync("git config user.email t@t.t && git config user.name t", { cwd: dir });
-	fs.writeFileSync(
-		path.join(dir, "feature_list.json"),
-		JSON.stringify({ features }, null, 2),
-	);
+	fs.writeFileSync(path.join(dir, "feature_list.json"), JSON.stringify({ features }, null, 2));
 	if (touchPath) {
 		fs.mkdirSync(path.dirname(path.join(dir, touchPath)), { recursive: true });
 		fs.writeFileSync(path.join(dir, touchPath), "x");
@@ -45,10 +40,7 @@ const baseF = (over) => ({
 
 test("non-git repo -> available:false with note", () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-art-"));
-	fs.writeFileSync(
-		path.join(dir, "feature_list.json"),
-		JSON.stringify({ features: [] }),
-	);
+	fs.writeFileSync(path.join(dir, "feature_list.json"), JSON.stringify({ features: [] }));
 	const r = detectArtifactDrift(dir);
 	assert.strictEqual(r.available, false);
 	assert.match(r.note, /non-git/);

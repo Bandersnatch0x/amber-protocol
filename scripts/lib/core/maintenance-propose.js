@@ -33,9 +33,7 @@ function buildMaintenanceProposalContent(inspection) {
 	}
 
 	lines.push("", "## Upgrade Assistant", "");
-	lines.push(
-		`- Current: ${inspection.upgradeAssistant.currentVersion || "not installed"}`,
-	);
+	lines.push(`- Current: ${inspection.upgradeAssistant.currentVersion || "not installed"}`);
 	lines.push(`- Latest: ${inspection.upgradeAssistant.latestVersion}`);
 	if (inspection.upgradeAssistant.previewCommand) {
 		lines.push(`- Preview: \`${inspection.upgradeAssistant.previewCommand}\``);
@@ -43,12 +41,8 @@ function buildMaintenanceProposalContent(inspection) {
 
 	lines.push("", "## Rule-Pack Drift", "");
 	lines.push(`- Drifted: ${inspection.rulePackDrift.drifted}`);
-	lines.push(
-		`- Expected: ${(inspection.rulePackDrift.expected || []).join(", ") || "none"}`,
-	);
-	lines.push(
-		`- Actual: ${(inspection.rulePackDrift.actual || []).join(", ") || "none"}`,
-	);
+	lines.push(`- Expected: ${(inspection.rulePackDrift.expected || []).join(", ") || "none"}`);
+	lines.push(`- Actual: ${(inspection.rulePackDrift.actual || []).join(", ") || "none"}`);
 
 	lines.push("", "## Evolution Rollup", "");
 	if (inspection.evolutionRollup.length === 0) {
@@ -86,12 +80,7 @@ function buildMaintenanceProposalContent(inspection) {
 			lines.push(`+ delivery finding: ${item.finding}`);
 		}
 	}
-	lines.push(
-		"```",
-		"",
-		"No source docs or standards were changed by this proposal.",
-		"",
-	);
+	lines.push("```", "", "No source docs or standards were changed by this proposal.", "");
 
 	return lines.join("\n");
 }
@@ -116,37 +105,42 @@ function proposeMaintenance(target, registryPath, priority, inspectMaintenance) 
 		// fall through every branch, leaving allowedCategories empty so each
 		// section was zeroed and a blank proposal was written with no error — a
 		// silent failure. Fail fast with a clear message instead.
-		if (!['high', 'medium', 'low'].includes(priority)) {
+		if (!["high", "medium", "low"].includes(priority)) {
 			return {
 				target: inspection.target,
-				errors: [
-					`Unknown priority "${priority}". Use high, medium, or low.`,
-				],
+				errors: [`Unknown priority "${priority}". Use high, medium, or low.`],
 				warnings: inspection.warnings,
 			};
 		}
 
 		const priorityLevels = {
-			high: ['staleDocs', 'rulePackDrift'],
-			medium: ['upgradeAssistant', 'evolutionRollup'],
-			low: ['regressionProposals'],
+			high: ["staleDocs", "rulePackDrift"],
+			medium: ["upgradeAssistant", "evolutionRollup"],
+			low: ["regressionProposals"],
 		};
 
 		const allowedCategories = [];
-		if (priority === 'high') {
+		if (priority === "high") {
 			allowedCategories.push(...priorityLevels.high);
-		} else if (priority === 'medium') {
+		} else if (priority === "medium") {
 			allowedCategories.push(...priorityLevels.high, ...priorityLevels.medium);
-		} else if (priority === 'low') {
-			allowedCategories.push(...priorityLevels.high, ...priorityLevels.medium, ...priorityLevels.low);
+		} else if (priority === "low") {
+			allowedCategories.push(
+				...priorityLevels.high,
+				...priorityLevels.medium,
+				...priorityLevels.low,
+			);
 		}
 
 		filteredInspection = { ...inspection };
-		if (!allowedCategories.includes('staleDocs')) filteredInspection.staleDocs = [];
-		if (!allowedCategories.includes('rulePackDrift')) filteredInspection.rulePackDrift = { drifted: false, expected: [], actual: [] };
-		if (!allowedCategories.includes('upgradeAssistant')) filteredInspection.upgradeAssistant = { currentVersion: null, latestVersion: null };
-		if (!allowedCategories.includes('evolutionRollup')) filteredInspection.evolutionRollup = [];
-		if (!allowedCategories.includes('regressionProposals')) filteredInspection.regressionProposals = [];
+		if (!allowedCategories.includes("staleDocs")) filteredInspection.staleDocs = [];
+		if (!allowedCategories.includes("rulePackDrift"))
+			filteredInspection.rulePackDrift = { drifted: false, expected: [], actual: [] };
+		if (!allowedCategories.includes("upgradeAssistant"))
+			filteredInspection.upgradeAssistant = { currentVersion: null, latestVersion: null };
+		if (!allowedCategories.includes("evolutionRollup")) filteredInspection.evolutionRollup = [];
+		if (!allowedCategories.includes("regressionProposals"))
+			filteredInspection.regressionProposals = [];
 	}
 
 	const proposalRoot = path.join(
@@ -167,7 +161,7 @@ function proposeMaintenance(target, registryPath, priority, inspectMaintenance) 
 		reviewable: true,
 		sourceFilesChanged: false,
 		inspection: filteredInspection,
-		priority: priority || 'all',
+		priority: priority || "all",
 		errors: [],
 		warnings: filteredInspection.warnings,
 	};

@@ -1,184 +1,184 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Loop Contract",
-  "description": "Declarative description of a repeatable agent workflow: trigger, cadence, state spine, hard stops, and review gates.",
-  "type": "object",
-  "required": ["id", "trigger", "stateSpine", "hardStops"],
-  "properties": {
-    "id": {
-      "type": "string",
-      "description": "Unique identifier for the loop contract."
-    },
-    "title": {
-      "type": "string",
-      "description": "Human-readable title for the loop contract."
-    },
-    "trigger": {
-      "type": "object",
-      "required": ["type", "enabled"],
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["manual", "scheduled", "goal", "external-signal"],
-          "description": "The trigger type that initiates this loop."
-        },
-        "cadence": {
-          "type": "string",
-          "description": "Human-readable cadence description (e.g. 'daily', 'on-commit')."
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether the trigger is currently enabled."
-        }
-      }
-    },
-    "cadence": {
-      "type": "string",
-      "description": "Deprecated top-level cadence; prefer trigger.cadence."
-    },
-    "goal": {
-      "type": "string",
-      "description": "The goal the loop pursues."
-    },
-    "stateSpine": {
-      "type": "string",
-      "description": "Path to the durable state artifact recording loop progress and resume point."
-    },
-    "inputs": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Named input sources the loop consumes."
-    },
-    "skills": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Skill identifiers the loop may reference."
-    },
-    "connectors": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Connector contract IDs the loop may use."
-    },
-    "triageOutputs": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": ["archive", "candidate-task", "needs-human", "blocked", "regression-test-proposal"]
-      },
-      "description": "Valid triage classifications the loop can produce."
-    },
-    "hardStops": {
-      "type": "object",
-      "required": ["maxIterations"],
-      "properties": {
-        "maxIterations": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "description": "Maximum number of iterations before the loop must stop."
-        },
-        "timeoutMinutes": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "description": "Maximum wall-clock minutes before the loop must stop."
-        },
-        "timeout": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "description": "Deprecated; prefer timeoutMinutes."
-        },
-        "noProgressDetection": {
-          "type": "boolean",
-          "description": "Whether the loop must detect and stop on repeated no-progress observations."
-        },
-        "budget": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "description": "Deprecated top-level budget ceiling."
-        }
-      }
-    },
-    "budget": {
-      "type": "object",
-      "properties": {
-        "maxMinutes": { "type": "integer", "exclusiveMinimum": 0 },
-        "maxTokens": { "type": "integer", "exclusiveMinimum": 0 },
-        "maxUsd": { "type": "number", "exclusiveMinimum": 0 }
-      },
-      "description": "Resource budget ceiling for the loop."
-    },
-    "reviewGates": {
-      "type": "array",
-      "items": { "type": "string" },
-      "minItems": 1,
-      "description": "Required review gates before work is considered complete."
-    },
-    "execution": {
-      "type": "object",
-      "required": ["executesAnything"],
-      "properties": {
-        "executesAnything": {
-          "type": "boolean",
-          "const": false,
-          "description": "Must always be false — live loop execution is outside the product boundary."
-        },
-        "schedulesJobs": {
-          "type": "boolean",
-          "const": false
-        },
-        "dispatchesAgents": {
-          "type": "boolean",
-          "const": false
-        },
-        "writesExternalSystems": {
-          "type": "boolean",
-          "const": false
-        }
-      }
-    },
-    "governed": {
-      "type": "object",
-      "description": "Optional human-triggered, governance-gated command. Orthogonal to execution.executesAnything (which stays false — the loop never runs anything on its own). Run only by `amber loop run --execute` after policy + approval gates.",
-      "required": ["command"],
-      "properties": {
-        "command": {
-          "type": "string",
-          "description": "Shell command executed after the policy and approval gates pass."
-        },
-        "requiresApproval": {
-          "type": "boolean",
-          "default": true
-        },
-        "rules": {
-          "type": "array",
-          "description": "Extra fixed-predicate rules composed with the global rules.json for this command only. deny-wins is absolute: a context allow can never override any deny.",
-          "items": {
-            "type": "object",
-            "required": ["id", "action", "match", "pattern"],
-            "properties": {
-              "id": { "type": "string" },
-              "action": { "enum": ["allow", "deny"] },
-              "match": { "enum": ["exact", "prefix", "regex"] },
-              "pattern": { "type": "string" },
-              "mapsTo": { "type": "array", "items": { "type": "string" } }
-            }
-          }
-        }
-      }
-    },
-    "amber_protocol_version": { "type": "string" },
-    "artifact_sequence": { "type": "integer" },
-    "created_at": { "type": "string", "format": "date-time" },
-    "artifact_type": { "type": "string" },
-    "execution_mode": { "enum": ["direct", "bounded_loop", "swarm", "dag"] },
-    "execution_context": {
-      "type": "object",
-      "properties": {
-        "engine": { "enum": ["claude-code", "codex", "cursor"] },
-        "model": { "type": "string" },
-        "reasoning_effort": { "enum": ["low", "high", "max"] },
-        "pinned_at": { "type": "string", "format": "date-time" },
-        "pinned_by": { "type": "string" }
-      }
-    }
-  }
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Loop Contract",
+	"description": "Declarative description of a repeatable agent workflow: trigger, cadence, state spine, hard stops, and review gates.",
+	"type": "object",
+	"required": ["id", "trigger", "stateSpine", "hardStops"],
+	"properties": {
+		"id": {
+			"type": "string",
+			"description": "Unique identifier for the loop contract."
+		},
+		"title": {
+			"type": "string",
+			"description": "Human-readable title for the loop contract."
+		},
+		"trigger": {
+			"type": "object",
+			"required": ["type", "enabled"],
+			"properties": {
+				"type": {
+					"type": "string",
+					"enum": ["manual", "scheduled", "goal", "external-signal"],
+					"description": "The trigger type that initiates this loop."
+				},
+				"cadence": {
+					"type": "string",
+					"description": "Human-readable cadence description (e.g. 'daily', 'on-commit')."
+				},
+				"enabled": {
+					"type": "boolean",
+					"description": "Whether the trigger is currently enabled."
+				}
+			}
+		},
+		"cadence": {
+			"type": "string",
+			"description": "Deprecated top-level cadence; prefer trigger.cadence."
+		},
+		"goal": {
+			"type": "string",
+			"description": "The goal the loop pursues."
+		},
+		"stateSpine": {
+			"type": "string",
+			"description": "Path to the durable state artifact recording loop progress and resume point."
+		},
+		"inputs": {
+			"type": "array",
+			"items": { "type": "string" },
+			"description": "Named input sources the loop consumes."
+		},
+		"skills": {
+			"type": "array",
+			"items": { "type": "string" },
+			"description": "Skill identifiers the loop may reference."
+		},
+		"connectors": {
+			"type": "array",
+			"items": { "type": "string" },
+			"description": "Connector contract IDs the loop may use."
+		},
+		"triageOutputs": {
+			"type": "array",
+			"items": {
+				"type": "string",
+				"enum": ["archive", "candidate-task", "needs-human", "blocked", "regression-test-proposal"]
+			},
+			"description": "Valid triage classifications the loop can produce."
+		},
+		"hardStops": {
+			"type": "object",
+			"required": ["maxIterations"],
+			"properties": {
+				"maxIterations": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"description": "Maximum number of iterations before the loop must stop."
+				},
+				"timeoutMinutes": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"description": "Maximum wall-clock minutes before the loop must stop."
+				},
+				"timeout": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"description": "Deprecated; prefer timeoutMinutes."
+				},
+				"noProgressDetection": {
+					"type": "boolean",
+					"description": "Whether the loop must detect and stop on repeated no-progress observations."
+				},
+				"budget": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"description": "Deprecated top-level budget ceiling."
+				}
+			}
+		},
+		"budget": {
+			"type": "object",
+			"properties": {
+				"maxMinutes": { "type": "integer", "exclusiveMinimum": 0 },
+				"maxTokens": { "type": "integer", "exclusiveMinimum": 0 },
+				"maxUsd": { "type": "number", "exclusiveMinimum": 0 }
+			},
+			"description": "Resource budget ceiling for the loop."
+		},
+		"reviewGates": {
+			"type": "array",
+			"items": { "type": "string" },
+			"minItems": 1,
+			"description": "Required review gates before work is considered complete."
+		},
+		"execution": {
+			"type": "object",
+			"required": ["executesAnything"],
+			"properties": {
+				"executesAnything": {
+					"type": "boolean",
+					"const": false,
+					"description": "Must always be false — live loop execution is outside the product boundary."
+				},
+				"schedulesJobs": {
+					"type": "boolean",
+					"const": false
+				},
+				"dispatchesAgents": {
+					"type": "boolean",
+					"const": false
+				},
+				"writesExternalSystems": {
+					"type": "boolean",
+					"const": false
+				}
+			}
+		},
+		"governed": {
+			"type": "object",
+			"description": "Optional human-triggered, governance-gated command. Orthogonal to execution.executesAnything (which stays false — the loop never runs anything on its own). Run only by `amber loop run --execute` after policy + approval gates.",
+			"required": ["command"],
+			"properties": {
+				"command": {
+					"type": "string",
+					"description": "Shell command executed after the policy and approval gates pass."
+				},
+				"requiresApproval": {
+					"type": "boolean",
+					"default": true
+				},
+				"rules": {
+					"type": "array",
+					"description": "Extra fixed-predicate rules composed with the global rules.json for this command only. deny-wins is absolute: a context allow can never override any deny.",
+					"items": {
+						"type": "object",
+						"required": ["id", "action", "match", "pattern"],
+						"properties": {
+							"id": { "type": "string" },
+							"action": { "enum": ["allow", "deny"] },
+							"match": { "enum": ["exact", "prefix", "regex"] },
+							"pattern": { "type": "string" },
+							"mapsTo": { "type": "array", "items": { "type": "string" } }
+						}
+					}
+				}
+			}
+		},
+		"amber_protocol_version": { "type": "string" },
+		"artifact_sequence": { "type": "integer" },
+		"created_at": { "type": "string", "format": "date-time" },
+		"artifact_type": { "type": "string" },
+		"execution_mode": { "enum": ["direct", "bounded_loop", "swarm", "dag"] },
+		"execution_context": {
+			"type": "object",
+			"properties": {
+				"engine": { "enum": ["claude-code", "codex", "cursor"] },
+				"model": { "type": "string" },
+				"reasoning_effort": { "enum": ["low", "high", "max"] },
+				"pinned_at": { "type": "string", "format": "date-time" },
+				"pinned_by": { "type": "string" }
+			}
+		}
+	}
 }

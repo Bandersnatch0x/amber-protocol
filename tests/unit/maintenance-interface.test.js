@@ -94,8 +94,6 @@ test("only the legacy compatibility module may import Maintenance internals outs
 
 test("ordinary tests cannot import Maintenance internals", () => {
 	const testsRoot = path.join(REPO_ROOT, "tests");
-	const consumers = internalConsumers(testsRoot)
-		.map(relative)
-		.sort();
+	const consumers = internalConsumers(testsRoot).map(relative).sort();
 	assert.deepEqual(consumers, []);
 });

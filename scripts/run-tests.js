@@ -22,11 +22,9 @@ function resolveRequestedFiles(patterns) {
 
 		const stats = fs.statSync(resolved);
 		if (stats.isDirectory()) {
-			collectFilesBySuffix(resolved, ".test.js", TEST_IGNORED_DIRS).forEach(
-				(filePath) => {
-					files.push(filePath);
-				},
-			);
+			collectFilesBySuffix(resolved, ".test.js", TEST_IGNORED_DIRS).forEach((filePath) => {
+				files.push(filePath);
+			});
 		} else {
 			files.push(resolved);
 		}
@@ -55,9 +53,9 @@ if (files.length === 0) {
 const SESSIONS_DIR = path.join(ROOT, ".amber", "sessions");
 function listRootSessions() {
 	if (!fs.existsSync(SESSIONS_DIR)) return [];
-	return fs.readdirSync(SESSIONS_DIR).filter((name) =>
-		fs.statSync(path.join(SESSIONS_DIR, name)).isDirectory(),
-	);
+	return fs
+		.readdirSync(SESSIONS_DIR)
+		.filter((name) => fs.statSync(path.join(SESSIONS_DIR, name)).isDirectory());
 }
 const sessionsBefore = new Set(listRootSessions());
 

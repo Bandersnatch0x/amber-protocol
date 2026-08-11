@@ -3,10 +3,7 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const {
-	startSession,
-	continueSession,
-} = require("../../scripts/lib/session-commands");
+const { startSession, continueSession } = require("../../scripts/lib/session-commands");
 const { saveCheckpoint } = require("../../scripts/lib/checkpoint-manager");
 
 describe("Kill Recovery", () => {
@@ -39,13 +36,7 @@ describe("Kill Recovery", () => {
 		];
 
 		for (const point of interruptionPoints) {
-			const manifestPath = path.join(
-				testDir,
-				".amber",
-				"sessions",
-				sessionId,
-				"manifest.json",
-			);
+			const manifestPath = path.join(testDir, ".amber", "sessions", sessionId, "manifest.json");
 			const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
 			manifest.status = "paused";
@@ -76,13 +67,7 @@ describe("Kill Recovery", () => {
 		});
 		const sessionId = result.sessionId;
 
-		const manifestPath = path.join(
-			testDir,
-			".amber",
-			"sessions",
-			sessionId,
-			"manifest.json",
-		);
+		const manifestPath = path.join(testDir, ".amber", "sessions", sessionId, "manifest.json");
 		const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 		manifest.status = "paused";
 		manifest.currentStage = "implement";

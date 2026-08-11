@@ -8,7 +8,10 @@ const test = require("node:test");
 
 const { scaffoldHarness } = require("../../scripts/lib/core/scaffold");
 const { addFeature, recordFeatureEvidence } = require("../../scripts/lib/feature-commands");
-const { writeHandoffBundle, validateHandoffBundle } = require("../../scripts/lib/core/handoff-bundle");
+const {
+	writeHandoffBundle,
+	validateHandoffBundle,
+} = require("../../scripts/lib/core/handoff-bundle");
 
 function tempDir(name) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-handoff-bundle-${name}-`));
@@ -40,7 +43,9 @@ test("writeHandoffBundle creates the complete continuation artifact set", () => 
 		assert.ok(fs.existsSync(path.join(result.outputDir, rel)), `${rel} exists`);
 	}
 
-	const manifest = JSON.parse(fs.readFileSync(path.join(result.outputDir, "manifest.json"), "utf8"));
+	const manifest = JSON.parse(
+		fs.readFileSync(path.join(result.outputDir, "manifest.json"), "utf8"),
+	);
 	assert.equal(manifest.schemaVersion, 1);
 	assert.equal(manifest.artifactType, "amber-handoff-bundle");
 	assert.ok(manifest.files.includes("next-actions.md"));

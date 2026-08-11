@@ -53,7 +53,10 @@ test("inspectMaintenance composes evidence outcome and preserves valid facts", (
 		assert.ok(Array.isArray(out.evolutionRollup));
 		assert.equal(out.evidenceAvailability, "complete");
 		// No partial warnings for a complete source.
-		assert.deepEqual(out.warnings.filter((w) => /evidence unreadable/.test(w)), []);
+		assert.deepEqual(
+			out.warnings.filter((w) => /evidence unreadable/.test(w)),
+			[],
+		);
 		assert.deepEqual(out.errors, []);
 	} finally {
 		cleanup(target);

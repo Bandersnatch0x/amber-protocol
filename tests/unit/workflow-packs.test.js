@@ -45,27 +45,13 @@ test("validateWorkflowPackData rejects null and arrays as non-object", () => {
 
 test("validateWorkflowPackData flags missing id, title, and version", () => {
 	const result = validateWorkflowPackData({ steps: [] });
-	assert.ok(
-		result.errors.includes(
-			"Workflow pack field id must be a non-empty string.",
-		),
-	);
-	assert.ok(
-		result.errors.includes(
-			"Workflow pack field title must be a non-empty string.",
-		),
-	);
-	assert.ok(
-		result.errors.includes(
-			"Workflow pack field version must be a non-empty string.",
-		),
-	);
+	assert.ok(result.errors.includes("Workflow pack field id must be a non-empty string."));
+	assert.ok(result.errors.includes("Workflow pack field title must be a non-empty string."));
+	assert.ok(result.errors.includes("Workflow pack field version must be a non-empty string."));
 });
 
 test("validateWorkflowPackData rejects a non-semver version", () => {
-	const result = validateWorkflowPackData(
-		minimalValidPack({ version: "not-a-version" }),
-	);
+	const result = validateWorkflowPackData(minimalValidPack({ version: "not-a-version" }));
 	assert.deepEqual(result.errors, ["Workflow pack version must be semver."]);
 });
 
@@ -85,17 +71,13 @@ test("validateWorkflowPackData accepts semver with a prerelease OR build segment
 test("validateWorkflowPackData rejects semver with both prerelease and build metadata", () => {
 	// Pin the pattern's real behavior: a single (?:[-+][0-9A-Za-z.-]+)? group
 	// matches only one segment, so 1.2.3-rc.1+build.5 (both - and +) is rejected.
-	const result = validateWorkflowPackData(
-		minimalValidPack({ version: "1.2.3-rc.1+build.5" }),
-	);
+	const result = validateWorkflowPackData(minimalValidPack({ version: "1.2.3-rc.1+build.5" }));
 	assert.deepEqual(result.errors, ["Workflow pack version must be semver."]);
 });
 
 test("validateWorkflowPackData requires at least one step", () => {
 	const result = validateWorkflowPackData(minimalValidPack({ steps: [] }));
-	assert.deepEqual(result.errors, [
-		"Workflow pack steps must contain at least one step.",
-	]);
+	assert.deepEqual(result.errors, ["Workflow pack steps must contain at least one step."]);
 });
 
 test("validateWorkflowPackData flags a step that declares an executable script", () => {
@@ -110,12 +92,8 @@ test("validateWorkflowPackData flags a step that declares an executable script",
 });
 
 test("validateWorkflowPackData flags skills when present but not an array", () => {
-	const result = validateWorkflowPackData(
-		minimalValidPack({ skills: "not-an-array" }),
-	);
-	assert.deepEqual(result.errors, [
-		"Workflow pack skills must be an array when present.",
-	]);
+	const result = validateWorkflowPackData(minimalValidPack({ skills: "not-an-array" }));
+	assert.deepEqual(result.errors, ["Workflow pack skills must be an array when present."]);
 });
 
 // ---- validateLoopContracts ----
@@ -128,56 +106,50 @@ test("validateLoopContracts returns empty arrays when loopContracts is undefined
 
 test("validateLoopContracts rejects a non-array loopContracts value", () => {
 	const { errors } = validateLoopContracts("not-an-array");
-	assert.deepEqual(errors, [
-		"Workflow pack loopContracts must be an array when present.",
-	]);
+	assert.deepEqual(errors, ["Workflow pack loopContracts must be an array when present."]);
 });
 
 test("validateLoopContracts accepts a fully valid contract", () => {
-	const { errors } = validateLoopContracts(
-		[
-			{
-				id: "loop-1",
-				goal: "g",
-				stateSpine: "ss",
-				trigger: { type: "manual" },
-				triageOutputs: ["archive"],
-				hardStops: {
-					maxIterations: 5,
-					noProgressDetection: true,
-					timeoutMinutes: 30,
-				},
-				reviewGates: ["g1"],
-				execution: {
-					executesAnything: false,
-					schedulesJobs: false,
-					dispatchesAgents: false,
-					writesExternalSystems: false,
-				},
+	const { errors } = validateLoopContracts([
+		{
+			id: "loop-1",
+			goal: "g",
+			stateSpine: "ss",
+			trigger: { type: "manual" },
+			triageOutputs: ["archive"],
+			hardStops: {
+				maxIterations: 5,
+				noProgressDetection: true,
+				timeoutMinutes: 30,
 			},
-		],
-	);
+			reviewGates: ["g1"],
+			execution: {
+				executesAnything: false,
+				schedulesJobs: false,
+				dispatchesAgents: false,
+				writesExternalSystems: false,
+			},
+		},
+	]);
 	assert.deepEqual(errors, []);
 });
 
 test("validateLoopContracts flags an invalid trigger type", () => {
-	const { errors } = validateLoopContracts(
-		[
-			{
-				id: "loop-1",
-				goal: "g",
-				stateSpine: "ss",
-				trigger: { type: "bogus" },
-				hardStops: {
-					maxIterations: 1,
-					noProgressDetection: true,
-					timeoutMinutes: 5,
-				},
-				reviewGates: ["g"],
-				execution: { executesAnything: false },
+	const { errors } = validateLoopContracts([
+		{
+			id: "loop-1",
+			goal: "g",
+			stateSpine: "ss",
+			trigger: { type: "bogus" },
+			hardStops: {
+				maxIterations: 1,
+				noProgressDetection: true,
+				timeoutMinutes: 5,
 			},
-		],
-	);
+			reviewGates: ["g"],
+			execution: { executesAnything: false },
+		},
+	]);
 	assert.ok(
 		errors.includes(
 			"Loop contract [0].trigger.type must be one of: manual, scheduled, goal, external-signal.",
@@ -186,9 +158,9 @@ test("validateLoopContracts flags an invalid trigger type", () => {
 });
 
 test("validateLoopContracts reports both missing hardStops and the budget fallback", () => {
-	const { errors } = validateLoopContracts(
-		[{ id: "loop-1", goal: "g", stateSpine: "ss", reviewGates: ["g"] }],
-	);
+	const { errors } = validateLoopContracts([
+		{ id: "loop-1", goal: "g", stateSpine: "ss", reviewGates: ["g"] },
+	]);
 	assert.deepEqual(errors, [
 		"Loop contract [0].hardStops is required.",
 		"Loop contract [0] must specify at least one of: hardStops.timeoutMinutes, budget.maxMinutes, budget.maxTokens, or budget.maxUsd.",
@@ -196,25 +168,21 @@ test("validateLoopContracts reports both missing hardStops and the budget fallba
 });
 
 test("validateLoopContracts rejects maxIterations of zero or less", () => {
-	const { errors } = validateLoopContracts(
-		[
-			{
-				id: "l",
-				goal: "g",
-				stateSpine: "s",
-				hardStops: {
-					maxIterations: 0,
-					noProgressDetection: true,
-					timeoutMinutes: 5,
-				},
-				reviewGates: ["g"],
-				execution: { executesAnything: false },
+	const { errors } = validateLoopContracts([
+		{
+			id: "l",
+			goal: "g",
+			stateSpine: "s",
+			hardStops: {
+				maxIterations: 0,
+				noProgressDetection: true,
+				timeoutMinutes: 5,
 			},
-		],
-	);
-	assert.deepEqual(errors, [
-		"Loop contract [0].hardStops.maxIterations must be greater than 0.",
+			reviewGates: ["g"],
+			execution: { executesAnything: false },
+		},
 	]);
+	assert.deepEqual(errors, ["Loop contract [0].hardStops.maxIterations must be greater than 0."]);
 });
 
 // ---- describeLoopContracts ----
@@ -276,18 +244,9 @@ test("inspectLoopReadiness reports missing controls for empty input", () => {
 	assert.equal(result.readyForDryRun, false);
 	assert.equal(result.readyForRecordOnly, false);
 	assert.equal(result.readyForLiveScheduling, false);
-	assert.deepEqual(result.allowedNow, [
-		"describe",
-		"validate",
-		"dry-run",
-		"record",
-	]);
+	assert.deepEqual(result.allowedNow, ["describe", "validate", "dry-run", "record"]);
 	assert.ok(result.blockers.includes("loop contract is missing"));
-	assert.ok(
-		result.blockers.includes(
-			"live scheduling is disabled by product boundary",
-		),
-	);
+	assert.ok(result.blockers.includes("live scheduling is disabled by product boundary"));
 });
 
 test("inspectLoopReadiness marks a fully-provisioned pack ready for dry-run but never live", () => {
@@ -325,9 +284,7 @@ test("inspectLoopReadiness marks a fully-provisioned pack ready for dry-run but 
 	assert.equal(result.readyForRecordOnly, true);
 	// Live scheduling is always disabled by product boundary.
 	assert.equal(result.readyForLiveScheduling, false);
-	assert.deepEqual(result.blockers, [
-		"live scheduling is disabled by product boundary",
-	]);
+	assert.deepEqual(result.blockers, ["live scheduling is disabled by product boundary"]);
 });
 
 test("inspectLoopReadiness flags a missing connector contract as a blocker", () => {
@@ -362,11 +319,7 @@ test("inspectLoopReadiness flags a missing connector contract as a blocker", () 
 		},
 	};
 	const blockers = inspectLoopReadiness(ready).blockers;
-	assert.ok(
-		blockers.includes(
-			"connector contract c1 is missing for loop loop-1",
-		),
-	);
+	assert.ok(blockers.includes("connector contract c1 is missing for loop loop-1"));
 });
 
 // ---- validateWorkflowPackReferences (external-integration branch is pure) ----

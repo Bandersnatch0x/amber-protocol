@@ -70,23 +70,33 @@ function main() {
 		.map((line) => line.match(/refs\/tags\/(v[^^\s]+)$/)?.[1])
 		.filter(Boolean);
 	const registryVersions = sh("gh", [
-		"api", "--paginate",
+		"api",
+		"--paginate",
 		`users/${owner}/packages/npm/${pkg.name}/versions`,
-		"--jq", ".[].name",
-	]).split("\n").filter(Boolean);
+		"--jq",
+		".[].name",
+	])
+		.split("\n")
+		.filter(Boolean);
 
 	const unpushed = findUnpushedTags(localTags, remoteTags);
 	const ghosts = findGhostTags(remoteTags, registryVersions);
 
 	if (unpushed.length === 0 && ghosts.length === 0) {
-		console.log(`release:verify OK — ${stableTags(remoteTags).length} stable tags all published (latest registry: ${registryVersions[0] ?? "none"})`);
+		console.log(
+			`release:verify OK — ${stableTags(remoteTags).length} stable tags all published (latest registry: ${registryVersions[0] ?? "none"})`,
+		);
 		return 0;
 	}
 	for (const t of unpushed) {
-		console.error(`GHOST RISK: local tag ${t} was never pushed — publish never triggered. Push it or delete it.`);
+		console.error(
+			`GHOST RISK: local tag ${t} was never pushed — publish never triggered. Push it or delete it.`,
+		);
 	}
 	for (const t of ghosts) {
-		console.error(`GHOST: remote tag ${t} has no published ${t.slice(1)} in the registry. Re-run the publish workflow for it.`);
+		console.error(
+			`GHOST: remote tag ${t} has no published ${t.slice(1)} in the registry. Re-run the publish workflow for it.`,
+		);
 	}
 	return 1;
 }

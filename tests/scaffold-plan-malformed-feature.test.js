@@ -15,21 +15,16 @@ const { scaffoldPlan } = require("../scripts/lib/core/planning");
 
 function tempProject(features) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "scaffold-plan-"));
-	fs.writeFileSync(
-		path.join(root, "feature_list.json"),
-		JSON.stringify({ features })
-	);
+	fs.writeFileSync(path.join(root, "feature_list.json"), JSON.stringify({ features }));
 	return root;
 }
 
 test("scaffoldPlan errors instead of throwing when the feature lacks a verification array", () => {
-	const root = tempProject([
-		{ id: "f1", title: "T", user_visible_behavior: "x" },
-	]);
+	const root = tempProject([{ id: "f1", title: "T", user_visible_behavior: "x" }]);
 	const result = scaffoldPlan(root, { feature: "f1" });
 	assert.ok(
 		result.errors.some((e) => /verification/i.test(e)),
-		`expected a verification error, got: ${JSON.stringify(result.errors)}`
+		`expected a verification error, got: ${JSON.stringify(result.errors)}`,
 	);
 	assert.deepEqual(result.created, []);
 	fs.rmSync(root, { recursive: true, force: true });

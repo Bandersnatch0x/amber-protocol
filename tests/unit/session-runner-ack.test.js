@@ -148,12 +148,13 @@ describe("session runner ACK files", () => {
 		});
 
 		assert.throws(
-			() => writeRunnerAck(TEST_ROOT, start.sessionId, {
-				requestId: "../evil",
-				action: "resume",
-				status: "acked",
-				requestedStatus: "executing",
-			}),
+			() =>
+				writeRunnerAck(TEST_ROOT, start.sessionId, {
+					requestId: "../evil",
+					action: "resume",
+					status: "acked",
+					requestedStatus: "executing",
+				}),
 			/Invalid runner ACK request id/,
 		);
 	});

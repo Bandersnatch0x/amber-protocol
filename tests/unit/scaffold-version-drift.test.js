@@ -6,7 +6,11 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { detectScaffoldDrift } = require("../../scripts/lib/core/scaffold-version-drift");
-const { buildProvenance, writeProvenance, templateManagedFiles } = require("../../scripts/lib/core/scaffold-provenance");
+const {
+	buildProvenance,
+	writeProvenance,
+	templateManagedFiles,
+} = require("../../scripts/lib/core/scaffold-provenance");
 
 // Controlled + authored + state fake templates. amber.md is controlled; AGENTS.md authored.
 function fakeTemplateRoot() {

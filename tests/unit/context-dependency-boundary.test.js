@@ -73,7 +73,8 @@ describe("Context dependency direction", () => {
 		for (const file of productionFiles("scripts/lib/context")) {
 			for (const edge of contextImports(relative(file))) {
 				if (relative(file).includes("/adapters/")) {
-					if (edge.targetLayer !== "public") violations.push(`${relative(file)} -> ${edge.targetLayer}`);
+					if (edge.targetLayer !== "public")
+						violations.push(`${relative(file)} -> ${edge.targetLayer}`);
 				} else if (edge.targetLayer === "adapter") {
 					violations.push(`${relative(file)} -> ${edge.targetLayer}`);
 				}
@@ -105,10 +106,22 @@ describe("Context dependency direction", () => {
 	});
 
 	it("detects representative forbidden edges instead of relying on production accidents", () => {
-		assert.equal(classifyEdge("scripts/lib/context/index.js", "./adapters/command"), "public->adapter");
+		assert.equal(
+			classifyEdge("scripts/lib/context/index.js", "./adapters/command"),
+			"public->adapter",
+		);
 		assert.equal(classifyEdge("scripts/lib/core/context-store.js", "../context"), "core->public");
-		assert.equal(classifyEdge("scripts/lib/context/adapters/command.js", "../../core/context-store"), "adapter->core");
-		assert.equal(classifyEdge("apps/web/src/app.js", "../../../scripts/lib/core/context-store"), "external->core");
-		assert.equal(classifyEdge("scripts/lib/context/adapters/command.js", "../index"), "adapter->public");
+		assert.equal(
+			classifyEdge("scripts/lib/context/adapters/command.js", "../../core/context-store"),
+			"adapter->core",
+		);
+		assert.equal(
+			classifyEdge("apps/web/src/app.js", "../../../scripts/lib/core/context-store"),
+			"external->core",
+		);
+		assert.equal(
+			classifyEdge("scripts/lib/context/adapters/command.js", "../index"),
+			"adapter->public",
+		);
 	});
 });

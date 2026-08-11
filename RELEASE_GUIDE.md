@@ -12,6 +12,7 @@ bash scripts/release-v1.0.0-rc.1.sh
 ```
 
 脚本会引导你完成：
+
 1. ✅ 验证 Git tag（已创建）
 2. 🔧 创建 GitHub 仓库（需要你在浏览器中操作）
 3. 📤 推送代码到 GitHub

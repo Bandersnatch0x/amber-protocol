@@ -31,7 +31,10 @@ test("warns when a feature has evidence but status is still not_started", () => 
 	writeFeatureList(dir, [baseFeature({ evidence: ["ran tests on CI"] })]);
 	const r = validateFeatureListFile(path.join(dir, "feature_list.json"));
 	assert.equal(r.errors.length, 0);
-	assert.ok(r.warnings.some((w) => /evidence.*not_started/i.test(w)), `warning present: ${JSON.stringify(r.warnings)}`);
+	assert.ok(
+		r.warnings.some((w) => /evidence.*not_started/i.test(w)),
+		`warning present: ${JSON.stringify(r.warnings)}`,
+	);
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -40,6 +43,9 @@ test("does not warn when evidence aligns with a non-not_started status", () => {
 	writeFeatureList(dir, [baseFeature({ status: "passing", evidence: ["ran tests"] })]);
 	const r = validateFeatureListFile(path.join(dir, "feature_list.json"));
 	assert.equal(r.errors.length, 0);
-	assert.ok(!r.warnings.some((w) => /evidence.*not_started/i.test(w)), `no warning: ${JSON.stringify(r.warnings)}`);
+	assert.ok(
+		!r.warnings.some((w) => /evidence.*not_started/i.test(w)),
+		`no warning: ${JSON.stringify(r.warnings)}`,
+	);
 	fs.rmSync(dir, { recursive: true, force: true });
 });

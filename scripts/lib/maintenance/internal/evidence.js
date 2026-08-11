@@ -16,11 +16,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const {
-	readJson,
-	relativeSlash,
-	resolveTarget,
-} = require("../../core/fs-utils");
+const { readJson, relativeSlash, resolveTarget } = require("../../core/fs-utils");
 const {
 	countEvolutionFindings,
 	extractEvolutionFindings,

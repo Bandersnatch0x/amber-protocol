@@ -37,10 +37,7 @@ function checkGovernance(target, { warnOnly = false } = {}) {
 	if (findings.length > 0) {
 		const bucket = warnOnly ? warnings : errors;
 		bucket.push(
-			codedError(
-				"AMBER_E_HOOK_PRECOMMIT_BLOCKED",
-				`${findings.length} governance check(s) failed`,
-			),
+			codedError("AMBER_E_HOOK_PRECOMMIT_BLOCKED", `${findings.length} governance check(s) failed`),
 		);
 		for (const f of findings) bucket.push(f);
 	}
@@ -188,4 +185,3 @@ function statusHook(target) {
 }
 
 module.exports = { checkGovernance, installHook, uninstallHook, statusHook, HOOK_MARKER, shDquote };
-

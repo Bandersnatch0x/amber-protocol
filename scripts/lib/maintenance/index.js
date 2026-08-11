@@ -11,10 +11,7 @@
 // NOT depend on Team Distribution registry availability.
 
 const { collectEvidence } = require("./internal/evidence");
-const {
-	inspectMaintenance,
-	detectStaleDocs,
-} = require("../core/maintenance");
+const { inspectMaintenance, detectStaleDocs } = require("../core/maintenance");
 const { resolveTarget } = require("../core/fs-utils");
 
 /**
