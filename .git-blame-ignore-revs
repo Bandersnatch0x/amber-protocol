@@ -1,0 +1,9 @@
+# One full commit SHA per line. Lines starting with # are comments.
+# Use with: git blame --ignore-revs-file .git-blame-ignore-revs
+# or persist locally: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# 42d0e34 - chore: normalize repo formatting and add quality gates
+# Pure mechanical Prettier restyle across 352 files (tabs, double quotes,
+# trailing commas, 100-col, LF) plus .gitattributes/.prettierignore/.CODEOWNERS.
+# No logic changes; registering so blame attributes lines to the prior author.
+42d0e3401e6ceb2e19db07c10abc627b1447e87d
