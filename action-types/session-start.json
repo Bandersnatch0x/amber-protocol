@@ -1,0 +1,48 @@
+{
+	"actionTypeId": "amber.session.start",
+	"version": 1,
+	"title": "Start session",
+	"goal": "Create a new governed session for an agent task.",
+	"mode": "interactive",
+	"parameters": {
+		"goal": {
+			"type": "string",
+			"required": true,
+			"description": "Task goal statement."
+		},
+		"route": {
+			"type": "string",
+			"description": "Route id to bind (e.g. feature-standard, bugfix-quick)."
+		},
+		"mode": {
+			"type": "string",
+			"enum": ["interactive", "autonomous"],
+			"description": "Session execution mode."
+		}
+	},
+	"submissionCriteria": ["goal is non-empty", "no active session exists for the same goal"],
+	"effects": {
+		"edits": [".amber/sessions/<id>/manifest.json", ".amber/sessions/<id>/timeline.jsonl"],
+		"sideEffects": ["timeline-event", "worktree-create"],
+		"rollback": true
+	},
+	"evidenceRequired": ["timeline-event"],
+	"timeout": 300,
+	"governance": {
+		"policy": "governance/policy.md#session-lifecycle",
+		"approver": ["system"],
+		"evidence": ["timeline-event"],
+		"circuitBreaker": true,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "session",
+		"subcommand": "start",
+		"args": [
+			{ "flag": "--goal", "source": "parameters.goal" },
+			{ "flag": "--route", "source": "parameters.route", "optional": true },
+			{ "flag": "--mode", "source": "parameters.mode", "optional": true },
+			{ "flag": "--agent", "source": "parameters._agent", "optional": true }
+		]
+	}
+}

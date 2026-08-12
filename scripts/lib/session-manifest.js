@@ -36,7 +36,7 @@ function monotonicNowMs() {
 	lastTimestampMs = nowMs;
 	return nowMs;
 }
-function createManifest({ route, goal, budget, feature }) {
+function createManifest({ route, goal, budget, feature, agent }) {
 	const now = new Date(monotonicNowMs()).toISOString();
 	return {
 		sessionId: crypto.randomUUID(),
@@ -49,6 +49,7 @@ function createManifest({ route, goal, budget, feature }) {
 		completedStages: [],
 		...(feature ? { feature } : {}),
 		...(budget != null && { budget: { total: budget, used: 0 } }),
+		...(agent ? { agentId: agent, agentClaimedAt: now } : {}),
 	};
 }
 

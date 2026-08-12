@@ -1,0 +1,90 @@
+{
+	"actionTypeId": "amber.object.query",
+	"version": 1,
+	"title": "Query Amber objects",
+	"goal": "Read Amber-managed objects (sessions, routes, context Loadouts, ledger evidence) as structured data. The OAG query step: agents inspect governed reality before deciding on an action.",
+	"mode": "dry-run",
+	"parameters": {
+		"objectType": {
+			"type": "string",
+			"required": true,
+			"enum": ["session", "route", "context", "ledger", "loop"],
+			"description": "Which object family to query: session state, route definitions, task-scoped context Loadout, ledger evidence, or loop recommendations."
+		},
+		"id": {
+			"type": "string",
+			"description": "Optional object id (session id, context page id)."
+		},
+		"route": {
+			"type": "string",
+			"description": "Route id for Loadout assembly (context queries)."
+		},
+		"feature": {
+			"type": "string",
+			"description": "Feature id for Loadout assembly (context queries)."
+		},
+		"goal": {
+			"type": "string",
+			"description": "Improvement goal for loop recommendations. Omitted: defaults to 'continuous improvement'."
+		}
+	},
+	"submissionCriteria": ["objectType is one of session/route/context/ledger"],
+	"effects": {
+		"edits": [],
+		"sideEffects": [],
+		"rollback": false
+	},
+	"evidenceRequired": [],
+	"timeout": 120,
+	"governance": {
+		"policy": "governance/policy.md#reporting",
+		"approver": ["system"],
+		"evidence": [],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"variantParam": "objectType",
+		"variants": {
+			"session": {
+				"command": "session",
+				"subcommand": "status",
+				"args": [
+					{ "position": 0, "source": "parameters.id", "optional": true },
+					{ "flag": "--json", "flagOnly": true }
+				]
+			},
+			"route": {
+				"command": "route",
+				"subcommand": "list",
+				"args": [{ "flag": "--json", "flagOnly": true }]
+			},
+			"context": {
+				"command": "context",
+				"subcommand": "load",
+				"args": [
+					{ "flag": "--route", "source": "parameters.route" },
+					{ "flag": "--feature", "source": "parameters.feature", "optional": true },
+					{ "flag": "--page", "source": "parameters.id", "optional": true },
+					{ "flag": "--json", "flagOnly": true }
+				]
+			},
+			"ledger": {
+				"command": "ledger",
+				"subcommand": "export",
+				"args": [
+					{ "flag": "--home", "value": "all" },
+					{ "flag": "--format", "value": "json" }
+				]
+			},
+			"loop": {
+				"command": "loop",
+				"subcommand": "recommend",
+				"args": [
+					{ "flag": "--goal", "source": "parameters.goal", "optional": true },
+					{ "flag": "--json", "flagOnly": true }
+				]
+			}
+		}
+	}
+}

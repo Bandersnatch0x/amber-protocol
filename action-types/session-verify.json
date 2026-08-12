@@ -1,0 +1,48 @@
+{
+	"actionTypeId": "amber.session.verify",
+	"version": 1,
+	"title": "Verify session evidence",
+	"goal": "Record verification evidence for a session stage.",
+	"mode": "interactive",
+	"parameters": {
+		"sessionId": {
+			"type": "string",
+			"required": true,
+			"description": "Session id to attach evidence to."
+		},
+		"stage": {
+			"type": "string",
+			"required": true,
+			"description": "Stage name being verified."
+		},
+		"result": {
+			"type": "string",
+			"required": true,
+			"description": "Verification result text or evidence note."
+		}
+	},
+	"submissionCriteria": ["session exists and is not completed", "stage is non-empty"],
+	"effects": {
+		"edits": [".amber/sessions/<id>/timeline.jsonl"],
+		"sideEffects": ["timeline-event"],
+		"rollback": true
+	},
+	"evidenceRequired": ["timeline-event"],
+	"timeout": 120,
+	"governance": {
+		"policy": "governance/policy.md#session-lifecycle",
+		"approver": ["system"],
+		"evidence": ["timeline-event"],
+		"circuitBreaker": true,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "session",
+		"subcommand": "verify",
+		"args": [
+			{ "flag": "--session", "source": "parameters.sessionId" },
+			{ "flag": "--stage", "source": "parameters.stage" },
+			{ "flag": "--result", "source": "parameters.result" }
+		]
+	}
+}

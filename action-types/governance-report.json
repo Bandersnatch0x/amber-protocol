@@ -1,0 +1,28 @@
+{
+	"actionTypeId": "amber.governance.report",
+	"version": 1,
+	"title": "Governance report",
+	"goal": "Score the target repository's governance readiness and emit structured next actions. Read-only: the report is returned through MCP content/structuredContent and never written to a file.",
+	"mode": "dry-run",
+	"parameters": {},
+	"submissionCriteria": [],
+	"effects": {
+		"edits": [],
+		"sideEffects": [],
+		"rollback": false
+	},
+	"evidenceRequired": [],
+	"timeout": 120,
+	"governance": {
+		"policy": "governance/policy.md#reporting",
+		"approver": ["system"],
+		"evidence": [],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "governance",
+		"subcommand": "report",
+		"args": []
+	}
+}

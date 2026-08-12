@@ -10,12 +10,42 @@ Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, ga
 
 **Product Boundary:** Amber is a governance-first protocol layer, NOT a general agent framework or execution platform. It focuses on constraining, verifying, auditing, and handing off agent work safely inside a repository.
 
+## Governance Philosophy: Operational Ontology Positioning
+
+Amber's core mission is to give coding agents a repository-local, auditable,
+handoff-able governance layer. The operational-ontology paradigm (as analyzed
+in `docs/wiki/amber-ontology-mcp.md`) frames this as moving from a
+_descriptive_ protocol — one that records what exists (sessions, routes,
+wiki pages, evidence) — toward an _operative_ one: the protocol itself
+exposes governed operations that agents can call through typed, auditable
+Action Types (`schemas/action.type.schema.json`).
+
+Three principles follow:
+
+1. **Verbs are first-class.** A session isn't just a manifest; it is
+   something that can be started, verified, approved, and closed through
+   declared operations. Each operation states its parameters, submission
+   criteria, effects, rollback behavior, and evidence requirements.
+2. **Governance is intrinsic, not bolted on.** Approval gates, ledger
+   writes, and evidence records are part of the operation contract itself.
+   There is no sanctioned path that bypasses `governed-runner.js`.
+3. **Agents operate through Amber, not around it.** External agents reach
+   the repository through the protocol's governed surface. Amber never
+   auto-executes target-project commands, dispatches live agents, or runs
+   dynamic workflows on behalf of others.
+
+This positioning does not change what Amber executes; it gives the
+product boundary a stable vocabulary that the MCP bridge
+(`scripts/amber-mcp.js`) and OAG query layer (`amber.object.query`) are
+built against.
+
 ## Core Architecture
 
 ### Module Organization
 
 ```
 scripts/amber.js              -> Unified CLI entry point
+scripts/amber-mcp.js           -> P1 stdio MCP server exposing governed Action Types (see docs/wiki/amber-ontology-mcp.md)
 scripts/lib/command-help.js -> Command definitions, help, output policy, and stable public order
 scripts/lib/command-dispatcher.js -> Command handlers, startup registry binding, and dispatch
 scripts/lib/context/          -> Public Context Interface and command adapter boundary
@@ -28,7 +58,8 @@ scripts/lib/route-commands.js -> Route engine (loader, selector, inspector)
 scripts/lib/session-commands.js -> Session lifecycle (start, status, list, abort, continue)
 templates/                    -> Amber starter files (AGENTS.md, CLAUDE.md, feature_list.json, etc.)
 routes/                       -> Route definitions (feature-standard, bugfix-quick, refactor-safe)
-schemas/                      -> JSON Schema validation (route, session-manifest, timeline-event)
+schemas/                      -> JSON Schema validation (route, session-manifest, timeline-event, action.type)
+action-types/                 -> Governed Action Type whitelist consumed by scripts/amber-mcp.js
 workflow-packs/               -> Declarative workflow packs
 skills/                       -> Agent-facing skill instructions (amber-init, amber-audit, etc.)
 profiles/                     -> Project profiles

@@ -16,6 +16,7 @@ const FLAG_SPECS = {
 	"--budget": { key: "budget" },
 	"--mode": { key: "mode" },
 	"--feature": { key: "feature" },
+	"--agent": { key: "agent" },
 	"--title": { key: "title" },
 	"--plan": { key: "plan" },
 	"--file": { key: "file" },

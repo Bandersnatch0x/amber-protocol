@@ -14,6 +14,11 @@ do not execute workflows or mutate repository state.
   predating the Amber Protocol rename; command and file names reflect that era.
 - [Schema specification](SCHEMA_SPEC.md) - route, session, and timeline schema
   design notes for the Phase B contract.
+- [Amber Ontology MCP protocol design](amber-ontology-mcp.md) - implemented
+  design for exposing Amber's governance surface as typed Action Types over a
+  stdio MCP server (`scripts/amber-mcp.js`), governed by the
+  `schemas/action.type.schema.json` contract and the F018 repository-isolation
+  and fail-closed invariants.
 - [Context threat model](../architecture/context-threat-model.md) - trust boundaries,
   controls, residual risks, and report-only retention rules for Context artifacts.
 

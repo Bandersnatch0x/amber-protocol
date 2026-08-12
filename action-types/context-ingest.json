@@ -1,0 +1,42 @@
+{
+	"actionTypeId": "amber.context.ingest",
+	"version": 1,
+	"title": "Ingest context page",
+	"goal": "Judge agent-authored context output against a distillation contract and accept or reject it.",
+	"mode": "interactive",
+	"parameters": {
+		"requestId": {
+			"type": "string",
+			"required": true,
+			"description": "Distillation contract request id."
+		},
+		"payload": {
+			"type": "string",
+			"required": true,
+			"description": "Path to the payload file to judge."
+		}
+	},
+	"submissionCriteria": ["request exists", "payload file exists"],
+	"effects": {
+		"edits": [".amber/context/"],
+		"sideEffects": ["ingest-record"],
+		"rollback": true
+	},
+	"evidenceRequired": ["ingest-record"],
+	"timeout": 180,
+	"governance": {
+		"policy": "governance/policy.md#context-ingest",
+		"approver": ["human"],
+		"evidence": ["ingest-record"],
+		"circuitBreaker": true,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "context",
+		"subcommand": "ingest",
+		"args": [
+			{ "flag": "--request", "source": "parameters.requestId" },
+			{ "flag": "--payload", "source": "parameters.payload" }
+		]
+	}
+}

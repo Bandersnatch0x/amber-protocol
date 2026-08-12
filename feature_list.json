@@ -368,6 +368,57 @@
 				"docs/quality/f017-context-knowledge-lifecycle-retrospective.md"
 			],
 			"updated": "2026-08-10"
+		},
+		{
+			"id": "F018",
+			"priority": 1,
+			"area": "governance",
+			"title": "修复 Amber MCP 治理与仓库隔离不变量",
+			"user_visible_behavior": "MCP Action 和 Function 只能通过受治理且仓库本地的 seam 执行或读取，并以准确错误语义失败关闭",
+			"status": "passing",
+			"verification": [
+				"node --test tests/integration/action-type-schema.test.js tests/integration/amber-mcp.test.js",
+				"npm test",
+				"npm run manifests",
+				"npm run doctor",
+				"npm run gen:agents:check",
+				"node scripts/validate-wiki.js --target ."
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "1710/1710 pass",
+					"date": "2026-08-12",
+					"notes": "F018 targeted set 59/59; +36 negative-path coverage vs 1674 baseline"
+				},
+				{
+					"command": "amber review/gate/manifests/doctor/gen:agents:check/validate-wiki",
+					"result": "all green, 0 errors; two-axis review 0 findings, releaseReadiness ready",
+					"date": "2026-08-12",
+					"notes": "Six invariants enforced in mcp-targets.js + mcp-action-contracts.js + mcp-registry-loader.js"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/amber-mcp.js",
+				"action-types",
+				"action-functions",
+				"schemas",
+				"tests/integration",
+				"docs/wiki"
+			]
+		},
+		{
+			"id": "F019",
+			"priority": 2,
+			"area": "governance",
+			"title": "Intent router + deep journey skills + default-help projection",
+			"user_visible_behavior": "Converge the ~35-command surface behind an intent router with deep journey skills and a default-help projection, as a follow-up to the F018 typed governance seam.",
+			"status": "not_started",
+			"verification": ["npm test"],
+			"evidence": [],
+			"notes": [],
+			"paths": ["scripts", "skills"]
 		}
 	]
 }

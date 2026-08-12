@@ -46,6 +46,21 @@ node scripts/amber.js <command> --target <repo>
 - Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
 - Never overwrite user-authored files without explicit approval.
 
+## Governance philosophy (operational-ontology positioning)
+
+Amber is positioned as an operational-ontology governance layer: agents act
+_through_ Amber's governed surface, not around it. The protocol exposes
+verbs (Action Types, `schemas/action.type.schema.json`) on top of the
+objects it already manages (sessions, routes, wiki, evidence). Design
+reference: `docs/wiki/amber-ontology-mcp.md` — the P1 stdio MCP server
+(`scripts/amber-mcp.js`) and P2 OAG query layer (`amber.object.query`)
+are implemented. F018 enforces the governance seam: only registry-proven
+read-only variants execute without approval; every mutating operation is
+returned as approval-required and is never spawned by the adapter; corrupt
+governance state and non-zero command results fail closed (`isError`); and
+every Action/Function is confined to repositories configured at startup
+(`scripts/lib/mcp-targets.js`, `scripts/lib/mcp-action-contracts.js`).
+
 See also `LOOP.md` (loop engineering self-description) and the explicit `execution: { executesAnything: false }` rule in all Amber loop contracts.
 
 ## Skills & commands

@@ -1,0 +1,42 @@
+{
+	"actionTypeId": "amber.session.approve",
+	"version": 1,
+	"title": "Approve session gate",
+	"goal": "Record human approval for a session gate.",
+	"mode": "interactive",
+	"parameters": {
+		"sessionId": {
+			"type": "string",
+			"required": true,
+			"description": "Session id whose gate is being approved."
+		},
+		"gate": {
+			"type": "string",
+			"required": true,
+			"description": "Gate id to approve (e.g. user-approval-plan)."
+		}
+	},
+	"submissionCriteria": ["session exists", "gate id is known for the session route"],
+	"effects": {
+		"edits": [".amber/sessions/<id>/timeline.jsonl"],
+		"sideEffects": ["timeline-event"],
+		"rollback": true
+	},
+	"evidenceRequired": ["approval-record"],
+	"timeout": 120,
+	"governance": {
+		"policy": "governance/policy.md#approval-gates",
+		"approver": ["human"],
+		"evidence": ["approval-record"],
+		"circuitBreaker": true,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "session",
+		"subcommand": "approve",
+		"args": [
+			{ "flag": "--session", "source": "parameters.sessionId" },
+			{ "flag": "--gate", "source": "parameters.gate" }
+		]
+	}
+}

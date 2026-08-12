@@ -1,0 +1,292 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/action.type.schema.json",
+	"title": "Amber Action Type",
+	"description": "Declarative description of a governed, evidence-backed operation an agent (or human) may submit against an Amber-governed repository. An Action Type turns a verb (start a session, verify evidence, approve a gate) into a type-constrained, auditable transaction with explicit parameters, submission criteria, effects, rollback behavior, and governance requirements. Design reference: operational-ontology positioning described in docs/wiki/amber-ontology-mcp.md.",
+	"type": "object",
+	"required": ["actionTypeId", "version", "goal", "parameters", "governance"],
+	"additionalProperties": false,
+	"properties": {
+		"actionTypeId": {
+			"type": "string",
+			"pattern": "^amber\\.[a-z0-9-]+(\\.[a-z0-9-]+)*$",
+			"description": "Unique, namespaced identifier for the action type, e.g. amber.session.start. First segment is always amber; further segments mirror the command family (session, route, context, governance)."
+		},
+		"version": {
+			"type": "integer",
+			"minimum": 1,
+			"description": "Schema version of this action type definition. Bumping the version signals a breaking change in parameters, criteria, or governance."
+		},
+		"title": {
+			"type": "string",
+			"description": "Human-readable title for the action type."
+		},
+		"goal": {
+			"type": "string",
+			"description": "Single-sentence statement of what the action accomplishes, written as an outcome, not a procedure."
+		},
+		"mode": {
+			"type": "string",
+			"enum": ["interactive", "autonomous", "dry-run"],
+			"default": "interactive",
+			"description": "Execution mode the action is allowed to run in. dry-run only validates and reports the intended effects without applying them. interactive requires a human confirmation step for execution. autonomous permits governed execution without a human round-trip."
+		},
+		"parameters": {
+			"type": "object",
+			"description": "Named input parameters the action accepts. Keys must be lowerCamelCase identifiers.",
+			"propertyNames": {
+				"pattern": "^[a-z][a-zA-Z0-9]*$"
+			},
+			"additionalProperties": {
+				"type": "object",
+				"required": ["type"],
+				"additionalProperties": false,
+				"properties": {
+					"type": {
+						"type": "string",
+						"enum": ["string", "integer", "number", "boolean", "array", "object"],
+						"description": "JSON type of the parameter value."
+					},
+					"required": {
+						"type": "boolean",
+						"default": false,
+						"description": "Whether the parameter must be provided when the action is submitted."
+					},
+					"description": {
+						"type": "string",
+						"description": "What the parameter means and how it is used."
+					},
+					"default": {
+						"description": "Default value applied when the parameter is omitted. Type must match the declared type."
+					},
+					"enum": {
+						"type": "array",
+						"description": "Closed set of allowed values, when the parameter is constrained."
+					}
+				}
+			}
+		},
+		"submissionCriteria": {
+			"type": "array",
+			"items": { "type": "string" },
+			"description": "Preconditions that must hold for the action to be accepted (e.g. 'session status is created', 'evidence hash is present'). Mirrors the governed-runner gate checks."
+		},
+		"effects": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"edits": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "Repository artifacts the action may mutate (e.g. '.amber/sessions/<id>/manifest.json', 'docs/wiki/index.md')."
+				},
+				"sideEffects": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"enum": [
+							"timeline-event",
+							"ledger-append",
+							"ingest-record",
+							"notification",
+							"webhook",
+							"worktree-create"
+						]
+					},
+					"description": "Out-of-band consequences fired on successful execution. Ledger and timeline records are always written; listing them here documents the intent."
+				},
+				"rollback": {
+					"type": "boolean",
+					"default": true,
+					"description": "Whether the action supports reversal (e.g. session abort, ledger tombstone)."
+				}
+			}
+		},
+		"evidenceRequired": {
+			"type": "array",
+			"items": { "type": "string" },
+			"description": "Evidence kinds the executor must record before the action is considered complete (e.g. 'timeline-event', 'verify-result', 'approval-record')."
+		},
+		"timeout": {
+			"type": "integer",
+			"minimum": 1,
+			"description": "Maximum execution time in seconds before the action is aborted and marked incomplete."
+		},
+		"governance": {
+			"type": "object",
+			"required": ["policy", "approver", "evidence"],
+			"additionalProperties": false,
+			"properties": {
+				"policy": {
+					"type": "string",
+					"description": "Reference to the governance policy that authorizes this action (e.g. 'governance/policy.md#session-lifecycle')."
+				},
+				"approver": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"enum": ["human", "loop-contract", "system"]
+					},
+					"minItems": 1,
+					"description": "Parties that may approve execution. human requires a person; loop-contract allows an approved autonomous loop; system allows internal programmatic approval."
+				},
+				"evidence": {
+					"type": "array",
+					"items": { "type": "string" },
+					"description": "Evidence kinds required before approval can be granted (e.g. 'verification-result', 'ledger-hash')."
+				},
+				"circuitBreaker": {
+					"type": "boolean",
+					"default": true,
+					"description": "Whether a failure or anomaly in a previous action pauses the family until inspected."
+				},
+				"worktreeIsolation": {
+					"type": "boolean",
+					"default": true,
+					"description": "Whether execution must happen in an isolated worktree rather than the working branch."
+				}
+			}
+		},
+		"execution": {
+			"type": "object",
+			"oneOf": [
+				{
+					"required": ["command", "subcommand"],
+					"properties": {
+						"command": { "type": "string" },
+						"subcommand": { "type": "string" }
+					}
+				},
+				{
+					"required": ["variantParam", "variants"],
+					"properties": {
+						"variantParam": {
+							"type": "string",
+							"description": "Parameter name whose value selects the execution variant (e.g. objectType)."
+						},
+						"variants": {
+							"type": "object",
+							"description": "Map from variant value to a command/subcommand/args mapping.",
+							"additionalProperties": {
+								"type": "object",
+								"required": ["command", "subcommand"],
+								"additionalProperties": false,
+								"properties": {
+									"command": {
+										"type": "string",
+										"enum": [
+											"session",
+											"route",
+											"context",
+											"governance",
+											"ledger",
+											"loop",
+											"status"
+										]
+									},
+									"subcommand": { "type": "string" },
+									"args": { "$ref": "#/properties/execution/properties/args" }
+								}
+							}
+						}
+					}
+				}
+			],
+			"additionalProperties": false,
+			"properties": {
+				"variantParam": {
+					"type": "string",
+					"description": "Parameter name whose value selects the execution variant (e.g. objectType). Present only when the action dispatches to different commands per parameter value."
+				},
+				"variants": {
+					"type": "object",
+					"description": "Map from variant value to a command/subcommand/args mapping. Present only when variantParam is present.",
+					"additionalProperties": {
+						"type": "object",
+						"required": ["command", "subcommand"],
+						"additionalProperties": false,
+						"properties": {
+							"command": {
+								"type": "string",
+								"enum": ["session", "route", "context", "governance", "ledger", "loop", "status"]
+							},
+							"subcommand": { "type": "string" },
+							"args": { "$ref": "#/properties/execution/properties/args" }
+						}
+					}
+				},
+				"command": {
+					"type": "string",
+					"enum": ["session", "route", "context", "governance", "ledger", "loop", "status"],
+					"description": "Amber CLI command family this action maps to."
+				},
+				"subcommand": {
+					"type": "string",
+					"description": "Amber CLI subcommand within the command family."
+				},
+				"args": {
+					"type": "array",
+					"description": "Ordered argument templates that build the CLI invocation from the submitted parameters. Each template binds one flag or positional slot to a parameter source or a literal value.",
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"properties": {
+							"flag": {
+								"type": "string",
+								"description": "Flag form, e.g. --goal. Mutually exclusive with position."
+							},
+							"position": {
+								"type": "integer",
+								"minimum": 0,
+								"description": "Positional slot, e.g. the route id in `route test <id>`. Mutually exclusive with flag."
+							},
+							"source": {
+								"type": "string",
+								"pattern": "^parameters\\.[a-zA-Z0-9_.]+$",
+								"description": "Dotted path into the submitted parameters, e.g. parameters.goal. Mutually exclusive with value."
+							},
+							"value": {
+								"type": "string",
+								"description": "Literal value injected as-is. Mutually exclusive with source."
+							},
+							"optional": {
+								"type": "boolean",
+								"default": false,
+								"description": "When true, a missing source parameter is skipped instead of failing the call."
+							},
+							"flagOnly": {
+								"type": "boolean",
+								"default": false,
+								"description": "When true, emit only the flag without a value (boolean flags such as --json). Mutually exclusive with source/value."
+							}
+						}
+					}
+				}
+			}
+		},
+		"functions": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["name", "language", "entryPoint"],
+				"additionalProperties": false,
+				"properties": {
+					"name": {
+						"type": "string",
+						"description": "Function identifier exposed to agents, e.g. 'resolveEvidenceHash'."
+					},
+					"language": {
+						"type": "string",
+						"enum": ["typescript", "javascript", "python"],
+						"description": "Runtime language of the function implementation."
+					},
+					"entryPoint": {
+						"type": "string",
+						"description": "Repository-relative path to the function implementation."
+					}
+				}
+			},
+			"description": "Deterministic helpers the action may call (hash resolution, ledger queries). Functions do not widen the action's governance scope."
+		}
+	}
+}

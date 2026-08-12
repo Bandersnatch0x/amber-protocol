@@ -114,7 +114,7 @@ function loadAllSessionManifests(projectRoot) {
 }
 
 async function startSession(projectRoot, options) {
-	const { goal, route: routeId, budget, worktree, mode, feature } = options;
+	const { goal, route: routeId, budget, worktree, mode, feature, agent } = options;
 
 	if (!goal) {
 		return result("Error: --goal is required", 1);
@@ -200,6 +200,7 @@ async function startSession(projectRoot, options) {
 		goal,
 		budget,
 		feature,
+		agent,
 	});
 	const sessionDir = getSessionDirForCreate(projectRoot, manifest.sessionId);
 	fs.mkdirSync(sessionDir, { recursive: true });
@@ -277,7 +278,11 @@ function statusSession(projectRoot, options) {
 	if (!sessionId) {
 		sessionId = findMostRecentSession(projectRoot);
 		if (!sessionId) {
-			return result("No sessions found", 1);
+			// A read with no session to report is a valid empty result, not an
+			// error: MCP object.query(session) and `amber session status` must
+			// return exit 0 so the empty state is not surfaced as a failure
+			// (F018 fail-closed semantics: empty != error).
+			return result("No sessions found", 0);
 		}
 	}
 

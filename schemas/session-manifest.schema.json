@@ -34,6 +34,15 @@
 		"artifact_sequence": { "type": "integer" },
 		"created_at": { "type": "string", "format": "date-time" },
 		"artifact_type": { "type": "string" },
+		"agentId": {
+			"type": "string",
+			"description": "Agent identity that owns this session (set via `amber session start --agent <id>` or the MCP _agent parameter). Enables ownership-aware concurrency: a session may be managed by the agent that created it."
+		},
+		"agentClaimedAt": {
+			"type": "string",
+			"format": "date-time",
+			"description": "When the owning agent claimed the session."
+		},
 		"execution_context": {
 			"type": "object",
 			"properties": {

@@ -241,6 +241,7 @@ async function handleSession(args) {
 				worktree: args.worktree,
 				mode: args.mode,
 				feature: args.feature,
+				agent: args.agent,
 			});
 		}
 	} else if (action === "status") {

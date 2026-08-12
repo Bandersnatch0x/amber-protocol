@@ -1,0 +1,33 @@
+{
+	"actionTypeId": "amber.session.status",
+	"version": 1,
+	"title": "Session status",
+	"goal": "Read the current state of a session without mutating anything.",
+	"mode": "dry-run",
+	"parameters": {
+		"sessionId": {
+			"type": "string",
+			"description": "Session id to inspect. Omitted when listing the active session."
+		}
+	},
+	"submissionCriteria": [],
+	"effects": {
+		"edits": [],
+		"sideEffects": [],
+		"rollback": false
+	},
+	"evidenceRequired": [],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#session-lifecycle",
+		"approver": ["system"],
+		"evidence": [],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "session",
+		"subcommand": "status",
+		"args": [{ "position": 0, "source": "parameters.sessionId", "optional": true }]
+	}
+}
