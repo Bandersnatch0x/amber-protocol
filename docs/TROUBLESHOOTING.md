@@ -25,7 +25,7 @@ node scripts/amber.js maintenance inspect --target .
 1. **Abort and restart**:
 ```bash
 node scripts/amber.js session abort <session-id>
-node scripts/amber.js session start --goal "..." --route <route>
+node scripts/amber.js session start --goal "..." --route <route> --confirm
 ```
 
 2. **Continue from checkpoint**:
@@ -85,7 +85,8 @@ df -h .
 ```bash
 node scripts/amber.js session start \
   --goal "..." \
-  --route bugfix-quick  # Instead of feature-standard
+  --route bugfix-quick \
+  --confirm  # Instead of feature-standard
 ```
 
 3. **Break into smaller goals**:

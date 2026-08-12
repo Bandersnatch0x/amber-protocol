@@ -22,6 +22,36 @@ function runHarness(args, options = {}) {
 	});
 }
 
+test("default help projects journey and core commands", () => {
+	const result = runHarness([]);
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /Commands: .*next/);
+	assert.match(result.stdout, /governance/);
+	assert.doesNotMatch(result.stdout, /Commands: .*adoption/);
+	assert.doesNotMatch(result.stdout, /Commands: .*maintenance/);
+	assert.doesNotMatch(
+		result.stdout,
+		/amber (pack|profile|task|result|agent|team|maintenance|adoption) /,
+	);
+	assert.match(result.stdout, /amber --all/);
+});
+
+test("--all exposes deprecated and expert commands", () => {
+	const result = runHarness(["--all"]);
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /Commands: .*adoption/);
+	assert.match(result.stdout, /Commands: .*maintenance/);
+});
+
+test("hidden commands retain command-specific help", () => {
+	const result = runHarness(["adoption", "--help"]);
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /Usage: amber adoption/);
+	const alias = runHarness(["help", "adoption"]);
+	assert.equal(alias.status, 0, alias.stderr);
+	assert.match(alias.stdout, /Usage: amber adoption/);
+});
+
 test("init command scaffolds a Harness without overwriting existing files", () => {
 	const target = tempDir("init");
 	fs.writeFileSync(path.join(target, "AGENTS.md"), "# Existing rules\n");
@@ -1288,6 +1318,7 @@ test("governance report command exposes the complete product value loop", () => 
 		target,
 		"--output",
 		output,
+		"--confirm",
 		"--json",
 	]);
 	assert.equal(jsonResult.status, 0, jsonResult.stderr);
@@ -1301,6 +1332,41 @@ test("governance report command exposes the complete product value loop", () => 
 	);
 	assert.equal(fs.existsSync(outputPath), true);
 	assert.match(fs.readFileSync(outputPath, "utf8"), /# Amber Governance Report/);
+});
+
+test("typed mutations require confirmation before writing", () => {
+	const target = tempDir("typed-mutation-approval");
+	const output = path.join(target, "governance-report.md");
+
+	const start = runHarness([
+		"session",
+		"start",
+		"--goal",
+		"approval probe",
+		"--target",
+		target,
+		"--json",
+	]);
+	assert.notEqual(start.status, 0);
+	const startPayload = JSON.parse(start.stdout);
+	assert.equal(startPayload.executed, false);
+	assert.equal(startPayload.approvalRequired, true);
+	assert.equal(fs.existsSync(path.join(target, ".amber", "sessions")), false);
+
+	const report = runHarness([
+		"governance",
+		"report",
+		"--target",
+		target,
+		"--output",
+		output,
+		"--json",
+	]);
+	assert.notEqual(report.status, 0);
+	const reportPayload = JSON.parse(report.stdout);
+	assert.equal(reportPayload.executed, false);
+	assert.equal(reportPayload.approvalRequired, true);
+	assert.equal(fs.existsSync(output), false);
 });
 
 test("next command combines lifecycle guidance with top governance action", () => {
@@ -1406,6 +1472,7 @@ test("unknown command returns a clear error", () => {
 
 test("help scopes dry-run to commands that support it", () => {
 	const globalHelp = runHarness(["--help"]);
+	const allHelp = runHarness(["--all"]);
 	const adoptionHelp = runHarness(["adoption", "--help"]);
 	const initHelp = runHarness(["init", "--help"]);
 	const wikiHelp = runHarness(["wiki", "--help"]);
@@ -1414,6 +1481,7 @@ test("help scopes dry-run to commands that support it", () => {
 	const executionHelp = runHarness(["execution", "--help"]);
 
 	assert.equal(globalHelp.status, 0);
+	assert.equal(allHelp.status, 0);
 	assert.equal(adoptionHelp.status, 0);
 	assert.equal(initHelp.status, 0);
 	assert.equal(wikiHelp.status, 0);
@@ -1422,10 +1490,10 @@ test("help scopes dry-run to commands that support it", () => {
 	assert.equal(executionHelp.status, 0);
 	assert.match(globalHelp.stdout, /^Usage: amber <command> --target <repo> \[--json\]$/m);
 	assert.match(
-		globalHelp.stdout,
+		allHelp.stdout,
 		/team install --target path\/to\/repo --version 1\.0\.0 --preset safe-bootstrap --dry-run --json/,
 	);
-	assert.match(globalHelp.stdout, /maintenance inspect --target path\/to\/repo --json/);
+	assert.match(allHelp.stdout, /maintenance inspect --target path\/to\/repo --json/);
 	assert.match(adoptionHelp.stdout, /adoption apply-plan/);
 	assert.match(adoptionHelp.stdout, /--dry-run/);
 	assert.match(initHelp.stdout, /--dry-run/);
@@ -1552,6 +1620,7 @@ test("session complete-check reports missing evidence for a new session", () => 
 		"bugfix-quick",
 		"--target",
 		target,
+		"--confirm",
 		"--json",
 	]);
 	assert.equal(start.status, 0, start.stderr);

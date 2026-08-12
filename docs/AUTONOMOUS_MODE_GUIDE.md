@@ -33,7 +33,8 @@ Create `.amber/autonomous-policy.json`:
 ```bash
 node scripts/amber.js session start \
   --goal "implement user authentication" \
-  --route feature-standard
+  --route feature-standard \
+  --confirm
 ```
 
 Do not pass `--mode autonomous`; Amber refuses that mode so human approval gates remain real.
@@ -223,11 +224,12 @@ node scripts/amber.js route inspect feature-standard
 node scripts/amber.js session start \
   --goal "fix login timeout issue #123" \
   --route bugfix-quick \
-  --budget 25000
+  --budget 25000 \
+  --confirm
 
 node scripts/amber.js session status --target .
 node scripts/amber.js session approve --target . --session <session-id> --gate user-approval-fix --yes
-node scripts/amber.js session verify --target . --session <session-id> --execute --command "npm test"
+node scripts/amber.js session verify --target . --session <session-id> --execute --command "npm test" --confirm
 ```
 
 ### Scheduled Or CI Work

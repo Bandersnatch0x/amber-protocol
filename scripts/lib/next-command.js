@@ -8,6 +8,7 @@ const { REPO_ROOT } = require("./core/constants");
 const { buildContext, inferNextStep } = require("./core/lifecycle");
 const { buildGovernanceReport } = require("./core/governance-report");
 const { loadRoutes } = require("./route-loader");
+const { routeJourney } = require("./journey-router");
 
 // Route advisor (T5.8, ADR-0014): read-only keyword matching over route
 // manifest objective/description metadata. Amber never executes or creates
@@ -141,7 +142,7 @@ function suggestRouting(objective, target = REPO_ROOT) {
 			routeId: null,
 			confidence: 0,
 			workflowPackId: null,
-			suggestion: `No matching route for objective "${objective}". Suggest running the plan gate first: amber plan --feature <id> --title "<objective>", then amber session start --route <id> once a route fits.`,
+			suggestion: `No matching route for objective "${objective}". Suggest running the plan gate first: amber plan --feature <id> --title "<objective>", then amber session start --route <id> --confirm once a route fits.`,
 		};
 	}
 
@@ -239,6 +240,7 @@ function inferNext(target, options = {}) {
 	// absent (not null) so the no-flag envelope is byte-identical to before.
 	if (typeof options.objective === "string" && options.objective.trim() !== "") {
 		envelope.routingSuggestion = suggestRouting(options.objective.trim(), targetRoot);
+		envelope.journeyId = routeJourney(options.objective.trim());
 	}
 	envelope.text = renderText(envelope);
 	return envelope;

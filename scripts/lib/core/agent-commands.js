@@ -6,6 +6,11 @@ const { pathExists, readText, relativeSlash } = require("./fs-utils");
 
 const SAFETY_NOTE =
 	"Report the command output faithfully; never overwrite user-authored files without approval.";
+const GENERATED_MARKER = "GENERATED — edit skills/ instead. Run: npm run gen:agents";
+
+function markSkillMirror(content) {
+	return String(content).replace(/^---\r?\n/, `---\n# ${GENERATED_MARKER}\n`);
+}
 
 function stripQuotes(value) {
 	const t = String(value).trim();
@@ -22,7 +27,12 @@ function parseSkillFrontmatter(markdown) {
 		return null;
 	}
 	const lines = match[1].split(/\r?\n/);
-	const result = { name: null, description: null, amber: null };
+	const result = {
+		name: null,
+		description: null,
+		amber: null,
+		body: text.slice(match[0].length).trim(),
+	};
 	for (const line of lines) {
 		const nameMatch = line.match(/^name:\s*(.+?)\s*$/);
 		if (nameMatch) {
@@ -62,6 +72,21 @@ function applyPositionalArgs(command, args) {
 function renderClaudeCommand(skill) {
 	const args = skill.amber.args || [];
 	const argHint = args.map((arg) => `[${arg.name}]`).join(" ");
+	if (["router", "journey"].includes(skill.amber.kind)) {
+		const lines = ["---", `description: ${skill.description}`];
+		if (argHint) lines.push(`argument-hint: ${argHint}`);
+		lines.push(
+			"---",
+			"",
+			"<!-- GENERATED — edit skills/ instead. Run: npm run gen:agents -->",
+			"",
+			"User input: $ARGUMENTS",
+			"",
+			skill.body,
+			"",
+		);
+		return lines.join("\n");
+	}
 	const commandLine = applyPositionalArgs(skill.amber.command, args);
 	const lines = ["---", `description: ${skill.description}`];
 	if (argHint) {
@@ -107,6 +132,19 @@ function escapeTomlBasic(value) {
 }
 
 function renderGeminiCommand(skill) {
+	if (["router", "journey"].includes(skill.amber.kind)) {
+		const body = String(skill.body || "").replace(/"""/g, '\\"\\"\\"');
+		return [
+			"# GENERATED — edit skills/ instead. Run: npm run gen:agents",
+			`description = "${escapeTomlBasic(skill.description)}"`,
+			'prompt = """',
+			"User input: {{args}}",
+			"",
+			body,
+			'"""',
+			"",
+		].join("\n");
+	}
 	const promptCommand = applyGeminiArgs(skill.amber.command, skill.amber.args);
 	return [
 		"# GENERATED — edit skills/ instead. Run: npm run gen:agents",
@@ -163,7 +201,10 @@ function planOutputs(skills, repoRoot) {
 	const outputs = [];
 	for (const skill of skills) {
 		const manualName = path.basename(skill.amber.manualName);
-		const shortName = extractCommandName(skill.amber.command);
+		const shortName = skill.amber.commandName || extractCommandName(skill.amber.command);
+		if (!shortName || !/^[a-z][a-z0-9-]*$/.test(shortName)) {
+			throw new Error(`Skill ${skill.name} requires a safe commandName or amber command`);
+		}
 		outputs.push({
 			path: path.join(repoRoot, ".claude", "commands", `${manualName}.md`),
 			content: renderClaudeCommand(skill),
@@ -182,7 +223,7 @@ function generateAgentCommands({ skillsRoot, repoRoot, check = false }) {
 	for (const name of listSkillDirs(skillsRoot)) {
 		outputs.push({
 			path: path.join(repoRoot, ".agents", "skills", name, "SKILL.md"),
-			content: readText(path.join(skillsRoot, name, "SKILL.md")),
+			content: markSkillMirror(readText(path.join(skillsRoot, name, "SKILL.md"))),
 		});
 	}
 	const paths = [];
@@ -200,7 +241,47 @@ function generateAgentCommands({ skillsRoot, repoRoot, check = false }) {
 			}
 		}
 	}
-	return { paths, changed };
+	const planned = new Set(paths.map((value) => value.toLowerCase()));
+	const stale = findStaleGeneratedOutputs(repoRoot, planned);
+	for (const relativePath of stale) {
+		changed.push(relativePath);
+		if (!check) fs.rmSync(path.join(repoRoot, relativePath), { recursive: true, force: true });
+	}
+	return { paths, changed, removed: stale };
+}
+
+function findStaleGeneratedOutputs(repoRoot, planned) {
+	const stale = [];
+	const roots = [
+		{
+			dir: path.join(repoRoot, ".claude", "commands"),
+			accept: (name) => /^amber(?:-|\.md$)/.test(name) && name.endsWith(".md"),
+		},
+		{
+			dir: path.join(repoRoot, ".gemini", "commands", "amber"),
+			accept: (name) => name.endsWith(".toml"),
+		},
+		{
+			dir: path.join(repoRoot, ".agents", "skills"),
+			accept: (name, entry) => entry.isDirectory(),
+			resolveFile: (name) => path.join(name, "SKILL.md"),
+		},
+	];
+	for (const root of roots) {
+		if (!pathExists(root.dir)) continue;
+		for (const entry of fs.readdirSync(root.dir, { withFileTypes: true })) {
+			if (!root.accept(entry.name, entry)) continue;
+			const file = path.join(
+				root.dir,
+				root.resolveFile ? root.resolveFile(entry.name) : entry.name,
+			);
+			if (!pathExists(file)) continue;
+			const relative = relativeSlash(repoRoot, file);
+			if (!planned.has(relative.toLowerCase()) && readText(file).includes(GENERATED_MARKER))
+				stale.push(relative);
+		}
+	}
+	return stale.sort();
 }
 
 module.exports = {
@@ -214,4 +295,5 @@ module.exports = {
 	collectAmberSkills,
 	listSkillDirs,
 	generateAgentCommands,
+	findStaleGeneratedOutputs,
 };

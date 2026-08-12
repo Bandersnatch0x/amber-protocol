@@ -50,6 +50,7 @@ function startSession(target, goal) {
 		goal,
 		"--route",
 		"bugfix-quick",
+		"--confirm",
 		"--json",
 	]);
 	assert.equal(started.status, 0, started.stderr);

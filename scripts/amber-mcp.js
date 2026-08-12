@@ -30,25 +30,15 @@
 //   * Protocol truth invariant — unknown tools, docs, and tests agree on the
 //     MCP-native JSON-RPC error shape.
 
-const fs = require("node:fs");
 const path = require("node:path");
 const readline = require("node:readline");
-const { spawnSync } = require("node:child_process");
 const Ajv = require("ajv");
 
-const {
-	buildConfiguredTargets,
-	resolveTargetOverride,
-	resolveConfiguredRepoPath,
-	resolveRepoPath,
-} = require("./lib/mcp-targets");
-const {
-	resolveCapability,
-	bindsWriteFlag,
-	isReadOnlyExecutable,
-	validateWhitelist,
-} = require("./lib/mcp-action-contracts");
+const { buildConfiguredTargets, resolveTargetOverride } = require("./lib/mcp-targets");
+const { validateWhitelist } = require("./lib/mcp-action-contracts");
 const { loadActionTypes, loadFunctions } = require("./lib/mcp-registry-loader");
+const { createFunctionRuntime } = require("./lib/mcp-functions");
+const actionRuntime = require("./lib/mcp-action-runtime");
 
 const ROOT = path.resolve(__dirname, "..");
 const AMBER_JS = path.join(ROOT, "scripts", "amber.js");
@@ -56,9 +46,7 @@ const SCHEMA_PATH = path.join(ROOT, "schemas", "action.type.schema.json");
 const ACTION_TYPES_DIR = path.join(ROOT, "action-types");
 const ACTION_FUNCTIONS_DIR = path.join(ROOT, "action-functions");
 
-const ACTIVE_SESSION_STATUSES = new Set(["created", "routed", "executing", "paused"]);
-
-const SERVER_INFO = { name: "amber-mcp", version: "0.3.0" };
+const SERVER_INFO = { name: "amber-mcp", version: "0.7.0" };
 const KNOWN_VERSIONS = new Set(["2024-11-05", "2025-03-26", "2025-06-18"]);
 
 // ---- argument parsing ---------------------------------------------------
@@ -188,223 +176,6 @@ function toFunctionTool(fn) {
 
 // Extract the first JSON value from a possibly-mixed stdout buffer
 // (CLI JSON output followed by diagnostics). Returns null when absent.
-function extractJson(text) {
-	const trimmed = (text || "").trim();
-	if (!trimmed) return null;
-	try {
-		return JSON.parse(trimmed);
-	} catch {
-		const start = trimmed.indexOf("{");
-		const end = trimmed.lastIndexOf("}");
-		if (start === -1 || end === -1 || end <= start) return null;
-		try {
-			return JSON.parse(trimmed.slice(start, end + 1));
-		} catch {
-			return null;
-		}
-	}
-}
-
-// Resolve the effective command mapping: a plain command/subcommand pair, or
-// the variant selected by the submitted parameters (e.g. objectType).
-function resolveExecution(action, parameters) {
-	const ex = action.execution;
-	if (ex.variants) {
-		const variant = parameters[ex.variantParam];
-		if (!variant || !ex.variants[variant]) {
-			throw new Error(`unknown ${ex.variantParam}: ${variant}`);
-		}
-		return ex.variants[variant];
-	}
-	return ex;
-}
-
-// Build the rendered CLI invocation for an action, applying argument
-// templates against the submitted parameters.
-function buildCommand(action, parameters) {
-	const mapping = resolveExecution(action, parameters);
-	const positional = [];
-	const flagArgs = [];
-	for (const tmpl of mapping.args || []) {
-		if (tmpl.position !== undefined) {
-			if (tmpl.source) {
-				const key = tmpl.source.replace(/^parameters\./, "");
-				const value = parameters[key];
-				if (value === undefined || value === null) {
-					if (tmpl.optional) continue;
-					throw new Error(`missing required parameter: ${key}`);
-				}
-				positional[tmpl.position] = String(value);
-			} else {
-				positional[tmpl.position] = tmpl.value;
-			}
-			continue;
-		}
-		if (tmpl.flagOnly) {
-			flagArgs.push(tmpl.flag);
-			continue;
-		}
-		if (tmpl.source) {
-			const key = tmpl.source.replace(/^parameters\./, "");
-			const value = parameters[key];
-			if (value === undefined || value === null) {
-				if (tmpl.optional) continue;
-				throw new Error(`missing required parameter: ${key}`);
-			}
-			flagArgs.push(tmpl.flag, String(value));
-		} else {
-			flagArgs.push(tmpl.flag, tmpl.value);
-		}
-	}
-	return [mapping.command, mapping.subcommand, ...positional, ...flagArgs];
-}
-
-// ---- concurrency guard --------------------------------------------------
-
-// Enumerate active sessions for the one-active-session-per-repository guard.
-// Returns { active, corrupt }. Corrupt manifests are reported (not silently
-// ignored) so the decision gate can fail closed while preserving ownership
-// information for valid sessions.
-function listActiveSessions(target) {
-	// Resolve the sessions directory through real-path-aware containment so a
-	// symlink/Windows junction inside the repo (e.g. `.amber` -> outside) cannot
-	// make the guard read governance state from outside the configured repo.
-	// resolveRepoPath throws (-> isError) on escape; the message propagates as-is.
-	const sessionsDir = resolveRepoPath(target, path.join(".amber", "sessions"));
-	if (!fs.existsSync(sessionsDir)) return { active: [], corrupt: [] };
-	const active = [];
-	const corrupt = [];
-	for (const name of fs.readdirSync(sessionsDir).sort()) {
-		const manifestPath = path.join(sessionsDir, name, "manifest.json");
-		if (!fs.existsSync(manifestPath)) continue;
-		let manifest;
-		try {
-			manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-		} catch {
-			corrupt.push({ sessionId: name });
-			continue;
-		}
-		if (ACTIVE_SESSION_STATUSES.has(manifest.status)) {
-			active.push({ sessionId: name, agentId: manifest.agentId || null });
-		}
-	}
-	return { active, corrupt };
-}
-
-// Concurrency guard for mutating actions. Throws a fail-closed error when any
-// active-session manifest is unreadable; returns { conflict } when another
-// session is active; otherwise { conflict: null }.
-function concurrencyGuard(target, parameters) {
-	const { active, corrupt } = listActiveSessions(target);
-	if (corrupt.length > 0) {
-		const owners = {};
-		for (const s of active) owners[s.sessionId] = s.agentId;
-		const err = new Error(
-			`corrupt session manifest prevents the concurrency check: ${corrupt
-				.map((c) => c.sessionId)
-				.join(", ")}. Refusing to proceed (fail-closed).`,
-		);
-		err.code = "CORRUPT_GOVERNANCE_STATE";
-		err.conflict = {
-			activeSessions: active.map((s) => s.sessionId),
-			owners,
-			corrupt: corrupt.map((c) => c.sessionId),
-		};
-		throw err;
-	}
-	const mySession = parameters.sessionId || parameters.id;
-	const otherActive = active.filter((s) => s.sessionId !== mySession);
-	if (otherActive.length > 0) {
-		const owners = {};
-		for (const s of otherActive) owners[s.sessionId] = s.agentId;
-		return {
-			conflict: {
-				activeSessions: otherActive.map((s) => s.sessionId),
-				owners,
-			},
-		};
-	}
-	return { conflict: null };
-}
-
-// ---- action execution ---------------------------------------------------
-
-// Decide whether the SELECTED variant of an action may execute directly as a
-// read-only operation: registry-proven read + directReadOnlyExec + no
-// write-capable flag bound by the rendered invocation.
-function selectedVariantIsReadOnlyExec(action, parameters) {
-	if (!isReadOnlyExecutable(action)) return false;
-	const resolved = resolveCapability(action, parameters);
-	if (!resolved.capability) return false;
-	if (resolved.capability.effect !== "read" || !resolved.capability.directReadOnlyExec)
-		return false;
-	return !bindsWriteFlag(resolved);
-}
-
-function runAction(action, parameters, flags, configured, targetOverride) {
-	const target = targetOverride || configured.primary;
-	const argv = buildCommand(action, parameters);
-	const commandLine = `amber ${argv.join(" ")} --target ${target}`;
-	const attribution = parameters._agent ? { agent: parameters._agent } : {};
-
-	// Resolve the selected variant's capability (fail-closed on unknown).
-	const resolved = resolveCapability(action, parameters);
-	if (!resolved.capability) {
-		throw new Error(
-			`action ${action.actionTypeId} maps to an unknown command (${resolved.key}) — registration contract broken`,
-		);
-	}
-
-	// Read-only path: registry-proven read variants execute directly. They
-	// cannot mutate the target, so the concurrency guard does not apply.
-	if (selectedVariantIsReadOnlyExec(action, parameters)) {
-		const result = spawnSync(process.execPath, [AMBER_JS, ...argv, "--target", target], {
-			cwd: ROOT,
-			encoding: "utf8",
-			timeout: (action.timeout || 60) * 1000,
-		});
-		return {
-			executed: true,
-			dryRun: false,
-			approvalRequired: false,
-			command: commandLine,
-			exitCode: result.status,
-			signal: result.signal || undefined,
-			error: result.error ? result.error.message : undefined,
-			stdout: (result.stdout || "").trim(),
-			stderr: (result.stderr || "").trim(),
-			...attribution,
-		};
-	}
-
-	// Mutation / interactive path: NEVER spawn. Run the concurrency guard
-	// first (fail-closed on corrupt governance state), then return the
-	// submission as approval-required. The adapter does not spawn mutations
-	// regardless of --execute; a four-gate governed runner adapter would be
-	// required to change that (none exists in this repair).
-	const guard = concurrencyGuard(target, parameters);
-	if (guard.conflict) {
-		return {
-			executed: false,
-			dryRun: false,
-			approvalRequired: false,
-			conflict: guard.conflict,
-			command: commandLine,
-			hint: "Repository already has an active session. One active session per repository: wait for completion or abort before mutating.",
-			...attribution,
-		};
-	}
-
-	return {
-		executed: false,
-		dryRun: false,
-		approvalRequired: true,
-		command: commandLine,
-		hint: "Action requires human approval. Run the rendered command in an interactive terminal, then record the outcome.",
-		...attribution,
-	};
-}
-
 // ---- JSON-RPC plumbing --------------------------------------------------
 
 function jsonError(id, code, message) {
@@ -471,27 +242,13 @@ try {
 
 const actionMap = new Map(actions.map((a) => [a.actionTypeId, a]));
 const functionMap = new Map(functions.map((f) => [f.name, f]));
+const functionRuntime = createFunctionRuntime({ configured, definitions: functions });
 const allTools = [...actions.map(toTool), ...functions.map(toFunctionTool)];
 
 // In-process result cache for read-only Functions (TTL-bounded; see
 // --cache-ttl-ms / --no-cache). Keyed by function, canonical repository set,
 // and input so per-repo results never cross-contaminate.
 const functionCache = new Map();
-
-// Read-only file context handed to Function handlers. All paths resolve
-// through resolveRepoPath (real-path-aware containment): no shell, no
-// execution, no symlink/junction/`..` escape from a configured repository.
-function makeFunctionContext(configured, targetOverride) {
-	const target = targetOverride || configured.primary;
-	const targets = [target, ...configured.targets.filter((t) => t !== target)];
-	const resolvePath = (relativePath, requestedTarget) =>
-		resolveConfiguredRepoPath({
-			configured,
-			target: requestedTarget || target,
-			relativePath,
-		});
-	return { target, targets, resolvePath };
-}
 
 const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
 
@@ -567,9 +324,10 @@ function handleRequest(message) {
 					cached = true;
 				} else {
 					try {
-						data = fn.handler(
+						data = functionRuntime.invoke(
+							fn.name,
 							{ ...input, _target: undefined, _agent: undefined },
-							makeFunctionContext(configured, targetOverride),
+							targetOverride,
 						);
 					} catch (err) {
 						error = err.message;
@@ -617,7 +375,15 @@ function handleRequest(message) {
 
 		let outcome;
 		try {
-			outcome = runAction(action, input, flags, configured, targetOverride);
+			outcome = actionRuntime.runAction(
+				action,
+				input,
+				flags,
+				configured,
+				targetOverride,
+				ROOT,
+				AMBER_JS,
+			);
 		} catch (err) {
 			// Fail-closed: contract failure, corrupt governance state, or a
 			// command-rendering failure is an MCP error, never a silent success.
@@ -632,29 +398,16 @@ function handleRequest(message) {
 
 		// Structured return (OAG): when the executed command emitted JSON, ship
 		// it as MCP structuredContent so agents consume typed data, not text.
-		const structured = outcome.executed ? extractJson(outcome.stdout) : undefined;
+		const structured = outcome.executed ? actionRuntime.extractJson(outcome.stdout) : undefined;
 		const result = {
 			content: [{ type: "text", text: JSON.stringify(outcome, null, 2) }],
-			isError: isErrorOutcome(outcome),
+			isError: actionRuntime.isErrorOutcome(outcome),
 		};
 		if (structured !== null && structured !== undefined) result.structuredContent = structured;
 		return jsonResult(id, result);
 	}
 
 	return jsonError(id, -32601, `method not found: ${method}`);
-}
-
-// Fail-closed isError classification (F018 Slice 5):
-//   * executed read-only command -> error on any non-zero exit, signal, or
-//     spawn error (no command-specific exceptions).
-//   * non-executed outcome -> error only when an error field is present
-//     (corrupt governance state, contract failure). dry-run, approval-
-//     required, and structured conflicts are successful non-executions.
-function isErrorOutcome(outcome) {
-	if (outcome.executed) {
-		return outcome.exitCode !== 0 || Boolean(outcome.signal) || Boolean(outcome.error);
-	}
-	return Boolean(outcome.error);
 }
 
 rl.on("line", (line) => {
@@ -685,10 +438,5 @@ rl.on("close", () => {
 });
 
 module.exports = {
-	runAction,
-	concurrencyGuard,
-	listActiveSessions,
-	selectedVariantIsReadOnlyExec,
-	isErrorOutcome,
-	buildCommand,
+	handleRequest,
 };

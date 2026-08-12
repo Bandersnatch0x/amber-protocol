@@ -91,7 +91,7 @@ MCP Action 和 Function 只能通过受治理且仓库本地的 seam 执行或�
 
 ## Resume Checkpoint
 
-- Resume Point: all seven slices implemented; status `passing`. All automated verification gates green (1710 tests, manifests/doctor/wiki/gate 0 errors).
+- Resume Point: all seven slices implemented; status `passing`. All automated verification gates green (1711 tests, manifests/doctor/wiki/gate 0 errors).
 - Blockers: none.
 - Next Action: optional follow-up — open the separate approved feature for "intent router + deep journey skills + default-help projection" (command-surface convergence), keeping it isolated from this security repair. Do not add a mutation-executing governed runner adapter inside F018.
 - Recovery Instructions: the typed seam lives in `scripts/lib/mcp-targets.js`, `scripts/lib/mcp-action-contracts.js`, and `scripts/lib/mcp-registry-loader.js`; `scripts/amber-mcp.js` consumes them. Never regenerate or overwrite this plan.
@@ -128,10 +128,10 @@ MCP Action 和 Function 只能通过受治理且仓库本地的 seam 执行或�
 - Command: `node --test tests/unit/mcp-targets.test.js tests/unit/mcp-action-contracts.test.js tests/integration/action-type-schema.test.js tests/integration/amber-mcp.test.js`
 - Result: 59/59 pass (incl. negative-path characterization: unconfigured `_target`, `--output` rejection, non-zero read-only → isError, corrupt-manifest fail-closed, junction escape, contract mismatch refused, unknown-flag fail-closed).
 - Command: `npm test`
-- Result: 1710/1710 pass (baseline was 1674; +36 from new F018 coverage).
+- Result: 1711/1711 pass, 4 skipped (baseline was 1674; targeted F018 coverage includes Action and Function manifest-schema failures, exact effects parity, and runtime extraction paths).
 - Command: `npm run manifests` / `npm run doctor` / `npm run gen:agents:check` / `node scripts/validate-wiki.js --target .` / `node scripts/amber.js gate --target . --plan docs/plans/F018-Amber-MCP.md`
 - Result: all green — 0 errors (manifests, doctor, wiki), 31 generated-agent files up to date, F018 gate 0 errors.
 - Date: 2026-08-12
-- Notes: Six invariants enforced in two deep modules (`scripts/lib/mcp-targets.js`, `scripts/lib/mcp-action-contracts.js`, plus the extracted `scripts/lib/mcp-registry-loader.js`); `scripts/amber-mcp.js` is now the thin stdio/MCP adapter. Manifests corrected: `session.verify` evidence → `timeline-event`; `governance.report` `--output` removed. Mutations are always `approvalRequired` and never spawned; only registry-proven read-only variants execute. `session status` empty result → exit 0. Two-axis review self-conducted against the acceptance criteria (all 11 satisfied); no dynamic execution / live dispatch / auto target-project execution / user-file overwrite introduced.
+- Notes: Six invariants enforced in deep modules (`scripts/lib/mcp-targets.js`, `scripts/lib/mcp-action-contracts.js`, `scripts/lib/mcp-registry-loader.js`, and `scripts/lib/mcp-action-runtime.js`); `scripts/amber-mcp.js` remains the stdio/MCP protocol adapter. Session manifests now fail closed on missing, malformed, or schema-invalid state. `session.start` no longer exposes autonomous mode. Mutations are always `approvalRequired` and never spawned; only registry-proven read-only variants execute. Protocol server version is `0.7.0`. No dynamic execution / live dispatch / auto target-project execution / user-file overwrite introduced.
 - Artifact or session id: `docs/plans/F018-Amber-MCP.md`; modules under `scripts/lib/mcp-*.js`; tests under `tests/unit/mcp-*.test.js` and `tests/integration/amber-mcp.test.js`.
 - Remaining risk: `_target` tightening is an intentional compatibility break (documented migration to `--targets`); `loop recommend` on a pack-less repo stays exit 1 by existing CLI contract and now correctly surfaces as `isError` (structuredContent still shipped). The 35-command intent-router/UI convergence is deliberately deferred to a separate feature (Slice 7).

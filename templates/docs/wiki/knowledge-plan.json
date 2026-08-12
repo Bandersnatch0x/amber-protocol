@@ -151,7 +151,7 @@
     },
     {
       "id": "skills-source-of-truth",
-      "text": "skills/ contains platform-agnostic skill definitions (amber-adoption through amber-wiki). Platform-specific files in .claude/, .agents/skills/, .gemini/commands/ are generated, never hand-edited. Run `npm run gen:agents` after changing skills/.",
+      "text": "skills/ contains the platform-agnostic journey skill definitions: amber (intent router), amber-delivery, amber-diagnosis-adoption, amber-context-continuity, and amber-continuous-improvement. Platform-specific files in .claude/, .agents/skills/, .gemini/commands/ are generated, never hand-edited. Run `npm run gen:agents` after changing skills/.",
       "tags": ["skills", "generation"]
     },
     {

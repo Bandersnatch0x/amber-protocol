@@ -32,6 +32,7 @@ test("empty repo cannot reach a passing complete-check --strict", () => {
 		"add login feature",
 		"--route",
 		"feature-standard",
+		"--confirm",
 		"--json",
 	]);
 	assert.equal(start.status, 0, start.stderr);
@@ -47,6 +48,7 @@ test("empty repo cannot reach a passing complete-check --strict", () => {
 		"npm test",
 		"--result",
 		"passed",
+		"--confirm",
 	]);
 	amber(dir, [
 		"session",

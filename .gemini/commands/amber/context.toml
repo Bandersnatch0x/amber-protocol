@@ -1,8 +1,0 @@
-# GENERATED — edit skills/ instead. Run: npm run gen:agents
-description = "Run Amber Context when distilling provenance-backed Context Pages, refreshing stale knowledge, or assembling a task-scoped Loadout with verified Required Artifacts."
-prompt = """
-Run the Amber amber-context workflow for the target repository.
-If no target is provided, use the current repository root (.).
-Execute: node scripts/amber.js context {{args}}
-Report the command output faithfully; never overwrite user-authored files without approval.
-"""

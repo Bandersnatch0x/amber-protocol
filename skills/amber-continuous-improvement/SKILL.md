@@ -1,27 +1,32 @@
 ---
 name: amber-continuous-improvement
 description: Use when continuing a repository improvement goal, running an automation wakeup, or selecting the next safe Amber-backed improvement slice.
+x-amber-json: {"kind":"journey","command":"node scripts/amber.js loop recommend --goal {{objective}} --target {{target}}","commandName":"continuous-improvement","args":[{"name":"objective","hint":"improvement objective"},{"name":"target","hint":"repo path","default":"."}],"manualName":"amber-continuous-improvement"}
 ---
 
 # Amber Continuous Improvement
 
 ## Workflow
 
-1. Read `AGENTS.md`, `CLAUDE.md`, `PROGRESS.md`, `session-handoff.md`, `feature_list.json`, `docs/wiki/index.md`, and `.workflow/continuous-improvement/state.json`.
+1. Read repository instructions, the operating manual, progress/handoff, feature state, active session, and continuous-improvement state.
 2. Inspect repo state and treat pre-existing dirty files as user-owned.
-3. Select one coherent, high-value, low-risk slice.
-4. Before editing, write a contract:
+3. Run `amber loop recommend --goal "<objective>" --target <repo>`. Recommendations are read-only; they do not authorize execution.
+4. Select one coherent, high-value, low-risk slice and validate its plan/gate state.
+5. Before editing, write a contract:
    - Objective.
    - Files in scope.
    - Files out of scope.
    - Expected result.
    - Verification evidence.
    - Approval gates.
-5. Use `docs/wiki/agent/workflow-packets.md` for ambiguous or multi-track work.
-6. Implement only the contracted slice.
-7. Run a separate review pass.
-8. Verify with the narrowest reliable command or file evidence.
+6. Use `docs/wiki/agent/workflow-packets.md` for ambiguous or multi-track work.
+7. Implement only the contracted slice through the governed delivery lifecycle; preserve approval, isolation, and ledger gates.
+8. Run a separate review pass and record real verification evidence.
 9. Update progress, handoff, feature evidence, and continuous-improvement state when project state changes.
+
+On failure, record the negative evidence and next recoverable action. Do not select a second slice to hide an incomplete first slice.
+
+Evidence order: repository state, recommendation, selected slice contract, approval/isolation decision, changed-file scope, verification output, review findings, ledger and handoff updates.
 
 ## Safe Defaults
 

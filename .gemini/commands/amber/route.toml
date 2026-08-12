@@ -1,8 +1,0 @@
-# GENERATED — edit skills/ instead. Run: npm run gen:agents
-description = "List, inspect, validate, or dry-run Amber route definitions."
-prompt = """
-Run the Amber amber-route workflow for the target repository.
-If no target is provided, use the current repository root (.).
-Execute: node scripts/amber.js route list
-Report the command output faithfully; never overwrite user-authored files without approval.
-"""

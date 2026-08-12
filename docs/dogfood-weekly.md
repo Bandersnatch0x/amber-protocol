@@ -88,7 +88,8 @@ node scripts/amber.js session start \
   --target . \
   --goal "<goal echoing the plan; match route goalPattern>" \
   --route <ROUTE> \
-  --feature <FID>
+  --feature <FID> \
+  --confirm
 #    prints: Session created: <SID>
 #    Then: node scripts/amber.js route inspect <ROUTE>  → list every gate id
 
@@ -97,7 +98,8 @@ node scripts/amber.js session verify \
   --target . \
   --session <SID> \
   --execute \
-  --command "npm test"
+  --command "npm test" \
+  --confirm
 #    --execute runs the command, records its real exit code in the tamper-evident
 #    ledger, and (because the session is bound to <FID>) refluxes evidence into
 #    feature_list.json. A claim-only verify (no --execute) is NOT acceptable here.

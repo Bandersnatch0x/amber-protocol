@@ -231,11 +231,11 @@ amber-protocol/
     settings.json
     hooks.json
   skills/
-    amber-init/
-    amber-audit/
-    amber-wiki/
-    amber-doctor/
-    amber-handoff/
+    amber/
+    amber-delivery/
+    amber-diagnosis-adoption/
+    amber-context-continuity/
+    amber-continuous-improvement/
   profiles/
     default/
       profile.json

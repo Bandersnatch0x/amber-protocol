@@ -71,7 +71,7 @@ node scripts/amber.js session complete-check --target . --session <session-id>
 
 ### 3:30 — Start And Resume Work (30s)
 ```bash
-node scripts/amber.js session start --target . --goal "fix login bug"
+node scripts/amber.js session start --target . --goal "fix login bug" --confirm
 node scripts/amber.js session status --target .
 node scripts/amber.js session continue --target .
 ```

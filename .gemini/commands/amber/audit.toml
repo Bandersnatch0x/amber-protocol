@@ -1,8 +1,0 @@
-# GENERATED — edit skills/ instead. Run: npm run gen:agents
-description = "Inspect an existing repository for Amber Setup readiness without modifying project files."
-prompt = """
-Run the Amber amber-audit workflow for the target repository.
-If no target is provided, use the current repository root (.).
-Execute: node scripts/amber.js audit --target {{args}}
-Report the command output faithfully; never overwrite user-authored files without approval.
-"""

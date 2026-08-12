@@ -73,7 +73,7 @@ amber route inspect feature-standard
 Start a new development session:
 
 ```bash
-amber session start --goal "fix login bug"
+amber session start --goal "fix login bug" --confirm
 ```
 
 Check current session status:

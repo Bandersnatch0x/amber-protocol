@@ -22,9 +22,10 @@ function main(argv = process.argv.slice(2)) {
 		return 0;
 	}
 
-	const current = result.paths.length - result.changed.length;
+	const updated = result.changed.length - result.removed.length;
+	const current = result.paths.length - updated;
 	console.log(
-		`Agent command files: ${result.paths.length} total, ${result.changed.length} updated, ${current} already current.`,
+		`Agent command files: ${result.paths.length} total, ${updated} updated, ${result.removed.length} removed, ${current} already current.`,
 	);
 	for (const file of result.paths) {
 		console.log(`  ${file}`);

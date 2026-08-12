@@ -224,6 +224,40 @@ describe("generateAgentCommands", () => {
 		}
 		assert.ok(fs.existsSync(path.join(repoRoot, ".claude/commands/evil.md")));
 	});
+
+	it("removes only stale generated command projections", () => {
+		const { skillsRoot, repoRoot } = setup();
+		const commands = path.join(repoRoot, ".claude", "commands");
+		fs.mkdirSync(commands, { recursive: true });
+		fs.writeFileSync(
+			path.join(commands, "amber-old.md"),
+			"<!-- GENERATED — edit skills/ instead. Run: npm run gen:agents -->\n",
+		);
+		fs.writeFileSync(path.join(commands, "amber-user.md"), "# user authored\n");
+		const result = generateAgentCommands({ skillsRoot, repoRoot });
+		assert.deepStrictEqual(result.removed, [".claude/commands/amber-old.md"]);
+		assert.equal(fs.existsSync(path.join(commands, "amber-old.md")), false);
+		assert.equal(fs.existsSync(path.join(commands, "amber-user.md")), true);
+	});
+
+	it("removes stale generated skill mirrors but preserves user-authored mirrors", () => {
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-agent-stale-mirror-"));
+		const skillsRoot = makeTempSkills({
+			current: skillMd("current", "node scripts/amber.js audit --target {{target}}"),
+		});
+		const mirrors = path.join(repoRoot, ".agents", "skills");
+		for (const [name, content] of [
+			["old", `---\n# GENERATED — edit skills/ instead. Run: npm run gen:agents\nname: old\n---\n`],
+			["user", "---\nname: user\n---\n# user authored\n"],
+		]) {
+			fs.mkdirSync(path.join(mirrors, name), { recursive: true });
+			fs.writeFileSync(path.join(mirrors, name, "SKILL.md"), content);
+		}
+		const result = generateAgentCommands({ skillsRoot, repoRoot });
+		assert.ok(result.removed.includes(".agents/skills/old/SKILL.md"));
+		assert.equal(fs.existsSync(path.join(mirrors, "old", "SKILL.md")), false);
+		assert.equal(fs.existsSync(path.join(mirrors, "user", "SKILL.md")), true);
+	});
 });
 
 const { COMMANDS } = require("../../scripts/amber.js");
@@ -235,16 +269,11 @@ describe("real skills integration", () => {
 	it("discovers the core skills", () => {
 		const names = skills.map((s) => s.name).sort();
 		assert.deepStrictEqual(names, [
-			"amber-adoption",
-			"amber-audit",
-			"amber-context",
-			"amber-doctor",
-			"amber-handoff",
-			"amber-init",
-			"amber-plan",
-			"amber-route",
-			"amber-session",
-			"amber-wiki",
+			"amber",
+			"amber-context-continuity",
+			"amber-continuous-improvement",
+			"amber-delivery",
+			"amber-diagnosis-adoption",
 		]);
 	});
 
@@ -291,8 +320,16 @@ describe("root AGENTS.md", () => {
 		const text = fs.readFileSync(path.join(repoRoot, "AGENTS.md"), "utf8");
 		const skills = collectAmberSkills(path.join(repoRoot, "skills"));
 		for (const skill of skills) {
-			const name = extractCommandName(skill.amber.command);
-			assert.match(text, new RegExp(`amber\\.js ${name}\\b`), `AGENTS.md missing command: ${name}`);
+			if (skill.amber.kind === "router") {
+				assert.match(text, /`amber` router/);
+			} else {
+				const name = extractCommandName(skill.amber.command);
+				assert.match(
+					text,
+					new RegExp(`amber\\.js ${name}\\b`),
+					`AGENTS.md missing command: ${name}`,
+				);
+			}
 		}
 	});
 });
@@ -316,9 +353,11 @@ describe("listSkillDirs + .agents/skills mirror", () => {
 		generateAgentCommands({ skillsRoot, repoRoot });
 		const mirrored = path.join(repoRoot, ".agents/skills/amber-init/SKILL.md");
 		assert.ok(fs.existsSync(mirrored));
-		assert.strictEqual(
-			fs.readFileSync(mirrored, "utf8"),
-			fs.readFileSync(path.join(skillsRoot, "amber-init/SKILL.md"), "utf8"),
+		const mirroredText = fs.readFileSync(mirrored, "utf8");
+		assert.match(mirroredText, /^---\n# GENERATED/);
+		assert.deepStrictEqual(
+			parseSkillFrontmatter(mirroredText),
+			parseSkillFrontmatter(fs.readFileSync(path.join(skillsRoot, "amber-init/SKILL.md"), "utf8")),
 		);
 		assert.ok(fs.existsSync(path.join(repoRoot, ".agents/skills/plain-skill/SKILL.md")));
 	});

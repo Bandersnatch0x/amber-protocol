@@ -101,7 +101,7 @@ context-editing eviction: Amber records what should be skipped rather than decid
 
 Generation-time: the allocator applies the D4 hard gate. Load-time: a new `amber context verify
 --loadout <file>` re-checks **required-tier** pages' hash freshness only (cheap; guards the
-irreplaceable bits). The amber-context skill tells the agent to run it right before loading.
+irreplaceable bits). The amber-context-continuity journey tells the agent to run it right before loading.
 
 ---
 
@@ -134,7 +134,7 @@ irreplaceable bits). The amber-context skill tells the agent to run it right bef
 - **Write-path changes**: `context-page.schema.json` 1.1.0 (optional `scope`), `request` `--scope`,
   `ingest` stamps scope.
 - **Glossary** (CONTEXT.md): add **Loadout**, **Context Budget**, **Scope Tag**.
-- **Skill**: extend `skills/amber-context/SKILL.md` with the load step.
+- **Skill**: extend `skills/amber-context-continuity/SKILL.md` with the load step.
 - **Tests**: allocator determinism (same signal → same loadout), tier ordering, budget exclusion
   with reasons, fail-fast, freshness gates per tier, scope stamping round trip.
 

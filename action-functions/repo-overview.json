@@ -1,0 +1,9 @@
+{
+	"name": "amber.fn.repoOverview",
+	"description": "Aggregate governance overview across all configured repositories: per-repo session counts, active sessions, and route inventory. Read-only.",
+	"inputSchema": {
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {}
+	}
+}

@@ -105,7 +105,7 @@
 		"evidenceRequired": {
 			"type": "array",
 			"items": { "type": "string" },
-			"description": "Evidence kinds the executor must record before the action is considered complete (e.g. 'timeline-event', 'verify-result', 'approval-record')."
+			"description": "Evidence kinds the mapped command actually records before the action is considered complete (e.g. 'timeline-event', 'approval-record'). Registration rejects missing or invented evidence kinds."
 		},
 		"timeout": {
 			"type": "integer",
@@ -133,7 +133,7 @@
 				"evidence": {
 					"type": "array",
 					"items": { "type": "string" },
-					"description": "Evidence kinds required before approval can be granted (e.g. 'verification-result', 'ledger-hash')."
+					"description": "Evidence kinds declared by the governance contract. For the current MCP Action registry this must agree exactly with the mapped command's persisted evidence; registration rejects drift."
 				},
 				"circuitBreaker": {
 					"type": "boolean",

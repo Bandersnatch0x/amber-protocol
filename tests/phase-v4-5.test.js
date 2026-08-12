@@ -46,6 +46,7 @@ function preparedTarget(name) {
 			"prepare agent slice",
 			"--route",
 			"bugfix-quick",
+			"--confirm",
 		]).status,
 		0,
 	);

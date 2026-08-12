@@ -60,12 +60,12 @@ ok "plan confirmed"
 
 # 6. session start (bound to F002)
 step 6/11 session start
-SID=$("${AMBER[@]}" session start --target . --goal "verify lifecycle" --feature F002 --json | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).sessionId))")
+SID=$("${AMBER[@]}" session start --target . --goal "verify lifecycle" --feature F002 --confirm --json | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).sessionId))")
 ok "session $SID"
 
 # 7. session verify --execute
 step 7/11 session verify
-"${AMBER[@]}" session verify --session "$SID" --execute --command "npm test" --target . > /dev/null 2>&1
+"${AMBER[@]}" session verify --session "$SID" --execute --command "npm test" --target . --confirm > /dev/null 2>&1
 ok "session verified"
 
 # 8. session approve

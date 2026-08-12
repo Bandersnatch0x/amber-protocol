@@ -21,7 +21,7 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
 - `scripts/amber.js` derives supported top-level commands from the Command definitions,
   parses arguments, calls `dispatch()`, prints text or JSON results, and returns non-zero
   when `result.errors` is non-empty.
-- `scripts/lib/command-help.js` owns each Command definition: identity, help knowledge,
+- `scripts/lib/command-help.js` owns each Command definition: identity, visibility tier, help knowledge,
   and output policy. It also binds definitions to handlers and rejects missing or
   orphaned handlers at startup.
 - `scripts/lib/command-dispatcher.js` owns handler implementation, the bound runtime
@@ -35,7 +35,8 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
 
 ## Dispatch Flow
 
-1. `run()` handles help and version requests, rejects unknown top-level commands, and
+1. `run()` handles help and version requests, projects `journey|core` by default (`--all` shows
+   every tier), rejects unknown top-level commands, and
    parses the remaining arguments.
 2. `dispatch(command, args)` looks up the command in the bound runtime registry; an unregistered
    command produces a structured error and exit code 1.
@@ -71,3 +72,6 @@ flowchart LR
   non-overwriting behavior for scaffold commands such as `init` and `wiki`.
 - The root CLI package intentionally depends only on `ajv` and `ajv-formats`; Web
   dependencies remain isolated in `apps/web/package.json`.
+ - `scripts/lib/cli-typed-seam.js` validates the Action whitelist at CLI startup and classifies
+   Action-equivalent invocations through the same capability registry used by MCP. It does not
+   replace CLI handlers or grant execution authority.

@@ -249,7 +249,7 @@ const STEPS = [
 		isDone: (ctx) => featureHasEvidence(ctx),
 		why: () => "no verification evidence is recorded for this feature yet.",
 		remedy: (ctx) =>
-			`amber session start --target ${shellQuote(ctx.targetDisplay)} --goal "..." --feature ${ctx.focus.id}`,
+			`amber session start --target ${shellQuote(ctx.targetDisplay)} --goal "..." --feature ${ctx.focus.id} --confirm`,
 	},
 	{
 		id: "verify",
@@ -262,7 +262,7 @@ const STEPS = [
 			// from disk; never silently fall back to `npm test` for an unknown
 			// toolchain (#42). Unknown -> explicit placeholder.
 			const cmd = ctx.state.verifyCommand || "<confirm-verification-command>";
-			return `amber session verify --session ${ctx.focus.id} --execute --target ${shellQuote(ctx.targetDisplay)} --command ${shellQuote(cmd)}`;
+			return `amber session verify --session ${ctx.focus.id} --execute --target ${shellQuote(ctx.targetDisplay)} --command ${shellQuote(cmd)} --confirm`;
 		},
 	},
 	{

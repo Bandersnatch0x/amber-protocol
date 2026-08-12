@@ -127,6 +127,7 @@ test("Governed Delivery: plan, gate, review, and session complete-check", () => 
 		"deliver small slice",
 		"--route",
 		"feature-standard",
+		"--confirm",
 		"--json",
 	]);
 	assert.equal(session.status, 0, session.stderr);
@@ -158,6 +159,7 @@ test("Continuity Layer: session start and status", () => {
 		"fix login bug",
 		"--route",
 		"bugfix-quick",
+		"--confirm",
 		"--json",
 	]);
 	assert.equal(start.status, 0, start.stderr);

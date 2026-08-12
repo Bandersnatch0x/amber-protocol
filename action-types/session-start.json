@@ -13,17 +13,19 @@
 		"route": {
 			"type": "string",
 			"description": "Route id to bind (e.g. feature-standard, bugfix-quick)."
-		},
-		"mode": {
-			"type": "string",
-			"enum": ["interactive", "autonomous"],
-			"description": "Session execution mode."
 		}
 	},
 	"submissionCriteria": ["goal is non-empty", "no active session exists for the same goal"],
 	"effects": {
-		"edits": [".amber/sessions/<id>/manifest.json", ".amber/sessions/<id>/timeline.jsonl"],
-		"sideEffects": ["timeline-event", "worktree-create"],
+		"edits": [
+			".amber/sessions/<id>/manifest.json",
+			".amber/sessions/<id>/timeline.jsonl",
+			".amber/sessions/<id>/gates/<gate>.gate.json",
+			"MEMORY.md",
+			"notes.md",
+			"tasks/README.md"
+		],
+		"sideEffects": ["timeline-event"],
 		"rollback": true
 	},
 	"evidenceRequired": ["timeline-event"],
@@ -41,7 +43,6 @@
 		"args": [
 			{ "flag": "--goal", "source": "parameters.goal" },
 			{ "flag": "--route", "source": "parameters.route", "optional": true },
-			{ "flag": "--mode", "source": "parameters.mode", "optional": true },
 			{ "flag": "--agent", "source": "parameters._agent", "optional": true }
 		]
 	}

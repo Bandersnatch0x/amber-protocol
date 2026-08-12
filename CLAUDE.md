@@ -28,7 +28,10 @@ Three principles follow:
    criteria, effects, rollback behavior, and evidence requirements.
 2. **Governance is intrinsic, not bolted on.** Approval gates, ledger
    writes, and evidence records are part of the operation contract itself.
-   There is no sanctioned path that bypasses `governed-runner.js`.
+   The MCP adapter executes only registry-proven reads. Mutations remain
+   non-executing approval-required submissions; any future mutation adapter
+   must pass the policy, approval, isolation, and ledger gates implemented by
+   the governed runner.
 3. **Agents operate through Amber, not around it.** External agents reach
    the repository through the protocol's governed surface. Amber never
    auto-executes target-project commands, dispatches live agents, or runs
@@ -48,6 +51,7 @@ scripts/amber.js              -> Unified CLI entry point
 scripts/amber-mcp.js           -> P1 stdio MCP server exposing governed Action Types (see docs/wiki/amber-ontology-mcp.md)
 scripts/lib/command-help.js -> Command definitions, help, output policy, and stable public order
 scripts/lib/command-dispatcher.js -> Command handlers, startup registry binding, and dispatch
+scripts/lib/cli-typed-seam.js -> CLI projection of the shared Action capability registry
 scripts/lib/context/          -> Public Context Interface and command adapter boundary
 scripts/lib/core/             -> Domain modules (adoption-*, loops, doctor, profiles, etc.); imported directly (no facade — ADR-0005)
 scripts/lib/core/context-*.js -> Context lifecycle, assurance evidence, projections, benchmarks, source adapters, retention, and Loadout assembly
@@ -61,7 +65,7 @@ routes/                       -> Route definitions (feature-standard, bugfix-qui
 schemas/                      -> JSON Schema validation (route, session-manifest, timeline-event, action.type)
 action-types/                 -> Governed Action Type whitelist consumed by scripts/amber-mcp.js
 workflow-packs/               -> Declarative workflow packs
-skills/                       -> Agent-facing skill instructions (amber-init, amber-audit, etc.)
+skills/                       -> User-invoked Amber router plus four deep journey skills
 profiles/                     -> Project profiles
 src/migration/                -> Migration utilities (dry-run, rollback, schema-validator)
 apps/web/                     -> Phase C web viewer (Vite + React + tRPC)
@@ -274,7 +278,7 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 
 ### When Working on This Codebase
 
-- **Adding new commands**: Add the Command definition (identity, help, output policy, public order) in `scripts/lib/command-help.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green
+- **Adding new commands**: Add the Command definition (identity, tier, help, output policy, public order) in `scripts/lib/command-help.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green. Default help exposes only `journey` and `core`; `--all` is the complete compatibility projection.
 - **Modifying schemas**: Update `schemas/*.schema.json` and ensure validators in `scripts/validate-*.js` are synced
 - **Adding templates**: Place in `templates/` and update `scripts/lib/core/scaffolding.js`
 - **Adding routes**: Create `.route.json` in `routes/` following `schemas/route.schema.json`

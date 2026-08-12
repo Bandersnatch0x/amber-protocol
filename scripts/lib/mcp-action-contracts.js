@@ -37,54 +37,88 @@ const COMMAND_CAPABILITIES = {
 		approver: "system",
 		evidence: "timeline-event",
 		directReadOnlyExec: false,
+		edits: [
+			".amber/sessions/<id>/manifest.json",
+			".amber/sessions/<id>/timeline.jsonl",
+			".amber/sessions/<id>/gates/<gate>.gate.json",
+			"MEMORY.md",
+			"notes.md",
+			"tasks/README.md",
+		],
+		sideEffects: ["timeline-event"],
 	},
 	"session/verify": {
 		effect: "write",
 		approver: "system",
 		evidence: "timeline-event",
 		directReadOnlyExec: false,
+		edits: [
+			".amber/sessions/<id>/timeline.jsonl",
+			".amber/sessions/<id>/ledger.jsonl",
+			".amber/sessions/<id>/manifest.json",
+		],
+		sideEffects: ["timeline-event", "ledger-append"],
 	},
 	"session/approve": {
 		effect: "write",
 		approver: "human",
 		evidence: "approval-record",
 		directReadOnlyExec: false,
+		edits: [
+			".amber/sessions/<id>/manifest.json",
+			".amber/sessions/<id>/ledger.jsonl",
+			".amber/sessions/<id>/gates/<gate>.decision.json",
+			".amber/sessions/<id>/timeline.jsonl",
+		],
+		sideEffects: ["timeline-event", "ledger-append"],
 	},
 	"session/status": {
 		effect: "read",
 		approver: "system",
 		evidence: null,
 		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
 	},
 	"route/list": {
 		effect: "read",
 		approver: "system",
 		evidence: null,
 		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
 	},
 	"route/test": {
 		effect: "read",
 		approver: "system",
 		evidence: null,
 		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
 	},
 	"context/ingest": {
 		effect: "write",
 		approver: "human",
 		evidence: "ingest-record",
 		directReadOnlyExec: false,
+		edits: [".amber/context/"],
+		sideEffects: ["ingest-record"],
 	},
 	"context/load": {
 		effect: "read",
 		approver: "system",
 		evidence: null,
 		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
 	},
 	"governance/report": {
 		effect: "read",
 		approver: "system",
 		evidence: null,
 		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
 		writeFlags: ["--output"],
 	},
 	"ledger/export": {
@@ -92,6 +126,8 @@ const COMMAND_CAPABILITIES = {
 		approver: "system",
 		evidence: null,
 		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
 		writeFlags: ["--out"],
 	},
 	"loop/recommend": {
@@ -99,6 +135,8 @@ const COMMAND_CAPABILITIES = {
 		approver: "system",
 		evidence: null,
 		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
 	},
 };
 
@@ -279,6 +317,20 @@ function validateActionContract(action) {
 		if (cap.effect === "write" && !declaredEdits) {
 			findings.push(
 				`${label}: effect mismatch — command ${key} is a write but effects.edits is empty`,
+			);
+		}
+		const expectedEdits = [...(cap.edits || [])].sort();
+		const actualEdits = [...((action.effects && action.effects.edits) || [])].sort();
+		if (expectedEdits.join("\n") !== actualEdits.join("\n")) {
+			findings.push(
+				`${label}: edits mismatch — expected [${expectedEdits.join(", ")}] but action declares [${actualEdits.join(", ")}]`,
+			);
+		}
+		const expectedSideEffects = [...(cap.sideEffects || [])].sort();
+		const actualSideEffects = [...declaredSideEffects].sort();
+		if (expectedSideEffects.join("\n") !== actualSideEffects.join("\n")) {
+			findings.push(
+				`${label}: sideEffects mismatch — expected [${expectedSideEffects.join(", ")}] but action declares [${actualSideEffects.join(", ")}]`,
 			);
 		}
 		if (cap.effect === "read" && declaredEdits) {

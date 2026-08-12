@@ -133,7 +133,7 @@ amber handoff bundle --target my-project
 amber handoff validate --target my-project
 ```
 
-`init` and `wiki` never overwrite existing files. See the [CLI reference](./docs/CLI_REFERENCE.md) for the full command surface.
+`init` and `wiki` never overwrite existing files. Default help shows journey and core governance commands; `amber --all` shows the complete compatibility surface. See the [CLI reference](./docs/CLI_REFERENCE.md).
 
 ### `amber governance report` - readiness score and next actions
 
@@ -143,7 +143,7 @@ command and expected outcome.
 
 ```bash
 amber governance report --target .
-amber governance report --target . --output docs/quality/amber-governance-report.md
+amber governance report --target . --output docs/quality/amber-governance-report.md --confirm
 ```
 
 ### `amber workflow` — workflow effectiveness (ADR-0008)
@@ -233,7 +233,7 @@ Amber itself never calls a model.
 
 ```bash
 amber context request --target . --page governed-execution     # write a distillation contract
-amber context ingest --target . --request <id> --payload out.json   # judge the agent's output
+amber context ingest --target . --request <id> --payload out.json --confirm   # judge the agent's output
 amber context verify --target . --json                         # page health (stale/tampered/obsolete)
 amber context refresh --target .                               # regenerate requests for stale sources
 amber context load --target . --route feature-standard --feature F016 # assemble a governed Loadout
@@ -246,7 +246,7 @@ amber context stats --target . --window 50                     # filter rate, pa
 ```
 
 Every claim on an accepted page carries provenance; pages live in `.amber/context/pages/` and are
-indexed in `docs/wiki/context-index.md`. See `skills/amber-context/SKILL.md` for the full loop an
+indexed in `docs/wiki/context-index.md`. See `skills/amber-context-continuity/SKILL.md` for the full governed context and handoff journey.
 agent should run. Loadouts separately include target-local Required Artifacts and fresh Context
 Pages, enforce the configured budget, and fail closed when required inputs are missing or changed.
 Knowledge Kind, supersession lineage, and assurance are observational and never grant execution

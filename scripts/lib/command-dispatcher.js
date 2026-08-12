@@ -1097,11 +1097,16 @@ const COMMAND_HANDLERS = {
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);
+const { dispatchTypedInvocation } = require("./cli-typed-seam");
 
 // ── Deprecated commands ─────────────────────────────────────────────────────
 // These commands are isolated from the core governance flow and will be removed
 // in v2. Users should migrate to equivalent governance commands.
-const DEPRECATED_COMMANDS = new Set(["profile", "task", "result", "agent", "team", "adoption"]);
+const DEPRECATED_COMMANDS = new Set(
+	Object.values(COMMAND_REGISTRY)
+		.filter((registration) => registration.definition.tier === "deprecated")
+		.map((registration) => registration.definition.name),
+);
 
 // ── Dispatcher ──────────────────────────────────────────────────────────────
 
@@ -1110,7 +1115,7 @@ const DEPRECATED_COMMANDS = new Set(["profile", "task", "result", "agent", "team
  *
  * @param {string} command
  * @param {object} args  Parsed CLI arguments
- * @returns {{ result: object, exitCode?: number, bypassPrint?: boolean, onBypass?: () => void }}
+ * @returns {object|Promise<object>} A response envelope, synchronously or asynchronously.
  */
 function dispatch(command, args) {
 	const registration = COMMAND_REGISTRY[command];
@@ -1120,14 +1125,18 @@ function dispatch(command, args) {
 			exitCode: 1,
 		};
 	}
-	const response = registration.handler(args);
-	if (DEPRECATED_COMMANDS.has(command)) {
+	const response = dispatchTypedInvocation(command, args, () => registration.handler(args));
+	const addDeprecationWarning = (resolvedResponse) => {
+		if (!DEPRECATED_COMMANDS.has(command)) return resolvedResponse;
 		const msg =
 			`⚠️  DEPRECATED: 'amber ${command}' will be removed in a future version. ` +
 			"Use 'amber governance' or 'amber maintenance' for equivalent functionality.";
-		response.result.warnings = [...(response.result.warnings || []), msg];
-	}
-	return response;
+		resolvedResponse.result.warnings = [...(resolvedResponse.result.warnings || []), msg];
+		return resolvedResponse;
+	};
+	return response && typeof response.then === "function"
+		? response.then(addDeprecationWarning)
+		: addDeprecationWarning(response);
 }
 
-module.exports = { dispatch, COMMAND_REGISTRY };
+module.exports = { dispatch, COMMAND_REGISTRY, DEPRECATED_COMMANDS };

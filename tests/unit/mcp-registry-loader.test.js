@@ -30,16 +30,31 @@ test("Action registry loading fails closed when any manifest is invalid", () => 
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("session.start capability declares every durable write surface", () => {
+	const { COMMAND_CAPABILITIES } = require("../../scripts/lib/mcp-action-contracts");
+	assert.deepEqual(
+		new Set(COMMAND_CAPABILITIES["session/start"].edits),
+		new Set([
+			".amber/sessions/<id>/manifest.json",
+			".amber/sessions/<id>/timeline.jsonl",
+			".amber/sessions/<id>/gates/<gate>.gate.json",
+			"MEMORY.md",
+			"notes.md",
+			"tasks/README.md",
+		]),
+	);
+});
+
 test("Function registry loading fails closed when any module is invalid", () => {
 	const dir = tempDir();
 	fs.writeFileSync(
-		path.join(dir, "broken.js"),
-		'module.exports = { name: "amber.fn.broken", inputSchema: { type: "object" } };\n',
+		path.join(dir, "broken.json"),
+		JSON.stringify({ name: "amber.fn.broken", inputSchema: { type: "object" } }),
 	);
 
 	assert.throws(
 		() => loadFunctions({ directory: dir }),
-		/function registry is invalid.*broken\.js.*missing handler/s,
+		/function registry is invalid.*broken\.json.*missing description/s,
 	);
 	fs.rmSync(dir, { recursive: true, force: true });
 });

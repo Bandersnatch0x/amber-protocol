@@ -97,6 +97,7 @@ test("initialize handshake returns server info and tools capability", () => {
 	);
 	const result = byId.get(1).result;
 	assert.equal(result.serverInfo.name, "amber-mcp");
+	assert.equal(result.serverInfo.version, "0.7.0");
 	assert.ok(result.capabilities.tools);
 	assert.equal(result.protocolVersion, "2024-11-05");
 });
@@ -138,6 +139,8 @@ test("tools/list exposes every whitelisted amber.* action", () => {
 			`${tool.name} accepts the reserved _agent identity`,
 		);
 	}
+	const startTool = tools.find((tool) => tool.name === "amber.session.start");
+	assert.equal(startTool.inputSchema.properties.mode, undefined);
 
 	// Function tools are exposed alongside action tools.
 	assert.ok(names.includes("amber.fn.sessionEvidence"));
@@ -146,6 +149,7 @@ test("tools/list exposes every whitelisted amber.* action", () => {
 
 test("object.query executes in default mode for every object family", () => {
 	const target = tempTarget();
+	fs.mkdirSync(path.join(target, ".amber"));
 	const byId = rpc(
 		[
 			{
@@ -495,6 +499,7 @@ test("functions: amber.fn.sessionEvidence summarizes a session read-only", () =>
 			"fn probe",
 			"--route",
 			"feature-standard",
+			"--confirm",
 			"--target",
 			target,
 		],
@@ -534,6 +539,34 @@ test("functions: amber.fn.sessionEvidence summarizes a session read-only", () =>
 	assert.equal(byId.get(2).result.structuredContent.sessions[0].sessionId, sessionId);
 });
 
+test("functions: schema-invalid session manifest fails closed", () => {
+	const target = tempTarget();
+	const sessionDir = path.join(target, ".amber", "sessions", "invalid");
+	fs.mkdirSync(sessionDir, { recursive: true });
+	fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify({}));
+	const byId = rpc(
+		[
+			{
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: { name: "amber.fn.sessionEvidence", arguments: { sessionId: "invalid" } },
+			},
+			{
+				jsonrpc: "2.0",
+				id: 2,
+				method: "tools/call",
+				params: { name: "amber.fn.repoOverview", arguments: {} },
+			},
+		],
+		["--target", target],
+	);
+	for (const id of [1, 2]) {
+		assert.equal(byId.get(id).result.isError, true);
+		assert.match(JSON.parse(byId.get(id).result.content[0].text).error, /corrupt session manifest/);
+	}
+});
+
 test("functions: amber.fn.repoOverview aggregates across repositories", () => {
 	const targetA = tempTarget();
 	const targetB = tempTarget();
@@ -549,6 +582,7 @@ test("functions: amber.fn.repoOverview aggregates across repositories", () => {
 			"overview probe",
 			"--route",
 			"feature-standard",
+			"--confirm",
 			"--target",
 			targetB,
 		],
@@ -625,6 +659,7 @@ test("concurrency: mutating actions conflict on a busy repository", () => {
 			"feature-standard",
 			"--agent",
 			"owner-agent",
+			"--confirm",
 			"--target",
 			targetB,
 		],
@@ -690,6 +725,7 @@ test("ownership: --agent records agentId in the session manifest", () => {
 			"feature-standard",
 			"--agent",
 			"agent-master",
+			"--confirm",
 			"--target",
 			target,
 		],
@@ -857,6 +893,7 @@ test("fail-closed: corrupt active-session manifest blocks mutation with isError"
 			"corrupt guard probe",
 			"--route",
 			"feature-standard",
+			"--confirm",
 			"--target",
 			target,
 		],
@@ -889,12 +926,87 @@ test("fail-closed: corrupt active-session manifest blocks mutation with isError"
 	assert.equal(byId.get(1).result.isError, true, "corrupt governance state must be isError");
 });
 
+test("fail-closed: missing session manifest blocks mutation", () => {
+	const target = tempTarget();
+	const sessionDir = path.join(target, ".amber", "sessions", "orphan");
+	fs.mkdirSync(sessionDir, { recursive: true });
+	const byId = rpc(
+		[
+			{
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: { name: "amber.session.start", arguments: { goal: "blocked" } },
+			},
+		],
+		["--target", target],
+	);
+	const response = byId.get(1);
+	assert.equal(response.result.isError, true);
+	assert.match(JSON.parse(response.result.content[0].text).error, /corrupt session manifest/);
+});
+
+test("fail-closed: schema-invalid session manifest blocks mutation", () => {
+	const target = tempTarget();
+	const sessionDir = path.join(target, ".amber", "sessions", "invalid");
+	fs.mkdirSync(sessionDir, { recursive: true });
+	fs.writeFileSync(path.join(sessionDir, "manifest.json"), JSON.stringify({}));
+	const byId = rpc(
+		[
+			{
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: { name: "amber.session.start", arguments: { goal: "blocked" } },
+			},
+		],
+		["--target", target],
+	);
+	const response = byId.get(1);
+	assert.equal(response.result.isError, true);
+	assert.match(JSON.parse(response.result.content[0].text).error, /corrupt session manifest/);
+});
+
 test("fail-closed: concurrency guard refuses governance-state junction escape", () => {
 	const target = tempTarget();
 	const outside = tempTarget();
 	fs.mkdirSync(path.join(outside, "sessions"));
 	try {
 		fs.symlinkSync(outside, path.join(target, ".amber"), "junction");
+	} catch (err) {
+		if (/EPERM|ENOSYS|existing/i.test(err.message)) return;
+		throw err;
+	}
+
+	const byId = rpc(
+		[
+			{
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: {
+					name: "amber.session.start",
+					arguments: { goal: "must stay contained" },
+				},
+			},
+		],
+		["--target", target, "--execute"],
+	);
+	assert.equal(byId.get(1).result.isError, true);
+	assert.match(byId.get(1).result.content[0].text, /escapes repository root via link/);
+});
+
+test("fail-closed: concurrency guard refuses a session-directory junction escape", () => {
+	const target = tempTarget();
+	const outside = tempTarget();
+	const sessionsDir = path.join(target, ".amber", "sessions");
+	fs.mkdirSync(sessionsDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(outside, "manifest.json"),
+		JSON.stringify({ status: "created", agentId: "outside-agent" }),
+	);
+	try {
+		fs.symlinkSync(outside, path.join(sessionsDir, "escaped-session"), "junction");
 	} catch (err) {
 		if (/EPERM|ENOSYS|existing/i.test(err.message)) return;
 		throw err;

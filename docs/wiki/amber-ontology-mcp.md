@@ -51,37 +51,29 @@ evidence）与「门」（approval、verify、ledger），但缺少一层让外�
 
 ## 4. 协议形状（JSON-RPC 2.0 over MCP）
 
-> **P1 实现说明**：P1 服务器（v0.2）采用 MCP 原生工具形态——`tools/list`
-> 返回 Action Type 白名单（工具名 = `actionTypeId`），`tools/call` 按
-> governance 决策执行。下文 `amber.action.*` 自定义方法为协议形状的完整
-> 表达（供 P2 及未来扩展参考），与 P1 工具形态一一对应：
-> `amber.action.list` ≡ `tools/list`，`amber.action.execute` ≡ `tools/call`。
+当前服务器（v0.7）只实现 MCP 原生工具形态：`tools/list` 返回 Action Type
+与 Function 工具，`tools/call` 提交调用。没有实现 `amber.action.*` 自定义
+JSON-RPC 方法、server-to-client 审批推送或变更执行队列。
 
-MCP（Model Context Protocol）以 JSON-RPC 2.0 承载请求。Amber 协议在
-MCP 之上定义以下方法：
+MCP（Model Context Protocol）以 JSON-RPC 2.0 承载请求。Amber 实现以下
+原生方法：
 
 | Method | 方向 | 说明 |
 | --- | --- | --- |
-| `amber.action.list` | client → server | 列出可用的 Action Types（白名单） |
-| `amber.action.describe` | client → server | 返回单个 Action Type 的完整定义（来自 schema） |
-| `amber.action.execute` | client → server | 提交操作执行；按 governance 决定 dry-run / 待审批 / 执行 |
-| `amber.object.query` | client → server | 只读查询对象（session 状态、evidence、route 列表） |
-| `amber.action.approve` | server → client | 需要人工审批时向客户端推送待批操作 |
+| `initialize` | client → server | 协商协议版本并声明 tools capability |
+| `tools/list` | client → server | 列出 Action Type 与 Function 工具 |
+| `tools/call` | client → server | 调用一个工具；只读操作可执行，变更操作只形成待审批提交 |
+| `ping` | client → server | 存活检查 |
 
-### 4.1 `amber.action.execute` 请求
+### 4.1 `tools/call` 请求
 
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "amber.action.execute",
+  "method": "tools/call",
   "params": {
-    "actionTypeId": "amber.session.start",
-    "parameters": { "goal": "fix login bug", "route": "bugfix-quick" },
-    "context": {
-      "sessionId": "s-123",
-      "agentId": "claude",
-      "evidenceHash": "sha256:abc..."
-    }
+    "name": "amber.session.start",
+    "arguments": { "goal": "fix login bug", "route": "bugfix-quick", "_agent": "claude" }
   },
   "id": 1
 }
@@ -94,14 +86,8 @@ MCP 之上定义以下方法：
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "accepted": true,
-    "mode": "dry-run",
-    "approvalRequired": true,
-    "evidence": {
-      "timeline": ".amber/sessions/s-123/timeline.jsonl#evt-42",
-      "ledger": ".amber/sessions/s-123/ledger.jsonl#h-7f3"
-    },
-    "nextAction": { "actionTypeId": "amber.gate.submit", "params": { "sessionId": "s-123" } }
+    "content": [{ "type": "text", "text": "{...structured outcome...}" }],
+    "isError": false
   }
 }
 ```
@@ -166,12 +152,15 @@ Function 的所有路径读取经真实路径感知的 containment 检查，拒�
 
 白名单文件在 `action-types/*.json`，每个文件声明一个 Action Type（含 `execution`
 映射：command/subcommand + 参数模板）。启动时全部经
-`schemas/action.type.schema.json` 校验，无效文件跳过并告警。
+`schemas/action.type.schema.json` 校验；任一 JSON、schema、execution mapping
+或重复标识错误都会使整个 registry 拒绝启动，不发布部分工具面。Function
+registry 采用相同的整体 fail-closed 语义。
 
 映射规则（**契约一致性不变量**，F018）：命令能力注册表
 （`scripts/lib/mcp-action-contracts.js` 的 `COMMAND_CAPABILITIES`）是
 Action 注册的唯一比较面。Action 的 `governance.approver`、`evidenceRequired`、
-`effects.edits`、`mode` 必须与其映射命令的 effect/approver/evidence/
+`governance.evidence`、`effects.edits`、`effects.sideEffects`、`mode` 必须与
+其映射命令的 effect/approver/evidence/
 directReadOnlyExec 全部一致，且只读声明之后不得隐藏写能力参数（如
 `governance report --output` 已从只读接口移除，报告经 content/
 structuredContent 回传）。启动时对全部 Action Type 做一致性校验，任一不
@@ -197,10 +186,13 @@ isolation/ledger 四道门控的 governed runner 适配器（本次修复不引�
 4. **fail-closed**：损坏的治理状态（如不可读的活跃会话 manifest）、
    未知的命令能力、命令的非零退出/超时/信号/spawn 失败、契约失败，一律
    作为 MCP 错误（`isError: true`）上抛，绝不退化为空/成功状态。合法的
-   空查询（如 `session status` 无会话）返回 exit 0。
+   空查询（如 `session status` 无会话）返回 exit 0。并发守卫读取每个
+   session manifest 时也逐路径执行 realpath containment，拒绝子目录 junction。
 5. **已配置仓库不变量**：每个 Action 与 Function 只作用于启动时配置的
    仓库真实路径；`_target` 必须精确匹配已配置成员，Function 读取经真实
-   路径感知 containment 防护。
+   路径感知 containment 防护。Function handler 提供的目标 base 也必须是
+   已配置成员；每个实际读取路径都会再次检查 symlink/Windows junction，
+   不允许回退读取 MCP 服务器源码目录。
 6. **产品边界声明**：本协议仅用于 Amber 内部治理与外部 agent 的安全协作。
    外部系统不得绕过 Amber 直接操作仓库；Amber 不自动执行目标项目命令、
    不派发 live agent、不运行动态工作流（与 AGENTS.md 安全边界一致）。
@@ -250,20 +242,23 @@ isolation/ledger 四道门控的 governed runner 适配器（本次修复不引�
   `amber.fn.sessionEvidence` 摘要暴露所有权；busy-guard 的
   `conflict.owners` 标出活跃会话归属。
 - **函数 schema 校验（已实现，v0.6）**：加载时 ajv 编译每个
-  `amber.fn.*` 的 inputSchema，非法即跳过并告警；调用时参数校验
+  `amber.fn.*` 的 inputSchema；任一 Function 无法加载、缺少 handler/name/
+  schema、schema 非法或名称重复时，整个 registry fail-closed 拒绝启动。
+  调用时继续执行参数校验
   （`additionalProperties: false` 拒绝未知参数）。
 - **跨仓库视图缓存（已实现，v0.6）**：函数结果 TTL 缓存（默认 5s，
   `--cache-ttl-ms <n>` 调整，`--no-cache` 关闭），outcome 带
   `cached` 标记；键 = 函数 + 仓库集 + 输入。
 - **F018 治理与仓库隔离修复（已实现，v0.7）**：抽出深度模块
   `scripts/lib/mcp-targets.js`（已配置仓库规范化、`_target` 精确匹配、
-  真实路径感知 containment）与 `scripts/lib/mcp-action-contracts.js`
+  真实路径感知 containment）、`scripts/lib/mcp-action-contracts.js`
   （命令能力注册表为注册唯一比较面 + 契约一致性校验）。删除泛化
   `mayExecute`；只读直接执行仅限注册表证明的只读变体，变更类从不 spawn。
   fail-closed：损坏 manifest / 非零退出 / 超时 / 信号 / 契约失败均为
   `isError: true`；合法空查询 exit 0。`session.verify` 证据订正为
   `timeline-event`；只读 `governance report` 移除 `--output`。未知工具采用
-  MCP 原生 JSON-RPC 错误形状。
+  MCP 原生 JSON-RPC 错误形状。`scripts/lib/mcp-registry-loader.js` 保证 Action
+  与 Function registry 任一坏条目都会整体拒绝启动。
 - **后续（未实现）**：MCP 资源订阅推送（resources/subscribe）、
   多 agent 会话所有权转移（claim/release）、跨进程缓存（Redis/文件）、
   四道门控 governed runner 适配器（若需 MCP 直接执行变更类操作）。

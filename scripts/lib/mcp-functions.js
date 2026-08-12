@@ -1,0 +1,150 @@
+"use strict";
+
+// Deep, fixed Function runtime. Function files are declarative metadata only;
+// executable handlers live here and can read solely through guarded helpers.
+
+const fs = require("node:fs");
+const path = require("node:path");
+const { resolveConfiguredRepoPath } = require("./mcp-targets");
+const { validateManifest } = require("./session-manifest");
+
+const ACTIVE_STATUSES = new Set(["created", "routed", "executing", "paused"]);
+
+function createReader(configured, primary) {
+	const resolve = (relativePath, target = primary) =>
+		resolveConfiguredRepoPath({ configured, target, relativePath });
+	return {
+		targets: [primary, ...configured.targets.filter((target) => target !== primary)],
+		exists(relativePath, target) {
+			return fs.existsSync(resolve(relativePath, target));
+		},
+		list(relativePath, target) {
+			return fs.readdirSync(resolve(relativePath, target));
+		},
+		isDirectory(relativePath, target) {
+			return fs.statSync(resolve(relativePath, target)).isDirectory();
+		},
+		mtime(relativePath, target) {
+			return fs.statSync(resolve(relativePath, target)).mtimeMs;
+		},
+		readJson(relativePath, target) {
+			return JSON.parse(fs.readFileSync(resolve(relativePath, target), "utf8"));
+		},
+		countNonEmptyLines(relativePath, target) {
+			const file = resolve(relativePath, target);
+			if (!fs.existsSync(file)) return 0;
+			return fs
+				.readFileSync(file, "utf8")
+				.split("\n")
+				.filter((line) => line.trim()).length;
+		},
+	};
+}
+
+function sessionSummary(reader, sessionId) {
+	const base = path.join(".amber", "sessions", sessionId);
+	const manifest = reader.readJson(path.join(base, "manifest.json"));
+	assertValidManifest(manifest, sessionId);
+	return {
+		sessionId,
+		status: manifest.status,
+		active: ACTIVE_STATUSES.has(manifest.status),
+		goal: manifest.goal,
+		route: manifest.route && manifest.route.id,
+		agentId: manifest.agentId || null,
+		timelineEvents: reader.countNonEmptyLines(path.join(base, "timeline.jsonl")),
+		ledgerLines: reader.countNonEmptyLines(path.join(base, "ledger.jsonl")),
+	};
+}
+
+function assertValidManifest(manifest, sessionId) {
+	const validation = validateManifest(manifest);
+	if (!validation.valid) {
+		throw new Error(`corrupt session manifest ${sessionId}: ${validation.errors.join("; ")}`);
+	}
+}
+
+function sessionEvidence(params, reader) {
+	const sessions = path.join(".amber", "sessions");
+	if (!reader.exists(sessions)) return { sessions: [] };
+	let ids = reader.list(sessions).filter((id) => reader.isDirectory(path.join(sessions, id)));
+	if (params.sessionId) {
+		if (!ids.includes(params.sessionId)) throw new Error(`session not found: ${params.sessionId}`);
+		ids = [params.sessionId];
+	} else {
+		ids.sort((a, b) => reader.mtime(path.join(sessions, b)) - reader.mtime(path.join(sessions, a)));
+		ids = ids.slice(0, 1);
+	}
+	return { sessions: ids.map((id) => sessionSummary(reader, id)) };
+}
+
+function repoSnapshot(reader, target) {
+	const sessionsPath = path.join(".amber", "sessions");
+	let sessions = [];
+	if (reader.exists(sessionsPath, target)) {
+		sessions = reader
+			.list(sessionsPath, target)
+			.filter((id) => reader.isDirectory(path.join(sessionsPath, id), target))
+			.map((id) => {
+				const manifest = reader.readJson(path.join(sessionsPath, id, "manifest.json"), target);
+				assertValidManifest(manifest, id);
+				return {
+					sessionId: id,
+					status: manifest.status,
+					active: ACTIVE_STATUSES.has(manifest.status),
+					goal: manifest.goal,
+					route: manifest.route && manifest.route.id,
+				};
+			});
+	}
+	const routesPath = "routes";
+	const routes = reader.exists(routesPath, target)
+		? reader
+				.list(routesPath, target)
+				.filter((file) => file.endsWith(".route.json"))
+				.map((file) => file.replace(/\.route\.json$/, ""))
+		: [];
+	return {
+		target,
+		hasAmberState: reader.exists(".amber", target),
+		sessionCount: sessions.length,
+		activeSessions: sessions.filter((session) => session.active),
+		routes,
+	};
+}
+
+function repoOverview(_params, reader) {
+	const repos = reader.targets.map((target) => repoSnapshot(reader, target));
+	return {
+		repoCount: repos.length,
+		repos,
+		totalSessions: repos.reduce((sum, repo) => sum + repo.sessionCount, 0),
+		totalActive: repos.reduce((sum, repo) => sum + repo.activeSessions.length, 0),
+	};
+}
+
+const HANDLERS = new Map([
+	["amber.fn.repoOverview", repoOverview],
+	["amber.fn.sessionEvidence", sessionEvidence],
+]);
+
+function createFunctionRuntime({ configured, definitions }) {
+	const names = new Set(definitions.map((definition) => definition.name));
+	const missing = [...names].filter((name) => !HANDLERS.has(name));
+	const orphaned = [...HANDLERS.keys()].filter((name) => !names.has(name));
+	if (missing.length || orphaned.length) {
+		throw new Error(
+			`function implementation parity failed: missing=[${missing.join(", ")}], orphaned=[${orphaned.join(", ")}]`,
+		);
+	}
+	return {
+		invoke(name, parameters, targetOverride) {
+			const handler = HANDLERS.get(name);
+			if (!handler || !names.has(name)) throw new Error(`unknown Function: ${name}`);
+			const primary = targetOverride || configured.primary;
+			return handler(parameters, createReader(configured, primary));
+		},
+	};
+}
+
+module.exports = { createFunctionRuntime };

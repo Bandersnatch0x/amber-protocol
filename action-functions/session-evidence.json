@@ -1,0 +1,14 @@
+{
+	"name": "amber.fn.sessionEvidence",
+	"description": "Summarize a session's evidence trail (manifest state, timeline events, ledger lines) for a target repository. Read-only.",
+	"inputSchema": {
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {
+			"sessionId": {
+				"type": "string",
+				"description": "Session id to summarize. Omitted: the most recently updated session (empty list when the repository has none)."
+			}
+		}
+	}
+}

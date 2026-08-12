@@ -184,15 +184,15 @@ const COMMAND_HELP = {
 		"  Both layers must be satisfied for complete-check --strict to pass.",
 		"",
 		"Examples:",
-		'  amber session start --goal "implement user auth"',
-		'  amber session start --goal "fix login bug" --route bugfix-quick --worktree',
-		'  amber session start --goal "add feature" --mode interactive',
+		'  amber session start --goal "implement user auth" --confirm',
+		'  amber session start --goal "fix login bug" --route bugfix-quick --worktree --confirm',
+		'  amber session start --goal "add feature" --mode interactive --confirm',
 		"  amber session status",
 		"  amber session list",
 		"  amber session abort <session-id>",
 		"  amber session continue",
 		"  amber session complete-check --session <session-id>",
-		"  amber session verify --session <session-id>",
+		"  amber session verify --session <session-id> --confirm",
 		"  amber session approve --session <session-id>",
 	],
 	migrate: [
@@ -349,7 +349,7 @@ const COMMAND_HELP = {
 		"  amber governance readiness --target path/to/repo --json",
 		"  amber governance readiness --target path/to/repo --output docs/governance-readiness.md",
 		"  amber governance report --target path/to/repo",
-		"  amber governance report --target path/to/repo --output docs/governance-report.md",
+		"  amber governance report --target path/to/repo --output docs/governance-report.md --confirm",
 	],
 	status: [
 		"Show a curated one-line overview of repo state: git branch, Amber init status,",
@@ -448,7 +448,7 @@ const COMMAND_HELP = {
 		"",
 		"Examples:",
 		"  amber context request --target . --page governed-execution",
-		"  amber context ingest --target . --request kd-2026-08-07-a3f1 --payload page.json",
+		"  amber context ingest --target . --request kd-2026-08-07-a3f1 --payload page.json --confirm",
 		"  amber context verify --target . --json",
 		"  amber context refresh --target .",
 		"  amber context load --target . --route feature-standard --feature F015",
@@ -513,7 +513,7 @@ const COMMAND_OUTPUT = {
 	governance: {
 		usage: [
 			"Usage: amber governance <docs|evidence|policy|audit|readiness|report|standards|rules> [--target <repo>] [--json]",
-			"       amber governance report --target <repo> [--output <file>] [--json]",
+			"       amber governance report --target <repo> [--output <file> --confirm] [--json]",
 			"       amber governance rules <init|inspect|check> --target <repo> [--command <cmd>]",
 		].join("\n"),
 	},
@@ -580,13 +580,62 @@ const COMMANDS = Object.freeze([
 	"workflow",
 	"context",
 ]);
+const TIER_BY_COMMAND = {
+	init: "core",
+	audit: "core",
+	wiki: "core",
+	doctor: "core",
+	handoff: "core",
+	plan: "core",
+	gate: "core",
+	review: "core",
+	accept: "core",
+	loop: "core",
+	ledger: "core",
+	route: "core",
+	session: "core",
+	governance: "core",
+	feature: "core",
+	context: "core",
+	next: "journey",
+	profile: "deprecated",
+	task: "deprecated",
+	result: "deprecated",
+	agent: "deprecated",
+	team: "deprecated",
+	adoption: "deprecated",
+	pack: "expert",
+	maintenance: "expert",
+	status: "expert",
+	drift: "expert",
+	sync: "expert",
+	migrate: "expert",
+	execution: "expert",
+	security: "expert",
+	clean: "expert",
+	explain: "expert",
+	hooks: "expert",
+	workflow: "expert",
+};
+const COMMAND_TIERS = Object.freeze(
+	Object.fromEntries(COMMANDS.map((name) => [name, TIER_BY_COMMAND[name]])),
+);
+const VALID_TIERS = new Set(["core", "journey", "deprecated", "expert"]);
 const commandNames = new Set(COMMANDS);
 const missingHelp = COMMANDS.filter((name) => !Object.hasOwn(COMMAND_HELP, name));
 const orphanedHelp = Object.keys(COMMAND_HELP).filter((name) => !commandNames.has(name));
 const orphanedOutput = Object.keys(COMMAND_OUTPUT).filter((name) => !commandNames.has(name));
-if (missingHelp.length > 0 || orphanedHelp.length > 0 || orphanedOutput.length > 0) {
+const missingTiers = COMMANDS.filter((name) => !VALID_TIERS.has(COMMAND_TIERS[name]));
+const orphanedTiers = Object.keys(COMMAND_TIERS).filter((name) => !commandNames.has(name));
+if (
+	missingHelp.length > 0 ||
+	orphanedHelp.length > 0 ||
+	orphanedOutput.length > 0 ||
+	missingTiers.length > 0 ||
+	orphanedTiers.length > 0
+) {
 	throw new Error(
-		`Invalid Command definitions: missing help [${missingHelp.join(", ")}], orphaned help [${orphanedHelp.join(", ")}], orphaned output [${orphanedOutput.join(", ")}].`,
+		`Invalid Command definitions: missing help [${missingHelp.join(", ")}], orphaned help [${orphanedHelp.join(", ")}], orphaned output [${orphanedOutput.join(", ")}], missing tier [${missingTiers.join(", ")}], orphaned tier [${orphanedTiers.join(", ")}].`,
 	);
 }
 const COMMAND_DEFINITIONS = Object.freeze(
@@ -595,11 +644,15 @@ const COMMAND_DEFINITIONS = Object.freeze(
 			name,
 			Object.freeze({
 				name,
+				tier: COMMAND_TIERS[name],
 				help: COMMAND_HELP[name],
 				output: Object.freeze({ ...DEFAULT_OUTPUT, ...(COMMAND_OUTPUT[name] || {}) }),
 			}),
 		]),
 	),
+);
+const DEFAULT_COMMANDS = Object.freeze(
+	COMMANDS.filter((name) => ["journey", "core"].includes(COMMAND_DEFINITIONS[name].tier)),
 );
 
 function commandSummary(command) {
@@ -641,6 +694,8 @@ function bindCommandHandlers(handlers) {
 
 module.exports = {
 	COMMANDS,
+	DEFAULT_COMMANDS,
+	COMMAND_TIERS,
 	COMMAND_DEFINITIONS,
 	commandSummary,
 	commandUsageLine,

@@ -246,6 +246,7 @@ function measureRoute(route) {
 		route.featureId,
 		"--route",
 		route.id,
+		"--confirm",
 		"--json",
 	]);
 	let sid;
@@ -277,6 +278,7 @@ function measureRoute(route) {
 		"npm test",
 		"--target",
 		".",
+		"--confirm",
 	]);
 	rec("session verify --execute", "cli", r, {
 		id: "verify_execute",

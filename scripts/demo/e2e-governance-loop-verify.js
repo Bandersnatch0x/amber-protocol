@@ -223,6 +223,7 @@ function pathSuccess() {
 			"e2e success path",
 			"--feature",
 			featureId,
+			"--confirm",
 			"--json",
 		]),
 	);
@@ -242,6 +243,7 @@ function pathSuccess() {
 			"npm test",
 			"--target",
 			".",
+			"--confirm",
 		]),
 	);
 	const n5 = nextJson(target);
@@ -417,6 +419,7 @@ function pathRejections() {
 			"reject path",
 			"--feature",
 			featureId,
+			"--confirm",
 			"--json",
 		]),
 	);
@@ -435,12 +438,16 @@ function pathRejections() {
 			"echo should-deny",
 			"--target",
 			".",
+			"--confirm",
 		]),
 	);
 	const denyOk = denied.exitCode !== 0 && /denied|policy/i.test(denied.stdout + denied.stderr);
 
 	// B2: claim-only verify then strict complete-check must fail on verification
-	step("verify claim-only", run(target, ["session", "verify", "--session", sid, "--target", "."]));
+	step(
+		"verify claim-only",
+		run(target, ["session", "verify", "--session", sid, "--target", ".", "--confirm"]),
+	);
 	const claimCc = step(
 		"complete-check --strict after claim",
 		run(target, ["session", "complete-check", "--session", sid, "--strict", "--target", "."]),
@@ -614,6 +621,7 @@ function pathVerifyFailRecover() {
 			"fail then recover",
 			"--feature",
 			featureId,
+			"--confirm",
 			"--json",
 		]),
 	);
@@ -631,6 +639,7 @@ function pathVerifyFailRecover() {
 			"npm test",
 			"--target",
 			".",
+			"--confirm",
 		]),
 	);
 	const failRecorded =
@@ -665,6 +674,7 @@ function pathVerifyFailRecover() {
 			"npm test",
 			"--target",
 			".",
+			"--confirm",
 		]),
 	);
 	step(
@@ -758,6 +768,7 @@ function pathCrossSessionHandoff() {
 			"session one work",
 			"--feature",
 			featureId,
+			"--confirm",
 			"--json",
 		]),
 	);
@@ -774,6 +785,7 @@ function pathCrossSessionHandoff() {
 			"npm test",
 			"--target",
 			".",
+			"--confirm",
 		]),
 	);
 	step(
@@ -830,6 +842,7 @@ function pathCrossSessionHandoff() {
 			"continue from handoff",
 			"--feature",
 			"F2",
+			"--confirm",
 			"--json",
 		]),
 	);

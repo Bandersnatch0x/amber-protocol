@@ -475,7 +475,8 @@ const ACTION_LIBRARY = {
 		severity: "medium",
 		summary: "Run governed sessions and export evidence when work completes.",
 		why: "A complete product loop needs verification evidence before handoff is trustworthy.",
-		command: 'node scripts/amber.js session start --target <repo> --goal "verify current delivery"',
+		command:
+			'node scripts/amber.js session start --target <repo> --goal "verify current delivery" --confirm',
 		expectedOutcome:
 			"A governed session or execution records verification evidence that can be exported.",
 		blocks: ["evidence-score", "handoff-readiness"],

@@ -414,11 +414,61 @@
 			"area": "governance",
 			"title": "Intent router + deep journey skills + default-help projection",
 			"user_visible_behavior": "Converge the ~35-command surface behind an intent router with deep journey skills and a default-help projection, as a follow-up to the F018 typed governance seam.",
-			"status": "not_started",
-			"verification": ["npm test"],
-			"evidence": [],
-			"notes": [],
-			"paths": ["scripts", "skills"]
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/cli-typed-seam.test.js tests/unit/journey-router.test.js tests/unit/agent-commands.test.js tests/unit/command-registry-parity.test.js tests/amber-cli.test.js tests/integration/session-commands.test.js tests/integration/amber-mcp.test.js tests/integration/amber-next.test.js tests/integration/action-type-schema.test.js tests/integration/interactive-session.test.js tests/load/sequential-sessions.test.js tests/phase-v4.test.js tests/phase-v4-5.test.js tests/e2e/autonomous-session.test.js tests/e2e/concurrent-sessions.test.js tests/e2e/product-service-packages.test.js",
+				"npm test",
+				"npm run manifests",
+				"npm run doctor",
+				"npm run gen:agents:check",
+				"node scripts/validate-wiki.js --target .",
+				"npm run lint",
+				"npm run format:check",
+				"node scripts/amber.js review --target . --plan docs/plans/F019-Intent-router-deep-journey-skills-default-help-projection.md --json",
+				"node scripts/amber.js gate --target . --plan docs/plans/F019-Intent-router-deep-journey-skills-default-help-projection.md"
+			],
+			"evidence": [
+				{
+					"command": "expanded F019 targeted node --test suite",
+					"result": "184 passed, 0 failed, 0 skipped",
+					"date": "2026-08-13",
+					"notes": "Covers command tiers/help projection, router/journey contracts, typed seam, MCP, integration, E2E, and regression fixtures."
+				},
+				{
+					"command": "npm test",
+					"result": "1737 total, 1733 passed, 4 skipped, 0 failed",
+					"date": "2026-08-13",
+					"notes": "Full repository verification after typed-write confirmation synchronization."
+				},
+				{
+					"command": "manifests; doctor; gen:agents:check; validate-wiki; lint; format:check",
+					"result": "all exit 0; errors 0; 15 generated agent files current",
+					"date": "2026-08-13",
+					"notes": "Repository health and generated projections are clean."
+				},
+				{
+					"command": "amber review + amber gate for F019",
+					"result": "review findings 0, releaseReadiness ready, gate errors 0",
+					"date": "2026-08-13",
+					"notes": "Plan confirmation, evidence, scope and phase-boundary checks passed."
+				}
+			],
+			"notes": [
+				"F019 implementation complete; typed mutations require explicit --confirm/--yes and approval-only requests never write.",
+				"Three-axis architecture/spec/standards re-review on 2026-08-13 reported no High or Medium findings."
+			],
+			"paths": [
+				"scripts/amber.js",
+				"scripts/lib",
+				"skills",
+				".claude/commands",
+				".gemini/commands",
+				".agents/skills",
+				"tests",
+				"docs/CLI_REFERENCE.md",
+				"docs/plans/F019-Intent-router-deep-journey-skills-default-help-projection.md"
+			],
+			"updated": "2026-08-13"
 		}
 	]
 }

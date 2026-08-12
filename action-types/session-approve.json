@@ -18,8 +18,13 @@
 	},
 	"submissionCriteria": ["session exists", "gate id is known for the session route"],
 	"effects": {
-		"edits": [".amber/sessions/<id>/timeline.jsonl"],
-		"sideEffects": ["timeline-event"],
+		"edits": [
+			".amber/sessions/<id>/manifest.json",
+			".amber/sessions/<id>/ledger.jsonl",
+			".amber/sessions/<id>/gates/<gate>.decision.json",
+			".amber/sessions/<id>/timeline.jsonl"
+		],
+		"sideEffects": ["timeline-event", "ledger-append"],
 		"rollback": true
 	},
 	"evidenceRequired": ["approval-record"],

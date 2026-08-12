@@ -27,7 +27,7 @@ const CATALOG = {
 	AMBER_E_ROUTE_NOT_FOUND: {
 		title: "No route matched the session goal",
 		cause: "session start could not match the goal to a route trigger and no --route was given.",
-		remedy: "amber route list   # then: amber session start --goal <g> --route <name>",
+		remedy: "amber route list   # then: amber session start --goal <g> --route <name> --confirm",
 		layer: "Lifecycle",
 		related: [],
 	},
@@ -41,7 +41,8 @@ const CATALOG = {
 	AMBER_E_SESSION_INCOMPLETE: {
 		title: "Session completion check failed",
 		cause: "complete-check found missing verification and/or approval evidence for the session.",
-		remedy: "amber session verify --session <id> ...   then   amber session approve --session <id>",
+		remedy:
+			"amber session verify --session <id> ... --confirm   then   amber session approve --session <id>",
 		layer: "Verification",
 		related: [],
 	},

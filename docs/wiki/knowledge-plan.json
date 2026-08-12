@@ -32,13 +32,13 @@
         "text": "Seven governance control layers in priority order: Governance (highest) > Verification > Observability > Lifecycle > Context > Tooling > Execution (lowest/avoid). This priority weighting shapes the entire codebase."
       },
       {
-        "text": "The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command."
+        "text": "The delivery lifecycle is: audit -> init -> governance report -> next -> plan -> gate -> verify -> approve -> handoff bundle -> handoff validate. Each stage maps to a CLI command; the amber-delivery journey coordinates the sequence."
       },
       {
         "text": "Safety boundary: read-only/dry-run first. 'init' and 'wiki' never overwrite existing files. Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows."
       },
       {
-        "text": "Skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead."
+        "text": "The amber router and four deep journey skills in skills/*/SKILL.md are the single source of truth. Platform-specific files (.claude/, .agents/skills/, .gemini/commands/) are auto-generated via 'npm run gen:agents'. Never edit generated files; edit skills/ instead."
       },
       {
         "text": "Dependencies are intentionally minimal: ajv for JSON Schema validation and ajv-formats for format validation. No Express, no database, no ORM in the CLI package."
@@ -151,7 +151,7 @@
     },
     {
       "id": "skills-source-of-truth",
-      "text": "skills/ contains platform-agnostic skill definitions (amber-adoption through amber-wiki). Platform-specific files in .claude/, .agents/skills/, .gemini/commands/ are generated, never hand-edited. Run `npm run gen:agents` after changing skills/.",
+      "text": "skills/ contains the platform-agnostic amber router and four deep journey definitions. Platform-specific files in .claude/, .agents/skills/, .gemini/commands/ are generated, never hand-edited. Run `npm run gen:agents` after changing skills/.",
       "tags": ["skills", "generation"]
     },
     {

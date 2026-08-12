@@ -1,0 +1,76 @@
+---
+description: Use when continuing a repository improvement goal, running an automation wakeup, or selecting the next safe Amber-backed improvement slice.
+argument-hint: [objective] [target]
+---
+
+<!-- GENERATED — edit skills/ instead. Run: npm run gen:agents -->
+
+User input: $ARGUMENTS
+
+# Amber Continuous Improvement
+
+## Workflow
+
+1. Read repository instructions, the operating manual, progress/handoff, feature state, active session, and continuous-improvement state.
+2. Inspect repo state and treat pre-existing dirty files as user-owned.
+3. Run `amber loop recommend --goal "<objective>" --target <repo>`. Recommendations are read-only; they do not authorize execution.
+4. Select one coherent, high-value, low-risk slice and validate its plan/gate state.
+5. Before editing, write a contract:
+   - Objective.
+   - Files in scope.
+   - Files out of scope.
+   - Expected result.
+   - Verification evidence.
+   - Approval gates.
+6. Use `docs/wiki/agent/workflow-packets.md` for ambiguous or multi-track work.
+7. Implement only the contracted slice through the governed delivery lifecycle; preserve approval, isolation, and ledger gates.
+8. Run a separate review pass and record real verification evidence.
+9. Update progress, handoff, feature evidence, and continuous-improvement state when project state changes.
+
+On failure, record the negative evidence and next recoverable action. Do not select a second slice to hide an incomplete first slice.
+
+Evidence order: repository state, recommendation, selected slice contract, approval/isolation decision, changed-file scope, verification output, review findings, ledger and handoff updates.
+
+## Safe Defaults
+
+- Prefer small patches over broad rewrites.
+- Do not overwrite user-authored files without explicit approval.
+- Do not delete, deploy, publish, change secrets, change dependencies, create migrations, or perform destructive git operations without approval.
+- Do not execute Dynamic Workflows, dispatch subagents, orchestrate worktrees, or route models from the V1 Amber Protocol boundary.
+
+## Result Note Template
+
+```text
+Date:
+Task:
+Workflow:
+Changed files:
+Evidence:
+Review findings:
+Skipped checks:
+Next candidate:
+```
+
+## Loop Triage Compatible Output (when used inside a daily-triage loop)
+
+When invoked as part of a loop (e.g. via `/loop` or `amber loop run`), prefer producing output in this structure so it can be directly merged into a `STATE.md` or loop ledger:
+
+### High-Priority Items
+
+- ...
+
+### Watch Items
+
+- ...
+
+### Noise / Ignore
+
+- ...
+
+### State Updates
+
+- Last run: <timestamp>
+- Amber health score / doctor summary
+- Candidate next actions (with links to commands)
+
+This aligns Amber continuous improvement with loop-engineering `loop-triage` skill conventions while respecting Amber's governance and dry-run boundaries.

@@ -36,6 +36,7 @@ test("session start creates manifest and timeline", () => {
 		"implement test feature",
 		"--route",
 		"feature-standard",
+		"--confirm",
 	]);
 	assert.equal(result.status, 0);
 	assert.match(result.stdout, /Session created:/);
@@ -63,6 +64,7 @@ test("session status shows current session", () => {
 		"implement status test",
 		"--route",
 		"feature-standard",
+		"--confirm",
 	]);
 	const match = startResult.stdout.match(/Session created: ([a-f0-9-]+)/);
 	const sessionId = match[1];
@@ -81,6 +83,7 @@ test("session status by ID shows specific session", () => {
 		"implement status by id test",
 		"--route",
 		"feature-standard",
+		"--confirm",
 	]);
 	const match = startResult.stdout.match(/Session created: ([a-f0-9-]+)/);
 	const sessionId = match[1];
@@ -99,6 +102,7 @@ test("session list shows all sessions", () => {
 		"implement first feature",
 		"--route",
 		"feature-standard",
+		"--confirm",
 	]);
 	runHarness([
 		"session",
@@ -107,6 +111,7 @@ test("session list shows all sessions", () => {
 		"implement second feature",
 		"--route",
 		"feature-standard",
+		"--confirm",
 	]);
 
 	const result = runHarness(["session", "list"]);
@@ -123,6 +128,7 @@ test("session abort sets status to aborted", () => {
 		"implement abort test",
 		"--route",
 		"feature-standard",
+		"--confirm",
 	]);
 	const match = startResult.stdout.match(/Session created: ([a-f0-9-]+)/);
 	const sessionId = match[1];
@@ -144,6 +150,7 @@ test("session start with explicit route", () => {
 		"implement explicit route",
 		"--route",
 		"bugfix-quick",
+		"--confirm",
 	]);
 	assert.equal(result.status, 0);
 	assert.match(result.stdout, /bugfix-quick/);
@@ -157,6 +164,7 @@ test("session --json emits standard envelope", () => {
 		"implement json test",
 		"--route",
 		"feature-standard",
+		"--confirm",
 		"--json",
 	]);
 	assert.equal(result.status, 0);
@@ -173,7 +181,7 @@ test("unknown session subcommand exits non-zero", () => {
 });
 
 test("session start with goal matching bugfix-quick route auto-selects route", () => {
-	const result = runHarness(["session", "start", "--goal", "fix critical login bug"]);
+	const result = runHarness(["session", "start", "--goal", "fix critical login bug", "--confirm"]);
 	assert.equal(result.status, 0);
 	assert.match(result.stdout, /bugfix-quick/);
 });

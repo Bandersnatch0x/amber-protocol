@@ -25,6 +25,9 @@ node scripts/amber.js <command> --target <repo>
 
 ## Core commands
 
+Default `amber` help projects the journey entry (`next`) and core governance commands below.
+Use `node scripts/amber.js --all` for deprecated and expert compatibility commands.
+
 - `node scripts/amber.js init --target <repo>` - install the V1 scaffold (skips existing files).
 - `node scripts/amber.js audit --target <repo>` - read-only readiness inspection.
 - `node scripts/amber.js wiki --target <repo>` - create/validate the wiki skeleton.
@@ -36,9 +39,10 @@ node scripts/amber.js <command> --target <repo>
 - `node scripts/amber.js context request --target <repo> --page <id>` - write a distillation contract; `ingest`/`verify`/`refresh`/`stats` close the loop (ADR-0009).
 - `node scripts/amber.js route list` - list available routes.
 - `node scripts/amber.js session status` - inspect the current session.
-- `node scripts/amber.js adoption report --target <repo> --output-dir docs/examples/adoptions` - generate a legacy adoption report.
+- Deprecated adoption reports remain available via `node scripts/amber.js --all` and `amber adoption --help`; prefer the diagnosis/adoption journey for new work.
 - `node scripts/amber.js plan --target <repo> --feature <feature-id> --title "<title>"` - scaffold a feature plan.
 - `node scripts/amber.js loop recommend` / `loop run --dry-run` — safe continuous improvement entrypoints (see LOOP.md).
+- `node scripts/amber.js next --objective "<goal>" --target <repo>` - deterministic route advice; never an LLM decision.
 
 ## Safety boundaries
 
@@ -70,6 +74,10 @@ regenerate every platform product (edit `skills/`, never the generated files;
 `npm run gen:agents:check` guards against drift in CI).
 
 This repo also follows loop-engineering patterns (see LOOP.md). Skills in `skills/` can be used directly from Grok `/loop`, Claude `$skill`, etc. The `amber-continuous-improvement` skill implements a governed form of daily triage.
+
+Use the user-invoked `amber` router to choose among four deep journeys: `amber-delivery`,
+`amber-diagnosis-adoption`, `amber-context-continuity`, and `amber-continuous-improvement`.
+The journey skills compose deterministic CLI primitives; they do not add execution authority.
 
 - **Claude Code** - loaded via `.claude-plugin/` -> `skills/`; manual slash commands in `.claude/commands/`.
 - **Codex & Cursor** - skills mirrored to `.agents/skills/` (the shared open-standard location both read natively).

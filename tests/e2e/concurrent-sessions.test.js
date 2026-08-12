@@ -30,6 +30,7 @@ describe("concurrent sessions E2E", () => {
 					`implement feature ${i}`,
 					"--target",
 					target,
+					"--confirm",
 					"--json",
 				],
 				{ cwd: ROOT, encoding: "utf8", timeout: 15000 },

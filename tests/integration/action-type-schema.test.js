@@ -190,6 +190,7 @@ test("mapped CLI surface still works (P1 whitelist smoke)", () => {
 		"action type smoke",
 		"--route",
 		"feature-standard",
+		"--confirm",
 	]);
 	assert.equal(start.status, 0, start.stderr);
 	const match = start.stdout.match(/Session created: ([a-f0-9-]+)/);
@@ -206,6 +207,7 @@ test("mapped CLI surface still works (P1 whitelist smoke)", () => {
 		"smoke",
 		"--result",
 		"ok",
+		"--confirm",
 	]);
 	assert.equal(verify.status, 0, verify.stderr);
 

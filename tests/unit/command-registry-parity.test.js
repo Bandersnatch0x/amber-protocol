@@ -5,10 +5,21 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
-const { COMMANDS } = require("../../scripts/amber.js");
-const { COMMAND_REGISTRY } = require("../../scripts/lib/command-dispatcher.js");
-const { COMMAND_DEFINITIONS, bindCommandHandlers } = require("../../scripts/lib/command-help.js");
+const { COMMANDS, DEFAULT_COMMANDS, run } = require("../../scripts/amber.js");
+const {
+	COMMAND_REGISTRY,
+	DEPRECATED_COMMANDS,
+	dispatch,
+} = require("../../scripts/lib/command-dispatcher.js");
+const {
+	COMMAND_DEFINITIONS,
+	COMMAND_TIERS,
+	bindCommandHandlers,
+} = require("../../scripts/lib/command-help.js");
 
 const PUBLIC_COMMAND_ORDER = [
 	"init",
@@ -59,11 +70,24 @@ test("one Command registry drives help, policy, dispatch, and the public command
 		const definition = COMMAND_DEFINITIONS[name];
 		const registration = COMMAND_REGISTRY[name];
 		assert.equal(definition.name, name);
+		assert.ok(["core", "journey", "deprecated", "expert"].includes(definition.tier));
 		assert.ok(definition.help, `${name} must own its help knowledge`);
 		assert.ok(definition.output, `${name} must own its output policy`);
 		assert.equal(registration.definition, definition);
 		assert.equal(typeof registration.handler, "function");
 	}
+});
+
+test("Command tiers are the single visibility source", () => {
+	assert.deepEqual(Object.keys(COMMAND_TIERS), COMMANDS);
+	assert.deepEqual(
+		DEFAULT_COMMANDS,
+		COMMANDS.filter((name) => ["journey", "core"].includes(COMMAND_TIERS[name])),
+	);
+	assert.deepEqual(
+		new Set(COMMANDS.filter((name) => COMMAND_TIERS[name] === "deprecated")),
+		DEPRECATED_COMMANDS,
+	);
 });
 
 test("Command handler binding fails fast on missing or orphaned handlers", () => {
@@ -73,4 +97,31 @@ test("Command handler binding fails fast on missing or orphaned handlers", () =>
 	);
 	handlers.orphaned = () => ({ result: {} });
 	assert.throws(() => bindCommandHandlers(handlers), /orphaned handlers/i);
+});
+
+test("deprecated warnings are added after asynchronous handlers resolve", async () => {
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-async-deprecated-"));
+	DEPRECATED_COMMANDS.add("session");
+	try {
+		const response = await dispatch("session", { _: ["status"], target });
+		assert.match(response.result.warnings.join("\n"), /deprecated/i);
+	} finally {
+		DEPRECATED_COMMANDS.delete("session");
+		fs.rmSync(target, { recursive: true, force: true });
+	}
+});
+
+test("bypass responses with errors produce a non-zero CLI exit", async () => {
+	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-bypass-error-"));
+	const originalLog = console.log;
+	console.log = () => {};
+	try {
+		assert.equal(
+			await run(["ledger", "export", "--home", "all", "--format", "json", "--target", target]),
+			1,
+		);
+	} finally {
+		console.log = originalLog;
+		fs.rmSync(target, { recursive: true, force: true });
+	}
 });

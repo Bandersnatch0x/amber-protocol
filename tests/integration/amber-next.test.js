@@ -70,6 +70,7 @@ describe("amber next (integration)", () => {
 			"n2",
 			"--feature",
 			"F001",
+			"--confirm",
 			"--json",
 		]);
 		assert.equal(start.status, 0, start.stderr);
@@ -85,6 +86,7 @@ describe("amber next (integration)", () => {
 				"npm test",
 				"--target",
 				".",
+				"--confirm",
 			]).status,
 			0,
 		);
@@ -184,6 +186,7 @@ describe("amber next progression (feature path, no session)", () => {
 			"last mile",
 			"--feature",
 			"F001",
+			"--confirm",
 			"--json",
 		]);
 		assert.equal(start.status, 0, start.stderr);
@@ -200,6 +203,7 @@ describe("amber next progression (feature path, no session)", () => {
 				"npm test",
 				"--target",
 				".",
+				"--confirm",
 			]).status,
 			0,
 		);

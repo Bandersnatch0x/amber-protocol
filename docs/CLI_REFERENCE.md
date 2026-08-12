@@ -2,6 +2,11 @@
 
 Complete command reference for Amber Protocol CLI.
 
+Running `amber` or `amber --help` shows the journey and core governance projection.
+Run `amber --all` to list every deprecated and expert compatibility command. Hidden commands
+remain callable and retain `amber <command> --help`; F019 changes discovery, not command removal.
+For agent-guided work, invoke the `amber` router skill, which selects one of four deep journeys.
+
 ## Global Options
 
 ```bash
@@ -84,10 +89,11 @@ Start a new session:
 ```bash
 node scripts/amber.js session start \
   --target . \
-  --goal "implement user authentication" \
-  --route feature-standard \
-  [--budget 100000] \
-  [--worktree] \
+	--goal "implement user authentication" \
+	--route feature-standard \
+	[--budget 100000] \
+	[--worktree] \
+	--confirm
 ```
 
 **Options:**
@@ -95,6 +101,7 @@ node scripts/amber.js session start \
 - `--route`: Route ID (default: feature-standard)
 - `--budget`: Token limit (default: from route)
 - `--worktree`: Use git worktree isolation
+- `--confirm`: Required before the typed mutation is executed.
 - `--mode autonomous`: refused in V1 by ADR-0001/0005; use the default governed session flow.
 
 ### session status
@@ -145,8 +152,8 @@ ledger. `verify` and `approve` also mirror the event into a hash-chain ledger
 (`.amber/sessions/<id>/ledger.jsonl`) so a later edit to a recorded result is detectable.
 
 ```bash
-node scripts/amber.js session verify   --session <id> --command "npm test" --result pass  --target .
-node scripts/amber.js session approve  --session <id> [--gate <gate-id>]                  --target .
+node scripts/amber.js session verify   --session <id> --command "npm test" --result pass  --target . --confirm
+node scripts/amber.js session approve  --session <id> [--gate <gate-id>] --yes            --target .
 node scripts/amber.js session verify-ledger --session <id>                                --target .
 ```
 
@@ -214,7 +221,7 @@ Score the repository's product delivery loop and emit structured next actions.
 
 ```bash
 node scripts/amber.js governance report --target .
-node scripts/amber.js governance report --target . --output docs/quality/amber-governance-report.md
+node scripts/amber.js governance report --target . --output docs/quality/amber-governance-report.md --confirm
 ```
 
 The report covers the product loop `Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle`, with scores for governance, evidence, continuity, safety, and maintenance.
@@ -764,8 +771,9 @@ node scripts/amber.js adoption gate --reports-dir docs/examples/adoptions
 ```bash
 node scripts/amber.js session start \
   --target . \
-  --goal "fix login timeout bug" \
-  --route bugfix-quick
+	--goal "fix login timeout bug" \
+	--route bugfix-quick \
+	--confirm
 ```
 
 ### Autonomous Mode Boundary
@@ -1042,14 +1050,14 @@ the repo.
 `request` writes a hash-bearing distillation contract; a host agent executes it; `ingest` judges the
 result (schema, citation completeness, payload-to-request binding, source freshness) and persists
 provenance-backed pages under `.amber/context/pages/`, indexed by `docs/wiki/context-index.md`.
-Run `amber context --help` for the full subcommand reference; `skills/amber-context/SKILL.md` is the
+Run `amber context --help` for the full subcommand reference; `skills/amber-context-continuity/SKILL.md` is the
 agent-facing loop.
 
 ```bash
 # Contract + gate
 node scripts/amber.js context request --target . --page governed-execution --title "Governed execution" --source docs/adr/0003-....md
-node scripts/amber.js context ingest  --target . --request kd-2026-08-07-a3f1 --payload out.json
-node scripts/amber.js context ingest  --target . --request <id> --payload no-change.json   # {"outcome":"no-change"} rebases hashes
+node scripts/amber.js context ingest  --target . --request kd-2026-08-07-a3f1 --payload out.json --confirm
+node scripts/amber.js context ingest  --target . --request <id> --payload no-change.json --confirm  # {"outcome":"no-change"} rebases hashes
 
 # Health and maintenance
 node scripts/amber.js context verify --target . --json

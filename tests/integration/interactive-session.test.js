@@ -44,6 +44,7 @@ describe("Interactive Session Integration", () => {
 				TEST_PROJECT,
 				"--mode",
 				"interactive",
+				"--confirm",
 			],
 			{ encoding: "utf8", cwd: ROOT },
 		);
@@ -71,6 +72,7 @@ describe("Interactive Session Integration", () => {
 				TEST_PROJECT,
 				"--mode",
 				"interactive",
+				"--confirm",
 			],
 			{ encoding: "utf8", cwd: ROOT },
 		);
@@ -94,6 +96,7 @@ describe("Interactive Session Integration", () => {
 				"add feature",
 				"--target",
 				TEST_PROJECT,
+				"--confirm",
 			],
 			{ encoding: "utf8", cwd: ROOT },
 		);

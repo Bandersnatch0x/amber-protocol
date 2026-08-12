@@ -23,8 +23,12 @@
 	},
 	"submissionCriteria": ["session exists and is not completed", "stage is non-empty"],
 	"effects": {
-		"edits": [".amber/sessions/<id>/timeline.jsonl"],
-		"sideEffects": ["timeline-event"],
+		"edits": [
+			".amber/sessions/<id>/timeline.jsonl",
+			".amber/sessions/<id>/ledger.jsonl",
+			".amber/sessions/<id>/manifest.json"
+		],
+		"sideEffects": ["timeline-event", "ledger-append"],
 		"rollback": true
 	},
 	"evidenceRequired": ["timeline-event"],

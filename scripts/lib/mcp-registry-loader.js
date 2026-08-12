@@ -75,21 +75,21 @@ function loadFunctions({ directory }) {
 	const names = new Set();
 	for (const file of fs
 		.readdirSync(directory)
-		.filter((name) => name.endsWith(".js"))
+		.filter((name) => name.endsWith(".json"))
 		.sort()) {
 		let fn;
 		try {
-			fn = require(path.join(directory, file));
+			fn = JSON.parse(fs.readFileSync(path.join(directory, file), "utf8"));
 		} catch (err) {
-			findings.push(`${file}: failed to load (${err.message})`);
-			continue;
-		}
-		if (!fn || typeof fn.handler !== "function") {
-			findings.push(`${file}: missing handler function`);
+			findings.push(`${file}: invalid JSON (${err.message})`);
 			continue;
 		}
 		if (!/^amber\.fn\./.test(fn.name || "")) {
 			findings.push(`${file}: name must start with amber.fn.`);
+			continue;
+		}
+		if (typeof fn.description !== "string" || fn.description.trim() === "") {
+			findings.push(`${file}: missing description`);
 			continue;
 		}
 		if (!fn.inputSchema || typeof fn.inputSchema !== "object") {

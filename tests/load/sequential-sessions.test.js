@@ -32,6 +32,7 @@ describe("sequential sessions load test", () => {
 					`implement load test feature ${i}`,
 					"--target",
 					target,
+					"--confirm",
 					"--json",
 				],
 				{ cwd: ROOT, encoding: "utf8", timeout: 10000 },
