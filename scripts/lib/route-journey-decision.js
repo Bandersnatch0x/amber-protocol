@@ -2,6 +2,11 @@
 
 const MATCH_WEIGHT = 0.6;
 const COVERAGE_WEIGHT = 0.4;
+// D: max advisory metadata score used to normalize confidence to [0,1].
+// scoreRouteMetadata can return up to 4 (textScore from 4 metadata fields +
+// idBonus of 2 when routeId keyword matches), but in practice a route rarely
+// matches all fields, so 4 keeps the confidence curve meaningful.
+const ADVISORY_MAX_SCORE = 4;
 
 // ── Journey registry (G: data and algorithm now co-located) ──────────────
 
@@ -216,6 +221,9 @@ function decideAdvisoryRouteJourney({ objective = "", routes, journeys }) {
 	if (!Array.isArray(routes)) throw new TypeError("routes must be an array");
 	if (!Array.isArray(journeys)) throw new TypeError("journeys must be an array");
 	const text = String(objective || "").trim();
+	// D/F: tokenize once and return tokens so callers (e.g. decideRouting)
+	// can reuse them for workflow-pack suggestion without re-tokenizing.
+	const tokens = tokenizeObjective(text);
 	const scored = suggestRouteMetadata(text, routes);
 	const best = scored[0] || null;
 	const route = best ? best.route : null;
@@ -224,7 +232,7 @@ function decideAdvisoryRouteJourney({ objective = "", routes, journeys }) {
 				status: "selected",
 				routeId: route.routeId,
 				displayName: route.displayName || route.routeId,
-				confidence: Math.min(1, Math.round((best.score / 4) * 100) / 100),
+				confidence: Math.min(1, Math.round((best.score / ADVISORY_MAX_SCORE) * 100) / 100),
 				candidates: scored.map((entry) => ({
 					routeId: entry.route.routeId,
 					score: entry.score,
@@ -252,6 +260,7 @@ function decideAdvisoryRouteJourney({ objective = "", routes, journeys }) {
 			journeyAffinity: journeyDecision.affinity,
 		},
 		warnings: [],
+		tokens,
 	};
 }
 

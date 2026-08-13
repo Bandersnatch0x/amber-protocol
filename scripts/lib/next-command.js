@@ -123,8 +123,8 @@ function decideRouting(objective, target = REPO_ROOT) {
 
 	const routeId = decision.route.routeId;
 	const confidence = decision.route.confidence;
-	// D/F: tokenize once and reuse for both routing and workflow-pack suggestion.
-	const tokens = tokenizeObjective(objective);
+	// D/F: reuse tokens from decideAdvisoryRouteJourney instead of re-tokenizing.
+	const tokens = decision.tokens || tokenizeObjective(objective);
 	const workflowPackId =
 		suggestWorkflowPack(tokens, objective, path.join(targetRoot, "workflow-packs")) || null;
 	return {
