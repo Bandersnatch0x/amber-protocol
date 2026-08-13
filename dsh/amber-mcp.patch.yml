@@ -1,0 +1,25 @@
+# Amber Protocol × dsh — Path A: MCP Server
+#
+# Exposes Amber governance tools (session, context, route, governance) as
+# model-facing dsh tools via the MCP stdio bridge. Each tool is named
+# mcp__amber__<rawName> in the agent's tool catalog.
+#
+# Install: merge into $DSH_HOME/profiles/<name>/cordis.patch.yml
+# Docs:    dsh/README.md
+
+- insert:
+    - id: mcp-amber
+      name: "@deepseek-ai/dsh-mcp-client"
+      config:
+        transport: stdio
+        serverName: amber
+        command: node
+        args:
+          # Adjust this path to your coding-harness checkout
+          - !!js "require('path').resolve(process.env.AMBER_REPO || process.cwd(), 'scripts/amber-mcp.js')"
+          - --target
+          # The repository Amber governs; defaults to the dsh workspace root
+          - !!js "process.env.AMBER_TARGET || process.cwd()"
+        env: {}
+        toolCallTimeoutMs: 60000
+        failOnStartupError: false

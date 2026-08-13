@@ -1,0 +1,36 @@
+# Amber Protocol × dsh — Path A + B Combined
+#
+# Merges amber-mcp.patch.yml and amber-skills.patch.yml into one layer.
+#
+# Install: copy to $DSH_HOME/profiles/<name>/cordis.patch.yml
+# Docs:    dsh/README.md
+
+# ── Path A: MCP governance tools ──────────────────────────────────────────
+
+- insert:
+    - id: mcp-amber
+      name: "@deepseek-ai/dsh-mcp-client"
+      config:
+        transport: stdio
+        serverName: amber
+        command: node
+        args:
+          # Adjust this path to your coding-harness checkout
+          - !!js "require('path').resolve(process.env.AMBER_REPO || process.cwd(), 'scripts/amber-mcp.js')"
+          - --target
+          # The repository Amber governs; defaults to the dsh workspace root
+          - !!js "process.env.AMBER_TARGET || process.cwd()"
+        env: {}
+        toolCallTimeoutMs: 60000
+        failOnStartupError: false
+
+# ── Path B: Journey skills ───────────────────────────────────────────────
+
+- update:
+    - id: skill-filesystem
+      name: "@deepseek-ai/dsh-skill-filesystem"
+      config:
+        includeDefaultRoots: true
+        customSkillDirs:
+          # Adjust this path to your coding-harness checkout
+          - !!js "require('path').resolve(process.env.AMBER_REPO || process.cwd(), 'skills')"

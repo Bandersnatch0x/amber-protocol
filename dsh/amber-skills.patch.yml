@@ -1,0 +1,21 @@
+# Amber Protocol × dsh — Path B: Journey Skills
+#
+# Exposes Amber's 4 deep journey skills to the dsh agent by adding the
+# coding-harness skills directory as a custom skill root.
+#
+# Install: merge into $DSH_HOME/profiles/<name>/cordis.patch.yml
+# Docs:    dsh/README.md
+#
+# The skill-filesystem plugin is already mounted by dsh-base; this patch
+# updates its config to include Amber's skills directory alongside the
+# default roots.
+
+- update:
+    - id: skill-filesystem
+      name: "@deepseek-ai/dsh-skill-filesystem"
+      config:
+        # includeDefaultRoots stays true so dsh's own skills remain available
+        includeDefaultRoots: true
+        customSkillDirs:
+          # Adjust this path to your coding-harness checkout
+          - !!js "require('path').resolve(process.env.AMBER_REPO || process.cwd(), 'skills')"
