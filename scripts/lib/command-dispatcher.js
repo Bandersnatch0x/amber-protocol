@@ -73,7 +73,7 @@ const {
 	writeAdoptionSelectedFiles,
 } = require("./core/adoption-proposals");
 const sessionCommands = require("./session-commands");
-const { bindCommandHandlers } = require("./command-help");
+const { bindCommandHandlers } = require("./command-registry");
 const { inferNext } = require("./next-command");
 const { backfillVersioning, migrateManifests } = require("./migrate-command");
 const { migrateState, migrateWiki } = require("./state-migration");

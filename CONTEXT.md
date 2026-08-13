@@ -44,6 +44,18 @@ _Avoid_: ALLOWED_TRANSITIONS (web-local copy), dual state machines, resume-from-
 A declarative delivery template that defines the stages and approval gates for a class of work goals. Selected when a session starts; describes structure, does not execute stage content.
 _Avoid_: workflow, pipeline, playbook, path
 
+**Journey affinity**:
+An optional preference or constraint connecting a Route to a Journey. When absent, the Route does not constrain Journey selection.
+_Avoid_: route family, route category
+
+**Route/Journey Decision**:
+A deterministic selection record that explains the Route and Journey chosen for an objective, including explicit overrides, defaults, mismatches, and tie-breaking.
+_Avoid_: routing result, matcher output
+
+**Decision Evidence**:
+The compact facts supporting a Route/Journey Decision, such as matched terms, scores, tie-breaking, fallback reason, or explicit-route mismatch. It explains a deterministic decision without becoming a separate artifact by default.
+_Avoid_: scoring details, diagnostic dump
+
 **Stage Reference**:
 The identifier naming which skill, pack, or command a route stage invokes.
 _Avoid_: stage target, step target

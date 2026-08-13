@@ -19,7 +19,8 @@ const {
 	COMMAND_DEFINITIONS,
 	COMMAND_TIERS,
 	bindCommandHandlers,
-} = require("../../scripts/lib/command-help.js");
+	validateCommandRegistry,
+} = require("../../scripts/lib/command-registry.js");
 
 const PUBLIC_COMMAND_ORDER = [
 	"init",
@@ -73,6 +74,7 @@ test("one Command registry drives help, policy, dispatch, and the public command
 		assert.ok(["core", "journey", "deprecated", "expert"].includes(definition.tier));
 		assert.ok(definition.help, `${name} must own its help knowledge`);
 		assert.ok(definition.output, `${name} must own its output policy`);
+		assert.equal(typeof definition.typed, "boolean");
 		assert.equal(registration.definition, definition);
 		assert.equal(typeof registration.handler, "function");
 	}
@@ -97,6 +99,44 @@ test("Command handler binding fails fast on missing or orphaned handlers", () =>
 	);
 	handlers.orphaned = () => ({ result: {} });
 	assert.throws(() => bindCommandHandlers(handlers), /orphaned handlers/i);
+});
+
+test("Command registry rejects capabilities without a Command Definition", () => {
+	assert.throws(
+		() =>
+			validateCommandRegistry({
+				definitions: { session: { name: "session" } },
+				capabilities: {
+					"session/status": {},
+					"unknown/read": {},
+				},
+			}),
+		/undefined commands \[unknown\]/i,
+	);
+	assert.equal(validateCommandRegistry(), true);
+});
+
+test("Command Definitions own typed coverage and must stay capability-parity aligned", () => {
+	const definitions = {
+		session: { name: "session", typed: true },
+		context: { name: "context", typed: false },
+	};
+	assert.throws(
+		() =>
+			validateCommandRegistry({
+				definitions,
+				capabilities: { "session/status": {}, "context/preview": {} },
+			}),
+		/typed parity mismatch.*untyped capabilities \[context\]/i,
+	);
+	assert.throws(
+		() =>
+			validateCommandRegistry({
+				definitions: { session: { name: "session", typed: true } },
+				capabilities: {},
+			}),
+		/typed parity mismatch.*missing capabilities \[session\]/i,
+	);
 });
 
 test("deprecated warnings are added after asynchronous handlers resolve", async () => {

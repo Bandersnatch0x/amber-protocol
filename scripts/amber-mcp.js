@@ -32,13 +32,11 @@
 
 const path = require("node:path");
 const readline = require("node:readline");
-const Ajv = require("ajv");
-
-const { buildConfiguredTargets, resolveTargetOverride } = require("./lib/mcp-targets");
+const { buildConfiguredTargets } = require("./lib/mcp-targets");
 const { validateWhitelist } = require("./lib/mcp-action-contracts");
 const { loadActionTypes, loadFunctions } = require("./lib/mcp-registry-loader");
 const { createFunctionRuntime } = require("./lib/mcp-functions");
-const actionRuntime = require("./lib/mcp-action-runtime");
+const { createInvocationCoordinator } = require("./lib/mcp-invocation-coordinator");
 
 const ROOT = path.resolve(__dirname, "..");
 const AMBER_JS = path.join(ROOT, "scripts", "amber.js");
@@ -244,27 +242,19 @@ const actionMap = new Map(actions.map((a) => [a.actionTypeId, a]));
 const functionMap = new Map(functions.map((f) => [f.name, f]));
 const functionRuntime = createFunctionRuntime({ configured, definitions: functions });
 const allTools = [...actions.map(toTool), ...functions.map(toFunctionTool)];
-
-// In-process result cache for read-only Functions (TTL-bounded; see
-// --cache-ttl-ms / --no-cache). Keyed by function, canonical repository set,
-// and input so per-repo results never cross-contaminate.
-const functionCache = new Map();
+const invocationCoordinator = createInvocationCoordinator({
+	configured,
+	flags,
+	actionMap,
+	functionMap,
+	functionRuntime,
+	actionSchema: toInputSchema,
+	functionSchema: toFunctionInputSchema,
+	root: ROOT,
+	amberJs: AMBER_JS,
+});
 
 const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-
-// Resolve a per-call _target override against the configured set for either an
-// action or a function. Returns the canonical target, or null when no override
-// was supplied. Throws (-> JSON-RPC -32602) on escape / unknown repo.
-function resolveCallTarget(input) {
-	if (input._target === undefined || input._target === null || input._target === "") return null;
-	try {
-		return resolveTargetOverride({ override: input._target, configured, cwd: process.cwd() });
-	} catch (err) {
-		const e = new Error(err.message);
-		e.rpcCode = -32602;
-		throw e;
-	}
-}
 
 function handleRequest(message) {
 	const { id, method, params } = message;
@@ -290,121 +280,19 @@ function handleRequest(message) {
 	if (method === "tools/call") {
 		const toolName = params && params.name;
 		const input = (params && params.arguments) || {};
-		const action = actionMap.get(toolName);
-
-		// Function tools (amber.fn.*) run in-process against configured repos.
-		if (!action) {
-			const fn = functionMap.get(toolName);
-			if (fn) {
-				const ajv = new Ajv({ allErrors: true });
-				const validate = ajv.compile(toFunctionInputSchema(fn));
-				if (!validate(input)) {
-					const details = validate.errors
-						.map((e) => `${e.instancePath || "/"} ${e.message}`)
-						.join("; ");
-					return jsonError(id, -32602, `invalid arguments for ${toolName}: ${details}`);
-				}
-
-				let targetOverride;
-				try {
-					targetOverride = resolveCallTarget(input);
-				} catch (err) {
-					return jsonError(id, err.rpcCode || -32602, err.message);
-				}
-
-				let data;
-				let error;
-				let cached = false;
-				const cacheKey =
-					`${fn.name}|${targetOverride || configured.primary}|${configured.targets.join(",")}|` +
-					JSON.stringify({ ...input, _target: undefined, _agent: undefined });
-				const hit = flags.cacheTtlMs > 0 && functionCache.get(cacheKey);
-				if (hit && Date.now() - hit.at < flags.cacheTtlMs) {
-					data = hit.data;
-					cached = true;
-				} else {
-					try {
-						data = functionRuntime.invoke(
-							fn.name,
-							{ ...input, _target: undefined, _agent: undefined },
-							targetOverride,
-						);
-					} catch (err) {
-						error = err.message;
-					}
-					if (!error && flags.cacheTtlMs > 0) {
-						functionCache.set(cacheKey, { data, at: Date.now() });
-					}
-				}
-				const outcome = {
-					executed: !error,
-					function: fn.name,
-					target: targetOverride || configured.primary,
-					cached,
-					error,
-					data: error ? undefined : data,
-				};
-				const result = {
-					content: [{ type: "text", text: JSON.stringify(outcome, null, 2) }],
-					isError: Boolean(error),
-				};
-				if (!error && data && typeof data === "object") {
-					result.structuredContent = data;
-				}
-				return jsonResult(id, result);
-			}
-			// Unknown tool — MCP-native JSON-RPC error shape (canonical).
-			return jsonError(id, -32602, `unknown tool: ${toolName}`);
+		const invocation = invocationCoordinator.invoke(toolName, input);
+		if (invocation.kind === "unknown" || invocation.kind === "invalid") {
+			return jsonError(id, -32602, invocation.error);
 		}
-
-		const ajv = new Ajv({ allErrors: true });
-		const validate = ajv.compile(toInputSchema(action));
-		if (!validate(input)) {
-			const details = validate.errors
-				.map((e) => `${e.instancePath || "/"} ${e.message}`)
-				.join("; ");
-			return jsonError(id, -32602, `invalid arguments for ${toolName}: ${details}`);
-		}
-
-		let targetOverride;
-		try {
-			targetOverride = resolveCallTarget(input);
-		} catch (err) {
-			return jsonError(id, err.rpcCode || -32602, err.message);
-		}
-
-		let outcome;
-		try {
-			outcome = actionRuntime.runAction(
-				action,
-				input,
-				flags,
-				configured,
-				targetOverride,
-				ROOT,
-				AMBER_JS,
-			);
-		} catch (err) {
-			// Fail-closed: contract failure, corrupt governance state, or a
-			// command-rendering failure is an MCP error, never a silent success.
-			outcome = {
-				executed: false,
-				dryRun: false,
-				approvalRequired: false,
-				error: err.message,
-				...(err.conflict ? { conflict: err.conflict } : {}),
-			};
-		}
-
-		// Structured return (OAG): when the executed command emitted JSON, ship
-		// it as MCP structuredContent so agents consume typed data, not text.
-		const structured = outcome.executed ? actionRuntime.extractJson(outcome.stdout) : undefined;
-		const result = {
-			content: [{ type: "text", text: JSON.stringify(outcome, null, 2) }],
-			isError: actionRuntime.isErrorOutcome(outcome),
+		const coordinatedOutcome = invocation.outcome;
+		const coordinatedResult = {
+			content: [{ type: "text", text: JSON.stringify(coordinatedOutcome, null, 2) }],
+			isError: invocation.isError,
 		};
-		if (structured !== null && structured !== undefined) result.structuredContent = structured;
-		return jsonResult(id, result);
+		if (invocation.structuredContent !== null && invocation.structuredContent !== undefined) {
+			coordinatedResult.structuredContent = invocation.structuredContent;
+		}
+		return jsonResult(id, coordinatedResult);
 	}
 
 	return jsonError(id, -32601, `method not found: ${method}`);

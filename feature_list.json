@@ -375,7 +375,7 @@
 			"area": "governance",
 			"title": "修复 Amber MCP 治理与仓库隔离不变量",
 			"user_visible_behavior": "MCP Action 和 Function 只能通过受治理且仓库本地的 seam 执行或读取，并以准确错误语义失败关闭",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/integration/action-type-schema.test.js tests/integration/amber-mcp.test.js",
 				"npm test",
@@ -414,7 +414,7 @@
 			"area": "governance",
 			"title": "Intent router + deep journey skills + default-help projection",
 			"user_visible_behavior": "Converge the ~35-command surface behind an intent router with deep journey skills and a default-help projection, as a follow-up to the F018 typed governance seam.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/cli-typed-seam.test.js tests/unit/journey-router.test.js tests/unit/agent-commands.test.js tests/unit/command-registry-parity.test.js tests/amber-cli.test.js tests/integration/session-commands.test.js tests/integration/amber-mcp.test.js tests/integration/amber-next.test.js tests/integration/action-type-schema.test.js tests/integration/interactive-session.test.js tests/load/sequential-sessions.test.js tests/phase-v4.test.js tests/phase-v4-5.test.js tests/e2e/autonomous-session.test.js tests/e2e/concurrent-sessions.test.js tests/e2e/product-service-packages.test.js",
 				"npm test",

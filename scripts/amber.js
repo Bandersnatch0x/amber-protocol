@@ -7,7 +7,7 @@ const {
 	DEFAULT_COMMANDS,
 	commandSummary,
 	commandUsageLine,
-} = require("./lib/command-help");
+} = require("./lib/command-registry");
 const { dispatch } = require("./lib/command-dispatcher");
 
 function usage(command, options = {}) {

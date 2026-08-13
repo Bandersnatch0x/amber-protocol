@@ -7,9 +7,14 @@ const {
 	capabilityKey,
 	validateWhitelist,
 } = require("./mcp-action-contracts");
+const {
+	TYPED_COMMANDS,
+	KNOWN_UNTYPED_SUBCOMMANDS,
+	knownSubcommands,
+} = require("./command-registry");
+const { resolveContextAction } = require("./context/action-registry");
 
 const ACTION_TYPES_DIR = path.resolve(__dirname, "../../action-types");
-const TYPED_COMMANDS = new Set(["session", "route", "context", "governance", "ledger", "loop"]);
 
 function validateTypedSeam(actionTypesDir = ACTION_TYPES_DIR) {
 	const actions = fs
@@ -36,6 +41,16 @@ function classifyCliInvocation(command, args = {}) {
 	if (!TYPED_COMMANDS.has(command)) return null;
 	const subcommand = args._?.[0];
 	if (!subcommand) return null;
+	if (command === "context") {
+		const contextAction = resolveContextAction(subcommand, args);
+		if (!contextAction) return null;
+		return Object.freeze({
+			key: `context/${contextAction.name}`,
+			effect: contextAction.effect,
+			approver: contextAction.approvalRequired ? "human" : "system",
+			directReadOnlyExec: !contextAction.approvalRequired && contextAction.effect === "read",
+		});
+	}
 	const capability = COMMAND_CAPABILITIES[capabilityKey(command, subcommand)];
 	if (!capability) return null;
 	const writeFlags = new Set(capability.writeFlags || []);
@@ -62,8 +77,45 @@ function validateCliInvocation(command, args = {}) {
 	const key = capabilityKey(command, subcommand);
 	const capability = classifyCliInvocation(command, args);
 	const action = ACTIONS_BY_CAPABILITY.get(key) || null;
-	if (!capability || !action) {
-		return { valid: true, disposition: "unmapped", capability: null, action: null };
+	if (!capability && KNOWN_UNTYPED_SUBCOMMANDS.has(key)) {
+		return { valid: true, disposition: "untyped", capability: null, action: null };
+	}
+	if (!capability) {
+		const expected = knownSubcommands(command);
+		return {
+			valid: false,
+			disposition: "unmapped",
+			capability: null,
+			action: null,
+			error: `Governed command has no Action Type mapping: ${key}. Expected one of: ${expected.join(", ")}`,
+		};
+	}
+	if (!action && command === "context") {
+		const contextAction = resolveContextAction(subcommand, args);
+		if (!contextAction) {
+			return {
+				valid: false,
+				disposition: "unmapped",
+				capability: null,
+				action: null,
+				error: `Governed command has no Context Action contract: ${key}`,
+			};
+		}
+		return {
+			valid: true,
+			disposition: "typed",
+			capability,
+			action: { actionTypeId: `amber.context.${contextAction.name}` },
+		};
+	}
+	if (!action) {
+		return {
+			valid: false,
+			disposition: "unmapped",
+			capability: null,
+			action: null,
+			error: `Governed command has no Action Type mapping: ${key}`,
+		};
 	}
 	return { valid: true, disposition: "typed", capability, action };
 }

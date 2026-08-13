@@ -43,6 +43,10 @@
 			"format": "date-time",
 			"description": "When the owning agent claimed the session."
 		},
+		"journeyId": {
+			"type": "string",
+			"description": "The deep-journey id selected by decideRouteJourney for this session's goal (e.g. amber-delivery). Persisted so the journey half of the routing decision is not lost."
+		},
 		"execution_context": {
 			"type": "object",
 			"properties": {

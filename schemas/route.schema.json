@@ -8,6 +8,17 @@
 		"version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
 		"displayName": { "type": "string" },
 		"description": { "type": "string" },
+		"journeyAffinity": {
+			"oneOf": [
+				{ "type": "string", "pattern": "^[a-z0-9-]+$" },
+				{
+					"type": "array",
+					"minItems": 1,
+					"uniqueItems": true,
+					"items": { "type": "string", "pattern": "^[a-z0-9-]+$" }
+				}
+			]
+		},
 		"trigger": {
 			"type": "object",
 			"properties": {

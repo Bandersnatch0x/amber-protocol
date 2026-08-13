@@ -16,6 +16,7 @@ const {
 	readPage,
 	deletePage,
 	describeKnowledge,
+	previewLoadout,
 	buildLoadout,
 	verifyLoadoutFile,
 	projectionStatus,
@@ -24,22 +25,7 @@ const {
 	importSourceBundle,
 	retentionReport,
 } = require("../index");
-
-const ACTIONS = [
-	"request",
-	"ingest",
-	"verify",
-	"list",
-	"show",
-	"refresh",
-	"stats",
-	"delete",
-	"load",
-	"projection",
-	"benchmark",
-	"source-adapter",
-	"retention",
-];
+const { ACTIONS, resolveContextAction } = require("../action-registry");
 
 function errResult(action, message) {
 	return {
@@ -359,6 +345,40 @@ function handleLoad(args, targetRoot) {
 	};
 }
 
+function handlePreview(args, targetRoot) {
+	const result = previewLoadout(targetRoot, {
+		route: args.route,
+		feature: args.feature,
+		budget: args.budget ? Number(args.budget) : undefined,
+		since: args.since,
+		required: args.page ? (Array.isArray(args.page) ? args.page : [args.page]) : undefined,
+		knowledgeKinds: args.knowledgeKind,
+	});
+	if (result.errors.length > 0) {
+		return {
+			result: {
+				target: args.target,
+				errors: result.errors.map((error) => `${error.code}: ${error.detail}`),
+				warnings: result.warnings,
+				code: result.errors[0].code,
+			},
+			exitCode: 1,
+			bypassPrint: false,
+		};
+	}
+	return {
+		result: {
+			target: args.target,
+			loadout: result.loadout,
+			text: JSON.stringify(result.loadout, null, 2),
+			errors: [],
+			warnings: result.warnings,
+		},
+		exitCode: 0,
+		bypassPrint: !args.json,
+	};
+}
+
 function handleList(args, targetRoot) {
 	const verify = verifyPages(targetRoot);
 	if (!verify.ok) {
@@ -494,9 +514,8 @@ function handleDelete(args, targetRoot) {
 	};
 }
 
-function handleProjection(args, targetRoot) {
-	const subaction = Array.isArray(args._) ? args._[args._.length - 1] : null;
-	if (subaction === "rebuild") {
+function handleProjection(args, targetRoot, variant) {
+	if (variant === "rebuild") {
 		const rebuilt = rebuildProjection(targetRoot);
 		return {
 			result: {
@@ -510,7 +529,7 @@ function handleProjection(args, targetRoot) {
 			bypassPrint: !args.json,
 		};
 	}
-	if (subaction !== "status") {
+	if (variant !== "status") {
 		return errResult("projection", "context projection requires status or rebuild");
 	}
 	const status = projectionStatus(targetRoot);
@@ -614,20 +633,24 @@ function handleRetention(args, targetRoot) {
 }
 
 function contextDispatch(action, args) {
+	const definition = resolveContextAction(action, args);
+	if (!definition) return unknownAction(action);
 	const targetRoot = resolveTarget(args.target || ".");
-	if (action === "request") return handleRequest(args, targetRoot);
-	if (action === "ingest") return handleIngest(args, targetRoot);
-	if (action === "verify") return handleVerify(args, targetRoot);
-	if (action === "list") return handleList(args, targetRoot);
-	if (action === "show") return handleShow(args, targetRoot);
-	if (action === "refresh") return handleRefresh(args, targetRoot);
-	if (action === "stats") return handleStats(args, targetRoot);
-	if (action === "delete") return handleDelete(args, targetRoot);
-	if (action === "load") return handleLoad(args, targetRoot);
-	if (action === "projection") return handleProjection(args, targetRoot);
-	if (action === "benchmark") return handleBenchmark(args, targetRoot);
-	if (action === "source-adapter") return handleSourceAdapter(args, targetRoot);
-	if (action === "retention") return handleRetention(args, targetRoot);
+	const canonical = definition.name;
+	if (canonical === "request") return handleRequest(args, targetRoot);
+	if (canonical === "ingest") return handleIngest(args, targetRoot);
+	if (canonical === "verify") return handleVerify(args, targetRoot);
+	if (canonical === "list") return handleList(args, targetRoot);
+	if (canonical === "show") return handleShow(args, targetRoot);
+	if (canonical === "refresh") return handleRefresh(args, targetRoot);
+	if (canonical === "stats") return handleStats(args, targetRoot);
+	if (canonical === "delete") return handleDelete(args, targetRoot);
+	if (canonical === "preview") return handlePreview(args, targetRoot);
+	if (canonical === "load") return handleLoad(args, targetRoot);
+	if (canonical === "projection") return handleProjection(args, targetRoot, definition.variant);
+	if (canonical === "benchmark") return handleBenchmark(args, targetRoot);
+	if (canonical === "source-adapter") return handleSourceAdapter(args, targetRoot);
+	if (canonical === "retention") return handleRetention(args, targetRoot);
 	return unknownAction(action);
 }
 

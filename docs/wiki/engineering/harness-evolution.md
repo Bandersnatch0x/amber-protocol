@@ -1,6 +1,6 @@
 # Amber Evolution Log
 
-Last Reviewed: 2026-08-04
+Last Reviewed: 2026-08-13
 
 ## 2026-07-14 docs/plans/F009-Governance-evidence-reads-resolve-state-dir-legacy-harness-support.md
 
@@ -51,3 +51,15 @@ Last Reviewed: 2026-08-04
 - Plan: `docs/plans/F016-Review-blocker-remediation.md`
 - Review status: ready
 - Feature: F016 status → accepted in feature_list.json
+
+## 2026-08-12 docs/plans/F018-Amber-MCP.md
+
+- Plan: `docs/plans/F018-Amber-MCP.md`
+- Review status: ready
+- Feature: F018 status → accepted in feature_list.json
+
+## 2026-08-13 docs/plans/F019-Intent-router-deep-journey-skills-default-help-projection.md
+
+- Plan: `docs/plans/F019-Intent-router-deep-journey-skills-default-help-projection.md`
+- Review status: ready
+- Feature: F019 status → accepted in feature_list.json

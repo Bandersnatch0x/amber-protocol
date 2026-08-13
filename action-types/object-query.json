@@ -61,7 +61,7 @@
 			},
 			"context": {
 				"command": "context",
-				"subcommand": "load",
+				"subcommand": "preview",
 				"args": [
 					{ "flag": "--route", "source": "parameters.route" },
 					{ "flag": "--feature", "source": "parameters.feature", "optional": true },

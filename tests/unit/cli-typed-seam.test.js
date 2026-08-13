@@ -37,6 +37,36 @@ test("CLI typed seam classifies read, write, and write-flag variants", () => {
 	assert.equal(classifyCliInvocation("doctor", {}), null);
 });
 
+test("CLI typed seam classifies Context Actions from their actual side effects", () => {
+	assert.equal(classifyCliInvocation("context", { _: ["load"] }).effect, "write");
+	assert.equal(classifyCliInvocation("context", { _: ["benchmark"] }).effect, "write");
+	assert.equal(classifyCliInvocation("context", { _: ["source-adapter"] }).effect, "read");
+	assert.equal(classifyCliInvocation("context", { _: ["projection", "status"] }).effect, "read");
+	assert.equal(classifyCliInvocation("context", { _: ["projection", "rebuild"] }).effect, "write");
+});
+
+test("CLI typed seam gates only mutating Context Action variants", () => {
+	let invocations = 0;
+	const invoke = () => {
+		invocations += 1;
+		return { result: { errors: [], warnings: [] } };
+	};
+
+	const status = dispatchTypedInvocation("context", { _: ["projection", "status"] }, invoke);
+	assert.equal(status.exitCode, undefined);
+	assert.equal(invocations, 1);
+
+	const rebuild = dispatchTypedInvocation("context", { _: ["projection", "rebuild"] }, invoke);
+	assert.equal(rebuild.exitCode, 1);
+	assert.equal(rebuild.result.approvalRequired, true);
+	assert.equal(invocations, 1);
+
+	const load = dispatchTypedInvocation("context", { _: ["load"] }, invoke);
+	assert.equal(load.exitCode, 1);
+	assert.equal(load.result.approvalRequired, true);
+	assert.equal(invocations, 1);
+});
+
 test("CLI typed seam fails closed when an Action contract is corrupt", () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-seam-"));
 	fs.writeFileSync(path.join(dir, "bad.json"), JSON.stringify({ actionTypeId: "amber.bad" }));
@@ -47,6 +77,31 @@ test("CLI typed seam validates typed capability keys before dispatch", () => {
 	assert.equal(validateCliInvocation("session", { _: ["status"] }).disposition, "typed");
 	assert.equal(validateCliInvocation("session", { _: ["unknown"] }).disposition, "unmapped");
 	assert.equal(validateCliInvocation("doctor", {}).disposition, "untyped");
+});
+
+test("CLI typed seam preserves registered compatibility commands and rejects unknown ones", () => {
+	const compatibilityCommands = [
+		["governance", "docs"],
+		["governance", "evidence"],
+		["governance", "policy"],
+		["loop", "inspect"],
+		["loop", "run"],
+		["loop", "approve"],
+		["loop", "verify-ledger"],
+		["loop", "record"],
+		["loop", "status"],
+	];
+	for (const [command, subcommand] of compatibilityCommands) {
+		assert.equal(
+			validateCliInvocation(command, { _: [subcommand] }).disposition,
+			"untyped",
+			`${command}/${subcommand}`,
+		);
+	}
+
+	const unknown = validateCliInvocation("loop", { _: ["unknown"] });
+	assert.equal(unknown.valid, false);
+	assert.match(unknown.error, /Expected one of:.*approve.*verify-ledger/);
 });
 
 test("CLI typed seam gates human mutations before invoking the handler", () => {

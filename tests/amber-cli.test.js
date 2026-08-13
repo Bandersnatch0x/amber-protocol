@@ -22,6 +22,49 @@ function runHarness(args, options = {}) {
 	});
 }
 
+test("Context CLI approval follows the selected Action variant", () => {
+	const target = tempDir("context-approval");
+
+	const rebuildBlocked = runHarness([
+		"context",
+		"projection",
+		"rebuild",
+		"--target",
+		target,
+		"--json",
+	]);
+	assert.equal(rebuildBlocked.status, 1);
+	assert.equal(JSON.parse(rebuildBlocked.stdout).approvalRequired, true);
+
+	const loadBlocked = runHarness([
+		"context",
+		"load",
+		"--route",
+		"feature-standard",
+		"--target",
+		target,
+		"--json",
+	]);
+	assert.equal(loadBlocked.status, 1);
+	assert.equal(JSON.parse(loadBlocked.stdout).approvalRequired, true);
+	assert.equal(fs.existsSync(path.join(target, ".amber")), false);
+
+	const rebuild = runHarness([
+		"context",
+		"projection",
+		"rebuild",
+		"--confirm",
+		"--target",
+		target,
+		"--json",
+	]);
+	assert.equal(rebuild.status, 0, rebuild.stderr || rebuild.stdout);
+
+	const status = runHarness(["context", "projection", "status", "--target", target, "--json"]);
+	assert.equal(status.status, 0, status.stderr || status.stdout);
+	assert.equal(JSON.parse(status.stdout).approvalRequired, undefined);
+});
+
 test("default help projects journey and core commands", () => {
 	const result = runHarness([]);
 	assert.equal(result.status, 0, result.stderr);

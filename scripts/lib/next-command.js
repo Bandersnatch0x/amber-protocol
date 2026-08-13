@@ -8,7 +8,11 @@ const { REPO_ROOT } = require("./core/constants");
 const { buildContext, inferNextStep } = require("./core/lifecycle");
 const { buildGovernanceReport } = require("./core/governance-report");
 const { loadRoutes } = require("./route-loader");
-const { routeJourney } = require("./journey-router");
+const {
+	JOURNEYS,
+	decideAdvisoryRouteJourney,
+	tokenizeObjective,
+} = require("./route-journey-decision");
 
 // Route advisor (T5.8, ADR-0014): read-only keyword matching over route
 // manifest objective/description metadata. Amber never executes or creates
@@ -40,33 +44,6 @@ const SECURITY_KEYWORDS = [
 	"upload",
 	"download",
 ];
-
-function tokenize(text) {
-	if (typeof text !== "string") return [];
-	return (text.toLowerCase().match(/[a-z0-9]+/g) || []).filter((token) => token.length >= 3);
-}
-
-// Score one route against the objective's tokens. Route-id keywords (e.g.
-// "bugfix", "feature", "refactor") are prioritised with a bonus so explicit
-// intent maps to the route's id, not just its prose.
-function scoreRoute(route, tokens, objective) {
-	const meta = [route.objective, route.description, route.displayName, route.routeId]
-		.filter((value) => typeof value === "string")
-		.join(" ")
-		.toLowerCase();
-	const textScore = tokens.reduce((count, token) => count + (meta.includes(token) ? 1 : 0), 0);
-	const objectiveText = objective.toLowerCase();
-	const idBonus = (route.routeId.split("-") || []).some((keyword) => {
-		if (keyword.length < 3) return false;
-		return (
-			objectiveText.includes(keyword) ||
-			tokens.some((token) => token.includes(keyword) || keyword.includes(token))
-		);
-	})
-		? 2
-		: 0;
-	return textScore + idBonus;
-}
 
 function loadWorkflowPacks(packsDir) {
 	if (!fs.existsSync(packsDir)) {
@@ -124,41 +101,48 @@ function suggestWorkflowPack(tokens, objective, packsDir) {
 // Produce the read-only routing suggestion for a stated objective. When no
 // route matches, degrades to "run the plan gate first" advice instead of
 // guessing a route.
-function suggestRouting(objective, target = REPO_ROOT) {
+function decideRouting(objective, target = REPO_ROOT) {
 	const targetRoot = resolveTarget(target);
-	const tokens = tokenize(objective);
 	const { routes } = loadRoutes(path.join(targetRoot, "routes"));
-	const scored = routes
-		.map((route) => ({ route, score: scoreRoute(route, tokens, objective) }))
-		.filter((entry) => entry.score > 0)
-		.sort((a, b) => b.score - a.score || a.route.routeId.localeCompare(b.route.routeId));
-	const best = scored[0];
+	const decision = decideAdvisoryRouteJourney({ objective, routes, journeys: JOURNEYS });
 
-	if (!best) {
+	if (decision.route.status === "unmatched") {
 		return {
-			provided: true,
-			objective,
-			matched: false,
-			routeId: null,
-			confidence: 0,
-			workflowPackId: null,
-			suggestion: `No matching route for objective "${objective}". Suggest running the plan gate first: amber plan --feature <id> --title "<objective>", then amber session start --route <id> --confirm once a route fits.`,
+			decision,
+			suggestion: {
+				provided: true,
+				objective,
+				matched: false,
+				routeId: null,
+				confidence: 0,
+				workflowPackId: null,
+				suggestion: `No matching route for objective "${objective}". Suggest running the plan gate first: amber plan --feature <id> --title "<objective>", then amber session start --route <id> --confirm once a route fits.`,
+			},
 		};
 	}
 
+	const routeId = decision.route.routeId;
+	const confidence = decision.route.confidence;
+	// D/F: tokenize once and reuse for both routing and workflow-pack suggestion.
+	const tokens = tokenizeObjective(objective);
+	const workflowPackId =
+		suggestWorkflowPack(tokens, objective, path.join(targetRoot, "workflow-packs")) || null;
 	return {
-		provided: true,
-		objective,
-		matched: true,
-		routeId: best.route.routeId,
-		confidence: Math.min(1, Math.round((best.score / 4) * 100) / 100),
-		workflowPackId:
-			suggestWorkflowPack(tokens, objective, path.join(targetRoot, "workflow-packs")) || null,
-		matches: scored.map((entry) => ({
-			routeId: entry.route.routeId,
-			score: entry.score,
-		})),
+		decision,
+		suggestion: {
+			provided: true,
+			objective,
+			matched: true,
+			routeId,
+			confidence,
+			workflowPackId,
+			matches: decision.route.candidates,
+		},
 	};
+}
+
+function suggestRouting(objective, target = REPO_ROOT) {
+	return decideRouting(objective, target).suggestion;
 }
 
 function focusLabel(focus) {
@@ -239,8 +223,9 @@ function inferNext(target, options = {}) {
 	// T5.8 / ADR-0014: routing advisor. Only present when --objective is given;
 	// absent (not null) so the no-flag envelope is byte-identical to before.
 	if (typeof options.objective === "string" && options.objective.trim() !== "") {
-		envelope.routingSuggestion = suggestRouting(options.objective.trim(), targetRoot);
-		envelope.journeyId = routeJourney(options.objective.trim());
+		const routing = decideRouting(options.objective.trim(), targetRoot);
+		envelope.routingSuggestion = routing.suggestion;
+		envelope.journeyId = routing.decision.journey.journeyId;
 	}
 	envelope.text = renderText(envelope);
 	return envelope;

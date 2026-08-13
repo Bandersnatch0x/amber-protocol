@@ -105,6 +105,14 @@ const COMMAND_CAPABILITIES = {
 		sideEffects: ["ingest-record"],
 	},
 	"context/load": {
+		effect: "write",
+		approver: "human",
+		evidence: "loadout",
+		directReadOnlyExec: false,
+		edits: [".amber/context/loadouts/", ".amber/context/events.jsonl"],
+		sideEffects: ["loadout-written"],
+	},
+	"context/preview": {
 		effect: "read",
 		approver: "system",
 		evidence: null,

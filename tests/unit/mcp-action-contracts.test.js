@@ -39,7 +39,7 @@ test("COMMAND_CAPABILITIES covers every command the eight Action Types map to", 
 		"route/list",
 		"route/test",
 		"context/ingest",
-		"context/load",
+		"context/preview",
 		"governance/report",
 		"ledger/export",
 		"loop/recommend",
@@ -47,6 +47,8 @@ test("COMMAND_CAPABILITIES covers every command the eight Action Types map to", 
 	for (const key of required) {
 		assert.ok(COMMAND_CAPABILITIES[key], `registry missing ${key}`);
 	}
+	assert.equal(COMMAND_CAPABILITIES["context/load"].effect, "write");
+	assert.equal(COMMAND_CAPABILITIES["context/load"].directReadOnlyExec, false);
 });
 
 test("every real action type passes semantic parity validation", () => {

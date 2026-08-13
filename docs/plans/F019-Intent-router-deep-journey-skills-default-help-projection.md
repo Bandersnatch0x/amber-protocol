@@ -1,7 +1,7 @@
 # Plan: Intent router + deep journey skills + default-help projection
 
 Feature: F019
-Status: passing
+Status: accepted
 User Confirmation: confirmed
 
 > 本文件既是 F019 实施计划,也是给接手 agent 的**交接文档**(self-contained)。
@@ -15,7 +15,7 @@ User Confirmation: confirmed
 
 - 分支:`feature/f018-mcp-governance-seam`(从 `master` 切出)。工作树干净。
 - 提交:`ec1f65d` feat(mcp): F018 governed typed seam;`2d01ed4` docs(f019): 本计划 scaffold。
-- F018 已 `passing`(两条 verify 证据已记入 `feature_list.json`)。
+- F018 已 `accepted`(验证证据已记入 `feature_list.json`)。
 - 基线快照评审:`architecture-review-final-20260812-005749.html`(`HEAD eeef260 · ontology v0.6`)。其「先修条件(红色阻塞区)」4 项已由 F018 全部解决;本特性对应其三条**后续建议**(评审自身用「待安全不变量修复后」排序)。
 
 ## F018 基础:F019 必须穿过、不得破坏的 typed seam
@@ -94,7 +94,7 @@ F018 把治理不变量沉到两个深度模块,`scripts/amber-mcp.js` 退化为
   - 更新 `docs/wiki/`、`AGENTS.md`/`CLAUDE.md`、`CLI_REFERENCE.md`(若存在)、ontology 文档的命令面章节;`npm run gen:agents`。
   - 复跑 `validate-wiki` 与 `gen:agents:check`。
 - [x] Slice 7: 评审收尾。
-  - 对最终补丁跑 `amber review`(两轴)与 `amber gate`,要求 0 findings;记录证据后将 F019 置 `passing`。
+  - 对最终补丁跑 `amber review`(两轴)与 `amber gate`,要求 0 findings;记录证据后将 F019 置 `accepted`。
 
 ## 待决设计问题(接手 agent 决策点)
 

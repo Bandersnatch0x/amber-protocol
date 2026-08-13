@@ -96,6 +96,22 @@ test("next --objective resolves routes from the Target Repository", () => {
 	assert.equal(suggestion.routeId, "lunar-calibration");
 });
 
+test("next keeps its Journey coherent with the selected Route affinity", () => {
+	const target = tempDir("route-affinity");
+	const route = JSON.parse(
+		fs.readFileSync(path.join(ROOT, "routes", "feature-standard.route.json"), "utf8"),
+	);
+	route.routeId = "context-delivery";
+	route.objective = "refresh context loadout";
+	route.description = "Deliver a context refresh through the delivery journey.";
+	route.journeyAffinity = ["amber-delivery"];
+	writeTargetJson(target, "routes/context-delivery.route.json", route);
+
+	const envelope = inferNext(target, { objective: "refresh context loadout" });
+	assert.equal(envelope.routingSuggestion.routeId, "context-delivery");
+	assert.equal(envelope.journeyId, "amber-delivery");
+});
+
 test("next --objective matches feature-standard plus secure-code-review pack", () => {
 	const target = tempDir("match-feature");
 	copyProductAsset(target, "routes/feature-standard.route.json");

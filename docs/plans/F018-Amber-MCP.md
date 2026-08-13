@@ -1,7 +1,7 @@
 # Plan: 修复 Amber MCP 治理与仓库隔离不变量
 
 Feature: F018
-Status: passing
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
@@ -86,12 +86,12 @@ MCP Action 和 Function 只能通过受治理且仓库本地的 seam 执行或�
 
 - [x] Slice 7: Close the review and prepare command-surface convergence separately.
   - Re-run both Standards and Spec review axes against the final patch; require zero high/medium findings for the covered invariants.
-  - Record executed verification evidence on F018 before changing status to passing.
+  - Record executed verification evidence on F018 before changing status to accepted.
   - After the typed seam is safe, open a separate approved feature for “intent router + deep journey skills + default-help projection.” Do not mix the 35-command user-interface redesign into this security repair or remove deterministic governance primitives here.
 
 ## Resume Checkpoint
 
-- Resume Point: all seven slices implemented; status `passing`. All automated verification gates green (1711 tests, manifests/doctor/wiki/gate 0 errors).
+- Resume Point: all seven slices implemented; status `accepted`. All automated verification gates green (1711 tests, manifests/doctor/wiki/gate 0 errors).
 - Blockers: none.
 - Next Action: optional follow-up — open the separate approved feature for "intent router + deep journey skills + default-help projection" (command-surface convergence), keeping it isolated from this security repair. Do not add a mutation-executing governed runner adapter inside F018.
 - Recovery Instructions: the typed seam lives in `scripts/lib/mcp-targets.js`, `scripts/lib/mcp-action-contracts.js`, and `scripts/lib/mcp-registry-loader.js`; `scripts/amber-mcp.js` consumes them. Never regenerate or overwrite this plan.

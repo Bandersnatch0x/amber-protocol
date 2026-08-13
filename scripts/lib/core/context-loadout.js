@@ -562,7 +562,7 @@ function persistLoadout(targetRoot, loadout, route, feature) {
 }
 
 /**
- * Build a deterministic, freshness-gated, budgeted context loadout file.
+ * Assemble a deterministic, freshness-gated, budgeted Context Loadout.
  *
  * @param {string} targetRoot
  * @param {object} opts
@@ -573,7 +573,7 @@ function persistLoadout(targetRoot, loadout, route, feature) {
  * @param {string[]} [opts.required] Pinned pageIds for the required tier.
  * @returns {{loadout, loadoutPath, errors, warnings}}
  */
-function buildLoadout(targetRoot, opts = {}) {
+function previewLoadout(targetRoot, opts = {}) {
 	const warnings = [];
 	const config = loadBuildConfig(targetRoot, opts);
 	if (config.errors.length > 0) {
@@ -607,7 +607,17 @@ function buildLoadout(targetRoot, opts = {}) {
 		return { loadout: null, loadoutPath: null, errors, warnings };
 	}
 
-	const persisted = persistLoadout(targetRoot, loadout, config.route, config.feature);
+	return { loadout, errors, warnings };
+}
+
+/** Build and persist a deterministic Context Loadout file. */
+function buildLoadout(targetRoot, opts = {}) {
+	const preview = previewLoadout(targetRoot, opts);
+	if (preview.errors.length > 0) {
+		return { ...preview, loadoutPath: null };
+	}
+	const { loadout, errors, warnings } = preview;
+	const persisted = persistLoadout(targetRoot, loadout, loadout.route, loadout.feature);
 	if (persisted.error) {
 		errors.push(persisted.error);
 		return { loadout: null, loadoutPath: null, errors, warnings };
@@ -773,4 +783,4 @@ function verifyLoadoutFile(targetRoot, loadoutPath) {
 	return { ok: findings.length === 0, findings };
 }
 
-module.exports = { loadoutsDir, buildLoadout, verifyLoadoutFile };
+module.exports = { loadoutsDir, previewLoadout, buildLoadout, verifyLoadoutFile };

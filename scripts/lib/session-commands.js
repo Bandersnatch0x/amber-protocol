@@ -13,8 +13,8 @@ const { SessionStateMachine, STATES } = require("./session-state-machine");
 const { loadLatestCheckpoint, loadCheckpointByStage } = require("./checkpoint-manager");
 const { checkSchemaVersion, SCHEMA_VERSION } = require("./schema-version-checker");
 const { createWorktree, removeWorktree } = require("./worktree-manager");
-const { selectRoute } = require("./route-selector");
 const { loadRoutes } = require("./route-loader");
+const { decideRouteJourney, JOURNEYS } = require("./route-journey-decision");
 const { result } = require("./result");
 const { promptYesNo } = require("./prompt");
 const { ensureContinuitySurfaces } = require("./continuity-surfaces");
@@ -138,61 +138,36 @@ async function startSession(projectRoot, options) {
 	const { routes } = loadRoutes(ROUTES_DIR);
 	let route;
 	let fallbackWarning = null;
-
-	if (!selectedRouteId) {
-		const match = selectRoute(goal, routes);
-
-		if (!match.matched) {
-			// No trigger matched. Rather than hard-error on a first-time user, default
-			// to feature-standard with a low-confidence warning. --route still overrides.
-			selectedRouteId = "feature-standard";
-			route = routes.find((r) => r.routeId === selectedRouteId);
-			if (!route) {
-				const availableRoutes = routes
-					.map((r) => `  ${r.routeId} — matches goals matching: ${r.trigger.goalPattern}`)
-					.join("\n");
-				return result(
-					`Error: No route matched goal "${goal}" and the default route "feature-standard" is missing.\n\nAvailable routes:\n${availableRoutes}\n\nTip: pass --route <id> to select a route explicitly.`,
-					1,
-				);
-			}
-			routeVersion = route.version || "1.0.0";
-			fallbackWarning =
-				`No route matched goal "${goal}"; defaulting to feature-standard (low confidence). ` +
-				"Pass --route to choose explicitly.";
-		} else {
-			selectedRouteId = match.routeId;
-			route = routes.find((r) => r.routeId === selectedRouteId);
-			routeVersion = (route && route.version) || "1.0.0";
-		}
-	} else {
-		route = routes.find((r) => r.routeId === selectedRouteId);
-		if (!route) {
-			const routeList = routes.map((r) => `  ${r.routeId}`).join("\n");
-			return result(
-				`Error: Route "${selectedRouteId}" not found.\n\nAvailable routes:\n${routeList}`,
-				1,
-			);
-		}
-		routeVersion = route.version || SCHEMA_VERSION;
-	}
-
-	// When the user explicitly passes --route, warn if the goal does not match
-	// the route's own goalPattern — the session will work, but the route may
-	// not fit the stated intent.
 	let goalMismatchWarning = null;
-	if (routeId && route.trigger && route.trigger.goalPattern) {
-		try {
-			const pattern = new RegExp(route.trigger.goalPattern, "i");
-			if (!pattern.test(goal)) {
-				goalMismatchWarning =
-					`Warning: goal "${goal}" does not match the route pattern ` +
-					`"${route.trigger.goalPattern}". The session will proceed ` +
-					`but the route may not fit the stated intent.`;
-			}
-		} catch (_) {
-			// Invalid goalPattern regex — skip the warning but don't crash.
+	const decision = decideRouteJourney({
+		objective: goal,
+		explicitRouteId: routeId,
+		routes,
+		journeys: JOURNEYS,
+	});
+	if (decision.status === "invalid") {
+		if (routeId) {
+			const routeList = routes.map((r) => `  ${r.routeId}`).join("\n");
+			return result(`Error: Route "${routeId}" not found.\n\nAvailable routes:\n${routeList}`, 1);
 		}
+		const availableRoutes = routes.map((r) => `  ${r.routeId}`).join("\n");
+		return result(
+			`Error: No route matched goal "${goal}" and the default route "feature-standard" is missing.\n\nAvailable routes:\n${availableRoutes}\n\nTip: pass --route <id> to select a route explicitly.`,
+			1,
+		);
+	}
+	selectedRouteId = decision.route.routeId;
+	route = routes.find((r) => r.routeId === selectedRouteId);
+	routeVersion = route.version || (routeId ? SCHEMA_VERSION : "1.0.0");
+	// G: persist the journey half of decideRouteJourney so the fail-closed
+	// affinity validation is not paid for nothing — the selected journeyId is
+	// recorded on the manifest and surfaced in the session summary.
+	const selectedJourneyId = decision.journey.journeyId;
+	if (decision.route.status === "defaulted") {
+		fallbackWarning = `No route matched goal "${goal}"; defaulting to feature-standard (low confidence). Pass --route to choose explicitly.`;
+	}
+	if (decision.warnings[0]) {
+		goalMismatchWarning = `Warning: ${decision.warnings[0]} The session will proceed but the route may not fit the stated intent.`;
 	}
 
 	const manifest = createManifest({
@@ -210,6 +185,9 @@ async function startSession(projectRoot, options) {
 		`Route: ${selectedRouteId}`,
 		`Goal: ${goal}`,
 	];
+	if (selectedJourneyId) {
+		lines.push(`Journey: ${selectedJourneyId}`);
+	}
 	if (feature) {
 		lines.push(`Feature: ${feature}`);
 	}
@@ -217,6 +195,9 @@ async function startSession(projectRoot, options) {
 	const extras = {
 		continuitySurfaces: ensureContinuitySurfaces(projectRoot),
 	};
+	if (selectedJourneyId) {
+		extras.journeyId = selectedJourneyId;
+	}
 	lines.push(
 		`Continuity surfaces: ${extras.continuitySurfaces.memory}, ${extras.continuitySurfaces.notes}, ${extras.continuitySurfaces.tasksReadme}`,
 	);

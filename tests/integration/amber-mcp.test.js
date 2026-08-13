@@ -207,8 +207,9 @@ test("object.query executes in default mode for every object family", () => {
 
 	const context = callOutcome(byId.get(4));
 	assert.equal(context.executed, true);
-	assert.match(context.command, /amber context load --route feature-standard --json --target /);
+	assert.match(context.command, /amber context preview --route feature-standard --json --target /);
 	assert.ok(context.stdout.length > 0);
+	assert.equal(fs.existsSync(path.join(target, ".amber", "context", "loadouts")), false);
 });
 
 test("object.query rejects unknown object types", () => {

@@ -7,7 +7,7 @@ const { refreshPages } = require("../core/context-refresh");
 const { computeStats } = require("../core/context-stats");
 const { listPages, readPage, deletePage } = require("../core/context-store");
 const { describeKnowledge } = require("../core/context-knowledge");
-const { buildLoadout, verifyLoadoutFile } = require("../core/context-loadout");
+const { previewLoadout, buildLoadout, verifyLoadoutFile } = require("../core/context-loadout");
 const { projectionStatus, rebuildProjection } = require("../core/context-projection");
 const { runBenchmark } = require("../core/context-benchmark");
 const { importSourceBundle, sourceTargetBinding } = require("../core/context-source-adapter");
@@ -23,6 +23,7 @@ module.exports = {
 	readPage,
 	deletePage,
 	describeKnowledge,
+	previewLoadout,
 	buildLoadout,
 	verifyLoadoutFile,
 	projectionStatus,
