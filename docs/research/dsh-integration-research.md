@@ -2,8 +2,8 @@
 
 > **调研日期**: 2026-08-14
 > **dsh 版本**: `@deepseek-ai/dsh@0.1.0-rc.6`
-> **本地源码**: `D:/code_space/.orca-workspaces/deepseek-harness/deepseek-harness`
-> **Amber 仓库**: `D:/code_space/coding-harness`
+> **本地源码**: `/path/to/deepseek-harness/deepseek-harness`
+> **Amber 仓库**: `/path/to/coding-harness`
 
 ## 1. dsh 插件体系概要
 

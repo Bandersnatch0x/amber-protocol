@@ -61,23 +61,45 @@ The dsh agent gains 4 journey skills discoverable via the skill system:
 
 ## Configuration
 
-All paths in the patch files use `!!js` expressions. Adjust:
+The patch files use hardcoded absolute paths. Adjust the two paths in each
+patch file:
 
-- **`AMBER_REPO`**: path to the `coding-harness` checkout (where `scripts/amber-mcp.js` lives)
-- **`AMBER_TARGET`**: path to the repository Amber governs (default: current working directory)
+- **`scripts/amber-mcp.js` path**: point to your `coding-harness` checkout
+- **`skills` path**: point to the `skills` directory under the same checkout
+- **`--target` path**: the repository Amber governs (can differ from the
+  `coding-harness` checkout)
 
 ```yaml
 # In the patch file, replace:
 command: node
 args:
-  - !!js "require('path').join(process.env.HOME, 'code/coding-harness/scripts/amber-mcp.js')"
+  - "/path/to/coding-harness/scripts/amber-mcp.js"
   - --target
-  - !!js "process.cwd()"
-# With your actual paths, or set environment variables before launching dsh.
+  - "/path/to/coding-harness"
+# With your actual paths.
 ```
+
+### Patch syntax
+
+The patch files use dsh's native Cordis patch format:
+
+- **`- insert:`** adds new plugin rows (used for `mcp-amber`)
+- **`- id: <existing>`** overrides an existing row's config (used for
+  `skill-filesystem`); this is the flat id-targeted override syntax, not a
+  nested `update:` key
+
+See `amber-full.patch.yml` for the combined layer.
 
 ## HMR
 
 dsh watches `cordis.patch.yml` for changes. Editing the patch file triggers
 hot-reload: the MCP client disconnects and reconnects, and skill directories
 are re-scanned — no restart needed.
+
+## Verified
+
+- MCP server responds to `initialize` + `tools/list` (10 tools)
+- Read-only tools (`governance.report`) execute directly (`approvalRequired: false`)
+- Mutating tools (`session.start`) fail-closed (`approvalRequired: true`, `executed: false`)
+- Skills match dsh `SKILL.md` frontmatter format (5 skills, kebab-case names)
+- `dsh --dump-config` composes both patches with zero errors

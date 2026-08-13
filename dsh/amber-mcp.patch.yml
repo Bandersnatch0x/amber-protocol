@@ -16,10 +16,10 @@
         command: node
         args:
           # Adjust this path to your coding-harness checkout
-          - !!js "require('path').resolve(process.env.AMBER_REPO || process.cwd(), 'scripts/amber-mcp.js')"
+          - "/path/to/coding-harness/scripts/amber-mcp.js"
           - --target
           # The repository Amber governs; defaults to the dsh workspace root
-          - !!js "process.env.AMBER_TARGET || process.cwd()"
+          - "/path/to/coding-harness"
         env: {}
         toolCallTimeoutMs: 60000
         failOnStartupError: false
