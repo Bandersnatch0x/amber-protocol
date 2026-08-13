@@ -3,7 +3,7 @@
 > **调研日期**: 2026-08-14
 > **dsh 版本**: `@deepseek-ai/dsh@0.1.0-rc.6`
 > **本地源码**: `/path/to/deepseek-harness/deepseek-harness`
-> **Amber 仓库**: `/path/to/coding-harness`
+> **Amber 仓库**: `/path/to/amber-protocol`
 
 ## 1. dsh 插件体系概要
 
@@ -37,7 +37,7 @@ dsh 是 DeepSeek 的 agent harness，基于 [Cordis](https://github.com/cordiver
         serverName: amber
         command: node
         args:
-          - /path/to/coding-harness/scripts/amber-mcp.js
+          - /path/to/amber-protocol/scripts/amber-mcp.js
           - --target
           - /path/to/target-repo
         env: {}
@@ -85,7 +85,7 @@ dsh 是 DeepSeek 的 agent harness，基于 [Cordis](https://github.com/cordiver
     - id: skill-filesystem
       config:
         customSkillDirs:
-          - /path/to/coding-harness/skills
+          - /path/to/amber-protocol/skills
 ```
 
 **方式 B2 — 发布 npm bundle 包**:
@@ -158,4 +158,4 @@ dsh 是 DeepSeek 的 agent harness，基于 [Cordis](https://github.com/cordiver
 | Profile 模板（web/headless） | `packages/boot/app-boot/src/profile.ts` — `PROFILE_TEMPLATES` |
 | `PROFILE_PATCH_TEMPLATE` | `packages/boot/app-boot/src/profile.ts` |
 | Cordis 插件开发指南 | `config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md` |
-| Amber MCP server 入口 | `scripts/amber-mcp.js`（coding-harness 仓库） |
+| Amber MCP server 入口 | `scripts/amber-mcp.js`（amber-protocol 仓库） |

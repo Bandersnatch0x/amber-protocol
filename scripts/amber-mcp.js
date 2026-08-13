@@ -289,9 +289,9 @@ function handleRequest(message) {
 			content: [{ type: "text", text: JSON.stringify(coordinatedOutcome, null, 2) }],
 			isError: invocation.isError,
 		};
-		if (invocation.structuredContent !== null && invocation.structuredContent !== undefined) {
-			coordinatedResult.structuredContent = invocation.structuredContent;
-		}
+		// dsh MCP client requires structuredContent to be an object (not null)
+		// when outputSchema is declared. Set to {} when absent.
+		coordinatedResult.structuredContent = invocation.structuredContent ?? {};
 		return jsonResult(id, coordinatedResult);
 	}
 

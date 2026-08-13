@@ -352,6 +352,54 @@ test("invalid arguments are rejected with a JSON-RPC error", () => {
 	assert.match(response.error.message, /goal/);
 });
 
+test("every tools/call result carries structuredContent as an object", () => {
+	// dsh MCP client requires structuredContent to be an object (not null /
+	// absent) whenever a tool declares outputSchema. Regression: the server
+	// previously omitted the field when the outcome had no structured data
+	// (approval-required or failed executions), breaking the dsh tool schema.
+	const target = tempTarget();
+	const byId = rpc(
+		[
+			{
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: {
+					name: "amber.governance.report",
+					arguments: { _target: target },
+				},
+			},
+			{
+				jsonrpc: "2.0",
+				id: 2,
+				method: "tools/call",
+				params: {
+					name: "amber.session.start",
+					arguments: { goal: "smoke", _target: target },
+				},
+			},
+		],
+		["--target", target],
+	);
+
+	for (const id of [1, 2]) {
+		const response = byId.get(id);
+		assert.ok(response.result, `response ${id} must have a result`);
+		assert.ok(
+			"structuredContent" in response.result,
+			`response ${id} must carry structuredContent`,
+		);
+		assert.ok(
+			response.result.structuredContent !== null &&
+				typeof response.result.structuredContent === "object" &&
+				!Array.isArray(response.result.structuredContent),
+			`response ${id} structuredContent must be a plain object, got ${JSON.stringify(
+				response.result.structuredContent,
+			)}`,
+		);
+	}
+});
+
 test("unknown tool names are rejected", () => {
 	const target = tempTarget();
 	const byId = rpc(
