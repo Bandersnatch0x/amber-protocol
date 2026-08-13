@@ -15,11 +15,11 @@
         serverName: amber
         command: node
         args:
-          # Adjust this path to your coding-harness checkout
-          - "/path/to/coding-harness/scripts/amber-mcp.js"
+          # Adjust this path to your amber-protocol checkout
+          - "/path/to/amber-protocol/scripts/amber-mcp.js"
           - --target
           # The repository Amber governs; defaults to the dsh workspace root
-          - "/path/to/coding-harness"
+          - "/path/to/amber-protocol"
         env: {}
         toolCallTimeoutMs: 60000
-        failOnStartupError: false
+        failOnStartupError: true

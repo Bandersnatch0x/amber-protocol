@@ -1,7 +1,7 @@
 # Amber Protocol × dsh — Path B: Journey Skills
 #
 # Exposes Amber's 5 journey skills to the dsh agent by adding the
-# coding-harness skills directory as a custom skill root.
+# amber-protocol skills directory as a custom skill root.
 #
 # Install: merge into $DSH_HOME/profiles/<name>/cordis.patch.yml
 # Docs:    dsh/README.md
@@ -15,5 +15,5 @@
   config:
     includeDefaultRoots: true
     customSkillDirs:
-      # Adjust this path to your coding-harness checkout
-      - "/path/to/coding-harness/skills"
+      # Adjust this path to your amber-protocol checkout
+      - "/path/to/amber-protocol/skills"

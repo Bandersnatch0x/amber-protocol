@@ -1,0 +1,33 @@
+# dsh-amber-protocol bundle layer.
+# Installed by: dsh plugin --profile <name> add dsh-amber-protocol
+
+- insert:
+    - id: amber-bundle-runtime
+      name: dsh-amber-protocol/runtime
+
+    - id: mcp-amber
+      name: "@deepseek-ai/dsh-mcp-client"
+      inject:
+        - amberBundlePaths
+      config:
+        transport: stdio
+        serverName: amber
+        command: !!js process.execPath
+        args:
+          - !!js amberBundlePaths.mcpScript
+          - --target
+          - !!js process.cwd()
+        cwd: !!js process.cwd()
+        env: {}
+        toolCallTimeoutMs: 60000
+        failOnStartupError: true
+
+    - id: amber-skill-filesystem
+      name: "@deepseek-ai/dsh-skill-filesystem"
+      inject:
+        - amberBundlePaths
+      config:
+        providerName: amber-protocol
+        includeDefaultRoots: false
+        customSkillDirs:
+          - !!js amberBundlePaths.skillsDir
