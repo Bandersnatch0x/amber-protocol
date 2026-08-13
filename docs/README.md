@@ -9,6 +9,7 @@
 - [快速开始指南](user-guide/getting-started.md) - 安装、初始化和基本使用
 - [常见问题 FAQ](user-guide/faq.md) - 常见问题解答
 - [故障排查](user-guide/troubleshooting.md) - 问题诊断与解决
+- [DeepSeek Harness 集成](../dsh/README.md) - 官方 `dsh-plugin` topic；`dsh plugin add` 原生 bundle 安装
 
 ## 🏗️ 架构与设计
 

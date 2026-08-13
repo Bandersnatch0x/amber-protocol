@@ -5,18 +5,33 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.5.1] - 2026-08-14
 
 ### Added
 
 - `.gitattributes` enforces LF line endings cross-platform (`* text=auto eol=lf`) with a binary-file allowlist.
 - `.github/CODEOWNERS` routes review by directory.
 - CI runs `npm run lint` and `npm run format:check` before tests; the opt-in `pre-commit` hook runs the same two gates after identity validation.
+- Add the installable `dsh-amber-protocol` bundle for native DeepSeek Harness profile setup. The bundle resolves `amber-protocol` from its own installed location, exposes `amberBundlePaths` to later rows, and inserts a stdio MCP client + dedicated skill-filesystem instance.
+- Add `scripts/lib/subcommand-dispatcher.js` — a deep dispatch module that takes an action table + envelope shaper and returns a unified dispatcher, collapsing the duplicated if-chain pattern across adapters.
+- Add `tests/integration/dsh-bundle.test.js` — manifest contract, pack dry-run, and runtime path-resolution tests.
+- Add `tests/integration/capability-helpers.test.js` — unit tests for `deriveCapabilityFromAction` and `toCapability` parity.
+- Add `dsh/LICENSE` (MIT) to the bundle artifact.
 
 ### Changed
 
-- Apply Prettier across the repository against `.prettierrc.json` (tabs, double quotes, trailing commas, 100-col width, LF) - unifies mixed 2-space/tab indentation and quote styles.
-- Expand `.prettierignore` to exclude generated agent products (`.agents/`, `.claude/`, `.codex-plugin/`), skills, docs, templates, and data directories so Prettier only touches first-party source.
+- Ship the MCP Action and Function registries in the `amber-protocol` npm artifact so external adapters can start the governed stdio server.
+- Centralize `ACTIVE_SESSION_STATUSES`, `loadAndValidateManifest`, `manifestProjection`, `readSessionSummary`, and `readSessionsForConcurrency` in `session-manifest.js` — eliminating duplicated manifest read/validate/project sequences across `mcp-action-runtime.js` and `mcp-functions.js`.
+- Wire `deriveCapabilityFromAction` into `validateActionContract` so JSON→capability derivation has one shape, not inline per field.
+- Add `toCapability` helper to `context/action-registry.js` — unifies the context capability shape with `COMMAND_CAPABILITIES` entries in `classifyCliInvocation`.
+- Migrate `contextDispatch` from a 14-branch if-chain to a `HANDLERS` map; migrate `maintenanceDispatch` to `createSubcommandDispatcher` with an envelope shaper.
+- Fix `resolveTargetOverride` TOCTOU: stat→realpath→re-verify in one try block, consistent with `canonicalizeDirectory`.
+- Fix `handleWorkflow` `--output-dir` guard ordering: reject before dispatch, not after.
+- Fix `handleIngest` payload guard: require `--payload` unconditionally, not only when `--json` is absent.
+- Unify `failOnStartupError: true` across all dsh patch files (bundle + overlay).
+- Rewrite `README.md`, `README.zh-CN.md`, `docs/README.md`, `dsh/README.md` to lead with `dsh plugin --profile web add dsh-amber-protocol`; overlay patches retained as unpublished-checkout fallback.
+- Document the pnpm `overrides` workaround for unpublished local tarball installation in `dsh/README.md`.
+- Apply Prettier across the repository against `.prettierrc.json` (tabs, double quotes, trailing commas, 100-col width, LF).
 
 ## [1.5.0] - 2026-08-10
 

@@ -54,6 +54,28 @@ amber doctor --target my-project
 
 `init` 和 `wiki` 永不覆盖已有文件。完整命令面见 [CLI 参考](./docs/CLI_REFERENCE.md)。
 
+## 在 DeepSeek Harness 里用
+
+Amber 挂在官方 [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic 下。以原生 dsh bundle 安装，无需手动改路径：
+
+```bash
+# 安装一次；dsh 把 Amber bundle 层加入 profile
+dsh plugin --profile web add dsh-amber-protocol
+
+# 安装后普通启动即加载 Amber（无需重复 --patch）
+dsh --profile web
+```
+
+Windows 上默认端口 `3080` 常被系统保留，监听失败时加 `--port 13080`。
+
+**未发布 checkout fallback：** 如果你在开发 Amber 本身且 bundle 尚未发布，改用 overlay patch。编辑 `dsh/amber-full.patch.yml`，把 `/path/to/amber-protocol` 换成本仓库路径，启动时叠加，不改 profile：
+
+```bash
+dsh --profile web --patch /path/to/amber-protocol/dsh/amber-full.patch.yml
+```
+
+完整说明见 [dsh/README.md](./dsh/README.md)。
+
 ### `amber loop recommend` —— 安全的持续改进入口
 
 `amber loop recommend` 是只读命令：它扫描本地 workflow-pack 里的 loop contract，
@@ -107,17 +129,18 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 
 ## 文档
 
-| 主题               | 链接                                                                                                                                                                  |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 完整 CLI 参考      | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md)                                                                                                                      |
-| 快速开始指南       | [docs/user-guide/getting-started.md](./docs/user-guide/getting-started.md)                                                                                            |
-| 架构与治理模型     | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md)                                                                                      |
-| 部署与运维         | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)                                                                                                                            |
-| 监控 / 通知 / 策略 | [MONITORING_SETUP.md](./docs/MONITORING_SETUP.md) · [NOTIFICATION_SETUP.md](./docs/NOTIFICATION_SETUP.md) · [POLICY_CONFIGURATION.md](./docs/POLICY_CONFIGURATION.md) |
-| 故障排查           | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)                                                                                                                  |
-| 完整文档索引       | [docs/README.md](./docs/README.md)                                                                                                                                    |
-| 规格与路线图       | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                     |
-| 贡献指南           | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                  |
+| 主题                            | 链接                                                                                                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 完整 CLI 参考                   | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md)                                                                                                                      |
+| 快速开始指南                    | [docs/user-guide/getting-started.md](./docs/user-guide/getting-started.md)                                                                                            |
+| 架构与治理模型                  | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md)                                                                                      |
+| 部署与运维                      | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)                                                                                                                            |
+| 监控 / 通知 / 策略              | [MONITORING_SETUP.md](./docs/MONITORING_SETUP.md) · [NOTIFICATION_SETUP.md](./docs/NOTIFICATION_SETUP.md) · [POLICY_CONFIGURATION.md](./docs/POLICY_CONFIGURATION.md) |
+| 故障排查                        | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)                                                                                                                  |
+| 完整文档索引                    | [docs/README.md](./docs/README.md)                                                                                                                                    |
+| 规格与路线图                    | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                     |
+| DeepSeek Harness（`dsh`）叠加层 | [dsh/README.md](./dsh/README.md)                                                                                                                                      |
+| 贡献指南                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                  |
 
 Web 查看器（`apps/web`）为会话和时间线提供一个仪表盘：
 

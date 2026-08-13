@@ -9,11 +9,11 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/npm/v/amber-protocol)
 
-**Status:** Stable | **Version:** 1.5.0 · [Milestones & test status →](./ROADMAP.md)
+**Status:** Stable | **Version:** 1.5.1 · [Milestones & test status →](./ROADMAP.md)
 
 **Make AI coding sessions reviewable, gated, and handoff-ready.**
 
-[Getting started](./docs/user-guide/getting-started.md) · [CLI reference](./docs/CLI_REFERENCE.md) · [Governance model](./docs/architecture/governance-model.md) · [Examples](./docs/examples/README.md) · [Roadmap](./ROADMAP.md)
+[Getting started](./docs/user-guide/getting-started.md) · [CLI reference](./docs/CLI_REFERENCE.md) · [Governance model](./docs/architecture/governance-model.md) · [dsh](./dsh/README.md) · [Examples](./docs/examples/README.md) · [Roadmap](./ROADMAP.md)
 
 ## What is Amber?
 
@@ -107,6 +107,28 @@ resolve from GitHub Packages automatically.
 For CI (GitHub Actions), `secrets.GITHUB_TOKEN` is available automatically — the
 publish workflow (`.github/workflows/publish-github-packages.yml`) builds the
 `.npmrc` on the fly.
+
+## Use with DeepSeek Harness
+
+Amber is listed under the official [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic. Install it as a native dsh bundle — no manual path editing:
+
+```bash
+# Install once; dsh adds the Amber bundle layer to your profile
+dsh plugin --profile web add dsh-amber-protocol
+
+# Ordinary startup loads Amber after install (no repeated --patch flag)
+dsh --profile web
+```
+
+On Windows, default port `3080` is often reserved — pass `--port 13080` if listen fails.
+
+**Unpublished checkout fallback:** if you are developing Amber itself and the bundle is not yet published, use the overlay patches instead. Edit `dsh/amber-full.patch.yml`, replace `/path/to/amber-protocol` with this checkout, then overlay without changing your profile:
+
+```bash
+dsh --profile web --patch /path/to/amber-protocol/dsh/amber-full.patch.yml
+```
+
+Full bundle and overlay notes: [dsh/README.md](./dsh/README.md).
 
 ## Quick Start
 
@@ -339,6 +361,7 @@ For the full boundary notes, see [SPEC.md](./SPEC.md).
 | Troubleshooting                     | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)                                                                                                                  |
 | Full docs index                     | [docs/README.md](./docs/README.md)                                                                                                                                    |
 | Spec & roadmap                      | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                     |
+| DeepSeek Harness (`dsh`) overlay    | [dsh/README.md](./dsh/README.md)                                                                                                                                      |
 | Contributing                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                  |
 
 The web viewer (`apps/web`) provides a dashboard for sessions and timelines:
