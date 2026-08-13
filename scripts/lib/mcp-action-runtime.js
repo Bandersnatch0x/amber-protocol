@@ -1,17 +1,14 @@
 "use strict";
 
-const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { resolveRepoPath } = require("./mcp-targets");
-const { validateManifest } = require("./session-manifest");
+const { readSessionsForConcurrency } = require("./session-manifest");
 const {
 	resolveCapability,
 	bindsWriteFlag,
 	isReadOnlyExecutable,
 } = require("./mcp-action-contracts");
-
-const ACTIVE_SESSION_STATUSES = new Set(["created", "routed", "executing", "paused"]);
 
 function extractJson(text) {
 	const trimmed = (text || "").trim();
@@ -77,34 +74,9 @@ function buildCommand(action, parameters) {
 
 function listActiveSessions(target) {
 	const sessionsDir = resolveRepoPath(target, path.join(".amber", "sessions"));
-	if (!fs.existsSync(sessionsDir)) return { active: [], corrupt: [] };
-	const active = [];
-	const corrupt = [];
-	for (const name of fs.readdirSync(sessionsDir).sort()) {
-		const manifestPath = resolveRepoPath(
-			target,
-			path.join(".amber", "sessions", name, "manifest.json"),
-		);
-		if (!fs.existsSync(manifestPath)) {
-			corrupt.push({ sessionId: name, reason: "missing manifest.json" });
-			continue;
-		}
-		let manifest;
-		try {
-			manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-		} catch {
-			corrupt.push({ sessionId: name, reason: "invalid JSON" });
-			continue;
-		}
-		const validation = validateManifest(manifest);
-		if (!validation.valid) {
-			corrupt.push({ sessionId: name, reason: validation.errors.join("; ") });
-			continue;
-		}
-		if (ACTIVE_SESSION_STATUSES.has(manifest.status))
-			active.push({ sessionId: name, agentId: manifest.agentId || null });
-	}
-	return { active, corrupt };
+	return readSessionsForConcurrency(sessionsDir, (name) =>
+		resolveRepoPath(target, path.join(".amber", "sessions", name)),
+	);
 }
 
 function concurrencyGuard(target, parameters) {

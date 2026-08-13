@@ -90,15 +90,9 @@ function readAllSessionManifests(sessionsDir) {
 	}
 	return fs
 		.readdirSync(sessionsDir)
-		.filter((name) => fs.existsSync(path.join(sessionsDir, name, "manifest.json")))
-		.map((name) => {
-			try {
-				return JSON.parse(fs.readFileSync(path.join(sessionsDir, name, "manifest.json"), "utf8"));
-			} catch {
-				return null;
-			}
-		})
-		.filter(Boolean)
+		.map((name) => readSessionManifest(path.join(sessionsDir, name)))
+		.filter((result) => result && result.manifest)
+		.map((result) => result.manifest)
 		.sort((a, b) => {
 			// Newest createdAt first; a deterministic sessionId tiebreak ensures
 			// equal timestamps (cross-process same-ms) never fall back to
@@ -119,10 +113,94 @@ function writeSessionManifest(sessionDir, manifest) {
 	return persisted;
 }
 
+// Statuses that mark a session as in-progress (not completed/aborted).
+// Shared by mcp-action-runtime (concurrency guard) and mcp-functions (snapshot).
+const ACTIVE_SESSION_STATUSES = new Set(["created", "routed", "executing", "paused"]);
+
+// Read + validate a manifest from a parsed JSON object. Throws on corrupt
+// manifests so call sites can distinguish "absent" (null) from "corrupt"
+// (throws) from "valid" (returns manifest). Used by both Function and Action
+// runtimes so the error shape is identical across the MCP seam.
+function loadAndValidateManifest(manifest, sessionId) {
+	const validation = validateManifest(manifest);
+	if (!validation.valid) {
+		throw new Error(`corrupt session manifest ${sessionId}: ${validation.errors.join("; ")}`);
+	}
+	return manifest;
+}
+
+// Project the common summary fields from a validated manifest. Both
+// sessionSummary (Function) and repoSnapshot (Function) build the same shape;
+// centralizing it keeps the two in lockstep.
+function manifestProjection(manifest, sessionId) {
+	return {
+		sessionId,
+		status: manifest.status,
+		active: ACTIVE_SESSION_STATUSES.has(manifest.status),
+		goal: manifest.goal,
+		route: manifest.route && manifest.route.id,
+		agentId: manifest.agentId || null,
+	};
+}
+
+// Read all session manifests under a target repo's .amber/sessions/ dir.
+// Returns { active, corrupt } where active = sessions with a non-terminal
+// status, corrupt = sessions with missing/invalid manifests. This is the
+// single read entry point for concurrency guards and summaries — every
+// caller goes through here so the fail-closed rule (corrupt manifest =
+// refuse, not skip) cannot drift.
+//
+// sessionsDir: absolute path to .amber/sessions (already containment-checked).
+// resolveManifestPath(name): returns the absolute manifest.json path for a
+// session directory name, applying containment checks (symlink/junction
+// escape). The caller owns resolution so this module stays free of target-repo
+// logic.
+function readSessionsForConcurrency(sessionsDir, resolveSessionDir) {
+	if (!fs.existsSync(sessionsDir)) return { active: [], corrupt: [] };
+	const active = [];
+	const corrupt = [];
+	for (const name of fs.readdirSync(sessionsDir).sort()) {
+		const sessionDir = resolveSessionDir(name);
+		const result = readSessionManifest(sessionDir);
+		if (!result) {
+			corrupt.push({ sessionId: name, reason: "missing manifest.json" });
+			continue;
+		}
+		if (result.corrupt) {
+			corrupt.push({ sessionId: name, reason: "invalid JSON" });
+			continue;
+		}
+		const validation = validateManifest(result.manifest);
+		if (!validation.valid) {
+			corrupt.push({ sessionId: name, reason: validation.errors.join("; ") });
+			continue;
+		}
+		if (ACTIVE_SESSION_STATUSES.has(result.manifest.status))
+			active.push({ sessionId: name, agentId: result.manifest.agentId || null });
+	}
+	return { active, corrupt };
+}
+
+// Validate + project a parsed session manifest in one call. This is the
+// single summary entry point — sessionSummary (Function runtime) and
+// repoSnapshot (Function runtime) both call it so the validate-project
+// sequence cannot drift between call sites. Accepts the already-parsed
+// manifest object so the caller owns the read path (reader injection stays
+// at the caller where target resolution lives).
+function readSessionSummary(manifest, sessionId) {
+	loadAndValidateManifest(manifest, sessionId);
+	return manifestProjection(manifest, sessionId);
+}
+
 module.exports = {
 	createManifest,
 	validateManifest,
 	readSessionManifest,
 	readAllSessionManifests,
 	writeSessionManifest,
+	ACTIVE_SESSION_STATUSES,
+	loadAndValidateManifest,
+	manifestProjection,
+	readSessionsForConcurrency,
+	readSessionSummary,
 };

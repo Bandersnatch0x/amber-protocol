@@ -198,7 +198,7 @@ test("resolveTargetOverride: missing directory is rejected", () => {
 	assert.throws(
 		() =>
 			resolveTargetOverride({ override: "definitely-missing-dir", configured, cwd: os.tmpdir() }),
-		/not a directory/,
+		/does not exist|not a directory/,
 	);
 	fs.rmSync(a, { recursive: true, force: true });
 });

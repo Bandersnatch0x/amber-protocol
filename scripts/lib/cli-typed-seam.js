@@ -12,7 +12,7 @@ const {
 	KNOWN_UNTYPED_SUBCOMMANDS,
 	knownSubcommands,
 } = require("./command-registry");
-const { resolveContextAction } = require("./context/action-registry");
+const { resolveContextAction, toCapability } = require("./context/action-registry");
 
 const ACTION_TYPES_DIR = path.resolve(__dirname, "../../action-types");
 
@@ -41,25 +41,22 @@ function classifyCliInvocation(command, args = {}) {
 	if (!TYPED_COMMANDS.has(command)) return null;
 	const subcommand = args._?.[0];
 	if (!subcommand) return null;
+	let capability;
 	if (command === "context") {
 		const contextAction = resolveContextAction(subcommand, args);
 		if (!contextAction) return null;
-		return Object.freeze({
-			key: `context/${contextAction.name}`,
-			effect: contextAction.effect,
-			approver: contextAction.approvalRequired ? "human" : "system",
-			directReadOnlyExec: !contextAction.approvalRequired && contextAction.effect === "read",
-		});
+		capability = toCapability(contextAction);
+	} else {
+		capability = COMMAND_CAPABILITIES[capabilityKey(command, subcommand)];
+		if (!capability) return null;
 	}
-	const capability = COMMAND_CAPABILITIES[capabilityKey(command, subcommand)];
-	if (!capability) return null;
 	const writeFlags = new Set(capability.writeFlags || []);
 	const bindsWrite = [...writeFlags].some((flag) => {
 		const key = flag.replace(/^--/, "").replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 		return args[key] !== undefined && args[key] !== null && args[key] !== false;
 	});
 	return Object.freeze({
-		key: capabilityKey(command, subcommand),
+		key: capability.key || capabilityKey(command, subcommand),
 		effect: bindsWrite ? "write" : capability.effect,
 		approver: capability.approver,
 		directReadOnlyExec: !bindsWrite && capability.directReadOnlyExec,

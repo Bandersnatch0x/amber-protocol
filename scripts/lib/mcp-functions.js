@@ -6,9 +6,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { resolveConfiguredRepoPath } = require("./mcp-targets");
-const { validateManifest } = require("./session-manifest");
-
-const ACTIVE_STATUSES = new Set(["created", "routed", "executing", "paused"]);
+const { readSessionSummary } = require("./session-manifest");
 
 function createReader(configured, primary) {
 	const resolve = (relativePath, target = primary) =>
@@ -44,24 +42,12 @@ function createReader(configured, primary) {
 function sessionSummary(reader, sessionId) {
 	const base = path.join(".amber", "sessions", sessionId);
 	const manifest = reader.readJson(path.join(base, "manifest.json"));
-	assertValidManifest(manifest, sessionId);
+	const projected = readSessionSummary(manifest, sessionId);
 	return {
-		sessionId,
-		status: manifest.status,
-		active: ACTIVE_STATUSES.has(manifest.status),
-		goal: manifest.goal,
-		route: manifest.route && manifest.route.id,
-		agentId: manifest.agentId || null,
+		...projected,
 		timelineEvents: reader.countNonEmptyLines(path.join(base, "timeline.jsonl")),
 		ledgerLines: reader.countNonEmptyLines(path.join(base, "ledger.jsonl")),
 	};
-}
-
-function assertValidManifest(manifest, sessionId) {
-	const validation = validateManifest(manifest);
-	if (!validation.valid) {
-		throw new Error(`corrupt session manifest ${sessionId}: ${validation.errors.join("; ")}`);
-	}
 }
 
 function sessionEvidence(params, reader) {
@@ -87,14 +73,7 @@ function repoSnapshot(reader, target) {
 			.filter((id) => reader.isDirectory(path.join(sessionsPath, id), target))
 			.map((id) => {
 				const manifest = reader.readJson(path.join(sessionsPath, id, "manifest.json"), target);
-				assertValidManifest(manifest, id);
-				return {
-					sessionId: id,
-					status: manifest.status,
-					active: ACTIVE_STATUSES.has(manifest.status),
-					goal: manifest.goal,
-					route: manifest.route && manifest.route.id,
-				};
+				return readSessionSummary(manifest, id);
 			});
 	}
 	const routesPath = "routes";

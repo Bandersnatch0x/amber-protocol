@@ -148,6 +148,29 @@ const COMMAND_CAPABILITIES = {
 	},
 };
 
+// ---- capability derivation (single shape for JSON → declared values) ----
+// Derives the declared capability fields from an Action Type's JSON so
+// validateActionContract compares one derived shape against the registry
+// instead of re-implementing the extraction inline per field. Only fields
+// used in parity validation are derived; directReadOnlyExec and writeFlags
+// are registry-side concepts (not declared in Action JSON) so they stay out.
+function deriveCapabilityFromAction(action) {
+	const declaredEdits = (action.effects && action.effects.edits) || [];
+	const declaredSideEffects = (action.effects && action.effects.sideEffects) || [];
+	const approvers = (action.governance && action.governance.approver) || [];
+	const evidenceRequired = action.evidenceRequired || [];
+	const governanceEvidence = (action.governance && action.governance.evidence) || [];
+	const effect = declaredEdits.length > 0 ? "write" : "read";
+	return {
+		effect,
+		approvers,
+		evidenceRequired,
+		governanceEvidence,
+		declaredEdits,
+		declaredSideEffects,
+	};
+}
+
 function capabilityKey(command, subcommand) {
 	return `${command}/${subcommand}`;
 }
@@ -260,11 +283,8 @@ function validateActionContract(action) {
 	}
 
 	const variants = ex.variants ? Object.entries(ex.variants) : [["", ex]];
-	const declaredEdits = hasDeclaredEdits(action);
-	const declaredSideEffects = (action.effects && action.effects.sideEffects) || [];
-	const approvers = (action.governance && action.governance.approver) || [];
-	const evidenceRequired = action.evidenceRequired || [];
-	const governanceEvidence = (action.governance && action.governance.evidence) || [];
+	const { approvers, evidenceRequired, governanceEvidence, declaredEdits, declaredSideEffects } =
+		deriveCapabilityFromAction(action);
 
 	for (const [variantName, mapping] of variants) {
 		const key = capabilityKey(mapping.command, mapping.subcommand);
@@ -322,13 +342,13 @@ function validateActionContract(action) {
 		}
 
 		// Effect parity.
-		if (cap.effect === "write" && !declaredEdits) {
+		if (cap.effect === "write" && declaredEdits.length === 0) {
 			findings.push(
 				`${label}: effect mismatch — command ${key} is a write but effects.edits is empty`,
 			);
 		}
 		const expectedEdits = [...(cap.edits || [])].sort();
-		const actualEdits = [...((action.effects && action.effects.edits) || [])].sort();
+		const actualEdits = [...declaredEdits].sort();
 		if (expectedEdits.join("\n") !== actualEdits.join("\n")) {
 			findings.push(
 				`${label}: edits mismatch — expected [${expectedEdits.join(", ")}] but action declares [${actualEdits.join(", ")}]`,
@@ -341,7 +361,7 @@ function validateActionContract(action) {
 				`${label}: sideEffects mismatch — expected [${expectedSideEffects.join(", ")}] but action declares [${actualSideEffects.join(", ")}]`,
 			);
 		}
-		if (cap.effect === "read" && declaredEdits) {
+		if (cap.effect === "read" && declaredEdits.length > 0) {
 			findings.push(
 				`${label}: effect mismatch — command ${key} is a read but effects.edits is non-empty`,
 			);
@@ -385,6 +405,7 @@ function validateWhitelist(actions) {
 module.exports = {
 	COMMAND_CAPABILITIES,
 	capabilityKey,
+	deriveCapabilityFromAction,
 	resolveCapability,
 	bindsWriteFlag,
 	isReadOnlyExecutable,

@@ -52,4 +52,20 @@ function resolveContextAction(action, args = {}) {
 	return PROJECTION_VARIANTS[subaction] || PROJECTION;
 }
 
-module.exports = { ACTIONS, ALIASES, resolveContextAction };
+// Project a context contract to the unified capability shape that
+// classifyCliInvocation uses for every command. Context actions have no
+// writeFlags (no --output/--out args), and evidence is the contract's
+// evidence array (empty for pure reads). This keeps the context branch
+// and the COMMAND_CAPABILITIES branch in the same shape.
+function toCapability(contextAction) {
+	return {
+		key: `context/${contextAction.name}`,
+		effect: contextAction.effect,
+		approver: contextAction.approvalRequired ? "human" : "system",
+		directReadOnlyExec: !contextAction.approvalRequired && contextAction.effect === "read",
+		writeFlags: [],
+		evidence: contextAction.evidence,
+	};
+}
+
+module.exports = { ACTIONS, ALIASES, resolveContextAction, toCapability };

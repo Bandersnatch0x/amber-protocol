@@ -695,30 +695,22 @@ function handleRoute(args) {
 
 function handleWorkflow(args) {
 	const action = args._?.[0];
-	const { workflowDispatch } = require("./workflow-assessment/adapters/command");
 	const targetRoot = resolveTarget(args);
+	// Guard before dispatch: only assess supports --output-dir.
+	const SUPPORTS_OUTPUT_DIR = action === "assess";
+	if (args.outputDir && !SUPPORTS_OUTPUT_DIR) {
+		const msg = `'amber workflow ${action}' does not support --output-dir (only assess writes a report file).`;
+		return {
+			result: { target: targetRoot, errors: [msg], warnings: [] },
+			exitCode: 1,
+			bypassPrint: !args.json,
+		};
+	}
+	const { workflowDispatch } = require("./workflow-assessment/adapters/command");
 	const result = workflowDispatch(action, targetRoot, {
 		...args,
 		target: targetRoot,
 	});
-	// Only assess supports --output-dir (writes report to disk). findings/plan/
-	// compare reject it; everything else emits raw JSON/Markdown to stdout
-	// (parser-safe) with diagnostics on stderr. bypassPrint avoids the "Target:" envelope.
-	const SUPPORTS_OUTPUT_DIR = action === "assess";
-	if (args.outputDir && !SUPPORTS_OUTPUT_DIR) {
-		// Reject --output-dir for non-assess actions. Diagnostics go to stderr and
-		// stdout stays empty (parser-safe). onBypass prints the error itself
-		// because the bypass+onBypass path skips the dispatcher's error printing.
-		const msg = `'amber workflow ${action}' does not support --output-dir (only assess writes a report file).`;
-		return {
-			result: { target: targetRoot, errors: [msg], warnings: [] },
-			bypassPrint: true,
-			onBypass: () => {
-				console.error(`ERROR: ${msg}`);
-			},
-			exitCode: 1,
-		};
-	}
 	if (args.outputDir && action === "assess") {
 		// Report written to disk; print only a one-line confirmation, not the body.
 		for (const e of result.errors || []) console.error(`ERROR: ${e}`);

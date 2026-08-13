@@ -14,6 +14,7 @@ const { resolveTarget } = require("../../core/fs-utils");
 const { runMaintenanceAction } = require("../../core/maintenance");
 const { detectScaffoldDrift } = require("../../core/scaffold-version-drift");
 const { writeDistillProposal } = require("../../distill-candidates");
+const { createSubcommandDispatcher } = require("../../subcommand-dispatcher");
 
 const MAINTENANCE_ACTIONS = [
 	"inspect",
@@ -28,8 +29,6 @@ const MAINTENANCE_ACTIONS = [
 	"distill",
 ];
 
-// Long-standing alias accepted by runMaintenanceAction. The adapter resolves
-// it before the action whitelist check so alias behavior is unchanged.
 const ACTION_ALIASES = {
 	proposal: "propose",
 };
@@ -44,7 +43,7 @@ function unknownMaintenanceAction() {
 function handleScaffoldDrift(args) {
 	const targetRoot = resolveTarget(args.target);
 	const drift = detectScaffoldDrift(targetRoot);
-	return { result: { target: targetRoot, scaffoldDrift: drift, errors: [], warnings: [] } };
+	return { target: targetRoot, scaffoldDrift: drift, errors: [], warnings: [] };
 }
 
 function handleDistill(args) {
@@ -53,35 +52,36 @@ function handleDistill(args) {
 		args.output || path.join(targetRoot, "docs", "maintenance", "distill-proposals.md");
 	const proposal = writeDistillProposal(targetRoot, outputPath, args);
 	return {
-		result: {
-			target: targetRoot,
-			outputPath: proposal.outputPath,
-			candidateCount: proposal.candidateCount,
-			errors: [],
-			warnings: [],
-		},
+		target: targetRoot,
+		outputPath: proposal.outputPath,
+		candidateCount: proposal.candidateCount,
+		errors: [],
+		warnings: [],
 	};
 }
 
-/**
- * Dispatch a Maintenance subcommand to its implementation.
- * Preserves the runMaintenanceAction envelope contract for the eight
- * dispatch-owned actions; scaffold-drift and distill keep their distinct
- * envelopes exactly as the former outer-handler branches produced them.
- */
-function maintenanceDispatch(action, args) {
-	if (action === "scaffold-drift") {
-		return handleScaffoldDrift(args);
-	}
-	if (action === "distill") {
-		return handleDistill(args);
-	}
-	const resolved = ACTION_ALIASES[action] || action;
-	if (!resolved || !MAINTENANCE_ACTIONS.includes(resolved)) {
-		return { result: unknownMaintenanceAction() };
-	}
-	return { result: runMaintenanceAction(resolved, args.target, args) };
-}
+// Eight dispatch-owned actions delegate to runMaintenanceAction; the two
+// local handlers (scaffold-drift, distill) keep their distinct envelopes.
+const DISPATCH_OWNED = MAINTENANCE_ACTIONS.filter(
+	(action) => action !== "scaffold-drift" && action !== "distill",
+);
+
+const maintenanceDispatch = createSubcommandDispatcher({
+	actions: MAINTENANCE_ACTIONS,
+	aliases: ACTION_ALIASES,
+	handlers: {
+		"scaffold-drift": handleScaffoldDrift,
+		distill: handleDistill,
+		...Object.fromEntries(
+			DISPATCH_OWNED.map((action) => [
+				action,
+				(args) => runMaintenanceAction(action, args.target, args),
+			]),
+		),
+	},
+	unknownHandler: unknownMaintenanceAction,
+	envelope: (result) => ({ result }),
+});
 
 module.exports = {
 	MAINTENANCE_ACTIONS,

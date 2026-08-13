@@ -27,7 +27,7 @@ const {
 } = require("../index");
 const { ACTIONS, resolveContextAction } = require("../action-registry");
 
-function errResult(action, message) {
+function errResult(message) {
 	return {
 		result: { target: undefined, errors: [message], warnings: [] },
 		exitCode: 1,
@@ -137,7 +137,7 @@ function renderStats(stats) {
 
 function handleRequest(args, targetRoot) {
 	const pageId = args.page;
-	if (!pageId) return errResult("request", "context request requires --page <id> (kebab-case).");
+	if (!pageId) return errResult("context request requires --page <id> (kebab-case).");
 	const rawSources =
 		args.sources ||
 		(args.source ? (Array.isArray(args.source) ? args.source : [args.source]) : undefined);
@@ -174,9 +174,8 @@ function handleRequest(args, targetRoot) {
 function handleIngest(args, targetRoot) {
 	const requestId = args.request || args.requestId;
 	const payloadPath = args.payload;
-	if (!payloadPath && !args.json) {
+	if (!payloadPath) {
 		return errResult(
-			"ingest",
 			"context ingest requires --payload <file.json> (the agent's distilled output).",
 		);
 	}
@@ -415,9 +414,9 @@ function handleList(args, targetRoot) {
 
 function handleShow(args, targetRoot) {
 	const pageId = args.page;
-	if (!pageId) return errResult("show", "context show requires --page <id>.");
+	if (!pageId) return errResult("context show requires --page <id>.");
 	const page = readPage(targetRoot, pageId);
-	if (!page) return errResult("show", `page not found: ${pageId}`);
+	if (!page) return errResult(`page not found: ${pageId}`);
 	const knowledge = describeKnowledge(targetRoot, page);
 	const verified = verifyPages(targetRoot).pages.find((item) => item.pageId === pageId);
 	const assurance = verified
@@ -490,15 +489,12 @@ function handleStats(args, targetRoot) {
 
 function handleDelete(args, targetRoot) {
 	const pageId = args.page;
-	if (!pageId) return errResult("delete", "context delete requires --page <id>.");
+	if (!pageId) return errResult("context delete requires --page <id>.");
 	const page = readPage(targetRoot, pageId);
 	if (page) {
 		const knowledge = describeKnowledge(targetRoot, page);
 		if (knowledge.supersedes.length > 0 || knowledge.supersededBy.length > 0) {
-			return errResult(
-				"delete",
-				`Context Page ${pageId} participates in supersession and cannot be deleted`,
-			);
+			return errResult(`Context Page ${pageId} participates in supersession and cannot be deleted`);
 		}
 	}
 	const removed = deletePage(targetRoot, pageId);
@@ -530,7 +526,7 @@ function handleProjection(args, targetRoot, variant) {
 		};
 	}
 	if (variant !== "status") {
-		return errResult("projection", "context projection requires status or rebuild");
+		return errResult("context projection requires status or rebuild");
 	}
 	const status = projectionStatus(targetRoot);
 	if (!status.ok) {
@@ -559,7 +555,7 @@ function handleProjection(args, targetRoot, variant) {
 }
 
 function handleBenchmark(args, targetRoot) {
-	if (!args.fixture) return errResult("benchmark", "context benchmark requires --fixture <file>");
+	if (!args.fixture) return errResult("context benchmark requires --fixture <file>");
 	const result = runBenchmark(targetRoot, { fixture: args.fixture, mode: args.mode });
 	const report = result.report;
 	const text = report
@@ -588,7 +584,7 @@ function handleBenchmark(args, targetRoot) {
 
 function handleSourceAdapter(args, targetRoot) {
 	if (!args.fixture) {
-		return errResult("source-adapter", "context source-adapter requires --fixture <file>");
+		return errResult("context source-adapter requires --fixture <file>");
 	}
 	const imported = importSourceBundle(targetRoot, {
 		fixture: args.fixture,
@@ -632,26 +628,36 @@ function handleRetention(args, targetRoot) {
 	};
 }
 
+// Unified dispatch table: one handler per canonical action name, mirroring
+// the action-registry DEFINITIONS. Replaces the former 14-branch if-chain;
+// adding a context action now requires only a DEFINITIONS entry + a handler.
+const HANDLERS = {
+	request: handleRequest,
+	ingest: handleIngest,
+	verify: handleVerify,
+	list: handleList,
+	show: handleShow,
+	refresh: handleRefresh,
+	stats: handleStats,
+	delete: handleDelete,
+	preview: handlePreview,
+	load: handleLoad,
+	projection: (args, targetRoot, variant) => handleProjection(args, targetRoot, variant),
+	benchmark: handleBenchmark,
+	"source-adapter": handleSourceAdapter,
+	retention: handleRetention,
+};
+
 function contextDispatch(action, args) {
 	const definition = resolveContextAction(action, args);
 	if (!definition) return unknownAction(action);
 	const targetRoot = resolveTarget(args.target || ".");
-	const canonical = definition.name;
-	if (canonical === "request") return handleRequest(args, targetRoot);
-	if (canonical === "ingest") return handleIngest(args, targetRoot);
-	if (canonical === "verify") return handleVerify(args, targetRoot);
-	if (canonical === "list") return handleList(args, targetRoot);
-	if (canonical === "show") return handleShow(args, targetRoot);
-	if (canonical === "refresh") return handleRefresh(args, targetRoot);
-	if (canonical === "stats") return handleStats(args, targetRoot);
-	if (canonical === "delete") return handleDelete(args, targetRoot);
-	if (canonical === "preview") return handlePreview(args, targetRoot);
-	if (canonical === "load") return handleLoad(args, targetRoot);
-	if (canonical === "projection") return handleProjection(args, targetRoot, definition.variant);
-	if (canonical === "benchmark") return handleBenchmark(args, targetRoot);
-	if (canonical === "source-adapter") return handleSourceAdapter(args, targetRoot);
-	if (canonical === "retention") return handleRetention(args, targetRoot);
-	return unknownAction(action);
+	const handler = HANDLERS[definition.name];
+	if (!handler) return unknownAction(action);
+	// projection carries a variant (status/rebuild) the handler needs.
+	return definition.variant
+		? handler(args, targetRoot, definition.variant)
+		: handler(args, targetRoot);
 }
 
 module.exports = {

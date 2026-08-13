@@ -152,11 +152,24 @@ function resolveTargetOverride({ override, configured, cwd }) {
 	if (override === undefined || override === null || override === "") return null;
 	const base = cwd || process.cwd();
 	const resolved = path.resolve(base, override);
-	const exists = fs.existsSync(resolved) && fs.statSync(resolved).isDirectory();
-	if (!exists) {
-		throw new Error(`_target is not a directory: ${override}`);
+	let canonical;
+	try {
+		const stat = fs.statSync(resolved);
+		if (!stat.isDirectory()) {
+			throw new Error(`_target is not a directory: ${override}`);
+		}
+		canonical = fs.realpathSync(resolved);
+		// Re-verify after realpath: a symlink swap between stat and realpath
+		// could change the target type. Consistent with canonicalizeDirectory.
+		if (!fs.statSync(canonical).isDirectory()) {
+			throw new Error(`_target resolved to a non-directory: ${override}`);
+		}
+	} catch (err) {
+		if (err.code === "ENOENT") {
+			throw new Error(`_target does not exist: ${override}`, { cause: err });
+		}
+		throw err;
 	}
-	const canonical = fs.realpathSync(resolved);
 	if (!configured.index.has(canonical)) {
 		throw new Error(
 			`_target is not a configured repository: ${override} ` +
