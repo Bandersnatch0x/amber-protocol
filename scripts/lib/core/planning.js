@@ -10,6 +10,7 @@ const {
 	readJson,
 	readText,
 	relativeSlash,
+	resolvePathWithin,
 	resolveTarget,
 	walkFiles,
 } = require("./fs-utils");
@@ -28,6 +29,33 @@ const { findFeatureById } = require("./validators");
 const { codedError } = require("./error-catalog");
 
 const { MESSAGES } = require("./terminology");
+
+function resolveRelativePlanPath(targetRoot, planRelativePath) {
+	if (path.isAbsolute(planRelativePath)) {
+		return {
+			canonicalTarget: null,
+			planPath: null,
+			error: "Plan path must be relative to the target repository.",
+		};
+	}
+	try {
+		const canonicalTarget = resolvePathWithin(targetRoot, ".", {
+			label: "Target repository",
+			allowRoot: true,
+			canonicalExisting: true,
+		});
+		return {
+			canonicalTarget,
+			planPath: resolvePathWithin(canonicalTarget, planRelativePath, {
+				label: "Plan path",
+				canonicalExisting: true,
+			}),
+			error: null,
+		};
+	} catch (error) {
+		return { canonicalTarget: null, planPath: null, error: error.message };
+	}
+}
 
 function buildPlanContent(feature, title, options = {}) {
 	const planReference = options.planPath || "this plan file";
@@ -219,15 +247,16 @@ function validatePlanGate(target, planRelativePath) {
 		};
 	}
 
-	const planPath = path.resolve(targetRoot, planRelativePath);
-	if (!planPath.startsWith(targetRoot)) {
+	const resolvedPlan = resolveRelativePlanPath(targetRoot, planRelativePath);
+	if (resolvedPlan.error) {
 		return {
 			target: targetRoot,
 			plan: planRelativePath,
-			errors: ["Plan path must stay inside the target repository."],
+			errors: [resolvedPlan.error],
 			warnings: [],
 		};
 	}
+	const planPath = resolvedPlan.planPath;
 	if (!pathExists(planPath)) {
 		return {
 			target: targetRoot,
@@ -420,9 +449,9 @@ function reviewPlan(target, planRelativePath) {
 	const gateResult = validatePlanGate(targetRoot, planRelativePath);
 	let content = "";
 	if (gateResult.plan) {
-		const planPath = path.join(targetRoot, gateResult.plan);
-		if (pathExists(planPath)) {
-			content = readText(planPath);
+		const resolvedPlan = resolveRelativePlanPath(targetRoot, gateResult.plan);
+		if (!resolvedPlan.error && pathExists(resolvedPlan.planPath)) {
+			content = readText(resolvedPlan.planPath);
 		}
 	}
 	return buildReviewResult({
@@ -447,16 +476,17 @@ function confirmPlanGate(target, planRelativePath) {
 		};
 	}
 
-	const planPath = path.resolve(targetRoot, planRelativePath);
-	if (!planPath.startsWith(targetRoot)) {
+	const resolvedPlan = resolveRelativePlanPath(targetRoot, planRelativePath);
+	if (resolvedPlan.error) {
 		return {
 			target: targetRoot,
 			plan: planRelativePath,
 			confirmed: false,
-			errors: ["Plan path must stay inside the target repository."],
+			errors: [resolvedPlan.error],
 			warnings: [],
 		};
 	}
+	const planPath = resolvedPlan.planPath;
 	if (!pathExists(planPath)) {
 		return {
 			target: targetRoot,
@@ -508,7 +538,18 @@ function acceptPlan(target, planRelativePath, options = {}) {
 		};
 	}
 
-	const planPath = path.join(targetRoot, planRelativePath);
+	const resolvedPlan = resolveRelativePlanPath(targetRoot, planRelativePath);
+	if (resolvedPlan.error || !pathExists(resolvedPlan.planPath)) {
+		return {
+			target: targetRoot,
+			plan: planRelativePath,
+			accepted: false,
+			errors: [resolvedPlan.error || `Plan file is missing: ${planRelativePath}`],
+			warnings: review.warnings,
+			review,
+		};
+	}
+	const planPath = resolvedPlan.planPath;
 	const planContent = readText(planPath);
 	const featureId = readPlanField(planContent, "Feature");
 	let featureUpdated = false;
@@ -580,12 +621,13 @@ function acceptPlan(target, planRelativePath, options = {}) {
 
 	const evolutionRelativePath = path.join("docs", "wiki", "engineering", "harness-evolution.md");
 	const evolutionPath = path.join(targetRoot, evolutionRelativePath);
+	const portablePlanPath = relativeSlash(resolvedPlan.canonicalTarget, resolvedPlan.planPath);
 	const date = new Date().toISOString().slice(0, 10);
 	const entry = [
 		"",
-		`## ${date} ${planRelativePath}`,
+		`## ${date} ${portablePlanPath}`,
 		"",
-		`- Plan: \`${planRelativePath}\``,
+		`- Plan: \`${portablePlanPath}\``,
 		"- Review status: ready",
 		featureUpdated
 			? `- Feature: ${featureId} status → accepted in feature_list.json`

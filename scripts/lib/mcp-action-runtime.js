@@ -10,6 +10,9 @@ const {
 	isReadOnlyExecutable,
 } = require("./mcp-action-contracts");
 
+const POSIX_SAFE_SHELL_TOKEN = /^[A-Za-z0-9_@%+=:,./-]+$/;
+const POWERSHELL_SAFE_SHELL_TOKEN = /^[A-Za-z0-9_+=:./\\-]+$/;
+
 function extractJson(text) {
 	const trimmed = (text || "").trim();
 	if (!trimmed) return null;
@@ -72,6 +75,26 @@ function buildCommand(action, parameters) {
 	return [mapping.command, mapping.subcommand, ...positional, ...flags];
 }
 
+function quoteShellToken(value, platform = process.platform) {
+	const text = String(value);
+	if (platform === "win32") {
+		if (POWERSHELL_SAFE_SHELL_TOKEN.test(text)) return text;
+		return `'${text.replace(/'/g, "''")}'`;
+	}
+	if (POSIX_SAFE_SHELL_TOKEN.test(text)) return text;
+	return `'${text.replace(/'/g, "'\"'\"'")}'`;
+}
+
+function commandContract(argv, target) {
+	const commandArgv = ["amber", ...argv, "--target", target];
+	const commandShell = process.platform === "win32" ? "powershell" : "posix";
+	return {
+		command: commandArgv.map((value) => quoteShellToken(value)).join(" "),
+		commandArgv,
+		commandShell,
+	};
+}
+
 function listActiveSessions(target) {
 	const sessionsDir = resolveRepoPath(target, path.join(".amber", "sessions"));
 	return readSessionsForConcurrency(sessionsDir, (name) =>
@@ -118,7 +141,7 @@ function selectedVariantIsReadOnlyExec(action, parameters) {
 function runAction(action, parameters, flags, configured, targetOverride, root, amberJs) {
 	const target = targetOverride || configured.primary;
 	const argv = buildCommand(action, parameters);
-	const command = `amber ${argv.join(" ")} --target ${target}`;
+	const command = commandContract(argv, target);
 	const attribution = parameters._agent ? { agent: parameters._agent } : {};
 	const resolved = resolveCapability(action, parameters);
 	if (!resolved.capability)
@@ -135,7 +158,7 @@ function runAction(action, parameters, flags, configured, targetOverride, root, 
 			executed: true,
 			dryRun: false,
 			approvalRequired: false,
-			command,
+			...command,
 			exitCode: result.status,
 			signal: result.signal || undefined,
 			error: result.error ? result.error.message : undefined,
@@ -151,7 +174,7 @@ function runAction(action, parameters, flags, configured, targetOverride, root, 
 			dryRun: false,
 			approvalRequired: false,
 			conflict: guard.conflict,
-			command,
+			...command,
 			hint: "Repository already has an active session. One active session per repository: wait for completion or abort before mutating.",
 			...attribution,
 		};
@@ -159,8 +182,8 @@ function runAction(action, parameters, flags, configured, targetOverride, root, 
 		executed: false,
 		dryRun: false,
 		approvalRequired: true,
-		command,
-		hint: "Action requires human approval. Run the rendered command in an interactive terminal, then record the outcome.",
+		...command,
+		hint: "Action requires explicit approval. Preserve commandArgv boundaries when launching it, or use command only with the indicated commandShell, then record the outcome.",
 		...attribution,
 	};
 }
@@ -174,6 +197,8 @@ function isErrorOutcome(outcome) {
 module.exports = {
 	extractJson,
 	buildCommand,
+	quoteShellToken,
+	commandContract,
 	listActiveSessions,
 	concurrencyGuard,
 	selectedVariantIsReadOnlyExec,

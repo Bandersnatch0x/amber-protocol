@@ -7,7 +7,7 @@ const { resolveTarget, readJsonSafe } = require("./core/fs-utils");
 const { REPO_ROOT } = require("./core/constants");
 const { buildContext, inferNextStep } = require("./core/lifecycle");
 const { buildGovernanceReport } = require("./core/governance-report");
-const { loadRoutes } = require("./route-loader");
+const { loadTargetRoutes } = require("./route-loader");
 const {
 	JOURNEYS,
 	decideAdvisoryRouteJourney,
@@ -103,7 +103,7 @@ function suggestWorkflowPack(tokens, objective, packsDir) {
 // guessing a route.
 function decideRouting(objective, target = REPO_ROOT) {
 	const targetRoot = resolveTarget(target);
-	const { routes } = loadRoutes(path.join(targetRoot, "routes"));
+	const { routes } = loadTargetRoutes(targetRoot);
 	const decision = decideAdvisoryRouteJourney({ objective, routes, journeys: JOURNEYS });
 
 	if (decision.route.status === "unmatched") {

@@ -10,6 +10,7 @@ const {
 const { dispatch } = require("../../scripts/lib/command-dispatcher");
 const { parseArgs } = require("../../scripts/lib/core/cli-output");
 const { readRunnerAck, writeRunnerAck } = require("../../scripts/lib/runner-ack");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 const TEST_ROOT = path.join(__dirname, "../fixtures/session-runner-ack");
 
@@ -33,6 +34,7 @@ describe("session runner ACK files", () => {
 	beforeEach(() => {
 		cleanup();
 		fs.mkdirSync(TEST_ROOT, { recursive: true });
+		installTargetRoutes(TEST_ROOT);
 	});
 
 	afterEach(() => {

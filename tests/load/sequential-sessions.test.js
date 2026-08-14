@@ -4,13 +4,15 @@ const { spawnSync } = require("child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("path");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 const ROOT = path.join(__dirname, "../..");
 
 describe("sequential sessions load test", () => {
-	// Isolated target so session state / continuity surfaces land in a tempdir
-	// instead of the amber source tree. cwd stays at ROOT so routes resolve.
+	// Isolated initialized target so session state, Route manifests, and
+	// continuity surfaces stay out of the product repository.
 	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-load-"));
+	installTargetRoutes(target);
 
 	after(() => {
 		fs.rmSync(target, { recursive: true, force: true });

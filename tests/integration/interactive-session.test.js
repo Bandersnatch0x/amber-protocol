@@ -3,6 +3,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 const ROOT = path.join(__dirname, "../..");
 const TEST_PROJECT = path.join(ROOT, ".amber-test-interactive");
@@ -18,6 +19,7 @@ describe("Interactive Session Integration", () => {
 			});
 		}
 		fs.mkdirSync(TEST_PROJECT, { recursive: true });
+		installTargetRoutes(TEST_PROJECT);
 	});
 
 	afterEach(() => {

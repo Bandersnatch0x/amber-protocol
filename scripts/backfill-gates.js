@@ -21,13 +21,11 @@
 
 const fs = require("fs");
 const path = require("path");
-const { loadRoutes } = require("./lib/route-loader");
+const { loadTargetRoutes } = require("./lib/route-loader");
 const { readSessionEvents } = require("./lib/session-timeline");
 const { resolveStateDirForRead } = require("./lib/state-dir-resolver");
 const { readJsonSafe } = require("./lib/core/fs-utils");
 const { buildGateStageMap, writeGateDefinition, writeGateDecision } = require("./lib/gate-writer");
-
-const ROUTES_DIR = path.join(__dirname, "../routes");
 
 function parseArgv(argv) {
 	const args = { target: process.cwd(), dryRun: false, json: false, help: false };
@@ -156,7 +154,7 @@ function main() {
 		return;
 	}
 
-	const { routes } = loadRoutes(ROUTES_DIR);
+	const { routes } = loadTargetRoutes(args.target);
 	const routesById = new Map(routes.map((r) => [r.routeId, r]));
 
 	const sessionIds = fs

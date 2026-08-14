@@ -62,6 +62,10 @@
 					"enum": {
 						"type": "array",
 						"description": "Closed set of allowed values, when the parameter is constrained."
+					},
+					"pattern": {
+						"type": "string",
+						"description": "ECMA-262 regular expression that string values must satisfy."
 					}
 				}
 			}

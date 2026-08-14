@@ -57,6 +57,7 @@ const {
 	rollbackTeamDistribution,
 } = require("./core/team");
 const routeCommands = require("./route-commands");
+const { resolveTargetRoutesDirectory } = require("./route-loader");
 const featureCommands = require("./feature-commands");
 const {
 	generateAdoptionReport,
@@ -641,25 +642,32 @@ function handleRoute(args) {
 	const action = args._?.[0];
 	const routeId = args._?.[1] || "";
 	const targetRoot = resolveTarget(args);
+	const routesDir = resolveTargetRoutesDirectory(targetRoot);
 	let routeResult;
 
-	if (action === "list") routeResult = routeCommands.listRoutes();
-	else if (action === "inspect") routeResult = routeCommands.inspectRoute(routeId);
+	if (action === "list") routeResult = routeCommands.listRoutes(routesDir);
+	else if (action === "inspect") routeResult = routeCommands.inspectRoute(routeId, routesDir);
 	else if (action === "validate")
 		routeResult = routeCommands.validateRouteFile(args.file || routeId);
 	else if (action === "test") {
 		// Governed execution of a single command stage (GLX Phase 3); default stays dry-run.
 		if (args.execute && args.stage) {
-			const er = routeCommands.executeRouteStage(routeId, args.stage, targetRoot);
+			const er = routeCommands.executeRouteStage(routeId, args.stage, targetRoot, routesDir);
 			routeResult = { text: er.text, exitCode: er.exitCode };
 		} else {
-			routeResult = routeCommands.testRoute(routeId);
+			routeResult = routeCommands.testRoute(routeId, routesDir);
 		}
 	} else if (action === "approve") {
 		if (!args.stage) {
 			routeResult = { text: "route approve requires --stage <name>.", exitCode: 1 };
 		} else {
-			routeResult = routeCommands.approveRouteStage(routeId, args.stage, targetRoot, args.reviewer);
+			routeResult = routeCommands.approveRouteStage(
+				routeId,
+				args.stage,
+				targetRoot,
+				args.reviewer,
+				routesDir,
+			);
 		}
 	} else if (action === "verify-ledger") {
 		routeResult = routeCommands.verifyRouteLedger(routeId, targetRoot);

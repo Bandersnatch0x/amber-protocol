@@ -32,6 +32,10 @@ function relativeEscapesRoot(relative) {
 	return path.isAbsolute(relative) || relative === ".." || relative.startsWith(`..${path.sep}`);
 }
 
+function toPortablePath(value) {
+	return String(value).replace(/\\/g, "/");
+}
+
 function lstatIfPresent(filePath) {
 	try {
 		return fs.lstatSync(filePath);
@@ -66,7 +70,7 @@ function realPathForPotential(filePath, seenLinks = new Set()) {
 }
 
 function resolvePathWithin(root, candidate, options = {}) {
-	const { label = "Path", allowRoot = false } = options;
+	const { label = "Path", allowRoot = false, canonicalExisting = false } = options;
 	if (typeof candidate !== "string" || candidate.trim() === "") {
 		throw new Error(`${label} is required.`);
 	}
@@ -83,7 +87,7 @@ function resolvePathWithin(root, candidate, options = {}) {
 	if (relativeEscapesRoot(realRelative) || (!allowRoot && realRelative === "")) {
 		throw new Error(`${label} is outside the target root: ${candidate}`);
 	}
-	return resolved;
+	return canonicalExisting && lstatIfPresent(resolved) ? realCandidate : resolved;
 }
 
 function pathExists(filePath) {
@@ -227,7 +231,7 @@ function walkProjectFiles(root, current = root) {
 }
 
 function relativeSlash(from, to) {
-	return path.relative(from, to).split(path.sep).join("/");
+	return toPortablePath(path.relative(from, to));
 }
 
 function repoRelativePath(filePath) {
@@ -247,6 +251,7 @@ module.exports = {
 	AUDIT_IGNORED_DIRECTORY_NAMES,
 	resolveTarget,
 	resolvePathWithin,
+	toPortablePath,
 	pathExists,
 	readText,
 	isMissingPath,

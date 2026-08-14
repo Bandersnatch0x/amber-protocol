@@ -12,8 +12,45 @@ const {
 	verifySession,
 } = require("../../scripts/lib/session-commands");
 const { addFeature, listFeatureEvidence } = require("../../scripts/lib/feature-commands");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 const TEST_ROOT = path.join(__dirname, "../fixtures/session-test-repo");
+
+function writeTargetRoute(routeId) {
+	const routesDir = path.join(TEST_ROOT, "routes");
+	fs.mkdirSync(routesDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(routesDir, `${routeId}.route.json`),
+		JSON.stringify(
+			{
+				routeId,
+				schemaVersion: "1.0.0",
+				version: "1.0.0",
+				displayName: "Target-only Route",
+				description: "Route defined only in the selected target repository",
+				trigger: { goalPattern: "^target-only\\b", complexity: "medium" },
+				stages: [
+					{
+						name: "verify",
+						displayName: "Target Verification",
+						type: "command",
+						target: "node --test",
+						gateAfter: "target-approval",
+					},
+				],
+				gates: [
+					{
+						id: "target-approval",
+						type: "user-approval",
+						description: "Approve the target-only Route?",
+					},
+				],
+			},
+			null,
+			2,
+		) + "\n",
+	);
+}
 
 function removeTestRoot(dir) {
 	if (!fs.existsSync(dir)) return;
@@ -46,6 +83,7 @@ describe("session-commands", () => {
 	beforeEach(() => {
 		cleanupTestRoot(TEST_ROOT);
 		fs.mkdirSync(TEST_ROOT, { recursive: true });
+		installTargetRoutes(TEST_ROOT);
 
 		spawnSync("git", ["init"], { cwd: TEST_ROOT });
 		spawnSync("git", ["config", "user.name", "Test"], { cwd: TEST_ROOT });
@@ -62,6 +100,30 @@ describe("session-commands", () => {
 	});
 
 	describe("startSession", () => {
+		it("loads an explicit Route from the selected target repository", async () => {
+			writeTargetRoute("target-only");
+
+			const result = await startSession(TEST_ROOT, {
+				goal: "target-only delivery",
+				route: "target-only",
+			});
+
+			assert.strictEqual(result.exitCode, 0, result.text);
+			assert.ok(result.sessionId);
+			assert.ok(
+				fs.existsSync(
+					path.join(
+						TEST_ROOT,
+						".amber",
+						"sessions",
+						result.sessionId,
+						"gates",
+						"target-approval.gate.json",
+					),
+				),
+			);
+		});
+
 		it("creates a new session with manifest and timeline", async () => {
 			const result = await startSession(TEST_ROOT, {
 				goal: "test feature",
@@ -163,6 +225,40 @@ describe("session-commands", () => {
 
 			assert.notEqual(result.exitCode, 0);
 			assert.ok(result.text.includes("goal"));
+		});
+	});
+
+	describe("target-local Route lifecycle", () => {
+		it("uses target-local verification metadata", async () => {
+			writeTargetRoute("target-only");
+			const start = await startSession(TEST_ROOT, {
+				goal: "target-only delivery",
+				route: "target-only",
+			});
+
+			const verified = await verifySession(TEST_ROOT, { sessionId: start.sessionId });
+
+			assert.strictEqual(verified.exitCode, 0, verified.text);
+			assert.match(verified.text, /Stage: Target Verification/);
+			assert.match(verified.text, /Suggested verification command: node --test/);
+		});
+
+		it("approves gates declared by a target-local Route", async () => {
+			writeTargetRoute("target-only");
+			const start = await startSession(TEST_ROOT, {
+				goal: "target-only delivery",
+				route: "target-only",
+			});
+
+			const approved = await approveSession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				gate: "target-approval",
+				yes: true,
+			});
+
+			assert.strictEqual(approved.exitCode, 0, approved.text);
+			assert.match(approved.text, /Gate: target-approval/);
+			assert.match(approved.text, /session marked completed/);
 		});
 	});
 

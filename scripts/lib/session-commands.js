@@ -13,7 +13,7 @@ const { SessionStateMachine, STATES } = require("./session-state-machine");
 const { loadLatestCheckpoint, loadCheckpointByStage } = require("./checkpoint-manager");
 const { checkSchemaVersion, SCHEMA_VERSION } = require("./schema-version-checker");
 const { createWorktree, removeWorktree } = require("./worktree-manager");
-const { loadRoutes } = require("./route-loader");
+const { loadTargetRoutes } = require("./route-loader");
 const { decideRouteJourney, JOURNEYS } = require("./route-journey-decision");
 const { result } = require("./result");
 const { promptYesNo } = require("./prompt");
@@ -28,8 +28,6 @@ const {
 	resolveStateDirForCreate,
 	CANONICAL_STATE_DIR,
 } = require("./state-dir-resolver");
-
-const ROUTES_DIR = path.join(__dirname, "../../routes");
 
 function getSessionsDir(projectRoot) {
 	// Discovery/read path: prefers .amber, falls back to legacy .harness.
@@ -135,7 +133,7 @@ async function startSession(projectRoot, options) {
 	let routeVersion;
 
 	// Load routes once — reused for version, goal-mismatch warning, and gate persistence.
-	const { routes } = loadRoutes(ROUTES_DIR);
+	const { routes } = loadTargetRoutes(projectRoot);
 	let route;
 	let fallbackWarning = null;
 	let goalMismatchWarning = null;
@@ -564,7 +562,7 @@ async function verifySession(projectRoot, options) {
 	}
 
 	// Resolve the route definition to find verification stage metadata.
-	const { routes } = loadRoutes(ROUTES_DIR);
+	const { routes } = loadTargetRoutes(projectRoot);
 	const route = routes.find((r) => r.routeId === manifest.route.id);
 	const stages = route && Array.isArray(route.stages) ? route.stages : [];
 	const verifyStage = route ? stages.find((s) => s.name === (stageName || "verify")) : null;
@@ -712,7 +710,7 @@ async function approveSession(projectRoot, options) {
 	}
 
 	// Resolve route gates so we can name the gate being approved.
-	const { routes } = loadRoutes(ROUTES_DIR);
+	const { routes } = loadTargetRoutes(projectRoot);
 	const route = routes.find((r) => r.routeId === manifest.route.id);
 
 	const gates = route && Array.isArray(route.gates) ? route.gates : [];

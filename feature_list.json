@@ -469,6 +469,122 @@
 				"docs/plans/F019-Intent-router-deep-journey-skills-default-help-projection.md"
 			],
 			"updated": "2026-08-13"
+		},
+		{
+			"id": "F020",
+			"priority": 1,
+			"area": "governance",
+			"title": "Remediate v1.5.1 review findings",
+			"user_visible_behavior": "MCP submissions, repository reads, route queries, releases, and version metadata preserve their documented safety contracts",
+			"status": "accepted",
+			"verification": ["npm test and release governance checks pass"],
+			"evidence": [
+				{
+					"command": "node --test F020 targeted suite",
+					"result": "156 passed, 0 failed, 0 skipped",
+					"date": "2026-08-14",
+					"notes": "MCP, canonical paths, target-local Route consumers, release, dsh packaging, and version synchronization regressions passed."
+				},
+				{
+					"command": "node --test tests/unit/governance-readiness-collectors.test.js tests/integration/session-commands.test.js",
+					"result": "14 passed, 0 failed, 0 skipped",
+					"date": "2026-08-14",
+					"notes": "Final canonical target-relative Route reporting and target-local Session fixture regressions passed."
+				},
+				{
+					"command": "npm test",
+					"result": "1781 total, 1777 passed, 4 skipped, 0 failed",
+					"date": "2026-08-14",
+					"notes": "Final full repository suite after every target-Route consumer and canonical readiness path fix; governed Session 6b0aa503-6f0d-41cf-b7eb-90a8b4e5e370 is strict-pass."
+				},
+				{
+					"command": "manifests; doctor; gen:agents:check; validate-wiki; lint; format:check; git diff --check",
+					"result": "all exit 0; errors 0; generated files current",
+					"date": "2026-08-14",
+					"notes": "Repository health, generated surfaces, wiki, lint, formatting, and whitespace gates passed."
+				},
+				{
+					"command": "amber review + amber gate for F020",
+					"result": "review findings 0; releaseReadiness ready; gate errors 0",
+					"date": "2026-08-14",
+					"notes": "Plan confirmation, evidence, phase boundary, and acceptance checks passed."
+				},
+				{
+					"command": "$code-review v1.5.0...v1.5.1 final Standards + Spec re-review",
+					"result": "Standards 0 High, 0 Medium, 0 Low; Spec 0 High, 0 Medium, 0 Low",
+					"date": "2026-08-14",
+					"notes": "Independent final reviewers cleared the current worktree after canonical target path and target-local Route lifecycle remediation."
+				}
+			],
+			"notes": [
+				"F020 implementation, repository gates, Amber review/gate, and portable handoff validation are complete.",
+				"Version 1.6.0 is prepared in source only; no tag, package publish, or GitHub Release was created."
+			],
+			"paths": [
+				"scripts/amber-mcp.js",
+				"schemas/action.type.schema.json",
+				"scripts/lib/mcp-action-runtime.js",
+				"scripts/lib/mcp-targets.js",
+				"scripts/lib/mcp-functions.js",
+				"scripts/lib/command-dispatcher.js",
+				"scripts/lib/core/fs-utils.js",
+				"scripts/lib/route-loader.js",
+				"scripts/lib/route-commands.js",
+				"scripts/lib/next-command.js",
+				"scripts/lib/core/governance-readiness.js",
+				"scripts/lib/core/lifecycle.js",
+				"scripts/lib/session-commands.js",
+				"scripts/backfill-gates.js",
+				"scripts/sync-version.js",
+				".github/workflows/ci.yml",
+				".claude-plugin/plugin.json",
+				".codex-plugin/plugin.json",
+				"package.json",
+				"package-lock.json",
+				"dsh/package.json",
+				"tests",
+				"docs/plans/F020-Remediate-v1-5-1-review-findings.md"
+			],
+			"updated": "2026-08-14"
+		},
+		{
+			"id": "F021",
+			"priority": 1,
+			"area": "governance",
+			"title": "Align prerelease publish policy with the lockstep release contract",
+			"user_visible_behavior": "Pre-release tags skip GitHub Packages publish the same way they skip npmjs, and release docs name the secrets the workflows actually use",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/release-workflow.test.js",
+				"GitHub Packages workflow excludes -rc/-beta tags while keeping workflow_dispatch",
+				"CONTRIBUTING.md names NPM_TOKEN for the npmjs release job"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/release-workflow.test.js",
+					"result": "5 passed, 0 failed, 0 skipped",
+					"date": "2026-08-14",
+					"notes": "GitHub Packages prerelease skip and workflow_dispatch contract locked next to the existing npmjs lockstep checks."
+				},
+				{
+					"command": "amber review + amber gate for F021",
+					"result": "review findings 0; releaseReadiness ready; gate errors 0",
+					"date": "2026-08-14",
+					"notes": "Plan confirmation, evidence fields, and phase-boundary checks passed."
+				}
+			],
+			"notes": [
+				"Selected after F020: next-up is empty; governance report flagged stale wiki plus leftover release-contract drift.",
+				"No tag, package publish, or GitHub Release was created."
+			],
+			"paths": [
+				".github/workflows/publish-github-packages.yml",
+				"CONTRIBUTING.md",
+				"docs/wiki/amber-ontology-mcp.md",
+				"tests/unit/release-workflow.test.js",
+				"docs/plans/F021-Align-prerelease-publish-policy.md"
+			],
+			"updated": "2026-08-14"
 		}
 	]
 }

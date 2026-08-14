@@ -7,12 +7,14 @@ const os = require("node:os");
 const path = require("node:path");
 const { execSync } = require("node:child_process");
 const { startSession, approveSession } = require("../../scripts/lib/session-commands");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 function tmpRepo() {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-ai-"));
 	execSync("git init -q && git config user.email a@b.c && git config user.name t", { cwd: dir });
 	fs.writeFileSync(path.join(dir, ".gitignore"), ".amber/\n");
 	fs.writeFileSync(path.join(dir, "x.txt"), "hi");
+	installTargetRoutes(dir);
 	execSync("git add -A && git commit -qm init", { cwd: dir });
 	return dir;
 }

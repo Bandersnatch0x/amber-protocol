@@ -8,10 +8,12 @@ const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "../..");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
-// Isolated session root so manifests and continuity surfaces land in a tempdir
-// instead of the amber source tree. cwd stays at ROOT so routes resolve.
+// Isolated session root so manifests, continuity surfaces, and target-local
+// Route fixtures land in a tempdir instead of the Amber source tree.
 const SESSION_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "amber-session-int-"));
+installTargetRoutes(SESSION_ROOT);
 
 test.after(() => {
 	fs.rmSync(SESSION_ROOT, { recursive: true, force: true });

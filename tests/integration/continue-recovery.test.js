@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { startSession, continueSession } = require("../../scripts/lib/session-commands");
 const { saveCheckpoint } = require("../../scripts/lib/checkpoint-manager");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 describe("Continue Recovery", () => {
 	const testDir = path.join(__dirname, "../fixtures/continue-test");
@@ -18,6 +19,7 @@ describe("Continue Recovery", () => {
 			});
 		}
 		fs.mkdirSync(testDir, { recursive: true });
+		installTargetRoutes(testDir);
 	});
 
 	afterEach(() => {

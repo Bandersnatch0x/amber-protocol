@@ -5,6 +5,7 @@ const os = require("os");
 const path = require("path");
 const { startSession, continueSession } = require("../../scripts/lib/session-commands");
 const { saveCheckpoint } = require("../../scripts/lib/checkpoint-manager");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 describe("Kill Recovery", () => {
 	// Unique temp dir per test: a shared fixed path under tests/fixtures collides
@@ -14,6 +15,7 @@ describe("Kill Recovery", () => {
 
 	beforeEach(() => {
 		testDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-kill-recovery-"));
+		installTargetRoutes(testDir);
 	});
 
 	afterEach(() => {

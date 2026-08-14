@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { pathExists, readText, collectFilesBySuffix } = require("./fs-utils");
+const { pathExists, readText, collectFilesBySuffix, toPortablePath } = require("./fs-utils");
 const { REQUIRED_HARNESS_FILES } = require("./constants");
 const { classifyTarget } = require("./target-classification");
 const { shellQuote } = require("./text-utils");
@@ -28,7 +28,7 @@ function parsePlanFile(targetRoot, filePath) {
 	const featureMatch = content.match(/^Feature:\s*(\S+)/m);
 	const confirmMatch = content.match(/^User Confirmation:\s*(\S+)/m);
 	return {
-		path: path.relative(targetRoot, filePath).split(path.sep).join("/"),
+		path: toPortablePath(path.relative(targetRoot, filePath)),
 		featureId: featureMatch ? featureMatch[1] : null,
 		confirmed: Boolean(confirmMatch && confirmMatch[1].toLowerCase() === "confirmed"),
 		mtimeMs: safeMtimeMs(filePath),
@@ -111,34 +111,30 @@ function gatherState(targetRoot) {
 
 /** Resolve next unapproved gate id for a session (N2). */
 function resolvePendingGate(targetRoot, sessionId) {
-	try {
-		const { loadSessionManifest } = require("../session-commands");
-		const { readSessionEvents } = require("../session-timeline");
-		const { loadRoutes } = require("../route-loader");
-		const pathMod = require("node:path");
-		const routesDir = pathMod.join(__dirname, "../../../routes");
-		const loaded = loadSessionManifest(targetRoot, sessionId);
-		if (!loaded || !loaded.manifest) return { gates: [], pendingGateId: null, routeId: null };
-		const manifest = loaded.manifest;
-		const routeId = (manifest.route && (manifest.route.id || manifest.route.routeId)) || null;
-		const { routes } = loadRoutes(routesDir);
-		const route = routes.find((r) => r.routeId === routeId);
-		const gates = route && Array.isArray(route.gates) ? route.gates : [];
-		const events = readSessionEvents(
-			loaded.sessionDir || path.join(targetRoot, ".amber", "sessions", sessionId),
-		);
-		const passed = new Set(
-			events
-				.filter((e) => e && e.type === "gate_passed" && e.data)
-				.map((e) => e.data.gateId || e.data.gate)
-				.filter(Boolean),
-		);
-		const pending = gates.filter((g) => !passed.has(g.id));
-		const pendingGateId = (pending[0] && pending[0].id) || (gates[0] && gates[0].id) || null;
-		return { gates, pendingGateId, routeId, pendingCount: pending.length };
-	} catch {
+	const { loadSessionManifest } = require("../session-commands");
+	const { readSessionEvents } = require("../session-timeline");
+	const { loadTargetRoutes } = require("../route-loader");
+	const loaded = loadSessionManifest(targetRoot, sessionId);
+	if (!loaded || !loaded.manifest) {
 		return { gates: [], pendingGateId: null, routeId: null, pendingCount: 0 };
 	}
+	const manifest = loaded.manifest;
+	const routeId = (manifest.route && (manifest.route.id || manifest.route.routeId)) || null;
+	const { routes } = loadTargetRoutes(targetRoot);
+	const route = routes.find((r) => r.routeId === routeId);
+	const gates = route && Array.isArray(route.gates) ? route.gates : [];
+	const events = readSessionEvents(
+		loaded.sessionDir || path.join(targetRoot, ".amber", "sessions", sessionId),
+	);
+	const passed = new Set(
+		events
+			.filter((e) => e && e.type === "gate_passed" && e.data)
+			.map((e) => e.data.gateId || e.data.gate)
+			.filter(Boolean),
+	);
+	const pending = gates.filter((g) => !passed.has(g.id));
+	const pendingGateId = (pending[0] && pending[0].id) || (gates[0] && gates[0].id) || null;
+	return { gates, pendingGateId, routeId, pendingCount: pending.length };
 }
 
 // ── State-derived helpers (operate on the context built below) ───────────────
@@ -167,7 +163,7 @@ function acceptLogged(ctx) {
 	);
 	if (!pathExists(evoPath)) return false;
 	try {
-		return readText(evoPath).includes(plan.path);
+		return toPortablePath(readText(evoPath)).includes(toPortablePath(plan.path));
 	} catch {
 		return false;
 	}

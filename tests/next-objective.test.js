@@ -96,6 +96,27 @@ test("next --objective resolves routes from the Target Repository", () => {
 	assert.equal(suggestion.routeId, "lunar-calibration");
 });
 
+test("next --objective rejects a routes junction outside the Target Repository", () => {
+	const target = tempDir("target-route-junction");
+	const outside = tempDir("outside-route-junction");
+	copyProductAsset(outside, "routes/bugfix-quick.route.json");
+	try {
+		fs.symlinkSync(path.join(outside, "routes"), path.join(target, "routes"), "junction");
+	} catch (error) {
+		fs.rmSync(target, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+		if (/EPERM|ENOSYS|existing/i.test(error.message)) return;
+		throw error;
+	}
+
+	const result = runHarness(["next", "--target", target, "--objective", "fix login bug", "--json"]);
+	assert.notEqual(result.status, 0);
+	assert.match(`${result.stdout}\n${result.stderr}`, /Routes directory is outside the target root/);
+
+	fs.rmSync(target, { recursive: true, force: true });
+	fs.rmSync(outside, { recursive: true, force: true });
+});
+
 test("next keeps its Journey coherent with the selected Route affinity", () => {
 	const target = tempDir("route-affinity");
 	const route = JSON.parse(

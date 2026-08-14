@@ -20,6 +20,7 @@ const os = require("node:os");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const Ajv = require("ajv");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 const ROOT = path.resolve(__dirname, "../..");
 const MCP_JS = path.join(ROOT, "scripts", "amber-mcp.js");
@@ -28,6 +29,19 @@ const ACTION_TYPES_DIR = path.join(ROOT, "action-types");
 
 function tempTarget() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-mcp-int-"));
+}
+
+function writeTargetRoute(target, routeId, sourceRouteId = "feature-standard") {
+	const routesDir = path.join(target, "routes");
+	fs.mkdirSync(routesDir, { recursive: true });
+	const route = JSON.parse(
+		fs.readFileSync(path.join(ROOT, "routes", `${sourceRouteId}.route.json`), "utf8"),
+	);
+	route.routeId = routeId;
+	fs.writeFileSync(
+		path.join(routesDir, `${routeId}.route.json`),
+		`${JSON.stringify(route, null, 2)}\n`,
+	);
 }
 
 function rpc(messages, extraArgs = []) {
@@ -141,6 +155,18 @@ test("tools/list exposes every whitelisted amber.* action", () => {
 	}
 	const startTool = tools.find((tool) => tool.name === "amber.session.start");
 	assert.equal(startTool.inputSchema.properties.mode, undefined);
+	for (const file of fs.readdirSync(ACTION_TYPES_DIR).filter((name) => name.endsWith(".json"))) {
+		const action = JSON.parse(fs.readFileSync(path.join(ACTION_TYPES_DIR, file), "utf8"));
+		const tool = tools.find((candidate) => candidate.name === action.actionTypeId);
+		for (const [name, definition] of Object.entries(action.parameters || {})) {
+			if (!definition.required || definition.type !== "string") continue;
+			const pattern = tool.inputSchema.properties[name].pattern;
+			assert.ok(pattern, `${action.actionTypeId}.${name} must reject blank strings`);
+			assert.equal(new RegExp(pattern).test("   "), false);
+		}
+	}
+	const queryTool = tools.find((candidate) => candidate.name === "amber.object.query");
+	assert.equal(new RegExp(queryTool.inputSchema.properties.route.pattern).test("   "), false);
 
 	// Function tools are exposed alongside action tools.
 	assert.ok(names.includes("amber.fn.sessionEvidence"));
@@ -150,6 +176,7 @@ test("tools/list exposes every whitelisted amber.* action", () => {
 test("object.query executes in default mode for every object family", () => {
 	const target = tempTarget();
 	fs.mkdirSync(path.join(target, ".amber"));
+	writeTargetRoute(target, "feature-standard");
 	const byId = rpc(
 		[
 			{
@@ -232,6 +259,7 @@ test("object.query rejects unknown object types", () => {
 
 test("closed loop: query -> decide -> act(read-only) -> verify chain works", () => {
 	const target = tempTarget();
+	writeTargetRoute(target, "feature-standard");
 	const byId = rpc(
 		[
 			// query: what routes exist?
@@ -270,7 +298,13 @@ test("closed loop: query -> decide -> act(read-only) -> verify chain works", () 
 		true,
 		"mutating act is always approval-required (never spawned)",
 	);
-	assert.match(act.command, /amber session start --goal loop smoke --target /);
+	assert.deepEqual(act.commandArgv.slice(0, 5), [
+		"amber",
+		"session",
+		"start",
+		"--goal",
+		"loop smoke",
+	]);
 
 	const verify = callOutcome(byId.get(3));
 	assert.equal(verify.executed, true);
@@ -301,8 +335,56 @@ test("--execute still gates mutating actions behind human approval", () => {
 	assert.ok(!fs.existsSync(path.join(target, ".amber")));
 });
 
+test("approval submissions preserve argv boundaries and quote their display command", () => {
+	const target = tempTarget();
+	const goal = "review; echo 'not a second command'";
+	const shellSensitiveGoal = process.platform === "win32" ? "@args" : "review\\scope";
+	const byId = rpc(
+		[
+			{
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: { name: "amber.session.start", arguments: { goal } },
+			},
+			{
+				jsonrpc: "2.0",
+				id: 2,
+				method: "tools/call",
+				params: {
+					name: "amber.session.start",
+					arguments: { goal: shellSensitiveGoal },
+				},
+			},
+		],
+		["--target", target],
+	);
+	const outcome = callOutcome(byId.get(1));
+
+	assert.deepEqual(outcome.commandArgv, [
+		"amber",
+		"session",
+		"start",
+		"--goal",
+		goal,
+		"--target",
+		fs.realpathSync(target),
+	]);
+	assert.equal(outcome.commandShell, process.platform === "win32" ? "powershell" : "posix");
+	assert.ok(outcome.command.includes("'"), "unsafe arguments must be quoted for display");
+	assert.doesNotMatch(outcome.hint, /Run the rendered command/);
+	assert.equal(outcome.approvalRequired, true);
+
+	const shellSensitive = callOutcome(byId.get(2));
+	assert.ok(
+		shellSensitive.command.includes(`'${shellSensitiveGoal}'`),
+		`${shellSensitiveGoal} must be quoted for ${shellSensitive.commandShell}`,
+	);
+});
+
 test("--execute runs read-only action types and reports stdout", () => {
 	const target = tempTarget();
+	writeTargetRoute(target, "feature-standard");
 	const byId = rpc(
 		[
 			{
@@ -343,6 +425,36 @@ test("invalid arguments are rejected with a JSON-RPC error", () => {
 				method: "tools/call",
 				params: { name: "amber.session.start", arguments: {} },
 			},
+			{
+				jsonrpc: "2.0",
+				id: 2,
+				method: "tools/call",
+				params: { name: "amber.session.start", arguments: { goal: "   " } },
+			},
+			{
+				jsonrpc: "2.0",
+				id: 3,
+				method: "tools/call",
+				params: { name: "amber.object.query", arguments: { objectType: "context" } },
+			},
+			{
+				jsonrpc: "2.0",
+				id: 4,
+				method: "tools/call",
+				params: {
+					name: "amber.context.ingest",
+					arguments: { requestId: "   ", payload: "   " },
+				},
+			},
+			{
+				jsonrpc: "2.0",
+				id: 5,
+				method: "tools/call",
+				params: {
+					name: "amber.object.query",
+					arguments: { objectType: "context", route: "   " },
+				},
+			},
 		],
 		["--target", target],
 	);
@@ -350,6 +462,26 @@ test("invalid arguments are rejected with a JSON-RPC error", () => {
 	assert.ok(response.error);
 	assert.equal(response.error.code, -32602);
 	assert.match(response.error.message, /goal/);
+
+	const blankGoal = byId.get(2);
+	assert.ok(blankGoal.error);
+	assert.equal(blankGoal.error.code, -32602);
+	assert.match(blankGoal.error.message, /goal/);
+
+	const missingVariantParameter = byId.get(3);
+	assert.ok(missingVariantParameter.error);
+	assert.equal(missingVariantParameter.error.code, -32602);
+	assert.match(missingVariantParameter.error.message, /route/);
+
+	const blankContext = byId.get(4);
+	assert.ok(blankContext.error);
+	assert.equal(blankContext.error.code, -32602);
+	assert.match(blankContext.error.message, /requestId|payload/);
+
+	const blankVariantParameter = byId.get(5);
+	assert.ok(blankVariantParameter.error);
+	assert.equal(blankVariantParameter.error.code, -32602);
+	assert.match(blankVariantParameter.error.message, /route/);
 });
 
 test("every tools/call result carries structuredContent as an object", () => {
@@ -420,6 +552,7 @@ test("unknown tool names are rejected", () => {
 
 test("object.query returns structuredContent for JSON-emitting commands", () => {
 	const target = tempTarget();
+	writeTargetRoute(target, "feature-standard");
 	const byId = rpc(
 		[
 			{
@@ -469,7 +602,8 @@ test("object.query returns structuredContent for JSON-emitting commands", () => 
 test("multi-target: _target overrides the repository per call (configured member)", () => {
 	const targetA = tempTarget();
 	const targetB = tempTarget();
-	fs.writeFileSync(path.join(targetB, "marker.txt"), "b");
+	writeTargetRoute(targetA, "target-a");
+	writeTargetRoute(targetB, "target-b", "bugfix-quick");
 	const byId = rpc(
 		[
 			{
@@ -487,9 +621,42 @@ test("multi-target: _target overrides the repository per call (configured member
 	);
 	const outcome = callOutcome(byId.get(1));
 	assert.equal(outcome.executed, true);
-	assert.ok(
-		outcome.command.endsWith(`--target ${targetB}`),
+	assert.equal(
+		outcome.commandArgv.at(-1),
+		fs.realpathSync(targetB),
 		`command must target the override: ${outcome.command}`,
+	);
+	assert.match(outcome.stdout, /target-b/);
+	assert.doesNotMatch(outcome.stdout, /target-a/);
+});
+
+test("configured-repository invariant: route query rejects a routes junction escape", () => {
+	const target = tempTarget();
+	const outside = tempTarget();
+	writeTargetRoute(outside, "outside-route");
+	try {
+		fs.symlinkSync(path.join(outside, "routes"), path.join(target, "routes"), "junction");
+	} catch (error) {
+		if (/EPERM|ENOSYS|existing/i.test(error.message)) return;
+		throw error;
+	}
+
+	const byId = rpc(
+		[
+			{
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: { name: "amber.object.query", arguments: { objectType: "route" } },
+			},
+		],
+		["--target", target],
+	);
+	const outcome = callOutcome(byId.get(1));
+	assert.equal(byId.get(1).result.isError, true);
+	assert.match(
+		`${outcome.stdout}\n${outcome.stderr}\n${outcome.error || ""}`,
+		/outside the target root/,
 	);
 });
 
@@ -538,6 +705,7 @@ test("multi-target: invalid _target is rejected", () => {
 
 test("functions: amber.fn.sessionEvidence summarizes a session read-only", () => {
 	const target = tempTarget();
+	installTargetRoutes(target);
 	const start = spawnSync(
 		process.execPath,
 		[
@@ -619,8 +787,7 @@ test("functions: schema-invalid session manifest fails closed", () => {
 test("functions: amber.fn.repoOverview aggregates across repositories", () => {
 	const targetA = tempTarget();
 	const targetB = tempTarget();
-	fs.mkdirSync(path.join(targetB, "routes"));
-	fs.writeFileSync(path.join(targetB, "routes", "configured.route.json"), "{}\n");
+	writeTargetRoute(targetB, "configured");
 	const start = spawnSync(
 		process.execPath,
 		[
@@ -630,7 +797,7 @@ test("functions: amber.fn.repoOverview aggregates across repositories", () => {
 			"--goal",
 			"overview probe",
 			"--route",
-			"feature-standard",
+			"configured",
 			"--confirm",
 			"--target",
 			targetB,
@@ -696,6 +863,7 @@ test("functions: repoOverview refuses a session-directory junction escape", () =
 test("concurrency: mutating actions conflict on a busy repository", () => {
 	const targetA = tempTarget();
 	const targetB = tempTarget();
+	installTargetRoutes(targetB);
 	const start = spawnSync(
 		process.execPath,
 		[
@@ -762,6 +930,7 @@ test("concurrency: mutating actions conflict on a busy repository", () => {
 
 test("ownership: --agent records agentId in the session manifest", () => {
 	const target = tempTarget();
+	installTargetRoutes(target);
 	const start = spawnSync(
 		process.execPath,
 		[
@@ -930,6 +1099,7 @@ test("fail-closed: non-zero read-only command surfaces as isError", () => {
 
 test("fail-closed: corrupt active-session manifest blocks mutation with isError", () => {
 	const target = tempTarget();
+	installTargetRoutes(target);
 	// Seed an active session, then corrupt its manifest so the concurrency
 	// guard cannot read governance state.
 	const start = spawnSync(

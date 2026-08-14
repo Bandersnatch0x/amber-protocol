@@ -111,9 +111,10 @@ function containsRealPath(child, root) {
 }
 
 // Resolve a repository-relative path for a read, rejecting every escape vector:
-// absolute paths, `..` traversal, and symlink/junction redirection. Returns the
-// absolute lexical path under the canonical root (suitable for fs reads).
-function resolveRepoPath(root, rel) {
+// absolute paths, `..` traversal, and symlink/junction redirection. Existing
+// entries return the canonical path that passed containment validation; only
+// missing entries return a validated lexical path for existence probes.
+function resolveRepoPath(root, rel, { mustExist = false } = {}) {
 	if (typeof rel !== "string" || rel === "") {
 		throw new Error("path is empty");
 	}
@@ -125,8 +126,25 @@ function resolveRepoPath(root, rel) {
 	if (!isDescendant(resolved, realRoot)) {
 		throw new Error(`path escapes repository root: ${rel}`);
 	}
+	if (fs.existsSync(resolved)) {
+		let canonical;
+		try {
+			canonical = fs.realpathSync(resolved);
+		} catch (error) {
+			throw new Error(`path cannot be resolved safely: ${rel}`, { cause: error });
+		}
+		if (!isDescendant(canonical, realRoot)) {
+			throw new Error(`path escapes repository root via link: ${rel}`);
+		}
+		return canonical;
+	}
 	if (!containsRealPath(rel, realRoot)) {
 		throw new Error(`path escapes repository root via link: ${rel}`);
+	}
+	if (mustExist) {
+		const error = new Error(`path does not exist: ${rel}`);
+		error.code = "ENOENT";
+		throw error;
 	}
 	return resolved;
 }
@@ -134,12 +152,12 @@ function resolveRepoPath(root, rel) {
 // Resolve a descendant path only after proving its base is an exact member of
 // the configured repository set. Function handlers use this interface so an
 // arbitrary `base` argument cannot widen the server's startup configuration.
-function resolveConfiguredRepoPath({ configured, target, relativePath }) {
+function resolveConfiguredRepoPath({ configured, target, relativePath, mustExist = false }) {
 	const canonicalTarget = canonicalizeDirectory(target || configured.primary);
 	if (!configured.index.has(canonicalTarget)) {
 		throw new Error(`path base is not a configured repository: ${target}`);
 	}
-	return resolveRepoPath(canonicalTarget, relativePath);
+	return resolveRepoPath(canonicalTarget, relativePath, { mustExist });
 }
 
 // ---- _target resolution -------------------------------------------------

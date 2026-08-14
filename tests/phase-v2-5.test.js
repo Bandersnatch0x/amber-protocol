@@ -92,5 +92,27 @@ test("review passes confirmed plans and accept appends evolution log", () => {
 	assert.equal(JSON.parse(review.stdout).releaseReadiness.status, "ready");
 	assert.equal(accept.status, 0, accept.stderr);
 	assert.equal(JSON.parse(accept.stdout).accepted, true);
-	assert.match(fs.readFileSync(evolutionPath, "utf8"), /F001-Accept-ready\.md/);
+	assert.match(fs.readFileSync(evolutionPath, "utf8"), /`docs\/plans\/F001-Accept-ready\.md`/);
+});
+
+test("gate, review, and accept reject an absolute plan path", () => {
+	const target = tempDir("absolute-plan");
+	assert.equal(runHarness(["init", "--target", target]).status, 0);
+	const plan = createPlan(target, "Absolute path");
+	const absolutePlan = path.join(target, plan);
+
+	for (const args of [
+		["gate", "--confirm", "--target", target, "--plan", absolutePlan, "--json"],
+		["review", "--target", target, "--plan", absolutePlan, "--json"],
+		["accept", "--target", target, "--plan", absolutePlan, "--json"],
+	]) {
+		const result = runHarness(args);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stdout, /Plan path must be relative to the target repository/);
+	}
+
+	assert.equal(
+		fs.existsSync(path.join(target, "docs", "wiki", "engineering", "harness-evolution.md")),
+		false,
+	);
 });

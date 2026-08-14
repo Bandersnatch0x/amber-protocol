@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -149,6 +150,7 @@ test("Governed Delivery: plan, gate, review, and session complete-check", () => 
 
 test("Continuity Layer: session start and status", () => {
 	const target = tempDir("continuity");
+	installTargetRoutes(target);
 
 	const start = runAmber([
 		"session",

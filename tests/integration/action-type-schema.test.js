@@ -19,10 +19,12 @@ const os = require("node:os");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const Ajv = require("ajv");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 const ROOT = path.resolve(__dirname, "../..");
 const SCHEMA_PATH = path.join(ROOT, "schemas", "action.type.schema.json");
 const SESSION_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "amber-action-int-"));
+installTargetRoutes(SESSION_ROOT);
 
 test.after(() => {
 	fs.rmSync(SESSION_ROOT, { recursive: true, force: true });

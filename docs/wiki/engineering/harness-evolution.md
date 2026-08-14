@@ -63,3 +63,15 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F019-Intent-router-deep-journey-skills-default-help-projection.md`
 - Review status: ready
 - Feature: F019 status → accepted in feature_list.json
+
+## 2026-08-14 docs/plans/F020-Remediate-v1-5-1-review-findings.md
+
+- Plan: `docs/plans/F020-Remediate-v1-5-1-review-findings.md`
+- Review status: ready
+- Feature: F020 status → accepted in feature_list.json
+
+## 2026-08-14 docs/plans/F021-Align-prerelease-publish-policy.md
+
+- Plan: `docs/plans/F021-Align-prerelease-publish-policy.md`
+- Review status: ready
+- Feature: F021 status → accepted in feature_list.json

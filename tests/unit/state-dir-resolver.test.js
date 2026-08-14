@@ -10,6 +10,7 @@ const {
 	CANONICAL_STATE_DIR,
 	LEGACY_STATE_DIR,
 } = require("../../scripts/lib/state-dir-resolver");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 function tmpRoot() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-resolver-"));
@@ -50,6 +51,7 @@ test("exports canonical and legacy dir names", () => {
 
 test("startSession creates sessions under .amber, not .harness", async () => {
 	const root = tmpRoot();
+	installTargetRoutes(root);
 	const { startSession } = require("../../scripts/lib/session-commands");
 	const start = await startSession(root, {
 		goal: "demo goal",

@@ -142,6 +142,42 @@ test("resolveRepoPath rejects a missing descendant beneath an escaping link", ()
 	fs.rmSync(outside, { recursive: true, force: true });
 });
 
+test("resolveRepoPath returns the canonical path that passed containment validation", () => {
+	const root = makeTempRepo();
+	const outside = makeTempRepo();
+	const inside = path.join(root, "inside");
+	const alias = path.join(root, "alias");
+	fs.mkdirSync(inside);
+	fs.writeFileSync(path.join(inside, "value.txt"), "inside");
+	fs.writeFileSync(path.join(outside, "value.txt"), "outside");
+
+	try {
+		fs.symlinkSync(inside, alias, "junction");
+	} catch (err) {
+		if (/EPERM|ENOSYS|existing/i.test(err.message)) return;
+		throw err;
+	}
+
+	const resolved = resolveRepoPath(root, "alias/value.txt");
+	assert.equal(resolved, fs.realpathSync(path.join(inside, "value.txt")));
+
+	fs.unlinkSync(alias);
+	fs.symlinkSync(outside, alias, "junction");
+	assert.equal(fs.readFileSync(resolved, "utf8"), "inside");
+
+	fs.rmSync(root, { recursive: true, force: true });
+	fs.rmSync(outside, { recursive: true, force: true });
+});
+
+test("resolveRepoPath can require an existing canonical entry for consuming reads", () => {
+	const root = makeTempRepo();
+	assert.throws(
+		() => resolveRepoPath(root, "missing.json", { mustExist: true }),
+		(error) => error.code === "ENOENT" && /does not exist/.test(error.message),
+	);
+	fs.rmSync(root, { recursive: true, force: true });
+});
+
 test("resolveConfiguredRepoPath accepts only configured repository bases", () => {
 	const primary = makeTempRepo();
 	const extra = makeTempRepo();

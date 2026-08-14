@@ -1,5 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("assert");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("path");
 const { loadRoutes, loadRouteFile } = require("../../scripts/lib/route-loader");
 
@@ -32,6 +34,25 @@ describe("loadRoutes", () => {
 	it("ignores files that do not end with .route.json", () => {
 		const result = loadRoutes(ROUTES_DIR);
 		assert.ok(result.routes.every((r) => r.filePath.endsWith(".route.json")));
+	});
+
+	it("rejects a route file symlink that escapes the routes directory", () => {
+		const routesDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-routes-inside-"));
+		const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-routes-outside-"));
+		const outsideFile = path.join(outside, "outside.route.json");
+		fs.copyFileSync(path.join(ROUTES_DIR, "bugfix-quick.route.json"), outsideFile);
+		try {
+			fs.symlinkSync(outsideFile, path.join(routesDir, "escaped.route.json"), "file");
+		} catch (error) {
+			fs.rmSync(routesDir, { recursive: true, force: true });
+			fs.rmSync(outside, { recursive: true, force: true });
+			if (/EPERM|ENOSYS|existing/i.test(error.message)) return;
+			throw error;
+		}
+
+		assert.throws(() => loadRoutes(routesDir), /Route file is outside the target root/);
+		fs.rmSync(routesDir, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
 	});
 });
 

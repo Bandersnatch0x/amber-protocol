@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { inspectPolicy } = require("./governance");
 const { readJsonSafe } = require("./fs-utils");
-const { loadRoutes } = require("../route-loader");
+const { loadTargetRoutes } = require("../route-loader");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { walkLedgers, verifyLedgerChain } = require("./loop-ledger");
 
@@ -69,13 +69,17 @@ function gateIdsForRoute(route) {
 }
 
 function inspectRoutes(targetRoot) {
-	const routesDir = path.join(targetRoot, "routes");
-	const loaded = loadRoutes(routesDir);
+	const resolvedTarget = path.resolve(targetRoot);
+	const canonicalTarget = fs.existsSync(resolvedTarget)
+		? (fs.realpathSync.native || fs.realpathSync)(resolvedTarget)
+		: resolvedTarget;
+	const loaded = loadTargetRoutes(canonicalTarget);
+	const { routesDir } = loaded;
 	const routes = loaded.routes.map((route) => {
 		const gateIds = gateIdsForRoute(route);
 		return {
 			id: route.routeId,
-			file: slash(path.relative(targetRoot, route.filePath)),
+			file: slash(path.relative(canonicalTarget, route.filePath)),
 			stageCount: Array.isArray(route.stages) ? route.stages.length : 0,
 			gateIds,
 			hasGates: gateIds.length > 0,
@@ -84,7 +88,7 @@ function inspectRoutes(targetRoot) {
 	});
 
 	return {
-		routesDir: slash(path.relative(targetRoot, routesDir)) || ".",
+		routesDir: slash(path.relative(canonicalTarget, routesDir)) || ".",
 		count: routes.length,
 		routes,
 		errors: loaded.errors,

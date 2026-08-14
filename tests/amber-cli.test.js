@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
+const { installTargetRoutes } = require("./helpers/target-routes");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -1654,6 +1655,7 @@ test("security audit command exposes help", () => {
 
 test("session complete-check reports missing evidence for a new session", () => {
 	const target = tempDir("session-complete-check");
+	installTargetRoutes(target);
 	const start = runHarness([
 		"session",
 		"start",

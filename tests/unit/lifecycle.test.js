@@ -30,6 +30,20 @@ function writePlan(dir, name, body) {
 	fs.writeFileSync(path.join(plansDir, name), body);
 }
 
+function writeTargetRoute(dir, routeId, gateId) {
+	const routesDir = path.join(dir, "routes");
+	fs.mkdirSync(routesDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(routesDir, `${routeId}.route.json`),
+		JSON.stringify({
+			routeId,
+			schemaVersion: "1.0.0",
+			stages: [{ name: "verify", type: "command", target: "node --test", gateAfter: gateId }],
+			gates: [{ id: gateId, type: "user-approval" }],
+		}),
+	);
+}
+
 describe("gatherState", () => {
 	it("returns empty, non-installed state for a bare directory", () => {
 		const dir = tmpRepo();
@@ -300,6 +314,34 @@ describe("acceptLogged via synthetic ctx + real evolution log", () => {
 		);
 		assert.equal(inferNextStep(ctx), null);
 	});
+
+	it("recognizes an accepted plan logged with Windows path separators", () => {
+		const dir = tmpRepo();
+		const evoDir = path.join(dir, "docs", "wiki", "engineering");
+		fs.mkdirSync(evoDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(evoDir, "harness-evolution.md"),
+			"## 2026-08-14 docs\\plans\\F001-login.md\n",
+		);
+		const ctx = ctxOf(
+			{
+				targetRoot: dir,
+				features: [
+					{
+						id: "F001",
+						status: "accepted",
+						evidence: [{ command: "x", result: "y", date: "2026-08-14" }],
+					},
+				],
+				plans: [
+					{ path: "docs/plans/F001-login.md", featureId: "F001", confirmed: true, mtimeMs: 1 },
+				],
+			},
+			{ type: "feature", id: "F001" },
+		);
+
+		assert.equal(inferNextStep(ctx), null);
+	});
 });
 
 describe("focus auto-selection", () => {
@@ -401,6 +443,70 @@ describe("session continuation remedies carry the selected target (#41)", () => 
 		const step = inferNextStep(session({ status: "pass", missing: [] }));
 		assert.equal(step.id, "session-complete");
 		assert.match(step.remedy, /--target \./);
+	});
+});
+
+describe("target-local Route lifecycle", () => {
+	it("resolves the pending gate from the selected target repository", () => {
+		const dir = tmpRepo();
+		const sessionId = "sess-target-route";
+		writeTargetRoute(dir, "target-only", "target-approval");
+		const sessionDir = path.join(dir, ".amber", "sessions", sessionId);
+		fs.mkdirSync(sessionDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(sessionDir, "manifest.json"),
+			JSON.stringify({
+				schemaVersion: "1.0.0",
+				sessionId,
+				status: "executing",
+				goal: "target-local lifecycle",
+				route: { id: "target-only", version: "1.0.0" },
+				createdAt: "2026-08-14T00:00:00.000Z",
+			}),
+		);
+
+		const ctx = buildContext(dir, { session: sessionId, target: "." });
+
+		assert.equal(ctx.pendingGateId, "target-approval");
+		assert.deepEqual(
+			ctx.sessionGates.map((gate) => gate.id),
+			["target-approval"],
+		);
+	});
+
+	it("fails closed when the target Routes directory escapes through a link", (t) => {
+		const dir = tmpRepo();
+		const outside = tmpRepo();
+		const sessionId = "sess-escaped-routes";
+		writeTargetRoute(outside, "target-only", "target-approval");
+		try {
+			fs.symlinkSync(
+				path.join(outside, "routes"),
+				path.join(dir, "routes"),
+				process.platform === "win32" ? "junction" : "dir",
+			);
+		} catch (error) {
+			t.skip(`link creation unavailable: ${error.message}`);
+			return;
+		}
+		const sessionDir = path.join(dir, ".amber", "sessions", sessionId);
+		fs.mkdirSync(sessionDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(sessionDir, "manifest.json"),
+			JSON.stringify({
+				schemaVersion: "1.0.0",
+				sessionId,
+				status: "executing",
+				goal: "escaped Route directory",
+				route: { id: "target-only", version: "1.0.0" },
+				createdAt: "2026-08-14T00:00:00.000Z",
+			}),
+		);
+
+		assert.throws(
+			() => buildContext(dir, { session: sessionId, target: "." }),
+			/Routes directory is outside the target root/,
+		);
 	});
 });
 

@@ -4,6 +4,7 @@ const { spawnSync } = require("child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("path");
+const { installTargetRoutes } = require("../helpers/target-routes");
 
 const ROOT = path.join(__dirname, "../..");
 
@@ -11,6 +12,7 @@ describe("concurrent sessions E2E", () => {
 	// Use an isolated target so `session start` writes its manifests and
 	// continuity surfaces into a tempdir instead of polluting the repo root.
 	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-concurrent-"));
+	installTargetRoutes(target);
 
 	after(() => {
 		fs.rmSync(target, { recursive: true, force: true });

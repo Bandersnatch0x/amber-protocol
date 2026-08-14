@@ -1,10 +1,17 @@
 "use strict";
 
 const fs = require("fs");
-const path = require("path");
+const { resolvePathWithin } = require("./core/fs-utils");
 const validateRoute = require("./validate-route");
 
 const ROUTE_FILE_SUFFIX = ".route.json";
+
+function resolveTargetRoutesDirectory(targetRoot) {
+	return resolvePathWithin(targetRoot, "routes", {
+		label: "Routes directory",
+		canonicalExisting: true,
+	});
+}
 
 function loadRouteFile(filePath) {
 	let raw;
@@ -43,7 +50,12 @@ function listRouteFiles(routesDir) {
 		.readdirSync(routesDir)
 		.filter((name) => name.endsWith(ROUTE_FILE_SUFFIX))
 		.sort()
-		.map((name) => path.join(routesDir, name));
+		.map((name) =>
+			resolvePathWithin(routesDir, name, {
+				label: "Route file",
+				canonicalExisting: true,
+			}),
+		);
 }
 
 function loadRoutes(routesDir) {
@@ -62,4 +74,15 @@ function loadRoutes(routesDir) {
 	return { routes, errors };
 }
 
-module.exports = { loadRoutes, loadRouteFile, ROUTE_FILE_SUFFIX };
+function loadTargetRoutes(targetRoot) {
+	const routesDir = resolveTargetRoutesDirectory(targetRoot);
+	return { routesDir, ...loadRoutes(routesDir) };
+}
+
+module.exports = {
+	loadRoutes,
+	loadTargetRoutes,
+	loadRouteFile,
+	resolveTargetRoutesDirectory,
+	ROUTE_FILE_SUFFIX,
+};

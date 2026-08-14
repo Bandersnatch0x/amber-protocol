@@ -9,12 +9,18 @@ const { resolveConfiguredRepoPath } = require("./mcp-targets");
 const { readSessionSummary } = require("./session-manifest");
 
 function createReader(configured, primary) {
-	const resolve = (relativePath, target = primary) =>
-		resolveConfiguredRepoPath({ configured, target, relativePath });
+	const resolve = (relativePath, target = primary, mustExist = true) =>
+		resolveConfiguredRepoPath({ configured, target, relativePath, mustExist });
 	return {
 		targets: [primary, ...configured.targets.filter((target) => target !== primary)],
 		exists(relativePath, target) {
-			return fs.existsSync(resolve(relativePath, target));
+			try {
+				resolve(relativePath, target);
+				return true;
+			} catch (error) {
+				if (error.code === "ENOENT") return false;
+				throw error;
+			}
 		},
 		list(relativePath, target) {
 			return fs.readdirSync(resolve(relativePath, target));
@@ -29,12 +35,15 @@ function createReader(configured, primary) {
 			return JSON.parse(fs.readFileSync(resolve(relativePath, target), "utf8"));
 		},
 		countNonEmptyLines(relativePath, target) {
-			const file = resolve(relativePath, target);
-			if (!fs.existsSync(file)) return 0;
-			return fs
-				.readFileSync(file, "utf8")
-				.split("\n")
-				.filter((line) => line.trim()).length;
+			try {
+				return fs
+					.readFileSync(resolve(relativePath, target), "utf8")
+					.split("\n")
+					.filter((line) => line.trim()).length;
+			} catch (error) {
+				if (error.code === "ENOENT") return 0;
+				throw error;
+			}
 		},
 	};
 }

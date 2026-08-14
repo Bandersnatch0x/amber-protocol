@@ -60,24 +60,15 @@ test("dsh bundle runtime resolves published Amber assets", () => {
 test("npm pack dry-run ships every declared bundle asset", () => {
 	const { execFileSync } = require("node:child_process");
 	const manifest = JSON.parse(read("package.json"));
-
-	let packed;
-	try {
-		const raw = execFileSync(
-			process.execPath,
-			["../../node_modules/npm/bin/npm-cli.js", "pack", "--dry-run", "--json"],
-			{ cwd: BUNDLE_ROOT, encoding: "utf8", timeout: 30000 },
-		);
-		packed = JSON.parse(raw);
-	} catch (error) {
-		// Fallback: invoke npm directly (global install / npx)
-		const raw = execFileSync("npm", ["pack", "--dry-run", "--json"], {
-			cwd: BUNDLE_ROOT,
-			encoding: "utf8",
-			timeout: 30000,
-		});
-		packed = JSON.parse(raw);
-	}
+	const npmCli = process.env.npm_execpath;
+	const command = npmCli ? process.execPath : "npm";
+	const args = npmCli ? [npmCli, "pack", "--dry-run", "--json"] : ["pack", "--dry-run", "--json"];
+	const raw = execFileSync(command, args, {
+		cwd: BUNDLE_ROOT,
+		encoding: "utf8",
+		timeout: 30000,
+	});
+	const packed = JSON.parse(raw);
 
 	const shipped = new Set();
 	for (const entry of packed[0].files) shipped.add(entry.path);

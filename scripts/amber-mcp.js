@@ -122,22 +122,48 @@ function injectReservedParams(schema) {
 }
 
 function toInputSchema(action) {
+	const execution = action.execution;
+	const variantRequirements = execution?.variants
+		? Object.entries(execution.variants)
+				.map(([variant, mapping]) => ({
+					variant,
+					required: (mapping.args || [])
+						.filter((argument) => argument.source && !argument.optional)
+						.map((argument) => argument.source.replace(/^parameters\./, ""))
+						.filter((parameter) => parameter !== execution.variantParam),
+				}))
+				.filter(({ required }) => required.length > 0)
+		: [];
+	const requiredByVariant = new Set(variantRequirements.flatMap(({ required }) => required));
 	const properties = {};
 	const required = [];
 	for (const [key, def] of Object.entries(action.parameters || {})) {
 		const prop = { type: def.type };
 		if (def.description) prop.description = def.description;
 		if (def.enum) prop.enum = def.enum;
+		if (def.pattern) prop.pattern = def.pattern;
+		else if ((def.required || requiredByVariant.has(key)) && def.type === "string")
+			prop.pattern = "\\S";
 		if (def.type === "array") prop.items = { type: "string" };
 		properties[key] = prop;
 		if (def.required) required.push(key);
 	}
-	return injectReservedParams({
+	const schema = injectReservedParams({
 		type: "object",
 		properties,
 		required,
 		additionalProperties: false,
 	});
+	if (variantRequirements.length > 0) {
+		schema.allOf = variantRequirements.map(({ variant, required: variantRequired }) => ({
+			if: {
+				properties: { [execution.variantParam]: { const: variant } },
+				required: [execution.variantParam],
+			},
+			then: { required: [...new Set(variantRequired)] },
+		}));
+	}
+	return schema;
 }
 
 function toFunctionInputSchema(fn) {
