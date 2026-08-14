@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { trpc, getTRPCClient } from './trpc';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSettings } from './settings-provider';
 import type { Settings } from '@/features/settings/settings-model';
 
@@ -18,18 +18,19 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
   const { settings } = useSettings();
   const { autoRefresh, refreshInterval } = settings;
 
+  const queries = useMemo(
+    () => queryDefaults({ autoRefresh, refreshInterval }),
+    [autoRefresh, refreshInterval],
+  );
+
   const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: queryDefaults({ autoRefresh, refreshInterval }),
-    },
+    defaultOptions: { queries },
   }));
   const [trpcClient] = useState(() => getTRPCClient());
 
   useEffect(() => {
-    queryClient.setDefaultOptions({
-      queries: queryDefaults({ autoRefresh, refreshInterval }),
-    });
-  }, [autoRefresh, refreshInterval, queryClient]);
+    queryClient.setDefaultOptions({ queries });
+  }, [queries, queryClient]);
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>

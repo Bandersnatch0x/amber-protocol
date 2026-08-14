@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -49,14 +50,21 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettingsState] = useState<Settings>(loadStoredSettings);
+  const settingsRef = useRef(settings);
 
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  // Persistence runs outside the state updater on purpose: React may invoke
+  // an updater more than once (StrictMode, concurrent replays), and the
+  // localStorage write must happen exactly once per call.
   const setSettings = useCallback((next: Settings | ((prev: Settings) => Settings)) => {
-    setSettingsState((prev) => {
-      const resolved = typeof next === 'function' ? next(prev) : next;
-      const normalized = normalizeSettings(resolved);
-      persistSettings(normalized);
-      return normalized;
-    });
+    const resolved = typeof next === 'function' ? next(settingsRef.current) : next;
+    const normalized = normalizeSettings(resolved);
+    settingsRef.current = normalized;
+    persistSettings(normalized);
+    setSettingsState(normalized);
   }, []);
 
   const updateSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
