@@ -90,9 +90,13 @@ test("stable release skips GitHub Release creation when the release already exis
 	assert.ok(checkStart < releaseStart, "release existence check must precede release creation");
 
 	const checkStep = stepBody(workflow, "Check GitHub Release", "Create GitHub Release");
-	assert.match(checkStep, /gh release view/);
-	assert.match(checkStep, /exists=true/);
-	assert.match(checkStep, /exists=false/);
+	assert.match(checkStep, /curl[\s\S]*releases\/tags\//);
+	assert.match(checkStep, /200\)\s*echo "exists=true"/);
+	assert.match(checkStep, /404\)\s*echo "exists=false"/);
+	// Transient lookup failures must retry and then fail closed; an
+	// undetermined existence must never fall through as "does not exist".
+	assert.match(checkStep, /for attempt in 1 2 3/);
+	assert.match(checkStep, /\*\)[\s\S]*exit 1/);
 	assert.match(
 		workflow.slice(releaseStart),
 		/if:\s*steps\.check_release\.outputs\.exists == 'false'/,
