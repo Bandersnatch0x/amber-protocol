@@ -1,9 +1,10 @@
-﻿import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { trpc } from '@/lib/trpc';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StatusBadge } from '@/components/session/StatusBadge';
 import { filterAndSortSessions } from '@/features/sessions/sessions-view-model';
 import { useI18n, type I18nKey } from '@/lib/i18n';
+import { useSettings } from '@/lib/settings-provider';
 
 export const Route = createFileRoute('/sessions/')({ component: SessionsPage });
 
@@ -35,6 +36,7 @@ function budgetText(session: {
 
 function SessionsPage() {
   const { t } = useI18n();
+  const { settings } = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const { data: sessions, isLoading, error, refetch } = trpc.session.list.useQuery();
@@ -136,6 +138,18 @@ function SessionsPage() {
               ? t('sessions.empty.filtered.detail')
               : t('sessions.empty.all.detail')}
           </p>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('');
+              }}
+              className="btn-secondary mt-4 text-sm"
+            >
+              {t('sessions.clearFilters')}
+            </button>
+          )}
         </div>
       )}
 
@@ -150,10 +164,12 @@ function SessionsPage() {
                 key={session.id}
                 to="/sessions/$id"
                 params={{ id: session.id }}
-                className="block px-5 py-4 transition-colors duration-150 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-slate-900"
+                className={`block transition-colors duration-150 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-slate-900 ${
+                  settings.compactView ? 'px-4 py-2.5' : 'px-5 py-4'
+                }`}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1 space-y-2">
+                  <div className={`min-w-0 flex-1 ${settings.compactView ? 'space-y-1' : 'space-y-2'}`}>
                     <div className="flex flex-wrap items-center gap-3">
                       <StatusBadge status={session.status} />
                       <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{session.id.slice(0, 8)}</span>

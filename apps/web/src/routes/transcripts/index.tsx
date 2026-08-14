@@ -3,6 +3,7 @@ import { trpc } from '@/lib/trpc';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { filterTranscripts } from '@/features/transcripts/transcripts-model';
 import { useI18n } from '@/lib/i18n';
+import { useSettings } from '@/lib/settings-provider';
 
 export const Route = createFileRoute('/transcripts/')({ component: TranscriptsPage });
 
@@ -21,6 +22,7 @@ function fileNameFromPath(value: string): string {
 
 function TranscriptsPage() {
   const { t } = useI18n();
+  const { settings } = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
   const { data: transcripts, isLoading, error, refetch } = trpc.transcript.list.useQuery();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -118,6 +120,15 @@ function TranscriptsPage() {
               ? t('transcripts.empty.filtered.detail')
               : t('transcripts.empty.all.detail')}
           </p>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="btn-secondary mt-4 text-sm"
+            >
+              {t('transcripts.clearFilters')}
+            </button>
+          )}
         </div>
       )}
 
@@ -128,10 +139,12 @@ function TranscriptsPage() {
               key={transcript.id}
               to="/transcripts/$id"
               params={{ id: transcript.id }}
-              className="block px-5 py-4 transition-colors duration-150 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-slate-900"
+              className={`block transition-colors duration-150 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-slate-900 ${
+                settings.compactView ? 'px-4 py-2.5' : 'px-5 py-4'
+              }`}
             >
               <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1 space-y-2">
+                <div className={`min-w-0 flex-1 ${settings.compactView ? 'space-y-1' : 'space-y-2'}`}>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{transcript.id.slice(0, 8)}</span>
                     {transcript.gitBranch && (

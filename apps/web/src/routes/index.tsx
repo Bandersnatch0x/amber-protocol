@@ -153,17 +153,11 @@ function HomePage() {
 
   return (
     <div className="page-container space-y-8">
-      <header className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">{t('home.title')}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-            {t('home.description')}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Link to="/sessions" className="btn-primary text-sm">{t('home.openSessions')}</Link>
-          <Link to="/gates" className="btn-secondary text-sm">{t('home.reviewGates')}</Link>
-        </div>
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">{t('home.title')}</h1>
+        <p className="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+          {t('home.description')}
+        </p>
       </header>
 
       <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">

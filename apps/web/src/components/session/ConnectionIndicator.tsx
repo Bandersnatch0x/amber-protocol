@@ -4,6 +4,8 @@ type ConnectionState = 'connecting' | 'open' | 'closed' | 'error';
 
 interface ConnectionIndicatorProps {
   state: ConnectionState;
+  onRetry?: () => void;
+  reconnectAttempt?: number;
 }
 
 const stateConfig: Record<ConnectionState, { labelKey: I18nKey; dotClass: string; textClass: string }> = {
@@ -13,14 +15,29 @@ const stateConfig: Record<ConnectionState, { labelKey: I18nKey; dotClass: string
   error: { labelKey: 'sessions.connection.error', dotClass: 'bg-red-500', textClass: 'text-red-600 dark:text-red-400' },
 };
 
-export function ConnectionIndicator({ state }: ConnectionIndicatorProps) {
+export function ConnectionIndicator({ state, onRetry, reconnectAttempt }: ConnectionIndicatorProps) {
   const { t } = useI18n();
   const config = stateConfig[state];
 
   return (
-    <div className="flex items-center gap-1.5">
-      <div className={`w-1.5 h-1.5 rounded-full ${config.dotClass}`} />
-      <span className={`text-xs font-medium ${config.textClass}`}>{t(config.labelKey)}</span>
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
+        <div className={`h-1.5 w-1.5 rounded-full ${config.dotClass}`} />
+        <span className={`text-xs font-medium ${config.textClass}`}>
+          {t(config.labelKey)}
+          {reconnectAttempt && reconnectAttempt > 0 && state === 'connecting' ? ` (${reconnectAttempt})` : ''}
+        </span>
+      </div>
+
+      {state === 'error' && onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded px-1.5 py-0.5 text-[11px] font-medium text-red-700 underline-offset-2 hover:bg-red-50 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-red-500 dark:text-red-300 dark:hover:bg-red-950/40"
+        >
+          {t('sessions.connection.retry')}
+        </button>
+      )}
     </div>
   );
 }

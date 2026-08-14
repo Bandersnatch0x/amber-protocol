@@ -44,13 +44,15 @@ function lifecycleFromNext(data: unknown): unknown {
 function SessionDetailPage() {
   const { t } = useI18n();
   const { id } = Route.useParams();
+  const search = Route.useSearch() as { from?: string } | undefined;
+  const fromGates = search?.from === 'gates';
   const { data: session, isLoading, error, refetch } = trpc.session.byId.useQuery({ id });
   const timelineQuery = trpc.session.timeline.useQuery({ sessionId: id });
   const auditSummary = trpc.session.auditSummary.useQuery({ sessionId: id });
   const lifecycleNext = trpc.lifecycle.next.useQuery({ session: id, strict: true });
   const completionCheck = trpc.lifecycle.completionCheck.useQuery({ sessionId: id, strict: true });
   const runVerification = trpc.lifecycle.runVerification.useMutation();
-  const { status: liveStatus, connectionState, lastEvent } = useSessionEvents(id);
+  const { status: liveStatus, connectionState, lastEvent, reconnect, reconnectAttempt } = useSessionEvents(id);
   const [manifestExpanded, setManifestExpanded] = useState(false);
 
   const effectiveStatus = (liveStatus ?? session?.status ?? null) as SessionStatusType | null;
@@ -115,8 +117,8 @@ function SessionDetailPage() {
               : error?.message}
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
-            <Link to="/sessions" className="btn-secondary text-sm">
-              {t('sessions.detail.back')}
+            <Link to={fromGates ? '/gates' : '/sessions'} className="btn-secondary text-sm">
+              {fromGates ? t('gates.backToGates') : t('sessions.detail.back')}
             </Link>
             {!isNotFound && (
               <button onClick={() => refetch()} className="btn-secondary text-sm">
@@ -132,11 +134,11 @@ function SessionDetailPage() {
   return (
     <div className="page-container space-y-6">
       <header className="space-y-3">
-        <Link to="/sessions" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200">
+        <Link to={fromGates ? '/gates' : '/sessions'} className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200">
           <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
-          {t('nav.sessions')}
+          {fromGates ? t('gates.backToGates') : t('nav.sessions')}
         </Link>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -157,7 +159,13 @@ function SessionDetailPage() {
       <section className="card p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex-1">
-            <SessionStatus status={effectiveStatus} connectionState={connectionState} lastEvent={latestEvent} />
+            <SessionStatus
+              status={effectiveStatus}
+              connectionState={connectionState}
+              lastEvent={latestEvent}
+              onRetry={reconnect}
+              reconnectAttempt={reconnectAttempt}
+            />
           </div>
           <div className="lg:pl-6">
             <SessionControls
@@ -217,9 +225,7 @@ function SessionDetailPage() {
               )}
             </dl>
           </section>
-        </div>
 
-        <aside className="space-y-6">
           <SessionCompletionWorkbench
             completion={completionCheck.data}
             lifecycle={lifecycleFromNext(lifecycleNext.data)}
@@ -230,7 +236,9 @@ function SessionDetailPage() {
             verificationResult={runVerification.data}
             onRunVerification={handleRunVerification}
           />
+        </div>
 
+        <aside className="space-y-6">
           <section className="card p-5">
             <AuditEvidenceCard
               summary={auditSummary.data}

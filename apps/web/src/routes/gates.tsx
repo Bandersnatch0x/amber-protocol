@@ -3,6 +3,7 @@ import { trpc } from '@/lib/trpc';
 import { useEffect, useMemo, useState } from 'react';
 import type { Gate, GateStatus } from '@/lib/types/gate';
 import { useI18n, type I18nKey } from '@/lib/i18n';
+import { useSettings } from '@/lib/settings-provider';
 import {
   buildApproveAndResumeFeedback,
   buildRejectFeedback,
@@ -88,12 +89,14 @@ function GateAuditEvidence({ gate }: { gate: Gate }) {
 
 function GatesPage() {
   const { t } = useI18n();
+  const { settings } = useSettings();
   const trpcUtils = trpc.useContext();
   const [statusFilter, setStatusFilter] = useState<GateStatus | ''>('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [expandedGateKey, setExpandedGateKey] = useState<string | null>(null);
   const [rejectingGateKey, setRejectingGateKey] = useState<string | null>(null);
   const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
+  const [rejectInlineErrorKey, setRejectInlineErrorKey] = useState<string | null>(null);
   const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<GateActionFeedback | null>(null);
   const { data: gates, isLoading, error, refetch } = trpc.gate.list.useQuery(statusFilter ? { status: statusFilter } : undefined);
@@ -105,6 +108,7 @@ function GatesPage() {
         trpcUtils.gate.auditSummary.invalidate({ sessionId: variables.sessionId, gateId: variables.gateId }),
       ]);
       setRejectingGateKey(null);
+      setRejectInlineErrorKey(null);
       setActionFeedback(buildApproveAndResumeFeedback(result, variables.gateId, t));
     },
     onError: (mutationError) => {
@@ -122,6 +126,7 @@ function GatesPage() {
         trpcUtils.gate.auditSummary.invalidate({ sessionId: variables.sessionId, gateId: variables.gateId }),
       ]);
       setRejectingGateKey(null);
+      setRejectInlineErrorKey(null);
       setRejectReasons((current) => {
         const next = { ...current };
         delete next[getGateKey(variables)];
@@ -168,10 +173,12 @@ function GatesPage() {
     const key = getGateKey(gate);
     const reason = rejectReasons[key]?.trim() ?? '';
     if (!reason) {
+      setRejectInlineErrorKey(key);
       setActionFeedback({ tone: 'error', message: t('gates.feedback.rejectReasonRequired') });
       return;
     }
 
+    setRejectInlineErrorKey(null);
     setPendingActionKey(key);
     setActionFeedback(null);
     rejectGate.mutate({ sessionId: gate.sessionId, gateId: gate.gateId, reason });
@@ -279,9 +286,9 @@ function GatesPage() {
 
               return (
                 <article key={key} className="card overflow-hidden">
-                  <div className="px-5 py-4">
+                  <div className={settings.compactView ? 'px-4 py-3' : 'px-5 py-4'}>
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0 flex-1 space-y-2">
+                      <div className={`min-w-0 flex-1 ${settings.compactView ? 'space-y-1' : 'space-y-2'}`}>
                         <div className="flex flex-wrap items-center gap-3">
                           <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${statusStyles[gate.status]}`}>{t(statusLabelKeys[gate.status])}</span>
                           <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{gate.gateId}</span>
@@ -326,7 +333,7 @@ function GatesPage() {
                             </button>
                           </>
                         )}
-                        <Link to="/sessions/$id" params={{ id: gate.sessionId }} className="btn-secondary px-3 py-1.5 text-xs">
+                        <Link to="/sessions/$id" params={{ id: gate.sessionId }} search={{ from: 'gates' }} className="btn-secondary px-3 py-1.5 text-xs">
                           {t('gates.action.openSession')}
                         </Link>
                       </div>
@@ -374,13 +381,25 @@ function GatesPage() {
                         id={rejectReasonId}
                         aria-describedby={`${rejectReasonId}-hint`}
                         value={rejectReasons[key] ?? ''}
-                        onChange={(event) => setRejectReasons((current) => ({ ...current, [key]: event.target.value }))}
+                        onChange={(event) => {
+                          setRejectInlineErrorKey(null);
+                          setRejectReasons((current) => ({ ...current, [key]: event.target.value }));
+                        }}
                         rows={3}
-                        className="mt-3 w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-red-900/70 dark:bg-slate-950 dark:text-white"
+                        className={`mt-3 w-full rounded-md bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:outline-none focus:ring-2 dark:bg-slate-950 dark:text-white ${
+                          rejectInlineErrorKey === key
+                            ? 'border-2 border-red-500 focus:ring-red-500'
+                            : 'border border-red-200 focus:ring-red-500 dark:border-red-900/70'
+                        }`}
                         placeholder={t('gates.rejectReasonPlaceholder')}
                       />
+                      {rejectInlineErrorKey === key && (
+                        <p className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+                          {t('gates.feedback.rejectReasonRequiredInline')}
+                        </p>
+                      )}
                       <div className="mt-3 flex flex-wrap justify-end gap-2">
-                        <button type="button" className="btn-secondary px-3 py-1.5 text-xs" onClick={() => setRejectingGateKey(null)} disabled={pendingActionKey !== null}>
+                        <button type="button" className="btn-secondary px-3 py-1.5 text-xs" onClick={() => { setRejectingGateKey(null); setRejectInlineErrorKey(null); }} disabled={pendingActionKey !== null}>
                           {t('gates.action.cancelReject')}
                         </button>
                         <button type="button" className="btn-danger px-3 py-1.5 text-xs" onClick={() => handleReject(gate)} disabled={pendingActionKey !== null}>

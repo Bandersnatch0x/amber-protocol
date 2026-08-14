@@ -196,7 +196,7 @@ function MetadataPanel({ metadata }: { metadata: TranscriptMetadataItem[] }) {
 function TranscriptDetailPage() {
   const { id } = Route.useParams();
   const { t } = useI18n();
-  const { data: detail, isLoading, error } = trpc.transcript.read.useQuery({ id });
+  const { data: detail, isLoading, error, refetch } = trpc.transcript.read.useQuery({ id });
   const saveDigest = trpc.transcript.save.useMutation();
   const proposeRegressions = trpc.transcript.proposeRegressions.useMutation();
   const displayModel = useMemo(
@@ -261,7 +261,16 @@ function TranscriptDetailPage() {
 
       {error && (
         <div className="card p-5">
-          <p className="text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
+          <h2 className="text-sm font-medium text-slate-900 dark:text-white">{t('transcripts.detail.failedTitle')}</h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link to="/transcripts" className="btn-secondary text-sm">
+              {t('transcripts.detail.back')}
+            </Link>
+            <button onClick={() => refetch()} className="btn-secondary text-sm">
+              {t('common.retry')}
+            </button>
+          </div>
         </div>
       )}
 

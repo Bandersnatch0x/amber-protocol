@@ -8,7 +8,7 @@ export const Route = createFileRoute('/routes/$id/')({ component: RouteDetailPag
 function RouteDetailPage() {
   const { id } = Route.useParams();
   const { t } = useI18n();
-  const { data: route, isLoading, error } = trpc.route.byId.useQuery({ id });
+  const { data: route, isLoading, error, refetch } = trpc.route.byId.useQuery({ id });
 
   if (isLoading) {
     return (
@@ -31,9 +31,16 @@ function RouteDetailPage() {
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             {error?.message || t('routes.detail.notFoundDetail')}
           </p>
-          <Link to="/routes" className="btn-secondary mt-5 text-sm">
-            {t('routes.detail.back')}
-          </Link>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link to="/routes" className="btn-secondary text-sm">
+              {t('routes.detail.back')}
+            </Link>
+            {error && (
+              <button onClick={() => refetch()} className="btn-secondary text-sm">
+                {t('routes.detail.retry')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

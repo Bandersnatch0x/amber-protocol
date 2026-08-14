@@ -1,36 +1,24 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { hasSettingsChanges, normalizeSettings, type Settings } from '@/features/settings/settings-model';
 import { useI18n } from '@/lib/i18n';
+import { useSettings } from '@/lib/settings-provider';
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage });
 
-const STORAGE_KEY = 'amber-web-settings';
-
-const defaults: Settings = {
-  autoRefresh: true,
-  refreshInterval: 5,
-  showNotifications: true,
-  compactView: false,
-};
-
-function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaults;
-    return normalizeSettings({ ...defaults, ...JSON.parse(raw) });
-  } catch {
-    return defaults;
-  }
-}
-
 function SettingsPage() {
   const { t } = useI18n();
-  const [persistedSettings, setPersistedSettings] = useState<Settings>(loadSettings);
-  const [settings, setSettings] = useState<Settings>(persistedSettings);
+  const { settings: globalSettings, saveSettings } = useSettings();
+  const [persistedSettings, setPersistedSettings] = useState<Settings>(globalSettings);
+  const [settings, setSettings] = useState<Settings>(globalSettings);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setPersistedSettings(globalSettings);
+    setSettings(globalSettings);
+  }, [globalSettings]);
 
   const isDirty = useMemo(() => hasSettingsChanges(settings, persistedSettings), [settings, persistedSettings]);
 
@@ -47,7 +35,7 @@ function SettingsPage() {
 
     try {
       const normalized = normalizeSettings(settings);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      saveSettings(normalized);
       setPersistedSettings(normalized);
       setSettings(normalized);
       setSaved(true);
@@ -56,7 +44,7 @@ function SettingsPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [settings, t]);
+  }, [settings, saveSettings, t]);
 
   return (
     <div className="page-container max-w-3xl space-y-6">

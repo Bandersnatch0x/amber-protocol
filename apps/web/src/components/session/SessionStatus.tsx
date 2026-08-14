@@ -1,4 +1,4 @@
-﻿import { StatusBadge } from './StatusBadge';
+import { StatusBadge } from './StatusBadge';
 import { ConnectionIndicator } from './ConnectionIndicator';
 import { formatEventTimestamp, parseTimestamp } from '@/components/timeline/timeline-utils';
 import { useI18n, type I18nKey } from '@/lib/i18n';
@@ -10,6 +10,8 @@ interface SessionStatusProps {
   status: SessionStatusType | null;
   connectionState: ConnectionState;
   lastEvent: SessionEvent | null;
+  onRetry?: () => void;
+  reconnectAttempt?: number;
 }
 
 function formatRelativeTime(timestamp: number, t: (key: I18nKey, params?: Record<string, string | number>) => string): string {
@@ -21,7 +23,7 @@ function formatRelativeTime(timestamp: number, t: (key: I18nKey, params?: Record
   return t('sessions.status.daysAgo', { count: Math.floor(seconds / 86400) });
 }
 
-export function SessionStatus({ status, connectionState, lastEvent }: SessionStatusProps) {
+export function SessionStatus({ status, connectionState, lastEvent, onRetry, reconnectAttempt }: SessionStatusProps) {
   const { t } = useI18n();
   const latestTimestamp = lastEvent ? parseTimestamp(lastEvent.timestamp) : null;
   const latestLabel = lastEvent ? t(`timeline.event.${lastEvent.type}` as I18nKey) : t('sessions.status.waiting');
@@ -38,7 +40,7 @@ export function SessionStatus({ status, connectionState, lastEvent }: SessionSta
       <div className="space-y-1">
         <p className="label">{t('sessions.status.connection')}</p>
         <div className="flex items-center gap-2">
-          <ConnectionIndicator state={connectionState} />
+          <ConnectionIndicator state={connectionState} onRetry={onRetry} reconnectAttempt={reconnectAttempt} />
         </div>
       </div>
 

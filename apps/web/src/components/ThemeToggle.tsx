@@ -1,7 +1,9 @@
-﻿import { useTheme } from '@/lib/theme-provider';
+import { useTheme } from '@/lib/theme-provider';
+import { useI18n } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 
 export function ThemeToggle() {
+  const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
 
@@ -12,9 +14,9 @@ export function ThemeToggle() {
   return (
     <button
       onClick={() => mounted && setTheme(theme === 'dark' ? 'light' : 'dark')}
-      aria-label="Toggle theme"
+      aria-label={t('theme.toggle')}
       className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition-colors duration-150 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-      title={mounted ? `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode` : 'Toggle theme'}
+      title={mounted ? (theme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')) : t('theme.toggle')}
       disabled={!mounted}
     >
       {theme === 'dark' ? (

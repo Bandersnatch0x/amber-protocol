@@ -1,4 +1,3 @@
-
 import { useI18n } from '@/lib/i18n';
 
 interface ConfirmAbortDialogProps {
@@ -13,24 +12,32 @@ export function ConfirmAbortDialog({ isOpen, onConfirm, onCancel }: ConfirmAbort
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-        <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="abort-dialog-title"
+      aria-describedby="abort-dialog-description"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    >
+      <div className="mx-4 w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+        <h2 id="abort-dialog-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
           {t('sessions.controls.abortTitle')}
         </h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
+        <p id="abort-dialog-description" className="mt-2 mb-6 text-sm text-slate-600 dark:text-slate-400">
           {t('sessions.controls.abortDetail')}
         </p>
-        <div className="flex gap-3 justify-end">
+        <div className="flex justify-end gap-3">
           <button
+            type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100"
+            className="btn-secondary text-sm"
           >
             {t('common.cancel')}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
-            className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
+            className="btn-danger text-sm"
           >
             {t('sessions.controls.abort')}
           </button>
