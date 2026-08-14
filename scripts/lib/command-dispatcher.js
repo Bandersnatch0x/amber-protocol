@@ -140,35 +140,20 @@ function handleLedger(args) {
 			const fs = require("node:fs");
 			const outputPath = path.resolve(targetRoot, args.out);
 			fs.writeFileSync(outputPath, result.payload + "\n");
-			return {
-				result: {
-					target: args.target,
-					text: `Wrote ${result.ledgers.length} ledger(s) to ${outputPath} (intact=${result.intactCount}, broken=${result.brokenCount})`,
-					errors: result.errors,
-					warnings: result.warnings,
-				},
-				bypassPrint: !args.json,
-			};
-		}
-		if (args.json) {
-			return {
-				result: {
-					target: args.target,
-					...result,
-					errors: result.errors,
-					warnings: result.warnings,
-				},
-			};
-		}
-		return {
-			result: {
-				target: args.target,
-				text: result.payload,
+			return shapeResult(args, {
+				text: `Wrote ${result.ledgers.length} ledger(s) to ${outputPath} (intact=${result.intactCount}, broken=${result.brokenCount})`,
 				errors: result.errors,
 				warnings: result.warnings,
-			},
-			bypassPrint: true,
-		};
+			});
+		}
+		if (args.json) {
+			return shapeResult(args, result, { bypassPrint: false });
+		}
+		return shapeResult(args, {
+			text: result.payload,
+			errors: result.errors,
+			warnings: result.warnings,
+		});
 	}
 	if (action === "seal") {
 		const { sealLedger } = require("./core/ledger-seal");
@@ -176,17 +161,11 @@ function handleLedger(args) {
 		const text = result.sealed
 			? `Sealed ${result.ledgerCount} ledger(s) to tag ${result.tagName} at HEAD ${result.head}.`
 			: `Seal failed: ${result.errors.join("; ")}`;
-		return {
-			result: {
-				target: args.target,
-				text,
-				...result,
-				errors: result.errors,
-				warnings: result.warnings,
-			},
-			exitCode: result.sealed ? 0 : 1,
-			bypassPrint: !args.json,
-		};
+		return shapeResult(
+			args,
+			{ text, ...result, errors: result.errors, warnings: result.warnings },
+			{ exitCode: result.sealed ? 0 : 1 },
+		);
 	}
 	if (action === "verify-anchoring") {
 		const { verifyAnchoring } = require("./core/ledger-seal");
@@ -199,25 +178,37 @@ function handleLedger(args) {
 		} else {
 			text = `NOT anchored: ${result.ledgerChangedSinceSeal} ledger(s) changed since seal tag ${result.sealTag}.`;
 		}
-		return {
-			result: {
-				target: args.target,
-				text,
-				...result,
-				errors: result.errors,
-				warnings: result.warnings,
-			},
-			exitCode: result.errors?.length ? 1 : result.anchored ? 0 : 1,
-			bypassPrint: !args.json,
-		};
+		return shapeResult(
+			args,
+			{ text, ...result, errors: result.errors, warnings: result.warnings },
+			{ exitCode: result.errors?.length ? 1 : result.anchored ? 0 : 1 },
+		);
 	}
+	return shapeResult(
+		args,
+		{ errors: ["ledger requires export, seal, or verify-anchoring."] },
+		{ exitCode: 1 },
+	);
+}
+
+function shapeResult(args, body, { exitCode, bypassPrint } = {}) {
 	return {
 		result: {
 			target: args.target,
-			errors: ["ledger requires export, seal, or verify-anchoring."],
-			warnings: [],
+			...body,
+			errors: body.errors || [],
+			warnings: body.warnings || [],
 		},
+		exitCode,
+		bypassPrint: bypassPrint ?? !args.json,
 	};
+}
+
+function requireSessionId(args, action) {
+	if (!args.session) {
+		return { text: `session ${action} requires --session <id>.`, exitCode: 1 };
+	}
+	return null;
 }
 
 async function handleSession(args) {
@@ -259,17 +250,15 @@ async function handleSession(args) {
 			requestId: args.requestId,
 		});
 	} else if (action === "complete-check") {
-		if (!args.session) {
-			sessionResult = { text: "session complete-check requires --session <id>.", exitCode: 1 };
-		} else {
+		sessionResult = requireSessionId(args, "complete-check");
+		if (!sessionResult) {
 			const { buildCompletionResult } = require("./completion-check");
 			const completion = buildCompletionResult(targetRoot, args.session, args);
 			sessionResult = { text: completion.text, exitCode: completion.errors.length > 0 ? 1 : 0 };
 		}
 	} else if (action === "complete") {
-		if (!args.session) {
-			sessionResult = { text: "session complete requires --session <id>.", exitCode: 1 };
-		} else {
+		sessionResult = requireSessionId(args, "complete");
+		if (!sessionResult) {
 			sessionResult = await sessionCommands.completeSession(targetRoot, {
 				sessionId: args.session,
 				strict: args.strict,
@@ -277,9 +266,8 @@ async function handleSession(args) {
 			});
 		}
 	} else if (action === "verify") {
-		if (!args.session) {
-			sessionResult = { text: "session verify requires --session <id>.", exitCode: 1 };
-		} else {
+		sessionResult = requireSessionId(args, "verify");
+		if (!sessionResult) {
 			sessionResult = await sessionCommands.verifySession(targetRoot, {
 				sessionId: args.session,
 				stage: args.stage,
@@ -290,9 +278,8 @@ async function handleSession(args) {
 			});
 		}
 	} else if (action === "approve") {
-		if (!args.session) {
-			sessionResult = { text: "session approve requires --session <id>.", exitCode: 1 };
-		} else {
+		sessionResult = requireSessionId(args, "approve");
+		if (!sessionResult) {
 			sessionResult = await sessionCommands.approveSession(targetRoot, {
 				sessionId: args.session,
 				gate: args.gate || args._?.[1],
@@ -300,9 +287,8 @@ async function handleSession(args) {
 			});
 		}
 	} else if (action === "verify-ledger") {
-		if (!args.session) {
-			sessionResult = { text: "session verify-ledger requires --session <id>.", exitCode: 1 };
-		} else {
+		sessionResult = requireSessionId(args, "verify-ledger");
+		if (!sessionResult) {
 			sessionResult = sessionCommands.verifyLedgerSession(targetRoot, args.session);
 		}
 	} else {

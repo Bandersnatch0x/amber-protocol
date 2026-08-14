@@ -312,7 +312,13 @@ jobs:
           echo "✅ Package contents validated"
 
       - name: Publish to npm
-        run: npm publish
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "amber-protocol@$VERSION" >/dev/null 2>&1; then
+            echo "::notice::amber-protocol@$VERSION already published — skipping."
+          else
+            npm publish
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
