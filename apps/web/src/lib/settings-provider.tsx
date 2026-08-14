@@ -18,13 +18,24 @@ export const defaultSettings: Settings = {
   compactView: false,
 };
 
+function parseStoredSettings(raw: string): Settings {
+  return normalizeSettings({ ...defaultSettings, ...JSON.parse(raw) });
+}
+
 export function loadStoredSettings(): Settings {
   try {
     const raw = typeof window !== 'undefined' ? localStorage.getItem(SETTINGS_STORAGE_KEY) : null;
-    if (!raw) return defaultSettings;
-    return normalizeSettings({ ...defaultSettings, ...JSON.parse(raw) });
+    return raw ? parseStoredSettings(raw) : defaultSettings;
   } catch {
     return defaultSettings;
+  }
+}
+
+function persistSettings(settings: Settings) {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // ignore storage errors
   }
 }
 
@@ -32,7 +43,6 @@ interface SettingsContextValue {
   settings: Settings;
   setSettings: (next: Settings | ((prev: Settings) => Settings)) => void;
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
-  saveSettings: (next: Settings) => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -40,25 +50,11 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettingsState] = useState<Settings>(loadStoredSettings);
 
-  const saveSettings = useCallback((next: Settings) => {
-    const normalized = normalizeSettings(next);
-    setSettingsState(normalized);
-    try {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
-    } catch {
-      // ignore storage errors
-    }
-  }, []);
-
   const setSettings = useCallback((next: Settings | ((prev: Settings) => Settings)) => {
     setSettingsState((prev) => {
       const resolved = typeof next === 'function' ? next(prev) : next;
       const normalized = normalizeSettings(resolved);
-      try {
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
-      } catch {
-        // ignore storage errors
-      }
+      persistSettings(normalized);
       return normalized;
     });
   }, []);
@@ -71,7 +67,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const handleStorage = (event: StorageEvent) => {
       if (event.key === SETTINGS_STORAGE_KEY && event.newValue) {
         try {
-          setSettingsState(normalizeSettings({ ...defaultSettings, ...JSON.parse(event.newValue) }));
+          setSettingsState(parseStoredSettings(event.newValue));
         } catch {
           // ignore parsing errors
         }
@@ -82,8 +78,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ settings, setSettings, updateSetting, saveSettings }),
-    [settings, setSettings, updateSetting, saveSettings],
+    () => ({ settings, setSettings, updateSetting }),
+    [settings, setSettings, updateSetting],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
@@ -92,12 +88,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 export function useSettings(): SettingsContextValue {
   const context = useContext(SettingsContext);
   if (!context) {
-    return {
-      settings: defaultSettings,
-      setSettings: () => {},
-      updateSetting: () => {},
-      saveSettings: () => {},
-    };
+    throw new Error('useSettings must be used within a SettingsProvider');
   }
   return context;
 }

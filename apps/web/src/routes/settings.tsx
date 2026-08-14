@@ -8,7 +8,7 @@ export const Route = createFileRoute('/settings')({ component: SettingsPage });
 
 function SettingsPage() {
   const { t } = useI18n();
-  const { settings: globalSettings, saveSettings } = useSettings();
+  const { settings: globalSettings, setSettings: saveSettings } = useSettings();
   const [persistedSettings, setPersistedSettings] = useState<Settings>(globalSettings);
   const [settings, setSettings] = useState<Settings>(globalSettings);
   const [saved, setSaved] = useState(false);

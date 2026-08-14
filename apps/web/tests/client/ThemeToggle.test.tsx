@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { I18nProvider } from '@/lib/i18n';
 import { ThemeProvider } from '@/lib/theme-provider';
 
 // theme-provider reads matchMedia for the "system" preference; happy-dom may
@@ -26,7 +27,9 @@ describe('ThemeToggle', () => {
   it('renders a button with an accessible "Toggle theme" label', () => {
     render(
       <ThemeProvider>
-        <ThemeToggle />
+        <I18nProvider initialLanguage="en">
+          <ThemeToggle />
+        </I18nProvider>
       </ThemeProvider>,
     );
     // This is exactly what the e2e selector getByRole('button',{name:/toggle theme/i})
@@ -38,7 +41,9 @@ describe('ThemeToggle', () => {
   it('toggles the documentElement dark class when clicked', () => {
     render(
       <ThemeProvider>
-        <ThemeToggle />
+        <I18nProvider initialLanguage="en">
+          <ThemeToggle />
+        </I18nProvider>
       </ThemeProvider>,
     );
     const button = screen.getByRole('button', { name: /toggle theme/i });

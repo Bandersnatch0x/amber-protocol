@@ -1070,11 +1070,7 @@ export function I18nProvider({ children, initialLanguage }: I18nProviderProps) {
 export function useI18n(): I18nContextValue {
   const ctx = useContext(I18nContext);
   if (!ctx) {
-    return {
-      language: 'en',
-      setLanguage: () => {},
-      t: (key: TranslationKey, params?: TranslationParams) => interpolate(en[key] ?? key, params),
-    };
+    throw new Error('useI18n must be used within an I18nProvider');
   }
   return ctx;
 }
