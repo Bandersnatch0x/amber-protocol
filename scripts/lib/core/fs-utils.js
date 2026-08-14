@@ -251,6 +251,7 @@ module.exports = {
 	AUDIT_IGNORED_DIRECTORY_NAMES,
 	resolveTarget,
 	resolvePathWithin,
+	realPathForPotential,
 	toPortablePath,
 	pathExists,
 	readText,

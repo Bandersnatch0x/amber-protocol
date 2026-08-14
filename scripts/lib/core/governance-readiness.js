@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { inspectPolicy } = require("./governance");
-const { readJsonSafe } = require("./fs-utils");
+const { readJsonSafe, realPathForPotential } = require("./fs-utils");
 const { loadTargetRoutes } = require("../route-loader");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { walkLedgers, verifyLedgerChain } = require("./loop-ledger");
@@ -69,10 +69,7 @@ function gateIdsForRoute(route) {
 }
 
 function inspectRoutes(targetRoot) {
-	const resolvedTarget = path.resolve(targetRoot);
-	const canonicalTarget = fs.existsSync(resolvedTarget)
-		? (fs.realpathSync.native || fs.realpathSync)(resolvedTarget)
-		: resolvedTarget;
+	const canonicalTarget = realPathForPotential(path.resolve(targetRoot));
 	const loaded = loadTargetRoutes(canonicalTarget);
 	const { routesDir } = loaded;
 	const routes = loaded.routes.map((route) => {
