@@ -104,6 +104,13 @@ node scripts/amber.js handoff --target path/to/repo
 
 ### Route Engine
 
+All route reads are target-local: `route list`/`inspect`/`test` (and every
+internal consumer such as `session`, `next`, `governance`, and backfill)
+resolve Route definitions from the selected target repository's own `routes/`
+directory (`--target`), never from Amber's packaged `routes/`. A target routes
+directory that escapes the target root (for example through a junction or
+symlink) is rejected instead of read.
+
 ```bash
 # List available routes
 node scripts/amber.js route list
