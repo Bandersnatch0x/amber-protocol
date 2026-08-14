@@ -518,7 +518,8 @@
 			],
 			"notes": [
 				"F020 implementation, repository gates, Amber review/gate, and portable handoff validation are complete.",
-				"Version 1.6.0 is prepared in source only; no tag, package publish, or GitHub Release was created."
+				"Version 1.6.0 is prepared in source only; no tag, package publish, or GitHub Release was created.",
+				"planning.js was touched to reject absolute --plan paths outright (the old startsWith prefix check could be bypassed by sibling directories); gate/review/accept enforce the same containment."
 			],
 			"paths": [
 				"scripts/amber-mcp.js",
@@ -529,10 +530,10 @@
 				"scripts/lib/command-dispatcher.js",
 				"scripts/lib/core/fs-utils.js",
 				"scripts/lib/route-loader.js",
-				"scripts/lib/route-commands.js",
 				"scripts/lib/next-command.js",
 				"scripts/lib/core/governance-readiness.js",
 				"scripts/lib/core/lifecycle.js",
+				"scripts/lib/core/planning.js",
 				"scripts/lib/session-commands.js",
 				"scripts/backfill-gates.js",
 				"scripts/sync-version.js",
