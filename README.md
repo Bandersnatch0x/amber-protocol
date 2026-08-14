@@ -9,7 +9,7 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/npm/v/amber-protocol)
 
-**Status:** Stable | **Version:** 1.5.1 · [Milestones & test status →](./ROADMAP.md)
+**Status:** Stable | **Version:** 1.6.0 · [Milestones & test status →](./ROADMAP.md)
 
 **Make AI coding sessions reviewable, gated, and handoff-ready.**
 

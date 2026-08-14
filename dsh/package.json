@@ -1,6 +1,6 @@
 {
 	"name": "dsh-amber-protocol",
-	"version": "1.5.1",
+	"version": "1.6.0",
 	"description": "DeepSeek Harness bundle for Amber Protocol governance tools and skills",
 	"license": "MIT",
 	"type": "commonjs",
@@ -18,7 +18,7 @@
 		"LICENSE"
 	],
 	"dependencies": {
-		"amber-protocol": "^1.5.1"
+		"amber-protocol": "^1.6.0"
 	},
 	"engines": {
 		"node": "^20.19.0 || ^22.12.0 || >=23"

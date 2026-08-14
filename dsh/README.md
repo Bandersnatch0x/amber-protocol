@@ -73,26 +73,26 @@ the static overlay patches instead. These are **not** shipped in the bundle
 `files` array — they exist only for local development.
 
 **Alternative — local tarball install with pnpm overrides:** if you want to
-test the bundle contract (not the overlay) against an unpublished `1.5.1`
-tarball, `dsh plugin add` forwards to pnpm. When `amber-protocol@1.5.1` is
+test the bundle contract (not the overlay) against an unpublished `1.6.0`
+tarball, `dsh plugin add` forwards to pnpm. When `amber-protocol@1.6.0` is
 not yet on the registry, add a pnpm `overrides` entry so the bundle's
-`amber-protocol@^1.5.1` dependency resolves from the local tarball instead of
-the registry (which still has `1.5.0`):
+`amber-protocol@^1.6.0` dependency resolves from the local tarball instead of
+the registry (which still has `1.5.1`):
 
 ```yaml
 # In the profile's pnpm-workspace.yaml (dsh creates this on first init):
 overrides:
-  amber-protocol: file:/path/to/amber-protocol-1.5.1.tgz
+  amber-protocol: file:/path/to/amber-protocol-1.6.0.tgz
 ```
 
 Then:
 
 ```sh
-dsh plugin --profile web add /path/to/amber-protocol-1.5.1.tgz
-dsh plugin --profile web add /path/to/dsh-amber-protocol-1.5.1.tgz
+dsh plugin --profile web add /path/to/amber-protocol-1.6.0.tgz
+dsh plugin --profile web add /path/to/dsh-amber-protocol-1.6.0.tgz
 ```
 
-Once `1.5.1` is published, plain `dsh plugin --profile web add dsh-amber-protocol`
+Once `1.6.0` is published, plain `dsh plugin --profile web add dsh-amber-protocol`
 works without overrides.
 
 ### Overlay patches
