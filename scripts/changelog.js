@@ -8,8 +8,8 @@
  * release-please, no new runtime deps, pure Node built-ins + git.
  *
  * Release constraints honored here (documented for users):
- *   - Publishes exclusively via GitHub Packages (see .github/workflows/publish-github-packages.yml)
- *   - `npm run version:sync` is mandatory in release prep (syncs plugin manifests)
+ *   - Publishes amber-protocol then dsh-amber-protocol to npmjs (see .github/workflows/ci.yml)
+ *   - `npm run version:sync` is mandatory in release prep (syncs plugins, DSH, lockfile)
  *   - `npm run release:verify` is the terminal gate after tag push (guards #46 ghost-version class)
  *   - Prefer minimal (patch) version bumps for most releases.
  *
@@ -21,11 +21,11 @@
  *   2. npm version --no-git-tag-version patch   # or minor/major as needed; minimal by preference
  *   3. npm run version:sync
  *   4. node scripts/changelog.js
- *   5. git add package.json .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
+ *   5. git add package.json package-lock.json dsh/package.json .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
  *   6. git commit -m "chore(release): vX.Y.Z"
  *   7. git tag -a vX.Y.Z -m "Release vX.Y.Z"
  *   8. git push origin master && git push origin vX.Y.Z
- *   9. (CI: tests + publish-github-packages)
+ *   9. (CI: tests + npmjs lockstep publish)
  *  10. npm run release:verify
  *
  * The script is safe to re-run for the same version (replaces the section).

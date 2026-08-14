@@ -311,11 +311,26 @@ jobs:
 
           echo "✅ Package contents validated"
 
+      - name: Validate lockstep versions
+        run: node scripts/validate-release-versions.js
+
       - name: Publish to npm
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if npm view "amber-protocol@$VERSION" >/dev/null 2>&1; then
             echo "::notice::amber-protocol@$VERSION already published — skipping."
+          else
+            npm publish
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish DSH to npm
+        working-directory: dsh
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "dsh-amber-protocol@$VERSION" >/dev/null 2>&1; then
+            echo "::notice::dsh-amber-protocol@$VERSION already published — skipping."
           else
             npm publish
           fi

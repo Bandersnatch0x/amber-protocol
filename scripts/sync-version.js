@@ -1,11 +1,8 @@
 "use strict";
 
 // Single-source-of-truth version sync. package.json is the only file whose
-// `version` is hand-edited; this script copies it into the static manifest
-// files that CONSUMERS read directly — the Claude and Codex plugin manifests.
-// Those manifests MUST carry their own `version` (marketplaces read them as
-// static JSON; they cannot read package.json at runtime), so we keep them in
-// lockstep here instead of via a test failure at release time.
+// `version` is hand-edited; this script copies it into every package and plugin
+// manifest that consumers read directly, plus the root lockfile.
 //
 // Run via `npm run version:sync` as part of the release flow: edit
 // package.json's version, run this, then commit + tag.
@@ -19,6 +16,50 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const TARGETS = [".claude-plugin/plugin.json", ".codex-plugin/plugin.json"];
+
+function syncJson(root, rel, update) {
+	const abs = path.join(root, rel);
+	if (!fs.existsSync(abs)) return false;
+	const text = fs.readFileSync(abs, "utf8");
+	const data = JSON.parse(text);
+	if (!update(data)) return false;
+	const indent = text.match(/\n([\t ]+)"/)?.[1] || "\t";
+	fs.writeFileSync(abs, `${JSON.stringify(data, null, indent)}\n`);
+	return true;
+}
+
+function syncPackageLock(root, version) {
+	return syncJson(root, "package-lock.json", (lock) => {
+		let changed = false;
+		if (lock.version !== version) {
+			lock.version = version;
+			changed = true;
+		}
+		if (lock.packages?.[""] && lock.packages[""].version !== version) {
+			lock.packages[""].version = version;
+			changed = true;
+		}
+		return changed;
+	});
+}
+
+function syncDshPackage(root, version) {
+	return syncJson(root, "dsh/package.json", (dshPackage) => {
+		let changed = false;
+		if (dshPackage.version !== version) {
+			dshPackage.version = version;
+			changed = true;
+		}
+		if (
+			dshPackage.dependencies?.["amber-protocol"] &&
+			dshPackage.dependencies["amber-protocol"] !== `^${version}`
+		) {
+			dshPackage.dependencies["amber-protocol"] = `^${version}`;
+			changed = true;
+		}
+		return changed;
+	});
+}
 
 // README carries a human-readable version badge (e.g. "**Version:** 1.3.4").
 // Keep it in lockstep with package.json via regex replacement so the badge
@@ -42,14 +83,18 @@ function syncVersions(root) {
 	}
 	const synced = [];
 	for (const rel of TARGETS) {
-		const abs = path.join(root, rel);
-		if (!fs.existsSync(abs)) continue;
-		const data = JSON.parse(fs.readFileSync(abs, "utf8"));
-		if (data.version === pkg.version) continue;
-		data.version = pkg.version;
-		fs.writeFileSync(abs, JSON.stringify(data, null, 2) + "\n");
-		synced.push(rel);
+		if (
+			syncJson(root, rel, (data) => {
+				if (data.version === pkg.version) return false;
+				data.version = pkg.version;
+				return true;
+			})
+		) {
+			synced.push(rel);
+		}
 	}
+	if (syncPackageLock(root, pkg.version)) synced.push("package-lock.json");
+	if (syncDshPackage(root, pkg.version)) synced.push("dsh/package.json");
 	if (syncReadme(root, pkg.version)) {
 		synced.push("README.md");
 	}

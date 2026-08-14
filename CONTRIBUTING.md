@@ -216,11 +216,11 @@ Before releasing, review the quality assurance documentation:
 
 ### Automated Release (Default)
 
-Amber Protocol uses automated releases via GitHub Actions. When a stable version tag (`vX.Y.Z`) is pushed, CI runs the full test matrix and publishes to **GitHub Packages** (not npmjs.org). See `.github/workflows/publish-github-packages.yml`.
+Amber Protocol uses automated releases via GitHub Actions. When a stable version tag (`vX.Y.Z`) is pushed, CI runs the full test matrix and publishes **both** `amber-protocol` and `dsh-amber-protocol` to npmjs.org from `.github/workflows/ci.yml`. The GitHub Packages workflow remains a scoped mirror of the main package only.
 
 **Core invariants (never bypass):**
 
-- `npm run version:sync` MUST be executed during prep (it keeps `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` in lockstep with `package.json`).
+- `npm run version:sync` MUST be executed during prep (it keeps plugin manifests, `dsh/package.json`, and the root lockfile in lockstep with `package.json`).
 - `npm run release:verify` MUST be run after the tag is pushed and the publish workflow has completed (terminal guard against the v1.3.1 ghost-version class from #46).
 - Prefer the smallest increment (patch) unless the changes warrant minor/major.
 
@@ -234,7 +234,7 @@ CHANGELOG.md is now generated from conventional commits by `node scripts/changel
    ```bash
    npm version --no-git-tag-version patch   # or minor / major
    ```
-3. Sync plugin manifests (mandatory):
+3. Sync plugin manifests, DSH bundle version, and lockfile (mandatory):
    ```bash
    npm run version:sync
    ```
@@ -245,7 +245,7 @@ CHANGELOG.md is now generated from conventional commits by `node scripts/changel
    Review the inserted `## [X.Y.Z] - YYYY-MM-DD` section. Light narrative polish is acceptable; the commit list is authoritative.
 5. Stage and commit (version files + changelog):
    ```bash
-   git add package.json .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
+   git add package.json package-lock.json dsh/package.json .claude-plugin/plugin.json .codex-plugin/plugin.json CHANGELOG.md
    git commit -m "chore(release): vX.Y.Z"
    ```
 6. Create annotated tag:
@@ -257,23 +257,23 @@ CHANGELOG.md is now generated from conventional commits by `node scripts/changel
    git push origin master
    git push origin vX.Y.Z
    ```
-8. CI runs tests + publishes to GitHub Packages (idempotent; re-runs are safe).
+8. CI runs tests, then publishes `amber-protocol` and `dsh-amber-protocol` to npmjs (idempotent; re-runs are safe).
 9. After the publish workflow succeeds, run the terminal verifier:
    ```bash
    npm run release:verify
    ```
-   This asserts every stable tag is on the remote and present in the GH Packages registry.
+   This asserts every stable tag is on the remote and both lockstep packages exist on npmjs.
 
 **Version Tag Format:**
 
-- Stable releases: `v1.0.0`, `v1.1.0`, `v2.0.0` (triggers publish to GitHub Packages)
-- Release candidates: `v1.0.0-rc.1`, `v1.0.0-rc.2` (skips publish)
-- Beta releases: `v1.0.0-beta`, `v1.0.0-beta.1` (skips publish)
+- Stable releases: `v1.0.0`, `v1.1.0`, `v2.0.0` (triggers npmjs lockstep publish)
+- Release candidates: `v1.0.0-rc.1`, `v1.0.0-rc.2` (skips npmjs publish)
+- Beta releases: `v1.0.0-beta`, `v1.0.0-beta.1` (skips npmjs publish)
 
 **Publish workflow notes:**
 
-- Active flow: `.github/workflows/publish-github-packages.yml` (on tag push `v*`, runs tests, scopes temporarily for `@bandersnatch0x/amber-protocol`, publishes idempotently to `https://npm.pkg.github.com`).
-- A legacy `release` job exists in `ci.yml` for historical reference; the GitHub Packages workflow is authoritative for this repo.
+- Authoritative npmjs flow: the `release` job in `.github/workflows/ci.yml`. It validates the lockstep version contract, publishes `amber-protocol`, then `dsh-amber-protocol`, then creates the GitHub Release. Both publish steps skip if that exact version already exists.
+- Mirror: `.github/workflows/publish-github-packages.yml` (on tag push `v*`, scopes temporarily for `@bandersnatch0x/amber-protocol`, publishes idempotently to `https://npm.pkg.github.com`). It does not publish the DSH bundle.
 
 ### Manual Release (Emergency Fallback)
 
@@ -331,9 +331,9 @@ Install pre-releases with: `npm install -g amber-protocol@rc` or `npm install -g
 
 ### GitHub Secrets / Permissions
 
-The GitHub Packages publish workflow (`.github/workflows/publish-github-packages.yml`) uses the built-in `GITHUB_TOKEN` (with `packages: write` permission). No `NPM_TOKEN` is required for the primary publish path.
+The authoritative npmjs release job in `.github/workflows/ci.yml` uses `secrets.NPM_TOKEN` to publish `amber-protocol` and `dsh-amber-protocol`.
 
-For any legacy npmjs paths, a separate `NPM_TOKEN` would be needed (currently unused for normal releases).
+The GitHub Packages publish workflow (`.github/workflows/publish-github-packages.yml`) uses the built-in `GITHUB_TOKEN` (with `packages: write` permission). It is a scoped mirror of the main package only and does not publish the DSH bundle.
 
 ## License
 

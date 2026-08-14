@@ -9,10 +9,12 @@
 //
 // Asserts two invariants over stable tags (vX.Y.Z, no prerelease suffix):
 //   1. every local stable tag exists on the remote        (v1.3.1's failure)
-//   2. every remote stable tag has a published version    (silent-skip class)
+//   2. every remote stable tag has both lockstep npmjs
+//      packages published                                 (silent-skip class)
 //
 // Run via `npm run release:verify` after pushing the release tag and waiting
-// for the publish workflow. Requires `gh` (authenticated) for the registry.
+// for the publish workflow. Registry checks use public `npm view` so both
+// amber-protocol and dsh-amber-protocol are verified on npmjs.
 //
 // ponytail: runbook-invoked only, not wired into CI — a CI check racing an
 // in-flight publish would false-red; add a debounced CI sweep if a ghost
@@ -21,6 +23,7 @@
 const { execFileSync } = require("node:child_process");
 
 const STABLE_TAG = /^v\d+\.\d+\.\d+$/;
+const LOCKSTEP_PACKAGES = ["amber-protocol", "dsh-amber-protocol"];
 
 function stableTags(tags) {
 	return tags.filter((t) => STABLE_TAG.test(t));
@@ -54,37 +57,46 @@ function findGhostTags(remoteTags, registryVersions) {
 		.map((v) => `v${v}`);
 }
 
+function collectGhostReports(remoteTags, registries) {
+	const reports = [];
+	for (const { name, versions } of registries) {
+		for (const tag of findGhostTags(remoteTags, versions)) {
+			reports.push({ tag, package: name });
+		}
+	}
+	return reports;
+}
+
+function npmVersions(name) {
+	const parsed = JSON.parse(sh("npm", ["view", name, "versions", "--json"]));
+	const versions = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+	return versions.filter((version) => /^\d+\.\d+\.\d+$/.test(version));
+}
+
 function sh(cmd, args) {
 	return execFileSync(cmd, args, { encoding: "utf8" }).trim();
 }
 
 function main() {
-	const pkg = require("../package.json");
-	const remoteUrl = sh("git", ["remote", "get-url", "origin"]);
-	const owner = remoteUrl.match(/[:/]([^/]+)\/[^/]+?(?:\.git)?$/)?.[1];
-	if (!owner) throw new Error(`Cannot parse owner from remote: ${remoteUrl}`);
-
 	const localTags = sh("git", ["tag", "--list"]).split("\n").filter(Boolean);
 	const remoteTags = sh("git", ["ls-remote", "--tags", "origin"])
 		.split("\n")
 		.map((line) => line.match(/refs\/tags\/(v[^^\s]+)$/)?.[1])
 		.filter(Boolean);
-	const registryVersions = sh("gh", [
-		"api",
-		"--paginate",
-		`users/${owner}/packages/npm/${pkg.name}/versions`,
-		"--jq",
-		".[].name",
-	])
-		.split("\n")
-		.filter(Boolean);
+	const registries = LOCKSTEP_PACKAGES.map((name) => ({
+		name,
+		versions: npmVersions(name),
+	}));
 
 	const unpushed = findUnpushedTags(localTags, remoteTags);
-	const ghosts = findGhostTags(remoteTags, registryVersions);
+	const ghosts = collectGhostReports(remoteTags, registries);
 
 	if (unpushed.length === 0 && ghosts.length === 0) {
+		const latest = registries
+			.map(({ name, versions }) => `${name}@${[...versions].sort(cmpVer).at(-1) ?? "none"}`)
+			.join(", ");
 		console.log(
-			`release:verify OK — ${stableTags(remoteTags).length} stable tags all published (latest registry: ${registryVersions[0] ?? "none"})`,
+			`release:verify OK — ${stableTags(remoteTags).length} stable tags published on npmjs (${latest})`,
 		);
 		return 0;
 	}
@@ -93,15 +105,20 @@ function main() {
 			`GHOST RISK: local tag ${t} was never pushed — publish never triggered. Push it or delete it.`,
 		);
 	}
-	for (const t of ghosts) {
+	for (const { tag, package: packageName } of ghosts) {
 		console.error(
-			`GHOST: remote tag ${t} has no published ${t.slice(1)} in the registry. Re-run the publish workflow for it.`,
+			`GHOST: remote tag ${tag} has no published ${tag.slice(1)} of ${packageName} on npmjs. Re-run the publish workflow for it.`,
 		);
 	}
 	return 1;
 }
 
-module.exports = { stableTags, findUnpushedTags, findGhostTags };
+module.exports = {
+	stableTags,
+	findUnpushedTags,
+	findGhostTags,
+	collectGhostReports,
+};
 
 if (require.main === module) {
 	process.exit(main());

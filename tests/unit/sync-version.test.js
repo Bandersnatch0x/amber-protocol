@@ -74,3 +74,37 @@ test("syncVersions leaves README alone when the badge already matches", () => {
 	assert.ok(!r.synced.includes("README.md"), "README not re-synced");
 	fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("syncVersions updates the root lockfile and dsh bundle dependency", () => {
+	const dir = fixture("9.9.9", "1.0.0");
+	fs.writeFileSync(
+		path.join(dir, "package-lock.json"),
+		JSON.stringify({
+			name: "amber-protocol",
+			version: "1.0.0",
+			packages: { "": { name: "amber-protocol", version: "1.0.0" } },
+		}),
+	);
+	fs.mkdirSync(path.join(dir, "dsh"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, "dsh", "package.json"),
+		JSON.stringify({
+			name: "dsh-amber-protocol",
+			version: "1.0.0",
+			dependencies: { "amber-protocol": "^1.5.1" },
+		}),
+	);
+
+	const r = syncVersions(dir);
+	assert.ok(r.synced.includes("package-lock.json"));
+	assert.ok(r.synced.includes("dsh/package.json"));
+
+	const lock = JSON.parse(fs.readFileSync(path.join(dir, "package-lock.json"), "utf8"));
+	assert.equal(lock.version, "9.9.9");
+	assert.equal(lock.packages[""].version, "9.9.9");
+
+	const dsh = JSON.parse(fs.readFileSync(path.join(dir, "dsh", "package.json"), "utf8"));
+	assert.equal(dsh.version, "9.9.9");
+	assert.equal(dsh.dependencies["amber-protocol"], "^9.9.9");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
