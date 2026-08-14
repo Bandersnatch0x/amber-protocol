@@ -17,9 +17,9 @@ export function ConfirmAbortDialog({ isOpen, onConfirm, onCancel }: ConfirmAbort
       aria-modal="true"
       aria-labelledby="abort-dialog-title"
       aria-describedby="abort-dialog-description"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
     >
-      <div className="mx-4 w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+      <div className="mx-4 w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
         <h2 id="abort-dialog-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
           {t('sessions.controls.abortTitle')}
         </h2>

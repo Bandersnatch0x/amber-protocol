@@ -17,7 +17,7 @@ function DefaultErrorFallback({ error }: { error?: Error }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg p-6 border border-red-200 dark:border-red-800 shadow-sm">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg p-6 border border-red-200 dark:border-red-800">
         <h2 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
           {t('error.somethingWentWrong')}
         </h2>
