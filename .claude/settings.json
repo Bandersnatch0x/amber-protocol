@@ -24,6 +24,12 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "node \"D:/code_space/coding-harness/scripts/amber.js\" hooks breadcrumb print --target \"D:/code_space/coding-harness\" --format json # amber-managed-hook v1"
+      }
     ]
   },
   "permissions": {

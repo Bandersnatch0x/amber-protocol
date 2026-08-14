@@ -75,3 +75,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F021-Align-prerelease-publish-policy.md`
 - Review status: ready
 - Feature: F021 status → accepted in feature_list.json
+
+## 2026-08-14 docs/plans/F022-Per-turn-workflow-state-breadcrumb-hook.md
+
+- Plan: `docs/plans/F022-Per-turn-workflow-state-breadcrumb-hook.md`
+- Review status: ready
+- Feature: F022 status → accepted in feature_list.json

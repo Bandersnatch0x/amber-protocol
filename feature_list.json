@@ -593,19 +593,40 @@
 			"area": "governance",
 			"title": "Per-turn workflow-state breadcrumb hook (opt-in agent context injection)",
 			"user_visible_behavior": "An opt-in `amber hooks breadcrumb` surface injects the active Amber focus (session stage, status, pending gates) plus the deterministic required next step into every agent turn via a host hook; when no Amber state exists it emits a visible degraded hint instead of staying silent",
-			"status": "not_started",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/hooks-command.test.js (breadcrumb cases)",
 				"node --test tests/unit/workflow-state-breadcrumb-parity.test.js",
 				"amber hooks breadcrumb print --target . runs read-only and emits a valid <amber-workflow-state> block",
 				"amber hooks breadcrumb install/status/uninstall round-trip on a temp repo"
 			],
-			"evidence": [],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 64169ms)",
+					"date": "2026-08-14",
+					"notes": "session 7dbd3312-15cc-4f18-8e12-770b1c17a17a stage verify",
+					"sessionId": "7dbd3312-15cc-4f18-8e12-770b1c17a17a"
+				}
+			],
 			"notes": [
 				"Selected from Trellis-mechanism analysis P1-1: per-turn workflow-state breadcrumb. Mechanism idea only (Trellis is AGPL-3.0); no Trellis code or text is copied.",
-				"Hook reads governance metadata only; never executes target-project commands, never dispatches agents; never auto-installed."
+				"Hook reads governance metadata only; never executes target-project commands, never dispatches agents; never auto-installed.",
+				"Lifecycle dogfood: plan F022 gate-confirmed, implemented, two-axis reviewed (Standards major fixed: registry help guard added), npm test 1820/1820 via session verify --execute, accepted, handoff validated. Friction logged as issues #118/#119/#120."
 			],
-			"updated": "2026-08-15"
+			"updated": "2026-08-15",
+			"paths": [
+				"scripts/lib/hooks-command.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/command-dispatcher.js",
+				"tests/unit/hooks-command.test.js",
+				"tests/unit/workflow-state-breadcrumb-parity.test.js",
+				"tests/unit/command-registry-parity.test.js",
+				"docs/specs/2026-08-15-workflow-state-breadcrumb.md",
+				"docs/CLI_REFERENCE.md",
+				"README.md",
+				"CLAUDE.md"
+			]
 		}
 	]
 }

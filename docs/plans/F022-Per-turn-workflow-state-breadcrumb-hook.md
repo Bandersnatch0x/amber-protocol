@@ -1,7 +1,7 @@
 # Plan: Per-turn workflow-state breadcrumb hook
 
 Feature: F022
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
