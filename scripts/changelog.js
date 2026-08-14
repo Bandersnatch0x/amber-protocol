@@ -159,6 +159,12 @@ function formatEntry(parsed, ref) {
 	return ref ? `${base} (${ref})` : base;
 }
 
+// Release-cut bookkeeping ("chore: bump version to X.Y.Z" and the
+// "chore(release): X.Y.Z" commit from the documented cut flow) is not a
+// user-visible change; listing it in its own release notes is tautological.
+const BOOKKEEPING_SUBJECT_RE =
+	/^chore(\([^)]*\))?: (?:bump version to v?\d+\.\d+\.\d+|v?\d+\.\d+\.\d+)$/i;
+
 function groupCommits(commits) {
 	const groups = {
 		Added: [],
@@ -167,6 +173,9 @@ function groupCommits(commits) {
 		Other: [],
 	};
 	for (const c of commits) {
+		if (BOOKKEEPING_SUBJECT_RE.test(c.subject)) {
+			continue;
+		}
 		const p = parseConventional(c.subject, c.body);
 		const ref = extractReference(c.subject) || extractReference(c.body);
 		let entry = formatEntry(p, ref);
@@ -214,7 +223,9 @@ function formatReleaseSection(version, dateStr, groups) {
 	for (const s of sections) {
 		if (s.items.length === 0) continue;
 		any = true;
-		out += `### ${s.title}\n`;
+		// Blank line after the heading matches the existing CHANGELOG style
+		// and keeps the generated section inside Prettier's markdown format.
+		out += `### ${s.title}\n\n`;
 		for (const item of s.items) {
 			out += `- ${item}\n`;
 		}

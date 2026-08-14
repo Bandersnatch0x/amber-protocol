@@ -124,7 +124,6 @@ test("groupCommits maps types to sections and preserves refs + scopes", () => {
 		{ subject: "feat: new governance lifecycle", body: "" },
 		{ subject: "fix(policy): harden verify (#40)", body: "" },
 		{ subject: "docs: update release process", body: "See (#47)" },
-		{ subject: "chore(release): v1.3.2", body: "" },
 		{ subject: "refactor(lib): extract pipeline", body: "" },
 		{ subject: "feat(api)!: new flag", body: "" },
 		{ subject: "feat: new endpoint", body: "BREAKING CHANGE: removed v1\n\nLong explanation." },
@@ -139,8 +138,23 @@ test("groupCommits maps types to sections and preserves refs + scopes", () => {
 		g.Changed.some((e) => e.includes("**BREAKING**") && e.includes("new endpoint")),
 		"body-footer breaking commit must be marked BREAKING in Changed",
 	);
-	// chore goes to Changed
-	assert.ok(g.Changed.some((e) => e.includes("chore(release): v1.3.2") === false || true)); // may be present
+});
+
+test("groupCommits skips release-bookkeeping commits", () => {
+	const commits = [
+		{ subject: "chore: bump version to 1.6.0", body: "" },
+		{ subject: "chore(release): v1.3.2", body: "" },
+		{ subject: "chore: bump version to v2.0.0", body: "" },
+		{ subject: "fix: real change", body: "" },
+		// non-version chores still appear
+		{ subject: "chore(deps): refresh dev tools", body: "" },
+	];
+	const g = groupCommits(commits);
+	const flat = [...g.Added, ...g.Fixed, ...g.Changed, ...g.Other].join("\n");
+	assert.ok(!/bump version to/.test(flat), "version bump chores must not be listed");
+	assert.ok(!/v1\.3\.2/.test(flat), "release-cut chores must not be listed");
+	assert.ok(g.Fixed.some((e) => e.includes("real change")));
+	assert.ok(g.Changed.some((e) => e.includes("refresh dev tools")));
 });
 
 test("formatReleaseSection produces Keep a Changelog style", () => {
@@ -157,6 +171,9 @@ test("formatReleaseSection produces Keep a Changelog style", () => {
 	assert.ok(sec.includes("### Changed"));
 	assert.ok(sec.includes("**BREAKING**"));
 	assert.ok(sec.includes("- governance lifecycle"));
+	// headings are followed by a blank line so generated sections stay
+	// inside Prettier's markdown format without post-processing
+	assert.ok(sec.includes("### Added\n\n- governance lifecycle"));
 });
 
 test("getPackageVersion reads from a fixture", () => {
