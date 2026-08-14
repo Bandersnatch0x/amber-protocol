@@ -20,7 +20,11 @@ const os = require("node:os");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const Ajv = require("ajv");
-const { installTargetRoutes } = require("../helpers/target-routes");
+const {
+	installTargetRoutes,
+	writeTargetRoute,
+	withRoutesJunctionEscape,
+} = require("../helpers/target-routes");
 
 const ROOT = path.resolve(__dirname, "../..");
 const MCP_JS = path.join(ROOT, "scripts", "amber-mcp.js");
@@ -29,19 +33,6 @@ const ACTION_TYPES_DIR = path.join(ROOT, "action-types");
 
 function tempTarget() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-mcp-int-"));
-}
-
-function writeTargetRoute(target, routeId, sourceRouteId = "feature-standard") {
-	const routesDir = path.join(target, "routes");
-	fs.mkdirSync(routesDir, { recursive: true });
-	const route = JSON.parse(
-		fs.readFileSync(path.join(ROOT, "routes", `${sourceRouteId}.route.json`), "utf8"),
-	);
-	route.routeId = routeId;
-	fs.writeFileSync(
-		path.join(routesDir, `${routeId}.route.json`),
-		`${JSON.stringify(route, null, 2)}\n`,
-	);
 }
 
 function rpc(messages, extraArgs = []) {
@@ -603,7 +594,7 @@ test("multi-target: _target overrides the repository per call (configured member
 	const targetA = tempTarget();
 	const targetB = tempTarget();
 	writeTargetRoute(targetA, "target-a");
-	writeTargetRoute(targetB, "target-b", "bugfix-quick");
+	writeTargetRoute(targetB, "target-b", { sourceRouteId: "bugfix-quick" });
 	const byId = rpc(
 		[
 			{
@@ -632,32 +623,25 @@ test("multi-target: _target overrides the repository per call (configured member
 
 test("configured-repository invariant: route query rejects a routes junction escape", () => {
 	const target = tempTarget();
-	const outside = tempTarget();
-	writeTargetRoute(outside, "outside-route");
-	try {
-		fs.symlinkSync(path.join(outside, "routes"), path.join(target, "routes"), "junction");
-	} catch (error) {
-		if (/EPERM|ENOSYS|existing/i.test(error.message)) return;
-		throw error;
-	}
-
-	const byId = rpc(
-		[
-			{
-				jsonrpc: "2.0",
-				id: 1,
-				method: "tools/call",
-				params: { name: "amber.object.query", arguments: { objectType: "route" } },
-			},
-		],
-		["--target", target],
-	);
-	const outcome = callOutcome(byId.get(1));
-	assert.equal(byId.get(1).result.isError, true);
-	assert.match(
-		`${outcome.stdout}\n${outcome.stderr}\n${outcome.error || ""}`,
-		/outside the target root/,
-	);
+	withRoutesJunctionEscape(target, () => {
+		const byId = rpc(
+			[
+				{
+					jsonrpc: "2.0",
+					id: 1,
+					method: "tools/call",
+					params: { name: "amber.object.query", arguments: { objectType: "route" } },
+				},
+			],
+			["--target", target],
+		);
+		const outcome = callOutcome(byId.get(1));
+		assert.equal(byId.get(1).result.isError, true);
+		assert.match(
+			`${outcome.stdout}\n${outcome.stderr}\n${outcome.error || ""}`,
+			/outside the target root/,
+		);
+	});
 });
 
 test("configured-repository invariant: existing but unconfigured _target is rejected", () => {
@@ -804,7 +788,11 @@ test("functions: amber.fn.repoOverview aggregates across repositories", () => {
 		],
 		{ cwd: ROOT, encoding: "utf8" },
 	);
-	assert.equal(start.status, 0, start.stderr);
+	assert.equal(
+		start.status,
+		0,
+		`session start failed status=${start.status}\nstdout=${start.stdout}\nstderr=${start.stderr}\nerror=${start.error && start.error.message}`,
+	);
 
 	const byId = rpc(
 		[

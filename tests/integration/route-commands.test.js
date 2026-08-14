@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
+const { writeTargetRoute, withRoutesJunctionEscape } = require("../helpers/target-routes");
 
 const ROOT = path.resolve(__dirname, "../..");
 
@@ -56,58 +57,40 @@ test("route test --dry-run prints the ordered stage sequence", () => {
 
 test("target-bound route reads use only the selected repository routes", () => {
 	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-route-target-"));
-	const routesDir = path.join(target, "routes");
-	fs.mkdirSync(routesDir);
-	const route = JSON.parse(
-		fs.readFileSync(path.join(ROOT, "routes", "bugfix-quick.route.json"), "utf8"),
-	);
-	route.routeId = "target-only";
-	route.displayName = "Target Only";
-	fs.writeFileSync(
-		path.join(routesDir, "target-only.route.json"),
-		`${JSON.stringify(route, null, 2)}\n`,
-	);
+	try {
+		writeTargetRoute(target, "target-only", {
+			sourceRouteId: "bugfix-quick",
+			displayName: "Target Only",
+		});
 
-	const list = runHarness(["route", "list", "--target", target]);
-	assert.equal(list.status, 0, list.stderr || list.stdout);
-	assert.match(list.stdout, /target-only/);
-	assert.doesNotMatch(list.stdout, /feature-standard/);
+		const list = runHarness(["route", "list", "--target", target]);
+		assert.equal(list.status, 0, list.stderr || list.stdout);
+		assert.match(list.stdout, /target-only/);
+		assert.doesNotMatch(list.stdout, /feature-standard/);
 
-	const inspect = runHarness(["route", "inspect", "target-only", "--target", target]);
-	assert.equal(inspect.status, 0, inspect.stderr || inspect.stdout);
-	assert.match(inspect.stdout, /Target Only/);
+		const inspect = runHarness(["route", "inspect", "target-only", "--target", target]);
+		assert.equal(inspect.status, 0, inspect.stderr || inspect.stdout);
+		assert.match(inspect.stdout, /Target Only/);
 
-	const dryRun = runHarness(["route", "test", "target-only", "--target", target]);
-	assert.equal(dryRun.status, 0, dryRun.stderr || dryRun.stdout);
-	assert.match(dryRun.stdout, /Dry-run for route: target-only/);
-
-	fs.rmSync(target, { recursive: true, force: true });
+		const dryRun = runHarness(["route", "test", "target-only", "--target", target]);
+		assert.equal(dryRun.status, 0, dryRun.stderr || dryRun.stdout);
+		assert.match(dryRun.stdout, /Dry-run for route: target-only/);
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
 });
 
 test("target-bound route reads reject a routes junction outside the repository", () => {
 	const target = fs.mkdtempSync(path.join(os.tmpdir(), "amber-route-target-"));
-	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-route-outside-"));
-	const outsideRoutes = path.join(outside, "routes");
-	fs.mkdirSync(outsideRoutes);
-	fs.copyFileSync(
-		path.join(ROOT, "routes", "bugfix-quick.route.json"),
-		path.join(outsideRoutes, "outside.route.json"),
-	);
 	try {
-		fs.symlinkSync(outsideRoutes, path.join(target, "routes"), "junction");
-	} catch (error) {
+		withRoutesJunctionEscape(target, () => {
+			const list = runHarness(["route", "list", "--target", target]);
+			assert.notEqual(list.status, 0);
+			assert.match(`${list.stdout}\n${list.stderr}`, /Routes directory is outside the target root/);
+		});
+	} finally {
 		fs.rmSync(target, { recursive: true, force: true });
-		fs.rmSync(outside, { recursive: true, force: true });
-		if (/EPERM|ENOSYS|existing/i.test(error.message)) return;
-		throw error;
 	}
-
-	const list = runHarness(["route", "list", "--target", target]);
-	assert.notEqual(list.status, 0);
-	assert.match(`${list.stdout}\n${list.stderr}`, /Routes directory is outside the target root/);
-
-	fs.rmSync(target, { recursive: true, force: true });
-	fs.rmSync(outside, { recursive: true, force: true });
 });
 
 test("route --json emits a standard envelope with an errors array", () => {
