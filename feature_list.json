@@ -586,6 +586,26 @@
 				"docs/plans/F021-Align-prerelease-publish-policy.md"
 			],
 			"updated": "2026-08-14"
+		},
+		{
+			"id": "F022",
+			"priority": 1,
+			"area": "governance",
+			"title": "Per-turn workflow-state breadcrumb hook (opt-in agent context injection)",
+			"user_visible_behavior": "An opt-in `amber hooks breadcrumb` surface injects the active Amber focus (session stage, status, pending gates) plus the deterministic required next step into every agent turn via a host hook; when no Amber state exists it emits a visible degraded hint instead of staying silent",
+			"status": "not_started",
+			"verification": [
+				"node --test tests/unit/hooks-command.test.js (breadcrumb cases)",
+				"node --test tests/unit/workflow-state-breadcrumb-parity.test.js",
+				"amber hooks breadcrumb print --target . runs read-only and emits a valid <amber-workflow-state> block",
+				"amber hooks breadcrumb install/status/uninstall round-trip on a temp repo"
+			],
+			"evidence": [],
+			"notes": [
+				"Selected from Trellis-mechanism analysis P1-1: per-turn workflow-state breadcrumb. Mechanism idea only (Trellis is AGPL-3.0); no Trellis code or text is copied.",
+				"Hook reads governance metadata only; never executes target-project commands, never dispatches agents; never auto-installed."
+			],
+			"updated": "2026-08-15"
 		}
 	]
 }

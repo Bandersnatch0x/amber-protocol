@@ -14,6 +14,10 @@ const {
 	statusHook,
 	HOOK_MARKER,
 	shDquote,
+	printBreadcrumb,
+	installBreadcrumb,
+	uninstallBreadcrumb,
+	statusBreadcrumb,
 } = require("../../scripts/lib/hooks-command");
 
 function tmpGitRepo() {
@@ -164,4 +168,334 @@ test("shDquote escapes characters dangerous inside a double-quoted sh literal", 
 	assert.equal(shDquote("a$b"), "a\\$b");
 	assert.equal(shDquote("a`b"), "a\\`b");
 	assert.equal(shDquote("a\\b"), "a\\\\b");
+});
+
+// ── breadcrumb (F022) ────────────────────────────────────────────────────────
+
+const CRUMB_SESSION_ID = "aaaabbbb-cccc-dddd-eeee-ffff00001111";
+
+// Minimal repo whose lifecycle focus resolves to an active session: a manifest
+// plus one timeline event (enough for buildContext; no routes dir needed).
+function breadcrumbSessionRepo() {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-"));
+	const sessionDir = path.join(dir, ".amber", "sessions", CRUMB_SESSION_ID);
+	fs.mkdirSync(sessionDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(sessionDir, "manifest.json"),
+		JSON.stringify({
+			sessionId: CRUMB_SESSION_ID,
+			route: { id: "feature-standard" },
+			goal: "wire the breadcrumb",
+			status: "executing",
+			completedStages: ["capture"],
+		}),
+	);
+	fs.writeFileSync(
+		path.join(sessionDir, "timeline.jsonl"),
+		`${JSON.stringify({ type: "session_created", timestamp: "2026-08-15T00:00:00.000Z" })}\n`,
+	);
+	return dir;
+}
+
+test("breadcrumb: text print on an active session renders focus, next step, and run line", () => {
+	const dir = breadcrumbSessionRepo();
+	const r = printBreadcrumb(dir, { format: "text" });
+	assert.deepEqual(r.errors, []);
+	assert.deepEqual(r.warnings, []);
+	assert.ok(r.text.includes("<amber-workflow-state>"));
+	assert.ok(r.text.includes("</amber-workflow-state>"));
+	assert.match(r.text, /Focus: session aaaabbbb/);
+	assert.match(r.text, /Next step: /);
+	assert.match(r.text, /Run: amber /);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: AMBER_SKIP_HOOKS=1 silences print with no errors (bypass parity)", () => {
+	const dir = breadcrumbSessionRepo();
+	const prior = process.env.AMBER_SKIP_HOOKS;
+	process.env.AMBER_SKIP_HOOKS = "1";
+	try {
+		const r = printBreadcrumb(dir, { format: "text" });
+		assert.equal(r.text, "");
+		assert.deepEqual(r.errors, []);
+		assert.deepEqual(r.warnings, []);
+	} finally {
+		if (prior === undefined) delete process.env.AMBER_SKIP_HOOKS;
+		else process.env.AMBER_SKIP_HOOKS = prior;
+	}
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: unreadable state degrades visibly instead of erroring", () => {
+	// docs/plans as a FILE makes gatherPlans readdir a non-directory (ENOTDIR),
+	// so buildContext throws and print must render the degraded block.
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-deg-"));
+	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+	fs.writeFileSync(path.join(dir, "docs", "plans"), "not a directory");
+	const r = printBreadcrumb(dir, { format: "text" });
+	assert.deepEqual(r.errors, [], "a context hook must not block the turn");
+	assert.ok(r.text.includes("<amber-workflow-state>"));
+	assert.match(r.text, /degraded/);
+	assert.match(r.text, /Hint: run amber next/);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: an invalid format is the one argument error", () => {
+	const dir = breadcrumbSessionRepo();
+	const r = printBreadcrumb(dir, { format: "xml" });
+	assert.ok(r.errors.length > 0);
+	assert.equal(r.text, "");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+function claudeSettings(dir) {
+	return path.join(dir, ".claude", "settings.json");
+}
+
+const FOREIGN_SETTINGS = {
+	permissions: { allow: ["Bash(npm test)"] },
+	hooks: {
+		UserPromptSubmit: [{ type: "command", command: "echo foreign-context" }],
+		PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "echo pre" }] }],
+	},
+};
+
+test("breadcrumb: install/uninstall/status round-trip preserves foreign settings", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-rt-"));
+	fs.mkdirSync(path.join(dir, ".claude"), { recursive: true });
+	fs.writeFileSync(claudeSettings(dir), JSON.stringify(FOREIGN_SETTINGS, null, 2) + "\n");
+
+	// Install: append exactly one marker-carrying entry, foreign content intact.
+	const ins = installBreadcrumb(dir);
+	assert.deepEqual(ins.errors, []);
+	let settings = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	assert.deepEqual(settings.permissions, FOREIGN_SETTINGS.permissions);
+	assert.deepEqual(settings.hooks.PreToolUse, FOREIGN_SETTINGS.hooks.PreToolUse);
+	assert.equal(settings.hooks.UserPromptSubmit.length, 2);
+	assert.deepEqual(settings.hooks.UserPromptSubmit[0], FOREIGN_SETTINGS.hooks.UserPromptSubmit[0]);
+	const managed = settings.hooks.UserPromptSubmit[1];
+	assert.equal(managed.type, "command");
+	assert.ok(managed.command.includes(HOOK_MARKER), "managed entry carries the marker");
+	assert.ok(managed.command.includes("hooks breadcrumb print"));
+
+	// Second install is idempotent: still exactly one managed entry.
+	const again = installBreadcrumb(dir);
+	assert.deepEqual(again.errors, []);
+	assert.match(again.text, /already installed/);
+	settings = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	assert.equal(settings.hooks.UserPromptSubmit.length, 2);
+
+	// Status reports installed and echoes the command.
+	const st = statusBreadcrumb(dir);
+	assert.deepEqual(st.errors, []);
+	assert.match(st.text, /installed/);
+	assert.match(st.text, /hooks breadcrumb print/);
+
+	// Uninstall removes only the marker entry: foreign content deep-equal intact.
+	const un = uninstallBreadcrumb(dir);
+	assert.deepEqual(un.errors, []);
+	settings = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	assert.deepEqual(settings, FOREIGN_SETTINGS);
+	const after = statusBreadcrumb(dir);
+	assert.deepEqual(after.errors, []);
+	assert.match(after.text, /not installed/);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: install on missing .claude creates it; uninstall round-trips back to {}", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-new-"));
+	const ins = installBreadcrumb(dir);
+	assert.deepEqual(ins.errors, []);
+	const settings = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	assert.equal(settings.hooks.UserPromptSubmit.length, 1);
+	assert.ok(settings.hooks.UserPromptSubmit[0].command.includes(HOOK_MARKER));
+	const un = uninstallBreadcrumb(dir);
+	assert.deepEqual(un.errors, []);
+	const after = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	assert.deepEqual(after, {});
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: corrupt settings.json fails closed and untouched; status warns", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-corrupt-"));
+	fs.mkdirSync(path.join(dir, ".claude"), { recursive: true });
+	const raw = "{ this is not json";
+	fs.writeFileSync(claudeSettings(dir), raw);
+
+	const ins = installBreadcrumb(dir);
+	assert.ok(ins.errors.length > 0, "install refuses an unparseable settings file");
+	const un = uninstallBreadcrumb(dir);
+	assert.ok(un.errors.length > 0, "uninstall refuses too");
+	assert.equal(fs.readFileSync(claudeSettings(dir), "utf8"), raw, "file bytes unchanged");
+
+	const st = statusBreadcrumb(dir);
+	assert.deepEqual(st.errors, [], "status never errors on an unreadable file");
+	assert.ok(st.warnings.length > 0);
+	assert.match(st.text, /unknown/);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: an unsupported platform is rejected", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-plat-"));
+	const r = installBreadcrumb(dir, { platform: "cursor" });
+	assert.ok(r.errors.length > 0);
+	assert.ok(!fs.existsSync(claudeSettings(dir)), "nothing written for an unknown platform");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: ambient AMBER_SKIP_HOOKS in the environment does not skew print assertions", () => {
+	const dir = breadcrumbSessionRepo();
+	const prior = process.env.AMBER_SKIP_HOOKS;
+	delete process.env.AMBER_SKIP_HOOKS;
+	try {
+		const r = printBreadcrumb(dir, { format: "text" });
+		assert.deepEqual(r.errors, []);
+		assert.match(r.text, /Next step: /);
+	} finally {
+		if (prior !== undefined) process.env.AMBER_SKIP_HOOKS = prior;
+	}
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: a foreign entry containing only the marker is not managed", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-collide-"));
+	fs.mkdirSync(path.join(dir, ".claude"), { recursive: true });
+	const foreign = {
+		hooks: {
+			UserPromptSubmit: [{ type: "command", command: `echo unrelated ${HOOK_MARKER} thing` }],
+		},
+	};
+	fs.writeFileSync(claudeSettings(dir), JSON.stringify(foreign));
+	const ins = installBreadcrumb(dir);
+	assert.deepEqual(
+		ins.errors,
+		[],
+		"install must not mistake a marker-mentioning foreign entry for its own",
+	);
+	const settings = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	assert.equal(settings.hooks.UserPromptSubmit.length, 2, "real breadcrumb appended");
+	const un = uninstallBreadcrumb(dir);
+	assert.deepEqual(un.errors, []);
+	const after = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	assert.deepEqual(after, foreign, "only the genuine breadcrumb entry was removed");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: install/uninstall blocking errors carry a stable code", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-code-"));
+	fs.mkdirSync(path.join(dir, ".claude"), { recursive: true });
+	fs.writeFileSync(claudeSettings(dir), "{ not json");
+	for (const r of [installBreadcrumb(dir), uninstallBreadcrumb(dir)]) {
+		assert.ok(r.errors.length > 0);
+		assert.match(r.errors.join("\n"), /AMBER_E_SETTINGS_UNMERGEABLE/);
+	}
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: print is read-only (no file in the target changes)", () => {
+	const dir = breadcrumbSessionRepo();
+	const before = snapshotTree(dir);
+	const r = printBreadcrumb(dir, { format: "json" });
+	assert.deepEqual(r.errors, []);
+	const after = snapshotTree(dir);
+	assert.deepEqual(after, before, "print must not write anything anywhere");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+function snapshotTree(root) {
+	const entries = {};
+	(function walk(dir) {
+		for (const name of fs.readdirSync(dir).sort()) {
+			const full = path.join(dir, name);
+			const rel = path.relative(root, full);
+			const stat = fs.statSync(full);
+			entries[rel] = stat.isDirectory() ? "dir" : fs.readFileSync(full, "utf8");
+			if (stat.isDirectory()) walk(full);
+		}
+	})(root);
+	return entries;
+}
+
+test("breadcrumb: amber init never installs the breadcrumb entry", async () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-init-"));
+	const { run } = require("../../scripts/amber.js");
+	const originalLog = console.log;
+	console.log = () => {};
+	let exit;
+	try {
+		exit = await run(["init", "--target", dir]);
+	} finally {
+		console.log = originalLog;
+	}
+	assert.equal(exit, 0);
+	const settings = claudeSettings(dir);
+	if (fs.existsSync(settings)) {
+		const parsed = JSON.parse(fs.readFileSync(settings, "utf8"));
+		const entries = (parsed.hooks && parsed.hooks.UserPromptSubmit) || [];
+		assert.equal(
+			entries.filter(
+				(e) => e && typeof e.command === "string" && e.command.includes("hooks breadcrumb print"),
+			).length,
+			0,
+			"init must never install the breadcrumb hook",
+		);
+	}
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// CLI-level dispatch guard: the host pipes stdout straight into the
+// conversation, so nothing but the envelope may appear there.
+const { spawnSync } = require("node:child_process");
+const CLI = path.join(__dirname, "..", "..", "scripts", "amber.js");
+
+function runCli(args, env = {}) {
+	return spawnSync(process.execPath, [CLI, ...args], {
+		cwd: __dirname,
+		encoding: "utf8",
+		env: { ...process.env, ...env },
+	});
+}
+
+test("breadcrumb CLI: print emits exactly the envelope on stdout and exits 0", () => {
+	const target = breadcrumbSessionRepo();
+	const json = runCli(["hooks", "breadcrumb", "print", "--target", target, "--format", "json"]);
+	assert.equal(json.status, 0);
+	assert.equal(json.stderr, "");
+	const lines = json.stdout.trimEnd().split("\n");
+	assert.equal(lines.length, 1, "stdout is exactly one line");
+	const envelope = JSON.parse(lines[0]);
+	assert.equal(envelope.hookSpecificOutput.hookEventName, "UserPromptSubmit");
+	assert.ok(envelope.hookSpecificOutput.additionalContext.includes("<amber-workflow-state>"));
+
+	const text = runCli(["hooks", "breadcrumb", "print", "--target", target, "--format", "text"]);
+	assert.equal(text.status, 0);
+	assert.equal(text.stderr, "");
+	assert.ok(text.stdout.startsWith("<amber-workflow-state>"));
+	assert.ok(text.stdout.trimEnd().endsWith("</amber-workflow-state>"));
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("breadcrumb CLI: bypass emits zero bytes; invalid format exits 1 with empty stdout", () => {
+	const target = breadcrumbSessionRepo();
+	const bypass = runCli(["hooks", "breadcrumb", "print", "--target", target, "--format", "text"], {
+		AMBER_SKIP_HOOKS: "1",
+	});
+	assert.equal(bypass.status, 0);
+	assert.equal(bypass.stdout, "");
+
+	const bad = runCli(["hooks", "breadcrumb", "print", "--target", target, "--format", "xml"]);
+	assert.equal(bad.status, 1);
+	assert.equal(bad.stdout, "", "errors go to stderr, never stdout");
+	assert.match(bad.stderr, /AMBER_E_INVALID_ARG/);
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+test("breadcrumb CLI: --platform=cursor is rejected, not silently treated as claude", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-platcli-"));
+	const r = runCli(["hooks", "breadcrumb", "install", "--target", dir, "--platform=cursor"]);
+	assert.equal(r.status, 1);
+	// Non-bypass paths print errors through the generic printer on stdout.
+	assert.match(r.stdout, /Unsupported breadcrumb platform/);
+	assert.ok(!fs.existsSync(claudeSettings(dir)), "nothing installed for a rejected platform");
+	fs.rmSync(dir, { recursive: true, force: true });
 });

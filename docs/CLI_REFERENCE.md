@@ -962,6 +962,27 @@ node scripts/amber.js hooks status --target .      # installed (blocking|warn-on
 node scripts/amber.js hooks uninstall --target .   # removes the Amber guard; restores any backup
 ```
 
+### hooks breadcrumb
+
+An opt-in per-turn agent hook. When the host fires its prompt hook, `breadcrumb print` renders a
+read-only `<amber-workflow-state>` block — current focus, session status and pending gates, and the
+single required next step (same source as `amber next`) — and injects it into the agent turn as
+context.
+
+```bash
+node scripts/amber.js hooks breadcrumb print --target .                # JSON envelope (default)
+node scripts/amber.js hooks breadcrumb print --target . --format text  # bare block
+node scripts/amber.js hooks breadcrumb install --target .   # merge into .claude/settings.json (opt-in)
+node scripts/amber.js hooks breadcrumb status --target .    # installed / not installed (echoes the entry)
+node scripts/amber.js hooks breadcrumb uninstall --target . # removes the Amber entry only
+```
+
+`print` reads governance metadata from disk only: it writes nothing, never runs target-project
+commands, and never dispatches agents — context injection, not execution. Like the pre-commit guard,
+the breadcrumb is never installed automatically (`amber init` does not add it), and
+`AMBER_SKIP_HOOKS=1` silences it. Mechanism and invariants live in
+[docs/specs/2026-08-15-workflow-state-breadcrumb.md](specs/2026-08-15-workflow-state-breadcrumb.md).
+
 ## Drift Commands
 
 `amber drift` is a CI-native drift gate. It aggregates the artifact, wiki, and scaffold drift

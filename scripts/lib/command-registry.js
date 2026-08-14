@@ -329,14 +329,27 @@ const COMMAND_HELP = {
 		"  check [--warn-only]",
 		"        Run the governance checks now (this is what the hook invokes).",
 		"",
+		"  breadcrumb print [--format json|text]",
+		"        Render the per-turn <amber-workflow-state> block (read-only; default json envelope).",
+		"  breadcrumb install [--platform claude]",
+		"        Opt-in merge of the breadcrumb command into .claude/settings.json hooks.UserPromptSubmit.",
+		"  breadcrumb uninstall",
+		"        Remove the Amber-managed breadcrumb entry; foreign entries are preserved.",
+		"  breadcrumb status",
+		"        Report whether the breadcrumb hook is installed (and echo its command).",
+		"",
+		"The breadcrumb is opt-in and never auto-installed (amber init does not add it).",
 		"The hook only reads governance metadata; it never runs project build/test commands.",
-		"Bypass once with: AMBER_SKIP_HOOKS=1 git commit ...",
+		"Bypass once with: AMBER_SKIP_HOOKS=1 git commit ... (breadcrumb print is silent too).",
 		"",
 		"Examples:",
 		"  amber hooks install --target .",
 		"  amber hooks status --target .",
 		"  amber hooks check --target .",
 		"  amber hooks uninstall --target .",
+		"  amber hooks breadcrumb print --target . --format text",
+		"  amber hooks breadcrumb install --target . --platform claude",
+		"  amber hooks breadcrumb status --target .",
 	],
 	governance: [
 		"Create, inspect, and report governance controls for a target repository.",
@@ -515,7 +528,7 @@ const COMMAND_OUTPUT = {
 	explain: { usage: "Usage: amber explain [<code>] [--markdown <path>] [--json]" },
 	hooks: {
 		usage:
-			"Usage: amber hooks <check|install|uninstall|status> --target <repo> [--warn-only] [--force] [--json]",
+			"Usage: amber hooks <check|install|uninstall|status> --target <repo> | amber hooks breadcrumb <print|install|uninstall|status> --target <repo> [--format json|text] [--platform claude] [--json]",
 	},
 	loop: {
 		usage:

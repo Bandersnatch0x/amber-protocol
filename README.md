@@ -285,12 +285,15 @@ time, install the opt-in guard:
 amber hooks install --target .     # writes .git/hooks/pre-commit (opt-in; never auto-installed)
 amber hooks status --target .
 amber hooks check --target .       # what the hook runs; exits non-zero on a violation
+amber hooks breadcrumb install --target .  # opt-in per-turn workflow-state context injection for agent hosts
 ```
 
 The guard reads governance **metadata only** (e.g. a feature must not be marked complete with an
 empty `evidence` array) — it never runs your build or tests. Install with `--warn-only` to surface
 findings without blocking, bypass once with `AMBER_SKIP_HOOKS=1 git commit ...`, or remove it with
-`amber hooks uninstall`.
+`amber hooks uninstall`. The breadcrumb hook (`amber hooks breadcrumb install`) is likewise opt-in
+and per-turn: it reads governance metadata only and injects the current workflow state — focus,
+session status, required next step — into every agent turn; it never runs target commands.
 
 Every blocking error carries a stable code (e.g. `AMBER_E_FEATURE_NO_EVIDENCE`). Run
 `amber explain <code>` for its cause and fix, `amber explain` to list them all, or

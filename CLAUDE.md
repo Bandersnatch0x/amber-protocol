@@ -234,6 +234,12 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 > reads metadata only and still does **not** run target project build/test commands or dispatch
 > agents. It is never installed automatically.
 
+> **Boundary note (per-turn context injection):** Amber MAY install an **opt-in** per-turn agent-hook
+> entry (`amber hooks breadcrumb install`) that READS governance metadata and injects an
+> `<amber-workflow-state>` block (focus, session status, required next step) into the agent
+> conversation. This is context injection, not execution — it never runs target project commands,
+> never dispatches agents, and is never installed automatically.
+
 > **Boundary note (governed execution, ADR-0003):** Amber MAY run a loop contract's declared
 > `governed.command` via `amber loop run --execute`, but ONLY behind four gates — policy
 > (`.amber/governance/rules.json`), an explicit `amber loop approve` (one approval ⇒ one run),
