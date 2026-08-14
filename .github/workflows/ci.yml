@@ -332,12 +332,40 @@ jobs:
           if npm view "dsh-amber-protocol@$VERSION" >/dev/null 2>&1; then
             echo "::notice::dsh-amber-protocol@$VERSION already published — skipping."
           else
+            # Confirm the dependency is resolvable on npmjs before publishing DSH;
+            # registry propagation after the amber-protocol publish can lag.
+            visible=false
+            for attempt in $(seq 1 30); do
+              if npm view "amber-protocol@$VERSION" >/dev/null 2>&1; then
+                visible=true
+                break
+              fi
+              echo "amber-protocol@$VERSION not visible yet (attempt $attempt/30) — waiting 10s"
+              sleep 10
+            done
+            if [ "$visible" != "true" ]; then
+              echo "::error::amber-protocol@$VERSION is not visible on npmjs — refusing to publish dsh-amber-protocol@$VERSION with an unresolvable dependency."
+              exit 1
+            fi
             npm publish
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Check GitHub Release
+        id: check_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
+        if: steps.check_release.outputs.exists == 'false'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

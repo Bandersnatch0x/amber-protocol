@@ -56,12 +56,48 @@ test("stable release publishes DSH after the main package and before GitHub Rele
 	assert.ok(dshStart > mainStart, "DSH publish must follow the main package");
 	assert.ok(releaseStart > dshStart, "GitHub Release must follow DSH publish");
 
-	const dshStep = stepBody(workflow, "Publish DSH to npm", "Create GitHub Release");
+	const dshStep = stepBody(workflow, "Publish DSH to npm", "Check GitHub Release");
 	assert.match(dshStep, /working-directory:\s*dsh/);
 	assert.match(dshStep, /if npm view "dsh-amber-protocol@\$VERSION"/);
 	assert.match(dshStep, /already published .* skipping/);
-	assert.match(dshStep, /else\s+npm publish\s+fi/);
-	assert.doesNotMatch(dshStep, /exit\s+1/);
+	// The already-published path skips without failing so the re-run can still
+	// reach GitHub Release creation.
+	const skipBranch = dshStep.slice(
+		dshStep.indexOf("already published"),
+		dshStep.indexOf("visible=false"),
+	);
+	assert.doesNotMatch(skipBranch, /exit\s+1/);
+});
+
+test("stable release confirms the amber-protocol dependency is visible before publishing DSH", () => {
+	const workflow = fs.readFileSync(WORKFLOW, "utf8");
+	const dshStep = stepBody(workflow, "Publish DSH to npm", "Check GitHub Release");
+	const visibilityCheck = dshStep.indexOf('npm view "amber-protocol@$VERSION"');
+	const publishCall = dshStep.indexOf("npm publish");
+	assert.ok(
+		visibilityCheck >= 0 && publishCall > visibilityCheck,
+		"DSH publish must wait for amber-protocol@$VERSION visibility before npm publish",
+	);
+	// Fail closed: an unresolvable dependency must abort the DSH publish.
+	assert.match(dshStep, /not visible on npmjs[\s\S]*exit 1/);
+});
+
+test("stable release skips GitHub Release creation when the release already exists", () => {
+	const workflow = fs.readFileSync(WORKFLOW, "utf8");
+	const checkStart = workflow.indexOf("- name: Check GitHub Release");
+	const releaseStart = workflow.indexOf("- name: Create GitHub Release");
+	assert.ok(checkStart >= 0, "stable release must check for an existing GitHub Release");
+	assert.ok(checkStart < releaseStart, "release existence check must precede release creation");
+
+	const checkStep = stepBody(workflow, "Check GitHub Release", "Create GitHub Release");
+	assert.match(checkStep, /gh release view/);
+	assert.match(checkStep, /exists=true/);
+	assert.match(checkStep, /exists=false/);
+	assert.match(
+		workflow.slice(releaseStart),
+		/if:\s*steps\.check_release\.outputs\.exists == 'false'/,
+		"release creation must be gated on the existence check",
+	);
 });
 
 test("stable release still excludes prerelease tags", () => {
