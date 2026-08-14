@@ -5,6 +5,32 @@ All notable changes to Amber Protocol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-08-14
+
+### Added
+
+- release: lockstep-publish dsh-amber-protocol on stable tags
+
+### Fixed
+
+- release: fail closed when release existence cannot be determined
+- release: gate DSH publish on npm visibility and release idempotency
+- web: drop at-rest shadows and blur from viewer surfaces
+- governance: remediate v1.5.1 review findings
+- web: share settings and tighten viewer a11y
+
+### Changed
+
+- clean up the MCP junction-fixture target directory
+- web: keep settings persistence and query defaults pure
+- align F020 feature paths with the actual change surface
+- document target-local route reads in CLAUDE.md
+- governance: reuse realPathForPotential in inspectRoutes
+- test: share target-route fixtures across integration suites
+- web: dedupe provider logic and split session-event hook
+- release: skip GitHub Packages publish on prerelease tags
+- dispatcher: extract shapeResult + requireSessionId, fix CI npm publish
+
 ## [1.5.1] - 2026-08-14
 
 ### Added
