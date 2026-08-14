@@ -53,6 +53,12 @@
       "command": "node scripts/amber.js next --target ."
     },
     {
+      "id": "f021-prerelease-publish-policy",
+      "title": "Align GitHub Packages prerelease skip with CONTRIBUTING",
+      "status": "done",
+      "lastResult": "Accepted 2026-08-14; workflow contract 5/5; no tag or publish created."
+    },
+    {
       "id": "f017-lifecycle-plan",
       "title": "Create and review the F017 lifecycle plan",
       "status": "invalidated",
@@ -82,6 +88,7 @@
     "change primary product behavior, major UI flows, or security boundaries"
   ],
   "resultNotes": [
+    "2026-08-14: After F020, next-up was empty. Selected F021 to close leftover release-contract drift: GitHub Packages now skips -rc/-beta like npmjs, CONTRIBUTING names NPM_TOKEN for the lockstep job, and amber-ontology-mcp.md has Last Reviewed. Workflow tests 5/5; Amber review/gate ready; accepted. No tag or publish.",
     "2026-08-10: Post-review correction invalidated the retrospective F017 plan and acceptance, restored F017 to passing, removed the erroneous evolution entry, and recorded complete-range source-isolation evidence in docs/quality/f017-context-knowledge-lifecycle-retrospective.md. Final Standards and Spec review found no unresolved findings; 64 focused and 1649 full-suite tests passed with repository gates green.",
     "2026-08-10 [superseded]: F017 was temporarily marked accepted; post-review found that retrospective artifacts cannot satisfy the prospective Amber lifecycle, so this state was invalidated.",
     "2026-08-10 [superseded]: User confirmation was applied to the retrospective F017 draft; the draft was later removed from docs/plans because it could not authorize already-landed implementation.",

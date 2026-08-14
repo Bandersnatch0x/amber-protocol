@@ -1,5 +1,7 @@
 # Amber Ontology MCP 协议设计文档
 
+Last Reviewed: 2026-08-14
+
 **版本**：0.7（F018 治理与仓库隔离修复已落地）
 **状态**：`implemented` — 协议契约、stdio 服务器、OAG 查询层、学习回路、结构化返回、多目标、Functions、并发守卫、跨仓库视图、所有权写回、函数 schema 校验、结果缓存均已落地；F018 在此之上强制了已配置仓库不变量、契约一致性、只读/受治理执行分离与 fail-closed 语义。
 **相关工件**：`schemas/action.type.schema.json`、`action-types/`（白名单）、`action-functions/`（Functions）、`scripts/amber-mcp.js`（服务器）、`scripts/lib/mcp-targets.js`（已配置仓库模块）、`scripts/lib/mcp-action-contracts.js`（命令能力注册表 + 契约校验）、`tests/unit/mcp-targets.test.js`、`tests/unit/mcp-action-contracts.test.js`、`tests/integration/amber-mcp.test.js`

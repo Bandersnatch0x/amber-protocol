@@ -7,6 +7,7 @@ const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "../..");
 const WORKFLOW = path.join(ROOT, ".github", "workflows", "ci.yml");
+const PACKAGES_WORKFLOW = path.join(ROOT, ".github", "workflows", "publish-github-packages.yml");
 
 function releaseJob(workflow) {
 	const start = workflow.search(/^ {2}release:/m);
@@ -67,4 +68,15 @@ test("stable release still excludes prerelease tags", () => {
 	const job = releaseJob(fs.readFileSync(WORKFLOW, "utf8"));
 	assert.match(job, /!contains\(github\.ref, '-rc'\)/);
 	assert.match(job, /!contains\(github\.ref, '-beta'\)/);
+});
+
+test("GitHub Packages mirror skips prerelease tags and keeps manual dispatch", () => {
+	const workflow = fs.readFileSync(PACKAGES_WORKFLOW, "utf8");
+	assert.match(workflow, /workflow_dispatch/);
+	assert.match(workflow, /!contains\(github\.ref, '-rc'\)/);
+	assert.match(workflow, /!contains\(github\.ref, '-beta'\)/);
+	assert.match(
+		workflow,
+		/github\.event_name\s*==\s*'workflow_dispatch'\s*\|\|[\s\S]*!contains\(github\.ref, '-rc'\)[\s\S]*!contains\(github\.ref, '-beta'\)/,
+	);
 });

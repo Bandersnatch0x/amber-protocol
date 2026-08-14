@@ -333,7 +333,7 @@ Install pre-releases with: `npm install -g amber-protocol@rc` or `npm install -g
 
 The authoritative npmjs release job in `.github/workflows/ci.yml` uses `secrets.NPM_TOKEN` to publish `amber-protocol` and `dsh-amber-protocol`.
 
-The GitHub Packages publish workflow (`.github/workflows/publish-github-packages.yml`) uses the built-in `GITHUB_TOKEN` (with `packages: write` permission). It is a scoped mirror of the main package only and does not publish the DSH bundle.
+The GitHub Packages publish workflow (`.github/workflows/publish-github-packages.yml`) uses the built-in `GITHUB_TOKEN` (with `packages: write` permission). It is a scoped mirror of the main package only, does not publish the DSH bundle, and skips `-rc`/`-beta` tags while still allowing `workflow_dispatch`.
 
 ## License
 
