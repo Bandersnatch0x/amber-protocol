@@ -623,25 +623,29 @@ test("multi-target: _target overrides the repository per call (configured member
 
 test("configured-repository invariant: route query rejects a routes junction escape", () => {
 	const target = tempTarget();
-	withRoutesJunctionEscape(target, () => {
-		const byId = rpc(
-			[
-				{
-					jsonrpc: "2.0",
-					id: 1,
-					method: "tools/call",
-					params: { name: "amber.object.query", arguments: { objectType: "route" } },
-				},
-			],
-			["--target", target],
-		);
-		const outcome = callOutcome(byId.get(1));
-		assert.equal(byId.get(1).result.isError, true);
-		assert.match(
-			`${outcome.stdout}\n${outcome.stderr}\n${outcome.error || ""}`,
-			/outside the target root/,
-		);
-	});
+	try {
+		withRoutesJunctionEscape(target, () => {
+			const byId = rpc(
+				[
+					{
+						jsonrpc: "2.0",
+						id: 1,
+						method: "tools/call",
+						params: { name: "amber.object.query", arguments: { objectType: "route" } },
+					},
+				],
+				["--target", target],
+			);
+			const outcome = callOutcome(byId.get(1));
+			assert.equal(byId.get(1).result.isError, true);
+			assert.match(
+				`${outcome.stdout}\n${outcome.stderr}\n${outcome.error || ""}`,
+				/outside the target root/,
+			);
+		});
+	} finally {
+		fs.rmSync(target, { recursive: true, force: true });
+	}
 });
 
 test("configured-repository invariant: existing but unconfigured _target is rejected", () => {
