@@ -735,19 +735,49 @@
 			"area": "governance",
 			"title": "Break-loop post-mortem scaffold for recurring friction",
 			"user_visible_behavior": "When a friction or bug class recurs after a fix, `amber break-loop` scaffolds a post-mortem document with a five-way root-cause taxonomy and a prevention-mechanism menu mapped to Amber's knowledge surfaces, and `amber break-loop validate` refuses placeholder content — recurring defects get a durable, checkable prevention record instead of a re-fixed symptom",
-			"status": "not_started",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/break-loop.test.js",
 				"amber break-loop --target <tmp> --issue 118 --title \"...\" scaffolds docs/quality/break-loops/<date>-<slug>.md with all required sections",
 				"amber break-loop validate --target <tmp> --file <scaffolded> fails on placeholders and passes when filled",
 				"amber break-loop --help renders the taxonomy and menu"
 			],
-			"evidence": [],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 92709ms)",
+					"date": "2026-08-15",
+					"notes": "session 42215a6e-e53b-4a89-b72f-7b66a53d3225 stage verify",
+					"sessionId": "42215a6e-e53b-4a89-b72f-7b66a53d3225"
+				}
+			],
 			"notes": [
 				"P2-1 from the Trellis-mechanism analysis: deep bug retrospectives for defect loops. Mechanism idea only (AGPL); all wording original.",
 				"Amber scaffolds and validates; the analysis itself stays with the operator/agent — no issue-tracker network access, no auto-detection, no LLM."
 			],
-			"updated": "2026-08-15"
+			"updated": "2026-08-15",
+			"paths": [
+				"scripts/lib/core/break-loop.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/command-dispatcher.js",
+				"scripts/lib/core/cli-output.js",
+				"tests/unit/break-loop.test.js",
+				"tests/unit/command-registry-parity.test.js",
+				"docs/CLI_REFERENCE.md",
+				"docs/dogfood-weekly.md",
+				"AGENTS.md",
+				"docs/quality/break-loops/2026-08-15-Bookkeeping-dates-drift-to-the-UTC-day.md",
+				"tests/unit/local-date-hygiene.test.js",
+				"scripts/lib/core/planning.js",
+				"scripts/changelog.js"
+			],
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-15",
+				"surfaces": [
+					"docs/quality/break-loops/2026-08-15-Bookkeeping-dates-drift-to-the-UTC-day.md"
+				]
+			}
 		}
 	]
 }

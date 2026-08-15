@@ -93,3 +93,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F024-Fix-dogfood-friction-batch.md`
 - Review status: ready
 - Feature: F024 status → accepted in feature_list.json
+
+## 2026-08-15 docs/plans/F025-Break-loop-post-mortem-scaffold.md
+
+- Plan: `docs/plans/F025-Break-loop-post-mortem-scaffold.md`
+- Review status: ready
+- Feature: F025 status → accepted in feature_list.json

@@ -15,7 +15,7 @@ const {
 	walkFiles,
 } = require("./fs-utils");
 
-const { getSectionBody, hasSectionWithBody, slugify } = require("./text-utils");
+const { getSectionBody, hasSectionWithBody, slugify, localIsoDate } = require("./text-utils");
 
 const EVIDENCE_SCHEMA_FIELDS = ["Command", "Result", "Date"];
 const RESUME_CHECKPOINT_FIELDS = [
@@ -592,9 +592,7 @@ function acceptPlan(target, planRelativePath, options = {}) {
 				const idx = data.features.findIndex((f) => f && f.id === featureId);
 				if (idx !== -1 && data.features[idx].status !== "accepted") {
 					const updatedFeatures = data.features.map((f, i) =>
-						i === idx
-							? { ...f, status: "accepted", updated: new Date().toISOString().slice(0, 10) }
-							: f,
+						i === idx ? { ...f, status: "accepted", updated: localIsoDate() } : f,
 					);
 					fs.writeFileSync(
 						featureListPath,
@@ -622,7 +620,7 @@ function acceptPlan(target, planRelativePath, options = {}) {
 	const evolutionRelativePath = path.join("docs", "wiki", "engineering", "harness-evolution.md");
 	const evolutionPath = path.join(targetRoot, evolutionRelativePath);
 	const portablePlanPath = relativeSlash(resolvedPlan.canonicalTarget, resolvedPlan.planPath);
-	const date = new Date().toISOString().slice(0, 10);
+	const date = localIsoDate();
 	const entry = [
 		"",
 		`## ${date} ${portablePlanPath}`,

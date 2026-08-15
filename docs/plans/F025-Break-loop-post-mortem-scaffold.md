@@ -1,7 +1,7 @@
 # Plan: Break-loop post-mortem scaffold
 
 Feature: F025
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal

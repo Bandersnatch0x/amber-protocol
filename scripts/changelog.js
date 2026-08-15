@@ -34,6 +34,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { execSync } = require("node:child_process");
+const { localIsoDate } = require("./lib/core/text-utils");
 
 const ROOT = path.resolve(__dirname, "..");
 const CHANGELOG_PATH = path.join(ROOT, "CHANGELOG.md");
@@ -208,7 +209,8 @@ function groupCommits(commits) {
 }
 
 function formatDate(d = new Date()) {
-	return d.toISOString().slice(0, 10);
+	// Calendar day in local time (matches every other bookkeeping date).
+	return localIsoDate(d);
 }
 
 function formatReleaseSection(version, dateStr, groups) {
