@@ -96,6 +96,24 @@ const COMMAND_HELP = {
 		"  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
 		"  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md --session <session-id>",
 	],
+	learnings: [
+		"Inspect post-accept learning write-back triggers for a feature, or book the review.",
+		"Read-only inspection by default; --reviewed books the review on the feature entry.",
+		"",
+		"Options:",
+		"  --feature <id>     Feature to inspect (defaults to the current lifecycle focus).",
+		"  --reviewed         Book the learning review (requires --feature; overwrites any prior booking).",
+		"  --surface <path>   Knowledge surface the review was written to. Repeatable;",
+		"                     a single flag also accepts a comma-separated list.",
+		"  --json             Emit the machine-readable envelope.",
+		"",
+		"Boundary: Amber detects and reminds; it never writes knowledge docs itself.",
+		"",
+		"Examples:",
+		"  amber learnings --target .",
+		"  amber learnings --target . --feature F001",
+		"  amber learnings --target . --feature F001 --reviewed --surface docs/specs/f001.md",
+	],
 	pack: "Inspect or validate declarative workflow packs without executing them.",
 	ledger:
 		"Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emits JSON/CSV/OTLP-JSON for SIEM.",
@@ -282,7 +300,7 @@ const COMMAND_HELP = {
 	next: [
 		"Infer the repo's position in the Amber lifecycle and print the next command to run (read-only).",
 		"",
-		"Lifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept.",
+		"Lifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept → learnings (when write-back triggers matched).",
 		"Session evaluation matches complete-check --strict (executed verification + live handoff, not init scaffold).",
 		"Existing projects: next recommends a read-only audit first; audit writes no file, so next advances straight to init.",
 		"",
@@ -518,6 +536,10 @@ const COMMAND_OUTPUT = {
 		usage:
 			"Usage: amber accept --target <repo> --plan <relative-plan-path> [--session <id>] [--strict] [--json]",
 	},
+	learnings: {
+		usage:
+			"Usage: amber learnings --target <repo> [--feature <id>] [--reviewed] [--surface <path>] [--json]",
+	},
 	handoff: {
 		usage: [
 			"Usage: amber handoff --target <repo> [--json]",
@@ -581,6 +603,7 @@ const COMMANDS = Object.freeze([
 	"gate",
 	"review",
 	"accept",
+	"learnings",
 	"pack",
 	"profile",
 	"task",
@@ -618,6 +641,7 @@ const TIER_BY_COMMAND = {
 	gate: "core",
 	review: "core",
 	accept: "core",
+	learnings: "core",
 	loop: "core",
 	ledger: "core",
 	route: "core",

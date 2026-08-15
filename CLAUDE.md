@@ -202,8 +202,10 @@ npm run test:e2e         # Run Playwright tests
 ### Weekly self-dogfood ritual
 
 Each week, drive one real piece of work through the full Amber session lifecycle
-(`plan → gate → verify --execute → approve → complete → accept → handoff`) and log
-every UX friction as a `next-up` issue. This is the continuous, cheap replacement
+(`plan → gate → verify --execute → approve → complete → accept → learnings → handoff`) and log
+every UX friction as a `next-up` issue. After `accept`, `node scripts/amber.js learnings --target .`
+inspects (read-only) whether the accepted work hit knowledge write-back triggers; `--reviewed`
+books the review. This is the continuous, cheap replacement
 for episodic external pilots. Full ritual, command template, exit criteria, and
 the first-round candidate list live in **[`docs/dogfood-weekly.md`](docs/dogfood-weekly.md)**.
 

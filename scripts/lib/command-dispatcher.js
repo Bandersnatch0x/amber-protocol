@@ -1034,6 +1034,34 @@ function hooksBreadcrumbPlatform(args) {
 	return args.platform;
 }
 
+// F023: read-only inspection by default; --reviewed books the review on the
+// feature entry (featureId comes from args.feature — booking never resolves a
+// focus implicitly). --surface is repeatable via FLAG_SPECS accumulate, and a
+// single flag may also carry a comma-separated list.
+function handleLearnings(args) {
+	const { inspectLearningWriteBack, bookLearningWriteBack } = require("./core/learning-writeback");
+	let r;
+	if (args.reviewed) {
+		r = bookLearningWriteBack(args.target, {
+			featureId: args.feature,
+			surfaces: args.surfaces,
+		});
+	} else {
+		r = inspectLearningWriteBack(resolveTarget(args), { featureId: args.feature });
+	}
+	return {
+		result: {
+			...r,
+			target: r.target,
+			text: r.text || "",
+			errors: r.errors || [],
+			warnings: r.warnings || [],
+		},
+		exitCode: (r.errors || []).length > 0 ? 1 : 0,
+		bypassPrint: !args.json,
+	};
+}
+
 function handleHooks(args) {
 	const hooks = require("./hooks-command");
 	const action = args._?.[0];
@@ -1110,6 +1138,7 @@ const COMMAND_HANDLERS = {
 	gate: handleGate,
 	review: handleReview,
 	accept: handleAccept,
+	learnings: handleLearnings,
 	pack: handlePack,
 	profile: handleProfile,
 	status: handleStatus,

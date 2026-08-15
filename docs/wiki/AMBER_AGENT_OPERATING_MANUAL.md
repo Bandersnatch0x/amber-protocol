@@ -51,6 +51,9 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
 - Inspect before mutating; prefer read-only/dry-run commands first.
 - `init` and `wiki` are idempotent and never overwrite existing files.
 - Treat gates as real checkpoints; record evidence before claiming pass/done.
+- After a plan is accepted, run `node scripts/amber.js learnings --target .`: it reports whether the
+  accepted work hit knowledge write-back triggers (schema/contract/infra paths) and `--reviewed`
+  books the review. Amber detects and reminds — it never writes the knowledge docs itself.
 - Leave handoff state before ending a session.
 - Use `node scripts/amber.js governance report --target .` as the primary product-loop report: it
   scores readiness, names risks, and emits structured next actions.

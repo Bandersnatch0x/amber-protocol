@@ -627,6 +627,26 @@
 				"README.md",
 				"CLAUDE.md"
 			]
+		},
+		{
+			"id": "F023",
+			"priority": 1,
+			"area": "governance",
+			"title": "Post-accept learning write-back checkpoint",
+			"user_visible_behavior": "After a feature is accepted, Amber deterministically detects whether the work hit mandatory knowledge write-back triggers (schema/contract/infra paths) and, when triggered, surfaces a visible checkpoint through amber next, the per-turn breadcrumb, and amber handoff until the learning review is booked via amber learnings --reviewed",
+			"status": "not_started",
+			"verification": [
+				"node --test tests/unit/learning-writeback.test.js",
+				"node --test tests/unit/workflow-state-breadcrumb-parity.test.js (walk extended with the learnings checkpoint)",
+				"amber learnings --target . (read-only inspection renders triggers, matching paths, suggested surfaces, booking state)",
+				"amber learnings --target . --feature <id> --reviewed --surface <path> books learningWriteBack on the feature entry"
+			],
+			"evidence": [],
+			"notes": [
+				"Selected from Trellis-mechanism analysis P1-2: post-finish knowledge consolidation. Mechanism idea only (Trellis is AGPL-3.0); all wording original.",
+				"Amber never writes knowledge docs itself — the checkpoint detects, reminds, and books; the write-back is done by the operator/agent."
+			],
+			"updated": "2026-08-15"
 		}
 	]
 }

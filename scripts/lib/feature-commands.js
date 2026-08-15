@@ -2,7 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { readJson, resolveTarget } = require("./core/fs-utils");
+const { readJson, resolveTarget, writeJsonPrettier } = require("./core/fs-utils");
 
 function getFeatureListPath(targetRoot) {
 	return path.join(targetRoot, "feature_list.json");
@@ -26,7 +26,10 @@ function loadFeatures(targetRoot) {
 
 function saveFeatures(data) {
 	const { _file, _corrupt, ...rest } = data;
-	fs.writeFileSync(_file, JSON.stringify(rest, null, 2) + "\n");
+	// writeJsonPrettier emits the Prettier JSON format (tabs + fit-based
+	// collapse), so a booking produces a one-field diff instead of a
+	// whole-file reformat, and stays clean under format:check.
+	writeJsonPrettier(_file, rest);
 }
 
 function addFeature(target, options) {
@@ -391,5 +394,6 @@ module.exports = {
 	recordFeatureEvidence,
 	listFeatureEvidence,
 	loadFeatures,
+	saveFeatures,
 	runFeatureAction,
 };

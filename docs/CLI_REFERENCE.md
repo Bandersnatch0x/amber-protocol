@@ -80,6 +80,28 @@ node scripts/amber.js accept --target . --plan docs/plans/F001-small-slice.md --
 
 With `--session`, the plan's `Feature:` header must match the session's feature — a definite mismatch blocks the accept.
 
+### learnings
+
+Inspect the post-accept learning write-back triggers for a feature, or book the learning review:
+
+```bash
+node scripts/amber.js learnings --target .
+node scripts/amber.js learnings --target . --feature F001
+node scripts/amber.js learnings --target . --feature F001 --reviewed --surface docs/specs/f001.md
+```
+
+**Options:**
+- `--feature`: Feature to inspect (defaults to the current lifecycle focus)
+- `--reviewed`: Book the learning review (requires `--feature`; overwrites any prior booking)
+- `--surface`: Knowledge surface the review was written to (repeatable; a single flag also accepts a comma-separated list)
+- `--json`: Emit the machine-readable envelope
+
+Inspection is read-only: it classifies the feature's booked paths into the `schema`, `contract`, and `infra` trigger categories, lists the matching paths with suggested knowledge surfaces, and shows the current booking state. `--reviewed` clears the checkpoint by writing the `learningWriteBack` booking onto that feature's entry in `feature_list.json` — the only write the command performs.
+
+Boundary: Amber detects and reminds; it never writes knowledge docs itself.
+
+Trigger rules, invariants, and the channels that surface this checkpoint (`amber next`, the breadcrumb, `amber handoff`) are specified in [docs/specs/2026-08-15-learning-writeback.md](specs/2026-08-15-learning-writeback.md).
+
 ## Session Commands
 
 ### session start
@@ -459,7 +481,7 @@ node scripts/amber.js next --target . --objective "fix login timeout" # match a 
 node scripts/amber.js next --target . --json          # machine-readable envelope
 ```
 
-Lifecycle: `[audit on existing repos] → init → feature → plan → gate → verify → approve → handoff → complete-check → session complete → accept` (handoff may refresh after accept). With no
+Lifecycle: `[audit on existing repos] → init → feature → plan → gate → verify → approve → handoff → complete-check → session complete → accept → learnings` (handoff may refresh after accept; the learnings checkpoint applies only when write-back triggers matched). With no
 `--feature`/`--session`, `next` auto-selects (active session → most-recent plan's feature → first
 unstarted feature) and reports the chosen focus plus how many other items are pending. Session
 completion evaluation matches `complete-check --strict` (executed verification + live handoff, not

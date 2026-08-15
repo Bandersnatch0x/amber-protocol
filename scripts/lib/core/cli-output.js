@@ -110,6 +110,8 @@ const FLAG_SPECS = {
 	"--no-sessions": { key: "noSessions", kind: "boolean" },
 	"--enable": { key: "enable", kind: "boolean" },
 	"--allow-transcript": { key: "allowTranscript", kind: "boolean" },
+	"--reviewed": { key: "reviewed", kind: "boolean" },
+	"--surface": { key: "surface", accumulate: "surfaces" },
 	"--help": { key: "help", kind: "boolean" },
 	"-h": { key: "help", kind: "boolean" },
 };

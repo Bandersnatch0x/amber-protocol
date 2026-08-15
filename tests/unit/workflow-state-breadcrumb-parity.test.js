@@ -366,9 +366,41 @@ describe("workflow-state breadcrumb lifecycle parity (F022)", () => {
 		const cp10 = expectStep(root, "accept");
 		assert.match(cp10.block, /Focus: feature F022 \(auto-selected\)/);
 
-		// 11. Accept logged in the evolution log → terminal state: the channel
-		//     renders "all lifecycle steps complete" instead of a next step.
+		// 11. Accept logged in the evolution log, and the accepted feature's booked
+		//     paths include a docs/specs/** contract doc → the F023 post-accept
+		//     learning write-back checkpoint renders through the per-turn channel.
 		writeEvolutionLog(root);
+		writeFeatureList(root, [
+			{
+				id: "F022",
+				title: "Breadcrumb",
+				status: "passing",
+				evidence: [{ date: "2026-08-15", command: "npm test", result: "pass" }],
+				paths: ["docs/specs/2026-08-15-workflow-state-breadcrumb.md"],
+			},
+		]);
+		const cp11 = expectStep(root, "learnings");
+		assert.match(cp11.advisor.remedy, /--feature F022/);
+		assert.match(cp11.advisor.why, /contract/);
+
+		// 12. Learning review booked on the feature entry (learningWriteBack written
+		//     into feature_list.json directly, exactly what `amber learnings
+		//     --reviewed` records) → terminal state: the channel renders "all
+		//     lifecycle steps complete" instead of a next step.
+		writeFeatureList(root, [
+			{
+				id: "F022",
+				title: "Breadcrumb",
+				status: "passing",
+				evidence: [{ date: "2026-08-15", command: "npm test", result: "pass" }],
+				paths: ["docs/specs/2026-08-15-workflow-state-breadcrumb.md"],
+				learningWriteBack: {
+					reviewed: true,
+					date: "2026-08-15",
+					surfaces: ["docs/specs/2026-08-15-workflow-state-breadcrumb.md"],
+				},
+			},
+		]);
 		const advisor = inferNextStep(buildContext(root));
 		assert.equal(advisor, null, "advisor has nothing left to require");
 		const r = printBreadcrumb(root, { format: "text" });

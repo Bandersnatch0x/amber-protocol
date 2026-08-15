@@ -36,7 +36,7 @@ A weekly ritual keeps the **real** lifecycle exercised continuously, so the path
 A good dogfood target is:
 
 1. **Real** — work that would ship anyway (a bugfix, small feature, safe refactor, or a doc/governance fix that closes a known gap). Not a synthetic "touch README".
-2. **Lifecycle-shaped** — small enough to finish in one session, real enough to exercise every stage `plan → gate → verify --execute → approve → complete → accept → handoff`.
+2. **Lifecycle-shaped** — small enough to finish in one session, real enough to exercise every stage `plan → gate → verify --execute → approve → complete → accept → learnings → handoff`.
 3. **High-friction-yield** — preferably a known Amber weakness (G2 from `docs/quality/`), because fixing it *through* the lifecycle is self-referentially dogfooding the path it improves.
 4. **Non-destructive** by default — doc/governance/skill tasks are safest to drive end-to-end first; code tasks after.
 5. **Avoid** targets owned by a parallel task that is mid-flight (e.g. another issue's branch). Pick unclaimed work.
@@ -47,7 +47,7 @@ Pick the route that fits (`feature-standard` | `bugfix-quick` | `refactor-safe`)
 
 ## 4. The full lifecycle command template
 
-This is the **canonical, e2e-verified** path (matches `docs/quality/e2e-governance-loop-verify.md`). Run it top-to-bottom. The tail (`complete → accept → handoff`) is exercised explicitly; `amber next` now includes the terminal sequence steps (handoff / complete-check / session-complete / accept) per the lifecycle definition.
+This is the **canonical, e2e-verified** path (matches `docs/quality/e2e-governance-loop-verify.md`; the conditional `learnings` step is a later addition — F023). Run it top-to-bottom. The tail (`complete → accept → learnings → handoff`) is exercised explicitly; `amber next` now includes the terminal sequence steps (learnings / handoff / complete-check / session-complete / accept) per the lifecycle definition.
 
 ### 4.0 Pick the route first
 
@@ -138,7 +138,18 @@ node scripts/amber.js accept \
   --plan docs/plans/<FID>-<slug>.md \
   --session <SID>
 
-# ── 10. Leave handoff state (never end a session without this) ────────────
+# ── 10. Learning write-back checkpoint (read-only; book when triggered) ───
+node scripts/amber.js learnings --target . --feature <FID>
+#    Reports whether the accepted work hit mandatory knowledge write-back
+#    triggers (schema / contract / infra paths). If any matched, write the
+#    review onto the suggested surface (docs/specs, docs/adr, or docs/wiki)
+#    and book it — Amber never writes knowledge docs itself:
+node scripts/amber.js learnings --target . --feature <FID> --reviewed --surface <path>
+#    No matched triggers → the checkpoint does not apply (no fake gate).
+#    Booking through the CLI also keeps the next/breadcrumb/handoff parity
+#    channels and the governance loop fed from the same lifecycle SSOT.
+
+# ── 11. Leave handoff state (never end a session without this) ────────────
 node scripts/amber.js handoff --target .          # regenerate session-handoff.md
 node scripts/amber.js handoff bundle --target .   # portable continuation artifact
 node scripts/amber.js handoff validate --target . # verify it's complete
@@ -204,7 +215,7 @@ Prior Candidate A (G1/G2 target-repo verification, #54) and the 2026-07-14 dogfo
 ### Candidate A — Empty-queue dogfood: policy dry-run honesty (rules check ↔ runner)
 
 - **Source:** continuous-improvement note 2026-07-22 (`governance rules check` now uses `evaluateGovernedPolicy`).
-- **Why suitable:** Confirms the check surface and governed-runner stay aligned after policy changes; exercises `plan → gate → verify --execute → approve → complete → accept → handoff` on a governance-layer fix.
+- **Why suitable:** Confirms the check surface and governed-runner stay aligned after policy changes; exercises `plan → gate → verify --execute → approve → complete → accept → learnings → handoff` on a governance-layer fix.
 - **Shape:** already landed as a code fix; next dogfood can re-verify on a fresh target with a custom `rules.json` allow prefix + shell composite.
 
 ### Candidate B — Hosted web boundary (only if you want product expansion)
@@ -219,4 +230,4 @@ Prior Candidate A (G1/G2 target-repo verification, #54) and the 2026-07-14 dogfo
 | current | A — policy dry-run honesty / any real small slice when `next-up` is empty | bugfix-quick or feature-standard | rules check, verify policy, handoff tail |
 | next | re-evaluate live `next-up` + external adoption / value pilot gaps | per route | per discovered friction |
 
-Record each completed run in `session-handoff.md` (regenerated at step 10) and the friction issues opened in the GitHub `next-up` queue — together these make the four-week graduation bar in §6 auditable without a new state file.
+Record each completed run in `session-handoff.md` (regenerated at step 11) and the friction issues opened in the GitHub `next-up` queue — together these make the four-week graduation bar in §6 auditable without a new state file.

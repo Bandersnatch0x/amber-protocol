@@ -160,6 +160,56 @@ function writeJson(filePath, data) {
 	fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`);
 }
 
+// Prettier-compatible JSON layout. JSON.stringify never collapses containers, so its
+// output fails format:check on repos that Prettier-check their JSON. Rules mirror
+// Prettier's json printer: tab indent (tabWidth 2), printWidth 100, containers
+// collapse to one line when the whole line fits; Prettier does not preserve source
+// line breaks in JSON, so fit-based collapse is canonical.
+const PRETTIER_TAB_WIDTH = 2;
+const PRETTIER_PRINT_WIDTH = 100;
+
+function prettierJsonIndent(level) {
+	return "\t".repeat(level);
+}
+
+function prettierJsonValue(value, keyPrefix, level) {
+	if (value === null || typeof value !== "object") {
+		return JSON.stringify(value);
+	}
+	// keyPrefix (e.g. `"evidence": `) sits on the same line as the collapsed
+	// value, so it must count toward the fit check or boundary lines collapse
+	// where Prettier expands them.
+	const indentWidth = level * PRETTIER_TAB_WIDTH;
+	const fits = (text) => indentWidth + keyPrefix.length + text.length < PRETTIER_PRINT_WIDTH;
+	const isArray = Array.isArray(value);
+	if (isArray && value.length === 0) return "[]";
+	if (!isArray && Object.keys(value).length === 0) return "{}";
+	const innerLevel = level + 1;
+	const innerIndent = prettierJsonIndent(innerLevel);
+	const entries = isArray
+		? value.map((item) => innerIndent + prettierJsonValue(item, "", innerLevel))
+		: Object.entries(value).map(
+				([k, v]) =>
+					innerIndent +
+					`${JSON.stringify(k)}: ` +
+					prettierJsonValue(v, `${JSON.stringify(k)}: `, innerLevel),
+			);
+	const collapsed = isArray
+		? `[${entries.map((e) => e.trimStart()).join(", ")}]`
+		: `{ ${entries.map((e) => e.trimStart()).join(", ")} }`;
+	if (fits(collapsed)) return collapsed;
+	const opener = isArray ? "[" : "{";
+	const closer = isArray ? "]" : "}";
+	return `${opener}\n${entries.join(",\n")}\n${prettierJsonIndent(level)}${closer}`;
+}
+
+function writeJsonPrettier(filePath, data) {
+	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	const tmp = `${filePath}.tmp`;
+	fs.writeFileSync(tmp, `${prettierJsonValue(data, "", 0)}\n`);
+	fs.renameSync(tmp, filePath);
+}
+
 function collectFilesBySuffix(root, suffix, ignoredDirNames = new Set()) {
 	const files = [];
 
@@ -259,6 +309,7 @@ module.exports = {
 	readJson,
 	readJsonSafe,
 	writeJson,
+	writeJsonPrettier,
 	collectFilesBySuffix,
 	walkFiles,
 	isIgnoredAuditPath,

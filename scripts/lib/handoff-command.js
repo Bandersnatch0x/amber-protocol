@@ -80,6 +80,26 @@ function formatEvidenceLine(e) {
 	return `- ${e.feature}: \`${e.command || "(none)"}\` → ${e.result || "(none)"} (${e.date || "?"}${sid})`;
 }
 
+// F023: finish-phase reminder. When the focus feature was accepted with matched
+// write-back triggers and no booked review, the handoff names the feature, the
+// triggered categories, and the remedy command. Read-only; null when quiet.
+function learningWriteBackLines(targetRoot, ctx) {
+	if (!ctx || ctx.focus.type !== "feature" || !ctx.focus.id) return null;
+	let inspection;
+	try {
+		const { inspectLearningWriteBack } = require("./core/learning-writeback");
+		inspection = inspectLearningWriteBack(targetRoot, { featureId: ctx.focus.id });
+	} catch {
+		return null;
+	}
+	if (!inspection || inspection.status !== "unreviewed") return null;
+	const categories = inspection.matchedCategories.join(", ");
+	return [
+		`- Feature ${ctx.focus.id} was accepted with work touching ${categories} paths — the learning write-back review is not booked yet.`,
+		"- Inspect with `amber learnings --feature <id>`, then book with `--reviewed [--surface <path>]`.",
+	];
+}
+
 function renderHandoff(targetRoot) {
 	const { gatherState, buildContext, inferNextStep } = require("./core/lifecycle");
 	const { findMostRecentSession, loadSessionManifest } = require("./session-commands");
@@ -150,6 +170,8 @@ function renderHandoff(targetRoot) {
 		? [`1. ${next.label} — ${next.why}`, `   \`${next.remedy}\``]
 		: ["1. All lifecycle steps complete for the current focus — start the next feature."];
 
+	const learningLines = learningWriteBackLines(targetRoot, ctx);
+
 	// Local calendar date — matches operator "today" (UTC ISO can lag behind
 	// evening Asia/local sessions) and validateHandoff's "Last Updated:" scrape.
 	const now = new Date();
@@ -193,6 +215,7 @@ function renderHandoff(targetRoot) {
 		"## Next Actions",
 		"",
 		...nextActions,
+		...(learningLines ? ["", "## Learning write-back", "", ...learningLines] : []),
 		"",
 	].join("\n");
 }

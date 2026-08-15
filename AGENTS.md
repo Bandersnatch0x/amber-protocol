@@ -43,6 +43,7 @@ Use `node scripts/amber.js --all` for deprecated and expert compatibility comman
 - `node scripts/amber.js plan --target <repo> --feature <feature-id> --title "<title>"` - scaffold a feature plan.
 - `node scripts/amber.js loop recommend` / `loop run --dry-run` — safe continuous improvement entrypoints (see LOOP.md).
 - `node scripts/amber.js next --objective "<goal>" --target <repo>` - deterministic route advice; never an LLM decision.
+- `node scripts/amber.js learnings --target <repo> --feature <id>` - inspect post-accept knowledge write-back triggers; `--reviewed` books the review (Amber never writes the docs itself).
 
 ## Safety boundaries
 

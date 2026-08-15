@@ -342,6 +342,37 @@ const STEPS = [
 			return `amber accept --target ${shellQuote(ctx.targetDisplay)} --plan ${shellQuote(plan.path)}${sessionSuffix}`;
 		},
 	},
+	// F023: accepted work that touched schema/contract/infra paths owes a
+	// knowledge write-back review. Detection is pure path matching over the
+	// feature's booked paths (cheap; learning-writeback.js is required lazily
+	// so importing lifecycle for remedies stays light). When no category
+	// matched, the step does not apply — no fake gate.
+	{
+		id: "learnings",
+		label: "Review learning write-back",
+		appliesTo: (ctx) => {
+			if (ctx.focus.type !== "feature" || !planFor(ctx) || !acceptLogged(ctx)) return false;
+			const feature = ctx.state.features.find((f) => f && f.id === ctx.focus.id);
+			const paths = feature && Array.isArray(feature.paths) ? feature.paths : [];
+			const { detectWriteBackTriggers } = require("./learning-writeback");
+			return detectWriteBackTriggers(paths).matchedCategories.length > 0;
+		},
+		isDone: (ctx) => {
+			const feature = ctx.state.features.find((f) => f && f.id === ctx.focus.id);
+			return Boolean(
+				feature && feature.learningWriteBack && feature.learningWriteBack.reviewed === true,
+			);
+		},
+		why: (ctx) => {
+			const feature = ctx.state.features.find((f) => f && f.id === ctx.focus.id);
+			const paths = feature && Array.isArray(feature.paths) ? feature.paths : [];
+			const { detectWriteBackTriggers } = require("./learning-writeback");
+			const categories = detectWriteBackTriggers(paths).matchedCategories;
+			return `accepted work touched ${categories.join("/")} paths — the knowledge write-back review is not booked yet (book it with amber learnings --reviewed).`;
+		},
+		remedy: (ctx) =>
+			`amber learnings --target ${shellQuote(ctx.targetDisplay)} --feature ${ctx.focus.id}`,
+	},
 ];
 
 // ── Focus resolution ─────────────────────────────────────────────────────────
@@ -465,5 +496,7 @@ module.exports = {
 	remedyFor,
 	resolvePendingGate,
 	hasExistingProjectSignals,
+	planFor,
+	acceptLogged,
 	STEPS,
 };

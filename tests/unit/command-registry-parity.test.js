@@ -32,6 +32,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"gate",
 	"review",
 	"accept",
+	"learnings",
 	"pack",
 	"profile",
 	"task",

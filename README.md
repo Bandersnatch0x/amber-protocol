@@ -191,6 +191,17 @@ amber workflow compare --target . --baseline path/to/old.json --current path/to/
 `plan` is dry-run only (plan-input or maintenance-proposal draft). Only `assess` accepts
 `--output-dir`. Full flag list: [CLI reference — Workflow Commands](./docs/CLI_REFERENCE.md#workflow-commands).
 
+### `amber learnings` — post-accept knowledge checkpoint
+
+After `amber accept`, `amber learnings` checks (read-only) whether the accepted work hit mandatory
+knowledge write-back triggers — schema, contract, or infra paths — and `--reviewed` books the review
+on the feature entry. Amber detects and reminds; the write-back itself stays with the operator.
+
+```bash
+amber learnings --target . --feature F001                          # inspect triggers read-only
+amber learnings --target . --feature F001 --reviewed --surface docs/specs/f001.md
+```
+
 ### `amber handoff bundle` - portable continuation artifact
 
 `amber handoff bundle` writes a complete handoff directory with the session summary, verification
