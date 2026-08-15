@@ -825,19 +825,41 @@
 			"area": "governance",
 			"title": "Role-scoped context manifests in plans and a memory usage creed",
 			"user_visible_behavior": "Plan scaffolds gain a Context manifests section (implement/ and review/ roles listing knowledge-surface paths only — contract docs, specs, wiki, ADRs; never code paths), validated at the plan gate (missing file or code-path entry is an error with a clear remedy) and echoed by amber review; templates/MEMORY.md gains a 'capability, not ceremony' usage creed stating what belongs in memory and an explicit when-NOT list",
-			"status": "not_started",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/planning.test.js (context-manifest cases)",
 				"node --test tests/unit/continuity-surfaces.test.js (templates/MEMORY.md creed install — the suite covering the MEMORY.md starter)",
 				"amber gate --target <tmp> --plan <p> rejects a manifest entry that is a missing path or a code file",
 				"amber review echoes the manifests for a filled plan"
 			],
-			"evidence": [],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 72936ms)",
+					"date": "2026-08-15",
+					"notes": "session bc63eff4-870b-4cec-a70d-48afdfffa090 stage verify",
+					"sessionId": "bc63eff4-870b-4cec-a70d-48afdfffa090"
+				}
+			],
 			"notes": [
 				"P3 from the Trellis-mechanism analysis: per-role context lists curated at planning time with validation (knowledge surfaces only, not code paths) and a memory usage creed (capability not ceremony, explicit when-NOT). Mechanism ideas only (AGPL); all wording original.",
 				"No new command, no new lifecycle step; the gate is the validation point; templates are starters — init never overwrites existing files."
 			],
-			"updated": "2026-08-15"
+			"updated": "2026-08-15",
+			"paths": [
+				"scripts/lib/core/planning.js",
+				"scripts/lib/core/cli-output.js",
+				"templates/MEMORY.md",
+				"tests/unit/planning.test.js",
+				"tests/unit/continuity-surfaces.test.js",
+				"tests/integration/amber-next.test.js",
+				"tests/phase-v2.test.js",
+				"tests/phase-v2-5.test.js",
+				"tests/phase-v4.test.js",
+				"tests/phase-v4-5.test.js",
+				"docs/CLI_REFERENCE.md",
+				"docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md"
+			]
 		}
 	]
 }

@@ -1,7 +1,7 @@
 # Plan: Role-scoped context manifests in plans and a memory usage creed
 
 Feature: F027
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
