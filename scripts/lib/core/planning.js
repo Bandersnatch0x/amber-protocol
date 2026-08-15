@@ -30,6 +30,80 @@ const { codedError } = require("./error-catalog");
 
 const { MESSAGES } = require("./terminology");
 
+// ── Context manifests (F027) ─────────────────────────────────────────────────
+//
+// Plans carry role-scoped context lists: knowledge-surface paths the
+// implementer and the reviewer each need (contract docs, wiki pages, ADRs,
+// schema docs). Code paths never belong here — they ride the feature's booked
+// paths — and both roles must be curated before implementation-ready.
+
+const CONTEXT_MANIFEST_ROLES = ["implement", "review"];
+
+// The one rule line the scaffold renders under `## Context manifests`.
+const CONTEXT_MANIFEST_RULE_LINE =
+	"Entries are bare, comma- or space-separated knowledge-surface paths only — docs/specs contracts, wiki pages, ADRs, schema docs; code paths belong in the feature's booked paths, not here.";
+
+// Parse the `## Context manifests` section. Returns null when the section is
+// absent; otherwise { implement: string|null, review: string|null } with each
+// role bullet's raw text (null when that role bullet is missing). Prose lines
+// around the bullets are ignored.
+function parseContextManifests(content) {
+	const body = getSectionBody(content, "Context manifests");
+	if (body === null) return null;
+	const roles = {};
+	for (const role of CONTEXT_MANIFEST_ROLES) {
+		const match = body.match(new RegExp(`^\\s*-\\s*${role}\\s*:\\s*(.*)$`, "im"));
+		roles[role] = match ? match[1].trim() : null;
+	}
+	return roles;
+}
+
+// A role bullet still carrying scaffold placeholder text (`<fill: ...>`) is
+// uncurated output, not a manifest entry.
+function isUncuratedManifestValue(value) {
+	return /<fill[:>]/i.test(value);
+}
+
+// Split a role bullet into individual entries (comma- or space-separated
+// BARE paths). Markdown wrappers (backticks/asterisks/quotes) are stripped
+// the same way scopeMentionTokens strips them, so `docs/a.md` parses.
+function splitManifestEntries(value) {
+	return value
+		.split(/[,\s]+/)
+		.map((entry) =>
+			entry
+				.replace(/^["'`([{<*_~]+/, "")
+				.replace(/["'`)\]}>.,;:*_~]+$/, "")
+				.trim(),
+		)
+		.filter(Boolean);
+}
+
+// Knowledge-surface rule: `.md` files and `.schema.json` files anywhere, plus
+// any file living under docs/, schemas/, or standards/. Everything else —
+// code extensions included — is rejected by the gate. Case-insensitive so a
+// root-level README.MD is still a knowledge surface.
+function isKnowledgeSurfacePath(entry) {
+	const normalized = entry.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+	if (normalized.endsWith(".md") || normalized.endsWith(".schema.json")) return true;
+	return ["docs/", "schemas/", "standards/"].some((prefix) => normalized.startsWith(prefix));
+}
+
+// Curated per-role entry arrays for the review echo. Null when the section is
+// absent; an uncurated (placeholder) or missing role echoes as an empty array.
+function extractContextManifests(content) {
+	const parsed = parseContextManifests(content);
+	if (!parsed) return null;
+	const block = {};
+	for (const role of CONTEXT_MANIFEST_ROLES) {
+		block[role] =
+			parsed[role] === null || isUncuratedManifestValue(parsed[role])
+				? []
+				: splitManifestEntries(parsed[role]);
+	}
+	return block;
+}
+
 function resolveRelativePlanPath(targetRoot, planRelativePath) {
 	if (path.isAbsolute(planRelativePath)) {
 		return {
@@ -75,6 +149,12 @@ function buildPlanContent(feature, title, options = {}) {
 		"- Context:",
 		"- Proposed approach:",
 		"- Risks:",
+		"",
+		"## Context manifests",
+		"",
+		CONTEXT_MANIFEST_RULE_LINE,
+		"- implement: <fill: knowledge-surface paths the implementer needs>",
+		"- review: <fill: knowledge-surface paths the reviewer needs>",
 		"",
 		"## Vertical Slices",
 		"",
@@ -185,10 +265,12 @@ function readPlanField(content, field) {
 // Pure core of validatePlanGate: given the plan content and an injected feature
 // resolver, produce the gate errors/warnings without touching the filesystem.
 // resolveFeature(featureId) => { found: boolean, error: string|null } where a
-// non-null error means feature_list.json could not be read. Extracted so the
-// validation branching (feature field, feature lookup, required sections, user
-// confirmation) is unit-testable.
-function validatePlanContent({ content, resolveFeature }) {
+// non-null error means feature_list.json could not be read. resolveExists(entry)
+// => boolean optionally checks that a Context manifests entry exists in the
+// target repo; when omitted, existence checks are skipped (pure/test callers).
+// Extracted so the validation branching (feature field, feature lookup,
+// required sections, context manifests, user confirmation) is unit-testable.
+function validatePlanContent({ content, resolveFeature, resolveExists }) {
 	const errors = [];
 	const warnings = [];
 	const featureId = readPlanField(content, "Feature");
@@ -207,6 +289,7 @@ function validatePlanContent({ content, resolveFeature }) {
 
 	for (const section of [
 		"High Level Design",
+		"Context manifests",
 		"Vertical Slices",
 		"Resume Checkpoint",
 		"Acceptance Criteria",
@@ -215,6 +298,49 @@ function validatePlanContent({ content, resolveFeature }) {
 	]) {
 		if (!hasSectionWithBody(content, section)) {
 			errors.push(`Plan must include a non-empty ${section} section.`);
+		}
+	}
+
+	// Context manifests (F027): both roles curated, knowledge surfaces only,
+	// every entry present in the target repo. The section itself is already
+	// covered by the required-sections rule above; this block only runs when
+	// the section exists, so a missing section reports exactly once.
+	const manifests = parseContextManifests(content);
+	if (manifests !== null) {
+		for (const role of CONTEXT_MANIFEST_ROLES) {
+			const value = manifests[role];
+			if (value === null) {
+				errors.push(
+					`Context manifests must define an ${role} role. → fix: add a "- ${role}: <knowledge-surface paths>" bullet.`,
+				);
+				continue;
+			}
+			if (isUncuratedManifestValue(value)) {
+				errors.push(
+					`Context manifests must be curated before implementation-ready: the ${role} role still carries scaffold placeholders. → fix: replace them with the knowledge-surface paths that role needs.`,
+				);
+				continue;
+			}
+			const entries = splitManifestEntries(value);
+			if (entries.length === 0) {
+				errors.push(
+					`Context manifests must be curated before implementation-ready: the ${role} role lists no entries. → fix: name at least one knowledge-surface path.`,
+				);
+				continue;
+			}
+			for (const entry of entries) {
+				if (!isKnowledgeSurfacePath(entry)) {
+					errors.push(
+						`Context manifest entry ${entry} (${role}) is a code path — context lists carry knowledge surfaces, not code. → fix: move code paths to the feature's booked paths.`,
+					);
+					continue;
+				}
+				if (resolveExists && !resolveExists(entry)) {
+					errors.push(
+						`Context manifest entry ${entry} (${role}) does not exist in the target repository (or escapes its root). → fix: point the entry at a knowledge surface inside the repository.`,
+					);
+				}
+			}
 		}
 	}
 
@@ -276,6 +402,17 @@ function validatePlanGate(target, planRelativePath) {
 			} catch (error) {
 				return { found: false, error: error.message };
 			}
+		},
+		// Context-manifest entries are repo-relative paths; existence is checked
+		// against the target root so the pure core stays disk-free, and the
+		// resolved path must stay INSIDE the root — an entry that escapes via
+		// ../ or an absolute path is not a repo knowledge surface.
+		resolveExists: (entry) => {
+			const root = path.resolve(targetRoot);
+			const resolved = path.resolve(root, entry.replace(/\\/g, "/"));
+			const rel = path.relative(root, resolved);
+			if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) return false;
+			return pathExists(resolved);
 		},
 	});
 
@@ -538,6 +675,10 @@ function buildReviewResult({
 				)
 			: [];
 
+	// Context manifests (F027): the plan's curated per-role knowledge-surface
+	// lists, echoed for display only — never a blocking finding of their own.
+	const contextManifests = content ? extractContextManifests(content) : null;
+
 	return {
 		target: targetRoot,
 		plan: planRelativePath,
@@ -550,6 +691,7 @@ function buildReviewResult({
 		errors: findings.map((finding) => finding.message),
 		warnings: [...gateResult.warnings, ...scopeWarnings],
 		scopeDiscipline,
+		contextManifests,
 	};
 }
 
@@ -799,4 +941,9 @@ module.exports = {
 	SCOPE_DISCIPLINE_CHECKLIST,
 	extractScopeBullet,
 	buildScopeDiscipline,
+	CONTEXT_MANIFEST_ROLES,
+	CONTEXT_MANIFEST_RULE_LINE,
+	parseContextManifests,
+	extractContextManifests,
+	isKnowledgeSurfacePath,
 };

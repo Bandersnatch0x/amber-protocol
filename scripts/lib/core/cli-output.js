@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("node:path");
+const { CONTEXT_MANIFEST_ROLES } = require("./planning");
 
 // Declarative flag table driving parseArgs. Each entry maps a CLI flag to the
 // args key it sets and how it consumes argv:
@@ -629,6 +630,15 @@ function printResult(result, options = {}) {
 		console.log("Scope discipline checklist (advisory — never blocks the gate):");
 		for (const question of result.scopeDiscipline.checklist) {
 			console.log(`  - ${question}`);
+		}
+	}
+	// Context manifests (F027): the plan's curated per-role knowledge-surface
+	// lists, echoed for display only — display never adds blocking findings.
+	if (result.contextManifests) {
+		console.log("Context manifests (knowledge surfaces per role):");
+		for (const role of CONTEXT_MANIFEST_ROLES) {
+			const entries = result.contextManifests[role] || [];
+			console.log(`  ${role}: ${entries.length > 0 ? entries.join(", ") : "(not curated)"}`);
 		}
 	}
 	if (result.releaseReadiness && result.releaseReadiness.status) {

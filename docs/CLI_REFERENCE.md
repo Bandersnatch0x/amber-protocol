@@ -38,7 +38,7 @@ learning write-back checkpoint (`amber learnings`) detects its triggers from the
 
 ### plan
 
-Create a feature-linked vertical-slice plan from a registered feature:
+Create a feature-linked vertical-slice plan from a registered feature (the scaffold includes the Context manifests section: implement/review knowledge-surface lists, gate-validated — missing paths, escaping paths, and code paths are errors; `amber review` echoes the curated lists):
 
 ```bash
 node scripts/amber.js plan --target . --feature F001 --title "Small slice" [--dry-run]
@@ -48,6 +48,11 @@ node scripts/amber.js plan --target . --feature F001 --title "Small slice" [--dr
 - `--feature`: Feature id (e.g. F001) — must already exist in `feature_list.json` (required)
 - `--title`: Short human-readable title for the plan (required)
 - `--dry-run`: Preview without writing files
+
+The scaffold includes a **Context manifests** section: `implement` and `review` role lists of
+knowledge-surface paths (docs/specs contracts, wiki pages, ADRs, schema docs) each role needs.
+Curate them at planning time — the gate validates both roles (missing paths and code paths are
+errors; code belongs in the feature's booked paths), and `amber review` echoes the curated lists.
 
 ### gate
 
