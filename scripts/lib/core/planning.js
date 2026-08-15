@@ -395,13 +395,110 @@ function evaluateStandardChecks({ content, standards }) {
 	return findings;
 }
 
+// ── Scope-discipline advisories (F026) ───────────────────────────────────────
+//
+// Booked feature paths the plan's declared Scope never mentioned are classic
+// scope creep. The diff rides the NON-blocking warnings channel plus a
+// structured `scopeDiscipline` block — every entry in `findings` blocks, so
+// advisories never go there; the blocking computation stays untouched.
+
+// Four self-review questions, rendered as advisory lines in review output.
+const SCOPE_DISCIPLINE_CHECKLIST = [
+	"Uninvited tidying outside the task's stated work?",
+	"Abstraction added beyond what this change needed?",
+	"Files the acceptance criteria never named?",
+	"A fix patched at the caller instead of the cause?",
+];
+
+// The `- Scope:` bullet under High Level Design (the F024/F025 plan shape)
+// declares the surfaces a feature intends to touch. Extract the bullet text
+// plus its deeper-indented continuation/nested lines; "" when absent.
+function extractScopeBullet(content) {
+	const body = getSectionBody(content, "High Level Design");
+	if (!body) return "";
+	const lines = body.split(/\r?\n/);
+	let bulletIndent = -1;
+	const captured = [];
+	for (const line of lines) {
+		const indent = line.match(/^(\s*)/)[1].length;
+		if (bulletIndent === -1) {
+			const scopeMatch = line.match(/^\s*-\s*Scope:\s*(.*)$/);
+			if (scopeMatch) {
+				bulletIndent = indent;
+				captured.push(scopeMatch[1]);
+			}
+			continue;
+		}
+		// A sibling/outer bullet or any dedented non-empty line ends the block;
+		// blank lines and deeper-indented continuations belong to it.
+		if (line.trim() !== "" && indent <= bulletIndent) break;
+		captured.push(line);
+	}
+	return captured.join("\n").trim();
+}
+
+// Candidate path tokens from Scope prose: whitespace-separated runs with
+// surrounding markdown/punctuation trimmed and trailing slashes dropped
+// (a trailing "/" and the bare directory are equivalent mentions).
+function scopeMentionTokens(scopeText) {
+	const tokens = new Set();
+	for (const raw of scopeText.split(/\s+/)) {
+		const token = raw
+			.replace(/^["'`([{<*_~]+/, "")
+			.replace(/["'`)\]}>.,;:!?:*_~]+$/, "")
+			.replace(/^\.\//, "")
+			.toLowerCase();
+		if (token === "") continue;
+		tokens.add(token);
+		if (token.endsWith("/")) tokens.add(token.slice(0, -1));
+	}
+	return tokens;
+}
+
+// A booked path is mentioned when the Scope text names it exactly or names one
+// of its ancestor directories (whole segments — "src/a.js" is covered by a
+// "src/" or "src" mention, not by "sr"). Conservative: any plausible mention
+// suppresses the advisory.
+function isPathMentionedInScope(bookedPath, tokens) {
+	const normalized = bookedPath.toLowerCase();
+	if (tokens.has(normalized)) return true;
+	const segments = normalized.split("/").filter(Boolean);
+	for (let k = 1; k < segments.length; k += 1) {
+		if (tokens.has(segments.slice(0, k).join("/"))) return true;
+	}
+	return false;
+}
+
+// Pure booked-paths-vs-Scope diff. Returns null when there is nothing to
+// compare against (no booked paths or no declared Scope — stay quiet);
+// otherwise { unmentionedPaths, checklist }. No disk access.
+function buildScopeDiscipline({ bookedPaths, scopeText }) {
+	const paths = (Array.isArray(bookedPaths) ? bookedPaths : [])
+		.map((p) => (typeof p === "string" ? p.trim().replace(/\\/g, "/").replace(/^\.\//, "") : ""))
+		.filter(Boolean);
+	const text = typeof scopeText === "string" ? scopeText : "";
+	if (paths.length === 0 || text.trim() === "") return null;
+	const tokens = scopeMentionTokens(text);
+	return {
+		unmentionedPaths: paths.filter((p) => !isPathMentionedInScope(p, tokens)),
+		checklist: [...SCOPE_DISCIPLINE_CHECKLIST],
+	};
+}
+
 // Pure core of reviewPlan: given a gate result and the loaded standards, build
 // the review object — classify gate errors into findings (user-confirmation vs
 // plan-gate), evaluate standards against plan content, expand standards into
 // applicable checks, and compute the required user action and release readiness.
 // Extracted so the review assembly is unit-testable without discoverStandards/
 // validatePlanGate hitting disk.
-function buildReviewResult({ targetRoot, planRelativePath, gateResult, standards, content = "" }) {
+function buildReviewResult({
+	targetRoot,
+	planRelativePath,
+	gateResult,
+	standards,
+	content = "",
+	scopeDisciplineInput = null,
+}) {
 	const gateFindings = gateResult.errors.map((message) => {
 		const checkId = /User confirmation/.test(message) ? "user-confirmation" : "plan-gate";
 		const finding = { severity: "error", checkId, message };
@@ -429,6 +526,18 @@ function buildReviewResult({ targetRoot, planRelativePath, gateResult, standards
 	const requiredUserAction =
 		findings.length > 0 ? ["Confirm the plan and resolve review findings before acceptance."] : [];
 
+	// Scope-discipline diff (F026): advisories ride the warnings channel and a
+	// structured block. They never enter findings, so requiredUserAction and
+	// releaseReadiness below are computed exactly as before.
+	const scopeDiscipline = scopeDisciplineInput ? buildScopeDiscipline(scopeDisciplineInput) : null;
+	const scopeWarnings =
+		scopeDiscipline && scopeDiscipline.unmentionedPaths.length > 0
+			? scopeDiscipline.unmentionedPaths.map(
+					(p) =>
+						`Booked path ${p} is not mentioned in the plan's declared Scope — advisory only; confirm it belongs to this feature.`,
+				)
+			: [];
+
 	return {
 		target: targetRoot,
 		plan: planRelativePath,
@@ -439,7 +548,8 @@ function buildReviewResult({ targetRoot, planRelativePath, gateResult, standards
 		requiredUserAction,
 		releaseReadiness: { status: findings.length > 0 ? "blocked" : "ready" },
 		errors: findings.map((finding) => finding.message),
-		warnings: gateResult.warnings,
+		warnings: [...gateResult.warnings, ...scopeWarnings],
+		scopeDiscipline,
 	};
 }
 
@@ -454,12 +564,33 @@ function reviewPlan(target, planRelativePath) {
 			content = readText(resolvedPlan.planPath);
 		}
 	}
+	// Scope-discipline inputs: the plan's feature id resolves to its booked
+	// paths; the declared Scope bullet comes from the plan content. A missing
+	// feature, unreadable feature_list, or absent bullet stays quiet.
+	let scopeDisciplineInput = null;
+	if (content) {
+		const featureId = readPlanField(content, "Feature");
+		if (featureId) {
+			try {
+				const feature = findFeatureById(targetRoot, featureId);
+				if (feature && Array.isArray(feature.paths) && feature.paths.length > 0) {
+					scopeDisciplineInput = {
+						bookedPaths: feature.paths,
+						scopeText: extractScopeBullet(content),
+					};
+				}
+			} catch {
+				scopeDisciplineInput = null;
+			}
+		}
+	}
 	return buildReviewResult({
 		targetRoot,
 		planRelativePath,
 		gateResult,
 		standards,
 		content,
+		scopeDisciplineInput,
 	});
 }
 
@@ -665,4 +796,7 @@ module.exports = {
 	buildReviewResult,
 	reviewPlan,
 	acceptPlan,
+	SCOPE_DISCIPLINE_CHECKLIST,
+	extractScopeBullet,
+	buildScopeDiscipline,
 };

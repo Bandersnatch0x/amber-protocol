@@ -153,6 +153,8 @@ node scripts/amber.js learnings --target . --feature <FID> --reviewed --surface 
 node scripts/amber.js handoff --target .          # regenerate session-handoff.md
 node scripts/amber.js handoff bundle --target .   # portable continuation artifact
 node scripts/amber.js handoff validate --target . # verify it's complete
+# handoff also surfaces a read-only dirty-worktree classification (booked work
+# to commit vs. parallel/unbooked paths vs. ignored Amber-managed churn).
 ```
 
 ### Terminal-state checklist

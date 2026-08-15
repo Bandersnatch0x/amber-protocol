@@ -623,6 +623,14 @@ function printResult(result, options = {}) {
 			console.log(`  - ${check.id}: ${check.description || "(no description)"}`);
 		}
 	}
+	// Scope-discipline checklist (F026): advisory self-review lines — compact,
+	// never blocks the gate. Unmentioned booked paths ride the warnings footer.
+	if (result.scopeDiscipline && Array.isArray(result.scopeDiscipline.checklist)) {
+		console.log("Scope discipline checklist (advisory — never blocks the gate):");
+		for (const question of result.scopeDiscipline.checklist) {
+			console.log(`  - ${question}`);
+		}
+	}
 	if (result.releaseReadiness && result.releaseReadiness.status) {
 		const statusLabel = result.releaseReadiness.status === "ready" ? "READY" : "BLOCKED";
 		console.log(`Release readiness: ${statusLabel}`);

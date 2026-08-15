@@ -9,6 +9,9 @@ const {
 	validatePlanContent,
 	evaluateStandardChecks,
 	buildReviewResult,
+	extractScopeBullet,
+	buildScopeDiscipline,
+	SCOPE_DISCIPLINE_CHECKLIST,
 } = require("../../scripts/lib/core/planning");
 
 const { MESSAGES } = require("../../scripts/lib/core/terminology");
@@ -56,7 +59,8 @@ const errorResolver = () => ({ found: false, error: "disk on fire" });
 // The remaining exports (scaffoldPlan, validatePlanGate, discoverStandards,
 // reviewPlan, acceptPlan) are fs-coupled and intentionally not covered here.
 // Pin current behavior of buildPlanContent and readPlanField before any future
-// refactor of the plan scaffolding pipeline.
+// refactor of the plan scaffolding pipeline. The F026 scope-discipline helpers
+// (extractScopeBullet, buildScopeDiscipline) are pure and covered below.
 
 test("buildPlanContent renders a titled plan for a fully-populated feature", () => {
 	const feature = {
@@ -451,4 +455,138 @@ test("buildReviewResult blocks release when only a standard check fails", () => 
 	});
 	assert.equal(result.releaseReadiness.status, "blocked");
 	assert.ok(result.findings.some((f) => f.checkId === "scope-boundary"));
+});
+
+// ---- scope-discipline advisories (F026): booked paths vs declared Scope ----
+
+test("extractScopeBullet captures the Scope bullet block and stops at siblings", () => {
+	const content = validPlanContent({
+		highLevelDesign: [
+			"- Context: the tree is messy.",
+			"- Proposed approach:",
+			"  1. do the thing.",
+			"- Risks:",
+			"  - small risk.",
+			"- Scope:",
+			"  - Touches `src/one.js` and surfaces under docs/.",
+			"  - Non-goals: nothing else.",
+			"- Follow-ups:",
+			"  - later.",
+		].join("\n"),
+	});
+	const scope = extractScopeBullet(content);
+	assert.match(scope, /src\/one\.js/);
+	assert.match(scope, /Non-goals/);
+	assert.ok(!scope.includes("Follow-ups"), "sibling bullet ends the Scope block");
+	assert.ok(!scope.includes("Context"), "earlier bullets are not Scope");
+});
+
+test("extractScopeBullet returns an empty string without a Scope bullet", () => {
+	assert.equal(extractScopeBullet(validPlanContent({ highLevelDesign: "- approach only" })), "");
+	assert.equal(extractScopeBullet("# Plan: x\n\nno sections here\n"), "");
+});
+
+test("buildScopeDiscipline flags booked paths the Scope never mentions", () => {
+	const block = buildScopeDiscipline({
+		bookedPaths: ["src/secret.js", "docs/readme.md"],
+		scopeText: "- Scope: touches `docs/readme.md` only.",
+	});
+	assert.deepEqual(block.unmentionedPaths, ["src/secret.js"]);
+	assert.deepEqual(block.checklist, SCOPE_DISCIPLINE_CHECKLIST);
+});
+
+test("buildScopeDiscipline stays quiet on verbatim and directory-prefix mentions", () => {
+	const verbatim = buildScopeDiscipline({
+		bookedPaths: ["src/one.js"],
+		scopeText: "- Scope: touches `src/one.js` and nothing else.",
+	});
+	assert.deepEqual(verbatim.unmentionedPaths, []);
+	const underDir = buildScopeDiscipline({
+		bookedPaths: ["src/deep/helper.js"],
+		scopeText: "- Scope: work under src/ stays put.",
+	});
+	assert.deepEqual(underDir.unmentionedPaths, []);
+	const bareDir = buildScopeDiscipline({
+		bookedPaths: ["src/deep/helper.js"],
+		scopeText: "- Scope: confined to the src tree.",
+	});
+	assert.deepEqual(bareDir.unmentionedPaths, []);
+});
+
+test("buildScopeDiscipline returns null without booked paths or a Scope bullet", () => {
+	assert.equal(
+		buildScopeDiscipline({ bookedPaths: [], scopeText: "- Scope: touches src/." }),
+		null,
+	);
+	assert.equal(buildScopeDiscipline({ bookedPaths: ["src/a.js"], scopeText: "" }), null);
+	assert.equal(buildScopeDiscipline({ bookedPaths: ["src/a.js"], scopeText: "   " }), null);
+});
+
+test("buildReviewResult rides scope warnings without touching the blocking channels", () => {
+	const result = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: ["gate note"] },
+		standards: [],
+		scopeDisciplineInput: {
+			bookedPaths: ["src/extra.js"],
+			scopeText: "- Scope: touches docs/readme.md.",
+		},
+	});
+	// The advisory names the path and lands AFTER the gate warnings.
+	assert.deepEqual(result.warnings, [
+		"gate note",
+		"Booked path src/extra.js is not mentioned in the plan's declared Scope — advisory only; confirm it belongs to this feature.",
+	]);
+	// Structured block carries the diff plus the checklist.
+	assert.deepEqual(result.scopeDiscipline.unmentionedPaths, ["src/extra.js"]);
+	assert.deepEqual(result.scopeDiscipline.checklist, SCOPE_DISCIPLINE_CHECKLIST);
+	// A scope warning alone never blocks: findings/errors/action/readiness stay clean.
+	assert.deepEqual(result.findings, []);
+	assert.deepEqual(result.errors, []);
+	assert.deepEqual(result.requiredUserAction, []);
+	assert.deepEqual(result.releaseReadiness, { status: "ready" });
+});
+
+test("buildReviewResult without scope input keeps scopeDiscipline null and warnings intact", () => {
+	const result = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: ["gate note"] },
+		standards: [],
+	});
+	assert.equal(result.scopeDiscipline, null);
+	assert.deepEqual(result.warnings, ["gate note"]);
+	assert.deepEqual(result.releaseReadiness, { status: "ready" });
+});
+
+test("printResult renders the four-question checklist as advisory review output", () => {
+	const { printResult } = require("../../scripts/lib/core/cli-output");
+	const result = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: [] },
+		standards: [],
+		scopeDisciplineInput: {
+			bookedPaths: ["src/extra.js"],
+			scopeText: "- Scope: touches docs/readme.md.",
+		},
+	});
+	const lines = [];
+	const originalLog = console.log;
+	console.log = (line) => lines.push(String(line));
+	try {
+		printResult(result);
+	} finally {
+		console.log = originalLog;
+	}
+	const text = lines.join("\n");
+	assert.match(text, /Scope discipline checklist \(advisory — never blocks the gate\):/);
+	for (const question of SCOPE_DISCIPLINE_CHECKLIST) {
+		assert.match(text, new RegExp(question.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+	}
+	// The unmentioned path rides the warnings footer; readiness stays READY.
+	assert.match(text, /Warnings: 1/);
+	assert.match(text, /src\/extra\.js is not mentioned in the plan's declared Scope/);
+	assert.match(text, /Release readiness: READY/);
 });

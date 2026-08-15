@@ -778,6 +778,26 @@
 					"docs/quality/break-loops/2026-08-15-Bookkeeping-dates-drift-to-the-UTC-day.md"
 				]
 			}
+		},
+		{
+			"id": "F026",
+			"priority": 1,
+			"area": "governance",
+			"title": "Finish-time dirty-path classification and scope-discipline review checks",
+			"user_visible_behavior": "amber handoff classifies dirty worktree paths into Amber-managed churn, the focus feature's uncommitted work (bail back: commit before finishing), and outside-scope files (reported once, left alone); amber review flags booked feature paths absent from the plan's declared scope and prints a four-question scope-discipline checklist",
+			"status": "not_started",
+			"verification": [
+				"node --test tests/unit/dirty-paths.test.js",
+				"node --test tests/unit/planning.test.js (scope-discipline cases)",
+				"amber handoff --target <tmp-with-dirty-tree> renders the three-bucket classification read-only",
+				"amber review --target <tmp> --plan <p> flags a booked path missing from the plan scope"
+			],
+			"evidence": [],
+			"notes": [
+				"P2-2 + P2-3 from the Trellis-mechanism analysis (dirty-path triage at finish; scope-discipline checks). Mechanism ideas only (AGPL); all wording original.",
+				"Both are read-only additions to existing commands; no new lifecycle step; no git mutations — classification reads, it never stages/commits/asks."
+			],
+			"updated": "2026-08-15"
 		}
 	]
 }

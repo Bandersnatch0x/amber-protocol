@@ -68,6 +68,8 @@ Review a plan against static Amber standards and release-readiness checks:
 node scripts/amber.js review --target . --plan docs/plans/F001-small-slice.md
 ```
 
+Review also runs a scope-discipline advisory: feature paths booked in `feature_list.json` that the plan's declared `Scope` bullet never mentions (exact path or directory prefix) surface as warnings, next to a four-question self-review checklist (uninvited tidying, speculative abstraction, files the acceptance criteria never named, caller-side workarounds). This check is advisory only — it never blocks the gate or release readiness.
+
 ### accept
 
 Accept a reviewed plan and append an Amber evolution record:
@@ -387,6 +389,8 @@ Regenerate `session-handoff.md` from live repository state.
 ```bash
 node scripts/amber.js handoff --target .
 ```
+
+When the worktree is dirty with non-managed changes, the regenerated handoff includes a "Dirty worktree" classification: Amber-managed churn (`.amber/`, legacy `.harness/`, `*.amber-backup`) is summarized as an ignored count, the focus feature's booked uncommitted work carries a commit-before-finishing bail-back line, and every other dirty path gets a one-time FYI as parallel or unbooked work. The classification is read-only — handoff never stages, commits, or prompts — and clean or managed-only trees render no section.
 
 ### handoff bundle / validate
 

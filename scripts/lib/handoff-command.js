@@ -10,6 +10,7 @@ const path = require("node:path");
 const { resolveTarget } = require("./core/fs-utils");
 const { localIsoDate } = require("./core/text-utils");
 const { getRepoSnapshot } = require("./core/git-state");
+const { classifyDirtyPaths, renderDirtyPathsSection } = require("./core/dirty-paths");
 
 /** Display strings for handoff Repo State — reuses status's git snapshot. */
 function gitInfo(targetRoot) {
@@ -101,6 +102,30 @@ function learningWriteBackLines(targetRoot, ctx) {
 	];
 }
 
+// F026: finish-time dirty-worktree classification. Groups the live snapshot's
+// dirty paths into Amber-managed churn (ignored), the focus feature's booked
+// work (bail back: commit before finishing), and outside-scope files (FYI
+// only). Read-only — handoff never stages, commits, or prompts; null when the
+// tree is clean or only managed churn is present.
+function dirtyWorktreeSection(targetRoot, ctx) {
+	const snap = getRepoSnapshot(targetRoot);
+	if (!snap.isGit || snap.dirtyPaths === null) return null;
+	const focusFeaturePaths =
+		ctx &&
+		ctx.focus.type === "feature" &&
+		ctx.focus.id &&
+		ctx.state &&
+		Array.isArray(ctx.state.features)
+			? ctx.state.features.find((f) => f && f.id === ctx.focus.id)
+			: null;
+	const featurePaths =
+		focusFeaturePaths && Array.isArray(focusFeaturePaths.paths)
+			? focusFeaturePaths.paths.filter((p) => typeof p === "string" && p.trim() !== "")
+			: [];
+	const classification = classifyDirtyPaths(snap.dirtyPaths, { featurePaths });
+	return renderDirtyPathsSection(classification);
+}
+
 function renderHandoff(targetRoot) {
 	const { gatherState, buildContext, inferNextStep } = require("./core/lifecycle");
 	const { findMostRecentSession, loadSessionManifest } = require("./session-commands");
@@ -172,6 +197,7 @@ function renderHandoff(targetRoot) {
 		: ["1. All lifecycle steps complete for the current focus — start the next feature."];
 
 	const learningLines = learningWriteBackLines(targetRoot, ctx);
+	const dirtySection = dirtyWorktreeSection(targetRoot, ctx);
 
 	// Local calendar date — matches operator "today" (UTC ISO can lag behind
 	// evening Asia/local sessions) and validateHandoff's "Last Updated:" scrape.
@@ -212,6 +238,7 @@ function renderHandoff(targetRoot) {
 		"",
 		...nextActions,
 		...(learningLines ? ["", "## Learning write-back", "", ...learningLines] : []),
+		...(dirtySection ? ["", dirtySection] : []),
 		"",
 	].join("\n");
 }
