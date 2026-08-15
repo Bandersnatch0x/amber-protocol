@@ -18,6 +18,8 @@ const FLAG_SPECS = {
 	"--feature": { key: "feature" },
 	"--agent": { key: "agent" },
 	"--title": { key: "title" },
+	"--issue": { key: "issue" },
+	"--recurrence": { key: "recurrence" },
 	"--plan": { key: "plan" },
 	"--file": { key: "file" },
 	"--task": { key: "task" },

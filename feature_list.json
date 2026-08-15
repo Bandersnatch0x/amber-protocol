@@ -728,6 +728,26 @@
 				"tests/unit/hooks-command.test.js",
 				"docs/CLI_REFERENCE.md"
 			]
+		},
+		{
+			"id": "F025",
+			"priority": 1,
+			"area": "governance",
+			"title": "Break-loop post-mortem scaffold for recurring friction",
+			"user_visible_behavior": "When a friction or bug class recurs after a fix, `amber break-loop` scaffolds a post-mortem document with a five-way root-cause taxonomy and a prevention-mechanism menu mapped to Amber's knowledge surfaces, and `amber break-loop validate` refuses placeholder content — recurring defects get a durable, checkable prevention record instead of a re-fixed symptom",
+			"status": "not_started",
+			"verification": [
+				"node --test tests/unit/break-loop.test.js",
+				"amber break-loop --target <tmp> --issue 118 --title \"...\" scaffolds docs/quality/break-loops/<date>-<slug>.md with all required sections",
+				"amber break-loop validate --target <tmp> --file <scaffolded> fails on placeholders and passes when filled",
+				"amber break-loop --help renders the taxonomy and menu"
+			],
+			"evidence": [],
+			"notes": [
+				"P2-1 from the Trellis-mechanism analysis: deep bug retrospectives for defect loops. Mechanism idea only (AGPL); all wording original.",
+				"Amber scaffolds and validates; the analysis itself stays with the operator/agent — no issue-tracker network access, no auto-detection, no LLM."
+			],
+			"updated": "2026-08-15"
 		}
 	]
 }

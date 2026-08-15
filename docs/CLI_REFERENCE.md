@@ -106,6 +106,28 @@ Boundary: Amber detects and reminds; it never writes knowledge docs itself.
 
 Trigger rules, invariants, and the channels that surface this checkpoint (`amber next`, the breadcrumb, `amber handoff`) are specified in [docs/specs/2026-08-15-learning-writeback.md](specs/2026-08-15-learning-writeback.md).
 
+### break-loop
+
+Escalation path for RECURRING friction or defect classes — the same class coming back after a fix (recurrence ≥ 2, declared by the operator):
+
+```bash
+node scripts/amber.js break-loop --target . --issue 122 --title "Evidence dates drift UTC vs local" --recurrence 2
+node scripts/amber.js break-loop validate --target . --file docs/quality/break-loops/2026-08-15-Evidence-dates-drift-UTC-vs-local.md
+```
+
+**Options:**
+- `--issue <n>`: Reference number of the recurring issue (recorded only, no tracker access)
+- `--title "<t>"`: Post-mortem title (becomes the filename slug)
+- `--recurrence <n>`: How many times the class has come back; must be ≥ 2
+- `--file <path>`: Post-mortem file to validate (validate action)
+- `--json`: Emit the machine-readable envelope
+
+The default action scaffolds `docs/quality/break-loops/<date>-<slug>.md` from a five-way root-cause taxonomy (`missing-contract`, `cross-layer-drift`, `change-propagation-failure`, `verification-gap`, `implicit-assumption`) and a prevention-mechanism menu (`contract-and-anchor`, `parity-guard`, `centralized-helper`, `checklist-item`), each entry mapped to its write-back surface. An existing file is never overwritten — the refusal names the file. `validate` refuses placeholder content: every section must be filled, exactly one primary category id and one mechanism id chosen, a write-back surface path and test anchor recorded, and a runnable verification command present.
+
+Boundary: Amber scaffolds and validates — the analysis is the operator's. No issue-tracker access, no recurrence auto-detection, no execution.
+
+The escalation trigger lives in the dogfood ritual's friction loop: [docs/dogfood-weekly.md](dogfood-weekly.md) §5.
+
 ## Session Commands
 
 ### session start

@@ -188,6 +188,8 @@ Rules:
 - **Label `next-up`** so it enters the candidate pool for §7.
 - **Be honest about severity** — a confusing message is `next-up`, a bypassable gate is `bug, ready-for-agent`.
 
+**Escalation — when the same class comes back.** If a friction class you already fixed resurfaces (second occurrence), don't just re-fix the symptom: run `amber break-loop --target . --issue <n> --title "<what recurred>" --recurrence <n>` right after opening the new issue, fill the scaffolded post-mortem (root-cause category, prevention mechanism, write-back surface), and link the post-mortem from that issue. `amber break-loop validate` must pass before the issue leaves `next-up` — a recurring defect closes with a checkable prevention record, not another patch.
+
 The feedback loop closes weekly: **run ritual → log friction → next week's ritual picks one friction from the queue → fix it through the same lifecycle → log any new friction.** This is the continuous, cheap replacement for episodic pilots.
 
 ---

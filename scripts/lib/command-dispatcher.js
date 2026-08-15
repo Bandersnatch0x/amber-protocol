@@ -1062,6 +1062,37 @@ function handleLearnings(args) {
 	};
 }
 
+// F025: `amber break-loop` — dispatch on the first positional: `validate`
+// validates an existing post-mortem; any other positional is a typo that must
+// not fall through to the WRITING scaffold action. The analysis stays with the
+// operator; Amber only scaffolds and validates.
+function handleBreakLoop(args) {
+	const { scaffoldPostMortem, validatePostMortem } = require("./core/break-loop");
+	const subAction = args._?.[0];
+	if (subAction !== undefined && subAction !== "validate") {
+		return { result: unknownAction("break-loop", ["validate"]) };
+	}
+	const r =
+		subAction === "validate"
+			? validatePostMortem(resolveTarget(args), { file: args.file })
+			: scaffoldPostMortem(args.target, {
+					issue: args.issue,
+					title: args.title,
+					recurrence: args.recurrence,
+				});
+	return {
+		result: {
+			...r,
+			target: r.target,
+			text: r.text || "",
+			errors: r.errors || [],
+			warnings: r.warnings || [],
+		},
+		exitCode: (r.errors || []).length > 0 ? 1 : 0,
+		bypassPrint: !args.json,
+	};
+}
+
 function handleHooks(args) {
 	const hooks = require("./hooks-command");
 	const action = args._?.[0];
@@ -1139,6 +1170,7 @@ const COMMAND_HANDLERS = {
 	review: handleReview,
 	accept: handleAccept,
 	learnings: handleLearnings,
+	"break-loop": handleBreakLoop,
 	pack: handlePack,
 	profile: handleProfile,
 	status: handleStatus,

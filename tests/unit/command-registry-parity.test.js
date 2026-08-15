@@ -33,6 +33,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"review",
 	"accept",
 	"learnings",
+	"break-loop",
 	"pack",
 	"profile",
 	"task",

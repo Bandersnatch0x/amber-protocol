@@ -1,6 +1,10 @@
 "use strict";
 
 const { COMMAND_CAPABILITIES, capabilityKey } = require("./mcp-action-contracts");
+// F025: break-loop help renders the taxonomy and menu from the same single
+// source the scaffold uses (scripts/lib/core/break-loop.js), so the two can
+// never disagree.
+const { renderTaxonomyLines, renderMenuLines } = require("./core/break-loop");
 
 // Command ownership metadata lives with the Command Definitions. Capability
 // manifests are validated against this projection, never used to invent it.
@@ -113,6 +117,35 @@ const COMMAND_HELP = {
 		"  amber learnings --target .",
 		"  amber learnings --target . --feature F001",
 		"  amber learnings --target . --feature F001 --reviewed --surface docs/specs/f001.md",
+	],
+	"break-loop": [
+		"Scaffold and validate a post-mortem for a defect class that recurred after a fix (recurrence >= 2).",
+		"The default action scaffolds; `validate` refuses placeholder content.",
+		"",
+		"Actions:",
+		"  (none)             Scaffold docs/quality/break-loops/<date>-<slug>.md; never overwrites an existing file.",
+		"  validate           Check every section is filled: ids chosen, write-back surface + test",
+		"                     anchor + runnable verification command present.",
+		"",
+		"Options:",
+		"  --issue <n>        Reference number of the recurring issue, required to scaffold (recorded only, no tracker access).",
+		'  --title "<t>"      Post-mortem title, required to scaffold; needs at least one ASCII letter or digit (becomes the filename slug).',
+		"  --recurrence <n>   How many times the class has come back, required to scaffold; must be >= 2.",
+		"  --file <path>      Post-mortem file to validate (validate action).",
+		"  --json             Emit the machine-readable envelope.",
+		"",
+		"Root-cause taxonomy (pick one primary by id):",
+		...renderTaxonomyLines("  "),
+		"",
+		"Prevention-mechanism menu (pick one by id):",
+		...renderMenuLines("  "),
+		"",
+		"Boundary: Amber scaffolds and validates — the analysis is the operator's.",
+		"No issue-tracker access, no recurrence auto-detection, no execution.",
+		"",
+		"Examples:",
+		'  amber break-loop --target . --issue 122 --title "Evidence dates drift" --recurrence 2',
+		"  amber break-loop validate --target . --file docs/quality/break-loops/2026-08-15-Evidence-dates-drift.md",
 	],
 	pack: "Inspect or validate declarative workflow packs without executing them.",
 	ledger:
@@ -544,6 +577,10 @@ const COMMAND_OUTPUT = {
 		usage:
 			"Usage: amber learnings --target <repo> [--feature <id>] [--reviewed] [--surface <path>] [--json]",
 	},
+	"break-loop": {
+		usage:
+			'Usage: amber break-loop --target <repo> --issue <n> --title "<title>" --recurrence <n> | amber break-loop validate --target <repo> --file <path> [--json]',
+	},
 	handoff: {
 		usage: [
 			"Usage: amber handoff --target <repo> [--json]",
@@ -608,6 +645,7 @@ const COMMANDS = Object.freeze([
 	"review",
 	"accept",
 	"learnings",
+	"break-loop",
 	"pack",
 	"profile",
 	"task",
@@ -646,6 +684,7 @@ const TIER_BY_COMMAND = {
 	review: "core",
 	accept: "core",
 	learnings: "core",
+	"break-loop": "core",
 	loop: "core",
 	ledger: "core",
 	route: "core",
