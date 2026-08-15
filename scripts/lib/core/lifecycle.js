@@ -133,7 +133,9 @@ function resolvePendingGate(targetRoot, sessionId) {
 			.filter(Boolean),
 	);
 	const pending = gates.filter((g) => !passed.has(g.id));
-	const pendingGateId = (pending[0] && pending[0].id) || (gates[0] && gates[0].id) || null;
+	// Null when nothing is pending: an all-approved route must not advertise an
+	// already-passed gate as "next" (#119) — consumers render a placeholder.
+	const pendingGateId = (pending[0] && pending[0].id) || null;
 	return { gates, pendingGateId, routeId, pendingCount: pending.length };
 }
 

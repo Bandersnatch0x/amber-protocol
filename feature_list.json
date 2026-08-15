@@ -685,6 +685,25 @@
 				"date": "2026-08-15",
 				"surfaces": ["docs/specs/2026-08-15-learning-writeback.md"]
 			}
+		},
+		{
+			"id": "F024",
+			"priority": 1,
+			"area": "governance",
+			"title": "Fix dogfood friction batch #118/#119/#121",
+			"user_visible_behavior": "Evidence reflux stamps the local calendar day (not UTC); resolvePendingGate no longer reports a next gate when zero gates are pending; a new `amber feature paths` subcommand books feature paths at completion (append-only, deduped), unblocking the F023 learnings trigger detection without hand-edited JSON",
+			"status": "not_started",
+			"verification": [
+				"node --test tests/unit/feature-commands.test.js",
+				"node --test tests/unit/workflow-state-breadcrumb-parity.test.js",
+				"amber feature paths --target <tmp> --feature <id> --path <p> books paths that survive validate-feature-list and stay Prettier-clean",
+				"amber next --feature <id> renders no pending-gate hint when all route gates are approved"
+			],
+			"evidence": [],
+			"notes": [
+				"Dogfood friction batch: issues #121 (no CLI to book feature paths at completion), #118 (evidence date UTC off-by-one vs local day), #119 (resolvePendingGate gates[0] fallback reports a next gate when none are pending)."
+			],
+			"updated": "2026-08-15"
 		}
 	]
 }

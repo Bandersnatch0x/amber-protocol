@@ -350,10 +350,11 @@ describe("workflow-state breadcrumb lifecycle parity (F022)", () => {
 		expectStep(root, "handoff");
 
 		// 8. Live (non-scaffold) handoff, blocker still open → complete-check.
-		//    (resolvePendingGate names gates[0] as "next" even with none pending.)
+		//    (With zero gates pending the resolver reports null, so the line
+		//    renders "(next: none)" rather than an already-approved gate.)
 		writeLiveHandoff(root);
 		const cp8 = expectStep(root, "complete-check");
-		assert.match(cp8.block, /Pending gates: 0/);
+		assert.match(cp8.block, /Pending gates: 0 \(next: none\)/);
 
 		// 9. Blocker resolved → completion passes → session-complete.
 		writeSessionManifest(root, {

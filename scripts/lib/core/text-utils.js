@@ -44,6 +44,29 @@ function timestampForFileName(date = new Date()) {
 	return date.toISOString().replace(/[:.]/g, "-").toLowerCase();
 }
 
+// Local calendar day as YYYY-MM-DD via getFullYear/getMonth/getDate: evidence
+// records the day the operator saw, not the UTC day (they diverge near midnight).
+function localIsoDate(now = new Date()) {
+	return [
+		now.getFullYear(),
+		String(now.getMonth() + 1).padStart(2, "0"),
+		String(now.getDate()).padStart(2, "0"),
+	].join("-");
+}
+
+function splitCommaList(values) {
+	const list = Array.isArray(values) ? values : [values];
+	const out = [];
+	for (const entry of list) {
+		if (typeof entry !== "string") continue;
+		for (const part of entry.split(",")) {
+			const trimmed = part.trim();
+			if (trimmed !== "") out.push(trimmed);
+		}
+	}
+	return out;
+}
+
 function escapeMarkdownTableCell(value) {
 	return String(value || "")
 		.replace(/\r?\n/g, " ")
@@ -138,6 +161,8 @@ module.exports = {
 	formatList,
 	formatCommandList,
 	timestampForFileName,
+	localIsoDate,
+	splitCommaList,
 	escapeMarkdownTableCell,
 	extractMarkdownLinks,
 	isInsideDirectory,

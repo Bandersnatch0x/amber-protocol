@@ -252,16 +252,9 @@ function breadcrumbSessionLines(targetRoot, sessionId) {
 		lines.push(`Stages done: ${stages.length > 0 ? stages.join(", ") : "none"}`);
 	}
 	const gateInfo = resolvePendingGate(targetRoot, sessionId);
-	// pendingGateId falls back to the route's first gate even when nothing is
-	// pending (lifecycle resolver contract), so the next-gate hint is only
-	// rendered when a gate is actually outstanding.
-	if (gateInfo.pendingCount > 0) {
-		lines.push(
-			`Pending gates: ${gateInfo.pendingCount} (next: ${gateInfo.pendingGateId || "none"})`,
-		);
-	} else {
-		lines.push("Pending gates: 0");
-	}
+	// The resolver returns null when nothing is pending (no gates[0] fallback
+	// since F024), so the next-gate hint is rendered unconditionally.
+	lines.push(`Pending gates: ${gateInfo.pendingCount} (next: ${gateInfo.pendingGateId || "none"})`);
 	return lines;
 }
 
@@ -347,19 +340,55 @@ function readSettingsObject(settingsPath) {
 // Both signals are required: the versioned HOOK_MARKER is shared with other
 // Amber-managed entries, so the marker alone could match (and uninstall could
 // remove) a foreign or future Amber entry that is not the breadcrumb.
+//
+// Shape note: Claude Code expects each hooks.<Event> entry to be
+// { matcher, hooks: [ {type, command} ] }. Entries written by F022 at launch
+// were flat { type, command } objects, which Claude Code refuses to load
+// ("Expected array, but received undefined"). Detection accepts both shapes so
+// uninstall can remove legacy flat entries and install can repair them.
+function breadcrumbCommandOf(entry) {
+	if (!entry || typeof entry !== "object") return null;
+	if (typeof entry.command === "string") return entry.command; // legacy flat
+	if (Array.isArray(entry.hooks)) {
+		for (const hook of entry.hooks) {
+			if (hook && typeof hook === "object" && typeof hook.command === "string") {
+				return hook.command;
+			}
+		}
+	}
+	return null;
+}
+
 function isManagedBreadcrumbEntry(entry) {
+	const command = breadcrumbCommandOf(entry);
 	return (
-		Boolean(entry) &&
-		typeof entry === "object" &&
-		typeof entry.command === "string" &&
-		entry.command.includes(HOOK_MARKER) &&
-		entry.command.includes("hooks breadcrumb print")
+		command !== null && command.includes(HOOK_MARKER) && command.includes("hooks breadcrumb print")
 	);
 }
 
 function findManagedBreadcrumbEntry(entries) {
 	if (!Array.isArray(entries)) return null;
 	return entries.find(isManagedBreadcrumbEntry) || null;
+}
+
+// The Claude Code settings shape for one hooks.<Event> entry: a matcher plus a
+// hooks array of {type, command} actions (see the Shape note above).
+function buildBreadcrumbSettingsEntry(targetRoot) {
+	return {
+		matcher: "",
+		hooks: [{ type: "command", command: buildBreadcrumbCommand(targetRoot) }],
+	};
+}
+
+// True when the entry already carries the loadable {matcher, hooks} shape.
+function isWrappedBreadcrumbEntry(entry) {
+	return (
+		Boolean(entry) &&
+		typeof entry === "object" &&
+		!Array.isArray(entry) &&
+		Array.isArray(entry.hooks) &&
+		typeof entry.command !== "string"
+	);
 }
 
 // The hooks.UserPromptSubmit array of a parsed settings object, or null when
@@ -435,7 +464,8 @@ function installBreadcrumb(target, { platform = "claude" } = {}) {
 		};
 	}
 	const entries = Array.isArray(hooks.UserPromptSubmit) ? hooks.UserPromptSubmit : [];
-	if (findManagedBreadcrumbEntry(entries)) {
+	const managedIndex = entries.findIndex(isManagedBreadcrumbEntry);
+	if (managedIndex !== -1 && isWrappedBreadcrumbEntry(entries[managedIndex])) {
 		return {
 			target: targetRoot,
 			text: "Amber workflow-state breadcrumb hook already installed in .claude/settings.json; nothing to do.",
@@ -444,15 +474,23 @@ function installBreadcrumb(target, { platform = "claude" } = {}) {
 		};
 	}
 	// Append-only merge: foreign entries keep their positions, the Amber entry
-	// carries the marker so uninstall removes exactly this entry.
-	hooks.UserPromptSubmit = [
-		...entries,
-		{ type: "command", command: buildBreadcrumbCommand(targetRoot) },
-	];
+	// carries the marker so uninstall removes exactly this entry. A legacy
+	// flat managed entry (pre-shape-fix installs, unloadable by Claude Code)
+	// is repaired in place instead of appended next to.
+	if (managedIndex !== -1) {
+		hooks.UserPromptSubmit = entries.map((entry, i) =>
+			i === managedIndex ? buildBreadcrumbSettingsEntry(targetRoot) : entry,
+		);
+	} else {
+		hooks.UserPromptSubmit = [...entries, buildBreadcrumbSettingsEntry(targetRoot)];
+	}
 	writeJson(settingsPath, settings);
 	return {
 		target: targetRoot,
-		text: "Installed Amber workflow-state breadcrumb hook in .claude/settings.json (bypass a turn with AMBER_SKIP_HOOKS=1).",
+		text:
+			managedIndex !== -1
+				? "Repaired Amber workflow-state breadcrumb hook in .claude/settings.json (legacy flat entry upgraded to the matcher+hooks shape; bypass a turn with AMBER_SKIP_HOOKS=1)."
+				: "Installed Amber workflow-state breadcrumb hook in .claude/settings.json (bypass a turn with AMBER_SKIP_HOOKS=1).",
 		errors: [],
 		warnings: [],
 	};
@@ -537,7 +575,7 @@ function statusBreadcrumb(target) {
 	}
 	return {
 		target: targetRoot,
-		text: `Workflow-state breadcrumb hook: installed.\nCommand: ${managed.command}`,
+		text: `Workflow-state breadcrumb hook: installed.\nCommand: ${breadcrumbCommandOf(managed)}`,
 		errors: [],
 		warnings: [],
 	};

@@ -11,7 +11,9 @@ const {
 	buildContext,
 	inferNextStep,
 	remedyFor,
+	resolvePendingGate,
 } = require("../../scripts/lib/core/lifecycle");
+const { appendSessionEvent } = require("../../scripts/lib/session-timeline");
 
 function tmpRepo() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-lifecycle-"));
@@ -163,6 +165,25 @@ describe("inferNextStep (synthetic ctx)", () => {
 		assert.equal(step.id, "approve");
 		assert.match(step.remedy, /--gate user-approval-implement/);
 		assert.doesNotMatch(step.remedy, /<gate-id>/);
+	});
+
+	it("approve remedy renders the <gate-id> placeholder when nothing is pending (#119)", () => {
+		const base = {
+			...ctxOf({}, { type: "session", id: "sess-1" }),
+			liveHandoff: false,
+			sessionStatus: "executing",
+			pendingGateId: null,
+			sessionGates: [{ id: "user-approval-plan" }, { id: "user-approval-implement" }],
+			completion: { status: "fail", missing: ["approval", "handoff"] },
+		};
+		const step = inferNextStep(base);
+		assert.equal(step.id, "approve");
+		assert.match(step.remedy, /--gate <gate-id>/);
+		assert.doesNotMatch(
+			step.remedy,
+			/user-approval-(plan|implement)/,
+			"an already-passed gate must not be advertised as next",
+		);
 	});
 
 	it("recommends feature when installed but no features", () => {
@@ -507,6 +528,81 @@ describe("target-local Route lifecycle", () => {
 			() => buildContext(dir, { session: sessionId, target: "." }),
 			/Routes directory is outside the target root/,
 		);
+	});
+});
+
+describe("resolvePendingGate (#119: null when none pending)", () => {
+	function writeSession(dir, sessionId, routeId) {
+		const sessionDir = path.join(dir, ".amber", "sessions", sessionId);
+		fs.mkdirSync(sessionDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(sessionDir, "manifest.json"),
+			JSON.stringify({
+				schemaVersion: "1.0.0",
+				sessionId,
+				status: "executing",
+				goal: "gate resolver fixture",
+				route: { id: routeId, version: "1.0.0" },
+				createdAt: "2026-08-14T00:00:00.000Z",
+			}),
+		);
+		return sessionDir;
+	}
+
+	// A two-gate route (schema requires >=1 stage, so carry one command stage).
+	function writeTwoGateRoute(dir, routeId, gateIds = ["g-plan", "g-impl"]) {
+		const routesDir = path.join(dir, "routes");
+		fs.mkdirSync(routesDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(routesDir, `${routeId}.route.json`),
+			JSON.stringify({
+				routeId,
+				schemaVersion: "1.0.0",
+				stages: [{ name: "verify", type: "command", target: "node --test", gateAfter: gateIds[0] }],
+				gates: gateIds.map((id) => ({ id, type: "user-approval" })),
+			}),
+		);
+	}
+
+	it("names the first pending gate when every gate is outstanding", () => {
+		const dir = tmpRepo();
+		writeTwoGateRoute(dir, "two-gates");
+		writeSession(dir, "sess-gates-open", "two-gates");
+		const info = resolvePendingGate(dir, "sess-gates-open");
+		assert.equal(info.pendingGateId, "g-plan");
+		assert.equal(info.pendingCount, 2);
+	});
+
+	it("names the first STILL-pending gate, skipping passed ones", () => {
+		const dir = tmpRepo();
+		writeTwoGateRoute(dir, "two-gates");
+		const sessionDir = writeSession(dir, "sess-gates-part", "two-gates");
+		appendSessionEvent(sessionDir, { type: "gate_passed", data: { gateId: "g-plan" } });
+		const info = resolvePendingGate(dir, "sess-gates-part");
+		assert.equal(info.pendingGateId, "g-impl");
+		assert.equal(info.pendingCount, 1);
+	});
+
+	it("reports null (not gates[0]) when every route gate has passed", () => {
+		const dir = tmpRepo();
+		writeTwoGateRoute(dir, "two-gates");
+		const sessionDir = writeSession(dir, "sess-gates-done", "two-gates");
+		for (const gateId of ["g-plan", "g-impl"]) {
+			appendSessionEvent(sessionDir, { type: "gate_passed", data: { gateId } });
+		}
+		const info = resolvePendingGate(dir, "sess-gates-done");
+		assert.equal(info.pendingGateId, null);
+		assert.equal(info.pendingCount, 0);
+		assert.equal(info.gates.length, 2, "route gates are still reported for context");
+	});
+
+	it("stays null for a route with zero gates defined", () => {
+		const dir = tmpRepo();
+		writeTwoGateRoute(dir, "no-gates", []);
+		writeSession(dir, "sess-gates-none", "no-gates");
+		const info = resolvePendingGate(dir, "sess-gates-none");
+		assert.equal(info.pendingGateId, null);
+		assert.equal(info.pendingCount, 0);
 	});
 });
 

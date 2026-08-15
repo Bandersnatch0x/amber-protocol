@@ -8,6 +8,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { localIsoDate } = require("./text-utils");
 const Ajv = require("ajv");
 const addFormats = require("ajv-formats");
 
@@ -182,8 +183,7 @@ const DEFAULT_INSTRUCTIONS =
 	"facts beyond the sources. Return a payload matching the output schema exactly.";
 
 function makeRequestId() {
-	const d = new Date();
-	const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+	const ymd = localIsoDate();
 	return `kd-${ymd}-${crypto.randomBytes(3).toString("hex")}`;
 }
 

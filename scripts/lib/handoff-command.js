@@ -8,6 +8,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { resolveTarget } = require("./core/fs-utils");
+const { localIsoDate } = require("./core/text-utils");
 const { getRepoSnapshot } = require("./core/git-state");
 
 /** Display strings for handoff Repo State — reuses status's git snapshot. */
@@ -174,12 +175,7 @@ function renderHandoff(targetRoot) {
 
 	// Local calendar date — matches operator "today" (UTC ISO can lag behind
 	// evening Asia/local sessions) and validateHandoff's "Last Updated:" scrape.
-	const now = new Date();
-	const lastUpdated = [
-		now.getFullYear(),
-		String(now.getMonth() + 1).padStart(2, "0"),
-		String(now.getDate()).padStart(2, "0"),
-	].join("-");
+	const lastUpdated = localIsoDate();
 
 	return [
 		"# Session Handoff",

@@ -274,9 +274,13 @@ test("breadcrumb: install/uninstall/status round-trip preserves foreign settings
 	assert.equal(settings.hooks.UserPromptSubmit.length, 2);
 	assert.deepEqual(settings.hooks.UserPromptSubmit[0], FOREIGN_SETTINGS.hooks.UserPromptSubmit[0]);
 	const managed = settings.hooks.UserPromptSubmit[1];
-	assert.equal(managed.type, "command");
-	assert.ok(managed.command.includes(HOOK_MARKER), "managed entry carries the marker");
-	assert.ok(managed.command.includes("hooks breadcrumb print"));
+	// Claude Code loads only the {matcher, hooks:[{type,command}]} shape.
+	assert.equal(managed.matcher, "");
+	assert.ok(Array.isArray(managed.hooks), "managed entry wraps actions in a hooks array");
+	assert.equal(managed.hooks.length, 1);
+	assert.equal(managed.hooks[0].type, "command");
+	assert.ok(managed.hooks[0].command.includes(HOOK_MARKER), "managed entry carries the marker");
+	assert.ok(managed.hooks[0].command.includes("hooks breadcrumb print"));
 
 	// Second install is idempotent: still exactly one managed entry.
 	const again = installBreadcrumb(dir);
@@ -308,7 +312,8 @@ test("breadcrumb: install on missing .claude creates it; uninstall round-trips b
 	assert.deepEqual(ins.errors, []);
 	const settings = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
 	assert.equal(settings.hooks.UserPromptSubmit.length, 1);
-	assert.ok(settings.hooks.UserPromptSubmit[0].command.includes(HOOK_MARKER));
+	assert.ok(Array.isArray(settings.hooks.UserPromptSubmit[0].hooks));
+	assert.ok(settings.hooks.UserPromptSubmit[0].hooks[0].command.includes(HOOK_MARKER));
 	const un = uninstallBreadcrumb(dir);
 	assert.deepEqual(un.errors, []);
 	const after = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
@@ -354,6 +359,66 @@ test("breadcrumb: ambient AMBER_SKIP_HOOKS in the environment does not skew prin
 	} finally {
 		if (prior !== undefined) process.env.AMBER_SKIP_HOOKS = prior;
 	}
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: legacy flat managed entry is repaired in place by install", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-repair-"));
+	fs.mkdirSync(path.join(dir, ".claude"), { recursive: true });
+	// The unloadable pre-shape-fix entry (F022 launch installs): flat {type, command}.
+	const legacy = {
+		hooks: {
+			UserPromptSubmit: [
+				{ type: "command", command: "echo keep-me" },
+				{
+					type: "command",
+					command: `node amber.js hooks breadcrumb print --target . --format json ${HOOK_MARKER}`,
+				},
+			],
+		},
+	};
+	fs.writeFileSync(claudeSettings(dir), JSON.stringify(legacy, null, 2));
+
+	const ins = installBreadcrumb(dir);
+	assert.deepEqual(ins.errors, []);
+	assert.match(ins.text, /Repaired/);
+	const settings = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	const entries = settings.hooks.UserPromptSubmit;
+	assert.equal(entries.length, 2, "repair replaces in place, never appends a sibling");
+	assert.equal(entries[0].command, "echo keep-me", "foreign entries untouched");
+	const repaired = entries[1];
+	assert.equal(repaired.matcher, "");
+	assert.ok(Array.isArray(repaired.hooks));
+	assert.ok(repaired.hooks[0].command.includes(HOOK_MARKER));
+
+	// Uninstall still removes the (repaired) managed entry, leaving the foreign one.
+	const un = uninstallBreadcrumb(dir);
+	assert.deepEqual(un.errors, []);
+	const after = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	assert.equal(after.hooks.UserPromptSubmit.length, 1);
+	assert.equal(after.hooks.UserPromptSubmit[0].command, "echo keep-me");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb: legacy flat managed entry is removed by uninstall", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-legacy-un-"));
+	fs.mkdirSync(path.join(dir, ".claude"), { recursive: true });
+	const legacy = {
+		hooks: {
+			UserPromptSubmit: [
+				{
+					type: "command",
+					command: `node amber.js hooks breadcrumb print --target . --format json ${HOOK_MARKER}`,
+				},
+			],
+		},
+	};
+	fs.writeFileSync(claudeSettings(dir), JSON.stringify(legacy));
+
+	const un = uninstallBreadcrumb(dir);
+	assert.deepEqual(un.errors, []);
+	const after = JSON.parse(fs.readFileSync(claudeSettings(dir), "utf8"));
+	assert.deepEqual(after, {}, "legacy flat entry fully removed, empty hooks object cleaned up");
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 

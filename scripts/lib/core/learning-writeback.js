@@ -9,6 +9,8 @@
 // Amber detects, reminds, and books — it never writes knowledge docs itself.
 
 const { resolveTarget } = require("./fs-utils");
+const { splitCommaList } = require("./text-utils");
+const { localIsoDate } = require("./text-utils");
 
 // ── Trigger classification (pure path matching — no globs, no judgment) ──────
 
@@ -127,17 +129,6 @@ function learningWriteBackGuidance() {
 }
 
 // ── Inspection (strictly read-only) ─────────────────────────────────────────
-
-// Local calendar date, matching the handoff renderer's "today" (a UTC ISO date
-// can lag behind evening local sessions).
-function localDate() {
-	const now = new Date();
-	return [
-		now.getFullYear(),
-		String(now.getMonth() + 1).padStart(2, "0"),
-		String(now.getDate()).padStart(2, "0"),
-	].join("-");
-}
 
 function renderInspectionText(featureId, accepted, triggered, guidance, learningWriteBack) {
 	const lines = [];
@@ -270,16 +261,7 @@ function inspectLearningWriteBack(targetRoot, { featureId } = {}) {
 // ── Booking (the only write; touches feature_list.json alone) ───────────────
 
 function normalizeSurfaces(surfaces) {
-	const list = Array.isArray(surfaces) ? surfaces : [surfaces];
-	const out = [];
-	for (const entry of list) {
-		if (typeof entry !== "string") continue;
-		for (const part of entry.split(",")) {
-			const trimmed = part.trim();
-			if (trimmed !== "") out.push(trimmed);
-		}
-	}
-	return out;
+	return splitCommaList(surfaces);
 }
 
 /**
@@ -329,7 +311,7 @@ function bookLearningWriteBack(target, { featureId, surfaces } = {}) {
 	const bookedSurfaces = normalizeSurfaces(surfaces);
 	feature.learningWriteBack = {
 		reviewed: true,
-		date: localDate(),
+		date: localIsoDate(),
 		surfaces: bookedSurfaces,
 	};
 	saveFeatures(data);

@@ -22,7 +22,7 @@ The governed delivery flow starts here: register a feature, plan a slice, gate t
 
 ### feature
 
-Add, list, remove features in `feature_list.json` and record verification evidence:
+Add, list, remove features in `feature_list.json`, record verification evidence, and book feature paths:
 
 ```bash
 node scripts/amber.js feature add --id F001 --title "User login" --priority 1 --area auth --behavior "User logs in with email and receives a session token." --verify "npm test" --paths src/auth --target .
@@ -30,7 +30,11 @@ node scripts/amber.js feature list --target .
 node scripts/amber.js feature remove --id F001 --target .
 node scripts/amber.js feature verify --feature F001 --command "npm test" --result "42 passed" --target .
 node scripts/amber.js feature evidence --feature F001 --target .
+node scripts/amber.js feature paths --feature F001 --path src/auth/login.js --target .   # append-only, deduped; no --path lists current paths
 ```
+
+`feature paths` is the completion-time way to book the files a feature touched — the post-accept
+learning write-back checkpoint (`amber learnings`) detects its triggers from these paths.
 
 ### plan
 
