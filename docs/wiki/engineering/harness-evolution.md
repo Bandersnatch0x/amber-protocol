@@ -111,3 +111,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F027-Role-scoped-context-manifests-in-plans-and-a-memory-usage-creed.md`
 - Review status: ready
 - Feature: F027 status → accepted in feature_list.json
+
+## 2026-08-16 docs/plans/F028-Durable-owner-routing-for-recurring-friction.md
+
+- Plan: `docs/plans/F028-Durable-owner-routing-for-recurring-friction.md`
+- Review status: ready
+- Feature: F028 status → accepted in feature_list.json

@@ -98,20 +98,23 @@ Inspect the post-accept learning write-back triggers for a feature, or book the 
 ```bash
 node scripts/amber.js learnings --target .
 node scripts/amber.js learnings --target . --feature F001
-node scripts/amber.js learnings --target . --feature F001 --reviewed --surface docs/specs/f001.md
+node scripts/amber.js learnings --target . --feature F001 --reviewed --owner command --surface docs/specs/f001.md
 ```
 
 **Options:**
 - `--feature`: Feature to inspect (defaults to the current lifecycle focus)
 - `--reviewed`: Book the learning review (requires `--feature`; overwrites any prior booking)
+- `--owner`: Canonical durable owner ID (exactly one is required with `--reviewed`): `skill`, `hook`, `command`, `standard`, `script`, `workflow-pack`, `loop-contract`, or `ci`
 - `--surface`: Knowledge surface the review was written to (repeatable; a single flag also accepts a comma-separated list)
 - `--json`: Emit the machine-readable envelope
 
-Inspection is read-only: it classifies the feature's booked paths into the `schema`, `contract`, and `infra` trigger categories, lists the matching paths with suggested knowledge surfaces, and shows the current booking state. `--reviewed` clears the checkpoint by writing the `learningWriteBack` booking onto that feature's entry in `feature_list.json` — the only write the command performs.
+Inspection is read-only: it classifies the feature's booked paths into the `schema`, `contract`, and `infra` trigger categories, lists the matching paths with suggested knowledge surfaces, renders the complete owner catalog, and shows the current booking and owner state. `--reviewed` clears the checkpoint by writing `{ reviewed, date, surfaces, owner }` onto that feature's entry in `feature_list.json` — the only write the command performs. Re-booking replaces the date, surfaces, and owner. Missing, repeated, comma-separated, and unknown owners fail without changing the file.
 
-Boundary: Amber detects and reminds; it never writes knowledge docs itself.
+Amber never infers the owner from paths or prose. Existing reviewed records without an owner remain complete and are reported as legacy bookings. Owner selection is distinct from F025 prevention-mechanism selection: the prevention mechanism says how recurrence is prevented; the owner says which Amber surface carries that behavior.
 
-Trigger rules, invariants, and the channels that surface this checkpoint (`amber next`, the breadcrumb, `amber handoff`) are specified in [docs/specs/2026-08-15-learning-writeback.md](specs/2026-08-15-learning-writeback.md).
+Boundary: Amber detects and reminds; it never writes knowledge docs itself. `workflow-pack` and `loop-contract` are declarative owner routes, not live scheduling or execution. `ci` means a check that actually runs on a protected repository event or pull-request gate.
+
+Trigger rules, invariants, and the channels that surface this checkpoint (`amber next`, the breadcrumb, `amber handoff`) are specified in [docs/specs/2026-08-15-learning-writeback.md](specs/2026-08-15-learning-writeback.md). Owner decisions and route boundaries are documented in [docs/wiki/learning-owner-routing.md](wiki/learning-owner-routing.md).
 
 ### break-loop
 

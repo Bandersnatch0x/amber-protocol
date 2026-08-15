@@ -11,6 +11,12 @@
 const { resolveTarget } = require("./fs-utils");
 const { splitCommaList } = require("./text-utils");
 const { localIsoDate } = require("./text-utils");
+const {
+	LEARNING_OWNER_ROUTES,
+	getLearningOwner,
+	learningOwnerIdsText,
+	renderLearningOwnerLines,
+} = require("./learning-owner-routing");
 
 // ── Trigger classification (pure path matching — no globs, no judgment) ──────
 
@@ -130,11 +136,59 @@ function learningWriteBackGuidance() {
 
 // ── Inspection (strictly read-only) ─────────────────────────────────────────
 
+function ownerFields(learningWriteBack) {
+	const reviewed = learningWriteBack && learningWriteBack.reviewed === true;
+	const hasOwner =
+		learningWriteBack && Object.prototype.hasOwnProperty.call(learningWriteBack, "owner");
+	const owner =
+		hasOwner && typeof learningWriteBack.owner === "string" ? learningWriteBack.owner : null;
+	const ownerRoute = owner ? getLearningOwner(owner) : null;
+	const ownerStatus = !reviewed
+		? "unbooked"
+		: !hasOwner
+			? "legacy"
+			: ownerRoute
+				? "assigned"
+				: "invalid";
+	return {
+		ownerCatalog: LEARNING_OWNER_ROUTES,
+		owner,
+		ownerRoute,
+		ownerStatus,
+		ownerDecisionQuestion: ownerRoute ? ownerRoute.decisionQuestion : null,
+		ownerResponsibility: ownerRoute ? ownerRoute.responsibility : null,
+	};
+}
+
+function renderOwnerRouting(learningWriteBack) {
+	const details = ownerFields(learningWriteBack);
+	const lines = ["Durable owner catalog:", ...renderLearningOwnerLines("  ")];
+	if (details.ownerStatus === "legacy") {
+		lines.push(
+			"Current owner: legacy ownerless booking (reviewed and complete; no migration required).",
+		);
+	} else if (details.owner) {
+		lines.push(`Current owner: ${details.owner}`);
+		if (details.ownerRoute) {
+			lines.push(`  Decision question: ${details.ownerRoute.decisionQuestion}`);
+			lines.push(`  Responsibility: ${details.ownerRoute.responsibility}`);
+		} else {
+			lines.push("  Owner is not a recognized canonical route.");
+		}
+	} else {
+		lines.push("Current owner: (not assigned)");
+	}
+	return lines;
+}
+
 function renderInspectionText(featureId, accepted, triggered, guidance, learningWriteBack) {
 	const lines = [];
+	const details = ownerFields(learningWriteBack);
 	if (accepted) {
 		const bookingState =
-			learningWriteBack && learningWriteBack.reviewed ? "review booked" : "review NOT booked";
+			learningWriteBack && learningWriteBack.reviewed === true
+				? "review booked"
+				: "review NOT booked";
 		lines.push(`Feature ${featureId} — accepted (${bookingState}).`);
 	} else {
 		lines.push(`Feature ${featureId} — not accepted yet (checkpoint applies after accept).`);
@@ -151,14 +205,22 @@ function renderInspectionText(featureId, accepted, triggered, guidance, learning
 	}
 	lines.push("Guidance:");
 	for (const line of guidance) lines.push(`  - ${line}`);
-	if (learningWriteBack && learningWriteBack.reviewed) {
+	lines.push(...renderOwnerRouting(learningWriteBack));
+	if (learningWriteBack && learningWriteBack.reviewed === true) {
 		const surfaces = Array.isArray(learningWriteBack.surfaces) ? learningWriteBack.surfaces : [];
 		lines.push(
 			`Review booked ${learningWriteBack.date || "(no date)"} (surfaces: ${surfaces.join(", ") || "none"})`,
 		);
+		if (details.ownerStatus === "legacy") {
+			lines.push("Owner status: legacy ownerless booking; lifecycle completion remains unchanged.");
+		} else if (details.ownerRoute) {
+			lines.push(`Owner: ${details.ownerRoute.id}`);
+			lines.push(`Owner decision question: ${details.ownerRoute.decisionQuestion}`);
+			lines.push(`Owner responsibility: ${details.ownerRoute.responsibility}`);
+		}
 	} else {
 		lines.push(
-			`Review NOT booked — run: amber learnings --feature ${featureId} --reviewed [--surface <path>]`,
+			`Review NOT booked — run: amber learnings --feature ${featureId} --reviewed --owner <id> [--surface <path>]`,
 		);
 	}
 	return lines.join("\n");
@@ -191,7 +253,11 @@ function inspectLearningWriteBack(targetRoot, { featureId } = {}) {
 			matchedCategories: [],
 			guidance: learningWriteBackGuidance(),
 			learningWriteBack: null,
-			text: "No feature in focus — pass --feature <id> to inspect a specific feature's learning write-back triggers.",
+			...ownerFields(null),
+			text: [
+				"No feature in focus — pass --feature <id> to inspect a specific feature's learning write-back triggers.",
+				...renderOwnerRouting(null),
+			].join("\n"),
 			errors: [],
 			warnings: [],
 		};
@@ -209,7 +275,11 @@ function inspectLearningWriteBack(targetRoot, { featureId } = {}) {
 			matchedCategories: [],
 			guidance: learningWriteBackGuidance(),
 			learningWriteBack: null,
-			text: `Feature ${resolvedId} was not found in feature_list.json — nothing to inspect.`,
+			...ownerFields(null),
+			text: [
+				`Feature ${resolvedId} was not found in feature_list.json — nothing to inspect.`,
+				...renderOwnerRouting(null),
+			].join("\n"),
 			errors: [],
 			warnings: [],
 		};
@@ -246,6 +316,7 @@ function inspectLearningWriteBack(targetRoot, { featureId } = {}) {
 		matchedCategories: detection.matchedCategories,
 		guidance,
 		learningWriteBack,
+		...ownerFields(learningWriteBack),
 		text: renderInspectionText(
 			resolvedId,
 			accepted,
@@ -271,7 +342,36 @@ function normalizeSurfaces(surfaces) {
  * feature is never booked, so the wrong entry cannot be written. Re-booking
  * overwrites date/surfaces and still succeeds.
  */
-function bookLearningWriteBack(target, { featureId, surfaces } = {}) {
+function validateBookingOwner(owner, owners) {
+	const occurrences =
+		Array.isArray(owners) && owners.length > 0 ? owners : owner === undefined ? [] : [owner];
+	if (occurrences.length !== 1) {
+		return {
+			error: `learnings --reviewed requires exactly one explicit --owner <id>; repeated --owner flags are not allowed. Valid ids: ${learningOwnerIdsText()}.`,
+		};
+	}
+
+	const selected = occurrences[0];
+	if (typeof selected !== "string" || selected.trim() === "") {
+		return {
+			error: `learnings --reviewed requires exactly one explicit --owner <id>. Valid ids: ${learningOwnerIdsText()}.`,
+		};
+	}
+	const normalized = selected.trim();
+	if (normalized.includes(",")) {
+		return {
+			error: `comma-separated values are not allowed for learning owners; pass exactly one --owner <id>. Valid ids: ${learningOwnerIdsText()}.`,
+		};
+	}
+	if (!getLearningOwner(normalized)) {
+		return {
+			error: `Unknown learning owner '${normalized}'. Valid owner ids: ${learningOwnerIdsText()}.`,
+		};
+	}
+	return { owner: normalized };
+}
+
+function bookLearningWriteBack(target, { featureId, surfaces, owner, owners } = {}) {
 	const targetRoot = resolveTarget(target);
 	if (!featureId) {
 		return {
@@ -280,6 +380,18 @@ function bookLearningWriteBack(target, { featureId, surfaces } = {}) {
 			errors: [
 				"learnings --reviewed requires --feature <feature-id> — Amber never books an auto-resolved feature.",
 			],
+			warnings: [],
+		};
+	}
+
+	// Validate all booking-shaped input before loading feature state. A bad
+	// owner must be a visible no-write error, even when the target is malformed.
+	const ownerResult = validateBookingOwner(owner, owners);
+	if (ownerResult.error) {
+		return {
+			target: targetRoot,
+			text: "",
+			errors: [ownerResult.error],
 			warnings: [],
 		};
 	}
@@ -313,6 +425,7 @@ function bookLearningWriteBack(target, { featureId, surfaces } = {}) {
 		reviewed: true,
 		date: localIsoDate(),
 		surfaces: bookedSurfaces,
+		owner: ownerResult.owner,
 	};
 	saveFeatures(data);
 
@@ -322,6 +435,7 @@ function bookLearningWriteBack(target, { featureId, surfaces } = {}) {
 		text: [
 			`Learning review booked for feature: ${featureId}`,
 			`  Date: ${feature.learningWriteBack.date}`,
+			`  Owner: ${feature.learningWriteBack.owner}`,
 			`  Surfaces: ${surfaceText}`,
 			previouslyReviewed ? "  (previous booking overwritten)" : "",
 		]
@@ -338,4 +452,5 @@ module.exports = {
 	learningWriteBackGuidance,
 	inspectLearningWriteBack,
 	bookLearningWriteBack,
+	validateBookingOwner,
 };

@@ -1045,6 +1045,8 @@ function handleLearnings(args) {
 		r = bookLearningWriteBack(args.target, {
 			featureId: args.feature,
 			surfaces: args.surfaces,
+			owner: args.owner,
+			owners: args.owners,
 		});
 	} else {
 		r = inspectLearningWriteBack(resolveTarget(args), { featureId: args.feature });

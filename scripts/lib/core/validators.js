@@ -21,6 +21,7 @@ const {
 } = require("./text-utils");
 
 const { validateOkfFrontmatter } = require("./okf-frontmatter");
+const { LEARNING_OWNER_IDS, learningOwnerIdsText } = require("./learning-owner-routing");
 
 function loadFeatureList(targetRoot) {
 	return readJson(path.join(targetRoot, "feature_list.json"));
@@ -86,6 +87,21 @@ function validateFeatureListData(data) {
 				errors.push(`${prefix}.paths must be a non-empty array if present.`);
 			} else if (feature.paths.some((p) => typeof p !== "string" || p.trim() === "")) {
 				errors.push(`${prefix}.paths entries must be non-empty strings.`);
+			}
+		}
+
+		if (feature.learningWriteBack !== undefined) {
+			if (
+				!feature.learningWriteBack ||
+				typeof feature.learningWriteBack !== "object" ||
+				Array.isArray(feature.learningWriteBack)
+			) {
+				errors.push(`${prefix}.learningWriteBack must be an object.`);
+			} else if (
+				Object.prototype.hasOwnProperty.call(feature.learningWriteBack, "owner") &&
+				!LEARNING_OWNER_IDS.includes(feature.learningWriteBack.owner)
+			) {
+				errors.push(`${prefix}.learningWriteBack.owner must be one of ${learningOwnerIdsText()}.`);
 			}
 		}
 

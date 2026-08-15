@@ -115,6 +115,7 @@ const FLAG_SPECS = {
 	"--enable": { key: "enable", kind: "boolean" },
 	"--allow-transcript": { key: "allowTranscript", kind: "boolean" },
 	"--reviewed": { key: "reviewed", kind: "boolean" },
+	"--owner": { key: "owner", accumulate: "owners" },
 	"--surface": { key: "surface", accumulate: "surfaces" },
 	"--help": { key: "help", kind: "boolean" },
 	"-h": { key: "help", kind: "boolean" },

@@ -98,7 +98,7 @@ function learningWriteBackLines(targetRoot, ctx) {
 	const categories = inspection.matchedCategories.join(", ");
 	return [
 		`- Feature ${ctx.focus.id} was accepted with work touching ${categories} paths — the learning write-back review is not booked yet.`,
-		"- Inspect with `amber learnings --feature <id>`, then book with `--reviewed [--surface <path>]`.",
+		"- Inspect with `amber learnings --feature <id>`, then book with `--reviewed --owner <id> [--surface <path>]`.",
 	];
 }
 

@@ -860,6 +860,50 @@
 				"docs/CLI_REFERENCE.md",
 				"docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md"
 			]
+		},
+		{
+			"id": "F028",
+			"priority": 1,
+			"area": "governance",
+			"title": "Durable owner routing for recurring friction",
+			"user_visible_behavior": "amber learnings requires one explicit durable Amber owner when booking a new review, records and explains the owner through a centralized taxonomy, and keeps legacy ownerless bookings complete without migration",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/learning-writeback.test.js",
+				"node --test tests/unit/validators.test.js",
+				"node scripts/validate-feature-list.js --target ."
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 126293ms)",
+					"date": "2026-08-16",
+					"notes": "session 209878b2-937e-4bb9-b0b7-f33eca775771 stage verify"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/learning-owner-routing.js",
+				"scripts/lib/core/learning-writeback.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/core/validators.js",
+				"scripts/lib/command-dispatcher.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/learning-writeback.test.js",
+				"tests/unit/validators.test.js",
+				"docs/specs/2026-08-15-learning-writeback.md",
+				"docs/wiki/learning-owner-routing.md",
+				"docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md",
+				"docs/CLI_REFERENCE.md",
+				"docs/plans/F028-Durable-owner-routing-for-recurring-friction.md"
+			],
+			"updated": "2026-08-16",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-16",
+				"surfaces": ["docs/specs/2026-08-15-learning-writeback.md"],
+				"owner": "command"
+			}
 		}
 	]
 }

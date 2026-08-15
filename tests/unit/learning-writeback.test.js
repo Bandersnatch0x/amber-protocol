@@ -24,6 +24,11 @@ const {
 	bookLearningWriteBack,
 } = require("../../scripts/lib/core/learning-writeback");
 const {
+	LEARNING_OWNER_ROUTES,
+	LEARNING_OWNER_IDS,
+	getLearningOwner,
+} = require("../../scripts/lib/core/learning-owner-routing");
+const {
 	buildContext,
 	inferNextStep,
 	evaluateLifecycle,
@@ -166,6 +171,67 @@ describe("trigger classification (pure)", () => {
 	});
 });
 
+describe("durable learning owner taxonomy", () => {
+	it("defines the eight canonical routes in stable order", () => {
+		assert.deepEqual(LEARNING_OWNER_IDS, [
+			"skill",
+			"hook",
+			"command",
+			"standard",
+			"script",
+			"workflow-pack",
+			"loop-contract",
+			"ci",
+		]);
+		assert.deepEqual(
+			LEARNING_OWNER_ROUTES.map((route) => route.id),
+			LEARNING_OWNER_IDS,
+		);
+		assert.ok(Object.isFrozen(LEARNING_OWNER_ROUTES));
+		for (const route of LEARNING_OWNER_ROUTES) {
+			assert.ok(Object.isFrozen(route), `${route.id} route must be immutable`);
+			assert.match(route.decisionQuestion, /\?$/);
+			assert.ok(route.responsibility.length > 20);
+			assert.equal(getLearningOwner(route.id), route);
+		}
+	});
+
+	it("keeps route boundaries distinct, including declarative non-execution surfaces", () => {
+		const byId = Object.fromEntries(LEARNING_OWNER_ROUTES.map((route) => [route.id, route]));
+		assert.match(byId.skill.responsibility, /instruction/i);
+		assert.match(byId.hook.responsibility, /lifecycle|deterministic/i);
+		assert.match(byId.command.responsibility, /entry/i);
+		assert.match(byId.standard.responsibility, /review/i);
+		assert.match(byId.script.responsibility, /deterministic/i);
+		assert.match(byId["workflow-pack"].responsibility, /declarative/i);
+		assert.match(byId["loop-contract"].responsibility, /trigger|cadence|state|review/i);
+		assert.match(byId.ci.responsibility, /protected|PR|event/i);
+		assert.match(byId["workflow-pack"].responsibility, /not|never|does not|without/i);
+		assert.match(byId["loop-contract"].responsibility, /not|never|does not|without/i);
+	});
+
+	it("keeps the owner-routing wiki catalog in exact parity with the core taxonomy", () => {
+		const wikiPath = path.join(__dirname, "..", "..", "docs", "wiki", "learning-owner-routing.md");
+		const wiki = fs.readFileSync(wikiPath, "utf8");
+		const block = wiki.match(
+			/<!-- learning-owner-catalog:start -->\r?\n([\s\S]*?)\r?\n<!-- learning-owner-catalog:end -->/,
+		);
+		assert.ok(block, "wiki must contain the machine-checked owner catalog markers");
+
+		const documentedRoutes = block[1]
+			.split(/\r?\n/)
+			.map((line) => line.match(/^\| `([^`]+)` \| (.+) \| (.+) \|$/))
+			.filter(Boolean)
+			.map((match) => ({
+				id: match[1],
+				decisionQuestion: match[2],
+				responsibility: match[3],
+			}));
+
+		assert.deepEqual(documentedRoutes, LEARNING_OWNER_ROUTES);
+	});
+});
+
 // ── Fixture synthesis ────────────────────────────────────────────────────────
 //
 // Enough on-disk state for buildContext to resolve a feature focus and for the
@@ -292,7 +358,11 @@ describe("lifecycle step gating (learnings step via the SSOT)", () => {
 
 	it("after booking, the learnings step is done and no longer advised", () => {
 		const root = acceptedRepo("amber-learn-done-", "F023D", ["schemas/route.schema.json"]);
-		bookLearningWriteBack(root, { featureId: "F023D", surfaces: ["docs/specs/f023d.md"] });
+		bookLearningWriteBack(root, {
+			featureId: "F023D",
+			surfaces: ["docs/specs/f023d.md"],
+			owner: "command",
+		});
 		const ctx = buildContext(root, { feature: "F023D" });
 		const entry = evaluateLifecycle(ctx).find((s) => s.id === "learnings");
 		assert.ok(entry, "step still applies (triggers matched)");
@@ -338,7 +408,12 @@ describe("inspectLearningWriteBack", () => {
 		assert.deepEqual(r.matchedCategories, ["contract"]);
 		assert.match(r.text, /Trigger contract/);
 		assert.match(r.text, /Review NOT booked/);
-		assert.match(r.text, /amber learnings --feature F023I --reviewed/);
+		assert.match(r.text, /amber learnings --feature F023I --reviewed --owner <id>/);
+		assert.deepEqual(
+			r.ownerCatalog.map((route) => route.id),
+			LEARNING_OWNER_IDS,
+		);
+		assert.equal(r.ownerStatus, "unbooked");
 	});
 
 	it("booked feature: status reviewed and text shows the booked date", () => {
@@ -346,6 +421,7 @@ describe("inspectLearningWriteBack", () => {
 		const booked = bookLearningWriteBack(root, {
 			featureId: "F023R",
 			surfaces: ["docs/specs/2026-08-15-y.md"],
+			owner: "command",
 		});
 		assert.deepEqual(booked.errors, []);
 		const r = inspectLearningWriteBack(root, { featureId: "F023R" });
@@ -353,7 +429,30 @@ describe("inspectLearningWriteBack", () => {
 		const date = r.learningWriteBack && r.learningWriteBack.date;
 		assert.match(date, /^\d{4}-\d{2}-\d{2}$/);
 		assert.match(r.text, new RegExp(`Review booked ${date}`));
+		assert.equal(r.owner, "command");
+		assert.equal(r.ownerRoute.id, "command");
+		assert.match(r.text, /Owner: command/);
+		assert.match(r.text, /decision question/i);
 		assert.doesNotMatch(r.text, /Review NOT booked/);
+	});
+
+	it("marks a reviewed ownerless record as legacy while keeping it reviewed", () => {
+		const root = acceptedRepo("amber-learn-legacy-", "F023L", ["docs/specs/legacy.md"]);
+		const feature = readFeatures(root).features[0];
+		feature.learningWriteBack = {
+			reviewed: true,
+			date: "2026-08-14",
+			surfaces: ["docs/specs/legacy.md"],
+		};
+		writeFeatureList(root, [feature]);
+
+		const r = inspectLearningWriteBack(root, { featureId: "F023L" });
+		assert.equal(r.status, "reviewed");
+		assert.equal(r.ownerStatus, "legacy");
+		assert.equal(r.owner, null);
+		assert.match(r.text, /legacy/i);
+		assert.equal(inferNextStep(buildContext(root, { feature: "F023L" })), null);
+		assert.deepEqual(validateFeatureListData(readFeatures(root)).errors, []);
 	});
 
 	it("nonexistent featureId: featureFound false, visible text, no errors", () => {
@@ -421,6 +520,7 @@ describe("bookLearningWriteBack", () => {
 		const r = bookLearningWriteBack(root, {
 			featureId: "F900",
 			surfaces: ["docs/specs/f900.md", "docs/wiki/gotchas.md"],
+			owner: "command",
 		});
 		assert.deepEqual(r.errors, []);
 		assert.deepEqual(r.warnings, []);
@@ -433,8 +533,9 @@ describe("bookLearningWriteBack", () => {
 			"docs/specs/f900.md",
 			"docs/wiki/gotchas.md",
 		]);
+		assert.equal(booked.learningWriteBack.owner, "command");
 		// Everything else about the booked entry survives.
-		const { learningWriteBack, ...rest } = booked;
+		const { learningWriteBack: _learningWriteBack, ...rest } = booked;
 		assert.deepEqual(
 			rest,
 			validFeature("F900", { paths: ["schemas/route.schema.json", "src/a.js"] }),
@@ -454,7 +555,11 @@ describe("bookLearningWriteBack", () => {
 			[],
 			"fixture starts valid",
 		);
-		bookLearningWriteBack(root, { featureId: "F900", surfaces: ["docs/specs/a.md"] });
+		bookLearningWriteBack(root, {
+			featureId: "F900",
+			surfaces: ["docs/specs/a.md"],
+			owner: "standard",
+		});
 		const { errors } = validateFeatureListData(readFeatures(root));
 		assert.deepEqual(errors, [], "booking must not break validate-feature-list rules");
 	});
@@ -462,17 +567,61 @@ describe("bookLearningWriteBack", () => {
 	it("re-booking is an explicit overwrite of date/surfaces", () => {
 		const root = makeRoot("amber-learn-rebook-");
 		writeFeatureList(root, [validFeature("F900", { paths: ["Dockerfile"] })]);
-		bookLearningWriteBack(root, { featureId: "F900", surfaces: ["docs/specs/first.md"] });
+		bookLearningWriteBack(root, {
+			featureId: "F900",
+			surfaces: ["docs/specs/first.md"],
+			owner: "command",
+		});
 		const r = bookLearningWriteBack(root, {
 			featureId: "F900",
 			surfaces: ["docs/specs/second.md"],
+			owner: "hook",
 		});
 		assert.deepEqual(r.errors, []);
 		assert.match(r.text, /previous booking overwritten/);
 		const booked = readFeatures(root).features[0].learningWriteBack;
 		assert.equal(booked.reviewed, true);
 		assert.deepEqual(booked.surfaces, ["docs/specs/second.md"], "surfaces replaced, not merged");
+		assert.equal(booked.owner, "hook", "owner is replaced on re-booking");
 	});
+
+	for (const [label, options, expected] of [
+		[
+			"missing owner",
+			{ featureId: "F900", surfaces: ["docs/specs/x.md"] },
+			/ requires exactly one explicit --owner/,
+		],
+		[
+			"unknown owner",
+			{ featureId: "F900", surfaces: ["docs/specs/x.md"], owner: "rule" },
+			/Unknown learning owner.*skill, hook, command, standard, script, workflow-pack, loop-contract, ci/,
+		],
+		[
+			"comma-combined owner",
+			{ featureId: "F900", surfaces: ["docs/specs/x.md"], owner: "command,hook" },
+			/comma-separated values are not allowed/,
+		],
+		[
+			"repeated owner",
+			{
+				featureId: "F900",
+				surfaces: ["docs/specs/x.md"],
+				owners: ["command", "hook"],
+				owner: "hook",
+			},
+			/requires exactly one explicit --owner.*repeated/,
+		],
+	]) {
+		it(`${label} fails before mutation`, () => {
+			const root = makeRoot(`amber-learn-owner-${label.replace(/\W+/g, "-")}-`);
+			writeFeatureList(root, [validFeature("F900", { paths: ["Dockerfile"] })]);
+			const before = fs.readFileSync(path.join(root, "feature_list.json"), "utf8");
+			const r = bookLearningWriteBack(root, options);
+			assert.ok(r.errors.length > 0);
+			assert.match(r.errors.join("\n"), expected);
+			assert.equal(fs.readFileSync(path.join(root, "feature_list.json"), "utf8"), before);
+		});
+	}
 
 	it("missing featureId errors and writes nothing (never books an auto-resolved feature)", () => {
 		const root = makeRoot("amber-learn-noid-");
@@ -489,7 +638,11 @@ describe("bookLearningWriteBack", () => {
 		const root = makeRoot("amber-learn-ghost-");
 		writeFeatureList(root, [validFeature("F900", { paths: ["Dockerfile"] })]);
 		const before = fs.readFileSync(path.join(root, "feature_list.json"), "utf8");
-		const r = bookLearningWriteBack(root, { featureId: "F404", surfaces: ["docs/specs/x.md"] });
+		const r = bookLearningWriteBack(root, {
+			featureId: "F404",
+			surfaces: ["docs/specs/x.md"],
+			owner: "command",
+		});
 		assert.ok(r.errors.length > 0);
 		assert.match(r.errors.join("\n"), /F404/);
 		assert.equal(fs.readFileSync(path.join(root, "feature_list.json"), "utf8"), before);
@@ -537,6 +690,8 @@ describe("amber learnings (CLI)", () => {
 			"--feature",
 			"F023S",
 			"--reviewed",
+			"--owner",
+			"command",
 			"--surface",
 			"docs/specs/f023s.md",
 			"--surface",
@@ -556,6 +711,8 @@ describe("amber learnings (CLI)", () => {
 			"--feature",
 			"F023U",
 			"--reviewed",
+			"--owner",
+			"command",
 			"--surface",
 			"docs/specs/one.md, docs/wiki/two.md",
 		]);
@@ -581,7 +738,16 @@ describe("amber learnings (CLI)", () => {
 
 	it("booking through the CLI clears the checkpoint (advisor goes quiet)", () => {
 		const root = acceptedRepo("amber-learn-clifin-", "F023F", ["docs/specs/f.md"]);
-		const r = runCli(["learnings", "--target", root, "--feature", "F023F", "--reviewed"]);
+		const r = runCli([
+			"learnings",
+			"--target",
+			root,
+			"--feature",
+			"F023F",
+			"--reviewed",
+			"--owner",
+			"command",
+		]);
 		assert.equal(r.status, 0, `stderr: ${r.stderr}`);
 		assert.match(r.stdout, /Learning review booked for feature: F023F/);
 		assert.equal(inferNextStep(buildContext(root, { feature: "F023F" })), null);
@@ -609,7 +775,11 @@ describe("handoff Learning write-back section", () => {
 
 	it("is absent once the review is booked", () => {
 		const root = acceptedRepo("amber-learn-handoff2-", "F023G", ["docs/specs/2026-08-15-g.md"]);
-		bookLearningWriteBack(root, { featureId: "F023G", surfaces: ["docs/specs/2026-08-15-g.md"] });
+		bookLearningWriteBack(root, {
+			featureId: "F023G",
+			surfaces: ["docs/specs/2026-08-15-g.md"],
+			owner: "command",
+		});
 		const text = renderHandoff(root);
 		assert.doesNotMatch(text, /Learning write-back/, "booked review silences the reminder");
 	});
@@ -621,7 +791,11 @@ describe("handoff Learning write-back section", () => {
 // spawning the real prettier on the booked fixture.
 it("booking keeps feature_list.json Prettier-clean (format:check contract)", () => {
 	const dir = acceptedRepo("amber-learn-fmt-", "FMT1", ["docs/specs/contract.md"]);
-	const r = bookLearningWriteBack(dir, { featureId: "FMT1", surfaces: ["docs/specs/contract.md"] });
+	const r = bookLearningWriteBack(dir, {
+		featureId: "FMT1",
+		surfaces: ["docs/specs/contract.md"],
+		owner: "command",
+	});
 	assert.deepEqual(r.errors, []);
 
 	const listPath = path.join(dir, "feature_list.json");

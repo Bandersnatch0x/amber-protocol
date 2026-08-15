@@ -1,6 +1,6 @@
 # Amber Wiki
 
-Last Reviewed: 2026-06-29
+Last Reviewed: 2026-08-15
 
 This wiki index anchors the repository-local project notes that are kept under
 `docs/wiki/`. The pages here are product and historical reference material; they
@@ -10,6 +10,8 @@ do not execute workflows or mutate repository state.
 
 - [Amber agent operating manual](AMBER_AGENT_OPERATING_MANUAL.md) - distilled
   agent operating rules for governed, evidence-backed Amber work.
+- [Learning owner routing](learning-owner-routing.md) - canonical durable owner
+  taxonomy, selection rule, compatibility behavior, and execution boundaries.
 - [Phase B Alpha task list](PHASE_B_ALPHA_TASKS.md) - historical task list
   predating the Amber Protocol rename; command and file names reflect that era.
 - [Schema specification](SCHEMA_SPEC.md) - route, session, and timeline schema

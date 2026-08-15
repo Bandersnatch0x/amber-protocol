@@ -187,3 +187,22 @@ test("hooks help and usage document the breadcrumb subcommand surface", () => {
 	assert.match(definition.output.usage, /breadcrumb <print\|install\|uninstall\|status>/);
 	assert.match(definition.output.usage, /--format/);
 });
+
+test("learnings help and usage render canonical owner choices", () => {
+	const definition = COMMAND_DEFINITIONS.learnings;
+	const help = definition.help.join("\n");
+	for (const owner of [
+		"skill",
+		"hook",
+		"command",
+		"standard",
+		"script",
+		"workflow-pack",
+		"loop-contract",
+		"ci",
+	]) {
+		assert.match(help, new RegExp(`\\b${owner.replace("-", "\\-")}\\b`));
+	}
+	assert.match(help, /--owner <id>/);
+	assert.match(definition.output.usage, /--owner <id>/);
+});

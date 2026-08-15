@@ -370,10 +370,10 @@ const STEPS = [
 			const paths = feature && Array.isArray(feature.paths) ? feature.paths : [];
 			const { detectWriteBackTriggers } = require("./learning-writeback");
 			const categories = detectWriteBackTriggers(paths).matchedCategories;
-			return `accepted work touched ${categories.join("/")} paths — the knowledge write-back review is not booked yet (book it with amber learnings --reviewed).`;
+			return `accepted work touched ${categories.join("/")} paths — the knowledge write-back review is not booked yet (book it with amber learnings --reviewed --owner <id>).`;
 		},
 		remedy: (ctx) =>
-			`amber learnings --target ${shellQuote(ctx.targetDisplay)} --feature ${ctx.focus.id}`,
+			`amber learnings --target ${shellQuote(ctx.targetDisplay)} --feature ${ctx.focus.id} --reviewed --owner <id>`,
 	},
 ];
 

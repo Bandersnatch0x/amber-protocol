@@ -5,6 +5,7 @@ const { COMMAND_CAPABILITIES, capabilityKey } = require("./mcp-action-contracts"
 // source the scaffold uses (scripts/lib/core/break-loop.js), so the two can
 // never disagree.
 const { renderTaxonomyLines, renderMenuLines } = require("./core/break-loop");
+const { renderLearningOwnerLines } = require("./core/learning-owner-routing");
 
 // Command ownership metadata lives with the Command Definitions. Capability
 // manifests are validated against this projection, never used to invent it.
@@ -107,6 +108,9 @@ const COMMAND_HELP = {
 		"Options:",
 		"  --feature <id>     Feature to inspect (defaults to the current lifecycle focus).",
 		"  --reviewed         Book the learning review (requires --feature; overwrites any prior booking).",
+		"  --owner <id>       Durable Amber surface that owns the learned behavior; exactly one is required when booking.",
+		"                     Canonical owner routes:",
+		...renderLearningOwnerLines("                       "),
 		"  --surface <path>   Knowledge surface the review was written to. Repeatable;",
 		"                     a single flag also accepts a comma-separated list.",
 		"  --json             Emit the machine-readable envelope.",
@@ -116,7 +120,7 @@ const COMMAND_HELP = {
 		"Examples:",
 		"  amber learnings --target .",
 		"  amber learnings --target . --feature F001",
-		"  amber learnings --target . --feature F001 --reviewed --surface docs/specs/f001.md",
+		"  amber learnings --target . --feature F001 --reviewed --owner command --surface docs/specs/f001.md",
 	],
 	"break-loop": [
 		"Scaffold and validate a post-mortem for a defect class that recurred after a fix (recurrence >= 2).",
@@ -575,7 +579,7 @@ const COMMAND_OUTPUT = {
 	},
 	learnings: {
 		usage:
-			"Usage: amber learnings --target <repo> [--feature <id>] [--reviewed] [--surface <path>] [--json]",
+			"Usage: amber learnings --target <repo> [--feature <id>] [--reviewed --owner <id>] [--surface <path>] [--json]",
 	},
 	"break-loop": {
 		usage:
