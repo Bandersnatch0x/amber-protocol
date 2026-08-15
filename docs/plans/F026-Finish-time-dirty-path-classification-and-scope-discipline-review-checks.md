@@ -1,7 +1,7 @@
 # Plan: Finish-time dirty-path classification and scope-discipline review checks
 
 Feature: F026
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal

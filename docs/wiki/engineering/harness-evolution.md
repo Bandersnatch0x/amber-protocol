@@ -99,3 +99,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F025-Break-loop-post-mortem-scaffold.md`
 - Review status: ready
 - Feature: F025 status → accepted in feature_list.json
+
+## 2026-08-15 docs/plans/F026-Finish-time-dirty-path-classification-and-scope-discipline-review-checks.md
+
+- Plan: `docs/plans/F026-Finish-time-dirty-path-classification-and-scope-discipline-review-checks.md`
+- Review status: ready
+- Feature: F026 status → accepted in feature_list.json
