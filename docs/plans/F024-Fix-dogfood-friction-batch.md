@@ -1,7 +1,7 @@
 # Plan: Fix dogfood friction batch
 
 Feature: F024
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal

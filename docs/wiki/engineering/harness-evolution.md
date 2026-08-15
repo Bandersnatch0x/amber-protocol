@@ -87,3 +87,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F023-Post-accept-learning-write-back-checkpoint.md`
 - Review status: ready
 - Feature: F023 status → accepted in feature_list.json
+
+## 2026-08-15 docs/plans/F024-Fix-dogfood-friction-batch.md
+
+- Plan: `docs/plans/F024-Fix-dogfood-friction-batch.md`
+- Review status: ready
+- Feature: F024 status → accepted in feature_list.json
