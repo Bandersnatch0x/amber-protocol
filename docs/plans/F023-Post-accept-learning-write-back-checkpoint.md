@@ -1,7 +1,7 @@
 # Plan: Post-accept learning write-back checkpoint
 
 Feature: F023
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
