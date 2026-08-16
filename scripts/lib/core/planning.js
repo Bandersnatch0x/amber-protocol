@@ -908,7 +908,10 @@ function acceptPlan(target, planRelativePath, options = {}) {
 
 	fs.mkdirSync(path.dirname(evolutionPath), { recursive: true });
 	if (!pathExists(evolutionPath)) {
-		fs.writeFileSync(evolutionPath, `${MESSAGES.evolutionLogHeading}\n${entry}`);
+		fs.writeFileSync(
+			evolutionPath,
+			`${MESSAGES.evolutionLogHeading}\n\nLast Reviewed: ${date}\n${entry}`,
+		);
 	} else {
 		fs.appendFileSync(evolutionPath, entry);
 	}

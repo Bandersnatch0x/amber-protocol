@@ -101,7 +101,9 @@ test("review passes confirmed plans and accept appends evolution log", () => {
 	assert.equal(JSON.parse(review.stdout).releaseReadiness.status, "ready");
 	assert.equal(accept.status, 0, accept.stderr);
 	assert.equal(JSON.parse(accept.stdout).accepted, true);
-	assert.match(fs.readFileSync(evolutionPath, "utf8"), /`docs\/plans\/F001-Accept-ready\.md`/);
+	const evolution = fs.readFileSync(evolutionPath, "utf8");
+	assert.match(evolution, /`docs\/plans\/F001-Accept-ready\.md`/);
+	assert.match(evolution, /Last Reviewed: \d{4}-\d{2}-\d{2}/);
 });
 
 test("gate, review, and accept reject an absolute plan path", () => {
