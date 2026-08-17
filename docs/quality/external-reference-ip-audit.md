@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-16
 
-**Scope:** Amber Protocol tracked tree at `d69c05b`, ignored local artifacts, reachable Git history, dependencies, and an isolated real Target Repository E2E run.
+**Scope:** Amber Protocol current branch at audit time, ignored local artifacts, reachable Git history, dependencies, and isolated real Target Repository E2E runs.
 
 **Purpose:** monitor trademark/source-reference residue and reduce accidental copying or license contamination. This is an engineering provenance audit, not legal advice.
 
@@ -77,7 +77,16 @@ Executed flow:
 
 Final F900 state: accepted; evidence present; learning status reviewed; owner status assigned; owner `command`; surface `docs/specs/f900.md`.
 
-The first handoff bundle scored 91/100 because a fresh minimal target lacked optional governance documents/rules; bundle validation and all functional checks still passed. This warning is retained as real evidence rather than rewritten as success.
+The first handoff bundle scored 91/100 because a fresh minimal target lacked optional governance documents/rules; bundle validation and all functional checks still passed. This warning was retained as real evidence and then used as a regression target.
+
+### Quality-signal closure
+
+A second clean Target Repository reran the flow after both findings were addressed:
+
+- the E2E setup explicitly ran `amber governance docs` and `amber governance rules init` instead of treating fresh `init` as a complete higher-autonomy setup;
+- `acceptPlan` now adds `Last Reviewed: <local date>` when it creates `docs/wiki/engineering/harness-evolution.md`, with a regression assertion in `tests/phase-v2-5.test.js`;
+- the second real `npm test`, session ledger verification, two approvals, strict completion, accept, learning booking, doctor, feature/wiki validators, and handoff validation all passed;
+- the final handoff readiness score was **100/100 (ready)** with Errors 0.
 
 ## Residual risk
 
