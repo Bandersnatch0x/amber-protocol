@@ -5,5 +5,5 @@
   "author": {
     "name": "Test"
   },
-  "skills": "../missing-skills"
+  "skills": ["./missing-skills/"]
 }

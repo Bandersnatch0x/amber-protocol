@@ -40,23 +40,48 @@ function requireManifestString(manifest, relativePath, field, errors) {
 	return value;
 }
 
-function validateSkillsPath(pluginRoot, manifestDir, relativePath, rawSkillsPath, errors) {
-	if (typeof rawSkillsPath !== "string" || rawSkillsPath.trim() === "") {
-		errors.push(`${relativePath} field skills must be a non-empty string.`);
+function validateSkillsPath(
+	pluginRoot,
+	relativePath,
+	rawSkillsPath,
+	errors,
+	skillsType = "string",
+) {
+	const paths =
+		skillsType === "array"
+			? rawSkillsPath
+			: typeof rawSkillsPath === "string"
+				? [rawSkillsPath]
+				: null;
+	if (
+		!Array.isArray(paths) ||
+		paths.length === 0 ||
+		paths.some((value) => typeof value !== "string" || value.trim() === "") ||
+		(skillsType === "string" && Array.isArray(rawSkillsPath))
+	) {
+		const expected = skillsType === "array" ? "a non-empty array of strings" : "a non-empty string";
+		errors.push(`${relativePath} field skills must be ${expected}.`);
 		return;
 	}
 
-	const candidates = [
-		path.resolve(pluginRoot, rawSkillsPath),
-		path.resolve(manifestDir, rawSkillsPath),
-	];
-	if (!candidates.some(pathExists)) {
-		errors.push(`${relativePath} skills path does not exist: ${rawSkillsPath}`);
+	for (const rawPath of paths) {
+		const resolvedPath = path.resolve(pluginRoot, rawPath);
+		const relativeToRoot = path.relative(pluginRoot, resolvedPath);
+		if (
+			relativeToRoot === ".." ||
+			relativeToRoot.startsWith(`..${path.sep}`) ||
+			path.isAbsolute(relativeToRoot)
+		) {
+			errors.push(`${relativePath} skills path must stay within plugin root: ${rawPath}`);
+			continue;
+		}
+		if (!pathExists(resolvedPath)) {
+			errors.push(`${relativePath} skills path does not exist: ${rawPath}`);
+		}
 	}
 }
 
-function validateCommonManifest(pluginRoot, relativePath, manifest, errors) {
-	const manifestDir = path.dirname(path.join(pluginRoot, relativePath));
+function validateCommonManifest(pluginRoot, relativePath, manifest, errors, options = {}) {
 	requireManifestString(manifest, relativePath, "name", errors);
 	const version = requireManifestString(manifest, relativePath, "version", errors);
 	if (version && !SEMVER_PATTERN.test(version)) {
@@ -64,12 +89,12 @@ function validateCommonManifest(pluginRoot, relativePath, manifest, errors) {
 	}
 	requireManifestString(manifest, relativePath, "description", errors);
 	requireManifestString(manifest, relativePath, "author.name", errors);
-	validateSkillsPath(pluginRoot, manifestDir, relativePath, manifest.skills, errors);
+	validateSkillsPath(pluginRoot, relativePath, manifest.skills, errors, options.skillsType);
 }
 
 function validateCodexManifest(pluginRoot, manifest, errors) {
 	const relativePath = ".codex-plugin/plugin.json";
-	validateCommonManifest(pluginRoot, relativePath, manifest, errors);
+	validateCommonManifest(pluginRoot, relativePath, manifest, errors, { skillsType: "string" });
 
 	if (
 		!manifest.interface ||
@@ -119,7 +144,9 @@ function validateManifests(target) {
 		validateCodexManifest(pluginRoot, codexManifest, errors);
 	}
 	if (claudeManifest) {
-		validateCommonManifest(pluginRoot, ".claude-plugin/plugin.json", claudeManifest, errors);
+		validateCommonManifest(pluginRoot, ".claude-plugin/plugin.json", claudeManifest, errors, {
+			skillsType: "array",
+		});
 	}
 
 	return { target: pluginRoot, errors, warnings };
