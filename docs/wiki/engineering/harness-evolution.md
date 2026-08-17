@@ -117,3 +117,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F028-Durable-owner-routing-for-recurring-friction.md`
 - Review status: ready
 - Feature: F028 status → accepted in feature_list.json
+
+## 2026-08-17 docs/plans/F029-Teach-the-identity-gate-the-GitHub-merge-commit-boundary.md
+
+- Plan: `docs/plans/F029-Teach-the-identity-gate-the-GitHub-merge-commit-boundary.md`
+- Review status: ready
+- Feature: F029 status → accepted in feature_list.json

@@ -4,6 +4,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
+	commitIdentityBatch,
 	commitIdentities,
 	currentIdentities,
 	formatFailure,
@@ -115,6 +116,92 @@ test("allowBots still rejects unknown bots and partial spoofs", () => {
 	]);
 });
 
+test("keeps the public commit identity shape stable", () => {
+	const git = () =>
+		"merge123\tbase123 feature123\tsummersong\t13325067+Bandersnatch0x@users.noreply.github.com\tGitHub\tnoreply@github.com";
+
+	assert.deepEqual(commitIdentities("base123..merge123", ".", git), [
+		{
+			scope: "commit merge123",
+			role: "author",
+			name: "summersong",
+			email: "13325067+Bandersnatch0x@users.noreply.github.com",
+		},
+		{
+			scope: "commit merge123",
+			role: "committer",
+			name: "GitHub",
+			email: "noreply@github.com",
+		},
+	]);
+});
+
+test("validates merge authors from explicit commit context, not object identity", () => {
+	const mergeAuthor = {
+		scope: "commit merge123",
+		role: "author",
+		name: "summersong",
+		email: "13325067+Bandersnatch0x@users.noreply.github.com",
+	};
+	const commitContextByScope = new Map([
+		[
+			mergeAuthor.scope,
+			{
+				parents: ["base123", "feature123"],
+				committer: { name: "GitHub", email: "noreply@github.com" },
+			},
+		],
+	]);
+
+	assert.deepEqual(
+		validateIdentities([{ ...mergeAuthor }], {
+			allowBots: true,
+			allowGitHubMergeAuthors: true,
+			commitContextByScope,
+		}),
+		[],
+	);
+});
+
+test("accepts a repository noreply display name only on a GitHub-committed merge", () => {
+	const batchFor = ({
+		parents = "base123 feature123",
+		committer = "GitHub\tnoreply@github.com",
+	} = {}) => {
+		const git = () =>
+			`merge123\t${parents}\tsummersong\t13325067+Bandersnatch0x@users.noreply.github.com\t${committer}`;
+		return commitIdentityBatch("base123..merge123", ".", git);
+	};
+	const optionsFor = (batch) => ({
+		allowBots: true,
+		allowGitHubMergeAuthors: true,
+		commitContextByScope: batch.commitContextByScope,
+	});
+	const batch = batchFor();
+
+	assert.deepEqual(validateIdentities(batch.identities, optionsFor(batch)), []);
+
+	const oneParentBatch = batchFor({ parents: "base123" });
+	const locallyCommittedBatch = batchFor({
+		committer: "Bandersnatch0x\txihalele@gmail.com",
+	});
+
+	assert.deepEqual(validateIdentities(oneParentBatch.identities, optionsFor(oneParentBatch)), [
+		oneParentBatch.identities[0],
+	]);
+	assert.deepEqual(
+		validateIdentities(locallyCommittedBatch.identities, optionsFor(locallyCommittedBatch)),
+		[locallyCommittedBatch.identities[0]],
+	);
+	assert.deepEqual(
+		validateIdentities(batch.identities, {
+			allowBots: true,
+			commitContextByScope: batch.commitContextByScope,
+		}),
+		[batch.identities[0]],
+	);
+});
+
 test("reads effective author and committer identities through the injected git runner", () => {
 	const calls = [];
 	const git = (args, cwd) => {
@@ -136,10 +223,10 @@ test("reads effective author and committer identities through the injected git r
 
 test("reads author and committer metadata for every commit in a revision", () => {
 	const git = (args) => {
-		assert.deepEqual(args, ["log", "--format=%H%x09%an%x09%ae%x09%cn%x09%ce", "base..head"]);
+		assert.deepEqual(args, ["log", "--format=%H%x09%P%x09%an%x09%ae%x09%cn%x09%ce", "base..head"]);
 		return [
-			"aaaa\tBandersnatch0x\txihalele@gmail.com\tBandersnatch0x\txihalele@gmail.com",
-			"bbbb\tUnexpected User\tunexpected@example.com\tBandersnatch0x\txihalele@gmail.com",
+			"aaaa\tbase parent\tBandersnatch0x\txihalele@gmail.com\tBandersnatch0x\txihalele@gmail.com",
+			"bbbb\tbase\tUnexpected User\tunexpected@example.com\tBandersnatch0x\txihalele@gmail.com",
 		].join("\n");
 	};
 
@@ -152,8 +239,13 @@ test("reads author and committer metadata for every commit in a revision", () =>
 
 test("single-commit mode limits git log to one revision", () => {
 	const git = (args) => {
-		assert.deepEqual(args, ["log", "--format=%H%x09%an%x09%ae%x09%cn%x09%ce", "-1", "headsha"]);
-		return "headsha\tBandersnatch0x\txihalele@gmail.com\tBandersnatch0x\txihalele@gmail.com";
+		assert.deepEqual(args, [
+			"log",
+			"--format=%H%x09%P%x09%an%x09%ae%x09%cn%x09%ce",
+			"-1",
+			"headsha",
+		]);
+		return "headsha\t\tBandersnatch0x\txihalele@gmail.com\tBandersnatch0x\txihalele@gmail.com";
 	};
 
 	const identities = commitIdentities("headsha", ".", git, { single: true });

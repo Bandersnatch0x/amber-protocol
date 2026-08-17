@@ -904,6 +904,58 @@
 				"surfaces": ["docs/specs/2026-08-15-learning-writeback.md"],
 				"owner": "command"
 			}
+		},
+		{
+			"id": "F029",
+			"priority": 1,
+			"area": "ci",
+			"title": "CI commit identity gate accepts GitHub merge commits safely",
+			"user_visible_behavior": "GitHub-generated merge commits with the repository noreply author and GitHub committer pass CI while ordinary commits still require the exact repository identity",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/validate-git-identity.test.js",
+				"node scripts/validate-git-identity.js --range <base>..<head>"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 102991ms)",
+					"date": "2026-08-17",
+					"notes": "session 3825e4df-0115-43f8-a1e3-f903d5e9f6f5; original CI range 03702dd..d8eeff0 exits 0; remaining risk: GitHub-hosted CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "node --test tests/unit/validate-git-identity.test.js",
+					"result": "passed (15 tests, exit 0)",
+					"date": "2026-08-17",
+					"notes": "public-shape and explicit-context regressions pass; artifact docs/plans/F029-Teach-the-identity-gate-the-GitHub-merge-commit-boundary.md; remaining risk: GitHub-hosted CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "npm test",
+					"result": "passed (1961 passed, 4 skipped, 0 failed; exit 0, 127306ms)",
+					"date": "2026-08-17",
+					"notes": "final full-suite verification with explicit commit context; artifact docs/plans/F029-Teach-the-identity-gate-the-GitHub-merge-commit-boundary.md; remaining risk: GitHub-hosted CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "cd apps/web && npm test",
+					"result": "passed (392 tests across 54 files, exit 0)",
+					"date": "2026-08-17",
+					"notes": "web viewer guardrail; artifact docs/plans/F029-Teach-the-identity-gate-the-GitHub-merge-commit-boundary.md; remaining risk: GitHub-hosted CI has not rerun because the fix is not pushed"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/validate-git-identity.js",
+				"tests/unit/validate-git-identity.test.js",
+				"CONTRIBUTING.md",
+				"docs/plans/F029-Teach-the-identity-gate-the-GitHub-merge-commit-boundary.md"
+			],
+			"updated": "2026-08-17",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-17",
+				"surfaces": ["CONTRIBUTING.md"],
+				"owner": "ci"
+			}
 		}
 	]
 }
