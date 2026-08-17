@@ -63,6 +63,16 @@ test("--include accumulates into includes", () => {
 	assert.deepEqual(args.includes, ["AGENTS.md", "CLAUDE.md"]);
 });
 
+test("--owner parses one value and preserves repeated values for validation", () => {
+	const args = parseArgs(["--owner", "command"]);
+	assert.equal(args.owner, "command");
+	assert.deepEqual(args.owners, ["command"]);
+
+	const repeated = parseArgs(["--owner", "command", "--owner", "hook"]);
+	assert.equal(repeated.owner, "hook");
+	assert.deepEqual(repeated.owners, ["command", "hook"]);
+});
+
 test("unknown tokens collect into _", () => {
 	const args = parseArgs(["list", "--json", "inspect"]);
 	assert.deepEqual(args._, ["list", "inspect"]);

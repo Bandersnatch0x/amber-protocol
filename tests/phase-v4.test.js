@@ -35,7 +35,16 @@ function createConfirmedPlan(target) {
 		planPath,
 		fs
 			.readFileSync(planPath, "utf8")
-			.replace("User Confirmation: pending", "User Confirmation: confirmed"),
+			.replace("User Confirmation: pending", "User Confirmation: confirmed")
+			// Curate the F027 scaffold placeholders so the manifest rules pass.
+			.replace(
+				"- implement: <fill: knowledge-surface paths the implementer needs>",
+				"- implement: docs/wiki/engineering/verification.md",
+			)
+			.replace(
+				"- review: <fill: knowledge-surface paths the reviewer needs>",
+				"- review: docs/wiki/engineering/runbook.md",
+			),
 	);
 	return plan;
 }
@@ -317,7 +326,16 @@ test("task prepare records trace-derived replay and regression proposal", () => 
 		planPath,
 		fs
 			.readFileSync(planPath, "utf8")
-			.replace("User Confirmation: pending", "User Confirmation: confirmed"),
+			.replace("User Confirmation: pending", "User Confirmation: confirmed")
+			// Curate the F027 scaffold placeholders so the manifest rules pass.
+			.replace(
+				"- implement: <fill: knowledge-surface paths the implementer needs>",
+				"- implement: docs/wiki/engineering/verification.md",
+			)
+			.replace(
+				"- review: <fill: knowledge-surface paths the reviewer needs>",
+				"- review: docs/wiki/engineering/runbook.md",
+			),
 	);
 	startSession(target, "prepare trace regression task");
 

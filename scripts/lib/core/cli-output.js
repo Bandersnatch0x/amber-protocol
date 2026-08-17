@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("node:path");
+const { CONTEXT_MANIFEST_ROLES } = require("./planning");
 
 // Declarative flag table driving parseArgs. Each entry maps a CLI flag to the
 // args key it sets and how it consumes argv:
@@ -18,6 +19,8 @@ const FLAG_SPECS = {
 	"--feature": { key: "feature" },
 	"--agent": { key: "agent" },
 	"--title": { key: "title" },
+	"--issue": { key: "issue" },
+	"--recurrence": { key: "recurrence" },
 	"--plan": { key: "plan" },
 	"--file": { key: "file" },
 	"--task": { key: "task" },
@@ -72,7 +75,8 @@ const FLAG_SPECS = {
 	"--review-bandwidth-status": { key: "reviewBandwidthStatus" },
 	"--review-gate-status": { key: "reviewGateStatus" },
 	"--priority": { key: "priority" },
-	"--paths": { key: "paths" },
+	"--paths": { key: "pathsVal", accumulate: "paths" },
+	"--path": { key: "path", accumulate: "paths" },
 	"--decision": { key: "decision", accumulate: "decisions" },
 	"--include": { key: "include", accumulate: "includes" },
 	"--worktree": { key: "worktree", kind: "boolean" },
@@ -110,6 +114,9 @@ const FLAG_SPECS = {
 	"--no-sessions": { key: "noSessions", kind: "boolean" },
 	"--enable": { key: "enable", kind: "boolean" },
 	"--allow-transcript": { key: "allowTranscript", kind: "boolean" },
+	"--reviewed": { key: "reviewed", kind: "boolean" },
+	"--owner": { key: "owner", accumulate: "owners" },
+	"--surface": { key: "surface", accumulate: "surfaces" },
 	"--help": { key: "help", kind: "boolean" },
 	"-h": { key: "help", kind: "boolean" },
 };
@@ -616,6 +623,23 @@ function printResult(result, options = {}) {
 		console.log("Checks evaluated:");
 		for (const check of result.applicableChecks) {
 			console.log(`  - ${check.id}: ${check.description || "(no description)"}`);
+		}
+	}
+	// Scope-discipline checklist (F026): advisory self-review lines — compact,
+	// never blocks the gate. Unmentioned booked paths ride the warnings footer.
+	if (result.scopeDiscipline && Array.isArray(result.scopeDiscipline.checklist)) {
+		console.log("Scope discipline checklist (advisory — never blocks the gate):");
+		for (const question of result.scopeDiscipline.checklist) {
+			console.log(`  - ${question}`);
+		}
+	}
+	// Context manifests (F027): the plan's curated per-role knowledge-surface
+	// lists, echoed for display only — display never adds blocking findings.
+	if (result.contextManifests) {
+		console.log("Context manifests (knowledge surfaces per role):");
+		for (const role of CONTEXT_MANIFEST_ROLES) {
+			const entries = result.contextManifests[role] || [];
+			console.log(`  ${role}: ${entries.length > 0 ? entries.join(", ") : "(not curated)"}`);
 		}
 	}
 	if (result.releaseReadiness && result.releaseReadiness.status) {

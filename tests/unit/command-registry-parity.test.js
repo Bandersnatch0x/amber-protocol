@@ -32,6 +32,8 @@ const PUBLIC_COMMAND_ORDER = [
 	"gate",
 	"review",
 	"accept",
+	"learnings",
+	"break-loop",
 	"pack",
 	"profile",
 	"task",
@@ -164,4 +166,43 @@ test("bypass responses with errors produce a non-zero CLI exit", async () => {
 		console.log = originalLog;
 		fs.rmSync(target, { recursive: true, force: true });
 	}
+});
+
+// F022: the hooks Command Definition must keep documenting the breadcrumb
+// surface (subcommands, opt-in boundary, bypass env) — the workflow-state
+// contract doc names this test as its registry-drift anchor.
+test("hooks help and usage document the breadcrumb subcommand surface", () => {
+	const definition = COMMAND_DEFINITIONS.hooks;
+	const help = definition.help.join("\n");
+	assert.match(help, /breadcrumb/);
+	for (const sub of ["print", "install", "uninstall", "status"]) {
+		assert.match(
+			help,
+			new RegExp(`breadcrumb.*${sub}|${sub}.*breadcrumb`),
+			`help must mention breadcrumb ${sub}`,
+		);
+	}
+	assert.match(help, /opt-in/i);
+	assert.match(help, /AMBER_SKIP_HOOKS/);
+	assert.match(definition.output.usage, /breadcrumb <print\|install\|uninstall\|status>/);
+	assert.match(definition.output.usage, /--format/);
+});
+
+test("learnings help and usage render canonical owner choices", () => {
+	const definition = COMMAND_DEFINITIONS.learnings;
+	const help = definition.help.join("\n");
+	for (const owner of [
+		"skill",
+		"hook",
+		"command",
+		"standard",
+		"script",
+		"workflow-pack",
+		"loop-contract",
+		"ci",
+	]) {
+		assert.match(help, new RegExp(`\\b${owner.replace("-", "\\-")}\\b`));
+	}
+	assert.match(help, /--owner <id>/);
+	assert.match(definition.output.usage, /--owner <id>/);
 });

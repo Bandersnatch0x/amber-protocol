@@ -586,6 +586,324 @@
 				"docs/plans/F021-Align-prerelease-publish-policy.md"
 			],
 			"updated": "2026-08-14"
+		},
+		{
+			"id": "F022",
+			"priority": 1,
+			"area": "governance",
+			"title": "Per-turn workflow-state breadcrumb hook (opt-in agent context injection)",
+			"user_visible_behavior": "An opt-in `amber hooks breadcrumb` surface injects the active Amber focus (session stage, status, pending gates) plus the deterministic required next step into every agent turn via a host hook; when no Amber state exists it emits a visible degraded hint instead of staying silent",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/hooks-command.test.js (breadcrumb cases)",
+				"node --test tests/unit/workflow-state-breadcrumb-parity.test.js",
+				"amber hooks breadcrumb print --target . runs read-only and emits a valid <amber-workflow-state> block",
+				"amber hooks breadcrumb install/status/uninstall round-trip on a temp repo"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 64169ms)",
+					"date": "2026-08-14",
+					"notes": "session 7dbd3312-15cc-4f18-8e12-770b1c17a17a stage verify",
+					"sessionId": "7dbd3312-15cc-4f18-8e12-770b1c17a17a"
+				}
+			],
+			"notes": [
+				"Selected from Trellis-mechanism analysis P1-1: per-turn workflow-state breadcrumb. Mechanism idea only (Trellis is AGPL-3.0); no Trellis code or text is copied.",
+				"Hook reads governance metadata only; never executes target-project commands, never dispatches agents; never auto-installed.",
+				"Lifecycle dogfood: plan F022 gate-confirmed, implemented, two-axis reviewed (Standards major fixed: registry help guard added), npm test 1820/1820 via session verify --execute, accepted, handoff validated. Friction logged as issues #118/#119/#120."
+			],
+			"updated": "2026-08-15",
+			"paths": [
+				"scripts/lib/hooks-command.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/command-dispatcher.js",
+				"tests/unit/hooks-command.test.js",
+				"tests/unit/workflow-state-breadcrumb-parity.test.js",
+				"tests/unit/command-registry-parity.test.js",
+				"docs/specs/2026-08-15-workflow-state-breadcrumb.md",
+				"docs/CLI_REFERENCE.md",
+				"README.md",
+				"CLAUDE.md"
+			],
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-15",
+				"surfaces": ["docs/specs/2026-08-15-workflow-state-breadcrumb.md"]
+			}
+		},
+		{
+			"id": "F023",
+			"priority": 1,
+			"area": "governance",
+			"title": "Post-accept learning write-back checkpoint",
+			"user_visible_behavior": "After a feature is accepted, Amber deterministically detects whether the work hit mandatory knowledge write-back triggers (schema/contract/infra paths) and, when triggered, surfaces a visible checkpoint through amber next, the per-turn breadcrumb, and amber handoff until the learning review is booked via amber learnings --reviewed",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/learning-writeback.test.js",
+				"node --test tests/unit/workflow-state-breadcrumb-parity.test.js (walk extended with the learnings checkpoint)",
+				"amber learnings --target . (read-only inspection renders triggers, matching paths, suggested surfaces, booking state)",
+				"amber learnings --target . --feature <id> --reviewed --surface <path> books learningWriteBack on the feature entry"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 68457ms)",
+					"date": "2026-08-15",
+					"notes": "session 22fe017e-45b1-459e-a5d8-a140a614fb83 stage verify",
+					"sessionId": "22fe017e-45b1-459e-a5d8-a140a614fb83"
+				}
+			],
+			"notes": [
+				"Selected from Trellis-mechanism analysis P1-2: post-finish knowledge consolidation. Mechanism idea only (Trellis is AGPL-3.0); all wording original.",
+				"Amber never writes knowledge docs itself — the checkpoint detects, reminds, and books; the write-back is done by the operator/agent.",
+				"Lifecycle dogfood: two-axis reviewed (Spec major fixed: saveFeatures now emits Prettier JSON via writeJsonPrettier); npm test 1853/1853 via session verify --execute; accepted. F022 learnings booked as trigger-detection dogfood."
+			],
+			"updated": "2026-08-15",
+			"paths": [
+				"scripts/lib/core/learning-writeback.js",
+				"scripts/lib/core/lifecycle.js",
+				"scripts/lib/core/fs-utils.js",
+				"scripts/lib/feature-commands.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/command-dispatcher.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/handoff-command.js",
+				"tests/unit/learning-writeback.test.js",
+				"tests/unit/workflow-state-breadcrumb-parity.test.js",
+				"tests/unit/command-registry-parity.test.js",
+				"docs/specs/2026-08-15-learning-writeback.md",
+				"docs/plans/F023-Post-accept-learning-write-back-checkpoint.md",
+				"docs/CLI_REFERENCE.md",
+				"README.md",
+				"CLAUDE.md",
+				"AGENTS.md"
+			],
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-15",
+				"surfaces": ["docs/specs/2026-08-15-learning-writeback.md"]
+			}
+		},
+		{
+			"id": "F024",
+			"priority": 1,
+			"area": "governance",
+			"title": "Fix dogfood friction batch #118/#119/#121",
+			"user_visible_behavior": "Evidence reflux stamps the local calendar day (not UTC); resolvePendingGate no longer reports a next gate when zero gates are pending; a new `amber feature paths` subcommand books feature paths at completion (append-only, deduped), unblocking the F023 learnings trigger detection without hand-edited JSON",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/feature-commands.test.js",
+				"node --test tests/unit/workflow-state-breadcrumb-parity.test.js",
+				"amber feature paths --target <tmp> --feature <id> --path <p> books paths that survive validate-feature-list and stay Prettier-clean",
+				"amber next --feature <id> renders no pending-gate hint when all route gates are approved"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 86701ms)",
+					"date": "2026-08-15",
+					"notes": "session aec473b6-0c29-45c1-89bb-9f84ead2e704 stage verify",
+					"sessionId": "aec473b6-0c29-45c1-89bb-9f84ead2e704"
+				}
+			],
+			"notes": [
+				"Dogfood friction batch: issues #121 (no CLI to book feature paths at completion), #118 (evidence date UTC off-by-one vs local day), #119 (resolvePendingGate gates[0] fallback reports a next gate when none are pending)."
+			],
+			"updated": "2026-08-15",
+			"paths": [
+				"scripts/lib/feature-commands.js",
+				"scripts/lib/core/text-utils.js",
+				"scripts/lib/core/lifecycle.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/hooks-command.js",
+				"scripts/lib/handoff-command.js",
+				"scripts/lib/core/context-request.js",
+				"scripts/lib/core/learning-writeback.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/feature-commands.test.js",
+				"tests/unit/lifecycle.test.js",
+				"tests/unit/workflow-state-breadcrumb-parity.test.js",
+				"tests/unit/hooks-command.test.js",
+				"docs/CLI_REFERENCE.md"
+			]
+		},
+		{
+			"id": "F025",
+			"priority": 1,
+			"area": "governance",
+			"title": "Break-loop post-mortem scaffold for recurring friction",
+			"user_visible_behavior": "When a friction or bug class recurs after a fix, `amber break-loop` scaffolds a post-mortem document with a five-way root-cause taxonomy and a prevention-mechanism menu mapped to Amber's knowledge surfaces, and `amber break-loop validate` refuses placeholder content — recurring defects get a durable, checkable prevention record instead of a re-fixed symptom",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/break-loop.test.js",
+				"amber break-loop --target <tmp> --issue 118 --title \"...\" scaffolds docs/quality/break-loops/<date>-<slug>.md with all required sections",
+				"amber break-loop validate --target <tmp> --file <scaffolded> fails on placeholders and passes when filled",
+				"amber break-loop --help renders the taxonomy and menu"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 92709ms)",
+					"date": "2026-08-15",
+					"notes": "session 42215a6e-e53b-4a89-b72f-7b66a53d3225 stage verify",
+					"sessionId": "42215a6e-e53b-4a89-b72f-7b66a53d3225"
+				}
+			],
+			"notes": [
+				"P2-1 from the Trellis-mechanism analysis: deep bug retrospectives for defect loops. Mechanism idea only (AGPL); all wording original.",
+				"Amber scaffolds and validates; the analysis itself stays with the operator/agent — no issue-tracker network access, no auto-detection, no LLM."
+			],
+			"updated": "2026-08-15",
+			"paths": [
+				"scripts/lib/core/break-loop.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/command-dispatcher.js",
+				"scripts/lib/core/cli-output.js",
+				"tests/unit/break-loop.test.js",
+				"tests/unit/command-registry-parity.test.js",
+				"docs/CLI_REFERENCE.md",
+				"docs/dogfood-weekly.md",
+				"AGENTS.md",
+				"docs/quality/break-loops/2026-08-15-Bookkeeping-dates-drift-to-the-UTC-day.md",
+				"tests/unit/local-date-hygiene.test.js",
+				"scripts/lib/core/planning.js",
+				"scripts/changelog.js"
+			],
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-15",
+				"surfaces": [
+					"docs/quality/break-loops/2026-08-15-Bookkeeping-dates-drift-to-the-UTC-day.md"
+				]
+			}
+		},
+		{
+			"id": "F026",
+			"priority": 1,
+			"area": "governance",
+			"title": "Finish-time dirty-path classification and scope-discipline review checks",
+			"user_visible_behavior": "amber handoff classifies dirty worktree paths into Amber-managed churn, the focus feature's uncommitted work (bail back: commit before finishing), and outside-scope files (reported once, left alone); amber review flags booked feature paths absent from the plan's declared scope and prints a four-question scope-discipline checklist",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/dirty-paths.test.js",
+				"node --test tests/unit/planning.test.js (scope-discipline cases)",
+				"amber handoff --target <tmp-with-dirty-tree> renders the three-bucket classification read-only",
+				"amber review --target <tmp> --plan <p> flags a booked path missing from the plan scope"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 76661ms)",
+					"date": "2026-08-15",
+					"notes": "session 391e142e-046a-4236-a039-baab6f8c804f stage verify",
+					"sessionId": "391e142e-046a-4236-a039-baab6f8c804f"
+				}
+			],
+			"notes": [
+				"P2-2 + P2-3 from the Trellis-mechanism analysis (dirty-path triage at finish; scope-discipline checks). Mechanism ideas only (AGPL); all wording original.",
+				"Both are read-only additions to existing commands; no new lifecycle step; no git mutations — classification reads, it never stages/commits/asks."
+			],
+			"updated": "2026-08-15",
+			"paths": [
+				"scripts/lib/core/dirty-paths.js",
+				"scripts/lib/core/git-state.js",
+				"scripts/lib/core/planning.js",
+				"scripts/lib/handoff-command.js",
+				"scripts/lib/core/cli-output.js",
+				"tests/unit/dirty-paths.test.js",
+				"tests/unit/git-state.test.js",
+				"tests/unit/planning.test.js",
+				"docs/CLI_REFERENCE.md",
+				"docs/dogfood-weekly.md"
+			]
+		},
+		{
+			"id": "F027",
+			"priority": 1,
+			"area": "governance",
+			"title": "Role-scoped context manifests in plans and a memory usage creed",
+			"user_visible_behavior": "Plan scaffolds gain a Context manifests section (implement/ and review/ roles listing knowledge-surface paths only — contract docs, specs, wiki, ADRs; never code paths), validated at the plan gate (missing file or code-path entry is an error with a clear remedy) and echoed by amber review; templates/MEMORY.md gains a 'capability, not ceremony' usage creed stating what belongs in memory and an explicit when-NOT list",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/planning.test.js (context-manifest cases)",
+				"node --test tests/unit/continuity-surfaces.test.js (templates/MEMORY.md creed install — the suite covering the MEMORY.md starter)",
+				"amber gate --target <tmp> --plan <p> rejects a manifest entry that is a missing path or a code file",
+				"amber review echoes the manifests for a filled plan"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 72936ms)",
+					"date": "2026-08-15",
+					"notes": "session bc63eff4-870b-4cec-a70d-48afdfffa090 stage verify",
+					"sessionId": "bc63eff4-870b-4cec-a70d-48afdfffa090"
+				}
+			],
+			"notes": [
+				"P3 from the Trellis-mechanism analysis: per-role context lists curated at planning time with validation (knowledge surfaces only, not code paths) and a memory usage creed (capability not ceremony, explicit when-NOT). Mechanism ideas only (AGPL); all wording original.",
+				"No new command, no new lifecycle step; the gate is the validation point; templates are starters — init never overwrites existing files."
+			],
+			"updated": "2026-08-15",
+			"paths": [
+				"scripts/lib/core/planning.js",
+				"scripts/lib/core/cli-output.js",
+				"templates/MEMORY.md",
+				"tests/unit/planning.test.js",
+				"tests/unit/continuity-surfaces.test.js",
+				"tests/integration/amber-next.test.js",
+				"tests/phase-v2.test.js",
+				"tests/phase-v2-5.test.js",
+				"tests/phase-v4.test.js",
+				"tests/phase-v4-5.test.js",
+				"docs/CLI_REFERENCE.md",
+				"docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md"
+			]
+		},
+		{
+			"id": "F028",
+			"priority": 1,
+			"area": "governance",
+			"title": "Durable owner routing for recurring friction",
+			"user_visible_behavior": "amber learnings requires one explicit durable Amber owner when booking a new review, records and explains the owner through a centralized taxonomy, and keeps legacy ownerless bookings complete without migration",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/learning-writeback.test.js",
+				"node --test tests/unit/validators.test.js",
+				"node scripts/validate-feature-list.js --target ."
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 126293ms)",
+					"date": "2026-08-16",
+					"notes": "session 209878b2-937e-4bb9-b0b7-f33eca775771 stage verify"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/learning-owner-routing.js",
+				"scripts/lib/core/learning-writeback.js",
+				"scripts/lib/core/cli-output.js",
+				"scripts/lib/core/validators.js",
+				"scripts/lib/command-dispatcher.js",
+				"scripts/lib/command-registry.js",
+				"tests/unit/learning-writeback.test.js",
+				"tests/unit/validators.test.js",
+				"docs/specs/2026-08-15-learning-writeback.md",
+				"docs/wiki/learning-owner-routing.md",
+				"docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md",
+				"docs/CLI_REFERENCE.md",
+				"docs/plans/F028-Durable-owner-routing-for-recurring-friction.md"
+			],
+			"updated": "2026-08-16",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-16",
+				"surfaces": ["docs/specs/2026-08-15-learning-writeback.md"],
+				"owner": "command"
+			}
 		}
 	]
 }

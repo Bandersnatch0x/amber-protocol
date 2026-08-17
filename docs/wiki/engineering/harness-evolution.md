@@ -75,3 +75,45 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F021-Align-prerelease-publish-policy.md`
 - Review status: ready
 - Feature: F021 status → accepted in feature_list.json
+
+## 2026-08-14 docs/plans/F022-Per-turn-workflow-state-breadcrumb-hook.md
+
+- Plan: `docs/plans/F022-Per-turn-workflow-state-breadcrumb-hook.md`
+- Review status: ready
+- Feature: F022 status → accepted in feature_list.json
+
+## 2026-08-15 docs/plans/F023-Post-accept-learning-write-back-checkpoint.md
+
+- Plan: `docs/plans/F023-Post-accept-learning-write-back-checkpoint.md`
+- Review status: ready
+- Feature: F023 status → accepted in feature_list.json
+
+## 2026-08-15 docs/plans/F024-Fix-dogfood-friction-batch.md
+
+- Plan: `docs/plans/F024-Fix-dogfood-friction-batch.md`
+- Review status: ready
+- Feature: F024 status → accepted in feature_list.json
+
+## 2026-08-15 docs/plans/F025-Break-loop-post-mortem-scaffold.md
+
+- Plan: `docs/plans/F025-Break-loop-post-mortem-scaffold.md`
+- Review status: ready
+- Feature: F025 status → accepted in feature_list.json
+
+## 2026-08-15 docs/plans/F026-Finish-time-dirty-path-classification-and-scope-discipline-review-checks.md
+
+- Plan: `docs/plans/F026-Finish-time-dirty-path-classification-and-scope-discipline-review-checks.md`
+- Review status: ready
+- Feature: F026 status → accepted in feature_list.json
+
+## 2026-08-15 docs/plans/F027-Role-scoped-context-manifests-in-plans-and-a-memory-usage-creed.md
+
+- Plan: `docs/plans/F027-Role-scoped-context-manifests-in-plans-and-a-memory-usage-creed.md`
+- Review status: ready
+- Feature: F027 status → accepted in feature_list.json
+
+## 2026-08-16 docs/plans/F028-Durable-owner-routing-for-recurring-friction.md
+
+- Plan: `docs/plans/F028-Durable-owner-routing-for-recurring-friction.md`
+- Review status: ready
+- Feature: F028 status → accepted in feature_list.json

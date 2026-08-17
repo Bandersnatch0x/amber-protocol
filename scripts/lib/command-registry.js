@@ -1,6 +1,11 @@
 "use strict";
 
 const { COMMAND_CAPABILITIES, capabilityKey } = require("./mcp-action-contracts");
+// F025: break-loop help renders the taxonomy and menu from the same single
+// source the scaffold uses (scripts/lib/core/break-loop.js), so the two can
+// never disagree.
+const { renderTaxonomyLines, renderMenuLines } = require("./core/break-loop");
+const { renderLearningOwnerLines } = require("./core/learning-owner-routing");
 
 // Command ownership metadata lives with the Command Definitions. Capability
 // manifests are validated against this projection, never used to invent it.
@@ -95,6 +100,56 @@ const COMMAND_HELP = {
 		"Example:",
 		"  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
 		"  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md --session <session-id>",
+	],
+	learnings: [
+		"Inspect post-accept learning write-back triggers for a feature, or book the review.",
+		"Read-only inspection by default; --reviewed books the review on the feature entry.",
+		"",
+		"Options:",
+		"  --feature <id>     Feature to inspect (defaults to the current lifecycle focus).",
+		"  --reviewed         Book the learning review (requires --feature; overwrites any prior booking).",
+		"  --owner <id>       Durable Amber surface that owns the learned behavior; exactly one is required when booking.",
+		"                     Canonical owner routes:",
+		...renderLearningOwnerLines("                       "),
+		"  --surface <path>   Knowledge surface the review was written to. Repeatable;",
+		"                     a single flag also accepts a comma-separated list.",
+		"  --json             Emit the machine-readable envelope.",
+		"",
+		"Boundary: Amber detects and reminds; it never writes knowledge docs itself.",
+		"",
+		"Examples:",
+		"  amber learnings --target .",
+		"  amber learnings --target . --feature F001",
+		"  amber learnings --target . --feature F001 --reviewed --owner command --surface docs/specs/f001.md",
+	],
+	"break-loop": [
+		"Scaffold and validate a post-mortem for a defect class that recurred after a fix (recurrence >= 2).",
+		"The default action scaffolds; `validate` refuses placeholder content.",
+		"",
+		"Actions:",
+		"  (none)             Scaffold docs/quality/break-loops/<date>-<slug>.md; never overwrites an existing file.",
+		"  validate           Check every section is filled: ids chosen, write-back surface + test",
+		"                     anchor + runnable verification command present.",
+		"",
+		"Options:",
+		"  --issue <n>        Reference number of the recurring issue, required to scaffold (recorded only, no tracker access).",
+		'  --title "<t>"      Post-mortem title, required to scaffold; needs at least one ASCII letter or digit (becomes the filename slug).',
+		"  --recurrence <n>   How many times the class has come back, required to scaffold; must be >= 2.",
+		"  --file <path>      Post-mortem file to validate (validate action).",
+		"  --json             Emit the machine-readable envelope.",
+		"",
+		"Root-cause taxonomy (pick one primary by id):",
+		...renderTaxonomyLines("  "),
+		"",
+		"Prevention-mechanism menu (pick one by id):",
+		...renderMenuLines("  "),
+		"",
+		"Boundary: Amber scaffolds and validates — the analysis is the operator's.",
+		"No issue-tracker access, no recurrence auto-detection, no execution.",
+		"",
+		"Examples:",
+		'  amber break-loop --target . --issue 122 --title "Evidence dates drift" --recurrence 2',
+		"  amber break-loop validate --target . --file docs/quality/break-loops/2026-08-15-Evidence-dates-drift.md",
 	],
 	pack: "Inspect or validate declarative workflow packs without executing them.",
 	ledger:
@@ -248,10 +303,10 @@ const COMMAND_HELP = {
 		"  amber security audit --target path/to/repo --output docs/security-audit.md",
 	],
 	feature: [
-		"Add, list, remove features in feature_list.json and record verification evidence.",
+		"Add, list, remove features in feature_list.json, record verification evidence, and book feature paths.",
 		"",
 		"Subcommands:",
-		"  add    --id <id> --title <text> [--priority <n>] [--area <area>] [--behavior <text>] [--verify <step>...] [--paths <p,p>]",
+		"  add    --id <id> --title <text> [--priority <n>] [--area <area>] [--behavior <text>] [--verify <step>...] [--paths <p,p> | --path <p>]...",
 		"         Register a new feature in feature_list.json. To be doctor-valid, pass --area, --behavior, and at least one --verify.",
 		"  list",
 		"         List all registered features with status.",
@@ -261,6 +316,9 @@ const COMMAND_HELP = {
 		"         Record verification evidence for a feature.",
 		"  evidence --feature <id>",
 		"         List all recorded evidence for a feature.",
+		"  paths  --feature <id> [--path <p>]...",
+		"         Book paths onto a feature (append-only, comma-splits each value, skips duplicates).",
+		"         Without --path it inspects the feature's current paths read-only.",
 		"",
 		"Examples:",
 		'  amber feature add --id F001 --title "User login" --priority 1 --area auth --behavior "User logs in with email" --verify "npm test" --paths src/auth',
@@ -268,6 +326,7 @@ const COMMAND_HELP = {
 		"  amber feature remove --id F001",
 		'  amber feature verify --feature F001 --command "npm test" --result "42 passed"',
 		"  amber feature evidence --feature F001",
+		"  amber feature paths --target . --feature F001 --path src/new.js",
 	],
 	clean: [
 		"Remove amber-generated files from the target repository (reverse of init).",
@@ -282,7 +341,7 @@ const COMMAND_HELP = {
 	next: [
 		"Infer the repo's position in the Amber lifecycle and print the next command to run (read-only).",
 		"",
-		"Lifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept.",
+		"Lifecycle: [audit on existing] → init → governance report → … → verify → approve(--gate id) → handoff bundle → complete-check --strict → session complete → accept → learnings (when write-back triggers matched).",
 		"Session evaluation matches complete-check --strict (executed verification + live handoff, not init scaffold).",
 		"Existing projects: next recommends a read-only audit first; audit writes no file, so next advances straight to init.",
 		"",
@@ -329,14 +388,27 @@ const COMMAND_HELP = {
 		"  check [--warn-only]",
 		"        Run the governance checks now (this is what the hook invokes).",
 		"",
+		"  breadcrumb print [--format json|text]",
+		"        Render the per-turn <amber-workflow-state> block (read-only; default json envelope).",
+		"  breadcrumb install [--platform claude]",
+		"        Opt-in merge of the breadcrumb command into .claude/settings.json hooks.UserPromptSubmit.",
+		"  breadcrumb uninstall",
+		"        Remove the Amber-managed breadcrumb entry; foreign entries are preserved.",
+		"  breadcrumb status",
+		"        Report whether the breadcrumb hook is installed (and echo its command).",
+		"",
+		"The breadcrumb is opt-in and never auto-installed (amber init does not add it).",
 		"The hook only reads governance metadata; it never runs project build/test commands.",
-		"Bypass once with: AMBER_SKIP_HOOKS=1 git commit ...",
+		"Bypass once with: AMBER_SKIP_HOOKS=1 git commit ... (breadcrumb print is silent too).",
 		"",
 		"Examples:",
 		"  amber hooks install --target .",
 		"  amber hooks status --target .",
 		"  amber hooks check --target .",
 		"  amber hooks uninstall --target .",
+		"  amber hooks breadcrumb print --target . --format text",
+		"  amber hooks breadcrumb install --target . --platform claude",
+		"  amber hooks breadcrumb status --target .",
 	],
 	governance: [
 		"Create, inspect, and report governance controls for a target repository.",
@@ -505,6 +577,14 @@ const COMMAND_OUTPUT = {
 		usage:
 			"Usage: amber accept --target <repo> --plan <relative-plan-path> [--session <id>] [--strict] [--json]",
 	},
+	learnings: {
+		usage:
+			"Usage: amber learnings --target <repo> [--feature <id>] [--reviewed --owner <id>] [--surface <path>] [--json]",
+	},
+	"break-loop": {
+		usage:
+			'Usage: amber break-loop --target <repo> --issue <n> --title "<title>" --recurrence <n> | amber break-loop validate --target <repo> --file <path> [--json]',
+	},
 	handoff: {
 		usage: [
 			"Usage: amber handoff --target <repo> [--json]",
@@ -515,7 +595,7 @@ const COMMAND_OUTPUT = {
 	explain: { usage: "Usage: amber explain [<code>] [--markdown <path>] [--json]" },
 	hooks: {
 		usage:
-			"Usage: amber hooks <check|install|uninstall|status> --target <repo> [--warn-only] [--force] [--json]",
+			"Usage: amber hooks <check|install|uninstall|status> --target <repo> | amber hooks breadcrumb <print|install|uninstall|status> --target <repo> [--format json|text] [--platform claude] [--json]",
 	},
 	loop: {
 		usage:
@@ -568,6 +648,8 @@ const COMMANDS = Object.freeze([
 	"gate",
 	"review",
 	"accept",
+	"learnings",
+	"break-loop",
 	"pack",
 	"profile",
 	"task",
@@ -605,6 +687,8 @@ const TIER_BY_COMMAND = {
 	gate: "core",
 	review: "core",
 	accept: "core",
+	learnings: "core",
+	"break-loop": "core",
 	loop: "core",
 	ledger: "core",
 	route: "core",

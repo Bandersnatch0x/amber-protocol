@@ -22,7 +22,7 @@ The governed delivery flow starts here: register a feature, plan a slice, gate t
 
 ### feature
 
-Add, list, remove features in `feature_list.json` and record verification evidence:
+Add, list, remove features in `feature_list.json`, record verification evidence, and book feature paths:
 
 ```bash
 node scripts/amber.js feature add --id F001 --title "User login" --priority 1 --area auth --behavior "User logs in with email and receives a session token." --verify "npm test" --paths src/auth --target .
@@ -30,11 +30,15 @@ node scripts/amber.js feature list --target .
 node scripts/amber.js feature remove --id F001 --target .
 node scripts/amber.js feature verify --feature F001 --command "npm test" --result "42 passed" --target .
 node scripts/amber.js feature evidence --feature F001 --target .
+node scripts/amber.js feature paths --feature F001 --path src/auth/login.js --target .   # append-only, deduped; no --path lists current paths
 ```
+
+`feature paths` is the completion-time way to book the files a feature touched — the post-accept
+learning write-back checkpoint (`amber learnings`) detects its triggers from these paths.
 
 ### plan
 
-Create a feature-linked vertical-slice plan from a registered feature:
+Create a feature-linked vertical-slice plan from a registered feature (the scaffold includes the Context manifests section: implement/review knowledge-surface lists, gate-validated — missing paths, escaping paths, and code paths are errors; `amber review` echoes the curated lists):
 
 ```bash
 node scripts/amber.js plan --target . --feature F001 --title "Small slice" [--dry-run]
@@ -44,6 +48,11 @@ node scripts/amber.js plan --target . --feature F001 --title "Small slice" [--dr
 - `--feature`: Feature id (e.g. F001) — must already exist in `feature_list.json` (required)
 - `--title`: Short human-readable title for the plan (required)
 - `--dry-run`: Preview without writing files
+
+The scaffold includes a **Context manifests** section: `implement` and `review` role lists of
+knowledge-surface paths (docs/specs contracts, wiki pages, ADRs, schema docs) each role needs.
+Curate them at planning time — the gate validates both roles (missing paths and code paths are
+errors; code belongs in the feature's booked paths), and `amber review` echoes the curated lists.
 
 ### gate
 
@@ -64,6 +73,8 @@ Review a plan against static Amber standards and release-readiness checks:
 node scripts/amber.js review --target . --plan docs/plans/F001-small-slice.md
 ```
 
+Review also runs a scope-discipline advisory: feature paths booked in `feature_list.json` that the plan's declared `Scope` bullet never mentions (exact path or directory prefix) surface as warnings, next to a four-question self-review checklist (uninvited tidying, speculative abstraction, files the acceptance criteria never named, caller-side workarounds). This check is advisory only — it never blocks the gate or release readiness.
+
 ### accept
 
 Accept a reviewed plan and append an Amber evolution record:
@@ -79,6 +90,53 @@ node scripts/amber.js accept --target . --plan docs/plans/F001-small-slice.md --
 - `--strict`: With `--session`, turn missing completion-check evidence into errors
 
 With `--session`, the plan's `Feature:` header must match the session's feature — a definite mismatch blocks the accept.
+
+### learnings
+
+Inspect the post-accept learning write-back triggers for a feature, or book the learning review:
+
+```bash
+node scripts/amber.js learnings --target .
+node scripts/amber.js learnings --target . --feature F001
+node scripts/amber.js learnings --target . --feature F001 --reviewed --owner command --surface docs/specs/f001.md
+```
+
+**Options:**
+- `--feature`: Feature to inspect (defaults to the current lifecycle focus)
+- `--reviewed`: Book the learning review (requires `--feature`; overwrites any prior booking)
+- `--owner`: Canonical durable owner ID (exactly one is required with `--reviewed`): `skill`, `hook`, `command`, `standard`, `script`, `workflow-pack`, `loop-contract`, or `ci`
+- `--surface`: Knowledge surface the review was written to (repeatable; a single flag also accepts a comma-separated list)
+- `--json`: Emit the machine-readable envelope
+
+Inspection is read-only: it classifies the feature's booked paths into the `schema`, `contract`, and `infra` trigger categories, lists the matching paths with suggested knowledge surfaces, renders the complete owner catalog, and shows the current booking and owner state. `--reviewed` clears the checkpoint by writing `{ reviewed, date, surfaces, owner }` onto that feature's entry in `feature_list.json` — the only write the command performs. Re-booking replaces the date, surfaces, and owner. Missing, repeated, comma-separated, and unknown owners fail without changing the file.
+
+Amber never infers the owner from paths or prose. Existing reviewed records without an owner remain complete and are reported as legacy bookings. Owner selection is distinct from F025 prevention-mechanism selection: the prevention mechanism says how recurrence is prevented; the owner says which Amber surface carries that behavior.
+
+Boundary: Amber detects and reminds; it never writes knowledge docs itself. `workflow-pack` and `loop-contract` are declarative owner routes, not live scheduling or execution. `ci` means a check that actually runs on a protected repository event or pull-request gate.
+
+Trigger rules, invariants, and the channels that surface this checkpoint (`amber next`, the breadcrumb, `amber handoff`) are specified in [docs/specs/2026-08-15-learning-writeback.md](specs/2026-08-15-learning-writeback.md). Owner decisions and route boundaries are documented in [docs/wiki/learning-owner-routing.md](wiki/learning-owner-routing.md).
+
+### break-loop
+
+Escalation path for RECURRING friction or defect classes — the same class coming back after a fix (recurrence ≥ 2, declared by the operator):
+
+```bash
+node scripts/amber.js break-loop --target . --issue 122 --title "Evidence dates drift UTC vs local" --recurrence 2
+node scripts/amber.js break-loop validate --target . --file docs/quality/break-loops/2026-08-15-Evidence-dates-drift-UTC-vs-local.md
+```
+
+**Options:**
+- `--issue <n>`: Reference number of the recurring issue (recorded only, no tracker access)
+- `--title "<t>"`: Post-mortem title (becomes the filename slug)
+- `--recurrence <n>`: How many times the class has come back; must be ≥ 2
+- `--file <path>`: Post-mortem file to validate (validate action)
+- `--json`: Emit the machine-readable envelope
+
+The default action scaffolds `docs/quality/break-loops/<date>-<slug>.md` from a five-way root-cause taxonomy (`missing-contract`, `cross-layer-drift`, `change-propagation-failure`, `verification-gap`, `implicit-assumption`) and a prevention-mechanism menu (`contract-and-anchor`, `parity-guard`, `centralized-helper`, `checklist-item`), each entry mapped to its write-back surface. An existing file is never overwritten — the refusal names the file. `validate` refuses placeholder content: every section must be filled, exactly one primary category id and one mechanism id chosen, a write-back surface path and test anchor recorded, and a runnable verification command present.
+
+Boundary: Amber scaffolds and validates — the analysis is the operator's. No issue-tracker access, no recurrence auto-detection, no execution.
+
+The escalation trigger lives in the dogfood ritual's friction loop: [docs/dogfood-weekly.md](dogfood-weekly.md) §5.
 
 ## Session Commands
 
@@ -340,6 +398,8 @@ Regenerate `session-handoff.md` from live repository state.
 node scripts/amber.js handoff --target .
 ```
 
+When the worktree is dirty with non-managed changes, the regenerated handoff includes a "Dirty worktree" classification: Amber-managed churn (`.amber/`, legacy `.harness/`, `*.amber-backup`) is summarized as an ignored count, the focus feature's booked uncommitted work carries a commit-before-finishing bail-back line, and every other dirty path gets a one-time FYI as parallel or unbooked work. The classification is read-only — handoff never stages, commits, or prompts — and clean or managed-only trees render no section.
+
 ### handoff bundle / validate
 
 Produce and validate the portable continuation artifact set.
@@ -459,7 +519,7 @@ node scripts/amber.js next --target . --objective "fix login timeout" # match a 
 node scripts/amber.js next --target . --json          # machine-readable envelope
 ```
 
-Lifecycle: `[audit on existing repos] → init → feature → plan → gate → verify → approve → handoff → complete-check → session complete → accept` (handoff may refresh after accept). With no
+Lifecycle: `[audit on existing repos] → init → feature → plan → gate → verify → approve → handoff → complete-check → session complete → accept → learnings` (handoff may refresh after accept; the learnings checkpoint applies only when write-back triggers matched). With no
 `--feature`/`--session`, `next` auto-selects (active session → most-recent plan's feature → first
 unstarted feature) and reports the chosen focus plus how many other items are pending. Session
 completion evaluation matches `complete-check --strict` (executed verification + live handoff, not
@@ -961,6 +1021,27 @@ array (`AMBER_E_FEATURE_NO_EVIDENCE`). Bypass once with `AMBER_SKIP_HOOKS=1 git 
 node scripts/amber.js hooks status --target .      # installed (blocking|warn-only) / not installed
 node scripts/amber.js hooks uninstall --target .   # removes the Amber guard; restores any backup
 ```
+
+### hooks breadcrumb
+
+An opt-in per-turn agent hook. When the host fires its prompt hook, `breadcrumb print` renders a
+read-only `<amber-workflow-state>` block — current focus, session status and pending gates, and the
+single required next step (same source as `amber next`) — and injects it into the agent turn as
+context.
+
+```bash
+node scripts/amber.js hooks breadcrumb print --target .                # JSON envelope (default)
+node scripts/amber.js hooks breadcrumb print --target . --format text  # bare block
+node scripts/amber.js hooks breadcrumb install --target .   # merge into .claude/settings.json (opt-in)
+node scripts/amber.js hooks breadcrumb status --target .    # installed / not installed (echoes the entry)
+node scripts/amber.js hooks breadcrumb uninstall --target . # removes the Amber entry only
+```
+
+`print` reads governance metadata from disk only: it writes nothing, never runs target-project
+commands, and never dispatches agents — context injection, not execution. Like the pre-commit guard,
+the breadcrumb is never installed automatically (`amber init` does not add it), and
+`AMBER_SKIP_HOOKS=1` silences it. Mechanism and invariants live in
+[docs/specs/2026-08-15-workflow-state-breadcrumb.md](specs/2026-08-15-workflow-state-breadcrumb.md).
 
 ## Drift Commands
 

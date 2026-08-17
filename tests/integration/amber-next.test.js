@@ -28,6 +28,25 @@ function nextId(dir, extra = []) {
 	return out.nextStep && out.nextStep.id;
 }
 
+// Curate the F027 scaffold placeholders into real knowledge-surface paths.
+// Every init-ed target ships docs/wiki/engineering/ files, so these exist.
+function curateManifests(dir, planPath) {
+	const abs = path.join(dir, planPath);
+	fs.writeFileSync(
+		abs,
+		fs
+			.readFileSync(abs, "utf8")
+			.replace(
+				"- implement: <fill: knowledge-surface paths the implementer needs>",
+				"- implement: docs/wiki/engineering/verification.md",
+			)
+			.replace(
+				"- review: <fill: knowledge-surface paths the reviewer needs>",
+				"- review: docs/wiki/engineering/runbook.md",
+			),
+	);
+}
+
 describe("amber next (integration)", () => {
 	it("recommends init on a bare directory (JSON)", () => {
 		const dir = tmpRepo();
@@ -132,6 +151,9 @@ describe("amber next progression (feature path, no session)", () => {
 		// 4. confirm the plan (discover the real filename — case preserved) → feature-evidence
 		const planFile = fs.readdirSync(path.join(dir, "docs", "plans")).find((f) => f.endsWith(".md"));
 		const planPath = `docs/plans/${planFile}`;
+		// Curate the scaffolded Context manifests (F027): both roles must carry
+		// knowledge-surface paths that exist before the gate passes.
+		curateManifests(dir, planPath);
 		r = amber(dir, ["gate", "--confirm", "--target", ".", "--plan", planPath]);
 		assert.equal(r.status, 0, r.stderr);
 		assert.equal(nextId(dir, ["--feature", "F001"]), "feature-evidence");
@@ -259,8 +281,10 @@ describe("amber next progression (feature path, no session)", () => {
 		const planFile = fs.readdirSync(path.join(dir, "docs", "plans")).find((f) => f.endsWith(".md"));
 		const planPath = `docs/plans/${planFile}`;
 		// Fill the Verification section so reviewPlan's own gate passes, leaving
-		// only the new evidence gate to trip.
+		// only the new evidence gate to trip. Curate the manifests so the F027
+		// manifest rules do not shadow the evidence error.
 		const abs = path.join(dir, planPath);
+		curateManifests(dir, planPath);
 		fs.writeFileSync(
 			abs,
 			fs

@@ -2,6 +2,9 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
 const {
 	buildPlanContent,
@@ -9,13 +12,19 @@ const {
 	validatePlanContent,
 	evaluateStandardChecks,
 	buildReviewResult,
+	extractScopeBullet,
+	buildScopeDiscipline,
+	SCOPE_DISCIPLINE_CHECKLIST,
 } = require("../../scripts/lib/core/planning");
 
 const { MESSAGES } = require("../../scripts/lib/core/terminology");
 
 // A plan body that satisfies every gate requirement: a Feature field, a
 // "confirmed" User Confirmation, and a non-empty body under each required
-// section. Tests mutate slices of it to assert each gate rule independently.
+// section — including a curated Context manifests section with one
+// knowledge-surface entry per role (existence is only checked when a
+// resolveExists resolver is injected, so these paths need not exist on disk).
+// Tests mutate slices of it to assert each gate rule independently.
 function validPlanContent(overrides = {}) {
 	return [
 		`Feature: ${overrides.featureId ?? "F1"}`,
@@ -23,6 +32,9 @@ function validPlanContent(overrides = {}) {
 		"",
 		"## High Level Design",
 		overrides.highLevelDesign ?? "approach",
+		"",
+		"## Context manifests",
+		overrides.contextManifests ?? "- implement: docs/specs/contract.md\n- review: docs/adr/0001.md",
 		"",
 		"## Vertical Slices",
 		overrides.verticalSlices ?? "- slice 1",
@@ -56,7 +68,8 @@ const errorResolver = () => ({ found: false, error: "disk on fire" });
 // The remaining exports (scaffoldPlan, validatePlanGate, discoverStandards,
 // reviewPlan, acceptPlan) are fs-coupled and intentionally not covered here.
 // Pin current behavior of buildPlanContent and readPlanField before any future
-// refactor of the plan scaffolding pipeline.
+// refactor of the plan scaffolding pipeline. The F026 scope-discipline helpers
+// (extractScopeBullet, buildScopeDiscipline) are pure and covered below.
 
 test("buildPlanContent renders a titled plan for a fully-populated feature", () => {
 	const feature = {
@@ -129,6 +142,30 @@ test("buildPlanContent interpolates an undefined title literally", () => {
 	};
 	const out = buildPlanContent(feature, undefined);
 	assert.equal(out.split("\n")[0], "# Plan: undefined");
+});
+
+// ---- context manifests (F027): scaffold section, gate rules, review echo ----
+
+test("buildPlanContent renders the Context manifests section between High Level Design and Vertical Slices", () => {
+	const feature = {
+		id: "F-006",
+		user_visible_behavior: "X",
+		verification: ["v"],
+	};
+	const out = buildPlanContent(feature, "Manifests", { planPath: "docs/plans/p.md" });
+	// Placement: after High Level Design, before Vertical Slices — never inside
+	// the Verification → Evidence Schema window the split test pins.
+	const hld = out.indexOf("## High Level Design");
+	const manifests = out.indexOf("## Context manifests");
+	const slices = out.indexOf("## Vertical Slices");
+	assert.ok(hld !== -1 && manifests !== -1 && slices !== -1);
+	assert.ok(hld < manifests && manifests < slices, "section sits between HLD and Vertical Slices");
+	// The rule line states the knowledge-surface-only contract.
+	assert.match(out, /knowledge-surface paths only/);
+	assert.match(out, /code paths belong in the feature's booked paths/);
+	// Both role placeholder bullets are scaffolded.
+	assert.match(out, /- implement: <fill: knowledge-surface paths the implementer needs>/);
+	assert.match(out, /- review: <fill: knowledge-surface paths the reviewer needs>/);
 });
 
 test("readPlanField returns the trimmed value of a matching field", () => {
@@ -278,6 +315,134 @@ test("validatePlanContent orders errors feature-field, then sections, then confi
 		result.errors[result.errors.length - 1] ===
 			"User confirmation is required before implementation-ready status.",
 	);
+});
+
+// ---- validatePlanContent: context-manifest gate rules (F027) ----
+
+test("validatePlanContent requires a non-empty Context manifests section like other required sections", () => {
+	const content = validPlanContent().replace(
+		"## Context manifests\n- implement: docs/specs/contract.md\n- review: docs/adr/0001.md\n",
+		"",
+	);
+	const result = validatePlanContent({
+		content,
+		resolveFeature: foundResolver,
+	});
+	assert.ok(result.errors.includes("Plan must include a non-empty Context manifests section."));
+	// An empty section body fails the same way.
+	const emptied = validPlanContent().replace(
+		/## Context manifests\n[\s\S]*?\n\n## Vertical Slices/,
+		"## Context manifests\n\n## Vertical Slices",
+	);
+	assert.ok(
+		validatePlanContent({ content: emptied, resolveFeature: foundResolver }).errors.includes(
+			"Plan must include a non-empty Context manifests section.",
+		),
+	);
+});
+
+test("validatePlanContent flags an uncurated placeholder manifest role with a remedy", () => {
+	const result = validatePlanContent({
+		content: validPlanContent({
+			contextManifests:
+				"- implement: <fill: knowledge-surface paths the implementer needs>\n- review: docs/adr/0001.md",
+		}),
+		resolveFeature: foundResolver,
+	});
+	assert.equal(result.errors.length, 1);
+	assert.match(result.errors[0], /implement role still carries scaffold placeholders/);
+	assert.match(result.errors[0], /→ fix:/);
+});
+
+test("validatePlanContent flags a missing manifest role bullet", () => {
+	const result = validatePlanContent({
+		content: validPlanContent({
+			contextManifests: "- implement: docs/specs/contract.md",
+		}),
+		resolveFeature: foundResolver,
+	});
+	assert.equal(result.errors.length, 1);
+	assert.match(result.errors[0], /Context manifests must define an review role/);
+	assert.match(result.errors[0], /"- review:/);
+});
+
+test("validatePlanContent rejects a code-path manifest entry with the booked-paths remedy", () => {
+	const result = validatePlanContent({
+		content: validPlanContent({
+			contextManifests: "- implement: src/app.js\n- review: docs/adr/0001.md",
+		}),
+		resolveFeature: foundResolver,
+	});
+	assert.equal(result.errors.length, 1);
+	assert.match(result.errors[0], /src\/app\.js/);
+	assert.match(result.errors[0], /is a code path — context lists carry knowledge surfaces/);
+	assert.match(result.errors[0], /move code paths to the feature's booked paths/);
+});
+
+test("validatePlanContent rejects non-knowledge-surface entries outside the allowed sets", () => {
+	for (const entry of ["scripts/lib/x.ts", "lib/handler.py", "cmd/main.go", "styles/main.css"]) {
+		const result = validatePlanContent({
+			content: validPlanContent({
+				contextManifests: `- implement: ${entry}\n- review: docs/adr/0001.md`,
+			}),
+			resolveFeature: foundResolver,
+		});
+		assert.ok(
+			result.errors.some(
+				(e) =>
+					e.includes(entry) && /is a code path . context lists carry knowledge surfaces/.test(e),
+			),
+			`${entry} must be rejected as a non-knowledge surface`,
+		);
+	}
+});
+
+test("validatePlanContent accepts every allowed knowledge-surface shape without existence checks", () => {
+	// .md anywhere, anything under docs/, schemas/, standards/, and .schema.json.
+	// No resolveExists injected: the pure core skips disk-backed existence.
+	const result = validatePlanContent({
+		content: validPlanContent({
+			contextManifests:
+				"- implement: docs/specs/contract.md, schemas/action.schema.json, README.md\n- review: standards/amber-delivery.json, schemas/event.schema.json",
+		}),
+		resolveFeature: foundResolver,
+	});
+	assert.deepEqual(result.errors, []);
+});
+
+test("validatePlanContent flags manifest entries that do not exist via the injected resolver", () => {
+	const result = validatePlanContent({
+		content: validPlanContent(),
+		resolveFeature: foundResolver,
+		resolveExists: () => false,
+	});
+	assert.deepEqual(result.errors, [
+		"Context manifest entry docs/specs/contract.md (implement) does not exist in the target repository (or escapes its root). → fix: point the entry at a knowledge surface inside the repository.",
+		"Context manifest entry docs/adr/0001.md (review) does not exist in the target repository (or escapes its root). → fix: point the entry at a knowledge surface inside the repository.",
+	]);
+	// With the resolver reporting existence, the same content passes — proving
+	// the errors come from the injection, not a disk hit inside the core.
+	assert.deepEqual(
+		validatePlanContent({
+			content: validPlanContent(),
+			resolveFeature: foundResolver,
+			resolveExists: () => true,
+		}).errors,
+		[],
+	);
+});
+
+test("validatePlanContent parses comma- and space-separated manifest entries", () => {
+	const result = validatePlanContent({
+		content: validPlanContent({
+			contextManifests: "- implement: docs/a.md,docs/b.md docs/c.md\n- review: docs/adr/0001.md",
+		}),
+		resolveFeature: foundResolver,
+		resolveExists: (entry) => entry !== "docs/b.md",
+	});
+	assert.deepEqual(result.errors, [
+		"Context manifest entry docs/b.md (implement) does not exist in the target repository (or escapes its root). → fix: point the entry at a knowledge surface inside the repository.",
+	]);
 });
 
 // ---- buildReviewResult: pure review assembly ----
@@ -451,4 +616,266 @@ test("buildReviewResult blocks release when only a standard check fails", () => 
 	});
 	assert.equal(result.releaseReadiness.status, "blocked");
 	assert.ok(result.findings.some((f) => f.checkId === "scope-boundary"));
+});
+
+// ---- scope-discipline advisories (F026): booked paths vs declared Scope ----
+
+test("extractScopeBullet captures the Scope bullet block and stops at siblings", () => {
+	const content = validPlanContent({
+		highLevelDesign: [
+			"- Context: the tree is messy.",
+			"- Proposed approach:",
+			"  1. do the thing.",
+			"- Risks:",
+			"  - small risk.",
+			"- Scope:",
+			"  - Touches `src/one.js` and surfaces under docs/.",
+			"  - Non-goals: nothing else.",
+			"- Follow-ups:",
+			"  - later.",
+		].join("\n"),
+	});
+	const scope = extractScopeBullet(content);
+	assert.match(scope, /src\/one\.js/);
+	assert.match(scope, /Non-goals/);
+	assert.ok(!scope.includes("Follow-ups"), "sibling bullet ends the Scope block");
+	assert.ok(!scope.includes("Context"), "earlier bullets are not Scope");
+});
+
+test("extractScopeBullet returns an empty string without a Scope bullet", () => {
+	assert.equal(extractScopeBullet(validPlanContent({ highLevelDesign: "- approach only" })), "");
+	assert.equal(extractScopeBullet("# Plan: x\n\nno sections here\n"), "");
+});
+
+test("buildScopeDiscipline flags booked paths the Scope never mentions", () => {
+	const block = buildScopeDiscipline({
+		bookedPaths: ["src/secret.js", "docs/readme.md"],
+		scopeText: "- Scope: touches `docs/readme.md` only.",
+	});
+	assert.deepEqual(block.unmentionedPaths, ["src/secret.js"]);
+	assert.deepEqual(block.checklist, SCOPE_DISCIPLINE_CHECKLIST);
+});
+
+test("buildScopeDiscipline stays quiet on verbatim and directory-prefix mentions", () => {
+	const verbatim = buildScopeDiscipline({
+		bookedPaths: ["src/one.js"],
+		scopeText: "- Scope: touches `src/one.js` and nothing else.",
+	});
+	assert.deepEqual(verbatim.unmentionedPaths, []);
+	const underDir = buildScopeDiscipline({
+		bookedPaths: ["src/deep/helper.js"],
+		scopeText: "- Scope: work under src/ stays put.",
+	});
+	assert.deepEqual(underDir.unmentionedPaths, []);
+	const bareDir = buildScopeDiscipline({
+		bookedPaths: ["src/deep/helper.js"],
+		scopeText: "- Scope: confined to the src tree.",
+	});
+	assert.deepEqual(bareDir.unmentionedPaths, []);
+});
+
+test("buildScopeDiscipline returns null without booked paths or a Scope bullet", () => {
+	assert.equal(
+		buildScopeDiscipline({ bookedPaths: [], scopeText: "- Scope: touches src/." }),
+		null,
+	);
+	assert.equal(buildScopeDiscipline({ bookedPaths: ["src/a.js"], scopeText: "" }), null);
+	assert.equal(buildScopeDiscipline({ bookedPaths: ["src/a.js"], scopeText: "   " }), null);
+});
+
+test("buildReviewResult rides scope warnings without touching the blocking channels", () => {
+	const result = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: ["gate note"] },
+		standards: [],
+		scopeDisciplineInput: {
+			bookedPaths: ["src/extra.js"],
+			scopeText: "- Scope: touches docs/readme.md.",
+		},
+	});
+	// The advisory names the path and lands AFTER the gate warnings.
+	assert.deepEqual(result.warnings, [
+		"gate note",
+		"Booked path src/extra.js is not mentioned in the plan's declared Scope — advisory only; confirm it belongs to this feature.",
+	]);
+	// Structured block carries the diff plus the checklist.
+	assert.deepEqual(result.scopeDiscipline.unmentionedPaths, ["src/extra.js"]);
+	assert.deepEqual(result.scopeDiscipline.checklist, SCOPE_DISCIPLINE_CHECKLIST);
+	// A scope warning alone never blocks: findings/errors/action/readiness stay clean.
+	assert.deepEqual(result.findings, []);
+	assert.deepEqual(result.errors, []);
+	assert.deepEqual(result.requiredUserAction, []);
+	assert.deepEqual(result.releaseReadiness, { status: "ready" });
+});
+
+test("buildReviewResult without scope input keeps scopeDiscipline null and warnings intact", () => {
+	const result = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: ["gate note"] },
+		standards: [],
+	});
+	assert.equal(result.scopeDiscipline, null);
+	assert.deepEqual(result.warnings, ["gate note"]);
+	assert.deepEqual(result.releaseReadiness, { status: "ready" });
+});
+
+test("printResult renders the four-question checklist as advisory review output", () => {
+	const { printResult } = require("../../scripts/lib/core/cli-output");
+	const result = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: [] },
+		standards: [],
+		scopeDisciplineInput: {
+			bookedPaths: ["src/extra.js"],
+			scopeText: "- Scope: touches docs/readme.md.",
+		},
+	});
+	const lines = [];
+	const originalLog = console.log;
+	console.log = (line) => lines.push(String(line));
+	try {
+		printResult(result);
+	} finally {
+		console.log = originalLog;
+	}
+	const text = lines.join("\n");
+	assert.match(text, /Scope discipline checklist \(advisory — never blocks the gate\):/);
+	for (const question of SCOPE_DISCIPLINE_CHECKLIST) {
+		assert.match(text, new RegExp(question.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+	}
+	// The unmentioned path rides the warnings footer; readiness stays READY.
+	assert.match(text, /Warnings: 1/);
+	assert.match(text, /src\/extra\.js is not mentioned in the plan's declared Scope/);
+	assert.match(text, /Release readiness: READY/);
+});
+
+// ---- context-manifest review echo (F027): display-only, never blocks ----
+
+test("buildReviewResult echoes curated manifests as a structured block without blocking", () => {
+	const result = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: [] },
+		standards: [],
+		content: validPlanContent({
+			contextManifests:
+				"- implement: docs/specs/contract.md, docs/wiki/runbook.md\n- review: docs/adr/0001.md",
+		}),
+	});
+	assert.deepEqual(result.contextManifests, {
+		implement: ["docs/specs/contract.md", "docs/wiki/runbook.md"],
+		review: ["docs/adr/0001.md"],
+	});
+	// The echo never adds findings of its own.
+	assert.deepEqual(result.findings, []);
+	assert.deepEqual(result.errors, []);
+	assert.deepEqual(result.releaseReadiness, { status: "ready" });
+});
+
+test("buildReviewResult echoes empty arrays for uncurated roles and null without the section", () => {
+	const uncurated = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: [] },
+		standards: [],
+		content: validPlanContent({
+			contextManifests: "- implement: <fill: not yet curated>\n- review: docs/adr/0001.md",
+		}),
+	});
+	assert.deepEqual(uncurated.contextManifests, { implement: [], review: ["docs/adr/0001.md"] });
+	const absent = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: [] },
+		standards: [],
+		content: "# Plan: x\n\nno manifest section\n",
+	});
+	assert.equal(absent.contextManifests, null);
+});
+
+test("printResult renders both manifest role lists next to the scope-discipline checklist", () => {
+	const { printResult } = require("../../scripts/lib/core/cli-output");
+	const result = buildReviewResult({
+		targetRoot: "/repo",
+		planRelativePath: "p.md",
+		gateResult: { errors: [], warnings: [] },
+		standards: [],
+		content: validPlanContent({
+			contextManifests: "- implement: docs/specs/contract.md\n- review: docs/adr/0001.md",
+		}),
+	});
+	const lines = [];
+	const originalLog = console.log;
+	console.log = (line) => lines.push(String(line));
+	try {
+		printResult(result);
+	} finally {
+		console.log = originalLog;
+	}
+	const text = lines.join("\n");
+	assert.match(text, /Context manifests \(knowledge surfaces per role\):/);
+	assert.match(text, /implement: docs\/specs\/contract\.md/);
+	assert.match(text, /review: docs\/adr\/0001\.md/);
+	// Display-only: the echo never blocks readiness.
+	assert.match(text, /Release readiness: READY/);
+});
+
+// F027 review fixes: target-root containment in the existence resolver,
+// markdown-wrapped entries, and case-insensitive extensions.
+test("validatePlanGate rejects manifest entries that escape the target root", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-manifest-escape-"));
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "amber-manifest-outside-"));
+	try {
+		// An existing file OUTSIDE the target root must not satisfy the gate.
+		fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+		fs.writeFileSync(path.join(dir, "docs", "inside.md"), "x");
+		fs.writeFileSync(path.join(outside, "escaped.md"), "x");
+		const relEscape = path
+			.relative(dir, path.join(outside, "escaped.md"))
+			.split(path.sep)
+			.join("/");
+		const { validatePlanGate } = require("../../scripts/lib/core/planning");
+		const planRel = "docs/plans/T001-escape.md";
+		fs.mkdirSync(path.join(dir, "docs", "plans"), { recursive: true });
+		fs.writeFileSync(
+			path.join(dir, planRel),
+			validPlanContent({
+				contextManifests: `- implement: docs/inside.md, ${relEscape}\n- review: docs/inside.md`,
+			}),
+		);
+		const result = validatePlanGate(dir, planRel);
+		assert.ok(
+			result.errors.some((e) => e.includes(relEscape) && e.includes("escapes its root")),
+			`escape entry must be rejected: ${result.errors.join(" | ")}`,
+		);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});
+
+test("splitManifestEntries strips markdown wrappers around paths", () => {
+	const { validatePlanContent } = require("../../scripts/lib/core/planning");
+	const result = validatePlanContent({
+		content: validPlanContent({
+			contextManifests: "- implement: `docs/a.md`, **docs/b.md**\n- review: docs/c.md",
+		}),
+		resolveFeature: foundResolver,
+		resolveExists: () => true,
+	});
+	assert.deepEqual(
+		result.errors.filter((e) => e.includes("code path")),
+		[],
+		"wrapped knowledge-surface paths must not be mistaken for code paths",
+	);
+});
+
+test("isKnowledgeSurfacePath matches extensions case-insensitively", () => {
+	const { isKnowledgeSurfacePath } = require("../../scripts/lib/core/planning");
+	assert.equal(isKnowledgeSurfacePath("README.MD"), true);
+	assert.equal(isKnowledgeSurfacePath("Docs/Specs/Contract.Md"), true);
+	assert.equal(isKnowledgeSurfacePath("src/App.JS"), false);
 });

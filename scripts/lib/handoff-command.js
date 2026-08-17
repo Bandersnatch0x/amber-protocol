@@ -8,7 +8,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { resolveTarget } = require("./core/fs-utils");
+const { localIsoDate } = require("./core/text-utils");
 const { getRepoSnapshot } = require("./core/git-state");
+const { classifyDirtyPaths, renderDirtyPathsSection } = require("./core/dirty-paths");
 
 /** Display strings for handoff Repo State — reuses status's git snapshot. */
 function gitInfo(targetRoot) {
@@ -78,6 +80,50 @@ function formatEvidenceLine(e) {
 	}
 	const sid = e.sessionId ? `, session ${String(e.sessionId).slice(0, 8)}` : "";
 	return `- ${e.feature}: \`${e.command || "(none)"}\` → ${e.result || "(none)"} (${e.date || "?"}${sid})`;
+}
+
+// F023: finish-phase reminder. When the focus feature was accepted with matched
+// write-back triggers and no booked review, the handoff names the feature, the
+// triggered categories, and the remedy command. Read-only; null when quiet.
+function learningWriteBackLines(targetRoot, ctx) {
+	if (!ctx || ctx.focus.type !== "feature" || !ctx.focus.id) return null;
+	let inspection;
+	try {
+		const { inspectLearningWriteBack } = require("./core/learning-writeback");
+		inspection = inspectLearningWriteBack(targetRoot, { featureId: ctx.focus.id });
+	} catch {
+		return null;
+	}
+	if (!inspection || inspection.status !== "unreviewed") return null;
+	const categories = inspection.matchedCategories.join(", ");
+	return [
+		`- Feature ${ctx.focus.id} was accepted with work touching ${categories} paths — the learning write-back review is not booked yet.`,
+		"- Inspect with `amber learnings --feature <id>`, then book with `--reviewed --owner <id> [--surface <path>]`.",
+	];
+}
+
+// F026: finish-time dirty-worktree classification. Groups the live snapshot's
+// dirty paths into Amber-managed churn (ignored), the focus feature's booked
+// work (bail back: commit before finishing), and outside-scope files (FYI
+// only). Read-only — handoff never stages, commits, or prompts; null when the
+// tree is clean or only managed churn is present.
+function dirtyWorktreeSection(targetRoot, ctx) {
+	const snap = getRepoSnapshot(targetRoot);
+	if (!snap.isGit || snap.dirtyPaths === null) return null;
+	const focusFeaturePaths =
+		ctx &&
+		ctx.focus.type === "feature" &&
+		ctx.focus.id &&
+		ctx.state &&
+		Array.isArray(ctx.state.features)
+			? ctx.state.features.find((f) => f && f.id === ctx.focus.id)
+			: null;
+	const featurePaths =
+		focusFeaturePaths && Array.isArray(focusFeaturePaths.paths)
+			? focusFeaturePaths.paths.filter((p) => typeof p === "string" && p.trim() !== "")
+			: [];
+	const classification = classifyDirtyPaths(snap.dirtyPaths, { featurePaths });
+	return renderDirtyPathsSection(classification);
 }
 
 function renderHandoff(targetRoot) {
@@ -150,14 +196,12 @@ function renderHandoff(targetRoot) {
 		? [`1. ${next.label} — ${next.why}`, `   \`${next.remedy}\``]
 		: ["1. All lifecycle steps complete for the current focus — start the next feature."];
 
+	const learningLines = learningWriteBackLines(targetRoot, ctx);
+	const dirtySection = dirtyWorktreeSection(targetRoot, ctx);
+
 	// Local calendar date — matches operator "today" (UTC ISO can lag behind
 	// evening Asia/local sessions) and validateHandoff's "Last Updated:" scrape.
-	const now = new Date();
-	const lastUpdated = [
-		now.getFullYear(),
-		String(now.getMonth() + 1).padStart(2, "0"),
-		String(now.getDate()).padStart(2, "0"),
-	].join("-");
+	const lastUpdated = localIsoDate();
 
 	return [
 		"# Session Handoff",
@@ -193,6 +237,8 @@ function renderHandoff(targetRoot) {
 		"## Next Actions",
 		"",
 		...nextActions,
+		...(learningLines ? ["", "## Learning write-back", "", ...learningLines] : []),
+		...(dirtySection ? ["", dirtySection] : []),
 		"",
 	].join("\n");
 }

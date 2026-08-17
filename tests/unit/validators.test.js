@@ -148,6 +148,63 @@ test("paths entries must be non-empty strings", () => {
 	assert.ok(r.errors.some((e) => e.includes("paths entries must be non-empty strings")));
 });
 
+test("learning write-back owner is optional for legacy records", () => {
+	const legacy = validateFeatureListData({
+		features: [
+			validFeature({
+				learningWriteBack: {
+					reviewed: true,
+					date: "2026-08-14",
+					surfaces: ["docs/specs/legacy.md"],
+				},
+			}),
+		],
+	});
+	assert.deepEqual(legacy.errors, []);
+
+	const current = validateFeatureListData({
+		features: [
+			validFeature({
+				learningWriteBack: {
+					reviewed: true,
+					date: "2026-08-15",
+					surfaces: ["docs/specs/current.md"],
+					owner: "command",
+				},
+			}),
+		],
+	});
+	assert.deepEqual(current.errors, []);
+});
+
+test("learning write-back rejects an unknown present owner and lists canonical ids", () => {
+	const result = validateFeatureListData({
+		features: [
+			validFeature({
+				learningWriteBack: {
+					reviewed: true,
+					date: "2026-08-15",
+					surfaces: [],
+					owner: "rule",
+				},
+			}),
+		],
+	});
+	assert.equal(result.errors.length, 1);
+	assert.match(result.errors[0], /learningWriteBack\.owner/);
+	assert.match(
+		result.errors[0],
+		/skill, hook, command, standard, script, workflow-pack, loop-contract, ci/,
+	);
+});
+
+test("learning write-back must be an object when present", () => {
+	const result = validateFeatureListData({
+		features: [validFeature({ learningWriteBack: "reviewed" })],
+	});
+	assert.deepEqual(result.errors, ["features[0].learningWriteBack must be an object."]);
+});
+
 test("accumulates every field error for an empty feature object", () => {
 	const result = validateFeatureListData({ features: [{}] });
 	assert.deepEqual(result.errors, [

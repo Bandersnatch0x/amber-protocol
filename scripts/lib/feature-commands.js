@@ -2,7 +2,8 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { readJson, resolveTarget } = require("./core/fs-utils");
+const { readJson, resolveTarget, writeJsonPrettier } = require("./core/fs-utils");
+const { localIsoDate, splitCommaList } = require("./core/text-utils");
 
 function getFeatureListPath(targetRoot) {
 	return path.join(targetRoot, "feature_list.json");
@@ -26,7 +27,10 @@ function loadFeatures(targetRoot) {
 
 function saveFeatures(data) {
 	const { _file, _corrupt, ...rest } = data;
-	fs.writeFileSync(_file, JSON.stringify(rest, null, 2) + "\n");
+	// writeJsonPrettier emits the Prettier JSON format (tabs + fit-based
+	// collapse), so a booking produces a one-field diff instead of a
+	// whole-file reformat, and stays clean under format:check.
+	writeJsonPrettier(_file, rest);
 }
 
 function addFeature(target, options) {
@@ -88,12 +92,10 @@ function addFeature(target, options) {
 		evidence: [],
 		notes: [],
 	};
-	if (typeof paths === "string" && paths.trim() !== "") {
-		feature.paths = paths
-			.split(",")
-			.map((p) => p.trim())
-			.filter(Boolean);
-	}
+	// Accepts the single-string --paths value and the repeatable --path
+	// accumulator alike (splitCommaList handles both shapes).
+	const normalizedPaths = splitCommaList(paths);
+	if (normalizedPaths.length > 0) feature.paths = normalizedPaths;
 
 	data.features.push(feature);
 	saveFeatures(data);
@@ -216,7 +218,7 @@ function recordFeatureEvidence(target, options) {
 	const entry = {
 		command: command || "",
 		result: result || "",
-		date: new Date().toISOString().slice(0, 10),
+		date: localIsoDate(),
 		notes: notes || "",
 		...(sessionId ? { sessionId } : {}),
 	};
@@ -237,6 +239,95 @@ function recordFeatureEvidence(target, options) {
 		target: targetRoot,
 		featureId,
 		entry,
+		errors: [],
+		warnings: [],
+	};
+}
+
+// Normalize --path values into a flat list: each value (repeatable flag or
+// Comma-split and trim a string-or-string[] flag value (shared helper).
+function normalizePaths(values) {
+	return splitCommaList(values);
+}
+
+/**
+ * Book paths onto a feature (F024, #121): append-only with exact-match dedupe,
+ * so the F023 learnings trigger detection has its input without hand-edited
+ * JSON. Without --path values this is a read-only inspection listing the
+ * feature's current paths. Re-booking an already-present path is a visible
+ * no-op, never an error.
+ */
+function recordFeaturePaths(target, options) {
+	const targetRoot = resolveTarget(target);
+	const { feature: featureId, paths } = options;
+
+	if (!featureId) {
+		return {
+			target: targetRoot,
+			errors: ["feature paths requires --feature <feature-id>."],
+			warnings: [],
+		};
+	}
+
+	const data = loadFeatures(targetRoot);
+
+	if (data._corrupt) {
+		return {
+			target: targetRoot,
+			errors: ["feature_list.json is missing or corrupt. Run `amber init` first."],
+			warnings: [],
+		};
+	}
+
+	const feature = data.features.find((f) => f && f.id === featureId);
+	if (!feature) {
+		return {
+			target: targetRoot,
+			errors: [`Feature ${featureId} was not found in feature_list.json.`],
+			warnings: [],
+		};
+	}
+
+	const requested = normalizePaths(paths);
+	if (requested.length === 0) {
+		return {
+			target: targetRoot,
+			featureId,
+			inspection: true,
+			added: [],
+			duplicates: [],
+			paths: Array.isArray(feature.paths) ? feature.paths.filter(Boolean) : [],
+			errors: [],
+			warnings: [],
+		};
+	}
+
+	if (!Array.isArray(feature.paths)) {
+		feature.paths = [];
+	}
+	const added = [];
+	const duplicates = [];
+	for (const p of requested) {
+		if (feature.paths.includes(p)) {
+			duplicates.push(p);
+		} else {
+			feature.paths.push(p);
+			added.push(p);
+		}
+	}
+	// Nothing new -> nothing written: an all-duplicates re-run leaves the file
+	// byte-identical (idempotent by construction, not just by re-serialization).
+	if (added.length > 0) {
+		saveFeatures(data);
+	}
+
+	return {
+		target: targetRoot,
+		featureId,
+		inspection: false,
+		added,
+		duplicates,
+		paths: feature.paths,
 		errors: [],
 		warnings: [],
 	};
@@ -283,7 +374,7 @@ function listFeatureEvidence(target, options) {
 	};
 }
 
-const FEATURE_ACTIONS = ["add", "list", "remove", "verify", "evidence"];
+const FEATURE_ACTIONS = ["add", "list", "remove", "verify", "evidence", "paths"];
 
 /**
  * Presentation entry for the feature command family.
@@ -324,6 +415,11 @@ function runFeatureAction(action, target, options = {}) {
 	} else if (action === "evidence") {
 		structured = listFeatureEvidence(target, {
 			feature: opts.feature || opts._?.[1],
+		});
+	} else if (action === "paths") {
+		structured = recordFeaturePaths(target, {
+			feature: opts.feature || opts._?.[1],
+			paths: opts.paths,
 		});
 	} else {
 		const listed = FEATURE_ACTIONS.slice(0, -1).join(", ");
@@ -379,6 +475,29 @@ function runFeatureAction(action, target, options = {}) {
 				.join("\n");
 			text = `Evidence for ${structured.featureId}:\n${rows}`;
 		}
+	} else if (action === "paths" && typeof structured.inspection === "boolean") {
+		const paths = structured.paths || [];
+		if (structured.inspection) {
+			if (paths.length === 0) {
+				text = `No paths booked for feature: ${structured.featureId}`;
+			} else {
+				const rows = paths.map((p) => `  - ${p}`).join("\n");
+				text = `Paths for ${structured.featureId} (${paths.length}):\n${rows}`;
+			}
+		} else {
+			const added = structured.added || [];
+			const duplicates = structured.duplicates || [];
+			const addedText =
+				added.length > 0
+					? `${added.join(", ")} (${added.length})`
+					: "none — every requested path is already booked";
+			text = [
+				`Paths booked for feature: ${structured.featureId}`,
+				`  Added: ${addedText}`,
+				`  Skipped as duplicates: ${duplicates.length}`,
+				`  Total booked paths: ${paths.length}`,
+			].join("\n");
+		}
 	}
 
 	return { text, errors, warnings };
@@ -390,6 +509,8 @@ module.exports = {
 	removeFeature,
 	recordFeatureEvidence,
 	listFeatureEvidence,
+	recordFeaturePaths,
 	loadFeatures,
+	saveFeatures,
 	runFeatureAction,
 };

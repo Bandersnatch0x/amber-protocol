@@ -202,8 +202,10 @@ npm run test:e2e         # Run Playwright tests
 ### Weekly self-dogfood ritual
 
 Each week, drive one real piece of work through the full Amber session lifecycle
-(`plan → gate → verify --execute → approve → complete → accept → handoff`) and log
-every UX friction as a `next-up` issue. This is the continuous, cheap replacement
+(`plan → gate → verify --execute → approve → complete → accept → learnings → handoff`) and log
+every UX friction as a `next-up` issue. After `accept`, `node scripts/amber.js learnings --target .`
+inspects (read-only) whether the accepted work hit knowledge write-back triggers; `--reviewed`
+books the review. This is the continuous, cheap replacement
 for episodic external pilots. Full ritual, command template, exit criteria, and
 the first-round candidate list live in **[`docs/dogfood-weekly.md`](docs/dogfood-weekly.md)**.
 
@@ -233,6 +235,12 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 > complete must carry evidence). This is Governance-layer enforcement, not execution - the guard
 > reads metadata only and still does **not** run target project build/test commands or dispatch
 > agents. It is never installed automatically.
+
+> **Boundary note (per-turn context injection):** Amber MAY install an **opt-in** per-turn agent-hook
+> entry (`amber hooks breadcrumb install`) that READS governance metadata and injects an
+> `<amber-workflow-state>` block (focus, session status, required next step) into the agent
+> conversation. This is context injection, not execution — it never runs target project commands,
+> never dispatches agents, and is never installed automatically.
 
 > **Boundary note (governed execution, ADR-0003):** Amber MAY run a loop contract's declared
 > `governed.command` via `amber loop run --execute`, but ONLY behind four gates — policy

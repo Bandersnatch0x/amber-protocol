@@ -50,7 +50,19 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
 
 - Inspect before mutating; prefer read-only/dry-run commands first.
 - `init` and `wiki` are idempotent and never overwrite existing files.
+- Plans carry role-scoped Context manifests (implement/review): knowledge-surface paths only —
+  docs/specs contracts, wiki pages, ADRs, schema docs. The gate errors on missing paths or code
+  paths (code belongs in the feature's booked paths); `amber review` echoes the curated lists.
 - Treat gates as real checkpoints; record evidence before claiming pass/done.
+- After a plan is accepted, run `node scripts/amber.js learnings --target .`: it reports whether the
+  accepted work hit knowledge write-back triggers (schema/contract/infra paths), renders the
+  durable owner catalog, and shows the current booking. Book with an explicit feature and exactly
+  one owner: `learnings --feature <id> --reviewed --owner <id> [--surface <path>]`. Amber never
+  infers an owner from paths or prose, and it never writes the knowledge docs itself.
+- Choose the smallest real owner described in [Learning owner routing](learning-owner-routing.md).
+  The owner says where Amber carries the learned behavior; F025's prevention mechanism says how
+  recurrence is prevented. Existing reviewed records without owner metadata remain complete and
+  require no migration.
 - Leave handoff state before ending a session.
 - Use `node scripts/amber.js governance report --target .` as the primary product-loop report: it
   scores readiness, names risks, and emits structured next actions.

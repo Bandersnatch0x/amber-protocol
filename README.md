@@ -191,6 +191,17 @@ amber workflow compare --target . --baseline path/to/old.json --current path/to/
 `plan` is dry-run only (plan-input or maintenance-proposal draft). Only `assess` accepts
 `--output-dir`. Full flag list: [CLI reference — Workflow Commands](./docs/CLI_REFERENCE.md#workflow-commands).
 
+### `amber learnings` — post-accept knowledge checkpoint
+
+After `amber accept`, `amber learnings` checks (read-only) whether the accepted work hit mandatory
+knowledge write-back triggers — schema, contract, or infra paths — and `--reviewed` books the review
+on the feature entry. Amber detects and reminds; the write-back itself stays with the operator.
+
+```bash
+amber learnings --target . --feature F001                          # inspect triggers read-only
+amber learnings --target . --feature F001 --reviewed --surface docs/specs/f001.md
+```
+
 ### `amber handoff bundle` - portable continuation artifact
 
 `amber handoff bundle` writes a complete handoff directory with the session summary, verification
@@ -285,12 +296,15 @@ time, install the opt-in guard:
 amber hooks install --target .     # writes .git/hooks/pre-commit (opt-in; never auto-installed)
 amber hooks status --target .
 amber hooks check --target .       # what the hook runs; exits non-zero on a violation
+amber hooks breadcrumb install --target .  # opt-in per-turn workflow-state context injection for agent hosts
 ```
 
 The guard reads governance **metadata only** (e.g. a feature must not be marked complete with an
 empty `evidence` array) — it never runs your build or tests. Install with `--warn-only` to surface
 findings without blocking, bypass once with `AMBER_SKIP_HOOKS=1 git commit ...`, or remove it with
-`amber hooks uninstall`.
+`amber hooks uninstall`. The breadcrumb hook (`amber hooks breadcrumb install`) is likewise opt-in
+and per-turn: it reads governance metadata only and injects the current workflow state — focus,
+session status, required next step — into every agent turn; it never runs target commands.
 
 Every blocking error carries a stable code (e.g. `AMBER_E_FEATURE_NO_EVIDENCE`). Run
 `amber explain <code>` for its cause and fix, `amber explain` to list them all, or
