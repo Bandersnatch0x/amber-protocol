@@ -54,7 +54,11 @@ decision questions, and responsibilities), `scripts/lib/core/lifecycle.js`
   the text.
 - **Inspect / book surface.** `amber learnings --target <t> [--feature <id>]`
   is read-only: accept state, triggered categories with matching paths,
-  suggested surfaces, guidance, booking state, and the NOT-booked remedy line.
+  suggested surfaces, guidance, and booking state. Triggered, unbooked
+  features render the NOT-booked remedy. When no mandatory trigger matches,
+  inspection instead says that no mandatory review is owed and that
+  judgment-based write-back remains optional, regardless of whether an
+  optional review was already booked; it does not print the remedy.
   `--reviewed --owner <id> [--surface <path>]...` books
   `learningWriteBack = { reviewed: true, date, surfaces, owner }` via the
   shared loadFeatures/saveFeatures path; `--surface` is repeatable and each
@@ -205,8 +209,9 @@ feature_list.json feature.paths ──▶ detectWriteBackTriggers      (core/lea
   - "explicit featureId, found + unreviewed…", "booked feature: status
     reviewed…", "nonexistent featureId: featureFound false, visible text, no
     errors", "no featureId and no resolvable focus: visible no-focus text, no
-    errors", "degrades visibly for not-accepted and no-trigger features" —
-    invariant 6.
+    errors", "degrades visibly for not-accepted and no-trigger features"
+    (including no mandatory-review wording and no booking remedy) — invariant
+    6.
   - F028 owner routing: "defines the eight canonical routes in stable order",
     "keeps route boundaries distinct, including declarative non-execution
     surfaces", "keeps the owner-routing wiki catalog in exact parity with the
@@ -221,7 +226,8 @@ feature_list.json feature.paths ──▶ detectWriteBackTriggers      (core/lea
     table cases "missing owner / unknown owner / comma-combined owner /
     repeated owner fails before mutation" — invariants 4, 7.
   - CLI end-to-end ("inspect renders the trigger and the NOT-booked remedy,
-    exit 0", "--reviewed without --feature exits 1 with the
+    exit 0", "no-trigger inspection says no mandatory review is owed, exit
+    0" before and after optional booking, "--reviewed without --feature exits 1 with the
     never-book-auto-resolved error", "repeatable --surface flags and
     comma-separated values both book every surface", "--json emits a
     machine-readable envelope with the expected fields", "booking through the

@@ -123,3 +123,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F029-Teach-the-identity-gate-the-GitHub-merge-commit-boundary.md`
 - Review status: ready
 - Feature: F029 status → accepted in feature_list.json
+
+## 2026-08-18 docs/plans/F030-Clarify-learnings-output-when-no-mandatory-review-is-owed.md
+
+- Plan: `docs/plans/F030-Clarify-learnings-output-when-no-mandatory-review-is-owed.md`
+- Review status: ready
+- Feature: F030 status → accepted in feature_list.json

@@ -184,11 +184,15 @@ function renderOwnerRouting(learningWriteBack) {
 function renderInspectionText(featureId, accepted, triggered, guidance, learningWriteBack) {
 	const lines = [];
 	const details = ownerFields(learningWriteBack);
+	const reviewBooked = learningWriteBack && learningWriteBack.reviewed === true;
+	const hasMandatoryTriggers = triggered.length > 0;
 	if (accepted) {
-		const bookingState =
-			learningWriteBack && learningWriteBack.reviewed === true
-				? "review booked"
-				: "review NOT booked";
+		let bookingState = "no mandatory review owed";
+		if (hasMandatoryTriggers) {
+			bookingState = reviewBooked ? "review booked" : "review NOT booked";
+		} else if (reviewBooked) {
+			bookingState = "no mandatory review owed; review booked";
+		}
 		lines.push(`Feature ${featureId} — accepted (${bookingState}).`);
 	} else {
 		lines.push(`Feature ${featureId} — not accepted yet (checkpoint applies after accept).`);
@@ -206,7 +210,7 @@ function renderInspectionText(featureId, accepted, triggered, guidance, learning
 	lines.push("Guidance:");
 	for (const line of guidance) lines.push(`  - ${line}`);
 	lines.push(...renderOwnerRouting(learningWriteBack));
-	if (learningWriteBack && learningWriteBack.reviewed === true) {
+	if (reviewBooked) {
 		const surfaces = Array.isArray(learningWriteBack.surfaces) ? learningWriteBack.surfaces : [];
 		lines.push(
 			`Review booked ${learningWriteBack.date || "(no date)"} (surfaces: ${surfaces.join(", ") || "none"})`,
@@ -218,7 +222,10 @@ function renderInspectionText(featureId, accepted, triggered, guidance, learning
 			lines.push(`Owner decision question: ${details.ownerRoute.decisionQuestion}`);
 			lines.push(`Owner responsibility: ${details.ownerRoute.responsibility}`);
 		}
-	} else {
+	}
+	if (!hasMandatoryTriggers) {
+		lines.push("No mandatory review is owed. Judgment-based write-back remains optional.");
+	} else if (!reviewBooked) {
 		lines.push(
 			`Review NOT booked — run: amber learnings --feature ${featureId} --reviewed --owner <id> [--surface <path>]`,
 		);

@@ -956,6 +956,65 @@
 				"surfaces": ["CONTRIBUTING.md"],
 				"owner": "ci"
 			}
+		},
+		{
+			"id": "F030",
+			"priority": 1,
+			"area": "learnings",
+			"title": "Clarify learnings output when no mandatory review is owed",
+			"user_visible_behavior": "When no mandatory write-back triggers match, amber learnings states that no mandatory review is owed while preserving the review-not-booked warning when triggers do match",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/learning-writeback.test.js",
+				"node scripts/amber.js learnings --target . --feature F025"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/learning-writeback.test.js",
+					"result": "passed (43 tests, 0 failed, 0 skipped; exit 0)",
+					"date": "2026-08-18",
+					"notes": "session 09988a35-cf61-4739-9fee-4377c2b1b912; real F025/F009/F021 boundaries and JSON/status compatibility pass; artifact docs/plans/F030-Clarify-learnings-output-when-no-mandatory-review-is-owed.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "npm test",
+					"result": "passed (1965 passed, 4 pre-existing skips, 0 failed; exit 0, 143374ms)",
+					"date": "2026-08-18",
+					"notes": "session 09988a35-cf61-4739-9fee-4377c2b1b912; final full-suite verification after review remediation; artifact docs/plans/F030-Clarify-learnings-output-when-no-mandatory-review-is-owed.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "Standards / Spec independent final review",
+					"result": "passed (0 Standards findings; 0 Spec findings)",
+					"date": "2026-08-18",
+					"notes": "session 09988a35-cf61-4739-9fee-4377c2b1b912; both axes confirmed the F025/F009/F021 and JSON/status boundaries; artifact docs/plans/F030-Clarify-learnings-output-when-no-mandatory-review-is-owed.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "Orca Run run_bf7b74565de3: Claude Code and Codex native-host plugin validation",
+					"result": "passed (2 worker_done succeeded; each 43 passed, 0 failed, 0 skipped; WIP hash unchanged)",
+					"date": "2026-08-18",
+					"notes": "session 09988a35-cf61-4739-9fee-4377c2b1b912; Claude dispatch ctx_b4ef18af3a68 and Codex dispatch ctx_6e4f0fe08d36 validated staged hash 4f32862cd5662cb85134bc5ba16e4f2e0cfadfc2 without file edits; artifact docs/plans/F030-Clarify-learnings-output-when-no-mandatory-review-is-owed.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 107466ms)",
+					"date": "2026-08-18",
+					"notes": "session 09988a35-cf61-4739-9fee-4377c2b1b912 stage verify",
+					"sessionId": "09988a35-cf61-4739-9fee-4377c2b1b912"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/learning-writeback.js",
+				"tests/unit/learning-writeback.test.js",
+				"docs/plans/F030-Clarify-learnings-output-when-no-mandatory-review-is-owed.md",
+				"docs/specs/2026-08-15-learning-writeback.md"
+			],
+			"updated": "2026-08-18",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-18",
+				"surfaces": ["docs/specs/2026-08-15-learning-writeback.md"],
+				"owner": "command"
+			}
 		}
 	]
 }

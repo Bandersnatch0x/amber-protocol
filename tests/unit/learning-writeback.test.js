@@ -397,6 +397,14 @@ describe("lifecycle step gating (learnings step via the SSOT)", () => {
 
 // ── Inspection (read-only) ───────────────────────────────────────────────────
 
+function assertNoMandatoryReviewWording(text) {
+	assert.match(text, /No mandatory write-back triggers/);
+	assert.match(text, /No mandatory review is owed/);
+	assert.match(text, /Judgment-based write-back remains optional/);
+	assert.doesNotMatch(text, /Review NOT booked/);
+	assert.doesNotMatch(text, /--reviewed/);
+}
+
 describe("inspectLearningWriteBack", () => {
 	it("explicit featureId, found + unreviewed: status unreviewed, text lists category and NOT-booked remedy", () => {
 		const root = acceptedRepo("amber-learn-insp-", "F023I", ["docs/specs/2026-08-15-x.md"]);
@@ -488,7 +496,21 @@ describe("inspectLearningWriteBack", () => {
 		const b = inspectLearningWriteBack(noTriggers, { featureId: "F023B" });
 		assert.deepEqual(b.errors, []);
 		assert.equal(b.status, "no-triggers");
-		assert.match(b.text, /No mandatory write-back triggers/);
+		assertNoMandatoryReviewWording(b.text);
+	});
+
+	it("keeps no-trigger wording after an optional review is booked", () => {
+		const noTriggers = acceptedRepo("amber-learn-notrig-booked-", "F023B", ["src/index.js"]);
+		const booking = bookLearningWriteBack(noTriggers, {
+			featureId: "F023B",
+			surfaces: ["docs/wiki/optional-notes.md"],
+			owner: "command",
+		});
+		assert.deepEqual(booking.errors, []);
+		const booked = inspectLearningWriteBack(noTriggers, { featureId: "F023B" });
+		assert.equal(booked.status, "no-triggers");
+		assert.match(booked.text, /no mandatory review owed; review booked/);
+		assertNoMandatoryReviewWording(booked.text);
 	});
 
 	it("inspection writes nothing (invariant 2)", () => {
@@ -669,6 +691,24 @@ describe("amber learnings (CLI)", () => {
 		assert.match(r.stdout, /Trigger contract/);
 		assert.match(r.stdout, /Review NOT booked/);
 		assert.match(r.stdout, /amber learnings --feature F023C --reviewed/);
+	});
+
+	it("no-trigger inspection says no mandatory review is owed, exit 0", () => {
+		const root = acceptedRepo("amber-learn-clinotrig-", "F023N", ["src/index.js"]);
+		const r = runCli(["learnings", "--target", root, "--feature", "F023N"]);
+		assert.equal(r.status, 0, `stderr: ${r.stderr}`);
+		assertNoMandatoryReviewWording(r.stdout);
+
+		const booking = bookLearningWriteBack(root, {
+			featureId: "F023N",
+			surfaces: ["docs/wiki/optional-notes.md"],
+			owner: "command",
+		});
+		assert.deepEqual(booking.errors, []);
+		const booked = runCli(["learnings", "--target", root, "--feature", "F023N"]);
+		assert.equal(booked.status, 0, `stderr: ${booked.stderr}`);
+		assert.match(booked.stdout, /no mandatory review owed; review booked/);
+		assertNoMandatoryReviewWording(booked.stdout);
 	});
 
 	it("--reviewed without --feature exits 1 with the never-book-auto-resolved error", () => {
