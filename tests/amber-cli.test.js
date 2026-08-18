@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
+const { readSessionArtifacts } = require("./helpers/session-artifacts");
 const { installTargetRoutes } = require("./helpers/target-routes");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -21,6 +22,38 @@ function runHarness(args, options = {}) {
 		encoding: "utf8",
 		...options,
 	});
+}
+
+function startConfirmedSession(target, goal, route) {
+	const start = runHarness([
+		"session",
+		"start",
+		"--goal",
+		goal,
+		"--route",
+		route,
+		"--target",
+		target,
+		"--confirm",
+		"--json",
+	]);
+	assert.equal(start.status, 0, start.stderr || start.stdout);
+	return JSON.parse(start.stdout).sessionId;
+}
+
+function runSuccessfulSessionCommand(target, sessionId, action, extraArgs = []) {
+	const command = runHarness([
+		"session",
+		action,
+		"--target",
+		target,
+		"--session",
+		sessionId,
+		...extraArgs,
+		"--json",
+	]);
+	assert.equal(command.status, 0, command.stderr || command.stdout);
+	return command;
 }
 
 test("Context CLI approval follows the selected Action variant", () => {
@@ -1684,6 +1717,41 @@ test("session complete-check reports missing evidence for a new session", () => 
 	const payload = JSON.parse(check.stdout);
 	assert.match(payload.text, /Completion check status: fail/);
 	assert.match(payload.text, /Missing:/);
+});
+
+test("session approval leaves a two-gate Session active until explicit completion", () => {
+	const target = tempDir("session-approval-not-completion");
+	installTargetRoutes(target);
+	const sessionId = startConfirmedSession(
+		target,
+		"add approval lifecycle feature",
+		"feature-standard",
+	);
+	runSuccessfulSessionCommand(target, sessionId, "continue");
+
+	for (const gate of ["user-approval-plan", "user-approval-implement"]) {
+		runSuccessfulSessionCommand(target, sessionId, "approve", ["--gate", gate, "--yes"]);
+	}
+
+	const { manifest, timeline } = readSessionArtifacts(target, sessionId);
+	assert.equal(manifest.status, "executing");
+	assert.equal(
+		timeline.some((event) => event.type === "session_completed"),
+		false,
+	);
+
+	const check = runHarness([
+		"session",
+		"complete-check",
+		"--target",
+		target,
+		"--session",
+		sessionId,
+		"--strict",
+		"--json",
+	]);
+	assert.equal(check.status, 1);
+	assert.match(JSON.parse(check.stdout).text, /Missing: [^\n]*verification/);
 });
 
 test("maintenance distill writes a proposal from repeated plan headings", () => {

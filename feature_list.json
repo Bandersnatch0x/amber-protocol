@@ -1015,6 +1015,91 @@
 				"surfaces": ["docs/specs/2026-08-15-learning-writeback.md"],
 				"owner": "command"
 			}
+		},
+		{
+			"id": "F031",
+			"priority": 1,
+			"area": "agent-skills",
+			"title": "Keep skill frontmatter commands in lockstep with the Governance Console",
+			"user_visible_behavior": "Every shipped Amber skill names a real Governance Console command, and generated-agent validation fails when a skill invents or stales that command",
+			"status": "not_started",
+			"verification": ["node --test tests/unit/agent-commands.test.js", "npm run gen:agents:check"],
+			"evidence": [],
+			"notes": ["GitHub issue #128; no live agent execution or Journey routing policy change"],
+			"paths": [
+				"skills/",
+				"scripts/lib/core/agent-commands.js",
+				"scripts/lib/command-registry.js",
+				"scripts/gen-agent-commands.js",
+				"tests/unit/agent-commands.test.js",
+				"docs/wiki/knowledge/skills-platform-generation/skills-platform-generation.md",
+				"docs/wiki/knowledge/cli-architecture-command-dispatch/cli-architecture-command-dispatch.md",
+				"docs/plans/F031-Keep-skill-frontmatter-commands-in-lockstep-with-the-Governance-Console.md"
+			],
+			"updated": "2026-08-18"
+		},
+		{
+			"id": "F032",
+			"priority": 1,
+			"area": "sessions",
+			"title": "Keep approval gates distinct from Session completion",
+			"user_visible_behavior": "Passing every approval gate records approval but does not mark a Session completed until strict completion evidence passes and session complete is invoked",
+			"status": "accepted",
+			"verification": [
+				"node --test tests/unit/session-commands.test.js",
+				"node --test tests/amber-cli.test.js"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/unit/session-commands.test.js tests/amber-cli.test.js",
+					"result": "passed (78 tests, 0 failed; exit 0)",
+					"date": "2026-08-18",
+					"notes": "session 27de0ce6-d53e-48c6-a80d-57461a0bf7b9; unit and CLI regressions cover multi-gate approval without auto-completion, updatedAt refresh, strict rejection without verification, and explicit completion after executed verification; artifact docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "npm test",
+					"result": "passed (1968 passed, 4 skipped, 0 failed; 1972 total; exit 0)",
+					"date": "2026-08-18",
+					"notes": "session 27de0ce6-d53e-48c6-a80d-57461a0bf7b9; final non-concurrent full-suite rerun passed after one transient unrelated DSH npm-pack ETIMEDOUT; artifact docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "npm run lint; npm run manifests; npm run doctor; npm run gen:agents:check; validate wiki; validate feature list; git diff --check",
+					"result": "passed (all exit 0; zero validation errors; 15 generated files current)",
+					"date": "2026-08-18",
+					"notes": "session 27de0ce6-d53e-48c6-a80d-57461a0bf7b9; repository guardrails and changed-path scope pass; artifact docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "Standards / Spec independent final review",
+					"result": "passed (0 Standards findings; 0 Spec findings)",
+					"date": "2026-08-18",
+					"notes": "session 27de0ce6-d53e-48c6-a80d-57461a0bf7b9; both axes confirmed the single explicit completion seam and approval-verification-completion separation; artifact docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "Orca Run run_c27401be854e: Claude Code and Codex native-host plugin validation",
+					"result": "passed (2 worker_done succeeded; each 78 focused tests passed; WIP fingerprint unchanged; no files modified)",
+					"date": "2026-08-18",
+					"notes": "session 27de0ce6-d53e-48c6-a80d-57461a0bf7b9; Claude dispatch ctx_ac1a4ce7fa6d and Codex dispatch ctx_a39a585c29e3 validated native plugin/skill flows; coordinator and Codex confirmed fingerprint 9fc2aa78bf952879c97ace05a3f0a4ee7c42f619; artifact docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 149011ms)",
+					"date": "2026-08-18",
+					"notes": "session 27de0ce6-d53e-48c6-a80d-57461a0bf7b9 stage verify",
+					"sessionId": "27de0ce6-d53e-48c6-a80d-57461a0bf7b9"
+				}
+			],
+			"notes": [
+				"Discovered while starting F031: Session b5d284ee-59b7-4cba-b3f7-2063365694e4 became completed after two gates while strict complete-check still reported missing verification"
+			],
+			"paths": [
+				"scripts/lib/session-commands.js",
+				"tests/unit/session-commands.test.js",
+				"tests/amber-cli.test.js",
+				"tests/helpers/session-artifacts.js",
+				"docs/wiki/knowledge/session-lifecycle-management/session-lifecycle-management.md",
+				"docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md"
+			],
+			"updated": "2026-08-18"
 		}
 	]
 }

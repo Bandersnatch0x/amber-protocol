@@ -3,12 +3,12 @@ kind: "knowledge"
 category: "session-lifecycle-management"
 title: "Session & Lifecycle Management"
 template: "architecture"
-updated_at: "2026-08-08T00:00:00.000Z"
+updated_at: "2026-08-18T00:00:00.000Z"
 ---
 
 # Session & Lifecycle Management
 
-Last Reviewed: 2026-08-08
+Last Reviewed: 2026-08-18
 
 A session is a durable execution context selected from a declarative Route. Its
 manifest, event stream, checkpoints, verification evidence, and optional worktree make
@@ -41,6 +41,12 @@ The states are `created`, `routed`, `executing`, `paused`, `completed`, `failed`
 `created -> routed -> executing`, with `executing <-> paused`; active states may also
 move to a final state where the transition table permits it.
 
+The transition table describes legal edges, not command authority. Route Gate
+approval records `gate_passed` evidence and never moves a Session to `completed`.
+Only explicit `session complete` owns the normal completed transition, and it first
+requires strict Completion Check evidence to pass. This keeps approval, verification,
+and completion as separate lifecycle responsibilities.
+
 ```mermaid
 stateDiagram-v2
     [*] --> created
@@ -71,7 +77,9 @@ stateDiagram-v2
 3. Mutating execution can use a session-specific worktree so the main checkout is not
    the execution environment.
 4. Verification appends evidence rather than trusting self-reported completion.
-   Approval and completion remain explicit operations.
+   `session approve` records approval evidence; passing the last Route Gate leaves the
+   Session active. `session complete` is a separate explicit operation that transitions
+   to `completed` only after strict Completion Check succeeds.
 5. Governance Report and Workflow Effectiveness read normalized Session evidence from
    the same module while retaining separate decisions under ADR-0008.
 6. `lifecycle` inspection reads plans, gates, and project signals to recommend a next
@@ -89,5 +97,7 @@ stateDiagram-v2
   fields at execution time.
 - Keep route selection, state transition, checkpoint recovery, worktree isolation,
   verification, and approval as distinct responsibilities.
+- Do not add a completion side path to approval or verification commands. Keep the
+  guarded transition local to `completeSession()`.
 - A session status or dry-run is not proof of target-project execution; use recorded
   verification evidence for completion claims.

@@ -8,10 +8,13 @@ const {
 	statusSession,
 	listSessions,
 	abortSession,
+	continueSession,
+	completeSession,
 	approveSession,
 	verifySession,
 } = require("../../scripts/lib/session-commands");
 const { addFeature, listFeatureEvidence } = require("../../scripts/lib/feature-commands");
+const { readSessionArtifacts } = require("../helpers/session-artifacts");
 const { installTargetRoutes } = require("../helpers/target-routes");
 
 const TEST_ROOT = path.join(__dirname, "../fixtures/session-test-repo");
@@ -258,7 +261,7 @@ describe("session-commands", () => {
 
 			assert.strictEqual(approved.exitCode, 0, approved.text);
 			assert.match(approved.text, /Gate: target-approval/);
-			assert.match(approved.text, /session marked completed/);
+			assert.match(approved.text, /approval requirements satisfied/);
 		});
 	});
 
@@ -433,6 +436,80 @@ describe("session-commands", () => {
 					path.join(gatesDir(start.sessionId), "user-approval-implement.decision.json"),
 				),
 			);
+		});
+
+		it("keeps a two-gate Session active until explicit completion has evidence", async () => {
+			const start = await startSession(TEST_ROOT, {
+				goal: "test",
+				route: "feature-standard",
+			});
+			await continueSession(TEST_ROOT, { sessionId: start.sessionId });
+			const updatedAtBeforeApproval = readSessionArtifacts(TEST_ROOT, start.sessionId).manifest
+				.updatedAt;
+
+			await approveSession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				gate: "user-approval-plan",
+				yes: true,
+			});
+			const finalApproval = await approveSession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				gate: "user-approval-implement",
+				yes: true,
+			});
+
+			const { manifest, timeline: events } = readSessionArtifacts(TEST_ROOT, start.sessionId);
+
+			assert.strictEqual(manifest.status, "executing");
+			assert.ok(Date.parse(manifest.updatedAt) > Date.parse(updatedAtBeforeApproval));
+			assert.ok(!events.some((event) => event.type === "session_completed"));
+			assert.match(finalApproval.text, /All gates passed/);
+			assert.doesNotMatch(finalApproval.text, /marked completed/);
+
+			const completion = await completeSession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				strict: true,
+			});
+			assert.notStrictEqual(completion.exitCode, 0);
+			assert.match(completion.text, /missing: [^\n]*verification/);
+		});
+
+		it("completes explicitly after executed verification and approval evidence", async () => {
+			fs.writeFileSync(
+				path.join(TEST_ROOT, "package.json"),
+				JSON.stringify({ name: "s", scripts: { test: 'node -e "process.exit(0)"' } }),
+			);
+			fs.writeFileSync(
+				path.join(TEST_ROOT, "session-handoff.md"),
+				"# Session Handoff\n\nVerification completed and the Session is ready to close.\n",
+			);
+			const start = await startSession(TEST_ROOT, {
+				goal: "fix test bug",
+				route: "bugfix-quick",
+			});
+			await continueSession(TEST_ROOT, { sessionId: start.sessionId });
+			await approveSession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				gate: "user-approval-fix",
+				yes: true,
+			});
+
+			const verification = await verifySession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				command: "npm test",
+				execute: true,
+			});
+			assert.strictEqual(verification.exitCode, 0, verification.text);
+
+			const completion = await completeSession(TEST_ROOT, {
+				sessionId: start.sessionId,
+				strict: true,
+			});
+			assert.strictEqual(completion.exitCode, 0, completion.text);
+
+			const { manifest, timeline: events } = readSessionArtifacts(TEST_ROOT, start.sessionId);
+			assert.strictEqual(manifest.status, "completed");
+			assert.strictEqual(events.filter((event) => event.type === "session_completed").length, 1);
 		});
 	});
 

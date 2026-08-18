@@ -783,30 +783,23 @@ async function approveSession(projectRoot, options) {
 		}
 	}
 
-	// If all route gates have now been approved, complete the session.
+	// Report whether all route gates are approved. Approval is evidence for
+	// completion, not a terminal-state transition; completeSession owns the only
+	// normal path to STATES.COMPLETED after strict completion evidence passes.
 	const gateEvents = readSessionEvents(sessionDir).filter((e) => e.type === "gate_passed");
 	const routeGateIds = gates.map((g) => g.id);
 	const allGatesPassed =
 		routeGateIds.length > 0 &&
 		routeGateIds.every((id) => gateEvents.some((e) => e.data && e.data.gateId === id));
-
-	const sm = new SessionStateMachine(manifest.status);
-	let completionEvent;
-	let newStatus = manifest.status;
-	if (allGatesPassed) {
-		const transition = sm.transition(STATES.COMPLETED);
-		if (transition.success && transition.event) {
-			completionEvent = transition.event;
-			newStatus = STATES.COMPLETED;
-			appendSessionEvent(sessionDir, completionEvent);
-		}
-	}
-
-	writeSessionManifest(sessionDir, { ...manifest, status: newStatus });
+	// Approval is still Session activity even though it does not change status.
+	// Refresh updatedAt so activity ordering remains accurate for readers.
+	writeSessionManifest(sessionDir, manifest);
 
 	const lines = [`Approval recorded for session: ${sessionId}`, `Gate: ${resolvedGateId}`];
 	if (allGatesPassed) {
-		lines.push("All gates passed — session marked completed.");
+		lines.push(
+			"All gates passed — approval requirements satisfied; session remains active pending verification and explicit completion.",
+		);
 	} else if (gates.length > 1) {
 		const pending = gates.filter((g) => !gateEvents.some((e) => e.data && e.data.gateId === g.id));
 		lines.push(`Pending gates: ${pending.map((g) => g.id).join(", ")}`);

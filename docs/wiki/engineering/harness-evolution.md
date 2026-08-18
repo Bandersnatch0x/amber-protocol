@@ -129,3 +129,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F030-Clarify-learnings-output-when-no-mandatory-review-is-owed.md`
 - Review status: ready
 - Feature: F030 status → accepted in feature_list.json
+
+## 2026-08-18 docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md
+
+- Plan: `docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md`
+- Review status: ready
+- Feature: F032 status → accepted in feature_list.json
