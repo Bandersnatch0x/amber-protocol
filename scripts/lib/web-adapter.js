@@ -26,6 +26,7 @@ const { readSessionManifest } = require("./session-manifest");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
 const loopPolicy = require("./core/loop-policy");
 const loopLedger = require("./core/loop-ledger");
+const { isLegalTransition, STATES } = require("./session-state-machine");
 
 /**
  * Containment guard for caller-supplied session ids — the CLI-side twin of
@@ -407,6 +408,32 @@ function appendVerificationLedgerRecord(ledgerPath, record) {
 	return loopLedger.appendLedgerRecord(ledgerPath, record);
 }
 
+/**
+ * Session-state fold (Issue #130): the web checks transition legality through
+ * this seam instead of requiring scripts/lib/session-state-machine.js
+ * directly. Delegates to the CLI SSOT predicate unchanged — the web can
+ * neither relax nor fork the transition graph.
+ *
+ * @param {string} from
+ * @param {string} to
+ * @returns {boolean}
+ */
+function isLegalSessionTransition(from, to) {
+	return isLegalTransition(from, to);
+}
+
+/**
+ * Narrow projection of the CLI session-state vocabulary used by the web
+ * control surface (idle/running pre-normalization and action legality).
+ * Frozen so the web cannot mutate the SSOT values.
+ */
+const SESSION_STATES = Object.freeze({
+	CREATED: STATES.CREATED,
+	ROUTED: STATES.ROUTED,
+	EXECUTING: STATES.EXECUTING,
+	PAUSED: STATES.PAUSED,
+});
+
 module.exports = {
 	evaluateLifecycleNext,
 	getCompletionStatus,
@@ -417,4 +444,6 @@ module.exports = {
 	getCompletionNextActions,
 	evaluateVerifyPolicy,
 	appendVerificationLedgerRecord,
+	isLegalSessionTransition,
+	SESSION_STATES,
 };

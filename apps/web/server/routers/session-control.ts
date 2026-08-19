@@ -13,19 +13,17 @@ import {
   type RunnerControlAction,
   type RunnerControlRequest,
 } from '../lib/runner-ack';
+import type { WebAdapter } from '../../../../scripts/lib/web-adapter';
 
-// CLI session transition SSOT (ADR-blessed createRequire seam). Web does not keep
-// a second ALLOWED_TRANSITIONS table; legality comes from isLegalTransition.
+// CLI session transition SSOT folded into the web-adapter seam (ADR-0007
+// principle 4: one seam only). Web does not keep a second ALLOWED_TRANSITIONS
+// table; legality comes from adapter.isLegalSessionTransition.
 const requireCli = createRequire(import.meta.url);
-const { isLegalTransition, STATES } = requireCli(
-  '../../../../scripts/lib/session-state-machine.js',
-) as {
-  isLegalTransition: (from: string, to: string) => boolean;
-  STATES: Record<string, string>;
-};
+const adapter = requireCli('../../../../scripts/lib/web-adapter.js') as WebAdapter;
+const { isLegalSessionTransition, SESSION_STATES } = adapter;
 
 // Web-local action → target status. Sources are not listed here; legality is
-// checked via isLegalTransition after idle/running pre-normalization.
+// checked via isLegalSessionTransition after idle/running pre-normalization.
 // start is special: from created it must go created→routed→executing (not a
 // direct created→executing jump — matches continueSession).
 const ACTION_TARGET: Record<RunnerControlAction, SessionStatus> = {
@@ -40,8 +38,8 @@ const ACTION_TARGET: Record<RunnerControlAction, SessionStatus> = {
  * idle → created, running → executing. Canonical statuses pass through.
  */
 function normalizeStatus(status: string): string {
-  if (status === 'idle') return STATES.CREATED;
-  if (status === 'running') return STATES.EXECUTING;
+  if (status === 'idle') return SESSION_STATES.CREATED;
+  if (status === 'running') return SESSION_STATES.EXECUTING;
   return status;
 }
 
@@ -59,16 +57,16 @@ function canInvokeAction(action: RunnerControlAction, status: string): boolean {
 
   if (action === 'start') {
     // start path: created (via routed) or already routed — never pause→executing
-    return from === STATES.CREATED || from === STATES.ROUTED;
+    return from === SESSION_STATES.CREATED || from === SESSION_STATES.ROUTED;
   }
 
   if (action === 'resume') {
     // resume is only "continue after pause". Do not treat routed→executing as resume
     // even though that edge is legal in the CLI SSOT graph (start owns that path).
-    return from === STATES.PAUSED;
+    return from === SESSION_STATES.PAUSED;
   }
 
-  return isLegalTransition(from, target);
+  return isLegalSessionTransition(from, target);
 }
 
 const controlInputSchema = z.object({ sessionId: z.string() });
@@ -133,17 +131,17 @@ async function transitionCreatedToRouted(sessionId: string): Promise<{
   status: SessionStatus;
   warning?: string;
 }> {
-  if (!isLegalTransition(STATES.CREATED, STATES.ROUTED)) {
-    throw new Error(`Cannot start from status: ${STATES.CREATED}`);
+  if (!isLegalSessionTransition(SESSION_STATES.CREATED, SESSION_STATES.ROUTED)) {
+    throw new Error(`Cannot start from status: ${SESSION_STATES.CREATED}`);
   }
 
-  const status = await persistAndConfirmStatus(sessionId, STATES.ROUTED as SessionStatus);
+  const status = await persistAndConfirmStatus(sessionId, SESSION_STATES.ROUTED as SessionStatus);
 
   try {
     const data = {
       sessionId,
-      fromState: STATES.CREATED,
-      toState: STATES.ROUTED,
+      fromState: SESSION_STATES.CREATED,
+      toState: SESSION_STATES.ROUTED,
       source: 'web-control',
     };
     await appendSessionTimelineEvent(sessionId, {
@@ -154,7 +152,7 @@ async function transitionCreatedToRouted(sessionId: string): Promise<{
       schemaVersion: 2,
       kind: 'route_selected',
       ...data,
-      status: STATES.ROUTED,
+      status: SESSION_STATES.ROUTED,
     });
     return { status };
   } catch (error) {
@@ -363,14 +361,14 @@ export const sessionControlRouter = router({
     // created (and legacy idle) must not jump to executing — route first, then execute.
     let routeWarning: string | undefined;
     let statusForTransition: SessionStatus = currentStatus as SessionStatus;
-    if (normalizeStatus(currentStatus) === STATES.CREATED) {
+    if (normalizeStatus(currentStatus) === SESSION_STATES.CREATED) {
       const routed = await transitionCreatedToRouted(input.sessionId);
       statusForTransition = routed.status;
       routeWarning = routed.warning;
-      if (!isLegalTransition(STATES.ROUTED, STATES.EXECUTING)) {
+      if (!isLegalSessionTransition(SESSION_STATES.ROUTED, SESSION_STATES.EXECUTING)) {
         throw new Error(`Cannot ${action} from status: ${statusForTransition}`);
       }
-    } else if (!isLegalTransition(normalizeStatus(currentStatus), ACTION_TARGET.start)) {
+    } else if (!isLegalSessionTransition(normalizeStatus(currentStatus), ACTION_TARGET.start)) {
       throw new Error(`Cannot ${action} from status: ${currentStatus}`);
     }
 

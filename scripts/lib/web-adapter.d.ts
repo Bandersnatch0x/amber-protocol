@@ -230,6 +230,24 @@ export function appendVerificationLedgerRecord(
 	record: Record<string, unknown>,
 ): Record<string, unknown>;
 
+/**
+ * Session-state fold (Issue #130): delegates to the CLI SSOT predicate in
+ * session-state-machine.js — the web checks transition legality through this
+ * seam and can neither relax nor fork the transition graph.
+ */
+export function isLegalSessionTransition(from: string, to: string): boolean;
+
+/**
+ * Narrow frozen projection of the CLI session-state vocabulary used by the
+ * web control surface (idle/running pre-normalization and action legality).
+ */
+export const SESSION_STATES: Readonly<{
+	CREATED: string;
+	ROUTED: string;
+	EXECUTING: string;
+	PAUSED: string;
+}>;
+
 /** Runtime module shape for createRequire cast — single SSOT with the functions above. */
 export type WebAdapter = {
 	evaluateLifecycleNext: typeof evaluateLifecycleNext;
@@ -241,4 +259,6 @@ export type WebAdapter = {
 	getCompletionNextActions: typeof getCompletionNextActions;
 	evaluateVerifyPolicy: typeof evaluateVerifyPolicy;
 	appendVerificationLedgerRecord: typeof appendVerificationLedgerRecord;
+	isLegalSessionTransition: typeof isLegalSessionTransition;
+	SESSION_STATES: typeof SESSION_STATES;
 };
