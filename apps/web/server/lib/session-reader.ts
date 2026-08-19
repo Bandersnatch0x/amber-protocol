@@ -124,7 +124,10 @@ function normalizeEvent(raw: unknown): SessionEvent | null {
   } as SessionEvent;
 }
 
-export function readTimelineEvents(sessionId: string, limit?: number): SessionEvent[] {
+export function readTimelineEvents(
+  sessionId: string,
+  options?: { limit?: number; tail?: number },
+): SessionEvent[] {
   const sessionDir = resolveStatePath('sessions', sessionId);
   if (!sessionDir) {
     return [];
@@ -148,8 +151,11 @@ export function readTimelineEvents(sessionId: string, limit?: number): SessionEv
       })
       .filter((e): e is SessionEvent => e !== null);
 
-    if (limit) {
-      return events.slice(0, limit);
+    if (options?.tail) {
+      return events.slice(-options.tail);
+    }
+    if (options?.limit) {
+      return events.slice(0, options.limit);
     }
 
     return events;

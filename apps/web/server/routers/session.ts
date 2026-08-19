@@ -21,10 +21,14 @@ export const sessionRouter = router({
       z.object({
         sessionId: z.string(),
         limit: z.number().optional(),
+        tail: z.number().optional(),
       }),
     )
     .query(({ input }) => {
-      return readTimelineEvents(input.sessionId, input.limit);
+      return readTimelineEvents(input.sessionId, {
+        limit: input.limit,
+        tail: input.tail,
+      });
     }),
 
   auditSummary: publicProcedure.input(z.object({ sessionId: z.string() })).query(({ input }) => {

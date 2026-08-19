@@ -14,6 +14,7 @@ export const FIXTURE_GATE_ID = 'e2e-approval-gate';
 // session id so the baseline evidence (runner_ack etc.) stays pristine.
 export const APPROVE_CONSUMABLE_SESSION_ID = '00000000-0000-4000-8000-00000000e2a1';
 export const REJECT_CONSUMABLE_SESSION_ID = '00000000-0000-4000-8000-00000000e2b2';
+export const COMPLETED_FIXTURE_SESSION_ID = '00000000-0000-4000-8000-00000000c0mp';
 export const APPROVE_CONSUMABLE_GATE_ID = 'e2e-approve-consumable-gate';
 export const REJECT_CONSUMABLE_GATE_ID = 'e2e-reject-consumable-gate';
 
@@ -64,14 +65,19 @@ function writeLedger(sessionDir: string, records: Array<Record<string, unknown>>
   fs.writeFileSync(path.join(sessionDir, 'ledger.jsonl'), `${lines.join('\n')}\n`);
 }
 
-function seedSession(repoRoot: string, sessionId: string, goal: string): void {
+function seedSession(
+  repoRoot: string,
+  sessionId: string,
+  goal: string,
+  status = 'executing',
+): void {
   const sessionDir = path.join(repoRoot, '.amber', 'sessions', sessionId);
   fs.mkdirSync(sessionDir, { recursive: true });
 
   const manifest = {
     id: sessionId,
     goal,
-    status: 'executing',
+    status,
     route: { id: 'feature-standard', name: 'Feature Standard' },
     createdAt: FIXED_TS,
     updatedAt: FIXED_LAST_ACTIVITY,
@@ -229,6 +235,8 @@ export function seedFixtureSession(repoRoot: string): void {
     'E2E fixture gate awaiting approval',
   );
 
+  seedSession(repoRoot, COMPLETED_FIXTURE_SESSION_ID, 'E2E completed fixture session', 'completed');
+
   seedSession(repoRoot, APPROVE_CONSUMABLE_SESSION_ID, 'E2E approve-consumable fixture session');
   seedPendingGate(
     repoRoot,
@@ -251,6 +259,7 @@ export function removeFixtureSession(repoRoot: string): void {
   for (const sessionId of [
     FIXTURE_SESSION_ID,
     CONTROL_FIXTURE_SESSION_ID,
+    COMPLETED_FIXTURE_SESSION_ID,
     APPROVE_CONSUMABLE_SESSION_ID,
     REJECT_CONSUMABLE_SESSION_ID,
   ]) {

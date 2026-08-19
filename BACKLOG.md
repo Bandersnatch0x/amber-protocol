@@ -43,6 +43,12 @@ This backlog tracks implementation status across the roadmap. V1 remains Safe Am
 
 ## P0
 
+### Live Activity Feed — follow-up slices
+
+- **Server-side timeline-tailer**: `fs.watch` + byte-offset incremental reads bridging CLI appends to `timeline.jsonl` into the existing SSE channel for sub-second latency. Trigger: when 5s polling is proven insufficient by real usage. See ADR-0017.
+- **No-progress findings on web**: Surface ADR-0013 `detectNoProgress` findings via a new read-only continuity seam to the Live Activity Card health layer (current health layer covers only timeline-vocabulary budget/failure events).
+- **`getEventSummary` i18n**: The detail labels in `timeline-utils.ts` `getEventSummary` are hard-coded English; follow up with proper i18n keys (pre-existing gap shared with the timeline page, now also visible in the Live Activity Card).
+
 ## P2
 
 No open V1, V1.5, V2, V2.5, V3, V4, V4.5, V5, or V5.5 implementation items.

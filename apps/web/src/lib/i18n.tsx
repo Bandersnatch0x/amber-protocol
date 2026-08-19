@@ -495,6 +495,15 @@ const en = {
   'sessions.timeline.empty': 'No events yet',
   'sessions.timeline.jumpToLatest': 'Jump to latest',
   'sessions.timeline.jumpToTop': 'Jump to top',
+  'sessions.live.title': 'Live Activity',
+  'sessions.live.detail': 'Real-time events from this session.',
+  'sessions.live.empty': 'No activity recorded yet.',
+  'sessions.live.emptyNoRunner':
+    'No runner attached — activity will not be generated until an agent session starts the runner.',
+  'sessions.live.badge': 'Live',
+  'sessions.live.recent': 'Showing latest {count} events',
+  'sessions.live.runnerTimeout': 'Runner timed out',
+  'sessions.live.viewTranscript': 'View transcript',
   'governance.title': 'Governance',
   'governance.description':
     'Read-only governance summary for this repository. Loaded on demand — this page never polls.',
@@ -835,6 +844,7 @@ const en = {
   'timeline.event.task_progress': 'Task Progress',
   'timeline.event.error': 'Error',
   'timeline.event.heartbeat': 'Heartbeat',
+  'timeline.event.evidence-job-changed': 'Evidence job changed',
   // ux namespace: read-only cognitive-design copy (task #27). Backend string
   // mappings mirror the exact English prose emitted by scripts/lib/core/
   // lifecycle.js and scripts/lib/web-adapter.js.
@@ -1411,8 +1421,16 @@ const zh: Record<TranslationKey, string> = {
   'sessions.controls.confirmation.runnerTimeout': 'Runner ACK \u8d85\u65f6',
   'sessions.timeline.empty': '\u6682\u65e0\u4e8b\u4ef6',
   'sessions.timeline.jumpToLatest': '\u5b9a\u4f4d\u5230\u6700\u65b0',
-  'sessions.timeline.jumpToTop': '\u8fd4\u56de\u9876\u90e8',
-  'governance.title': '\u6cbb\u7406\u6982\u89c8',
+  'sessions.timeline.jumpToTop': '返回顶部',
+  'sessions.live.title': '实时活动',
+  'sessions.live.detail': '该会话的实时事件流。',
+  'sessions.live.empty': '暂无活动记录。',
+  'sessions.live.emptyNoRunner': 'Runner 未接入 — 在 Agent 会话启动 Runner 前不会产生活动。',
+  'sessions.live.badge': '实时',
+  'sessions.live.recent': '显示最近 {count} 条事件',
+  'sessions.live.runnerTimeout': 'Runner 超时',
+  'sessions.live.viewTranscript': '查看转录',
+  'governance.title': '治理概览',
   'governance.description':
     '\u672c\u4ed3\u5e93\u7684\u53ea\u8bfb\u6cbb\u7406\u6458\u8981\u3002\u6309\u9700\u52a0\u8f7d\u2014\u2014\u8be5\u9875\u9762\u4e0d\u4f1a\u8f6e\u8be2\u3002',
   'governance.loading': '\u6b63\u5728\u52a0\u8f7d\u6cbb\u7406\u6458\u8981...',
@@ -1743,7 +1761,8 @@ const zh: Record<TranslationKey, string> = {
   'timeline.event.runner_timeout': 'Runner \u8d85\u65f6',
   'timeline.event.task_progress': '\u4efb\u52a1\u8fdb\u5ea6',
   'timeline.event.error': '\u9519\u8bef',
-  'timeline.event.heartbeat': '\u5fc3\u8df3',
+  'timeline.event.heartbeat': '心跳',
+  'timeline.event.evidence-job-changed': '证据任务状态变更',
   'ux.links.viewTranscripts': '查看记录',
   'ux.links.transcriptsNote': '转录按 Claude 项目目录独立存放，控制台暂不能自动关联到具体会话。',
   'ux.links.relatedTranscripts': '可能相关的转录',

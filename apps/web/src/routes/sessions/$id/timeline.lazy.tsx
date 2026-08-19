@@ -1,6 +1,7 @@
 ﻿import { createLazyFileRoute, Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { trpc } from '@/lib/trpc';
+import { isActiveStatus } from '@/features/sessions/sessions-view-model';
 import { TimelineEvent } from '@/components/timeline/TimelineEvent';
 import { TimelineFilter } from '@/components/timeline/TimelineFilter';
 import { computeTimelineMetrics, formatDuration } from '@/components/timeline/timeline-utils';
@@ -21,7 +22,10 @@ function TimelinePage() {
     isLoading,
     error,
     refetch,
-  } = trpc.session.timeline.useQuery({ sessionId: id });
+  } = trpc.session.timeline.useQuery(
+    { sessionId: id },
+    { refetchInterval: isActiveStatus(session?.status ?? '') ? 10000 : false },
+  );
 
   const metrics = useMemo(() => computeTimelineMetrics(events), [events]);
   const timelineEntries = useMemo(

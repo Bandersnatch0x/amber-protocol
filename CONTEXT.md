@@ -180,6 +180,12 @@ _Avoid_: transfer, delegation, swap
 A durable file in a target repository that preserves context across agent sessions (e.g. `session-handoff.md`, `PROGRESS.md`, `feature_list.json`).
 _Avoid_: context file, memory file, state file
 
+## Observability
+
+**Live Activity Feed**:
+The Governance Console's near-real-time rendered view of a Session's timeline events: the web console polls `timeline.jsonl` as the single source of truth while a session is active and uses SSE only as an invalidation signal. It presents recorded evidence; it is not a runtime interception of the agent.
+_Avoid_: live log, console stream, runtime trace
+
 ## Agent Integration
 
 **Skill**:

@@ -7,6 +7,8 @@ import { SessionStatus } from '@/components/session/SessionStatus';
 import { CodeBlock } from '@/components/code/CodeBlock';
 import { AuditEvidenceCard } from '@/components/session/AuditEvidenceCard';
 import { HandoffCard } from '@/components/session/HandoffCard';
+import { LiveActivityCard, type LiveActivityState } from '@/components/session/LiveActivityCard';
+import { isActiveStatus } from '@/features/sessions/sessions-view-model';
 import {
   SessionCompletionWorkbench,
   resolveVerificationProgress,
@@ -60,7 +62,10 @@ function SessionDetailPage() {
   const search = Route.useSearch() as { from?: string } | undefined;
   const fromGates = search?.from === 'gates';
   const { data: session, isLoading, error, refetch } = trpc.session.byId.useQuery({ id });
-  const timelineQuery = trpc.session.timeline.useQuery({ sessionId: id });
+  const timelineQuery = trpc.session.timeline.useQuery(
+    { sessionId: id, tail: 50 },
+    { refetchInterval: isActiveStatus(session?.status ?? '') ? 5000 : false },
+  );
   const auditSummary = trpc.session.auditSummary.useQuery({ sessionId: id });
   const lifecycleNext = trpc.lifecycle.next.useQuery({ session: id, strict: true });
   const completionCheck = trpc.lifecycle.completionCheck.useQuery({ sessionId: id, strict: true });
@@ -133,6 +138,19 @@ function SessionDetailPage() {
     }
   }, [events, activeJobId, verificationJob]);
 
+  // SSE → timeline refetch: any non-heartbeat event means fresh data on disk
+  const lastTimelineEventRef = useRef('');
+  useEffect(() => {
+    if (!events.length) return;
+    const last = events[events.length - 1];
+    if (!last || last.type === 'heartbeat') return;
+    const marker = `${last.type}:${String(last.timestamp)}`;
+    if (marker !== lastTimelineEventRef.current) {
+      lastTimelineEventRef.current = marker;
+      void timelineQuery.refetch();
+    }
+  }, [events, timelineQuery]);
+
   // Once a verification settles (denied / completed / failed / timeout),
   // refresh every read-only fold that evidence may have touched.
   const settledJobRef = useRef('');
@@ -155,6 +173,12 @@ function SessionDetailPage() {
   }, [verificationProgress.phase, verificationProgress.jobId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const effectiveStatus = (liveStatus ?? session?.status ?? null) as SessionStatusType | null;
+  const hasRunnerTimeout = useMemo(
+    () =>
+      events.some((e) => e.type === 'runner_timeout') ||
+      (timelineQuery.data ?? []).some((e) => e.type === 'runner_timeout'),
+    [events, timelineQuery.data],
+  );
   const latestEvent = useMemo<SessionEvent | null>(() => {
     if (lastEvent) return lastEvent;
     const timeline = timelineQuery.data;
@@ -170,7 +194,23 @@ function SessionDetailPage() {
     [manifestJson],
   );
   const budgetText = session ? formatBudget(session, t) : null;
-  const eventCount = timelineQuery.data?.length ?? session?.timelineEvents ?? 0;
+  const eventCount = session?.timelineEvents ?? timelineQuery.data?.length ?? 0;
+
+  const liveActivityState = useMemo<LiveActivityState>(() => {
+    const isLive = isActiveStatus(effectiveStatus ?? '') && connectionState === 'open';
+    if (timelineQuery.isLoading) return { kind: 'loading' };
+    const mergedCount = (timelineQuery.data ?? []).length + events.length;
+    if (mergedCount === 0 && hasRunnerTimeout) return { kind: 'empty-runner-timeout', isLive };
+    if (mergedCount === 0) return { kind: 'empty-normal', isLive };
+    return { kind: 'has-events', isLive };
+  }, [
+    timelineQuery.isLoading,
+    timelineQuery.data,
+    events.length,
+    hasRunnerTimeout,
+    effectiveStatus,
+    connectionState,
+  ]);
 
   async function handleRunVerification(input: { command?: string }) {
     try {
@@ -291,6 +331,13 @@ function SessionDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          <LiveActivityCard
+            timelineEvents={timelineQuery.data ?? []}
+            sseEvents={events}
+            state={liveActivityState}
+            transcriptId={transcriptCandidates.data?.candidates?.[0]?.transcriptId}
+            sessionId={id}
+          />
           <section className="card p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>

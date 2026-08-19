@@ -205,3 +205,31 @@ export function computeTimelineMetrics(events: SessionEvent[] | undefined): Time
 
   return { startTime, endTime, duration, typeCounts };
 }
+
+/**
+ * Merge timeline (disk source-of-truth) and SSE events (acceleration layer),
+ * deduplicate by exact (type, timestampMs), filter heartbeats, return ascending.
+ */
+export function mergeActivityEvents(timeline: SessionEvent[], sse: SessionEvent[]): SessionEvent[] {
+  const seen = new Set<string>();
+  const merged: SessionEvent[] = [];
+
+  for (const event of timeline) {
+    const key = `${event.type}|${parseTimestamp(event.timestamp)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(event);
+    }
+  }
+
+  for (const event of sse) {
+    if (event.type === 'heartbeat') continue;
+    const key = `${event.type}|${parseTimestamp(event.timestamp)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(event);
+    }
+  }
+
+  return merged.sort((a, b) => parseTimestamp(a.timestamp)! - parseTimestamp(b.timestamp)!);
+}

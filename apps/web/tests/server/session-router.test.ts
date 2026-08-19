@@ -65,15 +65,34 @@ describe('sessionRouter', () => {
       const result = await caller.timeline({ sessionId: 'session-1', limit: 5 });
 
       expect(result).toBe(events);
-      expect(readTimelineEvents).toHaveBeenCalledWith('session-1', 5);
+      expect(readTimelineEvents).toHaveBeenCalledWith('session-1', {
+        limit: 5,
+        tail: undefined,
+      });
     });
 
-    it('passes undefined limit when omitted', async () => {
+    it('passes the tail parameter through to the reader', async () => {
+      const events = [{ type: 'session_completed' }];
+      readTimelineEvents.mockReturnValue(events);
+
+      const result = await caller.timeline({ sessionId: 'session-1', tail: 50 });
+
+      expect(result).toBe(events);
+      expect(readTimelineEvents).toHaveBeenCalledWith('session-1', {
+        limit: undefined,
+        tail: 50,
+      });
+    });
+
+    it('passes undefined limit and tail when omitted', async () => {
       readTimelineEvents.mockReturnValue([]);
 
       await caller.timeline({ sessionId: 'session-1' });
 
-      expect(readTimelineEvents).toHaveBeenCalledWith('session-1', undefined);
+      expect(readTimelineEvents).toHaveBeenCalledWith('session-1', {
+        limit: undefined,
+        tail: undefined,
+      });
     });
   });
 
