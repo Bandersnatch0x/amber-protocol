@@ -12,7 +12,7 @@ export function createApp() {
     createExpressMiddleware({
       router: appRouter,
       createContext: () => ({}),
-    })
+    }),
   );
 
   app.get('/api/sessions/:sessionId/events', handleSSE);

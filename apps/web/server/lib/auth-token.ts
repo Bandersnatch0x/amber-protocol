@@ -29,7 +29,7 @@ export function validateSSEAuthToken(req: Request): SSEAuthResult {
     }
 
     console.warn(
-      '[auth-token] SSE_AUTH_SECRET is not set. The SSE endpoint is open in development/test environments.'
+      '[auth-token] SSE_AUTH_SECRET is not set. The SSE endpoint is open in development/test environments.',
     );
     return {
       valid: true,

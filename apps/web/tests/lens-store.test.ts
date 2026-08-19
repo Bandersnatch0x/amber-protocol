@@ -7,7 +7,10 @@ import { saveTranscriptDigest } from '../server/lib/lens-store';
 const FIXTURE_JSONL = [
   JSON.stringify({
     type: 'user',
-    message: { role: 'user', content: 'set GITHUB_TOKEN=ghp_1234567890abcdefABCDEF1234567890abcd then continue' },
+    message: {
+      role: 'user',
+      content: 'set GITHUB_TOKEN=ghp_1234567890abcdefABCDEF1234567890abcd then continue',
+    },
     timestamp: '2026-06-17T10:00:00Z',
   }),
   JSON.stringify({

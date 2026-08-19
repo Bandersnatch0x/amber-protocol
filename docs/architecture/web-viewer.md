@@ -2,396 +2,173 @@
 
 ## Overview
 
-The web viewer is a Next.js-based dashboard for visualizing Amber Protocol sessions,
-routes, timelines, and wiki documentation. It is a **supervised action viewer** —
+The web viewer (`apps/web`) is a Vite + React single-page application served by a
+local Express + tRPC backend. It visualizes Amber Protocol sessions, routes,
+gates, transcripts, and continuity state. It is a **supervised action viewer** —
 read-only dashboards combined with a constrained set of audited, non-arbitrary
-mutations (session start/pause/resume/abort and verification command execution).
+mutations (session start/pause/resume/abort and verification command
+execution). Everything else (handoff generation, approval, completion, feature
+management) stays CLI-only and surfaces in the UI as copy-only command
+guidance, never as an executable button.
 
 See [ADR-0007](../adr/0007-web-viewer-role.md) for the formal boundary between
 allowed web actions and CLI-only actions.
 
-**Status:** Scaffold with server-side session control and verification. UI
-components partially implemented.
-
 ## Tech Stack
 
-- **Framework:** Next.js 14 (App Router)
+- **Build/Dev Server:** Vite 5 (client) + `tsx watch` (server)
 - **Runtime:** React 18
 - **Language:** TypeScript (strict mode)
-- **API Layer:** tRPC 10 + Zod validation
-- **Backend:** Express 5 + tRPC
-- **UI Components:** Tailwind CSS + shadcn/ui + Radix UI primitives
-- **State Management:** TanStack Query (server state) + Zustand (client state)
+- **Routing:** TanStack Router (file-based routes, generated `routeTree.gen.ts`)
+- **API Layer:** tRPC 10 + Zod validation + superjson transformer
+- **Backend:** Express 5 hosting the tRPC HTTP handler and SSE endpoints
+- **UI:** Tailwind CSS with hand-rolled component classes (no component kit)
+- **Server State:** TanStack Query v4 via `@trpc/react-query`
 - **Real-time:** Server-Sent Events (SSE)
 - **Testing:** Vitest (unit) + Playwright (E2E)
-- **Dev Tools:** ESLint, Prettier, Husky pre-commit hooks
+- **Dev Tools:** ESLint, Prettier (2-space)
 
 ## Architecture Principles
 
-1. **Supervised Action Viewer:** Web viewer reads `.amber/` filesystem. It may
-   write to `timeline.jsonl`, `ledger.jsonl`, and `manifest.json` for session
-   control and verification — see [ADR-0007](../adr/0007-web-viewer-role.md) for
-   the complete allow list. It never creates/deletes files or modifies
-   `feature_list.json`.
-2. **No Database:** All data comes from filesystem state (manifest.json, timeline.jsonl)
-3. **Real-Time Updates:** SSE streams filesystem changes to connected clients
-4. **Stateless Server:** tRPC procedures are pure functions reading current state
-5. **Local-First:** Runs on `localhost`, no external hosting or authentication
-6. **Offline-Capable:** Works without internet connection
+1. **Supervised Action Viewer:** The web viewer reads `.amber/` filesystem
+   state. It may write to `timeline.jsonl`, `ledger.jsonl`, and `manifest.json`
+   for the five audited mutations only — see
+   [ADR-0007](../adr/0007-web-viewer-role.md) for the allow list. The one
+   registered exception is async verification: evidence job status snapshots
+   are persisted under `.amber/tmp/evidence-jobs/` as tmp-scoped recovery
+   state (not audit artifacts, not user documents) per the ADR-0007
+   Amendment 2026-08-18 (b). Otherwise it never creates/deletes files, never
+   modifies `feature_list.json`, and never writes handoff documents. CLI-only
+   actions appear as copy-only command blocks.
+2. **No Database:** All data comes from filesystem state (manifest.json,
+   timeline.jsonl, ledger.jsonl, gates, transcripts).
+3. **Real-Time Updates:** SSE streams session and evidence-job transitions to
+   connected clients.
+4. **CLI Core Behind One Seam:** Governance logic lives in `scripts/lib`. The
+   web server only imports `scripts/lib/web-adapter.js` (typed by
+   `web-adapter.d.ts` as the SSOT) — never deep CLI modules.
+5. **Local-First:** Runs on `localhost`, single-user development environment.
 
 ## Project Structure
 
 ```
 apps/web/
+├── index.html                 # Vite entry
 ├── src/
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── layout.tsx          # Root layout + theme provider
-│   │   ├── page.tsx            # Dashboard home
-│   │   ├── sessions/           # Session listing and detail
-│   │   ├── routes/             # Route browser
-│   │   ├── wiki/               # Wiki viewer
-│   │   ├── settings/           # Settings panel
-│   │   └── api/                # API routes
-│   │       ├── trpc/[trpc]/    # tRPC handler
-│   │       └── sse/            # SSE endpoint
-│   ├── components/
-│   │   ├── ui/                 # shadcn/ui base components
-│   │   ├── sessions/           # Session-specific components
-│   │   ├── routes/             # Route-specific components
-│   │   ├── timeline/           # Timeline visualization
-│   │   ├── wiki/               # Wiki renderer
-│   │   └── layout/             # Layout components (nav, header)
-│   ├── server/
-│   │   ├── trpc.ts             # tRPC router setup
-│   │   ├── context.ts          # Request context
-│   │   └── routers/            # tRPC procedure routers
-│   │       ├── session.ts      # Session operations
-│   │       ├── route.ts        # Route operations
-│   │       ├── timeline.ts     # Timeline operations
-│   │       └── wiki.ts         # Wiki operations
-│   ├── lib/
-│   │   ├── session-reader.ts   # Read session manifests
-│   │   ├── route-reader.ts     # Read route definitions
-│   │   ├── timeline-reader.ts  # Stream timeline events
-│   │   ├── wiki-reader.ts      # Parse wiki markdown
-│   │   └── sse-manager.ts      # SSE connection manager
-│   └── types/
-│       ├── session.ts          # Zod schemas for sessions
-│       ├── route.ts            # Zod schemas for routes
-│       └── timeline.ts         # Zod schemas for timeline events
-├── tests/
-│   ├── unit/                   # Vitest unit tests
-│   └── e2e/                    # Playwright E2E tests
-├── package.json
-└── README.md
+│   ├── main.tsx               # SPA bootstrap (router + providers)
+│   ├── routeTree.gen.ts       # Generated by TanStack Router plugin
+│   ├── routes/                # File-based routes
+│   │   ├── __root.tsx         # Root layout (nav, theme, i18n)
+│   │   ├── index.tsx          # Dashboard home
+│   │   ├── sessions/          # Session list / detail / timeline
+│   │   ├── routes/            # Route browser + detail
+│   │   ├── gates.tsx          # Gate review surface
+│   │   ├── transcripts/       # Transcript browser
+│   │   ├── governance.tsx     # On-demand governance overview
+│   │   └── settings.tsx       # Settings panel
+│   ├── components/            # Session, gate, code (CodeBlock, CommandCopyBlock)
+│   ├── features/              # Feature-scoped view models (e.g. settings)
+│   └── lib/                   # trpc client, i18n, hooks, SSE types
+├── server/
+│   ├── index.ts               # Express bootstrap
+│   ├── app.ts                 # Express app wiring (/api/trpc, SSE, health)
+│   ├── app-router.ts          # tRPC AppRouter composition
+│   ├── routers/               # session, route, session-control, gate,
+│   │                          # transcript, lifecycle, continuity
+│   ├── lib/                   # Readers (session, gate, transcript, timeline)
+│   ├── services/              # evidence-jobs (async verification registry)
+│   └── types/                 # session-events Zod schemas (SSOT for SSE)
+└── tests/e2e/                 # Playwright specs + fixture seed
 ```
 
-## Core Components
+## tRPC Routers
 
-### 1. tRPC API Layer
+| Router | Purpose |
+|--------|---------|
+| `session` | Session list/detail/timeline/audit summary (read-only) |
+| `route` | Route catalog + detail (read-only) |
+| `sessionControl` | start/pause/resume/abort via runner-ack protocol |
+| `gate` | Gate listing/review; approval surface per ADR-0007 |
+| `transcript` | Transcript records with secrets redacted (read-only) |
+| `lifecycle` | Next-step evaluation, completion check, `runVerification`, `verificationJob` |
+| `continuity` | Read-only continuity seam: `handoff.status`, `handoff.preview`, `governance.summary`, `completion.nextActions` |
 
-**Purpose:** Type-safe API between frontend and filesystem.
+The `continuity` router is strictly read-only: it adds no mutations and does
+not change the CLI-only allow list. All four queries delegate to the web
+adapter and degrade defensively on unknown fields.
 
-**Routers:**
+## Async Verification
 
-#### Session Router (`server/routers/session.ts`)
-```typescript
-listSessions({ filter?, page?, pageSize? }) → Session[]
-getSession(sessionId) → SessionDetail
-getSessionStats(sessionId) → SessionStats
-controlSession(sessionId, action) → ControlResult
-```
+`lifecycle.runVerification` no longer blocks the mutation:
 
-#### Route Router (`server/routers/route.ts`)
-```typescript
-listRoutes() → Route[]
-getRoute(routeId) → RouteDetail
-getRouteStages(routeId) → Stage[]
-```
+- **Policy denial** (verify-rules deny-wins) returns synchronously:
+  `{ status: 'denied', reason, ... }`.
+- **Accepted** runs return immediately: `{ status: 'accepted', jobId, ... }`.
+  The command executes in a background evidence job
+  (`server/services/evidence-jobs.ts`).
+- `lifecycle.verificationJob({ jobId })` returns
+  `{ jobId, status: 'pending' | 'running' | 'denied' | 'completed' | 'failed' | 'timeout', result?, error? }`.
+- Job transitions broadcast the SSE event `evidence-job-changed`
+  (`{ type, sessionId, jobId, status, timestamp }`). The session detail page
+  follows the job via SSE (primary) with a `refetchInterval` poll on
+  `verificationJob` as the fallback.
 
-#### Timeline Router (`server/routers/timeline.ts`)
-```typescript
-getTimeline(sessionId, { offset, limit, eventTypes? }) → TimelineEvent[]
-getTimelineStats(sessionId) → TimelineStats
-```
+Governance is unchanged: the same verify-rules policy gate, hash-chain ledger,
+and timeline audit apply as with the previous synchronous execution.
 
-#### Wiki Router (`server/routers/wiki.ts`)
-```typescript
-getWikiIndex() → WikiNode[]
-getWikiPage(path) → WikiPage
-searchWiki(query) → SearchResult[]
-```
+## Continuity UI Surfaces
 
-**Design:**
-- All procedures read filesystem directly (no caching layer)
-- Zod schemas validate input and output
-- Error handling returns typed errors to client
-- Procedures are stateless and pure
+- **HandoffCard** (session detail aside): read-only live/scaffold/missing
+  state, bundle delivery readiness, lazily-loaded markdown preview, and a
+  copy-only CLI remediation command (`amber handoff --target .` when the
+  handoff is missing or not delivery-ready).
+- **SessionCompletionWorkbench**: consumes `continuity.completion.nextActions`
+  and renders each missing item as actionable guidance — in-page verification
+  (the verify form), in-page approval (link to `/gates`), or a copy-only CLI
+  command block. When everything passes it shows the closing command
+  `amber session complete --session <id>` as a copy block, never an execute
+  button.
+- **Governance page** (`/governance`): on-demand read-only rendering of
+  `continuity.governance.summary` (decision badge, scores, findings,
+  next-action commands, learnings). It opts out of the global refresh interval
+  and only refetches via a manual refresh button.
 
-### 2. Filesystem Readers
+## Real-Time Updates (SSE)
 
-#### Session Reader (`lib/session-reader.ts`)
+**Endpoint:** `GET /api/sessions/:id/events`
 
-**Purpose:** Read session manifests from `.amber/sessions/`.
+Event schema SSOT: `server/types/session-events.ts` (Zod discriminated union;
+the web client re-exports it). Families:
 
-**Functions:**
+- Session lifecycle: `session_created/started/paused/resumed/completed/aborted/failed`
+- Stage + gate lifecycle: `stage_started/completed/failed`, `gate_triggered/passed/failed`
+- Runner control plane: `runner_control_requested`, `runner_ack`, `runner_rejected`, `runner_timeout`
+- Evidence jobs: `evidence-job-changed`
+- Utility: `task_progress`, `budget_warning`, `budget_exceeded`, `error`, `heartbeat`
 
-- **`listSessions(filter)`**
-  - Scans `.amber/sessions/` directory
-  - Reads manifest.json for each session
-  - Filters by state (active/completed/failed)
-  - Returns sorted list (newest first)
-
-- **`getSession(sessionId)`**
-  - Reads `manifest.json`
-  - Validates against Zod schema
-  - Returns full session detail
-
-- **`getSessionStats(sessionId)`**
-  - Calculates duration, event count, token usage
-  - Returns aggregated metrics
-
-**Error Handling:**
-- Missing manifest → null return
-- Corrupt JSON → validation error
-- Missing sessions directory → empty list
-
-#### Timeline Reader (`lib/timeline-reader.ts`)
-
-**Purpose:** Stream and parse timeline.jsonl files.
-
-**Functions:**
-
-- **`getTimeline(sessionId, options)`**
-  - Streams JSONL file line-by-line
-  - Supports offset/limit pagination
-  - Filters by event type
-  - Handles large files (10K+ events)
-
-- **`getTimelineStats(sessionId)`**
-  - Counts total events
-  - Groups by event type
-  - Returns summary statistics
-
-**Performance:**
-- Lazy loading (don't load entire file into memory)
-- Stream parsing for large timelines
-- Client-side pagination support
-
-#### Route Reader (`lib/route-reader.ts`)
-
-**Purpose:** Read route definitions from `routes/`.
-
-**Functions:**
-
-- **`listRoutes()`**
-  - Scans `routes/*.route.json`
-  - Validates each route
-  - Returns sorted list
-
-- **`getRoute(routeId)`**
-  - Reads route definition
-  - Parses stages and gates
-  - Returns full route detail
-
-- **`getRouteStages(routeId)`**
-  - Extracts stage tree
-  - Resolves gate references
-  - Returns executable plan
-
-#### Wiki Reader (`lib/wiki-reader.ts`)
-
-**Purpose:** Parse and serve wiki documentation.
-
-**Functions:**
-
-- **`getWikiIndex()`**
-  - Reads `docs/wiki/index.md`
-  - Parses navigation tree
-  - Returns hierarchical structure
-
-- **`getWikiPage(path)`**
-  - Reads markdown file
-  - Parses frontmatter (if present)
-  - Returns HTML + metadata
-
-- **`searchWiki(query)`**
-  - Full-text search across wiki pages
-  - Returns matching pages with highlights
-
-### 3. Real-Time Updates (SSE)
-
-#### SSE Manager (`lib/sse-manager.ts`)
-
-**Purpose:** Stream filesystem changes to connected clients.
-
-**Events:**
-
-- `session_created` - New session started
-- `session_updated` - Session state changed
-- `session_completed` - Session finished
-- `timeline_event` - New timeline event added
-
-**Implementation:**
-- Server-Sent Events (SSE) API
-- Filesystem watcher (chokidar or fs.watch)
-- Connection pooling per client
-- Automatic reconnection on client
-
-**Endpoint:**
-```
-GET /api/sse?sessionId=<id>
-```
-
-**Event Stream:**
-```
-event: session_updated
-data: {"sessionId":"abc-123","state":"executing","stage":"implement"}
-
-event: timeline_event
-data: {"type":"stage_completed","stage":"verify","timestamp":"2026-06-21T10:00:00Z"}
-```
-
-### 4. UI Components
-
-#### Session Components
-
-- **SessionTable** - Paginated list of sessions
-- **SessionDetail** - Full session view with stages
-- **SessionControls** - Play/pause/abort buttons
-- **SessionMetrics** - Token usage, duration, progress bar
-
-#### Timeline Components
-
-- **TimelineView** - Chronological event list
-- **TimelineFilter** - Event type filter dropdown
-- **EventCard** - Individual event display
-- **TimelineChart** - Visual timeline graph
-
-#### Route Components
-
-- **RouteGrid** - Route cards by category
-- **RouteDetail** - Full route definition view
-- **StageTree** - Visual stage hierarchy
-- **GateMarker** - Gate checkpoint indicators
-
-#### Wiki Components
-
-- **WikiNav** - Tree navigation sidebar
-- **WikiPage** - Markdown renderer with syntax highlighting
-- **WikiSearch** - Search input with live results
-
-### 5. State Management
-
-#### Server State (TanStack Query)
-
-- Handles all API calls via tRPC
-- Automatic caching and revalidation
-- Optimistic updates for session controls
-- Background refetching
-
-#### Client State (Zustand)
-
-- UI state (sidebar open/closed, theme)
-- Filter settings (session filter, timeline filter)
-- Pagination state
-- User preferences
-
-### 6. Theme System
-
-**next-themes** integration:
-
-- System/light/dark mode support
-- Persists to localStorage
-- SSR-compatible (no flash)
-- Tailwind dark mode classes
-
-**Theme Toggle:**
-- Header button switches themes
-- Icon changes (sun/moon)
-- Transitions smoothly
+The client hook `useSessionEvents` maintains the EventSource with exponential
+reconnect and feeds both status derivation and the verification job follower.
 
 ## Page Routes
 
 ```
-/                           # Dashboard home (overview)
+/                           # Dashboard home (+ governance overview link)
 /sessions                   # Session list
-/sessions/:id               # Session detail
-/sessions/:id/timeline      # Full timeline view
-/routes                     # Route browser
-/routes/:id                 # Route detail
-/wiki                       # Wiki index
-/wiki/:path                 # Wiki page
+/sessions/$id               # Session detail (workbench, handoff card, evidence)
+/sessions/$id/timeline      # Full timeline view
+/routes, /routes/$id        # Route browser + detail
+/gates                      # Gate review
+/transcripts, /transcripts/$id
+/governance                 # On-demand governance overview
 /settings                   # Settings panel
 ```
 
 ## API Endpoints
 
 ```
-/api/trpc/[trpc]           # tRPC HTTP handler
-/api/sse                   # Server-Sent Events stream
-```
-
-## Data Flow
-
-```
-Filesystem (.amber/)
-    ↓
-Readers (session-reader, timeline-reader, etc.)
-    ↓
-tRPC Routers (server/routers/)
-    ↓
-tRPC Client (TanStack Query)
-    ↓
-React Components
-    ↓
-User Interface
-```
-
-**Real-Time Updates:**
-```
-Filesystem Change
-    ↓
-fs.watch / chokidar
-    ↓
-SSE Manager
-    ↓
-Event Stream
-    ↓
-Client EventSource
-    ↓
-Query Invalidation
-    ↓
-UI Update
-```
-
-## Testing Strategy
-
-### Unit Tests (Vitest)
-
-- Reader functions (session-reader, timeline-reader)
-- tRPC procedures
-- Utility functions
-- Component logic
-
-### E2E Tests (Playwright)
-
-- Session list page
-- Session detail page
-- Timeline view
-- Route browser
-- Wiki navigation
-- Session controls
-- Real-time updates
-
-### Test Fixtures
-
-```
-tests/fixtures/
-├── sessions/              # Sample session manifests
-├── routes/                # Sample route definitions
-├── timelines/             # Sample timeline.jsonl files
-└── wiki/                  # Sample wiki pages
+/api/trpc/*                   # tRPC HTTP handler (superjson)
+/api/sessions/:id/events      # SSE stream for one session
+/api/health                   # Health probe
 ```
 
 ## Development Commands
@@ -399,69 +176,28 @@ tests/fixtures/
 ```bash
 cd apps/web
 
-# Development
-npm run dev              # Start dev server (client + backend)
+npm run dev              # Start dev servers (Express API + Vite client)
 npm run dev:client       # Vite dev server only
 npm run dev:server       # Express + tRPC server only
 
-# Build
-npm run build            # Production build
-npm run start            # Start production server
-
-# Testing
-npm test                 # Run Vitest tests
-npm run test:e2e         # Run Playwright tests
-npm run test:watch       # Watch mode
-
-# Linting
-npm run lint             # ESLint
-npm run format           # Prettier
+npm run build            # tsc --noEmit && vite build
+npm test                 # Vitest unit tests
+npm run test:e2e         # Playwright tests (self-hosted fixture repo)
 ```
 
-## Configuration Files
-
-```
-apps/web/
-├── next.config.mjs         # Next.js configuration
-├── tailwind.config.ts      # Tailwind CSS configuration
-├── tsconfig.json           # TypeScript configuration
-├── vitest.config.ts        # Vitest configuration
-├── playwright.config.ts    # Playwright configuration
-├── .eslintrc.json          # ESLint configuration
-└── .prettierrc             # Prettier configuration
-```
+The TanStack Router Vite plugin regenerates `src/routeTree.gen.ts` whenever
+route files change during `dev`/`build`.
 
 ## Security Considerations
 
-1. **Local-Only:** Server binds to localhost only (no external access)
-2. **No Authentication:** Assumes single-user local development environment
-3. **Audited Mutations Only:** Web viewer writes only to `timeline.jsonl`,
-   `ledger.jsonl`, and `manifest.json` — all appended, never overridden. See
-   [ADR-0007](../adr/0007-web-viewer-role.md) for the allowed mutation list.
-4. **Input Validation:** All API inputs validated via Zod schemas
-5. **Path Traversal:** Filesystem reads restricted to `.amber/` directory
-
-## Performance Targets
-
-- Page load: < 1s
-- API response: < 200ms
-- Timeline (1000 events): < 2s
-- Real-time latency: < 100ms
-- Memory usage: < 100MB
-
-## Browser Support
-
-- Chrome/Edge 90+
-- Firefox 88+
-- Safari 14+
-- No IE11 support
-
-## Future Enhancements
-
-- Session replay (step through timeline)
-- Route visualization (graph view)
-- Export reports (PDF/CSV)
-- Custom dashboards
-- Multi-project support
-- Session comparison
-- Metrics charting
+1. **Local-Only:** Server binds to `127.0.0.1`.
+2. **Audited Mutations Only:** The five allowed mutations append to
+   `timeline.jsonl` / `ledger.jsonl` / `manifest.json`; see ADR-0007. The only
+   other write is the async-verification exception: evidence job status
+   snapshots under `.amber/tmp/evidence-jobs/`, tmp-scoped recovery state that
+   is neither an audit artifact nor a user document (ADR-0007 Amendment
+   2026-08-18 (b)).
+3. **Copy-Only CLI Guidance:** CLI-only actions are rendered as clipboard-copy
+   blocks (`CommandCopyBlock`) — the console never executes them.
+4. **Input Validation:** All API inputs validated via Zod schemas.
+5. **Secret Redaction:** Transcript rendering redacts secrets before display.

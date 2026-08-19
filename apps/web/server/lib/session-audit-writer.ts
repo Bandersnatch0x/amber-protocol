@@ -71,7 +71,10 @@ function canonicalize(record: Record<string, unknown>): string {
 }
 
 function hashRecord(record: Record<string, unknown>, prevHash: string): string {
-  return crypto.createHash('sha256').update(prevHash + canonicalize(record)).digest('hex');
+  return crypto
+    .createHash('sha256')
+    .update(prevHash + canonicalize(record))
+    .digest('hex');
 }
 
 async function readLastLedgerHash(ledgerPath: string): Promise<string> {
@@ -79,7 +82,7 @@ async function readLastLedgerHash(ledgerPath: string): Promise<string> {
     const content = await fsp.readFile(ledgerPath, 'utf8');
     const lastLine = content
       .split('\n')
-      .map(line => line.trim())
+      .map((line) => line.trim())
       .filter(Boolean)
       .at(-1);
     if (!lastLine) return GENESIS_HASH;
@@ -100,7 +103,11 @@ function getGateId(value: unknown): string | undefined {
   const record = value as Record<string, unknown>;
   if (typeof record.gateId === 'string') return record.gateId;
   const data = record.data;
-  if (data && typeof data === 'object' && typeof (data as Record<string, unknown>).gateId === 'string') {
+  if (
+    data &&
+    typeof data === 'object' &&
+    typeof (data as Record<string, unknown>).gateId === 'string'
+  ) {
     return (data as Record<string, unknown>).gateId as string;
   }
   return undefined;
@@ -289,7 +296,10 @@ export async function appendSessionLedgerRecord(
   return full;
 }
 
-export async function readSessionAuditSummary(sessionId: string, gateId?: string): Promise<SessionAuditSummary> {
+export async function readSessionAuditSummary(
+  sessionId: string,
+  gateId?: string,
+): Promise<SessionAuditSummary> {
   const sessionDir = getSessionDir(sessionId);
   const [ledger, timeline] = await Promise.all([
     readLedgerSummary(sessionId, path.join(sessionDir, 'ledger.jsonl'), gateId),

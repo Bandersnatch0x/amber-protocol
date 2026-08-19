@@ -30,29 +30,88 @@ const SessionEventBaseSchema = z.object({
 // Keeping it optional lets one schema validate both paths without dropping
 // events.
 export const SessionEventSchema = z.discriminatedUnion('type', [
-  SessionEventBaseSchema.extend({ type: z.literal('session_created'), sessionId: z.string().optional(), goal: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_started'), sessionId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_paused'), sessionId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_resumed'), sessionId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_completed'), sessionId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_aborted'), sessionId: z.string().optional(), reason: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('session_failed'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('session_created'),
+    sessionId: z.string().optional(),
+    goal: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('session_started'),
+    sessionId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('session_paused'),
+    sessionId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('session_resumed'),
+    sessionId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('session_completed'),
+    sessionId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('session_aborted'),
+    sessionId: z.string().optional(),
+    reason: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('session_failed'),
+    sessionId: z.string().optional(),
+  }),
   // State-machine transition events. data carries { fromState, toState }.
-  SessionEventBaseSchema.extend({ type: z.literal('route_selected'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('route_selected'),
+    sessionId: z.string().optional(),
+  }),
   // Stage lifecycle. data carries { stage, displayName, command, result }.
-  SessionEventBaseSchema.extend({ type: z.literal('stage_started'), sessionId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('stage_completed'), sessionId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('stage_failed'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('stage_started'),
+    sessionId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('stage_completed'),
+    sessionId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('stage_failed'),
+    sessionId: z.string().optional(),
+  }),
   // Gate lifecycle. data carries { gateId, approvedBy } / { gateId, type }.
-  SessionEventBaseSchema.extend({ type: z.literal('gate_triggered'), sessionId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('gate_passed'), sessionId: z.string().optional(), gateId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('gate_failed'), sessionId: z.string().optional(), gateId: z.string().optional(), reason: z.string().optional() }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('gate_triggered'),
+    sessionId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('gate_passed'),
+    sessionId: z.string().optional(),
+    gateId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('gate_failed'),
+    sessionId: z.string().optional(),
+    gateId: z.string().optional(),
+    reason: z.string().optional(),
+  }),
   // Budget signals. data carries { used, total, percentage }.
-  SessionEventBaseSchema.extend({ type: z.literal('budget_warning'), sessionId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('budget_exceeded'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('budget_warning'),
+    sessionId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('budget_exceeded'),
+    sessionId: z.string().optional(),
+  }),
   // Checkpoint / verification lifecycle from the CLI timeline schema.
-  SessionEventBaseSchema.extend({ type: z.literal('checkpoint_created'), sessionId: z.string().optional() }),
-  SessionEventBaseSchema.extend({ type: z.literal('verification_failed'), sessionId: z.string().optional() }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('checkpoint_created'),
+    sessionId: z.string().optional(),
+  }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('verification_failed'),
+    sessionId: z.string().optional(),
+  }),
   // Web control-plane lifecycle for durable runner handshakes. These are a web
   // superset over the CLI timeline schema so the UI can show where a control
   // request stopped: requested, acknowledged, rejected, or timed out.
@@ -94,7 +153,21 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
     source: z.string().optional(),
     message: z.string().optional(),
   }),
-  SessionEventBaseSchema.extend({ type: z.literal('task_progress'), sessionId: z.string().optional(), task: z.string(), progress: z.number() }),
+  SessionEventBaseSchema.extend({
+    type: z.literal('task_progress'),
+    sessionId: z.string().optional(),
+    task: z.string(),
+    progress: z.number(),
+  }),
+  // Async evidence-job lifecycle (web superset): the non-blocking
+  // runVerification pipeline broadcasts job transitions so the UI can follow
+  // long-running verifications without holding the mutation open.
+  SessionEventBaseSchema.extend({
+    type: z.literal('evidence-job-changed'),
+    sessionId: z.string().optional(),
+    jobId: z.string(),
+    status: z.string(),
+  }),
   // The CLI schema's error payload is an optional object ({ message, stack,
   // recoverable }); the SSE path historically emitted a plain string. Accept
   // both so a CLI-valid error event never fails web validation.

@@ -18,9 +18,7 @@ describe('route-reader', () => {
     });
 
     it('uses "uncategorized" for routes without a category', () => {
-      const routes = [
-        { id: '1', name: 'A', description: '', stages: [] },
-      ];
+      const routes = [{ id: '1', name: 'A', description: '', stages: [] }];
 
       const grouped = groupRoutesByCategory(routes);
 
@@ -46,7 +44,7 @@ describe('route-reader', () => {
 
     it('returns routes sorted by name', () => {
       const routes = listRoutes();
-      const names = routes.map(r => r.name);
+      const names = routes.map((r) => r.name);
 
       expect(names).toEqual([...names].sort());
     });

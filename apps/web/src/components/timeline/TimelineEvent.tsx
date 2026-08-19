@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { EventIcon } from './EventIcon';
-import { formatEventTimestamp, formatDuration, getEventSummary, parseTimestamp } from './timeline-utils';
+import {
+  formatEventTimestamp,
+  formatDuration,
+  getEventSummary,
+  parseTimestamp,
+} from './timeline-utils';
 import type { SessionEvent } from '@/lib/types/session-events';
 import { CodeBlock } from '@/components/code/CodeBlock';
 import { useI18n, type I18nKey } from '@/lib/i18n';
@@ -12,7 +17,12 @@ interface TimelineEventProps {
   startTime: number | null;
 }
 
-export function TimelineEvent({ event, displayIndex, previousTimestamp, startTime }: TimelineEventProps) {
+export function TimelineEvent({
+  event,
+  displayIndex,
+  previousTimestamp,
+  startTime,
+}: TimelineEventProps) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const eventLabel = t(`timeline.event.${event.type}` as I18nKey);
@@ -20,7 +30,8 @@ export function TimelineEvent({ event, displayIndex, previousTimestamp, startTim
   const timestamp = parseTimestamp(event.timestamp);
 
   const offset = startTime !== null && timestamp !== null ? timestamp - startTime : null;
-  const interval = previousTimestamp !== null && timestamp !== null ? timestamp - previousTimestamp : null;
+  const interval =
+    previousTimestamp !== null && timestamp !== null ? timestamp - previousTimestamp : null;
 
   return (
     <div className="flex gap-4 group">
@@ -44,7 +55,9 @@ export function TimelineEvent({ event, displayIndex, previousTimestamp, startTim
               <p className="text-sm font-medium text-slate-900 dark:text-white">
                 {summary.title || eventLabel}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{formatEventTimestamp(event.timestamp)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {formatEventTimestamp(event.timestamp)}
+              </p>
             </div>
 
             <button
@@ -82,9 +95,19 @@ export function TimelineEvent({ event, displayIndex, previousTimestamp, startTim
           )}
 
           {expanded && (
-            <div id={`event-detail-${displayIndex}`} className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-700">
-              <p className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">{t('timeline.rawEvent')}</p>
-              <CodeBlock code={JSON.stringify(event, null, 2)} language="json" title="event.json" collapseAfterLines={18} />
+            <div
+              id={`event-detail-${displayIndex}`}
+              className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-700"
+            >
+              <p className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                {t('timeline.rawEvent')}
+              </p>
+              <CodeBlock
+                code={JSON.stringify(event, null, 2)}
+                language="json"
+                title="event.json"
+                collapseAfterLines={18}
+              />
             </div>
           )}
         </div>

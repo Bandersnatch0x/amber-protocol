@@ -17,7 +17,14 @@ const JSONL = [
     type: 'user',
     message: {
       role: 'user',
-      content: [{ type: 'tool_result', tool_use_id: 'tu_1', is_error: true, content: 'AssertionError: expected 2 got 3' }],
+      content: [
+        {
+          type: 'tool_result',
+          tool_use_id: 'tu_1',
+          is_error: true,
+          content: 'AssertionError: expected 2 got 3',
+        },
+      ],
     },
     timestamp: '2026-06-17T10:00:01Z',
   }),
@@ -66,7 +73,10 @@ describe('proposeRegressionsFromTranscript', () => {
   it('reports zero proposals when the transcript has no failures', () => {
     fs.writeFileSync(
       path.join(claudeHome, '.claude', 'projects', encoded, 'clean.jsonl'),
-      JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'hi' }] } }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'hi' }] },
+      }),
     );
     const result = proposeRegressionsFromTranscript('clean', { repoPath, repoRoot, claudeHome });
     expect(result.proposedCount).toBe(0);

@@ -33,12 +33,18 @@ describe('filterTranscripts', () => {
 
   it('matches transcript id and branch text', () => {
     expect(filterTranscripts(transcripts, '82af').map((item) => item.id)).toEqual(['trans_82af91']);
-    expect(filterTranscripts(transcripts, 'session-ui').map((item) => item.id)).toEqual(['trans_82af91']);
+    expect(filterTranscripts(transcripts, 'session-ui').map((item) => item.id)).toEqual([
+      'trans_82af91',
+    ]);
   });
 
   it('matches outline and source directory text', () => {
-    expect(filterTranscripts(transcripts, 'directory overview').map((item) => item.id)).toEqual(['trans_82af91']);
-    expect(filterTranscripts(transcripts, 'projects\\other').map((item) => item.id)).toEqual(['trans_77bc02']);
+    expect(filterTranscripts(transcripts, 'directory overview').map((item) => item.id)).toEqual([
+      'trans_82af91',
+    ]);
+    expect(filterTranscripts(transcripts, 'projects\\other').map((item) => item.id)).toEqual([
+      'trans_77bc02',
+    ]);
   });
 });
 
@@ -70,7 +76,9 @@ describe('transcript display helpers', () => {
 
   it('identifies tool-only records and maps tool names', () => {
     expect(isToolOnlyTurn({ type: 'message', role: 'assistant', tools: ['Read'] })).toBe(true);
-    expect(isToolOnlyTurn({ type: 'message', role: 'assistant', tools: ['Read'], text: 'done' })).toBe(false);
+    expect(
+      isToolOnlyTurn({ type: 'message', role: 'assistant', tools: ['Read'], text: 'done' }),
+    ).toBe(false);
     expect(getToolDisplayLabel('Read')).toBe('Read file');
     expect(getToolDisplayLabel('UnknownTool')).toBe('UnknownTool');
   });

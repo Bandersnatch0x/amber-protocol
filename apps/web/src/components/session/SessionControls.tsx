@@ -48,9 +48,16 @@ interface ConfirmationState {
   message?: string;
 }
 
-function getConfirmationState(result: ControlActionResult | null | undefined): ConfirmationState | null {
+function getConfirmationState(
+  result: ControlActionResult | null | undefined,
+): ConfirmationState | null {
   if (!result) return null;
-  if (!result.confirmation && !result.runnerAck && result.persisted === undefined && result.confirmed === undefined) {
+  if (
+    !result.confirmation &&
+    !result.runnerAck &&
+    result.persisted === undefined &&
+    result.confirmed === undefined
+  ) {
     return null;
   }
 
@@ -76,21 +83,27 @@ export function SessionControls({ sessionId, status, onActionSettled }: SessionC
   const resumeMutation = trpc.sessionControl.resume.useMutation();
   const abortMutation = trpc.sessionControl.abort.useMutation();
 
-  const isPending = startMutation.isPending || pauseMutation.isPending || resumeMutation.isPending || abortMutation.isPending;
+  const isPending =
+    startMutation.isPending ||
+    pauseMutation.isPending ||
+    resumeMutation.isPending ||
+    abortMutation.isPending;
 
   const execute = async (mutation: typeof startMutation, action: string) => {
     setError(null);
     setWarning(null);
     setConfirmationState(null);
     try {
-      const result = await mutation.mutateAsync({ sessionId }) as ControlActionResult | undefined;
+      const result = (await mutation.mutateAsync({ sessionId })) as ControlActionResult | undefined;
       if (result?.auditWarning) {
         setWarning(t('sessions.controls.auditWarning', { warning: result.auditWarning }));
       }
       setConfirmationState(getConfirmationState(result));
       await onActionSettled?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('sessions.controls.failedAction', { action }));
+      setError(
+        err instanceof Error ? err.message : t('sessions.controls.failedAction', { action }),
+      );
     }
   };
 
@@ -155,16 +168,18 @@ export function SessionControls({ sessionId, status, onActionSettled }: SessionC
     return null;
   }
 
-  const runnerAckLabelKey = confirmationState?.runnerAckStatus === 'acked'
-    ? 'sessions.controls.confirmation.runnerAcked'
-    : confirmationState?.runnerAckStatus === 'rejected'
-      ? 'sessions.controls.confirmation.runnerRejected'
-      : 'sessions.controls.confirmation.runnerTimeout';
-  const runnerAckTone = confirmationState?.runnerAckStatus === 'acked'
-    ? 'text-emerald-700 dark:text-emerald-300'
-    : confirmationState?.runnerAckStatus === 'rejected'
-      ? 'text-red-700 dark:text-red-300'
-      : 'text-amber-700 dark:text-amber-300';
+  const runnerAckLabelKey =
+    confirmationState?.runnerAckStatus === 'acked'
+      ? 'sessions.controls.confirmation.runnerAcked'
+      : confirmationState?.runnerAckStatus === 'rejected'
+        ? 'sessions.controls.confirmation.runnerRejected'
+        : 'sessions.controls.confirmation.runnerTimeout';
+  const runnerAckTone =
+    confirmationState?.runnerAckStatus === 'acked'
+      ? 'text-emerald-700 dark:text-emerald-300'
+      : confirmationState?.runnerAckStatus === 'rejected'
+        ? 'text-red-700 dark:text-red-300'
+        : 'text-amber-700 dark:text-amber-300';
 
   return (
     <div className="flex flex-col gap-2">
@@ -187,33 +202,51 @@ export function SessionControls({ sessionId, status, onActionSettled }: SessionC
       {error && (
         <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="underline text-xs">{t('common.dismiss')}</button>
+          <button onClick={() => setError(null)} className="underline text-xs">
+            {t('common.dismiss')}
+          </button>
         </div>
       )}
 
       {warning && (
         <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
           <span>{warning}</span>
-          <button onClick={() => setWarning(null)} className="underline text-xs">{t('common.dismiss')}</button>
+          <button onClick={() => setWarning(null)} className="underline text-xs">
+            {t('common.dismiss')}
+          </button>
         </div>
       )}
 
       {confirmationState && (
         <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
           <ol className="grid gap-1 sm:grid-cols-3">
-            <li className={confirmationState.requestPersisted ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}>
+            <li
+              className={
+                confirmationState.requestPersisted
+                  ? 'text-emerald-700 dark:text-emerald-300'
+                  : 'text-amber-700 dark:text-amber-300'
+              }
+            >
               {confirmationState.requestPersisted
                 ? t('sessions.controls.confirmation.requestPersisted')
                 : t('sessions.controls.confirmation.requestNotPersisted')}
             </li>
-            <li className={confirmationState.manifestConfirmed ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}>
+            <li
+              className={
+                confirmationState.manifestConfirmed
+                  ? 'text-emerald-700 dark:text-emerald-300'
+                  : 'text-amber-700 dark:text-amber-300'
+              }
+            >
               {confirmationState.manifestConfirmed
                 ? t('sessions.controls.confirmation.manifestConfirmed')
                 : t('sessions.controls.confirmation.manifestUnconfirmed')}
             </li>
             <li className={runnerAckTone}>{t(runnerAckLabelKey)}</li>
           </ol>
-          {(confirmationState.message || confirmationState.requestId || confirmationState.source) && (
+          {(confirmationState.message ||
+            confirmationState.requestId ||
+            confirmationState.source) && (
             <p className="mt-2 flex flex-wrap gap-x-2 gap-y-1 break-words font-mono text-[0.68rem] text-slate-500 dark:text-slate-400">
               {confirmationState.message && <span>{confirmationState.message}</span>}
               {confirmationState.requestId && <span>{confirmationState.requestId}</span>}

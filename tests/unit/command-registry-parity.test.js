@@ -19,6 +19,8 @@ const {
 	COMMAND_DEFINITIONS,
 	COMMAND_TIERS,
 	bindCommandHandlers,
+	commandInvocationContract,
+	knownSubcommands,
 	validateCommandRegistry,
 } = require("../../scripts/lib/command-registry.js");
 
@@ -92,6 +94,34 @@ test("Command tiers are the single visibility source", () => {
 		new Set(COMMANDS.filter((name) => COMMAND_TIERS[name] === "deprecated")),
 		DEPRECATED_COMMANDS,
 	);
+});
+
+test("Command Definitions project option contracts without a skill-only allowlist", () => {
+	const next = commandInvocationContract("next");
+	assert.ok(next.allowedOptions.includes("--objective"));
+	assert.ok(!next.allowedOptions.includes("--goal"));
+
+	const loopRecommend = commandInvocationContract("loop", "recommend");
+	assert.ok(loopRecommend.allowedOptions.includes("--goal"));
+	assert.ok(!loopRecommend.allowedOptions.includes("--stale"));
+
+	const contextLoad = commandInvocationContract("context", "load");
+	assert.ok(contextLoad.allowedOptions.includes("--route"));
+	assert.ok(contextLoad.requiredOptions.includes("--route"));
+
+	const contextBenchmark = commandInvocationContract("context", "benchmark");
+	assert.deepEqual(contextBenchmark.allowedValues["--mode"], ["full", "smoke"]);
+
+	const workflowFindings = commandInvocationContract("workflow", "findings");
+	assert.ok(workflowFindings.requiredOptions.includes("--report"));
+
+	const breakLoopDefault = commandInvocationContract("break-loop");
+	assert.ok(breakLoopDefault.requiredOptions.includes("--issue"));
+	const breakLoopValidate = commandInvocationContract("break-loop", "validate");
+	assert.ok(breakLoopValidate.requiredOptions.includes("--file"));
+	assert.ok(!breakLoopValidate.requiredOptions.includes("--issue"));
+	assert.ok(knownSubcommands("context").includes("show"));
+	assert.ok(knownSubcommands("context").includes("delete"));
 });
 
 test("Command handler binding fails fast on missing or orphaned handlers", () => {

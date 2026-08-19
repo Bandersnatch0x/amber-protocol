@@ -56,3 +56,8 @@ No open V1, V1.5, V2, V2.5, V3, V4, V4.5, V5, or V5.5 implementation items.
 - External marketplace publishing.
 - Automatic rewrite of old project files.
 - Hosted multi-tenant web deployment beyond the local 127.0.0.1 viewer boundary (auth model, multi-user isolation).
+- Future ADR revision: open web `handoff` / `complete` write operations (currently CLI-only per ADR-0007). Preconditions before such a revision can be considered:
+  - dryRun preview + explicit second confirmation + audit-chain design for the new write surface;
+  - an identity-gate semantic equivalence scheme (web act must credibly represent the CLI identity-bound act; see ADR-0007 amendment (c), mitigated 2026-08-18 with the reviewer audit identifier);
+  - a formal ADR revision process amending the ADR-0007 allowed-mutation list.
+- The apps/web one-time Prettier reformat (task #35) was merged into the feature commit rather than committed standalone; since `.git-blame-ignore-revs` is reserved for pure formatting-only commits, no separate blame-ignore entry is needed.

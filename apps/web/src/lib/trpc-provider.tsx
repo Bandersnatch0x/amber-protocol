@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSettings } from './settings-provider';
 import type { Settings } from '@/features/settings/settings-model';
 
-function queryDefaults({ autoRefresh, refreshInterval }: Pick<Settings, 'autoRefresh' | 'refreshInterval'>) {
+function queryDefaults({
+  autoRefresh,
+  refreshInterval,
+}: Pick<Settings, 'autoRefresh' | 'refreshInterval'>) {
   return {
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -23,9 +26,12 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
     [autoRefresh, refreshInterval],
   );
 
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: { queries },
-  }));
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries },
+      }),
+  );
   const [trpcClient] = useState(() => getTRPCClient());
 
   useEffect(() => {
@@ -34,9 +40,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </trpc.Provider>
   );
 }

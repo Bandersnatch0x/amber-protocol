@@ -33,7 +33,13 @@ vi.mock('@tanstack/react-virtual', () => ({
 }));
 
 vi.mock('@/components/session/TimelineRow', () => ({
-  TimelineRow: ({ event, onClick }: { event: SessionEvent; onClick?: (e: SessionEvent) => void }) => (
+  TimelineRow: ({
+    event,
+    onClick,
+  }: {
+    event: SessionEvent;
+    onClick?: (e: SessionEvent) => void;
+  }) => (
     <div data-testid={`timeline-row-${event.type}`} onClick={() => onClick?.(event)}>
       {event.type}
     </div>

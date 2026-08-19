@@ -15,7 +15,7 @@ function createMockResponse(): any {
       handlers.get(event)!.push(cb);
     }),
     emit: (event: string) => {
-      handlers.get(event)?.forEach(cb => cb());
+      handlers.get(event)?.forEach((cb) => cb());
     },
     setHeader: vi.fn(),
     writeHead: vi.fn(),
@@ -49,7 +49,11 @@ describe('EventBroadcaster', () => {
     eventBroadcaster.addConnection('session-1', res1);
     eventBroadcaster.addConnection('session-1', res2);
 
-    const event: SessionEvent = { type: 'session_started', sessionId: 'session-1', timestamp: Date.now() };
+    const event: SessionEvent = {
+      type: 'session_started',
+      sessionId: 'session-1',
+      timestamp: Date.now(),
+    };
     await eventBroadcaster.broadcast('session-1', event);
 
     expect(res1.write).toHaveBeenCalled();
@@ -58,7 +62,7 @@ describe('EventBroadcaster', () => {
 
   it('should enforce max connections per session', () => {
     const responses = Array.from({ length: 12 }, () => createMockResponse());
-    const results = responses.map(r => eventBroadcaster.addConnection('session-1', r));
+    const results = responses.map((r) => eventBroadcaster.addConnection('session-1', r));
 
     const successful = results.filter(Boolean).length;
     expect(successful).toBeLessThanOrEqual(10);

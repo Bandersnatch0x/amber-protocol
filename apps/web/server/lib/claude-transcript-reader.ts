@@ -19,6 +19,9 @@ export interface TranscriptTurn {
   text: string;
   tools: string[];
   timestamp?: string;
+  /** Optional additive passthrough from the raw Claude JSONL record. */
+  subtype?: string;
+  isMeta?: boolean;
 }
 
 export interface TranscriptSummary {
@@ -27,6 +30,12 @@ export interface TranscriptSummary {
   firstTimestamp?: string;
   lastTimestamp?: string;
   gitBranch?: string;
+  /**
+   * Working directory recorded on the first raw JSONL entry that carries one.
+   * Additive field (task #34) used to infer transcript↔session association;
+   * low-level records (summary/mode) omit it, so it stays optional.
+   */
+  cwd?: string;
   outline: string;
   repoPath: string;
   sourceDirectory: string;
@@ -110,12 +119,15 @@ function normalizeTurn(raw: unknown, redact: boolean): TranscriptTurn | null {
   }
   const obj = raw as Record<string, unknown>;
   const message =
-    obj.message && typeof obj.message === 'object'
-      ? (obj.message as Record<string, unknown>)
-      : {};
+    obj.message && typeof obj.message === 'object' ? (obj.message as Record<string, unknown>) : {};
   const { text, tools } = extractTextAndTools(message.content);
   const role = typeof message.role === 'string' ? message.role : undefined;
-  const type = typeof obj.type === 'string' ? obj.type : role ?? 'unknown';
+  const type = typeof obj.type === 'string' ? obj.type : (role ?? 'unknown');
+  // Read-only passthrough of discriminator fields so the web client can
+  // denoise precisely (e.g. away_summary recaps). Undefined values are
+  // dropped by JSON serialization, keeping the wire shape backward compatible.
+  const subtype = typeof obj.subtype === 'string' ? obj.subtype : undefined;
+  const isMeta = obj.isMeta === true ? true : undefined;
 
   return {
     type,
@@ -123,6 +135,8 @@ function normalizeTurn(raw: unknown, redact: boolean): TranscriptTurn | null {
     text: redact ? redactSecrets(text) : text,
     tools,
     timestamp: typeof obj.timestamp === 'string' ? obj.timestamp : undefined,
+    subtype,
+    isMeta,
   };
 }
 
@@ -263,6 +277,27 @@ function findGitBranch(content: string): string | undefined {
   return undefined;
 }
 
+// First top-level `cwd` value in the JSONL stream. Conversation records carry
+// it; metadata records do not, so stop at the first hit instead of scanning
+// further (summarize already parses the full content for turns/branch).
+function findCwd(content: string): string | undefined {
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+    try {
+      const obj = JSON.parse(trimmed) as Record<string, unknown>;
+      if (obj && typeof obj.cwd === 'string' && obj.cwd) {
+        return obj.cwd;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
 function truncateOutline(value: string, maxLength = 220): string {
   const normalized = value.replace(/\s+/g, ' ').trim();
   if (normalized.length <= maxLength) {
@@ -271,13 +306,76 @@ function truncateOutline(value: string, maxLength = 220): string {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
+// Minimal, self-contained title denoise for outlines. Mirrors the client-side
+// transcript-denoise rules (caveat/system-reminder wrappers, slash-command
+// envelopes, local-command-stdout folds, ANSI stripping) without importing any
+// frontend module, keeping the server CommonJS and standalone.
+const OUTLINE_ANSI_PATTERN = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\u0007]*(?:\u0007|$)/g;
+const OUTLINE_CAVEAT_PATTERN = /^<local-command-caveat>[\s\S]*<\/local-command-caveat>\s*$/;
+const OUTLINE_SYSTEM_REMINDER_PATTERN = /^<system-reminder>[\s\S]*<\/system-reminder>\s*$/;
+
+function stripOutlineAnsi(text: string): string {
+  return text.replace(OUTLINE_ANSI_PATTERN, '');
+}
+
+function extractOutlineTag(text: string, tag: string): string | undefined {
+  const match = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`).exec(text);
+  return match ? match[1] : undefined;
+}
+
+function collapseOutlineWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Returns a readable outline title for a turn's text, or null when the turn
+ * is a noise envelope with nothing readable to surface (whole-message caveat
+ * / system-reminder wrappers, or slash-command/stdout envelopes whose inner
+ * content is empty). Plain text passes through unchanged (ANSI stripped).
+ */
+function readableOutlineText(text: string): string | null {
+  const stripped = stripOutlineAnsi(text).trim();
+  if (!stripped) {
+    return null;
+  }
+  if (OUTLINE_CAVEAT_PATTERN.test(stripped) || OUTLINE_SYSTEM_REMINDER_PATTERN.test(stripped)) {
+    return null;
+  }
+  if (stripped.includes('<command-name>')) {
+    const args = collapseOutlineWhitespace(extractOutlineTag(stripped, 'command-args') ?? '');
+    const message = collapseOutlineWhitespace(extractOutlineTag(stripped, 'command-message') ?? '');
+    return args || message || null;
+  }
+  if (stripped.includes('<local-command-stdout>')) {
+    const content = extractOutlineTag(stripped, 'local-command-stdout') ?? '';
+    const firstLine = content.split('\n').find((line) => line.trim()) ?? '';
+    return collapseOutlineWhitespace(firstLine) || null;
+  }
+  return stripped;
+}
+
 function buildOutline(turns: TranscriptTurn[]): string {
-  const firstUserText = turns.find((turn) => (turn.role ?? turn.type) === 'user' && turn.text.trim())?.text;
+  const userTurns = turns.filter((turn) => (turn.role ?? turn.type) === 'user' && turn.text.trim());
+
+  // Prefer the first user turn that yields a readable title; noise envelopes
+  // (caveats, system reminders, slash-command wrappers) are skipped so the
+  // list page never shows raw XML wrappers as titles.
+  for (const turn of userTurns) {
+    const readable = readableOutlineText(turn.text);
+    if (readable) {
+      return truncateOutline(readable);
+    }
+  }
+
+  // Fallback: every user turn is noise — keep the legacy truncation behavior.
+  const firstUserText = userTurns[0]?.text;
   if (firstUserText) {
     return truncateOutline(firstUserText);
   }
 
-  const firstAssistantText = turns.find((turn) => (turn.role ?? turn.type) === 'assistant' && turn.text.trim())?.text;
+  const firstAssistantText = turns.find(
+    (turn) => (turn.role ?? turn.type) === 'assistant' && turn.text.trim(),
+  )?.text;
   if (firstAssistantText) {
     return truncateOutline(firstAssistantText);
   }
@@ -290,7 +388,11 @@ function buildOutline(turns: TranscriptTurn[]): string {
   return 'No readable message text; this file only contains low-level session records.';
 }
 
-function summarize(id: string, content: string, source: { repoPath: string; sourceDirectory: string; sourceFile: string }): TranscriptSummary {
+function summarize(
+  id: string,
+  content: string,
+  source: { repoPath: string; sourceDirectory: string; sourceFile: string },
+): TranscriptSummary {
   const turns = parseTranscript(content, { redact: true });
   const timestamps = turns
     .map((t) => t.timestamp)
@@ -302,6 +404,7 @@ function summarize(id: string, content: string, source: { repoPath: string; sour
     firstTimestamp: timestamps[0],
     lastTimestamp: timestamps[timestamps.length - 1],
     gitBranch: findGitBranch(content),
+    cwd: findCwd(content),
     outline: buildOutline(turns),
     repoPath: source.repoPath,
     sourceDirectory: source.sourceDirectory,

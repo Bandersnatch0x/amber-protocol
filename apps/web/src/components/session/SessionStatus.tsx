@@ -14,7 +14,10 @@ interface SessionStatusProps {
   reconnectAttempt?: number;
 }
 
-function formatRelativeTime(timestamp: number, t: (key: I18nKey, params?: Record<string, string | number>) => string): string {
+function formatRelativeTime(
+  timestamp: number,
+  t: (key: I18nKey, params?: Record<string, string | number>) => string,
+): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
   if (seconds < 5) return t('sessions.status.justNow');
   if (seconds < 60) return t('sessions.status.secondsAgo', { count: seconds });
@@ -23,10 +26,18 @@ function formatRelativeTime(timestamp: number, t: (key: I18nKey, params?: Record
   return t('sessions.status.daysAgo', { count: Math.floor(seconds / 86400) });
 }
 
-export function SessionStatus({ status, connectionState, lastEvent, onRetry, reconnectAttempt }: SessionStatusProps) {
+export function SessionStatus({
+  status,
+  connectionState,
+  lastEvent,
+  onRetry,
+  reconnectAttempt,
+}: SessionStatusProps) {
   const { t } = useI18n();
   const latestTimestamp = lastEvent ? parseTimestamp(lastEvent.timestamp) : null;
-  const latestLabel = lastEvent ? t(`timeline.event.${lastEvent.type}` as I18nKey) : t('sessions.status.waiting');
+  const latestLabel = lastEvent
+    ? t(`timeline.event.${lastEvent.type}` as I18nKey)
+    : t('sessions.status.waiting');
 
   return (
     <div className="grid gap-4 sm:grid-cols-3">
@@ -40,7 +51,11 @@ export function SessionStatus({ status, connectionState, lastEvent, onRetry, rec
       <div className="space-y-1">
         <p className="label">{t('sessions.status.connection')}</p>
         <div className="flex items-center gap-2">
-          <ConnectionIndicator state={connectionState} onRetry={onRetry} reconnectAttempt={reconnectAttempt} />
+          <ConnectionIndicator
+            state={connectionState}
+            onRetry={onRetry}
+            reconnectAttempt={reconnectAttempt}
+          />
         </div>
       </div>
 
@@ -49,12 +64,18 @@ export function SessionStatus({ status, connectionState, lastEvent, onRetry, rec
         {latestTimestamp !== null ? (
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-900 dark:text-white">{latestLabel}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400" title={formatEventTimestamp(lastEvent?.timestamp)}>
-              {formatRelativeTime(latestTimestamp, t)} · {formatEventTimestamp(lastEvent?.timestamp)}
+            <p
+              className="text-xs text-slate-500 dark:text-slate-400"
+              title={formatEventTimestamp(lastEvent?.timestamp)}
+            >
+              {formatRelativeTime(latestTimestamp, t)} ·{' '}
+              {formatEventTimestamp(lastEvent?.timestamp)}
             </p>
           </div>
         ) : (
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('sessions.status.noTimelineActivity')}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {t('sessions.status.noTimelineActivity')}
+          </p>
         )}
       </div>
     </div>

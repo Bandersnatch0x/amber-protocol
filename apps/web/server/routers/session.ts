@@ -8,30 +8,26 @@ export const sessionRouter = router({
     return readSessionList();
   }),
 
-  byId: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .query(({ input }) => {
-      const session = readSessionById(input.id);
-      if (!session) {
-        throw new Error('Session not found');
-      }
-      return session;
-    }),
+  byId: publicProcedure.input(z.object({ id: z.string() })).query(({ input }) => {
+    const session = readSessionById(input.id);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+    return session;
+  }),
 
   timeline: publicProcedure
     .input(
       z.object({
         sessionId: z.string(),
         limit: z.number().optional(),
-      })
+      }),
     )
     .query(({ input }) => {
       return readTimelineEvents(input.sessionId, input.limit);
     }),
 
-  auditSummary: publicProcedure
-    .input(z.object({ sessionId: z.string() }))
-    .query(({ input }) => {
-      return readSessionAuditSummary(input.sessionId);
-    }),
+  auditSummary: publicProcedure.input(z.object({ sessionId: z.string() })).query(({ input }) => {
+    return readSessionAuditSummary(input.sessionId);
+  }),
 });

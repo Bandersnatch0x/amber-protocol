@@ -67,9 +67,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettingsState(normalized);
   }, []);
 
-  const updateSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  }, [setSettings]);
+  const updateSetting = useCallback(
+    <K extends keyof Settings>(key: K, value: Settings[K]) => {
+      setSettings((prev) => ({ ...prev, [key]: value }));
+    },
+    [setSettings],
+  );
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {

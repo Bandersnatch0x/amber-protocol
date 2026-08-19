@@ -16,7 +16,9 @@ vi.mock('@server/lib/session-audit-writer', () => ({
 const readSessionList = sessionReader.readSessionList as ReturnType<typeof vi.fn>;
 const readSessionById = sessionReader.readSessionById as ReturnType<typeof vi.fn>;
 const readTimelineEvents = sessionReader.readTimelineEvents as ReturnType<typeof vi.fn>;
-const readSessionAuditSummary = sessionAuditWriter.readSessionAuditSummary as ReturnType<typeof vi.fn>;
+const readSessionAuditSummary = sessionAuditWriter.readSessionAuditSummary as ReturnType<
+  typeof vi.fn
+>;
 
 const caller = sessionRouter.createCaller({});
 

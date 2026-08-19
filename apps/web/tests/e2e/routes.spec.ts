@@ -19,6 +19,8 @@ test.describe('Routes', () => {
     await page.goto('/routes/feature-standard');
     await expect(page).toHaveURL(/\/routes\/feature-standard/);
     await expect(page.getByText('feature-standard')).toBeVisible();
-    await expect(page.getByText('Complete feature delivery with planning and review')).toBeVisible();
+    await expect(
+      page.getByText('Complete feature delivery with planning and review'),
+    ).toBeVisible();
   });
 });

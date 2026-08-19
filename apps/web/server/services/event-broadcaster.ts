@@ -68,7 +68,7 @@ class EventBroadcaster {
       }
     }
 
-    deadConns.forEach(res => this.removeConnection(sessionId, res));
+    deadConns.forEach((res) => this.removeConnection(sessionId, res));
   }
 
   private writeWithTimeout(res: Response, data: string): Promise<void> {
@@ -98,7 +98,7 @@ class EventBroadcaster {
           }
         }
 
-        deadConns.forEach(res => this.removeConnection(sessionId, res));
+        deadConns.forEach((res) => this.removeConnection(sessionId, res));
       }
     }, HEARTBEAT_INTERVAL);
   }

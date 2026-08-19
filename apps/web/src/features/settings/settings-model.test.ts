@@ -3,8 +3,22 @@ import { hasSettingsChanges, normalizeSettings } from './settings-model';
 
 describe('normalizeSettings', () => {
   it('clamps refresh interval into the supported 1s to 60s range', () => {
-    expect(normalizeSettings({ autoRefresh: true, refreshInterval: 0, showNotifications: true, compactView: false }).refreshInterval).toBe(1);
-    expect(normalizeSettings({ autoRefresh: true, refreshInterval: 99, showNotifications: true, compactView: false }).refreshInterval).toBe(60);
+    expect(
+      normalizeSettings({
+        autoRefresh: true,
+        refreshInterval: 0,
+        showNotifications: true,
+        compactView: false,
+      }).refreshInterval,
+    ).toBe(1);
+    expect(
+      normalizeSettings({
+        autoRefresh: true,
+        refreshInterval: 99,
+        showNotifications: true,
+        compactView: false,
+      }).refreshInterval,
+    ).toBe(60);
   });
 });
 

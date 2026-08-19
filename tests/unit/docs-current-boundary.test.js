@@ -19,7 +19,8 @@ const ALLOW_AUTONOMOUS_MODE = new Set([
 ]);
 // Session history (plans) may quote the refused flag when documenting refusals/fixes (#67).
 // Other boundary patterns below still apply to these directories.
-const ALLOW_AUTONOMOUS_MODE_DIRS = ["docs/plans/"];
+// Sharing materials quote historical commands when narrating the execution evolution.
+const ALLOW_AUTONOMOUS_MODE_DIRS = ["docs/plans/", "docs/sharing/"];
 
 function listMarkdown(dir) {
 	const entries = fs.readdirSync(dir, { withFileTypes: true });

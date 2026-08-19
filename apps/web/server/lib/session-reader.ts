@@ -50,7 +50,7 @@ export function readSessionList(): Session[] {
   const dirs = fs.readdirSync(sessionsDir);
 
   const sessions = dirs
-    .map(id => {
+    .map((id) => {
       const manifestPath = path.join(sessionsDir, id, 'manifest.json');
       if (!fs.existsSync(manifestPath)) {
         return null;
@@ -112,9 +112,10 @@ function normalizeEvent(raw: unknown): SessionEvent | null {
   }
 
   const event = raw as Record<string, unknown>;
-  const data = typeof event.data === 'object' && event.data !== null
-    ? event.data as Record<string, unknown>
-    : {};
+  const data =
+    typeof event.data === 'object' && event.data !== null
+      ? (event.data as Record<string, unknown>)
+      : {};
 
   return {
     ...event,
@@ -138,7 +139,7 @@ export function readTimelineEvents(sessionId: string, limit?: number): SessionEv
     const content = fs.readFileSync(timelinePath, 'utf8');
     const lines = content.trim().split('\n');
     const events = lines
-      .map(line => {
+      .map((line) => {
         try {
           return normalizeEvent(JSON.parse(line));
         } catch {

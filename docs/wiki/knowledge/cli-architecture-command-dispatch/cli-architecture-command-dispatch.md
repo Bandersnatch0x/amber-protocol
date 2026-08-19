@@ -3,12 +3,12 @@ kind: "knowledge"
 category: "cli-architecture-command-dispatch"
 title: "CLI Architecture & Command Dispatch"
 template: "architecture"
-updated_at: "2026-08-08T00:00:00.000Z"
+updated_at: "2026-08-18T00:00:00.000Z"
 ---
 
 # CLI Architecture & Command Dispatch
 
-Last Reviewed: 2026-08-08
+Last Reviewed: 2026-08-18
 
 Amber exposes one CommonJS CLI entry point and keeps command parsing, command routing,
 and domain work in separate layers. The entry point validates the top-level command,
@@ -21,9 +21,13 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
 - `scripts/amber.js` derives supported top-level commands from the Command definitions,
   parses arguments, calls `dispatch()`, prints text or JSON results, and returns non-zero
   when `result.errors` is non-empty.
-- `scripts/lib/command-help.js` owns each Command definition: identity, visibility tier, help knowledge,
-  and output policy. It also binds definitions to handlers and rejects missing or
-  orphaned handlers at startup.
+- `scripts/lib/command-registry.js` owns each Command definition: identity, visibility
+  tier, help knowledge, output policy, and handler binding. Typed seams and skill
+  generation consume this same registry. `knownSubcommands()` derives family
+  invocations from registered capabilities plus documented help verbs, while
+  `commandInvocationContract()` projects command-specific allowed and required
+  options from the Command help/usage definitions. `scripts/lib/command-help.js` is
+  a compatibility re-export of that module.
 - `scripts/lib/command-dispatcher.js` owns handler implementation, the bound runtime
   registry, family argument mapping, and deprecation warnings.
 - `scripts/lib/*-commands.js` modules own command-specific option handling, target
@@ -70,6 +74,12 @@ flowchart LR
   evidence controls. A new handler must not become an execution bypass.
 - Keep read-only and dry-run behavior as the default, and retain idempotent,
   non-overwriting behavior for scaffold commands such as `init` and `wiki`.
+- Authored skill frontmatter (`x-amber-json.command`) is checked at the existing
+  generator seam against the registry and the CLI parser's flag specifications before
+  products are planned. A stale family subcommand, invented top-level command,
+  undocumented or missing option, malformed value, undeclared placeholder, or unused
+  declared argument fails deterministically without executing the command or writing
+  generated products.
 - The root CLI package intentionally depends only on `ajv` and `ajv-formats`; Web
   dependencies remain isolated in `apps/web/package.json`.
  - `scripts/lib/cli-typed-seam.js` validates the Action whitelist at CLI startup and classifies

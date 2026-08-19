@@ -6,9 +6,14 @@ import {
 } from './timeline-view-model';
 import type { SessionEvent } from '@/lib/types/session-events';
 
+// Constrain overrides to the task_progress member: spreading a
+// Partial<SessionEvent> of the full discriminated union widens the literal
+// `type` (e.g. with evidence-job-changed in the union) and breaks assignability.
+type TaskProgressEvent = Extract<SessionEvent, { type: 'task_progress' }>;
+
 function taskProgressEvent(
   timestamp: string,
-  overrides: Partial<SessionEvent> = {},
+  overrides: Partial<TaskProgressEvent> = {},
 ): SessionEvent {
   return {
     type: 'task_progress',
@@ -34,11 +39,21 @@ describe('getTimelineSearchText', () => {
 
 describe('buildTimelineView', () => {
   const events: SessionEvent[] = [
-    { type: 'session_created', sessionId: 'session-1', timestamp: '2026-06-20T00:00:00.000Z', goal: 'Refactor auth middleware' },
+    {
+      type: 'session_created',
+      sessionId: 'session-1',
+      timestamp: '2026-06-20T00:00:00.000Z',
+      goal: 'Refactor auth middleware',
+    },
     { type: 'session_started', sessionId: 'session-1', timestamp: '2026-06-20T00:00:10.000Z' },
     taskProgressEvent('2026-06-20T00:00:20.000Z'),
     { type: 'heartbeat', timestamp: '2026-06-20T00:00:30.000Z' },
-    { type: 'error', sessionId: 'session-1', timestamp: '2026-06-20T00:00:40.000Z', error: 'command failed' },
+    {
+      type: 'error',
+      sessionId: 'session-1',
+      timestamp: '2026-06-20T00:00:40.000Z',
+      error: 'command failed',
+    },
   ];
 
   function getVisible(entries: TimelineViewEntry[]): TimelineViewEntry[] {
@@ -46,14 +61,18 @@ describe('buildTimelineView', () => {
   }
 
   it('preserves global numbering after filtering', () => {
-    const visible = getVisible(buildTimelineView(events, { selectedType: 'task_progress', searchQuery: '' }));
+    const visible = getVisible(
+      buildTimelineView(events, { selectedType: 'task_progress', searchQuery: '' }),
+    );
 
     expect(visible).toHaveLength(1);
     expect(visible[0].globalIndex).toBe(2);
   });
 
   it('computes since previous from the real previous event in the full stream', () => {
-    const visible = getVisible(buildTimelineView(events, { selectedType: '', searchQuery: 'command failed' }));
+    const visible = getVisible(
+      buildTimelineView(events, { selectedType: '', searchQuery: 'command failed' }),
+    );
 
     expect(visible).toHaveLength(1);
     expect(visible[0].previousTimestamp).toBe(Date.parse('2026-06-20T00:00:30.000Z'));
@@ -61,13 +80,21 @@ describe('buildTimelineView', () => {
 
   it('inserts a gap indicator when filters hide events between visible items', () => {
     const gappedEvents: SessionEvent[] = [
-      { type: 'session_created', sessionId: 'session-1', timestamp: '2026-06-20T00:00:00.000Z', goal: 'Refactor auth middleware' },
+      {
+        type: 'session_created',
+        sessionId: 'session-1',
+        timestamp: '2026-06-20T00:00:00.000Z',
+        goal: 'Refactor auth middleware',
+      },
       taskProgressEvent('2026-06-20T00:00:10.000Z', { task: 'Capture requirements' }),
       { type: 'heartbeat', timestamp: '2026-06-20T00:00:20.000Z' },
       taskProgressEvent('2026-06-20T00:00:30.000Z', { task: 'Implement feature' }),
     ];
 
-    const visibleAndGap = buildTimelineView(gappedEvents, { selectedType: 'task_progress', searchQuery: '' });
+    const visibleAndGap = buildTimelineView(gappedEvents, {
+      selectedType: 'task_progress',
+      searchQuery: '',
+    });
 
     expect(visibleAndGap).toHaveLength(3);
     expect(visibleAndGap[0]).toMatchObject({ kind: 'event', globalIndex: 1 });
@@ -76,7 +103,9 @@ describe('buildTimelineView', () => {
   });
 
   it('matches search against curated visible details', () => {
-    const visible = getVisible(buildTimelineView(events, { selectedType: '', searchQuery: 'implement feature' }));
+    const visible = getVisible(
+      buildTimelineView(events, { selectedType: '', searchQuery: 'implement feature' }),
+    );
 
     expect(visible).toHaveLength(1);
     expect(visible[0].event.type).toBe('task_progress');
@@ -89,7 +118,9 @@ describe('buildTimelineView', () => {
       }),
     ];
 
-    const visible = getVisible(buildTimelineView(withHiddenData, { selectedType: '', searchQuery: 'secret-token' }));
+    const visible = getVisible(
+      buildTimelineView(withHiddenData, { selectedType: '', searchQuery: 'secret-token' }),
+    );
 
     expect(visible).toHaveLength(0);
   });

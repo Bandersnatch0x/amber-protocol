@@ -1,4 +1,5 @@
 import { seedFixtureSession } from './fixtures/seed';
+import { getE2EClaudeHome, seedE2ETranscriptFixture } from './fixtures/transcript-fixture';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -43,4 +44,13 @@ function prepareE2ERepoRoot(): string {
 export default function globalSetup(): void {
   const repoRoot = prepareE2ERepoRoot();
   seedFixtureSession(repoRoot);
+
+  // Hermetic Claude home for the transcript timeline fixture (read path only;
+  // the web server picks it up via AMBER_CLAUDE_HOME from playwright.config).
+  const claudeHome = getE2EClaudeHome();
+  if (!path.resolve(claudeHome).startsWith(path.resolve(os.tmpdir()) + path.sep)) {
+    throw new Error(`Refusing to prepare non-temp E2E Claude home: ${claudeHome}`);
+  }
+  fs.rmSync(claudeHome, { recursive: true, force: true });
+  seedE2ETranscriptFixture(repoRoot, claudeHome);
 }

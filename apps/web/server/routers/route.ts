@@ -7,15 +7,13 @@ export const routeRouter = router({
     return listRoutes();
   }),
 
-  byId: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .query(({ input }) => {
-      const route = getRouteById(input.id);
-      if (!route) {
-        throw new Error('Route not found');
-      }
-      return route;
-    }),
+  byId: publicProcedure.input(z.object({ id: z.string() })).query(({ input }) => {
+    const route = getRouteById(input.id);
+    if (!route) {
+      throw new Error('Route not found');
+    }
+    return route;
+  }),
 
   grouped: publicProcedure.query(() => {
     const routes = listRoutes();

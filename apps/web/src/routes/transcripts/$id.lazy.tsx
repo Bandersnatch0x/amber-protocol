@@ -1,26 +1,15 @@
 import { createLazyFileRoute, Link } from '@tanstack/react-router';
 import { useId, useMemo, useState } from 'react';
-import { MarkdownMessage } from '@/components/code/MarkdownMessage';
+import { TranscriptTimeline } from '@/components/transcript/TranscriptTimeline';
 import {
-  buildTranscriptDisplayModel,
-  getToolDisplayLabel,
-  getTurnDisplayLabel,
-  getTurnRoleLabel,
-  isToolOnlyTurn,
-  type TranscriptMetadataItem,
-  type TranscriptTurnLike,
-} from '@/features/transcripts/transcripts-model';
+  buildTranscriptTimeline,
+  type TranscriptTimelineModel,
+} from '@/features/transcripts/transcript-timeline-model';
+import type { TranscriptMetadataItem } from '@/features/transcripts/transcripts-model';
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import { trpc } from '@/lib/trpc';
 
 export const Route = createLazyFileRoute('/transcripts/$id')({ component: TranscriptDetailPage });
-
-const TYPE_STYLES: Record<string, string> = {
-  user: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
-  assistant: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
-  system: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
-  tool: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
-};
 
 const metadataKeyByLabel = {
   'Attachment record': 'attachment',
@@ -28,55 +17,63 @@ const metadataKeyByLabel = {
   'Empty system record': 'emptySystem',
   'Empty user record': 'emptyUser',
   'File history snapshot': 'fileHistorySnapshot',
+  'Local command record': 'localCommand',
   'Permission record': 'permissionMode',
   'Prompt snapshot': 'lastPrompt',
   'Queue operation record': 'queueOperation',
   'Session mode record': 'mode',
   'Summary record': 'summary',
+  'System reminder record': 'systemReminder',
 } as const;
 
 type MetadataTranslationKey = (typeof metadataKeyByLabel)[keyof typeof metadataKeyByLabel];
 
-const roleKeys = new Set(['assistant', 'system', 'tool', 'user']);
-const typeKeys = new Set(['attachment', 'file-history-snapshot', 'last-prompt', 'mode', 'permission-mode', 'queue-operation', 'summary']);
-const toolKeys = new Set(['Bash', 'Edit', 'Glob', 'Grep', 'LS', 'MultiEdit', 'Read', 'TodoWrite', 'WebFetch', 'Write']);
+// Denoise-hidden groups (R1/R6) live in the new `transcript.hidden.*`
+// namespace; legacy metadata groups keep `transcripts.metadata.*`.
+const DENOISE_METADATA_KEYS = new Set(['localCommand', 'systemReminder']);
+
+type TranslateFn = (key: I18nKey, params?: Record<string, string | number>) => string;
 
 function getMetadataTranslationKey(label: string): MetadataTranslationKey | undefined {
   return metadataKeyByLabel[label as keyof typeof metadataKeyByLabel];
 }
 
-function translateMetadataLabel(label: string, t: (key: I18nKey, params?: Record<string, string | number>) => string): string {
+function metadataKeyNamespace(
+  metadataKey: MetadataTranslationKey,
+): 'transcript.hidden' | 'transcripts.metadata' {
+  return DENOISE_METADATA_KEYS.has(metadataKey) ? 'transcript.hidden' : 'transcripts.metadata';
+}
+
+function translateMetadataLabel(label: string, t: TranslateFn): string {
   const metadataKey = getMetadataTranslationKey(label);
-  return metadataKey ? t(`transcripts.metadata.${metadataKey}.label` as I18nKey) : label;
+  return metadataKey
+    ? t(`${metadataKeyNamespace(metadataKey)}.${metadataKey}.label` as I18nKey)
+    : label;
 }
 
-function translateMetadataDescription(group: MetadataGroup, t: (key: I18nKey, params?: Record<string, string | number>) => string): string {
-  return group.metadataKey ? t(`transcripts.metadata.${group.metadataKey}.description` as I18nKey) : group.description;
+function translateMetadataDescription(group: MetadataGroup, t: TranslateFn): string {
+  return group.metadataKey
+    ? t(`${metadataKeyNamespace(group.metadataKey)}.${group.metadataKey}.description` as I18nKey)
+    : group.description;
 }
 
-function translateToolLabel(tool: string, t: (key: I18nKey, params?: Record<string, string | number>) => string): string {
-  return toolKeys.has(tool) ? t(`transcripts.tool.${tool}` as I18nKey) : getToolDisplayLabel(tool);
-}
-
-function translateTurnLabel(turn: TranscriptTurnLike, t: (key: I18nKey, params?: Record<string, string | number>) => string): string {
-  const roleLabel = getTurnRoleLabel(turn);
-  if (roleKeys.has(roleLabel)) return t(`transcripts.role.${roleLabel}` as I18nKey);
-  if (typeKeys.has(roleLabel)) return t(`transcripts.type.${roleLabel}` as I18nKey);
-  return getTurnDisplayLabel(turn);
-}
-
-function formatMetadataSummary(metadata: TranscriptMetadataItem[], t: (key: I18nKey, params?: Record<string, string | number>) => string): string {
-  const counts = metadata.reduce<Record<string, { count: number; item: TranscriptMetadataItem }>>((acc, item) => {
-    const key = getMetadataTranslationKey(item.label) ?? item.summaryLabel;
-    acc[key] = { count: (acc[key]?.count ?? 0) + 1, item };
-    return acc;
-  }, {});
+function formatMetadataSummary(metadata: TranscriptMetadataItem[], t: TranslateFn): string {
+  const counts = metadata.reduce<Record<string, { count: number; item: TranscriptMetadataItem }>>(
+    (acc, item) => {
+      const key = getMetadataTranslationKey(item.label) ?? item.summaryLabel;
+      acc[key] = { count: (acc[key]?.count ?? 0) + 1, item };
+      return acc;
+    },
+    {},
+  );
 
   return Object.values(counts)
     .map(({ count, item }) => {
       const metadataKey = getMetadataTranslationKey(item.label);
       const label = metadataKey
-        ? t(`transcripts.metadata.${metadataKey}.${count === 1 ? 'summaryOne' : 'summary'}` as I18nKey)
+        ? t(
+            `${metadataKeyNamespace(metadataKey)}.${metadataKey}.${count === 1 ? 'summaryOne' : 'summary'}` as I18nKey,
+          )
         : count === 1
           ? item.summaryLabel.replace(/s$/, '')
           : item.summaryLabel;
@@ -146,12 +143,19 @@ function MetadataPanel({ metadata }: { metadata: TranscriptMetadataItem[] }) {
     <section className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/40">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-sm font-medium text-slate-900 dark:text-white">{t('transcripts.detail.hiddenSystemRecords')}</h2>
+          <h2 className="text-sm font-medium text-slate-900 dark:text-white">
+            {t('transcripts.detail.hiddenSystemRecords')}
+          </h2>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {t(metadata.length === 1 ? 'transcripts.detail.hiddenRecordsSummaryOne' : 'transcripts.detail.hiddenRecordsSummary', {
-              count: metadata.length,
-              summary: formatMetadataSummary(metadata, t),
-            })}
+            {t(
+              metadata.length === 1
+                ? 'transcripts.detail.hiddenRecordsSummaryOne'
+                : 'transcripts.detail.hiddenRecordsSummary',
+              {
+                count: metadata.length,
+                summary: formatMetadataSummary(metadata, t),
+              },
+            )}
           </p>
         </div>
         <button
@@ -161,28 +165,47 @@ function MetadataPanel({ metadata }: { metadata: TranscriptMetadataItem[] }) {
           aria-controls={metadataPanelId}
           className="self-start rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-300 dark:hover:bg-slate-800 sm:self-auto"
         >
-          {expanded ? t('transcripts.detail.hideRecordTypes') : t('transcripts.detail.showRecordTypes')}
+          {expanded
+            ? t('transcripts.detail.hideRecordTypes')
+            : t('transcripts.detail.showRecordTypes')}
         </button>
       </div>
 
       {expanded && (
-        <div id={metadataPanelId} className="mt-3 divide-y divide-slate-200 rounded-md border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800">
+        <div
+          id={metadataPanelId}
+          className="mt-3 divide-y divide-slate-200 rounded-md border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800"
+        >
           {groups.map((group) => {
             const timestampRange = formatTimestampRange(group);
 
             return (
-              <div key={group.metadataKey ?? group.label} className="flex flex-col gap-2 px-3 py-3 lg:flex-row lg:items-start lg:justify-between">
+              <div
+                key={group.metadataKey ?? group.label}
+                className="flex flex-col gap-2 px-3 py-3 lg:flex-row lg:items-start lg:justify-between"
+              >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm text-slate-800 dark:text-slate-100">{translateMetadataLabel(group.label, t)}</span>
+                    <span className="text-sm text-slate-800 dark:text-slate-100">
+                      {translateMetadataLabel(group.label, t)}
+                    </span>
                     <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                      {t(group.count === 1 ? 'transcripts.detail.recordsOne' : 'transcripts.detail.records', { count: group.count })}
+                      {t(
+                        group.count === 1
+                          ? 'transcripts.detail.recordsOne'
+                          : 'transcripts.detail.records',
+                        { count: group.count },
+                      )}
                     </span>
                   </div>
-                  <p className="mt-1 break-words text-xs text-slate-500 dark:text-slate-400">{translateMetadataDescription(group, t)}</p>
+                  <p className="mt-1 break-words text-xs text-slate-500 dark:text-slate-400">
+                    {translateMetadataDescription(group, t)}
+                  </p>
                 </div>
                 {timestampRange && (
-                  <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{timestampRange}</span>
+                  <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                    {timestampRange}
+                  </span>
                 )}
               </div>
             );
@@ -199,16 +222,26 @@ function TranscriptDetailPage() {
   const { data: detail, isLoading, error, refetch } = trpc.transcript.read.useQuery({ id });
   const saveDigest = trpc.transcript.save.useMutation();
   const proposeRegressions = trpc.transcript.proposeRegressions.useMutation();
-  const displayModel = useMemo(
-    () => buildTranscriptDisplayModel(detail?.turns ?? []),
+  const timelineModel = useMemo<TranscriptTimelineModel>(
+    () => buildTranscriptTimeline(detail?.turns ?? []),
     [detail?.turns],
   );
 
   return (
     <div className="page-container space-y-6">
       <header className="space-y-3">
-        <Link to="/transcripts" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200">
-          <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <Link
+          to="/transcripts"
+          className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          <svg
+            aria-hidden="true"
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
           {t('transcripts.detail.back')}
@@ -216,7 +249,9 @@ function TranscriptDetailPage() {
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="font-mono text-xl font-semibold text-slate-950 dark:text-white sm:text-2xl">{id.slice(0, 8)}</h1>
+            <h1 className="font-mono text-xl font-semibold text-slate-950 dark:text-white sm:text-2xl">
+              {id.slice(0, 8)}
+            </h1>
             {detail && (
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                 {t('transcripts.detail.secretsRedacted', { count: detail.turnCount })}
@@ -239,18 +274,30 @@ function TranscriptDetailPage() {
               disabled={proposeRegressions.isLoading}
               className="btn-secondary px-3 py-1.5 text-xs"
             >
-              {proposeRegressions.isLoading ? t('transcripts.detail.scanning') : t('transcripts.detail.proposeRegressions')}
+              {proposeRegressions.isLoading
+                ? t('transcripts.detail.scanning')
+                : t('transcripts.detail.proposeRegressions')}
             </button>
           </div>
         </div>
 
         {(saveDigest.isSuccess || saveDigest.isError || proposeRegressions.isSuccess) && (
           <div className="flex flex-wrap items-center gap-3 text-xs">
-            {saveDigest.isSuccess && <span className="text-emerald-600 dark:text-emerald-400">{t('transcripts.detail.savedToLens')}</span>}
-            {saveDigest.isError && <span className="text-red-600 dark:text-red-400">{t('transcripts.detail.saveFailed')}</span>}
+            {saveDigest.isSuccess && (
+              <span className="text-emerald-600 dark:text-emerald-400">
+                {t('transcripts.detail.savedToLens')}
+              </span>
+            )}
+            {saveDigest.isError && (
+              <span className="text-red-600 dark:text-red-400">
+                {t('transcripts.detail.saveFailed')}
+              </span>
+            )}
             {proposeRegressions.isSuccess && (
               <span className="text-emerald-600 dark:text-emerald-400">
-                {t('transcripts.detail.proposalsWritten', { count: proposeRegressions.data.proposedCount })}
+                {t('transcripts.detail.proposalsWritten', {
+                  count: proposeRegressions.data.proposedCount,
+                })}
               </span>
             )}
           </div>
@@ -261,7 +308,9 @@ function TranscriptDetailPage() {
 
       {error && (
         <div className="card p-5">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-white">{t('transcripts.detail.failedTitle')}</h2>
+          <h2 className="text-sm font-medium text-slate-900 dark:text-white">
+            {t('transcripts.detail.failedTitle')}
+          </h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link to="/transcripts" className="btn-secondary text-sm">
@@ -276,49 +325,22 @@ function TranscriptDetailPage() {
 
       {detail && detail.turns.length >= 50 && (
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
-          {t(displayModel.visibleTurns.length === 1 ? 'transcripts.detail.visibleTurnsOne' : 'transcripts.detail.visibleTurns', { count: displayModel.visibleTurns.length })}
-          {displayModel.metadata.length > 0
-            ? ` ${t(displayModel.metadata.length === 1 ? 'transcripts.detail.hiddenSystemRecordsInlineOne' : 'transcripts.detail.hiddenSystemRecordsInline', { count: displayModel.metadata.length })}`
+          {t(
+            timelineModel.visibleTurns.length === 1
+              ? 'transcripts.detail.visibleTurnsOne'
+              : 'transcripts.detail.visibleTurns',
+            { count: timelineModel.visibleTurns.length },
+          )}
+          {timelineModel.metadata.length > 0
+            ? ` ${t(timelineModel.metadata.length === 1 ? 'transcripts.detail.hiddenSystemRecordsInlineOne' : 'transcripts.detail.hiddenSystemRecordsInline', { count: timelineModel.metadata.length })}`
             : ''}
         </div>
       )}
 
       {detail && (
         <>
-          <MetadataPanel metadata={displayModel.metadata} />
-
-          <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800">
-            {displayModel.visibleTurns.map((turn, index) => {
-              const roleLabel = getTurnRoleLabel(turn);
-              const toolOnly = isToolOnlyTurn(turn);
-
-              return (
-                <article key={`${turn.timestamp ?? 'turn'}-${index}`} className={toolOnly ? 'bg-slate-50/70 px-5 py-3 dark:bg-slate-900/30' : 'px-5 py-4'}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${TYPE_STYLES[roleLabel] ?? TYPE_STYLES.system}`}>
-                      {toolOnly ? t('transcripts.detail.toolCall') : translateTurnLabel(turn, t)}
-                    </span>
-                    {turn.tools.map((tool) => (
-                      <span key={tool} className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                        {translateToolLabel(tool, t)}
-                      </span>
-                    ))}
-                    {turn.timestamp && (
-                      <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">
-                        {new Date(turn.timestamp).toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                  {toolOnly && (
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      {t('transcripts.detail.assistantRequested', { tools: turn.tools.map((tool) => translateToolLabel(tool, t)).join(', ') })}
-                    </p>
-                  )}
-                  {turn.text && <MarkdownMessage text={turn.text} />}
-                </article>
-              );
-            })}
-          </div>
+          <MetadataPanel metadata={timelineModel.metadata} />
+          <TranscriptTimeline model={timelineModel} />
         </>
       )}
     </div>

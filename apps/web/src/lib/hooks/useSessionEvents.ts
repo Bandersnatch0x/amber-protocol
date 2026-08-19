@@ -15,10 +15,7 @@ const EVENT_STATUS_MAP: Partial<Record<SessionEvent['type'], SessionStatus>> = {
   session_aborted: 'aborted',
 };
 
-
-export function statusFromEventType(
-  type: SessionEvent['type'],
-): SessionStatus | null {
+export function statusFromEventType(type: SessionEvent['type']): SessionStatus | null {
   return EVENT_STATUS_MAP[type] ?? null;
 }
 

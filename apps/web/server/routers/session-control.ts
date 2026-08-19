@@ -17,10 +17,9 @@ import {
 // CLI session transition SSOT (ADR-blessed createRequire seam). Web does not keep
 // a second ALLOWED_TRANSITIONS table; legality comes from isLegalTransition.
 const requireCli = createRequire(import.meta.url);
-const {
-  isLegalTransition,
-  STATES,
-} = requireCli('../../../../scripts/lib/session-state-machine.js') as {
+const { isLegalTransition, STATES } = requireCli(
+  '../../../../scripts/lib/session-state-machine.js',
+) as {
   isLegalTransition: (from: string, to: string) => boolean;
   STATES: Record<string, string>;
 };
@@ -76,14 +75,21 @@ const controlInputSchema = z.object({ sessionId: z.string() });
 const abortInputSchema = controlInputSchema.extend({ reason: z.string().optional() });
 
 function mergeWarnings(...warnings: Array<string | undefined>): string | undefined {
-  const values = Array.from(new Set(warnings.filter((warning): warning is string => Boolean(warning))));
+  const values = Array.from(
+    new Set(warnings.filter((warning): warning is string => Boolean(warning))),
+  );
   return values.length > 0 ? values.join('; ') : undefined;
 }
 
-async function persistAndConfirmStatus(sessionId: string, status: SessionStatus): Promise<SessionStatus> {
+async function persistAndConfirmStatus(
+  sessionId: string,
+  status: SessionStatus,
+): Promise<SessionStatus> {
   const confirmed = await persistSessionStatus(sessionId, status);
   if (confirmed.status !== status) {
-    throw new Error(`Session status persistence was not confirmed: expected ${status}, got ${confirmed.status}`);
+    throw new Error(
+      `Session status persistence was not confirmed: expected ${status}, got ${confirmed.status}`,
+    );
   }
   return confirmed.status as SessionStatus;
 }
@@ -159,7 +165,9 @@ async function transitionCreatedToRouted(sessionId: string): Promise<{
   }
 }
 
-async function recordRunnerControlRequest(request: RunnerControlRequest): Promise<string | undefined> {
+async function recordRunnerControlRequest(
+  request: RunnerControlRequest,
+): Promise<string | undefined> {
   const data = {
     sessionId: request.sessionId,
     requestId: request.requestId,
@@ -186,7 +194,9 @@ async function recordRunnerControlRequest(request: RunnerControlRequest): Promis
   }
 }
 
-function runnerEventType(outcome: RunnerAckOutcome): 'runner_ack' | 'runner_rejected' | 'runner_timeout' {
+function runnerEventType(
+  outcome: RunnerAckOutcome,
+): 'runner_ack' | 'runner_rejected' | 'runner_timeout' {
   if (outcome.status === 'acked') return 'runner_ack';
   if (outcome.status === 'rejected') return 'runner_rejected';
   return 'runner_timeout';
@@ -328,141 +338,133 @@ async function runControlledTransition({
 }
 
 export const sessionControlRouter = router({
-  start: publicProcedure
-    .input(controlInputSchema)
-    .mutation(async ({ input }) => {
-      const session = readSessionById(input.sessionId);
-      if (!session) {
-        throw new Error('Session not found');
+  start: publicProcedure.input(controlInputSchema).mutation(async ({ input }) => {
+    const session = readSessionById(input.sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    const currentStatus = session.status;
+    const action: RunnerControlAction = 'start';
+
+    // Legacy recovery: running is treated as executing (already started).
+    if (currentStatus === 'running') {
+      const status = await persistAndConfirmStatus(input.sessionId, 'executing');
+      return { status, timestamp: Date.now(), persisted: true, confirmed: true };
+    }
+    if (currentStatus === 'executing') {
+      return { status: currentStatus, timestamp: Date.now(), persisted: true, confirmed: true };
+    }
+
+    if (!canInvokeAction(action, currentStatus)) {
+      throw new Error(`Cannot ${action} from status: ${currentStatus}`);
+    }
+
+    // created (and legacy idle) must not jump to executing — route first, then execute.
+    let routeWarning: string | undefined;
+    let statusForTransition: SessionStatus = currentStatus as SessionStatus;
+    if (normalizeStatus(currentStatus) === STATES.CREATED) {
+      const routed = await transitionCreatedToRouted(input.sessionId);
+      statusForTransition = routed.status;
+      routeWarning = routed.warning;
+      if (!isLegalTransition(STATES.ROUTED, STATES.EXECUTING)) {
+        throw new Error(`Cannot ${action} from status: ${statusForTransition}`);
       }
+    } else if (!isLegalTransition(normalizeStatus(currentStatus), ACTION_TARGET.start)) {
+      throw new Error(`Cannot ${action} from status: ${currentStatus}`);
+    }
 
-      const currentStatus = session.status;
-      const action: RunnerControlAction = 'start';
+    const result = await runControlledTransition({
+      sessionId: input.sessionId,
+      action,
+      currentStatus: statusForTransition,
+      targetStatus: ACTION_TARGET.start,
+      eventType: 'session_started',
+      emit: () => sessionEvents.emitSessionStarted(input.sessionId),
+    });
 
-      // Legacy recovery: running is treated as executing (already started).
-      if (currentStatus === 'running') {
-        const status = await persistAndConfirmStatus(input.sessionId, 'executing');
-        return { status, timestamp: Date.now(), persisted: true, confirmed: true };
-      }
-      if (currentStatus === 'executing') {
-        return { status: currentStatus, timestamp: Date.now(), persisted: true, confirmed: true };
-      }
+    return {
+      ...result,
+      auditWarning: mergeWarnings(routeWarning, result.auditWarning),
+    };
+  }),
 
-      if (!canInvokeAction(action, currentStatus)) {
-        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
-      }
+  pause: publicProcedure.input(controlInputSchema).mutation(async ({ input }) => {
+    const session = readSessionById(input.sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
 
-      // created (and legacy idle) must not jump to executing — route first, then execute.
-      let routeWarning: string | undefined;
-      let statusForTransition: SessionStatus = currentStatus as SessionStatus;
-      if (normalizeStatus(currentStatus) === STATES.CREATED) {
-        const routed = await transitionCreatedToRouted(input.sessionId);
-        statusForTransition = routed.status;
-        routeWarning = routed.warning;
-        if (!isLegalTransition(STATES.ROUTED, STATES.EXECUTING)) {
-          throw new Error(`Cannot ${action} from status: ${statusForTransition}`);
-        }
-      } else if (!isLegalTransition(normalizeStatus(currentStatus), ACTION_TARGET.start)) {
-        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
-      }
+    const currentStatus = session.status;
+    const action: RunnerControlAction = 'pause';
+    if (!canInvokeAction(action, currentStatus)) {
+      if (currentStatus === 'paused') return { status: currentStatus, timestamp: Date.now() };
+      throw new Error(`Cannot ${action} from status: ${currentStatus}`);
+    }
 
-      const result = await runControlledTransition({
-        sessionId: input.sessionId,
-        action,
-        currentStatus: statusForTransition,
-        targetStatus: ACTION_TARGET.start,
-        eventType: 'session_started',
-        emit: () => sessionEvents.emitSessionStarted(input.sessionId),
-      });
+    return runControlledTransition({
+      sessionId: input.sessionId,
+      action,
+      currentStatus: currentStatus as SessionStatus,
+      targetStatus: ACTION_TARGET.pause,
+      eventType: 'session_paused',
+      emit: () => sessionEvents.emitSessionPaused(input.sessionId),
+    });
+  }),
 
-      return {
-        ...result,
-        auditWarning: mergeWarnings(routeWarning, result.auditWarning),
-      };
-    }),
+  resume: publicProcedure.input(controlInputSchema).mutation(async ({ input }) => {
+    const session = readSessionById(input.sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
 
-  pause: publicProcedure
-    .input(controlInputSchema)
-    .mutation(async ({ input }) => {
-      const session = readSessionById(input.sessionId);
-      if (!session) {
-        throw new Error('Session not found');
-      }
+    const currentStatus = session.status;
+    const action: RunnerControlAction = 'resume';
 
-      const currentStatus = session.status;
-      const action: RunnerControlAction = 'pause';
-      if (!canInvokeAction(action, currentStatus)) {
-        if (currentStatus === 'paused') return { status: currentStatus, timestamp: Date.now() };
-        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
-      }
+    // Legacy recovery: running is already-executing vocabulary drift.
+    if (currentStatus === 'running') {
+      const status = await persistAndConfirmStatus(input.sessionId, 'executing');
+      return { status, timestamp: Date.now(), persisted: true, confirmed: true };
+    }
+    if (currentStatus === 'executing') {
+      return { status: currentStatus, timestamp: Date.now(), persisted: true, confirmed: true };
+    }
 
-      return runControlledTransition({
-        sessionId: input.sessionId,
-        action,
-        currentStatus: currentStatus as SessionStatus,
-        targetStatus: ACTION_TARGET.pause,
-        eventType: 'session_paused',
-        emit: () => sessionEvents.emitSessionPaused(input.sessionId),
-      });
-    }),
+    if (!canInvokeAction(action, currentStatus)) {
+      throw new Error(`Cannot ${action} from status: ${currentStatus}`);
+    }
 
-  resume: publicProcedure
-    .input(controlInputSchema)
-    .mutation(async ({ input }) => {
-      const session = readSessionById(input.sessionId);
-      if (!session) {
-        throw new Error('Session not found');
-      }
+    return runControlledTransition({
+      sessionId: input.sessionId,
+      action,
+      currentStatus: currentStatus as SessionStatus,
+      targetStatus: ACTION_TARGET.resume,
+      eventType: 'session_resumed',
+      emit: () => sessionEvents.emitSessionResumed(input.sessionId),
+    });
+  }),
 
-      const currentStatus = session.status;
-      const action: RunnerControlAction = 'resume';
+  abort: publicProcedure.input(abortInputSchema).mutation(async ({ input }) => {
+    const session = readSessionById(input.sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
 
-      // Legacy recovery: running is already-executing vocabulary drift.
-      if (currentStatus === 'running') {
-        const status = await persistAndConfirmStatus(input.sessionId, 'executing');
-        return { status, timestamp: Date.now(), persisted: true, confirmed: true };
-      }
-      if (currentStatus === 'executing') {
-        return { status: currentStatus, timestamp: Date.now(), persisted: true, confirmed: true };
-      }
+    const currentStatus = session.status;
+    const action: RunnerControlAction = 'abort';
+    if (!canInvokeAction(action, currentStatus)) {
+      if (currentStatus === 'aborted') return { status: currentStatus, timestamp: Date.now() };
+      throw new Error(`Cannot ${action} from status: ${currentStatus}`);
+    }
 
-      if (!canInvokeAction(action, currentStatus)) {
-        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
-      }
-
-      return runControlledTransition({
-        sessionId: input.sessionId,
-        action,
-        currentStatus: currentStatus as SessionStatus,
-        targetStatus: ACTION_TARGET.resume,
-        eventType: 'session_resumed',
-        emit: () => sessionEvents.emitSessionResumed(input.sessionId),
-      });
-    }),
-
-  abort: publicProcedure
-    .input(abortInputSchema)
-    .mutation(async ({ input }) => {
-      const session = readSessionById(input.sessionId);
-      if (!session) {
-        throw new Error('Session not found');
-      }
-
-      const currentStatus = session.status;
-      const action: RunnerControlAction = 'abort';
-      if (!canInvokeAction(action, currentStatus)) {
-        if (currentStatus === 'aborted') return { status: currentStatus, timestamp: Date.now() };
-        throw new Error(`Cannot ${action} from status: ${currentStatus}`);
-      }
-
-      return runControlledTransition({
-        sessionId: input.sessionId,
-        action,
-        currentStatus: currentStatus as SessionStatus,
-        targetStatus: ACTION_TARGET.abort,
-        eventType: 'session_aborted',
-        eventData: { reason: input.reason },
-        emit: () => sessionEvents.emitSessionAborted(input.sessionId, input.reason),
-      });
-    }),
+    return runControlledTransition({
+      sessionId: input.sessionId,
+      action,
+      currentStatus: currentStatus as SessionStatus,
+      targetStatus: ACTION_TARGET.abort,
+      eventType: 'session_aborted',
+      eventData: { reason: input.reason },
+      emit: () => sessionEvents.emitSessionAborted(input.sessionId, input.reason),
+    });
+  }),
 });

@@ -80,7 +80,10 @@ function stripSequentialLineNumbers(lines: string[]): string[] {
 
 function normalizeLanguage(language: string | undefined): string | undefined {
   if (!language) return undefined;
-  const normalized = language.toLowerCase().replace(/^language-/, '').trim();
+  const normalized = language
+    .toLowerCase()
+    .replace(/^language-/, '')
+    .trim();
   return LANGUAGE_ALIASES[normalized] ?? normalized;
 }
 
@@ -92,14 +95,12 @@ function getDiffLineKind(line: string): DiffLineKind {
 }
 
 function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function lineClassName(kind: DiffLineKind): string {
-  if (kind === 'add') return 'bg-emerald-50/80 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100';
+  if (kind === 'add')
+    return 'bg-emerald-50/80 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100';
   if (kind === 'remove') return 'bg-red-50/80 text-red-950 dark:bg-red-950/30 dark:text-red-100';
   if (kind === 'meta') return 'bg-blue-50/70 text-blue-900 dark:bg-blue-950/30 dark:text-blue-200';
   return 'text-slate-800 dark:text-slate-200';
@@ -134,17 +135,26 @@ export function CodeBlock({
 }: CodeBlockProps) {
   const { t } = useI18n();
   const codeRegionId = useId();
-  const normalizedCode = useMemo(() => stripSequentialLineNumbers(normalizeCode(code).split('\n')).join('\n'), [code]);
+  const normalizedCode = useMemo(
+    () => stripSequentialLineNumbers(normalizeCode(code).split('\n')).join('\n'),
+    [code],
+  );
   const normalizedLanguage = useMemo(() => normalizeLanguage(language), [language]);
   const lines = useMemo(() => normalizedCode.split('\n'), [normalizedCode]);
-  const isDiff = normalizedLanguage === 'diff' || lines.some((line) => /^(@@|\+\+\+|---|[-+]\S)/.test(line));
+  const isDiff =
+    normalizedLanguage === 'diff' || lines.some((line) => /^(@@|\+\+\+|---|[-+]\S)/.test(line));
   const shouldCollapse = defaultCollapsed ?? lines.length > collapseAfterLines;
   const [expanded, setExpanded] = useState(!shouldCollapse);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const visibleLines = expanded ? lines : lines.slice(0, collapseAfterLines);
   const hiddenCount = Math.max(lines.length - visibleLines.length, 0);
   const label = title ?? normalizedLanguage ?? 'text';
-  const copyLabel = copyState === 'copied' ? t('code.copied') : copyState === 'failed' ? t('code.copyFailed') : t('code.copy');
+  const copyLabel =
+    copyState === 'copied'
+      ? t('code.copied')
+      : copyState === 'failed'
+        ? t('code.copyFailed')
+        : t('code.copy');
 
   async function copyCode() {
     try {
@@ -162,7 +172,9 @@ export function CodeBlock({
       <figcaption className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
         <div className="flex min-w-0 items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-blue-500" />
-          <span className="truncate font-mono text-xs font-medium text-slate-600 dark:text-slate-300">{label}</span>
+          <span className="truncate font-mono text-xs font-medium text-slate-600 dark:text-slate-300">
+            {label}
+          </span>
           {isDiff && (
             <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300">
               diff
@@ -195,7 +207,10 @@ export function CodeBlock({
         </div>
       </figcaption>
 
-      <pre id={codeRegionId} className="max-h-[32rem] overflow-auto bg-slate-950/0 text-xs leading-5">
+      <pre
+        id={codeRegionId}
+        className="max-h-[32rem] overflow-auto bg-slate-950/0 text-xs leading-5"
+      >
         <code className="block min-w-full py-2 font-mono">
           {visibleLines.map((line, index) => {
             const lineNumber = index + 1;
@@ -204,12 +219,24 @@ export function CodeBlock({
             const codeLine = marker ? line.slice(1) : line;
 
             return (
-              <span key={`${lineNumber}-${line}`} className={`grid grid-cols-[3.25rem_1.5rem_minmax(0,1fr)] px-0 ${lineClassName(diffKind)}`}>
+              <span
+                key={`${lineNumber}-${line}`}
+                className={`grid grid-cols-[3.25rem_1.5rem_minmax(0,1fr)] px-0 ${lineClassName(diffKind)}`}
+              >
                 <span className="select-none border-r border-slate-200/70 pr-3 text-right text-slate-400 dark:border-slate-700/80 dark:text-slate-500">
                   {lineNumber}
                 </span>
-                <span className={`select-none text-center font-semibold ${markerClassName(diffKind)}`}>{marker}</span>
-                <span className="whitespace-pre px-3" dangerouslySetInnerHTML={{ __html: highlightLine(codeLine, normalizedLanguage) || ' ' }} />
+                <span
+                  className={`select-none text-center font-semibold ${markerClassName(diffKind)}`}
+                >
+                  {marker}
+                </span>
+                <span
+                  className="whitespace-pre px-3"
+                  dangerouslySetInnerHTML={{
+                    __html: highlightLine(codeLine, normalizedLanguage) || ' ',
+                  }}
+                />
               </span>
             );
           })}
@@ -224,7 +251,9 @@ export function CodeBlock({
           aria-controls={codeRegionId}
           className="block w-full border-t border-slate-200 bg-gradient-to-r from-blue-50 via-slate-50 to-blue-50 px-3 py-2.5 text-center text-xs font-medium text-blue-700 hover:from-blue-100 hover:to-blue-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 dark:border-slate-700 dark:from-slate-800 dark:via-slate-800/90 dark:to-slate-800 dark:text-blue-300 dark:hover:from-slate-700 dark:hover:to-slate-700"
         >
-          {t(hiddenCount === 1 ? 'code.hiddenLinesOne' : 'code.hiddenLines', { count: hiddenCount })}
+          {t(hiddenCount === 1 ? 'code.hiddenLinesOne' : 'code.hiddenLines', {
+            count: hiddenCount,
+          })}
         </button>
       )}
     </figure>

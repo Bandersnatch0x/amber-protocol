@@ -16,7 +16,12 @@ function TimelinePage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const { data: session } = trpc.session.byId.useQuery({ id });
-  const { data: events, isLoading, error, refetch } = trpc.session.timeline.useQuery({ sessionId: id });
+  const {
+    data: events,
+    isLoading,
+    error,
+    refetch,
+  } = trpc.session.timeline.useQuery({ sessionId: id });
 
   const metrics = useMemo(() => computeTimelineMetrics(events), [events]);
   const timelineEntries = useMemo(
@@ -51,11 +56,18 @@ function TimelinePage() {
     return (
       <div className="page-container">
         <div className="card max-w-xl p-5">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">{t('timeline.failed')}</h1>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+            {t('timeline.failed')}
+          </h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
-          <button onClick={() => refetch()} className="btn-secondary mt-4 text-sm">
-            {t('common.retry')}
-          </button>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button onClick={() => refetch()} className="btn-secondary text-sm">
+              {t('common.retry')}
+            </button>
+            <Link to="/" className="btn-secondary text-sm">
+              {t('error.backHome')}
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -69,17 +81,28 @@ function TimelinePage() {
           params={{ id }}
           className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
         >
-          <svg aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg
+            aria-hidden="true"
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
           {t('timeline.backToSession')}
         </Link>
-        <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">{t('timeline.title')}</h1>
+        <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
+          {t('timeline.title')}
+        </h1>
         {session && <p className="text-sm text-slate-600 dark:text-slate-400">{session.goal}</p>}
         <p className="text-sm text-slate-600 dark:text-slate-400">
           {hasActiveFilters
             ? t('timeline.showing', { visible: visibleEventCount, total: totalEventCount })
-            : t(totalEventCount === 1 ? 'timeline.countOne' : 'timeline.count', { count: totalEventCount })}
+            : t(totalEventCount === 1 ? 'timeline.countOne' : 'timeline.count', {
+                count: totalEventCount,
+              })}
         </p>
       </header>
 
@@ -91,7 +114,9 @@ function TimelinePage() {
           </div>
           <div>
             <dt className="label">{t('timeline.startedAt')}</dt>
-            <dd className="value">{metrics.startTime !== null ? new Date(metrics.startTime).toLocaleString() : '-'}</dd>
+            <dd className="value">
+              {metrics.startTime !== null ? new Date(metrics.startTime).toLocaleString() : '-'}
+            </dd>
           </div>
           {eventTypeSummary && (
             <div>
@@ -111,13 +136,21 @@ function TimelinePage() {
 
       {totalEventCount === 0 ? (
         <div className="card p-12 text-center" role="status">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-white">{t('timeline.empty.title')}</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t('timeline.empty.detail')}</p>
+          <h2 className="text-sm font-medium text-slate-900 dark:text-white">
+            {t('timeline.empty.title')}
+          </h2>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            {t('timeline.empty.detail')}
+          </p>
         </div>
       ) : visibleEventCount === 0 ? (
         <div className="card p-12 text-center" role="status">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-white">{t('timeline.noMatches.title')}</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t('timeline.noMatches.detail')}</p>
+          <h2 className="text-sm font-medium text-slate-900 dark:text-white">
+            {t('timeline.noMatches.title')}
+          </h2>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            {t('timeline.noMatches.detail')}
+          </p>
           <button
             onClick={() => {
               setSelectedType('');
@@ -133,13 +166,24 @@ function TimelinePage() {
           {timelineEntries.map((entry, index) => {
             if (entry.kind === 'gap') {
               return (
-                <div key={`gap-${index}`} className="ml-14 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
-                  {t(entry.hiddenCount === 1 ? 'timeline.hiddenByFiltersOne' : 'timeline.hiddenByFilters', { count: entry.hiddenCount })}
+                <div
+                  key={`gap-${index}`}
+                  className="ml-14 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                >
+                  {t(
+                    entry.hiddenCount === 1
+                      ? 'timeline.hiddenByFiltersOne'
+                      : 'timeline.hiddenByFilters',
+                    { count: entry.hiddenCount },
+                  )}
                 </div>
               );
             }
 
-            const key = 'id' in entry.event && entry.event.id ? entry.event.id as string : `${entry.event.type}-${entry.event.timestamp}-${entry.globalIndex}`;
+            const key =
+              'id' in entry.event && entry.event.id
+                ? (entry.event.id as string)
+                : `${entry.event.type}-${entry.event.timestamp}-${entry.globalIndex}`;
             return (
               <TimelineEvent
                 key={key}

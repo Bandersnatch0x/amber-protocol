@@ -38,6 +38,31 @@ const artifacts = [
   '.workflow/continuous-improvement/state.json',
 ] as const;
 
+/** Lifecycle step ids emitted by scripts/lib/core/lifecycle.js (STEPS). */
+const LIFECYCLE_STEP_IDS = [
+  'audit',
+  'init',
+  'feature',
+  'plan',
+  'gate',
+  'feature-evidence',
+  'verify',
+  'approve',
+  'handoff',
+  'complete-check',
+  'session-complete',
+  'accept',
+  'learnings',
+] as const;
+
+type LifecycleStepId = (typeof LIFECYCLE_STEP_IDS)[number];
+
+function knownLifecycleStep(stepId: string): LifecycleStepId | null {
+  return (LIFECYCLE_STEP_IDS as readonly string[]).includes(stepId)
+    ? (stepId as LifecycleStepId)
+    : null;
+}
+
 function formatRefresh(value: number, fallback: string): string {
   if (!value) return fallback;
   return new Date(value).toLocaleString();
@@ -58,6 +83,7 @@ function deriveLoopStage(activeSessionCount: number, pendingGateCount: number): 
 interface NextActionView {
   focusLabel: string;
   sessionId: string | null;
+  stepId: string;
   nextStep: string;
   reason: string;
   remedy: string;
@@ -91,7 +117,10 @@ function sessionIdFromFocus(value: unknown): string | null {
 function labelFromFocus(value: unknown, fallback: string): string {
   if (typeof value === 'string' && value.trim()) return value.trim();
   if (!isRecord(value)) return fallback;
-  return firstString(value, ['label', 'name', 'title', 'id', 'sessionId', 'session', 'feature']) || fallback;
+  return (
+    firstString(value, ['label', 'name', 'title', 'id', 'sessionId', 'session', 'feature']) ||
+    fallback
+  );
 }
 
 function rowText(value: unknown, keys: string[], fallback = '-'): string {
@@ -100,24 +129,86 @@ function rowText(value: unknown, keys: string[], fallback = '-'): string {
   return firstString(value, keys) || fallback;
 }
 
-function buildNextActionView(data: unknown, repositoryFallback: string, noActionFallback: string): NextActionView {
+function buildNextActionView(
+  data: unknown,
+  repositoryFallback: string,
+  noActionFallback: string,
+): NextActionView {
   const record = isRecord(data) ? data : {};
   const focus = record.focus;
   const nextStep = record.nextStep;
   const completion = record.completion;
-  const sessionId = sessionIdFromFocus(focus) ?? (isRecord(nextStep) ? sessionIdFromFocus(nextStep) : null);
+  const sessionId =
+    sessionIdFromFocus(focus) ?? (isRecord(nextStep) ? sessionIdFromFocus(nextStep) : null);
 
   return {
     focusLabel: labelFromFocus(focus, repositoryFallback),
     sessionId,
-    nextStep: rowText(nextStep, ['title', 'label', 'name', 'action', 'command', 'id'], noActionFallback),
-    reason: rowText(nextStep, ['reason', 'why', 'detail', 'message'], rowText(record, ['reason', 'why', 'detail', 'message'])),
+    stepId: rowText(nextStep, ['id', 'stepId'], ''),
+    nextStep: rowText(
+      nextStep,
+      ['title', 'label', 'name', 'action', 'command', 'id'],
+      noActionFallback,
+    ),
+    reason: rowText(
+      nextStep,
+      ['reason', 'why', 'detail', 'message'],
+      rowText(record, ['reason', 'why', 'detail', 'message']),
+    ),
     remedy: rowText(
       nextStep,
       ['remedy', 'recommendation', 'nextCommand', 'command', 'fix'],
-      rowText(record, ['remedy', 'recommendation', 'nextCommand', 'command', 'fix'], rowText(completion, ['reason', 'message', 'text'])),
+      rowText(
+        record,
+        ['remedy', 'recommendation', 'nextCommand', 'command', 'fix'],
+        rowText(completion, ['reason', 'message', 'text']),
+      ),
     ),
   };
+}
+
+/** Skeleton row matching the session/gate list item layout (title + meta + trailing control). */
+function ListSkeleton({ trailing = 'badge' }: { trailing?: 'badge' | 'link' }) {
+  return (
+    <ul className="mt-4 space-y-3" aria-hidden="true">
+      {[0, 1, 2].map((index) => (
+        <li key={index} className="flex animate-pulse items-start justify-between gap-3 py-1">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+            <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+          </div>
+          {trailing === 'badge' ? (
+            <div className="h-5 w-16 shrink-0 rounded-full bg-slate-200 dark:bg-slate-700" />
+          ) : (
+            <div className="mt-0.5 h-4 w-16 shrink-0 rounded bg-slate-200 dark:bg-slate-700" />
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Friendly failure card: localized title + explanation + retry (mirrors sessions/gates list pages). */
+function QueryFailure({
+  title,
+  detail,
+  onRetry,
+  retryLabel,
+}: {
+  title: string;
+  detail: string;
+  onRetry: () => void;
+  retryLabel: string;
+}) {
+  return (
+    <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/30">
+      <p className="text-sm font-medium text-red-800 dark:text-red-200">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-red-700 dark:text-red-300">{detail}</p>
+      <button type="button" onClick={onRetry} className="btn-secondary mt-3 text-xs">
+        {retryLabel}
+      </button>
+    </div>
+  );
 }
 
 function HomePage() {
@@ -125,7 +216,7 @@ function HomePage() {
   const sessionsQuery = trpc.session.list.useQuery();
   const gatesQuery = trpc.gate.list.useQuery();
   const nextActionQuery = trpc.lifecycle.next.useQuery({});
-  const [lifecycleExpanded, setLifecycleExpanded] = useState(true);
+  const [fieldOpen, setFieldOpen] = useState(false);
 
   const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : [];
   const gates = Array.isArray(gatesQuery.data) ? gatesQuery.data : [];
@@ -135,10 +226,7 @@ function HomePage() {
     [sessions],
   );
 
-  const pendingGates = useMemo(
-    () => gates.filter((gate) => gate.status === 'pending'),
-    [gates],
-  );
+  const pendingGates = useMemo(() => gates.filter((gate) => gate.status === 'pending'), [gates]);
 
   const loopStage = deriveLoopStage(activeSessions.length, pendingGates.length);
   const loopProgress = Math.min(
@@ -147,31 +235,52 @@ function HomePage() {
   );
 
   const nextAction = useMemo(
-    () => buildNextActionView(nextActionQuery.data, t('home.nextAction.repositoryFocus'), t('home.nextAction.noAction')),
+    () =>
+      buildNextActionView(
+        nextActionQuery.data,
+        t('home.nextAction.repositoryFocus'),
+        t('home.nextAction.noAction'),
+      ),
     [nextActionQuery.data, t],
   );
+
+  // Known lifecycle steps render localized copy; unknown backend strings
+  // degrade to their mono original text instead of raw error noise.
+  const knownStep = knownLifecycleStep(nextAction.stepId);
+  const stepTitleKey = knownStep ? (`home.step.${knownStep}.title` as I18nKey) : null;
+  const stepReasonKey = knownStep ? (`home.step.${knownStep}.reason` as I18nKey) : null;
+  const hasRawStep = Boolean(!knownStep && nextAction.stepId);
 
   return (
     <div className="page-container space-y-8">
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">{t('home.title')}</h1>
+        <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
+          {t('home.title')}
+        </h1>
         <p className="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
           {t('home.description')}
         </p>
       </header>
 
-      <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+      {/* Block 1: overview */}
+      <section>
         <div className="card min-w-0 p-5">
           <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="label">{t('home.repository')}</p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{t('home.repositoryName')}</h2>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t('home.repositoryDetail')}</p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                {t('home.repositoryName')}
+              </h2>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                {t('home.repositoryDetail')}
+              </p>
             </div>
             <dl className="grid min-w-0 gap-4 sm:grid-cols-3">
               <div>
                 <dt className="label">{t('home.lastRefresh')}</dt>
-                <dd className="value">{formatRefresh(sessionsQuery.dataUpdatedAt, t('home.notRefreshed'))}</dd>
+                <dd className="value">
+                  {formatRefresh(sessionsQuery.dataUpdatedAt, t('home.notRefreshed'))}
+                </dd>
               </div>
               <div>
                 <dt className="label">{t('home.activeSessions')}</dt>
@@ -184,59 +293,62 @@ function HomePage() {
             </dl>
           </div>
         </div>
-
-        <div className="amber-loop-card card min-w-0 overflow-hidden">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
-            <div>
-              <h2 className="text-sm font-medium text-slate-900 dark:text-white">{t('home.governanceReference')}</h2>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{t('home.governanceReferenceDetail')}</p>
-            </div>
-            <span className="label shrink-0">{t(lifecycle[loopStage].stageKey as I18nKey)}</span>
-          </div>
-          <div className="amber-loop-card__field">
-            <AmberField stage={loopStage} progress={loopProgress} />
-          </div>
-          <ol className="grid grid-cols-3 gap-px border-t border-slate-200 bg-slate-200 dark:border-slate-700 dark:bg-slate-700 sm:grid-cols-6">
-            {lifecycle.map((item, index) => (
-              <li
-                key={item.stageKey}
-                className={`bg-white px-2 py-2 text-center dark:bg-slate-800 ${
-                  index === loopStage ? 'bg-blue-50 dark:bg-blue-950/40' : ''
-                }`}
-              >
-                <span
-                  className={`block text-[10px] font-medium uppercase tracking-wide ${
-                    index === loopStage ? 'text-blue-700 dark:text-blue-300' : 'text-slate-500 dark:text-slate-400'
-                  }`}
-                >
-                  {t(item.stageKey as I18nKey)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </div>
       </section>
 
+      {/* Block 2: next action */}
       <section className="card p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="section-title">{t('home.nextAction.title')}</h2>
-            <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
-              {nextActionQuery.isLoading ? t('home.nextAction.loading') : nextAction.nextStep}
-            </p>
+            {nextActionQuery.isLoading ? (
+              <div
+                className="mt-2 h-4 w-48 animate-pulse rounded bg-slate-200 dark:bg-slate-700"
+                aria-hidden="true"
+              />
+            ) : (
+              <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
+                {stepTitleKey ? (
+                  t(stepTitleKey)
+                ) : hasRawStep ? (
+                  <span className="font-mono text-xs">{nextAction.nextStep}</span>
+                ) : (
+                  nextAction.nextStep
+                )}
+              </p>
+            )}
           </div>
           {nextAction.sessionId && (
-            <Link to="/sessions/$id" params={{ id: nextAction.sessionId }} className="btn-primary text-sm">
+            <Link
+              to="/sessions/$id"
+              params={{ id: nextAction.sessionId }}
+              className="btn-primary text-sm"
+            >
               {t('home.nextAction.openSession')}
             </Link>
           )}
         </div>
 
-        {nextActionQuery.error ? (
-          <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
-            <p className="font-medium">{t('home.nextAction.unavailable')}</p>
-            {nextActionQuery.error.message && <p className="mt-1 break-words">{nextActionQuery.error.message}</p>}
+        {nextActionQuery.isLoading ? (
+          <div className="mt-4 animate-pulse space-y-3" aria-hidden="true">
+            <div className="grid gap-3 md:grid-cols-3">
+              {[0, 1, 2].map((index) => (
+                <div
+                  key={index}
+                  className="rounded-md border border-slate-200 p-3 dark:border-slate-700"
+                >
+                  <div className="h-3 w-16 rounded bg-slate-200 dark:bg-slate-700" />
+                  <div className="mt-2 h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+                </div>
+              ))}
+            </div>
           </div>
+        ) : nextActionQuery.error ? (
+          <QueryFailure
+            title={t('home.nextAction.unavailable')}
+            detail={t('home.nextActionFailedDetail')}
+            onRetry={() => nextActionQuery.refetch()}
+            retryLabel={t('common.retry')}
+          />
         ) : (
           <dl className="mt-4 grid gap-3 md:grid-cols-3">
             <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
@@ -245,30 +357,49 @@ function HomePage() {
             </div>
             <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
               <dt className="label">{t('home.nextAction.reason')}</dt>
-              <dd className="value break-words">{nextAction.reason}</dd>
+              <dd className="value break-words">
+                {stepReasonKey ? (
+                  t(stepReasonKey)
+                ) : (
+                  <span className="font-mono text-xs leading-5">{nextAction.reason}</span>
+                )}
+              </dd>
             </div>
             <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
               <dt className="label">{t('home.nextAction.remedy')}</dt>
-              <dd className="value break-words">{nextAction.remedy}</dd>
+              <dd className="break-all font-mono text-xs leading-5 text-slate-900 dark:text-white">
+                {nextAction.remedy}
+              </dd>
             </div>
           </dl>
         )}
       </section>
 
+      {/* Block 3 + 4: active sessions and pending gates */}
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="card p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="section-title">{t('home.activeSessions')}</h2>
-            <Link to="/sessions" className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400">
+            <Link
+              to="/sessions"
+              className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400"
+            >
               {t('home.openSessions')}
             </Link>
           </div>
           {sessionsQuery.isLoading ? (
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{t('sessions.loading')}</p>
+            <ListSkeleton trailing="badge" />
           ) : sessionsQuery.error ? (
-            <p className="mt-4 text-sm text-red-700 dark:text-red-300">{sessionsQuery.error.message}</p>
+            <QueryFailure
+              title={t('home.sessionsFailed')}
+              detail={t('home.sessionsFailedDetail')}
+              onRetry={() => sessionsQuery.refetch()}
+              retryLabel={t('common.retry')}
+            />
           ) : activeSessions.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{t('home.nextAction.noAction')}</p>
+            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+              {t('home.nextAction.noAction')}
+            </p>
           ) : (
             <ul className="mt-4 divide-y divide-slate-200 dark:divide-slate-700">
               {activeSessions.slice(0, 4).map((session) => (
@@ -279,7 +410,9 @@ function HomePage() {
                     className="-mx-2 flex min-w-0 items-start justify-between gap-3 rounded-md px-2 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/40"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{session.goal || session.id}</p>
+                      <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+                        {session.goal || session.id}
+                      </p>
                       <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
                         {session.route.name} · {formatTime(session.updatedAt ?? session.createdAt)}
                       </p>
@@ -295,16 +428,26 @@ function HomePage() {
         <div className="card p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="section-title">{t('home.pendingGates')}</h2>
-            <Link to="/gates" className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400">
+            <Link
+              to="/gates"
+              className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400"
+            >
               {t('home.reviewGates')}
             </Link>
           </div>
           {gatesQuery.isLoading ? (
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{t('gates.loading')}</p>
+            <ListSkeleton trailing="link" />
           ) : gatesQuery.error ? (
-            <p className="mt-4 text-sm text-red-700 dark:text-red-300">{gatesQuery.error.message}</p>
+            <QueryFailure
+              title={t('home.gatesFailed')}
+              detail={t('home.gatesFailedDetail')}
+              onRetry={() => gatesQuery.refetch()}
+              retryLabel={t('common.retry')}
+            />
           ) : pendingGates.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{t('home.nextAction.noAction')}</p>
+            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+              {t('home.nextAction.noAction')}
+            </p>
           ) : (
             <ul className="mt-4 divide-y divide-slate-200 dark:divide-slate-700">
               {pendingGates.slice(0, 4).map((gate) => (
@@ -319,11 +462,10 @@ function HomePage() {
                       </p>
                     </div>
                     <Link
-                      to="/sessions/$id"
-                      params={{ id: gate.sessionId }}
+                      to="/gates"
                       className="shrink-0 text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400"
                     >
-                      {t('home.nextAction.openSession')}
+                      {t('home.reviewGate')}
                     </Link>
                   </div>
                 </li>
@@ -333,19 +475,26 @@ function HomePage() {
         </div>
       </section>
 
+      {/* Block 5: entries */}
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-4">
           <div>
             <h2 className="section-title">{t('home.primaryWorkflows')}</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('home.primaryWorkflowsDetail')}</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {t('home.primaryWorkflowsDetail')}
+            </p>
           </div>
           <div className="grid gap-3">
             {primarySurfaces.map((surface) => (
               <Link key={surface.to} to={surface.to} className="card-hover block p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-sm font-medium text-slate-900 dark:text-white">{t(surface.labelKey)}</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">{t(surface.detailKey)}</p>
+                    <h3 className="text-sm font-medium text-slate-900 dark:text-white">
+                      {t(surface.labelKey)}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                      {t(surface.detailKey)}
+                    </p>
                   </div>
                   <span className="mt-1 text-sm text-slate-300 dark:text-slate-600">/</span>
                 </div>
@@ -357,15 +506,25 @@ function HomePage() {
         <div className="space-y-4">
           <div>
             <h2 className="section-title">{t('home.secondarySurfaces')}</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('home.secondarySurfacesDetail')}</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {t('home.secondarySurfacesDetail')}
+            </p>
           </div>
           <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800">
             {secondarySurfaces.map((surface) => (
-              <Link key={surface.to} to={surface.to} className="block px-4 py-4 transition-colors duration-150 hover:bg-slate-50 dark:hover:bg-slate-900">
+              <Link
+                key={surface.to}
+                to={surface.to}
+                className="block px-4 py-4 transition-colors duration-150 hover:bg-slate-50 dark:hover:bg-slate-900"
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-sm font-medium text-slate-900 dark:text-white">{t(surface.labelKey)}</h3>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t(surface.detailKey)}</p>
+                    <h3 className="text-sm font-medium text-slate-900 dark:text-white">
+                      {t(surface.labelKey)}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                      {t(surface.detailKey)}
+                    </p>
                   </div>
                   <span className="mt-1 text-sm text-slate-300 dark:text-slate-600">/</span>
                 </div>
@@ -375,44 +534,103 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="card p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="section-title">{t('home.governanceReference')}</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('home.governanceReferenceDetail')}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setLifecycleExpanded((current) => !current)}
-              className="text-sm text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-400 rounded"
-            >
-              {lifecycleExpanded ? t('common.hide') : t('common.show')}
-            </button>
+      {/* Collapsed reference zone: lifecycle explainer, artifacts, and the
+          opt-in decorative WebGL showcase. Data above stays authoritative. */}
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="section-title">{t('home.moreTitle')}</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {t('home.moreDetail')}
+            </p>
           </div>
-          {lifecycleExpanded && (
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {lifecycle.map((item) => (
-                <div key={item.stageKey} className="rounded-md border border-slate-200 px-4 py-3 dark:border-slate-700">
-                  <dt className="label">{t(item.stageKey as I18nKey)}</dt>
-                  <dd className="mt-1 text-sm text-slate-900 dark:text-white">{t(item.detailKey as I18nKey)}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
+          <Link
+            to="/governance"
+            className="rounded text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-blue-400"
+          >
+            {t('home.governanceOpen')}
+          </Link>
         </div>
 
-        <div className="card p-5">
-          <h2 className="section-title">{t('home.evidenceReferences')}</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('home.evidenceReferencesDetail')}</p>
+        <details className="card p-5">
+          <summary className="cursor-pointer scroll-mt-20 select-none text-sm font-medium text-slate-900 dark:text-white">
+            {t('home.governanceReference')}
+            <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">
+              {t('home.governanceReferenceDetail')}
+            </span>
+          </summary>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {lifecycle.map((item) => (
+              <div
+                key={item.stageKey}
+                className="rounded-md border border-slate-200 px-4 py-3 dark:border-slate-700"
+              >
+                <dt className="label">{t(item.stageKey as I18nKey)}</dt>
+                <dd className="mt-1 text-sm text-slate-900 dark:text-white">
+                  {t(item.detailKey as I18nKey)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+
+        <details className="card p-5">
+          <summary className="cursor-pointer scroll-mt-20 select-none text-sm font-medium text-slate-900 dark:text-white">
+            {t('home.evidenceReferences')}
+            <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">
+              {t('home.evidenceReferencesDetail')}
+            </span>
+          </summary>
           <ul className="mt-4 space-y-2">
             {artifacts.map((artifact) => (
-              <li key={artifact} className="rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+              <li
+                key={artifact}
+                className="rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300"
+              >
                 {artifact}
               </li>
             ))}
           </ul>
-        </div>
+        </details>
+
+        <details
+          className="card overflow-hidden"
+          onToggle={(event) => setFieldOpen(event.currentTarget.open)}
+        >
+          <summary className="cursor-pointer scroll-mt-20 select-none p-5 text-sm font-medium text-slate-900 dark:text-white">
+            {t('home.field.title')}
+            <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">
+              {t('home.field.detail')}
+            </span>
+          </summary>
+          {fieldOpen && (
+            <div className="px-5 pb-5">
+              <div className="amber-loop-card__field overflow-hidden rounded-md">
+                <AmberField stage={loopStage} progress={loopProgress} />
+              </div>
+              <ol className="mt-3 grid grid-cols-3 gap-px rounded-md border border-slate-200 bg-slate-200 sm:grid-cols-6 dark:border-slate-700 dark:bg-slate-700">
+                {lifecycle.map((item, index) => (
+                  <li
+                    key={item.stageKey}
+                    className={`bg-white px-2 py-2 text-center dark:bg-slate-800 ${
+                      index === loopStage ? 'bg-blue-50 dark:bg-blue-950/40' : ''
+                    }`}
+                  >
+                    <span
+                      className={`block text-[10px] font-medium uppercase tracking-wide ${
+                        index === loopStage
+                          ? 'text-blue-700 dark:text-blue-300'
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      {t(item.stageKey as I18nKey)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </details>
       </section>
     </div>
   );

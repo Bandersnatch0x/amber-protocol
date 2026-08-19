@@ -20,25 +20,23 @@ export function ConfirmAbortDialog({ isOpen, onConfirm, onCancel }: ConfirmAbort
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
     >
       <div className="mx-4 w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
-        <h2 id="abort-dialog-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h2
+          id="abort-dialog-title"
+          className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+        >
           {t('sessions.controls.abortTitle')}
         </h2>
-        <p id="abort-dialog-description" className="mt-2 mb-6 text-sm text-slate-600 dark:text-slate-400">
+        <p
+          id="abort-dialog-description"
+          className="mt-2 mb-6 text-sm text-slate-600 dark:text-slate-400"
+        >
           {t('sessions.controls.abortDetail')}
         </p>
         <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="btn-secondary text-sm"
-          >
+          <button type="button" onClick={onCancel} className="btn-secondary text-sm">
             {t('common.cancel')}
           </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="btn-danger text-sm"
-          >
+          <button type="button" onClick={onConfirm} className="btn-danger text-sm">
             {t('sessions.controls.abort')}
           </button>
         </div>

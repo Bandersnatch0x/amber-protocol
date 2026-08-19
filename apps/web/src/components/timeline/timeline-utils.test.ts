@@ -104,16 +104,19 @@ describe('getEventSummary', () => {
 
   it('session_aborted records the transition and reason', () => {
     const summary = getEventSummary(
-      event({ type: 'session_aborted', fromState: 'running', toState: 'aborted', reason: 'user' } as never),
+      event({
+        type: 'session_aborted',
+        fromState: 'running',
+        toState: 'aborted',
+        reason: 'user',
+      } as never),
     );
     expect(summary.details).toContainEqual({ label: 'Transition', value: 'running → aborted' });
     expect(summary.details).toContainEqual({ label: 'Reason', value: 'user' });
   });
 
   it('task_progress surfaces task as title and progress percent', () => {
-    const summary = getEventSummary(
-      event({ type: 'task_progress', task: 'build', progress: 42 }),
-    );
+    const summary = getEventSummary(event({ type: 'task_progress', task: 'build', progress: 42 }));
     expect(summary.title).toBe('build');
     expect(summary.details).toContainEqual({ label: 'Task', value: 'build' });
     expect(summary.details).toContainEqual({ label: 'Progress', value: '42%' });
@@ -175,7 +178,8 @@ describe('getEventSummary', () => {
       getEventSummary(event({ type: 'gate_passed', gateId: 'user-approval-plan' } as never)).title,
     ).toBe('user-approval-plan');
     expect(
-      getEventSummary(event({ type: 'gate_passed', gate: 'user-approval-implement' } as never)).title,
+      getEventSummary(event({ type: 'gate_passed', gate: 'user-approval-implement' } as never))
+        .title,
     ).toBe('user-approval-implement');
   });
 });

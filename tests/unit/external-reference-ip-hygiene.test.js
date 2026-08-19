@@ -54,6 +54,9 @@ const TRACKED_REFERENCE_ALLOWLIST = new Set([
 	"docs/plans/F025-Break-loop-post-mortem-scaffold.md",
 	"docs/quality/better-harness-reference-improvement-plan.md",
 	"docs/quality/external-reference-ip-audit.md",
+	// Sharing materials cite external projects (e.g. Trellis) as reviewed competitive research.
+	"docs/sharing/2026-08-amber-architecture-sharing.md",
+	"docs/sharing/2026-08-amber-sharing-outline.md",
 	"docs/superpowers/specs/2026-06-09-declarative-loop-contract-design.md",
 	"docs/wiki/knowledge-plan.json",
 	"docs/wiki/knowledge/index.md",

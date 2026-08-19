@@ -3,6 +3,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathExists, readText, relativeSlash } = require("./fs-utils");
+const { COMMANDS, commandInvocationContract } = require("../command-registry");
+const { getFlagSpec } = require("./cli-output");
 
 const SAFETY_NOTE =
 	"Report the command output faithfully; never overwrite user-authored files without approval.";
@@ -59,6 +61,140 @@ function parseSkillFrontmatter(markdown) {
 function extractCommandName(command) {
 	const match = String(command).match(/amber\.js\s+([a-z][a-z0-9-]*)/i);
 	return match ? match[1] : null;
+}
+
+function tokenizeSkillCommand(command) {
+	const tokens = [];
+	let current = "";
+	let quote = null;
+	let escaped = false;
+
+	for (const character of String(command || "").trim()) {
+		if (escaped) {
+			current += character;
+			escaped = false;
+			continue;
+		}
+		if (character === "\\" && !quote) {
+			escaped = true;
+			continue;
+		}
+		if (quote) {
+			if (character === quote) quote = null;
+			else current += character;
+			continue;
+		}
+		if (character === '"' || character === "'") {
+			quote = character;
+			continue;
+		}
+		if (/\s/.test(character)) {
+			if (current) {
+				tokens.push(current);
+				current = "";
+			}
+			continue;
+		}
+		current += character;
+	}
+
+	if (escaped || quote) {
+		return { tokens: [], error: "unterminated escape or quote" };
+	}
+	if (current) tokens.push(current);
+	return { tokens, error: null };
+}
+
+function validateSkillCommand(skill) {
+	const command = String(skill?.amber?.command || "").trim();
+	const name = skill?.name || "<unnamed>";
+	const parsed = tokenizeSkillCommand(command);
+	if (parsed.error) {
+		return `Skill ${name} declares an invalid Governance Console command: ${parsed.error}.`;
+	}
+
+	const [runtime, script, commandName] = parsed.tokens;
+	if (runtime !== "node" || script !== "scripts/amber.js" || !commandName) {
+		return `Skill ${name} declares unsupported Governance Console invocation "${command}".`;
+	}
+	if (!COMMANDS.includes(commandName)) {
+		return `Skill ${name} declares unknown Governance Console command "${commandName}".`;
+	}
+
+	const invocationTokens = parsed.tokens.slice(3);
+	const positionalPrefix = invocationTokens.filter((token, index) => {
+		return invocationTokens.slice(0, index + 1).every((value) => !value.startsWith("--"));
+	});
+	let subcommand = null;
+	let consumedPositionals = 0;
+	for (let count = 1; count <= positionalPrefix.length; count += 1) {
+		const candidate = positionalPrefix.slice(0, count).join(" ");
+		if (commandInvocationContract(commandName, candidate).recognized) {
+			subcommand = candidate;
+			consumedPositionals = count;
+		}
+	}
+
+	const contract = commandInvocationContract(commandName, subcommand);
+	if (!contract.recognized || positionalPrefix.length > consumedPositionals) {
+		const attempted = positionalPrefix.length > 0 ? positionalPrefix.join(" ") : null;
+		const invocation = [commandName, attempted].filter(Boolean).join(" ");
+		return `Skill ${name} declares unknown Governance Console invocation "${invocation}".`;
+	}
+	const invocation = [commandName, subcommand].filter(Boolean).join(" ");
+	const optionTokens = invocationTokens.slice(consumedPositionals);
+	const seenOptions = new Set();
+	for (let index = 0; index < optionTokens.length; index += 1) {
+		const option = optionTokens[index];
+		if (!option.startsWith("--")) {
+			return `Skill ${name} declares unexpected argument "${option}" for Governance Console invocation "${invocation}".`;
+		}
+		if (!contract.allowedOptions.includes(option)) {
+			return `Skill ${name} declares Governance Console invocation "${invocation}" with unknown option "${option}".`;
+		}
+		const spec = getFlagSpec(option);
+		if (!spec) {
+			return `Skill ${name} declares Governance Console option "${option}" that its parser does not accept.`;
+		}
+		seenOptions.add(option);
+		if (spec.kind === "boolean") continue;
+		const value = optionTokens[index + 1];
+		if (!value || value.startsWith("--")) {
+			return `Skill ${name} declares Governance Console option "${option}" without a value.`;
+		}
+		const allowedValues = contract.allowedValues[option];
+		const isPlaceholder = /^\{\{[^{}]+\}\}$/.test(value);
+		if (allowedValues && !isPlaceholder && !allowedValues.includes(value)) {
+			return `Skill ${name} declares Governance Console option "${option}" with unknown value "${value}".`;
+		}
+		index += 1;
+	}
+	const missingOption = contract.requiredOptions.find((option) => !seenOptions.has(option));
+	if (missingOption) {
+		return `Skill ${name} declares Governance Console invocation "${invocation}" that requires option "${missingOption}".`;
+	}
+
+	const declaredArgs = new Set((skill.amber.args || []).map((arg) => arg.name));
+	const placeholders = [...command.matchAll(/\{\{([^{}]+)\}\}/g)].map((match) => match[1]);
+	const unknownPlaceholder = placeholders.find((placeholder) => !declaredArgs.has(placeholder));
+	if (unknownPlaceholder) {
+		return `Skill ${name} uses undeclared command argument "${unknownPlaceholder}".`;
+	}
+	const unusedArgument = [...declaredArgs].find((argument) => !placeholders.includes(argument));
+	if (unusedArgument) {
+		return `Skill ${name} declares unused command argument "${unusedArgument}".`;
+	}
+
+	return null;
+}
+
+function validateSkillCommands(skills) {
+	const errors = [];
+	for (const skill of skills) {
+		const error = validateSkillCommand(skill);
+		if (error) errors.push(error);
+	}
+	return { valid: errors.length === 0, errors };
 }
 
 function applyPositionalArgs(command, args) {
@@ -219,6 +355,10 @@ function planOutputs(skills, repoRoot) {
 
 function generateAgentCommands({ skillsRoot, repoRoot, check = false }) {
 	const skills = collectAmberSkills(skillsRoot);
+	const validation = validateSkillCommands(skills);
+	if (!validation.valid) {
+		return { paths: [], changed: [], removed: [], ...validation };
+	}
 	const outputs = planOutputs(skills, repoRoot);
 	for (const name of listSkillDirs(skillsRoot)) {
 		outputs.push({
@@ -247,7 +387,7 @@ function generateAgentCommands({ skillsRoot, repoRoot, check = false }) {
 		changed.push(relativePath);
 		if (!check) fs.rmSync(path.join(repoRoot, relativePath), { recursive: true, force: true });
 	}
-	return { paths, changed, removed: stale };
+	return { paths, changed, removed: stale, valid: true, errors: [] };
 }
 
 function findStaleGeneratedOutputs(repoRoot, planned) {

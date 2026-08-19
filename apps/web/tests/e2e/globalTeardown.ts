@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { getE2EClaudeHome, removeE2ETranscriptFixture } from './fixtures/transcript-fixture';
 
 // Inline functions to avoid TypeScript import resolution issues
 function getE2ERepoRoot(): string {
@@ -25,4 +26,5 @@ function removeE2ERepoRoot(): void {
 
 export default function globalTeardown(): void {
   removeE2ERepoRoot();
+  removeE2ETranscriptFixture(getE2EClaudeHome());
 }

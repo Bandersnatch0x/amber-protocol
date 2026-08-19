@@ -53,8 +53,8 @@
 		"gen:agents:check": "node scripts/gen-agent-commands.js --check",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
-		"format": "prettier --write .",
-		"format:check": "prettier --check .",
+		"format": "prettier --write . && npm --prefix apps/web run format",
+		"format:check": "prettier --check . && npm --prefix apps/web run format:check",
 		"typecheck": "cd apps/web && npx tsc --noEmit"
 	},
 	"c8": {

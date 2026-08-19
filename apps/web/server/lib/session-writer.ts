@@ -12,7 +12,10 @@ import { readSessionById } from './session-reader';
 import type { SessionStatus } from '../types/session-events';
 import type { SessionDetail } from './session-reader';
 
-export async function persistSessionStatus(id: string, status: SessionStatus): Promise<SessionDetail> {
+export async function persistSessionStatus(
+  id: string,
+  status: SessionStatus,
+): Promise<SessionDetail> {
   const sessionDir = resolveStatePath('sessions', id);
   if (!sessionDir) {
     throw new Error('Session not found');
@@ -57,7 +60,9 @@ export async function persistCompletedStage(id: string, stage: string): Promise<
 
   const manifest = value as Record<string, unknown>;
   const existingStages = Array.isArray(manifest.completedStages) ? manifest.completedStages : [];
-  const completedStages = existingStages.includes(stage) ? existingStages : [...existingStages, stage];
+  const completedStages = existingStages.includes(stage)
+    ? existingStages
+    : [...existingStages, stage];
   const updatedManifest = {
     ...manifest,
     completedStages,

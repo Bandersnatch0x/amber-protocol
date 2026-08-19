@@ -2,7 +2,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import type { Request } from 'express';
 import { validateSSEAuthToken } from '@server/lib/auth-token';
 
-function mockRequest(overrides: { query?: Record<string, string>; headers?: Record<string, string> } = {}): Partial<Request> {
+function mockRequest(
+  overrides: { query?: Record<string, string>; headers?: Record<string, string> } = {},
+): Partial<Request> {
   return {
     query: {},
     headers: {},
@@ -22,14 +24,18 @@ describe('auth-token', () => {
   it('validates a matching token via query param', () => {
     process.env.NODE_ENV = 'production';
     process.env.SSE_AUTH_SECRET = 'prod-secret';
-    const result = validateSSEAuthToken(mockRequest({ query: { token: 'prod-secret' } }) as Request);
+    const result = validateSSEAuthToken(
+      mockRequest({ query: { token: 'prod-secret' } }) as Request,
+    );
     expect(result.valid).toBe(true);
   });
 
   it('validates a matching token via Authorization header', () => {
     process.env.NODE_ENV = 'production';
     process.env.SSE_AUTH_SECRET = 'prod-secret';
-    const result = validateSSEAuthToken(mockRequest({ headers: { authorization: 'Bearer prod-secret' } }) as Request);
+    const result = validateSSEAuthToken(
+      mockRequest({ headers: { authorization: 'Bearer prod-secret' } }) as Request,
+    );
     expect(result.valid).toBe(true);
   });
 
@@ -44,7 +50,9 @@ describe('auth-token', () => {
   it('rejects a mismatched token via Authorization header', () => {
     process.env.NODE_ENV = 'production';
     process.env.SSE_AUTH_SECRET = 'prod-secret';
-    const result = validateSSEAuthToken(mockRequest({ headers: { authorization: 'Bearer wrong' } }) as Request);
+    const result = validateSSEAuthToken(
+      mockRequest({ headers: { authorization: 'Bearer wrong' } }) as Request,
+    );
     expect(result.valid).toBe(false);
   });
 
@@ -103,19 +111,23 @@ describe('auth-token', () => {
     process.env.NODE_ENV = 'production';
     process.env.SSE_AUTH_SECRET = 'query-wins';
     // Query has the correct token, header has wrong
-    const result = validateSSEAuthToken(mockRequest({
-      query: { token: 'query-wins' },
-      headers: { authorization: 'Bearer header-loses' },
-    }) as Request);
+    const result = validateSSEAuthToken(
+      mockRequest({
+        query: { token: 'query-wins' },
+        headers: { authorization: 'Bearer header-loses' },
+      }) as Request,
+    );
     expect(result.valid).toBe(true);
   });
 
   it('falls back to Authorization header when query is absent', () => {
     process.env.NODE_ENV = 'production';
     process.env.SSE_AUTH_SECRET = 'bearer-wins';
-    const result = validateSSEAuthToken(mockRequest({
-      headers: { authorization: 'Bearer bearer-wins' },
-    }) as Request);
+    const result = validateSSEAuthToken(
+      mockRequest({
+        headers: { authorization: 'Bearer bearer-wins' },
+      }) as Request,
+    );
     expect(result.valid).toBe(true);
   });
 
@@ -133,7 +145,9 @@ describe('auth-token', () => {
   it('handles missing Authorization header prefix', () => {
     process.env.NODE_ENV = 'production';
     process.env.SSE_AUTH_SECRET = 'no-bearer';
-    const result = validateSSEAuthToken(mockRequest({ headers: { authorization: 'no-bearer' } }) as Request);
+    const result = validateSSEAuthToken(
+      mockRequest({ headers: { authorization: 'no-bearer' } }) as Request,
+    );
     expect(result.valid).toBe(false);
   });
 });

@@ -1022,16 +1022,21 @@
 			"area": "agent-skills",
 			"title": "Keep skill frontmatter commands in lockstep with the Governance Console",
 			"user_visible_behavior": "Every shipped Amber skill names a real Governance Console command, and generated-agent validation fails when a skill invents or stales that command",
-			"status": "not_started",
-			"verification": ["node --test tests/unit/agent-commands.test.js", "npm run gen:agents:check"],
+			"status": "in_progress",
+			"verification": [
+				"node --test tests/unit/agent-commands.test.js tests/unit/command-registry-parity.test.js",
+				"npm run gen:agents:check"
+			],
 			"evidence": [],
 			"notes": ["GitHub issue #128; no live agent execution or Journey routing policy change"],
 			"paths": [
 				"skills/",
 				"scripts/lib/core/agent-commands.js",
+				"scripts/lib/core/cli-output.js",
 				"scripts/lib/command-registry.js",
 				"scripts/gen-agent-commands.js",
 				"tests/unit/agent-commands.test.js",
+				"tests/unit/command-registry-parity.test.js",
 				"docs/wiki/knowledge/skills-platform-generation/skills-platform-generation.md",
 				"docs/wiki/knowledge/cli-architecture-command-dispatch/cli-architecture-command-dispatch.md",
 				"docs/plans/F031-Keep-skill-frontmatter-commands-in-lockstep-with-the-Governance-Console.md"

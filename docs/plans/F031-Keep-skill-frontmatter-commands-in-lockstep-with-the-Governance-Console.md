@@ -1,7 +1,7 @@
 # Plan: Keep skill frontmatter commands in lockstep with the Governance Console
 
 Feature: F031
-Status: implementation-ready
+Status: implemented-pending-verification
 User Confirmation: confirmed
 
 ## Goal
@@ -50,30 +50,34 @@ Entries are bare, comma- or space-separated knowledge-surface paths only — doc
 
 ## Vertical Slices
 
-- [ ] Slice 1: through the existing generator/check seam, add a failing test
+- [x] Slice 1: through the existing generator/check seam, add a failing test
   proving an invented or stale skill command is rejected without writing
   generated files.
-- [ ] Slice 2: implement registry-backed command-contract validation inside the
+- [x] Slice 2: implement registry-backed command-contract validation inside the
   existing `agent-commands` module, with no second command allowlist and no
   command execution.
-- [ ] Slice 3: prove the four shipped Journey/router contracts remain valid,
+- [x] Slice 3: prove the four shipped Journey/router contracts remain valid,
   including `amber next --objective` as the sole matcher, and wire the failure
   into `gen:agents:check`/CI.
-- [ ] Slice 4: update the two stable knowledge surfaces, run focused and full
+- [x] Slice 4: update the two stable knowledge surfaces, run focused and full
   verification, and complete independent Standards/Spec review.
 
 ## Resume Checkpoint
 
-- Resume Point: F031 is registered, confirmed, and bound to feature-standard
-  Session `b5d284ee-59b7-4cba-b3f7-2063365694e4`; implementation has not
-  started.
-- Blockers: the Session incorrectly became `completed` immediately after its
-  second approval gate even though `complete-check --strict` fails with missing
-  verification. The user explicitly prioritized repairing this state-machine
-  defect before F031 implementation.
-- Next Action: complete the separate F032 bugfix, then resume here with Slice
-  1's failing generator-interface test only.
-- Recovery Instructions: reopen this plan and continue at the first unchecked vertical slice; do not regenerate unless the plan file is missing.
+- Resume Point: F031 implementation is in the working tree on Session
+  `08729f11-77e5-4a20-8f63-036678043135` at base commit `37dd369`. Command
+  contract validation lives in `agent-commands` and consumes
+  `commandInvocationContract()` from `command-registry`. Dual-axis review is
+  clean after wiki ownership and skill-count corrections. Session status is
+  still `created`; verification and approval are missing.
+- Blockers: none for implementation. Next gates are Session approval and
+  executed `npm test` evidence. Unrelated web-viewer WIP is also dirty and
+  must be preserved, not mixed into F031.
+- Next Action: approve the two feature-standard Session gates, then record
+  executed verification with `session verify --execute --confirm`.
+- Recovery Instructions: reopen this plan and continue at the first unchecked
+  vertical slice; if all slices are checked, resume at Next Action. Do not
+  regenerate unless the plan file is missing.
 
 ## Acceptance Criteria
 
@@ -89,14 +93,41 @@ Entries are bare, comma- or space-separated knowledge-surface paths only — doc
 
 ## Verification
 
-- node --test tests/unit/agent-commands.test.js
+- node --test tests/unit/agent-commands.test.js tests/unit/command-registry-parity.test.js
 - npm run gen:agents:check
 - node scripts/validate-feature-list.js --target .
 - npm test
 
 ## Evidence Schema
 
-- Command: `<exact command>`
-- Result: `<exit code and pass/fail counts>`
-- Date: `<YYYY-MM-DD>`
-- Notes: `<Session id, artifact path, architectural invariant, and remaining risk>`
+- Command: `node --test tests/unit/agent-commands.test.js tests/unit/command-registry-parity.test.js`
+- Result: 56 passed, 0 failed (exit 0)
+- Date: 2026-08-18
+- Notes: focused suite covers invented/stale commands, undocumented and
+  missing options, value-domain and required-option projection, default
+  actions, nested and slash-separated subcommands, unused declared args, and
+  the five shipped skill contracts. Session:
+  `08729f11-77e5-4a20-8f63-036678043135`. Remaining risk: full `npm test` and
+  Session verification are not yet recorded.
+
+- Command: `npm run lint`, `npm run format:check`, `npm run gen:agents:check`,
+  `npm run manifests`, `npm run doctor`, `node scripts/validate-wiki.js --target .`,
+  `node scripts/validate-feature-list.js --target .`
+- Result: all exit 0; 15 generated files current; zero validation errors
+- Date: 2026-08-18
+- Notes: static guardrails pass on the mixed working tree. Artifact: this
+  plan. Session: `08729f11-77e5-4a20-8f63-036678043135`. Remaining risk:
+  unrelated web-viewer WIP remains uncommitted beside F031.
+
+- Command: Standards / Spec independent review of the F031 WIP against
+  baseline `37dd369fabd49eddacea96474529e5e9540259ae`
+- Result: first pass Standards 2 hard wiki findings (invented 10-skill tree;
+  dual Command-definition owner plus "generated frontmatter" wording); Spec 0
+  findings. After wiki/booking fixes, Standards 0 remaining hard findings;
+  Spec 0 findings.
+- Date: 2026-08-18
+- Notes: residual judgement calls are long `validateSkillCommand`,
+  `knownSubcommands` help union, dual command-string parsers, and help/usage
+  projection being stricter than `parseArgs` defaults. Artifact: this plan.
+  Session: `08729f11-77e5-4a20-8f63-036678043135`. Remaining risk: Session
+  approval and executed full-suite verification are still open.

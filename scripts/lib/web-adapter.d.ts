@@ -2,7 +2,7 @@
  * Typed SSOT for the web console ↔ CLI core adapter (ADR-0007).
  *
  * Depth pin: LifecycleContext, buildContext, inferNextStep, and evaluateLifecycle
- * must NOT appear on this exported surface. The web calls only the three ops below.
+ * must NOT appear on this exported surface. The web calls only the seven ops below.
  */
 
 export type LifecycleFocus = {
@@ -102,9 +102,143 @@ export type EvidenceCommandResult = {
  */
 export function runEvidenceCommand(input: EvidenceCommandInput): EvidenceCommandResult;
 
+export type HandoffBundleStatus = {
+	present: boolean;
+	valid: boolean;
+	structureValid: boolean;
+	deliveryReady: boolean;
+	readinessScore: number | null;
+	errors: string[];
+};
+
+export type HandoffStatusResult = {
+	handoffPath: string;
+	state: "live" | "scaffold" | "missing";
+	sessionEvidence: boolean;
+	bundle: HandoffBundleStatus;
+};
+
+/**
+ * Read-only handoff status fold: live/scaffold/missing judgement from
+ * completion-check plus the handoff-bundle validation. A missing bundle is a
+ * graceful empty state, never a throw. Writes nothing.
+ */
+export function getHandoffStatus(targetRoot: string, sessionId?: string): HandoffStatusResult;
+
+export type HandoffPreviewResult = {
+	/**
+	 * Session the returned markdown belongs to. For `rendered` previews this
+	 * is ALWAYS the most recent session (renderHandoff ignores the requested
+	 * id) and may differ from `requestedSessionId`; for the file fallbacks
+	 * (`session-handoff.md` / `none`) the actual session is unknown, so this
+	 * echoes the request.
+	 */
+	sessionId: string | null;
+	/** The session id the caller asked for (null when omitted). */
+	requestedSessionId: string | null;
+	markdown: string;
+	source: "rendered" | "session-handoff.md" | "none";
+};
+
+/**
+ * Render-only handoff preview (what `amber handoff` would write) — never
+ * writes session-handoff.md. Falls back to reading the existing file, marked
+ * via `source`. Note: a `rendered` preview always targets the most recent
+ * session; `sessionId` echoes that actual session, `requestedSessionId` the
+ * caller's request.
+ */
+export function getHandoffPreview(targetRoot: string, sessionId?: string): HandoffPreviewResult;
+
+export type LearningsSummary = {
+	featureId: string | null;
+	status: string;
+	hasTriggers: boolean;
+	matchedCategories: string[];
+	reviewBooked: boolean;
+};
+
+export type GovernanceSummaryResult = {
+	target: string;
+	generatedAt: string;
+	decision: "ready" | "warn" | "block";
+	scores: Record<string, number>;
+	summary: Record<string, number>;
+	findings: Array<Record<string, unknown>>;
+	nextActions: Array<Record<string, unknown>>;
+	errors: string[];
+	warnings: string[];
+	learnings: LearningsSummary;
+};
+
+export type GovernanceSummaryOptions = {
+	featureId?: string;
+};
+
+/**
+ * Read-only fold over buildGovernanceReport + inspectLearningWriteBack.
+ * Without `featureId` the learnings block only reports whether trigger
+ * conditions are present for the lifecycle focus.
+ */
+export function getGovernanceSummary(
+	targetRoot: string,
+	options?: GovernanceSummaryOptions,
+): GovernanceSummaryResult;
+
+export type CompletionNextAction = {
+	item: string;
+	action: "in-page" | "cli-command";
+	command?: string;
+	hint: string;
+};
+
+export type CompletionNextActionsResult = {
+	status: "pass" | "fail";
+	missing: string[];
+	actions: CompletionNextAction[];
+};
+
+/**
+ * Maps getCompletionStatus missing items to web-shaped next actions; all-pass
+ * yields the single closing action `amber session complete --session <id>`.
+ */
+export function getCompletionNextActions(
+	targetRoot: string,
+	sessionId: string,
+): CompletionNextActionsResult;
+
+export type VerifyPolicyVerdict = {
+	allowed: boolean;
+	reason?: string;
+	matchedRule?: string | null;
+	confidence?: string;
+};
+
+/**
+ * Verify-policy fold: loads verify-rules.json for the target and evaluates the
+ * command against the deny-wins policy (built-in destructive + composition
+ * denies + custom verify-rules). The exact call evidence-runner makes before
+ * spawning — so the web surface can neither relax nor fork the gate.
+ */
+export function evaluateVerifyPolicy(targetRoot: string, command: string): VerifyPolicyVerdict;
+
+/**
+ * Append one hash-chained ledger record through the CLI SSOT (loop-ledger.js),
+ * so web-written records verify against the same chain the CLI writes.
+ */
+export function appendVerificationLedgerRecord(
+	ledgerPath: string,
+	record: Record<string, unknown>,
+): Record<string, unknown>;
+
 /** Runtime module shape for createRequire cast — single SSOT with the functions above. */
 export type WebAdapter = {
 	evaluateLifecycleNext: typeof evaluateLifecycleNext;
 	getCompletionStatus: typeof getCompletionStatus;
 	runEvidenceCommand: typeof runEvidenceCommand;
+	getHandoffStatus: typeof getHandoffStatus;
+	getHandoffPreview: typeof getHandoffPreview;
+	getGovernanceSummary: typeof getGovernanceSummary;
+	getCompletionNextActions: typeof getCompletionNextActions;
+	evaluateVerifyPolicy: typeof evaluateVerifyPolicy;
+	appendVerificationLedgerRecord: typeof appendVerificationLedgerRecord;
 };

@@ -196,8 +196,219 @@ describe("generateAgentCommands", () => {
 	it("check mode reports changes without writing", () => {
 		const { skillsRoot, repoRoot } = setup();
 		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.strictEqual(result.valid, true);
+		assert.deepStrictEqual(result.errors, []);
 		assert.ok(result.changed.length > 0);
 		assert.strictEqual(fs.existsSync(path.join(repoRoot, ".claude/commands/amber-init.md")), false);
+	});
+
+	it("check mode rejects a stale command-family invocation", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-loop": skillMd(
+				"amber-loop",
+				"node scripts/amber.js loop schedule --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.deepStrictEqual(result.errors, [
+			'Skill amber-loop declares unknown Governance Console invocation "loop schedule".',
+		]);
+		assert.deepStrictEqual(result.changed, []);
+		assert.strictEqual(fs.existsSync(path.join(repoRoot, ".claude")), false);
+	});
+
+	it("check mode rejects an invented top-level command", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-journey": skillMd(
+				"amber-journey",
+				"node scripts/amber.js journey --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.deepStrictEqual(result.errors, [
+			'Skill amber-journey declares unknown Governance Console command "journey".',
+		]);
+		assert.deepStrictEqual(result.changed, []);
+	});
+
+	it("check mode rejects an undeclared command placeholder", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-next": skillMd(
+				"amber-next",
+				"node scripts/amber.js next --objective {{objective}} --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.deepStrictEqual(result.errors, [
+			'Skill amber-next uses undeclared command argument "objective".',
+		]);
+		assert.deepStrictEqual(result.changed, []);
+		assert.strictEqual(fs.existsSync(path.join(repoRoot, ".claude")), false);
+	});
+
+	it("check mode rejects an undocumented command option", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-loop": skillMd(
+				"amber-loop",
+				"node scripts/amber.js loop recommend --stale {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.match(result.errors.join("\n"), /loop recommend.*unknown option "--stale"/i);
+		assert.deepStrictEqual(result.changed, []);
+	});
+
+	it("check mode rejects an option owned by another command", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-next": skillMd("amber-next", "node scripts/amber.js next --goal {{target}}"),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.match(result.errors.join("\n"), /next.*unknown option "--goal"/i);
+		assert.deepStrictEqual(result.changed, []);
+	});
+
+	it("check mode rejects a command missing a required option", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-context": skillMd(
+				"amber-context",
+				"node scripts/amber.js context load --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.match(result.errors.join("\n"), /context load.*requires option "--route"/i);
+		assert.deepStrictEqual(result.changed, []);
+	});
+
+	it("check mode rejects an option missing its value", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-audit": skillMd("amber-audit", "node scripts/amber.js audit --target"),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.match(result.errors.join("\n"), /option "--target" without a value/i);
+		assert.deepStrictEqual(result.changed, []);
+	});
+
+	it("check mode rejects a literal outside the documented option value domain", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-benchmark": skillMd(
+				"amber-benchmark",
+				"node scripts/amber.js context benchmark --fixture fixture.json --mode bogus --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.match(result.errors.join("\n"), /option "--mode".*unknown value "bogus"/i);
+		assert.deepStrictEqual(result.changed, []);
+	});
+
+	it("check mode rejects a documented family invocation missing its required option", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-findings": skillMd(
+				"amber-findings",
+				"node scripts/amber.js workflow findings --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.match(result.errors.join("\n"), /workflow findings.*requires option "--report"/i);
+		assert.deepStrictEqual(result.changed, []);
+	});
+
+	it("check mode accepts a complete documented family invocation", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-findings": skillMd(
+				"amber-findings",
+				"node scripts/amber.js workflow findings --report report.json --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.strictEqual(result.valid, true);
+		assert.deepStrictEqual(result.errors, []);
+	});
+
+	it("check mode accepts a default action beside documented subcommands", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-handoff": skillMd(
+				"amber-handoff",
+				"node scripts/amber.js handoff --target {{target}}",
+			),
+			"amber-break-loop": skillMd(
+				"amber-break-loop",
+				"node scripts/amber.js break-loop --issue 1 --title defect --recurrence 2 --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.strictEqual(result.valid, true);
+		assert.deepStrictEqual(result.errors, []);
+	});
+
+	it("check mode accepts nested documented subcommands", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-hooks": skillMd(
+				"amber-hooks",
+				"node scripts/amber.js hooks breadcrumb print --target {{target}}",
+			),
+			"amber-context": skillMd(
+				"amber-context",
+				"node scripts/amber.js context projection status --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.strictEqual(result.valid, true);
+		assert.deepStrictEqual(result.errors, []);
+	});
+
+	it("check mode accepts every slash-separated documented action", () => {
+		const skillsRoot = makeTempSkills({
+			"amber-show": skillMd(
+				"amber-show",
+				"node scripts/amber.js context show --page page-id --target {{target}}",
+			),
+			"amber-delete": skillMd(
+				"amber-delete",
+				"node scripts/amber.js context delete --page page-id --target {{target}}",
+			),
+		});
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.strictEqual(result.valid, true);
+		assert.deepStrictEqual(result.errors, []);
+	});
+
+	it("check mode rejects a declared argument unused by the command", () => {
+		const markdown = skillMd(
+			"amber-next",
+			"node scripts/amber.js next --target {{target}}",
+		).replace('"args":[{"name":"target"}]', '"args":[{"name":"target"},{"name":"objective"}]');
+		const skillsRoot = makeTempSkills({ "amber-next": markdown });
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "amber-repo-"));
+
+		const result = generateAgentCommands({ skillsRoot, repoRoot, check: true });
+		assert.match(result.errors.join("\n"), /declares unused command argument "objective"/i);
+		assert.deepStrictEqual(result.changed, []);
 	});
 
 	it("treats CRLF-only differences as unchanged", () => {
@@ -283,6 +494,31 @@ describe("real skills integration", () => {
 			assert.ok(COMMANDS.includes(name), `${skill.name} → unknown command "${name}"`);
 			assert.match(skill.amber.command, /^node scripts\/amber\.js /);
 		}
+	});
+
+	it("all shipped skill commands pass the generator contract", () => {
+		const result = generateAgentCommands({
+			skillsRoot: path.join(repoRoot, "skills"),
+			repoRoot,
+			check: true,
+		});
+		assert.strictEqual(result.valid, true);
+		assert.deepStrictEqual(result.errors, []);
+	});
+
+	it("keeps next --objective as the only router matcher", () => {
+		const { JOURNEYS, nextObjectiveCommand } = require("../../scripts/lib/route-journey-decision");
+		const router = skills.find((skill) => skill.amber.kind === "router");
+		const journeys = skills.filter((skill) => skill.amber.kind === "journey");
+		assert.strictEqual(router.name, "amber");
+		assert.strictEqual(
+			router.amber.command,
+			nextObjectiveCommand("{{objective}}", "{{target}}").join(" "),
+		);
+		assert.deepStrictEqual(
+			journeys.map((skill) => skill.name).sort(),
+			JOURNEYS.map((journey) => journey.id).sort(),
+		);
 	});
 });
 

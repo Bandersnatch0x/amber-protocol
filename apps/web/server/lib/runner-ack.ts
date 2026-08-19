@@ -80,7 +80,7 @@ function timeoutOutcome(request: RunnerControlRequest): RunnerAckOutcome {
 }
 
 async function sleep(ms: number): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, ms));
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function readRunnerAck(request: RunnerControlRequest): Promise<RunnerAckOutcome | null> {
@@ -193,11 +193,15 @@ export async function writeRunnerAck(
   await fsp.mkdir(path.dirname(ackPath), { recursive: true });
   await fsp.writeFile(
     ackPath,
-    JSON.stringify({
-      ...ack,
-      source: ack.source ?? 'runner',
-      receivedAt: ack.receivedAt ?? nowIso(),
-    }, null, 2),
+    JSON.stringify(
+      {
+        ...ack,
+        source: ack.source ?? 'runner',
+        receivedAt: ack.receivedAt ?? nowIso(),
+      },
+      null,
+      2,
+    ),
     'utf8',
   );
 }

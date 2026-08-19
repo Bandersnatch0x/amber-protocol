@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildApproveAndResumeFeedback, buildRejectFeedback } from './gate-feedback';
+import {
+  buildApproveAndResumeFeedback,
+  buildRejectFeedback,
+  parseStatusFilter,
+} from './gate-feedback';
 import type { I18nKey } from '@/lib/i18n';
 
 function t(key: I18nKey, params: Record<string, string | number> = {}): string {
@@ -12,7 +16,9 @@ function t(key: I18nKey, params: Record<string, string | number> = {}): string {
     'gates.feedback.auditWarning': 'Audit warning: {warning}',
     'gates.feedback.unknownReason': 'Unknown reason',
   };
-  return (templates[key] ?? key).replace(/\{(\w+)\}/g, (_match, name: string) => String(params[name] ?? `{${name}}`));
+  return (templates[key] ?? key).replace(/\{(\w+)\}/g, (_match, name: string) =>
+    String(params[name] ?? `{${name}}`),
+  );
 }
 
 describe('gate feedback', () => {
@@ -26,12 +32,15 @@ describe('gate feedback', () => {
         resumeEventWarning: 'timeline locked',
       },
       'gate-1',
+      'session-1',
       t,
     );
 
     expect(feedback).toEqual({
       tone: 'warning',
       message: 'Gate gate-1 confirmed as executing. Audit warning: ledger locked; timeline locked',
+      sessionId: 'session-1',
+      guidance: 'completion',
     });
   });
 
@@ -44,21 +53,67 @@ describe('gate feedback', () => {
         eventWarning: 'ledger locked',
       },
       'gate-1',
+      'session-1',
       t,
     );
 
     expect(feedback).toEqual({
       tone: 'warning',
       message: 'No resume for completed. Audit warning: ledger locked',
+      sessionId: 'session-1',
+      guidance: 'completion',
     });
   });
 
   it('marks rejection feedback as warning when audit evidence could not be written', () => {
-    const feedback = buildRejectFeedback({ eventWarning: 'timeline locked' }, 'gate-1', t);
+    const feedback = buildRejectFeedback(
+      { eventWarning: 'timeline locked' },
+      'gate-1',
+      'session-1',
+      t,
+    );
 
     expect(feedback).toEqual({
       tone: 'warning',
       message: 'Gate gate-1 rejected. Audit warning: timeline locked',
+      sessionId: 'session-1',
+      guidance: 'rework',
     });
   });
+
+  it('carries the session id for completion workbench guidance on clean approval', () => {
+    const feedback = buildApproveAndResumeFeedback(
+      {
+        resumeConfirmed: true,
+        resumeRequested: true,
+        sessionStatus: 'executing',
+      },
+      'gate-1',
+      'session-42',
+      t,
+    );
+
+    expect(feedback).toEqual({
+      tone: 'success',
+      message: 'Gate gate-1 confirmed as executing.',
+      sessionId: 'session-42',
+      guidance: 'completion',
+    });
+  });
+});
+
+describe('gates status filter search param', () => {
+  it.each(['pending', 'approved', 'rejected'] as const)(
+    'accepts the known status "%s"',
+    (value) => {
+      expect(parseStatusFilter(value)).toBe(value);
+    },
+  );
+
+  it.each([undefined, null, '', 'executing', 'PENDING', ['pending'], 42])(
+    'degrades unknown values (%p) to the all-gates filter',
+    (value) => {
+      expect(parseStatusFilter(value)).toBe('');
+    },
+  );
 });

@@ -1,6 +1,13 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { Gate, GateStatus, GateFilters, GateDecision } from './types/gate';
+import {
+  Gate,
+  GateStatus,
+  GateFilters,
+  GateDecision,
+  REVIEWER_PATTERN,
+  WEB_ANONYMOUS_REVIEWER,
+} from './types/gate';
 import { resolveStatePath, readJsonSafeAsync } from './artifact-store';
 
 // Filesystem layout: .amber/sessions/{sessionId}/gates/{gateId}.gate.json
@@ -28,13 +35,15 @@ async function mapWithConcurrency<T, R>(
   let nextIndex = 0;
   const workerCount = Math.min(concurrency, items.length);
 
-  await Promise.all(Array.from({ length: workerCount }, async () => {
-    while (nextIndex < items.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      results[currentIndex] = await mapper(items[currentIndex]);
-    }
-  }));
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await mapper(items[currentIndex]);
+      }
+    }),
+  );
 
   return results;
 }
@@ -63,7 +72,10 @@ async function readGateFile(gatePath: string, decisionPath: string): Promise<Gat
     status: decision ? (decision.decision === 'approved' ? 'approved' : 'rejected') : 'pending',
     triggeredAt: str(gateData.triggeredAt, ''),
     resolvedAt: decision?.resolvedAt,
-    resolvedBy: decision ? 'human' : undefined,
+    // Read the recorded identity instead of hardcoding: legacy decision files
+    // (CLI gate-writer.js or pre-reviewer web writes) carry 'human'; new web
+    // writes carry the reviewer identifier or 'web:anonymous'.
+    resolvedBy: decision ? decision.resolvedBy || 'human' : undefined,
     reason: decision?.reason,
   };
 }
@@ -80,7 +92,7 @@ async function listSessionGates(sessionsDir: string, sessionId: string): Promise
     return [];
   }
 
-  const gateFiles = files.filter(f => f.endsWith('.gate.json'));
+  const gateFiles = files.filter((f) => f.endsWith('.gate.json'));
   const gates = await mapWithConcurrency(gateFiles, 16, async (file) => {
     const gateId = file.replace('.gate.json', '');
     const gatePath = path.join(gatesDir, file);
@@ -102,12 +114,10 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
   }
 
   const gates: Gate[] = [];
-  const sessionDirs = filters.sessionId
-    ? [filters.sessionId]
-    : await fs.readdir(sessionsDir);
+  const sessionDirs = filters.sessionId ? [filters.sessionId] : await fs.readdir(sessionsDir);
 
   const sessionGates = await mapWithConcurrency(sessionDirs, 32, (sessionId) =>
-    listSessionGates(sessionsDir, sessionId)
+    listSessionGates(sessionsDir, sessionId),
   );
   gates.push(...sessionGates.flat());
 
@@ -119,8 +129,8 @@ export async function listGates(filters: GateFilters = {}): Promise<Gate[]> {
   }
 
   // Sort by triggered time (newest first)
-  return filtered.sort((a, b) =>
-    new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime()
+  return filtered.sort(
+    (a, b) => new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime(),
   );
 }
 
@@ -154,13 +164,21 @@ export async function writeGateDecision(
   sessionId: string,
   gateId: string,
   decision: 'approved' | 'rejected',
-  reason?: string
+  reason?: string,
+  reviewer?: string,
 ): Promise<void> {
   if (!validateSessionId(sessionId)) {
     throw new Error('Invalid session ID');
   }
   if (!validateGateId(gateId)) {
     throw new Error('Invalid gate ID');
+  }
+
+  // Defense in depth: the router validates with zod too, but direct callers must
+  // not be able to smuggle arbitrary text into the audit chain.
+  const resolvedBy = reviewer?.trim() || undefined;
+  if (resolvedBy && !REVIEWER_PATTERN.test(resolvedBy)) {
+    throw new Error('Invalid reviewer identifier');
   }
 
   const sessionsDir = getSessionsPath();
@@ -194,7 +212,9 @@ export async function writeGateDecision(
   const decisionData: GateDecision = {
     decision,
     resolvedAt: new Date().toISOString(),
-    resolvedBy: 'human',
+    // Record the real reviewer when provided; otherwise an explicit, clearly
+    // identifiable web-anonymous marker — never the ambiguous 'human'.
+    resolvedBy: resolvedBy ?? WEB_ANONYMOUS_REVIEWER,
     reason,
   };
 
@@ -204,10 +224,20 @@ export async function writeGateDecision(
   await fs.rename(tempPath, decisionPath);
 }
 
-export async function approveGate(sessionId: string, gateId: string, reason?: string): Promise<void> {
-  return writeGateDecision(sessionId, gateId, 'approved', reason);
+export async function approveGate(
+  sessionId: string,
+  gateId: string,
+  reason?: string,
+  reviewer?: string,
+): Promise<void> {
+  return writeGateDecision(sessionId, gateId, 'approved', reason, reviewer);
 }
 
-export async function rejectGate(sessionId: string, gateId: string, reason?: string): Promise<void> {
-  return writeGateDecision(sessionId, gateId, 'rejected', reason);
+export async function rejectGate(
+  sessionId: string,
+  gateId: string,
+  reason?: string,
+  reviewer?: string,
+): Promise<void> {
+  return writeGateDecision(sessionId, gateId, 'rejected', reason, reviewer);
 }

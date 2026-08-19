@@ -5,6 +5,7 @@ import { sessionControlRouter } from './routers/session-control';
 import { gateRouter } from './routers/gate';
 import { transcriptRouter } from './routers/transcript';
 import { lifecycleRouter } from './routers/lifecycle';
+import { continuityRouter } from './routers/continuity';
 
 export const appRouter = router({
   session: sessionRouter,
@@ -13,6 +14,7 @@ export const appRouter = router({
   gate: gateRouter,
   transcript: transcriptRouter,
   lifecycle: lifecycleRouter,
+  continuity: continuityRouter,
 });
 
 export type AppRouter = typeof appRouter;

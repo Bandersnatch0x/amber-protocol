@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as GovernanceRouteImport } from './routes/governance'
 import { Route as GatesRouteImport } from './routes/gates'
 import { Route as SessionsRouteRouteImport } from './routes/sessions/route'
 import { Route as RoutesRouteRouteImport } from './routes/routes/route'
@@ -27,6 +28,11 @@ import { Route as SessionsIdTimelineRouteImport } from './routes/sessions/$id/ti
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GovernanceRoute = GovernanceRouteImport.update({
+  id: '/governance',
+  path: '/governance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GatesRoute = GatesRouteImport.update({
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/routes': typeof RoutesRouteRouteWithChildren
   '/sessions': typeof SessionsRouteRouteWithChildren
   '/gates': typeof GatesRoute
+  '/governance': typeof GovernanceRoute
   '/settings': typeof SettingsRoute
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
@@ -120,6 +127,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/gates': typeof GatesRoute
+  '/governance': typeof GovernanceRoute
   '/settings': typeof SettingsRoute
   '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes': typeof RoutesIndexRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/routes': typeof RoutesRouteRouteWithChildren
   '/sessions': typeof SessionsRouteRouteWithChildren
   '/gates': typeof GatesRoute
+  '/governance': typeof GovernanceRoute
   '/settings': typeof SettingsRoute
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/routes'
     | '/sessions'
     | '/gates'
+    | '/governance'
     | '/settings'
     | '/routes/$id'
     | '/sessions/$id'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/gates'
+    | '/governance'
     | '/settings'
     | '/transcripts/$id'
     | '/routes'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/routes'
     | '/sessions'
     | '/gates'
+    | '/governance'
     | '/settings'
     | '/routes/$id'
     | '/sessions/$id'
@@ -198,6 +210,7 @@ export interface RootRouteChildren {
   RoutesRouteRoute: typeof RoutesRouteRouteWithChildren
   SessionsRouteRoute: typeof SessionsRouteRouteWithChildren
   GatesRoute: typeof GatesRoute
+  GovernanceRoute: typeof GovernanceRoute
   SettingsRoute: typeof SettingsRoute
   TranscriptsIdRoute: typeof TranscriptsIdRoute
   TranscriptsIndexRoute: typeof TranscriptsIndexRoute
@@ -210,6 +223,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/governance': {
+      id: '/governance'
+      path: '/governance'
+      fullPath: '/governance'
+      preLoaderRoute: typeof GovernanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gates': {
@@ -365,6 +385,7 @@ const rootRouteChildren: RootRouteChildren = {
   RoutesRouteRoute: RoutesRouteRouteWithChildren,
   SessionsRouteRoute: SessionsRouteRouteWithChildren,
   GatesRoute: GatesRoute,
+  GovernanceRoute: GovernanceRoute,
   SettingsRoute: SettingsRoute,
   TranscriptsIdRoute: TranscriptsIdRoute,
   TranscriptsIndexRoute: TranscriptsIndexRoute,

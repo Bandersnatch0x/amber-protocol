@@ -87,7 +87,10 @@ describe('handleErrorReport', () => {
     handleErrorReport(
       mockReq({
         message: 'm',
-        context: { apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl', nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' } },
+        context: {
+          apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl',
+          nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' },
+        },
       }) as Request,
       res as Response,
     );

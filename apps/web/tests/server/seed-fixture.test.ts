@@ -38,10 +38,7 @@ describe('e2e seed fixture', () => {
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'amber-e2e-seed-'));
     seedFixtureSession(tmpRoot);
 
-    const lines = fs
-      .readFileSync(sessionPath('timeline.jsonl'), 'utf8')
-      .trim()
-      .split('\n');
+    const lines = fs.readFileSync(sessionPath('timeline.jsonl'), 'utf8').trim().split('\n');
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {
       expect(() => JSON.parse(line)).not.toThrow();
@@ -52,7 +49,9 @@ describe('e2e seed fixture', () => {
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'amber-e2e-seed-'));
     seedFixtureSession(tmpRoot);
 
-    const gate = JSON.parse(fs.readFileSync(sessionPath('gates', `${FIXTURE_GATE_ID}.gate.json`), 'utf8'));
+    const gate = JSON.parse(
+      fs.readFileSync(sessionPath('gates', `${FIXTURE_GATE_ID}.gate.json`), 'utf8'),
+    );
     expect(gate.gateId).toBe(FIXTURE_GATE_ID);
     expect(gate.sessionId).toBe(FIXTURE_SESSION_ID);
     expect(gate.triggeredAt).toBeTruthy();

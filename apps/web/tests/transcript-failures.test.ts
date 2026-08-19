@@ -20,7 +20,12 @@ const JSONL_WITH_FAILURE = [
     message: {
       role: 'user',
       content: [
-        { type: 'tool_result', tool_use_id: 'tu_1', is_error: true, content: 'error TS2345: type mismatch' },
+        {
+          type: 'tool_result',
+          tool_use_id: 'tu_1',
+          is_error: true,
+          content: 'error TS2345: type mismatch',
+        },
       ],
     },
     timestamp: '2026-06-17T10:00:01Z',
@@ -63,12 +68,24 @@ describe('extractFailures', () => {
         type: 'assistant',
         message: {
           role: 'assistant',
-          content: [{ type: 'tool_use', id: 'x', name: 'Bash', input: { command: 'curl -H "Authorization: Bearer sk-ant-secret000111222333444" url' } }],
+          content: [
+            {
+              type: 'tool_use',
+              id: 'x',
+              name: 'Bash',
+              input: {
+                command: 'curl -H "Authorization: Bearer sk-ant-secret000111222333444" url',
+              },
+            },
+          ],
         },
       }),
       JSON.stringify({
         type: 'user',
-        message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'x', is_error: true, content: 'failed' }] },
+        message: {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'x', is_error: true, content: 'failed' }],
+        },
       }),
     ].join('\n');
 

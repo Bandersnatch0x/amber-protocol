@@ -93,7 +93,8 @@ export function getEventSummary(event: SessionEvent): EventSummary {
       const fromState = getString(event, 'fromState');
       const toState = getString(event, 'toState');
       const reason = getString(event, 'reason');
-      if (fromState && toState) details.push({ label: 'Transition', value: `${fromState} → ${toState}` });
+      if (fromState && toState)
+        details.push({ label: 'Transition', value: `${fromState} → ${toState}` });
       if (reason) details.push({ label: 'Reason', value: reason });
       return { details };
     }
@@ -146,7 +147,8 @@ export function getEventSummary(event: SessionEvent): EventSummary {
       if (command) details.push({ label: 'Command', value: command });
       if (result) details.push({ label: 'Result', value: result });
       if (exitCode !== undefined) details.push({ label: 'Exit Code', value: String(exitCode) });
-      if (durationMs !== undefined) details.push({ label: 'Duration', value: formatDuration(durationMs) });
+      if (durationMs !== undefined)
+        details.push({ label: 'Duration', value: formatDuration(durationMs) });
       return { title: command ?? stage, details };
     }
 
@@ -186,17 +188,20 @@ export function computeTimelineMetrics(events: SessionEvent[] | undefined): Time
     return { startTime: null, endTime: null, duration: null, typeCounts: {} };
   }
 
-  const timestamps = events.map(e => parseTimestamp(e.timestamp));
+  const timestamps = events.map((e) => parseTimestamp(e.timestamp));
   const validTimestamps = timestamps.filter((t): t is number => t !== null);
   const startTime = validTimestamps.length > 0 ? Math.min(...validTimestamps) : null;
   const endTime = validTimestamps.length > 0 ? Math.max(...validTimestamps) : null;
   const duration = startTime !== null && endTime !== null ? endTime - startTime : null;
 
-  const typeCounts = events.reduce((acc, event) => {
-    const type = event.type || 'unknown';
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const typeCounts = events.reduce(
+    (acc, event) => {
+      const type = event.type || 'unknown';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
 
   return { startTime, endTime, duration, typeCounts };
 }

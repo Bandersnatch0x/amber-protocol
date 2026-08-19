@@ -9,6 +9,11 @@ function main(argv = process.argv.slice(2)) {
 	const repoRoot = path.resolve(__dirname, "..");
 	const skillsRoot = path.join(repoRoot, "skills");
 	const result = generateAgentCommands({ skillsRoot, repoRoot, check });
+	if (result.errors && result.errors.length > 0) {
+		console.error("Skill command contract errors:");
+		for (const error of result.errors) console.error(`  ${error}`);
+		return 1;
+	}
 
 	if (check) {
 		if (result.changed.length > 0) {

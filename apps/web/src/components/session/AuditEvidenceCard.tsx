@@ -36,6 +36,8 @@ interface AuditEvidenceLabels {
   failed: string;
   title: string;
   detail: string;
+  /** Optional one-sentence plain-language gloss for the ledger term (task #27). */
+  ledgerGloss?: string;
   ledgerMissing: string;
   ledgerVerified: string;
   ledgerBroken: string;
@@ -90,7 +92,9 @@ export function AuditEvidenceCard({
 }: AuditEvidenceCardProps) {
   if (isLoading) {
     return (
-      <div className={`rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 ${className}`}>
+      <div
+        className={`rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 ${className}`}
+      >
         {labels.loading}
       </div>
     );
@@ -98,7 +102,9 @@ export function AuditEvidenceCard({
 
   if (error) {
     return (
-      <div className={`rounded-md border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-900 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200 ${className}`}>
+      <div
+        className={`rounded-md border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-900 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200 ${className}`}
+      >
         <p className="font-medium">{labels.failed}</p>
         <p className="mt-1 break-words">{error.message}</p>
       </div>
@@ -112,11 +118,14 @@ export function AuditEvidenceCard({
     : summary.ledger.verified
       ? labels.ledgerVerified
       : labels.ledgerBroken;
-  const ledgerTone = summary.ledger.exists && summary.ledger.verified
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200'
-    : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200';
+  const ledgerTone =
+    summary.ledger.exists && summary.ledger.verified
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200'
+      : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200';
   const latestLedger = preferGateScoped ? summary.ledger.latestForGate : summary.ledger.latest;
-  const latestTimeline = preferGateScoped ? summary.timeline.latestForGate : summary.timeline.latest;
+  const latestTimeline = preferGateScoped
+    ? summary.timeline.latestForGate
+    : summary.timeline.latest;
   const hashSource = latestLedger ?? summary.ledger.latest;
   const textSize = compact ? 'text-xs leading-5' : 'text-sm leading-6';
   const definitionLayout = compact ? 'mt-3 space-y-2' : 'mt-3 grid gap-3 sm:grid-cols-2';
@@ -127,6 +136,9 @@ export function AuditEvidenceCard({
         <div>
           <p className="font-medium">{labels.title}</p>
           <p className="mt-1 text-xs leading-5">{labels.detail}</p>
+          {labels.ledgerGloss && (
+            <p className="mt-1 text-xs leading-5 opacity-80">{labels.ledgerGloss}</p>
+          )}
         </div>
         <span className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-xs font-medium dark:bg-slate-950/50">
           {ledgerStatus}
@@ -136,11 +148,15 @@ export function AuditEvidenceCard({
       <dl className={definitionLayout}>
         <div>
           <dt className="text-xs font-medium">{labels.latestLedger}</dt>
-          <dd className="break-words font-mono text-xs">{formatAuditRecord(latestLedger, labels.emptyLedger)}</dd>
+          <dd className="break-words font-mono text-xs">
+            {formatAuditRecord(latestLedger, labels.emptyLedger)}
+          </dd>
         </div>
         <div>
           <dt className="text-xs font-medium">{labels.latestTimeline}</dt>
-          <dd className="break-words font-mono text-xs">{formatAuditEvent(latestTimeline, labels.emptyTimeline)}</dd>
+          <dd className="break-words font-mono text-xs">
+            {formatAuditEvent(latestTimeline, labels.emptyTimeline)}
+          </dd>
         </div>
         <div>
           <dt className="text-xs font-medium">{labels.hash}</dt>
@@ -163,8 +179,12 @@ export function AuditEvidenceCard({
       )}
 
       <div className="mt-3 space-y-1 font-mono text-[0.68rem]">
-        <code className="block break-all rounded bg-white/60 p-2 dark:bg-slate-950/40">{summary.ledger.path}</code>
-        <code className="block break-all rounded bg-white/60 p-2 dark:bg-slate-950/40">{summary.timeline.path}</code>
+        <code className="block break-all rounded bg-white/60 p-2 dark:bg-slate-950/40">
+          {summary.ledger.path}
+        </code>
+        <code className="block break-all rounded bg-white/60 p-2 dark:bg-slate-950/40">
+          {summary.timeline.path}
+        </code>
       </div>
     </div>
   );

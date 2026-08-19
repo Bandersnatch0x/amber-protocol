@@ -59,28 +59,96 @@ describe('gate-reader', () => {
 
     it('rejects invalid gate IDs with path traversal', async () => {
       const { getGate } = await import('@server/lib/gate-reader');
-      await expect(getGate('00000000-0000-0000-0000-000000000001', '../evil')).rejects.toThrow('Invalid gate ID');
+      await expect(getGate('00000000-0000-0000-0000-000000000001', '../evil')).rejects.toThrow(
+        'Invalid gate ID',
+      );
     });
 
     it('rejects gate IDs with special characters', async () => {
       const { getGate } = await import('@server/lib/gate-reader');
-      await expect(getGate('00000000-0000-0000-0000-000000000001', 'gate/../evil')).rejects.toThrow('Invalid gate ID');
+      await expect(getGate('00000000-0000-0000-0000-000000000001', 'gate/../evil')).rejects.toThrow(
+        'Invalid gate ID',
+      );
     });
   });
 
   describe('writeGateDecision', () => {
     it('rejects invalid session IDs', async () => {
       const { writeGateDecision } = await import('@server/lib/gate-reader');
-      await expect(
-        writeGateDecision('bad-id', 'my-gate', 'approved', 'ok')
-      ).rejects.toThrow('Invalid session ID');
+      await expect(writeGateDecision('bad-id', 'my-gate', 'approved', 'ok')).rejects.toThrow(
+        'Invalid session ID',
+      );
     });
 
     it('rejects invalid gate IDs', async () => {
       const { writeGateDecision } = await import('@server/lib/gate-reader');
       await expect(
-        writeGateDecision('00000000-0000-0000-0000-000000000001', '../evil', 'approved')
+        writeGateDecision('00000000-0000-0000-0000-000000000001', '../evil', 'approved'),
       ).rejects.toThrow('Invalid gate ID');
+    });
+  });
+
+  describe('writeGateDecision reviewer identity', () => {
+    const sessionId = '00000000-0000-4000-8000-000000000002';
+
+    function seedGate(gateId: string): void {
+      const gatesDir = path.join(sessionsDir, sessionId, 'gates');
+      ensureDir(gatesDir);
+      writeJson(path.join(gatesDir, `${gateId}.gate.json`), {
+        gateId,
+        sessionId,
+        type: 'user-approval',
+        stage: 'implement',
+        description: 'reviewer test gate',
+        triggeredAt: '2026-06-20T00:00:00.000Z',
+      });
+    }
+
+    function decisionPath(gateId: string): string {
+      return path.join(sessionsDir, sessionId, 'gates', `${gateId}.decision.json`);
+    }
+
+    it('records the supplied reviewer as resolvedBy', async () => {
+      const { writeGateDecision } = await import('@server/lib/gate-reader');
+      seedGate('reviewer-gate');
+
+      await writeGateDecision(sessionId, 'reviewer-gate', 'approved', 'ok', 'alice@team');
+
+      const decision = JSON.parse(fs.readFileSync(decisionPath('reviewer-gate'), 'utf8'));
+      expect(decision.decision).toBe('approved');
+      expect(decision.resolvedBy).toBe('alice@team');
+    });
+
+    it('defaults resolvedBy to web:anonymous when no reviewer is supplied', async () => {
+      const { writeGateDecision } = await import('@server/lib/gate-reader');
+      seedGate('anonymous-gate');
+
+      await writeGateDecision(sessionId, 'anonymous-gate', 'rejected', 'needs work');
+
+      const decision = JSON.parse(fs.readFileSync(decisionPath('anonymous-gate'), 'utf8'));
+      expect(decision.resolvedBy).toBe('web:anonymous');
+    });
+
+    it('rejects invalid reviewer identifiers without writing a decision', async () => {
+      const { writeGateDecision } = await import('@server/lib/gate-reader');
+      seedGate('bad-reviewer-gate');
+
+      await expect(
+        writeGateDecision(sessionId, 'bad-reviewer-gate', 'approved', undefined, 'bad<script>'),
+      ).rejects.toThrow('Invalid reviewer identifier');
+
+      expect(fs.existsSync(decisionPath('bad-reviewer-gate'))).toBe(false);
+    });
+
+    it('surfaces the recorded resolvedBy when reading the gate back', async () => {
+      const { writeGateDecision, getGate } = await import('@server/lib/gate-reader');
+      seedGate('readback-gate');
+
+      await writeGateDecision(sessionId, 'readback-gate', 'approved', undefined, 'web:carol');
+
+      const gate = await getGate(sessionId, 'readback-gate');
+      expect(gate?.status).toBe('approved');
+      expect(gate?.resolvedBy).toBe('web:carol');
     });
   });
 
@@ -90,14 +158,14 @@ describe('gate-reader', () => {
       // Invalid session — passes validation but will fail on fs (gate not found)
       // The gate doesn't exist yet, so we expect an error about missing gate
       await expect(
-        approveGate('00000000-0000-0000-0000-000000000001', 'nonexistent')
+        approveGate('00000000-0000-0000-0000-000000000001', 'nonexistent'),
       ).rejects.toThrow();
     });
 
     it('rejectGate delegates to writeGateDecision', async () => {
       const { rejectGate } = await import('@server/lib/gate-reader');
       await expect(
-        rejectGate('00000000-0000-0000-0000-000000000001', 'nonexistent')
+        rejectGate('00000000-0000-0000-0000-000000000001', 'nonexistent'),
       ).rejects.toThrow();
     });
   });

@@ -16,23 +16,33 @@ const navItems = [
   { to: '/transcripts', labelKey: 'nav.transcripts' },
   { to: '/routes', labelKey: 'nav.routes' },
   { to: '/gates', labelKey: 'nav.gates' },
+  { to: '/governance', labelKey: 'nav.governance' },
   { to: '/settings', labelKey: 'nav.settings' },
 ] as const;
 
-function NavLink({ to, labelKey, compact = false }: { to: string; labelKey: I18nKey; compact?: boolean }) {
+function NavLink({
+  to,
+  labelKey,
+  compact = false,
+}: {
+  to: string;
+  labelKey: I18nKey;
+  compact?: boolean;
+}) {
   const routerState = useRouterState();
   const { t } = useI18n();
-  const isActive = routerState.location.pathname === to ||
-    routerState.location.pathname.startsWith(to);
+  const isActive =
+    routerState.location.pathname === to || routerState.location.pathname.startsWith(to);
 
   return (
     <Link
       to={to}
       className={`
         inline-flex shrink-0 items-center ${compact ? 'px-2.5' : 'px-3'} py-2 border-b-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-sm min-h-[44px]
-        ${isActive
-          ? 'border-blue-500 text-slate-900 dark:text-white'
-          : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
+        ${
+          isActive
+            ? 'border-blue-500 text-slate-900 dark:text-white'
+            : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
         }
       `}
     >
@@ -113,7 +123,10 @@ function AppShell() {
       </nav>
 
       {/* Mobile nav */}
-      <nav aria-label={t('nav.mobile')} className="overflow-x-hidden border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 sm:hidden">
+      <nav
+        aria-label={t('nav.mobile')}
+        className="overflow-x-hidden border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 sm:hidden"
+      >
         <div className="flex w-full max-w-full gap-0.5 overflow-x-auto overscroll-x-contain px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {navItems.map((item) => (
             <NavLink key={item.to} {...item} compact />

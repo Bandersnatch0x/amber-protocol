@@ -88,7 +88,8 @@ runner would never pick up the change. This is acceptable: the web reports the
 rejection or timeout back to the user.
 
 This is distinct from `runVerification`, which runs evidence commands
-synchronously in the web server process (same as the CLI does). The
+synchronously in the web server process (same as the CLI does) (superseded by
+Amendment 2026-08-18 (b)). The
 verification command reads the working tree and writes to the ledger; it does
 not talk to the runner.
 
@@ -116,6 +117,93 @@ to.
 `complete`) are intentionally withheld. This is consistent with Amber's
 governance-first principle: approval requires human intentionality that a
 button click in a localhost dashboard cannot credibly provide.
+
+## Amendment 2026-08-18 — continuity read-only seam and async verification
+
+This amendment registers two implementation changes and one open governance
+item. It does **not** alter the Decision tables above; the allowed-mutation
+allow list and the CLI-only forbidden list keep their existing semantics.
+
+### (a) Continuity router: four read-only queries
+
+`server/routers/continuity.ts` adds four **queries** backed by the existing
+`scripts/lib/web-adapter.js` seam:
+
+| Query | Purpose |
+|-------|---------|
+| `continuity.handoff.status` | Handoff state (live/scaffold/missing) + bundle delivery readiness |
+| `continuity.handoff.preview` | Lazily-rendered handoff markdown for display only |
+| `continuity.governance.summary` | Repository governance report (decision, scores, findings, next actions) |
+| `continuity.completion.nextActions` | Missing-item → next-action guidance for a session |
+
+All four are read-only: they add **no mutations**, do not extend the allowed
+web-mutation list, and do not change the CLI-only whitelist. Web surfaces
+consuming them (HandoffCard, SessionCompletionWorkbench guidance, /governance
+page) render CLI-only actions exclusively as copy-only command blocks —
+handoff regeneration, session completion, and approval remain CLI acts.
+
+### (b) runVerification is now an async evidence job
+
+`lifecycle.runVerification` no longer executes the verification command
+inline. Its contract is now:
+
+- A policy denial (verify-rules deny-wins) still returns synchronously:
+  `{ status: 'denied', reason, ... }`.
+- An accepted run returns immediately with `{ status: 'accepted', jobId, ... }`
+  and executes in a background evidence job (`server/services/evidence-jobs.ts`).
+- `lifecycle.verificationJob({ jobId })` polls the job:
+  `{ jobId, status: 'pending'|'running'|'denied'|'completed'|'failed'|'timeout', result?, error? }`.
+- Job transitions broadcast the SSE event `evidence-job-changed`
+  (`{ type, sessionId, jobId, status, timestamp }`), defined in
+  `server/types/session-events.ts`.
+
+This is an execution-mechanics change only. Governance is unchanged: the same
+verify-rules policy gate (default-deny) decides admission, and the same
+audit trail records the outcome — the verification result is appended to the
+session timeline and the hash-chain ledger exactly as the synchronous path did.
+The web UI follows the job via SSE (primary) with a polling fallback, and keeps
+showing denials and outcomes in the historical result shape.
+
+One write-surface addition is registered here as an explicit exception:
+evidence job status snapshots are persisted under `.amber/tmp/evidence-jobs/`
+(`server/services/evidence-jobs.ts`) so a client that loses its SSE connection
+— or a server restart — can still recover a terminal job result via
+`lifecycle.verificationJob`. These snapshots are tmp-scoped recovery state:
+they are not audit artifacts (the audited outcome remains the timeline/ledger
+append described above), they are not user documents, and they carry no
+governance semantics. The exception does not alter the audit-boundary
+semantics of the Decision: the web still only appends to
+`timeline.jsonl` / `ledger.jsonl` / `manifest.json` for the five allowed
+mutations, and still never creates/deletes user files or handoff documents.
+
+### (c) web gate.approve vs the CLI identity gate — mitigated via reviewer audit identity
+
+The web `gate.approve` surface and the CLI identity gate (`approve` requiring
+`--yes` or a TTY, see the CLI-only table above) carried an unresolved semantic
+tension: the web flow records an approval decision with confirmation steps,
+while the CLI model treats approval as an identity-bound act that a button
+click cannot credibly represent.
+
+**Status: mitigated (2026-08-18).** The tension is resolved in favor of
+strengthening audit identity without moving the permission boundary:
+
+- `gate.approve` / `gate.approveAndResume` / `gate.reject` accept an optional
+  `reviewer` identifier (trimmed, whitelist charset, bounded length). When
+  supplied, the identifier is recorded consistently in the `.decision.json`
+  `resolvedBy` field, the session timeline event, and the hash-chain ledger
+  record (`approvedBy` / `rejectedBy`), so the audit chain attributes the
+  decision to the real reviewer.
+- When no reviewer is supplied, the decision is recorded under the explicit,
+  clearly identifiable marker `web:anonymous` — the ambiguous hardcoded
+  `'human'` value is no longer written by the web surface. Legacy decision
+  files keep their recorded `resolvedBy` values.
+
+The retained boundary: web approval **still does not constitute an equivalent
+of the CLI identity gate**. The CLI `approve` semantics (`--yes` or TTY as the
+intentionality proof) are not migrated to the web; the mitigation only makes
+the existing web decision surface auditable to a real reviewer identity. A
+future ADR revision (tracked in BACKLOG.md) may separately revisit web
+handoff/complete write surfaces, which remain forbidden here.
 
 ## Related
 

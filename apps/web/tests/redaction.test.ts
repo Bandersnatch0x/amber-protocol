@@ -22,7 +22,9 @@ describe('redactSecrets', () => {
   });
 
   it('redacts Bearer tokens in authorization headers', () => {
-    const out = redactSecrets('Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig');
+    const out = redactSecrets(
+      'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig',
+    );
     expect(out).not.toContain('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig');
     expect(out).toContain('[REDACTED');
   });
@@ -210,7 +212,10 @@ describe('redactDeep', () => {
   });
 
   it('does not mutate the input object', () => {
-    const input = { apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl', nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' } };
+    const input = {
+      apiKey: 'sk-ant-api03-AbC123_def456GHI789jkl',
+      nested: { token: 'ghp_1234567890abcdefABCDEF1234567890abcd' },
+    };
     const snapshot = JSON.parse(JSON.stringify(input));
     redactDeep(input);
     expect(input).toEqual(snapshot);

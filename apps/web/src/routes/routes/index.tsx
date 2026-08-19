@@ -22,10 +22,10 @@ function RoutesPage() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (
-        event.key === '/'
-        && !(event.target instanceof HTMLInputElement)
-        && !(event.target instanceof HTMLTextAreaElement)
-        && !(event.target instanceof HTMLSelectElement)
+        event.key === '/' &&
+        !(event.target instanceof HTMLInputElement) &&
+        !(event.target instanceof HTMLTextAreaElement) &&
+        !(event.target instanceof HTMLSelectElement)
       ) {
         event.preventDefault();
         searchRef.current?.focus();
@@ -37,16 +37,19 @@ function RoutesPage() {
   }, []);
 
   const filteredSections = useMemo(() => {
-    if (!grouped) return [] as Array<{ key: string; labelKey: I18nKey; routes: typeof grouped[string] }>;
+    if (!grouped)
+      return [] as Array<{ key: string; labelKey: I18nKey; routes: (typeof grouped)[string] }>;
     const query = searchQuery.trim().toLowerCase();
 
     return categoryOrder
       .map((key) => {
         const routes = (grouped[key] ?? []).filter((route) => {
           if (!query) return true;
-          return route.name.toLowerCase().includes(query)
-            || route.id.toLowerCase().includes(query)
-            || route.description.toLowerCase().includes(query);
+          return (
+            route.name.toLowerCase().includes(query) ||
+            route.id.toLowerCase().includes(query) ||
+            route.description.toLowerCase().includes(query)
+          );
         });
 
         return {
@@ -63,7 +66,9 @@ function RoutesPage() {
   return (
     <div className="page-container space-y-6">
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">{t('routes.title')}</h1>
+        <h1 className="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
+          {t('routes.title')}
+        </h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           {t(totalRoutes === 1 ? 'routes.countOne' : 'routes.count', { count: totalRoutes })}
         </p>
@@ -79,7 +84,9 @@ function RoutesPage() {
           aria-label={t('routes.searchAria')}
           className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 pr-10 text-sm text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder-slate-400"
         />
-        <span className="pointer-events-none absolute right-7 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-slate-500">/</span>
+        <span className="pointer-events-none absolute right-7 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-slate-500">
+          /
+        </span>
       </div>
 
       {isLoading && (
@@ -98,9 +105,18 @@ function RoutesPage() {
 
       {error && (
         <div className="card p-5">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-white">{t('routes.failed')}</h2>
+          <h2 className="text-sm font-medium text-slate-900 dark:text-white">
+            {t('routes.failed')}
+          </h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
-          <button onClick={() => refetch()} className="btn-secondary mt-4 text-sm">{t('common.retry')}</button>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button onClick={() => refetch()} className="btn-secondary text-sm">
+              {t('common.retry')}
+            </button>
+            <Link to="/" className="btn-secondary text-sm">
+              {t('error.backHome')}
+            </Link>
+          </div>
         </div>
       )}
 
@@ -121,22 +137,40 @@ function RoutesPage() {
             <section key={section.key} className="space-y-3">
               <div className="flex items-center justify-between gap-4">
                 <h2 className="label">{t(section.labelKey)}</h2>
-                <span className="text-xs text-slate-500 dark:text-slate-400">{section.routes.length}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {section.routes.length}
+                </span>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {section.routes.map((route) => (
-                  <Link key={route.id} to="/routes/$id" params={{ id: route.id }} className="card-hover block p-4">
+                  <Link
+                    key={route.id}
+                    to="/routes/$id"
+                    params={{ id: route.id }}
+                    className="card-hover block p-4"
+                  >
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h3 className="text-sm font-medium text-slate-900 dark:text-white">{route.name}</h3>
-                          <p className="mt-1 font-mono text-xs text-slate-500 dark:text-slate-400">{route.id}</p>
+                          <h3 className="text-sm font-medium text-slate-900 dark:text-white">
+                            {route.name}
+                          </h3>
+                          <p className="mt-1 font-mono text-xs text-slate-500 dark:text-slate-400">
+                            {route.id}
+                          </p>
                         </div>
                         <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {t((route.stages?.length ?? 0) === 1 ? 'routes.stagesOne' : 'routes.stages', { count: route.stages?.length ?? 0 })}
+                          {t(
+                            (route.stages?.length ?? 0) === 1
+                              ? 'routes.stagesOne'
+                              : 'routes.stages',
+                            { count: route.stages?.length ?? 0 },
+                          )}
                         </span>
                       </div>
-                      <p className="line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-400">{route.description}</p>
+                      <p className="line-clamp-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                        {route.description}
+                      </p>
                     </div>
                   </Link>
                 ))}

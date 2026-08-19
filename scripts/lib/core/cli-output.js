@@ -121,6 +121,10 @@ const FLAG_SPECS = {
 	"-h": { key: "help", kind: "boolean" },
 };
 
+function getFlagSpec(flag) {
+	return FLAG_SPECS[flag] || null;
+}
+
 function parseArgs(argv) {
 	const args = { target: process.cwd(), json: false, dryRun: false };
 
@@ -677,6 +681,7 @@ function printResult(result, options = {}) {
 }
 
 module.exports = {
+	getFlagSpec,
 	parseArgs,
 	printAuditSummary,
 	printResult,

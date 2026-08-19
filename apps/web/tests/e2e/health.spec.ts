@@ -36,9 +36,19 @@ test.describe('Server availability', () => {
     }
 
     // The test runner's own cwd should also find it
-    const cwdFixture = path.resolve(process.cwd(), '..', '..', '.amber', 'sessions', '00000000-0000-4000-8000-00000000e2e5');
+    const cwdFixture = path.resolve(
+      process.cwd(),
+      '..',
+      '..',
+      '.amber',
+      'sessions',
+      '00000000-0000-4000-8000-00000000e2e5',
+    );
     console.log('[health] cwd-based fixture:', cwdFixture);
-    console.log('[health] cwd-based manifest exists:', fs.existsSync(path.join(cwdFixture, 'manifest.json')));
+    console.log(
+      '[health] cwd-based manifest exists:',
+      fs.existsSync(path.join(cwdFixture, 'manifest.json')),
+    );
   });
 
   test('Vite dev server is reachable', async ({ request }) => {

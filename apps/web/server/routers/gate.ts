@@ -1,6 +1,7 @@
 import { router, publicProcedure } from '../trpc';
 import { z } from 'zod';
 import { listGates, getGate, approveGate, rejectGate } from '../lib/gate-reader';
+import { REVIEWER_PATTERN, WEB_ANONYMOUS_REVIEWER } from '../lib/types/gate';
 import { readSessionById } from '../lib/session-reader';
 import { persistSessionStatus } from '../lib/session-writer';
 import {
@@ -41,18 +42,35 @@ function mergeWarnings(...warnings: Array<string | undefined>): string | undefin
   return warnings.filter(Boolean).join('; ') || undefined;
 }
 
-async function tryRecordGatePassed(sessionId: string, gateId: string): Promise<string | undefined> {
+// Optional reviewer identifier for the audit chain (ADR-0007 amendment (c)).
+// Trimmed, whitelist-charset only, bounded length; empty string means "no
+// reviewer supplied" and resolves to WEB_ANONYMOUS_REVIEWER downstream.
+const reviewerInput = z
+  .string()
+  .trim()
+  .refine((value) => value === '' || REVIEWER_PATTERN.test(value), {
+    message: 'Invalid reviewer identifier',
+  })
+  .transform((value) => (value === '' ? undefined : value))
+  .optional();
+
+async function tryRecordGatePassed(
+  sessionId: string,
+  gateId: string,
+  reviewer: string | undefined,
+): Promise<string | undefined> {
+  const approvedBy = reviewer ?? WEB_ANONYMOUS_REVIEWER;
   try {
     await appendSessionTimelineEvent(sessionId, {
       type: 'gate_passed',
-      data: { sessionId, gateId, approvedBy: 'web' },
+      data: { sessionId, gateId, approvedBy },
     });
     await appendSessionLedgerRecord(sessionId, {
       schemaVersion: 2,
       kind: 'gate_passed',
       sessionId,
       gateId,
-      approvedBy: 'web',
+      approvedBy,
     });
     return undefined;
   } catch (error) {
@@ -60,11 +78,17 @@ async function tryRecordGatePassed(sessionId: string, gateId: string): Promise<s
   }
 }
 
-async function tryRecordGateFailed(sessionId: string, gateId: string, reason: string): Promise<string | undefined> {
+async function tryRecordGateFailed(
+  sessionId: string,
+  gateId: string,
+  reason: string,
+  reviewer: string | undefined,
+): Promise<string | undefined> {
+  const rejectedBy = reviewer ?? WEB_ANONYMOUS_REVIEWER;
   try {
     await appendSessionTimelineEvent(sessionId, {
       type: 'gate_failed',
-      data: { sessionId, gateId, reason },
+      data: { sessionId, gateId, reason, rejectedBy },
     });
     await appendSessionLedgerRecord(sessionId, {
       schemaVersion: 2,
@@ -72,6 +96,7 @@ async function tryRecordGateFailed(sessionId: string, gateId: string, reason: st
       sessionId,
       gateId,
       reason,
+      rejectedBy,
     });
     return undefined;
   } catch (error) {
@@ -93,53 +118,67 @@ async function tryRecordSessionResumed(sessionId: string): Promise<string | unde
 
 export const gateRouter = router({
   list: publicProcedure
-    .input(z.object({
-      sessionId: z.string().optional(),
-      status: z.enum(['pending', 'approved', 'rejected']).optional(),
-    }).optional())
+    .input(
+      z
+        .object({
+          sessionId: z.string().optional(),
+          status: z.enum(['pending', 'approved', 'rejected']).optional(),
+        })
+        .optional(),
+    )
     .query(async ({ input }) => {
       return await listGates(input || {});
     }),
 
   byId: publicProcedure
-    .input(z.object({
-      sessionId: z.string(),
-      gateId: z.string(),
-    }))
+    .input(
+      z.object({
+        sessionId: z.string(),
+        gateId: z.string(),
+      }),
+    )
     .query(async ({ input }) => {
       return await getGate(input.sessionId, input.gateId);
     }),
 
   auditSummary: publicProcedure
-    .input(z.object({
-      sessionId: z.string(),
-      gateId: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        sessionId: z.string(),
+        gateId: z.string().optional(),
+      }),
+    )
     .query(async ({ input }) => {
       return await readSessionAuditSummary(input.sessionId, input.gateId);
     }),
 
   approve: publicProcedure
-    .input(z.object({
-      sessionId: z.string(),
-      gateId: z.string(),
-      reason: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        sessionId: z.string(),
+        gateId: z.string(),
+        reason: z.string().optional(),
+        reviewer: reviewerInput,
+      }),
+    )
     .mutation(async ({ input }) => {
-      await approveGate(input.sessionId, input.gateId, input.reason);
+      await approveGate(input.sessionId, input.gateId, input.reason, input.reviewer);
       const eventWarning = tryEmitGatePassed(input.sessionId, input.gateId);
-      const auditWarning = await tryRecordGatePassed(input.sessionId, input.gateId);
+      const auditWarning = await tryRecordGatePassed(input.sessionId, input.gateId, input.reviewer);
       const warning = mergeWarnings(eventWarning, auditWarning);
       if (warning) return { success: true, eventWarning: warning };
       return { success: true };
     }),
 
   approveAndResume: publicProcedure
-    .input(z.object({
-      sessionId: z.string(),
-      gateId: z.string(),
-      reason: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        sessionId: z.string(),
+        gateId: z.string(),
+        reason: z.string().optional(),
+        reviewer: reviewerInput,
+      }),
+    )
     .mutation(async ({ input }) => {
       const session = readSessionById(input.sessionId);
       if (!session) {
@@ -157,10 +196,10 @@ export const gateRouter = router({
         throw new Error(`Gate already ${gate.status}`);
       }
 
-      await approveGate(input.sessionId, input.gateId, input.reason);
+      await approveGate(input.sessionId, input.gateId, input.reason, input.reviewer);
       const eventWarning = mergeWarnings(
         tryEmitGatePassed(input.sessionId, input.gateId),
-        await tryRecordGatePassed(input.sessionId, input.gateId),
+        await tryRecordGatePassed(input.sessionId, input.gateId, input.reviewer),
       );
 
       if (session.status === 'paused') {
@@ -281,16 +320,19 @@ export const gateRouter = router({
     }),
 
   reject: publicProcedure
-    .input(z.object({
-      sessionId: z.string(),
-      gateId: z.string(),
-      reason: z.string().trim().min(1),
-    }))
+    .input(
+      z.object({
+        sessionId: z.string(),
+        gateId: z.string(),
+        reason: z.string().trim().min(1),
+        reviewer: reviewerInput,
+      }),
+    )
     .mutation(async ({ input }) => {
-      await rejectGate(input.sessionId, input.gateId, input.reason);
+      await rejectGate(input.sessionId, input.gateId, input.reason, input.reviewer);
       const eventWarning = mergeWarnings(
         tryEmitGateFailed(input.sessionId, input.gateId, input.reason),
-        await tryRecordGateFailed(input.sessionId, input.gateId, input.reason),
+        await tryRecordGateFailed(input.sessionId, input.gateId, input.reason, input.reviewer),
       );
       if (eventWarning) return { success: true, eventWarning };
       return { success: true };

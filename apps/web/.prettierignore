@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs and generated artifacts
+dist/
+.tanstack/
+playwright-report/
+test-results/
+vite/
+*.tsbuildinfo
+*.log
+
+# TanStack Router generated route tree — rewritten by the route generator on
+# every route change; formatting it would churn the format gate red for no
+# human-authored content (file header already opts out of lint/typecheck).
+src/routeTree.gen.ts
+
+# Environment files (keep as-is)
+.env.example

@@ -3,25 +3,31 @@ kind: "knowledge"
 category: "skills-platform-generation"
 title: "Skills & Platform Generation"
 template: "architecture"
-updated_at: "2026-07-14T07:07:21.804Z"
+updated_at: "2026-08-18T00:00:00.000Z"
 ---
 
 # Skills & Platform Generation
 
-Last Reviewed: 2026-07-16
+Last Reviewed: 2026-08-18
 
 Amber maintains one canonical skill definition per capability and generates the
-platform-specific surfaces from it. The ten directories under `skills/` are authored
-inputs. Claude Code, Codex/Cursor, and Gemini files are products of the generator and
-must remain reproducible from those inputs.
+platform-specific surfaces from it. The five directories under `skills/` are authored
+inputs: the `amber` router plus four deep journeys. Claude Code, Codex/Cursor, and
+Gemini files are products of the generator and must remain reproducible from those
+inputs.
 
 ## Source and Outputs
 
 - `skills/<name>/SKILL.md` is the source of truth for each Amber capability. Current
-  skills cover adoption, audit, continuous improvement, doctor, handoff, init, plan,
-  route, session, and wiki operations.
+  authored skills are `amber` (router), `amber-delivery`,
+  `amber-diagnosis-adoption`, `amber-context-continuity`, and
+  `amber-continuous-improvement`.
 - `scripts/gen-agent-commands.js` is the CLI entry for generation and check mode; it
-  delegates generation to the shared agent-command generator.
+  delegates generation to the shared agent-command generator. Before planning any
+  product output, that module validates every `x-amber-json.command` against the
+  Command registry's command/subcommand and documented option contract plus the CLI
+  parser's value/boolean flag shapes. Invalid contracts return errors and write
+  neither generated files nor stale-output removals.
 - `.claude-plugin/` exposes the canonical skills to Claude as a plugin, while generated
   command surfaces are written under `.claude/`.
 - `.agents/skills/` is the generated open-standard skill location consumed by Codex
@@ -60,5 +66,9 @@ makes the canonical skill and generated outputs a single tested contract.
   supported outputs in the same change.
 - Treat generation as deterministic repository maintenance; generated output should
   not depend on machine-specific paths, clocks, or mutable external services.
+- Command contract truth stays centralized in `scripts/lib/command-registry.js` and
+  parser flag shape stays in `scripts/lib/core/cli-output.js`. The generator consumes
+  those existing projections directly; do not add a skill-only command/option
+  allowlist or execute a skill command as part of generation.
 - Skill instructions expose governed CLI behavior. They must not imply that Amber
   dispatches live agents or bypasses approvals on the user's behalf.

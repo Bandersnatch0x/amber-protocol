@@ -12,7 +12,7 @@ function Probe() {
   const { language, t } = useI18n();
   return (
     <div>
-      <p data-testid='language'>{language}</p>
+      <p data-testid="language">{language}</p>
       <p>{t('nav.sessions')}</p>
       <p>{t('gates.count', { count: 3 })}</p>
     </div>
@@ -38,7 +38,9 @@ describe('i18n', () => {
   });
 
   it('interpolates named values in translated strings', () => {
-    expect(interpolate('Showing {visible} of {total} gates.', { visible: 12, total: 30 })).toBe('Showing 12 of 30 gates.');
+    expect(interpolate('Showing {visible} of {total} gates.', { visible: 12, total: 30 })).toBe(
+      'Showing 12 of 30 gates.',
+    );
   });
 
   it('provides translations and updates document language', () => {
@@ -58,7 +60,7 @@ describe('i18n', () => {
 
   it('toggles language, persists it, and keeps an accessible label', () => {
     render(
-      <I18nProvider initialLanguage='en'>
+      <I18nProvider initialLanguage="en">
         <LanguageToggle />
         <Probe />
       </I18nProvider>,

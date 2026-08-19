@@ -18,8 +18,10 @@ export function hasSettingsChanges(current: Settings, persisted: Settings): bool
   const normalizedCurrent = normalizeSettings(current);
   const normalizedPersisted = normalizeSettings(persisted);
 
-  return normalizedCurrent.autoRefresh !== normalizedPersisted.autoRefresh
-    || normalizedCurrent.refreshInterval !== normalizedPersisted.refreshInterval
-    || normalizedCurrent.showNotifications !== normalizedPersisted.showNotifications
-    || normalizedCurrent.compactView !== normalizedPersisted.compactView;
+  return (
+    normalizedCurrent.autoRefresh !== normalizedPersisted.autoRefresh ||
+    normalizedCurrent.refreshInterval !== normalizedPersisted.refreshInterval ||
+    normalizedCurrent.showNotifications !== normalizedPersisted.showNotifications ||
+    normalizedCurrent.compactView !== normalizedPersisted.compactView
+  );
 }

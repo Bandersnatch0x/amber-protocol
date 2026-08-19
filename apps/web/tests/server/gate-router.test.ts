@@ -41,9 +41,15 @@ const approveGate = gateReader.approveGate as ReturnType<typeof vi.fn>;
 const rejectGate = gateReader.rejectGate as ReturnType<typeof vi.fn>;
 const readSessionByIdMock = sessionReader.readSessionById as ReturnType<typeof vi.fn>;
 const persistSessionStatus = sessionWriter.persistSessionStatus as ReturnType<typeof vi.fn>;
-const appendSessionLedgerRecord = sessionAuditWriter.appendSessionLedgerRecord as ReturnType<typeof vi.fn>;
-const appendSessionTimelineEvent = sessionAuditWriter.appendSessionTimelineEvent as ReturnType<typeof vi.fn>;
-const readSessionAuditSummary = sessionAuditWriter.readSessionAuditSummary as ReturnType<typeof vi.fn>;
+const appendSessionLedgerRecord = sessionAuditWriter.appendSessionLedgerRecord as ReturnType<
+  typeof vi.fn
+>;
+const appendSessionTimelineEvent = sessionAuditWriter.appendSessionTimelineEvent as ReturnType<
+  typeof vi.fn
+>;
+const readSessionAuditSummary = sessionAuditWriter.readSessionAuditSummary as ReturnType<
+  typeof vi.fn
+>;
 const emitGateFailed = sessionEvents.emitGateFailed as ReturnType<typeof vi.fn>;
 const emitGatePassed = sessionEvents.emitGatePassed as ReturnType<typeof vi.fn>;
 const emitSessionResumed = sessionEvents.emitSessionResumed as ReturnType<typeof vi.fn>;
@@ -71,7 +77,12 @@ describe('gateRouter', () => {
     readSessionAuditSummary.mockResolvedValue({
       sessionId: 'session-1',
       gateId: 'gate-1',
-      ledger: { path: '.amber/sessions/session-1/ledger.jsonl', exists: true, verified: true, recordCount: 1 },
+      ledger: {
+        path: '.amber/sessions/session-1/ledger.jsonl',
+        exists: true,
+        verified: true,
+        recordCount: 1,
+      },
       timeline: { path: '.amber/sessions/session-1/timeline.jsonl', exists: true, eventCount: 1 },
     });
   });
@@ -146,20 +157,77 @@ describe('gateRouter', () => {
         reason: 'looks good',
       });
 
-      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', 'looks good');
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', 'looks good', undefined);
       expect(emitGatePassed).toHaveBeenCalledWith('session-1', 'gate-1');
       expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
         type: 'gate_passed',
-        data: { sessionId: 'session-1', gateId: 'gate-1', approvedBy: 'web' },
+        data: { sessionId: 'session-1', gateId: 'gate-1', approvedBy: 'web:anonymous' },
       });
       expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
         schemaVersion: 2,
         kind: 'gate_passed',
         sessionId: 'session-1',
         gateId: 'gate-1',
-        approvedBy: 'web',
+        approvedBy: 'web:anonymous',
       });
       expect(result).toEqual({ success: true });
+    });
+
+    it('records the supplied reviewer in the decision and audit chain', async () => {
+      approveGate.mockResolvedValue(undefined);
+
+      const result = await caller.approve({
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        reason: 'looks good',
+        reviewer: 'alice@team',
+      });
+
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', 'looks good', 'alice@team');
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
+        type: 'gate_passed',
+        data: { sessionId: 'session-1', gateId: 'gate-1', approvedBy: 'alice@team' },
+      });
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
+        schemaVersion: 2,
+        kind: 'gate_passed',
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        approvedBy: 'alice@team',
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it('treats an empty reviewer as the web-anonymous marker', async () => {
+      approveGate.mockResolvedValue(undefined);
+
+      await caller.approve({ sessionId: 'session-1', gateId: 'gate-1', reviewer: '   ' });
+
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined, undefined);
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
+        schemaVersion: 2,
+        kind: 'gate_passed',
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        approvedBy: 'web:anonymous',
+      });
+    });
+
+    it('rejects reviewers outside the whitelist charset', async () => {
+      await expect(
+        caller.approve({ sessionId: 'session-1', gateId: 'gate-1', reviewer: 'bad<script>' }),
+      ).rejects.toThrow();
+
+      expect(approveGate).not.toHaveBeenCalled();
+      expect(appendSessionLedgerRecord).not.toHaveBeenCalled();
+    });
+
+    it('rejects reviewers longer than 64 characters', async () => {
+      await expect(
+        caller.approve({ sessionId: 'session-1', gateId: 'gate-1', reviewer: 'a'.repeat(65) }),
+      ).rejects.toThrow();
+
+      expect(approveGate).not.toHaveBeenCalled();
     });
 
     it('keeps approval successful when the gate decision event cannot be emitted', async () => {
@@ -170,7 +238,7 @@ describe('gateRouter', () => {
 
       const result = await caller.approve({ sessionId: 'session-1', gateId: 'gate-1' });
 
-      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined);
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined, undefined);
       expect(result).toEqual({ success: true, eventWarning: 'event stream unavailable' });
     });
 
@@ -198,7 +266,7 @@ describe('gateRouter', () => {
 
       expect(readSessionByIdMock).toHaveBeenCalledWith('session-1');
       expect(getGate).toHaveBeenCalledWith('session-1', 'gate-1');
-      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', 'reviewed');
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', 'reviewed', undefined);
       expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'executing');
       expect(emitGatePassed).toHaveBeenCalledWith('session-1', 'gate-1');
       expect(emitSessionResumed).toHaveBeenCalledWith('session-1');
@@ -224,7 +292,7 @@ describe('gateRouter', () => {
 
       const result = await caller.approveAndResume({ sessionId: 'session-1', gateId: 'gate-1' });
 
-      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined);
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined, undefined);
       expect(emitGatePassed).toHaveBeenCalledWith('session-1', 'gate-1');
       expect(emitSessionResumed).not.toHaveBeenCalled();
       expect(result).toMatchObject({
@@ -235,6 +303,27 @@ describe('gateRouter', () => {
         resumeConfirmed: true,
         resumed: true,
         message: 'Legacy running status normalized to executing',
+      });
+    });
+
+    it('records the supplied reviewer when approving and resuming', async () => {
+      readSessionByIdMock.mockReturnValue({ id: 'session-1', status: 'paused' });
+      mockPendingGate();
+      approveGate.mockResolvedValue(undefined);
+
+      await caller.approveAndResume({
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        reviewer: 'bob.auditor',
+      });
+
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined, 'bob.auditor');
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
+        schemaVersion: 2,
+        kind: 'gate_passed',
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        approvedBy: 'bob.auditor',
       });
     });
 
@@ -264,7 +353,7 @@ describe('gateRouter', () => {
 
       const result = await caller.approveAndResume({ sessionId: 'session-1', gateId: 'gate-1' });
 
-      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined);
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined, undefined);
       expect(emitGatePassed).toHaveBeenCalledWith('session-1', 'gate-1');
       expect(emitSessionResumed).not.toHaveBeenCalled();
       expect(result).toMatchObject({
@@ -288,7 +377,7 @@ describe('gateRouter', () => {
 
       const result = await caller.approveAndResume({ sessionId: 'session-1', gateId: 'gate-1' });
 
-      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined);
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined, undefined);
       expect(result).toMatchObject({
         success: true,
         gateStatus: 'approved',
@@ -309,7 +398,7 @@ describe('gateRouter', () => {
 
       const result = await caller.approveAndResume({ sessionId: 'session-1', gateId: 'gate-1' });
 
-      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined);
+      expect(approveGate).toHaveBeenCalledWith('session-1', 'gate-1', undefined, undefined);
       expect(emitSessionResumed).not.toHaveBeenCalled();
       expect(result).toMatchObject({
         success: true,
@@ -326,9 +415,9 @@ describe('gateRouter', () => {
       readSessionByIdMock.mockReturnValue({ id: 'session-1', status: 'paused' });
       mockPendingGate({ status: 'approved' });
 
-      await expect(caller.approveAndResume({ sessionId: 'session-1', gateId: 'gate-1' })).rejects.toThrow(
-        'Gate already approved'
-      );
+      await expect(
+        caller.approveAndResume({ sessionId: 'session-1', gateId: 'gate-1' }),
+      ).rejects.toThrow('Gate already approved');
 
       expect(approveGate).not.toHaveBeenCalled();
       expect(emitSessionResumed).not.toHaveBeenCalled();
@@ -337,9 +426,9 @@ describe('gateRouter', () => {
     it('does not approve the gate when the session is missing', async () => {
       readSessionByIdMock.mockReturnValue(null);
 
-      await expect(caller.approveAndResume({ sessionId: 'missing', gateId: 'gate-1' })).rejects.toThrow(
-        'Session not found'
-      );
+      await expect(
+        caller.approveAndResume({ sessionId: 'missing', gateId: 'gate-1' }),
+      ).rejects.toThrow('Session not found');
 
       expect(approveGate).not.toHaveBeenCalled();
       expect(emitSessionResumed).not.toHaveBeenCalled();
@@ -356,11 +445,16 @@ describe('gateRouter', () => {
         reason: 'needs work',
       });
 
-      expect(rejectGate).toHaveBeenCalledWith('session-1', 'gate-1', 'needs work');
+      expect(rejectGate).toHaveBeenCalledWith('session-1', 'gate-1', 'needs work', undefined);
       expect(emitGateFailed).toHaveBeenCalledWith('session-1', 'gate-1', 'needs work');
       expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
         type: 'gate_failed',
-        data: { sessionId: 'session-1', gateId: 'gate-1', reason: 'needs work' },
+        data: {
+          sessionId: 'session-1',
+          gateId: 'gate-1',
+          reason: 'needs work',
+          rejectedBy: 'web:anonymous',
+        },
       });
       expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
         schemaVersion: 2,
@@ -368,8 +462,54 @@ describe('gateRouter', () => {
         sessionId: 'session-1',
         gateId: 'gate-1',
         reason: 'needs work',
+        rejectedBy: 'web:anonymous',
       });
       expect(result).toEqual({ success: true });
+    });
+
+    it('records the supplied reviewer in the rejection audit chain', async () => {
+      rejectGate.mockResolvedValue(undefined);
+
+      const result = await caller.reject({
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        reason: 'needs work',
+        reviewer: 'carol:review',
+      });
+
+      expect(rejectGate).toHaveBeenCalledWith('session-1', 'gate-1', 'needs work', 'carol:review');
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
+        type: 'gate_failed',
+        data: {
+          sessionId: 'session-1',
+          gateId: 'gate-1',
+          reason: 'needs work',
+          rejectedBy: 'carol:review',
+        },
+      });
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
+        schemaVersion: 2,
+        kind: 'gate_failed',
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        reason: 'needs work',
+        rejectedBy: 'carol:review',
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it('rejects reviewers outside the whitelist charset', async () => {
+      await expect(
+        caller.reject({
+          sessionId: 'session-1',
+          gateId: 'gate-1',
+          reason: 'needs work',
+          reviewer: 'evil;rm -rf',
+        }),
+      ).rejects.toThrow();
+
+      expect(rejectGate).not.toHaveBeenCalled();
+      expect(appendSessionLedgerRecord).not.toHaveBeenCalled();
     });
 
     it('keeps rejection successful when the gate decision event cannot be emitted', async () => {
@@ -378,14 +518,20 @@ describe('gateRouter', () => {
         throw new Error('event stream unavailable');
       });
 
-      const result = await caller.reject({ sessionId: 'session-1', gateId: 'gate-1', reason: 'needs work' });
+      const result = await caller.reject({
+        sessionId: 'session-1',
+        gateId: 'gate-1',
+        reason: 'needs work',
+      });
 
-      expect(rejectGate).toHaveBeenCalledWith('session-1', 'gate-1', 'needs work');
+      expect(rejectGate).toHaveBeenCalledWith('session-1', 'gate-1', 'needs work', undefined);
       expect(result).toEqual({ success: true, eventWarning: 'event stream unavailable' });
     });
 
     it('requires a non-empty reason', async () => {
-      await expect(caller.reject({ sessionId: 'session-1', gateId: 'gate-1', reason: '   ' })).rejects.toThrow();
+      await expect(
+        caller.reject({ sessionId: 'session-1', gateId: 'gate-1', reason: '   ' }),
+      ).rejects.toThrow();
 
       expect(rejectGate).not.toHaveBeenCalled();
     });

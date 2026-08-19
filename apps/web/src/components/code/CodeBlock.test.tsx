@@ -39,7 +39,9 @@ describe('CodeBlock', () => {
   });
 
   it('renders highlight.js syntax tokens for supported languages', () => {
-    const { container } = renderWithI18n(<CodeBlock code={'const value = 1;'} language={'typescript'} />);
+    const { container } = renderWithI18n(
+      <CodeBlock code={'const value = 1;'} language={'typescript'} />,
+    );
 
     expect(container.querySelector('.hljs-keyword')?.textContent).toBe('const');
     expect(container.querySelector('.hljs-number')?.textContent).toBe('1');
@@ -48,7 +50,9 @@ describe('CodeBlock', () => {
 
 describe('MarkdownMessage', () => {
   it('renders fenced code through CodeBlock', () => {
-    const { container } = renderWithI18n(<MarkdownMessage text={'Before\n\n```tsx\nconst value = 1;\n```'} />);
+    const { container } = renderWithI18n(
+      <MarkdownMessage text={'Before\n\n```tsx\nconst value = 1;\n```'} />,
+    );
 
     expect(screen.getByText('Before')).toBeDefined();
     expect(screen.getByText('typescript')).toBeDefined();
@@ -57,7 +61,10 @@ describe('MarkdownMessage', () => {
   });
 
   it('auto-detects bare pasted code and collapses it', () => {
-    const code = Array.from({ length: 22 }, (_, index) => `${index + 1} const value${index + 1} = require('pkg');`).join('\n');
+    const code = Array.from(
+      { length: 22 },
+      (_, index) => `${index + 1} const value${index + 1} = require('pkg');`,
+    ).join('\n');
     renderWithI18n(<MarkdownMessage text={code} />);
 
     expect(screen.getByText('javascript')).toBeDefined();

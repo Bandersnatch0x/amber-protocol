@@ -89,6 +89,18 @@ class SessionEvents {
     eventBroadcaster.broadcast(sessionId, event);
   }
 
+  emitEvidenceJobChanged(sessionId: string, jobId: string, status: string): void {
+    const event: SessionEvent = {
+      type: 'evidence-job-changed',
+      sessionId,
+      jobId,
+      status,
+      timestamp: Date.now(),
+    };
+    eventStore.addEvent(sessionId, event);
+    eventBroadcaster.broadcast(sessionId, event);
+  }
+
   emitError(sessionId: string, error: string): void {
     const event: SessionEvent = {
       type: 'error',

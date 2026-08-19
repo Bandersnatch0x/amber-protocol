@@ -25,6 +25,7 @@ const en = {
   'nav.transcripts': 'Transcripts',
   'nav.routes': 'Routes',
   'nav.gates': 'Gates',
+  'nav.governance': 'Governance',
   'nav.settings': 'Settings',
   'nav.docs': 'Docs',
   'nav.mobile': 'Mobile navigation',
@@ -35,6 +36,10 @@ const en = {
   'error.somethingWentWrong': 'Something went wrong',
   'error.unexpected': 'An unexpected error occurred',
   'error.reload': 'Reload page',
+  'error.backHome': 'Back to Home',
+  'error.description':
+    'The page hit an unexpected problem. Reload or head back home; technical details are available below.',
+  'error.details': 'Error details',
   'common.retry': 'Retry',
   'common.cancel': 'Cancel',
   'common.dismiss': 'Dismiss',
@@ -52,12 +57,14 @@ const en = {
   'code.hiddenLines': '{count} hidden lines - expand full block',
   'code.hiddenLinesOne': '1 hidden line - expand full block',
   'home.title': 'Amber Operator Console',
-  'home.description': 'Review repository-local sessions, inspect timelines, triage approval gates, and keep transcript evidence close to the code that produced it.',
+  'home.description':
+    'Review repository-local sessions, inspect timelines, triage approval gates, and keep transcript evidence close to the code that produced it.',
   'home.openSessions': 'Open Sessions',
   'home.reviewGates': 'Review Gates',
   'home.repository': 'Repository',
   'home.repositoryName': 'coding-harness',
-  'home.repositoryDetail': 'Repository-local viewer. No external telemetry or hosted dependency required.',
+  'home.repositoryDetail':
+    'Repository-local viewer. No external telemetry or hosted dependency required.',
   'home.lastRefresh': 'Last Refresh',
   'home.notRefreshed': 'Not refreshed yet',
   'home.activeSessions': 'Active Sessions',
@@ -65,11 +72,14 @@ const en = {
   'home.primaryWorkflows': 'Primary Workflows',
   'home.primaryWorkflowsDetail': 'Sessions and gates are the main operator entry points.',
   'home.secondarySurfaces': 'Secondary Surfaces',
-  'home.secondarySurfacesDetail': 'Reference views for workflow definitions, transcripts, and local preferences.',
+  'home.secondarySurfacesDetail':
+    'Reference views for workflow definitions, transcripts, and local preferences.',
   'home.governanceReference': 'Governance Reference',
   'home.governanceReferenceDetail': 'A compact lifecycle reminder for repository-local workflows.',
+  'home.governanceOpen': 'Open governance overview',
   'home.evidenceReferences': 'Evidence References',
-  'home.evidenceReferencesDetail': 'Repository-local artifacts commonly consulted during review and handoff.',
+  'home.evidenceReferencesDetail':
+    'Repository-local artifacts commonly consulted during review and handoff.',
   'home.nextAction.title': 'Next Amber Action',
   'home.nextAction.loading': 'Loading next action...',
   'home.nextAction.unavailable': 'Next action unavailable',
@@ -97,6 +107,50 @@ const en = {
   'home.lifecycle.verify.detail': 'Record evidence before completion',
   'home.lifecycle.handoff.stage': 'Handoff',
   'home.lifecycle.handoff.detail': 'Persist continuable session state',
+  'home.sessionsFailed': 'Failed to load sessions',
+  'home.sessionsFailedDetail':
+    'Repository-local session data could not be read. Retry, or check that the Amber CLI state under .amber/ is intact.',
+  'home.gatesFailed': 'Failed to load gates',
+  'home.gatesFailedDetail':
+    'Pending gate data could not be read. Retry, or check that the Amber CLI state under .amber/ is intact.',
+  'home.nextActionFailedDetail':
+    'The next-action inference could not be computed. Retry, or run amber next in the terminal.',
+  'home.reviewGate': 'Review gate',
+  'home.moreTitle': 'Reference & lifecycle',
+  'home.moreDetail': 'Collapsed reference material. Expand only when needed.',
+  'home.field.title': 'Lifecycle visualization (optional showcase)',
+  'home.field.detail':
+    'Decorative WebGL rendering of the governance loop. The data above is authoritative; this panel is opt-in.',
+  'home.step.audit.title': 'Audit existing repository (read-only advisory)',
+  'home.step.audit.reason':
+    'This looks like an existing project — optionally inspect with audit (read-only) before install.',
+  'home.step.init.title': 'Install Amber',
+  'home.step.init.reason': 'Amber starter files are not all present.',
+  'home.step.feature.title': 'Register a feature',
+  'home.step.feature.reason': 'No feature is registered in feature_list.json yet.',
+  'home.step.plan.title': 'Create a plan',
+  'home.step.plan.reason': 'The focused feature has no plan yet.',
+  'home.step.gate.title': 'Confirm the plan',
+  'home.step.gate.reason': 'The plan exists but confirmation is still pending.',
+  'home.step.feature-evidence.title': 'Record feature verification evidence',
+  'home.step.feature-evidence.reason': 'No verification evidence is recorded for this feature yet.',
+  'home.step.verify.title': 'Record session verification',
+  'home.step.verify.reason': 'The session has no verification evidence yet.',
+  'home.step.approve.title': 'Approve the session',
+  'home.step.approve.reason': 'The session has no approval evidence yet.',
+  'home.step.handoff.title': 'Regenerate session handoff',
+  'home.step.handoff.reason':
+    'session-handoff.md is missing or still the init scaffold — regenerate it from live state.',
+  'home.step.complete-check.title': 'Run completion check',
+  'home.step.complete-check.reason': 'The session is not yet complete (evidence still missing).',
+  'home.step.session-complete.title': 'Mark session completed',
+  'home.step.session-complete.reason':
+    'Completion check passed but the session is not marked completed yet.',
+  'home.step.accept.title': 'Accept the plan',
+  'home.step.accept.reason': 'The plan is ready to accept and append to the evolution log.',
+  'home.step.learnings.title': 'Review learning write-back',
+  'home.step.learnings.reason':
+    'Accepted work touched knowledge paths — the write-back review is not booked yet.',
   'settings.title': 'Settings',
   'settings.display': 'Display',
   'settings.compactView': 'Compact View',
@@ -112,7 +166,8 @@ const en = {
   'settings.save': 'Save Settings',
   'settings.saveError': 'Failed to save settings. Storage may be unavailable.',
   'gates.title': 'Gates',
-  'gates.description': 'Approval checkpoints that pause autonomous work until a human reviews the next step.',
+  'gates.description':
+    'Approval checkpoints that pause autonomous work until a human reviews the next step.',
   'gates.loading': 'Loading gates...',
   'gates.count': '{count} gates',
   'gates.countOne': '1 gate',
@@ -127,15 +182,18 @@ const en = {
   'gates.failed': 'Failed to load gates',
   'gates.empty.all.title': 'No gates yet',
   'gates.empty.filtered.title': 'No {status} gates',
-  'gates.empty.all.detail': 'Agents pause at gates when explicit human approval is required before proceeding.',
-  'gates.empty.filtered.detail': 'Try another status filter to review a different set of approvals.',
+  'gates.empty.all.detail':
+    'Agents pause at gates when explicit human approval is required before proceeding.',
+  'gates.empty.filtered.detail':
+    'Try another status filter to review a different set of approvals.',
   'gates.showing': 'Showing {visible} of {total} gates.',
   'gates.stage': 'Stage {stage}',
   'gates.session': 'Session {session}',
   'gates.waitingSince': 'Waiting since',
   'gates.reviewedAt': 'Reviewed at',
   'gates.review': 'Review',
-  'gates.loopHint': 'Review gate context, decide approve or reject, then inspect the session for follow-up evidence.',
+  'gates.loopHint':
+    'Review gate context, decide approve or reject, then inspect the session for follow-up evidence.',
   'gates.action.review': 'Review',
   'gates.action.hideReview': 'Hide review',
   'gates.action.approveAndRequestResume': 'Approve and confirm resume',
@@ -146,7 +204,8 @@ const en = {
   'gates.action.rejecting': 'Rejecting...',
   'gates.action.openSession': 'Open session',
   'gates.reviewPanel.title': 'Review context',
-  'gates.reviewPanel.detail': 'These fields are read from repository-local Amber gate files and optional decision files. Re-read happens before approval to avoid acting on stale pending gates.',
+  'gates.reviewPanel.detail':
+    'These fields are read from repository-local Amber gate files and optional decision files. Re-read happens before approval to avoid acting on stale pending gates.',
   'gates.reviewPanel.sessionId': 'Session ID',
   'gates.reviewPanel.gateId': 'Gate ID',
   'gates.reviewPanel.type': 'Type',
@@ -158,11 +217,17 @@ const en = {
   'gates.reviewPanel.unresolved': 'Unresolved',
   'gates.reviewPanel.noReason': 'No reason recorded',
   'gates.reviewPanel.sourceTitle': 'Data source',
-  'gates.reviewPanel.sourceDetail': 'Gate status is derived from the gate JSON plus a sibling decision JSON when one exists.',
+  'gates.reviewPanel.sourceDetail':
+    'Gate status is derived from the gate JSON plus a sibling decision JSON when one exists.',
+  'gates.reviewerLabel': 'Reviewer identifier (optional)',
+  'gates.reviewerPlaceholder': 'e.g. alice@team or on-call-auditor',
+  'gates.reviewerHint':
+    'Recorded in the decision file and the audit trail so the real reviewer stays traceable. Left empty, the decision is recorded as web:anonymous.',
   'gates.audit.loading': 'Loading audit evidence...',
   'gates.audit.failed': 'Audit evidence unavailable',
   'gates.audit.title': 'Evidence trail',
-  'gates.audit.detail': 'Reread from local timeline and ledger files after gate decisions.',
+  'gates.audit.detail':
+    'Reread from local timeline and ledger files after gate decisions. Counts cover the whole session file, while the latest entries shown are scoped to this gate.',
   'gates.audit.ledgerMissing': 'No ledger',
   'gates.audit.ledgerVerified': 'Ledger verified',
   'gates.audit.ledgerBroken': 'Ledger warning',
@@ -171,23 +236,50 @@ const en = {
   'gates.audit.hash': 'Ledger hash',
   'gates.audit.latestTimeline': 'Latest gate timeline event',
   'gates.audit.noGateTimeline': 'No gate-specific timeline event yet',
-  'gates.audit.ledgerRecords': 'Ledger records',
-  'gates.audit.timelineEvents': 'Timeline events',
+  'gates.audit.ledgerRecords': 'Session ledger records',
+  'gates.audit.timelineEvents': 'Session timeline events',
   'gates.rejectReasonLabel': 'Reject reason',
-  'gates.rejectReasonHint': 'Rejecting keeps the decision auditable. The reason is required before a decision file is written.',
+  'gates.rejectReasonHint':
+    'Rejecting keeps the decision auditable. The reason is required before a decision file is written.',
   'gates.rejectReasonPlaceholder': 'Explain what must change before this gate can pass...',
-  'gates.feedback.resumeConfirmed': 'Gate {gate} was approved and the session status was persisted as {status}.',
-  'gates.feedback.resumeAlreadyRunning': 'Gate {gate} was approved. The session was already confirmed as {status}.',
-  'gates.feedback.resumeConfirmFailed': 'Gate was approved, but resumed status could not be confirmed: {reason}',
-  'gates.feedback.approvedNoResume': 'Gate was approved. Session is {status}, so no resume confirmation was attempted.',
+  'gates.feedback.resumeConfirmed':
+    'Gate {gate} was approved and the session status was persisted as {status}.',
+  'gates.feedback.resumeAlreadyRunning':
+    'Gate {gate} was approved. The session was already confirmed as {status}.',
+  'gates.feedback.resumeConfirmFailed':
+    'Gate was approved, but resumed status could not be confirmed: {reason}',
+  'gates.feedback.approvedNoResume':
+    'Gate was approved. Session is {status}, so no resume confirmation was attempted.',
   'gates.feedback.rejected': 'Gate {gate} was rejected and the reason was recorded.',
   'gates.feedback.auditWarning': 'Audit warning: {warning}',
   'gates.feedback.failed': 'Gate action failed: {message}',
   'gates.feedback.rejectReasonRequired': 'Add a reject reason before recording this decision.',
+  'gates.feedback.reviewerInvalid':
+    'Reviewer identifier may only contain letters, digits, and . _ @ : - (up to 64 characters).',
   'gates.feedback.unknownReason': 'Unknown reason',
   'gates.feedback.rejectReasonRequiredInline': 'Please provide a rejection reason.',
+  'gates.guidance.approvedNext':
+    'Next: open the session completion workbench to inspect follow-up evidence.',
+  'gates.guidance.openCompletionWorkbench': 'Open completion workbench',
+  'gates.guidance.rejectedNext':
+    'Next: open the session to address the reject reason, then re-run verification.',
+  'gates.guidance.openSessionForRework': 'Open session for rework',
   'gates.backToGates': 'Gates',
   'gates.showMore': 'Show {count} more gates',
+  'gates.backend.type.auto': 'Automatic',
+  'gates.backend.type.userApproval': 'User approval',
+  'gates.backend.type.stepConfirm': 'Step confirmation',
+  'gates.backend.stage.capture': 'Capture requirements',
+  'gates.backend.stage.plan': 'Create plan',
+  'gates.backend.stage.implement': 'Implement',
+  'gates.backend.stage.verify': 'Run verification',
+  'gates.backend.stage.reproduce': 'Reproduce bug',
+  'gates.backend.stage.fix': 'Apply fix',
+  'gates.backend.stage.characterize': 'Characterize behavior',
+  'gates.backend.stage.refactor': 'Refactor code',
+  'gates.backend.unknown': 'Unknown',
+  'gates.backend.resolvedBy.human': 'Human (CLI approval)',
+  'gates.backend.resolvedBy.webAnonymous': 'Web reviewer (anonymous)',
   'sessions.title': 'Sessions',
   'sessions.loading': 'Loading sessions...',
   'sessions.count': '{count} sessions',
@@ -212,11 +304,13 @@ const en = {
   'sessions.empty.filtered.title': 'No sessions match your filters',
   'sessions.empty.all.title': 'No sessions yet',
   'sessions.empty.filtered.detail': 'Try a different search term or status filter.',
-  'sessions.empty.all.detail': 'Sessions appear here when repository-local coding work is started and recorded under .amber/sessions/.',
+  'sessions.empty.all.detail':
+    'Sessions appear here when repository-local coding work is started and recorded under .amber/sessions/.',
   'sessions.lastActivity': 'Last activity {time}',
   'sessions.detail.notFound': 'Session not found',
   'sessions.detail.failed': 'Unable to load session',
-  'sessions.detail.notFoundDetail': 'This session could not be found in the repository state. The link may be stale, or the session may have been removed.',
+  'sessions.detail.notFoundDetail':
+    'This session could not be found in the repository state. The link may be stale, or the session may have been removed.',
   'sessions.detail.back': 'Back to Sessions',
   'sessions.detail.completedSuccessfully': 'Completed successfully',
   'sessions.detail.details': 'Details',
@@ -234,7 +328,8 @@ const en = {
   'sessions.detail.tokensUsedOfMax': '{used} of {max} tokens used ({percent}%)',
   'sessions.detail.manifest': 'Manifest',
   'sessions.detail.manifestDetail': 'Configuration and metadata snapshot.',
-  'sessions.detail.manifestCollapsed': 'Collapsed by default so inspection does not compete with live controls.',
+  'sessions.detail.manifestCollapsed':
+    'Collapsed by default so inspection does not compete with live controls.',
   'sessions.completion.title': 'Completion',
   'sessions.completion.strictState': 'Strict completion state',
   'sessions.completion.loading': 'Loading completion...',
@@ -264,6 +359,86 @@ const en = {
   'sessions.completion.runningVerification': 'Running...',
   'sessions.completion.verificationFailed': 'Verification failed',
   'sessions.completion.verificationOutcome': 'Verification Outcome',
+  'sessions.completion.jobStatus': 'Job status',
+  'sessions.completion.verificationJobQueued': 'Verification job queued...',
+  'sessions.completion.verificationJobRunning':
+    'Verification is running in the background — results appear when the job settles.',
+  'sessions.completion.nextActions': 'Next Actions',
+  'sessions.completion.nextActionsDetail': 'Actionable guidance derived from the completion check.',
+  'sessions.completion.nextActionsLoading': 'Loading next actions...',
+  'sessions.completion.nextActionsUnavailable': 'Next actions unavailable',
+  'sessions.completion.action.inPage': 'In-page action',
+  'sessions.completion.action.cliCommand': 'CLI command',
+  'sessions.completion.action.gotoVerify': 'Go to verification form',
+  'sessions.completion.closing.title': 'Ready to close',
+  'sessions.completion.closing.detail':
+    'All completion checks pass. Copy the command below and run it in the repository — the web console never completes sessions itself.',
+  'sessions.completion.detailsShow': 'Show evidence details',
+  'sessions.completion.detailsHide': 'Hide evidence details',
+  'sessions.completion.detailsTitle': 'Evidence details',
+  'sessions.completion.backendText': 'Completion check report',
+  'sessions.completion.backend.missing.goal': 'Goal',
+  'sessions.completion.backend.missing.timeline': 'Timeline',
+  'sessions.completion.backend.missing.verification': 'Verification',
+  'sessions.completion.backend.missing.approval': 'Approval',
+  'sessions.completion.backend.missing.work': 'Work evidence',
+  'sessions.completion.backend.missing.handoff': 'Handoff',
+  'sessions.completion.backend.missing.openBlockers': 'Open blockers',
+  'sessions.completion.backend.missing.manifestNotFound': 'Manifest not found',
+  'sessions.completion.backend.missing.manifestCorrupt': 'Manifest is corrupt',
+  'sessions.completion.backend.reason.goalPresent': 'Goal present',
+  'sessions.completion.backend.reason.timelinePresent': 'Timeline present',
+  'sessions.completion.backend.reason.verificationPresent': 'Verification present',
+  'sessions.completion.backend.reason.approvalPresent': 'Approval present',
+  'sessions.completion.backend.reason.workPresent': 'Work present',
+  'sessions.completion.backend.reason.handoffPresent': 'Handoff present',
+  'sessions.completion.backend.reason.noOpenBlockers': 'No open blockers',
+  'sessions.completion.backend.step.audit': 'Audit existing repository (read-only advisory)',
+  'sessions.completion.backend.step.init': 'Install Amber',
+  'sessions.completion.backend.step.feature': 'Register a feature',
+  'sessions.completion.backend.step.plan': 'Create a plan',
+  'sessions.completion.backend.step.gate': 'Confirm the plan',
+  'sessions.completion.backend.step.featureEvidence': 'Record feature verification evidence',
+  'sessions.completion.backend.step.verify': 'Record session verification',
+  'sessions.completion.backend.step.approve': 'Approve the session',
+  'sessions.completion.backend.step.handoff': 'Regenerate session handoff',
+  'sessions.completion.backend.step.completeCheck': 'Run completion check',
+  'sessions.completion.backend.step.sessionComplete': 'Mark session completed',
+  'sessions.completion.backend.step.accept': 'Accept the plan',
+  'sessions.completion.backend.step.learnings': 'Review learning write-back',
+  'sessions.completion.backend.text.status': 'Completion check status: {status}',
+  'sessions.completion.backend.text.reasons': 'Reasons',
+  'sessions.completion.backend.text.missing': 'Missing',
+  'sessions.completion.backend.text.none': 'none',
+  'sessions.handoff.title': 'Handoff continuity',
+  'sessions.handoff.detail': 'Read-only handoff state; regenerate via CLI.',
+  'sessions.handoff.loading': 'Loading handoff status...',
+  'sessions.handoff.failed': 'Handoff status unavailable',
+  'sessions.handoff.state': 'Handoff state',
+  'sessions.handoff.state.live': 'Live',
+  'sessions.handoff.state.scaffold': 'Scaffold',
+  'sessions.handoff.state.missing': 'Missing',
+  'sessions.handoff.bundle': 'Bundle',
+  'sessions.handoff.bundle.deliveryReady': 'Delivery ready',
+  'sessions.handoff.bundle.notReady': 'Not delivery ready',
+  'sessions.handoff.bundle.missing': 'No bundle',
+  'sessions.handoff.bundle.invalid': 'Invalid structure',
+  'sessions.handoff.readinessScore': 'Readiness score',
+  'sessions.handoff.sessionEvidence': 'Session evidence',
+  'sessions.handoff.evidencePresent': 'Present',
+  'sessions.handoff.evidenceMissing': 'Missing',
+  'sessions.handoff.errors': 'Bundle errors',
+  'sessions.handoff.preview': 'Preview handoff',
+  'sessions.handoff.previewHide': 'Hide preview',
+  'sessions.handoff.previewLoading': 'Rendering preview...',
+  'sessions.handoff.previewFailed': 'Preview unavailable',
+  'sessions.handoff.previewEmpty': 'No handoff content available yet.',
+  'sessions.handoff.previewSource.rendered': 'Rendered from live state',
+  'sessions.handoff.previewSource.file': 'Read from session-handoff.md',
+  'sessions.handoff.previewSource.none': 'No source available',
+  'sessions.handoff.cli.title': 'CLI remediation',
+  'sessions.handoff.cli.detail':
+    'The web console never writes the handoff — run this command in the repository instead.',
   'sessions.audit.loading': 'Loading audit evidence...',
   'sessions.audit.failed': 'Audit evidence unavailable',
   'sessions.audit.title': 'Evidence trail',
@@ -306,7 +481,8 @@ const en = {
   'sessions.controls.aborting': 'Aborting...',
   'sessions.controls.abortAria': 'Abort session',
   'sessions.controls.abortTitle': 'Abort Session?',
-  'sessions.controls.abortDetail': 'Are you sure you want to abort this session? This action cannot be undone.',
+  'sessions.controls.abortDetail':
+    'Are you sure you want to abort this session? This action cannot be undone.',
   'sessions.controls.failedAction': 'Failed to {action}',
   'sessions.controls.auditWarning': 'Audit warning: {warning}',
   'sessions.controls.confirmation.requestPersisted': 'Request persisted',
@@ -319,8 +495,126 @@ const en = {
   'sessions.timeline.empty': 'No events yet',
   'sessions.timeline.jumpToLatest': 'Jump to latest',
   'sessions.timeline.jumpToTop': 'Jump to top',
+  'governance.title': 'Governance',
+  'governance.description':
+    'Read-only governance summary for this repository. Loaded on demand — this page never polls.',
+  'governance.loading': 'Loading governance summary...',
+  'governance.failed': 'Governance summary unavailable',
+  'governance.refresh': 'Refresh',
+  'governance.refreshing': 'Refreshing...',
+  'governance.refreshAria': 'Refresh governance summary',
+  'governance.target': 'Target',
+  'governance.generatedAt': 'Generated',
+  'governance.decision': 'Decision',
+  'governance.decision.ready': 'Ready',
+  'governance.decision.warn': 'Warnings',
+  'governance.decision.block': 'Blocked',
+  'governance.scores': 'Scores',
+  'governance.summary': 'Summary',
+  'governance.findings': 'Findings',
+  'governance.noFindings': 'No findings',
+  'governance.nextActions': 'Next actions',
+  'governance.noNextActions': 'No next actions',
+  'governance.errors': 'Errors',
+  'governance.warnings': 'Warnings',
+  'governance.learnings': 'Learnings',
+  'governance.learnings.unavailable': 'Learnings unavailable',
+  'governance.learnings.triggers': 'Write-back triggers present',
+  'governance.learnings.noTriggers': 'No write-back triggers',
+  'governance.learnings.reviewBooked': 'Review booked',
+  'governance.learnings.reviewPending': 'Review not booked',
+  'governance.learnings.categories': 'Matched categories',
+  'governance.featureId': 'Feature',
+  'governance.severity.high': 'high',
+  'governance.severity.medium': 'medium',
+  'governance.severity.low': 'low',
+  'governance.backHome': 'Back to Home',
+  'governance.featureSelector.label': 'Feature focus',
+  'governance.featureSelector.all': 'Repository-wide (no feature focus)',
+  'governance.featureSelector.aria': 'Select feature focus',
+  'governance.featureSelector.empty':
+    'No feature candidates found in current lifecycle or governance data. Use ?featureId=<id> in the URL to focus a feature directly.',
+  'governance.learnings.reviewHint':
+    'To book the review, run the command below in your terminal (copy-only — the console never executes CLI commands):',
+  'governance.summaryKey.features': 'Features',
+  'governance.summaryKey.featureEvidence': 'Feature evidence',
+  'governance.summaryKey.readinessFindings': 'Readiness findings',
+  'governance.summaryKey.staleDocs': 'Stale docs',
+  'governance.summaryKey.maintenanceErrors': 'Maintenance errors',
+  'governance.summaryKey.overall': 'Overall',
+  'governance.summaryKey.governance': 'Governance',
+  'governance.summaryKey.evidence': 'Evidence',
+  'governance.summaryKey.continuity': 'Continuity',
+  'governance.summaryKey.safety': 'Safety',
+  'governance.summaryKey.maintenance': 'Maintenance',
+  'governance.backend.policyError.why':
+    'Governance policy errors make the repository unsafe to route through governed workflows.',
+  'governance.backend.policyError.outcome':
+    'Policy errors are fixed or recorded as explicit owner-approved exceptions.',
+  'governance.backend.unsafeUserApproval.why':
+    'A leftover policy claiming user-approval=approve contradicts the removed autonomous executor and confuses operators.',
+  'governance.backend.unsafeUserApproval.outcome':
+    'Leftover policy is fixed, removed, or documented as non-executing config only.',
+  'governance.backend.policyWarning.why':
+    'Policy warnings reduce trust in governed automation boundaries.',
+  'governance.backend.policyWarning.outcome': 'Warnings are resolved or consciously accepted.',
+  'governance.backend.routeError.why':
+    'Invalid routes cannot be used as repeatable delivery workflows.',
+  'governance.backend.routeError.outcome': 'Route definitions validate cleanly.',
+  'governance.backend.workflowPackReadError.why':
+    'Unreadable workflow packs cannot provide trustworthy execution constraints.',
+  'governance.backend.workflowPackReadError.outcome':
+    'Workflow pack JSON can be parsed and inspected.',
+  'governance.backend.missingGovernanceDoc.why':
+    'Missing governance documents leave policy, boundary, or audit context invisible.',
+  'governance.backend.missingGovernanceDoc.outcome':
+    'Required governance documents exist under .amber/governance.',
+  'governance.backend.routeWithoutGates.why':
+    'Routes without gates do not enforce review or approval checkpoints.',
+  'governance.backend.routeWithoutGates.outcome':
+    'Routes include gates around planning, implementation, review, or merge stages.',
+  'governance.backend.packMissingReviewGates.why':
+    'Loop contracts without review gates cannot prove independent review.',
+  'governance.backend.packMissingReviewGates.outcome': 'Each loop contract defines review gates.',
+  'governance.backend.packMissingWorktreeIsolation.why':
+    'Mutating loops need worktree isolation to avoid accidental main checkout changes.',
+  'governance.backend.packMissingWorktreeIsolation.outcome':
+    'Mutating loop contracts require isolated worktrees and forbid main checkout mutation.',
+  'governance.backend.missingSecurityStandard.why':
+    'Security pack claims need an auditable standard to map controls and gaps.',
+  'governance.backend.missingSecurityStandard.outcome':
+    'Creates standards/security-governance.json (declarative security-governance standard), clearing this finding. Re-run `governance standards` to map coverage.',
+  'governance.backend.securityPackNotLinked.why':
+    'Security-named workflow packs should link to the security governance standard.',
+  'governance.backend.securityPackNotLinked.outcome':
+    'Security workflow packs reference security-governance.',
+  'governance.backend.noAuditEvidence.why':
+    'A complete product loop needs verification evidence before handoff is trustworthy.',
+  'governance.backend.noAuditEvidence.outcome':
+    'A governed session or execution records verification evidence that can be exported.',
+  'governance.backend.missingGovernanceRules.why':
+    'Built-in defaults are safe, but a repository-local policy is easier to inspect and hand off.',
+  'governance.backend.missingGovernanceRules.outcome':
+    '.amber/governance/rules.json exists with defaultAction=deny.',
+  'governance.backend.unsafeDefaultAllow.why':
+    'defaultAction=allow permits unlisted commands and breaks deny-by-default governance.',
+  'governance.backend.unsafeDefaultAllow.outcome':
+    'rules.json uses defaultAction=deny and deny-wins command policy.',
+  'governance.backend.ledgerTampered.why':
+    'A tampered ledger means evidence continuity cannot be trusted.',
+  'governance.backend.ledgerTampered.outcome':
+    'Tampered ledger records are investigated and restored from version control if appropriate.',
+  'governance.backend.finding.noAuditEvidence':
+    'No session or execution evidence found for audit review.',
+  'governance.backend.finding.missingGovernanceRules':
+    'No .amber/governance/rules.json found; governed execution will use built-in defaults.',
+  'governance.backend.finding.unsafeDefaultAllow':
+    'rules.json defaultAction=allow is unsafe — unlisted commands would be permitted.',
+  'governance.backend.finding.missingSecurityStandard':
+    'Security governance standard is missing: standards/security-governance.json',
   'transcripts.title': 'Transcripts',
-  'transcripts.description': 'Read-only transcript records for this repository, with secrets redacted before display.',
+  'transcripts.description':
+    'Read-only transcript records for this repository, with secrets redacted before display.',
   'transcripts.count': '{count} transcripts',
   'transcripts.countOne': '1 transcript',
   'transcripts.repositoryDirectory': 'Repository directory',
@@ -333,7 +627,8 @@ const en = {
   'transcripts.empty.filtered.title': 'No transcripts match your search',
   'transcripts.empty.all.title': 'No transcripts yet',
   'transcripts.empty.filtered.detail': 'Try another id fragment or branch name.',
-  'transcripts.empty.all.detail': 'Transcripts are durable records of model and tool-call interactions for Claude Code sessions in this repository.',
+  'transcripts.empty.all.detail':
+    'Transcripts are durable records of model and tool-call interactions for Claude Code sessions in this repository.',
   'transcripts.noOutline': 'No readable outline available.',
   'transcripts.turns': '{count} turns',
   'transcripts.turnsOne': '1 turn',
@@ -353,8 +648,10 @@ const en = {
   'transcripts.detail.hiddenSystemRecordsInline': '{count} system records hidden.',
   'transcripts.detail.hiddenSystemRecordsInlineOne': '1 system record hidden.',
   'transcripts.detail.hiddenSystemRecords': 'Hidden system records',
-  'transcripts.detail.hiddenRecordsSummary': '{count} setup/state records hidden so the transcript focuses on readable messages and tool calls. Includes {summary}.',
-  'transcripts.detail.hiddenRecordsSummaryOne': '1 setup/state record hidden so the transcript focuses on readable messages and tool calls. Includes {summary}.',
+  'transcripts.detail.hiddenRecordsSummary':
+    '{count} setup/state records hidden so the transcript focuses on readable messages and tool calls. Includes {summary}.',
+  'transcripts.detail.hiddenRecordsSummaryOne':
+    '1 setup/state record hidden so the transcript focuses on readable messages and tool calls. Includes {summary}.',
   'transcripts.detail.hideRecordTypes': 'Hide record types',
   'transcripts.detail.showRecordTypes': 'Show record types',
   'transcripts.detail.records': '{count} records',
@@ -385,19 +682,23 @@ const en = {
   'transcripts.metadata.emptyAssistant.label': 'Empty assistant record',
   'transcripts.metadata.emptyAssistant.summary': 'empty assistant records',
   'transcripts.metadata.emptyAssistant.summaryOne': 'empty assistant record',
-  'transcripts.metadata.emptyAssistant.description': 'A message envelope with no rendered assistant text or tool call.',
+  'transcripts.metadata.emptyAssistant.description':
+    'A message envelope with no rendered assistant text or tool call.',
   'transcripts.metadata.attachment.label': 'Attachment record',
   'transcripts.metadata.attachment.summary': 'attachment records',
   'transcripts.metadata.attachment.summaryOne': 'attachment record',
-  'transcripts.metadata.attachment.description': 'File or image attachment metadata captured with the prompt.',
+  'transcripts.metadata.attachment.description':
+    'File or image attachment metadata captured with the prompt.',
   'transcripts.metadata.fileHistorySnapshot.label': 'File history snapshot',
   'transcripts.metadata.fileHistorySnapshot.summary': 'file history snapshots',
   'transcripts.metadata.fileHistorySnapshot.summaryOne': 'file history snapshot',
-  'transcripts.metadata.fileHistorySnapshot.description': 'Repository file-state snapshot recorded for context continuity.',
+  'transcripts.metadata.fileHistorySnapshot.description':
+    'Repository file-state snapshot recorded for context continuity.',
   'transcripts.metadata.lastPrompt.label': 'Prompt snapshot',
   'transcripts.metadata.lastPrompt.summary': 'prompt snapshots',
   'transcripts.metadata.lastPrompt.summaryOne': 'prompt snapshot',
-  'transcripts.metadata.lastPrompt.description': 'Internal state for the latest prompt, hidden from the readable transcript.',
+  'transcripts.metadata.lastPrompt.description':
+    'Internal state for the latest prompt, hidden from the readable transcript.',
   'transcripts.metadata.mode.label': 'Session mode record',
   'transcripts.metadata.mode.summary': 'session mode records',
   'transcripts.metadata.mode.summaryOne': 'session mode record',
@@ -405,24 +706,53 @@ const en = {
   'transcripts.metadata.permissionMode.label': 'Permission record',
   'transcripts.metadata.permissionMode.summary': 'permission records',
   'transcripts.metadata.permissionMode.summaryOne': 'permission record',
-  'transcripts.metadata.permissionMode.description': 'Tool approval policy state captured during the session.',
+  'transcripts.metadata.permissionMode.description':
+    'Tool approval policy state captured during the session.',
   'transcripts.metadata.queueOperation.label': 'Queue operation record',
   'transcripts.metadata.queueOperation.summary': 'queue operation records',
   'transcripts.metadata.queueOperation.summaryOne': 'queue operation record',
-  'transcripts.metadata.queueOperation.description': 'Internal queue state used to coordinate session work.',
+  'transcripts.metadata.queueOperation.description':
+    'Internal queue state used to coordinate session work.',
   'transcripts.metadata.summary.label': 'Summary record',
   'transcripts.metadata.summary.summary': 'summary records',
   'transcripts.metadata.summary.summaryOne': 'summary record',
-  'transcripts.metadata.summary.description': 'Stored conversation summary used for context continuity.',
+  'transcripts.metadata.summary.description':
+    'Stored conversation summary used for context continuity.',
   'transcripts.metadata.emptySystem.label': 'Empty system record',
   'transcripts.metadata.emptySystem.summary': 'empty system records',
   'transcripts.metadata.emptySystem.summaryOne': 'empty system record',
-  'transcripts.metadata.emptySystem.description': 'A system message envelope with no readable transcript text.',
+  'transcripts.metadata.emptySystem.description':
+    'A system message envelope with no readable transcript text.',
   'transcripts.metadata.emptyUser.label': 'Empty user record',
   'transcripts.metadata.emptyUser.summary': 'empty user records',
   'transcripts.metadata.emptyUser.summaryOne': 'empty user record',
-  'transcripts.metadata.emptyUser.description': 'A user message envelope with no rendered prompt text.',
-  'transcripts.metadata.unknown.description': 'Low-level session record hidden from the readable transcript.',
+  'transcripts.metadata.emptyUser.description':
+    'A user message envelope with no rendered prompt text.',
+  'transcripts.metadata.unknown.description':
+    'Low-level session record hidden from the readable transcript.',
+  'transcript.chip.slashCommand': 'Slash command {name}',
+  'transcript.chip.commandStdout': 'Command output',
+  'transcript.chip.taskNotification': 'Background task',
+  'transcript.chip.recap': 'Session recap',
+  'transcript.expand': 'Expand all',
+  'transcript.collapse': 'Collapse',
+  'transcript.viewRaw': 'View raw',
+  'transcript.hideRaw': 'Hide raw',
+  'transcript.turnSeparator': 'Turn separator',
+  'transcript.role.user': 'User',
+  'transcript.role.assistant': 'Assistant',
+  'transcript.role.system': 'System',
+  'transcript.role.tool': 'Tool',
+  'transcript.hidden.localCommand.label': 'Local command record',
+  'transcript.hidden.localCommand.summary': 'local command records',
+  'transcript.hidden.localCommand.summaryOne': 'local command record',
+  'transcript.hidden.localCommand.description':
+    'Slash-command caveat envelope hidden from the readable transcript.',
+  'transcript.hidden.systemReminder.label': 'System reminder record',
+  'transcript.hidden.systemReminder.summary': 'system reminder records',
+  'transcript.hidden.systemReminder.summaryOne': 'system reminder record',
+  'transcript.hidden.systemReminder.description':
+    'Injected system reminder envelope hidden from the readable transcript.',
   'routes.title': 'Routes',
   'routes.count': '{count} routes',
   'routes.countOne': '1 route',
@@ -432,7 +762,8 @@ const en = {
   'routes.empty.filtered.title': 'No matching routes',
   'routes.empty.all.title': 'No routes available',
   'routes.empty.filtered.detail': 'The current search does not match any route definitions.',
-  'routes.empty.all.detail': 'Route definitions appear here when JSON route files exist under the repository routes directory.',
+  'routes.empty.all.detail':
+    'Route definitions appear here when JSON route files exist under the repository routes directory.',
   'routes.category.simple': 'Simple',
   'routes.category.medium': 'Medium',
   'routes.category.complex': 'Complex',
@@ -469,7 +800,8 @@ const en = {
   'timeline.empty.title': 'No events recorded yet',
   'timeline.empty.detail': 'This session has not written any timeline events yet.',
   'timeline.noMatches.title': 'No events match your filters',
-  'timeline.noMatches.detail': 'Search and event-type filters preserve the full chronology, but nothing matches the current subset.',
+  'timeline.noMatches.detail':
+    'Search and event-type filters preserve the full chronology, but nothing matches the current subset.',
   'timeline.clearFilters': 'Clear filters',
   'timeline.hiddenByFilters': '{count} events hidden by filters',
   'timeline.hiddenByFiltersOne': '1 event hidden by filters',
@@ -503,6 +835,80 @@ const en = {
   'timeline.event.task_progress': 'Task Progress',
   'timeline.event.error': 'Error',
   'timeline.event.heartbeat': 'Heartbeat',
+  // ux namespace: read-only cognitive-design copy (task #27). Backend string
+  // mappings mirror the exact English prose emitted by scripts/lib/core/
+  // lifecycle.js and scripts/lib/web-adapter.js.
+  'ux.links.viewTranscripts': 'View transcripts',
+  'ux.links.transcriptsNote':
+    'Transcripts are stored independently per Claude project directory; the console cannot yet auto-link them to a specific session.',
+  'ux.links.relatedTranscripts': 'Possibly related transcripts',
+  'ux.links.relatedTranscriptsBasis':
+    'Inferred from matching working directories and overlapping session activity windows — indicative only, not proven.',
+  'ux.links.relatedOverlap': 'Activity overlap: {from} – {to}',
+  'ux.links.relatedNone':
+    'No transcript matched this session by working directory and activity window.',
+  'ux.governance.score.governance':
+    'How healthy the governance config is: policy errors, missing governance docs, or unreadable workflow packs deduct points.',
+  'ux.governance.score.evidence':
+    'Whether sessions carry trustworthy audit evidence: missing audit evidence or a tampered ledger deduct heavily.',
+  'ux.governance.score.continuity':
+    'Whether workflows and docs stay handable: route errors, stale docs, and wiki lint errors deduct points.',
+  'ux.governance.score.safety':
+    'Whether approval gates and security baselines hold: routes without gates, missing review gates, or missing security standards deduct points.',
+  'ux.governance.score.maintenance':
+    'Whether maintenance drifted: stale docs, rule-pack/scaffold/artifact drift, and maintenance errors deduct points.',
+  'ux.governance.score.overall':
+    'Weighted blend of the five scores: governance 25%, evidence 25%, continuity 20%, safety 20%, maintenance 10%.',
+  'ux.terms.ledger':
+    'The ledger is an append-only, hash-chained log of session events — it proves the audit record was not tampered with.',
+  'ux.terms.learnings':
+    'Learnings write-back: after work is accepted, review whether proven experience should be written back to the knowledge base so future work can reuse it.',
+  'ux.terms.worktree':
+    'A worktree is a separate Git checkout for this session, so governed work does not disturb your main checkout.',
+  'ux.backend.lifecycle.prefix': 'Lifecycle advances past: {step}.',
+  'ux.backend.lifecycle.why.audit':
+    'this looks like an existing project — optionally inspect with audit (read-only) before install; for multi-repo adoption reviews also run amber adoption report.',
+  'ux.backend.lifecycle.why.init': 'Amber starter files are not all present.',
+  'ux.backend.lifecycle.why.initAfterAudit':
+    'Amber starter files are not all present (audit done or skipped) — safe next install is init.',
+  'ux.backend.lifecycle.why.feature': 'no feature is registered in feature_list.json.',
+  'ux.backend.lifecycle.why.planTemplate': 'feature {feature} has no plan yet.',
+  'ux.backend.lifecycle.why.gate': 'the plan exists but User Confirmation is still "pending".',
+  'ux.backend.lifecycle.why.featureEvidence':
+    'no verification evidence is recorded for this feature yet.',
+  'ux.backend.lifecycle.why.verify': 'the session has no verification evidence yet.',
+  'ux.backend.lifecycle.why.approve': 'the session has no approval evidence yet.',
+  'ux.backend.lifecycle.why.approveTemplate':
+    'the session has no approval evidence yet (next gate: {gate}; {count} gates on route).',
+  'ux.backend.lifecycle.why.handoff':
+    'session-handoff.md is missing or still the init scaffold — regenerate from live state.',
+  'ux.backend.lifecycle.why.completeCheckTemplate':
+    'the session is not yet complete (missing: {missing}).',
+  'ux.backend.lifecycle.why.completeCheck':
+    'the session is not yet complete (evidence still missing).',
+  'ux.backend.lifecycle.why.sessionComplete':
+    'complete-check passed but the session is not marked completed yet.',
+  'ux.backend.lifecycle.why.accept': 'the plan is ready to accept and append to the evolution log.',
+  'ux.backend.lifecycle.why.learningsTemplate':
+    'accepted work touched {categories} paths — the knowledge write-back review is not booked yet (book it with amber learnings --reviewed --owner <id>).',
+  'ux.backend.completion.hint.verification': 'Run verification from the console evidence runner.',
+  'ux.backend.completion.hint.approval': 'Approve via the gates view (/gates).',
+  'ux.backend.completion.hint.handoff':
+    'Regenerate the live session-handoff.md from current repo state.',
+  'ux.backend.completion.hint.goal':
+    'Start a session with a goal: amber session start --goal "<goal>" --target .',
+  'ux.backend.completion.hint.timeline':
+    'Timeline events are recorded automatically as governed work happens.',
+  'ux.backend.completion.hint.work':
+    'Make at least one real change (commit or working-tree edit) during the session.',
+  'ux.backend.completion.hint.openBlockers':
+    "Resolve or close the session's open blockers before completing.",
+  'ux.backend.completion.hint.manifestNotFound':
+    'No session manifest yet — start a session: amber session start --target .',
+  'ux.backend.completion.hint.manifestCorrupt':
+    'Inspect the session manifest under the state dir; recover or restart the session.',
+  'ux.backend.completion.hint.sessionComplete': 'All completion checks pass — close the session.',
+  'ux.backend.completion.hint.unknownTemplate': 'Resolve the missing completion item: {item}.',
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -518,6 +924,7 @@ const zh: Record<TranslationKey, string> = {
   'nav.transcripts': '\u8bb0\u5f55',
   'nav.routes': '\u8def\u7531',
   'nav.gates': '\u5173\u5361',
+  'nav.governance': '治理',
   'nav.settings': '\u8bbe\u7f6e',
   'nav.docs': '\u6587\u6863',
   'nav.mobile': '\u79fb\u52a8\u7aef\u5bfc\u822a',
@@ -528,6 +935,9 @@ const zh: Record<TranslationKey, string> = {
   'error.somethingWentWrong': '\u9875\u9762\u53d1\u751f\u9519\u8bef',
   'error.unexpected': '\u53d1\u751f\u4e86\u610f\u5916\u9519\u8bef',
   'error.reload': '\u91cd\u65b0\u52a0\u8f7d\u9875\u9762',
+  'error.backHome': '返回首页',
+  'error.description': '页面遇到了意外问题。请重新加载或返回首页；技术详情可在下方展开查看。',
+  'error.details': '错误详情',
   'common.retry': '\u91cd\u8bd5',
   'common.cancel': '\u53d6\u6d88',
   'common.dismiss': '\u5173\u95ed',
@@ -542,27 +952,35 @@ const zh: Record<TranslationKey, string> = {
   'code.copy': '\u590d\u5236',
   'code.copied': '\u5df2\u590d\u5236',
   'code.copyFailed': '\u590d\u5236\u5931\u8d25',
-  'code.hiddenLines': '{count} \u884c\u5df2\u9690\u85cf - \u5c55\u5f00\u5b8c\u6574\u4ee3\u7801\u5757',
+  'code.hiddenLines':
+    '{count} \u884c\u5df2\u9690\u85cf - \u5c55\u5f00\u5b8c\u6574\u4ee3\u7801\u5757',
   'code.hiddenLinesOne': '1 \u884c\u5df2\u9690\u85cf - \u5c55\u5f00\u5b8c\u6574\u4ee3\u7801\u5757',
   'home.title': 'Amber \u64cd\u4f5c\u63a7\u5236\u53f0',
-  'home.description': '\u5ba1\u9605\u4ed3\u5e93\u672c\u5730\u4f1a\u8bdd\uff0c\u68c0\u67e5\u65f6\u95f4\u7ebf\uff0c\u5904\u7406\u5ba1\u6279\u5173\u5361\uff0c\u5e76\u8ba9 transcript \u8bc1\u636e\u8d34\u8fd1\u4ea7\u751f\u5b83\u7684\u4ee3\u7801\u3002',
+  'home.description':
+    '\u5ba1\u9605\u4ed3\u5e93\u672c\u5730\u4f1a\u8bdd\uff0c\u68c0\u67e5\u65f6\u95f4\u7ebf\uff0c\u5904\u7406\u5ba1\u6279\u5173\u5361\uff0c\u5e76\u8ba9 transcript \u8bc1\u636e\u8d34\u8fd1\u4ea7\u751f\u5b83\u7684\u4ee3\u7801\u3002',
   'home.openSessions': '\u6253\u5f00\u4f1a\u8bdd',
   'home.reviewGates': '\u5ba1\u9605\u5173\u5361',
   'home.repository': '\u4ed3\u5e93',
   'home.repositoryName': 'coding-harness',
-  'home.repositoryDetail': '\u4ed3\u5e93\u672c\u5730\u67e5\u770b\u5668\uff0c\u4e0d\u4f9d\u8d56\u5916\u90e8\u9065\u6d4b\u6216\u6258\u7ba1\u670d\u52a1\u3002',
+  'home.repositoryDetail':
+    '\u4ed3\u5e93\u672c\u5730\u67e5\u770b\u5668\uff0c\u4e0d\u4f9d\u8d56\u5916\u90e8\u9065\u6d4b\u6216\u6258\u7ba1\u670d\u52a1\u3002',
   'home.lastRefresh': '\u4e0a\u6b21\u5237\u65b0',
   'home.notRefreshed': '\u5c1a\u672a\u5237\u65b0',
   'home.activeSessions': '\u6d3b\u8dc3\u4f1a\u8bdd',
   'home.pendingGates': '\u5f85\u5904\u7406\u5173\u5361',
   'home.primaryWorkflows': '\u4e3b\u8981\u5de5\u4f5c\u6d41',
-  'home.primaryWorkflowsDetail': '\u4f1a\u8bdd\u548c\u5173\u5361\u662f\u64cd\u4f5c\u5458\u7684\u4e3b\u8981\u5165\u53e3\u3002',
+  'home.primaryWorkflowsDetail':
+    '\u4f1a\u8bdd\u548c\u5173\u5361\u662f\u64cd\u4f5c\u5458\u7684\u4e3b\u8981\u5165\u53e3\u3002',
   'home.secondarySurfaces': '\u8f85\u52a9\u754c\u9762',
-  'home.secondarySurfacesDetail': '\u7528\u4e8e\u67e5\u770b\u5de5\u4f5c\u6d41\u5b9a\u4e49\u3001transcript \u548c\u672c\u5730\u504f\u597d\u3002',
+  'home.secondarySurfacesDetail':
+    '\u7528\u4e8e\u67e5\u770b\u5de5\u4f5c\u6d41\u5b9a\u4e49\u3001transcript \u548c\u672c\u5730\u504f\u597d\u3002',
   'home.governanceReference': '\u6cbb\u7406\u53c2\u8003',
-  'home.governanceReferenceDetail': '\u4ed3\u5e93\u672c\u5730\u5de5\u4f5c\u6d41\u7684\u7b80\u660e\u751f\u547d\u5468\u671f\u63d0\u793a\u3002',
+  'home.governanceReferenceDetail':
+    '\u4ed3\u5e93\u672c\u5730\u5de5\u4f5c\u6d41\u7684\u7b80\u660e\u751f\u547d\u5468\u671f\u63d0\u793a\u3002',
+  'home.governanceOpen': '\u6253\u5f00\u6cbb\u7406\u6982\u89c8',
   'home.evidenceReferences': '\u8bc1\u636e\u53c2\u8003',
-  'home.evidenceReferencesDetail': '\u5ba1\u9605\u548c\u4ea4\u63a5\u65f6\u5e38\u7528\u7684\u4ed3\u5e93\u672c\u5730\u4ea7\u7269\u3002',
+  'home.evidenceReferencesDetail':
+    '\u5ba1\u9605\u548c\u4ea4\u63a5\u65f6\u5e38\u7528\u7684\u4ed3\u5e93\u672c\u5730\u4ea7\u7269\u3002',
   'home.nextAction.title': '\u4e0b\u4e00\u4e2a Amber \u52a8\u4f5c',
   'home.nextAction.loading': '\u6b63\u5728\u52a0\u8f7d\u4e0b\u4e00\u4e2a\u52a8\u4f5c...',
   'home.nextAction.unavailable': '\u4e0b\u4e00\u4e2a\u52a8\u4f5c\u4e0d\u53ef\u7528',
@@ -573,11 +991,16 @@ const zh: Record<TranslationKey, string> = {
   'home.nextAction.nextStep': '\u4e0b\u4e00\u6b65',
   'home.nextAction.openSession': '\u6253\u5f00\u4f1a\u8bdd',
   'home.nextAction.repositoryFocus': '\u4ed3\u5e93',
-  'home.surface.sessions.detail': '\u76d1\u63a7\u5b9e\u65f6\u81ea\u4e3b\u7f16\u7801\u8fd0\u884c\uff0c\u5e76\u5728\u9700\u8981\u65f6\u4ecb\u5165\u3002',
-  'home.surface.gates.detail': '\u5728\u5de5\u4f5c\u7ee7\u7eed\u524d\u5ba1\u9605\u5f85\u5904\u7406\u7684\u5ba1\u6279\u5173\u5361\u3002',
-  'home.surface.routes.detail': '\u68c0\u67e5\u53d7\u6cbb\u7406\u7684\u5de5\u4f5c\u6d41\u5b9a\u4e49\u548c\u9636\u6bb5\u7ed3\u6784\u3002',
-  'home.surface.transcripts.detail': '\u9605\u8bfb\u6301\u4e45\u5316\u3001\u5df2\u8131\u654f\u7684\u6a21\u578b\u548c\u5de5\u5177\u8c03\u7528\u8bb0\u5f55\u3002',
-  'home.surface.settings.detail': '\u8c03\u6574\u672c\u5730\u67e5\u770b\u884c\u4e3a\u548c\u5237\u65b0\u504f\u597d\u3002',
+  'home.surface.sessions.detail':
+    '\u76d1\u63a7\u5b9e\u65f6\u81ea\u4e3b\u7f16\u7801\u8fd0\u884c\uff0c\u5e76\u5728\u9700\u8981\u65f6\u4ecb\u5165\u3002',
+  'home.surface.gates.detail':
+    '\u5728\u5de5\u4f5c\u7ee7\u7eed\u524d\u5ba1\u9605\u5f85\u5904\u7406\u7684\u5ba1\u6279\u5173\u5361\u3002',
+  'home.surface.routes.detail':
+    '\u68c0\u67e5\u53d7\u6cbb\u7406\u7684\u5de5\u4f5c\u6d41\u5b9a\u4e49\u548c\u9636\u6bb5\u7ed3\u6784\u3002',
+  'home.surface.transcripts.detail':
+    '\u9605\u8bfb\u6301\u4e45\u5316\u3001\u5df2\u8131\u654f\u7684\u6a21\u578b\u548c\u5de5\u5177\u8c03\u7528\u8bb0\u5f55\u3002',
+  'home.surface.settings.detail':
+    '\u8c03\u6574\u672c\u5730\u67e5\u770b\u884c\u4e3a\u548c\u5237\u65b0\u504f\u597d\u3002',
   'home.lifecycle.audit.stage': '\u5ba1\u8ba1',
   'home.lifecycle.audit.detail': '\u53ea\u8bfb\u5c31\u7eea\u68c0\u67e5',
   'home.lifecycle.init.stage': '\u521d\u59cb\u5316',
@@ -585,27 +1008,72 @@ const zh: Record<TranslationKey, string> = {
   'home.lifecycle.plan.stage': '\u8ba1\u5212',
   'home.lifecycle.plan.detail': '\u8bb0\u5f55\u5e76\u5ba1\u9605\u529f\u80fd\u65b9\u5411',
   'home.lifecycle.gate.stage': '\u5173\u5361',
-  'home.lifecycle.gate.detail': '\u6682\u505c\u5e76\u7b49\u5f85\u660e\u786e\u4eba\u5de5\u6279\u51c6',
+  'home.lifecycle.gate.detail':
+    '\u6682\u505c\u5e76\u7b49\u5f85\u660e\u786e\u4eba\u5de5\u6279\u51c6',
   'home.lifecycle.verify.stage': '\u9a8c\u8bc1',
   'home.lifecycle.verify.detail': '\u5728\u5b8c\u6210\u524d\u8bb0\u5f55\u8bc1\u636e',
   'home.lifecycle.handoff.stage': '\u4ea4\u63a5',
-  'home.lifecycle.handoff.detail': '\u6301\u4e45\u5316\u53ef\u7ee7\u7eed\u7684\u4f1a\u8bdd\u72b6\u6001',
+  'home.lifecycle.handoff.detail':
+    '\u6301\u4e45\u5316\u53ef\u7ee7\u7eed\u7684\u4f1a\u8bdd\u72b6\u6001',
+  'home.sessionsFailed': '会话加载失败',
+  'home.sessionsFailedDetail':
+    '无法读取仓库本地会话数据。请重试，或检查 .amber/ 下的 Amber CLI 状态是否完整。',
+  'home.gatesFailed': '关卡加载失败',
+  'home.gatesFailedDetail':
+    '无法读取待处理关卡数据。请重试，或检查 .amber/ 下的 Amber CLI 状态是否完整。',
+  'home.nextActionFailedDetail': '无法推断下一个动作。请重试，或在终端运行 amber next。',
+  'home.reviewGate': '审阅关卡',
+  'home.moreTitle': '参考与生命周期',
+  'home.moreDetail': '折叠的参考资料，按需展开。',
+  'home.field.title': '生命周期可视化（可选展示）',
+  'home.field.detail': '治理循环的装饰性 WebGL 渲染。以上方数据为准，此面板按需展开。',
+  'home.step.audit.title': '审计现有仓库（只读建议）',
+  'home.step.audit.reason': '这似乎是现有项目——安装前可用 audit（只读）进行检查。',
+  'home.step.init.title': '安装 Amber',
+  'home.step.init.reason': 'Amber 起始文件尚不完整。',
+  'home.step.feature.title': '注册功能',
+  'home.step.feature.reason': 'feature_list.json 中还没有注册任何功能。',
+  'home.step.plan.title': '创建计划',
+  'home.step.plan.reason': '当前功能还没有计划。',
+  'home.step.gate.title': '确认计划',
+  'home.step.gate.reason': '计划已存在但尚未确认。',
+  'home.step.feature-evidence.title': '记录功能验证证据',
+  'home.step.feature-evidence.reason': '该功能还没有记录验证证据。',
+  'home.step.verify.title': '记录会话验证',
+  'home.step.verify.reason': '会话还没有验证证据。',
+  'home.step.approve.title': '批准会话',
+  'home.step.approve.reason': '会话还没有批准证据。',
+  'home.step.handoff.title': '重新生成会话交接',
+  'home.step.handoff.reason': 'session-handoff.md 缺失或仍是初始脚手架——请从实时状态重新生成。',
+  'home.step.complete-check.title': '运行完成检查',
+  'home.step.complete-check.reason': '会话尚未完成（仍有证据缺失）。',
+  'home.step.session-complete.title': '标记会话完成',
+  'home.step.session-complete.reason': '完成检查已通过，但会话尚未标记为完成。',
+  'home.step.accept.title': '验收计划',
+  'home.step.accept.reason': '计划可以验收并写入演进日志。',
+  'home.step.learnings.title': '审阅知识回写',
+  'home.step.learnings.reason': '已验收的工作触及知识类路径——知识回写尚未登记。',
   'settings.title': '\u8bbe\u7f6e',
   'settings.display': '\u663e\u793a',
   'settings.compactView': '\u7d27\u51d1\u89c6\u56fe',
-  'settings.compactViewDetail': '\u51cf\u5c11\u5217\u8868\u4e2d\u7684\u5185\u8fb9\u8ddd\u548c\u95f4\u8ddd\u3002',
+  'settings.compactViewDetail':
+    '\u51cf\u5c11\u5217\u8868\u4e2d\u7684\u5185\u8fb9\u8ddd\u548c\u95f4\u8ddd\u3002',
   'settings.updates': '\u66f4\u65b0',
   'settings.autoRefresh': '\u81ea\u52a8\u5237\u65b0',
-  'settings.autoRefreshDetail': '\u6309\u56fa\u5b9a\u95f4\u9694\u8f6e\u8be2\u65b0\u7684\u4f1a\u8bdd\u548c\u65f6\u95f4\u7ebf\u6570\u636e\u3002',
+  'settings.autoRefreshDetail':
+    '\u6309\u56fa\u5b9a\u95f4\u9694\u8f6e\u8be2\u65b0\u7684\u4f1a\u8bdd\u548c\u65f6\u95f4\u7ebf\u6570\u636e\u3002',
   'settings.refreshInterval': '\u5237\u65b0\u95f4\u9694',
   'settings.refreshIntervalAria': '\u5237\u65b0\u95f4\u9694\uff0c\u5355\u4f4d\u4e3a\u79d2',
   'settings.notifications': '\u901a\u77e5',
   'settings.showNotifications': '\u663e\u793a\u901a\u77e5',
-  'settings.showNotificationsDetail': '\u5728\u4f1a\u8bdd\u5b8c\u6210\u6216\u5931\u8d25\u65f6\u63d0\u9192\u3002',
+  'settings.showNotificationsDetail':
+    '\u5728\u4f1a\u8bdd\u5b8c\u6210\u6216\u5931\u8d25\u65f6\u63d0\u9192\u3002',
   'settings.save': '\u4fdd\u5b58\u8bbe\u7f6e',
-  'settings.saveError': '\u4fdd\u5b58\u8bbe\u7f6e\u5931\u8d25\uff0c\u5b58\u50a8\u53ef\u80fd\u4e0d\u53ef\u7528\u3002',
+  'settings.saveError':
+    '\u4fdd\u5b58\u8bbe\u7f6e\u5931\u8d25\uff0c\u5b58\u50a8\u53ef\u80fd\u4e0d\u53ef\u7528\u3002',
   'gates.title': '\u5173\u5361',
-  'gates.description': '\u5ba1\u6279\u68c0\u67e5\u70b9\u4f1a\u6682\u505c\u81ea\u4e3b\u5de5\u4f5c\uff0c\u76f4\u5230\u4eba\u5de5\u5ba1\u9605\u4e0b\u4e00\u6b65\u3002',
+  'gates.description':
+    '\u5ba1\u6279\u68c0\u67e5\u70b9\u4f1a\u6682\u505c\u81ea\u4e3b\u5de5\u4f5c\uff0c\u76f4\u5230\u4eba\u5de5\u5ba1\u9605\u4e0b\u4e00\u6b65\u3002',
   'gates.loading': '\u6b63\u5728\u52a0\u8f7d\u5173\u5361...',
   'gates.count': '{count} \u4e2a\u5173\u5361',
   'gates.countOne': '1 \u4e2a\u5173\u5361',
@@ -620,15 +1088,18 @@ const zh: Record<TranslationKey, string> = {
   'gates.failed': '\u52a0\u8f7d\u5173\u5361\u5931\u8d25',
   'gates.empty.all.title': '\u6682\u65e0\u5173\u5361',
   'gates.empty.filtered.title': '\u6ca1\u6709 {status} \u5173\u5361',
-  'gates.empty.all.detail': '\u5f53\u7ee7\u7eed\u524d\u9700\u8981\u660e\u786e\u4eba\u5de5\u6279\u51c6\u65f6\uff0cAgent \u4f1a\u5728\u5173\u5361\u5904\u6682\u505c\u3002',
-  'gates.empty.filtered.detail': '\u5c1d\u8bd5\u5176\u4ed6\u72b6\u6001\u7b5b\u9009\uff0c\u67e5\u770b\u4e0d\u540c\u7684\u5ba1\u6279\u96c6\u5408\u3002',
+  'gates.empty.all.detail':
+    '\u5f53\u7ee7\u7eed\u524d\u9700\u8981\u660e\u786e\u4eba\u5de5\u6279\u51c6\u65f6\uff0cAgent \u4f1a\u5728\u5173\u5361\u5904\u6682\u505c\u3002',
+  'gates.empty.filtered.detail':
+    '\u5c1d\u8bd5\u5176\u4ed6\u72b6\u6001\u7b5b\u9009\uff0c\u67e5\u770b\u4e0d\u540c\u7684\u5ba1\u6279\u96c6\u5408\u3002',
   'gates.showing': '\u6b63\u5728\u663e\u793a {visible} / {total} \u4e2a\u5173\u5361\u3002',
   'gates.stage': '\u9636\u6bb5 {stage}',
   'gates.session': '\u4f1a\u8bdd {session}',
   'gates.waitingSince': '\u7b49\u5f85\u81ea',
   'gates.reviewedAt': '\u5ba1\u9605\u4e8e',
   'gates.review': '\u5ba1\u9605',
-  'gates.loopHint': '\u5ba1\u9605\u5173\u5361\u4e0a\u4e0b\u6587\uff0c\u51b3\u5b9a\u6279\u51c6\u6216\u62d2\u7edd\uff0c\u7136\u540e\u6253\u5f00\u4f1a\u8bdd\u68c0\u67e5\u540e\u7eed\u8bc1\u636e\u3002',
+  'gates.loopHint':
+    '\u5ba1\u9605\u5173\u5361\u4e0a\u4e0b\u6587\uff0c\u51b3\u5b9a\u6279\u51c6\u6216\u62d2\u7edd\uff0c\u7136\u540e\u6253\u5f00\u4f1a\u8bdd\u68c0\u67e5\u540e\u7eed\u8bc1\u636e\u3002',
   'gates.action.review': '\u5ba1\u9605',
   'gates.action.hideReview': '\u6536\u8d77\u5ba1\u9605',
   'gates.action.approveAndRequestResume': '\u6279\u51c6\u5e76\u786e\u8ba4\u6062\u590d',
@@ -639,7 +1110,8 @@ const zh: Record<TranslationKey, string> = {
   'gates.action.rejecting': '\u6b63\u5728\u62d2\u7edd...',
   'gates.action.openSession': '\u6253\u5f00\u4f1a\u8bdd',
   'gates.reviewPanel.title': '\u5ba1\u9605\u4e0a\u4e0b\u6587',
-  'gates.reviewPanel.detail': '\u8fd9\u4e9b\u5b57\u6bb5\u6765\u81ea\u4ed3\u5e93\u672c\u5730 Amber \u5173\u5361\u6587\u4ef6\u548c\u53ef\u9009\u7684\u51b3\u7b56\u6587\u4ef6\u3002\u6279\u51c6\u524d\u4f1a\u91cd\u65b0\u8bfb\u53d6\uff0c\u907f\u514d\u5904\u7406\u8fc7\u671f\u7684\u5f85\u5904\u7406\u5173\u5361\u3002',
+  'gates.reviewPanel.detail':
+    '\u8fd9\u4e9b\u5b57\u6bb5\u6765\u81ea\u4ed3\u5e93\u672c\u5730 Amber \u5173\u5361\u6587\u4ef6\u548c\u53ef\u9009\u7684\u51b3\u7b56\u6587\u4ef6\u3002\u6279\u51c6\u524d\u4f1a\u91cd\u65b0\u8bfb\u53d6\uff0c\u907f\u514d\u5904\u7406\u8fc7\u671f\u7684\u5f85\u5904\u7406\u5173\u5361\u3002',
   'gates.reviewPanel.sessionId': '\u4f1a\u8bdd ID',
   'gates.reviewPanel.gateId': '\u5173\u5361 ID',
   'gates.reviewPanel.type': '\u7c7b\u578b',
@@ -651,11 +1123,15 @@ const zh: Record<TranslationKey, string> = {
   'gates.reviewPanel.unresolved': '\u672a\u51b3\u7b56',
   'gates.reviewPanel.noReason': '\u672a\u8bb0\u5f55\u539f\u56e0',
   'gates.reviewPanel.sourceTitle': '\u6570\u636e\u6765\u6e90',
-  'gates.reviewPanel.sourceDetail': '\u5173\u5361\u72b6\u6001\u7531 gate JSON \u548c\u540c\u76ee\u5f55 decision JSON \u63a8\u5bfc\u800c\u6765\u3002',
+  'gates.reviewPanel.sourceDetail': '关卡状态由 gate JSON 和同目录 decision JSON 推导而来。',
+  'gates.reviewerLabel': '审查人标识（可选）',
+  'gates.reviewerPlaceholder': '例如 alice@team 或 on-call-auditor',
+  'gates.reviewerHint': '将写入决策文件与审计链，使真实审查者可追溯；留空时记录为 web:anonymous。',
   'gates.audit.loading': '\u6b63\u5728\u52a0\u8f7d\u5ba1\u8ba1\u8bc1\u636e...',
   'gates.audit.failed': '\u5ba1\u8ba1\u8bc1\u636e\u4e0d\u53ef\u7528',
   'gates.audit.title': '\u8bc1\u636e\u8f68\u8ff9',
-  'gates.audit.detail': '\u5173\u5361\u51b3\u7b56\u540e\u4ece\u672c\u5730 timeline \u548c ledger \u6587\u4ef6\u91cd\u65b0\u8bfb\u53d6\u3002',
+  'gates.audit.detail':
+    '\u5173\u5361\u51b3\u7b56\u540e\u4ece\u672c\u5730 timeline \u548c ledger \u6587\u4ef6\u91cd\u65b0\u8bfb\u53d6\u3002\u8ba1\u6570\u4e3a\u6574\u4e2a\u4f1a\u8bdd\u6587\u4ef6\u7684\u603b\u91cf\uff0c\u800c\u6240\u793a\u201c\u6700\u65b0\u201d\u6761\u76ee\u4ec5\u9650\u8be5\u5173\u5361\u3002',
   'gates.audit.ledgerMissing': '\u65e0 ledger',
   'gates.audit.ledgerVerified': 'Ledger \u5df2\u6821\u9a8c',
   'gates.audit.ledgerBroken': 'Ledger \u8b66\u544a',
@@ -664,23 +1140,52 @@ const zh: Record<TranslationKey, string> = {
   'gates.audit.hash': 'Ledger hash',
   'gates.audit.latestTimeline': '\u6700\u65b0\u5173\u5361 timeline \u4e8b\u4ef6',
   'gates.audit.noGateTimeline': '\u6682\u65e0\u8be5\u5173\u5361\u7684 timeline \u4e8b\u4ef6',
-  'gates.audit.ledgerRecords': 'Ledger \u8bb0\u5f55',
-  'gates.audit.timelineEvents': 'Timeline \u4e8b\u4ef6',
+  'gates.audit.ledgerRecords': '\u4f1a\u8bdd\u7ea7 Ledger \u8bb0\u5f55',
+  'gates.audit.timelineEvents': '\u4f1a\u8bdd\u7ea7 Timeline \u4e8b\u4ef6',
   'gates.rejectReasonLabel': '\u62d2\u7edd\u539f\u56e0',
-  'gates.rejectReasonHint': '\u62d2\u7edd\u9700\u8981\u7559\u4e0b\u53ef\u5ba1\u8ba1\u539f\u56e0\u3002\u5199\u5165\u51b3\u7b56\u6587\u4ef6\u524d\u5fc5\u987b\u586b\u5199\u3002',
-  'gates.rejectReasonPlaceholder': '\u8bf4\u660e\u8be5\u5173\u5361\u901a\u8fc7\u524d\u9700\u8981\u4fee\u6539\u4ec0\u4e48...',
-  'gates.feedback.resumeConfirmed': '\u5173\u5361 {gate} \u5df2\u6279\u51c6\uff0c\u4f1a\u8bdd\u72b6\u6001\u5df2\u6301\u4e45\u5316\u786e\u8ba4\u4e3a {status}\u3002',
-  'gates.feedback.resumeAlreadyRunning': '\u5173\u5361 {gate} \u5df2\u6279\u51c6\u3002\u4f1a\u8bdd\u5df2\u786e\u8ba4\u5904\u4e8e {status}\u3002',
-  'gates.feedback.resumeConfirmFailed': '\u5173\u5361\u5df2\u6279\u51c6\uff0c\u4f46\u672a\u80fd\u786e\u8ba4\u6062\u590d\u72b6\u6001\uff1a{reason}',
-  'gates.feedback.approvedNoResume': '\u5173\u5361\u5df2\u6279\u51c6\u3002\u4f1a\u8bdd\u72b6\u6001\u4e3a {status}\uff0c\u56e0\u6b64\u672a\u5c1d\u8bd5\u6062\u590d\u786e\u8ba4\u3002',
-  'gates.feedback.rejected': '\u5173\u5361 {gate} \u5df2\u62d2\u7edd\uff0c\u539f\u56e0\u5df2\u8bb0\u5f55\u3002',
+  'gates.rejectReasonHint':
+    '\u62d2\u7edd\u9700\u8981\u7559\u4e0b\u53ef\u5ba1\u8ba1\u539f\u56e0\u3002\u5199\u5165\u51b3\u7b56\u6587\u4ef6\u524d\u5fc5\u987b\u586b\u5199\u3002',
+  'gates.rejectReasonPlaceholder':
+    '\u8bf4\u660e\u8be5\u5173\u5361\u901a\u8fc7\u524d\u9700\u8981\u4fee\u6539\u4ec0\u4e48...',
+  'gates.feedback.resumeConfirmed':
+    '\u5173\u5361 {gate} \u5df2\u6279\u51c6\uff0c\u4f1a\u8bdd\u72b6\u6001\u5df2\u6301\u4e45\u5316\u786e\u8ba4\u4e3a {status}\u3002',
+  'gates.feedback.resumeAlreadyRunning':
+    '\u5173\u5361 {gate} \u5df2\u6279\u51c6\u3002\u4f1a\u8bdd\u5df2\u786e\u8ba4\u5904\u4e8e {status}\u3002',
+  'gates.feedback.resumeConfirmFailed':
+    '\u5173\u5361\u5df2\u6279\u51c6\uff0c\u4f46\u672a\u80fd\u786e\u8ba4\u6062\u590d\u72b6\u6001\uff1a{reason}',
+  'gates.feedback.approvedNoResume':
+    '\u5173\u5361\u5df2\u6279\u51c6\u3002\u4f1a\u8bdd\u72b6\u6001\u4e3a {status}\uff0c\u56e0\u6b64\u672a\u5c1d\u8bd5\u6062\u590d\u786e\u8ba4\u3002',
+  'gates.feedback.rejected':
+    '\u5173\u5361 {gate} \u5df2\u62d2\u7edd\uff0c\u539f\u56e0\u5df2\u8bb0\u5f55\u3002',
   'gates.feedback.auditWarning': '\u5ba1\u8ba1\u8b66\u544a\uff1a{warning}',
   'gates.feedback.failed': '\u5173\u5361\u64cd\u4f5c\u5931\u8d25\uff1a{message}',
-  'gates.feedback.rejectReasonRequired': '\u8bb0\u5f55\u8be5\u51b3\u7b56\u524d\u9700\u8981\u586b\u5199\u62d2\u7edd\u539f\u56e0\u3002',
+  'gates.feedback.rejectReasonRequired': '记录该决策前需要填写拒绝原因。',
+  'gates.feedback.reviewerInvalid':
+    '审查人标识仅允许字母、数字及 . _ @ : - 字符（最长 64 个字符）。',
   'gates.feedback.unknownReason': '\u672a\u77e5\u539f\u56e0',
   'gates.feedback.rejectReasonRequiredInline': '\u8bf7\u586b\u5199\u62d2\u7edd\u539f\u56e0\u3002',
+  'gates.guidance.approvedNext':
+    '\u5df2\u6279\u51c6\u3002\u4e0b\u4e00\u6b65\uff1a\u6253\u5f00\u4f1a\u8bdd\u5b8c\u6210\u5de5\u4f5c\u53f0\uff0c\u68c0\u67e5\u540e\u7eed\u8bc1\u636e\u3002',
+  'gates.guidance.openCompletionWorkbench': '\u6253\u5f00\u5b8c\u6210\u5de5\u4f5c\u53f0',
+  'gates.guidance.rejectedNext':
+    '\u5df2\u62d2\u7edd\u3002\u4e0b\u4e00\u6b65\uff1a\u6253\u5f00\u4f1a\u8bdd\u5904\u7406\u62d2\u7edd\u539f\u56e0\uff0c\u7136\u540e\u91cd\u65b0\u8fd0\u884c\u9a8c\u8bc1\u3002',
+  'gates.guidance.openSessionForRework': '\u6253\u5f00\u4f1a\u8bdd\u8fdb\u884c\u8fd4\u5de5',
   'gates.backToGates': '\u5173\u5361',
   'gates.showMore': '\u518d\u663e\u793a {count} \u4e2a\u5173\u5361',
+  'gates.backend.type.auto': '自动',
+  'gates.backend.type.userApproval': '用户审批',
+  'gates.backend.type.stepConfirm': '步骤确认',
+  'gates.backend.stage.capture': '需求捕获',
+  'gates.backend.stage.plan': '制定计划',
+  'gates.backend.stage.implement': '实现',
+  'gates.backend.stage.verify': '运行验证',
+  'gates.backend.stage.reproduce': '复现缺陷',
+  'gates.backend.stage.fix': '应用修复',
+  'gates.backend.stage.characterize': '行为刻画',
+  'gates.backend.stage.refactor': '重构代码',
+  'gates.backend.unknown': '未知',
+  'gates.backend.resolvedBy.human': '人工（CLI 审批）',
+  'gates.backend.resolvedBy.webAnonymous': 'Web 审查人（匿名）',
   'sessions.title': '\u4f1a\u8bdd',
   'sessions.loading': '\u6b63\u5728\u52a0\u8f7d\u4f1a\u8bdd...',
   'sessions.count': '{count} \u4e2a\u4f1a\u8bdd',
@@ -702,14 +1207,18 @@ const zh: Record<TranslationKey, string> = {
   'sessions.unknown': '\u672a\u77e5',
   'sessions.tokens': '{used} / {max} tokens',
   'sessions.failed': '\u52a0\u8f7d\u4f1a\u8bdd\u5931\u8d25',
-  'sessions.empty.filtered.title': '\u6ca1\u6709\u5339\u914d\u7b5b\u9009\u6761\u4ef6\u7684\u4f1a\u8bdd',
+  'sessions.empty.filtered.title':
+    '\u6ca1\u6709\u5339\u914d\u7b5b\u9009\u6761\u4ef6\u7684\u4f1a\u8bdd',
   'sessions.empty.all.title': '\u6682\u65e0\u4f1a\u8bdd',
-  'sessions.empty.filtered.detail': '\u5c1d\u8bd5\u4e0d\u540c\u7684\u641c\u7d22\u8bcd\u6216\u72b6\u6001\u7b5b\u9009\u3002',
-  'sessions.empty.all.detail': '\u5f53\u4ed3\u5e93\u672c\u5730\u7f16\u7801\u5de5\u4f5c\u542f\u52a8\u5e76\u8bb0\u5f55\u5230 .amber/sessions/ \u540e\uff0c\u4f1a\u8bdd\u4f1a\u51fa\u73b0\u5728\u8fd9\u91cc\u3002',
+  'sessions.empty.filtered.detail':
+    '\u5c1d\u8bd5\u4e0d\u540c\u7684\u641c\u7d22\u8bcd\u6216\u72b6\u6001\u7b5b\u9009\u3002',
+  'sessions.empty.all.detail':
+    '\u5f53\u4ed3\u5e93\u672c\u5730\u7f16\u7801\u5de5\u4f5c\u542f\u52a8\u5e76\u8bb0\u5f55\u5230 .amber/sessions/ \u540e\uff0c\u4f1a\u8bdd\u4f1a\u51fa\u73b0\u5728\u8fd9\u91cc\u3002',
   'sessions.lastActivity': '\u6700\u8fd1\u6d3b\u52a8 {time}',
   'sessions.detail.notFound': '\u672a\u627e\u5230\u4f1a\u8bdd',
   'sessions.detail.failed': '\u65e0\u6cd5\u52a0\u8f7d\u4f1a\u8bdd',
-  'sessions.detail.notFoundDetail': '\u5728\u4ed3\u5e93\u72b6\u6001\u4e2d\u627e\u4e0d\u5230\u8be5\u4f1a\u8bdd\u3002\u94fe\u63a5\u53ef\u80fd\u5df2\u8fc7\u671f\uff0c\u6216\u4f1a\u8bdd\u5df2\u88ab\u79fb\u9664\u3002',
+  'sessions.detail.notFoundDetail':
+    '\u5728\u4ed3\u5e93\u72b6\u6001\u4e2d\u627e\u4e0d\u5230\u8be5\u4f1a\u8bdd\u3002\u94fe\u63a5\u53ef\u80fd\u5df2\u8fc7\u671f\uff0c\u6216\u4f1a\u8bdd\u5df2\u88ab\u79fb\u9664\u3002',
   'sessions.detail.back': '\u8fd4\u56de\u4f1a\u8bdd',
   'sessions.detail.completedSuccessfully': '\u5df2\u6210\u529f\u5b8c\u6210',
   'sessions.detail.details': '\u8be6\u60c5',
@@ -727,7 +1236,8 @@ const zh: Record<TranslationKey, string> = {
   'sessions.detail.tokensUsedOfMax': '\u5df2\u7528 {used} / {max} tokens\uff08{percent}%\uff09',
   'sessions.detail.manifest': 'Manifest',
   'sessions.detail.manifestDetail': '\u914d\u7f6e\u548c\u5143\u6570\u636e\u5feb\u7167\u3002',
-  'sessions.detail.manifestCollapsed': '\u9ed8\u8ba4\u6298\u53e0\uff0c\u907f\u514d\u5728\u68c0\u67e5\u65f6\u5e72\u6270\u5b9e\u65f6\u63a7\u5236\u3002',
+  'sessions.detail.manifestCollapsed':
+    '\u9ed8\u8ba4\u6298\u53e0\uff0c\u907f\u514d\u5728\u68c0\u67e5\u65f6\u5e72\u6270\u5b9e\u65f6\u63a7\u5236\u3002',
   'sessions.completion.title': '\u5b8c\u6210\u72b6\u6001',
   'sessions.completion.strictState': '\u4e25\u683c\u5b8c\u6210\u72b6\u6001',
   'sessions.completion.loading': '\u6b63\u5728\u52a0\u8f7d\u5b8c\u6210\u72b6\u6001...',
@@ -757,10 +1267,97 @@ const zh: Record<TranslationKey, string> = {
   'sessions.completion.runningVerification': '\u6b63\u5728\u8fd0\u884c...',
   'sessions.completion.verificationFailed': '\u9a8c\u8bc1\u5931\u8d25',
   'sessions.completion.verificationOutcome': '\u9a8c\u8bc1\u7ed3\u679c',
+  'sessions.completion.jobStatus': '\u4efb\u52a1\u72b6\u6001',
+  'sessions.completion.verificationJobQueued': '\u9a8c\u8bc1\u4efb\u52a1\u5df2\u6392\u961f...',
+  'sessions.completion.verificationJobRunning':
+    '\u9a8c\u8bc1\u6b63\u5728\u540e\u53f0\u8fd0\u884c\u2014\u2014\u4efb\u52a1\u7ed3\u675f\u540e\u4f1a\u663e\u793a\u7ed3\u679c\u3002',
+  'sessions.completion.nextActions': '\u4e0b\u4e00\u6b65\u64cd\u4f5c',
+  'sessions.completion.nextActionsDetail':
+    '\u57fa\u4e8e\u5b8c\u6210\u72b6\u6001\u68c0\u67e5\u751f\u6210\u7684\u53ef\u6267\u884c\u5f15\u5bfc\u3002',
+  'sessions.completion.nextActionsLoading':
+    '\u6b63\u5728\u52a0\u8f7d\u4e0b\u4e00\u6b65\u64cd\u4f5c...',
+  'sessions.completion.nextActionsUnavailable': '\u4e0b\u4e00\u6b65\u64cd\u4f5c\u4e0d\u53ef\u7528',
+  'sessions.completion.action.inPage': '\u9875\u9762\u5185\u64cd\u4f5c',
+  'sessions.completion.action.cliCommand': 'CLI \u547d\u4ee4',
+  'sessions.completion.action.gotoVerify': '\u524d\u5f80\u9a8c\u8bc1\u8868\u5355',
+  'sessions.completion.closing.title': '\u53ef\u4ee5\u6536\u5c3e',
+  'sessions.completion.closing.detail':
+    '\u6240\u6709\u5b8c\u6210\u72b6\u6001\u68c0\u67e5\u5747\u5df2\u901a\u8fc7\u3002\u590d\u5236\u4ee5\u4e0b\u547d\u4ee4\u5e76\u5728\u4ed3\u5e93\u4e2d\u6267\u884c\u2014\u2014Web \u63a7\u5236\u53f0\u4e0d\u4f1a\u81ea\u884c\u5b8c\u6210\u4f1a\u8bdd\u3002',
+  'sessions.completion.detailsShow': '\u5c55\u5f00\u8bc1\u636e\u8be6\u60c5',
+  'sessions.completion.detailsHide': '\u6536\u8d77\u8bc1\u636e\u8be6\u60c5',
+  'sessions.completion.detailsTitle': '\u8bc1\u636e\u8be6\u60c5',
+  'sessions.completion.backendText': '\u5b8c\u6210\u68c0\u67e5\u62a5\u544a',
+  'sessions.completion.backend.missing.goal': '\u76ee\u6807',
+  'sessions.completion.backend.missing.timeline': '\u65f6\u95f4\u7ebf',
+  'sessions.completion.backend.missing.verification': '\u9a8c\u8bc1',
+  'sessions.completion.backend.missing.approval': '\u5ba1\u6279',
+  'sessions.completion.backend.missing.work': '\u5de5\u4f5c\u6210\u679c',
+  'sessions.completion.backend.missing.handoff': '\u4ea4\u63a5',
+  'sessions.completion.backend.missing.openBlockers': '\u672a\u89e3\u51b3\u7684\u963b\u585e\u9879',
+  'sessions.completion.backend.missing.manifestNotFound': '\u6e05\u5355\u672a\u627e\u5230',
+  'sessions.completion.backend.missing.manifestCorrupt': '\u6e05\u5355\u5df2\u635f\u574f',
+  'sessions.completion.backend.reason.goalPresent': '\u76ee\u6807\u5df2\u63d0\u4f9b',
+  'sessions.completion.backend.reason.timelinePresent': '\u65f6\u95f4\u7ebf\u5df2\u63d0\u4f9b',
+  'sessions.completion.backend.reason.verificationPresent': '\u9a8c\u8bc1\u5df2\u63d0\u4f9b',
+  'sessions.completion.backend.reason.approvalPresent': '\u5ba1\u6279\u5df2\u63d0\u4f9b',
+  'sessions.completion.backend.reason.workPresent': '\u5de5\u4f5c\u6210\u679c\u5df2\u63d0\u4f9b',
+  'sessions.completion.backend.reason.handoffPresent': '\u4ea4\u63a5\u5df2\u63d0\u4f9b',
+  'sessions.completion.backend.reason.noOpenBlockers':
+    '\u65e0\u672a\u89e3\u51b3\u7684\u963b\u585e\u9879',
+  'sessions.completion.backend.step.audit':
+    '\u5ba1\u8ba1\u73b0\u6709\u4ed3\u5e93\uff08\u53ea\u8bfb\u5efa\u8bae\uff09',
+  'sessions.completion.backend.step.init': '\u5b89\u88c5 Amber',
+  'sessions.completion.backend.step.feature': '\u6ce8\u518c\u7279\u6027',
+  'sessions.completion.backend.step.plan': '\u521b\u5efa\u8ba1\u5212',
+  'sessions.completion.backend.step.gate': '\u786e\u8ba4\u8ba1\u5212',
+  'sessions.completion.backend.step.featureEvidence':
+    '\u8bb0\u5f55\u7279\u6027\u9a8c\u8bc1\u8bc1\u636e',
+  'sessions.completion.backend.step.verify': '\u8bb0\u5f55\u4f1a\u8bdd\u9a8c\u8bc1',
+  'sessions.completion.backend.step.approve': '\u5ba1\u6279\u4f1a\u8bdd',
+  'sessions.completion.backend.step.handoff': '\u91cd\u65b0\u751f\u6210\u4f1a\u8bdd\u4ea4\u63a5',
+  'sessions.completion.backend.step.completeCheck': '\u8fd0\u884c\u5b8c\u6210\u68c0\u67e5',
+  'sessions.completion.backend.step.sessionComplete': '\u6807\u8bb0\u4f1a\u8bdd\u5b8c\u6210',
+  'sessions.completion.backend.step.accept': '\u63a5\u53d7\u8ba1\u5212',
+  'sessions.completion.backend.step.learnings': '\u5ba1\u9605\u5b66\u4e60\u56de\u5199',
+  'sessions.completion.backend.text.status': '\u5b8c\u6210\u68c0\u67e5\u72b6\u6001\uff1a{status}',
+  'sessions.completion.backend.text.reasons': '\u7406\u7531',
+  'sessions.completion.backend.text.missing': '\u7f3a\u5931',
+  'sessions.completion.backend.text.none': '\u65e0',
+  'sessions.handoff.title': '\u4ea4\u63a5\u8fde\u7eed\u6027',
+  'sessions.handoff.detail':
+    '\u53ea\u8bfb\u4ea4\u63a5\u72b6\u6001\uff1b\u8bf7\u901a\u8fc7 CLI \u91cd\u65b0\u751f\u6210\u3002',
+  'sessions.handoff.loading': '\u6b63\u5728\u52a0\u8f7d\u4ea4\u63a5\u72b6\u6001...',
+  'sessions.handoff.failed': '\u4ea4\u63a5\u72b6\u6001\u4e0d\u53ef\u7528',
+  'sessions.handoff.state': '\u4ea4\u63a5\u72b6\u6001',
+  'sessions.handoff.state.live': '\u5b9e\u65f6',
+  'sessions.handoff.state.scaffold': '\u811a\u624b\u67b6',
+  'sessions.handoff.state.missing': '\u7f3a\u5931',
+  'sessions.handoff.bundle': '\u4ea4\u63a5\u5305',
+  'sessions.handoff.bundle.deliveryReady': '\u53ef\u4ea4\u4ed8',
+  'sessions.handoff.bundle.notReady': '\u5c1a\u4e0d\u53ef\u4ea4\u4ed8',
+  'sessions.handoff.bundle.missing': '\u65e0\u4ea4\u63a5\u5305',
+  'sessions.handoff.bundle.invalid': '\u7ed3\u6784\u65e0\u6548',
+  'sessions.handoff.readinessScore': '\u5c31\u7eea\u5206\u6570',
+  'sessions.handoff.sessionEvidence': '\u4f1a\u8bdd\u8bc1\u636e',
+  'sessions.handoff.evidencePresent': '\u5b58\u5728',
+  'sessions.handoff.evidenceMissing': '\u7f3a\u5931',
+  'sessions.handoff.errors': '\u4ea4\u63a5\u5305\u9519\u8bef',
+  'sessions.handoff.preview': '\u9884\u89c8\u4ea4\u63a5\u6587\u6863',
+  'sessions.handoff.previewHide': '\u6536\u8d77\u9884\u89c8',
+  'sessions.handoff.previewLoading': '\u6b63\u5728\u6e32\u67d3\u9884\u89c8...',
+  'sessions.handoff.previewFailed': '\u9884\u89c8\u4e0d\u53ef\u7528',
+  'sessions.handoff.previewEmpty': '\u6682\u65e0\u4ea4\u63a5\u5185\u5bb9\u3002',
+  'sessions.handoff.previewSource.rendered': '\u7531\u5b9e\u65f6\u72b6\u6001\u6e32\u67d3',
+  'sessions.handoff.previewSource.file': '\u8bfb\u53d6\u81ea session-handoff.md',
+  'sessions.handoff.previewSource.none': '\u65e0\u53ef\u7528\u6765\u6e90',
+  'sessions.handoff.cli.title': 'CLI \u4fee\u590d\u547d\u4ee4',
+  'sessions.handoff.cli.detail':
+    'Web \u63a7\u5236\u53f0\u4e0d\u4f1a\u5199\u5165\u4ea4\u63a5\u6587\u6863\u2014\u2014\u8bf7\u5728\u4ed3\u5e93\u4e2d\u8fd0\u884c\u4ee5\u4e0b\u547d\u4ee4\u3002',
   'sessions.audit.loading': '\u6b63\u5728\u52a0\u8f7d\u5ba1\u8ba1\u8bc1\u636e...',
   'sessions.audit.failed': '\u5ba1\u8ba1\u8bc1\u636e\u4e0d\u53ef\u7528',
   'sessions.audit.title': '\u8bc1\u636e\u8f68\u8ff9',
-  'sessions.audit.detail': '\u4ece\u672c\u5730 timeline \u548c ledger \u6587\u4ef6\u91cd\u65b0\u8bfb\u53d6\u7684\u6301\u4e45\u5316\u4f1a\u8bdd\u8bc1\u636e\u3002',
+  'sessions.audit.detail':
+    '\u4ece\u672c\u5730 timeline \u548c ledger \u6587\u4ef6\u91cd\u65b0\u8bfb\u53d6\u7684\u6301\u4e45\u5316\u4f1a\u8bdd\u8bc1\u636e\u3002',
   'sessions.audit.ledgerMissing': '\u65e0 ledger',
   'sessions.audit.ledgerVerified': 'Ledger \u5df2\u6821\u9a8c',
   'sessions.audit.ledgerBroken': 'Ledger \u8b66\u544a',
@@ -775,7 +1372,8 @@ const zh: Record<TranslationKey, string> = {
   'sessions.status.connection': '\u8fde\u63a5',
   'sessions.status.latestActivity': '\u6700\u65b0\u6d3b\u52a8',
   'sessions.status.waiting': '\u7b49\u5f85\u6d3b\u52a8',
-  'sessions.status.noTimelineActivity': '\u5c1a\u672a\u6536\u5230\u65f6\u95f4\u7ebf\u6d3b\u52a8\u3002',
+  'sessions.status.noTimelineActivity':
+    '\u5c1a\u672a\u6536\u5230\u65f6\u95f4\u7ebf\u6d3b\u52a8\u3002',
   'sessions.status.justNow': '\u521a\u521a',
   'sessions.status.secondsAgo': '{count} \u79d2\u524d',
   'sessions.status.minutesAgo': '{count} \u5206\u949f\u524d',
@@ -799,11 +1397,13 @@ const zh: Record<TranslationKey, string> = {
   'sessions.controls.aborting': '\u6b63\u5728\u4e2d\u6b62...',
   'sessions.controls.abortAria': '\u4e2d\u6b62\u4f1a\u8bdd',
   'sessions.controls.abortTitle': '\u4e2d\u6b62\u4f1a\u8bdd\uff1f',
-  'sessions.controls.abortDetail': '\u786e\u5b9a\u8981\u4e2d\u6b62\u8be5\u4f1a\u8bdd\u5417\uff1f\u6b64\u64cd\u4f5c\u65e0\u6cd5\u64a4\u9500\u3002',
+  'sessions.controls.abortDetail':
+    '\u786e\u5b9a\u8981\u4e2d\u6b62\u8be5\u4f1a\u8bdd\u5417\uff1f\u6b64\u64cd\u4f5c\u65e0\u6cd5\u64a4\u9500\u3002',
   'sessions.controls.failedAction': '\u6267\u884c {action} \u5931\u8d25',
   'sessions.controls.auditWarning': '\u5ba1\u8ba1\u8b66\u544a\uff1a{warning}',
   'sessions.controls.confirmation.requestPersisted': '\u8bf7\u6c42\u5df2\u6301\u4e45\u5316',
-  'sessions.controls.confirmation.requestNotPersisted': '\u8bf7\u6c42\u6301\u4e45\u5316\u8b66\u544a',
+  'sessions.controls.confirmation.requestNotPersisted':
+    '\u8bf7\u6c42\u6301\u4e45\u5316\u8b66\u544a',
   'sessions.controls.confirmation.manifestConfirmed': 'Manifest \u5df2\u786e\u8ba4',
   'sessions.controls.confirmation.manifestUnconfirmed': 'Manifest \u672a\u786e\u8ba4',
   'sessions.controls.confirmation.runnerAcked': 'Runner ACK \u5df2\u786e\u8ba4',
@@ -812,21 +1412,127 @@ const zh: Record<TranslationKey, string> = {
   'sessions.timeline.empty': '\u6682\u65e0\u4e8b\u4ef6',
   'sessions.timeline.jumpToLatest': '\u5b9a\u4f4d\u5230\u6700\u65b0',
   'sessions.timeline.jumpToTop': '\u8fd4\u56de\u9876\u90e8',
+  'governance.title': '\u6cbb\u7406\u6982\u89c8',
+  'governance.description':
+    '\u672c\u4ed3\u5e93\u7684\u53ea\u8bfb\u6cbb\u7406\u6458\u8981\u3002\u6309\u9700\u52a0\u8f7d\u2014\u2014\u8be5\u9875\u9762\u4e0d\u4f1a\u8f6e\u8be2\u3002',
+  'governance.loading': '\u6b63\u5728\u52a0\u8f7d\u6cbb\u7406\u6458\u8981...',
+  'governance.failed': '\u6cbb\u7406\u6458\u8981\u4e0d\u53ef\u7528',
+  'governance.refresh': '\u5237\u65b0',
+  'governance.refreshing': '\u6b63\u5728\u5237\u65b0...',
+  'governance.refreshAria': '\u5237\u65b0\u6cbb\u7406\u6458\u8981',
+  'governance.target': '\u76ee\u6807\u4ed3\u5e93',
+  'governance.generatedAt': '\u751f\u6210\u65f6\u95f4',
+  'governance.decision': '\u51b3\u7b56',
+  'governance.decision.ready': '\u5c31\u7eea',
+  'governance.decision.warn': '\u6709\u8b66\u544a',
+  'governance.decision.block': '\u53d7\u963b',
+  'governance.scores': '\u5206\u6570',
+  'governance.summary': '\u6982\u89c8\u8ba1\u6570',
+  'governance.findings': '\u53d1\u73b0\u9879',
+  'governance.noFindings': '\u65e0\u53d1\u73b0\u9879',
+  'governance.nextActions': '\u4e0b\u4e00\u6b65\u64cd\u4f5c',
+  'governance.noNextActions': '\u65e0\u4e0b\u4e00\u6b65\u64cd\u4f5c',
+  'governance.errors': '\u9519\u8bef',
+  'governance.warnings': '\u8b66\u544a',
+  'governance.learnings': '\u7ecf\u9a8c\u56de\u5199',
+  'governance.learnings.unavailable': '\u7ecf\u9a8c\u56de\u5199\u4e0d\u53ef\u7528',
+  'governance.learnings.triggers': '\u5b58\u5728\u56de\u5199\u89e6\u53d1\u6761\u4ef6',
+  'governance.learnings.noTriggers': '\u65e0\u56de\u5199\u89e6\u53d1\u6761\u4ef6',
+  'governance.learnings.reviewBooked': '\u5df2\u767b\u8bb0\u8bc4\u5ba1',
+  'governance.learnings.reviewPending': '\u672a\u767b\u8bb0\u8bc4\u5ba1',
+  'governance.learnings.categories': '\u5339\u914d\u7c7b\u522b',
+  'governance.featureId': '\u529f\u80fd',
+  'governance.severity.high': '\u9ad8',
+  'governance.severity.medium': '\u4e2d',
+  'governance.severity.low': '\u4f4e',
+  'governance.backHome': '\u8fd4\u56de\u9996\u9875',
+  'governance.featureSelector.label': '功能聚焦',
+  'governance.featureSelector.all': '全仓库（不聚焦功能）',
+  'governance.featureSelector.aria': '选择聚焦的功能',
+  'governance.featureSelector.empty':
+    '当前生命周期与治理数据中没有可用的功能候选。可通过 URL 参数 ?featureId=<id> 直接指定聚焦功能。',
+  'governance.learnings.reviewHint':
+    '如需登记评审，请在终端执行以下命令（仅复制——控制台不会执行 CLI 命令）：',
+  'governance.summaryKey.features': '功能数',
+  'governance.summaryKey.featureEvidence': '功能证据',
+  'governance.summaryKey.readinessFindings': '就绪发现项',
+  'governance.summaryKey.staleDocs': '过期文档',
+  'governance.summaryKey.maintenanceErrors': '维护错误',
+  'governance.summaryKey.overall': '总分',
+  'governance.summaryKey.governance': '治理',
+  'governance.summaryKey.evidence': '证据',
+  'governance.summaryKey.continuity': '连续性',
+  'governance.summaryKey.safety': '安全性',
+  'governance.summaryKey.maintenance': '维护',
+  'governance.backend.policyError.why': '治理策略错误会使仓库无法安全地经由受治理工作流路由。',
+  'governance.backend.policyError.outcome': '策略错误已修复，或已记录为所有者明确批准的例外。',
+  'governance.backend.unsafeUserApproval.why':
+    '残留策略声称 user-approval=approve，与已移除的自主执行器相矛盾，会误导操作人员。',
+  'governance.backend.unsafeUserApproval.outcome':
+    '残留策略已被修复、移除，或已记录为仅作为不执行的配置。',
+  'governance.backend.policyWarning.why': '策略警告会削弱对受治理自动化边界的信任。',
+  'governance.backend.policyWarning.outcome': '警告已解决或已被有意识地接受。',
+  'governance.backend.routeError.why': '无效路由无法作为可重复的交付工作流使用。',
+  'governance.backend.routeError.outcome': '路由定义通过校验，无错误。',
+  'governance.backend.workflowPackReadError.why': '无法读取的工作流包无法提供可信的执行约束。',
+  'governance.backend.workflowPackReadError.outcome': '工作流包 JSON 可以被解析并检查。',
+  'governance.backend.missingGovernanceDoc.why': '缺失治理文档会使策略、边界或审计上下文不可见。',
+  'governance.backend.missingGovernanceDoc.outcome':
+    '所需的治理文档已存在于 .amber/governance 下。',
+  'governance.backend.routeWithoutGates.why': '没有关卡的路由不会强制评审或审批检查点。',
+  'governance.backend.routeWithoutGates.outcome': '路由在规划、实现、评审或合并阶段周围包含关卡。',
+  'governance.backend.packMissingReviewGates.why': '没有评审关卡的循环契约无法证明独立评审。',
+  'governance.backend.packMissingReviewGates.outcome': '每个循环契约都定义了评审关卡。',
+  'governance.backend.packMissingWorktreeIsolation.why':
+    '会产生变更的循环需要 worktree 隔离，以避免意外修改主检出。',
+  'governance.backend.packMissingWorktreeIsolation.outcome':
+    '变更类循环契约要求隔离的 worktree，并禁止修改主检出。',
+  'governance.backend.missingSecurityStandard.why':
+    '安全包声明需要可审计的标准来映射控制项与差距。',
+  'governance.backend.missingSecurityStandard.outcome':
+    '创建 standards/security-governance.json（声明式安全治理标准），从而清除此发现项。重新运行 `governance standards` 以映射覆盖情况。',
+  'governance.backend.securityPackNotLinked.why':
+    '以 security 命名的工作流包应链接到安全治理标准。',
+  'governance.backend.securityPackNotLinked.outcome': '安全工作流包已引用 security-governance。',
+  'governance.backend.noAuditEvidence.why': '完整的产品闭环需要验证证据，交接才可信。',
+  'governance.backend.noAuditEvidence.outcome': '受治理的会话或执行已记录可导出的验证证据。',
+  'governance.backend.missingGovernanceRules.why':
+    '内置默认值是安全的，但仓库本地策略更易于检查与交接。',
+  'governance.backend.missingGovernanceRules.outcome':
+    '.amber/governance/rules.json 已存在，且 defaultAction=deny。',
+  'governance.backend.unsafeDefaultAllow.why':
+    'defaultAction=allow 会放行未列出的命令，破坏默认拒绝的治理策略。',
+  'governance.backend.unsafeDefaultAllow.outcome':
+    'rules.json 使用 defaultAction=deny 与拒绝优先的命令策略。',
+  'governance.backend.ledgerTampered.why': '账本被篡改意味着证据连续性不可信。',
+  'governance.backend.ledgerTampered.outcome':
+    '被篡改的账本记录已被排查，并在适当时从版本控制恢复。',
+  'governance.backend.finding.noAuditEvidence': '未找到可供审计评审的会话或执行证据。',
+  'governance.backend.finding.missingGovernanceRules':
+    '未找到 .amber/governance/rules.json；受治理执行将使用内置默认值。',
+  'governance.backend.finding.unsafeDefaultAllow':
+    'rules.json 的 defaultAction=allow 不安全——未列出的命令将被放行。',
+  'governance.backend.finding.missingSecurityStandard':
+    '缺少安全治理标准：standards/security-governance.json',
   'transcripts.title': '\u8f6c\u5f55',
-  'transcripts.description': '\u6b64\u4ed3\u5e93\u7684\u53ea\u8bfb\u8f6c\u5f55\u8bb0\u5f55\uff0c\u5c55\u793a\u524d\u5df2\u5bf9\u5bc6\u94a5\u8fdb\u884c\u8131\u654f\u3002',
+  'transcripts.description':
+    '\u6b64\u4ed3\u5e93\u7684\u53ea\u8bfb\u8f6c\u5f55\u8bb0\u5f55\uff0c\u5c55\u793a\u524d\u5df2\u5bf9\u5bc6\u94a5\u8fdb\u884c\u8131\u654f\u3002',
   'transcripts.count': '{count} \u4e2a\u8f6c\u5f55',
   'transcripts.countOne': '1 \u4e2a\u8f6c\u5f55',
   'transcripts.repositoryDirectory': '\u4ed3\u5e93\u76ee\u5f55',
   'transcripts.transcriptDirectory': '\u8f6c\u5f55\u76ee\u5f55',
   'transcripts.unknown': '\u672a\u77e5',
-  'transcripts.searchPlaceholder': '\u6309 id\u3001\u5206\u652f\u3001\u5927\u7eb2\u6216\u76ee\u5f55\u641c\u7d22...',
+  'transcripts.searchPlaceholder':
+    '\u6309 id\u3001\u5206\u652f\u3001\u5927\u7eb2\u6216\u76ee\u5f55\u641c\u7d22...',
   'transcripts.searchAria': '\u641c\u7d22\u8f6c\u5f55',
   'transcripts.clearFilters': '\u6e05\u9664\u7b5b\u9009',
   'transcripts.failed': '\u52a0\u8f7d\u8f6c\u5f55\u5931\u8d25',
   'transcripts.empty.filtered.title': '\u6ca1\u6709\u5339\u914d\u641c\u7d22\u7684\u8f6c\u5f55',
   'transcripts.empty.all.title': '\u6682\u65e0\u8f6c\u5f55',
-  'transcripts.empty.filtered.detail': '\u8bf7\u5c1d\u8bd5\u5176\u4ed6 id \u7247\u6bb5\u6216\u5206\u652f\u540d\u3002',
-  'transcripts.empty.all.detail': '\u8f6c\u5f55\u662f\u6b64\u4ed3\u5e93 Claude Code \u4f1a\u8bdd\u4e2d\u6a21\u578b\u548c\u5de5\u5177\u8c03\u7528\u4ea4\u4e92\u7684\u6301\u4e45\u8bb0\u5f55\u3002',
+  'transcripts.empty.filtered.detail':
+    '\u8bf7\u5c1d\u8bd5\u5176\u4ed6 id \u7247\u6bb5\u6216\u5206\u652f\u540d\u3002',
+  'transcripts.empty.all.detail':
+    '\u8f6c\u5f55\u662f\u6b64\u4ed3\u5e93 Claude Code \u4f1a\u8bdd\u4e2d\u6a21\u578b\u548c\u5de5\u5177\u8c03\u7528\u4ea4\u4e92\u7684\u6301\u4e45\u8bb0\u5f55\u3002',
   'transcripts.noOutline': '\u6682\u65e0\u53ef\u8bfb\u5927\u7eb2\u3002',
   'transcripts.turns': '{count} \u8f6e',
   'transcripts.turnsOne': '1 \u8f6e',
@@ -838,16 +1544,22 @@ const zh: Record<TranslationKey, string> = {
   'transcripts.detail.saveDigest': '\u4fdd\u5b58\u6458\u8981',
   'transcripts.detail.proposeRegressions': '\u63d0\u8bae\u56de\u5f52\u9879',
   'transcripts.detail.scanning': '\u6b63\u5728\u626b\u63cf...',
-  'transcripts.detail.savedToLens': '\u5df2\u4fdd\u5b58\u5230 .amber/lens/\uff08git \u5ffd\u7565\uff09',
+  'transcripts.detail.savedToLens':
+    '\u5df2\u4fdd\u5b58\u5230 .amber/lens/\uff08git \u5ffd\u7565\uff09',
   'transcripts.detail.saveFailed': '\u4fdd\u5b58\u5931\u8d25',
-  'transcripts.detail.proposalsWritten': '\u5df2\u5c06 {count} \u4e2a\u63d0\u8bae\u5199\u5165 .amber/executions/',
+  'transcripts.detail.proposalsWritten':
+    '\u5df2\u5c06 {count} \u4e2a\u63d0\u8bae\u5199\u5165 .amber/executions/',
   'transcripts.detail.visibleTurns': '\u5df2\u663e\u793a {count} \u8f6e\u5bf9\u8bdd\u3002',
   'transcripts.detail.visibleTurnsOne': '\u5df2\u663e\u793a 1 \u8f6e\u5bf9\u8bdd\u3002',
-  'transcripts.detail.hiddenSystemRecordsInline': '\u5df2\u9690\u85cf {count} \u6761\u7cfb\u7edf\u8bb0\u5f55\u3002',
-  'transcripts.detail.hiddenSystemRecordsInlineOne': '\u5df2\u9690\u85cf 1 \u6761\u7cfb\u7edf\u8bb0\u5f55\u3002',
+  'transcripts.detail.hiddenSystemRecordsInline':
+    '\u5df2\u9690\u85cf {count} \u6761\u7cfb\u7edf\u8bb0\u5f55\u3002',
+  'transcripts.detail.hiddenSystemRecordsInlineOne':
+    '\u5df2\u9690\u85cf 1 \u6761\u7cfb\u7edf\u8bb0\u5f55\u3002',
   'transcripts.detail.hiddenSystemRecords': '\u5df2\u9690\u85cf\u7684\u7cfb\u7edf\u8bb0\u5f55',
-  'transcripts.detail.hiddenRecordsSummary': '\u5df2\u9690\u85cf {count} \u6761\u8bbe\u7f6e/\u72b6\u6001\u8bb0\u5f55\uff0c\u4f7f\u8f6c\u5f55\u805a\u7126\u4e8e\u53ef\u8bfb\u6d88\u606f\u548c\u5de5\u5177\u8c03\u7528\u3002\u5305\u62ec {summary}\u3002',
-  'transcripts.detail.hiddenRecordsSummaryOne': '\u5df2\u9690\u85cf 1 \u6761\u8bbe\u7f6e/\u72b6\u6001\u8bb0\u5f55\uff0c\u4f7f\u8f6c\u5f55\u805a\u7126\u4e8e\u53ef\u8bfb\u6d88\u606f\u548c\u5de5\u5177\u8c03\u7528\u3002\u5305\u62ec {summary}\u3002',
+  'transcripts.detail.hiddenRecordsSummary':
+    '\u5df2\u9690\u85cf {count} \u6761\u8bbe\u7f6e/\u72b6\u6001\u8bb0\u5f55\uff0c\u4f7f\u8f6c\u5f55\u805a\u7126\u4e8e\u53ef\u8bfb\u6d88\u606f\u548c\u5de5\u5177\u8c03\u7528\u3002\u5305\u62ec {summary}\u3002',
+  'transcripts.detail.hiddenRecordsSummaryOne':
+    '\u5df2\u9690\u85cf 1 \u6761\u8bbe\u7f6e/\u72b6\u6001\u8bb0\u5f55\uff0c\u4f7f\u8f6c\u5f55\u805a\u7126\u4e8e\u53ef\u8bfb\u6d88\u606f\u548c\u5de5\u5177\u8c03\u7528\u3002\u5305\u62ec {summary}\u3002',
   'transcripts.detail.hideRecordTypes': '\u9690\u85cf\u8bb0\u5f55\u7c7b\u578b',
   'transcripts.detail.showRecordTypes': '\u663e\u793a\u8bb0\u5f55\u7c7b\u578b',
   'transcripts.detail.records': '{count} \u6761\u8bb0\u5f55',
@@ -878,45 +1590,76 @@ const zh: Record<TranslationKey, string> = {
   'transcripts.metadata.emptyAssistant.label': '\u7a7a\u52a9\u624b\u8bb0\u5f55',
   'transcripts.metadata.emptyAssistant.summary': '\u7a7a\u52a9\u624b\u8bb0\u5f55',
   'transcripts.metadata.emptyAssistant.summaryOne': '\u7a7a\u52a9\u624b\u8bb0\u5f55',
-  'transcripts.metadata.emptyAssistant.description': '\u4e00\u4e2a\u6ca1\u6709\u53ef\u5448\u73b0\u52a9\u624b\u6587\u672c\u6216\u5de5\u5177\u8c03\u7528\u7684\u6d88\u606f\u5c01\u5957\u3002',
+  'transcripts.metadata.emptyAssistant.description':
+    '\u4e00\u4e2a\u6ca1\u6709\u53ef\u5448\u73b0\u52a9\u624b\u6587\u672c\u6216\u5de5\u5177\u8c03\u7528\u7684\u6d88\u606f\u5c01\u5957\u3002',
   'transcripts.metadata.attachment.label': '\u9644\u4ef6\u8bb0\u5f55',
   'transcripts.metadata.attachment.summary': '\u9644\u4ef6\u8bb0\u5f55',
   'transcripts.metadata.attachment.summaryOne': '\u9644\u4ef6\u8bb0\u5f55',
-  'transcripts.metadata.attachment.description': '\u968f\u63d0\u793a\u6355\u83b7\u7684\u6587\u4ef6\u6216\u56fe\u50cf\u9644\u4ef6\u5143\u6570\u636e\u3002',
+  'transcripts.metadata.attachment.description':
+    '\u968f\u63d0\u793a\u6355\u83b7\u7684\u6587\u4ef6\u6216\u56fe\u50cf\u9644\u4ef6\u5143\u6570\u636e\u3002',
   'transcripts.metadata.fileHistorySnapshot.label': '\u6587\u4ef6\u5386\u53f2\u5feb\u7167',
   'transcripts.metadata.fileHistorySnapshot.summary': '\u6587\u4ef6\u5386\u53f2\u5feb\u7167',
   'transcripts.metadata.fileHistorySnapshot.summaryOne': '\u6587\u4ef6\u5386\u53f2\u5feb\u7167',
-  'transcripts.metadata.fileHistorySnapshot.description': '\u4e3a\u4e0a\u4e0b\u6587\u8fde\u7eed\u6027\u8bb0\u5f55\u7684\u4ed3\u5e93\u6587\u4ef6\u72b6\u6001\u5feb\u7167\u3002',
+  'transcripts.metadata.fileHistorySnapshot.description':
+    '\u4e3a\u4e0a\u4e0b\u6587\u8fde\u7eed\u6027\u8bb0\u5f55\u7684\u4ed3\u5e93\u6587\u4ef6\u72b6\u6001\u5feb\u7167\u3002',
   'transcripts.metadata.lastPrompt.label': '\u63d0\u793a\u5feb\u7167',
   'transcripts.metadata.lastPrompt.summary': '\u63d0\u793a\u5feb\u7167',
   'transcripts.metadata.lastPrompt.summaryOne': '\u63d0\u793a\u5feb\u7167',
-  'transcripts.metadata.lastPrompt.description': '\u6700\u65b0\u63d0\u793a\u7684\u5185\u90e8\u72b6\u6001\uff0c\u5df2\u4ece\u53ef\u8bfb\u8f6c\u5f55\u4e2d\u9690\u85cf\u3002',
+  'transcripts.metadata.lastPrompt.description':
+    '\u6700\u65b0\u63d0\u793a\u7684\u5185\u90e8\u72b6\u6001\uff0c\u5df2\u4ece\u53ef\u8bfb\u8f6c\u5f55\u4e2d\u9690\u85cf\u3002',
   'transcripts.metadata.mode.label': '\u4f1a\u8bdd\u6a21\u5f0f\u8bb0\u5f55',
   'transcripts.metadata.mode.summary': '\u4f1a\u8bdd\u6a21\u5f0f\u8bb0\u5f55',
   'transcripts.metadata.mode.summaryOne': '\u4f1a\u8bdd\u6a21\u5f0f\u8bb0\u5f55',
-  'transcripts.metadata.mode.description': '\u5ba2\u6237\u7aef\u8bb0\u5f55\u7684\u8fd0\u884c\u65f6\u6a21\u5f0f\u4fe1\u606f\u3002',
+  'transcripts.metadata.mode.description':
+    '\u5ba2\u6237\u7aef\u8bb0\u5f55\u7684\u8fd0\u884c\u65f6\u6a21\u5f0f\u4fe1\u606f\u3002',
   'transcripts.metadata.permissionMode.label': '\u6743\u9650\u8bb0\u5f55',
   'transcripts.metadata.permissionMode.summary': '\u6743\u9650\u8bb0\u5f55',
   'transcripts.metadata.permissionMode.summaryOne': '\u6743\u9650\u8bb0\u5f55',
-  'transcripts.metadata.permissionMode.description': '\u4f1a\u8bdd\u671f\u95f4\u6355\u83b7\u7684\u5de5\u5177\u5ba1\u6279\u7b56\u7565\u72b6\u6001\u3002',
+  'transcripts.metadata.permissionMode.description':
+    '\u4f1a\u8bdd\u671f\u95f4\u6355\u83b7\u7684\u5de5\u5177\u5ba1\u6279\u7b56\u7565\u72b6\u6001\u3002',
   'transcripts.metadata.queueOperation.label': '\u961f\u5217\u64cd\u4f5c\u8bb0\u5f55',
   'transcripts.metadata.queueOperation.summary': '\u961f\u5217\u64cd\u4f5c\u8bb0\u5f55',
   'transcripts.metadata.queueOperation.summaryOne': '\u961f\u5217\u64cd\u4f5c\u8bb0\u5f55',
-  'transcripts.metadata.queueOperation.description': '\u7528\u4e8e\u534f\u8c03\u4f1a\u8bdd\u5de5\u4f5c\u7684\u5185\u90e8\u961f\u5217\u72b6\u6001\u3002',
+  'transcripts.metadata.queueOperation.description':
+    '\u7528\u4e8e\u534f\u8c03\u4f1a\u8bdd\u5de5\u4f5c\u7684\u5185\u90e8\u961f\u5217\u72b6\u6001\u3002',
   'transcripts.metadata.summary.label': '\u6458\u8981\u8bb0\u5f55',
   'transcripts.metadata.summary.summary': '\u6458\u8981\u8bb0\u5f55',
   'transcripts.metadata.summary.summaryOne': '\u6458\u8981\u8bb0\u5f55',
-  'transcripts.metadata.summary.description': '\u7528\u4e8e\u4e0a\u4e0b\u6587\u8fde\u7eed\u6027\u7684\u5df2\u5b58\u50a8\u5bf9\u8bdd\u6458\u8981\u3002',
+  'transcripts.metadata.summary.description':
+    '\u7528\u4e8e\u4e0a\u4e0b\u6587\u8fde\u7eed\u6027\u7684\u5df2\u5b58\u50a8\u5bf9\u8bdd\u6458\u8981\u3002',
   'transcripts.metadata.emptySystem.label': '\u7a7a\u7cfb\u7edf\u8bb0\u5f55',
   'transcripts.metadata.emptySystem.summary': '\u7a7a\u7cfb\u7edf\u8bb0\u5f55',
   'transcripts.metadata.emptySystem.summaryOne': '\u7a7a\u7cfb\u7edf\u8bb0\u5f55',
-  'transcripts.metadata.emptySystem.description': '\u4e00\u4e2a\u6ca1\u6709\u53ef\u8bfb\u8f6c\u5f55\u6587\u672c\u7684\u7cfb\u7edf\u6d88\u606f\u5c01\u5957\u3002',
+  'transcripts.metadata.emptySystem.description':
+    '\u4e00\u4e2a\u6ca1\u6709\u53ef\u8bfb\u8f6c\u5f55\u6587\u672c\u7684\u7cfb\u7edf\u6d88\u606f\u5c01\u5957\u3002',
   'transcripts.metadata.emptyUser.label': '\u7a7a\u7528\u6237\u8bb0\u5f55',
   'transcripts.metadata.emptyUser.summary': '\u7a7a\u7528\u6237\u8bb0\u5f55',
   'transcripts.metadata.emptyUser.summaryOne': '\u7a7a\u7528\u6237\u8bb0\u5f55',
-  'transcripts.metadata.emptyUser.description': '\u4e00\u4e2a\u6ca1\u6709\u53ef\u5448\u73b0\u63d0\u793a\u6587\u672c\u7684\u7528\u6237\u6d88\u606f\u5c01\u5957\u3002',
-  'transcripts.metadata.unknown.description': '\u5df2\u4ece\u53ef\u8bfb\u8f6c\u5f55\u4e2d\u9690\u85cf\u7684\u5e95\u5c42\u4f1a\u8bdd\u8bb0\u5f55\u3002',
-  'routes.title': '\u8def\u7531',
+  'transcripts.metadata.emptyUser.description':
+    '\u4e00\u4e2a\u6ca1\u6709\u53ef\u5448\u73b0\u63d0\u793a\u6587\u672c\u7684\u7528\u6237\u6d88\u606f\u5c01\u5957\u3002',
+  'transcripts.metadata.unknown.description': '已从可读转录中隐藏的底层会话记录。',
+  'transcript.chip.slashCommand': '斜杠命令 {name}',
+  'transcript.chip.commandStdout': '命令输出',
+  'transcript.chip.taskNotification': '后台任务',
+  'transcript.chip.recap': '会话 Recap',
+  'transcript.expand': '展开全部',
+  'transcript.collapse': '收起',
+  'transcript.viewRaw': '查看原文',
+  'transcript.hideRaw': '收起原文',
+  'transcript.turnSeparator': 'Turn 分隔',
+  'transcript.role.user': '用户',
+  'transcript.role.assistant': '助手',
+  'transcript.role.system': '系统',
+  'transcript.role.tool': '工具',
+  'transcript.hidden.localCommand.label': '本地命令记录',
+  'transcript.hidden.localCommand.summary': '本地命令记录',
+  'transcript.hidden.localCommand.summaryOne': '本地命令记录',
+  'transcript.hidden.localCommand.description': '已从可读转录中隐藏的斜杠命令提示封套。',
+  'transcript.hidden.systemReminder.label': '系统提醒记录',
+  'transcript.hidden.systemReminder.summary': '系统提醒记录',
+  'transcript.hidden.systemReminder.summaryOne': '系统提醒记录',
+  'transcript.hidden.systemReminder.description': '已从可读转录中隐藏的注入式系统提醒封套。',
+  'routes.title': '路由',
   'routes.count': '{count} \u6761\u8def\u7531',
   'routes.countOne': '1 \u6761\u8def\u7531',
   'routes.searchPlaceholder': '\u641c\u7d22\u8def\u7531...',
@@ -924,8 +1667,10 @@ const zh: Record<TranslationKey, string> = {
   'routes.failed': '\u52a0\u8f7d\u8def\u7531\u5931\u8d25',
   'routes.empty.filtered.title': '\u6ca1\u6709\u5339\u914d\u7684\u8def\u7531',
   'routes.empty.all.title': '\u6682\u65e0\u8def\u7531',
-  'routes.empty.filtered.detail': '\u5f53\u524d\u641c\u7d22\u672a\u5339\u914d\u4efb\u4f55\u8def\u7531\u5b9a\u4e49\u3002',
-  'routes.empty.all.detail': '\u5f53 JSON \u8def\u7531\u6587\u4ef6\u5b58\u5728\u4e8e\u4ed3\u5e93 routes \u76ee\u5f55\u4e0b\u65f6\uff0c\u8def\u7531\u5b9a\u4e49\u4f1a\u663e\u793a\u5728\u8fd9\u91cc\u3002',
+  'routes.empty.filtered.detail':
+    '\u5f53\u524d\u641c\u7d22\u672a\u5339\u914d\u4efb\u4f55\u8def\u7531\u5b9a\u4e49\u3002',
+  'routes.empty.all.detail':
+    '\u5f53 JSON \u8def\u7531\u6587\u4ef6\u5b58\u5728\u4e8e\u4ed3\u5e93 routes \u76ee\u5f55\u4e0b\u65f6\uff0c\u8def\u7531\u5b9a\u4e49\u4f1a\u663e\u793a\u5728\u8fd9\u91cc\u3002',
   'routes.category.simple': '\u7b80\u5355',
   'routes.category.medium': '\u4e2d\u7b49',
   'routes.category.complex': '\u590d\u6742',
@@ -933,7 +1678,8 @@ const zh: Record<TranslationKey, string> = {
   'routes.stages': '{count} \u4e2a\u9636\u6bb5',
   'routes.stagesOne': '1 \u4e2a\u9636\u6bb5',
   'routes.detail.notFound': '\u672a\u627e\u5230\u8def\u7531',
-  'routes.detail.notFoundDetail': '\u8be5\u8def\u7531\u53ef\u80fd\u5df2\u88ab\u79fb\u9664\uff0c\u6216\u94fe\u63a5\u4e0d\u6b63\u786e\u3002',
+  'routes.detail.notFoundDetail':
+    '\u8be5\u8def\u7531\u53ef\u80fd\u5df2\u88ab\u79fb\u9664\uff0c\u6216\u94fe\u63a5\u4e0d\u6b63\u786e\u3002',
   'routes.detail.back': '\u8fd4\u56de\u8def\u7531',
   'routes.detail.retry': '\u91cd\u8bd5',
   'routes.detail.description': '\u63cf\u8ff0',
@@ -960,9 +1706,11 @@ const zh: Record<TranslationKey, string> = {
   'timeline.searchPlaceholder': '\u641c\u7d22\u4e8b\u4ef6...',
   'timeline.searchAria': '\u641c\u7d22\u4e8b\u4ef6',
   'timeline.empty.title': '\u6682\u65e0\u8bb0\u5f55\u7684\u4e8b\u4ef6',
-  'timeline.empty.detail': '\u8be5\u4f1a\u8bdd\u5c1a\u672a\u5199\u5165\u4efb\u4f55\u65f6\u95f4\u7ebf\u4e8b\u4ef6\u3002',
+  'timeline.empty.detail':
+    '\u8be5\u4f1a\u8bdd\u5c1a\u672a\u5199\u5165\u4efb\u4f55\u65f6\u95f4\u7ebf\u4e8b\u4ef6\u3002',
   'timeline.noMatches.title': '\u6ca1\u6709\u5339\u914d\u7b5b\u9009\u6761\u4ef6\u7684\u4e8b\u4ef6',
-  'timeline.noMatches.detail': '\u641c\u7d22\u548c\u4e8b\u4ef6\u7c7b\u578b\u7b5b\u9009\u4f1a\u4fdd\u7559\u5b8c\u6574\u65f6\u5e8f\uff0c\u4f46\u5f53\u524d\u5b50\u96c6\u4e2d\u6ca1\u6709\u5339\u914d\u9879\u3002',
+  'timeline.noMatches.detail':
+    '\u641c\u7d22\u548c\u4e8b\u4ef6\u7c7b\u578b\u7b5b\u9009\u4f1a\u4fdd\u7559\u5b8c\u6574\u65f6\u5e8f\uff0c\u4f46\u5f53\u524d\u5b50\u96c6\u4e2d\u6ca1\u6709\u5339\u914d\u9879\u3002',
   'timeline.clearFilters': '\u6e05\u9664\u7b5b\u9009',
   'timeline.hiddenByFilters': '{count} \u4e2a\u4e8b\u4ef6\u5df2\u88ab\u7b5b\u9009\u9690\u85cf',
   'timeline.hiddenByFiltersOne': '1 \u4e2a\u4e8b\u4ef6\u5df2\u88ab\u7b5b\u9009\u9690\u85cf',
@@ -996,11 +1744,70 @@ const zh: Record<TranslationKey, string> = {
   'timeline.event.task_progress': '\u4efb\u52a1\u8fdb\u5ea6',
   'timeline.event.error': '\u9519\u8bef',
   'timeline.event.heartbeat': '\u5fc3\u8df3',
+  'ux.links.viewTranscripts': '查看记录',
+  'ux.links.transcriptsNote': '转录按 Claude 项目目录独立存放，控制台暂不能自动关联到具体会话。',
+  'ux.links.relatedTranscripts': '可能相关的转录',
+  'ux.links.relatedTranscriptsBasis': '按工作目录与会话活动时间窗推断，仅供参考，并非确证。',
+  'ux.links.relatedOverlap': '活动重叠区间：{from} – {to}',
+  'ux.links.relatedNone': '没有按工作目录与活动时间窗匹配到本会话的转录。',
+  'ux.governance.score.governance':
+    '治理配置是否健康：策略错误、缺少治理文档、工作流包无法解析等问题会扣分。',
+  'ux.governance.score.evidence':
+    '会话是否具备可信的审计证据：缺少审计证据或账本被篡改会被大幅扣分。',
+  'ux.governance.score.continuity':
+    '工作与文档是否可持续交接：路由定义错误、文档过期、wiki 校验错误会扣分。',
+  'ux.governance.score.safety':
+    '审批关卡与安全底线是否到位：路由缺少关卡、缺少评审关卡、缺少安全标准等会扣分。',
+  'ux.governance.score.maintenance':
+    '维护项是否漂移：文档过期、规则包/脚手架/产物漂移、维护错误会扣分。',
+  'ux.governance.score.overall':
+    '五个分数的加权总分：治理 25%、证据 25%、连续性 20%、安全性 20%、维护 10%。',
+  'ux.terms.ledger': '账本（ledger）是按哈希链逐条追加的会话记录，用来证明证据轨迹没有被篡改。',
+  'ux.terms.learnings':
+    '经验回写：工作验收后，评审是否需要把已验证的经验写回知识库，供后续工作复用。',
+  'ux.terms.worktree':
+    '工作树（worktree）是为该会话单独创建的 Git 检出，避免受治理的工作影响主检出。',
+  'ux.backend.lifecycle.prefix': '生命周期将推进到：{step}。',
+  'ux.backend.lifecycle.why.audit':
+    '这看起来是一个已有项目——安装前可先用审计（只读）检查一下；多仓库采纳评审请另外运行 amber adoption report。',
+  'ux.backend.lifecycle.why.init': 'Amber 初始文件尚未齐备。',
+  'ux.backend.lifecycle.why.initAfterAudit':
+    'Amber 初始文件尚未齐备（审计已完成或跳过）——安全的下一步是 init 安装。',
+  'ux.backend.lifecycle.why.feature': 'feature_list.json 中还没有登记任何功能。',
+  'ux.backend.lifecycle.why.planTemplate': '功能 {feature} 还没有计划。',
+  'ux.backend.lifecycle.why.gate': '计划已存在，但用户确认仍为 "pending"。',
+  'ux.backend.lifecycle.why.featureEvidence': '该功能还没有记录验证证据。',
+  'ux.backend.lifecycle.why.verify': '会话还没有验证证据。',
+  'ux.backend.lifecycle.why.approve': '会话还没有审批证据。',
+  'ux.backend.lifecycle.why.approveTemplate':
+    '会话还没有审批证据（下一个关卡：{gate}；路由共 {count} 个关卡）。',
+  'ux.backend.lifecycle.why.handoff':
+    'session-handoff.md 缺失或仍是初始脚手架——请根据实时状态重新生成。',
+  'ux.backend.lifecycle.why.completeCheckTemplate': '会话尚未完成（缺少：{missing}）。',
+  'ux.backend.lifecycle.why.completeCheck': '会话尚未完成（仍缺少证据）。',
+  'ux.backend.lifecycle.why.sessionComplete': '完成检查已通过，但会话还没有标记为已完成。',
+  'ux.backend.lifecycle.why.accept': '计划可以验收了，验收后会追加到演进日志。',
+  'ux.backend.lifecycle.why.learningsTemplate':
+    '已验收的工作改动了 {categories} 路径——经验回写评审还未登记（用 amber learnings --reviewed --owner <id> 登记）。',
+  'ux.backend.completion.hint.verification': '在控制台的证据运行器中执行验证。',
+  'ux.backend.completion.hint.approval': '在关卡页（/gates）完成审批。',
+  'ux.backend.completion.hint.handoff': '根据当前仓库状态重新生成实时的 session-handoff.md。',
+  'ux.backend.completion.hint.goal':
+    '先带目标启动会话：amber session start --goal "<goal>" --target .',
+  'ux.backend.completion.hint.timeline': '时间线事件会随受治理的工作自动记录。',
+  'ux.backend.completion.hint.work': '在会话期间至少做一次真实改动（提交或工作区编辑）。',
+  'ux.backend.completion.hint.openBlockers': '完成前先解决或关闭会话的未决阻塞项。',
+  'ux.backend.completion.hint.manifestNotFound':
+    '还没有会话 manifest——先启动会话：amber session start --target .',
+  'ux.backend.completion.hint.manifestCorrupt':
+    '检查状态目录下的会话 manifest；恢复或重新启动会话。',
+  'ux.backend.completion.hint.sessionComplete': '所有完成检查均已通过——可以收尾会话了。',
+  'ux.backend.completion.hint.unknownTemplate': '补齐缺失的完成项：{item}。',
 };
 
 export type I18nKey = TranslationKey;
 
-const dictionaries: Record<Language, Record<TranslationKey, string>> = { en, 'zh-CN': zh };
+export const dictionaries: Record<Language, Record<TranslationKey, string>> = { en, 'zh-CN': zh };
 
 interface I18nContextValue {
   language: Language;
@@ -1046,7 +1853,9 @@ interface I18nProviderProps {
 }
 
 export function I18nProvider({ children, initialLanguage }: I18nProviderProps) {
-  const [language, setLanguageState] = useState<Language>(() => initialLanguage ?? readInitialLanguage());
+  const [language, setLanguageState] = useState<Language>(
+    () => initialLanguage ?? readInitialLanguage(),
+  );
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -1058,7 +1867,8 @@ export function I18nProvider({ children, initialLanguage }: I18nProviderProps) {
   }, []);
 
   const t = useCallback(
-    (key: TranslationKey, params?: TranslationParams) => interpolate(dictionaries[language][key] ?? en[key], params),
+    (key: TranslationKey, params?: TranslationParams) =>
+      interpolate(dictionaries[language][key] ?? en[key], params),
     [language],
   );
 

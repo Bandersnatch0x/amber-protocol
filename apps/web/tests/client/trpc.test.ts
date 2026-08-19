@@ -27,9 +27,7 @@ describe('getTRPCClient', () => {
 
     getTRPCClient();
 
-    expect(createClient).toHaveBeenCalledWith(
-      expect.objectContaining({ transformer: superjson }),
-    );
+    expect(createClient).toHaveBeenCalledWith(expect.objectContaining({ transformer: superjson }));
     expect(httpBatchLink).toHaveBeenCalledWith(
       expect.not.objectContaining({ transformer: expect.anything() }),
     );

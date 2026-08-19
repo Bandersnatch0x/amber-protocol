@@ -52,8 +52,12 @@ vi.mock('@server/services/session-events', () => ({
 
 const readSessionById = sessionReader.readSessionById as ReturnType<typeof vi.fn>;
 const persistSessionStatus = sessionWriter.persistSessionStatus as ReturnType<typeof vi.fn>;
-const appendSessionLedgerRecord = sessionAuditWriter.appendSessionLedgerRecord as ReturnType<typeof vi.fn>;
-const appendSessionTimelineEvent = sessionAuditWriter.appendSessionTimelineEvent as ReturnType<typeof vi.fn>;
+const appendSessionLedgerRecord = sessionAuditWriter.appendSessionLedgerRecord as ReturnType<
+  typeof vi.fn
+>;
+const appendSessionTimelineEvent = sessionAuditWriter.appendSessionTimelineEvent as ReturnType<
+  typeof vi.fn
+>;
 const createRunnerControlRequest = runnerAck.createRunnerControlRequest as ReturnType<typeof vi.fn>;
 const waitForRunnerAck = runnerAck.waitForRunnerAck as ReturnType<typeof vi.fn>;
 
@@ -277,7 +281,7 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('completed');
 
       await expect(caller.start({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot start from status: completed'
+        'Cannot start from status: completed',
       );
       expect(sessionEvents.emitSessionStarted).not.toHaveBeenCalled();
     });
@@ -286,7 +290,7 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('aborted');
 
       await expect(caller.start({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot start from status: aborted'
+        'Cannot start from status: aborted',
       );
     });
 
@@ -294,16 +298,14 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('paused');
 
       await expect(caller.start({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot start from status: paused'
+        'Cannot start from status: paused',
       );
     });
 
     it('throws Session not found when session does not exist', async () => {
       readSessionById.mockReturnValue(null);
 
-      await expect(caller.start({ sessionId: 'missing' })).rejects.toThrow(
-        'Session not found'
-      );
+      await expect(caller.start({ sessionId: 'missing' })).rejects.toThrow('Session not found');
       expect(sessionEvents.emitSessionStarted).not.toHaveBeenCalled();
     });
   });
@@ -349,7 +351,7 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('idle');
 
       await expect(caller.pause({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot pause from status: idle'
+        'Cannot pause from status: idle',
       );
     });
 
@@ -357,16 +359,14 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('completed');
 
       await expect(caller.pause({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot pause from status: completed'
+        'Cannot pause from status: completed',
       );
     });
 
     it('throws Session not found when session does not exist', async () => {
       readSessionById.mockReturnValue(null);
 
-      await expect(caller.pause({ sessionId: 'missing' })).rejects.toThrow(
-        'Session not found'
-      );
+      await expect(caller.pause({ sessionId: 'missing' })).rejects.toThrow('Session not found');
     });
   });
 
@@ -447,7 +447,7 @@ describe('sessionControlRouter', () => {
       persistSessionStatus.mockResolvedValue({ id: 'session-1', goal: 'test', status: 'paused' });
 
       await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
-        'Session status persistence was not confirmed: expected executing, got paused'
+        'Session status persistence was not confirmed: expected executing, got paused',
       );
       expect(sessionEvents.emitSessionResumed).not.toHaveBeenCalled();
     });
@@ -466,7 +466,7 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('aborted');
 
       await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot resume from status: aborted'
+        'Cannot resume from status: aborted',
       );
     });
 
@@ -474,7 +474,7 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('completed');
 
       await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot resume from status: completed'
+        'Cannot resume from status: completed',
       );
     });
 
@@ -482,7 +482,7 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('idle');
 
       await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot resume from status: idle'
+        'Cannot resume from status: idle',
       );
     });
 
@@ -490,7 +490,7 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('routed');
 
       await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot resume from status: routed'
+        'Cannot resume from status: routed',
       );
       expect(persistSessionStatus).not.toHaveBeenCalled();
       expect(sessionEvents.emitSessionResumed).not.toHaveBeenCalled();
@@ -499,9 +499,7 @@ describe('sessionControlRouter', () => {
     it('throws Session not found when session does not exist', async () => {
       readSessionById.mockReturnValue(null);
 
-      await expect(caller.resume({ sessionId: 'missing' })).rejects.toThrow(
-        'Session not found'
-      );
+      await expect(caller.resume({ sessionId: 'missing' })).rejects.toThrow('Session not found');
     });
   });
 
@@ -582,16 +580,14 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('completed');
 
       await expect(caller.abort({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot abort from status: completed'
+        'Cannot abort from status: completed',
       );
     });
 
     it('throws Session not found when session does not exist', async () => {
       readSessionById.mockReturnValue(null);
 
-      await expect(caller.abort({ sessionId: 'missing' })).rejects.toThrow(
-        'Session not found'
-      );
+      await expect(caller.abort({ sessionId: 'missing' })).rejects.toThrow('Session not found');
     });
   });
 });

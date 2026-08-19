@@ -548,6 +548,212 @@ const COMMAND_HELP = {
 	],
 };
 
+const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
+
+function optionsIn(text) {
+	return [...new Set(String(text || "").match(OPTION_PATTERN) || [])];
+}
+
+function optionValuesIn(text) {
+	const values = [];
+	const pattern = /(--[a-z][a-z0-9-]*)\s+(?:<([^<>]+)>|([a-z0-9-]+(?:\|[a-z0-9-]+)+))/g;
+	for (const match of String(text || "").matchAll(pattern)) {
+		const choices = match[2] || match[3] || "";
+		if (!choices.includes("|")) continue;
+		values.push([match[1], choices.split("|")]);
+	}
+	return values;
+}
+
+function splitUsageAlternatives(line) {
+	const alternatives = [];
+	let start = 0;
+	let squareDepth = 0;
+	let angleDepth = 0;
+	for (let index = 0; index < line.length; index += 1) {
+		const character = line[index];
+		if (character === "[") squareDepth += 1;
+		else if (character === "]") squareDepth = Math.max(0, squareDepth - 1);
+		else if (character === "<") angleDepth += 1;
+		else if (character === ">") angleDepth = Math.max(0, angleDepth - 1);
+		else if (
+			character === "|" &&
+			squareDepth === 0 &&
+			angleDepth === 0 &&
+			/\s/.test(line[index - 1] || "") &&
+			/\s/.test(line[index + 1] || "")
+		) {
+			alternatives.push(line.slice(start, index).trim());
+			start = index + 1;
+		}
+	}
+	alternatives.push(line.slice(start).trim());
+	return alternatives.filter(Boolean);
+}
+
+function intersectionOf(lists) {
+	if (lists.length === 0) return [];
+	return [...new Set(lists[0])].filter((value) => lists.every((list) => list.includes(value)));
+}
+
+function documentedSubcommands(command) {
+	const discovered = new Set();
+	const commandPattern = new RegExp(
+		`amber\\s+${command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+(?:<([^>]+)>|([a-z][a-z0-9-]*))`,
+		"g",
+	);
+	for (const line of commandUsageLine(command).split("\n").flatMap(splitUsageAlternatives)) {
+		for (const match of line.matchAll(commandPattern)) {
+			if (match[1]) {
+				for (const choice of match[1].split("|")) discovered.add(choice);
+			} else if (match[2]) discovered.add(match[2]);
+		}
+	}
+
+	const help = COMMAND_DEFINITIONS[command]?.help;
+	const lines = Array.isArray(help) ? help : [help];
+	let inSubcommands = false;
+	for (const line of lines) {
+		const text = String(line || "");
+		const trimmed = text.trim();
+		if (["Subcommands:", "Actions:"].includes(trimmed)) {
+			inSubcommands = true;
+			continue;
+		}
+		if (inSubcommands && /^[A-Z][A-Za-z -]+:$/.test(trimmed)) {
+			inSubcommands = false;
+			continue;
+		}
+		if (!inSubcommands) continue;
+		if (!/^ {2}\S/.test(text)) continue;
+		for (const alternative of trimmed.split(/\s+\/\s+/)) {
+			const match = alternative.match(/^([a-z][a-z0-9-]*)(?:\s|$)/);
+			if (match) discovered.add(match[1]);
+		}
+	}
+	return [...discovered].sort();
+}
+
+function requiredOptionsIn(syntax) {
+	const required = [];
+	let optionalDepth = 0;
+	for (let index = 0; index < syntax.length; index += 1) {
+		const character = syntax[index];
+		if (character === "[") {
+			optionalDepth += 1;
+			continue;
+		}
+		if (character === "]") {
+			optionalDepth = Math.max(0, optionalDepth - 1);
+			continue;
+		}
+		if (optionalDepth !== 0 || syntax.slice(index, index + 2) !== "--") continue;
+		const match = syntax.slice(index).match(/^--[a-z][a-z0-9-]*/);
+		if (!match) continue;
+		required.push(match[0]);
+		index += match[0].length - 1;
+	}
+	return [...new Set(required)];
+}
+
+function invocationLines(command, subcommand) {
+	const usageLines = commandUsageLine(command)
+		.split("\n")
+		.flatMap(splitUsageAlternatives)
+		.map((line) => line.trim());
+	const help = COMMAND_DEFINITIONS[command]?.help;
+	const helpLines = (Array.isArray(help) ? help : [help])
+		.flatMap((line) => String(line || "").split(/\s+\/\s+/))
+		.map((line) => line.trim());
+	const commandPrefix = `amber ${command}`;
+
+	if (!subcommand) {
+		const common = usageLines.filter((line) => {
+			const normalized = line.replace(/^Usage:\s*/, "").trim();
+			return normalized.startsWith(`${commandPrefix} --`) || normalized === commandPrefix;
+		});
+		return {
+			common,
+			specific: [],
+			syntax: common,
+			sharedOptions: [],
+			sharedRequiredOptions: [],
+		};
+	}
+
+	const pathTokens = subcommand.split(/\s+/).filter(Boolean);
+	const matchesInvocation = (line) => {
+		const normalized = line.replace(/^Usage:\s*/, "").trim();
+		let remaining = normalized.startsWith(`${commandPrefix} `)
+			? normalized.slice(commandPrefix.length).trim()
+			: normalized;
+		for (const token of pathTokens) {
+			if (remaining === token || remaining.startsWith(`${token} `)) {
+				remaining = remaining.slice(token.length).trim();
+				continue;
+			}
+			const choices = remaining.match(/^<([^>]+)>/);
+			if (!choices || !choices[1].split("|").includes(token)) return false;
+			remaining = remaining.slice(choices[0].length).trim();
+		}
+		return true;
+	};
+	const usageSpecific = usageLines.filter(matchesInvocation);
+	const helpSpecific = helpLines.filter(matchesInvocation);
+	const specific = [...usageSpecific, ...helpSpecific];
+	const common = [];
+	const sharedOptions = intersectionOf(usageLines.map(optionsIn));
+	const sharedRequiredOptions = intersectionOf(usageLines.map(requiredOptionsIn));
+	const syntax = [
+		...usageSpecific,
+		...helpSpecific.filter(
+			(line) =>
+				!line
+					.replace(/^Usage:\s*/, "")
+					.trim()
+					.startsWith("amber "),
+		),
+	];
+	return { common, specific, syntax, sharedOptions, sharedRequiredOptions };
+}
+
+// Project the human-facing Command Definition into the static invocation
+// contract consumed by generators and other non-executing adapters. This keeps
+// accepted options beside the CLI's own help/usage source instead of adding a
+// second skill-only command or flag allowlist.
+function commandInvocationContract(command, subcommand = null) {
+	if (!COMMAND_DEFINITIONS[command]) return null;
+	const lines = invocationLines(command, subcommand);
+	const allowedOptions = [
+		...new Set([
+			...lines.sharedOptions,
+			...[...lines.common, ...lines.specific].flatMap(optionsIn),
+		]),
+	];
+	const requiredOptions = [
+		...new Set([...lines.sharedRequiredOptions, ...lines.syntax.flatMap(requiredOptionsIn)]),
+	];
+	const valueEntries = [...lines.common, ...lines.specific].flatMap(optionValuesIn);
+	const allowedValues = {};
+	for (const [option, values] of valueEntries) {
+		allowedValues[option] = [...new Set([...(allowedValues[option] || []), ...values])].sort();
+	}
+	return Object.freeze({
+		command,
+		subcommand,
+		recognized: subcommand ? lines.specific.length > 0 : lines.common.length > 0,
+		allowedOptions: Object.freeze(allowedOptions.sort()),
+		requiredOptions: Object.freeze(requiredOptions.sort()),
+		allowedValues: Object.freeze(
+			Object.fromEntries(
+				Object.entries(allowedValues)
+					.sort(([left], [right]) => left.localeCompare(right))
+					.map(([option, values]) => [option, Object.freeze(values)]),
+			),
+		),
+	});
+}
+
 const DEFAULT_SUMMARY = "Run Amber Protocol command.";
 
 const COMMAND_OUTPUT = {
@@ -634,6 +840,10 @@ const COMMAND_OUTPUT = {
 			"       amber workflow plan --target <repo> --report <path> --finding <id>",
 			"       amber workflow compare --target <repo> --baseline <path> --current <path>",
 		].join("\n"),
+	},
+	next: {
+		usage:
+			"Usage: amber next --target <repo> [--feature <id>] [--session <id>] [--objective <text>] [--json]",
 	},
 };
 
@@ -879,10 +1089,12 @@ function isGovernedCommand(command) {
 
 function knownSubcommands(command) {
 	const prefix = `${command}/`;
-	return [...new Set([...Object.keys(COMMAND_CAPABILITIES), ...KNOWN_UNTYPED_SUBCOMMANDS])]
+	const registered = [
+		...new Set([...Object.keys(COMMAND_CAPABILITIES), ...KNOWN_UNTYPED_SUBCOMMANDS]),
+	]
 		.filter((key) => key.startsWith(prefix))
-		.map((key) => key.slice(prefix.length))
-		.sort();
+		.map((key) => key.slice(prefix.length));
+	return [...new Set([...registered, ...documentedSubcommands(command)])].sort();
 }
 
 module.exports = {
@@ -894,6 +1106,7 @@ module.exports = {
 	KNOWN_UNTYPED_SUBCOMMANDS,
 	commandSummary,
 	commandUsageLine,
+	commandInvocationContract,
 	capabilityFor,
 	isGovernedCommand,
 	knownSubcommands,

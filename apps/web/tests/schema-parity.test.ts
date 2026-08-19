@@ -38,7 +38,12 @@ describe('schema parity (CLI schemas ⊆ web types)', () => {
   });
 
   it('accepts web control-plane runner ACK timeline events', () => {
-    for (const type of ['runner_control_requested', 'runner_ack', 'runner_rejected', 'runner_timeout']) {
+    for (const type of [
+      'runner_control_requested',
+      'runner_ack',
+      'runner_rejected',
+      'runner_timeout',
+    ]) {
       const result = SessionEventSchema.safeParse({
         type,
         timestamp: new Date().toISOString(),

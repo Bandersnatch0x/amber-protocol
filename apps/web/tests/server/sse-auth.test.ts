@@ -21,7 +21,7 @@ function createMockResponse(): any {
       handlers.get(event)!.push(cb);
     }),
     emit: (event: string) => {
-      handlers.get(event)?.forEach(cb => cb());
+      handlers.get(event)?.forEach((cb) => cb());
     },
     setHeader: vi.fn(),
     writeHead: vi.fn(),
@@ -31,7 +31,9 @@ function createMockResponse(): any {
   };
 }
 
-function createMockRequest(overrides: { query?: Record<string, string>; headers?: Record<string, string> } = {}): any {
+function createMockRequest(
+  overrides: { query?: Record<string, string>; headers?: Record<string, string> } = {},
+): any {
   return {
     params: { sessionId: 'session-1' },
     query: {},

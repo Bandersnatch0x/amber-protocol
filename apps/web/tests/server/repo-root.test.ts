@@ -12,10 +12,7 @@ function tempDir(): string {
 
 function writeRepoMarker(root: string): void {
   fs.mkdirSync(path.join(root, 'routes'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'package.json'),
-    JSON.stringify({ name: 'amber-protocol' }),
-  );
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'amber-protocol' }));
 }
 
 afterEach(() => {

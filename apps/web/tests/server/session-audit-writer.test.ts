@@ -110,9 +110,9 @@ describe('session-audit-writer', () => {
     const escapedDir = path.join(testRoot, '.amber', 'evil');
     fs.mkdirSync(escapedDir, { recursive: true });
 
-    await expect(
-      appendSessionTimelineEvent('../evil', { type: 'gate_passed' }),
-    ).rejects.toThrow('Session not found');
+    await expect(appendSessionTimelineEvent('../evil', { type: 'gate_passed' })).rejects.toThrow(
+      'Session not found',
+    );
     await expect(readSessionAuditSummary('../evil')).rejects.toThrow('Session not found');
     expect(fs.existsSync(path.join(escapedDir, 'timeline.jsonl'))).toBe(false);
   });

@@ -1,4 +1,6 @@
-﻿export interface TranscriptListItem {
+﻿import { classifyTurn } from './transcript-denoise';
+
+export interface TranscriptListItem {
   id: string;
   gitBranch?: string;
   outline?: string;
@@ -16,6 +18,9 @@ export interface TranscriptTurnLike {
   text?: string;
   tools?: string[];
   timestamp?: string;
+  /** Optional additive passthrough from the server reader (Claude JSONL). */
+  subtype?: string;
+  isMeta?: boolean;
 }
 
 export interface TranscriptMetadataItem {
@@ -38,12 +43,13 @@ export function filterTranscripts(
   const query = searchQuery.trim().toLowerCase();
   if (!query) return transcripts;
 
-  return transcripts.filter((transcript) =>
-    transcript.id.toLowerCase().includes(query)
-      || (transcript.gitBranch ?? '').toLowerCase().includes(query)
-      || (transcript.outline ?? '').toLowerCase().includes(query)
-      || (transcript.repoPath ?? '').toLowerCase().includes(query)
-      || (transcript.sourceDirectory ?? '').toLowerCase().includes(query),
+  return transcripts.filter(
+    (transcript) =>
+      transcript.id.toLowerCase().includes(query) ||
+      (transcript.gitBranch ?? '').toLowerCase().includes(query) ||
+      (transcript.outline ?? '').toLowerCase().includes(query) ||
+      (transcript.repoPath ?? '').toLowerCase().includes(query) ||
+      (transcript.sourceDirectory ?? '').toLowerCase().includes(query),
   );
 }
 
@@ -99,6 +105,11 @@ const METADATA_DETAILS: Record<string, Omit<TranscriptMetadataItem, 'timestamp'>
     summaryLabel: 'prompt snapshots',
     description: 'Internal state for the latest prompt, hidden from the readable transcript.',
   },
+  localCommand: {
+    label: 'Local command record',
+    summaryLabel: 'local command records',
+    description: 'Slash-command caveat envelope hidden from the readable transcript.',
+  },
   mode: {
     label: 'Session mode record',
     summaryLabel: 'session mode records',
@@ -118,6 +129,11 @@ const METADATA_DETAILS: Record<string, Omit<TranscriptMetadataItem, 'timestamp'>
     label: 'Summary record',
     summaryLabel: 'summary records',
     description: 'Stored conversation summary used for context continuity.',
+  },
+  systemReminder: {
+    label: 'System reminder record',
+    summaryLabel: 'system reminder records',
+    description: 'Injected system reminder envelope hidden from the readable transcript.',
   },
   system: {
     label: 'Empty system record',
@@ -155,7 +171,9 @@ function hasTools(turn: TranscriptTurnLike): boolean {
 export function isMetadataOnlyTurn(turn: TranscriptTurnLike): boolean {
   if (hasText(turn) || hasTools(turn)) return false;
   const label = getTurnRoleLabel(turn);
-  return METADATA_TYPES.has(label) || label === 'assistant' || label === 'user' || label === 'system';
+  return (
+    METADATA_TYPES.has(label) || label === 'assistant' || label === 'user' || label === 'system'
+  );
 }
 
 export function getTurnDisplayLabel(turn: TranscriptTurnLike): string {
@@ -169,11 +187,13 @@ export function getToolDisplayLabel(tool: string): string {
 
 function getMetadataDetails(turn: TranscriptTurnLike): Omit<TranscriptMetadataItem, 'timestamp'> {
   const label = getTurnRoleLabel(turn);
-  return METADATA_DETAILS[label] ?? {
-    label: getTurnDisplayLabel(turn),
-    summaryLabel: `${getTurnDisplayLabel(turn).toLowerCase()} records`,
-    description: 'Low-level session record hidden from the readable transcript.',
-  };
+  return (
+    METADATA_DETAILS[label] ?? {
+      label: getTurnDisplayLabel(turn),
+      summaryLabel: `${getTurnDisplayLabel(turn).toLowerCase()} records`,
+      description: 'Low-level session record hidden from the readable transcript.',
+    }
+  );
 }
 
 export function isToolOnlyTurn(turn: TranscriptTurnLike): boolean {
@@ -191,6 +211,17 @@ export function buildTranscriptDisplayModel<T extends TranscriptTurnLike>(
       const details = getMetadataDetails(turn);
       metadata.push({
         ...details,
+        timestamp: turn.timestamp,
+      });
+      continue;
+    }
+
+    // Denoise R1/R6: whole-message caveat/system-reminder wrappers are hidden
+    // from the timeline and counted in the MetadataPanel instead.
+    const denoise = classifyTurn(turn);
+    if (denoise.kind === 'hidden' && denoise.hiddenGroup) {
+      metadata.push({
+        ...METADATA_DETAILS[denoise.hiddenGroup],
         timestamp: turn.timestamp,
       });
       continue;

@@ -3,14 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "tsx server/dev-bootstrap.mts",
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "format": "prettier --write src server tests index.html playwright.config.ts vitest.config.ts vite.config.mts postcss.config.js tailwind.config.js tsconfig*.json package.json",
+    "format:check": "prettier --check src server tests index.html playwright.config.ts vitest.config.ts vite.config.mts postcss.config.js tailwind.config.js tsconfig*.json package.json"
   },
   "dependencies": {
     "@tanstack/react-query": "^4.36.1",

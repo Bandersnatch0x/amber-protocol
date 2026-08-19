@@ -32,7 +32,8 @@ export interface RegressionEvidenceResult {
 }
 
 function assertionFor(failure: TranscriptFailure): string {
-  const firstLine = failure.error.split('\n').find((l) => l.trim().length > 0) ?? 'the failing command';
+  const firstLine =
+    failure.error.split('\n').find((l) => l.trim().length > 0) ?? 'the failing command';
   return `Re-running \`${failure.tool}\` with the recorded input should not fail with: ${firstLine.trim()}`;
 }
 
@@ -72,7 +73,10 @@ export function proposeRegressionsFromTranscript(
     const taskDir = path.join(executionsRoot, `${id}-failure-${index + 1}`);
     fs.mkdirSync(taskDir, { recursive: true });
     const evidencePath = path.join(taskDir, 'evidence.json');
-    fs.writeFileSync(evidencePath, `${JSON.stringify(buildEvidence(id, index, failure), null, 2)}\n`);
+    fs.writeFileSync(
+      evidencePath,
+      `${JSON.stringify(buildEvidence(id, index, failure), null, 2)}\n`,
+    );
     files.push(evidencePath);
   });
 

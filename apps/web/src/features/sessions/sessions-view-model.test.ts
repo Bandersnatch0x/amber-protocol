@@ -40,8 +40,12 @@ describe('filterAndSortSessions', () => {
   });
 
   it('filters by search across goal, session id, and route id', () => {
-    expect(filterAndSortSessions(sessions, 'bugfix', '').map((session) => session.id)).toEqual(['session-running']);
-    expect(filterAndSortSessions(sessions, 'session-completed', '').map((session) => session.id)).toEqual(['session-completed']);
+    expect(filterAndSortSessions(sessions, 'bugfix', '').map((session) => session.id)).toEqual([
+      'session-running',
+    ]);
+    expect(
+      filterAndSortSessions(sessions, 'session-completed', '').map((session) => session.id),
+    ).toEqual(['session-completed']);
   });
 
   it('filters by status after applying search', () => {

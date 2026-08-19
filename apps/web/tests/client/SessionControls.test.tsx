@@ -64,7 +64,9 @@ describe('SessionControls', () => {
   });
 
   it('shows no actions for a completed session', () => {
-    const { container } = renderWithI18n(<SessionControls sessionId={'session-1'} status={'completed'} />);
+    const { container } = renderWithI18n(
+      <SessionControls sessionId={'session-1'} status={'completed'} />,
+    );
 
     expect(screen.queryByRole('button')).toBeNull();
     expect(container.textContent?.trim()).toBe('');
@@ -102,7 +104,9 @@ describe('SessionControls', () => {
   it('notifies the parent after a successful action so evidence can refresh', async () => {
     startMutateAsync.mockResolvedValue({});
     const onActionSettled = vi.fn();
-    renderWithI18n(<SessionControls sessionId={'session-1'} status={'idle'} onActionSettled={onActionSettled} />);
+    renderWithI18n(
+      <SessionControls sessionId={'session-1'} status={'idle'} onActionSettled={onActionSettled} />,
+    );
 
     fireEvent.click(screen.getByText('Start'));
 
@@ -150,6 +154,8 @@ describe('SessionControls', () => {
     expect(await screen.findByText('Request persisted')).toBeDefined();
     expect(screen.getByText('Manifest confirmed')).toBeDefined();
     expect(screen.getByText('Runner ACK timed out')).toBeDefined();
-    expect(screen.getByText('No runner ACK observed before timeout; manifest status is confirmed.')).toBeDefined();
+    expect(
+      screen.getByText('No runner ACK observed before timeout; manifest status is confirmed.'),
+    ).toBeDefined();
   });
 });

@@ -13,8 +13,16 @@ const route = {
     version: '1.0.0',
   },
   gates: [
-    { id: 'user-approval-plan', type: 'user-approval', description: 'Approve plan before implementation?' },
-    { id: 'user-approval-implement', type: 'user-approval', description: 'Proceed with implementation?' },
+    {
+      id: 'user-approval-plan',
+      type: 'user-approval',
+      description: 'Approve plan before implementation?',
+    },
+    {
+      id: 'user-approval-implement',
+      type: 'user-approval',
+      description: 'Proceed with implementation?',
+    },
   ],
 } as const;
 

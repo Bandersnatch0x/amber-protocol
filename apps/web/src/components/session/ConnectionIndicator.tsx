@@ -8,14 +8,37 @@ interface ConnectionIndicatorProps {
   reconnectAttempt?: number;
 }
 
-const stateConfig: Record<ConnectionState, { labelKey: I18nKey; dotClass: string; textClass: string }> = {
-  open: { labelKey: 'sessions.connection.open', dotClass: 'bg-emerald-500', textClass: 'text-emerald-600 dark:text-emerald-400' },
-  connecting: { labelKey: 'sessions.connection.connecting', dotClass: 'bg-amber-500 animate-pulse', textClass: 'text-amber-600 dark:text-amber-400' },
-  closed: { labelKey: 'sessions.connection.closed', dotClass: 'bg-slate-400', textClass: 'text-slate-500 dark:text-slate-400' },
-  error: { labelKey: 'sessions.connection.error', dotClass: 'bg-red-500', textClass: 'text-red-600 dark:text-red-400' },
+const stateConfig: Record<
+  ConnectionState,
+  { labelKey: I18nKey; dotClass: string; textClass: string }
+> = {
+  open: {
+    labelKey: 'sessions.connection.open',
+    dotClass: 'bg-emerald-500',
+    textClass: 'text-emerald-600 dark:text-emerald-400',
+  },
+  connecting: {
+    labelKey: 'sessions.connection.connecting',
+    dotClass: 'bg-amber-500 animate-pulse',
+    textClass: 'text-amber-600 dark:text-amber-400',
+  },
+  closed: {
+    labelKey: 'sessions.connection.closed',
+    dotClass: 'bg-slate-400',
+    textClass: 'text-slate-500 dark:text-slate-400',
+  },
+  error: {
+    labelKey: 'sessions.connection.error',
+    dotClass: 'bg-red-500',
+    textClass: 'text-red-600 dark:text-red-400',
+  },
 };
 
-export function ConnectionIndicator({ state, onRetry, reconnectAttempt }: ConnectionIndicatorProps) {
+export function ConnectionIndicator({
+  state,
+  onRetry,
+  reconnectAttempt,
+}: ConnectionIndicatorProps) {
   const { t } = useI18n();
   const config = stateConfig[state];
 
@@ -25,7 +48,9 @@ export function ConnectionIndicator({ state, onRetry, reconnectAttempt }: Connec
         <div className={`h-1.5 w-1.5 rounded-full ${config.dotClass}`} />
         <span className={`text-xs font-medium ${config.textClass}`}>
           {t(config.labelKey)}
-          {reconnectAttempt && reconnectAttempt > 0 && state === 'connecting' ? ` (${reconnectAttempt})` : ''}
+          {reconnectAttempt && reconnectAttempt > 0 && state === 'connecting'
+            ? ` (${reconnectAttempt})`
+            : ''}
         </span>
       </div>
 

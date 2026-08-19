@@ -24,17 +24,48 @@ function stripLeadingLineNumber(line: string): string {
   return line.replace(/^\s*\d+(?:\s+|[|:]\s*)/, '');
 }
 
+function isProseBulletLine(line: string): boolean {
+  const trimmed = stripLeadingLineNumber(line).trim();
+  const match = /^[-*+]\s+(.*)$/.exec(trimmed);
+  if (!match?.[1]) return false;
+  const body = match[1];
+  // Markdown bold is prose emphasis, never a diff hunk: real diff deletions
+  // ("- foo") are bare code identifiers without emphasis markers.
+  if (body.includes('**')) return true;
+  // Code punctuation marks diff hunks like "-  required: [id, trigger]";
+  // only punctuation-free bodies with natural-language words read as prose.
+  if (/[{}()[\];=:]|=>/.test(body)) return false;
+  return (
+    /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/.test(body) || /[A-Za-z]{2,}/.test(body)
+  );
+}
+
 function codeSignal(line: string): number {
   const trimmed = stripLeadingLineNumber(line).trim();
   if (!trimmed) return 0;
+  // Short stat bullets ("- **含空白** 350 文件 +10742/-10535") are Markdown
+  // list items, not diff hunks: strip every diff/code signal so they never
+  // qualify as bare code.
+  if (isProseBulletLine(trimmed)) return 0;
 
   let score = 0;
-  if (/^(import|export|const|let|var|function|class|interface|type|return|if|for|while|try|catch|throw|async|await)\b/.test(trimmed)) score += 2;
-  if (/(require\(|console\.|JSON\.|path\.|fs\.|new Error|module\.exports|=>)/.test(trimmed)) score += 2;
+  if (
+    /^(import|export|const|let|var|function|class|interface|type|return|if|for|while|try|catch|throw|async|await)\b/.test(
+      trimmed,
+    )
+  )
+    score += 2;
+  if (/(require\(|console\.|JSON\.|path\.|fs\.|new Error|module\.exports|=>)/.test(trimmed))
+    score += 2;
   if (/[{}();=]/.test(trimmed)) score += 1;
-  if (/^(diff --git|@@|\+\+\+|---|\+|-)/.test(trimmed)) score += 3;
+  if (/^(diff --git|@@|\+\+\+|---|[+-]\S)/.test(trimmed)) score += 3;
+  // Weak diff signal: "+/- " prefixed lines may be indented diff hunks, but
+  // they are indistinguishable from Markdown list items in isolation, so the
+  // natural-language guard below decides which reading wins.
+  if (/^[+-]\s/.test(trimmed)) score += 1;
   if (/^[\w./-]+[\\/][\w./\\-]+\.[a-z0-9]+$/i.test(trimmed)) score += 2;
-  if (/^(\$|>)?\s*(npm|pnpm|yarn|git|node|npx|cd|ls|dir|cat|rg|Get-|Set-|Invoke-)\b/.test(trimmed)) score += 2;
+  if (/^(\$|>)?\s*(npm|pnpm|yarn|git|node|npx|cd|ls|dir|cat|rg|Get-|Set-|Invoke-)\b/.test(trimmed))
+    score += 2;
   if (/^[)}\]];?,?$/.test(trimmed)) score += 1;
   if (/^["'`].*["'`],?\s*[+)]?$/.test(trimmed)) score += 1;
   return score;
@@ -64,18 +95,45 @@ function hasSequentialLineNumbers(lines: string[]): boolean {
 function isLikelyWholeCodeBlock(lines: string[]): boolean {
   const nonBlankLines = lines.filter((line) => line.trim().length > 0);
   if (nonBlankLines.length < 6) return false;
+  // Long assistant Markdown (lists, prose paragraphs) must never be wrapped
+  // into a code block: bail out when natural-language text dominates.
+  if (naturalLanguageRatio(nonBlankLines) >= 0.5) return false;
   if (hasSequentialLineNumbers(lines)) return true;
 
   const signalCount = nonBlankLines.filter((line) => codeSignal(line) > 0).length;
-  const structuralCount = nonBlankLines.filter((line) => /[{}();=]|^\s*(\/\/|#|\/\*|\*)/.test(stripLeadingLineNumber(line).trim())).length;
+  const structuralCount = nonBlankLines.filter((line) =>
+    /[{}();=]|^\s*(\/\/|#|\/\*|\*)/.test(stripLeadingLineNumber(line).trim()),
+  ).length;
 
   return signalCount >= 5 && structuralCount / nonBlankLines.length >= 0.35;
+}
+
+function isNaturalLanguageLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  // Short stat bullets carrying bold markers or natural-language words are
+  // prose even when they stay under the five-word threshold.
+  if (isProseBulletLine(trimmed)) return true;
+  // A weak paren/dash-list signal (=1) can come from prose like "the fix
+  // (see issue 42) works" or "- Fixed the login redirect bug"; anything
+  // stronger means code.
+  if (codeSignal(trimmed) > 1) return false;
+  const body = trimmed.replace(/^(#{1,6}\s+|>\s+|[-*+]\s+|\d+[.)]\s+)/, '');
+  const words = body.split(/\s+/).filter(Boolean);
+  return words.length >= 5;
+}
+
+function naturalLanguageRatio(lines: string[]): number {
+  const nonBlank = lines.filter((line) => line.trim().length > 0);
+  if (nonBlank.length === 0) return 0;
+  const prose = nonBlank.filter((line) => isNaturalLanguageLine(line)).length;
+  return prose / nonBlank.length;
 }
 
 function inferLanguage(lines: string[]): string | undefined {
   const source = lines.join('\n');
   const trimmed = source.trim();
-  if (/^(diff --git|@@|\+\+\+|---|\+|-)/m.test(trimmed)) return 'diff';
+  if (/^(diff --git|@@|\+\+\+|---|[+-]\S)/m.test(trimmed)) return 'diff';
   if (/^\s*[{[]/.test(trimmed)) {
     try {
       JSON.parse(trimmed);
@@ -85,7 +143,8 @@ function inferLanguage(lines: string[]): string | undefined {
     }
   }
   if (/\b(interface|type\s+\w+\s*=|tsx|React\.|JSX)\b/.test(trimmed)) return 'typescript';
-  if (/\b(import|export|const|let|function|require\(|module\.exports|console\.)\b/.test(trimmed)) return 'javascript';
+  if (/\b(import|export|const|let|function|require\(|module\.exports|console\.)\b/.test(trimmed))
+    return 'javascript';
   if (/^(\$|>)?\s*(npm|pnpm|yarn|git|node|npx|cd|ls|dir|cat|rg)\b/m.test(trimmed)) return 'shell';
   if (/^\s*(Get-|Set-|Invoke-|\$env:|\$\w+\s*=)/m.test(trimmed)) return 'powershell';
   if (/^\s*(def|class|import|from|print\()/m.test(trimmed)) return 'python';
@@ -97,11 +156,13 @@ function segmentBareText(text: string): MessageSegment[] {
   const lines = text.split('\n');
   if (isLikelyWholeCodeBlock(lines)) {
     const strippedLines = stripSequentialLineNumbers(lines);
-    return [{
-      type: 'code',
-      value: strippedLines.join('\n').trim(),
-      language: inferLanguage(strippedLines),
-    }];
+    return [
+      {
+        type: 'code',
+        value: strippedLines.join('\n').trim(),
+        language: inferLanguage(strippedLines),
+      },
+    ];
   }
 
   const segments: MessageSegment[] = [];
@@ -140,7 +201,9 @@ function segmentBareText(text: string): MessageSegment[] {
 
     const candidate = lines.slice(start, end);
     const nonBlankCount = candidate.filter((line) => line.trim()).length;
-    const qualifies = signalCount >= 4 || (signalCount >= 3 && nonBlankCount >= 4);
+    const qualifies =
+      (signalCount >= 4 || (signalCount >= 3 && nonBlankCount >= 4)) &&
+      naturalLanguageRatio(candidate) < 0.5;
 
     if (!qualifies) {
       index = end;
@@ -191,7 +254,10 @@ function segmentMessage(text: string): MessageSegment[] {
   return segments.length > 0 ? segments : [{ type: 'text', value: text }];
 }
 
-function MarkdownContent({ text, codeCollapseAfterLines }: Required<Pick<MarkdownMessageProps, 'text' | 'codeCollapseAfterLines'>>) {
+function MarkdownContent({
+  text,
+  codeCollapseAfterLines,
+}: Required<Pick<MarkdownMessageProps, 'text' | 'codeCollapseAfterLines'>>) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -212,7 +278,13 @@ function MarkdownContent({ text, codeCollapseAfterLines }: Required<Pick<Markdow
             );
           }
 
-          return <CodeBlock code={codeText} language={language} collapseAfterLines={codeCollapseAfterLines} />;
+          return (
+            <CodeBlock
+              code={codeText}
+              language={language}
+              collapseAfterLines={codeCollapseAfterLines}
+            />
+          );
         },
         pre({ children }) {
           return <>{children}</>;
@@ -227,11 +299,20 @@ function MarkdownContent({ text, codeCollapseAfterLines }: Required<Pick<Markdow
           return <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>;
         },
         blockquote({ children }) {
-          return <blockquote className="my-3 border-l-2 border-slate-300 pl-3 text-slate-600 dark:border-slate-600 dark:text-slate-400">{children}</blockquote>;
+          return (
+            <blockquote className="my-3 border-l-2 border-slate-300 pl-3 text-slate-600 dark:border-slate-600 dark:text-slate-400">
+              {children}
+            </blockquote>
+          );
         },
         a({ children, href }) {
           return (
-            <a href={href} className="text-blue-600 underline decoration-blue-300 underline-offset-2 hover:text-blue-500 dark:text-blue-300" target="_blank" rel="noreferrer">
+            <a
+              href={href}
+              className="text-blue-600 underline decoration-blue-300 underline-offset-2 hover:text-blue-500 dark:text-blue-300"
+              target="_blank"
+              rel="noreferrer"
+            >
               {children}
             </a>
           );
@@ -248,11 +329,22 @@ export function MarkdownMessage({ text, codeCollapseAfterLines = 18 }: MarkdownM
 
   return (
     <div className="markdown-message text-sm leading-6 text-slate-700 dark:text-slate-300">
-      {segments.map((segment, index) => (
-        segment.type === 'code'
-          ? <CodeBlock key={`${segment.type}-${index}`} code={segment.value} language={segment.language} collapseAfterLines={codeCollapseAfterLines} />
-          : <MarkdownContent key={`${segment.type}-${index}`} text={segment.value} codeCollapseAfterLines={codeCollapseAfterLines} />
-      ))}
+      {segments.map((segment, index) =>
+        segment.type === 'code' ? (
+          <CodeBlock
+            key={`${segment.type}-${index}`}
+            code={segment.value}
+            language={segment.language}
+            collapseAfterLines={codeCollapseAfterLines}
+          />
+        ) : (
+          <MarkdownContent
+            key={`${segment.type}-${index}`}
+            text={segment.value}
+            codeCollapseAfterLines={codeCollapseAfterLines}
+          />
+        ),
+      )}
     </div>
   );
 }
