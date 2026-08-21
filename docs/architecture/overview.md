@@ -4,7 +4,7 @@ High-level overview of the current `Amber Protocol` repository. The primary CLI 
 
 ## Positioning
 
-The current repository and package name are `Amber Protocol`. Architecturally, the project is a repository-local governance layer for coding agents.
+The current repository and package name are `Amber Protocol`. Architecturally, the project is a repository-local governance layer for coding agents. The authoritative distributed-governance baseline is [Distributed Governance Architecture Baseline](distributed-governance-baseline.md).
 
 The system can be understood through seven internal control layers:
 

@@ -1,11 +1,11 @@
 # Amber Protocol
 
-A repository-local governance protocol. Its Governance Console is the CLI and artifact surface that constrains, verifies, audits, and hands off AI-assisted engineering work inside a git repository.
+A governance protocol whose Amber Core is repository-local and offline-capable. Its optional distributed contexts synchronize and project governed artifacts without executing target work.
 
 ## Language
 
 **Amber Protocol**:
-The product: a repository-local governance layer for AI-assisted engineering that installs, audits, validates, and maintains agent-facing project state.
+The product: a governance layer for AI-assisted engineering whose Amber Core owns repository-local project state while optional distributed contexts add synchronization, shared projections, governed knowledge, visualization, and administration.
 _Avoid_: Coding Harness, framework, platform
 
 **Governance Console**:
@@ -107,6 +107,208 @@ _Avoid_: vertical slice, sub-task, step
 **Feature State**:
 The machine-readable record of all features in `feature_list.json`.
 _Avoid_: task list, project status, backlog
+
+## Distributed Governance
+
+**Amber Core**:
+The repository-local, offline-capable bounded context that owns canonical governance artifacts, their admission rules, and governed Actions. It is not a hosted service or agent runtime.
+_Avoid_: core service, local runtime, execution engine
+
+**Sync Runtime**:
+The optional non-executing bounded context that synchronizes typed immutable Domain Facts and Domain Events across Source Replicas and owns Sync Control Records for delivery, replay, Checkpoint, subscription, fencing, rejection, and Conflict recording. It validates and transports records but never owns source-domain facts, resolves their Conflicts, or executes target work.
+_Avoid_: agent runtime, orchestration runtime, worker runtime
+
+**Runtime Protocol**:
+The single transport-neutral, versioned contract through which Amber Core and other bounded contexts negotiate and use Sync Runtime capabilities. It exposes only statically registered synchronization operations, queries, subscriptions, diagnostics, and typed settlements; it never exposes generic invocation, arbitrary commands, filesystem access, or domain authority.
+_Avoid_: wire format, adapter API, execution protocol
+
+**Component Type**:
+An immutable, statically registered definition of one Runtime adapter contract, including its category, versions, schemas, integrity identity, capabilities, compatible ranges, allowed scopes and effects, dependencies, lifecycle contract, and upgrade class. It contains neither executable configuration nor mutable instance state.
+_Avoid_: plugin package, discovered module, Component Instance
+
+**Component Instance**:
+An explicitly configured, scoped use of one Component Type with a stable logical identity, validated non-secret configuration, opaque Secret References, deterministic dependency bindings, and successive Component Generations.
+_Avoid_: loaded plugin, process, Component Type
+
+**Component Generation**:
+One immutable admitted activation of a Component Instance, bound to exact configuration, dependency, contract, capability, policy, and fence evidence. Replacement is a forward fenced handoff to a new Component Generation; it is distinct from Source Generation and never rewrites synchronized lineage.
+_Avoid_: Source Generation, retry, hot reload
+
+**Secret Reference**:
+An opaque, scoped reference to secret material resolved only inside its owning deployment boundary. Runtime records may carry its non-secret identity, version, freshness, lease, and resolution outcome, but never the secret material itself or a derivable value.
+_Avoid_: credential value, redacted secret, configuration string
+
+**Runtime Session**:
+A stable, resumable Runtime Protocol context with one immutable negotiated and admitted identity, scope, protocol, capability, policy, and fence snapshot. Connections and Transport Bindings are replaceable routing details and never become authority or settlement identity.
+_Avoid_: connection, process session, agent session
+
+**Runtime Operation**:
+One typed, scoped Runtime Protocol request with a caller idempotency identity, canonical input hash, deadline, admitted snapshot, progress evidence, and exactly one durable terminal settlement. Cancellation, deadline expiry, disconnect, and wait timeout do not imply rollback or settlement.
+_Avoid_: command, transport request, agent task
+
+**Degraded Read-Only**:
+The explicit Runtime posture used when mutation authority, integrity, compatibility, required capability, policy, fence, dependency, or lifecycle state cannot be proven. It permits only proven scoped inspection, verification, diagnostics, durable-record lookup, and immutable export; it never becomes a stale-read or alternate-write fallback.
+_Avoid_: best effort, fallback mode, partial authority
+
+**Domain Fact**:
+An immutable, content-hashed, provenance-bearing assertion emitted by the bounded context authoritative for its type. Synchronization may deliver or reject it but cannot change its meaning or authority.
+_Avoid_: mutable object, projection row, synchronized truth
+
+**Domain Event**:
+An immutable record of a domain transition, decision, or Resolution with an explicit actor, valid time, recorded time, and causal parents. Source sequence orders it only within one Source Replica generation and stream.
+_Avoid_: global sequence, mutable status, transport message
+
+**Sync Control Record**:
+An immutable Runtime-owned record for negotiation, Delivery, Checkpoint, acknowledgement, rejection, Conflict recording, or Ownership Handoff. It settles synchronization state without becoming a source-domain fact.
+_Avoid_: Domain Fact, command, authority grant
+
+**Sync Envelope**:
+The single versioned immutable wrapper used by every Deployment Profile for a Domain Fact or Domain Event. It carries type and protocol versions, Tenant and governed-subject scope, explicit Repository scope state, stream and Source Replica generation, local sequence, actor, time, content hash, provenance, and causal identity.
+_Avoid_: transport frame, global log entry, unscoped payload
+
+**Source Replica**:
+A stable identified copy of synchronized governance state. A connection, process, clone path, or device handle is not a Source Replica identity.
+_Avoid_: connection, process, Repository Identity
+
+**Source Generation**:
+One admitted writer epoch for a Source Replica and stream. Checkpoints and cursors are pinned to it; an accepted Ownership Handoff or fenced recovery starts a new generation and leaves prior generations readable but unable to publish.
+_Avoid_: retry count, schema version, connection generation
+
+**Checkpoint**:
+The last durably settled position for one Tenant, governed subject, Repository scope, stream, Source Replica, and Source Generation, bound to its schema and hash-chain state. It advances only after every delivered record has a durable outcome.
+_Avoid_: cursor alone, acknowledgement request, best-effort offset
+
+**Ownership Handoff**:
+A governed transfer of mutation authority between Source Replicas that binds an accepted Checkpoint to a new fence and Source Generation. It never implies rollback, deletion, or implicit writer replacement.
+_Avoid_: Delivery, reconnect, Continuity Handoff
+
+**Governance Graph**:
+A rebuildable, tenant- and repository-scoped projection of governance entities and their causal, provenance, temporal, and policy relationships. It is never a graph store authority or independent source of truth.
+_Avoid_: graph database, system of record, memory graph
+
+**Decision**:
+An immutable, scoped governance record of a question, chosen outcome, rationale, alternatives and trade-offs, supporting and contradicting Evidence, actor and approver, lifecycle status, valid and recorded time, affected Artifacts, content hash, and provenance. It never records private reasoning.
+_Avoid_: hidden reasoning, mutable choice, graph edit
+
+**Claim**:
+A provenance-bearing statement that can be supported, contradicted, superseded, or preserved in a Conflict. A Claim does not become accepted knowledge or domain truth merely because it is projected into the Governance Graph.
+_Avoid_: accepted fact, inference, search result
+
+**Action**:
+A typed governed operation together with its invocation receipt, actor, scope, approval disposition, outcome, and Evidence. A projected Action describes governed activity; it does not grant the Governance Graph execution authority.
+_Avoid_: raw command, graph mutation, execution engine
+
+**Approval**:
+An immutable authorization decision naming the approver, capability or Policy, explicit scope, outcome, valid and recorded time, and provenance. Approval never widens scope implicitly or overrides a deny-wins rule.
+_Avoid_: implicit consent, permission flag, Resolution
+
+**Provenance Envelope**:
+The mandatory provenance carried by every durable Governance Graph node, edge, Domain Fact/Event projection, and Inference: source and Resolution owners, source identity and content hash, actor, originating Action or causal parent, explicit scope, derivation kind, confidence or assurance, valid and recorded time, correlation/causal metadata, and source-stream predecessor metadata when available. An Inference also records its rule/version and every input identity and hash.
+_Avoid_: citation string, optional metadata, source label
+
+**Inference**:
+A rebuildable conclusion produced by a versioned deterministic rule from explicitly identified, content-hashed inputs. It is always distinct from authored or observed facts and never becomes authoritative through projection.
+_Avoid_: Claim, accepted knowledge, hidden rule
+
+**Graph Projection Freshness**:
+The per-scope status of a Governance Graph projection, proven by its source Checkpoint or sequence, schema and projection-rule versions, build and last-applied times, and integrity evidence. The status is fresh, stale, rebuilding, or blocked; stale or unprovable state fails closed to read-only inspection.
+_Avoid_: cache age, best-effort current, timestamp alone
+
+**Governance Graph Projection Bundle**:
+A versioned, scoped, read-only internal interchange form containing projected node and edge records, Provenance Envelopes, source hashes, schema and projection-rule versions, Checkpoint and freshness metadata, and integrity evidence. Import is always governed admission followed by rebuild validation; the bundle is never an authoritative graph write.
+_Avoid_: backup authority, direct graph import, mutable snapshot
+
+**Governed Knowledge Base**:
+The bounded context that governs Knowledge Record admission, review, freshness, refresh, supersession, retirement, and cross-repository discovery. It is distinct from the Wiki, and its catalogs and indexes are rebuildable.
+_Avoid_: Wiki, document store, generic ingestion platform
+
+**Knowledge Record**:
+A provenance-backed, reviewed, freshness-aware unit of durable knowledge with an explicit lifecycle and owning repository. A Context Page is Amber Core's distilled form of a Knowledge Record, not a competing concept.
+_Avoid_: raw event, generated summary, Wiki page
+
+**Visualization Workbench**:
+The distributed exploration surface for temporal, relationship, and knowledge projections. It is distinct from the repository-local Governance Console and never acts as an authoritative write path.
+_Avoid_: Governance Console, visualization store, source of truth
+
+**Organization Control Plane**:
+The service-side bounded context that owns tenants, principals, membership, repository registration, tenant configuration, assigned policy, and administrative audit. It does not own repository work state or execute target work.
+_Avoid_: Organization Profile, execution plane, repository authority
+
+**Principal**:
+A Tenant-scoped authorization subject. A Principal is exactly one Person or Agent Identity; Amber does not create a cross-Tenant Principal identity.
+_Avoid_: account, global user, actor alias
+
+**Person**:
+A Tenant-scoped Principal representing a human. The same human in different Tenants is represented by distinct Persons that Amber does not automatically link.
+_Avoid_: user account, global person, operator identity
+
+**Agent Identity**:
+A Tenant-scoped Principal representing a non-human actor. It never impersonates a Person, has independent Membership and Role Assignments, and names an accountable Person Membership or Team in the same Organization.
+_Avoid_: bot user, Person alias, execution worker
+
+**Tenant**:
+The hard boundary for identity, authorization, assigned policy, and distributed governance data. Each Tenant has exactly one root Organization and never shares a Principal, Membership, or authoritative fact with another Tenant implicitly.
+_Avoid_: Organization, Deployment Profile, hosted instance
+
+**Organization**:
+The root governance subject inside one Tenant. It contains the Tenant's Teams and Repository Registrations but is distinct from the Tenant isolation boundary and from the Organization Profile Deployment Profile.
+_Avoid_: Tenant, Organization Profile, Organization Control Plane
+
+**Team**:
+An optional flat governance group inside one Organization. A Team never crosses a Tenant or contains another Team, and its authority comes only from explicit Membership and Role Assignments.
+_Avoid_: Tenant, nested group, permission boundary
+
+**Repository Identity**:
+The stable identity of one Target Repository across clones and synchronization replicas. It belongs to one Tenant and Organization at a time; replicas are distinguished by source replica and generation rather than becoming new Repositories.
+_Avoid_: clone identity, replica identity, Repository Registration
+
+**Membership**:
+An explicit lifecycle relationship between a Principal and an Organization or Team in the same Tenant. Membership establishes belonging but grants no capability by itself; Amber does not define Repository Membership.
+_Avoid_: permission, Role Assignment, Repository access
+
+**Role**:
+A named, versioned capability bundle defined within one Tenant. A Role has no subject or resource scope until a Role Assignment applies it.
+_Avoid_: Membership, Policy, permission grant
+
+**Role Assignment**:
+A lifecycle relationship that binds one Role to a Person, Agent Identity, or Team at exactly one Organization, Team, or Repository scope. Effective Role Assignments require active Membership and remain subject to deny-wins policy evaluation.
+_Avoid_: Membership, Role, Policy Assignment
+
+**Policy Assignment**:
+A lifecycle relationship that binds an immutable Policy version to an explicit subject selector and resource scope. It can restrict capabilities but never independently grant them or relax Amber Core safety invariants or Repository rules.
+_Avoid_: Policy, Role Assignment, capability grant
+
+**Deployment Profile**:
+A supported composition of distributed-governance bounded contexts that shares one protocol and artifact model. Profiles change deployment shape and governance scope, not Tenant count, commercial tier, or repository artifact semantics.
+_Avoid_: bounded context, product tier, protocol variant
+
+**Personal Node**:
+A single-operator, offline-first Deployment Profile centered on Amber Core, with one deterministic local Tenant, Organization, and Person scope, optional local projections, one or more Repositories, and no required service.
+_Avoid_: single-user mode, local runtime
+
+**Team Hub**:
+A self-hosted Deployment Profile for one Tenant and one Organization that adds synchronization, shared projections, and the minimum administrative authority needed for Person and Agent Identity, Team, Membership, Repository Registration, Role Assignment, and Policy Assignment.
+_Avoid_: central source of truth, hosted organization service
+
+**Organization Profile**:
+A Deployment Profile using the same identity and authorization semantics for organization-wide administration and cross-Repository governance without changing Amber Core artifact authority. A service may host multiple isolated Organization Profile Tenants without creating another Deployment Profile.
+_Avoid_: Organization Control Plane, enterprise edition, protocol variant
+
+**Conflict**:
+A first-class record of structurally valid, provenance-bearing competing claims that cannot all become domain truth because they violate an explicit invariant. It is distinct from Rejection and Corruption, preserves every claim, and remains visible after the context owning the invariant records an explicit governed Resolution.
+_Avoid_: last-write-wins, merge failure, silent overwrite
+
+**Rejection**:
+A durable typed settlement for a record that cannot enter synchronization state because its type, scope, capability, authority, policy, fence, or provenance is invalid or unprovable. A Rejection is acknowledged as settled receipt but is not semantic acceptance or a Conflict.
+_Avoid_: Conflict, retry forever, silent drop
+
+**Corruption**:
+An identity, content-hash, source-sequence, hash-chain, or Checkpoint-lineage contradiction that makes the affected write stream untrustworthy. Corruption fails closed to read-only inspection until governed repair and is never resolved by choosing a competing claim.
+_Avoid_: Conflict, duplicate, recoverable warning
+
+**Resolution**:
+An immutable governed event recorded by the bounded context owning a violated invariant. It links the Conflict and every preserved claim to the decision, approver, outcome, evidence, valid and recorded time, and provenance without editing or deleting prior records.
+_Avoid_: overwrite, deletion, Runtime merge
 
 ## Governance
 
@@ -299,3 +501,199 @@ _Avoid_: comment, opinion, review note
 **Control Layer**:
 One of seven priority layers that frame how Amber capabilities are organized: Governance, Verification, Observability, Lifecycle, Context, Tooling, Execution. A documentation positioning frame, not a runtime module or command namespace.
 _Avoid_: tier, level, stack
+
+## Storage And Read Model
+
+**Canonical Record**:
+An immutable, schema-versioned Domain Fact, Domain Event, or Sync Control Record that retains one source owner and one Resolution owner. Canonical records and their governed Artifact bodies are authoritative; mutable rows, snapshots, indexes, and caches are not.
+_Avoid_: source row, mutable record, projection authority
+
+**Content-Addressed Artifact**:
+An immutable Artifact body identified by its content hash and owned by the bounded context that admits it. Its identity and hash are distinct from any Domain Event identity, and references to it do not authorize arbitrary file or secret transfer.
+_Avoid_: blob store, file authority, attachment
+
+**Projection**:
+A rebuildable read model derived from authoritative canonical records, admitted events, or Sync Control Records under declared schema and projection-rule versions. A Projection never becomes a source-domain authority or an independent mutation path.
+_Avoid_: materialized truth, replica authority, mutable view
+
+**Projection Freshness**:
+The per-scope evidence state of a Projection, including its source Checkpoint or watermark, applied schema and projection-rule versions, build and last-applied times, and integrity evidence. Its status is fresh, stale, rebuilding, or blocked; it cannot support an unproven currentness or authority claim.
+_Avoid_: cache age, current by timestamp, best-effort freshness
+
+**Query Contract**:
+A statically registered, typed, finite, and scoped read definition that declares exact scope, capability and Policy checks, filtering, sorting, direction, bounds, truncation, and result evidence. It does not expose arbitrary query languages, server-side code, unbounded scans, or scope-widening joins.
+_Avoid_: query string, database query, free-form search
+
+**Read Cursor**:
+An opaque position bound to a Query Contract, exact scope, Projection identity and versions, source Checkpoint or watermark, sort/filter hash, direction, and declared expiry or retention. A changed binding or lineage invalidates it; it never silently restarts.
+_Avoid_: offset, page number, global cursor
+
+**Read Snapshot**:
+An explicit per-scope immutable observation bound to canonical or Projection watermark, schema and rule versions, and integrity evidence. It remains usable only while its source lineage is verifiable and never promises global or cross-scope atomicity.
+_Avoid_: global snapshot, mutable view, timestamp snapshot
+
+**Subscription**:
+A durable accepted Runtime Operation with an immutable typed filter, exact scope, capability hash, receiver credit, receiver Checkpoint, at-least-once replay, and one terminal settlement. A filter, scope, or contract change creates a new Subscription.
+_Avoid_: live feed, implicit listener, best-effort stream
+
+**Consistency Level**:
+An explicitly proven per-scope read posture: canonical-local, causally-complete, checkpoint-bounded, projection-fresh, or degraded-read-only. Profiles advertise only levels they can prove and never silently upgrade or fall back to a stronger posture.
+_Avoid_: eventual consistency, read preference, freshness mode
+
+**Retention Policy**:
+An explicit governed policy for retaining canonical history, Artifact bodies, provenance, causal lineage, Resolution lineage, and Conflict, Rejection, and Corruption evidence. Expiry is a typed unavailable or blocked posture, never a silent gap; compaction is limited to rebuildable or disposable material after replay proof.
+_Avoid_: cleanup, automatic deletion, archive shortcut
+
+**Backpressure**:
+A typed non-admission posture caused by bounded item, byte, or outstanding-work capacity. Producers pause or receive Backpressured outcomes while control capacity remains available for fencing, cancellation, flow control, and terminal settlement; records are not dropped, reordered, or silently rerouted.
+_Avoid_: overflow, lossy queue, hidden spillover
+
+## Security, Privacy, And Isolation
+
+**Trust Boundary**:
+An explicit boundary inside which a named bounded context, authenticated Principal, admitted Policy and capability Evidence, exact scope, and integrity-checked state may support an authority claim. A transport, Projection, cache, local operator assertion, or administrative assertion outside its proven authority never becomes a trust root.
+_Avoid_: implicit trust, service trust, administrator override
+
+**Authorization Evidence**:
+The immutable evidence for one deny-wins authorization decision: Principal, active Membership, Role Assignment, Policy Assignment, capability, exact scope and effect, validity window, policy and schema versions, source pointers and hashes, fence and generation inputs, decision time, and outcome. Missing, stale, ambiguous, or unverifiable evidence fails closed.
+_Avoid_: permission flag, token claim, cached allow
+
+**Tenant Isolation**:
+The non-crossable separation of identity, authorization, Policy, administrative data, synchronized data, Projections, audit, and retention by Tenant. Organization, Team, Repository, Source Replica, Source Generation, cursor, Checkpoint, Subscription, export, and audit scopes remain explicit and never blur through joins, caches, or fallback.
+_Avoid_: tenant filter, namespace convention, best-effort separation
+
+**Privacy Minimization**:
+The rule that an operation, Projection, query, Subscription, export, log, audit record, or Evidence bundle receives only the fields necessary for its declared capability, exact scope, and purpose. Identifiers and content hashes do not substitute for authorization.
+_Avoid_: collect then redact, broad visibility, metadata exception
+
+**Redaction State**:
+A deterministic bounded result that records which unauthorized or unnecessary fields were omitted without exposing them through values, counts, ordering, errors, indexes, caches, logs, or Projection metadata. It never falls back to an unredacted result.
+_Avoid_: masked success, hidden omission, best-effort redaction
+
+**Audit Anchor**:
+The owning context's append-only canonical Artifact or ledger lineage to which a provenance-bearing audit record is bound by content hash and predecessor or hash-chain state. A Projection may expose the record but cannot rewrite its authority; failed verification blocks the affected operation.
+_Avoid_: audit view, mutable log, external authority
+
+**Deletion Tombstone**:
+An immutable owner-governed record proving that scoped content was deleted and preventing replicas, Projections, indexes, caches, exports, or Subscriptions from resurrecting it. It preserves only minimum privacy-minimized deletion and prior-authority Evidence, contains no secret material, and is not a restore source.
+_Avoid_: soft delete, hidden backup, empty record
+
+**Retention Hold**:
+An explicit scoped Policy or Resolution that prevents destruction of governed content and its required Evidence until the owning context records release or replacement. It does not silently widen access or suspend privacy minimization.
+_Avoid_: permanent retention, administrator note, backup lock
+
+**Security Incident Posture**:
+The fail-closed response to compromise, replay, downgrade, cross-scope reuse, or Corruption: preserve claims and Evidence, expose affected scope and uncertainty, revoke or fence impacted identities, bindings, and generations, and require the owning context's Resolution or governed recovery. Unaffected scopes continue only when their checks pass.
+_Avoid_: silent repair, destructive reset, automatic branch selection
+
+**Administrative Separation**:
+The ownership rule that Organization Control Plane governs Tenant administration, identity, Membership, Repository Registration, assigned Policy, capability, fencing, revocation, retention directives, and administrative audit while Amber Core retains Repository work authority and Sync Runtime retains only synchronization-operational authority. Administrative authority cannot rewrite Repository work or resolve its Conflict.
+_Avoid_: superuser ownership, service authority, administrative override
+
+## Compatibility And Migration
+
+**Compatibility Relation**:
+A proven, directional relation among a Runtime Protocol version, contract and schema versions, required capability identities and hashes, Policy and fence state, dependencies, lifecycle state, and exact scope. Transport reachability or parseability alone never proves compatibility or authority.
+_Avoid_: generic semver compatibility, best-effort interoperability, transport compatibility
+
+**Version Domain**:
+An independently versioned identity space whose meaning cannot be substituted by another: Runtime Protocol, contract/schema, capability, projection rule, Component Generation, or Source Generation. Each admitted Runtime Session and Runtime Operation binds the domains it uses explicitly.
+_Avoid_: single version, release number, generation alias
+
+**Compatibility Matrix**:
+A deterministic, scope-bound record of supported Version Domains, compatible ranges, required capability hashes, upgrade classes, policy and fence prerequisites, and unknown-version outcomes used by a profile gate. It never authorizes an unproven combination.
+_Avoid_: compatibility guess, fallback table, feature flag list
+
+**Migration Checkpoint**:
+A durable position after a bounded migration step has a settled outcome, validation evidence, and idempotency identity. Repeating the same identity returns the existing settlement or performs no operation; it never duplicates or rewrites canonical history.
+_Avoid_: progress marker, best-effort offset, rollback point
+
+**Source-Generation Fence**:
+An integrity-checked boundary that prevents a superseded Source Generation from publishing or resuming writes. Recovery or Ownership Handoff creates a new generation while preserving prior lineage for read-only evidence and replay.
+_Avoid_: reconnect flag, retry counter, schema version
+
+## Governance Tracer Scenario
+
+**Governance Tracer Scenario**:
+A decision-complete architecture fixture that follows one scoped Decision, Evidence, Context/Knowledge candidate, causal lineage, and Provenance Envelope from Personal Node capture through bounded Team Hub synchronization to Organization Profile audit. It validates contracts and acceptance gates without implementing a prototype or claiming production readiness.
+_Avoid_: demo runtime, production prototype, execution scenario
+
+**Evidence Receipt**:
+A deterministic, replayable record of one tracer outcome containing stable identities, canonical serialization, exact scope, versions, lineage, hashes, causal parents, authorization or redaction references, and the durable outcome. Applied, duplicate, Rejection, Conflict, Corruption, unsettled, and Degraded Read-Only outcomes are explicit and never silently replaced.
+_Avoid_: success log, transport acknowledgement, test screenshot
+
+**Knowledge Candidate**:
+A provenance-backed, scoped proposal for Governed Knowledge Base admission that names its owning Repository, source identities and hashes, confidence, freshness policy, and review state. Synchronization, projection, raw events, logs, transcripts, summaries, and inferences cannot admit it as accepted Knowledge.
+_Avoid_: accepted Knowledge Record, generated summary, raw event
+
+**Knowledge Admission**:
+An explicit governed transition that creates an immutable Knowledge Record version from an eligible Knowledge Candidate only after authorized human review/approval, complete Provenance Envelope, exact scope, source/Resolution owner, confidence/assurance, freshness policy, valid/recorded time, privacy/retention decision, and a durable receipt. It never promotes raw events, logs, transcripts, generated summaries, inferences, search results, or projections automatically.
+_Avoid_: automatic acceptance, implicit promotion, projection authority
+
+**Knowledge Record Version**:
+One immutable content-hashed version of a Knowledge Record's canonical assertion and provenance, linked to predecessor, refresh, supersession, Conflict, retirement, and tombstone lineage; a changed assertion creates a new version and never rewrites the prior version.
+_Avoid_: mutable knowledge record, in-place refresh, projection row
+
+**Knowledge Reuse**:
+A governed consumer-Repository proposal and review that references an exact source Knowledge Record Version and hash without transferring source authority; acceptance creates a distinct consumer-owned record/lineage and source retirement, deletion, or Policy change produces explicit invalidation or re-review receipts.
+_Avoid_: authority transfer, implicit copy, cross-Tenant reuse
+
+**Knowledge Lifecycle Receipt**:
+An immutable deterministic replayable receipt for one knowledge proposal, review, admission, rejection, refresh, no-change, Conflict, supersession, retirement, deletion, reuse, invalidation, or Degraded Read-Only outcome, bound to identity/hash, exact scope, actor and authority evidence, provenance, causal lineage, and valid/recorded time; each item settles independently and identity/hash mismatch is Corruption.
+_Avoid_: success log, mutable status, silent fallback
+
+**Audit Query Declaration**:
+The immutable scope and purpose declaration for one Organization Profile audit read: Tenant, governed subject, explicit Repository set, Principal and capability, Authorization Evidence, temporal clock, relationship bounds, filter and sort, cursor or snapshot, Checkpoint/watermark, and redaction posture. Continuation revalidates these bindings and cannot widen scope or reuse stale authority.
+_Avoid_: unrestricted query, global search, implicit join
+
+**Profile Acceptance Gate**:
+A deterministic evidence gate for promoting a Deployment Profile, covering identity, exact scope, authority, offline capture and replay, idempotence, Conflict preservation, Provenance, Knowledge admission, projection rebuild parity, read-only visualization, Tenant Isolation, Privacy Minimization, bounded queries, explicit degradation, and no-execution. A failed or unavailable gate blocks promotion and leaves the prior Profile usable.
+_Avoid_: readiness by liveness, soft launch, best-effort promotion
+
+**Tracer Scenario Frontier**:
+The numbered set of unresolved architecture decisions for the Governance Tracer Scenario. The frontier is empty only after explicit round-by-round confirmation of the three-profile flow, canonical records, deterministic Evidence Receipts, acceptance gates, non-claims, and deferred implementation fog.
+_Avoid_: implementation backlog, prototype TODOs, implied technology choice
+
+**Projection Identity**:
+The deterministic identity of one rebuildable read model: view kind, canonicalized Query Contract, Tenant and exact Repository/Profile scope, schema and projection-rule versions, source generation vector, and Policy/Redaction revision. It never grants source authority or mutation capability.
+_Avoid_: view URL, cache key alone, visualization authority
+
+**Projection Generation**:
+The generation and watermark evidence produced by rebuilding a Projection from declared canonical snapshot, schema, projection-rule, Policy, Redaction, and source inputs. A mismatch or unverifiable input makes the Projection stale or Degraded Read-Only, never silently fresh.
+_Avoid_: cache timestamp, refresh hint, inferred currentness
+
+**Projection Read Receipt**:
+An immutable deterministic record of one read-only projection operation containing its canonicalized request, exact scope, Read Snapshot, generation vector, policy/redaction and schema revisions, ordered identifiers, lineage, and explicit uncertainty, conflict, redaction, freshness, or degradation state. It is not mutation authorization.
+_Avoid_: UI event, success log, command authorization
+
+**Projection Evidence Package**:
+A versioned integrity-protected export of a Projection and its read evidence, including canonicalized request, immutable snapshot, exact scope, authorization, generation/watermark vector, schema and projection-rule versions, policy/redaction revision, ordered identifiers, lineage, receipts, and non-fresh states. Import is governed admission input, not authority restoration.
+_Avoid_: backup restore, authority copy, unverified export
+
+**Temporal Projection**:
+A rebuildable Projection of authorized canonical facts and lifecycle transitions ordered by recorded-time, effective-time under a fixed null rule, stable identity, and revision/content hash. Each item retains source/Resolution ownership, Provenance, lineage, freshness, Conflict or uncertainty state, and an evidence reference; it never becomes authority or mutable history.
+_Avoid_: event log, wall-clock timeline, mutable history
+
+**Relationship Projection**:
+A rebuildable Projection of declared, Provenance-bearing relationships among authorized canonical records, including Decision-to-Evidence, Resolution-to-Knowledge, supersession, refresh, dependency, Conflict, and Context links. It never infers causality from adjacency, similarity, ranking, or layout, and never becomes graph authority.
+_Avoid_: inferred graph, adjacency truth, layout authority
+
+**Projection Query Envelope**:
+The normalized deterministic result of one authorized Projection read, containing Read Snapshot, Projection Identity and Generation, canonical query echo/hash, ordered nodes/items and edges, exact-scope omission or redaction reasons, freshness or Degraded Read-Only state, and a Projection Read Receipt. It is read evidence, not mutation authorization.
+_Avoid_: query response, view state, mutation result
+
+**Projection Decision Tree**:
+The deterministic sequence that validates a Workbench Fixture, schema, exact scope, Policy, authorization, source lineage, and Projection Generation; applies deny-wins privacy; builds or degrades projections; bounds read operations; rejects mutation-shaped requests; and requires rebuild parity before acceptance. It has no execution or heuristic fallback authority.
+_Avoid_: UI workflow, Runtime execution, heuristic fallback
+
+**Implementation Acceptance Contract**:
+The decision-complete internal-language criteria and phase-gate evidence required before implementation mutations begin: architecture ownership, ADR and invariant traceability, contracts and versions, compatibility, profile tracers, threat-model evidence, deterministic fixtures and outputs, operational boundaries, rollback and promotion, and explicit authorization. It selects no implementation technology and grants no execution authority.
+_Avoid_: release checklist, implementation plan, technology choice
+
+**Implementation Handoff Bundle**:
+The bounded internal-language handoff record that separates accepted decisions, required implementation evidence, deferred fog, non-claims, unresolved risks, and exact authorized next mutations. It is a governance input, not implementation, production readiness, or a transfer of authority.
+_Avoid_: deployment package, project dump, execution grant
+
+**Phase Gate**:
+A staged promotion checkpoint requiring complete deterministic evidence, compatibility proof, invariant non-regression, and explicit authorization. Rollback preserves append-only lineage and returns to the last fully evidenced generation or Checkpoint without destructive or silent fallback.
+_Avoid_: sprint boundary, release approval, silent rollback
