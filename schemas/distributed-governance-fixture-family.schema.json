@@ -1,0 +1,435 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/distributed-governance-fixture-family.schema.json",
+	"title": "Amber Distributed Governance Fixture Family",
+	"description": "Canonical fixture family, adversarial variants, golden outputs, and stable acceptance matrix for distributed-governance evidence.",
+	"type": "object",
+	"required": [
+		"fixtureFamilyId",
+		"fixtureFamilyVersion",
+		"sourceBaseline",
+		"sourceRegistry",
+		"authorityBoundaries",
+		"profiles",
+		"fixtures",
+		"adversarialVariants",
+		"goldenOutputs",
+		"acceptanceMatrix"
+	],
+	"additionalProperties": false,
+	"properties": {
+		"fixtureFamilyId": {
+			"const": "amber.distributed-governance.fixture-family"
+		},
+		"fixtureFamilyVersion": {
+			"type": "string",
+			"pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+		},
+		"sourceBaseline": {
+			"const": "docs/architecture/distributed-governance-baseline.md"
+		},
+		"sourceRegistry": {
+			"const": "docs/architecture/distributed-governance-contract-registry.json"
+		},
+		"authorityBoundaries": {
+			"type": "object",
+			"required": [
+				"repositoryLocalAuthority",
+				"offlineCapability",
+				"executesAnything",
+				"appendOnlyLineage",
+				"languageBoundary"
+			],
+			"additionalProperties": false,
+			"properties": {
+				"repositoryLocalAuthority": {
+					"const": true
+				},
+				"offlineCapability": {
+					"const": true
+				},
+				"executesAnything": {
+					"const": false
+				},
+				"appendOnlyLineage": {
+					"const": true
+				},
+				"languageBoundary": {
+					"const": "amber-internal"
+				}
+			}
+		},
+		"profiles": {
+			"type": "array",
+			"minItems": 3,
+			"uniqueItems": true,
+			"items": {
+				"type": "object",
+				"required": ["id", "title"],
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"enum": ["personal-node", "team-hub", "organization-profile"]
+					},
+					"title": {
+						"type": "string",
+						"minLength": 1
+					}
+				}
+			}
+		},
+		"fixtures": {
+			"type": "array",
+			"minItems": 3,
+			"uniqueItems": true,
+			"items": {
+				"type": "object",
+				"required": ["fixtureId", "kind", "profile", "title", "inputs"],
+				"additionalProperties": false,
+				"properties": {
+					"fixtureId": {
+						"type": "string",
+						"pattern": "^DG-FIXTURE-[A-Z0-9-]+$"
+					},
+					"kind": {
+						"const": "canonical"
+					},
+					"profile": {
+						"enum": ["personal-node", "team-hub", "organization-profile"]
+					},
+					"title": {
+						"type": "string",
+						"minLength": 1
+					},
+					"inputs": {
+						"type": "object"
+					}
+				}
+			}
+		},
+		"adversarialVariants": {
+			"type": "array",
+			"minItems": 28,
+			"uniqueItems": true,
+			"items": {
+				"type": "object",
+				"required": [
+					"variantId",
+					"baseFixtureId",
+					"category",
+					"expectedOutcome",
+					"inputs",
+					"sequence"
+				],
+				"additionalProperties": false,
+				"properties": {
+					"variantId": {
+						"type": "string",
+						"pattern": "^DG-FIXTURE-ADVERSARIAL-[A-Z0-9-]+$"
+					},
+					"baseFixtureId": {
+						"type": "string",
+						"pattern": "^DG-FIXTURE-[A-Z0-9-]+$"
+					},
+					"category": {
+						"enum": [
+							"unknown-version",
+							"incompatible-version",
+							"silent-downgrade",
+							"stale-generation",
+							"unresolved-conflict",
+							"corruption",
+							"revoked-authorization",
+							"exact-scope-deny-wins",
+							"retention-deletion",
+							"cross-tenant-escape",
+							"execution-boundary-escape",
+							"projection-divergence",
+							"disclosure",
+							"replay",
+							"stale-authorization",
+							"provenance-forgery",
+							"secret-replication",
+							"credential-replication",
+							"source-replication",
+							"arbitrary-file-replication",
+							"cross-repository-scope-escape",
+							"deny-wins-bypass",
+							"compromised-person-surface",
+							"compromised-component-surface",
+							"compromised-transport-surface",
+							"compromised-store-surface",
+							"compromised-projection-surface",
+							"compromised-admin-surface"
+						]
+					},
+					"expectedOutcome": {
+						"enum": ["refused", "fenced", "preserved", "rejected", "denied", "enforced", "redacted"]
+					},
+					"inputs": {
+						"type": "object"
+					},
+					"sequence": {
+						"type": "integer",
+						"minimum": 1
+					}
+				}
+			}
+		},
+		"goldenOutputs": {
+			"type": "array",
+			"minItems": 14,
+			"uniqueItems": true,
+			"items": {
+				"type": "object",
+				"required": ["outputId", "outputKind", "fixtureIds", "expectedOutput", "digest"],
+				"additionalProperties": false,
+				"properties": {
+					"outputId": {
+						"type": "string",
+						"pattern": "^DG-GOLDEN-[A-Z0-9-]+$"
+					},
+					"outputKind": {
+						"enum": [
+							"golden-envelope",
+							"golden-projection",
+							"query-envelope",
+							"read-snapshot",
+							"projection-receipt",
+							"knowledge-lifecycle-receipt",
+							"replay-result",
+							"idempotence-result",
+							"migration-evidence",
+							"checkpoint-evidence",
+							"fencing-evidence",
+							"mixed-version-evidence",
+							"rebuild-parity",
+							"adversarial-evidence"
+						]
+					},
+					"fixtureIds": {
+						"type": "array",
+						"minItems": 1,
+						"items": {
+							"type": "string",
+							"pattern": "^DG-FIXTURE-[A-Z0-9-]+$"
+						}
+					},
+					"digest": {
+						"type": "string",
+						"pattern": "^[a-f0-9]{64}$"
+					},
+					"expectedOutput": {
+						"type": "object",
+						"required": ["records", "order", "omissionRedactionReasons", "freshness", "receipt"],
+						"additionalProperties": false,
+						"properties": {
+							"records": {
+								"type": "array",
+								"minItems": 1,
+								"items": {
+									"type": "object",
+									"required": ["recordId", "recordType", "position", "outcome", "content"],
+									"additionalProperties": false,
+									"properties": {
+										"recordId": {
+											"type": "string",
+											"pattern": "^DG-GOLDEN-[A-Z0-9-]+-RECORD-[0-9]{3}$"
+										},
+										"recordType": {
+											"type": "string",
+											"minLength": 1
+										},
+										"position": {
+											"type": "integer",
+											"minimum": 1
+										},
+										"variantId": {
+											"type": "string",
+											"pattern": "^DG-FIXTURE-ADVERSARIAL-[A-Z0-9-]+$"
+										},
+										"category": {
+											"type": "string",
+											"minLength": 1
+										},
+										"outcome": {
+											"type": "string",
+											"minLength": 1
+										},
+										"content": {
+											"type": "string",
+											"minLength": 1
+										}
+									}
+								}
+							},
+							"order": {
+								"type": "array",
+								"minItems": 1,
+								"items": {
+									"type": "string",
+									"pattern": "^DG-GOLDEN-[A-Z0-9-]+-RECORD-[0-9]{3}$"
+								}
+							},
+							"omissionRedactionReasons": {
+								"type": "array",
+								"items": {
+									"type": "object",
+									"required": ["recordId", "reason"],
+									"additionalProperties": false,
+									"properties": {
+										"recordId": {
+											"type": "string"
+										},
+										"reason": {
+											"type": "string",
+											"minLength": 1
+										}
+									}
+								}
+							},
+							"freshness": {
+								"type": "object",
+								"required": ["asOfSequence", "generation", "state", "basis"],
+								"additionalProperties": false,
+								"properties": {
+									"asOfSequence": {
+										"type": "integer",
+										"minimum": 1
+									},
+									"generation": {
+										"type": "integer",
+										"minimum": 1
+									},
+									"state": {
+										"enum": ["current", "stale"]
+									},
+									"basis": {
+										"type": "string",
+										"minLength": 1
+									}
+								}
+							},
+							"receipt": {
+								"type": "object",
+								"required": ["status", "reason", "sequence"],
+								"additionalProperties": false,
+								"properties": {
+									"status": {
+										"enum": ["recorded", "refused"]
+									},
+									"reason": {
+										"type": "string",
+										"minLength": 1
+									},
+									"sequence": {
+										"type": "integer",
+										"minimum": 1
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"acceptanceMatrix": {
+			"type": "array",
+			"minItems": 50,
+			"uniqueItems": true,
+			"items": {
+				"type": "object",
+				"required": [
+					"criterionId",
+					"title",
+					"sourceDecision",
+					"invariant",
+					"owningContext",
+					"requiredArtifactOrContract",
+					"phaseGate",
+					"evidenceType",
+					"goldenOutputIds"
+				],
+				"additionalProperties": false,
+				"properties": {
+					"criterionId": {
+						"type": "string",
+						"pattern": "^DG-ACC-[A-Z0-9-]+$"
+					},
+					"title": {
+						"type": "string",
+						"minLength": 1
+					},
+					"sourceDecision": {
+						"enum": ["154", "158"]
+					},
+					"invariant": {
+						"type": "string",
+						"pattern": "^amber\\.distributed-governance\\.invariant\\.[a-z0-9-]+$"
+					},
+					"owningContext": {
+						"enum": [
+							"amber-core",
+							"sync-runtime",
+							"governance-graph",
+							"governed-knowledge-base",
+							"visualization-workbench",
+							"organization-control-plane"
+						]
+					},
+					"requiredArtifactOrContract": {
+						"type": "string",
+						"pattern": "^amber\\.distributed-governance\\.(contract|invariant)\\.[a-z0-9-]+$"
+					},
+					"phaseGate": {
+						"enum": ["phase-1", "phase-2", "phase-3", "phase-4"]
+					},
+					"evidenceType": {
+						"type": "string",
+						"pattern": "^[a-z0-9-]+-digest$"
+					},
+					"goldenOutputIds": {
+						"type": "array",
+						"minItems": 1,
+						"items": {
+							"type": "string",
+							"pattern": "^DG-GOLDEN-[A-Z0-9-]+$"
+						}
+					},
+					"threatCategory": {
+						"enum": [
+							"unknown-version",
+							"incompatible-version",
+							"silent-downgrade",
+							"stale-generation",
+							"unresolved-conflict",
+							"corruption",
+							"revoked-authorization",
+							"exact-scope-deny-wins",
+							"retention-deletion",
+							"cross-tenant-escape",
+							"execution-boundary-escape",
+							"projection-divergence",
+							"disclosure",
+							"replay",
+							"stale-authorization",
+							"provenance-forgery",
+							"secret-replication",
+							"credential-replication",
+							"source-replication",
+							"arbitrary-file-replication",
+							"cross-repository-scope-escape",
+							"deny-wins-bypass",
+							"compromised-person-surface",
+							"compromised-component-surface",
+							"compromised-transport-surface",
+							"compromised-store-surface",
+							"compromised-projection-surface",
+							"compromised-admin-surface"
+						]
+					}
+				}
+			}
+		}
+	}
+}

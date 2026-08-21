@@ -1,0 +1,5102 @@
+{
+	"fixtureFamilyId": "amber.distributed-governance.fixture-family",
+	"fixtureFamilyVersion": "1.0.0",
+	"sourceBaseline": "docs/architecture/distributed-governance-baseline.md",
+	"sourceRegistry": "docs/architecture/distributed-governance-contract-registry.json",
+	"authorityBoundaries": {
+		"repositoryLocalAuthority": true,
+		"offlineCapability": true,
+		"executesAnything": false,
+		"appendOnlyLineage": true,
+		"languageBoundary": "amber-internal"
+	},
+	"profiles": [
+		{
+			"id": "personal-node",
+			"title": "Personal Node"
+		},
+		{
+			"id": "team-hub",
+			"title": "Team Hub"
+		},
+		{
+			"id": "organization-profile",
+			"title": "Organization Profile"
+		}
+	],
+	"fixtures": [
+		{
+			"fixtureId": "DG-FIXTURE-PERSONAL-NODE-001",
+			"kind": "canonical",
+			"profile": "personal-node",
+			"title": "Personal Node offline tracer",
+			"inputs": {
+				"repositoryScope": "local-repository",
+				"localScope": {
+					"tenant": "local-tenant-1",
+					"organization": "local-organization-1",
+					"person": "local-person-1"
+				},
+				"agentIdentities": [
+					{
+						"id": "local-agent-1",
+						"admittedBy": "local-person-1"
+					}
+				],
+				"repositoryRegistrations": [
+					{
+						"id": "local-repository-1",
+						"tenant": "local-tenant-1",
+						"organization": "local-organization-1"
+					}
+				],
+				"decisions": [
+					{
+						"id": "decision-1",
+						"title": "Admit local evidence",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"evidence": [
+					{
+						"id": "evidence-1",
+						"title": "Local evidence record",
+						"source": "local-capture"
+					}
+				],
+				"knowledgeCandidates": [
+					{
+						"id": "knowledge-candidate-1",
+						"title": "Local knowledge candidate",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"offlineOperation": {
+					"mode": "offline-first",
+					"required": true
+				},
+				"localProjections": [
+					{
+						"id": "local-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-knowledge-base-1",
+						"context": "governed-knowledge-base",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				]
+			}
+		},
+		{
+			"fixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"kind": "canonical",
+			"profile": "team-hub",
+			"title": "Team Hub synchronization tracer",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				]
+			}
+		},
+		{
+			"fixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"kind": "canonical",
+			"profile": "organization-profile",
+			"title": "Organization Profile audit tracer",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				}
+			}
+		}
+	],
+	"adversarialVariants": [
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-UNKNOWN-VERSION-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "unknown-version",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "unknown-version",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"negotiationAttempt": {
+							"version": "unknown",
+							"disposition": "fail-closed"
+						}
+					}
+				}
+			},
+			"sequence": 1
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-INCOMPATIBLE-VERSION-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "incompatible-version",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "incompatible-version",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"negotiationAttempt": {
+							"version": "incompatible",
+							"disposition": "fail-closed"
+						}
+					}
+				}
+			},
+			"sequence": 2
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-SILENT-DOWNGRADE-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "silent-downgrade",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "silent-downgrade",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"negotiationAttempt": {
+							"version": "older",
+							"disclosureRequired": true
+						}
+					}
+				}
+			},
+			"sequence": 3
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-STALE-GENERATION-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "stale-generation",
+			"expectedOutcome": "fenced",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "stale-generation",
+					"expectedOutcome": "fenced",
+					"threatEvidence": {
+						"generationState": {
+							"current": 2,
+							"submitted": 1
+						}
+					}
+				}
+			},
+			"sequence": 4
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-UNRESOLVED-CONFLICT-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "unresolved-conflict",
+			"expectedOutcome": "preserved",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "unresolved-conflict",
+					"expectedOutcome": "preserved",
+					"threatEvidence": {
+						"conflictState": {
+							"recordId": "conflict-1",
+							"resolution": "governed"
+						}
+					}
+				}
+			},
+			"sequence": 5
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-CORRUPTION-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "corruption",
+			"expectedOutcome": "rejected",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "corruption",
+					"expectedOutcome": "rejected",
+					"threatEvidence": {
+						"integrityState": {
+							"recordId": "record-1",
+							"disposition": "reject"
+						}
+					}
+				}
+			},
+			"sequence": 6
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-REVOKED-AUTHORIZATION-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "revoked-authorization",
+			"expectedOutcome": "denied",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "revoked-authorization",
+					"expectedOutcome": "denied",
+					"threatEvidence": {
+						"authorizationState": {
+							"subject": "person-2",
+							"status": "revoked"
+						}
+					}
+				}
+			},
+			"sequence": 7
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-EXACT-SCOPE-DENY-WINS-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "exact-scope-deny-wins",
+			"expectedOutcome": "denied",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "exact-scope-deny-wins",
+					"expectedOutcome": "denied",
+					"threatEvidence": {
+						"policyState": {
+							"allow": "repository-1",
+							"deny": "organization",
+							"precedence": "deny"
+						}
+					}
+				}
+			},
+			"sequence": 8
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-RETENTION-DELETION-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "retention-deletion",
+			"expectedOutcome": "enforced",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "retention-deletion",
+					"expectedOutcome": "enforced",
+					"threatEvidence": {
+						"retentionState": {
+							"recordId": "record-1",
+							"action": "delete",
+							"auditRetained": true
+						}
+					}
+				}
+			},
+			"sequence": 9
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-CROSS-TENANT-ESCAPE-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "cross-tenant-escape",
+			"expectedOutcome": "denied",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "cross-tenant-escape",
+					"expectedOutcome": "denied",
+					"threatEvidence": {
+						"requestedScope": {
+							"tenant": "tenant-1",
+							"repository": "other-tenant-repository"
+						}
+					}
+				}
+			},
+			"sequence": 10
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-EXECUTION-BOUNDARY-ESCAPE-001",
+			"baseFixtureId": "DG-FIXTURE-PERSONAL-NODE-001",
+			"category": "execution-boundary-escape",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "local-repository",
+				"localScope": {
+					"tenant": "local-tenant-1",
+					"organization": "local-organization-1",
+					"person": "local-person-1"
+				},
+				"agentIdentities": [
+					{
+						"id": "local-agent-1",
+						"admittedBy": "local-person-1"
+					}
+				],
+				"repositoryRegistrations": [
+					{
+						"id": "local-repository-1",
+						"tenant": "local-tenant-1",
+						"organization": "local-organization-1"
+					}
+				],
+				"decisions": [
+					{
+						"id": "decision-1",
+						"title": "Admit local evidence",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"evidence": [
+					{
+						"id": "evidence-1",
+						"title": "Local evidence record",
+						"source": "local-capture"
+					}
+				],
+				"knowledgeCandidates": [
+					{
+						"id": "knowledge-candidate-1",
+						"title": "Local knowledge candidate",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"offlineOperation": {
+					"mode": "offline-first",
+					"required": true
+				},
+				"localProjections": [
+					{
+						"id": "local-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-knowledge-base-1",
+						"context": "governed-knowledge-base",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "execution-boundary-escape",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"attemptedOperation": {
+							"class": "execution",
+							"authorized": false
+						}
+					}
+				}
+			},
+			"sequence": 11
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-PROJECTION-DIVERGENCE-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "projection-divergence",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "projection-divergence",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"projectionState": {
+							"projectionId": "projection-1",
+							"canonicalSequence": 2,
+							"projectedSequence": 1
+						}
+					}
+				}
+			},
+			"sequence": 12
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-DISCLOSURE-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "disclosure",
+			"expectedOutcome": "redacted",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "disclosure",
+					"expectedOutcome": "redacted",
+					"threatEvidence": {
+						"disclosureAttempt": {
+							"materialClass": "bounded-synthetic-sensitive-material",
+							"handling": "omit-and-redact"
+						}
+					}
+				}
+			},
+			"sequence": 13
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-REPLAY-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "replay",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "replay",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"replayAttempt": {
+							"envelopeId": "envelope-1",
+							"sequence": 1
+						}
+					}
+				}
+			},
+			"sequence": 14
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-STALE-AUTHORIZATION-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "stale-authorization",
+			"expectedOutcome": "denied",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "stale-authorization",
+					"expectedOutcome": "denied",
+					"threatEvidence": {
+						"authorizationState": {
+							"subject": "person-1",
+							"status": "stale"
+						}
+					}
+				}
+			},
+			"sequence": 15
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-PROVENANCE-FORGERY-001",
+			"baseFixtureId": "DG-FIXTURE-PERSONAL-NODE-001",
+			"category": "provenance-forgery",
+			"expectedOutcome": "rejected",
+			"inputs": {
+				"repositoryScope": "local-repository",
+				"localScope": {
+					"tenant": "local-tenant-1",
+					"organization": "local-organization-1",
+					"person": "local-person-1"
+				},
+				"agentIdentities": [
+					{
+						"id": "local-agent-1",
+						"admittedBy": "local-person-1"
+					}
+				],
+				"repositoryRegistrations": [
+					{
+						"id": "local-repository-1",
+						"tenant": "local-tenant-1",
+						"organization": "local-organization-1"
+					}
+				],
+				"decisions": [
+					{
+						"id": "decision-1",
+						"title": "Admit local evidence",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"evidence": [
+					{
+						"id": "evidence-1",
+						"title": "Local evidence record",
+						"source": "local-capture"
+					}
+				],
+				"knowledgeCandidates": [
+					{
+						"id": "knowledge-candidate-1",
+						"title": "Local knowledge candidate",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"offlineOperation": {
+					"mode": "offline-first",
+					"required": true
+				},
+				"localProjections": [
+					{
+						"id": "local-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-knowledge-base-1",
+						"context": "governed-knowledge-base",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "provenance-forgery",
+					"expectedOutcome": "rejected",
+					"threatEvidence": {
+						"provenanceAttempt": {
+							"recordId": "record-1",
+							"claimedSource": "unverified-source"
+						}
+					}
+				}
+			},
+			"sequence": 16
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-SECRET-REPLICATION-001",
+			"baseFixtureId": "DG-FIXTURE-PERSONAL-NODE-001",
+			"category": "secret-replication",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "local-repository",
+				"localScope": {
+					"tenant": "local-tenant-1",
+					"organization": "local-organization-1",
+					"person": "local-person-1"
+				},
+				"agentIdentities": [
+					{
+						"id": "local-agent-1",
+						"admittedBy": "local-person-1"
+					}
+				],
+				"repositoryRegistrations": [
+					{
+						"id": "local-repository-1",
+						"tenant": "local-tenant-1",
+						"organization": "local-organization-1"
+					}
+				],
+				"decisions": [
+					{
+						"id": "decision-1",
+						"title": "Admit local evidence",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"evidence": [
+					{
+						"id": "evidence-1",
+						"title": "Local evidence record",
+						"source": "local-capture"
+					}
+				],
+				"knowledgeCandidates": [
+					{
+						"id": "knowledge-candidate-1",
+						"title": "Local knowledge candidate",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"offlineOperation": {
+					"mode": "offline-first",
+					"required": true
+				},
+				"localProjections": [
+					{
+						"id": "local-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-knowledge-base-1",
+						"context": "governed-knowledge-base",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "secret-replication",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"replicationAttempt": {
+							"materialClass": "synthetic-sensitive-material",
+							"destination": "outside-scope"
+						}
+					}
+				}
+			},
+			"sequence": 17
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-CREDENTIAL-REPLICATION-001",
+			"baseFixtureId": "DG-FIXTURE-PERSONAL-NODE-001",
+			"category": "credential-replication",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "local-repository",
+				"localScope": {
+					"tenant": "local-tenant-1",
+					"organization": "local-organization-1",
+					"person": "local-person-1"
+				},
+				"agentIdentities": [
+					{
+						"id": "local-agent-1",
+						"admittedBy": "local-person-1"
+					}
+				],
+				"repositoryRegistrations": [
+					{
+						"id": "local-repository-1",
+						"tenant": "local-tenant-1",
+						"organization": "local-organization-1"
+					}
+				],
+				"decisions": [
+					{
+						"id": "decision-1",
+						"title": "Admit local evidence",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"evidence": [
+					{
+						"id": "evidence-1",
+						"title": "Local evidence record",
+						"source": "local-capture"
+					}
+				],
+				"knowledgeCandidates": [
+					{
+						"id": "knowledge-candidate-1",
+						"title": "Local knowledge candidate",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"offlineOperation": {
+					"mode": "offline-first",
+					"required": true
+				},
+				"localProjections": [
+					{
+						"id": "local-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-knowledge-base-1",
+						"context": "governed-knowledge-base",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "credential-replication",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"replicationAttempt": {
+							"materialClass": "synthetic-access-material",
+							"destination": "outside-scope"
+						}
+					}
+				}
+			},
+			"sequence": 18
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-SOURCE-REPLICATION-001",
+			"baseFixtureId": "DG-FIXTURE-PERSONAL-NODE-001",
+			"category": "source-replication",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "local-repository",
+				"localScope": {
+					"tenant": "local-tenant-1",
+					"organization": "local-organization-1",
+					"person": "local-person-1"
+				},
+				"agentIdentities": [
+					{
+						"id": "local-agent-1",
+						"admittedBy": "local-person-1"
+					}
+				],
+				"repositoryRegistrations": [
+					{
+						"id": "local-repository-1",
+						"tenant": "local-tenant-1",
+						"organization": "local-organization-1"
+					}
+				],
+				"decisions": [
+					{
+						"id": "decision-1",
+						"title": "Admit local evidence",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"evidence": [
+					{
+						"id": "evidence-1",
+						"title": "Local evidence record",
+						"source": "local-capture"
+					}
+				],
+				"knowledgeCandidates": [
+					{
+						"id": "knowledge-candidate-1",
+						"title": "Local knowledge candidate",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"offlineOperation": {
+					"mode": "offline-first",
+					"required": true
+				},
+				"localProjections": [
+					{
+						"id": "local-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-knowledge-base-1",
+						"context": "governed-knowledge-base",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "source-replication",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"replicationAttempt": {
+							"materialClass": "synthetic-source-material",
+							"destination": "outside-scope"
+						}
+					}
+				}
+			},
+			"sequence": 19
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-ARBITRARY-FILE-REPLICATION-001",
+			"baseFixtureId": "DG-FIXTURE-PERSONAL-NODE-001",
+			"category": "arbitrary-file-replication",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "local-repository",
+				"localScope": {
+					"tenant": "local-tenant-1",
+					"organization": "local-organization-1",
+					"person": "local-person-1"
+				},
+				"agentIdentities": [
+					{
+						"id": "local-agent-1",
+						"admittedBy": "local-person-1"
+					}
+				],
+				"repositoryRegistrations": [
+					{
+						"id": "local-repository-1",
+						"tenant": "local-tenant-1",
+						"organization": "local-organization-1"
+					}
+				],
+				"decisions": [
+					{
+						"id": "decision-1",
+						"title": "Admit local evidence",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"evidence": [
+					{
+						"id": "evidence-1",
+						"title": "Local evidence record",
+						"source": "local-capture"
+					}
+				],
+				"knowledgeCandidates": [
+					{
+						"id": "knowledge-candidate-1",
+						"title": "Local knowledge candidate",
+						"provenance": [
+							"evidence-1"
+						]
+					}
+				],
+				"offlineOperation": {
+					"mode": "offline-first",
+					"required": true
+				},
+				"localProjections": [
+					{
+						"id": "local-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-knowledge-base-1",
+						"context": "governed-knowledge-base",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "local-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "arbitrary-file-replication",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"replicationAttempt": {
+							"materialClass": "synthetic-file-reference",
+							"destination": "outside-scope"
+						}
+					}
+				}
+			},
+			"sequence": 20
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-CROSS-REPOSITORY-SCOPE-ESCAPE-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "cross-repository-scope-escape",
+			"expectedOutcome": "denied",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "cross-repository-scope-escape",
+					"expectedOutcome": "denied",
+					"threatEvidence": {
+						"requestedScope": {
+							"repository": "repository-1",
+							"target": "repository-2"
+						}
+					}
+				}
+			},
+			"sequence": 21
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-DENY-WINS-BYPASS-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "deny-wins-bypass",
+			"expectedOutcome": "denied",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "deny-wins-bypass",
+					"expectedOutcome": "denied",
+					"threatEvidence": {
+						"policyAttempt": {
+							"allow": "reader",
+							"deny": "writer",
+							"precedence": "deny"
+						}
+					}
+				}
+			},
+			"sequence": 22
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-PERSON-SURFACE-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "compromised-person-surface",
+			"expectedOutcome": "denied",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "compromised-person-surface",
+					"expectedOutcome": "denied",
+					"threatEvidence": {
+						"compromisedSurface": {
+							"surface": "person",
+							"action": "impersonation"
+						}
+					}
+				}
+			},
+			"sequence": 23
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-COMPONENT-SURFACE-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "compromised-component-surface",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "compromised-component-surface",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"compromisedSurface": {
+							"surface": "component",
+							"action": "unauthorized-substitution"
+						}
+					}
+				}
+			},
+			"sequence": 24
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-TRANSPORT-SURFACE-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "compromised-transport-surface",
+			"expectedOutcome": "rejected",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "compromised-transport-surface",
+					"expectedOutcome": "rejected",
+					"threatEvidence": {
+						"compromisedSurface": {
+							"surface": "transport",
+							"action": "reordering"
+						}
+					}
+				}
+			},
+			"sequence": 25
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-STORE-SURFACE-001",
+			"baseFixtureId": "DG-FIXTURE-TEAM-HUB-001",
+			"category": "compromised-store-surface",
+			"expectedOutcome": "fenced",
+			"inputs": {
+				"repositoryScope": "team-repository",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"team": {
+						"id": "team-1",
+						"structure": "flat-team"
+					},
+					"memberships": [
+						{
+							"personId": "person-1",
+							"teamId": "team-1"
+						},
+						{
+							"personId": "person-2",
+							"teamId": "team-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "repository-1",
+							"effect": "deny-wins"
+						}
+					]
+				},
+				"syncRuntime": {
+					"syncSession": {
+						"id": "sync-session-1",
+						"mode": "bounded-delivery"
+					},
+					"envelopes": [
+						{
+							"id": "envelope-1",
+							"kind": "sync-envelope",
+							"sequence": 1
+						}
+					],
+					"checkpoint": {
+						"id": "checkpoint-1",
+						"sequence": 1
+					}
+				},
+				"sharedProjections": [
+					{
+						"id": "shared-governance-graph-1",
+						"context": "governance-graph",
+						"authority": "read-only",
+						"rebuildable": true
+					},
+					{
+						"id": "shared-workbench-1",
+						"context": "visualization-workbench",
+						"authority": "read-only",
+						"rebuildable": true
+					}
+				],
+				"adversarialVariant": {
+					"category": "compromised-store-surface",
+					"expectedOutcome": "fenced",
+					"threatEvidence": {
+						"compromisedSurface": {
+							"surface": "store",
+							"action": "unauthorized-rewrite"
+						}
+					}
+				}
+			},
+			"sequence": 26
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-PROJECTION-SURFACE-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "compromised-projection-surface",
+			"expectedOutcome": "refused",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "compromised-projection-surface",
+					"expectedOutcome": "refused",
+					"threatEvidence": {
+						"compromisedSurface": {
+							"surface": "projection",
+							"action": "poisoning"
+						}
+					}
+				}
+			},
+			"sequence": 27
+		},
+		{
+			"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-ADMIN-SURFACE-001",
+			"baseFixtureId": "DG-FIXTURE-ORGANIZATION-PROFILE-001",
+			"category": "compromised-admin-surface",
+			"expectedOutcome": "denied",
+			"inputs": {
+				"repositoryScope": "organization-repositories",
+				"organizationControlPlane": {
+					"tenant": "tenant-1",
+					"organization": "organization-1",
+					"personIdentities": [
+						{
+							"id": "person-1"
+						},
+						{
+							"id": "person-2"
+						}
+					],
+					"agentIdentities": [
+						{
+							"id": "agent-1",
+							"admittedBy": "person-1"
+						}
+					],
+					"repositoryRegistrations": [
+						{
+							"id": "repository-1",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						},
+						{
+							"id": "repository-2",
+							"tenant": "tenant-1",
+							"organization": "organization-1"
+						}
+					],
+					"roleAssignments": [
+						{
+							"id": "role-assignment-1",
+							"personId": "person-1",
+							"repositoryId": "repository-1",
+							"role": "reader"
+						}
+					],
+					"policyAssignments": [
+						{
+							"id": "policy-assignment-1",
+							"policyId": "policy-1",
+							"scope": "organization",
+							"effect": "deny-wins"
+						}
+					],
+					"administrativeFencing": {
+						"transferRequired": true,
+						"targetGenerationStartsWithNoAuthorization": true
+					}
+				},
+				"boundedContextEvidence": [
+					{
+						"context": "amber-core",
+						"evidence": [
+							"decision-1",
+							"evidence-1",
+							"approval-1"
+						]
+					},
+					{
+						"context": "sync-runtime",
+						"evidence": [
+							"envelope-1",
+							"checkpoint-1"
+						]
+					},
+					{
+						"context": "governance-graph",
+						"evidence": [
+							"projection-rule-1",
+							"provenance-path-1"
+						]
+					},
+					{
+						"context": "governed-knowledge-base",
+						"evidence": [
+							"knowledge-record-1",
+							"freshness-review-1"
+						]
+					},
+					{
+						"context": "visualization-workbench",
+						"evidence": [
+							"read-snapshot-1",
+							"projection-receipt-1"
+						]
+					},
+					{
+						"context": "organization-control-plane",
+						"evidence": [
+							"identity-1",
+							"policy-1"
+						]
+					}
+				],
+				"crossRepositoryGovernance": {
+					"scope": "organization-wide",
+					"queries": [
+						{
+							"id": "cross-repository-query-1",
+							"repositories": [
+								"repository-1",
+								"repository-2"
+							]
+						}
+					]
+				},
+				"adversarialVariant": {
+					"category": "compromised-admin-surface",
+					"expectedOutcome": "denied",
+					"threatEvidence": {
+						"compromisedSurface": {
+							"surface": "admin",
+							"action": "scope-expansion"
+						}
+					}
+				}
+			},
+			"sequence": 28
+		}
+	],
+	"goldenOutputs": [
+		{
+			"outputId": "DG-GOLDEN-ENVELOPE-001",
+			"outputKind": "golden-envelope",
+			"fixtureIds": [
+				"DG-FIXTURE-TEAM-HUB-001"
+			],
+			"digest": "3269072bacbb2036fcdbc48dad2d54d9a2ed2f34c0042ce90480f25f85633e9f",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-ENVELOPE-001-RECORD-001",
+						"recordType": "golden-envelope",
+						"position": 1,
+						"outcome": "accepted",
+						"content": "bounded synthetic golden-envelope evidence for DG-FIXTURE-TEAM-HUB-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-ENVELOPE-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-ENVELOPE-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-PROJECTION-001",
+			"outputKind": "golden-projection",
+			"fixtureIds": [
+				"DG-FIXTURE-TEAM-HUB-001"
+			],
+			"digest": "fc0c0f67ee56a6a32127170e2a943fecaa91dee742a47039fb789fa2ccd8abd5",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-PROJECTION-001-RECORD-001",
+						"recordType": "golden-projection",
+						"position": 1,
+						"outcome": "rebuilt",
+						"content": "bounded synthetic golden-projection evidence for DG-FIXTURE-TEAM-HUB-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-PROJECTION-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-PROJECTION-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-QUERY-ENVELOPE-001",
+			"outputKind": "query-envelope",
+			"fixtureIds": [
+				"DG-FIXTURE-ORGANIZATION-PROFILE-001"
+			],
+			"digest": "cd6a067b8f27ac4da1ed7a0378c944ba9083c4502393d43a1920ff91ef2505da",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-QUERY-ENVELOPE-001-RECORD-001",
+						"recordType": "query-envelope",
+						"position": 1,
+						"outcome": "accepted",
+						"content": "bounded synthetic query-envelope evidence for DG-FIXTURE-ORGANIZATION-PROFILE-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-QUERY-ENVELOPE-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-QUERY-ENVELOPE-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-READ-SNAPSHOT-001",
+			"outputKind": "read-snapshot",
+			"fixtureIds": [
+				"DG-FIXTURE-ORGANIZATION-PROFILE-001"
+			],
+			"digest": "18970b5ec9b5f6904c21271fbaa6c0cf2530dbf6e46c767e07887a046403a576",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-READ-SNAPSHOT-001-RECORD-001",
+						"recordType": "read-snapshot",
+						"position": 1,
+						"outcome": "authorized",
+						"content": "bounded synthetic read-snapshot evidence for DG-FIXTURE-ORGANIZATION-PROFILE-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-READ-SNAPSHOT-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-READ-SNAPSHOT-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-PROJECTION-RECEIPT-001",
+			"outputKind": "projection-receipt",
+			"fixtureIds": [
+				"DG-FIXTURE-TEAM-HUB-001"
+			],
+			"digest": "28370d5d8c2d38e3e09f7598c2f62dc90394261cc0ff943f5684aefc7d413e7e",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-PROJECTION-RECEIPT-001-RECORD-001",
+						"recordType": "projection-receipt",
+						"position": 1,
+						"outcome": "recorded",
+						"content": "bounded synthetic projection-receipt evidence for DG-FIXTURE-TEAM-HUB-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-PROJECTION-RECEIPT-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-PROJECTION-RECEIPT-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-KNOWLEDGE-LIFECYCLE-RECEIPT-001",
+			"outputKind": "knowledge-lifecycle-receipt",
+			"fixtureIds": [
+				"DG-FIXTURE-PERSONAL-NODE-001"
+			],
+			"digest": "0469aa3bd716fe9c175d1bc818b302494310afe70ed2cb92b702a0cd3f9de439",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-KNOWLEDGE-LIFECYCLE-RECEIPT-001-RECORD-001",
+						"recordType": "knowledge-lifecycle-receipt",
+						"position": 1,
+						"outcome": "recorded",
+						"content": "bounded synthetic knowledge-lifecycle-receipt evidence for DG-FIXTURE-PERSONAL-NODE-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-KNOWLEDGE-LIFECYCLE-RECEIPT-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-KNOWLEDGE-LIFECYCLE-RECEIPT-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-REPLAY-RESULT-001",
+			"outputKind": "replay-result",
+			"fixtureIds": [
+				"DG-FIXTURE-PERSONAL-NODE-001"
+			],
+			"digest": "cdf2808efd9726137ff44f69095712d1329442f1bbf6238098d3f0cdb37d0cdc",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-REPLAY-RESULT-001-RECORD-001",
+						"recordType": "replay-result",
+						"position": 1,
+						"outcome": "idempotent",
+						"content": "bounded synthetic replay-result evidence for DG-FIXTURE-PERSONAL-NODE-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-REPLAY-RESULT-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-REPLAY-RESULT-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-IDEMPOTENCE-RESULT-001",
+			"outputKind": "idempotence-result",
+			"fixtureIds": [
+				"DG-FIXTURE-TEAM-HUB-001"
+			],
+			"digest": "b12eecb9b059dccc49fbfcb8e8ec930e715db1b503befa42f15191f95eef44c1",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-IDEMPOTENCE-RESULT-001-RECORD-001",
+						"recordType": "idempotence-result",
+						"position": 1,
+						"outcome": "idempotent",
+						"content": "bounded synthetic idempotence-result evidence for DG-FIXTURE-TEAM-HUB-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-IDEMPOTENCE-RESULT-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-IDEMPOTENCE-RESULT-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-MIGRATION-EVIDENCE-001",
+			"outputKind": "migration-evidence",
+			"fixtureIds": [
+				"DG-FIXTURE-TEAM-HUB-001",
+				"DG-FIXTURE-ADVERSARIAL-UNKNOWN-VERSION-001"
+			],
+			"digest": "f9866ea32479413abf830f3ceeff91bc53e870cefe76d9b37e9aac8c42fd9b58",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-MIGRATION-EVIDENCE-001-RECORD-001",
+						"recordType": "migration-evidence",
+						"position": 1,
+						"outcome": "recorded",
+						"content": "bounded synthetic migration-evidence evidence for DG-FIXTURE-TEAM-HUB-001"
+					},
+					{
+						"recordId": "DG-GOLDEN-MIGRATION-EVIDENCE-001-RECORD-002",
+						"recordType": "migration-evidence",
+						"position": 2,
+						"outcome": "recorded",
+						"content": "bounded synthetic migration-evidence evidence for DG-FIXTURE-ADVERSARIAL-UNKNOWN-VERSION-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-MIGRATION-EVIDENCE-001-RECORD-001",
+					"DG-GOLDEN-MIGRATION-EVIDENCE-001-RECORD-002"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-MIGRATION-EVIDENCE-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-MIGRATION-EVIDENCE-001-RECORD-002",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-CHECKPOINT-EVIDENCE-001",
+			"outputKind": "checkpoint-evidence",
+			"fixtureIds": [
+				"DG-FIXTURE-TEAM-HUB-001"
+			],
+			"digest": "2313fdd3994920fe85c1ef5a83c70caf6ebaa6b6575b1c95f08c1a100770e808",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-CHECKPOINT-EVIDENCE-001-RECORD-001",
+						"recordType": "checkpoint-evidence",
+						"position": 1,
+						"outcome": "recorded",
+						"content": "bounded synthetic checkpoint-evidence evidence for DG-FIXTURE-TEAM-HUB-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-CHECKPOINT-EVIDENCE-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-CHECKPOINT-EVIDENCE-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-FENCING-EVIDENCE-001",
+			"outputKind": "fencing-evidence",
+			"fixtureIds": [
+				"DG-FIXTURE-ADVERSARIAL-STALE-GENERATION-001"
+			],
+			"digest": "e6b356b0f004c138e21dd20a66c683b1ee5982e5ba26f484f4f170ab919f28b4",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-FENCING-EVIDENCE-001-RECORD-001",
+						"recordType": "fencing-evidence",
+						"position": 1,
+						"outcome": "fenced",
+						"content": "bounded synthetic fencing-evidence evidence for DG-FIXTURE-ADVERSARIAL-STALE-GENERATION-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-FENCING-EVIDENCE-001-RECORD-001"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-FENCING-EVIDENCE-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-MIXED-VERSION-EVIDENCE-001",
+			"outputKind": "mixed-version-evidence",
+			"fixtureIds": [
+				"DG-FIXTURE-TEAM-HUB-001",
+				"DG-FIXTURE-ADVERSARIAL-INCOMPATIBLE-VERSION-001"
+			],
+			"digest": "3fcf843eed1e0662c8fa974a0206787e308fb34fddc05c708b6db79f6408bc75",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-MIXED-VERSION-EVIDENCE-001-RECORD-001",
+						"recordType": "mixed-version-evidence",
+						"position": 1,
+						"outcome": "refused",
+						"content": "bounded synthetic mixed-version-evidence evidence for DG-FIXTURE-TEAM-HUB-001"
+					},
+					{
+						"recordId": "DG-GOLDEN-MIXED-VERSION-EVIDENCE-001-RECORD-002",
+						"recordType": "mixed-version-evidence",
+						"position": 2,
+						"outcome": "refused",
+						"content": "bounded synthetic mixed-version-evidence evidence for DG-FIXTURE-ADVERSARIAL-INCOMPATIBLE-VERSION-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-MIXED-VERSION-EVIDENCE-001-RECORD-001",
+					"DG-GOLDEN-MIXED-VERSION-EVIDENCE-001-RECORD-002"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-MIXED-VERSION-EVIDENCE-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-MIXED-VERSION-EVIDENCE-001-RECORD-002",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-REBUILD-PARITY-001",
+			"outputKind": "rebuild-parity",
+			"fixtureIds": [
+				"DG-FIXTURE-TEAM-HUB-001",
+				"DG-FIXTURE-ORGANIZATION-PROFILE-001"
+			],
+			"digest": "de363ecbbde22bf941d76f469f443c43f0d0f3e5a06c0cb10c58647810716f50",
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-REBUILD-PARITY-001-RECORD-001",
+						"recordType": "rebuild-parity",
+						"position": 1,
+						"outcome": "equal",
+						"content": "bounded synthetic rebuild-parity evidence for DG-FIXTURE-TEAM-HUB-001"
+					},
+					{
+						"recordId": "DG-GOLDEN-REBUILD-PARITY-001-RECORD-002",
+						"recordType": "rebuild-parity",
+						"position": 2,
+						"outcome": "equal",
+						"content": "bounded synthetic rebuild-parity evidence for DG-FIXTURE-ORGANIZATION-PROFILE-001"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-REBUILD-PARITY-001-RECORD-001",
+					"DG-GOLDEN-REBUILD-PARITY-001-RECORD-002"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-REBUILD-PARITY-001-RECORD-001",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-REBUILD-PARITY-001-RECORD-002",
+						"reason": "out-of-scope-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 1,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-fixture-inputs"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic expected output",
+					"sequence": 1
+				}
+			}
+		},
+		{
+			"outputId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001",
+			"outputKind": "adversarial-evidence",
+			"fixtureIds": [
+				"DG-FIXTURE-ADVERSARIAL-UNKNOWN-VERSION-001",
+				"DG-FIXTURE-ADVERSARIAL-INCOMPATIBLE-VERSION-001",
+				"DG-FIXTURE-ADVERSARIAL-SILENT-DOWNGRADE-001",
+				"DG-FIXTURE-ADVERSARIAL-STALE-GENERATION-001",
+				"DG-FIXTURE-ADVERSARIAL-UNRESOLVED-CONFLICT-001",
+				"DG-FIXTURE-ADVERSARIAL-CORRUPTION-001",
+				"DG-FIXTURE-ADVERSARIAL-REVOKED-AUTHORIZATION-001",
+				"DG-FIXTURE-ADVERSARIAL-EXACT-SCOPE-DENY-WINS-001",
+				"DG-FIXTURE-ADVERSARIAL-RETENTION-DELETION-001",
+				"DG-FIXTURE-ADVERSARIAL-CROSS-TENANT-ESCAPE-001",
+				"DG-FIXTURE-ADVERSARIAL-EXECUTION-BOUNDARY-ESCAPE-001",
+				"DG-FIXTURE-ADVERSARIAL-PROJECTION-DIVERGENCE-001",
+				"DG-FIXTURE-ADVERSARIAL-DISCLOSURE-001",
+				"DG-FIXTURE-ADVERSARIAL-REPLAY-001",
+				"DG-FIXTURE-ADVERSARIAL-STALE-AUTHORIZATION-001",
+				"DG-FIXTURE-ADVERSARIAL-PROVENANCE-FORGERY-001",
+				"DG-FIXTURE-ADVERSARIAL-SECRET-REPLICATION-001",
+				"DG-FIXTURE-ADVERSARIAL-CREDENTIAL-REPLICATION-001",
+				"DG-FIXTURE-ADVERSARIAL-SOURCE-REPLICATION-001",
+				"DG-FIXTURE-ADVERSARIAL-ARBITRARY-FILE-REPLICATION-001",
+				"DG-FIXTURE-ADVERSARIAL-CROSS-REPOSITORY-SCOPE-ESCAPE-001",
+				"DG-FIXTURE-ADVERSARIAL-DENY-WINS-BYPASS-001",
+				"DG-FIXTURE-ADVERSARIAL-COMPROMISED-PERSON-SURFACE-001",
+				"DG-FIXTURE-ADVERSARIAL-COMPROMISED-COMPONENT-SURFACE-001",
+				"DG-FIXTURE-ADVERSARIAL-COMPROMISED-TRANSPORT-SURFACE-001",
+				"DG-FIXTURE-ADVERSARIAL-COMPROMISED-STORE-SURFACE-001",
+				"DG-FIXTURE-ADVERSARIAL-COMPROMISED-PROJECTION-SURFACE-001",
+				"DG-FIXTURE-ADVERSARIAL-COMPROMISED-ADMIN-SURFACE-001"
+			],
+			"expectedOutput": {
+				"records": [
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-001",
+						"recordType": "adversarial-evidence",
+						"position": 1,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-UNKNOWN-VERSION-001",
+						"category": "unknown-version",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-002",
+						"recordType": "adversarial-evidence",
+						"position": 2,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-INCOMPATIBLE-VERSION-001",
+						"category": "incompatible-version",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-003",
+						"recordType": "adversarial-evidence",
+						"position": 3,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-SILENT-DOWNGRADE-001",
+						"category": "silent-downgrade",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-004",
+						"recordType": "adversarial-evidence",
+						"position": 4,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-STALE-GENERATION-001",
+						"category": "stale-generation",
+						"outcome": "fenced",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-005",
+						"recordType": "adversarial-evidence",
+						"position": 5,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-UNRESOLVED-CONFLICT-001",
+						"category": "unresolved-conflict",
+						"outcome": "preserved",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-006",
+						"recordType": "adversarial-evidence",
+						"position": 6,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-CORRUPTION-001",
+						"category": "corruption",
+						"outcome": "rejected",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-007",
+						"recordType": "adversarial-evidence",
+						"position": 7,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-REVOKED-AUTHORIZATION-001",
+						"category": "revoked-authorization",
+						"outcome": "denied",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-008",
+						"recordType": "adversarial-evidence",
+						"position": 8,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-EXACT-SCOPE-DENY-WINS-001",
+						"category": "exact-scope-deny-wins",
+						"outcome": "denied",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-009",
+						"recordType": "adversarial-evidence",
+						"position": 9,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-RETENTION-DELETION-001",
+						"category": "retention-deletion",
+						"outcome": "enforced",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-010",
+						"recordType": "adversarial-evidence",
+						"position": 10,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-CROSS-TENANT-ESCAPE-001",
+						"category": "cross-tenant-escape",
+						"outcome": "denied",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-011",
+						"recordType": "adversarial-evidence",
+						"position": 11,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-EXECUTION-BOUNDARY-ESCAPE-001",
+						"category": "execution-boundary-escape",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-012",
+						"recordType": "adversarial-evidence",
+						"position": 12,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-PROJECTION-DIVERGENCE-001",
+						"category": "projection-divergence",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-013",
+						"recordType": "adversarial-evidence",
+						"position": 13,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-DISCLOSURE-001",
+						"category": "disclosure",
+						"outcome": "redacted",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-014",
+						"recordType": "adversarial-evidence",
+						"position": 14,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-REPLAY-001",
+						"category": "replay",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-015",
+						"recordType": "adversarial-evidence",
+						"position": 15,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-STALE-AUTHORIZATION-001",
+						"category": "stale-authorization",
+						"outcome": "denied",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-016",
+						"recordType": "adversarial-evidence",
+						"position": 16,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-PROVENANCE-FORGERY-001",
+						"category": "provenance-forgery",
+						"outcome": "rejected",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-017",
+						"recordType": "adversarial-evidence",
+						"position": 17,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-SECRET-REPLICATION-001",
+						"category": "secret-replication",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-018",
+						"recordType": "adversarial-evidence",
+						"position": 18,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-CREDENTIAL-REPLICATION-001",
+						"category": "credential-replication",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-019",
+						"recordType": "adversarial-evidence",
+						"position": 19,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-SOURCE-REPLICATION-001",
+						"category": "source-replication",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-020",
+						"recordType": "adversarial-evidence",
+						"position": 20,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-ARBITRARY-FILE-REPLICATION-001",
+						"category": "arbitrary-file-replication",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-021",
+						"recordType": "adversarial-evidence",
+						"position": 21,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-CROSS-REPOSITORY-SCOPE-ESCAPE-001",
+						"category": "cross-repository-scope-escape",
+						"outcome": "denied",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-022",
+						"recordType": "adversarial-evidence",
+						"position": 22,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-DENY-WINS-BYPASS-001",
+						"category": "deny-wins-bypass",
+						"outcome": "denied",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-023",
+						"recordType": "adversarial-evidence",
+						"position": 23,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-PERSON-SURFACE-001",
+						"category": "compromised-person-surface",
+						"outcome": "denied",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-024",
+						"recordType": "adversarial-evidence",
+						"position": 24,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-COMPONENT-SURFACE-001",
+						"category": "compromised-component-surface",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-025",
+						"recordType": "adversarial-evidence",
+						"position": 25,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-TRANSPORT-SURFACE-001",
+						"category": "compromised-transport-surface",
+						"outcome": "rejected",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-026",
+						"recordType": "adversarial-evidence",
+						"position": 26,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-STORE-SURFACE-001",
+						"category": "compromised-store-surface",
+						"outcome": "fenced",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-027",
+						"recordType": "adversarial-evidence",
+						"position": 27,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-PROJECTION-SURFACE-001",
+						"category": "compromised-projection-surface",
+						"outcome": "refused",
+						"content": "bounded synthetic adversarial evidence"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-028",
+						"recordType": "adversarial-evidence",
+						"position": 28,
+						"variantId": "DG-FIXTURE-ADVERSARIAL-COMPROMISED-ADMIN-SURFACE-001",
+						"category": "compromised-admin-surface",
+						"outcome": "denied",
+						"content": "bounded synthetic adversarial evidence"
+					}
+				],
+				"order": [
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-001",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-002",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-003",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-004",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-005",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-006",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-007",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-008",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-009",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-010",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-011",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-012",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-013",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-014",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-015",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-016",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-017",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-018",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-019",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-020",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-021",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-022",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-023",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-024",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-025",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-026",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-027",
+					"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-028"
+				],
+				"omissionRedactionReasons": [
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-001",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-002",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-003",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-004",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-005",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-006",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-007",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-008",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-009",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-010",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-011",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-012",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-013",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-014",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-015",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-016",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-017",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-018",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-019",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-020",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-021",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-022",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-023",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-024",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-025",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-026",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-027",
+						"reason": "sensitive-synthetic-material-omitted"
+					},
+					{
+						"recordId": "DG-GOLDEN-ADVERSARIAL-EVIDENCE-001-RECORD-028",
+						"reason": "sensitive-synthetic-material-omitted"
+					}
+				],
+				"freshness": {
+					"asOfSequence": 28,
+					"generation": 1,
+					"state": "current",
+					"basis": "named-adversarial-variants"
+				},
+				"receipt": {
+					"status": "recorded",
+					"reason": "deterministic adversarial evidence output",
+					"sequence": 28
+				}
+			},
+			"digest": "4e76ae6d730ca2c179f381949cf27c26fc1990419f76e1f4ff7d66e49090356a"
+		}
+	],
+	"acceptanceMatrix": [
+		{
+			"criterionId": "DG-ACC-GOLDEN-ENVELOPE-001",
+			"title": "Golden envelope",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"owningContext": "sync-runtime",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.sync-envelope",
+			"phaseGate": "phase-3",
+			"evidenceType": "golden-envelope-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ENVELOPE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-GOLDEN-PROJECTION-001",
+			"title": "Golden projection output",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.rebuildable-read-only-projections",
+			"owningContext": "governance-graph",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.projection-generation",
+			"phaseGate": "phase-2",
+			"evidenceType": "golden-projection-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-PROJECTION-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-QUERY-ENVELOPE-001",
+			"title": "Query envelope",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"owningContext": "governance-graph",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.query-contract",
+			"phaseGate": "phase-2",
+			"evidenceType": "query-envelope-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-QUERY-ENVELOPE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-READ-SNAPSHOT-001",
+			"title": "Read snapshot",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"owningContext": "visualization-workbench",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.read-snapshot",
+			"phaseGate": "phase-2",
+			"evidenceType": "read-snapshot-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-READ-SNAPSHOT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-PROJECTION-RECEIPT-001",
+			"title": "Projection receipt",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"owningContext": "visualization-workbench",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.projection-read-receipt",
+			"phaseGate": "phase-2",
+			"evidenceType": "projection-receipt-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-PROJECTION-RECEIPT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-KNOWLEDGE-LIFECYCLE-RECEIPT-001",
+			"title": "Knowledge lifecycle receipt",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.source-and-resolution-ownership",
+			"owningContext": "governed-knowledge-base",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.knowledge-record",
+			"phaseGate": "phase-2",
+			"evidenceType": "knowledge-lifecycle-receipt-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-KNOWLEDGE-LIFECYCLE-RECEIPT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-REPLAY-RESULT-001",
+			"title": "Replay result",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.offline-operation",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.domain-event",
+			"phaseGate": "phase-1",
+			"evidenceType": "replay-result-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-REPLAY-RESULT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-IDEMPOTENCE-RESULT-001",
+			"title": "Idempotence result",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"owningContext": "sync-runtime",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.sync-operation",
+			"phaseGate": "phase-3",
+			"evidenceType": "idempotence-result-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-IDEMPOTENCE-RESULT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-MIGRATION-EVIDENCE-001",
+			"title": "Migration evidence",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"owningContext": "sync-runtime",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.sync-envelope",
+			"phaseGate": "phase-3",
+			"evidenceType": "migration-evidence-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-MIGRATION-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-CHECKPOINT-EVIDENCE-001",
+			"title": "Checkpoint evidence",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"owningContext": "sync-runtime",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.checkpoint",
+			"phaseGate": "phase-3",
+			"evidenceType": "checkpoint-evidence-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-CHECKPOINT-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-FENCING-EVIDENCE-001",
+			"title": "Fencing evidence",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"owningContext": "sync-runtime",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.checkpoint",
+			"phaseGate": "phase-3",
+			"evidenceType": "fencing-evidence-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-FENCING-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-MIXED-VERSION-EVIDENCE-001",
+			"title": "Mixed-version evidence",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"owningContext": "sync-runtime",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.sync-envelope",
+			"phaseGate": "phase-4",
+			"evidenceType": "mixed-version-evidence-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-MIXED-VERSION-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-REBUILD-PARITY-001",
+			"title": "Rebuild parity",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.rebuildable-read-only-projections",
+			"owningContext": "governance-graph",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.projection-generation",
+			"phaseGate": "phase-2",
+			"evidenceType": "rebuild-parity-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-REBUILD-PARITY-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-PERSONAL-NODE-TRACER-001",
+			"title": "Personal Node tracer",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.offline-operation",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.context-page",
+			"phaseGate": "phase-1",
+			"evidenceType": "personal-node-tracer-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-REPLAY-RESULT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-TEAM-HUB-TRACER-001",
+			"title": "Team Hub tracer",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.optional-non-executing-sync-runtime",
+			"owningContext": "sync-runtime",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.sync-session",
+			"phaseGate": "phase-3",
+			"evidenceType": "team-hub-tracer-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-IDEMPOTENCE-RESULT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-ORGANIZATION-PROFILE-TRACER-001",
+			"title": "Organization Profile tracer",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"owningContext": "organization-control-plane",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"phaseGate": "phase-4",
+			"evidenceType": "organization-profile-tracer-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-READ-SNAPSHOT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-REPOSITORY-LOCAL-AUTHORITY-001",
+			"title": "Repository-local authority",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.repository-local-authority",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.domain-fact",
+			"phaseGate": "phase-1",
+			"evidenceType": "repository-local-authority-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ENVELOPE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-OFFLINE-CAPABILITY-001",
+			"title": "Offline capability",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.offline-operation",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.contract.context-page",
+			"phaseGate": "phase-1",
+			"evidenceType": "offline-capability-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-REPLAY-RESULT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-NO-EXECUTION-BOUNDARY-001",
+			"title": "No-execution boundary",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"phaseGate": "phase-3",
+			"evidenceType": "no-execution-boundary-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ENVELOPE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-APPEND-ONLY-LINEAGE-001",
+			"title": "Append-only lineage",
+			"sourceDecision": "154",
+			"invariant": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"phaseGate": "phase-2",
+			"evidenceType": "append-only-lineage-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-PROJECTION-RECEIPT-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-FAIL-CLOSED-DEGRADED-READ-ONLY-001",
+			"title": "Fail-closed degraded read-only acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.fail-closed-degraded-read-only",
+			"owningContext": "visualization-workbench",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.fail-closed-degraded-read-only",
+			"phaseGate": "phase-4",
+			"evidenceType": "fail-closed-degraded-read-only-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-CONFLICT-PRESERVATION-AND-GOVERNED-RESOLUTION-001",
+			"title": "Conflict preservation and governed resolution acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.conflict-preservation-and-governed-resolution",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.conflict-preservation-and-governed-resolution",
+			"phaseGate": "phase-4",
+			"evidenceType": "conflict-preservation-and-governed-resolution-digest",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-UNKNOWN-VERSION-001",
+			"title": "unknown-version adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"phaseGate": "phase-4",
+			"evidenceType": "unknown-version-adversarial-digest",
+			"threatCategory": "unknown-version",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-INCOMPATIBLE-VERSION-001",
+			"title": "incompatible-version adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"phaseGate": "phase-4",
+			"evidenceType": "incompatible-version-adversarial-digest",
+			"threatCategory": "incompatible-version",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-SILENT-DOWNGRADE-001",
+			"title": "silent-downgrade adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.one-versioned-protocol-and-artifact-model",
+			"phaseGate": "phase-4",
+			"evidenceType": "silent-downgrade-adversarial-digest",
+			"threatCategory": "silent-downgrade",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-STALE-GENERATION-001",
+			"title": "stale-generation adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"owningContext": "organization-control-plane",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"phaseGate": "phase-4",
+			"evidenceType": "stale-generation-adversarial-digest",
+			"threatCategory": "stale-generation",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-UNRESOLVED-CONFLICT-001",
+			"title": "unresolved-conflict adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.conflict-preservation-and-governed-resolution",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.conflict-preservation-and-governed-resolution",
+			"phaseGate": "phase-4",
+			"evidenceType": "unresolved-conflict-adversarial-digest",
+			"threatCategory": "unresolved-conflict",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-CORRUPTION-001",
+			"title": "corruption adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"phaseGate": "phase-4",
+			"evidenceType": "corruption-adversarial-digest",
+			"threatCategory": "corruption",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-REVOKED-AUTHORIZATION-001",
+			"title": "revoked-authorization adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"phaseGate": "phase-4",
+			"evidenceType": "revoked-authorization-adversarial-digest",
+			"threatCategory": "revoked-authorization",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-EXACT-SCOPE-DENY-WINS-001",
+			"title": "exact-scope-deny-wins adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"phaseGate": "phase-4",
+			"evidenceType": "exact-scope-deny-wins-adversarial-digest",
+			"threatCategory": "exact-scope-deny-wins",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-RETENTION-DELETION-001",
+			"title": "retention-deletion adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"phaseGate": "phase-4",
+			"evidenceType": "retention-deletion-adversarial-digest",
+			"threatCategory": "retention-deletion",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-CROSS-TENANT-ESCAPE-001",
+			"title": "cross-tenant-escape adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"owningContext": "organization-control-plane",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"phaseGate": "phase-4",
+			"evidenceType": "cross-tenant-escape-adversarial-digest",
+			"threatCategory": "cross-tenant-escape",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-EXECUTION-BOUNDARY-ESCAPE-001",
+			"title": "execution-boundary-escape adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"phaseGate": "phase-4",
+			"evidenceType": "execution-boundary-escape-adversarial-digest",
+			"threatCategory": "execution-boundary-escape",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-PROJECTION-DIVERGENCE-001",
+			"title": "projection-divergence adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.rebuildable-read-only-projections",
+			"owningContext": "governance-graph",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.rebuildable-read-only-projections",
+			"phaseGate": "phase-4",
+			"evidenceType": "projection-divergence-adversarial-digest",
+			"threatCategory": "projection-divergence",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-DISCLOSURE-001",
+			"title": "disclosure adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"phaseGate": "phase-4",
+			"evidenceType": "disclosure-adversarial-digest",
+			"threatCategory": "disclosure",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-REPLAY-001",
+			"title": "replay adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"phaseGate": "phase-4",
+			"evidenceType": "replay-adversarial-digest",
+			"threatCategory": "replay",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-STALE-AUTHORIZATION-001",
+			"title": "stale-authorization adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"phaseGate": "phase-4",
+			"evidenceType": "stale-authorization-adversarial-digest",
+			"threatCategory": "stale-authorization",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-PROVENANCE-FORGERY-001",
+			"title": "provenance-forgery adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.source-and-resolution-ownership",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.source-and-resolution-ownership",
+			"phaseGate": "phase-4",
+			"evidenceType": "provenance-forgery-adversarial-digest",
+			"threatCategory": "provenance-forgery",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-SECRET-REPLICATION-001",
+			"title": "secret-replication adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"phaseGate": "phase-4",
+			"evidenceType": "secret-replication-adversarial-digest",
+			"threatCategory": "secret-replication",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-CREDENTIAL-REPLICATION-001",
+			"title": "credential-replication adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"phaseGate": "phase-4",
+			"evidenceType": "credential-replication-adversarial-digest",
+			"threatCategory": "credential-replication",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-SOURCE-REPLICATION-001",
+			"title": "source-replication adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.source-and-resolution-ownership",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.source-and-resolution-ownership",
+			"phaseGate": "phase-4",
+			"evidenceType": "source-replication-adversarial-digest",
+			"threatCategory": "source-replication",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-ARBITRARY-FILE-REPLICATION-001",
+			"title": "arbitrary-file-replication adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.repository-local-authority",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.repository-local-authority",
+			"phaseGate": "phase-4",
+			"evidenceType": "arbitrary-file-replication-adversarial-digest",
+			"threatCategory": "arbitrary-file-replication",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-CROSS-REPOSITORY-SCOPE-ESCAPE-001",
+			"title": "cross-repository-scope-escape adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"owningContext": "organization-control-plane",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"phaseGate": "phase-4",
+			"evidenceType": "cross-repository-scope-escape-adversarial-digest",
+			"threatCategory": "cross-repository-scope-escape",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-DENY-WINS-BYPASS-001",
+			"title": "deny-wins-bypass adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.exact-scope-deny-wins-authorization-and-privacy-minimization",
+			"phaseGate": "phase-4",
+			"evidenceType": "deny-wins-bypass-adversarial-digest",
+			"threatCategory": "deny-wins-bypass",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-COMPROMISED-PERSON-SURFACE-001",
+			"title": "compromised-person-surface adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"owningContext": "organization-control-plane",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"phaseGate": "phase-4",
+			"evidenceType": "compromised-person-surface-adversarial-digest",
+			"threatCategory": "compromised-person-surface",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-COMPROMISED-COMPONENT-SURFACE-001",
+			"title": "compromised-component-surface adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.no-hidden-authority-or-execution",
+			"phaseGate": "phase-4",
+			"evidenceType": "compromised-component-surface-adversarial-digest",
+			"threatCategory": "compromised-component-surface",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-COMPROMISED-TRANSPORT-SURFACE-001",
+			"title": "compromised-transport-surface adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.optional-non-executing-sync-runtime",
+			"owningContext": "sync-runtime",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.optional-non-executing-sync-runtime",
+			"phaseGate": "phase-4",
+			"evidenceType": "compromised-transport-surface-adversarial-digest",
+			"threatCategory": "compromised-transport-surface",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-COMPROMISED-STORE-SURFACE-001",
+			"title": "compromised-store-surface adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"owningContext": "amber-core",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.append-only-lineage-and-immutable-records",
+			"phaseGate": "phase-4",
+			"evidenceType": "compromised-store-surface-adversarial-digest",
+			"threatCategory": "compromised-store-surface",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-COMPROMISED-PROJECTION-SURFACE-001",
+			"title": "compromised-projection-surface adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.rebuildable-read-only-projections",
+			"owningContext": "governance-graph",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.rebuildable-read-only-projections",
+			"phaseGate": "phase-4",
+			"evidenceType": "compromised-projection-surface-adversarial-digest",
+			"threatCategory": "compromised-projection-surface",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		},
+		{
+			"criterionId": "DG-ACC-THREAT-COMPROMISED-ADMIN-SURFACE-001",
+			"title": "compromised-admin-surface adversarial acceptance",
+			"sourceDecision": "158",
+			"invariant": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"owningContext": "organization-control-plane",
+			"requiredArtifactOrContract": "amber.distributed-governance.invariant.tenant-and-repository-isolation",
+			"phaseGate": "phase-4",
+			"evidenceType": "compromised-admin-surface-adversarial-digest",
+			"threatCategory": "compromised-admin-surface",
+			"goldenOutputIds": [
+				"DG-GOLDEN-ADVERSARIAL-EVIDENCE-001"
+			]
+		}
+	]
+}
