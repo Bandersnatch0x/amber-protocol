@@ -17,6 +17,7 @@ Use one lifecycle. Do not skip a gate because implementation already exists.
 6. Record real verification with `session verify --execute --confirm` when policy permits. A claim-only verification is not equivalent evidence.
 7. Run `session complete-check`, resolve required approval gates with `session approve`, then complete the session only when evidence passes.
 8. Run plan review and gate again, prepare `handoff`, and use `accept` only after review findings are closed.
+9. When durable knowledge emerged, nominate it through the memory pipeline (`memory request`, `memory ingest`) and let a human `memory approve` + `memory book` it into MEMORY.md. Never write MEMORY.md directly and never pass `--yes` on the agent side.
 
 Evidence order: confirmed plan, route/session identity, changed-file scope, command exit evidence, ledger/timeline records, review findings, approval decision, handoff/acceptance record.
 

@@ -124,8 +124,13 @@ describe → submit(execute) → gate(dry-run/validation)
 | `amber.session.status` | `amber session status` | system | —（只读） |
 | `amber.route.test` | `amber route test` | system | —（只读） |
 | `amber.context.ingest` | `amber context ingest` | human | ingest-record |
+| `amber.memory.approve` | `amber memory approve` | human | approval-record |
+| `amber.memory.abandon` | `amber memory abandon` | human | ingest-record |
+| `amber.memory.status` | `amber memory status` | system | —（只读） |
 | `amber.governance.report` | `amber governance report` | system | —（只读） |
 | `amber.object.query` | 按 `objectType` 变体分发（见下） | system | —（只读查询） |
+
+**M3 记忆动词边界注记（批次 A）**：`memory/approve` 是唯一人工批准闸门（条目级，恰一个 entryId，reject 必须非空 reason）；`memory/request`、`memory/ingest`、`memory/book` 为非类型化白名单表面（动词内联身份门 M12，非 TTY 无 `--yes` 拒绝），不经 MCP 工具暴露——Amber 从不写 MEMORY.md，人写入后经 `book` 追认登记（追认轨：`book --ratify --claim <text>` 直接创建 active 条目，无前置 request/ingest/approve，不耗 γ）。`memory/abandon` 复用 ingest-record 语义扩注：ingest-record 在 memory 域 = “记忆管道治理记录写入事件账本”，覆盖四类生命周期处置（提名创建 request / 准入 ingest / 账面登记 book / 放弃 abandon）；事件载荷 `{scope(request|entry), targetId, triggerSource(auto-threshold|explicit), requestId?, entryId?}`，abandoned 是账本终态标记，仅进 doctor 统计，消费面一律过滤。拒绝新造 book-record/abandon-record/request-record（零消费者、稀释词表）。
 
 `amber.object.query`（P2，OAG 查询层）通过 `execution.variantParam` 按
 `objectType` 分发到不同只读命令：

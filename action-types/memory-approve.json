@@ -1,0 +1,52 @@
+{
+	"actionTypeId": "amber.memory.approve",
+	"version": 1,
+	"title": "Approve a memory entry",
+	"goal": "Record human approval or rejection for exactly one memory registry entry. Boundary: approval and book are distinct ceremonies — approve authorizes; a later book registers the MEMORY.md surface and promotes to active.",
+	"mode": "interactive",
+	"parameters": {
+		"entryId": {
+			"type": "string",
+			"required": true,
+			"description": "Registry entry id to approve or reject (exactly one per call)."
+		},
+		"decision": {
+			"type": "string",
+			"required": true,
+			"enum": ["approve", "reject"],
+			"description": "Approval decision. reject requires a non-empty --reason (enforced by the handler)."
+		},
+		"reason": {
+			"type": "string",
+			"required": false,
+			"description": "Rejection reason. Mandatory (handler-enforced non-empty) when decision is reject; recorded in the memory-approval event and the entry lastRejection."
+		}
+	},
+	"submissionCriteria": [
+		"entry exists in the memory registry",
+		"entry is in proposal state for the decision to be valid"
+	],
+	"effects": {
+		"edits": [".amber/memory/registry/", ".amber/context/events.jsonl"],
+		"sideEffects": ["ledger-append"],
+		"rollback": true
+	},
+	"evidenceRequired": ["approval-record"],
+	"timeout": 120,
+	"governance": {
+		"policy": "governance/policy.md#approval-gates",
+		"approver": ["human"],
+		"evidence": ["approval-record"],
+		"circuitBreaker": true,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "memory",
+		"subcommand": "approve",
+		"args": [
+			{ "flag": "--entry-id", "source": "parameters.entryId" },
+			{ "flag": "--decision", "source": "parameters.decision" },
+			{ "flag": "--reason", "source": "parameters.reason", "optional": true }
+		]
+	}
+}

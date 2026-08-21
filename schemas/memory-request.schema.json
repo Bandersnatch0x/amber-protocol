@@ -1,0 +1,185 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/memory-request.schema.json",
+	"title": "Memory Request",
+	"description": "The memory nomination request artifact written at .amber/memory/requests/<requestId>.json (Governed Memory Layer spec §10.1). Same family as context-request (draft-07); page-level fields (pageId/scope/supersedes/target) are forbidden per #172-B3. The 'one open request per trigger' exclusivity is enforced by the write path, not by this schema. entries[] carry the §10.2 core entry fields (registry extension fields are not present at request time).",
+	"type": "object",
+	"required": [
+		"schemaVersion",
+		"requestId",
+		"createdAt",
+		"triggerRef",
+		"provenance",
+		"entries",
+		"contract",
+		"acceptance"
+	],
+	"properties": {
+		"schemaVersion": { "type": "string", "enum": ["1.0.0"] },
+		"requestId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+		"createdAt": { "type": "string", "format": "date-time" },
+		"triggerRef": {
+			"type": "object",
+			"required": ["ref"],
+			"properties": {
+				"ref": { "type": "string", "minLength": 1 }
+			}
+		},
+		"provenance": {
+			"type": "object",
+			"required": ["channel"],
+			"properties": {
+				"channel": {
+					"type": "string",
+					"enum": [
+						"dreaming-maintenance",
+						"t1-writeback",
+						"t2-writeback",
+						"distill-conversion",
+						"maintenance-conversion",
+						"evolution-conversion",
+						"regression-conversion",
+						"human-escape-hatch"
+					]
+				},
+				"signal": {
+					"type": "string",
+					"enum": [
+						"break-loop-recurrence",
+						"distill-count",
+						"executed-evidence",
+						"f023-category-hit",
+						"evolution-recurrence",
+						"t1t2-trigger"
+					]
+				},
+				"batchId": { "type": "string" },
+				"loopRecord": { "type": "string" },
+				"derivedFrom": { "type": "string" }
+			},
+			"allOf": [
+				{
+					"description": "conversion + dreaming channels must carry a closed-set signal id (§5.3 signal validation; #173-Q1.3 absorption + #174-M13). T1/T2 and escape-hatch channels are exempt.",
+					"if": {
+						"properties": {
+							"channel": {
+								"enum": [
+									"dreaming-maintenance",
+									"distill-conversion",
+									"maintenance-conversion",
+									"evolution-conversion",
+									"regression-conversion"
+								]
+							}
+						}
+					},
+					"then": { "required": ["signal"] }
+				},
+				{
+					"description": "dreaming channel additionally carries batchId + loopRecord (#174-M5/M11/M12)",
+					"if": { "properties": { "channel": { "const": "dreaming-maintenance" } } },
+					"then": { "required": ["batchId", "loopRecord"] }
+				}
+			]
+		},
+		"entries": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": [
+					"schemaVersion",
+					"entryId",
+					"claim",
+					"knowledgeKind",
+					"targetSurface",
+					"provenance"
+				],
+				"properties": {
+					"schemaVersion": { "type": "string", "enum": ["1.0.0"] },
+					"entryId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+					"claim": { "type": "string", "minLength": 1 },
+					"knowledgeKind": {
+						"type": "string",
+						"enum": [
+							"invariant",
+							"decision",
+							"pattern",
+							"failure",
+							"rejected-approach",
+							"external-constraint",
+							"unspecified"
+						]
+					},
+					"targetSurface": {
+						"type": "string",
+						"enum": ["MEMORY.md", "docs/wiki", "docs/adr", "docs/specs"]
+					},
+					"provenance": {
+						"type": "object",
+						"required": ["sources"],
+						"properties": {
+							"sources": {
+								"type": "array",
+								"minItems": 1,
+								"items": {
+									"type": "object",
+									"required": ["kind", "ref", "rawHash", "mutable"],
+									"properties": {
+										"kind": { "type": "string" },
+										"ref": { "type": "string", "minLength": 1 },
+										"rawHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+										"normHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+										"mutable": { "type": "boolean" },
+										"excerpt": { "type": "string" },
+										"excerptHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+										"backref": { "type": "string" }
+									},
+									"allOf": [
+										{
+											"description": "mutable sources carry normHash; immutable sources carry an excerpt snapshot (ADR-0009 D5/D5a)",
+											"if": { "properties": { "mutable": { "const": true } } },
+											"then": { "required": ["normHash"] },
+											"else": { "required": ["excerpt", "excerptHash"] }
+										}
+									]
+								}
+							}
+						}
+					},
+					"supersedeTarget": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+					"related": {
+						"type": "array",
+						"items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+					}
+				}
+			}
+		},
+		"contract": {
+			"type": "object",
+			"required": ["instructions", "constraints"],
+			"properties": {
+				"instructions": { "type": "string", "minLength": 1 },
+				"constraints": {
+					"type": "object",
+					"required": ["forbidNewFacts"],
+					"properties": {
+						"forbidNewFacts": { "type": "boolean" }
+					}
+				}
+			}
+		},
+		"acceptance": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": ["check", "code"],
+				"properties": {
+					"check": { "type": "string" },
+					"code": { "type": "string", "pattern": "^AMBER_E_MEMORY_[A-Z_]+$" }
+				}
+			}
+		}
+	}
+}

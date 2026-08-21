@@ -1105,6 +1105,72 @@
 				"docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md"
 			],
 			"updated": "2026-08-18"
+		},
+		{
+			"id": "F033",
+			"priority": 1,
+			"area": "context",
+			"title": "Governed Memory Layer batch A: five-verb surface, registry, and doctor rules",
+			"user_visible_behavior": "amber memory request/ingest/approve/book/abandon/status govern the MEMORY.md write-back pipeline: nominations are mechanically admitted under schema, binding, signal, alpha and gamma gates; humans approve entry-by-entry; book registers the surface hash; doctor enforces ledger-registry consistency, source health, and drift rules",
+			"status": "passing",
+			"verification": [
+				"node --test tests/integration/memory-commands.test.js",
+				"node --test tests/unit/cli-typed-seam.test.js tests/unit/mcp-action-contracts.test.js tests/integration/action-type-schema.test.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/integration/memory-commands.test.js",
+					"result": "passed (31 tests, 0 failed; exit 0)",
+					"date": "2026-08-21",
+					"notes": "dogfood T1 chain replay (§14-5), state-machine edges incl. β pair and needs-re-review reset (§14-6), gates (identity/binding/signal/α/γ incl. mixed-pool C4×M14), F1(i)/F3 lineage, doctor rules 1-11 positive and negative (§14-7), ratification track, derivedFrom inheritance, excerpt seal"
+				},
+				{
+					"command": "node --test tests/integration/amber-mcp.test.js tests/unit/cli-typed-seam.test.js tests/unit/mcp-action-contracts.test.js tests/integration/action-type-schema.test.js tests/unit/command-registry-parity.test.js tests/unit/scaffold-gitignore-advisory.test.js",
+					"result": "passed (all exit 0)",
+					"date": "2026-08-21",
+					"notes": "tools/list exactly three memory tools; approve/abandon approvalRequired:true executed:false; status executed:true; CLI real invocation; seam whitelist + exit-1 gating; three action-type JSONs schema-valid; capability parity; scaffold gitignore advisory"
+				},
+				{
+					"command": "npm test",
+					"result": "passed (2052 passed, 0 failed, 0 skipped; exit 0)",
+					"date": "2026-08-21",
+					"notes": "full-suite rerun after the review-fix batch; artifact docs/plans/F033-Governed-Memory-Layer-batch-A.md; remaining risk: remote CI has not rerun because the work is not pushed"
+				},
+				{
+					"command": "npm run lint; npm run format:check; npm run manifests; node scripts/amber.js doctor --target .; node scripts/validate-wiki.js --target .; npm run gen:agents:check; git diff --check",
+					"result": "passed (all exit 0; zero validation errors; 15 generated files current)",
+					"date": "2026-08-21",
+					"notes": "repository guardrails green; amber review release readiness READY; amber gate errors 0; plan user confirmation confirmed"
+				},
+				{
+					"command": "Standards / Spec independent final review (two rounds)",
+					"result": "round 1: 13 findings (1 high, 3 medium, 9 low) — all fixed same session; round 2: 13/13 confirmed fixed, 6 new low findings (K1 target anchor, abandoned queued-pool exclusion, payload signal path, §9 payload field enumeration, --ratify/--entry-id exclusivity, message cosmetics) — all fixed with dedicated tests (34-test memory suite)",
+					"date": "2026-08-21",
+					"notes": "reviewer: independent subagent over the uncommitted diff against docs/specs/2026-08-21-governed-memory-layer.md; spec §9 field evolution recorded per #175-系统性四; artifact docs/plans/F033-Governed-Memory-Layer-batch-A.md; remaining risk: remote CI has not rerun because the work is not pushed"
+				}
+			],
+			"notes": [
+				"ADR-0018 batch A per docs/specs/2026-08-21-governed-memory-layer.md section 13; single atomic PR (M15); T1/T2 auto-trigger mounting is explicitly out of scope for batch A"
+			],
+			"paths": [
+				"scripts/lib/memory-commands.js",
+				"scripts/lib/core/memory-store.js",
+				"scripts/lib/core/doctor.js",
+				"scripts/lib/core/governance-report.js",
+				"scripts/lib/core/scaffold.js",
+				"action-types/memory-approve.json",
+				"action-types/memory-abandon.json",
+				"action-types/memory-status.json",
+				"schemas/memory-request.schema.json",
+				"schemas/memory-entry.schema.json",
+				"workflow-packs/memory-maintenance.pack.json",
+				"templates/MEMORY.md",
+				"tests/integration/memory-commands.test.js",
+				"tests/unit/scaffold-gitignore-advisory.test.js",
+				"docs/plans/F033-Governed-Memory-Layer-batch-A.md"
+			],
+			"updated": "2026-08-21"
 		}
 	]
 }

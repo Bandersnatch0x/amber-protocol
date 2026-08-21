@@ -171,3 +171,43 @@ test("CLI typed seam annotates asynchronous handler results", async () => {
 	}));
 	assert.equal(response.result.typedAction, "amber.session.status");
 });
+
+test("CLI typed seam classifies the memory verb surface (batch A §8.3)", () => {
+	assert.deepEqual(classifyCliInvocation("memory", { _: ["status"] }), {
+		key: "memory/status",
+		effect: "read",
+		approver: "system",
+		directReadOnlyExec: true,
+	});
+	assert.equal(classifyCliInvocation("memory", { _: ["approve"] }).effect, "write");
+	assert.equal(classifyCliInvocation("memory", { _: ["approve"] }).approver, "human");
+	assert.equal(classifyCliInvocation("memory", { _: ["abandon"] }).effect, "write");
+	assert.equal(classifyCliInvocation("memory", { _: ["abandon"] }).approver, "human");
+});
+
+test("CLI typed seam gates memory approve/abandon but whitelists request/ingest/book", () => {
+	let invocations = 0;
+	const invoke = () => {
+		invocations += 1;
+		return { result: { errors: [], warnings: [] } };
+	};
+
+	// request/ingest/book are untyped (their own inline identity gate, M12).
+	for (const sub of ["request", "ingest", "book"]) {
+		assert.equal(validateCliInvocation("memory", { _: [sub] }).disposition, "untyped", sub);
+	}
+
+	const approve = dispatchTypedInvocation("memory", { _: ["approve"] }, invoke);
+	assert.equal(approve.exitCode, 1);
+	assert.equal(approve.result.approvalRequired, true);
+	assert.equal(invocations, 0, "handler must not run without --yes");
+
+	const abandon = dispatchTypedInvocation("memory", { _: ["abandon"] }, invoke);
+	assert.equal(abandon.exitCode, 1);
+	assert.equal(abandon.result.approvalRequired, true);
+	assert.equal(invocations, 0);
+
+	const allowed = dispatchTypedInvocation("memory", { _: ["approve"], yes: true }, invoke);
+	assert.equal(invocations, 1);
+	assert.equal(allowed.result.typedAction, "amber.memory.approve");
+});

@@ -146,6 +146,30 @@ const COMMAND_CAPABILITIES = {
 		edits: [],
 		sideEffects: [],
 	},
+	"memory/approve": {
+		effect: "write",
+		approver: "human",
+		evidence: "approval-record",
+		directReadOnlyExec: false,
+		edits: [".amber/memory/registry/", ".amber/context/events.jsonl"],
+		sideEffects: ["ledger-append"],
+	},
+	"memory/abandon": {
+		effect: "write",
+		approver: "human",
+		evidence: "ingest-record",
+		directReadOnlyExec: false,
+		edits: [".amber/memory/registry/", ".amber/memory/requests/", ".amber/context/events.jsonl"],
+		sideEffects: ["ledger-append"],
+	},
+	"memory/status": {
+		effect: "read",
+		approver: "system",
+		evidence: null,
+		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
+	},
 };
 
 // ---- capability derivation (single shape for JSON → declared values) ----

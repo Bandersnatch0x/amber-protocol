@@ -136,6 +136,15 @@ function buildScaffoldWarnings(targetRoot, created, backups, options) {
 					". These governance files should be committed for team visibility. " +
 					"Consider updating .gitignore.",
 			);
+			// ADR-0018 §10.3 advisory: MEMORY.md is governed shared memory, tracked
+			// by default — unlike the local working files a target may ignore.
+			if (conflicts.some((c) => c.file === "MEMORY.md")) {
+				warnings.push(
+					"MEMORY.md is governed shared memory (ADR-0018) — tracked by git by default. " +
+						"Re-include it with a '!/MEMORY.md' rule so booked entries stay versioned; " +
+						"otherwise doctor reports an acknowledged L2 divergence (one-time notice).",
+				);
+			}
 		}
 	}
 
@@ -350,4 +359,5 @@ module.exports = {
 	scaffoldWiki,
 	checkWikiReadiness,
 	saveInitReport,
+	buildScaffoldWarnings,
 };

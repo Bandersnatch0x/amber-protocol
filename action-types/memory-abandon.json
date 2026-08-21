@@ -1,0 +1,45 @@
+{
+	"actionTypeId": "amber.memory.abandon",
+	"version": 1,
+	"title": "Abandon a memory request or entry",
+	"goal": "Record an explicit human abandon of a memory request or entry as a terminal ledger marker; never a physical delete. Boundary: this is the F1(ii) explicit human entrypoint — the F1(i) automatic lineage path (3 accumulated ingest rejections) does not pass through this action or MCP.",
+	"mode": "interactive",
+	"parameters": {
+		"request": {
+			"type": "string",
+			"required": false,
+			"description": "Request id to abandon (request scope). Mutually exclusive with --entry (enforced by the handler)."
+		},
+		"entry": {
+			"type": "string",
+			"required": false,
+			"description": "Entry id to abandon (entry scope). Mutually exclusive with --request (enforced by the handler)."
+		}
+	},
+	"submissionCriteria": [
+		"exactly one of request or entry is provided",
+		"the referenced request or entry exists in the memory registry"
+	],
+	"effects": {
+		"edits": [".amber/memory/registry/", ".amber/memory/requests/", ".amber/context/events.jsonl"],
+		"sideEffects": ["ledger-append"],
+		"rollback": true
+	},
+	"evidenceRequired": ["ingest-record"],
+	"timeout": 120,
+	"governance": {
+		"policy": "governance/policy.md#approval-gates",
+		"approver": ["human"],
+		"evidence": ["ingest-record"],
+		"circuitBreaker": true,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "memory",
+		"subcommand": "abandon",
+		"args": [
+			{ "flag": "--request", "source": "parameters.request", "optional": true },
+			{ "flag": "--entry", "source": "parameters.entry", "optional": true }
+		]
+	}
+}

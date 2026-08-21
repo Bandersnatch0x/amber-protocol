@@ -1,0 +1,28 @@
+{
+	"actionTypeId": "amber.memory.status",
+	"version": 1,
+	"title": "Memory status",
+	"goal": "Read the three-section memory projection (entries, gamma, alpha) without mutating anything. Observation only — doctor is the sole judgment authority; status only projects counts, window, and utilization.",
+	"mode": "dry-run",
+	"parameters": {},
+	"submissionCriteria": [],
+	"effects": {
+		"edits": [],
+		"sideEffects": [],
+		"rollback": false
+	},
+	"evidenceRequired": [],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#read-only-projection",
+		"approver": ["system"],
+		"evidence": [],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "memory",
+		"subcommand": "status",
+		"args": [{ "flag": "--json", "flagOnly": true }]
+	}
+}

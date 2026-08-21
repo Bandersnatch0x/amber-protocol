@@ -1,0 +1,95 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/memory-entry.schema.json",
+	"title": "Memory Entry",
+	"description": "A governed memory entry (Governed Memory Layer, spec 2026-08-21-governed-memory-layer §10.2). Same family as context-request/context-page (draft-07). The core fields are shared by request entries[] elements and the registry entry object; registry-only extension fields (status/origin/booking/rejection bookkeeping) are carried solely by the persisted registry object. entryId is the content-hash identity — revised content is a new entryId.",
+	"type": "object",
+	"required": ["schemaVersion", "entryId", "claim", "knowledgeKind", "targetSurface", "provenance"],
+	"properties": {
+		"schemaVersion": { "type": "string", "enum": ["1.0.0"] },
+		"entryId": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+		"claim": { "type": "string", "minLength": 1 },
+		"knowledgeKind": {
+			"type": "string",
+			"enum": [
+				"invariant",
+				"decision",
+				"pattern",
+				"failure",
+				"rejected-approach",
+				"external-constraint",
+				"unspecified"
+			]
+		},
+		"targetSurface": {
+			"type": "string",
+			"enum": ["MEMORY.md", "docs/wiki", "docs/adr", "docs/specs"]
+		},
+		"provenance": {
+			"type": "object",
+			"required": ["sources"],
+			"properties": {
+				"sources": {
+					"type": "array",
+					"minItems": 1,
+					"items": {
+						"type": "object",
+						"required": ["kind", "ref", "rawHash", "mutable"],
+						"properties": {
+							"kind": { "type": "string" },
+							"ref": { "type": "string", "minLength": 1 },
+							"rawHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+							"normHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+							"mutable": { "type": "boolean" },
+							"excerpt": { "type": "string" },
+							"excerptHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+							"backref": { "type": "string" }
+						},
+						"allOf": [
+							{
+								"description": "mutable sources carry normHash; immutable sources carry an excerpt snapshot (ADR-0009 D5/D5a; backref is best-effort, non-load-bearing per #170-Q3)",
+								"if": { "properties": { "mutable": { "const": true } } },
+								"then": { "required": ["normHash"] },
+								"else": { "required": ["excerpt", "excerptHash"] }
+							}
+						]
+					}
+				}
+			}
+		},
+		"supersedeTarget": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+		"related": {
+			"type": "array",
+			"items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+		},
+		"status": {
+			"type": "string",
+			"enum": ["draft", "proposal", "active", "superseded", "needs-re-review", "abandoned"]
+		},
+		"origin": {
+			"type": "string",
+			"enum": ["governed-promotion", "human-direct-ratification"]
+		},
+		"approvedAt": { "type": "string", "format": "date-time" },
+		"lastRejection": {
+			"type": "object",
+			"required": ["reason", "at"],
+			"properties": {
+				"reason": { "type": "string", "minLength": 1 },
+				"at": { "type": "string", "format": "date-time" }
+			}
+		},
+		"rejectionCount": { "type": "integer", "minimum": 0 },
+		"bookedSurface": {
+			"type": "object",
+			"required": ["path", "normHash", "bookedAt"],
+			"properties": {
+				"path": { "type": "string", "minLength": 1 },
+				"normHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+				"bookedAt": { "type": "string", "format": "date-time" }
+			}
+		},
+		"createdAt": { "type": "string", "format": "date-time" },
+		"updatedAt": { "type": "string", "format": "date-time" }
+	}
+}

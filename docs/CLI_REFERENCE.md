@@ -1195,6 +1195,40 @@ target binding; if a fixture declares `target`, the binding must match the selec
 age and eligibility but does not delete or rewrite requests, payloads, pages, verification evidence,
 Loadouts, or projections. See the [Context threat model](architecture/context-threat-model.md).
 
+## Memory Commands
+
+`amber memory` is the ADR-0018 Governed Memory Layer surface: a governed write-back pipeline for
+MEMORY.md nominations. **Amber never writes MEMORY.md** — humans curate the surface; Amber admits,
+approves, registers, and audits. `request` nominates entries (T1/T2 write-back triggers or the human
+escape hatch); `ingest` is the mechanical all-or-nothing admission gate (schema → source binding →
+signal → α budget → γ rate limit); `approve` is the single human, entry-level gate; `book` registers
+the MEMORY.md surface hash and promotes entries to active; `abandon` is the explicit terminal
+marker; `status` is a read-only three-section projection (entries / gamma / alpha). Doctor owns the
+judgment rules (ledger consistency, source health, surface drift, budget compliance).
+
+`request`/`ingest`/`book` inline the identity gate (non-TTY without `--yes` is refused);
+`approve`/`abandon` are typed-seam mutations and require `--yes`/`--confirm`.
+
+```bash
+# Nominate + admit + approve + register (the governed chain)
+node scripts/amber.js memory request --target . --payload mem-request.json --yes
+node scripts/amber.js memory ingest  --target . --request mreq-... --yes
+node scripts/amber.js memory approve --target . --entry-id sha256:... --decision approve --yes
+node scripts/amber.js memory book    --target . --entry-id sha256:... --yes
+
+# Human escape hatch + explicit terminal marker
+node scripts/amber.js memory abandon --target . --entry sha256:... --yes
+
+# Ratify a human direct edit of MEMORY.md (no request/ingest/approve, γ-free)
+node scripts/amber.js memory book --target . --ratify --claim "<entry heading>" --yes
+
+# Read-only projection (also exposed as the amber.memory.status MCP tool)
+node scripts/amber.js memory status --target . --json
+```
+
+Run `amber memory --help` for the full subcommand reference; the design contract is
+`docs/specs/2026-08-21-governed-memory-layer.md`.
+
 ## Error Codes
 
 ### explain

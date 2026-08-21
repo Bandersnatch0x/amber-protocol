@@ -37,6 +37,7 @@ Use `node scripts/amber.js --all` for deprecated and expert compatibility comman
 - `node scripts/amber.js handoff bundle --target <repo>` - produce the portable continuation bundle.
 - `node scripts/amber.js handoff validate --target <repo>` - verify the handoff bundle is complete.
 - `node scripts/amber.js context request --target <repo> --page <id>` - write a distillation contract; `ingest`/`verify`/`refresh`/`stats` close the loop (ADR-0009).
+- `node scripts/amber.js memory <request|ingest|approve|book|abandon|status> --target <repo>` - governed MEMORY.md write-back pipeline (ADR-0018); humans curate MEMORY.md, Amber admits/approves/registers.
 - `node scripts/amber.js route list` - list available routes.
 - `node scripts/amber.js session status` - inspect the current session.
 - Deprecated adoption reports remain available via `node scripts/amber.js --all` and `amber adoption --help`; prefer the diagnosis/adoption journey for new work.

@@ -1159,6 +1159,11 @@ function handleContext(args) {
 	return contextDispatch(args._?.[0], args);
 }
 
+function handleMemory(args) {
+	const { memoryDispatch } = require("./memory-commands");
+	return memoryDispatch(args._?.[0], args, resolveTarget(args));
+}
+
 // ── Command registry ────────────────────────────────────────────────────────
 
 const COMMAND_HANDLERS = {
@@ -1199,6 +1204,7 @@ const COMMAND_HANDLERS = {
 	hooks: handleHooks,
 	workflow: handleWorkflow,
 	context: handleContext,
+	memory: handleMemory,
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);

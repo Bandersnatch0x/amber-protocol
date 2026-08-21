@@ -242,6 +242,38 @@ function collectWorkflowEffectiveness(targetRoot, sessionId) {
 	};
 }
 
+// §6.1 附属裁决义务: governance report shows the memory nomination channel
+// mix (auto T1/T2 + dreaming/conversion vs human escape-hatch) from the
+// memory-request-created ledger. Read-only; empty ledger → omitted section.
+function collectMemoryChannelMix(targetRoot) {
+	const eventsPath = path.join(targetRoot, ".amber", "context", "events.jsonl");
+	if (!fs.existsSync(eventsPath)) return null;
+	const channels = {};
+	let total = 0;
+	for (const raw of fs.readFileSync(eventsPath, "utf8").split(/\r?\n/)) {
+		if (!raw.trim()) continue;
+		let event;
+		try {
+			event = JSON.parse(raw);
+		} catch {
+			continue;
+		}
+		if (event.kind !== "memory-request-created") continue;
+		total += 1;
+		const channel = event.channel || "unattributed";
+		channels[channel] = (channels[channel] || 0) + 1;
+	}
+	if (total === 0) return null;
+	const human = channels["human-escape-hatch"] || 0;
+	return {
+		totalRequests: total,
+		channels,
+		humanNominations: human,
+		automaticNominations: total - human,
+		humanSharePct: total === 0 ? 0 : Math.round((human / total) * 1000) / 10,
+	};
+}
+
 function buildGovernanceReport(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const targetDisplay = options.targetDisplay || target || ".";
@@ -285,6 +317,7 @@ function buildGovernanceReport(target, options = {}) {
 			warnings: maintenance.warnings || [],
 		},
 		workflowEffectiveness: collectWorkflowEffectiveness(targetRoot, state.activeSessionId),
+		memoryChannelMix: collectMemoryChannelMix(targetRoot),
 		nextActions,
 		errors,
 		warnings: [...(readiness.warnings || []), ...(maintenance.warnings || [])],
@@ -339,6 +372,19 @@ function renderWorkflowEffectivenessMarkdown(effectiveness = {}) {
 	return lines;
 }
 
+function renderMemoryChannelMixMarkdown(mix) {
+	if (!mix) return ["- No memory nominations recorded yet."];
+	const channelLines = Object.entries(mix.channels)
+		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+		.map(([channel, count]) => `  - ${channel}: ${count}`);
+	return [
+		`- Memory nomination requests: ${mix.totalRequests}`,
+		`- Human (escape-hatch) vs automatic: ${mix.humanNominations} vs ${mix.automaticNominations} (${mix.humanSharePct}% human)`,
+		"- Channels:",
+		...channelLines,
+	];
+}
+
 function renderGovernanceReportMarkdown(report) {
 	const lines = [
 		"# Amber Governance Report",
@@ -374,6 +420,10 @@ function renderGovernanceReportMarkdown(report) {
 		"",
 		...renderWorkflowEffectivenessMarkdown(report.workflowEffectiveness),
 		"",
+		"## Memory Nomination Mix",
+		"",
+		...renderMemoryChannelMixMarkdown(report.memoryChannelMix),
+		"",
 	];
 	return lines.join("\n");
 }
@@ -402,6 +452,20 @@ function renderGovernanceReportText(report) {
 		`  ${effectiveness.confidence?.summary || "confidence gating: unavailable"}`,
 		`  No-progress findings: ${(effectiveness.noProgress || []).length}`,
 	);
+	const mix = report.memoryChannelMix;
+	lines.push("Memory Nomination Mix:");
+	if (!mix) {
+		lines.push("  No memory nominations recorded yet.");
+	} else {
+		lines.push(
+			`  Requests: ${mix.totalRequests} — human (escape-hatch) ${mix.humanNominations} vs automatic ${mix.automaticNominations} (${mix.humanSharePct}% human)`,
+		);
+		for (const [channel, count] of Object.entries(mix.channels).sort(
+			(a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+		)) {
+			lines.push(`    ${channel}: ${count}`);
+		}
+	}
 	return lines.join("\n");
 }
 

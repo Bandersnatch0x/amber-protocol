@@ -48,6 +48,7 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
 | Gate          | `amber next --target <repo>`                              | The next safe lifecycle command                                                                        |
 | Verify        | `amber doctor --target <repo>`                            | Checks for required agent-facing surfaces                                                              |
 | Context       | `amber context request --target <repo> --page <id>`       | Contract-driven distillation: turns session evidence into provenance-backed knowledge pages (ADR-0009) |
+| Memory        | `amber memory status --target <repo> --json`              | Governed MEMORY.md write-back pipeline: nominate, admit, approve, book (ADR-0018)                      |
 | Handoff       | `amber handoff bundle --target <repo>`                    | Portable continuation bundle another human or agent can continue                                       |
 
 ## Repository artifacts
@@ -286,6 +287,22 @@ Knowledge Kind, supersession lineage, and assurance are observational and never 
 authority. Source adapters are opt-in, transcript import requires explicit redacted handling, and
 returned Source Bundles are hash-bound to the selected Target Repository. Retention never deletes
 artifacts. See the [Context threat model](docs/architecture/context-threat-model.md).
+
+### `amber memory` — governed MEMORY.md write-back
+
+`amber memory` is the ADR-0018 Governed Memory Layer. Amber never writes MEMORY.md: the host agent
+(or a human) nominates entries via a request, Amber admits them mechanically (schema, source
+binding, signal, α budget, γ rate limit), a human approves entry-by-entry, and `book` registers the
+surface hash. `status` is a read-only projection; doctor owns the judgment rules.
+
+```bash
+amber memory request --target . --payload mem-request.json --yes   # nominate (T1/T2 or escape hatch)
+amber memory ingest  --target . --request mreq-... --yes           # all-or-nothing admission
+amber memory approve --target . --entry-id sha256:... --decision approve --yes  # the human gate
+amber memory book    --target . --entry-id sha256:... --yes         # register the MEMORY.md hash
+amber memory book    --target . --ratify --claim "<heading>" --yes     # ratify a human direct edit (γ-free)
+amber memory status  --target . --json                             # entries / gamma / alpha
+```
 
 ### Mechanical enforcement (opt-in)
 

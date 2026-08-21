@@ -185,7 +185,8 @@
 											"governance",
 											"ledger",
 											"loop",
-											"status"
+											"status",
+											"memory"
 										]
 									},
 									"subcommand": { "type": "string" },
@@ -212,7 +213,16 @@
 						"properties": {
 							"command": {
 								"type": "string",
-								"enum": ["session", "route", "context", "governance", "ledger", "loop", "status"]
+								"enum": [
+									"session",
+									"route",
+									"context",
+									"governance",
+									"ledger",
+									"loop",
+									"status",
+									"memory"
+								]
 							},
 							"subcommand": { "type": "string" },
 							"args": { "$ref": "#/properties/execution/properties/args" }
@@ -221,7 +231,16 @@
 				},
 				"command": {
 					"type": "string",
-					"enum": ["session", "route", "context", "governance", "ledger", "loop", "status"],
+					"enum": [
+						"session",
+						"route",
+						"context",
+						"governance",
+						"ledger",
+						"loop",
+						"status",
+						"memory"
+					],
 					"description": "Amber CLI command family this action maps to."
 				},
 				"subcommand": {

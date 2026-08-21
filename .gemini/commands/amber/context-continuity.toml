@@ -12,7 +12,8 @@ Amber owns contracts, validation, selection, and gates. The host agent owns gene
 3. After human review, ingest the payload through `context ingest --confirm`. Without explicit confirmation the typed CLI seam returns `approvalRequired` and performs no write. Never write a page directly or re-hash sources to evade freshness checks.
 4. Run `context refresh` and resolve stale-source requests. Use no-change only when the claims truly remain valid.
 5. Build a task Loadout with `context load --route <id>` and verify it immediately before use. Required Artifacts are separate from page references and may not be omitted to fit budget.
-6. Before stopping, update progress, feature/session evidence, Resume Checkpoint, and `session-handoff.md`; run `handoff` validation.
+6. For operator-preference knowledge that belongs in MEMORY.md, use the governed memory verbs (`memory request` / `memory ingest` / human `memory approve` / `memory book`; `memory status` to observe). Amber registers the surface hash; humans curate MEMORY.md.
+7. Before stopping, update progress, feature/session evidence, Resume Checkpoint, and `session-handoff.md`; run `handoff` validation.
 
 Evidence order: request id and source hashes, schema-valid payload, ingest result, refresh state, Loadout path/hash, Required Artifact verification, handoff validation.
 

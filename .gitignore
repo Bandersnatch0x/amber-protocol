@@ -94,6 +94,9 @@ MEMORY.md
 .release-checklist.md
 session-handoff.md
 tasks/
+# Governed shared memory (ADR-0018) — tracked by git by default, unlike the
+# local working files above; book entries via `amber memory book`.
+!/MEMORY.md
 feature_list.json
 !/feature_list.json
 问题清单.md

@@ -278,6 +278,41 @@ test("isReadOnlyExecutable: read queries pass, mutations fail", () => {
 	assert.equal(isReadOnlyExecutable(byId.get("amber.context.ingest")), false);
 });
 
+test("COMMAND_CAPABILITIES covers the memory verb surface with exact parity (batch A)", () => {
+	const required = ["memory/approve", "memory/abandon", "memory/status"];
+	for (const key of required) {
+		assert.ok(COMMAND_CAPABILITIES[key], `registry missing ${key}`);
+	}
+	assert.deepEqual(COMMAND_CAPABILITIES["memory/approve"], {
+		effect: "write",
+		approver: "human",
+		evidence: "approval-record",
+		directReadOnlyExec: false,
+		edits: [".amber/memory/registry/", ".amber/context/events.jsonl"],
+		sideEffects: ["ledger-append"],
+	});
+	assert.equal(COMMAND_CAPABILITIES["memory/abandon"].approver, "human");
+	assert.equal(COMMAND_CAPABILITIES["memory/abandon"].evidence, "ingest-record");
+	assert.ok(COMMAND_CAPABILITIES["memory/abandon"].edits.includes(".amber/memory/requests/"));
+	assert.deepEqual(COMMAND_CAPABILITIES["memory/status"], {
+		effect: "read",
+		approver: "system",
+		evidence: null,
+		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
+	});
+
+	const actions = loadRealActions();
+	const byId = new Map(actions.map((a) => [a.actionTypeId, a]));
+	assert.ok(byId.get("amber.memory.approve"), "memory-approve.json must be registered");
+	assert.ok(byId.get("amber.memory.abandon"), "memory-abandon.json must be registered");
+	assert.ok(byId.get("amber.memory.status"), "memory-status.json must be registered");
+	assert.equal(isReadOnlyExecutable(byId.get("amber.memory.status")), true);
+	assert.equal(isReadOnlyExecutable(byId.get("amber.memory.approve")), false);
+	assert.equal(isReadOnlyExecutable(byId.get("amber.memory.abandon")), false);
+});
+
 test("bindsWriteFlag detects --output on governance/report", () => {
 	const resolved = {
 		mapping: {

@@ -23,6 +23,7 @@ const { installTargetRoutes } = require("../helpers/target-routes");
 
 const ROOT = path.resolve(__dirname, "../..");
 const SCHEMA_PATH = path.join(ROOT, "schemas", "action.type.schema.json");
+const ACTION_TYPES_DIR = path.join(ROOT, "action-types");
 const SESSION_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "amber-action-int-"));
 installTargetRoutes(SESSION_ROOT);
 
@@ -181,6 +182,20 @@ test("variant-based execution mapping validates and rejects unknown variants", (
 		},
 	};
 	assert.equal(validate(brokenVariant), false);
+});
+
+test("the three memory action types validate against the contract schema (batch A)", () => {
+	const validate = compileSchema(loadActionTypeSchema());
+	const files = fs
+		.readdirSync(ACTION_TYPES_DIR)
+		.filter((f) => f.startsWith("memory-") && f.endsWith(".json"))
+		.sort();
+	assert.deepEqual(files, ["memory-abandon.json", "memory-approve.json", "memory-status.json"]);
+	for (const file of files) {
+		const action = JSON.parse(fs.readFileSync(path.join(ACTION_TYPES_DIR, file), "utf-8"));
+		assert.equal(validate(action), true, `${file}: ${JSON.stringify(validate.errors)}`);
+		assert.equal(action.execution.command, "memory");
+	}
 });
 
 test("mapped CLI surface still works (P1 whitelist smoke)", () => {

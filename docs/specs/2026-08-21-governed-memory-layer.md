@@ -348,7 +348,7 @@ M8 权威归属：α 50% 强制复审**告警**职责唯一归 doctor；γ 超�
 | kind | 载荷字段（除 appendEvent 公共时间戳外） |
 | --- | --- |
 | `memory-request-created` | `requestId`, `channel`, `signal?`, `triggerRef.ref`, `entryIds[]`, `batchId?`, `derivedFrom?` |
-| `memory-ingest` | `requestId`, `channel`, `outcome`(admitted/rejected/no-change), `entryIds[]`, `ranking?`(`[{entryId, k1, k2}]` 按名次排序，K3=entryId 本身隐含), `code?`, `batchId?` |
+| `memory-ingest` | `requestId`, `channel`, `outcome`(admitted/rejected/no-change), `entryIds[]`, `ranking?`(`[{entryId, k1, k2, queued?}]` 按名次排序，K3=entryId 本身隐含；`queued` 标记混合池排队候选，#175-系统性四字段演进), `skippedAbandoned?`(F3 重建排除留痕), `code?`, `batchId?` |
 | `memory-approval` | `entryId`, `requestId`, `decision`(approve/reject), `reason?`, `decidedBy:"human"`, 另含 β pair 第二事件时 `supersededEntryId` |
 | `memory-book` | `entryIds[]`, `origin`(governed-promotion/human-direct-ratification), `surfacePath`, `normHash`; 追认轨无 `requestId` |
 | `memory-abandon` | `scope`(request/entry), `targetId`, `triggerSource`(auto-threshold/explicit), `requestId?`, `entryId?` |

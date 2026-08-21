@@ -282,6 +282,92 @@ const CATALOG = {
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_SOURCE_MISSING"],
 	},
+	// --- Governed Memory Layer (spec 2026-08-21 §12; extends, never rebuilds) ---
+	// layer is Context for the whole family, inheriting the AMBER_E_CONTEXT_* tier.
+	AMBER_E_MEMORY_RATE_LIMITED: {
+		title: "168h 窗口内 memory-ingest 准入已达 5 条上限，提交整体拒绝",
+		cause: "entries[] 超剩余配额（γ 168h 滚动窗口内 memory-ingest 准入事件 ≥ 5）。",
+		remedy: "缩减后重交，或待窗口滚动（request 保留）。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_BUDGET_EXCEEDED"],
+	},
+	AMBER_E_MEMORY_SOURCE_STALE: {
+		title: "条目 provenance 源 normHash 漂移或源失效",
+		cause: "源被修改或清除，登记哈希与当前源不符。",
+		remedy: "复审条目：修正后重验或 supersede。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_SURFACE_DRIFT"],
+	},
+	AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID: {
+		title: "载荷未过 memory-request schema",
+		cause: "字段缺失或类型错误。",
+		remedy: "修正后重交（request 保留）。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID"],
+	},
+	AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID: {
+		title: "条目未过 memory-entry schema",
+		cause: "字段缺失或类型错误（signal 闭集/枚举违例在 AMBER_E_MEMORY_SIGNAL_INVALID 单列）。",
+		remedy: "修正后重交。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID", "AMBER_E_MEMORY_SIGNAL_INVALID"],
+	},
+	AMBER_E_MEMORY_BINDING_MISMATCH: {
+		title: "checkRequestBinding 逐源哈希比对失败",
+		cause: "源文件与 request 登记哈希不符。",
+		remedy: "重新生成 request。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_SOURCE_STALE"],
+	},
+	AMBER_E_MEMORY_BUDGET_EXCEEDED: {
+		title: "α 预算耗尽状态拒绝新准入",
+		cause: "MEMORY.md 物理条目数或字节数达上限（条目数 ≥ 50 或字节数 ≥ 8192）。",
+		remedy: "拆分为多条、或经 β 指认 supersedeTarget 腾出预算（禁止裸拒绝）。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_RATE_LIMITED"],
+	},
+	AMBER_E_MEMORY_SIGNAL_INVALID: {
+		title: "provenance.signal 缺失或不属 6 闭集",
+		cause: "转换/dreaming 通道的 request 未提供 §6.1 闭集信号 id。",
+		remedy: "引用闭集信号 id 之一。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID"],
+	},
+	AMBER_E_MEMORY_APPROVAL_REQUIRED: {
+		title: "非 TTY 调用人判定动词且无 --yes",
+		cause: "非交互环境执行 request/ingest/book 或 approve/abandon。",
+		remedy: "由人在 TTY 执行或显式 --yes（agent 永不传）。",
+		layer: "Context",
+		related: [],
+	},
+	AMBER_E_MEMORY_ENTRY_NOT_FOUND: {
+		title: "entryId 不在 registry",
+		cause: "指针指向不存在条目。",
+		remedy: "核对 `amber memory status` 与 entryId。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_REQUEST_NOT_FOUND"],
+	},
+	AMBER_E_MEMORY_REQUEST_NOT_FOUND: {
+		title: "requestId 无对应 request 文件",
+		cause: "指针指向不存在 request。",
+		remedy: "核对 `amber memory status` 与 requestId。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_ENTRY_NOT_FOUND"],
+	},
+	AMBER_E_MEMORY_STATE_INVALID: {
+		title: "状态机非法迁移",
+		cause: "如 approve 非 proposal 条目、参数互斥违例。",
+		remedy: "对照 §4.1 迁移表。",
+		layer: "Context",
+		related: [],
+	},
+	AMBER_E_MEMORY_SURFACE_DRIFT: {
+		title: "登记 surface normHash 漂移",
+		cause: "关联条目进入 needs-re-review。",
+		remedy: "按 §11-4 二选一 remedy 处置。",
+		layer: "Context",
+		related: ["AMBER_E_MEMORY_SOURCE_STALE"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing

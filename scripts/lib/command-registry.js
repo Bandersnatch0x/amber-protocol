@@ -16,6 +16,7 @@ const TYPED_COMMAND_NAMES = new Set([
 	"governance",
 	"ledger",
 	"loop",
+	"memory",
 ]);
 
 // Per-command help text shown by `amber <command> --help`.
@@ -546,6 +547,27 @@ const COMMAND_HELP = {
 		"  amber context retention --target . --older-than-days 90",
 		"  amber context stats --target .",
 	],
+	memory: [
+		"Govern the memory write-back pipeline (Governed Memory Layer): request, ingest,",
+		"approve, book, and abandon memory entries, plus a read-only status projection.",
+		"Amber never writes knowledge docs itself — humans curate MEMORY.md; Amber registers.",
+		"",
+		"Subcommands:",
+		"  request    Produce a memory request (trigger / conversion / escape-hatch / ratification pre-nomination).",
+		"  ingest     Mechanically admit request entries into the registry as proposals (all-or-nothing).",
+		"  approve    Human, entry-level approval gate (--entry-id, --decision approve|reject, --reason).",
+		"  book       Register a MEMORY.md surface hash and promote booked entries to active.",
+		"             --ratify --claim <text> ratifies a human direct edit directly (γ-free).",
+		"  abandon    Explicit human abandon of a request or entry (terminal ledger marker).",
+		"  status     Read-only three-section projection (entries / gamma / alpha).",
+		"",
+		"Boundary: Amber detects, admits, and registers; humans curate MEMORY.md and approve.",
+		"",
+		"Examples:",
+		"  amber memory status --target . --json",
+		"  amber memory approve --target . --entry-id <id> --decision approve",
+		"  amber memory abandon --target . --entry <id>",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -845,6 +867,10 @@ const COMMAND_OUTPUT = {
 		usage:
 			"Usage: amber next --target <repo> [--feature <id>] [--session <id>] [--objective <text>] [--json]",
 	},
+	memory: {
+		usage:
+			"Usage: amber memory <request|ingest|approve|book|abandon|status> [--target <repo>] [--json]",
+	},
 };
 
 const DEFAULT_OUTPUT = Object.freeze({ dryRun: false, summary: false, usage: null });
@@ -886,6 +912,7 @@ const COMMANDS = Object.freeze([
 	"hooks",
 	"workflow",
 	"context",
+	"memory",
 ]);
 const TIER_BY_COMMAND = {
 	init: "core",
@@ -906,6 +933,7 @@ const TIER_BY_COMMAND = {
 	governance: "core",
 	feature: "core",
 	context: "core",
+	memory: "core",
 	next: "journey",
 	profile: "deprecated",
 	task: "deprecated",
@@ -1076,6 +1104,9 @@ const KNOWN_UNTYPED_SUBCOMMANDS = Object.freeze(
 		"loop/validate-loop",
 		"ledger/verify-anchoring",
 		"ledger/verify",
+		"memory/request",
+		"memory/ingest",
+		"memory/book",
 	]),
 );
 

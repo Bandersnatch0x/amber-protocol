@@ -1,0 +1,68 @@
+{
+	"id": "memory-maintenance",
+	"title": "Memory Maintenance (Dreaming)",
+	"version": "0.1.0",
+	"description": "Governance pack for the dreaming memory-maintenance loop. Forward-looking: the memory pipeline it feeds (amber memory command family, registry, events) is delivered by the Governed Memory Layer spec; mechanical fields below reference only presently verifiable artifacts.",
+	"connectorContracts": [
+		{
+			"id": "local-docs",
+			"type": "filesystem",
+			"mode": "read-only",
+			"credentials": "none",
+			"redaction": "not-required",
+			"externalWrites": false
+		}
+	],
+	"approvalPolicy": {
+		"readOnlyInspection": "allowed",
+		"reportGeneration": "allowed",
+		"fileMutation": "requires-human-approval",
+		"commandExecution": "requires-human-approval",
+		"externalNotification": "requires-human-approval",
+		"issueCreation": "requires-human-approval",
+		"selfApprovalAllowed": false
+	},
+	"loopLedger": {
+		"required": true,
+		"pathTemplate": ".amber/loops/{contractId}/ledger.json",
+		"chatHistoryRequired": false,
+		"recordsInputSnapshot": true,
+		"recordsToolSummary": true,
+		"recordsBudgetUsage": true,
+		"recordsStopReason": true,
+		"recordsApprovalState": true,
+		"recordsReviewerOutcome": true
+	},
+	"workspaceIsolation": {
+		"mutatingLoopsUseWorktree": true,
+		"mainCheckoutMutation": false
+	},
+	"loopContracts": [
+		{
+			"id": "memory-maintenance-dreaming",
+			"title": "Memory Maintenance Dreaming",
+			"trigger": { "type": "scheduled", "cadence": "weekly", "enabled": false },
+			"goal": "Collect memory maintenance signals (wiki drift, stale candidates, distill and evolution recurrence) and produce reviewable memory proposals for human admission; never mutate surfaces.",
+			"stateSpine": ".amber/loops/memory-maintenance-dreaming/state.json",
+			"inputs": [
+				"amber drift / amber status (wiki drift)",
+				"amber maintenance inspect",
+				"amber maintenance distill output",
+				"evolution findings recurrence",
+				"break-loop post-mortems"
+			],
+			"skills": ["amber-continuous-improvement"],
+			"connectors": ["local-docs"],
+			"triageOutputs": ["candidate-task", "needs-human"],
+			"hardStops": { "maxIterations": 3, "timeoutMinutes": 30, "noProgressDetection": true },
+			"budget": { "maxMinutes": 30 },
+			"reviewGates": ["human-approval", "reviewer-evidence"],
+			"execution": {
+				"executesAnything": false,
+				"schedulesJobs": false,
+				"dispatchesAgents": false,
+				"writesExternalSystems": false
+			}
+		}
+	]
+}

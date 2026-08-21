@@ -62,6 +62,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"hooks",
 	"workflow",
 	"context",
+	"memory",
 ];
 
 test("one Command registry drives help, policy, dispatch, and the public command list", () => {

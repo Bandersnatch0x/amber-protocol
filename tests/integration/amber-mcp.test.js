@@ -164,6 +164,74 @@ test("tools/list exposes every whitelisted amber.* action", () => {
 	assert.ok(names.includes("amber.fn.repoOverview"));
 });
 
+test("tools/list exposes exactly the three memory tools (batch A §8.1)", () => {
+	const target = tempTarget();
+	const byId = rpc([{ jsonrpc: "2.0", id: 1, method: "tools/list" }], ["--target", target]);
+	const tools = byId.get(1).result.tools;
+	const memoryTools = tools.filter((t) => t.name.startsWith("amber.memory."));
+	assert.deepEqual(memoryTools.map((t) => t.name).sort(), [
+		"amber.memory.abandon",
+		"amber.memory.approve",
+		"amber.memory.status",
+	]);
+	for (const tool of memoryTools) {
+		assert.equal(tool.inputSchema.type, "object");
+		assert.equal(tool.outputSchema.type, "object");
+	}
+});
+
+test("memory approve/abandon are approval-required; status executes read-only", () => {
+	const target = tempTarget();
+	const byId = rpc(
+		[
+			{
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: {
+					name: "amber.memory.approve",
+					arguments: { entryId: "sha256:" + "a".repeat(64), decision: "approve" },
+				},
+			},
+			{
+				jsonrpc: "2.0",
+				id: 2,
+				method: "tools/call",
+				params: {
+					name: "amber.memory.abandon",
+					arguments: { entry: "sha256:" + "b".repeat(64) },
+				},
+			},
+			{
+				jsonrpc: "2.0",
+				id: 3,
+				method: "tools/call",
+				params: { name: "amber.memory.status", arguments: {} },
+			},
+		],
+		["--target", target],
+	);
+
+	const approve = callOutcome(byId.get(1));
+	assert.equal(approve.executed, false);
+	assert.equal(approve.approvalRequired, true);
+	assert.equal(
+		fs.existsSync(path.join(target, ".amber", "memory")),
+		false,
+		"no writes without approval",
+	);
+
+	const abandon = callOutcome(byId.get(2));
+	assert.equal(abandon.executed, false);
+	assert.equal(abandon.approvalRequired, true);
+
+	const status = callOutcome(byId.get(3));
+	assert.equal(status.executed, true);
+	assert.equal(status.approvalRequired, false);
+	assert.equal(status.exitCode, 0);
+	assert.match(status.command, /amber memory status --json --target /);
+});
+
 test("object.query executes in default mode for every object family", () => {
 	const target = tempTarget();
 	fs.mkdirSync(path.join(target, ".amber"));
