@@ -1,3 +1,15 @@
+---
+module: <project-name>
+role: <module-role>
+entry_point: <primary-entry-script>
+boundary: repository-local
+scope: root
+safety:
+  - read-only-first
+  - never-overwrite-user-files
+  - executesAnything: false
+---
+
 # Agent Working Rules
 
 ## Project Overview

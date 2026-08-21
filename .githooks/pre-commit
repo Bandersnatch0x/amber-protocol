@@ -8,4 +8,7 @@ node "$repo_root/scripts/validate-git-identity.js" || exit 1
 # Run lint and format checks for fast quality feedback at commit time
 cd "$repo_root" || exit 1
 npm run lint || { echo "Lint check failed. Fix with: npm run lint:fix"; exit 1; }
-npm run format:check || { echo "Format check failed. Fix with: npm run format"; exit 1; }
+# Format check runs only on staged files via lint-staged (avoids unrelated
+# unstaged files blocking the commit). prettier --write auto-fixes issues and
+# re-stages the formatted files.
+npx lint-staged || { echo "lint-staged (prettier) failed on staged files. Fix reported issues and re-stage."; exit 1; }

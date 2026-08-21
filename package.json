@@ -57,6 +57,9 @@
 		"format:check": "prettier --check . && npm --prefix apps/web run format:check",
 		"typecheck": "cd apps/web && npx tsc --noEmit"
 	},
+	"lint-staged": {
+		"*.{js,mjs,cjs,json,md,yml,yaml}": "prettier --write"
+	},
 	"c8": {
 		"exclude": [
 			"tests/**",
@@ -86,6 +89,7 @@
 		"c8": "^12.0.0",
 		"eslint": "^10.8.0",
 		"globals": "^17.8.0",
+		"lint-staged": "^16.4.0",
 		"prettier": "^3.9.6"
 	},
 	"volta": {
