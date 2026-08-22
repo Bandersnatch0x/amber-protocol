@@ -1,7 +1,7 @@
 # Plan: Governed Memory Layer batch A
 
 Feature: F033
-Status: implemented-pending-verification
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal

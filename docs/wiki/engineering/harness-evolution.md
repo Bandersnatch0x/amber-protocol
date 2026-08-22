@@ -141,3 +141,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F031-Keep-skill-frontmatter-commands-in-lockstep-with-the-Governance-Console.md`
 - Review status: ready
 - Feature: F031 status → accepted in feature_list.json
+
+## 2026-08-22 docs/plans/F033-Governed-Memory-Layer-batch-A.md
+
+- Plan: `docs/plans/F033-Governed-Memory-Layer-batch-A.md`
+- Review status: ready
+- Feature: F033 status → accepted in feature_list.json

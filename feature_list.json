@@ -1138,7 +1138,7 @@
 			"area": "context",
 			"title": "Governed Memory Layer batch A: five-verb surface, registry, and doctor rules",
 			"user_visible_behavior": "amber memory request/ingest/approve/book/abandon/status govern the MEMORY.md write-back pipeline: nominations are mechanically admitted under schema, binding, signal, alpha and gamma gates; humans approve entry-by-entry; book registers the surface hash; doctor enforces ledger-registry consistency, source health, and drift rules",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/integration/memory-commands.test.js",
 				"node --test tests/unit/cli-typed-seam.test.js tests/unit/mcp-action-contracts.test.js tests/integration/action-type-schema.test.js",
@@ -1196,7 +1196,7 @@
 				"tests/unit/scaffold-gitignore-advisory.test.js",
 				"docs/plans/F033-Governed-Memory-Layer-batch-A.md"
 			],
-			"updated": "2026-08-21"
+			"updated": "2026-08-22"
 		}
 	]
 }
