@@ -135,3 +135,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F032-Keep-approval-gates-distinct-from-Session-completion.md`
 - Review status: ready
 - Feature: F032 status → accepted in feature_list.json
+
+## 2026-08-22 docs/plans/F031-Keep-skill-frontmatter-commands-in-lockstep-with-the-Governance-Console.md
+
+- Plan: `docs/plans/F031-Keep-skill-frontmatter-commands-in-lockstep-with-the-Governance-Console.md`
+- Review status: ready
+- Feature: F031 status → accepted in feature_list.json

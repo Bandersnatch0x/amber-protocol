@@ -1022,12 +1022,38 @@
 			"area": "agent-skills",
 			"title": "Keep skill frontmatter commands in lockstep with the Governance Console",
 			"user_visible_behavior": "Every shipped Amber skill names a real Governance Console command, and generated-agent validation fails when a skill invents or stales that command",
-			"status": "in_progress",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/agent-commands.test.js tests/unit/command-registry-parity.test.js",
 				"npm run gen:agents:check"
 			],
-			"evidence": [],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 84803ms)",
+					"date": "2026-08-22",
+					"notes": "session 08729f11-77e5-4a20-8f63-036678043135 stage verify",
+					"sessionId": "08729f11-77e5-4a20-8f63-036678043135"
+				},
+				{
+					"command": "node --test tests/unit/agent-commands.test.js tests/unit/command-registry-parity.test.js",
+					"result": "passed (56 tests, 0 failed; exit 0)",
+					"date": "2026-08-22",
+					"notes": "lockstep contract: invented or stale skill commands are rejected at the generator/check seam without writing generated files; four shipped Journey/router contracts stay valid; command truth stays centralized in command-registry via commandInvocationContract(); artifact docs/plans/F031-Keep-skill-frontmatter-commands-in-lockstep-with-the-Governance-Console.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "npm run gen:agents:check",
+					"result": "passed (15 generated files current; exit 0)",
+					"date": "2026-08-22",
+					"notes": "CI drift guard green over the skills -> .claude/.agents/.gemini products; artifact docs/plans/F031-Keep-skill-frontmatter-commands-in-lockstep-with-the-Governance-Console.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				},
+				{
+					"command": "Standards / Spec independent final review",
+					"result": "passed (0 Standards findings; 0 Spec findings after wiki ownership and skill-count corrections)",
+					"date": "2026-08-19",
+					"notes": "review completed in-session during implementation; amber session 08729f11 completed strict complete-check on 2026-08-22; artifact docs/plans/F031-Keep-skill-frontmatter-commands-in-lockstep-with-the-Governance-Console.md; remaining risk: remote CI has not rerun because the fix is not pushed"
+				}
+			],
 			"notes": ["GitHub issue #128; no live agent execution or Journey routing policy change"],
 			"paths": [
 				"skills/",
@@ -1041,7 +1067,7 @@
 				"docs/wiki/knowledge/cli-architecture-command-dispatch/cli-architecture-command-dispatch.md",
 				"docs/plans/F031-Keep-skill-frontmatter-commands-in-lockstep-with-the-Governance-Console.md"
 			],
-			"updated": "2026-08-18"
+			"updated": "2026-08-22"
 		},
 		{
 			"id": "F032",

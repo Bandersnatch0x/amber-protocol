@@ -1,7 +1,7 @@
 # Plan: Keep skill frontmatter commands in lockstep with the Governance Console
 
 Feature: F031
-Status: implemented-pending-verification
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
