@@ -1197,6 +1197,56 @@
 				"docs/plans/F033-Governed-Memory-Layer-batch-A.md"
 			],
 			"updated": "2026-08-22"
+		},
+		{
+			"id": "F034",
+			"priority": 1,
+			"area": "context",
+			"title": "T1/T2 memory write-back trigger mounting",
+			"user_visible_behavior": "Completing a session strictly with handoff evidence nominates a T1 memory write-back contract, and accepting a feature whose booked paths hit a write-back category nominates a T2 contract — each exactly once per trigger event, as a ledger-visible nomination the host agent answers via amber memory request or legitimately skips",
+			"status": "passing",
+			"verification": [
+				"node --test tests/integration/memory-triggers.test.js",
+				"node --test tests/integration/memory-commands.test.js tests/unit/session-commands.test.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "node --test tests/integration/memory-triggers.test.js",
+					"result": "passed (5 tests, 0 failed; exit 0)",
+					"date": "2026-08-22",
+					"notes": "trigger semantics (contract + event + exclusivity, gamma untouched, MEMORY.md never edited), T1 exactly-once on strict completion and silence on failure, T2 firing at accept on category hit and silence otherwise, idempotent re-accept; artifact docs/plans/F034-T1-T2-memory-write-back-trigger-mounting.md"
+				},
+				{
+					"command": "node --test tests/integration/memory-commands.test.js tests/unit/session-commands.test.js",
+					"result": "passed (34 + session suites, 0 failed; exit 0)",
+					"date": "2026-08-22",
+					"notes": "no regressions in the memory verb surface or the session lifecycle the triggers mount into"
+				},
+				{
+					"command": "npm test",
+					"result": "passed (2057 passed, 0 failed, 0 skipped; exit 0)",
+					"date": "2026-08-22",
+					"notes": "full suite; artifact docs/plans/F034-T1-T2-memory-write-back-trigger-mounting.md; remaining risk: independent two-axis review deferred - the subagent delegation channel is down (provider 400); run it before accept"
+				},
+				{
+					"command": "npm run lint; npm run format:check; npm run manifests; amber doctor; validate-wiki; gen:agents:check",
+					"result": "passed (all exit 0; zero validation errors; 15 generated files current)",
+					"date": "2026-08-22",
+					"notes": "repository guardrails green; amber review release readiness READY; amber gate errors 0; plan user confirmation confirmed"
+				}
+			],
+			"notes": [
+				"ADR-0018 spec section 5.1 batch B; triggers are nomination contracts only (M3: no gamma, no schema-fabricated requests, no MEMORY.md writes)"
+			],
+			"paths": [
+				"scripts/lib/core/memory-trigger.js",
+				"scripts/lib/session-commands.js",
+				"scripts/lib/core/planning.js",
+				"tests/integration/memory-triggers.test.js",
+				"docs/plans/F034-T1-T2-memory-write-back-trigger-mounting.md"
+			],
+			"updated": "2026-08-22"
 		}
 	]
 }

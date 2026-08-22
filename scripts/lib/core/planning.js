@@ -916,6 +916,32 @@ function acceptPlan(target, planRelativePath, options = {}) {
 		fs.appendFileSync(evolutionPath, entry);
 	}
 
+	// T2 memory write-back trigger (ADR-0018 spec §5.1): at the feature-accept
+	// write-back site — the same deterministic detectWriteBackTriggers criteria
+	// F023 uses — a path-category hit nominates a memory write-back contract
+	// (channel t2-writeback). Ledger-visible nomination only (M3); never blocks
+	// acceptance; failures surface as a warning.
+	let t2Warning = null;
+	if (featureId) {
+		try {
+			const feature = findFeatureById(targetRoot, featureId);
+			const paths = feature && Array.isArray(feature.paths) ? feature.paths.filter(Boolean) : [];
+			const { detectWriteBackTriggers } = require("./learning-writeback");
+			if (detectWriteBackTriggers(paths).matchedCategories.length > 0) {
+				const { triggerWriteBackRequest } = require("./memory-trigger");
+				const t2 = triggerWriteBackRequest(targetRoot, {
+					channel: "t2-writeback",
+					triggerRef: featureId,
+				});
+				if (t2.created) {
+					t2Warning = `T2 memory write-back nomination created (${t2.triggerId}) for ${featureId} — answer it with \`amber memory request\` (triggerRef ${featureId}) or legitimately skip.`;
+				}
+			}
+		} catch (err) {
+			t2Warning = `T2 memory write-back trigger failed (non-blocking): ${err.message}`;
+		}
+	}
+
 	return {
 		target: targetRoot,
 		plan: planRelativePath,
@@ -924,7 +950,7 @@ function acceptPlan(target, planRelativePath, options = {}) {
 		featureUpdated,
 		evolutionLog: evolutionRelativePath,
 		errors: [],
-		warnings: review.warnings,
+		warnings: t2Warning ? [...review.warnings, t2Warning] : review.warnings,
 		review,
 	};
 }

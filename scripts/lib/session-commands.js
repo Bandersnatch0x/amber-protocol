@@ -404,6 +404,28 @@ async function completeSession(projectRoot, options) {
 	writeSessionManifest(sessionDir, { ...manifest, status: STATES.COMPLETED });
 	appendSessionEvent(sessionDir, transition.event);
 
+	// T1 memory write-back trigger (ADR-0018 spec §5.1): AFTER the completion
+	// transition succeeds, when strict complete-check passed and handoff
+	// evidence exists, nominate a memory write-back contract. The trigger is
+	// a ledger-visible nomination only (M3) and must never block completion;
+	// failures surface as a warning.
+	let t1Warning = null;
+	try {
+		const { hasHandoffEvidence } = require("./completion-check");
+		if (hasHandoffEvidence(projectRoot, manifest)) {
+			const { triggerWriteBackRequest } = require("./core/memory-trigger");
+			const t1 = triggerWriteBackRequest(projectRoot, {
+				channel: "t1-writeback",
+				triggerRef: sessionId,
+			});
+			if (t1.created) {
+				t1Warning = `T1 memory write-back nomination created (${t1.triggerId}) — answer it with \`amber memory request\` (triggerRef ${sessionId}) or legitimately skip.`;
+			}
+		}
+	} catch (err) {
+		t1Warning = `T1 memory write-back trigger failed (non-blocking): ${err.message}`;
+	}
+
 	const warning = writeRunnerAckWarning(projectRoot, sessionId, {
 		requestId: options.requestId,
 		action: "complete",
@@ -412,7 +434,10 @@ async function completeSession(projectRoot, options) {
 		source: "amber-session-complete",
 		message: "Session marked completed after complete-check passed.",
 	});
-	return withOptionalWarning(result(`Session completed: ${sessionId}`, 0), warning);
+	return withOptionalWarning(
+		withOptionalWarning(result(`Session completed: ${sessionId}`, 0), warning),
+		t1Warning,
+	);
 }
 
 async function continueSession(projectRoot, options) {
