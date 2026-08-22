@@ -19,12 +19,7 @@
  */
 
 export type DenoiseKind =
-  | 'hidden'
-  | 'slashCommand'
-  | 'stdout'
-  | 'taskNotification'
-  | 'recap'
-  | 'plain';
+  'hidden' | 'slashCommand' | 'stdout' | 'taskNotification' | 'recap' | 'plain';
 
 export type DenoiseHiddenGroup = 'localCommand' | 'systemReminder';
 

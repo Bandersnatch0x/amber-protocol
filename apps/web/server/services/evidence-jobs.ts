@@ -60,12 +60,7 @@ export const MAX_CONCURRENT_EVIDENCE_JOBS = 4;
 const STALE_TERMINAL_JOB_MS = 24 * 60 * 60 * 1000;
 
 export type EvidenceJobStatus =
-  | 'pending'
-  | 'running'
-  | 'denied'
-  | 'completed'
-  | 'failed'
-  | 'timeout';
+  'pending' | 'running' | 'denied' | 'completed' | 'failed' | 'timeout';
 
 export const EVIDENCE_JOB_TERMINAL_STATUSES: readonly EvidenceJobStatus[] = [
   'denied',
@@ -398,6 +393,18 @@ function killProcessTree(child: ChildProcessWithoutNullStreams): void {
     } catch {
       // fall through to the plain kill below
     }
+  } else {
+    // POSIX: the job is spawned detached (process-group leader) precisely so
+    // a budget kill can take out the WHOLE group. Killing only the shell pid
+    // would orphan the real command, which keeps the inherited stdio pipes
+    // open — the 'close' event then waits for the command's full runtime and
+    // the job settles far past its budget.
+    try {
+      process.kill(-child.pid, 'SIGKILL');
+      return;
+    } catch {
+      // fall through to the plain kill below
+    }
   }
   child.kill('SIGKILL');
 }
@@ -427,7 +434,14 @@ function spawnEvidenceCommand(
 
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = spawn(command, { shell: true, cwd, windowsHide: true });
+      child = spawn(command, {
+        shell: true,
+        cwd,
+        windowsHide: true,
+        // POSIX: run the shell as its own process-group leader so a budget
+        // kill can SIGKILL the entire group (see killProcessTree).
+        detached: process.platform !== 'win32',
+      });
     } catch (error) {
       resolve({
         exitCode: -1,
