@@ -3,7 +3,7 @@ kind: "knowledge"
 category: "cli-architecture-command-dispatch"
 title: "CLI Architecture & Command Dispatch"
 template: "architecture"
-updated_at: "2026-08-18T00:00:00.000Z"
+updated_at: "2026-08-23T00:00:00.000Z"
 ---
 
 # CLI Architecture & Command Dispatch
@@ -49,7 +49,11 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
 4. Command modules call core functions and return a result with `errors` and
    `warnings`. Async handlers are supported because `run()` awaits the dispatch result.
 5. `scripts/amber.js` is the single output boundary unless a handler explicitly uses
-   the `bypassPrint` contract for streaming or custom output.
+   the `bypassPrint` contract for streaming or custom output. Default `bypassPrint`
+   (no custom `onBypass`) writes payload `text` to stdout and `WARNING:` / `ERROR:`
+   lines to stderr. Custom `onBypass` handlers must not re-emit those diagnostics
+   on stdout. `--json` still prints the structured result (including `errors`) on
+   stdout.
 
 ```mermaid
 flowchart LR

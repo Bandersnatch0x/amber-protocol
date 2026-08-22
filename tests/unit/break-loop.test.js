@@ -379,7 +379,7 @@ describe("amber break-loop (CLI)", () => {
 			`${BREAK_LOOP_DIR}/${files[0]}`,
 		]);
 		assert.equal(v.status, 1);
-		assert.match(v.stdout, /still contains unfilled placeholder markers/);
+		assert.match(v.stderr, /still contains unfilled placeholder markers/);
 	});
 
 	it("--recurrence 1 exits 1 with the visible guard error and writes nothing", () => {
@@ -396,7 +396,7 @@ describe("amber break-loop (CLI)", () => {
 			"1",
 		]);
 		assert.equal(r.status, 1);
-		assert.match(r.stdout, /--recurrence <n> with n >= 2/);
+		assert.match(r.stderr, /--recurrence <n> with n >= 2/);
 		assert.equal(fs.existsSync(postMortemDir(root)), false, "nothing written");
 	});
 

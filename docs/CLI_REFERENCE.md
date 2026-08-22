@@ -16,6 +16,10 @@ For agent-guided work, invoke the `amber` router skill, which selects one of fou
 --help            # Show command help
 ```
 
+Text-mode bypass output writes payload text to stdout and prefixes blocking diagnostics as
+`ERROR:` / `WARNING:` on **stderr**. `--json` still prints the structured result (including
+`errors`) on stdout.
+
 ## Feature & Plan Commands
 
 The governed delivery flow starts here: register a feature, plan a slice, gate the plan, review it, then accept it after the session completes. `amber next` walks this lifecycle step by step.
@@ -1040,7 +1044,9 @@ node scripts/amber.js hooks breadcrumb uninstall --target . # removes the Amber 
 `print` reads governance metadata from disk only: it writes nothing, never runs target-project
 commands, and never dispatches agents — context injection, not execution. Like the pre-commit guard,
 the breadcrumb is never installed automatically (`amber init` does not add it), and
-`AMBER_SKIP_HOOKS=1` silences it. Mechanism and invariants live in
+`AMBER_SKIP_HOOKS=1` silences it. Blocking errors from every `hooks` subcommand go to **stderr**
+(`ERROR:` lines); `--json` still prints the structured result on stdout. Mechanism and invariants
+live in
 [docs/specs/2026-08-15-workflow-state-breadcrumb.md](specs/2026-08-15-workflow-state-breadcrumb.md).
 
 ## Drift Commands

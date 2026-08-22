@@ -559,8 +559,37 @@ test("breadcrumb CLI: --platform=cursor is rejected, not silently treated as cla
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-platcli-"));
 	const r = runCli(["hooks", "breadcrumb", "install", "--target", dir, "--platform=cursor"]);
 	assert.equal(r.status, 1);
-	// Non-bypass paths print errors through the generic printer on stdout.
-	assert.match(r.stdout, /Unsupported breadcrumb platform/);
+	assert.equal(r.stdout, "", "blocking errors stay off stdout");
+	assert.match(r.stderr, /^ERROR: /m);
+	assert.match(r.stderr, /Unsupported breadcrumb platform/);
 	assert.ok(!fs.existsSync(claudeSettings(dir)), "nothing installed for a rejected platform");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("hooks CLI: check blocking errors prefix ERROR: on stderr, never stdout", () => {
+	const dir = tmpRepo({ features: [{ id: "F1", status: "passing", evidence: [] }] });
+	const r = runCli(["hooks", "check", "--target", dir]);
+	assert.notEqual(r.status, 0);
+	assert.match(r.stderr, /^ERROR: /m);
+	assert.match(r.stderr, /AMBER_E_FEATURE_NO_EVIDENCE/);
+	assert.equal(r.stdout.includes("ERROR:"), false);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("breadcrumb CLI: --json keeps errors in the stdout payload", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-crumb-platjson-"));
+	const r = runCli([
+		"hooks",
+		"breadcrumb",
+		"install",
+		"--target",
+		dir,
+		"--platform=cursor",
+		"--json",
+	]);
+	assert.equal(r.status, 1);
+	const payload = JSON.parse(r.stdout);
+	assert.ok(payload.errors.some((e) => /Unsupported breadcrumb platform/.test(e)));
+	assert.equal(r.stderr, "");
 	fs.rmSync(dir, { recursive: true, force: true });
 });

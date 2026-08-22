@@ -106,14 +106,16 @@ async function run(argv = process.argv.slice(2)) {
 	if (bypassPrint) {
 		if (onBypass) onBypass();
 		else {
-			console.log(resolved.text);
+			// Payload text on stdout; WARNING/ERROR diagnostics on stderr so
+			// blocking errors do not depend on the dispatch path (#120).
+			if (typeof resolved.text === "string" && resolved.text.length > 0) {
+				console.log(resolved.text);
+			}
 			if (Array.isArray(resolved.warnings) && resolved.warnings.length > 0) {
-				console.log("");
-				for (const w of resolved.warnings) console.log(`WARNING: ${w}`);
+				for (const w of resolved.warnings) console.error(`WARNING: ${w}`);
 			}
 			if (Array.isArray(resolved.errors) && resolved.errors.length > 0) {
-				console.log("");
-				for (const e of resolved.errors) console.log(`ERROR: ${e}`);
+				for (const e of resolved.errors) console.error(`ERROR: ${e}`);
 			}
 		}
 		return exitCode ?? (Array.isArray(resolved.errors) && resolved.errors.length > 0 ? 1 : 0);

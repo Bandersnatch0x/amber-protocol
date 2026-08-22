@@ -716,8 +716,8 @@ describe("amber learnings (CLI)", () => {
 		const before = fs.readFileSync(path.join(root, "feature_list.json"), "utf8");
 		const r = runCli(["learnings", "--target", root, "--reviewed"]);
 		assert.equal(r.status, 1);
-		assert.match(r.stdout, /requires --feature/);
-		assert.match(r.stdout, /never books an auto-resolved feature/);
+		assert.match(r.stderr, /requires --feature/);
+		assert.match(r.stderr, /never books an auto-resolved feature/);
 		assert.equal(fs.readFileSync(path.join(root, "feature_list.json"), "utf8"), before);
 	});
 
