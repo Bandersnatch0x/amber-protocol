@@ -355,9 +355,8 @@ const STEPS = [
 		appliesTo: (ctx) => {
 			if (ctx.focus.type !== "feature" || !planFor(ctx) || !acceptLogged(ctx)) return false;
 			const feature = ctx.state.features.find((f) => f && f.id === ctx.focus.id);
-			const paths = feature && Array.isArray(feature.paths) ? feature.paths : [];
-			const { detectWriteBackTriggers } = require("./learning-writeback");
-			return detectWriteBackTriggers(paths).matchedCategories.length > 0;
+			const { featureWriteBackCategories } = require("./learning-writeback");
+			return featureWriteBackCategories(feature).length > 0;
 		},
 		isDone: (ctx) => {
 			const feature = ctx.state.features.find((f) => f && f.id === ctx.focus.id);
@@ -367,9 +366,8 @@ const STEPS = [
 		},
 		why: (ctx) => {
 			const feature = ctx.state.features.find((f) => f && f.id === ctx.focus.id);
-			const paths = feature && Array.isArray(feature.paths) ? feature.paths : [];
-			const { detectWriteBackTriggers } = require("./learning-writeback");
-			const categories = detectWriteBackTriggers(paths).matchedCategories;
+			const { featureWriteBackCategories } = require("./learning-writeback");
+			const categories = featureWriteBackCategories(feature);
 			return `accepted work touched ${categories.join("/")} paths — the knowledge write-back review is not booked yet (book it with amber learnings --reviewed --owner <id>).`;
 		},
 		remedy: (ctx) =>

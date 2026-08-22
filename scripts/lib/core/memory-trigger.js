@@ -77,7 +77,10 @@ function triggerWriteBackRequest(targetRoot, { channel, triggerRef }) {
 	// §5.2 exclusivity: one open nomination per trigger event.
 	const existing = listTriggers(targetRoot).find(
 		(record) =>
-			record.status === "open" && record.channel === channel && record.triggerRef.ref === ref,
+			record.status === "open" &&
+			record.channel === channel &&
+			record.triggerRef &&
+			record.triggerRef.ref === ref,
 	);
 	if (existing) {
 		return {
@@ -113,6 +116,26 @@ function triggerWriteBackRequest(targetRoot, { channel, triggerRef }) {
 	return { created: true, triggerId, channel, triggerRef: ref };
 }
 
+/**
+ * Mount helper for the T1/T2 call sites (spec §5.1-M3): a nomination may
+ * never block the host operation, so the trigger write is the ONLY code
+ * under the try — failures surface as a warning line, and exclusivity
+ * no-ops (already-nominated) return null. Callers keep their own gating
+ * (handoff evidence / category hit) outside the catch.
+ *
+ * @returns {string|null} user-facing warning text, or null when silent
+ */
+function mountWriteBackTrigger(targetRoot, { channel, triggerRef, label }) {
+	let result;
+	try {
+		result = triggerWriteBackRequest(targetRoot, { channel, triggerRef });
+	} catch (err) {
+		return `${label} memory write-back trigger failed (non-blocking): ${err.message}`;
+	}
+	if (!result.created) return null;
+	return `${label} memory write-back nomination created (${result.triggerId}) — answer it with \`amber memory request\` (triggerRef ${triggerRef}) or legitimately skip.`;
+}
+
 module.exports = {
 	TRIGGER_CHANNELS,
 	triggersDir,
@@ -120,4 +143,5 @@ module.exports = {
 	listTriggers,
 	writeTrigger,
 	triggerWriteBackRequest,
+	mountWriteBackTrigger,
 };

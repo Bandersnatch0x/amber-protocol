@@ -1,7 +1,7 @@
 # Plan: T1/T2 memory write-back trigger mounting
 
 Feature: F034
-Status: implemented-pending-verification
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
@@ -52,6 +52,13 @@ Completing a session strictly with handoff evidence nominates a T1 memory write-
     `readRequests()` (which feeds ingest pools), so no γ/pool pollution.
   - Both mounts are fail-open by design: a trigger failure must not block
     session completion or feature acceptance — it degrades to a warning.
+
+## Deviation Table (spec §14-8)
+
+| # | Spec point | Deviation / interpretation | Rationale |
+|---|------------|----------------------------|-----------|
+| D1 | §5.1-M3 says the trigger product is a "request (contract + event)" and §10.4 stores requests under `.amber/memory/requests/` | The trigger writes a new artifact class under `.amber/memory/triggers/`, never `.amber/memory/requests/`; the `memory-request-created` event carries `entryIds: []` | The `memory-request` schema requires `entries[]` minItems 1, but a mechanical trigger may not invent claims (§5.1 "零语义判定"). A schema-valid request in requests/ would fake an admission. Contract-only shape is marked by `entryIds: []` within the §9 closed field set. |
+| D2 | §5.1 locates T2 "与 F023 learningWriteBack 同一触发位点" and mentions "复用 detectWriteBackTriggers 判据与 F023 owner 路由" | T2 mounts inside `acceptPlan` after a successful accept (not inside the lifecycle review step, which is read-only and gated on `acceptLogged`), and consumes only the deterministic `matchedCategories` criteria. Owner routing stays with the F023 `amber learnings --reviewed --owner` flow — the T2 nomination's remedy surfaces `amber memory request (triggerRef <feature-id>)` parallel to it | The lifecycle site never executes during accept; mounting there would fire on inspections, not on the accept event. Reusing the owner-routing write path would entangle the learning-review booking with a system nomination. |
 
 ## Context manifests
 

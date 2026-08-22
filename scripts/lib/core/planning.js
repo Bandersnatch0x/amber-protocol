@@ -923,22 +923,15 @@ function acceptPlan(target, planRelativePath, options = {}) {
 	// acceptance; failures surface as a warning.
 	let t2Warning = null;
 	if (featureId) {
-		try {
-			const feature = findFeatureById(targetRoot, featureId);
-			const paths = feature && Array.isArray(feature.paths) ? feature.paths.filter(Boolean) : [];
-			const { detectWriteBackTriggers } = require("./learning-writeback");
-			if (detectWriteBackTriggers(paths).matchedCategories.length > 0) {
-				const { triggerWriteBackRequest } = require("./memory-trigger");
-				const t2 = triggerWriteBackRequest(targetRoot, {
-					channel: "t2-writeback",
-					triggerRef: featureId,
-				});
-				if (t2.created) {
-					t2Warning = `T2 memory write-back nomination created (${t2.triggerId}) for ${featureId} — answer it with \`amber memory request\` (triggerRef ${featureId}) or legitimately skip.`;
-				}
-			}
-		} catch (err) {
-			t2Warning = `T2 memory write-back trigger failed (non-blocking): ${err.message}`;
+		const feature = findFeatureById(targetRoot, featureId);
+		const { featureWriteBackCategories } = require("./learning-writeback");
+		if (featureWriteBackCategories(feature).length > 0) {
+			const { mountWriteBackTrigger } = require("./memory-trigger");
+			t2Warning = mountWriteBackTrigger(targetRoot, {
+				channel: "t2-writeback",
+				triggerRef: featureId,
+				label: "T2",
+			});
 		}
 	}
 

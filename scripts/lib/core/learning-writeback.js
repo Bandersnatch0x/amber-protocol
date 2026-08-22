@@ -104,6 +104,15 @@ function categoryById(id) {
 	return TRIGGER_CATEGORIES.find((c) => c.id === id) || null;
 }
 
+// The single extraction point for "which write-back categories does this
+// feature's booked paths hit" — the lifecycle reminder, the learnings
+// inspection, and the T2 memory trigger mount all share it so a criteria
+// change stays a one-site edit.
+function featureWriteBackCategories(feature) {
+	const paths = feature && Array.isArray(feature.paths) ? feature.paths : [];
+	return detectWriteBackTriggers(paths).matchedCategories;
+}
+
 // Classify booked paths into trigger categories. Only categories with at least
 // one match appear; non-string/blank entries are ignored, never thrown on.
 function detectWriteBackTriggers(paths) {
@@ -456,6 +465,7 @@ function bookLearningWriteBack(target, { featureId, surfaces, owner, owners } = 
 module.exports = {
 	TRIGGER_CATEGORIES,
 	detectWriteBackTriggers,
+	featureWriteBackCategories,
 	learningWriteBackGuidance,
 	inspectLearningWriteBack,
 	bookLearningWriteBack,

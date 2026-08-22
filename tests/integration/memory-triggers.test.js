@@ -174,6 +174,17 @@ test("T1 never fires when strict completion fails (M1: mount is post-transition)
 	fs.rmSync(target, { recursive: true, force: true });
 });
 
+test("T1 stays silent on non-strict completion (explicit strict gate)", async () => {
+	const target = mkTarget();
+	const start = await prepareStrictSession(target);
+	const completion = await completeSession(target, { sessionId: start.sessionId, strict: false });
+	assert.equal(completion.exitCode, 0, completion.text);
+
+	assert.equal(listTriggers(target).length, 0, "non-strict completion never nominates (§5.1-M2)");
+	assert.equal(memoryEvents(target).filter((e) => e.kind === "memory-request-created").length, 0);
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
 // ── T2: feature accept mount ────────────────────────────────────────────────
 
 function setupAcceptTarget(paths) {
@@ -268,8 +279,14 @@ test("T2 fires at feature accept when a write-back path category hits", () => {
 
 	const created = memoryEvents(dir).filter((e) => e.kind === "memory-request-created");
 	assert.equal(created.length, 1);
-	assert.equal(created[0].channel, "t2-writeback");
-	assert.deepEqual(created[0].entryIds, []);
+	assert.equal(created[0].channel, "t2-writeback", "§9 payload: channel attribution");
+	assert.equal(
+		created[0].requestId,
+		records[0].triggerId,
+		"§9 payload: requestId anchors the trigger artifact",
+	);
+	assert.equal(created[0].triggerRef.ref, "F001", "§9 payload: triggerRef.ref linkage");
+	assert.deepEqual(created[0].entryIds, [], "a trigger is a contract, never an admission");
 	assert.equal(gammaAdmitted(dir), 0);
 	assert.equal(fs.existsSync(path.join(dir, "MEMORY.md")), false);
 

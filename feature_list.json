@@ -1204,7 +1204,7 @@
 			"area": "context",
 			"title": "T1/T2 memory write-back trigger mounting",
 			"user_visible_behavior": "Completing a session strictly with handoff evidence nominates a T1 memory write-back contract, and accepting a feature whose booked paths hit a write-back category nominates a T2 contract — each exactly once per trigger event, as a ledger-visible nomination the host agent answers via amber memory request or legitimately skips",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/integration/memory-triggers.test.js",
 				"node --test tests/integration/memory-commands.test.js tests/unit/session-commands.test.js",
@@ -1234,6 +1234,12 @@
 					"result": "passed (all exit 0; zero validation errors; 15 generated files current)",
 					"date": "2026-08-22",
 					"notes": "repository guardrails green; amber review release readiness READY; amber gate errors 0; plan user confirmation confirmed"
+				},
+				{
+					"command": "independent two-axis review of 2c372dc..HEAD (Standards + Spec sub-agents, spec 5.1/5.2/9)",
+					"result": "passed (0 hard violations; all findings closed before accept)",
+					"date": "2026-08-22",
+					"notes": "Standards: deduplicated write-back category extraction into featureWriteBackCategories (lifecycle x3 + acceptPlan x1), shared mountWriteBackTrigger helper with narrowed fail-open catch, guarded triggerRef access. Spec: explicit strict gate on T1 (options.strict !== false) + new non-strict silence test, T2 9-event payload assertions (requestId/triggerRef/channel/entryIds), plan D1/D2 deviation table records the trigger-artifact-form and T2 mount-point interpretations (spec 14-8). signal field exempt for t1/t2 channels per 6.2 + 174-M13; 14-5 dogfood full-chain already covered in memory-commands.test.js."
 				}
 			],
 			"notes": [

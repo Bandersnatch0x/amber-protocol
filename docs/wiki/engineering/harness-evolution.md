@@ -147,3 +147,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F033-Governed-Memory-Layer-batch-A.md`
 - Review status: ready
 - Feature: F033 status → accepted in feature_list.json
+
+## 2026-08-22 docs/plans/F034-T1-T2-memory-write-back-trigger-mounting.md
+
+- Plan: `docs/plans/F034-T1-T2-memory-write-back-trigger-mounting.md`
+- Review status: ready
+- Feature: F034 status → accepted in feature_list.json
