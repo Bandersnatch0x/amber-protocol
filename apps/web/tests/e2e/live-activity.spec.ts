@@ -28,9 +28,8 @@ test.describe('Live Activity Card', () => {
     const card = page.locator('[data-testid="live-activity-card"]');
     await expect(card).toBeVisible();
 
-    // If the Live badge is rendered, it contains the expected pulsing indicator.
-    const liveBadge = card.getByText('Live');
-    // The badge is conditional on SSE connectivity; don't fail if absent.
+    // If the Live badge is rendered, it is the dedicated badge element.
+    const liveBadge = card.getByTestId('live-badge');
     if (await liveBadge.isVisible().catch(() => false)) {
       await expect(liveBadge).toBeVisible();
     }
@@ -43,7 +42,7 @@ test.describe('Live Activity Card', () => {
     await expect(card).toBeVisible();
 
     // A completed session must never show the Live badge.
-    const liveBadge = card.getByText('Live');
+    const liveBadge = card.getByTestId('live-badge');
     await expect(liveBadge).toBeHidden();
 
     // Events should still be visible inside the card.
