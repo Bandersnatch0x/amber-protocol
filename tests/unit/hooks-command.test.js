@@ -551,6 +551,8 @@ test("breadcrumb CLI: bypass emits zero bytes; invalid format exits 1 with empty
 	const bad = runCli(["hooks", "breadcrumb", "print", "--target", target, "--format", "xml"]);
 	assert.equal(bad.status, 1);
 	assert.equal(bad.stdout, "", "errors go to stderr, never stdout");
+	assert.equal(bad.stdout.includes("ERROR:"), false);
+	assert.match(bad.stderr, /^ERROR: /m);
 	assert.match(bad.stderr, /AMBER_E_INVALID_ARG/);
 	fs.rmSync(target, { recursive: true, force: true });
 });
