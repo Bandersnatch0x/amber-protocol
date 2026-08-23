@@ -1,0 +1,29 @@
+{
+	"schemaVersion": "1.0.0",
+	"fixtureId": "success-organization",
+	"path": "success",
+	"variant": "canonical",
+	"description": "Success path on an Organization Control Plane deployment profile: the canonical governance loop closes identically, but the fixture declares the Organization tracer — proving the fixture family covers the third and final deployment profile. Organization adds cross-repo policy enforcement and audit on top of Team Hub; the runner exercises the same CLI path on a fresh target.",
+	"deploymentProfile": "organization",
+	"inputs": {
+		"targetSeed": {
+			"packageJson": {
+				"name": "amber-e2e-org",
+				"version": "0.0.0",
+				"private": true,
+				"scripts": { "test": "node -e \"console.log('ok')\"" }
+			},
+			"initialCommit": true
+		},
+		"featureId": "F002",
+		"gateId": "user-approval-implement"
+	},
+	"golden": {
+		"exitCode": 0,
+		"summary": {
+			"successClosed": true,
+			"highFindings": []
+		},
+		"evidenceType": "timeline-event"
+	}
+}

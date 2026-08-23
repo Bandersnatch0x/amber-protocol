@@ -115,7 +115,7 @@ test("reportFixtureCoverage loads the family and reports no mismatches for a mat
 	};
 	const report = reportFixtureCoverage(runtime);
 	assert.equal(report.errors.length, 0);
-	assert.ok(report.familySize >= 5, `expected at least 5 fixtures, got ${report.familySize}`);
+	assert.ok(report.familySize >= 7, `expected at least 7 fixtures, got ${report.familySize}`);
 	// Canonical fixtures should all match a fully-passing runtime summary.
 	// The adversarial fixture (exitCode 1) should mismatch on a passing summary.
 	for (const m of report.mismatches) {
@@ -123,14 +123,18 @@ test("reportFixtureCoverage loads the family and reports no mismatches for a mat
 	}
 });
 
-test("the committed fixture family has exactly 5 fixtures covering all 4 paths", () => {
+test("the committed fixture family has at least 7 fixtures covering all 4 paths and 3 profiles", () => {
 	const { fixtures } = loadFamily();
-	assert.equal(fixtures.length, 5);
+	assert.ok(fixtures.length >= 7, `expected at least 7 fixtures, got ${fixtures.length}`);
 	const paths = new Set(fixtures.map((f) => f.fixture.path));
 	assert.ok(paths.has("success"));
 	assert.ok(paths.has("rejection"));
 	assert.ok(paths.has("verify-fail-recover"));
 	assert.ok(paths.has("cross-session-handoff"));
+	const profiles = new Set(fixtures.map((f) => f.fixture.deploymentProfile));
+	assert.ok(profiles.has("personal-node"));
+	assert.ok(profiles.has("team-hub"));
+	assert.ok(profiles.has("organization"));
 });
 
 test("the family includes at least one adversarial variant", () => {
