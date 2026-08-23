@@ -1,0 +1,29 @@
+{
+	"schemaVersion": "1.0.0",
+	"fixtureId": "success-adversarial-no-evidence",
+	"path": "success",
+	"variant": "adversarial",
+	"description": "Adversarial success variant: attempt to accept a feature with no executed verify reflux. The accept must be blocked — this fixture's golden exitCode is 1, proving the governance gate refuses evidence-less acceptance even on the success path.",
+	"deploymentProfile": "personal-node",
+	"inputs": {
+		"targetSeed": {
+			"packageJson": {
+				"name": "amber-e2e-target",
+				"version": "0.0.0",
+				"private": true,
+				"scripts": { "test": "node -e \"console.log('ok')\"" }
+			},
+			"initialCommit": true
+		},
+		"featureId": "F-NOEV",
+		"gateId": "user-approval-implement"
+	},
+	"golden": {
+		"exitCode": 1,
+		"summary": {
+			"successClosed": false,
+			"highFindings": ["R3"]
+		},
+		"evidenceType": "ingest-record"
+	}
+}

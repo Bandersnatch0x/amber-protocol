@@ -1,0 +1,29 @@
+{
+	"schemaVersion": "1.0.0",
+	"fixtureId": "verify-fail-recover-canonical",
+	"path": "verify-fail-recover",
+	"variant": "canonical",
+	"description": "Verify-fail recovery: a failing verify --execute records a failure event, the session stays open, the fix is committed, and a re-verify passes strict complete-check with both failed and passed timeline events present.",
+	"deploymentProfile": "personal-node",
+	"inputs": {
+		"targetSeed": {
+			"packageJson": {
+				"name": "amber-e2e-fail",
+				"version": "0.0.0",
+				"private": true,
+				"scripts": { "test": "node -e \"process.exit(1)\"" }
+			},
+			"initialCommit": true
+		},
+		"featureId": "F002",
+		"gateId": "user-approval-implement"
+	},
+	"golden": {
+		"exitCode": 0,
+		"summary": {
+			"verifyFailRecovered": true,
+			"highFindings": []
+		},
+		"evidenceType": "timeline-event"
+	}
+}

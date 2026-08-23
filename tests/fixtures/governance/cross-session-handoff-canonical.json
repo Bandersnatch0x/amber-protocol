@@ -1,0 +1,29 @@
+{
+	"schemaVersion": "1.0.0",
+	"fixtureId": "cross-session-handoff-canonical",
+	"path": "cross-session-handoff",
+	"variant": "canonical",
+	"description": "Cross-session handoff: after session-1 completes and accepts, a live handoff carries evidence and next actions; session continue on the completed session is refused; a second session can start independently.",
+	"deploymentProfile": "personal-node",
+	"inputs": {
+		"targetSeed": {
+			"packageJson": {
+				"name": "amber-e2e-target",
+				"version": "0.0.0",
+				"private": true,
+				"scripts": { "test": "node -e \"console.log('ok')\"" }
+			},
+			"initialCommit": true
+		},
+		"featureId": "F002",
+		"gateId": "user-approval-implement"
+	},
+	"golden": {
+		"exitCode": 0,
+		"summary": {
+			"crossSessionHandoff": true,
+			"highFindings": []
+		},
+		"evidenceType": "timeline-event"
+	}
+}
