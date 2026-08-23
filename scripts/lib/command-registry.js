@@ -604,6 +604,26 @@ const COMMAND_HELP = {
 		"  amber knowledge admit --page p1 --auth human-approve --target . --json",
 		"  amber knowledge status --id <record-id> --target . --json",
 	],
+	phase: [
+		"Manage Phase 0-4 gate evidence, promotion, and rollback (#168).",
+		"Each phase gate requires complete deterministic evidence; promotion",
+		"requires explicit authorization; rollback requires a checkpoint",
+		"(destructive rollback is impossible) and records append-only lineage.",
+		"",
+		"Subcommands:",
+		"  evidence --phase <phase-0..phase-4>  Show the gate evidence.",
+		"  validate --phase <phase>  Check evidence completeness.",
+		"  promote --phase <phase> --auth <authorization>",
+		"        Promote with complete evidence + explicit authorization.",
+		"  rollback --phase <phase> --checkpoint <id> [--reason <text>]",
+		"        Roll back to a checkpoint (never destructive).",
+		"  transitions              List append-only lineage.",
+		"  invariants               Check invariant non-regression.",
+		"",
+		"Examples:",
+		"  amber phase validate --phase phase-0 --target . --json",
+		"  amber phase promote --phase phase-0 --auth human-approve --target . --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -951,6 +971,7 @@ const COMMANDS = Object.freeze([
 	"memory",
 	"projection",
 	"knowledge",
+	"phase",
 ]);
 const TIER_BY_COMMAND = {
 	init: "core",
@@ -974,6 +995,7 @@ const TIER_BY_COMMAND = {
 	memory: "core",
 	projection: "core",
 	knowledge: "core",
+	phase: "core",
 	next: "journey",
 	profile: "deprecated",
 	task: "deprecated",
