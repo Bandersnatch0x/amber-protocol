@@ -1,0 +1,181 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/sync-envelope.schema.json",
+	"title": "Sync Envelope",
+	"description": "Versioned, immutable interchange contract for transporting governed artifacts across Amber instances. Owned by the Sync Runtime bounded context. An envelope wraps exactly one artifact with structural identity, provenance, and conflict metadata. It never carries source code, secrets, agents, tools, or arbitrary files. See ADR-0012 (amended) and ADR-0019.",
+	"type": "object",
+	"required": [
+		"schemaVersion",
+		"envelopeId",
+		"artifactType",
+		"artifactRef",
+		"structuralIdentity",
+		"origin",
+		"createdAt"
+	],
+	"additionalProperties": false,
+	"properties": {
+		"schemaVersion": {
+			"type": "string",
+			"enum": ["1.0.0"],
+			"description": "Envelope schema version. Bumped on breaking shape changes."
+		},
+		"envelopeId": {
+			"type": "string",
+			"pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+			"description": "UUID identifying this envelope instance. Immutable."
+		},
+		"artifactType": {
+			"type": "string",
+			"enum": [
+				"session-manifest",
+				"timeline-event",
+				"feature-list",
+				"route",
+				"loop-contract",
+				"context-page",
+				"context-request",
+				"knowledge-plan",
+				"workflow-assessment",
+				"memory-entry",
+				"memory-request",
+				"governance-report"
+			],
+			"description": "The type of artifact this envelope carries. Must match a known artifact type in the Amber schema registry."
+		},
+		"artifactRef": {
+			"type": "object",
+			"required": ["path", "hash"],
+			"additionalProperties": false,
+			"properties": {
+				"path": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Repository-relative path to the artifact file."
+				},
+				"hash": {
+					"type": "string",
+					"pattern": "^sha256:[0-9a-f]{64}$",
+					"description": "SHA-256 content hash of the artifact at the time of enveloping. Immutable."
+				}
+			},
+			"description": "Reference to the wrapped artifact: its path and content hash."
+		},
+		"structuralIdentity": {
+			"type": "object",
+			"required": ["tenantId", "repositoryId", "repositoryGeneration"],
+			"additionalProperties": false,
+			"properties": {
+				"tenantId": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Tenant scope the originating repository belongs to."
+				},
+				"repositoryId": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Identifier of the originating repository."
+				},
+				"repositoryGeneration": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Generation counter of the repository. Incremented on fenced transfer."
+				}
+			},
+			"description": "Structural identity anchoring the artifact to its origin tenant, repository, and generation."
+		},
+		"origin": {
+			"type": "object",
+			"required": ["profile"],
+			"additionalProperties": false,
+			"properties": {
+				"profile": {
+					"type": "string",
+					"enum": ["personal-node", "team-hub", "organization"],
+					"description": "Deployment profile of the originating Amber instance."
+				},
+				"personId": {
+					"type": "string",
+					"description": "Person identity of the operator who created or last touched the artifact."
+				},
+				"agentId": {
+					"type": "string",
+					"description": "Agent identity, if the artifact was agent-assisted."
+				}
+			},
+			"description": "Origin metadata: deployment profile and identity of the source."
+		},
+		"createdAt": {
+			"type": "string",
+			"format": "date-time",
+			"description": "ISO 8601 timestamp of envelope creation."
+		},
+		"versionNegotiation": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"amberProtocolVersion": {
+					"type": "string",
+					"description": "Amber package version that produced the wrapped artifact."
+				},
+				"minCompatibleVersion": {
+					"type": "string",
+					"description": "Minimum Amber version that can correctly interpret this envelope."
+				},
+				"capabilities": {
+					"type": "array",
+					"items": { "type": "string" },
+					"uniqueItems": true,
+					"description": "Capabilities the source instance declares (e.g. 'sync-envelope-v1', 'structural-identity-v1')."
+				}
+			},
+			"description": "Version and capability negotiation metadata. Enables compatibility checks and refusal of incompatible envelopes."
+		},
+		"conflictRecord": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"conflictType": {
+					"type": "string",
+					"enum": [
+						"concurrent-edit",
+						"generation-mismatch",
+						"version-mismatch",
+						"identity-mismatch"
+					],
+					"description": "Type of conflict detected during synchronization."
+				},
+				"remoteEnvelopeId": {
+					"type": "string",
+					"pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+					"description": "Envelope ID of the conflicting remote envelope."
+				},
+				"resolution": {
+					"type": "string",
+					"enum": ["pending", "local-wins", "remote-wins", "manual-merge-required"],
+					"description": "Resolution status. 'pending' means the conflict is recorded but unresolved."
+				},
+				"recordedAt": {
+					"type": "string",
+					"format": "date-time",
+					"description": "When the conflict was detected."
+				}
+			},
+			"description": "Conflict metadata, present only when a synchronization conflict was detected. Conflicts are never silently overwritten."
+		},
+		"amber_protocol_version": {
+			"type": "string",
+			"description": "Amber package version that produced this envelope. Inherited from ADR-0012 versioning."
+		},
+		"artifact_sequence": {
+			"type": "integer",
+			"minimum": 0,
+			"description": "Monotonically increasing sequence within the envelope's identity scope."
+		},
+		"artifact_type": {
+			"type": "string",
+			"const": "sync-envelope",
+			"description": "Stable discriminant for this artifact type."
+		}
+	}
+}

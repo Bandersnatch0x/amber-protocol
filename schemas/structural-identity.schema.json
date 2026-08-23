@@ -1,0 +1,75 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/structural-identity.schema.json",
+	"title": "Structural Identity",
+	"description": "Ownership-bearing identity contract that anchors a governed artifact to its origin tenant, repository, and generation. Carried inside every sync envelope. Structural identity is immutable within a generation; a fenced repository transfer starts a new generation and terminates old-tenant applicability. See ADR-0012 (amended) and ADR-0019.",
+	"type": "object",
+	"required": ["schemaVersion", "tenantId", "repositoryId", "repositoryGeneration"],
+	"additionalProperties": false,
+	"properties": {
+		"schemaVersion": {
+			"type": "string",
+			"enum": ["1.0.0"],
+			"description": "Structural identity schema version."
+		},
+		"tenantId": {
+			"type": "string",
+			"minLength": 1,
+			"description": "Tenant scope the repository belongs to. For Personal Node bootstrap, defaults to 'local'."
+		},
+		"repositoryId": {
+			"type": "string",
+			"minLength": 1,
+			"description": "Identifier of the repository. Typically the repository name or a deterministic hash of its path."
+		},
+		"repositoryGeneration": {
+			"type": "integer",
+			"minimum": 0,
+			"description": "Generation counter. Starts at 0. Incremented on fenced repository transfer to a new tenant."
+		},
+		"organizationId": {
+			"type": "string",
+			"description": "Organization the tenant belongs to. For Personal Node bootstrap, defaults to 'personal'. Absent means unscoped."
+		},
+		"transferRecord": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"fromTenantId": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Previous tenant before the transfer."
+				},
+				"toTenantId": {
+					"type": "string",
+					"minLength": 1,
+					"description": "New tenant after the transfer."
+				},
+				"transferredAt": {
+					"type": "string",
+					"format": "date-time",
+					"description": "When the fenced transfer occurred."
+				},
+				"previousGeneration": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Generation counter before the transfer."
+				}
+			},
+			"description": "Present only after a fenced repository transfer. Proves continuity: historical facts retain their original tenant and generation scope."
+		},
+		"amber_protocol_version": {
+			"type": "string",
+			"description": "Amber package version. Inherited from ADR-0012 versioning."
+		},
+		"artifact_sequence": {
+			"type": "integer",
+			"minimum": 0
+		},
+		"artifact_type": {
+			"type": "string",
+			"const": "structural-identity",
+			"description": "Stable discriminant."
+		}
+	}
+}
