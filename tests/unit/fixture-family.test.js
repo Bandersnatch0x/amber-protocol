@@ -117,3 +117,27 @@ test("the success-minimal fixture targets personal-node deployment profile", () 
 	const success = fixtures.find((f) => f.fixture.fixtureId === "success-minimal");
 	assert.equal(success.fixture.deploymentProfile, "personal-node");
 });
+
+test("fixture family covers all three deployment profiles (#160)", () => {
+	const { fixtures } = loadFamily();
+	const profiles = new Set(fixtures.map((f) => f.fixture.deploymentProfile));
+	assert.ok(profiles.has("personal-node"), "missing personal-node fixture");
+	assert.ok(profiles.has("team-hub"), "missing team-hub fixture");
+	assert.ok(profiles.has("organization"), "missing organization fixture");
+});
+
+test("team-hub fixture exists and targets team-hub profile", () => {
+	const { fixtures } = loadFamily();
+	const teamHub = fixtures.find((f) => f.fixture.fixtureId === "success-team-hub");
+	assert.ok(teamHub, "success-team-hub fixture missing");
+	assert.equal(teamHub.fixture.deploymentProfile, "team-hub");
+	assert.equal(teamHub.fixture.golden.exitCode, 0);
+});
+
+test("organization fixture exists and targets organization profile", () => {
+	const { fixtures } = loadFamily();
+	const org = fixtures.find((f) => f.fixture.fixtureId === "success-organization");
+	assert.ok(org, "success-organization fixture missing");
+	assert.equal(org.fixture.deploymentProfile, "organization");
+	assert.equal(org.fixture.golden.exitCode, 0);
+});

@@ -1,0 +1,29 @@
+{
+	"schemaVersion": "1.0.0",
+	"fixtureId": "success-team-hub",
+	"path": "success",
+	"variant": "canonical",
+	"description": "Success path on a Team Hub deployment profile: the canonical governance loop closes identically to personal-node, but the fixture declares the Team Hub tracer — proving the fixture family covers the second deployment profile. Team Hub adds shared-state semantics on top of personal-node authority; the runner exercises the same CLI path on a fresh target.",
+	"deploymentProfile": "team-hub",
+	"inputs": {
+		"targetSeed": {
+			"packageJson": {
+				"name": "amber-e2e-team-hub",
+				"version": "0.0.0",
+				"private": true,
+				"scripts": { "test": "node -e \"console.log('ok')\"" }
+			},
+			"initialCommit": true
+		},
+		"featureId": "F002",
+		"gateId": "user-approval-implement"
+	},
+	"golden": {
+		"exitCode": 0,
+		"summary": {
+			"successClosed": true,
+			"highFindings": []
+		},
+		"evidenceType": "timeline-event"
+	}
+}
