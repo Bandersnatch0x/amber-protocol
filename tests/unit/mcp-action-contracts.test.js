@@ -18,6 +18,7 @@ const {
 	validateActionContract,
 	validateWhitelist,
 } = require("../../scripts/lib/mcp-action-contracts");
+const { KNOWN_UNTYPED_SUBCOMMANDS } = require("../../scripts/lib/command-registry");
 
 const ACTION_TYPES_DIR = path.resolve(__dirname, "../../action-types");
 
@@ -47,8 +48,11 @@ test("COMMAND_CAPABILITIES covers every command the eight Action Types map to", 
 	for (const key of required) {
 		assert.ok(COMMAND_CAPABILITIES[key], `registry missing ${key}`);
 	}
-	assert.equal(COMMAND_CAPABILITIES["context/load"].effect, "write");
-	assert.equal(COMMAND_CAPABILITIES["context/load"].directReadOnlyExec, false);
+});
+
+test("context/load is untyped (§15.1 open point (c) cleanup)", () => {
+	assert.equal(COMMAND_CAPABILITIES["context/load"], undefined);
+	assert.equal(KNOWN_UNTYPED_SUBCOMMANDS.has("context/load"), true);
 });
 
 test("every real action type passes semantic parity validation", () => {

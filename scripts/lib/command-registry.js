@@ -1107,6 +1107,7 @@ const KNOWN_UNTYPED_SUBCOMMANDS = Object.freeze(
 		"memory/request",
 		"memory/ingest",
 		"memory/book",
+		"context/load",
 	]),
 );
 
