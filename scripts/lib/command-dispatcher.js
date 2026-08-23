@@ -1051,6 +1051,10 @@ function handleStatus(args) {
 
 function handleSync(args) {
 	const targetRoot = resolveTarget(args);
+	const sub = args._?.[0];
+	if (sub === "envelope") {
+		return handleSyncEnvelope(args, targetRoot);
+	}
 	// Orchestration (scaffold + artifact drift + conditional refresh + note) lives
 	// in core/sync-project. Handler keeps the lines[] text builder and result.sync
 	// envelope byte-identical — artifact is intentionally NOT in result.sync.
@@ -1091,6 +1095,136 @@ function handleSync(args) {
 			warnings: [],
 		},
 		bypassPrint: !args.json,
+	};
+}
+
+function handleSyncEnvelope(args, targetRoot) {
+	const {
+		packEnvelope,
+		unpackEnvelope,
+		checkCompatibility,
+		validateEnvelope,
+	} = require("./core/sync-remote");
+	const sub = args._?.[1];
+	if (sub === "pack") {
+		const artifactType = args.type;
+		const artifactPath = args.artifact;
+		if (!artifactType || !artifactPath) {
+			return {
+				result: {
+					target: args.target,
+					text: "",
+					errors: ["sync envelope pack requires --type <artifact-type> --artifact <path>"],
+					warnings: [],
+				},
+				exitCode: 1,
+				bypassPrint: !args.json,
+			};
+		}
+		const { envelope, errors } = packEnvelope(targetRoot, artifactType, artifactPath);
+		const exitCode = errors.length > 0 ? 1 : 0;
+		return {
+			result: {
+				target: args.target,
+				text: envelope ? JSON.stringify(envelope, null, 2) : "",
+				errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "unpack") {
+		let envelope;
+		try {
+			envelope = JSON.parse(args.envelope || "");
+		} catch {
+			return {
+				result: {
+					target: args.target,
+					text: "",
+					errors: ["sync envelope unpack requires --envelope <json>"],
+					warnings: [],
+				},
+				exitCode: 1,
+				bypassPrint: !args.json,
+			};
+		}
+		const { artifactPath, errors } = unpackEnvelope(targetRoot, envelope);
+		const exitCode = errors.length > 0 ? 1 : 0;
+		return {
+			result: {
+				target: args.target,
+				text:
+					errors.length > 0
+						? ""
+						: `Envelope validated; artifact ${artifactPath} present with matching hash.`,
+				errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "compat") {
+		let envelope;
+		try {
+			envelope = JSON.parse(args.envelope || "");
+		} catch {
+			return {
+				result: {
+					target: args.target,
+					text: "",
+					errors: ["sync envelope compat requires --envelope <json>"],
+					warnings: [],
+				},
+				exitCode: 1,
+				bypassPrint: !args.json,
+			};
+		}
+		const { compatible, reasons } = checkCompatibility(envelope);
+		const exitCode = compatible ? 0 : 1;
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify({ compatible, reasons }, null, 2),
+				errors: compatible ? [] : reasons,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "validate") {
+		let envelope;
+		try {
+			envelope = JSON.parse(args.envelope || "");
+		} catch {
+			return {
+				result: {
+					target: args.target,
+					text: "",
+					errors: ["sync envelope validate requires --envelope <json>"],
+					warnings: [],
+				},
+				exitCode: 1,
+				bypassPrint: !args.json,
+			};
+		}
+		const { valid, errors } = validateEnvelope(envelope);
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify({ valid, errors }, null, 2),
+				errors: valid ? [] : errors,
+				warnings: [],
+			},
+			exitCode: valid ? 0 : 1,
+			bypassPrint: !args.json,
+		};
+	}
+	return {
+		result: unknownAction("sync envelope", ["pack", "unpack", "compat", "validate"]),
 	};
 }
 
