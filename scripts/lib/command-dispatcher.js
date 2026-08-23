@@ -1239,6 +1239,35 @@ function handleSyncSession(args, targetRoot) {
 		listEnvelopes,
 	} = require("./core/sync-session");
 	const sub = args._?.[1];
+	if (sub === "replay") {
+		const { replayEnvelopes } = require("./core/sync-conflicts");
+		const result = replayEnvelopes(targetRoot);
+		const exitCode = result.errors.length > 0 ? 1 : 0;
+		return {
+			result: {
+				target: args.target,
+				text: `Applied ${result.applied} envelope(s); conflicts ${result.conflicts.length}; errors ${result.errors.length}.`,
+				errors: result.errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "conflicts") {
+		const { listConflicts } = require("./core/sync-conflicts");
+		const conflicts = listConflicts(targetRoot);
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify(conflicts, null, 2),
+				errors: [],
+				warnings: [],
+			},
+			exitCode: 0,
+			bypassPrint: !args.json,
+		};
+	}
 	if (sub === "run") {
 		const { session, summary, errors } = runSyncSession(targetRoot);
 		const exitCode = errors.length > 0 ? 1 : 0;
@@ -1295,7 +1324,7 @@ function handleSyncSession(args, targetRoot) {
 		};
 	}
 	return {
-		result: unknownAction("sync session", ["run", "push", "pull", "list"]),
+		result: unknownAction("sync session", ["run", "push", "pull", "list", "replay", "conflicts"]),
 	};
 }
 
