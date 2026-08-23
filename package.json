@@ -47,6 +47,7 @@
 		"orient": "node scripts/orient.js",
 		"test:load": "node scripts/run-tests.js tests/load/sequential-sessions.test.js",
 		"test:e2e": "node scripts/run-tests.js tests/e2e/",
+		"test:governance-loop": "node scripts/demo/e2e-governance-loop-verify.js",
 		"identity:check": "node scripts/validate-git-identity.js",
 		"dev:hooks:install": "git config --local core.hooksPath .githooks",
 		"gen:agents": "node scripts/gen-agent-commands.js",
