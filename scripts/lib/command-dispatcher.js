@@ -1055,6 +1055,9 @@ function handleSync(args) {
 	if (sub === "envelope") {
 		return handleSyncEnvelope(args, targetRoot);
 	}
+	if (sub === "session") {
+		return handleSyncSession(args, targetRoot);
+	}
 	// Orchestration (scaffold + artifact drift + conditional refresh + note) lives
 	// in core/sync-project. Handler keeps the lines[] text builder and result.sync
 	// envelope byte-identical — artifact is intentionally NOT in result.sync.
@@ -1225,6 +1228,74 @@ function handleSyncEnvelope(args, targetRoot) {
 	}
 	return {
 		result: unknownAction("sync envelope", ["pack", "unpack", "compat", "validate"]),
+	};
+}
+
+function handleSyncSession(args, targetRoot) {
+	const {
+		runSyncSession,
+		pushEnvelopes,
+		pullEnvelopes,
+		listEnvelopes,
+	} = require("./core/sync-session");
+	const sub = args._?.[1];
+	if (sub === "run") {
+		const { session, summary, errors } = runSyncSession(targetRoot);
+		const exitCode = errors.length > 0 ? 1 : 0;
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify({ session, summary }, null, 2),
+				errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "push") {
+		const result = pushEnvelopes(targetRoot);
+		const exitCode = result.errors.length > 0 ? 1 : 0;
+		return {
+			result: {
+				target: args.target,
+				text: result.note,
+				errors: result.errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "pull") {
+		const result = pullEnvelopes(targetRoot);
+		const exitCode = result.errors.length > 0 ? 1 : 0;
+		return {
+			result: {
+				target: args.target,
+				text: `Validated ${result.validated} envelope(s); refused ${result.refused}.`,
+				errors: result.errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "list") {
+		const envelopes = listEnvelopes(targetRoot);
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify(envelopes, null, 2),
+				errors: [],
+				warnings: [],
+			},
+			exitCode: 0,
+			bypassPrint: !args.json,
+		};
+	}
+	return {
+		result: unknownAction("sync session", ["run", "push", "pull", "list"]),
 	};
 }
 
