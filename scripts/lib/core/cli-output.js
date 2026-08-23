@@ -75,6 +75,7 @@ const FLAG_SPECS = {
 	"--review-bandwidth-status": { key: "reviewBandwidthStatus" },
 	"--review-gate-status": { key: "reviewGateStatus" },
 	"--priority": { key: "priority" },
+	"--profile": { key: "profile" },
 	"--paths": { key: "pathsVal", accumulate: "paths" },
 	"--path": { key: "path", accumulate: "paths" },
 	"--decision": { key: "decision", accumulate: "decisions" },
