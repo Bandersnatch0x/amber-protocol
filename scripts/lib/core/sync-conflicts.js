@@ -199,6 +199,9 @@ function replayEnvelopes(cwd) {
 			markEnvelopeApplied(cwd, envelope.envelopeId);
 		} else if (result.action === "conflict") {
 			conflicts.push(result.conflict);
+			// a conflict is terminal for this envelope in this replay pass —
+			// mark it handled so repeated replays do not duplicate the record
+			markEnvelopeApplied(cwd, envelope.envelopeId);
 		} else {
 			errors.push(...result.errors);
 		}
