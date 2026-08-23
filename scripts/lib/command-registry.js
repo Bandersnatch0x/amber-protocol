@@ -584,6 +584,26 @@ const COMMAND_HELP = {
 		"  amber projection rebuild --type governance-graph --target . --json",
 		"  amber projection status --type knowledge-base --target . --json",
 	],
+	knowledge: [
+		"Govern the Knowledge Base lifecycle (ADR-0009 amendment; baseline",
+		"Governed Knowledge Base bounded context): admission with provenance",
+		"and explicit authorization, immutable reviewable records, freshness,",
+		"refresh, retirement, and reuse lineage. Queries are exact-scope and",
+		"fail closed.",
+		"",
+		"Subcommands:",
+		"  admit --page <id> --auth <authorization>",
+		"        Admit a Knowledge Record from a canonical Context Page.",
+		"  list                  List all Knowledge Records.",
+		"  status --id <record-id>  Report record freshness (fresh/stale).",
+		"  retire --id <record-id> --reason <text>",
+		"        Retire a record explicitly.",
+		"  query --scope <page-id>  Exact-scope query; unknown scope denied.",
+		"",
+		"Examples:",
+		"  amber knowledge admit --page p1 --auth human-approve --target . --json",
+		"  amber knowledge status --id <record-id> --target . --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -930,6 +950,7 @@ const COMMANDS = Object.freeze([
 	"context",
 	"memory",
 	"projection",
+	"knowledge",
 ]);
 const TIER_BY_COMMAND = {
 	init: "core",
@@ -952,6 +973,7 @@ const TIER_BY_COMMAND = {
 	context: "core",
 	memory: "core",
 	projection: "core",
+	knowledge: "core",
 	next: "journey",
 	profile: "deprecated",
 	task: "deprecated",

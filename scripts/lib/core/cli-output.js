@@ -79,6 +79,7 @@ const FLAG_SPECS = {
 	"--profile": { key: "profile" },
 	"--type": { key: "type" },
 	"--artifact": { key: "artifact" },
+	"--auth": { key: "auth" },
 	"--envelope": { key: "envelope" },
 	"--paths": { key: "pathsVal", accumulate: "paths" },
 	"--path": { key: "path", accumulate: "paths" },
