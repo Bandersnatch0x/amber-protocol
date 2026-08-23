@@ -87,6 +87,8 @@ const FLAG_SPECS = {
 	"--entity": { key: "entity" },
 	"--kind": { key: "kind" },
 	"--sort": { key: "sort" },
+	"--phase": { key: "phase" },
+	"--checkpoint": { key: "checkpoint" },
 	"--envelope": { key: "envelope" },
 	"--paths": { key: "pathsVal", accumulate: "paths" },
 	"--path": { key: "path", accumulate: "paths" },

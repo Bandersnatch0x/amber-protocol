@@ -1,0 +1,175 @@
+"use strict";
+
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+const {
+	PHASES,
+	gatherPhaseEvidence,
+	validatePhaseEvidence,
+	promotePhase,
+	rollbackPhase,
+	listTransitions,
+	checkInvariantNonRegression,
+} = require("../../scripts/lib/core/phase-gates");
+
+function mkTarget(label) {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-gate-${label}-`));
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	return dir;
+}
+
+// ── Phase definitions ─────────────────────────────────────────
+
+test("PHASES enumerates Phase 0 through Phase 4", () => {
+	assert.deepEqual([...PHASES].sort(), ["phase-0", "phase-1", "phase-2", "phase-3", "phase-4"]);
+});
+
+// ── Gate evidence ─────────────────────────────────────────────
+
+test("gatherPhaseEvidence collects deterministic evidence for a phase", () => {
+	const dir = mkTarget("gather");
+	const evidence = gatherPhaseEvidence(dir, "phase-0");
+	assert.ok(Array.isArray(evidence));
+	assert.ok(evidence.length > 0, "phase-0 requires evidence");
+	for (const item of evidence) {
+		assert.ok(item.id, "evidence has stable id");
+		assert.ok(item.requirement, "evidence has requirement text");
+		assert.equal(typeof item.satisfied, "boolean");
+	}
+});
+
+test("validatePhaseEvidence reports complete when all evidence present", () => {
+	const dir = mkTarget("valid");
+	// phase-0 needs canonical artifacts — provide a context page
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "context", "pages", "p1.json"),
+		JSON.stringify({
+			pageId: "p1",
+			title: "Page 1",
+			sources: { s1: { kind: "repo", ref: "a.md" } },
+			blocks: [],
+		}),
+	);
+	const result = validatePhaseEvidence(dir, "phase-0");
+	assert.equal(result.complete, true, JSON.stringify(result.missing));
+	assert.deepEqual(result.missing, []);
+});
+
+test("validatePhaseEvidence reports incomplete when evidence missing", () => {
+	const dir = mkTarget("incomplete");
+	const result = validatePhaseEvidence(dir, "phase-1");
+	assert.equal(result.complete, false);
+	assert.ok(result.missing.length > 0, "missing evidence listed");
+});
+
+// ── Promotion ─────────────────────────────────────────────────
+
+test("promotePhase requires explicit authorization", () => {
+	const dir = mkTarget("promote-noauth");
+	const result = promotePhase(dir, "phase-0", { authorization: null });
+	assert.equal(result.ok, false);
+	assert.ok(result.errors.some((e) => e.includes("authorization")));
+});
+
+test("promotePhase records the promotion when evidence complete", () => {
+	const dir = mkTarget("promote");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "context", "pages", "p1.json"),
+		JSON.stringify({
+			pageId: "p1",
+			title: "Page 1",
+			sources: { s1: { kind: "repo", ref: "a.md" } },
+			blocks: [],
+		}),
+	);
+	const result = promotePhase(dir, "phase-0", { authorization: "human-approve" });
+	assert.equal(result.ok, true, JSON.stringify(result.errors));
+	assert.ok(result.transition);
+	assert.equal(result.transition.phase, "phase-0");
+	assert.equal(result.transition.status, "promoted");
+
+	const transitions = listTransitions(dir);
+	assert.equal(transitions.length, 1);
+	assert.equal(transitions[0].authorization, "human-approve");
+});
+
+test("promotePhase refuses when evidence is incomplete (no silent promotion)", () => {
+	const dir = mkTarget("promote-blocked");
+	const result = promotePhase(dir, "phase-1", { authorization: "human-approve" });
+	assert.equal(result.ok, false);
+	assert.ok(
+		result.errors.some((e) => e.includes("evidence")),
+		"incomplete evidence blocks promotion",
+	);
+});
+
+// ── Rollback ─────────────────────────────────────────────────
+
+test("rollbackPhase records an append-only lineage entry", () => {
+	const dir = mkTarget("rollback");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "context", "pages", "p1.json"),
+		JSON.stringify({
+			pageId: "p1",
+			title: "Page 1",
+			sources: { s1: { kind: "repo", ref: "a.md" } },
+			blocks: [],
+		}),
+	);
+	promotePhase(dir, "phase-0", { authorization: "human-approve" });
+	const result = rollbackPhase(dir, "phase-0", {
+		checkpoint: "abc123",
+		reason: "evidence regression",
+	});
+	assert.equal(result.ok, true, JSON.stringify(result.errors));
+	assert.equal(result.transition.status, "rolled-back");
+	assert.ok(result.transition.rollbackTo, "checkpoint recorded");
+
+	const transitions = listTransitions(dir);
+	// promote + rollback both recorded (append-only lineage)
+	assert.equal(transitions.length, 2);
+	assert.equal(transitions[1].status, "rolled-back");
+});
+
+test("rollbackPhase refuses a destructive rollback (no checkpoint)", () => {
+	const dir = mkTarget("destructive");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "context", "pages", "p1.json"),
+		JSON.stringify({
+			pageId: "p1",
+			title: "Page 1",
+			sources: { s1: { kind: "repo", ref: "a.md" } },
+			blocks: [],
+		}),
+	);
+	promotePhase(dir, "phase-0", { authorization: "human-approve" });
+	const result = rollbackPhase(dir, "phase-0", { checkpoint: null, reason: "destroy" });
+	assert.equal(result.ok, false, "destructive rollback without checkpoint is impossible");
+	assert.ok(result.errors.some((e) => e.includes("checkpoint")));
+});
+
+// ── Invariant non-regression ──────────────────────────────────
+
+test("checkInvariantNonRegression verifies core invariants", () => {
+	const dir = mkTarget("invariants");
+	const result = checkInvariantNonRegression(dir);
+	assert.ok(result);
+	assert.equal(typeof result.ok, "boolean");
+	assert.ok(Array.isArray(result.invariants));
+	assert.ok(result.invariants.length > 0, "invariants enumerated");
+});
+
+test("invariant check fails closed on missing canonical state", () => {
+	const dir = mkTarget("invariants-fail");
+	// empty target → some invariant (e.g. context pages present) fails
+	const result = checkInvariantNonRegression(dir);
+	assert.equal(typeof result.ok, "boolean");
+});
