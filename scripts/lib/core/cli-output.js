@@ -48,6 +48,7 @@ const FLAG_SPECS = {
 	"--out": { key: "out" },
 	"--format": { key: "format" },
 	"--scope": { key: "scope" },
+	"--limit": { key: "limit" },
 	"--home": { key: "home" },
 	"--bundle-dir": { key: "bundleDir" },
 	"--report": { key: "report" },

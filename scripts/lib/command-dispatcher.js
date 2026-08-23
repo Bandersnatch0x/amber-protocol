@@ -1336,6 +1336,69 @@ function handleProjection(args) {
 		rebuildProjection,
 		projectionStatus,
 	} = require("./core/projection-registry");
+	if (sub === "query") {
+		const { buildGovernanceGraph, queryGraph } = require("./core/governance-graph");
+		const { recordReadReceipt } = require("./core/projection-receipts");
+		const graph = buildGovernanceGraph(targetRoot);
+		const result = queryGraph(graph, {
+			scope: args.scope || null,
+			limit: args.limit ? Number(args.limit) : 50,
+		});
+		// every read leaves an immutable receipt
+		const receipt = recordReadReceipt(targetRoot, {
+			scope: args.scope || "unscoped",
+			projectionType: "governance-graph",
+			resultHash: graph.sourceHash,
+		});
+		const exitCode = result.ok ? 0 : 1;
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify(
+					{
+						ok: result.ok,
+						code: result.code,
+						nodes: result.nodes,
+						truncated: result.truncated,
+						receiptId: receipt.receiptId,
+					},
+					null,
+					2,
+				),
+				errors: result.ok ? [] : [result.reason || result.code],
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "receipt") {
+		const { listReadReceipts, verifyReceipt } = require("./core/projection-receipts");
+		if (args.id) {
+			const { ok, receipt } = verifyReceipt(targetRoot, args.id);
+			return {
+				result: {
+					target: args.target,
+					text: JSON.stringify({ ok, receipt }, null, 2),
+					errors: ok ? [] : ["receipt not found"],
+					warnings: [],
+				},
+				exitCode: ok ? 0 : 1,
+				bypassPrint: !args.json,
+			};
+		}
+		const receipts = listReadReceipts(targetRoot);
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify(receipts, null, 2),
+				errors: [],
+				warnings: [],
+			},
+			exitCode: 0,
+			bypassPrint: !args.json,
+		};
+	}
 	if (sub === "rebuild") {
 		const type = args.type;
 		if (!type || !PROJECTION_TYPES.includes(type)) {
@@ -1414,7 +1477,7 @@ function handleProjection(args) {
 		};
 	}
 	return {
-		result: unknownAction("projection", ["rebuild", "status", "list"]),
+		result: unknownAction("projection", ["rebuild", "status", "list", "query", "receipt"]),
 	};
 }
 
