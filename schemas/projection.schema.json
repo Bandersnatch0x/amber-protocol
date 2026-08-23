@@ -1,0 +1,59 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/projection.schema.json",
+	"title": "Amber Projection Manifest",
+	"description": "A rebuildable read-only projection manifest. Projections (Governance Graph, Governed Knowledge Base, Visualization Workbench) are derived from canonical Amber artifacts and are never canonical authority. See ADR-0012 amendment (projection versioning), ADR-0019 D5, and the distributed-governance baseline.",
+	"type": "object",
+	"required": [
+		"schemaVersion",
+		"projectionId",
+		"projectionType",
+		"projectionVersion",
+		"rebuildCheckpoint",
+		"sourceHash",
+		"outputHash"
+	],
+	"additionalProperties": false,
+	"properties": {
+		"schemaVersion": {
+			"type": "string",
+			"const": "1.0.0",
+			"description": "Projection manifest schema version."
+		},
+		"projectionId": {
+			"type": "string",
+			"pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+			"description": "Stable kebab-case identifier for this projection instance."
+		},
+		"projectionType": {
+			"type": "string",
+			"enum": ["governance-graph", "knowledge-base", "visualization-workbench"],
+			"description": "Projection kind. Reserved by ADR-0012 amendment."
+		},
+		"projectionVersion": {
+			"type": "integer",
+			"minimum": 1,
+			"description": "Projection schema version. Bump on breaking output-shape changes."
+		},
+		"rebuildCheckpoint": {
+			"type": "string",
+			"minLength": 1,
+			"description": "Deterministic anchor identifying the canonical state this projection was built from."
+		},
+		"sourceHash": {
+			"type": "string",
+			"pattern": "^sha256:[0-9a-f]{64}$",
+			"description": "Hash of the canonical artifacts this projection was built from."
+		},
+		"outputHash": {
+			"type": "string",
+			"pattern": "^sha256:[0-9a-f]{64}$",
+			"description": "Hash of the projection output, for drift detection."
+		},
+		"rebuiltAt": {
+			"type": "string",
+			"format": "date-time",
+			"description": "When the projection was last rebuilt."
+		}
+	}
+}

@@ -568,6 +568,22 @@ const COMMAND_HELP = {
 		"  amber memory approve --target . --entry-id <id> --decision approve",
 		"  amber memory abandon --target . --entry <id>",
 	],
+	projection: [
+		"Manage rebuildable read-only projections (ADR-0019 D5; ADR-0012 amendment):",
+		"Governance Graph, Governed Knowledge Base, and Visualization Workbench.",
+		"Projections are derived from canonical Amber artifacts and are never canonical",
+		"authority — rebuild() regenerates from canonical state at any time.",
+		"",
+		"Subcommands:",
+		"  rebuild --type <governance-graph|knowledge-base|visualization-workbench>",
+		"        Rebuild a projection from canonical artifacts (.amber/context/pages/).",
+		"  status --type <type>  Report projection state: missing, current, or drifted.",
+		"  list                  List all projections and their status.",
+		"",
+		"Examples:",
+		"  amber projection rebuild --type governance-graph --target . --json",
+		"  amber projection status --type knowledge-base --target . --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -913,6 +929,7 @@ const COMMANDS = Object.freeze([
 	"workflow",
 	"context",
 	"memory",
+	"projection",
 ]);
 const TIER_BY_COMMAND = {
 	init: "core",
@@ -934,6 +951,7 @@ const TIER_BY_COMMAND = {
 	feature: "core",
 	context: "core",
 	memory: "core",
+	projection: "core",
 	next: "journey",
 	profile: "deprecated",
 	task: "deprecated",
