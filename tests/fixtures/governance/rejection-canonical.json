@@ -1,0 +1,34 @@
+{
+	"schemaVersion": "1.0.0",
+	"fixtureId": "rejection-canonical",
+	"path": "rejection",
+	"variant": "canonical",
+	"description": "Rejection path: non-allowlisted verify --execute is denied by policy; claim-only verify does not satisfy strict complete-check; accept without evidence is blocked; multi-gate approve requires --gate.",
+	"deploymentProfile": "personal-node",
+	"inputs": {
+		"targetSeed": {
+			"packageJson": {
+				"name": "amber-e2e-target",
+				"version": "0.0.0",
+				"private": true,
+				"scripts": { "test": "node -e \"console.log('ok')\"" }
+			},
+			"initialCommit": true
+		},
+		"featureId": "F002",
+		"gateId": "user-approval-implement"
+	},
+	"golden": {
+		"exitCode": 0,
+		"summary": {
+			"rejections": {
+				"policyDeny": true,
+				"claimStrict": true,
+				"acceptNoEvidence": true,
+				"approveNeedsGate": true
+			},
+			"highFindings": []
+		},
+		"evidenceType": "timeline-event"
+	}
+}

@@ -27,11 +27,15 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const AMBER = path.join(REPO_ROOT, "scripts", "amber.js");
 
 function parseRunnerArgs(argv) {
-	const parsed = { outputPath: null, help: false };
+	const parsed = { outputPath: null, help: false, fixtureFamily: false };
 	for (let index = 0; index < argv.length; index += 1) {
 		const token = argv[index];
 		if (token === "--help" || token === "-h") {
 			parsed.help = true;
+			continue;
+		}
+		if (token === "--fixture-family") {
+			parsed.fixtureFamily = true;
 			continue;
 		}
 		if (token === "--output") {
@@ -125,6 +129,10 @@ function printRunnerHelp() {
 			"Runs the four Governance Console paths on a fresh non-Amber git target.",
 			"Exits non-zero on any path regression or product-repo mutation.",
 			"Does not write docs/quality unless --output is given.",
+			"",
+			"--fixture-family  Compare the runtime summary against the committed golden",
+			"                  fixture family (tests/fixtures/governance/). Exits",
+			"                  non-zero on any golden mismatch.",
 		].join("\n"),
 	);
 }
@@ -1085,12 +1093,103 @@ function main(argv = process.argv.slice(2)) {
 	if (results.summary.highFindings.length) {
 		console.log("High findings:", results.summary.highFindings.join(", "));
 	}
-	process.exitCode = code;
+	if (args.fixtureFamily) {
+		const report = reportFixtureCoverage(results.summary);
+		console.log(JSON.stringify(report, null, 2));
+		if (report.mismatches.length > 0) {
+			process.exitCode = 1;
+			return 1;
+		}
+	}
 	return code;
 }
 
 if (require.main === module) {
 	main();
+}
+
+function matchGolden(runtimeSummary, golden) {
+	const mismatches = [];
+	const gs = golden.summary || {};
+	if (
+		typeof gs.successClosed === "boolean" &&
+		Boolean(runtimeSummary.successClosed) !== gs.successClosed
+	) {
+		mismatches.push(
+			`successClosed: expected ${gs.successClosed}, got ${runtimeSummary.successClosed}`,
+		);
+	}
+	if (
+		typeof gs.verifyFailRecovered === "boolean" &&
+		Boolean(runtimeSummary.verifyFailRecovered) !== gs.verifyFailRecovered
+	) {
+		mismatches.push(
+			`verifyFailRecovered: expected ${gs.verifyFailRecovered}, got ${runtimeSummary.verifyFailRecovered}`,
+		);
+	}
+	if (
+		typeof gs.crossSessionHandoff === "boolean" &&
+		Boolean(runtimeSummary.crossSessionHandoff) !== gs.crossSessionHandoff
+	) {
+		mismatches.push(
+			`crossSessionHandoff: expected ${gs.crossSessionHandoff}, got ${runtimeSummary.crossSessionHandoff}`,
+		);
+	}
+	if (gs.rejections && typeof gs.rejections === "object") {
+		const rr = runtimeSummary.rejections || {};
+		for (const key of ["policyDeny", "claimStrict", "acceptNoEvidence", "approveNeedsGate"]) {
+			if (typeof gs.rejections[key] === "boolean" && Boolean(rr[key]) !== gs.rejections[key]) {
+				mismatches.push(`rejections.${key}: expected ${gs.rejections[key]}, got ${rr[key]}`);
+			}
+		}
+	}
+	if (Array.isArray(gs.highFindings)) {
+		const runtimeHighs = (runtimeSummary.highFindings || []).slice().sort();
+		const goldenHighs = gs.highFindings.slice().sort();
+		if (JSON.stringify(runtimeHighs) !== JSON.stringify(goldenHighs)) {
+			mismatches.push(
+				`highFindings: expected ${JSON.stringify(goldenHighs)}, got ${JSON.stringify(runtimeHighs)}`,
+			);
+		}
+	}
+	const expectedExit = golden.exitCode;
+	const actualExit = exitCodeFromSummary(runtimeSummary);
+	if (typeof expectedExit === "number" && expectedExit !== actualExit) {
+		mismatches.push(`exitCode: expected ${expectedExit}, got ${actualExit}`);
+	}
+	return mismatches;
+}
+
+function reportFixtureCoverage(runtimeSummary) {
+	let family;
+	try {
+		family = require("../lib/core/fixture-family").loadFamily();
+	} catch (err) {
+		return { error: err.message, fixtures: [], mismatches: [] };
+	}
+	const pathToFixture = {};
+	for (const { fixture } of family.fixtures) {
+		const key = fixture.path;
+		if (!pathToFixture[key]) pathToFixture[key] = [];
+		pathToFixture[key].push(fixture);
+	}
+	const mismatches = [];
+	for (const { fixture } of family.fixtures) {
+		const diffs = matchGolden(runtimeSummary, fixture.golden);
+		if (diffs.length > 0) {
+			mismatches.push({
+				fixtureId: fixture.fixtureId,
+				path: fixture.path,
+				variant: fixture.variant || "canonical",
+				diffs,
+			});
+		}
+	}
+	return {
+		familySize: family.fixtures.length,
+		errors: family.errors,
+		mismatches,
+	};
 }
 
 module.exports = {
@@ -1099,4 +1198,6 @@ module.exports = {
 	snapshotProduct,
 	detectProductMutation,
 	exitCodeFromSummary,
+	matchGolden,
+	reportFixtureCoverage,
 };
