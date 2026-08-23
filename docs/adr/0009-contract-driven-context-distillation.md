@@ -222,3 +222,23 @@ distribution, `unknown`-block share, and mean sources-per-block (quality).
 **Implementation:** Complete — the ADR-0009 write path ships through `amber context request`,
 `ingest`, `verify`, `list`, `show`, `refresh`, `stats`, and `delete`; ADR-0010/0015 add the
 task-scoped `load` path and Required Artifact contract.
+
+---
+
+## Amendment (ADR-0019, 2026-08-23): Context Page as Core form of the Knowledge Record lifecycle
+
+Per the distributed-governance baseline (`docs/architecture/distributed-governance-baseline.md`)
+and ADR-0019, the Context Page defined in this ADR is the **Core form** of the broader Knowledge
+Record lifecycle. The Governed Knowledge Base bounded context (baseline §Bounded Contexts) owns
+Knowledge Record admission and lifecycle semantics — candidate, review, accepted, stale,
+refresh-required, superseded, and retired — and the Context Page is the repository-local
+implementation of the accepted and refresh-required states.
+
+This amendment does not change the Context Page schema, the `amber context` command surface, or
+the write-path loop defined above. It establishes that when the Governed Knowledge Base is
+implemented (Stage 4 per ADR-0019), its Knowledge Record lifecycle builds on the Context Page as
+the Core form, extending — not replacing — the existing `sources`/`blocks`/`assurance` structure
+with cross-repository discovery, provenance, and retirement semantics.
+
+The invariant traceability matrix (baseline row 9) directs this amendment: "Amend ADR-0009 to make
+Context Page the Core form of the broader Knowledge Record lifecycle."

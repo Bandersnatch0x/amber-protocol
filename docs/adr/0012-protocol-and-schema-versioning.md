@@ -114,3 +114,58 @@ modifying `required` arrays. Legacy artifacts in the wild are unaffected.
 - ADR-0011 (governance readiness dimensions)
 - ADR-0013 (governance-readiness computeConfidenceClasses)
 - ADR-0014 (governance-report integration)
+
+---
+
+## Amendment (ADR-0019, 2026-08-23): Distributed envelope, structural identity, version negotiation, compatibility/refusal, and projection versioning
+
+Per the distributed-governance baseline (`docs/architecture/distributed-governance-baseline.md`)
+and ADR-0019, this ADR is amended with the interchange contract for the Sync Runtime bounded
+context. The amendment adds five concerns:
+
+### A. Distributed envelope
+
+A new schema, `schemas/sync-envelope.schema.json`, defines the versioned, immutable interchange
+contract for transporting governed artifacts across Amber instances. An envelope wraps exactly one
+artifact with its content hash, structural identity, origin metadata, and optional conflict record.
+Envelopes never carry source code, secrets, agents, tools, or arbitrary files (baseline §Authority
+Boundaries, item 6; #158 user stories 19-20).
+
+### B. Structural identity
+
+A new schema, `schemas/structural-identity.schema.json`, defines the ownership-bearing identity
+contract that anchors an artifact to its origin tenant, repository, and generation. Structural
+identity is immutable within a generation; a fenced repository transfer starts a new generation
+and terminates old-tenant role and policy applicability (baseline §Deployment Profiles).
+
+### C. Version and capability negotiation
+
+The envelope carries a `versionNegotiation` block: `amberProtocolVersion`, `minCompatibleVersion`,
+and a `capabilities` array. This enables compatibility checks: an instance that cannot interpret
+the envelope's protocol version or lacks a declared capability must refuse the envelope rather
+than silently downgrading semantics (baseline invariant: "No hidden authority or execution";
+#158 user story 26: mixed-version tests).
+
+### D. Compatibility/refusal contract
+
+Refusal is explicit and recorded. A refused envelope produces a conflict record with
+`conflictType: "version-mismatch"` and `resolution: "pending"`. Conflicts are never silently
+overwritten (baseline invariant: "Conflict preservation and governed resolution"; #158 user
+stories 5, 17).
+
+### E. Projection versioning
+
+The ADR-0012 versioning fields (`amber_protocol_version`, `artifact_sequence`, `created_at`,
+`artifact_type`) are extended to projection artifacts. Three new optional fields are reserved for
+projection schemas (to be defined in Stage 4):
+
+- `projection_type` (string) — the projection kind (governance-graph, knowledge-base,
+visualization-workbench).
+- `projection_version` (integer) — the projection schema version.
+- `rebuild_checkpoint` (string) — the checkpoint anchor for deterministic rebuild.
+
+These fields are reserved now so that projection schemas defined in Stage 4 inherit the ADR-0012
+versioning surface without a breaking amendment. No projection code is built in Stage 1 (ADR-0019
+decision D5).
+
+The invariant traceability matrix (baseline rows 4, 5, 11) directs this amendment.
