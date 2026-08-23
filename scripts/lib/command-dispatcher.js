@@ -535,10 +535,96 @@ function handlePack(args) {
 }
 
 function handleProfile(args) {
-	if (args._?.[0] !== "inspect") {
-		return { result: unknownAction("profile", ["inspect"]) };
+	const action = args._?.[0];
+	if (action === "deployment") {
+		return handleDeploymentProfile(args);
+	}
+	if (action !== "inspect") {
+		return { result: unknownAction("profile", ["inspect", "deployment"]) };
 	}
 	return { result: inspectProjectProfile(args.file || "") };
+}
+
+function handleDeploymentProfile(args) {
+	const sub = args._?.[1];
+	const {
+		showDeploymentProfile,
+		resolveDeploymentProfile,
+		writeProfileFile,
+		validateDeploymentProfile,
+	} = require("./core/deployment-profile");
+	const target = args.target || ".";
+	if (sub === "show") {
+		const shown = showDeploymentProfile(target);
+		const exitCode = shown.errors.length > 0 ? 1 : 0;
+		return {
+			result: {
+				target,
+				text: JSON.stringify(shown, null, 2),
+				errors: shown.errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "set") {
+		const profile = args.profile;
+		if (!profile) {
+			return {
+				result: {
+					target,
+					text: "",
+					errors: [
+						"profile deployment set requires --profile <personal-node|team-hub|organization>",
+					],
+					warnings: [],
+				},
+				exitCode: 1,
+				bypassPrint: !args.json,
+			};
+		}
+		const written = writeProfileFile(target, profile);
+		const exitCode = written.errors.length > 0 ? 1 : 0;
+		return {
+			result: {
+				target,
+				text: written.errors.length > 0 ? "" : `Deployment profile set to ${profile}.`,
+				errors: written.errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "validate") {
+		const { valid, deploymentProfile, errors } = validateDeploymentProfile(target);
+		return {
+			result: {
+				target,
+				text: JSON.stringify({ valid, deploymentProfile }, null, 2),
+				errors: errors,
+				warnings: [],
+			},
+			exitCode: valid ? 0 : 1,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "resolve") {
+		const resolved = resolveDeploymentProfile(target);
+		const exitCode = resolved.errors.length > 0 ? 1 : 0;
+		return {
+			result: {
+				target,
+				text: JSON.stringify(resolved, null, 2),
+				errors: resolved.errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	return { result: unknownAction("profile deployment", ["show", "set", "validate", "resolve"]) };
 }
 
 function handleTask(args) {
