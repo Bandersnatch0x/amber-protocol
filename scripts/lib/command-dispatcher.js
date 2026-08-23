@@ -1299,6 +1299,96 @@ function handleSyncSession(args, targetRoot) {
 	};
 }
 
+function handleProjection(args) {
+	const targetRoot = resolveTarget(args);
+	const sub = args._?.[0];
+	const {
+		PROJECTION_TYPES,
+		rebuildProjection,
+		projectionStatus,
+	} = require("./core/projection-registry");
+	if (sub === "rebuild") {
+		const type = args.type;
+		if (!type || !PROJECTION_TYPES.includes(type)) {
+			return {
+				result: {
+					target: args.target,
+					text: "",
+					errors: [`projection rebuild requires --type <${PROJECTION_TYPES.join("|")}>`],
+					warnings: [],
+				},
+				exitCode: 1,
+				bypassPrint: !args.json,
+			};
+		}
+		// Default builder: derive a deterministic read-only summary from canonical pages.
+		const built = rebuildProjection(targetRoot, type, (state) => ({
+			projection: type,
+			canonicalPageCount: state.artifacts.length,
+			pages: state.artifacts.map((page) => ({
+				id: page.pageId || page.id,
+				title: page.title || "",
+			})),
+		}));
+		const exitCode = built.ok ? 0 : 1;
+		return {
+			result: {
+				target: args.target,
+				text: built.ok ? JSON.stringify(built.manifest, null, 2) : "",
+				errors: built.errors,
+				warnings: [],
+			},
+			exitCode,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "status") {
+		const type = args.type;
+		if (!type || !PROJECTION_TYPES.includes(type)) {
+			return {
+				result: {
+					target: args.target,
+					text: "",
+					errors: [`projection status requires --type <${PROJECTION_TYPES.join("|")}>`],
+					warnings: [],
+				},
+				exitCode: 1,
+				bypassPrint: !args.json,
+			};
+		}
+		const status = projectionStatus(targetRoot, type);
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify({ ok: status.ok, code: status.code, detail: status.detail }, null, 2),
+				errors: status.ok ? [] : [status.detail],
+				warnings: [],
+			},
+			exitCode: status.ok ? 0 : 1,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "list") {
+		const statuses = PROJECTION_TYPES.map((type) => {
+			const status = projectionStatus(targetRoot, type);
+			return { projectionType: type, ok: status.ok, code: status.code, detail: status.detail };
+		});
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify(statuses, null, 2),
+				errors: [],
+				warnings: [],
+			},
+			exitCode: 0,
+			bypassPrint: !args.json,
+		};
+	}
+	return {
+		result: unknownAction("projection", ["rebuild", "status", "list"]),
+	};
+}
+
 function handleExplain(args) {
 	const { explain } = require("./explain-command");
 	const r = explain(args);
@@ -1496,6 +1586,7 @@ const COMMAND_HANDLERS = {
 	workflow: handleWorkflow,
 	context: handleContext,
 	memory: handleMemory,
+	projection: handleProjection,
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);
