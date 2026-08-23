@@ -1,0 +1,117 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://amber-protocol.dev/schemas/fixture-family.manifest.schema.json",
+	"title": "Governance Fixture Family Manifest",
+	"description": "Canonical deterministic fixture for the governance-loop acceptance matrix. One fixture encodes the inputs and golden expected outcome for a single governance path on a fresh non-Amber target. The family is the set of all committed fixture files under tests/fixtures/governance/.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"schemaVersion",
+		"fixtureId",
+		"path",
+		"description",
+		"inputs",
+		"golden"
+	],
+	"properties": {
+		"schemaVersion": {
+			"type": "string",
+			"const": "1.0.0",
+			"description": "Manifest schema version. Bumped on breaking shape changes to the fixture family."
+		},
+		"fixtureId": {
+			"type": "string",
+			"pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+			"description": "Stable, kebab-case identifier for this fixture. Used as the acceptance-matrix row key."
+		},
+		"path": {
+			"type": "string",
+			"enum": ["success", "rejection", "verify-fail-recover", "cross-session-handoff"],
+			"description": "Governance Console path this fixture exercises."
+		},
+		"variant": {
+			"type": "string",
+			"enum": ["canonical", "adversarial"],
+			"description": "canonical = the happy-path shape; adversarial = a deliberately hostile variant of the same path. Defaults to canonical when absent."
+		},
+		"description": {
+			"type": "string",
+			"minLength": 1,
+			"description": "Human-readable summary of what this fixture proves."
+		},
+		"deploymentProfile": {
+			"type": "string",
+			"enum": ["personal-node", "team-hub", "organization"],
+			"description": "Deployment profile tracer this fixture targets. #160 requires the family to cover all three."
+		},
+		"inputs": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["targetSeed"],
+			"properties": {
+				"targetSeed": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["packageJson", "initialCommit"],
+					"properties": {
+						"packageJson": {
+							"type": "object",
+							"required": ["name", "version", "private", "scripts"],
+							"description": "The package.json written to the fresh target before amber init."
+						},
+						"initialCommit": {
+							"type": "boolean",
+							"description": "Whether the harness commits the seed files before init."
+						}
+					}
+				},
+				"featureId": {
+					"type": "string",
+					"description": "Feature id the fixture uses for plan/session. If omitted, the harness uses the seeded default."
+				},
+				"gateId": {
+					"type": "string",
+					"description": "The session gate the fixture approves. Defaults to user-approval-implement."
+				}
+			}
+		},
+		"golden": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["exitCode", "summary"],
+			"properties": {
+				"exitCode": {
+					"type": "integer",
+					"enum": [0, 1],
+					"description": "Expected runner exit code for this fixture."
+				},
+				"summary": {
+					"type": "object",
+					"description": "Expected subset of the runner summary object. Fields present here must match the runner output exactly; fields absent are not asserted.",
+					"properties": {
+						"successClosed": { "type": "boolean" },
+						"rejections": {
+							"type": "object",
+							"properties": {
+								"policyDeny": { "type": "boolean" },
+								"claimStrict": { "type": "boolean" },
+								"acceptNoEvidence": { "type": "boolean" },
+								"approveNeedsGate": { "type": "boolean" }
+							}
+						},
+						"verifyFailRecovered": { "type": "boolean" },
+						"crossSessionHandoff": { "type": "boolean" },
+						"highFindings": {
+							"type": "array",
+							"items": { "type": "string" }
+						}
+					}
+				},
+				"evidenceType": {
+					"type": "string",
+					"description": "Stable identifier for the evidence class this fixture produces (e.g. timeline-event, approval-record, ingest-record)."
+				}
+			}
+		}
+	}
+}
