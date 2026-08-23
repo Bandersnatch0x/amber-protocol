@@ -3,8 +3,9 @@
 **Ticket:** [在全新目标仓库验证 Amber 治理闭环](https://github.com/Bandersnatch0x/amber-protocol/issues/29)  
 **Map:** [验证 Amber 的运行闭环与实际价值](https://github.com/Bandersnatch0x/amber-protocol/issues/27)  
 **Product:** `amber-protocol@1.3.1`  
+**Standard command:** `npm run test:governance-loop`  
 **Runner:** `node scripts/demo/e2e-governance-loop-verify.js`  
-**Machine log:** [`e2e-governance-loop-verify.json`](./e2e-governance-loop-verify.json)  
+**Machine log (historical):** [`e2e-governance-loop-verify.json`](./e2e-governance-loop-verify.json)  
 **When:** 2026-07-10 (win32, Node v24.2.0)  
 **Constraint:** investigation only — product behavior not changed; temp targets only.
 
@@ -115,9 +116,10 @@ Cross-person continuity is achievable **if** someone runs `amber handoff` after 
 ## Reproduce
 
 ```bash
-# from amber-protocol product root
-node scripts/demo/e2e-governance-loop-verify.js
-# writes docs/quality/e2e-governance-loop-verify.json
+# from amber-protocol product root — standard verification command (#127)
+npm run test:governance-loop
+# optional: node scripts/demo/e2e-governance-loop-verify.js --output /tmp/loop.json
+# Exits non-zero on path regression. Does not write the product tree unless --output is set.
 
 # Or run the canonical manual dogfood ritual on a fresh target (as in #54):
 # 1. mkdir -p /tmp/target && cd /tmp/target && git init && ... (package.json with test)

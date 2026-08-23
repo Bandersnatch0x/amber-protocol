@@ -1252,6 +1252,20 @@ Blocking errors render with their stable code inline (`<message> [CODE] → fix:
 catalog is the single source of truth. `--markdown` writes a standalone reference file (don't point
 it at a doc with hand-written front-matter — it writes only the generated table).
 
+## Governance loop e2e
+
+The product-repo command that proves the isolated Console loop (success, rejection,
+verify-fail recovery, cross-session handoff) on a fresh non-Amber git target:
+
+```bash
+npm run test:governance-loop
+node scripts/demo/e2e-governance-loop-verify.js --output /tmp/loop.json
+```
+
+It is read-only against this repository. A regression or a leaked product-repo session
+exits non-zero. CI runs it on pull requests and as a nightly dispatch job. Details:
+[docs/quality/e2e-governance-loop-verify.md](quality/e2e-governance-loop-verify.md).
+
 ## Next Steps
 
 - Return to [Autonomous Mode Guide](AUTONOMOUS_MODE_GUIDE.md)

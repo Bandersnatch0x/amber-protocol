@@ -12,7 +12,10 @@
  *   D) cross-session handoff
  *
  * Read-only w.r.t. the product repo: only mutates a temp target.
- * Usage: node scripts/demo/e2e-governance-loop-verify.js
+ * Usage:
+ *   npm run test:governance-loop
+ *   node scripts/demo/e2e-governance-loop-verify.js [--output <json>] [--help]
+ * Exits non-zero on any path regression or product-repo mutation.
  */
 
 const fs = require("node:fs");
@@ -22,6 +25,109 @@ const { spawnSync } = require("node:child_process");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const AMBER = path.join(REPO_ROOT, "scripts", "amber.js");
+
+function parseRunnerArgs(argv) {
+	const parsed = { outputPath: null, help: false };
+	for (let index = 0; index < argv.length; index += 1) {
+		const token = argv[index];
+		if (token === "--help" || token === "-h") {
+			parsed.help = true;
+			continue;
+		}
+		if (token === "--output") {
+			parsed.outputPath = argv[index + 1] || null;
+			index += 1;
+			continue;
+		}
+		if (token.startsWith("--output=")) {
+			parsed.outputPath = token.slice("--output=".length);
+		}
+	}
+	return parsed;
+}
+
+function listSessionIds(root) {
+	const dir = path.join(root, ".amber", "sessions");
+	if (!fs.existsSync(dir)) return [];
+	return fs
+		.readdirSync(dir)
+		.filter((name) => {
+			try {
+				return fs.statSync(path.join(dir, name)).isDirectory();
+			} catch {
+				return false;
+			}
+		})
+		.sort();
+}
+
+function qualityLogMtime(root) {
+	const logPath = path.join(root, "docs", "quality", "e2e-governance-loop-verify.json");
+	if (!fs.existsSync(logPath)) return null;
+	return fs.statSync(logPath).mtimeMs;
+}
+
+function gitPorcelain(root) {
+	const res = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
+	if (res.status !== 0) return [];
+	return (res.stdout || "")
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.sort();
+}
+
+function snapshotProduct(root) {
+	return {
+		sessions: listSessionIds(root),
+		qualityLogMtime: qualityLogMtime(root),
+		porcelain: gitPorcelain(root),
+	};
+}
+
+function detectProductMutation(root, snap) {
+	const leakedSessions = listSessionIds(root).filter((id) => !(snap.sessions || []).includes(id));
+	const dirtyPaths = [];
+	const logPath = path.join(root, "docs", "quality", "e2e-governance-loop-verify.json");
+	const mtime = qualityLogMtime(root);
+	if (mtime != null && mtime !== snap.qualityLogMtime) {
+		dirtyPaths.push(path.relative(root, logPath) || logPath);
+	}
+	const before = new Set(snap.porcelain || []);
+	for (const line of gitPorcelain(root)) {
+		if (!before.has(line)) dirtyPaths.push(line);
+	}
+	return { leakedSessions, dirtyPaths };
+}
+
+function exitCodeFromSummary(summary) {
+	if (!summary || typeof summary !== "object") return 1;
+	const rejections = summary.rejections || {};
+	const rejectionsHold =
+		Boolean(rejections.policyDeny) &&
+		Boolean(rejections.claimStrict) &&
+		Boolean(rejections.acceptNoEvidence) &&
+		Boolean(rejections.approveNeedsGate);
+	if ((summary.highFindings || []).length > 0) return 1;
+	if (!summary.successClosed) return 1;
+	if (!rejectionsHold) return 1;
+	if (!summary.verifyFailRecovered) return 1;
+	if (!summary.crossSessionHandoff) return 1;
+	return 0;
+}
+
+function printRunnerHelp() {
+	console.log(
+		[
+			"Usage: npm run test:governance-loop",
+			"       node scripts/demo/e2e-governance-loop-verify.js [--output <json>] [--help]",
+			"",
+			"Runs the four Governance Console paths on a fresh non-Amber git target.",
+			"Exits non-zero on any path regression or product-repo mutation.",
+			"Does not write docs/quality unless --output is given.",
+		].join("\n"),
+	);
+}
 
 const results = {
 	meta: {
@@ -96,6 +202,16 @@ function ensurePlanReady(target, planRel) {
 			"## Resume Checkpoint\n\n- Resume Point: e2e\n- Blockers: none\n- Next Action: implement\n- Recovery Instructions: reopen plan\n\n",
 		);
 	}
+	// F027: gate/accept refuse `<fill:>` context-manifest placeholders.
+	c = c
+		.replace(
+			"- implement: <fill: knowledge-surface paths the implementer needs>",
+			"- implement: docs/wiki/engineering/verification.md",
+		)
+		.replace(
+			"- review: <fill: knowledge-surface paths the reviewer needs>",
+			"- review: docs/wiki/engineering/runbook.md",
+		);
 	fs.writeFileSync(planPath, c);
 }
 
@@ -318,6 +434,7 @@ function pathSuccess() {
 
 	const flAfter = JSON.parse(fs.readFileSync(path.join(target, "feature_list.json"), "utf8"));
 	const feature = flAfter.features.find((f) => f.id === featureId);
+	const completeCheckPassedAfterLiveHandoff = /status: pass/i.test(ccStrict.stdout);
 
 	const success = {
 		target,
@@ -333,9 +450,13 @@ function pathSuccess() {
 		nextRecommendsHandoff,
 		completeCheckFailedOnTemplateHandoff:
 			ccOnTemplate.exitCode !== 0 || /status: fail/i.test(ccOnTemplate.stdout),
-		completeCheckPassedAfterLiveHandoff: /status: pass/i.test(ccStrict.stdout),
+		completeCheckPassedAfterLiveHandoff,
 		isTemplateHandoffBeforeRegen: isTemplateHandoff,
-		closed: accept.exitCode === 0 && handoff.exitCode === 0 && (feature?.evidence?.length || 0) > 0,
+		closed:
+			accept.exitCode === 0 &&
+			handoff.exitCode === 0 &&
+			(feature?.evidence?.length || 0) > 0 &&
+			completeCheckPassedAfterLiveHandoff,
 		log,
 	};
 
@@ -556,7 +677,7 @@ function pathRejections() {
 	} else {
 		note(
 			"R4",
-			"medium",
+			"high",
 			"session approve without --gate did not require gate id (route may have single gate).",
 			approveNoGate,
 		);
@@ -908,7 +1029,8 @@ function summarize() {
 		verifyFailRecovered: Boolean(results.paths.verifyFailRecover?.recovered),
 		crossSessionHandoff: Boolean(
 			results.paths.crossSessionHandoff?.handoffUseful &&
-			results.paths.crossSessionHandoff?.session2Started,
+			results.paths.crossSessionHandoff?.session2Started &&
+			results.paths.crossSessionHandoff?.refuseResurrectCompleted,
 		),
 		highFindings: highs.map((f) => f.id),
 		infoFindings: infos.map((f) => f.id),
@@ -921,24 +1043,60 @@ function summarize() {
 	};
 }
 
-function main() {
+function main(argv = process.argv.slice(2)) {
+	const args = parseRunnerArgs(argv);
+	if (args.help) {
+		printRunnerHelp();
+		return 0;
+	}
+
+	results.paths = {};
+	results.findings = [];
+	results.meta.startedAt = new Date().toISOString();
+	delete results.summary;
+
 	console.log("Amber e2e governance-loop verify — fresh targets only");
+	const snap = snapshotProduct(REPO_ROOT);
 	pathSuccess();
 	pathRejections();
 	pathVerifyFailRecover();
 	pathCrossSessionHandoff();
 	summarize();
 
-	const outDir = path.join(REPO_ROOT, "docs", "quality");
-	fs.mkdirSync(outDir, { recursive: true });
-	const jsonPath = path.join(outDir, "e2e-governance-loop-verify.json");
-	fs.writeFileSync(jsonPath, JSON.stringify(results, null, 2) + "\n");
+	const mutation = detectProductMutation(REPO_ROOT, snap);
+	if (mutation.leakedSessions.length > 0 || mutation.dirtyPaths.length > 0) {
+		note(
+			"ISO1",
+			"high",
+			"Product repo mutated or sessions leaked under the product Amber Setup.",
+			mutation,
+		);
+		summarize();
+	}
+
+	if (args.outputPath) {
+		fs.mkdirSync(path.dirname(args.outputPath), { recursive: true });
+		fs.writeFileSync(args.outputPath, JSON.stringify(results, null, 2) + "\n");
+		console.log("Wrote", args.outputPath);
+	}
+
 	console.log(JSON.stringify(results.summary, null, 2));
-	console.log("Wrote", jsonPath);
+	const code = exitCodeFromSummary(results.summary);
 	if (results.summary.highFindings.length) {
 		console.log("High findings:", results.summary.highFindings.join(", "));
-		process.exitCode = 0; // investigation success even if product gaps found
 	}
+	process.exitCode = code;
+	return code;
 }
 
-main();
+if (require.main === module) {
+	main();
+}
+
+module.exports = {
+	main,
+	parseRunnerArgs,
+	snapshotProduct,
+	detectProductMutation,
+	exitCodeFromSummary,
+};
