@@ -1,0 +1,29 @@
+{
+	"schemaVersion": "1.0.0",
+	"fixtureId": "success-minimal",
+	"path": "success",
+	"variant": "canonical",
+	"description": "Minimal success path: init → plan → gate → session → verify-execute → approve → handoff → complete-check → complete → accept on a fresh non-Amber personal-node target. Proves the happy path closes with feature evidence.",
+	"deploymentProfile": "personal-node",
+	"inputs": {
+		"targetSeed": {
+			"packageJson": {
+				"name": "amber-e2e-target",
+				"version": "0.0.0",
+				"private": true,
+				"scripts": { "test": "node -e \"console.log('ok')\"" }
+			},
+			"initialCommit": true
+		},
+		"featureId": "F002",
+		"gateId": "user-approval-implement"
+	},
+	"golden": {
+		"exitCode": 0,
+		"summary": {
+			"successClosed": true,
+			"highFindings": []
+		},
+		"evidenceType": "timeline-event"
+	}
+}
