@@ -85,6 +85,8 @@ const FLAG_SPECS = {
 	"--query-tenant": { key: "queryTenant" },
 	"--action": { key: "action" },
 	"--entity": { key: "entity" },
+	"--kind": { key: "kind" },
+	"--sort": { key: "sort" },
 	"--envelope": { key: "envelope" },
 	"--paths": { key: "pathsVal", accumulate: "paths" },
 	"--path": { key: "path", accumulate: "paths" },

@@ -1562,8 +1562,97 @@ function handleProjection(args) {
 			bypassPrint: !args.json,
 		};
 	}
+	if (sub === "view") {
+		const { buildWorkbenchProjection, applyBounds } = require("./core/visualization-workbench");
+		const { recordReadReceipt } = require("./core/projection-receipts");
+		const kind = args.kind;
+		if (!kind) {
+			return {
+				result: {
+					target: args.target,
+					text: "",
+					errors: ["projection view requires --kind <temporal|timeline|relationship|mind-map>"],
+					warnings: [],
+				},
+				exitCode: 1,
+				bypassPrint: !args.json,
+			};
+		}
+		const projection = buildWorkbenchProjection(targetRoot, kind);
+		const items =
+			projection.entries || projection.events || projection.nodes || projection.pages || [];
+		const bounded = applyBounds(items, {
+			limit: args.limit ? Number(args.limit) : 50,
+			sortKey: args.sort || null,
+		});
+		const receipt = recordReadReceipt(targetRoot, {
+			scope: args.scope || "unscoped",
+			projectionType: `visualization-${kind}`,
+			resultHash: projection.sourceHash,
+		});
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify(
+					{
+						kind,
+						items: bounded.items,
+						truncated: bounded.truncated,
+						sourceHash: projection.sourceHash,
+						receiptId: receipt.receiptId,
+					},
+					null,
+					2,
+				),
+				errors: [],
+				warnings: [],
+			},
+			exitCode: 0,
+			bypassPrint: !args.json,
+		};
+	}
+	if (sub === "compare") {
+		const {
+			buildWorkbenchProjection,
+			compareProjections,
+		} = require("./core/visualization-workbench");
+		const kind = args.kind;
+		if (!kind) {
+			return {
+				result: {
+					target: args.target,
+					text: "",
+					errors: ["projection compare requires --kind <temporal|timeline|relationship|mind-map>"],
+					warnings: [],
+				},
+				exitCode: 1,
+				bypassPrint: !args.json,
+			};
+		}
+		const before = buildWorkbenchProjection(targetRoot, kind);
+		const after = buildWorkbenchProjection(targetRoot, kind);
+		const diff = compareProjections(before, after);
+		return {
+			result: {
+				target: args.target,
+				text: JSON.stringify(diff, null, 2),
+				errors: [],
+				warnings: [],
+			},
+			exitCode: 0,
+			bypassPrint: !args.json,
+		};
+	}
 	return {
-		result: unknownAction("projection", ["rebuild", "status", "list", "query", "receipt"]),
+		result: unknownAction("projection", [
+			"rebuild",
+			"status",
+			"list",
+			"query",
+			"receipt",
+			"view",
+			"compare",
+		]),
 	};
 }
 
