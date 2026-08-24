@@ -15,12 +15,7 @@ const {
 	listTransitions,
 	checkInvariantNonRegression,
 } = require("../../scripts/lib/core/phase-gates");
-
-function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-gate-${label}-`));
-	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
-	return dir;
-}
+const { mkTarget, addPage } = require("../helpers/harness");
 
 // ── Phase definitions ─────────────────────────────────────────
 

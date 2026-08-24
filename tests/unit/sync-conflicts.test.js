@@ -14,14 +14,7 @@ const {
 	replayEnvelopes,
 	applyEnvelope,
 } = require("../../scripts/lib/core/sync-conflicts");
-
-function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-conflict-${label}-`));
-	execSync("git init", { cwd: dir, encoding: "utf8" });
-	execSync('git config user.email "test@example.com"', { cwd: dir, encoding: "utf8" });
-	execSync('git config user.name "Test User"', { cwd: dir, encoding: "utf8" });
-	return dir;
-}
+const { mkTarget } = require("../helpers/harness");
 
 function writeArtifact(dir, relPath, content) {
 	const full = path.join(dir, relPath);
@@ -41,12 +34,12 @@ function makeEnvelope(dir, relPath, { hash = null, envelopeId = null } = {}) {
 // ── Conflict ledger ───────────────────────────────────────────
 
 test("conflictLedgerPath points at .amber/sync/conflicts.jsonl", () => {
-	const dir = mkTarget("path");
+	const dir = mkTarget("path", { git: true });
 	assert.ok(conflictLedgerPath(dir).endsWith(path.join(".amber", "sync", "conflicts.jsonl")));
 });
 
 test("recordConflict appends to the ledger (append-only)", () => {
-	const dir = mkTarget("record");
+	const dir = mkTarget("record", { git: true });
 	recordConflict(dir, {
 		conflictType: "concurrent-edit",
 		envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
@@ -63,12 +56,12 @@ test("recordConflict appends to the ledger (append-only)", () => {
 });
 
 test("listConflicts returns empty when no conflicts recorded", () => {
-	const dir = mkTarget("empty");
+	const dir = mkTarget("empty", { git: true });
 	assert.deepEqual(listConflicts(dir), []);
 });
 
 test("recordConflict preserves multiple entries (append-only, never overwrites)", () => {
-	const dir = mkTarget("multi");
+	const dir = mkTarget("multi", { git: true });
 	recordConflict(dir, {
 		conflictType: "concurrent-edit",
 		envelopeId: "11111111-1111-1111-1111-111111111111",
@@ -91,7 +84,7 @@ test("recordConflict preserves multiple entries (append-only, never overwrites)"
 // ── applyEnvelope (never silently overwrites) ────────────────
 
 test("applyEnvelope applies cleanly when the local artifact matches", () => {
-	const dir = mkTarget("apply-ok");
+	const dir = mkTarget("apply-ok", { git: true });
 	const content = "original content";
 	writeArtifact(dir, "docs/a.md", content);
 	const envelope = makeEnvelope(dir, "docs/a.md");
@@ -101,7 +94,7 @@ test("applyEnvelope applies cleanly when the local artifact matches", () => {
 });
 
 test("applyEnvelope records a conflict and refuses when the local hash differs", () => {
-	const dir = mkTarget("apply-conflict");
+	const dir = mkTarget("apply-conflict", { git: true });
 	writeArtifact(dir, "docs/a.md", "original");
 	const envelope = makeEnvelope(dir, "docs/a.md");
 	// Local content changes after enveloping → hash mismatch
@@ -123,7 +116,7 @@ test("applyEnvelope records a conflict and refuses when the local hash differs",
 });
 
 test("applyEnvelope records a conflict for an incompatible envelope", () => {
-	const dir = mkTarget("apply-incompat");
+	const dir = mkTarget("apply-incompat", { git: true });
 	writeArtifact(dir, "docs/a.md", "original");
 	const envelope = makeEnvelope(dir, "docs/a.md");
 	envelope.versionNegotiation = { minCompatibleVersion: "99.0.0", capabilities: [] };
@@ -137,7 +130,7 @@ test("applyEnvelope records a conflict for an incompatible envelope", () => {
 // ── replayEnvelopes (idempotent + bounded) ───────────────────
 
 test("replayEnvelopes is idempotent across repeated runs", () => {
-	const dir = mkTarget("replay");
+	const dir = mkTarget("replay", { git: true });
 	writeArtifact(dir, "docs/a.md", "stable");
 	const envelope = makeEnvelope(dir, "docs/a.md");
 	// write the envelope to disk as an incoming envelope
@@ -157,7 +150,7 @@ test("replayEnvelopes is idempotent across repeated runs", () => {
 });
 
 test("replayEnvelopes applies each envelope at most once", () => {
-	const dir = mkTarget("replay-once");
+	const dir = mkTarget("replay-once", { git: true });
 	writeArtifact(dir, "docs/a.md", "stable");
 	const envelope = makeEnvelope(dir, "docs/a.md");
 	const envDir = path.join(dir, ".amber", "sync", "envelopes");
@@ -174,7 +167,7 @@ test("replayEnvelopes applies each envelope at most once", () => {
 });
 
 test("replayEnvelopes refuses envelopes that would conflict", () => {
-	const dir = mkTarget("replay-conflict");
+	const dir = mkTarget("replay-conflict", { git: true });
 	writeArtifact(dir, "docs/a.md", "original");
 	const envelope = makeEnvelope(dir, "docs/a.md");
 	// local diverges after enveloping
@@ -193,7 +186,7 @@ test("replayEnvelopes refuses envelopes that would conflict", () => {
 });
 
 test("replayEnvelopes never transports source code paths", () => {
-	const dir = mkTarget("replay-safe");
+	const dir = mkTarget("replay-safe", { git: true });
 	// only .amber artifacts are enveloped; source files under src/ are not in the envelope surface
 	writeArtifact(dir, ".amber/context/pages/p1.json", '{"pageId":"p1"}');
 	const envelope = makeEnvelope(dir, ".amber/context/pages/p1.json");

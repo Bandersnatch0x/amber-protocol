@@ -18,26 +18,7 @@ const {
 	applyBounds,
 	compareProjections,
 } = require("../../scripts/lib/core/visualization-workbench");
-
-function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-viz-${label}-`));
-	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
-	return dir;
-}
-
-function addPage(dir, pageId, { title, sources = {}, createdAt = null } = {}) {
-	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
-	fs.writeFileSync(
-		path.join(dir, ".amber", "context", "pages", `${pageId}.json`),
-		JSON.stringify({
-			pageId,
-			title: title || pageId,
-			sources,
-			blocks: [],
-			createdAt: createdAt || `2026-08-0${pageId.slice(1)}T00:00:00Z`,
-		}),
-	);
-}
+const { mkTarget, addPage } = require("../helpers/harness");
 
 // ── Constants ─────────────────────────────────────────────────
 

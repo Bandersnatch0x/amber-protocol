@@ -16,21 +16,7 @@ const {
 	listReadReceipts,
 	verifyReceipt,
 } = require("../../scripts/lib/core/projection-receipts");
-
-function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-graph-${label}-`));
-	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
-	return dir;
-}
-
-function addPage(dir, pageId, { title, sources = {}, blocks = [] } = {}) {
-	const dirPath = path.join(dir, ".amber", "context", "pages");
-	fs.mkdirSync(dirPath, { recursive: true });
-	fs.writeFileSync(
-		path.join(dirPath, `${pageId}.json`),
-		JSON.stringify({ pageId, title: title || pageId, sources, blocks }),
-	);
-}
+const { mkTarget, addPage } = require("../helpers/harness");
 
 // ── buildGovernanceGraph ──────────────────────────────────────
 

@@ -22,20 +22,7 @@ const {
 	retireRecord,
 	queryKnowledge,
 } = require("../../scripts/lib/core/knowledge-base");
-
-function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-kb-${label}-`));
-	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
-	return dir;
-}
-
-function addPage(dir, pageId, { title, sources = {}, blocks = [] } = {}) {
-	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
-	fs.writeFileSync(
-		path.join(dir, ".amber", "context", "pages", `${pageId}.json`),
-		JSON.stringify({ pageId, title: title || pageId, sources, blocks }),
-	);
-}
+const { mkTarget, addPage } = require("../helpers/harness");
 
 function source() {
 	return { s1: { kind: "repo", ref: "a.md", rawHash: "sha256:" + "a".repeat(64) } };

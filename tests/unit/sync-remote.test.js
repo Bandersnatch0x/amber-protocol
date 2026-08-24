@@ -14,14 +14,7 @@ const {
 	envelopeFromArtifact,
 	validateEnvelope,
 } = require("../../scripts/lib/core/sync-remote");
-
-function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-sync-${label}-`));
-	execSync("git init", { cwd: dir, encoding: "utf8" });
-	execSync('git config user.email "test@example.com"', { cwd: dir, encoding: "utf8" });
-	execSync('git config user.name "Test User"', { cwd: dir, encoding: "utf8" });
-	return dir;
-}
+const { mkTarget } = require("../helpers/harness");
 
 function writeArtifact(dir, relPath, content) {
 	const full = path.join(dir, relPath);
@@ -144,7 +137,7 @@ test("validateEnvelope rejects an envelope with invalid hash format", () => {
 // ── envelopeFromArtifact ───────────────────────────────────────
 
 test("envelopeFromArtifact creates an envelope with a content hash", () => {
-	const dir = mkTarget("pack");
+	const dir = mkTarget("pack", { git: true });
 	writeArtifact(dir, "docs/note.md", "hello envelope");
 	const env = envelopeFromArtifact(dir, "context-page", "docs/note.md");
 	assert.equal(env.artifactType, "context-page");
@@ -156,14 +149,14 @@ test("envelopeFromArtifact creates an envelope with a content hash", () => {
 });
 
 test("envelopeFromArtifact throws for a missing artifact", () => {
-	const dir = mkTarget("missing");
+	const dir = mkTarget("missing", { git: true });
 	assert.throws(() => envelopeFromArtifact(dir, "context-page", "does-not-exist.md"), /not found/);
 });
 
 // ── packEnvelope / unpackEnvelope ─────────────────────────────
 
 test("packEnvelope writes an envelope to .amber/sync/", () => {
-	const dir = mkTarget("pack-write");
+	const dir = mkTarget("pack-write", { git: true });
 	writeArtifact(dir, "docs/note.md", "pack me");
 	const packed = packEnvelope(dir, "context-page", "docs/note.md");
 	assert.equal(packed.errors.length, 0);
@@ -180,7 +173,7 @@ test("packEnvelope writes an envelope to .amber/sync/", () => {
 });
 
 test("unpackEnvelope validates a locally-present artifact with matching hash", () => {
-	const dir = mkTarget("unpack");
+	const dir = mkTarget("unpack", { git: true });
 	const content = "artifact content 123";
 	writeArtifact(dir, "docs/source.md", content);
 	const packed = packEnvelope(dir, "context-page", "docs/source.md");
@@ -194,7 +187,7 @@ test("unpackEnvelope validates a locally-present artifact with matching hash", (
 });
 
 test("unpackEnvelope fails closed for an incompatible envelope", () => {
-	const dir = mkTarget("incompat");
+	const dir = mkTarget("incompat", { git: true });
 	writeArtifact(dir, "docs/source.md", "content");
 	const packed = packEnvelope(dir, "context-page", "docs/source.md");
 	// Corrupt the version negotiation to require a newer protocol
@@ -210,7 +203,7 @@ test("unpackEnvelope fails closed for an incompatible envelope", () => {
 });
 
 test("unpackEnvelope refuses when the artifact hash does not match", () => {
-	const dir = mkTarget("hash-mismatch");
+	const dir = mkTarget("hash-mismatch", { git: true });
 	writeArtifact(dir, "docs/source.md", "original");
 	const packed = packEnvelope(dir, "context-page", "docs/source.md");
 	// Corrupt the envelope hash
@@ -221,7 +214,7 @@ test("unpackEnvelope refuses when the artifact hash does not match", () => {
 });
 
 test("packEnvelope uses the deployment profile identity", () => {
-	const dir = mkTarget("profile");
+	const dir = mkTarget("profile", { git: true });
 	writeArtifact(dir, "docs/note.md", "x");
 	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
 	fs.writeFileSync(

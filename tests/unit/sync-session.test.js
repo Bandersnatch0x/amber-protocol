@@ -14,14 +14,7 @@ const {
 	pushEnvelopes,
 	pullEnvelopes,
 } = require("../../scripts/lib/core/sync-session");
-
-function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-session-${label}-`));
-	execSync("git init", { cwd: dir, encoding: "utf8" });
-	execSync('git config user.email "test@example.com"', { cwd: dir, encoding: "utf8" });
-	execSync('git config user.name "Test User"', { cwd: dir, encoding: "utf8" });
-	return dir;
-}
+const { mkTarget } = require("../helpers/harness");
 
 function writeArtifact(dir, relPath, content) {
 	const full = path.join(dir, relPath);
@@ -39,7 +32,7 @@ function initTarget(dir) {
 // ── createSyncSession ─────────────────────────────────────────
 
 test("createSyncSession returns a session record with a UUID and timestamps", () => {
-	const dir = mkTarget("create");
+	const dir = mkTarget("create", { git: true });
 	const session = createSyncSession(dir, "push");
 	assert.match(session.sessionId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
 	assert.equal(session.operation, "push");
@@ -50,14 +43,14 @@ test("createSyncSession returns a session record with a UUID and timestamps", ()
 // ── listEnvelopes ─────────────────────────────────────────────
 
 test("listEnvelopes returns empty for a target with no envelopes", () => {
-	const dir = mkTarget("empty");
+	const dir = mkTarget("empty", { git: true });
 	initTarget(dir);
 	const envelopes = listEnvelopes(dir);
 	assert.deepEqual(envelopes, []);
 });
 
 test("listEnvelopes returns packed envelopes", () => {
-	const dir = mkTarget("list");
+	const dir = mkTarget("list", { git: true });
 	initTarget(dir);
 	writeArtifact(dir, "docs/page.md", "# Page\n");
 	const { packEnvelope } = require("../../scripts/lib/core/sync-remote");
@@ -70,7 +63,7 @@ test("listEnvelopes returns packed envelopes", () => {
 // ── pushEnvelopes ─────────────────────────────────────────────
 
 test("pushEnvelopes commits envelopes when git is clean and remote exists", () => {
-	const dir = mkTarget("push");
+	const dir = mkTarget("push", { git: true });
 	initTarget(dir);
 	writeArtifact(dir, "docs/page.md", "# Page\n");
 	const { packEnvelope } = require("../../scripts/lib/core/sync-remote");
@@ -86,7 +79,7 @@ test("pushEnvelopes commits envelopes when git is clean and remote exists", () =
 });
 
 test("pushEnvelopes with no envelopes is a no-op", () => {
-	const dir = mkTarget("noop");
+	const dir = mkTarget("noop", { git: true });
 	initTarget(dir);
 	const result = pushEnvelopes(dir);
 	assert.equal(result.committed, 0);
@@ -96,7 +89,7 @@ test("pushEnvelopes with no envelopes is a no-op", () => {
 // ── pullEnvelopes ─────────────────────────────────────────────
 
 test("pullEnvelopes validates on-disk envelopes without errors", () => {
-	const dir = mkTarget("pull");
+	const dir = mkTarget("pull", { git: true });
 	initTarget(dir);
 	writeArtifact(dir, "docs/page.md", "# Page\n");
 	const { packEnvelope } = require("../../scripts/lib/core/sync-remote");
@@ -108,7 +101,7 @@ test("pullEnvelopes validates on-disk envelopes without errors", () => {
 });
 
 test("pullEnvelopes reports invalid envelopes as errors", () => {
-	const dir = mkTarget("pull-bad");
+	const dir = mkTarget("pull-bad", { git: true });
 	initTarget(dir);
 	const envDir = path.join(dir, ".amber", "sync", "envelopes");
 	fs.mkdirSync(envDir, { recursive: true });
@@ -122,7 +115,7 @@ test("pullEnvelopes reports invalid envelopes as errors", () => {
 // ── runSyncSession ────────────────────────────────────────────
 
 test("runSyncSession orchestrates pull → pack → push with a session record", () => {
-	const dir = mkTarget("session");
+	const dir = mkTarget("session", { git: true });
 	initTarget(dir);
 	writeArtifact(dir, "docs/page.md", "# Page\n");
 	const { packEnvelope } = require("../../scripts/lib/core/sync-remote");

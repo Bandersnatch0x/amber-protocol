@@ -13,12 +13,7 @@ const {
 	checkIsolation,
 	recordRetentionAction,
 } = require("../../scripts/lib/core/organization-audit");
-
-function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-org-${label}-`));
-	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
-	return dir;
-}
+const { mkTarget, addPage } = require("../helpers/harness");
 
 // ── Audit ledger ──────────────────────────────────────────────
 

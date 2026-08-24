@@ -14,12 +14,7 @@ const {
 	buildProjection,
 	validateProjectionManifest,
 } = require("../../scripts/lib/core/projection-registry");
-
-function mkTarget(label) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-proj-${label}-`));
-	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
-	return dir;
-}
+const { mkTarget, addPage } = require("../helpers/harness");
 
 // ── Constants ──────────────────────────────────────────────────
 

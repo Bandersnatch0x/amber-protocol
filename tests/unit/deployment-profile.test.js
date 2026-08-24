@@ -16,22 +16,9 @@ const {
 	validateDeploymentProfile,
 	showDeploymentProfile,
 } = require("../../scripts/lib/core/deployment-profile");
+const { mkTarget } = require("../helpers/harness");
 
 const PROFILE_FILE = ".amber/profile.json";
-
-function mkTarget(label, { git = true, profile = null } = {}) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-profile-${label}-`));
-	if (git) {
-		execSync("git init", { cwd: dir, encoding: "utf8" });
-		execSync('git config user.email "test@example.com"', { cwd: dir, encoding: "utf8" });
-		execSync('git config user.name "Test User"', { cwd: dir, encoding: "utf8" });
-	}
-	if (profile) {
-		fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
-		fs.writeFileSync(path.join(dir, PROFILE_FILE), JSON.stringify(profile, null, 2));
-	}
-	return dir;
-}
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -135,7 +122,7 @@ test("showDeploymentProfile returns profile + identity + source", () => {
 });
 
 test("showDeploymentProfile reflects the profile file and git identity", () => {
-	const dir = mkTarget("show-set", { profile: { deploymentProfile: "team-hub" } });
+	const dir = mkTarget("show-set", { git: true, profile: { deploymentProfile: "team-hub" } });
 	const shown = showDeploymentProfile(dir);
 	assert.equal(shown.deploymentProfile, "team-hub");
 	assert.equal(shown.identity.personId, "Test User <test@example.com>");
