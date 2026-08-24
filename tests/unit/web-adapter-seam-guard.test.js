@@ -38,45 +38,128 @@ function collectSourceFiles(dir, out = []) {
  * @param {string} source
  * @returns {string}
  */
+
+/**
+ * Blank comments (and regex literals / template interpolations) while
+ * preserving string literals and line structure. A small lexer, not a regex
+ * sweep: handles line/block comments, escaped quotes, nested template
+ * interpolation `${...}` (with its own strings), and regex literals — so the
+ * scan never trips on commented-out imports nor misses real ones, and does
+ * not need updating as comment styles evolve. Newlines survive, keeping the
+ * index → line mapping intact.
+ */
 function blankOutComments(source) {
 	const out = source.split("");
-	let i = 0;
 	const n = source.length;
+	const blank = (from, to) => {
+		for (let k = from; k < to && k < n; k += 1) {
+			if (source[k] !== "\n") out[k] = " ";
+		}
+	};
+
+	// Walk a quoted string (escapes respected); nothing is blanked.
+	const skipString = (start, quote) => {
+		let i = start + 1;
+		while (i < n) {
+			if (source[i] === "\\") {
+				i += 2;
+				continue;
+			}
+			if (source[i] === quote) return i + 1;
+			i += 1;
+		}
+		return n;
+	};
+
+	// Walk a template literal; interpolations `${...}` are blanked (they may
+	// contain quotes, comments, or nested templates).
+	const skipTemplate = (start) => {
+		let i = start + 1;
+		while (i < n) {
+			if (source[i] === "\\") {
+				i += 2;
+				continue;
+			}
+			if (source[i] === "`") return i + 1;
+			if (source[i] === "$" && source[i + 1] === "{") {
+				const exprStart = i;
+				let depth = 1;
+				i += 2;
+				while (i < n && depth > 0) {
+					if (source[i] === "`") {
+						i = skipTemplate(i);
+						continue;
+					}
+					if (source[i] === "'" || source[i] === '"') {
+						i = skipString(i, source[i]);
+						continue;
+					}
+					if (source[i] === "{") depth += 1;
+					else if (source[i] === "}") depth -= 1;
+					i += 1;
+				}
+				blank(exprStart, i);
+				continue;
+			}
+			i += 1;
+		}
+		return n;
+	};
+
+	// Regex-start heuristic: `/` begins a regex when the previous significant
+	// token cannot end an expression (operators, openers, or start of line).
+	const isRegexStart = (pos) => {
+		let prev = pos - 1;
+		while (prev >= 0 && /\s/.test(source[prev])) prev -= 1;
+		if (prev < 0) return true;
+		const c = source[prev];
+		if (/[A-Za-z0-9_$)\]'"]/.test(c)) return false;
+		return true;
+	};
+
+	const skipRegex = (start) => {
+		let i = start + 1;
+		let inClass = false;
+		while (i < n) {
+			if (source[i] === "\\") {
+				i += 2;
+				continue;
+			}
+			if (source[i] === "[") inClass = true;
+			else if (source[i] === "]") inClass = false;
+			else if (source[i] === "/" && !inClass) {
+				i += 1;
+				while (i < n && /[A-Za-z]/.test(source[i])) i += 1;
+				return i;
+			}
+			i += 1;
+		}
+		return n;
+	};
+
+	let i = 0;
 	while (i < n) {
 		const ch = source[i];
 		const next = source[i + 1];
 		if (ch === "/" && next === "/") {
-			while (i < n && source[i] !== "\n") {
-				out[i] = " ";
-				i += 1;
-			}
+			let j = i;
+			while (j < n && source[j] !== "\n") j += 1;
+			blank(i, j);
+			i = j;
 		} else if (ch === "/" && next === "*") {
-			out[i] = " ";
-			out[i + 1] = " ";
-			i += 2;
-			while (i < n && !(source[i] === "*" && source[i + 1] === "/")) {
-				if (source[i] !== "\n") out[i] = " ";
-				i += 1;
-			}
-			if (i < n) {
-				out[i] = " ";
-				out[i + 1] = " ";
-				i += 2;
-			}
-		} else if (ch === "'" || ch === '"' || ch === "`") {
-			const quote = ch;
-			i += 1;
-			while (i < n) {
-				if (source[i] === "\\") {
-					i += 2;
-					continue;
-				}
-				if (source[i] === quote) {
-					i += 1;
-					break;
-				}
-				i += 1;
-			}
+			let j = i + 2;
+			while (j < n && !(source[j] === "*" && source[j + 1] === "/")) j += 1;
+			j = Math.min(n, j + 2);
+			blank(i, j);
+			i = j;
+		} else if (ch === "'" || ch === '"') {
+			i = skipString(i, ch);
+		} else if (ch === "`") {
+			i = skipTemplate(i);
+		} else if (ch === "/" && isRegexStart(i)) {
+			const end = skipRegex(i);
+			blank(i, end);
+			i = end;
 		} else {
 			i += 1;
 		}
@@ -189,6 +272,30 @@ describe("seam guard detector (self-check against silent no-op scans)", () => {
 				"// mirrors scripts/lib/session-state-machine.js",
 				"/* deep require('../../scripts/lib/core/loop-policy.js') lives here */",
 				"const a = require('real-mod'); // trailing scripts/lib/core/audit.js note",
+			].join("\n"),
+		);
+		const specifiers = extractModuleSpecifiers(sample).map((s) => s.specifier);
+		assert.deepEqual(specifiers, ["real-mod"]);
+	});
+
+	it("lexer survives regex literals containing comment sequences", () => {
+		// a regex containing `//` and `/*` must not start a comment scan
+		const sample = blankOutComments(
+			[
+				"const re = /scripts\\/lib\\/\\/\\/deep\\.js/; // real comment",
+				"const a = require('real-mod');",
+			].join("\n"),
+		);
+		const specifiers = extractModuleSpecifiers(sample).map((s) => s.specifier);
+		assert.deepEqual(specifiers, ["real-mod"]);
+	});
+
+	it("lexer survives template literals with quoted interpolation", () => {
+		// quotes inside ${...} and comments inside the template must not escape
+		const sample = blankOutComments(
+			[
+				"const p = `path/${'deep'}/` + require('real-mod');",
+				"const t = `a ${x ? 'y' : 'z'} /* not a comment */ b`;",
 			].join("\n"),
 		);
 		const specifiers = extractModuleSpecifiers(sample).map((s) => s.specifier);
