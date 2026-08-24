@@ -1330,7 +1330,13 @@
 				"docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md",
 				"apps/web/src/routes/gates.render.test.tsx"
 			],
-			"updated": "2026-08-24"
+			"updated": "2026-08-24",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-25",
+				"surfaces": [],
+				"owner": "script"
+			}
 		}
 	]
 }
