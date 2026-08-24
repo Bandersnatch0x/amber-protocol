@@ -28,6 +28,7 @@ const {
 	acceptPlan,
 	readPlanField,
 } = require("./core/planning");
+const { resolveSessionFeature, readPlanFeature } = require("./core/feature-attribution");
 const { validateWiki } = require("./core/validators");
 const { exportOkfBundle } = require("./core/okf-export");
 const { inspectWorkflowPack, inspectWorkflowPackReadiness } = require("./core/workflow-packs");
@@ -526,36 +527,6 @@ function handleGate(args) {
 
 function handleReview(args) {
 	return { result: reviewPlan(args.target, args.plan) };
-}
-
-// A plan belongs to the feature named in its `Feature:` header, and a session
-// has a feature too. When accept is run with a session, the two must agree —
-// otherwise accepting would mark/append the WRONG feature (e.g. accept F001's
-// plan while completing an F002 session). These read-only helpers surface both
-// so handleAccept can validate before acceptPlan mutates feature_list.json.
-function resolveSessionFeature(targetRoot, sessionId) {
-	try {
-		const { resolveStateDirForRead } = require("./state-dir-resolver");
-		const { readSessionManifest } = require("./session-manifest");
-		const stateDir = resolveStateDirForRead(targetRoot, { quiet: true });
-		const loaded = readSessionManifest(path.join(stateDir, "sessions", sessionId));
-		if (!loaded || loaded.corrupt || !loaded.manifest) return null;
-		return loaded.manifest.feature || null;
-	} catch {
-		return null;
-	}
-}
-
-function readPlanFeature(targetRoot, planRelPath) {
-	if (!planRelPath) return null;
-	try {
-		const fs = require("node:fs");
-		const abs = path.resolve(targetRoot, planRelPath);
-		if (!fs.existsSync(abs)) return null;
-		return readPlanField(fs.readFileSync(abs, "utf8"), "Feature") || null;
-	} catch {
-		return null;
-	}
 }
 
 function handleAccept(args) {
