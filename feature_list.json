@@ -1334,7 +1334,7 @@
 			"learningWriteBack": {
 				"reviewed": true,
 				"date": "2026-08-25",
-				"surfaces": [],
+				"surfaces": ["docs/specs/sync-envelope-contract.md"],
 				"owner": "script"
 			}
 		}
