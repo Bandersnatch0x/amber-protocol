@@ -19,7 +19,6 @@ const crypto = require("node:crypto");
 const { sha256 } = require("./context-hash");
 const { readJSONL, appendJSONL } = require("./jsonl");
 const fs = require("node:fs");
-const path = require("node:path");
 const { statePathForCreate } = require("../state-dir-resolver");
 
 const RETENTION_ACTIONS = Object.freeze(["retain", "delete", "revoke"]);

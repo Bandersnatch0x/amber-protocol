@@ -29,7 +29,6 @@ const crypto = require("node:crypto");
 const { sha256 } = require("./context-hash");
 const { readJSONL, appendJSONL, foldJSONL } = require("./jsonl");
 const fs = require("node:fs");
-const path = require("node:path");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
 
 const KB_CORRUPT_CODE = "AMBER_E_KB_CORRUPT";

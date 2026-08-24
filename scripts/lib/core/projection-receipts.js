@@ -13,7 +13,6 @@
  */
 
 const crypto = require("node:crypto");
-const path = require("node:path");
 const { readJSONL, appendJSONL } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 

@@ -1,7 +1,6 @@
 "use strict";
 
 const fs = require("node:fs");
-const path = require("node:path");
 
 const { canonicalJson, sha256 } = require("./context-hash");
 const { resolvePathWithin } = require("./fs-utils");
