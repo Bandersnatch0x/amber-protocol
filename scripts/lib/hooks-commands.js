@@ -2,7 +2,7 @@
 
 // Extracted from command-dispatcher.js (architecture review #1).
 
-const { resolveTarget, unknownAction } = require("./command-helpers");
+const { unknownAction } = require("./command-helpers");
 
 function hooksBreadcrumbPlatform(args) {
 	const positional = Array.isArray(args._) ? args._ : [];
