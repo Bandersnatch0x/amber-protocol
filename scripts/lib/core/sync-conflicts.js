@@ -16,12 +16,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const {
-	validateEnvelope,
-	checkCompatibility,
-	hashFile,
-	resolveSyncArtifact,
-} = require("./sync-remote");
+const { admitEnvelope } = require("./sync-remote");
 const { readJSONL, appendJSONL } = require("./jsonl");
 
 const CONFLICT_TYPES = Object.freeze([
@@ -51,8 +46,11 @@ function appliedLedgerPath(cwd) {
 	return path.join(cwd, ".amber", "sync", "applied.jsonl");
 }
 
-function listAppliedEnvelopeIds(cwd) {
-	const ledgerPath = appliedLedgerPath(cwd);
+function refusedLedgerPath(cwd) {
+	return path.join(cwd, ".amber", "sync", "refused.jsonl");
+}
+
+function readLedgerIds(ledgerPath) {
 	if (!fs.existsSync(ledgerPath)) return new Set();
 	return new Set(
 		fs
@@ -70,11 +68,35 @@ function listAppliedEnvelopeIds(cwd) {
 	);
 }
 
+function listAppliedEnvelopeIds(cwd) {
+	return readLedgerIds(appliedLedgerPath(cwd));
+}
+
+function listRefusedEnvelopeIds(cwd) {
+	return readLedgerIds(refusedLedgerPath(cwd));
+}
+
 function markEnvelopeApplied(cwd, envelopeId) {
 	ensureSyncDir(cwd);
 	fs.appendFileSync(
 		appliedLedgerPath(cwd),
 		JSON.stringify({ envelopeId, appliedAt: new Date().toISOString() }) + "\n",
+		"utf8",
+	);
+}
+
+/**
+ * Track a semantically refused envelope for replay idempotency. A refused
+ * envelope is NEVER marked applied (F035 S3); this separate ledger is what
+ * keeps repeated replays from recording duplicate conflicts.
+ * @param {string} cwd - Repository root.
+ * @param {string} envelopeId - Envelope id.
+ */
+function markEnvelopeRefused(cwd, envelopeId) {
+	ensureSyncDir(cwd);
+	fs.appendFileSync(
+		refusedLedgerPath(cwd),
+		JSON.stringify({ envelopeId, refusedAt: new Date().toISOString() }) + "\n",
 		"utf8",
 	);
 }
@@ -112,55 +134,29 @@ function listConflicts(cwd) {
 }
 
 /**
- * Apply a single envelope: validate, compatibility-check, admit the artifact
- * path, hash-match. On hash mismatch or incompatibility, records a conflict
- * and refuses — the local artifact is never silently overwritten. An invalid
- * artifact path fails as invalid input: it is neither applied nor recorded as
- * a semantic conflict, and no outside file is ever read or hashed.
+ * Apply a single envelope through the shared admission pipeline
+ * (schema → path/type → protocol → tenant → repository → generation →
+ * content hash). Every semantic refusal is recorded as one pending
+ * conflict and never marks the envelope applied; invalid input (schema or
+ * path admission) is neither applied nor recorded as a semantic conflict,
+ * and no outside file is ever read or hashed.
  * @param {string} cwd - Repository root.
  * @param {object} envelope - The envelope to apply.
  * @returns {{ok: boolean, action: string, conflict: object|null, errors: string[]}}
  */
 function applyEnvelope(cwd, envelope) {
-	const validation = validateEnvelope(envelope);
-	if (!validation.valid) {
-		return { ok: false, action: "invalid", conflict: null, errors: validation.errors };
+	const admission = admitEnvelope(cwd, envelope);
+	if (admission.status === "invalid") {
+		return { ok: false, action: "invalid", conflict: null, errors: admission.errors };
 	}
-	const compat = checkCompatibility(envelope);
-	if (!compat.compatible) {
+	if (admission.status === "refused") {
 		const conflict = recordConflict(cwd, {
-			conflictType: "version-mismatch",
+			conflictType: admission.conflictType,
 			envelopeId: envelope.envelopeId,
-			artifactPath: envelope.artifactRef.path,
-			detail: compat.reasons.join("; "),
+			artifactPath: admission.artifactPath || envelope.artifactRef.path,
+			detail: admission.errors.join("; "),
 		}).record;
-		return { ok: false, action: "conflict", conflict, errors: compat.reasons };
-	}
-	let canonicalPath;
-	try {
-		canonicalPath = resolveSyncArtifact(cwd, envelope.artifactType, envelope.artifactRef.path);
-	} catch (err) {
-		return { ok: false, action: "invalid", conflict: null, errors: [err.message] };
-	}
-	const absPath = path.join(cwd, canonicalPath);
-	if (!fs.existsSync(absPath)) {
-		// artifact missing: nothing to overwrite, nothing to protect — treat as applied
-		return { ok: true, action: "applied", conflict: null, errors: [] };
-	}
-	const localHash = hashFile(absPath);
-	if (localHash !== envelope.artifactRef.hash) {
-		const conflict = recordConflict(cwd, {
-			conflictType: "concurrent-edit",
-			envelopeId: envelope.envelopeId,
-			artifactPath: canonicalPath,
-			detail: `local hash ${localHash} differs from envelope ${envelope.artifactRef.hash}; local artifact preserved`,
-		}).record;
-		return {
-			ok: false,
-			action: "conflict",
-			conflict,
-			errors: ["local artifact diverged from envelope; refusing to overwrite"],
-		};
+		return { ok: false, action: "conflict", conflict, errors: admission.errors };
 	}
 	return { ok: true, action: "applied", conflict: null, errors: [] };
 }
@@ -189,9 +185,15 @@ function replayEnvelopes(cwd) {
 	const conflicts = [];
 	const errors = [];
 	const alreadyApplied = listAppliedEnvelopeIds(cwd);
+	const alreadyRefused = listRefusedEnvelopeIds(cwd);
 	for (const envelope of envelopes) {
 		if (alreadyApplied.has(envelope.envelopeId)) {
 			// idempotent: already applied in a previous replay, skip
+			continue;
+		}
+		if (alreadyRefused.has(envelope.envelopeId)) {
+			// idempotent: already refused in a previous replay, skip — the
+			// conflict was recorded once and must not be duplicated
 			continue;
 		}
 		const result = applyEnvelope(cwd, envelope);
@@ -200,9 +202,10 @@ function replayEnvelopes(cwd) {
 			markEnvelopeApplied(cwd, envelope.envelopeId);
 		} else if (result.action === "conflict") {
 			conflicts.push(result.conflict);
-			// a conflict is terminal for this envelope in this replay pass —
-			// mark it handled so repeated replays do not duplicate the record
-			markEnvelopeApplied(cwd, envelope.envelopeId);
+			// a refused envelope is terminal in this replay pass — track it in
+			// the refused ledger so repeated replays do not duplicate the
+			// record, while it never counts as applied
+			markEnvelopeRefused(cwd, envelope.envelopeId);
 		} else {
 			errors.push(...result.errors);
 		}
@@ -215,11 +218,14 @@ module.exports = {
 	RESOLUTIONS,
 	ConflictError,
 	conflictLedgerPath,
+	refusedLedgerPath,
 	recordConflict,
 	listConflicts,
 	applyEnvelope,
 	replayEnvelopes,
 	appliedLedgerPath,
 	listAppliedEnvelopeIds,
+	listRefusedEnvelopeIds,
 	markEnvelopeApplied,
+	markEnvelopeRefused,
 };

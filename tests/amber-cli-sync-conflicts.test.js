@@ -136,6 +136,46 @@ test("sync session replay never overwrites local content on conflict", () => {
 	assert.equal(content, "# Diverged\n", "local content must be preserved on conflict");
 });
 
+test("sync session replay records an identity-mismatch conflict and applies nothing", () => {
+	const dir = mkTarget("identity");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
+	const p = runCli(
+		[
+			"sync",
+			"envelope",
+			"pack",
+			"--type",
+			"context-page",
+			"--artifact",
+			".amber/context/pages/page.json",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(p.status, 0, p.stderr);
+	// local identity moves to another tenant after the envelope was packed
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "identity.json"),
+		JSON.stringify({ tenantId: "team-a" }),
+	);
+
+	const r = runCli(["sync", "session", "replay", "--target", dir, "--json"], dir);
+	assert.equal(r.status, 0, r.stderr);
+	assert.match(JSON.parse(r.stdout).text, /Applied 0 envelope/);
+	assert.match(JSON.parse(r.stdout).text, /conflicts 1/);
+
+	const c = runCli(["sync", "session", "conflicts", "--target", dir, "--json"], dir);
+	assert.equal(c.status, 0, c.stderr);
+	const conflicts = payload(c);
+	assert.equal(conflicts.length, 1);
+	assert.equal(conflicts[0].conflictType, "identity-mismatch");
+	assert.equal(conflicts[0].resolution, "pending");
+});
+
 test("sync session unknown subcommand errors", () => {
 	const dir = mkTarget("unknown");
 	const r = runCli(["sync", "session", "bogus", "--target", dir, "--json"], dir);

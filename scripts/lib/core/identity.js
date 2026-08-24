@@ -12,6 +12,13 @@
  *   2. Infer Person from `git config user.name` + `user.email`.
  *   3. Fill remaining fields with deterministic defaults.
  *   4. Identity file wins over git inference for any field it declares.
+ *
+ * Repository identity (F035 S3) is stable across clones:
+ *   1. `.amber/identity.json` `repositoryId` (explicit governed override).
+ *   2. The normalized `remote.origin.url` (the same remote spells one
+ *      repository, whatever directory each clone lives in).
+ *   3. The deterministic bootstrap default.
+ * The repository directory name is NEVER the shared identity.
  */
 
 const fs = require("node:fs");
@@ -21,6 +28,7 @@ const { spawnSync } = require("node:child_process");
 const DEFAULT_TENANT_ID = "local";
 const DEFAULT_ORGANIZATION_ID = "personal";
 const DEFAULT_REPOSITORY_GENERATION = 0;
+const DEFAULT_REPOSITORY_ID = "local-repository";
 
 /**
  * Return the deterministic default identity (no git, no identity file).
@@ -31,6 +39,7 @@ function defaultIdentity() {
 		tenantId: DEFAULT_TENANT_ID,
 		organizationId: DEFAULT_ORGANIZATION_ID,
 		repositoryGeneration: DEFAULT_REPOSITORY_GENERATION,
+		repositoryId: DEFAULT_REPOSITORY_ID,
 		personId: null,
 		agentId: null,
 		source: "default",
@@ -95,6 +104,59 @@ function loadIdentityFile(cwd) {
 }
 
 /**
+ * Normalize a git remote URL to one stable repository identity string.
+ * ssh scp (`git@host:path`), https, credentialed, and `.git`-suffixed
+ * spellings of the same remote collapse to the same value; Windows drive
+ * paths keep their shape (F035 S3).
+ * @param {string} url - Raw remote URL.
+ * @returns {string} Normalized repository identity string.
+ */
+function normalizeRemoteUrl(url) {
+	let u = String(url || "").trim();
+	if (!u) return "";
+	// strip scheme (https://, ssh://, git://, ...)
+	u = u.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, "");
+	// strip user[:pass]@ credentials before the first slash
+	u = u.replace(/^[^/@\s]+@/, "");
+	// scp-like `host:path` (path not starting with `/`, host not a lone drive
+	// letter) becomes `host/path`
+	const scp = /^([^/:]+):([^/].*)$/.exec(u);
+	if (scp && scp[1].length > 1) {
+		u = `${scp[1]}/${scp[2]}`;
+	}
+	u = u.replace(/\\/g, "/");
+	// lowercase the host segment (empty for plain absolute paths)
+	const slash = u.indexOf("/");
+	if (slash > 0) {
+		u = u.slice(0, slash).toLowerCase() + u.slice(slash);
+	} else if (slash !== 0) {
+		u = u.toLowerCase();
+	}
+	u = u.replace(/\/+$/, "");
+	if (u.endsWith(".git")) u = u.slice(0, -4);
+	return u;
+}
+
+/**
+ * Derive the repository identity from the governed bootstrap rules.
+ * @param {string} cwd - Repository root.
+ * @param {object|null} file - Parsed identity file, when present.
+ * @returns {string} Stable repositoryId.
+ */
+function resolveRepositoryId(cwd, file = null) {
+	if (file && typeof file.repositoryId === "string" && file.repositoryId) {
+		return file.repositoryId;
+	}
+	if (fs.existsSync(path.join(cwd, ".git"))) {
+		const remote = gitConfig(cwd, "remote.origin.url");
+		if (remote) {
+			return normalizeRemoteUrl(remote);
+		}
+	}
+	return DEFAULT_REPOSITORY_ID;
+}
+
+/**
  * Resolve identity using the hybrid strategy (ADR-0019 D4).
  *
  * @param {string} cwd - Repository root.
@@ -116,6 +178,9 @@ function resolveIdentity(cwd) {
 		result.personId = git.personId;
 	}
 	result.agentId = git.agentId;
+
+	// Repository identity: governed override > git remote > bootstrap default
+	result.repositoryId = resolveRepositoryId(cwd, file);
 
 	// Apply identity file overrides
 	if (hasFile) {
@@ -154,9 +219,12 @@ module.exports = {
 	DEFAULT_TENANT_ID,
 	DEFAULT_ORGANIZATION_ID,
 	DEFAULT_REPOSITORY_GENERATION,
+	DEFAULT_REPOSITORY_ID,
 	defaultIdentity,
 	gitConfig,
 	inferFromGit,
 	loadIdentityFile,
+	normalizeRemoteUrl,
+	resolveRepositoryId,
 	resolveIdentity,
 };

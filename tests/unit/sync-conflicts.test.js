@@ -11,6 +11,8 @@ const {
 	conflictLedgerPath,
 	replayEnvelopes,
 	applyEnvelope,
+	listAppliedEnvelopeIds,
+	listRefusedEnvelopeIds,
 } = require("../../scripts/lib/core/sync-conflicts");
 const { mkTarget } = require("../helpers/harness");
 
@@ -198,6 +200,96 @@ test("replayEnvelopes never transports source code paths", () => {
 	writeArtifact(dir, ".amber/context/pages/p1.json", '{"pageId":"p1"}');
 	const envelope = makeEnvelope(dir, ".amber/context/pages/p1.json");
 	assert.ok(envelope.artifactRef.path.startsWith(".amber"), "only .amber artifacts enveloped");
+});
+
+// ── F035 S3: identity admission + conflict classification ──────
+
+function persistEnvelope(dir, envelope) {
+	const envDir = path.join(dir, ".amber", "sync", "envelopes");
+	fs.mkdirSync(envDir, { recursive: true });
+	fs.writeFileSync(
+		path.join(envDir, `${envelope.envelopeId}.json`),
+		JSON.stringify(envelope, null, 2),
+	);
+}
+
+test("applyEnvelope records identity-mismatch for a foreign tenant", () => {
+	const dir = mkTarget("apply-tenant", { git: true });
+	writeArtifact(dir, PAGE, "original");
+	const envelope = makeEnvelope(dir, PAGE);
+	envelope.structuralIdentity.tenantId = "team-a";
+
+	const result = applyEnvelope(dir, envelope);
+	assert.equal(result.ok, false);
+	assert.equal(result.action, "conflict");
+	assert.equal(result.conflict.conflictType, "identity-mismatch");
+	assert.equal(result.conflict.resolution, "pending");
+	assert.equal(listConflicts(dir).length, 1);
+	assert.equal(
+		fs.readFileSync(path.join(dir, PAGE), "utf8"),
+		"original",
+		"local content is never touched",
+	);
+});
+
+test("applyEnvelope records identity-mismatch for a foreign repository", () => {
+	const dir = mkTarget("apply-repo", { git: true });
+	writeArtifact(dir, PAGE, "original");
+	const envelope = makeEnvelope(dir, PAGE);
+	envelope.structuralIdentity.repositoryId = "another-repo";
+
+	const result = applyEnvelope(dir, envelope);
+	assert.equal(result.action, "conflict");
+	assert.equal(result.conflict.conflictType, "identity-mismatch");
+});
+
+test("applyEnvelope records generation-mismatch for a divergent generation", () => {
+	const dir = mkTarget("apply-gen", { git: true });
+	writeArtifact(dir, PAGE, "original");
+	const envelope = makeEnvelope(dir, PAGE);
+	envelope.structuralIdentity.repositoryGeneration = 3;
+
+	const result = applyEnvelope(dir, envelope);
+	assert.equal(result.action, "conflict");
+	assert.equal(result.conflict.conflictType, "generation-mismatch");
+});
+
+test("a refused envelope is never marked applied", () => {
+	const dir = mkTarget("refused-ledger", { git: true });
+	writeArtifact(dir, PAGE, "original");
+	const envelope = makeEnvelope(dir, PAGE);
+	envelope.structuralIdentity.tenantId = "team-a";
+	persistEnvelope(dir, envelope);
+
+	const result = replayEnvelopes(dir);
+	assert.equal(result.applied, 0);
+	assert.equal(result.conflicts.length, 1);
+	assert.equal(listConflicts(dir).length, 1);
+	assert.equal(
+		listAppliedEnvelopeIds(dir).has(envelope.envelopeId),
+		false,
+		"a refused envelope must never enter the applied ledger",
+	);
+	assert.equal(
+		listRefusedEnvelopeIds(dir).has(envelope.envelopeId),
+		true,
+		"a refused envelope is tracked in the refused ledger",
+	);
+});
+
+test("replaying a refused envelope twice records exactly one conflict", () => {
+	const dir = mkTarget("refused-idem", { git: true });
+	writeArtifact(dir, PAGE, "original");
+	const envelope = makeEnvelope(dir, PAGE);
+	envelope.structuralIdentity.repositoryGeneration = 7;
+	persistEnvelope(dir, envelope);
+
+	const first = replayEnvelopes(dir);
+	const second = replayEnvelopes(dir);
+	assert.equal(first.applied, 0);
+	assert.equal(second.applied, 0);
+	assert.equal(second.conflicts.length, 0, "second replay adds no new conflict");
+	assert.equal(listConflicts(dir).length, 1, "conflict recorded exactly once");
 });
 
 // ── F035 S1: conflict application admission ───────────────────

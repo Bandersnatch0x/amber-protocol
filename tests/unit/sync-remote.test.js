@@ -3,7 +3,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
 const {
 	checkCompatibility,
@@ -12,6 +14,7 @@ const {
 	envelopeFromArtifact,
 	validateEnvelope,
 	resolveSyncArtifact,
+	admitEnvelope,
 	ARTIFACT_PATH_REGISTRY,
 } = require("../../scripts/lib/core/sync-remote");
 const { mkTarget } = require("../helpers/harness");
@@ -516,5 +519,133 @@ test("unpackEnvelope refuses a valid type paired with an unrelated path", () => 
 	});
 	const unpacked = unpackEnvelope(dir, envelope);
 	assert.ok(unpacked.errors.length > 0, "type and canonical path family must both match");
+	assert.equal(unpacked.artifactPath, null);
+});
+
+// ── F035 S3: structural identity admission ─────────────────────
+
+const LOCAL_IDENTITY = {
+	tenantId: "local",
+	repositoryId: "local-repository",
+	repositoryGeneration: 0,
+};
+
+test("admitEnvelope admits an envelope matching the local structural identity", () => {
+	const dir = mkTarget("admit-ok", { git: true });
+	writeArtifact(dir, PAGE, "content");
+	const packed = packEnvelope(dir, "context-page", PAGE);
+
+	const admission = admitEnvelope(dir, packed.envelope);
+	assert.equal(admission.status, "admitted");
+	assert.equal(admission.conflictType, null);
+	assert.equal(admission.artifactPath, PAGE);
+	assert.deepEqual(admission.errors, []);
+});
+
+test("admitEnvelope refuses a tenant mismatch as identity-mismatch before reading content", () => {
+	const dir = mkTarget("admit-tenant", { git: true });
+	writeArtifact(dir, PAGE, "content");
+	// Wrong hash AND wrong tenant: only the identity-before-hash ordering can
+	// surface identity-mismatch here.
+	const envelope = validEnvelope({
+		structuralIdentity: { ...LOCAL_IDENTITY, tenantId: "team-a" },
+		artifactRef: { path: PAGE, hash: "sha256:" + "b".repeat(64) },
+	});
+	const admission = admitEnvelope(dir, envelope);
+	assert.equal(admission.status, "refused");
+	assert.equal(admission.conflictType, "identity-mismatch");
+	assert.ok(admission.errors.some((e) => e.includes("tenant")));
+});
+
+test("admitEnvelope refuses a repository mismatch as identity-mismatch", () => {
+	const dir = mkTarget("admit-repo", { git: true });
+	writeArtifact(dir, PAGE, "content");
+	const envelope = validEnvelope({
+		structuralIdentity: { ...LOCAL_IDENTITY, repositoryId: "someone-elses-repo" },
+	});
+	const admission = admitEnvelope(dir, envelope);
+	assert.equal(admission.status, "refused");
+	assert.equal(admission.conflictType, "identity-mismatch");
+	assert.ok(admission.errors.some((e) => e.includes("repository")));
+});
+
+test("admitEnvelope refuses a generation mismatch as generation-mismatch", () => {
+	const dir = mkTarget("admit-gen", { git: true });
+	writeArtifact(dir, PAGE, "content");
+	const envelope = validEnvelope({
+		structuralIdentity: { ...LOCAL_IDENTITY, repositoryGeneration: 5 },
+	});
+	const admission = admitEnvelope(dir, envelope);
+	assert.equal(admission.status, "refused");
+	assert.equal(admission.conflictType, "generation-mismatch");
+	assert.ok(admission.errors.some((e) => e.includes("generation")));
+});
+
+test("admitEnvelope refuses incompatible protocol as version-mismatch", () => {
+	const dir = mkTarget("admit-version", { git: true });
+	writeArtifact(dir, PAGE, "content");
+	const envelope = validEnvelope({
+		structuralIdentity: { ...LOCAL_IDENTITY },
+		versionNegotiation: {
+			amberProtocolVersion: "1.6.0",
+			minCompatibleVersion: "99.0.0",
+			capabilities: ["sync-envelope-v1"],
+		},
+	});
+	const admission = admitEnvelope(dir, envelope);
+	assert.equal(admission.status, "refused");
+	assert.equal(admission.conflictType, "version-mismatch");
+});
+
+test("admitEnvelope classifies a non-canonical path as invalid input, not a conflict", () => {
+	const dir = mkTarget("admit-path", { git: true });
+	writeArtifact(dir, "feature_list.json", "{}");
+	const envelope = validEnvelope({
+		structuralIdentity: { ...LOCAL_IDENTITY },
+		artifactType: "context-page",
+		artifactRef: { path: "feature_list.json", hash: "sha256:" + "a".repeat(64) },
+	});
+	const admission = admitEnvelope(dir, envelope);
+	assert.equal(admission.status, "invalid");
+	assert.equal(admission.conflictType, null);
+	assert.equal(admission.artifactPath, null);
+});
+
+test("envelopeFromArtifact stamps the governed repositoryId, never the directory name", () => {
+	const dir = mkTarget("repo-id", { git: true });
+	writeArtifact(dir, PAGE, "content");
+	const packed = packEnvelope(dir, "context-page", PAGE);
+	assert.equal(packed.envelope.structuralIdentity.repositoryId, "local-repository");
+	assert.notEqual(packed.envelope.structuralIdentity.repositoryId, path.basename(dir));
+});
+
+test("envelopeFromArtifact repositoryId is stable across clones of one remote", () => {
+	const base = fs.mkdtempSync(path.join(os.tmpdir(), "amber-admit-clones-"));
+	const bare = path.join(base, "hub.git");
+	spawnSync("git", ["init", "--bare", bare]);
+	const ids = [];
+	for (const name of ["clone-alpha", "clone-beta"]) {
+		const dir = path.join(base, name);
+		spawnSync("git", ["clone", bare, dir]);
+		spawnSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });
+		spawnSync("git", ["config", "user.name", "Test User"], { cwd: dir });
+		writeArtifact(dir, PAGE, "same content");
+		const packed = packEnvelope(dir, "context-page", PAGE);
+		ids.push(packed.envelope.structuralIdentity.repositoryId);
+	}
+	assert.equal(ids[0], ids[1], "clones of one remote must stamp one repositoryId");
+	assert.ok(!["clone-alpha", "clone-beta"].includes(ids[0]));
+});
+
+test("unpackEnvelope refuses a cross-tenant envelope", () => {
+	const dir = mkTarget("unpack-tenant", { git: true });
+	writeArtifact(dir, PAGE, "content");
+	const { hashFile } = require("../../scripts/lib/core/sync-remote");
+	const envelope = validEnvelope({
+		structuralIdentity: { ...LOCAL_IDENTITY, tenantId: "team-a" },
+		artifactRef: { path: PAGE, hash: hashFile(path.join(dir, PAGE)) },
+	});
+	const unpacked = unpackEnvelope(dir, envelope);
+	assert.ok(unpacked.errors.some((e) => e.includes("tenant")));
 	assert.equal(unpacked.artifactPath, null);
 });

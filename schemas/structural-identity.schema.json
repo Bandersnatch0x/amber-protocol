@@ -20,7 +20,7 @@
 		"repositoryId": {
 			"type": "string",
 			"minLength": 1,
-			"description": "Identifier of the repository. Typically the repository name or a deterministic hash of its path."
+			"description": "Identifier of the repository, stable across clones. Resolved by the governed identity contract: .amber/identity.json repositoryId override > normalized remote.origin.url > bootstrap default ('local-repository'). Never the repository directory name."
 		},
 		"repositoryGeneration": {
 			"type": "integer",

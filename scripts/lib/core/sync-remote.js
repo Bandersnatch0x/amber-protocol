@@ -289,7 +289,7 @@ function envelopeFromArtifact(cwd, artifactType, relPath) {
 		artifactRef: { path: canonicalPath, hash },
 		structuralIdentity: {
 			tenantId: identity.tenantId,
-			repositoryId: path.basename(cwd),
+			repositoryId: identity.repositoryId,
 			repositoryGeneration: identity.repositoryGeneration,
 		},
 		origin: {
@@ -329,40 +329,99 @@ function packEnvelope(cwd, artifactType, relPath) {
 }
 
 /**
- * Validate, compatibility-check, and materialize an incoming envelope. The
- * artifact path passes the same canonical admission as packing; an envelope
- * can never read or hash a file outside the selected repository or outside
- * its artifact type's canonical path family.
+ * The one envelope admission pipeline (F035). Fixed order:
+ * schema → artifact path/type → protocol → tenant → repository →
+ * generation → content hash. Identity is compared BEFORE any artifact
+ * content is read. Every semantic refusal carries its conflict type; only
+ * path/type/schema violations are invalid input (never a semantic conflict).
  * @param {string} cwd - Repository root.
- * @param {object} envelope - The envelope to unpack.
- * @returns {{artifactPath: string|null, errors: string[]}}
+ * @param {object} envelope - The envelope to admit.
+ * @returns {{status: "admitted"|"refused"|"invalid", conflictType: string|null, artifactPath: string|null, errors: string[]}}
  */
-function unpackEnvelope(cwd, envelope) {
+function admitEnvelope(cwd, envelope) {
 	const validation = validateEnvelope(envelope);
 	if (!validation.valid) {
-		return { artifactPath: null, errors: validation.errors };
-	}
-	const compat = checkCompatibility(envelope);
-	if (!compat.compatible) {
-		return { artifactPath: null, errors: compat.reasons };
+		return { status: "invalid", conflictType: null, artifactPath: null, errors: validation.errors };
 	}
 	let canonicalPath;
 	try {
 		canonicalPath = resolveSyncArtifact(cwd, envelope.artifactType, envelope.artifactRef.path);
 	} catch (err) {
-		return { artifactPath: null, errors: [err.message] };
+		return { status: "invalid", conflictType: null, artifactPath: null, errors: [err.message] };
 	}
-	const absPath = path.join(cwd, canonicalPath);
-	const actualHash = fs.existsSync(absPath) ? hashFile(absPath) : null;
-	if (actualHash !== null && actualHash !== envelope.artifactRef.hash) {
+	const compat = checkCompatibility(envelope);
+	if (!compat.compatible) {
 		return {
-			artifactPath: null,
+			status: "refused",
+			conflictType: "version-mismatch",
+			artifactPath: canonicalPath,
+			errors: compat.reasons,
+		};
+	}
+	const identity = resolveIdentity(cwd);
+	const incoming = envelope.structuralIdentity;
+	if (incoming.tenantId !== identity.tenantId) {
+		return {
+			status: "refused",
+			conflictType: "identity-mismatch",
+			artifactPath: canonicalPath,
 			errors: [
-				`artifact ${canonicalPath} hash mismatch: local ${actualHash}, envelope ${envelope.artifactRef.hash}`,
+				`envelope tenant "${incoming.tenantId}" does not match local tenant "${identity.tenantId}"`,
 			],
 		};
 	}
-	return { artifactPath: canonicalPath, errors: [] };
+	if (incoming.repositoryId !== identity.repositoryId) {
+		return {
+			status: "refused",
+			conflictType: "identity-mismatch",
+			artifactPath: canonicalPath,
+			errors: [
+				`envelope repository "${incoming.repositoryId}" does not match local repository "${identity.repositoryId}"`,
+			],
+		};
+	}
+	if (incoming.repositoryGeneration !== identity.repositoryGeneration) {
+		return {
+			status: "refused",
+			conflictType: "generation-mismatch",
+			artifactPath: canonicalPath,
+			errors: [
+				`envelope generation ${incoming.repositoryGeneration} does not match local generation ${identity.repositoryGeneration}`,
+			],
+		};
+	}
+	const absPath = path.join(cwd, canonicalPath);
+	if (fs.existsSync(absPath)) {
+		const localHash = hashFile(absPath);
+		if (localHash !== envelope.artifactRef.hash) {
+			return {
+				status: "refused",
+				conflictType: "concurrent-edit",
+				artifactPath: canonicalPath,
+				errors: [
+					`local hash ${localHash} differs from envelope ${envelope.artifactRef.hash}; local artifact preserved`,
+				],
+			};
+		}
+	}
+	return { status: "admitted", conflictType: null, artifactPath: canonicalPath, errors: [] };
+}
+
+/**
+ * Validate, compatibility-check, and admit an incoming envelope through the
+ * shared admission pipeline. An envelope can never read or hash a file
+ * outside the selected repository or outside its artifact type's canonical
+ * path family, and a foreign tenant/repository/generation is refused.
+ * @param {string} cwd - Repository root.
+ * @param {object} envelope - The envelope to unpack.
+ * @returns {{artifactPath: string|null, errors: string[]}}
+ */
+function unpackEnvelope(cwd, envelope) {
+	const admission = admitEnvelope(cwd, envelope);
+	if (admission.status !== "admitted") {
+		return { artifactPath: null, errors: admission.errors };
+	}
+	return { artifactPath: admission.artifactPath, errors: [] };
 }
 
 module.exports = {
@@ -376,6 +435,7 @@ module.exports = {
 	checkCompatibility,
 	validateEnvelope,
 	resolveSyncArtifact,
+	admitEnvelope,
 	envelopeFromArtifact,
 	packEnvelope,
 	unpackEnvelope,

@@ -12,6 +12,7 @@ const {
 	inferFromGit,
 	loadIdentityFile,
 	defaultIdentity,
+	normalizeRemoteUrl,
 } = require("../../scripts/lib/core/identity");
 
 function mkGitTarget(label) {
@@ -243,6 +244,7 @@ test("resolveIdentity returns a serializable object with all fields", () => {
 		"organizationId",
 		"personId",
 		"repositoryGeneration",
+		"repositoryId",
 		"source",
 		"tenantId",
 	]);
@@ -252,4 +254,64 @@ test("resolveIdentity source is one of: default, git-inference, identity-file, i
 	const dir = mkNoGitTarget("source-check");
 	const id = resolveIdentity(dir);
 	assert.ok(["default", "git-inference", "identity-file", "identity-file+git"].includes(id.source));
+});
+
+// ── repositoryId: stable across clones (F035 S3) ──────────────
+
+test("resolveIdentity resolves a repositoryId with the governed default when no remote and no identity file", () => {
+	const dir = mkGitTarget("repo-default");
+	const id = resolveIdentity(dir);
+	assert.equal(id.repositoryId, "local-repository");
+});
+
+test("resolveIdentity: identity file repositoryId override wins over git remote", () => {
+	const dir = mkGitTarget("repo-override");
+	execSync("git remote add origin git@github.com:acme/widget.git", { cwd: dir, encoding: "utf8" });
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "identity.json"),
+		JSON.stringify({ repositoryId: "governed-repo-id" }),
+	);
+	const id = resolveIdentity(dir);
+	assert.equal(id.repositoryId, "governed-repo-id");
+});
+
+test("resolveIdentity derives repositoryId from the git remote origin URL", () => {
+	const dir = mkGitTarget("repo-remote");
+	execSync("git remote add origin git@github.com:acme/widget.git", { cwd: dir, encoding: "utf8" });
+	const id = resolveIdentity(dir);
+	assert.equal(id.repositoryId, "github.com/acme/widget");
+});
+
+test("resolveIdentity repositoryId is stable across clones of the same remote", () => {
+	const base = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-clones-"));
+	const bare = path.join(base, "hub.git");
+	execSync(`git init --bare "${bare}"`, { encoding: "utf8" });
+	const first = path.join(base, "clone-alpha");
+	const second = path.join(base, "clone-beta");
+	for (const dir of [first, second]) {
+		execSync(`git clone "${bare}" "${dir}"`, { encoding: "utf8" });
+		execSync('git config user.email "test@example.com"', { cwd: dir, encoding: "utf8" });
+		execSync('git config user.name "Test User"', { cwd: dir, encoding: "utf8" });
+	}
+	const a = resolveIdentity(first);
+	const b = resolveIdentity(second);
+	assert.equal(a.repositoryId, b.repositoryId, "clones of one remote share one repositoryId");
+	assert.notEqual(a.repositoryId, path.basename(first));
+	assert.notEqual(a.repositoryId, path.basename(second));
+});
+
+// ── normalizeRemoteUrl ─────────────────────────────────────────
+
+test("normalizeRemoteUrl maps ssh scp, https, and credentialed spellings to one id", () => {
+	const expected = "github.com/acme/widget";
+	assert.equal(normalizeRemoteUrl("git@github.com:acme/widget.git"), expected);
+	assert.equal(normalizeRemoteUrl("https://github.com/acme/widget.git"), expected);
+	assert.equal(normalizeRemoteUrl("https://user:token@github.com/acme/widget.git"), expected);
+	assert.equal(normalizeRemoteUrl("ssh://git@github.com/acme/widget.git"), expected);
+});
+
+test("normalizeRemoteUrl keeps local absolute paths intact and strip-neutral", () => {
+	assert.equal(normalizeRemoteUrl("D:\\repos\\hub.git"), "d:/repos/hub");
+	assert.equal(normalizeRemoteUrl("D:/repos/hub.git/"), "d:/repos/hub");
 });
