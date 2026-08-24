@@ -825,6 +825,55 @@ test("functions: amber.fn.sessionEvidence summarizes a session read-only", () =>
 	assert.equal(byId.get(2).result.structuredContent.sessions[0].sessionId, sessionId);
 });
 
+test("functions: sessionEvidence falls back to the newest session by mtime", () => {
+	const target = tempTarget();
+	installTargetRoutes(target);
+	const startSession = (goal) =>
+		assertSessionStarted(
+			spawnSync(
+				process.execPath,
+				[
+					path.join(ROOT, "scripts", "amber.js"),
+					"session",
+					"start",
+					"--goal",
+					goal,
+					"--route",
+					"feature-standard",
+					"--confirm",
+					"--target",
+					target,
+				],
+				{ cwd: ROOT, encoding: "utf8" },
+			),
+		);
+
+	const older = startSession("fn probe older");
+	const newer = startSession("fn probe newer");
+	assert.notEqual(older, newer);
+
+	// Make the FIRST-created session the newest on disk so directory order and
+	// mtime order disagree; only an mtime-aware pick can get this right.
+	const future = new Date(Date.now() + 60_000);
+	fs.utimesSync(path.join(target, ".amber", "sessions", older), future, future);
+
+	const byId = rpc(
+		[
+			{
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: { name: "amber.fn.sessionEvidence", arguments: {} },
+			},
+		],
+		["--target", target],
+	);
+
+	const sessions = byId.get(1).result.structuredContent.sessions;
+	assert.equal(sessions.length, 1);
+	assert.equal(sessions[0].sessionId, older);
+});
+
 test("functions: schema-invalid session manifest fails closed", () => {
 	const target = tempTarget();
 	const sessionDir = path.join(target, ".amber", "sessions", "invalid");

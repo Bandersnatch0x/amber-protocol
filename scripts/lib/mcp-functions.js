@@ -67,8 +67,19 @@ function sessionEvidence(params, reader) {
 		if (!ids.includes(params.sessionId)) throw new Error(`session not found: ${params.sessionId}`);
 		ids = [params.sessionId];
 	} else {
-		ids.sort((a, b) => reader.mtime(path.join(sessions, b)) - reader.mtime(path.join(sessions, a)));
-		ids = ids.slice(0, 1);
+		// ponytail: only the newest session is returned, so take the max in one
+		// pass. sort() asks for mtime O(n log n) times and every call is a fresh
+		// resolve + statSync; at 10k sessions that dominated the whole request.
+		let newest = null;
+		let newestMtime = -Infinity;
+		for (const id of ids) {
+			const mtime = reader.mtime(path.join(sessions, id));
+			if (mtime > newestMtime) {
+				newestMtime = mtime;
+				newest = id;
+			}
+		}
+		ids = newest === null ? [] : [newest];
 	}
 	return { sessions: ids.map((id) => sessionSummary(reader, id)) };
 }
