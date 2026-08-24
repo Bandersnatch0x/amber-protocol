@@ -20,10 +20,12 @@ const { hashText } = require("./context-hash");
 const { resolveIdentity } = require("./identity");
 const { resolveDeploymentProfile } = require("./deployment-profile");
 const { resolvePathWithin, toPortablePath } = require("./fs-utils");
+const { validateSyncEnvelope } = require("./sync-envelope-contract");
 
 const SYNC_DIR = ".amber/sync";
 const ENVELOPES_DIR = path.join(SYNC_DIR, "envelopes");
 const ENVELOPE_SCHEMA_VERSION = "1.0.0";
+const SEMVER_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const LOCAL_CAPABILITIES = Object.freeze(["sync-envelope-v1", "structural-identity-v1"]);
 
 const ARTIFACT_TYPES = Object.freeze([
@@ -171,23 +173,42 @@ function hashFile(filePath) {
 
 /**
  * Check envelope version/capability compatibility against the local install.
+ * Fails closed: a malformed version, an unknown future producer major, a
+ * minimum above the local version, or a missing local capability all refuse
+ * the envelope (ADR-0012 §C).
  * @param {object} envelope - The envelope to check.
  * @param {{version?: string, capabilities?: string[]}} [local] - Local install metadata.
  * @returns {{compatible: boolean, reasons: string[]}}
  */
 function checkCompatibility(envelope, local = {}) {
-	const reasons = [];
-	const neg = envelope.versionNegotiation;
+	const neg = envelope && envelope.versionNegotiation;
 	if (!neg || typeof neg !== "object") {
 		return { compatible: false, reasons: ["envelope has no versionNegotiation block"] };
 	}
-	const localVersion =
-		local.version || require(path.join(__dirname, "..", "..", "..", "package.json")).version;
+	const reasons = [];
+	const producer = neg.amberProtocolVersion;
 	const minCompat = neg.minCompatibleVersion;
-	if (typeof minCompat === "string" && minCompat && compareVersions(localVersion, minCompat) < 0) {
-		reasons.push(
-			`envelope requires minCompatibleVersion ${minCompat}; local is ${localVersion} (silent downgrade refused)`,
-		);
+	const producerOk = typeof producer === "string" && SEMVER_PATTERN.test(producer);
+	const minCompatOk = typeof minCompat === "string" && SEMVER_PATTERN.test(minCompat);
+	if (!producerOk) {
+		reasons.push(`envelope declares malformed amberProtocolVersion ${JSON.stringify(producer)}`);
+	}
+	if (!minCompatOk) {
+		reasons.push(`envelope declares malformed minCompatibleVersion ${JSON.stringify(minCompat)}`);
+	}
+	if (producerOk && minCompatOk) {
+		const localVersion =
+			local.version || require(path.join(__dirname, "..", "..", "..", "package.json")).version;
+		if (majorVersion(producer) > majorVersion(localVersion)) {
+			reasons.push(
+				`envelope producer amberProtocolVersion ${producer} is a newer major than local ${localVersion}; unknown future protocol semantics are refused`,
+			);
+		}
+		if (compareVersions(localVersion, minCompat) < 0) {
+			reasons.push(
+				`envelope requires minCompatibleVersion ${minCompat}; local is ${localVersion} (silent downgrade refused)`,
+			);
+		}
 	}
 	const localCaps = new Set(local.capabilities || LOCAL_CAPABILITIES);
 	if (Array.isArray(neg.capabilities)) {
@@ -201,7 +222,17 @@ function checkCompatibility(envelope, local = {}) {
 }
 
 /**
- * Simple semver-ish comparison. Returns <0, 0, >0.
+ * Major component of a strict x.y.z version.
+ * @param {string} v - Version string.
+ * @returns {number}
+ */
+function majorVersion(v) {
+	return parseInt(v.split(".")[0], 10);
+}
+
+/**
+ * Simple semver-ish comparison. Returns <0, 0, >0. Both inputs must already
+ * match SEMVER_PATTERN.
  * @param {string} a - Version a.
  * @param {string} b - Version b.
  * @returns {number}
@@ -223,71 +254,14 @@ function compareVersions(a, b) {
 
 /**
  * Validate an envelope against the sync-envelope contract.
- * Structural checks mirror schemas/sync-envelope.schema.json without a runtime
- * AJV dependency.
+ * Delegates to the compiled schemas/sync-envelope.schema.json via the cached
+ * AJV adapter (scripts/lib/core/sync-envelope-contract.js) — the schema is
+ * the single source of structural truth.
  * @param {object} envelope - The envelope to validate.
  * @returns {{valid: boolean, errors: string[]}}
  */
 function validateEnvelope(envelope) {
-	const errors = [];
-	if (typeof envelope !== "object" || envelope === null || Array.isArray(envelope)) {
-		return { valid: false, errors: ["envelope must be an object"] };
-	}
-	for (const field of [
-		"schemaVersion",
-		"envelopeId",
-		"artifactType",
-		"artifactRef",
-		"structuralIdentity",
-		"origin",
-		"createdAt",
-	]) {
-		if (!(field in envelope)) {
-			errors.push(`missing required field "${field}"`);
-		}
-	}
-	if (envelope.schemaVersion && envelope.schemaVersion !== ENVELOPE_SCHEMA_VERSION) {
-		errors.push(
-			`unsupported schemaVersion "${envelope.schemaVersion}" (expected "${ENVELOPE_SCHEMA_VERSION}")`,
-		);
-	}
-	if (
-		envelope.envelopeId &&
-		!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(envelope.envelopeId)
-	) {
-		errors.push(`envelopeId "${envelope.envelopeId}" is not a UUID`);
-	}
-	if (envelope.artifactType && !ARTIFACT_TYPES.includes(envelope.artifactType)) {
-		errors.push(`artifactType "${envelope.artifactType}" is not a known artifact type`);
-	}
-	if (envelope.artifactRef) {
-		if (typeof envelope.artifactRef !== "object") {
-			errors.push("artifactRef must be an object");
-		} else {
-			if (
-				typeof envelope.artifactRef.hash !== "string" ||
-				!/^sha256:[0-9a-f]{64}$/.test(envelope.artifactRef.hash)
-			) {
-				errors.push("artifactRef.hash must be sha256:<64 hex>");
-			}
-			if (typeof envelope.artifactRef.path !== "string" || envelope.artifactRef.path.length === 0) {
-				errors.push("artifactRef.path must be a non-empty string");
-			}
-		}
-	}
-	if (envelope.structuralIdentity) {
-		for (const field of ["tenantId", "repositoryId", "repositoryGeneration"]) {
-			if (!(field in envelope.structuralIdentity)) {
-				errors.push(`structuralIdentity missing "${field}"`);
-			}
-		}
-	}
-	if (envelope.origin) {
-		if (!["personal-node", "team-hub", "organization"].includes(envelope.origin.profile)) {
-			errors.push(`origin.profile "${envelope.origin.profile}" is not a known profile`);
-		}
-	}
-	return { valid: errors.length === 0, errors };
+	return validateSyncEnvelope(envelope);
 }
 
 /**

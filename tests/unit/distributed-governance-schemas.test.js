@@ -94,6 +94,11 @@ function validateAgainstSchema(instance, schema, label) {
 
 const envelopeSchema = loadSchema("sync-envelope.schema.json");
 const identitySchema = loadSchema("structural-identity.schema.json");
+const { envelopeFixture, structuralMatrix } = require("../helpers/sync-envelope-fixtures");
+
+function loadAdapter() {
+	return require("../../scripts/lib/core/sync-envelope-contract");
+}
 
 // ── Sync Envelope ──────────────────────────────────────────────
 
@@ -103,7 +108,7 @@ test("sync-envelope.schema.json exists and is valid JSON", () => {
 	assert.equal(envelopeSchema.additionalProperties, false);
 });
 
-test("sync-envelope schema requires the 7 core fields", () => {
+test("sync-envelope schema requires the 8 core fields", () => {
 	const required = envelopeSchema.required;
 	assert.deepEqual(required.sort(), [
 		"artifactRef",
@@ -113,86 +118,63 @@ test("sync-envelope schema requires the 7 core fields", () => {
 		"origin",
 		"schemaVersion",
 		"structuralIdentity",
+		"versionNegotiation",
 	]);
 });
 
+test("versionNegotiation requires every negotiation field", () => {
+	const neg = envelopeSchema.properties.versionNegotiation;
+	assert.ok(neg, "versionNegotiation property must exist");
+	assert.deepEqual((neg.required || []).sort(), [
+		"amberProtocolVersion",
+		"capabilities",
+		"minCompatibleVersion",
+	]);
+});
+
+test("versionNegotiation versions are constrained to semantic versions", () => {
+	const neg = envelopeSchema.properties.versionNegotiation;
+	assert.ok(
+		typeof neg.properties.amberProtocolVersion.pattern === "string",
+		"amberProtocolVersion must carry a semver pattern",
+	);
+	assert.ok(
+		typeof neg.properties.minCompatibleVersion.pattern === "string",
+		"minCompatibleVersion must carry a semver pattern",
+	);
+	assert.ok(
+		(neg.properties.capabilities.minItems || 0) >= 1,
+		"capabilities must declare at least one capability",
+	);
+});
+
 test("a valid sync envelope passes validation", () => {
-	const valid = {
-		schemaVersion: "1.0.0",
-		envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
-		artifactType: "timeline-event",
-		artifactRef: {
-			path: ".amber/sessions/abc/timeline.jsonl",
-			hash: "sha256:" + "a".repeat(64),
-		},
-		structuralIdentity: {
-			tenantId: "local",
-			repositoryId: "my-repo",
-			repositoryGeneration: 0,
-		},
-		origin: {
-			profile: "personal-node",
-		},
-		createdAt: "2026-08-23T12:00:00Z",
-	};
-	const errors = validateAgainstSchema(valid, envelopeSchema, "envelope");
+	const errors = validateAgainstSchema(envelopeFixture(), envelopeSchema, "envelope");
 	assert.deepEqual(errors, [], errors.join("\n"));
 });
 
 test("an envelope with an invalid artifactType fails validation", () => {
-	const invalid = {
-		schemaVersion: "1.0.0",
-		envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
-		artifactType: "not-a-real-type",
-		artifactRef: { path: "x", hash: "sha256:" + "a".repeat(64) },
-		structuralIdentity: { tenantId: "local", repositoryId: "r", repositoryGeneration: 0 },
-		origin: { profile: "personal-node" },
-		createdAt: "2026-08-23T12:00:00Z",
-	};
+	const invalid = envelopeFixture({ artifactType: "not-a-real-type" });
 	const errors = validateAgainstSchema(invalid, envelopeSchema, "envelope");
 	assert.ok(errors.some((e) => e.includes("not-a-real-type")));
 });
 
 test("an envelope with an invalid envelopeId (not a UUID) fails validation", () => {
-	const invalid = {
-		schemaVersion: "1.0.0",
-		envelopeId: "not-a-uuid",
-		artifactType: "timeline-event",
-		artifactRef: { path: "x", hash: "sha256:" + "a".repeat(64) },
-		structuralIdentity: { tenantId: "local", repositoryId: "r", repositoryGeneration: 0 },
-		origin: { profile: "personal-node" },
-		createdAt: "2026-08-23T12:00:00Z",
-	};
+	const invalid = envelopeFixture({ envelopeId: "not-a-uuid" });
 	const errors = validateAgainstSchema(invalid, envelopeSchema, "envelope");
 	assert.ok(errors.some((e) => e.includes("envelopeId")));
 });
 
 test("an envelope with an additional property fails validation", () => {
-	const invalid = {
-		schemaVersion: "1.0.0",
-		envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
-		artifactType: "timeline-event",
-		artifactRef: { path: "x", hash: "sha256:" + "a".repeat(64) },
-		structuralIdentity: { tenantId: "local", repositoryId: "r", repositoryGeneration: 0 },
-		origin: { profile: "personal-node" },
-		createdAt: "2026-08-23T12:00:00Z",
-		extraField: "should not be here",
-	};
+	const invalid = envelopeFixture();
+	invalid.extraField = "should not be here";
 	const errors = validateAgainstSchema(invalid, envelopeSchema, "envelope");
 	assert.ok(errors.some((e) => e.includes("extraField")));
 });
 
 test("envelope origin.profile accepts all three deployment profiles", () => {
 	for (const profile of ["personal-node", "team-hub", "organization"]) {
-		const valid = {
-			schemaVersion: "1.0.0",
-			envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
-			artifactType: "timeline-event",
-			artifactRef: { path: "x", hash: "sha256:" + "a".repeat(64) },
-			structuralIdentity: { tenantId: "local", repositoryId: "r", repositoryGeneration: 0 },
-			origin: { profile },
-			createdAt: "2026-08-23T12:00:00Z",
-		};
+		const valid = envelopeFixture({ origin: { profile } });
 		const errors = validateAgainstSchema(valid, envelopeSchema, "envelope");
 		assert.deepEqual(errors, [], `profile ${profile} should be valid`);
 	}
@@ -205,25 +187,44 @@ test("envelope conflictRecord is optional and accepts all conflict types", () =>
 		"version-mismatch",
 		"identity-mismatch",
 	]) {
-		const valid = {
-			schemaVersion: "1.0.0",
-			envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
-			artifactType: "timeline-event",
-			artifactRef: { path: "x", hash: "sha256:" + "a".repeat(64) },
-			structuralIdentity: { tenantId: "local", repositoryId: "r", repositoryGeneration: 0 },
-			origin: { profile: "personal-node" },
-			createdAt: "2026-08-23T12:00:00Z",
+		const valid = envelopeFixture({
 			conflictRecord: {
 				conflictType: ct,
 				remoteEnvelopeId: "01234567-89ab-cdef-0123-456789abcdef",
 				resolution: "pending",
 				recordedAt: "2026-08-23T12:00:00Z",
 			},
-		};
+		});
 		const errors = validateAgainstSchema(valid, envelopeSchema, "envelope");
 		assert.deepEqual(errors, [], `conflictType ${ct} should be valid`);
 	}
 });
+
+// ── F035 S2: runtime adapter is the schema SSOT ────────────────
+// The cached AJV adapter compiles schemas/sync-envelope.schema.json itself,
+// so schema tests and runtime tests share one fixture matrix and cannot
+// drift apart again.
+
+test("sync-envelope-contract adapter is cached", () => {
+	const first = loadAdapter();
+	const second = loadAdapter();
+	assert.equal(first, second, "adapter module is require-cached");
+	assert.equal(typeof first.validateSyncEnvelope, "function");
+});
+
+for (const { name, envelope, expectValid, errorPattern } of structuralMatrix()) {
+	test(`adapter structural matrix: ${name}`, () => {
+		const { validateSyncEnvelope } = loadAdapter();
+		const result = validateSyncEnvelope(envelope);
+		assert.equal(result.valid, expectValid, JSON.stringify(result.errors));
+		if (!expectValid && errorPattern) {
+			assert.ok(
+				result.errors.some((e) => errorPattern.test(e)),
+				`expected an error matching ${errorPattern}, got: ${result.errors.join("; ")}`,
+			);
+		}
+	});
+}
 
 // ── Structural Identity ────────────────────────────────────────
 

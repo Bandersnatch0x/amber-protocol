@@ -11,7 +11,8 @@
 		"artifactRef",
 		"structuralIdentity",
 		"origin",
-		"createdAt"
+		"createdAt",
+		"versionNegotiation"
 	],
 	"additionalProperties": false,
 	"properties": {
@@ -112,21 +113,25 @@
 		},
 		"versionNegotiation": {
 			"type": "object",
+			"required": ["amberProtocolVersion", "minCompatibleVersion", "capabilities"],
 			"additionalProperties": false,
 			"properties": {
 				"amberProtocolVersion": {
 					"type": "string",
-					"description": "Amber package version that produced the wrapped artifact."
+					"pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+					"description": "Amber package version that produced the wrapped artifact. Strict x.y.z semantic version."
 				},
 				"minCompatibleVersion": {
 					"type": "string",
-					"description": "Minimum Amber version that can correctly interpret this envelope."
+					"pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+					"description": "Minimum Amber version that can correctly interpret this envelope. Strict x.y.z semantic version."
 				},
 				"capabilities": {
 					"type": "array",
+					"minItems": 1,
 					"items": { "type": "string" },
 					"uniqueItems": true,
-					"description": "Capabilities the source instance declares (e.g. 'sync-envelope-v1', 'structural-identity-v1')."
+					"description": "Capabilities the source instance declares (e.g. 'sync-envelope-v1', 'structural-identity-v1'). Every declared capability must be present on the receiving install."
 				}
 			},
 			"description": "Version and capability negotiation metadata. Enables compatibility checks and refusal of incompatible envelopes."

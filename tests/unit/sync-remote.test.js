@@ -15,6 +15,11 @@ const {
 	ARTIFACT_PATH_REGISTRY,
 } = require("../../scripts/lib/core/sync-remote");
 const { mkTarget } = require("../helpers/harness");
+const {
+	envelopeFixture,
+	structuralMatrix,
+	compatibilityMatrix,
+} = require("../helpers/sync-envelope-fixtures");
 
 const PAGE = ".amber/context/pages/note.json";
 
@@ -37,23 +42,7 @@ function trySymlink(target, linkPath, type = "file") {
 	}
 }
 
-function validEnvelope(overrides = {}) {
-	return {
-		schemaVersion: "1.0.0",
-		envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
-		artifactType: "context-page",
-		artifactRef: { path: PAGE, hash: "sha256:" + "a".repeat(64) },
-		structuralIdentity: { tenantId: "local", repositoryId: "r", repositoryGeneration: 0 },
-		origin: { profile: "personal-node" },
-		createdAt: "2026-08-23T12:00:00Z",
-		versionNegotiation: {
-			amberProtocolVersion: "1.6.0",
-			minCompatibleVersion: "1.0.0",
-			capabilities: ["sync-envelope-v1"],
-		},
-		...overrides,
-	};
-}
+const validEnvelope = envelopeFixture;
 
 // ── checkCompatibility ─────────────────────────────────────────
 
@@ -123,48 +112,70 @@ test("checkCompatibility accepts when capabilities are satisfied", () => {
 // ── validateEnvelope ───────────────────────────────────────────
 
 test("validateEnvelope accepts a well-formed envelope", () => {
-	const envelope = {
-		schemaVersion: "1.0.0",
-		envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
-		artifactType: "timeline-event",
-		artifactRef: { path: "x", hash: "sha256:" + "a".repeat(64) },
-		structuralIdentity: { tenantId: "local", repositoryId: "r", repositoryGeneration: 0 },
-		origin: { profile: "personal-node" },
-		createdAt: "2026-08-23T12:00:00Z",
-	};
-	const result = validateEnvelope(envelope);
+	const result = validateEnvelope(validEnvelope());
 	assert.equal(result.valid, true);
 	assert.deepEqual(result.errors, []);
 });
 
 test("validateEnvelope rejects an envelope missing structuralIdentity", () => {
-	const envelope = {
-		schemaVersion: "1.0.0",
-		envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
-		artifactType: "timeline-event",
-		artifactRef: { path: "x", hash: "sha256:" + "a".repeat(64) },
-		origin: { profile: "personal-node" },
-		createdAt: "2026-08-23T12:00:00Z",
-	};
+	const envelope = validEnvelope();
+	delete envelope.structuralIdentity;
 	const result = validateEnvelope(envelope);
 	assert.equal(result.valid, false);
 	assert.ok(result.errors.some((e) => e.includes("structuralIdentity")));
 });
 
 test("validateEnvelope rejects an envelope with invalid hash format", () => {
-	const envelope = {
-		schemaVersion: "1.0.0",
-		envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
-		artifactType: "timeline-event",
-		artifactRef: { path: "x", hash: "not-a-hash" },
-		structuralIdentity: { tenantId: "local", repositoryId: "r", repositoryGeneration: 0 },
-		origin: { profile: "personal-node" },
-		createdAt: "2026-08-23T12:00:00Z",
-	};
+	const envelope = validEnvelope({ artifactRef: { path: "x", hash: "not-a-hash" } });
 	const result = validateEnvelope(envelope);
 	assert.equal(result.valid, false);
 	assert.ok(result.errors.some((e) => e.includes("hash")));
 });
+
+// ── F035 S2: schema SSOT fixture matrix ────────────────────────
+// The runtime validator must accept/reject exactly what the compiled
+// schemas/sync-envelope.schema.json accepts/rejects (tests/helpers/
+// sync-envelope-fixtures.js is the single shared matrix).
+
+for (const { name, envelope, expectValid, errorPattern } of structuralMatrix()) {
+	test(`validateEnvelope structural matrix: ${name}`, () => {
+		const result = validateEnvelope(envelope);
+		assert.equal(result.valid, expectValid, JSON.stringify(result.errors));
+		if (!expectValid && errorPattern) {
+			assert.ok(
+				result.errors.some((e) => errorPattern.test(e)),
+				`expected an error matching ${errorPattern}, got: ${result.errors.join("; ")}`,
+			);
+		}
+	});
+}
+
+// ── F035 S2: protocol compatibility matrix ─────────────────────
+// Both the producer's amberProtocolVersion and the declared
+// minCompatibleVersion must be checked; unknown future producer majors and
+// malformed versions fail closed instead of being silently interpreted.
+
+for (const {
+	name,
+	versionNegotiation,
+	localVersion,
+	localCapabilities,
+	expectCompatible,
+	reasonPattern,
+} of compatibilityMatrix()) {
+	test(`checkCompatibility matrix: ${name}`, () => {
+		const local = { version: localVersion };
+		if (localCapabilities) local.capabilities = localCapabilities;
+		const result = checkCompatibility({ versionNegotiation }, local);
+		assert.equal(result.compatible, expectCompatible, JSON.stringify(result.reasons));
+		if (!expectCompatible && reasonPattern) {
+			assert.ok(
+				result.reasons.some((r) => reasonPattern.test(r)),
+				`expected a reason matching ${reasonPattern}, got: ${result.reasons.join("; ")}`,
+			);
+		}
+	});
+}
 
 // ── envelopeFromArtifact ───────────────────────────────────────
 

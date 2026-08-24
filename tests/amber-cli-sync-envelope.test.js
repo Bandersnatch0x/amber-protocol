@@ -133,6 +133,49 @@ test("sync envelope compat refuses an incompatible envelope", () => {
 	assert.equal(cpayload.compatible, false);
 });
 
+test("sync envelope compat refuses a future producer version with a low minimum", () => {
+	const dir = mkTarget("compfuture");
+	const { envelopeFixture } = require("./helpers/sync-envelope-fixtures");
+	const env = envelopeFixture({
+		versionNegotiation: {
+			amberProtocolVersion: "99.0.0",
+			minCompatibleVersion: "1.0.0",
+			capabilities: ["sync-envelope-v1"],
+		},
+	});
+	const r = runCli(
+		["sync", "envelope", "compat", "--envelope", JSON.stringify(env), "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(r.status, 1, r.stdout);
+	const out = JSON.parse(r.stdout);
+	const payload = JSON.parse(out.text);
+	assert.equal(payload.compatible, false);
+	assert.ok(
+		out.errors.some((e) => e.includes("amberProtocolVersion")),
+		`expected a producer-version reason, got: ${out.errors.join("; ")}`,
+	);
+});
+
+test("sync envelope validate refuses an envelope missing versionNegotiation", () => {
+	const dir = mkTarget("validatemiss");
+	const { envelopeFixture } = require("./helpers/sync-envelope-fixtures");
+	const env = envelopeFixture();
+	delete env.versionNegotiation;
+	const r = runCli(
+		["sync", "envelope", "validate", "--envelope", JSON.stringify(env), "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(r.status, 1, r.stdout);
+	const out = JSON.parse(r.stdout);
+	const payload = JSON.parse(out.text);
+	assert.equal(payload.valid, false);
+	assert.ok(
+		out.errors.some((e) => e.includes("versionNegotiation")),
+		`expected a versionNegotiation error, got: ${out.errors.join("; ")}`,
+	);
+});
+
 test("sync envelope unpack validates a matching local artifact", () => {
 	const dir = mkTarget("unpack");
 	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });

@@ -122,7 +122,11 @@ test("applyEnvelope records a conflict for an incompatible envelope", () => {
 	const dir = mkTarget("apply-incompat", { git: true });
 	writeArtifact(dir, PAGE, "original");
 	const envelope = makeEnvelope(dir, PAGE);
-	envelope.versionNegotiation = { minCompatibleVersion: "99.0.0", capabilities: [] };
+	envelope.versionNegotiation = {
+		amberProtocolVersion: "1.6.0",
+		minCompatibleVersion: "99.0.0",
+		capabilities: ["sync-envelope-v1"],
+	};
 
 	const result = applyEnvelope(dir, envelope);
 	assert.equal(result.ok, false);
