@@ -70,6 +70,12 @@ test("every public Context Loadout error code is registered", () => {
 	}
 });
 
+test("every ledger-corruption error code is registered", () => {
+	for (const code of ["AMBER_E_KB_CORRUPT", "AMBER_E_ORG_CORRUPT"]) {
+		assert.ok(getEntry(code), `${code} must be explainable`);
+	}
+});
+
 test("every production Context error code is registered", () => {
 	const libRoot = path.join(__dirname, "..", "..", "scripts", "lib");
 	const discovered = new Set();

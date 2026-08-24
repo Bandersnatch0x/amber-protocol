@@ -89,7 +89,26 @@ const CATALOG = {
 		cause: "verify-ledger recomputed a record hash that does not match the stored chain.",
 		remedy: "Investigate the flagged record; restore it from version control if it was edited.",
 		layer: "Observability",
-		related: [],
+		related: ["AMBER_E_KB_CORRUPT"],
+	},
+	// --- Fail-closed ledger reads (F035-S5 decision D4: absence is empty, not corruption) ---
+	AMBER_E_KB_CORRUPT: {
+		title: "Knowledge ledger is corrupt or unreadable",
+		cause:
+			"A knowledge-base read hit a corrupt line or unreadable .amber/knowledge/records.jsonl. An absent ledger reads as empty; this code only fires on real corruption.",
+		remedy:
+			"Restore .amber/knowledge/records.jsonl from version control; never delete it to reset — the ledger is append-only provenance.",
+		layer: "Observability",
+		related: ["AMBER_E_ORG_CORRUPT", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_ORG_CORRUPT: {
+		title: "Organization audit ledger is corrupt or unreadable",
+		cause:
+			"An organization-audit read hit a corrupt line or unreadable .amber/audit/events.jsonl. An absent ledger reads as empty; this code only fires on real corruption.",
+		remedy:
+			"Restore .amber/audit/events.jsonl from version control; never delete it to reset — the ledger is append-only provenance.",
+		layer: "Observability",
+		related: ["AMBER_E_KB_CORRUPT", "AMBER_E_LEDGER_TAMPERED"],
 	},
 	AMBER_E_CONTEXT_SCHEMA_INVALID: {
 		title: "Context page payload fails the page schema",
