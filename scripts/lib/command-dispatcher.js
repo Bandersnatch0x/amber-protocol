@@ -74,6 +74,18 @@ const {
 	writeAdoptionSelectedFiles,
 } = require("./core/adoption-proposals");
 const sessionCommands = require("./session-commands");
+const {
+	resolveTarget,
+	unknownAction,
+	shapeResult,
+	requireSessionId,
+} = require("./command-helpers");
+const { projectionDispatch } = require("./projection-commands");
+const { syncDispatch } = require("./sync-commands");
+const { knowledgeDispatch } = require("./knowledge-commands");
+const { phaseDispatch } = require("./phase-commands");
+const { orgAuditDispatch } = require("./org-audit-commands");
+const { hooksDispatch } = require("./hooks-commands");
 const { bindCommandHandlers } = require("./command-registry");
 const { inferNext } = require("./next-command");
 const { backfillVersioning, migrateManifests } = require("./migrate-command");
@@ -81,22 +93,6 @@ const { migrateState, migrateWiki } = require("./state-migration");
 const { validateWorkflowPack, validateLoopContract } = require("./core/execution-validator");
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function unknownAction(command, actions) {
-	const list =
-		actions.length > 1
-			? `${actions.slice(0, -1).join(", ")}, or ${actions.at(-1)}`
-			: `${actions[0]}`;
-	return {
-		target: undefined,
-		errors: [`${command} requires ${list}.`],
-		warnings: [],
-	};
-}
-
-function resolveTarget(args) {
-	return args.target || process.cwd();
-}
 
 function handleMaintenance(args) {
 	const { maintenanceDispatch } = require("./maintenance/adapters/command");
@@ -194,26 +190,6 @@ function handleLedger(args) {
 		{ errors: ["ledger requires export, seal, or verify-anchoring."] },
 		{ exitCode: 1 },
 	);
-}
-
-function shapeResult(args, body, { exitCode, bypassPrint } = {}) {
-	return {
-		result: {
-			target: args.target,
-			...body,
-			errors: body.errors || [],
-			warnings: body.warnings || [],
-		},
-		exitCode,
-		bypassPrint: bypassPrint ?? !args.json,
-	};
-}
-
-function requireSessionId(args, action) {
-	if (!args.session) {
-		return { text: `session ${action} requires --session <id>.`, exitCode: 1 };
-	}
-	return null;
 }
 
 async function handleSession(args) {
@@ -354,85 +330,7 @@ function handleAudit(args) {
 }
 
 function handleOrganizationAudit(args) {
-	const targetRoot = resolveTarget(args);
-	const sub = args._?.[1];
-	const {
-		checkIsolation,
-		auditCrossRepository,
-		recordRetentionAction,
-		listAuditEvents,
-	} = require("./core/organization-audit");
-	if (sub === "events") {
-		const events = listAuditEvents(targetRoot);
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(events, null, 2),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "isolation") {
-		const result = checkIsolation(targetRoot, {
-			tenantId: args.tenant,
-			repositoryId: args.repository || null,
-			queryTenantId: args.queryTenant || null,
-		});
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify({ ok: result.ok, events: result.events }, null, 2),
-				errors: result.errors,
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "cross-repo") {
-		const result = auditCrossRepository(targetRoot, {
-			tenantId: args.tenant,
-			scope: args.scope || null,
-		});
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify({ ok: result.ok, events: result.events }, null, 2),
-				errors: result.errors,
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "retention") {
-		const result = recordRetentionAction(targetRoot, {
-			tenantId: args.tenant,
-			repositoryId: args.repository,
-			action: args.action,
-			target: args.entity,
-			reason: args.reason,
-		});
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: result.ok ? JSON.stringify(result.event, null, 2) : "",
-				errors: result.errors,
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	return {
-		result: unknownAction("audit org", ["events", "isolation", "cross-repo", "retention"]),
-	};
+	return orgAuditDispatch(args);
 }
 
 function handleWiki(args) {
@@ -1106,55 +1004,7 @@ function handleStatus(args) {
 }
 
 function handleSync(args) {
-	const targetRoot = resolveTarget(args);
-	const sub = args._?.[0];
-	if (sub === "envelope") {
-		return handleSyncEnvelope(args, targetRoot);
-	}
-	if (sub === "session") {
-		return handleSyncSession(args, targetRoot);
-	}
-	// Orchestration (scaffold + artifact drift + conditional refresh + note) lives
-	// in core/sync-project. Handler keeps the lines[] text builder and result.sync
-	// envelope byte-identical — artifact is intentionally NOT in result.sync.
-	const { syncProject } = require("./core/sync-project");
-	const { drift, refresh, note } = syncProject(targetRoot, {
-		execute: Boolean(args.execute),
-		templateRoot: args.templateRoot,
-	});
-
-	const lines = [
-		`Target: ${targetRoot}`,
-		`Mode: ${args.execute ? "execute" : "dry-run (no changes made)"}`,
-	];
-	if (drift.installed) {
-		const c = drift.counts;
-		lines.push(
-			`Scaffold drift: fresh=${c.fresh} stale=${c.stale} customized=${c.customized} ambiguous=${c.ambiguous} missing=${c.missing}`,
-		);
-	} else {
-		lines.push(`Scaffold drift: ${drift.note || "no provenance"}`);
-	}
-	if (refresh) {
-		lines.push(
-			`Refreshed (stale controlled): ${refresh.refreshed.length} — ${refresh.refreshed.join(", ") || "(none)"}`,
-		);
-		lines.push(
-			`Proposals cached (customized/ambiguous): ${refresh.proposals.length} — ${refresh.proposals.join(", ") || "(none)"}`,
-		);
-	}
-	lines.push(note);
-
-	return {
-		result: {
-			target: args.target,
-			text: lines.join("\n"),
-			sync: { executed: Boolean(args.execute), drift, refresh, note },
-			errors: [],
-			warnings: [],
-		},
-		bypassPrint: !args.json,
-	};
+	return syncDispatch(args);
 }
 
 function handleSyncEnvelope(args, targetRoot) {
@@ -1385,452 +1235,15 @@ function handleSyncSession(args, targetRoot) {
 }
 
 function handleProjection(args) {
-	const targetRoot = resolveTarget(args);
-	const sub = args._?.[0];
-	const {
-		PROJECTION_TYPES,
-		rebuildProjection,
-		projectionStatus,
-	} = require("./core/projection-registry");
-	if (sub === "query") {
-		const { buildGovernanceGraph, queryGraph } = require("./core/governance-graph");
-		const { recordReadReceipt } = require("./core/projection-receipts");
-		const graph = buildGovernanceGraph(targetRoot);
-		const result = queryGraph(graph, {
-			scope: args.scope || null,
-			limit: args.limit ? Number(args.limit) : 50,
-		});
-		// every read leaves an immutable receipt
-		const receipt = recordReadReceipt(targetRoot, {
-			scope: args.scope || "unscoped",
-			projectionType: "governance-graph",
-			resultHash: graph.sourceHash,
-		});
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(
-					{
-						ok: result.ok,
-						code: result.code,
-						nodes: result.nodes,
-						truncated: result.truncated,
-						receiptId: receipt.receiptId,
-					},
-					null,
-					2,
-				),
-				errors: result.ok ? [] : [result.reason || result.code],
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "receipt") {
-		const { listReadReceipts, verifyReceipt } = require("./core/projection-receipts");
-		if (args.id) {
-			const { ok, receipt } = verifyReceipt(targetRoot, args.id);
-			return {
-				result: {
-					target: args.target,
-					text: JSON.stringify({ ok, receipt }, null, 2),
-					errors: ok ? [] : ["receipt not found"],
-					warnings: [],
-				},
-				exitCode: ok ? 0 : 1,
-				bypassPrint: !args.json,
-			};
-		}
-		const receipts = listReadReceipts(targetRoot);
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(receipts, null, 2),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "rebuild") {
-		const type = args.type;
-		if (!type || !PROJECTION_TYPES.includes(type)) {
-			return {
-				result: {
-					target: args.target,
-					text: "",
-					errors: [`projection rebuild requires --type <${PROJECTION_TYPES.join("|")}>`],
-					warnings: [],
-				},
-				exitCode: 1,
-				bypassPrint: !args.json,
-			};
-		}
-		// Default builder: derive a deterministic read-only summary from canonical pages.
-		const built = rebuildProjection(targetRoot, type, (state) => ({
-			projection: type,
-			canonicalPageCount: state.artifacts.length,
-			pages: state.artifacts.map((page) => ({
-				id: page.pageId || page.id,
-				title: page.title || "",
-			})),
-		}));
-		const exitCode = built.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: built.ok ? JSON.stringify(built.manifest, null, 2) : "",
-				errors: built.errors,
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "status") {
-		const type = args.type;
-		if (!type || !PROJECTION_TYPES.includes(type)) {
-			return {
-				result: {
-					target: args.target,
-					text: "",
-					errors: [`projection status requires --type <${PROJECTION_TYPES.join("|")}>`],
-					warnings: [],
-				},
-				exitCode: 1,
-				bypassPrint: !args.json,
-			};
-		}
-		const status = projectionStatus(targetRoot, type);
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify({ ok: status.ok, code: status.code, detail: status.detail }, null, 2),
-				errors: status.ok ? [] : [status.detail],
-				warnings: [],
-			},
-			exitCode: status.ok ? 0 : 1,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "list") {
-		const statuses = PROJECTION_TYPES.map((type) => {
-			const status = projectionStatus(targetRoot, type);
-			return { projection_type: type, ok: status.ok, code: status.code, detail: status.detail };
-		});
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(statuses, null, 2),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "view") {
-		const { buildWorkbenchProjection, applyBounds } = require("./core/visualization-workbench");
-		const { recordReadReceipt } = require("./core/projection-receipts");
-		const kind = args.kind;
-		if (!kind) {
-			return {
-				result: {
-					target: args.target,
-					text: "",
-					errors: [
-						"projection view requires --kind <temporal|timeline|causal|relationship|mind-map|context>",
-					],
-					warnings: [],
-				},
-				exitCode: 1,
-				bypassPrint: !args.json,
-			};
-		}
-		const projection = buildWorkbenchProjection(targetRoot, kind);
-		const items =
-			projection.entries || projection.events || projection.nodes || projection.pages || [];
-		const bounded = applyBounds(items, {
-			limit: args.limit ? Number(args.limit) : 50,
-			sortKey: args.sort || null,
-		});
-		const receipt = recordReadReceipt(targetRoot, {
-			scope: args.scope || "unscoped",
-			projectionType: `visualization-${kind}`,
-			resultHash: projection.sourceHash,
-		});
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(
-					{
-						kind,
-						items: bounded.items,
-						truncated: bounded.truncated,
-						sourceHash: projection.sourceHash,
-						receiptId: receipt.receiptId,
-					},
-					null,
-					2,
-				),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "compare") {
-		const {
-			buildWorkbenchProjection,
-			compareProjections,
-		} = require("./core/visualization-workbench");
-		const kind = args.kind;
-		if (!kind) {
-			return {
-				result: {
-					target: args.target,
-					text: "",
-					errors: [
-						"projection compare requires --kind <temporal|timeline|causal|relationship|mind-map|context>",
-					],
-					warnings: [],
-				},
-				exitCode: 1,
-				bypassPrint: !args.json,
-			};
-		}
-		const before = buildWorkbenchProjection(targetRoot, kind);
-		const after = buildWorkbenchProjection(targetRoot, kind);
-		const diff = compareProjections(before, after);
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(diff, null, 2),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	return {
-		result: unknownAction("projection", [
-			"rebuild",
-			"status",
-			"list",
-			"query",
-			"receipt",
-			"view",
-			"compare",
-		]),
-	};
+	return projectionDispatch(args);
 }
 
 function handleKnowledge(args) {
-	const targetRoot = resolveTarget(args);
-	const sub = args._?.[0];
-	const {
-		admitKnowledge,
-		listRecords,
-		checkFreshness,
-		retireRecord,
-		queryKnowledge,
-	} = require("./core/knowledge-base");
-	if (sub === "admit") {
-		const result = admitKnowledge(targetRoot, {
-			pageId: args.page,
-			authorization: args.auth || null,
-		});
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: result.ok ? JSON.stringify(result.record, null, 2) : "",
-				errors: result.errors,
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "list") {
-		const records = listRecords(targetRoot);
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(records, null, 2),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "status") {
-		const status = checkFreshness(targetRoot, args.id);
-		const exitCode = status.status === "stale" ? 1 : 0;
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(status, null, 2),
-				errors: status.status === "stale" ? [status.detail] : [],
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "retire") {
-		const result = retireRecord(targetRoot, args.id, { reason: args.reason });
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: result.ok ? JSON.stringify(result.record, null, 2) : "",
-				errors: result.errors,
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "query") {
-		const result = queryKnowledge(targetRoot, { scope: args.scope || null });
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(
-					{ ok: result.ok, code: result.code, records: result.records },
-					null,
-					2,
-				),
-				errors: result.errors,
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	return {
-		result: unknownAction("knowledge", ["admit", "list", "status", "retire", "query"]),
-	};
+	return knowledgeDispatch(args);
 }
 
 function handlePhase(args) {
-	const targetRoot = resolveTarget(args);
-	const sub = args._?.[0];
-	const {
-		gatherPhaseEvidence,
-		validatePhaseEvidence,
-		promotePhase,
-		rollbackPhase,
-		listTransitions,
-		checkInvariantNonRegression,
-	} = require("./core/phase-gates");
-	if (sub === "evidence") {
-		const evidence = gatherPhaseEvidence(targetRoot, args.phase);
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(evidence, null, 2),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "validate") {
-		const validation = validatePhaseEvidence(targetRoot, args.phase);
-		const exitCode = validation.complete ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(
-					{ complete: validation.complete, missing: validation.missing },
-					null,
-					2,
-				),
-				errors: validation.complete ? [] : [`missing evidence: ${validation.missing.join(", ")}`],
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "promote") {
-		const result = promotePhase(targetRoot, args.phase, { authorization: args.auth || null });
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: result.ok ? JSON.stringify(result.transition, null, 2) : "",
-				errors: result.errors,
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "rollback") {
-		const result = rollbackPhase(targetRoot, args.phase, {
-			checkpoint: args.checkpoint || null,
-			reason: args.reason || null,
-		});
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: result.ok ? JSON.stringify(result.transition, null, 2) : "",
-				errors: result.errors,
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "transitions") {
-		const transitions = listTransitions(targetRoot);
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(transitions, null, 2),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "invariants") {
-		const result = checkInvariantNonRegression(targetRoot);
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(result.invariants, null, 2),
-				errors: result.ok ? [] : ["invariant regression detected"],
-				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	return {
-		result: unknownAction("phase", [
-			"evidence",
-			"validate",
-			"promote",
-			"rollback",
-			"transitions",
-			"invariants",
-		]),
-	};
+	return phaseDispatch(args);
 }
 
 function handleExplain(args) {
@@ -1846,19 +1259,6 @@ function handleExplain(args) {
 // --platform is scoped to `hooks breadcrumb install`, so it is read from the
 // positional stream here instead of joining the global FLAG_SPECS table.
 // Both `--platform <value>` and `--platform=<value>` forms are accepted.
-function hooksBreadcrumbPlatform(args) {
-	const positional = Array.isArray(args._) ? args._ : [];
-	const index = positional.findIndex(
-		(token) => token === "--platform" || token.startsWith("--platform="),
-	);
-	if (index >= 0) {
-		const token = positional[index];
-		if (token.startsWith("--platform=")) return token.slice("--platform=".length);
-		if (index + 1 < positional.length) return positional[index + 1];
-	}
-	return args.platform;
-}
-
 // F023: read-only inspection by default; --reviewed books the review on the
 // feature entry (featureId comes from args.feature — booking never resolves a
 // focus implicitly). --surface is repeatable via FLAG_SPECS accumulate, and a
@@ -1921,62 +1321,7 @@ function handleBreakLoop(args) {
 }
 
 function handleHooks(args) {
-	const hooks = require("./hooks-command");
-	const action = args._?.[0];
-	let r;
-	if (action === "breadcrumb") {
-		const subAction = args._?.[1];
-		if (subAction === "print") r = hooks.printBreadcrumb(args.target, { format: args.format });
-		else if (subAction === "install")
-			r = hooks.installBreadcrumb(args.target, { platform: hooksBreadcrumbPlatform(args) });
-		else if (subAction === "uninstall") r = hooks.uninstallBreadcrumb(args.target);
-		else if (subAction === "status") r = hooks.statusBreadcrumb(args.target);
-		else
-			return {
-				result: unknownAction("hooks breadcrumb", ["print", "install", "uninstall", "status"]),
-			};
-
-		if (subAction === "print" && !args.json) {
-			// A host hook pipes stdout straight into the conversation, so print
-			// must emit exactly the renderer's text — no headers, no footers, and
-			// nothing at all when bypassed. Diagnostics go to stderr only.
-			return {
-				result: {
-					target: args.target,
-					text: r.text || "",
-					errors: r.errors || [],
-					warnings: r.warnings || [],
-				},
-				exitCode: (r.errors || []).length > 0 ? 1 : 0,
-				bypassPrint: true,
-				onBypass: () => {
-					for (const w of r.warnings || []) console.error(`WARNING: ${w}`);
-					for (const e of r.errors || []) console.error(`ERROR: ${e}`);
-					if (r.text) process.stdout.write(`${r.text}\n`);
-				},
-			};
-		}
-	} else if (action === "check")
-		r = hooks.checkGovernance(args.target, { warnOnly: args.warnOnly });
-	else if (action === "install")
-		r = hooks.installHook(args.target, { warnOnly: args.warnOnly, force: args.force });
-	else if (action === "uninstall") r = hooks.uninstallHook(args.target);
-	else if (action === "status") r = hooks.statusHook(args.target);
-	else
-		return {
-			result: unknownAction("hooks", ["check", "install", "uninstall", "status", "breadcrumb"]),
-		};
-
-	return {
-		result: {
-			target: args.target,
-			text: r.text || "",
-			errors: r.errors || [],
-			warnings: r.warnings || [],
-		},
-		exitCode: (r.errors || []).length > 0 ? 1 : 0,
-		bypassPrint: !args.json,
-	};
+	return hooksDispatch(args);
 }
 
 function handleContext(args) {
