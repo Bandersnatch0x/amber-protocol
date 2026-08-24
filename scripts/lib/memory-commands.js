@@ -1,7 +1,6 @@
 "use strict";
 
 // Business-logic layer for the Governed Memory Layer (spec 2026-08-21
-// §5/§6/§8). This module owns the five verbs (request/ingest/approve/book/
 // abandon) plus the read-only status projection. It reuses ONLY the data layer
 // (core/memory-store), identity/hash helpers (core/context-hash) and the error
 // catalog (core/error-catalog) — zero cross-imports of session/context/
@@ -126,7 +125,6 @@ function makeRequestId() {
 	return `mreq-${Date.now().toString(36)}-${crypto.randomBytes(3).toString("hex")}`;
 }
 
-// §5.5-A3 / §8.4-M12: request/ingest/book inline the identity gate (they are not
 // in the typed seam). Non-TTY without an explicit --yes is refused fail-closed.
 function identityGate(args) {
 	if (!process.stdout.isTTY && !args.yes) {
@@ -139,30 +137,9 @@ function identityGate(args) {
 	return null;
 }
 
-// §5.5 / §11-4: registered surface hash = sha256 of the normalized MEMORY.md.
 function surfaceNormHash(targetRoot) {
 	return sha256(store.normalizeMemoryMd(readMemoryMd(targetRoot)));
 }
-
-// §6.3 α surface physical counts (never registry counts) + exhaustion predicate.
-
-// §6.5 γ 168h rolling window: count admitted memory-ingest entryIds in [T-168h, T].
-
-// §10.3 bookText — α byte-dimension admission estimate (minimal deterministic form).
-
-// §10.2 entryId = sha256 of canonical JSON of the core fields — revised content
-// is a new entryId. canonicalJson takes a JSON string and sorts keys recursively.
-
-// §6.5 K1 (staleness ↓) / K2 (β pressure ↓) / K3 (entryId lexicographic ↑).
-// §6.5 K1 for a NEW candidate: days since the newest on-disk provenance
-// artifact (source file mtime), falling back to the nominating request's
-// createdAt (Spec-defined 补全: T1/T2 候选取触发工件时间戳).
-
-// §6.5 K1 (staleness ↓) / K2 (β pressure ↓) / K3 (entryId lexicographic ↑) over
-// a mixed candidate pool (current batch + queued open-request candidates).
-
-// §5.2-C5: a request resolves when every one of its original entryIds reaches
-// a terminal disposition (active / superseded / rejected-draft / abandoned).
 
 function findRequestId(targetRoot, entryId) {
 	const found = store
@@ -309,7 +286,6 @@ function rejectIngest(args, targetRoot, request, channel, code, message, entryId
 	};
 }
 
-// §5.3 stage 2: per-source hash binding against the live target files. A
 // source whose ref resolves to an existing file inside the target must still
 // hash to the registered rawHash/normHash; a mismatch means the file changed
 // after the request (or the hash was fabricated) — refuse the whole batch.

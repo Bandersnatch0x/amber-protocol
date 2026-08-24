@@ -61,7 +61,7 @@ npm run identity:check      # validate the effective author/committer now
 
 CI runs the same checker on introduced commits (`identity` job). Release jobs and the test matrix wait on it.
 
-**Platform exceptions (CI only):** when validating already-made commits (`--range` / `--commit`), the checker accepts exact name+email pairs for Dependabot, GitHub’s bot committer, and `github-actions[bot]`. It also accepts GitHub's account display name as the author only when the commit has at least two parents, uses this repository's exact noreply email, and was committed by the exact GitHub bot identity. This covers GitHub-generated merge commits without adding a second human identity. Local pre-commit (`npm run identity:check` with no args) stays human-only so platform or bot identities cannot land from a workstation.
+**Platform exceptions (CI only):** when validating already-made commits (`--range` / `--commit`), the checker accepts exact name+email pairs for Dependabot, GitHub’s bot committer, and `github-actions[bot]`. It also accepts GitHub's account display name as the author when the commit uses this repository's exact noreply email and was committed by the exact GitHub bot identity — covering GitHub-generated merge AND squash-merge commits (squash-merges carry a single parent; the trust anchor is the owner's noreply address plus GitHub's own committer identity, which only holds when the owner produced the commit through GitHub). Local pre-commit (`npm run identity:check` with no args) stays human-only so platform or bot identities cannot land from a workstation.
 
 CLI:
 

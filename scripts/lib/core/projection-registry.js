@@ -21,6 +21,7 @@
 const { sha256 } = require("./context-hash");
 const fs = require("node:fs");
 const path = require("node:path");
+const { readCanonicalPages } = require("./context-store");
 
 const PROJECTION_TYPES = Object.freeze([
 	"governance-graph",
@@ -47,20 +48,9 @@ function projectionManifestPath(targetRoot, projectionType) {
  * @returns {{artifacts: Array<object>, checkpoint: string}}
  */
 function canonicalState(targetRoot) {
-	const pagesDir = path.join(targetRoot, ".amber", "context", "pages");
-	const artifacts = [];
-	if (fs.existsSync(pagesDir)) {
-		for (const name of fs
-			.readdirSync(pagesDir)
-			.filter((f) => f.endsWith(".json"))
-			.sort()) {
-			try {
-				artifacts.push(JSON.parse(fs.readFileSync(path.join(pagesDir, name), "utf8")));
-			} catch {
-				// skip unreadable pages; they are not canonical evidence
-			}
-		}
-	}
+	// canonical evidence reader lives in context-store; projection registry
+	// derives the deterministic checkpoint from the same page set
+	const artifacts = readCanonicalPages(targetRoot);
 	const canonicalJson = JSON.stringify(artifacts);
 	return { artifacts, checkpoint: sha256(canonicalJson) };
 }

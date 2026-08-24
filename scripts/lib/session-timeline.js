@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { readJSONL } = require("./core/jsonl");
 
 // scripts/lib/session-timeline.js
 // The single deep module owning the Session timeline artifact: the event
@@ -59,26 +60,7 @@ function appendSessionEvent(sessionDir, event) {
 // line throws (so a half-written timeline is still inspectable after a crash).
 function readSessionEvents(sessionDir, { strict = false } = {}) {
 	const filePath = path.join(sessionDir, FILENAME);
-	if (!fs.existsSync(filePath)) {
-		return [];
-	}
-
-	const events = [];
-	const lines = fs.readFileSync(filePath, "utf8").split("\n");
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i].trim();
-		if (line === "") continue;
-
-		try {
-			events.push(JSON.parse(line));
-		} catch (err) {
-			if (strict) {
-				throw new Error(`Corrupt timeline at line ${i + 1}: ${err.message}`, { cause: err });
-			}
-		}
-	}
-
-	return events;
+	return readJSONL(filePath, { onCorrupt: strict ? "throw" : "skip" });
 }
 
 module.exports = {

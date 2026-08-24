@@ -302,6 +302,21 @@ describe("seam guard detector (self-check against silent no-op scans)", () => {
 		assert.deepEqual(specifiers, ["real-mod"]);
 	});
 
+	it("lexer treats a regex after a closing paren as code (known heuristic limit)", () => {
+		// a regex right after `)` (e.g. after an if condition) is read as a
+		// division by the heuristic, so a `//` inside such a regex can start a
+		// comment scan. The guard still must not invent specifiers from the
+		// surrounding code — lock the actual behavior here.
+		const sample = blankOutComments(
+			[
+				"if (flag) /a\\/\\/b/.test(p) && require('real-mod');",
+				"const a = require('real-mod');",
+			].join("\n"),
+		);
+		const specifiers = extractModuleSpecifiers(sample).map((s) => s.specifier);
+		assert.deepEqual(specifiers, ["real-mod", "real-mod"]);
+	});
+
 	it("classifies web-adapter variants as legal and deep modules as violations", () => {
 		for (const legal of [
 			"../../../../scripts/lib/web-adapter",

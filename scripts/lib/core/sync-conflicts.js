@@ -17,6 +17,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { validateEnvelope, checkCompatibility, hashFile } = require("./sync-remote");
+const { readJSONL, appendJSONL } = require("./jsonl");
 
 const CONFLICT_TYPES = Object.freeze([
 	"concurrent-edit",
@@ -92,7 +93,7 @@ function recordConflict(cwd, entry) {
 		resolution: entry.resolution || "pending",
 		recordedAt: new Date().toISOString(),
 	};
-	fs.appendFileSync(conflictLedgerPath(cwd), JSON.stringify(record) + "\n", "utf8");
+	appendJSONL(conflictLedgerPath(cwd), record);
 	return { record };
 }
 
@@ -102,20 +103,7 @@ function recordConflict(cwd, entry) {
  * @returns {Array<object>}
  */
 function listConflicts(cwd) {
-	const ledgerPath = conflictLedgerPath(cwd);
-	if (!fs.existsSync(ledgerPath)) return [];
-	return fs
-		.readFileSync(ledgerPath, "utf8")
-		.split(/\r?\n/)
-		.filter(Boolean)
-		.map((line) => {
-			try {
-				return JSON.parse(line);
-			} catch {
-				return null;
-			}
-		})
-		.filter(Boolean);
+	return readJSONL(conflictLedgerPath(cwd), { onCorrupt: "skip" });
 }
 
 /**

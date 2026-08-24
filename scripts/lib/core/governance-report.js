@@ -7,6 +7,7 @@ const { inspect: inspectMaintenance } = require("../maintenance");
 const { resolveRegistryPath } = require("./team");
 const { inspectGovernanceReadiness, ACTION_LIBRARY } = require("./governance-readiness");
 const { readJsonSafe, resolveTarget } = require("./fs-utils");
+const { readJSONL } = require("./jsonl");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { gatherState, buildContext, inferNextStep } = require("./lifecycle");
 const { shellQuote } = require("./text-utils");
@@ -250,14 +251,7 @@ function collectMemoryChannelMix(targetRoot) {
 	if (!fs.existsSync(eventsPath)) return null;
 	const channels = {};
 	let total = 0;
-	for (const raw of fs.readFileSync(eventsPath, "utf8").split(/\r?\n/)) {
-		if (!raw.trim()) continue;
-		let event;
-		try {
-			event = JSON.parse(raw);
-		} catch {
-			continue;
-		}
+	for (const event of readJSONL(eventsPath, { onCorrupt: "skip" })) {
 		if (event.kind !== "memory-request-created") continue;
 		total += 1;
 		const channel = event.channel || "unattributed";

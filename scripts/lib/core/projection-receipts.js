@@ -13,15 +13,11 @@
  */
 
 const crypto = require("node:crypto");
-const fs = require("node:fs");
 const path = require("node:path");
+const { readJSONL, appendJSONL } = require("./jsonl");
 
 function receiptsLedgerPath(cwd) {
 	return path.join(cwd, ".amber", "projections", "receipts.jsonl");
-}
-
-function ensureDir(cwd) {
-	fs.mkdirSync(path.join(cwd, ".amber", "projections"), { recursive: true });
 }
 
 /**
@@ -31,7 +27,6 @@ function ensureDir(cwd) {
  * @returns {object} The receipt.
  */
 function recordReadReceipt(cwd, { scope, projectionType, resultHash }) {
-	ensureDir(cwd);
 	const receipt = {
 		receiptId: crypto.randomUUID(),
 		scope: scope || null,
@@ -39,8 +34,7 @@ function recordReadReceipt(cwd, { scope, projectionType, resultHash }) {
 		resultHash,
 		readAt: new Date().toISOString(),
 	};
-	fs.appendFileSync(receiptsLedgerPath(cwd), JSON.stringify(receipt) + "\n", "utf8");
-	return receipt;
+	return appendJSONL(receiptsLedgerPath(cwd), receipt);
 }
 
 /**
@@ -49,20 +43,7 @@ function recordReadReceipt(cwd, { scope, projectionType, resultHash }) {
  * @returns {Array<object>}
  */
 function listReadReceipts(cwd) {
-	const ledgerPath = receiptsLedgerPath(cwd);
-	if (!fs.existsSync(ledgerPath)) return [];
-	return fs
-		.readFileSync(ledgerPath, "utf8")
-		.split(/\r?\n/)
-		.filter(Boolean)
-		.map((line) => {
-			try {
-				return JSON.parse(line);
-			} catch {
-				return null;
-			}
-		})
-		.filter(Boolean);
+	return readJSONL(receiptsLedgerPath(cwd), { onCorrupt: "skip" });
 }
 
 /**

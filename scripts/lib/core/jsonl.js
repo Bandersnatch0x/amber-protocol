@@ -20,8 +20,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const CORRUPT_LINE_ERROR = (filePath) => new Error(`corrupt JSONL line in ${filePath}`);
-
 /**
  * Read a JSONL file into an array of parsed objects.
  * @param {string} filePath - Absolute path.
@@ -30,15 +28,19 @@ const CORRUPT_LINE_ERROR = (filePath) => new Error(`corrupt JSONL line in ${file
  */
 function readJSONL(filePath, { onCorrupt = "skip", missing = "empty" } = {}) {
 	if (!fs.existsSync(filePath)) {
-		if (missing === "throw") throw CORRUPT_LINE_ERROR(filePath);
+		if (missing === "throw") throw new Error(`missing JSONL file: ${filePath}`);
 		return [];
 	}
 	const out = [];
+	let lineIndex = 0;
 	for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/).filter(Boolean)) {
+		lineIndex += 1;
 		try {
 			out.push(JSON.parse(line));
 		} catch (err) {
-			if (onCorrupt === "throw") throw CORRUPT_LINE_ERROR(filePath);
+			if (onCorrupt === "throw") {
+				throw new Error(`corrupt JSONL line ${lineIndex} in ${filePath}`, { cause: err });
+			}
 			if (onCorrupt === "mark") out.push({ _unparseable: line });
 			// "skip" drops the line
 		}
