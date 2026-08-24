@@ -42,6 +42,26 @@ function resolveStateDirForCreate(projectRoot) {
 	return path.join(projectRoot, CANONICAL_STATE_DIR);
 }
 
+/**
+ * Build a path under the read-resolved state dir (legacy .harness fallback
+ * applies). Use for reading state that may predate the rename.
+ * @param {string} projectRoot
+ * @param {...string} segments
+ */
+function statePath(projectRoot, ...segments) {
+	return path.join(resolveStateDirForRead(projectRoot), ...segments);
+}
+
+/**
+ * Build a path for state that is about to be created or written: always
+ * under .amber, never the legacy dir.
+ * @param {string} projectRoot
+ * @param {...string} segments
+ */
+function statePathForCreate(projectRoot, ...segments) {
+	return path.join(resolveStateDirForCreate(projectRoot), ...segments);
+}
+
 // test hook: reset once-per-process warning latches
 function resetWarnings() {
 	warnedLegacyRead = false;
@@ -53,5 +73,7 @@ module.exports = {
 	LEGACY_STATE_DIR,
 	resolveStateDirForRead,
 	resolveStateDirForCreate,
+	statePath,
+	statePathForCreate,
 	resetWarnings,
 };

@@ -7,6 +7,8 @@ const os = require("node:os");
 const {
 	resolveStateDirForRead,
 	resolveStateDirForCreate,
+	statePath,
+	statePathForCreate,
 	CANONICAL_STATE_DIR,
 	LEGACY_STATE_DIR,
 } = require("../../scripts/lib/state-dir-resolver");
@@ -47,6 +49,26 @@ test("both exist: .amber wins for read and create", () => {
 test("exports canonical and legacy dir names", () => {
 	assert.equal(CANONICAL_STATE_DIR, ".amber");
 	assert.equal(LEGACY_STATE_DIR, ".harness");
+});
+
+test("statePath joins segments under the read-resolved state dir", () => {
+	const root = tmpRoot();
+	fs.mkdirSync(path.join(root, ".harness"));
+	assert.equal(statePath(root, "sessions", "s1"), path.join(root, ".harness", "sessions", "s1"));
+});
+
+test("statePathForCreate joins segments under .amber regardless of legacy state", () => {
+	const root = tmpRoot();
+	fs.mkdirSync(path.join(root, ".harness"));
+	assert.equal(
+		statePathForCreate(root, "sessions", "s1"),
+		path.join(root, ".amber", "sessions", "s1"),
+	);
+});
+
+test("statePath with no segments returns the state dir itself", () => {
+	const root = tmpRoot();
+	assert.equal(statePath(root), path.join(root, ".amber"));
 });
 
 test("startSession creates sessions under .amber, not .harness", async () => {
