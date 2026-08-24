@@ -28,6 +28,7 @@ const {
 
 const ROOT = path.resolve(__dirname, "../..");
 const MCP_JS = path.join(ROOT, "scripts", "amber-mcp.js");
+const MCP_RPC_HELPER = path.join(ROOT, "tests", "helpers", "mcp-rpc.js");
 const SCHEMA_PATH = path.join(ROOT, "schemas", "action.type.schema.json");
 const ACTION_TYPES_DIR = path.join(ROOT, "action-types");
 
@@ -49,13 +50,17 @@ function assertSessionStarted(start) {
 	return start.stdout.match(/Session created: ([a-f0-9-]+)/)[1];
 }
 
+// Drives the MCP server through tests/helpers/mcp-rpc.js: async spawn with a
+// process-tree kill on timeout and transient retries, so a CPU-starved spawn
+// under full-suite parallelism fails fast with a clear message instead of
+// hanging past the old fixed spawnSync timeout (see the helper header).
 function rpc(messages, extraArgs = []) {
 	const lines = messages.map((m) => JSON.stringify(m)).join("\n") + "\n";
-	const result = spawnSync(process.execPath, [MCP_JS, ...extraArgs], {
+	const result = spawnSync(process.execPath, [MCP_RPC_HELPER, ...extraArgs], {
 		cwd: ROOT,
 		input: lines,
 		encoding: "utf8",
-		timeout: 120_000,
+		timeout: 300_000,
 	});
 	assert.equal(result.status, 0, result.stderr || result.stdout);
 	const responses = result.stdout
