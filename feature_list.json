@@ -1260,7 +1260,7 @@
 			"area": "governance",
 			"title": "Harden distributed sync admission and fail-closed boundaries",
 			"user_visible_behavior": "Sync Runtime envelopes pass one admission pipeline (schema, canonical artifact path/type, protocol, Tenant/Repository/generation, content hash) that cannot read outside the repository or outside the artifact's canonical path family; sync transport becomes preparation/report-only without git add/commit/push; corrupt Knowledge and Organization ledgers fail closed with typed errors and non-zero CLI results instead of returning empty success; gate inputs lose their resting shadow per DESIGN.md",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/sync-remote.test.js tests/unit/sync-conflicts.test.js tests/unit/sync-session.test.js tests/unit/distributed-governance-schemas.test.js tests/unit/identity-bootstrap.test.js",
 				"node --test tests/amber-cli-sync-envelope.test.js tests/amber-cli-sync-conflicts.test.js tests/amber-cli-sync-session.test.js tests/amber-cli-knowledge.test.js tests/amber-cli-organization-audit.test.js",
@@ -1280,6 +1280,18 @@
 					"result": "118 passed, 0 failed (F035 S3 targeted)",
 					"date": "2026-08-24",
 					"notes": "S3: admitEnvelope pipeline (schema->path->protocol->tenant->repo->generation->hash); repositoryId stable across clones (identity-file > remote.origin.url > default, never basename); refused ledger separates refusal from applied; 21 red before fix"
+				},
+				{
+					"command": "node --test tests/unit/sync-session.test.js tests/amber-cli-sync-session.test.js tests/amber-cli-team-hub-tracer.test.js",
+					"result": "25 passed, 0 failed (F035 S4 targeted)",
+					"date": "2026-08-24",
+					"notes": "S4: transport preparation/report-only (no git add/commit/push, no --execute); pull routes through admission pipeline so refusals persist as conflicts; help documents D1 behavior change. 13 red before fix; full npm test 2513 passed"
+				},
+				{
+					"command": "amber review --plan docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md; npm run doctor; npm run manifests; npm run gen:agents:check; npm run format:check; npm --prefix apps/web run format:check",
+					"result": "amber review READY, 0 errors; npm run doctor exit 0 (errors=0); npm run manifests exit 0; npm run gen:agents:check exit 0 (15 files up to date); npm run format:check exit 0 (root + web clean); npm --prefix apps/web run format:check exit 0; npm test exit 0, 2513 passed / 0 failed (recorded at final slice close e0f8ace, not re-run at closeout)",
+					"date": "2026-08-24",
+					"notes": "Closeout gates for F035 after satisfying the plan Evidence Schema (Command/Result/Date with real per-slice numbers) and phase-boundary acknowledgment; review reports READY with zero errors and zero warnings."
 				}
 			],
 			"notes": [

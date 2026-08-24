@@ -153,3 +153,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F034-T1-T2-memory-write-back-trigger-mounting.md`
 - Review status: ready
 - Feature: F034 status → accepted in feature_list.json
+
+## 2026-08-24 docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md
+
+- Plan: `docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md`
+- Review status: ready
+- Feature: F035 status → accepted in feature_list.json

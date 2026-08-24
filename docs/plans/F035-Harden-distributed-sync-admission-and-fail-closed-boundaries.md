@@ -1,7 +1,7 @@
 # Plan: Harden distributed sync admission and fail-closed boundaries
 
 Feature: F035
-Status: draft
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
