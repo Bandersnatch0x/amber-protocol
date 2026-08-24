@@ -18,6 +18,11 @@
  * content drifts. Retirement and supersession are explicit and
  * evidence-backed. Queries are exact-scope (unknown scope denied) and fail
  * closed on corruption.
+ *
+ * Fail-closed reads (F035-S5, decision D4): only an ABSENT ledger is a
+ * legitimate empty state. A corrupt or unreadable ledger is a typed failure
+ * (AMBER_E_KB_CORRUPT) — never an empty success, never a partial projection,
+ * and never a misreported "not found" or "scope denied".
  */
 
 const crypto = require("node:crypto");
@@ -25,6 +30,8 @@ const { sha256 } = require("./context-hash");
 const { readJSONL, appendJSONL, foldJSONL } = require("./jsonl");
 const fs = require("node:fs");
 const path = require("node:path");
+
+const KB_CORRUPT_CODE = "AMBER_E_KB_CORRUPT";
 
 const KNOWLEDGE_STATUSES = Object.freeze([
 	"candidate",
@@ -64,26 +71,58 @@ function pageSourceHash(page) {
 }
 
 /**
+ * Wrap a ledger read failure as a typed corruption error (F035-S5).
+ * readJSONL only throws for corrupt lines or unreadable files — an absent
+ * ledger always reads as [] — so every throw here is corruption, never a
+ * legitimate empty state (decision D4).
+ * @param {Error} err - The raw read failure.
+ * @returns {Error} Error carrying .amberCode = AMBER_E_KB_CORRUPT.
+ */
+function corruptLedgerError(err) {
+	const detail = err && err.message ? err.message : String(err);
+	const error = new Error(
+		`knowledge ledger corrupt or unreadable — failing closed: ${detail} [${KB_CORRUPT_CODE}]`,
+	);
+	error.amberCode = KB_CORRUPT_CODE;
+	error.cause = err;
+	return error;
+}
+
+/**
  * Read the ledger and fold it to the CURRENT state of every record.
  *
  * Append-only semantics: each line is an immutable record state. Later lines
  * for the same recordId supersede earlier ones, so the fold is
  * last-writer-wins per recordId and preserves the full lineage on disk.
+ * Fails closed on any corrupt line or unreadable file.
  * @param {string} cwd - Repository root.
  * @returns {Array<object>} Current state per record, in first-seen order.
+ * @throws {Error} Typed AMBER_E_KB_CORRUPT error when the ledger is corrupt or unreadable.
  */
 function readAllRecords(cwd) {
-	return foldJSONL(recordsPath(cwd), "recordId", { onCorrupt: "skip" });
+	try {
+		return foldJSONL(recordsPath(cwd), "recordId", { onCorrupt: "throw" });
+	} catch (err) {
+		throw corruptLedgerError(err);
+	}
 }
 
 /**
- * Read the full append-only lineage of one record.
+ * Read the full append-only lineage of one record. Fails closed on any
+ * corrupt line or unreadable file.
  * @param {string} cwd - Repository root.
  * @param {string} recordId - Record id.
  * @returns {Array<object>} Every state line ever appended for the record.
+ * @throws {Error} Typed AMBER_E_KB_CORRUPT error when the ledger is corrupt or unreadable.
  */
 function readRecordLineage(cwd, recordId) {
-	return readJSONL(recordsPath(cwd), { onCorrupt: "skip" }).filter((r) => r.recordId === recordId);
+	try {
+		return readJSONL(recordsPath(cwd), { onCorrupt: "throw" }).filter(
+			(r) => r.recordId === recordId,
+		);
+	} catch (err) {
+		throw corruptLedgerError(err);
+	}
 }
 
 function appendRecordState(cwd, state) {
@@ -177,7 +216,8 @@ function candidateKnowledge(cwd, { pageId, title = null }) {
  * Read a single record by id (current state).
  * @param {string} cwd - Repository root.
  * @param {string} recordId - Record id.
- * @returns {object|null}
+ * @returns {object|null} The record's current state, or null when absent.
+ * @throws {Error} Typed AMBER_E_KB_CORRUPT error when the ledger is corrupt or unreadable.
  */
 function readRecord(cwd, recordId) {
 	return readAllRecords(cwd).find((r) => r.recordId === recordId) || null;
@@ -186,7 +226,8 @@ function readRecord(cwd, recordId) {
 /**
  * List all records (current state each).
  * @param {string} cwd - Repository root.
- * @returns {Array<object>}
+ * @returns {Array<object>} Current state of every record ([] only for an absent ledger).
+ * @throws {Error} Typed AMBER_E_KB_CORRUPT error when the ledger is corrupt or unreadable.
  */
 function listRecords(cwd) {
 	return readAllRecords(cwd);
@@ -331,14 +372,26 @@ function supersedeRecord(cwd, recordId, { byRecordId, reason = null }) {
 
 /**
  * Shared transition machinery: load current state, require it active,
- * apply the state change, append the new immutable line.
+ * apply the state change, append the new immutable line. A corrupt or
+ * unreadable ledger is a typed corruption failure — transitions never
+ * operate on a partial store (F035-S5).
  * @param {string} cwd - Repository root.
  * @param {string} recordId - Record id.
  * @param {(record: object) => object} apply - State change (may throw).
- * @returns {{ok: boolean, record: object|null, errors: string[]}}
+ * @returns {{ok: boolean, code: string|null, record: object|null, errors: string[]}}
  */
 function transitionRecord(cwd, recordId, apply) {
-	const current = readRecord(cwd, recordId);
+	let current;
+	try {
+		current = readRecord(cwd, recordId);
+	} catch (err) {
+		return {
+			ok: false,
+			code: err.amberCode || KB_CORRUPT_CODE,
+			record: null,
+			errors: [err.message],
+		};
+	}
 	if (!current) {
 		return { ok: false, record: null, errors: [`record "${recordId}" not found`] };
 	}
@@ -400,7 +453,9 @@ function retireRecord(cwd, recordId, { reason }) {
 }
 
 /**
- * Query records with exact-scope privacy.
+ * Query records with exact-scope privacy. A corrupt or unreadable ledger is
+ * a typed corruption failure (AMBER_E_KB_CORRUPT) — distinct from an
+ * unknown-scope denial (AMBER_E_KB_DENY) and never an empty success (F035-S5).
  * @param {string} cwd - Repository root.
  * @param {{scope?: string|null}} params - Query scope.
  * @returns {{ok: boolean, code: string|null, records: Array<object>, errors: string[]}}
@@ -409,12 +464,12 @@ function queryKnowledge(cwd, { scope = null } = {}) {
 	let records;
 	try {
 		records = readAllRecords(cwd);
-	} catch {
+	} catch (err) {
 		return {
 			ok: false,
-			code: null,
+			code: err.amberCode || KB_CORRUPT_CODE,
 			records: [],
-			errors: ["knowledge store unreadable — failing closed"],
+			errors: [err.message],
 		};
 	}
 	if (scope && typeof scope === "string") {

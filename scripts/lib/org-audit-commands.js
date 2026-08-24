@@ -4,6 +4,28 @@
 
 const { resolveTarget, unknownAction } = require("./command-helpers");
 
+/**
+ * Typed read failure for corrupt or unreadable ledgers (F035-S5, decision
+ * D4): explicit code, empty payload, non-empty diagnostics, exit code 1 —
+ * never an empty successful array.
+ * @param {object} args - Parsed CLI arguments.
+ * @param {Error} err - Typed error thrown by the read surface.
+ * @returns {{result: object, exitCode: number, bypassPrint: boolean}}
+ */
+function readFailure(args, err) {
+	return {
+		result: {
+			target: args.target,
+			text: "",
+			errors: [err.message || String(err)],
+			warnings: [],
+			code: err.amberCode || "AMBER_E_ORG_CORRUPT",
+		},
+		exitCode: 1,
+		bypassPrint: !args.json,
+	};
+}
+
 function orgAuditDispatch(args) {
 	const targetRoot = resolveTarget(args);
 	const sub = args._?.[1];
@@ -14,7 +36,12 @@ function orgAuditDispatch(args) {
 		listAuditEvents,
 	} = require("./core/organization-audit");
 	if (sub === "events") {
-		const events = listAuditEvents(targetRoot);
+		let events;
+		try {
+			events = listAuditEvents(targetRoot);
+		} catch (err) {
+			return readFailure(args, err);
+		}
 		return {
 			result: {
 				target: args.target,
@@ -36,9 +63,10 @@ function orgAuditDispatch(args) {
 		return {
 			result: {
 				target: args.target,
-				text: JSON.stringify({ ok: result.ok, events: result.events }, null, 2),
+				text: JSON.stringify({ ok: result.ok, code: result.code, events: result.events }, null, 2),
 				errors: result.errors,
 				warnings: [],
+				...(result.code ? { code: result.code } : {}),
 			},
 			exitCode,
 			bypassPrint: !args.json,
@@ -53,9 +81,10 @@ function orgAuditDispatch(args) {
 		return {
 			result: {
 				target: args.target,
-				text: JSON.stringify({ ok: result.ok, events: result.events }, null, 2),
+				text: JSON.stringify({ ok: result.ok, code: result.code, events: result.events }, null, 2),
 				errors: result.errors,
 				warnings: [],
+				...(result.code ? { code: result.code } : {}),
 			},
 			exitCode,
 			bypassPrint: !args.json,

@@ -24,6 +24,28 @@ function payload(r) {
 	return outer.text ? JSON.parse(outer.text) : outer;
 }
 
+const ORG_CORRUPT = "AMBER_E_ORG_CORRUPT";
+
+function auditLedgerFile(dir) {
+	return path.join(dir, ".amber", "audit", "events.jsonl");
+}
+
+function goodEventLine(tenantId = "tenant-a", repositoryId = "repo-1") {
+	return JSON.stringify({
+		eventId: "e-1",
+		tenantId,
+		repositoryId,
+		action: "policy-assign",
+		actor: "admin@org",
+		evidenceHash: "sha256:" + "a".repeat(64),
+	});
+}
+
+function writeLedger(dir, lines) {
+	fs.mkdirSync(path.dirname(auditLedgerFile(dir)), { recursive: true });
+	fs.writeFileSync(auditLedgerFile(dir), lines.join("\n") + "\n");
+}
+
 test("audit org events shows empty ledger on fresh target", () => {
 	const dir = mkTarget("events");
 	const r = runCli(["audit", "org", "events", "--target", dir, "--json"], dir);
@@ -243,4 +265,92 @@ test("legacy audit still works", () => {
 	const dir = mkTarget("legacy");
 	const r = runCli(["audit", "--target", dir, "--json"], dir);
 	assert.equal(r.status, 0, r.stderr);
+});
+
+// ── Fail-closed corruption (F035-S5, decision D4) ────────────
+//
+// Only an ABSENT ledger is a legitimate empty state. A corrupt or unreadable
+// Organization audit ledger exits 1 with the typed code AMBER_E_ORG_CORRUPT,
+// an empty payload, and non-empty diagnostics — never empty success.
+
+test("audit org events fails closed on corrupt first, middle, and last JSONL lines", () => {
+	for (const [label, lines] of [
+		["first line corrupt", ["{ not json", goodEventLine(), goodEventLine("tenant-b", "repo-2")]],
+		["middle line corrupt", [goodEventLine(), "{ not json", goodEventLine("tenant-b", "repo-2")]],
+		["last line corrupt", [goodEventLine(), goodEventLine("tenant-b", "repo-2"), "{ not json"]],
+	]) {
+		const dir = mkTarget("corrupt-events");
+		writeLedger(dir, lines);
+		const r = runCli(["audit", "org", "events", "--target", dir, "--json"], dir);
+		assert.equal(r.status, 1, `corrupt ledger is not empty success: ${label}`);
+		const outer = payload(r);
+		assert.equal(outer.code, ORG_CORRUPT, `typed code: ${label}`);
+		assert.equal(outer.text, "", `empty payload: ${label}`);
+		assert.ok(outer.errors.length > 0, `non-empty diagnostics: ${label}`);
+		assert.ok(outer.errors[0].includes(ORG_CORRUPT), `code in diagnostics: ${label}`);
+	}
+});
+
+test("audit org events fails closed on an unreadable ledger (filesystem read error)", () => {
+	const dir = mkTarget("corrupt-events-unreadable");
+	// a directory where the ledger file is expected → readFileSync fails
+	fs.mkdirSync(auditLedgerFile(dir), { recursive: true });
+	const r = runCli(["audit", "org", "events", "--target", dir, "--json"], dir);
+	assert.equal(r.status, 1, "unreadable ledger is not empty success");
+	const outer = payload(r);
+	assert.equal(outer.code, ORG_CORRUPT);
+	assert.equal(outer.text, "");
+	assert.ok(outer.errors[0].includes(ORG_CORRUPT));
+});
+
+test("audit org events reports the typed corruption failure on stderr in text mode", () => {
+	const dir = mkTarget("corrupt-events-text");
+	writeLedger(dir, [goodEventLine(), "{ not json"]);
+	const r = runCli(["audit", "org", "events", "--target", dir], dir);
+	assert.equal(r.status, 1);
+	assert.ok(r.stderr.includes(ORG_CORRUPT), "typed code reaches stderr diagnostics");
+	assert.equal(r.stdout.trim(), "", "no payload masquerade on stdout");
+});
+
+test("audit org isolation fails closed with the typed corruption code", () => {
+	const dir = mkTarget("corrupt-isolation");
+	writeLedger(dir, [goodEventLine(), "{ not json"]);
+	const r = runCli(
+		["audit", "org", "isolation", "--tenant", "tenant-a", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(r.status, 1, "corrupt ledger must fail");
+	const outer = JSON.parse(r.stdout);
+	assert.equal(outer.code, ORG_CORRUPT, "typed code on the envelope");
+	assert.ok(outer.errors[0].includes(ORG_CORRUPT), "code in diagnostics");
+	const body = JSON.parse(outer.text);
+	assert.equal(body.ok, false);
+	assert.deepEqual(body.events, [], "empty payload");
+});
+
+test("audit org cross-repo fails closed with the typed corruption code", () => {
+	const dir = mkTarget("corrupt-cross-repo");
+	writeLedger(dir, [goodEventLine(), "{ not json"]);
+	const r = runCli(
+		[
+			"audit",
+			"org",
+			"cross-repo",
+			"--tenant",
+			"tenant-a",
+			"--scope",
+			"repo-1",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1, "corrupt ledger must fail");
+	const outer = JSON.parse(r.stdout);
+	assert.equal(outer.code, ORG_CORRUPT, "typed code on the envelope");
+	assert.ok(outer.errors[0].includes(ORG_CORRUPT), "code in diagnostics");
+	const body = JSON.parse(outer.text);
+	assert.equal(body.ok, false);
+	assert.deepEqual(body.events, [], "empty payload");
 });
