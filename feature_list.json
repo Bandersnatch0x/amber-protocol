@@ -1337,6 +1337,32 @@
 				"surfaces": ["docs/specs/sync-envelope-contract.md"],
 				"owner": "script"
 			}
+		},
+		{
+			"id": "F036",
+			"priority": 34,
+			"area": "core",
+			"title": "Adopt the state-dir path seam and fix the legacy .harness sessions bug",
+			"user_visible_behavior": "Resolves .amber state paths through state-dir-resolver so legacy .harness repositories read correct state (amber audit counts sessions identically to amber session list)",
+			"status": "passing",
+			"verification": [
+				"rtk node --test tests/unit/state-dir-resolver.test.js tests/unit/audit.test.js"
+			],
+			"evidence": [
+				{
+					"command": "rtk node --test",
+					"result": "2580 tests, 2522 pass, 58 pre-existing failures (55 apps/web vitest-only + 3 misc) — zero new failures vs baseline; state-dir-seam-guard green; S1 regressions green",
+					"date": "2026-08-25",
+					"notes": ""
+				},
+				{
+					"command": "node scripts/amber.js doctor --target .",
+					"result": "errors=0",
+					"date": "2026-08-25",
+					"notes": ""
+				}
+			],
+			"notes": []
 		}
 	]
 }
