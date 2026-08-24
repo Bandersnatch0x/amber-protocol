@@ -619,7 +619,7 @@ function GatesPage() {
                                   }));
                                 }}
                                 placeholder={t('gates.reviewerPlaceholder')}
-                                className={`mt-1 w-full rounded-md bg-white px-3 py-1.5 text-sm text-slate-950 shadow-sm focus:outline-none focus:ring-2 dark:bg-slate-950 dark:text-white ${
+                                className={`mt-1 w-full rounded-md bg-white px-3 py-1.5 text-sm text-slate-950 focus:outline-none focus:ring-2 dark:bg-slate-950 dark:text-white ${
                                   reviewerInlineErrorKey === key
                                     ? 'border-2 border-red-500 focus:ring-red-500'
                                     : 'border border-slate-300 focus:ring-blue-500 dark:border-slate-600'
@@ -697,7 +697,7 @@ function GatesPage() {
                           }));
                         }}
                         rows={3}
-                        className={`mt-3 w-full rounded-md bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:outline-none focus:ring-2 dark:bg-slate-950 dark:text-white ${
+                        className={`mt-3 w-full rounded-md bg-white px-3 py-2 text-sm text-slate-950 focus:outline-none focus:ring-2 dark:bg-slate-950 dark:text-white ${
                           rejectInlineErrorKey === key
                             ? 'border-2 border-red-500 focus:ring-red-500'
                             : 'border border-red-200 focus:ring-red-500 dark:border-red-900/70'

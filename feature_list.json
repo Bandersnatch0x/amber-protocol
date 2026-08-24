@@ -1260,7 +1260,7 @@
 			"area": "governance",
 			"title": "Harden distributed sync admission and fail-closed boundaries",
 			"user_visible_behavior": "Sync Runtime envelopes pass one admission pipeline (schema, canonical artifact path/type, protocol, Tenant/Repository/generation, content hash) that cannot read outside the repository or outside the artifact's canonical path family; sync transport becomes preparation/report-only without git add/commit/push; corrupt Knowledge and Organization ledgers fail closed with typed errors and non-zero CLI results instead of returning empty success; gate inputs lose their resting shadow per DESIGN.md",
-			"status": "not_started",
+			"status": "passing",
 			"verification": [
 				"node --test tests/unit/sync-remote.test.js tests/unit/sync-conflicts.test.js tests/unit/sync-session.test.js tests/unit/distributed-governance-schemas.test.js tests/unit/identity-bootstrap.test.js",
 				"node --test tests/amber-cli-sync-envelope.test.js tests/amber-cli-sync-conflicts.test.js tests/amber-cli-sync-session.test.js tests/amber-cli-knowledge.test.js tests/amber-cli-organization-audit.test.js",
@@ -1268,7 +1268,14 @@
 				"npm --prefix apps/web test",
 				"npm test; npm run manifests; npm run doctor; npm run gen:agents:check; npm run format:check; npm --prefix apps/web run format:check"
 			],
-			"evidence": [],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "2485 passed, 0 failed (F035 S2+S5+S6 combined tree)",
+					"date": "2026-08-24",
+					"notes": "S2: schema SSOT via cached AJV adapter + producer/minCompat checks (37 red before fix); S5: fail-closed corrupt reads AMBER_E_KB_CORRUPT/AMBER_E_ORG_CORRUPT (24 red before fix); S6: removed resting shadow-sm from gates.tsx inputs (3 red before fix)"
+				}
+			],
 			"notes": [
 				"Closes the nine findings from the two-axis review of v1.6.0...HEAD (4 standards, 5 spec) across six vertical slices; see docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md."
 			],
@@ -1302,7 +1309,8 @@
 				"tests/amber-cli-knowledge.test.js",
 				"tests/amber-cli-organization-audit.test.js",
 				"tests/amber-cli-team-hub-tracer.test.js",
-				"docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md"
+				"docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md",
+				"apps/web/src/routes/gates.render.test.tsx"
 			],
 			"updated": "2026-08-24"
 		}
