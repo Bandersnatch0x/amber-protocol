@@ -104,3 +104,6 @@ feature_list.json
 # Local regression-test scratch (go-stock analysis reports and ad-hoc test scripts)
 test-reports/
 test-workflows/
+
+# Session-commands unit-test scratch repo (created at runtime by tests/unit/session-commands.test.js)
+tests/fixtures/session-test-repo/
