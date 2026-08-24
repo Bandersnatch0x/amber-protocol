@@ -25,6 +25,7 @@ const { spawnSync } = require("node:child_process");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const AMBER = path.join(REPO_ROOT, "scripts", "amber.js");
+const { DEPLOYMENT_PROFILES } = require("../lib/core/deployment-profile");
 
 function parseRunnerArgs(argv) {
 	const parsed = { outputPath: null, help: false, fixtureFamily: false };
@@ -126,7 +127,9 @@ function printRunnerHelp() {
 			"Usage: npm run test:governance-loop",
 			"       node scripts/demo/e2e-governance-loop-verify.js [--output <json>] [--help]",
 			"",
-			"Runs the four Governance Console paths on a fresh non-Amber git target.",
+			"Runs the Governance Console paths on fresh non-Amber git targets:",
+			"success (once per deployment profile), adversarial no-evidence refusal,",
+			"rejections, verify-fail recovery, cross-session handoff.",
 			"Exits non-zero on any path regression or product-repo mutation.",
 			"Does not write docs/quality unless --output is given.",
 			"",
@@ -272,8 +275,25 @@ function mkTarget(label) {
 	return target;
 }
 
-function pathSuccess() {
-	const target = mkTarget("success");
+/**
+ * Success path under a declared deployment profile (#160).
+ *
+ * The fixture family carries one success fixture per deployment profile; each
+ * golden must be checked against a run that actually declared that profile,
+ * because the profile flows into artifacts (sync envelope origin.profile).
+ * @param {string} profileLabel - One of DEPLOYMENT_PROFILES.
+ */
+function pathSuccess(profileLabel) {
+	const target = mkTarget(`success-${profileLabel}`);
+	const { writeProfileFile } = require("../lib/core/deployment-profile");
+	const profileErrors = writeProfileFile(target, profileLabel).errors;
+	if (profileErrors.length > 0) {
+		note(
+			"S0",
+			"high",
+			`Success path could not declare profile "${profileLabel}": ${profileErrors.join("; ")}`,
+		);
+	}
 	const log = [];
 	const step = (name, r) => {
 		log.push({
@@ -447,6 +467,7 @@ function pathSuccess() {
 	const success = {
 		target,
 		sessionId: sid,
+		profile: profileLabel,
 		planRel,
 		featureStatus: feature?.status,
 		evidenceCount: feature?.evidence?.length || 0,
@@ -508,8 +529,111 @@ function pathSuccess() {
 		);
 	}
 
-	results.paths.success = success;
 	return success;
+}
+
+/**
+ * Adversarial success variant (#160): attempt to accept a feature with NO
+ * executed verification evidence on the success path. The governance gate
+ * must refuse (R3) — the golden for success-adversarial-no-evidence asserts
+ * successClosed false, highFindings ["R3"], exitCode 1.
+ *
+ * This genuinely exercises the refusal instead of proxying the rejection
+ * path's accept-without-evidence facts.
+ * @returns {{acceptBlocked: boolean, closed: boolean}}
+ */
+function pathSuccessAdversarial() {
+	const target = mkTarget("adversarial");
+	const log = [];
+	const step = (name, r) => {
+		log.push({
+			name,
+			exitCode: r.exitCode,
+			stdoutHead: (r.stdout || "").slice(0, 400),
+			stderrHead: (r.stderr || "").slice(0, 200),
+		});
+		return r;
+	};
+	const { writeProfileFile } = require("../lib/core/deployment-profile");
+	writeProfileFile(target, "personal-node");
+
+	step("init", run(target, ["init", "--target", "."]));
+	const fl = JSON.parse(fs.readFileSync(path.join(target, "feature_list.json"), "utf8"));
+	const featureId = fl.features?.[0]?.id || "F002";
+	if (!fl.features?.length) {
+		step(
+			"feature add",
+			run(target, [
+				"feature",
+				"add",
+				"--target",
+				".",
+				"--id",
+				featureId,
+				"--title",
+				"Adversarial no-evidence feature",
+				"--priority",
+				"1",
+				"--area",
+				"e2e",
+			]),
+		);
+	}
+	step(
+		"plan",
+		run(target, ["plan", "--target", ".", "--feature", featureId, "--title", "Adversarial plan"]),
+	);
+	const plans = fs.readdirSync(path.join(target, "docs", "plans")).filter((f) => f.endsWith(".md"));
+	const planRel = `docs/plans/${plans[0]}`;
+	ensurePlanReady(target, planRel);
+	step("gate --confirm", run(target, ["gate", "--confirm", "--target", ".", "--plan", planRel]));
+
+	// Start a session but NEVER run verify --execute / claim with evidence.
+	const start = step(
+		"session start",
+		run(target, [
+			"session",
+			"start",
+			"--target",
+			".",
+			"--goal",
+			"adversarial no-evidence path",
+			"--feature",
+			featureId,
+			"--confirm",
+			"--json",
+		]),
+	);
+	const sid = parseJsonOut(start)?.sessionId;
+
+	// Attempt accept without any verification evidence.
+	const acceptNoEv = step(
+		"accept without evidence",
+		run(target, ["accept", "--target", ".", "--plan", planRel]),
+	);
+	const acceptBlocked =
+		acceptNoEv.exitCode !== 0 &&
+		(/NO_EVIDENCE|no verification evidence/i.test(acceptNoEv.stdout + acceptNoEv.stderr) ||
+			/Cannot accept/i.test(acceptNoEv.stdout));
+
+	const out = { target, sessionId: sid, acceptBlocked, closed: false, log };
+	if (acceptBlocked) {
+		note(
+			"A1",
+			"info",
+			"Adversarial success variant: accept without verification evidence was refused (R3 semantics).",
+			{ exit: acceptNoEv.exitCode },
+		);
+	} else {
+		note(
+			"A1",
+			"high",
+			"Adversarial success variant: accept without evidence was NOT blocked.",
+			acceptNoEv,
+		);
+	}
+	results.paths.successAdversarial = out;
+	return out;
 }
 
 function pathRejections() {
@@ -1026,8 +1150,9 @@ function summarize() {
 	const highs = results.findings.filter((f) => f.severity === "high");
 	const infos = results.findings.filter((f) => f.severity === "info");
 	results.meta.finishedAt = new Date().toISOString();
+	const successRuns = Object.values(results.paths.success || {});
 	results.summary = {
-		successClosed: Boolean(results.paths.success?.closed),
+		successClosed: successRuns.length > 0 && successRuns.every((run) => Boolean(run?.closed)),
 		rejections: {
 			policyDeny: Boolean(results.paths.rejections?.policyDenyWorks),
 			claimStrict: Boolean(results.paths.rejections?.claimOnlyStrictFails),
@@ -1065,7 +1190,11 @@ function main(argv = process.argv.slice(2)) {
 
 	console.log("Amber e2e governance-loop verify — fresh targets only");
 	const snap = snapshotProduct(REPO_ROOT);
-	pathSuccess();
+	results.paths.success = {};
+	for (const profile of DEPLOYMENT_PROFILES) {
+		results.paths.success[profile] = pathSuccess(profile);
+	}
+	pathSuccessAdversarial();
 	pathRejections();
 	pathVerifyFailRecover();
 	pathCrossSessionHandoff();
@@ -1166,22 +1295,23 @@ function matchGolden(runtimeSummary, golden) {
 /**
  * Build the runtime summary a fixture's golden must be checked against.
  *
- * Every fixture names a governance path (+ variant). The runner produces one
- * result per path (results.paths.*), and the golden for a fixture must match
- * THAT path's runtime outcome — not the whole-run aggregate. Adversarial
- * fixtures assert the governance gate REFUSES the adversarial input; the
- * runner proves that refusal in the rejection path (accept without evidence
- * → R3), so the adversarial success fixture's golden is checked against the
- * refusal facts.
+ * Every fixture names a governance path (+ variant + deployment profile).
+ * The runner produces one result per path — and per profile for the success
+ * path — and the golden for a fixture must match THAT path/profile's runtime
+ * outcome, not the whole-run aggregate. Adversarial fixtures assert the
+ * governance gate REFUSES the adversarial input; the runner exercises that
+ * refusal directly (success-adversarial-no-evidence → R3).
  * @param {object} fixture - Fixture.
  * @param {object} paths - Per-path runtime results (results.paths).
- * @returns {object|null} Runtime summary, or null when the path is unmapped.
+ * @returns {object|null} Runtime summary, or null when the path/profile is unmapped.
  */
 function runtimeSummaryForFixture(fixture, paths) {
 	const variant = fixture.variant || "canonical";
 	if (variant === "adversarial") {
 		// Refusal state: accept without evidence must be blocked (R3).
-		const blocked = Boolean(paths.rejections?.acceptWithoutEvidenceBlocked);
+		const run = paths.successAdversarial;
+		if (!run) return null;
+		const blocked = Boolean(run.acceptBlocked);
 		return {
 			successClosed: false,
 			highFindings: blocked ? ["R3"] : [],
@@ -1190,8 +1320,10 @@ function runtimeSummaryForFixture(fixture, paths) {
 	}
 	switch (fixture.path) {
 		case "success": {
-			const result = paths.success;
-			const closed = Boolean(result?.closed);
+			const profile = fixture.deploymentProfile || "personal-node";
+			const result = paths.success?.[profile];
+			if (!result) return null;
+			const closed = Boolean(result.closed);
 			return { successClosed: closed, highFindings: [], exitCode: closed ? 0 : 1 };
 		}
 		case "rejection": {

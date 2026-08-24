@@ -103,7 +103,12 @@ test("matchGolden detects a highFindings mismatch", () => {
 
 function healthyPathResults() {
 	return {
-		success: { closed: true },
+		success: {
+			"personal-node": { closed: true },
+			"team-hub": { closed: true },
+			organization: { closed: true },
+		},
+		successAdversarial: { acceptBlocked: true },
 		rejections: {
 			policyDenyWorks: true,
 			claimOnlyStrictFails: true,
@@ -129,16 +134,19 @@ test("reportFixtureCoverage is green on a healthy run (canonical goldens match, 
 
 test("reportFixtureCoverage fails when a canonical golden drifts from its path result", () => {
 	const paths = healthyPathResults();
-	paths.success.closed = false; // success path no longer closes
+	paths.success["personal-node"].closed = false; // personal-node success no longer closes
 	const report = reportFixtureCoverage(paths);
 	const failure = report.mismatches.find((m) => m.fixtureId === "success-minimal");
 	assert.ok(failure, "success-minimal golden must mismatch an unclosed success path");
 	assert.ok(failure.diffs.some((d) => d.includes("successClosed") || d.includes("exitCode")));
+	// team-hub/organization runs still closed → their fixtures still match
+	const teamHub = report.mismatches.find((m) => m.fixtureId === "success-team-hub");
+	assert.equal(teamHub, undefined, "team-hub fixture bound to its own profile run");
 });
 
 test("reportFixtureCoverage fails when the adversarial refusal is NOT proven", () => {
 	const paths = healthyPathResults();
-	paths.rejections.acceptWithoutEvidenceBlocked = false; // gate failed to block
+	paths.successAdversarial.acceptBlocked = false; // gate failed to block
 	const report = reportFixtureCoverage(paths);
 	const failure = report.mismatches.find((m) => m.fixtureId === "success-adversarial-no-evidence");
 	assert.ok(failure, "adversarial golden must mismatch when the refusal is not proven");
