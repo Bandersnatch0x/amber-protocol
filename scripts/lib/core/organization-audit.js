@@ -13,6 +13,7 @@
 
 const crypto = require("node:crypto");
 const { sha256 } = require("./context-hash");
+const { readJSONL, appendJSONL } = require("./jsonl");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -27,18 +28,8 @@ function ensureDir(cwd) {
 }
 
 function readAllEvents(cwd) {
-	const filePath = auditLedgerPath(cwd);
-	if (!fs.existsSync(filePath)) return [];
-	const events = [];
-	for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/).filter(Boolean)) {
-		try {
-			events.push(JSON.parse(line));
-		} catch {
-			// caller decides fail-closed policy
-			throw new Error("audit ledger is corrupt");
-		}
-	}
-	return events;
+	// fail closed: any corrupt line is an error, never a silent gap
+	return readJSONL(auditLedgerPath(cwd), { onCorrupt: "throw" });
 }
 
 /**
@@ -66,8 +57,7 @@ function recordAuditEvent(
 		...payload,
 		evidenceHash: sha256(JSON.stringify(payload)),
 	};
-	fs.appendFileSync(auditLedgerPath(cwd), JSON.stringify(event) + "\n", "utf8");
-	return event;
+	return appendJSONL(auditLedgerPath(cwd), event);
 }
 
 /**

@@ -8,6 +8,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { codedError } = require("./error-catalog");
+const { readJSONL } = require("./jsonl");
 
 const GENESIS = "0".repeat(64);
 
@@ -36,19 +37,9 @@ function hashRecord(record, prevHash) {
 }
 
 function readLedger(ledgerPath) {
-	if (!fs.existsSync(ledgerPath)) return [];
-	return fs
-		.readFileSync(ledgerPath, "utf8")
-		.split("\n")
-		.map((line) => line.trim())
-		.filter(Boolean)
-		.map((line) => {
-			try {
-				return JSON.parse(line);
-			} catch {
-				return { _unparseable: line };
-			}
-		});
+	// SIEM walk semantics: broken lines stay visible as { _unparseable } —
+	// data, not refusal (ledger-export reports intact:false downstream).
+	return readJSONL(ledgerPath, { onCorrupt: "mark" });
 }
 
 function appendLedgerRecord(ledgerPath, record) {

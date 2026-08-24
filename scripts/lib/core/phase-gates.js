@@ -11,6 +11,7 @@
 
 const crypto = require("node:crypto");
 const { sha256 } = require("./context-hash");
+const { readJSONL, appendJSONL } = require("./jsonl");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -141,26 +142,11 @@ function validatePhaseEvidence(cwd, phase) {
 }
 
 function readTransitions(cwd) {
-	const filePath = transitionsPath(cwd);
-	if (!fs.existsSync(filePath)) return [];
-	return fs
-		.readFileSync(filePath, "utf8")
-		.split(/\r?\n/)
-		.filter(Boolean)
-		.map((line) => {
-			try {
-				return JSON.parse(line);
-			} catch {
-				return null;
-			}
-		})
-		.filter(Boolean);
+	return readJSONL(transitionsPath(cwd), { onCorrupt: "skip" });
 }
 
 function appendTransition(cwd, transition) {
-	ensureDir(cwd);
-	fs.appendFileSync(transitionsPath(cwd), JSON.stringify(transition) + "\n", "utf8");
-	return transition;
+	return appendJSONL(transitionsPath(cwd), transition);
 }
 
 /**

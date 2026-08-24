@@ -22,6 +22,7 @@
 
 const crypto = require("node:crypto");
 const { sha256 } = require("./context-hash");
+const { readJSONL, appendJSONL, foldJSONL } = require("./jsonl");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -76,20 +77,7 @@ function pageSourceHash(page) {
  * @returns {Array<object>} Current state per record, in first-seen order.
  */
 function readAllRecords(cwd) {
-	const filePath = recordsPath(cwd);
-	if (!fs.existsSync(filePath)) return [];
-	const byId = new Map();
-	for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/).filter(Boolean)) {
-		try {
-			const parsed = JSON.parse(line);
-			if (parsed && typeof parsed.recordId === "string") {
-				byId.set(parsed.recordId, parsed);
-			}
-		} catch {
-			// corrupt line skipped; caller decides fail-closed policy
-		}
-	}
-	return [...byId.values()];
+	return foldJSONL(recordsPath(cwd), "recordId", { onCorrupt: "skip" });
 }
 
 /**
@@ -99,26 +87,11 @@ function readAllRecords(cwd) {
  * @returns {Array<object>} Every state line ever appended for the record.
  */
 function readRecordLineage(cwd, recordId) {
-	const filePath = recordsPath(cwd);
-	if (!fs.existsSync(filePath)) return [];
-	const lineage = [];
-	for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/).filter(Boolean)) {
-		try {
-			const parsed = JSON.parse(line);
-			if (parsed && parsed.recordId === recordId) {
-				lineage.push(parsed);
-			}
-		} catch {
-			// corrupt line skipped
-		}
-	}
-	return lineage;
+	return readJSONL(recordsPath(cwd), { onCorrupt: "skip" }).filter((r) => r.recordId === recordId);
 }
 
 function appendRecordState(cwd, state) {
-	ensureDir(cwd);
-	fs.appendFileSync(recordsPath(cwd), JSON.stringify(state) + "\n", "utf8");
-	return state;
+	return appendJSONL(recordsPath(cwd), state);
 }
 
 /**

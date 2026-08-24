@@ -10,6 +10,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { readJson, resolvePathWithin } = require("./fs-utils");
+const { readJSONL, appendJSONL } = require("./jsonl");
 
 const SCHEMA_VERSION = "1.0.0";
 const INDEX_REL = path.join("docs", "wiki", "context-index.md");
@@ -120,29 +121,13 @@ function regenerateIndex(targetRoot) {
 
 /** Append one JSON line to the append-only event log. */
 function appendEvent(targetRoot, event) {
-	const file = eventsPath(targetRoot);
-	ensureDir(path.dirname(file));
 	const recorded = { ...event, at: new Date().toISOString() };
-	fs.appendFileSync(file, JSON.stringify(recorded) + "\n", "utf8");
-	return recorded;
+	return appendJSONL(eventsPath(targetRoot), recorded);
 }
 
 /** Read all events as objects. */
 function readEvents(targetRoot) {
-	const file = eventsPath(targetRoot);
-	if (!fs.existsSync(file)) return [];
-	return fs
-		.readFileSync(file, "utf8")
-		.split("\n")
-		.filter(Boolean)
-		.map((line) => {
-			try {
-				return JSON.parse(line);
-			} catch {
-				return null;
-			}
-		})
-		.filter(Boolean);
+	return readJSONL(eventsPath(targetRoot), { onCorrupt: "skip" });
 }
 
 module.exports = {
