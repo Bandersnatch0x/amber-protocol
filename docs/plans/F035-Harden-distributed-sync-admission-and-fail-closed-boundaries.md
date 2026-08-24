@@ -272,6 +272,9 @@ Primary files:
 - Gate inputs satisfy the `DESIGN.md` flat-at-rest rule.
 - All nine original review findings have a linked negative test and closure
   evidence.
+- Phase boundary guardrails: no live transport, execution, or agent dispatch is
+  added — transport stays preparation/report-only (decision D1), and no phase
+  boundary expands.
 
 ## Verification
 
@@ -305,6 +308,9 @@ satisfy completion.
 
 ## Evidence Schema
 
+- Command: per-slice targeted suites (`node --test` on `tests/unit/sync-remote.test.js`, `tests/unit/sync-conflicts.test.js`, `tests/amber-cli-sync-envelope.test.js`, `tests/unit/distributed-governance-schemas.test.js`, `tests/unit/identity-bootstrap.test.js`, `tests/amber-cli-sync-conflicts.test.js`, `tests/unit/sync-session.test.js`, `tests/amber-cli-sync-session.test.js`, `tests/amber-cli-team-hub-tracer.test.js`, `tests/unit/knowledge-base.test.js`, `tests/unit/organization-audit.test.js`, `tests/amber-cli-knowledge.test.js`, `tests/amber-cli-organization-audit.test.js`, and `npm --prefix apps/web test`), then the repository gates `npm test`, `npm run doctor`, `npm run manifests`, `npm run gen:agents:check`, `npm run format:check`, and `npm --prefix apps/web run format:check`.
+- Result: every targeted suite exits 0 — S1 24 red→green, then sync-remote 35/35, sync-conflicts 14/14, CLI sync-envelope 11/11, adjacent sync 23/23, schemas 16/16; S2 37 red→green, then 111/111 targeted + 42/42 adjacent; S3 21 red→green, then 118/118 targeted + 87/87 adjacent; S4 13 red→green, then 25/25; S5 24 red→green, then 74/74; S6 3 red→green, then web exit 0 (571 tests). Full `npm test` exits 0 with 2513 passed / 0 failed.
+- Date: 2026-08-24.
 - Plan gate result and explicit user confirmation.
 - Feature/session identity and exact booked paths.
 - Before-fix negative-test failures for every P1/P2 finding.
