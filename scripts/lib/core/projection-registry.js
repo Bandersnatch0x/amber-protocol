@@ -18,7 +18,6 @@
  * `artifact_type`).
  */
 
-const crypto = require("node:crypto");
 const { sha256 } = require("./context-hash");
 const fs = require("node:fs");
 const path = require("node:path");

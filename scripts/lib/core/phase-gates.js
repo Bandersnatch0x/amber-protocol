@@ -33,10 +33,6 @@ function transitionsPath(cwd) {
 	return path.join(cwd, ".amber", "phases", "transitions.jsonl");
 }
 
-function ensureDir(cwd) {
-	fs.mkdirSync(path.join(cwd, ".amber", "phases"), { recursive: true });
-}
-
 function hasContextPages(cwd) {
 	const dir = path.join(cwd, ".amber", "context", "pages");
 	if (!fs.existsSync(dir)) return false;

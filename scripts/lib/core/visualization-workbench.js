@@ -21,8 +21,6 @@
 
 const { sha256 } = require("./context-hash");
 const { readCanonicalPages: canonicalPages } = require("./context-store");
-const fs = require("node:fs");
-const path = require("node:path");
 
 const PROJECTION_KINDS = Object.freeze([
 	"temporal",
@@ -91,7 +89,7 @@ function renderCausal(targetRoot) {
 	}));
 	const sourceIndex = new Map();
 	for (const page of pages) {
-		for (const [sourceId, source] of Object.entries(page.sources || {})) {
+		for (const [_sourceId, source] of Object.entries(page.sources || {})) {
 			const ref = source && source.ref;
 			if (!ref) continue;
 			if (!sourceIndex.has(ref)) sourceIndex.set(ref, []);

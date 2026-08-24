@@ -3,7 +3,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 
 const {
@@ -13,7 +12,7 @@ const {
 	checkIsolation,
 	recordRetentionAction,
 } = require("../../scripts/lib/core/organization-audit");
-const { mkTarget, addPage } = require("../helpers/harness");
+const { mkTarget } = require("../helpers/harness");
 
 // ── Audit ledger ──────────────────────────────────────────────
 

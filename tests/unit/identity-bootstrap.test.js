@@ -97,7 +97,7 @@ test("inferFromGit returns null when git config is empty", () => {
 });
 
 test("inferFromGit falls back to global config when local is unset (ADR-0019 D4)", () => {
-	withIsolatedGitConfig((home) => {
+	withIsolatedGitConfig(() => {
 		execSync('git config --global user.email "global@example.com"', { encoding: "utf8" });
 		execSync('git config --global user.name "Global User"', { encoding: "utf8" });
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-global-"));

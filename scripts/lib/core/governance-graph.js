@@ -14,8 +14,6 @@
 
 const { sha256 } = require("./context-hash");
 const { readCanonicalPages: canonicalPages } = require("./context-store");
-const fs = require("node:fs");
-const path = require("node:path");
 
 const DEFAULT_QUERY_LIMIT = 50;
 

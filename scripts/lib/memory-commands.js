@@ -27,7 +27,7 @@ const Ajv = require("ajv");
 const addFormats = require("ajv-formats");
 
 const store = require("./core/memory-store");
-const { sha256, canonicalJson, hashFile } = require("./core/context-hash");
+const { sha256, hashFile } = require("./core/context-hash");
 const {
 	SCHEMA_VERSION,
 	ALPHA_MAX_ENTRIES,
@@ -45,7 +45,6 @@ const {
 	bookText,
 	computeEntryIdFor,
 	withEntryId,
-	candidateK1,
 	rankEntries,
 	maybeResolveRequests,
 } = require("./core/memory-policy");

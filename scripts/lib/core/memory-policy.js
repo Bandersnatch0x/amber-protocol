@@ -14,7 +14,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const store = require("./memory-store");
-const { sha256, canonicalJson } = require("./context-hash");
+const { canonicalJson } = require("./context-hash");
 
 // ── Constants (spec §6 budgets, §10 schema version) ──────────────────────────
 const SCHEMA_VERSION = "1.0.0";

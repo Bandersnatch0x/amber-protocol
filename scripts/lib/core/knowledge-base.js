@@ -46,10 +46,6 @@ function recordsPath(cwd) {
 	return path.join(cwd, ".amber", "knowledge", "records.jsonl");
 }
 
-function ensureDir(cwd) {
-	fs.mkdirSync(path.join(cwd, ".amber", "knowledge"), { recursive: true });
-}
-
 function readPage(cwd, pageId) {
 	const pagePath = path.join(cwd, ".amber", "context", "pages", `${pageId}.json`);
 	if (!fs.existsSync(pagePath)) return null;
