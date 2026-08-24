@@ -51,6 +51,23 @@ const CATALOG = {
 		cause: "A command that needs a file/path argument was invoked without one.",
 		remedy: "Re-run with the documented --flag <path> (see `amber <command> --help`).",
 		layer: "Tooling",
+		related: ["AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_INVALID_ARG: {
+		title: "Command argument is invalid",
+		cause: "A hooks command received an unsupported format or platform value for one of its flags.",
+		remedy:
+			"Re-run with a supported value (see the command's --help, e.g. --format json, --platform claude).",
+		layer: "Tooling",
+		related: ["AMBER_E_MISSING_PATH_ARG"],
+	},
+	AMBER_E_SETTINGS_UNMERGEABLE: {
+		title: "Claude settings file cannot be safely merged",
+		cause:
+			".claude/settings.json is not a valid JSON object, or its hooks shape is incompatible (hooks not an object, UserPromptSubmit not an array).",
+		remedy:
+			"Repair .claude/settings.json to a valid JSON object with an optional hooks.UserPromptSubmit array, then retry; the file is left untouched on this error.",
+		layer: "Tooling",
 		related: [],
 	},
 	AMBER_E_HOOK_PRECOMMIT_BLOCKED: {
@@ -101,6 +118,15 @@ const CATALOG = {
 		layer: "Observability",
 		related: ["AMBER_E_ORG_CORRUPT", "AMBER_E_LEDGER_TAMPERED"],
 	},
+	AMBER_E_KB_DENY: {
+		title: "Knowledge query scope is denied",
+		cause:
+			"A knowledge-base query named a scope (pageId) with no records — deny-wins semantics refuse rather than guess or return an empty success.",
+		remedy:
+			"List valid scopes with `amber knowledge list` (or inspect .amber/knowledge/records.jsonl), then re-query with a scope that has records.",
+		layer: "Governance",
+		related: ["AMBER_E_ORG_DENY", "AMBER_E_GRAPH_DENY"],
+	},
 	AMBER_E_ORG_CORRUPT: {
 		title: "Organization audit ledger is corrupt or unreadable",
 		cause:
@@ -109,6 +135,41 @@ const CATALOG = {
 			"Restore .amber/audit/events.jsonl from version control; never delete it to reset — the ledger is append-only provenance.",
 		layer: "Observability",
 		related: ["AMBER_E_KB_CORRUPT", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_ORG_DENY: {
+		title: "Organization audit query is denied",
+		cause:
+			"The audit query was cross-tenant, missing a scope, or scoped to a tenant/repository with no events — deny-wins semantics refuse rather than guess or return an empty success.",
+		remedy:
+			"Query your own tenant with an explicit scope that has events; cross-tenant audit is not permitted.",
+		layer: "Governance",
+		related: ["AMBER_E_KB_DENY", "AMBER_E_GRAPH_DENY"],
+	},
+	AMBER_E_GRAPH_DENY: {
+		title: "Governance graph query scope is denied",
+		cause:
+			"A graph query named an exact scope with no matching node — deny-wins semantics refuse rather than guess or return an empty graph.",
+		remedy:
+			"Query `amber object query` without an exact scope, or use a node id that exists in the graph.",
+		layer: "Governance",
+		related: ["AMBER_E_ORG_DENY", "AMBER_E_KB_DENY"],
+	},
+	AMBER_E_PROJECTION_MISSING: {
+		title: "Governance projection has not been built",
+		cause:
+			"The projection manifest or output file is absent, so the derived projection cannot be served or verified.",
+		remedy:
+			"Build it with `amber projection rebuild` (see the projection registry), then re-check status.",
+		layer: "Observability",
+		related: ["AMBER_E_PROJECTION_DRIFT", "AMBER_E_CONTEXT_PROJECTION_MISSING"],
+	},
+	AMBER_E_PROJECTION_DRIFT: {
+		title: "Governance projection is drifted",
+		cause:
+			"The projection manifest is unreadable, fails its schema, or its recorded source/output hashes no longer match the canonical state — the derived view may be stale or tampered.",
+		remedy: "Rebuild it with `amber projection rebuild`; investigate unexpected repeated drift.",
+		layer: "Verification",
+		related: ["AMBER_E_PROJECTION_MISSING", "AMBER_E_CONTEXT_PROJECTION_DRIFT"],
 	},
 	AMBER_E_CONTEXT_SCHEMA_INVALID: {
 		title: "Context page payload fails the page schema",

@@ -76,6 +76,24 @@ test("every ledger-corruption error code is registered", () => {
 	}
 });
 
+test("every deny-scope and projection error code is registered", () => {
+	for (const code of [
+		"AMBER_E_KB_DENY",
+		"AMBER_E_ORG_DENY",
+		"AMBER_E_GRAPH_DENY",
+		"AMBER_E_PROJECTION_MISSING",
+		"AMBER_E_PROJECTION_DRIFT",
+	]) {
+		assert.ok(getEntry(code), `${code} must be explainable`);
+	}
+});
+
+test("every hooks error code is registered", () => {
+	for (const code of ["AMBER_E_INVALID_ARG", "AMBER_E_SETTINGS_UNMERGEABLE"]) {
+		assert.ok(getEntry(code), `${code} must be explainable`);
+	}
+});
+
 test("every production Context error code is registered", () => {
 	const libRoot = path.join(__dirname, "..", "..", "scripts", "lib");
 	const discovered = new Set();
