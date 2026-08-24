@@ -499,7 +499,8 @@ function validateHandoff(target) {
 	// Count session directories when present.
 	let sessionCount = 0;
 	try {
-		const sessionsDir = path.join(targetRoot, ".amber", "sessions");
+		const { resolveStateDirForRead } = require("../state-dir-resolver");
+		const sessionsDir = path.join(resolveStateDirForRead(targetRoot), "sessions");
 		if (pathExists(sessionsDir)) {
 			sessionCount = require("node:fs")
 				.readdirSync(sessionsDir, { withFileTypes: true })

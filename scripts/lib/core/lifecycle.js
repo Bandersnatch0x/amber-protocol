@@ -123,9 +123,7 @@ function resolvePendingGate(targetRoot, sessionId) {
 	const { routes } = loadTargetRoutes(targetRoot);
 	const route = routes.find((r) => r.routeId === routeId);
 	const gates = route && Array.isArray(route.gates) ? route.gates : [];
-	const events = readSessionEvents(
-		loaded.sessionDir || path.join(targetRoot, ".amber", "sessions", sessionId),
-	);
+	const events = readSessionEvents(loaded.sessionDir);
 	const passed = new Set(
 		events
 			.filter((e) => e && e.type === "gate_passed" && e.data)

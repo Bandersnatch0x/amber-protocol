@@ -45,6 +45,7 @@ const ALLOWLIST = [
 	"tests/unit/state-dir-resolver.test.js",
 	"tests/unit/state-migration.test.js",
 	"tests/unit/governance-legacy-state-dir.test.js", // regression #60: exercises legacy .harness fallback
+	"tests/unit/legacy-sessions-state-dir.test.js", // F036-S1: exercises legacy .harness sessions fallback
 	"tests/amber-cli.test.js", // shim-forwarding subtest spawns legacy entrypoints
 	"package.json", // legacy bin alias
 	"package-lock.json",
