@@ -149,12 +149,19 @@ jobs:
         run: npm audit --audit-level=moderate
         continue-on-error: true
 
+      # apps/web is not part of the root workspace, so the audit above never
+      # reaches it. Scan its lockfile explicitly (no install needed).
+      - name: Run web viewer security audit
+        run: npm audit --prefix apps/web --package-lock-only --audit-level=moderate
+        continue-on-error: true
+
       - name: Check production dependencies for known vulnerabilities
         run: |
           echo "Security scan completed"
           # Release gate covers dependencies shipped to users. The full dependency
           # tree is still scanned above so development-tool advisories stay visible.
           npm audit --omit=dev --audit-level=high
+          npm audit --prefix apps/web --package-lock-only --omit=dev --audit-level=high
 
   performance:
     name: Performance
