@@ -6,11 +6,15 @@ const path = require("node:path");
 const { canonicalJson, sha256 } = require("./context-hash");
 const { resolvePathWithin } = require("./fs-utils");
 const { pagePath, readEvents } = require("./context-store");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 const EVIDENCE_SCHEMA_VERSION = "1.0.0";
 
+// Verification evidence is a post-rename context-layer state kind: it never
+// existed under .harness, so reads and creates both target the canonical dir
+// (see the note in context-store.js).
 function verificationDir(targetRoot) {
-	return resolvePathWithin(targetRoot, path.join(".amber", "context", "verification"), {
+	return resolvePathWithin(targetRoot, statePathForCreate(targetRoot, "context", "verification"), {
 		label: "Context verification evidence directory",
 	});
 }
@@ -18,7 +22,7 @@ function verificationDir(targetRoot) {
 function evidencePath(targetRoot, pageId) {
 	return resolvePathWithin(
 		targetRoot,
-		path.join(".amber", "context", "verification", `${pageId}.json`),
+		statePathForCreate(targetRoot, "context", "verification", `${pageId}.json`),
 		{
 			label: "Context verification evidence file",
 		},

@@ -7,6 +7,8 @@ const { auditProject } = require("./audit");
 
 const { pathExists, readText, resolveTarget } = require("./fs-utils");
 
+const { statePathForCreate } = require("../state-dir-resolver");
+
 const { inspect: inspectMaintenance } = require("../maintenance");
 
 const { scaffoldHarness } = require("./scaffold");
@@ -472,8 +474,9 @@ function generateAdoptionReport(target, options = {}) {
 		}
 		// Default: write to the target's .amber/reports/ so the adoption report
 		// stays co-located with the project's governance state instead of
-		// polluting the Amber tooling repository.
-		return uniqueAdoptionReportPath(targetRoot, path.join(targetRoot, ".amber", "reports"));
+		// polluting the Amber tooling repository. Reports are newly created
+		// artifacts, so the create policy (always .amber) applies.
+		return uniqueAdoptionReportPath(targetRoot, statePathForCreate(targetRoot, "reports"));
 	})();
 	const warnings = [];
 

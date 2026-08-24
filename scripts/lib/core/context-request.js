@@ -116,8 +116,8 @@ function kindOf(ref) {
 
 /** Most recent session ledger for automatic evidence bundling. */
 function findLatestLedger(targetRoot) {
-	const { resolveStateDirForRead } = require("../state-dir-resolver");
-	const sessionsRoot = path.join(resolveStateDirForRead(targetRoot), "sessions");
+	const { statePath } = require("../state-dir-resolver");
+	const sessionsRoot = statePath(targetRoot, "sessions");
 	if (!fs.existsSync(sessionsRoot)) return null;
 	let best = null;
 	const walk = (dir) => {

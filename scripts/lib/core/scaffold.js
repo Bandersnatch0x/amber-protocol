@@ -20,6 +20,8 @@ const {
 
 const { validateWiki } = require("./validators");
 
+const { statePathForCreate } = require("../state-dir-resolver");
+
 const { detectGitWorkflow } = require("./git-workflow-detector");
 const { generateGovernanceAdvice } = require("./team-governance-advisor");
 
@@ -326,9 +328,10 @@ function checkWikiReadiness(target) {
 }
 
 // Write the init detection report to <target>/.amber/init-report.json. writeJson
-// creates the .amber directory as needed.
+// creates the .amber directory as needed. The report is a freshly created
+// artifact, so the create policy (always .amber) applies.
 function saveInitReport(targetRoot, data) {
-	const reportPath = path.join(targetRoot, ".amber", "init-report.json");
+	const reportPath = statePathForCreate(targetRoot, "init-report.json");
 	writeJson(reportPath, data);
 	return reportPath;
 }

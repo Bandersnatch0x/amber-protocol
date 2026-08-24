@@ -15,9 +15,13 @@
 const crypto = require("node:crypto");
 const path = require("node:path");
 const { readJSONL, appendJSONL } = require("./jsonl");
+const { statePathForCreate } = require("../state-dir-resolver");
 
+// Read receipts (#162, post-rename state kind): the ledger never existed under
+// .harness, so reads and creates both target the canonical dir (see the note
+// in organization-audit.js).
 function receiptsLedgerPath(cwd) {
-	return path.join(cwd, ".amber", "projections", "receipts.jsonl");
+	return statePathForCreate(cwd, "projections", "receipts.jsonl");
 }
 
 /**

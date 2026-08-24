@@ -20,6 +20,7 @@ const {
 	loadProvenance,
 	writeProvenance,
 } = require("./scaffold-provenance");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 function detectScaffoldDrift(targetRoot, { templateRoot = TEMPLATE_ROOT } = {}) {
 	const provenance = loadProvenance(targetRoot);
@@ -107,7 +108,9 @@ function refreshAmberOwnedFiles(targetRoot, { templateRoot = TEMPLATE_ROOT } = {
 	for (const f of drift.files) {
 		if (f.tier !== "controlled") continue;
 		if (f.classification === "customized" || f.classification === "ambiguous") {
-			const proposalDir = path.join(targetRoot, ".amber", "maintenance", "proposals");
+			// Proposals are freshly created artifacts (like maintenance-propose),
+			// so the create policy (always .amber) applies.
+			const proposalDir = statePathForCreate(targetRoot, "maintenance", "proposals");
 			fs.mkdirSync(proposalDir, { recursive: true });
 			fs.copyFileSync(
 				path.join(templateRoot, f.path),

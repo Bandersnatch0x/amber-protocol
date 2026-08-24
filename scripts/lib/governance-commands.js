@@ -92,10 +92,13 @@ function exportGovernanceEvidenceBody(target, options = {}) {
 	if (options.all) {
 		// Batch export all sessions and executions
 		const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-		const batchDir = path.join(target, ".amber", "governance", "evidence", timestamp);
+		const { resolveStateDirForRead, statePathForCreate } = require("./state-dir-resolver");
+		// The batch dir is a freshly created artifact, so the create policy
+		// (always .amber) applies; the exported state below is read through the
+		// read policy so legacy .harness state is still visible.
+		const batchDir = statePathForCreate(target, "governance", "evidence", timestamp);
 		fs.mkdirSync(batchDir, { recursive: true });
 
-		const { resolveStateDirForRead } = require("./state-dir-resolver");
 		const stateDir = resolveStateDirForRead(target);
 		const sessionsDir = path.join(stateDir, "sessions");
 		const executionsDir = path.join(stateDir, "executions");

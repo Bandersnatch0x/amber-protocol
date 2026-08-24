@@ -14,6 +14,7 @@ const { sha256 } = require("./context-hash");
 const { readJSONL, appendJSONL } = require("./jsonl");
 const fs = require("node:fs");
 const path = require("node:path");
+const { statePath, statePathForCreate } = require("../state-dir-resolver");
 
 const PHASES = Object.freeze(["phase-0", "phase-1", "phase-2", "phase-3", "phase-4"]);
 
@@ -29,18 +30,21 @@ const PHASE_REQUIREMENTS = Object.freeze({
 	],
 });
 
+// Phase-gate state (#168, post-rename state kind): transitions never existed
+// under .harness, so reads and creates both target the canonical dir (see the
+// note in organization-audit.js).
 function transitionsPath(cwd) {
-	return path.join(cwd, ".amber", "phases", "transitions.jsonl");
+	return statePathForCreate(cwd, "phases", "transitions.jsonl");
 }
 
 function hasContextPages(cwd) {
-	const dir = path.join(cwd, ".amber", "context", "pages");
+	const dir = statePath(cwd, "context", "pages");
 	if (!fs.existsSync(dir)) return false;
 	return fs.readdirSync(dir).filter((f) => f.endsWith(".json")).length > 0;
 }
 
 function hasProfile(cwd) {
-	const profilePath = path.join(cwd, ".amber", "profile.json");
+	const profilePath = statePath(cwd, "profile.json");
 	if (!fs.existsSync(profilePath)) return false;
 	try {
 		const raw = JSON.parse(fs.readFileSync(profilePath, "utf8"));
@@ -51,17 +55,17 @@ function hasProfile(cwd) {
 }
 
 function hasEnvelopes(cwd) {
-	const dir = path.join(cwd, ".amber", "sync", "envelopes");
+	const dir = statePath(cwd, "sync", "envelopes");
 	return fs.existsSync(dir) && fs.readdirSync(dir).filter((f) => f.endsWith(".json")).length > 0;
 }
 
 function hasProjections(cwd) {
-	const dir = path.join(cwd, ".amber", "projections");
+	const dir = statePath(cwd, "projections");
 	return fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
 }
 
 function hasKnowledge(cwd) {
-	return fs.existsSync(path.join(cwd, ".amber", "knowledge", "records.jsonl"));
+	return fs.existsSync(statePath(cwd, "knowledge", "records.jsonl"));
 }
 
 /**
@@ -98,13 +102,13 @@ function requirementSatisfied(cwd, requirement) {
 		case "sync session proven":
 			return hasEnvelopes(cwd);
 		case "conflict preservation proven":
-			return fs.existsSync(path.join(cwd, ".amber", "sync", "conflicts.jsonl"));
+			return fs.existsSync(statePath(cwd, "sync", "conflicts.jsonl"));
 		case "projections rebuildable":
 			return hasProjections(cwd);
 		case "knowledge base lifecycle proven":
 			return hasKnowledge(cwd);
 		case "organization audit proven":
-			return fs.existsSync(path.join(cwd, ".amber", "audit", "events.jsonl"));
+			return fs.existsSync(statePath(cwd, "audit", "events.jsonl"));
 		default:
 			return false;
 	}

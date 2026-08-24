@@ -30,6 +30,7 @@ const { sha256 } = require("./context-hash");
 const { readJSONL, appendJSONL, foldJSONL } = require("./jsonl");
 const fs = require("node:fs");
 const path = require("node:path");
+const { statePath, statePathForCreate } = require("../state-dir-resolver");
 
 const KB_CORRUPT_CODE = "AMBER_E_KB_CORRUPT";
 
@@ -49,12 +50,18 @@ const ACTIVE_STATUSES = new Set(["candidate", "review", "accepted", "stale", "re
 // Terminal statuses: no further lifecycle transition (except none at all).
 const TERMINAL_STATUSES = new Set(["superseded", "retired"]);
 
+// Knowledge Records (#163, post-rename state kind): the ledger never existed
+// under .harness, so reads and creates both target the canonical dir —
+// statePathForCreate keeps the write policy (always .amber) even on a
+// not-yet-migrated legacy repo, and reads lose nothing under either policy.
 function recordsPath(cwd) {
-	return path.join(cwd, ".amber", "knowledge", "records.jsonl");
+	return statePathForCreate(cwd, "knowledge", "records.jsonl");
 }
 
 function readPage(cwd, pageId) {
-	const pagePath = path.join(cwd, ".amber", "context", "pages", `${pageId}.json`);
+	// Context Pages are post-rename state; the read policy finds them under
+	// .amber once it exists and nothing either way before that.
+	const pagePath = statePath(cwd, "context", "pages", `${pageId}.json`);
 	if (!fs.existsSync(pagePath)) return null;
 	try {
 		return JSON.parse(fs.readFileSync(pagePath, "utf8"));

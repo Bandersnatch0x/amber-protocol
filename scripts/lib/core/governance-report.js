@@ -8,7 +8,7 @@ const { resolveRegistryPath } = require("./team");
 const { inspectGovernanceReadiness, ACTION_LIBRARY } = require("./governance-readiness");
 const { readJsonSafe, resolveTarget } = require("./fs-utils");
 const { readJSONL } = require("./jsonl");
-const { resolveStateDirForRead } = require("../state-dir-resolver");
+const { resolveStateDirForRead, statePath } = require("../state-dir-resolver");
 const { gatherState, buildContext, inferNextStep } = require("./lifecycle");
 const { shellQuote } = require("./text-utils");
 const { detectNoProgress } = require("../workflow-assessment");
@@ -247,7 +247,7 @@ function collectWorkflowEffectiveness(targetRoot, sessionId) {
 // mix (auto T1/T2 + dreaming/conversion vs human escape-hatch) from the
 // memory-request-created ledger. Read-only; empty ledger → omitted section.
 function collectMemoryChannelMix(targetRoot) {
-	const eventsPath = path.join(targetRoot, ".amber", "context", "events.jsonl");
+	const eventsPath = statePath(targetRoot, "context", "events.jsonl");
 	if (!fs.existsSync(eventsPath)) return null;
 	const channels = {};
 	let total = 0;

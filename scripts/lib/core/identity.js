@@ -25,6 +25,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
+const { statePath } = require("../state-dir-resolver");
+
 const DEFAULT_TENANT_ID = "local";
 const DEFAULT_ORGANIZATION_ID = "personal";
 const DEFAULT_REPOSITORY_GENERATION = 0;
@@ -88,7 +90,7 @@ function inferFromGit(cwd) {
  * @returns {object|null} Parsed identity fields, or null if absent/malformed.
  */
 function loadIdentityFile(cwd) {
-	const filePath = path.join(cwd, ".amber", "identity.json");
+	const filePath = statePath(cwd, "identity.json");
 	if (!fs.existsSync(filePath)) {
 		return null;
 	}

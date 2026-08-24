@@ -11,25 +11,30 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { readJson, resolvePathWithin } = require("./fs-utils");
 const { readJSONL, appendJSONL } = require("./jsonl");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 const SCHEMA_VERSION = "1.0.0";
 const INDEX_REL = path.join("docs", "wiki", "context-index.md");
 const PAGE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+// Context-layer state is a post-rename state kind (ADR-0009, 2026-08-07): it
+// never existed under .harness, so reads and creates both target the canonical
+// dir — statePathForCreate keeps the write policy (always .amber) even on a
+// not-yet-migrated legacy repo, and reads lose nothing under either policy.
 function pagesDir(targetRoot) {
-	return resolvePathWithin(targetRoot, path.join(".amber", "context", "pages"), {
+	return resolvePathWithin(targetRoot, statePathForCreate(targetRoot, "context", "pages"), {
 		label: "Context Pages directory",
 	});
 }
 
 function requestsDir(targetRoot) {
-	return resolvePathWithin(targetRoot, path.join(".amber", "context", "requests"), {
+	return resolvePathWithin(targetRoot, statePathForCreate(targetRoot, "context", "requests"), {
 		label: "Context requests directory",
 	});
 }
 
 function eventsPath(targetRoot) {
-	return resolvePathWithin(targetRoot, path.join(".amber", "context", "events.jsonl"), {
+	return resolvePathWithin(targetRoot, statePathForCreate(targetRoot, "context", "events.jsonl"), {
 		label: "Context events file",
 	});
 }
@@ -43,9 +48,11 @@ function pagePath(targetRoot, pageId) {
 		throw new Error(`Invalid Context Page id: ${pageId}. Expected kebab-case.`);
 	}
 	pagesDir(targetRoot);
-	return resolvePathWithin(targetRoot, path.join(".amber", "context", "pages", `${pageId}.json`), {
-		label: "Context Page file",
-	});
+	return resolvePathWithin(
+		targetRoot,
+		statePathForCreate(targetRoot, "context", "pages", `${pageId}.json`),
+		{ label: "Context Page file" },
+	);
 }
 
 /** List accepted pages as [{ pageId, filePath }] via directory scan. */

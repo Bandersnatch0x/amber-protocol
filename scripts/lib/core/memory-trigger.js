@@ -30,11 +30,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const store = require("./memory-store");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 const TRIGGER_CHANNELS = new Set(["t1-writeback", "t2-writeback"]);
 
+// Triggers are memory-layer state (ADR-0018, post-rename): reads and creates
+// both target the canonical dir (see the note in memory-store.js).
 function triggersDir(targetRoot) {
-	return path.join(targetRoot, ".amber", "memory", "triggers");
+	return statePathForCreate(targetRoot, "memory", "triggers");
 }
 
 function triggerPath(targetRoot, triggerId) {

@@ -22,6 +22,7 @@ const { sha256 } = require("./context-hash");
 const fs = require("node:fs");
 const path = require("node:path");
 const { readCanonicalPages } = require("./context-store");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 const PROJECTION_TYPES = Object.freeze([
 	"governance-graph",
@@ -33,8 +34,11 @@ const AMBER_PROTOCOL_VERSION = require(
 	path.resolve(__dirname, "..", "..", "..", "package.json"),
 ).version;
 
+// Projections (#158 Stage 4, post-rename state kind): manifests never existed
+// under .harness, so reads and creates both target the canonical dir (see the
+// note in organization-audit.js).
 function projectionsDir(targetRoot) {
-	return path.join(targetRoot, ".amber", "projections");
+	return statePathForCreate(targetRoot, "projections");
 }
 
 function projectionManifestPath(targetRoot, projectionType) {

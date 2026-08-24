@@ -38,6 +38,7 @@ const addFormats = require("ajv-formats");
 const { verifyPages } = require("./context-verify");
 const { listPages, readPage, readEvents, appendEvent } = require("./context-store");
 const { sha256, canonicalJson } = require("./context-hash");
+const { statePathForCreate } = require("../state-dir-resolver");
 const { relativeSlash, resolvePathWithin } = require("./fs-utils");
 const {
 	KNOWLEDGE_KINDS,
@@ -74,9 +75,10 @@ function validateLoadoutShape(loadout) {
 		.map((error) => `${error.instancePath || "/"} ${error.message}`);
 }
 
-/** Loadouts directory: .amber/context/loadouts/ */
+/** Loadouts directory: .amber/context/loadouts/ (post-rename state kind — see
+ * the note in context-store.js; reads and creates both target the canonical dir). */
 function loadoutsDir(targetRoot) {
-	return resolvePathWithin(targetRoot, path.join(".amber", "context", "loadouts"), {
+	return resolvePathWithin(targetRoot, statePathForCreate(targetRoot, "context", "loadouts"), {
 		label: "Context Loadouts directory",
 	});
 }

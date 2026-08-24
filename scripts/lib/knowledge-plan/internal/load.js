@@ -5,10 +5,10 @@ const path = require("node:path");
 const { loadYamlFile } = require("../../core/simple-yaml");
 const { pathExists, readJson, resolveTarget } = require("../../core/fs-utils");
 const { validateKnowledgePlanData } = require("./validate");
+const { statePath } = require("../../state-dir-resolver");
 
 const KNOWLEDGE_PLAN_RELATIVE = path.join("docs", "wiki", "knowledge-plan.json");
 const KNOWLEDGE_PLAN_YAML_RELATIVE = path.join("docs", "wiki", "knowledge-plan.yaml");
-const AMBER_KNOWLEDGE_PLAN_YAML = path.join(".amber", "knowledge-plan.yaml");
 
 /**
  * Normalize a parsed (yaml or json) plan into the internal shape we validate against.
@@ -32,7 +32,7 @@ function normalizePlan(raw) {
  * Checks (in order):
  *   docs/wiki/knowledge-plan.json
  *   docs/wiki/knowledge-plan.yaml
- *   .amber/knowledge-plan.yaml
+ *   .amber/knowledge-plan.yaml (read through the state-dir seam)
  */
 function loadKnowledgePlan(target) {
 	const targetRoot = resolveTarget(target);
@@ -40,7 +40,7 @@ function loadKnowledgePlan(target) {
 	const candidates = [
 		{ path: path.join(targetRoot, KNOWLEDGE_PLAN_RELATIVE), kind: "json" },
 		{ path: path.join(targetRoot, KNOWLEDGE_PLAN_YAML_RELATIVE), kind: "yaml" },
-		{ path: path.join(targetRoot, AMBER_KNOWLEDGE_PLAN_YAML), kind: "yaml" },
+		{ path: statePath(targetRoot, "knowledge-plan.yaml"), kind: "yaml" },
 	];
 
 	let chosen = null;
@@ -100,7 +100,6 @@ function loadKnowledgePlan(target) {
 module.exports = {
 	KNOWLEDGE_PLAN_RELATIVE,
 	KNOWLEDGE_PLAN_YAML_RELATIVE,
-	AMBER_KNOWLEDGE_PLAN_YAML,
 	normalizePlan,
 	loadKnowledgePlan,
 };

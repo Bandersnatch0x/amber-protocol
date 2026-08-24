@@ -2,6 +2,8 @@
 
 const path = require("node:path");
 
+const { statePathForCreate } = require("../state-dir-resolver");
+
 const REQUIRED_BUNDLE_FILES = [
 	"README.md",
 	"session-summary.md",
@@ -16,8 +18,11 @@ function slash(value) {
 	return value.split(path.sep).join("/");
 }
 
+// Handoff bundles (post-rename state kind, 2026-07-13): bundle state never
+// existed under .harness, so reads (validate) and creates (produce) both
+// target the canonical dir (see the note in organization-audit.js).
 function defaultBundleDir(targetRoot) {
-	return path.join(targetRoot, ".amber", "handoff", "latest");
+	return statePathForCreate(targetRoot, "handoff", "latest");
 }
 
 function resolveTargetRelativePath(targetRoot, candidate) {

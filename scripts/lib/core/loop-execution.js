@@ -11,9 +11,13 @@ const { readJsonSafe, resolveTarget } = require("./fs-utils");
 const { findLoopContract, dryRunLoopContract } = require("./loops");
 const { appendLedgerRecord, verifyLedgerOutcome } = require("./loop-ledger");
 const { runGovernedCommand } = require("./governed-runner");
+const { statePathForCreate } = require("../state-dir-resolver");
 
+// Loop execution ledgers (post-rename state kind, 2026-06-30): they never
+// existed under .harness, so reads and creates both target the canonical dir
+// (see the note in organization-audit.js).
 function ledgerPath(targetRoot, contractId) {
-	return path.join(resolveTarget(targetRoot), ".amber", "loops", contractId, "ledger.jsonl");
+	return statePathForCreate(resolveTarget(targetRoot), "loops", contractId, "ledger.jsonl");
 }
 
 function loadContract(file, contractId) {

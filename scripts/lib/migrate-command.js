@@ -5,6 +5,7 @@ const path = require("path");
 const { getSessionsDir } = require("./session-commands");
 const { SCHEMA_VERSION } = require("./schema-version-checker");
 const { CLI_VERSION } = require("./core/constants");
+const { statePath } = require("./state-dir-resolver");
 
 function writeJsonWithBackup(filePath, value) {
 	const backupPath = `${filePath}.backup`;
@@ -118,8 +119,10 @@ function inferArtifactType(obj) {
 
 function collectJsonArtifacts(projectRoot) {
 	const files = [];
+	// Read policy: artifact migration stamps whatever state already exists,
+	// including a not-yet-consolidated legacy .harness tree.
 	const queue = [
-		path.join(projectRoot, ".amber"),
+		statePath(projectRoot),
 		path.join(projectRoot, "routes"),
 		path.join(projectRoot, "workflow-packs"),
 	].filter((root) => fs.existsSync(root));

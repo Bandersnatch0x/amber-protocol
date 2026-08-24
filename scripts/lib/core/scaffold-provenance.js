@@ -14,6 +14,7 @@ const {
 	AMBER_STATE_FILES,
 } = require("./constants");
 const { pathExists, readText, writeJson, relativeSlash, walkFiles } = require("./fs-utils");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 // Strip YAML-frontmatter `updated:` lines before hashing. A release that bumps
 // only the date is metadata, not content; hashing raw bytes would flag every
@@ -51,8 +52,11 @@ function fileTier(relPath) {
 	return "authored";
 }
 
+// Install provenance (post-rename state kind, 2026-07-04): it never existed
+// under .harness, so reads and creates both target the canonical dir (see the
+// note in organization-audit.js).
 function provenancePath(targetRoot) {
-	return path.join(targetRoot, ".amber", "provenance.json");
+	return statePathForCreate(targetRoot, "provenance.json");
 }
 
 function loadProvenance(targetRoot) {

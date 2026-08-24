@@ -8,6 +8,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { resolveTarget } = require("./core/fs-utils");
+const { CANONICAL_STATE_DIR, LEGACY_STATE_DIR } = require("./state-dir-resolver");
 const { classifyTarget } = require("./core/target-classification");
 const { getRepoSnapshot } = require("./core/git-state");
 const { detectScaffoldDrift } = require("./core/scaffold-version-drift");
@@ -20,12 +21,15 @@ function buildStatus(target) {
 	const repo = getRepoSnapshot(targetRoot);
 	const classification = classifyTarget(targetRoot);
 
-	const amberDir = path.join(targetRoot, ".amber");
-	const harnessDir = path.join(targetRoot, ".harness"); // legacy state dir (pre-.amber Amber)
+	// Which state dir exists (display): prefer the canonical .amber, fall back
+	// to legacy .harness. Reported by name, so this uses the resolver's dir
+	// constants rather than a path verb.
+	const amberDir = path.join(targetRoot, CANONICAL_STATE_DIR);
+	const harnessDir = path.join(targetRoot, LEGACY_STATE_DIR); // legacy state dir (pre-.amber Amber)
 	const stateDir = fs.existsSync(amberDir)
-		? ".amber"
+		? CANONICAL_STATE_DIR
 		: fs.existsSync(harnessDir)
-			? ".harness" // .amber preferred; legacy .harness fallback
+			? LEGACY_STATE_DIR // .amber preferred; legacy .harness fallback
 			: "none";
 	const provenance = loadProvenance(targetRoot);
 

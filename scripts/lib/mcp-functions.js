@@ -7,6 +7,15 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { resolveConfiguredRepoPath } = require("./mcp-targets");
 const { readSessionSummary } = require("./session-manifest");
+const { statePath } = require("./state-dir-resolver");
+
+// Repo-relative state-dir path for a configured target. The Function runtime
+// speaks repository-relative paths (the reader confines them to the target),
+// so the read policy is projected back to relative form: legacy .harness state
+// stays visible to MCP reads.
+function stateDirRelative(target, ...segments) {
+	return path.relative(target, statePath(target, ...segments));
+}
 
 function createReader(configured, primary) {
 	const resolve = (relativePath, target = primary, mustExist = true) =>
@@ -49,7 +58,7 @@ function createReader(configured, primary) {
 }
 
 function sessionSummary(reader, sessionId) {
-	const base = path.join(".amber", "sessions", sessionId);
+	const base = path.join(stateDirRelative(reader.targets[0], "sessions"), sessionId);
 	const manifest = reader.readJson(path.join(base, "manifest.json"));
 	const projected = readSessionSummary(manifest, sessionId);
 	return {
@@ -60,7 +69,7 @@ function sessionSummary(reader, sessionId) {
 }
 
 function sessionEvidence(params, reader) {
-	const sessions = path.join(".amber", "sessions");
+	const sessions = stateDirRelative(reader.targets[0], "sessions");
 	if (!reader.exists(sessions)) return { sessions: [] };
 	let ids = reader.list(sessions).filter((id) => reader.isDirectory(path.join(sessions, id)));
 	if (params.sessionId) {
@@ -87,7 +96,7 @@ function sessionEvidence(params, reader) {
 }
 
 function repoSnapshot(reader, target) {
-	const sessionsPath = path.join(".amber", "sessions");
+	const sessionsPath = stateDirRelative(target, "sessions");
 	let sessions = [];
 	if (reader.exists(sessionsPath, target)) {
 		sessions = reader
@@ -107,7 +116,7 @@ function repoSnapshot(reader, target) {
 		: [];
 	return {
 		target,
-		hasAmberState: reader.exists(".amber", target),
+		hasAmberState: reader.exists(stateDirRelative(target), target),
 		sessionCount: sessions.length,
 		activeSessions: sessions.filter((session) => session.active),
 		routes,

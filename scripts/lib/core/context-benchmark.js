@@ -8,6 +8,7 @@ const addFormats = require("ajv-formats");
 const { buildLoadout } = require("./context-loadout");
 const { canonicalJson, sha256 } = require("./context-hash");
 const { resolvePathWithin } = require("./fs-utils");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 const RUN_COUNT = 10;
 const HARD_METRIC_THRESHOLDS = Object.freeze({
@@ -200,7 +201,7 @@ function loadFixture(targetRoot, fixturePath) {
 function persistReport(targetRoot, fixtureId, report) {
 	const reportPath = resolvePathWithin(
 		targetRoot,
-		path.join(".amber", "context", "benchmarks", `${fixtureId}.json`),
+		statePathForCreate(targetRoot, "context", "benchmarks", `${fixtureId}.json`),
 		{ label: "Context benchmark report" },
 	);
 	fs.mkdirSync(path.dirname(reportPath), { recursive: true });

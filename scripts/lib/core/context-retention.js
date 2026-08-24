@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const { resolvePathWithin } = require("./fs-utils");
 const { projectionManifestPath, projectionStatus } = require("./context-projection");
+const { statePath } = require("../state-dir-resolver");
 
 const DEFAULT_OLDER_THAN_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -87,7 +88,7 @@ function retentionReport(targetRoot, options = {}) {
 	}
 
 	try {
-		const contextRoot = resolvePathWithin(targetRoot, path.join(".amber", "context"), {
+		const contextRoot = resolvePathWithin(targetRoot, statePath(targetRoot, "context"), {
 			label: "Context retention root",
 		});
 		const entries = CATEGORIES.flatMap((category) => {

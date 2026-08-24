@@ -21,9 +21,8 @@ const { resolveIdentity } = require("./identity");
 const { resolveDeploymentProfile } = require("./deployment-profile");
 const { resolvePathWithin, toPortablePath } = require("./fs-utils");
 const { validateSyncEnvelope } = require("./sync-envelope-contract");
+const { statePathForCreate } = require("../state-dir-resolver");
 
-const SYNC_DIR = ".amber/sync";
-const ENVELOPES_DIR = path.join(SYNC_DIR, "envelopes");
 const ENVELOPE_SCHEMA_VERSION = "1.0.0";
 const SEMVER_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const LOCAL_CAPABILITIES = Object.freeze(["sync-envelope-v1", "structural-identity-v1"]);
@@ -316,7 +315,10 @@ function envelopeFromArtifact(cwd, artifactType, relPath) {
 function packEnvelope(cwd, artifactType, relPath) {
 	try {
 		const envelope = envelopeFromArtifact(cwd, artifactType, relPath);
-		const dir = path.join(cwd, ENVELOPES_DIR);
+		// Sync envelopes are a post-rename state kind (ADR-0019, #158 Stage 3):
+		// they never existed under .harness, so the create policy (always
+		// .amber) is correct for both fresh writes and re-packs.
+		const dir = statePathForCreate(cwd, "sync", "envelopes");
 		fs.mkdirSync(dir, { recursive: true });
 		fs.writeFileSync(
 			path.join(dir, `${envelope.envelopeId}.json`),
@@ -425,8 +427,6 @@ function unpackEnvelope(cwd, envelope) {
 }
 
 module.exports = {
-	SYNC_DIR,
-	ENVELOPES_DIR,
 	ARTIFACT_TYPES,
 	ARTIFACT_PATH_REGISTRY,
 	LOCAL_CAPABILITIES,

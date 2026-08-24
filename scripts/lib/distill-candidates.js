@@ -3,6 +3,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { statePath } = require("./state-dir-resolver");
+
 const DEFAULT_THRESHOLD = 2;
 
 const HEADING_PATTERN = /^#{1,3}\s+(.+)$/;
@@ -131,7 +133,9 @@ function findDistillCandidates(projectRoot, options = {}) {
 			filter: isGateReport,
 		},
 		{
-			dir: path.join(root, ".amber", "maintenance"),
+			// Read policy: maintenance proposals may predate the .harness→.amber
+			// rename, so legacy .harness state must stay visible here.
+			dir: statePath(root, "maintenance"),
 			extractors: [extractHeadings, extractListItems],
 		},
 	];

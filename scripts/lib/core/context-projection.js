@@ -7,14 +7,17 @@ const { canonicalJson, sha256 } = require("./context-hash");
 const { indexPath, listPages, readPage } = require("./context-store");
 const { renderContextIndex, validateContextIndex } = require("./context-index");
 const { resolvePathWithin } = require("./fs-utils");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 const SCHEMA_VERSION = "1.0.0";
 const PROJECTION_ID = "context-index";
 
+// Projection manifests are a post-rename context-layer state kind (see the
+// note in context-store.js): reads and creates both target the canonical dir.
 function projectionManifestPath(targetRoot) {
 	return resolvePathWithin(
 		targetRoot,
-		path.join(".amber", "context", "projections", `${PROJECTION_ID}.json`),
+		statePathForCreate(targetRoot, "context", "projections", `${PROJECTION_ID}.json`),
 		{ label: "Context projection manifest" },
 	);
 }

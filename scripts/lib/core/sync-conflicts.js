@@ -18,6 +18,7 @@ const path = require("node:path");
 
 const { admitEnvelope } = require("./sync-remote");
 const { readJSONL, appendJSONL } = require("./jsonl");
+const { statePath, statePathForCreate } = require("../state-dir-resolver");
 
 const CONFLICT_TYPES = Object.freeze([
 	"concurrent-edit",
@@ -34,20 +35,24 @@ const RESOLUTIONS = Object.freeze([
 
 class ConflictError extends Error {}
 
+// Sync Runtime state (#165, post-rename state kind): these ledgers never
+// existed under .harness, so reads and creates both target the canonical dir —
+// statePathForCreate keeps the write policy (always .amber) even on a
+// not-yet-migrated legacy repo, and reads lose nothing under either policy.
 function conflictLedgerPath(cwd) {
-	return path.join(cwd, ".amber", "sync", "conflicts.jsonl");
+	return statePathForCreate(cwd, "sync", "conflicts.jsonl");
 }
 
 function ensureSyncDir(cwd) {
-	fs.mkdirSync(path.join(cwd, ".amber", "sync"), { recursive: true });
+	fs.mkdirSync(statePathForCreate(cwd, "sync"), { recursive: true });
 }
 
 function appliedLedgerPath(cwd) {
-	return path.join(cwd, ".amber", "sync", "applied.jsonl");
+	return statePathForCreate(cwd, "sync", "applied.jsonl");
 }
 
 function refusedLedgerPath(cwd) {
-	return path.join(cwd, ".amber", "sync", "refused.jsonl");
+	return statePathForCreate(cwd, "sync", "refused.jsonl");
 }
 
 function readLedgerIds(ledgerPath) {
@@ -167,7 +172,9 @@ function applyEnvelope(cwd, envelope) {
  * @returns {{applied: number, conflicts: Array<object>, errors: string[]}}
  */
 function replayEnvelopes(cwd) {
-	const envDir = path.join(cwd, ".amber", "sync", "envelopes");
+	// Pure read of existing envelopes (written under .amber by the sync
+	// transport): read policy so the dir resolution stays uniform.
+	const envDir = statePath(cwd, "sync", "envelopes");
 	const envelopes = [];
 	if (fs.existsSync(envDir)) {
 		for (const name of fs

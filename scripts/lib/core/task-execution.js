@@ -2,7 +2,11 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { resolveStateDirForRead, resolveStateDirForCreate } = require("../state-dir-resolver");
+const {
+	resolveStateDirForRead,
+	resolveStateDirForCreate,
+	statePathForCreate,
+} = require("../state-dir-resolver");
 const { TRANSITIONS, isFinal } = require("../session-state-machine");
 
 const { pathExists, readJson, relativeSlash, resolveTarget } = require("./fs-utils");
@@ -149,10 +153,17 @@ function buildExecutionEvidence(coordinates, options) {
 	return evidence;
 }
 
+// Recorded repo-relative path for execution artifacts. Derived from the same
+// create-policy resolution that places the artifacts on disk (always .amber),
+// so the ledger/replay documents and the on-disk layout can never drift apart.
+function stateRelativeForCreate(targetRoot, ...segments) {
+	return path.relative(targetRoot, statePathForCreate(targetRoot, ...segments));
+}
+
 function persistExecutionArtifacts(coordinates, artifacts) {
 	const { targetRoot, taskId } = coordinates;
-	const worktreeRelativePath = path.join(".amber", "worktrees", taskId);
-	const executionRelativePath = path.join(".amber", "executions", taskId);
+	const worktreeRelativePath = stateRelativeForCreate(targetRoot, "worktrees", taskId);
+	const executionRelativePath = stateRelativeForCreate(targetRoot, "executions", taskId);
 	const worktreePath = path.join(targetRoot, worktreeRelativePath);
 	const executionPath = path.join(targetRoot, executionRelativePath);
 	fs.mkdirSync(worktreePath, { recursive: true });
@@ -217,7 +228,7 @@ function prepareTaskExecution(target, planRelativePath, taskIdInput, options = {
 		return preparationFailure(coordinates, [session.error], [], review);
 	}
 	const boundCoordinates = { ...coordinates, sessionId: session.sessionId };
-	const worktreeRelativePath = path.join(".amber", "worktrees", taskId);
+	const worktreeRelativePath = stateRelativeForCreate(targetRoot, "worktrees", taskId);
 	const evidence = buildExecutionEvidence(boundCoordinates, options);
 	const artifacts = {
 		evidence,

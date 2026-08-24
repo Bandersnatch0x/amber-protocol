@@ -17,6 +17,7 @@ const path = require("node:path");
 const { appendEvent, readEvents } = require("./context-store");
 const { sha256 } = require("./context-hash");
 const { resolvePathWithin } = require("./fs-utils");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 // Event kind closed set (§2.2 / §9 — 5 values, never extended).
 const MEMORY_EVENT_KINDS = Object.freeze([
@@ -35,14 +36,18 @@ function ensureDir(dir) {
 	fs.mkdirSync(dir, { recursive: true });
 }
 
+// Memory-layer state is a post-rename state kind (ADR-0018, 2026-08-21): it
+// never existed under .harness, so reads and creates both target the canonical
+// dir — statePathForCreate keeps the write policy (always .amber) even on a
+// not-yet-migrated legacy repo, and reads lose nothing under either policy.
 function registryDir(targetRoot) {
-	return resolvePathWithin(targetRoot, path.join(".amber", "memory", "registry"), {
+	return resolvePathWithin(targetRoot, statePathForCreate(targetRoot, "memory", "registry"), {
 		label: "Memory registry directory",
 	});
 }
 
 function requestsDir(targetRoot) {
-	return resolvePathWithin(targetRoot, path.join(".amber", "memory", "requests"), {
+	return resolvePathWithin(targetRoot, statePathForCreate(targetRoot, "memory", "requests"), {
 		label: "Memory requests directory",
 	});
 }
@@ -61,7 +66,7 @@ function entryPath(targetRoot, entryId) {
 	registryDir(targetRoot);
 	return resolvePathWithin(
 		targetRoot,
-		path.join(".amber", "memory", "registry", entryFileName(entryId)),
+		statePathForCreate(targetRoot, "memory", "registry", entryFileName(entryId)),
 		{ label: "Memory entry file" },
 	);
 }
@@ -73,7 +78,7 @@ function requestPath(targetRoot, requestId) {
 	requestsDir(targetRoot);
 	return resolvePathWithin(
 		targetRoot,
-		path.join(".amber", "memory", "requests", `${requestId}.json`),
+		statePathForCreate(targetRoot, "memory", "requests", `${requestId}.json`),
 		{ label: "Memory request file" },
 	);
 }

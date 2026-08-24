@@ -14,6 +14,8 @@ const { REQUIRED_HARNESS_FILES } = require("./constants");
 
 const { pathExists, resolveTarget } = require("./fs-utils");
 
+const { statePath } = require("../state-dir-resolver");
+
 const { validateManifests } = require("./manifests");
 const { classifyTarget } = require("./target-classification");
 
@@ -510,11 +512,12 @@ function doctor(target, options = {}) {
 
 	// Version drift — scan artifacts with amber_protocol_version against the
 	// installed package version. Only warn when the field is present and doesn't
-	// match; absent fields are legal legacy artifacts (ADR-0012).
-	const amberDir = path.join(targetRoot, ".amber");
-	if (pathExists(amberDir)) {
+	// match; absent fields are legal legacy artifacts (ADR-0012). Read policy:
+	// a not-yet-migrated legacy .harness repo gets its artifacts scanned too.
+	const stateDir = statePath(targetRoot);
+	if (pathExists(stateDir)) {
 		const driftArtifacts = [];
-		const queue = [amberDir];
+		const queue = [stateDir];
 		while (queue.length > 0) {
 			const dir = queue.shift();
 			let entries;
@@ -552,7 +555,7 @@ function doctor(target, options = {}) {
 	}
 
 	// Context pages (optional — only when the context layer is in use, ADR-0009 D8)
-	if (pathExists(path.join(targetRoot, ".amber", "context"))) {
+	if (pathExists(statePath(targetRoot, "context"))) {
 		const { verifyPages } = require("./context-verify");
 		const ctx = verifyPages(targetRoot);
 		if (!ctx.ok) {
@@ -575,7 +578,7 @@ function doctor(target, options = {}) {
 	// Memory layer (§11 1–11): runs whenever the memory registry is in use OR
 	// a MEMORY.md surface exists (rules 4/8 must see surface-only targets).
 	if (
-		pathExists(path.join(targetRoot, ".amber", "memory")) ||
+		pathExists(statePath(targetRoot, "memory")) ||
 		pathExists(path.join(targetRoot, "MEMORY.md"))
 	) {
 		const memoryResult = doctorMemoryRules(targetRoot);

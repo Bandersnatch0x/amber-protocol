@@ -4,6 +4,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { resolveRepoPath } = require("./mcp-targets");
 const { readSessionsForConcurrency } = require("./session-manifest");
+const { statePath } = require("./state-dir-resolver");
 const {
 	resolveCapability,
 	bindsWriteFlag,
@@ -95,10 +96,19 @@ function commandContract(argv, target) {
 	};
 }
 
+// Repo-relative sessions path for a configured target. The MCP layer speaks
+// repository-relative paths (resolveRepoPath confines them to the target), so
+// the read policy is projected back to a relative form: legacy .harness
+// sessions stay visible to the concurrency guard.
+function sessionsRelative(target) {
+	return path.relative(target, statePath(target, "sessions"));
+}
+
 function listActiveSessions(target) {
-	const sessionsDir = resolveRepoPath(target, path.join(".amber", "sessions"));
+	const sessionsRel = sessionsRelative(target);
+	const sessionsDir = resolveRepoPath(target, sessionsRel);
 	return readSessionsForConcurrency(sessionsDir, (name) =>
-		resolveRepoPath(target, path.join(".amber", "sessions", name)),
+		resolveRepoPath(target, path.join(sessionsRel, name)),
 	);
 }
 

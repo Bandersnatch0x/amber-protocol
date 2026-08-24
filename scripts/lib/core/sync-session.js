@@ -28,9 +28,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const { SYNC_DIR, ENVELOPES_DIR } = require("./sync-remote");
 const { replayEnvelopes, listConflicts, listRefusedEnvelopeIds } = require("./sync-conflicts");
 const { collectFilesBySuffix, toPortablePath } = require("./fs-utils");
+const { statePath, statePathForCreate } = require("../state-dir-resolver");
 
 /**
  * Create a sync session record.
@@ -54,7 +54,9 @@ function createSyncSession(cwd, operation) {
  * @returns {Array<object>} Parsed envelopes.
  */
 function listEnvelopes(cwd) {
-	const dir = path.join(cwd, ENVELOPES_DIR);
+	// Pure read of envelopes written by the sync transport (post-rename state
+	// kind: never existed under .harness).
+	const dir = statePath(cwd, "sync", "envelopes");
 	if (!fs.existsSync(dir)) return [];
 	return fs
 		.readdirSync(dir)
@@ -105,7 +107,7 @@ function hasRemote(cwd) {
  * @returns {Array<string>} Sorted repository-relative POSIX paths.
  */
 function listSyncTreePaths(cwd) {
-	const root = path.resolve(cwd, SYNC_DIR);
+	const root = statePath(cwd, "sync");
 	return collectFilesBySuffix(root)
 		.map((abs) => toPortablePath(path.relative(path.resolve(cwd), abs)))
 		.sort();
@@ -138,7 +140,11 @@ function pushEnvelopes(cwd) {
 	const envelopeIds = envelopes
 		.map((envelope) => envelope.envelopeId)
 		.filter((id) => typeof id === "string");
-	const envelopeDir = toPortablePath(ENVELOPES_DIR);
+	// Envelopes always live in the canonical sync home (post-rename state
+	// kind), matching the `git add .amber/sync` proposal below.
+	const envelopeDir = toPortablePath(
+		path.relative(path.resolve(cwd), statePathForCreate(cwd, "sync", "envelopes")),
+	);
 	const envelopePaths = envelopeIds.map((id) => `${envelopeDir}/${id}.json`).sort();
 	const affectedPaths = listSyncTreePaths(cwd);
 	const remoteConfigured = hasRemote(cwd);

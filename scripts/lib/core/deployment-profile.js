@@ -15,9 +15,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { resolveIdentity } = require("./identity");
+const { statePath, statePathForCreate } = require("../state-dir-resolver");
 
 const DEPLOYMENT_PROFILES = Object.freeze(["personal-node", "team-hub", "organization"]);
 const DEFAULT_PROFILE = "personal-node";
+// Canonical location of the profile declaration (documentation shape; reads
+// go through the state-dir seam so a legacy .harness profile stays visible).
 const PROFILE_FILE = ".amber/profile.json";
 
 /**
@@ -27,7 +30,7 @@ const PROFILE_FILE = ".amber/profile.json";
  *   deploymentProfile is null when the file declares an unknown profile.
  */
 function readProfileFile(cwd) {
-	const filePath = path.join(cwd, PROFILE_FILE);
+	const filePath = statePath(cwd, "profile.json");
 	const base = { deploymentProfile: DEFAULT_PROFILE, source: "default", errors: [] };
 	if (!fs.existsSync(filePath)) {
 		return base;
@@ -68,12 +71,9 @@ function writeProfileFile(cwd, profile) {
 			],
 		};
 	}
-	const amberDir = path.join(cwd, ".amber");
-	fs.mkdirSync(amberDir, { recursive: true });
-	fs.writeFileSync(
-		path.join(amberDir, "profile.json"),
-		JSON.stringify({ deploymentProfile: profile }, null, 2) + "\n",
-	);
+	const profilePath = statePathForCreate(cwd, "profile.json");
+	fs.mkdirSync(path.dirname(profilePath), { recursive: true });
+	fs.writeFileSync(profilePath, JSON.stringify({ deploymentProfile: profile }, null, 2) + "\n");
 	return { errors: [] };
 }
 

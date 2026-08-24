@@ -20,16 +20,21 @@ const { sha256 } = require("./context-hash");
 const { readJSONL, appendJSONL } = require("./jsonl");
 const fs = require("node:fs");
 const path = require("node:path");
+const { statePathForCreate } = require("../state-dir-resolver");
 
 const RETENTION_ACTIONS = Object.freeze(["retain", "delete", "revoke"]);
 const ORG_CORRUPT_CODE = "AMBER_E_ORG_CORRUPT";
 
+// Organization-audit state (#167, post-rename state kind): the ledger never
+// existed under .harness, so reads and creates both target the canonical dir —
+// statePathForCreate keeps the write policy (always .amber) even on a
+// not-yet-migrated legacy repo, and reads lose nothing under either policy.
 function auditLedgerPath(cwd) {
-	return path.join(cwd, ".amber", "audit", "events.jsonl");
+	return statePathForCreate(cwd, "audit", "events.jsonl");
 }
 
 function ensureDir(cwd) {
-	fs.mkdirSync(path.join(cwd, ".amber", "audit"), { recursive: true });
+	fs.mkdirSync(statePathForCreate(cwd, "audit"), { recursive: true });
 }
 
 /**
