@@ -159,3 +159,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md`
 - Review status: ready
 - Feature: F035 status → accepted in feature_list.json
+
+## 2026-08-25 docs/plans/F036-Adopt-the-state-dir-path-seam-and-fix-the-legacy-harness-sessions-bug.md
+
+- Plan: `docs/plans/F036-Adopt-the-state-dir-path-seam-and-fix-the-legacy-harness-sessions-bug.md`
+- Review status: ready
+- Feature: F036 status → accepted in feature_list.json

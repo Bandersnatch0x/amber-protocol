@@ -1,7 +1,7 @@
 # Plan: Adopt the state-dir path seam and fix the legacy .harness sessions bug
 
 Feature: F036
-Status: implementation-ready
+Status: accepted
 User Confirmation: confirmed
 
 ## Goal
