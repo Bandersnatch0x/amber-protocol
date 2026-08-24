@@ -16,6 +16,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { hashText } = require("./context-hash");
 const { resolveIdentity } = require("./identity");
 const { resolveDeploymentProfile } = require("./deployment-profile");
 
@@ -45,8 +46,9 @@ const ARTIFACT_TYPES = Object.freeze([
  * @returns {string} "sha256:<64 hex>"
  */
 function hashFile(filePath) {
-	const content = fs.readFileSync(filePath);
-	return `sha256:${crypto.createHash("sha256").update(content).digest("hex")}`;
+	// content hashing lives in context-hash (single home); reading as utf8
+	// yields the same bytes, so the digest is identical to the old raw read
+	return hashText(fs.readFileSync(filePath, "utf8"));
 }
 
 /**

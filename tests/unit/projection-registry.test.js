@@ -42,6 +42,20 @@ test("validateProjectionManifest accepts a well-formed manifest", () => {
 	assert.deepEqual(result.errors, []);
 });
 
+test("validateProjectionManifest accepts legacy camelCase trio (pre-rename manifests)", () => {
+	const manifest = {
+		schemaVersion: "1.0.0",
+		projectionId: "governance-graph",
+		projectionType: "governance-graph",
+		projectionVersion: 1,
+		rebuildCheckpoint: "abc",
+		sourceHash: "sha256:" + "a".repeat(64),
+		outputHash: "sha256:" + "b".repeat(64),
+	};
+	const result = validateProjectionManifest(manifest);
+	assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
 test("validateProjectionManifest accepts ADR-0012 versioning fields", () => {
 	const manifest = {
 		schemaVersion: "1.0.0",

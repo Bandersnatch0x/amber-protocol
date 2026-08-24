@@ -673,27 +673,10 @@ const SHAPE_RENDERERS = Object.freeze([
 		render: renderGateReport,
 	},
 	{
-		id: "adoption-selected-files",
-		match: (r) => r.kind === "adoption-selected-files",
+		id: "adoption",
+		match: (r) => typeof r.kind === "string" && r.kind.startsWith("adoption-"),
 		render: renderAdoptionKind,
 	},
-	{
-		id: "adoption-apply-plan",
-		match: (r) => r.kind === "adoption-apply-plan",
-		render: renderAdoptionKind,
-	},
-	{
-		id: "adoption-decision-record",
-		match: (r) => r.kind === "adoption-decision-record",
-		render: renderAdoptionKind,
-	},
-	{
-		id: "adoption-next-actions",
-		match: (r) => r.kind === "adoption-next-actions",
-		render: renderAdoptionKind,
-	},
-	{ id: "adoption-bundle", match: (r) => r.kind === "adoption-bundle", render: renderAdoptionKind },
-	{ id: "adoption-status", match: (r) => r.kind === "adoption-status", render: renderAdoptionKind },
 	{ id: "generic", match: () => true, render: renderGeneric },
 ]);
 

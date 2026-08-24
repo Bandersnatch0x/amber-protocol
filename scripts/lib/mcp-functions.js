@@ -74,7 +74,9 @@ function sessionEvidence(params, reader) {
 		let newestMtime = -Infinity;
 		for (const id of ids) {
 			const mtime = reader.mtime(path.join(sessions, id));
-			if (mtime > newestMtime) {
+			// deterministic tiebreak on equal mtimes: lexicographically smaller id
+			// wins, so the same-ms class cannot flip the newest session between runs
+			if (mtime > newestMtime || (mtime === newestMtime && newest !== null && id < newest)) {
 				newestMtime = mtime;
 				newest = id;
 			}

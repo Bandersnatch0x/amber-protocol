@@ -65,16 +65,40 @@ function validateProjectionManifest(manifest) {
 	if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest)) {
 		return { valid: false, errors: ["manifest must be an object"] };
 	}
-	for (const field of [
-		"schemaVersion",
-		"projectionId",
-		"projection_type",
-		"projection_version",
-		"rebuild_checkpoint",
-		"sourceHash",
-		"outputHash",
-	]) {
+	// ADR-0012 amendment E reserved the trio as projection fields; manifests
+	// written before the rename carried camelCase (projectionType/…). Accept
+	// either spelling so legacy manifests keep validating (legacy artifacts
+	// must continue to validate per ADR-0012 §1) — new manifests are written
+	// snake_case only.
+	const typeField =
+		"projection_type" in manifest
+			? "projection_type"
+			: "projectionType" in manifest
+				? "projectionType"
+				: null;
+	const versionField =
+		"projection_version" in manifest
+			? "projection_version"
+			: "projectionVersion" in manifest
+				? "projectionVersion"
+				: null;
+	const checkpointField =
+		"rebuild_checkpoint" in manifest
+			? "rebuild_checkpoint"
+			: "rebuildCheckpoint" in manifest
+				? "rebuildCheckpoint"
+				: null;
+	for (const field of ["schemaVersion", "projectionId", "sourceHash", "outputHash"]) {
 		if (!(field in manifest)) {
+			errors.push(`missing required field "${field}"`);
+		}
+	}
+	for (const [field, resolved] of [
+		["projection_type", typeField],
+		["projection_version", versionField],
+		["rebuild_checkpoint", checkpointField],
+	]) {
+		if (resolved === null) {
 			errors.push(`missing required field "${field}"`);
 		}
 	}
@@ -83,15 +107,17 @@ function validateProjectionManifest(manifest) {
 			`unsupported schemaVersion "${manifest.schemaVersion}" (expected "${SCHEMA_VERSION}")`,
 		);
 	}
-	if (manifest.projection_type && !PROJECTION_TYPES.includes(manifest.projection_type)) {
-		errors.push(`unknown projection_type "${manifest.projection_type}"`);
+	const projectionType = manifest[typeField];
+	if (projectionType && !PROJECTION_TYPES.includes(projectionType)) {
+		errors.push(`unknown projection_type "${projectionType}"`);
 	}
 	if (manifest.projectionId && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(manifest.projectionId)) {
 		errors.push(`projectionId "${manifest.projectionId}" must be kebab-case`);
 	}
+	const projectionVersion = manifest[versionField];
 	if (
-		manifest.projection_version !== undefined &&
-		(!Number.isInteger(manifest.projection_version) || manifest.projection_version < 1)
+		projectionVersion !== undefined &&
+		(!Number.isInteger(projectionVersion) || projectionVersion < 1)
 	) {
 		errors.push("projection_version must be an integer >= 1");
 	}
