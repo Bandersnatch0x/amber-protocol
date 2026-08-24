@@ -31,7 +31,13 @@ const { remedyFor } = require("./lifecycle");
 
 const memoryStore = require("./memory-store");
 const { hashFile } = require("./context-hash");
-const { alphaState, gammaWindow, GAMMA_QUOTA } = require("../memory-commands");
+const {
+	alphaState,
+	gammaWindow,
+	GAMMA_QUOTA,
+	ALPHA_MAX_ENTRIES,
+	ALPHA_MAX_BYTES,
+} = require("./memory-policy");
 const { sha256, canonicalJson } = require("./context-hash");
 
 const { CLI_VERSION } = require("./constants");
@@ -106,8 +112,6 @@ function doctorProductRepo(targetRoot, classification) {
 // function owns the six read-only increments over the registry + the memory-*
 // event subset. One-shot load; never spawns a subprocess (executesAnything:
 // false) — git "tracking" is inferred from filesystem markers only.
-const ALPHA_MAX_ENTRIES = 50; // §6.3
-const ALPHA_MAX_BYTES = 8192; // §6.3
 const ALPHA_REVIEW_ENTRIES = 25; // 50% of the §6.3 entry budget (rule 6)
 const ALPHA_REVIEW_BYTES = 4096; // 50% of the §6.3 byte budget (rule 6)
 const MEMORY_TRIPLET_KEYS = ["approvalPolicy", "loopLedger", "workspaceIsolation"];
