@@ -30,16 +30,6 @@ function collectSourceFiles(dir, out = []) {
 }
 
 /**
- * Blank out comments while preserving string literals and line structure, so
- * regex scans neither trip on commented-out imports nor miss real imports
- * that follow a `//` on the same line. Comment characters become spaces;
- * newlines survive, keeping index → line mapping intact.
- *
- * @param {string} source
- * @returns {string}
- */
-
-/**
  * Blank comments (and regex literals / template interpolations) while
  * preserving string literals and line structure. A small lexer, not a regex
  * sweep: handles line/block comments, escaped quotes, nested template
