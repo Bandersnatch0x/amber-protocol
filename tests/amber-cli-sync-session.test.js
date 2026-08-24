@@ -38,8 +38,8 @@ test("sync session list shows zero envelopes on a fresh target", () => {
 
 test("sync session run completes a full pipeline", () => {
 	const dir = mkTarget("run");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	// Pack one envelope first
 	const p = runCli(
 		[
@@ -49,7 +49,7 @@ test("sync session run completes a full pipeline", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -68,8 +68,8 @@ test("sync session run completes a full pipeline", () => {
 
 test("sync session push commits and reports", () => {
 	const dir = mkTarget("push");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	runCli(
 		[
 			"sync",
@@ -78,7 +78,7 @@ test("sync session push commits and reports", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -94,8 +94,8 @@ test("sync session push commits and reports", () => {
 
 test("sync session pull validates packed envelopes", () => {
 	const dir = mkTarget("pull");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	runCli(
 		[
 			"sync",
@@ -104,7 +104,7 @@ test("sync session pull validates packed envelopes", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",

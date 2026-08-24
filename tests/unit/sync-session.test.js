@@ -50,9 +50,9 @@ test("listEnvelopes returns empty for a target with no envelopes", () => {
 test("listEnvelopes returns packed envelopes", () => {
 	const dir = mkTarget("list", { git: true });
 	initTarget(dir);
-	writeArtifact(dir, "docs/page.md", "# Page\n");
+	writeArtifact(dir, ".amber/context/pages/page.json", "# Page\n");
 	const { packEnvelope } = require("../../scripts/lib/core/sync-remote");
-	packEnvelope(dir, "context-page", "docs/page.md");
+	packEnvelope(dir, "context-page", ".amber/context/pages/page.json");
 	const envelopes = listEnvelopes(dir);
 	assert.equal(envelopes.length, 1);
 	assert.equal(envelopes[0].artifactType, "context-page");
@@ -63,9 +63,9 @@ test("listEnvelopes returns packed envelopes", () => {
 test("pushEnvelopes commits envelopes when git is clean and remote exists", () => {
 	const dir = mkTarget("push", { git: true });
 	initTarget(dir);
-	writeArtifact(dir, "docs/page.md", "# Page\n");
+	writeArtifact(dir, ".amber/context/pages/page.json", "# Page\n");
 	const { packEnvelope } = require("../../scripts/lib/core/sync-remote");
-	packEnvelope(dir, "context-page", "docs/page.md");
+	packEnvelope(dir, "context-page", ".amber/context/pages/page.json");
 
 	const result = pushEnvelopes(dir);
 	// No remote configured → push skipped with a clear note, not an error
@@ -89,9 +89,9 @@ test("pushEnvelopes with no envelopes is a no-op", () => {
 test("pullEnvelopes validates on-disk envelopes without errors", () => {
 	const dir = mkTarget("pull", { git: true });
 	initTarget(dir);
-	writeArtifact(dir, "docs/page.md", "# Page\n");
+	writeArtifact(dir, ".amber/context/pages/page.json", "# Page\n");
 	const { packEnvelope } = require("../../scripts/lib/core/sync-remote");
-	packEnvelope(dir, "context-page", "docs/page.md");
+	packEnvelope(dir, "context-page", ".amber/context/pages/page.json");
 
 	const result = pullEnvelopes(dir);
 	assert.equal(result.errors.length, 0);
@@ -115,9 +115,9 @@ test("pullEnvelopes reports invalid envelopes as errors", () => {
 test("runSyncSession orchestrates pull → pack → push with a session record", () => {
 	const dir = mkTarget("session", { git: true });
 	initTarget(dir);
-	writeArtifact(dir, "docs/page.md", "# Page\n");
+	writeArtifact(dir, ".amber/context/pages/page.json", "# Page\n");
 	const { packEnvelope } = require("../../scripts/lib/core/sync-remote");
-	packEnvelope(dir, "context-page", "docs/page.md");
+	packEnvelope(dir, "context-page", ".amber/context/pages/page.json");
 
 	const result = runSyncSession(dir);
 	assert.ok(result.session, "session record present");

@@ -72,8 +72,8 @@ test("TH1: repository-local authority — sync never touches non-.amber paths", 
 
 test("TH2: conflict records are append-only and resolution is explicit", () => {
 	const dir = mkTarget("conflicts");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Original\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Original\n");
 	runCli(
 		[
 			"sync",
@@ -82,14 +82,14 @@ test("TH2: conflict records are append-only and resolution is explicit", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
 		],
 		dir,
 	);
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Diverged\n");
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Diverged\n");
 
 	runCli(["sync", "session", "replay", "--target", dir, "--json"], dir);
 	const c1 = payload(runCli(["sync", "session", "conflicts", "--target", dir, "--json"], dir));
@@ -166,8 +166,8 @@ test("TH5: full Team Hub flow — profile, sync session, conflict, projection", 
 	assert.equal(prof.deploymentProfile, "team-hub");
 
 	// envelope with team-hub origin
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	const pack = payload(
 		runCli(
 			[
@@ -177,7 +177,7 @@ test("TH5: full Team Hub flow — profile, sync session, conflict, projection", 
 				"--type",
 				"context-page",
 				"--artifact",
-				"docs/page.md",
+				".amber/context/pages/page.json",
 				"--target",
 				dir,
 				"--json",

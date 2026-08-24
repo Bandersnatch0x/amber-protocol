@@ -43,8 +43,8 @@ test("PN1: offline capture — identity resolves without a service", () => {
 
 test("PN2: deterministic receipts — envelope pack is reproducible across runs", () => {
 	const dir = mkTarget("receipts");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Deterministic\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Deterministic\n");
 	const r1 = runCli(
 		[
 			"sync",
@@ -53,7 +53,7 @@ test("PN2: deterministic receipts — envelope pack is reproducible across runs"
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -71,7 +71,7 @@ test("PN2: deterministic receipts — envelope pack is reproducible across runs"
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -151,8 +151,8 @@ test("PN5: full offline loop — init-free personal node works end to end", () =
 	assert.equal(payload(id).deploymentProfile, "personal-node");
 
 	// envelope
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Loop\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Loop\n");
 	const pack = runCli(
 		[
 			"sync",
@@ -161,7 +161,7 @@ test("PN5: full offline loop — init-free personal node works end to end", () =
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",

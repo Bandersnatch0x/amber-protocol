@@ -37,8 +37,8 @@ test("sync session conflicts shows empty ledger on fresh target", () => {
 
 test("sync session replay applies envelopes idempotently", () => {
 	const dir = mkTarget("replay");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	// pack → writes envelope to .amber/sync/envelopes/
 	const p = runCli(
 		[
@@ -48,7 +48,7 @@ test("sync session replay applies envelopes idempotently", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -72,8 +72,8 @@ test("sync session replay applies envelopes idempotently", () => {
 
 test("sync session replay records a conflict when local content diverges", () => {
 	const dir = mkTarget("conflict");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Original\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Original\n");
 	runCli(
 		[
 			"sync",
@@ -82,7 +82,7 @@ test("sync session replay records a conflict when local content diverges", () =>
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -90,7 +90,10 @@ test("sync session replay records a conflict when local content diverges", () =>
 		dir,
 	);
 	// local diverges
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Changed locally\n");
+	fs.writeFileSync(
+		path.join(dir, ".amber", "context", "pages", "page.json"),
+		"# Changed locally\n",
+	);
 
 	const r = runCli(["sync", "session", "replay", "--target", dir, "--json"], dir);
 	assert.equal(r.status, 0, r.stderr);
@@ -106,8 +109,8 @@ test("sync session replay records a conflict when local content diverges", () =>
 
 test("sync session replay never overwrites local content on conflict", () => {
 	const dir = mkTarget("preserve");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Original\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Original\n");
 	runCli(
 		[
 			"sync",
@@ -116,17 +119,20 @@ test("sync session replay never overwrites local content on conflict", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
 		],
 		dir,
 	);
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Diverged\n");
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Diverged\n");
 	runCli(["sync", "session", "replay", "--target", dir, "--json"], dir);
 
-	const content = fs.readFileSync(path.join(dir, "docs", "page.md"), "utf8");
+	const content = fs.readFileSync(
+		path.join(dir, ".amber", "context", "pages", "page.json"),
+		"utf8",
+	);
 	assert.equal(content, "# Diverged\n", "local content must be preserved on conflict");
 });
 

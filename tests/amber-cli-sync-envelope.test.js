@@ -24,8 +24,8 @@ function mkTarget(label) {
 
 test("sync envelope pack creates an envelope file", () => {
 	const dir = mkTarget("pack");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	const r = runCli(
 		[
 			"sync",
@@ -34,7 +34,7 @@ test("sync envelope pack creates an envelope file", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -45,7 +45,7 @@ test("sync envelope pack creates an envelope file", () => {
 	const out = JSON.parse(r.stdout);
 	const env = JSON.parse(out.text);
 	assert.equal(env.artifactType, "context-page");
-	assert.equal(env.artifactRef.path, "docs/page.md");
+	assert.equal(env.artifactRef.path, ".amber/context/pages/page.json");
 	const envPath = path.join(dir, ".amber", "sync", "envelopes", `${env.envelopeId}.json`);
 	assert.ok(fs.existsSync(envPath), "envelope file written");
 });
@@ -72,8 +72,8 @@ test("sync envelope pack rejects a missing artifact", () => {
 
 test("sync envelope validate accepts a packed envelope", () => {
 	const dir = mkTarget("validate");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	const r = runCli(
 		[
 			"sync",
@@ -82,7 +82,7 @@ test("sync envelope validate accepts a packed envelope", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -103,8 +103,8 @@ test("sync envelope validate accepts a packed envelope", () => {
 
 test("sync envelope compat refuses an incompatible envelope", () => {
 	const dir = mkTarget("compat");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	const r = runCli(
 		[
 			"sync",
@@ -113,7 +113,7 @@ test("sync envelope compat refuses an incompatible envelope", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -135,8 +135,8 @@ test("sync envelope compat refuses an incompatible envelope", () => {
 
 test("sync envelope unpack validates a matching local artifact", () => {
 	const dir = mkTarget("unpack");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	const r = runCli(
 		[
 			"sync",
@@ -145,7 +145,7 @@ test("sync envelope unpack validates a matching local artifact", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -163,9 +163,9 @@ test("sync envelope unpack validates a matching local artifact", () => {
 
 test("sync envelope pack uses team-hub profile when declared", () => {
 	const dir = mkTarget("profile");
-	fs.mkdirSync(path.join(dir, "docs"), { recursive: true });
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
 	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
-	fs.writeFileSync(path.join(dir, "docs", "page.md"), "# Page\n");
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
 	fs.writeFileSync(
 		path.join(dir, ".amber", "profile.json"),
 		JSON.stringify({ deploymentProfile: "team-hub" }),
@@ -178,7 +178,7 @@ test("sync envelope pack uses team-hub profile when declared", () => {
 			"--type",
 			"context-page",
 			"--artifact",
-			"docs/page.md",
+			".amber/context/pages/page.json",
 			"--target",
 			dir,
 			"--json",
@@ -197,6 +197,94 @@ test("legacy sync (drift) still works", () => {
 	assert.equal(r.status, 0, r.stderr);
 	const out = JSON.parse(r.stdout);
 	assert.ok(out.text.includes("Target:"));
+});
+
+// ── F035 S1: canonical artifact path and allowlist ────────────
+
+test("sync envelope pack refuses a traversal path outside the repository", () => {
+	const dir = mkTarget("pack-traversal");
+	const outside = path.join(dir, "..", "outside-secret-cli.txt");
+	fs.writeFileSync(outside, "secret");
+	const r = runCli(
+		[
+			"sync",
+			"envelope",
+			"pack",
+			"--type",
+			"context-page",
+			"--artifact",
+			"../outside-secret-cli.txt",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1, "must refuse to pack outside the repository");
+});
+
+test("sync envelope pack refuses a source file with a valid artifact type", () => {
+	const dir = mkTarget("pack-source");
+	fs.mkdirSync(path.join(dir, "scripts", "lib"), { recursive: true });
+	fs.writeFileSync(path.join(dir, "scripts", "lib", "x.js"), "module.exports = {};\n");
+	const r = runCli(
+		[
+			"sync",
+			"envelope",
+			"pack",
+			"--type",
+			"context-page",
+			"--artifact",
+			"scripts/lib/x.js",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1, "source files are never enveloped");
+});
+
+test("sync envelope unpack refuses an envelope whose path escapes the repository", () => {
+	const dir = mkTarget("unpack-outside");
+	const outside = path.join(dir, "..", "outside-secret-unpack-cli.txt");
+	fs.writeFileSync(outside, "secret");
+	const { hashText } = require("../scripts/lib/core/context-hash");
+	const realHash = hashText(fs.readFileSync(outside, "utf8"));
+	const envelope = {
+		schemaVersion: "1.0.0",
+		envelopeId: "01234567-89ab-cdef-0123-456789abcdef",
+		artifactType: "context-page",
+		artifactRef: { path: "../outside-secret-unpack-cli.txt", hash: realHash },
+		structuralIdentity: { tenantId: "local", repositoryId: "r", repositoryGeneration: 0 },
+		origin: { profile: "personal-node" },
+		createdAt: "2026-08-23T12:00:00Z",
+		versionNegotiation: {
+			amberProtocolVersion: "1.6.0",
+			minCompatibleVersion: "1.0.0",
+			capabilities: ["sync-envelope-v1"],
+		},
+	};
+	const u = runCli(
+		[
+			"sync",
+			"envelope",
+			"unpack",
+			"--envelope",
+			JSON.stringify(envelope),
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(u.status, 1, "must refuse an outside artifact path");
+	const out = JSON.parse(u.stdout);
+	assert.ok(out.errors.length > 0);
+	assert.ok(
+		!out.errors.join("; ").includes(realHash),
+		"rejection must not leak the outside file's hash",
+	);
 });
 
 test("sync envelope with unknown subcommand errors", () => {

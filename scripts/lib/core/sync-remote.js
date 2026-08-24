@@ -19,6 +19,7 @@ const path = require("node:path");
 const { hashText } = require("./context-hash");
 const { resolveIdentity } = require("./identity");
 const { resolveDeploymentProfile } = require("./deployment-profile");
+const { resolvePathWithin, toPortablePath } = require("./fs-utils");
 
 const SYNC_DIR = ".amber/sync";
 const ENVELOPES_DIR = path.join(SYNC_DIR, "envelopes");
@@ -39,6 +40,123 @@ const ARTIFACT_TYPES = Object.freeze([
 	"memory-request",
 	"governance-report",
 ]);
+
+// Canonical artifact home per type (F035 S1). Artifact type is not authority by
+// itself: every type maps to one repository-owned path family, and a valid
+// type paired with an unrelated path (source, package, credential, secret,
+// agent, tool files) is refused. Patterns are matched against the canonical
+// repository-relative POSIX form before any existence check, read, or hash.
+const ARTIFACT_PATH_REGISTRY = Object.freeze({
+	"session-manifest": {
+		pattern: /^\.amber\/sessions\/[^/]+\/manifest\.json$/,
+		family: ".amber/sessions/<sessionId>/manifest.json",
+	},
+	"timeline-event": {
+		pattern: /^\.amber\/sessions\/[^/]+\/timeline\.jsonl$/,
+		family: ".amber/sessions/<sessionId>/timeline.jsonl",
+	},
+	"feature-list": { pattern: /^feature_list\.json$/, family: "feature_list.json" },
+	route: { pattern: /^routes\/[^/]+\.route\.json$/, family: "routes/<name>.route.json" },
+	"loop-contract": {
+		pattern: /^workflow-packs\/[^/]+\.pack\.json$/,
+		family: "workflow-packs/<name>.pack.json",
+	},
+	"context-page": {
+		pattern: /^\.amber\/context\/pages\/[^/]+\.json$/,
+		family: ".amber/context/pages/<pageId>.json",
+	},
+	"context-request": {
+		pattern: /^\.amber\/context\/requests\/[^/]+\.json$/,
+		family: ".amber/context/requests/<requestId>.json",
+	},
+	"knowledge-plan": {
+		pattern: /^docs\/wiki\/knowledge-plan\.(json|yaml)$/,
+		family: "docs/wiki/knowledge-plan.json (or .yaml)",
+	},
+	"workflow-assessment": {
+		pattern: /^docs\/workflow-assessment\.(md|json)$/,
+		family: "docs/workflow-assessment.md (or .json)",
+	},
+	"memory-entry": {
+		pattern: /^\.amber\/memory\/registry\/[^/]+\.json$/,
+		family: ".amber/memory/registry/<entryId>.json",
+	},
+	"memory-request": {
+		pattern: /^\.amber\/memory\/requests\/[^/]+\.json$/,
+		family: ".amber/memory/requests/<requestId>.json",
+	},
+	"governance-report": {
+		pattern: /^docs\/governance-report\.(md|json)$/,
+		family: "docs/governance-report.md (or .json)",
+	},
+});
+
+/**
+ * Resolve an enveloped artifact path to its canonical repository-relative POSIX
+ * form (F035 S1 admission primitive). Rejects, in order, before any content
+ * read, hash, or ledger write: unknown types; empty paths; absolute paths;
+ * dot/empty segments and non-POSIX separators; paths outside the artifact
+ * type's canonical family; paths that escape the repository lexically or
+ * through a symlink/realpath transition; directories and non-regular files.
+ * @param {string} cwd - Repository root.
+ * @param {string} artifactType - One of ARTIFACT_TYPES.
+ * @param {string} artifactPath - Repository-relative artifact path.
+ * @returns {string} Canonical repository-relative POSIX path.
+ * @throws {Error} With a deterministic, user-facing message on rejection.
+ */
+function resolveSyncArtifact(cwd, artifactType, artifactPath) {
+	const registryEntry = ARTIFACT_PATH_REGISTRY[artifactType];
+	if (!registryEntry) {
+		throw new Error(`unknown artifact type "${artifactType}"`);
+	}
+	if (typeof artifactPath !== "string" || artifactPath.trim() === "") {
+		throw new Error("artifact path is required");
+	}
+	if (artifactPath === "." || artifactPath === "..") {
+		throw new Error(
+			`artifact path must name a file inside the repository, not the repository root: ${artifactPath}`,
+		);
+	}
+	if (path.isAbsolute(artifactPath)) {
+		throw new Error(`artifact path must be repository-relative, not absolute: ${artifactPath}`);
+	}
+	if (artifactPath.includes("\\")) {
+		throw new Error(`artifact path must use POSIX separators, not backslashes: ${artifactPath}`);
+	}
+	const segments = artifactPath.split("/");
+	const sawEmpty = segments.includes("");
+	const sawDot = segments.includes(".");
+	const sawParent = segments.includes("..");
+	if (sawParent) {
+		throw new Error(
+			`artifact path must not contain ".." segments (outside the repository): ${artifactPath}`,
+		);
+	}
+	if (sawEmpty) {
+		throw new Error(
+			`artifact path must not contain empty segments (double or trailing separators): ${artifactPath}`,
+		);
+	}
+	if (sawDot) {
+		throw new Error(`artifact path must not contain dot segments: ${artifactPath}`);
+	}
+	if (!registryEntry.pattern.test(artifactPath)) {
+		throw new Error(
+			`artifactType "${artifactType}" artifacts must live at ${registryEntry.family}: ${artifactPath}`,
+		);
+	}
+	const resolved = resolvePathWithin(cwd, artifactPath, { label: "artifact path" });
+	let stat = null;
+	try {
+		stat = fs.statSync(resolved);
+	} catch (error) {
+		if (error && error.code !== "ENOENT") throw error;
+	}
+	if (stat && !stat.isFile()) {
+		throw new Error(`artifact path is not a regular file: ${artifactPath}`);
+	}
+	return toPortablePath(path.relative(path.resolve(cwd), resolved));
+}
 
 /**
  * Compute the sha256: content hash of a file.
@@ -178,15 +296,14 @@ function validateEnvelope(envelope) {
  * @param {string} artifactType - One of ARTIFACT_TYPES.
  * @param {string} relPath - Repository-relative path to the artifact.
  * @returns {object} The envelope.
- * @throws {Error} When the artifact is missing or the type is unknown.
+ * @throws {Error} When the artifact is missing, the type is unknown, or the
+ *   path is not canonical for the type (see resolveSyncArtifact).
  */
 function envelopeFromArtifact(cwd, artifactType, relPath) {
-	if (!ARTIFACT_TYPES.includes(artifactType)) {
-		throw new Error(`unknown artifact type "${artifactType}"`);
-	}
-	const absPath = path.join(cwd, relPath);
+	const canonicalPath = resolveSyncArtifact(cwd, artifactType, relPath);
+	const absPath = path.join(cwd, canonicalPath);
 	if (!fs.existsSync(absPath)) {
-		throw new Error(`artifact not found: ${relPath}`);
+		throw new Error(`artifact not found: ${canonicalPath}`);
 	}
 	const identity = resolveIdentity(cwd);
 	const profile = resolveDeploymentProfile(cwd);
@@ -195,7 +312,7 @@ function envelopeFromArtifact(cwd, artifactType, relPath) {
 		schemaVersion: ENVELOPE_SCHEMA_VERSION,
 		envelopeId: crypto.randomUUID(),
 		artifactType,
-		artifactRef: { path: relPath, hash },
+		artifactRef: { path: canonicalPath, hash },
 		structuralIdentity: {
 			tenantId: identity.tenantId,
 			repositoryId: path.basename(cwd),
@@ -238,7 +355,10 @@ function packEnvelope(cwd, artifactType, relPath) {
 }
 
 /**
- * Validate, compatibility-check, and materialize an incoming envelope.
+ * Validate, compatibility-check, and materialize an incoming envelope. The
+ * artifact path passes the same canonical admission as packing; an envelope
+ * can never read or hash a file outside the selected repository or outside
+ * its artifact type's canonical path family.
  * @param {string} cwd - Repository root.
  * @param {object} envelope - The envelope to unpack.
  * @returns {{artifactPath: string|null, errors: string[]}}
@@ -252,28 +372,36 @@ function unpackEnvelope(cwd, envelope) {
 	if (!compat.compatible) {
 		return { artifactPath: null, errors: compat.reasons };
 	}
-	const absPath = path.join(cwd, envelope.artifactRef.path);
+	let canonicalPath;
+	try {
+		canonicalPath = resolveSyncArtifact(cwd, envelope.artifactType, envelope.artifactRef.path);
+	} catch (err) {
+		return { artifactPath: null, errors: [err.message] };
+	}
+	const absPath = path.join(cwd, canonicalPath);
 	const actualHash = fs.existsSync(absPath) ? hashFile(absPath) : null;
 	if (actualHash !== null && actualHash !== envelope.artifactRef.hash) {
 		return {
 			artifactPath: null,
 			errors: [
-				`artifact ${envelope.artifactRef.path} hash mismatch: local ${actualHash}, envelope ${envelope.artifactRef.hash}`,
+				`artifact ${canonicalPath} hash mismatch: local ${actualHash}, envelope ${envelope.artifactRef.hash}`,
 			],
 		};
 	}
-	return { artifactPath: envelope.artifactRef.path, errors: [] };
+	return { artifactPath: canonicalPath, errors: [] };
 }
 
 module.exports = {
 	SYNC_DIR,
 	ENVELOPES_DIR,
 	ARTIFACT_TYPES,
+	ARTIFACT_PATH_REGISTRY,
 	LOCAL_CAPABILITIES,
 	hashFile,
 	compareVersions,
 	checkCompatibility,
 	validateEnvelope,
+	resolveSyncArtifact,
 	envelopeFromArtifact,
 	packEnvelope,
 	unpackEnvelope,

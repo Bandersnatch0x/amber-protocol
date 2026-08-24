@@ -16,7 +16,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { validateEnvelope, checkCompatibility, hashFile } = require("./sync-remote");
+const {
+	validateEnvelope,
+	checkCompatibility,
+	hashFile,
+	resolveSyncArtifact,
+} = require("./sync-remote");
 const { readJSONL, appendJSONL } = require("./jsonl");
 
 const CONFLICT_TYPES = Object.freeze([
@@ -107,9 +112,11 @@ function listConflicts(cwd) {
 }
 
 /**
- * Apply a single envelope: validate, compatibility-check, hash-match.
- * On hash mismatch or incompatibility, records a conflict and refuses —
- * the local artifact is never silently overwritten.
+ * Apply a single envelope: validate, compatibility-check, admit the artifact
+ * path, hash-match. On hash mismatch or incompatibility, records a conflict
+ * and refuses — the local artifact is never silently overwritten. An invalid
+ * artifact path fails as invalid input: it is neither applied nor recorded as
+ * a semantic conflict, and no outside file is ever read or hashed.
  * @param {string} cwd - Repository root.
  * @param {object} envelope - The envelope to apply.
  * @returns {{ok: boolean, action: string, conflict: object|null, errors: string[]}}
@@ -129,7 +136,13 @@ function applyEnvelope(cwd, envelope) {
 		}).record;
 		return { ok: false, action: "conflict", conflict, errors: compat.reasons };
 	}
-	const absPath = path.join(cwd, envelope.artifactRef.path);
+	let canonicalPath;
+	try {
+		canonicalPath = resolveSyncArtifact(cwd, envelope.artifactType, envelope.artifactRef.path);
+	} catch (err) {
+		return { ok: false, action: "invalid", conflict: null, errors: [err.message] };
+	}
+	const absPath = path.join(cwd, canonicalPath);
 	if (!fs.existsSync(absPath)) {
 		// artifact missing: nothing to overwrite, nothing to protect — treat as applied
 		return { ok: true, action: "applied", conflict: null, errors: [] };
@@ -139,7 +152,7 @@ function applyEnvelope(cwd, envelope) {
 		const conflict = recordConflict(cwd, {
 			conflictType: "concurrent-edit",
 			envelopeId: envelope.envelopeId,
-			artifactPath: envelope.artifactRef.path,
+			artifactPath: canonicalPath,
 			detail: `local hash ${localHash} differs from envelope ${envelope.artifactRef.hash}; local artifact preserved`,
 		}).record;
 		return {
