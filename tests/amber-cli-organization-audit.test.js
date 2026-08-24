@@ -61,9 +61,11 @@ test("audit org retention records an evidence-backed revocation", () => {
 	assert.ok(event.evidenceHash);
 	assert.equal(event.target, "actor-123");
 
-	// event is in the ledger
+	// event is in the ledger, with target/reason persisted on the ledger copy
 	const ev = payload(runCli(["audit", "org", "events", "--target", dir, "--json"], dir));
 	assert.equal(ev.length, 1);
+	assert.equal(ev[0].target, "actor-123", "ledger copy carries target");
+	assert.equal(ev[0].reason, "offboarding", "ledger copy carries reason");
 });
 
 test("audit org retention rejects an unknown action", () => {

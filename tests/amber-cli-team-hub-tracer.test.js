@@ -125,7 +125,7 @@ test("TH3: checkpoint and freshness evidence are deterministic", () => {
 	const m2 = payload(r2);
 	assert.equal(m1.sourceHash, m2.sourceHash, "sourceHash must be deterministic across rebuilds");
 	assert.match(m1.sourceHash, /^sha256:[0-9a-f]{64}$/);
-	assert.ok(m1.rebuildCheckpoint, "checkpoint present");
+	assert.ok(m1.rebuild_checkpoint, "checkpoint present");
 });
 
 test("TH4: rebuild from admitted records is proven (drift → rebuild → current)", () => {

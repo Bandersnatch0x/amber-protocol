@@ -26,6 +26,32 @@ function mkNoGitTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-identity-nogit-${label}-`));
 }
 
+/**
+ * Redirect git's global/system config to an isolated home while `fn` runs,
+ * so tests are immune to the machine's git identity.
+ */
+function withIsolatedGitConfig(fn) {
+	const home = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-home-"));
+	const prev = {
+		HOME: process.env.HOME,
+		USERPROFILE: process.env.USERPROFILE,
+		GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL,
+		GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM,
+	};
+	process.env.HOME = home;
+	process.env.USERPROFILE = home;
+	delete process.env.GIT_CONFIG_GLOBAL;
+	process.env.GIT_CONFIG_NOSYSTEM = "1";
+	try {
+		return fn(home);
+	} finally {
+		for (const [key, value] of Object.entries(prev)) {
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	}
+}
+
 // ── defaultIdentity ─────────────────────────────────────────────
 
 test("defaultIdentity returns deterministic local defaults", () => {
@@ -61,11 +87,29 @@ test("inferFromGit returns personId from git config in a git repo", () => {
 });
 
 test("inferFromGit returns null when git config is empty", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-empty-"));
-	execSync("git init", { cwd: dir, encoding: "utf8" });
-	// Don't set user.name/email
-	const inferred = inferFromGit(dir);
-	assert.equal(inferred.personId, null);
+	withIsolatedGitConfig(() => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-empty-"));
+		execSync("git init", { cwd: dir, encoding: "utf8" });
+		// Don't set user.name/email anywhere
+		const inferred = inferFromGit(dir);
+		assert.equal(inferred.personId, null);
+	});
+});
+
+test("inferFromGit falls back to global config when local is unset (ADR-0019 D4)", () => {
+	withIsolatedGitConfig((home) => {
+		execSync('git config --global user.email "global@example.com"', { encoding: "utf8" });
+		execSync('git config --global user.name "Global User"', { encoding: "utf8" });
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-identity-global-"));
+		execSync("git init", { cwd: dir, encoding: "utf8" });
+		// no local user.name/email — effective config resolves from global
+		const inferred = inferFromGit(dir);
+		assert.equal(inferred.personId, "Global User <global@example.com>");
+		// local config still wins when present
+		execSync('git config user.email "local@example.com"', { cwd: dir, encoding: "utf8" });
+		execSync('git config user.name "Local User"', { cwd: dir, encoding: "utf8" });
+		assert.equal(inferFromGit(dir).personId, "Local User <local@example.com>");
+	});
 });
 
 // ── loadIdentityFile ────────────────────────────────────────────

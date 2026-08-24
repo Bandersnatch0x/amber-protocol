@@ -130,9 +130,9 @@ function printRunnerHelp() {
 			"Exits non-zero on any path regression or product-repo mutation.",
 			"Does not write docs/quality unless --output is given.",
 			"",
-			"--fixture-family  Compare the runtime summary against the committed golden",
-			"                  fixture family (tests/fixtures/governance/). Exits",
-			"                  non-zero on any golden mismatch.",
+			"--fixture-family  Check every committed golden (tests/fixtures/governance/)",
+			"                  against its own path's runtime result. Exits non-zero",
+			"                  on any golden mismatch. Green on a healthy run.",
 		].join("\n"),
 	);
 }
@@ -1094,7 +1094,7 @@ function main(argv = process.argv.slice(2)) {
 		console.log("High findings:", results.summary.highFindings.join(", "));
 	}
 	if (args.fixtureFamily) {
-		const report = reportFixtureCoverage(results.summary);
+		const report = reportFixtureCoverage(results.paths);
 		console.log(JSON.stringify(report, null, 2));
 		if (report.mismatches.length > 0) {
 			process.exitCode = 1;
@@ -1153,41 +1153,124 @@ function matchGolden(runtimeSummary, golden) {
 		}
 	}
 	const expectedExit = golden.exitCode;
-	const actualExit = exitCodeFromSummary(runtimeSummary);
+	const actualExit =
+		typeof runtimeSummary.exitCode === "number"
+			? runtimeSummary.exitCode
+			: exitCodeFromSummary(runtimeSummary);
 	if (typeof expectedExit === "number" && expectedExit !== actualExit) {
 		mismatches.push(`exitCode: expected ${expectedExit}, got ${actualExit}`);
 	}
 	return mismatches;
 }
 
-function reportFixtureCoverage(runtimeSummary) {
+/**
+ * Build the runtime summary a fixture's golden must be checked against.
+ *
+ * Every fixture names a governance path (+ variant). The runner produces one
+ * result per path (results.paths.*), and the golden for a fixture must match
+ * THAT path's runtime outcome — not the whole-run aggregate. Adversarial
+ * fixtures assert the governance gate REFUSES the adversarial input; the
+ * runner proves that refusal in the rejection path (accept without evidence
+ * → R3), so the adversarial success fixture's golden is checked against the
+ * refusal facts.
+ * @param {object} fixture - Fixture.
+ * @param {object} paths - Per-path runtime results (results.paths).
+ * @returns {object|null} Runtime summary, or null when the path is unmapped.
+ */
+function runtimeSummaryForFixture(fixture, paths) {
+	const variant = fixture.variant || "canonical";
+	if (variant === "adversarial") {
+		// Refusal state: accept without evidence must be blocked (R3).
+		const blocked = Boolean(paths.rejections?.acceptWithoutEvidenceBlocked);
+		return {
+			successClosed: false,
+			highFindings: blocked ? ["R3"] : [],
+			exitCode: blocked ? 1 : 0,
+		};
+	}
+	switch (fixture.path) {
+		case "success": {
+			const result = paths.success;
+			const closed = Boolean(result?.closed);
+			return { successClosed: closed, highFindings: [], exitCode: closed ? 0 : 1 };
+		}
+		case "rejection": {
+			const result = paths.rejections;
+			const hold = Boolean(
+				result?.policyDenyWorks &&
+				result?.claimOnlyStrictFails &&
+				result?.acceptWithoutEvidenceBlocked &&
+				result?.approveRequiresGateId,
+			);
+			return {
+				rejections: {
+					policyDeny: Boolean(result?.policyDenyWorks),
+					claimStrict: Boolean(result?.claimOnlyStrictFails),
+					acceptNoEvidence: Boolean(result?.acceptWithoutEvidenceBlocked),
+					approveNeedsGate: Boolean(result?.approveRequiresGateId),
+				},
+				highFindings: [],
+				exitCode: hold ? 0 : 1,
+			};
+		}
+		case "verify-fail-recover": {
+			const recovered = Boolean(paths.verifyFailRecover?.recovered);
+			return { verifyFailRecovered: recovered, highFindings: [], exitCode: recovered ? 0 : 1 };
+		}
+		case "cross-session-handoff": {
+			const result = paths.crossSessionHandoff;
+			const useful = Boolean(
+				result?.handoffUseful && result?.session2Started && result?.refuseResurrectCompleted,
+			);
+			return { crossSessionHandoff: useful, highFindings: [], exitCode: useful ? 0 : 1 };
+		}
+		default:
+			return null;
+	}
+}
+
+/**
+ * Check every committed fixture's golden against the corresponding per-path
+ * runtime result. A golden mismatch fails the fixture gate; the gate is
+ * GREEN on a healthy run (canonical goldens match, the adversarial refusal
+ * is proven).
+ * @param {object} paths - Per-path runtime results (results.paths).
+ * @returns {{familySize: number, errors: string[], mismatches: Array<object>, matches: Array<object>}}
+ */
+function reportFixtureCoverage(paths) {
 	let family;
 	try {
 		family = require("../lib/core/fixture-family").loadFamily();
 	} catch (err) {
 		return { error: err.message, fixtures: [], mismatches: [] };
 	}
-	const pathToFixture = {};
-	for (const { fixture } of family.fixtures) {
-		const key = fixture.path;
-		if (!pathToFixture[key]) pathToFixture[key] = [];
-		pathToFixture[key].push(fixture);
-	}
+	const matches = [];
 	const mismatches = [];
 	for (const { fixture } of family.fixtures) {
+		const entry = {
+			fixtureId: fixture.fixtureId,
+			path: fixture.path,
+			variant: fixture.variant || "canonical",
+			deploymentProfile: fixture.deploymentProfile || null,
+		};
+		const runtimeSummary = runtimeSummaryForFixture(fixture, paths);
+		if (runtimeSummary === null) {
+			entry.diffs = [`path "${fixture.path}" has no runtime result`];
+			mismatches.push(entry);
+			continue;
+		}
 		const diffs = matchGolden(runtimeSummary, fixture.golden);
 		if (diffs.length > 0) {
-			mismatches.push({
-				fixtureId: fixture.fixtureId,
-				path: fixture.path,
-				variant: fixture.variant || "canonical",
-				diffs,
-			});
+			entry.diffs = diffs;
+			mismatches.push(entry);
+		} else {
+			matches.push(entry);
 		}
 	}
 	return {
 		familySize: family.fixtures.length,
 		errors: family.errors,
+		matches,
 		mismatches,
 	};
 }
@@ -1199,5 +1282,6 @@ module.exports = {
 	detectProductMutation,
 	exitCodeFromSummary,
 	matchGolden,
+	runtimeSummaryForFixture,
 	reportFixtureCoverage,
 };

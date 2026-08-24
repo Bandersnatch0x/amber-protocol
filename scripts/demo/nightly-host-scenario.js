@@ -27,6 +27,8 @@ const { spawnSync, execSync } = require("node:child_process");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const AMBER = path.join(REPO_ROOT, "scripts", "amber.js");
+const { loadTargetRoutes } = require("../lib/route-loader");
+const { JOURNEYS } = require("../lib/route-journey-decision");
 
 const SKIP_EXIT = 42;
 const PASS_EXIT = 0;
@@ -123,6 +125,38 @@ function hostBinaryAvailable(binary) {
 }
 
 /**
+ * Verify route provenance: the session's route must be one amber itself
+ * chose (`amber next` / `session start --route`), never a host-invented
+ * journey.
+ *
+ * A legitimate manifest records `route` as { id, version } — the shape
+ * `session start` writes after route selection — and an optional `journeyId`
+ * selected by decideRouteJourney. Provenance holds when:
+ *   1. the route id is a registered route in the target's routes/ registry,
+ *      and
+ *   2. any recorded journeyId is one of Amber's known journeys.
+ * A string route, an unknown route id, or an unknown journey id is an
+ * invented journey → provenance fails.
+ * @param {string} target - Target root.
+ * @param {object} manifest - Session manifest.
+ * @returns {boolean}
+ */
+function routeFromAmberProven(target, manifest) {
+	if (!manifest || typeof manifest !== "object") return false;
+	const route = manifest.route;
+	if (!route || typeof route !== "object" || Array.isArray(route)) return false;
+	const routeId = route.id;
+	if (typeof routeId !== "string" || routeId.trim() === "") return false;
+	const { routes } = loadTargetRoutes(target);
+	const knownRoute = routes.some((r) => r.routeId === routeId);
+	if (!knownRoute) return false;
+	if (manifest.journeyId !== undefined && manifest.journeyId !== null) {
+		return JOURNEYS.some((j) => j.id === manifest.journeyId);
+	}
+	return true;
+}
+
+/**
  * Build the judge context from the isolated target's Session artifacts.
  * @param {string} target - Target root.
  * @param {{objective: string}} opts
@@ -154,12 +188,12 @@ function buildJudgeContext(target, { objective }) {
 			".",
 		]);
 		completeCheckPassed = cc.exitCode === 0 || /status: pass/i.test(cc.stdout);
-		// route provenance: session manifest records the route id
+		// route provenance: session manifest records the route chosen by amber
 		const manifestPath = path.join(sessionsDir, sid, "manifest.json");
 		if (fs.existsSync(manifestPath)) {
 			try {
 				const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-				routeFromAmber = typeof manifest.route === "string" || typeof manifest.journey === "string";
+				routeFromAmber = routeFromAmberProven(target, manifest);
 			} catch {
 				routeFromAmber = false;
 			}
@@ -260,6 +294,7 @@ module.exports = {
 	parseArgs,
 	mkIsolatedTarget,
 	hostBinaryAvailable,
+	routeFromAmberProven,
 	buildJudgeContext,
 	judgePassFail,
 	isSilentSkip,

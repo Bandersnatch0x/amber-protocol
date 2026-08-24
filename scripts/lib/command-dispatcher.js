@@ -1549,7 +1549,7 @@ function handleProjection(args) {
 	if (sub === "list") {
 		const statuses = PROJECTION_TYPES.map((type) => {
 			const status = projectionStatus(targetRoot, type);
-			return { projectionType: type, ok: status.ok, code: status.code, detail: status.detail };
+			return { projection_type: type, ok: status.ok, code: status.code, detail: status.detail };
 		});
 		return {
 			result: {
@@ -1571,7 +1571,9 @@ function handleProjection(args) {
 				result: {
 					target: args.target,
 					text: "",
-					errors: ["projection view requires --kind <temporal|timeline|relationship|mind-map>"],
+					errors: [
+						"projection view requires --kind <temporal|timeline|causal|relationship|mind-map|context>",
+					],
 					warnings: [],
 				},
 				exitCode: 1,
@@ -1622,7 +1624,9 @@ function handleProjection(args) {
 				result: {
 					target: args.target,
 					text: "",
-					errors: ["projection compare requires --kind <temporal|timeline|relationship|mind-map>"],
+					errors: [
+						"projection compare requires --kind <temporal|timeline|causal|relationship|mind-map|context>",
+					],
 					warnings: [],
 				},
 				exitCode: 1,

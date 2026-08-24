@@ -16,7 +16,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { execSync } = require("node:child_process");
+const { spawnSync } = require("node:child_process");
 
 const DEFAULT_TENANT_ID = "local";
 const DEFAULT_ORGANIZATION_ID = "personal";
@@ -38,36 +38,37 @@ function defaultIdentity() {
 }
 
 /**
+ * Read a single effective git config key (local > global > system).
+ * @param {string} cwd - Repository root.
+ * @param {string} key - Config key, e.g. "user.name".
+ * @returns {string} Trimmed value, or "" when unset.
+ */
+function gitConfig(cwd, key) {
+	const res = spawnSync("git", ["config", key], {
+		cwd,
+		encoding: "utf8",
+		stdio: ["pipe", "pipe", "pipe"],
+	});
+	if (res.status !== 0) return "";
+	return (res.stdout || "").trim();
+}
+
+/**
  * Infer Person identity from git config.
  * @param {string} cwd - Repository root.
  * @returns {{personId: string|null, agentId: null}} Git-inferred person, or nulls.
  */
 function inferFromGit(cwd) {
-	// Only infer from an actual git repository, and only from repository-local
-	// config. Global config is machine identity, not governance identity.
+	// Only infer from an actual git repository. Reads the effective config
+	// (local > global > system, per ADR-0019 D4: "git config user.name" /
+	// "user.email") so a zero-config machine with machine-level identity is
+	// still inferred. Repository-local values win when both exist. The
+	// identity file (.amber/identity.json) overrides everything.
 	if (!fs.existsSync(path.join(cwd, ".git"))) {
 		return { personId: null, agentId: null };
 	}
-	let name;
-	let email;
-	try {
-		name = execSync("git config --local user.name", {
-			cwd,
-			encoding: "utf8",
-			stdio: ["pipe", "pipe", "pipe"],
-		}).trim();
-	} catch {
-		name = "";
-	}
-	try {
-		email = execSync("git config --local user.email", {
-			cwd,
-			encoding: "utf8",
-			stdio: ["pipe", "pipe", "pipe"],
-		}).trim();
-	} catch {
-		email = "";
-	}
+	const name = gitConfig(cwd, "user.name");
+	const email = gitConfig(cwd, "user.email");
 	const personId = name && email ? `${name} <${email}>` : null;
 	return { personId, agentId: null };
 }
@@ -154,6 +155,7 @@ module.exports = {
 	DEFAULT_ORGANIZATION_ID,
 	DEFAULT_REPOSITORY_GENERATION,
 	defaultIdentity,
+	gitConfig,
 	inferFromGit,
 	loadIdentityFile,
 	resolveIdentity,

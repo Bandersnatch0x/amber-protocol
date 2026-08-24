@@ -11,6 +11,11 @@
  * state. `sourceHash` detects canonical drift; `outputHash` detects output
  * tampering. Projections are rebuildable — rebuild() regenerates from
  * canonical artifacts at any time.
+ *
+ * Field names follow ADR-0012 amendment E: `projection_type`,
+ * `projection_version`, `rebuild_checkpoint`, plus the four versioning
+ * fields (`amber_protocol_version`, `artifact_sequence`, `created_at`,
+ * `artifact_type`).
  */
 
 const crypto = require("node:crypto");
@@ -23,6 +28,9 @@ const PROJECTION_TYPES = Object.freeze([
 	"visualization-workbench",
 ]);
 const SCHEMA_VERSION = "1.0.0";
+const AMBER_PROTOCOL_VERSION = require(
+	path.resolve(__dirname, "..", "..", "..", "package.json"),
+).version;
 
 function projectionsDir(targetRoot) {
 	return path.join(targetRoot, ".amber", "projections");
@@ -74,9 +82,9 @@ function validateProjectionManifest(manifest) {
 	for (const field of [
 		"schemaVersion",
 		"projectionId",
-		"projectionType",
-		"projectionVersion",
-		"rebuildCheckpoint",
+		"projection_type",
+		"projection_version",
+		"rebuild_checkpoint",
 		"sourceHash",
 		"outputHash",
 	]) {
@@ -89,22 +97,35 @@ function validateProjectionManifest(manifest) {
 			`unsupported schemaVersion "${manifest.schemaVersion}" (expected "${SCHEMA_VERSION}")`,
 		);
 	}
-	if (manifest.projectionType && !PROJECTION_TYPES.includes(manifest.projectionType)) {
-		errors.push(`unknown projectionType "${manifest.projectionType}"`);
+	if (manifest.projection_type && !PROJECTION_TYPES.includes(manifest.projection_type)) {
+		errors.push(`unknown projection_type "${manifest.projection_type}"`);
 	}
 	if (manifest.projectionId && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(manifest.projectionId)) {
 		errors.push(`projectionId "${manifest.projectionId}" must be kebab-case`);
 	}
 	if (
-		manifest.projectionVersion !== undefined &&
-		(!Number.isInteger(manifest.projectionVersion) || manifest.projectionVersion < 1)
+		manifest.projection_version !== undefined &&
+		(!Number.isInteger(manifest.projection_version) || manifest.projection_version < 1)
 	) {
-		errors.push("projectionVersion must be an integer >= 1");
+		errors.push("projection_version must be an integer >= 1");
 	}
 	for (const field of ["sourceHash", "outputHash"]) {
 		if (manifest[field] !== undefined && !/^sha256:[0-9a-f]{64}$/.test(manifest[field])) {
 			errors.push(`${field} must be sha256:<64 hex>`);
 		}
+	}
+	// ADR-0012 versioning fields are optional and, when present, must be sane.
+	if (
+		manifest.artifact_sequence !== undefined &&
+		(!Number.isInteger(manifest.artifact_sequence) || manifest.artifact_sequence < 0)
+	) {
+		errors.push("artifact_sequence must be an integer >= 0");
+	}
+	if (
+		manifest.amber_protocol_version !== undefined &&
+		typeof manifest.amber_protocol_version !== "string"
+	) {
+		errors.push("amber_protocol_version must be a string");
 	}
 	return { valid: errors.length === 0, errors };
 }
@@ -132,11 +153,16 @@ function buildProjection(targetRoot, projectionType, builder) {
 		const manifest = {
 			schemaVersion: SCHEMA_VERSION,
 			projectionId: projectionType,
-			projectionType,
-			projectionVersion: 1,
-			rebuildCheckpoint: state.checkpoint,
+			projection_type: projectionType,
+			projection_version: 1,
+			rebuild_checkpoint: state.checkpoint,
 			sourceHash: state.checkpoint,
 			outputHash: sha256(output),
+			// ADR-0012 versioning fields (optional, populated when writing)
+			amber_protocol_version: AMBER_PROTOCOL_VERSION,
+			artifact_sequence: 0,
+			created_at: new Date().toISOString(),
+			artifact_type: "projection-manifest",
 			rebuiltAt: new Date().toISOString(),
 		};
 		const validation = validateProjectionManifest(manifest);
@@ -245,6 +271,7 @@ function projectionStatus(targetRoot, projectionType) {
 module.exports = {
 	PROJECTION_TYPES,
 	SCHEMA_VERSION,
+	AMBER_PROTOCOL_VERSION,
 	projectionsDir,
 	projectionManifestPath,
 	canonicalState,

@@ -7,6 +7,7 @@ const path = require("node:path");
 
 const {
 	matchGolden,
+	runtimeSummaryForFixture,
 	reportFixtureCoverage,
 	parseRunnerArgs,
 } = require("../../scripts/demo/e2e-governance-loop-verify.js");
@@ -100,27 +101,62 @@ test("matchGolden detects a highFindings mismatch", () => {
 	assert.ok(diffs.some((d) => d.includes("highFindings")));
 });
 
-test("reportFixtureCoverage loads the family and reports no mismatches for a matching summary", () => {
-	const runtime = {
-		successClosed: true,
-		highFindings: [],
+function healthyPathResults() {
+	return {
+		success: { closed: true },
 		rejections: {
-			policyDeny: true,
-			claimStrict: true,
-			acceptNoEvidence: true,
-			approveNeedsGate: true,
+			policyDenyWorks: true,
+			claimOnlyStrictFails: true,
+			acceptWithoutEvidenceBlocked: true,
+			approveRequiresGateId: true,
 		},
-		verifyFailRecovered: true,
-		crossSessionHandoff: true,
+		verifyFailRecover: { recovered: true },
+		crossSessionHandoff: {
+			handoffUseful: true,
+			session2Started: true,
+			refuseResurrectCompleted: true,
+		},
 	};
-	const report = reportFixtureCoverage(runtime);
+}
+
+test("reportFixtureCoverage is green on a healthy run (canonical goldens match, refusal proven)", () => {
+	const report = reportFixtureCoverage(healthyPathResults());
 	assert.equal(report.errors.length, 0);
 	assert.ok(report.familySize >= 7, `expected at least 7 fixtures, got ${report.familySize}`);
-	// Canonical fixtures should all match a fully-passing runtime summary.
-	// The adversarial fixture (exitCode 1) should mismatch on a passing summary.
-	for (const m of report.mismatches) {
-		assert.ok(m.fixtureId.includes("adversarial"), `unexpected mismatch on ${m.fixtureId}`);
+	assert.deepEqual(report.mismatches, []);
+	assert.equal(report.matches.length, report.familySize);
+});
+
+test("reportFixtureCoverage fails when a canonical golden drifts from its path result", () => {
+	const paths = healthyPathResults();
+	paths.success.closed = false; // success path no longer closes
+	const report = reportFixtureCoverage(paths);
+	const failure = report.mismatches.find((m) => m.fixtureId === "success-minimal");
+	assert.ok(failure, "success-minimal golden must mismatch an unclosed success path");
+	assert.ok(failure.diffs.some((d) => d.includes("successClosed") || d.includes("exitCode")));
+});
+
+test("reportFixtureCoverage fails when the adversarial refusal is NOT proven", () => {
+	const paths = healthyPathResults();
+	paths.rejections.acceptWithoutEvidenceBlocked = false; // gate failed to block
+	const report = reportFixtureCoverage(paths);
+	const failure = report.mismatches.find((m) => m.fixtureId === "success-adversarial-no-evidence");
+	assert.ok(failure, "adversarial golden must mismatch when the refusal is not proven");
+});
+
+test("runtimeSummaryForFixture maps each fixture to its own path's result", () => {
+	const paths = healthyPathResults();
+	const { fixtures } = loadFamily();
+	for (const { fixture } of fixtures) {
+		const summary = runtimeSummaryForFixture(fixture, paths);
+		assert.ok(summary, `fixture ${fixture.fixtureId} maps to a runtime result`);
 	}
+	// adversarial summary encodes the refusal state
+	const adversarial = fixtures.find((f) => f.fixture.variant === "adversarial");
+	const advSummary = runtimeSummaryForFixture(adversarial.fixture, paths);
+	assert.equal(advSummary.successClosed, false);
+	assert.deepEqual(advSummary.highFindings, ["R3"]);
+	assert.equal(advSummary.exitCode, 1);
 });
 
 test("the committed fixture family has at least 7 fixtures covering all 4 paths and 3 profiles", () => {

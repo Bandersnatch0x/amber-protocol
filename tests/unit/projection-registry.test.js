@@ -37,9 +37,9 @@ test("validateProjectionManifest accepts a well-formed manifest", () => {
 	const manifest = {
 		schemaVersion: "1.0.0",
 		projectionId: "governance-graph",
-		projectionType: "governance-graph",
-		projectionVersion: 1,
-		rebuildCheckpoint: "abc",
+		projection_type: "governance-graph",
+		projection_version: 1,
+		rebuild_checkpoint: "abc",
 		sourceHash: "sha256:" + "a".repeat(64),
 		outputHash: "sha256:" + "b".repeat(64),
 	};
@@ -48,13 +48,47 @@ test("validateProjectionManifest accepts a well-formed manifest", () => {
 	assert.deepEqual(result.errors, []);
 });
 
+test("validateProjectionManifest accepts ADR-0012 versioning fields", () => {
+	const manifest = {
+		schemaVersion: "1.0.0",
+		projectionId: "governance-graph",
+		projection_type: "governance-graph",
+		projection_version: 1,
+		rebuild_checkpoint: "abc",
+		sourceHash: "sha256:" + "a".repeat(64),
+		outputHash: "sha256:" + "b".repeat(64),
+		amber_protocol_version: "1.7.0",
+		artifact_sequence: 0,
+		created_at: "2026-08-20T00:00:00Z",
+		artifact_type: "projection-manifest",
+	};
+	const result = validateProjectionManifest(manifest);
+	assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
+test("validateProjectionManifest rejects a bad artifact_sequence", () => {
+	const manifest = {
+		schemaVersion: "1.0.0",
+		projectionId: "governance-graph",
+		projection_type: "governance-graph",
+		projection_version: 1,
+		rebuild_checkpoint: "abc",
+		sourceHash: "sha256:" + "a".repeat(64),
+		outputHash: "sha256:" + "b".repeat(64),
+		artifact_sequence: -1,
+	};
+	const result = validateProjectionManifest(manifest);
+	assert.equal(result.valid, false);
+	assert.ok(result.errors.some((e) => e.includes("artifact_sequence")));
+});
+
 test("validateProjectionManifest rejects an unknown projection type", () => {
 	const manifest = {
 		schemaVersion: "1.0.0",
 		projectionId: "bogus",
-		projectionType: "bogus",
-		projectionVersion: 1,
-		rebuildCheckpoint: "abc",
+		projection_type: "bogus",
+		projection_version: 1,
+		rebuild_checkpoint: "abc",
 		sourceHash: "sha256:" + "a".repeat(64),
 		outputHash: "sha256:" + "b".repeat(64),
 	};
@@ -83,10 +117,15 @@ test("buildProjection creates an immutable rebuildable projection from canonical
 	const result = buildProjection(dir, "governance-graph", () => ({ nodes: [{ id: "p1" }] }));
 	assert.equal(result.ok, true, result.detail || JSON.stringify(result));
 	assert.ok(result.manifest);
-	assert.equal(result.manifest.projectionType, "governance-graph");
+	assert.equal(result.manifest.projection_type, "governance-graph");
 	assert.ok(result.manifest.sourceHash);
 	assert.ok(result.manifest.outputHash);
-	assert.ok(result.manifest.rebuildCheckpoint);
+	assert.ok(result.manifest.rebuild_checkpoint);
+	// ADR-0012 versioning fields populated on write
+	assert.equal(result.manifest.artifact_type, "projection-manifest");
+	assert.equal(result.manifest.artifact_sequence, 0);
+	assert.ok(result.manifest.amber_protocol_version);
+	assert.ok(result.manifest.created_at);
 });
 
 test("rebuildProjection writes a manifest with a stable identity", () => {

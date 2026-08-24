@@ -9,7 +9,6 @@ const path = require("node:path");
 const {
 	buildGovernanceGraph,
 	queryGraph,
-	DENY_SCOPE,
 	parseScope,
 } = require("../../scripts/lib/core/governance-graph");
 const {
@@ -73,7 +72,7 @@ test("buildGovernanceGraph edges carry provenance (source refs)", () => {
 	assert.ok(edge.provenance && edge.provenance.length >= 2, "edge has provenance");
 });
 
-// ── parseScope / DENY_SCOPE ───────────────────────────────────
+// ── parseScope ────────────────────────────────────────────────
 
 test("parseScope returns an explicit scope or null for global", () => {
 	assert.equal(parseScope("p1"), "p1");
@@ -81,8 +80,11 @@ test("parseScope returns an explicit scope or null for global", () => {
 	assert.equal(parseScope(""), null);
 });
 
-test("DENY_SCOPE is a distinct sentinel for exact-scope denial", () => {
-	assert.ok((DENY_SCOPE !== null && typeof DENY_SCOPE === "symbol") || DENY_SCOPE === "deny");
+test("queryGraph denies unknown scopes with AMBER_E_GRAPH_DENY", () => {
+	const graph = { nodes: [{ id: "p1" }], edges: [] };
+	const result = queryGraph(graph, { scope: "ghost" });
+	assert.equal(result.ok, false);
+	assert.equal(result.code, "AMBER_E_GRAPH_DENY");
 });
 
 // ── queryGraph ────────────────────────────────────────────────

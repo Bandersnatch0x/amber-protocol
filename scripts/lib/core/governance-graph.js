@@ -17,7 +17,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const DEFAULT_QUERY_LIMIT = 50;
-const DENY_SCOPE = Symbol("deny");
 
 function sha256(input) {
 	return `sha256:${crypto.createHash("sha256").update(input).digest("hex")}`;
@@ -138,7 +137,6 @@ function queryGraph(graph, { scope = null, limit = DEFAULT_QUERY_LIMIT } = {}) {
 
 module.exports = {
 	DEFAULT_QUERY_LIMIT,
-	DENY_SCOPE,
 	sha256,
 	parseScope,
 	buildGovernanceGraph,

@@ -3,12 +3,16 @@
 /**
  * Visualization Workbench projections (#164).
  *
- * Four rebuildable read-only projections over authorized canonical artifacts
- * (context pages) and governed records:
+ * Six rebuildable read-only projections over authorized canonical artifacts
+ * (context pages) and governed records, covering the baseline's four named
+ * projections (temporal, causal, relationship, mind-map/context) plus the
+ * timeline event sequence:
  *   - temporal:  time-ordered (by createdAt)
  *   - timeline:  ordered event sequence
+ *   - causal:    directional page→page derivation edges (older → newer)
  *   - relationship: page↔page edges from shared sources
  *   - mind-map:  page → source hierarchy
+ *   - context:   page → source context (ref/kind/hash)
  *
  * All reads are bounded (limit), sortable by key, filterable, and
  * deterministic. Compare reports added/removed/changed between two states.
@@ -19,7 +23,14 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const PROJECTION_KINDS = Object.freeze(["temporal", "timeline", "relationship", "mind-map"]);
+const PROJECTION_KINDS = Object.freeze([
+	"temporal",
+	"timeline",
+	"causal",
+	"relationship",
+	"mind-map",
+	"context",
+]);
 
 function sha256(input) {
 	return `sha256:${crypto.createHash("sha256").update(input).digest("hex")}`;
@@ -43,37 +54,93 @@ function canonicalPages(targetRoot) {
 	return pages;
 }
 
+function sortByTimestamp(items, { ascending = false } = {}) {
+	// deterministic sort; items without a timestamp sink to the end and
+	// compare equal to each other (never an unstable 1/-1 flip). Default is
+	// newest-first (descending) to match the temporal view.
+	const direction = ascending ? 1 : -1;
+	return [...items].sort((a, b) => {
+		const hasA = a && a.timestamp;
+		const hasB = b && b.timestamp;
+		if (!hasA && !hasB) return 0;
+		if (!hasA) return 1;
+		if (!hasB) return -1;
+		return String(a.timestamp).localeCompare(String(b.timestamp)) * direction;
+	});
+}
+
 function renderTemporal(targetRoot) {
 	const pages = canonicalPages(targetRoot);
-	const entries = pages
-		.map((page) => ({
+	const entries = sortByTimestamp(
+		pages.map((page) => ({
 			id: page.pageId || page.id,
 			title: page.title || "",
 			timestamp: page.createdAt || null,
-		}))
-		.sort((a, b) => {
-			if (!a.timestamp) return 1;
-			if (!b.timestamp) return -1;
-			return String(b.timestamp).localeCompare(String(a.timestamp));
-		});
+		})),
+	);
 	return { kind: "temporal", entries };
 }
 
 function renderTimeline(targetRoot) {
 	const pages = canonicalPages(targetRoot);
-	const events = pages
-		.map((page) => ({
+	const events = sortByTimestamp(
+		pages.map((page) => ({
 			id: page.pageId || page.id,
 			title: page.title || "",
 			timestamp: page.createdAt || null,
 			eventType: "page-created",
-		}))
-		.sort((a, b) => {
-			if (!a.timestamp) return 1;
-			if (!b.timestamp) return -1;
-			return String(a.timestamp).localeCompare(String(b.timestamp));
-		});
+		})),
+	);
 	return { kind: "timeline", events };
+}
+
+/**
+ * Causal projection: directional page→page derivation edges.
+ *
+ * Two pages that share a source reference form a derivation chain ordered by
+ * createdAt — the earlier page is treated as the causal antecedent of the
+ * later one (later derives from earlier through the shared provenance).
+ * Deterministic and read-only; never claims real-world causality beyond what
+ * shared provenance + timestamps support.
+ */
+function renderCausal(targetRoot) {
+	const pages = canonicalPages(targetRoot);
+	const nodes = pages.map((page) => ({
+		id: page.pageId || page.id,
+		title: page.title || "",
+		timestamp: page.createdAt || null,
+	}));
+	const sourceIndex = new Map();
+	for (const page of pages) {
+		for (const [sourceId, source] of Object.entries(page.sources || {})) {
+			const ref = source && source.ref;
+			if (!ref) continue;
+			if (!sourceIndex.has(ref)) sourceIndex.set(ref, []);
+			sourceIndex
+				.get(ref)
+				.push({ pageId: page.pageId || page.id, createdAt: page.createdAt || null });
+		}
+	}
+	const edges = [];
+	for (const [ref, members] of sourceIndex) {
+		// derivation chain: oldest page first (causal antecedent)
+		const ordered = sortByTimestamp(
+			members.map((m) => ({ ...m, timestamp: m.createdAt })),
+			{ ascending: true },
+		);
+		for (let i = 0; i < ordered.length; i += 1) {
+			for (let j = i + 1; j < ordered.length; j += 1) {
+				if (ordered[i].pageId === ordered[j].pageId) continue;
+				edges.push({
+					source: ordered[i].pageId,
+					target: ordered[j].pageId,
+					ref,
+					type: "causal-derivation",
+				});
+			}
+		}
+	}
+	return { kind: "causal", nodes, edges };
 }
 
 function renderRelationship(targetRoot) {
@@ -116,11 +183,35 @@ function renderMindMap(targetRoot) {
 	return mindMap;
 }
 
+/**
+ * Context projection: every page with its full source context
+ * (ref/kind/hash). The baseline's "mind-map/context" pair: mind-map is the
+ * hierarchy shape, context is the flat source-context view.
+ */
+function renderContext(targetRoot) {
+	const pages = canonicalPages(targetRoot);
+	return {
+		kind: "context",
+		contexts: pages.map((page) => ({
+			id: page.pageId || page.id,
+			title: page.title || "",
+			sources: Object.entries(page.sources || {}).map(([id, source]) => ({
+				id,
+				ref: source && source.ref,
+				kind: source && source.kind,
+				hash: source && (source.rawHash || source.normHash || null),
+			})),
+		})),
+	};
+}
+
 const RENDERERS = {
 	temporal: renderTemporal,
 	timeline: renderTimeline,
+	causal: renderCausal,
 	relationship: renderRelationship,
 	"mind-map": renderMindMap,
+	context: renderContext,
 };
 
 /**
@@ -183,8 +274,10 @@ module.exports = {
 	buildWorkbenchProjection,
 	renderTemporal,
 	renderTimeline,
+	renderCausal,
 	renderRelationship,
 	renderMindMap,
+	renderContext,
 	applyBounds,
 	compareProjections,
 };

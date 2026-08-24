@@ -2,14 +2,14 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "amber/projection.schema.json",
 	"title": "Amber Projection Manifest",
-	"description": "A rebuildable read-only projection manifest. Projections (Governance Graph, Governed Knowledge Base, Visualization Workbench) are derived from canonical Amber artifacts and are never canonical authority. See ADR-0012 amendment (projection versioning), ADR-0019 D5, and the distributed-governance baseline.",
+	"description": "A rebuildable read-only projection manifest. Projections (Governance Graph, Governed Knowledge Base, Visualization Workbench) are derived from canonical Amber artifacts and are never canonical authority. Field names follow ADR-0012 amendment E: projection_type, projection_version, rebuild_checkpoint, plus the four ADR-0012 versioning fields (amber_protocol_version, artifact_sequence, created_at, artifact_type). See ADR-0019 D5 and the distributed-governance baseline.",
 	"type": "object",
 	"required": [
 		"schemaVersion",
 		"projectionId",
-		"projectionType",
-		"projectionVersion",
-		"rebuildCheckpoint",
+		"projection_type",
+		"projection_version",
+		"rebuild_checkpoint",
 		"sourceHash",
 		"outputHash"
 	],
@@ -25,20 +25,20 @@
 			"pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
 			"description": "Stable kebab-case identifier for this projection instance."
 		},
-		"projectionType": {
+		"projection_type": {
 			"type": "string",
 			"enum": ["governance-graph", "knowledge-base", "visualization-workbench"],
-			"description": "Projection kind. Reserved by ADR-0012 amendment."
+			"description": "Projection kind. Reserved by ADR-0012 amendment E."
 		},
-		"projectionVersion": {
+		"projection_version": {
 			"type": "integer",
 			"minimum": 1,
-			"description": "Projection schema version. Bump on breaking output-shape changes."
+			"description": "Projection schema version. Bump on breaking output-shape changes. Reserved by ADR-0012 amendment E."
 		},
-		"rebuildCheckpoint": {
+		"rebuild_checkpoint": {
 			"type": "string",
 			"minLength": 1,
-			"description": "Deterministic anchor identifying the canonical state this projection was built from."
+			"description": "Deterministic anchor identifying the canonical state this projection was built from. Reserved by ADR-0012 amendment E."
 		},
 		"sourceHash": {
 			"type": "string",
@@ -54,6 +54,24 @@
 			"type": "string",
 			"format": "date-time",
 			"description": "When the projection was last rebuilt."
+		},
+		"amber_protocol_version": {
+			"type": "string",
+			"description": "ADR-0012 versioning field: the Amber package version that produced or last touched this artifact. Optional."
+		},
+		"artifact_sequence": {
+			"type": "integer",
+			"minimum": 0,
+			"description": "ADR-0012 versioning field: monotonically-increasing sequence number within the artifact's identity scope. Optional."
+		},
+		"created_at": {
+			"type": "string",
+			"format": "date-time",
+			"description": "ADR-0012 versioning field: ISO 8601 timestamp of first creation. Optional."
+		},
+		"artifact_type": {
+			"type": "string",
+			"description": "ADR-0012 versioning field: stable discriminant, e.g. \"projection-manifest\". Optional."
 		}
 	}
 }

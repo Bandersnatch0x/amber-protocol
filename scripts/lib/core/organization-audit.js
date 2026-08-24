@@ -15,7 +15,6 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const DENY = Symbol("deny");
 const RETENTION_ACTIONS = Object.freeze(["retain", "delete", "revoke"]);
 
 function auditLedgerPath(cwd) {
@@ -48,12 +47,23 @@ function readAllEvents(cwd) {
 /**
  * Record an evidence-backed audit event (append-only).
  * @param {string} cwd - Repository root.
- * @param {{tenantId: string, repositoryId: string, action: string, actor: string}} input
+ * @param {{tenantId: string, repositoryId: string, action: string, actor: string, target?: string|null, reason?: string|null}} input
  * @returns {object} The event.
  */
-function recordAuditEvent(cwd, { tenantId, repositoryId, action, actor }) {
+function recordAuditEvent(
+	cwd,
+	{ tenantId, repositoryId, action, actor, target = null, reason = null },
+) {
 	ensureDir(cwd);
-	const payload = { tenantId, repositoryId, action, actor, timestamp: new Date().toISOString() };
+	const payload = {
+		tenantId,
+		repositoryId,
+		action,
+		actor,
+		timestamp: new Date().toISOString(),
+		...(target != null ? { target } : {}),
+		...(reason != null ? { reason } : {}),
+	};
 	const event = {
 		eventId: crypto.randomUUID(),
 		...payload,
@@ -168,15 +178,13 @@ function recordRetentionAction(cwd, { tenantId, repositoryId, action, target, re
 		repositoryId,
 		action,
 		actor: `retention:${action}`,
+		target,
+		reason,
 	});
-	// augment with target + reason on the ledger copy
-	event.target = target;
-	event.reason = reason;
 	return { ok: true, event, errors: [] };
 }
 
 module.exports = {
-	DENY,
 	RETENTION_ACTIONS,
 	auditLedgerPath,
 	recordAuditEvent,

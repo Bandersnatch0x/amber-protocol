@@ -58,12 +58,12 @@ test("knowledge admit creates a record", () => {
 	);
 	assert.equal(r.status, 0, r.stderr);
 	const record = payload(r);
-	assert.equal(record.status, "admitted");
+	assert.equal(record.status, "accepted");
 	assert.equal(record.pageId, "p1");
 	assert.equal(record.provenance.length, 1);
 });
 
-test("knowledge list returns admitted records", () => {
+test("knowledge list returns accepted records", () => {
 	const dir = mkTarget("list");
 	addPage(dir, "p1", { title: "Page 1", sources: { s1: { kind: "repo", ref: "a.md" } } });
 	runCli(

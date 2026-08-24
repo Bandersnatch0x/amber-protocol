@@ -8,6 +8,7 @@ const path = require("node:path");
 const {
 	CANNED_OBJECTIVES,
 	mkIsolatedTarget,
+	routeFromAmberProven,
 	buildJudgeContext,
 	judgePassFail,
 	isSilentSkip,
@@ -49,6 +50,73 @@ test("buildJudgeContext captures session artifacts and route provenance", () => 
 	assert.ok(ctx);
 	assert.equal(ctx.objective, "run canned objective");
 	assert.equal(typeof ctx.sessionEvidence, "object");
+});
+
+// ── Route provenance ──────────────────────────────────────────
+
+function seedRouteRegistry(target) {
+	fs.mkdirSync(path.join(target, "routes"), { recursive: true });
+	// copy the product's real route file so it passes the route validator
+	const src = path.resolve(__dirname, "..", "..", "routes", "feature-standard.route.json");
+	fs.copyFileSync(src, path.join(target, "routes", "feature-standard.route.json"));
+}
+
+function writeSessionManifest(target, sid, manifest) {
+	const dir = path.join(target, ".amber", "sessions", sid);
+	fs.mkdirSync(dir, { recursive: true });
+	fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(manifest, null, 2));
+}
+
+function knownJourneyId() {
+	const { JOURNEYS } = require("../../scripts/lib/route-journey-decision");
+	return JOURNEYS[0].id;
+}
+
+test("routeFromAmberProven accepts an amber-chosen route with a known journey", () => {
+	const target = mkIsolatedTarget("route-ok");
+	seedRouteRegistry(target);
+	const manifest = {
+		route: { id: "feature-standard", version: "1.0.0" },
+		journeyId: knownJourneyId(),
+	};
+	assert.equal(routeFromAmberProven(target, manifest), true);
+});
+
+test("routeFromAmberProven rejects an invented (unregistered) route id", () => {
+	const target = mkIsolatedTarget("route-invented");
+	seedRouteRegistry(target);
+	const manifest = { route: { id: "my-made-up-journey", version: "9.9" } };
+	assert.equal(routeFromAmberProven(target, manifest), false);
+});
+
+test("routeFromAmberProven rejects a string route (not the amber manifest shape)", () => {
+	const target = mkIsolatedTarget("route-string");
+	seedRouteRegistry(target);
+	assert.equal(routeFromAmberProven(target, { route: "feature-standard" }), false);
+	assert.equal(routeFromAmberProven(target, { journey: "invented" }), false);
+	assert.equal(routeFromAmberProven(target, null), false);
+});
+
+test("routeFromAmberProven rejects an unknown journeyId", () => {
+	const target = mkIsolatedTarget("route-journey");
+	seedRouteRegistry(target);
+	const manifest = { route: { id: "feature-standard" }, journeyId: "invented-journey" };
+	assert.equal(routeFromAmberProven(target, manifest), false);
+});
+
+test("buildJudgeContext requires amber provenance on the session route", () => {
+	const target = mkIsolatedTarget("judge-provenance");
+	seedRouteRegistry(target);
+	// invented route → routeFromAmber false → judge fails
+	writeSessionManifest(target, "sess-1", {
+		sessionId: "sess-1",
+		route: { id: "not-a-real-route" },
+		goal: "x",
+	});
+	const ctx = buildJudgeContext(target, { objective: "x" });
+	assert.equal(ctx.sessionEvidence.routeFromAmber, false);
+	const verdict = judgePassFail(ctx);
+	assert.ok(verdict.reasons.some((r) => /route|journey|amber next/i.test(r)));
 });
 
 // ── Pass/fail judgment ────────────────────────────────────────

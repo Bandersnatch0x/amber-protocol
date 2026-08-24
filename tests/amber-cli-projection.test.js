@@ -47,7 +47,7 @@ test("projection rebuild creates a governance-graph projection", () => {
 	);
 	assert.equal(r.status, 0, r.stderr);
 	const out = payload(r);
-	assert.equal(out.projectionType, "governance-graph");
+	assert.equal(out.projection_type, "governance-graph");
 	assert.ok(out.sourceHash);
 	assert.ok(fs.existsSync(path.join(dir, ".amber", "projections", "governance-graph.json")));
 });

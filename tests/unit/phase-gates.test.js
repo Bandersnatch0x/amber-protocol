@@ -169,7 +169,38 @@ test("checkInvariantNonRegression verifies core invariants", () => {
 
 test("invariant check fails closed on missing canonical state", () => {
 	const dir = mkTarget("invariants-fail");
-	// empty target → some invariant (e.g. context pages present) fails
+	// empty target → every invariant fails (no silent `|| true`)
 	const result = checkInvariantNonRegression(dir);
-	assert.equal(typeof result.ok, "boolean");
+	assert.equal(result.ok, false);
+	for (const invariant of result.invariants) {
+		assert.equal(invariant.satisfied, false, `invariant ${invariant.id} must not be vacuous`);
+	}
+});
+
+test("each invariant is a real check — satisfied only when its artifact exists", () => {
+	const dir = mkTarget("invariants-real");
+	// only a deployment profile → only inv-2 passes
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "profile.json"),
+		JSON.stringify({ deploymentProfile: "personal-node" }),
+	);
+	const withProfile = checkInvariantNonRegression(dir);
+	const inv2 = withProfile.invariants.find((i) => i.id === "inv-2");
+	assert.equal(inv2.satisfied, true);
+	assert.equal(
+		withProfile.invariants.find((i) => i.id === "inv-1").satisfied,
+		false,
+		"inv-1 still fails without context pages",
+	);
+	assert.equal(
+		withProfile.invariants.find((i) => i.id === "inv-3").satisfied,
+		false,
+		"inv-3 still fails without a transitions ledger",
+	);
+	// add the transitions ledger → inv-3 passes
+	fs.mkdirSync(path.join(dir, ".amber", "phases"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "phases", "transitions.jsonl"), "");
+	const withLedger = checkInvariantNonRegression(dir);
+	assert.equal(withLedger.invariants.find((i) => i.id === "inv-3").satisfied, true);
 });

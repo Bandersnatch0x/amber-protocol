@@ -12,7 +12,6 @@ const {
 	auditCrossRepository,
 	checkIsolation,
 	recordRetentionAction,
-	DENY,
 } = require("../../scripts/lib/core/organization-audit");
 
 function mkTarget(label) {
@@ -142,6 +141,26 @@ test("recordRetentionAction is evidence-backed", () => {
 	assert.equal(events[0].action, "revoke");
 });
 
+test("recordRetentionAction persists target and reason to the ledger", () => {
+	const dir = mkTarget("retention-ledger");
+	const result = recordRetentionAction(dir, {
+		tenantId: "tenant-a",
+		repositoryId: "repo-1",
+		action: "revoke",
+		target: "actor-123",
+		reason: "offboarding",
+	});
+	assert.equal(result.ok, true);
+	const ledger = listAuditEvents(dir);
+	assert.equal(ledger.length, 1);
+	assert.equal(ledger[0].target, "actor-123", "ledger copy carries target");
+	assert.equal(ledger[0].reason, "offboarding", "ledger copy carries reason");
+	const ev = result.event;
+	assert.ok(ev.evidenceHash);
+	assert.equal(ev.target, "actor-123");
+	assert.equal(ev.reason, "offboarding");
+});
+
 test("recordRetentionAction rejects unknown action types", () => {
 	const dir = mkTarget("bad-action");
 	const result = recordRetentionAction(dir, {
@@ -165,6 +184,18 @@ test("audit fails closed on a corrupt ledger", () => {
 	assert.ok(result.errors.length > 0, "corrupt ledger fails closed");
 });
 
-test("DENY is a sentinel distinct from an empty result", () => {
-	assert.ok(DENY);
+test("cross-tenant isolation denies (deny-wins)", () => {
+	const dir = mkTarget("isolation-denied");
+	recordAuditEvent(dir, {
+		tenantId: "tenant-a",
+		repositoryId: "repo-1",
+		action: "retain",
+		actor: "ops",
+	});
+	const result = checkIsolation(dir, {
+		tenantId: "tenant-a",
+		queryTenantId: "tenant-b",
+	});
+	assert.equal(result.ok, false);
+	assert.equal(result.code, "AMBER_E_ORG_DENY");
 });

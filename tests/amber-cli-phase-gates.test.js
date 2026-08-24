@@ -30,6 +30,15 @@ function setupPhase0(dir) {
 			blocks: [],
 		}),
 	);
+	// inv-2: deployment profile resolvable
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "profile.json"),
+		JSON.stringify({ deploymentProfile: "personal-node" }),
+	);
+	// inv-3: transitions ledger exists (append-only lineage)
+	fs.mkdirSync(path.join(dir, ".amber", "phases"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "phases", "transitions.jsonl"), "");
 }
 
 function payload(r) {
@@ -173,6 +182,27 @@ test("phase invariants checks non-regression", () => {
 	assert.ok(
 		invariants.every((i) => i.satisfied === true),
 		"canonical target passes invariants",
+	);
+});
+
+test("phase invariants fails closed when an invariant is missing (no vacuous pass)", () => {
+	const dir = mkTarget("invariants-gap");
+	// context pages only — no profile, no transitions ledger
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "context", "pages", "p1.json"),
+		JSON.stringify({
+			pageId: "p1",
+			title: "Page 1",
+			sources: { s1: { kind: "repo", ref: "a.md" } },
+			blocks: [],
+		}),
+	);
+	const r = runCli(["phase", "invariants", "--target", dir, "--json"], dir);
+	const invariants = payload(r);
+	assert.ok(
+		invariants.some((i) => i.satisfied === false),
+		"missing artifacts fail invariants",
 	);
 });
 

@@ -11,8 +11,10 @@ const {
 	buildWorkbenchProjection,
 	renderTemporal,
 	renderTimeline,
+	renderCausal,
 	renderRelationship,
 	renderMindMap,
+	renderContext,
 	applyBounds,
 	compareProjections,
 } = require("../../scripts/lib/core/visualization-workbench");
@@ -39,8 +41,10 @@ function addPage(dir, pageId, { title, sources = {}, createdAt = null } = {}) {
 
 // ── Constants ─────────────────────────────────────────────────
 
-test("PROJECTION_KINDS enumerates the four workbench projections", () => {
+test("PROJECTION_KINDS enumerates the workbench projections (baseline #164)", () => {
 	assert.deepEqual([...PROJECTION_KINDS].sort(), [
+		"causal",
+		"context",
 		"mind-map",
 		"relationship",
 		"temporal",
@@ -70,6 +74,38 @@ test("renderTimeline produces an ordered event sequence", () => {
 		result.events.every((e) => e.timestamp),
 		"events carry timestamps",
 	);
+});
+
+test("renderCausal produces directional derivation edges (older → newer)", () => {
+	const dir = mkTarget("causal");
+	const shared = { kind: "repo", ref: "docs/spec.md" };
+	addPage(dir, "p1", { title: "Old", sources: { s1: shared }, createdAt: "2026-08-01T00:00:00Z" });
+	addPage(dir, "p2", { title: "New", sources: { s1: shared }, createdAt: "2026-08-03T00:00:00Z" });
+	const result = renderCausal(dir);
+	assert.equal(result.kind, "causal");
+	assert.ok(result.nodes.length >= 2);
+	assert.ok(result.edges.length >= 1, "causal edge from shared provenance");
+	const edge = result.edges[0];
+	assert.equal(edge.type, "causal-derivation");
+	assert.equal(edge.source, "p1");
+	assert.equal(edge.target, "p2");
+	assert.equal(edge.ref, "docs/spec.md");
+});
+
+test("renderContext produces a page→source-context view", () => {
+	const dir = mkTarget("context");
+	addPage(dir, "p1", {
+		title: "Page 1",
+		sources: { s1: { kind: "repo", ref: "a.md", rawHash: "sha256:" + "a".repeat(64) } },
+	});
+	const result = renderContext(dir);
+	assert.equal(result.kind, "context");
+	assert.ok(result.contexts.length >= 1);
+	const page = result.contexts[0];
+	assert.equal(page.id, "p1");
+	assert.equal(page.sources.length, 1);
+	assert.equal(page.sources[0].ref, "a.md");
+	assert.ok(page.sources[0].hash, "context carries source hash");
 });
 
 test("renderRelationship produces edges from shared sources", () => {

@@ -89,7 +89,12 @@ function requirementSatisfied(cwd, requirement) {
 			}
 		}
 		case "envelope schema validated":
-			return fs.existsSync(path.join(cwd, "..", "..", "schemas", "sync-envelope.schema.json"));
+			// The sync-envelope schema ships with Amber (schemas/ in the product
+			// repo), so resolve it relative to this module — never from the target
+			// cwd, which may live anywhere on disk.
+			return fs.existsSync(
+				path.resolve(__dirname, "..", "..", "..", "schemas", "sync-envelope.schema.json"),
+			);
 		case "compatibility negotiation proven":
 			return hasEnvelopes(cwd);
 		case "personal-node profile declared":
@@ -240,11 +245,11 @@ function listTransitions(cwd) {
 function checkInvariantNonRegression(cwd) {
 	const invariants = [
 		{ id: "inv-1", name: "canonical artifacts exist", satisfied: hasContextPages(cwd) },
-		{ id: "inv-2", name: "deployment profile resolvable", satisfied: hasProfile(cwd) || true },
+		{ id: "inv-2", name: "deployment profile resolvable", satisfied: hasProfile(cwd) },
 		{
 			id: "inv-3",
 			name: "no silent fallback (transitions append-only)",
-			satisfied: fs.existsSync(transitionsPath(cwd)) || true,
+			satisfied: fs.existsSync(transitionsPath(cwd)),
 		},
 	];
 	return { ok: invariants.every((i) => i.satisfied), invariants };
