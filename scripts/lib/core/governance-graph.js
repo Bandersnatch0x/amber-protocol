@@ -13,6 +13,7 @@
  */
 
 const { sha256 } = require("./context-hash");
+const { readCanonicalPages: canonicalPages } = require("./context-store");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -26,24 +27,6 @@ const DEFAULT_QUERY_LIMIT = 50;
 function parseScope(scope) {
 	if (typeof scope !== "string" || scope.trim() === "") return null;
 	return scope.trim();
-}
-
-function canonicalPages(targetRoot) {
-	const pagesDir = path.join(targetRoot, ".amber", "context", "pages");
-	const pages = [];
-	if (fs.existsSync(pagesDir)) {
-		for (const name of fs
-			.readdirSync(pagesDir)
-			.filter((f) => f.endsWith(".json"))
-			.sort()) {
-			try {
-				pages.push(JSON.parse(fs.readFileSync(path.join(pagesDir, name), "utf8")));
-			} catch {
-				// unreadable pages are not canonical evidence
-			}
-		}
-	}
-	return pages;
 }
 
 /**

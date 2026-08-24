@@ -65,6 +65,25 @@ function readPage(targetRoot, pageId) {
 	return readJson(file);
 }
 
+/**
+ * Read every accepted page as an object, skipping unreadable files.
+ *
+ * The canonical-evidence reader for projections (Governance Graph,
+ * Visualization Workbench): unreadable pages are NOT canonical evidence and
+ * are dropped, never fatal. Sorted by pageId for determinism.
+ */
+function readCanonicalPages(targetRoot) {
+	return listPages(targetRoot)
+		.map(({ filePath }) => {
+			try {
+				return JSON.parse(fs.readFileSync(filePath, "utf8"));
+			} catch {
+				return null;
+			}
+		})
+		.filter(Boolean);
+}
+
 function ensureDir(dir) {
 	fs.mkdirSync(dir, { recursive: true });
 }
@@ -136,6 +155,7 @@ module.exports = {
 	pagePath,
 	listPages,
 	readPage,
+	readCanonicalPages,
 	writePage,
 	deletePage,
 	regenerateIndex,

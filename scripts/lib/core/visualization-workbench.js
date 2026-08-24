@@ -20,6 +20,7 @@
  */
 
 const { sha256 } = require("./context-hash");
+const { readCanonicalPages: canonicalPages } = require("./context-store");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -31,24 +32,6 @@ const PROJECTION_KINDS = Object.freeze([
 	"mind-map",
 	"context",
 ]);
-
-function canonicalPages(targetRoot) {
-	const pagesDir = path.join(targetRoot, ".amber", "context", "pages");
-	const pages = [];
-	if (fs.existsSync(pagesDir)) {
-		for (const name of fs
-			.readdirSync(pagesDir)
-			.filter((f) => f.endsWith(".json"))
-			.sort()) {
-			try {
-				pages.push(JSON.parse(fs.readFileSync(path.join(pagesDir, name), "utf8")));
-			} catch {
-				// unreadable pages are not canonical evidence
-			}
-		}
-	}
-	return pages;
-}
 
 function sortByTimestamp(items, { ascending = false } = {}) {
 	// deterministic sort; items without a timestamp sink to the end and
