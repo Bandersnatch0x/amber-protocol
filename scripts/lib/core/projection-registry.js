@@ -19,6 +19,7 @@
  */
 
 const crypto = require("node:crypto");
+const { sha256 } = require("./context-hash");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -38,10 +39,6 @@ function projectionsDir(targetRoot) {
 
 function projectionManifestPath(targetRoot, projectionType) {
 	return path.join(projectionsDir(targetRoot), `${projectionType}.json`);
-}
-
-function sha256(input) {
-	return `sha256:${crypto.createHash("sha256").update(input).digest("hex")}`;
 }
 
 /**

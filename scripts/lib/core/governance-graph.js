@@ -12,15 +12,11 @@
  * Never canonical authority. Rebuildable from canonical inputs at any time.
  */
 
-const crypto = require("node:crypto");
+const { sha256 } = require("./context-hash");
 const fs = require("node:fs");
 const path = require("node:path");
 
 const DEFAULT_QUERY_LIMIT = 50;
-
-function sha256(input) {
-	return `sha256:${crypto.createHash("sha256").update(input).digest("hex")}`;
-}
 
 /**
  * Parse a scope parameter into an explicit scope id, or null for unscoped.

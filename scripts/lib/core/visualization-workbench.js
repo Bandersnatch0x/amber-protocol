@@ -19,7 +19,7 @@
  * Projections are never canonical authority.
  */
 
-const crypto = require("node:crypto");
+const { sha256 } = require("./context-hash");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -31,10 +31,6 @@ const PROJECTION_KINDS = Object.freeze([
 	"mind-map",
 	"context",
 ]);
-
-function sha256(input) {
-	return `sha256:${crypto.createHash("sha256").update(input).digest("hex")}`;
-}
 
 function canonicalPages(targetRoot) {
 	const pagesDir = path.join(targetRoot, ".amber", "context", "pages");

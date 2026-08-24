@@ -10,6 +10,7 @@
  */
 
 const crypto = require("node:crypto");
+const { sha256 } = require("./context-hash");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -33,10 +34,6 @@ function transitionsPath(cwd) {
 
 function ensureDir(cwd) {
 	fs.mkdirSync(path.join(cwd, ".amber", "phases"), { recursive: true });
-}
-
-function sha256(input) {
-	return `sha256:${crypto.createHash("sha256").update(input).digest("hex")}`;
 }
 
 function hasContextPages(cwd) {

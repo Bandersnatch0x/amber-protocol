@@ -12,6 +12,7 @@
  */
 
 const crypto = require("node:crypto");
+const { sha256 } = require("./context-hash");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -23,10 +24,6 @@ function auditLedgerPath(cwd) {
 
 function ensureDir(cwd) {
 	fs.mkdirSync(path.join(cwd, ".amber", "audit"), { recursive: true });
-}
-
-function sha256(input) {
-	return `sha256:${crypto.createHash("sha256").update(input).digest("hex")}`;
 }
 
 function readAllEvents(cwd) {
