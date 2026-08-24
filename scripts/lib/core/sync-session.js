@@ -3,10 +3,20 @@
 /**
  * Sync Runtime session orchestration (#158 Stage 3, Team Hub).
  *
- * A sync session is the ordered pipeline: pull remote envelopes → validate
- * and apply → pack local artifacts → commit → push. Envelopes are carried by
- * git (ADR-0019 D1): the .amber/sync/envelopes/ directory is committed to the
- * shared Team Hub repository and exchanged via git remote.
+ * A sync session is the ordered pipeline: pull remote envelopes (admit and
+ * apply them through the shared admission pipeline) → prepare the transport
+ * report. Transport is preparation/report-only (F035 decision D1): the
+ * session lists the envelopes, the affected `.amber/sync/**` paths, and the
+ * proposed git operations as strings for a human to replay, but it NEVER
+ * runs `git add`, `git commit`, or `git push` — reintroducing live transport
+ * requires its own accepted ADR and governed Action. Envelopes are carried
+ * by git (ADR-0019 D1): the .amber/sync/envelopes/ directory is committed to
+ * the shared Team Hub repository and exchanged via git remote.
+ *
+ * Pull-path refusals (version/identity/generation/concurrent-edit) are
+ * recorded in the conflict ledger (.amber/sync/conflicts.jsonl) and never
+ * marked applied; invalid structural envelopes fail explicitly as errors
+ * without touching the conflict ledger.
  *
  * Safety: the Sync Runtime never executes target-repository work, never
  * dispatches agents or tools, and never carries source code, secrets, agents,
@@ -18,7 +28,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const { ENVELOPES_DIR, validateEnvelope, unpackEnvelope } = require("./sync-remote");
+const { SYNC_DIR, ENVELOPES_DIR } = require("./sync-remote");
+const { replayEnvelopes, listConflicts, listRefusedEnvelopeIds } = require("./sync-conflicts");
+const { collectFilesBySuffix, toPortablePath } = require("./fs-utils");
 
 /**
  * Create a sync session record.
@@ -75,7 +87,9 @@ function git(cwd, args) {
 }
 
 /**
- * Check whether a git remote is configured.
+ * Check whether a git remote is configured. Read-only query: the Sync Runtime
+ * never mutates git state (F035 D1), it only reports whether `git push` would
+ * be part of the proposed operations.
  * @param {string} cwd - Repository root.
  * @returns {boolean}
  */
@@ -85,73 +99,108 @@ function hasRemote(cwd) {
 }
 
 /**
- * Commit and push .amber/sync/ envelopes to the shared remote.
+ * List every file under .amber/sync/ as a repository-relative POSIX path.
+ * These are the paths the proposed `git add .amber/sync` would stage.
  * @param {string} cwd - Repository root.
- * @returns {{committed: number, pushed: boolean, note: string, errors: string[]}}
+ * @returns {Array<string>} Sorted repository-relative POSIX paths.
+ */
+function listSyncTreePaths(cwd) {
+	const root = path.resolve(cwd, SYNC_DIR);
+	return collectFilesBySuffix(root)
+		.map((abs) => toPortablePath(path.relative(path.resolve(cwd), abs)))
+		.sort();
+}
+
+/**
+ * Prepare the transport report for .amber/sync/ envelopes WITHOUT executing
+ * any git command (F035 D1: transport is preparation/report-only, and there
+ * is no --execute escape hatch). The report is replayable: it lists the
+ * envelopes, the affected .amber/sync/** paths, and the proposed git
+ * operations as strings for a human to review and run. `git push` is only
+ * proposed when a remote is configured (read-only query).
+ * @param {string} cwd - Repository root.
+ * @returns {{
+ *   mode: string,
+ *   envelopeCount: number,
+ *   envelopeIds: string[],
+ *   envelopePaths: string[],
+ *   affectedPaths: string[],
+ *   proposedOps: string[],
+ *   remoteConfigured: boolean,
+ *   conflictCount: number,
+ *   refusedCount: number,
+ *   note: string,
+ *   errors: string[],
+ * }}
  */
 function pushEnvelopes(cwd) {
 	const envelopes = listEnvelopes(cwd);
-	if (envelopes.length === 0) {
-		return { committed: 0, pushed: false, note: "No envelopes to push.", errors: [] };
-	}
-	const res = git(cwd, ["add", ".amber/sync"]);
-	if (res.exitCode !== 0) {
-		return {
-			committed: 0,
-			pushed: false,
-			note: "",
-			errors: [`git add failed: ${res.stderr || res.stdout}`],
-		};
-	}
-	const commit = git(cwd, ["commit", "-m", `amber sync: ${envelopes.length} envelope(s)`]);
-	const committed = commit.exitCode === 0 ? envelopes.length : 0;
-	let pushed = false;
+	const envelopeIds = envelopes
+		.map((envelope) => envelope.envelopeId)
+		.filter((id) => typeof id === "string");
+	const envelopeDir = toPortablePath(ENVELOPES_DIR);
+	const envelopePaths = envelopeIds.map((id) => `${envelopeDir}/${id}.json`).sort();
+	const affectedPaths = listSyncTreePaths(cwd);
+	const remoteConfigured = hasRemote(cwd);
+	const proposedOps =
+		envelopePaths.length === 0
+			? []
+			: [
+					"git add .amber/sync",
+					`git commit -m "amber sync: ${envelopePaths.length} envelope(s)"`,
+					...(remoteConfigured ? ["git push"] : []),
+				];
+	const conflictCount = listConflicts(cwd).length;
+	const refusedCount = listRefusedEnvelopeIds(cwd).size;
 	let note;
-	if (committed > 0 && hasRemote(cwd)) {
-		const push = git(cwd, ["push"]);
-		pushed = push.exitCode === 0;
-		note = pushed
-			? `Pushed ${committed} envelope(s) to remote.`
-			: `Committed ${committed} envelope(s); push skipped (remote error).`;
-	} else if (committed > 0) {
-		note = `Committed ${committed} envelope(s); no remote configured — local sync only.`;
+	if (envelopePaths.length === 0) {
+		note = "No envelopes to prepare; no git operations proposed.";
+	} else if (remoteConfigured) {
+		note = `Prepared ${envelopePaths.length} envelope(s) for transport; proposed git operations were NOT executed.`;
 	} else {
-		note = "No changes to commit.";
+		note = `Prepared ${envelopePaths.length} envelope(s) for transport; no remote configured — git push not proposed. No git operations were executed.`;
 	}
-	return { committed, pushed, note, errors: [] };
+	return {
+		mode: "prepare",
+		envelopeCount: envelopes.length,
+		envelopeIds,
+		envelopePaths,
+		affectedPaths,
+		proposedOps,
+		remoteConfigured,
+		conflictCount,
+		refusedCount,
+		note,
+		errors: [],
+	};
 }
 
 /**
- * Validate all on-disk envelopes. This is the apply step: every envelope is
- * validated and compatibility-checked; incompatible envelopes are refused.
+ * Pull (admit and apply) all on-disk envelopes through the shared admission
+ * pipeline (schema → path/type → protocol → tenant → repository →
+ * generation → content hash). Every semantic refusal (version/identity/
+ * generation/concurrent-edit) is recorded as one pending conflict in
+ * .amber/sync/conflicts.jsonl and never marked applied; invalid structural
+ * envelopes (schema/path) fail explicitly in `errors` without touching the
+ * conflict ledger. Pulls are idempotent across passes.
  * @param {string} cwd - Repository root.
- * @returns {{validated: number, refused: number, errors: string[]}}
+ * @returns {{validated: number, refused: number, conflicts: Array<object>, errors: string[]}}
  */
 function pullEnvelopes(cwd) {
-	const envelopes = listEnvelopes(cwd);
-	let validated = 0;
-	let refused = 0;
-	const errors = [];
-	for (const envelope of envelopes) {
-		const validation = validateEnvelope(envelope);
-		if (!validation.valid) {
-			refused += 1;
-			errors.push(`envelope ${envelope.envelopeId || "?"}: ${validation.errors.join("; ")}`);
-			continue;
-		}
-		const applied = unpackEnvelope(cwd, envelope);
-		if (applied.errors.length > 0) {
-			refused += 1;
-			errors.push(`envelope ${envelope.envelopeId || "?"}: ${applied.errors.join("; ")}`);
-			continue;
-		}
-		validated += 1;
-	}
-	return { validated, refused, errors };
+	const result = replayEnvelopes(cwd);
+	return {
+		validated: result.applied,
+		refused: result.conflicts.length,
+		conflicts: result.conflicts,
+		errors: result.errors,
+	};
 }
 
 /**
- * Run a full sync session: pull → validate → pack new → commit → push.
+ * Run a full sync session: pull (admit + apply) → prepare the transport
+ * report. No git command is ever executed (F035 D1). Semantic refusals are
+ * persisted as conflicts and surface in the summary; only invalid structural
+ * envelopes fail the session through `errors`.
  * @param {string} cwd - Repository root.
  * @returns {{session: object, summary: object, errors: string[]}}
  */
@@ -162,8 +211,8 @@ function runSyncSession(cwd) {
 	const pulled = pullEnvelopes(cwd);
 	errors.push(...pulled.errors);
 
-	const pushed = pushEnvelopes(cwd);
-	errors.push(...pushed.errors);
+	const preparation = pushEnvelopes(cwd);
+	errors.push(...preparation.errors);
 
 	session.status = errors.length > 0 ? "failed" : "completed";
 	session.finishedAt = new Date().toISOString();
@@ -173,9 +222,8 @@ function runSyncSession(cwd) {
 		summary: {
 			pulled: pulled.validated,
 			refused: pulled.refused,
-			committed: pushed.committed,
-			pushed: pushed.pushed,
-			note: pushed.note,
+			conflicts: pulled.conflicts,
+			preparation,
 		},
 		errors,
 	};

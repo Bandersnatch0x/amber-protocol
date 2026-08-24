@@ -158,6 +158,9 @@ test("TH4: rebuild from admitted records is proven (drift → rebuild → curren
 
 test("TH5: full Team Hub flow — profile, sync session, conflict, projection", () => {
 	const dir = mkTarget("full");
+	// Baseline commit so the tracer can prove sync performs zero git mutations
+	execSync('git commit --allow-empty -m "baseline"', { cwd: dir, encoding: "utf8" });
+	const headBefore = execSync("git rev-parse HEAD", { cwd: dir, encoding: "utf8" }).trim();
 	// declare team-hub profile
 	runCli(["profile", "deployment", "set", "--profile", "team-hub", "--target", dir, "--json"], dir);
 	const prof = payload(
@@ -187,9 +190,37 @@ test("TH5: full Team Hub flow — profile, sync session, conflict, projection", 
 	);
 	assert.equal(pack.origin.profile, "team-hub");
 
-	// sync session run
+	// sync session run — transport is preparation/report-only (F035 D1): the
+	// report is replayable, git is never executed
 	const run = runCli(["sync", "session", "run", "--target", dir, "--json"], dir);
 	assert.equal(run.status, 0, run.stderr);
+	const out = payload(run);
+	assert.ok(out.summary.preparation, "run produces a transport preparation report");
+	assert.ok(
+		out.summary.preparation.proposedOps.some((op) => op.startsWith("git add")),
+		"proposed git operations are reported as strings",
+	);
+	assert.ok(
+		out.summary.preparation.envelopeCount >= 1,
+		"envelopes are listed in the preparation report",
+	);
+	assert.equal(
+		execSync("git rev-parse HEAD", { cwd: dir, encoding: "utf8" }).trim(),
+		headBefore,
+		"sync session run must not create a commit",
+	);
+
+	// sync session push — same contract: report produced, never executed
+	const push = runCli(["sync", "session", "push", "--target", dir, "--json"], dir);
+	assert.equal(push.status, 0, push.stderr);
+	const pushText = JSON.parse(push.stdout).text;
+	assert.ok(pushText.includes("git add .amber/sync"), "push proposes git add as a string");
+	assert.ok(pushText.includes("git commit"), "push proposes git commit as a string");
+	assert.equal(
+		execSync("git rev-parse HEAD", { cwd: dir, encoding: "utf8" }).trim(),
+		headBefore,
+		"sync session push must not create a commit",
+	);
 
 	// projection rebuild
 	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });

@@ -14,6 +14,12 @@ function runCli(args, cwd) {
 	return spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8" });
 }
 
+function git(dir, args) {
+	const res = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+	assert.equal(res.status, 0, (res.stderr || "").toString());
+	return (res.stdout || "").trim();
+}
+
 function mkTarget(label) {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-cli-sess-${label}-`));
 	execSync("git init", { cwd: dir, encoding: "utf8" });
@@ -28,6 +34,34 @@ function payload(r) {
 	return outer.text ? JSON.parse(outer.text) : outer;
 }
 
+function packPageEnvelope(dir) {
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
+	return runCli(
+		[
+			"sync",
+			"envelope",
+			"pack",
+			"--type",
+			"context-page",
+			"--artifact",
+			".amber/context/pages/page.json",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+}
+
+function head(dir) {
+	return git(dir, ["rev-parse", "HEAD"]);
+}
+
+function porcelain(dir) {
+	return git(dir, ["status", "--porcelain", "-uall"]);
+}
+
 test("sync session list shows zero envelopes on a fresh target", () => {
 	const dir = mkTarget("list");
 	const r = runCli(["sync", "session", "list", "--target", dir, "--json"], dir);
@@ -36,26 +70,11 @@ test("sync session list shows zero envelopes on a fresh target", () => {
 	assert.deepEqual(out, []);
 });
 
-test("sync session run completes a full pipeline", () => {
+test("sync session run prepares transport without git writes", () => {
 	const dir = mkTarget("run");
-	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
-	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
-	// Pack one envelope first
-	const p = runCli(
-		[
-			"sync",
-			"envelope",
-			"pack",
-			"--type",
-			"context-page",
-			"--artifact",
-			".amber/context/pages/page.json",
-			"--target",
-			dir,
-			"--json",
-		],
-		dir,
-	);
+	git(dir, ["commit", "--allow-empty", "-m", "baseline"]);
+	const headBefore = head(dir);
+	const p = packPageEnvelope(dir);
 	assert.equal(p.status, 0, p.stderr);
 
 	const r = runCli(["sync", "session", "run", "--target", dir, "--json"], dir);
@@ -63,59 +82,79 @@ test("sync session run completes a full pipeline", () => {
 	const out = payload(r);
 	assert.ok(out.session, "session record present");
 	assert.equal(out.session.operation, "sync");
-	assert.ok(out.summary.committed >= 1, `expected committed >= 1, got ${out.summary.committed}`);
+	assert.ok(out.summary.pulled >= 1, `expected pulled >= 1, got ${out.summary.pulled}`);
+	const prep = out.summary.preparation;
+	assert.ok(prep, "transport preparation report present");
+	assert.equal(prep.mode, "prepare");
+	assert.ok(prep.proposedOps.includes("git add .amber/sync"));
+	assert.ok(prep.proposedOps.some((op) => op.startsWith('git commit -m "amber sync:')));
+	assert.ok(prep.envelopeIds.length >= 1, "envelope ids listed in the report");
+
+	assert.equal(head(dir), headBefore, "sync session run must not commit");
+	const status = porcelain(dir);
+	assert.match(status, /\?\? \.amber\/sync\/envelopes\//, "envelope files stay untracked");
+	const staged = status
+		.split(/\r?\n/)
+		.filter(Boolean)
+		.filter((line) => !line.startsWith("??"));
+	assert.deepEqual(staged, [], "nothing may be staged");
 });
 
-test("sync session push commits and reports", () => {
+test("sync session push reports preparation and performs no git writes", () => {
 	const dir = mkTarget("push");
-	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
-	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
-	runCli(
-		[
-			"sync",
-			"envelope",
-			"pack",
-			"--type",
-			"context-page",
-			"--artifact",
-			".amber/context/pages/page.json",
-			"--target",
-			dir,
-			"--json",
-		],
-		dir,
-	);
+	git(dir, ["commit", "--allow-empty", "-m", "baseline"]);
+	const headBefore = head(dir);
+	const logBefore = git(dir, ["log", "--oneline"]);
+	const p = packPageEnvelope(dir);
+	assert.equal(p.status, 0, p.stderr);
 
 	const r = runCli(["sync", "session", "push", "--target", dir, "--json"], dir);
 	assert.equal(r.status, 0, r.stderr);
 	const outer = JSON.parse(r.stdout);
-	assert.ok(outer.text.includes("envelope") || outer.text.includes("remote"));
+	assert.match(outer.text, /preparation/i, "report names transport preparation");
+	assert.ok(outer.text.includes("git add .amber/sync"), "report proposes git add as a string");
+	assert.ok(outer.text.includes("git commit"), "report proposes git commit as a string");
+	assert.ok(/not executed|never executed|no git commands were executed/i.test(outer.text));
+
+	assert.equal(head(dir), headBefore, "push must not create a commit");
+	assert.equal(git(dir, ["log", "--oneline"]), logBefore, "commit count must be unchanged");
+	const status = porcelain(dir);
+	assert.match(status, /\?\? \.amber\/sync\/envelopes\//, "envelope files remain untracked");
 });
 
 test("sync session pull validates packed envelopes", () => {
 	const dir = mkTarget("pull");
-	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
-	fs.writeFileSync(path.join(dir, ".amber", "context", "pages", "page.json"), "# Page\n");
-	runCli(
-		[
-			"sync",
-			"envelope",
-			"pack",
-			"--type",
-			"context-page",
-			"--artifact",
-			".amber/context/pages/page.json",
-			"--target",
-			dir,
-			"--json",
-		],
-		dir,
-	);
+	const p = packPageEnvelope(dir);
+	assert.equal(p.status, 0, p.stderr);
 
 	const r = runCli(["sync", "session", "pull", "--target", dir, "--json"], dir);
 	assert.equal(r.status, 0, r.stderr);
 	const outer = JSON.parse(r.stdout);
 	assert.match(outer.text, /Validated 1 envelope/);
+});
+
+test("sync session pull records a refused envelope in the conflict ledger", () => {
+	const dir = mkTarget("pull-refused");
+	const p = packPageEnvelope(dir);
+	assert.equal(p.status, 0, p.stderr);
+	// Local identity moves to another tenant after the envelope was packed
+	fs.writeFileSync(
+		path.join(dir, ".amber", "identity.json"),
+		JSON.stringify({ tenantId: "team-a" }),
+	);
+
+	const r = runCli(["sync", "session", "pull", "--target", dir, "--json"], dir);
+	assert.equal(r.status, 0, r.stderr);
+	const outer = JSON.parse(r.stdout);
+	assert.match(outer.text, /refused 1/, "the refusal surfaces in the report");
+	assert.match(outer.text, /conflicts recorded/i);
+
+	const c = runCli(["sync", "session", "conflicts", "--target", dir, "--json"], dir);
+	assert.equal(c.status, 0, c.stderr);
+	const conflicts = payload(c);
+	assert.equal(conflicts.length, 1);
+	assert.equal(conflicts[0].conflictType, "identity-mismatch");
+	assert.equal(conflicts[0].resolution, "pending");
 });
 
 test("sync session with unknown subcommand errors", () => {

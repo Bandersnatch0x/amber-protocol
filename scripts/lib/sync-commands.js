@@ -224,6 +224,8 @@ function handleSyncSession(args, targetRoot) {
 		};
 	}
 	if (sub === "run") {
+		// F035 D1: run pulls (admit + apply, refusals recorded as conflicts)
+		// and then prepares the transport report; no git command runs.
 		const { session, summary, errors } = runSyncSession(targetRoot);
 		const exitCode = errors.length > 0 ? 1 : 0;
 		return {
@@ -238,13 +240,32 @@ function handleSyncSession(args, targetRoot) {
 		};
 	}
 	if (sub === "push") {
-		const result = pushEnvelopes(targetRoot);
-		const exitCode = result.errors.length > 0 ? 1 : 0;
+		// F035 D1: push is transport PREPARATION only. The report lists the
+		// proposed git operations as strings; Amber never runs them.
+		const report = pushEnvelopes(targetRoot);
+		const exitCode = report.errors.length > 0 ? 1 : 0;
+		const lines = [
+			`Transport preparation (report-only): ${report.envelopeCount} envelope(s); no git commands were executed.`,
+		];
+		if (report.proposedOps.length > 0) {
+			lines.push("Proposed operations (not executed):");
+			for (const op of report.proposedOps) {
+				lines.push(`  ${op}`);
+			}
+		} else {
+			lines.push("No envelopes to prepare; no git operations proposed.");
+		}
+		lines.push(
+			`Remote: ${report.remoteConfigured ? "configured" : "not configured"}${report.remoteConfigured ? "" : " — git push not proposed"}.`,
+		);
+		lines.push(
+			`Conflicts recorded: ${report.conflictCount}; refused envelopes tracked: ${report.refusedCount}.`,
+		);
 		return {
 			result: {
 				target: args.target,
-				text: result.note,
-				errors: result.errors,
+				text: lines.join("\n"),
+				errors: report.errors,
 				warnings: [],
 			},
 			exitCode,
@@ -252,12 +273,15 @@ function handleSyncSession(args, targetRoot) {
 		};
 	}
 	if (sub === "pull") {
+		// Pull routes through the shared admission pipeline: semantic
+		// refusals are recorded as conflicts (exit 0, mirroring replay);
+		// invalid structural envelopes fail explicitly (exit 1).
 		const result = pullEnvelopes(targetRoot);
 		const exitCode = result.errors.length > 0 ? 1 : 0;
 		return {
 			result: {
 				target: args.target,
-				text: `Validated ${result.validated} envelope(s); refused ${result.refused}.`,
+				text: `Validated ${result.validated} envelope(s); refused ${result.refused} (conflicts recorded); errors ${result.errors.length}.`,
 				errors: result.errors,
 				warnings: [],
 			},
