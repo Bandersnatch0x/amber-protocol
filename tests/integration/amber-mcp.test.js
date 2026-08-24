@@ -35,6 +35,20 @@ function tempTarget() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-mcp-int-"));
 }
 
+/**
+ * Assert `amber session start` succeeded and return the new session id.
+ * The status check has gone flaky with an empty stderr, so every spawn
+ * channel is surfaced to make the next failure diagnosable.
+ */
+function assertSessionStarted(start) {
+	assert.equal(
+		start.status,
+		0,
+		`status=${start.status} signal=${start.signal} error=${start.error}\nstderr: ${start.stderr}\nstdout: ${start.stdout}`,
+	);
+	return start.stdout.match(/Session created: ([a-f0-9-]+)/)[1];
+}
+
 function rpc(messages, extraArgs = []) {
 	const lines = messages.map((m) => JSON.stringify(m)).join("\n") + "\n";
 	const result = spawnSync(process.execPath, [MCP_JS, ...extraArgs], {
@@ -778,8 +792,7 @@ test("functions: amber.fn.sessionEvidence summarizes a session read-only", () =>
 		],
 		{ cwd: ROOT, encoding: "utf8" },
 	);
-	assert.equal(start.status, 0, start.stderr);
-	const sessionId = start.stdout.match(/Session created: ([a-f0-9-]+)/)[1];
+	const sessionId = assertSessionStarted(start);
 
 	const byId = rpc(
 		[
@@ -942,8 +955,7 @@ test("concurrency: mutating actions conflict on a busy repository", () => {
 		],
 		{ cwd: ROOT, encoding: "utf8" },
 	);
-	assert.equal(start.status, 0, start.stderr);
-	const sessionId = start.stdout.match(/Session created: ([a-f0-9-]+)/)[1];
+	const sessionId = assertSessionStarted(start);
 
 	const byId = rpc(
 		[
@@ -1009,8 +1021,7 @@ test("ownership: --agent records agentId in the session manifest", () => {
 		],
 		{ cwd: ROOT, encoding: "utf8" },
 	);
-	assert.equal(start.status, 0, start.stderr);
-	const sessionId = start.stdout.match(/Session created: ([a-f0-9-]+)/)[1];
+	const sessionId = assertSessionStarted(start);
 
 	const manifestPath = path.join(target, ".amber", "sessions", sessionId, "manifest.json");
 	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
@@ -1178,8 +1189,7 @@ test("fail-closed: corrupt active-session manifest blocks mutation with isError"
 		],
 		{ cwd: ROOT, encoding: "utf8" },
 	);
-	assert.equal(start.status, 0, start.stderr);
-	const sessionId = start.stdout.match(/Session created: ([a-f0-9-]+)/)[1];
+	const sessionId = assertSessionStarted(start);
 	const manifestPath = path.join(target, ".amber", "sessions", sessionId, "manifest.json");
 	fs.writeFileSync(manifestPath, "{ not valid json ");
 
