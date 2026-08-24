@@ -50,7 +50,7 @@ function isBotIdentity(identity) {
  * another collaborator's web edit carries their own noreply email and is
  * still rejected. This is not a second human identity.
  */
-function isGitHubMergeAuthor(identity, commit) {
+function isGitHubProducedCommit(identity, commit) {
 	return (
 		identity.role === "author" &&
 		String(identity.email).toLowerCase() === GITHUB_MERGE_AUTHOR_EMAIL &&
@@ -149,7 +149,7 @@ function validateIdentities(identities, options = {}) {
 		if (allowBots && isBotIdentity(identity)) return false;
 		const commitContext =
 			commitContextByScope instanceof Map ? commitContextByScope.get(identity.scope) : undefined;
-		if (allowGitHubMergeAuthors && isGitHubMergeAuthor(identity, commitContext)) return false;
+		if (allowGitHubMergeAuthors && isGitHubProducedCommit(identity, commitContext)) return false;
 		return true;
 	});
 }

@@ -61,8 +61,11 @@ function appendJSONL(filePath, obj) {
 }
 
 /**
- * Overwrite a JSONL file with a set of lines (append-only callers use this
- * only when building a fresh file, e.g. tests).
+ * Overwrite a JSONL file with a set of lines.
+ *
+ * This is the NON-append tool: it exists for tests (building fixtures) and
+ * one-shot rebuilds, not for the append-only production paths — production
+ * record/ledger writers must use appendJSONL so lineage is never truncated.
  * @param {string} filePath - Absolute path.
  * @param {Array<object>} objs - Values to serialize.
  */
