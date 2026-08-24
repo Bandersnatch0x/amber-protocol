@@ -42,17 +42,19 @@ function isBotIdentity(identity) {
 
 /**
  * GitHub writes the account's profile display name into the author field of a
- * web-created merge commit. The email and GitHub committer are still exact,
- * and the commit must have at least two parents; this is not a second human
- * identity.
+ * commit it creates on the web, which covers both merge commits and
+ * squash-merges (the latter carry a single parent). The trust anchor is the
+ * pair of exact matches that remain: the author email is the repository
+ * owner's noreply address and the committer is GitHub itself. That
+ * combination only holds when the owner produced the commit through GitHub;
+ * another collaborator's web edit carries their own noreply email and is
+ * still rejected. This is not a second human identity.
  */
 function isGitHubMergeAuthor(identity, commit) {
 	return (
 		identity.role === "author" &&
 		String(identity.email).toLowerCase() === GITHUB_MERGE_AUTHOR_EMAIL &&
-		Array.isArray(commit?.parents) &&
-		commit.parents.length >= 2 &&
-		commit.committer?.name === GITHUB_COMMITTER_NAME &&
+		commit?.committer?.name === GITHUB_COMMITTER_NAME &&
 		String(commit.committer?.email).toLowerCase() === GITHUB_COMMITTER_EMAIL
 	);
 }
@@ -170,7 +172,7 @@ function formatFailure(invalid, options = {}) {
 	}
 	if (allowGitHubMergeAuthors) {
 		lines.push(
-			"Allowed GitHub merge author: repository noreply email on a commit with at least two parents committed by GitHub.",
+			"Allowed GitHub merge author: repository noreply email on a commit committed by GitHub (merge or squash-merge).",
 		);
 	}
 	lines.push("");

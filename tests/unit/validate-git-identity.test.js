@@ -163,7 +163,7 @@ test("validates merge authors from explicit commit context, not object identity"
 	);
 });
 
-test("accepts a repository noreply display name only on a GitHub-committed merge", () => {
+test("accepts a repository noreply display name only on a GitHub-committed merge or squash", () => {
 	const batchFor = ({
 		parents = "base123 feature123",
 		committer = "GitHub\tnoreply@github.com",
@@ -181,14 +181,14 @@ test("accepts a repository noreply display name only on a GitHub-committed merge
 
 	assert.deepEqual(validateIdentities(batch.identities, optionsFor(batch)), []);
 
+	// A squash-merge lands on master with a single parent; GitHub is still the
+	// committer, so it stays allowed.
 	const oneParentBatch = batchFor({ parents: "base123" });
 	const locallyCommittedBatch = batchFor({
 		committer: "Bandersnatch0x\txihalele@gmail.com",
 	});
 
-	assert.deepEqual(validateIdentities(oneParentBatch.identities, optionsFor(oneParentBatch)), [
-		oneParentBatch.identities[0],
-	]);
+	assert.deepEqual(validateIdentities(oneParentBatch.identities, optionsFor(oneParentBatch)), []);
 	assert.deepEqual(
 		validateIdentities(locallyCommittedBatch.identities, optionsFor(locallyCommittedBatch)),
 		[locallyCommittedBatch.identities[0]],
