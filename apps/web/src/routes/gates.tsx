@@ -149,7 +149,7 @@ function GateAuditEvidence({ gate }: { gate: Gate }) {
 function GatesPage() {
   const { t } = useI18n();
   const { settings } = useSettings();
-  const trpcUtils = trpc.useContext();
+  const trpcUtils = trpc.useUtils();
   const { status } = Route.useSearch();
   const navigate = Route.useNavigate();
   const statusFilter: GateStatus | '' = status ?? '';
@@ -165,7 +165,8 @@ function GatesPage() {
   // Two feedback channels with distinct lifecycles — keep them separate:
   // 1. actionFeedback (top aria-live banner): only ever carries the RESULT of a
   //    dispatched mutation. Cleared the moment a mutation fires, then set from
-  //    onSuccess/onError; it persists until the next mutation.
+  //    the dispatch handler's success/error paths; it persists until the next
+  //    mutation.
   // 2. Inline field errors (reviewer / reject reason): pre-dispatch validation
   //    tied to the field. They never write to actionFeedback and are cleared as
   //    soon as the user edits the field, so no stale banner outlives the fix.
@@ -177,70 +178,10 @@ function GatesPage() {
     refetch,
   } = trpc.gate.list.useQuery(statusFilter ? { status: statusFilter } : undefined);
 
-  const approveAndResume = trpc.gate.approveAndResume.useMutation({
-    onSuccess: async (result, variables) => {
-      await Promise.all([
-        refetch(),
-        trpcUtils.gate.auditSummary.invalidate({
-          sessionId: variables.sessionId,
-          gateId: variables.gateId,
-        }),
-      ]);
-      setRejectingGateKey(null);
-      setRejectInlineErrorKey(null);
-      setReviewers((current) => {
-        const next = { ...current };
-        delete next[getGateKey(variables)];
-        return next;
-      });
-      setActionFeedback(
-        buildApproveAndResumeFeedback(result, variables.gateId, variables.sessionId, t),
-      );
-    },
-    onError: (mutationError) => {
-      setActionFeedback({
-        tone: 'error',
-        message: t('gates.feedback.failed', { message: mutationError.message }),
-      });
-    },
-    onSettled: () => {
-      setPendingActionKey(null);
-    },
-  });
-
-  const rejectGate = trpc.gate.reject.useMutation({
-    onSuccess: async (result, variables) => {
-      await Promise.all([
-        refetch(),
-        trpcUtils.gate.auditSummary.invalidate({
-          sessionId: variables.sessionId,
-          gateId: variables.gateId,
-        }),
-      ]);
-      setRejectingGateKey(null);
-      setRejectInlineErrorKey(null);
-      setRejectReasons((current) => {
-        const next = { ...current };
-        delete next[getGateKey(variables)];
-        return next;
-      });
-      setReviewers((current) => {
-        const next = { ...current };
-        delete next[getGateKey(variables)];
-        return next;
-      });
-      setActionFeedback(buildRejectFeedback(result, variables.gateId, variables.sessionId, t));
-    },
-    onError: (mutationError) => {
-      setActionFeedback({
-        tone: 'error',
-        message: t('gates.feedback.failed', { message: mutationError.message }),
-      });
-    },
-    onSettled: () => {
-      setPendingActionKey(null);
-    },
-  });
+  // Feedback is driven by the dispatch handlers (handleApproveAndRequestResume /
+  // handleReject) via mutateAsync — v5 removed the useMutation callbacks.
+  const approveAndResume = trpc.gate.approveAndResume.useMutation();
+  const rejectGate = trpc.gate.reject.useMutation();
 
   const orderedGates = useMemo(() => {
     if (!gates) return [];
@@ -281,22 +222,51 @@ function GatesPage() {
     setExpandedGateKey(key);
   }
 
-  function handleApproveAndRequestResume(gate: Gate): void {
+  async function handleApproveAndRequestResume(gate: Gate): Promise<void> {
     const key = getGateKey(gate);
     if (hasReviewerError(key)) {
       flagReviewerError(key);
       return;
     }
-    setPendingActionKey(key);
-    setActionFeedback(null);
-    approveAndResume.mutate({
+    const variables = {
       sessionId: gate.sessionId,
       gateId: gate.gateId,
       reviewer: reviewerFor(key),
-    });
+    };
+    setPendingActionKey(key);
+    setActionFeedback(null);
+    try {
+      const result = await approveAndResume.mutateAsync(variables);
+      await Promise.all([
+        refetch(),
+        trpcUtils.gate.auditSummary.invalidate({
+          sessionId: variables.sessionId,
+          gateId: variables.gateId,
+        }),
+      ]);
+      setRejectingGateKey(null);
+      setRejectInlineErrorKey(null);
+      setReviewers((current) => {
+        const next = { ...current };
+        delete next[getGateKey(variables)];
+        return next;
+      });
+      setActionFeedback(
+        buildApproveAndResumeFeedback(result, variables.gateId, variables.sessionId, t),
+      );
+    } catch (mutationError) {
+      setActionFeedback({
+        tone: 'error',
+        message: t('gates.feedback.failed', {
+          message: mutationError instanceof Error ? mutationError.message : String(mutationError),
+        }),
+      });
+    } finally {
+      setPendingActionKey(null);
+    }
   }
 
-  function handleReject(gate: Gate): void {
+  async function handleReject(gate: Gate): Promise<void> {
     const key = getGateKey(gate);
     const reason = rejectReasons[key]?.trim() ?? '';
     if (!reason) {
@@ -311,14 +281,46 @@ function GatesPage() {
     }
 
     setRejectInlineErrorKey(null);
-    setPendingActionKey(key);
-    setActionFeedback(null);
-    rejectGate.mutate({
+    const variables = {
       sessionId: gate.sessionId,
       gateId: gate.gateId,
       reason,
       reviewer: reviewerFor(key),
-    });
+    };
+    setPendingActionKey(key);
+    setActionFeedback(null);
+    try {
+      const result = await rejectGate.mutateAsync(variables);
+      await Promise.all([
+        refetch(),
+        trpcUtils.gate.auditSummary.invalidate({
+          sessionId: variables.sessionId,
+          gateId: variables.gateId,
+        }),
+      ]);
+      setRejectingGateKey(null);
+      setRejectInlineErrorKey(null);
+      setRejectReasons((current) => {
+        const next = { ...current };
+        delete next[getGateKey(variables)];
+        return next;
+      });
+      setReviewers((current) => {
+        const next = { ...current };
+        delete next[getGateKey(variables)];
+        return next;
+      });
+      setActionFeedback(buildRejectFeedback(result, variables.gateId, variables.sessionId, t));
+    } catch (mutationError) {
+      setActionFeedback({
+        tone: 'error',
+        message: t('gates.feedback.failed', {
+          message: mutationError instanceof Error ? mutationError.message : String(mutationError),
+        }),
+      });
+    } finally {
+      setPendingActionKey(null);
+    }
   }
 
   return (
@@ -536,7 +538,7 @@ function GatesPage() {
                               disabled={pendingActionKey !== null}
                               className="btn-primary px-3 py-1.5 text-xs"
                             >
-                              {isPendingAction && approveAndResume.isLoading
+                              {isPendingAction && approveAndResume.isPending
                                 ? t('gates.action.requesting')
                                 : t('gates.action.approveAndRequestResume')}
                             </button>
@@ -727,7 +729,7 @@ function GatesPage() {
                           onClick={() => handleReject(gate)}
                           disabled={pendingActionKey !== null}
                         >
-                          {isPendingAction && rejectGate.isLoading
+                          {isPendingAction && rejectGate.isPending
                             ? t('gates.action.rejecting')
                             : t('gates.action.confirmReject')}
                         </button>

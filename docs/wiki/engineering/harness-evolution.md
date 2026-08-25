@@ -207,3 +207,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F043-apps-web-eslint-10-flat-config-issue-207-batch-1.md`
 - Review status: ready
 - Feature: F043 status → accepted in feature_list.json
+
+## 2026-08-25 docs/plans/F044-apps-web-tRPC-11-TanStack-Query-5-issue-207-batch-2.md
+
+- Plan: `docs/plans/F044-apps-web-tRPC-11-TanStack-Query-5-issue-207-batch-2.md`
+- Review status: ready
+- Feature: F044 status → accepted in feature_list.json

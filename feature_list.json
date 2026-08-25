@@ -1540,6 +1540,30 @@
 				".github/workflows/ci.yml"
 			],
 			"updated": "2026-08-25"
+		},
+		{
+			"id": "F044",
+			"priority": 42,
+			"area": "tooling",
+			"title": "Upgrade apps/web tRPC 11 + TanStack Query 5 (issue #207 batch 2)",
+			"user_visible_behavior": "apps/web runs tRPC 11 with @tanstack/react-query 5; client/provider/hooks refactored for the v5 API; all routers keep their contracts",
+			"status": "accepted",
+			"verification": [
+				"cd apps/web && npm run lint",
+				"cd apps/web && npm test",
+				"cd apps/web && npm run build"
+			],
+			"evidence": [
+				{
+					"command": "bash .scratch/f044-verify.sh",
+					"result": "pass",
+					"date": "2026-08-25",
+					"notes": "apps/web tRPC 11.18.0 + react-query 5.102.3: lint 0 errors, vitest 571/571, build clean; root suite 2672/0"
+				}
+			],
+			"notes": [],
+			"paths": ["apps/web/package.json", "apps/web/package-lock.json"],
+			"updated": "2026-08-25"
 		}
 	]
 }

@@ -47,7 +47,7 @@ vi.mock('@tanstack/react-router', async () => {
 
 vi.mock('@/lib/trpc', () => ({
   trpc: {
-    useContext: () => ({
+    useUtils: () => ({
       gate: {
         auditSummary: {
           invalidate: () => Promise.resolve(),
@@ -67,10 +67,20 @@ vi.mock('@/lib/trpc', () => ({
         useQuery: () => ({ data: undefined, isLoading: false, error: null }),
       },
       approveAndResume: {
-        useMutation: () => ({ mutate: () => undefined, isLoading: false }),
+        useMutation: () => ({
+          mutate: () => undefined,
+          mutateAsync: () => Promise.resolve(),
+          isPending: false,
+          isLoading: false,
+        }),
       },
       reject: {
-        useMutation: () => ({ mutate: () => undefined, isLoading: false }),
+        useMutation: () => ({
+          mutate: () => undefined,
+          mutateAsync: () => Promise.resolve(),
+          isPending: false,
+          isLoading: false,
+        }),
       },
     },
   },
