@@ -1638,6 +1638,26 @@
 				"apps/web/src/lib/hooks/useSessionEvents.ts"
 			],
 			"updated": "2026-08-26"
+		},
+		{
+			"id": "F048",
+			"priority": 48,
+			"area": "tooling",
+			"title": "Add prettier pre-commit hook via husky + lint-staged (issue #207 follow-up)",
+			"user_visible_behavior": "Commits in this repo automatically prettier-format staged files before the commit is created, so formatting drift can never reach CI",
+			"status": "accepted",
+			"verification": ["bash .scratch/f048-verify.sh"],
+			"evidence": [
+				{
+					"command": "bash .scratch/f048-verify.sh",
+					"result": "pass — root format:check green, root lint clean, root suite 2672/0, web vitest 571/571",
+					"date": "2026-08-26",
+					"notes": "Prettier pre-commit coverage gap closed: web-scoped lint-staged entry in root package.json; hook proven end-to-end with a misformatted staged apps/web file (auto-formatted + re-staged); routeTree.gen.ts stays ignored"
+				}
+			],
+			"notes": [],
+			"paths": ["package.json", ".husky/pre-commit"],
+			"updated": "2026-08-26"
 		}
 	]
 }
