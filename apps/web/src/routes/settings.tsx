@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   hasSettingsChanges,
   normalizeSettings,
@@ -19,10 +19,15 @@ function SettingsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
+  // Reset the local form when the global settings change from outside this
+  // page (storage event or another surface saving). Render-time adjustment is
+  // the react.dev replacement for copying a prop into state via an effect.
+  const [prevGlobalSettings, setPrevGlobalSettings] = useState(globalSettings);
+  if (prevGlobalSettings !== globalSettings) {
+    setPrevGlobalSettings(globalSettings);
     setPersistedSettings(globalSettings);
     setSettings(globalSettings);
-  }, [globalSettings]);
+  }
 
   const isDirty = useMemo(
     () => hasSettingsChanges(settings, persistedSettings),

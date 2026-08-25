@@ -1,29 +1,16 @@
 import { useTheme } from '@/lib/theme-provider';
 import { useI18n } from '@/lib/i18n';
-import { useEffect, useState } from 'react';
 
 export function ThemeToggle() {
   const { t } = useI18n();
-  const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   return (
     <button
-      onClick={() => mounted && setTheme(theme === 'dark' ? 'light' : 'dark')}
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
       aria-label={t('theme.toggle')}
       className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition-colors duration-150 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-      title={
-        mounted
-          ? theme === 'dark'
-            ? t('theme.switchToLight')
-            : t('theme.switchToDark')
-          : t('theme.toggle')
-      }
-      disabled={!mounted}
+      title={theme === 'dark' ? t('theme.switchToLight') : t('theme.switchToDark')}
     >
       {theme === 'dark' ? (
         <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">

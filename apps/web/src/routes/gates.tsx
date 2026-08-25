@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { trpc } from '@/lib/trpc';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Gate, GateStatus } from '@/lib/types/gate';
 import { REVIEWER_MAX_LENGTH, REVIEWER_PATTERN } from '@/lib/types/gate';
 import { useI18n, type I18nKey } from '@/lib/i18n';
@@ -194,9 +194,13 @@ function GatesPage() {
   const visibleGates = orderedGates.slice(0, visibleCount);
   const hasMoreGates = visibleGates.length < orderedGates.length;
 
-  useEffect(() => {
+  // Reset pagination when the status filter changes (render-time adjustment
+  // instead of a setState-in-effect reset).
+  const [prevStatusFilter, setPrevStatusFilter] = useState<GateStatus | ''>(statusFilter);
+  if (prevStatusFilter !== statusFilter) {
+    setPrevStatusFilter(statusFilter);
     setVisibleCount(PAGE_SIZE);
-  }, [statusFilter]);
+  }
 
   function handleReviewToggle(gate: Gate): void {
     const key = getGateKey(gate);

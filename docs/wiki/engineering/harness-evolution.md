@@ -225,3 +225,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F046-apps-web-build-chain-issue-207-batch-4.md`
 - Review status: ready
 - Feature: F046 status → accepted in feature_list.json
+
+## 2026-08-26 docs/plans/F047-apps-web-react-hooks-production-warnings.md
+
+- Plan: `docs/plans/F047-apps-web-react-hooks-production-warnings.md`
+- Review status: ready
+- Feature: F047 status → accepted in feature_list.json

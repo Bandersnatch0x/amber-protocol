@@ -1612,6 +1612,32 @@
 				"apps/web/server/types/session-events.ts"
 			],
 			"updated": "2026-08-26"
+		},
+		{
+			"id": "F047",
+			"priority": 47,
+			"area": "web",
+			"title": "Clear the six deferred react-hooks production warnings (F043 follow-up)",
+			"user_visible_behavior": "apps/web runs with zero react-hooks set-state-in-effect/refs warnings; theme hydration, settings sync, gates pagination reset, and SSE reconnect behavior are unchanged",
+			"status": "accepted",
+			"verification": ["bash .scratch/f047-verify.sh"],
+			"evidence": [
+				{
+					"command": "bash .scratch/f047-verify.sh",
+					"result": "pass",
+					"date": "2026-08-26",
+					"notes": "all 6 react-hooks production warnings cleared; behavior preserved (theme toggle, settings sync, gates pagination, SSE reconnect); 571/571 + E2E 43/43 + root 2672/0"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"apps/web/src/lib/theme-provider.tsx",
+				"apps/web/src/components/ThemeToggle.tsx",
+				"apps/web/src/routes/settings.tsx",
+				"apps/web/src/routes/gates.tsx",
+				"apps/web/src/lib/hooks/useSessionEvents.ts"
+			],
+			"updated": "2026-08-26"
 		}
 	]
 }

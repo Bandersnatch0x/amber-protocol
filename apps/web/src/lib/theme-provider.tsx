@@ -4,7 +4,7 @@ type Theme = 'dark' | 'light' | 'system';
 type ResolvedTheme = 'dark' | 'light';
 
 interface ThemeContextValue {
-  theme: ResolvedTheme | undefined;
+  theme: ResolvedTheme;
   setTheme: (theme: Theme) => void;
 }
 
@@ -55,17 +55,18 @@ export function ThemeProvider({
   defaultTheme: _defaultTheme = 'system',
   disableTransitionOnChange = true,
 }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<ResolvedTheme | undefined>();
+  // Client-only SPA (no SSR): resolve once during the first render instead of
+  // hydrating through a mount effect.
+  const [theme, setThemeState] = useState<ResolvedTheme>(() =>
+    resolveTheme(readStoredTheme()),
+  );
 
-  // Hydrate on mount — avoids flash and mismatch
+  // Keep the DOM class token in sync with the resolved theme.
   useEffect(() => {
-    const stored = readStoredTheme();
-    const resolved = resolveTheme(stored);
-    setThemeState(resolved);
     if (attribute === 'class') {
-      applyDOMTheme(resolved);
+      applyDOMTheme(theme);
     }
-  }, [attribute]);
+  }, [theme, attribute]);
 
   // Listen for system preference changes when stored theme is "system"
   useEffect(() => {

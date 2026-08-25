@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { SessionEvent, SessionStatus, SessionEventSchema } from '@/lib/types/session-events';
 
 type ConnectionState = 'connecting' | 'open' | 'closed' | 'error';
@@ -33,114 +33,112 @@ const MAX_EVENTS = 500;
 
 export function useSessionEvents(sessionId: string | null): UseSessionEventsReturn {
   const [status, setStatus] = useState<SessionStatus | null>(null);
-  const [connectionState, setConnectionState] = useState<ConnectionState>('closed');
+  const [connectionState, setConnectionState] = useState<ConnectionState>(() =>
+    sessionId ? 'connecting' : 'closed',
+  );
   const [lastEvent, setLastEvent] = useState<SessionEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  // Bumped by manualReconnect to re-run the connection effect on demand.
+  const [reconnectNonce, setReconnectNonce] = useState(0);
 
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef(0);
   const isManuallyClosedRef = useRef(false);
 
-  const connect = useRef<() => void>(() => {});
-
-  const closeEventSource = () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-  };
-
-  const appendEvent = (event: SessionEvent) => {
-    setLastEvent(event);
-
-    if (event.type !== 'heartbeat') {
-      setEvents((prev) => {
-        const next = [...prev, event];
-        return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
-      });
-    }
-
-    const nextStatus = statusFromEventType(event.type);
-    if (nextStatus) setStatus(nextStatus);
-  };
-
-  const scheduleReconnect = (es: EventSource) => {
-    setConnectionState('error');
-    setError('Connection lost. Reconnecting...');
-    es.close();
-
-    const backoff = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
-    reconnectAttemptRef.current += 1;
-    setReconnectAttempt(reconnectAttemptRef.current);
-
-    reconnectTimeoutRef.current = setTimeout(() => {
-      if (eventSourceRef.current === es) {
-        connect.current();
-      }
-    }, backoff);
-  };
-
-  connect.current = () => {
-    if (!sessionId || isManuallyClosedRef.current) return;
-
-    closeEventSource();
-    setConnectionState('connecting');
-
-    const es = new EventSource(`/api/sessions/${sessionId}/events`);
-    eventSourceRef.current = es;
-
-    es.onopen = () => {
-      setConnectionState('open');
-      setError(null);
-      reconnectAttemptRef.current = 0;
-      setReconnectAttempt(0);
-    };
-
-    es.onmessage = (e) => {
-      try {
-        appendEvent(SessionEventSchema.parse(JSON.parse(e.data)));
-      } catch {
-        // Event parse failures are non-fatal; skip malformed events
-      }
-    };
-
-    es.onerror = () => scheduleReconnect(es);
-  };
-
-  const manualReconnect = () => {
-    reconnectAttemptRef.current = 0;
-    setReconnectAttempt(0);
-    isManuallyClosedRef.current = false;
-    connect.current();
-  };
-
-  useEffect(() => {
-    if (!sessionId) {
-      setConnectionState('closed');
-      return;
-    }
-
-    isManuallyClosedRef.current = false;
+  // Reset per-session state when the session identity changes (render-time
+  // adjustment — the react.dev replacement for resetting state in an effect).
+  const [prevSessionId, setPrevSessionId] = useState(sessionId);
+  if (prevSessionId !== sessionId) {
+    setPrevSessionId(sessionId);
     setStatus(null);
     setEvents([]);
     setLastEvent(null);
     setError(null);
-    reconnectAttemptRef.current = 0;
     setReconnectAttempt(0);
+    setConnectionState(sessionId ? 'connecting' : 'closed');
+  }
 
-    connect.current();
+  useEffect(() => {
+    if (!sessionId) return;
+
+    isManuallyClosedRef.current = false;
+    reconnectAttemptRef.current = 0;
+
+    const eventSourceRef: { current: EventSource | null } = { current: null };
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
+    const closeEventSource = () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+    };
+
+    const appendEvent = (event: SessionEvent) => {
+      setLastEvent(event);
+
+      if (event.type !== 'heartbeat') {
+        setEvents((prev) => {
+          const next = [...prev, event];
+          return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
+        });
+      }
+
+      const nextStatus = statusFromEventType(event.type);
+      if (nextStatus) setStatus(nextStatus);
+    };
+
+    const connect = () => {
+      if (isManuallyClosedRef.current) return;
+
+      closeEventSource();
+
+      const es = new EventSource(`/api/sessions/${sessionId}/events`);
+      eventSourceRef.current = es;
+
+      es.onopen = () => {
+        setConnectionState('open');
+        setError(null);
+        reconnectAttemptRef.current = 0;
+        setReconnectAttempt(0);
+      };
+
+      es.onmessage = (e) => {
+        try {
+          appendEvent(SessionEventSchema.parse(JSON.parse(e.data)));
+        } catch {
+          // Event parse failures are non-fatal; skip malformed events
+        }
+      };
+
+      es.onerror = () => {
+        setConnectionState('error');
+        setError('Connection lost. Reconnecting...');
+        es.close();
+        if (eventSourceRef.current === es) {
+          eventSourceRef.current = null;
+        }
+
+        const backoff = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
+        reconnectAttemptRef.current += 1;
+        setReconnectAttempt(reconnectAttemptRef.current);
+
+        reconnectTimeout = setTimeout(connect, backoff);
+      };
+    };
+
+    connect();
 
     const handleOnline = () => {
-      if (sessionId) {
-        manualReconnect();
-      }
+      if (isManuallyClosedRef.current) return;
+      reconnectAttemptRef.current = 0;
+      setReconnectAttempt(0);
+      connect();
     };
 
     if (typeof window !== 'undefined') {
@@ -154,7 +152,15 @@ export function useSessionEvents(sessionId: string | null): UseSessionEventsRetu
       }
       closeEventSource();
     };
-  }, [sessionId]);
+  }, [sessionId, reconnectNonce]);
+
+  const manualReconnect = useCallback(() => {
+    reconnectAttemptRef.current = 0;
+    setReconnectAttempt(0);
+    isManuallyClosedRef.current = false;
+    setConnectionState('connecting');
+    setReconnectNonce((nonce) => nonce + 1);
+  }, []);
 
   return {
     status,
