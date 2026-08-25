@@ -1,39 +1,24 @@
 "use strict";
 
-// Extracted from command-dispatcher.js (architecture review #1).
+// Extracted from command-dispatcher.js (architecture review #1). Envelope,
+// routing, and exit codes are owned by defineCommand (F039).
 
-const { resolveTarget, unknownAction } = require("./command-helpers");
+const { defineCommand } = require("./subcommand-dispatcher");
+const { resolveTarget } = require("./command-helpers");
 
-function phaseDispatch(args) {
-	const targetRoot = resolveTarget(args);
-	const sub = args._?.[0];
-	const {
-		gatherPhaseEvidence,
-		validatePhaseEvidence,
-		promotePhase,
-		rollbackPhase,
-		listTransitions,
-		checkInvariantNonRegression,
-	} = require("./core/phase-gates");
-	if (sub === "evidence") {
-		const evidence = gatherPhaseEvidence(targetRoot, args.phase);
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(evidence, null, 2),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "validate") {
-		const validation = validatePhaseEvidence(targetRoot, args.phase);
-		const exitCode = validation.complete ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
+const dispatch = defineCommand({
+	command: "phase",
+	actions: ["evidence", "validate", "promote", "rollback", "transitions", "invariants"],
+	handlers: {
+		evidence: (args) => {
+			const { gatherPhaseEvidence } = require("./core/phase-gates");
+			const evidence = gatherPhaseEvidence(resolveTarget(args), args.phase);
+			return { text: JSON.stringify(evidence, null, 2) };
+		},
+		validate: (args) => {
+			const { validatePhaseEvidence } = require("./core/phase-gates");
+			const validation = validatePhaseEvidence(resolveTarget(args), args.phase);
+			return {
 				text: JSON.stringify(
 					{ complete: validation.complete, missing: validation.missing },
 					null,
@@ -41,79 +26,53 @@ function phaseDispatch(args) {
 				),
 				errors: validation.complete ? [] : [`missing evidence: ${validation.missing.join(", ")}`],
 				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "promote") {
-		const result = promotePhase(targetRoot, args.phase, { authorization: args.auth || null });
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
+				exitCode: validation.complete ? 0 : 1,
+			};
+		},
+		promote: (args) => {
+			const { promotePhase } = require("./core/phase-gates");
+			const result = promotePhase(resolveTarget(args), args.phase, {
+				authorization: args.auth || null,
+			});
+			return {
 				text: result.ok ? JSON.stringify(result.transition, null, 2) : "",
 				errors: result.errors,
 				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "rollback") {
-		const result = rollbackPhase(targetRoot, args.phase, {
-			checkpoint: args.checkpoint || null,
-			reason: args.reason || null,
-		});
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
+				exitCode: result.ok ? 0 : 1,
+			};
+		},
+		rollback: (args) => {
+			const { rollbackPhase } = require("./core/phase-gates");
+			const result = rollbackPhase(resolveTarget(args), args.phase, {
+				checkpoint: args.checkpoint || null,
+				reason: args.reason || null,
+			});
+			return {
 				text: result.ok ? JSON.stringify(result.transition, null, 2) : "",
 				errors: result.errors,
 				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "transitions") {
-		const transitions = listTransitions(targetRoot);
-		return {
-			result: {
-				target: args.target,
-				text: JSON.stringify(transitions, null, 2),
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
-		};
-	}
-	if (sub === "invariants") {
-		const result = checkInvariantNonRegression(targetRoot);
-		const exitCode = result.ok ? 0 : 1;
-		return {
-			result: {
-				target: args.target,
+				exitCode: result.ok ? 0 : 1,
+			};
+		},
+		transitions: (args) => {
+			const { listTransitions } = require("./core/phase-gates");
+			return { text: JSON.stringify(listTransitions(resolveTarget(args)), null, 2) };
+		},
+		invariants: (args) => {
+			const { checkInvariantNonRegression } = require("./core/phase-gates");
+			const result = checkInvariantNonRegression(resolveTarget(args));
+			return {
 				text: JSON.stringify(result.invariants, null, 2),
 				errors: result.ok ? [] : ["invariant regression detected"],
 				warnings: [],
-			},
-			exitCode,
-			bypassPrint: !args.json,
-		};
-	}
-	return {
-		result: unknownAction("phase", [
-			"evidence",
-			"validate",
-			"promote",
-			"rollback",
-			"transitions",
-			"invariants",
-		]),
-	};
+				exitCode: result.ok ? 0 : 1,
+			};
+		},
+	},
+});
+
+function phaseDispatch(args) {
+	return dispatch(args._?.[0], args);
 }
 
 module.exports = { phaseDispatch };

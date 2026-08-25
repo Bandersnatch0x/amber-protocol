@@ -18,6 +18,10 @@
 //              origin governed-promotion|human-direct-ratification (+ memory-book)
 //   abandon  → explicit F1(ii) entry/request terminal marker (+ memory-abandon)
 //   status   → three-section read-only projection (entries/gamma/alpha)
+//
+// Envelope, routing, and exit codes are owned by defineCommand (F039): the
+// verb handlers return bodies; failure bodies carry bypassPrint: false so the
+// coded envelope still renders through printResult in text mode.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -48,6 +52,7 @@ const {
 	maybeResolveRequests,
 } = require("./core/memory-policy");
 const { codedError } = require("./core/error-catalog");
+const { defineCommand } = require("./subcommand-dispatcher");
 
 const CREED_HINT = [
 	"── Memory creed (capability, not ceremony) ──",
@@ -95,29 +100,6 @@ function validateRequestSchema(request) {
 	};
 }
 
-// ── Envelope helpers (mirror command-dispatcher handler shape) ────────────────
-function ok(args, body = {}) {
-	return {
-		result: { target: args.target, errors: [], warnings: [], ...body },
-		exitCode: 0,
-		bypassPrint: !args.json,
-	};
-}
-
-function fail(args, code, message, extra = {}) {
-	return {
-		result: {
-			target: args.target,
-			errors: [codedError(code, message)],
-			warnings: [],
-			code,
-			...extra,
-		},
-		exitCode: 1,
-		bypassPrint: false,
-	};
-}
-
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 function makeRequestId() {
@@ -128,11 +110,14 @@ function makeRequestId() {
 // in the typed seam). Non-TTY without an explicit --yes is refused fail-closed.
 function identityGate(args) {
 	if (!process.stdout.isTTY && !args.yes) {
-		return fail(
-			args,
-			"AMBER_E_MEMORY_APPROVAL_REQUIRED",
-			"non-interactive invocation without --yes",
-		);
+		return {
+			errors: [
+				codedError("AMBER_E_MEMORY_APPROVAL_REQUIRED", "non-interactive invocation without --yes"),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_APPROVAL_REQUIRED",
+			bypassPrint: false,
+		};
 	}
 	return null;
 }
@@ -154,25 +139,44 @@ function handleRequest(args, targetRoot) {
 	if (gate) return gate;
 
 	if (!args.payload) {
-		return fail(
-			args,
-			"AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
-			"memory request requires --payload <file.json>",
-		);
+		return {
+			errors: [
+				codedError(
+					"AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
+					"memory request requires --payload <file.json>",
+				),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
+			bypassPrint: false,
+		};
 	}
 	const payloadPath = path.resolve(targetRoot, args.payload);
 	if (!fs.existsSync(payloadPath)) {
-		return fail(args, "AMBER_E_MEMORY_REQUEST_NOT_FOUND", `payload not found: ${args.payload}`);
+		return {
+			errors: [
+				codedError("AMBER_E_MEMORY_REQUEST_NOT_FOUND", `payload not found: ${args.payload}`),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_REQUEST_NOT_FOUND",
+			bypassPrint: false,
+		};
 	}
 	let body;
 	try {
 		body = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
 	} catch (err) {
-		return fail(
-			args,
-			"AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
-			`payload not valid JSON: ${err.message}`,
-		);
+		return {
+			errors: [
+				codedError(
+					"AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
+					`payload not valid JSON: ${err.message}`,
+				),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
+			bypassPrint: false,
+		};
 	}
 
 	const requestId = body.requestId || makeRequestId();
@@ -193,7 +197,14 @@ function handleRequest(args, targetRoot) {
 	};
 
 	const v = validateRequestSchema(request);
-	if (!v.valid) return fail(args, "AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID", v.errors.join("; "));
+	if (!v.valid) {
+		return {
+			errors: [codedError("AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID", v.errors.join("; "))],
+			warnings: [],
+			code: "AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
+			bypassPrint: false,
+		};
+	}
 
 	// §10.4: request file = artifact + bookkeeping {status, resolvedAt?, rejectionCount}.
 	// §5.2-C5/F2: a derived request inherits the parent's rejection count — the
@@ -218,15 +229,17 @@ function handleRequest(args, targetRoot) {
 		batchId: request.provenance.batchId,
 		derivedFrom: request.provenance.derivedFrom,
 	});
-	return ok(args, {
+	return {
+		errors: [],
+		warnings: [],
 		text: `memory request ${requestId} created (${request.entries.length} entry/entries, channel ${request.provenance.channel}).`,
 		requestId,
 		entryIds: request.entries.map((e) => e.entryId),
-	});
+	};
 }
 
 // ── ingest (§5.3 five-stage acceptance, all-or-nothing) ───────────────────────
-function rejectIngest(args, targetRoot, request, channel, code, message, entryIds, ranking) {
+function rejectIngest(targetRoot, request, channel, code, message, entryIds, ranking) {
 	const warnings = [];
 	let abandoned = false;
 	if (request) {
@@ -272,16 +285,12 @@ function rejectIngest(args, targetRoot, request, channel, code, message, entryId
 		);
 	}
 	return {
-		result: {
-			target: args.target,
-			errors: [codedError(code, message)],
-			warnings,
-			code,
-			outcome: "rejected",
-			entryIds,
-			ranking,
-		},
-		exitCode: 1,
+		errors: [codedError(code, message)],
+		warnings,
+		code,
+		outcome: "rejected",
+		entryIds,
+		ranking,
 		bypassPrint: false,
 	};
 }
@@ -343,7 +352,12 @@ function handleIngest(args, targetRoot) {
 	if (requestId) {
 		request = store.readRequests(targetRoot).find((r) => r.requestId === requestId);
 		if (!request) {
-			return fail(args, "AMBER_E_MEMORY_REQUEST_NOT_FOUND", `request not found: ${requestId}`);
+			return {
+				errors: [codedError("AMBER_E_MEMORY_REQUEST_NOT_FOUND", `request not found: ${requestId}`)],
+				warnings: [],
+				code: "AMBER_E_MEMORY_REQUEST_NOT_FOUND",
+				bypassPrint: false,
+			};
 		}
 		// §5.6-F1(i)/C5 terminality: a resolved request is a dead lineage — its
 		// entries can never be re-admitted; continue via a fresh request with
@@ -352,42 +366,67 @@ function handleIngest(args, targetRoot) {
 			const autoAbandoned = store
 				.readMemoryEvents(targetRoot, 0)
 				.some((e) => e.kind === "memory-abandon" && e.targetId === requestId);
-			return fail(
-				args,
-				"AMBER_E_MEMORY_STATE_INVALID",
-				`request ${requestId} is resolved (${
-					autoAbandoned
-						? "F1(i) auto-abandoned lineage"
-						: "all entries reached terminal disposition"
-				}) — submit a new request with provenance.derivedFrom to continue the lineage`,
-			);
+			return {
+				errors: [
+					codedError(
+						"AMBER_E_MEMORY_STATE_INVALID",
+						`request ${requestId} is resolved (${
+							autoAbandoned
+								? "F1(i) auto-abandoned lineage"
+								: "all entries reached terminal disposition"
+						}) — submit a new request with provenance.derivedFrom to continue the lineage`,
+					),
+				],
+				warnings: [],
+				code: "AMBER_E_MEMORY_STATE_INVALID",
+				bypassPrint: false,
+			};
 		}
 		rawEntries = request.entries || [];
 		channel = request.provenance && request.provenance.channel;
 	} else if (args.payload) {
 		const payloadPath = path.resolve(targetRoot, args.payload);
 		if (!fs.existsSync(payloadPath)) {
-			return fail(args, "AMBER_E_MEMORY_REQUEST_NOT_FOUND", `payload not found: ${args.payload}`);
+			return {
+				errors: [
+					codedError("AMBER_E_MEMORY_REQUEST_NOT_FOUND", `payload not found: ${args.payload}`),
+				],
+				warnings: [],
+				code: "AMBER_E_MEMORY_REQUEST_NOT_FOUND",
+				bypassPrint: false,
+			};
 		}
 		let body;
 		try {
 			body = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
 		} catch (err) {
-			return fail(
-				args,
-				"AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
-				`payload not valid JSON: ${err.message}`,
-			);
+			return {
+				errors: [
+					codedError(
+						"AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
+						`payload not valid JSON: ${err.message}`,
+					),
+				],
+				warnings: [],
+				code: "AMBER_E_MEMORY_REQUEST_SCHEMA_INVALID",
+				bypassPrint: false,
+			};
 		}
 		rawEntries = body.entries || [];
 		payloadBody = body;
 		channel = body.channel || (body.provenance && body.provenance.channel);
 	} else {
-		return fail(
-			args,
-			"AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID",
-			"memory ingest requires --request <id> or --payload <file.json>",
-		);
+		return {
+			errors: [
+				codedError(
+					"AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID",
+					"memory ingest requires --request <id> or --payload <file.json>",
+				),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID",
+			bypassPrint: false,
+		};
 	}
 
 	const entries = rawEntries.map(withEntryId);
@@ -398,7 +437,6 @@ function handleIngest(args, targetRoot) {
 		const v = validateEntrySchema(entry);
 		if (!v.valid) {
 			return rejectIngest(
-				args,
 				targetRoot,
 				request,
 				channel,
@@ -415,7 +453,6 @@ function handleIngest(args, targetRoot) {
 	const bindingFindings = checkSourceBinding(targetRoot, entries);
 	if (bindingFindings) {
 		return rejectIngest(
-			args,
 			targetRoot,
 			request,
 			channel,
@@ -432,7 +469,6 @@ function handleIngest(args, targetRoot) {
 			(payloadBody && payloadBody.provenance && payloadBody.provenance.signal);
 		if (!signal || !SIGNAL_CLOSED_SET.has(signal)) {
 			return rejectIngest(
-				args,
 				targetRoot,
 				request,
 				channel,
@@ -465,16 +501,11 @@ function handleIngest(args, targetRoot) {
 			batchId: request && request.provenance && request.provenance.batchId,
 		});
 		return {
-			result: {
-				target: args.target,
-				text: `ingest: no change — all ${skipped.length} candidate(s) are abandoned (F3 rebuild exclusion).`,
-				errors: [],
-				warnings: [],
-				outcome: "no-change",
-				entryIds: [],
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
+			text: `ingest: no change — all ${skipped.length} candidate(s) are abandoned (F3 rebuild exclusion).`,
+			errors: [],
+			warnings: [],
+			outcome: "no-change",
+			entryIds: [],
 		};
 	}
 
@@ -506,7 +537,6 @@ function handleIngest(args, targetRoot) {
 			freedBytes;
 		if (projectedEntries > ALPHA_MAX_ENTRIES || projectedBytes > ALPHA_MAX_BYTES) {
 			return rejectIngest(
-				args,
 				targetRoot,
 				request,
 				channel,
@@ -558,7 +588,6 @@ function handleIngest(args, targetRoot) {
 				queued: r.queued,
 			}));
 			return rejectIngest(
-				args,
 				targetRoot,
 				request,
 				channel,
@@ -603,17 +632,12 @@ function handleIngest(args, targetRoot) {
 			]
 		: [];
 	return {
-		result: {
-			target: args.target,
-			text: `ingest admitted ${effectiveIds.length} proposal(s).`,
-			errors: [],
-			warnings,
-			outcome: "admitted",
-			entryIds: effectiveIds,
-			ranking,
-		},
-		exitCode: 0,
-		bypassPrint: !args.json,
+		text: `ingest admitted ${effectiveIds.length} proposal(s).`,
+		errors: [],
+		warnings,
+		outcome: "admitted",
+		entryIds: effectiveIds,
+		ranking,
 	};
 }
 
@@ -621,16 +645,34 @@ function handleIngest(args, targetRoot) {
 function handleApprove(args, targetRoot) {
 	const entryId = args.entryId;
 	if (!entryId) {
-		return fail(args, "AMBER_E_MEMORY_STATE_INVALID", "memory approve requires --entry-id");
+		return {
+			errors: [codedError("AMBER_E_MEMORY_STATE_INVALID", "memory approve requires --entry-id")],
+			warnings: [],
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+			bypassPrint: false,
+		};
 	}
 	const entry = store.readEntry(targetRoot, entryId);
-	if (!entry) return fail(args, "AMBER_E_MEMORY_ENTRY_NOT_FOUND", `entry not found: ${entryId}`);
+	if (!entry) {
+		return {
+			errors: [codedError("AMBER_E_MEMORY_ENTRY_NOT_FOUND", `entry not found: ${entryId}`)],
+			warnings: [],
+			code: "AMBER_E_MEMORY_ENTRY_NOT_FOUND",
+			bypassPrint: false,
+		};
+	}
 	if (entry.status !== "proposal") {
-		return fail(
-			args,
-			"AMBER_E_MEMORY_STATE_INVALID",
-			`approve requires proposal state (got ${entry.status})`,
-		);
+		return {
+			errors: [
+				codedError(
+					"AMBER_E_MEMORY_STATE_INVALID",
+					`approve requires proposal state (got ${entry.status})`,
+				),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+			bypassPrint: false,
+		};
 	}
 	const decision = args.decision || "approve";
 	const now = nowIso();
@@ -640,7 +682,14 @@ function handleApprove(args, targetRoot) {
 	if (decision === "reject") {
 		const reason = args.reason;
 		if (!reason || !String(reason).trim()) {
-			return fail(args, "AMBER_E_MEMORY_STATE_INVALID", "reject requires a non-empty --reason");
+			return {
+				errors: [
+					codedError("AMBER_E_MEMORY_STATE_INVALID", "reject requires a non-empty --reason"),
+				],
+				warnings: [],
+				code: "AMBER_E_MEMORY_STATE_INVALID",
+				bypassPrint: false,
+			};
 		}
 		entry.status = "draft";
 		entry.lastRejection = { reason: String(reason), at: now };
@@ -655,12 +704,14 @@ function handleApprove(args, targetRoot) {
 			decidedBy: "human",
 		});
 		maybeResolveRequests(targetRoot, [entryId]);
-		return ok(args, {
+		return {
+			errors: [],
+			warnings: [],
 			text: `${CREED_HINT}\n\nrejected ${entryId} → draft.`,
 			decision: "reject",
 			entryId,
 			status: "draft",
-		});
+		};
 	}
 
 	// C3 β pair: approving an entry that carries supersedeTarget completes the
@@ -669,18 +720,30 @@ function handleApprove(args, targetRoot) {
 	if (supersedeTarget) {
 		const target = store.readEntry(targetRoot, supersedeTarget);
 		if (!target) {
-			return fail(
-				args,
-				"AMBER_E_MEMORY_ENTRY_NOT_FOUND",
-				`supersedeTarget not found: ${supersedeTarget}`,
-			);
+			return {
+				errors: [
+					codedError(
+						"AMBER_E_MEMORY_ENTRY_NOT_FOUND",
+						`supersedeTarget not found: ${supersedeTarget}`,
+					),
+				],
+				warnings: [],
+				code: "AMBER_E_MEMORY_ENTRY_NOT_FOUND",
+				bypassPrint: false,
+			};
 		}
 		if (!["active", "needs-re-review"].includes(target.status)) {
-			return fail(
-				args,
-				"AMBER_E_MEMORY_STATE_INVALID",
-				`supersedeTarget must be active/needs-re-review (got ${target.status})`,
-			);
+			return {
+				errors: [
+					codedError(
+						"AMBER_E_MEMORY_STATE_INVALID",
+						`supersedeTarget must be active/needs-re-review (got ${target.status})`,
+					),
+				],
+				warnings: [],
+				code: "AMBER_E_MEMORY_STATE_INVALID",
+				bypassPrint: false,
+			};
 		}
 		entry.approvedAt = now;
 		entry.updatedAt = now;
@@ -705,12 +768,14 @@ function handleApprove(args, targetRoot) {
 			supersededEntryId: supersedeTarget,
 		});
 		maybeResolveRequests(targetRoot, [entryId, supersedeTarget]);
-		return ok(args, {
+		return {
+			errors: [],
+			warnings: [],
 			text: `${CREED_HINT}\n\napproved ${entryId}; superseded ${supersedeTarget} (β pair). Write to MEMORY.md, then \`amber memory book\`.`,
 			decision: "approve",
 			entryId,
 			supersededEntryId: supersedeTarget,
-		});
+		};
 	}
 
 	entry.approvedAt = now;
@@ -723,11 +788,13 @@ function handleApprove(args, targetRoot) {
 		decision: "approve",
 		decidedBy: "human",
 	});
-	return ok(args, {
+	return {
+		errors: [],
+		warnings: [],
 		text: `${CREED_HINT}\n\napproved ${entryId}. Write the entry into MEMORY.md, then run \`amber memory book --entry-id ${entryId}\`.`,
 		decision: "approve",
 		entryId,
-	});
+	};
 }
 
 // ── book (§5.5 surface registration + dual-track origin) ──────────────────────
@@ -752,20 +819,32 @@ function handleBook(args, targetRoot) {
 	// normHash); knowledgeKind is the human's choice (unspecified allowed).
 	const entryId = args.entryId || args.entry;
 	if (args.ratify && entryId) {
-		return fail(
-			args,
-			"AMBER_E_MEMORY_STATE_INVALID",
-			"--ratify and --entry-id are mutually exclusive: ratify creates a new registry entry from --claim; --entry-id books an existing one",
-		);
+		return {
+			errors: [
+				codedError(
+					"AMBER_E_MEMORY_STATE_INVALID",
+					"--ratify and --entry-id are mutually exclusive: ratify creates a new registry entry from --claim; --entry-id books an existing one",
+				),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+			bypassPrint: false,
+		};
 	}
 	if (args.ratify && !entryId) {
 		const claim = args.claim;
 		if (!claim || !String(claim).trim()) {
-			return fail(
-				args,
-				"AMBER_E_MEMORY_STATE_INVALID",
-				"ratification requires --claim <text> (the entry heading as written in MEMORY.md)",
-			);
+			return {
+				errors: [
+					codedError(
+						"AMBER_E_MEMORY_STATE_INVALID",
+						"ratification requires --claim <text> (the entry heading as written in MEMORY.md)",
+					),
+				],
+				warnings: [],
+				code: "AMBER_E_MEMORY_STATE_INVALID",
+				bypassPrint: false,
+			};
 		}
 		const knowledgeKind = args.knowledgeKind || "unspecified";
 		const raw = readMemoryMd(targetRoot);
@@ -788,14 +867,25 @@ function handleBook(args, targetRoot) {
 		});
 		const v = validateEntrySchema(candidate);
 		if (!v.valid) {
-			return fail(args, "AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID", v.errors.join("; "));
+			return {
+				errors: [codedError("AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID", v.errors.join("; "))],
+				warnings: [],
+				code: "AMBER_E_MEMORY_ENTRY_SCHEMA_INVALID",
+				bypassPrint: false,
+			};
 		}
 		if (store.readEntry(targetRoot, candidate.entryId)) {
-			return fail(
-				args,
-				"AMBER_E_MEMORY_STATE_INVALID",
-				`entry ${candidate.entryId} is already registered — no ratification needed (re-book by --entry-id only if drift moves it to needs-re-review)`,
-			);
+			return {
+				errors: [
+					codedError(
+						"AMBER_E_MEMORY_STATE_INVALID",
+						`entry ${candidate.entryId} is already registered — no ratification needed (re-book by --entry-id only if drift moves it to needs-re-review)`,
+					),
+				],
+				warnings: [],
+				code: "AMBER_E_MEMORY_STATE_INVALID",
+				bypassPrint: false,
+			};
 		}
 		store.writeEntry(targetRoot, {
 			...candidate,
@@ -813,36 +903,50 @@ function handleBook(args, targetRoot) {
 			normHash,
 		});
 		return {
-			result: {
-				target: args.target,
-				text: `ratified ${candidate.entryId} → active (human-direct-ratification; no γ consumed).`,
-				errors: [],
-				warnings,
-				origin: "human-direct-ratification",
-				entryId: candidate.entryId,
-				normHash,
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
+			text: `ratified ${candidate.entryId} → active (human-direct-ratification; no γ consumed).`,
+			errors: [],
+			warnings,
+			origin: "human-direct-ratification",
+			entryId: candidate.entryId,
+			normHash,
 		};
 	}
 
 	if (!entryId) {
-		return fail(
-			args,
-			"AMBER_E_MEMORY_STATE_INVALID",
-			"memory book requires --entry-id, or --ratify --claim <text> for a human direct edit",
-		);
+		return {
+			errors: [
+				codedError(
+					"AMBER_E_MEMORY_STATE_INVALID",
+					"memory book requires --entry-id, or --ratify --claim <text> for a human direct edit",
+				),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+			bypassPrint: false,
+		};
 	}
 	const entry = store.readEntry(targetRoot, entryId);
-	if (!entry) return fail(args, "AMBER_E_MEMORY_ENTRY_NOT_FOUND", `entry not found: ${entryId}`);
+	if (!entry) {
+		return {
+			errors: [codedError("AMBER_E_MEMORY_ENTRY_NOT_FOUND", `entry not found: ${entryId}`)],
+			warnings: [],
+			code: "AMBER_E_MEMORY_ENTRY_NOT_FOUND",
+			bypassPrint: false,
+		};
+	}
 	// proposal→active (governed-promotion) or needs-re-review→active (reset, §4.1).
 	if (!["proposal", "needs-re-review"].includes(entry.status)) {
-		return fail(
-			args,
-			"AMBER_E_MEMORY_STATE_INVALID",
-			`book requires proposal/needs-re-review (got ${entry.status})`,
-		);
+		return {
+			errors: [
+				codedError(
+					"AMBER_E_MEMORY_STATE_INVALID",
+					`book requires proposal/needs-re-review (got ${entry.status})`,
+				),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+			bypassPrint: false,
+		};
 	}
 
 	const origin = args.ratify ? "human-direct-ratification" : "governed-promotion";
@@ -869,17 +973,12 @@ function handleBook(args, targetRoot) {
 	});
 	maybeResolveRequests(targetRoot, [entryId]);
 	return {
-		result: {
-			target: args.target,
-			text: `booked ${entryId} → active (${origin}).`,
-			errors: [],
-			warnings,
-			origin,
-			entryId,
-			normHash,
-		},
-		exitCode: 0,
-		bypassPrint: !args.json,
+		text: `booked ${entryId} → active (${origin}).`,
+		errors: [],
+		warnings,
+		origin,
+		entryId,
+		normHash,
 	};
 }
 
@@ -888,19 +987,37 @@ function handleAbandon(args, targetRoot) {
 	const requestId = args.request;
 	const entryId = args.entry || args.entryId;
 	if ((requestId && entryId) || (!requestId && !entryId)) {
-		return fail(
-			args,
-			"AMBER_E_MEMORY_STATE_INVALID",
-			"memory abandon requires exactly one of --request or --entry",
-		);
+		return {
+			errors: [
+				codedError(
+					"AMBER_E_MEMORY_STATE_INVALID",
+					"memory abandon requires exactly one of --request or --entry",
+				),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+			bypassPrint: false,
+		};
 	}
 	const now = nowIso();
 
 	if (entryId) {
 		const entry = store.readEntry(targetRoot, entryId);
-		if (!entry) return fail(args, "AMBER_E_MEMORY_ENTRY_NOT_FOUND", `entry not found: ${entryId}`);
+		if (!entry) {
+			return {
+				errors: [codedError("AMBER_E_MEMORY_ENTRY_NOT_FOUND", `entry not found: ${entryId}`)],
+				warnings: [],
+				code: "AMBER_E_MEMORY_ENTRY_NOT_FOUND",
+				bypassPrint: false,
+			};
+		}
 		if (entry.status === "abandoned") {
-			return fail(args, "AMBER_E_MEMORY_STATE_INVALID", `entry already abandoned: ${entryId}`);
+			return {
+				errors: [codedError("AMBER_E_MEMORY_STATE_INVALID", `entry already abandoned: ${entryId}`)],
+				warnings: [],
+				code: "AMBER_E_MEMORY_STATE_INVALID",
+				bypassPrint: false,
+			};
 		}
 		entry.status = "abandoned";
 		entry.updatedAt = now;
@@ -913,12 +1030,23 @@ function handleAbandon(args, targetRoot) {
 			entryId,
 		});
 		maybeResolveRequests(targetRoot, [entryId]);
-		return ok(args, { text: `abandoned entry ${entryId}.`, scope: "entry", entryId });
+		return {
+			errors: [],
+			warnings: [],
+			text: `abandoned entry ${entryId}.`,
+			scope: "entry",
+			entryId,
+		};
 	}
 
 	const request = store.readRequests(targetRoot).find((r) => r.requestId === requestId);
 	if (!request) {
-		return fail(args, "AMBER_E_MEMORY_REQUEST_NOT_FOUND", `request not found: ${requestId}`);
+		return {
+			errors: [codedError("AMBER_E_MEMORY_REQUEST_NOT_FOUND", `request not found: ${requestId}`)],
+			warnings: [],
+			code: "AMBER_E_MEMORY_REQUEST_NOT_FOUND",
+			bypassPrint: false,
+		};
 	}
 	const abandonedIds = [];
 	for (const e of request.entries || []) {
@@ -940,12 +1068,14 @@ function handleAbandon(args, targetRoot) {
 		triggerSource: "explicit",
 		requestId,
 	});
-	return ok(args, {
+	return {
+		errors: [],
+		warnings: [],
 		text: `abandoned request ${requestId} (${abandonedIds.length} entry/entries).`,
 		scope: "request",
 		requestId,
 		entryIds: abandonedIds,
-	});
+	};
 }
 
 // ── status (§8.2 three-section read-only projection) ──────────────────────────
@@ -1021,41 +1151,44 @@ function renderStatus(p) {
 function handleStatus(args, targetRoot) {
 	const projection = buildProjection(targetRoot);
 	return {
-		result: {
-			target: args.target,
-			...projection,
-			text: renderStatus(projection),
-			errors: [],
-			warnings: [],
-		},
-		exitCode: 0,
-		bypassPrint: !args.json,
+		...projection,
+		text: renderStatus(projection),
+		errors: [],
+		warnings: [],
 	};
 }
 
-// ── dispatch (§8.1 one handler per verb, zero mapping table) ──────────────────
+// ── dispatch (§8.1 one handler per verb) ──────────────────────────────────────
+// defineCommand owns routing, the envelope, and exit codes. The dispatcher is
+// built per call because the verb handlers need the per-call target root and
+// the unknown-action guidance names the attempted verb.
+const MEMORY_ACTIONS = ["request", "ingest", "approve", "book", "abandon", "status"];
+
 function memoryDispatch(subcommand, args, targetRoot) {
 	const root = path.resolve(targetRoot || (args && args.target) || process.cwd());
-	switch (subcommand) {
-		case "request":
-			return handleRequest(args, root);
-		case "ingest":
-			return handleIngest(args, root);
-		case "approve":
-			return handleApprove(args, root);
-		case "book":
-			return handleBook(args, root);
-		case "abandon":
-			return handleAbandon(args, root);
-		case "status":
-			return handleStatus(args, root);
-		default:
-			return fail(
-				args || {},
-				"AMBER_E_MEMORY_STATE_INVALID",
-				`unknown memory action: ${subcommand}. Expected one of: request, ingest, approve, book, abandon, status`,
-			);
-	}
+	const dispatch = defineCommand({
+		command: "memory",
+		actions: MEMORY_ACTIONS,
+		handlers: {
+			request: (a) => handleRequest(a, root),
+			ingest: (a) => handleIngest(a, root),
+			approve: (a) => handleApprove(a, root),
+			book: (a) => handleBook(a, root),
+			abandon: (a) => handleAbandon(a, root),
+			status: (a) => handleStatus(a, root),
+		},
+		unknown: () => ({
+			errors: [
+				codedError(
+					"AMBER_E_MEMORY_STATE_INVALID",
+					`unknown memory action: ${subcommand}. Expected one of: ${MEMORY_ACTIONS.join(", ")}`,
+				),
+			],
+			warnings: [],
+			code: "AMBER_E_MEMORY_STATE_INVALID",
+		}),
+	});
+	return dispatch(subcommand, args);
 }
 
 module.exports = {
