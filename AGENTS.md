@@ -40,6 +40,7 @@ Use `node scripts/amber.js --all` for deprecated and expert compatibility comman
 - `node scripts/amber.js memory <request|ingest|approve|book|abandon|status> --target <repo>` - governed MEMORY.md write-back pipeline (ADR-0018); humans curate MEMORY.md, Amber admits/approves/registers.
 - `node scripts/amber.js route list` - list available routes.
 - `node scripts/amber.js session status` - inspect the current session.
+- `node scripts/amber.js sync session push --target <repo>` - report-only transport preparation (F040 structured report); `approve --reviewer <name>` + `push --execute --yes` performs the ADR-0020 Stage A governed local commit (add + commit behind identity, policy, single-use approval, and path-and-state confinement; `git push` is never executed); `ledger` verifies the transport ledger chain.
 - Deprecated adoption reports remain available via `node scripts/amber.js --all` and `amber adoption --help`; prefer the diagnosis/adoption journey for new work.
 - `node scripts/amber.js plan --target <repo> --feature <feature-id> --title "<title>"` - scaffold a feature plan.
 - `node scripts/amber.js loop recommend` / `loop run --dry-run` — safe continuous improvement entrypoints (see LOOP.md).
@@ -52,6 +53,10 @@ Use `node scripts/amber.js --all` for deprecated and expert compatibility comman
 - Read-only / dry-run first; `init` and `wiki` never overwrite existing files.
 - Amber does not auto-execute target-project commands, dispatch live agents, or run dynamic workflows.
 - Never overwrite user-authored files without explicit approval.
+- Amber never runs `git push`. The one gated exception to "no live git": ADR-0020 Stage A
+  (`amber sync session push --execute --yes`) performs the local `git add` + `git commit` of sync
+  envelopes behind identity, policy, single-use approval, path-and-state confinement, and a
+  tamper-evident transport ledger; every other git interaction stays read-only.
 
 ## Governance philosophy (operational-ontology positioning)
 

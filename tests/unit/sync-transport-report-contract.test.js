@@ -173,8 +173,13 @@ test("pushEnvelopes emits a schema-valid report with structured ops (no remote)"
 	const v = validateSyncTransportReport(report);
 	assert.equal(v.valid, true, `produced report must validate: ${JSON.stringify(v.errors)}`);
 	assert.ok(
-		report.proposedOps.some((op) => op.verb === "add" && op.paths.includes(".amber/sync")),
-		"the add op carries its confined paths",
+		report.proposedOps.some(
+			(op) =>
+				op.verb === "add" &&
+				op.paths.includes(".amber/sync/envelopes") &&
+				op.paths.includes(".amber/sync/transport/decisions"),
+		),
+		"the add op carries its confined paths (ADR-0020 adjudication 4)",
 	);
 	assert.ok(
 		report.proposedOps.some((op) => op.verb === "commit" && op.message.startsWith("amber sync:")),

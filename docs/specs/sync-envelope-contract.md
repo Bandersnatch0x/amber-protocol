@@ -13,11 +13,14 @@
 > hand-rolled structural validation is forbidden. Semantic refusals are
 > preserved append-only in `.amber/sync/conflicts.jsonl` and are never marked
 > applied; structurally invalid envelopes fail explicitly WITHOUT a conflict
-> entry. Transport is preparation/report-only (decision D1): Amber proposes
+> entry. Transport is report-only by default (decision D1): Amber proposes
 > git operations as structured, schema-governed operations
 > (`schemas/sync-transport-report.schema.json`, F040 / ADR-0020 D5) for a
-> human or external executor to replay and never runs `git add`, `git
-> commit`, or `git push`.
+> human or external executor to replay. ADR-0020 Stage A (F041) adds ONE
+> governed execution surface — `amber sync session push --execute --yes`
+> runs the local `git add` + `git commit` behind identity, policy,
+> single-use approval, and path-and-state confinement gates; `git push` is
+> never executed.
 
 **Date:** 2026-08-25
 **Plan:** `docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md`
@@ -261,17 +264,46 @@ into `errors`. Returns `{ applied, conflicts, errors }`. Because the
 snapshots are taken once before the pass, markings made during a pass take
 effect for the next pass.
 
-## Transport preparation contract — decision D1 (传输准备契约)
+## Transport contract — decision D1 + ADR-0020 Stage A (传输契约)
 
-Transport is preparation/report-only. The session never executes `git add`,
-`git commit`, or `git push`, and there is no `--execute` escape hatch; the
-only git invocation on this surface is the read-only `git remote` listing
-used to compute `remoteConfigured`. Envelopes are still *carried* by git
+The default transport surface is preparation/report-only: `pushEnvelopes`
+never executes `git add`, `git commit`, or `git push`, and the only git
+invocation on that surface is the read-only `git remote` listing used to
+compute `remoteConfigured`. Envelopes are still *carried* by git
 (ADR-0019 D1): the `.amber/sync/envelopes/` directory is committed to the
 shared Team Hub repository and exchanged via git remote — by a human
-replaying the proposed operations. Reintroducing live transport requires its
-own accepted ADR defining policy, approval, isolation, ledger, and recovery
-semantics, plus a governed Action.
+replaying the proposed operations, or by the governed Stage A surface below.
+
+ADR-0020 Stage A (F041) authorizes exactly one governed execution surface:
+`amber sync session push --execute --yes` (core: `executeTransport` in
+`scripts/lib/core/sync-transport.js`). Gate order, each governed refusal
+recorded in the hash-chained transport ledger
+(`.amber/sync/transport/ledger.jsonl`):
+
+1. **Report.** Build the F040 report; no envelopes → typed `no-change`
+   outcome (exit 0, nothing executed).
+2. **Conflict downgrade.** Pending conflicts downgrade to preparation-only
+   (adjudication 2) — a typed exit-0 outcome, not an error.
+3. **Identity.** Non-TTY without `--yes` fails closed
+   (`AMBER_E_SYNC_TRANSPORT_APPROVAL_REQUIRED`); a TTY invocation without
+   `--yes` gets the F019-shaped `approvalRequired` envelope.
+4. **Policy.** `rules.json` is required (missing/invalid refuses); the derived
+   add/commit shell lines are evaluated deny-wins
+   (`AMBER_E_SYNC_TRANSPORT_POLICY_REFUSED`). `git push` is never evaluated.
+5. **Approval.** One `amber sync session approve --reviewer <name>` record
+   authorizes exactly one execution (`AMBER_E_SYNC_TRANSPORT_NOT_APPROVED`).
+6. **Path-and-state confinement.** A pre-staged index refuses
+   (`AMBER_E_SYNC_TRANSPORT_DIRTY_TREE` — `git commit` commits the whole
+   index, so the empty-index check is load-bearing), and every staged path
+   must realpath inside the repository (symlinked sync paths refuse).
+7. **Execution.** Write the decision record
+   (`.amber/sync/transport/decisions/<batchId>.json`), `git add` exactly
+   `.amber/sync/envelopes` + `.amber/sync/transport/decisions` (never the
+   conflict/applied ledgers, never the transport ledger), commit with the
+   derived message, record the sha (`AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED`
+   with captured stderr on failure); an already-committed batch is a typed
+   `nothing-to-commit` outcome, never a duplicate empty commit. `git push`
+   is never executed, evaluated, or proposed by the executing path.
 
 `pushEnvelopes(cwd)` produces the preparation report — a published,
 schema-governed, ADR-0012-versioned contract
@@ -290,7 +322,7 @@ while text mode renders shell lines derived one-way from the structured ops.
 | `envelopeIds` | the `envelopeId` values that are strings |
 | `envelopePaths` | `.amber/sync/envelopes/<id>.json` per envelope, sorted |
 | `affectedPaths` | every file under `.amber/sync/`, repository-relative POSIX, sorted |
-| `proposedOps` | **structured operations** (never shell strings): `[]` when there are no envelopes; otherwise `{verb: "add", paths: [".amber/sync"]}`, `{verb: "commit", message: "amber sync: N envelope(s)"}`, plus `{verb: "push"}` only when a remote is configured — closed verb set (add/commit/push), confined paths carried as an explicit array |
+| `proposedOps` | **structured operations** (never shell strings): `[]` when there are no envelopes; otherwise `{verb: "add", paths: [".amber/sync/envelopes", ".amber/sync/transport/decisions"]}` (ADR-0020 adjudication 4 — exactly what Stage A execution stages), `{verb: "commit", message: "amber sync: N envelope(s)"}`, plus `{verb: "push"}` only when a remote is configured — closed verb set (add/commit/push), confined paths carried as an explicit array |
 | `remoteConfigured` | whether `git remote` lists at least one remote |
 | `conflictCount` | records currently in `conflicts.jsonl` |
 | `refusedCount` | distinct envelope ids in `refused.jsonl` |
@@ -325,9 +357,12 @@ persisted conflicts and surface through the summary, not as session errors.
    both already-applied and already-refused envelopes.
 6. **Invalid is not a conflict.** Schema or path failures are explicit
    errors with no conflict-ledger entry.
-7. **Zero git mutations.** Preparation proposes structured operations
-   (schema-governed, closed verb set — never shell strings); only the
-   read-only `git remote` query runs.
+7. **Zero git mutations on the preparation surface.** Preparation proposes
+   structured operations (schema-governed, closed verb set — never shell
+   strings); only the read-only `git remote` query runs. The sole mutating
+   surface is the ADR-0020 Stage A execution (identity, policy, single-use
+   approval, path-and-state confinement, ledger) — and it never runs
+   `git push`.
 8. **Envelope boundary.** One envelope wraps exactly one registered
    artifact type at its canonical path; source, secrets, agents, tools, and
    arbitrary files are refused.
@@ -344,6 +379,9 @@ persisted conflicts and surface through the summary, not as session errors.
   `normalizeRemoteUrl`, `resolveRepositoryId`)
 - Ledgers, apply, replay: `scripts/lib/core/sync-conflicts.js`
 - Pull/push/session and the preparation report: `scripts/lib/core/sync-session.js`
+- Governed transport execution (ADR-0020 Stage A), transport approval and
+  ledger: `scripts/lib/core/sync-transport.js` (`executeTransport`,
+  `approveTransport`, `transportLedgerStatus`)
 - CLI wiring: `scripts/lib/sync-commands.js`
 - On-disk state: `.amber/sync/envelopes/` (envelope store),
   `.amber/sync/conflicts.jsonl`, `.amber/sync/applied.jsonl`,

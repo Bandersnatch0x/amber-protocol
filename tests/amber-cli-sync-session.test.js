@@ -86,7 +86,14 @@ test("sync session run prepares transport without git writes", () => {
 	const prep = out.summary.preparation;
 	assert.ok(prep, "transport preparation report present");
 	assert.equal(prep.mode, "prepare");
-	assert.ok(prep.proposedOps.some((op) => op.verb === "add" && op.paths.includes(".amber/sync")));
+	assert.ok(
+		prep.proposedOps.some(
+			(op) =>
+				op.verb === "add" &&
+				op.paths.includes(".amber/sync/envelopes") &&
+				op.paths.includes(".amber/sync/transport/decisions"),
+		),
+	);
 	assert.ok(
 		prep.proposedOps.some((op) => op.verb === "commit" && op.message.startsWith("amber sync:")),
 	);
@@ -114,7 +121,10 @@ test("sync session push reports preparation and performs no git writes", () => {
 	assert.equal(r.status, 0, r.stderr);
 	const outer = JSON.parse(r.stdout);
 	assert.match(outer.text, /preparation/i, "report names transport preparation");
-	assert.ok(outer.text.includes("git add .amber/sync"), "report renders the add op's shell line");
+	assert.ok(
+		outer.text.includes("git add .amber/sync/envelopes .amber/sync/transport/decisions"),
+		"report renders the add op's shell line",
+	);
 	assert.ok(outer.text.includes("git commit"), "report renders the commit op's shell line");
 	assert.ok(/not executed|never executed|no git commands were executed/i.test(outer.text));
 
@@ -172,8 +182,118 @@ test("sync session pull records a refused envelope in the conflict ledger", () =
 	assert.equal(conflicts[0].resolution, "pending");
 });
 
+test("sync session approve records a single-use approval in the transport ledger", () => {
+	const dir = mkTarget("approve");
+	const r = runCli(
+		["sync", "session", "approve", "--reviewer", "alice", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(r.status, 0, r.stderr);
+	const outer = JSON.parse(r.stdout);
+	assert.match(outer.text, /approvalKey/i, "output names the approval key");
+
+	const lp = path.join(dir, ".amber", "sync", "transport", "ledger.jsonl");
+	assert.ok(fs.existsSync(lp), "transport ledger created");
+	const records = fs
+		.readFileSync(lp, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	assert.equal(records.length, 1);
+	assert.equal(records[0].kind, "approved");
+	assert.equal(records[0].reviewer, "alice");
+	assert.equal(records[0].executesAnything, false);
+});
+
+test("sync session approve without --reviewer fails and writes nothing", () => {
+	const dir = mkTarget("approve-missing");
+	const r = runCli(["sync", "session", "approve", "--target", dir, "--json"], dir);
+	assert.equal(r.status, 1);
+	assert.ok(
+		!fs.existsSync(path.join(dir, ".amber", "sync", "transport", "ledger.jsonl")),
+		"no ledger record on refusal",
+	);
+});
+
+test("sync session ledger verifies the transport ledger chain read-only", () => {
+	const dir = mkTarget("ledger");
+	const a = runCli(
+		["sync", "session", "approve", "--reviewer", "alice", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(a.status, 0, a.stderr);
+	const r = runCli(["sync", "session", "ledger", "--target", dir, "--json"], dir);
+	assert.equal(r.status, 0, r.stderr);
+	const outer = JSON.parse(r.stdout);
+	assert.match(outer.text, /intact/i);
+	const report = outer.report || JSON.parse(outer.text);
+	assert.equal(report.intact, true);
+	assert.equal(report.records, 1);
+});
+
 test("sync session with unknown subcommand errors", () => {
 	const dir = mkTarget("unknown");
 	const r = runCli(["sync", "session", "bogus", "--target", dir, "--json"], dir);
 	assert.equal(r.status, 1);
+});
+
+test("sync session push --execute --yes performs the governed local commit", () => {
+	const dir = mkTarget("push-execute");
+	git(dir, ["commit", "--allow-empty", "-m", "baseline"]);
+	const p = packPageEnvelope(dir);
+	assert.equal(p.status, 0, p.stderr);
+	fs.mkdirSync(path.join(dir, ".amber", "governance"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "governance", "rules.json"),
+		JSON.stringify({
+			schemaVersion: 1,
+			defaultAction: "deny",
+			rules: [
+				{ id: "allow-sync-add", action: "allow", match: "prefix", pattern: "git add .amber/sync/" },
+				{
+					id: "allow-sync-commit",
+					action: "allow",
+					match: "prefix",
+					pattern: 'git commit -m "amber sync:',
+				},
+			],
+		}),
+	);
+	const a = runCli(
+		["sync", "session", "approve", "--reviewer", "alice", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(a.status, 0, a.stderr);
+
+	const headBefore = head(dir);
+	const r = runCli(
+		["sync", "session", "push", "--execute", "--yes", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(r.status, 0, r.stderr);
+	const outer = JSON.parse(r.stdout);
+	assert.match(outer.text, /commit/i);
+	const newHead = head(dir);
+	assert.notEqual(newHead, headBefore, "a governed commit was created");
+	assert.equal(git(dir, ["log", "-1", "--pretty=%s"]), "amber sync: 1 envelope(s)");
+	const committed = git(dir, ["show", "--name-only", "--pretty=format:", "HEAD"])
+		.split(/\r?\n/)
+		.filter(Boolean);
+	assert.ok(committed.some((f) => f.startsWith(".amber/sync/envelopes/")));
+	assert.ok(committed.some((f) => f.startsWith(".amber/sync/transport/decisions/")));
+	assert.ok(!committed.some((f) => f.endsWith("ledger.jsonl")));
+	assert.ok(outer.transport && outer.transport.commitSha === newHead);
+});
+
+test("sync session push --execute without --yes fails closed (non-TTY identity gate)", () => {
+	const dir = mkTarget("push-execute-noyes");
+	git(dir, ["commit", "--allow-empty", "-m", "baseline"]);
+	const p = packPageEnvelope(dir);
+	assert.equal(p.status, 0, p.stderr);
+	const headBefore = head(dir);
+	const r = runCli(["sync", "session", "push", "--execute", "--target", dir, "--json"], dir);
+	assert.equal(r.status, 1);
+	const outer = JSON.parse(r.stdout);
+	assert.match(outer.errors.join("\n"), /AMBER_E_SYNC_TRANSPORT_APPROVAL_REQUIRED/);
+	assert.equal(head(dir), headBefore, "no commit without --yes");
 });

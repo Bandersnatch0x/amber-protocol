@@ -189,3 +189,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F040-Publish-the-sync-transport-report-as-a-structured-schema-governed-contract.md`
 - Review status: ready
 - Feature: F040 status → accepted in feature_list.json
+
+## 2026-08-25 docs/plans/F041-ADR-0020-Stage-A-governed-local-commit.md
+
+- Plan: `docs/plans/F041-ADR-0020-Stage-A-governed-local-commit.md`
+- Review status: ready
+- Feature: F041 status → accepted in feature_list.json

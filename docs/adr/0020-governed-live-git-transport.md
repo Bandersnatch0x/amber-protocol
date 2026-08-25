@@ -265,8 +265,25 @@ Each records the decision and its binding consequence.
    `proposedOps` (verb + confined paths / derived message, never shell strings) and self-validates
    fail-closed; `amber sync session push --json` surfaces the schema-valid report object.
    Note: adjudication 4's narrowed `git add` path (`.amber/sync/envelopes/` + decision record) is a
-   Stage A implementation change — the 1.0.0 contract still proposes `git add .amber/sync`, and the
-   narrowing lands with Stage A (F041) as a schema-evidenced shape change.
+   Stage A implementation change — **narrowed as shipped in F041 (2026-08-25)**: the 1.0.0 contract's
+   add op now proposes exactly `[".amber/sync/envelopes", ".amber/sync/transport/decisions"]`, the
+   same pathspec set Stage A execution stages.
+
+**Stage A shipped (F041, 2026-08-25).** `amber sync session push --execute --yes` now performs the
+governed local commit (`scripts/lib/core/sync-transport.js`): the report → conflict-downgrade →
+identity (non-TTY without `--yes` fails closed; TTY without `--yes` gets the F019-shaped
+`approvalRequired` envelope) → policy (`rules.json` required, deny-wins over the derived add/commit
+lines) → single-use approval (`amber sync session approve --reviewer <name>`, loop-ledger shape,
+`latestUnconsumedApproval`) → path-and-state confinement (pre-staged index refuses — `git commit`
+commits the whole index; every staged path must realpath inside the repository) → execution gates,
+with every attempt appended to the hash-chained transport ledger
+(`.amber/sync/transport/ledger.jsonl`, never itself staged). Execution stages exactly
+`.amber/sync/envelopes` + `.amber/sync/transport/decisions` (decision records at
+`.amber/sync/transport/decisions/<batchId>.json`), commits with the derived message, records the
+sha, and maps nothing-to-commit to a typed idempotent outcome. `git push` is never executed,
+evaluated, or proposed by the executing path — Stage B remains unimplemented and requires its own
+accepted decision. The default `push` (no `--execute`) stays the byte-compatible report-only
+preparation.
 
 ## Related
 

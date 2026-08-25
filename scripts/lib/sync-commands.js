@@ -6,15 +6,11 @@
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget } = require("./command-helpers");
-
-// Display-only derivation (F040): structured report ops render as the shell
-// line a human would type. One-way — the renderer never parses strings back
-// into operations (the injection hazard ADR-0020 Option 3 removes).
-function proposedOpText(op) {
-	if (op.verb === "add") return `git add ${op.paths.join(" ")}`;
-	if (op.verb === "commit") return `git commit -m "${op.message}"`;
-	return "git push";
-}
+// Display-only rendering of structured report ops. The derivation itself is
+// owned by core/sync-transport (F041) so the executing path (policy lines) and
+// this display path can never disagree; it stays one-way — nothing ever parses
+// a shell string back into an operation.
+const { proposedOpText } = require("./core/sync-transport");
 
 const envelopeDispatch = defineCommand({
 	command: "sync envelope",
@@ -111,7 +107,7 @@ const envelopeDispatch = defineCommand({
 
 const sessionDispatch = defineCommand({
 	command: "sync session",
-	actions: ["run", "push", "pull", "list", "replay", "conflicts"],
+	actions: ["run", "push", "pull", "list", "replay", "conflicts", "approve", "ledger"],
 	handlers: {
 		replay: (args) => {
 			const { replayEnvelopes } = require("./core/sync-conflicts");
@@ -127,6 +123,37 @@ const sessionDispatch = defineCommand({
 			const { listConflicts } = require("./core/sync-conflicts");
 			return { text: JSON.stringify(listConflicts(resolveTarget(args)), null, 2) };
 		},
+		// ADR-0020 Stage A (F041): a single-use approval on the hash-chained
+		// transport ledger authorizes exactly one governed execution.
+		approve: (args) => {
+			const { approveTransport } = require("./core/sync-transport");
+			const result = approveTransport({
+				target: resolveTarget(args),
+				reviewer: args.reviewer,
+			});
+			return {
+				text: result.text || "",
+				errors: result.errors,
+				warnings: [],
+				exitCode: result.errors.length > 0 ? 1 : 0,
+			};
+		},
+		ledger: (args) => {
+			const { transportLedgerStatus } = require("./core/sync-transport");
+			const status = transportLedgerStatus(resolveTarget(args));
+			const lines = [
+				`Transport ledger: ${status.found ? "present" : "absent (no approvals yet)"}; chain ${status.intact ? "intact" : "BROKEN"}.`,
+				`Records: ${status.records}; unconsumed approvals: ${status.unconsumedApprovals}.`,
+			];
+			if (status.tampered) lines.push(status.tampered);
+			return {
+				text: lines.join("\n"),
+				report: status,
+				errors: status.tampered ? [status.tampered] : [],
+				warnings: [],
+				exitCode: status.tampered ? 1 : 0,
+			};
+		},
 		run: (args) => {
 			// F035 D1: run pulls (admit + apply, refusals recorded as conflicts)
 			// and then prepares the transport report; no git command runs.
@@ -140,6 +167,45 @@ const sessionDispatch = defineCommand({
 			};
 		},
 		push: (args) => {
+			// ADR-0020 Stage A (F041): --execute runs the governed local commit
+			// (add envelopes + decision record, commit; never push) behind the
+			// full gate set in core/sync-transport. Default stays the F040
+			// report-only preparation — byte-identical, the permanent fallback.
+			if (args.execute) {
+				const { executeTransport } = require("./core/sync-transport");
+				const result = executeTransport({
+					target: resolveTarget(args),
+					yes: Boolean(args.yes),
+				});
+				const lines = [];
+				if (result.outcome === "no-change") {
+					lines.push("Governed transport: no envelopes to commit; nothing executed.");
+				} else if (result.outcome === "preparation-only") {
+					lines.push(
+						`Governed transport downgraded to preparation-only: ${result.conflictCount} pending conflict(s) must be resolved first. No git commands were executed.`,
+					);
+				} else if (result.outcome === "nothing-to-commit") {
+					lines.push(
+						"Governed transport: nothing to commit — this batch is already committed. No new commit was created.",
+					);
+				} else if (result.outcome === "executed") {
+					lines.push(
+						`Governed transport executed: commit ${result.commitSha} (${result.decisionRecord}).`,
+					);
+					lines.push(
+						"Staged .amber/sync/envelopes + transport decision record; git push was NOT executed.",
+					);
+				} else if (result.approvalRequired) {
+					lines.push(result.hint);
+				}
+				return {
+					text: lines.join("\n"),
+					transport: result,
+					errors: result.errors,
+					warnings: [],
+					exitCode: result.errors.length > 0 || result.approvalRequired ? 1 : 0,
+				};
+			}
 			// F035 D1: push is transport PREPARATION only. The report is the
 			// published structured contract (F040): proposedOps carry verb +
 			// confined paths, Amber never runs them, and the schema-valid

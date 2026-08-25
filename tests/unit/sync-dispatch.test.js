@@ -62,7 +62,7 @@ test("nested unknown session action: exit 1, guidance on the printResult path", 
 	assert.equal(envelope.exitCode, 1);
 	assert.equal(envelope.bypassPrint, false);
 	assert.deepEqual(envelope.result.errors, [
-		"sync session requires run, push, pull, list, replay, or conflicts.",
+		"sync session requires run, push, pull, list, replay, conflicts, approve, or ledger.",
 	]);
 	assert.deepEqual(envelope.result.warnings, []);
 	fs.rmSync(root, { recursive: true, force: true });

@@ -214,7 +214,10 @@ test("TH5: full Team Hub flow — profile, sync session, conflict, projection", 
 	const push = runCli(["sync", "session", "push", "--target", dir, "--json"], dir);
 	assert.equal(push.status, 0, push.stderr);
 	const pushText = JSON.parse(push.stdout).text;
-	assert.ok(pushText.includes("git add .amber/sync"), "push proposes git add as a string");
+	assert.ok(
+		pushText.includes("git add .amber/sync/envelopes .amber/sync/transport/decisions"),
+		"push proposes the confined git add as a string",
+	);
 	assert.ok(pushText.includes("git commit"), "push proposes git commit as a string");
 	assert.equal(
 		execSync("git rev-parse HEAD", { cwd: dir, encoding: "utf8" }).trim(),

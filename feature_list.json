@@ -1460,6 +1460,31 @@
 				"scripts/lib/sync-commands.js"
 			],
 			"updated": "2026-08-25"
+		},
+		{
+			"id": "F041",
+			"priority": 1,
+			"area": "sync",
+			"title": "ADR-0020 Stage A: governed local commit for sync transport",
+			"user_visible_behavior": "amber sync session push --execute --yes runs git add .amber/sync/envelopes + git commit behind the full gate set (identity, policy, single-use approval, path-and-state confinement, transport ledger); push stays report-only",
+			"status": "accepted",
+			"verification": ["node --test tests/unit/sync-transport.test.js", "npm test"],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "2660/2660 pass (34 new F041 tests: catalog family, approveTransport single-use, gate order incl. conflict downgrade/identity/policy/approval/confinement, execution with decision record + commit sha, adversarial symlink/dirty-tree suite)",
+					"date": "2026-08-25",
+					"notes": ""
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/sync-transport.js",
+				"scripts/lib/core/sync-session.js",
+				"scripts/lib/sync-commands.js",
+				"scripts/lib/core/error-catalog.js"
+			],
+			"updated": "2026-08-25"
 		}
 	]
 }

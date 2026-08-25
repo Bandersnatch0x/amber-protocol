@@ -5,13 +5,12 @@
  *
  * A sync session is the ordered pipeline: pull remote envelopes (admit and
  * apply them through the shared admission pipeline) → prepare the transport
- * report. Transport is preparation/report-only (F035 decision D1): the
+ * report. This module stays preparation/report-only (F035 decision D1): the
  * session lists the envelopes, the affected `.amber/sync/**` paths, and the
  * proposed git operations as structured, schema-governed operations
- * (F040, ADR-0020 adjudication 5) for a human or external executor to
- * replay, but it NEVER runs `git add`, `git commit`, or `git push` —
- * reintroducing live transport requires its own accepted ADR and governed
- * Action. Envelopes are carried
+ * (F040, ADR-0020 adjudication 5). The governed execution of those ops —
+ * ADR-0020 Stage A (F041), local add + commit behind the full gate set —
+ * lives in core/sync-transport.js, never here. Envelopes are carried
  * by git (ADR-0019 D1): the .amber/sync/envelopes/ directory is committed to
  * the shared Team Hub repository and exchanged via git remote.
  *
@@ -89,7 +88,8 @@ function hasRemote(cwd) {
 
 /**
  * List every file under .amber/sync/ as a repository-relative POSIX path.
- * These are the paths the proposed `git add .amber/sync` would stage.
+ * These are the paths a transport commit could sweep (the add op itself is
+ * pathspec-confined to envelopes + decision records — ADR-0020 adjudication 4).
  * @param {string} cwd - Repository root.
  * @returns {Array<string>} Sorted repository-relative POSIX paths.
  */
@@ -102,14 +102,14 @@ function listSyncTreePaths(cwd) {
 
 /**
  * Prepare the transport report for .amber/sync/ envelopes WITHOUT executing
- * any git command (F035 D1: transport is preparation/report-only, and there
- * is no --execute escape hatch). The report is the published, schema-governed
- * contract (F040, ADR-0020 adjudication 5): proposedOps are structured
- * operations (verb + confined paths / derived commit message), never shell
- * strings, and the report self-validates against
- * schemas/sync-transport-report.schema.json — a violation fails closed into
- * `errors`. `git push` is only proposed when a remote is configured (read-only
- * query).
+ * any git command (F035 D1: this path is preparation/report-only — the
+ * governed --execute path lives in core/sync-transport.js behind the ADR-0020
+ * Stage A gate set). The report is the published, schema-governed contract
+ * (F040, ADR-0020 adjudication 5): proposedOps are structured operations
+ * (verb + confined paths / derived commit message), never shell strings, and
+ * the report self-validates against schemas/sync-transport-report.schema.json
+ * — a violation fails closed into `errors`. `git push` is only proposed when
+ * a remote is configured (read-only query).
  * @param {string} cwd - Repository root.
  * @returns {{
  *   schemaVersion: string,
@@ -132,7 +132,7 @@ function pushEnvelopes(cwd) {
 		.map((envelope) => envelope.envelopeId)
 		.filter((id) => typeof id === "string");
 	// Envelopes always live in the canonical sync home (post-rename state
-	// kind), matching the `git add .amber/sync` proposal below.
+	// kind), matching the pathspec-confined add op proposed below.
 	const envelopeDir = toPortablePath(
 		path.relative(path.resolve(cwd), statePathForCreate(cwd, "sync", "envelopes")),
 	);
@@ -143,7 +143,14 @@ function pushEnvelopes(cwd) {
 		envelopePaths.length === 0
 			? []
 			: [
-					{ verb: "add", paths: [".amber/sync"] },
+					// Adjudication 4 (ADR-0020): the add op proposes exactly what
+					// Stage A execution stages — envelopes plus transport decision
+					// records. Never the pull-side conflict/applied ledgers, never
+					// the transport ledger itself.
+					{
+						verb: "add",
+						paths: [".amber/sync/envelopes", ".amber/sync/transport/decisions"],
+					},
 					{ verb: "commit", message: `amber sync: ${envelopePaths.length} envelope(s)` },
 					...(remoteConfigured ? [{ verb: "push" }] : []),
 				];

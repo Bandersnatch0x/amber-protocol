@@ -109,8 +109,13 @@ test("pushEnvelopes prepares transport and performs zero git mutations", () => {
 		"affected paths list the .amber/sync/** files a transport commit would include",
 	);
 	assert.ok(
-		result.proposedOps.some((op) => op.verb === "add" && op.paths.includes(".amber/sync")),
-		"the add op carries its confined staging paths",
+		result.proposedOps.some(
+			(op) =>
+				op.verb === "add" &&
+				op.paths.includes(".amber/sync/envelopes") &&
+				op.paths.includes(".amber/sync/transport/decisions"),
+		),
+		"the add op carries its confined staging paths (ADR-0020 adjudication 4)",
 	);
 	assert.ok(
 		result.proposedOps.some((op) => op.verb === "commit" && op.message.startsWith("amber sync:")),
@@ -307,7 +312,14 @@ test("runSyncSession prepares transport with zero git mutations", () => {
 	assert.equal(prep.mode, "prepare");
 	assert.equal(prep.envelopeCount, 1);
 	assert.deepEqual(prep.envelopeIds, [envelope.envelopeId]);
-	assert.ok(prep.proposedOps.some((op) => op.verb === "add" && op.paths.includes(".amber/sync")));
+	assert.ok(
+		prep.proposedOps.some(
+			(op) =>
+				op.verb === "add" &&
+				op.paths.includes(".amber/sync/envelopes") &&
+				op.paths.includes(".amber/sync/transport/decisions"),
+		),
+	);
 	assert.ok(
 		prep.affectedPaths.some((p) => p === `.amber/sync/envelopes/${envelope.envelopeId}.json`),
 		"affected paths list the envelope files",

@@ -448,6 +448,52 @@ const CATALOG = {
 		layer: "Context",
 		related: ["AMBER_E_MEMORY_SOURCE_STALE"],
 	},
+	// --- ADR-0020 Stage A governed local transport (F041) ---
+	AMBER_E_SYNC_TRANSPORT_APPROVAL_REQUIRED: {
+		title: "Sync transport execution requires explicit approval",
+		cause:
+			"sync session push --execute was invoked without --yes, or non-interactively without an explicit confirmation.",
+		remedy:
+			"Review the report (default push), approve with `amber sync session approve --reviewer <name>`, then re-run with --execute --yes.",
+		layer: "Governance",
+		related: ["AMBER_E_SYNC_TRANSPORT_NOT_APPROVED", "AMBER_E_LOOP_NOT_APPROVED"],
+	},
+	AMBER_E_SYNC_TRANSPORT_NOT_APPROVED: {
+		title: "Sync transport has no unconsumed approval",
+		cause:
+			"executeTransport found no unconsumed approval record in .amber/sync/transport/ledger.jsonl (each approval authorizes exactly one execution).",
+		remedy:
+			"Record a fresh approval: amber sync session approve --reviewer <name> --target <repo>.",
+		layer: "Governance",
+		related: ["AMBER_E_SYNC_TRANSPORT_APPROVAL_REQUIRED", "AMBER_E_POLICY_DENY"],
+	},
+	AMBER_E_SYNC_TRANSPORT_POLICY_REFUSED: {
+		title: "Sync transport blocked by governance policy",
+		cause:
+			"A derived git operation (add/commit) was denied by .amber/governance/rules.json (deny rule, or no allow rule under defaultAction=deny, or missing/invalid rules).",
+		remedy:
+			"Allow the sync transport git operations in .amber/governance/rules.json, then re-approve and retry.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_DENY", "AMBER_E_SYNC_TRANSPORT_NOT_APPROVED"],
+	},
+	AMBER_E_SYNC_TRANSPORT_DIRTY_TREE: {
+		title: "Sync transport refused: index or path confinement failed",
+		cause:
+			"The git index already holds staged paths, or a sync path resolves (via symlink) outside the target repository — git commit commits the whole index, so pre-staged content would be swept into the transport commit.",
+		remedy:
+			"Commit or reset the staged changes first (git restore --staged .), remove symlinks under .amber/sync, then re-run the transport.",
+		layer: "Governance",
+		related: ["AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED"],
+	},
+	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
+		title: "Sync transport git command failed",
+		cause:
+			"A governed git add/commit exited non-zero (hook refusal, identity missing, or git error); stderr is captured in the transport ledger.",
+		remedy:
+			"Inspect the recorded stderr in .amber/sync/transport/ledger.jsonl, fix the underlying cause, then re-approve and retry.",
+		layer: "Verification",
+		related: ["AMBER_E_SYNC_TRANSPORT_DIRTY_TREE", "AMBER_E_LEDGER_TAMPERED"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing
