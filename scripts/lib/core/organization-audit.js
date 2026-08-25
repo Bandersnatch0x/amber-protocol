@@ -17,7 +17,7 @@
 
 const crypto = require("node:crypto");
 const { sha256 } = require("./context-hash");
-const { readJSONL, appendJSONL } = require("./jsonl");
+const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const fs = require("node:fs");
 const { statePathForCreate } = require("../state-dir-resolver");
 
@@ -36,31 +36,9 @@ function ensureDir(cwd) {
 	fs.mkdirSync(statePathForCreate(cwd, "audit"), { recursive: true });
 }
 
-/**
- * Wrap a ledger read failure as a typed corruption error (F035-S5).
- * readJSONL only throws for corrupt lines or unreadable files — an absent
- * ledger always reads as [] — so every throw here is corruption, never a
- * legitimate empty state (decision D4).
- * @param {Error} err - The raw read failure.
- * @returns {Error} Error carrying .amberCode = AMBER_E_ORG_CORRUPT.
- */
-function corruptLedgerError(err) {
-	const detail = err && err.message ? err.message : String(err);
-	const error = new Error(
-		`organization audit ledger corrupt or unreadable — failing closed: ${detail} [${ORG_CORRUPT_CODE}]`,
-	);
-	error.amberCode = ORG_CORRUPT_CODE;
-	error.cause = err;
-	return error;
-}
-
 function readAllEvents(cwd) {
 	// fail closed: any corrupt line is an error, never a silent gap
-	try {
-		return readJSONL(auditLedgerPath(cwd), { onCorrupt: "throw" });
-	} catch (err) {
-		throw corruptLedgerError(err);
-	}
+	return readLedgerFailClosed(auditLedgerPath(cwd), ORG_CORRUPT_CODE, "organization audit");
 }
 
 /**

@@ -27,7 +27,7 @@
 
 const crypto = require("node:crypto");
 const { sha256 } = require("./context-hash");
-const { readJSONL, appendJSONL, foldJSONL } = require("./jsonl");
+const { appendJSONL, readLedgerFailClosed, foldLedgerFailClosed } = require("./jsonl");
 const fs = require("node:fs");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
 
@@ -77,24 +77,6 @@ function pageSourceHash(page) {
 }
 
 /**
- * Wrap a ledger read failure as a typed corruption error (F035-S5).
- * readJSONL only throws for corrupt lines or unreadable files — an absent
- * ledger always reads as [] — so every throw here is corruption, never a
- * legitimate empty state (decision D4).
- * @param {Error} err - The raw read failure.
- * @returns {Error} Error carrying .amberCode = AMBER_E_KB_CORRUPT.
- */
-function corruptLedgerError(err) {
-	const detail = err && err.message ? err.message : String(err);
-	const error = new Error(
-		`knowledge ledger corrupt or unreadable — failing closed: ${detail} [${KB_CORRUPT_CODE}]`,
-	);
-	error.amberCode = KB_CORRUPT_CODE;
-	error.cause = err;
-	return error;
-}
-
-/**
  * Read the ledger and fold it to the CURRENT state of every record.
  *
  * Append-only semantics: each line is an immutable record state. Later lines
@@ -106,11 +88,7 @@ function corruptLedgerError(err) {
  * @throws {Error} Typed AMBER_E_KB_CORRUPT error when the ledger is corrupt or unreadable.
  */
 function readAllRecords(cwd) {
-	try {
-		return foldJSONL(recordsPath(cwd), "recordId", { onCorrupt: "throw" });
-	} catch (err) {
-		throw corruptLedgerError(err);
-	}
+	return foldLedgerFailClosed(recordsPath(cwd), "recordId", KB_CORRUPT_CODE, "knowledge");
 }
 
 /**
@@ -122,13 +100,9 @@ function readAllRecords(cwd) {
  * @throws {Error} Typed AMBER_E_KB_CORRUPT error when the ledger is corrupt or unreadable.
  */
 function readRecordLineage(cwd, recordId) {
-	try {
-		return readJSONL(recordsPath(cwd), { onCorrupt: "throw" }).filter(
-			(r) => r.recordId === recordId,
-		);
-	} catch (err) {
-		throw corruptLedgerError(err);
-	}
+	return readLedgerFailClosed(recordsPath(cwd), KB_CORRUPT_CODE, "knowledge").filter(
+		(r) => r.recordId === recordId,
+	);
 }
 
 function appendRecordState(cwd, state) {

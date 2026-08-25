@@ -45,9 +45,33 @@ function requireSessionId(args, action) {
 	return null;
 }
 
+/**
+ * Typed read-failure envelope for corrupt or unreadable ledgers (F035-S5,
+ * decision D4): explicit code, empty payload, non-empty diagnostics, exit
+ * code 1 — never an empty success.
+ * @param {object} args - Parsed CLI arguments.
+ * @param {Error} err - Typed error thrown by the read surface.
+ * @param {string} fallbackCode - Code to report when err carries no .amberCode.
+ * @returns {{result: object, exitCode: number, bypassPrint: boolean}}
+ */
+function readFailure(args, err, fallbackCode) {
+	return {
+		result: {
+			target: args.target,
+			text: "",
+			errors: [err.message || String(err)],
+			warnings: [],
+			code: err.amberCode || fallbackCode,
+		},
+		exitCode: 1,
+		bypassPrint: !args.json,
+	};
+}
+
 module.exports = {
 	resolveTarget,
 	unknownAction,
 	shapeResult,
 	requireSessionId,
+	readFailure,
 };

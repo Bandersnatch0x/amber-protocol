@@ -2,29 +2,7 @@
 
 // Extracted from command-dispatcher.js (architecture review #1).
 
-const { resolveTarget, unknownAction } = require("./command-helpers");
-
-/**
- * Typed read failure for corrupt or unreadable ledgers (F035-S5, decision
- * D4): explicit code, empty payload, non-empty diagnostics, exit code 1 —
- * never empty success.
- * @param {object} args - Parsed CLI arguments.
- * @param {Error} err - Typed error thrown by the read surface.
- * @returns {{result: object, exitCode: number, bypassPrint: boolean}}
- */
-function readFailure(args, err) {
-	return {
-		result: {
-			target: args.target,
-			text: "",
-			errors: [err.message || String(err)],
-			warnings: [],
-			code: err.amberCode || "AMBER_E_KB_CORRUPT",
-		},
-		exitCode: 1,
-		bypassPrint: !args.json,
-	};
-}
+const { resolveTarget, unknownAction, readFailure } = require("./command-helpers");
 
 function knowledgeDispatch(args) {
 	const targetRoot = resolveTarget(args);
@@ -58,7 +36,7 @@ function knowledgeDispatch(args) {
 		try {
 			records = listRecords(targetRoot);
 		} catch (err) {
-			return readFailure(args, err);
+			return readFailure(args, err, "AMBER_E_KB_CORRUPT");
 		}
 		return {
 			result: {
@@ -76,7 +54,7 @@ function knowledgeDispatch(args) {
 		try {
 			status = checkFreshness(targetRoot, args.id);
 		} catch (err) {
-			return readFailure(args, err);
+			return readFailure(args, err, "AMBER_E_KB_CORRUPT");
 		}
 		const exitCode = status.status === "stale" ? 1 : 0;
 		return {

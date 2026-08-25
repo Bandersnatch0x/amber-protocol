@@ -91,9 +91,70 @@ function foldJSONL(filePath, key, opts) {
 	return [...byKey.values()];
 }
 
+/**
+ * Build the typed fail-closed error for a ledger read failure (F035-S5,
+ * decision D4): readJSONL only throws for corrupt lines or unreadable files —
+ * an absent ledger always reads as [] — so every throw here is corruption,
+ * never a legitimate empty state.
+ * @param {Error} err - The raw read failure.
+ * @param {string} code - Typed error code, e.g. "AMBER_E_KB_CORRUPT".
+ * @param {string} label - Ledger family label, e.g. "knowledge".
+ * @returns {Error} Error carrying .amberCode = code and .cause = err.
+ */
+function ledgerCorruptError(err, code, label) {
+	const detail = err && err.message ? err.message : String(err);
+	const error = new Error(
+		`${label} ledger corrupt or unreadable — failing closed: ${detail} [${code}]`,
+	);
+	error.amberCode = code;
+	error.cause = err;
+	return error;
+}
+
+/**
+ * Read a ledger with the fail-closed contract (F035-S5, decision D4): an
+ * ABSENT ledger is a legitimate empty state ([]), while a corrupt or
+ * unreadable ledger throws a typed error — never an empty success and never
+ * a partial projection.
+ * @param {string} filePath - Absolute path.
+ * @param {string} code - Typed error code, e.g. "AMBER_E_KB_CORRUPT".
+ * @param {string} label - Ledger family label, e.g. "knowledge".
+ * @returns {Array<object>}
+ * @throws {Error} Typed error with .amberCode = code when the ledger is corrupt or unreadable.
+ */
+function readLedgerFailClosed(filePath, code, label) {
+	try {
+		return readJSONL(filePath, { onCorrupt: "throw" });
+	} catch (err) {
+		throw ledgerCorruptError(err, code, label);
+	}
+}
+
+/**
+ * Fold a ledger to the current state per key with the fail-closed contract
+ * (F035-S5, decision D4): foldJSONL semantics (last line wins per key,
+ * first-seen order preserved), but a corrupt or unreadable ledger throws a
+ * typed error instead of folding a partial read.
+ * @param {string} filePath - Absolute path.
+ * @param {string} key - Identity field, e.g. "recordId".
+ * @param {string} code - Typed error code, e.g. "AMBER_E_KB_CORRUPT".
+ * @param {string} label - Ledger family label, e.g. "knowledge".
+ * @returns {Array<object>}
+ * @throws {Error} Typed error with .amberCode = code when the ledger is corrupt or unreadable.
+ */
+function foldLedgerFailClosed(filePath, key, code, label) {
+	try {
+		return foldJSONL(filePath, key, { onCorrupt: "throw" });
+	} catch (err) {
+		throw ledgerCorruptError(err, code, label);
+	}
+}
+
 module.exports = {
 	readJSONL,
 	appendJSONL,
 	writeJSONL,
 	foldJSONL,
+	readLedgerFailClosed,
+	foldLedgerFailClosed,
 };

@@ -94,7 +94,7 @@ test("every hooks error code is registered", () => {
 	}
 });
 
-test("every production Context error code is registered", () => {
+test("every production error code literal is registered", () => {
 	const libRoot = path.join(__dirname, "..", "..", "scripts", "lib");
 	const discovered = new Set();
 	const visit = (dir) => {
@@ -102,7 +102,12 @@ test("every production Context error code is registered", () => {
 			const full = path.join(dir, entry.name);
 			if (entry.isDirectory()) visit(full);
 			else if (entry.name.endsWith(".js") && entry.name !== "error-catalog.js") {
-				for (const match of fs.readFileSync(full, "utf8").matchAll(/AMBER_E_CONTEXT_[A-Z_]+/g)) {
+				const source = fs.readFileSync(full, "utf8");
+				for (const match of source.matchAll(/AMBER_E_[A-Z_]+/g)) {
+					// `AMBER_E_CONTEXT_*`-style family wildcards in help text are
+					// prose, not code literals — never registerable codes.
+					const after = source[match.index + match[0].length];
+					if (after === "*" || match[0].endsWith("_")) continue;
 					discovered.add(match[0]);
 				}
 			}
