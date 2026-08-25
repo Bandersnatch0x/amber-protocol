@@ -67,6 +67,11 @@ test("bundleSources auto-bundles the latest ledger under the legacy .harness sta
 	]);
 	const now = new Date();
 	fs.utimesSync(path.join(latest, "ledger.jsonl"), now, now);
+	// Backdate the older ledger explicitly: on coarse-mtime filesystems both
+	// writes can share one mtimeMs, and readdir order then decides which
+	// ledger findLatestLedger keeps — a CI-only flake (seen in run 32879175845).
+	const older = path.join(target, ".harness", "sessions", "s-older", "ledger.jsonl");
+	fs.utimesSync(older, new Date(now.getTime() - 10_000), new Date(now.getTime() - 10_000));
 
 	const bundled = bundleSources(target, []);
 	assert.deepEqual(bundled.errors, []);
