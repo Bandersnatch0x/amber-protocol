@@ -60,7 +60,7 @@
 	},
 	"lint-staged": {
 		"*.{js,mjs,cjs,json,md,yml,yaml}": "prettier --write",
-		"apps/web/**/*.{ts,tsx,css,html}": "prettier --config apps/web/.prettierrc.json --ignore-path apps/web/.prettierignore --write"
+		"apps/web/**": "prettier --config apps/web/.prettierrc.json --ignore-path apps/web/.prettierignore --write"
 	},
 	"c8": {
 		"exclude": [

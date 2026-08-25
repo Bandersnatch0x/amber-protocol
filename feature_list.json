@@ -1643,7 +1643,7 @@
 			"id": "F048",
 			"priority": 48,
 			"area": "tooling",
-			"title": "Add prettier pre-commit hook via husky + lint-staged (issue #207 follow-up)",
+			"title": "Close the apps/web pre-commit prettier coverage gap in lint-staged (issue #207 follow-up)",
 			"user_visible_behavior": "Commits in this repo automatically prettier-format staged files before the commit is created, so formatting drift can never reach CI",
 			"status": "accepted",
 			"verification": ["bash .scratch/f048-verify.sh"],
@@ -1656,7 +1656,7 @@
 				}
 			],
 			"notes": [],
-			"paths": ["package.json", ".husky/pre-commit"],
+			"paths": ["package.json"],
 			"updated": "2026-08-26"
 		}
 	]
