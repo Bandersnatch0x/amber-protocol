@@ -68,12 +68,41 @@ test.describe('Operator Console visual contracts', () => {
     const palette = await page
       .locator('main .card')
       .first()
-      .evaluate((element) => ({
-        page: getComputedStyle(document.querySelector('.min-h-screen')!).backgroundColor,
-        card: getComputedStyle(element).backgroundColor,
-      }));
-    expect(palette.page).toBe('rgb(15, 23, 42)');
-    expect(palette.card).toBe('rgb(30, 41, 59)');
+      .evaluate((element) => {
+        // Tailwind v4 emits palette colors as oklch() (v3 used rgb() hex
+        // literals), so comparing computed-style strings would pin the test
+        // to one major's color-function spelling. Normalize through a 1x1
+        // canvas instead: the contract is the rendered sRGB channels.
+        function renderedChannels(color: string): number[] {
+          const canvas = document.createElement('canvas');
+          canvas.width = 1;
+          canvas.height = 1;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return [-1, -1, -1];
+          ctx.fillStyle = color;
+          ctx.fillRect(0, 0, 1, 1);
+          return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
+        }
+        return {
+          page: renderedChannels(
+            getComputedStyle(document.querySelector('.min-h-screen')!).backgroundColor,
+          ),
+          card: renderedChannels(getComputedStyle(element).backgroundColor),
+        };
+      });
+    // Tailwind v4 emits palette colors as oklch() and regenerated the slate
+    // ramp, so the anchors are the v4-rendered sRGB channels (v3's hexes
+    // #0f172a/#1e293b land a couple of channels off). oklch -> sRGB round-
+    // trips can also wobble one rounding step, hence the ±1 tolerance.
+    const expected: Record<'page' | 'card', number[]> = {
+      page: [15, 23, 43],
+      card: [29, 41, 61],
+    };
+    for (const key of ['page', 'card'] as const) {
+      palette[key].forEach((channel, index) => {
+        expect(Math.abs(channel - expected[key][index])).toBeLessThanOrEqual(1);
+      });
+    }
 
     await capture(page, 'operator-console-desktop-dark.png');
   });
