@@ -1564,6 +1564,26 @@
 			"notes": [],
 			"paths": ["apps/web/package.json", "apps/web/package-lock.json"],
 			"updated": "2026-08-25"
+		},
+		{
+			"id": "F045",
+			"priority": 45,
+			"area": "web",
+			"title": "Upgrade apps/web React 19 (issue #207 batch 3)",
+			"user_visible_behavior": "apps/web runs react/react-dom 19.2.x with @types/react 19; UI, tests, and build behave identically on the React 19 runtime",
+			"status": "accepted",
+			"verification": ["cd apps/web && npx tsc --noEmit", "bash .scratch/f045-verify.sh"],
+			"evidence": [
+				{
+					"command": "bash .scratch/f045-verify.sh",
+					"result": "pass",
+					"date": "2026-08-25",
+					"notes": "apps/web React 19.2.8 + types 19.2.x: tsc clean, lint 0 errors, vitest 571/571, build clean; root suite 2672/0; --legacy-peer-deps no longer required"
+				}
+			],
+			"notes": [],
+			"paths": ["apps/web/package.json", "apps/web/src/main.tsx"],
+			"updated": "2026-08-25"
 		}
 	]
 }
