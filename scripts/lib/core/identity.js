@@ -23,9 +23,9 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 
 const { statePath } = require("../state-dir-resolver");
+const { configGet } = require("./git-exec");
 
 const DEFAULT_TENANT_ID = "local";
 const DEFAULT_ORGANIZATION_ID = "personal";
@@ -49,22 +49,6 @@ function defaultIdentity() {
 }
 
 /**
- * Read a single effective git config key (local > global > system).
- * @param {string} cwd - Repository root.
- * @param {string} key - Config key, e.g. "user.name".
- * @returns {string} Trimmed value, or "" when unset.
- */
-function gitConfig(cwd, key) {
-	const res = spawnSync("git", ["config", key], {
-		cwd,
-		encoding: "utf8",
-		stdio: ["pipe", "pipe", "pipe"],
-	});
-	if (res.status !== 0) return "";
-	return (res.stdout || "").trim();
-}
-
-/**
  * Infer Person identity from git config.
  * @param {string} cwd - Repository root.
  * @returns {{personId: string|null, agentId: null}} Git-inferred person, or nulls.
@@ -78,8 +62,8 @@ function inferFromGit(cwd) {
 	if (!fs.existsSync(path.join(cwd, ".git"))) {
 		return { personId: null, agentId: null };
 	}
-	const name = gitConfig(cwd, "user.name");
-	const email = gitConfig(cwd, "user.email");
+	const name = configGet(cwd, "user.name");
+	const email = configGet(cwd, "user.email");
 	const personId = name && email ? `${name} <${email}>` : null;
 	return { personId, agentId: null };
 }
@@ -150,7 +134,7 @@ function resolveRepositoryId(cwd, file = null) {
 		return file.repositoryId;
 	}
 	if (fs.existsSync(path.join(cwd, ".git"))) {
-		const remote = gitConfig(cwd, "remote.origin.url");
+		const remote = configGet(cwd, "remote.origin.url");
 		if (remote) {
 			return normalizeRemoteUrl(remote);
 		}
@@ -223,7 +207,6 @@ module.exports = {
 	DEFAULT_REPOSITORY_GENERATION,
 	DEFAULT_REPOSITORY_ID,
 	defaultIdentity,
-	gitConfig,
 	inferFromGit,
 	loadIdentityFile,
 	normalizeRemoteUrl,

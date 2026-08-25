@@ -26,11 +26,11 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 
 const { replayEnvelopes, listConflicts, listRefusedEnvelopeIds } = require("./sync-conflicts");
 const { collectFilesBySuffix, toPortablePath } = require("./fs-utils");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
+const { gitExec } = require("./git-exec");
 
 /**
  * Create a sync session record.
@@ -72,22 +72,6 @@ function listEnvelopes(cwd) {
 		.filter(Boolean);
 }
 
-function git(cwd, args) {
-	try {
-		const res = spawnSync("git", args, { cwd, encoding: "utf8" });
-		if (res.status === 0) {
-			return { exitCode: 0, stdout: (res.stdout || "").trim() };
-		}
-		return {
-			exitCode: res.status === null ? -1 : res.status,
-			stdout: "",
-			stderr: (res.stderr || "").toString(),
-		};
-	} catch (err) {
-		return { exitCode: 1, stdout: "", stderr: err.message };
-	}
-}
-
 /**
  * Check whether a git remote is configured. Read-only query: the Sync Runtime
  * never mutates git state (F035 D1), it only reports whether `git push` would
@@ -96,8 +80,8 @@ function git(cwd, args) {
  * @returns {boolean}
  */
 function hasRemote(cwd) {
-	const res = git(cwd, ["remote"]);
-	return res.exitCode === 0 && res.stdout.length > 0;
+	const res = gitExec(cwd, ["remote"]);
+	return res.ok && res.stdout.length > 0;
 }
 
 /**

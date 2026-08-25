@@ -1364,6 +1364,23 @@
 			],
 			"notes": [],
 			"updated": "2026-08-25"
+		},
+		{
+			"id": "F037",
+			"priority": 35,
+			"area": "core",
+			"title": "Unify the git adapter seam",
+			"user_visible_behavior": "git-exec.js becomes the single git invocation seam; sync-session, identity, and worktree-manager migrate onto it and their private wrappers are deleted",
+			"status": "in_progress",
+			"verification": [
+				"rtk node --test tests/unit/git-exec-seam.test.js (gitExec/isRepository/configGet shapes: success, non-zero exit, spawn failure)",
+				"rtk node --test tests/unit/git-seam-guard.test.js (no direct git spawn in scripts/lib outside git-exec.js)",
+				"rtk node --test on all consumer suites: git-state, git-workflow-detector, completion-gate, ledger-seal, artifact-drift, sync-*, identity-*, worktree-manager",
+				"rtk node --test full suite matches the 58-known-failure baseline"
+			],
+			"evidence": [],
+			"notes": [],
+			"updated": "2026-08-25"
 		}
 	]
 }

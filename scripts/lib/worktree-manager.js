@@ -1,35 +1,35 @@
 "use strict";
 
-const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { resolveStateDirForRead, resolveStateDirForCreate } = require("./state-dir-resolver");
+const { gitExec } = require("./core/git-exec");
 
 function createWorktree(projectRoot, sessionId) {
 	const worktreePath = path.join(resolveStateDirForCreate(projectRoot), "worktrees", sessionId);
 
-	const currentBranchResult = spawnSync("git", ["branch", "--show-current"], {
-		cwd: projectRoot,
-		encoding: "utf8",
-	});
+	const currentBranchResult = gitExec(projectRoot, ["branch", "--show-current"]);
 
-	if (currentBranchResult.status !== 0) {
+	if (!currentBranchResult.ok) {
 		return {
 			success: false,
 			error: "Not a git repository or no current branch",
 		};
 	}
 
-	const baseBranch = currentBranchResult.stdout.trim();
+	const baseBranch = currentBranchResult.stdout;
 	const worktreeBranch = `harness-session-${sessionId}`;
 
-	const addResult = spawnSync(
-		"git",
-		["worktree", "add", "-b", worktreeBranch, worktreePath, baseBranch],
-		{ cwd: projectRoot, encoding: "utf8" },
-	);
+	const addResult = gitExec(projectRoot, [
+		"worktree",
+		"add",
+		"-b",
+		worktreeBranch,
+		worktreePath,
+		baseBranch,
+	]);
 
-	if (addResult.status !== 0) {
+	if (!addResult.ok) {
 		return {
 			success: false,
 			error: addResult.stderr || "Failed to create worktree",
@@ -54,12 +54,9 @@ function removeWorktree(projectRoot, sessionId) {
 		};
 	}
 
-	const removeResult = spawnSync("git", ["worktree", "remove", worktreePath, "--force"], {
-		cwd: projectRoot,
-		encoding: "utf8",
-	});
+	const removeResult = gitExec(projectRoot, ["worktree", "remove", worktreePath, "--force"]);
 
-	if (removeResult.status !== 0) {
+	if (!removeResult.ok) {
 		return {
 			success: false,
 			error: removeResult.stderr || "Failed to remove worktree",
@@ -74,12 +71,9 @@ function removeWorktree(projectRoot, sessionId) {
 }
 
 function listWorktrees(projectRoot) {
-	const listResult = spawnSync("git", ["worktree", "list", "--porcelain"], {
-		cwd: projectRoot,
-		encoding: "utf8",
-	});
+	const listResult = gitExec(projectRoot, ["worktree", "list", "--porcelain"]);
 
-	if (listResult.status !== 0) {
+	if (!listResult.ok) {
 		return [];
 	}
 
