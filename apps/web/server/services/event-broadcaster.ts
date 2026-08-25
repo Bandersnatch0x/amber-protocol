@@ -77,7 +77,8 @@ class EventBroadcaster {
 
       res.write(data, (err) => {
         clearTimeout(timeout);
-        err ? reject(err) : resolve();
+        if (err) reject(err);
+        else resolve();
       });
     });
   }

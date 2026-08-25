@@ -2,7 +2,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import {
   Gate,
-  GateStatus,
   GateFilters,
   GateDecision,
   REVIEWER_PATTERN,

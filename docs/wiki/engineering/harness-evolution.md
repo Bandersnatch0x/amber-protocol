@@ -201,3 +201,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F042-Ajv-adapter-generalization.md`
 - Review status: ready
 - Feature: F042 status → accepted in feature_list.json
+
+## 2026-08-25 docs/plans/F043-apps-web-eslint-10-flat-config-issue-207-batch-1.md
+
+- Plan: `docs/plans/F043-apps-web-eslint-10-flat-config-issue-207-batch-1.md`
+- Review status: ready
+- Feature: F043 status → accepted in feature_list.json

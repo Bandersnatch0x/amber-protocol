@@ -1511,6 +1511,35 @@
 				"scripts/lib/session-manifest.js"
 			],
 			"updated": "2026-08-25"
+		},
+		{
+			"id": "F043",
+			"priority": 41,
+			"area": "tooling",
+			"title": "Upgrade apps/web eslint to 10 with a flat config (issue #207 batch 1)",
+			"user_visible_behavior": "apps/web lints its TS/React toolchain with eslint 10 (version parity with root) via a flat config; the lint gate runs in CI",
+			"status": "accepted",
+			"verification": [
+				"cd apps/web && npm run lint",
+				"cd apps/web && npm test",
+				"cd apps/web && npm run build"
+			],
+			"evidence": [
+				{
+					"command": "bash .scratch/f043-verify.sh",
+					"result": "pass: eslint 0 errors/36 warnings, vitest 571/571, build clean",
+					"date": "2026-08-25",
+					"notes": "eslint 8.57->10.9.1; flat config; CI lint step wired; zod-validation-error override ^4.0.2"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"apps/web/package.json",
+				"apps/web/eslint.config.mjs",
+				"apps/web/package-lock.json",
+				".github/workflows/ci.yml"
+			],
+			"updated": "2026-08-25"
 		}
 	]
 }

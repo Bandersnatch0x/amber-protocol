@@ -137,7 +137,7 @@ export function LiveActivityCard({
             </p>
           )}
           <div className="mt-3 space-y-3" data-testid="live-activity-feed">
-            {timelineEntries.map((entry, index) => {
+            {timelineEntries.map((entry, _index) => {
               if (entry.kind === 'gap') return null;
               const key =
                 'id' in entry.event && entry.event.id
