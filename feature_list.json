@@ -1412,6 +1412,29 @@
 			],
 			"notes": [],
 			"updated": "2026-08-25"
+		},
+		{
+			"id": "F039",
+			"priority": 37,
+			"area": "core",
+			"title": "Unify the command envelope behind one dispatcher composition",
+			"user_visible_behavior": "defineCommand (createSubcommandDispatcher + shapeResult composed) owns routing, aliasing, envelopes, and exit-code derivation; the 11 command modules migrate to handler tables and the four competing envelope conventions collapse into one",
+			"status": "accepted",
+			"verification": [
+				"rtk node --test on defineCommand unit tests and every migrated module's suite after each batch",
+				"rtk node --test full suite matches the 58-known-failure baseline after each batch"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 128412ms)",
+					"date": "2026-08-25",
+					"notes": "session 0893942b-50d3-47a0-9caa-70997724eb09 stage verify",
+					"sessionId": "0893942b-50d3-47a0-9caa-70997724eb09"
+				}
+			],
+			"notes": [],
+			"updated": "2026-08-25"
 		}
 	]
 }
