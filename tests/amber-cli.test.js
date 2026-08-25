@@ -1446,6 +1446,88 @@ test("typed mutations require confirmation before writing", () => {
 	assert.equal(fs.existsSync(output), false);
 });
 
+test("typed-mutation approval block fails loudly in text mode (session verify --execute)", () => {
+	const target = tempDir("typed-mutation-text-verify");
+
+	// The typed seam intercepts `session verify --execute` (a write) before the
+	// handler runs, so the session id is never resolved — no state is touched.
+	// Text mode must fail loudly with the --yes guidance instead of rendering
+	// the approval envelope like a success ("Target: n/a / Errors: 0").
+	const blocked = runHarness([
+		"session",
+		"verify",
+		"--session",
+		"00000000-text-mode-probe",
+		"--command",
+		"npm test",
+		"--result",
+		"probe",
+		"--execute",
+		"--target",
+		target,
+	]);
+	assert.notEqual(blocked.status, 0, `expected non-zero exit, got:\n${blocked.stdout}`);
+	assert.match(
+		blocked.stdout,
+		/--yes|--confirm/,
+		"text mode must tell the user how to approve the typed mutation",
+	);
+	assert.doesNotMatch(
+		blocked.stdout,
+		/Errors: 0/,
+		"a blocked mutation must not render as error-free",
+	);
+
+	// The JSON envelope is the machine-readable contract and stays unchanged.
+	const envelope = runHarness([
+		"session",
+		"verify",
+		"--session",
+		"00000000-text-mode-probe",
+		"--command",
+		"npm test",
+		"--result",
+		"probe",
+		"--execute",
+		"--target",
+		target,
+		"--json",
+	]);
+	assert.notEqual(envelope.status, 0);
+	const payload = JSON.parse(envelope.stdout);
+	assert.equal(payload.approvalRequired, true);
+	assert.equal(payload.executed, false);
+	assert.match(payload.hint, /--yes or --confirm/);
+});
+
+test("session verify --execute surfaces verify-policy denials after approval", () => {
+	const target = tempDir("verify-policy-denial");
+	installTargetRoutes(target);
+	const sessionId = startConfirmedSession(target, "policy denial probe", "feature-standard");
+
+	// `rtk node --test` is not on the default verify allow-list, so the
+	// evidence runner must deny it and the CLI must report that denial
+	// (non-zero exit + explicit denied-by-policy message), not return quietly.
+	const denied = runHarness([
+		"session",
+		"verify",
+		"--session",
+		sessionId,
+		"--command",
+		"rtk node --test",
+		"--execute",
+		"--yes",
+		"--target",
+		target,
+	]);
+	assert.notEqual(denied.status, 0, `expected non-zero exit, got:\n${denied.stdout}`);
+	assert.match(
+		denied.stdout,
+		/denied by policy/,
+		"a verify-policy denial must be reported to the user",
+	);
+});
+
 test("next command combines lifecycle guidance with top governance action", () => {
 	const target = tempDir("next-governance-action");
 	assert.equal(runHarness(["init", "--target", target]).status, 0);

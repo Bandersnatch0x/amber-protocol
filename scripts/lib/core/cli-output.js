@@ -645,6 +645,24 @@ function renderGeneric(result) {
 	}
 }
 
+// Typed-mutation seam (F019): a write intercepted without --yes/--confirm is
+// returned as an approval-required envelope (executed: false, hint, exit 1).
+// JSON consumers read the envelope fields directly, but the generic renderer
+// would print "Target: n/a / Errors: 0" — indistinguishable from success.
+// Text mode fails loudly with the seam's own hint instead, mirroring the coded
+// error the memory verbs print for the same approval situation.
+function renderApprovalRequired(result) {
+	console.log(`Target: ${result.target || "n/a"}`);
+	if (result.actionTypeId) {
+		console.log(`Action type: ${result.actionTypeId}`);
+	}
+	console.log("Executed: false");
+	console.log("Errors: 1");
+	console.log(
+		`  - ${result.hint || "This typed mutation requires explicit approval (--yes or --confirm)."}`,
+	);
+}
+
 // Shape → renderer registry (architecture review #2). A new command output
 // shape is a new entry: matcher and renderer live together (locality), and
 // printResult stays a registry lookup instead of a growing if-cascade.
@@ -676,6 +694,11 @@ const SHAPE_RENDERERS = Object.freeze([
 		id: "adoption",
 		match: (r) => typeof r.kind === "string" && r.kind.startsWith("adoption-"),
 		render: renderAdoptionKind,
+	},
+	{
+		id: "approval-required",
+		match: (r) => r.approvalRequired === true,
+		render: renderApprovalRequired,
 	},
 	{ id: "generic", match: () => true, render: renderGeneric },
 ]);
