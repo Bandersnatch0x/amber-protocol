@@ -165,3 +165,15 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F036-Adopt-the-state-dir-path-seam-and-fix-the-legacy-harness-sessions-bug.md`
 - Review status: ready
 - Feature: F036 status → accepted in feature_list.json
+
+## 2026-08-25 docs/plans/F037-Unify-the-git-adapter-seam.md
+
+- Plan: `docs/plans/F037-Unify-the-git-adapter-seam.md`
+- Review status: ready
+- Feature: F037 status → accepted in feature_list.json
+
+## 2026-08-25 docs/plans/F038-Dedupe-the-fail-closed-ledger-ritual-and-guard-all-error-code-literals.md
+
+- Plan: `docs/plans/F038-Dedupe-the-fail-closed-ledger-ritual-and-guard-all-error-code-literals.md`
+- Review status: ready
+- Feature: F038 status → accepted in feature_list.json

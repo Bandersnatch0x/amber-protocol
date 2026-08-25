@@ -1,8 +1,8 @@
 # Plan: Dedupe the fail-closed ledger ritual and guard all error-code literals
 
 Feature: F038
-Status: implementation-ready
-User Confirmation: pending
+Status: accepted
+User Confirmation: confirmed
 
 ## Goal
 
@@ -22,8 +22,8 @@ Entries are bare, comma- or space-separated knowledge-surface paths only — doc
 
 ## Vertical Slices
 
-- [ ] Slice 1: red-first — generalize the error-catalog production scan to all AMBER_E_* literals (expect green; it proves the backfill held); add failing unit tests for readLedgerFailClosed/foldLedgerFailClosed shapes and the shared readFailure envelope; implement in jsonl.js and command-helpers.js (green).
-- [ ] Slice 2: migrate knowledge-base.js (readAllRecords, readRecordLineage), organization-audit.js (readAuditEvents), knowledge-commands.js, org-audit-commands.js onto the shared helpers; delete the four private copies; all existing fail-closed regression tests stay green.
+- [x] Slice 1: red-first — generalize the error-catalog production scan to all AMBER_E_* literals (expect green; it proves the backfill held); add failing unit tests for readLedgerFailClosed/foldLedgerFailClosed shapes and the shared readFailure envelope; implement in jsonl.js and command-helpers.js (green).
+- [x] Slice 2: migrate knowledge-base.js (readAllRecords, readRecordLineage), organization-audit.js (readAuditEvents), knowledge-commands.js, org-audit-commands.js onto the shared helpers; delete the four private copies; all existing fail-closed regression tests stay green.
 
 ## Resume Checkpoint
 
@@ -43,12 +43,16 @@ Entries are bare, comma- or space-separated knowledge-surface paths only — doc
 
 ## Verification
 
-- rtk node --test on jsonl, knowledge-base, organization-audit, knowledge-commands, org-audit-commands, and error-catalog suites
-- rtk node --test full suite matches the 58-known-failure baseline
+- Red-first: `rtk node --test tests/unit/ledger-fail-closed.test.js` → 12/12 fail pre-implementation → 12/12 pass after.
+- Catalog guard: generalizing the scan to all `AMBER_E_*` literals went red on exactly one token — the `AMBER_E_CONTEXT_*` wildcard family mention in command-registry.js help prose (not a code); the scan skips wildcard-family references and now guards all 58 real codes green.
+- Affected suites (ledger-fail-closed, knowledge-base, organization-audit, error-catalog, jsonl, amber-cli-knowledge, amber-cli-organization-audit): 104/104 pass.
+- Full suite: `rtk node --test` → 2605 tests / 2547 pass / 58 fail = baseline + 12 new tests, zero new failures.
+- Session evidence: `amber session verify --execute` ran `npm test` for real (exit 0, 150277ms), recorded against feature F038.
+- Confirmation greps: `corruptLedgerError` has zero occurrences in scripts/; exactly one `readFailure` definition (command-helpers.js).
 
 ## Evidence Schema
 
-- Command:
-- Result:
-- Date:
-- Notes:
+- Command: `rtk node --test` (full suite)
+- Result: 2605 tests / 2547 pass / 58 fail (baseline-identical + 12 new tests)
+- Date: 2026-08-25
+- Notes: implementation via subagent; coordinator-verified diffs, 104/104 affected suites, full suite. Commits 81b68d5 (implementation) + governance closeout. Session 3f42529a-5b47-4efc-888e-5c5f47f04238.

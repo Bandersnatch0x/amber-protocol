@@ -1371,14 +1371,45 @@
 			"area": "core",
 			"title": "Unify the git adapter seam",
 			"user_visible_behavior": "git-exec.js becomes the single git invocation seam; sync-session, identity, and worktree-manager migrate onto it and their private wrappers are deleted",
-			"status": "in_progress",
+			"status": "accepted",
 			"verification": [
 				"rtk node --test tests/unit/git-exec-seam.test.js (gitExec/isRepository/configGet shapes: success, non-zero exit, spawn failure)",
 				"rtk node --test tests/unit/git-seam-guard.test.js (no direct git spawn in scripts/lib outside git-exec.js)",
 				"rtk node --test on all consumer suites: git-state, git-workflow-detector, completion-gate, ledger-seal, artifact-drift, sync-*, identity-*, worktree-manager",
 				"rtk node --test full suite matches the 58-known-failure baseline"
 			],
-			"evidence": [],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 135369ms)",
+					"date": "2026-08-25",
+					"notes": "session a4b43c97-57ea-402f-806d-7d5f60c7bcc3 stage verify",
+					"sessionId": "a4b43c97-57ea-402f-806d-7d5f60c7bcc3"
+				}
+			],
+			"notes": [],
+			"updated": "2026-08-25"
+		},
+		{
+			"id": "F038",
+			"priority": 36,
+			"area": "core",
+			"title": "Dedupe the fail-closed ledger ritual and guard all error-code literals",
+			"user_visible_behavior": "jsonl.js owns the typed fail-closed ledger read (readLedgerFailClosed/foldLedgerFailClosed) and command-helpers.js owns the readFailure envelope; the four verbatim copies are deleted, and a guard test asserts every AMBER_E_* literal in scripts/lib resolves in the error catalog",
+			"status": "accepted",
+			"verification": [
+				"rtk node --test on jsonl, knowledge-base, organization-audit, knowledge-commands, org-audit-commands, and error-catalog suites",
+				"rtk node --test full suite matches the 58-known-failure baseline"
+			],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "passed (exit 0, 150277ms)",
+					"date": "2026-08-25",
+					"notes": "session 3f42529a-5b47-4efc-888e-5c5f47f04238 stage verify",
+					"sessionId": "3f42529a-5b47-4efc-888e-5c5f47f04238"
+				}
+			],
 			"notes": [],
 			"updated": "2026-08-25"
 		}
