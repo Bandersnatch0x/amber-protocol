@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { readJson, resolveTarget, writeJsonPrettier } = require("./core/fs-utils");
 const { localIsoDate, splitCommaList } = require("./core/text-utils");
+const { defineCommand } = require("./subcommand-dispatcher");
 
 function getFeatureListPath(targetRoot) {
 	return path.join(targetRoot, "feature_list.json");
@@ -376,60 +377,52 @@ function listFeatureEvidence(target, options) {
 
 const FEATURE_ACTIONS = ["add", "list", "remove", "verify", "evidence", "paths"];
 
+// Routing + unknown-action guidance live in the shared dispatcher; handlers
+// map each action onto its structured fn. The structured fns stay exported for
+// lifecycle/session callers that need machine-readable results.
+const dispatch = defineCommand({
+	command: "feature",
+	actions: FEATURE_ACTIONS,
+	handlers: {
+		add: (args) =>
+			addFeature(args.target, {
+				id: args.id || args._?.[1],
+				title: args.title || args._?.[2],
+				priority: args.priority,
+				area: args.area,
+				paths: args.paths,
+				behavior: args.behavior,
+				verify: args.verify,
+			}),
+		list: (args) => listFeatures(args.target),
+		remove: (args) => removeFeature(args.target, { id: args.id || args._?.[1] }),
+		verify: (args) =>
+			recordFeatureEvidence(args.target, {
+				feature: args.feature || args._?.[1],
+				command: args.command,
+				result: args.result,
+				notes: args.notes,
+				sessionId: args.sessionId,
+			}),
+		evidence: (args) => listFeatureEvidence(args.target, { feature: args.feature || args._?.[1] }),
+		paths: (args) =>
+			recordFeaturePaths(args.target, {
+				feature: args.feature || args._?.[1],
+				paths: args.paths,
+			}),
+	},
+});
+
 /**
  * Presentation entry for the feature command family.
- * Owns arg-shaping + text rendering; structured action fns stay exported for
- * lifecycle/session callers that need machine-readable results.
- * Auto-transition lives in recordFeatureEvidence, not here.
+ * Owns arg-shaping + text rendering on top of the dispatcher's structured
+ * results. Auto-transition lives in recordFeatureEvidence, not here.
  *
  * @returns {{ text: string, errors: string[], warnings: string[] }}
  */
 function runFeatureAction(action, target, options = {}) {
 	const opts = options || {};
-	let structured;
-
-	if (action === "add") {
-		structured = addFeature(target, {
-			id: opts.id || opts._?.[1],
-			title: opts.title || opts._?.[2],
-			priority: opts.priority,
-			area: opts.area,
-			paths: opts.paths,
-			behavior: opts.behavior,
-			verify: opts.verify,
-		});
-	} else if (action === "list") {
-		structured = listFeatures(target);
-	} else if (action === "remove") {
-		structured = removeFeature(target, {
-			id: opts.id || opts._?.[1],
-		});
-	} else if (action === "verify") {
-		structured = recordFeatureEvidence(target, {
-			feature: opts.feature || opts._?.[1],
-			command: opts.command,
-			result: opts.result,
-			notes: opts.notes,
-			sessionId: opts.sessionId,
-		});
-	} else if (action === "evidence") {
-		structured = listFeatureEvidence(target, {
-			feature: opts.feature || opts._?.[1],
-		});
-	} else if (action === "paths") {
-		structured = recordFeaturePaths(target, {
-			feature: opts.feature || opts._?.[1],
-			paths: opts.paths,
-		});
-	} else {
-		const listed = FEATURE_ACTIONS.slice(0, -1).join(", ");
-		const last = FEATURE_ACTIONS[FEATURE_ACTIONS.length - 1];
-		return {
-			text: "",
-			errors: [`feature requires ${listed}, or ${last}.`],
-			warnings: [],
-		};
-	}
+	const structured = dispatch(action, { ...opts, target }).result;
 
 	const errors = structured.errors || [];
 	const warnings = structured.warnings || [];

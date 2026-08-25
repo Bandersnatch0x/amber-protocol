@@ -219,3 +219,70 @@ describe("governanceDispatch", () => {
 		}
 	});
 });
+
+// F039 slice 4: byte-level pins for the defineCommand routing. The dispatcher
+// owns routing and the unknown-action guidance; governanceDispatch unwraps
+// its result at the boundary so the plain-body contract stays pinned above.
+describe("governanceDispatch defineCommand envelopes", () => {
+	it("unknown action body matches the legacy unknownGovernanceAction shape", () => {
+		const { governanceDispatch } = loadGovernanceCommands();
+		assert.deepStrictEqual(governanceDispatch("bogus", "some-target", {}), {
+			target: undefined,
+			errors: [
+				"governance requires docs, evidence, policy, audit, readiness, report, standards, or rules.",
+			],
+			warnings: [],
+		});
+	});
+
+	it("docs success body: target, created/skipped arrays, defaulted errors/warnings", () => {
+		const { governanceDispatch } = loadGovernanceCommands();
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gov-dispatch-docs-"));
+		try {
+			const result = governanceDispatch("docs", tmp, {});
+			assert.deepStrictEqual(result, {
+				target: tmp,
+				created: result.created,
+				skipped: result.skipped,
+				errors: [],
+				warnings: [],
+			});
+			assert.ok(result.created.length > 0, "docs scaffolding must create files");
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("rules check body: verdict fields with defaulted errors/warnings", () => {
+		const { governanceDispatch } = loadGovernanceCommands();
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gov-dispatch-rules-"));
+		try {
+			const result = governanceDispatch("rules", tmp, { action: "check", command: "rm -rf ." });
+			assert.strictEqual(result.target, tmp);
+			assert.strictEqual(result.command, "rm -rf .");
+			assert.strictEqual(result.allowed, false);
+			assert.match(result.text, /^DENY: /);
+			assert.deepStrictEqual(result.errors, []);
+			assert.deepStrictEqual(result.warnings, []);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+
+	it("readiness body keeps the core target and defaulted errors/warnings", () => {
+		const { governanceDispatch } = loadGovernanceCommands();
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gov-dispatch-readiness-"));
+		try {
+			const result = governanceDispatch("readiness", tmp, {});
+			assert.strictEqual(result.target, tmp);
+			// Findings surface as warnings (decision: warn on a bare target);
+			// the pin is the key presence, not the findings themselves.
+			assert.ok(Array.isArray(result.errors), "errors must default to an array");
+			assert.ok(Array.isArray(result.warnings), "warnings must default to an array");
+			assert.strictEqual(typeof result.text, "string");
+			assert.ok(result.decision);
+		} finally {
+			fs.rmSync(tmp, { recursive: true, force: true });
+		}
+	});
+});

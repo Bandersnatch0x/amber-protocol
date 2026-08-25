@@ -21,6 +21,7 @@ const {
 } = require("./core/governance-report");
 const { mapStandards } = require("./core/standards");
 const { DEFAULT_RULES, loadPolicyRules, evaluateGovernedPolicy } = require("./core/loop-policy");
+const { defineCommand } = require("./subcommand-dispatcher");
 
 const GOVERNANCE_ACTIONS = [
 	"docs",
@@ -65,16 +66,6 @@ function runGuarded(target, extra, fn) {
 			warnings: [],
 		};
 	}
-}
-
-function unknownGovernanceAction() {
-	const actions = GOVERNANCE_ACTIONS.slice();
-	const last = actions.pop();
-	return {
-		target: undefined,
-		errors: [`governance requires ${actions.join(", ")}, or ${last}.`],
-		warnings: [],
-	};
 }
 
 // --- Substantive action bodies (no requireTarget / try-catch; dispatch owns those) ---
@@ -349,68 +340,55 @@ function governanceRulesBody(action, target, options = {}) {
 }
 
 /**
- * Single governance-dispatch chokepoint. Owns the switch over all 8 actions,
- * the shared requireTarget guard, and the shared try/catch (runGuarded).
- *
- * Pure forwards (docs, policy, and the standards map path) are inlined as
- * branches. Substantive bodies are internal helpers called from branches.
+ * Single governance-dispatch chokepoint. The handler table maps each action
+ * onto its substantive body (or a pure forward); defineCommand owns routing,
+ * the unknown-action guidance, and the envelope. The plain-body contract is
+ * preserved at the boundary by unwrapping the dispatcher's result — the
+ * command-dispatcher and the governance test suites pin the body shape.
  *
  * @param {string} action
  * @param {string} target
  * @param {object} [options]
  */
 function governanceDispatch(action, target, options = {}) {
-	switch (action) {
-		case "docs":
+	const dispatch = defineCommand({
+		command: "governance",
+		actions: GOVERNANCE_ACTIONS,
+		handlers: {
 			// Pure forward of governanceDocs — success extras preserved.
-			return runGuarded(target, { created: [], skipped: [] }, () => {
-				const result = governanceDocs(target);
-				return {
-					target,
-					created: result.created,
-					skipped: result.skipped,
-					errors: [],
-					warnings: [],
-				};
-			});
-
-		case "evidence":
-			return runGuarded(target, () => exportGovernanceEvidenceBody(target, options));
-
-		case "policy":
+			docs: (a) =>
+				runGuarded(a.target, { created: [], skipped: [] }, () => {
+					const result = governanceDocs(a.target);
+					return {
+						target: a.target,
+						created: result.created,
+						skipped: result.skipped,
+						errors: [],
+						warnings: [],
+					};
+				}),
+			evidence: (a) => runGuarded(a.target, () => exportGovernanceEvidenceBody(a.target, a)),
 			// Pure forward of inspectPolicy.
-			return runGuarded(target, () => {
-				const result = inspectPolicy(target);
-				return {
-					target,
-					...result,
-				};
-			});
-
-		case "audit":
-			return runGuarded(target, () => auditGovernanceBody(target, options));
-
-		case "readiness":
-			return runGuarded(target, () => inspectGovernanceReadinessBody(target, options));
-
-		case "report":
-			return runGuarded(target, () => generateGovernanceReportBody(target, options));
-
-		case "standards":
+			policy: (a) =>
+				runGuarded(a.target, () => {
+					const result = inspectPolicy(a.target);
+					return {
+						target: a.target,
+						...result,
+					};
+				}),
+			audit: (a) => runGuarded(a.target, () => auditGovernanceBody(a.target, a)),
+			readiness: (a) => runGuarded(a.target, () => inspectGovernanceReadinessBody(a.target, a)),
+			report: (a) => runGuarded(a.target, () => generateGovernanceReportBody(a.target, a)),
 			// init sub-action stays a substantive helper; map path is the pure forward.
-			return runGuarded(target, () => {
-				if (options.action === "init") {
-					return standardsInitBody(target);
-				}
-				return mapStandardsBody(target, options);
-			});
-
-		case "rules":
-			return runGuarded(target, () => governanceRulesBody(options.action, target, options));
-
-		default:
-			return unknownGovernanceAction();
-	}
+			standards: (a) =>
+				runGuarded(a.target, () =>
+					a.action === "init" ? standardsInitBody(a.target) : mapStandardsBody(a.target, a),
+				),
+			rules: (a) => runGuarded(a.target, () => governanceRulesBody(a.action, a.target, a)),
+		},
+	});
+	return dispatch(action, { ...options, target }).result;
 }
 
 // Compatibility wrappers for tests that still import named entry points.

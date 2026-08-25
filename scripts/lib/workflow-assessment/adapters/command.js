@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { isMissingPath, resolveTarget } = require("../../core/fs-utils");
+const { defineCommand } = require("../../subcommand-dispatcher");
 const { assess, buildDraft, compare, findings } = require("..");
 const { renderJson, renderMarkdown } = require("./renderers");
 
@@ -82,7 +83,9 @@ function dispatchCompare(target, args) {
 	if (current.errors) {
 		return { target: target || ".", errors: current.errors, warnings: [] };
 	}
-	return { ...compare(baseline, current), errors: [] };
+	// Compare deltas are report-relative and never carried a target; the
+	// explicit undefined keeps the dispatcher's args.target prepend off the wire.
+	return { target: undefined, ...compare(baseline, current), errors: [] };
 }
 
 function dispatchPlan(target, args) {
@@ -120,17 +123,29 @@ function dispatchPlan(target, args) {
 	};
 }
 
-function workflowDispatch(action, target, args) {
-	if (action === "assess") return assessWorkflow(args);
-	if (action === "findings") return dispatchFindings(target, args);
-	if (action === "compare") return dispatchCompare(target, args);
-	if (action === "plan") return dispatchPlan(target, args);
-	const label = action == null || action === "" ? "(none)" : String(action);
-	return {
-		target: target || ".",
-		errors: [`Unknown workflow action: ${label}. Known: assess, findings, plan, compare.`],
-		warnings: [],
-	};
+function workflowDispatch(action, target, args = {}) {
+	// Handlers close over the caller's (target, args) pair — assessWorkflow
+	// reads args.target itself, and the per-action helpers take target
+	// directly — so the dispatcher owns only routing and the unknown body.
+	const dispatch = defineCommand({
+		command: "workflow",
+		actions: ["assess", "findings", "compare", "plan"],
+		handlers: {
+			assess: () => assessWorkflow(args),
+			findings: () => dispatchFindings(target, args),
+			compare: () => dispatchCompare(target, args),
+			plan: () => dispatchPlan(target, args),
+		},
+		unknown: () => {
+			const label = action == null || action === "" ? "(none)" : String(action);
+			return {
+				target: target || ".",
+				errors: [`Unknown workflow action: ${label}. Known: assess, findings, plan, compare.`],
+				warnings: [],
+			};
+		},
+	});
+	return dispatch(action, args).result;
 }
 
 module.exports = { workflowDispatch };

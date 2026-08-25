@@ -6,6 +6,7 @@
 const path = require("node:path");
 
 const { resolveTarget } = require("../../core/fs-utils");
+const { defineCommand } = require("../../subcommand-dispatcher");
 const {
 	createRequest,
 	ingestPayload,
@@ -26,25 +27,6 @@ const {
 	retentionReport,
 } = require("../index");
 const { ACTIONS, resolveContextAction } = require("../action-registry");
-
-function errResult(message) {
-	return {
-		result: { target: undefined, errors: [message], warnings: [] },
-		exitCode: 1,
-		bypassPrint: false,
-	};
-}
-
-function unknownAction(actual) {
-	return {
-		result: {
-			errors: [`unknown context action: ${actual}. Expected one of: ${ACTIONS.join(", ")}`],
-			warnings: [],
-		},
-		exitCode: 1,
-		bypassPrint: false,
-	};
-}
 
 function renderRequest(req, requestPath) {
 	const lines = [
@@ -135,9 +117,16 @@ function renderStats(stats) {
 	return lines.join("\n");
 }
 
-function handleRequest(args, targetRoot) {
+function requestBody(args, targetRoot) {
 	const pageId = args.page;
-	if (!pageId) return errResult("context request requires --page <id> (kebab-case).");
+	if (!pageId) {
+		return {
+			target: undefined,
+			errors: ["context request requires --page <id> (kebab-case)."],
+			warnings: [],
+			bypassPrint: false,
+		};
+	}
 	const rawSources =
 		args.sources ||
 		(args.source ? (Array.isArray(args.source) ? args.source : [args.source]) : undefined);
@@ -154,62 +143,56 @@ function handleRequest(args, targetRoot) {
 	});
 	if (created.errors.length > 0) {
 		return {
-			result: { target: args.target, errors: created.errors, warnings: [] },
-			exitCode: 1,
+			errors: created.errors,
+			warnings: [],
 			bypassPrint: false,
 		};
 	}
 	return {
-		result: {
-			target: args.target,
-			text: renderRequest(created.request, created.requestPath),
-			errors: [],
-			warnings: [],
-		},
-		exitCode: 0,
-		bypassPrint: !args.json,
+		text: renderRequest(created.request, created.requestPath),
+		errors: [],
+		warnings: [],
 	};
 }
 
-function handleIngest(args, targetRoot) {
+function ingestBody(args, targetRoot) {
 	const requestId = args.request || args.requestId;
 	const payloadPath = args.payload;
 	if (!payloadPath) {
-		return errResult(
-			"context ingest requires --payload <file.json> (the agent's distilled output).",
-		);
+		return {
+			target: undefined,
+			errors: ["context ingest requires --payload <file.json> (the agent's distilled output)."],
+			warnings: [],
+			bypassPrint: false,
+		};
 	}
 	const result = ingestPayload(targetRoot, { requestId, payloadPath });
 	if (result.accepted) {
 		return {
-			result: {
-				target: args.target,
-				text:
-					result.outcome === "no-change"
-						? `no-change accepted for ${result.pageId}; source hashes rebased.`
-						: `accepted ${result.pageId} (${result.findings.length} informational findings).`,
-				errors: [],
-				warnings: result.findings.map((f) => `${f.code}: ${f.detail}`),
-				pageId: result.pageId,
-				outcome: result.outcome,
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
+			text:
+				result.outcome === "no-change"
+					? `no-change accepted for ${result.pageId}; source hashes rebased.`
+					: `accepted ${result.pageId} (${result.findings.length} informational findings).`,
+			errors: [],
+			warnings: result.findings.map((f) => `${f.code}: ${f.detail}`),
+			pageId: result.pageId,
+			outcome: result.outcome,
 		};
 	}
 	return {
-		result: {
-			target: args.target,
-			errors: result.errors,
-			warnings: result.findings.map((f) => `${f.code}: ${f.detail}`),
-			code: result.code,
-			pageId: result.pageId,
-		},
-		exitCode: 1,
+		errors: result.errors,
+		warnings: result.findings.map((f) => `${f.code}: ${f.detail}`),
+		code: result.code,
+		pageId: result.pageId,
 		bypassPrint: false,
 	};
 }
 
+// F039 carve-out: this branch keeps its hand-rolled envelope. Both JSON paths
+// spread verifyPages()/verifyLoadoutFile() results whose top-level `ok` is a
+// payload field (pinned on the wire), but defineCommand treats `ok` as a
+// control field and strips it — the same inexpressibility that stopped the
+// knowledge-plan migration in slice 3.
 function handleVerify(args, targetRoot) {
 	// Loadout re-verification (ADR-0010 D7): required-tier-only hash check.
 	if (args.loadout) {
@@ -295,7 +278,7 @@ function renderLoadout(loadout, loadoutPath) {
 	return lines.join("\n");
 }
 
-function handleLoad(args, targetRoot) {
+function loadBody(args, targetRoot) {
 	const result = buildLoadout(targetRoot, {
 		route: args.route,
 		feature: args.feature,
@@ -308,43 +291,30 @@ function handleLoad(args, targetRoot) {
 	});
 	if (result.errors.length > 0) {
 		return {
-			result: {
-				target: args.target,
-				errors: result.errors.map((e) => `${e.code}: ${e.detail}`),
-				warnings: [],
-				code: result.errors[0].code,
-			},
-			exitCode: 1,
+			errors: result.errors.map((e) => `${e.code}: ${e.detail}`),
+			warnings: [],
+			code: result.errors[0].code,
 			bypassPrint: false,
 		};
 	}
 	if (args.json) {
 		return {
-			result: {
-				target: args.target,
-				loadout: result.loadout,
-				loadoutPath: result.loadoutPath,
-				errors: [],
-				warnings: [],
-			},
-			exitCode: 0,
+			loadout: result.loadout,
+			loadoutPath: result.loadoutPath,
+			errors: [],
+			warnings: [],
 			bypassPrint: false,
 		};
 	}
 	return {
-		result: {
-			target: args.target,
-			text: renderLoadout(result.loadout, result.loadoutPath),
-			errors: [],
-			warnings: [],
-			loadoutPath: result.loadoutPath,
-		},
-		exitCode: 0,
-		bypassPrint: !args.json,
+		text: renderLoadout(result.loadout, result.loadoutPath),
+		errors: [],
+		warnings: [],
+		loadoutPath: result.loadoutPath,
 	};
 }
 
-function handlePreview(args, targetRoot) {
+function previewBody(args, targetRoot) {
 	const result = previewLoadout(targetRoot, {
 		route: args.route,
 		feature: args.feature,
@@ -355,40 +325,27 @@ function handlePreview(args, targetRoot) {
 	});
 	if (result.errors.length > 0) {
 		return {
-			result: {
-				target: args.target,
-				errors: result.errors.map((error) => `${error.code}: ${error.detail}`),
-				warnings: result.warnings,
-				code: result.errors[0].code,
-			},
-			exitCode: 1,
+			errors: result.errors.map((error) => `${error.code}: ${error.detail}`),
+			warnings: result.warnings,
+			code: result.errors[0].code,
 			bypassPrint: false,
 		};
 	}
 	return {
-		result: {
-			target: args.target,
-			loadout: result.loadout,
-			text: JSON.stringify(result.loadout, null, 2),
-			errors: [],
-			warnings: result.warnings,
-		},
-		exitCode: 0,
-		bypassPrint: !args.json,
+		loadout: result.loadout,
+		text: JSON.stringify(result.loadout, null, 2),
+		errors: [],
+		warnings: result.warnings,
 	};
 }
 
-function handleList(args, targetRoot) {
+function listBody(args, targetRoot) {
 	const verify = verifyPages(targetRoot);
 	if (!verify.ok) {
 		return {
-			result: {
-				target: args.target,
-				code: verify.code,
-				errors: [`${verify.code}: ${verify.detail}`],
-				warnings: [],
-			},
-			exitCode: 1,
+			code: verify.code,
+			errors: [`${verify.code}: ${verify.detail}`],
+			warnings: [],
 			bypassPrint: false,
 		};
 	}
@@ -406,17 +363,31 @@ function handleList(args, targetRoot) {
 		})
 		.filter((page) => !args.knowledgeKind || page.knowledgeKind === args.knowledgeKind);
 	return {
-		result: { target: args.target, text: renderList(pages, statusMap), errors: [], warnings: [] },
-		exitCode: 0,
-		bypassPrint: !args.json,
+		text: renderList(pages, statusMap),
+		errors: [],
+		warnings: [],
 	};
 }
 
-function handleShow(args, targetRoot) {
+function showBody(args, targetRoot) {
 	const pageId = args.page;
-	if (!pageId) return errResult("context show requires --page <id>.");
+	if (!pageId) {
+		return {
+			target: undefined,
+			errors: ["context show requires --page <id>."],
+			warnings: [],
+			bypassPrint: false,
+		};
+	}
 	const page = readPage(targetRoot, pageId);
-	if (!page) return errResult(`page not found: ${pageId}`);
+	if (!page) {
+		return {
+			target: undefined,
+			errors: [`page not found: ${pageId}`],
+			warnings: [],
+			bypassPrint: false,
+		};
+	}
 	const knowledge = describeKnowledge(targetRoot, page);
 	const verified = verifyPages(targetRoot).pages.find((item) => item.pageId === pageId);
 	const assurance = verified
@@ -446,13 +417,13 @@ function handleShow(args, targetRoot) {
 		lines.push(`  sources: ${b.sources.join(", ")}`);
 	});
 	return {
-		result: { target: args.target, text: lines.join("\n"), errors: [], warnings: [] },
-		exitCode: 0,
-		bypassPrint: !args.json,
+		text: lines.join("\n"),
+		errors: [],
+		warnings: [],
 	};
 }
 
-function handleRefresh(args, targetRoot) {
+function refreshBody(args, targetRoot) {
 	const result = refreshPages(targetRoot);
 	const text = [
 		result.requests.length > 0
@@ -469,93 +440,98 @@ function handleRefresh(args, targetRoot) {
 		.filter(Boolean)
 		.join("\n");
 	return {
-		result: { target: args.target, text, errors: result.errors, warnings: [] },
-		exitCode: result.errors.length > 0 ? 1 : 0,
-		bypassPrint: !args.json,
+		text,
+		errors: result.errors,
+		warnings: [],
 	};
 }
 
-function handleStats(args, targetRoot) {
+function statsBody(args, targetRoot) {
 	const stats = computeStats(targetRoot, {
 		window: args.window ? Number(args.window) : undefined,
 		knowledgeKind: args.knowledgeKind,
 	});
 	return {
-		result: { target: args.target, text: renderStats(stats), errors: [], warnings: [] },
-		exitCode: 0,
-		bypassPrint: !args.json,
+		text: renderStats(stats),
+		errors: [],
+		warnings: [],
 	};
 }
 
-function handleDelete(args, targetRoot) {
+function deleteBody(args, targetRoot) {
 	const pageId = args.page;
-	if (!pageId) return errResult("context delete requires --page <id>.");
+	if (!pageId) {
+		return {
+			target: undefined,
+			errors: ["context delete requires --page <id>."],
+			warnings: [],
+			bypassPrint: false,
+		};
+	}
 	const page = readPage(targetRoot, pageId);
 	if (page) {
 		const knowledge = describeKnowledge(targetRoot, page);
 		if (knowledge.supersedes.length > 0 || knowledge.supersededBy.length > 0) {
-			return errResult(`Context Page ${pageId} participates in supersession and cannot be deleted`);
+			return {
+				target: undefined,
+				errors: [`Context Page ${pageId} participates in supersession and cannot be deleted`],
+				warnings: [],
+				bypassPrint: false,
+			};
 		}
 	}
 	const removed = deletePage(targetRoot, pageId);
 	return {
-		result: {
-			target: args.target,
-			text: removed ? `deleted ${pageId}` : `page not found: ${pageId}`,
-			errors: removed ? [] : [`page not found: ${pageId}`],
-			warnings: [],
-		},
-		exitCode: removed ? 0 : 1,
-		bypassPrint: !args.json,
+		text: removed ? `deleted ${pageId}` : `page not found: ${pageId}`,
+		errors: removed ? [] : [`page not found: ${pageId}`],
+		warnings: [],
 	};
 }
 
-function handleProjection(args, targetRoot, variant) {
+function projectionBody(args, targetRoot, variant) {
 	if (variant === "rebuild") {
 		const rebuilt = rebuildProjection(targetRoot);
 		return {
-			result: {
-				target: args.target,
-				text: `rebuilt context-index (${rebuilt.manifest.pageCount} page(s))`,
-				errors: [],
-				warnings: [],
-				manifest: rebuilt.manifest,
-			},
-			exitCode: 0,
-			bypassPrint: !args.json,
+			text: `rebuilt context-index (${rebuilt.manifest.pageCount} page(s))`,
+			errors: [],
+			warnings: [],
+			manifest: rebuilt.manifest,
 		};
 	}
 	if (variant !== "status") {
-		return errResult("context projection requires status or rebuild");
+		return {
+			target: undefined,
+			errors: ["context projection requires status or rebuild"],
+			warnings: [],
+			bypassPrint: false,
+		};
 	}
 	const status = projectionStatus(targetRoot);
 	if (!status.ok) {
 		return {
-			result: {
-				target: args.target,
-				code: status.code,
-				errors: [`${status.code}: ${status.detail}`],
-				warnings: [],
-			},
-			exitCode: 1,
+			code: status.code,
+			errors: [`${status.code}: ${status.detail}`],
+			warnings: [],
 			bypassPrint: false,
 		};
 	}
 	return {
-		result: {
-			target: args.target,
-			text: `context-index: ${status.detail} (${status.manifest.pageCount} page(s))`,
-			errors: [],
-			warnings: [],
-			manifest: status.manifest,
-		},
-		exitCode: 0,
-		bypassPrint: !args.json,
+		text: `context-index: ${status.detail} (${status.manifest.pageCount} page(s))`,
+		errors: [],
+		warnings: [],
+		manifest: status.manifest,
 	};
 }
 
-function handleBenchmark(args, targetRoot) {
-	if (!args.fixture) return errResult("context benchmark requires --fixture <file>");
+function benchmarkBody(args, targetRoot) {
+	if (!args.fixture) {
+		return {
+			target: undefined,
+			errors: ["context benchmark requires --fixture <file>"],
+			warnings: [],
+			bypassPrint: false,
+		};
+	}
 	const result = runBenchmark(targetRoot, { fixture: args.fixture, mode: args.mode });
 	const report = result.report;
 	const text = report
@@ -569,22 +545,23 @@ function handleBenchmark(args, targetRoot) {
 			].join("\n")
 		: "";
 	return {
-		result: {
-			target: args.target,
-			text,
-			code: result.code,
-			report,
-			errors: result.ok ? [] : [`${result.code}: ${result.detail}`],
-			warnings: [],
-		},
-		exitCode: result.ok ? 0 : 1,
+		text,
+		code: result.code,
+		report,
+		errors: result.ok ? [] : [`${result.code}: ${result.detail}`],
+		warnings: [],
 		bypassPrint: !args.json && result.ok,
 	};
 }
 
-function handleSourceAdapter(args, targetRoot) {
+function sourceAdapterBody(args, targetRoot) {
 	if (!args.fixture) {
-		return errResult("context source-adapter requires --fixture <file>");
+		return {
+			target: undefined,
+			errors: ["context source-adapter requires --fixture <file>"],
+			warnings: [],
+			bypassPrint: false,
+		};
 	}
 	const imported = importSourceBundle(targetRoot, {
 		fixture: args.fixture,
@@ -592,72 +569,77 @@ function handleSourceAdapter(args, targetRoot) {
 		allowTranscript: args.allowTranscript,
 	});
 	return {
-		result: {
-			target: args.target,
-			code: imported.code,
-			bundle: imported.bundle,
-			text: imported.ok
-				? `Imported ${imported.bundle.sources.length} Source Bundle candidate(s) from ${imported.bundle.adapterId}`
-				: "",
-			errors: imported.ok ? [] : [`${imported.code}: ${imported.detail}`],
-			warnings: [],
-		},
-		exitCode: imported.ok ? 0 : 1,
+		code: imported.code,
+		bundle: imported.bundle,
+		text: imported.ok
+			? `Imported ${imported.bundle.sources.length} Source Bundle candidate(s) from ${imported.bundle.adapterId}`
+			: "",
+		errors: imported.ok ? [] : [`${imported.code}: ${imported.detail}`],
+		warnings: [],
 		bypassPrint: !args.json && imported.ok,
 	};
 }
 
-function handleRetention(args, targetRoot) {
+function retentionBody(args, targetRoot) {
 	const retained = retentionReport(targetRoot, {
 		olderThanDays: args.olderThanDays == null ? undefined : Number(args.olderThanDays),
 	});
 	const report = retained.report;
 	return {
-		result: {
-			target: args.target,
-			code: retained.code,
-			report,
-			text: report
-				? `Context retention report: ${report.summary.eligible} candidate(s), ${report.summary.protected} protected artifact(s)`
-				: "",
-			errors: retained.ok ? [] : [`${retained.code}: ${retained.detail}`],
-			warnings: [],
-		},
-		exitCode: retained.ok ? 0 : 1,
+		code: retained.code,
+		report,
+		text: report
+			? `Context retention report: ${report.summary.eligible} candidate(s), ${report.summary.protected} protected artifact(s)`
+			: "",
+		errors: retained.ok ? [] : [`${retained.code}: ${retained.detail}`],
+		warnings: [],
 		bypassPrint: !args.json && retained.ok,
 	};
 }
 
-// Unified dispatch table: one handler per canonical action name, mirroring
-// the action-registry DEFINITIONS. Replaces the former 14-branch if-chain;
-// adding a context action now requires only a DEFINITIONS entry + a handler.
-const HANDLERS = {
-	request: handleRequest,
-	ingest: handleIngest,
-	verify: handleVerify,
-	list: handleList,
-	show: handleShow,
-	refresh: handleRefresh,
-	stats: handleStats,
-	delete: handleDelete,
-	preview: handlePreview,
-	load: handleLoad,
-	projection: (args, targetRoot, variant) => handleProjection(args, targetRoot, variant),
-	benchmark: handleBenchmark,
-	"source-adapter": handleSourceAdapter,
-	retention: handleRetention,
-};
-
-function contextDispatch(action, args) {
-	const definition = resolveContextAction(action, args);
-	if (!definition) return unknownAction(action);
+// Error bodies that the legacy errResult pair shaped with `target: undefined`
+// carry that key explicitly so the dispatcher's args.target prepend cannot
+// resurrect a concrete target on the wire.
+function contextDispatch(action, args = {}) {
+	if (action === "verify") {
+		return handleVerify(args, resolveTarget(args.target || "."));
+	}
 	const targetRoot = resolveTarget(args.target || ".");
-	const handler = HANDLERS[definition.name];
-	if (!handler) return unknownAction(action);
-	// projection carries a variant (status/rebuild) the handler needs.
-	return definition.variant
-		? handler(args, targetRoot, definition.variant)
-		: handler(args, targetRoot);
+	const dispatch = defineCommand({
+		command: "context",
+		actions: ACTIONS,
+		aliases: {
+			"projection-status": "projection",
+			"projection-rebuild": "projection",
+			source: "source-adapter",
+		},
+		handlers: {
+			request: (a) => requestBody(a, targetRoot),
+			ingest: (a) => ingestBody(a, targetRoot),
+			list: (a) => listBody(a, targetRoot),
+			show: (a) => showBody(a, targetRoot),
+			refresh: (a) => refreshBody(a, targetRoot),
+			stats: (a) => statsBody(a, targetRoot),
+			delete: (a) => deleteBody(a, targetRoot),
+			preview: (a) => previewBody(a, targetRoot),
+			load: (a) => loadBody(a, targetRoot),
+			// The projection variant (status/rebuild) rides the action-registry
+			// resolution: alias actions pin it, the bare action reads it off _.
+			projection: (a) => {
+				const definition = resolveContextAction(action, a);
+				return projectionBody(a, targetRoot, definition ? definition.variant : undefined);
+			},
+			benchmark: (a) => benchmarkBody(a, targetRoot),
+			"source-adapter": (a) => sourceAdapterBody(a, targetRoot),
+			retention: (a) => retentionBody(a, targetRoot),
+		},
+		unknown: () => ({
+			target: undefined,
+			errors: [`unknown context action: ${action}. Expected one of: ${ACTIONS.join(", ")}`],
+			warnings: [],
+		}),
+	});
+	return dispatch(action, args);
 }
 
 module.exports = {
