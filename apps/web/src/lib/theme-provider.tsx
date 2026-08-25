@@ -57,9 +57,7 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   // Client-only SPA (no SSR): resolve once during the first render instead of
   // hydrating through a mount effect.
-  const [theme, setThemeState] = useState<ResolvedTheme>(() =>
-    resolveTheme(readStoredTheme()),
-  );
+  const [theme, setThemeState] = useState<ResolvedTheme>(() => resolveTheme(readStoredTheme()));
 
   // Keep the DOM class token in sync with the resolved theme.
   useEffect(() => {
