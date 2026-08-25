@@ -7,6 +7,15 @@
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget } = require("./command-helpers");
 
+// Display-only derivation (F040): structured report ops render as the shell
+// line a human would type. One-way — the renderer never parses strings back
+// into operations (the injection hazard ADR-0020 Option 3 removes).
+function proposedOpText(op) {
+	if (op.verb === "add") return `git add ${op.paths.join(" ")}`;
+	if (op.verb === "commit") return `git commit -m "${op.message}"`;
+	return "git push";
+}
+
 const envelopeDispatch = defineCommand({
 	command: "sync envelope",
 	actions: ["pack", "unpack", "compat", "validate"],
@@ -131,8 +140,10 @@ const sessionDispatch = defineCommand({
 			};
 		},
 		push: (args) => {
-			// F035 D1: push is transport PREPARATION only. The report lists the
-			// proposed git operations as strings; Amber never runs them.
+			// F035 D1: push is transport PREPARATION only. The report is the
+			// published structured contract (F040): proposedOps carry verb +
+			// confined paths, Amber never runs them, and the schema-valid
+			// report rides along in the result body for --json consumers.
 			const { pushEnvelopes } = require("./core/sync-session");
 			const report = pushEnvelopes(resolveTarget(args));
 			const lines = [
@@ -141,7 +152,7 @@ const sessionDispatch = defineCommand({
 			if (report.proposedOps.length > 0) {
 				lines.push("Proposed operations (not executed):");
 				for (const op of report.proposedOps) {
-					lines.push(`  ${op}`);
+					lines.push(`  ${proposedOpText(op)}`);
 				}
 			} else {
 				lines.push("No envelopes to prepare; no git operations proposed.");
@@ -154,6 +165,7 @@ const sessionDispatch = defineCommand({
 			);
 			return {
 				text: lines.join("\n"),
+				report,
 				errors: report.errors,
 				warnings: [],
 				exitCode: report.errors.length > 0 ? 1 : 0,

@@ -303,7 +303,7 @@ test("both new schemas are in the schemas/ directory", () => {
 	assert.ok(fs.existsSync(path.join(SCHEMAS_DIR, "structural-identity.schema.json")));
 });
 
-test("schemas count is now 18 (15 + sync/identity + projection)", () => {
+test("schemas count is now 19 (18 + sync-transport-report)", () => {
 	const files = fs.readdirSync(SCHEMAS_DIR).filter((f) => f.endsWith(".schema.json"));
-	assert.equal(files.length, 18, `expected 18 schemas, got ${files.length}`);
+	assert.equal(files.length, 19, `expected 19 schemas, got ${files.length}`);
 });

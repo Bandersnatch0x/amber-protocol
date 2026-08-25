@@ -258,7 +258,15 @@ Each records the decision and its binding consequence.
 5. **Structured report contract — publish immediately, independent of execution.** Option 3's
    ADR-0012-versioned, schema-governed machine-readable execution-report contract is compositional
    with every other option and is approved for publication now, de-risking the executor ecosystem
-   without touching the execution decision.
+   without touching the execution decision. **Published as F040** (2026-08-25):
+   `schemas/sync-transport-report.schema.json` (`schemaVersion: "1.0.0"`, closed verb set,
+   `additionalProperties: false`), compiled by
+   `scripts/lib/core/sync-transport-report-contract.js`; `pushEnvelopes` emits structured
+   `proposedOps` (verb + confined paths / derived message, never shell strings) and self-validates
+   fail-closed; `amber sync session push --json` surfaces the schema-valid report object.
+   Note: adjudication 4's narrowed `git add` path (`.amber/sync/envelopes/` + decision record) is a
+   Stage A implementation change — the 1.0.0 contract still proposes `git add .amber/sync`, and the
+   narrowing lands with Stage A (F041) as a schema-evidenced shape change.
 
 ## Related
 

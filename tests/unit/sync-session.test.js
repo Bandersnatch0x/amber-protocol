@@ -108,15 +108,19 @@ test("pushEnvelopes prepares transport and performs zero git mutations", () => {
 		[`.amber/sync/envelopes/${envelope.envelopeId}.json`],
 		"affected paths list the .amber/sync/** files a transport commit would include",
 	);
-	assert.ok(result.proposedOps.includes("git add .amber/sync"));
 	assert.ok(
-		result.proposedOps.some((op) => op.startsWith('git commit -m "amber sync:')),
+		result.proposedOps.some((op) => op.verb === "add" && op.paths.includes(".amber/sync")),
+		"the add op carries its confined staging paths",
+	);
+	assert.ok(
+		result.proposedOps.some((op) => op.verb === "commit" && op.message.startsWith("amber sync:")),
 		`expected a proposed commit op, got ${JSON.stringify(result.proposedOps)}`,
 	);
 	assert.ok(
-		result.proposedOps.every((op) => typeof op === "string"),
-		"proposed operations are strings, never executed",
+		result.proposedOps.every((op) => typeof op === "object" && typeof op.verb === "string"),
+		"proposed operations are structured objects (F040 contract), never executed",
 	);
+	assert.equal(result.schemaVersion, "1.0.0");
 	assert.equal(result.remoteConfigured, false, "no remote is configured in this fixture");
 	assert.equal(result.conflictCount, 0);
 	assert.equal(result.refusedCount, 0);
@@ -144,7 +148,10 @@ test("pushEnvelopes proposes git push only when a remote is configured", () => {
 	const result = pushEnvelopes(dir);
 
 	assert.equal(result.remoteConfigured, true);
-	assert.ok(result.proposedOps.includes("git push"), "git push is proposed as a string");
+	assert.ok(
+		result.proposedOps.some((op) => op.verb === "push"),
+		"git push is proposed as a structured push op",
+	);
 	assert.deepEqual(result.errors, []);
 });
 
@@ -300,7 +307,7 @@ test("runSyncSession prepares transport with zero git mutations", () => {
 	assert.equal(prep.mode, "prepare");
 	assert.equal(prep.envelopeCount, 1);
 	assert.deepEqual(prep.envelopeIds, [envelope.envelopeId]);
-	assert.ok(prep.proposedOps.includes("git add .amber/sync"));
+	assert.ok(prep.proposedOps.some((op) => op.verb === "add" && op.paths.includes(".amber/sync")));
 	assert.ok(
 		prep.affectedPaths.some((p) => p === `.amber/sync/envelopes/${envelope.envelopeId}.json`),
 		"affected paths list the envelope files",

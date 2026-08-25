@@ -1435,6 +1435,31 @@
 			],
 			"notes": [],
 			"updated": "2026-08-25"
+		},
+		{
+			"id": "F040",
+			"priority": 1,
+			"area": "sync",
+			"title": "Publish the sync transport report as a structured schema-governed contract (ADR-0020 D5)",
+			"user_visible_behavior": "sync session push emits a schemaVersioned report whose proposedOps are structured operations (verb + confined paths + commit message), self-validated against schemas/sync-transport-report.schema.json and machine-consumable via --json",
+			"status": "accepted",
+			"verification": ["node --test tests/unit/sync-transport-report-contract.test.js", "npm test"],
+			"evidence": [
+				{
+					"command": "npm test",
+					"result": "2626 tests / 2626 pass / 0 fail (session verify --execute, exit 0); raw node --test 2684/2626/58 = pre-existing baseline, +16 contract tests, zero regressions",
+					"date": "2026-08-25",
+					"notes": ""
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/sync-session.js",
+				"schemas/sync-transport-report.schema.json",
+				"scripts/lib/core/sync-transport-report-contract.js",
+				"scripts/lib/sync-commands.js"
+			],
+			"updated": "2026-08-25"
 		}
 	]
 }

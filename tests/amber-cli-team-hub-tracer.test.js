@@ -197,8 +197,8 @@ test("TH5: full Team Hub flow — profile, sync session, conflict, projection", 
 	const out = payload(run);
 	assert.ok(out.summary.preparation, "run produces a transport preparation report");
 	assert.ok(
-		out.summary.preparation.proposedOps.some((op) => op.startsWith("git add")),
-		"proposed git operations are reported as strings",
+		out.summary.preparation.proposedOps.some((op) => op.verb === "add"),
+		"proposed git operations are reported as structured ops (F040 contract)",
 	);
 	assert.ok(
 		out.summary.preparation.envelopeCount >= 1,

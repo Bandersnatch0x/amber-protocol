@@ -14,8 +14,10 @@
 > preserved append-only in `.amber/sync/conflicts.jsonl` and are never marked
 > applied; structurally invalid envelopes fail explicitly WITHOUT a conflict
 > entry. Transport is preparation/report-only (decision D1): Amber proposes
-> git operations as strings for a human to replay and never runs `git add`,
-> `git commit`, or `git push`.
+> git operations as structured, schema-governed operations
+> (`schemas/sync-transport-report.schema.json`, F040 / ADR-0020 D5) for a
+> human or external executor to replay and never runs `git add`, `git
+> commit`, or `git push`.
 
 **Date:** 2026-08-25
 **Plan:** `docs/plans/F035-Harden-distributed-sync-admission-and-fail-closed-boundaries.md`
@@ -271,21 +273,29 @@ replaying the proposed operations. Reintroducing live transport requires its
 own accepted ADR defining policy, approval, isolation, ledger, and recovery
 semantics, plus a governed Action.
 
-`pushEnvelopes(cwd)` produces the preparation report:
+`pushEnvelopes(cwd)` produces the preparation report — a published,
+schema-governed, ADR-0012-versioned contract
+(`schemas/sync-transport-report.schema.json`, compiled by the cached AJV
+adapter `scripts/lib/core/sync-transport-report-contract.js`; F040, ADR-0020
+adjudication 5). The emitted report self-validates against its own schema and
+folds any violation into `errors` (fail-closed); `amber sync session push
+--json` surfaces the schema-valid report object for machine consumption,
+while text mode renders shell lines derived one-way from the structured ops.
 
 | Field | Meaning |
 | --- | --- |
+| `schemaVersion` | `"1.0.0"` (ADR-0012 versioning; bumped on breaking shape changes) |
 | `mode` | always `"prepare"` |
 | `envelopeCount` | number of parsed envelopes in `.amber/sync/envelopes/` |
 | `envelopeIds` | the `envelopeId` values that are strings |
 | `envelopePaths` | `.amber/sync/envelopes/<id>.json` per envelope, sorted |
 | `affectedPaths` | every file under `.amber/sync/`, repository-relative POSIX, sorted |
-| `proposedOps` | git operations as **strings**: `[]` when there are no envelopes; otherwise `git add .amber/sync`, `git commit -m "amber sync: N envelope(s)"`, plus `git push` only when a remote is configured |
+| `proposedOps` | **structured operations** (never shell strings): `[]` when there are no envelopes; otherwise `{verb: "add", paths: [".amber/sync"]}`, `{verb: "commit", message: "amber sync: N envelope(s)"}`, plus `{verb: "push"}` only when a remote is configured — closed verb set (add/commit/push), confined paths carried as an explicit array |
 | `remoteConfigured` | whether `git remote` lists at least one remote |
 | `conflictCount` | records currently in `conflicts.jsonl` |
 | `refusedCount` | distinct envelope ids in `refused.jsonl` |
 | `note` | one of three deterministic messages: no envelopes to prepare; prepared with proposed operations NOT executed; prepared with no remote configured so `git push` was not proposed |
-| `errors` | empty (the report cannot fail) |
+| `errors` | empty unless the report itself violates its contract (self-check, fail-closed) |
 
 Session orchestration: `pullEnvelopes(cwd)` maps `replayEnvelopes` to
 `{ validated, refused, conflicts, errors }` (`validated` = applied count);
@@ -315,8 +325,9 @@ persisted conflicts and surface through the summary, not as session errors.
    both already-applied and already-refused envelopes.
 6. **Invalid is not a conflict.** Schema or path failures are explicit
    errors with no conflict-ledger entry.
-7. **Zero git mutations.** Preparation proposes operations as strings; only
-   the read-only `git remote` query runs.
+7. **Zero git mutations.** Preparation proposes structured operations
+   (schema-governed, closed verb set — never shell strings); only the
+   read-only `git remote` query runs.
 8. **Envelope boundary.** One envelope wraps exactly one registered
    artifact type at its canonical path; source, secrets, agents, tools, and
    arbitrary files are refused.

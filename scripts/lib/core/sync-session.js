@@ -7,9 +7,11 @@
  * apply them through the shared admission pipeline) → prepare the transport
  * report. Transport is preparation/report-only (F035 decision D1): the
  * session lists the envelopes, the affected `.amber/sync/**` paths, and the
- * proposed git operations as strings for a human to replay, but it NEVER
- * runs `git add`, `git commit`, or `git push` — reintroducing live transport
- * requires its own accepted ADR and governed Action. Envelopes are carried
+ * proposed git operations as structured, schema-governed operations
+ * (F040, ADR-0020 adjudication 5) for a human or external executor to
+ * replay, but it NEVER runs `git add`, `git commit`, or `git push` —
+ * reintroducing live transport requires its own accepted ADR and governed
+ * Action. Envelopes are carried
  * by git (ADR-0019 D1): the .amber/sync/envelopes/ directory is committed to
  * the shared Team Hub repository and exchanged via git remote.
  *
@@ -31,6 +33,7 @@ const { replayEnvelopes, listConflicts, listRefusedEnvelopeIds } = require("./sy
 const { collectFilesBySuffix, toPortablePath } = require("./fs-utils");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
 const { gitExec } = require("./git-exec");
+const { validateSyncTransportReport } = require("./sync-transport-report-contract");
 
 /**
  * Create a sync session record.
@@ -100,18 +103,22 @@ function listSyncTreePaths(cwd) {
 /**
  * Prepare the transport report for .amber/sync/ envelopes WITHOUT executing
  * any git command (F035 D1: transport is preparation/report-only, and there
- * is no --execute escape hatch). The report is replayable: it lists the
- * envelopes, the affected .amber/sync/** paths, and the proposed git
- * operations as strings for a human to review and run. `git push` is only
- * proposed when a remote is configured (read-only query).
+ * is no --execute escape hatch). The report is the published, schema-governed
+ * contract (F040, ADR-0020 adjudication 5): proposedOps are structured
+ * operations (verb + confined paths / derived commit message), never shell
+ * strings, and the report self-validates against
+ * schemas/sync-transport-report.schema.json — a violation fails closed into
+ * `errors`. `git push` is only proposed when a remote is configured (read-only
+ * query).
  * @param {string} cwd - Repository root.
  * @returns {{
+ *   schemaVersion: string,
  *   mode: string,
  *   envelopeCount: number,
  *   envelopeIds: string[],
  *   envelopePaths: string[],
  *   affectedPaths: string[],
- *   proposedOps: string[],
+ *   proposedOps: Array<{verb: "add", paths: string[]}|{verb: "commit", message: string}|{verb: "push"}>,
  *   remoteConfigured: boolean,
  *   conflictCount: number,
  *   refusedCount: number,
@@ -136,9 +143,9 @@ function pushEnvelopes(cwd) {
 		envelopePaths.length === 0
 			? []
 			: [
-					"git add .amber/sync",
-					`git commit -m "amber sync: ${envelopePaths.length} envelope(s)"`,
-					...(remoteConfigured ? ["git push"] : []),
+					{ verb: "add", paths: [".amber/sync"] },
+					{ verb: "commit", message: `amber sync: ${envelopePaths.length} envelope(s)` },
+					...(remoteConfigured ? [{ verb: "push" }] : []),
 				];
 	const conflictCount = listConflicts(cwd).length;
 	const refusedCount = listRefusedEnvelopeIds(cwd).size;
@@ -150,7 +157,8 @@ function pushEnvelopes(cwd) {
 	} else {
 		note = `Prepared ${envelopePaths.length} envelope(s) for transport; no remote configured — git push not proposed. No git operations were executed.`;
 	}
-	return {
+	const report = {
+		schemaVersion: "1.0.0",
 		mode: "prepare",
 		envelopeCount: envelopes.length,
 		envelopeIds,
@@ -163,6 +171,14 @@ function pushEnvelopes(cwd) {
 		note,
 		errors: [],
 	};
+	// Fail-closed self-check: the emitted report must satisfy its own published
+	// contract, or the violation surfaces as an error (exit 1) — never a
+	// silently malformed artifact.
+	const v = validateSyncTransportReport(report);
+	if (!v.valid) {
+		report.errors = v.errors.map((e) => `transport report violates its contract: ${e}`);
+	}
+	return report;
 }
 
 /**

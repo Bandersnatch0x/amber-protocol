@@ -183,3 +183,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F039-Unify-the-command-envelope-behind-one-dispatcher-composition.md`
 - Review status: ready
 - Feature: F039 status → accepted in feature_list.json
+
+## 2026-08-25 docs/plans/F040-Publish-the-sync-transport-report-as-a-structured-schema-governed-contract.md
+
+- Plan: `docs/plans/F040-Publish-the-sync-transport-report-as-a-structured-schema-governed-contract.md`
+- Review status: ready
+- Feature: F040 status → accepted in feature_list.json

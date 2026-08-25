@@ -86,8 +86,10 @@ test("sync session run prepares transport without git writes", () => {
 	const prep = out.summary.preparation;
 	assert.ok(prep, "transport preparation report present");
 	assert.equal(prep.mode, "prepare");
-	assert.ok(prep.proposedOps.includes("git add .amber/sync"));
-	assert.ok(prep.proposedOps.some((op) => op.startsWith('git commit -m "amber sync:')));
+	assert.ok(prep.proposedOps.some((op) => op.verb === "add" && op.paths.includes(".amber/sync")));
+	assert.ok(
+		prep.proposedOps.some((op) => op.verb === "commit" && op.message.startsWith("amber sync:")),
+	);
 	assert.ok(prep.envelopeIds.length >= 1, "envelope ids listed in the report");
 
 	assert.equal(head(dir), headBefore, "sync session run must not commit");
@@ -112,9 +114,22 @@ test("sync session push reports preparation and performs no git writes", () => {
 	assert.equal(r.status, 0, r.stderr);
 	const outer = JSON.parse(r.stdout);
 	assert.match(outer.text, /preparation/i, "report names transport preparation");
-	assert.ok(outer.text.includes("git add .amber/sync"), "report proposes git add as a string");
-	assert.ok(outer.text.includes("git commit"), "report proposes git commit as a string");
+	assert.ok(outer.text.includes("git add .amber/sync"), "report renders the add op's shell line");
+	assert.ok(outer.text.includes("git commit"), "report renders the commit op's shell line");
 	assert.ok(/not executed|never executed|no git commands were executed/i.test(outer.text));
+
+	// F040: --json carries the schema-valid machine-readable report itself
+	assert.ok(outer.report, "the schema-governed report rides in the JSON result");
+	assert.equal(outer.report.schemaVersion, "1.0.0");
+	assert.ok(
+		outer.report.proposedOps.every((op) => typeof op === "object" && typeof op.verb === "string"),
+		"CLI-reported ops are structured, never shell strings",
+	);
+	const {
+		validateSyncTransportReport,
+	} = require("../scripts/lib/core/sync-transport-report-contract");
+	const v = validateSyncTransportReport(outer.report);
+	assert.equal(v.valid, true, `CLI report must validate: ${JSON.stringify(v.errors)}`);
 
 	assert.equal(head(dir), headBefore, "push must not create a commit");
 	assert.equal(git(dir, ["log", "--oneline"]), logBefore, "commit count must be unchanged");

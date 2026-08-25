@@ -1,0 +1,124 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/sync-transport-report.schema.json",
+	"title": "Sync Transport Report",
+	"description": "Machine-readable contract for the sync session push preparation report (ADR-0020, adjudication 5). The report is preparation/report-only: proposedOps are structured operations (verb + confined paths or derived commit message), never shell strings — parsing strings into execution is an injection-shaped hazard the contract removes. External executors consume this artifact; Amber itself never executes the proposed operations. Versioned per ADR-0012.",
+	"type": "object",
+	"required": [
+		"schemaVersion",
+		"mode",
+		"envelopeCount",
+		"envelopeIds",
+		"envelopePaths",
+		"affectedPaths",
+		"proposedOps",
+		"remoteConfigured",
+		"conflictCount",
+		"refusedCount",
+		"note",
+		"errors"
+	],
+	"additionalProperties": false,
+	"properties": {
+		"schemaVersion": {
+			"type": "string",
+			"enum": ["1.0.0"],
+			"description": "Report schema version. Bumped on breaking shape changes (ADR-0012)."
+		},
+		"mode": {
+			"type": "string",
+			"enum": ["prepare"],
+			"description": "Always prepare: the report proposes operations, never executes them."
+		},
+		"envelopeCount": {
+			"type": "integer",
+			"minimum": 0,
+			"description": "Number of envelopes found in the sync home."
+		},
+		"envelopeIds": {
+			"type": "array",
+			"items": {
+				"type": "string",
+				"pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+			},
+			"description": "UUIDs of the envelopes prepared for transport."
+		},
+		"envelopePaths": {
+			"type": "array",
+			"items": { "type": "string", "minLength": 1 },
+			"description": "Repository-relative POSIX paths of the envelope files."
+		},
+		"affectedPaths": {
+			"type": "array",
+			"items": { "type": "string", "minLength": 1 },
+			"description": "Every file under the sync home a transport commit would include. Plain strings: the state-dir seam can relocate .amber, so the schema does not pin a path prefix."
+		},
+		"proposedOps": {
+			"type": "array",
+			"description": "Structured proposed git operations, in replay order. Closed verb set; no shell strings.",
+			"items": {
+				"oneOf": [
+					{
+						"type": "object",
+						"required": ["verb", "paths"],
+						"additionalProperties": false,
+						"properties": {
+							"verb": { "type": "string", "enum": ["add"] },
+							"paths": {
+								"type": "array",
+								"minItems": 1,
+								"items": { "type": "string", "minLength": 1 },
+								"description": "Confined staging paths for git add."
+							}
+						}
+					},
+					{
+						"type": "object",
+						"required": ["verb", "message"],
+						"additionalProperties": false,
+						"properties": {
+							"verb": { "type": "string", "enum": ["commit"] },
+							"message": {
+								"type": "string",
+								"minLength": 1,
+								"description": "Commit message derived from the report (deterministic, replayable)."
+							}
+						}
+					},
+					{
+						"type": "object",
+						"required": ["verb"],
+						"additionalProperties": false,
+						"properties": {
+							"verb": { "type": "string", "enum": ["push"] }
+						}
+					}
+				]
+			}
+		},
+		"remoteConfigured": {
+			"type": "boolean",
+			"description": "Whether a git remote is configured (read-only query). git push is only proposed when true."
+		},
+		"conflictCount": {
+			"type": "integer",
+			"minimum": 0,
+			"description": "Pending conflicts in the sync conflict ledger."
+		},
+		"refusedCount": {
+			"type": "integer",
+			"minimum": 0,
+			"description": "Refused envelopes currently tracked in the admission pipeline."
+		},
+		"note": {
+			"type": "string",
+			"minLength": 1,
+			"description": "Human-facing summary line."
+		},
+		"errors": {
+			"type": "array",
+			"items": { "type": "string", "minLength": 1 },
+			"description": "Structured errors (including any self-validation violation of this schema)."
+		}
+	}
+}
