@@ -1584,6 +1584,34 @@
 			"notes": [],
 			"paths": ["apps/web/package.json", "apps/web/src/main.tsx"],
 			"updated": "2026-08-25"
+		},
+		{
+			"id": "F046",
+			"priority": 46,
+			"area": "web",
+			"title": "Upgrade apps/web build chain (issue #207 batch 4)",
+			"user_visible_behavior": "apps/web runs vite 8 + vitest 4 + typescript 7 + tailwind 4 + zod 4 + react-markdown 10 + @types/node 26; suite, lint, typecheck, and build stay green",
+			"status": "accepted",
+			"verification": ["bash .scratch/f046-verify.sh"],
+			"evidence": [
+				{
+					"command": "bash .scratch/f046-verify.sh",
+					"result": "pass",
+					"date": "2026-08-26",
+					"notes": "apps/web build chain: vite 8 + vitest 4 + TS 6.0.3 + tailwind 4 + zod 4 + react-markdown 10 + @types/node 26; tsc/lint/vitest 571/build green; root 2672/0"
+				}
+			],
+			"notes": [],
+			"paths": [
+				"apps/web/package.json",
+				"apps/web/vite.config.mts",
+				"apps/web/vitest.config.ts",
+				"apps/web/tailwind.config.js",
+				"apps/web/postcss.config.js",
+				"apps/web/src/index.css",
+				"apps/web/server/types/session-events.ts"
+			],
+			"updated": "2026-08-26"
 		}
 	]
 }

@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@config '../tailwind.config.js';
 
 @layer base {
   :root {
@@ -56,7 +55,8 @@
   }
 
   .card-hover {
-    @apply card hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-[border-color,box-shadow] duration-150
+    @apply bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg
+      hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-[border-color,box-shadow] duration-150
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2;
   }
 

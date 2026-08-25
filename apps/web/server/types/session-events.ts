@@ -21,7 +21,7 @@ export type SessionStatus = z.infer<typeof SessionStatusSchema>;
 
 const SessionEventBaseSchema = z.object({
   timestamp: z.union([z.number(), z.string()]),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 // sessionId is optional on every variant: events read back from timeline.jsonl
@@ -174,7 +174,7 @@ export const SessionEventSchema = z.discriminatedUnion('type', [
   SessionEventBaseSchema.extend({
     type: z.literal('error'),
     sessionId: z.string().optional(),
-    error: z.union([z.string(), z.record(z.unknown())]).optional(),
+    error: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
   }),
   SessionEventBaseSchema.extend({ type: z.literal('heartbeat') }),
 ]);
