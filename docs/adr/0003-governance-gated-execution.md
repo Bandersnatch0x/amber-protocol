@@ -51,6 +51,12 @@ an orthogonal axis.
 
 - Scheduling / cron / daemon / hook-triggered execution (no unattended runs).
 - External writes: PRs, issue trackers, notifications, account-bearing CLIs.
+  - Boundary clarification ([ADR-0020](0020-governed-live-git-transport.md), adjudicated
+    2026-08-25): pushing the repository's own `.amber/sync` tree to its own already-configured
+    origin is **not** an external write in the forbidden class — it is self-owned governance state
+    published through the same governed-execution gates as any other typed mutation, and only under
+    ADR-0020 Stage B. Writes to any third-party surface (a caller-supplied remote URL, a PR, a
+    tracker) remain forbidden.
 - Auto-approval, or self-approval by loop output.
 - Interception or wrapping of another agent's tool calls (the "runtime governance" market — out of
   scope; we complement Codex/Claude Code rather than compete with them).

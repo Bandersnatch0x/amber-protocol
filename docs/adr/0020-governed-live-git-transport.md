@@ -1,6 +1,7 @@
 # ADR-0020: Governed Live Git Transport for the Sync Runtime
 
-**Status:** Proposed
+**Status:** Accepted (2026-08-25 — the five open questions adjudicated by the repository owner; see
+"Adjudicated decisions" below)
 **Date:** 2026-08-25
 **Builds on:** [ADR-0001](0001-governance-first-artifact-first.md) (governance-first, artifact-first),
 [ADR-0003](0003-governed-gated-execution.md) (the five governed-execution preconditions),
@@ -66,10 +67,10 @@ anything the governed surface currently performs, and adjacent to ADR-0003's sti
 
 ## Decision
 
-**This section is a recommendation for review, not an accepted decision.** The choice among the
-options below belongs to the human reviewer; this ADR becomes binding only if and when its status
-changes to Accepted. While Status: Proposed, nothing in it authorizes implementation, and
-`sync session run|push` must remain preparation/report-only (F035 D1).
+**Accepted 2026-08-25: staged governed execution (enter through Option 4, grow into Option 2)** —
+the recommendation below was reviewed and accepted by the repository owner, together with the five
+adjudications recorded in "Adjudicated decisions" (which resolve every item formerly under "Open
+questions for review"). ADR-0003's boundary text is amended explicitly per adjudication 1.
 
 ### Recommendation: staged governed execution (enter through Option 4, grow into Option 2)
 
@@ -230,25 +231,34 @@ fallback — no option removes it. Option 3's structured report contract is wort
 any outcome. The `sync session run|push` preparation report itself is unchanged by this ADR; only
 an executing variant would be added.
 
-## Open questions for review
+## Adjudicated decisions (2026-08-25, repository owner)
 
-1. **Push vs. the ADR-0003 external-writes boundary.** Is pushing the repository's own
-   `.amber/sync` tree to its own configured origin inside or outside the forbidden class? This
-   ADR's position (a different category than third-party writes) must be confirmed or rejected by
-   the reviewer, and the boundary text amended explicitly in the accepting ADR.
-2. **Pending conflicts: hard-block or downgrade?** Recommended: downgrade to preparation-only
-   (ADR-0011, uncertainty flows downward). A hard block could deadlock a repository carrying a
-   long-lived pending conflict that is unrelated to the outbound batch.
-3. **Stage B promotion trigger.** How much Stage A evidence (batches executed, anomaly-free
-   ledgers, elapsed time, or an explicit human decision) before `git push` may join the gated path?
-4. **Ledger sharing.** `git add .amber/sync` stages the pull-side ledgers
-   (`applied.jsonl`/`refused.jsonl`/`conflicts.jsonl`) alongside the envelopes. Sharing them gives
-   full transparency but every clone's append-only ledgers will collide on merge. Narrow the add
-   path to `envelopes/` (+ a transport decision record), or accept shared ledgers? This may deserve
-   its own small adjudication; it changes `affectedPaths` semantics.
-5. **Publish the structured report contract regardless?** Option 3 is composable with every other
-   option; deciding it independently would de-risk the executor ecosystem without touching the
-   execution decision.
+The five open questions below were adjudicated by the repository owner when this ADR was accepted.
+Each records the decision and its binding consequence.
+
+1. **Push vs. the ADR-0003 external-writes boundary — accepted: outside the forbidden class.**
+   Pushing the repository's own `.amber/sync` tree to its own already-configured origin is
+   self-owned governance state, categorically different from third-party external writes. The
+   boundary text in [ADR-0003](0003-governance-gated-execution.md) is amended explicitly (see its
+   "Still forbidden" section): caller-supplied remote URLs and every third-party surface remain
+   forbidden; origin-only push under Stage B gates is not.
+2. **Pending conflicts — downgrade, not hard-block.** With any pending conflict, outbound transport
+   downgrades to preparation-only (ADR-0011: uncertainty flows downward). A long-lived pending
+   conflict unrelated to the outbound batch must not deadlock a repository's sync.
+3. **Stage B promotion trigger — explicit human decision only.** No quantitative auto-promotion
+   (no "N batches anomaly-free" threshold). Stage A evidence informs the decision, but `git push`
+   joins the gated path only by an explicit human configuration change. This matches the
+   governance-first philosophy: evidence accumulates, authority does not.
+4. **Ledger sharing — envelopes only.** The transport `git add` path is narrowed to
+   `.amber/sync/envelopes/` (plus a transport decision record); the pull-side ledgers
+   (`applied.jsonl`/`refused.jsonl`/`conflicts.jsonl`) are never shared — every clone's append-only
+   ledgers would otherwise collide on merge. Transparency is preserved by the envelopes plus local
+   ledgers. This changes `affectedPaths` semantics: the preparation report's proposed `git add` must
+   reflect the narrowed path set.
+5. **Structured report contract — publish immediately, independent of execution.** Option 3's
+   ADR-0012-versioned, schema-governed machine-readable execution-report contract is compositional
+   with every other option and is approved for publication now, de-risking the executor ecosystem
+   without touching the execution decision.
 
 ## Related
 
