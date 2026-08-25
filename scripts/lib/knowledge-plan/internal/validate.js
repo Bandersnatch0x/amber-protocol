@@ -1,27 +1,10 @@
 "use strict";
 
-const fs = require("node:fs");
-const path = require("node:path");
+// Compile once at require time (fail fast on broken install) through the one
+// schema-contract seam.
+const { compileSchema } = require("../../core/schema-contract");
 
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
-
-// Load schema once at require time (fail fast on broken install).
-const schemaPath = path.join(__dirname, "../../../../schemas/knowledge-plan.schema.json");
-let knowledgePlanSchema;
-try {
-	knowledgePlanSchema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
-} catch (e) {
-	throw new Error(
-		`Failed to load knowledge-plan schema from ${schemaPath}: ${e.message}. ` +
-			"Re-run 'node scripts/amber.js init' (or npm install) to restore schema files.",
-		{ cause: e },
-	);
-}
-
-const ajv = new Ajv({ allErrors: true });
-addFormats(ajv);
-const validateKnowledgePlan = ajv.compile(knowledgePlanSchema);
+const validateKnowledgePlan = compileSchema("knowledge-plan");
 
 /**
  * Validate raw plan data against the schema.

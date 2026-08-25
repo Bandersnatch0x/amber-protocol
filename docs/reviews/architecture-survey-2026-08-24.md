@@ -70,6 +70,8 @@ Give `state-dir-resolver` (or `fs-utils`) path-building verbs so callers never c
 
 ## Finding 3 — Thirteen private Ajv adapters: the sync-envelope-contract exemplar was not generalized
 
+> **Shipped (F042, 2026-08-25):** `scripts/lib/core/schema-contract.js` now owns every compile — one shared Ajv (`allErrors: true`), formats registered once plus the strict RFC 3339 `date-time`, a compile-once cache, and the generalized `formatErrors`. All 12 files migrated (session-manifest and validate-route keep eager throw-on-load; mcp-registry-loader uses `compileInline` for dynamic schemas), and `tests/unit/schema-contract-guard.test.js` fails on any new Ajv site outside the seam.
+
 **Files + lines** (all `new Ajv` sites)
 `scripts/lib/core/context-benchmark.js:20`, `context-ingest.js:27`, `context-loadout.js:55`, `context-request.js:27`, `context-source-adapter.js:13`, `sync-envelope-contract.js:23`, `scripts/lib/knowledge-plan/internal/validate.js:22`, `scripts/lib/mcp-invocation-coordinator.js:19`, `scripts/lib/mcp-registry-loader.js:28,100`, `scripts/lib/memory-commands.js:67`, `scripts/lib/session-manifest.js:21`, `scripts/lib/validate-route.js:18` — **13 constructions in 12 files**, each paired with its own schema-path `path.join(__dirname, ...)` and lazy-compile dance (e.g. `context-ingest.js:30-35`, `context-loadout.js:57-76`, `memory-commands.js:72-96`).
 

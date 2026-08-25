@@ -42,6 +42,7 @@ npm run doctor
 - Keep functions under 50 lines where possible
 - Write tests for new features
 - Document command-line interfaces
+- Compile every JSON Schema through `scripts/lib/core/schema-contract.js`; never instantiate Ajv elsewhere (`tests/unit/schema-contract-guard.test.js` enforces it)
 
 ### Git Commit Identity
 

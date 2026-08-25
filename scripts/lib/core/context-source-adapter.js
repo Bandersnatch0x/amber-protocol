@@ -2,29 +2,17 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const Ajv = require("ajv");
 
 const { sha256 } = require("./context-hash");
 const { bundleSource } = require("./context-request");
 const { resolvePathWithin } = require("./fs-utils");
 const { redactSecrets } = require("./redaction");
+const { compileSchema } = require("./schema-contract");
 
 const ADAPTER_ID = "local-fixture";
-const ajv = new Ajv({ allErrors: true });
-let fixtureValidator = null;
 
 function getFixtureValidator() {
-	if (fixtureValidator) return fixtureValidator;
-	const schemaPath = path.join(
-		__dirname,
-		"..",
-		"..",
-		"..",
-		"schemas",
-		"context-source-adapter.schema.json",
-	);
-	fixtureValidator = ajv.compile(JSON.parse(fs.readFileSync(schemaPath, "utf8")));
-	return fixtureValidator;
+	return compileSchema("context-source-adapter");
 }
 
 function failure(code, detail) {

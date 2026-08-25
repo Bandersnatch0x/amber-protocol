@@ -6,26 +6,25 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const Ajv = require("ajv");
+const { compileSchema, compileInline } = require("./core/schema-contract");
 
 function registryError(kind, findings) {
 	return new Error(`${kind} registry is invalid:\n  - ${findings.join("\n  - ")}`);
 }
 
-function loadActionTypes({ directory, schemaPath }) {
+function loadActionTypes({ directory, schemaName }) {
 	if (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) {
 		throw new Error(`action registry directory not found: ${directory}`);
 	}
 
-	let schema;
+	let validate;
 	try {
-		schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+		validate = compileSchema(schemaName);
 	} catch (err) {
-		throw new Error(`action registry schema is invalid: ${schemaPath} (${err.message})`, {
+		throw new Error(`action registry schema is invalid: ${schemaName} (${err.message})`, {
 			cause: err,
 		});
 	}
-	const validate = new Ajv({ allErrors: true }).compile(schema);
 	const actions = [];
 	const findings = [];
 	const ids = new Set();
@@ -97,7 +96,7 @@ function loadFunctions({ directory }) {
 			continue;
 		}
 		try {
-			new Ajv({ allErrors: true }).compile(fn.inputSchema);
+			compileInline(fn.inputSchema);
 		} catch (err) {
 			findings.push(`${file}: inputSchema is not valid JSON Schema (${err.message})`);
 			continue;

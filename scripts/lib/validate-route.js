@@ -1,23 +1,8 @@
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
-const fs = require("fs");
-const path = require("path");
+const { compileSchema } = require("./core/schema-contract");
 
-const schemaPath = path.join(__dirname, "../../schemas/route.schema.json");
-let schema;
-try {
-	schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
-} catch (e) {
-	throw new Error(
-		`Failed to load route schema from ${schemaPath}: ${e.message}. ` +
-			"Re-run 'node scripts/amber.js init' to restore missing schema files.",
-		{ cause: e },
-	);
-}
-
-const ajv = new Ajv();
-addFormats(ajv);
-const validate = ajv.compile(schema);
+// Compiled at module scope so a broken schema install throws at require time,
+// not on first validation.
+const validate = compileSchema("route");
 
 function validateRoute(routeData) {
 	const valid = validate(routeData);

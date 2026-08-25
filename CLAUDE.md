@@ -295,6 +295,7 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 
 - **Adding new commands**: Add the Command definition (identity, tier, help, output policy, public order) in `scripts/lib/command-help.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green. Default help exposes only `journey` and `core`; `--all` is the complete compatibility projection.
 - **Modifying schemas**: Update `schemas/*.schema.json` and ensure validators in `scripts/validate-*.js` are synced
+- **Schema validation**: compile every JSON Schema through `scripts/lib/core/schema-contract.js` (`compileSchema`/`compileInline`/`validate`); never instantiate Ajv elsewhere — `tests/unit/schema-contract-guard.test.js` fails the suite otherwise
 - **Adding templates**: Place in `templates/` and update `scripts/lib/core/scaffolding.js`
 - **Adding routes**: Create `.route.json` in `routes/` following `schemas/route.schema.json`
 - **Migration changes**: Add utilities to `src/migration/` with dry-run support

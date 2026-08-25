@@ -9,9 +9,6 @@
 // `no-change` is a valid outcome that rebases hashes without touching content.
 
 const fs = require("node:fs");
-const path = require("node:path");
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
 
 const { loadRequest } = require("./context-request");
 const { checkSourceHealth, finding, stripRange } = require("./context-sources");
@@ -23,16 +20,10 @@ const {
 	validateKnowledgeGraph,
 } = require("./context-knowledge");
 const { writeVerificationEvidence } = require("./context-assurance");
+const { compileSchema } = require("./schema-contract");
 
-const ajv = new Ajv({ allErrors: true });
-addFormats(ajv);
-
-let pageValidate = null;
 function getPageValidator() {
-	if (pageValidate) return pageValidate;
-	const schemaPath = path.join(__dirname, "..", "..", "..", "schemas", "context-page.schema.json");
-	pageValidate = ajv.compile(JSON.parse(fs.readFileSync(schemaPath, "utf8")));
-	return pageValidate;
+	return compileSchema("context-page");
 }
 
 /**

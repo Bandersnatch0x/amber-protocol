@@ -1,6 +1,6 @@
 "use strict";
 
-const Ajv = require("ajv");
+const { compileInline } = require("./core/schema-contract");
 const { resolveTargetOverride } = require("./mcp-targets");
 const actionRuntime = require("./mcp-action-runtime");
 
@@ -16,15 +16,15 @@ function createInvocationCoordinator({
 	amberJs,
 }) {
 	const functionCache = new Map();
-	const ajv = new Ajv({ allErrors: true });
 	// F: memoize compiled validators — action/function schemas are stable per
 	// tool, so recompiling on every tools/call RPC is pure codegen waste under
-	// burst load. Keyed by the tool name the schema was built for.
+	// burst load. Keyed by the tool name the schema was built for. Compilation
+	// itself goes through the schema-contract seam (one shared Ajv instance).
 	const validatorCache = new Map();
 	const validate = (schema, input, toolName) => {
 		let checker = validatorCache.get(toolName);
 		if (!checker) {
-			checker = ajv.compile(schema);
+			checker = compileInline(schema);
 			validatorCache.set(toolName, checker);
 		}
 		if (checker(input)) return null;

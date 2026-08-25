@@ -195,3 +195,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F041-ADR-0020-Stage-A-governed-local-commit.md`
 - Review status: ready
 - Feature: F041 status → accepted in feature_list.json
+
+## 2026-08-25 docs/plans/F042-Ajv-adapter-generalization.md
+
+- Plan: `docs/plans/F042-Ajv-adapter-generalization.md`
+- Review status: ready
+- Feature: F042 status → accepted in feature_list.json

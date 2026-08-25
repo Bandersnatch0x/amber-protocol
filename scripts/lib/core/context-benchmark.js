@@ -2,13 +2,12 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
 
 const { buildLoadout } = require("./context-loadout");
 const { canonicalJson, sha256 } = require("./context-hash");
 const { resolvePathWithin } = require("./fs-utils");
 const { statePathForCreate } = require("../state-dir-resolver");
+const { compileSchema } = require("./schema-contract");
 
 const RUN_COUNT = 10;
 const HARD_METRIC_THRESHOLDS = Object.freeze({
@@ -18,22 +17,9 @@ const HARD_METRIC_THRESHOLDS = Object.freeze({
 	requiredCoverage: 1,
 	stability: 1,
 });
-const ajv = new Ajv({ allErrors: true });
-addFormats(ajv);
-let fixtureValidator = null;
 
 function getFixtureValidator() {
-	if (fixtureValidator) return fixtureValidator;
-	const schemaPath = path.join(
-		__dirname,
-		"..",
-		"..",
-		"..",
-		"schemas",
-		"context-benchmark.schema.json",
-	);
-	fixtureValidator = ajv.compile(JSON.parse(fs.readFileSync(schemaPath, "utf8")));
-	return fixtureValidator;
+	return compileSchema("context-benchmark");
 }
 
 function ratio(numerator, denominator) {

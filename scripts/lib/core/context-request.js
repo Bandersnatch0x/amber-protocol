@@ -9,8 +9,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { localIsoDate } = require("./text-utils");
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
 
 const { hashFile, sha256 } = require("./context-hash");
 const { requestsDir, appendEvent } = require("./context-store");
@@ -24,21 +22,10 @@ const PAGE_SCHEMA = "schemas/context-page.schema.json";
 // snapshotted into the contract/page as excerpts (ADR-0009 D5a).
 const IMMUTABLE_PREFIXES = [".amber", "docs/adr", "docs/decisions"];
 
-const ajv = new Ajv({ allErrors: true });
-addFormats(ajv);
-let requestValidate = null;
+const { compileSchema } = require("./schema-contract");
+
 function validateRequestSchema(request) {
-	if (!requestValidate) {
-		const schemaPath = path.join(
-			__dirname,
-			"..",
-			"..",
-			"..",
-			"schemas",
-			"context-request.schema.json",
-		);
-		requestValidate = ajv.compile(JSON.parse(fs.readFileSync(schemaPath, "utf8")));
-	}
+	const requestValidate = compileSchema("context-request");
 	if (requestValidate(request)) return { valid: true, errors: [] };
 	return {
 		valid: false,

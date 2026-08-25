@@ -32,8 +32,6 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
 
 const { verifyPages } = require("./context-verify");
 const { listPages, readPage, readEvents, appendEvent } = require("./context-store");
@@ -45,6 +43,7 @@ const {
 	normalizeKnowledgeKind,
 	readKnowledgeGraph,
 } = require("./context-knowledge");
+const { compileSchema } = require("./schema-contract");
 
 const SCHEMA_VERSION = "1.0.0";
 const ROUTE_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/; // kebab-case, matching pageId
@@ -53,22 +52,8 @@ const EPOCH = "1970-01-01T00:00:00.000Z";
 const OPERATING_MANUAL_PATH = "docs/wiki/agent/amber.md";
 const LOADOUT_DEFINITION_PATH = "docs/wiki/agent/context-loadout.md";
 
-const ajv = new Ajv({ allErrors: true });
-addFormats(ajv);
-let loadoutValidate = null;
-
 function validateLoadoutShape(loadout) {
-	if (!loadoutValidate) {
-		const schemaPath = path.join(
-			__dirname,
-			"..",
-			"..",
-			"..",
-			"schemas",
-			"context-loadout.schema.json",
-		);
-		loadoutValidate = ajv.compile(JSON.parse(fs.readFileSync(schemaPath, "utf8")));
-	}
+	const loadoutValidate = compileSchema("context-loadout");
 	if (loadoutValidate(loadout)) return [];
 	return loadoutValidate.errors
 		.slice(0, 5)

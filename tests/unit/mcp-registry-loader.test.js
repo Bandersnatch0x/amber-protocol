@@ -9,7 +9,6 @@ const test = require("node:test");
 const { loadActionTypes, loadFunctions } = require("../../scripts/lib/mcp-registry-loader");
 
 const ROOT = path.resolve(__dirname, "../..");
-const SCHEMA_PATH = path.join(ROOT, "schemas", "action.type.schema.json");
 
 function tempDir() {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "amber-mcp-registry-"));
@@ -24,7 +23,7 @@ test("Action registry loading fails closed when any manifest is invalid", () => 
 	fs.writeFileSync(path.join(dir, "broken.json"), "{ not valid json ");
 
 	assert.throws(
-		() => loadActionTypes({ directory: dir, schemaPath: SCHEMA_PATH }),
+		() => loadActionTypes({ directory: dir, schemaName: "action.type" }),
 		/action registry is invalid.*broken\.json.*invalid JSON/s,
 	);
 	fs.rmSync(dir, { recursive: true, force: true });

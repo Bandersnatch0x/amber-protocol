@@ -1485,6 +1485,32 @@
 				"scripts/lib/core/error-catalog.js"
 			],
 			"updated": "2026-08-25"
+		},
+		{
+			"id": "F042",
+			"priority": 40,
+			"area": "tooling",
+			"title": "Generalize the Ajv adapter into one schema-contract seam (survey Finding 3)",
+			"user_visible_behavior": "All JSON-schema validation routes through one cached, format-registered schema-contract adapter; no module instantiates Ajv directly",
+			"status": "accepted",
+			"verification": ["node --test tests/unit/schema-contract.test.js", "npm test"],
+			"evidence": [
+				{
+					"command": "",
+					"result": "",
+					"date": "2026-08-25",
+					"notes": ""
+				}
+			],
+			"notes": [],
+			"paths": [
+				"scripts/lib/core/schema-contract.js",
+				"scripts/lib/core/sync-envelope-contract.js",
+				"scripts/lib/core/sync-transport-report-contract.js",
+				"scripts/lib/memory-commands.js",
+				"scripts/lib/session-manifest.js"
+			],
+			"updated": "2026-08-25"
 		}
 	]
 }

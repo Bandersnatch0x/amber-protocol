@@ -40,7 +40,6 @@ const { createInvocationCoordinator } = require("./lib/mcp-invocation-coordinato
 
 const ROOT = path.resolve(__dirname, "..");
 const AMBER_JS = path.join(ROOT, "scripts", "amber.js");
-const SCHEMA_PATH = path.join(ROOT, "schemas", "action.type.schema.json");
 const ACTION_TYPES_DIR = path.join(ROOT, "action-types");
 const ACTION_FUNCTIONS_DIR = path.join(ROOT, "action-functions");
 
@@ -251,7 +250,7 @@ try {
 let actions;
 let functions;
 try {
-	actions = loadActionTypes({ directory: ACTION_TYPES_DIR, schemaPath: SCHEMA_PATH });
+	actions = loadActionTypes({ directory: ACTION_TYPES_DIR, schemaName: "action.type" });
 	const contractCheck = validateWhitelist(actions);
 	if (!contractCheck.valid) {
 		throw new Error(

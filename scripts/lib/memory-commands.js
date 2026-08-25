@@ -26,8 +26,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
 
 const store = require("./core/memory-store");
 const { sha256, hashFile } = require("./core/context-hash");
@@ -52,6 +50,7 @@ const {
 	maybeResolveRequests,
 } = require("./core/memory-policy");
 const { codedError } = require("./core/error-catalog");
+const { compileSchema } = require("./core/schema-contract");
 const { defineCommand } = require("./subcommand-dispatcher");
 
 const CREED_HINT = [
@@ -68,18 +67,10 @@ const CREED_HINT = [
 	"Every entry must change a future decision or be deleted.",
 ].join("\n");
 
-// ── ajv validators (lazy-compiled; §4.3-B1 reuse of ajv acceptance mode) ──────
-const ajv = new Ajv({ allErrors: true });
-addFormats(ajv);
-let entryValidate = null;
-let requestValidate = null;
-
-function loadSchema(name) {
-	return JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "schemas", name), "utf8"));
-}
+// ── schema validators (§4.3-B1; compiled through the one schema-contract seam) ─
 
 function validateEntrySchema(entry) {
-	if (!entryValidate) entryValidate = ajv.compile(loadSchema("memory-entry.schema.json"));
+	const entryValidate = compileSchema("memory-entry");
 	if (entryValidate(entry)) return { valid: true, errors: [] };
 	return {
 		valid: false,
@@ -90,7 +81,7 @@ function validateEntrySchema(entry) {
 }
 
 function validateRequestSchema(request) {
-	if (!requestValidate) requestValidate = ajv.compile(loadSchema("memory-request.schema.json"));
+	const requestValidate = compileSchema("memory-request");
 	if (requestValidate(request)) return { valid: true, errors: [] };
 	return {
 		valid: false,
