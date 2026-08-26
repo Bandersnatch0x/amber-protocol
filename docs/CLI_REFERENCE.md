@@ -392,6 +392,31 @@ the global `rules.json` for that one command only — a context `allow` can supp
 policy, but **deny-wins is absolute**: no context `allow` can override a global or context `deny`
 (or a built-in deny).
 
+### artifact admit / show / list
+
+Admit and read Canonical Planning Artifacts (F049; ADR-0023). Each revision binds a human-readable
+Artifact Body (Markdown) to a machine-actionable Artifact Envelope in one atomic admission, settled
+through durable prepared/committed/aborted journal records. Only committed revisions are visible;
+history is append-only and immutable — there is no in-place mutation path for a committed revision.
+
+```bash
+# admit a new Intent revision (returns the admission receipt)
+node scripts/amber.js artifact admit --target . --id intent/login-bug --body "# Intent: login bug" --json
+
+# supersede the current head with new content (compare-and-swap on the expected head)
+node scripts/amber.js artifact admit --target . --id intent/login-bug --body "..." --supersedes-revision 1
+
+# show the current or an explicit revision; list current revision of each artifact
+node scripts/amber.js artifact show --target . --id intent/login-bug [--revision 1] --json
+node scripts/amber.js artifact list --target . --json
+```
+
+An exact-duplicate retry returns the original receipt (flagged as duplicate); different content at
+an existing head without `--supersedes-revision` fails closed as `AMBER_E_ARTIFACT_CONFLICT`. Reads
+verify both halves of the binding: a stored Body that lost its contentHash match reports
+`AMBER_E_ARTIFACT_HASH_MISMATCH`, a stored Envelope that lost its envelopeHash match reports
+`AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`.
+
 ## Handoff Commands
 
 ### handoff

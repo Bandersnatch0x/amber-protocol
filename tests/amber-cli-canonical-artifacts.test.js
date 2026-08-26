@@ -177,3 +177,43 @@ test("prepared-but-unsettled revisions are invisible to show/list via CLI", () =
 	assert.equal(list.status, 0);
 	assert.deepEqual(payload(list), []);
 });
+
+test("tampered Envelope metadata fails show/list with the stable envelope-mismatch code", () => {
+	const dir = mkTarget("envelope-tamper-cli");
+	runCli(
+		["artifact", "admit", "--id", "intent/t", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	const envFile = path.join(
+		dir,
+		".amber",
+		"artifacts",
+		"intents",
+		"intent_t",
+		"rev-1.envelope.json",
+	);
+	const stored = JSON.parse(fs.readFileSync(envFile, "utf8"));
+	stored.provenance = { source: "TAMPERED" };
+	fs.writeFileSync(envFile, JSON.stringify(stored, null, 2) + "\n", "utf8");
+
+	const shown = runCli(["artifact", "show", "--id", "intent/t", "--target", dir, "--json"], dir);
+	assert.equal(shown.status, 1);
+	assert.equal(payload(shown).code, "AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH");
+
+	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
+	assert.equal(list.status, 1);
+	assert.equal(payload(list).code, "AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH");
+});
+
+test("pure-dot identity is rejected via CLI with a stable code and no store writes", () => {
+	for (const identity of [".", ".."]) {
+		const dir = mkTarget(`dot-id-cli-${identity === "." ? "self" : "parent"}`);
+		const r = runCli(
+			["artifact", "admit", "--id", identity, "--body", BODY_V1, "--target", dir, "--json"],
+			dir,
+		);
+		assert.equal(r.status, 1);
+		assert.equal(payload(r).code, "AMBER_E_ARTIFACT_INVALID_IDENTITY");
+		assert.ok(!fs.existsSync(path.join(dir, ".amber", "artifacts")), "store root stays clean");
+	}
+});

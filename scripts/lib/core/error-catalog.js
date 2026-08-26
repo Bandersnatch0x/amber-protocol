@@ -500,7 +500,16 @@ const CATALOG = {
 		remedy:
 			"Regenerate the Envelope from the current Body so both sides bind to the same contentHash, then re-admit.",
 		layer: "Verification",
-		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF"],
+		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF", "AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH"],
+	},
+	AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH: {
+		title: "Canonical Artifact Envelope hash mismatch",
+		cause:
+			"The stored Envelope no longer matches its recorded envelopeHash — its metadata (provenance, supersedes, lifecycle references) was edited after admission.",
+		remedy:
+			"Restore the Envelope file from version control; never edit a committed Envelope in place — any change is a new admission input.",
+		layer: "Verification",
+		related: ["AMBER_E_ARTIFACT_HASH_MISMATCH"],
 	},
 	AMBER_E_ARTIFACT_JOURNAL_CORRUPT: {
 		title: "Canonical Artifact journal is corrupt or unreadable",
@@ -533,6 +542,15 @@ const CATALOG = {
 		title: "Canonical Artifact type is not registered",
 		cause: "Admission named an Artifact Type outside the closed registry (currently intent only).",
 		remedy: "Use a registered Artifact Type; `intent` is the first admitted type.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF"],
+	},
+	AMBER_E_ARTIFACT_INVALID_IDENTITY: {
+		title: "Canonical Artifact identity is not a usable directory name",
+		cause:
+			'Admission named an artifact identity that is empty or a pure-dot path segment ("." / ".."); such names would resolve the artifact home outside its per-identity directory.',
+		remedy:
+			"Re-admit with a concrete identity (letters, digits, dots, dashes, underscores; e.g. intent/login-bug).",
 		layer: "Governance",
 		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF"],
 	},

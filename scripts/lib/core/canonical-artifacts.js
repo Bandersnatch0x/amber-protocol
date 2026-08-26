@@ -41,6 +41,14 @@ const JOURNAL_CORRUPT_CODE = "AMBER_E_ARTIFACT_JOURNAL_CORRUPT";
 
 const TYPE_DIR_BY_TYPE = Object.freeze({ intent: "intents" });
 
+// Pure-dot path segments ("." / "..") would resolve the artifact home to the
+// store root or its parent instead of a per-identity directory.
+const DOT_SEGMENT_PATTERN = /^\.+$/;
+
+function isValidIdentity(identity) {
+	return typeof identity === "string" && identity.length > 0 && !DOT_SEGMENT_PATTERN.test(identity);
+}
+
 function artifactDir(cwd, type, identity) {
 	// ponytail: flat slug identity→dir; collisions across e.g. "a/b" vs "a_b"
 	// would alias, acceptable for the tracer bullet's intent-only registry.
@@ -131,17 +139,33 @@ function maxSettledRevision(journal, ...kinds) {
 	return max;
 }
 
+// Typed read failure: a real Error carrying .amberCode so CLI readFailure
+// surfaces the stable code instead of its NOT_FOUND fallback (same contract
+// as ledgerCorruptError in jsonl.js).
+function typedReadError(code, message) {
+	const error = new Error(codedError(code, message));
+	error.amberCode = code;
+	return error;
+}
+
 /**
  * Build the externally visible projection of one committed revision.
- * Verifies the Body hash before serving: a stored Body that no longer
- * matches its recorded contentHash is corruption, not content.
+ * Verifies both halves of the binding before serving (ADR-0023): the stored
+ * Body against its recorded contentHash, and the stored Envelope against its
+ * own canonical envelopeHash. Either mismatch is corruption, not content.
  */
 function committedProjection(type, identity, revision, body, envelope, committedAt) {
 	const recordedHash = envelope.bodyHash || null;
 	if (!recordedHash || bodyHash(body) !== recordedHash) {
-		throw codedError(
+		throw typedReadError(
 			"AMBER_E_ARTIFACT_HASH_MISMATCH",
 			`stored Body for "${identity}" revision ${revision} no longer matches its recorded contentHash`,
+		);
+	}
+	if (envelope.envelopeHash !== envelopeHash(envelope)) {
+		throw typedReadError(
+			"AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH",
+			`stored Envelope for "${identity}" revision ${revision} no longer matches its recorded envelopeHash`,
 		);
 	}
 	return Object.freeze({
@@ -164,7 +188,8 @@ function committedProjection(type, identity, revision, body, envelope, committed
  * visibility. Returns null when the identity has no committed revision or
  * the named revision is not committed — prepared/aborted stay invisible.
  * @throws {Error} Typed AMBER_E_ARTIFACT_JOURNAL_CORRUPT on a corrupt journal,
- *         AMBER_E_ARTIFACT_HASH_MISMATCH when a stored pair fails its binding.
+ *         AMBER_E_ARTIFACT_HASH_MISMATCH / AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH
+ *         when a stored pair fails its binding.
  */
 function showArtifact(cwd, identity, { type = "intent", revision = null } = {}) {
 	const dir = artifactDir(cwd, type, identity);
@@ -226,8 +251,10 @@ function admitArtifact(
 			`artifact type "${type}" is not registered; registered types: ${ARTIFACT_TYPES.join(", ")}`,
 		]);
 	}
-	if (!identity || typeof identity !== "string") {
-		return fail("AMBER_E_ARTIFACT_ORPHANED_HALF", ["admission requires an artifact identity"]);
+	if (!isValidIdentity(identity)) {
+		return fail("AMBER_E_ARTIFACT_INVALID_IDENTITY", [
+			`artifact identity "${identity}" is not a usable directory name (empty and pure-dot segments are rejected)`,
+		]);
 	}
 	// Pair binding (ADR-0023): both sides must arrive in one atomic call.
 	if (typeof body !== "string" || body.length === 0) {

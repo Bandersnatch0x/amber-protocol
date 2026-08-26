@@ -131,6 +131,13 @@ test("orphaned Body or Envelope input is rejected with a stable error code", () 
 	assert.equal(missingEnvelope.code, "AMBER_E_ARTIFACT_ORPHANED_HALF");
 });
 
+test("missing identity is rejected with the stable invalid-identity code", () => {
+	const dir = mkTarget("no-identity");
+	const r = admitArtifact(dir, { type: "intent", identity: undefined, body: BODY_V1 });
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_INVALID_IDENTITY");
+});
+
 test("unknown artifact type is rejected with a stable error code", () => {
 	const dir = mkTarget("bad-type");
 	const r = admitArtifact(dir, {
@@ -205,6 +212,61 @@ test("tampered committed Body is rejected on read with the stable hash-mismatch 
 	assert.throws(() => showArtifact(dir, "intent/login-bug"), /AMBER_E_ARTIFACT_HASH_MISMATCH/);
 });
 
+test("tampered Envelope metadata is rejected on read with the stable envelope-mismatch code", () => {
+	const dir = mkTarget("envelope-tamper");
+	admitIntent(dir);
+	const envFile = path.join(
+		dir,
+		".amber",
+		"artifacts",
+		"intents",
+		"intent_login-bug",
+		"rev-1.envelope.json",
+	);
+	// Rewrite provenance without recomputing envelopeHash: the stored Envelope
+	// no longer matches its own canonical hash.
+	const stored = JSON.parse(fs.readFileSync(envFile, "utf8"));
+	stored.provenance = { source: "TAMPERED" };
+	stored.supersedes = 99;
+	fs.writeFileSync(envFile, JSON.stringify(stored, null, 2) + "\n", "utf8");
+	assert.throws(
+		() => showArtifact(dir, "intent/login-bug"),
+		/AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH/,
+	);
+	assert.throws(() => listArtifacts(dir), /AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH/);
+});
+
+test("garbage envelopeHash on a stored Envelope is rejected on read", () => {
+	const dir = mkTarget("env-hash-garbage");
+	admitIntent(dir);
+	const envFile = path.join(
+		dir,
+		".amber",
+		"artifacts",
+		"intents",
+		"intent_login-bug",
+		"rev-1.envelope.json",
+	);
+	const stored = JSON.parse(fs.readFileSync(envFile, "utf8"));
+	stored.envelopeHash = "deadbeef";
+	fs.writeFileSync(envFile, JSON.stringify(stored, null, 2) + "\n", "utf8");
+	assert.throws(
+		() => showArtifact(dir, "intent/login-bug"),
+		/AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH/,
+	);
+});
+
+test("pure-dot identities are rejected and the store root stays clean", () => {
+	for (const identity of [".", ".."]) {
+		const dir = mkTarget(`dot-identity-${identity === "." ? "self" : "parent"}`);
+		const r = admitArtifact(dir, { type: "intent", identity, body: BODY_V1 });
+		assert.equal(r.ok, false, `identity "${identity}" must be rejected`);
+		assert.equal(r.code, "AMBER_E_ARTIFACT_INVALID_IDENTITY");
+		// No artifact home was created anywhere under the store.
+		assert.ok(!fs.existsSync(path.join(dir, ".amber", "artifacts")), "store root stays clean");
+	}
+});
+
 test("aborted revisions are not visible but stay in the durable journal", () => {
 	const dir = mkTarget("aborted");
 	const ok = admitIntent(dir);
@@ -242,7 +304,6 @@ test("no mutation path exists: module exposes no status/content setter", () => {
 	}
 	assert.deepEqual(ARTIFACT_STATUSES, ["prepared", "committed", "aborted"]);
 });
-
 test("status names are exactly prepared/committed/aborted in journal records", () => {
 	const dir = mkTarget("journal-names");
 	admitIntent(dir);

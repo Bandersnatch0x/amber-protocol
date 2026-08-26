@@ -396,6 +396,10 @@ _Avoid_: markdown file, document body, description
 The machine-actionable metadata for a Canonical Artifact, including identity, type, revision, source owner, provenance, content hash, and lifecycle references. It is not a second artifact authority.
 _Avoid_: header, metadata blob, status file
 
+**Admission**:
+The one atomic CLI operation (`artifact admit`) that binds an Artifact Body and its Artifact Envelope into one immutable revision, settles it through durable prepared/committed/aborted journal records, and returns a receipt. Only committed revisions are visible to reads; retries and supersession go through admission, never in-place edits.
+_Avoid_: upload, import, save
+
 **Canonical Owner**:
 The one bounded context or registered external system responsible for the authoritative revision and lifecycle of a record. Other surfaces may project or adapt it only with an explicit linkage and freshness state.
 _Avoid_: primary copy, source file, latest writer
