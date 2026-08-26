@@ -64,6 +64,22 @@ _Avoid_: stage target, step target
 A durable governance artifact linking one feature to goal, vertical slices, verification steps, evidence schema, and approval state. Survives chat loss; advanced through Plan Gate, Review, and Accept.
 _Avoid_: prompt, spec, ticket, design doc
 
+**Intent**:
+A durable governance artifact stating why a change or investigation is needed, its desired outcome, scope, constraints, non-goals, and origin. An accepted Intent may trigger a Spec; it does not authorize implementation or execution.
+_Avoid_: idea, request, ticket, prompt
+
+**Spec**:
+A durable governance artifact that refines an accepted Intent into requirements, design constraints, alternatives, and unresolved concerns. A Spec can be approved for planning without authorizing implementation or execution.
+_Avoid_: design doc, implementation plan, proposal
+
+**Eval**:
+A versioned, reproducible assessment definition and its recorded outcome for a declared behavior, artifact, or policy. An Eval supplies Evidence to a Gate; it is not an Approval and cannot widen execution authority.
+_Avoid_: benchmark score, model confidence, test log
+
+**Finding**:
+A provenance-backed observation produced by an allowed detector or review that identifies a deviation, risk, regression, or control-band breach. A Finding may propose an Intent but never silently creates one or mutates the target.
+_Avoid_: alert, ticket, bug, inference
+
 **Source Bundle**:
 The structured set of inputs that informed a plan, each with provenance, freshness, confidence, and inspection status.
 _Avoid_: context pile, attachments, references
@@ -201,6 +217,10 @@ _Avoid_: raw command, graph mutation, execution engine
 **Approval**:
 An immutable authorization decision naming the approver, capability or Policy, explicit scope, outcome, valid and recorded time, and provenance. Approval never widens scope implicitly or overrides a deny-wins rule.
 _Avoid_: implicit consent, permission flag, Resolution
+
+**Decision Owner**:
+The named role accountable for a governed decision at a Gate. A Decision Owner may rely on Evidence and other Approval records, but cannot delegate the decision to a model or infer it from an Artifact status field.
+_Avoid_: assignee, reviewer, approver (when the role is broader than an authorization)
 
 **Provenance Envelope**:
 The mandatory provenance carried by every durable Governance Graph node, edge, Domain Fact/Event projection, and Inference: source and Resolution owners, source identity and content hash, actor, originating Action or causal parent, explicit scope, derivation kind, confidence or assurance, valid and recorded time, correlation/causal metadata, and source-stream predecessor metadata when available. An Inference also records its rule/version and every input identity and hash.
@@ -364,13 +384,45 @@ _Avoid_: changelog, retrospective, lesson learned
 An inspectable, version-controlled governance record in a repository (plan, report, timeline, approval record). Amber's primary output, not a live-execution side effect.
 _Avoid_: output, file, document
 
+**Canonical Artifact**:
+The authoritative governance record formed by one human-readable Artifact Body and its machine-actionable Artifact Envelope, bound by revision, content hash, and provenance. A projection or adapter may reference it but cannot become a competing authority.
+_Avoid_: artifact pair, rendered document, graph node
+
+**Artifact Body**:
+The human-readable content of a Canonical Artifact. Its meaning is governed together with the corresponding Artifact Envelope; neither side may carry an independent mutable status.
+_Avoid_: markdown file, document body, description
+
+**Artifact Envelope**:
+The machine-actionable metadata for a Canonical Artifact, including identity, type, revision, source owner, provenance, content hash, and lifecycle references. It is not a second artifact authority.
+_Avoid_: header, metadata blob, status file
+
+**Canonical Owner**:
+The one bounded context or registered external system responsible for the authoritative revision and lifecycle of a record. Other surfaces may project or adapt it only with an explicit linkage and freshness state.
+_Avoid_: primary copy, source file, latest writer
+
 **Evidence**:
 Concrete proof that a claim was verified: command, result, date, and notes. A kind of artifact recorded in features and plans.
 _Avoid_: proof, output, log
 
+**Evidence Assurance**:
+A bounded statement of how strongly an Evidence record can support a Gate: `unavailable`, `observed`, `replayable`, or `verified`. Each Gate declares its minimum assurance and required receipt fields; an assurance label never substitutes for those fields.
+_Avoid_: confidence score, pass/fail, trust level
+
 **Verification**:
 Explicit steps an agent or human can run or inspect to validate that behavior meets expectations. Describes what to check, not the check results.
 _Avoid_: testing, validation, QA
+
+**Control Band**:
+A versioned deterministic rule over declared observations that defines an allowed operating range and the response to a breach. A breach produces a Finding with Evidence; it does not directly authorize remediation or release.
+_Avoid_: alert threshold, model score, health check
+
+**Trigger Proposal**:
+A request to consider the next governed stage, carrying its source Artifact and Evidence. It is not a Gate decision, Approval, or execution command.
+_Avoid_: approval request, automatic transition, job
+
+**Triage Decision**:
+An explicit service-owner disposition of a Finding: `fix`, `schedule`, or `dismiss`. Only `fix` may create a candidate Intent, which still passes the ordinary Intent Gate.
+_Avoid_: auto-remediation, severity score, classifier output
 
 ## Continuity
 
@@ -438,6 +490,10 @@ _Avoid_: log, trace, run record
 The replayable evidence bundle and replay requirements for a prepared task. Paired with the execution ledger.
 _Avoid_: evidence pack, results folder, proof bundle
 
+**Execution Boundary**:
+The policy and capability boundary separating Amber's governance actions from target-repository or environment side effects. In 2.0, Amber may inspect, validate, plan, and record externally performed results; Evidence of an action does not grant Amber authority to perform it.
+_Avoid_: runner permission, automation mode, sandbox alone
+
 **Replay**:
 An artifact that lets a person or agent re-inspect a task result without chat history. Carried by `replay.md`; depends on the execution ledger and task evidence.
 _Avoid_: rerun, reproduction, retry
@@ -471,6 +527,14 @@ _Avoid_: regression test, bug fix, auto-fix
 **Dynamic Workflow**:
 Live multi-step agent orchestration with runtime dispatch and execution. Outside Amber's product boundary in V1.
 _Avoid_: workflow (when meaning live execution), orchestration
+
+**Adapter**:
+A read-only compatibility surface that maps a legacy or external record to a Canonical Artifact while preserving source bytes, hashes, provenance, and the external system's Canonical Owner until an explicit cutover.
+_Avoid_: importer, synchronizer, migration rewrite
+
+**Cutover**:
+An explicit, bounded, reversible decision that changes the Canonical Owner for a declared artifact type or scope after compatibility and rollback evidence pass. Cutover never silently rewrites historical records.
+_Avoid_: migration complete, takeover, sync
 
 ## Navigation
 
