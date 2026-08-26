@@ -1,6 +1,7 @@
 const { describe, it, beforeEach, afterEach } = require("node:test");
 const assert = require("assert");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const {
@@ -17,7 +18,13 @@ const { addFeature, listFeatureEvidence } = require("../../scripts/lib/feature-c
 const { readSessionArtifacts } = require("../helpers/session-artifacts");
 const { installTargetRoutes } = require("../helpers/target-routes");
 
-const TEST_ROOT = path.join(__dirname, "../fixtures/session-test-repo");
+// Unique temp dir per test (assigned in beforeEach). The former fixed shared path
+// tests/fixtures/session-test-repo meant one locked rmdir on Windows (EBUSY from
+// antivirus/indexer while other suites run) failed the afterEach hook and then
+// chain-failed every later test's beforeEach on the same locked directory - 7
+// cascade failures from a single environment hiccup. Per-test dirs match the
+// kill-recovery fix and confine any cleanup failure to one test.
+let TEST_ROOT;
 
 function writeTargetRoute(routeId) {
 	const routesDir = path.join(TEST_ROOT, "routes");
@@ -84,8 +91,7 @@ function cleanupTestRoot(dir) {
 
 describe("session-commands", () => {
 	beforeEach(() => {
-		cleanupTestRoot(TEST_ROOT);
-		fs.mkdirSync(TEST_ROOT, { recursive: true });
+		TEST_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "amber-session-commands-"));
 		installTargetRoutes(TEST_ROOT);
 
 		spawnSync("git", ["init"], { cwd: TEST_ROOT });
@@ -99,7 +105,9 @@ describe("session-commands", () => {
 	});
 
 	afterEach(() => {
-		cleanupTestRoot(TEST_ROOT);
+		if (TEST_ROOT) {
+			cleanupTestRoot(TEST_ROOT);
+		}
 	});
 
 	describe("startSession", () => {
