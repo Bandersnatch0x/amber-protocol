@@ -947,6 +947,31 @@ function admitUnderLock(
 	}
 	const head = committedHead(journal);
 
+	// Pair-completeness sweep over the committed history (ticket-02 review
+	// finding F8 opened the Envelope half; ticket-03 review F-2 closes the
+	// Body half): every committed revision must still have BOTH halves of
+	// its pair on disk before any idempotency path can confirm a retry or
+	// any admission can build on the store — a hole at ANY revision is
+	// settlement corruption, never a silent skip the dedupe scan works
+	// around. The sweep reads each pair once, ahead of the keyed and
+	// content-bound paths below, which reuse the reads.
+	const committedPairs = new Map();
+	for (const revision of committedRevisions(journal)) {
+		const envelope = readEnvelope(dir, revision);
+		if (!envelope) {
+			return fail(SETTLEMENT_CORRUPT_CODE, [
+				`committed revision ${revision} of "${identity}" is missing its Envelope on disk; refusing to scan inconsistent settlement state`,
+			]);
+		}
+		const bodyText = readBody(dir, revision);
+		if (!bodyText) {
+			return fail(SETTLEMENT_CORRUPT_CODE, [
+				`committed revision ${revision} of "${identity}" is missing its Body on disk; refusing to scan inconsistent settlement state`,
+			]);
+		}
+		committedPairs.set(revision, { envelope, bodyText });
+	}
+
 	// Caller-key idempotency: the key is retry metadata recorded on the
 	// committed journal record. Replaying identical canonical content
 	// returns the original receipt; reusing the key for different content
@@ -954,8 +979,9 @@ function admitUnderLock(
 	if (idempotencyKey !== null) {
 		const prior = findKeyRecord(journal, idempotencyKey);
 		if (prior) {
-			let priorEnvelope = readEnvelope(dir, prior.revision);
-			let priorBody = readBody(dir, prior.revision);
+			const priorPair = committedPairs.get(prior.revision) || null;
+			const priorEnvelope = priorPair ? priorPair.envelope : null;
+			const priorBody = priorPair ? priorPair.bodyText : null;
 			if (!priorEnvelope || !priorBody) {
 				return fail(SETTLEMENT_CORRUPT_CODE, [
 					`revision ${prior.revision} settled under idempotency key "${idempotencyKey}" is missing its Body/Envelope pair on disk; refusing to serve inconsistent settlement state`,
@@ -994,26 +1020,14 @@ function admitUnderLock(
 	// Content-bound idempotency: any committed revision whose full canonical
 	// admission content matches returns its original receipt — a retry after
 	// a timeout, or a retry of a revision that was later superseded, never
-	// creates a duplicate revision. Ticket-02 review finding F8: a committed
-	// revision missing its half on disk is settlement corruption at ANY
-	// revision, not a silent skip — the scan fails closed instead of deduping
-	// around the hole. F9: the committed record's contentHash is cross-checked
-	// against the matched Envelope's bodyHash before the receipt is served, so
-	// a retry can never confirm a tampered revision.
+	// creates a duplicate revision. F9: the committed record's contentHash is
+	// cross-checked against the matched Envelope's bodyHash before the receipt
+	// is served, so a retry can never confirm a tampered revision. Both halves
+	// of every scanned revision were already established present by the
+	// pair-completeness sweep above.
 	for (const revision of committedRevisions(journal)) {
-		const envelope = readEnvelope(dir, revision);
-		if (!envelope) {
-			return fail(SETTLEMENT_CORRUPT_CODE, [
-				`committed revision ${revision} of "${identity}" is missing its Envelope on disk; refusing to scan inconsistent settlement state`,
-			]);
-		}
+		const { envelope, bodyText } = committedPairs.get(revision);
 		if (admissionHashOfEnvelope(envelope) !== incomingKeyHash) continue;
-		const bodyText = readBody(dir, revision);
-		if (!bodyText) {
-			return fail(SETTLEMENT_CORRUPT_CODE, [
-				`committed revision ${revision} of "${identity}" is missing its Body on disk; refusing to confirm a retry against an incomplete pair`,
-			]);
-		}
 		try {
 			committedProjection(type, identity, revision, bodyText, envelope, null);
 			const record = findCommitRecord(journal, revision);

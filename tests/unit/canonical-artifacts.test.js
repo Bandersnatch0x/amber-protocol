@@ -1338,6 +1338,44 @@ test("F8: a missing pair at a non-head revision fails the dedupe scan as corrupt
 	assert.match(retry.errors[0], /revision 1.*missing its Envelope on disk/);
 });
 
+test("F-2: a committed revision missing its Body fails the next admission as corruption", () => {
+	const dir = mkTarget("dedupe-body-half");
+	admitIntent(dir);
+	admitIntent(dir, { body: BODY_V1 + "v2\n", expectedHead: 1 });
+	// Remove revision 1's Body while keeping its Envelope: the head
+	// (revision 2) stays intact, but the pair-completeness sweep must fail
+	// closed at ANY committed revision — the old scan only noticed a missing
+	// Body when the incoming admission hash matched that revision, so
+	// admitting revision 3 on the holed store silently succeeded.
+	fs.rmSync(path.join(homeOf(dir), "rev-1.md"));
+	const next = admitIntent(dir, { body: BODY_V1 + "v3\n", expectedHead: 2 });
+	assert.equal(next.ok, false);
+	assert.equal(next.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+	assert.match(next.errors[0], /revision 1.*missing its Body on disk/);
+	// Nothing was admitted on top of the holed history.
+	assert.equal(journalOf(dir).filter((r) => r.kind === "committed").length, 2);
+	assert.equal(showArtifact(dir, "intent/login-bug").revision, 2);
+});
+
+test("F-2: a keyed retry also refuses a holed committed history", () => {
+	const dir = mkTarget("dedupe-body-half-keyed");
+	admitIntent(dir, { idempotencyKey: "seed-1" });
+	admitIntent(dir, { body: BODY_V1 + "v2\n", expectedHead: 1, idempotencyKey: "seed-2" });
+	fs.rmSync(path.join(homeOf(dir), "rev-1.md"));
+	// The key matches the intact head revision, but the history below it is
+	// holed: the retry fails closed instead of confirming a receipt on a
+	// store admission would refuse to build on.
+	const retry = admitIntent(dir, {
+		body: BODY_V1 + "v2\n",
+		expectedHead: 1,
+		idempotencyKey: "seed-2",
+	});
+	assert.equal(retry.ok, false);
+	assert.equal(retry.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+	assert.match(retry.errors[0], /revision 1.*missing its Body on disk/);
+	assert.equal(journalOf(dir).filter((r) => r.kind === "committed").length, 2);
+});
+
 test("F9: a committed record whose contentHash disagrees with the Envelope fails closed", () => {
 	const dir = mkTarget("content-hash-crosscheck");
 	admitIntent(dir);

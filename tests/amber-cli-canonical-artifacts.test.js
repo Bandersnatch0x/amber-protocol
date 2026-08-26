@@ -1058,6 +1058,75 @@ test("F5: an explicitly empty --idempotency-key fails closed", () => {
 	assert.equal(payload(list).length, 0);
 });
 
+test("F-3: an explicitly empty --type fails closed instead of defaulting to intent", () => {
+	const dir = mkTarget("t03r-empty-type");
+	for (const action of ["admit", "show"]) {
+		const args = [
+			"artifact",
+			action,
+			"--id",
+			"intent/x",
+			...(action === "admit" ? ["--body", BODY_V1] : []),
+			"--type",
+			"",
+			"--target",
+			dir,
+			"--json",
+		];
+		const r = runCli(args, dir);
+		assert.equal(r.status, 1, `--type "" on ${action} must fail`);
+		const outer = payload(r);
+		assert.equal(outer.code, "AMBER_E_INVALID_ARG", action);
+		assert.match(outer.errors.join(" "), /--type/);
+	}
+	// A whitespace-only value is equally an explicitly empty type.
+	const blank = runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/x",
+			"--body",
+			BODY_V1,
+			"--type",
+			"   ",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(blank.status, 1);
+	assert.equal(payload(blank).code, "AMBER_E_INVALID_ARG");
+
+	// The legitimate default (flag absent entirely) still resolves to intent.
+	const admit = runCli(
+		["artifact", "admit", "--id", "intent/x", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(admit.status, 0, admit.stderr);
+	assert.equal(payload(admit).type, "intent");
+	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
+	assert.equal(payload(list).length, 1);
+});
+
+test("F-4: a trailing --target fails closed instead of falling back to the CWD", () => {
+	const dir = mkTarget("t03r-trailing-target");
+	// The CLI process runs with `dir` as its CWD and --target is the LAST
+	// token, so the invocation names no target at all: the old behavior
+	// silently resolved the missing value to process.cwd() and admitted there.
+	const r = runCli(
+		["artifact", "admit", "--id", "intent/x", "--body", BODY_V1, "--json", "--target"],
+		dir,
+	);
+	assert.equal(r.status, 1, "a trailing --target must fail");
+	const outer = payload(r);
+	assert.equal(outer.code, "AMBER_E_INVALID_ARG");
+	assert.match(outer.errors.join(" "), /--target requires a value/);
+	// Nothing was written to the CWD the truncated invocation fell back to.
+	assert.ok(!fs.existsSync(path.join(dir, ".amber")), "nothing was written to the CWD");
+});
+
 test("CLI: malformed --trace values are rejected with the stable arg code (never NaN)", () => {
 	const dir = mkTarget("t03-trace-garbage");
 	for (const garbage of [

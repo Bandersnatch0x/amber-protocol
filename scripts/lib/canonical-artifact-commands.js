@@ -39,6 +39,10 @@ function parseRevisionFlag(raw, flag) {
  * parseArgs only sets a value flag's key when the flag appears, so
  * present-but-undefined names exactly the truncated invocation, and it fails
  * closed as AMBER_E_INVALID_ARG here at the artifact command seam.
+ * Ticket-03 review finding F-4 adds `--target`: parseArgs seeds args.target
+ * with process.cwd() rather than leaving it absent, so a trailing `--target`
+ * would otherwise parse as undefined and silently fall back to the CWD at
+ * resolveTarget — the same present-but-undefined check catches it.
  */
 function missingValueFlag(args) {
 	const valueFlags = [
@@ -53,6 +57,7 @@ function missingValueFlag(args) {
 		["scope", "--scope"],
 		["traceVal", "--trace"],
 		["revision", "--revision"],
+		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
 		if (key in args && args[key] === undefined) return flag;
@@ -113,6 +118,24 @@ function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
 }
 
+/**
+ * Ticket-03 review finding F-3: an explicitly passed-but-empty --type is a
+ * malformed invocation, never a silent default to intent — the caller meant
+ * to name a type, so it fails closed as AMBER_E_INVALID_ARG exactly like an
+ * explicitly empty --scope does. The legitimate default (the flag absent
+ * entirely) still resolves to intent.
+ */
+function typeFlagValue(args) {
+	if (args.type === undefined) return { value: "intent" };
+	const type = String(args.type);
+	if (type.trim().length === 0) {
+		return {
+			error: `--type must be one of the registered artifact types (${ARTIFACT_TYPES.join(", ")}) when provided; got ${JSON.stringify(args.type)}`,
+		};
+	}
+	return { value: type };
+}
+
 function unknownType(type) {
 	return {
 		text: "",
@@ -153,8 +176,10 @@ const dispatch = defineCommand({
 			}
 			const traces = parseTraceFlags(args.traceArgs);
 			if (traces.error) return invalidArg(traces.error);
+			const type = typeFlagValue(args);
+			if (type.error) return invalidArg(type.error);
 			const result = admitArtifact(resolveTarget(args), {
-				type: args.type || "intent",
+				type: type.value,
 				identity: args.id,
 				body,
 				provenance: args.provenance ? { source: args.provenance } : null,
@@ -182,11 +207,15 @@ const dispatch = defineCommand({
 				);
 			const revision = parseRevisionFlag(args.revision, "--revision");
 			if (revision.error) return invalidArg(revision.error);
-			const type = args.type || "intent";
-			if (!ARTIFACT_TYPES.includes(type)) return unknownType(type);
+			const type = typeFlagValue(args);
+			if (type.error) return invalidArg(type.error);
+			if (!ARTIFACT_TYPES.includes(type.value)) return unknownType(type.value);
 			let shown;
 			try {
-				shown = showArtifact(resolveTarget(args), args.id, { type, revision: revision.value });
+				shown = showArtifact(resolveTarget(args), args.id, {
+					type: type.value,
+					revision: revision.value,
+				});
 			} catch (err) {
 				const failure = readFailure(args, err, CORRUPT_CODE);
 				return { ...failure.result, exitCode: failure.exitCode };

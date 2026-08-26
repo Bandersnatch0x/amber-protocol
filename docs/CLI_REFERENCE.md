@@ -454,9 +454,10 @@ node scripts/amber.js artifact list --target . --json
 
 `--trace <type>:<identity>[@<revision>]` is repeatable; the target type is derived from the
 registered Trace contract (the CLI never names a type the registry contradicts). Malformed flag
-values — a garbage revision, a missing target, or a value flag trailing at the end of the command
-line — fail closed as `AMBER_E_INVALID_ARG`, never as a silently dropped precondition (an
-explicitly empty `--idempotency-key` fails the same way).
+values — a garbage revision, a missing target, or one of this command's value flags (including
+`--target`) trailing at the end of the command line — fail closed as `AMBER_E_INVALID_ARG`, never
+as a silently dropped precondition (an explicitly empty `--idempotency-key` or `--type` fails the
+same way; a non-artifact flag trailing on an artifact command is simply ignored).
 
 `--expected-head <n>` is the compare-and-swap precondition: the admission commits only if the
 current committed head is exactly `<n>`, otherwise it fails closed as `AMBER_E_ARTIFACT_CONFLICT`
@@ -474,8 +475,10 @@ idempotency key for different content, or presenting the same Body with differen
 the head, fails closed as `AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT`. Settlement state admission could
 never have written — a double commit, a commit without its prepared record, a forked expected head,
 a skipped revision slot, or a committed pair missing on disk — fails closed as
-`AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT` (the committed record's contentHash is cross-checked against
-the Envelope's bodyHash at every settlement validation). A durable write that fails mid-admission
+`AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT` at the next admission of that artifact: the admission scans
+both halves of every committed revision (a hole at any revision, not just the head or the retried
+one, is corruption), and the committed record's contentHash is cross-checked against the Envelope's
+bodyHash at every settlement validation. A durable write that fails mid-admission
 surfaces as `AMBER_E_ARTIFACT_IO` instead of a raw filesystem error.
 Reads verify both halves of the binding: a stored Body that lost its contentHash match reports
 `AMBER_E_ARTIFACT_HASH_MISMATCH`, a stored Envelope that lost its envelopeHash match reports
