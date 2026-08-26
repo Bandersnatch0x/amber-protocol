@@ -32,6 +32,7 @@ const { loadPolicyRules, evaluateGovernedPolicy } = require("./loop-policy");
 const { codedError } = require("./error-catalog");
 const { gitExec } = require("./git-exec");
 const { pushEnvelopes } = require("./sync-session");
+const { sha256Hex } = require("./context-hash");
 
 // The one derivation from a structured op to the shell line a human would
 // type. One-way: policy evaluates and the CLI renders these lines; nothing
@@ -48,6 +49,7 @@ function proposedOpText(op) {
 // decision records — never the pull-side conflict ledger, never the transport
 // ledger itself.
 const STAGE_A_ADD_PATHS = [".amber/sync/envelopes", ".amber/sync/transport/decisions"];
+const [ENVELOPES_HOME, DECISIONS_HOME] = STAGE_A_ADD_PATHS;
 
 function stageAOps(envelopePathCount) {
 	return [
@@ -65,15 +67,12 @@ function transportDecisionsDir(targetRoot) {
 }
 
 function opsFingerprint(envelopeIds, affectedPaths) {
-	return crypto
-		.createHash("sha256")
-		.update(
-			canonicalize({
-				envelopeIds: [...envelopeIds].sort(),
-				affectedPaths: [...affectedPaths].sort(),
-			}),
-		)
-		.digest("hex");
+	return sha256Hex(
+		canonicalize({
+			envelopeIds: [...envelopeIds].sort(),
+			affectedPaths: [...affectedPaths].sort(),
+		}),
+	);
 }
 
 /**
@@ -191,6 +190,125 @@ function confinementViolations(targetRoot) {
 	return violations;
 }
 
+// Identity gate (memory precedent): agents run non-TTY and never pass --yes;
+// a human in a TTY gets the F019-shaped approval envelope instead.
+function identityRefusal(targetRoot, yes, isTTY) {
+	if (yes) return null;
+	if (!isTTY) {
+		return {
+			target: targetRoot,
+			executed: false,
+			code: "AMBER_E_SYNC_TRANSPORT_APPROVAL_REQUIRED",
+			errors: [
+				codedError(
+					"AMBER_E_SYNC_TRANSPORT_APPROVAL_REQUIRED",
+					"non-interactive invocation without --yes",
+				),
+			],
+			warnings: [],
+		};
+	}
+	return {
+		target: targetRoot,
+		executed: false,
+		approvalRequired: true,
+		hint: "Governed transport requires explicit approval (--yes) after `amber sync session approve --reviewer <name>`.",
+		errors: [],
+		warnings: [],
+	};
+}
+
+// Policy gate (loop precedent): required rules.json, deny-wins, evaluated
+// over each derived op's shell line (add/commit only — push is never
+// evaluated or executed in Stage A).
+function policyRefusal(targetRoot, lp, envelopePathCount, subject) {
+	const rules = loadPolicyRules(targetRoot, { required: true });
+	if (!rules) {
+		return denied(
+			targetRoot,
+			lp,
+			"policy",
+			"AMBER_E_SYNC_TRANSPORT_POLICY_REFUSED",
+			"governance rules.json is missing or invalid; governed transport requires an explicit policy",
+			subject,
+		);
+	}
+	for (const op of stageAOps(envelopePathCount)) {
+		const verdict = evaluateGovernedPolicy(proposedOpText(op), rules);
+		if (!verdict.allowed) {
+			return denied(
+				targetRoot,
+				lp,
+				"policy",
+				"AMBER_E_SYNC_TRANSPORT_POLICY_REFUSED",
+				`${proposedOpText(op)} — ${verdict.reason}`,
+				{ ...subject, matchedRule: verdict.matchedRule },
+			);
+		}
+	}
+	return null;
+}
+
+// Approval gate (loop precedent): one approval authorizes exactly one
+// execution.
+function approvalRefusal(targetRoot, lp, subject) {
+	if (latestUnconsumedApproval(readLedger(lp))) return null;
+	return denied(
+		targetRoot,
+		lp,
+		"approval",
+		"AMBER_E_SYNC_TRANSPORT_NOT_APPROVED",
+		"no unconsumed transport approval; each approval authorizes exactly one execution",
+		subject,
+	);
+}
+
+// Confinement gate: path-and-state isolation replaces the loop worktree.
+function confinementRefusal(targetRoot, lp, subject) {
+	if (!fs.existsSync(path.join(targetRoot, ".git"))) {
+		return {
+			target: targetRoot,
+			executed: false,
+			code: "AMBER_E_MISSING_PATH_ARG",
+			errors: [codedError("AMBER_E_MISSING_PATH_ARG", "not a git repository")],
+			warnings: [],
+		};
+	}
+	const staged = stagedIndexPaths(targetRoot);
+	if (staged === null) {
+		return denied(
+			targetRoot,
+			lp,
+			"confinement",
+			"AMBER_E_SYNC_TRANSPORT_DIRTY_TREE",
+			"could not inspect the git index (git diff --cached failed)",
+			subject,
+		);
+	}
+	if (staged.length > 0) {
+		return denied(
+			targetRoot,
+			lp,
+			"confinement",
+			"AMBER_E_SYNC_TRANSPORT_DIRTY_TREE",
+			`index already holds staged paths: ${staged.join(", ")}`,
+			subject,
+		);
+	}
+	const violations = confinementViolations(targetRoot);
+	if (violations.length > 0) {
+		return denied(
+			targetRoot,
+			lp,
+			"confinement",
+			"AMBER_E_SYNC_TRANSPORT_DIRTY_TREE",
+			`staged paths resolve outside the repository: ${violations.join(", ")}`,
+			subject,
+		);
+	}
+	return null;
+}
+
 /**
  * Governed execution of the Stage A local transport (ADR-0020):
  * git add <envelopes + decision records> && git commit — never git push.
@@ -261,130 +379,54 @@ function executeTransport({ target, yes = false, isTTY = process.stdout.isTTY })
 		};
 	}
 
-	// Identity gate (memory precedent): agents run non-TTY and never pass
-	// --yes; a human in a TTY gets the F019-shaped approval envelope instead.
-	if (!yes) {
-		if (!isTTY) {
-			return {
-				target: targetRoot,
-				executed: false,
-				code: "AMBER_E_SYNC_TRANSPORT_APPROVAL_REQUIRED",
-				errors: [
-					codedError(
-						"AMBER_E_SYNC_TRANSPORT_APPROVAL_REQUIRED",
-						"non-interactive invocation without --yes",
-					),
-				],
-				warnings: [],
-			};
-		}
-		return {
-			target: targetRoot,
-			executed: false,
-			approvalRequired: true,
-			hint: "Governed transport requires explicit approval (--yes) after `amber sync session approve --reviewer <name>`.",
-			errors: [],
-			warnings: [],
-		};
-	}
+	const refusal =
+		identityRefusal(targetRoot, yes, isTTY) ||
+		policyRefusal(targetRoot, lp, report.envelopePaths.length, subject) ||
+		approvalRefusal(targetRoot, lp, subject) ||
+		confinementRefusal(targetRoot, lp, subject);
+	if (refusal) return refusal;
 
-	// Policy gate (loop precedent): required rules.json, deny-wins, evaluated
-	// over each derived op's shell line (add/commit only — push is never
-	// evaluated or executed in Stage A).
-	const rules = loadPolicyRules(targetRoot, { required: true });
-	if (!rules) {
-		return denied(
-			targetRoot,
-			lp,
-			"policy",
-			"AMBER_E_SYNC_TRANSPORT_POLICY_REFUSED",
-			"governance rules.json is missing or invalid; governed transport requires an explicit policy",
-			subject,
-		);
-	}
-	for (const op of stageAOps(report.envelopePaths.length)) {
-		const verdict = evaluateGovernedPolicy(proposedOpText(op), rules);
-		if (!verdict.allowed) {
-			return denied(
-				targetRoot,
-				lp,
-				"policy",
-				"AMBER_E_SYNC_TRANSPORT_POLICY_REFUSED",
-				`${proposedOpText(op)} — ${verdict.reason}`,
-				{ ...subject, matchedRule: verdict.matchedRule },
-			);
-		}
-	}
-
-	// Approval gate (loop precedent): one approval authorizes exactly one
-	// execution.
 	const approval = latestUnconsumedApproval(readLedger(lp));
-	if (!approval) {
-		return denied(
-			targetRoot,
-			lp,
-			"approval",
-			"AMBER_E_SYNC_TRANSPORT_NOT_APPROVED",
-			"no unconsumed transport approval; each approval authorizes exactly one execution",
-			subject,
-		);
-	}
-
-	// Confinement gate: path-and-state isolation replaces the loop worktree.
-	if (!fs.existsSync(path.join(targetRoot, ".git"))) {
-		return {
-			target: targetRoot,
-			executed: false,
-			code: "AMBER_E_MISSING_PATH_ARG",
-			errors: [codedError("AMBER_E_MISSING_PATH_ARG", "not a git repository")],
-			warnings: [],
-		};
-	}
-	const staged = stagedIndexPaths(targetRoot);
-	if (staged === null) {
-		return denied(
-			targetRoot,
-			lp,
-			"confinement",
-			"AMBER_E_SYNC_TRANSPORT_DIRTY_TREE",
-			"could not inspect the git index (git diff --cached failed)",
-			subject,
-		);
-	}
-	if (staged.length > 0) {
-		return denied(
-			targetRoot,
-			lp,
-			"confinement",
-			"AMBER_E_SYNC_TRANSPORT_DIRTY_TREE",
-			`index already holds staged paths: ${staged.join(", ")}`,
-			subject,
-		);
-	}
-	const violations = confinementViolations(targetRoot);
-	if (violations.length > 0) {
-		return denied(
-			targetRoot,
-			lp,
-			"confinement",
-			"AMBER_E_SYNC_TRANSPORT_DIRTY_TREE",
-			`staged paths resolve outside the repository: ${violations.join(", ")}`,
-			subject,
-		);
-	}
-
 	return runStageAExecution(targetRoot, lp, approval, report, subject);
 }
 
-// Stage A execution: decision record + pathspec-confined add + commit. The
-// decision record is written BEFORE the commit so it is staged with the
+// The decision record is written BEFORE the commit so it is staged with the
 // envelopes (the chicken-egg: commitSha can only ride in the ledger, never in
-// the record it produced). Envelopes are staged first; if the index holds no
-// change against HEAD the retry is a typed nothing-to-commit outcome — no
-// duplicate empty commit is created.
+// the record it produced).
+function writeDecisionRecord(targetRoot, batchId, approval, report, subject, ops) {
+	const decisionsDir = transportDecisionsDir(targetRoot);
+	const decisionPath = path.join(decisionsDir, `${batchId}.json`);
+	fs.mkdirSync(decisionsDir, { recursive: true });
+	fs.writeFileSync(
+		decisionPath,
+		JSON.stringify(
+			{
+				schemaVersion: 1,
+				kind: "transport-decision",
+				batchId,
+				approvalKey: approval.approvalKey,
+				reviewer: approval.reviewer,
+				envelopeIds: report.envelopeIds,
+				opsFingerprint: subject.opsFingerprint,
+				ops,
+				recordedAt: new Date().toISOString(),
+				note: "ADR-0020 Stage A governed local commit; git push is not executed by Amber.",
+			},
+			null,
+			2,
+		) + "\n",
+	);
+	return decisionPath;
+}
+
+// Stage A execution: decision record + pathspec-confined add + commit.
+// Envelopes are staged first; if the index holds no change against HEAD the
+// retry is a typed nothing-to-commit outcome — no duplicate empty commit is
+// created.
 function runStageAExecution(targetRoot, lp, approval, report, subject) {
 	const batchId = crypto.randomUUID();
 	const ops = stageAOps(report.envelopePaths.length);
+	const [, commitOp] = ops;
 	const lines = ops.map(proposedOpText);
 	const executedRecord = (over) =>
 		appendLedgerRecord(lp, {
@@ -419,7 +461,7 @@ function runStageAExecution(targetRoot, lp, approval, report, subject) {
 	};
 
 	// 1. Stage the envelopes (pathspec-confined; the ledger is never staged).
-	const addEnvelopes = gitExec(targetRoot, ["add", STAGE_A_ADD_PATHS[0]]);
+	const addEnvelopes = gitExec(targetRoot, ["add", ENVELOPES_HOME]);
 	if (!addEnvelopes.ok) {
 		return failure({
 			action: {
@@ -449,29 +491,8 @@ function runStageAExecution(targetRoot, lp, approval, report, subject) {
 	}
 
 	// 3. Decision record (pre-commit so it rides in the same commit).
-	const decisionsDir = transportDecisionsDir(targetRoot);
-	const decisionPath = path.join(decisionsDir, `${batchId}.json`);
-	fs.mkdirSync(decisionsDir, { recursive: true });
-	fs.writeFileSync(
-		decisionPath,
-		JSON.stringify(
-			{
-				schemaVersion: 1,
-				kind: "transport-decision",
-				batchId,
-				approvalKey: approval.approvalKey,
-				reviewer: approval.reviewer,
-				envelopeIds: report.envelopeIds,
-				opsFingerprint: subject.opsFingerprint,
-				ops,
-				recordedAt: new Date().toISOString(),
-				note: "ADR-0020 Stage A governed local commit; git push is not executed by Amber.",
-			},
-			null,
-			2,
-		) + "\n",
-	);
-	const addDecisions = gitExec(targetRoot, ["add", STAGE_A_ADD_PATHS[1]]);
+	const decisionPath = writeDecisionRecord(targetRoot, batchId, approval, report, subject, ops);
+	const addDecisions = gitExec(targetRoot, ["add", DECISIONS_HOME]);
 	if (!addDecisions.ok) {
 		return failure({
 			action: {
@@ -485,7 +506,7 @@ function runStageAExecution(targetRoot, lp, approval, report, subject) {
 
 	// 4. Commit with the derived message (whole index — the empty-index gate
 	// above is what makes this safe).
-	const commit = gitExec(targetRoot, ["commit", "-m", ops[1].message]);
+	const commit = gitExec(targetRoot, ["commit", "-m", commitOp.message]);
 	if (!commit.ok) {
 		return failure({
 			action: {

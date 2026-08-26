@@ -6,9 +6,9 @@
 // whole file and recomputes every hash (that needs external anchoring; see spec).
 const fs = require("node:fs");
 const path = require("node:path");
-const crypto = require("node:crypto");
 const { codedError } = require("./error-catalog");
-const { readJSONL } = require("./jsonl");
+const { readJSONL, appendJSONL } = require("./jsonl");
+const { sha256Hex } = require("./context-hash");
 
 const GENESIS = "0".repeat(64);
 
@@ -30,10 +30,7 @@ function canonicalize(record) {
 }
 
 function hashRecord(record, prevHash) {
-	return crypto
-		.createHash("sha256")
-		.update(prevHash + canonicalize(record))
-		.digest("hex");
+	return sha256Hex(prevHash + canonicalize(record));
 }
 
 function readLedger(ledgerPath) {
@@ -47,8 +44,7 @@ function appendLedgerRecord(ledgerPath, record) {
 	const prevHash = existing.length ? existing[existing.length - 1].hash || GENESIS : GENESIS;
 	const body = { ...record, prevHash };
 	const full = { ...body, hash: hashRecord(body, prevHash) };
-	fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
-	fs.appendFileSync(ledgerPath, JSON.stringify(full) + "\n");
+	appendJSONL(ledgerPath, full);
 	return full;
 }
 

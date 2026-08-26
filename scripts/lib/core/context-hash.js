@@ -14,7 +14,13 @@ const path = require("node:path");
 
 /** sha256 of a UTF-8 string, prefixed "sha256:" for self-describing hashes. */
 function sha256(text) {
-	return `sha256:${crypto.createHash("sha256").update(text, "utf8").digest("hex")}`;
+	return `sha256:${sha256Hex(text)}`;
+}
+
+/** Raw hex sha256 of a UTF-8 string — the seam for fingerprints and chain
+ * hashes that are compared, not displayed (architecture review #6). */
+function sha256Hex(text) {
+	return crypto.createHash("sha256").update(text, "utf8").digest("hex");
 }
 
 // Strip comments and whitespace from JavaScript source without parsing string
@@ -181,6 +187,7 @@ function hashSource(text, ext) {
 
 module.exports = {
 	sha256,
+	sha256Hex,
 	normalizeForHash,
 	hashFile,
 	hashText,

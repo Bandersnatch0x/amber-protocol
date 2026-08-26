@@ -203,7 +203,7 @@ jobs:
 
       - name: Install web dependencies
         working-directory: apps/web
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Lint web app
         working-directory: apps/web

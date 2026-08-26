@@ -218,8 +218,14 @@ function HomePage() {
   const nextActionQuery = trpc.lifecycle.next.useQuery({});
   const [fieldOpen, setFieldOpen] = useState(false);
 
-  const sessions = Array.isArray(sessionsQuery.data) ? sessionsQuery.data : [];
-  const gates = Array.isArray(gatesQuery.data) ? gatesQuery.data : [];
+  const sessions = useMemo(
+    () => (Array.isArray(sessionsQuery.data) ? sessionsQuery.data : []),
+    [sessionsQuery.data],
+  );
+  const gates = useMemo(
+    () => (Array.isArray(gatesQuery.data) ? gatesQuery.data : []),
+    [gatesQuery.data],
+  );
 
   const activeSessions = useMemo(
     () => sessions.filter((session) => isActiveStatus(session.status)),

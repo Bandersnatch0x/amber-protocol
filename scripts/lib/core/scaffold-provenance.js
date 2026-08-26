@@ -6,7 +6,6 @@
 // fresh / stale / customized / ambiguous. Lives in `.amber/provenance.json`
 // (NOT init-report.json, which is only written when detection/wiki insights exist).
 const path = require("node:path");
-const crypto = require("node:crypto");
 const {
 	TEMPLATE_ROOT,
 	CLI_VERSION,
@@ -14,6 +13,7 @@ const {
 	AMBER_STATE_FILES,
 } = require("./constants");
 const { pathExists, readText, writeJson, relativeSlash, walkFiles } = require("./fs-utils");
+const { sha256Hex } = require("./context-hash");
 const { statePathForCreate } = require("../state-dir-resolver");
 
 // Strip YAML-frontmatter `updated:` lines before hashing. A release that bumps
@@ -30,10 +30,7 @@ function normalizedContentForHash(text) {
 function computeTemplateHash(filePath) {
 	if (!pathExists(filePath)) return null;
 	try {
-		return crypto
-			.createHash("sha256")
-			.update(normalizedContentForHash(readText(filePath)), "utf8")
-			.digest("hex");
+		return sha256Hex(normalizedContentForHash(readText(filePath)));
 	} catch {
 		return null;
 	}
