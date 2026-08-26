@@ -660,6 +660,26 @@ const COMMAND_HELP = {
 		"  amber phase validate --phase phase-0 --target . --json",
 		"  amber phase promote --phase phase-0 --auth human-approve --target . --json",
 	],
+	artifact: [
+		"Admit and read Canonical Planning Artifacts (F049; ADR-0023).",
+		"Each revision binds a human-readable Artifact Body to a",
+		"machine-actionable Envelope in one atomic admission, settled through",
+		"durable prepared/committed/aborted journal records. Only committed",
+		"revisions are visible; history is append-only and immutable — there",
+		"is no in-place mutation path for a committed revision.",
+		"",
+		"Subcommands:",
+		"  admit --id <identity> --body <markdown>",
+		"        Admit a new Intent revision; returns the admission receipt.",
+		"        Pass --supersedes-revision <n> to supersede the current head.",
+		"  show --id <identity> [--revision <n>]  Show a committed revision.",
+		"  list                  List committed artifacts (current revision each).",
+		"",
+		"Examples:",
+		'  amber artifact admit --id intent/login-bug --body "# Intent: login bug" --target . --json',
+		"  amber artifact show --id intent/login-bug --revision 1 --target . --json",
+		"  amber artifact list --target . --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -966,6 +986,13 @@ const COMMAND_OUTPUT = {
 		usage:
 			"Usage: amber memory <request|ingest|approve|book|abandon|status> [--target <repo>] [--json]",
 	},
+	artifact: {
+		usage: [
+			"Usage: amber artifact admit --target <repo> --id <identity> --body <markdown> [--supersedes-revision <n>] [--json]",
+			"       amber artifact show --target <repo> --id <identity> [--revision <n>] [--json]",
+			"       amber artifact list --target <repo> [--json]",
+		].join("\n"),
+	},
 };
 
 const DEFAULT_OUTPUT = Object.freeze({ dryRun: false, summary: false, usage: null });
@@ -1011,6 +1038,7 @@ const COMMANDS = Object.freeze([
 	"projection",
 	"knowledge",
 	"phase",
+	"artifact",
 ]);
 const TIER_BY_COMMAND = {
 	init: "core",
@@ -1035,6 +1063,7 @@ const TIER_BY_COMMAND = {
 	projection: "core",
 	knowledge: "core",
 	phase: "core",
+	artifact: "core",
 	next: "journey",
 	profile: "deprecated",
 	task: "deprecated",

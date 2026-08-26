@@ -66,6 +66,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"projection",
 	"knowledge",
 	"phase",
+	"artifact",
 ];
 
 test("one Command registry drives help, policy, dispatch, and the public command list", () => {

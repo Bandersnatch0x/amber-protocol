@@ -84,6 +84,7 @@ const { projectionDispatch } = require("./projection-commands");
 const { syncDispatch } = require("./sync-commands");
 const { knowledgeDispatch } = require("./knowledge-commands");
 const { phaseDispatch } = require("./phase-commands");
+const { artifactDispatch } = require("./canonical-artifact-commands");
 const { orgAuditDispatch } = require("./org-audit-commands");
 const { hooksDispatch } = require("./hooks-commands");
 const { bindCommandHandlers } = require("./command-registry");
@@ -1019,6 +1020,10 @@ function handlePhase(args) {
 	return phaseDispatch(args);
 }
 
+function handleArtifact(args) {
+	return artifactDispatch(args);
+}
+
 function handleExplain(args) {
 	const { explain } = require("./explain-command");
 	const r = explain(args);
@@ -1151,6 +1156,7 @@ const COMMAND_HANDLERS = {
 	projection: handleProjection,
 	knowledge: handleKnowledge,
 	phase: handlePhase,
+	artifact: handleArtifact,
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);

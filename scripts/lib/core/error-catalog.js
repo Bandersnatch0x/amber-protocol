@@ -485,6 +485,57 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED"],
 	},
+	AMBER_E_ARTIFACT_ORPHANED_HALF: {
+		title: "Canonical Artifact pair is incomplete",
+		cause:
+			"Admission arrived incomplete: a Body without an Envelope, an Envelope without a Body, or no artifact identity to bind the pair; ADR-0023 requires the pair to be committed atomically.",
+		remedy: "Re-admit with both the Artifact Body and its Artifact Envelope in one call.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_HASH_MISMATCH", "AMBER_E_ARTIFACT_CONFLICT"],
+	},
+	AMBER_E_ARTIFACT_HASH_MISMATCH: {
+		title: "Canonical Artifact Body/Envelope hash mismatch",
+		cause:
+			"The Envelope's recorded Body hash does not match the canonical serialization of the submitted Body.",
+		remedy:
+			"Regenerate the Envelope from the current Body so both sides bind to the same contentHash, then re-admit.",
+		layer: "Verification",
+		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF"],
+	},
+	AMBER_E_ARTIFACT_JOURNAL_CORRUPT: {
+		title: "Canonical Artifact journal is corrupt or unreadable",
+		cause:
+			"An artifact read or admission hit a corrupt line or unreadable .amber/artifacts journal.jsonl. An absent journal reads as empty; this code only fires on real corruption.",
+		remedy:
+			"Restore .amber/artifacts/<type>/<identity>/journal.jsonl from version control; never delete it — the journal is append-only provenance.",
+		layer: "Observability",
+		related: ["AMBER_E_KB_CORRUPT", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_ARTIFACT_CONFLICT: {
+		title: "Canonical Artifact compare-and-swap conflict",
+		cause:
+			"The admission's expected head (supersedes revision) is not the artifact's current committed revision.",
+		remedy:
+			"Read the current revision with `amber artifact show`, then re-admit superseding that revision.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_NOT_FOUND"],
+	},
+	AMBER_E_ARTIFACT_NOT_FOUND: {
+		title: "Canonical Artifact or revision not found",
+		cause:
+			"A read named an identity or revision with no committed record. Prepared and aborted revisions are invisible by design.",
+		remedy:
+			"List committed artifacts with `amber artifact list` to see valid identities and revisions.",
+		layer: "Observability",
+		related: ["AMBER_E_ARTIFACT_CONFLICT"],
+	},
+	AMBER_E_ARTIFACT_UNKNOWN_TYPE: {
+		title: "Canonical Artifact type is not registered",
+		cause: "Admission named an Artifact Type outside the closed registry (currently intent only).",
+		remedy: "Use a registered Artifact Type; `intent` is the first admitted type.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
