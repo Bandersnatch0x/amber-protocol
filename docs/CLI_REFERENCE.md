@@ -504,6 +504,50 @@ stays invisible to reads, and its consumed revision slot is never reused. Nothin
 automatically beyond that settlement record — restoring tampered artifact state is a
 version-control operation, never a silent write.
 
+Committed revisions and their typed Traces project into the Governance Graph — see
+`projection rebuild --type governance-graph` below.
+
+### projection rebuild / status / query (Governance Graph of artifact revisions)
+
+The Governance Graph is the only graph projection (ADR-0021) and is never a write authority: the
+artifact store remains the sole writer, and the graph is a rebuildable read-only projection of
+committed state. `projection rebuild --type governance-graph` derives the graph from canonical
+context pages **and** every committed Canonical Artifact revision: one node per fully committed
+Intent/Spec/Plan revision and one typed edge per resolved Trace (`refines`, `realizes`,
+`supersedes`), so the Intent → Spec → Plan planning lineage is queryable directly.
+
+- Artifact-layer node ids are `<type>/<identity>@<revision>` (e.g. `spec/spec/login-spec@2`). A node
+  carries only read-only references — artifact type, identity, revision, lifecycle, scope, binding
+  hashes, and provenance; a lifecycle change is always a new committed revision (a new node), never
+  an in-place status edit.
+- Rebuild is deterministic: identical committed state produces the identical result hash. The
+  receipt (the manifest under `.amber/projections/governance-graph.json`) records the source
+  checkpoint (`rebuild_checkpoint`/`sourceHash` — a digest of the pages plus the committed revision
+  references with their Envelope hashes), the projection rule and Trace contract versions
+  (`projection_rule_versions`), the schema version, the result hash (`outputHash`), and the Amber
+  protocol version.
+- `projection status --type governance-graph` certifies currency against the same checkpoint:
+  committing a new artifact revision drifts the projection until it is rebuilt.
+- `projection query` keeps the existing bounded-read contract: an exact scope resolves one node
+  (page id or artifact revision id) plus its edge neighborhood, an unknown scope is denied as
+  `AMBER_E_GRAPH_DENY`, and unscoped reads are capped (`--limit`, default 50) with a `truncated`
+  flag. Every query records an immutable read receipt.
+- Only fully committed revisions are projected; prepared and aborted revisions are invisible. A
+  corrupt artifact store fails the rebuild and the query closed with the typed artifact corruption
+  code (e.g. `AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`) — never a partial projection — and the
+  projection itself never writes or repairs Canonical Artifacts.
+
+```bash
+# project the committed planning lineage and inspect the rebuild receipt
+node scripts/amber.js projection rebuild --type governance-graph --target . --json
+
+# query one revision plus its refines/realizes neighborhood (bounded, receipted)
+node scripts/amber.js projection query --scope spec/spec/login-spec@2 --target . --json
+
+# currency: drifts when a new artifact revision is committed, current again after rebuild
+node scripts/amber.js projection status --type governance-graph --target . --json
+```
+
 ## Handoff Commands
 
 ### handoff

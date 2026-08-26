@@ -1059,6 +1059,85 @@ function listArtifacts(cwd) {
 	return committedCurrents(cwd);
 }
 
+// Canonical ordering of committed revisions for projections (F049 ticket 05):
+// (type, identity, revision). The store's walk order is directory iteration
+// order, which is not a contract — the projection layer needs an order that
+// is a pure function of the committed content.
+function compareArtifactRevisions(a, b) {
+	if (a.type !== b.type) return a.type < b.type ? -1 : 1;
+	if (a.identity !== b.identity) return a.identity < b.identity ? -1 : 1;
+	return a.revision - b.revision;
+}
+
+/**
+ * Every committed revision of the whole store as an externally visible
+ * projection — the read seam the Governance Graph projection consumes
+ * (F049 ticket 05, #222; ADR-0021: Canonical Artifacts remain the write
+ * authority, the graph is a rebuildable read-only projection).
+ *
+ * This is a verification read with the same fail-closed guarantees as
+ * show/list: every home's settlement journal is replayed, both halves of
+ * every committed pair are swept, each served revision's committed record
+ * is cross-checked against its Envelope, and the committed trace graph of
+ * every revision is walked for cycles. One corrupt artifact fails the
+ * entire read — the projection is never partial (F035-S5), so corrupt
+ * revisions are excluded by refusal, never by silent skipping. Only fully
+ * committed revisions are returned; prepared and aborted revisions are
+ * invisible by design.
+ *
+ * Unlike show/list, this read is STRICTLY read-only: it never settles
+ * crashed attempts, so not even a journal-only recovery record is appended
+ * through the projection path. There is no code path from the projection
+ * rebuild or query to a Canonical Artifact write of any kind.
+ *
+ * @param {string} cwd - Target repository root.
+ * @returns {Array<object>} Committed revision projections, canonically
+ *         ordered by (type, identity, revision).
+ * @throws {Error} Typed AMBER_E_ARTIFACT_JOURNAL_CORRUPT /
+ *         AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT / AMBER_E_ARTIFACT_TRACE_CYCLE /
+ *         AMBER_E_ARTIFACT_HASH_MISMATCH / AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH.
+ */
+function listArtifactRevisions(cwd) {
+	const revisions = [];
+	const startNodes = [];
+	for (const { dir } of walkArtifactHomes(cwd)) {
+		const slug = path.basename(dir);
+		const journal = readJournal(dir);
+		validateSettlement(journal);
+		for (const revision of committedRevisions(journal)) {
+			const envelope = readEnvelope(dir, revision);
+			const body = readBody(dir, revision);
+			if (!envelope || !body) {
+				throw typedReadError(
+					SETTLEMENT_CORRUPT_CODE,
+					`committed revision ${revision} of "${slug}" is missing its ${envelope ? "Body" : "Envelope"} on disk; refusing to project inconsistent settlement state`,
+				);
+			}
+			const commitRecord = findCommitRecord(journal, revision);
+			revisions.push(
+				committedProjection(
+					envelope.type,
+					envelope.identity,
+					revision,
+					body,
+					envelope,
+					commitRecord?.at ?? null,
+				),
+			);
+			if (contentHashMismatch(commitRecord, envelope)) {
+				throw typedReadError(
+					SETTLEMENT_CORRUPT_CODE,
+					settlementContentHashMessage(envelope.identity, revision, commitRecord, envelope),
+				);
+			}
+			startNodes.push({ type: envelope.type, identity: envelope.identity, revision });
+		}
+	}
+	const cycle = findTraceCycle(startNodes, traceEdgesResolver(cwd));
+	if (cycle) throw traceCycleError(cycle);
+	return revisions.sort(compareArtifactRevisions);
+}
+
 /**
  * Admit one Canonical Artifact revision: validate the Body/Envelope pair,
  * then settle it atomically through prepared → committed journal records as
@@ -1602,4 +1681,5 @@ module.exports = {
 	admitArtifact,
 	showArtifact,
 	listArtifacts,
+	listArtifactRevisions,
 };

@@ -1,19 +1,33 @@
 "use strict";
 
 /**
- * Governance Graph projection + bounded query contract (#162).
+ * Governance Graph projection + bounded query contract (#162; F049 ticket
+ * 05, #222).
  *
- * The Governance Graph is a rebuildable read-only projection (baseline bounded
- * context; ADR-0019 D5). It derives deterministic relationship edges from
- * canonical Amber artifacts (context pages + their source references) and
- * serves bounded queries with exact-scope denial: a query for an unknown
- * scope is denied, never guessed.
+ * The Governance Graph is a rebuildable read-only projection (baseline
+ * bounded context; ADR-0019 D5) and — per ADR-0021 — the ONLY graph
+ * projection. It derives deterministic relationship edges from canonical
+ * Amber artifacts (context pages + their source references) and, since F049
+ * ticket 05, from committed Canonical Planning Artifact revisions: every
+ * fully committed Intent/Spec/Plan revision becomes a graph node and every
+ * resolved Trace (refines / realizes / supersedes) becomes a typed edge, so
+ * a graph consumer can query the Intent → Spec → Plan lineage.
  *
  * Never canonical authority. Rebuildable from canonical inputs at any time.
+ * The artifact layer is derived through the strictly read-only verification
+ * seam listArtifactRevisions (canonical-artifacts.js), so a corrupt store
+ * fails the graph build closed instead of yielding a partial projection
+ * (F035-S5: corrupt revisions are excluded by refusal, never skipped), and
+ * no code path from a graph build or query reaches a Canonical Artifact
+ * write. Deterministic: nodes and edges are canonically ordered, so
+ * identical canonical state always produces the identical graph and source
+ * hash, independent of directory iteration order.
  */
 
-const { sha256 } = require("./context-hash");
+const { sha256, canonicalJson } = require("./context-hash");
 const { readCanonicalPages: canonicalPages } = require("./context-store");
+const { listArtifactRevisions } = require("./canonical-artifacts");
+const { artifactGraphLayer, artifactSourceFingerprint } = require("./artifact-graph-projection");
 
 const DEFAULT_QUERY_LIMIT = 50;
 
@@ -28,18 +42,56 @@ function parseScope(scope) {
 }
 
 /**
- * Build the Governance Graph from canonical artifacts.
+ * Source state of the Governance Graph projection: canonical context pages
+ * plus every committed Canonical Artifact revision (F049 ticket 05, #222).
+ * Both halves are read through fail-closed canonical readers, so a corrupt
+ * page set or artifact store throws instead of feeding the projection a
+ * partial source.
  * @param {string} targetRoot - Repository root.
- * @returns {{nodes: Array<object>, edges: Array<object>, sourceHash: string}}
+ * @returns {{artifacts: Array<object>, artifactRevisions: Array<object>}}
  */
-function buildGovernanceGraph(targetRoot) {
-	const pages = canonicalPages(targetRoot);
-	const nodes = pages.map((page) => ({
+function governanceGraphSource(targetRoot) {
+	return {
+		artifacts: canonicalPages(targetRoot),
+		artifactRevisions: listArtifactRevisions(targetRoot),
+	};
+}
+
+/**
+ * Source checkpoint of the Governance Graph projection: a tamper-evident
+ * digest of BOTH canonical sources. The page half is the canonical page
+ * set; the artifact half is the committed revision references with their
+ * Envelope hashes (an Envelope hash covers the full revision content —
+ * bodyHash, provenance, lifecycle, scope, resolved traces), so the
+ * checkpoint changes exactly when either source changes. A rebuild records
+ * this checkpoint in its receipt; a status check compares against it.
+ * @param {{artifacts: Array<object>, artifactRevisions: Array<object>}} source
+ * @returns {string} `sha256:<64 hex>`
+ */
+function governanceGraphCheckpoint({ artifacts = [], artifactRevisions = [] } = {}) {
+	return sha256(
+		canonicalJson(
+			JSON.stringify({
+				artifacts,
+				artifactRevisions: artifactSourceFingerprint(artifactRevisions),
+			}),
+		),
+	);
+}
+
+// Page nodes: one per canonical context page.
+function pageNodes(pages) {
+	return pages.map((page) => ({
 		id: page.pageId || page.id,
 		type: "context-page",
 		title: page.title || "",
 	}));
-	// Edges: pages sharing a source reference → relationship with provenance.
+}
+
+// Page edges: pages sharing a source reference → relationship with
+// provenance. Members are ordered by page id, so the edge set (and its
+// hash) is a pure function of the page content, never of directory order.
+function pageEdges(pages) {
 	const sourceIndex = new Map();
 	const edges = [];
 	for (const page of pages) {
@@ -47,13 +99,13 @@ function buildGovernanceGraph(targetRoot) {
 		for (const [sourceId, source] of Object.entries(sources)) {
 			const ref = source && source.ref;
 			if (!ref) continue;
-			const key = ref;
-			if (!sourceIndex.has(key)) sourceIndex.set(key, []);
-			sourceIndex.get(key).push({ pageId: page.pageId || page.id, sourceId, source });
+			if (!sourceIndex.has(ref)) sourceIndex.set(ref, []);
+			sourceIndex.get(ref).push({ pageId: page.pageId || page.id, sourceId, source });
 		}
 	}
 	for (const [ref, members] of sourceIndex) {
 		if (members.length < 2) continue;
+		members.sort((a, b) => (a.pageId < b.pageId ? -1 : a.pageId > b.pageId ? 1 : 0));
 		for (let i = 0; i < members.length; i += 1) {
 			for (let j = i + 1; j < members.length; j += 1) {
 				edges.push({
@@ -71,8 +123,48 @@ function buildGovernanceGraph(targetRoot) {
 			}
 		}
 	}
-	const canonicalJson = JSON.stringify({ nodes, edges });
-	return { nodes, edges, sourceHash: sha256(canonicalJson) };
+	return edges;
+}
+
+function compareNodes(a, b) {
+	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+function compareEdges(a, b) {
+	if (a.source !== b.source) return a.source < b.source ? -1 : 1;
+	if (a.target !== b.target) return a.target < b.target ? -1 : 1;
+	if (a.type !== b.type) return a.type < b.type ? -1 : 1;
+	return 0;
+}
+
+/**
+ * Build the Governance Graph from a source state (pages + committed
+ * artifact revisions). Deterministic: the page nodes/edges and the artifact
+ * revision nodes/typed trace edges are merged and canonically ordered, so
+ * identical canonical state always yields the identical graph and source
+ * hash. Page node ids and artifact revision node ids (`<type>/<identity>@
+ * <revision>`) live in disjoint id namespaces by construction.
+ * @param {{artifacts?: Array<object>, artifactRevisions?: Array<object>}} state
+ * @returns {{nodes: Array<object>, edges: Array<object>, sourceHash: string}}
+ */
+function governanceGraphFromState({ artifacts = [], artifactRevisions = [] } = {}) {
+	const layer = artifactGraphLayer(artifactRevisions);
+	const nodes = [...pageNodes(artifacts), ...layer.nodes].sort(compareNodes);
+	const edges = [...pageEdges(artifacts), ...layer.edges].sort(compareEdges);
+	const canonicalGraphJson = JSON.stringify({ nodes, edges });
+	return { nodes, edges, sourceHash: sha256(canonicalGraphJson) };
+}
+
+/**
+ * Build the Governance Graph from canonical artifacts (context pages plus
+ * committed Canonical Artifact revisions). Fail-closed: a corrupt artifact
+ * store throws the typed artifact corruption error instead of producing a
+ * partial graph.
+ * @param {string} targetRoot - Repository root.
+ * @returns {{nodes: Array<object>, edges: Array<object>, sourceHash: string}}
+ */
+function buildGovernanceGraph(targetRoot) {
+	return governanceGraphFromState(governanceGraphSource(targetRoot));
 }
 
 /**
@@ -116,6 +208,9 @@ module.exports = {
 	DEFAULT_QUERY_LIMIT,
 	sha256,
 	parseScope,
+	governanceGraphSource,
+	governanceGraphCheckpoint,
+	governanceGraphFromState,
 	buildGovernanceGraph,
 	queryGraph,
 };

@@ -22,6 +22,7 @@ const { sha256 } = require("./context-hash");
 const fs = require("node:fs");
 const path = require("node:path");
 const { readCanonicalPages } = require("./context-store");
+const { governanceGraphSource, governanceGraphCheckpoint } = require("./governance-graph");
 const { statePathForCreate } = require("../state-dir-resolver");
 
 const PROJECTION_TYPES = Object.freeze([
@@ -45,15 +46,38 @@ function projectionManifestPath(targetRoot, projectionType) {
 	return path.join(projectionsDir(targetRoot), `${projectionType}.json`);
 }
 
+// Per-projection canonical source collectors (F049 ticket 05, #222; ADR-0021
+// #2: the Governance Graph's registry and sources may be extended for 2.0
+// types). The Governance Graph — the only graph projection — derives from
+// context pages AND committed Canonical Artifact revisions, so its source
+// state and drift checkpoint cover both. The other projections stay
+// page-derived. The artifact half is read through the strictly read-only
+// verification seam listArtifactRevisions, so a corrupt store makes the
+// source unreadable (fail closed) rather than the projection partial.
+const PROJECTION_SOURCES = Object.freeze({
+	"governance-graph": (targetRoot) => {
+		const source = governanceGraphSource(targetRoot);
+		return {
+			...source,
+			checkpoint: governanceGraphCheckpoint(source),
+		};
+	},
+});
+
 /**
  * Collect canonical artifacts a projection is built from.
- * Today: context pages under .amber/context/pages/.
+ * Default: context pages under .amber/context/pages/. Projections with a
+ * registered source collector (PROJECTION_SOURCES) derive their state and
+ * checkpoint from it instead.
  * @param {string} targetRoot - Repository root.
+ * @param {string} [projectionType] - One of PROJECTION_TYPES.
  * @returns {{artifacts: Array<object>, checkpoint: string}}
  */
-function canonicalState(targetRoot) {
+function canonicalState(targetRoot, projectionType) {
 	// canonical evidence reader lives in context-store; projection registry
 	// derives the deterministic checkpoint from the same page set
+	const source = projectionType ? PROJECTION_SOURCES[projectionType] : undefined;
+	if (source) return source(targetRoot);
 	const artifacts = readCanonicalPages(targetRoot);
 	const canonicalJson = JSON.stringify(artifacts);
 	return { artifacts, checkpoint: sha256(canonicalJson) };
@@ -143,6 +167,21 @@ function validateProjectionManifest(manifest) {
 	) {
 		errors.push("amber_protocol_version must be a string");
 	}
+	// F049 ticket 05 (#222): rebuild receipts record the projection rule
+	// versions they were built under. Optional and, when present, a map of
+	// rule name → positive integer version.
+	if (manifest.projection_rule_versions !== undefined) {
+		const versions = manifest.projection_rule_versions;
+		if (versions === null || typeof versions !== "object" || Array.isArray(versions)) {
+			errors.push("projection_rule_versions must be an object of rule name → version");
+		} else {
+			for (const [rule, version] of Object.entries(versions)) {
+				if (!Number.isInteger(version) || version < 1) {
+					errors.push(`projection_rule_versions.${rule} must be an integer >= 1`);
+				}
+			}
+		}
+	}
 	return { valid: errors.length === 0, errors };
 }
 
@@ -151,19 +190,24 @@ function validateProjectionManifest(manifest) {
  * @param {string} targetRoot - Repository root.
  * @param {string} projectionType - One of PROJECTION_TYPES.
  * @param {(state: {artifacts: Array<object>, checkpoint: string}) => object} builder
- * @returns {{ok: boolean, manifest: object|null, output: string|null, errors: string[]}}
+ * @param {object} [options]
+ * @param {object|null} [options.manifestFields] - Extra receipt fields merged
+ *        into the manifest (e.g. projection_rule_versions for the
+ *        Governance Graph's artifact layer).
+ * @returns {{ok: boolean, manifest: object|null, output: string|null, errors: string[], code: string|null}}
  */
-function buildProjection(targetRoot, projectionType, builder) {
+function buildProjection(targetRoot, projectionType, builder, { manifestFields = null } = {}) {
 	if (!PROJECTION_TYPES.includes(projectionType)) {
 		return {
 			ok: false,
 			manifest: null,
 			output: null,
 			errors: [`unknown projection type "${projectionType}"`],
+			code: null,
 		};
 	}
 	try {
-		const state = canonicalState(targetRoot);
+		const state = canonicalState(targetRoot, projectionType);
 		const built = builder(state);
 		const output = JSON.stringify(built, null, 2) + "\n";
 		const manifest = {
@@ -180,14 +224,24 @@ function buildProjection(targetRoot, projectionType, builder) {
 			created_at: new Date().toISOString(),
 			artifact_type: "projection-manifest",
 			rebuiltAt: new Date().toISOString(),
+			...(manifestFields || {}),
 		};
 		const validation = validateProjectionManifest(manifest);
 		if (!validation.valid) {
-			return { ok: false, manifest: null, output: null, errors: validation.errors };
+			return { ok: false, manifest: null, output: null, errors: validation.errors, code: null };
 		}
-		return { ok: true, manifest, output, errors: [] };
+		return { ok: true, manifest, output, errors: [], code: null };
 	} catch (err) {
-		return { ok: false, manifest: null, output: null, errors: [err.message] };
+		// Fail closed, never partial: a source the projection cannot verify
+		// (e.g. a corrupt Canonical Artifact store) fails the whole rebuild —
+		// nothing is written and the typed code rides the result.
+		return {
+			ok: false,
+			manifest: null,
+			output: null,
+			errors: [err.message],
+			code: err.amberCode || null,
+		};
 	}
 }
 
@@ -196,10 +250,11 @@ function buildProjection(targetRoot, projectionType, builder) {
  * @param {string} targetRoot - Repository root.
  * @param {string} projectionType - One of PROJECTION_TYPES.
  * @param {(state: object) => object} builder
- * @returns {{ok: boolean, manifest: object|null, manifestPath: string|null, outputPath: string|null, errors: string[]}}
+ * @param {object} [options] - See buildProjection.
+ * @returns {{ok: boolean, manifest: object|null, manifestPath: string|null, outputPath: string|null, errors: string[], code: string|null}}
  */
-function rebuildProjection(targetRoot, projectionType, builder) {
-	const built = buildProjection(targetRoot, projectionType, builder);
+function rebuildProjection(targetRoot, projectionType, builder, options = {}) {
+	const built = buildProjection(targetRoot, projectionType, builder, options);
 	if (!built.ok) {
 		return {
 			ok: false,
@@ -207,6 +262,7 @@ function rebuildProjection(targetRoot, projectionType, builder) {
 			manifestPath: null,
 			outputPath: null,
 			errors: built.errors,
+			code: built.code,
 		};
 	}
 	const dir = projectionsDir(targetRoot);
@@ -215,7 +271,14 @@ function rebuildProjection(targetRoot, projectionType, builder) {
 	const outputPath = path.join(dir, `${projectionType}.output.json`);
 	fs.writeFileSync(manifestPath, JSON.stringify(built.manifest, null, 2) + "\n", "utf8");
 	fs.writeFileSync(outputPath, built.output, "utf8");
-	return { ok: true, manifest: built.manifest, manifestPath, outputPath, errors: [] };
+	return {
+		ok: true,
+		manifest: built.manifest,
+		manifestPath,
+		outputPath,
+		errors: [],
+		code: null,
+	};
 }
 
 /**
@@ -254,7 +317,21 @@ function projectionStatus(targetRoot, projectionType) {
 			manifest,
 		};
 	}
-	const state = canonicalState(targetRoot);
+	let state;
+	try {
+		state = canonicalState(targetRoot, projectionType);
+	} catch (err) {
+		// Fail closed: a source the status check cannot verify (e.g. a
+		// corrupt Canonical Artifact store under the Governance Graph's
+		// source) means the projection cannot be certified current — report
+		// the typed failure, never a guessed "current".
+		return {
+			ok: false,
+			code: err.amberCode || "AMBER_E_PROJECTION_DRIFT",
+			detail: `canonical source unreadable: ${err.message}`,
+			manifest,
+		};
+	}
 	if (manifest.sourceHash !== state.checkpoint) {
 		return {
 			ok: false,
@@ -286,6 +363,7 @@ function projectionStatus(targetRoot, projectionType) {
 
 module.exports = {
 	PROJECTION_TYPES,
+	PROJECTION_SOURCES,
 	SCHEMA_VERSION,
 	AMBER_PROTOCOL_VERSION,
 	projectionsDir,

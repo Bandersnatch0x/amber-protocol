@@ -4,7 +4,7 @@
 // routing, and exit codes are owned by defineCommand (F039).
 
 const { defineCommand } = require("./subcommand-dispatcher");
-const { resolveTarget } = require("./command-helpers");
+const { resolveTarget, readFailure } = require("./command-helpers");
 
 const dispatch = defineCommand({
 	command: "projection",
@@ -14,7 +14,16 @@ const dispatch = defineCommand({
 			const targetRoot = resolveTarget(args);
 			const { buildGovernanceGraph, queryGraph } = require("./core/governance-graph");
 			const { recordReadReceipt } = require("./core/projection-receipts");
-			const graph = buildGovernanceGraph(targetRoot);
+			let graph;
+			try {
+				graph = buildGovernanceGraph(targetRoot);
+			} catch (err) {
+				// Fail closed: a corrupt Canonical Artifact store never yields
+				// a partial graph — the typed artifact corruption code rides
+				// the failure instead (F049 ticket 05, #222).
+				const failure = readFailure(args, err, "AMBER_E_PROJECTION_DRIFT");
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
 			const result = queryGraph(graph, {
 				scope: args.scope || null,
 				limit: args.limit ? Number(args.limit) : 50,
@@ -66,6 +75,45 @@ const dispatch = defineCommand({
 					errors: [`projection rebuild requires --type <${PROJECTION_TYPES.join("|")}>`],
 					warnings: [],
 					exitCode: 1,
+				};
+			}
+			// The Governance Graph — the only graph projection (ADR-0021) —
+			// rebuilds through the projection registry with the real graph
+			// builder (F049 ticket 05, #222): context-page nodes plus one
+			// node per committed Canonical Artifact revision and one typed
+			// edge per resolved Trace. The receipt records the source
+			// checkpoint, the rule and schema versions, the result hash, and
+			// protocol provenance; the build is read-only and fails closed on
+			// a corrupt artifact store (never a partial projection).
+			if (type === "governance-graph") {
+				const { governanceGraphFromState } = require("./core/governance-graph");
+				const { ARTIFACT_GRAPH_RULE_VERSION } = require("./core/artifact-graph-projection");
+				const { TRACE_REGISTRY_VERSION } = require("./core/canonical-artifact-contracts");
+				const ruleVersions = {
+					artifactGraph: ARTIFACT_GRAPH_RULE_VERSION,
+					traceContract: TRACE_REGISTRY_VERSION,
+				};
+				const built = rebuildProjection(
+					targetRoot,
+					type,
+					(state) => {
+						const graph = governanceGraphFromState(state);
+						return {
+							projection: type,
+							ruleVersions,
+							graphHash: graph.sourceHash,
+							nodes: graph.nodes,
+							edges: graph.edges,
+						};
+					},
+					{ manifestFields: { projection_rule_versions: ruleVersions } },
+				);
+				return {
+					text: built.ok ? JSON.stringify(built.manifest, null, 2) : "",
+					errors: built.errors,
+					warnings: [],
+					exitCode: built.ok ? 0 : 1,
+					...(built.code ? { code: built.code } : {}),
 				};
 			}
 			// Default builder: derive a deterministic read-only summary from canonical pages.
