@@ -1354,7 +1354,12 @@ test("F-2: a committed revision missing its Body fails the next admission as cor
 	assert.match(next.errors[0], /revision 1.*missing its Body on disk/);
 	// Nothing was admitted on top of the holed history.
 	assert.equal(journalOf(dir).filter((r) => r.kind === "committed").length, 2);
-	assert.equal(showArtifact(dir, "intent/login-bug").revision, 2);
+	// Ticket 04: the read side agrees — show fails closed on the orphaned
+	// Body half instead of serving the intact head over a holed history.
+	assert.throws(
+		() => showArtifact(dir, "intent/login-bug"),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT",
+	);
 });
 
 test("F-2: a keyed retry also refuses a holed committed history", () => {
@@ -1457,7 +1462,13 @@ test("F9: a committed record whose contentHash disagrees with the Envelope fails
 
 test("legacy revisions without lifecycle fields can still be transitioned and refined", () => {
 	const dir = mkTarget("legacy-migration");
-	// A ticket-02-shaped envelope: no lifecycle/transition/scope/traces.
+	// A ticket-02-shaped store: the journal carries full settlement hashes
+	// (expectedHead + admissionHash on every record), while the ENVELOPE is
+	// legacy — no lifecycle/transition/scope/traces fields. (Ticket 04's
+	// strict hashless policy reads hashless committed records as stripped
+	// provenance once any record is hash-bearing, so a legacy ENVELOPE must
+	// ride a hash-bearing journal; pure hashless ticket-01 journals are
+	// covered separately below.)
 	const home = path.join(dir, ".amber", "artifacts", "intents", "intent_login-bug");
 	fs.mkdirSync(home, { recursive: true });
 	fs.writeFileSync(path.join(home, "rev-1.md"), BODY_V1);
@@ -1472,6 +1483,7 @@ test("legacy revisions without lifecycle fields can still be transitioned and re
 		committedAt: new Date("2024-01-01T00:00:00.000Z").toISOString(),
 	};
 	legacyEnvelope.envelopeHash = envelopeHash(legacyEnvelope);
+	const legacyAdmissionHash = "a".repeat(64);
 	fs.writeFileSync(
 		path.join(home, "rev-1.envelope.json"),
 		`${JSON.stringify(legacyEnvelope, null, 2)}\n`,
@@ -1484,6 +1496,7 @@ test("legacy revisions without lifecycle fields can still be transitioned and re
 				revision: 1,
 				at: legacyEnvelope.committedAt,
 				expectedHead: 0,
+				admissionHash: legacyAdmissionHash,
 				attemptId: "legacy-attempt",
 			}),
 			JSON.stringify({
@@ -1491,6 +1504,7 @@ test("legacy revisions without lifecycle fields can still be transitioned and re
 				revision: 1,
 				at: legacyEnvelope.committedAt,
 				expectedHead: 0,
+				admissionHash: legacyAdmissionHash,
 				contentHash: legacyEnvelope.bodyHash,
 			}),
 		].join("\n")}\n`,
@@ -1532,4 +1546,567 @@ test("legacy revisions without lifecycle fields can still be transitioned and re
 	assert.deepEqual(spec.receipt.traces, [
 		{ type: "refines", to: { type: "intent", identity: "intent/login-bug", revision: 2 } },
 	]);
+});
+
+// ---------------------------------------------------------------------------
+// F049 ticket 04 (#221) — fail-closed admission integrity hardening.
+// Fixtures exercise the PUBLIC seams (admitArtifact / showArtifact /
+// listArtifacts); journals, Bodies, and Envelopes are hand-crafted as durable
+// state and read back as durable state — never through private helpers. The
+// hand-crafted stores are exactly the corrupt states admission could never
+// produce, which is why they must be forged by hand.
+// ---------------------------------------------------------------------------
+
+/**
+ * Hand-edit a committed revision's Envelope traces with a freshly recomputed
+ * envelopeHash — the canonical way to build corrupt-but-self-consistent
+ * lineage state (a real hand-edit that forgot the hash would fail earlier on
+ * the envelope binding, not on the lineage verdict under test).
+ */
+function rewriteEnvelopeTraces(dir, identity, revision, traces) {
+	const file = path.join(homeOf(dir, identity), `rev-${revision}.envelope.json`);
+	const stored = JSON.parse(fs.readFileSync(file, "utf8"));
+	stored.traces = traces;
+	const { envelopeHash: _self, ...rest } = stored;
+	stored.envelopeHash = envelopeHash(rest);
+	fs.writeFileSync(file, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
+}
+
+test("ticket-04: a mutual supersedes cycle fails show with the stable cycle code", () => {
+	const dir = mkTarget("t04-cycle");
+	admitArtifact(dir, { type: "intent", identity: "intent/a", body: "# a\n" });
+	admitArtifact(dir, { type: "intent", identity: "intent/b", body: "# b\n" });
+	rewriteEnvelopeTraces(dir, "intent/a", 1, [
+		{ type: "supersedes", to: { type: "intent", identity: "intent/b", revision: 1 } },
+	]);
+	rewriteEnvelopeTraces(dir, "intent/b", 1, [
+		{ type: "supersedes", to: { type: "intent", identity: "intent/a", revision: 1 } },
+	]);
+	for (const identity of ["intent/a", "intent/b"]) {
+		assert.throws(
+			() => showArtifact(dir, identity),
+			(err) =>
+				err.amberCode === "AMBER_E_ARTIFACT_TRACE_CYCLE" &&
+				/cyclic/.test(err.message) &&
+				err.message.includes("intent/intent/a@1") &&
+				err.message.includes("intent/intent/b@1"),
+			`show of ${identity} must fail closed on the cyclic lineage naming both nodes`,
+		);
+	}
+});
+
+test("ticket-04: a self-supersede (one-revision cycle) fails the read", () => {
+	const dir = mkTarget("t04-self-cycle");
+	admitArtifact(dir, { type: "intent", identity: "intent/a", body: "# a\n" });
+	rewriteEnvelopeTraces(dir, "intent/a", 1, [
+		{ type: "supersedes", to: { type: "intent", identity: "intent/a", revision: 1 } },
+	]);
+	assert.throws(
+		() => showArtifact(dir, "intent/a"),
+		(err) =>
+			err.amberCode === "AMBER_E_ARTIFACT_TRACE_CYCLE" &&
+			/intent\/intent\/a@1 -> intent\/intent\/a@1/.test(err.message),
+	);
+});
+
+test("ticket-04: a trace cycle fails the store-wide list, including for clean artifacts", () => {
+	const dir = mkTarget("t04-cycle-list");
+	admitArtifact(dir, { type: "intent", identity: "intent/a", body: "# a\n" });
+	admitArtifact(dir, { type: "intent", identity: "intent/b", body: "# b\n" });
+	rewriteEnvelopeTraces(dir, "intent/a", 1, [
+		{ type: "supersedes", to: { type: "intent", identity: "intent/b", revision: 1 } },
+	]);
+	rewriteEnvelopeTraces(dir, "intent/b", 1, [
+		{ type: "supersedes", to: { type: "intent", identity: "intent/a", revision: 1 } },
+	]);
+	// A clean artifact in the same store does not dilute the verdict: the
+	// listing is a verification read of the WHOLE store — never a partial
+	// projection that skips the corrupt artifact.
+	admitArtifact(dir, { type: "intent", identity: "intent/c", body: "# c\n" });
+	assert.throws(
+		() => listArtifacts(dir),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_TRACE_CYCLE",
+	);
+});
+
+test("ticket-04: a cycle through a superseded (non-head) revision still fails the read", () => {
+	const dir = mkTarget("t04-cycle-superseded");
+	const v1 = admitArtifact(dir, { type: "intent", identity: "intent/a", body: "# a\n" });
+	admitArtifact(dir, { type: "intent", identity: "intent/b", body: "# b\n" });
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/a",
+		body: "# a v2\n",
+		expectedHead: v1.receipt.revision,
+	});
+	// The cycle rides revision 1, which the head (revision 2) superseded: a
+	// cycle through superseded lineage is as corrupt as one through a head.
+	rewriteEnvelopeTraces(dir, "intent/a", 1, [
+		{ type: "supersedes", to: { type: "intent", identity: "intent/b", revision: 1 } },
+	]);
+	rewriteEnvelopeTraces(dir, "intent/b", 1, [
+		{ type: "supersedes", to: { type: "intent", identity: "intent/a", revision: 1 } },
+	]);
+	assert.throws(
+		() => listArtifacts(dir),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_TRACE_CYCLE",
+	);
+	assert.throws(
+		() => showArtifact(dir, "intent/a"),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_TRACE_CYCLE",
+	);
+});
+
+test("ticket-04: acyclic shared-ancestor lineage (a diamond) reads clean — no false positives", () => {
+	const dir = mkTarget("t04-diamond");
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/root",
+		body: BODY_V1,
+		transition: "accept",
+	});
+	for (const identity of ["spec/left", "spec/right"]) {
+		const refines = [{ type: "refines", to: { type: "intent", identity: "intent/root" } }];
+		const draft = admitArtifact(dir, { type: "spec", identity, body: "# Spec\n", traces: refines });
+		assert.equal(draft.ok, true, draft.errors.join("; "));
+		const approved = admitArtifact(dir, {
+			type: "spec",
+			identity,
+			body: "# Spec\n",
+			expectedHead: 1,
+			transition: "approve",
+			traces: refines,
+		});
+		assert.equal(approved.ok, true, approved.errors.join("; "));
+	}
+	for (const [specId, planId] of [
+		["spec/left", "plan/left"],
+		["spec/right", "plan/right"],
+	]) {
+		const plan = admitArtifact(dir, {
+			type: "plan",
+			identity: planId,
+			body: "# Plan\n",
+			traces: [{ type: "realizes", to: { type: "spec", identity: specId } }],
+		});
+		assert.equal(plan.ok, true, plan.errors.join("; "));
+	}
+	// Two plans sharing one accepted ancestor is a DAG, not a cycle: the
+	// walk must read the whole diamond without a verdict.
+	const entries = listArtifacts(dir);
+	assert.equal(entries.length, 5);
+	assert.equal(showArtifact(dir, "plan/left", { type: "plan" }).revision, 1);
+	assert.equal(showArtifact(dir, "intent/root").lifecycle, "accepted");
+});
+
+test("ticket-04: an orphaned Envelope half fails show AND list at any committed revision", () => {
+	const dir = mkTarget("t04-orphan-envelope");
+	admitIntent(dir);
+	admitIntent(dir, { body: BODY_V1 + "v2\n", expectedHead: 1 });
+	// Hole at the non-head revision 1 while the head (revision 2) is intact:
+	// the old read side served the head (show) or skipped the artifact
+	// (list) — the verification read now fails closed on the hole itself.
+	fs.rmSync(path.join(homeOf(dir), "rev-1.envelope.json"));
+	assert.throws(
+		() => showArtifact(dir, "intent/login-bug"),
+		(err) =>
+			err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT" &&
+			/revision 1.*missing its Envelope/.test(err.message),
+	);
+	assert.throws(
+		() => showArtifact(dir, "intent/login-bug", { revision: 2 }),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT",
+		"the intact head is not served over a holed history either",
+	);
+	assert.throws(
+		() => listArtifacts(dir),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT",
+	);
+});
+
+test("ticket-04: an orphaned Body half at the head fails show AND list (asymmetry closed)", () => {
+	const dir = mkTarget("t04-orphan-body-head");
+	admitIntent(dir);
+	admitIntent(dir, { body: BODY_V1 + "v2\n", expectedHead: 1 });
+	fs.rmSync(path.join(homeOf(dir), "rev-2.md"));
+	// `list` used to hide the artifact (head pair missing) while `show`
+	// served revision 1 — reads disagreed. Both now fail closed.
+	assert.throws(
+		() => showArtifact(dir, "intent/login-bug"),
+		(err) =>
+			err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT" &&
+			/revision 2.*missing its Body/.test(err.message),
+	);
+	assert.throws(
+		() => listArtifacts(dir),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT",
+	);
+});
+
+test("ticket-04: a ghost committed record fails show AND list as corruption", () => {
+	const dir = mkTarget("t04-ghost-read");
+	admitIntent(dir);
+	fs.appendFileSync(
+		path.join(homeOf(dir), "journal.jsonl"),
+		JSON.stringify({
+			kind: "committed",
+			revision: 99,
+			at: new Date().toISOString(),
+			expectedHead: 1,
+			admissionHash: "f".repeat(64),
+		}) + "\n",
+		"utf8",
+	);
+	for (const read of [() => showArtifact(dir, "intent/login-bug"), () => listArtifacts(dir)]) {
+		assert.throws(
+			read,
+			(err) =>
+				err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT" &&
+				/revision 99 without a matching prepared record/.test(err.message),
+		);
+	}
+});
+
+test("ticket-04: a forked settlement with intact pairs fails show AND list as corruption", () => {
+	const dir = mkTarget("t04-fork-read");
+	admitIntent(dir);
+	const home = homeOf(dir);
+	// Two forged revisions both building on head 1, each with a fully valid
+	// pair on disk: only the settlement replay can see the fork.
+	for (const revision of [2, 3]) {
+		const body = BODY_V1 + `v${revision}\n`;
+		const content = {
+			schemaVersion: 1,
+			type: "intent",
+			identity: "intent/login-bug",
+			revision,
+			supersedes: 1,
+			bodyHash: bodyHash(body),
+			lifecycle: "draft",
+			transition: null,
+			scope: null,
+			traces: [],
+			provenance: null,
+			committedAt: new Date().toISOString(),
+		};
+		content.envelopeHash = envelopeHash(content);
+		fs.writeFileSync(path.join(home, `rev-${revision}.md`), body, "utf8");
+		fs.writeFileSync(
+			path.join(home, `rev-${revision}.envelope.json`),
+			`${JSON.stringify(content, null, 2)}\n`,
+			"utf8",
+		);
+		fs.appendFileSync(
+			path.join(home, "journal.jsonl"),
+			JSON.stringify({
+				kind: "prepared",
+				revision,
+				at: new Date().toISOString(),
+				expectedHead: 1,
+				admissionHash: `h${revision}`,
+				attemptId: `forged-${revision}`,
+			}) +
+				"\n" +
+				JSON.stringify({
+					kind: "committed",
+					revision,
+					at: new Date().toISOString(),
+					expectedHead: 1,
+					admissionHash: `h${revision}`,
+					contentHash: content.bodyHash,
+				}) +
+				"\n",
+			"utf8",
+		);
+	}
+	for (const read of [() => showArtifact(dir, "intent/login-bug"), () => listArtifacts(dir)]) {
+		assert.throws(
+			read,
+			(err) =>
+				err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT" &&
+				/forked or forged settlement/.test(err.message),
+		);
+	}
+});
+
+test("ticket-04: a skipped revision slot fails show AND list as corruption", () => {
+	const dir = mkTarget("t04-skip-read");
+	admitIntent(dir);
+	const home = homeOf(dir);
+	// A fully valid revision 3 pair whose slot numbering jumps over 2: only
+	// the replay sees the hole in the numbering.
+	const body = BODY_V1 + "v3\n";
+	const content = {
+		schemaVersion: 1,
+		type: "intent",
+		identity: "intent/login-bug",
+		revision: 3,
+		supersedes: 1,
+		bodyHash: bodyHash(body),
+		lifecycle: "draft",
+		transition: null,
+		scope: null,
+		traces: [],
+		provenance: null,
+		committedAt: new Date().toISOString(),
+	};
+	content.envelopeHash = envelopeHash(content);
+	fs.writeFileSync(path.join(home, "rev-3.md"), body, "utf8");
+	fs.writeFileSync(
+		path.join(home, "rev-3.envelope.json"),
+		`${JSON.stringify(content, null, 2)}\n`,
+		"utf8",
+	);
+	fs.appendFileSync(
+		path.join(home, "journal.jsonl"),
+		JSON.stringify({
+			kind: "prepared",
+			revision: 3,
+			at: new Date().toISOString(),
+			expectedHead: 1,
+			admissionHash: "h3",
+			attemptId: "forged-3",
+		}) +
+			"\n" +
+			JSON.stringify({
+				kind: "committed",
+				revision: 3,
+				at: new Date().toISOString(),
+				expectedHead: 1,
+				admissionHash: "h3",
+				contentHash: content.bodyHash,
+			}) +
+			"\n",
+		"utf8",
+	);
+	for (const read of [() => showArtifact(dir, "intent/login-bug"), () => listArtifacts(dir)]) {
+		assert.throws(
+			read,
+			(err) =>
+				err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT" &&
+				/skips revision slot 2/.test(err.message),
+		);
+	}
+});
+
+test("ticket-04: a hashless committed record in a hash-bearing journal fails reads and admission (F2)", () => {
+	const dir = mkTarget("t04-stripped");
+	admitIntent(dir);
+	const journalFile = path.join(homeOf(dir), "journal.jsonl");
+	// Strip the settlement hashes from the committed record only: the old
+	// legacy fallback matched it by revision and let a forged fork through.
+	const lines = journalOf(dir).map((record) => ({ ...record }));
+	for (const record of lines) {
+		if (record.kind === "committed") {
+			delete record.admissionHash;
+			delete record.expectedHead;
+		}
+	}
+	fs.writeFileSync(journalFile, `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`, "utf8");
+	for (const read of [() => showArtifact(dir, "intent/login-bug"), () => listArtifacts(dir)]) {
+		assert.throws(
+			read,
+			(err) =>
+				err.amberCode === "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT" &&
+				/without its settlement hashes/.test(err.message),
+		);
+	}
+	// Admission refuses to build on the stripped journal — and fails before
+	// appending anything (the journal is unchanged by the refusal).
+	const build = admitIntent(dir, { body: BODY_V1 + "v2\n", expectedHead: 1 });
+	assert.equal(build.ok, false);
+	assert.equal(build.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+	assert.match(build.errors[0], /settlement hashes/);
+	assert.equal(journalOf(dir).length, lines.length, "no record was appended by the refusal");
+});
+
+test("ticket-04: a pure ticket-01 journal (zero hash-bearing records) stays readable", () => {
+	const dir = mkTarget("t04-legacy-pure");
+	const home = path.join(dir, ".amber", "artifacts", "intents", "intent_login-bug");
+	fs.mkdirSync(home, { recursive: true });
+	fs.writeFileSync(path.join(home, "rev-1.md"), BODY_V1);
+	const legacy = {
+		schemaVersion: 1,
+		type: "intent",
+		identity: "intent/login-bug",
+		revision: 1,
+		supersedes: null,
+		bodyHash: bodyHash(BODY_V1),
+		provenance: null,
+		committedAt: "2024-01-01T00:00:00.000Z",
+	};
+	legacy.envelopeHash = envelopeHash(legacy);
+	fs.writeFileSync(path.join(home, "rev-1.envelope.json"), `${JSON.stringify(legacy, null, 2)}\n`);
+	fs.writeFileSync(
+		path.join(home, "journal.jsonl"),
+		`${[
+			JSON.stringify({ kind: "prepared", revision: 1, at: legacy.committedAt }),
+			JSON.stringify({ kind: "committed", revision: 1, at: legacy.committedAt }),
+		].join("\n")}\n`,
+	);
+	const shown = showArtifact(dir, "intent/login-bug");
+	assert.equal(shown.revision, 1);
+	assert.equal(shown.lifecycle, null, "legacy envelope reads with lifecycle normalized");
+	assert.deepEqual(
+		listArtifacts(dir).map((e) => e.revision),
+		[1],
+	);
+
+	// A verbatim retry still dedupes against the legacy envelope (the
+	// admission hash ignores derived lifecycle content).
+	const retry = admitArtifact(dir, { type: "intent", identity: "intent/login-bug", body: BODY_V1 });
+	assert.equal(retry.ok, true, retry.errors.join("; "));
+	assert.equal(retry.duplicate, true);
+	assert.equal(retry.receipt.revision, 1);
+
+	// Extending the hashless journal fails closed BEFORE any write: the
+	// strict policy never leaves a mixed journal behind (which it would then
+	// have to read as stripped provenance).
+	const extend = admitIntent(dir, { body: BODY_V1 + "v2\n", expectedHead: 1 });
+	assert.equal(extend.ok, false);
+	assert.equal(extend.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+	assert.match(extend.errors[0], /pure ticket-01 legacy journal/);
+	assert.equal(journalOf(dir).length, 2, "the refusal appended nothing");
+	assert.equal(
+		showArtifact(dir, "intent/login-bug").revision,
+		1,
+		"still readable after the refusal",
+	);
+});
+
+test("ticket-04: a dangling prepared record is settled as aborted by the verification read (journal-only)", () => {
+	const dir = mkTarget("t04-recover-read");
+	admitIntent(dir);
+	const home = homeOf(dir);
+	fs.appendFileSync(
+		path.join(home, "journal.jsonl"),
+		JSON.stringify({
+			kind: "prepared",
+			revision: 2,
+			at: new Date().toISOString(),
+			expectedHead: 1,
+			admissionHash: "e".repeat(64),
+			attemptId: "crashed-attempt",
+			idempotencyKey: "crashed-key",
+		}) + "\n",
+		"utf8",
+	);
+	// Snapshot the durable artifact state: recovery may append to the
+	// JOURNAL only — every Body and Envelope byte must survive untouched,
+	// and no new pair file may appear.
+	const bodyBefore = fs.readFileSync(path.join(home, "rev-1.md"), "utf8");
+	const envelopeBefore = fs.readFileSync(path.join(home, "rev-1.envelope.json"), "utf8");
+	const filesBefore = fs.readdirSync(home).sort();
+
+	const shown = showArtifact(dir, "intent/login-bug");
+	assert.equal(shown.revision, 1, "the read serves the committed head");
+
+	const journal = journalOf(dir);
+	const aborted = journal.filter((r) => r.kind === "aborted");
+	assert.equal(aborted.length, 1, "exactly one aborted record settles the crashed attempt");
+	assert.equal(aborted[0].revision, 2);
+	assert.equal(aborted[0].recovered, true, "the record is marked as recovery-settled");
+	assert.equal(aborted[0].expectedHead, 1, "the crashed attempt's anchors are copied");
+	assert.equal(aborted[0].admissionHash, "e".repeat(64));
+	assert.equal(aborted[0].attemptId, "crashed-attempt");
+	assert.equal(aborted[0].idempotencyKey, "crashed-key");
+
+	// No repair path reached the artifacts: only journal.jsonl changed.
+	assert.equal(fs.readFileSync(path.join(home, "rev-1.md"), "utf8"), bodyBefore);
+	assert.equal(fs.readFileSync(path.join(home, "rev-1.envelope.json"), "utf8"), envelopeBefore);
+	assert.deepEqual(fs.readdirSync(home).sort(), filesBefore, "no pair file was created or removed");
+
+	// The aborted revision stays invisible, and the listing agrees.
+	assert.equal(showArtifact(dir, "intent/login-bug", { revision: 2 }), null);
+	assert.deepEqual(
+		listArtifacts(dir).map((e) => e.revision),
+		[1],
+	);
+
+	// The consumed slot is never reused: the next admission takes 3.
+	const next = admitIntent(dir, { body: BODY_V1 + "v2\n", expectedHead: 1 });
+	assert.equal(next.ok, true, next.errors.join("; "));
+	assert.equal(next.receipt.revision, 3);
+});
+
+test("ticket-04: recovery leaves a live admission's prepared record alone", () => {
+	const dir = mkTarget("t04-recover-live");
+	admitIntent(dir);
+	const home = homeOf(dir);
+	fs.appendFileSync(
+		path.join(home, "journal.jsonl"),
+		JSON.stringify({
+			kind: "prepared",
+			revision: 2,
+			at: new Date().toISOString(),
+			expectedHead: 1,
+			admissionHash: "d".repeat(64),
+			attemptId: "live-attempt",
+		}) + "\n",
+		"utf8",
+	);
+	// A fresh admit.lock means a live admission owns that prepared record
+	// right now: the read serves the head but must NOT abort it.
+	fs.writeFileSync(path.join(home, "admit.lock"), String(Date.now()), "utf8");
+	assert.equal(showArtifact(dir, "intent/login-bug").revision, 1);
+	assert.equal(
+		journalOf(dir).filter((r) => r.kind === "aborted").length,
+		0,
+		"a live attempt's prepared record is not aborted",
+	);
+	// Once the lock is gone (the admission finished or crashed for real),
+	// the same read settles the dangling record deterministically.
+	fs.rmSync(path.join(home, "admit.lock"));
+	assert.equal(showArtifact(dir, "intent/login-bug").revision, 1);
+	assert.equal(journalOf(dir).filter((r) => r.kind === "aborted").length, 1);
+});
+
+test("ticket-04: admission settles a crashed prior attempt before claiming its own slot", () => {
+	const dir = mkTarget("t04-recover-admit");
+	admitIntent(dir);
+	fs.appendFileSync(
+		path.join(homeOf(dir), "journal.jsonl"),
+		JSON.stringify({ kind: "prepared", revision: 2, idempotencyKey: "crashed" }) + "\n",
+		"utf8",
+	);
+	const next = admitIntent(dir, { body: BODY_V1 + "v2\n", supersedes: 1 });
+	assert.equal(next.ok, true, next.errors.join("; "));
+	assert.equal(next.receipt.revision, 3, "the crashed attempt's slot is consumed, not reused");
+	const aborted = journalOf(dir).filter((r) => r.kind === "aborted");
+	assert.equal(aborted.length, 1, "the admission settled the crashed attempt as aborted");
+	assert.equal(aborted[0].revision, 2);
+	assert.equal(aborted[0].recovered, true);
+	assert.equal(aborted[0].idempotencyKey, "crashed");
+});
+
+test("ticket-04: the integrity analysis module holds no I/O or write capability (no repair path)", () => {
+	// Structural guard in the T1 "no mutation path" style: detection lives in
+	// a deliberately pure module, so no code path from a verdict can reach a
+	// Body/Envelope write. The module must stay import-free and must expose
+	// only pure verdict functions.
+	const modulePath = path.join(
+		__dirname,
+		"..",
+		"..",
+		"scripts",
+		"lib",
+		"core",
+		"canonical-artifact-verify.js",
+	);
+	const source = fs.readFileSync(modulePath, "utf8");
+	assert.doesNotMatch(source, /require\s*\(/, "the pure module must import nothing");
+	assert.doesNotMatch(
+		source,
+		/writeFileSync|appendFileSync|readFileSync|rmSync|unlinkSync|mkdirSync|openSync|renameSync|copyFileSync|truncateSync|\bprocess\./,
+		"the pure module must hold no filesystem or process capability",
+	);
+	const verify = require("../../scripts/lib/core/canonical-artifact-verify");
+	assert.deepEqual(Object.keys(verify).sort(), ["danglingPreparedRevisions", "findTraceCycle"]);
+	for (const name of Object.keys(verify)) {
+		assert.doesNotMatch(
+			name,
+			/set|update|mutate|rewrite|edit|write|repair|recover|append/i,
+			`${name} must stay a pure verdict`,
+		);
+	}
 });

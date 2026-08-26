@@ -61,6 +61,27 @@
  * identity: canonical identity stays owner-generated (identity + revision
  * + hashes), per the F049 spec.
  *
+ * Ticket 04 (#221) adds fail-closed read-side integrity: every verification
+ * read (show/list) replays the settlement journal and fails closed on any
+ * sequence admission could not have written (T2-review finding F1 — reads
+ * previously served forged journals silently), sweeps both halves of every
+ * committed revision (an orphaned half is corruption, never a silent skip:
+ * `list` no longer hides an artifact whose head pair is missing while `show`
+ * serves earlier revisions), cross-checks the committed record's contentHash,
+ * and walks the trace graph for cyclic lineage (AMBER_E_ARTIFACT_TRACE_CYCLE
+ * — impossible through admission, so always hand-edited state). A journal
+ * that carries settlement hashes anywhere rejects hashless committed records
+ * as corruption (T2-review finding F2: the legacy fallback was bypassable by
+ * stripping the hash fields; only pure ticket-01 journals with zero
+ * hash-bearing records stay readable — and admission refuses to extend those
+ * in place, failing closed before any write rather than leaving a mixed
+ * journal the strict policy must reject). Crashed admission attempts settle
+ * deterministically: a prepared record with no committed/aborted outcome is
+ * settled by appending one `aborted` journal record — recovery is
+ * journal-only and never writes or rewrites a Body or Envelope (the pure
+ * analysis lives in canonical-artifact-verify.js, which holds no I/O
+ * capability at all).
+ *
  * Storage layout (repository-local, always under .amber):
  *   .amber/artifacts/<types>/<identity-slug>/
  *     rev-<n>.md                 Body, verbatim
@@ -95,6 +116,7 @@ const {
 	structuralTraceProblems,
 	traceShapeProblem,
 } = require("./canonical-artifact-contracts");
+const { findTraceCycle, danglingPreparedRevisions } = require("./canonical-artifact-verify");
 
 const ARTIFACT_STATUSES = Object.freeze(["prepared", "committed", "aborted"]);
 
@@ -114,6 +136,7 @@ const TRACE_DIRECTION_CODE = "AMBER_E_ARTIFACT_TRACE_DIRECTION";
 const TRACE_SCOPE_CODE = "AMBER_E_ARTIFACT_TRACE_SCOPE";
 const TRACE_TARGET_NOT_FOUND_CODE = "AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND";
 const TRACE_TARGET_LIFECYCLE_CODE = "AMBER_E_ARTIFACT_TRACE_TARGET_LIFECYCLE";
+const TRACE_CYCLE_CODE = "AMBER_E_ARTIFACT_TRACE_CYCLE";
 const IO_CODE = "AMBER_E_ARTIFACT_IO";
 
 // ponytail: exclusive-lock admission (open O_EXCL lock file → settle →
@@ -168,6 +191,17 @@ function acquireAdmissionLock(dir) {
 				"another admission for this artifact is in flight; the expected-head compare-and-swap lost the race",
 			);
 		}
+	}
+}
+
+// A fresh admit.lock means a live admission owns the journal right now: its
+// prepared records are in flight, not crashed, so settlement recovery must
+// leave them alone. A lock older than LOCK_STALE_MS is a crashed holder.
+function admissionInFlight(dir) {
+	try {
+		return Date.now() - fs.statSync(path.join(dir, "admit.lock")).mtimeMs <= LOCK_STALE_MS;
+	} catch {
+		return false; // no lock: nobody is mid-admission
 	}
 }
 
@@ -358,8 +392,17 @@ function typedReadError(code, message) {
  * Verifies both halves of the binding before serving (ADR-0023): the stored
  * Body against its recorded contentHash, and the stored Envelope against its
  * own canonical envelopeHash. Either mismatch is corruption, not content.
+ * Ticket 04: the Envelope must also agree with the identity it is stored
+ * under — a revision whose Envelope binds a different type/identity is a
+ * mismatched pair, never silently relabeled.
  */
 function committedProjection(type, identity, revision, body, envelope, committedAt) {
+	if (envelope.type !== type || envelope.identity !== identity) {
+		throw typedReadError(
+			SETTLEMENT_CORRUPT_CODE,
+			`the Envelope stored for revision ${revision} of "${identity}" binds ${envelope.type}/"${envelope.identity}"; a revision stored under the wrong identity is settlement corruption, not content`,
+		);
+	}
 	const recordedHash = envelope.bodyHash || null;
 	if (!recordedHash || bodyHash(body) !== recordedHash) {
 		throw typedReadError(
@@ -422,11 +465,23 @@ function settlementContentHashMessage(identity, revision, record, envelope) {
  *       when it landed — the replayed head at that point must equal it
  *       (hashless legacy records without expectedHead are not checkable),
  *   (d) revision slots that skip or start away from 1 (truncated or forged
- *       numbering).
+ *       numbering),
+ *   (e) ticket 04 (T2-review finding F2): a committed record stripped of
+ *       its settlement hashes in a journal that carries them anywhere. The
+ *       hashless fallback exists only for pure ticket-01 journals, whose
+ *       records genuinely predate expectedHead/admissionHash; once any
+ *       record is hash-bearing, a hashless committed record can only be an
+ *       in-place edit of history that shed its verification anchors.
+ * Runs at admission (under the lock, after every append via settleGuard)
+ * and on every verification read (show/list — ticket 04).
  * @param {Array<object>} journal Parsed journal records, in append order.
  * @throws {Error} Typed AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT.
  */
 function validateSettlement(journal) {
+	const hashBearing = journal.some(
+		(record) =>
+			typeof record?.admissionHash === "string" || typeof record?.expectedHead === "number",
+	);
 	const preparedHashes = new Set(); // "<revision>:<admissionHash>"
 	const preparedRevisions = new Set(); // legacy: revision claimed by some prepared record
 	const committed = new Set();
@@ -444,6 +499,15 @@ function validateSettlement(journal) {
 				preparedHashes.add(`${revision}:${record.admissionHash}`);
 			}
 		} else if (record.kind === KIND_COMMITTED) {
+			if (
+				hashBearing &&
+				(typeof record.admissionHash !== "string" || typeof record.expectedHead !== "number")
+			) {
+				throw typedReadError(
+					SETTLEMENT_CORRUPT_CODE,
+					`artifact journal commits revision ${revision} without its settlement hashes (admissionHash and expectedHead) while other records in the journal carry them; a hashless committed record in a hash-bearing journal is stripped provenance, not legacy state — only journals with zero hash-bearing records read as ticket-01 legacy`,
+				);
+			}
 			if (committed.has(revision)) {
 				throw typedReadError(
 					SETTLEMENT_CORRUPT_CODE,
@@ -508,6 +572,185 @@ function settleGuard(dir, { revision, attemptId, expectedHead }) {
 }
 
 /**
+ * Deterministic settlement recovery for crashed admissions (ticket 04,
+ * #221): a prepared record with no committed/aborted outcome is a crashed
+ * attempt — settle it by appending one `aborted` journal record (the pure
+ * analysis is danglingPreparedRevisions in canonical-artifact-verify.js).
+ * Recovery writes ONLY journal settlement state: it never writes or rewrites
+ * a Body or Envelope, never resurrects a half-written pair, and never
+ * promotes uncommitted content to committed — the aborted revision stays
+ * invisible and its slot stays consumed. The aborted record copies the
+ * crashed attempt's own anchors (expectedHead, admissionHash, attemptId,
+ * idempotencyKey) so the journal stays auditable.
+ *
+ * Reads call this with underLock=false: a fresh admit.lock means a live
+ * admission owns its prepared records right now, and those are left alone.
+ * Admission calls it with underLock=true (it holds the lock itself, so any
+ * dangling prepared record is a crashed PRIOR attempt).
+ * @param {string} dir - Artifact home directory.
+ * @param {Array<object>} journal - Parsed journal records (already validated).
+ * @param {object} [options]
+ * @param {string} [options.identity] - Identity label for diagnostics.
+ * @param {boolean} [options.underLock] - The caller holds the admission lock.
+ * @returns {Array<object>} The journal after recovery (re-read when any
+ *          record was appended).
+ * @throws {Error} Typed AMBER_E_ARTIFACT_IO when an aborted record cannot be
+ *         appended — recovery fails closed instead of skipping silently.
+ */
+function recoverDanglingPrepared(dir, journal, { identity = null, underLock = false } = {}) {
+	if (!underLock && admissionInFlight(dir)) return journal;
+	const dangling = danglingPreparedRevisions(journal);
+	if (dangling.length === 0) return journal;
+	for (const revision of dangling) {
+		const claim =
+			[...journal].reverse().find((r) => r.kind === KIND_PREPARED && r.revision === revision) ||
+			null;
+		try {
+			appendJSONL(journalPath(dir), {
+				kind: KIND_ABORTED,
+				revision,
+				at: new Date().toISOString(),
+				recovered: true,
+				...(claim && typeof claim.expectedHead === "number"
+					? { expectedHead: claim.expectedHead }
+					: {}),
+				...(claim && typeof claim.admissionHash === "string"
+					? { admissionHash: claim.admissionHash }
+					: {}),
+				...(claim && typeof claim.attemptId === "string" ? { attemptId: claim.attemptId } : {}),
+				...(claim && typeof claim.idempotencyKey === "string"
+					? { idempotencyKey: claim.idempotencyKey }
+					: {}),
+			});
+		} catch (err) {
+			throw typedReadError(
+				IO_CODE,
+				`failed to append the aborted recovery record for revision ${revision} of "${identity ?? "an artifact"}" to the settlement journal: ${err.message}`,
+			);
+		}
+	}
+	return readJournal(dir);
+}
+
+/**
+ * Read-side integrity gate for one artifact home (ticket 04, #221 — the
+ * T2-review finding F1 fix: reads never validated settlement, so forged
+ * journals were served silently). Every verification read (show/list):
+ *   1. replays the settlement journal (impossible sequences, strict
+ *      hashless policy),
+ *   2. settles crashed attempts deterministically — journal-only aborted
+ *      records, skipped while a live admission holds the lock,
+ *   3. sweeps both halves of EVERY committed revision: a hole at any
+ *      revision is corruption, never a silent skip (`list` no longer hides
+ *      an artifact whose head pair is missing while `show` serves earlier
+ *      revisions — both fail closed).
+ * @param {string} dir - Artifact home directory.
+ * @param {object} [options]
+ * @param {string} [options.identity] - Identity label for diagnostics.
+ * @returns {Array<object>} The (possibly recovered) journal, in append order.
+ * @throws {Error} Typed AMBER_E_ARTIFACT_JOURNAL_CORRUPT /
+ *         AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT / AMBER_E_ARTIFACT_IO.
+ */
+function verifyArtifactHomeForRead(dir, { identity = null } = {}) {
+	let journal = readJournal(dir);
+	validateSettlement(journal);
+	journal = recoverDanglingPrepared(dir, journal, { identity });
+	for (const revision of committedRevisions(journal)) {
+		if (!readEnvelope(dir, revision)) {
+			throw typedReadError(
+				SETTLEMENT_CORRUPT_CODE,
+				`committed revision ${revision} of "${identity ?? "an artifact"}" is missing its Envelope on disk; refusing to read inconsistent settlement state`,
+			);
+		}
+		if (!readBody(dir, revision)) {
+			throw typedReadError(
+				SETTLEMENT_CORRUPT_CODE,
+				`committed revision ${revision} of "${identity ?? "an artifact"}" is missing its Body on disk; refusing to read inconsistent settlement state`,
+			);
+		}
+	}
+	return journal;
+}
+
+// Human-readable rendering of a trace-graph node for cycle diagnostics.
+function renderTraceNode(node) {
+	return `${node.type}/${node.identity}@${node.revision}`;
+}
+
+function traceCycleError(cycle) {
+	return typedReadError(
+		TRACE_CYCLE_CODE,
+		`the trace lineage graph is cyclic: ${cycle.map(renderTraceNode).join(" -> ")}; every trace binds an already-committed revision and committed revisions are immutable, so admission can never produce a cycle — this is hand-edited state, not a lineage`,
+	);
+}
+
+/**
+ * Lazy outgoing-edge resolver for the committed trace graph: the resolved
+ * traces of one committed revision, as structured target nodes. Every node
+ * the walk reaches must be a committed revision with a readable Envelope
+ * that agrees with the identity it is stored under — the walk fails closed
+ * rather than guessing lineage through a hole (the pure walker lives in
+ * canonical-artifact-verify.js; this side reads the store).
+ * @param {string} cwd - Target repository root.
+ * @returns {(node: {type: string, identity: string, revision: number}) =>
+ *           Array<{type: string, identity: string, revision: number}>}
+ */
+function traceEdgesResolver(cwd) {
+	const journalByDir = new Map();
+	const envelopeByKey = new Map();
+	return (node) => {
+		const dir = artifactDir(cwd, node.type, node.identity);
+		let journal = journalByDir.get(dir);
+		if (journal === undefined) {
+			journal = readJournal(dir); // throws JOURNAL_CORRUPT on a corrupt ledger
+			journalByDir.set(dir, journal);
+		}
+		if (!journal.some((r) => r.kind === KIND_COMMITTED && r.revision === node.revision)) {
+			throw typedReadError(
+				SETTLEMENT_CORRUPT_CODE,
+				`the trace graph references ${renderTraceNode(node)}, which is not a committed revision; traces bind committed revisions only`,
+			);
+		}
+		const key = JSON.stringify([node.type, node.identity, node.revision]);
+		let envelope = envelopeByKey.get(key);
+		if (envelope === undefined) {
+			envelope = readEnvelope(dir, node.revision);
+			envelopeByKey.set(key, envelope);
+		}
+		if (!envelope) {
+			throw typedReadError(
+				SETTLEMENT_CORRUPT_CODE,
+				`committed revision ${node.revision} of "${node.identity}" is missing its Envelope on disk; the trace graph cannot be walked through a hole`,
+			);
+		}
+		if (envelope.type !== node.type || envelope.identity !== node.identity) {
+			throw typedReadError(
+				SETTLEMENT_CORRUPT_CODE,
+				`the Envelope stored for revision ${node.revision} of "${node.identity}" binds ${envelope.type}/"${envelope.identity}"; the trace graph cannot be walked through a mismatched revision`,
+			);
+		}
+		const targets = [];
+		for (const trace of envelope.traces || []) {
+			const to = trace?.to;
+			if (
+				!to ||
+				typeof to.type !== "string" ||
+				typeof to.identity !== "string" ||
+				!Number.isInteger(to.revision) ||
+				to.revision < 1
+			) {
+				throw typedReadError(
+					SETTLEMENT_CORRUPT_CODE,
+					`committed revision ${node.revision} of "${node.identity}" carries a malformed trace ${JSON.stringify(trace)}; a resolved trace binds { type, identity, revision }`,
+				);
+			}
+			targets.push({ type: to.type, identity: to.identity, revision: to.revision });
+		}
+		return targets;
+	};
+}
+
+/**
  * Resolve one committed revision of a target artifact for Trace binding:
  * journal-settled visibility (prepared/aborted stay invisible), the pair
  * present on disk, and both binding hashes verified. Returns null when the
@@ -517,6 +760,10 @@ function settleGuard(dir, { revision, attemptId, expectedHead }) {
  */
 function readCommittedRevision(dir, type, identity, revision /* number|null for head */) {
 	const journal = readJournal(dir);
+	// Ticket 04: a Trace never binds to inconsistent settlement state — the
+	// target's journal is replayed, not just read for its head (the JSDoc
+	// contract above, now enforced on every binding).
+	validateSettlement(journal);
 	const head = committedHead(journal);
 	if (head === 0) return null;
 	const target =
@@ -684,42 +931,130 @@ function removeDirIfEmpty(dir) {
  * Read one artifact's current (or explicit) revision with journal-settled
  * visibility. Returns null when the identity has no committed revision or
  * the named revision is not committed — prepared/aborted stay invisible.
+ *
+ * Ticket 04 (#221): this is a verification read. It replays the settlement
+ * journal, sweeps both halves of every committed revision of the artifact
+ * (an orphaned half anywhere fails closed — the read never guesses which
+ * revisions are still authoritative), cross-checks the served revision's
+ * committed record against its Envelope, and walks the outgoing trace graph
+ * from the artifact's committed revisions across artifacts: the lineage this
+ * read vouches for must be acyclic (AMBER_E_ARTIFACT_TRACE_CYCLE). A crashed
+ * attempt (dangling prepared, no live lock) is settled as aborted on the way
+ * through — journal-only, never an artifact write.
  * @throws {Error} Typed AMBER_E_ARTIFACT_JOURNAL_CORRUPT on a corrupt journal,
+ *         AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT on impossible settlement, a
+ *         holed or mismatched pair, or a forged lineage reference,
+ *         AMBER_E_ARTIFACT_TRACE_CYCLE on cyclic lineage,
  *         AMBER_E_ARTIFACT_HASH_MISMATCH / AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH
- *         when a stored pair fails its binding.
+ *         when a stored pair fails its binding,
+ *         AMBER_E_ARTIFACT_IO when recovery cannot append its aborted record.
  */
 function showArtifact(cwd, identity, { type = "intent", revision = null } = {}) {
 	const dir = artifactDir(cwd, type, identity);
-	const journal = readJournal(dir);
+	const journal = verifyArtifactHomeForRead(dir, { identity });
+	// Cyclic Trace chains fail the read: walk outgoing trace edges from every
+	// committed revision of THIS artifact, transitively across artifacts (the
+	// walk only reads the lineage it reaches — a cycle in unrelated artifacts
+	// is `list`'s verdict to deliver).
+	const cycle = findTraceCycle(
+		committedRevisions(journal).map((r) => ({ type, identity, revision: r })),
+		traceEdgesResolver(cwd),
+	);
+	if (cycle) throw traceCycleError(cycle);
 	for (const record of [...journal].reverse()) {
 		if (record.kind !== KIND_COMMITTED) continue;
 		if (revision !== null && record.revision !== revision) continue;
 		const body = readBody(dir, record.revision);
 		const envelope = readEnvelope(dir, record.revision);
-		if (!body || !envelope) continue; // orphaned half on disk: not readable
-		return committedProjection(type, identity, record.revision, body, envelope, record.at);
+		if (!body || !envelope) {
+			// Unreachable after the pair sweep above; kept so the serving path
+			// itself never depends on the sweep's diagnostics.
+			throw typedReadError(
+				SETTLEMENT_CORRUPT_CODE,
+				`committed revision ${record.revision} of "${identity}" is missing its ${envelope ? "Body" : "Envelope"} on disk; refusing to serve an incomplete pair`,
+			);
+		}
+		const projection = committedProjection(
+			type,
+			identity,
+			record.revision,
+			body,
+			envelope,
+			record.at,
+		);
+		const commitRecord = findCommitRecord(journal, record.revision);
+		if (contentHashMismatch(commitRecord, envelope)) {
+			throw typedReadError(
+				SETTLEMENT_CORRUPT_CODE,
+				settlementContentHashMessage(identity, record.revision, commitRecord, envelope),
+			);
+		}
+		return projection;
 	}
 	return null;
 }
 
 // Latest committed revision per artifact, first-seen order.
+//
+// Ticket 04 (#221): the listing is a verification read of the WHOLE store.
+// Granularity is wholesale per artifact home and fail-closed overall — one
+// corrupt artifact fails the entire list rather than being skipped or
+// served as a partial projection (the F035-S5 "never a partial projection"
+// convention; a per-artifact error channel would let consumers parse around
+// corruption). Every home's settlement is replayed, crashed attempts are
+// settled as aborted, every committed pair is swept, and the trace graph of
+// EVERY committed revision (not just heads) is walked for cycles.
 function committedCurrents(cwd) {
 	const currents = [];
+	const startNodes = [];
 	for (const { dir } of walkArtifactHomes(cwd)) {
-		const journal = readJournal(dir);
+		const slug = path.basename(dir);
+		const journal = verifyArtifactHomeForRead(dir, { identity: slug });
 		const head = committedHead(journal);
-		if (!head) continue;
-		const envelope = readEnvelope(dir, head);
-		const body = readBody(dir, head);
-		if (!envelope || !body) continue; // orphaned half: skip
-		currents.push(
-			committedProjection(envelope.type, envelope.identity, head, body, envelope, null),
-		);
+		if (head !== 0) {
+			const envelope = readEnvelope(dir, head);
+			const body = readBody(dir, head);
+			if (!envelope || !body) {
+				// Unreachable after the pair sweep in the gate; defensive.
+				throw typedReadError(
+					SETTLEMENT_CORRUPT_CODE,
+					`committed revision ${head} of "${slug}" is missing its ${envelope ? "Body" : "Envelope"} on disk; refusing to list inconsistent settlement state`,
+				);
+			}
+			currents.push(
+				committedProjection(envelope.type, envelope.identity, head, body, envelope, null),
+			);
+			const commitRecord = findCommitRecord(journal, head);
+			if (contentHashMismatch(commitRecord, envelope)) {
+				throw typedReadError(
+					SETTLEMENT_CORRUPT_CODE,
+					settlementContentHashMessage(envelope.identity, head, commitRecord, envelope),
+				);
+			}
+		}
+		// Cycle detection covers every committed revision, not only heads: a
+		// hand-crafted cycle through a superseded revision is as corrupt as
+		// one through a head.
+		for (const revision of committedRevisions(journal)) {
+			const envelope = readEnvelope(dir, revision);
+			if (!envelope || typeof envelope.type !== "string" || typeof envelope.identity !== "string") {
+				throw typedReadError(
+					SETTLEMENT_CORRUPT_CODE,
+					`committed revision ${revision} of "${slug}" carries no usable Envelope identity; the trace graph cannot be walked`,
+				);
+			}
+			startNodes.push({ type: envelope.type, identity: envelope.identity, revision });
+		}
 	}
+	const cycle = findTraceCycle(startNodes, traceEdgesResolver(cwd));
+	if (cycle) throw traceCycleError(cycle);
 	return currents;
 }
 
-/** List committed artifacts (current revision each). */
+/** List committed artifacts (current revision each). A verification read of
+ * the whole store: settlement replay, pair sweep, and trace-graph acyclicity
+ * over every committed revision (ticket 04) — one corrupt artifact fails the
+ * entire listing. */
 function listArtifacts(cwd) {
 	return committedCurrents(cwd);
 }
@@ -761,9 +1096,13 @@ function listArtifacts(cwd) {
  *   fails closed with stable trace errors. Trace revisions default to the
  *   target's current committed head and are recorded resolved.
  * - Tampered or inconsistent settlement state (impossible journal
- *   sequences, a committed pair missing or failing its binding) fails
- *   closed as corruption with stable codes instead of being served or
- *   overwritten.
+ *   sequences, a committed pair missing or failing its binding, a hashless
+ *   committed record in a hash-bearing journal) fails closed as corruption
+ *   with stable codes instead of being served or overwritten.
+ * - Ticket 04 (#221): a crashed prior attempt (a dangling prepared record)
+ *   is settled deterministically before this admission claims its slot —
+ *   one `aborted` journal record is appended; recovery never writes or
+ *   rewrites a Body or Envelope, and the aborted revision stays invisible.
  */
 function admitArtifact(
 	cwd,
@@ -942,6 +1281,12 @@ function admitUnderLock(
 	try {
 		journal = readJournal(dir);
 		validateSettlement(journal);
+		// Ticket 04: deterministic settlement recovery. We hold the admission
+		// lock, so any prepared record still lacking a committed/aborted
+		// outcome is a crashed PRIOR attempt — settle it as aborted
+		// (journal-only; the crashed attempt's files are never touched)
+		// before this admission claims its own slot.
+		journal = recoverDanglingPrepared(dir, journal, { identity, underLock: true });
 	} catch (err) {
 		return fail(err.amberCode || JOURNAL_CORRUPT_CODE, [err.message]);
 	}
@@ -1121,6 +1466,21 @@ function admitUnderLock(
 	}
 
 	const revision = highestClaimedRevision(journal) + 1;
+	// Ticket 04 strict policy (T2-review finding F2): a journal whose
+	// committed records are hashless is pure ticket-01 legacy — validation
+	// only lets that state pass when ZERO records carry settlement hashes,
+	// and the prepared record this admission is about to append would be the
+	// first. Extending hashless history with hash-bearing records would
+	// leave a journal the strict policy must then read as stripped
+	// provenance, so the admission fails closed BEFORE writing anything: the
+	// legacy store stays readable (verbatim retries above still dedupe
+	// without appending); rebuild it by re-admitting the content instead of
+	// migrating the journal in place.
+	if (journal.some((r) => r.kind === KIND_COMMITTED && typeof r.admissionHash !== "string")) {
+		return fail(SETTLEMENT_CORRUPT_CODE, [
+			`"${identity}" has a pure ticket-01 legacy journal (none of its records carry settlement hashes); the strict integrity policy refuses to extend hashless history — re-admit the content as a fresh store instead of migrating the journal in place`,
+		]);
+	}
 	const preparedAt = new Date().toISOString();
 	const attemptId = randomUUID();
 	const envelopeContent = {

@@ -545,11 +545,15 @@ const CATALOG = {
 	AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT: {
 		title: "Canonical Artifact settlement state is corrupt",
 		cause:
-			"The admission journal replays to a state admission itself could never have written — a revision committed twice, committed without a matching prepared record, committed against a stale expected head (forked settlement), a skipped revision slot, or a committed Body/Envelope pair missing on disk.",
+			"The settlement journal replays to a state admission itself could never have written — a revision committed twice, committed without a matching prepared record, committed against a stale expected head (forked settlement), a skipped revision slot, a committed record stripped of the settlement hashes its journal otherwise carries, a committed Body/Envelope pair missing or mismatched on disk, or a pure ticket-01 legacy journal that admission refuses to extend with hash-bearing records — detected at admission or by a verification read (show/list).",
 		remedy:
-			"Restore .amber/artifacts/<type>/<identity>/ (journal and revision files) from version control; the journal is append-only provenance and must never be hand-edited.",
+			"Restore .amber/artifacts/<type>/<identity>/ (journal and revision files) from version control; the journal is append-only provenance and must never be hand-edited. For a pure ticket-01 legacy journal, re-admit the content as a fresh store instead of migrating in place.",
 		layer: "Observability",
-		related: ["AMBER_E_ARTIFACT_JOURNAL_CORRUPT", "AMBER_E_ARTIFACT_CONFLICT"],
+		related: [
+			"AMBER_E_ARTIFACT_JOURNAL_CORRUPT",
+			"AMBER_E_ARTIFACT_CONFLICT",
+			"AMBER_E_ARTIFACT_TRACE_CYCLE",
+		],
 	},
 	AMBER_E_ARTIFACT_NOT_FOUND: {
 		title: "Canonical Artifact or revision not found",
@@ -648,6 +652,15 @@ const CATALOG = {
 			"Advance the target first — accept the Intent (or approve the Spec) via its registered transition, then re-admit the trace.",
 		layer: "Governance",
 		related: ["AMBER_E_ARTIFACT_TRANSITION_INVALID", "AMBER_E_ARTIFACT_TRACE_CARDINALITY"],
+	},
+	AMBER_E_ARTIFACT_TRACE_CYCLE: {
+		title: "Canonical Artifact trace lineage is cyclic",
+		cause:
+			"The committed trace graph (refines / realizes / supersedes edges between committed revisions, across artifacts) contains a cycle. Admission can never produce one — every trace binds an already-committed revision and committed revisions are immutable — so a cycle means hand-edited Body or Envelope state.",
+		remedy:
+			"Restore .amber/artifacts/ from version control; never hand-edit a committed revision's Envelope — a lineage change is always a new admission.",
+		layer: "Observability",
+		related: ["AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT", "AMBER_E_ARTIFACT_TRACE_DIRECTION"],
 	},
 	AMBER_E_ARTIFACT_IO: {
 		title: "Canonical Artifact durable write failed",

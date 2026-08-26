@@ -119,6 +119,26 @@ function invalidArg(message) {
 }
 
 /**
+ * Ticket-04 routed fix: an explicitly passed-but-empty --target ("", or
+ * whitespace) is a malformed invocation, never a silent fallback to the
+ * process CWD via `args.target || process.cwd()` — the caller meant to name
+ * a repository, so it fails closed as AMBER_E_INVALID_ARG exactly like an
+ * explicitly empty --type or --scope. (parseArgs seeds args.target with
+ * process.cwd() when the flag is absent; a trailing --target is undefined
+ * and already caught by missingValueFlag.)
+ */
+function targetFlagValue(args) {
+	if (args.target === undefined || args.target === null) return { value: resolveTarget(args) };
+	const target = String(args.target);
+	if (target.trim().length === 0) {
+		return {
+			error: `--target must be a non-empty repository path when provided; got ${JSON.stringify(args.target)}`,
+		};
+	}
+	return { value: target };
+}
+
+/**
  * Ticket-03 review finding F-3: an explicitly passed-but-empty --type is a
  * malformed invocation, never a silent default to intent — the caller meant
  * to name a type, so it fails closed as AMBER_E_INVALID_ARG exactly like an
@@ -178,7 +198,9 @@ const dispatch = defineCommand({
 			if (traces.error) return invalidArg(traces.error);
 			const type = typeFlagValue(args);
 			if (type.error) return invalidArg(type.error);
-			const result = admitArtifact(resolveTarget(args), {
+			const target = targetFlagValue(args);
+			if (target.error) return invalidArg(target.error);
+			const result = admitArtifact(target.value, {
 				type: type.value,
 				identity: args.id,
 				body,
@@ -210,9 +232,11 @@ const dispatch = defineCommand({
 			const type = typeFlagValue(args);
 			if (type.error) return invalidArg(type.error);
 			if (!ARTIFACT_TYPES.includes(type.value)) return unknownType(type.value);
+			const target = targetFlagValue(args);
+			if (target.error) return invalidArg(target.error);
 			let shown;
 			try {
-				shown = showArtifact(resolveTarget(args), args.id, {
+				shown = showArtifact(target.value, args.id, {
 					type: type.value,
 					revision: revision.value,
 				});
@@ -240,12 +264,20 @@ const dispatch = defineCommand({
 				return invalidArg(
 					`${truncated} requires a value; it was the last token on the command line`,
 				);
-			if (args.type !== undefined && !ARTIFACT_TYPES.includes(args.type)) {
-				return unknownType(args.type);
-			}
+			// Ticket-04 routed fix: `list --type ""` used to fall through to
+			// UNKNOWN_TYPE while admit/show rejected the same input as
+			// INVALID_ARG — the explicitly-empty check now lives in the shared
+			// typeFlagValue helper so all three actions agree. The type is
+			// validation-only here (listArtifacts lists every registered type);
+			// an unregistered non-empty value still reports UNKNOWN_TYPE.
+			const type = typeFlagValue(args);
+			if (type.error) return invalidArg(type.error);
+			if (!ARTIFACT_TYPES.includes(type.value)) return unknownType(type.value);
+			const target = targetFlagValue(args);
+			if (target.error) return invalidArg(target.error);
 			let artifacts;
 			try {
-				artifacts = listArtifacts(resolveTarget(args));
+				artifacts = listArtifacts(target.value);
 			} catch (err) {
 				const failure = readFailure(args, err, CORRUPT_CODE);
 				return { ...failure.result, exitCode: failure.exitCode };

@@ -14,6 +14,12 @@ const { spawnSync } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
+// Fixture-setup-only import: the CLI tests build corrupt-but-self-consistent
+// durable state with the store's own hash primitives; every assertion goes
+// through the CLI seam.
+const { envelopeHash, bodyHash } = require(
+	path.join(ROOT, "scripts", "lib", "core", "canonical-artifacts"),
+);
 
 function runCli(args, cwd) {
 	return spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8" });
@@ -536,10 +542,15 @@ test("tampered settlement fails the next CLI admission with the corruption code"
 	assert.equal(next.status, 1);
 	assert.equal(payload(next).code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
 
-	// Reads still see the untampered committed history.
+	// Ticket 04: reads fail closed too — the verification read replays the
+	// journal instead of serving the untampered prefix silently (T2-review
+	// finding F1: list used to drop the artifact while show served rev 1).
 	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
-	assert.equal(list.status, 0);
-	assert.equal(payload(list).length, 1);
+	assert.equal(list.status, 1);
+	assert.equal(payload(list).code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+	const shown = runCli(["artifact", "show", "--id", "intent/st", "--target", dir, "--json"], dir);
+	assert.equal(shown.status, 1);
+	assert.equal(payload(shown).code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
 });
 
 test("retry after a lost race replays the committed receipt and never duplicates revisions", () => {
@@ -1206,4 +1217,278 @@ test("CLI: an explicit trace revision binds that revision exactly", () => {
 	assert.deepEqual(payload(r).traces, [
 		{ type: "refines", to: { type: "intent", identity: "intent/login-bug", revision: 2 } },
 	]);
+});
+
+// ---------------------------------------------------------------------------
+// F049 ticket 04 (#221) — fail-closed integrity hardening at the public CLI
+// seam: verification reads (show/list) fail closed on tampered settlement,
+// orphaned pair halves, and cyclic trace lineage; crashed admissions settle
+// deterministically as aborted (journal-only recovery); plus the routed
+// strictness fixes for explicitly-empty --target / list --type.
+// ---------------------------------------------------------------------------
+
+function homeOfCli(dir, identity) {
+	const slug = identity.replace(/[^a-zA-Z0-9._-]+/g, "_");
+	return path.join(dir, ".amber", "artifacts", "intents", slug);
+}
+
+function journalOfCli(dir, identity) {
+	return fs
+		.readFileSync(path.join(homeOfCli(dir, identity), "journal.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+}
+
+test("CLI: ticket-04 — an explicitly empty --target fails as INVALID_ARG on admit, show, and list", () => {
+	const dir = mkTarget("t04-empty-target");
+	// The CLI process runs with `dir` as its CWD: the old behavior silently
+	// resolved the empty value to process.cwd() and operated there.
+	const invocations = [
+		["artifact", "admit", "--id", "intent/x", "--body", BODY_V1, "--target", "", "--json"],
+		["artifact", "show", "--id", "intent/x", "--target", "", "--json"],
+		["artifact", "list", "--target", "", "--json"],
+	];
+	for (const args of invocations) {
+		const r = runCli(args, dir);
+		assert.equal(r.status, 1, `${args[1]} --target "" must fail`);
+		const outer = payload(r);
+		assert.equal(outer.code, "AMBER_E_INVALID_ARG", args[1]);
+		assert.match(outer.errors.join(" "), /--target must be a non-empty repository path/);
+	}
+	// Nothing was written to the CWD the empty target would have resolved to.
+	assert.ok(!fs.existsSync(path.join(dir, ".amber")), "the CWD stays clean");
+});
+
+test('CLI: ticket-04 — list --type "" fails as INVALID_ARG, not UNKNOWN_TYPE', () => {
+	const dir = mkTarget("t04-empty-type");
+	const empty = runCli(["artifact", "list", "--type", "", "--target", dir, "--json"], dir);
+	assert.equal(empty.status, 1);
+	const outer = payload(empty);
+	assert.equal(
+		outer.code,
+		"AMBER_E_INVALID_ARG",
+		"an explicitly empty --type is an argument error",
+	);
+	assert.match(outer.errors.join(" "), /--type must be one of the registered artifact types/);
+	// An unregistered NON-empty value still reports the unknown-type verdict.
+	const unknown = runCli(["artifact", "list", "--type", "epic", "--target", dir, "--json"], dir);
+	assert.equal(unknown.status, 1);
+	assert.equal(payload(unknown).code, "AMBER_E_ARTIFACT_UNKNOWN_TYPE");
+	// The legitimate filter value still lists.
+	const ok = runCli(["artifact", "list", "--type", "intent", "--target", dir, "--json"], dir);
+	assert.equal(ok.status, 0, ok.stderr);
+});
+
+test("CLI: ticket-04 — an orphaned pair half fails show and list with the corruption code", () => {
+	const dir = mkTarget("t04-orphan-cli");
+	const seed = runCli(
+		["artifact", "admit", "--id", "intent/orphan", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(seed.status, 0, seed.stderr);
+	fs.rmSync(path.join(homeOfCli(dir, "intent/orphan"), "rev-1.md"));
+
+	const shown = runCli(
+		["artifact", "show", "--id", "intent/orphan", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(shown.status, 1);
+	const outer = payload(shown);
+	assert.equal(outer.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+	assert.match(outer.errors.join(" "), /missing its Body on disk/);
+
+	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
+	assert.equal(list.status, 1);
+	assert.equal(payload(list).code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+});
+
+test("CLI: ticket-04 — a ghost committed record fails show and list with the corruption code", () => {
+	const dir = mkTarget("t04-ghost-cli");
+	const seed = runCli(
+		["artifact", "admit", "--id", "intent/ghost", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(seed.status, 0, seed.stderr);
+	fs.appendFileSync(
+		path.join(homeOfCli(dir, "intent/ghost"), "journal.jsonl"),
+		JSON.stringify({
+			kind: "committed",
+			revision: 99,
+			at: new Date().toISOString(),
+			expectedHead: 1,
+			admissionHash: "f".repeat(64),
+		}) + "\n",
+		"utf8",
+	);
+	for (const args of [
+		["artifact", "show", "--id", "intent/ghost", "--target", dir, "--json"],
+		["artifact", "list", "--target", dir, "--json"],
+	]) {
+		const r = runCli(args, dir);
+		assert.equal(r.status, 1, args.join(" "));
+		const outer = payload(r);
+		assert.equal(outer.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+		assert.match(outer.errors.join(" "), /revision 99 without a matching prepared record/);
+	}
+});
+
+test("CLI: ticket-04 — cyclic trace lineage fails show and list with the stable cycle code", () => {
+	const dir = mkTarget("t04-cycle-cli");
+	for (const identity of ["intent/a", "intent/b"]) {
+		const seed = runCli(
+			["artifact", "admit", "--id", identity, "--body", "# cycle\n", "--target", dir, "--json"],
+			dir,
+		);
+		assert.equal(seed.status, 0, seed.stderr);
+	}
+	// Hand-edit both Envelopes into a mutual supersedes cycle, recomputing
+	// the envelope hash so the corruption is exactly the cyclic lineage.
+	for (const [self, other] of [
+		["intent/a", "intent/b"],
+		["intent/b", "intent/a"],
+	]) {
+		const file = path.join(homeOfCli(dir, self), "rev-1.envelope.json");
+		const stored = JSON.parse(fs.readFileSync(file, "utf8"));
+		stored.traces = [{ type: "supersedes", to: { type: "intent", identity: other, revision: 1 } }];
+		const { envelopeHash: _self, ...rest } = stored;
+		stored.envelopeHash = envelopeHash(rest);
+		fs.writeFileSync(file, JSON.stringify(stored, null, 2) + "\n", "utf8");
+	}
+	for (const args of [
+		["artifact", "show", "--id", "intent/a", "--target", dir, "--json"],
+		["artifact", "list", "--target", dir, "--json"],
+	]) {
+		const r = runCli(args, dir);
+		assert.equal(r.status, 1, args.join(" "));
+		const outer = payload(r);
+		assert.equal(outer.code, "AMBER_E_ARTIFACT_TRACE_CYCLE");
+		assert.match(outer.errors.join(" "), /cyclic/);
+		assert.match(outer.errors.join(" "), /intent\/intent\/a@1/);
+	}
+});
+
+test("CLI: ticket-04 — a stripped hashless committed record fails reads (strict hashless policy)", () => {
+	const dir = mkTarget("t04-stripped-cli");
+	const seed = runCli(
+		["artifact", "admit", "--id", "intent/st", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(seed.status, 0, seed.stderr);
+	const journalFile = path.join(homeOfCli(dir, "intent/st"), "journal.jsonl");
+	const lines = journalOfCli(dir, "intent/st").map((record) => ({ ...record }));
+	for (const record of lines) {
+		if (record.kind === "committed") {
+			delete record.admissionHash;
+			delete record.expectedHead;
+		}
+	}
+	fs.writeFileSync(journalFile, `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`, "utf8");
+	for (const args of [
+		["artifact", "show", "--id", "intent/st", "--target", dir, "--json"],
+		["artifact", "list", "--target", dir, "--json"],
+	]) {
+		const r = runCli(args, dir);
+		assert.equal(r.status, 1, args.join(" "));
+		const outer = payload(r);
+		assert.equal(outer.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+		assert.match(outer.errors.join(" "), /settlement hashes/);
+	}
+});
+
+test("CLI: ticket-04 — a dangling prepared record is settled as aborted by the verification read", () => {
+	const dir = mkTarget("t04-recover-cli");
+	const seed = runCli(
+		["artifact", "admit", "--id", "intent/crash", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(seed.status, 0, seed.stderr);
+	const home = homeOfCli(dir, "intent/crash");
+	const bodyBefore = fs.readFileSync(path.join(home, "rev-1.md"), "utf8");
+	const envelopeBefore = fs.readFileSync(path.join(home, "rev-1.envelope.json"), "utf8");
+	// A crashed admission attempt: prepared claimed slot 2, nothing settled it.
+	fs.appendFileSync(
+		path.join(home, "journal.jsonl"),
+		JSON.stringify({
+			kind: "prepared",
+			revision: 2,
+			at: new Date().toISOString(),
+			expectedHead: 1,
+			admissionHash: "e".repeat(64),
+			attemptId: "crashed-attempt",
+		}) + "\n",
+		"utf8",
+	);
+
+	const shown = runCli(
+		["artifact", "show", "--id", "intent/crash", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(shown.status, 0, shown.stderr);
+	assert.equal(payload(shown).revision, 1);
+
+	const journal = journalOfCli(dir, "intent/crash");
+	const aborted = journal.filter((r) => r.kind === "aborted");
+	assert.equal(aborted.length, 1, "the read settled the crashed attempt as aborted");
+	assert.equal(aborted[0].revision, 2);
+	assert.equal(aborted[0].recovered, true);
+	assert.equal(aborted[0].attemptId, "crashed-attempt");
+
+	// Journal-only recovery: the committed pair survived byte-identical.
+	assert.equal(fs.readFileSync(path.join(home, "rev-1.md"), "utf8"), bodyBefore);
+	assert.equal(fs.readFileSync(path.join(home, "rev-1.envelope.json"), "utf8"), envelopeBefore);
+
+	// The aborted revision stays invisible to reads.
+	const gone = runCli(
+		["artifact", "show", "--id", "intent/crash", "--revision", "2", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(gone.status, 1);
+	assert.equal(payload(gone).code, "AMBER_E_ARTIFACT_NOT_FOUND");
+	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
+	assert.equal(list.status, 0, list.stderr);
+	assert.deepEqual(
+		payload(list).map((e) => e.revision),
+		[1],
+	);
+});
+
+test("CLI: ticket-04 — a pure ticket-01 legacy journal still reads", () => {
+	const dir = mkTarget("t04-legacy-cli");
+	const home = path.join(dir, ".amber", "artifacts", "intents", "intent_legacy");
+	fs.mkdirSync(home, { recursive: true });
+	fs.writeFileSync(path.join(home, "rev-1.md"), BODY_V1);
+	const legacy = {
+		schemaVersion: 1,
+		type: "intent",
+		identity: "intent/legacy",
+		revision: 1,
+		supersedes: null,
+		bodyHash: bodyHash(BODY_V1),
+		provenance: null,
+		committedAt: "2024-01-01T00:00:00.000Z",
+	};
+	legacy.envelopeHash = envelopeHash(legacy);
+	fs.writeFileSync(path.join(home, "rev-1.envelope.json"), JSON.stringify(legacy, null, 2) + "\n");
+	fs.writeFileSync(
+		path.join(home, "journal.jsonl"),
+		[
+			JSON.stringify({ kind: "prepared", revision: 1, at: legacy.committedAt }),
+			JSON.stringify({ kind: "committed", revision: 1, at: legacy.committedAt }),
+		].join("\n") + "\n",
+		"utf8",
+	);
+	const shown = runCli(
+		["artifact", "show", "--id", "intent/legacy", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(shown.status, 0, shown.stderr);
+	assert.equal(payload(shown).revision, 1);
+	assert.equal(payload(shown).body, BODY_V1);
+	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
+	assert.equal(list.status, 0, list.stderr);
+	assert.deepEqual(
+		payload(list).map((e) => e.identity),
+		["intent/legacy"],
+	);
 });

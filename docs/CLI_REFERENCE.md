@@ -456,8 +456,11 @@ node scripts/amber.js artifact list --target . --json
 registered Trace contract (the CLI never names a type the registry contradicts). Malformed flag
 values — a garbage revision, a missing target, or one of this command's value flags (including
 `--target`) trailing at the end of the command line — fail closed as `AMBER_E_INVALID_ARG`, never
-as a silently dropped precondition (an explicitly empty `--idempotency-key` or `--type` fails the
-same way; a non-artifact flag trailing on an artifact command is simply ignored).
+as a silently dropped precondition (an explicitly empty `--idempotency-key`, `--type`, or
+`--target` fails the same way on all three actions — an empty `--target` never silently resolves
+to the current working directory, and `list --type ""` reports `AMBER_E_INVALID_ARG` rather than
+`AMBER_E_ARTIFACT_UNKNOWN_TYPE`; a non-artifact flag trailing on an artifact command is simply
+ignored).
 
 `--expected-head <n>` is the compare-and-swap precondition: the admission commits only if the
 current committed head is exactly `<n>`, otherwise it fails closed as `AMBER_E_ARTIFACT_CONFLICT`
@@ -474,15 +477,32 @@ warnings) without creating a new revision, even if the revision was later supers
 idempotency key for different content, or presenting the same Body with different provenance at
 the head, fails closed as `AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT`. Settlement state admission could
 never have written — a double commit, a commit without its prepared record, a forked expected head,
-a skipped revision slot, or a committed pair missing on disk — fails closed as
-`AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT` at the next admission of that artifact: the admission scans
-both halves of every committed revision (a hole at any revision, not just the head or the retried
-one, is corruption), and the committed record's contentHash is cross-checked against the Envelope's
-bodyHash at every settlement validation. A durable write that fails mid-admission
+a skipped revision slot, a committed record stripped of the settlement hashes its journal otherwise
+carries, or a committed pair missing on disk — fails closed as `AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT`
+at admission **and on every read**: `show` and `list` are verification reads that replay the
+settlement journal, sweep both halves of every committed revision (a hole at any revision, not just
+the head or the retried one, is corruption — `list` never silently drops an artifact whose pair is
+incomplete while `show` serves earlier revisions), and cross-check the committed record's
+contentHash against the Envelope's bodyHash. One corrupt artifact fails the whole listing — the
+listing is never a partial projection. Once a journal carries settlement hashes anywhere
+(`expectedHead`/`admissionHash`), hashless committed records are corruption; only pure ticket-01
+journals with zero hash-bearing records read as legacy — and admission refuses to extend those in
+place (re-admit the content as a fresh store). A durable write that fails mid-admission
 surfaces as `AMBER_E_ARTIFACT_IO` instead of a raw filesystem error.
 Reads verify both halves of the binding: a stored Body that lost its contentHash match reports
 `AMBER_E_ARTIFACT_HASH_MISMATCH`, a stored Envelope that lost its envelopeHash match reports
-`AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`.
+`AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`. Reads also walk the committed trace graph: a cyclic
+Trace chain (refines/realizes/supersedes edges that loop, including through superseded revisions)
+fails closed as `AMBER_E_ARTIFACT_TRACE_CYCLE` — structurally impossible through admission, so
+always hand-edited state.
+
+Crashed admissions settle deterministically (ticket 04): when a verification read or an admission
+encounters a `prepared` record that never received a committed or aborted outcome — and no live
+admission holds the lock — one `aborted` record is appended to the journal, settling the attempt.
+Recovery is journal-only: it never writes or rewrites a Body or Envelope, the aborted revision
+stays invisible to reads, and its consumed revision slot is never reused. Nothing is repaired
+automatically beyond that settlement record — restoring tampered artifact state is a
+version-control operation, never a silent write.
 
 ## Handoff Commands
 
