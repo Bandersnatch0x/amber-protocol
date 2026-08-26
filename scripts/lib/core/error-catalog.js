@@ -518,7 +518,11 @@ const CATALOG = {
 		remedy:
 			"Restore .amber/artifacts/<type>/<identity>/journal.jsonl from version control; never delete it — the journal is append-only provenance.",
 		layer: "Observability",
-		related: ["AMBER_E_KB_CORRUPT", "AMBER_E_LEDGER_TAMPERED"],
+		related: [
+			"AMBER_E_KB_CORRUPT",
+			"AMBER_E_LEDGER_TAMPERED",
+			"AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT",
+		],
 	},
 	AMBER_E_ARTIFACT_CONFLICT: {
 		title: "Canonical Artifact compare-and-swap conflict",
@@ -527,7 +531,25 @@ const CATALOG = {
 		remedy:
 			"Read the current revision with `amber artifact show`, then re-admit superseding that revision.",
 		layer: "Governance",
-		related: ["AMBER_E_ARTIFACT_NOT_FOUND"],
+		related: ["AMBER_E_ARTIFACT_NOT_FOUND", "AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT"],
+	},
+	AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT: {
+		title: "Canonical Artifact idempotency conflict",
+		cause:
+			"A retry presented canonical content that differs from the admission already settled at the same position — the same Artifact Body with different provenance at the current head, or an idempotency key reused for different content.",
+		remedy:
+			"Replay the exact original admission (identical Body, provenance, and expected head) to receive the original receipt, or admit the changed content as a new revision with an explicit expected head and a fresh idempotency key.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_CONFLICT", "AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH"],
+	},
+	AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT: {
+		title: "Canonical Artifact settlement state is corrupt",
+		cause:
+			"The admission journal replays to a state admission itself could never have written — a revision committed twice, committed without a matching prepared record, committed against a stale expected head (forked settlement), a skipped revision slot, or a committed Body/Envelope pair missing on disk.",
+		remedy:
+			"Restore .amber/artifacts/<type>/<identity>/ (journal and revision files) from version control; the journal is append-only provenance and must never be hand-edited.",
+		layer: "Observability",
+		related: ["AMBER_E_ARTIFACT_JOURNAL_CORRUPT", "AMBER_E_ARTIFACT_CONFLICT"],
 	},
 	AMBER_E_ARTIFACT_NOT_FOUND: {
 		title: "Canonical Artifact or revision not found",

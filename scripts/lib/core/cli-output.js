@@ -114,6 +114,8 @@ const FLAG_SPECS = {
 	"--knowledge-kind": { key: "knowledgeKind" },
 	"--supersedes": { key: "supersedesValue", accumulate: "supersedes" },
 	"--supersedes-revision": { key: "supersedesRevision" },
+	"--expected-head": { key: "expectedHead" },
+	"--idempotency-key": { key: "idempotencyKey" },
 	"--revision": { key: "revision" },
 	"--body": { key: "body" },
 	"--provenance": { key: "provenance" },

@@ -404,16 +404,35 @@ history is append-only and immutable — there is no in-place mutation path for 
 node scripts/amber.js artifact admit --target . --id intent/login-bug --body "# Intent: login bug" --json
 
 # supersede the current head with new content (compare-and-swap on the expected head)
+node scripts/amber.js artifact admit --target . --id intent/login-bug --body "..." --expected-head 1
+
+# same as above, naming the superseded revision instead of the head
 node scripts/amber.js artifact admit --target . --id intent/login-bug --body "..." --supersedes-revision 1
+
+# attach caller retry metadata (optional; never determines identity)
+node scripts/amber.js artifact admit --target . --id intent/login-bug --body "..." --idempotency-key op-123
 
 # show the current or an explicit revision; list current revision of each artifact
 node scripts/amber.js artifact show --target . --id intent/login-bug [--revision 1] --json
 node scripts/amber.js artifact list --target . --json
 ```
 
-An exact-duplicate retry returns the original receipt (flagged as duplicate); different content at
-an existing head without `--supersedes-revision` fails closed as `AMBER_E_ARTIFACT_CONFLICT`. Reads
-verify both halves of the binding: a stored Body that lost its contentHash match reports
+`--expected-head <n>` is the compare-and-swap precondition: the admission commits only if the
+current committed head is exactly `<n>`, otherwise it fails closed as `AMBER_E_ARTIFACT_CONFLICT`
+(the loser of two admissions racing on the same expected head never writes).
+`--supersedes-revision <n>` declares the same precondition from the other side and must agree with
+`--expected-head` when both are given.
+
+Admission is idempotent on the **full canonical envelope content** (schema version, type, identity,
+supersedes, bodyHash, and provenance — not the Body alone). An exact-duplicate retry — same Body,
+same provenance, same expected head, optionally recognized by the same `--idempotency-key` —
+returns the original receipt (flagged as duplicate in warnings) without creating a new revision,
+even if the revision was later superseded. Reusing an idempotency key for different content, or
+presenting the same Body with different provenance at the head, fails closed as
+`AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT`. Settlement state admission could never have written — a
+double commit, a commit without its prepared record, a forked expected head, a skipped revision
+slot, or a committed pair missing on disk — fails closed as `AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT`.
+Reads verify both halves of the binding: a stored Body that lost its contentHash match reports
 `AMBER_E_ARTIFACT_HASH_MISMATCH`, a stored Envelope that lost its envelopeHash match reports
 `AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`.
 
