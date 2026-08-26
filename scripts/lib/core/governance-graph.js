@@ -21,7 +21,11 @@
  * no code path from a graph build or query reaches a Canonical Artifact
  * write. Deterministic: nodes and edges are canonically ordered, so
  * identical canonical state always produces the identical graph and source
- * hash, independent of directory iteration order.
+ * hash, independent of directory iteration order — and, since the checkpoint
+ * canonicalizes key order, independent of raw `sources` key order inside the
+ * page files too (ticket-05 review finding F-2): edge order is a total order
+ * (source, target, type, then the shared `ref`), so canonically identical
+ * page stores cannot differ in graph hash.
  */
 
 const { sha256, canonicalJson } = require("./context-hash");
@@ -89,8 +93,11 @@ function pageNodes(pages) {
 }
 
 // Page edges: pages sharing a source reference → relationship with
-// provenance. Members are ordered by page id, so the edge set (and its
-// hash) is a pure function of the page content, never of directory order.
+// provenance. Members are ordered by (page id, source id) and refs are
+// emitted in sorted order, so the edge set (and its hash) is a pure function
+// of the page content — never of directory order or of raw `sources` key
+// order inside a page file (F-2: the checkpoint canonicalizes key order, so
+// the graph output must not depend on it either).
 function pageEdges(pages) {
 	const sourceIndex = new Map();
 	const edges = [];
@@ -103,9 +110,18 @@ function pageEdges(pages) {
 			sourceIndex.get(ref).push({ pageId: page.pageId || page.id, sourceId, source });
 		}
 	}
-	for (const [ref, members] of sourceIndex) {
+	// Canonical emission: refs in sorted order, members by (page id, source
+	// id) — a page carrying the same ref under two source ids, or two pages
+	// sharing two refs, always yields the same members array and edge order.
+	const refs = [...sourceIndex.keys()].sort();
+	for (const ref of refs) {
+		const members = sourceIndex.get(ref);
 		if (members.length < 2) continue;
-		members.sort((a, b) => (a.pageId < b.pageId ? -1 : a.pageId > b.pageId ? 1 : 0));
+		members.sort((a, b) => {
+			if (a.pageId !== b.pageId) return a.pageId < b.pageId ? -1 : 1;
+			if (a.sourceId !== b.sourceId) return a.sourceId < b.sourceId ? -1 : 1;
+			return 0;
+		});
 		for (let i = 0; i < members.length; i += 1) {
 			for (let j = i + 1; j < members.length; j += 1) {
 				edges.push({
@@ -130,10 +146,18 @@ function compareNodes(a, b) {
 	return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
+// Total order over the merged edge list: (source, target, type), then — for
+// page edges that share all three (two pages sharing two refs) — the shared
+// `ref` as the canonical tiebreaker (F-2). Trace edges carry no `ref`, so
+// the tiebreak is a no-op there; without it, order-tied page edges kept
+// Map-insertion order and canonically identical stores hashed differently.
 function compareEdges(a, b) {
 	if (a.source !== b.source) return a.source < b.source ? -1 : 1;
 	if (a.target !== b.target) return a.target < b.target ? -1 : 1;
 	if (a.type !== b.type) return a.type < b.type ? -1 : 1;
+	const refA = typeof a.ref === "string" ? a.ref : "";
+	const refB = typeof b.ref === "string" ? b.ref : "";
+	if (refA !== refB) return refA < refB ? -1 : 1;
 	return 0;
 }
 

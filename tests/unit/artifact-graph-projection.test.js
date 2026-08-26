@@ -203,7 +203,7 @@ test("artifact nodes are read-only reference cards carrying revision, lifecycle,
 		/^[0-9a-f]{64}$/,
 		"envelope hash is the store's bare canonical hash",
 	);
-	assert.ok(accepted.committedAt, "provenance: committed timestamp from the journal record");
+	assert.ok(accepted.committedAt, "provenance: committed timestamp from the Envelope");
 
 	// The node carries the store's binding hashes verbatim — it references
 	// the committed revision, it never owns the lifecycle state.
@@ -318,6 +318,128 @@ test("the source checkpoint covers committed artifact revisions — a new revisi
 	const status = projectionStatus(dir, "governance-graph");
 	assert.equal(status.ok, false);
 	assert.equal(status.code, "AMBER_E_PROJECTION_DRIFT");
+});
+
+// ── AC 2 (review fix round): checkpoint-covered determinism ────
+
+// Ticket-05 review finding F-1: the journal committed record's `at` sits
+// outside the source fingerprint, so it must not feed the projection output
+// — the node's committedAt comes from the hash-covered Envelope field. A
+// hand-edited journal timestamp therefore leaves both the checkpoint AND the
+// result hash untouched across rebuilds.
+test("a hand-edited journal committed timestamp cannot change the projection output", () => {
+	const dir = mkTarget("t05-journal-at");
+	buildLineage(dir);
+
+	const first = rebuildProjection(dir, "governance-graph", governanceGraphBuilder, REBUILD_OPTIONS);
+	assert.equal(first.ok, true, first.errors.join("; "));
+
+	// Hand-edit every committed record's `at` in one artifact's journal — the
+	// field no integrity check covers.
+	const journalFile = path.join(
+		dir,
+		".amber",
+		"artifacts",
+		"intents",
+		"intent_login-bug",
+		"journal.jsonl",
+	);
+	const edited = fs
+		.readFileSync(journalFile, "utf8")
+		.split(/\r?\n/)
+		.filter(Boolean)
+		.map((line) => {
+			const record = JSON.parse(line);
+			if (record.kind === "committed") record.at = "2000-01-01T00:00:00.000Z";
+			return JSON.stringify(record);
+		});
+	fs.writeFileSync(journalFile, edited.join("\n") + "\n", "utf8");
+
+	const second = rebuildProjection(
+		dir,
+		"governance-graph",
+		governanceGraphBuilder,
+		REBUILD_OPTIONS,
+	);
+	assert.equal(second.ok, true, second.errors.join("; "));
+	assert.equal(
+		second.manifest.rebuild_checkpoint,
+		first.manifest.rebuild_checkpoint,
+		"the journal `at` is outside the source fingerprint",
+	);
+	assert.equal(
+		second.manifest.outputHash,
+		first.manifest.outputHash,
+		"same checkpoint, same result hash — the output no longer depends on the journal record",
+	);
+
+	// The served node's committedAt is the Envelope's own committedAt (the
+	// field the envelopeHash covers), never the edited journal timestamp.
+	const graph = buildGovernanceGraph(dir);
+	const node = graph.nodes.find((n) => n.id === "intent/intent/login-bug@2");
+	const revision = listArtifactRevisions(dir).find((r) => r.type === "intent" && r.revision === 2);
+	const envelope = JSON.parse(
+		fs.readFileSync(
+			path.join(dir, ".amber", "artifacts", "intents", "intent_login-bug", "rev-2.envelope.json"),
+			"utf8",
+		),
+	);
+	assert.equal(node.committedAt, revision.committedAt);
+	assert.equal(node.committedAt, envelope.committedAt);
+	assert.notEqual(node.committedAt, "2000-01-01T00:00:00.000Z");
+});
+
+// Ticket-05 review finding F-2: the checkpoint canonicalizes key order, so
+// two page stores differing only in raw `sources` key order share a
+// checkpoint — the graph output (and its hash) must not be able to differ
+// for canonically identical state.
+test("page stores differing only in raw sources key order share checkpoint and graph hash", () => {
+	const dirA = mkTarget("t05-key-order-a");
+	const dirB = mkTarget("t05-key-order-b");
+	const refX = { kind: "repo", ref: "docs/x.md" };
+	const refY = { kind: "repo", ref: "docs/y.md" };
+	for (const dir of [dirA, dirB]) {
+		addPage(dir, "p1", { title: "Page 1", sources: { sx: refX, sy: refY } });
+		addPage(dir, "p2", { title: "Page 2", sources: { sx: refX, sy: refY } });
+	}
+
+	// Variant B: identical page content, only the raw key order inside p1's
+	// `sources` object differs (canonically identical state).
+	const p1File = path.join(dirB, ".amber", "context", "pages", "p1.json");
+	const p1 = JSON.parse(fs.readFileSync(p1File, "utf8"));
+	fs.writeFileSync(
+		p1File,
+		JSON.stringify({ ...p1, sources: { sy: p1.sources.sy, sx: p1.sources.sx } }),
+		"utf8",
+	);
+
+	const stateA = governanceGraphSource(dirA);
+	const stateB = governanceGraphSource(dirB);
+	assert.equal(
+		governanceGraphCheckpoint(stateB),
+		governanceGraphCheckpoint(stateA),
+		"canonically identical stores share a checkpoint",
+	);
+
+	const graphA = governanceGraphFromState(stateA);
+	const graphB = governanceGraphFromState(stateB);
+	assert.equal(
+		graphB.sourceHash,
+		graphA.sourceHash,
+		"identical canonical state produces the identical graph hash",
+	);
+	assert.deepEqual(graphB.edges, graphA.edges);
+
+	// The order-tied pair — two pages sharing two refs — is canonically
+	// ordered: the edge list resolves the (source, target, type) tie by the
+	// shared ref, so the docs/x.md edge precedes the docs/y.md edge in both
+	// stores regardless of key order.
+	const shared = graphA.edges.filter((e) => e.type === "shares-source");
+	assert.deepEqual(
+		shared.map((e) => `${e.source}->${e.target} ${e.ref}`),
+		["p1->p2 docs/x.md", "p1->p2 docs/y.md"],
+		"order-tied page edges are ref-sorted, never key-order residue",
+	);
 });
 
 // ── AC 3: the projection is read-only, never a write authority ──
@@ -448,6 +570,25 @@ test("a corrupt artifact store fails the rebuild closed — never a partial proj
 	const built = rebuildProjection(dir, "governance-graph", governanceGraphBuilder, REBUILD_OPTIONS);
 	assert.equal(built.ok, false);
 	assert.equal(built.code, "AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH");
+	assert.equal(built.manifestPath, null, "nothing is written on a failed rebuild");
+	assert.ok(!fs.existsSync(path.join(dir, ".amber", "projections", "governance-graph.json")));
+});
+
+// F-5 (ticket-05 review): the missing-half branch of the projection read — a
+// committed revision whose Body half is gone fails the whole read closed with
+// the settlement corruption code (only the hash-mismatch branch was covered).
+test("a committed revision missing its Body half fails the projection read closed", () => {
+	const dir = mkTarget("t05-missing-half");
+	buildLineage(dir);
+
+	fs.rmSync(path.join(dir, ".amber", "artifacts", "plans", "plan_login-plan", "rev-1.md"));
+
+	assert.throws(() => listArtifactRevisions(dir), /AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT/);
+	assert.throws(() => buildGovernanceGraph(dir), /missing its Body on disk/);
+
+	const built = rebuildProjection(dir, "governance-graph", governanceGraphBuilder, REBUILD_OPTIONS);
+	assert.equal(built.ok, false);
+	assert.equal(built.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
 	assert.equal(built.manifestPath, null, "nothing is written on a failed rebuild");
 	assert.ok(!fs.existsSync(path.join(dir, ".amber", "projections", "governance-graph.json")));
 });

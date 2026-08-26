@@ -137,7 +137,7 @@ test("projection rebuild projects committed artifact revisions as nodes with typ
 	assert.equal(manifest.projection_type, "governance-graph");
 	assert.match(manifest.rebuild_checkpoint, /^sha256:[0-9a-f]{64}$/);
 	assert.match(manifest.outputHash, /^sha256:[0-9a-f]{64}$/);
-	assert.deepEqual(manifest.projection_rule_versions, { artifactGraph: 1, traceContract: 1 });
+	assert.deepEqual(manifest.projection_rule_versions, { artifactGraph: 2, traceContract: 1 });
 	assert.equal(manifest.schemaVersion, "1.0.0");
 
 	// The durable output carries the graph: one node per committed revision,
@@ -269,6 +269,59 @@ test("projection query stays bounded over artifact revision nodes", () => {
 	assert.equal(out.ok, true);
 	assert.ok(out.nodes.length <= 2, "bounded read");
 	assert.equal(out.truncated, true, "truncation flagged");
+});
+
+// F-5 (ticket-05 review): a `supersedes` Trace must appear in the graph
+// output as a typed edge — the third registered Trace type rides the same
+// edge `type` field as refines/realizes, resolving to the target head.
+test("a supersedes trace appears in the graph output as a typed edge", () => {
+	const dir = mkTarget("supersedes");
+	const steps = [
+		["artifact", "admit", "--id", "intent/old", "--body", "# Intent: old\n"],
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/new",
+			"--body",
+			"# Intent: new\n",
+			"--trace",
+			"supersedes:intent/old",
+		],
+	];
+	for (const args of steps) {
+		const r = runCli([...args, "--target", dir, "--json"], dir);
+		assert.equal(r.status, 0, `${args.join(" ")}\n${r.stderr}`);
+	}
+
+	const r = rebuild(dir);
+	assert.equal(r.status, 0, r.stderr);
+	const output = JSON.parse(
+		fs.readFileSync(
+			path.join(dir, ".amber", "projections", "governance-graph.output.json"),
+			"utf8",
+		),
+	);
+	assert.deepEqual(
+		output.edges
+			.filter((e) => e.type === "supersedes")
+			.map((e) => `${e.source} -${e.type}-> ${e.target}`),
+		["intent/intent/new@1 -supersedes-> intent/intent/old@1"],
+		"the supersedes Trace resolves to the target's committed head",
+	);
+
+	// The scoped query reaches the successor through the typed edge.
+	const q = runCli(
+		["projection", "query", "--scope", "intent/intent/new@1", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(q.status, 0, q.stderr);
+	assert.deepEqual(
+		payload(q)
+			.nodes.map((n) => n.id)
+			.sort(),
+		["intent/intent/new@1", "intent/intent/old@1"],
+	);
 });
 
 test("rebuild and query never write to the Canonical Artifact store (non-authority)", () => {

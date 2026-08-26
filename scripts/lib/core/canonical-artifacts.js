@@ -1090,6 +1090,17 @@ function compareArtifactRevisions(a, b) {
  * through the projection path. There is no code path from the projection
  * rebuild or query to a Canonical Artifact write of any kind.
  *
+ * Ticket-05 review finding F-1 (determinism): every field of the returned
+ * projections is covered by the source fingerprint the Governance Graph
+ * checkpoints against (the Envelope hash). The revision's `committedAt`
+ * therefore comes from the Envelope's own `committedAt` field — which the
+ * envelopeHash covers — and NOT from the journal committed record's `at`,
+ * which sits outside both the fingerprint and every integrity check. show
+ * and list keep journal-record provenance (their pre-existing contract);
+ * only the projection seam needs checkpoint-covered inputs, so a hand-edited
+ * journal timestamp can no longer change a rebuild's result hash while
+ * `projection status` still certifies "current".
+ *
  * @param {string} cwd - Target repository root.
  * @returns {Array<object>} Committed revision projections, canonically
  *         ordered by (type, identity, revision).
@@ -1121,7 +1132,13 @@ function listArtifactRevisions(cwd) {
 					revision,
 					body,
 					envelope,
-					commitRecord?.at ?? null,
+					// F-1 (ticket-05 review): the projection seam sources
+					// committedAt from the Envelope — the field the
+					// envelopeHash covers — never from the journal record's
+					// `at`, which the source fingerprint does not cover. The
+					// commitRecord is still cross-checked below; only the
+					// observable timestamp's origin changes.
+					envelope.committedAt ?? null,
 				),
 			);
 			if (contentHashMismatch(commitRecord, envelope)) {

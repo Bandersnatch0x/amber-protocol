@@ -496,13 +496,17 @@ Trace chain (refines/realizes/supersedes edges that loop, including through supe
 fails closed as `AMBER_E_ARTIFACT_TRACE_CYCLE` — structurally impossible through admission, so
 always hand-edited state.
 
-Crashed admissions settle deterministically (ticket 04): when a verification read or an admission
-encounters a `prepared` record that never received a committed or aborted outcome — and no live
-admission holds the lock — one `aborted` record is appended to the journal, settling the attempt.
-Recovery is journal-only: it never writes or rewrites a Body or Envelope, the aborted revision
-stays invisible to reads, and its consumed revision slot is never reused. Nothing is repaired
-automatically beyond that settlement record — restoring tampered artifact state is a
-version-control operation, never a silent write.
+Crashed admissions settle deterministically (ticket 04): when the settling verification reads
+(`artifact show` and `artifact list`) or an admission encounter a `prepared` record that never
+received a committed or aborted outcome — and no live admission holds the lock — one `aborted`
+record is appended to the journal, settling the attempt. The Governance Graph's projection read
+(`listArtifactRevisions`, behind `projection rebuild/query/status`) deliberately never settles: it
+is read-only and non-authoritative, so a store on which only projections run keeps a dangling
+`prepared` record — invisible either way, since it never projects. Recovery is journal-only: it
+never writes or rewrites a Body or Envelope, the aborted revision stays invisible to reads, and
+its consumed revision slot is never reused. Nothing is repaired automatically beyond that
+settlement record — restoring tampered artifact state is a version-control operation, never a
+silent write.
 
 Committed revisions and their typed Traces project into the Governance Graph — see
 `projection rebuild --type governance-graph` below.
@@ -524,8 +528,9 @@ Intent/Spec/Plan revision and one typed edge per resolved Trace (`refines`, `rea
   receipt (the manifest under `.amber/projections/governance-graph.json`) records the source
   checkpoint (`rebuild_checkpoint`/`sourceHash` — a digest of the pages plus the committed revision
   references with their Envelope hashes), the projection rule and Trace contract versions
-  (`projection_rule_versions`), the schema version, the result hash (`outputHash`), and the Amber
-  protocol version.
+  (`projection_rule_versions`; the artifact-layer rules are at version 2, whose node `committedAt`
+  now derives from the hash-covered Envelope field), the schema version, the result hash
+  (`outputHash`), and the Amber protocol version.
 - `projection status --type governance-graph` certifies currency against the same checkpoint:
   committing a new artifact revision drifts the projection until it is rebuilt.
 - `projection query` keeps the existing bounded-read contract: an exact scope resolves one node

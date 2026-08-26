@@ -46,7 +46,15 @@
 // Recorded in the rebuild receipt next to the Trace contract version so a
 // rule change is visible as a different projection result, never a silent
 // reinterpretation of the same output.
-const ARTIFACT_GRAPH_RULE_VERSION = 1;
+//
+// Version 2 (ticket-05 review fix round, #222): a node's `committedAt` is
+// sourced from the Envelope's own `committedAt` field — the one the
+// envelopeHash covers — instead of the journal committed record's `at`
+// (finding F-1), so every node field is covered by the source fingerprint
+// the receipt checkpoints against. The graph's edge ordering was also made
+// a total order with a canonical tiebreaker (finding F-2) — same edges for
+// the same store, now independent of raw page `sources` key order.
+const ARTIFACT_GRAPH_RULE_VERSION = 2;
 
 const ARTIFACT_NODE_TYPE = "artifact-revision";
 
