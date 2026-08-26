@@ -119,6 +119,8 @@ const FLAG_SPECS = {
 	"--revision": { key: "revision" },
 	"--body": { key: "body" },
 	"--provenance": { key: "provenance" },
+	"--transition": { key: "transition" },
+	"--trace": { key: "traceVal", accumulate: "traceArgs" },
 	"--fixture": { key: "fixture" },
 	"--older-than-days": { key: "olderThanDays" },
 	"--all": { key: "all", kind: "boolean" },

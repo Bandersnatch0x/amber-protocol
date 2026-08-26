@@ -1,7 +1,8 @@
 "use strict";
 
 /**
- * Canonical Planning Artifacts — Intent admission (F049, #218/#219).
+ * Canonical Planning Artifacts — admission, settlement, typed lineage
+ * (F049, #218/#219/#220).
  *
  * A Canonical Artifact is a bound pair (ADR-0023): one human-readable
  * Artifact Body (Markdown) and one machine-actionable Artifact Envelope
@@ -9,6 +10,23 @@
  * prepared/committed/aborted journal; only committed revisions are visible
  * to reads. Revisions are append-only and immutable — there is no in-place
  * mutation path for a committed revision's status or content.
+ *
+ * Ticket 03 (#220) registers Spec and Plan alongside Intent, each with a
+ * closed lifecycle and named-transition contract, and adds the typed Trace
+ * lineage (refines / realizes / supersedes; see
+ * canonical-artifact-contracts.js for the registries):
+ * - The Envelope carries `lifecycle` (the revision's lifecycle state),
+ *   `transition` (the named transition this admission applied, if any),
+ *   `scope` (an optional confinement tag), and its resolved `traces` with
+ *   the trace contract version. A lifecycle change is admitted as a named
+ *   transition producing a NEW revision — a manual Body or Envelope change
+ *   is new admission input, never an in-place status mutation.
+ * - Required planning lineage is enforced at admission: a Spec refines
+ *   exactly one accepted Intent revision; a Plan realizes exactly one
+ *   approved Spec revision. A Plan cannot realize an Intent directly
+ *   (omitted-Spec policy), a generic or unregistered relation cannot
+ *   satisfy required lineage, and Traces crossing scope boundaries are
+ *   rejected.
  *
  * Admission is a compare-and-swap transaction on the expected head (#219)
  * with two serialization layers, so correctness never depends on call
@@ -63,8 +81,21 @@ const { sha256Hex, canonicalJson } = require("./context-hash");
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { codedError } = require("./error-catalog");
+const {
+	TYPE_REGISTRY,
+	ARTIFACT_TYPES,
+	TRACE_REGISTRY_VERSION,
+	isValidArtifactIdentity,
+	transitionFor,
+	registeredTransitionsOf,
+	lifecycleForAdmission,
+	transitionToState,
+	traceContract,
+	expectedToType,
+	structuralTraceProblems,
+	traceShapeProblem,
+} = require("./canonical-artifact-contracts");
 
-const ARTIFACT_TYPES = Object.freeze(["intent"]);
 const ARTIFACT_STATUSES = Object.freeze(["prepared", "committed", "aborted"]);
 
 // Journal record kinds double as the durable status names.
@@ -77,6 +108,13 @@ const SETTLEMENT_CORRUPT_CODE = "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT";
 const IDEMPOTENCY_CONFLICT_CODE = "AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT";
 const CONFLICT_CODE = "AMBER_E_ARTIFACT_CONFLICT";
 const INVALID_ARG_CODE = "AMBER_E_INVALID_ARG";
+const TRANSITION_UNKNOWN_CODE = "AMBER_E_ARTIFACT_TRANSITION_UNKNOWN";
+const TRANSITION_INVALID_CODE = "AMBER_E_ARTIFACT_TRANSITION_INVALID";
+const TRACE_DIRECTION_CODE = "AMBER_E_ARTIFACT_TRACE_DIRECTION";
+const TRACE_SCOPE_CODE = "AMBER_E_ARTIFACT_TRACE_SCOPE";
+const TRACE_TARGET_NOT_FOUND_CODE = "AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND";
+const TRACE_TARGET_LIFECYCLE_CODE = "AMBER_E_ARTIFACT_TRACE_TARGET_LIFECYCLE";
+const IO_CODE = "AMBER_E_ARTIFACT_IO";
 
 // ponytail: exclusive-lock admission (open O_EXCL lock file → settle →
 // unlink) instead of OS-level advisory locking; a crashed holder leaves the
@@ -84,21 +122,11 @@ const INVALID_ARG_CODE = "AMBER_E_INVALID_ARG";
 // journal serialization above still refuses to fork history even then.
 const LOCK_STALE_MS = 30_000;
 
-const TYPE_DIR_BY_TYPE = Object.freeze({ intent: "intents" });
-
-// Pure-dot path segments ("." / "..") would resolve the artifact home to the
-// store root or its parent instead of a per-identity directory.
-const DOT_SEGMENT_PATTERN = /^\.+$/;
-
-function isValidIdentity(identity) {
-	return typeof identity === "string" && identity.length > 0 && !DOT_SEGMENT_PATTERN.test(identity);
-}
-
 function artifactDir(cwd, type, identity) {
 	// ponytail: flat slug identity→dir; collisions across e.g. "a/b" vs "a_b"
-	// would alias, acceptable for the tracer bullet's intent-only registry.
+	// would alias, acceptable for the registered-type registry's scope.
 	const slug = `${identity}`.replace(/[^a-zA-Z0-9._-]+/g, "_");
-	return statePathForCreate(cwd, "artifacts", TYPE_DIR_BY_TYPE[type] || type, slug);
+	return statePathForCreate(cwd, "artifacts", TYPE_REGISTRY[type]?.dir || type, slug);
 }
 
 function journalPath(dir) {
@@ -171,12 +199,16 @@ function envelopeHash(envelope) {
 /**
  * The admission idempotency key (#219): sha256 over the canonical
  * serialization of every caller-determined Envelope field — schemaVersion,
- * type, identity, supersedes (the expected head), bodyHash, and provenance.
- * Assigned or volatile fields (revision, committedAt, envelopeHash) are
- * excluded, so a verbatim retry recomputes the same key while a retry that
- * changed ANY content — including provenance — does not. Ticket-01 review
- * finding F3: retries dedupe on the full canonical envelope content, never
- * on bodyHash alone.
+ * type, identity, supersedes (the expected head), bodyHash, provenance, and
+ * (ticket 03) the lifecycle content: the named `transition`, `scope`, and
+ * the resolved Trace set. Assigned, volatile, or DERIVED fields are excluded:
+ * revision, committedAt, envelopeHash, and the lifecycle STATE, which is a
+ * pure function of the type and the named transition (a revision admitted
+ * without a transition carries the type's initial state) — so two admissions
+ * cannot differ in lifecycle without differing in `transition`, and retries
+ * against pre-lifecycle (ticket-01/02) Envelopes still dedupe. Ticket-01
+ * review finding F3: retries dedupe on the full canonical envelope content,
+ * never on bodyHash alone.
  */
 function admissionHash({
 	schemaVersion,
@@ -185,6 +217,9 @@ function admissionHash({
 	supersedes,
 	bodyHash: content,
 	provenance,
+	transition,
+	scope,
+	traces,
 }) {
 	return sha256Hex(
 		canonicalJson(
@@ -195,12 +230,30 @@ function admissionHash({
 				supersedes: supersedes ?? null,
 				bodyHash: content,
 				provenance: provenance || null,
+				transition: transition ?? null,
+				scope: scope ?? null,
+				traces: canonicalTracesForHash(traces),
 			}),
 		),
 	);
 }
 
-// The admission key of an already-stored Envelope (same field set).
+// Traces in hash-canonical form: one fixed shape regardless of which
+// optional fields the caller omitted (derivation fills them before hashing).
+function canonicalTracesForHash(traces) {
+	return (Array.isArray(traces) ? traces : []).map((trace) => ({
+		type: trace?.type ?? null,
+		to: {
+			type: trace?.to?.type ?? null,
+			identity: trace?.to?.identity ?? null,
+			revision: trace?.to?.revision ?? null,
+		},
+	}));
+}
+
+// The admission key of an already-stored Envelope (same field set; the
+// lifecycle state stays excluded as a derived field, so pre-lifecycle
+// Envelopes hash exactly like their transition-less retries).
 function admissionHashOfEnvelope(envelope) {
 	return admissionHash({
 		schemaVersion: envelope.schemaVersion,
@@ -209,6 +262,9 @@ function admissionHashOfEnvelope(envelope) {
 		supersedes: envelope.supersedes ?? null,
 		bodyHash: envelope.bodyHash,
 		provenance: envelope.provenance || null,
+		transition: envelope.transition ?? null,
+		scope: envelope.scope ?? null,
+		traces: envelope.traces || [],
 	});
 }
 
@@ -327,23 +383,33 @@ function committedProjection(type, identity, revision, body, envelope, committed
 		contentHash: recordedHash,
 		envelopeHash: envelope.envelopeHash || null,
 		supersedes: envelope.supersedes ?? null,
+		lifecycle: envelope.lifecycle ?? null,
+		transition: envelope.transition ?? null,
+		scope: envelope.scope ?? null,
+		traces: envelope.traces || [],
 		provenance: envelope.provenance || null,
 		committedAt: committedAt || null,
 	});
 }
 
-/**
- * Verify the settled pair for one revision and build its receipt. Returns
- * null when the pair is not readable on disk; throws the typed read error
- * when the stored binding fails verification. A duplicate retry must never
- * succeed against a tampered revision.
- */
-function verifiedReceipt(dir, type, identity, revision, journal) {
-	const body = readBody(dir, revision);
-	const envelope = readEnvelope(dir, revision);
-	if (!body || !envelope) return null;
-	committedProjection(type, identity, revision, body, envelope, null);
-	return receiptFor(type, identity, revision, envelope, journal);
+// The committed journal record settling a revision, or null.
+function findCommitRecord(journal, revision) {
+	return (
+		[...journal].reverse().find((r) => r.kind === KIND_COMMITTED && r.revision === revision) || null
+	);
+}
+
+// The committed record's contentHash must still agree with the Envelope's
+// bodyHash (ticket-02 review finding F9): the field is cross-checked at
+// every settlement validation, not just written.
+function contentHashMismatch(record, envelope) {
+	return (
+		typeof record?.contentHash === "string" && record.contentHash !== (envelope?.bodyHash ?? null)
+	);
+}
+
+function settlementContentHashMessage(identity, revision, record, envelope) {
+	return `committed journal record for revision ${revision} of "${identity}" records contentHash ${record.contentHash} while the stored Envelope binds bodyHash ${envelope?.bodyHash ?? null}; the settlement no longer matches the revision it settled`;
 }
 
 /**
@@ -442,6 +508,179 @@ function settleGuard(dir, { revision, attemptId, expectedHead }) {
 }
 
 /**
+ * Resolve one committed revision of a target artifact for Trace binding:
+ * journal-settled visibility (prepared/aborted stay invisible), the pair
+ * present on disk, and both binding hashes verified. Returns null when the
+ * target has no such committed revision.
+ * @throws {Error} Typed corruption/binding errors — a Trace never binds to
+ *         inconsistent settlement state or a tampered pair.
+ */
+function readCommittedRevision(dir, type, identity, revision /* number|null for head */) {
+	const journal = readJournal(dir);
+	const head = committedHead(journal);
+	if (head === 0) return null;
+	const target =
+		revision === null || revision === undefined
+			? head
+			: journal.some((r) => r.kind === KIND_COMMITTED && r.revision === revision)
+				? revision
+				: null;
+	if (target === null) return null;
+	const envelope = readEnvelope(dir, target);
+	const body = readBody(dir, target);
+	if (!envelope || !body) {
+		throw typedReadError(
+			SETTLEMENT_CORRUPT_CODE,
+			`committed revision ${target} of "${identity}" is missing its ${envelope ? "Body" : "Envelope"} on disk; refusing to bind a Trace to an incomplete pair`,
+		);
+	}
+	committedProjection(type, identity, target, body, envelope, null);
+	const record = findCommitRecord(journal, target);
+	if (contentHashMismatch(record, envelope)) {
+		throw typedReadError(
+			SETTLEMENT_CORRUPT_CODE,
+			settlementContentHashMessage(identity, target, record, envelope),
+		);
+	}
+	return { revision: target, envelope, journal };
+}
+
+// Journal-level existence probe used to disambiguate a failed Trace target
+// lookup (a wrong-type target names a real artifact of another type).
+// Best-effort: a corrupt journal in an unrelated type directory leaves the
+// plain not-found verdict unchanged — the scan only improves the message.
+function committedRevisionExists(cwd, type, identity, revision /* number|null for head */) {
+	let journal;
+	try {
+		journal = readJournal(artifactDir(cwd, type, identity));
+	} catch {
+		return false;
+	}
+	if (revision === null || revision === undefined) {
+		return committedHead(journal) > 0;
+	}
+	return journal.some((r) => r.kind === KIND_COMMITTED && r.revision === revision);
+}
+
+/**
+ * Resolve and validate one Trace against the registered contract and the
+ * committed target state (ticket 03, #220):
+ * - direction: the declared (or derived) target type must match the Trace
+ *   contract; a derived lookup that finds the identity under a different
+ *   registered type reports the direction violation — this is where the
+ *   omitted-Spec policy (a Plan realizing its Intent directly) surfaces;
+ * - lifecycle gate: required-lineage Traces must target a revision in the
+ *   contract's required state (refines → accepted Intent, realizes →
+ *   approved Spec);
+ * - scope confinement: source and target must declare the same scope tag.
+ * The revision defaults to the target's current committed head and is
+ * resolved (and recorded) explicitly — Traces bind revisions, not heads.
+ * @returns {{ok: true, to: {type: string, identity: string, revision: number}} |
+ *           {ok: false, code: string, message: string}}
+ */
+function resolveTraceTarget(cwd, sourceType, sourceIdentity, sourceScope, trace) {
+	const contract = traceContract(trace.type);
+	const toType = expectedToType(trace.type, sourceType);
+	const declaredType = trace.to.type === undefined || trace.to.type === null ? null : trace.to.type;
+	if (declaredType !== null && declaredType !== toType) {
+		return {
+			ok: false,
+			code: TRACE_DIRECTION_CODE,
+			message: `"${trace.type}" Traces must target ${toType} artifacts, but the Trace names target type "${declaredType}"${omittedSpecNoteFor(trace.type, declaredType)}`,
+		};
+	}
+	const wantedRevision =
+		trace.to.revision === undefined || trace.to.revision === null ? null : trace.to.revision;
+
+	let resolved;
+	try {
+		resolved = readCommittedRevision(
+			artifactDir(cwd, toType, trace.to.identity),
+			toType,
+			trace.to.identity,
+			wantedRevision,
+		);
+	} catch (err) {
+		return { ok: false, code: err.amberCode || JOURNAL_CORRUPT_CODE, message: err.message };
+	}
+	if (!resolved) {
+		if (declaredType === null && !committedRevisionExists(cwd, toType, trace.to.identity, null)) {
+			for (const otherType of ARTIFACT_TYPES) {
+				if (otherType === toType) continue;
+				if (committedRevisionExists(cwd, otherType, trace.to.identity, wantedRevision)) {
+					return {
+						ok: false,
+						code: TRACE_DIRECTION_CODE,
+						message: `"${trace.type}" Traces must target ${toType} artifacts, but "${trace.to.identity}" resolves to a ${otherType} artifact${omittedSpecNoteFor(trace.type, otherType)}`,
+					};
+				}
+			}
+		}
+		const revisionNote =
+			wantedRevision !== null && committedRevisionExists(cwd, toType, trace.to.identity, null)
+				? ` is not a committed revision of ${toType}/"${trace.to.identity}" (prepared and aborted revisions are invisible)`
+				: ` matches no committed ${toType} artifact revision`;
+		return {
+			ok: false,
+			code: TRACE_TARGET_NOT_FOUND_CODE,
+			message: `the "${trace.type}" Trace target ${toType}/"${trace.to.identity}"${wantedRevision !== null ? ` at revision ${wantedRevision}` : ""}${revisionNote}; Traces bind to committed revisions only — admit the target first`,
+		};
+	}
+	if (contract.targetLifecycle !== null) {
+		const state = resolved.envelope.lifecycle ?? null;
+		if (state !== contract.targetLifecycle) {
+			const via = transitionToState(toType, contract.targetLifecycle);
+			const stateNote =
+				state === null
+					? "carries no lifecycle state (admitted before lifecycle contracts)"
+					: `is in lifecycle state "${state}"`;
+			return {
+				ok: false,
+				code: TRACE_TARGET_LIFECYCLE_CODE,
+				message: `the "${trace.type}" Trace targets ${toType}/"${trace.to.identity}" revision ${resolved.revision}, which ${stateNote}, but this Trace requires "${contract.targetLifecycle}"${via ? ` — admit the target revision through its "${via.name}" transition first` : ""}`,
+			};
+		}
+	}
+	const targetScope = resolved.envelope.scope ?? null;
+	if (targetScope !== sourceScope) {
+		return {
+			ok: false,
+			code: TRACE_SCOPE_CODE,
+			message: `the "${trace.type}" Trace from ${sourceType}/"${sourceIdentity}" (scope ${JSON.stringify(sourceScope)}) crosses a scope boundary: ${toType}/"${trace.to.identity}" revision ${resolved.revision} is in scope ${JSON.stringify(targetScope)} — Traces are confined to one scope`,
+		};
+	}
+	return {
+		ok: true,
+		to: Object.freeze({
+			type: toType,
+			identity: trace.to.identity,
+			revision: resolved.revision,
+		}),
+	};
+}
+
+function omittedSpecNoteFor(traceType, declaredType) {
+	if (traceType === "realizes" && declaredType === "intent") {
+		return " — a Plan cannot realize an Intent directly (omitted-Spec policy): admit a Spec that refines the accepted Intent revision, then realize that Spec";
+	}
+	return "";
+}
+
+// Best-effort removal of an artifact home left empty by a failed admission
+// (ticket-02 review finding F6): the admission lock creates the directory
+// before the journal validates, so a first admission that fails before any
+// durable write would otherwise strand an empty directory. Only a TRULY
+// empty directory is removed — journals and revision pairs are settlement
+// state and stay for fail-closed validation.
+function removeDirIfEmpty(dir) {
+	try {
+		if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+	} catch {
+		// best-effort only
+	}
+}
+
+/**
  * Read one artifact's current (or explicit) revision with journal-settled
  * visibility. Returns null when the identity has no committed revision or
  * the named revision is not committed — prepared/aborted stay invisible.
@@ -505,6 +744,22 @@ function listArtifacts(cwd) {
  *   revision returns its original receipt, while the same Body with a
  *   different envelope (e.g. changed provenance) at the head fails closed
  *   instead of silently discarding the difference.
+ * - `transition` (ticket 03, #220) names a transition from the type's closed
+ *   lifecycle table; the new revision carries the transition's target state.
+ *   An unregistered name fails closed as AMBER_E_ARTIFACT_TRANSITION_UNKNOWN;
+ *   a transition that does not apply from the current head's lifecycle state
+ *   fails closed as AMBER_E_ARTIFACT_TRANSITION_INVALID. Admissions without
+ *   a transition carry the type's initial state — changed content must pass
+ *   the gate again; a lifecycle change is always a new revision.
+ * - `scope` is an optional confinement tag; Traces are confined to one scope
+ *   (source and target tags must match; null counts as a scope).
+ * - `traces` is the typed lineage of the revision: each record is validated
+ *   against the registered, versioned Trace contract (refines / realizes /
+ *   supersedes) with direction, scope, and cardinality. Required planning
+ *   lineage is enforced: a Spec refines exactly one accepted Intent revision
+ *   and a Plan realizes exactly one approved Spec revision, or admission
+ *   fails closed with stable trace errors. Trace revisions default to the
+ *   target's current committed head and are recorded resolved.
  * - Tampered or inconsistent settlement state (impossible journal
  *   sequences, a committed pair missing or failing its binding) fails
  *   closed as corruption with stable codes instead of being served or
@@ -520,6 +775,9 @@ function admitArtifact(
 		supersedes = null,
 		expectedHead = null,
 		idempotencyKey = null,
+		transition = null,
+		scope = null,
+		traces = [],
 	},
 ) {
 	const fail = (code, errors) => ({ ok: false, code, receipt: null, errors });
@@ -529,7 +787,7 @@ function admitArtifact(
 			`artifact type "${type}" is not registered; registered types: ${ARTIFACT_TYPES.join(", ")}`,
 		]);
 	}
-	if (!isValidIdentity(identity)) {
+	if (!isValidArtifactIdentity(identity)) {
 		return fail("AMBER_E_ARTIFACT_INVALID_IDENTITY", [
 			`artifact identity "${identity}" is not a usable directory name (empty and pure-dot segments are rejected)`,
 		]);
@@ -539,6 +797,74 @@ function admitArtifact(
 		return fail("AMBER_E_ARTIFACT_ORPHANED_HALF", [
 			"admission received an Envelope without a readable Artifact Body",
 		]);
+	}
+
+	// Scope is an optional confinement tag for Traces: null or a non-empty
+	// string. Garbage never becomes a silent default scope.
+	if (scope !== undefined && scope !== null) {
+		if (typeof scope !== "string" || scope.trim().length === 0) {
+			return fail(INVALID_ARG_CODE, [
+				`scope must be a non-empty string scope tag or null; got ${JSON.stringify(scope)}`,
+			]);
+		}
+	}
+	const scopeTag = scope === undefined || scope === null ? null : scope;
+
+	// An explicitly passed-but-empty idempotency key is a malformed
+	// invocation, never a silent "no key" (ticket-02 review finding F5): the
+	// caller meant to bind a retry, so the flag must carry one.
+	if (idempotencyKey !== undefined && idempotencyKey !== null) {
+		if (typeof idempotencyKey !== "string" || idempotencyKey.trim().length === 0) {
+			return fail(INVALID_ARG_CODE, [
+				`idempotencyKey must be a non-empty string when provided; got ${JSON.stringify(idempotencyKey)}`,
+			]);
+		}
+	}
+	const key = typeof idempotencyKey === "string" ? idempotencyKey : null;
+
+	// Named lifecycle transition: the name must come from the type's closed
+	// transition table. The from-state check runs under the lock against the
+	// current head (where the CAS precondition is also validated).
+	if (transition !== undefined && transition !== null) {
+		if (typeof transition !== "string" || transition.length === 0) {
+			return fail(INVALID_ARG_CODE, [
+				`transition must be a named transition of ${type} artifacts or null; got ${JSON.stringify(transition)}`,
+			]);
+		}
+		if (transitionFor(type, transition) === null) {
+			const registered = registeredTransitionsOf(type);
+			return fail(TRANSITION_UNKNOWN_CODE, [
+				`transition "${transition}" is not registered for ${type} artifacts; registered transitions: ${registered.length > 0 ? registered.join(", ") : "(none)"}`,
+			]);
+		}
+	}
+	const transitionName = transition === undefined || transition === null ? null : transition;
+
+	// Typed Trace lineage: shape first (argument errors never masquerade as
+	// registry violations), then the registered contract (unknown relation,
+	// direction, cardinality), then resolution against the committed target
+	// state (existence, lifecycle gate, scope confinement). Traces bind to
+	// other artifacts' committed revisions, so resolution reads those homes
+	// before this artifact's lock is taken.
+	const traceList = traces === undefined || traces === null ? [] : traces;
+	if (!Array.isArray(traceList)) {
+		return fail(INVALID_ARG_CODE, [
+			`traces must be an array of Trace records { type, to: { type?, identity, revision? } }; got ${typeof traceList}`,
+		]);
+	}
+	for (const trace of traceList) {
+		const shapeProblem = traceShapeProblem(trace);
+		if (shapeProblem !== null) return fail(INVALID_ARG_CODE, [shapeProblem]);
+	}
+	const structural = structuralTraceProblems(type, identity, traceList);
+	if (structural.length > 0) {
+		return fail(structural[0].code, [structural[0].message]);
+	}
+	const resolvedTraces = [];
+	for (const trace of traceList) {
+		const resolved = resolveTraceTarget(cwd, type, identity, scopeTag, trace);
+		if (!resolved.ok) return fail(resolved.code, [resolved.message]);
+		resolvedTraces.push(Object.freeze({ type: trace.type, to: resolved.to }));
 	}
 
 	// The expected head is a positive revision number or null (first
@@ -563,9 +889,6 @@ function admitArtifact(
 	}
 	const expected = declared.length > 0 ? declared[0][1] : null;
 
-	const key =
-		typeof idempotencyKey === "string" && idempotencyKey.length > 0 ? idempotencyKey : null;
-
 	const dir = artifactDir(cwd, type, identity);
 	let unlock;
 	try {
@@ -573,15 +896,36 @@ function admitArtifact(
 	} catch (err) {
 		return fail(err.amberCode || CONFLICT_CODE, [err.message]);
 	}
+	let result;
 	try {
-		return admitUnderLock(dir, type, identity, body, provenance, expected, key, fail);
+		result = admitUnderLock(dir, type, identity, body, provenance, expected, key, fail, {
+			transition: transitionName,
+			scope: scopeTag,
+			traces: resolvedTraces,
+		});
 	} finally {
 		unlock();
 	}
+	// A failed admission leaves nothing behind when it never wrote durable
+	// state (ticket-02 review finding F6): the lock created the artifact
+	// home, so remove it again — but only when it is truly empty.
+	if (result && !result.ok) removeDirIfEmpty(dir);
+	return result;
 }
 
-function admitUnderLock(dir, type, identity, body, provenance, expected, idempotencyKey, fail) {
+function admitUnderLock(
+	dir,
+	type,
+	identity,
+	body,
+	provenance,
+	expected,
+	idempotencyKey,
+	fail,
+	{ transition = null, scope = null, traces = [] } = {},
+) {
 	const contentHashValue = bodyHash(body);
+	const lifecycle = lifecycleForAdmission(type, transition);
 	const incomingKeyHash = admissionHash({
 		schemaVersion: 1,
 		type,
@@ -589,6 +933,9 @@ function admitUnderLock(dir, type, identity, body, provenance, expected, idempot
 		supersedes: expected,
 		bodyHash: contentHashValue,
 		provenance,
+		transition,
+		scope,
+		traces,
 	});
 
 	let journal;
@@ -616,6 +963,16 @@ function admitUnderLock(dir, type, identity, body, provenance, expected, idempot
 			}
 			try {
 				committedProjection(type, identity, prior.revision, priorBody, priorEnvelope, null);
+				// Ticket-02 review finding F9: the committed record's
+				// contentHash is cross-checked against the Envelope's bodyHash —
+				// the field proves settlement integrity, not decoration.
+				const record = findCommitRecord(journal, prior.revision);
+				if (contentHashMismatch(record, priorEnvelope)) {
+					throw typedReadError(
+						SETTLEMENT_CORRUPT_CODE,
+						settlementContentHashMessage(identity, prior.revision, record, priorEnvelope),
+					);
+				}
 			} catch (err) {
 				return fail(err.amberCode || SETTLEMENT_CORRUPT_CODE, [err.message]);
 			}
@@ -637,22 +994,49 @@ function admitUnderLock(dir, type, identity, body, provenance, expected, idempot
 	// Content-bound idempotency: any committed revision whose full canonical
 	// admission content matches returns its original receipt — a retry after
 	// a timeout, or a retry of a revision that was later superseded, never
-	// creates a duplicate revision. The pair is verified before the receipt
-	// is returned, so a retry can never succeed against a tampered revision.
+	// creates a duplicate revision. Ticket-02 review finding F8: a committed
+	// revision missing its half on disk is settlement corruption at ANY
+	// revision, not a silent skip — the scan fails closed instead of deduping
+	// around the hole. F9: the committed record's contentHash is cross-checked
+	// against the matched Envelope's bodyHash before the receipt is served, so
+	// a retry can never confirm a tampered revision.
 	for (const revision of committedRevisions(journal)) {
 		const envelope = readEnvelope(dir, revision);
-		if (!envelope || admissionHashOfEnvelope(envelope) !== incomingKeyHash) continue;
+		if (!envelope) {
+			return fail(SETTLEMENT_CORRUPT_CODE, [
+				`committed revision ${revision} of "${identity}" is missing its Envelope on disk; refusing to scan inconsistent settlement state`,
+			]);
+		}
+		if (admissionHashOfEnvelope(envelope) !== incomingKeyHash) continue;
+		const bodyText = readBody(dir, revision);
+		if (!bodyText) {
+			return fail(SETTLEMENT_CORRUPT_CODE, [
+				`committed revision ${revision} of "${identity}" is missing its Body on disk; refusing to confirm a retry against an incomplete pair`,
+			]);
+		}
 		try {
-			const receipt = verifiedReceipt(dir, type, identity, revision, journal);
-			if (receipt) {
-				return { ok: true, duplicate: true, code: null, errors: [], receipt };
+			committedProjection(type, identity, revision, bodyText, envelope, null);
+			const record = findCommitRecord(journal, revision);
+			if (contentHashMismatch(record, envelope)) {
+				throw typedReadError(
+					SETTLEMENT_CORRUPT_CODE,
+					settlementContentHashMessage(identity, revision, record, envelope),
+				);
 			}
 		} catch (err) {
-			return fail(err.amberCode || JOURNAL_CORRUPT_CODE, [err.message]);
+			return fail(err.amberCode || SETTLEMENT_CORRUPT_CODE, [err.message]);
 		}
+		return {
+			ok: true,
+			duplicate: true,
+			code: null,
+			errors: [],
+			receipt: receiptFor(type, identity, revision, envelope, journal),
+		};
 	}
 
 	// Expected-head compare-and-swap.
+	let headEnvelope = null;
 	if (head > 0) {
 		const current = readEnvelope(dir, head);
 		const currentBody = readBody(dir, head);
@@ -679,54 +1063,93 @@ function admitUnderLock(dir, type, identity, body, provenance, expected, idempot
 				`expected head ${expected} is stale; current committed revision is ${head}`,
 			]);
 		}
-		// Building on the head: its pair must still hold its binding.
+		// Building on the head: its pair must still hold its binding, and its
+		// committed record must still agree with the Envelope it settled (F9).
 		try {
 			committedProjection(type, identity, head, currentBody, current, null);
+			const record = findCommitRecord(journal, head);
+			if (contentHashMismatch(record, current)) {
+				throw typedReadError(
+					SETTLEMENT_CORRUPT_CODE,
+					settlementContentHashMessage(identity, head, record, current),
+				);
+			}
 		} catch (err) {
 			return fail(err.amberCode || SETTLEMENT_CORRUPT_CODE, [err.message]);
 		}
+		headEnvelope = current;
 	} else if (expected !== null) {
 		return fail(CONFLICT_CODE, [
 			`cannot supersede revision ${expected}: "${identity}" has no committed revisions`,
 		]);
 	}
 
+	// Named transition applies from the current lifecycle state (ticket 03):
+	// the head revision's state when one exists — a legacy revision without
+	// the lifecycle field reads as the type's initial state, since it was
+	// admitted without a transition — and the type's initial state for a
+	// first admission. A transition that does not apply fails closed instead
+	// of producing a state the type's closed lifecycle cannot reach.
+	if (transition !== null) {
+		const contract = transitionFor(type, transition);
+		const currentState = headEnvelope
+			? (headEnvelope.lifecycle ?? TYPE_REGISTRY[type].lifecycle.initial)
+			: TYPE_REGISTRY[type].lifecycle.initial;
+		if (currentState !== contract.from) {
+			return fail(TRANSITION_INVALID_CODE, [
+				`transition "${transition}" of ${type} artifacts applies from lifecycle state "${contract.from}", but ${
+					head > 0
+						? `revision ${head} of "${identity}" is in lifecycle state "${currentState}"`
+						: `"${identity}" has no committed revisions yet and starts from "${currentState}"`
+				}; a lifecycle change is always a new admission — supersede with a transition that applies from "${currentState}"`,
+			]);
+		}
+	}
+
 	const revision = highestClaimedRevision(journal) + 1;
 	const preparedAt = new Date().toISOString();
 	const attemptId = randomUUID();
-	const envelope = Object.freeze({
+	const envelopeContent = {
 		schemaVersion: 1,
 		type,
 		identity,
 		revision,
 		supersedes: expected,
 		bodyHash: contentHashValue,
-		envelopeHash: envelopeHash({
-			schemaVersion: 1,
-			type,
-			identity,
-			revision,
-			supersedes: expected,
-			bodyHash: contentHashValue,
-			provenance: provenance || null,
-			committedAt: preparedAt,
-		}),
+		lifecycle,
+		transition,
+		scope,
+		traces: traces.map((trace) => ({ type: trace.type, to: { ...trace.to } })),
+		...(traces.length > 0 ? { traceContractVersion: TRACE_REGISTRY_VERSION } : {}),
 		provenance: provenance || null,
 		committedAt: preparedAt,
+	};
+	const envelope = Object.freeze({
+		...envelopeContent,
+		envelopeHash: envelopeHash(envelopeContent),
 	});
 
 	// Claim the slot, then re-validate through the journal after every
 	// append: the prepared record is the durable CAS intent, and the guard
-	// makes the journal itself the serialization point.
-	appendJSONL(journalPath(dir), {
-		kind: KIND_PREPARED,
-		revision,
-		at: preparedAt,
-		expectedHead: head,
-		admissionHash: incomingKeyHash,
-		attemptId,
-		...(idempotencyKey !== null ? { idempotencyKey } : {}),
-	});
+	// makes the journal itself the serialization point. Ticket-02 review
+	// finding F7: every durable write of the admission surfaces an I/O
+	// failure as the typed AMBER_E_ARTIFACT_IO result, never a raw fs
+	// exception — the write sequence itself is unchanged.
+	try {
+		appendJSONL(journalPath(dir), {
+			kind: KIND_PREPARED,
+			revision,
+			at: preparedAt,
+			expectedHead: head,
+			admissionHash: incomingKeyHash,
+			attemptId,
+			...(idempotencyKey !== null ? { idempotencyKey } : {}),
+		});
+	} catch (err) {
+		return fail(IO_CODE, [
+			`failed to append the prepared record for revision ${revision} of "${identity}" to the settlement journal: ${err.message}`,
+		]);
+	}
 	try {
 		settleGuard(dir, { revision, attemptId, expectedHead: head });
 	} catch (err) {
@@ -736,27 +1159,39 @@ function admitUnderLock(dir, type, identity, body, provenance, expected, idempot
 	// Atomic pair write between prepared and committed: a crash in between
 	// leaves the files present but the revision uncommitted (invisible), and
 	// the consumed slot is never reused.
-	fs.writeFileSync(path.join(dir, `rev-${revision}.md`), body, "utf8");
-	fs.writeFileSync(
-		path.join(dir, `rev-${revision}.envelope.json`),
-		JSON.stringify(envelope, null, 2) + "\n",
-		"utf8",
-	);
+	try {
+		fs.writeFileSync(path.join(dir, `rev-${revision}.md`), body, "utf8");
+		fs.writeFileSync(
+			path.join(dir, `rev-${revision}.envelope.json`),
+			JSON.stringify(envelope, null, 2) + "\n",
+			"utf8",
+		);
+	} catch (err) {
+		return fail(IO_CODE, [
+			`failed to write the Body/Envelope pair for revision ${revision} of "${identity}": ${err.message}`,
+		]);
+	}
 	try {
 		settleGuard(dir, { revision, attemptId, expectedHead: head });
 	} catch (err) {
 		return fail(err.amberCode || JOURNAL_CORRUPT_CODE, [err.message]);
 	}
 
-	appendJSONL(journalPath(dir), {
-		kind: KIND_COMMITTED,
-		revision,
-		at: new Date().toISOString(),
-		expectedHead: head,
-		admissionHash: incomingKeyHash,
-		contentHash: contentHashValue,
-		...(idempotencyKey !== null ? { idempotencyKey } : {}),
-	});
+	try {
+		appendJSONL(journalPath(dir), {
+			kind: KIND_COMMITTED,
+			revision,
+			at: new Date().toISOString(),
+			expectedHead: head,
+			admissionHash: incomingKeyHash,
+			contentHash: contentHashValue,
+			...(idempotencyKey !== null ? { idempotencyKey } : {}),
+		});
+	} catch (err) {
+		return fail(IO_CODE, [
+			`failed to append the committed record for revision ${revision} of "${identity}" to the settlement journal: ${err.message}`,
+		]);
+	}
 
 	return {
 		ok: true,
@@ -768,9 +1203,7 @@ function admitUnderLock(dir, type, identity, body, provenance, expected, idempot
 }
 
 function receiptFor(type, identity, revision, envelope, journal) {
-	const commitRecord = [...journal]
-		.reverse()
-		.find((r) => r.kind === KIND_COMMITTED && r.revision === revision);
+	const commitRecord = findCommitRecord(journal, revision);
 	return Object.freeze({
 		type,
 		identity,
@@ -778,6 +1211,10 @@ function receiptFor(type, identity, revision, envelope, journal) {
 		contentHash: envelope.bodyHash,
 		envelopeHash: envelope.envelopeHash,
 		supersedes: envelope.supersedes ?? null,
+		lifecycle: envelope.lifecycle ?? null,
+		transition: envelope.transition ?? null,
+		scope: envelope.scope ?? null,
+		traces: envelope.traces || [],
 		provenance: envelope.provenance,
 		committedAt: commitRecord ? commitRecord.at : envelope.committedAt,
 	});

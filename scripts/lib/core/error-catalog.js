@@ -562,10 +562,11 @@ const CATALOG = {
 	},
 	AMBER_E_ARTIFACT_UNKNOWN_TYPE: {
 		title: "Canonical Artifact type is not registered",
-		cause: "Admission named an Artifact Type outside the closed registry (currently intent only).",
-		remedy: "Use a registered Artifact Type; `intent` is the first admitted type.",
+		cause:
+			"Admission named an Artifact Type outside the closed registry (currently intent, spec, and plan).",
+		remedy: "Use a registered Artifact Type: `intent`, `spec`, or `plan`.",
 		layer: "Governance",
-		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF"],
+		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF", "AMBER_E_ARTIFACT_TRANSITION_UNKNOWN"],
 	},
 	AMBER_E_ARTIFACT_INVALID_IDENTITY: {
 		title: "Canonical Artifact identity is not a usable directory name",
@@ -575,6 +576,87 @@ const CATALOG = {
 			"Re-admit with a concrete identity (letters, digits, dots, dashes, underscores; e.g. intent/login-bug).",
 		layer: "Governance",
 		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF"],
+	},
+	AMBER_E_ARTIFACT_TRANSITION_UNKNOWN: {
+		title: "Canonical Artifact lifecycle transition is not registered",
+		cause:
+			"Admission named a lifecycle transition outside the closed per-type transition table (the registry in canonical-artifact-contracts).",
+		remedy:
+			"Use a registered transition for the artifact type: `accept` moves an Intent draft to accepted; `approve` moves a Spec or Plan draft to approved.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_TRANSITION_INVALID", "AMBER_E_ARTIFACT_UNKNOWN_TYPE"],
+	},
+	AMBER_E_ARTIFACT_TRANSITION_INVALID: {
+		title: "Canonical Artifact lifecycle transition does not apply",
+		cause:
+			"The named transition is registered for the artifact type but its from-state does not match the artifact's current committed lifecycle state.",
+		remedy:
+			"Read the current head with `amber artifact show` and admit a transition that applies to its lifecycle state.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_TRANSITION_UNKNOWN", "AMBER_E_ARTIFACT_CONFLICT"],
+	},
+	AMBER_E_ARTIFACT_TRACE_UNKNOWN: {
+		title: "Canonical Artifact trace type is not registered",
+		cause:
+			"Admission named a trace type outside the versioned trace registry (refines, realizes, supersedes).",
+		remedy:
+			"Use a registered trace type: `refines` (Spec to accepted Intent), `realizes` (Plan to approved Spec), or `supersedes` (same-type revision succession).",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_TRACE_DIRECTION", "AMBER_E_ARTIFACT_TRACE_CARDINALITY"],
+	},
+	AMBER_E_ARTIFACT_TRACE_DIRECTION: {
+		title: "Canonical Artifact trace direction is invalid",
+		cause:
+			"The trace's declared or resolved target type does not satisfy the trace contract's direction (fromType/toType) — including a Plan attempting to realize an Intent directly (omitted-Spec policy).",
+		remedy:
+			"Point the trace at a target the contract allows: a Spec refines an accepted Intent revision; a Plan realizes an approved Spec revision — admit the intervening Spec first.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_TRACE_UNKNOWN", "AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND"],
+	},
+	AMBER_E_ARTIFACT_TRACE_CARDINALITY: {
+		title: "Canonical Artifact trace cardinality is violated",
+		cause:
+			"The admission's traces violate the trace contract's cardinality — required planning lineage (a Spec refining exactly one accepted Intent revision; a Plan realizing exactly one approved Spec revision) was missing, duplicated, or carried a forbidden same-source trace type.",
+		remedy:
+			"Admit exactly one required trace: a Spec carries one `refines` trace to an accepted Intent revision; a Plan carries one `realizes` trace to an approved Spec revision.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_TRACE_UNKNOWN", "AMBER_E_ARTIFACT_TRACE_DIRECTION"],
+	},
+	AMBER_E_ARTIFACT_TRACE_SCOPE: {
+		title: "Canonical Artifact trace crosses a scope boundary",
+		cause:
+			"The trace's target artifact lives outside the source's scope confinement — every registered planning trace requires the same scope.",
+		remedy:
+			"Admit the trace within one scope, or admit a new artifact in the target scope that carries the cross-scope relationship in its Body.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_TRACE_DIRECTION", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND: {
+		title: "Canonical Artifact trace target has no committed revision",
+		cause:
+			"The trace names a target identity (and optional revision) with no committed revision — prepared and aborted revisions are invisible by design.",
+		remedy:
+			"Admit and settle the target artifact first (for example, accept the Intent before a Spec refines it), then re-admit the trace.",
+		layer: "Observability",
+		related: ["AMBER_E_ARTIFACT_NOT_FOUND", "AMBER_E_ARTIFACT_TRACE_DIRECTION"],
+	},
+	AMBER_E_ARTIFACT_TRACE_TARGET_LIFECYCLE: {
+		title: "Canonical Artifact trace target lifecycle state is insufficient",
+		cause:
+			"The trace's target revision is committed but has not reached the lifecycle state the trace contract requires (a Spec may only refine an accepted Intent revision; a Plan may only realize an approved Spec revision).",
+		remedy:
+			"Advance the target first — accept the Intent (or approve the Spec) via its registered transition, then re-admit the trace.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_TRANSITION_INVALID", "AMBER_E_ARTIFACT_TRACE_CARDINALITY"],
+	},
+	AMBER_E_ARTIFACT_IO: {
+		title: "Canonical Artifact durable write failed",
+		cause:
+			"Admission failed while writing the committed Body/Envelope pair or appending the committed journal record — the durable serialization point could not complete.",
+		remedy:
+			"Free disk space and check filesystem permissions under .amber/artifacts/, then re-admit; inspect journal.jsonl to see whether the prepared record needs a retry pass.",
+		layer: "Observability",
+		related: ["AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT", "AMBER_E_ARTIFACT_JOURNAL_CORRUPT"],
 	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",

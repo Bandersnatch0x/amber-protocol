@@ -114,6 +114,20 @@ test("feature add flags are registered (#75: --behavior, repeatable --verify)", 
 	assert.deepEqual(args._ || [], []);
 });
 
+test("artifact admit ticket-03 flags are registered (--transition, repeatable --trace)", () => {
+	const args = parseArgs([
+		"--transition",
+		"accept",
+		"--trace",
+		"refines:intent/login-bug@2",
+		"--trace",
+		"supersedes:old-spec",
+	]);
+	assert.equal(args.transition, "accept");
+	assert.deepEqual(args.traceArgs, ["refines:intent/login-bug@2", "supersedes:old-spec"]);
+	assert.deepEqual(args._ || [], []);
+});
+
 test("Context lifecycle, adapter, benchmark, and retention flags are registered", () => {
 	const args = parseArgs([
 		"--knowledge-kind",

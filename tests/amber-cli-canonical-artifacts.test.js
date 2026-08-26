@@ -619,3 +619,522 @@ test("retry after a lost race replays the committed receipt and never duplicates
 	assert.equal(entries.length, 1);
 	assert.equal(entries[0].revision, 2);
 });
+
+// ---------------------------------------------------------------------------
+// F049 ticket 03 (#220) — Spec/Plan types, lifecycle transitions, typed Trace
+// lineage, and the routed ticket-02 review fixes F4/F5, all through the
+// public CLI seam (`amber artifact admit|show|list`).
+// ---------------------------------------------------------------------------
+
+test("CLI: full Intent -> Spec -> Plan lineage with lifecycle transitions and traces", () => {
+	const dir = mkTarget("t03-lineage");
+	const admitIntent = runCli(
+		["artifact", "admit", "--id", "intent/login-bug", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(admitIntent.status, 0, admitIntent.stderr);
+	assert.equal(payload(admitIntent).lifecycle, "draft");
+
+	const accept = runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/login-bug",
+			"--body",
+			BODY_V1,
+			"--expected-head",
+			"1",
+			"--transition",
+			"accept",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(accept.status, 0, accept.stderr);
+	const accepted = payload(accept);
+	assert.equal(accepted.revision, 2);
+	assert.equal(accepted.lifecycle, "accepted");
+	assert.equal(accepted.transition, "accept");
+
+	const admitSpec = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/login-spec",
+			"--body",
+			"# Spec: login\n",
+			"--trace",
+			"refines:intent/login-bug",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(admitSpec.status, 0, admitSpec.stderr);
+	const spec = payload(admitSpec);
+	assert.equal(spec.type, "spec");
+	assert.equal(spec.lifecycle, "draft");
+	assert.deepEqual(spec.traces, [
+		{ type: "refines", to: { type: "intent", identity: "intent/login-bug", revision: 2 } },
+	]);
+
+	const approveSpec = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/login-spec",
+			"--body",
+			"# Spec: login\n",
+			"--expected-head",
+			"1",
+			"--transition",
+			"approve",
+			"--trace",
+			"refines:intent/login-bug",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(approveSpec.status, 0, approveSpec.stderr);
+	assert.equal(payload(approveSpec).lifecycle, "approved");
+
+	const admitPlan = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"plan",
+			"--id",
+			"plan/login-plan",
+			"--body",
+			"# Plan: login\n",
+			"--trace",
+			"realizes:spec/login-spec",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(admitPlan.status, 0, admitPlan.stderr);
+	const plan = payload(admitPlan);
+	assert.equal(plan.type, "plan");
+	assert.deepEqual(plan.traces, [
+		{ type: "realizes", to: { type: "spec", identity: "spec/login-spec", revision: 2 } },
+	]);
+
+	// show reads per-type; list sees the whole lineage.
+	const shown = runCli(
+		["artifact", "show", "--type", "plan", "--id", "plan/login-plan", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(shown.status, 0, shown.stderr);
+	const shownPlan = payload(shown);
+	assert.equal(shownPlan.lifecycle, "draft");
+	assert.deepEqual(shownPlan.traces, [
+		{ type: "realizes", to: { type: "spec", identity: "spec/login-spec", revision: 2 } },
+	]);
+
+	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
+	const entries = payload(list);
+	assert.deepEqual(
+		entries.map((e) => `${e.type}/${e.identity}:${e.revision}:${e.lifecycle}`).sort(),
+		[
+			"intent/intent/login-bug:2:accepted",
+			"plan/plan/login-plan:1:draft",
+			"spec/spec/login-spec:2:approved",
+		],
+	);
+});
+
+test("CLI: omitted-Spec policy rejects a Plan realizing its Intent directly", () => {
+	const dir = mkTarget("t03-omitted");
+	runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/login-bug",
+			"--body",
+			BODY_V1,
+			"--transition",
+			"accept",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	const r = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"plan",
+			"--id",
+			"plan/short-circuit",
+			"--body",
+			"# Plan\n",
+			"--trace",
+			"realizes:intent/login-bug",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	const outer = payload(r);
+	assert.equal(outer.code, "AMBER_E_ARTIFACT_TRACE_DIRECTION");
+	assert.match(outer.errors.join(" "), /omitted-Spec policy/);
+});
+
+test("CLI: a generic relation cannot satisfy required planning lineage", () => {
+	const dir = mkTarget("t03-generic");
+	runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/login-bug",
+			"--body",
+			BODY_V1,
+			"--transition",
+			"accept",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	const r = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/generic",
+			"--body",
+			"# Spec\n",
+			"--trace",
+			"relates-to:intent/login-bug",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	const outer = payload(r);
+	assert.equal(outer.code, "AMBER_E_ARTIFACT_TRACE_UNKNOWN");
+	assert.match(outer.errors.join(" "), /not registered/);
+
+	// A Spec with no trace at all misses required lineage.
+	const missing = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/bare",
+			"--body",
+			"# Spec\n",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(missing.status, 1);
+	assert.equal(payload(missing).code, "AMBER_E_ARTIFACT_TRACE_CARDINALITY");
+});
+
+test("CLI: cross-scope traces are rejected; same-scope traces admit", () => {
+	const dir = mkTarget("t03-scope");
+	runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/scoped",
+			"--body",
+			BODY_V1,
+			"--scope",
+			"team-a",
+			"--transition",
+			"accept",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	const cross = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/cross",
+			"--body",
+			"# Spec\n",
+			"--trace",
+			"refines:intent/scoped",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(cross.status, 1);
+	const outer = payload(cross);
+	assert.equal(outer.code, "AMBER_E_ARTIFACT_TRACE_SCOPE");
+	assert.match(outer.errors.join(" "), /crosses a scope boundary/);
+
+	const same = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/same",
+			"--body",
+			"# Spec\n",
+			"--scope",
+			"team-a",
+			"--trace",
+			"refines:intent/scoped",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(same.status, 0, same.stderr);
+	assert.equal(payload(same).scope, "team-a");
+});
+
+test("CLI: unknown and inapplicable transitions fail with stable codes", () => {
+	const dir = mkTarget("t03-transitions");
+	runCli(
+		["artifact", "admit", "--id", "intent/login-bug", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	const unknown = runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/login-bug",
+			"--body",
+			BODY_V1,
+			"--expected-head",
+			"1",
+			"--transition",
+			"ship",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(unknown.status, 1);
+	assert.equal(payload(unknown).code, "AMBER_E_ARTIFACT_TRANSITION_UNKNOWN");
+
+	runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/login-bug",
+			"--body",
+			BODY_V1,
+			"--expected-head",
+			"1",
+			"--transition",
+			"accept",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	const invalid = runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/login-bug",
+			"--body",
+			BODY_V1,
+			"--expected-head",
+			"2",
+			"--transition",
+			"accept",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(invalid.status, 1);
+	assert.equal(payload(invalid).code, "AMBER_E_ARTIFACT_TRANSITION_INVALID");
+});
+
+test("CLI: show rejects unregistered types with the stable unknown-type code", () => {
+	const dir = mkTarget("t03-bad-show-type");
+	const r = runCli(
+		["artifact", "show", "--type", "epic", "--id", "epic/x", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	assert.equal(payload(r).code, "AMBER_E_ARTIFACT_UNKNOWN_TYPE");
+});
+
+test("F4: a trailing value flag never silently drops its precondition", () => {
+	const dir = mkTarget("t03-f4");
+	for (const [flag, label] of [
+		["--expected-head", "expected head"],
+		["--body", "body"],
+		["--idempotency-key", "idempotency key"],
+		["--transition", "transition"],
+		["--trace", "trace"],
+	]) {
+		// The flag under test is the LAST token: parseArgs yields undefined,
+		// which must fail closed instead of meaning "not declared".
+		const r = runCli(
+			["artifact", "admit", "--target", dir, "--json", "--id", "intent/x", "--body", BODY_V1, flag],
+			dir,
+		);
+		assert.equal(r.status, 1, `${flag} as the last token must fail`);
+		const outer = payload(r);
+		assert.equal(outer.code, "AMBER_E_INVALID_ARG", label);
+		assert.match(outer.errors.join(" "), /requires a value/);
+	}
+	// Nothing was admitted by any of the truncated invocations.
+	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
+	assert.equal(payload(list).length, 0);
+});
+
+test("F5: an explicitly empty --idempotency-key fails closed", () => {
+	const dir = mkTarget("t03-f5");
+	const r = runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/x",
+			"--body",
+			BODY_V1,
+			"--idempotency-key",
+			"",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	const outer = payload(r);
+	assert.equal(outer.code, "AMBER_E_INVALID_ARG");
+	assert.match(outer.errors.join(" "), /non-empty string/);
+	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
+	assert.equal(payload(list).length, 0);
+});
+
+test("CLI: malformed --trace values are rejected with the stable arg code (never NaN)", () => {
+	const dir = mkTarget("t03-trace-garbage");
+	for (const garbage of [
+		"bogus",
+		"refines:",
+		":intent/a",
+		"refines:intent/a@abc",
+		"refines:intent/a@0",
+	]) {
+		const r = runCli(
+			[
+				"artifact",
+				"admit",
+				"--type",
+				"spec",
+				"--id",
+				"spec/x",
+				"--body",
+				"# Spec\n",
+				"--trace",
+				garbage,
+				"--target",
+				dir,
+				"--json",
+			],
+			dir,
+		);
+		assert.equal(r.status, 1, `--trace ${garbage} must fail`);
+		const outer = payload(r);
+		assert.equal(outer.code, "AMBER_E_INVALID_ARG", garbage);
+	}
+});
+
+test("CLI: an explicit trace revision binds that revision exactly", () => {
+	const dir = mkTarget("t03-trace-revision");
+	runCli(
+		["artifact", "admit", "--id", "intent/login-bug", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/login-bug",
+			"--body",
+			BODY_V1,
+			"--expected-head",
+			"1",
+			"--transition",
+			"accept",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	const r = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/pinned",
+			"--body",
+			"# Spec\n",
+			"--trace",
+			"refines:intent/login-bug@2",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 0, r.stderr);
+	assert.deepEqual(payload(r).traces, [
+		{ type: "refines", to: { type: "intent", identity: "intent/login-bug", revision: 2 } },
+	]);
+});

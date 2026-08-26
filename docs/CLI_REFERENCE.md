@@ -399,6 +399,27 @@ Artifact Body (Markdown) to a machine-actionable Artifact Envelope in one atomic
 through durable prepared/committed/aborted journal records. Only committed revisions are visible;
 history is append-only and immutable — there is no in-place mutation path for a committed revision.
 
+Registered Artifact Types form a closed registry: **intent**, **spec**, and **plan**, each with a
+closed lifecycle of named transitions. Admitting a revision without a transition carries the type's
+initial state (`draft`); `--transition <name>` applies a registered transition — `accept`
+(intent: draft → accepted) or `approve` (spec/plan: draft → approved) — as a **new revision**
+superseding the head. A transition that is not registered fails closed as
+`AMBER_E_ARTIFACT_TRANSITION_UNKNOWN`; one that does not apply from the current head's lifecycle
+state fails closed as `AMBER_E_ARTIFACT_TRANSITION_INVALID`.
+
+Typed Trace lineage is a versioned registry: `refines` (spec → intent), `realizes` (plan → spec),
+and `supersedes` (any type → a different artifact of the same type), each with direction, scope,
+and cardinality. Required planning lineage is enforced at admission: **a Spec must refine exactly
+one accepted Intent revision and a Plan must realize exactly one approved Spec revision** —
+omitting the required trace fails closed as `AMBER_E_ARTIFACT_TRACE_CARDINALITY`, a generic or
+unregistered relation fails as `AMBER_E_ARTIFACT_TRACE_UNKNOWN` (it cannot satisfy required
+lineage), a Plan realizing its Intent directly fails as `AMBER_E_ARTIFACT_TRACE_DIRECTION`
+(omitted-Spec policy), a target that is missing or not yet in the required lifecycle state fails
+as `AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND` / `AMBER_E_ARTIFACT_TRACE_TARGET_LIFECYCLE`, and a
+trace crossing a scope boundary fails as `AMBER_E_ARTIFACT_TRACE_SCOPE` (source and target must
+declare the same `--scope` tag; null counts as a scope). Trace revisions default to the target's
+current committed head and are recorded resolved — traces bind revisions, not heads.
+
 ```bash
 # admit a new Intent revision (returns the admission receipt)
 node scripts/amber.js artifact admit --target . --id intent/login-bug --body "# Intent: login bug" --json
@@ -409,13 +430,33 @@ node scripts/amber.js artifact admit --target . --id intent/login-bug --body "..
 # same as above, naming the superseded revision instead of the head
 node scripts/amber.js artifact admit --target . --id intent/login-bug --body "..." --supersedes-revision 1
 
+# accept the Intent: a NEW revision carrying the accepted state (never an in-place edit)
+node scripts/amber.js artifact admit --target . --id intent/login-bug --body "..." --expected-head 1 --transition accept
+
+# admit a Spec refining the accepted Intent (required planning lineage)
+node scripts/amber.js artifact admit --target . --type spec --id spec/login-spec --body "..." --trace refines:intent/login-bug
+
+# pin the traced revision explicitly; confine both endpoints to one scope
+node scripts/amber.js artifact admit --target . --type spec --id spec/login-spec --body "..." --trace refines:intent/login-bug@2 --scope team-a
+
+# approve the Spec, then admit a Plan realizing it
+node scripts/amber.js artifact admit --target . --type spec --id spec/login-spec --body "..." --expected-head 1 --transition approve --trace refines:intent/login-bug
+node scripts/amber.js artifact admit --target . --type plan --id plan/login-plan --body "..." --trace realizes:spec/login-spec
+
 # attach caller retry metadata (optional; never determines identity)
 node scripts/amber.js artifact admit --target . --id intent/login-bug --body "..." --idempotency-key op-123
 
 # show the current or an explicit revision; list current revision of each artifact
 node scripts/amber.js artifact show --target . --id intent/login-bug [--revision 1] --json
+node scripts/amber.js artifact show --target . --type spec --id spec/login-spec --json
 node scripts/amber.js artifact list --target . --json
 ```
+
+`--trace <type>:<identity>[@<revision>]` is repeatable; the target type is derived from the
+registered Trace contract (the CLI never names a type the registry contradicts). Malformed flag
+values — a garbage revision, a missing target, or a value flag trailing at the end of the command
+line — fail closed as `AMBER_E_INVALID_ARG`, never as a silently dropped precondition (an
+explicitly empty `--idempotency-key` fails the same way).
 
 `--expected-head <n>` is the compare-and-swap precondition: the admission commits only if the
 current committed head is exactly `<n>`, otherwise it fails closed as `AMBER_E_ARTIFACT_CONFLICT`
@@ -424,14 +465,18 @@ current committed head is exactly `<n>`, otherwise it fails closed as `AMBER_E_A
 `--expected-head` when both are given.
 
 Admission is idempotent on the **full canonical envelope content** (schema version, type, identity,
-supersedes, bodyHash, and provenance — not the Body alone). An exact-duplicate retry — same Body,
-same provenance, same expected head, optionally recognized by the same `--idempotency-key` —
-returns the original receipt (flagged as duplicate in warnings) without creating a new revision,
-even if the revision was later superseded. Reusing an idempotency key for different content, or
-presenting the same Body with different provenance at the head, fails closed as
-`AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT`. Settlement state admission could never have written — a
-double commit, a commit without its prepared record, a forked expected head, a skipped revision
-slot, or a committed pair missing on disk — fails closed as `AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT`.
+supersedes, bodyHash, provenance, and — since ticket 03 — the named transition, scope, and resolved
+trace set; the lifecycle state itself is derived from the transition and excluded like revision
+numbers). An exact-duplicate retry — same Body, same provenance, same expected head, optionally
+recognized by the same `--idempotency-key` — returns the original receipt (flagged as duplicate in
+warnings) without creating a new revision, even if the revision was later superseded. Reusing an
+idempotency key for different content, or presenting the same Body with different provenance at
+the head, fails closed as `AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT`. Settlement state admission could
+never have written — a double commit, a commit without its prepared record, a forked expected head,
+a skipped revision slot, or a committed pair missing on disk — fails closed as
+`AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT` (the committed record's contentHash is cross-checked against
+the Envelope's bodyHash at every settlement validation). A durable write that fails mid-admission
+surfaces as `AMBER_E_ARTIFACT_IO` instead of a raw filesystem error.
 Reads verify both halves of the binding: a stored Body that lost its contentHash match reports
 `AMBER_E_ARTIFACT_HASH_MISMATCH`, a stored Envelope that lost its envelopeHash match reports
 `AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`.

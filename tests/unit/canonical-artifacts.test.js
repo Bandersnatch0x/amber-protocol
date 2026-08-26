@@ -22,6 +22,7 @@ const {
 	showArtifact,
 	listArtifacts,
 	envelopeHash,
+	bodyHash,
 	ARTIFACT_TYPES,
 	ARTIFACT_STATUSES,
 } = require("../../scripts/lib/core/canonical-artifacts");
@@ -157,13 +158,17 @@ test("missing identity is rejected with the stable invalid-identity code", () =>
 test("unknown artifact type is rejected with a stable error code", () => {
 	const dir = mkTarget("bad-type");
 	const r = admitArtifact(dir, {
-		type: "spec",
-		identity: "spec/x",
+		type: "epic",
+		identity: "epic/x",
 		body: BODY_V1,
 	});
 	assert.equal(r.ok, false);
 	assert.equal(r.code, "AMBER_E_ARTIFACT_UNKNOWN_TYPE");
-	assert.deepEqual(ARTIFACT_TYPES, ["intent"], "closed registry starts with intent only");
+	assert.deepEqual(
+		ARTIFACT_TYPES,
+		["intent", "spec", "plan"],
+		"closed registry covers the three registered planning types",
+	);
 });
 
 test("show/list surface only committed revisions", () => {
@@ -743,4 +748,750 @@ test("winner retry after a lost race never duplicates the committed revision", (
 	assert.equal(journalOf(dir).filter((r) => r.kind === "committed").length, 3);
 	assert.equal(showArtifact(dir, "intent/login-bug").revision, 3);
 	assert.equal(v1.receipt.revision, 1);
+});
+
+// ---------------------------------------------------------------------------
+// F049 ticket 03 (#220) — Spec/Plan types, lifecycle transitions, typed Trace
+// lineage, and the routed ticket-02 review fixes F3/F6/F7/F8/F9. All
+// assertions go through the public admission seam (admitArtifact / show /
+// list); journals and pairs are read as durable state only.
+// ---------------------------------------------------------------------------
+
+test("admission without a transition carries the type's initial lifecycle state", () => {
+	const dir = mkTarget("lifecycle-initial");
+	const r = admitIntent(dir);
+	assert.equal(r.ok, true, r.errors.join("; "));
+	assert.equal(r.receipt.lifecycle, "draft");
+	assert.equal(r.receipt.transition, null);
+	assert.equal(r.receipt.scope, null);
+	assert.deepEqual(r.receipt.traces, []);
+	const shown = showArtifact(dir, "intent/login-bug");
+	assert.equal(shown.lifecycle, "draft");
+	assert.equal(shown.envelope.lifecycle, "draft");
+});
+
+test("a named transition admits a NEW revision with the target state; the old revision is untouched", () => {
+	const dir = mkTarget("lifecycle-accept");
+	admitIntent(dir);
+	const accepted = admitIntent(dir, { expectedHead: 1, transition: "accept" });
+	assert.equal(accepted.ok, true, accepted.errors.join("; "));
+	assert.equal(accepted.receipt.revision, 2);
+	assert.equal(accepted.receipt.lifecycle, "accepted");
+	assert.equal(accepted.receipt.transition, "accept");
+	assert.equal(accepted.receipt.supersedes, 1);
+
+	// Immutable history: revision 1 keeps its draft state; only the new
+	// revision carries the accepted state — no in-place status mutation.
+	const rev1 = showArtifact(dir, "intent/login-bug", { revision: 1 });
+	assert.equal(rev1.lifecycle, "draft");
+	assert.equal(rev1.transition, null);
+	const head = showArtifact(dir, "intent/login-bug");
+	assert.equal(head.revision, 2);
+	assert.equal(head.lifecycle, "accepted");
+	assert.equal(journalOf(dir).filter((r) => r.kind === "committed").length, 2);
+});
+
+test("retry of a transition admission is idempotent against the settled revision", () => {
+	const dir = mkTarget("lifecycle-retry");
+	admitIntent(dir);
+	const first = admitIntent(dir, { expectedHead: 1, transition: "accept" });
+	const retry = admitIntent(dir, { expectedHead: 1, transition: "accept" });
+	assert.equal(retry.ok, true, retry.errors.join("; "));
+	assert.equal(retry.duplicate, true);
+	assert.equal(retry.receipt.revision, first.receipt.revision);
+	assert.equal(retry.receipt.lifecycle, "accepted");
+	assert.equal(journalOf(dir).filter((r) => r.kind === "committed").length, 2);
+});
+
+test("unregistered transitions fail closed with the stable unknown-transition code", () => {
+	const dir = mkTarget("transition-unknown");
+	admitIntent(dir);
+	for (const bogus of ["ship", "approve"]) {
+		const r = admitIntent(dir, { expectedHead: 1, transition: bogus });
+		assert.equal(r.ok, false);
+		assert.equal(
+			r.code,
+			"AMBER_E_ARTIFACT_TRANSITION_UNKNOWN",
+			`${bogus} is not an intent transition`,
+		);
+		assert.match(r.errors[0], new RegExp(`transition "${bogus}" is not registered for intent`));
+	}
+});
+
+test("a transition that does not apply fails closed with the stable invalid-transition code", () => {
+	const dir = mkTarget("transition-invalid");
+	admitIntent(dir);
+	admitIntent(dir, { expectedHead: 1, transition: "accept" });
+	const again = admitIntent(dir, { expectedHead: 2, transition: "accept" });
+	assert.equal(again.ok, false);
+	assert.equal(again.code, "AMBER_E_ARTIFACT_TRANSITION_INVALID");
+	assert.match(again.errors[0], /applies from lifecycle state "draft"/);
+	assert.match(again.errors[0], /is in lifecycle state "accepted"/);
+	// Nothing was admitted on top of the accepted head.
+	assert.equal(showArtifact(dir, "intent/login-bug").revision, 2);
+});
+
+test("full planning lineage: accepted Intent <- Spec <- approved Spec <- Plan", () => {
+	const dir = mkTarget("lineage-full");
+	admitIntent(dir);
+	const accepted = admitIntent(dir, { expectedHead: 1, transition: "accept" });
+	assert.equal(accepted.ok, true, accepted.errors.join("; "));
+
+	// The Spec refines the accepted Intent revision (lineage is re-declared
+	// per admission: every revision's Envelope is self-contained).
+	const refines = [{ type: "refines", to: { type: "intent", identity: "intent/login-bug" } }];
+	const spec = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/login-spec",
+		body: "# Spec: login\n\nBehavior: SSO login works.\n",
+		traces: refines,
+	});
+	assert.equal(spec.ok, true, spec.errors.join("; "));
+	assert.equal(spec.receipt.lifecycle, "draft");
+	assert.deepEqual(spec.receipt.traces, [
+		{ type: "refines", to: { type: "intent", identity: "intent/login-bug", revision: 2 } },
+	]);
+
+	const approved = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/login-spec",
+		body: "# Spec: login\n\nBehavior: SSO login works.\n",
+		expectedHead: 1,
+		transition: "approve",
+		traces: refines,
+	});
+	assert.equal(approved.ok, true, approved.errors.join("; "));
+	assert.equal(approved.receipt.lifecycle, "approved");
+
+	const plan = admitArtifact(dir, {
+		type: "plan",
+		identity: "plan/login-plan",
+		body: "# Plan: login\n\nSlices: session, form, verification.\n",
+		traces: [{ type: "realizes", to: { type: "spec", identity: "spec/login-spec" } }],
+	});
+	assert.equal(plan.ok, true, plan.errors.join("; "));
+	assert.equal(plan.receipt.lifecycle, "draft");
+	assert.deepEqual(plan.receipt.traces, [
+		{ type: "realizes", to: { type: "spec", identity: "spec/login-spec", revision: 2 } },
+	]);
+
+	// The stored Envelopes carry the resolved traces and the contract version.
+	const specShown = showArtifact(dir, "spec/login-spec", { type: "spec" });
+	assert.deepEqual(specShown.traces, [
+		{ type: "refines", to: { type: "intent", identity: "intent/login-bug", revision: 2 } },
+	]);
+	assert.equal(specShown.envelope.traceContractVersion, 1);
+	const planShown = showArtifact(dir, "plan/login-plan", { type: "plan" });
+	assert.equal(planShown.envelope.traceContractVersion, 1);
+
+	// The type registry partitions storage by type directory.
+	assert.ok(fs.existsSync(path.join(dir, ".amber", "artifacts", "specs", "spec_login-spec")));
+	assert.ok(fs.existsSync(path.join(dir, ".amber", "artifacts", "plans", "plan_login-plan")));
+
+	// list sees all three types at their current revisions and states.
+	const entries = listArtifacts(dir);
+	assert.deepEqual(
+		entries.map((e) => `${e.type}/${e.identity}:${e.revision}:${e.lifecycle}`).sort(),
+		[
+			"intent/intent/login-bug:2:accepted",
+			"plan/plan/login-plan:1:draft",
+			"spec/spec/login-spec:2:approved",
+		],
+	);
+});
+
+test("omitted-Spec policy: a Plan cannot realize an Intent directly", () => {
+	const dir = mkTarget("omitted-spec");
+	admitIntent(dir);
+	admitIntent(dir, { expectedHead: 1, transition: "accept" });
+	const r = admitArtifact(dir, {
+		type: "plan",
+		identity: "plan/short-circuit",
+		body: "# Plan\n",
+		traces: [{ type: "realizes", to: { type: "intent", identity: "intent/login-bug" } }],
+	});
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_TRACE_DIRECTION");
+	assert.match(r.errors[0], /omitted-Spec policy/);
+	assert.match(r.errors[0], /realize that Spec/);
+	// Nothing was written for the rejected Plan.
+	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts", "plans")), false);
+});
+
+test("omitted-Spec policy also fires when the target identity resolves under the wrong type", () => {
+	const dir = mkTarget("omitted-spec-derived");
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "shared-id",
+		body: BODY_V1,
+		transition: "accept",
+	});
+	const r = admitArtifact(dir, {
+		type: "plan",
+		identity: "plan/short-circuit",
+		body: "# Plan\n",
+		traces: [{ type: "realizes", to: { identity: "shared-id" } }],
+	});
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_TRACE_DIRECTION");
+	assert.match(r.errors[0], /"shared-id" resolves to a intent artifact/);
+	assert.match(r.errors[0], /omitted-Spec policy/);
+});
+
+test("required lineage: a Spec without a refines trace fails the cardinality contract", () => {
+	const dir = mkTarget("lineage-missing");
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/login-bug",
+		body: BODY_V1,
+		transition: "accept",
+	});
+	const r = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/orphan",
+		body: "# Spec\n",
+	});
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_TRACE_CARDINALITY");
+	assert.match(r.errors[0], /exactly one accepted Intent revision/);
+	assert.match(r.errors[0], /carries 0 "refines" Traces/);
+});
+
+test("a generic relation cannot satisfy required planning lineage", () => {
+	const dir = mkTarget("generic-relation");
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/login-bug",
+		body: BODY_V1,
+		transition: "accept",
+	});
+	// An unregistered relation is rejected outright.
+	const unregistered = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/generic",
+		body: "# Spec\n",
+		traces: [{ type: "relates-to", to: { type: "intent", identity: "intent/login-bug" } }],
+	});
+	assert.equal(unregistered.ok, false);
+	assert.equal(unregistered.code, "AMBER_E_ARTIFACT_TRACE_UNKNOWN");
+	assert.match(unregistered.errors[0], /generic or unregistered relation cannot satisfy/);
+
+	// A registered but non-lineage relation (supersedes) still leaves the
+	// required refines trace unmet: cardinality fires before resolution.
+	const supersedesOnly = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/generic",
+		body: "# Spec\n",
+		traces: [{ type: "supersedes", to: { identity: "spec/another" } }],
+	});
+	assert.equal(supersedesOnly.ok, false);
+	assert.equal(supersedesOnly.code, "AMBER_E_ARTIFACT_TRACE_CARDINALITY");
+	assert.match(supersedesOnly.errors[0], /exactly one accepted Intent revision/);
+});
+
+test("required lineage: the target Intent revision must be accepted", () => {
+	const dir = mkTarget("lineage-gate");
+	admitArtifact(dir, { type: "intent", identity: "intent/login-bug", body: BODY_V1 });
+	const r = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/early",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/login-bug" } }],
+	});
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_TRACE_TARGET_LIFECYCLE");
+	assert.match(r.errors[0], /lifecycle state "draft"/);
+	assert.match(r.errors[0], /requires "accepted"/);
+	assert.match(r.errors[0], /"accept" transition first/);
+
+	// After the Intent is accepted, the same trace admits.
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/login-bug",
+		body: BODY_V1,
+		expectedHead: 1,
+		transition: "accept",
+	});
+	const ok = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/early",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/login-bug" } }],
+	});
+	assert.equal(ok.ok, true, ok.errors.join("; "));
+});
+
+test("required lineage: a Plan's Spec target must be approved", () => {
+	const dir = mkTarget("lineage-plan-gate");
+	// A Spec exists only through its own lineage: refine an accepted Intent,
+	// then stay in draft so the Plan's realizes gate has something to hit.
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/login-bug",
+		body: BODY_V1,
+		transition: "accept",
+	});
+	const spec = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/login-spec",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/login-bug" } }],
+	});
+	assert.equal(spec.ok, true, spec.errors.join("; "));
+	assert.equal(spec.receipt.lifecycle, "draft");
+	const r = admitArtifact(dir, {
+		type: "plan",
+		identity: "plan/early",
+		body: "# Plan\n",
+		traces: [{ type: "realizes", to: { type: "spec", identity: "spec/login-spec" } }],
+	});
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_TRACE_TARGET_LIFECYCLE");
+	assert.match(r.errors[0], /requires "approved"/);
+});
+
+test("trace targets must exist as committed revisions", () => {
+	const dir = mkTarget("lineage-not-found");
+	const r = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/ghost",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/ghost" } }],
+	});
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND");
+	assert.match(r.errors[0], /matches no committed intent artifact revision/);
+
+	// A named revision that is not committed (prepared and aborted revisions
+	// stay invisible) is equally absent.
+	admitArtifact(dir, { type: "intent", identity: "intent/real", body: BODY_V1 });
+	const pinned = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/pinned",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/real", revision: 7 } }],
+	});
+	assert.equal(pinned.ok, false);
+	assert.equal(pinned.code, "AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND");
+	assert.match(pinned.errors[0], /revision 7/);
+	assert.match(pinned.errors[0], /not a committed revision/);
+});
+
+test("traces bind revisions, not heads: an explicit draft revision fails the lifecycle gate", () => {
+	const dir = mkTarget("trace-pinning");
+	admitArtifact(dir, { type: "intent", identity: "intent/a", body: BODY_V1 });
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/a",
+		body: BODY_V1,
+		expectedHead: 1,
+		transition: "accept",
+	});
+	const r = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/pinned",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/a", revision: 1 } }],
+	});
+	// Revision 1 is a draft; the head's accepted state cannot bleed in.
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_TRACE_TARGET_LIFECYCLE");
+});
+
+test("traces crossing scope boundaries are rejected with the stable scope code", () => {
+	const dir = mkTarget("trace-scope");
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/scoped",
+		body: BODY_V1,
+		scope: "team-a",
+		transition: "accept",
+	});
+	const cross = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/cross",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/scoped" } }],
+	});
+	assert.equal(cross.ok, false);
+	assert.equal(cross.code, "AMBER_E_ARTIFACT_TRACE_SCOPE");
+	assert.match(cross.errors[0], /crosses a scope boundary/);
+	assert.match(cross.errors[0], /"team-a"/);
+
+	// Same scope on both endpoints admits; the scope rides the receipt.
+	const same = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/same",
+		body: "# Spec\n",
+		scope: "team-a",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/scoped" } }],
+	});
+	assert.equal(same.ok, true, same.errors.join("; "));
+	assert.equal(same.receipt.scope, "team-a");
+	assert.deepEqual(same.receipt.traces, [
+		{ type: "refines", to: { type: "intent", identity: "intent/scoped", revision: 1 } },
+	]);
+});
+
+test("a supersedes trace binds a different artifact of the same type", () => {
+	const dir = mkTarget("trace-supersedes");
+	admitArtifact(dir, { type: "intent", identity: "intent/old", body: BODY_V1 });
+	const r = admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/new",
+		body: "# Intent: replacement\n",
+		traces: [{ type: "supersedes", to: { identity: "intent/old" } }],
+	});
+	assert.equal(r.ok, true, r.errors.join("; "));
+	assert.deepEqual(r.receipt.traces, [
+		{ type: "supersedes", to: { type: "intent", identity: "intent/old", revision: 1 } },
+	]);
+});
+
+test("malformed trace input is rejected as an argument error before any registry check", () => {
+	const dir = mkTarget("trace-shape");
+	const cases = [
+		{ type: "refines" }, // missing target
+		{ type: "", to: { identity: "intent/a" } }, // empty type
+		{ type: "refines", to: { identity: "." } }, // pure-dot identity
+		{ type: "refines", to: { identity: "intent/a", revision: "2" } }, // non-integer
+		{ type: "refines", to: { identity: "intent/a", revision: 0 } },
+	];
+	for (const trace of cases) {
+		const r = admitArtifact(dir, {
+			type: "spec",
+			identity: "spec/x",
+			body: "# Spec\n",
+			traces: [trace],
+		});
+		assert.equal(r.ok, false);
+		assert.equal(r.code, "AMBER_E_INVALID_ARG", JSON.stringify(trace));
+	}
+	const nonArray = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/x",
+		body: "# Spec\n",
+		traces: "refines:intent/a",
+	});
+	assert.equal(nonArray.ok, false);
+	assert.equal(nonArray.code, "AMBER_E_INVALID_ARG");
+});
+
+test("scope and idempotency-key garbage fail closed as argument errors (F5)", () => {
+	const dir = mkTarget("arg-garbage");
+	for (const scope of ["", "   "]) {
+		const r = admitArtifact(dir, {
+			type: "intent",
+			identity: "intent/x",
+			body: BODY_V1,
+			scope,
+		});
+		assert.equal(r.ok, false);
+		assert.equal(r.code, "AMBER_E_INVALID_ARG");
+		assert.match(r.errors[0], /scope must be a non-empty string/);
+	}
+	const emptyKey = admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/x",
+		body: BODY_V1,
+		idempotencyKey: "",
+	});
+	assert.equal(emptyKey.ok, false);
+	assert.equal(emptyKey.code, "AMBER_E_INVALID_ARG");
+	assert.match(emptyKey.errors[0], /idempotencyKey must be a non-empty string/);
+});
+
+test("immutable history: a changed envelope (scope) on the same Body needs a new expected head", () => {
+	const dir = mkTarget("immutable-envelope");
+	admitIntent(dir);
+	// Same Body, new scope: different canonical envelope content — not a
+	// duplicate retry, and never an in-place edit of revision 1.
+	const silentlyEdited = admitIntent(dir, { scope: "team-a" });
+	assert.equal(silentlyEdited.ok, false);
+	assert.equal(silentlyEdited.code, "AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT");
+
+	const asRevision = admitIntent(dir, { scope: "team-a", expectedHead: 1 });
+	assert.equal(asRevision.ok, true, asRevision.errors.join("; "));
+	assert.equal(asRevision.receipt.revision, 2);
+	assert.equal(asRevision.receipt.scope, "team-a");
+
+	// Revision 1 keeps its original (null) scope; nothing was mutated.
+	const rev1 = showArtifact(dir, "intent/login-bug", { revision: 1 });
+	assert.equal(rev1.scope, null);
+	assert.equal(rev1.envelope.scope, null);
+	assert.equal(showArtifact(dir, "intent/login-bug").scope, "team-a");
+});
+
+test("immutable history: a manual Body change is new admission input, producing a new revision", () => {
+	const dir = mkTarget("immutable-body");
+	admitIntent(dir);
+	const before = fs.readFileSync(path.join(homeOf(dir), "rev-1.md"), "utf8");
+	const beforeEnvelope = fs.readFileSync(path.join(homeOf(dir), "rev-1.envelope.json"), "utf8");
+
+	const v2 = admitIntent(dir, { body: BODY_V1 + "\nAdded slice.\n", expectedHead: 1 });
+	assert.equal(v2.ok, true, v2.errors.join("; "));
+	assert.equal(v2.receipt.revision, 2);
+
+	// The committed revision 1 pair is byte-identical after the admission.
+	assert.equal(fs.readFileSync(path.join(homeOf(dir), "rev-1.md"), "utf8"), before);
+	assert.equal(
+		fs.readFileSync(path.join(homeOf(dir), "rev-1.envelope.json"), "utf8"),
+		beforeEnvelope,
+	);
+
+	// A hand-edited stored Body never becomes an in-place content mutation:
+	// reads fail closed on the broken binding instead.
+	fs.writeFileSync(path.join(homeOf(dir), "rev-2.md"), "# hand-edited\n");
+	assert.throws(
+		() => showArtifact(dir, "intent/login-bug"),
+		/HASH_MISMATCH/,
+		"a tampered Body fails the read binding",
+	);
+});
+
+test("F3: a fresh in-flight admission lock fails the next admission as a conflict", () => {
+	const dir = mkTarget("lock-in-flight");
+	const home = path.join(dir, ".amber", "artifacts", "intents", "intent_login-bug");
+	fs.mkdirSync(home, { recursive: true });
+	fs.writeFileSync(path.join(home, "admit.lock"), String(Date.now()), "utf8");
+	const r = admitIntent(dir);
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_CONFLICT");
+	assert.match(r.errors[0], /another admission for this artifact is in flight/);
+	// The foreign lock is neither stolen nor removed by the loser.
+	assert.ok(fs.existsSync(path.join(home, "admit.lock")));
+});
+
+test("F3: a stale admission lock is stolen and admission proceeds", () => {
+	const dir = mkTarget("lock-stale");
+	const home = path.join(dir, ".amber", "artifacts", "intents", "intent_login-bug");
+	fs.mkdirSync(home, { recursive: true });
+	fs.writeFileSync(path.join(home, "admit.lock"), String(Date.now()), "utf8");
+	const stale = new Date(Date.now() - 31_000);
+	fs.utimesSync(path.join(home, "admit.lock"), stale, stale);
+	const r = admitIntent(dir);
+	assert.equal(r.ok, true, r.errors.join("; "));
+	assert.equal(r.receipt.revision, 1);
+	// The stolen lock is released by the winner.
+	assert.equal(fs.existsSync(path.join(home, "admit.lock")), false);
+});
+
+test("F6: a failed first admission leaves no empty artifact directory behind", () => {
+	const dir = mkTarget("empty-dir-cleanup");
+	// expectedHead on an artifact with no committed revisions fails under the
+	// lock, after the lock created the artifact home but before any durable
+	// write — the empty home must not survive the failure.
+	const r = admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/x",
+		body: BODY_V1,
+		expectedHead: 3,
+	});
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_CONFLICT");
+	assert.equal(
+		fs.existsSync(path.join(dir, ".amber", "artifacts", "intents", "intent_x")),
+		false,
+		"no empty artifact home is left behind",
+	);
+
+	// A failed admission over EXISTING settlement state never removes the
+	// home (journals and revision pairs are durable state).
+	admitIntent(dir);
+	const conflict = admitIntent(dir, { body: BODY_V1 + "v2\n" });
+	assert.equal(conflict.ok, false);
+	assert.ok(fs.existsSync(path.join(homeOf(dir), "journal.jsonl")));
+});
+
+test("F7: I/O failures on the durable writes surface as the typed artifact-IO code", () => {
+	const dir = mkTarget("io-pair");
+	const home = path.join(dir, ".amber", "artifacts", "intents", "intent_x");
+	// rev-1.md as a directory makes the pair write fail after the prepared
+	// record has claimed the slot — the failure is a typed result, never a
+	// raw fs exception escaping admitArtifact.
+	fs.mkdirSync(path.join(home, "rev-1.md"), { recursive: true });
+	const r = admitArtifact(dir, { type: "intent", identity: "intent/x", body: BODY_V1 });
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_IO");
+	assert.match(r.errors[0], /failed to write the Body\/Envelope pair/);
+
+	// The envelope-side write fails the same way.
+	const dir2 = mkTarget("io-envelope");
+	const home2 = path.join(dir2, ".amber", "artifacts", "intents", "intent_x");
+	fs.mkdirSync(path.join(home2, "rev-1.envelope.json"), { recursive: true });
+	const r2 = admitArtifact(dir2, { type: "intent", identity: "intent/x", body: BODY_V1 });
+	assert.equal(r2.ok, false);
+	assert.equal(r2.code, "AMBER_E_ARTIFACT_IO");
+});
+
+test("F8: a missing pair at a non-head revision fails the dedupe scan as corruption", () => {
+	const dir = mkTarget("dedupe-non-head");
+	admitIntent(dir);
+	admitIntent(dir, { body: BODY_V1 + "v2\n", expectedHead: 1 });
+	// Remove revision 1's Envelope: the head (revision 2) stays intact, but
+	// the content-bound dedupe scan must fail closed instead of skipping the
+	// holed revision.
+	fs.rmSync(path.join(homeOf(dir), "rev-1.envelope.json"));
+	const retry = admitIntent(dir);
+	assert.equal(retry.ok, false);
+	assert.equal(retry.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+	assert.match(retry.errors[0], /revision 1.*missing its Envelope on disk/);
+});
+
+test("F9: a committed record whose contentHash disagrees with the Envelope fails closed", () => {
+	const dir = mkTarget("content-hash-crosscheck");
+	admitIntent(dir);
+	// Tamper the committed record's contentHash (journal replay stays
+	// structurally valid; only the settlement/body binding disagrees).
+	const journalPath = path.join(homeOf(dir), "journal.jsonl");
+	const lines = fs
+		.readFileSync(journalPath, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	for (const record of lines) {
+		if (record.kind === "committed") record.contentHash = `sha256:${"0".repeat(64)}`;
+	}
+	fs.writeFileSync(
+		journalPath,
+		`${lines.map((line) => JSON.stringify(line)).join("\n")}\n`,
+		"utf8",
+	);
+
+	// A verbatim retry (dedupe scan path) refuses to confirm the revision.
+	const retry = admitIntent(dir);
+	assert.equal(retry.ok, false);
+	assert.equal(retry.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+	assert.match(retry.errors[0], /records contentHash.*while the stored Envelope binds bodyHash/);
+
+	// Building on the head (CAS path) fails the same cross-check.
+	const dir2 = mkTarget("content-hash-crosscheck-head");
+	admitIntent(dir2);
+	const journalPath2 = path.join(homeOf(dir2), "journal.jsonl");
+	const lines2 = fs
+		.readFileSync(journalPath2, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	for (const record of lines2) {
+		if (record.kind === "committed") record.contentHash = `sha256:${"0".repeat(64)}`;
+	}
+	fs.writeFileSync(
+		journalPath2,
+		`${lines2.map((line) => JSON.stringify(line)).join("\n")}\n`,
+		"utf8",
+	);
+	const supersede = admitIntent(dir2, { body: BODY_V1 + "v2\n", expectedHead: 1 });
+	assert.equal(supersede.ok, false);
+	assert.equal(supersede.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+
+	// Trace target resolution refuses to bind across the disagreement too.
+	const dir3 = mkTarget("content-hash-crosscheck-trace");
+	admitArtifact(dir3, {
+		type: "intent",
+		identity: "intent/login-bug",
+		body: BODY_V1,
+		transition: "accept",
+	});
+	const journalPath3 = path.join(homeOf(dir3), "journal.jsonl");
+	const lines3 = fs
+		.readFileSync(journalPath3, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	for (const record of lines3) {
+		if (record.kind === "committed") record.contentHash = `sha256:${"0".repeat(64)}`;
+	}
+	fs.writeFileSync(
+		journalPath3,
+		`${lines3.map((line) => JSON.stringify(line)).join("\n")}\n`,
+		"utf8",
+	);
+	const spec = admitArtifact(dir3, {
+		type: "spec",
+		identity: "spec/login-spec",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/login-bug" } }],
+	});
+	assert.equal(spec.ok, false);
+	assert.equal(spec.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+});
+
+test("legacy revisions without lifecycle fields can still be transitioned and refined", () => {
+	const dir = mkTarget("legacy-migration");
+	// A ticket-02-shaped envelope: no lifecycle/transition/scope/traces.
+	const home = path.join(dir, ".amber", "artifacts", "intents", "intent_login-bug");
+	fs.mkdirSync(home, { recursive: true });
+	fs.writeFileSync(path.join(home, "rev-1.md"), BODY_V1);
+	const legacyEnvelope = {
+		schemaVersion: 1,
+		type: "intent",
+		identity: "intent/login-bug",
+		revision: 1,
+		supersedes: null,
+		bodyHash: bodyHash(BODY_V1),
+		provenance: null,
+		committedAt: new Date("2024-01-01T00:00:00.000Z").toISOString(),
+	};
+	legacyEnvelope.envelopeHash = envelopeHash(legacyEnvelope);
+	fs.writeFileSync(
+		path.join(home, "rev-1.envelope.json"),
+		`${JSON.stringify(legacyEnvelope, null, 2)}\n`,
+	);
+	fs.writeFileSync(
+		path.join(home, "journal.jsonl"),
+		`${[
+			JSON.stringify({
+				kind: "prepared",
+				revision: 1,
+				at: legacyEnvelope.committedAt,
+				expectedHead: 0,
+				attemptId: "legacy-attempt",
+			}),
+			JSON.stringify({
+				kind: "committed",
+				revision: 1,
+				at: legacyEnvelope.committedAt,
+				expectedHead: 0,
+				contentHash: legacyEnvelope.bodyHash,
+			}),
+		].join("\n")}\n`,
+	);
+
+	// The legacy revision reads with lifecycle normalized to null.
+	const shown = showArtifact(dir, "intent/login-bug");
+	assert.equal(shown.revision, 1);
+	assert.equal(shown.lifecycle, null);
+
+	// A verbatim retry still dedupes against the legacy envelope (the
+	// admission hash ignores derived lifecycle content).
+	const retry = admitArtifact(dir, { type: "intent", identity: "intent/login-bug", body: BODY_V1 });
+	assert.equal(retry.ok, true, retry.errors.join("; "));
+	assert.equal(retry.duplicate, true);
+	assert.equal(retry.receipt.revision, 1);
+
+	// The legacy draft can be accepted: its missing lifecycle field reads as
+	// the type's initial state.
+	const accepted = admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/login-bug",
+		body: BODY_V1,
+		expectedHead: 1,
+		transition: "accept",
+	});
+	assert.equal(accepted.ok, true, accepted.errors.join("; "));
+	assert.equal(accepted.receipt.revision, 2);
+	assert.equal(accepted.receipt.lifecycle, "accepted");
+
+	// And a Spec can now refine the accepted revision.
+	const spec = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/login-spec",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/login-bug" } }],
+	});
+	assert.equal(spec.ok, true, spec.errors.join("; "));
+	assert.deepEqual(spec.receipt.traces, [
+		{ type: "refines", to: { type: "intent", identity: "intent/login-bug", revision: 2 } },
+	]);
 });
