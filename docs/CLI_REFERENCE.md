@@ -642,6 +642,52 @@ node scripts/amber.js principal list --target . --json
 node scripts/amber.js principal revoke --target . --id alice@example.com --reason "left the team" --json
 ```
 
+### evidence record / verify / show / list
+
+Evidence receipts and the fixed four-level Assurance contract (F050): `unavailable | observed |
+replayable | verified`. A receipt records what actually ran — identity, producer (a
+registry-verified Principal snapshot, verified at record time exactly like a Decision's acting
+Principal), scope, subject, inputs, tools, environment, time, status (`pass|fail`), and outputs —
+so a reviewer can assess the claim, not just consume it.
+
+The ledger is governed state, not incidental output: an append-only event ledger under
+`.amber/evidence/receipts.jsonl` (recorded and verified events, each chained to its predecessor by
+a tamper-evident hash — an in-place edit breaks the chain and fails every read closed as
+`AMBER_E_EVIDENCE_REGISTRY_CORRUPT`), fail-closed on corruption and unsupported schema versions,
+with a size ceiling (`AMBER_E_EVIDENCE_MAX_REGISTRY_BYTES`, default 1 MiB) checked before any
+durable state is touched and re-checked under the write lock on the exact chained event. Writers
+serialize through `.amber/evidence/receipts.lock`: a concurrent record/verify fails with
+`AMBER_E_EVIDENCE_REGISTRY_LOCK` instead of racing (a crash-stale lock is reclaimed automatically
+after 30 s). An evidence id is recorded exactly once — a re-run is a new receipt with a distinct id.
+
+A claim can never impersonate verification: `--assurance verified` is refused as
+`AMBER_E_EVIDENCE_ASSURANCE_FORBIDDEN` (a Runner can never award itself proof); only `verify`,
+run by an independent registered Principal whose id differs from the producer's, appends a
+verification event and promotes the **effective** assurance to `verified` — the producer naming
+itself as verifier fails closed as `AMBER_E_EVIDENCE_SELF_VERIFICATION`. A `replayable` receipt
+must name the deterministic definition it replayed via `--replay-of` (an Eval id, a command
+definition, a suite version); a bare replayable claim, or `--replay-of` on any other level, fails
+as `AMBER_E_EVIDENCE_REPLAY_OF_CONFLICT`. Effective assurance and the verifier list are derived at
+read time (`show`/`list` report `assurance`, `recordedAssurance`, and `verifiedBy`) — a later
+verification changes what a read returns without rewriting any event.
+
+```bash
+# record a replayable receipt with full provenance
+node scripts/amber.js evidence record --target . --id evidence/run-42 --producer ci-runner \
+  --assurance replayable --replay-of eval.instruction-surface --subject eval.instruction-surface \
+  --status pass --input "npm test" --tool node --env os=linux --outputs "all evals pass" --json
+
+# an independent principal promotes effective assurance to verified
+node scripts/amber.js evidence verify --target . --id evidence/run-42 --verifier reviewer-alice --json
+
+# read the derived record / every receipt in first-recorded order
+node scripts/amber.js evidence show --target . --id evidence/run-42 --json
+node scripts/amber.js evidence list --target . --json
+```
+
+`--env` entries are `key=value` (one flag per entry; a duplicated key or a missing `=` fails as
+`AMBER_E_INVALID_ARG`); the accumulators `--input`, `--tool`, and `--outputs` may repeat.
+
 ### projection rebuild / status / query (Governance Graph of artifact revisions)
 
 The Governance Graph is the only graph projection (ADR-0021) and is never a write authority: the

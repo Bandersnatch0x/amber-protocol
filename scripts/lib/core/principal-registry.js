@@ -56,7 +56,12 @@ const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
-const { sha256Hex } = require("./context-hash");
+const {
+	GENESIS_HASH,
+	chainHash,
+	chainHeadHash: sharedChainHeadHash,
+	acquireLedgerLock,
+} = require("./registry-ledger");
 
 const REGISTRY_CORRUPT_CODE = "AMBER_E_PRINCIPAL_REGISTRY_CORRUPT";
 const UNSUPPORTED_VERSION_CODE = "AMBER_E_PRINCIPAL_REGISTRY_UNSUPPORTED_VERSION";
@@ -122,46 +127,6 @@ const PRINCIPAL_FIELDS = Object.freeze([
 	"issuer",
 ]);
 
-const GENESIS_HASH = "0".repeat(64);
-
-function sortKeys(value) {
-	if (Array.isArray(value)) return value.map(sortKeys);
-	if (value && typeof value === "object") {
-		return Object.keys(value)
-			.sort()
-			.reduce((acc, key) => {
-				if (key !== "hash") acc[key] = sortKeys(value[key]);
-				return acc;
-			}, {});
-	}
-	return value;
-}
-
-function chainHash(event, prevHash) {
-	const body = { ...event, prevHash };
-	delete body.hash;
-	// sortKeys runs AFTER the prevHash merge: merging first and sorting second
-	// is what makes the canonical body identical from the writer (which builds
-	// the event without prevHash) and from the fold (which reads it back with
-	// prevHash already present) — insertion order never leaks into the hash.
-	return sha256Hex(prevHash + JSON.stringify(sortKeys(body)));
-}
-
-// The chain head: the last event's hash, or the genesis constant for an empty
-// registry. Kept in sync with foldRegistry's walk by construction — the
-// writers read the tail under the registry lock, so a stale head cannot race
-// a concurrent append.
-function chainHeadHash(cwd) {
-	const events = readLedgerFailClosed(
-		registryPath(cwd),
-		REGISTRY_CORRUPT_CODE,
-		"principal registry",
-	);
-	return events.length > 0 && typeof events[events.length - 1].hash === "string"
-		? events[events.length - 1].hash
-		: GENESIS_HASH;
-}
-
 // ISO-8601 calendar date, optionally with a time and zone offset. A bare
 // date parses as UTC midnight; a date-TIME must carry an explicit zone (Z or
 // ±hh:mm) — a zoneless date-time would parse as LOCAL time and make validity
@@ -173,6 +138,13 @@ function registryPath(cwd) {
 	return statePathForCreate(cwd, "principals", "registry.jsonl");
 }
 
+// The chain/lock disciplines live in registry-ledger.js (shared with the
+// evidence receipts ledger); the imports at the top of this module re-export
+// GENESIS_HASH/chainHash for consumers that chain hand-built fixtures.
+function chainHeadHash(cwd) {
+	return sharedChainHeadHash(registryPath(cwd), REGISTRY_CORRUPT_CODE, "principal registry");
+}
+
 // F050 review F-1: the register/revoke writers are check-then-append, and the
 // fold treats a duplicate `registered` (or second `revoked`) event as
 // corruption — two racing writers would both pass the pre-check and both
@@ -182,44 +154,14 @@ function registryPath(cwd) {
 // holder releases the registry; a live one fails the second writer with a
 // stable conflict code instead of racing it).
 function acquireRegistryLock(cwd) {
-	const dir = path.dirname(registryPath(cwd));
-	const lockPath = path.join(dir, "registry.lock");
-	try {
-		fs.mkdirSync(dir, { recursive: true });
-	} catch (err) {
-		throw registryCorrupt(`cannot create the principals directory (${dir}): ${err.message}`);
-	}
-	for (;;) {
-		try {
-			const fd = fs.openSync(lockPath, "wx");
-			fs.writeFileSync(fd, String(Date.now()), "utf8");
-			fs.closeSync(fd);
-			let released = false;
-			return () => {
-				if (released) return;
-				released = true;
-				fs.rmSync(lockPath, { force: true });
-			};
-		} catch (err) {
-			if (err.code !== "EEXIST") {
-				throw registryCorrupt(`cannot create the registry lock (${lockPath}): ${err.message}`);
-			}
-			let age;
-			try {
-				age = Date.now() - fs.statSync(lockPath).mtimeMs;
-			} catch {
-				continue;
-			}
-			if (age > LOCK_STALE_MS) {
-				fs.rmSync(lockPath, { force: true });
-				continue;
-			}
-			throw typedError(
-				LOCK_CONFLICT_CODE,
-				`another principal registry write is in flight (${lockPath} is fresh); the conflicting write is refused rather than racing it — retry once the in-flight register/revoke completes`,
-			);
-		}
-	}
+	return acquireLedgerLock({
+		dirPath: path.dirname(registryPath(cwd)),
+		lockName: "registry.lock",
+		conflictCode: LOCK_CONFLICT_CODE,
+		corruptCode: REGISTRY_CORRUPT_CODE,
+		label: "principal registry",
+		staleMs: LOCK_STALE_MS,
+	});
 }
 
 function registryCorrupt(message) {

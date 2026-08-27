@@ -853,6 +853,94 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_DECISION_KIND_INVALID", "AMBER_E_DECISION_PRINCIPAL_REQUIRED"],
 	},
+	AMBER_E_EVIDENCE_REGISTRY_CORRUPT: {
+		title: "Evidence ledger is corrupt or unreadable",
+		cause:
+			"An evidence ledger read hit a corrupt line or an event sequence the record/verify writers could never have produced (a broken hash chain, a duplicate recorded id, a verification of an unrecorded id, a self-verification, a malformed receipt, or an event outside the closed field set). An absent ledger reads as empty; this code only fires on real corruption.",
+		remedy:
+			"Restore .amber/evidence/receipts.jsonl from version control; never edit the ledger in place — the evidence ledger is append-only governed state and every change is a record or verify event.",
+		layer: "Observability",
+		related: [
+			"AMBER_E_EVIDENCE_UNSUPPORTED_VERSION",
+			"AMBER_E_PRINCIPAL_REGISTRY_CORRUPT",
+			"AMBER_E_ARTIFACT_JOURNAL_CORRUPT",
+		],
+	},
+	AMBER_E_EVIDENCE_UNSUPPORTED_VERSION: {
+		title: "Evidence ledger event declares an unsupported version",
+		cause:
+			"An evidence ledger event carries a schemaVersion this reader does not support. Version negotiation is fail-closed: an event the reader cannot interpret is rejected, never silently reinterpreted.",
+		remedy:
+			"Upgrade amber to a version that supports the declared evidence schema, or rebuild the ledger under the supported schema version (1) with fresh record events.",
+		layer: "Governance",
+		related: ["AMBER_E_EVIDENCE_REGISTRY_CORRUPT", "AMBER_E_ARTIFACT_UNSUPPORTED_VERSION"],
+	},
+	AMBER_E_EVIDENCE_SIZE_CEILING: {
+		title: "Evidence ledger exceeds its size ceiling",
+		cause:
+			"Appending the next evidence event would grow .amber/evidence/receipts.jsonl beyond the size ceiling (default 1 MiB, env AMBER_EVIDENCE_MAX_REGISTRY_BYTES), so the write is refused before any durable state is touched — the ceiling is re-checked under the write lock on the exact chained event.",
+		remedy:
+			"Keep receipt outputs bounded, or raise the ceiling deliberately via AMBER_EVIDENCE_MAX_REGISTRY_BYTES (a positive integer; garbage fails closed as AMBER_E_INVALID_ARG).",
+		layer: "Governance",
+		related: [
+			"AMBER_E_PRINCIPAL_REGISTRY_CEILING",
+			"AMBER_E_ARTIFACT_SIZE_CEILING",
+			"AMBER_E_INVALID_ARG",
+		],
+	},
+	AMBER_E_EVIDENCE_REGISTRY_LOCK: {
+		title: "Another evidence ledger write is in flight",
+		cause:
+			"A concurrent record/verify holds the evidence lock (.amber/evidence/receipts.lock, fresh within the stale window), so the conflicting write is refused instead of racing the in-flight one — two racing writers would both pass the pre-check and append, producing a duplicate or unanchored event the fold treats as corruption.",
+		remedy:
+			"Retry once the in-flight record/verify completes; a lock older than the stale window (30 s) is a crashed holder and is reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_EVIDENCE_REGISTRY_CORRUPT", "AMBER_E_PRINCIPAL_REGISTRY_LOCK"],
+	},
+	AMBER_E_EVIDENCE_ALREADY_RECORDED: {
+		title: "Evidence id is already recorded",
+		cause:
+			"record was invoked with an id the ledger already holds. An evidence id is recorded exactly once — a re-run of the same check is a new receipt with a distinct id, not a rewrite of the old one.",
+		remedy:
+			"Inspect the existing receipt with `amber evidence show --id <id>`; record the re-run under a distinct id.",
+		layer: "Governance",
+		related: ["AMBER_E_EVIDENCE_NOT_FOUND", "AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT"],
+	},
+	AMBER_E_EVIDENCE_NOT_FOUND: {
+		title: "Evidence id is not recorded",
+		cause: "A verify or show named an evidence id with no recorded receipt in the ledger.",
+		remedy:
+			"List recorded evidence with `amber evidence list`; record the receipt first (`amber evidence record`).",
+		layer: "Observability",
+		related: ["AMBER_E_EVIDENCE_ALREADY_RECORDED", "AMBER_E_PRINCIPAL_NOT_FOUND"],
+	},
+	AMBER_E_EVIDENCE_ASSURANCE_FORBIDDEN: {
+		title: "Receipt cannot claim the verified assurance level",
+		cause:
+			'record was invoked with assurance "verified". The four-level Assurance contract reserves "verified" for independent verification: a Runner can never award itself proof, so no receipt may be recorded at that level.',
+		remedy:
+			"Record at the honest level (unavailable, observed, or replayable); an independent registered principal then promotes the effective assurance via `amber evidence verify --id <id> --verifier <other-principal>`.",
+		layer: "Verification",
+		related: ["AMBER_E_EVIDENCE_SELF_VERIFICATION", "AMBER_E_DECISION_HUMAN_SLOT_REQUIRED"],
+	},
+	AMBER_E_EVIDENCE_SELF_VERIFICATION: {
+		title: "Evidence producer cannot verify its own receipt",
+		cause:
+			"verify was invoked with a verifier whose principal id equals the receipt's producer id. Verification requires an independent principal — a Runner naming itself as verifier would award itself proof.",
+		remedy:
+			"Verify with a different registered principal (e.g. a human reviewer or an independent service identity).",
+		layer: "Verification",
+		related: ["AMBER_E_EVIDENCE_ASSURANCE_FORBIDDEN", "AMBER_E_PRINCIPAL_NOT_FOUND"],
+	},
+	AMBER_E_EVIDENCE_REPLAY_OF_CONFLICT: {
+		title: "Replay provenance conflicts with the assurance level",
+		cause:
+			"A replayable receipt arrived without replayOf (a bare claim with nothing to replay), or a non-replayable receipt carried replayOf (replay provenance is reserved for deterministic replays).",
+		remedy:
+			"Name the deterministic definition the replay executed (--replay-of, e.g. an Eval id or a command definition) on replayable receipts, and drop replayOf from non-replayable ones.",
+		layer: "Verification",
+		related: ["AMBER_E_EVIDENCE_ASSURANCE_FORBIDDEN", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

@@ -84,6 +84,14 @@ _Avoid_: sign-off, signoff type, verdict
 The repository-local append-only ledger under `.amber/principals/` registering the humans and service identities that can act with authority, each with kind, role, membership, capability, scope, validity window, issuer, and terminal revocation state. It is the trust root Decision admission verifies against; its events are hash-chained and an in-place edit fails every read closed.
 _Avoid_: user database, identity provider, session store
 
+**Evidence Receipt**:
+The append-only record under `.amber/evidence/` of one execution's provenance — producer (a registry-verified Principal snapshot), scope, subject, inputs, tools, environment, time, status, and outputs — written once and never rewritten. A receipt is the claim; verification is a separate event by an independent Principal.
+_Avoid_: test log, build output, badge, verification record
+
+**Assurance Level**:
+The closed four-level contract on Evidence: `unavailable | observed | replayable | verified`. Only the first three are recordable; `verified` is reached exclusively through an independent verification event (verifier id ≠ producer id), and `replayable` requires named replay provenance.
+_Avoid_: confidence score, trust level, coverage percentage
+
 **Eval**:
 A versioned, reproducible assessment definition and its recorded outcome for a declared behavior, artifact, or policy. An Eval supplies Evidence to a Gate; it is not an Approval and cannot widen execution authority.
 _Avoid_: benchmark score, model confidence, test log
