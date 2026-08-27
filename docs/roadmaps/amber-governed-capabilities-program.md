@@ -35,13 +35,15 @@ version. Each child Feature has its own local Spec and GitHub mirror; only child
 | F056 Registered External Side Effects | `docs/specs/F056-registered-external-side-effects.md` | F055 | [#216](https://github.com/Bandersnatch0x/amber-protocol/issues/216) |
 | F057 Break-glass Authorization | `docs/specs/F057-break-glass-authorization.md` | F053, F056 | [#217](https://github.com/Bandersnatch0x/amber-protocol/issues/217) |
 | F058 Instruction-Surface Adversarial Evals | `docs/specs/F058-instruction-surface-adversarial-evals.md` | F050 | [#224](https://github.com/Bandersnatch0x/amber-protocol/issues/224) |
+| F059 Knowledge & Decision Map | `docs/specs/F059-knowledge-decision-map.md` | F049, F058 | [#246](https://github.com/Bandersnatch0x/amber-protocol/issues/246) |
 
 ## Dependency graph
 
 ```text
 F049 → F050 → F052 → F053 → F057
   │       ├──────→ F054
-  │       └──────→ F058
+  │       └──────→ F058 → F059
+  ├──→ F059
   └──→ F051 → F055 → F056 → F057
 ```
 
