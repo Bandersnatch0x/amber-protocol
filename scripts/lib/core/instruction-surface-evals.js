@@ -24,11 +24,7 @@ const {
 } = require("./context-request");
 const { requiredArtifactSpecs, loadoutsDir } = require("./context-loadout");
 const { listPages, readPage, requestsDir } = require("./context-store");
-const {
-	BREADCRUMB_OPEN,
-	printBreadcrumb,
-	verifyPrintedBreadcrumb,
-} = require("../hooks-command");
+const { BREADCRUMB_OPEN, printBreadcrumb, verifyPrintedBreadcrumb } = require("../hooks-command");
 
 const ROOT = path.resolve(__dirname, "../../..");
 const SUITE_ID = "instruction-surface";
@@ -167,8 +163,7 @@ function evalModelIndependence(files, findings) {
 function evalMcpToolDescriptions(opts = {}) {
 	const findings = [];
 	const { actions, functions } = loadRegistries(opts);
-	const advertised =
-		opts.advertisedDescriptions || advertisedToolDescriptions(actions, functions);
+	const advertised = opts.advertisedDescriptions || advertisedToolDescriptions(actions, functions);
 	for (const action of actions) {
 		inspectAdvertisedTool(findings, {
 			id: action.actionTypeId,
@@ -244,7 +239,10 @@ function evalContextQuoteBoundary(targetRoot, opts = {}) {
 		schema.properties.contract.properties.constraints &&
 		schema.properties.contract.properties.constraints.properties;
 	const versionEnum =
-		schema && schema.properties && schema.properties.schemaVersion && schema.properties.schemaVersion.enum;
+		schema &&
+		schema.properties &&
+		schema.properties.schemaVersion &&
+		schema.properties.schemaVersion.enum;
 	if (schema && (!Array.isArray(versionEnum) || !versionEnum.includes(SCHEMA_VERSION))) {
 		findings.push(
 			finding(
@@ -289,7 +287,10 @@ function evalContextQuoteBoundary(targetRoot, opts = {}) {
 	}
 	for (const spec of specs) {
 		const normalized = String(spec.path || "").replace(/\\/g, "/");
-		if (normalized.includes(".amber/context/pages/") || normalized.startsWith(".amber/context/pages")) {
+		if (
+			normalized.includes(".amber/context/pages/") ||
+			normalized.startsWith(".amber/context/pages")
+		) {
 			findings.push(
 				finding(
 					"AMBER_E_EVAL_CONTEXT_REQUIRED_ARTIFACT_ROLE",
@@ -421,11 +422,7 @@ function evalBreadcrumbAuthenticity(targetRoot) {
 	const printed = printBreadcrumb(targetRoot, { format: "text", force: true });
 	if (printed.errors && printed.errors.length > 0) {
 		findings.push(
-			finding(
-				"AMBER_E_EVAL_BREADCRUMB_BINDING",
-				printed.errors[0],
-				"hooks breadcrumb print",
-			),
+			finding("AMBER_E_EVAL_BREADCRUMB_BINDING", printed.errors[0], "hooks breadcrumb print"),
 		);
 	} else if (!printed.text) {
 		findings.push(

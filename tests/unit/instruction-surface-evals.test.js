@@ -55,7 +55,10 @@ test("a drifted tools/list description fails the suite as MCP description drift"
 
 test("an MCP server that drops the shared tool surface fails the suite", () => {
 	const mcpSourcePath = path.join(tempDir("mcp-src"), "amber-mcp.js");
-	fs.writeFileSync(mcpSourcePath, "function toTool(action) { return { description: action.goal }; }\n");
+	fs.writeFileSync(
+		mcpSourcePath,
+		"function toTool(action) { return { description: action.goal }; }\n",
+	);
 	const suite = runInstructionSurfaceEvals(tempDir("mcp-src-target"), { mcpSourcePath });
 	assert.equal(suite.overall, "fail");
 	assert.ok(findingCodes(suite, EVAL_IDS.mcp).includes("AMBER_E_EVAL_MCP_DESCRIPTION_DRIFT"));
@@ -64,7 +67,9 @@ test("an MCP server that drops the shared tool surface fails the suite", () => {
 test("an Eval source that references a model client fails the suite", () => {
 	const modelFile = path.join(tempDir("model-src"), "client.js");
 	fs.writeFileSync(modelFile, 'const client = require("openai");\n');
-	const suite = runInstructionSurfaceEvals(tempDir("model-target"), { modelScanFiles: [modelFile] });
+	const suite = runInstructionSurfaceEvals(tempDir("model-target"), {
+		modelScanFiles: [modelFile],
+	});
 	assert.equal(suite.overall, "fail");
 	assert.equal(suite.modelIndependent, false);
 	assert.ok(findingCodes(suite, EVAL_IDS.mcp).includes("AMBER_E_EVAL_MODEL_DEPENDENCY"));
