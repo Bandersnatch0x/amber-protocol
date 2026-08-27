@@ -19,6 +19,7 @@ import '@xyflow/react/dist/style.css';
 import {
   knowledgeGraphFixture,
   type GraphLayer,
+  type KnowledgeEdgeDTO,
   type KnowledgeGraphDTO,
   type KnowledgeNode,
   type RecentChangeItem,
@@ -26,25 +27,29 @@ import {
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import { MarkdownMessage } from '@/components/code/MarkdownMessage';
 
-const LAYER_COLORS: Record<string, { dot: string; ring: string; badge: string; stroke: string }> = {
+const LAYER_COLORS: Record<string, { dot: string; badge: string; stroke: string }> = {
   decision: {
     dot: 'bg-amber-500',
-    ring: '#f59e0b',
     badge: 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200',
     stroke: '#f59e0b',
   },
   knowledge: {
     dot: 'bg-blue-500',
-    ring: '#3b82f6',
     badge: 'bg-blue-100 text-blue-900 dark:bg-blue-950/50 dark:text-blue-200',
     stroke: '#3b82f6',
   },
   implementation: {
     dot: 'bg-slate-500',
-    ring: '#64748b',
     badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
     stroke: '#64748b',
   },
+};
+
+const STATUS_DOT: Record<string, string> = {
+  passing: 'bg-emerald-500',
+  accepted: 'bg-emerald-500',
+  Accepted: 'bg-emerald-500',
+  committed: 'bg-emerald-500',
 };
 
 const KIND_LABEL_KEYS: Record<string, I18nKey> = {
@@ -248,6 +253,7 @@ function MiniContextGraph({
       }
     }
     const shown = out.slice(0, 8);
+    const hidden = out.length - shown.length;
     const cx = 160;
     const cy = 84;
     const rx = 118;
@@ -257,7 +263,7 @@ function MiniContextGraph({
       it.x = cx + rx * Math.cos(angle);
       it.y = cy + ry * Math.sin(angle);
     });
-    return { shown, cx, cy };
+    return { shown, hidden, cx, cy };
   }, [dto.edges, centerId, nodeById]);
 
   if (!center) return null;
@@ -284,7 +290,7 @@ function MiniContextGraph({
             markerHeight={6}
             orient="auto"
           >
-            <path d="M0,0 L8,4 L0,8 z" fill="#94a3b8" />
+            <path d="M0,0 L8,4 L0,8 z" className="fill-slate-400" />
           </marker>
         </defs>
         {items.shown.map((it) => {
@@ -301,12 +307,18 @@ function MiniContextGraph({
                 y1={y1}
                 x2={x2}
                 y2={y2}
-                stroke={it.inferred ? '#94a3b8' : '#7c8da4'}
+                className={it.inferred ? 'stroke-slate-400' : 'stroke-slate-500'}
                 strokeWidth={1.2}
                 strokeDasharray={it.inferred ? '4 3' : undefined}
                 markerEnd="url(#mini-arrow)"
               />
-              <text x={midX} y={midY - 3} textAnchor="middle" fontSize={7} fill="#b45309">
+              <text
+                x={midX}
+                y={midY - 3}
+                textAnchor="middle"
+                fontSize={8}
+                className="fill-amber-700 dark:fill-amber-300"
+              >
                 {it.verb}
               </text>
             </g>
@@ -319,7 +331,7 @@ function MiniContextGraph({
             width={116}
             height={24}
             rx={6}
-            fill="#fef3c7"
+            className="fill-amber-100 dark:fill-amber-950/60"
             stroke="#f59e0b"
             strokeWidth={1.4}
           />
@@ -327,18 +339,18 @@ function MiniContextGraph({
             x={items.cx}
             y={items.cy + 3}
             textAnchor="middle"
-            fontSize={8.5}
+            fontSize={9.5}
             fontWeight={600}
-            fill="#92400e"
+            className="fill-amber-900 dark:fill-amber-200"
           >
-            {center.title.length > 26 ? `${center.title.slice(0, 25)}…` : center.title}
+            {center.title.length > 24 ? `${center.title.slice(0, 23)}…` : center.title}
           </text>
         </g>
         {items.shown.map((it) => {
           const c = LAYER_COLORS[it.other.layer];
           const label =
-            it.other.title.length > 18 ? `${it.other.title.slice(0, 17)}…` : it.other.title;
-          const w = 84;
+            it.other.title.length > 17 ? `${it.other.title.slice(0, 16)}…` : it.other.title;
+          const w = 86;
           return (
             <g
               key={`node:${it.other.id}`}
@@ -351,16 +363,27 @@ function MiniContextGraph({
                 width={w}
                 height={20}
                 rx={5}
-                fill="#ffffff"
+                className="fill-white dark:fill-obsidian-elevated"
                 stroke={c.stroke}
                 strokeWidth={1.2}
               />
-              <text x={it.x} y={it.y + 3} textAnchor="middle" fontSize={7.5} fill="#334155">
+              <text
+                x={it.x}
+                y={it.y + 3}
+                textAnchor="middle"
+                fontSize={8.5}
+                className="fill-slate-700 dark:fill-slate-200"
+              >
                 {label}
               </text>
             </g>
           );
         })}
+        {items.hidden > 0 && (
+          <text x={items.cx} y={164} textAnchor="middle" fontSize={8.5} className="fill-slate-400">
+            +{items.hidden}
+          </text>
+        )}
       </svg>
     </div>
   );
@@ -496,6 +519,52 @@ function FlowCanvas({
 
 const nodeTypes = { knowledge: KnowledgeFlowNode };
 
+function EdgeRow({
+  edge,
+  otherId,
+  nodeById,
+  onSelect,
+  incoming = false,
+}: {
+  edge: KnowledgeEdgeDTO;
+  otherId: string;
+  nodeById: Map<string, KnowledgeNode>;
+  onSelect: (id: string) => void;
+  incoming?: boolean;
+}) {
+  const { t } = useI18n();
+  const other = nodeById.get(otherId);
+  const verb = (
+    <span className="font-mono text-[9px] uppercase text-amber-600 dark:text-amber-300 shrink-0">
+      {incoming ? '→' : ''} {edge.verb} {incoming ? '' : '→'}
+    </span>
+  );
+  return (
+    <li>
+      <button
+        onClick={() => onSelect(otherId)}
+        className="w-full text-left rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5 hover:border-amber-300 dark:hover:border-amber-700/60 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 transition-colors"
+      >
+        <div className="flex items-center gap-1.5">
+          {incoming && verb}
+          <span className="text-slate-700 dark:text-slate-200 truncate">
+            {other?.title ?? otherId}
+          </span>
+          {!incoming && verb}
+        </div>
+        {edge.origin === 'inferred' && (
+          <span
+            className="ml-0.5 text-[9px] text-slate-400 italic"
+            title={`inferred · ${edge.provenance?.model} · prompt ${edge.provenance?.promptHash} · ${edge.provenance?.timestamp}`}
+          >
+            {t('knowledge.inferredLabel')} ({edge.provenance?.model})
+          </span>
+        )}
+      </button>
+    </li>
+  );
+}
+
 function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
   const { dto, drift, highlight, dimmed, selected, neighbor } = data;
   const { t } = useI18n();
@@ -535,11 +604,7 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
         ) : dto.status ? (
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              dto.status === 'passing' || dto.status === 'accepted' || dto.status === 'committed'
-                ? 'bg-emerald-500'
-                : dto.status === 'Accepted'
-                  ? 'bg-emerald-500'
-                  : 'bg-slate-400'
+              STATUS_DOT[dto.status] ?? 'bg-slate-400'
             }`}
           />
         ) : null}
@@ -874,62 +939,25 @@ export function KnowledgeMapPage() {
                       {t('knowledge.edges')}
                     </div>
                     <ul className="space-y-1 text-[11px]">
-                      {outgoing.map((e, i) => {
-                        const other = nodeById.get(e.dst);
-                        return (
-                          <li key={`o${i}`}>
-                            <button
-                              onClick={() => setSelectedId(e.dst)}
-                              className="w-full text-left rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5 hover:border-amber-300 dark:hover:border-amber-700/60 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 transition-colors"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-[9px] uppercase text-amber-600 dark:text-amber-300 shrink-0">
-                                  {e.verb} →
-                                </span>
-                                <span className="text-slate-700 dark:text-slate-200 truncate">
-                                  {other?.title ?? e.dst}
-                                </span>
-                              </div>
-                              {e.origin === 'inferred' && (
-                                <span
-                                  className="ml-0.5 text-[9px] text-slate-400 italic"
-                                  title={`inferred · ${e.provenance?.model} · prompt ${e.provenance?.promptHash} · ${e.provenance?.timestamp}`}
-                                >
-                                  {t('knowledge.inferredLabel')} ({e.provenance?.model})
-                                </span>
-                              )}
-                            </button>
-                          </li>
-                        );
-                      })}
-                      {incoming.map((e, i) => {
-                        const other = nodeById.get(e.src);
-                        return (
-                          <li key={`i${i}`}>
-                            <button
-                              onClick={() => setSelectedId(e.src)}
-                              className="w-full text-left rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5 hover:border-amber-300 dark:hover:border-amber-700/60 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 transition-colors"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-slate-700 dark:text-slate-200 truncate">
-                                  {other?.title ?? e.src}
-                                </span>
-                                <span className="font-mono text-[9px] uppercase text-amber-600 dark:text-amber-300 shrink-0">
-                                  → {e.verb}
-                                </span>
-                              </div>
-                              {e.origin === 'inferred' && (
-                                <span
-                                  className="ml-0.5 text-[9px] text-slate-400 italic"
-                                  title={`inferred · ${e.provenance?.model} · prompt ${e.provenance?.promptHash} · ${e.provenance?.timestamp}`}
-                                >
-                                  {t('knowledge.inferredLabel')} ({e.provenance?.model})
-                                </span>
-                              )}
-                            </button>
-                          </li>
-                        );
-                      })}
+                      {outgoing.map((e, i) => (
+                        <EdgeRow
+                          key={`o${i}`}
+                          edge={e}
+                          otherId={e.dst}
+                          nodeById={nodeById}
+                          onSelect={setSelectedId}
+                        />
+                      ))}
+                      {incoming.map((e, i) => (
+                        <EdgeRow
+                          key={`i${i}`}
+                          edge={e}
+                          otherId={e.src}
+                          nodeById={nodeById}
+                          onSelect={setSelectedId}
+                          incoming
+                        />
+                      ))}
                     </ul>
                   </div>
                 );
