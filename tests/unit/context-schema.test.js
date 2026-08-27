@@ -281,6 +281,22 @@ describe("context-request schema", () => {
 		);
 	});
 
+	it("accepts a 1.3.0 request that treats sources as quoted evidence", () => {
+		const req = validRequest({ schemaVersion: "1.3.0" });
+		req.contract.constraints.treatSourcesAsQuotedEvidence = true;
+		assert.equal(validate(req), true, JSON.stringify(validate.errors));
+	});
+
+	it("rejects a 1.3.0 request that omits treatSourcesAsQuotedEvidence", () => {
+		assert.equal(validate(validRequest({ schemaVersion: "1.3.0" })), false);
+	});
+
+	it("rejects a 1.3.0 request that sets treatSourcesAsQuotedEvidence false", () => {
+		const req = validRequest({ schemaVersion: "1.3.0" });
+		req.contract.constraints.treatSourcesAsQuotedEvidence = false;
+		assert.equal(validate(req), false);
+	});
+
 	it("rejects a request with duplicate target.scope entries (uniqueItems)", () => {
 		const req = validRequest({ scope: ["feature-standard", "feature-standard"] });
 		assert.equal(validate(req), false);

@@ -1658,6 +1658,28 @@
 			"notes": [],
 			"paths": ["package.json"],
 			"updated": "2026-08-26"
+		},
+		{
+			"id": "F058",
+			"priority": 58,
+			"area": "verification",
+			"title": "Instruction-Surface Adversarial Evals",
+			"user_visible_behavior": "A deterministic F050 Eval suite reports whether MCP tool descriptions, the Context quote boundary, and breadcrumb authenticity still hold; results are Evidence, not Approval.",
+			"status": "in_progress",
+			"verification": [
+				"amber eval run --suite instruction-surface --target .",
+				"npm test (instruction-surface eval suites green)"
+			],
+			"evidence": [],
+			"notes": [
+				"First F050 Eval pack. Model-independent; does not call a host agent or TAP scanner.",
+				"GitHub mirror #224; T2 suite-seam tests #225 closed."
+			],
+			"paths": [
+				"docs/specs/F058-instruction-surface-adversarial-evals.md",
+				"scripts/lib/core/instruction-surface-evals.js",
+				"scripts/lib/eval-commands.js"
+			]
 		}
 	]
 }

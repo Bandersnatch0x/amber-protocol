@@ -770,4 +770,10 @@ function verifyLoadoutFile(targetRoot, loadoutPath) {
 	return { ok: findings.length === 0, findings };
 }
 
-module.exports = { loadoutsDir, previewLoadout, buildLoadout, verifyLoadoutFile };
+module.exports = {
+	loadoutsDir,
+	previewLoadout,
+	buildLoadout,
+	verifyLoadoutFile,
+	requiredArtifactSpecs,
+};

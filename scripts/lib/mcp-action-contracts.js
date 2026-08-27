@@ -162,6 +162,14 @@ const COMMAND_CAPABILITIES = {
 		edits: [],
 		sideEffects: [],
 	},
+	"eval/run": {
+		effect: "read",
+		approver: "system",
+		evidence: null,
+		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
+	},
 };
 
 // ---- capability derivation (single shape for JSON → declared values) ----

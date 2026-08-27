@@ -1,0 +1,36 @@
+{
+	"actionTypeId": "amber.eval.run",
+	"version": 1,
+	"title": "Run instruction-surface Evals",
+	"goal": "Replay the deterministic instruction-surface Eval suite and report Evidence without mutating anything.",
+	"mode": "dry-run",
+	"parameters": {
+		"suite": {
+			"type": "string",
+			"description": "Eval suite identity. Omitted: instruction-surface."
+		}
+	},
+	"submissionCriteria": [],
+	"effects": {
+		"edits": [],
+		"sideEffects": [],
+		"rollback": false
+	},
+	"evidenceRequired": [],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#read-only-projection",
+		"approver": ["system"],
+		"evidence": [],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "eval",
+		"subcommand": "run",
+		"args": [
+			{ "flag": "--suite", "source": "parameters.suite", "optional": true },
+			{ "flag": "--json", "flagOnly": true }
+		]
+	}
+}

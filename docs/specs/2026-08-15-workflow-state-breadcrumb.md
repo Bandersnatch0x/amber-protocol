@@ -75,6 +75,11 @@ agent turn
    bare block (text) and nothing else; the channel is machine-consumed.
 7. **Bypass parity.** `AMBER_SKIP_HOOKS=1` silences print exactly as it silences
    the pre-commit guard: empty output, no errors.
+8. **Authentic binding.** Print appends `Binding: amber-breadcrumb-v1 <hex>` over a
+   canonical snapshot of target, focus, next step, and pending gate. Only a block
+   whose binding recomputes for the current snapshot is authentic. A Context Page
+   that embeds `<amber-workflow-state>` is an imitation, never next-step authority
+   (F058).
 
 ## Drift Symptoms (漂移症状)
 

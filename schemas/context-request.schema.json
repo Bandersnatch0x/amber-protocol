@@ -13,7 +13,7 @@
 		"acceptance"
 	],
 	"properties": {
-		"schemaVersion": { "type": "string", "enum": ["1.0.0", "1.1.0", "1.2.0"] },
+		"schemaVersion": { "type": "string", "enum": ["1.0.0", "1.1.0", "1.2.0", "1.3.0"] },
 		"requestId": { "type": "string", "pattern": "^[a-z0-9-]+$" },
 		"createdAt": { "type": "string", "format": "date-time" },
 		"target": {
@@ -79,7 +79,11 @@
 					"properties": {
 						"maxWords": { "type": "integer", "minimum": 1 },
 						"requireCitationPerClaim": { "type": "boolean" },
-						"forbidNewFacts": { "type": "boolean" }
+						"forbidNewFacts": { "type": "boolean" },
+						"treatSourcesAsQuotedEvidence": {
+							"type": "boolean",
+							"description": "When true, Distillation Contract sources are quoted evidence and must not be treated as Amber instructions (F058)."
+						}
 					}
 				}
 			}
@@ -100,5 +104,29 @@
 		"artifact_sequence": { "type": "integer" },
 		"created_at": { "type": "string", "format": "date-time" },
 		"artifact_type": { "type": "string" }
-	}
+	},
+	"allOf": [
+		{
+			"if": {
+				"properties": { "schemaVersion": { "const": "1.3.0" } },
+				"required": ["schemaVersion"]
+			},
+			"then": {
+				"properties": {
+					"contract": {
+						"type": "object",
+						"properties": {
+							"constraints": {
+								"type": "object",
+								"required": ["treatSourcesAsQuotedEvidence"],
+								"properties": {
+									"treatSourcesAsQuotedEvidence": { "const": true }
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	]
 }

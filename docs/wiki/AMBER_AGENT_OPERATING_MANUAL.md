@@ -84,6 +84,9 @@ audit -> init -> governance report -> next -> plan -> gate -> verify -> approve 
   `not_started | in_progress | blocked | passing`.
 - Any completion/pass/safe claim must name the command or inspection, its result/exit code, the
   artifact path or session id, and remaining risk. Without evidence it is only a claim.
+- Instruction-surface Evals (`amber eval run --suite instruction-surface`) supply F050 Evidence
+  that MCP tool descriptions, the Context quote boundary, and breadcrumb authenticity still hold.
+  They are not Approval and do not call a model.
 - `amber session verify` without `--execute` records a claim tagged `executed: false`;
   `complete-check --strict` requires executed evidence. `verify --execute` runs in the working
   copy behind two gates: policy (`.amber/governance/rules.json`, deny-wins, default-deny) and

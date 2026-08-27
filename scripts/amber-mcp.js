@@ -37,6 +37,7 @@ const { validateWhitelist } = require("./lib/mcp-action-contracts");
 const { loadActionTypes, loadFunctions } = require("./lib/mcp-registry-loader");
 const { createFunctionRuntime } = require("./lib/mcp-functions");
 const { createInvocationCoordinator } = require("./lib/mcp-invocation-coordinator");
+const { mcpActionTool, mcpFunctionTool } = require("./lib/mcp-tool-surface");
 
 const ROOT = path.resolve(__dirname, "..");
 const AMBER_JS = path.join(ROOT, "scripts", "amber.js");
@@ -179,22 +180,17 @@ function toOutputSchema() {
 }
 
 function toTool(action) {
-	const approver = (action.governance.approver || []).join("/");
-	return {
-		name: action.actionTypeId,
-		description: `${action.goal} Mode: ${action.mode}. Approver: ${approver}.`,
+	return mcpActionTool(action, {
 		inputSchema: toInputSchema(action),
 		outputSchema: toOutputSchema(),
-	};
+	});
 }
 
 function toFunctionTool(fn) {
-	return {
-		name: fn.name,
-		description: `${fn.description} Function (in-process, read-only).`,
+	return mcpFunctionTool(fn, {
 		inputSchema: toFunctionInputSchema(fn),
 		outputSchema: toOutputSchema(),
-	};
+	});
 }
 
 // Extract the first JSON value from a possibly-mixed stdout buffer

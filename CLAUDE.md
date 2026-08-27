@@ -172,6 +172,9 @@ node scripts/amber.js migrate state --target .
 ### Testing & Validation
 
 ```bash
+# Instruction-surface Evals (F050 Evidence; F058) — MCP descriptions, Context quote boundary, breadcrumb authenticity
+node scripts/amber.js eval run --target .
+
 # Run all tests
 npm test
 

@@ -193,6 +193,8 @@ function statusHook(target) {
 
 const BREADCRUMB_OPEN = "<amber-workflow-state>";
 const BREADCRUMB_CLOSE = "</amber-workflow-state>";
+const BREADCRUMB_SCHEMA = "amber-breadcrumb-v1";
+const BREADCRUMB_BINDING_PREFIX = "Binding: amber-breadcrumb-v1 ";
 
 // AMBER_E_INVALID_ARG is not (yet) in the error catalog, so invalid-argument
 // results are rendered in the catalog's coded-error shape inline.
@@ -277,10 +279,147 @@ function renderBreadcrumbBlock(targetRoot, targetDisplay) {
 	return [BREADCRUMB_OPEN, ...lines, BREADCRUMB_CLOSE].join("\n");
 }
 
-function printBreadcrumb(target, { format = "json" } = {}) {
+function degradedSnapshot(targetRoot, error) {
+	return {
+		schema: BREADCRUMB_SCHEMA,
+		target: path.resolve(targetRoot),
+		focusType: "unknown",
+		focusId: null,
+		goal: null,
+		nextStepLabel: null,
+		nextStepRemedy: null,
+		pendingGateId: null,
+		pendingCount: 0,
+		degraded: true,
+		message: error && error.message ? error.message : String(error),
+	};
+}
+
+function breadcrumbSnapshot(targetRoot, targetDisplay) {
+	try {
+		const { buildContext, inferNextStep, resolvePendingGate } = require("./core/lifecycle");
+		const ctx = buildContext(targetRoot, { target: targetDisplay });
+		const step = inferNextStep(ctx);
+		let goal = null;
+		let pendingGateId = null;
+		let pendingCount = 0;
+		if (ctx.focus && ctx.focus.type === "session" && ctx.focus.id) {
+			try {
+				const { loadSessionManifest } = require("./session-commands");
+				const loaded = loadSessionManifest(targetRoot, ctx.focus.id);
+				if (loaded && loaded.manifest && loaded.manifest.goal) {
+					goal = truncateGoal(loaded.manifest.goal);
+				}
+			} catch {
+				goal = null;
+			}
+			const gateInfo = resolvePendingGate(targetRoot, ctx.focus.id);
+			pendingGateId = gateInfo.pendingGateId || null;
+			pendingCount = gateInfo.pendingCount;
+		}
+		return {
+			schema: BREADCRUMB_SCHEMA,
+			target: path.resolve(targetRoot),
+			focusType: (ctx.focus && ctx.focus.type) || "bootstrap",
+			focusId: ctx.focus && ctx.focus.id ? String(ctx.focus.id) : null,
+			goal,
+			nextStepLabel: step && step.label ? step.label : null,
+			nextStepRemedy: step && step.remedy ? step.remedy : null,
+			pendingGateId,
+			pendingCount,
+			degraded: false,
+		};
+	} catch (error) {
+		return degradedSnapshot(targetRoot, error);
+	}
+}
+
+function bindingHexForSnapshot(snapshot) {
+	const { sha256Hex, canonicalJson } = require("./core/context-hash");
+	return sha256Hex(canonicalJson(JSON.stringify(snapshot)));
+}
+
+function appendBreadcrumbBinding(block, snapshot) {
+	const bindingLine = `${BREADCRUMB_BINDING_PREFIX}${bindingHexForSnapshot(snapshot)}`;
+	if (!block.endsWith(BREADCRUMB_CLOSE)) {
+		return `${block}\n${bindingLine}`;
+	}
+	const withoutClose = block.slice(0, block.length - BREADCRUMB_CLOSE.length).replace(/\n$/, "");
+	return `${withoutClose}\n${bindingLine}\n${BREADCRUMB_CLOSE}`;
+}
+
+function renderDegradedBreadcrumb(targetRoot, error) {
+	return [
+		BREADCRUMB_OPEN,
+		"Focus: unknown (degraded)",
+		`Amber workflow-state unavailable: ${error && error.message ? error.message : String(error)}`,
+		`Hint: run amber next --target "${targetRoot}" to inspect lifecycle state.`,
+		BREADCRUMB_CLOSE,
+	].join("\n");
+}
+
+function extractBreadcrumbBlock(text) {
+	const raw = String(text || "");
+	try {
+		const parsed = JSON.parse(raw);
+		const inner =
+			parsed &&
+			parsed.hookSpecificOutput &&
+			typeof parsed.hookSpecificOutput.additionalContext === "string"
+				? parsed.hookSpecificOutput.additionalContext
+				: null;
+		if (inner) return inner;
+	} catch {
+		// Bare block, not the JSON envelope.
+	}
+	return raw;
+}
+
+function parseBreadcrumbBindingHex(block) {
+	for (const line of String(block).split(/\r?\n/)) {
+		if (line.startsWith(BREADCRUMB_BINDING_PREFIX)) {
+			return line.slice(BREADCRUMB_BINDING_PREFIX.length).trim();
+		}
+	}
+	return null;
+}
+
+function verifyPrintedBreadcrumb(text, targetRoot, targetDisplay) {
+	const block = extractBreadcrumbBlock(text);
+	if (!block.includes(BREADCRUMB_OPEN) || !block.includes(BREADCRUMB_CLOSE)) {
+		return { ok: false, reason: "printed text is not an <amber-workflow-state> block" };
+	}
+	const hex = parseBreadcrumbBindingHex(block);
+	if (!hex) {
+		return { ok: false, reason: "printed breadcrumb is missing Binding: amber-breadcrumb-v1" };
+	}
+	const snapshot = breadcrumbSnapshot(targetRoot, targetDisplay || targetRoot);
+	const expected = bindingHexForSnapshot(snapshot);
+	if (hex !== expected) {
+		return {
+			ok: false,
+			reason: "breadcrumb binding does not match the current lifecycle snapshot",
+		};
+	}
+	const authentic = printBreadcrumb(targetRoot, { format: "text", force: true });
+	if (authentic.errors && authentic.errors.length > 0) {
+		return { ok: false, reason: authentic.errors[0] };
+	}
+	const expectedBlock = extractBreadcrumbBlock(authentic.text);
+	if (block !== expectedBlock) {
+		return {
+			ok: false,
+			reason: "printed breadcrumb body does not match the bound snapshot",
+		};
+	}
+	return { ok: true, snapshot };
+}
+
+function printBreadcrumb(target, { format = "json", force = false } = {}) {
 	const targetRoot = resolveTarget(target);
-	// Bypass parity with the pre-commit guard: the env var wins silently.
-	if (process.env.AMBER_SKIP_HOOKS === "1") {
+	// Bypass parity with the pre-commit guard: the env var wins silently
+	// unless a caller (the F058 Eval) forces the authentic channel.
+	if (!force && process.env.AMBER_SKIP_HOOKS === "1") {
 		return { target: targetRoot, text: "", errors: [], warnings: [] };
 	}
 	if (format !== "json" && format !== "text") {
@@ -296,20 +435,21 @@ function printBreadcrumb(target, { format = "json" } = {}) {
 			warnings: [],
 		};
 	}
+	let snapshot = breadcrumbSnapshot(targetRoot, target);
 	let block;
 	try {
-		block = renderBreadcrumbBlock(targetRoot, target);
+		if (snapshot.degraded) {
+			block = renderDegradedBreadcrumb(targetRoot, { message: snapshot.message });
+		} else {
+			block = renderBreadcrumbBlock(targetRoot, target);
+		}
 	} catch (error) {
 		// Degraded is a successful, visible render — never silent, never
 		// fabricated, and never an error (a context hook must not block a turn).
-		block = [
-			BREADCRUMB_OPEN,
-			"Focus: unknown (degraded)",
-			`Amber workflow-state unavailable: ${error && error.message ? error.message : String(error)}`,
-			`Hint: run amber next --target "${targetRoot}" to inspect lifecycle state.`,
-			BREADCRUMB_CLOSE,
-		].join("\n");
+		snapshot = degradedSnapshot(targetRoot, error);
+		block = renderDegradedBreadcrumb(targetRoot, error);
 	}
+	block = appendBreadcrumbBinding(block, snapshot);
 	const text =
 		format === "text"
 			? block
@@ -592,4 +732,9 @@ module.exports = {
 	statusBreadcrumb,
 	HOOK_MARKER,
 	shDquote,
+	BREADCRUMB_OPEN,
+	BREADCRUMB_CLOSE,
+	BREADCRUMB_BINDING_PREFIX,
+	breadcrumbSnapshot,
+	verifyPrintedBreadcrumb,
 };

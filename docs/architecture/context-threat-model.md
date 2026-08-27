@@ -22,7 +22,7 @@ accepted evidence are authoritative. Every index and report is disposable derive
 | Threat | Control | Residual risk |
 | --- | --- | --- |
 | Malformed or hostile source content | Schema validation, source provenance, hashes, citation checks, and explicit error codes | A valid source can still contain false claims; human review and source inspection remain necessary |
-| Prompt injection embedded in a source | Source text is treated as quoted evidence, never as Amber instructions; connectors cannot execute commands or bypass ingest | A host agent may still follow hostile prose unless it preserves the Distillation Contract boundary |
+| Prompt injection embedded in a source | Source text is treated as quoted evidence, never as Amber instructions (`treatSourcesAsQuotedEvidence`); connectors cannot execute commands or bypass ingest; `amber eval run` replays the quote-boundary Eval (F058) | A host agent may still follow hostile prose unless it preserves the Distillation Contract boundary; the Eval is Evidence, not a host interceptor |
 | Lexical or realpath escape | Target-local resolution checks both the requested path and resolved filesystem target | Filesystem semantics can change after validation; load-time verification must remain immediate |
 | Mutable source tampering | Raw and normalized hashes detect meaningful drift; changed sources require refresh | Normalization deliberately ignores cosmetic changes and is not a language parser |
 | Immutable source tampering | Embedded excerpt and excerpt hash are checked independently | If all authoritative copies are rewritten together, repository history or external evidence is needed |

@@ -127,6 +127,7 @@ describe → submit(execute) → gate(dry-run/validation)
 | `amber.memory.approve` | `amber memory approve` | human | approval-record |
 | `amber.memory.abandon` | `amber memory abandon` | human | ingest-record |
 | `amber.memory.status` | `amber memory status` | system | —（只读） |
+| `amber.eval.run` | `amber eval run` | system | —（只读；F058 instruction-surface Eval） |
 | `amber.governance.report` | `amber governance report` | system | —（只读） |
 | `amber.object.query` | 按 `objectType` 变体分发（见下） | system | —（只读查询） |
 

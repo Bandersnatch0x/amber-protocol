@@ -17,6 +17,7 @@ const TYPED_COMMAND_NAMES = new Set([
 	"ledger",
 	"loop",
 	"memory",
+	"eval",
 ]);
 
 // Per-command help text shown by `amber <command> --help`.
@@ -728,6 +729,24 @@ const COMMAND_HELP = {
 		"  amber artifact show --id intent/login-bug --revision 1 --target . --json",
 		"  amber artifact list --target . --json",
 	],
+	eval: [
+		"Run deterministic instruction-surface Evals (F050 Evidence; F058).",
+		"The suite checks MCP tool descriptions, the Context quote boundary, and",
+		"breadcrumb authenticity. Results are Evidence with replayable assurance;",
+		"they are not Approval and cannot widen execution authority. Report-only:",
+		"no writes, no model calls, no TAP scanner.",
+		"",
+		"Subcommands:",
+		"  run [--suite instruction-surface]  Replay the suite against --target.",
+		"        Exit 0 when every Eval passes; exit 1 when any Eval has findings.",
+		"  list                  List registered Eval identities in the suite.",
+		"  show --id <evalId>    Show one Eval definition.",
+		"",
+		"Examples:",
+		"  amber eval run --target . --json",
+		"  amber eval list --target .",
+		"  amber eval show --id eval.instruction-surface.mcp-tool-description --target .",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -1041,6 +1060,14 @@ const COMMAND_OUTPUT = {
 			"       amber artifact list --target <repo> [--json]",
 		].join("\n"),
 	},
+	eval: {
+		usage: [
+			"Usage: amber eval <run|list|show> --target <repo> [--json]",
+			"       amber eval run --target <repo> [--suite instruction-surface] [--json]",
+			"       amber eval list --target <repo> [--json]",
+			"       amber eval show --id <evalId> --target <repo> [--json]",
+		].join("\n"),
+	},
 };
 
 const DEFAULT_OUTPUT = Object.freeze({ dryRun: false, summary: false, usage: null });
@@ -1087,6 +1114,7 @@ const COMMANDS = Object.freeze([
 	"knowledge",
 	"phase",
 	"artifact",
+	"eval",
 ]);
 const TIER_BY_COMMAND = {
 	init: "core",
@@ -1112,6 +1140,7 @@ const TIER_BY_COMMAND = {
 	knowledge: "core",
 	phase: "core",
 	artifact: "core",
+	eval: "core",
 	next: "journey",
 	profile: "deprecated",
 	task: "deprecated",
@@ -1286,6 +1315,8 @@ const KNOWN_UNTYPED_SUBCOMMANDS = Object.freeze(
 		"memory/ingest",
 		"memory/book",
 		"context/load",
+		"eval/list",
+		"eval/show",
 	]),
 );
 

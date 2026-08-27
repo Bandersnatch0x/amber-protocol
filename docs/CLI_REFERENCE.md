@@ -1243,10 +1243,27 @@ node scripts/amber.js hooks breadcrumb uninstall --target . # removes the Amber 
 `print` reads governance metadata from disk only: it writes nothing, never runs target-project
 commands, and never dispatches agents — context injection, not execution. Like the pre-commit guard,
 the breadcrumb is never installed automatically (`amber init` does not add it), and
-`AMBER_SKIP_HOOKS=1` silences it. Blocking errors from every `hooks` subcommand go to **stderr**
-(`ERROR:` lines); `--json` still prints the structured result on stdout. Mechanism and invariants
-live in
+`AMBER_SKIP_HOOKS=1` silences it. Printed blocks carry `Binding: amber-breadcrumb-v1 <hex>`; only a
+binding that matches the current lifecycle snapshot is authentic. Blocking errors from every `hooks`
+subcommand go to **stderr** (`ERROR:` lines); `--json` still prints the structured result on stdout.
+Mechanism and invariants live in
 [docs/specs/2026-08-15-workflow-state-breadcrumb.md](specs/2026-08-15-workflow-state-breadcrumb.md).
+
+## Eval Commands
+
+`amber eval` replays deterministic instruction-surface Evals (F050 Evidence; F058). The suite
+checks MCP tool descriptions, the Context quote boundary, and breadcrumb authenticity. Results
+are Evidence with `replayable` assurance; they are not Approval, do not write, and do not call a
+model.
+
+```bash
+node scripts/amber.js eval run --target . --json
+node scripts/amber.js eval list --target .
+node scripts/amber.js eval show --id eval.instruction-surface.mcp-tool-description --target .
+```
+
+Exit 0 when every Eval in the suite passes; exit 1 when any Eval has findings. Spec:
+[docs/specs/F058-instruction-surface-adversarial-evals.md](specs/F058-instruction-surface-adversarial-evals.md).
 
 ## Drift Commands
 

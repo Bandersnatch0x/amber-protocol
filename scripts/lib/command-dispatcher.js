@@ -85,6 +85,7 @@ const { syncDispatch } = require("./sync-commands");
 const { knowledgeDispatch } = require("./knowledge-commands");
 const { phaseDispatch } = require("./phase-commands");
 const { artifactDispatch } = require("./canonical-artifact-commands");
+const { evalDispatch } = require("./eval-commands");
 const { orgAuditDispatch } = require("./org-audit-commands");
 const { hooksDispatch } = require("./hooks-commands");
 const { bindCommandHandlers } = require("./command-registry");
@@ -1024,6 +1025,10 @@ function handleArtifact(args) {
 	return artifactDispatch(args);
 }
 
+function handleEval(args) {
+	return evalDispatch(args);
+}
+
 function handleExplain(args) {
 	const { explain } = require("./explain-command");
 	const r = explain(args);
@@ -1157,6 +1162,7 @@ const COMMAND_HANDLERS = {
 	knowledge: handleKnowledge,
 	phase: handlePhase,
 	artifact: handleArtifact,
+	eval: handleEval,
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);

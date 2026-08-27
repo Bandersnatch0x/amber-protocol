@@ -186,7 +186,8 @@
 											"ledger",
 											"loop",
 											"status",
-											"memory"
+											"memory",
+											"eval"
 										]
 									},
 									"subcommand": { "type": "string" },
@@ -221,7 +222,8 @@
 									"ledger",
 									"loop",
 									"status",
-									"memory"
+									"memory",
+									"eval"
 								]
 							},
 							"subcommand": { "type": "string" },
@@ -239,7 +241,8 @@
 						"ledger",
 						"loop",
 						"status",
-						"memory"
+						"memory",
+						"eval"
 					],
 					"description": "Amber CLI command family this action maps to."
 				},
