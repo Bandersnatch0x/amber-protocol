@@ -29,8 +29,8 @@ const {
 	traceShapeProblem,
 } = require("../../scripts/lib/core/canonical-artifact-contracts");
 
-test("the type registry covers intent, spec, plan, and decision (closed set)", () => {
-	assert.deepEqual(ARTIFACT_TYPES, ["intent", "spec", "plan", "decision"]);
+test("the type registry covers intent, spec, plan, decision, and gate (closed set)", () => {
+	assert.deepEqual(ARTIFACT_TYPES, ["intent", "spec", "plan", "decision", "gate"]);
 	assert.equal(Object.isFrozen(TYPE_REGISTRY), true);
 });
 
@@ -57,10 +57,17 @@ test("each registered type has a closed lifecycle with named transitions", () =>
 		initial: "recorded",
 		states: ["recorded"],
 	});
+	// A Gate (F050 ticket 3, #228) is a reviewable admission contract with a
+	// three-state lifecycle: drafted, activated, retired.
+	assert.deepEqual(TYPE_REGISTRY.gate.lifecycle, {
+		initial: "draft",
+		states: ["draft", "active", "retired"],
+	});
 	assert.deepEqual(registeredTransitionsOf("intent"), ["accept"]);
 	assert.deepEqual(registeredTransitionsOf("spec"), ["approve"]);
 	assert.deepEqual(registeredTransitionsOf("plan"), ["approve"]);
 	assert.deepEqual(registeredTransitionsOf("decision"), []);
+	assert.deepEqual(registeredTransitionsOf("gate"), ["activate", "retire"]);
 	assert.deepEqual(registeredTransitionsOf("bogus"), []);
 	// Every transition's from/to states are registered states of its type.
 	for (const type of ARTIFACT_TYPES) {
@@ -92,6 +99,15 @@ test("transition admission derives the lifecycle state; no transition means the 
 	assert.equal(lifecycleForAdmission("bogus", "accept"), null);
 	assert.equal(lifecycleForAdmission("decision", null), "recorded");
 	assert.equal(lifecycleForAdmission("decision", "accept"), null, "a decision has no transitions");
+	assert.equal(lifecycleForAdmission("gate", null), "draft");
+	assert.equal(lifecycleForAdmission("gate", "activate"), "active");
+	assert.equal(lifecycleForAdmission("gate", "retire"), "retired");
+	assert.equal(transitionFor("gate", "approve"), null, "approve is not a gate transition");
+	assert.deepEqual(transitionFor("gate", "retire"), {
+		name: "retire",
+		from: "active",
+		to: "retired",
+	});
 	assert.equal(transitionFor("decision", "accept"), null);
 	assert.deepEqual(transitionFor("intent", "accept"), {
 		name: "accept",

@@ -96,6 +96,14 @@ _Avoid_: permission flag, role assignment, session token, mutable approval state
 The atomic settlement of one Approval and the Decision it authorizes: the Decision is admitted (kind `approval`, principal = the frozen approver) and the single-use `consumed` event is appended binding the Decision's identity and revision, or nothing is written at all. One authorization can never be replayed.
 _Avoid_: token redemption, approval check, gate pass
 
+**Gate Contract**:
+A versioned canonical artifact of the registered `gate` type declaring what admission through a Gate requires — required Evidence types and Assurance levels, thresholds under registered comparators, bounded explicit `anyOf` alternatives, Decision owners, expiry, dependencies, and deny-only failure behavior — carried under the Envelope's `extensions` carrier in the `gate` namespace. The reviewable contract itself; evaluation consumes it but never modifies it.
+_Avoid_: quality bar, scoring rubric, model confidence, weighted criteria
+
+**Gate Outcome**:
+The immutable record appended to the hash-chained ledger under `.amber/gates/outcomes.jsonl` for every completed Gate evaluation — verdict (`pass|fail`), the evaluated revision and its content hash, and per-requirement details (which receipt joined, its effective Assurance, staleness, threshold comparison). A fail verdict is a recorded outcome, not an error; a pass is never silently revised.
+_Avoid_: gate result flag, cached verdict, mutable evaluation state
+
 **Assurance Level**:
 The closed four-level contract on Evidence: `unavailable | observed | replayable | verified`. Only the first three are recordable; `verified` is reached exclusively through an independent verification event (verifier id ≠ producer id), and `replayable` requires named replay provenance.
 _Avoid_: confidence score, trust level, coverage percentage

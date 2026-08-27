@@ -1070,6 +1070,86 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_DECISION_HUMAN_SLOT_REQUIRED", "AMBER_E_PRINCIPAL_NOT_FOUND"],
 	},
+	AMBER_E_GATE_NOT_FOUND: {
+		title: "Gate artifact is not recorded",
+		cause:
+			"A gate evaluation named an identity with no committed gate artifact revision in the canonical artifact store (or the named revision does not exist).",
+		remedy:
+			"List committed artifacts with `amber artifact list`; admit the Gate Contract first (`amber artifact admit --type gate ... --extension gate.require=...`), or evaluate the stored spelling of the identity.",
+		layer: "Observability",
+		related: ["AMBER_E_ARTIFACT_NOT_FOUND", "AMBER_E_GATE_CONTRACT_INVALID"],
+	},
+	AMBER_E_GATE_CONTRACT_INVALID: {
+		title: "Gate Contract is malformed",
+		cause:
+			"The gate artifact's extensions.gate contract failed the evaluator's shape validation: a missing or empty gate.require, an unknown gate.* key, a requirement with unknown keys or a non-string evidenceType, an unparseable expiry, a non-array where an array is required, an anyOf set outside the bounded explicit limits (at most 8 alternative sets of at most 8 entries), or a threshold value/comparator family mismatch (a number only compares numerically; a string compares exactly under eq/ne/contains and dot-numerically under lt/le/gt/ge).",
+		remedy:
+			"Fix the contract in a new gate revision (`amber artifact admit --type gate ... --expected-head <n>`) — a committed revision is immutable, so the correction is always a new revision. The message names the offending key.",
+		layer: "Governance",
+		related: [
+			"AMBER_E_GATE_UNSUPPORTED_COMPARATOR",
+			"AMBER_E_GATE_FAIL_BEHAVIOR_UNSUPPORTED",
+			"AMBER_E_INVALID_ARG",
+		],
+	},
+	AMBER_E_GATE_EXPIRED: {
+		title: "Gate Contract has expired",
+		cause:
+			"gate evaluate was invoked for a gate whose gate.expires bound is at or before the evaluation clock. Expiry is evaluated with no clock-skew tolerance: at exactly gate.expires the gate already refuses to run, and no outcome is appended — the gate did not evaluate, it declined.",
+		remedy:
+			"Admit a fresh gate revision with a current expiry; an expired contract is never revived — history is not rewritten.",
+		layer: "Governance",
+		related: ["AMBER_E_APPROVAL_EXPIRED", "AMBER_E_PRINCIPAL_EXPIRED"],
+	},
+	AMBER_E_GATE_UNSUPPORTED_COMPARATOR: {
+		title: "Gate threshold declares an unregistered comparator",
+		cause:
+			"A requirement threshold carries a comparator outside the registered comparison operator set. Only registered operators can be evaluated deterministically; an unknown one makes the contract invalid rather than silently satisfiable.",
+		remedy:
+			"Use a registered comparator — numeric: eq, ne, lt, le, gt, ge; string: eq, ne, contains; version (dot-numeric): eq, lt, le, gt, ge — in a new gate revision.",
+		layer: "Governance",
+		related: ["AMBER_E_GATE_CONTRACT_INVALID", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_GATE_FAIL_BEHAVIOR_UNSUPPORTED: {
+		title: "Gate failure behavior is unsupported",
+		cause:
+			'The gate contract declares a gate.failBehavior other than "deny". v1 is deny-only: a failing gate denies — there is no warn, quorum, or weighted pass, and no model confidence can soften the verdict.',
+		remedy:
+			'Omit gate.failBehavior (deny is the default) or set it to "deny" in a new gate revision.',
+		layer: "Governance",
+		related: ["AMBER_E_GATE_CONTRACT_INVALID"],
+	},
+	AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT: {
+		title: "Gate outcome ledger is corrupt or unreadable",
+		cause:
+			"A gate outcome read hit a corrupt line or an event the evaluate writer could never have produced (a broken hash chain, an event outside the closed field set, a missing field, an unknown kind, or a non-integer schemaVersion this reader cannot interpret). An absent ledger reads as empty; this code only fires on real corruption.",
+		remedy:
+			"Restore .amber/gates/outcomes.jsonl from version control; never edit the ledger in place — it is append-only governed state and every change is an evaluated event.",
+		layer: "Governance",
+		related: ["AMBER_E_APPROVAL_REGISTRY_CORRUPT", "AMBER_E_EVIDENCE_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_GATE_OUTCOME_SIZE_CEILING: {
+		title: "Gate outcome ledger exceeds its size ceiling",
+		cause:
+			"Appending the next evaluated event would grow .amber/gates/outcomes.jsonl beyond the size ceiling (default 1 MiB, env AMBER_GATE_MAX_OUTCOME_BYTES), so the write is refused before any durable state is touched — the ceiling is checked under the write lock on the exact chained event.",
+		remedy:
+			"Keep gate contracts bounded (fewer requirements with shorter subjects), or raise the ceiling deliberately via AMBER_GATE_MAX_OUTCOME_BYTES (a positive integer; garbage fails closed as AMBER_E_INVALID_ARG).",
+		layer: "Governance",
+		related: [
+			"AMBER_E_APPROVAL_SIZE_CEILING",
+			"AMBER_E_EVIDENCE_SIZE_CEILING",
+			"AMBER_E_INVALID_ARG",
+		],
+	},
+	AMBER_E_GATE_OUTCOME_REGISTRY_LOCK: {
+		title: "Another gate outcome write is in flight",
+		cause:
+			"A concurrent gate evaluation holds the outcomes lock (.amber/gates/outcomes.lock, fresh within the stale window), so the conflicting write is refused instead of racing the in-flight one — two racing evaluators would both chain onto the same head and fork the ledger.",
+		remedy:
+			"Retry once the in-flight evaluation completes; a lock older than the stale window (30 s) is a crashed holder and is reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT", "AMBER_E_APPROVAL_REGISTRY_LOCK"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

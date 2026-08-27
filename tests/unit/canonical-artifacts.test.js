@@ -211,8 +211,8 @@ test("unknown artifact type is rejected with a stable error code", () => {
 	assert.equal(r.code, "AMBER_E_ARTIFACT_UNKNOWN_TYPE");
 	assert.deepEqual(
 		ARTIFACT_TYPES,
-		["intent", "spec", "plan", "decision"],
-		"closed registry covers the three registered planning types plus the decision type (F050)",
+		["intent", "spec", "plan", "decision", "gate"],
+		"closed registry covers the three registered planning types plus the decision and gate types (F050)",
 	);
 });
 

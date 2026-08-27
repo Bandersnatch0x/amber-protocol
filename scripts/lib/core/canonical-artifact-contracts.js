@@ -30,6 +30,16 @@
  *   Traces), and its rationale (the Body). There is no transition: an
  *   amended decision is a new revision superseding the old one, exactly
  *   like every other revision-level change.
+ * - Gate (F050, #228): draft -> active via the named transition `activate`,
+ *   active -> retired via the named transition `retire`. A Gate is the
+ *   reviewable contract admission is decided against — never hidden weights
+ *   or model confidence — and its machine-actionable content (required
+ *   evidence, assurance, thresholds, owners, expiry, dependencies, failure
+ *   behavior) rides the Envelope's existing extensions carrier under the
+ *   `gate` namespace. The registry adds NO type-specific envelope
+ *   validation here: the deterministic evaluator
+ *   (scripts/lib/core/gate-evaluation.js) is that content's first shape
+ *   consumer and owns the contract verdicts.
  * `draft` is the initial admitted state of every gate-bearing type — the
  *   state before the type's gate. A lifecycle change is always an admission
  *   carrying a named transition: it produces a NEW revision, never an
@@ -113,6 +123,18 @@ const TYPE_REGISTRY = Object.freeze({
 		}),
 		lineageRequirement:
 			"a Decision must decide exactly one committed artifact revision of a registered type (declared by the decides Trace)",
+	}),
+	gate: Object.freeze({
+		dir: "gates",
+		lifecycle: Object.freeze({
+			initial: "draft",
+			states: Object.freeze(["draft", "active", "retired"]),
+		}),
+		transitions: Object.freeze({
+			activate: Object.freeze({ name: "activate", from: "draft", to: "active" }),
+			retire: Object.freeze({ name: "retire", from: "active", to: "retired" }),
+		}),
+		requiredTraces: Object.freeze({}),
 	}),
 });
 

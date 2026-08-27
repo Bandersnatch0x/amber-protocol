@@ -751,6 +751,69 @@ so an approver whose registration is later revoked or expired leaves the authori
 un-consumable (fail-closed) — though it can still be revoked by another registered human, since
 revocation verifies the revoker, not the approver.
 
+### gate evaluate / show / list
+
+Gate Contracts and deterministic evaluation (F050): admission through a Gate is decided by a
+reviewable contract — never by hidden weights or model confidence. A Gate Contract is a canonical
+artifact of the registered `gate` type, admitted through the existing artifact surface (lifecycle
+`draft -> active` via `--transition activate`, `active -> retired` via `--transition retire`); its
+machine-actionable content rides the Envelope's `extensions` carrier under the `gate` namespace.
+The evaluator is that content's first shape consumer — the artifact surface carries extensions
+opaquely by design, so a malformed contract is an evaluation-time verdict, not an admission error.
+
+Contract keys: `gate.require` (required — a non-empty array of requirement objects
+`{ evidenceType, subject?, assurance?, threshold?, maxAgeMs? }`), `gate.anyOf` (bounded explicit
+alternatives: at most 8 sets of at most 8 entries; at least one set must be fully satisfied when
+declared), `gate.owners`, `gate.expires`, `gate.dependsOn`, `gate.maxEvidenceAgeMs`, and
+`gate.failBehavior` (v1 is deny-only: `"deny"`; anything else is refused). A requirement is
+satisfied only by an Evidence receipt that joins on the receipt's `subject` (the requirement's
+`evidenceType`, scoped to the evaluation subject or the requirement's own subject override), has
+status `pass`, carries effective Assurance at or above the required level
+(`unavailable < observed < replayable < verified`), is fresh at the evaluation clock
+(`age <= maxAgeMs` — the requirement's `maxAgeMs`, else the gate's `maxEvidenceAgeMs`; no bound
+means always fresh; a stale receipt is listed in the outcome, never hidden), and — when a
+`threshold` `{ value, comparator }` is declared — whose LAST output parses and compares true
+(numeric `eq/ne/lt/le/gt/ge`; string `eq/ne/contains` exact; version `eq/lt/le/gt/ge`
+dot-numerically, where `"1.2" < "1.10"` and missing segments pad to zero). An expired gate
+refuses to run: `AMBER_E_GATE_EXPIRED`, no outcome appended.
+
+Every completed evaluation appends one immutable `evaluated` event to the hash-chained outcome
+ledger under `.amber/gates/outcomes.jsonl` — a pass is never silently revised, and a FAIL verdict
+is a completed evaluation, not a command error (exit code 0; the record is the audit trail). An
+in-place edit breaks the chain and fails every read closed as
+`AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT`. The ledger serializes through `.amber/gates/outcomes.lock`
+(`AMBER_E_GATE_OUTCOME_REGISTRY_LOCK`; a lock older than 30 s is reclaimed as stale) with a size
+ceiling (`AMBER_GATE_MAX_OUTCOME_BYTES`, default 1 MiB) checked before the append. Every outcome
+records its clock source (`injected` with `--now`, `system` otherwise) and the fixed skew policy
+`no-tolerance`.
+
+The legacy plan gate keeps its surface under the same command name: a bare
+`amber gate --plan <path> [--confirm]` (no `evaluate`/`show`/`list` action) routes to the plan
+gate-check unchanged.
+
+```bash
+# admit a Gate Contract through the artifact surface (contract keys ride --extension flags)
+node scripts/amber.js artifact admit --type gate --id gate/login-gate \
+  --body "# Gate: login readiness" \
+  --extension gate.require='[{"evidenceType":"spec/login@2","assurance":"observed","threshold":{"value":80,"comparator":"ge"}}]' \
+  --extension gate.owners='["alice@example.com"]' --target . --json
+
+# evaluate deterministically (appends one immutable outcome; a fail verdict is still exit 0)
+node scripts/amber.js gate evaluate --target . --gate gate/login-gate --subject spec/login@2 --json
+node scripts/amber.js gate evaluate --target . --gate gate/login-gate --subject spec/login@2 \
+  --revision 1 --now 2027-06-01T09:00:00Z --json
+
+# read outcomes: by 0-based ledger line, or the latest matching a gate (optionally narrowed by subject)
+node scripts/amber.js gate show --target . --index 0 --json
+node scripts/amber.js gate show --target . --gate gate/login-gate --subject spec/login@2 --json
+node scripts/amber.js gate list --target . [--gate <id>] [--subject <s>] [--verdict pass|fail] --json
+```
+
+Error codes: `AMBER_E_GATE_NOT_FOUND`, `AMBER_E_GATE_CONTRACT_INVALID`,
+`AMBER_E_GATE_EXPIRED`, `AMBER_E_GATE_UNSUPPORTED_COMPARATOR`,
+`AMBER_E_GATE_FAIL_BEHAVIOR_UNSUPPORTED`, `AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT`,
+`AMBER_E_GATE_OUTCOME_SIZE_CEILING`, `AMBER_E_GATE_OUTCOME_REGISTRY_LOCK`.
+
 ### projection rebuild / status / query (Governance Graph of artifact revisions)
 
 The Governance Graph is the only graph projection (ADR-0021) and is never a write authority: the

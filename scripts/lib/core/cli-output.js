@@ -151,6 +151,10 @@ const FLAG_SPECS = {
 	"--revoker": { key: "revoker" },
 	"--valid-until": { key: "validUntil" },
 	"--decision-identity": { key: "decisionIdentity" },
+	// F050 ticket 3 (#228): Gate evaluation flags (--gate, --subject,
+	// --revision, and --index are shared with the existing surfaces).
+	"--now": { key: "now" },
+	"--verdict": { key: "verdict" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

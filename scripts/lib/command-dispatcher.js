@@ -89,6 +89,7 @@ const { principalDispatch } = require("./principal-commands");
 const { evalDispatch } = require("./eval-commands");
 const { evidenceDispatch } = require("./evidence-commands");
 const { approvalDispatch } = require("./approval-commands");
+const { gateDispatch } = require("./gate-commands");
 const { orgAuditDispatch } = require("./org-audit-commands");
 const { hooksDispatch } = require("./hooks-commands");
 const { bindCommandHandlers } = require("./command-registry");
@@ -421,6 +422,15 @@ function handlePlan(args) {
 }
 
 function handleGate(args) {
+	// F050 ticket 3 (#228): the Gate Contract subcommand surface
+	// (evaluate/show/list) rides the same command name as the legacy
+	// plan-gate check. The first positional action selects the surface; a
+	// bare `amber gate --plan <path> [--confirm]` keeps the legacy
+	// behavior unchanged.
+	const action = args._?.[0];
+	if (action === "evaluate" || action === "show" || action === "list") {
+		return gateDispatch(args);
+	}
 	if (args.confirm) {
 		return { result: confirmPlanGate(args.target, args.plan) };
 	}
