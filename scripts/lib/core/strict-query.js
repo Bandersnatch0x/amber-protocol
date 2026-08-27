@@ -13,6 +13,7 @@ const {
 	governanceGraphFromState,
 } = require("./governance-graph");
 const { invalidationsForSubject } = require("./staleness-registry");
+const { sha256Hex } = require("./context-hash");
 
 const STRICT_QUERY_VERSION = 1;
 const PROJECTION_VERSION = 1;
@@ -49,14 +50,22 @@ function isSha256(value) {
 	return typeof value === "string" && /^sha256:[0-9a-f]{64}$/.test(value);
 }
 
+function cursorSignature(payload) {
+	return sha256Hex(JSON.stringify({ ...payload, sig: null }));
+}
+
 function encodeCursor(payload) {
-	return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+	const body = { ...payload, sig: null };
+	body.sig = cursorSignature(body);
+	return Buffer.from(JSON.stringify(body), "utf8").toString("base64url");
 }
 
 function decodeCursor(cursor) {
 	try {
 		const parsed = JSON.parse(Buffer.from(String(cursor), "base64url").toString("utf8"));
-		return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+		if (typeof parsed.sig !== "string" || parsed.sig !== cursorSignature(parsed)) return null;
+		return parsed;
 	} catch {
 		return null;
 	}
@@ -81,10 +90,18 @@ function normalizeInput(input = {}) {
 			error: `limit must be an integer in [1, ${MAX_LIMIT}]; got ${JSON.stringify(input.limit)}`,
 		};
 	}
-	const sort = input.sort || "id";
+	if (input.sort === undefined || input.sort === null || input.sort === "") {
+		return { error: "sort is required for strict queries and must be explicitly set to id" };
+	}
+	const sort = input.sort;
 	if (!SORTS.includes(sort))
 		return { error: `sort must be one of ${SORTS.join(", ")}; got ${JSON.stringify(sort)}` };
-	const depth = Number(input.depth ?? 1);
+	if (input.depth === undefined || input.depth === null || input.depth === "") {
+		return {
+			error: `depth is required for strict queries and must be one of ${DEPTHS.join(", ")}`,
+		};
+	}
+	const depth = Number(input.depth);
 	if (!DEPTHS.includes(depth))
 		return {
 			error: `depth must be one of ${DEPTHS.join(", ")}; got ${JSON.stringify(input.depth)}`,
@@ -114,13 +131,22 @@ function cursorProblem(cursor, normalized, nowMs) {
 	if (!Number.isInteger(decoded.offset) || decoded.offset < 0) {
 		return { offset: 0, error: { code: CURSOR_INVALID_CODE, message: "cursor offset is invalid" } };
 	}
+	if (!Number.isInteger(decoded.total) || decoded.total < 1) {
+		return { offset: 0, error: { code: CURSOR_INVALID_CODE, message: "cursor total is invalid" } };
+	}
+	if (decoded.offset >= decoded.total) {
+		return {
+			offset: 0,
+			error: { code: CURSOR_INVALID_CODE, message: "cursor offset is beyond the result set" },
+		};
+	}
 	if (!Number.isInteger(decoded.expiresAt) || nowMs >= decoded.expiresAt) {
 		return {
 			offset: 0,
 			error: { code: CURSOR_EXPIRED_CODE, message: "strict-query cursor has expired" },
 		};
 	}
-	return { offset: decoded.offset, error: null };
+	return { offset: decoded.offset, total: decoded.total, error: null };
 }
 
 function scopedNodes(graph, scope, depth) {
@@ -161,7 +187,14 @@ function strictGovernanceGraphQuery(cwd, input = {}, opts = {}) {
 			{ currentCheckpoint: checkpoint },
 		);
 	}
-	const invalidations = invalidationsForSubject(cwd, normalized.scope);
+	let invalidations;
+	try {
+		invalidations = invalidationsForSubject(cwd, normalized.scope);
+	} catch (err) {
+		return fail(err.amberCode || "AMBER_E_STALENESS_REGISTRY_CORRUPT", [
+			err.message || String(err),
+		]);
+	}
 	if (invalidations.length > 0) {
 		return fail(
 			STALE_CODE,
@@ -188,16 +221,22 @@ function strictGovernanceGraphQuery(cwd, input = {}, opts = {}) {
 	const page = nodes.slice(cursor.offset, end);
 	const truncated = end < nodes.length;
 	const nextCursor = truncated
-		? encodeCursor({ ...normalized, offset: end, expiresAt: nowMs + CURSOR_TTL_MS })
+		? encodeCursor({
+				...normalized,
+				offset: end,
+				total: nodes.length,
+				expiresAt: nowMs + CURSOR_TTL_MS,
+			})
 		: null;
+	const completeFromStart = cursor.offset === 0 && !truncated;
 	return {
 		ok: true,
 		code: null,
 		nodes: page,
 		truncated,
 		cursor: nextCursor,
-		degraded: truncated,
-		gateSatisfiable: !truncated,
+		degraded: !completeFromStart,
+		gateSatisfiable: completeFromStart,
 		checkpoint,
 		projectionVersion: PROJECTION_VERSION,
 		limit: normalized.limit,

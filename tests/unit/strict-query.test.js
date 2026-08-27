@@ -143,6 +143,39 @@ test("strict query cursor is bound to request shape and expires", () => {
 	assert.equal(page.gateSatisfiable, false);
 	assert.ok(page.cursor);
 
+	const finalPage = strictGovernanceGraphQuery(
+		dir,
+		{
+			scope,
+			checkpoint,
+			projectionVersion: 1,
+			limit: 1,
+			sort: "id",
+			depth: 1,
+			cursor: page.cursor,
+		},
+		{ now: new Date("2026-08-27T00:01:00.000Z") },
+	);
+	assert.equal(finalPage.ok, true, (finalPage.errors || []).join("; "));
+	assert.equal(finalPage.truncated, false);
+	assert.equal(finalPage.degraded, true, "continuation pages are partial/degraded even when final");
+	assert.equal(finalPage.gateSatisfiable, false);
+
+	const decoded = JSON.parse(Buffer.from(page.cursor, "base64url").toString("utf8"));
+	decoded.offset = 99;
+	const editedCursor = Buffer.from(JSON.stringify(decoded), "utf8").toString("base64url");
+	const edited = strictGovernanceGraphQuery(dir, {
+		scope,
+		checkpoint,
+		projectionVersion: 1,
+		limit: 1,
+		sort: "id",
+		depth: 1,
+		cursor: editedCursor,
+	});
+	assert.equal(edited.ok, false);
+	assert.equal(edited.code, "AMBER_E_STRICT_QUERY_CURSOR_INVALID");
+
 	const mismatch = strictGovernanceGraphQuery(dir, {
 		scope,
 		checkpoint,
@@ -172,10 +205,41 @@ test("strict query cursor is bound to request shape and expires", () => {
 	assert.equal(expired.code, "AMBER_E_STRICT_QUERY_CURSOR_EXPIRED");
 });
 
+test("recordInvalidation rejects unknown dependency fields before append", () => {
+	const dir = mkTarget("dependency-unknown-field");
+	const result = recordInvalidation(dir, {
+		subject: "intent/intent/login@1",
+		dependency: { type: "evidence", identity: "evidence/run-1", extra: "nope" },
+		reason: "malformed dependency",
+	});
+	assert.equal(result.ok, false);
+	assert.equal(result.code, "AMBER_E_INVALID_ARG");
+	assert.equal(fs.existsSync(ledgerPath(dir)), false);
+});
+
+test("recordInvalidation reports a garbage size ceiling as a structured argument error", () => {
+	const dir = mkTarget("garbage-ceiling");
+	process.env.AMBER_STALENESS_MAX_RECEIPT_BYTES = "garbage";
+	try {
+		const result = recordInvalidation(dir, {
+			subject: "intent/intent/login@1",
+			dependency: { type: "evidence", identity: "evidence/run-1" },
+			reason: "ceiling probe",
+		});
+		assert.equal(result.ok, false);
+		assert.equal(result.code, "AMBER_E_INVALID_ARG");
+	} finally {
+		delete process.env.AMBER_STALENESS_MAX_RECEIPT_BYTES;
+	}
+});
+
 test("tampered staleness ledger fails every read closed", () => {
 	const dir = mkTarget("tamper");
+	admitIntent(dir, "intent/login");
+	const checkpoint = checkpointOf(dir);
+	const scope = "intent/intent/login@1";
 	const receipt = recordInvalidation(dir, {
-		subject: "intent/intent/login@1",
+		subject: scope,
 		dependency: {
 			type: "policy",
 			identity: "policy/org",
@@ -196,4 +260,14 @@ test("tampered staleness ledger fails every read closed", () => {
 		() => listInvalidations(dir),
 		(err) => err.amberCode === "AMBER_E_STALENESS_REGISTRY_CORRUPT",
 	);
+	const strict = strictGovernanceGraphQuery(dir, {
+		scope,
+		checkpoint,
+		projectionVersion: 1,
+		limit: 10,
+		sort: "id",
+		depth: 0,
+	});
+	assert.equal(strict.ok, false);
+	assert.equal(strict.code, "AMBER_E_STALENESS_REGISTRY_CORRUPT");
 });

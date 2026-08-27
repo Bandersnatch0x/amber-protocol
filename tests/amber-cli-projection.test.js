@@ -178,6 +178,71 @@ test("projection strict-query binds checkpoint and refuses invalidated scopes", 
 	assert.equal(out.nodes.length, 1);
 	assert.equal(out.nodes[0].id, scope);
 
+	const missingSort = runCli(
+		[
+			"projection",
+			"strict-query",
+			"--scope",
+			scope,
+			"--checkpoint",
+			rebuilt.sourceHash,
+			"--projection-version",
+			"1",
+			"--limit",
+			"10",
+			"--depth",
+			"0",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(missingSort.status, 1);
+	assert.equal(JSON.parse(missingSort.stdout).code, "AMBER_E_STRICT_QUERY_INVALID");
+
+	const missingDepth = runCli(
+		[
+			"projection",
+			"strict-query",
+			"--scope",
+			scope,
+			"--checkpoint",
+			rebuilt.sourceHash,
+			"--projection-version",
+			"1",
+			"--limit",
+			"10",
+			"--sort",
+			"id",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(missingDepth.status, 1);
+	assert.equal(JSON.parse(missingDepth.stdout).code, "AMBER_E_STRICT_QUERY_INVALID");
+
+	const malformedDependency = runCli(
+		[
+			"projection",
+			"invalidate",
+			"--subject",
+			scope,
+			"--dependency",
+			"evidence:evidence/run-1@1@tail",
+			"--reason",
+			"bad dependency",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(malformedDependency.status, 1);
+	assert.equal(JSON.parse(malformedDependency.stdout).code, "AMBER_E_INVALID_ARG");
+
 	const invalidated = runCli(
 		[
 			"projection",
@@ -219,6 +284,76 @@ test("projection strict-query binds checkpoint and refuses invalidated scopes", 
 	);
 	assert.equal(stale.status, 1);
 	assert.equal(JSON.parse(stale.stdout).code, "AMBER_E_STRICT_QUERY_STALE");
+});
+
+test("projection strict-query reports corrupt staleness ledger as a JSON envelope", () => {
+	const dir = mkTarget("strict-query-corrupt-staleness");
+	const admitted = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"intent",
+			"--id",
+			"intent/login",
+			"--body",
+			"# Intent",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(admitted.status, 0, admitted.stderr || admitted.stdout);
+	const rebuilt = payload(
+		runCli(["projection", "rebuild", "--type", "governance-graph", "--target", dir, "--json"], dir),
+	);
+	const scope = "intent/intent/login@1";
+	const invalidated = runCli(
+		[
+			"projection",
+			"invalidate",
+			"--subject",
+			scope,
+			"--dependency",
+			"evidence:evidence/run-1",
+			"--reason",
+			"evidence changed",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(invalidated.status, 0, invalidated.stderr || invalidated.stdout);
+	const ledgerPath = path.join(dir, ".amber", "staleness", "receipts.jsonl");
+	const line = JSON.parse(fs.readFileSync(ledgerPath, "utf8").trim());
+	line.reason = "edited";
+	fs.writeFileSync(ledgerPath, `${JSON.stringify(line)}\n`);
+	const strict = runCli(
+		[
+			"projection",
+			"strict-query",
+			"--scope",
+			scope,
+			"--checkpoint",
+			rebuilt.sourceHash,
+			"--projection-version",
+			"1",
+			"--limit",
+			"10",
+			"--sort",
+			"id",
+			"--depth",
+			"0",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(strict.status, 1);
+	assert.equal(JSON.parse(strict.stdout).code, "AMBER_E_STALENESS_REGISTRY_CORRUPT");
 });
 
 test("projection help is registered in the command registry", () => {

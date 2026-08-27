@@ -92,6 +92,15 @@ function dependencyProblem(dependency, label = "dependency") {
 	return null;
 }
 
+function rawDependencyUnknownProblem(dependency) {
+	if (!isPlainObject(dependency)) return null;
+	const unknown = Object.keys(dependency)
+		.filter((key) => !DEPENDENCY_FIELDS.includes(key))
+		.sort();
+	if (unknown.length === 0) return null;
+	return `dependency carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${DEPENDENCY_FIELDS.join(", ")}`;
+}
+
 function normalizedDependency(input) {
 	return {
 		type: input.type,
@@ -175,6 +184,9 @@ function foldStalenessReceipts(cwd) {
 }
 
 function recordInvalidation(cwd, { subject, dependency, reason }, opts = {}) {
+	const rawDependencyProblem = rawDependencyUnknownProblem(dependency || {});
+	if (rawDependencyProblem !== null)
+		return { ok: false, code: INVALID_ARG_CODE, receipt: null, errors: [rawDependencyProblem] };
 	const dep = normalizedDependency(dependency || {});
 	const problem = inputProblem({ subject, dependency: dep, reason });
 	if (problem !== null)
@@ -213,7 +225,17 @@ function recordInvalidation(cwd, { subject, dependency, reason }, opts = {}) {
 		};
 		const prevHash = folded.length > 0 ? folded[folded.length - 1].hash : GENESIS_HASH;
 		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		const ceiling = appendWithinCeiling(cwd, event);
+		let ceiling;
+		try {
+			ceiling = appendWithinCeiling(cwd, event);
+		} catch (err) {
+			return {
+				ok: false,
+				code: err.amberCode || REGISTRY_CORRUPT_CODE,
+				receipt: null,
+				errors: [err.message || String(err)],
+			};
+		}
 		if (ceiling.wouldExceed) {
 			return {
 				ok: false,
@@ -222,7 +244,16 @@ function recordInvalidation(cwd, { subject, dependency, reason }, opts = {}) {
 				errors: [`appending the staleness receipt would exceed ${ceiling.ceiling} bytes`],
 			};
 		}
-		appendJSONL(ledgerPath(cwd), event);
+		try {
+			appendJSONL(ledgerPath(cwd), event);
+		} catch (err) {
+			return {
+				ok: false,
+				code: REGISTRY_CORRUPT_CODE,
+				receipt: null,
+				errors: [err.message || String(err)],
+			};
+		}
 		return { ok: true, code: null, receipt: { ...event, index: folded.length }, errors: [] };
 	} finally {
 		release();

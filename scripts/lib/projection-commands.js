@@ -28,9 +28,9 @@ const dispatch = defineCommand({
 				checkpoint: args.checkpoint,
 				projectionVersion: args.projectionVersion,
 				limit: args.limit,
-				sort: args.sort || "id",
-				depth: args.depth === undefined ? 1 : args.depth,
-				cursor: args.cursor || null,
+				sort: args.sort,
+				depth: args.depth,
+				cursor: args.cursor === undefined ? null : args.cursor,
 			});
 			return {
 				text: result.ok ? JSON.stringify(result, null, 2) : "",
@@ -49,15 +49,25 @@ const dispatch = defineCommand({
 			const targetRoot = resolveTarget(args);
 			const { recordInvalidation } = require("./core/staleness-registry");
 			const dependency = String(args.dependency || "");
-			const [type, identityWithRevision = ""] = dependency.split(":", 2);
-			const [identity, revisionText = null] = identityWithRevision.split("@", 2);
-			const revision = revisionText === null ? null : Number(revisionText);
+			const parsed = dependency.match(/^([^:@]+):([^@]+)(?:@(\d+))?$/);
+			if (parsed === null) {
+				return {
+					text: "",
+					errors: [
+						`--dependency must be exactly <type:identity[@revision]> with one ':' and at most one numeric revision suffix; got ${JSON.stringify(args.dependency)}`,
+					],
+					warnings: [],
+					exitCode: 1,
+					code: "AMBER_E_INVALID_ARG",
+				};
+			}
+			const [, type, identity, revisionText] = parsed;
 			const result = recordInvalidation(targetRoot, {
 				subject: args.subject || args.scope,
 				dependency: {
 					type,
 					identity,
-					revision: revisionText === null || revisionText === "" ? null : revision,
+					revision: revisionText === undefined ? null : Number(revisionText),
 					contentHash: null,
 				},
 				reason: args.reason,
