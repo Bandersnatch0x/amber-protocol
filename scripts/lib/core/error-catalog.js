@@ -1367,6 +1367,15 @@ const CATALOG = {
 		layer: "Observability",
 		related: ["AMBER_E_ADAPTER_READ_FORBIDDEN"],
 	},
+	AMBER_E_ADAPTER_STALE: {
+		title: "Adapter source is stale",
+		cause:
+			"The Adapter source was readable and receipted, but its file age exceeded the adapter's declared freshness.maxAgeMs bound. Stale Adapter observations are explicit and cannot pass as fresh reads.",
+		remedy:
+			"Refresh the external source, adjust the Adapter's freshness contract deliberately, or treat the record as stale until migration/cutover resolves it.",
+		layer: "Observability",
+		related: ["AMBER_E_ADAPTER_SOURCE_MISSING", "AMBER_E_ADAPTER_READ_FORBIDDEN"],
+	},
 	AMBER_E_ADAPTER_REGISTRY_CORRUPT: {
 		title: "Adapter registry is corrupt",
 		cause:

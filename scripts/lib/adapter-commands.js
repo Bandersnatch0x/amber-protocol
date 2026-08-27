@@ -137,10 +137,11 @@ const dispatch = defineCommand({
 				source: String(args.source),
 				recordId: String(args.recordId),
 				recordType: args.recordType === undefined ? null : String(args.recordType),
+				recordVersion: args.recordVersion === undefined ? null : String(args.recordVersion),
 				scope: args.scope === undefined ? null : String(args.scope),
 			});
 			return {
-				text: result.ok
+				text: result.receipt
 					? JSON.stringify({ receipt: result.receipt, source: result.source }, null, 2)
 					: "",
 				errors: result.errors,

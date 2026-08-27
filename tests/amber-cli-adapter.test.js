@@ -6,6 +6,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { registryPath } = require("../scripts/lib/core/adapter-registry");
+const { writeJSONL } = require("../scripts/lib/core/jsonl");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -79,6 +81,8 @@ test("adapter register/read/show/list/receipts lifecycle is read-only to artifac
 			"legacy/item.json",
 			"--record-id",
 			"legacy-1",
+			"--record-version",
+			"v1",
 			"--target",
 			dir,
 			"--json",
@@ -89,8 +93,11 @@ test("adapter register/read/show/list/receipts lifecycle is read-only to artifac
 	const out = payload(read);
 	assert.equal(out.receipt.adapterId, "adapter/legacy");
 	assert.equal(out.receipt.recordId, "legacy-1");
+	assert.equal(out.receipt.recordVersion, "v1");
+	assert.equal(out.receipt.status, "fresh");
 	assert.match(out.receipt.sourceHash, /^sha256:[0-9a-f]{64}$/);
 	assert.equal(out.source.bytes, '{"id":"legacy-1"}\n');
+	assert.equal(out.source.bytesBase64, Buffer.from('{"id":"legacy-1"}\n').toString("base64"));
 	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts")), false);
 
 	assert.equal(
@@ -131,6 +138,27 @@ test("adapter read refuses forbidden paths and missing adapters with stable code
 	);
 	assert.equal(forbidden.status, 1);
 	assert.equal(envelope(forbidden).code, "AMBER_E_ADAPTER_READ_FORBIDDEN");
+	const wrongVersion = runCli(
+		[
+			"adapter",
+			"read",
+			"--id",
+			"adapter/legacy",
+			"--source",
+			"legacy/item.json",
+			"--record-id",
+			"x",
+			"--record-version",
+			"v2",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(wrongVersion.status, 1);
+	assert.equal(envelope(wrongVersion).code, "AMBER_E_ADAPTER_READ_FORBIDDEN");
+
 	const missing = runCli(
 		[
 			"adapter",
@@ -149,6 +177,34 @@ test("adapter read refuses forbidden paths and missing adapters with stable code
 	);
 	assert.equal(missing.status, 1);
 	assert.equal(envelope(missing).code, "AMBER_E_ADAPTER_NOT_FOUND");
+});
+
+test("adapter read reports corrupt registry through the JSON envelope", () => {
+	const dir = mkTarget("corrupt-registry");
+	fs.mkdirSync(path.join(dir, "legacy"), { recursive: true });
+	fs.writeFileSync(path.join(dir, "legacy", "item.json"), "ok");
+	assert.equal(registerAdapterCli(dir).status, 0);
+	const event = JSON.parse(fs.readFileSync(registryPath(dir), "utf8"));
+	event.adapter.owner = "edited";
+	writeJSONL(registryPath(dir), [event]);
+	const read = runCli(
+		[
+			"adapter",
+			"read",
+			"--id",
+			"adapter/legacy",
+			"--source",
+			"legacy/item.json",
+			"--record-id",
+			"x",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(read.status, 1);
+	assert.equal(envelope(read).code, "AMBER_E_ADAPTER_REGISTRY_CORRUPT");
 });
 
 test("adapter help is registered", () => {

@@ -125,7 +125,7 @@ A registered pre-Cutover reader for legacy or external records. It declares sour
 _Avoid_: sync connector, importer, migration writer, ownership transfer
 
 **Adapter Read Receipt**:
-The append-only record under `.amber/adapters/read-receipts.jsonl` for one Adapter read: adapter id/version, record id/type, scope, source path, source bytes/digest, time, and provenance. It proves what was read without changing the legacy source or canonical target.
+The append-only record under `.amber/adapters/read-receipts.jsonl` for one Adapter read: adapter id/version, record id/type/version, scope, source path, status (`fresh|stale|unavailable|conflict|unmapped`), exact source bytes as base64 when available, source byte length, raw-byte digest, time, and provenance. It proves what was read without changing the legacy source or canonical target.
 _Avoid_: imported artifact, copied record, cache entry
 
 **Separation of Duties**:

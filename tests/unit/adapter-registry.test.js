@@ -2,6 +2,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -23,6 +24,10 @@ const { writeJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-adapter-${label}-`));
+}
+
+function sha256Bytes(buffer) {
+	return `sha256:${crypto.createHash("sha256").update(buffer).digest("hex")}`;
 }
 
 function adapter(overrides = {}) {
@@ -90,12 +95,17 @@ test("readAdapterRecord reads legacy bytes, appends a receipt, and does not crea
 	);
 	assert.equal(result.ok, true, (result.errors || []).join("; "));
 	assert.equal(result.source.bytes, '{"id":"legacy-1"}\n');
+	assert.equal(result.source.bytesBase64, Buffer.from('{"id":"legacy-1"}\n').toString("base64"));
 	assert.equal(result.receipt.kind, "read");
 	assert.equal(result.receipt.schemaVersion, ADAPTER_READ_RECEIPT_SCHEMA_VERSION);
 	assert.equal(result.receipt.adapterId, "adapter/legacy");
 	assert.equal(result.receipt.recordType, "legacy-ticket");
+	assert.equal(result.receipt.recordVersion, "v1");
+	assert.equal(result.receipt.status, "fresh");
 	assert.equal(result.receipt.scope, "F051");
-	assert.match(result.receipt.sourceHash, /^sha256:[0-9a-f]{64}$/);
+	assert.equal(result.receipt.sourceHash, sha256Bytes(Buffer.from('{"id":"legacy-1"}\n')));
+	assert.equal(result.receipt.sourceBytes, Buffer.from('{"id":"legacy-1"}\n').toString("base64"));
+	assert.equal(result.receipt.sourceByteLength, Buffer.byteLength('{"id":"legacy-1"}\n'));
 	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts")), false);
 	assert.equal(listReadReceipts(dir).length, 1);
 });
@@ -135,11 +145,69 @@ test("read boundaries refuse undeclared source, scope, type, missing adapter, an
 		"AMBER_E_ADAPTER_READ_FORBIDDEN",
 	);
 	assert.equal(
-		readAdapterRecord(dir, { id: "adapter/legacy", source: "legacy/missing.json", recordId: "x" })
-			.code,
-		"AMBER_E_ADAPTER_SOURCE_MISSING",
+		readAdapterRecord(dir, {
+			id: "adapter/legacy",
+			source: "legacy/../other/item.json",
+			recordId: "x",
+		}).code,
+		"AMBER_E_ADAPTER_READ_FORBIDDEN",
 	);
-	assert.equal(fs.existsSync(receiptPath(dir)), false);
+	const missingSource = readAdapterRecord(dir, {
+		id: "adapter/legacy",
+		source: "legacy/missing.json",
+		recordId: "x",
+	});
+	assert.equal(missingSource.code, "AMBER_E_ADAPTER_SOURCE_MISSING");
+	assert.equal(missingSource.receipt.status, "unavailable");
+	assert.equal(missingSource.receipt.sourceHash, null);
+	assert.equal(missingSource.receipt.sourceBytes, null);
+	assert.equal(missingSource.receipt.sourceByteLength, 0);
+	assert.equal(listReadReceipts(dir).length, 1);
+});
+
+test("freshness, raw bytes, and recordVersion are enforced and receipted", () => {
+	const staleDir = mkTarget("stale");
+	fs.mkdirSync(path.join(staleDir, "legacy"), { recursive: true });
+	fs.writeFileSync(path.join(staleDir, "legacy", "old.json"), "old");
+	registerFixture(staleDir, { freshness: { maxAgeMs: 1 } });
+	const old = new Date("2000-01-01T00:00:00.000Z");
+	fs.utimesSync(path.join(staleDir, "legacy", "old.json"), old, old);
+	const stale = readAdapterRecord(
+		staleDir,
+		{ id: "adapter/legacy", source: "legacy/old.json", recordId: "old" },
+		{ now: new Date("2026-08-27T00:00:00.000Z") },
+	);
+	assert.equal(stale.ok, false);
+	assert.equal(stale.code, "AMBER_E_ADAPTER_STALE");
+	assert.equal(stale.receipt.status, "stale");
+
+	const binaryDir = mkTarget("binary");
+	fs.mkdirSync(path.join(binaryDir, "legacy"), { recursive: true });
+	const raw = Buffer.from([0xff, 0xfe, 0x00, 0x61]);
+	fs.writeFileSync(path.join(binaryDir, "legacy", "bin.dat"), raw);
+	registerFixture(binaryDir, {
+		recordTypes: [{ type: "legacy-ticket", versions: ["v1", "v2"] }],
+	});
+	const read = readAdapterRecord(binaryDir, {
+		id: "adapter/legacy",
+		source: "legacy/bin.dat",
+		recordId: "bin",
+		recordVersion: "v2",
+	});
+	assert.equal(read.ok, true, (read.errors || []).join("; "));
+	assert.equal(read.receipt.recordVersion, "v2");
+	assert.equal(read.receipt.sourceHash, sha256Bytes(raw));
+	assert.equal(read.receipt.sourceBytes, raw.toString("base64"));
+	assert.equal(read.receipt.sourceByteLength, raw.length);
+	assert.equal(
+		readAdapterRecord(binaryDir, {
+			id: "adapter/legacy",
+			source: "legacy/bin.dat",
+			recordId: "bin",
+			recordVersion: "v3",
+		}).code,
+		"AMBER_E_ADAPTER_READ_FORBIDDEN",
+	);
 });
 
 test("tampered adapter registry and read receipts fail closed", () => {

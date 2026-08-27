@@ -9,13 +9,13 @@
 // admission, so the external source remains authoritative until a future
 // Cutover Decision.
 
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { resolvePathWithin } = require("./fs-utils");
-const { sha256 } = require("./context-hash");
 const { typedError } = require("./error-catalog");
 const {
 	GENESIS_HASH,
@@ -42,6 +42,7 @@ const INVALID_CODE = "AMBER_E_ADAPTER_INVALID";
 const NOT_FOUND_CODE = "AMBER_E_ADAPTER_NOT_FOUND";
 const READ_FORBIDDEN_CODE = "AMBER_E_ADAPTER_READ_FORBIDDEN";
 const SOURCE_MISSING_CODE = "AMBER_E_ADAPTER_SOURCE_MISSING";
+const STALE_CODE = "AMBER_E_ADAPTER_STALE";
 const INVALID_ARG_CODE = "AMBER_E_INVALID_ARG";
 
 const REGISTERED_EVENT_FIELDS = Object.freeze([
@@ -74,14 +75,18 @@ const RECEIPT_EVENT_FIELDS = Object.freeze([
 	"adapterVersion",
 	"recordId",
 	"recordType",
+	"recordVersion",
 	"scope",
 	"source",
+	"status",
 	"sourceHash",
 	"sourceBytes",
+	"sourceByteLength",
 	"provenance",
 	"prevHash",
 	"hash",
 ]);
+const READ_STATUSES = Object.freeze(["fresh", "stale", "unavailable", "conflict", "unmapped"]);
 
 function registryPath(cwd) {
 	return statePathForCreate(cwd, "adapters", "registry.jsonl");
@@ -296,16 +301,24 @@ function receiptEventProblem(event, lineIndex) {
 		"adapterVersion",
 		"recordId",
 		"recordType",
+		"recordVersion",
 		"scope",
 		"source",
-		"sourceHash",
 		"provenance",
 	]) {
 		if (!isNonEmptyString(event[field]))
 			return `adapter read receipt ${lineIndex}.${field} must be a non-empty string`;
 	}
-	if (!Number.isInteger(event.sourceBytes) || event.sourceBytes < 0)
-		return `adapter read receipt ${lineIndex}.sourceBytes must be a non-negative integer`;
+	if (!READ_STATUSES.includes(event.status))
+		return `adapter read receipt ${lineIndex}.status must be one of ${READ_STATUSES.join(", ")}`;
+	if (event.sourceHash !== null && !isNonEmptyString(event.sourceHash))
+		return `adapter read receipt ${lineIndex}.sourceHash must be null or a non-empty string`;
+	if (event.sourceBytes !== null && typeof event.sourceBytes !== "string")
+		return `adapter read receipt ${lineIndex}.sourceBytes must be null or a base64 string`;
+	if (!Number.isInteger(event.sourceByteLength) || event.sourceByteLength < 0)
+		return `adapter read receipt ${lineIndex}.sourceByteLength must be a non-negative integer`;
+	if (event.status !== "unavailable" && (event.sourceHash === null || event.sourceBytes === null))
+		return `adapter read receipt ${lineIndex} with status ${event.status} must carry sourceHash and sourceBytes`;
 	return null;
 }
 
@@ -422,15 +435,91 @@ function listAdapters(cwd) {
 	return foldAdapters(cwd);
 }
 
+function sha256Bytes(buffer) {
+	return `sha256:${crypto.createHash("sha256").update(buffer).digest("hex")}`;
+}
+
+function relativePathForAllowedCheck(value) {
+	const normalized = path.posix.normalize(String(value).replace(/\\/g, "/"));
+	return normalized === "." ? "" : normalized;
+}
+
 function allowedByAdapter(adapter, source) {
 	const allowed = adapter.permissions.allowedPaths;
 	if (allowed === null) return true;
-	return allowed.some(
-		(prefix) => source === prefix || source.startsWith(`${prefix.replace(/\/$/, "")}/`),
-	);
+	const actual = relativePathForAllowedCheck(source);
+	return allowed.some((prefix) => {
+		const root = relativePathForAllowedCheck(prefix).replace(/\/$/, "");
+		return root.length > 0 && (actual === root || actual.startsWith(`${root}/`));
+	});
 }
 
-function readAdapterRecord(cwd, { id, source, recordId, recordType, scope = null }, opts = {}) {
+function appendReadReceipt(cwd, body) {
+	let release;
+	try {
+		release = acquireReceiptLock(cwd);
+	} catch (err) {
+		return {
+			ok: false,
+			code: err.amberCode || RECEIPT_CORRUPT_CODE,
+			receipt: null,
+			errors: [err.message || String(err)],
+		};
+	}
+	try {
+		let current;
+		try {
+			current = foldReadReceipts(cwd);
+		} catch (err) {
+			return {
+				ok: false,
+				code: err.amberCode || RECEIPT_CORRUPT_CODE,
+				receipt: null,
+				errors: [err.message || String(err)],
+			};
+		}
+		const prevHash = current.length > 0 ? current[current.length - 1].hash : GENESIS_HASH;
+		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
+		let ceiling;
+		try {
+			ceiling = appendReceiptWithinCeiling(cwd, event);
+		} catch (err) {
+			return {
+				ok: false,
+				code: err.amberCode || RECEIPT_CORRUPT_CODE,
+				receipt: null,
+				errors: [err.message || String(err)],
+			};
+		}
+		if (ceiling.wouldExceed) {
+			return {
+				ok: false,
+				code: RECEIPT_SIZE_CEILING_CODE,
+				receipt: null,
+				errors: [`adapter read receipt would exceed ${ceiling.ceiling} bytes`],
+			};
+		}
+		try {
+			appendJSONL(receiptPath(cwd), event);
+		} catch (err) {
+			return {
+				ok: false,
+				code: RECEIPT_CORRUPT_CODE,
+				receipt: null,
+				errors: [err.message || String(err)],
+			};
+		}
+		return { ok: true, code: null, receipt: { ...event, index: current.length }, errors: [] };
+	} finally {
+		release();
+	}
+}
+
+function readAdapterRecord(
+	cwd,
+	{ id, source, recordId, recordType, recordVersion = null, scope = null },
+	opts = {},
+) {
 	if (!isNonEmptyString(id))
 		return {
 			ok: false,
@@ -455,7 +544,18 @@ function readAdapterRecord(cwd, { id, source, recordId, recordType, scope = null
 			source: null,
 			errors: [`recordId must be a non-empty string`],
 		};
-	const adapter = showAdapter(cwd, id);
+	let adapter;
+	try {
+		adapter = showAdapter(cwd, id);
+	} catch (err) {
+		return {
+			ok: false,
+			code: err.amberCode || REGISTRY_CORRUPT_CODE,
+			receipt: null,
+			source: null,
+			errors: [err.message || String(err)],
+		};
+	}
 	if (adapter === null)
 		return {
 			ok: false,
@@ -476,7 +576,10 @@ function readAdapterRecord(cwd, { id, source, recordId, recordType, scope = null
 			],
 		};
 	const effectiveRecordType = recordType || adapter.recordTypes[0].type;
-	if (!adapter.recordTypes.some((entry) => entry.type === effectiveRecordType))
+	const effectiveTypeEntry = adapter.recordTypes.find(
+		(entry) => entry.type === effectiveRecordType,
+	);
+	if (!effectiveTypeEntry)
 		return {
 			ok: false,
 			code: READ_FORBIDDEN_CODE,
@@ -486,13 +589,16 @@ function readAdapterRecord(cwd, { id, source, recordId, recordType, scope = null
 				`adapter "${id}" does not declare record type ${JSON.stringify(effectiveRecordType)}`,
 			],
 		};
-	if (!allowedByAdapter(adapter, source))
+	const effectiveRecordVersion = recordVersion || effectiveTypeEntry.versions[0];
+	if (!effectiveTypeEntry.versions.includes(effectiveRecordVersion))
 		return {
 			ok: false,
 			code: READ_FORBIDDEN_CODE,
 			receipt: null,
 			source: null,
-			errors: [`adapter "${id}" is not permitted to read ${JSON.stringify(source)}`],
+			errors: [
+				`adapter "${id}" does not declare record version ${JSON.stringify(effectiveRecordVersion)} for type ${JSON.stringify(effectiveRecordType)}`,
+			],
 		};
 	let fullPath;
 	try {
@@ -506,18 +612,51 @@ function readAdapterRecord(cwd, { id, source, recordId, recordType, scope = null
 			errors: [err.message || String(err)],
 		};
 	}
+	if (!allowedByAdapter(adapter, source))
+		return {
+			ok: false,
+			code: READ_FORBIDDEN_CODE,
+			receipt: null,
+			source: null,
+			errors: [`adapter "${id}" is not permitted to read ${JSON.stringify(source)}`],
+		};
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	const baseReceipt = {
+		kind: "read",
+		schemaVersion: ADAPTER_READ_RECEIPT_SCHEMA_VERSION,
+		at,
+		adapterId: adapter.id,
+		adapterVersion: adapter.adapterVersion,
+		recordId,
+		recordType: effectiveRecordType,
+		recordVersion: effectiveRecordVersion,
+		scope: adapter.scope,
+		source,
+		provenance: `adapter:${adapter.id}@${adapter.adapterVersion}`,
+	};
 	let bytes;
+	let stat;
 	try {
+		stat = fs.statSync(fullPath);
 		bytes = fs.readFileSync(fullPath);
 	} catch (err) {
-		if (err.code === "ENOENT" || err.code === "ENOTDIR")
+		if (err.code === "ENOENT" || err.code === "ENOTDIR") {
+			const appended = appendReadReceipt(cwd, {
+				...baseReceipt,
+				status: "unavailable",
+				sourceHash: null,
+				sourceBytes: null,
+				sourceByteLength: 0,
+			});
+			if (!appended.ok) return { ...appended, source: null };
 			return {
 				ok: false,
 				code: SOURCE_MISSING_CODE,
-				receipt: null,
+				receipt: appended.receipt,
 				source: null,
 				errors: [`source not found: ${source}`],
 			};
+		}
 		return {
 			ok: false,
 			code: READ_FORBIDDEN_CODE,
@@ -526,80 +665,30 @@ function readAdapterRecord(cwd, { id, source, recordId, recordType, scope = null
 			errors: [err.message || String(err)],
 		};
 	}
-	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
-	const sourceHash = sha256(bytes.toString("utf8"));
-	const body = {
-		kind: "read",
-		schemaVersion: ADAPTER_READ_RECEIPT_SCHEMA_VERSION,
-		at,
-		adapterId: adapter.id,
-		adapterVersion: adapter.adapterVersion,
-		recordId,
-		recordType: effectiveRecordType,
-		scope: adapter.scope,
-		source,
+	const sourceHash = sha256Bytes(bytes);
+	const nowMs = opts.now instanceof Date ? opts.now.getTime() : Date.now();
+	const stale = nowMs - stat.mtimeMs > adapter.freshness.maxAgeMs;
+	const status = stale ? "stale" : "fresh";
+	const appended = appendReadReceipt(cwd, {
+		...baseReceipt,
+		status,
 		sourceHash,
-		sourceBytes: bytes.length,
-		provenance: `adapter:${adapter.id}@${adapter.adapterVersion}`,
+		sourceBytes: bytes.toString("base64"),
+		sourceByteLength: bytes.length,
+	});
+	if (!appended.ok) return { ...appended, source: null };
+	return {
+		ok: !stale,
+		code: stale ? STALE_CODE : null,
+		receipt: appended.receipt,
+		source: {
+			bytes: bytes.toString("utf8"),
+			bytesBase64: bytes.toString("base64"),
+			hash: sourceHash,
+			byteLength: bytes.length,
+		},
+		errors: stale ? [`source ${JSON.stringify(source)} is stale for adapter "${id}"`] : [],
 	};
-	let release;
-	try {
-		release = acquireReceiptLock(cwd);
-	} catch (err) {
-		return {
-			ok: false,
-			code: err.amberCode || RECEIPT_CORRUPT_CODE,
-			receipt: null,
-			source: null,
-			errors: [err.message || String(err)],
-		};
-	}
-	try {
-		let current;
-		try {
-			current = foldReadReceipts(cwd);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || RECEIPT_CORRUPT_CODE,
-				receipt: null,
-				source: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		const prevHash = current.length > 0 ? current[current.length - 1].hash : GENESIS_HASH;
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendReceiptWithinCeiling(cwd, event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || RECEIPT_CORRUPT_CODE,
-				receipt: null,
-				source: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: RECEIPT_SIZE_CEILING_CODE,
-				receipt: null,
-				source: null,
-				errors: [`adapter read receipt would exceed ${ceiling.ceiling} bytes`],
-			};
-		appendJSONL(receiptPath(cwd), event);
-		return {
-			ok: true,
-			code: null,
-			receipt: { ...event, index: current.length },
-			source: { bytes: bytes.toString("utf8"), hash: sourceHash },
-			errors: [],
-		};
-	} finally {
-		release();
-	}
 }
 
 function listReadReceipts(cwd, { adapterId = null } = {}) {
