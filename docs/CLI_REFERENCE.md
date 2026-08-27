@@ -938,6 +938,37 @@ node scripts/amber.js projection invalidate --subject spec/spec/login-spec@2 \
 node scripts/amber.js projection status --type governance-graph --target . --json
 ```
 
+### adapter register / read / show / list / receipts
+
+Read-only Adapters (F051) let Amber inspect legacy or external records before Cutover without
+mutating either the source or Canonical Artifacts. An Adapter registration declares source owner,
+supported record type/version, exact scope, identity mapping, freshness, and read-only permissions.
+`adapter read` reads one source file under the target root and appends an immutable read receipt
+under `.amber/adapters/read-receipts.jsonl` with adapter id/version, record id/type, scope, source
+path, source bytes, source digest, timestamp, and provenance. The external source remains
+authoritative until a later explicit Cutover Decision.
+
+The Adapter registry and read-receipt ledger are hash-chained and fail closed on in-place edits.
+The command never calls Canonical Artifact admission; receipts are governance observations only.
+
+```bash
+node scripts/amber.js adapter register --target . --id adapter/legacy \
+  --adapter-owner legacy-team --record-type legacy-ticket --record-version v1 \
+  --scope F051 --identity-map path --freshness-ms 86400000 --allow-path legacy --json
+
+node scripts/amber.js adapter read --target . --id adapter/legacy \
+  --source legacy/item.json --record-id legacy-1 --json
+node scripts/amber.js adapter show --target . --id adapter/legacy --json
+node scripts/amber.js adapter list --target . --json
+node scripts/amber.js adapter receipts --target . --id adapter/legacy --json
+```
+
+Error codes: `AMBER_E_ADAPTER_INVALID`, `AMBER_E_ADAPTER_NOT_FOUND`,
+`AMBER_E_ADAPTER_READ_FORBIDDEN`, `AMBER_E_ADAPTER_SOURCE_MISSING`,
+`AMBER_E_ADAPTER_REGISTRY_CORRUPT`, `AMBER_E_ADAPTER_REGISTRY_LOCK`,
+`AMBER_E_ADAPTER_SIZE_CEILING`, `AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT`,
+`AMBER_E_ADAPTER_READ_RECEIPT_LOCK`, `AMBER_E_ADAPTER_READ_RECEIPT_SIZE_CEILING`.
+
 ## Handoff Commands
 
 ### handoff

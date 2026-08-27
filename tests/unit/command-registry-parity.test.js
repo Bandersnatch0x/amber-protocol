@@ -33,6 +33,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"plan",
 	"gate",
 	"policy",
+	"adapter",
 	"review",
 	"accept",
 	"learnings",

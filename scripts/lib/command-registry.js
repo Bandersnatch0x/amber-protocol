@@ -1061,6 +1061,25 @@ const COMMAND_HELP = {
 		"  amber policy show --target . --index 0 --json",
 		"  amber policy list --target . --verdict deny --json",
 	],
+	adapter: [
+		"Register read-only Adapters and record immutable read receipts (F051).",
+		"Adapters declare source owner, supported record types/versions, exact scope,",
+		"identity mapping, freshness, and read-only permissions. Pre-Cutover reads",
+		"never mutate Canonical Artifacts; they write only adapter governance receipts.",
+		"",
+		"Subcommands:",
+		"  register --id <id> --adapter-owner <owner> --record-type <type>",
+		"        --record-version <v> --scope <scope> --identity-map <strategy>",
+		"        --freshness-ms <n> [--allow-path <prefix>] [--adapter-version <v>]",
+		"  read --id <id> --source <path> --record-id <id> [--record-type <type>] [--scope <scope>]",
+		"  show --id <id>",
+		"  list",
+		"  receipts [--id <adapter-id>]",
+		"",
+		"Examples:",
+		"  amber adapter register --target . --id adapter/legacy --adapter-owner legacy-team --record-type legacy-ticket --record-version v1 --scope F051 --identity-map path --freshness-ms 86400000 --allow-path legacy --json",
+		"  amber adapter read --target . --id adapter/legacy --source legacy/item.json --record-id legacy-1 --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -1424,6 +1443,16 @@ const COMMAND_OUTPUT = {
 			"       amber policy list --target <repo> [--subject <subject>] [--submitter <principal>] [--capability <capability>] [--verdict pass|deny] [--json]",
 		].join("\n"),
 	},
+	adapter: {
+		usage: [
+			"Usage: amber adapter <register|read|show|list|receipts> --target <repo> [--json]",
+			"       amber adapter register --target <repo> --id <id> --adapter-owner <owner> --record-type <type> --record-version <version> --scope <scope> --identity-map <strategy> --freshness-ms <ms> [--allow-path <prefix>] [--adapter-version <version>] [--json]",
+			"       amber adapter read --target <repo> --id <id> --source <path> --record-id <id> [--record-type <type>] [--scope <scope>] [--json]",
+			"       amber adapter show --target <repo> --id <id> [--json]",
+			"       amber adapter list --target <repo> [--json]",
+			"       amber adapter receipts --target <repo> [--id <adapter-id>] [--json]",
+		].join("\n"),
+	},
 };
 
 const DEFAULT_OUTPUT = Object.freeze({ dryRun: false, summary: false, usage: null });
@@ -1436,6 +1465,7 @@ const COMMANDS = Object.freeze([
 	"plan",
 	"gate",
 	"policy",
+	"adapter",
 	"review",
 	"accept",
 	"learnings",
@@ -1485,6 +1515,7 @@ const TIER_BY_COMMAND = {
 	plan: "core",
 	gate: "core",
 	policy: "core",
+	adapter: "core",
 	review: "core",
 	accept: "core",
 	learnings: "core",

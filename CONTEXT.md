@@ -120,6 +120,14 @@ _Avoid_: search, best-effort lookup, partial page, cached projection read
 An append-only invalidation record under `.amber/staleness/receipts.jsonl` naming the affected subject, dependency, and reason. It never rewrites historical Gate/Policy outcomes or Decisions; strict queries consult it so only affected bindings become stale.
 _Avoid_: mutable stale flag, cache eviction, deleted outcome
 
+**Read-only Adapter**:
+A registered pre-Cutover reader for legacy or external records. It declares source owner, record types and versions, exact scope, identity mapping, freshness, and read-only permissions. It may write only Adapter governance observations and receipts; it never creates or mutates Canonical Artifacts and never seizes source authority before Cutover.
+_Avoid_: sync connector, importer, migration writer, ownership transfer
+
+**Adapter Read Receipt**:
+The append-only record under `.amber/adapters/read-receipts.jsonl` for one Adapter read: adapter id/version, record id/type, scope, source path, source bytes/digest, time, and provenance. It proves what was read without changing the legacy source or canonical target.
+_Avoid_: imported artifact, copied record, cache entry
+
 **Separation of Duties**:
 The F050 invariant that distinct responsibilities are held by distinct Principals: submitter, Evidence producer, verifier, Approval approver, and delegator cannot collapse into one actor for a strict consumption. Violations fail closed as policy denials and remain audit evidence.
 _Avoid_: code-owner review, informal independence, self-approval

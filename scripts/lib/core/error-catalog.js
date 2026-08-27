@@ -1334,6 +1334,91 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT", "AMBER_E_POLICY_DENIED"],
 	},
+	AMBER_E_ADAPTER_INVALID: {
+		title: "Adapter contract is invalid",
+		cause:
+			"An Adapter registration or read request does not match the closed read-only adapter contract: owner, record types/versions, scope, identity mapping, freshness, and read-only permissions must be explicit.",
+		remedy:
+			"Register the Adapter with the required fields and read-only permissions, then retry. Adapter output cannot write Canonical Artifacts pre-Cutover.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG", "AMBER_E_ADAPTER_READ_FORBIDDEN"],
+	},
+	AMBER_E_ADAPTER_NOT_FOUND: {
+		title: "Adapter is not registered",
+		cause: "An adapter read/show named an adapter id that is absent from the adapter registry.",
+		remedy: "Register it first with `amber adapter register` or use the stored adapter id.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_INVALID"],
+	},
+	AMBER_E_ADAPTER_READ_FORBIDDEN: {
+		title: "Adapter read is outside its declared permission boundary",
+		cause:
+			"A read request names a source, scope, or record type outside the Adapter's declared read-only permissions. Pre-Cutover Adapters never widen authority or write through to canonical state.",
+		remedy:
+			"Use a source path, scope, and record type declared by the Adapter, or register a new Adapter contract.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_INVALID", "AMBER_E_ADAPTER_SOURCE_MISSING"],
+	},
+	AMBER_E_ADAPTER_SOURCE_MISSING: {
+		title: "Adapter source is missing",
+		cause: "The requested legacy source path does not exist at read time.",
+		remedy:
+			"Restore the source, mark it unavailable in a later adapter state, or point the Adapter read at an existing source.",
+		layer: "Observability",
+		related: ["AMBER_E_ADAPTER_READ_FORBIDDEN"],
+	},
+	AMBER_E_ADAPTER_REGISTRY_CORRUPT: {
+		title: "Adapter registry is corrupt",
+		cause:
+			"The adapter registry ledger has a corrupt JSONL line, broken hash chain, unknown field, missing field, or unsupported schema version.",
+		remedy:
+			"Restore .amber/adapters/registry.jsonl from version control; never edit the ledger in place.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_INVALID"],
+	},
+	AMBER_E_ADAPTER_REGISTRY_LOCK: {
+		title: "Another adapter registry write is in flight",
+		cause:
+			"A fresh .amber/adapters/registry.lock exists, so this registration was refused instead of racing another writer.",
+		remedy:
+			"Retry after the in-flight registration completes; locks older than 30 seconds are reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_SIZE_CEILING: {
+		title: "Adapter registry exceeds its size ceiling",
+		cause: "Appending the Adapter registration would exceed the registry size ceiling.",
+		remedy:
+			"Keep Adapter declarations bounded or deliberately raise AMBER_ADAPTER_MAX_REGISTRY_BYTES.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_REGISTRY_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT: {
+		title: "Adapter read receipt ledger is corrupt",
+		cause:
+			"The Adapter read receipt ledger has a corrupt JSONL line, broken hash chain, unknown field, missing field, or unsupported schema version.",
+		remedy:
+			"Restore .amber/adapters/read-receipts.jsonl from version control; every Adapter read appends a receipt rather than mutating historical ones.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_READ_RECEIPT_LOCK: {
+		title: "Another Adapter read receipt write is in flight",
+		cause:
+			"A fresh .amber/adapters/read-receipts.lock exists, so this read receipt append was refused instead of racing another writer.",
+		remedy:
+			"Retry after the in-flight read completes; locks older than 30 seconds are reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_READ_RECEIPT_SIZE_CEILING: {
+		title: "Adapter read receipt ledger exceeds its size ceiling",
+		cause: "Appending the Adapter read receipt would exceed the receipt ledger size ceiling.",
+		remedy:
+			"Keep Adapter read receipts bounded or deliberately raise AMBER_ADAPTER_MAX_RECEIPT_BYTES.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
