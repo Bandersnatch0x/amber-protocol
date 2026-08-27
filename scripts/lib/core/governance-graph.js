@@ -32,8 +32,38 @@ const { sha256, canonicalJson } = require("./context-hash");
 const { readCanonicalPages: canonicalPages } = require("./context-store");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { artifactGraphLayer, artifactSourceFingerprint } = require("./artifact-graph-projection");
+const { resolvePositiveIntCeiling } = require("./resource-ceilings");
+const { typedError } = require("./error-catalog");
 
 const DEFAULT_QUERY_LIMIT = 50;
+
+/**
+ * Default resource ceilings of the Governance Graph build (F049 ticket 06,
+ * #223 — AC4). A rebuild (or a query, which builds the graph first) that
+ * would exceed these bounds fails closed with
+ * AMBER_E_PROJECTION_RESOURCE_CEILING instead of emitting a truncated graph
+ * as if it were complete — and instead of quietly consuming unbounded
+ * memory/time on a store far larger than the baseline bounded context.
+ * Override deliberately via AMBER_PROJECTION_MAX_NODES / _EDGES (positive
+ * integers; garbage fails closed as AMBER_E_INVALID_ARG).
+ */
+const DEFAULT_MAX_GRAPH_NODES = 20_000;
+const DEFAULT_MAX_GRAPH_EDGES = 200_000;
+
+function graphResourceCeilings() {
+	return {
+		maxNodes: resolvePositiveIntCeiling(
+			"AMBER_PROJECTION_MAX_NODES",
+			DEFAULT_MAX_GRAPH_NODES,
+			"governance-graph node ceiling",
+		),
+		maxEdges: resolvePositiveIntCeiling(
+			"AMBER_PROJECTION_MAX_EDGES",
+			DEFAULT_MAX_GRAPH_EDGES,
+			"governance-graph edge ceiling",
+		),
+	};
+}
 
 /**
  * Parse a scope parameter into an explicit scope id, or null for unscoped.
@@ -168,13 +198,38 @@ function compareEdges(a, b) {
  * identical canonical state always yields the identical graph and source
  * hash. Page node ids and artifact revision node ids (`<type>/<identity>@
  * <revision>`) live in disjoint id namespaces by construction.
+ *
+ * F049 ticket 06 (#223, AC4): the build is resource-bounded. A state whose
+ * merged graph would exceed the node or edge ceiling throws the typed
+ * AMBER_E_PROJECTION_RESOURCE_CEILING — the caller (projection rebuild /
+ * query) then fails closed, so a projection over its bounds is NEVER emitted
+ * as a truncated success. The ceiling applies to the whole graph, because
+ * the whole graph is what rebuild certifies complete and what an unscoped
+ * query could return; a scoped query's neighborhood is a subset of these
+ * nodes and therefore bounded by the same ceiling.
+ *
  * @param {{artifacts?: Array<object>, artifactRevisions?: Array<object>}} state
  * @returns {{nodes: Array<object>, edges: Array<object>, sourceHash: string}}
+ * @throws {Error} Typed AMBER_E_PROJECTION_RESOURCE_CEILING when the merged
+ *         graph exceeds its node or edge ceiling.
  */
 function governanceGraphFromState({ artifacts = [], artifactRevisions = [] } = {}) {
 	const layer = artifactGraphLayer(artifactRevisions);
 	const nodes = [...pageNodes(artifacts), ...layer.nodes].sort(compareNodes);
 	const edges = [...pageEdges(artifacts), ...layer.edges].sort(compareEdges);
+	const { maxNodes, maxEdges } = graphResourceCeilings();
+	if (nodes.length > maxNodes) {
+		throw typedError(
+			"AMBER_E_PROJECTION_RESOURCE_CEILING",
+			`the governance graph would carry ${nodes.length} nodes, above the projection node ceiling of ${maxNodes}; a projection that exceeds its resource bounds is refused rather than emitted as a truncated success — raise AMBER_PROJECTION_MAX_NODES deliberately (defaults: ${DEFAULT_MAX_GRAPH_NODES} nodes / ${DEFAULT_MAX_GRAPH_EDGES} edges) or split the target's state`,
+		);
+	}
+	if (edges.length > maxEdges) {
+		throw typedError(
+			"AMBER_E_PROJECTION_RESOURCE_CEILING",
+			`the governance graph would carry ${edges.length} edges, above the projection edge ceiling of ${maxEdges}; a projection that exceeds its resource bounds is refused rather than emitted as a truncated success — raise AMBER_PROJECTION_MAX_EDGES deliberately (defaults: ${DEFAULT_MAX_GRAPH_NODES} nodes / ${DEFAULT_MAX_GRAPH_EDGES} edges) or split the target's state`,
+		);
+	}
 	const canonicalGraphJson = JSON.stringify({ nodes, edges });
 	return { nodes, edges, sourceHash: sha256(canonicalGraphJson) };
 }

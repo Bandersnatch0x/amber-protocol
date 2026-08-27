@@ -101,11 +101,18 @@ const { randomUUID } = require("node:crypto");
 const { sha256Hex, canonicalJson } = require("./context-hash");
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
-const { codedError } = require("./error-catalog");
+const { typedError } = require("./error-catalog");
+const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 const {
 	TYPE_REGISTRY,
 	ARTIFACT_TYPES,
 	TRACE_REGISTRY_VERSION,
+	ENVELOPE_SCHEMA_VERSION,
+	SUPPORTED_ENVELOPE_SCHEMA_VERSIONS,
+	EXTENSION_CARRIER_FIELD,
+	envelopeVersionProblem,
+	envelopeUnknownFieldProblem,
+	extensionNamespaceProblem,
 	isValidArtifactIdentity,
 	transitionFor,
 	registeredTransitionsOf,
@@ -143,6 +150,38 @@ const IO_CODE = "AMBER_E_ARTIFACT_IO";
 // error (the read side reports the case-variant as plain NOT_FOUND).
 const IDENTITY_CASE_COLLISION_CODE = "AMBER_E_ARTIFACT_IDENTITY_CASE_COLLISION";
 const NOT_FOUND_CODE = "AMBER_E_ARTIFACT_NOT_FOUND";
+// F049 ticket 06 (#223): version negotiation, extension namespaces, and
+// admission size ceilings. (The unknown-field and extension-collision
+// verdicts travel on their problem objects' own .code from
+// canonical-artifact-contracts.js — the writer seam fails with
+// problem.code, the read seam throws problem.code — so they need no local
+// constant here.)
+const UNSUPPORTED_VERSION_CODE = "AMBER_E_ARTIFACT_UNSUPPORTED_VERSION";
+const SIZE_CEILING_CODE = "AMBER_E_ARTIFACT_SIZE_CEILING";
+
+/**
+ * Admission size ceilings (F049 ticket 06, #223 — AC3), in bytes.
+ * Documented defaults; deliberate overrides via the environment. Checked
+ * BEFORE any durable state is touched, so an oversized artifact never
+ * reaches the journal — the failure leaves no home, no lock, no record.
+ */
+const DEFAULT_MAX_BODY_BYTES = 512 * 1024;
+const DEFAULT_MAX_ENVELOPE_BYTES = 256 * 1024;
+
+function admissionSizeCeilings() {
+	return {
+		maxBodyBytes: resolvePositiveIntCeiling(
+			"AMBER_ARTIFACT_MAX_BODY_BYTES",
+			DEFAULT_MAX_BODY_BYTES,
+			"artifact Body size ceiling",
+		),
+		maxEnvelopeBytes: resolvePositiveIntCeiling(
+			"AMBER_ARTIFACT_MAX_ENVELOPE_BYTES",
+			DEFAULT_MAX_ENVELOPE_BYTES,
+			"artifact Envelope size ceiling",
+		),
+	};
+}
 
 // ponytail: exclusive-lock admission (open O_EXCL lock file → settle →
 // unlink) instead of OS-level advisory locking; a crashed holder leaves the
@@ -324,14 +363,17 @@ function envelopeHash(envelope) {
  * serialization of every caller-determined Envelope field — schemaVersion,
  * type, identity, supersedes (the expected head), bodyHash, provenance, and
  * (ticket 03) the lifecycle content: the named `transition`, `scope`, and
- * the resolved Trace set. Assigned, volatile, or DERIVED fields are excluded:
- * revision, committedAt, envelopeHash, and the lifecycle STATE, which is a
- * pure function of the type and the named transition (a revision admitted
- * without a transition carries the type's initial state) — so two admissions
- * cannot differ in lifecycle without differing in `transition`, and retries
- * against pre-lifecycle (ticket-01/02) Envelopes still dedupe. Ticket-01
- * review finding F3: retries dedupe on the full canonical envelope content,
- * never on bodyHash alone.
+ * the resolved Trace set, and (ticket 06, #223) the extension namespaces:
+ * extensions are canonical content, so the same Body with different
+ * extension data is a different admission, never a silent duplicate.
+ * Assigned, volatile, or DERIVED fields are excluded: revision, committedAt,
+ * envelopeHash, and the lifecycle STATE, which is a pure function of the
+ * type and the named transition (a revision admitted without a transition
+ * carries the type's initial state) — so two admissions cannot differ in
+ * lifecycle without differing in `transition`, and retries against
+ * pre-lifecycle (ticket-01/02) Envelopes still dedupe. Ticket-01 review
+ * finding F3: retries dedupe on the full canonical envelope content, never
+ * on bodyHash alone.
  */
 function admissionHash({
 	schemaVersion,
@@ -343,6 +385,7 @@ function admissionHash({
 	transition,
 	scope,
 	traces,
+	extensions,
 }) {
 	return sha256Hex(
 		canonicalJson(
@@ -356,6 +399,7 @@ function admissionHash({
 				transition: transition ?? null,
 				scope: scope ?? null,
 				traces: canonicalTracesForHash(traces),
+				extensions: extensions ?? null,
 			}),
 		),
 	);
@@ -388,6 +432,7 @@ function admissionHashOfEnvelope(envelope) {
 		transition: envelope.transition ?? null,
 		scope: envelope.scope ?? null,
 		traces: envelope.traces || [],
+		extensions: envelope[EXTENSION_CARRIER_FIELD] ?? null,
 	});
 }
 
@@ -469,11 +514,10 @@ function findKeyRecord(journal, idempotencyKey) {
 
 // Typed read failure: a real Error carrying .amberCode so CLI readFailure
 // surfaces the stable code instead of its NOT_FOUND fallback (same contract
-// as ledgerCorruptError in jsonl.js).
+// as ledgerCorruptError in jsonl.js). Delegates to the consolidated catalog
+// constructor (ticket 06, #223 — one typed-error shape everywhere).
 function typedReadError(code, message) {
-	const error = new Error(codedError(code, message));
-	error.amberCode = code;
-	return error;
+	return typedError(code, message);
 }
 
 /**
@@ -484,8 +528,30 @@ function typedReadError(code, message) {
  * Ticket 04: the Envelope must also agree with the identity it is stored
  * under — a revision whose Envelope binds a different type/identity is a
  * mismatched pair, never silently relabeled.
+ *
+ * Ticket 06 (#223 — AC1/AC2): version negotiation and the extension
+ * namespace contract run FIRST, before the binding hashes — an Envelope
+ * whose schemaVersion/traceContractVersion this reader cannot interpret, a
+ * top-level field this reader does not know, or an extensions carrier that
+ * violates the namespace contract is rejected with its own stable code,
+ * never silently dropped and never misreported as a hash mismatch. Every
+ * read seam (show, list, projection revisions) and every admission path that
+ * validates stored state (idempotency retries, CAS head, trace binding)
+ * funnels through here, so the negotiation verdict is identical everywhere.
  */
 function committedProjection(type, identity, revision, body, envelope, committedAt) {
+	const versionProblem = envelopeVersionProblem(envelope);
+	if (versionProblem !== null) throw typedReadError(versionProblem.code, versionProblem.message);
+	const unknownFieldProblem = envelopeUnknownFieldProblem(envelope);
+	if (unknownFieldProblem !== null) {
+		throw typedReadError(unknownFieldProblem.code, unknownFieldProblem.message);
+	}
+	const extensionProblem = extensionNamespaceProblem(
+		envelope ? envelope[EXTENSION_CARRIER_FIELD] : undefined,
+	);
+	if (extensionProblem !== null) {
+		throw typedReadError(extensionProblem.code, extensionProblem.message);
+	}
 	if (envelope.type !== type || envelope.identity !== identity) {
 		throw typedReadError(
 			SETTLEMENT_CORRUPT_CODE,
@@ -1392,6 +1458,8 @@ function admitArtifact(
 		transition = null,
 		scope = null,
 		traces = [],
+		schemaVersion = ENVELOPE_SCHEMA_VERSION,
+		extensions = null,
 	},
 ) {
 	const fail = (code, errors) => ({ ok: false, code, receipt: null, errors });
@@ -1401,6 +1469,29 @@ function admitArtifact(
 			`artifact type "${type}" is not registered; registered types: ${ARTIFACT_TYPES.join(", ")}`,
 		]);
 	}
+	// Ticket 06 (#223 — AC1): version negotiation at the WRITER seam. This
+	// amber only ever admits a supported schemaVersion; anything else is
+	// refused before any durable state is touched, so an unsupported version
+	// never reaches the journal.
+	if (
+		!Number.isInteger(schemaVersion) ||
+		!SUPPORTED_ENVELOPE_SCHEMA_VERSIONS.includes(schemaVersion)
+	) {
+		return fail(UNSUPPORTED_VERSION_CODE, [
+			`this amber writes Envelope schemaVersion ${ENVELOPE_SCHEMA_VERSION} and cannot admit schemaVersion ${JSON.stringify(schemaVersion)}; supported schema versions: ${SUPPORTED_ENVELOPE_SCHEMA_VERSIONS.join(", ")} — upgrade amber to write the newer Envelope`,
+		]);
+	}
+	// Ticket 06 (#223 — AC2): the extension namespace contract runs before
+	// any durable state is touched, so an Envelope the read side would
+	// refuse a moment later can never be written.
+	const extensionProblem = extensionNamespaceProblem(extensions);
+	if (extensionProblem !== null) {
+		return fail(extensionProblem.code, [extensionProblem.message]);
+	}
+	const extensionCarrier =
+		extensions === undefined || extensions === null || Object.keys(extensions).length === 0
+			? null
+			: extensions;
 	if (!isValidArtifactIdentity(identity)) {
 		return fail("AMBER_E_ARTIFACT_INVALID_IDENTITY", [
 			`artifact identity "${identity}" is not a usable directory name (empty and pure-dot segments are rejected)`,
@@ -1424,6 +1515,24 @@ function admitArtifact(
 	if (typeof body !== "string" || body.length === 0) {
 		return fail("AMBER_E_ARTIFACT_ORPHANED_HALF", [
 			"admission received an Envelope without a readable Artifact Body",
+		]);
+	}
+
+	// Ticket 06 (#223 — AC3): admission size ceilings. The Body is measured
+	// in bytes (UTF-8) BEFORE any durable state is touched — an oversized
+	// artifact never reaches the journal, never creates a home, never takes
+	// the lock. A garbage ceiling override is an argument error, never a
+	// silent default: an operator who set the variable meant a bound.
+	let ceilings;
+	try {
+		ceilings = admissionSizeCeilings();
+	} catch (err) {
+		return fail(err.amberCode || INVALID_ARG_CODE, [err.message]);
+	}
+	const bodyBytes = Buffer.byteLength(body, "utf8");
+	if (bodyBytes > ceilings.maxBodyBytes) {
+		return fail(SIZE_CEILING_CODE, [
+			`the Body is ${bodyBytes} bytes, above the admission ceiling of ${ceilings.maxBodyBytes} bytes (AMBER_ARTIFACT_MAX_BODY_BYTES); an oversized artifact is refused at admission and never reaches the journal — split the artifact or raise the ceiling deliberately`,
 		]);
 	}
 
@@ -1530,6 +1639,9 @@ function admitArtifact(
 			transition: transitionName,
 			scope: scopeTag,
 			traces: resolvedTraces,
+			schemaVersion,
+			extensions: extensionCarrier,
+			maxEnvelopeBytes: ceilings.maxEnvelopeBytes,
 		});
 	} finally {
 		unlock();
@@ -1550,12 +1662,19 @@ function admitUnderLock(
 	expected,
 	idempotencyKey,
 	fail,
-	{ transition = null, scope = null, traces = [] } = {},
+	{
+		transition = null,
+		scope = null,
+		traces = [],
+		schemaVersion = ENVELOPE_SCHEMA_VERSION,
+		extensions = null,
+		maxEnvelopeBytes = DEFAULT_MAX_ENVELOPE_BYTES,
+	} = {},
 ) {
 	const contentHashValue = bodyHash(body);
 	const lifecycle = lifecycleForAdmission(type, transition);
 	const incomingKeyHash = admissionHash({
-		schemaVersion: 1,
+		schemaVersion,
 		type,
 		identity,
 		supersedes: expected,
@@ -1564,6 +1683,7 @@ function admitUnderLock(
 		transition,
 		scope,
 		traces,
+		extensions,
 	});
 
 	let journal;
@@ -1773,7 +1893,7 @@ function admitUnderLock(
 	const preparedAt = new Date().toISOString();
 	const attemptId = randomUUID();
 	const envelopeContent = {
-		schemaVersion: 1,
+		schemaVersion,
 		type,
 		identity,
 		revision,
@@ -1784,6 +1904,7 @@ function admitUnderLock(
 		scope,
 		traces: traces.map((trace) => ({ type: trace.type, to: { ...trace.to } })),
 		...(traces.length > 0 ? { traceContractVersion: TRACE_REGISTRY_VERSION } : {}),
+		...(extensions !== null ? { [EXTENSION_CARRIER_FIELD]: extensions } : {}),
 		provenance: provenance || null,
 		committedAt: preparedAt,
 	};
@@ -1791,6 +1912,18 @@ function admitUnderLock(
 		...envelopeContent,
 		envelopeHash: envelopeHash(envelopeContent),
 	});
+
+	// Ticket 06 (#223 — AC3): the Envelope ceiling bounds the serialized
+	// Envelope (the durable, hash-covered form). Checked after the envelope
+	// is built but BEFORE the prepared record is appended, so an oversized
+	// Envelope never reaches the journal; the lock created the (still empty)
+	// home, which admitArtifact removes again below.
+	const envelopeBytes = Buffer.byteLength(JSON.stringify(envelope), "utf8");
+	if (envelopeBytes > maxEnvelopeBytes) {
+		return fail(SIZE_CEILING_CODE, [
+			`the Envelope serializes to ${envelopeBytes} bytes, above the admission ceiling of ${maxEnvelopeBytes} bytes (AMBER_ARTIFACT_MAX_ENVELOPE_BYTES); an oversized artifact is refused at admission and never reaches the journal — carry less provenance/extension data or raise the ceiling deliberately`,
+		]);
+	}
 
 	// Claim the slot, then re-validate through the journal after every
 	// append: the prepared record is the durable CAS intent, and the guard
@@ -1878,6 +2011,9 @@ function receiptFor(type, identity, revision, envelope, journal) {
 		transition: envelope.transition ?? null,
 		scope: envelope.scope ?? null,
 		traces: envelope.traces || [],
+		// Ticket 06 (#223 — AC2): extension namespaces ride in the receipt
+		// exactly as they were admitted — opaque, never interpreted.
+		extensions: envelope[EXTENSION_CARRIER_FIELD] ?? null,
 		provenance: envelope.provenance,
 		committedAt: commitRecord ? commitRecord.at : envelope.committedAt,
 	});

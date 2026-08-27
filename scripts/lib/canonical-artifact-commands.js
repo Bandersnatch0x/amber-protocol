@@ -60,6 +60,7 @@ function missingValueFlag(args) {
 		["transition", "--transition"],
 		["scope", "--scope"],
 		["traceVal", "--trace"],
+		["extensionVal", "--extension"],
 		["revision", "--revision"],
 		["target", "--target"],
 	];
@@ -134,6 +135,67 @@ function parseTraceFlags(rawList) {
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
+}
+
+/**
+ * Parse repeatable --extension flags (ticket 06, #223 — AC2):
+ * `--extension <namespace>.<key>=<value>` — e.g. `--extension acme.weight=3`
+ * or `--extension acme.meta={"a":1}`. The value is parsed as JSON when it is
+ * valid JSON (numbers, booleans, null, objects, arrays) and carried verbatim
+ * as a string otherwise — extension data is opaque to amber, so both
+ * `--extension acme.tag=hello` and `--extension acme.count=42` are
+ * legitimate (the first carries the string "hello", the second the number
+ * 42). The namespace/key split is on the FIRST dot of the name half, so
+ * extension keys may themselves contain dots. Collisions with core Envelope
+ * fields are NOT this parser's verdict — the admission contract owns that
+ * stable error (AMBER_E_ARTIFACT_EXTENSION_COLLISION), exactly like trace
+ * semantics are the registry's, not the CLI's. A duplicate namespace.key
+ * declaration is an argument error: one key carries one value.
+ */
+function parseExtensionFlags(rawList) {
+	const extensions = {};
+	const list = Array.isArray(rawList) ? rawList : [];
+	for (const raw of list) {
+		if (typeof raw !== "string" || raw.length === 0) {
+			return {
+				error: `--extension must be of the form <namespace>.<key>=<value>; got ${JSON.stringify(raw)}`,
+			};
+		}
+		const eq = raw.indexOf("=");
+		if (eq <= 0) {
+			return {
+				error: `--extension must be of the form <namespace>.<key>=<value>; got ${JSON.stringify(raw)}`,
+			};
+		}
+		const name = raw.slice(0, eq);
+		const value = raw.slice(eq + 1);
+		const dot = name.indexOf(".");
+		if (dot <= 0 || dot === name.length - 1) {
+			return {
+				error: `--extension must be of the form <namespace>.<key>=<value>; got ${JSON.stringify(raw)}`,
+			};
+		}
+		const namespace = name.slice(0, dot);
+		const key = name.slice(dot + 1);
+		let parsed;
+		if (value.length > 0) {
+			try {
+				parsed = JSON.parse(value);
+			} catch {
+				parsed = value; // not JSON: carry the verbatim string
+			}
+		} else {
+			parsed = "";
+		}
+		if (!Object.prototype.hasOwnProperty.call(extensions, namespace)) extensions[namespace] = {};
+		if (Object.prototype.hasOwnProperty.call(extensions[namespace], key)) {
+			return {
+				error: `--extension ${namespace}.${key} was declared twice; one extension key carries one value`,
+			};
+		}
+		extensions[namespace][key] = parsed;
+	}
+	return { value: Object.keys(extensions).length > 0 ? extensions : null };
 }
 
 /**
@@ -214,6 +276,8 @@ const dispatch = defineCommand({
 			}
 			const traces = parseTraceFlags(args.traceArgs);
 			if (traces.error) return invalidArg(traces.error);
+			const extensions = parseExtensionFlags(args.extensionArgs);
+			if (extensions.error) return invalidArg(extensions.error);
 			const type = typeFlagValue(args);
 			if (type.error) return invalidArg(type.error);
 			const target = targetFlagValue(args);
@@ -229,6 +293,7 @@ const dispatch = defineCommand({
 				transition: args.transition === undefined ? null : String(args.transition),
 				scope: args.scope === undefined ? null : String(args.scope),
 				traces: traces.value,
+				extensions: extensions.value,
 			});
 			return {
 				text: result.ok ? JSON.stringify(result.receipt, null, 2) : "",

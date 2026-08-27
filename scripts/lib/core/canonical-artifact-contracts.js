@@ -133,6 +133,203 @@ const TRACE_REGISTRY = Object.freeze({
 
 const TRACE_TYPES = Object.freeze(Object.keys(TRACE_REGISTRY));
 
+/**
+ * Envelope schema version this code writes (F049 ticket 06, #223). Version
+ * negotiation is fail-closed in both directions: a reader rejects any
+ * schemaVersion it cannot interpret instead of silently reinterpreting the
+ * Envelope, and a writer only ever emits a supported version.
+ */
+const ENVELOPE_SCHEMA_VERSION = 1;
+
+/** Every schemaVersion this reader can interpret, ascending. */
+const SUPPORTED_ENVELOPE_SCHEMA_VERSIONS = Object.freeze([1]);
+
+/**
+ * The closed set of core Envelope field names (F049 ticket 06, #223). An
+ * Envelope carrying a top-level field outside this set was written by a newer
+ * writer (or hand-edited); readers reject it with
+ * AMBER_E_ARTIFACT_UNKNOWN_FIELD instead of silently dropping the field.
+ * Extension data lives under the reserved `extensions` carrier — never at the
+ * top level — so the core semantics of every revision stay interpretable by
+ * every reader that knows its schemaVersion.
+ */
+const ENVELOPE_CORE_FIELDS = Object.freeze([
+	"schemaVersion",
+	"type",
+	"identity",
+	"revision",
+	"supersedes",
+	"bodyHash",
+	"lifecycle",
+	"transition",
+	"scope",
+	"traces",
+	"traceContractVersion",
+	"provenance",
+	"committedAt",
+	"envelopeHash",
+	"extensions",
+]);
+
+/** The reserved top-level carrier for extension namespaces (AC2). */
+const EXTENSION_CARRIER_FIELD = "extensions";
+
+const ENVELOPE_CORE_FIELD_SET = new Set(ENVELOPE_CORE_FIELDS);
+
+function isCoreEnvelopeField(name) {
+	return typeof name === "string" && ENVELOPE_CORE_FIELD_SET.has(name);
+}
+
+/**
+ * Version negotiation over one stored Envelope (F049 spec story 13: unknown
+ * required versions are rejected, never silently reinterpreted).
+ *
+ * Negotiated fields:
+ * - `schemaVersion`: absent reads as the implicit only version (1 — every
+ *   Envelope shape this store has ever written carries it, but legacy
+ *   envelopes are not punished for omitting it); present values must be an
+ *   integer this reader supports.
+ * - `traceContractVersion`: recorded on every Envelope that carries Traces
+ *   precisely so this check can refuse unknown Trace registries (see the
+ *   TRACE_REGISTRY_VERSION contract above). Absent is fine (no Traces, or a
+ *   pre-ticket-03 Envelope).
+ *
+ * @param {object} envelope - Stored Envelope.
+ * @returns {{code: string, message: string}|null} The negotiation problem.
+ */
+function envelopeVersionProblem(envelope) {
+	if (!envelope || typeof envelope !== "object") return null;
+	if (envelope.schemaVersion !== undefined) {
+		const version = envelope.schemaVersion;
+		if (!Number.isInteger(version) || !SUPPORTED_ENVELOPE_SCHEMA_VERSIONS.includes(version)) {
+			return {
+				code: "AMBER_E_ARTIFACT_UNSUPPORTED_VERSION",
+				message: `the Envelope for "${envelope.identity}" revision ${envelope.revision} declares schemaVersion ${JSON.stringify(version)}, but this reader supports ${SUPPORTED_ENVELOPE_SCHEMA_VERSIONS.join(", ")}; a version this reader cannot interpret is rejected rather than reinterpreted — upgrade amber or re-admit the artifact at a supported schema version`,
+			};
+		}
+	}
+	const traceVersion = envelope.traceContractVersion;
+	if (traceVersion !== undefined) {
+		if (!Number.isInteger(traceVersion) || traceVersion !== TRACE_REGISTRY_VERSION) {
+			return {
+				code: "AMBER_E_ARTIFACT_UNSUPPORTED_VERSION",
+				message: `the Envelope for "${envelope.identity}" revision ${envelope.revision} declares traceContractVersion ${JSON.stringify(traceVersion)}, but this reader implements Trace registry version ${TRACE_REGISTRY_VERSION}; an unknown Trace contract is rejected rather than reinterpreted — upgrade amber or re-admit the artifact under the registered Trace contract`,
+			};
+		}
+	}
+	return null;
+}
+
+/**
+ * Closed-set check over the Envelope's top-level fields (F049 spec story 13:
+ * a required field this reader does not recognize is rejected, not silently
+ * dropped). Unknown field names are reported in sorted order so the verdict
+ * is a pure function of the field SET, never of JSON key order.
+ * @param {object} envelope - Stored Envelope.
+ * @returns {{code: string, message: string}|null} The unknown-field problem.
+ */
+function envelopeUnknownFieldProblem(envelope) {
+	if (!envelope || typeof envelope !== "object") return null;
+	const unknown = Object.keys(envelope)
+		.filter((key) => !ENVELOPE_CORE_FIELD_SET.has(key))
+		.sort();
+	if (unknown.length === 0) return null;
+	return {
+		code: "AMBER_E_ARTIFACT_UNKNOWN_FIELD",
+		message: `the Envelope for "${envelope.identity}" revision ${envelope.revision} carries the unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}, which this reader does not know; unknown Envelope fields are rejected rather than silently dropped — the Envelope was written by a newer writer or hand-edited, and extension data belongs in the reserved "${EXTENSION_CARRIER_FIELD}" carrier`,
+	};
+}
+
+function isPlainObject(value) {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+// Extension values are carried opaquely as JSON (AC2): probe-serialize each
+// leaf so a caller can never smuggle a non-JSON value into the durable
+// Envelope (where the canonical hash would silently mangle it).
+function jsonSerializableProblem(namespace, key, value) {
+	let serialized;
+	try {
+		serialized = JSON.stringify(value);
+	} catch {
+		serialized = undefined;
+	}
+	if (serialized === undefined) {
+		return `the extension value under "${namespace}.${key}" is not JSON-serializable; extension data is carried opaquely as JSON, so it must survive JSON.stringify unchanged`;
+	}
+	return null;
+}
+
+/**
+ * The extension namespace contract (F049 ticket 06, #223 — AC2) over one
+ * `extensions` carrier value. Rules:
+ *   (a) extension data is carried ONLY inside the carrier, one sub-object per
+ *       namespace — never merged into the Envelope's core fields;
+ *   (b) namespace names and per-namespace keys must never collide with or
+ *       shadow a core Envelope field (a consumer that flattens a namespace
+ *       must not be able to overwrite `type`, `identity`, `traces`, ...);
+ *   (c) unregistered namespaces are carried opaquely — any shape check here
+ *       is structural (strings, objects, JSON), never an interpretation of
+ *       the namespace's meaning.
+ *
+ * Shared by the writer seam (admitArtifact validates caller-supplied
+ * extensions before any durable state is touched) and the reader seam
+ * (committedProjection validates the stored carrier), so admission can never
+ * write an Envelope the read side would refuse a moment later.
+ *
+ * @param {*} extensions - The `extensions` carrier value to validate.
+ * @returns {{code: string, message: string}|null} The contract violation.
+ */
+function extensionNamespaceProblem(extensions) {
+	if (extensions === undefined || extensions === null) return null;
+	if (!isPlainObject(extensions)) {
+		return {
+			code: "AMBER_E_ARTIFACT_EXTENSION_COLLISION",
+			message: `the "${EXTENSION_CARRIER_FIELD}" carrier must be an object mapping namespace → { key → value } (or absent); got ${JSON.stringify(extensions)}`,
+		};
+	}
+	for (const namespace of Object.keys(extensions).sort()) {
+		if (typeof namespace !== "string" || namespace.length === 0) {
+			return {
+				code: "AMBER_E_ARTIFACT_EXTENSION_COLLISION",
+				message: `extension namespace names must be non-empty strings; got ${JSON.stringify(namespace)}`,
+			};
+		}
+		if (isCoreEnvelopeField(namespace)) {
+			return {
+				code: "AMBER_E_ARTIFACT_EXTENSION_COLLISION",
+				message: `the extension namespace "${namespace}" collides with the core Envelope field "${namespace}"; extension namespaces must never shadow core Envelope fields — pick a namespace of your own`,
+			};
+		}
+		const entries = extensions[namespace];
+		if (!isPlainObject(entries)) {
+			return {
+				code: "AMBER_E_ARTIFACT_EXTENSION_COLLISION",
+				message: `the extension namespace "${namespace}" must map to an object of key → value; got ${JSON.stringify(entries)}`,
+			};
+		}
+		for (const key of Object.keys(entries).sort()) {
+			if (typeof key !== "string" || key.length === 0) {
+				return {
+					code: "AMBER_E_ARTIFACT_EXTENSION_COLLISION",
+					message: `extension keys under namespace "${namespace}" must be non-empty strings; got ${JSON.stringify(key)}`,
+				};
+			}
+			if (isCoreEnvelopeField(key)) {
+				return {
+					code: "AMBER_E_ARTIFACT_EXTENSION_COLLISION",
+					message: `the extension key "${namespace}.${key}" would shadow the core Envelope field "${key}"; extension keys must never collide with core Envelope fields — rename the key`,
+				};
+			}
+			const unsafe = jsonSerializableProblem(namespace, key, entries[key]);
+			if (unsafe !== null) {
+				return { code: "AMBER_E_ARTIFACT_EXTENSION_COLLISION", message: unsafe };
+			}
+		}
+	}
+	return null;
+}
+
 // Pure-dot path segments ("." / "..") would resolve an artifact home outside
 // its per-identity directory — shared by the store and the CLI trace parser.
 const DOT_SEGMENT_PATTERN = /^\.+$/;
@@ -292,6 +489,14 @@ module.exports = {
 	TRACE_REGISTRY,
 	TRACE_REGISTRY_VERSION,
 	TRACE_TYPES,
+	ENVELOPE_SCHEMA_VERSION,
+	SUPPORTED_ENVELOPE_SCHEMA_VERSIONS,
+	ENVELOPE_CORE_FIELDS,
+	EXTENSION_CARRIER_FIELD,
+	isCoreEnvelopeField,
+	envelopeVersionProblem,
+	envelopeUnknownFieldProblem,
+	extensionNamespaceProblem,
 	isValidArtifactIdentity,
 	transitionFor,
 	registeredTransitionsOf,

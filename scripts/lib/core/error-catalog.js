@@ -171,6 +171,15 @@ const CATALOG = {
 		layer: "Verification",
 		related: ["AMBER_E_PROJECTION_MISSING", "AMBER_E_CONTEXT_PROJECTION_DRIFT"],
 	},
+	AMBER_E_PROJECTION_RESOURCE_CEILING: {
+		title: "Governance projection exceeds its resource ceiling",
+		cause:
+			"Building the Governance Graph would produce more nodes or edges than the projection's resource ceilings allow (defaults: 20,000 nodes / 200,000 edges; env overrides AMBER_PROJECTION_MAX_NODES / AMBER_PROJECTION_MAX_EDGES). A projection over its bounds is refused — never emitted as a truncated success that pretends to be the complete graph.",
+		remedy:
+			"Raise AMBER_PROJECTION_MAX_NODES / AMBER_PROJECTION_MAX_EDGES deliberately to bound the rebuild cost for this store size, or split the target's state so one projection stays bounded.",
+		layer: "Verification",
+		related: ["AMBER_E_PROJECTION_MISSING", "AMBER_E_PROJECTION_DRIFT"],
+	},
 	AMBER_E_CONTEXT_SCHEMA_INVALID: {
 		title: "Context page payload fails the page schema",
 		cause: "ingest received a payload that does not satisfy schemas/context-page.schema.json.",
@@ -680,6 +689,48 @@ const CATALOG = {
 		layer: "Observability",
 		related: ["AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT", "AMBER_E_ARTIFACT_JOURNAL_CORRUPT"],
 	},
+	AMBER_E_ARTIFACT_UNSUPPORTED_VERSION: {
+		title: "Canonical Artifact Envelope declares an unsupported version",
+		cause:
+			"The Envelope's schemaVersion (or traceContractVersion, on an Envelope carrying Traces) is not a version this reader supports. Version negotiation is fail-closed: a version the reader cannot interpret is rejected at admission and at every read — show, list, projection rebuild — never silently reinterpreted.",
+		remedy:
+			"Upgrade amber to a version that supports the declared Envelope/Trace schema, or re-admit the artifact under the supported schema version (1).",
+		layer: "Governance",
+		related: [
+			"AMBER_E_ARTIFACT_UNKNOWN_FIELD",
+			"AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT",
+			"AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH",
+		],
+	},
+	AMBER_E_ARTIFACT_UNKNOWN_FIELD: {
+		title: "Canonical Artifact Envelope carries an unknown field",
+		cause:
+			"The stored Envelope has a top-level field outside the closed core field set — written by a newer writer or hand-edited. A required field this reader does not recognize is rejected, never silently dropped.",
+		remedy: `Upgrade amber to a version that knows the field, or restore the Envelope from version control; extension data belongs under the reserved "extensions" carrier, never at the top level.`,
+		layer: "Governance",
+		related: [
+			"AMBER_E_ARTIFACT_UNSUPPORTED_VERSION",
+			"AMBER_E_ARTIFACT_EXTENSION_COLLISION",
+			"AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH",
+		],
+	},
+	AMBER_E_ARTIFACT_EXTENSION_COLLISION: {
+		title: "Canonical Artifact extension namespace contract violated",
+		cause: `The reserved "extensions" carrier violates the namespace contract: the carrier is not an object of namespace → { key → value }, or a namespace or extension key collides with (would shadow) a core Envelope field, or an extension value is not JSON. Unregistered namespaces are otherwise carried opaquely and never alter core semantics.`,
+		remedy:
+			"Carry extension data only inside the extensions carrier, under namespace and key names that never match a core Envelope field (type, identity, revision, traces, ...), with JSON values; rename the colliding namespace or key.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_UNKNOWN_FIELD", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_ARTIFACT_SIZE_CEILING: {
+		title: "Canonical Artifact exceeds its admission size ceiling",
+		cause:
+			"The Body (default 512 KiB, env AMBER_ARTIFACT_MAX_BODY_BYTES) or the serialized Envelope (default 256 KiB, env AMBER_ARTIFACT_MAX_ENVELOPE_BYTES) exceeds its size ceiling, so admission refuses before any durable state is touched — an oversized artifact never reaches the journal.",
+		remedy:
+			"Split the artifact into smaller admissions, or raise the ceiling deliberately via AMBER_ARTIFACT_MAX_BODY_BYTES / AMBER_ARTIFACT_MAX_ENVELOPE_BYTES (positive integers; garbage fails closed as AMBER_E_INVALID_ARG).",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG", "AMBER_E_PROJECTION_RESOURCE_CEILING"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
@@ -688,6 +739,83 @@ const CATALOG = {
 			"Inspect the recorded stderr in .amber/sync/transport/ledger.jsonl, fix the underlying cause, then re-approve and retry.",
 		layer: "Verification",
 		related: ["AMBER_E_SYNC_TRANSPORT_DIRTY_TREE", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	// F058 instruction-surface Eval suite finding codes (#224). These are
+	// Eval FINDINGS (replayable evidence, never Approval) reported by
+	// scripts/lib/core/instruction-surface-evals.js; they are registered here
+	// so every production AMBER_E_* literal stays explainable (ticket 06,
+	// #223 — the consolidated catalog is the single registration point).
+	AMBER_E_EVAL_MCP_DESCRIPTION_DRIFT: {
+		title: "Eval finding: MCP tool description drifted from its contract",
+		cause:
+			"The tools/list description an MCP server advertises no longer matches what the contract composer derives, or the server does not advertise its tools through the registered composer markers.",
+		remedy:
+			"Route the server's tools/list through the contract composer (mcp-tool-surface) so descriptions are derived, not hand-maintained; re-run the eval.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_MCP_INSTRUCTION_OVERRIDE", "AMBER_E_EVAL_MCP_AUTHORITY_CLAIM"],
+	},
+	AMBER_E_EVAL_MCP_INSTRUCTION_OVERRIDE: {
+		title: "Eval finding: MCP description carries instruction-override language",
+		cause:
+			"An advertised tool description contains language that tries to override or re-target the model's instructions (e.g. ignore-previous-instructions patterns).",
+		remedy:
+			"Strip the override language from the tool contract; descriptions state capability, never instructions; re-run the eval.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_MCP_DESCRIPTION_DRIFT", "AMBER_E_EVAL_MCP_AUTHORITY_CLAIM"],
+	},
+	AMBER_E_EVAL_MCP_AUTHORITY_CLAIM: {
+		title: "Eval finding: read-only tool claims unauthorized capability",
+		cause:
+			"A tool registered as read-only advertises mutating or authority-widening capability in its description text.",
+		remedy:
+			"Correct the description to the tool's registered (read-only) capability, or re-register the tool with its true capability boundary; re-run the eval.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_MCP_DESCRIPTION_DRIFT", "AMBER_E_EVAL_MCP_INSTRUCTION_OVERRIDE"],
+	},
+	AMBER_E_EVAL_MODEL_DEPENDENCY: {
+		title: "Eval finding: eval source references a model or network client",
+		cause:
+			"An Eval suite source file references a model provider or network client. Evals are deterministic and model-independent — a network or model dependency makes the evidence non-replayable.",
+		remedy:
+			"Remove the model/network dependency from the eval source; evals must be deterministic over local state only.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_MCP_DESCRIPTION_DRIFT"],
+	},
+	AMBER_E_EVAL_CONTEXT_QUOTE_BOUNDARY_MISSING: {
+		title: "Eval finding: context quote boundary is not enforced",
+		cause:
+			"The context-request schema or a Distillation Contract does not enforce treatSourcesAsQuotedEvidence=true (or omits the source quote-boundary instruction), so distilled context could pass as the assistant's own words.",
+		remedy:
+			"Set treatSourcesAsQuotedEvidence=true on the Distillation Contract constraints and include the source quote-boundary rule in its instructions; keep the schema gate that requires it.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_CONTEXT_REQUIRED_ARTIFACT_ROLE"],
+	},
+	AMBER_E_EVAL_CONTEXT_REQUIRED_ARTIFACT_ROLE: {
+		title: "Eval finding: Required Artifact role contract violated",
+		cause:
+			"The Required Artifact kinds drifted from the closed set, a Required Artifact path or loadout occupies the Context Page store, or the loadouts directory is not target-local.",
+		remedy:
+			"Restore the closed Required Artifact kind set and keep Required Artifacts out of .amber/context/pages/; re-run the eval.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_CONTEXT_QUOTE_BOUNDARY_MISSING"],
+	},
+	AMBER_E_EVAL_BREADCRUMB_BINDING: {
+		title: "Eval finding: printed breadcrumb binding did not verify",
+		cause:
+			"The workflow-state breadcrumb could not be printed for the target, printed empty, or failed verification of its binding to canonical state — the breadcrumb must be derived state, not free text.",
+		remedy:
+			"Run amber doctor on the target to repair the breadcrumb's derived state, then re-run the eval.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_BREADCRUMB_IMITATION"],
+	},
+	AMBER_E_EVAL_BREADCRUMB_IMITATION: {
+		title: "Eval finding: Context Page imitates the breadcrumb",
+		cause:
+			"A Context Page embeds the breadcrumb marker (<amber-workflow-state>). Knowledge pages are never next-step authority; embedding the marker makes the page an imitation of the breadcrumb channel.",
+		remedy:
+			"Remove the <amber-workflow-state> marker from the Context Page text; next-step authority lives only in the breadcrumb channel.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_BREADCRUMB_BINDING"],
 	},
 };
 
@@ -709,8 +837,23 @@ function getEntry(code) {
 	return CATALOG[prefixed] || null;
 }
 
+/**
+ * Construct a typed Error carrying its stable code (F049 ticket 06, #223):
+ * the error-channel equivalent of codedError's string form. Read and
+ * projection seams throw these so CLI failure envelopes surface
+ * err.amberCode instead of a fallback code.
+ * @param {string} code - Registered AMBER_E_* code.
+ * @param {string} message - Human-readable head of the message.
+ * @returns {Error} Error with .amberCode set and the coded message.
+ */
+function typedError(code, message) {
+	const error = new Error(codedError(code, message));
+	error.amberCode = code;
+	return error;
+}
+
 function listCodes() {
 	return Object.keys(CATALOG).sort();
 }
 
-module.exports = { CATALOG, codedError, getEntry, listCodes };
+module.exports = { CATALOG, codedError, typedError, getEntry, listCodes };

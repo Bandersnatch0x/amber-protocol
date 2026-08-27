@@ -36,6 +36,16 @@
  * start nodes reach, so callers can scope detection (a read of one artifact
  * walks its lineage; a store-wide read passes every committed revision).
  *
+ * F049 ticket 06 (#223, routed finding 2): the walk is ITERATIVE — an
+ * explicit stack of frames plus a gray-path array, never recursion. A deep
+ * but valid lineage (e.g. a 10k-artifact linear supersedes chain) is walked
+ * to completion; the previous recursive form overflowed the call stack and
+ * surfaced as the wrong error (a raw RangeError — or worse,
+ * AMBER_E_ARTIFACT_NOT_FOUND from the CLI's fallback — instead of a verdict),
+ * which is exactly the fail-open hole a bounded-store read must not have.
+ * Depth is therefore bounded only by memory, and the walk semantics are
+ * unchanged: same start order, same edge order, same first-cycle path.
+ *
  * @param {Array<object>} startNodes - Nodes to walk from, each
  *        `{ type, identity, revision }` (a committed revision).
  * @param {(node: object) => Array<object>} edgesOf - The outgoing trace
@@ -52,35 +62,42 @@ function findTraceCycle(startNodes, edgesOf) {
 	const GRAY = 1;
 	const BLACK = 2;
 	const color = new Map();
-	const stack = [];
-
-	function visit(node) {
-		const key = keyOf(node);
-		color.set(key, GRAY);
-		stack.push(key);
-		for (const next of edgesOf(node)) {
-			const nextKey = keyOf(next);
-			const state = color.get(nextKey) ?? WHITE;
-			if (state === GRAY) {
-				const from = stack.indexOf(nextKey);
-				const path = (from === -1 ? [...stack] : stack.slice(from)).concat(nextKey);
-				return path.map(decodeKey);
-			}
-			if (state === WHITE) {
-				const found = visit(next);
-				if (found) return found;
-			}
-		}
-		stack.pop();
-		color.set(key, BLACK);
-		return null;
-	}
+	const grayPath = []; // keys of the current DFS path, root first
 
 	for (const start of Array.isArray(startNodes) ? startNodes : []) {
-		const key = keyOf(start);
-		if ((color.get(key) ?? WHITE) === WHITE) {
-			const found = visit(start);
-			if (found) return found;
+		const startKey = keyOf(start);
+		if ((color.get(startKey) ?? WHITE) !== WHITE) continue;
+		// Frame: { key, node, edges, index } — `edges` is resolved lazily on
+		// first visit and `index` is the next outgoing edge to take, so
+		// edgesOf runs exactly once per node, exactly like the recursive form.
+		const stack = [{ key: startKey, node: start, edges: null, index: 0 }];
+		color.set(startKey, GRAY);
+		grayPath.push(startKey);
+		while (stack.length > 0) {
+			const frame = stack[stack.length - 1];
+			if (frame.edges === null) frame.edges = edgesOf(frame.node);
+			if (frame.index < frame.edges.length) {
+				const next = frame.edges[frame.index];
+				frame.index += 1;
+				const nextKey = keyOf(next);
+				const state = color.get(nextKey) ?? WHITE;
+				if (state === GRAY) {
+					// Back edge: the cycle is the gray chain from the first
+					// occurrence of nextKey to the current frame, closed.
+					const from = grayPath.indexOf(nextKey);
+					const path = (from === -1 ? [...grayPath] : grayPath.slice(from)).concat(nextKey);
+					return path.map(decodeKey);
+				}
+				if (state === WHITE) {
+					color.set(nextKey, GRAY);
+					grayPath.push(nextKey);
+					stack.push({ key: nextKey, node: next, edges: null, index: 0 });
+				}
+			} else {
+				color.set(frame.key, BLACK);
+				grayPath.pop();
+				stack.pop();
+			}
 		}
 	}
 	return null;
