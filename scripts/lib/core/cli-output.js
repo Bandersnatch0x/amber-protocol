@@ -145,6 +145,12 @@ const FLAG_SPECS = {
 	"--tool": { key: "toolVal", accumulate: "tools" },
 	"--env": { key: "envVal", accumulate: "envEntries" },
 	"--outputs": { key: "outputVal", accumulate: "outputs" },
+	// F050 ticket 4 (#229): Approval registry flags (--id, --scope, --body,
+	// and --trace are shared with the artifact surface).
+	"--approver": { key: "approver" },
+	"--revoker": { key: "revoker" },
+	"--valid-until": { key: "validUntil" },
+	"--decision-identity": { key: "decisionIdentity" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

@@ -427,4 +427,7 @@ function artifactDispatch(args) {
 	return dispatch(args._?.[0], args);
 }
 
-module.exports = { artifactDispatch };
+// parseTraceFlags is shared with the approval command (F050 #229): the
+// consume action forwards the same `--trace decides:<type>:<identity>` grammar
+// to the Decision admission, so one parser owns the flag contract.
+module.exports = { artifactDispatch, parseTraceFlags };

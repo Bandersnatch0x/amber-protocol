@@ -88,6 +88,7 @@ const { artifactDispatch } = require("./canonical-artifact-commands");
 const { principalDispatch } = require("./principal-commands");
 const { evalDispatch } = require("./eval-commands");
 const { evidenceDispatch } = require("./evidence-commands");
+const { approvalDispatch } = require("./approval-commands");
 const { orgAuditDispatch } = require("./org-audit-commands");
 const { hooksDispatch } = require("./hooks-commands");
 const { bindCommandHandlers } = require("./command-registry");
@@ -1039,6 +1040,10 @@ function handleEvidence(args) {
 	return evidenceDispatch(args);
 }
 
+function handleApproval(args) {
+	return approvalDispatch(args);
+}
+
 function handleExplain(args) {
 	const { explain } = require("./explain-command");
 	const r = explain(args);
@@ -1175,6 +1180,7 @@ const COMMAND_HANDLERS = {
 	principal: handlePrincipal,
 	eval: handleEval,
 	evidence: handleEvidence,
+	approval: handleApproval,
 };
 
 const COMMAND_REGISTRY = bindCommandHandlers(COMMAND_HANDLERS);

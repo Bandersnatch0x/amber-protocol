@@ -950,6 +950,126 @@ const CATALOG = {
 		layer: "Verification",
 		related: ["AMBER_E_EVIDENCE_ASSURANCE_FORBIDDEN", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_APPROVAL_REGISTRY_CORRUPT: {
+		title: "Approval registry is corrupt or unreadable",
+		cause:
+			"An approval registry read hit a corrupt line or an event sequence the grant/revoke/consume writers could never have produced (a broken hash chain, a duplicate granted id, a revoked or consumed event for an unknown id, a revoked-then-consumed sequence, a malformed snapshot, or an event outside the closed field set). An absent registry reads as empty; this code only fires on real corruption.",
+		remedy:
+			"Restore .amber/approvals/registry.jsonl from version control; never edit the registry in place — it is append-only governed state and every change is a granted, revoked, or consumed event.",
+		layer: "Governance",
+		related: [
+			"AMBER_E_APPROVAL_UNSUPPORTED_VERSION",
+			"AMBER_E_EVIDENCE_REGISTRY_CORRUPT",
+			"AMBER_E_PRINCIPAL_REGISTRY_CORRUPT",
+		],
+	},
+	AMBER_E_APPROVAL_UNSUPPORTED_VERSION: {
+		title: "Approval registry event declares an unsupported version",
+		cause:
+			"An approval registry event carries a schemaVersion this reader does not support. Version negotiation is fail-closed: an event the reader cannot interpret is rejected, never silently reinterpreted.",
+		remedy:
+			"Upgrade amber to a version that supports the declared approval schema, or rebuild the registry under the supported schema version (1) with fresh grant events.",
+		layer: "Governance",
+		related: ["AMBER_E_APPROVAL_REGISTRY_CORRUPT", "AMBER_E_EVIDENCE_UNSUPPORTED_VERSION"],
+	},
+	AMBER_E_APPROVAL_SIZE_CEILING: {
+		title: "Approval registry exceeds its size ceiling",
+		cause:
+			"Appending the next approval event would grow .amber/approvals/registry.jsonl beyond the size ceiling (default 1 MiB, env AMBER_APPROVAL_MAX_REGISTRY_BYTES), so the write is refused before any durable state is touched — the ceiling is re-checked under the write lock on the exact chained event.",
+		remedy:
+			"Keep approval ids, scopes, and subjects bounded, or raise the ceiling deliberately via AMBER_APPROVAL_MAX_REGISTRY_BYTES (a positive integer; garbage fails closed as AMBER_E_INVALID_ARG).",
+		layer: "Governance",
+		related: [
+			"AMBER_E_EVIDENCE_SIZE_CEILING",
+			"AMBER_E_PRINCIPAL_REGISTRY_CEILING",
+			"AMBER_E_INVALID_ARG",
+		],
+	},
+	AMBER_E_APPROVAL_REGISTRY_LOCK: {
+		title: "Another approval registry write is in flight",
+		cause:
+			"A concurrent grant/revoke/consume holds the approvals lock (.amber/approvals/approvals.lock, fresh within the stale window), so the conflicting write is refused instead of racing the in-flight one — two racing consumers would both pass the pre-check and settle two Decisions under one authorization.",
+		remedy:
+			"Retry once the in-flight write completes; a lock older than the stale window (30 s) is a crashed holder and is reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_APPROVAL_REGISTRY_CORRUPT", "AMBER_E_EVIDENCE_REGISTRY_LOCK"],
+	},
+	AMBER_E_APPROVAL_NOT_FOUND: {
+		title: "Approval id is not recorded",
+		cause:
+			"A revoke, consume, or show named an approval id with no granted record in the registry.",
+		remedy:
+			"List recorded approvals with `amber approval list`; grant the authorization first (`amber approval grant`).",
+		layer: "Observability",
+		related: ["AMBER_E_APPROVAL_ALREADY_GRANTED", "AMBER_E_PRINCIPAL_NOT_FOUND"],
+	},
+	AMBER_E_APPROVAL_ALREADY_GRANTED: {
+		title: "Approval id is already granted",
+		cause:
+			"grant was invoked with an id the registry already holds. An approval id is granted exactly once — a re-grant is a new id, never a rewrite of the old authorization.",
+		remedy:
+			"Inspect the existing record with `amber approval show --id <id>`; grant a distinct approval id instead.",
+		layer: "Governance",
+		related: ["AMBER_E_APPROVAL_NOT_FOUND", "AMBER_E_APPROVAL_ALREADY_CONSUMED"],
+	},
+	AMBER_E_APPROVAL_ALREADY_REVOKED: {
+		title: "Approval is already revoked",
+		cause:
+			"revoke was invoked for an approval whose record is already revoked. Revocation is terminal — a second revoked event would only grow the ledger.",
+		remedy:
+			"Nothing to do: the authorization holds no force. Inspect the record with `amber approval show --id <id>`.",
+		layer: "Governance",
+		related: ["AMBER_E_APPROVAL_REVOKED", "AMBER_E_APPROVAL_ALREADY_GRANTED"],
+	},
+	AMBER_E_APPROVAL_ALREADY_CONSUMED: {
+		title: "Approval is already consumed",
+		cause:
+			"consume was invoked for an approval whose single use is settled, or revoke was invoked after consumption. An authorization is single-use: one authorization can never be replayed, so a second consumption (including a racing concurrent consumer) is refused with this stable code rather than recorded.",
+		remedy:
+			"Inspect the settled Decision with `amber approval show --id <id>` (or `amber artifact show`); settle further work under a freshly granted approval id.",
+		layer: "Governance",
+		related: [
+			"AMBER_E_APPROVAL_ALREADY_REVOKED",
+			"AMBER_E_APPROVAL_NOT_FOUND",
+			"AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT",
+		],
+	},
+	AMBER_E_APPROVAL_EXPIRED: {
+		title: "Approval validity window has ended",
+		cause:
+			"consume was invoked for an approval whose validUntil bound is at or before the evaluation time. The window is half-open [validAt, validUntil) under the recorded no-tolerance skew policy: at exactly validUntil the authorization is already expired.",
+		remedy:
+			"Grant a fresh approval with a current validity window; an expired authorization is never revived — history is not rewritten.",
+		layer: "Governance",
+		related: ["AMBER_E_APPROVAL_NOT_YET_VALID", "AMBER_E_PRINCIPAL_EXPIRED"],
+	},
+	AMBER_E_APPROVAL_REVOKED: {
+		title: "Approval has been revoked",
+		cause:
+			"consume was invoked for an approval whose record is revoked. A revoked authorization holds no force, so it cannot settle a Decision.",
+		remedy:
+			"Grant a fresh approval; the revoked record stays in the ledger as history (revocation is terminal).",
+		layer: "Governance",
+		related: ["AMBER_E_APPROVAL_ALREADY_REVOKED", "AMBER_E_PRINCIPAL_REVOKED"],
+	},
+	AMBER_E_APPROVAL_NOT_YET_VALID: {
+		title: "Approval validity window has not started",
+		cause:
+			"consume was invoked before the approval's validAt bound. The window is half-open and the recorded time is authoritative — no skew tolerance moves the boundary.",
+		remedy:
+			"Wait for the window to open, or grant an approval whose window covers the consumption.",
+		layer: "Governance",
+		related: ["AMBER_E_APPROVAL_EXPIRED", "AMBER_E_PRINCIPAL_NOT_YET_VALID"],
+	},
+	AMBER_E_APPROVAL_HUMAN_SLOT_REQUIRED: {
+		title: "Human-only approval slot occupied by a non-human principal",
+		cause:
+			"grant or revoke named an approver or revoker whose principalKind is not human. An Approval is a human authorization and its revocation a human act — agents and service identities cannot hold either slot (mirroring the acceptance/approval Decision discipline).",
+		remedy:
+			"Grant or revoke with a registered human principal; a service identity may at most carry a review Decision.",
+		layer: "Governance",
+		related: ["AMBER_E_DECISION_HUMAN_SLOT_REQUIRED", "AMBER_E_PRINCIPAL_NOT_FOUND"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

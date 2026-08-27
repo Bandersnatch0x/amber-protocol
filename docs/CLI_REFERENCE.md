@@ -690,6 +690,61 @@ node scripts/amber.js evidence list --target . --json
 `--env` entries are `key=value` (one flag per entry; a duplicated key or a missing `=` fails as
 `AMBER_E_INVALID_ARG`); the accumulators `--input`, `--tool`, and `--outputs` may repeat.
 
+### approval grant / revoke / consume / show / list
+
+Approval records (F050): the human authorizations a Decision settles under — scoped, expiring,
+revocable, and single-use. A `grant` binds the acting human (a registry-verified Principal snapshot
+frozen at grant time — an Approval is a human-only authorization slot, so a service principal is
+refused as `AMBER_E_APPROVAL_HUMAN_SLOT_REQUIRED`), the confinement scope, the subject that may be
+decided, and the half-open validity window `[validAt, validUntil)`; `validUntil` is an ISO-8601 date
+or zoned date-time, and the window is evaluated with no clock-skew tolerance (the recorded time is
+authoritative — at exactly `validUntil` the authorization is already expired).
+
+The registry is an append-only event ledger under `.amber/approvals/registry.jsonl` (granted,
+revoked, and consumed events; no in-place mutation path) protected by a tamper-evident hash chain —
+an in-place edit breaks the chain and fails every read closed as
+`AMBER_E_APPROVAL_REGISTRY_CORRUPT` — with a size ceiling
+(`AMBER_APPROVAL_MAX_REGISTRY_BYTES`, default 1 MiB) and a short-lived write lock (a second writer
+in flight fails closed as `AMBER_E_APPROVAL_REGISTRY_LOCK`; a lock older than 30 s is reclaimed as
+a crashed holder's leftover). An approval id is granted exactly once; a duplicate grant fails as
+`AMBER_E_APPROVAL_ALREADY_GRANTED`.
+
+Consumption is atomic with the authorized Decision's settlement: `consume` takes the approvals
+lock, re-verifies every lifecycle invariant under it (granted, not revoked, not consumed, inside
+the window at the evaluation clock), admits the Decision artifact (`decisionKind "approval"`,
+principal = the approval's frozen approver; the caller passes no `--principal`), and only then
+appends the single-use `consumed` event binding the Decision's identity and revision from the
+admission receipt. A failed admission leaves the authorization unconsumed; one authorization can
+never be replayed — a second consumer fails closed with `AMBER_E_APPROVAL_ALREADY_CONSUMED`.
+Revocation is terminal too: a revoked approval cannot be consumed (`AMBER_E_APPROVAL_REVOKED`),
+and a consumed one cannot be revoked afterwards. The effective status
+(`granted | revoked | consumed | expired`) is derived at read time against the reader's clock —
+"expired" is a verdict about the present, never a frozen fact. When the approval carries a scope,
+the Decision is admitted with that same scope (a conflicting `--scope` is an argument error).
+
+```bash
+# grant a scoped, expiring authorization (approver must be a registered human)
+node scripts/amber.js approval grant --target . --id approval/login-42 \
+  --approver alice@example.com --subject spec/login@2 --valid-until 2027-08-01 --scope F050 --json
+
+# revoke it (revoker must also be a registered human)
+node scripts/amber.js approval revoke --target . --id approval/login-42 \
+  --revoker bob@example.com --json
+
+# settle the authorized Decision atomically with the consumption
+node scripts/amber.js approval consume --target . --id approval/login-42 \
+  --decision-identity decision/login-approved --body "# Decision: login intent approved" \
+  --trace decides:intent:intent/login@1 --json
+
+# read the derived record / every approval in grant order
+node scripts/amber.js approval show --target . --id approval/login-42 --json
+node scripts/amber.js approval list --target . --json
+```
+
+The `--trace decides:<type>:<identity>[@<revision>]` grammar is the artifact surface's (one parser,
+shared). Every event records its clock source (`injected` when the caller injected a clock,
+`system` otherwise) and the fixed skew policy `no-tolerance`.
+
 ### projection rebuild / status / query (Governance Graph of artifact revisions)
 
 The Governance Graph is the only graph projection (ADR-0021) and is never a write authority: the

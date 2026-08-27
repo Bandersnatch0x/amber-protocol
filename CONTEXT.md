@@ -88,6 +88,14 @@ _Avoid_: user database, identity provider, session store
 The append-only record under `.amber/evidence/` of one execution's provenance — producer (a registry-verified Principal snapshot), scope, subject, inputs, tools, environment, time, status, and outputs — written once and never rewritten. A receipt is the claim; verification is a separate event by an independent Principal.
 _Avoid_: test log, build output, badge, verification record
 
+**Approval Record**:
+The append-only record under `.amber/approvals/` of one human authorization a Decision settles under — approver (a registry-verified human Principal snapshot frozen at grant time), scope, subject, and half-open validity window `[validAt, validUntil)`. Single-use, revocable, terminal on consumption; its effective status (`granted|revoked|consumed|expired`) is derived at read time against the reader's clock.
+_Avoid_: permission flag, role assignment, session token, mutable approval state
+
+**Approval Consumption**:
+The atomic settlement of one Approval and the Decision it authorizes: the Decision is admitted (kind `approval`, principal = the frozen approver) and the single-use `consumed` event is appended binding the Decision's identity and revision, or nothing is written at all. One authorization can never be replayed.
+_Avoid_: token redemption, approval check, gate pass
+
 **Assurance Level**:
 The closed four-level contract on Evidence: `unavailable | observed | replayable | verified`. Only the first three are recordable; `verified` is reached exclusively through an independent verification event (verifier id ≠ producer id), and `replayable` requires named replay provenance.
 _Avoid_: confidence score, trust level, coverage percentage
