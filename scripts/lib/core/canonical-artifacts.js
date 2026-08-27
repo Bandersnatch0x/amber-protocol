@@ -809,8 +809,12 @@ function recoverDanglingPrepared(dir, journal, { identity = null, underLock = fa
  * @param {Array<object>} journal - Parsed, already-replayed journal records.
  * @param {object} [options]
  * @param {string} [options.identity] - Identity label for diagnostics.
- * @throws {Error} Typed AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT /
- *         AMBER_E_ARTIFACT_HASH_MISMATCH / AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH.
+ * @throws {Error} Typed AMBER_E_ARTIFACT_UNSUPPORTED_VERSION /
+ *         AMBER_E_ARTIFACT_UNKNOWN_FIELD / AMBER_E_ARTIFACT_EXTENSION_COLLISION
+ *         (the version-negotiation and extension-contract verdicts the
+ *         per-revision committedProjection check throws FIRST, ticket 06) /
+ *         AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT / AMBER_E_ARTIFACT_HASH_MISMATCH /
+ *         AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH.
  */
 function sweepCommittedHistory(dir, journal, { identity = null } = {}) {
 	for (const revision of committedRevisions(journal)) {
@@ -1350,6 +1354,10 @@ function compareArtifactRevisions(a, b) {
  * @returns {Array<object>} Committed revision projections, canonically
  *         ordered by (type, identity, revision).
  * @throws {Error} Typed AMBER_E_ARTIFACT_JOURNAL_CORRUPT /
+ *         AMBER_E_ARTIFACT_UNSUPPORTED_VERSION / AMBER_E_ARTIFACT_UNKNOWN_FIELD /
+ *         AMBER_E_ARTIFACT_EXTENSION_COLLISION (the version-negotiation and
+ *         extension-contract verdicts each revision's committedProjection
+ *         check throws before its binding hashes, ticket 06) /
  *         AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT / AMBER_E_ARTIFACT_TRACE_CYCLE /
  *         AMBER_E_ARTIFACT_HASH_MISMATCH / AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH.
  */

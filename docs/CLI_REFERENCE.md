@@ -457,6 +457,9 @@ node scripts/amber.js artifact admit --target . --type plan --id plan/login-plan
 # attach caller retry metadata (optional; never determines identity)
 node scripts/amber.js artifact admit --target . --id intent/login-bug --body "..." --idempotency-key op-123
 
+# carry opaque extension data in a namespace (repeatable; a value parses as JSON when valid)
+node scripts/amber.js artifact admit --target . --type spec --id spec/login-spec --body "..." --extension acme.weight=3 --extension acme.meta='{"a":1}'
+
 # show the current or an explicit revision; list current revision of each artifact
 node scripts/amber.js artifact show --target . --id intent/login-bug [--revision 1] --json
 node scripts/amber.js artifact show --target . --type spec --id spec/login-spec --json
@@ -481,16 +484,40 @@ to the current working directory, and `list --type ""` reports `AMBER_E_INVALID_
 `AMBER_E_ARTIFACT_UNKNOWN_TYPE`; a non-artifact flag trailing on an artifact command is simply
 ignored).
 
+`--extension <namespace>.<key>=<value>` is repeatable and carries opaque extension data inside the
+Envelope's reserved `extensions` carrier (ticket 06): `--extension acme.weight=3`,
+`--extension acme.meta={"a":1}`. The value is parsed as JSON when it is valid JSON (numbers,
+booleans, null, objects, arrays) and carried verbatim as a string otherwise — extension data is
+opaque to Amber, which applies no interpretation beyond the structural rules. The namespace/key
+split is on the **first** dot of the name half, so extension keys may themselves contain dots; a
+malformed flag value, or the same `namespace.key` declared twice, fails closed as
+`AMBER_E_INVALID_ARG`. A namespace or per-namespace key that collides with — would shadow — a core
+Envelope field (`type`, `identity`, `traces`, ...) fails closed as
+`AMBER_E_ARTIFACT_EXTENSION_COLLISION`; unregistered namespaces are otherwise carried opaquely.
+Extensions are canonical admission content, so the same Body with different extension data is a
+different admission (an idempotency conflict), never a silent duplicate.
+
 `--expected-head <n>` is the compare-and-swap precondition: the admission commits only if the
 current committed head is exactly `<n>`, otherwise it fails closed as `AMBER_E_ARTIFACT_CONFLICT`
 (the loser of two admissions racing on the same expected head never writes).
 `--supersedes-revision <n>` declares the same precondition from the other side and must agree with
 `--expected-head` when both are given.
 
+Admission is bounded by size ceilings (ticket 06): a Body above 512 KiB (524,288 UTF-8 bytes) is
+refused with `AMBER_E_ARTIFACT_SIZE_CEILING` before any durable state is touched — no artifact
+home, no lock, no journal record — and an Envelope that serializes above 256 KiB (262,144 bytes)
+is refused with the same code before the prepared record is appended (on failure the still-empty
+lock-created home is removed again, so nothing remains). The boundaries are inclusive: a Body or
+Envelope of exactly the ceiling admits. Both ceilings can be raised deliberately for a bigger
+store via `AMBER_ARTIFACT_MAX_BODY_BYTES` / `AMBER_ARTIFACT_MAX_ENVELOPE_BYTES` (positive
+integers; a set-but-garbage override — non-integer, zero, or negative — fails closed as
+`AMBER_E_INVALID_ARG`, never a silent default).
+
 Admission is idempotent on the **full canonical envelope content** (schema version, type, identity,
 supersedes, bodyHash, provenance, and — since ticket 03 — the named transition, scope, and resolved
-trace set; the lifecycle state itself is derived from the transition and excluded like revision
-numbers). An exact-duplicate retry — same Body, same provenance, same expected head, optionally
+trace set, and — since ticket 06 — the extension namespaces; the lifecycle state itself is derived
+from the transition and excluded like revision numbers). An exact-duplicate retry — same Body, same
+provenance, same expected head, optionally
 recognized by the same `--idempotency-key` — returns the original receipt (flagged as duplicate in
 warnings) without creating a new revision, even if the revision was later superseded. Reusing an
 idempotency key for different content, or presenting the same Body with different provenance at
@@ -525,6 +552,17 @@ verification to the whole store. Reads also walk the committed trace graph: a cy
 Trace chain (refines/realizes/supersedes edges that loop, including through superseded revisions)
 fails closed as `AMBER_E_ARTIFACT_TRACE_CYCLE` — structurally impossible through admission, so
 always hand-edited state.
+
+Version negotiation is fail-closed in both directions (ticket 06): an Envelope whose
+`schemaVersion` — or `traceContractVersion`, on an Envelope carrying Traces — is not a version this
+reader supports is rejected with `AMBER_E_ARTIFACT_UNSUPPORTED_VERSION`, never silently
+reinterpreted, and a stored Envelope carrying a top-level field outside the closed core field set
+(written by a newer writer or hand-edited) is rejected with `AMBER_E_ARTIFACT_UNKNOWN_FIELD`, never
+silently dropped — extension data belongs under the reserved `extensions` carrier, never at the top
+level. Both verdicts apply at admission (a newer-schema writer is refused before any durable
+state) and on every read — `show`, `list`, and the projection rebuild/query — where they run
+**before** the binding-hash checks, so a stale hash can never mask or masquerade as a negotiation
+verdict.
 
 Crashed admissions settle deterministically (ticket 04): when the settling verification reads
 (`artifact show` and `artifact list`) or an admission encounter a `prepared` record that never
@@ -577,8 +615,17 @@ Intent/Spec/Plan revision and one typed edge per resolved Trace (`refines`, `rea
   flag. Every query records an immutable read receipt.
 - Only fully committed revisions are projected; prepared and aborted revisions are invisible. A
   corrupt artifact store fails the rebuild and the query closed with the typed artifact corruption
-  code (e.g. `AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`) — never a partial projection — and the
-  projection itself never writes or repairs Canonical Artifacts.
+  code (e.g. `AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`) — or, when a stored Envelope declares an
+  unsupported version, carries an unknown top-level field, or violates the extension namespace
+  contract, with the negotiation verdict `AMBER_E_ARTIFACT_UNSUPPORTED_VERSION` /
+  `AMBER_E_ARTIFACT_UNKNOWN_FIELD` / `AMBER_E_ARTIFACT_EXTENSION_COLLISION` — never a partial
+  projection — and the projection itself never writes or repairs Canonical Artifacts.
+- Resource ceilings bound the build (ticket 06): a rebuild — or a query, which builds the graph
+  first — that would exceed 20,000 nodes / 200,000 edges (defaults) fails closed as
+  `AMBER_E_PROJECTION_RESOURCE_CEILING` instead of emitting a truncated graph as if it were
+  complete, and a refused rebuild writes nothing. Raise the bounds deliberately for a bigger store
+  via `AMBER_PROJECTION_MAX_NODES` / `AMBER_PROJECTION_MAX_EDGES` (positive integers; a
+  set-but-garbage override fails closed as `AMBER_E_INVALID_ARG`, never a silent default).
 
 ```bash
 # project the committed planning lineage and inspect the rebuild receipt
