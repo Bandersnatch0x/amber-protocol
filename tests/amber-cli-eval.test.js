@@ -99,7 +99,7 @@ test("amber eval run reports a replayable instruction-surface suite without writ
 	assert.equal(suite.suiteId, "instruction-surface");
 	assert.equal(suite.assurance, "replayable");
 	assert.equal(suite.overall, "pass");
-	assert.equal(suite.evalCount, 3);
+	assert.equal(suite.evalCount, 4);
 	assert.equal(suite.modelIndependent, true);
 	// D-2 (grill G-1): the envelope carries each Eval's population census —
 	// a pass states what it scanned, never a vacuous zero.
@@ -109,6 +109,19 @@ test("amber eval run reports a replayable instruction-surface suite without writ
 	assert.ok(mcp.scanned.actionTypes > 0);
 	assert.ok(mcp.scanned.functions > 0);
 	assert.equal(mcp.scanned.modelScanFiles, 4);
+	assert.deepEqual(
+		suite.evals.find(
+			(item) => item.evalId === "eval.instruction-surface.qa-contract-model-independence",
+		).scanned,
+		{
+			qaModelScanFiles: 3,
+			qaModelScanPaths: [
+				"apps/web/server/lib/knowledge-qa.ts",
+				"apps/web/server/routers/knowledge.ts",
+				"apps/web/src/lib/knowledge-dto.ts",
+			],
+		},
+	);
 	assert.deepEqual(
 		suite.evals.find((item) => item.evalId === "eval.instruction-surface.context-quote-boundary")
 			.scanned,
@@ -126,11 +139,16 @@ test("amber eval run reports a replayable instruction-surface suite without writ
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("amber eval list and show expose the three Eval identities", () => {
+test("amber eval list and show expose the four Eval identities", () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-list-"));
 	const listed = payload(runCli(["eval", "list", "--target", dir, "--json"], dir));
 	assert.equal(listed.suiteId, "instruction-surface");
-	assert.equal(listed.evals.length, 3);
+	assert.equal(listed.evals.length, 4);
+	assert.ok(
+		listed.evals.some(
+			(item) => item.evalId === "eval.instruction-surface.qa-contract-model-independence",
+		),
+	);
 	const shown = payload(
 		runCli(
 			[

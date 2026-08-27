@@ -35,6 +35,7 @@ const EVAL_IDS = Object.freeze({
 	mcp: "eval.instruction-surface.mcp-tool-description",
 	context: "eval.instruction-surface.context-quote-boundary",
 	breadcrumb: "eval.instruction-surface.breadcrumb-authenticity",
+	qa: "eval.instruction-surface.qa-contract-model-independence",
 });
 
 const REQUIRED_ARTIFACT_KINDS = Object.freeze([
@@ -115,6 +116,14 @@ function defaultModelScanFiles() {
 		// could call a model is part of its own scan set. The split client
 		// names above are what keep this file out of its own findings.
 		path.join(ROOT, "scripts", "lib", "core", "instruction-surface-evals.js"),
+	];
+}
+
+function defaultQaModelScanFiles() {
+	return [
+		path.join(ROOT, "apps", "web", "server", "lib", "knowledge-qa.ts"),
+		path.join(ROOT, "apps", "web", "src", "lib", "knowledge-dto.ts"),
+		path.join(ROOT, "apps", "web", "server", "routers", "knowledge.ts"),
 	];
 }
 
@@ -200,17 +209,36 @@ function evalMcpSourceCoupling(mcpSourcePath, findings) {
 	}
 }
 
-function evalModelIndependence(files, findings) {
+function displayScanPath(file) {
+	const relative = path.relative(ROOT, file).replace(/\\/g, "/");
+	if (!relative.startsWith("../") && relative !== ".." && !path.isAbsolute(relative))
+		return relative;
+	return path.resolve(file).replace(/\\/g, "/");
+}
+
+function scanFiles(files) {
+	const byDisplay = new Map();
 	for (const file of files) {
+		const absolute = path.resolve(file);
+		byDisplay.set(displayScanPath(absolute), absolute);
+	}
+	return [...byDisplay.entries()]
+		.sort(([left], [right]) => left.localeCompare(right))
+		.map(([display, absolute]) => ({ display, absolute }));
+}
+
+function evalModelIndependence(files, findings, opts = {}) {
+	const scanSet = scanFiles(files);
+	for (const file of scanSet) {
 		let src;
 		try {
-			src = fs.readFileSync(file, "utf8");
+			src = fs.readFileSync(file.absolute, "utf8");
 		} catch (error) {
 			findings.push(
 				finding(
 					"AMBER_E_EVAL_MODEL_DEPENDENCY",
-					`Eval source unreadable: ${error.message}`,
-					path.basename(file),
+					`${opts.unreadableDetail || "Eval source unreadable"}: ${error.message}`,
+					file.display,
 				),
 			);
 			continue;
@@ -219,12 +247,13 @@ function evalModelIndependence(files, findings) {
 			findings.push(
 				finding(
 					"AMBER_E_EVAL_MODEL_DEPENDENCY",
-					"Eval source references a model or network client",
-					path.basename(file),
+					opts.dependencyDetail || "Eval source references a model or network client",
+					file.display,
 				),
 			);
 		}
 	}
+	return scanSet;
 }
 
 function evalMcpToolDescriptions(opts = {}) {
@@ -267,7 +296,7 @@ function evalMcpToolDescriptions(opts = {}) {
 	}
 	evalMcpSourceCoupling(opts.mcpSourcePath || path.join(ROOT, "scripts", "amber-mcp.js"), findings);
 	const modelScanFiles = opts.modelScanFiles || defaultModelScanFiles();
-	evalModelIndependence(modelScanFiles, findings);
+	const modelScanSet = evalModelIndependence(modelScanFiles, findings);
 	// D-2 (grill G-1): a pass must be earned over a non-empty population.
 	// Zero scanned surfaces is a finding, never a vacuous pass. The registry
 	// emptiness check is skipped when loading already failed — the unreadable
@@ -285,7 +314,7 @@ function evalMcpToolDescriptions(opts = {}) {
 			),
 		);
 	}
-	if (modelScanFiles.length === 0) {
+	if (modelScanSet.length === 0) {
 		findings.push(
 			finding(
 				"AMBER_E_EVAL_EMPTY_SCAN",
@@ -299,7 +328,36 @@ function evalMcpToolDescriptions(opts = {}) {
 		{
 			actionTypes: actions.length,
 			functions: functions.length,
-			modelScanFiles: modelScanFiles.length,
+			modelScanFiles: modelScanSet.length,
+		},
+		findings,
+	);
+}
+
+function evalQaContractModelIndependence(opts = {}) {
+	const findings = [];
+	const scanSet = evalModelIndependence(
+		opts.qaModelScanFiles || defaultQaModelScanFiles(),
+		findings,
+		{
+			unreadableDetail: "QA contract surface unreadable",
+			dependencyDetail: "QA contract surface references a model or network client",
+		},
+	);
+	if (scanSet.length === 0) {
+		findings.push(
+			finding(
+				"AMBER_E_EVAL_EMPTY_SCAN",
+				"QA contract-surface scan covered zero source files",
+				"qaModelScanFiles",
+			),
+		);
+	}
+	return evalResult(
+		EVAL_IDS.qa,
+		{
+			qaModelScanFiles: scanSet.length,
+			qaModelScanPaths: scanSet.map((file) => file.display),
 		},
 		findings,
 	);
@@ -627,6 +685,7 @@ function evalBreadcrumbAuthenticity(targetRoot) {
 function runInstructionSurfaceEvals(targetRoot, opts = {}) {
 	const evals = [
 		evalMcpToolDescriptions(opts),
+		evalQaContractModelIndependence(opts),
 		evalContextQuoteBoundary(targetRoot, opts),
 		evalBreadcrumbAuthenticity(targetRoot),
 	];
@@ -651,6 +710,11 @@ function listInstructionSurfaceEvals() {
 		{
 			evalId: EVAL_IDS.mcp,
 			surface: "MCP tool descriptions",
+			assurance: ASSURANCE,
+		},
+		{
+			evalId: EVAL_IDS.qa,
+			surface: "QA contract-surface model independence",
 			assurance: ASSURANCE,
 		},
 		{

@@ -26,18 +26,24 @@ function findingCodes(suite, evalId) {
 	return (item && item.findings ? item.findings : []).map((finding) => finding.code);
 }
 
+function evalById(suite, evalId) {
+	const item = suite.evals.find((entry) => entry.evalId === evalId);
+	assert.ok(item, `missing Eval ${evalId}`);
+	return item;
+}
+
 test("a clean target yields a replayable all-pass suite", () => {
 	const dir = tempDir("suite");
 	const suite = runInstructionSurfaceEvals(dir);
 	assert.equal(suite.suiteId, SUITE_ID);
 	assert.equal(suite.assurance, ASSURANCE);
 	assert.equal(suite.overall, "pass", JSON.stringify(suite, null, 2));
-	assert.equal(suite.evalCount, 3);
+	assert.equal(suite.evalCount, 4);
 	assert.equal(suite.failedCount, 0);
 	assert.equal(suite.modelIndependent, true);
 	assert.deepEqual(
 		suite.evals.map((item) => item.evalId),
-		[EVAL_IDS.mcp, EVAL_IDS.context, EVAL_IDS.breadcrumb],
+		[EVAL_IDS.mcp, EVAL_IDS.qa, EVAL_IDS.context, EVAL_IDS.breadcrumb],
 	);
 	assert.ok(suite.evals.every((item) => item.assurance === ASSURANCE));
 	assert.ok(suite.evals.every((item) => item.status === "pass"));
@@ -53,6 +59,19 @@ test("every Eval reports the population census it scanned", () => {
 	assert.ok(mcp.scanned.actionTypes > 0, "action registry must be non-empty for a real pass");
 	assert.ok(mcp.scanned.functions > 0);
 	assert.equal(mcp.scanned.modelScanFiles, 4);
+	const qa = byId.get(EVAL_IDS.qa);
+	assert.deepEqual(qa.scanned, {
+		qaModelScanFiles: 3,
+		qaModelScanPaths: [
+			"apps/web/server/lib/knowledge-qa.ts",
+			"apps/web/server/routers/knowledge.ts",
+			"apps/web/src/lib/knowledge-dto.ts",
+		],
+	});
+	assert.ok(
+		!qa.scanned.qaModelScanPaths.includes("apps/web/server/lib/knowledge-llm.ts"),
+		"provider adapter is intentionally outside the QA contract-surface census",
+	);
 	// Target-local stores legitimately scan as zero on a fresh target.
 	assert.deepEqual(byId.get(EVAL_IDS.context).scanned, { loadouts: 0, requests: 0 });
 	assert.deepEqual(byId.get(EVAL_IDS.breadcrumb).scanned, { pages: 0 });
@@ -84,7 +103,7 @@ test("a missing action registry becomes a finding, not a crash", () => {
 	assert.equal(mcp.status, "fail");
 	assert.ok(findingCodes(suite, EVAL_IDS.mcp).includes("AMBER_E_EVAL_REGISTRY_UNREADABLE"));
 	// The remaining evals still ran and the suite reached its envelope.
-	assert.equal(suite.evalCount, 3);
+	assert.equal(suite.evalCount, 4);
 	assert.equal(suite.modelIndependent, true);
 });
 
@@ -193,6 +212,82 @@ test("the suite module is part of its own model scan and does not self-flag", ()
 	assert.equal(explicit.evals[0].scanned.modelScanFiles, 1);
 	// The default scan set is the explicit set plus the shared-surface and CLI
 	// modules (four files, asserted in the census test above).
+});
+
+test("an empty QA contract-surface scan fails instead of passing vacuously", () => {
+	const suite = runInstructionSurfaceEvals(tempDir("qa-empty"), { qaModelScanFiles: [] });
+	assert.equal(suite.overall, "fail");
+	assert.equal(suite.modelIndependent, true);
+	const qa = evalById(suite, EVAL_IDS.qa);
+	assert.equal(qa.status, "fail");
+	assert.deepEqual(qa.scanned, { qaModelScanFiles: 0, qaModelScanPaths: [] });
+	assert.ok(findingCodes(suite, EVAL_IDS.qa).includes("AMBER_E_EVAL_EMPTY_SCAN"));
+});
+
+test("a missing QA contract-surface file becomes a typed finding", () => {
+	const missingFile = path.join(tempDir("qa-missing"), "knowledge-qa.ts");
+	const suite = runInstructionSurfaceEvals(tempDir("qa-missing-target"), {
+		qaModelScanFiles: [missingFile],
+	});
+	assert.equal(suite.overall, "fail");
+	assert.equal(suite.modelIndependent, false);
+	const qa = evalById(suite, EVAL_IDS.qa);
+	assert.equal(qa.status, "fail");
+	assert.deepEqual(findingCodes(suite, EVAL_IDS.qa), ["AMBER_E_EVAL_MODEL_DEPENDENCY"]);
+	assert.match(qa.findings[0].detail, /^QA contract surface unreadable:/);
+});
+
+test("a QA contract-surface fixture with vendor and network clients fails only the QA eval", () => {
+	const modelFile = path.join(tempDir("qa-vendor"), "knowledge-qa.ts");
+	fs.writeFileSync(
+		modelFile,
+		'const client = require("' +
+			"open" +
+			"ai" +
+			'");\n' +
+			"fe" +
+			"tch" +
+			'("https://example.invalid");\n',
+	);
+	const suite = runInstructionSurfaceEvals(tempDir("qa-vendor-target"), {
+		qaModelScanFiles: [modelFile],
+	});
+	assert.equal(suite.overall, "fail");
+	assert.equal(suite.failedCount, 1);
+	assert.equal(suite.modelIndependent, false);
+	assert.equal(evalById(suite, EVAL_IDS.mcp).status, "pass");
+	const qa = evalById(suite, EVAL_IDS.qa);
+	assert.equal(qa.status, "fail");
+	assert.deepEqual(findingCodes(suite, EVAL_IDS.qa), ["AMBER_E_EVAL_MODEL_DEPENDENCY"]);
+	assert.match(qa.findings[0].detail, /^QA contract surface references/);
+});
+
+test("QA contract-surface census is sorted and deduped deterministically", () => {
+	const dir = tempDir("qa-sorted");
+	const zFile = path.join(dir, "z-contract.ts");
+	const aFile = path.join(dir, "a-contract.ts");
+	fs.writeFileSync(zFile, "export const z = 1;\n");
+	fs.writeFileSync(aFile, "export const a = 1;\n");
+	const suite = runInstructionSurfaceEvals(tempDir("qa-sorted-target"), {
+		qaModelScanFiles: [zFile, aFile, zFile],
+	});
+	const expectedPaths = [aFile, zFile].map((file) => path.resolve(file).replace(/\\/g, "/"));
+	const qa = evalById(suite, EVAL_IDS.qa);
+	assert.equal(qa.status, "pass", JSON.stringify(qa.findings, null, 2));
+	assert.deepEqual(qa.scanned, {
+		qaModelScanFiles: 2,
+		qaModelScanPaths: expectedPaths,
+	});
+});
+
+test("the default QA contract-surface scan excludes the provider adapter", () => {
+	const suite = runInstructionSurfaceEvals(tempDir("qa-adapter-excluded"));
+	const qa = evalById(suite, EVAL_IDS.qa);
+	assert.equal(qa.status, "pass", JSON.stringify(qa.findings, null, 2));
+	assert.ok(
+		!qa.scanned.qaModelScanPaths.some((entry) => entry.endsWith("/knowledge-llm.ts")),
+		"provider adapter is intentionally outside the QA contract-surface scan",
+	);
 });
 
 test("a persisted Distillation Contract without the quote boundary fails the suite", () => {
