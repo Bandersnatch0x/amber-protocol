@@ -8,8 +8,26 @@ const { resolveTarget, readFailure } = require("./command-helpers");
 
 const dispatch = defineCommand({
 	command: "knowledge",
-	actions: ["admit", "list", "status", "retire", "query"],
+	actions: ["admit", "list", "status", "retire", "query", "graph"],
 	handlers: {
+		// F059 T1 (#247): the deterministic knowledge graph. Read-only; the
+		// canonical serialization is emitted verbatim (bypassPrint) so
+		// recompute over an unchanged tree is byte-identical at the CLI seam.
+		graph: (args) => {
+			const {
+				buildKnowledgeGraph,
+				serializeKnowledgeGraph,
+				ERROR_CODES,
+			} = require("./core/knowledge-graph");
+			let graph;
+			try {
+				graph = buildKnowledgeGraph(resolveTarget(args));
+			} catch (err) {
+				const failure = readFailure(args, err, ERROR_CODES.invalid);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+			return { text: serializeKnowledgeGraph(graph), bypassPrint: true };
+		},
 		admit: (args) => {
 			const { admitKnowledge } = require("./core/knowledge-base");
 			const result = admitKnowledge(resolveTarget(args), {

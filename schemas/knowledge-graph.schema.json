@@ -1,0 +1,123 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "amber/knowledge-graph.schema.json",
+	"title": "Knowledge Graph",
+	"description": "Deterministic knowledge-graph contract (F059): the repository's knowledge corpus as a three-layer, four-verb graph shared by `amber knowledge graph --json` and the web knowledge surface. The graph is a pure function of the committed tree: stable order, no absolute paths, byte-identical on recompute. Every node and edge carries provenance; this deterministic layer emits only \"deterministic\" — \"inferred\" is reserved for the read-time LLM layer, which is never persisted.",
+	"type": "object",
+	"required": ["schemaVersion", "nodes", "edges", "drift"],
+	"additionalProperties": false,
+	"properties": {
+		"schemaVersion": {
+			"type": "string",
+			"enum": ["1"],
+			"description": "Graph schema version. Bumped on breaking shape changes (ADR-0012)."
+		},
+		"nodes": {
+			"type": "array",
+			"description": "Graph nodes in stable id order. Code files are not nodes; artifacts enter at identity granularity.",
+			"items": {
+				"type": "object",
+				"required": ["id", "kind", "layer", "title", "sourcePath", "provenance"],
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"pattern": "^(adr|artifact|wiki|memory|architecture|feature):.+$",
+						"description": "Kind-prefixed node id, unique across the graph."
+					},
+					"kind": {
+						"type": "string",
+						"enum": ["adr", "artifact", "wiki", "memory", "architecture", "feature"]
+					},
+					"layer": {
+						"type": "string",
+						"enum": ["decision", "knowledge", "implementation"],
+						"description": "Three-layer ontology: decision (adr, artifact), knowledge (wiki, memory, architecture), implementation (feature)."
+					},
+					"title": { "type": "string", "minLength": 1 },
+					"status": { "type": "string" },
+					"updated": {
+						"type": "string",
+						"description": "Content-recorded date (ADR Date line, wiki frontmatter) — never a scan-time clock."
+					},
+					"sourcePath": {
+						"type": "string",
+						"minLength": 1,
+						"description": "Repo-relative source of the node (POSIX separators)."
+					},
+					"paths": {
+						"type": "array",
+						"items": { "type": "string", "minLength": 1 },
+						"description": "Declared anchors (a node property, never a ghost edge)."
+					},
+					"contextPage": {
+						"type": "string",
+						"description": "Context page id merged into its source node as a property (ADR-0009)."
+					},
+					"revisions": {
+						"type": "integer",
+						"minimum": 1,
+						"description": "Committed revision count for artifact nodes."
+					},
+					"provenance": { "type": "string", "enum": ["deterministic", "inferred"] }
+				}
+			}
+		},
+		"edges": {
+			"type": "array",
+			"description": "Directed declarer -> declared edges in stable (src, verb, dst) order. Exactly four verbs.",
+			"items": {
+				"type": "object",
+				"required": ["src", "dst", "verb", "provenance"],
+				"additionalProperties": false,
+				"properties": {
+					"src": { "type": "string", "minLength": 1 },
+					"dst": { "type": "string", "minLength": 1 },
+					"verb": {
+						"type": "string",
+						"enum": ["supersedes", "builds-on", "references", "describes"]
+					},
+					"provenance": { "type": "string", "enum": ["deterministic", "inferred"] },
+					"evidence": {
+						"type": "array",
+						"minItems": 1,
+						"items": {
+							"type": "object",
+							"required": ["path"],
+							"additionalProperties": false,
+							"properties": {
+								"path": { "type": "string", "minLength": 1 },
+								"line": { "type": "integer", "minimum": 1 }
+							}
+						},
+						"description": "Where the declaring document names the target."
+					}
+				}
+			}
+		},
+		"drift": {
+			"type": "array",
+			"description": "Dead-anchor findings attached to the declaring node, in stable (nodeId, path) order.",
+			"items": {
+				"type": "object",
+				"required": ["nodeId", "kind", "path", "detail"],
+				"additionalProperties": false,
+				"properties": {
+					"nodeId": { "type": "string", "minLength": 1 },
+					"kind": { "type": "string", "enum": ["dead-anchor"] },
+					"path": {
+						"type": "string",
+						"minLength": 1,
+						"description": "The declared anchor path absent from the tree."
+					},
+					"actualPath": {
+						"type": "string",
+						"minLength": 1,
+						"description": "Detected actual path when a rename or directory collapse is recognized."
+					},
+					"detail": { "type": "string", "minLength": 1 }
+				}
+			}
+		}
+	}
+}

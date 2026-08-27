@@ -1106,7 +1106,7 @@ const CATALOG = {
 		cause:
 			"A requirement threshold carries a comparator outside the registered comparison operator set. Only registered operators can be evaluated deterministically; an unknown one makes the contract invalid rather than silently satisfiable.",
 		remedy:
-			"Use a registered comparator — numeric: eq, ne, lt, le, gt, ge; string: eq, ne, contains; version (dot-numeric): eq, lt, le, gt, ge — in a new gate revision.",
+			"Use a registered comparator — numeric: eq, ne, lt, le, gt, ge (over strict base-10 decimal outputs); string: eq, ne, contains (exact); version ordering: lt, le, gt, ge (dot-numeric) — in a new gate revision.",
 		layer: "Governance",
 		related: ["AMBER_E_GATE_CONTRACT_INVALID", "AMBER_E_INVALID_ARG"],
 	},
@@ -1256,6 +1256,25 @@ const CATALOG = {
 			"Restore the scanned population (register Action Types/Functions, or provide the Eval scan file set); a clean pass must be earned over a non-empty surface.",
 		layer: "Verification",
 		related: ["AMBER_E_EVAL_REGISTRY_UNREADABLE"],
+	},
+	// F059 (#247): deterministic knowledge graph (amber knowledge graph).
+	AMBER_E_KNOWLEDGE_GRAPH_INVALID: {
+		title: "Knowledge graph failed its own schema validation",
+		cause:
+			"The graph built by the deterministic parser did not validate against schemas/knowledge-graph.schema.json — an internal parser defect or a hand-edited schema, never a property of the scanned repository.",
+		remedy:
+			"Re-run with an unmodified schemas/knowledge-graph.schema.json; if it still fails, the parser and schema have drifted — fix scripts/lib/core/knowledge-graph.js so they agree.",
+		layer: "Verification",
+		related: ["AMBER_E_KNOWLEDGE_GRAPH_SOURCE"],
+	},
+	AMBER_E_KNOWLEDGE_GRAPH_SOURCE: {
+		title: "Knowledge-graph source document is unreadable",
+		cause:
+			"A source the graph parses (feature_list.json) exists but is not valid JSON, so the deterministic graph refuses to build from a corrupt corpus. An absent source reads as an empty layer; this code only fires on real corruption.",
+		remedy:
+			"Repair feature_list.json to valid JSON (restore it from version control if it was hand-edited), then re-run amber knowledge graph.",
+		layer: "Context",
+		related: ["AMBER_E_KNOWLEDGE_GRAPH_INVALID", "AMBER_E_KB_CORRUPT"],
 	},
 };
 
