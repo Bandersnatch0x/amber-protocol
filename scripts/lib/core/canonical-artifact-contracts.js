@@ -154,6 +154,27 @@ const TYPE_REGISTRY = Object.freeze({
 		}),
 		requiredTraces: Object.freeze({}),
 	}),
+	eval: Object.freeze({
+		dir: "evals",
+		lifecycle: Object.freeze({
+			initial: "draft",
+			states: Object.freeze(["draft", "active", "retired"]),
+		}),
+		transitions: Object.freeze({
+			activate: Object.freeze({ name: "activate", from: "draft", to: "active" }),
+			retire: Object.freeze({ name: "retire", from: "active", to: "retired" }),
+		}),
+		requiredTraces: Object.freeze({}),
+	}),
+	"eval-result": Object.freeze({
+		dir: "eval-results",
+		lifecycle: Object.freeze({
+			initial: "recorded",
+			states: Object.freeze(["recorded"]),
+		}),
+		transitions: Object.freeze({}),
+		requiredTraces: Object.freeze({}),
+	}),
 });
 
 const ARTIFACT_TYPES = Object.freeze(Object.keys(TYPE_REGISTRY));

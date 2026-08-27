@@ -45,6 +45,7 @@ test("COMMAND_CAPABILITIES covers every command the eight Action Types map to", 
 		"ledger/export",
 		"loop/recommend",
 		"eval/run",
+		"eval/admit",
 	];
 	for (const key of required) {
 		assert.ok(COMMAND_CAPABILITIES[key], `registry missing ${key}`);

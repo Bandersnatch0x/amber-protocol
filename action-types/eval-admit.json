@@ -1,0 +1,61 @@
+{
+	"actionTypeId": "amber.eval.admit",
+	"version": 1,
+	"title": "Admit instruction-surface Eval evidence",
+	"goal": "Replay the deterministic instruction-surface Eval suite, admit canonical Eval definition/result artifacts, and record replayable Evidence through the normal receipt ledger.",
+	"mode": "interactive",
+	"parameters": {
+		"producer": {
+			"type": "string",
+			"description": "Registered Principal that produced the replayable Eval Evidence receipt."
+		},
+		"suite": {
+			"type": "string",
+			"description": "Eval suite identity. Omitted: instruction-surface."
+		},
+		"definitionId": {
+			"type": "string",
+			"description": "Optional Eval definition artifact identity."
+		},
+		"outcomeId": {
+			"type": "string",
+			"description": "Optional Eval result artifact identity."
+		},
+		"evidenceId": {
+			"type": "string",
+			"description": "Optional Evidence receipt id."
+		},
+		"subject": {
+			"type": "string",
+			"description": "Optional Evidence subject."
+		}
+	},
+	"submissionCriteria": ["approval-required"],
+	"effects": {
+		"edits": [".amber/artifacts/evals/", ".amber/artifacts/eval-results/", ".amber/evidence/"],
+		"sideEffects": ["ledger-append"],
+		"rollback": false
+	},
+	"evidenceRequired": ["canonical-eval-admission"],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#canonical-eval-admission",
+		"approver": ["human"],
+		"evidence": ["canonical-eval-admission"],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "eval",
+		"subcommand": "admit",
+		"args": [
+			{ "flag": "--producer", "source": "parameters.producer" },
+			{ "flag": "--suite", "source": "parameters.suite", "optional": true },
+			{ "flag": "--definition-id", "source": "parameters.definitionId", "optional": true },
+			{ "flag": "--outcome-id", "source": "parameters.outcomeId", "optional": true },
+			{ "flag": "--evidence-id", "source": "parameters.evidenceId", "optional": true },
+			{ "flag": "--subject", "source": "parameters.subject", "optional": true },
+			{ "flag": "--json", "flagOnly": true }
+		]
+	}
+}

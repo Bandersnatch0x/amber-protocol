@@ -170,6 +170,14 @@ const COMMAND_CAPABILITIES = {
 		edits: [],
 		sideEffects: [],
 	},
+	"eval/admit": {
+		effect: "write",
+		approver: "human",
+		evidence: "canonical-eval-admission",
+		directReadOnlyExec: false,
+		edits: [".amber/artifacts/evals/", ".amber/artifacts/eval-results/", ".amber/evidence/"],
+		sideEffects: ["ledger-append"],
+	},
 };
 
 // ---- capability derivation (single shape for JSON → declared values) ----

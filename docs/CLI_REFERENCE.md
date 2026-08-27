@@ -1581,17 +1581,26 @@ Mechanism and invariants live in
 ## Eval Commands
 
 `amber eval` replays deterministic instruction-surface Evals (F050 Evidence; F058). The suite
-checks MCP tool descriptions, the Context quote boundary, and breadcrumb authenticity. Results
-are Evidence with `replayable` assurance; they are not Approval, do not write, and do not call a
-model.
+checks MCP tool descriptions, the Context quote boundary, and breadcrumb authenticity. `eval run`
+remains report-only: it does not write, does not call a model, and exits 0 only when every Eval
+passes. `eval admit` is the explicit F050 admission path: it replays the same suite, admits an
+active `eval` definition artifact plus a recorded `eval-result` artifact, then records replayable
+Evidence through the normal `.amber/evidence/` receipt path. Eval artifacts are not Approval, do not
+consume Approval, do not bind a Decision principal, and cannot widen execution authority.
 
 ```bash
 node scripts/amber.js eval run --target . --json
+node scripts/amber.js eval admit --target . --producer ci-runner --evidence-id evidence/eval-run --json
 node scripts/amber.js eval list --target .
 node scripts/amber.js eval show --id eval.instruction-surface.mcp-tool-description --target .
 ```
 
-Exit 0 when every Eval in the suite passes; exit 1 when any Eval has findings. Spec:
+`eval admit` uses the registered producer Principal exactly like `evidence record`; the Evidence
+receipt is recorded with assurance `replayable`, `subject` defaults to `eval.instruction-surface`,
+and `replayOf` points at the admitted `eval-result:<identity>@<revision>`. Independent verification
+through `amber evidence verify` is still required before the receipt's effective Assurance becomes
+`verified`. Exit 0 when every Eval in the suite passes; exit 1 when any report-only `eval run` has
+findings. Spec:
 [docs/specs/F058-instruction-surface-adversarial-evals.md](specs/F058-instruction-surface-adversarial-evals.md).
 
 ### Eval result contract

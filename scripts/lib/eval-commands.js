@@ -12,6 +12,51 @@ const {
 	showInstructionSurfaceEval,
 } = require("./core/instruction-surface-evals");
 
+function invalidArg(message) {
+	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
+}
+
+function missingValueFlag(args) {
+	const valueFlags = [
+		["id", "--id"],
+		["suite", "--suite"],
+		["producer", "--producer"],
+		["definitionIdentity", "--definition-id"],
+		["outcomeIdentity", "--outcome-id"],
+		["evidenceId", "--evidence-id"],
+		["subject", "--subject"],
+		["target", "--target"],
+	];
+	for (const [key, flag] of valueFlags) {
+		if (key in args && args[key] === undefined) return flag;
+	}
+	return null;
+}
+
+function optionalString(value) {
+	return value === undefined ? null : String(value);
+}
+
+function requiredString(args, key, flag, example) {
+	const value = optionalString(args[key]);
+	if (value === null || value.trim().length === 0) {
+		return {
+			error: `${flag} is required and must be a non-empty value (e.g. ${flag} ${example}); got ${JSON.stringify(args[key])}`,
+		};
+	}
+	return { value };
+}
+
+function writeFailure(err) {
+	return {
+		text: "",
+		errors: [err.message || String(err)],
+		warnings: [],
+		exitCode: 1,
+		...(err.amberCode ? { code: err.amberCode } : {}),
+	};
+}
+
 function formatSuite(suite) {
 	const lines = [`${suite.suiteId}  ${suite.overall}  (assurance ${suite.assurance})`];
 	for (const item of suite.evals) {
@@ -33,8 +78,59 @@ function formatSuite(suite) {
 
 const dispatch = defineCommand({
 	command: "eval",
-	actions: ["run", "list", "show"],
+	actions: ["run", "list", "show", "admit"],
 	handlers: {
+		admit: (args) => {
+			const { admitInstructionSurfaceEval } = require("./core/canonical-eval-admission");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const suiteName = args.suite ? String(args.suite) : SUITE_ID;
+			if (suiteName !== SUITE_ID) {
+				return invalidArg(
+					`unknown eval suite ${JSON.stringify(suiteName)} (expected "${SUITE_ID}")`,
+				);
+			}
+			const producer = requiredString(args, "producer", "--producer", "ci-runner");
+			if (producer.error) return invalidArg(producer.error);
+			let result;
+			try {
+				result = admitInstructionSurfaceEval(resolveTarget(args), {
+					producer: producer.value,
+					suite: suiteName,
+					...(args.definitionIdentity !== undefined
+						? { definitionIdentity: String(args.definitionIdentity) }
+						: {}),
+					...(args.outcomeIdentity !== undefined
+						? { outcomeIdentity: String(args.outcomeIdentity) }
+						: {}),
+					...(args.evidenceId !== undefined ? { evidenceId: String(args.evidenceId) } : {}),
+					...(args.subject !== undefined ? { subject: String(args.subject) } : {}),
+				});
+			} catch (err) {
+				return writeFailure(err);
+			}
+			return {
+				text: result.ok
+					? JSON.stringify(
+							{
+								definition: result.definition,
+								outcome: result.outcome,
+								evidence: result.evidence,
+								suite: result.suite,
+							},
+							null,
+							2,
+						)
+					: "",
+				errors: result.errors,
+				warnings: [],
+				exitCode: result.ok ? 0 : 1,
+				...(result.code ? { code: result.code } : {}),
+			};
+		},
 		run: (args) => {
 			const suiteName = args.suite ? String(args.suite) : SUITE_ID;
 			if (suiteName !== SUITE_ID) {

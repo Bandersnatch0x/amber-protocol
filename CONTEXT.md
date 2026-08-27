@@ -125,7 +125,7 @@ The closed four-level contract on Evidence: `unavailable | observed | replayable
 _Avoid_: confidence score, trust level, coverage percentage
 
 **Eval**:
-A versioned, reproducible assessment definition and its recorded outcome for a declared behavior, artifact, or policy. An Eval supplies Evidence to a Gate; it is not an Approval and cannot widen execution authority.
+A versioned, reproducible assessment definition and its recorded outcome for a declared behavior, artifact, or policy. `eval run` is report-only; `eval admit` stores canonical `eval` definition and `eval-result` artifacts, then records normal replayable Evidence. Eval is not Approval and cannot widen execution authority.
 _Avoid_: benchmark score, model confidence, test log
 
 **Finding**:

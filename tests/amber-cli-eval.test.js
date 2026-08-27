@@ -80,6 +80,174 @@ test("amber eval list and show expose the three Eval identities", () => {
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("amber eval admit writes canonical Eval artifacts and replayable Evidence", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-admit-"));
+	const producer = runCli(
+		[
+			"principal",
+			"register",
+			"--id",
+			"ci-runner",
+			"--kind",
+			"service",
+			"--role",
+			"runner",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(producer.status, 0, producer.stderr || producer.stdout);
+	const verifier = runCli(
+		[
+			"principal",
+			"register",
+			"--id",
+			"reviewer@example.com",
+			"--kind",
+			"human",
+			"--role",
+			"reviewer",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(verifier.status, 0, verifier.stderr || verifier.stdout);
+
+	const admitted = runCli(
+		[
+			"eval",
+			"admit",
+			"--target",
+			dir,
+			"--producer",
+			"ci-runner",
+			"--evidence-id",
+			"evidence/eval-run",
+			"--yes",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(admitted.status, 0, admitted.stderr || admitted.stdout);
+	const result = payload(admitted);
+	assert.equal(result.definition.type, "eval");
+	assert.equal(result.definition.lifecycle, "active");
+	assert.equal(result.definition.decisionKind, null);
+	assert.equal(result.outcome.type, "eval-result");
+	assert.equal(result.outcome.lifecycle, "recorded");
+	assert.equal(result.outcome.decisionKind, null);
+	assert.equal(result.evidence.id, "evidence/eval-run");
+	assert.equal(result.evidence.assurance, "replayable");
+	assert.equal(result.evidence.recordedAssurance, "replayable");
+	assert.equal(
+		result.evidence.replayOf,
+		`eval-result:${result.outcome.identity}@${result.outcome.revision}`,
+	);
+	assert.equal(result.evidence.subject, "eval.instruction-surface");
+	assert.equal(result.evidence.status, "pass");
+	assert.equal(result.suite.assurance, "replayable");
+	assert.equal(result.suite.modelIndependent, true);
+
+	const shownDefinition = payload(
+		runCli(
+			[
+				"artifact",
+				"show",
+				"--target",
+				dir,
+				"--type",
+				"eval",
+				"--id",
+				"eval/instruction-surface",
+				"--json",
+			],
+			dir,
+		),
+	);
+	assert.equal(shownDefinition.lifecycle, "active");
+	assert.equal(shownDefinition.envelope.extensions.eval.suiteId, "instruction-surface");
+
+	const shownOutcome = payload(
+		runCli(
+			[
+				"artifact",
+				"show",
+				"--target",
+				dir,
+				"--type",
+				"eval-result",
+				"--id",
+				result.outcome.identity,
+				"--json",
+			],
+			dir,
+		),
+	);
+	assert.equal(
+		shownOutcome.envelope.extensions.evalResult.resultHash,
+		result.outcome.extensions.evalResult.resultHash,
+	);
+	assert.equal(
+		shownOutcome.envelope.extensions.evalResult.definition.identity,
+		"eval/instruction-surface",
+	);
+
+	const evidence = payload(
+		runCli(["evidence", "show", "--target", dir, "--id", "evidence/eval-run", "--json"], dir),
+	);
+	assert.equal(evidence.assurance, "replayable");
+	assert.equal(evidence.verifiedBy.length, 0);
+	const verified = runCli(
+		[
+			"evidence",
+			"verify",
+			"--target",
+			dir,
+			"--id",
+			"evidence/eval-run",
+			"--verifier",
+			"reviewer@example.com",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(verified.status, 0, verified.stderr || verified.stdout);
+	const promoted = payload(
+		runCli(["evidence", "show", "--target", dir, "--id", "evidence/eval-run", "--json"], dir),
+	);
+	assert.equal(promoted.assurance, "verified");
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("amber eval admit refuses an unregistered producer before writing Eval artifacts", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-admit-producer-"));
+	const r = runCli(
+		[
+			"eval",
+			"admit",
+			"--target",
+			dir,
+			"--producer",
+			"missing-producer",
+			"--evidence-id",
+			"evidence/eval-run",
+			"--yes",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	const outer = JSON.parse(r.stdout);
+	assert.equal(outer.code, "AMBER_E_PRINCIPAL_NOT_FOUND");
+	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts", "evals")), false);
+	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts", "eval-results")), false);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("amber eval run exits 1 when a Context Page imitates the breadcrumb", () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-fail-"));
 	const pages = path.join(dir, ".amber", "context", "pages");
