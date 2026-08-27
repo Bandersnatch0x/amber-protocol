@@ -70,6 +70,27 @@ export interface SemanticResultDTO {
   error?: string;
 }
 
+export interface KnowledgeAnswerSegmentDTO {
+  text: string;
+  citations: string[];
+}
+
+export type KnowledgeAskResultDTO =
+  | { status: 'unavailable'; reason: 'not-configured' | 'invalid-config' }
+  | {
+      status: 'ok';
+      answer: { segments: KnowledgeAnswerSegmentDTO[] };
+      omittedCount: number;
+      supersededBy: Record<string, string>;
+      contextDigest: string;
+      provenance: {
+        provider: string;
+        model: string;
+        timestamp: string;
+        promptHash: string;
+      };
+    };
+
 export interface LLMStatusDTO {
   available: boolean;
   reason?: 'not-configured' | 'invalid-config';

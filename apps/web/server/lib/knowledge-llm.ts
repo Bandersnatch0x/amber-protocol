@@ -4,7 +4,7 @@
  */
 
 export type LLMProvider = 'openai' | 'anthropic' | 'stub';
-export type LLMFacadePurpose = 'semantic-edges' | 'node-summaries';
+export type LLMFacadePurpose = 'semantic-edges' | 'node-summaries' | 'cited-qa';
 
 export interface LLMStatus {
   available: false;
@@ -128,10 +128,14 @@ export async function complete(
 
 function buildStubResponse(purpose: LLMFacadePurpose, userMessage: string): string {
   const request = JSON.parse(userMessage) as {
+    context?: string;
     nodes?: Array<{ id?: unknown; title?: unknown }>;
     existingEdges?: Array<{ src?: unknown; dst?: unknown; verb?: unknown }>;
   };
-  const nodes = (request.nodes ?? []).filter(
+  const context = request.context
+    ? (JSON.parse(request.context) as { nodes?: Array<{ id?: unknown; title?: unknown }> })
+    : undefined;
+  const nodes = (context?.nodes ?? request.nodes ?? []).filter(
     (node): node is { id: string; title?: unknown } => typeof node.id === 'string',
   );
 
@@ -140,6 +144,20 @@ function buildStubResponse(purpose: LLMFacadePurpose, userMessage: string): stri
     ...nodes.filter((node) => node.id === 'feature:F001'),
     ...nodes.filter((node) => node.id !== 'adr:0001' && node.id !== 'feature:F001'),
   ];
+
+  if (purpose === 'cited-qa') {
+    const first = preferred[0];
+    return JSON.stringify({
+      segments: first
+        ? [
+            {
+              text: `The deterministic knowledge graph includes ${String(first.title ?? first.id)}.`,
+              citations: [first.id],
+            },
+          ]
+        : [],
+    });
+  }
 
   if (purpose === 'node-summaries') {
     const first = preferred[0];

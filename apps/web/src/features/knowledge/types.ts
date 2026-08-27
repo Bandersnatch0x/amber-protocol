@@ -7,5 +7,7 @@ export type {
   RecentChangeItem,
   NodeSummaryDTO,
   SemanticResultDTO,
+  KnowledgeAnswerSegmentDTO,
+  KnowledgeAskResultDTO,
   LLMStatusDTO,
 } from '../../lib/knowledge-dto';

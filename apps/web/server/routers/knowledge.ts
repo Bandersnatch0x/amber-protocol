@@ -1,141 +1,46 @@
-import { createRequire } from 'module';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
 import { router, publicProcedure } from '../trpc';
 import { listRecentChanges } from '../lib/knowledge-recent';
 import { resolveRepoRoot } from '../lib/repo-root';
 import { getStatus } from '../lib/knowledge-llm';
 import { inferSemanticEdges, inferNodeSummaries } from '../lib/knowledge-llm-prompts';
+import { readKnowledgeGraphSnapshot } from '../lib/knowledge-graph-reader';
+import { answerKnowledgeQuestion, KnowledgeAskError } from '../lib/knowledge-qa';
 import type {
-  GraphLayer,
+  KnowledgeAskResultDTO,
   KnowledgeNode,
   KnowledgeGraphDTO,
   KnowledgeEdgeDTO,
-  DriftFinding,
   LLMStatusDTO,
   SemanticResultDTO,
   NodeSummaryDTO,
 } from '../../src/lib/knowledge-dto';
 
-const requireCli = createRequire(import.meta.url);
-const { buildKnowledgeGraph } = requireCli('../../../../scripts/lib/core/knowledge-graph.js') as {
-  buildKnowledgeGraph: (target: string) => RawGraph;
-};
+const MAX_QUESTION_BYTES = 8 * 1024;
+const MAX_FOCUS_NODE_ID_BYTES = 1024;
 
-interface RawEdge {
-  src: string;
-  dst: string;
-  verb: string;
-  provenance: string;
-  evidence?: Array<{ path: string; line?: number }>;
-}
-
-interface RawDrift {
-  nodeId: string;
-  kind: string;
-  path: string;
-  detail: string;
-  actualPath?: string;
-}
-
-interface RawNode {
-  id: string;
-  kind: string;
-  layer: string;
-  title: string;
-  sourcePath: string;
-  status?: string;
-  updated?: string;
-  paths?: string[];
-  contextPage?: string;
-  revisions?: number;
-  body?: string;
-}
-
-interface RawGraph {
-  schemaVersion: '1';
-  nodes: RawNode[];
-  edges: RawEdge[];
-  drift: RawDrift[];
-}
-
-const NODE_KINDS = new Set<KnowledgeNode['kind']>([
-  'adr',
-  'artifact',
-  'wiki',
-  'knowledge',
-  'memory',
-  'architecture',
-  'feature',
-]);
-const NODE_LAYERS = new Set<GraphLayer>(['decision', 'knowledge', 'implementation']);
-const EDGE_VERBS = new Set<KnowledgeEdgeDTO['verb']>([
-  'supersedes',
-  'builds-on',
-  'references',
-  'describes',
-]);
-const ORIGINS = new Set<'deterministic' | 'inferred'>(['deterministic', 'inferred']);
-
-function adaptNode(n: RawNode): KnowledgeNode {
-  if (!NODE_KINDS.has(n.kind as KnowledgeNode['kind'])) {
-    throw new Error(`Unknown node kind from parser: ${n.kind}`);
-  }
-  if (!NODE_LAYERS.has(n.layer as GraphLayer)) {
-    throw new Error(`Unknown node layer from parser: ${n.layer}`);
-  }
-  const node: KnowledgeNode = {
-    id: n.id,
-    kind: n.kind as KnowledgeNode['kind'],
-    layer: n.layer as GraphLayer,
-    title: n.title,
-    sourcePath: n.sourcePath,
-  };
-  if (n.status !== undefined) node.status = n.status;
-  if (n.updated !== undefined) node.updated = n.updated;
-  if (n.paths !== undefined) node.paths = n.paths;
-  if (n.contextPage !== undefined) node.contextPage = n.contextPage;
-  if (n.revisions !== undefined) node.revisions = n.revisions;
-  if (n.body !== undefined) node.body = n.body;
-  return node;
-}
-
-function adaptEdge(e: RawEdge): KnowledgeEdgeDTO {
-  if (!EDGE_VERBS.has(e.verb as KnowledgeEdgeDTO['verb'])) {
-    throw new Error(`Unknown edge verb from parser: ${e.verb}`);
-  }
-  if (!ORIGINS.has(e.provenance as 'deterministic' | 'inferred')) {
-    throw new Error(`Unknown edge provenance from parser: ${e.provenance}`);
-  }
-  return {
-    src: e.src,
-    dst: e.dst,
-    verb: e.verb as KnowledgeEdgeDTO['verb'],
-    origin: e.provenance as 'deterministic' | 'inferred',
-    ...(e.evidence ? { evidence: e.evidence } : {}),
-  };
-}
-
-function adaptDrift(d: RawDrift): DriftFinding {
-  if (d.kind !== 'dead-anchor') {
-    throw new Error(`Unknown drift kind from parser: ${d.kind}`);
-  }
-  return {
-    nodeId: d.nodeId,
-    kind: 'dead-anchor',
-    path: d.path,
-    detail: d.detail,
-    ...(d.actualPath ? { actualPath: d.actualPath } : {}),
-  };
-}
-
-function adaptGraph(raw: RawGraph): KnowledgeGraphDTO {
-  return {
-    schemaVersion: raw.schemaVersion,
-    nodes: raw.nodes.map(adaptNode),
-    edges: raw.edges.map(adaptEdge),
-    drift: raw.drift.map(adaptDrift),
-    recentChanges: [],
-  };
-}
+const askInputSchema = z.object({
+  question: z
+    .string()
+    .trim()
+    .min(1)
+    .max(2_000)
+    .refine(
+      (value) => Buffer.byteLength(value, 'utf8') <= MAX_QUESTION_BYTES,
+      'question-too-large',
+    ),
+  focusNodeId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(256)
+    .refine(
+      (value) => Buffer.byteLength(value, 'utf8') <= MAX_FOCUS_NODE_ID_BYTES,
+      'focus-node-id-too-large',
+    )
+    .optional(),
+});
 
 export function selectSemanticInputs(nodes: KnowledgeNode[]): {
   edgeNodes: KnowledgeNode[];
@@ -149,9 +54,7 @@ export function selectSemanticInputs(nodes: KnowledgeNode[]): {
 
 export const knowledgeRouter = router({
   graph: publicProcedure.query((): KnowledgeGraphDTO => {
-    const repoRoot = resolveRepoRoot();
-    const raw = buildKnowledgeGraph(repoRoot);
-    return adaptGraph(raw);
+    return readKnowledgeGraphSnapshot(resolveRepoRoot());
   }),
   recentChanges: publicProcedure.query(() => listRecentChanges(resolveRepoRoot())),
 
@@ -165,9 +68,9 @@ export const knowledgeRouter = router({
       return { available: false, inferredEdges: [], nodeSummaries: [] };
     }
 
-    let raw: RawGraph;
+    let snapshot: KnowledgeGraphDTO;
     try {
-      raw = buildKnowledgeGraph(resolveRepoRoot());
+      snapshot = readKnowledgeGraphSnapshot(resolveRepoRoot());
     } catch {
       console.warn('[knowledge.semantic] graph read failed');
       return {
@@ -178,11 +81,12 @@ export const knowledgeRouter = router({
       };
     }
 
-    const nodes = raw.nodes.map(adaptNode);
-    const semanticInputs = selectSemanticInputs(nodes);
-    const existingEdges = raw.edges
-      .filter((edge) => EDGE_VERBS.has(edge.verb as KnowledgeEdgeDTO['verb']))
-      .map((edge) => ({ src: edge.src, dst: edge.dst, verb: edge.verb }));
+    const semanticInputs = selectSemanticInputs(snapshot.nodes);
+    const existingEdges = snapshot.edges.map((edge) => ({
+      src: edge.src,
+      dst: edge.dst,
+      verb: edge.verb,
+    }));
 
     const [edgeOutcome, summaryOutcome] = await Promise.allSettled([
       inferSemanticEdges(semanticInputs.edgeNodes, existingEdges),
@@ -222,4 +126,39 @@ export const knowledgeRouter = router({
       ...(errors.length > 0 ? { error: errors.join(',') } : {}),
     };
   }),
+
+  ask: publicProcedure
+    .input(askInputSchema)
+    .query(async ({ input }): Promise<KnowledgeAskResultDTO> => {
+      const status = getStatus();
+      if (!status.available)
+        return { status: 'unavailable', reason: status.reason ?? 'invalid-config' };
+
+      let snapshot: KnowledgeGraphDTO;
+      try {
+        snapshot = readKnowledgeGraphSnapshot(resolveRepoRoot());
+      } catch {
+        console.warn('[knowledge.ask] graph read failed');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'knowledge-graph-unavailable',
+        });
+      }
+
+      try {
+        return await answerKnowledgeQuestion(snapshot, input.question, input.focusNodeId);
+      } catch (error) {
+        if (error instanceof KnowledgeAskError) {
+          throw new TRPCError({
+            code: error.code === 'uncitable-answer' ? 'UNPROCESSABLE_CONTENT' : 'BAD_REQUEST',
+            message: error.code,
+          });
+        }
+        console.warn('[knowledge.ask] cited QA unavailable');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'knowledge-answer-unavailable',
+        });
+      }
+    }),
 });

@@ -334,6 +334,19 @@ test.describe('Knowledge Map — semantic layer without a provider', () => {
     await expect(page.getByTestId('semantic-disclosure')).toHaveCount(0);
     await expect(page.getByRole('checkbox', { name: /inferred/i }).first()).toBeChecked();
   });
+
+  test('keeps the deterministic map usable when Ask has no provider', async ({ page }) => {
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+    await page.getByRole('tab', { name: 'Ask' }).click();
+    await page.getByLabel('Question').fill('What governs this repository?');
+    await page.getByRole('button', { name: 'Send question' }).click();
+
+    await expect(page.getByTestId('knowledge-ask-panel')).toContainText(/no LLM provider/i);
+    await expect(
+      page.locator('.react-flow__renderer, .react-flow__viewport').first(),
+    ).toBeVisible();
+  });
 });
 
 test.describe('Knowledge Map — user-triggered semantic stub', () => {
@@ -398,5 +411,34 @@ test.describe('Knowledge Map — user-triggered semantic stub', () => {
     ).toBeVisible();
     const { total } = await getSubtitleCounts(page);
     expect(total).toBeGreaterThanOrEqual(100);
+  });
+
+  test('returns cited segments and citation chips select live map nodes', async ({ page }) => {
+    let askRequests = 0;
+    page.on('request', (request) => {
+      if (request.url().includes('/knowledge.ask?')) askRequests += 1;
+    });
+
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+    await page.getByRole('tab', { name: 'Ask' }).click();
+    await expect(page.getByTestId('knowledge-ask-panel')).toContainText(
+      /sends your question and deterministic repository context/i,
+    );
+    expect(askRequests).toBe(0);
+
+    await page.getByLabel('Question').fill('What knowledge is available?');
+    await page.getByRole('button', { name: 'Send question' }).click();
+    await expect.poll(() => askRequests).toBe(1);
+
+    const answer = page.getByTestId('knowledge-ask-answer');
+    await expect(answer).toContainText(/deterministic knowledge graph includes/i);
+    const citation = answer.getByTestId('knowledge-citation-adr:0001');
+    await expect(citation).toBeVisible();
+    await citation.click();
+    await expect(page.getByTestId('knowledge-node-adr:0001')).toHaveClass(/border-amber-400/);
+    await expect(
+      page.locator('.react-flow__renderer, .react-flow__viewport').first(),
+    ).toBeVisible();
   });
 });
