@@ -906,6 +906,15 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_EVIDENCE_NOT_FOUND", "AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT"],
 	},
+	AMBER_E_EVIDENCE_ALREADY_VERIFIED: {
+		title: "Evidence is already verified by this principal",
+		cause:
+			"verify was invoked by a principal who has already appended a verification event for this receipt. A verification is recorded exactly once per verifier — repeating it would only grow the ledger without changing the derived state.",
+		remedy:
+			"Nothing to do: the effective assurance is already verified. A different independent principal may still add its own verification.",
+		layer: "Verification",
+		related: ["AMBER_E_EVIDENCE_SELF_VERIFICATION", "AMBER_E_EVIDENCE_NOT_FOUND"],
+	},
 	AMBER_E_EVIDENCE_NOT_FOUND: {
 		title: "Evidence id is not recorded",
 		cause: "A verify or show named an evidence id with no recorded receipt in the ledger.",

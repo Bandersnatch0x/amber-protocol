@@ -24,16 +24,15 @@
 // verification changes what a read returns without rewriting any event.
 
 const path = require("node:path");
-const fs = require("node:fs");
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
-const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 const {
 	GENESIS_HASH,
 	chainHash,
 	chainHeadHash: sharedChainHeadHash,
 	acquireLedgerLock,
+	appendWithinCeiling: sharedAppendWithinCeiling,
 } = require("./registry-ledger");
 const { resolveActivePrincipal } = require("./principal-registry");
 
@@ -42,6 +41,7 @@ const UNSUPPORTED_VERSION_CODE = "AMBER_E_EVIDENCE_UNSUPPORTED_VERSION";
 const SIZE_CEILING_CODE = "AMBER_E_EVIDENCE_SIZE_CEILING";
 const LOCK_CONFLICT_CODE = "AMBER_E_EVIDENCE_REGISTRY_LOCK";
 const ALREADY_RECORDED_CODE = "AMBER_E_EVIDENCE_ALREADY_RECORDED";
+const ALREADY_VERIFIED_CODE = "AMBER_E_EVIDENCE_ALREADY_VERIFIED";
 const NOT_FOUND_CODE = "AMBER_E_EVIDENCE_NOT_FOUND";
 const ASSURANCE_FORBIDDEN_CODE = "AMBER_E_EVIDENCE_ASSURANCE_FORBIDDEN";
 const SELF_VERIFICATION_CODE = "AMBER_E_EVIDENCE_SELF_VERIFICATION";
@@ -78,13 +78,17 @@ const DEFAULT_MAX_EVIDENCE_BYTES = 1024 * 1024;
 
 // Bounded receipt content: the ledger must stay small and reviewable, so the
 // writers refuse (typed argument error, never silent truncation) a receipt
-// that would smuggle unbounded output into governed state.
+// that would smuggle unbounded output into governed state. Every string
+// field and array entry is capped — the 1 MiB ledger ceiling is the last
+// line of defense, not the only bound.
 const MAX_INPUTS = 32;
 const MAX_TOOLS = 16;
 const MAX_ENV_KEYS = 32;
 const MAX_OUTPUTS = 8;
 const MAX_OUTPUT_CHARS = 2000;
+const MAX_ENTRY_CHARS = 2000;
 const MAX_SUBJECT_CHARS = 200;
+const MAX_SCOPE_CHARS = 200;
 const MAX_REPLAY_OF_CHARS = 200;
 const MAX_ID_CHARS = 200;
 
@@ -172,7 +176,7 @@ function isPlainObject(value) {
  * object of non-empty string keys to non-empty string values.
  * @returns {string|null} The argument problem, or null.
  */
-function boundedStringArrayProblem(label, value, cap) {
+function boundedStringArrayProblem(label, value, cap, charsCap = MAX_ENTRY_CHARS) {
 	if (value === undefined || value === null) return null;
 	if (!Array.isArray(value))
 		return `${label} must be an array of non-empty strings; got ${JSON.stringify(value)}`;
@@ -182,6 +186,9 @@ function boundedStringArrayProblem(label, value, cap) {
 	for (const entry of value) {
 		if (typeof entry !== "string" || entry.length === 0) {
 			return `${label} must be an array of non-empty strings; got ${JSON.stringify(entry)}`;
+		}
+		if (entry.length > charsCap) {
+			return `each ${label} entry must carry at most ${charsCap} characters; got ${entry.length} — the receipt contract keeps the ledger bounded`;
 		}
 	}
 	return null;
@@ -200,6 +207,9 @@ function environmentProblem(environment) {
 		const value = environment[key];
 		if (key.length === 0 || typeof value !== "string" || value.length === 0) {
 			return `environment must map non-empty keys to non-empty string values; got ${JSON.stringify(key)}: ${JSON.stringify(value)}`;
+		}
+		if (value.length > MAX_ENTRY_CHARS) {
+			return `each environment value must carry at most ${MAX_ENTRY_CHARS} characters; key ${JSON.stringify(key)} carries ${value.length} — the receipt contract keeps the ledger bounded`;
 		}
 	}
 	return null;
@@ -256,6 +266,9 @@ function receiptInputProblem({
 	}
 	if (!isNullableNonEmptyString(scope)) {
 		return `scope must be a non-empty string or null; got ${JSON.stringify(scope)}`;
+	}
+	if (scope !== null && scope.length > MAX_SCOPE_CHARS) {
+		return `scope must carry at most ${MAX_SCOPE_CHARS} characters; got ${scope.length} — the receipt contract keeps the ledger bounded`;
 	}
 	const subjectProblem = boundedScalarProblem("subject", subject, MAX_SUBJECT_CHARS);
 	if (subjectProblem !== null) return subjectProblem;
@@ -380,7 +393,6 @@ function foldEvidence(cwd) {
 			}
 			byId.set(event.receipt.id, {
 				...event.receipt,
-				recordedAt: event.receipt.recordedAt,
 				verifiedBy: [],
 			});
 		} else if (event.kind === "verified") {
@@ -408,6 +420,11 @@ function foldEvidence(cwd) {
 			if (event.verifier.id === record.producer.id) {
 				throw evidenceCorrupt(
 					`evidence ledger event ${lineIndex} has "${event.verifier.id}" verifying its own evidence "${event.evidenceId}"; the verify writer refuses self-verification, so the writers can never append this — the ledger was edited in place`,
+				);
+			}
+			if (record.verifiedBy.some((entry) => entry.verifier.id === event.verifier.id)) {
+				throw evidenceCorrupt(
+					`evidence ledger event ${lineIndex} has "${event.verifier.id}" verifying "${event.evidenceId}" a second time; the verify writer records a verification exactly once per verifier, so the writers can never append this — the ledger was edited in place`,
 				);
 			}
 			record.verifiedBy.push({
@@ -463,6 +480,9 @@ function storedReceiptProblem(receipt, lineIndex) {
 	if (!isNullableNonEmptyString(receipt.scope)) {
 		return `evidence ledger event ${lineIndex} carries a receipt whose scope is neither null nor a non-empty string; got ${JSON.stringify(receipt.scope)}`;
 	}
+	if (receipt.scope !== null && receipt.scope.length > MAX_SCOPE_CHARS) {
+		return `evidence ledger event ${lineIndex} carries a receipt whose scope exceeds ${MAX_SCOPE_CHARS} characters; got ${receipt.scope.length}`;
+	}
 	if (
 		typeof receipt.subject !== "string" ||
 		receipt.subject.length === 0 ||
@@ -481,19 +501,26 @@ function storedReceiptProblem(receipt, lineIndex) {
 		if (
 			!Array.isArray(value) ||
 			value.length > cap ||
-			value.some((entry) => typeof entry !== "string" || entry.length === 0)
+			value.some(
+				(entry) =>
+					typeof entry !== "string" || entry.length === 0 || entry.length > MAX_ENTRY_CHARS,
+			)
 		) {
-			return `evidence ledger event ${lineIndex} carries a receipt whose ${label} is not an array of at most ${cap} non-empty strings; got ${JSON.stringify(value)}`;
+			return `evidence ledger event ${lineIndex} carries a receipt whose ${label} is not an array of at most ${cap} non-empty strings of at most ${MAX_ENTRY_CHARS} characters; got ${JSON.stringify(value)}`;
 		}
 	}
 	if (
 		!isPlainObject(receipt.environment) ||
 		Object.keys(receipt.environment).length > MAX_ENV_KEYS ||
 		Object.entries(receipt.environment).some(
-			([key, value]) => key.length === 0 || typeof value !== "string" || value.length === 0,
+			([key, value]) =>
+				key.length === 0 ||
+				typeof value !== "string" ||
+				value.length === 0 ||
+				value.length > MAX_ENTRY_CHARS,
 		)
 	) {
-		return `evidence ledger event ${lineIndex} carries a receipt whose environment is not an object of at most ${MAX_ENV_KEYS} non-empty string keys to non-empty string values; got ${JSON.stringify(receipt.environment)}`;
+		return `evidence ledger event ${lineIndex} carries a receipt whose environment is not an object of at most ${MAX_ENV_KEYS} non-empty string keys to non-empty string values of at most ${MAX_ENTRY_CHARS} characters; got ${JSON.stringify(receipt.environment)}`;
 	}
 	if (
 		!Array.isArray(receipt.outputs) ||
@@ -555,23 +582,16 @@ function storedSnapshotProblem(snapshot, lineIndex, role) {
 }
 
 // The ledger append ceiling: refuse an event that would grow the ledger past
-// its bound BEFORE any durable state is touched.
+// its bound BEFORE any durable state is touched (shared discipline with the
+// principal registry through registry-ledger).
 function appendWithinCeiling(cwd, event) {
-	const ceiling = resolvePositiveIntCeiling(
-		"AMBER_EVIDENCE_MAX_REGISTRY_BYTES",
-		DEFAULT_MAX_EVIDENCE_BYTES,
-		"evidence ledger size ceiling",
-	);
-	const line = `${JSON.stringify(event)}\n`;
-	let currentBytes = 0;
-	try {
-		currentBytes = fs.existsSync(evidenceLedgerPath(cwd))
-			? fs.statSync(evidenceLedgerPath(cwd)).size
-			: 0;
-	} catch {
-		currentBytes = 0;
-	}
-	return { ceiling, wouldExceed: currentBytes + Buffer.byteLength(line, "utf8") > ceiling };
+	return sharedAppendWithinCeiling({
+		ledgerPath: evidenceLedgerPath(cwd),
+		event,
+		envName: "AMBER_EVIDENCE_MAX_REGISTRY_BYTES",
+		defaultBytes: DEFAULT_MAX_EVIDENCE_BYTES,
+		label: "evidence ledger",
+	});
 }
 
 /**
@@ -600,6 +620,14 @@ function recordEvidence(cwd, input, opts = {}) {
 		status,
 		replayOf = null,
 	} = input;
+	// Explicit nulls are normalized to the stored defaults: the write-side
+	// validators treat null as absent, but the destructuring defaults only
+	// cover undefined — a stored null would read back as corruption and
+	// brick the ledger, so the writer only ever stores fold-readable shapes.
+	const storedInputs = inputs ?? [];
+	const storedTools = tools ?? [];
+	const storedEnvironment = environment ?? {};
+	const storedOutputs = outputs ?? [];
 	if (typeof producer !== "string" || producer.trim().length === 0) {
 		return fail(INVALID_ARG_CODE, [
 			`producer is required: the receipt must bind the Principal that produced the evidence, verified against the registry (e.g. --producer ci-bot); got ${JSON.stringify(producer)}`,
@@ -623,10 +651,10 @@ function recordEvidence(cwd, input, opts = {}) {
 		assurance,
 		scope,
 		subject,
-		inputs,
-		tools,
-		environment,
-		outputs,
+		inputs: storedInputs,
+		tools: storedTools,
+		environment: storedEnvironment,
+		outputs: storedOutputs,
 		status,
 		replayOf,
 	});
@@ -668,10 +696,10 @@ function recordEvidence(cwd, input, opts = {}) {
 			assurance,
 			scope,
 			subject,
-			inputs,
-			tools,
-			environment,
-			outputs,
+			inputs: storedInputs,
+			tools: storedTools,
+			environment: storedEnvironment,
+			outputs: storedOutputs,
 			status,
 			replayOf,
 			recordedAt: at,
@@ -790,6 +818,14 @@ function verifyEvidence(cwd, { id, verifier }, opts = {}) {
 			`principal "${verifier}" produced evidence "${id}" and cannot also verify it: a Runner can never award itself proof — verification requires an independent registered principal (a different id)`,
 		]);
 	}
+	const priorVerification = target.verifiedBy.find(
+		(entry) => entry.verifier.id === resolvedVerifier.principal.id,
+	);
+	if (priorVerification !== undefined) {
+		return fail(ALREADY_VERIFIED_CODE, [
+			`principal "${verifier}" already verified evidence "${id}" (at ${priorVerification.verifiedAt}); a verification is recorded exactly once per verifier — the effective assurance is already verified, and a second append would only grow the ledger`,
+		]);
+	}
 
 	const at = new Date().toISOString();
 	const body = {
@@ -810,6 +846,7 @@ function verifyEvidence(cwd, { id, verifier }, opts = {}) {
 			`appending the verification for "${id}" would grow the evidence ledger beyond its size ceiling of ${ceilingCheck.ceiling} bytes (AMBER_EVIDENCE_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`,
 		]);
 	}
+	let freshTarget;
 	let release;
 	try {
 		release = acquireEvidenceLock(cwd);
@@ -823,7 +860,7 @@ function verifyEvidence(cwd, { id, verifier }, opts = {}) {
 		} catch (err) {
 			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
 		}
-		const freshTarget = fresh.find((record) => record.id === id);
+		freshTarget = fresh.find((record) => record.id === id);
 		if (!freshTarget) {
 			return fail(NOT_FOUND_CODE, [
 				`evidence "${id}" is not recorded; verification applies to a recorded receipt`,
@@ -832,6 +869,13 @@ function verifyEvidence(cwd, { id, verifier }, opts = {}) {
 		if (resolvedVerifier.principal.id === freshTarget.producer.id) {
 			return fail(SELF_VERIFICATION_CODE, [
 				`principal "${verifier}" produced evidence "${id}" and cannot also verify it: verification requires an independent registered principal`,
+			]);
+		}
+		if (
+			freshTarget.verifiedBy.some((entry) => entry.verifier.id === resolvedVerifier.principal.id)
+		) {
+			return fail(ALREADY_VERIFIED_CODE, [
+				`principal "${verifier}" already verified evidence "${id}"; a verification is recorded exactly once per verifier`,
 			]);
 		}
 		const prevHash = chainHeadHashOf(cwd);
@@ -852,7 +896,23 @@ function verifyEvidence(cwd, { id, verifier }, opts = {}) {
 	} finally {
 		release();
 	}
-	const updated = foldEvidence(cwd).find((record) => record.id === id);
+	// The append is durable; if this confirming fold still fails, the write
+	// happened — report the derived record rather than leaking a raw throw
+	// through the result-object seam.
+	let updated;
+	try {
+		updated = foldEvidence(cwd).find((record) => record.id === id);
+	} catch {
+		updated = {
+			...freshTarget,
+			verifiedBy: [
+				...freshTarget.verifiedBy,
+				{ verifier: Object.freeze({ ...resolvedVerifier.principal }), verifiedAt: at },
+			],
+			assurance: "verified",
+			recordedAssurance: freshTarget.recordedAssurance,
+		};
+	}
 	return { ok: true, code: null, receipt: updated ?? null, errors: [] };
 }
 

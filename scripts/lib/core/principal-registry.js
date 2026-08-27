@@ -55,12 +55,12 @@ const path = require("node:path");
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
-const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 const {
 	GENESIS_HASH,
 	chainHash,
 	chainHeadHash: sharedChainHeadHash,
 	acquireLedgerLock,
+	appendWithinCeiling: sharedAppendWithinCeiling,
 } = require("./registry-ledger");
 
 const REGISTRY_CORRUPT_CODE = "AMBER_E_PRINCIPAL_REGISTRY_CORRUPT";
@@ -509,21 +509,16 @@ function resolveActivePrincipal(cwd, id, { now = new Date() } = {}) {
 }
 
 // The registry append ceiling: refuse an event that would grow the ledger
-// past its bound BEFORE any durable state is touched.
+// past its bound BEFORE any durable state is touched (shared discipline,
+// registry-ledger.js).
 function registryAppendWithinCeiling(cwd, event) {
-	const ceiling = resolvePositiveIntCeiling(
-		"AMBER_PRINCIPAL_MAX_REGISTRY_BYTES",
-		DEFAULT_MAX_REGISTRY_BYTES,
-		"principal registry size ceiling",
-	);
-	const line = `${JSON.stringify(event)}\n`;
-	let currentBytes = 0;
-	try {
-		currentBytes = fs.existsSync(registryPath(cwd)) ? fs.statSync(registryPath(cwd)).size : 0;
-	} catch {
-		currentBytes = 0;
-	}
-	return { ceiling, wouldExceed: currentBytes + Buffer.byteLength(line, "utf8") > ceiling };
+	return sharedAppendWithinCeiling({
+		ledgerPath: registryPath(cwd),
+		event,
+		envName: "AMBER_PRINCIPAL_MAX_REGISTRY_BYTES",
+		defaultBytes: DEFAULT_MAX_REGISTRY_BYTES,
+		label: "principal registry",
+	});
 }
 
 /**

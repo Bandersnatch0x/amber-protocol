@@ -212,6 +212,34 @@ test("record refuses the verified level — a Runner can never award itself proo
 	assert.equal(fs.existsSync(ledgerPathOf(dir)), false, "no ledger line is written");
 });
 
+test("explicit null collection fields are normalized, never stored — a stored null would read back as corruption", () => {
+	const dir = mkTarget("null-seam");
+	seedPrincipals(dir);
+	const result = recordEvidence(dir, {
+		id: "evidence/null-seam",
+		producer: "ci-runner",
+		assurance: "observed",
+		scope: null,
+		subject: "spec/login@2",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: null,
+		status: "pass",
+	});
+	assert.equal(result.ok, true, (result.errors || []).join("; "));
+	assert.deepEqual(result.receipt.inputs, []);
+	assert.deepEqual(result.receipt.tools, []);
+	assert.deepEqual(result.receipt.environment, {});
+	assert.deepEqual(result.receipt.outputs, []);
+	const raw = JSON.parse(fs.readFileSync(ledgerPathOf(dir), "utf8").trim().split("\n")[0]);
+	assert.deepEqual(raw.receipt.inputs, []);
+	assert.deepEqual(raw.receipt.tools, []);
+	assert.deepEqual(raw.receipt.environment, {});
+	assert.deepEqual(raw.receipt.outputs, []);
+	assert.deepEqual(showEvidence(dir, "evidence/null-seam").inputs, []);
+});
+
 test("record requires an assurance from the recordable set — a dropped flag must not JSON-drop the field", () => {
 	const dir = mkTarget("assurance-required");
 	seedPrincipals(dir);
@@ -345,6 +373,30 @@ test("verify requires a recorded evidence id and a registered verifier", () => {
 	assert.equal(ghost.code, "AMBER_E_PRINCIPAL_NOT_FOUND");
 });
 
+test("verify is idempotent per verifier — a second verification by the same principal is refused", () => {
+	const dir = mkTarget("verify-dupe");
+	seedPrincipals(dir);
+	assert.equal(recordFixture(dir).ok, true);
+	assert.equal(verifyEvidence(dir, { id: "evidence/run-1", verifier: "reviewer-alice" }).ok, true);
+	const again = verifyEvidence(dir, { id: "evidence/run-1", verifier: "reviewer-alice" });
+	assert.equal(again.ok, false);
+	assert.equal(again.code, "AMBER_E_EVIDENCE_ALREADY_VERIFIED");
+	assert.match(again.errors.join("; "), /already verified/);
+	const lines = fs.readFileSync(ledgerPathOf(dir), "utf8").trim().split("\n");
+	assert.equal(lines.length, 2, "the refused verification wrote nothing");
+	assert.equal(showEvidence(dir, "evidence/run-1").verifiedBy.length, 1);
+	// A DIFFERENT independent principal can still add its own verification.
+	const second = registerPrincipal(dir, {
+		id: "reviewer-bob",
+		principalKind: "human",
+		role: "reviewer",
+	});
+	assert.equal(second.ok, true, (second.errors || []).join("; "));
+	const bob = verifyEvidence(dir, { id: "evidence/run-1", verifier: "reviewer-bob" });
+	assert.equal(bob.ok, true, (bob.errors || []).join("; "));
+	assert.equal(showEvidence(dir, "evidence/run-1").verifiedBy.length, 2);
+});
+
 test("show returns null for an unrecorded id; the derived record is never stored", () => {
 	const dir = mkTarget("show-null");
 	seedPrincipals(dir);
@@ -389,6 +441,78 @@ test("an in-place edit of a recorded receipt fails closed as corruption", () => 
 	foldThrows(dir, "AMBER_E_EVIDENCE_REGISTRY_CORRUPT", "hash that does not match its content");
 });
 
+test("a tampered nested environment entry — even one named hash — fails closed as corruption", () => {
+	const dir = mkTarget("tamper-nested");
+	seedPrincipals(dir);
+	assert.equal(
+		recordFixture(dir, "evidence/run-1", {
+			environment: { os: "linux", hash: "sha256:deadbeef" },
+		}).ok,
+		true,
+	);
+	// The writer->fold round trip preserves a nested key literally named
+	// "hash": the canonical event hash excludes only the event's OWN
+	// top-level hash field, never nested content.
+	assert.deepEqual(showEvidence(dir, "evidence/run-1").environment, {
+		os: "linux",
+		hash: "sha256:deadbeef",
+	});
+	const events = fs
+		.readFileSync(ledgerPathOf(dir), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	events[0].receipt.environment.hash = "sha256:attacker";
+	writeLedger(dir, events);
+	foldThrows(dir, "AMBER_E_EVIDENCE_REGISTRY_CORRUPT", "hash that does not match its content");
+});
+
+test("stored receipts with malformed bounded content fail closed on the fold", () => {
+	const cases = [
+		[
+			"environment value of the wrong type",
+			storedReceipt({ environment: { os: 7 } }),
+			"environment is not an object of at most",
+		],
+		[
+			"an oversized output entry",
+			storedReceipt({ outputs: ["x".repeat(2001)] }),
+			"outputs is not an array of at most",
+		],
+		[
+			"an oversized inputs entry",
+			storedReceipt({ inputs: ["x".repeat(2001)] }),
+			"inputs is not an array of at most",
+		],
+		[
+			"an empty scope string",
+			storedReceipt({ scope: "" }),
+			"scope is neither null nor a non-empty string",
+		],
+		[
+			"a missing recordedAt",
+			{ ...storedReceipt(), recordedAt: undefined },
+			"no recordedAt timestamp",
+		],
+	];
+	for (const [label, receipt, needle] of cases) {
+		const dir = mkTarget("stored-bounds");
+		writeLedger(dir, withChain([recordedEvent(receipt)]));
+		try {
+			listEvidence(dir);
+			assert.fail(`case "${label}" must fail closed`);
+		} catch (err) {
+			assert.equal(
+				err.amberCode,
+				"AMBER_E_EVIDENCE_REGISTRY_CORRUPT",
+				`case "${label}": ${err.message}`,
+			);
+			assert.ok(err.message.includes(needle), `case "${label}": ${err.message}`);
+		}
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
 test("a spliced middle event breaks the chain and fails closed", () => {
 	const dir = mkTarget("splice");
 	seedPrincipals(dir);
@@ -427,6 +551,20 @@ test("a self-verification inside the ledger is corruption", () => {
 		withChain([recordedEvent(receipt), verifiedEvent(receipt.id, receipt.producer.id)]),
 	);
 	foldThrows(dir, "AMBER_E_EVIDENCE_REGISTRY_CORRUPT", "verifying its own evidence");
+});
+
+test("a duplicate verification by the same verifier inside the ledger is corruption", () => {
+	const dir = mkTarget("dupe-verify-fold");
+	const receipt = storedReceipt();
+	writeLedger(
+		dir,
+		withChain([
+			recordedEvent(receipt),
+			verifiedEvent(receipt.id, "reviewer-alice"),
+			verifiedEvent(receipt.id, "reviewer-alice", "2026-08-03T00:00:00.000Z"),
+		]),
+	);
+	foldThrows(dir, "AMBER_E_EVIDENCE_REGISTRY_CORRUPT", "a second time");
 });
 
 test("unknown event fields, kinds, and schema versions fail closed", () => {

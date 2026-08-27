@@ -664,12 +664,14 @@ A claim can never impersonate verification: `--assurance verified` is refused as
 `AMBER_E_EVIDENCE_ASSURANCE_FORBIDDEN` (a Runner can never award itself proof); only `verify`,
 run by an independent registered Principal whose id differs from the producer's, appends a
 verification event and promotes the **effective** assurance to `verified` — the producer naming
-itself as verifier fails closed as `AMBER_E_EVIDENCE_SELF_VERIFICATION`. A `replayable` receipt
-must name the deterministic definition it replayed via `--replay-of` (an Eval id, a command
-definition, a suite version); a bare replayable claim, or `--replay-of` on any other level, fails
-as `AMBER_E_EVIDENCE_REPLAY_OF_CONFLICT`. Effective assurance and the verifier list are derived at
-read time (`show`/`list` report `assurance`, `recordedAssurance`, and `verifiedBy`) — a later
-verification changes what a read returns without rewriting any event.
+itself as verifier fails closed as `AMBER_E_EVIDENCE_SELF_VERIFICATION`, and the same verifier
+verifying twice fails as `AMBER_E_EVIDENCE_ALREADY_VERIFIED` (a verification is recorded exactly
+once per verifier; a different independent principal may still add its own). A `replayable`
+receipt must name the deterministic definition it replayed via `--replay-of` (an Eval id, a
+command definition, a suite version); a bare replayable claim, or `--replay-of` on any other
+level, fails as `AMBER_E_EVIDENCE_REPLAY_OF_CONFLICT`. Effective assurance and the verifier list
+are derived at read time (`show`/`list` report `assurance`, `recordedAssurance`, and `verifiedBy`)
+— a later verification changes what a read returns without rewriting any event.
 
 ```bash
 # record a replayable receipt with full provenance
