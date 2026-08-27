@@ -25,7 +25,8 @@
     { "slug": "gates", "route": "/gates", "title": "Gates Split-View Triage Workbench", "promptSection": "07 - Gates", "status": "upgraded-v10-prototype-ready" },
     { "slug": "transcripts-list", "route": "/transcripts", "title": "Transcripts List", "promptSection": "08 - Transcripts List", "status": "upgraded-v10" },
     { "slug": "transcript-detail", "route": "/transcripts/$id", "title": "Transcript Detail", "promptSection": "09 - Transcript Detail", "status": "upgraded-v10" },
-    { "slug": "settings", "route": "/settings", "title": "Settings", "promptSection": "10 - Settings", "status": "upgraded-v10" }
+    { "slug": "settings", "route": "/settings", "title": "Settings", "promptSection": "10 - Settings", "status": "upgraded-v10" },
+    { "slug": "knowledge-map", "route": "/knowledge", "title": "Knowledge Map", "promptSection": "11 - Knowledge Map", "status": "prompt-drafted" }
   ],
   "prototypeAssets": [
     ".stitch/designs/amber-viewer-v10-showcase.html"

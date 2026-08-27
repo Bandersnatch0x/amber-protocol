@@ -167,3 +167,25 @@ Apply this shell across all 10 screens:
    - **Polling & Updates:** Live SSE toggle, fallback polling interval slider (1s to 60s).
    - **Notifications:** Desktop notification toggle for session completions and gate blockers.
 3. **Save Footer:** Right-aligned dirty-gated "Save Settings" button (`⌘+S`) with inline success/failure status.
+
+## 11 - Knowledge Map
+
+**ROUTE:** `/knowledge`
+
+Interactive read-only map of the repository's knowledge and decisions: ADRs, wiki knowledge pages, and features as nodes; trace relationships as edges.
+
+**PLATFORM:** Web, desktop-first with mobile collapse to a searchable list.
+
+**SCREEN PURPOSE:** Let a developer or incoming agent answer three questions from one surface: what knowledge exists in this repository, how decisions and features connect to each other, and what changed recently or has gone stale. This is an evidence viewer, not an editor. Nothing on this screen mutates repository state.
+
+**PAGE STRUCTURE:**
+1. **Header:** Title "Knowledge Map", quiet supporting copy such as "Committed knowledge artifacts and their trace relationships", and compact counts as plain secondary text such as "86 nodes · 112 edges".
+2. **Filter bar:** Search input with placeholder "Search nodes..." and a quiet visible `/` hint. Node-kind filter chips for Decision Record, Knowledge Page, Feature, Architecture Page, with live counts per kind. An optional "Drift only" toggle that filters the map down to nodes with drift badges. Filters update the counts in the header.
+3. **Map canvas:** The primary surface is an interactive graph with pan and zoom. Nodes are visually distinct by kind through compact badges or shape cues, each showing a short label such as "ADR-0021", "F058", or "governance-model". Node clusters group loosely by kind without hard containers. Edges render as thin quiet lines; hover or selection may reveal a small edge-type label such as "supersedes", "builds on", "refines", "realizes", or "references". A small unobtrusive overview minimap sits in a canvas corner. When search matches, non-matching nodes dim and matching nodes stay full-contrast with a subtle ring.
+4. **Node detail side panel:** Clicking a node opens a right-side panel. Panel content: node kind badge, node title, a two-to-three-line summary, source path in monospace such as `docs/adr/0021-...md`, and relationship groups listed as "Points to" and "Referenced by" with compact clickable rows that navigate the map to those nodes. A quiet tertiary action "Open source" links out to the file. The panel closes with an explicit control and Escape.
+5. **Recent & Drift module:** A collapsible side section or below-canvas panel with two compact groups. "Recent" lists the latest knowledge changes as quiet rows, for example a new decision record, a feature status change, or a docs commit, each with a short relative time. "Drift" lists coverage gaps and stale documents as subdued warning rows, for example "Session & Lifecycle Management: declared in knowledge plan, no covering page". Drift rows correspond to drift badges on map nodes.
+6. **State handling:** Loading shows a canvas-sized skeleton with filter bar placeholder. Error is inline with Retry and a calm explanation. Empty state explains that the map renders committed knowledge artifacts and points to the wiki knowledge plan as the place to declare them.
+7. **Legend:** A compact legend explains node kinds and edge types without leaving the screen.
+8. **Mobile behavior:** Collapse the canvas to a simplified list of nodes grouped by kind with the same search and filters; relationship traversal moves into the node detail panel. Recent & Drift stacks below.
+
+**CONTENT GUIDANCE:** Use realistic Amber artifacts: decision records numbered ADR-0001 through ADR-0024 with titles like "Web console role — supervised action viewer"; features like F049 Canonical Planning Artifacts, F058 Instruction-Surface Adversarial Evals; knowledge pages like governance-model-seven-layers, cli-architecture-command-dispatch, web-dashboard; architecture pages like overview and data-flow. Edge examples: "ADR-0021 refines ADR-0012", "F058 realizes ADR-0011", "ADR-0007 supersedes web-viewer.md statement".
