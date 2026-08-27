@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark h-full">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Amber Protocol Web Viewer — Dual Theme v10 (Obsidian Dark & Porcelain Light)</title>
+  
+  <!-- Modern Engineering Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            obsidian: {
+              void: '#080B10',
+              surface: '#0F141C',
+              elevated: '#151D28',
+              inset: '#1B2433',
+              border: 'rgba(255, 255, 255, 0.08)',
+              'border-hover': 'rgba(255, 255, 255, 0.18)',
+              'border-active': 'rgba(245, 158, 11, 0.35)'
+            },
+            porcelain: {
+              void: '#F8FAFC',
+              surface: '#FFFFFF',
+              elevated: '#FFFFFF',
+              inset: '#F1F5F9',
+              border: '#E2E8F0',
+              'border-hover': '#CBD5E1'
+            },
+            amber: {
+              gold: '#F59E0B',
+              hover: '#D97706',
+              light: '#FDE68A',
+              muted: 'rgba(245, 158, 11, 0.12)',
+              glow: 'rgba(245, 158, 11, 0.25)'
+            },
+            cobalt: {
+              DEFAULT: '#2563EB',
+              hover: '#1D4ED8',
+              muted: 'rgba(37, 99, 235, 0.12)',
+              glow: 'rgba(37, 99, 235, 0.3)'
+            },
+            emerald: {
+              DEFAULT: '#10B981',
+              muted: 'rgba(16, 185, 129, 0.12)'
+            },
+            crimson: {
+              DEFAULT: '#F43F5E',
+              muted: 'rgba(244, 63, 94, 0.12)'
+            }
+          },
+          fontFamily: {
+            headline: ["Geist", "Inter", "sans-serif"],
+            body: ["Inter", "-apple-system", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"]
+          },
+          boxShadow: {
+            'glow-amber': '0 0 24px -2px rgba(245, 158, 11, 0.25)',
+            'glow-cobalt': '0 0 24px -2px rgba(37, 99, 235, 0.3)',
+            'tactile-card': '0 4px 20px -2px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05)',
+            'tactile-card-dark': '0 8px 32px -4px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.07)',
+            'floating-command': '0 24px 64px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+            'floating-command-dark': '0 24px 64px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.12)'
+          },
+          transitionTimingFunction: {
+            'spring': 'cubic-bezier(0.16, 1, 0.3, 1)'
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 18;
+    }
+    .material-symbols-fill {
+      font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 18;
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.35);
+      border-radius: 9999px;
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+    }
+    
+    /* Radial Micro Dot Grid */
+    .bg-dot-matrix {
+      background-image: radial-gradient(rgba(148, 163, 184, 0.2) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .dark .bg-dot-matrix {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    /* Spring Physics */
+    .spring-press {
+      transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .spring-press:active {
+      transform: scale(0.985);
+    }
+
+    /* Pulse Glow */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.8; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(1.4); }
+    }
+    .animate-pulse-glow {
+      animation: pulseGlow 2.4s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col bg-slate-50 dark:bg-obsidian-void text-slate-900 dark:text-slate-100 font-body antialiased overflow-hidden select-none transition-colors duration-200">
+
+  <!-- FLIGHT DECK TOP NAV BAR (Dual Theme Spacious Craft) -->
+  <header class="h-12 border-b border-slate-200 dark:border-obsidian-border bg-white/95 dark:bg-obsidian-void/95 backdrop-blur-xl px-5 flex items-center justify-between z-30 shrink-0">
+    
+    <!-- Left: Minimalist Workspace Identity -->
+    <div class="flex items-center gap-2.5">
+      <div class="w-6 h-6 rounded-md bg-amber-gold flex items-center justify-center text-slate-950 font-headline font-bold text-xs shadow-glow-amber">
+        A
+      </div>
+      <div class="flex items-center gap-1.5 cursor-pointer group">
+        <span class="font-headline font-semibold text-xs text-slate-900 dark:text-white tracking-tight group-hover:text-amber-gold transition-colors">amber-protocol</span>
+        <span class="material-symbols-outlined text-[14px] text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300">expand_more</span>
+      </div>
+      <span class="text-xs font-mono text-slate-500 dark:text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-obsidian-surface border border-slate-200 dark:border-obsidian-border/60">main</span>
+    </div>
+
+    <!-- Center: Clean & Airy Navigation Links -->
+    <nav class="flex items-center gap-6 text-xs font-medium">
+      <button class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+        总览
+      </button>
+      <button class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-1.5">
+        <span>会话</span>
+        <span class="text-[10px] font-mono text-slate-400">2</span>
+      </button>
+      <button class="text-amber-gold font-semibold flex items-center gap-1.5 relative py-3">
+        <span>闸门分诊</span>
+        <span class="w-4 h-4 rounded-full bg-amber-gold text-slate-950 font-mono text-[10px] font-bold flex items-center justify-center">1</span>
+        <span class="absolute bottom-0 left-0 right-0 h-[2px] bg-amber-gold shadow-glow-amber"></span>
+      </button>
+      <button class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+        时序
+      </button>
+      <button class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+        路由
+      </button>
+      <button class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+        治理
+      </button>
+    </nav>
+
+    <!-- Right: Slim Command Bar & Dual Theme Toggle -->
+    <div class="flex items-center gap-3">
+      <!-- Minimalist Command Search -->
+      <button onclick="toggleCommandPalette()" class="flex items-center gap-3 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-obsidian-surface hover:bg-slate-200 dark:hover:bg-obsidian-elevated border border-slate-200 dark:border-obsidian-border/80 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all">
+        <div class="flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[14px] text-slate-400 dark:text-slate-500">search</span>
+          <span class="text-[11px]">快速查找...</span>
+        </div>
+        <kbd class="px-1 py-0.2 rounded bg-white dark:bg-obsidian-inset text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-obsidian-border">⌘K</kbd>
+      </button>
+
+      <!-- Live Heartbeat Indicator -->
+      <div class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-mono text-slate-500 dark:text-slate-400" title="实时连接正常 (96% 治理健康)">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-slate-700 dark:text-slate-300">Live</span>
+      </div>
+
+      <!-- Theme Switcher -->
+      <button onclick="toggleTheme()" class="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-obsidian-surface text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors" title="切换深色/浅色主题">
+        <span class="material-symbols-outlined text-[16px]" id="theme-icon">light_mode</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN MULTI-PANE COCKPIT WORKSPACE (SPLIT-VIEW GATES TRIAGE) -->
+  <main class="flex-1 flex overflow-hidden bg-dot-matrix relative">
+    
+    <!-- LEFT RAIL: MASTER GATES TRIAGE INBOX (380px) -->
+    <aside class="w-[380px] border-r border-slate-200 dark:border-obsidian-border bg-white/95 dark:bg-obsidian-surface/95 backdrop-blur-md flex flex-col z-10 shrink-0">
+      
+      <!-- Inbox Filter & Count Bar -->
+      <div class="p-3.5 border-b border-slate-200 dark:border-obsidian-border flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-amber-gold text-[18px]">verified_user</span>
+          <h2 class="font-headline font-semibold text-xs text-slate-900 dark:text-white uppercase tracking-wider">审批闸门收件箱 (Gates)</h2>
+        </div>
+        <div class="flex items-center gap-1 text-[11px] font-mono">
+          <button class="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-muted text-amber-700 dark:text-amber-gold font-semibold border border-amber-200 dark:border-amber-gold/30">待决 (1)</button>
+          <button class="px-2 py-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">已过 (14)</button>
+          <button class="px-2 py-0.5 rounded text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">驳回 (0)</button>
+        </div>
+      </div>
+
+      <!-- Gate Items List -->
+      <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+        
+        <!-- Active Gate Card (Focused) -->
+        <div class="p-3 rounded-xl bg-slate-50 dark:bg-obsidian-elevated border border-amber-300 dark:border-amber-gold/40 shadow-tactile-card dark:shadow-tactile-card-dark space-y-2 cursor-pointer transition-all relative overflow-hidden group">
+          <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-gold"></div>
+          
+          <div class="flex items-center justify-between pl-1">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-gold animate-pulse"></span>
+              <span class="font-mono text-xs font-semibold text-amber-700 dark:text-amber-gold">gate-002:verify</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-muted text-amber-800 dark:text-amber-gold font-bold">USER_APPROVAL</span>
+            </div>
+            <span class="text-[10px] font-mono text-slate-400">2分钟前</span>
+          </div>
+
+          <p class="text-xs text-slate-700 dark:text-slate-200 pl-1 line-clamp-2 leading-relaxed">
+            自动化验证已通过 (24/24 tests passed)。检测到关键架构边界变更 (ADR-0020)，请求人工签署放行并恢复流水线。
+          </p>
+
+          <div class="flex items-center justify-between pl-1 pt-1.5 border-t border-slate-200 dark:border-obsidian-border/60 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+            <span>会话: #sess-8849</span>
+            <span class="text-amber-600 dark:text-amber-gold/90 font-medium">阶段: Verify & Commit</span>
+          </div>
+        </div>
+
+        <!-- Past Completed Gate Card -->
+        <div class="p-3 rounded-xl bg-white dark:bg-obsidian-surface/60 hover:bg-slate-50 dark:hover:bg-obsidian-surface border border-slate-200 dark:border-obsidian-border text-slate-500 dark:text-slate-400 space-y-2 cursor-pointer transition-all">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span class="font-mono text-xs text-slate-700 dark:text-slate-300">gate-001:plan</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-muted text-emerald-700 dark:text-emerald-400">PASSED</span>
+            </div>
+            <span class="text-[10px] font-mono text-slate-400 dark:text-slate-500">32分钟前</span>
+          </div>
+          <p class="text-xs text-slate-600 dark:text-slate-400 line-clamp-1">
+            初始规格与原子任务计划审核确认通过。
+          </p>
+          <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-obsidian-border/40 text-[11px] font-mono text-slate-400 dark:text-slate-500">
+            <span>会话: #sess-8849</span>
+            <span>评审人: amsterdam</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick Triage Bottom Hint -->
+      <div class="p-2.5 border-t border-slate-200 dark:border-obsidian-border bg-slate-50 dark:bg-obsidian-void/60 text-[11px] font-mono text-slate-500 flex items-center justify-between">
+        <span>按 <kbd class="px-1 py-0.5 rounded bg-white dark:bg-obsidian-inset border border-slate-200 dark:border-obsidian-border text-slate-600 dark:text-slate-300">J</kbd> / <kbd class="px-1 py-0.5 rounded bg-white dark:bg-obsidian-inset border border-slate-200 dark:border-obsidian-border text-slate-600 dark:text-slate-300">K</kbd> 漫游闸门</span>
+        <span>按 <kbd class="px-1 py-0.5 rounded bg-white dark:bg-obsidian-inset border border-slate-200 dark:border-obsidian-border text-slate-600 dark:text-slate-300">⌘↵</kbd> 快速签署</span>
+      </div>
+    </aside>
+
+    <!-- RIGHT DETAIL INSPECTOR: AUDIT EVIDENCE & DECISION COCKPIT -->
+    <section class="flex-1 flex flex-col overflow-hidden bg-slate-100/50 dark:bg-obsidian-void z-10">
+      
+      <!-- Detail Header Bar -->
+      <div class="h-14 border-b border-slate-200 dark:border-obsidian-border px-6 flex items-center justify-between bg-white dark:bg-obsidian-surface/40 shrink-0">
+        <div class="flex items-center gap-3">
+          <span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-amber-50 dark:bg-amber-muted text-amber-700 dark:text-amber-gold border border-amber-200 dark:border-amber-gold/30">
+            PENDING HUMAN VERDICT
+          </span>
+          <h1 class="font-headline font-bold text-sm text-slate-900 dark:text-white">
+            gate-002:verify — 关键验证与提交前置闸门
+          </h1>
+        </div>
+        <div class="flex items-center gap-2 text-xs font-mono">
+          <span class="text-slate-400 dark:text-slate-500">文件来源:</span>
+          <span class="px-2 py-1 rounded bg-slate-100 dark:bg-obsidian-inset text-slate-600 dark:text-slate-300 text-[11px] border border-slate-200 dark:border-obsidian-border">
+            .amber/sessions/sess-8849/gates/gate-002.json
+          </span>
+        </div>
+      </div>
+
+      <!-- Scrollable Inspector Body -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        
+        <!-- Context & Trigger Reason Card -->
+        <div class="p-4 rounded-xl bg-white dark:bg-obsidian-surface border border-slate-200 dark:border-obsidian-border shadow-sm dark:shadow-none space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-headline font-semibold text-xs text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-amber-gold">info</span>
+              <span>触发原因与上下文 (Trigger Reason & Context)</span>
+            </span>
+            <span class="text-[11px] font-mono text-slate-400">已等待: 2分14秒</span>
+          </div>
+          <p class="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
+            本阶段完成了 <code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-obsidian-inset text-amber-600 dark:text-amber-gold font-mono font-medium">ADR-0020 Stage A</code> 本地提交协议的代码实现。全量 24 个单元与集成测试均已 100% 绿灯通过，未引入任何破坏性越界操作。根据治理契约，涉及版本持久化前需由授权人类评审员签署确认。
+          </p>
+        </div>
+
+        <!-- Live Audit Evidence & Ledger Seal Card -->
+        <div class="p-4 rounded-xl bg-white dark:bg-obsidian-surface border border-slate-200 dark:border-obsidian-border shadow-sm dark:shadow-none space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="font-headline font-semibold text-xs text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-emerald-500 dark:text-emerald-400">lock_reset</span>
+              <span>账本哈希凭证与证据审计 (Ledger Integrity Audit)</span>
+            </span>
+            <span class="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-muted text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-bold border border-emerald-200 dark:border-emerald-500/30">
+              LEDGER VERIFIED (IMMUTABLE)
+            </span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 text-xs font-mono">
+            <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-obsidian-inset border border-slate-200 dark:border-obsidian-border">
+              <div class="text-[10px] text-slate-400 dark:text-slate-500 uppercase">Parent Checkpoint</div>
+              <div class="text-slate-700 dark:text-slate-300 truncate mt-0.5">sha256:7f9a2b0c1...</div>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-obsidian-inset border border-slate-200 dark:border-obsidian-border">
+              <div class="text-[10px] text-slate-400 dark:text-slate-500 uppercase">Context Page Ingestion</div>
+              <div class="text-emerald-600 dark:text-emerald-400 mt-0.5">ADR-0020 Validated</div>
+            </div>
+            <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-obsidian-inset border border-slate-200 dark:border-obsidian-border">
+              <div class="text-[10px] text-slate-400 dark:text-slate-500 uppercase">Principal Capability</div>
+              <div class="text-amber-600 dark:text-amber-gold mt-0.5">human-reviewer:amsterdam</div>
+            </div>
+          </div>
+
+          <!-- Code / Diff Excerpt Container -->
+          <div class="rounded-lg border border-slate-200 dark:border-obsidian-border bg-slate-50 dark:bg-obsidian-void overflow-hidden">
+            <div class="h-8 bg-slate-100 dark:bg-obsidian-inset px-3 flex items-center justify-between text-xs font-mono text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-obsidian-border">
+              <span>git diff --stat (2 files modified)</span>
+              <span>+48 lines, -6 lines</span>
+            </div>
+            <div class="p-3 font-mono text-[11px] leading-relaxed space-y-1">
+              <div class="text-slate-500 dark:text-slate-400">--- a/scripts/lib/transport/session-push.js</div>
+              <div class="text-slate-500 dark:text-slate-400">+++ b/scripts/lib/transport/session-push.js</div>
+              <div class="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-muted/40 px-1">+ const ledger = await verifyTransportLedgerChain(repoPath);</div>
+              <div class="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-muted/40 px-1">+ if (!ledger.isValid) throw new Error("Ledger chain corrupted");</div>
+              <div class="text-slate-400 dark:text-slate-500">  return performGovernedStageACommit(options);</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Timeline Micro-Delta Inspection -->
+        <div class="p-4 rounded-xl bg-white dark:bg-obsidian-surface border border-slate-200 dark:border-obsidian-border shadow-sm dark:shadow-none space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-headline font-semibold text-xs text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-cobalt">timeline</span>
+              <span>时序微增量追踪 (Timeline Micro-Deltas)</span>
+            </span>
+            <span class="text-[11px] font-mono text-slate-400">最近 3 个事件</span>
+          </div>
+
+          <div class="space-y-2 text-xs font-mono">
+            <div class="flex items-center gap-3 p-2 rounded-lg bg-slate-50 dark:bg-obsidian-inset border border-slate-200 dark:border-obsidian-border">
+              <span class="w-5 h-5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-400 flex items-center justify-center text-[10px] font-bold">#22</span>
+              <span class="text-slate-700 dark:text-slate-300">ToolCall: pytest_execute</span>
+              <span class="text-emerald-600 dark:text-emerald-400 ml-auto font-medium">+180ms</span>
+            </div>
+            <div class="flex items-center gap-3 p-2 rounded-lg bg-slate-50 dark:bg-obsidian-inset border border-slate-200 dark:border-obsidian-border">
+              <span class="w-5 h-5 rounded bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-400 flex items-center justify-center text-[10px] font-bold">#23</span>
+              <span class="text-slate-700 dark:text-slate-300">EvidenceGenerated: test-summary.json</span>
+              <span class="text-emerald-600 dark:text-emerald-400 ml-auto font-medium">+42ms</span>
+            </div>
+            <div class="flex items-center gap-3 p-2 rounded-lg bg-amber-50 dark:bg-amber-muted border border-amber-200 dark:border-amber-gold/30">
+              <span class="w-5 h-5 rounded bg-amber-gold text-slate-950 flex items-center justify-center text-[10px] font-bold">#24</span>
+              <span class="text-amber-800 dark:text-amber-gold font-semibold">GateTriggered: gate-002:verify</span>
+              <span class="text-amber-700 dark:text-amber-gold ml-auto font-bold">+12ms (PAUSED)</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- DECISION ACTION CONTROL BAR (STICKY BOTTOM) -->
+      <div class="p-4 border-t border-slate-200 dark:border-obsidian-border bg-white/95 dark:bg-obsidian-surface/90 backdrop-blur-xl flex items-center justify-between gap-4 shrink-0">
+        
+        <!-- Reviewer Identity Signature Field -->
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-mono text-slate-500 dark:text-slate-400">签署评审员 (Reviewer ID):</label>
+          <input type="text" value="amsterdam" class="h-8 text-xs font-mono rounded-lg border-slate-200 dark:border-obsidian-border bg-slate-50 dark:bg-obsidian-inset text-slate-900 dark:text-white px-2.5 focus:ring-amber-gold focus:border-amber-gold w-44" placeholder="e.g. your-name"/>
+        </div>
+
+        <!-- Decision Buttons -->
+        <div class="flex items-center gap-2">
+          <button onclick="rejectGate()" class="h-9 px-4 rounded-lg bg-slate-100 dark:bg-obsidian-inset hover:bg-rose-50 dark:hover:bg-crimson/20 border border-slate-200 dark:border-obsidian-border hover:border-rose-300 dark:hover:border-crimson/40 text-xs font-medium text-rose-600 dark:text-crimson transition-all flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[15px]">block</span>
+            <span>驳回 (Reject)</span>
+            <kbd class="px-1 py-0.2 rounded bg-white dark:bg-obsidian-surface text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-obsidian-border">⌘⇧↵</kbd>
+          </button>
+
+          <button onclick="approveGate()" class="h-9 px-5 rounded-lg bg-gradient-to-r from-amber-gold to-amber-hover hover:opacity-95 text-slate-950 font-semibold text-xs shadow-glow-amber transition-all flex items-center gap-1.5 spring-press">
+            <span class="material-symbols-outlined text-[16px] material-symbols-fill">verified</span>
+            <span>批准并签署放行 (Approve & Resume)</span>
+            <kbd class="px-1.5 py-0.2 rounded bg-slate-950/20 text-[10px] font-mono font-bold">⌘↵</kbd>
+          </button>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- GLOBAL COMMAND PALETTE (CMD+K MODAL) -->
+  <div id="command-palette" class="fixed inset-0 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-md z-50 flex items-start justify-center pt-24 hidden">
+    <div class="bg-white dark:bg-obsidian-elevated rounded-2xl border border-slate-200 dark:border-obsidian-border/80 w-full max-w-xl shadow-floating-command dark:shadow-floating-command-dark overflow-hidden space-y-0">
+      
+      <div class="p-3.5 border-b border-slate-200 dark:border-obsidian-border flex items-center gap-3">
+        <span class="material-symbols-outlined text-slate-400">search</span>
+        <input type="text" placeholder="键入指令、搜索会话、跳至路由或执行治理检查..." class="w-full bg-transparent border-none text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-0 font-body"/>
+        <kbd class="text-[10px] font-mono bg-slate-100 dark:bg-obsidian-inset text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded border border-slate-200 dark:border-obsidian-border">ESC</kbd>
+      </div>
+
+      <div class="p-2 space-y-1 text-xs">
+        <div class="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500">快捷操作 (Actions)</div>
+        <div class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-obsidian-inset text-slate-700 dark:text-slate-200 flex items-center justify-between cursor-pointer">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[16px] text-amber-gold">verified</span>
+            <span>审查待决闸门 (Review Pending Gates)</span>
+          </div>
+          <kbd class="font-mono text-[10px] text-slate-400 dark:text-slate-500">G</kbd>
+        </div>
+        <div class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-obsidian-inset text-slate-700 dark:text-slate-200 flex items-center justify-between cursor-pointer">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[16px] text-cobalt">play_arrow</span>
+            <span>跳转活跃会话 (Jump to #sess-8849)</span>
+          </div>
+          <kbd class="font-mono text-[10px] text-slate-400 dark:text-slate-500">S</kbd>
+        </div>
+        <div class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-obsidian-inset text-slate-700 dark:text-slate-200 flex items-center justify-between cursor-pointer">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">health_and_safety</span>
+            <span>运行治理审计报告 (Run Governance Audit)</span>
+          </div>
+          <kbd class="font-mono text-[10px] text-slate-400 dark:text-slate-500">R</kbd>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleCommandPalette() {
+      const p = document.getElementById('command-palette');
+      p.classList.toggle('hidden');
+    }
+
+    function toggleTheme() {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      document.getElementById('theme-icon').textContent = isDark ? 'light_mode' : 'dark_mode';
+    }
+
+    function approveGate() {
+      alert('已成功签署决策并为 session emit session_resumed 恢复事件！');
+    }
+
+    function rejectGate() {
+      const reason = prompt('请输入驳回此闸门的原因（必填）:');
+      if (reason) {
+        alert('闸门已驳回，原因记录已安全落盘。');
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        toggleCommandPalette();
+      }
+      if (e.key === 'Escape') {
+        document.getElementById('command-palette').classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

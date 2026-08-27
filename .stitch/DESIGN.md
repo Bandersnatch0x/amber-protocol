@@ -1,178 +1,180 @@
 ---
-name: Amber Protocol Web Viewer
-description: Real-time session monitoring for autonomous coding agents. Quiet, precise, data-first developer tooling.
+name: Amber Protocol Web Viewer — Obsidian & Amber Pulse
+description: High-precision developer command surface for autonomous AI coding agents. Linear & Raycast grade craftsmanship, quiet authority, and tactile developer ergonomics.
 colors:
-  debug-blue: "#2563eb"
-  debug-blue-hover: "#1d4ed8"
-  debug-blue-muted: "#dbeafe"
-  steel-white: "#ffffff"
-  steel-fog: "#f8fafc"
-  steel-wash: "#f1f5f9"
-  graphite: "#0f172a"
-  graphite-mid: "#475569"
-  graphite-light: "#64748b"
-  steel-line: "#e2e8f0"
-  steel-line-hover: "#cbd5e1"
-  emerald: "#16a34a"
-  emerald-muted: "#dcfce7"
-  amber: "#d97706"
-  amber-muted: "#fef3c7"
-  crimson: "#dc2626"
-  crimson-muted: "#fee2e2"
+  # Obsidian Dark Palette (Default Pro Experience)
+  obsidian-void: "#080B10"
+  obsidian-surface: "#0F141C"
+  obsidian-elevated: "#151D28"
+  obsidian-inset: "#1B2433"
+  obsidian-border: "rgba(255, 255, 255, 0.08)"
+  obsidian-border-hover: "rgba(255, 255, 255, 0.16)"
+  obsidian-border-active: "rgba(245, 158, 11, 0.35)"
+
+  # Porcelain Light Palette
+  porcelain-void: "#F8FAFC"
+  porcelain-surface: "#FFFFFF"
+  porcelain-elevated: "#FFFFFF"
+  porcelain-inset: "#F1F5F9"
+  porcelain-border: "#E2E8F0"
+  porcelain-border-hover: "#CBD5E1"
+
+  # Core Signature Dual Accents
+  amber-gold: "#F59E0B"
+  amber-gold-hover: "#D97706"
+  amber-gold-muted: "rgba(245, 158, 11, 0.12)"
+  amber-gold-glow: "0 0 24px -2px rgba(245, 158, 11, 0.25)"
+
+  cobalt-blue: "#2563EB"
+  cobalt-blue-hover: "#1D4ED8"
+  cobalt-blue-muted: "rgba(37, 99, 235, 0.12)"
+  cobalt-blue-glow: "0 0 24px -2px rgba(37, 99, 235, 0.3)"
+
+  # Semantic Status Aura
+  emerald-pass: "#10B981"
+  emerald-pass-muted: "rgba(16, 185, 129, 0.12)"
+  crimson-fail: "#F43F5E"
+  crimson-fail-muted: "rgba(244, 63, 94, 0.12)"
+  slate-idle: "#64748B"
+  slate-idle-muted: "rgba(100, 116, 139, 0.12)"
+
 typography:
+  display:
+    fontFamily: "Geist, Inter, -apple-system, sans-serif"
+    fontSize: "1.25rem"
+    fontWeight: 600
+    lineHeight: 1.35
+    letterSpacing: "-0.02em"
+  title:
+    fontFamily: "Geist, Inter, -apple-system, sans-serif"
+    fontSize: "1.0625rem"
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: "-0.015em"
   body:
-    fontFamily: "Inter, system-ui, -apple-system, sans-serif"
-    fontSize: "14px"
+    fontFamily: "Inter, -apple-system, sans-serif"
+    fontSize: "0.875rem"
     fontWeight: 400
     lineHeight: 1.5
-  title:
-    fontFamily: "Inter, system-ui, -apple-system, sans-serif"
-    fontSize: "18px"
-    fontWeight: 600
-    lineHeight: 1.55
   label:
-    fontFamily: "Inter, system-ui, -apple-system, sans-serif"
-    fontSize: "12px"
-    fontWeight: 500
-    lineHeight: 1.33
-    letterSpacing: "0.05em"
+    fontFamily: "Geist, Inter, -apple-system, sans-serif"
+    fontSize: "0.6875rem"
+    fontWeight: 600
+    lineHeight: 1.3
+    letterSpacing: "0.06em"
     textTransform: "uppercase"
   mono:
-    fontFamily: "JetBrains Mono, ui-monospace, SFMono-Regular, monospace"
-    fontSize: "12px"
+    fontFamily: "JetBrains Mono, Geist Mono, monospace"
+    fontSize: "0.75rem"
     fontWeight: 400
-    lineHeight: 1.66
+    lineHeight: 1.6
+    fontVariantNumeric: "tabular-nums"
+    letterSpacing: "-0.01em"
+
 rounded:
+  xs: "3px"
   sm: "4px"
   md: "6px"
   lg: "8px"
-  full: "9999px"
+  xl: "12px"
+  pill: "9999px"
+
 spacing:
+  2xs: "2px"
   xs: "4px"
   sm: "8px"
-  md: "16px"
-  lg: "24px"
-  xl: "32px"
+  md: "12px"
+  lg: "16px"
+  xl: "24px"
+  2xl: "32px"
+
+shadows:
+  glow-amber: "0 0 20px -4px rgba(245, 158, 11, 0.18)"
+  glow-cobalt: "0 0 20px -4px rgba(37, 99, 235, 0.22)"
+  tactile-card: "0 4px 20px -2px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15)"
+  floating-palette: "0 16px 48px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)"
 ---
 
-# Design System: Amber Protocol Web Viewer
+# Design System: Amber Protocol Web Viewer (Obsidian & Amber Pulse)
 
-## 1. Visual Theme and Atmosphere
+## 1. Creative North Star: "The Autonomous Flight Deck"
 
-Amber Protocol Web Viewer is a repository-local command surface for developers supervising autonomous coding sessions. It should feel like a calm control room inside an IDE: dense enough for repeated use, legible at a glance, and strict about showing evidence before action.
+Amber Protocol Web Viewer is a **mission-control cockpit** for developers supervising autonomous AI agent sessions. It fuses the restrained, razor-sharp craftsmanship of **Linear** and **Raycast** with the unyielding security rigor of **Amber Protocol**.
 
-The interface serves the product. It is not a landing page and it is not a marketing dashboard. The design must privilege session status, event timelines, route definitions, approval gates, and transcript evidence. The product personality is quiet, competent, responsive, and developer-native.
+### The Core Design Tenets:
+1. **Obsidian Depth & Luminous Hierarchy**: Deep obsidian surfaces (`#080B10` → `#0F141C` → `#151D28`) eliminate glare and frame information with micro-contrast. 1px hairline borders (`rgba(255,255,255,0.08)`) create razor-sharp separation without visual bulk.
+2. **Signature Dual Accent**:
+   - **Amber Gold (`#F59E0B`)**: The protocol's signature — represents governance authority, unforgeable ledger seals, pending human gates, and live pulse heartbeats.
+   - **Cobalt Blue (`#2563EB`)**: Developer interaction — represents keyboard focus, active selections, and executable command buttons.
+3. **Information Density with Breathability**: Monospace numbers use `tabular-nums` for rock-solid tabular alignment. Micro-labels are tight and tracked (`0.06em uppercase`). Content breathes through a disciplined 4px/8px rhythm.
+4. **Tactile Haptic Feedback**: Smooth spring cubic-bezier transitions (`cubic-bezier(0.16, 1, 0.3, 1)`), hover border illumination, and live status aura pulses create immediate responsiveness.
+5. **No SaaS Clutter**: Zero generic hero metrics, zero decorative gradient text, zero floating 3D spheres. Every pixel exists to deliver actionable runtime truth.
 
-Use restrained product UI patterns. Familiarity is a feature here: top navigation, filter bars, compact cards, status badges, progress bars, data lists, expandable raw JSON, and clear empty/error/loading states. No decorative hero treatment. No oversized metrics. No visual effects that compete with the data.
+---
 
-## 2. Color Palette and Roles
+## 2. Color Token Architecture
 
-### Primary Foundation
+### 2.1 Dark Obsidian Tonal Stack (Primary Pro Target)
+- **Void Canvas** (`#080B10`): Infinite canvas background with subtle 20px radial dot matrix.
+- **Surface Level 1** (`#0F141C`): Main card containers, master lists, inspector panels.
+- **Elevated Level 2** (`#151D28`): Modal command palette, dropdown flyouts, floating status pills.
+- **Inset Wash Level 3** (`#1B2433`): Terminal outputs, AST JSON nodes, diff blocks, and code editors.
+- **Hairline Borders**: `rgba(255, 255, 255, 0.08)` resting, `rgba(255, 255, 255, 0.18)` on hover/focus.
 
-- Steel Fog (#f8fafc): page background in light mode.
-- Steel White (#ffffff): primary content surface for cards, panels, inputs, and top navigation.
-- Steel Wash (#f1f5f9): inset areas, code blocks, skeleton bars, and quiet secondary panels.
-- Graphite (#0f172a): primary text, headings, active labels, and important values.
-- Graphite Mid (#475569): secondary text, descriptions, captions, timestamps, and helper copy.
-- Graphite Light (#64748b): tertiary labels, placeholders, disabled text, and low-priority metadata.
-- Steel Line (#e2e8f0): default borders, dividers, timeline connector lines, and table rules.
-- Steel Line Hover (#cbd5e1): hover border lift for interactive cards and form controls.
+### 2.2 Light Porcelain Tonal Stack
+- **Void Canvas** (`#F8FAFC`): Crisp neutral slate canvas.
+- **Surface Level 1** (`#FFFFFF`): Elevated white cards with hairline border `#E2E8F0`.
+- **Inset Wash Level 3** (`#F1F5F9`): Tertiary code blocks and metadata tags.
 
-### Accent and Interactive
+### 2.3 Semantic Status Auras (Functional Only)
+- **Pass / Completed / Healthy**: Emerald `#10B981` (Glow: `rgba(16, 185, 129, 0.15)`)
+- **Pending / Gate Waiting / Paused**: Amber Gold `#F59E0B` (Glow: `rgba(245, 158, 11, 0.2)`)
+- **Blocked / Failed / Aborted**: Crimson Rose `#F43F5E` (Glow: `rgba(244, 63, 94, 0.2)`)
+- **Idle / Staged / Neutral**: Slate `#64748B`
 
-- Debug Blue (#2563eb): the single product accent. Use only for primary actions, selected navigation, links, focus rings, live route emphasis, and active filters.
-- Debug Blue Hover (#1d4ed8): hover and pressed state for primary actions.
-- Debug Blue Muted (#dbeafe): quiet status or selected backgrounds when the state is informational.
+---
 
-### Functional States
+## 3. Typography Hierarchy
 
-- Emerald (#16a34a) and Emerald Muted (#dcfce7): completed, approved, live, success.
-- Amber (#d97706) and Amber Muted (#fef3c7): paused, pending, connecting, warning.
-- Crimson (#dc2626) and Crimson Muted (#fee2e2): failed, rejected, aborted, destructive.
+- **Title / Headline**: Geist / Inter (600 semi-bold, letter-spacing `-0.02em`)
+- **Body UI**: Inter (400 regular & 500 medium, line-height `1.5`)
+- **Engineering Mono**: JetBrains Mono (400 & 600, tabular numerals, letter-spacing `-0.01em`)
+- **Micro Metadata**: Geist Label (600, `0.6875rem / 11px`, `tracking-wider`, uppercase)
 
-State colors are never decorative. If a color appears, it must communicate state, selection, or action priority.
+---
 
-## 3. Typography Rules
+## 4. Key Component Blueprints
 
-Use one practical sans family for the product UI. Inter is allowed because it is already committed in the project and fits the product register. Use JetBrains Mono only for session ids, route ids, commands, raw events, transcript tool names, and code-like evidence.
+### 4.1 Repository Pulse Header (`AppShell`)
+- 52px ultra-compact sticky glass navigation bar (`backdrop-blur-md`).
+- Left: Amber polygon badge with micro-glow + repository moniker + current branch in mono.
+- Center: Global Route Tabs with glowing indicator underline.
+- Right: **Repository Pulse Capsule** `[ ● 2 Active | 1 Gate Pending | 96% Health ]` with live heartbeat aura + `Cmd+K` trigger + theme/lang switches.
 
-- Page titles: 24px, 700, compact line-height. One per screen.
-- Section titles: 18px, 600, used on cards and major panels.
-- Body: 14px, 400, 1.5 line-height.
-- Labels: 12px, 500, uppercase, 0.05em tracking. Use for metadata keys and field labels only.
-- Mono: 12px, 400, 1.66 line-height. Use for technical identifiers and raw data.
+### 4.2 Split-View Gates Inbox (`/gates`)
+- **Left Column (Master Rail - 380px)**: High-density triage stack. Filter by status (Pending/Approved/Rejected). Each row highlights trigger time, stage chip, and waiting duration.
+- **Right Column (Detail Inspector - Flex)**:
+  - Header: Gate metadata & full session ID with 1-click copy.
+  - Reason & Context: Full prompt & trigger reason.
+  - Live Audit Evidence: Ledger hash verification badge + inline Diff snapshot.
+  - Action Footer: Reviewer identity field, `⌘+↵` Approve & Resume button, `⌘+⇧+↵` Reject with Reason.
 
-Avoid display typography, fluid heading scales, serif pairings, gradient text, and giant numerals. Product density is controlled by spacing and grouping, not by dramatic type.
+### 4.3 Timeline Precision Scrubber (`/sessions/$id/timeline`)
+- Vertical timeline rail with categorized tool icons (Terminal, Disk, Network, Gate).
+- **Sub-second micro-duration deltas** (`+140ms`, `+1.8s`) between consecutive events.
+- **Chronology-gap awareness**: Pauses >60s render as a dashed separator with human duration (e.g. `— 12m 45s wait —`).
+- Interactive raw payload inspector with search & copy path.
 
-## 4. Component Stylings
+### 4.4 Interactive AST / JSON Explorer
+- Replace plain `<pre>` blocks with an interactive tree viewer featuring expandable nodes, syntax color highlights, and copy-value/copy-path shortcuts.
 
-### App Shell
+---
 
-Sticky top navigation, 56px high, white surface in light mode and graphite surface in dark mode. Left side contains a compact Amber mark and product name, followed by horizontal navigation items: Sessions, Transcripts, Routes, Gates, Settings. Right side contains Docs and a theme toggle. On mobile, keep a separate horizontal scroll nav below the top bar.
+## 5. Keyboard Navigation & Accessibility (WCAG 2.1 AA)
 
-### Buttons
-
-Primary buttons use Debug Blue and white text. Secondary buttons are white or dark surface with steel borders. Danger buttons use Crimson. All buttons use 6px radius, 14px text, clear focus rings, disabled states, loading labels, and a minimum 44px tap target where practical.
-
-### Cards and Panels
-
-Cards use 8px radius, 1px steel border, no shadow at rest, and 16-24px internal padding. Interactive cards may lift only through border color and a tiny hover shadow. Do not create nested cards. Prefer dividers and inset panels for dense detail.
-
-### Badges and Chips
-
-Badges use compact rounded rectangles, 12px medium text, and semantic muted backgrounds. Session statuses include Idle, Running, Executing, Paused, Completed, Aborted, Created, Routed, and Failed. Gate statuses include Pending, Approved, and Rejected.
-
-### Inputs and Filters
-
-Search inputs and selects use labeled or aria-labeled controls, steel borders, 6px radius, 14px text, and a visible Debug Blue focus ring. Filter bars should stay compact and line up with list content.
-
-### Tables, Lists, and Timelines
-
-Lists use stacked interactive rows when item content is mixed. Routes can use grouped grids because route cards are compact and comparable. Timelines use a vertical event rail with line icons, event number, event type badge, timestamp, relative offsets, detail key-value pairs, and optional raw JSON expansion.
-
-### Dialogs
-
-Use dialogs only for destructive confirmation, such as aborting a session. The dialog must include a strong title, one paragraph explaining consequence, Cancel, and Abort. Scrim should isolate foreground content without feeling theatrical.
-
-## 5. Layout Principles
-
-Use a max-width content container around 1280px with responsive side padding. Desktop-first structure is acceptable because developers use this at a desk, but every screen must collapse cleanly to mobile.
-
-Common layouts:
-
-- Overview/home: asymmetric two-column opening, then surface cards and evidence panels.
-- Lists: header, compact filter bar, loading/error/empty state, then stacked rows or grouped grids.
-- Detail pages: header with back link and status, primary content column plus metadata side panel.
-- Timeline: header, optional metrics summary, filter bar, vertical event rail.
-- Settings: narrow single-column form stack with persistent save feedback.
-
-Do not use a landing-page hero, three equal feature-card marketing grid, giant KPI row, decorative gradients, side-stripe cards, glassmorphism, or over-rounded surfaces.
-
-## 6. Motion and Interaction
-
-Motion is state feedback only. Use 150-250ms color, opacity, and transform transitions. Loading states are skeletons that match final layout dimensions. Do not use orchestrated page-load animations or decorative looping motion. Reduced motion must disable nonessential transitions.
-
-All interactive elements must have default, hover, focus, active, disabled, loading, and error treatment when applicable. Keyboard navigation and focus visibility are part of the design, not optional polish.
-
-## 7. Stitch Generation Rules
-
-When generating screens in Stitch, attach this design system at the project level. Screen prompts should describe structure, content, state, and interactions only. Do not repeat colors, font names, radius values, or theme tokens inside individual screen prompts.
-
-Every generated screen should include realistic developer-tool content: session ids, route ids, status labels, timestamps, token budgets, stage names, gate descriptions, and transcript turn excerpts. Avoid generic placeholders like Acme, John Doe, 99.99%, and vague copy such as "Elevate", "Seamless", "Unleash", or "Next-Gen".
-
-## 8. Anti-Patterns
-
-- No marketing hero sections.
-- No hero metrics template.
-- No gradient text.
-- No decorative blur or glass panels.
-- No decorative grid backgrounds.
-- No side-stripe borders.
-- No nested cards.
-- No oversized card radius.
-- No emoji as structural icons.
-- No custom scrollbars.
-- No fake round-number claims.
-- No generic SaaS illustration.
-- No centered empty praise copy. Empty states should teach the workflow.
-- No modal as a first choice except destructive confirmation.
+- `Cmd+K` / `Ctrl+K`: Global Command Palette
+- `J` / `K`: Up/Down navigation through lists & timeline events
+- `A`: Quick-approve focused gate (with confirmation modal if destructive)
+- `R`: Open reject drawer
+- `Escape`: Clear active focus / close floating drawers
+- Contrast ratios: Text ≥ 7.5:1 (Dark mode text `#F8FAFC` on `#080B10` is > 18:1).
