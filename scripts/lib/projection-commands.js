@@ -8,8 +8,68 @@ const { resolveTarget, readFailure } = require("./command-helpers");
 
 const dispatch = defineCommand({
 	command: "projection",
-	actions: ["rebuild", "status", "list", "query", "receipt", "view", "compare"],
+	actions: [
+		"rebuild",
+		"status",
+		"list",
+		"query",
+		"strict-query",
+		"invalidate",
+		"receipt",
+		"view",
+		"compare",
+	],
 	handlers: {
+		"strict-query": (args) => {
+			const targetRoot = resolveTarget(args);
+			const { strictGovernanceGraphQuery } = require("./core/strict-query");
+			const result = strictGovernanceGraphQuery(targetRoot, {
+				scope: args.scope,
+				checkpoint: args.checkpoint,
+				projectionVersion: args.projectionVersion,
+				limit: args.limit,
+				sort: args.sort || "id",
+				depth: args.depth === undefined ? 1 : args.depth,
+				cursor: args.cursor || null,
+			});
+			return {
+				text: result.ok ? JSON.stringify(result, null, 2) : "",
+				errors: result.errors,
+				warnings:
+					result.degraded && result.ok
+						? [
+								"strict query returned a partial page; it cannot satisfy a strict Gate until the cursor is exhausted",
+							]
+						: [],
+				exitCode: result.ok ? 0 : 1,
+				...(result.code ? { code: result.code } : {}),
+			};
+		},
+		invalidate: (args) => {
+			const targetRoot = resolveTarget(args);
+			const { recordInvalidation } = require("./core/staleness-registry");
+			const dependency = String(args.dependency || "");
+			const [type, identityWithRevision = ""] = dependency.split(":", 2);
+			const [identity, revisionText = null] = identityWithRevision.split("@", 2);
+			const revision = revisionText === null ? null : Number(revisionText);
+			const result = recordInvalidation(targetRoot, {
+				subject: args.subject || args.scope,
+				dependency: {
+					type,
+					identity,
+					revision: revisionText === null || revisionText === "" ? null : revision,
+					contentHash: null,
+				},
+				reason: args.reason,
+			});
+			return {
+				text: result.ok ? JSON.stringify(result.receipt, null, 2) : "",
+				errors: result.errors,
+				warnings: [],
+				exitCode: result.ok ? 0 : 1,
+				...(result.code ? { code: result.code } : {}),
+			};
+		},
 		query: (args) => {
 			const targetRoot = resolveTarget(args);
 			const { buildGovernanceGraph, queryGraph } = require("./core/governance-graph");

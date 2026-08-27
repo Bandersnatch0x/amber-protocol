@@ -180,6 +180,78 @@ const CATALOG = {
 		layer: "Verification",
 		related: ["AMBER_E_PROJECTION_MISSING", "AMBER_E_PROJECTION_DRIFT"],
 	},
+	AMBER_E_STRICT_QUERY_INVALID: {
+		title: "Strict query contract is malformed",
+		cause:
+			"A strict projection query omitted or malformed one of the fields that make the read admissible for Gates: exact scope, source checkpoint, projection version, limit, sort, depth, or cursor.",
+		remedy:
+			"Re-run with --scope <node>, --checkpoint <sha256>, --projection-version 1, --limit <1..100>, --sort id, and --depth 0|1. Use the returned cursor unchanged for the next page.",
+		layer: "Governance",
+		related: ["AMBER_E_GRAPH_DENY", "AMBER_E_STRICT_QUERY_CURSOR_INVALID"],
+	},
+	AMBER_E_STRICT_QUERY_CHECKPOINT_MISMATCH: {
+		title: "Strict query checkpoint does not match current source state",
+		cause:
+			"The caller's source checkpoint differs from the Governance Graph's current checkpoint. A strict Gate cannot consume a read over a changed source state.",
+		remedy:
+			"Rebuild or re-read the projection checkpoint, then rerun the strict query against the new checkpoint and review any dependency invalidations.",
+		layer: "Governance",
+		related: ["AMBER_E_PROJECTION_DRIFT", "AMBER_E_STRICT_QUERY_STALE"],
+	},
+	AMBER_E_STRICT_QUERY_STALE: {
+		title: "Strict query scope has stale dependencies",
+		cause:
+			"An append-only staleness receipt invalidates the requested scope. Degraded or stale reads are explicit and cannot satisfy strict Gates.",
+		remedy:
+			"Inspect staleness receipts for the scope, refresh the affected Policy/Evidence/projection dependency, then query again at a fresh checkpoint.",
+		layer: "Governance",
+		related: ["AMBER_E_STALENESS_REGISTRY_CORRUPT", "AMBER_E_STRICT_QUERY_CHECKPOINT_MISMATCH"],
+	},
+	AMBER_E_STRICT_QUERY_CURSOR_INVALID: {
+		title: "Strict query cursor is invalid",
+		cause:
+			"A strict query cursor could not be decoded, had invalid fields, or did not match the exact query contract that produced it.",
+		remedy:
+			"Use the cursor returned by the immediately preceding strict query page without editing its scope, checkpoint, projection version, limit, sort, or depth.",
+		layer: "Governance",
+		related: ["AMBER_E_STRICT_QUERY_INVALID", "AMBER_E_STRICT_QUERY_CURSOR_EXPIRED"],
+	},
+	AMBER_E_STRICT_QUERY_CURSOR_EXPIRED: {
+		title: "Strict query cursor expired",
+		cause:
+			"The cursor's expiry time has passed. Expiring cursors prevent stale partial result sets from satisfying strict Gates.",
+		remedy:
+			"Restart the strict query with a fresh checkpoint and consume all cursor pages before they expire.",
+		layer: "Governance",
+		related: ["AMBER_E_STRICT_QUERY_CURSOR_INVALID"],
+	},
+	AMBER_E_STALENESS_REGISTRY_CORRUPT: {
+		title: "Staleness receipt ledger is corrupt or unreadable",
+		cause:
+			"A staleness/invalidation receipt read encountered a corrupt JSONL line, broken hash chain, unknown field, missing field, or unsupported schema version.",
+		remedy:
+			"Restore .amber/staleness/receipts.jsonl from version control. Do not edit the ledger in place; append a new invalidation receipt instead.",
+		layer: "Governance",
+		related: ["AMBER_E_STRICT_QUERY_STALE", "AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_STALENESS_REGISTRY_LOCK: {
+		title: "Another staleness write is in flight",
+		cause:
+			"A concurrent invalidation writer holds .amber/staleness/receipts.lock within the stale window, so this append was refused rather than racing the ledger chain.",
+		remedy:
+			"Retry after the in-flight invalidation completes; a lock older than 30 seconds is reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_STALENESS_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_STALENESS_SIZE_CEILING: {
+		title: "Staleness receipt ledger exceeds its size ceiling",
+		cause:
+			"Appending an invalidation receipt would grow .amber/staleness/receipts.jsonl beyond the configured ceiling (default 1 MiB, env AMBER_STALENESS_MAX_RECEIPT_BYTES).",
+		remedy:
+			"Keep invalidation reasons bounded or deliberately raise AMBER_STALENESS_MAX_RECEIPT_BYTES to a positive integer.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG", "AMBER_E_STALENESS_REGISTRY_CORRUPT"],
+	},
 	AMBER_E_CONTEXT_SCHEMA_INVALID: {
 		title: "Context page payload fails the page schema",
 		cause: "ingest received a payload that does not satisfy schemas/context-page.schema.json.",

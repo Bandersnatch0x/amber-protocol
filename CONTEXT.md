@@ -112,6 +112,14 @@ _Avoid_: permission setting, configuration preference, feature flag, allowlist o
 The immutable record appended under `.amber/policies/outcomes.jsonl` for one strict-consumption policy evaluation. It binds the active policy revisions and hashes, consumed Approval, passing Gate Outcome, subject, submitter, capability, delegation if any, verdict (`pass|deny`), and reasons. Missing/stale/unsupported/conflicting policy refuses before an outcome; deny rules and role conflicts append deny outcomes.
 _Avoid_: mutable authorization flag, runtime ACL check, gate result
 
+**Strict Query**:
+A Gate-safe read of a projection that binds exact scope, source checkpoint, projection version, limit, sort, depth, and expiring cursor. A strict query fails closed on checkpoint mismatch, unknown scope, expired/edited cursor, corrupt projection source, or scoped staleness; a truncated page is explicit and cannot satisfy a strict Gate until fully consumed.
+_Avoid_: search, best-effort lookup, partial page, cached projection read
+
+**Staleness Receipt**:
+An append-only invalidation record under `.amber/staleness/receipts.jsonl` naming the affected subject, dependency, and reason. It never rewrites historical Gate/Policy outcomes or Decisions; strict queries consult it so only affected bindings become stale.
+_Avoid_: mutable stale flag, cache eviction, deleted outcome
+
 **Separation of Duties**:
 The F050 invariant that distinct responsibilities are held by distinct Principals: submitter, Evidence producer, verifier, Approval approver, and delegator cannot collapse into one actor for a strict consumption. Violations fail closed as policy denials and remain audit evidence.
 _Avoid_: code-owner review, informal independence, self-approval

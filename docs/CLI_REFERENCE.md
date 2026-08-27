@@ -895,6 +895,15 @@ Intent/Spec/Plan revision and one typed edge per resolved Trace (`refines`, `rea
   (page id or artifact revision id) plus its edge neighborhood, an unknown scope is denied as
   `AMBER_E_GRAPH_DENY`, and unscoped reads are capped (`--limit`, default 50) with a `truncated`
   flag. Every query records an immutable read receipt.
+- `projection strict-query` is the strict Gate-safe read contract: it requires exact `--scope`,
+  `--checkpoint <sha256>`, `--projection-version 1`, bounded `--limit`, `--sort id`, `--depth 0|1`,
+  and, for partial pages, the unedited expiring `--cursor` returned by the previous page. A
+  checkpoint mismatch, expired/edited cursor, unknown scope, or scoped staleness receipt fails
+  closed; truncated pages are explicit (`gateSatisfiable:false`) and cannot satisfy strict Gates.
+- `projection invalidate --subject <scope> --dependency <type:identity[@revision]> --reason <text>`
+  appends a staleness receipt under `.amber/staleness/receipts.jsonl`. History is never rewritten;
+  strict queries fail only for affected subjects, so dependency-scoped invalidation does not poison
+  unrelated bindings.
 - Only fully committed revisions are projected; prepared and aborted revisions are invisible. A
   corrupt artifact store fails the rebuild and the query closed with the typed artifact corruption
   code (e.g. `AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`) — or, when a stored Envelope declares an
@@ -915,6 +924,15 @@ node scripts/amber.js projection rebuild --type governance-graph --target . --js
 
 # query one revision plus its refines/realizes neighborhood (bounded, receipted)
 node scripts/amber.js projection query --scope spec/spec/login-spec@2 --target . --json
+
+# strict Gate-safe query at an exact checkpoint; truncated pages return an expiring cursor
+node scripts/amber.js projection strict-query --scope spec/spec/login-spec@2 \
+  --checkpoint sha256:<current-source-checkpoint> --projection-version 1 \
+  --limit 50 --sort id --depth 1 --target . --json
+
+# append dependency-scoped staleness without rewriting historical outcomes
+node scripts/amber.js projection invalidate --subject spec/spec/login-spec@2 \
+  --dependency evidence:evidence/run-42 --reason "evidence hash changed" --target . --json
 
 # currency: drifts when a new artifact revision is committed, current again after rebuild
 node scripts/amber.js projection status --type governance-graph --target . --json

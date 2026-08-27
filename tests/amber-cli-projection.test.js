@@ -127,6 +127,100 @@ test("projection rebuild requires a type", () => {
 	assert.equal(r.status, 1);
 });
 
+test("projection strict-query binds checkpoint and refuses invalidated scopes", () => {
+	const dir = mkTarget("strict-query");
+	const admitted = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"intent",
+			"--id",
+			"intent/login",
+			"--body",
+			"# Intent",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(admitted.status, 0, admitted.stderr || admitted.stdout);
+	const rebuilt = payload(
+		runCli(["projection", "rebuild", "--type", "governance-graph", "--target", dir, "--json"], dir),
+	);
+	const scope = "intent/intent/login@1";
+	const strict = runCli(
+		[
+			"projection",
+			"strict-query",
+			"--scope",
+			scope,
+			"--checkpoint",
+			rebuilt.sourceHash,
+			"--projection-version",
+			"1",
+			"--limit",
+			"10",
+			"--sort",
+			"id",
+			"--depth",
+			"0",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(strict.status, 0, strict.stderr || strict.stdout);
+	const out = payload(strict);
+	assert.equal(out.gateSatisfiable, true);
+	assert.equal(out.nodes.length, 1);
+	assert.equal(out.nodes[0].id, scope);
+
+	const invalidated = runCli(
+		[
+			"projection",
+			"invalidate",
+			"--subject",
+			scope,
+			"--dependency",
+			"evidence:evidence/run-1",
+			"--reason",
+			"evidence changed",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(invalidated.status, 0, invalidated.stderr || invalidated.stdout);
+	const stale = runCli(
+		[
+			"projection",
+			"strict-query",
+			"--scope",
+			scope,
+			"--checkpoint",
+			rebuilt.sourceHash,
+			"--projection-version",
+			"1",
+			"--limit",
+			"10",
+			"--sort",
+			"id",
+			"--depth",
+			"0",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(stale.status, 1);
+	assert.equal(JSON.parse(stale.stdout).code, "AMBER_E_STRICT_QUERY_STALE");
+});
+
 test("projection help is registered in the command registry", () => {
 	const dir = mkTarget("help");
 	const r = runCli(["projection", "--help", "--target", dir], dir);

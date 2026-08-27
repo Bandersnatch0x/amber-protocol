@@ -60,7 +60,7 @@ test("unknown action: exit 1, guidance on the printResult path", () => {
 	assert.equal(envelope.exitCode, 1);
 	assert.equal(envelope.bypassPrint, undefined);
 	assert.deepEqual(envelope.result.errors, [
-		"projection requires rebuild, status, list, query, receipt, view, or compare.",
+		"projection requires rebuild, status, list, query, strict-query, invalidate, receipt, view, or compare.",
 	]);
 	assert.deepEqual(envelope.result.warnings, []);
 	fs.rmSync(root, { recursive: true, force: true });
