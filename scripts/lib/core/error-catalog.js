@@ -558,11 +558,11 @@ const CATALOG = {
 	AMBER_E_ARTIFACT_NOT_FOUND: {
 		title: "Canonical Artifact or revision not found",
 		cause:
-			"A read named an identity or revision with no committed record. Prepared and aborted revisions are invisible by design.",
+			"A read named an identity or revision with no committed record — including a case-variant of a stored spelling, since identity matching is exact. Prepared and aborted revisions are invisible by design.",
 		remedy:
-			"List committed artifacts with `amber artifact list` to see valid identities and revisions.",
+			"List committed artifacts with `amber artifact list` to see valid identities and revisions; when the message names a stored spelling, use that exact spelling.",
 		layer: "Observability",
-		related: ["AMBER_E_ARTIFACT_CONFLICT"],
+		related: ["AMBER_E_ARTIFACT_CONFLICT", "AMBER_E_ARTIFACT_IDENTITY_CASE_COLLISION"],
 	},
 	AMBER_E_ARTIFACT_UNKNOWN_TYPE: {
 		title: "Canonical Artifact type is not registered",
@@ -580,6 +580,15 @@ const CATALOG = {
 			"Re-admit with a concrete identity (letters, digits, dots, dashes, underscores; e.g. intent/login-bug).",
 		layer: "Governance",
 		related: ["AMBER_E_ARTIFACT_ORPHANED_HALF"],
+	},
+	AMBER_E_ARTIFACT_IDENTITY_CASE_COLLISION: {
+		title: "Canonical Artifact identity collides by letter case with an existing artifact",
+		cause:
+			"Admission named an identity that differs only by letter case from an existing artifact home of the same type. Directory-name case folding (Windows, default macOS) would alias the two spellings to one artifact home, so the store refuses the ambiguity instead of normalizing: identity spelling is exact, and the check compares stored directory entries so the verdict is identical on case-sensitive filesystems.",
+		remedy:
+			"Re-admit with the exact stored spelling (run `amber artifact list` to see it), or choose an identity that differs by more than case.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_INVALID_IDENTITY", "AMBER_E_ARTIFACT_NOT_FOUND"],
 	},
 	AMBER_E_ARTIFACT_TRANSITION_UNKNOWN: {
 		title: "Canonical Artifact lifecycle transition is not registered",
@@ -665,7 +674,7 @@ const CATALOG = {
 	AMBER_E_ARTIFACT_IO: {
 		title: "Canonical Artifact durable write failed",
 		cause:
-			"Admission failed while writing the committed Body/Envelope pair or appending the committed journal record — the durable serialization point could not complete.",
+			"Admission failed on the filesystem — creating the artifact home or its exclusive admission lock (full-review follow-up finding 6), writing the committed Body/Envelope pair, or appending a journal record — the durable serialization point could not complete. These are I/O conditions, never compare-and-swap races.",
 		remedy:
 			"Free disk space and check filesystem permissions under .amber/artifacts/, then re-admit; inspect journal.jsonl to see whether the prepared record needs a retry pass.",
 		layer: "Observability",

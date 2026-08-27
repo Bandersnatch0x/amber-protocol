@@ -138,6 +138,11 @@ const TRACE_TARGET_NOT_FOUND_CODE = "AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND";
 const TRACE_TARGET_LIFECYCLE_CODE = "AMBER_E_ARTIFACT_TRACE_TARGET_LIFECYCLE";
 const TRACE_CYCLE_CODE = "AMBER_E_ARTIFACT_TRACE_CYCLE";
 const IO_CODE = "AMBER_E_ARTIFACT_IO";
+// Full-review follow-up finding 1: identity spelling is exact, so a
+// case-variant of an existing artifact home is its own stable admission
+// error (the read side reports the case-variant as plain NOT_FOUND).
+const IDENTITY_CASE_COLLISION_CODE = "AMBER_E_ARTIFACT_IDENTITY_CASE_COLLISION";
+const NOT_FOUND_CODE = "AMBER_E_ARTIFACT_NOT_FOUND";
 
 // ponytail: exclusive-lock admission (open O_EXCL lock file → settle →
 // unlink) instead of OS-level advisory locking; a crashed holder leaves the
@@ -145,11 +150,77 @@ const IO_CODE = "AMBER_E_ARTIFACT_IO";
 // journal serialization above still refuses to fork history even then.
 const LOCK_STALE_MS = 30_000;
 
-function artifactDir(cwd, type, identity) {
+function slugFor(identity) {
 	// ponytail: flat slug identity→dir; collisions across e.g. "a/b" vs "a_b"
 	// would alias, acceptable for the registered-type registry's scope.
-	const slug = `${identity}`.replace(/[^a-zA-Z0-9._-]+/g, "_");
-	return statePathForCreate(cwd, "artifacts", TYPE_REGISTRY[type]?.dir || type, slug);
+	return `${identity}`.replace(/[^a-zA-Z0-9._-]+/g, "_");
+}
+
+function artifactDir(cwd, type, identity) {
+	return statePathForCreate(cwd, "artifacts", TYPE_REGISTRY[type]?.dir || type, slugFor(identity));
+}
+
+/**
+ * Full-review follow-up finding 1: directory-name case folding (Windows,
+ * default macOS) makes "Login-Bug" and "login-bug" resolve to ONE artifact
+ * home while a case-sensitive filesystem keeps them distinct — the store's
+ * semantics must not depend on the platform. Policy: identity spelling is
+ * EXACT. Admission rejects an identity that differs only by case from an
+ * existing home; reads and trace targets resolve the case-variant as
+ * not-found with the stored spelling named — never as settlement corruption.
+ *
+ * The check is a directory scan of the type's sibling slugs (comparing
+ * stored entry names, never touching the filesystem case-insensitively), so
+ * the verdict is identical on both filesystem kinds: the variant home is
+ * discovered by its stored spelling wherever it exists. An exact entry match
+ * means the exact home exists and no ambiguity is possible (a case-sensitive
+ * filesystem may legitimately hold both spellings — only the exact one is
+ * served). Returns the stored sibling's identity spelling — read
+ * best-effort from its highest-revision Envelope, so the hint names the
+ * identity (e.g. "intent/Login-Bug"), degrading to the directory slug when
+ * the home is unreadable — or null.
+ * @param {string} cwd - Target repository root.
+ * @param {string} type - Registered artifact type.
+ * @param {string} identity - Identity spelling to resolve.
+ * @returns {string|null} The case-variant sibling's stored spelling.
+ */
+function caseVariantSibling(cwd, type, identity) {
+	const slug = slugFor(identity);
+	const typeDir = statePathForCreate(cwd, "artifacts", TYPE_REGISTRY[type]?.dir || type);
+	let entries;
+	try {
+		entries = fs.readdirSync(typeDir);
+	} catch {
+		return null; // no type directory: no siblings, no ambiguity
+	}
+	if (entries.includes(slug)) return null; // the exact home exists
+	for (const entry of entries) {
+		if (entry.toLowerCase() === slug.toLowerCase()) {
+			return storedIdentityOf(path.join(typeDir, entry)) ?? entry;
+		}
+	}
+	return null;
+}
+
+// Best-effort recovery of the identity SPELLING stored inside an artifact
+// home: the highest-revision Envelope's identity field. This only feeds the
+// exact-spelling hint, so it must never fail — unreadable state degrades to
+// the directory name the scan already found.
+function storedIdentityOf(dir) {
+	try {
+		const revisions = fs
+			.readdirSync(dir)
+			.map((name) => /^rev-(\d+)\.envelope\.json$/.exec(name))
+			.filter(Boolean)
+			.map((match) => Number.parseInt(match[1], 10));
+		if (revisions.length === 0) return null;
+		const envelope = readEnvelope(dir, Math.max(...revisions));
+		return typeof envelope?.identity === "string" && envelope.identity.length > 0
+			? envelope.identity
+			: null;
+	} catch {
+		return null;
+	}
 }
 
 function journalPath(dir) {
@@ -160,9 +231,22 @@ function journalPath(dir) {
 // leaves the file behind, so a lock older than LOCK_STALE_MS is stolen.
 // Returns an unlock function; throws a typed AMBER_E_ARTIFACT_CONFLICT when
 // another admission holds a fresh lock (the live racing loser fails closed).
+// Full-review follow-up finding 6: a genuine directory-create or lock-open
+// failure is an I/O condition, never a compare-and-swap race — the mutex is
+// the O_EXCL lock file, so a raw EPERM/EEXIST out of mkdirSync (an artifact
+// home blocked by a regular file, say) surfaces as the typed
+// AMBER_E_ARTIFACT_IO with the underlying message, not as CONFLICT advice to
+// retry the CAS against a head that does not exist.
 function acquireAdmissionLock(dir) {
 	const lockPath = path.join(dir, "admit.lock");
-	fs.mkdirSync(dir, { recursive: true });
+	try {
+		fs.mkdirSync(dir, { recursive: true });
+	} catch (err) {
+		throw typedReadError(
+			IO_CODE,
+			`cannot create the artifact home for admission (${dir}): ${err.message}`,
+		);
+	}
 	for (;;) {
 		try {
 			const fd = fs.openSync(lockPath, "wx");
@@ -175,7 +259,12 @@ function acquireAdmissionLock(dir) {
 				fs.rmSync(lockPath, { force: true });
 			};
 		} catch (err) {
-			if (err.code !== "EEXIST") throw err;
+			if (err.code !== "EEXIST") {
+				throw typedReadError(
+					IO_CODE,
+					`cannot create the admission lock (${lockPath}): ${err.message}`,
+				);
+			}
 			let age;
 			try {
 				age = Date.now() - fs.statSync(lockPath).mtimeMs;
@@ -633,6 +722,54 @@ function recoverDanglingPrepared(dir, journal, { identity = null, underLock = fa
 }
 
 /**
+ * Full committed-history sweep for one artifact home (full-review follow-up
+ * findings 4/5): EVERY committed revision must have both halves of its pair
+ * on disk AND still hold its binding — the stored Body against the recorded
+ * contentHash (AMBER_E_ARTIFACT_HASH_MISMATCH), the stored Envelope against
+ * its own canonical envelopeHash (AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH),
+ * and the committed journal record against the Envelope it settled
+ * (settlement corruption). Non-served revisions are no longer
+ * presence-swept only: the projection seam already proved the cost
+ * acceptable, so show/list, the trace-graph walk, and trace-target binding
+ * all apply the same per-revision verification.
+ *
+ * The sweep is identity-agnostic — each pair is verified against its own
+ * Envelope's declared type/identity — because the caller is the one that
+ * knows the requested spelling; identity resolution (and its
+ * case-insensitive filesystem policy, finding 1) stays at the seams that
+ * resolve the identity. It is also recovery-free: settling crashed attempts
+ * is verifyArtifactHomeForRead's job, never the walk's or the binder's.
+ * @param {string} dir - Artifact home directory.
+ * @param {Array<object>} journal - Parsed, already-replayed journal records.
+ * @param {object} [options]
+ * @param {string} [options.identity] - Identity label for diagnostics.
+ * @throws {Error} Typed AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT /
+ *         AMBER_E_ARTIFACT_HASH_MISMATCH / AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH.
+ */
+function sweepCommittedHistory(dir, journal, { identity = null } = {}) {
+	for (const revision of committedRevisions(journal)) {
+		const envelope = readEnvelope(dir, revision);
+		const body = readBody(dir, revision);
+		if (!envelope || !body) {
+			throw typedReadError(
+				SETTLEMENT_CORRUPT_CODE,
+				`committed revision ${revision} of "${identity ?? "an artifact"}" is missing its ${envelope ? "Body" : "Envelope"} on disk; refusing to read inconsistent settlement state`,
+			);
+		}
+		// Hash-verify both halves of every committed revision (finding 4) —
+		// the sweep already held both in hand for the presence check.
+		committedProjection(envelope.type, envelope.identity, revision, body, envelope, null);
+		const commitRecord = findCommitRecord(journal, revision);
+		if (contentHashMismatch(commitRecord, envelope)) {
+			throw typedReadError(
+				SETTLEMENT_CORRUPT_CODE,
+				settlementContentHashMessage(envelope.identity, revision, commitRecord, envelope),
+			);
+		}
+	}
+}
+
+/**
  * Read-side integrity gate for one artifact home (ticket 04, #221 — the
  * T2-review finding F1 fix: reads never validated settlement, so forged
  * journals were served silently). Every verification read (show/list):
@@ -643,32 +780,22 @@ function recoverDanglingPrepared(dir, journal, { identity = null, underLock = fa
  *   3. sweeps both halves of EVERY committed revision: a hole at any
  *      revision is corruption, never a silent skip (`list` no longer hides
  *      an artifact whose head pair is missing while `show` serves earlier
- *      revisions — both fail closed).
+ *      revisions — both fail closed). Full-review follow-up finding 4: the
+ *      sweep is a full hash verification of every committed revision, not a
+ *      presence check — non-served revisions hold their binding too.
  * @param {string} dir - Artifact home directory.
  * @param {object} [options]
  * @param {string} [options.identity] - Identity label for diagnostics.
  * @returns {Array<object>} The (possibly recovered) journal, in append order.
  * @throws {Error} Typed AMBER_E_ARTIFACT_JOURNAL_CORRUPT /
- *         AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT / AMBER_E_ARTIFACT_IO.
+ *         AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT / AMBER_E_ARTIFACT_IO /
+ *         AMBER_E_ARTIFACT_HASH_MISMATCH / AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH.
  */
 function verifyArtifactHomeForRead(dir, { identity = null } = {}) {
 	let journal = readJournal(dir);
 	validateSettlement(journal);
 	journal = recoverDanglingPrepared(dir, journal, { identity });
-	for (const revision of committedRevisions(journal)) {
-		if (!readEnvelope(dir, revision)) {
-			throw typedReadError(
-				SETTLEMENT_CORRUPT_CODE,
-				`committed revision ${revision} of "${identity ?? "an artifact"}" is missing its Envelope on disk; refusing to read inconsistent settlement state`,
-			);
-		}
-		if (!readBody(dir, revision)) {
-			throw typedReadError(
-				SETTLEMENT_CORRUPT_CODE,
-				`committed revision ${revision} of "${identity ?? "an artifact"}" is missing its Body on disk; refusing to read inconsistent settlement state`,
-			);
-		}
-	}
+	sweepCommittedHistory(dir, journal, { identity });
 	return journal;
 }
 
@@ -690,13 +817,20 @@ function traceCycleError(cycle) {
  * the walk reaches must be a committed revision with a readable Envelope
  * that agrees with the identity it is stored under — the walk fails closed
  * rather than guessing lineage through a hole (the pure walker lives in
- * canonical-artifact-verify.js; this side reads the store).
+ * canonical-artifact-verify.js; this side reads the store). Full-review
+ * follow-up finding 4: the first touch of a home is a full verification —
+ * settlement replay plus the hash sweep of every committed revision the
+ * walk's target home carries, not only the walked node — so the lineage a
+ * read vouches for is verified to the same standard `list` applies
+ * store-wide. The resolver is still strictly read-only: it never settles
+ * crashed attempts.
  * @param {string} cwd - Target repository root.
  * @returns {(node: {type: string, identity: string, revision: number}) =>
  *           Array<{type: string, identity: string, revision: number}>}
  */
 function traceEdgesResolver(cwd) {
 	const journalByDir = new Map();
+	const verifiedDirs = new Set();
 	const envelopeByKey = new Map();
 	return (node) => {
 		const dir = artifactDir(cwd, node.type, node.identity);
@@ -704,6 +838,11 @@ function traceEdgesResolver(cwd) {
 		if (journal === undefined) {
 			journal = readJournal(dir); // throws JOURNAL_CORRUPT on a corrupt ledger
 			journalByDir.set(dir, journal);
+		}
+		if (!verifiedDirs.has(dir)) {
+			validateSettlement(journal);
+			sweepCommittedHistory(dir, journal, { identity: node.identity });
+			verifiedDirs.add(dir);
 		}
 		if (!journal.some((r) => r.kind === KIND_COMMITTED && r.revision === node.revision)) {
 			throw typedReadError(
@@ -754,7 +893,14 @@ function traceEdgesResolver(cwd) {
  * Resolve one committed revision of a target artifact for Trace binding:
  * journal-settled visibility (prepared/aborted stay invisible), the pair
  * present on disk, and both binding hashes verified. Returns null when the
- * target has no such committed revision.
+ * target has no such committed revision. Full-review follow-up finding 5:
+ * the binding validates the target's ENTIRE committed history, not only the
+ * bound revision — the sweep below fails admission when the target home is
+ * holed or hash-broken at any committed revision, so a Trace never binds
+ * onto lineage that `list`/`rebuild` would refuse a moment later (the
+ * admission no longer succeeds against state the read seams classify as
+ * corruption). The sweep is recovery-free: admission settles crashed
+ * attempts only for the artifact it holds the lock of.
  * @throws {Error} Typed corruption/binding errors — a Trace never binds to
  *         inconsistent settlement state or a tampered pair.
  */
@@ -764,6 +910,7 @@ function readCommittedRevision(dir, type, identity, revision /* number|null for 
 	// target's journal is replayed, not just read for its head (the JSDoc
 	// contract above, now enforced on every binding).
 	validateSettlement(journal);
+	sweepCommittedHistory(dir, journal, { identity });
 	const head = committedHead(journal);
 	if (head === 0) return null;
 	const target =
@@ -838,6 +985,20 @@ function resolveTraceTarget(cwd, sourceType, sourceIdentity, sourceScope, trace)
 	}
 	const wantedRevision =
 		trace.to.revision === undefined || trace.to.revision === null ? null : trace.to.revision;
+
+	// Finding 1 (full-review follow-up): a case-variant trace target is a
+	// misspelling, not corruption — on a case-folding filesystem the folded
+	// directory would otherwise surface as settlement corruption in the
+	// binding's identity-agreement checks. The target resolves like `show`
+	// does: not-found, with the stored spelling named.
+	const variantHome = caseVariantSibling(cwd, toType, trace.to.identity);
+	if (variantHome !== null) {
+		return {
+			ok: false,
+			code: TRACE_TARGET_NOT_FOUND_CODE,
+			message: `the "${trace.type}" Trace target ${toType}/"${trace.to.identity}" matches no committed revision; the store has ${toType}/"${variantHome}" — identity spelling is exact, so trace the stored spelling`,
+		};
+	}
 
 	let resolved;
 	try {
@@ -933,12 +1094,13 @@ function removeDirIfEmpty(dir) {
  * the named revision is not committed — prepared/aborted stay invisible.
  *
  * Ticket 04 (#221): this is a verification read. It replays the settlement
- * journal, sweeps both halves of every committed revision of the artifact
- * (an orphaned half anywhere fails closed — the read never guesses which
- * revisions are still authoritative), cross-checks the served revision's
- * committed record against its Envelope, and walks the outgoing trace graph
- * from the artifact's committed revisions across artifacts: the lineage this
- * read vouches for must be acyclic (AMBER_E_ARTIFACT_TRACE_CYCLE). A crashed
+ * journal, sweeps and hash-verifies both halves of every committed revision
+ * of the artifact (an orphaned or tampered half anywhere fails closed — the
+ * read never guesses which revisions are still authoritative; full-review
+ * follow-up finding 4), cross-checks the served revision's committed record
+ * against its Envelope, and walks the outgoing trace graph from the
+ * artifact's committed revisions across artifacts: the lineage this read
+ * vouches for must be acyclic (AMBER_E_ARTIFACT_TRACE_CYCLE). A crashed
  * attempt (dangling prepared, no live lock) is settled as aborted on the way
  * through — journal-only, never an artifact write.
  * @throws {Error} Typed AMBER_E_ARTIFACT_JOURNAL_CORRUPT on a corrupt journal,
@@ -947,9 +1109,26 @@ function removeDirIfEmpty(dir) {
  *         AMBER_E_ARTIFACT_TRACE_CYCLE on cyclic lineage,
  *         AMBER_E_ARTIFACT_HASH_MISMATCH / AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH
  *         when a stored pair fails its binding,
- *         AMBER_E_ARTIFACT_IO when recovery cannot append its aborted record.
+ *         AMBER_E_ARTIFACT_IO when recovery cannot append its aborted record,
+ *         AMBER_E_ARTIFACT_NOT_FOUND when the identity is a case-variant of a
+ *         stored spelling (finding 1: spelling is exact; the message names
+ *         the stored spelling).
  */
 function showArtifact(cwd, identity, { type = "intent", revision = null } = {}) {
+	// Finding 1 (full-review follow-up): resolve the identity's SPELLING
+	// before any settlement read. On a case-folding filesystem the
+	// case-variant directory resolves to the existing home, and the
+	// identity-agreement checks downstream would misreport a misspelling as
+	// settlement corruption with a restore-from-version-control remedy —
+	// the worst possible advice for a typo. The variant is a plain
+	// not-found that names the stored spelling instead.
+	const variant = caseVariantSibling(cwd, type, identity);
+	if (variant !== null) {
+		throw typedReadError(
+			NOT_FOUND_CODE,
+			`no committed revision found for "${identity}": the store has "${variant}" — artifact identity spelling is exact (case-sensitive), so use the stored spelling`,
+		);
+	}
 	const dir = artifactDir(cwd, type, identity);
 	const journal = verifyArtifactHomeForRead(dir, { identity });
 	// Cyclic Trace chains fail the read: walk outgoing trace edges from every
@@ -1225,6 +1404,20 @@ function admitArtifact(
 	if (!isValidArtifactIdentity(identity)) {
 		return fail("AMBER_E_ARTIFACT_INVALID_IDENTITY", [
 			`artifact identity "${identity}" is not a usable directory name (empty and pure-dot segments are rejected)`,
+		]);
+	}
+	// Finding 1 (full-review follow-up): a case-variant of an existing
+	// artifact home is rejected BEFORE any durable state is touched (the
+	// admission lock would otherwise mkdir the folded path of the existing
+	// home on a case-folding filesystem, and a case-sensitive one would fork
+	// the store into platform-dependent spellings). The scan compares stored
+	// directory entries, so the verdict is identical on both filesystem
+	// kinds; two racing first admissions of case variants still degrade to
+	// the lock's CONFLICT, never to corruption.
+	const variantHome = caseVariantSibling(cwd, type, identity);
+	if (variantHome !== null) {
+		return fail(IDENTITY_CASE_COLLISION_CODE, [
+			`artifact identity "${identity}" differs only by letter case from the existing ${type} home "${variantHome}"; identity spelling is exact — re-admit with the stored spelling "${variantHome}" or choose an identity that differs by more than case`,
 		]);
 	}
 	// Pair binding (ADR-0023): both sides must arrive in one atomic call.

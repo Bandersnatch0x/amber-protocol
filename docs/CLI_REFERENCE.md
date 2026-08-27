@@ -420,6 +420,17 @@ trace crossing a scope boundary fails as `AMBER_E_ARTIFACT_TRACE_SCOPE` (source 
 declare the same `--scope` tag; null counts as a scope). Trace revisions default to the target's
 current committed head and are recorded resolved — traces bind revisions, not heads.
 
+Artifact identity spelling is **exact**. `--id` accepts any identity that is a usable directory
+name (empty and pure-dot segments are rejected as `AMBER_E_ARTIFACT_INVALID_IDENTITY`), and
+identities differing only by letter case are distinct spellings, never one artifact: admission of
+an identity that differs only by case from an existing artifact home fails closed as
+`AMBER_E_ARTIFACT_IDENTITY_CASE_COLLISION` naming the stored spelling, and a read that names a
+case-variant of a stored spelling (`artifact show`, or a `--trace` target) reports
+`AMBER_E_ARTIFACT_NOT_FOUND` with the stored spelling in the message — never settlement
+corruption. The check compares stored directory entries, so behavior is identical on
+case-insensitive filesystems (Windows, default macOS) and case-sensitive ones (Linux): case never
+decides whether two spellings alias.
+
 ```bash
 # admit a new Intent revision (returns the admission receipt)
 node scripts/amber.js artifact admit --target . --id intent/login-bug --body "# Intent: login bug" --json
@@ -453,8 +464,16 @@ node scripts/amber.js artifact list --target . --json
 ```
 
 `--trace <type>:<identity>[@<revision>]` is repeatable; the target type is derived from the
-registered Trace contract (the CLI never names a type the registry contradicts). Malformed flag
-values — a garbage revision, a missing target, or one of this command's value flags (including
+registered Trace contract (the CLI never names a type the registry contradicts). The revision is
+strict (positive integer, never NaN) and defaults to the target's current committed head inside
+the store. Identities containing `@` are supported: the revision is parsed from the **last** `@`
+and only when what follows it is all digits — `refines:user@tenant` names the identity
+`user@tenant` at its head, `refines:spec/login-spec@2` pins revision 2, and
+`refines:user@tenant@3` pins revision 3 of `user@tenant`. The one spelling this grammar cannot
+express is an identity that itself ends in `@<digits>` referenced *unpinned* (`user@123` would
+parse as identity `user` at revision 123) — pin a revision explicitly (`user@123@2`) in that
+case. Malformed flag values — a garbage revision (`@0`), a missing target, or one of this
+command's value flags (including
 `--target`) trailing at the end of the command line — fail closed as `AMBER_E_INVALID_ARG`, never
 as a silently dropped precondition (an explicitly empty `--idempotency-key`, `--type`, or
 `--target` fails the same way on all three actions — an empty `--target` never silently resolves
@@ -480,18 +499,29 @@ never have written — a double commit, a commit without its prepared record, a 
 a skipped revision slot, a committed record stripped of the settlement hashes its journal otherwise
 carries, or a committed pair missing on disk — fails closed as `AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT`
 at admission **and on every read**: `show` and `list` are verification reads that replay the
-settlement journal, sweep both halves of every committed revision (a hole at any revision, not just
-the head or the retried one, is corruption — `list` never silently drops an artifact whose pair is
-incomplete while `show` serves earlier revisions), and cross-check the committed record's
-contentHash against the Envelope's bodyHash. One corrupt artifact fails the whole listing — the
-listing is never a partial projection. Once a journal carries settlement hashes anywhere
+settlement journal, sweep and hash-verify both halves of every committed revision (a hole or a
+broken binding at any revision, not just the head or the served one, is corruption — `list` never
+silently drops an artifact whose pair is incomplete while `show` serves earlier revisions), and
+cross-check the committed record's contentHash against the Envelope's bodyHash. One corrupt
+artifact fails the whole listing — the listing is never a partial projection. Once a journal
+carries settlement hashes anywhere
 (`expectedHead`/`admissionHash`), hashless committed records are corruption; only pure ticket-01
 journals with zero hash-bearing records read as legacy — and admission refuses to extend those in
-place (re-admit the content as a fresh store). A durable write that fails mid-admission
-surfaces as `AMBER_E_ARTIFACT_IO` instead of a raw filesystem error.
-Reads verify both halves of the binding: a stored Body that lost its contentHash match reports
+place (re-admit the content as a fresh store). A filesystem failure during admission — creating
+the artifact home or its admission lock, writing the pair, or appending a journal record —
+surfaces as `AMBER_E_ARTIFACT_IO` instead of a raw filesystem error, and is never misreported as a
+compare-and-swap conflict.
+Reads verify both halves of the binding **at every committed revision they walk, not only the
+served or head one**: a stored Body that lost its contentHash match reports
 `AMBER_E_ARTIFACT_HASH_MISMATCH`, a stored Envelope that lost its envelopeHash match reports
-`AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`. Reads also walk the committed trace graph: a cyclic
+`AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH`. The exact verification scope is per seam: `show`
+hash-verifies every committed revision of the artifact read; `list` of every artifact in the
+store; the transitive trace walk underlying show/list/rebuild verifies settlement and hashes of
+every committed revision of each home it reaches; and admission's trace-target resolution
+(`readCommittedRevision`) sweeps the target's **entire** committed history, so a Trace never binds
+onto a target whose other revisions are holed or tampered. The Governance Graph projection seam
+(`listArtifactRevisions` behind `projection rebuild/query/status`) applies the same per-revision
+verification to the whole store. Reads also walk the committed trace graph: a cyclic
 Trace chain (refines/realizes/supersedes edges that loop, including through superseded revisions)
 fails closed as `AMBER_E_ARTIFACT_TRACE_CYCLE` — structurally impossible through admission, so
 always hand-edited state.
@@ -507,6 +537,14 @@ never writes or rewrites a Body or Envelope, the aborted revision stays invisibl
 its consumed revision slot is never reused. Nothing is repaired automatically beyond that
 settlement record — restoring tampered artifact state is a version-control operation, never a
 silent write.
+
+Two timestamps leave different traces by design. The Envelope's `committedAt` is **prepare
+time** — stamped when the pair is written between the prepared and committed journal records, and
+covered by the envelopeHash, so it is fingerprint-relevant: Governance Graph nodes and the
+projection seam surface it. The journal's committed record `at` is **commit time** — the
+settlement instant a moment later — and is what `artifact show` and admission receipts surface.
+Editing the journal timestamp changes nothing the projection checkpoints, while editing the
+Envelope's `committedAt` breaks the envelopeHash and fails every verification read.
 
 Committed revisions and their typed Traces project into the Governance Graph — see
 `projection rebuild --type governance-graph` below.

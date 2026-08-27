@@ -7,7 +7,11 @@ const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 const { ARTIFACT_TYPES } = require("./core/canonical-artifact-contracts");
 
-const CORRUPT_CODE = "AMBER_E_ARTIFACT_NOT_FOUND";
+// Full-review follow-up finding 7 (ticket-01 review F7): this constant is the
+// readFailure FALLBACK for untyped crashes/misses at the show/list seams, not
+// a corruption verdict — it is named for what it actually holds so a crash can
+// never be misread as "settlement corrupt" (or vice versa).
+const READ_FAILURE_CODE = "AMBER_E_ARTIFACT_NOT_FOUND";
 
 /**
  * Strict positive-integer parse for revision flags: absent → { value: null },
@@ -74,6 +78,16 @@ function missingValueFlag(args) {
  * CLI cannot name a target type the registry contradicts. The revision is
  * strict (positive integer, never NaN) and defaults to the target's current
  * committed head inside the store.
+ *
+ * Full-review follow-up finding 8 (ticket-03 review F-6): identities may
+ * contain `@`. The revision is parsed from the LAST `@` and only when what
+ * follows is all digits — `refines:user@tenant` names the identity
+ * `user@tenant` (head), `refines:user@tenant@3` pins revision 3 of it, and
+ * `refines:login-bug@2` still pins revision 2 of `login-bug`. A trailing
+ * all-digits-but-invalid value (`@0`) stays a fail-closed argument error —
+ * the caller meant a revision. The one spelling this grammar cannot express
+ * is an identity that itself ends in `@<digits>` referenced unpinned; pin a
+ * revision explicitly instead (documented in CLI_REFERENCE).
  */
 function parseTraceFlags(rawList) {
 	const traces = [];
@@ -96,13 +110,17 @@ function parseTraceFlags(rawList) {
 		const at = identity.lastIndexOf("@");
 		if (at !== -1) {
 			const revisionText = identity.slice(at + 1);
-			if (!/^[0-9]+$/.test(revisionText) || Number.parseInt(revisionText, 10) < 1) {
-				return {
-					error: `--trace revision must be a positive integer revision number; got ${JSON.stringify(revisionText)}`,
-				};
+			if (/^[0-9]+$/.test(revisionText)) {
+				if (Number.parseInt(revisionText, 10) < 1) {
+					return {
+						error: `--trace revision must be a positive integer revision number; got ${JSON.stringify(revisionText)}`,
+					};
+				}
+				revision = Number.parseInt(revisionText, 10);
+				identity = identity.slice(0, at);
 			}
-			revision = Number.parseInt(revisionText, 10);
-			identity = identity.slice(0, at);
+			// A non-digit suffix after the last '@' belongs to the identity
+			// itself (finding 8): the token names the target's head.
 		}
 		if (identity.length === 0) {
 			return {
@@ -241,7 +259,7 @@ const dispatch = defineCommand({
 					revision: revision.value,
 				});
 			} catch (err) {
-				const failure = readFailure(args, err, CORRUPT_CODE);
+				const failure = readFailure(args, err, READ_FAILURE_CODE);
 				return { ...failure.result, exitCode: failure.exitCode };
 			}
 			if (!shown) {
@@ -279,7 +297,7 @@ const dispatch = defineCommand({
 			try {
 				artifacts = listArtifacts(target.value);
 			} catch (err) {
-				const failure = readFailure(args, err, CORRUPT_CODE);
+				const failure = readFailure(args, err, READ_FAILURE_CODE);
 				return { ...failure.result, exitCode: failure.exitCode };
 			}
 			return { text: JSON.stringify(artifacts, null, 2) };

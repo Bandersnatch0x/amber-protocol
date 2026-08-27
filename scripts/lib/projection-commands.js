@@ -150,6 +150,11 @@ const dispatch = defineCommand({
 				errors: status.ok ? [] : [status.detail],
 				warnings: [],
 				exitCode: status.ok ? 0 : 1,
+				// Full-review follow-up finding 3: propagate the typed failure
+				// code into the CLI result envelope like rebuild/query do — the
+				// code must be machine-readable at the envelope seam, not only
+				// inside the JSON text payload.
+				...(status.code ? { code: status.code } : {}),
 			};
 		},
 		list: (args) => {

@@ -69,6 +69,51 @@ test("envelope hash is reproducible from the stored file (self-field excluded)",
 	assert.equal(envelopeHash(stored), stored.envelopeHash);
 });
 
+test("golden vector: canonical Body and Envelope hashes are pinned (full-review finding 9)", () => {
+	// A fixed Body and a fixed, volatile-free Envelope (none of the assigned
+	// fields admission stamps — revision, committedAt, envelopeHash). The
+	// literals below are the sha256 digests of the DOCUMENTED canonical forms:
+	// verbatim Body text for the contentHash, sorted-key whitespace-free JSON
+	// with the self-referential envelopeHash field excluded for the Envelope.
+	// The self-reproducibility fixture above cannot see a silent change to
+	// the canonical form itself (a different key order, a kept-whitespace
+	// serialization); this vector pins it to an externally computed value.
+	const body = "# Intent: login bug\n\nOutcome: users can log in again.\n";
+	assert.equal(
+		bodyHash(body),
+		"sha256:926b750e8a77014e33b11523ca295e38a30c54fdea2bb3497b9a73b89f0e27c1",
+	);
+	const envelope = {
+		schemaVersion: 1,
+		type: "intent",
+		identity: "intent/login-bug",
+		supersedes: null,
+		bodyHash: "sha256:926b750e8a77014e33b11523ca295e38a30c54fdea2bb3497b9a73b89f0e27c1",
+		lifecycle: "draft",
+		transition: null,
+		scope: null,
+		traces: [],
+		provenance: { author: "product-owner", source: "ticket#42" },
+	};
+	// The digest must not depend on the input object's key order: canonical
+	// serialization sorts keys, so a shuffled literal envelope hashes equal.
+	const shuffled = {
+		provenance: envelope.provenance,
+		traces: envelope.traces,
+		scope: envelope.scope,
+		transition: envelope.transition,
+		lifecycle: envelope.lifecycle,
+		bodyHash: envelope.bodyHash,
+		supersedes: envelope.supersedes,
+		identity: envelope.identity,
+		type: envelope.type,
+		schemaVersion: envelope.schemaVersion,
+	};
+	const PINNED = "456a5ebb60532f6ca12afc5b1df8a7325afef3d8255495a9cfbec4bd846cd89f";
+	assert.equal(envelopeHash(envelope), PINNED);
+	assert.equal(envelopeHash(shuffled), PINNED, "canonical form is key-order independent");
+});
+
 test("admit with different content and no expected head fails closed as conflict (default CAS)", () => {
 	const dir = mkTarget("fork-guard");
 	admitIntent(dir);
@@ -2109,4 +2154,170 @@ test("ticket-04: the integrity analysis module holds no I/O or write capability 
 			`${name} must stay a pure verdict`,
 		);
 	}
+});
+
+// ---------------------------------------------------------------------------
+// Full-review follow-up (F049 `ae42c09..3d8e4da`): identity case policy
+// (finding 1), verification granularity (findings 4/5), lock I/O
+// classification (finding 6). All assertions go through the public seams.
+// ---------------------------------------------------------------------------
+
+test("finding 1: a case-variant identity is refused at admission with the stored spelling", () => {
+	const dir = mkTarget("fr1-admit");
+	const first = admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/Login-Bug",
+		body: BODY_V1,
+	});
+	assert.equal(first.ok, true, first.errors.join("; "));
+
+	// The case variant never reaches the CAS: it is its own stable error
+	// naming the exact spelling, with or without a declared expected head.
+	for (const overrides of [{ body: BODY_V1 + "v2\n" }, { body: BODY_V1 + "v2\n", expectedHead: 1 }]) {
+		const variant = admitArtifact(dir, { type: "intent", identity: "intent/login-bug", ...overrides });
+		assert.equal(variant.ok, false);
+		assert.equal(variant.code, "AMBER_E_ARTIFACT_IDENTITY_CASE_COLLISION");
+		assert.match(variant.errors[0], /intent\/Login-Bug/, "the exact spelling is named");
+		assert.match(variant.errors[0], /case/i);
+	}
+
+	// No second home was created (on a case-folding filesystem the variant
+	// would have aliased into the existing one mid-admission).
+	const intentsDir = path.join(dir, ".amber", "artifacts", "intents");
+	assert.deepEqual(fs.readdirSync(intentsDir), ["intent_Login-Bug"]);
+
+	// The exact spelling keeps extending the artifact normally.
+	const v2 = admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/Login-Bug",
+		body: BODY_V1 + "v2\n",
+		expectedHead: 1,
+	});
+	assert.equal(v2.ok, true, v2.errors.join("; "));
+	assert.equal(v2.receipt.revision, 2);
+});
+
+test("finding 1: reading a case-variant identity is not-found with a hint, never corruption", () => {
+	const dir = mkTarget("fr1-read");
+	admitArtifact(dir, { type: "intent", identity: "intent/Login-Bug", body: BODY_V1 });
+	assert.throws(
+		() => showArtifact(dir, "intent/login-bug"),
+		(err) =>
+			err.amberCode === "AMBER_E_ARTIFACT_NOT_FOUND" &&
+			err.message.includes("intent/Login-Bug") &&
+			/case-sensitive|exact/.test(err.message),
+		"a misspelling must be a not-found naming the stored spelling, not settlement corruption",
+	);
+	// The exact spelling reads, and the listing serves the stored spelling.
+	assert.equal(showArtifact(dir, "intent/Login-Bug").identity, "intent/Login-Bug");
+	assert.deepEqual(
+		listArtifacts(dir).map((e) => e.identity),
+		["intent/Login-Bug"],
+	);
+});
+
+test("finding 1: a case-variant trace target fails as target-not-found naming the spelling", () => {
+	const dir = mkTarget("fr1-trace");
+	admitArtifact(dir, { type: "intent", identity: "intent/Login-Bug", body: BODY_V1, transition: "accept" });
+	const variant = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/child",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/login-bug" } }],
+	});
+	assert.equal(variant.ok, false);
+	assert.equal(variant.code, "AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND");
+	assert.match(variant.errors[0], /intent\/Login-Bug/);
+
+	const exact = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/child",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/Login-Bug" } }],
+	});
+	assert.equal(exact.ok, true, exact.errors.join("; "));
+	assert.deepEqual(exact.receipt.traces, [
+		{ type: "refines", to: { type: "intent", identity: "intent/Login-Bug", revision: 1 } },
+	]);
+});
+
+test("finding 4: show and list hash-verify every committed revision, not only the served one", () => {
+	const dir = mkTarget("fr4-tamper");
+	admitIntent(dir);
+	admitIntent(dir, { body: BODY_V1 + "v2\n", expectedHead: 1 });
+	// Tamper the NON-head revision 1: the head pair itself is intact.
+	fs.writeFileSync(path.join(homeOf(dir), "rev-1.md"), "# tampered v1\n");
+	assert.throws(
+		() => showArtifact(dir, "intent/login-bug"),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_HASH_MISMATCH",
+		"head show fails closed on a tampered non-head revision",
+	);
+	assert.throws(
+		() => listArtifacts(dir),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_HASH_MISMATCH",
+		"list fails closed on a tampered non-head revision",
+	);
+});
+
+test("finding 4: the trace walk verifies every revision of each home it reaches", () => {
+	const dir = mkTarget("fr4-walk");
+	admitArtifact(dir, { type: "intent", identity: "intent/root", body: BODY_V1, transition: "accept" });
+	const spec = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/child",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/root" } }],
+	});
+	assert.equal(spec.ok, true, spec.errors.join("; "));
+	// The spec's own pair is intact; its trace target carries a tampered
+	// NON-walked revision (the trace binds the head 2; revision 1 is holed
+	// by content). The lineage the read vouches for is verified as a whole.
+	const rootHome = path.join(dir, ".amber", "artifacts", "intents", "intent_root");
+	fs.writeFileSync(path.join(rootHome, "rev-1.md"), "# tampered root v1\n");
+	assert.throws(
+		() => showArtifact(dir, "spec/child", { type: "spec" }),
+		(err) => err.amberCode === "AMBER_E_ARTIFACT_HASH_MISMATCH",
+		"showing the clean spec fails closed through its tampered lineage",
+	);
+});
+
+test("finding 5: a trace never binds onto a target whose other committed revision is holed", () => {
+	const dir = mkTarget("fr5-holed-target");
+	admitArtifact(dir, { type: "intent", identity: "intent/root", body: BODY_V1 });
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/root",
+		body: BODY_V1 + "v2\n",
+		expectedHead: 1,
+		transition: "accept",
+	});
+	// Hole the target's NON-head revision 1 (the trace will bind head 2).
+	fs.rmSync(path.join(dir, ".amber", "artifacts", "intents", "intent_root", "rev-1.md"));
+	const spec = admitArtifact(dir, {
+		type: "spec",
+		identity: "spec/child",
+		body: "# Spec\n",
+		traces: [{ type: "refines", to: { type: "intent", identity: "intent/root" } }],
+	});
+	assert.equal(spec.ok, false);
+	assert.equal(spec.code, "AMBER_E_ARTIFACT_SETTLEMENT_CORRUPT");
+	assert.match(spec.errors[0], /revision 1 .*missing its Body/);
+	// The admission never created the source's artifact home: trace
+	// resolution fails before the lock is taken.
+	assert.equal(
+		fs.existsSync(path.join(dir, ".amber", "artifacts", "specs", "spec_child")),
+		false,
+	);
+});
+
+test("finding 6: an artifact home blocked by a file fails admission as artifact I/O", () => {
+	const dir = mkTarget("fr6-blocked");
+	const home = path.join(dir, ".amber", "artifacts", "intents", "intent_login-bug");
+	fs.mkdirSync(path.dirname(home), { recursive: true });
+	fs.writeFileSync(home, "not a directory");
+	const r = admitIntent(dir);
+	assert.equal(r.ok, false);
+	assert.equal(r.code, "AMBER_E_ARTIFACT_IO", "an I/O condition is never a CAS conflict");
+	assert.match(r.errors[0], /cannot create the artifact home/);
+	assert.match(r.errors[0], /intent_login-bug/);
 });

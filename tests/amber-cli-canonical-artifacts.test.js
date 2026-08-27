@@ -1140,11 +1140,14 @@ test("F-4: a trailing --target fails closed instead of falling back to the CWD",
 
 test("CLI: malformed --trace values are rejected with the stable arg code (never NaN)", () => {
 	const dir = mkTarget("t03-trace-garbage");
+	// Full-review follow-up finding 8: `refines:intent/a@abc` left this list —
+	// a non-digit suffix after the last '@' now belongs to the IDENTITY
+	// ("intent/a@abc"), so it fails later with TRACE_TARGET_NOT_FOUND instead
+	// of INVALID_ARG (covered by its own test below).
 	for (const garbage of [
 		"bogus",
 		"refines:",
 		":intent/a",
-		"refines:intent/a@abc",
 		"refines:intent/a@0",
 	]) {
 		const r = runCli(
@@ -1491,4 +1494,185 @@ test("CLI: ticket-04 — a pure ticket-01 legacy journal still reads", () => {
 		payload(list).map((e) => e.identity),
 		["intent/legacy"],
 	);
+});
+
+// ---------------------------------------------------------------------------
+// Full-review follow-up (F049 `ae42c09..3d8e4da`): identity case policy
+// (finding 1), lock I/O classification (finding 6), `@`-bearing identities
+// in the --trace grammar (finding 8).
+// ---------------------------------------------------------------------------
+
+test("CLI: a case-variant identity is a stable admission error and a hinted not-found read", () => {
+	const dir = mkTarget("fr1-cli");
+	const admit = runCli(
+		["artifact", "admit", "--id", "intent/Login-Bug", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(admit.status, 0, admit.stderr);
+	assert.equal(payload(admit).identity, "intent/Login-Bug");
+
+	// Admission of the case variant fails with the dedicated collision code
+	// and names the exact spelling — never a CAS conflict or corruption.
+	const variant = runCli(
+		["artifact", "admit", "--id", "intent/login-bug", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(variant.status, 1);
+	const variantOuter = JSON.parse(variant.stdout);
+	assert.equal(variantOuter.code, "AMBER_E_ARTIFACT_IDENTITY_CASE_COLLISION");
+	assert.match(variantOuter.errors.join("; "), /intent\/Login-Bug/);
+
+	// Reading the case variant is not-found with the stored spelling in the
+	// message — not settlement corruption with a restore-from-VCS remedy.
+	const shown = runCli(
+		["artifact", "show", "--id", "intent/login-bug", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(shown.status, 1);
+	const shownOuter = JSON.parse(shown.stdout);
+	assert.equal(shownOuter.code, "AMBER_E_ARTIFACT_NOT_FOUND");
+	assert.match(shownOuter.errors.join("; "), /intent\/Login-Bug/);
+	assert.doesNotMatch(shownOuter.errors.join("; "), /SETTLEMENT_CORRUPT/);
+
+	// The exact spelling still reads, and list serves the stored spelling.
+	const exact = runCli(
+		["artifact", "show", "--id", "intent/Login-Bug", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(exact.status, 0, exact.stderr);
+	assert.equal(payload(exact).identity, "intent/Login-Bug");
+	const list = runCli(["artifact", "list", "--target", dir, "--json"], dir);
+	assert.equal(list.status, 0, list.stderr);
+	assert.deepEqual(
+		payload(list).map((e) => e.identity),
+		["intent/Login-Bug"],
+	);
+});
+
+test("CLI: an artifact home blocked by a file fails admission as artifact I/O", () => {
+	const dir = mkTarget("fr6-cli");
+	const home = path.join(dir, ".amber", "artifacts", "intents", "intent_login-bug");
+	fs.mkdirSync(path.dirname(home), { recursive: true });
+	fs.writeFileSync(home, "not a directory");
+	const r = runCli(
+		["artifact", "admit", "--id", "intent/login-bug", "--body", BODY_V1, "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	const outer = JSON.parse(r.stdout);
+	// Finding 6: an I/O condition is never reported as a compare-and-swap
+	// conflict, and the raw mkdir error becomes the typed artifact-IO code.
+	assert.equal(outer.code, "AMBER_E_ARTIFACT_IO");
+	assert.match(outer.errors.join("; "), /cannot create the artifact home/);
+});
+
+test("CLI: --trace identities may contain '@' (revision parsed from the last '@' only)", () => {
+	const dir = mkTarget("fr8-cli");
+	const admit = runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/user@tenant",
+			"--body",
+			BODY_V1,
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(admit.status, 0, admit.stderr);
+	assert.equal(payload(admit).identity, "intent/user@tenant");
+	const accept = runCli(
+		[
+			"artifact",
+			"admit",
+			"--id",
+			"intent/user@tenant",
+			"--body",
+			BODY_V1,
+			"--expected-head",
+			"1",
+			"--transition",
+			"accept",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(accept.status, 0, accept.stderr);
+
+	// Unpinned: the whole token is the identity (the '@' is not a revision
+	// separator because what follows it is not all digits).
+	const spec = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/pinned",
+			"--body",
+			"# Spec\n",
+			"--trace",
+			"refines:intent/user@tenant",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(spec.status, 0, spec.stderr);
+	assert.deepEqual(payload(spec).traces, [
+		{ type: "refines", to: { type: "intent", identity: "intent/user@tenant", revision: 2 } },
+	]);
+
+	// Pinned: the revision parses from the LAST '@' only.
+	const specPinned = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/pinned-2",
+			"--body",
+			"# Spec 2\n",
+			"--trace",
+			"refines:intent/user@tenant@2",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(specPinned.status, 0, specPinned.stderr);
+	assert.deepEqual(payload(specPinned).traces, [
+		{ type: "refines", to: { type: "intent", identity: "intent/user@tenant", revision: 2 } },
+	]);
+
+	// A non-digit suffix that names no stored identity is a target miss, not
+	// an argument error (the grammar accepts it; the store rejects it).
+	const miss = runCli(
+		[
+			"artifact",
+			"admit",
+			"--type",
+			"spec",
+			"--id",
+			"spec/miss",
+			"--body",
+			"# Spec\n",
+			"--trace",
+			"refines:intent/a@abc",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(miss.status, 1);
+	assert.equal(JSON.parse(miss.stdout).code, "AMBER_E_ARTIFACT_TRACE_TARGET_NOT_FOUND");
 });

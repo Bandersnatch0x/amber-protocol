@@ -384,3 +384,34 @@ test("a corrupt artifact store fails rebuild and query closed with the typed cod
 		"query fails closed too",
 	);
 });
+
+test("a corrupt artifact store fails status closed with the typed code in the CLI envelope (full-review finding 3)", () => {
+	const dir = mkTarget("fail-closed-status");
+	buildLineage(dir);
+	assert.equal(rebuild(dir).status, 0);
+
+	// Tamper with a committed Envelope without recomputing its hash: the
+	// status check cannot certify currency against a source it cannot read.
+	const envFile = path.join(
+		dir,
+		".amber",
+		"artifacts",
+		"intents",
+		"intent_login-bug",
+		"rev-2.envelope.json",
+	);
+	const stored = JSON.parse(fs.readFileSync(envFile, "utf8"));
+	stored.provenance = { source: "TAMPERED" };
+	fs.writeFileSync(envFile, JSON.stringify(stored, null, 2) + "\n", "utf8");
+
+	const r = runCli(
+		["projection", "status", "--type", "governance-graph", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	// The typed ARTIFACT code must reach the OUTER result envelope — the
+	// machine-readable seam — not only the JSON text payload (finding 3).
+	const outer = JSON.parse(r.stdout);
+	assert.equal(outer.code, "AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH");
+	assert.equal(payload(r).code, "AMBER_E_ARTIFACT_ENVELOPE_HASH_MISMATCH");
+});
