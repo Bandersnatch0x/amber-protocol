@@ -155,6 +155,16 @@ const FLAG_SPECS = {
 	// --revision, and --index are shared with the existing surfaces).
 	"--now": { key: "now" },
 	"--verdict": { key: "verdict" },
+	// F050 ticket 5 (#230): Policy evaluation flags.
+	"--org-policy": { key: "orgPolicy" },
+	"--tenant-policy": { key: "tenantPolicy" },
+	"--repo-policy": { key: "repoPolicy" },
+	"--play-policy": { key: "playPolicy" },
+	"--gate-policy": { key: "gatePolicy" },
+	"--gate-outcome-index": { key: "gateOutcomeIndex" },
+	"--approval": { key: "approval" },
+	"--submitter": { key: "submitter" },
+	"--delegator": { key: "delegator" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

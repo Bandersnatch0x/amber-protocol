@@ -40,6 +40,12 @@
  *   validation here: the deterministic evaluator
  *   (scripts/lib/core/gate-evaluation.js) is that content's first shape
  *   consumer and owns the contract verdicts.
+ * - Policy (F050, #230): draft -> active via the named transition `activate`,
+ *   active -> retired via the named transition `retire`. A Policy is the
+ *   deny-wins ceiling for strict consumption. Its machine-actionable content
+ *   rides the Envelope's existing extensions carrier under the `policy`
+ *   namespace; the policy evaluator is the first shape consumer, so the
+ *   artifact registry remains opaque and type-generic.
  * `draft` is the initial admitted state of every gate-bearing type — the
  *   state before the type's gate. A lifecycle change is always an admission
  *   carrying a named transition: it produces a NEW revision, never an
@@ -126,6 +132,18 @@ const TYPE_REGISTRY = Object.freeze({
 	}),
 	gate: Object.freeze({
 		dir: "gates",
+		lifecycle: Object.freeze({
+			initial: "draft",
+			states: Object.freeze(["draft", "active", "retired"]),
+		}),
+		transitions: Object.freeze({
+			activate: Object.freeze({ name: "activate", from: "draft", to: "active" }),
+			retire: Object.freeze({ name: "retire", from: "active", to: "retired" }),
+		}),
+		requiredTraces: Object.freeze({}),
+	}),
+	policy: Object.freeze({
+		dir: "policies",
 		lifecycle: Object.freeze({
 			initial: "draft",
 			states: Object.freeze(["draft", "active", "retired"]),

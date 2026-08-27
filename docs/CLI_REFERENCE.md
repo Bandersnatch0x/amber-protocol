@@ -399,15 +399,17 @@ Artifact Body (Markdown) to a machine-actionable Artifact Envelope in one atomic
 through durable prepared/committed/aborted journal records. Only committed revisions are visible;
 history is append-only and immutable — there is no in-place mutation path for a committed revision.
 
-Registered Artifact Types form a closed registry: **intent**, **spec**, **plan**, and **decision**.
-The planning types each have a closed lifecycle of named transitions. Admitting a revision without
-a transition carries the type's initial state (`draft`); `--transition <name>` applies a
-registered transition — `accept` (intent: draft → accepted) or `approve` (spec/plan: draft →
-approved) — as a **new revision** superseding the head. A transition that is not registered fails
-closed as `AMBER_E_ARTIFACT_TRANSITION_UNKNOWN`; one that does not apply from the current head's
-lifecycle state fails closed as `AMBER_E_ARTIFACT_TRANSITION_INVALID`. A **decision** is different:
-it records a point-in-time authority act, so its lifecycle is the single state `recorded` with no
-transitions — an amended Decision is a new revision of the same identity, admitted fresh.
+Registered Artifact Types form a closed registry: **intent**, **spec**, **plan**, **decision**,
+**gate**, and **policy**. The planning types each have a closed lifecycle of named transitions.
+Admitting a revision without a transition carries the type's initial state (`draft`);
+`--transition <name>` applies a registered transition — `accept` (intent: draft → accepted) or
+`approve` (spec/plan: draft → approved) — as a **new revision** superseding the head. Gate and
+Policy Contracts use `activate` (draft → active) and `retire` (active → retired). A transition that
+is not registered fails closed as `AMBER_E_ARTIFACT_TRANSITION_UNKNOWN`; one that does not apply
+from the current head's lifecycle state fails closed as `AMBER_E_ARTIFACT_TRANSITION_INVALID`. A
+**decision** is different: it records a point-in-time authority act, so its lifecycle is the single
+state `recorded` with no transitions — an amended Decision is a new revision of the same identity,
+admitted fresh.
 
 A Decision admission (F050) binds the acting **Principal**: `--decision-kind
 <acceptance|approval|review>` and `--principal <id>` are required for `--type decision` and
@@ -815,6 +817,55 @@ Error codes: `AMBER_E_GATE_NOT_FOUND`, `AMBER_E_GATE_CONTRACT_INVALID`,
 `AMBER_E_GATE_EXPIRED`, `AMBER_E_GATE_UNSUPPORTED_COMPARATOR`,
 `AMBER_E_GATE_FAIL_BEHAVIOR_UNSUPPORTED`, `AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT`,
 `AMBER_E_GATE_OUTCOME_SIZE_CEILING`, `AMBER_E_GATE_OUTCOME_REGISTRY_LOCK`.
+
+### policy evaluate / show / list
+
+Policy Contracts and deny-wins strict consumption (F050): organization and tenant Policy are the
+non-relaxable ceiling, and optional repository, Play, and Gate policies may only tighten that
+ceiling. A Policy Contract is a canonical artifact of type `policy` (lifecycle `draft -> active` via
+`--transition activate`, `active -> retired` via `--transition retire`) whose machine-actionable
+content rides under `extensions.policy`. The policy evaluator is the first shape consumer; invalid,
+stale, unsupported, missing, or conflicting policy refuses before any outcome is appended.
+
+Contract keys: `policyVersion` (v1), `layer` (`org|tenant|repo|play|gate`), optional
+`validUntil`, optional `maxPolicyAgeMs`, `rules`, and `delegations`. Rules are deny-only:
+`denyPrincipals`, `denyCapabilities`, `denyScopes`, and `requireSeparationOfDuties: true`. Lower
+layers cannot relax the ceiling; unsupported allow/relax keys and
+`requireSeparationOfDuties: false` fail closed. Delegations are direct only and must match the
+named delegator, delegate, exact capability, exact subject/scope, and half-open validity window;
+chains are never followed.
+
+A completed evaluation appends one immutable `evaluated` event to
+`.amber/policies/outcomes.jsonl`, binding the active policy revisions and policy content hashes, the
+consumed Approval, the passing Gate Outcome hash, subject, submitter, capability, delegation (if
+any), verdict (`pass|deny`), and reasons. Missing/stale/unsupported/conflicting policy refuses with
+no append. A policy denial (deny rule, non-consumed Approval, non-passing Gate, separation-of-duties
+violation, or missing delegation) appends a deny outcome and exits non-zero with the specific code.
+
+```bash
+# admit and activate policy contracts through the artifact surface
+node scripts/amber.js artifact admit --target . --type policy --id policy/org \
+  --body "# Org policy" --extension policy.policyVersion=1 --extension policy.layer=org --json
+node scripts/amber.js artifact admit --target . --type policy --id policy/org \
+  --body "# Org policy" --extension policy.policyVersion=1 --extension policy.layer=org \
+  --expected-head 1 --transition activate --json
+
+# evaluate strict consumption against org/tenant plus optional tighter layers
+node scripts/amber.js policy evaluate --target . \
+  --org-policy policy/org --tenant-policy policy/tenant --repo-policy policy/repo \
+  --subject spec/login@2 --submitter dev@example.com --capability release \
+  --approval approval/login-42 --gate-outcome-index 0 --json
+
+node scripts/amber.js policy show --target . --index 0 --json
+node scripts/amber.js policy list --target . [--subject <s>] [--submitter <id>] \
+  [--capability <capability>] [--verdict pass|deny] --json
+```
+
+Error codes: `AMBER_E_POLICY_MISSING`, `AMBER_E_POLICY_INVALID`,
+`AMBER_E_POLICY_UNSUPPORTED_VERSION`, `AMBER_E_POLICY_STALE`, `AMBER_E_POLICY_CONFLICT`,
+`AMBER_E_POLICY_DENIED`, `AMBER_E_POLICY_SEPARATION_OF_DUTIES`,
+`AMBER_E_POLICY_DELEGATION_REQUIRED`, `AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT`,
+`AMBER_E_POLICY_OUTCOME_SIZE_CEILING`, `AMBER_E_POLICY_OUTCOME_REGISTRY_LOCK`.
 
 ### projection rebuild / status / query (Governance Graph of artifact revisions)
 

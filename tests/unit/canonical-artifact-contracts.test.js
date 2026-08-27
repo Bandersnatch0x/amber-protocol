@@ -29,8 +29,8 @@ const {
 	traceShapeProblem,
 } = require("../../scripts/lib/core/canonical-artifact-contracts");
 
-test("the type registry covers intent, spec, plan, decision, and gate (closed set)", () => {
-	assert.deepEqual(ARTIFACT_TYPES, ["intent", "spec", "plan", "decision", "gate"]);
+test("the type registry covers intent, spec, plan, decision, gate, and policy (closed set)", () => {
+	assert.deepEqual(ARTIFACT_TYPES, ["intent", "spec", "plan", "decision", "gate", "policy"]);
 	assert.equal(Object.isFrozen(TYPE_REGISTRY), true);
 });
 
@@ -63,11 +63,19 @@ test("each registered type has a closed lifecycle with named transitions", () =>
 		initial: "draft",
 		states: ["draft", "active", "retired"],
 	});
+	// A Policy (F050 ticket 5, #230) is the deny-wins ceiling contract for
+	// strict consumption, with the same activation/retirement lifecycle shape
+	// as a Gate Contract.
+	assert.deepEqual(TYPE_REGISTRY.policy.lifecycle, {
+		initial: "draft",
+		states: ["draft", "active", "retired"],
+	});
 	assert.deepEqual(registeredTransitionsOf("intent"), ["accept"]);
 	assert.deepEqual(registeredTransitionsOf("spec"), ["approve"]);
 	assert.deepEqual(registeredTransitionsOf("plan"), ["approve"]);
 	assert.deepEqual(registeredTransitionsOf("decision"), []);
 	assert.deepEqual(registeredTransitionsOf("gate"), ["activate", "retire"]);
+	assert.deepEqual(registeredTransitionsOf("policy"), ["activate", "retire"]);
 	assert.deepEqual(registeredTransitionsOf("bogus"), []);
 	// Every transition's from/to states are registered states of its type.
 	for (const type of ARTIFACT_TYPES) {
@@ -103,6 +111,10 @@ test("transition admission derives the lifecycle state; no transition means the 
 	assert.equal(lifecycleForAdmission("gate", "activate"), "active");
 	assert.equal(lifecycleForAdmission("gate", "retire"), "retired");
 	assert.equal(transitionFor("gate", "approve"), null, "approve is not a gate transition");
+	assert.equal(lifecycleForAdmission("policy", null), "draft");
+	assert.equal(lifecycleForAdmission("policy", "activate"), "active");
+	assert.equal(lifecycleForAdmission("policy", "retire"), "retired");
+	assert.equal(transitionFor("policy", "approve"), null, "approve is not a policy transition");
 	assert.deepEqual(transitionFor("gate", "retire"), {
 		name: "retire",
 		from: "active",

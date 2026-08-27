@@ -104,6 +104,22 @@ _Avoid_: quality bar, scoring rubric, model confidence, weighted criteria
 The immutable record appended to the hash-chained ledger under `.amber/gates/outcomes.jsonl` for every completed Gate evaluation — verdict (`pass|fail`), the evaluated revision and its content hash, and per-requirement details (which receipt joined, its effective Assurance, staleness, threshold comparison). A fail verdict is a recorded outcome, not an error; a pass is never silently revised.
 _Avoid_: gate result flag, cached verdict, mutable evaluation state
 
+**Policy Contract**:
+A versioned canonical artifact of the registered `policy` type declaring deny-wins rules for strict consumption: the org/tenant ceiling, optional tighter repo/play/gate layers, validity/freshness bounds, separation-of-duties requirement, denied principals/capabilities/scopes, and explicit direct delegations. It is carried under `extensions.policy`; policy admission stores the contract, policy evaluation interprets it.
+_Avoid_: permission setting, configuration preference, feature flag, allowlist override
+
+**Policy Outcome**:
+The immutable record appended under `.amber/policies/outcomes.jsonl` for one strict-consumption policy evaluation. It binds the active policy revisions and hashes, consumed Approval, passing Gate Outcome, subject, submitter, capability, delegation if any, verdict (`pass|deny`), and reasons. Missing/stale/unsupported/conflicting policy refuses before an outcome; deny rules and role conflicts append deny outcomes.
+_Avoid_: mutable authorization flag, runtime ACL check, gate result
+
+**Separation of Duties**:
+The F050 invariant that distinct responsibilities are held by distinct Principals: submitter, Evidence producer, verifier, Approval approver, and delegator cannot collapse into one actor for a strict consumption. Violations fail closed as policy denials and remain audit evidence.
+_Avoid_: code-owner review, informal independence, self-approval
+
+**Delegation**:
+A direct, non-transitive, scoped, capability-limited, time-limited grant in a Policy Contract: `{ delegator, delegate, capability, scope, validFrom, validUntil }`. A delegated strict-consumption request must match every field exactly and be inside the half-open validity window; chains are never followed.
+_Avoid_: role inheritance, group membership, blanket authorization
+
 **Assurance Level**:
 The closed four-level contract on Evidence: `unavailable | observed | replayable | verified`. Only the first three are recordable; `verified` is reached exclusively through an independent verification event (verifier id ≠ producer id), and `replayable` requires named replay provenance.
 _Avoid_: confidence score, trust level, coverage percentage

@@ -1150,6 +1150,109 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT", "AMBER_E_APPROVAL_REGISTRY_LOCK"],
 	},
+	AMBER_E_POLICY_MISSING: {
+		title: "Required Policy Contract is missing",
+		cause:
+			"A strict policy evaluation did not receive, or could not resolve, a required Policy Contract artifact. Org and tenant policy identities are mandatory; optional repo/play/gate policy identities must also resolve when named.",
+		remedy:
+			"Admit and activate the missing Policy Contract with `amber artifact admit --type policy ... --transition activate`, or pass the stored policy identity in the appropriate --*-policy flag.",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_NOT_FOUND", "AMBER_E_POLICY_INVALID"],
+	},
+	AMBER_E_POLICY_INVALID: {
+		title: "Policy Contract is malformed",
+		cause:
+			"A policy artifact's extensions.policy contract failed the evaluator's shape validation: missing or malformed policyVersion/layer/rules/delegations, a non-active policy lifecycle, malformed timestamps, or a lower-level value that cannot be evaluated deterministically.",
+		remedy:
+			"Admit a new active policy revision with policyVersion 1, the correct layer, deny-only rules, and explicit direct delegations. Committed policy revisions are immutable; corrections are new revisions.",
+		layer: "Governance",
+		related: [
+			"AMBER_E_POLICY_MISSING",
+			"AMBER_E_POLICY_CONFLICT",
+			"AMBER_E_POLICY_UNSUPPORTED_VERSION",
+		],
+	},
+	AMBER_E_POLICY_UNSUPPORTED_VERSION: {
+		title: "Policy Contract version is unsupported",
+		cause:
+			"A strict policy evaluation encountered a Policy Contract whose policyVersion is newer or otherwise unsupported by this evaluator. Unknown policy semantics are refused rather than reinterpreted.",
+		remedy:
+			"Use a Policy Contract with policyVersion 1, or upgrade the evaluator before consuming the newer policy version.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_INVALID", "AMBER_E_ARTIFACT_UNSUPPORTED_VERSION"],
+	},
+	AMBER_E_POLICY_STALE: {
+		title: "Policy Contract is stale or expired",
+		cause:
+			"A Policy Contract named by a strict evaluation has expired (validUntil is at or before the evaluation clock) or is older than its maxPolicyAgeMs freshness bound. Stale policy cannot authorize strict consumption.",
+		remedy:
+			"Admit and activate a fresh policy revision, then retry the strict policy evaluation against the current policy stack.",
+		layer: "Governance",
+		related: ["AMBER_E_GATE_EXPIRED", "AMBER_E_PRINCIPAL_EXPIRED"],
+	},
+	AMBER_E_POLICY_CONFLICT: {
+		title: "Policy stack conflicts with the deny-wins ceiling",
+		cause:
+			"A Policy Contract attempts to relabel its layer or relax the non-relaxable policy ceiling. Lower layers may only tighten org/tenant policy.",
+		remedy:
+			"Remove relaxing keys and admit a new policy revision. Model repo/play/gate policy as additional deny rules or explicit direct delegations, never as authority-widening overrides.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_INVALID", "AMBER_E_POLICY_DENIED"],
+	},
+	AMBER_E_POLICY_DENIED: {
+		title: "Policy evaluation denied strict consumption",
+		cause:
+			"The policy stack evaluated successfully and appended a deny outcome: a deny rule matched, the Gate Outcome was not a matching pass, the Approval was missing or not consumed, or another strict consumption precondition failed.",
+		remedy:
+			"Inspect the Policy Outcome reasons, then supply the required consumed Approval, passing Gate Outcome, current policy stack, and non-denied principals/scope before retrying.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_SEPARATION_OF_DUTIES", "AMBER_E_POLICY_DELEGATION_REQUIRED"],
+	},
+	AMBER_E_POLICY_SEPARATION_OF_DUTIES: {
+		title: "Policy separation of duties failed",
+		cause:
+			"The strict consumption context reused one principal across separated roles such as submitter, Evidence producer, verifier, approval approver, or delegator. Self-approval and self-review fail closed.",
+		remedy:
+			"Use distinct registered principals for submitter, Evidence producer, verifier, approval approver, and delegator, then retry. The denied outcome remains immutable audit evidence.",
+		layer: "Governance",
+		related: ["AMBER_E_EVIDENCE_SELF_VERIFICATION", "AMBER_E_POLICY_DENIED"],
+	},
+	AMBER_E_POLICY_DELEGATION_REQUIRED: {
+		title: "Required delegation is absent or invalid",
+		cause:
+			"The policy evaluation named a delegator, but no active direct delegation grants the submitter the exact capability on the exact subject for the evaluation clock. Delegation is explicit, non-transitive, scoped, capability-limited, and time-limited.",
+		remedy:
+			"Add an explicit direct delegation to an active Policy Contract, with matching delegator/delegate/capability/scope and a valid half-open time window. Do not rely on chained delegation.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_DENIED", "AMBER_E_POLICY_CONFLICT"],
+	},
+	AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT: {
+		title: "Policy outcome ledger is corrupt or unreadable",
+		cause:
+			"A policy outcome read hit a corrupt line or an event the evaluator could never have produced: a broken hash chain, an event outside the closed field set, a missing field, or an unsupported schemaVersion. An absent ledger reads as empty.",
+		remedy:
+			"Restore .amber/policies/outcomes.jsonl from version control; never edit the ledger in place — it is append-only governed state.",
+		layer: "Governance",
+		related: ["AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT", "AMBER_E_APPROVAL_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_POLICY_OUTCOME_SIZE_CEILING: {
+		title: "Policy outcome ledger exceeds its size ceiling",
+		cause:
+			"Appending the next policy outcome would grow .amber/policies/outcomes.jsonl beyond the configured ceiling (default 1 MiB, env AMBER_POLICY_MAX_OUTCOME_BYTES), so the write is refused before durable state is touched.",
+		remedy:
+			"Keep policy contexts bounded, or deliberately raise AMBER_POLICY_MAX_OUTCOME_BYTES to a positive integer. Garbage ceiling values fail closed as AMBER_E_INVALID_ARG.",
+		layer: "Governance",
+		related: ["AMBER_E_GATE_OUTCOME_SIZE_CEILING", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_POLICY_OUTCOME_REGISTRY_LOCK: {
+		title: "Another policy outcome write is in flight",
+		cause:
+			"A concurrent policy evaluation holds .amber/policies/outcomes.lock within the stale window, so this writer refused instead of racing and forking the ledger chain.",
+		remedy:
+			"Retry after the in-flight evaluation completes; a lock older than the stale window (30 s) is reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT", "AMBER_E_POLICY_DENIED"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
