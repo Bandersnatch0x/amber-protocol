@@ -7,6 +7,8 @@ import {
   FEATURE_HISTORY_ARGS,
   GIT_EXECUTABLE,
   GIT_RECENT_ARGS,
+  RECENT_CHANGES_LIMIT,
+  RecentChangeSourceError,
   attachVerifiedLink,
   collectAdrChanges,
   collectDriftChanges,
@@ -117,6 +119,36 @@ describe('knowledge recent-change source adapters', () => {
     ]);
   });
 
+  it('keeps successful empty git history distinct from git execution failure', async () => {
+    await expect(collectGitChanges('C:/repo', async () => ({ stdout: '' }))).resolves.toEqual([]);
+
+    try {
+      await collectGitChanges('C:/repo', async () => {
+        throw new Error('git executable missing');
+      });
+      throw new Error('expected collectGitChanges to reject');
+    } catch (error) {
+      expect(error).toBeInstanceOf(RecentChangeSourceError);
+      expect(error).toMatchObject({ historySource: 'git-history' });
+      expect((error as Error).message).toBe('Failed to read git-history: git executable missing');
+    }
+  });
+
+  it('propagates feature-list git history failures with a feature-history label', async () => {
+    try {
+      await collectFeatureChanges('C:/repo', async () => {
+        throw new Error('feature pathspec failed');
+      });
+      throw new Error('expected collectFeatureChanges to reject');
+    } catch (error) {
+      expect(error).toBeInstanceOf(RecentChangeSourceError);
+      expect(error).toMatchObject({ historySource: 'feature-history' });
+      expect((error as Error).message).toBe(
+        'Failed to read feature-history: feature pathspec failed',
+      );
+    }
+  });
+
   it('parses ADR Date lines and maps them to the real governance route', () => {
     const root = scratch();
     const adrRoot = path.join(root, 'docs', 'adr');
@@ -138,6 +170,27 @@ describe('knowledge recent-change source adapters', () => {
     ]);
   });
 
+  it('caps ADR items per source before merge while keeping newest dated decisions', () => {
+    const root = scratch();
+    const adrRoot = path.join(root, 'docs', 'adr');
+    fs.mkdirSync(adrRoot, { recursive: true });
+    for (let index = 1; index <= 5; index += 1) {
+      fs.writeFileSync(
+        path.join(adrRoot, `${String(index).padStart(4, '0')}-decision.md`),
+        `# Decision ${index}\n\n**Date:** 2026-08-0${index}\n`,
+      );
+    }
+
+    const changes = collectAdrChanges(root, 3);
+
+    expect(changes).toHaveLength(3);
+    expect(changes.map((change) => change.time)).toEqual([
+      '2026-08-05',
+      '2026-08-04',
+      '2026-08-03',
+    ]);
+  });
+
   it('maps graph drift deterministically while preserving finding content', () => {
     const changes = collectDriftChanges([
       { nodeId: 'feature:F007', kind: 'dead-anchor', path: 'b.ts', detail: 'second finding' },
@@ -150,6 +203,20 @@ describe('knowledge recent-change source adapters', () => {
       'second finding',
     ]);
     expect(changes.every((change) => change.source === 'drift' && change.time === '')).toBe(true);
+  });
+
+  it('caps drift items per source before merge', () => {
+    const changes = collectDriftChanges(
+      Array.from({ length: RECENT_CHANGES_LIMIT + 5 }, (_, index) => ({
+        nodeId: `feature:F${String(index).padStart(3, '0')}`,
+        kind: 'dead-anchor',
+        path: `file-${index}.ts`,
+        detail: `finding ${index}`,
+      })),
+    );
+
+    expect(changes).toHaveLength(RECENT_CHANGES_LIMIT);
+    expect(changes.every((change) => change.source === 'drift')).toBe(true);
   });
 
   it('passes maintenance finding text through without synthetic interpretation', () => {
@@ -166,6 +233,21 @@ describe('knowledge recent-change source adapters', () => {
       'repeated tool failure',
       'retry should preserve evidence',
     ]);
+    expect(changes.every((change) => change.source === 'maintenance')).toBe(true);
+  });
+
+  it('caps maintenance items per source before merge', () => {
+    const changes = collectMaintenanceChanges(
+      {
+        wikiLint: {
+          errors: Array.from({ length: RECENT_CHANGES_LIMIT + 5 }, (_, index) => `error ${index}`),
+          warnings: [],
+        },
+      },
+      4,
+    );
+
+    expect(changes).toHaveLength(4);
     expect(changes.every((change) => change.source === 'maintenance')).toBe(true);
   });
 });

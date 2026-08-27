@@ -652,6 +652,7 @@ export function KnowledgeMapPage() {
     refetchInterval: false,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
+    retry: false,
     staleTime: Infinity,
   });
   const { t } = useI18n();

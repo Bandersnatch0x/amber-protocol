@@ -40,6 +40,57 @@ export const FEATURE_HISTORY_ARGS = [
 ] as const;
 export const RECENT_CHANGES_LIMIT = 50;
 
+type GitHistorySource = 'git' | 'feature';
+type GitHistoryLabel = 'git-history' | 'feature-history';
+
+function normalizedLimit(limit: number): number {
+  return Math.max(0, Math.floor(limit));
+}
+
+function compareById(left: RecentChangeItem, right: RecentChangeItem): number {
+  return left.id.localeCompare(right.id);
+}
+
+function compareDatedNewest(left: RecentChangeItem, right: RecentChangeItem): number {
+  const timeOrder = Date.parse(right.time) - Date.parse(left.time);
+  return timeOrder || compareById(left, right);
+}
+
+function pushBounded(
+  items: RecentChangeItem[],
+  item: RecentChangeItem,
+  limit: number,
+  compare: (left: RecentChangeItem, right: RecentChangeItem) => number,
+): void {
+  if (limit <= 0) return;
+  items.push(item);
+  if (items.length > limit) {
+    items.sort(compare);
+    items.pop();
+  }
+}
+
+function gitHistoryLabel(source: GitHistorySource): GitHistoryLabel {
+  return source === 'feature' ? 'feature-history' : 'git-history';
+}
+
+function errorText(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return String(error);
+}
+
+export class RecentChangeSourceError extends Error {
+  readonly historySource: GitHistoryLabel;
+
+  constructor(source: GitHistorySource, cause: unknown) {
+    const historySource = gitHistoryLabel(source);
+    super(`Failed to read ${historySource}: ${errorText(cause)}`);
+    this.name = 'RecentChangeSourceError';
+    this.historySource = historySource;
+    Object.defineProperty(this, 'cause', { value: cause, enumerable: false });
+  }
+}
+
 interface RawGraph {
   drift: RawDrift[];
 }
@@ -116,7 +167,7 @@ function parseGitChanges(stdout: string, source: 'git' | 'feature'): RecentChang
 async function runGitHistory(
   repoRoot: string,
   args: readonly string[],
-  source: 'git' | 'feature',
+  source: GitHistorySource,
   run: ExecGit,
 ): Promise<RecentChangeItem[]> {
   try {
@@ -127,8 +178,8 @@ async function runGitHistory(
       maxBuffer: 1024 * 1024,
     });
     return parseGitChanges(stdout, source);
-  } catch {
-    return [];
+  } catch (error) {
+    throw new RecentChangeSourceError(source, error);
   }
 }
 
@@ -163,7 +214,11 @@ function readFeatureIds(repoRoot: string): Set<string> {
   }
 }
 
-export function collectAdrChanges(repoRoot: string): RecentChangeItem[] {
+export function collectAdrChanges(
+  repoRoot: string,
+  limit = RECENT_CHANGES_LIMIT,
+): RecentChangeItem[] {
+  const sourceLimit = normalizedLimit(limit);
   const adrRoot = path.join(repoRoot, 'docs', 'adr');
   let names: string[];
   try {
@@ -175,12 +230,14 @@ export function collectAdrChanges(repoRoot: string): RecentChangeItem[] {
     return [];
   }
 
-  return names.flatMap((name) => {
+  const items: RecentChangeItem[] = [];
+  for (const name of names) {
     const content = fs.readFileSync(path.join(adrRoot, name), 'utf8');
     const date = content.match(/^\*\*Date:\*\*\s*(\d{4}-\d{2}-\d{2})\s*$/m)?.[1];
     const title = content.match(/^#\s+(.+)$/m)?.[1]?.trim();
-    if (!date || !title || !Number.isFinite(Date.parse(date))) return [];
-    return [
+    if (!date || !title || !Number.isFinite(Date.parse(date))) continue;
+    pushBounded(
+      items,
       {
         id: `adr:${name.replace(/\.md$/, '')}:${date}`,
         source: 'adr' as const,
@@ -188,27 +245,46 @@ export function collectAdrChanges(repoRoot: string): RecentChangeItem[] {
         time: date,
         linkTo: 'governance' as const,
       },
-    ];
-  });
+      sourceLimit,
+      compareDatedNewest,
+    );
+  }
+
+  return items.sort(compareDatedNewest);
 }
 
-export function collectDriftChanges(drift: RawDrift[]): RecentChangeItem[] {
-  return drift
-    .map((finding) => ({
-      id: stableId('drift', `${finding.nodeId}\n${finding.path}\n${finding.detail}`),
-      source: 'drift' as const,
-      title: finding.detail,
-      time: '',
-      linkLabel: finding.nodeId,
-    }))
-    .sort((left, right) => left.id.localeCompare(right.id));
+export function collectDriftChanges(
+  drift: RawDrift[],
+  limit = RECENT_CHANGES_LIMIT,
+): RecentChangeItem[] {
+  const sourceLimit = normalizedLimit(limit);
+  const items: RecentChangeItem[] = [];
+  for (const finding of drift) {
+    pushBounded(
+      items,
+      {
+        id: stableId('drift', `${finding.nodeId}\n${finding.path}\n${finding.detail}`),
+        source: 'drift' as const,
+        title: finding.detail,
+        time: '',
+        linkLabel: finding.nodeId,
+      },
+      sourceLimit,
+      compareById,
+    );
+  }
+  return items.sort(compareById);
 }
 
-export function collectMaintenanceChanges(inspection: MaintenanceInspection): RecentChangeItem[] {
+export function collectMaintenanceChanges(
+  inspection: MaintenanceInspection,
+  limit = RECENT_CHANGES_LIMIT,
+): RecentChangeItem[] {
+  const sourceLimit = normalizedLimit(limit);
   const items: RecentChangeItem[] = [];
   const add = (key: string, value: unknown) => {
     const title = text(value);
-    if (title) items.push(toMaintenanceItem(key, title));
+    if (title) pushBounded(items, toMaintenanceItem(key, title), sourceLimit, compareById);
   };
 
   for (const finding of inspection.staleDocs ?? []) {
@@ -254,7 +330,7 @@ export function collectMaintenanceChanges(inspection: MaintenanceInspection): Re
     add(`warning:${index}`, finding);
   }
 
-  return items.sort((left, right) => left.id.localeCompare(right.id));
+  return items.sort(compareById);
 }
 
 function containsId(title: string, id: string): boolean {
@@ -292,18 +368,13 @@ export function orderAndCapRecentChanges(
   items: RecentChangeItem[],
   limit = RECENT_CHANGES_LIMIT,
 ): RecentChangeItem[] {
-  const drift = items
-    .filter((item) => item.source === 'drift')
-    .sort((left, right) => left.id.localeCompare(right.id));
+  const drift = items.filter((item) => item.source === 'drift').sort(compareById);
   const dated = items
     .filter((item) => item.source !== 'drift' && Number.isFinite(Date.parse(item.time)))
-    .sort((left, right) => {
-      const timeOrder = Date.parse(right.time) - Date.parse(left.time);
-      return timeOrder || left.id.localeCompare(right.id);
-    });
+    .sort(compareDatedNewest);
   const undated = items
     .filter((item) => item.source !== 'drift' && !Number.isFinite(Date.parse(item.time)))
-    .sort((left, right) => left.id.localeCompare(right.id));
+    .sort(compareById);
 
   return [...drift, ...dated, ...undated].slice(0, limit);
 }
@@ -314,9 +385,10 @@ export async function listRecentChanges(repoRoot: string): Promise<RecentChangeI
     collectFeatureChanges(repoRoot),
     listGates(),
   ]);
-  const adrs = collectAdrChanges(repoRoot);
-  const drift = collectDriftChanges(buildKnowledgeGraph(repoRoot).drift);
-  const maintenance = collectMaintenanceChanges(inspectMaintenance(repoRoot));
+  const adrs = collectAdrChanges(repoRoot, RECENT_CHANGES_LIMIT);
+  // Complete graph, maintenance, and live-ID reads preserve drift truth and verified links; only emitted items are capped.
+  const drift = collectDriftChanges(buildKnowledgeGraph(repoRoot).drift, RECENT_CHANGES_LIMIT);
+  const maintenance = collectMaintenanceChanges(inspectMaintenance(repoRoot), RECENT_CHANGES_LIMIT);
   const liveSources: LiveLinkSources = {
     sessionIds: new Set(readSessionList().map((session) => session.id)),
     gateIds: new Set(gates.map((gate) => gate.gateId)),
