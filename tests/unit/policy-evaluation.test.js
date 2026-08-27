@@ -57,7 +57,14 @@ function seedPrincipals(dir) {
 		{ id: "alice@example.com", principalKind: "human", role: "approver" },
 		{ id: "bob@example.com", principalKind: "human", role: "verifier" },
 		{ id: "dev@example.com", principalKind: "human", role: "submitter" },
-		{ id: "manager@example.com", principalKind: "human", role: "manager" },
+		{
+			id: "manager@example.com",
+			principalKind: "human",
+			role: "manager",
+			capability: "release",
+			scope: SUBJECT,
+		},
+		{ id: "observer@example.com", principalKind: "human", role: "observer" },
 		{ id: "lead@example.com", principalKind: "human", role: "lead" },
 		{ id: "ci-bot", principalKind: "service", capability: "execute" },
 	]) {
@@ -280,6 +287,26 @@ test("separation of duties denies self-approval and self-production", () => {
 	assert.ok(producerResult.outcome.reasons.some((reason) => reason.includes("evidence producer")));
 });
 
+test("separation of duties allows repeated same-role evidence actors across receipts", () => {
+	const dir = mkTarget("same-role-evidence");
+	seedPrincipals(dir);
+	recordAndVerifyEvidence(dir, { id: "evidence/a", subject: "eval/a" });
+	recordAndVerifyEvidence(dir, { id: "evidence/b", subject: "eval/b" });
+	createGateOutcome(dir, {
+		require: [
+			{ evidenceType: "eval/a", subject: "eval/a", assurance: "verified" },
+			{ evidenceType: "eval/b", subject: "eval/b", assurance: "verified" },
+		],
+	});
+	consumeApprovalFixture(dir);
+	admitActivePolicy(dir, "org");
+	admitActivePolicy(dir, "tenant");
+
+	const result = evaluatePolicy(dir, baseInput(), {});
+	assert.equal(result.ok, true, (result.errors || []).join("; "));
+	assert.equal(result.outcome.verdict, "pass");
+});
+
 test("missing, stale, unsupported, and relaxing policy contracts refuse before appending", () => {
 	const missing = mkTarget("missing");
 	seedPrincipals(missing);
@@ -312,6 +339,30 @@ test("missing, stale, unsupported, and relaxing policy contracts refuse before a
 	assert.equal(relaxingResult.ok, false);
 	assert.equal(relaxingResult.code, "AMBER_E_POLICY_CONFLICT");
 	assert.equal(fs.existsSync(outcomeLedgerPath(relaxing)), false);
+
+	const lowerDelegation = mkTarget("lower-delegation");
+	setupStrictContext(lowerDelegation, {
+		repo: {
+			delegations: [
+				{
+					delegator: "manager@example.com",
+					delegate: "dev@example.com",
+					capability: "release",
+					scope: SUBJECT,
+					validFrom: "2026-01-01T00:00:00.000Z",
+					validUntil: "2027-01-01T00:00:00.000Z",
+				},
+			],
+		},
+	});
+	const lowerDelegationResult = evaluatePolicy(
+		lowerDelegation,
+		baseInput({ policies: { repo: "policy/repo" }, delegator: "manager@example.com" }),
+		{},
+	);
+	assert.equal(lowerDelegationResult.ok, false);
+	assert.equal(lowerDelegationResult.code, "AMBER_E_POLICY_CONFLICT");
+	assert.equal(fs.existsSync(outcomeLedgerPath(lowerDelegation)), false);
 });
 
 test("delegation is direct, scoped, capability-limited, and time-limited", () => {
@@ -333,6 +384,8 @@ test("delegation is direct, scoped, capability-limited, and time-limited", () =>
 	const pass = evaluatePolicy(valid, baseInput({ delegator: "manager@example.com" }), {});
 	assert.equal(pass.ok, true, (pass.errors || []).join("; "));
 	assert.equal(pass.outcome.delegation.delegator, "manager@example.com");
+	assert.equal(showPolicyOutcome(valid, { index: pass.outcome.index }).hash, pass.outcome.hash);
+	assert.equal(listPolicyOutcomes(valid).length, 1);
 
 	const missing = mkTarget("delegation-missing");
 	setupStrictContext(missing);
@@ -390,6 +443,32 @@ test("delegation is direct, scoped, capability-limited, and time-limited", () =>
 	);
 	assert.equal(wrongShapeDenied.ok, false);
 	assert.equal(wrongShapeDenied.code, "AMBER_E_POLICY_DELEGATION_REQUIRED");
+
+	const unauthorizedDelegator = mkTarget("delegation-unauthorized-delegator");
+	setupStrictContext(unauthorizedDelegator, {
+		org: {
+			delegations: [
+				{
+					delegator: "observer@example.com",
+					delegate: "dev@example.com",
+					capability: "release",
+					scope: SUBJECT,
+					validFrom: "2026-01-01T00:00:00.000Z",
+					validUntil: "2027-01-01T00:00:00.000Z",
+				},
+			],
+		},
+	});
+	const unauthorized = evaluatePolicy(
+		unauthorizedDelegator,
+		baseInput({ delegator: "observer@example.com" }),
+		{},
+	);
+	assert.equal(unauthorized.ok, false);
+	assert.equal(unauthorized.code, "AMBER_E_POLICY_DELEGATION_REQUIRED");
+	assert.ok(
+		unauthorized.outcome.reasons.some((reason) => reason.startsWith("delegation invalid:")),
+	);
 
 	const deniedDelegator = mkTarget("delegation-denied-delegator");
 	setupStrictContext(deniedDelegator, {

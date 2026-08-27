@@ -9,9 +9,10 @@
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
+const { parseTimestamp } = require("./core/principal-registry");
 
-const READ_FAILURE_CODE = "AMBER_E_POLICY_MISSING";
-const POLICY_MISSING_CODE = "AMBER_E_POLICY_MISSING";
+const READ_FAILURE_CODE = "AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT";
+const POLICY_OUTCOME_NOT_FOUND_CODE = "AMBER_E_POLICY_OUTCOME_NOT_FOUND";
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -78,13 +79,13 @@ function requiredFlag(args, key, flag, example) {
 
 function nowFlagValue(args) {
 	if (args.now === undefined) return { value: undefined };
-	const parsed = new Date(String(args.now));
-	if (Number.isNaN(parsed.getTime())) {
+	const parsed = parseTimestamp(String(args.now));
+	if (parsed === null) {
 		return {
 			error: `--now must be an ISO-8601 date, or a date-time carrying an explicit zone (Z or ±hh:mm) — e.g. 2027-01-31 or 2027-01-31T09:00:00Z; got ${JSON.stringify(args.now)}`,
 		};
 	}
-	return { value: parsed };
+	return { value: new Date(parsed) };
 }
 
 function indexFlagValue(args) {
@@ -214,7 +215,7 @@ const dispatch = defineCommand({
 					errors: [`no policy outcome recorded at index ${index.value}`],
 					warnings: [],
 					exitCode: 1,
-					code: POLICY_MISSING_CODE,
+					code: POLICY_OUTCOME_NOT_FOUND_CODE,
 				};
 			}
 			return { text: JSON.stringify(record, null, 2) };

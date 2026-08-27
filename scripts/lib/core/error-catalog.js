@@ -1226,6 +1226,15 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_POLICY_DENIED", "AMBER_E_POLICY_CONFLICT"],
 	},
+	AMBER_E_POLICY_OUTCOME_NOT_FOUND: {
+		title: "Policy outcome is not recorded",
+		cause:
+			"policy show named a 0-based outcome ledger line that does not exist. The Policy Contract may exist, but no Policy Outcome has been appended at that index.",
+		remedy:
+			"Run `amber policy list --target <repo> --json` to inspect recorded outcomes, or run `amber policy evaluate` to append a new outcome.",
+		layer: "Observability",
+		related: ["AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT", "AMBER_E_POLICY_MISSING"],
+	},
 	AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT: {
 		title: "Policy outcome ledger is corrupt or unreadable",
 		cause:

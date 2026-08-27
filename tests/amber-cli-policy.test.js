@@ -180,9 +180,7 @@ function setupStrictContext(dir) {
 				"--subject",
 				SUBJECT,
 				"--valid-until",
-				"2027-01-01T00:00:00.000Z",
-				"--now",
-				"2026-08-01T00:00:00.000Z",
+				"2999-01-01T00:00:00.000Z",
 				"--target",
 				dir,
 				"--json",
@@ -203,8 +201,6 @@ function setupStrictContext(dir) {
 				"# Decision: approved",
 				"--trace",
 				"decides:intent:intent/login@1",
-				"--now",
-				"2026-08-10T00:00:00.000Z",
 				"--target",
 				dir,
 				"--json",
@@ -295,6 +291,22 @@ test("missing required policy and stale policy refuse before any outcome is appe
 	const expired = evaluatePolicyCli(stale, ["--repo-policy", "policy/repo"]);
 	assert.equal(expired.status, 1);
 	assert.equal(envelope(expired).code, "AMBER_E_POLICY_STALE");
+});
+
+test("policy CLI rejects zone-less --now and reports missing outcome distinctly", () => {
+	const dir = mkTarget("cli-errors");
+	setupStrictContext(dir);
+
+	const zoneLess = evaluatePolicyCli(dir, ["--now", "2026-08-10T12:34:56"]);
+	assert.equal(zoneLess.status, 1);
+	assert.equal(envelope(zoneLess).code, "AMBER_E_INVALID_ARG");
+
+	const missingOutcome = runCli(
+		["policy", "show", "--index", "99", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(missingOutcome.status, 1);
+	assert.equal(envelope(missingOutcome).code, "AMBER_E_POLICY_OUTCOME_NOT_FOUND");
 });
 
 test("policy help is wired", () => {

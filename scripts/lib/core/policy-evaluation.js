@@ -328,6 +328,12 @@ function policyContractProblem(contract, expectedLayer) {
 				message: `policy.delegations must be an array of explicit direct delegations when present; got ${JSON.stringify(contract.delegations)}`,
 			};
 		}
+		if (!REQUIRED_POLICY_LAYERS.includes(contract.layer) && contract.delegations.length > 0) {
+			return {
+				code: POLICY_CONFLICT_CODE,
+				message: `${contract.layer} policy cannot declare delegations: repo/play/gate policy may only tighten the org/tenant ceiling and delegation grants authority`,
+			};
+		}
 		for (let index = 0; index < contract.delegations.length; index += 1) {
 			const problem = delegationProblem(
 				contract.delegations[index],
@@ -537,19 +543,26 @@ function appendEvidenceActors(cwd, gateOutcome, actors, scopeCandidates, reasons
 	return { ok: true };
 }
 
+function separationRoleClass(role) {
+	if (role.startsWith("evidence producer ")) return "evidence producer";
+	if (role.startsWith("evidence verifier ")) return "evidence verifier";
+	return role;
+}
+
 function collectSeparationReasons(actors) {
 	const reasons = [];
 	const seen = new Map();
 	for (const actor of actors) {
 		if (!isNonEmptyString(actor.id)) continue;
-		const firstRole = seen.get(actor.id);
-		if (firstRole !== undefined) {
+		const roleClass = separationRoleClass(actor.role);
+		const first = seen.get(actor.id);
+		if (first !== undefined && first.roleClass !== roleClass) {
 			pushUnique(
 				reasons,
-				`separation of duties violation: principal "${actor.id}" occupies both ${firstRole} and ${actor.role}`,
+				`separation of duties violation: principal "${actor.id}" occupies both ${first.role} and ${actor.role}`,
 			);
-		} else {
-			seen.set(actor.id, actor.role);
+		} else if (first === undefined) {
+			seen.set(actor.id, { role: actor.role, roleClass });
 		}
 	}
 	return reasons;
@@ -612,7 +625,6 @@ function resolveDelegation(entries, { delegator, submitter, capability, subject,
 							validFrom: delegation.validFrom,
 							validUntil: delegation.validUntil,
 							policy: {
-								layer: entry.layer,
 								identity: entry.identity,
 								revision: entry.revision,
 								contentHash: entry.contentHash,
@@ -732,7 +744,13 @@ function firstDenialCode(reasons) {
 	if (reasons.some((reason) => reason.startsWith("separation of duties violation:"))) {
 		return POLICY_SEPARATION_CODE;
 	}
-	if (reasons.some((reason) => reason.startsWith("no active direct delegation"))) {
+	if (
+		reasons.some(
+			(reason) =>
+				reason.startsWith("no active direct delegation") ||
+				reason.startsWith("delegation invalid:"),
+		)
+	) {
 		return POLICY_DELEGATION_REQUIRED_CODE;
 	}
 	return POLICY_DENIED_CODE;
@@ -775,6 +793,7 @@ function evaluatePolicy(cwd, input = {}, opts = {}) {
 
 	const delegator =
 		input.delegator === undefined || input.delegator === null ? null : input.delegator;
+	let delegatorPrincipalSnapshot = null;
 	if (delegator !== null) {
 		let delegatorPrincipal;
 		try {
@@ -785,6 +804,7 @@ function evaluatePolicy(cwd, input = {}, opts = {}) {
 			]);
 		}
 		if (!delegatorPrincipal.ok) return fail(delegatorPrincipal.code, [delegatorPrincipal.message]);
+		delegatorPrincipalSnapshot = delegatorPrincipal.principal;
 	}
 
 	const reasons = [];
@@ -856,6 +876,21 @@ function evaluatePolicy(cwd, input = {}, opts = {}) {
 		scopes: scopeCandidates,
 	})) {
 		pushUnique(reasons, reason);
+	}
+
+	if (delegatorPrincipalSnapshot !== null) {
+		if (delegatorPrincipalSnapshot.capability !== input.capability) {
+			pushUnique(
+				reasons,
+				`delegation invalid: delegator "${delegator}" has capability ${JSON.stringify(delegatorPrincipalSnapshot.capability)}, not requested capability "${input.capability}"`,
+			);
+		}
+		if (delegatorPrincipalSnapshot.scope !== input.subject) {
+			pushUnique(
+				reasons,
+				`delegation invalid: delegator "${delegator}" has scope ${JSON.stringify(delegatorPrincipalSnapshot.scope)}, not requested subject "${input.subject}"`,
+			);
+		}
 	}
 
 	const delegationResult = resolveDelegation(stack.entries, {

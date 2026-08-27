@@ -831,9 +831,10 @@ Contract keys: `policyVersion` (v1), `layer` (`org|tenant|repo|play|gate`), opti
 `validUntil`, optional `maxPolicyAgeMs`, `rules`, and `delegations`. Rules are deny-only:
 `denyPrincipals`, `denyCapabilities`, `denyScopes`, and `requireSeparationOfDuties: true`. Lower
 layers cannot relax the ceiling; unsupported allow/relax keys and
-`requireSeparationOfDuties: false` fail closed. Delegations are direct only and must match the
-named delegator, delegate, exact capability, exact subject/scope, and half-open validity window;
-chains are never followed.
+`requireSeparationOfDuties: false` fail closed. Delegations are direct only, may be declared only by
+org/tenant policies, and must match the named delegator, delegate, exact capability, exact
+subject/scope, and half-open validity window. The delegator principal itself must carry that same
+capability and scope; chains are never followed.
 
 A completed evaluation appends one immutable `evaluated` event to
 `.amber/policies/outcomes.jsonl`, binding the active policy revisions and policy content hashes, the
@@ -864,8 +865,9 @@ node scripts/amber.js policy list --target . [--subject <s>] [--submitter <id>] 
 Error codes: `AMBER_E_POLICY_MISSING`, `AMBER_E_POLICY_INVALID`,
 `AMBER_E_POLICY_UNSUPPORTED_VERSION`, `AMBER_E_POLICY_STALE`, `AMBER_E_POLICY_CONFLICT`,
 `AMBER_E_POLICY_DENIED`, `AMBER_E_POLICY_SEPARATION_OF_DUTIES`,
-`AMBER_E_POLICY_DELEGATION_REQUIRED`, `AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT`,
-`AMBER_E_POLICY_OUTCOME_SIZE_CEILING`, `AMBER_E_POLICY_OUTCOME_REGISTRY_LOCK`.
+`AMBER_E_POLICY_DELEGATION_REQUIRED`, `AMBER_E_POLICY_OUTCOME_NOT_FOUND`,
+`AMBER_E_POLICY_OUTCOME_REGISTRY_CORRUPT`, `AMBER_E_POLICY_OUTCOME_SIZE_CEILING`,
+`AMBER_E_POLICY_OUTCOME_REGISTRY_LOCK`.
 
 ### projection rebuild / status / query (Governance Graph of artifact revisions)
 

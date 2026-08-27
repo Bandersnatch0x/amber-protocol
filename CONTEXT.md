@@ -117,7 +117,7 @@ The F050 invariant that distinct responsibilities are held by distinct Principal
 _Avoid_: code-owner review, informal independence, self-approval
 
 **Delegation**:
-A direct, non-transitive, scoped, capability-limited, time-limited grant in a Policy Contract: `{ delegator, delegate, capability, scope, validFrom, validUntil }`. A delegated strict-consumption request must match every field exactly and be inside the half-open validity window; chains are never followed.
+A direct, non-transitive, scoped, capability-limited, time-limited grant declared by org/tenant Policy: `{ delegator, delegate, capability, scope, validFrom, validUntil }`. A delegated strict-consumption request must match every field exactly, be inside the half-open validity window, and stay within the delegator Principal's own capability/scope; chains are never followed.
 _Avoid_: role inheritance, group membership, blanket authorization
 
 **Assurance Level**:
