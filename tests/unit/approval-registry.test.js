@@ -121,6 +121,7 @@ function revokedEvent(approvalId, revokerId = "bob@example.com", at = "2026-08-0
 			issuer: null,
 		},
 		clockSource: "injected",
+		skewPolicy: SKEW_POLICY,
 	};
 }
 
@@ -317,6 +318,40 @@ test("grant validates its input before any durable state is touched", () => {
 	assert.equal(fs.existsSync(ledgerPathOf(dir)), false, "no durable state for malformed input");
 });
 
+test("a born-expired or inverted validity window is malformed input, never a dead grant", () => {
+	const dir = mkTarget("grant-window");
+	seedPrincipals(dir);
+	const now = { now: new Date("2026-08-01T00:00:00.000Z") };
+
+	const inverted = grantApproval(
+		dir,
+		{
+			id: "approval/inverted",
+			approver: "alice@example.com",
+			subject: "spec/login@2",
+			validUntil: "2020-01-01",
+		},
+		now,
+	);
+	assert.equal(inverted.ok, false);
+	assert.equal(inverted.code, "AMBER_E_INVALID_ARG");
+
+	const empty = grantApproval(
+		dir,
+		{
+			id: "approval/empty",
+			approver: "alice@example.com",
+			subject: "spec/login@2",
+			validUntil: "2026-08-01",
+		},
+		now,
+	);
+	assert.equal(empty.ok, false);
+	assert.equal(empty.code, "AMBER_E_INVALID_ARG");
+
+	assert.equal(fs.existsSync(ledgerPathOf(dir)), false, "no durable state for a dead window");
+});
+
 test("grant binds a registry-verified HUMAN approver; ghost, service, and revoked principals fail closed", () => {
 	const dir = mkTarget("grant-human");
 	seedPrincipals(dir);
@@ -401,6 +436,7 @@ test("revoke appends one immutable event and the status flips to revoked", () =>
 		"prevHash",
 		"revoker",
 		"schemaVersion",
+		"skewPolicy",
 	]);
 	assert.equal(events[1].prevHash, events[0].hash);
 });
@@ -593,6 +629,46 @@ test("a failed Decision admission leaves the authorization unconsumed", () => {
 	assert.equal(retry.ok, true, (retry.errors || []).join("; "));
 });
 
+test("a consumption that cannot be recorded is refused BEFORE the Decision settles — no orphan", () => {
+	const dir = mkTarget("consume-ceiling");
+	seedPrincipals(dir);
+	grantFixture(dir, "approval/login-42");
+	admitIntentFixture(dir);
+
+	// Size the ceiling so the exact chained consumed event does NOT fit. The
+	// pre-fix probe omitted the chain fields (~151 bytes) and would have
+	// passed here, admitting and committing the Decision first — the orphan
+	// of review F-1. The dominating probe must refuse before the admission.
+	const ledgerBytes = fs.statSync(ledgerPathOf(dir)).size;
+	const exactLine = `${JSON.stringify({
+		kind: "consumed",
+		schemaVersion: APPROVAL_SCHEMA_VERSION,
+		at: "2026-08-10T00:00:00.000Z",
+		approvalId: "approval/login-42",
+		decisionIdentity: "decision/login-approved",
+		decisionRevision: 1,
+		clockSource: "injected",
+		skewPolicy: SKEW_POLICY,
+		prevHash: "0".repeat(64),
+		hash: "0".repeat(64),
+	})}\n`;
+	process.env.AMBER_APPROVAL_MAX_REGISTRY_BYTES = String(ledgerBytes + exactLine.length - 10);
+	try {
+		const refused = consumeFixture(dir, "approval/login-42");
+		assert.equal(refused.ok, false);
+		assert.equal(refused.code, "AMBER_E_APPROVAL_SIZE_CEILING");
+		assert.equal(readLedger(dir).length, 1, "no consumed event was written");
+		assert.equal(
+			fs.existsSync(path.join(dir, ".amber", "artifacts", "decisions")),
+			false,
+			"no Decision was settled — the orphan is impossible",
+		);
+		assert.equal(showApproval(dir, "approval/login-42").status, "granted");
+	} finally {
+		delete process.env.AMBER_APPROVAL_MAX_REGISTRY_BYTES;
+	}
+});
+
 test("scope confinement: a scoped approval forces the Decision's scope", () => {
 	const dir = mkTarget("consume-scope");
 	seedPrincipals(dir);
@@ -701,6 +777,41 @@ test("a revoked-then-consumed sequence is corruption — the writers can never p
 		]),
 	);
 	foldThrows(dir, "AMBER_E_APPROVAL_REGISTRY_CORRUPT", "revoked");
+});
+
+test("a consumed-then-revoked sequence is corruption — consumption is terminal", () => {
+	const dir = mkTarget("tamper-consumed-revoked");
+	writeJSONL(
+		ledgerPathOf(dir),
+		withChain([
+			storedGranted(),
+			consumedEvent("approval/fixture-1"),
+			revokedEvent("approval/fixture-1", "bob@example.com", "2026-08-04T00:00:00.000Z"),
+		]),
+	);
+	foldThrows(dir, "AMBER_E_APPROVAL_REGISTRY_CORRUPT", "already consumed");
+});
+
+test("a duplicate consumed event inside the ledger is corruption — single-use is absolute", () => {
+	const dir = mkTarget("tamper-dup-consumed");
+	writeJSONL(
+		ledgerPathOf(dir),
+		withChain([
+			storedGranted(),
+			consumedEvent("approval/fixture-1"),
+			consumedEvent("approval/fixture-1", "decision/fixture-2", 1, "2026-08-04T00:00:00.000Z"),
+		]),
+	);
+	foldThrows(dir, "AMBER_E_APPROVAL_REGISTRY_CORRUPT", "a second time");
+});
+
+test("a revoked event with a malformed skew policy fails closed", () => {
+	const dir = mkTarget("tamper-revoked-skew");
+	writeJSONL(
+		ledgerPathOf(dir),
+		withChain([storedGranted(), { ...revokedEvent("approval/fixture-1"), skewPolicy: "5m" }]),
+	);
+	foldThrows(dir, "AMBER_E_APPROVAL_REGISTRY_CORRUPT", "skewPolicy");
 });
 
 test("an event for an unrecorded approval, an unknown kind, and an unknown field are corruption", () => {

@@ -125,6 +125,7 @@ const REVOKED_EVENT_FIELDS = Object.freeze([
 	"approvalId",
 	"revoker",
 	"clockSource",
+	"skewPolicy",
 	"prevHash",
 	"hash",
 ]);
@@ -427,11 +428,8 @@ function foldApprovals(cwd) {
 					`approval registry event ${lineIndex} is a revoked event whose approvalId is not a non-empty string; got ${JSON.stringify(event.approvalId)}`,
 				);
 			}
-			if (!CLOCK_SOURCES.includes(event.clockSource)) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} carries a clockSource ${JSON.stringify(event.clockSource)} outside the closed set (${CLOCK_SOURCES.join(", ")})`,
-				);
-			}
+			const clockProblem = storedClockProblem(event, lineIndex, "revoked");
+			if (clockProblem !== null) throw approvalCorrupt(clockProblem);
 			const record = byId.get(event.approvalId);
 			if (record === undefined) {
 				throw approvalCorrupt(
@@ -612,6 +610,17 @@ function grantApproval(cwd, { id, approver, scope = null, subject, validUntil },
 	const now = writeClockOf(opts);
 	const inputProblem = grantInputProblem({ id, approver, scope, subject, validUntil });
 	if (inputProblem !== null) return fail(INVALID_ARG_CODE, [inputProblem]);
+	// The half-open window must be non-empty: validUntil strictly after the
+	// grant instant (validAt is the write instant). A born-expired or
+	// inverted grant is malformed input, never a silently dead
+	// authorization — the same window contract as the principal registry
+	// (review F-2).
+	const until = parseTimestamp(validUntil);
+	if (until !== null && until <= now.getTime()) {
+		return fail(INVALID_ARG_CODE, [
+			`validUntil must fall strictly after the grant instant (${now.toISOString()}); the validity window is half-open [validAt, validUntil) and must be non-empty — got ${JSON.stringify(validUntil)}, which is already expired at grant time`,
+		]);
+	}
 
 	const acting = resolveActingHuman(cwd, approver, "an Approval's approver", now);
 	if (!acting.ok) return fail(acting.code, [acting.message]);
@@ -773,6 +782,7 @@ function revokeApproval(cwd, { id, revoker }, opts = {}) {
 		approvalId: id,
 		revoker: Object.freeze({ ...acting.principal }),
 		clockSource: clockSourceOf(opts),
+		skewPolicy: SKEW_POLICY,
 	};
 	let ceilingCheck;
 	try {
@@ -903,8 +913,10 @@ function consumeApproval(
 		]);
 	}
 
-	// Pre-lock: the lifecycle verdict, the scope confinement, and the
-	// ceiling — all before any durable state is touched.
+	// Pre-lock: the lifecycle verdict and the scope confinement — before any
+	// durable state is touched. (The ceiling probe deliberately does NOT run
+	// here: only the under-lock probe below is authoritative, because a
+	// pre-lock probe cannot account for appends racing it onto the ledger.)
 	let current;
 	try {
 		current = foldApprovals(cwd);
@@ -917,33 +929,6 @@ function consumeApproval(
 	if (scopeVerdict.error !== null) return fail(INVALID_ARG_CODE, [scopeVerdict.error]);
 
 	const at = now.toISOString();
-	// The consumed line's exact length depends on the admission's revision,
-	// which exists only after the Decision settles. The pre-admission ceiling
-	// probe therefore pads the revision pessimistically (10 digits covers
-	// every realistic head), so a probe that passes cannot hide an exact line
-	// that would refuse — the Decision is never admitted into an approval
-	// whose consumption cannot be recorded.
-	const ceilingProbe = {
-		kind: "consumed",
-		schemaVersion: APPROVAL_SCHEMA_VERSION,
-		at,
-		approvalId: id,
-		decisionIdentity,
-		decisionRevision: 9_999_999_999,
-		clockSource: clockSourceOf(opts),
-		skewPolicy: SKEW_POLICY,
-	};
-	let probe;
-	try {
-		probe = appendWithinCeiling(cwd, ceilingProbe);
-	} catch (err) {
-		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-	}
-	if (probe.wouldExceed) {
-		return fail(SIZE_CEILING_CODE, [
-			`appending the consumption event for "${id}" would grow the approval registry beyond its size ceiling of ${probe.ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — raise the ceiling deliberately`,
-		]);
-	}
 
 	let release;
 	try {
@@ -966,6 +951,40 @@ function consumeApproval(
 		const target = locked.target;
 		const lockedScope = decisionScopeOf(target, scope);
 		if (lockedScope.error !== null) return fail(INVALID_ARG_CODE, [lockedScope.error]);
+
+		// The consumed line's exact length depends on the admission's revision
+		// and on the chain fields — all of which exist only after the Decision
+		// settles. The ceiling probe therefore runs UNDER the lock and BEFORE
+		// the admission, padded with structurally dominating dummies: a
+		// 10-digit revision (every realistic head) and 64-char hex chain
+		// placeholders exactly as long as the real prevHash/hash. A probe that
+		// passes cannot hide an exact line that would refuse, so the Decision
+		// is never admitted into an approval whose consumption cannot be
+		// recorded (review F-1: the pre-fix probe omitted the chain fields and
+		// could orphan a settled Decision into a near-saturated ledger).
+		const ceilingProbe = {
+			kind: "consumed",
+			schemaVersion: APPROVAL_SCHEMA_VERSION,
+			at,
+			approvalId: id,
+			decisionIdentity,
+			decisionRevision: 9_999_999_999,
+			clockSource: clockSourceOf(opts),
+			skewPolicy: SKEW_POLICY,
+			prevHash: "0".repeat(64),
+			hash: "0".repeat(64),
+		};
+		let probe;
+		try {
+			probe = appendWithinCeiling(cwd, ceilingProbe);
+		} catch (err) {
+			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
+		}
+		if (probe.wouldExceed) {
+			return fail(SIZE_CEILING_CODE, [
+				`appending the consumption event for "${id}" would grow the approval registry beyond its size ceiling of ${probe.ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — raise the ceiling deliberately`,
+			]);
+		}
 
 		// The Decision admission runs UNDER the approvals lock: consumption
 		// and settlement are one transaction. The artifact store takes only
@@ -1001,11 +1020,12 @@ function consumeApproval(
 		};
 		const prevHash = chainHeadHashOf(cwd);
 		const event = { ...eventBody, prevHash, hash: chainHash(eventBody, prevHash) };
-		// The exact chained event, still before the append itself. If this
-		// (or the append) fails after a successful admission, the Decision is
-		// orphaned — surfaced by name, never silently dropped. The branch is
-		// practically unreachable: the probe above already refused a ledger
-		// that could not hold the line, and the append runs under the lock.
+		// Belt-and-braces on the exact chained event. Structurally
+		// unreachable: the dominating probe above already refused a ledger
+		// that could not hold a line at least this long, and both run under
+		// the lock against the same file size. If it ever fires after a
+		// successful admission, the Decision is orphaned — surfaced by name,
+		// never silently dropped.
 		const underLockCeiling = appendWithinCeiling(cwd, event);
 		if (underLockCeiling.wouldExceed) {
 			return fail(SIZE_CEILING_CODE, [

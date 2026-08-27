@@ -743,7 +743,13 @@ node scripts/amber.js approval list --target . --json
 
 The `--trace decides:<type>:<identity>[@<revision>]` grammar is the artifact surface's (one parser,
 shared). Every event records its clock source (`injected` when the caller injected a clock,
-`system` otherwise) and the fixed skew policy `no-tolerance`.
+`system` otherwise) and the fixed skew policy `no-tolerance`. Two boundary notes: the `consumed`
+event's `at` is the caller's evaluation clock while the settled Decision's own `committedAt`
+reflects the artifact store's write clock — they are recorded independently and may diverge under
+an injected clock; and the approver is re-verified against the Principal registry at consumption,
+so an approver whose registration is later revoked or expired leaves the authorization
+un-consumable (fail-closed) — though it can still be revoked by another registered human, since
+revocation verifies the revoker, not the approver.
 
 ### projection rebuild / status / query (Governance Graph of artifact revisions)
 

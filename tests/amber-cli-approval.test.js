@@ -12,6 +12,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { GENESIS_HASH, chainHash } = require("../scripts/lib/core/approval-registry");
+const { writeJSONL } = require("../scripts/lib/core/jsonl");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -253,8 +255,36 @@ test("consume of an expired approval fails closed with the expiry code", () => {
 	const dir = mkTarget("consume-expired");
 	seedPrincipals(dir);
 	admitIntent(dir);
-	const r = grantApproval(dir, "approval/login-42", ["--valid-until", "2026-01-01"]);
-	assert.equal(r.status, 0, r.stderr);
+	// The writer refuses born-expired grants (the window must be non-empty),
+	// so a closed window at the CLI seam can only be a stored one: a
+	// hand-built chained granted event whose validUntil has passed.
+	const grantedBody = {
+		kind: "granted",
+		schemaVersion: 1,
+		at: "2026-01-01T00:00:00.000Z",
+		approvalId: "approval/login-42",
+		approver: {
+			id: "alice@example.com",
+			principalKind: "human",
+			role: "reviewer",
+			membership: null,
+			capability: null,
+			scope: null,
+			validFrom: null,
+			validTo: null,
+			issuer: null,
+		},
+		scope: null,
+		subject: "spec/login@2",
+		validAt: "2026-01-01T00:00:00.000Z",
+		validUntil: "2026-01-02T00:00:00.000Z",
+		recordedAt: "2026-01-01T00:00:00.000Z",
+		clockSource: "injected",
+		skewPolicy: "no-tolerance",
+	};
+	writeJSONL(path.join(dir, ".amber", "approvals", "registry.jsonl"), [
+		{ ...grantedBody, prevHash: GENESIS_HASH, hash: chainHash(grantedBody, GENESIS_HASH) },
+	]);
 
 	const consumed = consumeApproval(dir, "approval/login-42");
 	assert.equal(consumed.status, 1);
