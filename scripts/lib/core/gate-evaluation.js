@@ -47,13 +47,14 @@
 // explicit and reviewable, never guessed.
 //
 // CONVENTION — threshold value routing. The threshold's declared value type
-// selects the comparison family: a number compares numerically; a string
-// compares exactly under eq/ne and as a substring under contains, while the
-// ordering operators (lt/le/gt/ge) on a string are version compares
-// (dot-numeric segment order, "1.2" < "1.10", missing segments pad to
-// zero). The compared value is always parsed from the receipt's LAST
-// output: numerically for numeric comparators, verbatim otherwise. A parse
-// failure (no outputs, a non-finite number, a non-dot-numeric version)
+// selects the comparison family: a number compares numerically against a
+// strict base-10 decimal output; a string compares exactly under eq/ne and as
+// a substring under contains, while the ordering operators (lt/le/gt/ge) on a
+// string are version compares (dot-numeric segment order, "1.2" < "1.10",
+// missing segments pad to zero). The compared value is always parsed from the
+// receipt's LAST output: as a decimal for numeric comparators, verbatim for
+// exact string comparators, and dot-numerically for version ordering. A parse
+// failure (no outputs, a non-decimal numeric string, a non-dot-numeric version)
 // leaves the requirement unsatisfied — the detail's threshold.actual reads
 // null, which is the recorded "why not".
 //
@@ -175,6 +176,21 @@ const OUTCOME_EVENT_FIELDS = Object.freeze([
 ]);
 
 const VERDICTS = Object.freeze(["pass", "fail"]);
+const REQUIREMENT_DETAIL_FIELDS = Object.freeze([
+	"evidenceType",
+	"subject",
+	"satisfied",
+	"evidenceId",
+	"effectiveAssurance",
+	"recordedAt",
+	"stale",
+	"threshold",
+]);
+const REQUIRED_REQUIREMENT_DETAIL_FIELDS = Object.freeze(
+	REQUIREMENT_DETAIL_FIELDS.filter((field) => field !== "threshold"),
+);
+const THRESHOLD_DETAIL_FIELDS = Object.freeze(["value", "comparator", "actual"]);
+const ANYOF_DETAIL_FIELDS = Object.freeze(["satisfied", "entries"]);
 
 const ALL_COMPARATORS = new Set([
 	...COMPARATORS.numeric,
@@ -185,6 +201,7 @@ const ALL_COMPARATORS = new Set([
 // Dot-numeric version shape: "1", "1.2", "1.10", "2.0.1" — semver-ish, no
 // pre-release/build suffixes (the comparator contract is order, not flavor).
 const DOT_NUMERIC_PATTERN = /^\d+(?:\.\d+)*$/;
+const DECIMAL_NUMBER_PATTERN = /^-?(?:\d+|\d+\.\d+|\.\d+)$/;
 
 function outcomeLedgerPath(cwd) {
 	return statePathForCreate(cwd, "gates", "outcomes.jsonl");
@@ -208,6 +225,38 @@ function isPositiveInt(value) {
 
 function quotedList(values) {
 	return values.map((value) => `"${value}"`).join(", ");
+}
+
+function evaluationClockValue(input, opts) {
+	const injected = input.now !== undefined ? input.now : opts.now;
+	if (injected === undefined) {
+		const now = new Date();
+		return { ok: true, date: now, ms: now.getTime(), clockSource: "system" };
+	}
+	if (injected instanceof Date) {
+		const ms = injected.getTime();
+		if (Number.isNaN(ms)) {
+			return {
+				ok: false,
+				message: "now must be a valid Date or ISO-8601 timestamp; got an invalid Date",
+			};
+		}
+		return { ok: true, date: new Date(ms), ms, clockSource: "injected" };
+	}
+	if (typeof injected === "string") {
+		const ms = parseTimestamp(injected);
+		if (ms === null) {
+			return {
+				ok: false,
+				message: `now must be an ISO-8601 date, or a date-time carrying an explicit zone (Z or ±hh:mm), when injected; got ${JSON.stringify(injected)}`,
+			};
+		}
+		return { ok: true, date: new Date(ms), ms, clockSource: "injected" };
+	}
+	return {
+		ok: false,
+		message: `now must be a valid Date or ISO-8601 timestamp when injected; got ${JSON.stringify(injected)}`,
+	};
 }
 
 // ── Contract validation (the first shape consumer's verdicts) ──
@@ -448,7 +497,7 @@ function gateContractProblem(contract) {
  * same routing the contract validation applies — a number compares
  * numerically; a string compares exactly, or dot-numerically under the
  * ordering operators). Returns null on parse failure (no outputs, a
- * non-string output, a non-finite number, or a non-dot-numeric version) —
+ * non-string output, a non-decimal numeric string, or a non-dot-numeric version) —
  * the requirement then stays unsatisfied and the detail records the
  * failure as threshold.actual = null.
  * @returns {{actual: number|string|null}}
@@ -460,6 +509,7 @@ function parseThresholdActual(outputs, threshold) {
 	const last = outputs[outputs.length - 1];
 	if (typeof last !== "string") return { actual: null };
 	if (typeof threshold.value === "number") {
+		if (!DECIMAL_NUMBER_PATTERN.test(last)) return { actual: null };
 		const parsed = Number(last);
 		return { actual: Number.isFinite(parsed) ? parsed : null };
 	}
@@ -582,8 +632,11 @@ function evaluateRequirement(requirement, effectiveSubject, records, evalNowMs, 
 	const threshold = requirement.threshold ?? null;
 
 	const ageOf = (record) => evalNowMs - recordedAtMillis(record);
-	const isFresh = (record) => maxAgeMs === null || ageOf(record) <= maxAgeMs;
-	const isStale = (record) => maxAgeMs !== null && ageOf(record) > maxAgeMs;
+	const hasParseableRecordedAt = (record) => Number.isFinite(recordedAtMillis(record));
+	const isFresh = (record) =>
+		hasParseableRecordedAt(record) && (maxAgeMs === null || ageOf(record) <= maxAgeMs);
+	const isStale = (record) =>
+		!hasParseableRecordedAt(record) || (maxAgeMs !== null && ageOf(record) > maxAgeMs);
 
 	// One candidate satisfies the requirement when it passed, meets the
 	// required assurance level, is fresh at the evaluation clock, and (when
@@ -659,6 +712,96 @@ function appendWithinCeiling(cwd, event) {
 		defaultBytes: DEFAULT_MAX_OUTCOME_BYTES,
 		label: "gate outcome ledger",
 	});
+}
+
+function thresholdDetailProblem(threshold, label) {
+	if (!isPlainObject(threshold))
+		return `${label} is not an object; got ${JSON.stringify(threshold)}`;
+	const unknown = Object.keys(threshold)
+		.filter((key) => !THRESHOLD_DETAIL_FIELDS.includes(key))
+		.sort();
+	if (unknown.length > 0) {
+		return `${label} carries unknown key${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed key set is ${THRESHOLD_DETAIL_FIELDS.join(", ")}`;
+	}
+	const missing = THRESHOLD_DETAIL_FIELDS.filter((field) => !(field in threshold));
+	if (missing.length > 0) {
+		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed key set is ${THRESHOLD_DETAIL_FIELDS.join(", ")}`;
+	}
+	if (!(typeof threshold.value === "number" || typeof threshold.value === "string")) {
+		return `${label}.value is not a number or string; got ${JSON.stringify(threshold.value)}`;
+	}
+	if (typeof threshold.comparator !== "string" || !ALL_COMPARATORS.has(threshold.comparator)) {
+		return `${label}.comparator is not a registered comparator; got ${JSON.stringify(threshold.comparator)}`;
+	}
+	if (
+		threshold.actual !== null &&
+		!(typeof threshold.actual === "number" || typeof threshold.actual === "string")
+	) {
+		return `${label}.actual is not null, a number, or a string; got ${JSON.stringify(threshold.actual)}`;
+	}
+	return null;
+}
+
+function requirementDetailProblem(detail, label) {
+	if (!isPlainObject(detail)) return `${label} is not an object; got ${JSON.stringify(detail)}`;
+	const unknown = Object.keys(detail)
+		.filter((key) => !REQUIREMENT_DETAIL_FIELDS.includes(key))
+		.sort();
+	if (unknown.length > 0) {
+		return `${label} carries unknown key${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed key set is ${REQUIREMENT_DETAIL_FIELDS.join(", ")}`;
+	}
+	const missing = REQUIRED_REQUIREMENT_DETAIL_FIELDS.filter((field) => !(field in detail));
+	if (missing.length > 0) {
+		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed key set is ${REQUIREMENT_DETAIL_FIELDS.join(", ")}`;
+	}
+	if (!isNonEmptyString(detail.evidenceType)) {
+		return `${label}.evidenceType is not a non-empty string; got ${JSON.stringify(detail.evidenceType)}`;
+	}
+	if (!isNonEmptyString(detail.subject)) {
+		return `${label}.subject is not a non-empty string; got ${JSON.stringify(detail.subject)}`;
+	}
+	if (typeof detail.satisfied !== "boolean") {
+		return `${label}.satisfied is not a boolean; got ${JSON.stringify(detail.satisfied)}`;
+	}
+	if (detail.evidenceId !== null && !isNonEmptyString(detail.evidenceId)) {
+		return `${label}.evidenceId is not null or a non-empty string; got ${JSON.stringify(detail.evidenceId)}`;
+	}
+	if (detail.effectiveAssurance !== null && !ASSURANCE_LEVELS.includes(detail.effectiveAssurance)) {
+		return `${label}.effectiveAssurance is not null or one of ${ASSURANCE_LEVELS.join(", ")}; got ${JSON.stringify(detail.effectiveAssurance)}`;
+	}
+	if (detail.recordedAt !== null && !isNonEmptyString(detail.recordedAt)) {
+		return `${label}.recordedAt is not null or a non-empty string; got ${JSON.stringify(detail.recordedAt)}`;
+	}
+	if (typeof detail.stale !== "boolean") {
+		return `${label}.stale is not a boolean; got ${JSON.stringify(detail.stale)}`;
+	}
+	if ("threshold" in detail) return thresholdDetailProblem(detail.threshold, `${label}.threshold`);
+	return null;
+}
+
+function anyOfDetailProblem(set, label) {
+	if (!isPlainObject(set)) return `${label} is not an object; got ${JSON.stringify(set)}`;
+	const unknown = Object.keys(set)
+		.filter((key) => !ANYOF_DETAIL_FIELDS.includes(key))
+		.sort();
+	if (unknown.length > 0) {
+		return `${label} carries unknown key${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed key set is ${ANYOF_DETAIL_FIELDS.join(", ")}`;
+	}
+	const missing = ANYOF_DETAIL_FIELDS.filter((field) => !(field in set));
+	if (missing.length > 0) {
+		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed key set is ${ANYOF_DETAIL_FIELDS.join(", ")}`;
+	}
+	if (typeof set.satisfied !== "boolean") {
+		return `${label}.satisfied is not a boolean; got ${JSON.stringify(set.satisfied)}`;
+	}
+	if (!Array.isArray(set.entries)) {
+		return `${label}.entries is not an array; got ${JSON.stringify(set.entries)}`;
+	}
+	for (let index = 0; index < set.entries.length; index += 1) {
+		const problem = requirementDetailProblem(set.entries[index], `${label}.entries[${index}]`);
+		if (problem !== null) return problem;
+	}
+	return null;
 }
 
 /**
@@ -767,6 +910,24 @@ function foldOutcomes(cwd) {
 				`gate outcome ledger event ${lineIndex} carries a details object that is not { requirements: [...], anyOf: [...] }; got ${JSON.stringify(event.details)}`,
 			);
 		}
+		for (let detailIndex = 0; detailIndex < event.details.requirements.length; detailIndex += 1) {
+			const problem = requirementDetailProblem(
+				event.details.requirements[detailIndex],
+				`details.requirements[${detailIndex}]`,
+			);
+			if (problem !== null) {
+				throw outcomeCorrupt(`gate outcome ledger event ${lineIndex} carries ${problem}`);
+			}
+		}
+		for (let setIndex = 0; setIndex < event.details.anyOf.length; setIndex += 1) {
+			const problem = anyOfDetailProblem(
+				event.details.anyOf[setIndex],
+				`details.anyOf[${setIndex}]`,
+			);
+			if (problem !== null) {
+				throw outcomeCorrupt(`gate outcome ledger event ${lineIndex} carries ${problem}`);
+			}
+		}
 		records.push({ ...event, index });
 		prevHash = event.hash;
 	}
@@ -806,11 +967,12 @@ function evaluateGate(cwd, input = {}, opts = {}) {
 			`revision must be a positive integer when provided (the committed gate revision to evaluate; defaults to the current committed head); got ${JSON.stringify(revision)}`,
 		]);
 	}
-	const injected = input.now !== undefined ? input.now : opts.now;
-	const evalNow = injected ?? new Date();
-	const evalNowMs = evalNow instanceof Date ? evalNow.getTime() : new Date(evalNow).getTime();
-	const clockSource = injected !== undefined ? "injected" : "system";
-	const at = new Date(evalNowMs).toISOString();
+	const clock = evaluationClockValue(input, opts);
+	if (!clock.ok) return fail(INVALID_ARG_CODE, [clock.message]);
+	const evalNow = clock.date;
+	const evalNowMs = clock.ms;
+	const clockSource = clock.clockSource;
+	const at = evalNow.toISOString();
 
 	// Resolve the gate artifact through the canonical store's READ seam —
 	// never a direct file read: the store's verification (settlement

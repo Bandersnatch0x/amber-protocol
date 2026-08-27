@@ -431,6 +431,9 @@ function handleGate(args) {
 	if (action === "evaluate" || action === "show" || action === "list") {
 		return gateDispatch(args);
 	}
+	if (action !== undefined) {
+		return { result: unknownAction("gate", ["evaluate", "show", "list", "--plan <path>"]) };
+	}
 	if (args.confirm) {
 		return { result: confirmPlanGate(args.target, args.plan) };
 	}

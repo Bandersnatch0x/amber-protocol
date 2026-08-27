@@ -979,7 +979,6 @@ const COMMAND_HELP = {
 		'eq/ne on string values are exact, so "1.2" != "1.2.0"). An',
 		"expired gate (gate.expires at or before the clock, no-tolerance)",
 		"refuses to run: AMBER_E_GATE_EXPIRED, no outcome appended.",
-		"appended.",
 		"",
 		"Every completed evaluation appends one immutable `evaluated` event to",
 		"the hash-chained outcome ledger under .amber/gates/outcomes.jsonl —",

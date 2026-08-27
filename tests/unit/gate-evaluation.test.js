@@ -53,6 +53,10 @@ function outcomeLedgerPath(dir) {
 	return path.join(dir, ".amber", "gates", "outcomes.jsonl");
 }
 
+function evidenceLedgerPath(dir) {
+	return path.join(dir, ".amber", "evidence", "receipts.jsonl");
+}
+
 function readLedger(dir) {
 	return fs
 		.readFileSync(outcomeLedgerPath(dir), "utf8")
@@ -418,6 +422,28 @@ test("the requirement maxAgeMs overrides the gate maxEvidenceAgeMs; no bound mea
 	assert.equal(ancient.outcome.details.requirements[0].stale, false);
 });
 
+test("an unparseable evidence recordedAt never satisfies, even without a freshness bound", () => {
+	const dir = mkTarget("unparseable-recorded-at");
+	seedPrincipals(dir);
+	recordReceipt(dir);
+	const events = fs
+		.readFileSync(evidenceLedgerPath(dir), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	events[0].receipt.recordedAt = "not-a-date";
+	events[0].hash = chainHash(events[0], events[0].prevHash);
+	writeJSONL(evidenceLedgerPath(dir), events);
+	admitGate(dir, { require: [{ evidenceType: "spec/login@2", assurance: "observed" }] });
+
+	const result = evaluate(dir);
+	assert.equal(result.outcome.verdict, "fail");
+	const detail = result.outcome.details.requirements[0];
+	assert.equal(detail.evidenceId, "evidence/run-1");
+	assert.equal(detail.stale, true);
+	assert.equal(detail.satisfied, false);
+});
+
 // ── Expiry boundary ──
 
 test("a gate 1 ms before expiry evaluates; at expiry it refuses with no outcome appended", () => {
@@ -531,6 +557,16 @@ test("a numeric parse failure leaves the requirement unsatisfied with actual nul
 	});
 });
 
+test("numeric thresholds reject whitespace, hex, exponent, and padded outputs", () => {
+	const dir = mkTarget("threshold-strict-decimal");
+	seedPrincipals(dir);
+	thresholdCase(dir, 5, "ne", [" "], "fail", null);
+	thresholdCase(dir, 16, "ge", ["0x10"], "fail", null);
+	thresholdCase(dir, 1000, "ge", ["1e3"], "fail", null);
+	thresholdCase(dir, 87, "eq", [" 87 "], "fail", null);
+	thresholdCase(dir, -1.5, "eq", ["-1.5"], "pass", -1.5);
+});
+
 test("version comparators compare dot-numerically: 1.2 < 1.10", () => {
 	const dir = mkTarget("threshold-version");
 	seedPrincipals(dir);
@@ -556,6 +592,14 @@ test("version comparators compare dot-numerically: 1.2 < 1.10", () => {
 	const result = evaluate(dir);
 	assert.equal(result.outcome.verdict, "fail");
 	assert.equal(result.outcome.details.requirements[0].threshold.actual, null);
+});
+
+test("eq/ne on string thresholds are exact even when values look like versions", () => {
+	const dir = mkTarget("threshold-string-version-boundary");
+	seedPrincipals(dir);
+	thresholdCase(dir, "1.2.0", "eq", ["1.2"], "fail", "1.2");
+	thresholdCase(dir, "1.2", "ne", ["1.2.0"], "pass", "1.2.0");
+	thresholdCase(dir, "1.2", "ne", ["not-a-version"], "pass", "not-a-version");
 });
 
 test("string comparators compare exactly, with contains as a substring test", () => {
@@ -726,12 +770,18 @@ test("evaluation arguments are validated before any state is touched", () => {
 		[{ gate: "gate/login-gate", subject: "" }, "empty subject"],
 		[{ gate: "gate/login-gate", subject: "s", revision: 0 }, "zero revision"],
 		[{ gate: "gate/login-gate", subject: "s", revision: 1.5 }, "fractional revision"],
+		[{ gate: "gate/login-gate", subject: "s", now: null }, "null now"],
+		[{ gate: "gate/login-gate", subject: "s", now: "garbage" }, "garbage now"],
+		[{ gate: "gate/login-gate", subject: "s", now: new Date(Number.NaN) }, "invalid Date now"],
 	];
 	for (const [input, label] of cases) {
 		const result = evaluateGate(dir, input, {});
 		assert.equal(result.ok, false, label);
 		assert.equal(result.code, "AMBER_E_INVALID_ARG", label);
 	}
+	const optsNow = evaluateGate(dir, { gate: "gate/login-gate", subject: "s" }, { now: null });
+	assert.equal(optsNow.ok, false, "opts.now null");
+	assert.equal(optsNow.code, "AMBER_E_INVALID_ARG", "opts.now null");
 });
 
 // ── Revision selection ──
@@ -901,6 +951,34 @@ test("a hand-built event missing a closed-set field is corruption on read", () =
 	);
 });
 
+test("a re-forged event with malformed nested details is corruption on read", () => {
+	const dir = mkTarget("nested-details-corrupt");
+	seedPrincipals(dir);
+	recordReceipt(dir);
+	admitGate(dir, {
+		require: [
+			{
+				evidenceType: "spec/login@2",
+				assurance: "observed",
+				threshold: { value: 80, comparator: "ge" },
+			},
+		],
+	});
+	evaluate(dir);
+
+	const events = readLedger(dir);
+	events[0].details.requirements[0].threshold.actual = { forged: true };
+	events[0].hash = chainHash(events[0], events[0].prevHash);
+	writeJSONL(outcomeLedgerPath(dir), events);
+
+	assert.throws(
+		() => listGateOutcomes(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT" &&
+			err.message.includes("details.requirements[0].threshold.actual"),
+	);
+});
+
 test("an outcome event with an unsupported schema version is corruption on read", () => {
 	const dir = mkTarget("unsupported-version");
 	const body = {
@@ -925,7 +1003,29 @@ test("an outcome event with an unsupported schema version is corruption on read"
 	);
 });
 
-// ── Size ceiling ──
+// ── Locking and size ceiling ──
+
+test("a fresh outcome lock refuses the write; a stale lock is reclaimed and released", () => {
+	const dir = mkTarget("lock");
+	seedPrincipals(dir);
+	recordReceipt(dir);
+	admitGate(dir, { require: [{ evidenceType: "spec/login@2", assurance: "observed" }] });
+	const lockPath = path.join(dir, ".amber", "gates", "outcomes.lock");
+	fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+	fs.writeFileSync(lockPath, "holder-token-1");
+
+	const refused = evaluate(dir);
+	assert.equal(refused.ok, false);
+	assert.equal(refused.code, "AMBER_E_GATE_OUTCOME_REGISTRY_LOCK");
+	assert.equal(fs.existsSync(outcomeLedgerPath(dir)), false);
+
+	const stale = new Date(Date.now() - 60_000);
+	fs.utimesSync(lockPath, stale, stale);
+	const reclaimed = evaluate(dir);
+	assert.equal(reclaimed.ok, true, (reclaimed.errors || []).join("; "));
+	assert.equal(reclaimed.outcome.verdict, "pass");
+	assert.equal(fs.existsSync(lockPath), false);
+});
 
 test("the outcome size ceiling refuses the append before any durable state is touched", () => {
 	const dir = mkTarget("size-ceiling");

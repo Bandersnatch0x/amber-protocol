@@ -773,8 +773,10 @@ status `pass`, carries effective Assurance at or above the required level
 (`age <= maxAgeMs` — the requirement's `maxAgeMs`, else the gate's `maxEvidenceAgeMs`; no bound
 means always fresh; a stale receipt is listed in the outcome, never hidden), and — when a
 `threshold` `{ value, comparator }` is declared — whose LAST output parses and compares true
-(numeric `eq/ne/lt/le/gt/ge`; string `eq/ne/contains` exact; version `eq/lt/le/gt/ge`
-dot-numerically, where `"1.2" < "1.10"` and missing segments pad to zero). An expired gate
+(numeric `eq/ne/lt/le/gt/ge` over a strict base-10 decimal string; string `eq/ne/contains`
+exact; version ordering `lt/le/gt/ge` dot-numerically, where `"1.2" < "1.10"` and missing
+segments pad to zero; `eq/ne` on string values are exact, so `"1.2"` is not equal to
+`"1.2.0"`). An expired gate
 refuses to run: `AMBER_E_GATE_EXPIRED`, no outcome appended.
 
 Every completed evaluation appends one immutable `evaluated` event to the hash-chained outcome

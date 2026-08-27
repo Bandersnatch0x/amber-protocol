@@ -358,6 +358,17 @@ test("a bare gate --plan invocation routes to the legacy plan gate unchanged", (
 	);
 });
 
+test("an unknown gate subcommand names the supported actions", () => {
+	const r = runCli(["gate", "frobnicate", "--target", ROOT, "--json"], ROOT);
+	assert.equal(r.status, 1);
+	const out = envelope(r);
+	assert.ok(
+		out.errors.some((message) =>
+			message.includes("gate requires evaluate, show, list, or --plan <path>."),
+		),
+	);
+});
+
 test("gate help documents the evaluate/show/list surface and the legacy path", () => {
 	const r = runCli(["gate", "--help"], ROOT);
 	assert.equal(r.status, 0, r.stderr);
