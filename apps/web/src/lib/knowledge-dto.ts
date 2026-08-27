@@ -20,7 +20,7 @@ export interface KnowledgeEdgeDTO {
   verb: 'supersedes' | 'builds-on' | 'references' | 'describes';
   origin: 'deterministic' | 'inferred';
   evidence?: Array<{ path: string; line?: number }>;
-  provenance?: { model: string; timestamp: string; promptHash: string };
+  provenance?: { provider: string; model: string; timestamp: string; promptHash: string };
 }
 
 export interface DriftFinding {
@@ -53,6 +53,7 @@ export interface NodeSummaryDTO {
   nodeId: string;
   summary: string;
   provenance: {
+    provider: string;
     model: string;
     timestamp: string;
     promptHash: string;
@@ -71,6 +72,7 @@ export interface SemanticResultDTO {
 
 export interface LLMStatusDTO {
   available: boolean;
+  reason?: 'not-configured' | 'invalid-config';
   provider?: string;
   model?: string;
 }

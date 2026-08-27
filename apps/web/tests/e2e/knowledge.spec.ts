@@ -301,25 +301,27 @@ test.describe('Knowledge Map (/knowledge)', () => {
   });
 });
 
-test.describe('Knowledge Map — semantic layer (no LLM_API_KEY in test env)', () => {
-  test('graph renders fully in deterministic-only mode when no LLM provider is configured', async ({
-    page,
-  }) => {
+test.describe('Knowledge Map — semantic layer without a provider', () => {
+  test.skip(process.env.AMBER_E2E_SEMANTIC_STUB === '1', 'requires hermetic no-key server');
+
+  test('graph renders fully in deterministic-only mode without a provider', async ({ page }) => {
+    let semanticRequests = 0;
+    page.on('request', (request) => {
+      if (request.url().includes('/knowledge.semantic?')) semanticRequests += 1;
+    });
+
     await page.goto('/knowledge');
     await waitForGraph(page);
 
     const { total } = await getSubtitleCounts(page);
     expect(total).toBeGreaterThanOrEqual(100);
-
-    // Error state must not show
-    await expect(page.locator('[role="alert"]')).not.toBeVisible();
-    // Graph canvas must be visible
+    expect(semanticRequests).toBe(0);
     await expect(page.locator('.react-flow__renderer, .react-flow__viewport').first()).toBeVisible({
       timeout: 5_000,
     });
   });
 
-  test('semantic-status banner is present and shows provider-not-configured message', async ({
+  test('shows the provider-not-configured status and keeps inferred controls harmless', async ({
     page,
   }) => {
     await page.goto('/knowledge');
@@ -327,27 +329,74 @@ test.describe('Knowledge Map — semantic layer (no LLM_API_KEY in test env)', (
 
     const banner = page.getByTestId('semantic-status-banner');
     await expect(banner).toBeVisible({ timeout: 5_000 });
-    const text = await banner.textContent();
-    expect(text).toMatch(/not configured|provider/i);
+    await expect(banner).toHaveAttribute('role', 'status');
+    await expect(banner).toContainText(/not configured|provider/i);
+    await expect(page.getByTestId('semantic-disclosure')).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: /inferred/i }).first()).toBeChecked();
   });
+});
 
-  test('dashed inferred-edge legend line is visible alongside deterministic legend', async ({
+test.describe('Knowledge Map — user-triggered semantic stub', () => {
+  test.skip(process.env.AMBER_E2E_SEMANTIC_STUB !== '1', 'requires stub provider server');
+
+  test('waits for consent, then renders a real inferred edge, badge, summary, and provenance', async ({
     page,
   }) => {
+    let semanticRequests = 0;
+    page.on('request', (request) => {
+      if (request.url().includes('/knowledge.semantic?')) semanticRequests += 1;
+    });
+
     await page.goto('/knowledge');
     await waitForGraph(page);
+    const disclosure = page.getByTestId('semantic-disclosure');
+    await expect(disclosure).toContainText(
+      /sends repository node identifiers, kinds, titles, excerpts, and existing edges/i,
+    );
+    expect(semanticRequests).toBe(0);
 
-    // The legend bottom-left overlay must show both solid and dashed line indicators
-    await expect(page.locator('text=deterministic').first()).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('text=inferred').first()).toBeVisible({ timeout: 5_000 });
+    await disclosure.getByRole('button', { name: /send repository titles and excerpts/i }).click();
+    await expect.poll(() => semanticRequests).toBe(1);
+
+    const inferredPath = page.locator('.react-flow__edge.knowledge-edge-inferred path').first();
+    await expect(inferredPath).toBeVisible({ timeout: 15_000 });
+    expect(await inferredPath.getAttribute('style')).toMatch(/stroke-dasharray:\s*6(?:,|\s)+4/);
+
+    const adrNode = page.locator('.react-flow__node[data-id="adr:0001"]').first();
+    await expect(adrNode).toBeVisible({ timeout: 10_000 });
+    await adrNode.click();
+    const detail = page.locator('aside > .card').first();
+    await expect(detail).toContainText(/inferred \(stub\/stub-e2e\)/i);
+    await expect(detail.getByTestId('inferred-summary')).toContainText('Semantic summary for');
+    await expect(detail.getByTestId('inferred-summary')).toContainText(
+      /stub\/stub-e2e · \d{4}-\d{2}-\d{2}/,
+    );
   });
 
-  test('show-inferred checkbox is present and checked by default', async ({ page }) => {
+  test('keeps the deterministic graph visible when the semantic transport fails', async ({
+    page,
+  }) => {
+    await page.route('**/api/trpc/**', async (route) => {
+      const url = route.request().url();
+      if (url.includes('/knowledge.semantic?')) {
+        await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+        return;
+      }
+      await route.continue();
+    });
+
     await page.goto('/knowledge');
     await waitForGraph(page);
+    await page
+      .getByRole('button', { name: /send repository titles and excerpts for semantic analysis/i })
+      .click();
 
-    const checkbox = page.getByRole('checkbox', { name: /inferred/i }).first();
-    await expect(checkbox).toBeVisible({ timeout: 5_000 });
-    await expect(checkbox).toBeChecked();
+    const alert = page.getByRole('alert');
+    await expect(alert).toContainText(/failed or was incomplete/i);
+    await expect(
+      page.locator('.react-flow__renderer, .react-flow__viewport').first(),
+    ).toBeVisible();
+    const { total } = await getSubtitleCounts(page);
+    expect(total).toBeGreaterThanOrEqual(100);
   });
 });

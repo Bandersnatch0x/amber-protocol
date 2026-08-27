@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KnowledgeMapPage } from '@/features/knowledge/KnowledgeMapPage';
@@ -11,6 +11,7 @@ const trpcMocks = vi.hoisted(() => ({
   graphUseQuery: vi.fn(),
   recentRefetch: vi.fn(),
   recentUseQuery: vi.fn(),
+  semanticRefetch: vi.fn(),
   semanticStatusUseQuery: vi.fn(),
   semanticUseQuery: vi.fn(),
 }));
@@ -43,8 +44,41 @@ vi.mock('@xyflow/react', async () => {
     Handle: () => null,
     MarkerType: { ArrowClosed: 'arrowclosed' },
     Position: { Left: 'left', Right: 'right' },
-    ReactFlow: ({ children }: { children?: ReactNode }) =>
-      React.createElement('div', { 'data-testid': 'react-flow' }, children),
+    ReactFlow: ({
+      children,
+      edges = [],
+      nodes = [],
+      onNodeClick,
+    }: {
+      children?: ReactNode;
+      edges?: Array<{ id: string; style?: { strokeDasharray?: string } }>;
+      nodes?: Array<{ id: string }>;
+      onNodeClick?: (event: unknown, node: { id: string }) => void;
+    }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'react-flow' },
+        ...nodes.map((node) =>
+          React.createElement(
+            'button',
+            {
+              key: node.id,
+              type: 'button',
+              'data-testid': `flow-node-${node.id}`,
+              onClick: () => onNodeClick?.({}, node),
+            },
+            node.id,
+          ),
+        ),
+        ...edges.map((edge) =>
+          React.createElement('span', {
+            key: edge.id,
+            'data-testid': `flow-edge-${edge.id}`,
+            'data-stroke-dasharray': edge.style?.strokeDasharray ?? '',
+          }),
+        ),
+        children,
+      ),
     ReactFlowProvider: ({ children }: { children?: ReactNode }) =>
       React.createElement(React.Fragment, null, children),
     useReactFlow: () => ({ fitView: () => undefined }),
@@ -60,6 +94,7 @@ const graph: KnowledgeGraphDTO = {
       layer: 'implementation',
       title: 'Recent knowledge drift feed',
       sourcePath: 'feature_list.json',
+      body: 'Feature body.',
     },
     {
       id: 'adr:0001',
@@ -75,24 +110,53 @@ const graph: KnowledgeGraphDTO = {
   recentChanges: [],
 };
 
-function defaultSemanticStatusResult(available = false) {
+const inferredEdge = {
+  src: 'adr:0001',
+  dst: 'feature:F059',
+  verb: 'describes' as const,
+  origin: 'inferred' as const,
+  provenance: {
+    provider: 'stub',
+    model: 'stub-model',
+    timestamp: '2026-08-28T00:00:00.000Z',
+    promptHash: 'a'.repeat(64),
+  },
+};
+
+const inferredSummary = {
+  nodeId: 'adr:0001',
+  summary: 'A stub summary for testing.',
+  provenance: {
+    provider: 'stub',
+    model: 'stub-model',
+    timestamp: '2026-08-28T00:00:00.000Z',
+    promptHash: 'b'.repeat(64),
+  },
+  origin: 'inferred' as const,
+};
+
+function semanticStatus(available = false) {
   return {
-    data: { available, provider: available ? 'openai' : undefined, model: available ? 'gpt-4o' : undefined },
+    data: available
+      ? { available: true, provider: 'stub', model: 'stub-model' }
+      : { available: false, reason: 'not-configured' },
     isLoading: false,
     error: null,
   };
 }
 
-function defaultSemanticResult(result?: Partial<SemanticResultDTO>) {
+function semanticResult(result?: Partial<SemanticResultDTO>) {
   return {
     data: {
-      available: false,
+      available: true,
       inferredEdges: [],
       nodeSummaries: [],
       ...result,
     } satisfies SemanticResultDTO,
     isLoading: false,
+    isFetching: false,
     error: null,
+    refetch: trpcMocks.semanticRefetch,
   };
 }
 
@@ -111,17 +175,15 @@ beforeEach(() => {
     isLoading: false,
     refetch: trpcMocks.recentRefetch,
   });
-  trpcMocks.semanticStatusUseQuery.mockReturnValue(defaultSemanticStatusResult(false));
-  trpcMocks.semanticUseQuery.mockReturnValue(defaultSemanticResult());
+  trpcMocks.semanticStatusUseQuery.mockReturnValue(semanticStatus(false));
+  trpcMocks.semanticUseQuery.mockReturnValue(semanticResult({ available: false }));
 });
 
-afterEach(() => {
-  cleanup();
-});
+afterEach(cleanup);
 
-function renderPage(lang: 'en' | 'zh-CN' = 'en') {
+function renderPage(language: 'en' | 'zh-CN' = 'en') {
   return render(
-    <I18nProvider initialLanguage={lang}>
+    <I18nProvider initialLanguage={language}>
       <KnowledgeMapPage />
     </I18nProvider>,
   );
@@ -141,106 +203,126 @@ describe('KnowledgeMapPage recent changes query', () => {
   });
 });
 
-describe('KnowledgeMapPage semantic — provider unavailable', () => {
-  it('shows "provider not configured" banner when LLM status is available:false', () => {
+describe('KnowledgeMapPage semantic consent', () => {
+  it('keeps semantic inference disabled when the provider is unavailable', () => {
     renderPage();
-    const banner = screen.getByTestId('semantic-status-banner');
-    expect(banner).toBeDefined();
-    expect(banner.textContent).toContain('LLM provider not configured');
-  });
-
-  it('still renders the deterministic graph (recent-drift panel visible)', () => {
-    renderPage();
-    expect(screen.getByTestId('recent-drift-panel')).toBeDefined();
-  });
-
-  it('semantic query is NOT enabled when provider is unavailable', () => {
-    renderPage();
+    expect(screen.getByTestId('semantic-status-banner').textContent).toContain(
+      'LLM provider not configured',
+    );
     expect(trpcMocks.semanticUseQuery).toHaveBeenCalledWith(
       undefined,
       expect.objectContaining({ enabled: false }),
     );
+    expect(screen.getByTestId('recent-drift-panel')).toBeDefined();
   });
-});
 
-describe('KnowledgeMapPage semantic — provider available, stub inferred edges', () => {
-  const inferredEdge = {
-    src: 'adr:0001',
-    dst: 'feature:F059',
-    verb: 'describes' as const,
-    origin: 'inferred' as const,
-    provenance: { model: 'stub-model', timestamp: '2026-08-28T00:00:00.000Z', promptHash: 'abc123' },
-  };
+  it('does not enable semantic inference on page load when the provider is available', () => {
+    trpcMocks.semanticStatusUseQuery.mockReturnValue(semanticStatus(true));
+    renderPage();
 
-  const inferredSummary = {
-    nodeId: 'adr:0001',
-    summary: 'A stub summary for testing.',
-    provenance: { model: 'stub-model', timestamp: '2026-08-28T00:00:00.000Z', promptHash: 'def456' },
-    origin: 'inferred' as const,
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    trpcMocks.graphUseQuery.mockReturnValue({
-      data: graph,
-      isLoading: false,
-      error: null,
-      refetch: trpcMocks.graphRefetch,
-    });
-    trpcMocks.recentUseQuery.mockReturnValue({
-      data: [],
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch: trpcMocks.recentRefetch,
-    });
-    trpcMocks.semanticStatusUseQuery.mockReturnValue(defaultSemanticStatusResult(true));
-    trpcMocks.semanticUseQuery.mockReturnValue(
-      defaultSemanticResult({
-        available: true,
-        inferredEdges: [inferredEdge],
-        nodeSummaries: [inferredSummary],
-        providerModel: 'stub-model',
+    expect(trpcMocks.semanticUseQuery).toHaveBeenLastCalledWith(
+      undefined,
+      expect.objectContaining({
+        enabled: false,
+        refetchOnReconnect: false,
+        refetchOnWindowFocus: false,
+        retry: false,
+        staleTime: Infinity,
       }),
+    );
+    expect(screen.getByTestId('semantic-disclosure').textContent).toContain(
+      'sends repository node identifiers, kinds, titles, excerpts, and existing edges',
     );
   });
 
-  it('semantic query is enabled when provider is available', () => {
+  it('enables semantic inference only after the disclosure action is clicked', () => {
+    trpcMocks.semanticStatusUseQuery.mockReturnValue(semanticStatus(true));
     renderPage();
-    expect(trpcMocks.semanticUseQuery).toHaveBeenCalledWith(
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /send repository titles and excerpts for semantic analysis/i,
+      }),
+    );
+    expect(trpcMocks.semanticUseQuery).toHaveBeenLastCalledWith(
       undefined,
       expect.objectContaining({ enabled: true }),
     );
   });
+});
 
-  it('no provider-unavailable banner when LLM is available', () => {
-    renderPage();
-    const banner = screen.queryByTestId('semantic-status-banner');
-    // Banner may not be present when provider is available and no error
-    if (banner) {
-      expect(banner.textContent).not.toContain('not configured');
-    }
+describe('KnowledgeMapPage semantic results and failures', () => {
+  beforeEach(() => {
+    trpcMocks.semanticStatusUseQuery.mockReturnValue(semanticStatus(true));
+    trpcMocks.semanticUseQuery.mockImplementation((_input, options: { enabled?: boolean }) =>
+      options.enabled
+        ? semanticResult({
+            inferredEdges: [inferredEdge],
+            nodeSummaries: [inferredSummary],
+            providerModel: 'stub-model',
+          })
+        : { ...semanticResult(), data: undefined },
+    );
   });
 
-  it('legend shows dashed line indicator for inferred edges', () => {
+  it('renders a real dashed inferred edge, badge, summary, and original provenance after consent', () => {
     renderPage();
-    // The dashed line is rendered as a span with border-dashed class in the legend
-    const legendDashed = document.querySelector('.border-dashed');
-    expect(legendDashed).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /send repository titles and excerpts/i }));
+
+    expect(screen.getByTestId('flow-edge-e0').getAttribute('data-stroke-dasharray')).toBe('6 4');
+    fireEvent.click(screen.getByTestId('flow-node-adr:0001'));
+    expect(screen.getByText(/inferred \(stub\/stub-model\)/i)).toBeDefined();
+    expect(screen.getByTestId('inferred-summary').textContent).toContain(
+      'A stub summary for testing.',
+    );
+    expect(screen.getByTestId('inferred-summary').textContent).toContain(
+      'stub/stub-model · 2026-08-28',
+    );
   });
 
-  it('showInferred checkbox is present in the page controls', () => {
+  it('surfaces partial facade errors even when inferred edges exist', () => {
+    trpcMocks.semanticUseQuery.mockImplementation((_input, options: { enabled?: boolean }) =>
+      options.enabled
+        ? semanticResult({ inferredEdges: [inferredEdge], error: 'node-summaries-unavailable' })
+        : { ...semanticResult(), data: undefined },
+    );
     renderPage();
-    const checkbox = screen.getByRole('checkbox', { name: /inferred edges/i });
-    expect(checkbox).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /send repository titles and excerpts/i }));
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('failed or was incomplete');
+    expect(alert.className).toContain('border-red-300');
+  });
+
+  it('shows stable accessible errors for status and semantic transport failures', () => {
+    trpcMocks.semanticStatusUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('secret status detail'),
+    });
+    const { rerender } = renderPage();
+    expect(screen.getByRole('alert').textContent).toContain('status could not be loaded');
+    expect(document.body.textContent).not.toContain('secret status detail');
+
+    trpcMocks.semanticStatusUseQuery.mockReturnValue(semanticStatus(true));
+    trpcMocks.semanticUseQuery.mockReturnValue({
+      ...semanticResult(),
+      error: new Error('secret semantic detail'),
+    });
+    rerender(
+      <I18nProvider initialLanguage="en">
+        <KnowledgeMapPage />
+      </I18nProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /send repository titles and excerpts/i }));
+    expect(screen.getByRole('alert').textContent).toContain('failed or was incomplete');
+    expect(document.body.textContent).not.toContain('secret semantic detail');
   });
 });
 
-describe('KnowledgeMapPage i18n — zh-CN', () => {
-  it('renders semantic.unavailable banner in Chinese when provider is absent', () => {
-    trpcMocks.semanticStatusUseQuery.mockReturnValue(defaultSemanticStatusResult(false));
+describe('KnowledgeMapPage i18n', () => {
+  it('renders provider-unavailable state in zh-CN', () => {
     renderPage('zh-CN');
-    const banner = screen.getByTestId('semantic-status-banner');
-    expect(banner.textContent).toContain('未配置 LLM 提供者');
+    expect(screen.getByTestId('semantic-status-banner').textContent).toContain('未配置 LLM 提供者');
   });
 });

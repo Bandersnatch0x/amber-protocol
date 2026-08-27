@@ -1,421 +1,514 @@
 import fs from 'fs';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { KnowledgeLRUCache } from '@server/lib/knowledge-llm-cache';
-import { llmCache } from '@server/lib/knowledge-llm-cache';
+import { KnowledgeLRUCache, llmCache } from '@server/lib/knowledge-llm-cache';
 import {
-  SEMANTIC_EDGES_PROMPT_HASH,
   NODE_SUMMARY_PROMPT_HASH,
-  inferSemanticEdges,
+  NODE_SUMMARY_PROMPT_VERSION,
+  SEMANTIC_EDGES_PROMPT_HASH,
+  SEMANTIC_EDGES_PROMPT_VERSION,
   inferNodeSummaries,
+  inferSemanticEdges,
 } from '@server/lib/knowledge-llm-prompts';
-import { getStatus, complete } from '@server/lib/knowledge-llm';
-import { knowledgeRouter } from '@server/routers/knowledge';
+import { complete, getCacheIdentity, getStatus } from '@server/lib/knowledge-llm';
+import { knowledgeRouter, selectSemanticInputs } from '@server/routers/knowledge';
 
-// ── helpers ────────────────────────────────────────────────────────────────────
+const ENV_KEYS = [
+  'LLM_API_KEY',
+  'LLM_PROVIDER',
+  'LLM_MODEL',
+  'LLM_BASE_URL',
+  'LLM_TIMEOUT_MS',
+] as const;
+const SOURCE_ROOT = path.resolve(process.cwd(), '..', '..');
+const nodes = [
+  { id: 'adr:0001', kind: 'adr', title: 'Test ADR', body: 'Some body.' },
+  { id: 'feature:F001', kind: 'feature', title: 'Test feature', body: 'Feature body.' },
+];
 
-function setEnv(key: string, value: string) {
+function setEnv(key: (typeof ENV_KEYS)[number], value: string) {
   process.env[key] = value;
 }
 
-function clearEnv(...keys: string[]) {
+function clearEnv(...keys: readonly string[]) {
   for (const key of keys) delete process.env[key];
 }
 
-// ── 1. Provider availability ──────────────────────────────────────────────────
+function useStub(model = 'stub-model') {
+  setEnv('LLM_API_KEY', 'stub-key');
+  setEnv('LLM_PROVIDER', 'stub');
+  setEnv('LLM_MODEL', model);
+}
 
-describe('provider availability', () => {
-  afterEach(() => clearEnv('LLM_API_KEY', 'LLM_PROVIDER', 'LLM_MODEL', 'LLM_BASE_URL'));
+beforeEach(() => {
+  clearEnv(...ENV_KEYS);
+  llmCache.clear();
+  vi.restoreAllMocks();
+});
 
-  it('returns available:false when LLM_API_KEY is not set', () => {
-    clearEnv('LLM_API_KEY');
-    const status = getStatus();
-    expect(status.available).toBe(false);
-    expect((status as { provider?: string }).provider).toBeUndefined();
+afterEach(() => {
+  clearEnv(...ENV_KEYS);
+  llmCache.clear();
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
+
+describe('provider configuration and network bounds', () => {
+  it('reports no-key configuration as unavailable', () => {
+    expect(getStatus()).toEqual({ available: false, reason: 'not-configured' });
   });
 
-  it('returns available:true with provider and model when LLM_API_KEY is set', () => {
-    setEnv('LLM_API_KEY', 'test-key');
+  it('accepts only the openai, anthropic, and stub providers', async () => {
+    setEnv('LLM_API_KEY', 'secret');
+    setEnv('LLM_PROVIDER', 'azure');
+    expect(getStatus()).toEqual({ available: false, reason: 'invalid-config' });
+    await expect(complete('semantic-edges', 'system', '{}')).rejects.toThrow('invalid-provider');
+  });
+
+  it.each([
+    'http://provider.example/v1',
+    'ftp://provider.example/v1',
+    'https://user:password@provider.example/v1',
+    'file:///tmp/provider',
+  ])('rejects unsafe or credential-bearing base URL %s', async (baseUrl) => {
+    setEnv('LLM_API_KEY', 'secret');
     setEnv('LLM_PROVIDER', 'openai');
-    setEnv('LLM_MODEL', 'gpt-4o');
-    const status = getStatus();
-    expect(status.available).toBe(true);
-    if (status.available) {
-      expect(status.provider).toBe('openai');
-      expect(status.model).toBe('gpt-4o');
-    }
+    setEnv('LLM_BASE_URL', baseUrl);
+    expect(getStatus()).toEqual({ available: false, reason: 'invalid-config' });
+    await expect(complete('semantic-edges', 'system', '{}')).rejects.toThrow('invalid-base-url');
   });
 
-  it('complete() throws when no API key is configured', async () => {
-    clearEnv('LLM_API_KEY');
-    await expect(complete('sys', 'user')).rejects.toThrow('LLM unavailable');
+  it.each(['https://trusted.example/v1', 'http://127.0.0.1:11434/v1', 'http://localhost:11434/v1'])(
+    'accepts HTTPS and loopback HTTP endpoint %s',
+    (baseUrl) => {
+      setEnv('LLM_API_KEY', 'secret');
+      setEnv('LLM_PROVIDER', 'openai');
+      setEnv('LLM_BASE_URL', baseUrl);
+      expect(getCacheIdentity().endpoint).toContain(baseUrl.replace(/\/$/, ''));
+    },
+  );
+
+  it('aborts a stalled provider call at the configured bounded timeout', async () => {
+    setEnv('LLM_API_KEY', 'secret');
+    setEnv('LLM_PROVIDER', 'openai');
+    setEnv('LLM_TIMEOUT_MS', '5');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string | URL | Request, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+          }),
+      ),
+    );
+
+    await expect(complete('semantic-edges', 'system', '{}')).rejects.toThrow('provider-timeout');
+  });
+
+  it('keeps the timeout active while reading the provider response body', async () => {
+    setEnv('LLM_API_KEY', 'secret');
+    setEnv('LLM_PROVIDER', 'openai');
+    setEnv('LLM_TIMEOUT_MS', '5');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+        const body = new ReadableStream({
+          start(controller) {
+            init?.signal?.addEventListener('abort', () => controller.error(new Error('aborted')));
+          },
+        });
+        return Promise.resolve(new Response(body, { status: 200 }));
+      }),
+    );
+
+    await expect(complete('semantic-edges', 'system', '{}')).rejects.toThrow('provider-timeout');
+  });
+
+  it('honors a caller AbortSignal', async () => {
+    setEnv('LLM_API_KEY', 'secret');
+    setEnv('LLM_PROVIDER', 'openai');
+    const controller = new AbortController();
+    controller.abort();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+        if (init?.signal?.aborted) return Promise.reject(new Error('aborted'));
+        return Promise.reject(new Error('unexpected'));
+      }),
+    );
+
+    await expect(complete('semantic-edges', 'system', '{}', controller.signal)).rejects.toThrow(
+      'provider-aborted',
+    );
+  });
+
+  it('rejects oversized provider responses before parsing', async () => {
+    setEnv('LLM_API_KEY', 'secret');
+    setEnv('LLM_PROVIDER', 'openai');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('{}', {
+          status: 200,
+          headers: { 'content-length': String(128 * 1024 + 1) },
+        }),
+      ),
+    );
+
+    await expect(complete('semantic-edges', 'system', '{}')).rejects.toThrow('response-too-large');
+  });
+
+  it('rejects oversized streamed responses without a content-length header', async () => {
+    setEnv('LLM_API_KEY', 'secret');
+    setEnv('LLM_PROVIDER', 'openai');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('x'.repeat(128 * 1024 + 1), { status: 200 })),
+    );
+
+    await expect(complete('semantic-edges', 'system', '{}')).rejects.toThrow('response-too-large');
+  });
+
+  it('uses explicit facade purpose for non-empty valid stub results', async () => {
+    useStub();
+    const request = JSON.stringify({ nodes, existingEdges: [] });
+    const edges = JSON.parse(await complete('semantic-edges', 'system', request));
+    const summaries = JSON.parse(await complete('node-summaries', 'system', request));
+    expect(edges.edges).toEqual([{ src: 'adr:0001', dst: 'feature:F001', verb: 'references' }]);
+    expect(summaries.summaries[0]).toMatchObject({ nodeId: 'adr:0001' });
   });
 });
 
-// ── 2. Neutral env — prompts module has no vendor tokens ──────────────────────
+describe('vendor confinement', () => {
+  it('confines provider-specific tokens to knowledge-llm.ts across the semantic server surface', () => {
+    const serverRoot = path.resolve(import.meta.dirname, '../../server');
+    const files: string[] = [];
+    const visit = (directory: string) => {
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const absolute = path.join(directory, entry.name);
+        if (entry.isDirectory()) visit(absolute);
+        else if (/knowledge.*\.(?:ts|tsx|mts)$/.test(entry.name)) files.push(absolute);
+      }
+    };
+    visit(serverRoot);
 
-describe('neutral env / vendor confinement', () => {
-  const VENDOR_TOKENS = [
-    'openai.com',
-    'anthropic.com',
-    'api.anthropic',
-    'api.openai',
-    'x-api-key',
-    'Authorization',
-    'Bearer',
-  ];
-
-  const promptsFile = path.resolve(
-    import.meta.dirname,
-    '../../server/lib/knowledge-llm-prompts.ts',
-  );
-  const cacheFile = path.resolve(
-    import.meta.dirname,
-    '../../server/lib/knowledge-llm-cache.ts',
-  );
-
-  it('knowledge-llm-prompts.ts contains no vendor/network tokens', () => {
-    const src = fs.readFileSync(promptsFile, 'utf8');
-    for (const token of VENDOR_TOKENS) {
-      expect(src, `prompts module must not contain "${token}"`).not.toContain(token);
-    }
-  });
-
-  it('knowledge-llm-cache.ts contains no vendor/network tokens', () => {
-    const src = fs.readFileSync(cacheFile, 'utf8');
-    for (const token of VENDOR_TOKENS) {
-      expect(src, `cache module must not contain "${token}"`).not.toContain(token);
-    }
-  });
-
-  it('knowledge-llm.ts is the only file that imports fetch or contains provider URLs', () => {
-    const llmFile = path.resolve(import.meta.dirname, '../../server/lib/knowledge-llm.ts');
-    const src = fs.readFileSync(llmFile, 'utf8');
-    // Vendor URLs must appear only in knowledge-llm.ts
-    expect(src).toContain('openai.com');
-    expect(src).toContain('anthropic.com');
-    // And NOT in prompts or cache
-    expect(fs.readFileSync(promptsFile, 'utf8')).not.toContain('openai.com');
-    expect(fs.readFileSync(cacheFile, 'utf8')).not.toContain('openai.com');
+    const vendorTokens = ['api.openai.com', 'api.anthropic.com', 'x-api-key'];
+    const violations = files.filter((file) => {
+      if (file.endsWith(`${path.sep}knowledge-llm.ts`)) return false;
+      const source = fs.readFileSync(file, 'utf8');
+      return vendorTokens.some((token) => source.includes(token));
+    });
+    expect(files.length).toBeGreaterThanOrEqual(4);
+    expect(violations).toEqual([]);
   });
 });
-
-// ── 3. Prompt version / hash ──────────────────────────────────────────────────
 
 describe('versioned prompt hashes', () => {
-  it('SEMANTIC_EDGES_PROMPT_HASH is a 16-char hex string', () => {
-    expect(SEMANTIC_EDGES_PROMPT_HASH).toMatch(/^[0-9a-f]{16}$/);
-  });
-
-  it('NODE_SUMMARY_PROMPT_HASH is a 16-char hex string', () => {
-    expect(NODE_SUMMARY_PROMPT_HASH).toMatch(/^[0-9a-f]{16}$/);
-  });
-
-  it('the two prompt hashes are distinct', () => {
+  it('exports explicit versions and full sha256 hashes', () => {
+    expect(SEMANTIC_EDGES_PROMPT_VERSION).toBe('semantic-edges-v1');
+    expect(NODE_SUMMARY_PROMPT_VERSION).toBe('node-summary-v1');
+    expect(SEMANTIC_EDGES_PROMPT_HASH).toMatch(/^[0-9a-f]{64}$/);
+    expect(NODE_SUMMARY_PROMPT_HASH).toMatch(/^[0-9a-f]{64}$/);
     expect(SEMANTIC_EDGES_PROMPT_HASH).not.toBe(NODE_SUMMARY_PROMPT_HASH);
   });
-
-  it('hashes are stable across multiple imports (same module instance)', () => {
-    expect(SEMANTIC_EDGES_PROMPT_HASH.length).toBe(16);
-    expect(NODE_SUMMARY_PROMPT_HASH.length).toBe(16);
-  });
 });
 
-// ── 4. All-or-nothing facade calls ───────────────────────────────────────────
+describe('bounded all-or-nothing facades', () => {
+  beforeEach(() => useStub());
 
-describe('all-or-nothing facade behavior', () => {
-  const nodes = [
-    { id: 'adr:0001', kind: 'adr', title: 'Test ADR', body: 'Some body.' },
-  ];
-  const edges = [{ src: 'adr:0001', dst: 'feature:F001', verb: 'describes' }];
+  it('bounds input node and edge counts and strings before provider invocation', async () => {
+    const completeSpy = vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete');
+    const tooManyNodes = Array.from({ length: 257 }, (_, index) => ({
+      id: `adr:${index}`,
+      kind: 'adr',
+      title: 'title',
+    }));
+    const tooManyEdges = Array.from({ length: 513 }, (_, index) => ({
+      src: 'adr:0001',
+      dst: 'feature:F001',
+      verb: `verb-${index}`,
+    }));
 
-  beforeEach(() => {
-    setEnv('LLM_API_KEY', 'stub-key');
-    setEnv('LLM_PROVIDER', 'stub');
+    await expect(inferSemanticEdges(tooManyNodes, [])).rejects.toThrow();
+    await expect(inferSemanticEdges(nodes, tooManyEdges)).rejects.toThrow();
+    await expect(
+      inferNodeSummaries([{ id: 'adr:1', kind: 'adr', title: 'x'.repeat(513) }]),
+    ).rejects.toThrow();
+    expect(completeSpy).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    clearEnv('LLM_API_KEY', 'LLM_PROVIDER', 'LLM_MODEL');
-    llmCache['map'].clear();
-    llmCache['inflight'].clear();
+  it('bounds body excerpts before calling the provider', async () => {
+    const messages: Record<string, string> = {};
+    vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete').mockImplementation(
+      async (purpose, _systemPrompt, userMessage) => {
+        messages[purpose] = userMessage;
+        return purpose === 'semantic-edges'
+          ? JSON.stringify({ edges: [] })
+          : JSON.stringify({ summaries: [] });
+      },
+    );
+    const longBodyNodes = nodes.map((node) => ({ ...node, body: 'x'.repeat(10_000) }));
+
+    await inferSemanticEdges(longBodyNodes, []);
+    await inferNodeSummaries(longBodyNodes);
+    const edgeRequest = JSON.parse(messages['semantic-edges']) as {
+      nodes: Array<{ body: string }>;
+    };
+    const summaryRequest = JSON.parse(messages['node-summaries']) as {
+      nodes: Array<{ body: string }>;
+    };
+    expect(edgeRequest.nodes.every((node) => node.body.length === 300)).toBe(true);
+    expect(summaryRequest.nodes.every((node) => node.body.length === 600)).toBe(true);
   });
 
-  it('inferSemanticEdges throws when LLM_API_KEY is absent', async () => {
-    clearEnv('LLM_API_KEY');
-    await expect(inferSemanticEdges(nodes, edges)).rejects.toThrow('LLM unavailable');
+  it('enforces output cardinality in Zod schemas', async () => {
+    const manyNodes = Array.from({ length: 32 }, (_, index) => ({
+      id: `adr:${index}`,
+      kind: 'adr',
+      title: `ADR ${index}`,
+    }));
+    vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete').mockResolvedValueOnce(
+      JSON.stringify({
+        edges: Array.from({ length: 31 }, (_, index) => ({
+          src: 'adr:0',
+          dst: `adr:${index + 1}`,
+          verb: 'references',
+        })),
+      }),
+    );
+    await expect(inferSemanticEdges(manyNodes, [])).rejects.toThrow();
+
+    const summaryNodes = Array.from({ length: 256 }, (_, index) => ({
+      id: `wiki:${index}`,
+      kind: 'wiki',
+      title: `Wiki ${index}`,
+    }));
+    vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete').mockResolvedValueOnce(
+      JSON.stringify({
+        summaries: Array.from({ length: 257 }, (_, index) => ({
+          nodeId: `wiki:${index % 256}`,
+          summary: 'summary',
+        })),
+      }),
+    );
+    await expect(inferNodeSummaries(summaryNodes)).rejects.toThrow();
   });
 
-  it('inferNodeSummaries throws when LLM_API_KEY is absent', async () => {
-    clearEnv('LLM_API_KEY');
-    await expect(inferNodeSummaries(nodes)).rejects.toThrow('LLM unavailable');
-  });
-
-  it('inferSemanticEdges with stub provider returns empty edges array (all-or-nothing success)', async () => {
-    const result = await inferSemanticEdges(nodes, edges);
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it('inferNodeSummaries with stub provider returns empty summaries array (all-or-nothing success)', async () => {
-    const result = await inferNodeSummaries(nodes);
-    expect(Array.isArray(result)).toBe(true);
-  });
-
-  it('inferSemanticEdges throws on invalid JSON from provider', async () => {
-    // Spy on complete to return invalid JSON
-    const { complete: llmComplete } = await import('@server/lib/knowledge-llm');
-    vi.spyOn(
-      await import('@server/lib/knowledge-llm'),
-      'complete',
-    ).mockResolvedValueOnce('not valid json {{{');
-    // Clear cache so the mock is actually called
-    llmCache['map'].clear();
-    await expect(inferSemanticEdges(nodes, [])).rejects.toThrow(/not valid JSON|JSON/i);
-    vi.restoreAllMocks();
-    void llmComplete; // suppress unused var lint
-  });
-
-  it('inferSemanticEdges throws on schema-invalid JSON (no edges field)', async () => {
-    vi.spyOn(
-      await import('@server/lib/knowledge-llm'),
-      'complete',
-    ).mockResolvedValueOnce(JSON.stringify({ wrong_field: [] }));
-    llmCache['map'].clear();
+  it.each([
+    {
+      name: 'unknown node',
+      output: { edges: [{ src: 'adr:0001', dst: 'missing:id', verb: 'references' }] },
+    },
+    {
+      name: 'self edge',
+      output: { edges: [{ src: 'adr:0001', dst: 'adr:0001', verb: 'references' }] },
+    },
+    {
+      name: 'duplicate edge',
+      output: {
+        edges: [
+          { src: 'adr:0001', dst: 'feature:F001', verb: 'references' },
+          { src: 'adr:0001', dst: 'feature:F001', verb: 'references' },
+        ],
+      },
+    },
+  ])('fails the whole edge facade for $name references', async ({ output }) => {
+    vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete').mockResolvedValueOnce(
+      JSON.stringify(output),
+    );
     await expect(inferSemanticEdges(nodes, [])).rejects.toThrow();
-    vi.restoreAllMocks();
+  });
+
+  it('fails the whole edge facade when the provider repeats an existing edge', async () => {
+    vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete').mockResolvedValueOnce(
+      JSON.stringify({
+        edges: [{ src: 'adr:0001', dst: 'feature:F001', verb: 'describes' }],
+      }),
+    );
+    await expect(
+      inferSemanticEdges(nodes, [{ src: 'adr:0001', dst: 'feature:F001', verb: 'describes' }]),
+    ).rejects.toThrow('existing-edge-reference');
+  });
+
+  it.each([
+    {
+      summaries: [
+        { nodeId: 'adr:0001', summary: 'Valid.' },
+        { nodeId: 'missing:id', summary: 'Unknown.' },
+      ],
+    },
+    {
+      summaries: [
+        { nodeId: 'adr:0001', summary: 'First.' },
+        { nodeId: 'adr:0001', summary: 'Duplicate.' },
+      ],
+    },
+  ])('fails the whole summary facade for unknown or duplicate references', async (output) => {
+    vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete').mockResolvedValueOnce(
+      JSON.stringify(output),
+    );
+    await expect(inferNodeSummaries(nodes)).rejects.toThrow();
   });
 });
-
-// ── 5. LRU cache: key, size cap, in-flight sharing ────────────────────────────
 
 describe('KnowledgeLRUCache', () => {
-  it('returns undefined for unknown keys', () => {
-    const cache = new KnowledgeLRUCache();
-    expect(cache.get('no-such-key')).toBeUndefined();
-  });
-
-  it('stores and retrieves a value', () => {
-    const cache = new KnowledgeLRUCache();
-    cache.set('k1', 'v1');
-    expect(cache.get('k1')).toBe('v1');
-  });
-
-  it('evicts the least-recently-used entry when cap 200 is reached', () => {
-    const cache = new KnowledgeLRUCache();
-    // Fill to cap
-    for (let i = 0; i < 200; i += 1) {
-      cache.set(`key-${i}`, `val-${i}`);
-    }
+  it('preserves LRU-200 and promotes accessed entries', () => {
+    const cache = new KnowledgeLRUCache<string>();
+    for (let index = 0; index < 200; index += 1) cache.set(`key-${index}`, `value-${index}`);
+    expect(cache.get('key-0')).toBe('value-0');
+    cache.set('key-200', 'value-200');
     expect(cache.size).toBe(200);
-
-    // key-0 was inserted first and not touched since; adding one more should evict it
-    cache.set('key-200', 'val-200');
-    expect(cache.size).toBe(200);
-    expect(cache.get('key-0')).toBeUndefined();
-    expect(cache.get('key-200')).toBe('val-200');
-  });
-
-  it('promotes a get-accessed entry above the eviction candidate', () => {
-    const cache = new KnowledgeLRUCache();
-    for (let i = 0; i < 200; i += 1) {
-      cache.set(`key-${i}`, `val-${i}`);
-    }
-    // Access key-0 to promote it
-    cache.get('key-0');
-    // Now inserting a new key should evict key-1 (now the LRU), not key-0
-    cache.set('key-200', 'val-200');
-    expect(cache.get('key-0')).toBe('val-0');
     expect(cache.get('key-1')).toBeUndefined();
+    expect(cache.get('key-0')).toBe('value-0');
   });
 
-  it('getOrFetch calls fetcher exactly once for concurrent identical keys', async () => {
-    const cache = new KnowledgeLRUCache();
-    let callCount = 0;
-    const fetcher = () =>
-      new Promise<string>((resolve) => {
-        callCount += 1;
-        setTimeout(() => resolve('result'), 10);
-      });
-
-    const [r1, r2, r3] = await Promise.all([
-      cache.getOrFetch('shared', fetcher),
+  it('shares in-flight work and clears the entry after success', async () => {
+    const cache = new KnowledgeLRUCache<string>();
+    const fetcher = vi.fn(async () => 'result');
+    const [first, second] = await Promise.all([
       cache.getOrFetch('shared', fetcher),
       cache.getOrFetch('shared', fetcher),
     ]);
-
-    expect(callCount).toBe(1);
-    expect(r1).toBe('result');
-    expect(r2).toBe('result');
-    expect(r3).toBe('result');
-  });
-
-  it('getOrFetch returns cached value without calling fetcher on repeated calls', async () => {
-    const cache = new KnowledgeLRUCache();
-    let callCount = 0;
-    const fetcher = () => {
-      callCount += 1;
-      return Promise.resolve('cached-val');
-    };
-
-    await cache.getOrFetch('cachekey', fetcher);
-    await cache.getOrFetch('cachekey', fetcher);
-    expect(callCount).toBe(1);
-  });
-
-  it('in-flight entry is removed from inflight map after settlement', async () => {
-    const cache = new KnowledgeLRUCache();
-    const p = cache.getOrFetch('k', () => Promise.resolve('v'));
-    expect(cache.inflightSize).toBe(1);
-    await p;
+    expect(first).toBe('result');
+    expect(second).toBe('result');
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(cache.inflightSize).toBe(0);
   });
 
-  it('in-flight entry is removed after rejection', async () => {
-    const cache = new KnowledgeLRUCache();
-    const p = cache.getOrFetch('k', () => Promise.reject(new Error('boom')));
-    expect(cache.inflightSize).toBe(1);
-    await p.catch(() => undefined);
+  it('caps distinct in-flight requests at 200', async () => {
+    const cache = new KnowledgeLRUCache<string>();
+    const pending = new Promise<string>(() => undefined);
+    for (let index = 0; index < 200; index += 1) {
+      void cache.getOrFetch(`key-${index}`, () => pending);
+    }
+    expect(cache.inflightSize).toBe(200);
+    await expect(cache.getOrFetch('overflow', () => pending)).rejects.toThrow(
+      'cache-capacity-exceeded',
+    );
+  });
+
+  it('does not cache rejected work', async () => {
+    const cache = new KnowledgeLRUCache<string>();
+    await cache
+      .getOrFetch('key', async () => Promise.reject(new Error('failure')))
+      .catch(() => undefined);
+    expect(cache.size).toBe(0);
     expect(cache.inflightSize).toBe(0);
   });
-
-  it('rejection does not poison the cache — subsequent call can succeed', async () => {
-    const cache = new KnowledgeLRUCache();
-    let attempt = 0;
-    const fetcher = () => {
-      attempt += 1;
-      if (attempt === 1) return Promise.reject(new Error('transient'));
-      return Promise.resolve('ok');
-    };
-    await cache.getOrFetch('k', fetcher).catch(() => undefined);
-    const result = await cache.getOrFetch('k', fetcher);
-    expect(result).toBe('ok');
-    expect(attempt).toBe(2);
-  });
 });
 
-// ── 6. Cache key is (contentHash, promptHash, model) ─────────────────────────
+describe('validated cache identity and provenance', () => {
+  beforeEach(() => useStub());
 
-describe('cache key format', () => {
-  afterEach(() => {
-    clearEnv('LLM_API_KEY', 'LLM_PROVIDER', 'LLM_MODEL');
-    llmCache['map'].clear();
-    llmCache['inflight'].clear();
+  it('caches canonical typed results and preserves original provenance on hits', async () => {
+    const completeSpy = vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete');
+    const first = await inferSemanticEdges(nodes, []);
+    const second = await inferSemanticEdges(nodes, []);
+    expect(second).toEqual(first);
+    expect(second.provenance.timestamp).toBe(first.provenance.timestamp);
+    expect(completeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('same content + same prompt + same model → single provider call', async () => {
-    setEnv('LLM_API_KEY', 'stub-key');
-    setEnv('LLM_PROVIDER', 'stub');
-    setEnv('LLM_MODEL', 'test-model');
+  it('partitions cache across provider and endpoint identities', async () => {
+    const completeSpy = vi
+      .spyOn(await import('@server/lib/knowledge-llm'), 'complete')
+      .mockResolvedValue(JSON.stringify({ edges: [] }));
 
-    let calls = 0;
-    vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete').mockImplementation(
-      async () => {
-        calls += 1;
-        return JSON.stringify({ edges: [] });
-      },
-    );
-
-    const nodes = [{ id: 'adr:0001', kind: 'adr', title: 'ADR 1', body: 'body' }];
-    await inferSemanticEdges(nodes, []);
-    await inferSemanticEdges(nodes, []);
-    expect(calls).toBe(1);
-
-    vi.restoreAllMocks();
-  });
-
-  it('different model → separate provider calls', async () => {
-    setEnv('LLM_API_KEY', 'stub-key');
-    setEnv('LLM_PROVIDER', 'stub');
-
-    let calls = 0;
-    vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete').mockImplementation(
-      async () => {
-        calls += 1;
-        return JSON.stringify({ edges: [] });
-      },
-    );
-
-    const nodes = [{ id: 'adr:0002', kind: 'adr', title: 'ADR 2', body: 'body' }];
-
-    setEnv('LLM_MODEL', 'model-a');
-    await inferSemanticEdges(nodes, []);
-
-    setEnv('LLM_MODEL', 'model-b');
-    await inferSemanticEdges(nodes, []);
-
-    expect(calls).toBe(2);
-    vi.restoreAllMocks();
-  });
-});
-
-// ── 7. No writes — semantic query writes to no file or store ──────────────────
-
-describe('no writes', () => {
-  it('knowledgeRouter.semantic is a query, not a mutation', () => {
-    const proc = knowledgeRouter._def.procedures['semantic'] as {
-      _def?: { type?: string };
-    };
-    expect(proc._def?.type).toBe('query');
-  });
-
-  it('knowledgeRouter exposes zero mutation procedures', () => {
-    const procedures = Object.entries(knowledgeRouter._def.procedures);
-    const mutations = procedures.filter(([, proc]) => {
-      const def = (proc as { _def?: { type?: string } })._def;
-      return def?.type === 'mutation';
-    });
-    expect(mutations).toHaveLength(0);
-  });
-});
-
-// ── 8. Router: semanticStatus returns availability without key ─────────────────
-
-describe('knowledgeRouter.semanticStatus', () => {
-  const caller = knowledgeRouter.createCaller({});
-  const SOURCE_ROOT = path.resolve(process.cwd(), '..', '..');
-
-  beforeEach(() => {
-    process.env.AMBER_REPO_ROOT = SOURCE_ROOT;
-  });
-
-  afterEach(() => {
-    clearEnv('LLM_API_KEY', 'LLM_PROVIDER', 'LLM_MODEL');
-  });
-
-  it('returns available:false when no LLM_API_KEY is set', async () => {
-    clearEnv('LLM_API_KEY');
-    const status = await caller.semanticStatus();
-    expect(status.available).toBe(false);
-  });
-
-  it('returns available:true when LLM_API_KEY is set', async () => {
-    setEnv('LLM_API_KEY', 'test-key-xxx');
     setEnv('LLM_PROVIDER', 'openai');
-    const status = await caller.semanticStatus();
-    expect(status.available).toBe(true);
-    clearEnv('LLM_API_KEY', 'LLM_PROVIDER');
+    setEnv('LLM_BASE_URL', 'https://one.example/v1');
+    await inferSemanticEdges(nodes, []);
+    setEnv('LLM_BASE_URL', 'https://two.example/v1');
+    await inferSemanticEdges(nodes, []);
+    setEnv('LLM_PROVIDER', 'anthropic');
+    setEnv('LLM_BASE_URL', 'https://two.example');
+    await inferSemanticEdges(nodes, []);
+
+    expect(completeSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not poison cache on malformed HTTP-200 output and retries successfully', async () => {
+    const completeSpy = vi
+      .spyOn(await import('@server/lib/knowledge-llm'), 'complete')
+      .mockResolvedValueOnce('not-json')
+      .mockResolvedValueOnce(
+        JSON.stringify({ edges: [{ src: 'adr:0001', dst: 'feature:F001', verb: 'references' }] }),
+      );
+
+    await expect(inferSemanticEdges(nodes, [])).rejects.toThrow('invalid-json');
+    const result = await inferSemanticEdges(nodes, []);
+    expect(result.items).toHaveLength(1);
+    expect(completeSpy).toHaveBeenCalledTimes(2);
+    expect(llmCache.size).toBe(1);
   });
 });
 
-// ── 9. Router: semantic returns available:false DTO (no key) without error ─────
-
-describe('knowledgeRouter.semantic', () => {
+describe('knowledge semantic router', () => {
   const caller = knowledgeRouter.createCaller({});
-  const SOURCE_ROOT = path.resolve(process.cwd(), '..', '..');
 
   beforeEach(() => {
     process.env.AMBER_REPO_ROOT = SOURCE_ROOT;
-    clearEnv('LLM_API_KEY');
   });
 
-  it('returns available:false with empty arrays when no key configured', async () => {
+  it('returns unavailable without a key and remains a query-only surface', async () => {
     const result = await caller.semantic();
-    expect(result.available).toBe(false);
-    expect(result.inferredEdges).toEqual([]);
-    expect(result.nodeSummaries).toEqual([]);
-    expect(result.error).toBeUndefined();
+    expect(result).toEqual({ available: false, inferredEdges: [], nodeSummaries: [] });
+    const procedures = Object.values(knowledgeRouter._def.procedures);
+    expect(procedures.every((procedure) => procedure._def.type === 'query')).toBe(true);
   });
 
-  it('never throws — errors surface in the DTO', async () => {
-    await expect(caller.semantic()).resolves.toBeDefined();
+  it('observably performs no filesystem writes during a semantic query', async () => {
+    useStub();
+    const writeFile = vi.spyOn(fs, 'writeFileSync');
+    const appendFile = vi.spyOn(fs, 'appendFileSync');
+    const createWriteStream = vi.spyOn(fs, 'createWriteStream');
+    const promiseWriteFile = vi.spyOn(fs.promises, 'writeFile');
+
+    const result = await caller.semantic();
+    expect(result.available).toBe(true);
+    expect(result.inferredEdges.length).toBeGreaterThan(0);
+    expect(result.nodeSummaries.length).toBeGreaterThan(0);
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(appendFile).not.toHaveBeenCalled();
+    expect(createWriteStream).not.toHaveBeenCalled();
+    expect(promiseWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('makes every supported graph node kind eligible for semantic inference', () => {
+    const kinds = [
+      'adr',
+      'artifact',
+      'wiki',
+      'knowledge',
+      'memory',
+      'architecture',
+      'feature',
+    ] as const;
+    const allKinds = kinds.map((kind) => ({
+      id: `${kind}:test`,
+      kind,
+      layer: 'knowledge' as const,
+      title: kind,
+      sourcePath: `${kind}.md`,
+      body: `${kind} body`,
+    }));
+
+    const selected = selectSemanticInputs(allKinds);
+    expect(selected.edgeNodes.map((node) => node.kind)).toEqual(kinds);
+    expect(selected.summaryNodes.map((node) => node.kind)).toEqual(kinds);
+  });
+
+  it('returns bounded stable facade errors without leaking provider details', async () => {
+    useStub();
+    const promptModule = await import('@server/lib/knowledge-llm-prompts');
+    vi.spyOn(promptModule, 'inferSemanticEdges').mockRejectedValueOnce(
+      new Error('secret-token https://private.example/'.repeat(100)),
+    );
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const result = await caller.semantic();
+    expect(result.error).toBe('semantic-edges-unavailable');
+    expect(result.error?.length).toBeLessThan(64);
+    expect(JSON.stringify(result)).not.toContain('secret-token');
+    expect(result.nodeSummaries.length).toBeGreaterThan(0);
   });
 });

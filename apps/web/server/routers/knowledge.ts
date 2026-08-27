@@ -3,12 +3,7 @@ import { router, publicProcedure } from '../trpc';
 import { listRecentChanges } from '../lib/knowledge-recent';
 import { resolveRepoRoot } from '../lib/repo-root';
 import { getStatus } from '../lib/knowledge-llm';
-import {
-  inferSemanticEdges,
-  inferNodeSummaries,
-  SEMANTIC_EDGES_PROMPT_HASH,
-  NODE_SUMMARY_PROMPT_HASH,
-} from '../lib/knowledge-llm-prompts';
+import { inferSemanticEdges, inferNodeSummaries } from '../lib/knowledge-llm-prompts';
 import type {
   GraphLayer,
   KnowledgeNode,
@@ -142,7 +137,15 @@ function adaptGraph(raw: RawGraph): KnowledgeGraphDTO {
   };
 }
 
-const CONTENT_KINDS = new Set(['adr', 'wiki', 'memory', 'architecture']);
+export function selectSemanticInputs(nodes: KnowledgeNode[]): {
+  edgeNodes: KnowledgeNode[];
+  summaryNodes: KnowledgeNode[];
+} {
+  return {
+    edgeNodes: nodes,
+    summaryNodes: nodes.filter((node) => node.body),
+  };
+}
 
 export const knowledgeRouter = router({
   graph: publicProcedure.query((): KnowledgeGraphDTO => {
@@ -165,61 +168,58 @@ export const knowledgeRouter = router({
     let raw: RawGraph;
     try {
       raw = buildKnowledgeGraph(resolveRepoRoot());
-    } catch (err) {
+    } catch {
+      console.warn('[knowledge.semantic] graph read failed');
       return {
         available: true,
         inferredEdges: [],
         nodeSummaries: [],
-        error: err instanceof Error ? err.message : String(err),
+        error: 'graph-unavailable',
       };
     }
 
     const nodes = raw.nodes.map(adaptNode);
+    const semanticInputs = selectSemanticInputs(nodes);
     const existingEdges = raw.edges
-      .filter((e) => EDGE_VERBS.has(e.verb as KnowledgeEdgeDTO['verb']))
-      .map((e) => ({ src: e.src, dst: e.dst, verb: e.verb }));
+      .filter((edge) => EDGE_VERBS.has(edge.verb as KnowledgeEdgeDTO['verb']))
+      .map((edge) => ({ src: edge.src, dst: edge.dst, verb: edge.verb }));
 
-    const timestamp = new Date().toISOString();
-    const model = status.model;
-
-    let inferredEdges: KnowledgeEdgeDTO[] = [];
-    let nodeSummaries: NodeSummaryDTO[] = [];
+    const [edgeOutcome, summaryOutcome] = await Promise.allSettled([
+      inferSemanticEdges(semanticInputs.edgeNodes, existingEdges),
+      inferNodeSummaries(semanticInputs.summaryNodes),
+    ]);
     const errors: string[] = [];
 
-    try {
-      const contentNodes = nodes.filter((n) => CONTENT_KINDS.has(n.kind));
-      const inferred = await inferSemanticEdges(contentNodes, existingEdges);
-      inferredEdges = inferred.map((e) => ({
-        src: e.src,
-        dst: e.dst,
-        verb: e.verb,
+    let inferredEdges: KnowledgeEdgeDTO[] = [];
+    if (edgeOutcome.status === 'fulfilled') {
+      inferredEdges = edgeOutcome.value.items.map((edge) => ({
+        ...edge,
         origin: 'inferred' as const,
-        provenance: { model, timestamp, promptHash: SEMANTIC_EDGES_PROMPT_HASH },
+        provenance: edgeOutcome.value.provenance,
       }));
-    } catch (err) {
-      errors.push(`edges: ${err instanceof Error ? err.message : String(err)}`);
+    } else {
+      console.warn('[knowledge.semantic] semantic-edges facade failed');
+      errors.push('semantic-edges-unavailable');
     }
 
-    try {
-      const summaryNodes = nodes.filter((n) => CONTENT_KINDS.has(n.kind) && n.body);
-      const summaries = await inferNodeSummaries(summaryNodes);
-      nodeSummaries = summaries.map((s) => ({
-        nodeId: s.nodeId,
-        summary: s.summary,
-        provenance: { model, timestamp, promptHash: NODE_SUMMARY_PROMPT_HASH },
+    let nodeSummaries: NodeSummaryDTO[] = [];
+    if (summaryOutcome.status === 'fulfilled') {
+      nodeSummaries = summaryOutcome.value.items.map((summary) => ({
+        ...summary,
+        provenance: summaryOutcome.value.provenance,
         origin: 'inferred' as const,
       }));
-    } catch (err) {
-      errors.push(`summaries: ${err instanceof Error ? err.message : String(err)}`);
+    } else {
+      console.warn('[knowledge.semantic] node-summaries facade failed');
+      errors.push('node-summaries-unavailable');
     }
 
     return {
       available: true,
       inferredEdges,
       nodeSummaries,
-      providerModel: model,
-      timestamp,
-      ...(errors.length > 0 ? { error: errors.join('; ') } : {}),
+      providerModel: status.model,
+      ...(errors.length > 0 ? { error: errors.join(',') } : {}),
     };
   }),
 });

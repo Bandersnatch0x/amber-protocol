@@ -48,6 +48,7 @@ process.env.API_PORT = String(apiPort);
 process.env.VITE_DEV_PORT = String(clientPort);
 process.env.NO_PROXY = '127.0.0.1,localhost';
 process.env.no_proxy = '127.0.0.1,localhost';
+const semanticStubEnabled = process.env.AMBER_E2E_SEMANTIC_STUB === '1';
 const e2eEnv = {
   ...process.env,
   AMBER_REPO_ROOT: process.env.AMBER_REPO_ROOT,
@@ -55,6 +56,10 @@ const e2eEnv = {
   PORT: String(apiPort),
   API_PORT: String(apiPort),
   VITE_DEV_PORT: String(clientPort),
+  LLM_API_KEY: semanticStubEnabled ? 'stub-e2e-key' : '',
+  LLM_PROVIDER: semanticStubEnabled ? 'stub' : '',
+  LLM_MODEL: semanticStubEnabled ? 'stub-e2e' : '',
+  LLM_BASE_URL: '',
 };
 
 export default defineConfig({

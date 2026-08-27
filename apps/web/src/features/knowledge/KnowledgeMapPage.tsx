@@ -502,6 +502,7 @@ function FlowCanvas({
           id: `e${i}`,
           source: e.src,
           target: e.dst,
+          className: e.origin === 'inferred' ? 'knowledge-edge-inferred' : undefined,
           animated: connected,
           style: {
             stroke,
@@ -587,9 +588,9 @@ function EdgeRow({
         {edge.origin === 'inferred' && (
           <span
             className="ml-0.5 text-[9px] text-slate-400 italic"
-            title={`inferred · ${edge.provenance?.model} · prompt ${edge.provenance?.promptHash} · ${edge.provenance?.timestamp}`}
+            title={`inferred · ${edge.provenance?.provider}/${edge.provenance?.model} · prompt ${edge.provenance?.promptHash} · ${edge.provenance?.timestamp}`}
           >
-            {t('knowledge.inferredLabel')} ({edge.provenance?.model})
+            {t('knowledge.inferredLabel')} ({edge.provenance?.provider}/{edge.provenance?.model})
           </span>
         )}
       </button>
@@ -604,6 +605,7 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
   const active = selected || neighbor;
   return (
     <div
+      data-testid={`knowledge-node-${dto.id}`}
       className={`group rounded-lg border px-2.5 py-2 min-w-[128px] max-w-[190px] shadow-sm transition-all duration-150
         bg-white dark:bg-obsidian-elevated
         ${selected ? 'border-amber-400 dark:border-amber-600 shadow-glow-amber' : 'border-slate-200 dark:border-obsidian-border'}
@@ -650,6 +652,7 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
 }
 
 export function KnowledgeMapPage() {
+  const [semanticRequested, setSemanticRequested] = useState(false);
   const { data: dto, isLoading, error, refetch } = trpc.knowledge.graph.useQuery();
   const recentQuery = trpc.knowledge.recentChanges.useQuery(undefined, {
     refetchInterval: false,
@@ -659,15 +662,27 @@ export function KnowledgeMapPage() {
     staleTime: Infinity,
   });
   const semanticStatusQuery = trpc.knowledge.semanticStatus.useQuery(undefined, {
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
     staleTime: Infinity,
     retry: false,
   });
   const semanticQuery = trpc.knowledge.semantic.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
     retry: false,
-    enabled: semanticStatusQuery.data?.available === true,
+    enabled: semanticRequested && semanticStatusQuery.data?.available === true,
   });
   const { t } = useI18n();
+
+  const requestSemanticAnalysis = () => {
+    if (semanticRequested) {
+      void semanticQuery.refetch();
+      return;
+    }
+    setSemanticRequested(true);
+  };
 
   if (isLoading) {
     return (
@@ -712,8 +727,12 @@ export function KnowledgeMapPage() {
       recentIsLoading={recentQuery.isLoading}
       onRefreshRecent={() => void recentQuery.refetch()}
       semanticStatus={semanticStatusQuery.data ?? null}
+      semanticStatusError={semanticStatusQuery.error ? true : false}
       semanticResult={semanticQuery.data ?? null}
-      semanticLoading={semanticQuery.isLoading}
+      semanticTransportError={semanticQuery.error ? true : false}
+      semanticRequested={semanticRequested}
+      semanticLoading={semanticQuery.isFetching}
+      onRequestSemantic={requestSemanticAnalysis}
     />
   );
 }
@@ -726,8 +745,12 @@ function KnowledgeMapGraph({
   recentIsLoading,
   onRefreshRecent,
   semanticStatus,
+  semanticStatusError,
   semanticResult,
+  semanticTransportError,
+  semanticRequested,
   semanticLoading,
+  onRequestSemantic,
 }: {
   dto: KnowledgeGraphDTO;
   recentChanges: RecentChangeItem[];
@@ -736,8 +759,12 @@ function KnowledgeMapGraph({
   recentIsLoading: boolean;
   onRefreshRecent: () => void;
   semanticStatus: LLMStatusDTO | null;
+  semanticStatusError: boolean;
   semanticResult: SemanticResultDTO | null;
+  semanticTransportError: boolean;
+  semanticRequested: boolean;
   semanticLoading: boolean;
+  onRequestSemantic: () => void;
 }) {
   const { t } = useI18n();
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('cluster');
@@ -790,7 +817,10 @@ function KnowledgeMapGraph({
     return counts;
   }, [mergedDto.nodes]);
 
-  const driftNodeIds = useMemo(() => new Set(mergedDto.drift.map((d) => d.nodeId)), [mergedDto.drift]);
+  const driftNodeIds = useMemo(
+    () => new Set(mergedDto.drift.map((d) => d.nodeId)),
+    [mergedDto.drift],
+  );
 
   const visibleIds = useMemo(() => {
     if (kindFilter.size === 0 && searchHits === null && !showDriftOnly) return null;
@@ -821,35 +851,72 @@ function KnowledgeMapGraph({
   );
 
   const semanticBanner = useMemo(() => {
+    if (semanticStatusError) {
+      return { kind: 'error' as const, message: t('knowledge.semantic.statusError') };
+    }
     if (semanticStatus === null) return null;
     if (!semanticStatus.available) {
-      return { kind: 'unavailable' as const, message: t('knowledge.semantic.unavailable') };
-    }
-    if (semanticResult?.error && !semanticResult.inferredEdges.length) {
       return {
-        kind: 'error' as const,
-        message: t('knowledge.semantic.error', { error: semanticResult.error }),
+        kind:
+          semanticStatus.reason === 'invalid-config'
+            ? ('error' as const)
+            : ('unavailable' as const),
+        message:
+          semanticStatus.reason === 'invalid-config'
+            ? t('knowledge.semantic.invalidConfig')
+            : t('knowledge.semantic.unavailable'),
       };
+    }
+    if (semanticTransportError || semanticResult?.error) {
+      return { kind: 'error' as const, message: t('knowledge.semantic.error') };
     }
     if (semanticLoading) {
       return { kind: 'loading' as const, message: t('knowledge.semantic.loading') };
     }
     return null;
-  }, [semanticStatus, semanticResult, semanticLoading, t]);
+  }, [
+    semanticStatus,
+    semanticStatusError,
+    semanticResult,
+    semanticTransportError,
+    semanticLoading,
+    t,
+  ]);
 
   return (
     <div className="page-container">
       {semanticBanner && (
         <div
           data-testid="semantic-status-banner"
+          role={semanticBanner.kind === 'error' ? 'alert' : 'status'}
+          aria-live={semanticBanner.kind === 'error' ? 'assertive' : 'polite'}
           className={`mb-3 rounded-md px-3 py-2 text-[11px] border ${
             semanticBanner.kind === 'error'
-              ? 'border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200'
+              ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200'
               : 'border-slate-200 dark:border-obsidian-border bg-slate-50 dark:bg-obsidian-surface text-slate-500 dark:text-slate-400'
           }`}
         >
           {semanticBanner.message}
         </div>
+      )}
+      {semanticStatus?.available && (
+        <section
+          data-testid="semantic-disclosure"
+          aria-label={t('knowledge.semantic.run')}
+          className="mb-3 flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-obsidian-border dark:bg-obsidian-surface sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="text-[11px] text-slate-600 dark:text-slate-300">
+            {t('knowledge.semantic.disclosure', { provider: semanticStatus.provider ?? 'LLM' })}
+          </p>
+          <button
+            type="button"
+            onClick={onRequestSemantic}
+            disabled={semanticLoading}
+            className="btn-secondary shrink-0 text-xs disabled:opacity-50"
+          >
+            {semanticRequested ? t('knowledge.semantic.runAgain') : t('knowledge.semantic.run')}
+          </button>
+        </section>
       )}
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
@@ -1032,8 +1099,11 @@ function KnowledgeMapGraph({
                   </p>
                   <p className="text-[9px] text-slate-400 mt-1 italic">
                     {t('knowledge.summary.provenance', {
+                      provider: summaryByNodeId.get(selected.id)!.provenance.provider,
                       model: summaryByNodeId.get(selected.id)!.provenance.model,
-                      timestamp: summaryByNodeId.get(selected.id)!.provenance.timestamp.slice(0, 10),
+                      timestamp: summaryByNodeId
+                        .get(selected.id)!
+                        .provenance.timestamp.slice(0, 10),
                     })}
                   </p>
                 </div>

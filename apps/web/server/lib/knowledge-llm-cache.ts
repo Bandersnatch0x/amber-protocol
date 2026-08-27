@@ -1,36 +1,34 @@
 const LRU_CAP = 200;
 
-class KnowledgeLRUCache {
-  private readonly map = new Map<string, string>();
-  private readonly inflight = new Map<string, Promise<string>>();
+class KnowledgeLRUCache<T = unknown> {
+  private readonly map = new Map<string, T>();
+  private readonly inflight = new Map<string, Promise<T>>();
 
-  get(key: string): string | undefined {
+  get(key: string): T | undefined {
     if (!this.map.has(key)) return undefined;
-    const val = this.map.get(key)!;
-    // Re-insert at end to mark as most-recently-used
+    const value = this.map.get(key)!;
     this.map.delete(key);
-    this.map.set(key, val);
-    return val;
+    this.map.set(key, value);
+    return value;
   }
 
-  set(key: string, value: string): void {
+  set(key: string, value: T): void {
     if (this.map.has(key)) {
       this.map.delete(key);
     } else if (this.map.size >= LRU_CAP) {
-      // Evict the least-recently-used entry (first key in insertion-order Map)
       const lruKey = this.map.keys().next().value!;
       this.map.delete(lruKey);
     }
     this.map.set(key, value);
   }
 
-  /** Returns a promise that resolves to the cached value or fires fetcher exactly once. */
-  async getOrFetch(key: string, fetcher: () => Promise<string>): Promise<string> {
+  async getOrFetch(key: string, fetcher: () => Promise<T>): Promise<T> {
     const cached = this.get(key);
     if (cached !== undefined) return cached;
 
     const pending = this.inflight.get(key);
     if (pending) return pending;
+    if (this.inflight.size >= LRU_CAP) throw new Error('cache-capacity-exceeded');
 
     const promise = fetcher().then(
       (result) => {
@@ -38,14 +36,19 @@ class KnowledgeLRUCache {
         this.set(key, result);
         return result;
       },
-      (err: unknown) => {
+      (error: unknown) => {
         this.inflight.delete(key);
-        throw err;
+        throw error;
       },
     );
 
     this.inflight.set(key, promise);
     return promise;
+  }
+
+  clear(): void {
+    this.map.clear();
+    this.inflight.clear();
   }
 
   get size(): number {
