@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from '@tanstack/react-router';
 import {
   Background,
   BackgroundVariant,
   Controls,
+  Handle,
+  MarkerType,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   type Edge,
@@ -12,33 +16,44 @@ import {
 } from '@xyflow/react';
 import * as d3 from 'd3-force';
 import '@xyflow/react/dist/style.css';
-import { knowledgeGraphFixture, type KnowledgeGraphDTO, type KnowledgeNode } from './fixture';
+import {
+  knowledgeGraphFixture,
+  type GraphLayer,
+  type KnowledgeGraphDTO,
+  type KnowledgeNode,
+  type RecentChangeItem,
+} from './fixture';
+import { useI18n, type I18nKey } from '@/lib/i18n';
+import { MarkdownMessage } from '@/components/code/MarkdownMessage';
 
-const LAYER_COLORS: Record<string, { fill: string; ring: string; badge: string }> = {
+const LAYER_COLORS: Record<string, { dot: string; ring: string; badge: string; stroke: string }> = {
   decision: {
-    fill: 'bg-white dark:bg-obsidian-surface border-slate-300 dark:border-slate-600',
+    dot: 'bg-amber-500',
     ring: '#f59e0b',
     badge: 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200',
+    stroke: '#f59e0b',
   },
   knowledge: {
-    fill: 'bg-white dark:bg-obsidian-surface border-slate-300 dark:border-slate-600',
-    ring: '#2563eb',
+    dot: 'bg-blue-500',
+    ring: '#3b82f6',
     badge: 'bg-blue-100 text-blue-900 dark:bg-blue-950/50 dark:text-blue-200',
+    stroke: '#3b82f6',
   },
   implementation: {
-    fill: 'bg-white dark:bg-obsidian-surface border-slate-300 dark:border-slate-600',
+    dot: 'bg-slate-500',
     ring: '#64748b',
     badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    stroke: '#64748b',
   },
 };
 
-const KIND_LABEL: Record<string, string> = {
-  adr: 'ADR',
-  artifact: 'Artifact',
-  knowledge: 'Wiki',
-  memory: 'Memory',
-  architecture: 'Architecture',
-  feature: 'Feature',
+const KIND_LABEL_KEYS: Record<string, I18nKey> = {
+  adr: 'knowledge.kind.adr',
+  artifact: 'knowledge.kind.artifact',
+  knowledge: 'knowledge.kind.wiki',
+  memory: 'knowledge.kind.memory',
+  architecture: 'knowledge.kind.architecture',
+  feature: 'knowledge.kind.feature',
 };
 
 type LayoutMode = 'cluster' | 'layered';
@@ -49,6 +64,7 @@ interface KnowledgeNodeData extends Record<string, unknown> {
   highlight: boolean;
   dimmed: boolean;
   selected: boolean;
+  neighbor: boolean;
 }
 
 function computeLayout(
@@ -69,12 +85,12 @@ function computeLayout(
       implementation: [],
     };
     for (const n of nodes) layers[n.layer].push(n);
-    const layerY: Record<string, number> = { decision: -360, knowledge: 0, implementation: 360 };
+    const layerY: Record<string, number> = { decision: -480, knowledge: 0, implementation: 480 };
     for (const [layer, items] of Object.entries(layers)) {
       items.forEach((n, i) => {
-        const col = i % 12;
-        const row = Math.floor(i / 12);
-        positions.set(n.id, { x: (col - 5.5) * 190, y: layerY[layer] + row * 110 });
+        const col = i % 14;
+        const row = Math.floor(i / 14);
+        positions.set(n.id, { x: (col - 6.5) * 200, y: layerY[layer] + row * 120 });
       });
     }
     return positions;
@@ -87,24 +103,25 @@ function computeLayout(
       d3
         .forceLink(links)
         .id((d: never) => (d as KnowledgeNode).id)
-        .distance(130)
-        .strength(0.35),
+        .distance(170)
+        .strength(0.4),
     )
-    .force('charge', d3.forceManyBody().strength(-320))
+    .force('charge', d3.forceManyBody().strength(-420))
+    .force('collide', d3.forceCollide(108))
     .force('center', d3.forceCenter(0, 0))
     .force(
       'cluster',
       (() => {
         const centroids: Record<string, { x: number; y: number }> = {
-          decision: { x: -520, y: -240 },
-          knowledge: { x: 320, y: -200 },
-          implementation: { x: 0, y: 420 },
+          decision: { x: -560, y: -280 },
+          knowledge: { x: 400, y: -220 },
+          implementation: { x: 0, y: 460 },
         };
         const f = (alpha: number) => {
           for (const n of nodes) {
             const c = centroids[n.layer];
-            n.x = (n.x ?? 0) + (c.x - (n.x ?? 0)) * 0.045 * alpha;
-            n.y = (n.y ?? 0) + (c.y - (n.y ?? 0)) * 0.045 * alpha;
+            n.x = (n.x ?? 0) + (c.x - (n.x ?? 0)) * 0.05 * alpha;
+            n.y = (n.y ?? 0) + (c.y - (n.y ?? 0)) * 0.05 * alpha;
           }
         };
         return f as unknown as d3.Force<KnowledgeNode, undefined>;
@@ -112,17 +129,250 @@ function computeLayout(
     )
     .stop();
 
-  for (let i = 0; i < 300; i += 1) simulation.tick();
+  for (let i = 0; i < 320; i += 1) simulation.tick();
   const positions = new Map<string, { x: number; y: number }>();
   for (const n of nodes) positions.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
   return positions;
+}
+
+function neighborIdsOf(dto: KnowledgeGraphDTO, id: string): Set<string> {
+  const ids = new Set<string>([id]);
+  for (const e of dto.edges) {
+    if (e.src === id) ids.add(e.dst);
+    if (e.dst === id) ids.add(e.src);
+  }
+  return ids;
+}
+
+const KIND_LOCAL_TARGET: Record<string, RecentChangeItem['linkTo']> = {
+  feature: 'gates',
+  adr: 'governance',
+  artifact: 'governance',
+  knowledge: 'transcripts',
+  architecture: 'transcripts',
+  memory: 'transcripts',
+};
+
+function LocalJumpLink({
+  linkTo,
+  linkId,
+  label,
+  children,
+}: {
+  linkTo: RecentChangeItem['linkTo'];
+  linkId?: string;
+  label?: string;
+  children: React.ReactNode;
+}) {
+  const cls =
+    'inline-flex items-center gap-1 rounded border border-amber-300/70 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors';
+  if (linkTo === 'sessions' && linkId) {
+    return (
+      <Link to="/sessions/$id" params={{ id: linkId }} className={cls} title={label}>
+        {children}
+      </Link>
+    );
+  }
+  if (linkTo === 'transcripts' && linkId) {
+    return (
+      <Link to="/transcripts/$id" params={{ id: linkId }} className={cls} title={label}>
+        {children}
+      </Link>
+    );
+  }
+  if (linkTo === 'routes' && linkId) {
+    return (
+      <Link to="/routes/$id" params={{ id: linkId }} className={cls} title={label}>
+        {children}
+      </Link>
+    );
+  }
+  if (linkTo === 'gates') {
+    return (
+      <Link to="/gates" className={cls} title={label}>
+        {children}
+      </Link>
+    );
+  }
+  if (linkTo === 'governance') {
+    return (
+      <Link to="/governance" className={cls} title={label}>
+        {children}
+      </Link>
+    );
+  }
+  return null;
+}
+
+function MiniContextGraph({
+  dto,
+  centerId,
+  nodeById,
+  onSelect,
+}: {
+  dto: KnowledgeGraphDTO;
+  centerId: string;
+  nodeById: Map<string, KnowledgeNode>;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const center = nodeById.get(centerId);
+  const items = useMemo(() => {
+    const out: Array<{
+      other: KnowledgeNode;
+      verb: string;
+      dir: 'out' | 'in';
+      inferred: boolean;
+      x: number;
+      y: number;
+    }> = [];
+    for (const e of dto.edges) {
+      if (e.src === centerId && nodeById.has(e.dst)) {
+        out.push({
+          other: nodeById.get(e.dst)!,
+          verb: e.verb,
+          dir: 'out',
+          inferred: e.origin === 'inferred',
+          x: 0,
+          y: 0,
+        });
+      } else if (e.dst === centerId && nodeById.has(e.src)) {
+        out.push({
+          other: nodeById.get(e.src)!,
+          verb: e.verb,
+          dir: 'in',
+          inferred: e.origin === 'inferred',
+          x: 0,
+          y: 0,
+        });
+      }
+    }
+    const shown = out.slice(0, 8);
+    const cx = 160;
+    const cy = 84;
+    const rx = 118;
+    const ry = 62;
+    shown.forEach((it, i) => {
+      const angle = (i / shown.length) * Math.PI * 2 - Math.PI / 2;
+      it.x = cx + rx * Math.cos(angle);
+      it.y = cy + ry * Math.sin(angle);
+    });
+    return { shown, cx, cy };
+  }, [dto.edges, centerId, nodeById]);
+
+  if (!center) return null;
+  if (items.shown.length === 0) return null;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+      <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
+        {t('knowledge.contextGraph')}
+      </div>
+      <svg
+        viewBox="0 0 320 168"
+        className="w-full h-auto rounded-md border border-slate-200 dark:border-obsidian-border bg-slate-50 dark:bg-obsidian-surface"
+        role="img"
+        aria-label={t('knowledge.contextGraph')}
+      >
+        <defs>
+          <marker
+            id="mini-arrow"
+            viewBox="0 0 8 8"
+            refX={7}
+            refY={4}
+            markerWidth={6}
+            markerHeight={6}
+            orient="auto"
+          >
+            <path d="M0,0 L8,4 L0,8 z" fill="#94a3b8" />
+          </marker>
+        </defs>
+        {items.shown.map((it) => {
+          const x1 = it.dir === 'out' ? items.cx : it.x;
+          const y1 = it.dir === 'out' ? items.cy : it.y;
+          const x2 = it.dir === 'out' ? it.x : items.cx;
+          const y2 = it.dir === 'out' ? it.y : items.cy;
+          const midX = (x1 + x2) / 2;
+          const midY = (y1 + y2) / 2;
+          return (
+            <g key={`${it.dir}:${it.other.id}:${it.verb}`}>
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke={it.inferred ? '#94a3b8' : '#7c8da4'}
+                strokeWidth={1.2}
+                strokeDasharray={it.inferred ? '4 3' : undefined}
+                markerEnd="url(#mini-arrow)"
+              />
+              <text x={midX} y={midY - 3} textAnchor="middle" fontSize={7} fill="#b45309">
+                {it.verb}
+              </text>
+            </g>
+          );
+        })}
+        <g>
+          <rect
+            x={items.cx - 58}
+            y={items.cy - 12}
+            width={116}
+            height={24}
+            rx={6}
+            fill="#fef3c7"
+            stroke="#f59e0b"
+            strokeWidth={1.4}
+          />
+          <text
+            x={items.cx}
+            y={items.cy + 3}
+            textAnchor="middle"
+            fontSize={8.5}
+            fontWeight={600}
+            fill="#92400e"
+          >
+            {center.title.length > 26 ? `${center.title.slice(0, 25)}…` : center.title}
+          </text>
+        </g>
+        {items.shown.map((it) => {
+          const c = LAYER_COLORS[it.other.layer];
+          const label =
+            it.other.title.length > 18 ? `${it.other.title.slice(0, 17)}…` : it.other.title;
+          const w = 84;
+          return (
+            <g
+              key={`node:${it.other.id}`}
+              onClick={() => onSelect(it.other.id)}
+              className="cursor-pointer"
+            >
+              <rect
+                x={it.x - w / 2}
+                y={it.y - 10}
+                width={w}
+                height={20}
+                rx={5}
+                fill="#ffffff"
+                stroke={c.stroke}
+                strokeWidth={1.2}
+              />
+              <text x={it.x} y={it.y + 3} textAnchor="middle" fontSize={7.5} fill="#334155">
+                {label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
 }
 
 function FlowCanvas({
   dto,
   layout,
   selectedId,
+  hoverId,
   onSelect,
+  onHover,
   visibleIds,
   searchHits,
   showInferred,
@@ -130,13 +380,20 @@ function FlowCanvas({
   dto: KnowledgeGraphDTO;
   layout: Map<string, { x: number; y: number }>;
   selectedId: string | null;
+  hoverId: string | null;
   onSelect: (id: string | null) => void;
+  onHover: (id: string | null) => void;
   visibleIds: Set<string> | null;
   searchHits: Set<string> | null;
   showInferred: boolean;
 }) {
   const driftNodeIds = useMemo(() => new Set(dto.drift.map((d) => d.nodeId)), [dto.drift]);
   const { fitView } = useReactFlow();
+  const activeId = hoverId ?? selectedId;
+  const activeNeighbors = useMemo(
+    () => (activeId ? neighborIdsOf(dto, activeId) : null),
+    [dto, activeId],
+  );
 
   const flowNodes: Node<KnowledgeNodeData>[] = useMemo(
     () =>
@@ -145,6 +402,8 @@ function FlowCanvas({
         .map((n) => {
           const pos = layout.get(n.id) ?? { x: 0, y: 0 };
           const isHit = searchHits === null || searchHits.has(n.id);
+          const isActiveNeighbor = activeNeighbors?.has(n.id) ?? false;
+          const outsideActive = activeNeighbors !== null && !isActiveNeighbor;
           return {
             id: n.id,
             position: pos,
@@ -152,13 +411,23 @@ function FlowCanvas({
               dto: n,
               drift: driftNodeIds.has(n.id),
               highlight: searchHits !== null && isHit,
-              dimmed: searchHits !== null && !isHit,
+              dimmed: (searchHits !== null && !isHit) || outsideActive,
               selected: n.id === selectedId,
+              neighbor: activeNeighbors !== null && isActiveNeighbor && n.id !== activeId,
             },
             type: 'knowledge',
           } satisfies Node<KnowledgeNodeData>;
         }),
-    [dto.nodes, layout, driftNodeIds, visibleIds, searchHits, selectedId],
+    [
+      dto.nodes,
+      layout,
+      driftNodeIds,
+      visibleIds,
+      searchHits,
+      selectedId,
+      activeNeighbors,
+      activeId,
+    ],
   );
 
   useEffect(() => {
@@ -172,24 +441,33 @@ function FlowCanvas({
       .filter((e) => showInferred || e.origin !== 'inferred')
       .filter((e) => nodeIds.has(e.src) && nodeIds.has(e.dst))
       .map((e, i) => {
-        const connected = selectedId !== null && (e.src === selectedId || e.dst === selectedId);
+        const connected = activeId !== null && (e.src === activeId || e.dst === activeId);
+        const stroke = connected ? '#f59e0b' : e.origin === 'inferred' ? '#94a3b8' : '#7c8da4';
         return {
           id: `e${i}`,
           source: e.src,
           target: e.dst,
           animated: connected,
           style: {
-            stroke: connected ? '#f59e0b' : e.origin === 'inferred' ? '#94a3b8' : '#64748b',
-            strokeWidth: connected ? 2 : 1.5,
+            stroke,
+            strokeWidth: connected ? 2.4 : 1.6,
             strokeDasharray: e.origin === 'inferred' ? '6 4' : undefined,
-            opacity: connected ? 1 : 0.75,
+            opacity: connected ? 1 : 0.7,
           },
-          label: e.verb,
-          labelStyle: { fill: '#64748b', fontSize: 10 },
-          labelBgStyle: { fill: '#f8fafc' },
+          label: connected ? e.verb : undefined,
+          labelStyle: { fill: '#b45309', fontSize: 10, fontWeight: 600 },
+          labelBgStyle: { fill: '#fffbeb' },
+          labelBgPadding: [3, 1] as [number, number],
+          labelBgBorderRadius: 3,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: stroke,
+            width: 14,
+            height: 14,
+          },
         };
       });
-  }, [dto.edges, flowNodes, showInferred, selectedId]);
+  }, [dto.edges, flowNodes, showInferred, activeId]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => onSelect(node.id),
@@ -202,6 +480,8 @@ function FlowCanvas({
       edges={flowEdges}
       nodeTypes={nodeTypes}
       onNodeClick={handleNodeClick}
+      onNodeMouseEnter={(_e, node) => onHover(node.id)}
+      onNodeMouseLeave={() => onHover(null)}
       onPaneClick={() => onSelect(null)}
       minZoom={0.05}
       maxZoom={2}
@@ -217,46 +497,67 @@ function FlowCanvas({
 const nodeTypes = { knowledge: KnowledgeFlowNode };
 
 function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
-  const { dto, drift, highlight, dimmed, selected } = data;
+  const { dto, drift, highlight, dimmed, selected, neighbor } = data;
+  const { t } = useI18n();
   const c = LAYER_COLORS[dto.layer];
+  const active = selected || neighbor;
   return (
     <div
-      className={`rounded-md border px-2.5 py-1.5 min-w-[120px] max-w-[180px] shadow-sm transition-all ${c.fill} ${
-        drift
-          ? 'ring-2 ring-red-500'
-          : selected
-            ? 'ring-2 ring-amber-500'
-            : highlight
-              ? 'ring-2 ring-amber-500/60'
-              : ''
-      } ${selected ? 'shadow-glow-amber' : ''} ${dimmed ? 'opacity-35' : ''}`}
-      style={{ borderLeft: `3px solid ${c.ring}` }}
+      className={`group rounded-lg border px-2.5 py-2 min-w-[128px] max-w-[190px] shadow-sm transition-all duration-150
+        bg-white dark:bg-obsidian-elevated
+        ${selected ? 'border-amber-400 dark:border-amber-600 shadow-glow-amber' : 'border-slate-200 dark:border-obsidian-border'}
+        ${neighbor ? 'border-amber-300/70 dark:border-amber-700/60' : ''}
+        ${drift ? 'ring-2 ring-red-500' : highlight ? 'ring-2 ring-amber-500/60' : ''}
+        ${dimmed ? 'opacity-30' : 'hover:-translate-y-0.5 hover:shadow-md'}
+        ${active && !dimmed ? 'shadow-md' : ''}`}
     >
-      <div className="flex items-center gap-1.5">
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={false}
+        className="!h-1.5 !w-1.5 !border-0 !bg-slate-400 dark:!bg-slate-500"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={false}
+        className="!h-1.5 !w-1.5 !border-0 !bg-slate-400 dark:!bg-slate-500"
+      />
+      <div className="flex items-center justify-between gap-1.5 mb-1">
         <span
-          className={`text-[9px] font-mono uppercase tracking-wide px-1 py-0.5 rounded ${c.badge}`}
+          className={`inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded ${c.badge}`}
         >
-          {KIND_LABEL[dto.kind]}
+          <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+          {t(KIND_LABEL_KEYS[dto.kind])}
         </span>
-        {drift && (
+        {drift ? (
+          <span className="w-2 h-2 rounded-full bg-red-500 ring-2 ring-red-300 dark:ring-red-900 shrink-0" />
+        ) : dto.status ? (
           <span
-            className="w-2 h-2 rounded-full bg-red-500 ring-2 ring-red-300 dark:ring-red-900"
-            title="Drift: dead anchor"
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              dto.status === 'passing' || dto.status === 'accepted' || dto.status === 'committed'
+                ? 'bg-emerald-500'
+                : dto.status === 'Accepted'
+                  ? 'bg-emerald-500'
+                  : 'bg-slate-400'
+            }`}
           />
-        )}
+        ) : null}
       </div>
-      <div className="text-[11px] leading-snug text-slate-800 dark:text-slate-200 mt-1 line-clamp-2 font-medium">
+      <div className="text-[11px] leading-snug text-slate-800 dark:text-slate-200 line-clamp-2 font-medium">
         {dto.title}
       </div>
-      <div className="text-[9px] font-mono text-slate-400 mt-0.5">{dto.id}</div>
+      <div className="text-[9px] font-mono text-slate-400 mt-1 truncate">{dto.id}</div>
     </div>
   );
 }
 
 export function KnowledgeMapPage() {
   const dto = knowledgeGraphFixture;
+  const { t } = useI18n();
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('cluster');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<Set<string>>(new Set());
   const [showInferred, setShowInferred] = useState(true);
@@ -264,9 +565,11 @@ export function KnowledgeMapPage() {
 
   const layout = useMemo(() => computeLayout(dto, layoutMode), [dto, layoutMode]);
 
+  const nodeById = useMemo(() => new Map(dto.nodes.map((n) => [n.id, n])), [dto.nodes]);
+
   const selected = useMemo(
-    () => (selectedId ? (dto.nodes.find((n) => n.id === selectedId) ?? null) : null),
-    [dto.nodes, selectedId],
+    () => (selectedId ? (nodeById.get(selectedId) ?? null) : null),
+    [nodeById, selectedId],
   );
 
   const searchHits = useMemo(() => {
@@ -278,7 +581,8 @@ export function KnowledgeMapPage() {
           (n) =>
             n.title.toLowerCase().includes(q) ||
             n.id.toLowerCase().includes(q) ||
-            (n.status ?? '').toLowerCase().includes(q),
+            (n.status ?? '').toLowerCase().includes(q) ||
+            (n.body ?? '').toLowerCase().includes(q),
         )
         .map((n) => n.id),
     );
@@ -306,7 +610,13 @@ export function KnowledgeMapPage() {
 
   const visibleCount = visibleIds === null ? dto.nodes.length : visibleIds.size;
 
-  const edgesOf = useCallback(
+  const kindLayer = useMemo(() => {
+    const map = new Map<string, GraphLayer>();
+    for (const n of dto.nodes) if (!map.has(n.kind)) map.set(n.kind, n.layer);
+    return map;
+  }, [dto.nodes]);
+
+  const relatedOf = useCallback(
     (id: string) => ({
       outgoing: dto.edges.filter((e) => e.src === id),
       incoming: dto.edges.filter((e) => e.dst === id),
@@ -314,66 +624,40 @@ export function KnowledgeMapPage() {
     [dto.edges],
   );
 
-  const recentChanges = useMemo(
-    () => [
-      {
-        id: 'r1',
-        source: 'git-commit',
-        title: 'feat(governance): add Principal registry and Decision artifacts (F050)',
-        time: '2026-08-27',
-      },
-      {
-        id: 'r2',
-        source: 'adr-date',
-        title: 'ADR-0024 Principal registry accepted',
-        time: '2026-08-27',
-      },
-      {
-        id: 'r3',
-        source: 'feature-list-change',
-        title: 'F058 eval suite → passing',
-        time: '2026-08-27',
-      },
-      {
-        id: 'r4',
-        source: 'git-commit',
-        title: 'docs(program): add F049-F057 specs and ADR-0021..0024',
-        time: '2026-08-27',
-      },
-    ],
-    [],
-  );
-
   return (
     <div className="page-container">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
           <h1 className="text-lg font-headline font-semibold text-slate-900 dark:text-white">
-            Knowledge &amp; Decision Map
+            {t('knowledge.title')}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {visibleCount}/{dto.nodes.length} nodes · {dto.edges.length} edges · {dto.drift.length}{' '}
-            drift findings · deterministic parse of committed artifacts
+            {t('knowledge.subtitle', {
+              visible: visibleCount,
+              total: dto.nodes.length,
+              edges: dto.edges.length,
+              drift: dto.drift.length,
+            })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-500 flex items-center gap-1.5">
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
               checked={showInferred}
               onChange={(e) => setShowInferred(e.target.checked)}
               className="accent-amber-500"
             />
-            inferred edges
+            {t('knowledge.showInferred')}
           </label>
-          <label className="text-xs text-slate-500 flex items-center gap-1.5">
+          <label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
               checked={showDriftOnly}
               onChange={(e) => setShowDriftOnly(e.target.checked)}
               className="accent-red-500"
             />
-            drift only
+            {t('knowledge.driftOnly')}
           </label>
         </div>
       </div>
@@ -385,7 +669,7 @@ export function KnowledgeMapPage() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search nodes by title, id, status..."
+              placeholder={t('knowledge.searchPlaceholder')}
               className="flex-1 min-w-[200px] px-3 py-1.5 rounded-md border border-slate-200 dark:border-obsidian-border bg-white dark:bg-obsidian-surface text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500"
             />
             <div className="flex rounded-md border border-slate-200 dark:border-obsidian-border overflow-hidden">
@@ -399,7 +683,7 @@ export function KnowledgeMapPage() {
                       : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-obsidian-surface'
                   }`}
                 >
-                  {m}
+                  {t(`knowledge.layout.${m}` as I18nKey)}
                 </button>
               ))}
             </div>
@@ -419,13 +703,18 @@ export function KnowledgeMapPage() {
                       return next;
                     })
                   }
-                  className={`px-2 py-0.5 rounded-full text-[11px] border transition-colors ${
+                  className={`px-2 py-0.5 rounded-full text-[11px] border transition-colors inline-flex items-center gap-1 ${
                     active
                       ? 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300'
                       : 'border-transparent text-slate-400 dark:text-slate-600 line-through'
                   }`}
                 >
-                  {KIND_LABEL[kind]} {count}
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      LAYER_COLORS[kindLayer.get(kind) ?? 'implementation'].dot
+                    }`}
+                  />
+                  {t(KIND_LABEL_KEYS[kind])} {count}
                 </button>
               );
             })}
@@ -437,7 +726,9 @@ export function KnowledgeMapPage() {
                 dto={dto}
                 layout={layout}
                 selectedId={selectedId}
+                hoverId={hoverId}
                 onSelect={setSelectedId}
+                onHover={setHoverId}
                 visibleIds={visibleIds}
                 searchHits={searchHits}
                 showInferred={showInferred}
@@ -445,34 +736,38 @@ export function KnowledgeMapPage() {
             </ReactFlowProvider>
             <div className="absolute bottom-3 left-3 bg-white/90 dark:bg-obsidian-surface/90 backdrop-blur rounded-md border border-slate-200 dark:border-obsidian-border px-3 py-2 text-[10px] text-slate-500 dark:text-slate-400 space-y-1 pointer-events-none">
               <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm border-l-[3px] border-amber-500" /> decision
-                layer (ADR / artifact)
+                <span className="w-2 h-2 rounded-full bg-amber-500" />{' '}
+                {t('knowledge.legend.decision')}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm border-l-[3px] border-blue-600" /> knowledge
-                layer (wiki / memory / architecture)
+                <span className="w-2 h-2 rounded-full bg-blue-500" />{' '}
+                {t('knowledge.legend.knowledge')}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm border-l-[3px] border-slate-500" />{' '}
-                implementation layer (features)
+                <span className="w-2 h-2 rounded-full bg-slate-500" />{' '}
+                {t('knowledge.legend.implementation')}
               </div>
-              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-200 dark:border-slate-700">
-                <span className="w-4 border-t-2 border-slate-500 inline-block" /> deterministic ·
+              <div className="flex items-center gap-2 pt-1 border-t border-slate-200 dark:border-slate-700">
+                <span className="w-4 border-t-2 border-slate-500 inline-block" />{' '}
+                {t('knowledge.legend.deterministic')}
                 <span className="w-4 border-t-2 border-dashed border-slate-400 inline-block" />{' '}
-                inferred
+                {t('knowledge.legend.inferred')}
               </div>
             </div>
           </div>
         </div>
 
-        <aside className="w-full lg:w-80 shrink-0 space-y-4">
+        <aside className="w-full lg:w-96 shrink-0 space-y-4">
           {selected ? (
-            <div className="card p-4">
-              <div className="flex items-center justify-between mb-2">
+            <div className="card p-4 max-h-[70vh] overflow-y-auto">
+              <div className="flex items-center justify-between gap-2 mb-2">
                 <span
-                  className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${LAYER_COLORS[selected.layer].badge}`}
+                  className={`inline-flex items-center gap-1 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded ${LAYER_COLORS[selected.layer].badge}`}
                 >
-                  {KIND_LABEL[selected.kind]}
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${LAYER_COLORS[selected.layer].dot}`}
+                  />
+                  {t(KIND_LABEL_KEYS[selected.kind])}
                 </span>
                 {selected.status && (
                   <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
@@ -484,16 +779,47 @@ export function KnowledgeMapPage() {
                 {selected.title}
               </h2>
               <div className="text-[11px] font-mono text-slate-400 mt-1">{selected.id}</div>
-              <dl className="mt-3 space-y-1.5 text-[11px]">
+
+              {selected.body && (
+                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
+                    {t('knowledge.context')}
+                  </div>
+                  <div className="text-xs">
+                    <MarkdownMessage text={selected.body} codeCollapseAfterLines={8} />
+                  </div>
+                </div>
+              )}
+
+              <MiniContextGraph
+                dto={dto}
+                centerId={selected.id}
+                nodeById={nodeById}
+                onSelect={setSelectedId}
+              />
+
+              <dl className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-1.5 text-[11px]">
                 <div className="flex gap-2">
-                  <dt className="text-slate-400 w-16 shrink-0">source</dt>
-                  <dd className="font-mono text-slate-600 dark:text-slate-300 break-all">
+                  <dt className="text-slate-400 w-16 shrink-0">{t('knowledge.source')}</dt>
+                  <dd className="font-mono text-slate-600 dark:text-slate-300 break-all flex-1">
                     {selected.sourcePath}
+                  </dd>
+                  <dd className="shrink-0">
+                    {KIND_LOCAL_TARGET[selected.kind] && (
+                      <LocalJumpLink
+                        linkTo={KIND_LOCAL_TARGET[selected.kind]}
+                        linkId={selected.kind === 'feature' ? selected.id.split(':')[1] : undefined}
+                        label={selected.sourcePath}
+                      >
+                        <span aria-hidden>→</span>
+                        {t(`knowledge.link.${KIND_LOCAL_TARGET[selected.kind]}` as I18nKey)}
+                      </LocalJumpLink>
+                    )}
                   </dd>
                 </div>
                 {selected.updated && (
                   <div className="flex gap-2">
-                    <dt className="text-slate-400 w-16 shrink-0">updated</dt>
+                    <dt className="text-slate-400 w-16 shrink-0">{t('knowledge.updated')}</dt>
                     <dd className="font-mono text-slate-600 dark:text-slate-300">
                       {selected.updated}
                     </dd>
@@ -501,17 +827,18 @@ export function KnowledgeMapPage() {
                 )}
                 {selected.revisions != null && (
                   <div className="flex gap-2">
-                    <dt className="text-slate-400 w-16 shrink-0">revisions</dt>
+                    <dt className="text-slate-400 w-16 shrink-0">{t('knowledge.revisions')}</dt>
                     <dd className="font-mono text-slate-600 dark:text-slate-300">
-                      {selected.revisions} committed
+                      {selected.revisions} {t('knowledge.committed')}
                     </dd>
                   </div>
                 )}
               </dl>
+
               {selected.paths && (
                 <div className="mt-3">
                   <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">
-                    anchors
+                    {t('knowledge.anchors')}
                   </div>
                   <ul className="space-y-1">
                     {selected.paths.map((p) => {
@@ -526,53 +853,83 @@ export function KnowledgeMapPage() {
                           }`}
                         >
                           {p}
+                          {dead && (
+                            <span className="ml-1.5 text-[9px] uppercase not-italic">
+                              {t('knowledge.deadAnchor')}
+                            </span>
+                          )}
                         </li>
                       );
                     })}
                   </ul>
                 </div>
               )}
+
               {(() => {
-                const { outgoing, incoming } = edgesOf(selected.id);
+                const { outgoing, incoming } = relatedOf(selected.id);
                 if (!outgoing.length && !incoming.length) return null;
                 return (
                   <div className="mt-3">
-                    <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">
-                      edges
+                    <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
+                      {t('knowledge.edges')}
                     </div>
                     <ul className="space-y-1 text-[11px]">
-                      {outgoing.map((e, i) => (
-                        <li key={`o${i}`} className="text-slate-600 dark:text-slate-300">
-                          <span className="font-mono text-amber-600 dark:text-amber-300">
-                            {e.verb}
-                          </span>{' '}
-                          → <span className="font-mono">{e.dst}</span>
-                          {e.origin === 'inferred' && (
-                            <span
-                              className="ml-1 text-[9px] text-slate-400 italic"
-                              title={`inferred · ${e.provenance?.model} · prompt ${e.provenance?.promptHash} · ${e.provenance?.timestamp}`}
+                      {outgoing.map((e, i) => {
+                        const other = nodeById.get(e.dst);
+                        return (
+                          <li key={`o${i}`}>
+                            <button
+                              onClick={() => setSelectedId(e.dst)}
+                              className="w-full text-left rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5 hover:border-amber-300 dark:hover:border-amber-700/60 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 transition-colors"
                             >
-                              inferred ({e.provenance?.model})
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                      {incoming.map((e, i) => (
-                        <li key={`i${i}`} className="text-slate-600 dark:text-slate-300">
-                          <span className="font-mono">{e.src}</span> →{' '}
-                          <span className="font-mono text-amber-600 dark:text-amber-300">
-                            {e.verb}
-                          </span>
-                          {e.origin === 'inferred' && (
-                            <span
-                              className="ml-1 text-[9px] text-slate-400 italic"
-                              title={`inferred · ${e.provenance?.model} · prompt ${e.provenance?.promptHash} · ${e.provenance?.timestamp}`}
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[9px] uppercase text-amber-600 dark:text-amber-300 shrink-0">
+                                  {e.verb} →
+                                </span>
+                                <span className="text-slate-700 dark:text-slate-200 truncate">
+                                  {other?.title ?? e.dst}
+                                </span>
+                              </div>
+                              {e.origin === 'inferred' && (
+                                <span
+                                  className="ml-0.5 text-[9px] text-slate-400 italic"
+                                  title={`inferred · ${e.provenance?.model} · prompt ${e.provenance?.promptHash} · ${e.provenance?.timestamp}`}
+                                >
+                                  {t('knowledge.inferredLabel')} ({e.provenance?.model})
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })}
+                      {incoming.map((e, i) => {
+                        const other = nodeById.get(e.src);
+                        return (
+                          <li key={`i${i}`}>
+                            <button
+                              onClick={() => setSelectedId(e.src)}
+                              className="w-full text-left rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5 hover:border-amber-300 dark:hover:border-amber-700/60 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 transition-colors"
                             >
-                              inferred ({e.provenance?.model})
-                            </span>
-                          )}
-                        </li>
-                      ))}
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-slate-700 dark:text-slate-200 truncate">
+                                  {other?.title ?? e.src}
+                                </span>
+                                <span className="font-mono text-[9px] uppercase text-amber-600 dark:text-amber-300 shrink-0">
+                                  → {e.verb}
+                                </span>
+                              </div>
+                              {e.origin === 'inferred' && (
+                                <span
+                                  className="ml-0.5 text-[9px] text-slate-400 italic"
+                                  title={`inferred · ${e.provenance?.model} · prompt ${e.provenance?.promptHash} · ${e.provenance?.timestamp}`}
+                                >
+                                  {t('knowledge.inferredLabel')} ({e.provenance?.model})
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 );
@@ -581,25 +938,38 @@ export function KnowledgeMapPage() {
           ) : (
             <div className="card p-4">
               <div className="text-xs text-slate-500 dark:text-slate-400">
-                Select a node to inspect its committed source, anchors, and edges.
+                {t('knowledge.selectPrompt')}
               </div>
             </div>
           )}
 
           <div className="card p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
-              Recent
+              {t('knowledge.recent')}
             </h3>
-            <ul className="space-y-1.5">
-              {recentChanges.map((r) => (
+            <ul className="space-y-2">
+              {dto.recentChanges.map((r) => (
                 <li
                   key={r.id}
-                  className="text-[11px] text-slate-600 dark:text-slate-300 flex gap-2"
+                  className="text-[11px] text-slate-600 dark:text-slate-300 rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5"
                 >
-                  <span className="font-mono text-slate-400 shrink-0">{r.time}</span>
-                  <span className="truncate" title={r.title}>
-                    {r.title}
-                  </span>
+                  <div className="flex gap-2 items-baseline">
+                    <span className="font-mono text-slate-400 shrink-0">{r.time}</span>
+                    <span className="truncate" title={r.title}>
+                      {r.title}
+                    </span>
+                  </div>
+                  {r.linkTo && (
+                    <div className="mt-1">
+                      <LocalJumpLink linkTo={r.linkTo} linkId={r.linkId} label={r.linkLabel}>
+                        <span aria-hidden>→</span>
+                        {t(`knowledge.link.${r.linkTo}` as I18nKey)}
+                        {r.linkLabel ? (
+                          <span className="font-mono opacity-70">· {r.linkLabel}</span>
+                        ) : null}
+                      </LocalJumpLink>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -607,14 +977,14 @@ export function KnowledgeMapPage() {
 
           <div className="card p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
-              Drift
+              {t('knowledge.drift')}
             </h3>
             {dto.drift.length === 0 ? (
-              <div className="text-[11px] text-slate-500">No drift findings.</div>
+              <div className="text-[11px] text-slate-500">{t('knowledge.noDrift')}</div>
             ) : (
               <ul className="space-y-2">
                 {dto.drift.map((d) => {
-                  const node = dto.nodes.find((n) => n.id === d.nodeId);
+                  const node = nodeById.get(d.nodeId);
                   return (
                     <li key={`${d.nodeId}:${d.path}`} className="text-[11px]">
                       <button
