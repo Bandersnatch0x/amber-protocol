@@ -817,6 +817,27 @@ const CATALOG = {
 		layer: "Verification",
 		related: ["AMBER_E_EVAL_BREADCRUMB_BINDING"],
 	},
+	// F058 fix round (grill G-1/G-4, review S-2): registry-load failures and
+	// empty scans are Evidence delivered through the suite result envelope,
+	// never a bare crash or a vacuous pass.
+	AMBER_E_EVAL_REGISTRY_UNREADABLE: {
+		title: "Eval finding: Action/Function registry could not be loaded",
+		cause:
+			"The action-types or action-functions registry directory is missing, unreadable, or contains an entry that fails its schema, so the instruction-surface Eval cannot inspect the tool contracts.",
+		remedy:
+			"Repair the registry entry to valid JSON that satisfies schemas/action.type.schema.json (or restore the registry directory), then re-run the eval.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_EMPTY_SCAN", "AMBER_E_EVAL_MCP_DESCRIPTION_DRIFT"],
+	},
+	AMBER_E_EVAL_EMPTY_SCAN: {
+		title: "Eval finding: an Eval scanned zero candidate surfaces",
+		cause:
+			"An instruction-surface Eval examined none of its candidate surfaces — an empty tool registry (zero Action Types and Functions) or an empty model-independence scan file set — so a pass would be vacuous.",
+		remedy:
+			"Restore the scanned population (register Action Types/Functions, or provide the Eval scan file set); a clean pass must be earned over a non-empty surface.",
+		layer: "Verification",
+		related: ["AMBER_E_EVAL_REGISTRY_UNREADABLE"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing

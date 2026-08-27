@@ -47,27 +47,94 @@ function finding(code, detail, subject) {
 	return { code, detail, subject };
 }
 
-function evalResult(evalId, findings) {
+function evalResult(evalId, scanned, findings) {
 	return {
 		evalId,
 		version: 1,
 		status: findings.length === 0 ? "pass" : "fail",
 		assurance: ASSURANCE,
+		// D-2 (grill G-1): the population census the pass was earned over, so
+		// "pass" can never be mistaken for "scanned nothing, found nothing".
+		scanned,
 		findings,
 	};
 }
 
-const MODEL_NETWORK_RE =
-	/\b(openai|openrouter|anthropic|@ai-sdk|axios|node-fetch|https?\.(request|get)|fetch\s*\()\b/i;
+// D-3 (grill G-2): model/network client tripwire. Every client name is
+// assembled from two fragments on purpose — this suite module is part of its
+// own scan set (see defaultModelScanFiles), and a whole name written here
+// would make the suite flag itself. Add new clients the same way: split.
+function clientName(head, tail) {
+	return head + tail;
+}
+
+// Unambiguous provider/library tokens are matched anywhere as bare words.
+const MODEL_LIBRARY_TOKENS = [
+	clientName("open", "ai"),
+	clientName("open", "router"),
+	clientName("anth", "ropic"),
+	clientName("ax", "ios"),
+	clientName("node", "-fetch"),
+	clientName("und", "ici"),
+];
+// Scoped package tokens start with a non-word character, so a leading \b
+// would never match after a quote; they are matched without boundaries.
+const MODEL_SCOPED_TOKENS = [clientName("@ai-", "sdk")];
+// Generic-named HTTP clients collide with ordinary identifiers and prose, so
+// only their module-specifier and call forms count as dependencies.
+const MODEL_CALL_CLIENTS = [
+	clientName("fe", "tch"),
+	clientName("g", "ot"),
+	clientName("k", "y"),
+	clientName("re", "quest"),
+];
+
+const MODEL_NETWORK_RE = new RegExp(
+	[
+		"\\b(?:" + MODEL_LIBRARY_TOKENS.join("|") + ")\\b",
+		MODEL_SCOPED_TOKENS.join("|"),
+		`["'](?:${MODEL_CALL_CLIENTS.join("|")})["']`,
+		"\\b(?:" + MODEL_CALL_CLIENTS.join("|") + ")\\s*\\(",
+		"\\bhttps?\\s*\\.\\s*(?:" +
+			clientName("re", "quest") +
+			"|" +
+			clientName("ge", "t") +
+			")\\s*\\(",
+	].join("|"),
+	"i",
+);
 
 const MCP_SOURCE_MARKERS = ["mcp-tool-surface", "mcpActionTool", "mcpFunctionTool"];
 
-function loadRegistries(opts = {}) {
-	const actionTypesDir = opts.actionTypesDir || path.join(ROOT, "action-types");
-	const actionFunctionsDir = opts.actionFunctionsDir || path.join(ROOT, "action-functions");
-	const actions = loadActionTypes({ directory: actionTypesDir, schemaName: "action.type" });
-	const functions = loadFunctions({ directory: actionFunctionsDir });
-	return { actions, functions };
+function defaultModelScanFiles() {
+	return [
+		path.join(ROOT, "scripts", "lib", "mcp-tool-description.js"),
+		path.join(ROOT, "scripts", "lib", "mcp-tool-surface.js"),
+		path.join(ROOT, "scripts", "lib", "eval-commands.js"),
+		// D-3 (grill G-2): the suite module scans itself — the module that
+		// could call a model is part of its own scan set. The split client
+		// names above are what keep this file out of its own findings.
+		path.join(ROOT, "scripts", "lib", "core", "instruction-surface-evals.js"),
+	];
+}
+
+// D-4 (review S-2 / grill G-4): the fail-closed registry loader throws on a
+// missing directory, invalid JSON, or a schema violation. Inside the Eval
+// that throw is Evidence, not a crash: it degrades to a typed finding so the
+// suite result still reaches its JSON envelope and the remaining evals run.
+function loadRegistrySafely(loader, args, subject, findings) {
+	try {
+		return { value: loader(args), failed: false };
+	} catch (error) {
+		findings.push(
+			finding(
+				"AMBER_E_EVAL_REGISTRY_UNREADABLE",
+				`registry could not be loaded: ${error.message}`,
+				subject,
+			),
+		);
+		return { value: [], failed: true };
+	}
 }
 
 function inspectAdvertisedTool(findings, tool) {
@@ -162,7 +229,23 @@ function evalModelIndependence(files, findings) {
 
 function evalMcpToolDescriptions(opts = {}) {
 	const findings = [];
-	const { actions, functions } = loadRegistries(opts);
+	const actionRegistry = loadRegistrySafely(
+		loadActionTypes,
+		{
+			directory: opts.actionTypesDir || path.join(ROOT, "action-types"),
+			schemaName: "action.type",
+		},
+		"action-types",
+		findings,
+	);
+	const functionRegistry = loadRegistrySafely(
+		loadFunctions,
+		{ directory: opts.actionFunctionsDir || path.join(ROOT, "action-functions") },
+		"action-functions",
+		findings,
+	);
+	const actions = actionRegistry.value;
+	const functions = functionRegistry.value;
 	const advertised = opts.advertisedDescriptions || advertisedToolDescriptions(actions, functions);
 	for (const action of actions) {
 		inspectAdvertisedTool(findings, {
@@ -183,15 +266,43 @@ function evalMcpToolDescriptions(opts = {}) {
 		});
 	}
 	evalMcpSourceCoupling(opts.mcpSourcePath || path.join(ROOT, "scripts", "amber-mcp.js"), findings);
-	evalModelIndependence(
-		opts.modelScanFiles || [
-			path.join(ROOT, "scripts", "lib", "mcp-tool-description.js"),
-			path.join(ROOT, "scripts", "lib", "mcp-tool-surface.js"),
-			path.join(ROOT, "scripts", "lib", "eval-commands.js"),
-		],
+	const modelScanFiles = opts.modelScanFiles || defaultModelScanFiles();
+	evalModelIndependence(modelScanFiles, findings);
+	// D-2 (grill G-1): a pass must be earned over a non-empty population.
+	// Zero scanned surfaces is a finding, never a vacuous pass. The registry
+	// emptiness check is skipped when loading already failed — the unreadable
+	// registry finding names the actual root cause.
+	if (
+		!actionRegistry.failed &&
+		!functionRegistry.failed &&
+		actions.length + functions.length === 0
+	) {
+		findings.push(
+			finding(
+				"AMBER_E_EVAL_EMPTY_SCAN",
+				"tool registry scan covered zero Action Types and Functions",
+				"action-types",
+			),
+		);
+	}
+	if (modelScanFiles.length === 0) {
+		findings.push(
+			finding(
+				"AMBER_E_EVAL_EMPTY_SCAN",
+				"model-independence scan covered zero source files",
+				"modelScanFiles",
+			),
+		);
+	}
+	return evalResult(
+		EVAL_IDS.mcp,
+		{
+			actionTypes: actions.length,
+			functions: functions.length,
+			modelScanFiles: modelScanFiles.length,
+		},
 		findings,
 	);
-	return evalResult(EVAL_IDS.mcp, findings);
 }
 
 function contextRequestSchemaPath(opts = {}) {
@@ -300,6 +411,7 @@ function evalContextQuoteBoundary(targetRoot, opts = {}) {
 			);
 		}
 	}
+	let loadoutsScanned = 0;
 	if (targetRoot) {
 		let dir;
 		try {
@@ -315,7 +427,13 @@ function evalContextQuoteBoundary(targetRoot, opts = {}) {
 			dir = null;
 		}
 		if (dir && fs.existsSync(dir)) {
-			for (const name of fs.readdirSync(dir).filter((file) => file.endsWith(".json"))) {
+			// D-6 (grill G-5): sorted so finding order is stable across
+			// platforms and filesystem readdir orders.
+			for (const name of fs
+				.readdirSync(dir)
+				.filter((file) => file.endsWith(".json"))
+				.sort()) {
+				loadoutsScanned += 1;
 				let loadout;
 				try {
 					loadout = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
@@ -345,6 +463,7 @@ function evalContextQuoteBoundary(targetRoot, opts = {}) {
 			}
 		}
 	}
+	let requestsScanned = 0;
 	if (targetRoot) {
 		let requestDir;
 		try {
@@ -360,7 +479,13 @@ function evalContextQuoteBoundary(targetRoot, opts = {}) {
 			requestDir = null;
 		}
 		if (requestDir && fs.existsSync(requestDir)) {
-			for (const name of fs.readdirSync(requestDir).filter((file) => file.endsWith(".json"))) {
+			// D-6 (grill G-5): sorted so finding order is stable across
+			// platforms and filesystem readdir orders.
+			for (const name of fs
+				.readdirSync(requestDir)
+				.filter((file) => file.endsWith(".json"))
+				.sort()) {
+				requestsScanned += 1;
 				let request;
 				try {
 					request = JSON.parse(fs.readFileSync(path.join(requestDir, name), "utf8"));
@@ -404,7 +529,14 @@ function evalContextQuoteBoundary(targetRoot, opts = {}) {
 			}
 		}
 	}
-	return evalResult(EVAL_IDS.context, findings);
+	// Target-local stores legitimately scan as zero on a fresh target (they
+	// are optional populations); the schema, contract constants, and Required
+	// Artifact specs above are always scanned, so this Eval is never vacuous.
+	return evalResult(
+		EVAL_IDS.context,
+		{ loadouts: loadoutsScanned, requests: requestsScanned },
+		findings,
+	);
 }
 
 function evalBreadcrumbAuthenticity(targetRoot) {
@@ -417,7 +549,7 @@ function evalBreadcrumbAuthenticity(targetRoot) {
 				"target",
 			),
 		);
-		return evalResult(EVAL_IDS.breadcrumb, findings);
+		return evalResult(EVAL_IDS.breadcrumb, { pages: 0 }, findings);
 	}
 	const printed = printBreadcrumb(targetRoot, { format: "text", force: true });
 	if (printed.errors && printed.errors.length > 0) {
@@ -455,9 +587,13 @@ function evalBreadcrumbAuthenticity(targetRoot) {
 				"pages",
 			),
 		);
-		return evalResult(EVAL_IDS.breadcrumb, findings);
+		return evalResult(EVAL_IDS.breadcrumb, { pages: 0 }, findings);
 	}
+	// The printed breadcrumb is always verified above, so a page-less target
+	// still scans one surface; zero pages alone is a legitimate clean state.
+	let pagesScanned = 0;
 	for (const entry of pages) {
+		pagesScanned += 1;
 		let page;
 		try {
 			page = readPage(targetRoot, entry.pageId);
@@ -485,7 +621,7 @@ function evalBreadcrumbAuthenticity(targetRoot) {
 			}
 		}
 	}
-	return evalResult(EVAL_IDS.breadcrumb, findings);
+	return evalResult(EVAL_IDS.breadcrumb, { pages: pagesScanned }, findings);
 }
 
 function runInstructionSurfaceEvals(targetRoot, opts = {}) {

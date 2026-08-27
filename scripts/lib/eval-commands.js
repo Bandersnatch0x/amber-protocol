@@ -17,7 +17,13 @@ function formatSuite(suite) {
 	for (const item of suite.evals) {
 		const count = item.findings.length;
 		const suffix = item.status === "fail" ? `  ${count} finding${count === 1 ? "" : "s"}` : "";
-		lines.push(`  ${item.evalId}  ${item.status}${suffix}`);
+		// D-2 (grill G-1): every pass states the population it was earned over.
+		const scannedSummary = Object.entries(item.scanned || {})
+			.map(([scope, total]) => `${total} ${scope}`)
+			.join(", ");
+		lines.push(
+			`  ${item.evalId}  ${item.status}${suffix}${scannedSummary ? `  scanned ${scannedSummary}` : ""}`,
+		);
 		for (const finding of item.findings) {
 			lines.push(`    ${finding.code}  ${finding.subject}: ${finding.detail}`);
 		}

@@ -32,6 +32,24 @@ test("amber eval run reports a replayable instruction-surface suite without writ
 	assert.equal(suite.overall, "pass");
 	assert.equal(suite.evalCount, 3);
 	assert.equal(suite.modelIndependent, true);
+	// D-2 (grill G-1): the envelope carries each Eval's population census —
+	// a pass states what it scanned, never a vacuous zero.
+	const mcp = suite.evals.find(
+		(item) => item.evalId === "eval.instruction-surface.mcp-tool-description",
+	);
+	assert.ok(mcp.scanned.actionTypes > 0);
+	assert.ok(mcp.scanned.functions > 0);
+	assert.equal(mcp.scanned.modelScanFiles, 4);
+	assert.deepEqual(
+		suite.evals.find((item) => item.evalId === "eval.instruction-surface.context-quote-boundary")
+			.scanned,
+		{ loadouts: 0, requests: 0 },
+	);
+	assert.deepEqual(
+		suite.evals.find((item) => item.evalId === "eval.instruction-surface.breadcrumb-authenticity")
+			.scanned,
+		{ pages: 0 },
+	);
 	const after = fs.existsSync(path.join(dir, ".amber"))
 		? fs.readdirSync(path.join(dir, ".amber"))
 		: [];
@@ -123,11 +141,13 @@ test("amber eval run fails when a Distillation Contract omits the quote boundary
 	assert.equal(r.status, 1, r.stdout);
 	const suite = payload(r);
 	assert.equal(suite.overall, "fail");
+	const context = suite.evals.find(
+		(item) => item.evalId === "eval.instruction-surface.context-quote-boundary",
+	);
+	assert.equal(context.scanned.requests, 1);
 	assert.ok(
-		suite.evals.some((item) =>
-			item.findings.some(
-				(finding) => finding.code === "AMBER_E_EVAL_CONTEXT_QUOTE_BOUNDARY_MISSING",
-			),
+		context.findings.some(
+			(finding) => finding.code === "AMBER_E_EVAL_CONTEXT_QUOTE_BOUNDARY_MISSING",
 		),
 	);
 	fs.rmSync(dir, { recursive: true, force: true });

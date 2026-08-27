@@ -1265,6 +1265,38 @@ node scripts/amber.js eval show --id eval.instruction-surface.mcp-tool-descripti
 Exit 0 when every Eval in the suite passes; exit 1 when any Eval has findings. Spec:
 [docs/specs/F058-instruction-surface-adversarial-evals.md](specs/F058-instruction-surface-adversarial-evals.md).
 
+### Eval result contract
+
+Each Eval result carries `{evalId, version, status, assurance, scanned, findings}`. The `scanned`
+field is the population census the result was earned over: `actionTypes`, `functions`, and
+`modelScanFiles` for the MCP Eval; `loadouts` and `requests` for the Context Eval; `pages` for the
+Breadcrumb Eval. Target-local stores legitimately scan as zero on a fresh target; a pass is never
+vacuous:
+
+- An empty tool registry (zero Action Types and Functions scanned) fails the suite with
+  `AMBER_E_EVAL_EMPTY_SCAN` instead of passing with zero findings; the same code fires when the
+  model-independence scan covers zero files.
+- A registry that cannot be loaded (missing directory, invalid JSON, schema violation) fails the
+  affected Eval with `AMBER_E_EVAL_REGISTRY_UNREADABLE`, delivered through the normal JSON result
+  envelope — the remaining Evals still run, `overall` reflects the failure, and the CLI never dies
+  with a bare stack trace on a broken registry.
+
+The model-independence scan covers the four fixed Eval sources: `scripts/lib/mcp-tool-description.js`,
+`scripts/lib/mcp-tool-surface.js`, `scripts/lib/eval-commands.js`, and the suite module itself
+(`scripts/lib/core/instruction-surface-evals.js`, whose client-name pattern is assembled from
+fragments so it cannot self-flag). It detects model providers and HTTP clients by bare name
+(OpenAI, OpenRouter, Anthropic, @ai-sdk, axios, node-fetch, undici), by module specifier
+(`require("got")` / `require("ky")` / `require("request")`), by call form (`fetch("https://…")`,
+`got(…)`, `ky(…)`, `request(…)`), and by Node core member calls (`https.get(…)`,
+`http.request(…)`). Ordinary identifiers and prose (`const request = …`, `handleRequest(…)`) do
+not match. The scan is a lexical tripwire over that fixed file set, not a proof of independence;
+`modelIndependent: true` means "no known model/network client reference in the scanned sources".
+
+All Eval finding codes (the `AMBER_E_EVAL_*` family) are registered in the consolidated error
+catalog (`scripts/lib/core/error-catalog.js`) and are explainable with
+`amber explain <code>`. Findings are Evidence, not CLI errors: a failing suite still prints its
+JSON envelope on stdout with exit 1.
+
 ## Drift Commands
 
 `amber drift` is a CI-native drift gate. It aggregates the artifact, wiki, and scaffold drift
