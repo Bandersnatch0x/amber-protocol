@@ -50,6 +50,8 @@ const path = require("node:path");
 
 const { compileSchema, formatErrors } = require("./schema-contract");
 const { typedError } = require("./error-catalog");
+const { resolvePathWithin } = require("./fs-utils");
+const { stripRange } = require("./context-sources");
 
 const SCHEMA_VERSION = "1";
 const PROVENANCE = "deterministic";
@@ -64,8 +66,9 @@ const ERROR_CODES = Object.freeze({
 function readTextIfPresent(file) {
 	try {
 		return fs.readFileSync(file, "utf8");
-	} catch {
-		return null;
+	} catch (err) {
+		if (err.code === "ENOENT") return null;
+		throw typedError(ERROR_CODES.source, `could not read ${file}: ${err.message}`);
 	}
 }
 
@@ -211,7 +214,12 @@ function parseFeatures(targetRoot) {
 	} catch (e) {
 		throw typedError(ERROR_CODES.source, `feature_list.json is not valid JSON: ${e.message}`);
 	}
-	if (!data || !Array.isArray(data.features)) return [];
+	if (!data || !Array.isArray(data.features)) {
+		throw typedError(
+			ERROR_CODES.source,
+			`feature_list.json has unexpected shape (expected { features: Array })`,
+		);
+	}
 	return data.features
 		.filter((feature) => feature && typeof feature.id === "string")
 		.map((feature) => ({
@@ -272,18 +280,38 @@ function contextPagesBySource(targetRoot) {
 	const { statePath } = require("../state-dir-resolver");
 	const pagesDir = statePath(targetRoot, "context", "pages");
 	if (!fs.existsSync(pagesDir)) return new Map();
+	// Matches .amber/artifacts/<dir>/<slug>/rev-N.md so we can map to the identity dir.
+	const ARTIFACT_REV_RE = /^(\.amber\/artifacts\/[^/]+\/[^/]+)\/rev-\d+\.md$/;
 	const bySource = new Map();
 	for (const name of fs.readdirSync(pagesDir).sort()) {
 		if (!name.endsWith(".json")) continue;
+		const filePath = path.join(pagesDir, name);
+		let text;
+		try {
+			text = fs.readFileSync(filePath, "utf8");
+		} catch (err) {
+			if (err.code === "ENOENT") continue;
+			throw typedError(ERROR_CODES.source, `could not read context page ${name}: ${err.message}`);
+		}
 		let page;
 		try {
-			page = JSON.parse(fs.readFileSync(path.join(pagesDir, name), "utf8"));
-		} catch {
-			continue;
+			page = JSON.parse(text);
+		} catch (e) {
+			throw typedError(ERROR_CODES.source, `context page ${name} is not valid JSON: ${e.message}`);
 		}
-		if (!page || typeof page !== "object" || !page.pageId || !page.sources) continue;
+		if (!page || typeof page !== "object" || !page.pageId || !page.sources) {
+			throw typedError(
+				ERROR_CODES.source,
+				`context page ${name} has unexpected shape (missing pageId or sources)`,
+			);
+		}
 		for (const source of Object.values(page.sources)) {
-			const ref = source && typeof source.ref === "string" ? toPosix(source.ref) : null;
+			if (!source || typeof source.ref !== "string") continue;
+			// Strip #Lx-Ly fragment so the ref matches a node's sourcePath.
+			let ref = toPosix(stripRange(source.ref));
+			// Map artifact body file refs to their identity directory.
+			const artifactMatch = ARTIFACT_REV_RE.exec(ref);
+			if (artifactMatch) ref = artifactMatch[1];
 			if (ref && !bySource.has(ref)) bySource.set(ref, page.pageId);
 		}
 	}
@@ -451,7 +479,12 @@ function extOf(name) {
  */
 function detectActualPath(targetRoot, declared) {
 	const trimmed = declared.replace(/\/+$/, "");
-	const parentAbs = path.join(targetRoot, path.dirname(trimmed));
+	let parentAbs;
+	try {
+		parentAbs = resolvePathWithin(targetRoot, path.dirname(trimmed) || ".");
+	} catch {
+		return null; // escaping anchor: dead anchor, no probe outside
+	}
 	if (!fs.existsSync(parentAbs)) return null;
 	const base = path.basename(trimmed);
 	const siblings = fs.readdirSync(parentAbs).sort();
@@ -481,22 +514,97 @@ function detectActualPath(targetRoot, declared) {
 	return best ? { actualPath: relOf(best.name), reason: "renamed" } : null;
 }
 
-// A glob anchor (git-pathspec style, as artifact-drift consumes them) is
-// alive when at least one sibling matches its basename pattern. Only `*` is
-// interpreted; a glob in the directory part is not checkable here and is
-// treated as alive.
+/** Convert a glob segment (*, ?, [...]) to a RegExp anchored to full basename. */
+function globSegmentToRegex(segment) {
+	let result = "^";
+	for (let i = 0; i < segment.length; i++) {
+		const ch = segment[i];
+		if (ch === "*") {
+			result += ".*";
+		} else if (ch === "?") {
+			result += ".";
+		} else if (ch === "[") {
+			const close = segment.indexOf("]", i + 1);
+			if (close === -1) {
+				result += "\\[";
+			} else {
+				result += segment.slice(i, close + 1);
+				i = close;
+			}
+		} else {
+			result += ch.replace(/[.+^${}()|\\]/g, "\\$&");
+		}
+	}
+	result += "$";
+	return new RegExp(result);
+}
+
+// A glob anchor (git-pathspec style) is alive when at least one path in the
+// target tree matches the full declared pattern. Supports *, ?, and [...] in
+// any segment. Every resolved path is confined to the target root; an escaping
+// declaration returns false (dead anchor) without any probe outside.
 function globAnchorIsAlive(targetRoot, declared) {
-	const dir = path.dirname(declared);
-	if (/[*?[]/.test(dir)) return true;
-	const dirAbs = path.join(targetRoot, dir);
-	if (!fs.existsSync(dirAbs)) return false;
-	const pattern = new RegExp(
-		`^${path
-			.basename(declared)
-			.replace(/[.+^${}()|[\]\\?]/g, "\\$&")
-			.replace(/\*/g, ".*")}$`,
-	);
-	return fs.readdirSync(dirAbs).some((name) => pattern.test(name));
+	const root = path.resolve(targetRoot);
+	const isWithin = (absPath) => {
+		const rel = path.relative(root, path.resolve(absPath));
+		return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+	};
+
+	const segments = declared.split("/").filter(Boolean);
+	let candidates = [root];
+
+	for (let si = 0; si < segments.length; si++) {
+		const seg = segments[si];
+		const isLast = si === segments.length - 1;
+		const hasWild = /[*?[]/.test(seg);
+		const next = [];
+
+		for (const cur of candidates) {
+			if (!isWithin(cur) && cur !== root) continue;
+			if (!fs.existsSync(cur)) continue;
+
+			if (hasWild) {
+				const re = globSegmentToRegex(seg);
+				let entries;
+				try {
+					entries = fs.readdirSync(cur);
+				} catch {
+					continue;
+				}
+				for (const entry of entries) {
+					if (!re.test(entry)) continue;
+					const full = path.join(cur, entry);
+					if (!isWithin(full)) continue;
+					if (isLast) {
+						next.push(full);
+					} else {
+						try {
+							if (fs.statSync(full).isDirectory()) next.push(full);
+						} catch {
+							/* skip unreadable entries */
+						}
+					}
+				}
+			} else {
+				const full = path.join(cur, seg);
+				if (!isWithin(full) || !fs.existsSync(full)) continue;
+				if (isLast) {
+					next.push(full);
+				} else {
+					try {
+						if (fs.statSync(full).isDirectory()) next.push(full);
+					} catch {
+						/* skip */
+					}
+				}
+			}
+		}
+
+		candidates = next;
+		if (candidates.length === 0) return false;
+	}
+
+	return candidates.length > 0;
 }
 
 function buildDrift(targetRoot, features) {
@@ -505,8 +613,15 @@ function buildDrift(targetRoot, features) {
 		for (const declared of feature.paths) {
 			if (/[*?[]/.test(declared)) {
 				if (globAnchorIsAlive(targetRoot, declared)) continue;
-			} else if (fs.existsSync(path.join(targetRoot, declared))) {
-				continue;
+			} else {
+				let alive = false;
+				try {
+					const abs = resolvePathWithin(targetRoot, declared.replace(/\/+$/, "") || ".");
+					alive = fs.existsSync(abs);
+				} catch {
+					// Escaping anchor: dead anchor without probing outside
+				}
+				if (alive) continue;
 			}
 			const detected = detectActualPath(targetRoot, declared);
 			const finding = { nodeId: feature.id, kind: "dead-anchor", path: declared };

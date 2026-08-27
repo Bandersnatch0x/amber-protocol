@@ -314,3 +314,180 @@ test("rename detection requires prefix-related stems in the same directory", () 
 	assert.ok(unmatched);
 	assert.equal(unmatched.actualPath, undefined);
 });
+
+// ── F-2: context-page source ref normalization ────────────────────────
+
+test("F-2: context page with #L range fragment merges into its source node", () => {
+	const dir = mkTarget("kg-cp-range", { subdirs: ["docs/adr"] });
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0001-test-decision.md"),
+		"# ADR-0001: Test decision\n\n**Status:** Accepted\n**Date:** 2026-01-01\n",
+	);
+	addPage(dir, "test-fragmented-page", {
+		title: "Fragmented ref page",
+		sources: {
+			s1: {
+				kind: "file",
+				ref: "docs/adr/0001-test-decision.md#L1-L5",
+				rawHash: "sha256:0",
+				mutable: true,
+			},
+		},
+		blocks: [{ type: "prose", sources: ["s1"], text: "distilled" }],
+	});
+	const fixture = buildKnowledgeGraph(dir);
+	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
+	assert.ok(adr, "adr:0001 node missing");
+	assert.equal(adr.contextPage, "test-fragmented-page", "context page with #L range did not merge");
+});
+
+test("F-2: context page sourcing a canonical-artifact body file merges into the artifact node", () => {
+	const dir = mkTarget("kg-cp-artifact");
+	const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
+	const admission = admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/cp-test",
+		body: "# Intent: cp-test\n",
+	});
+	assert.equal(admission.ok, true, JSON.stringify(admission.errors));
+	// The artifact's body file is .amber/artifacts/intents/<slug>/rev-1.md
+	const slugFor = (identity) => String(identity).replace(/[^a-zA-Z0-9._-]+/g, "_");
+	const artifactSlug = slugFor("intent/cp-test");
+	const artifactRevPath = `.amber/artifacts/intents/${artifactSlug}/rev-1.md`;
+	addPage(dir, "artifact-context-page", {
+		title: "Artifact context page",
+		sources: {
+			s1: {
+				kind: "file",
+				ref: `${artifactRevPath}#L1-L1`,
+				rawHash: "sha256:0",
+				mutable: false,
+			},
+		},
+		blocks: [{ type: "prose", sources: ["s1"], text: "distilled artifact" }],
+	});
+	const fixture = buildKnowledgeGraph(dir);
+	const artifactNode = fixture.nodes.find((n) => n.id === `artifact:intent/intent/cp-test`);
+	assert.ok(artifactNode, "artifact node missing");
+	assert.equal(
+		artifactNode.contextPage,
+		"artifact-context-page",
+		"context page with artifact file ref did not merge into artifact node",
+	);
+});
+
+// ── F-3: repository-boundary confinement ─────────────────────────────
+
+test("F-3: ../ anchor produces a dead-anchor finding without probing outside the fixture", () => {
+	const dir = mkTarget("kg-escape", { subdirs: ["lib"] });
+	fs.writeFileSync(path.join(dir, "lib", "real.js"), "x");
+	writeJson(dir, "feature_list.json", {
+		features: [
+			{
+				id: "F001",
+				title: "t",
+				status: "passing",
+				paths: ["../outside.js", "lib/real.js"],
+			},
+		],
+	});
+	const fixture = buildKnowledgeGraph(dir);
+	// real.js is alive — no finding for it
+	const realFinding = fixture.drift.find((d) => d.path === "lib/real.js");
+	assert.equal(realFinding, undefined, "live path reported dead");
+	// ../outside.js is a dead anchor — finding present, no actualPath (no probe outside)
+	const escapeFinding = fixture.drift.find((d) => d.path === "../outside.js");
+	assert.ok(escapeFinding, "../outside.js anchor must produce a dead-anchor finding");
+	assert.equal(escapeFinding.kind, "dead-anchor");
+	assert.equal(escapeFinding.actualPath, undefined, "no actualPath: no probe outside target");
+});
+
+// ── F-4: glob matcher completeness ───────────────────────────────────
+
+test("F-4: dir-wildcard pattern matching no directory produces a finding", () => {
+	const dir = mkTarget("kg-glob-dir", { subdirs: ["lib"] });
+	fs.writeFileSync(path.join(dir, "lib", "real.js"), "x");
+	writeJson(dir, "feature_list.json", {
+		features: [
+			{
+				id: "F001",
+				title: "t",
+				status: "passing",
+				paths: ["missing*/also-missing.js"],
+			},
+		],
+	});
+	const fixture = buildKnowledgeGraph(dir);
+	const finding = fixture.drift.find(
+		(d) => d.nodeId === "feature:F001" && d.path === "missing*/also-missing.js",
+	);
+	assert.ok(finding, "missing*/also-missing.js must produce a dead-anchor finding");
+	assert.equal(finding.kind, "dead-anchor");
+});
+
+test("F-4: ? in basename matches a single character — lib/file?.js with lib/file1.js alive", () => {
+	const dir = mkTarget("kg-glob-qmark", { subdirs: ["lib"] });
+	fs.writeFileSync(path.join(dir, "lib", "file1.js"), "x");
+	writeJson(dir, "feature_list.json", {
+		features: [
+			{ id: "F001", title: "t", status: "passing", paths: ["lib/file?.js"] },
+		],
+	});
+	const fixture = buildKnowledgeGraph(dir);
+	const finding = fixture.drift.find((d) => d.nodeId === "feature:F001");
+	assert.equal(finding, undefined, "lib/file?.js must NOT produce a finding when lib/file1.js exists");
+});
+
+// ── F-5: root-CLI subprocess seam ─────────────────────────────────────
+
+test("F-5: amber knowledge graph --json emits schema-valid, byte-identical JSON from root CLI", () => {
+	const { spawnSync } = require("node:child_process");
+	const { validate } = require("../../scripts/lib/core/schema-contract");
+	const amber = path.join(REPO_ROOT, "scripts", "amber.js");
+	const run = () =>
+		spawnSync(
+			process.execPath,
+			[amber, "knowledge", "graph", "--target", REPO_ROOT, "--json"],
+			{ cwd: REPO_ROOT, encoding: "utf8" },
+		);
+
+	const first = run();
+	assert.equal(first.status, 0, `exit code non-zero; stderr: ${first.stderr}`);
+
+	// Schema-valid output
+	const parsed = JSON.parse(first.stdout);
+	const verdict = validate("knowledge-graph", parsed);
+	assert.deepEqual(verdict.errors, [], "schema validation errors");
+	assert.equal(verdict.valid, true);
+
+	// Byte-identical on repeated run
+	const second = run();
+	assert.equal(second.status, 0);
+	assert.equal(first.stdout, second.stdout, "output is not byte-identical on recompute");
+
+	// F001/F007 drift findings persist at the CLI seam
+	const f001 = parsed.drift.find(
+		(d) => d.nodeId === "feature:F001" && d.path === "scripts/lib/core/scaffolding.js",
+	);
+	assert.ok(f001, "F001 drift finding missing in CLI output");
+	const f007 = parsed.drift.find(
+		(d) => d.nodeId === "feature:F007" && d.path === "scripts/lib/core/loops/",
+	);
+	assert.ok(f007, "F007 drift finding missing in CLI output");
+
+	// Population bounds
+	assert.ok(parsed.nodes.length >= 100, `expected >=100 nodes, got ${parsed.nodes.length}`);
+	assert.ok(parsed.edges.length >= 80, `expected >=80 edges, got ${parsed.edges.length}`);
+
+	// Independently derivable edges (from reading the ADR source files directly)
+	const edge = (src, verb, dst) =>
+		parsed.edges.find((e) => e.src === src && e.verb === verb && e.dst === dst);
+	assert.ok(edge("adr:0003", "builds-on", "adr:0002"), "adr:0003 builds-on adr:0002");
+	assert.ok(edge("adr:0005", "supersedes", "adr:0002"), "adr:0005 supersedes adr:0002");
+	assert.ok(edge("adr:0007", "builds-on", "adr:0003"), "adr:0007 builds-on adr:0003");
+	assert.ok(edge("adr:0007", "builds-on", "adr:0006"), "adr:0007 builds-on adr:0006");
+	assert.ok(edge("adr:0007", "supersedes", "architecture:web-viewer"), "adr:0007 supersedes architecture:web-viewer");
+	assert.ok(edge("adr:0008", "builds-on", "adr:0003"), "adr:0008 builds-on adr:0003");
+	assert.ok(edge("adr:0008", "builds-on", "adr:0007"), "adr:0008 builds-on adr:0007");
+	assert.ok(edge("feature:F007", "references", "adr:0003"), "feature:F007 references adr:0003");
+});
