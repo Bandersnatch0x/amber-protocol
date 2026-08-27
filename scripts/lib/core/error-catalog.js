@@ -731,6 +731,119 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_INVALID_ARG", "AMBER_E_PROJECTION_RESOURCE_CEILING"],
 	},
+	// --- F050 Decisions, Gates & Evidence Assurance (ticket 1, #226) ---
+	// Principal registry + Decision artifacts. The registry family covers the
+	// append-only ledger under .amber/principals/registry.jsonl; the decision
+	// family covers Decision admission (a Canonical Artifact of type decision)
+	// and its human-only authority slots.
+	AMBER_E_PRINCIPAL_REGISTRY_CORRUPT: {
+		title: "Principal registry is corrupt or unreadable",
+		cause:
+			"A principal registry read hit a corrupt line or an event sequence the register/revoke writers could never have produced (a duplicate registration, a revocation of an unknown or already-revoked principal, a malformed event, or an event outside the closed field set). An absent registry reads as empty; this code only fires on real corruption.",
+		remedy:
+			"Restore .amber/principals/registry.jsonl from version control; never edit the ledger in place — the registry is append-only governed state and every change is a register or revoke event.",
+		layer: "Observability",
+		related: [
+			"AMBER_E_PRINCIPAL_REGISTRY_UNSUPPORTED_VERSION",
+			"AMBER_E_KB_CORRUPT",
+			"AMBER_E_ARTIFACT_JOURNAL_CORRUPT",
+		],
+	},
+	AMBER_E_PRINCIPAL_REGISTRY_UNSUPPORTED_VERSION: {
+		title: "Principal registry event declares an unsupported version",
+		cause:
+			"A registry event carries a schemaVersion this reader does not support. Version negotiation is fail-closed: an event the reader cannot interpret is rejected, never silently reinterpreted.",
+		remedy:
+			"Upgrade amber to a version that supports the declared registry schema, or rebuild the registry under the supported schema version (1) with fresh register events.",
+		layer: "Governance",
+		related: ["AMBER_E_PRINCIPAL_REGISTRY_CORRUPT", "AMBER_E_ARTIFACT_UNSUPPORTED_VERSION"],
+	},
+	AMBER_E_PRINCIPAL_REGISTRY_CEILING: {
+		title: "Principal registry exceeds its size ceiling",
+		cause:
+			"Appending the next registry event would grow .amber/principals/registry.jsonl beyond the size ceiling (default 1 MiB, env AMBER_PRINCIPAL_MAX_REGISTRY_BYTES), so the write is refused before any durable state is touched.",
+		remedy:
+			"Split principals across repositories, or raise the ceiling deliberately via AMBER_PRINCIPAL_MAX_REGISTRY_BYTES (a positive integer; garbage fails closed as AMBER_E_INVALID_ARG).",
+		layer: "Governance",
+		related: ["AMBER_E_ARTIFACT_SIZE_CEILING", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_PRINCIPAL_ALREADY_REGISTERED: {
+		title: "Principal id is already registered",
+		cause:
+			"register was invoked with an id the registry already holds. A principal id is registered at most once and revocation is terminal, so a revoked id cannot be re-registered either — re-registering would launder the revocation.",
+		remedy:
+			"Inspect the existing record with `amber principal show --id <id>`; register a distinct principal id instead.",
+		layer: "Governance",
+		related: ["AMBER_E_PRINCIPAL_ALREADY_REVOKED", "AMBER_E_PRINCIPAL_NOT_FOUND"],
+	},
+	AMBER_E_PRINCIPAL_NOT_FOUND: {
+		title: "Principal is not registered",
+		cause:
+			"A lookup named a principal id with no registration in the registry — decision admission verifies its acting Principal against the registry, so an unregistered principal cannot occupy a decision slot.",
+		remedy:
+			"Register the principal first: `amber principal register --id <id> --kind <human|service>`.",
+		layer: "Observability",
+		related: ["AMBER_E_PRINCIPAL_REVOKED", "AMBER_E_DECISION_PRINCIPAL_REQUIRED"],
+	},
+	AMBER_E_PRINCIPAL_ALREADY_REVOKED: {
+		title: "Principal is already revoked",
+		cause: "revoke was invoked for a principal whose registration is already revoked.",
+		remedy: "Inspect the record with `amber principal show --id <id>`; revocation is terminal.",
+		layer: "Governance",
+		related: ["AMBER_E_PRINCIPAL_REVOKED", "AMBER_E_PRINCIPAL_ALREADY_REGISTERED"],
+	},
+	AMBER_E_PRINCIPAL_REVOKED: {
+		title: "Principal has been revoked",
+		cause:
+			"Decision admission named a principal whose registration is revoked. A revoked principal holds no authority, so admission fails closed instead of binding the decision to dead authority.",
+		remedy:
+			"Register and use a different principal, or — if the revocation was wrong — audit the registry ledger and restore it from version control.",
+		layer: "Governance",
+		related: ["AMBER_E_PRINCIPAL_EXPIRED", "AMBER_E_PRINCIPAL_NOT_FOUND"],
+	},
+	AMBER_E_PRINCIPAL_EXPIRED: {
+		title: "Principal validity window has ended",
+		cause:
+			"Decision admission named a principal whose validTo bound is at or before the admission time (the window is half-open: [validFrom, validTo)).",
+		remedy:
+			"Register a new principal with a current validity window and use it for the decision; a validity change is a new registration, never an in-place edit.",
+		layer: "Governance",
+		related: ["AMBER_E_PRINCIPAL_REVOKED", "AMBER_E_PRINCIPAL_NOT_YET_VALID"],
+	},
+	AMBER_E_PRINCIPAL_NOT_YET_VALID: {
+		title: "Principal validity window has not started",
+		cause:
+			"Decision admission named a principal whose validFrom bound is after the admission time.",
+		remedy:
+			"Wait for the window to open, or register a principal whose validity window covers the admission time.",
+		layer: "Governance",
+		related: ["AMBER_E_PRINCIPAL_EXPIRED"],
+	},
+	AMBER_E_DECISION_KIND_INVALID: {
+		title: "Decision kind is invalid",
+		cause:
+			"Decision admission named a kind outside the closed set (acceptance, approval, review). The three kinds are distinct authorities and never interchangeable.",
+		remedy: "Re-admit with --decision-kind acceptance, approval, or review.",
+		layer: "Governance",
+		related: ["AMBER_E_DECISION_HUMAN_SLOT_REQUIRED", "AMBER_E_DECISION_PRINCIPAL_REQUIRED"],
+	},
+	AMBER_E_DECISION_PRINCIPAL_REQUIRED: {
+		title: "Decision admission is missing its acting Principal",
+		cause:
+			"Decision admission arrived without a --principal id, or the stored Envelope's principal binding snapshot is malformed. Every Decision binds the Principal that acted; the binding is core Envelope content, not extension data.",
+		remedy: "Re-admit with --principal <id> naming a registered principal.",
+		layer: "Governance",
+		related: ["AMBER_E_PRINCIPAL_NOT_FOUND", "AMBER_E_DECISION_KIND_INVALID"],
+	},
+	AMBER_E_DECISION_HUMAN_SLOT_REQUIRED: {
+		title: "Human-only decision slot occupied by a non-human principal",
+		cause:
+			"An acceptance or approval Decision was admitted by a service principal (or any principal whose principalKind is not human). Formal Acceptance and Approval require independently authenticated humans; agents and service identities cannot occupy a human approval slot.",
+		remedy:
+			"Re-admit with --principal naming a registered human principal, or record the artifact as a review Decision instead (review is the only kind a service principal may carry).",
+		layer: "Governance",
+		related: ["AMBER_E_DECISION_KIND_INVALID", "AMBER_E_DECISION_PRINCIPAL_REQUIRED"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

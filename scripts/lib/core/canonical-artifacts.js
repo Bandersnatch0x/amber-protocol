@@ -13,8 +13,9 @@
  *
  * Ticket 03 (#220) registers Spec and Plan alongside Intent, each with a
  * closed lifecycle and named-transition contract, and adds the typed Trace
- * lineage (refines / realizes / supersedes; see
- * canonical-artifact-contracts.js for the registries):
+ * lineage (refines / realizes / supersedes; F050 #226 adds the decision
+ * type and its decides trace; see canonical-artifact-contracts.js for the
+ * registries):
  * - The Envelope carries `lifecycle` (the revision's lifecycle state),
  *   `transition` (the named transition this admission applied, if any),
  *   `scope` (an optional confinement tag), and its resolved `traces` with
@@ -110,8 +111,10 @@ const {
 	ENVELOPE_SCHEMA_VERSION,
 	SUPPORTED_ENVELOPE_SCHEMA_VERSIONS,
 	EXTENSION_CARRIER_FIELD,
+	DECISION_KINDS,
 	envelopeVersionProblem,
 	envelopeUnknownFieldProblem,
+	decisionBindingProblem,
 	extensionNamespaceProblem,
 	isValidArtifactIdentity,
 	transitionFor,
@@ -124,6 +127,11 @@ const {
 	traceShapeProblem,
 } = require("./canonical-artifact-contracts");
 const { findTraceCycle, danglingPreparedRevisions } = require("./canonical-artifact-verify");
+// F050 ticket 1 (#226): Decision admission binds the acting Principal against
+// the Principal registry — the registry is the governed authority store, the
+// artifact store the consumer (no cycle: principal-registry imports neither
+// this module nor the contracts).
+const { resolveActivePrincipal } = require("./principal-registry");
 
 const ARTIFACT_STATUSES = Object.freeze(["prepared", "committed", "aborted"]);
 
@@ -158,6 +166,11 @@ const NOT_FOUND_CODE = "AMBER_E_ARTIFACT_NOT_FOUND";
 // constant here.)
 const UNSUPPORTED_VERSION_CODE = "AMBER_E_ARTIFACT_UNSUPPORTED_VERSION";
 const SIZE_CEILING_CODE = "AMBER_E_ARTIFACT_SIZE_CEILING";
+// F050 ticket 1 (#226): Decision admission codes — the Decision kind closed
+// set, the acting-Principal binding, and the human-only authority slots.
+const DECISION_KIND_INVALID_CODE = "AMBER_E_DECISION_KIND_INVALID";
+const DECISION_PRINCIPAL_REQUIRED_CODE = "AMBER_E_DECISION_PRINCIPAL_REQUIRED";
+const DECISION_HUMAN_SLOT_REQUIRED_CODE = "AMBER_E_DECISION_HUMAN_SLOT_REQUIRED";
 
 /**
  * Admission size ceilings (F049 ticket 06, #223 — AC3), in bytes.
@@ -366,14 +379,18 @@ function envelopeHash(envelope) {
  * the resolved Trace set, and (ticket 06, #223) the extension namespaces:
  * extensions are canonical content, so the same Body with different
  * extension data is a different admission, never a silent duplicate.
- * Assigned, volatile, or DERIVED fields are excluded: revision, committedAt,
- * envelopeHash, and the lifecycle STATE, which is a pure function of the
- * type and the named transition (a revision admitted without a transition
- * carries the type's initial state) — so two admissions cannot differ in
- * lifecycle without differing in `transition`, and retries against
- * pre-lifecycle (ticket-01/02) Envelopes still dedupe. Ticket-01 review
- * finding F3: retries dedupe on the full canonical envelope content, never
- * on bodyHash alone.
+ * (F050, #226) the Decision binding — `decisionKind` and the verified
+ * `principal` snapshot — is canonical content too: the same Body bound to a
+ * different principal or kind is a different admission. Assigned, volatile,
+ * or DERIVED fields are excluded: revision, committedAt, envelopeHash, and
+ * the lifecycle STATE, which is a pure function of the type and the named
+ * transition (a revision admitted without a transition carries the type's
+ * initial state) — so two admissions cannot differ in lifecycle without
+ * differing in `transition`, and retries against pre-lifecycle
+ * (ticket-01/02) Envelopes still dedupe. Ticket-01 review finding F3:
+ * retries dedupe on the full canonical envelope content, never on bodyHash
+ * alone. Pre-F050 Envelopes hash with both decision fields null, exactly
+ * like a non-decision admission does, so old stores stay retry-compatible.
  */
 function admissionHash({
 	schemaVersion,
@@ -386,6 +403,8 @@ function admissionHash({
 	scope,
 	traces,
 	extensions,
+	decisionKind,
+	principal,
 }) {
 	return sha256Hex(
 		canonicalJson(
@@ -400,6 +419,8 @@ function admissionHash({
 				scope: scope ?? null,
 				traces: canonicalTracesForHash(traces),
 				extensions: extensions ?? null,
+				decisionKind: decisionKind ?? null,
+				principal: principal ?? null,
 			}),
 		),
 	);
@@ -420,7 +441,9 @@ function canonicalTracesForHash(traces) {
 
 // The admission key of an already-stored Envelope (same field set; the
 // lifecycle state stays excluded as a derived field, so pre-lifecycle
-// Envelopes hash exactly like their transition-less retries).
+// Envelopes hash exactly like their transition-less retries). Pre-F050
+// Envelopes carry no decision fields, which hash as null — identical to a
+// non-decision admission.
 function admissionHashOfEnvelope(envelope) {
 	return admissionHash({
 		schemaVersion: envelope.schemaVersion,
@@ -433,6 +456,8 @@ function admissionHashOfEnvelope(envelope) {
 		scope: envelope.scope ?? null,
 		traces: envelope.traces || [],
 		extensions: envelope[EXTENSION_CARRIER_FIELD] ?? null,
+		decisionKind: envelope.decisionKind ?? null,
+		principal: envelope.principal ?? null,
 	});
 }
 
@@ -538,6 +563,13 @@ function typedReadError(code, message) {
  * read seam (show, list, projection revisions) and every admission path that
  * validates stored state (idempotency retries, CAS head, trace binding)
  * funnels through here, so the negotiation verdict is identical everywhere.
+ *
+ * F050 ticket 1 (#226): the Decision binding contract runs in the same
+ * pre-hash position — a decision Envelope must carry a kind from the closed
+ * set and a well-formed principal snapshot, a non-decision Envelope must
+ * carry neither, and acceptance/approval authority must never be bound to a
+ * service principal (a binding admission can never write, so a stored
+ * violation is hand-edited state).
  */
 function committedProjection(type, identity, revision, body, envelope, committedAt) {
 	const versionProblem = envelopeVersionProblem(envelope);
@@ -545,6 +577,10 @@ function committedProjection(type, identity, revision, body, envelope, committed
 	const unknownFieldProblem = envelopeUnknownFieldProblem(envelope);
 	if (unknownFieldProblem !== null) {
 		throw typedReadError(unknownFieldProblem.code, unknownFieldProblem.message);
+	}
+	const decisionProblem = decisionBindingProblem(envelope);
+	if (decisionProblem !== null) {
+		throw typedReadError(decisionProblem.code, decisionProblem.message);
 	}
 	const extensionProblem = extensionNamespaceProblem(
 		envelope ? envelope[EXTENSION_CARRIER_FIELD] : undefined,
@@ -587,6 +623,8 @@ function committedProjection(type, identity, revision, body, envelope, committed
 		traces: envelope.traces || [],
 		provenance: envelope.provenance || null,
 		committedAt: committedAt || null,
+		decisionKind: envelope.decisionKind ?? null,
+		principal: envelope.principal ?? null,
 	});
 }
 
@@ -1044,8 +1082,22 @@ function committedRevisionExists(cwd, type, identity, revision /* number|null fo
  */
 function resolveTraceTarget(cwd, sourceType, sourceIdentity, sourceScope, trace) {
 	const contract = traceContract(trace.type);
-	const toType = expectedToType(trace.type, sourceType);
 	const declaredType = trace.to.type === undefined || trace.to.type === null ? null : trace.to.type;
+	let toType = expectedToType(trace.type, sourceType);
+	if (toType === "any") {
+		// F050 (#226): a decides Trace declares its own target type — the
+		// registry cannot derive it from the source type. The structural
+		// check already rejects an absent or unregistered declaration; this
+		// guard keeps the resolver fail-closed when called directly.
+		if (declaredType === null || !ARTIFACT_TYPES.includes(declaredType)) {
+			return {
+				ok: false,
+				code: TRACE_DIRECTION_CODE,
+				message: `"${trace.type}" Traces must declare a registered target artifact type; got ${JSON.stringify(declaredType)} (registered types: ${ARTIFACT_TYPES.join(", ")})`,
+			};
+		}
+		toType = declaredType;
+	}
 	if (declaredType !== null && declaredType !== toType) {
 		return {
 			ok: false,
@@ -1439,11 +1491,23 @@ function listArtifactRevisions(cwd) {
  *   (source and target tags must match; null counts as a scope).
  * - `traces` is the typed lineage of the revision: each record is validated
  *   against the registered, versioned Trace contract (refines / realizes /
- *   supersedes) with direction, scope, and cardinality. Required planning
- *   lineage is enforced: a Spec refines exactly one accepted Intent revision
- *   and a Plan realizes exactly one approved Spec revision, or admission
- *   fails closed with stable trace errors. Trace revisions default to the
- *   target's current committed head and are recorded resolved.
+ *   supersedes / decides) with direction, scope, and cardinality. Required
+ *   planning lineage is enforced: a Spec refines exactly one accepted Intent
+ *   revision and a Plan realizes exactly one approved Spec revision, or
+ *   admission fails closed with stable trace errors. Trace revisions default
+ *   to the target's current committed head and are recorded resolved.
+ * - (F050, #226) `decisionKind` + `principal` bind a Decision: the kind must
+ *   come from the closed set (acceptance / approval / review — distinct,
+ *   non-interchangeable authorities; one record exercises one kind), and the
+ *   principal id is verified against the Principal registry BEFORE any
+ *   durable state is touched — unregistered, revoked, expired, and
+ *   not-yet-valid principals all fail closed with their own stable codes.
+ *   The verified principal snapshot is frozen into the Envelope. The
+ *   acceptance and approval kinds are human-only slots: a service principal
+ *   in one is rejected (AMBER_E_DECISION_HUMAN_SLOT_REQUIRED); review is the
+ *   only kind a service principal may carry. Both flags are decision-only:
+ *   a non-decision admission carrying either fails closed as an argument
+ *   error.
  * - Tampered or inconsistent settlement state (impossible journal
  *   sequences, a committed pair missing or failing its binding, a hashless
  *   committed record in a hash-bearing journal) fails closed as corruption
@@ -1468,6 +1532,8 @@ function admitArtifact(
 		traces = [],
 		schemaVersion = ENVELOPE_SCHEMA_VERSION,
 		extensions = null,
+		decisionKind = null,
+		principal = null,
 	},
 ) {
 	const fail = (code, errors) => ({ ok: false, code, receipt: null, errors });
@@ -1476,6 +1542,28 @@ function admitArtifact(
 		return fail("AMBER_E_ARTIFACT_UNKNOWN_TYPE", [
 			`artifact type "${type}" is not registered; registered types: ${ARTIFACT_TYPES.join(", ")}`,
 		]);
+	}
+	// F050 ticket 1 (#226): Decision bindings are decision-only envelope
+	// content. Flags on a non-decision admission are malformed input, never a
+	// silently dropped extra — the stored contract would then differ from the
+	// declared one.
+	if (type !== "decision" && (decisionKind !== null || principal !== null)) {
+		return fail(INVALID_ARG_CODE, [
+			`decisionKind/principal are decision-only admission inputs, but this admission is a "${type}" artifact; drop them, or admit --type decision`,
+		]);
+	}
+	let principalSnapshot = null;
+	if (type === "decision") {
+		if (!DECISION_KINDS.includes(decisionKind)) {
+			return fail(DECISION_KIND_INVALID_CODE, [
+				`decisionKind must be one of the closed kind set (${DECISION_KINDS.join(", ")}) — Acceptance, Approval, and Review are distinct authorities and never interchangeable; got ${JSON.stringify(decisionKind)}`,
+			]);
+		}
+		if (typeof principal !== "string" || principal.trim().length === 0) {
+			return fail(DECISION_PRINCIPAL_REQUIRED_CODE, [
+				`every Decision binds the Principal that acted; pass the acting principal id (got ${JSON.stringify(principal)}) — the binding is verified against the Principal registry at admission`,
+			]);
+		}
 	}
 	// Ticket 06 (#223 — AC1): version negotiation at the WRITER seam. This
 	// amber only ever admits a supported schemaVersion; anything else is
@@ -1612,6 +1700,34 @@ function admitArtifact(
 		resolvedTraces.push(Object.freeze({ type: trace.type, to: resolved.to }));
 	}
 
+	// F050 ticket 1 (#226): the acting Principal is verified against the
+	// registry BEFORE any durable state is touched (this artifact's lock is
+	// not yet taken), exactly like trace targets: an unregistered, revoked,
+	// expired, or not-yet-valid principal fails closed with its own stable
+	// code, and the human-only slots (acceptance/approval) reject a service
+	// principal. The verified snapshot is frozen into the envelope as the
+	// binding evidence.
+	if (type === "decision") {
+		let resolvedPrincipal;
+		try {
+			resolvedPrincipal = resolveActivePrincipal(cwd, principal, { now: new Date() });
+		} catch (err) {
+			return fail(err.amberCode || "AMBER_E_PRINCIPAL_REGISTRY_CORRUPT", [err.message]);
+		}
+		if (!resolvedPrincipal.ok) {
+			return fail(resolvedPrincipal.code, [resolvedPrincipal.message]);
+		}
+		if (
+			(decisionKind === "acceptance" || decisionKind === "approval") &&
+			resolvedPrincipal.principal.principalKind !== "human"
+		) {
+			return fail(DECISION_HUMAN_SLOT_REQUIRED_CODE, [
+				`${decisionKind === "acceptance" ? "an" : "a"} ${decisionKind} Decision is a human-only authority slot, but principal "${principal}" is a ${resolvedPrincipal.principal.principalKind} identity; formal acceptance and approval require an independently authenticated human — agents and service identities cannot occupy a human approval slot (a review Decision is the only kind a service principal may carry)`,
+			]);
+		}
+		principalSnapshot = Object.freeze(resolvedPrincipal.principal);
+	}
+
 	// The expected head is a positive revision number or null (first
 	// admission). Garbage never reaches the CAS comparison.
 	const declared = [];
@@ -1649,6 +1765,8 @@ function admitArtifact(
 			traces: resolvedTraces,
 			schemaVersion,
 			extensions: extensionCarrier,
+			decisionKind: type === "decision" ? decisionKind : null,
+			principal: type === "decision" ? principalSnapshot : null,
 			maxEnvelopeBytes: ceilings.maxEnvelopeBytes,
 		});
 	} finally {
@@ -1676,6 +1794,8 @@ function admitUnderLock(
 		traces = [],
 		schemaVersion = ENVELOPE_SCHEMA_VERSION,
 		extensions = null,
+		decisionKind = null,
+		principal = null,
 		maxEnvelopeBytes = DEFAULT_MAX_ENVELOPE_BYTES,
 	} = {},
 ) {
@@ -1692,6 +1812,8 @@ function admitUnderLock(
 		scope,
 		traces,
 		extensions,
+		decisionKind,
+		principal,
 	});
 
 	let journal;
@@ -1913,6 +2035,11 @@ function admitUnderLock(
 		traces: traces.map((trace) => ({ type: trace.type, to: { ...trace.to } })),
 		...(traces.length > 0 ? { traceContractVersion: TRACE_REGISTRY_VERSION } : {}),
 		...(extensions !== null ? { [EXTENSION_CARRIER_FIELD]: extensions } : {}),
+		// F050 (#226): the Decision binding is core Envelope content (never
+		// extension data — that carrier is contractually opaque), carried
+		// only by decision Envelopes.
+		...(decisionKind !== null ? { decisionKind } : {}),
+		...(principal !== null ? { principal } : {}),
 		provenance: provenance || null,
 		committedAt: preparedAt,
 	};
@@ -2024,6 +2151,10 @@ function receiptFor(type, identity, revision, envelope, journal) {
 		extensions: envelope[EXTENSION_CARRIER_FIELD] ?? null,
 		provenance: envelope.provenance,
 		committedAt: commitRecord ? commitRecord.at : envelope.committedAt,
+		// F050 (#226): the Decision binding rides in the receipt exactly as
+		// verified at admission — the kind and the principal snapshot.
+		decisionKind: envelope.decisionKind ?? null,
+		principal: envelope.principal ?? null,
 	});
 }
 

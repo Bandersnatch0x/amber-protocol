@@ -67,6 +67,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"knowledge",
 	"phase",
 	"artifact",
+	"principal",
 	"eval",
 ];
 

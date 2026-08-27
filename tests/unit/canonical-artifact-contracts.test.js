@@ -17,17 +17,19 @@ const {
 	TRACE_REGISTRY,
 	TRACE_REGISTRY_VERSION,
 	TRACE_TYPES,
+	DECISION_KINDS,
 	lifecycleForAdmission,
 	transitionFor,
 	registeredTransitionsOf,
 	transitionToState,
 	expectedToType,
+	traceRequiresDeclaredTarget,
 	structuralTraceProblems,
 	traceShapeProblem,
 } = require("../../scripts/lib/core/canonical-artifact-contracts");
 
-test("the type registry covers intent, spec, and plan (closed set)", () => {
-	assert.deepEqual(ARTIFACT_TYPES, ["intent", "spec", "plan"]);
+test("the type registry covers intent, spec, plan, and decision (closed set)", () => {
+	assert.deepEqual(ARTIFACT_TYPES, ["intent", "spec", "plan", "decision"]);
 	assert.equal(Object.isFrozen(TYPE_REGISTRY), true);
 });
 
@@ -47,9 +49,17 @@ test("each registered type has a closed lifecycle with named transitions", () =>
 		initial: "draft",
 		states: ["draft", "approved"],
 	});
+	// A Decision records an authority act (F050 ticket 1, #226): its lifecycle
+	// is a single recorded state — no transitions exist, so an amended
+	// Decision is a new revision of the same identity, never a mutation.
+	assert.deepEqual(TYPE_REGISTRY.decision.lifecycle, {
+		initial: "recorded",
+		states: ["recorded"],
+	});
 	assert.deepEqual(registeredTransitionsOf("intent"), ["accept"]);
 	assert.deepEqual(registeredTransitionsOf("spec"), ["approve"]);
 	assert.deepEqual(registeredTransitionsOf("plan"), ["approve"]);
+	assert.deepEqual(registeredTransitionsOf("decision"), []);
 	assert.deepEqual(registeredTransitionsOf("bogus"), []);
 	// Every transition's from/to states are registered states of its type.
 	for (const type of ARTIFACT_TYPES) {
@@ -79,6 +89,9 @@ test("transition admission derives the lifecycle state; no transition means the 
 	assert.equal(lifecycleForAdmission("plan", "approve"), "approved");
 	assert.equal(lifecycleForAdmission("intent", "bogus"), null);
 	assert.equal(lifecycleForAdmission("bogus", "accept"), null);
+	assert.equal(lifecycleForAdmission("decision", null), "recorded");
+	assert.equal(lifecycleForAdmission("decision", "accept"), null, "a decision has no transitions");
+	assert.equal(transitionFor("decision", "accept"), null);
 	assert.deepEqual(transitionFor("intent", "accept"), {
 		name: "accept",
 		from: "draft",
@@ -95,7 +108,7 @@ test("transition admission derives the lifecycle state; no transition means the 
 });
 
 test("the trace registry is versioned and defines direction, scope, and cardinality", () => {
-	assert.deepEqual(TRACE_TYPES, ["refines", "realizes", "supersedes"]);
+	assert.deepEqual(TRACE_TYPES, ["refines", "realizes", "supersedes", "decides"]);
 	assert.equal(typeof TRACE_REGISTRY_VERSION, "number");
 	assert.ok(TRACE_REGISTRY_VERSION >= 1);
 	for (const name of TRACE_TYPES) {
@@ -122,11 +135,24 @@ test("the trace registry is versioned and defines direction, scope, and cardinal
 	assert.equal(TRACE_REGISTRY.supersedes.direction.toType, "same");
 	assert.equal(TRACE_REGISTRY.supersedes.cardinality.source, "zero-or-more");
 	assert.equal(TRACE_REGISTRY.supersedes.targetLifecycle, null);
-	// Expected target types resolve per source type ("same" resolves).
+	// Decides (F050 ticket 1, #226): a Decision names its subject — any
+	// registered target type, so the Trace must DECLARE the type itself.
+	assert.equal(TRACE_REGISTRY.decides.direction.fromType, "decision");
+	assert.equal(TRACE_REGISTRY.decides.direction.toType, "any");
+	assert.equal(TRACE_REGISTRY.decides.scope, "same");
+	assert.equal(TRACE_REGISTRY.decides.cardinality.source, "exactly-one");
+	assert.equal(TRACE_REGISTRY.decides.targetLifecycle, null);
+	// Expected target types resolve per source type ("same" resolves, "any"
+	// stays "any" — the declared-type requirement is enforced downstream).
 	assert.equal(expectedToType("refines", "spec"), "intent");
 	assert.equal(expectedToType("realizes", "plan"), "spec");
 	assert.equal(expectedToType("supersedes", "plan"), "plan");
+	assert.equal(expectedToType("decides", "decision"), "any");
 	assert.equal(expectedToType("bogus", "plan"), null);
+	assert.equal(traceRequiresDeclaredTarget("decides"), true);
+	assert.equal(traceRequiresDeclaredTarget("refines"), false);
+	assert.equal(traceRequiresDeclaredTarget("supersedes"), false);
+	assert.equal(traceRequiresDeclaredTarget("bogus"), false);
 });
 
 test("required planning lineage is declared per type; intent carries none", () => {
@@ -137,6 +163,50 @@ test("required planning lineage is declared per type; intent carries none", () =
 	assert.deepEqual(TYPE_REGISTRY.plan.requiredTraces, {
 		realizes: { source: "exactly-one" },
 	});
+	// A Decision must decide exactly one subject (F050 ticket 1, #226).
+	assert.deepEqual(TYPE_REGISTRY.decision.requiredTraces, {
+		decides: { source: "exactly-one" },
+	});
+	assert.deepEqual(DECISION_KINDS, ["acceptance", "approval", "review"]);
+	assert.equal(Object.isFrozen(DECISION_KINDS), true);
+});
+
+test("a decides Trace must declare a registered target type (structural check)", () => {
+	// No declared type: the contract cannot derive it from the source type.
+	const undeclared = structuralTraceProblems("decision", "decision/x", [
+		{ type: "decides", to: { identity: "spec/a" } },
+	]);
+	assert.equal(undeclared.length, 1);
+	assert.equal(undeclared[0].code, "AMBER_E_ARTIFACT_TRACE_DIRECTION");
+	assert.match(undeclared[0].message, /must declare their target artifact type/);
+
+	// A declared type outside the closed registry.
+	const unregistered = structuralTraceProblems("decision", "decision/x", [
+		{ type: "decides", to: { type: "epic", identity: "epic/a" } },
+	]);
+	assert.equal(unregistered.length, 1);
+	assert.equal(unregistered[0].code, "AMBER_E_ARTIFACT_TRACE_DIRECTION");
+	assert.match(unregistered[0].message, /must declare a registered target artifact type/);
+
+	// A declared, registered type satisfies the structural cardinality.
+	const ok = structuralTraceProblems("decision", "decision/x", [
+		{ type: "decides", to: { type: "spec", identity: "spec/a" } },
+	]);
+	assert.equal(ok.length, 0);
+
+	// A decision carrying no decides Trace misses its required lineage.
+	const missing = structuralTraceProblems("decision", "decision/x", []);
+	assert.equal(missing.length, 1);
+	assert.equal(missing[0].code, "AMBER_E_ARTIFACT_TRACE_CARDINALITY");
+	assert.match(missing[0].message, /exactly one/);
+
+	// decides is carried by decision artifacts only.
+	const wrongCarrier = structuralTraceProblems("spec", "spec/x", [
+		{ type: "decides", to: { type: "intent", identity: "intent/a" } },
+	]);
+	assert.equal(wrongCarrier.length, 2);
+	assert.equal(wrongCarrier[0].code, "AMBER_E_ARTIFACT_TRACE_DIRECTION");
+	assert.equal(wrongCarrier[1].code, "AMBER_E_ARTIFACT_TRACE_CARDINALITY");
 });
 
 test("a generic relation cannot satisfy required planning lineage (structural check)", () => {

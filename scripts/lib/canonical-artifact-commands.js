@@ -5,7 +5,11 @@
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
-const { ARTIFACT_TYPES } = require("./core/canonical-artifact-contracts");
+const {
+	ARTIFACT_TYPES,
+	DECISION_KINDS,
+	traceRequiresDeclaredTarget,
+} = require("./core/canonical-artifact-contracts");
 
 // Full-review follow-up finding 7 (ticket-01 review F7): this constant is the
 // readFailure FALLBACK for untyped crashes/misses at the show/list seams, not
@@ -63,6 +67,8 @@ function missingValueFlag(args) {
 		["extensionVal", "--extension"],
 		["revision", "--revision"],
 		["target", "--target"],
+		["decisionKind", "--decision-kind"],
+		["principal", "--principal"],
 	];
 	for (const [key, flag] of valueFlags) {
 		if (key in args && args[key] === undefined) return flag;
@@ -80,6 +86,16 @@ function missingValueFlag(args) {
  * strict (positive integer, never NaN) and defaults to the target's current
  * committed head inside the store.
  *
+ * F050 ticket 1 (#226): a Trace type whose contract direction cannot derive
+ * the target type ("any", e.g. `decides`) MUST declare it — its grammar is
+ * `--trace <traceType>:<targetType>:<identity>[@<revision>]`, e.g.
+ * `--trace decides:spec:spec/login-spec`. The requirement is registry-driven
+ * (traceRequiresDeclaredTarget), not a CLI-side special case, so a future
+ * "any"-direction trace type inherits the same grammar. Whether the declared
+ * target type is REGISTERED stays the admission contract's verdict (the
+ * structural check lists the registered types), exactly like trace semantics
+ * are the registry's, not the CLI's.
+ *
  * Full-review follow-up finding 8 (ticket-03 review F-6): identities may
  * contain `@`. The revision is parsed from the LAST `@` and only when what
  * follows is all digits — `refines:user@tenant` names the identity
@@ -96,17 +112,29 @@ function parseTraceFlags(rawList) {
 	for (const raw of list) {
 		if (typeof raw !== "string" || raw.length === 0) {
 			return {
-				error: `--trace must be of the form <traceType>:<identity>[@<revision>]; got ${JSON.stringify(raw)}`,
+				error: `--trace must be of the form <traceType>:<identity>[@<revision>] (or <traceType>:<targetType>:<identity>[@<revision>] for a Trace type that declares its target type); got ${JSON.stringify(raw)}`,
 			};
 		}
 		const colon = raw.indexOf(":");
 		if (colon <= 0 || colon === raw.length - 1) {
 			return {
-				error: `--trace must be of the form <traceType>:<identity>[@<revision>]; got ${JSON.stringify(raw)}`,
+				error: `--trace must be of the form <traceType>:<identity>[@<revision>] (or <traceType>:<targetType>:<identity>[@<revision>] for a Trace type that declares its target type); got ${JSON.stringify(raw)}`,
 			};
 		}
 		const type = raw.slice(0, colon);
-		let identity = raw.slice(colon + 1);
+		let rest = raw.slice(colon + 1);
+		let declaredType = null;
+		if (traceRequiresDeclaredTarget(type)) {
+			const second = rest.indexOf(":");
+			if (second <= 0 || second === rest.length - 1) {
+				return {
+					error: `--trace ${type} must be of the form ${type}:<targetType>:<identity>[@<revision>] — the ${type} contract allows any registered target type, so the Trace declares it (registered types: ${ARTIFACT_TYPES.join(", ")}); got ${JSON.stringify(raw)}`,
+				};
+			}
+			declaredType = rest.slice(0, second);
+			rest = rest.slice(second + 1);
+		}
+		let identity = rest;
 		let revision = null;
 		const at = identity.lastIndexOf("@");
 		if (at !== -1) {
@@ -125,10 +153,17 @@ function parseTraceFlags(rawList) {
 		}
 		if (identity.length === 0) {
 			return {
-				error: `--trace must be of the form <traceType>:<identity>[@<revision>]; got ${JSON.stringify(raw)}`,
+				error: `--trace must be of the form <traceType>:<identity>[@<revision>] (or <traceType>:<targetType>:<identity>[@<revision>] for a Trace type that declares its target type); got ${JSON.stringify(raw)}`,
 			};
 		}
-		traces.push({ type, to: { identity, ...(revision !== null ? { revision } : {}) } });
+		traces.push({
+			type,
+			to: {
+				...(declaredType !== null ? { type: declaredType } : {}),
+				identity,
+				...(revision !== null ? { revision } : {}),
+			},
+		});
 	}
 	return { value: traces };
 }
@@ -274,6 +309,22 @@ const dispatch = defineCommand({
 					`--idempotency-key must be a non-empty string when provided; got ${JSON.stringify(args.idempotencyKey)}`,
 				);
 			}
+			// F050 ticket 1 (#226): Decision admissions bind a kind and an acting
+			// Principal. The flags are absent for every non-decision type (null);
+			// an explicitly passed-but-empty value is a malformed invocation and
+			// fails closed as AMBER_E_INVALID_ARG, mirroring --idempotency-key.
+			const decisionKind = args.decisionKind === undefined ? null : String(args.decisionKind);
+			if (decisionKind !== null && decisionKind.trim().length === 0) {
+				return invalidArg(
+					`--decision-kind must be one of the registered Decision kinds (${DECISION_KINDS.join(", ")}) when provided; got ${JSON.stringify(args.decisionKind)}`,
+				);
+			}
+			const principal = args.principal === undefined ? null : String(args.principal);
+			if (principal !== null && principal.trim().length === 0) {
+				return invalidArg(
+					`--principal must be a non-empty principal id when provided; got ${JSON.stringify(args.principal)}`,
+				);
+			}
 			const traces = parseTraceFlags(args.traceArgs);
 			if (traces.error) return invalidArg(traces.error);
 			const extensions = parseExtensionFlags(args.extensionArgs);
@@ -294,6 +345,8 @@ const dispatch = defineCommand({
 				scope: args.scope === undefined ? null : String(args.scope),
 				traces: traces.value,
 				extensions: extensions.value,
+				decisionKind,
+				principal,
 			});
 			return {
 				text: result.ok ? JSON.stringify(result.receipt, null, 2) : "",

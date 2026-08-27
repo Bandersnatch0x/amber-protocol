@@ -1,15 +1,17 @@
 "use strict";
 
 /**
- * Canonical Planning Artifact type and Trace contracts (F049 ticket 03, #220).
+ * Canonical Planning Artifact type and Trace contracts (F049 ticket 03, #220;
+ * F050 ticket 1, #226 adds the decision type and the decides trace).
  *
  * These registries are the closed vocabulary the artifact store admits
  * against (scripts/lib/core/canonical-artifacts.js): Artifact Types with
  * lifecycle state machines and named transitions, plus the versioned Trace
- * registry (refines / realizes / supersedes) with direction, scope, and
- * cardinality. Everything here is frozen data plus pure functions — no I/O —
- * so the admission seam stays the only writer while projections and
- * integrity checks can import the contracts without the store.
+ * registry (refines / realizes / supersedes / decides; see below) with
+ * direction, scope, and cardinality. Everything here is frozen data plus
+ * pure functions — no I/O — so the admission seam stays the only writer
+ * while projections and integrity checks can import the contracts without
+ * the store.
  *
  * Lifecycle vocabulary (F049 spec, the authority on state names):
  * - Intent: draft -> accepted, via the named transition `accept`. "a Spec to
@@ -21,11 +23,19 @@
  * - Plan: draft -> approved, via the named transition `approve`. CONTEXT.md:
  *   a Plan links a feature to "goal, vertical slices, verification steps,
  *   evidence schema, and approval state".
- * `draft` is the initial admitted state of every type — the state before the
- * type's gate. A lifecycle change is always an admission carrying a named
- * transition: it produces a NEW revision, never an in-place status mutation
- * (ADR-0023 #3). A revision admitted without a transition carries the type's
- * initial state — changed content must pass the gate again.
+ * - Decision (F050, #226): `recorded` is both the initial and only lifecycle
+ *   state — a Decision is a point-in-time record, never a state machine. It
+ *   binds the acting Principal (verified against the Principal registry at
+ *   admission), the Decision kind, its subject artifact (via `decides`
+ *   Traces), and its rationale (the Body). There is no transition: an
+ *   amended decision is a new revision superseding the old one, exactly
+ *   like every other revision-level change.
+ * `draft` is the initial admitted state of every gate-bearing type — the
+ *   state before the type's gate. A lifecycle change is always an admission
+ *   carrying a named transition: it produces a NEW revision, never an
+ *   in-place status mutation (ADR-0023 #3). A revision admitted without a
+ *   transition carries the type's initial state — changed content must pass
+ *   the gate again.
  *
  * Trace contracts (F049 spec Implementation Decisions): "Trace types,
  * directions, scope, and cardinality are registered and versioned. A generic
@@ -39,6 +49,13 @@
  *   same scope, source cardinality zero-or-more, no target lifecycle gate.
  *   Same-identity revision succession is the Envelope's revision-level
  *   `supersedes` field (the compare-and-swap precondition), not a Trace.
+ * - decides:    decision -> any registered type, same scope, source
+ *   cardinality exactly-one (required subject lineage), no target lifecycle
+ *   gate. The direction toType is the reserved word "any": unlike every
+ *   other trace type, a decides Trace MUST declare its target type
+ *   explicitly, because the registry cannot derive it from the source type
+ *   (a Decision may record against an Intent, Spec, Plan, or another
+ *   Decision's revision).
  *
  * Cyclic Trace chains (A -> B -> A) are detected by ticket 04 (#221); this
  * registry only declares the per-admission contract.
@@ -83,6 +100,19 @@ const TYPE_REGISTRY = Object.freeze({
 			realizes: Object.freeze({ source: "exactly-one" }),
 		}),
 		lineageRequirement: "a Plan must realize exactly one approved Spec revision",
+	}),
+	decision: Object.freeze({
+		dir: "decisions",
+		lifecycle: Object.freeze({
+			initial: "recorded",
+			states: Object.freeze(["recorded"]),
+		}),
+		transitions: Object.freeze({}),
+		requiredTraces: Object.freeze({
+			decides: Object.freeze({ source: "exactly-one" }),
+		}),
+		lineageRequirement:
+			"a Decision must decide exactly one committed artifact revision of a registered type (declared by the decides Trace)",
 	}),
 });
 
@@ -129,6 +159,20 @@ const TRACE_REGISTRY = Object.freeze({
 		cardinality: Object.freeze({ source: "zero-or-more", target: "many" }),
 		targetLifecycle: null,
 	}),
+	decides: Object.freeze({
+		version: 1,
+		description:
+			"A Decision records its subject: exactly one committed revision of any registered artifact type (the target type must be declared by the Trace).",
+		// fromType "decision": only Decisions carry a decides Trace.
+		// toType "any": the target type CANNOT be derived from the source type,
+		// so the Trace must declare it explicitly — the structural check and
+		// the store both reject a decides Trace without a declared, registered
+		// target type.
+		direction: Object.freeze({ fromType: "decision", toType: "any" }),
+		scope: "same",
+		cardinality: Object.freeze({ source: "exactly-one", target: "many" }),
+		targetLifecycle: null,
+	}),
 });
 
 const TRACE_TYPES = Object.freeze(Object.keys(TRACE_REGISTRY));
@@ -145,6 +189,15 @@ const ENVELOPE_SCHEMA_VERSION = 1;
 const SUPPORTED_ENVELOPE_SCHEMA_VERSIONS = Object.freeze([1]);
 
 /**
+ * The closed set of Decision kinds (F050, #226): Acceptance, Approval, and
+ * Review are DISTINCT authorities and never interchangeable — one Decision
+ * record exercises exactly one kind. Acceptance and Approval are human-only
+ * slots (a service principal cannot occupy them); Review is the only kind a
+ * service principal may carry.
+ */
+const DECISION_KINDS = Object.freeze(["acceptance", "approval", "review"]);
+
+/**
  * The closed set of core Envelope field names (F049 ticket 06, #223). An
  * Envelope carrying a top-level field outside this set was written by a newer
  * writer (or hand-edited); readers reject it with
@@ -152,6 +205,11 @@ const SUPPORTED_ENVELOPE_SCHEMA_VERSIONS = Object.freeze([1]);
  * Extension data lives under the reserved `extensions` carrier — never at the
  * top level — so the core semantics of every revision stay interpretable by
  * every reader that knows its schemaVersion.
+ *
+ * F050 (#226): `decisionKind` and `principal` are core fields (not extension
+ * data — the extensions carrier is contractually opaque) but they are carried
+ * ONLY by decision Envelopes; decisionBindingProblem rejects their presence on
+ * any other type.
  */
 const ENVELOPE_CORE_FIELDS = Object.freeze([
 	"schemaVersion",
@@ -169,6 +227,8 @@ const ENVELOPE_CORE_FIELDS = Object.freeze([
 	"committedAt",
 	"envelopeHash",
 	"extensions",
+	"decisionKind",
+	"principal",
 ]);
 
 /** The reserved top-level carrier for extension namespaces (AC2). */
@@ -242,6 +302,79 @@ function envelopeUnknownFieldProblem(envelope) {
 
 function isPlainObject(value) {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * The Decision binding contract over one Envelope (F050 ticket 1, #226):
+ * `decisionKind` and `principal` are core fields carried ONLY by decision
+ * Envelopes. A decision Envelope must carry a kind from the closed set and a
+ * well-formed principal snapshot (the verified-at-admission binding of the
+ * acting Principal); any other Envelope must carry neither field.
+ *
+ * Shared by the read seam (committedProjection validates the stored Envelope)
+ * so a hand-crafted or newer-writer binding is rejected with its own stable
+ * code instead of being silently served — the writer seam (admitArtifact)
+ * constructs the binding through registry verification, so admission can
+ * never produce a malformed one.
+ * @param {object} envelope - Stored Envelope.
+ * @returns {{code: string, message: string}|null} The binding problem.
+ */
+function decisionBindingProblem(envelope) {
+	if (!envelope || typeof envelope !== "object") return null;
+	const isDecision = envelope.type === "decision";
+	const carriesKind = envelope.decisionKind !== undefined && envelope.decisionKind !== null;
+	const carriesPrincipal = envelope.principal !== undefined && envelope.principal !== null;
+	if (!isDecision && !carriesKind && !carriesPrincipal) return null;
+	if (!isDecision) {
+		return {
+			code: "AMBER_E_ARTIFACT_UNKNOWN_FIELD",
+			message: `the Envelope for "${envelope.identity}" revision ${envelope.revision} is a ${envelope.type} artifact but carries decision-only field${carriesKind && carriesPrincipal ? "s" : ""} ${[
+				carriesKind ? "decisionKind" : null,
+				carriesPrincipal ? "principal" : null,
+			]
+				.filter(Boolean)
+				.map((field) => `"${field}"`)
+				.join(", ")}; only decision Envelopes bind a Decision kind and acting Principal`,
+		};
+	}
+	if (!carriesKind || !DECISION_KINDS.includes(envelope.decisionKind)) {
+		return {
+			code: "AMBER_E_DECISION_KIND_INVALID",
+			message: `the decision Envelope for "${envelope.identity}" revision ${envelope.revision} ${carriesKind ? `carries decisionKind ${JSON.stringify(envelope.decisionKind)}` : "carries no decisionKind"}, which is outside the closed kind set (${DECISION_KINDS.join(", ")})`,
+		};
+	}
+	const principal = envelope.principal;
+	if (!carriesPrincipal || !isPlainObject(principal)) {
+		return {
+			code: "AMBER_E_DECISION_PRINCIPAL_REQUIRED",
+			message: `the decision Envelope for "${envelope.identity}" revision ${envelope.revision} carries no principal binding: every Decision binds the Principal that acted, verified against the registry at admission`,
+		};
+	}
+	if (
+		typeof principal.id !== "string" ||
+		principal.id.length === 0 ||
+		typeof principal.principalKind !== "string" ||
+		!["human", "service"].includes(principal.principalKind)
+	) {
+		return {
+			code: "AMBER_E_DECISION_PRINCIPAL_REQUIRED",
+			message: `the decision Envelope for "${envelope.identity}" revision ${envelope.revision} carries a malformed principal binding ${JSON.stringify(principal)}: the verified snapshot must bind { id, principalKind: human|service, role, membership, capability, issuer }`,
+		};
+	}
+	// Human-only slots are a binding invariant, not just an admission gate:
+	// acceptance/approval authority requires a human principal, and admission
+	// can never write a service principal into one — so a stored envelope that
+	// carries one is hand-edited state and fails the read closed.
+	if (
+		(envelope.decisionKind === "acceptance" || envelope.decisionKind === "approval") &&
+		principal.principalKind !== "human"
+	) {
+		return {
+			code: "AMBER_E_DECISION_HUMAN_SLOT_REQUIRED",
+			message: `the decision Envelope for "${envelope.identity}" revision ${envelope.revision} binds a ${envelope.decisionKind} Decision to a ${principal.principalKind} principal ("${principal.id}"); formal acceptance and approval are human-only slots that admission can never bind to a service identity — this is hand-edited state`,
+		};
+	}
+	return null;
 }
 
 // Extension values are carried opaquely as JSON (AC2): probe-serialize each
@@ -375,12 +508,26 @@ function traceContract(name) {
 
 /**
  * The concrete Artifact Type a Trace of `traceType` must resolve to for a
- * source artifact of `sourceType` ("same" resolves to the source type).
+ * source artifact of `sourceType` ("same" resolves to the source type). The
+ * reserved word "any" passes through unresolved: the Trace MUST declare its
+ * target type, which the structural check and the store validate against
+ * ARTIFACT_TYPES (see traceRequiresDeclaredTarget).
  */
 function expectedToType(traceType, sourceType) {
 	const contract = traceContract(traceType);
 	if (!contract) return null;
 	return contract.direction.toType === "same" ? sourceType : contract.direction.toType;
+}
+
+/**
+ * Whether a Trace type's contract direction cannot derive the target type
+ * from the source type ("any"), so the Trace record must declare its target
+ * type explicitly. Shared by the structural check here and the CLI trace
+ * parser (scripts/lib/canonical-artifact-commands.js), so both seams enforce
+ * the same grammar.
+ */
+function traceRequiresDeclaredTarget(traceType) {
+	return traceContract(traceType)?.direction.toType === "any";
 }
 
 function omittedSpecNote(traceType, declaredType) {
@@ -430,6 +577,23 @@ function structuralTraceProblems(sourceType, sourceIdentity, traces) {
 		}
 		const toType = expectedToType(trace.type, sourceType);
 		const declared = trace.to.type;
+		if (toType === "any") {
+			// A decides Trace names its own target type: the registry cannot
+			// derive it from the source type, so the declaration is REQUIRED
+			// and must itself be a registered type.
+			if (typeof declared !== "string" || declared.length === 0) {
+				problems.push({
+					code: "AMBER_E_ARTIFACT_TRACE_DIRECTION",
+					message: `"${trace.type}" Traces must declare their target artifact type — the "${trace.type}" contract allows any registered type, so the Trace itself names it: { to: { type, identity } } (registered types: ${ARTIFACT_TYPES.join(", ")})`,
+				});
+			} else if (!ARTIFACT_TYPES.includes(declared)) {
+				problems.push({
+					code: "AMBER_E_ARTIFACT_TRACE_DIRECTION",
+					message: `"${trace.type}" Traces must declare a registered target artifact type; "${declared}" is not registered (registered types: ${ARTIFACT_TYPES.join(", ")})`,
+				});
+			}
+			continue;
+		}
 		if (typeof declared === "string" && declared !== toType) {
 			problems.push({
 				code: "AMBER_E_ARTIFACT_TRACE_DIRECTION",
@@ -493,9 +657,11 @@ module.exports = {
 	SUPPORTED_ENVELOPE_SCHEMA_VERSIONS,
 	ENVELOPE_CORE_FIELDS,
 	EXTENSION_CARRIER_FIELD,
+	DECISION_KINDS,
 	isCoreEnvelopeField,
 	envelopeVersionProblem,
 	envelopeUnknownFieldProblem,
+	decisionBindingProblem,
 	extensionNamespaceProblem,
 	isValidArtifactIdentity,
 	transitionFor,
@@ -504,6 +670,7 @@ module.exports = {
 	transitionToState,
 	traceContract,
 	expectedToType,
+	traceRequiresDeclaredTarget,
 	structuralTraceProblems,
 	traceShapeProblem,
 };

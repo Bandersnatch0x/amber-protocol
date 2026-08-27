@@ -179,6 +179,10 @@ test("the Envelope core field set is closed and frozen, with the extensions carr
 			"committedAt",
 			"envelopeHash",
 			"extensions",
+			// F050 #226: the Decision binding is canonical Envelope content;
+			// non-decision Envelopes carry both fields as null.
+			"decisionKind",
+			"principal",
 		],
 	);
 });

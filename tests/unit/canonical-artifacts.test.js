@@ -211,8 +211,8 @@ test("unknown artifact type is rejected with a stable error code", () => {
 	assert.equal(r.code, "AMBER_E_ARTIFACT_UNKNOWN_TYPE");
 	assert.deepEqual(
 		ARTIFACT_TYPES,
-		["intent", "spec", "plan"],
-		"closed registry covers the three registered planning types",
+		["intent", "spec", "plan", "decision"],
+		"closed registry covers the three registered planning types plus the decision type (F050)",
 	);
 });
 
@@ -2173,8 +2173,15 @@ test("finding 1: a case-variant identity is refused at admission with the stored
 
 	// The case variant never reaches the CAS: it is its own stable error
 	// naming the exact spelling, with or without a declared expected head.
-	for (const overrides of [{ body: BODY_V1 + "v2\n" }, { body: BODY_V1 + "v2\n", expectedHead: 1 }]) {
-		const variant = admitArtifact(dir, { type: "intent", identity: "intent/login-bug", ...overrides });
+	for (const overrides of [
+		{ body: BODY_V1 + "v2\n" },
+		{ body: BODY_V1 + "v2\n", expectedHead: 1 },
+	]) {
+		const variant = admitArtifact(dir, {
+			type: "intent",
+			identity: "intent/login-bug",
+			...overrides,
+		});
 		assert.equal(variant.ok, false);
 		assert.equal(variant.code, "AMBER_E_ARTIFACT_IDENTITY_CASE_COLLISION");
 		assert.match(variant.errors[0], /intent\/Login-Bug/, "the exact spelling is named");
@@ -2218,7 +2225,12 @@ test("finding 1: reading a case-variant identity is not-found with a hint, never
 
 test("finding 1: a case-variant trace target fails as target-not-found naming the spelling", () => {
 	const dir = mkTarget("fr1-trace");
-	admitArtifact(dir, { type: "intent", identity: "intent/Login-Bug", body: BODY_V1, transition: "accept" });
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/Login-Bug",
+		body: BODY_V1,
+		transition: "accept",
+	});
 	const variant = admitArtifact(dir, {
 		type: "spec",
 		identity: "spec/child",
@@ -2261,7 +2273,12 @@ test("finding 4: show and list hash-verify every committed revision, not only th
 
 test("finding 4: the trace walk verifies every revision of each home it reaches", () => {
 	const dir = mkTarget("fr4-walk");
-	admitArtifact(dir, { type: "intent", identity: "intent/root", body: BODY_V1, transition: "accept" });
+	admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/root",
+		body: BODY_V1,
+		transition: "accept",
+	});
 	const spec = admitArtifact(dir, {
 		type: "spec",
 		identity: "spec/child",
@@ -2304,10 +2321,7 @@ test("finding 5: a trace never binds onto a target whose other committed revisio
 	assert.match(spec.errors[0], /revision 1 .*missing its Body/);
 	// The admission never created the source's artifact home: trace
 	// resolution fails before the lock is taken.
-	assert.equal(
-		fs.existsSync(path.join(dir, ".amber", "artifacts", "specs", "spec_child")),
-		false,
-	);
+	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts", "specs", "spec_child")), false);
 });
 
 test("finding 6: an artifact home blocked by a file fails admission as artifact I/O", () => {
