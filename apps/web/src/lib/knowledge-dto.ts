@@ -41,7 +41,7 @@ export interface KnowledgeGraphDTO {
 
 export interface RecentChangeItem {
   id: string;
-  source: 'git' | 'feature' | 'adr' | 'drift';
+  source: 'git' | 'feature' | 'adr' | 'drift' | 'maintenance';
   title: string;
   time: string;
   linkTo?: 'sessions' | 'gates' | 'transcripts' | 'routes' | 'governance';

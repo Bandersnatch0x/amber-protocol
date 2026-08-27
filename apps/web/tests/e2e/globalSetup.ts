@@ -3,6 +3,7 @@ import { getE2EClaudeHome, seedE2ETranscriptFixture } from './fixtures/transcrip
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { execFileSync } from 'node:child_process';
 
 // Inline functions to avoid TypeScript import resolution issues
 function getE2ERepoRoot(): string {
@@ -58,11 +59,48 @@ function prepareE2ERepoRoot(): string {
     }
   }
 
+  const featureListPath = path.join(fixtureRoot, 'feature_list.json');
+  const featureList = JSON.parse(fs.readFileSync(featureListPath, 'utf8')) as {
+    features: Array<{ id: string; paths?: string[] }>;
+  };
+  for (const feature of featureList.features) {
+    if (feature.id !== 'F001' && feature.id !== 'F007') feature.paths = [];
+  }
+  fs.writeFileSync(featureListPath, JSON.stringify(featureList, null, 2));
+
   return fixtureRoot;
+}
+
+function seedFeatureHistory(repoRoot: string): void {
+  execFileSync('git', ['init', '--quiet'], { cwd: repoRoot });
+  const featureListPath = path.join(repoRoot, 'feature_list.json');
+
+  for (let day = 1; day <= 25; day += 1) {
+    fs.appendFileSync(featureListPath, ' ');
+    execFileSync('git', ['add', '--', 'feature_list.json'], { cwd: repoRoot });
+    const timestamp = `2026-08-${String(day).padStart(2, '0')}T12:00:00Z`;
+    execFileSync(
+      'git',
+      ['commit', '--quiet', '-m', `chore(features): record state update ${day}`],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Amber E2E',
+          GIT_AUTHOR_EMAIL: 'amber-e2e@example.invalid',
+          GIT_AUTHOR_DATE: timestamp,
+          GIT_COMMITTER_NAME: 'Amber E2E',
+          GIT_COMMITTER_EMAIL: 'amber-e2e@example.invalid',
+          GIT_COMMITTER_DATE: timestamp,
+        },
+      },
+    );
+  }
 }
 
 export default function globalSetup(): void {
   const repoRoot = prepareE2ERepoRoot();
+  seedFeatureHistory(repoRoot);
   seedFixtureSession(repoRoot);
 
   // Hermetic Claude home for the transcript timeline fixture (read path only;

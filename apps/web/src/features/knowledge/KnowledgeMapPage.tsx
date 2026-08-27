@@ -174,35 +174,63 @@ function LocalJumpLink({
     'inline-flex items-center gap-1 rounded border border-amber-300/70 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors';
   if (linkTo === 'sessions' && linkId) {
     return (
-      <Link to="/sessions/$id" params={{ id: linkId }} className={cls} title={label}>
+      <Link
+        to="/sessions/$id"
+        params={{ id: linkId }}
+        className={cls}
+        title={label}
+        data-link-to={linkTo}
+        data-link-id={linkId}
+      >
         {children}
       </Link>
     );
   }
   if (linkTo === 'transcripts' && linkId) {
     return (
-      <Link to="/transcripts/$id" params={{ id: linkId }} className={cls} title={label}>
+      <Link
+        to="/transcripts/$id"
+        params={{ id: linkId }}
+        className={cls}
+        title={label}
+        data-link-to={linkTo}
+        data-link-id={linkId}
+      >
         {children}
       </Link>
     );
   }
   if (linkTo === 'routes' && linkId) {
     return (
-      <Link to="/routes/$id" params={{ id: linkId }} className={cls} title={label}>
+      <Link
+        to="/routes/$id"
+        params={{ id: linkId }}
+        className={cls}
+        title={label}
+        data-link-to={linkTo}
+        data-link-id={linkId}
+      >
         {children}
       </Link>
     );
   }
   if (linkTo === 'gates') {
     return (
-      <Link to="/gates" className={cls} title={label}>
+      <Link to="/gates" className={cls} title={label} data-link-to={linkTo} data-link-id={linkId}>
         {children}
       </Link>
     );
   }
   if (linkTo === 'governance') {
     return (
-      <Link to="/governance" className={cls} title={label}>
+      <Link
+        to="/governance"
+        search={linkId ? { featureId: linkId } : {}}
+        className={cls}
+        title={label}
+        data-link-to={linkTo}
+        data-link-id={linkId}
+      >
         {children}
       </Link>
     );
@@ -620,6 +648,12 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
 
 export function KnowledgeMapPage() {
   const { data: dto, isLoading, error, refetch } = trpc.knowledge.graph.useQuery();
+  const recentQuery = trpc.knowledge.recentChanges.useQuery(undefined, {
+    refetchInterval: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
+  });
   const { t } = useI18n();
 
   if (isLoading) {
@@ -638,10 +672,7 @@ export function KnowledgeMapPage() {
 
   if (error || !dto) {
     return (
-      <div
-        role="alert"
-        className="page-container flex items-center justify-center min-h-[60vh]"
-      >
+      <div role="alert" className="page-container flex items-center justify-center min-h-[60vh]">
         <div className="card p-6 max-w-md text-center space-y-3">
           <div className="text-sm font-medium text-red-700 dark:text-red-300">
             {t('knowledge.errorTitle')}
@@ -659,10 +690,33 @@ export function KnowledgeMapPage() {
     );
   }
 
-  return <KnowledgeMapGraph dto={dto} />;
+  return (
+    <KnowledgeMapGraph
+      dto={dto}
+      recentChanges={recentQuery.data ?? []}
+      recentError={recentQuery.error?.message ?? null}
+      recentIsFetching={recentQuery.isFetching}
+      recentIsLoading={recentQuery.isLoading}
+      onRefreshRecent={() => void recentQuery.refetch()}
+    />
+  );
 }
 
-function KnowledgeMapGraph({ dto }: { dto: KnowledgeGraphDTO }) {
+function KnowledgeMapGraph({
+  dto,
+  recentChanges,
+  recentError,
+  recentIsFetching,
+  recentIsLoading,
+  onRefreshRecent,
+}: {
+  dto: KnowledgeGraphDTO;
+  recentChanges: RecentChangeItem[];
+  recentError: string | null;
+  recentIsFetching: boolean;
+  recentIsLoading: boolean;
+  onRefreshRecent: () => void;
+}) {
   const { t } = useI18n();
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('cluster');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1015,71 +1069,79 @@ function KnowledgeMapGraph({ dto }: { dto: KnowledgeGraphDTO }) {
             </div>
           )}
 
-          <div className="card p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
-              {t('knowledge.recent')}
-            </h3>
-            <ul className="space-y-2">
-              {dto.recentChanges.map((r) => (
-                <li
-                  key={r.id}
-                  className="text-[11px] text-slate-600 dark:text-slate-300 rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5"
+          <div className="card p-4" data-testid="recent-drift-panel">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {t('knowledge.recentDrift')}
+              </h3>
+              <button
+                type="button"
+                onClick={onRefreshRecent}
+                disabled={recentIsFetching}
+                className="btn-secondary px-2 py-1 text-[10px] disabled:opacity-50"
+              >
+                {recentIsFetching ? t('knowledge.recentRefreshing') : t('knowledge.recentRefresh')}
+              </button>
+            </div>
+            {recentIsLoading ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="text-[11px] text-slate-500 dark:text-slate-400"
+              >
+                {t('knowledge.recentLoading')}
+              </div>
+            ) : recentError ? (
+              <div role="alert" className="space-y-2">
+                <div className="text-[11px] text-red-700 dark:text-red-300 break-all">
+                  {recentError}
+                </div>
+                <button
+                  type="button"
+                  onClick={onRefreshRecent}
+                  className="btn-secondary text-[11px]"
                 >
-                  <div className="flex gap-2 items-baseline">
-                    <span className="font-mono text-slate-400 shrink-0">{r.time}</span>
-                    <span className="truncate" title={r.title}>
-                      {r.title}
-                    </span>
-                  </div>
-                  {r.linkTo && (
-                    <div className="mt-1">
-                      <LocalJumpLink linkTo={r.linkTo} linkId={r.linkId} label={r.linkLabel}>
-                        <span aria-hidden>→</span>
-                        {t(`knowledge.link.${r.linkTo}` as I18nKey)}
-                        {r.linkLabel ? (
-                          <span className="font-mono opacity-70">· {r.linkLabel}</span>
-                        ) : null}
-                      </LocalJumpLink>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="card p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
-              {t('knowledge.drift')}
-            </h3>
-            {dto.drift.length === 0 ? (
-              <div className="text-[11px] text-slate-500">{t('knowledge.noDrift')}</div>
+                  {t('common.retry')}
+                </button>
+              </div>
+            ) : recentChanges.length === 0 ? (
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                {t('knowledge.recentEmpty')}
+              </div>
             ) : (
               <ul className="space-y-2">
-                {dto.drift.map((d) => {
-                  const node = nodeById.get(d.nodeId);
-                  return (
-                    <li key={`${d.nodeId}:${d.path}`} className="text-[11px]">
-                      <button
-                        onClick={() => setSelectedId(d.nodeId)}
-                        className="text-left w-full rounded-md border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/30 px-2 py-1.5 hover:border-red-300 dark:hover:border-red-700 transition-colors"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                          <span className="font-mono text-red-700 dark:text-red-300">
-                            {d.nodeId}
-                          </span>
-                        </div>
-                        <div className="font-mono text-[10px] text-red-600 dark:text-red-400 mt-0.5 break-all">
-                          {d.path}
-                        </div>
-                        <div className="text-slate-600 dark:text-slate-400 mt-0.5">{d.detail}</div>
-                        {node && (
-                          <div className="text-slate-400 mt-0.5 text-[10px]">{node.title}</div>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
+                {recentChanges.map((r) => (
+                  <li
+                    key={r.id}
+                    data-testid="recent-change"
+                    data-source={r.source}
+                    className={`text-[11px] rounded-md border px-2 py-1.5 ${
+                      r.source === 'drift'
+                        ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200'
+                        : 'border-slate-200 text-slate-600 dark:border-obsidian-border dark:text-slate-300'
+                    }`}
+                  >
+                    <div className="flex gap-2 items-baseline">
+                      <span className="font-mono text-slate-400 shrink-0">
+                        {r.time ? r.time.slice(0, 10) : r.source}
+                      </span>
+                      <span className="truncate" title={r.title}>
+                        {r.title}
+                      </span>
+                    </div>
+                    {r.linkTo && (
+                      <div className="mt-1">
+                        <LocalJumpLink linkTo={r.linkTo} linkId={r.linkId} label={r.linkLabel}>
+                          <span aria-hidden>→</span>
+                          {t(`knowledge.link.${r.linkTo}` as I18nKey)}
+                          {r.linkLabel ? (
+                            <span className="font-mono opacity-70">· {r.linkLabel}</span>
+                          ) : null}
+                        </LocalJumpLink>
+                      </div>
+                    )}
+                  </li>
+                ))}
               </ul>
             )}
           </div>

@@ -3,6 +3,10 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { appRouter } from '@server/app-router';
+import { listGates } from '@server/lib/gate-reader';
+import { listRoutes } from '@server/lib/route-reader';
+import { readSessionList } from '@server/lib/session-reader';
+import { listTranscripts } from '@server/lib/transcript-service';
 import { knowledgeRouter } from '@server/routers/knowledge';
 
 const ORIGINAL_AMBER_REPO_ROOT = process.env.AMBER_REPO_ROOT;
@@ -79,6 +83,60 @@ describe('knowledgeRouter', () => {
     const result = await caller.graph();
 
     expect(result.recentChanges).toEqual([]);
+  });
+
+  it('returns non-empty live feature history with drift pinned and dated rows ordered', async () => {
+    const changes = await caller.recentChanges();
+
+    expect(changes.length).toBeGreaterThan(0);
+    expect(changes.length).toBeLessThanOrEqual(50);
+    const sources = new Set(changes.map((change) => change.source));
+    expect(sources).toContain('git');
+    expect(sources).toContain('feature');
+    expect(sources).toContain('adr');
+    expect(sources).toContain('drift');
+    expect(changes.filter((change) => change.source === 'feature').length).toBeGreaterThan(0);
+
+    const firstNonDrift = changes.findIndex((change) => change.source !== 'drift');
+    expect(firstNonDrift).toBeGreaterThan(0);
+    expect(changes.slice(0, firstNonDrift).every((change) => change.source === 'drift')).toBe(true);
+    expect(changes.slice(firstNonDrift).some((change) => change.source === 'drift')).toBe(false);
+
+    const dated = changes.filter((change) => Number.isFinite(Date.parse(change.time)));
+    for (let index = 1; index < dated.length; index += 1) {
+      const previous = dated[index - 1];
+      const current = dated[index];
+      expect(Date.parse(previous.time)).toBeGreaterThanOrEqual(Date.parse(current.time));
+      if (Date.parse(previous.time) === Date.parse(current.time)) {
+        expect(previous.id.localeCompare(current.id)).toBeLessThanOrEqual(0);
+      }
+    }
+  }, 15_000);
+
+  it('validates every emitted jump id against the corresponding live source', async () => {
+    const [changes, gates] = await Promise.all([caller.recentChanges(), listGates()]);
+    const featureList = JSON.parse(
+      fs.readFileSync(path.join(SOURCE_ROOT, 'feature_list.json'), 'utf8'),
+    ) as {
+      features: Array<{ id: string }>;
+    };
+    const liveIds = {
+      sessions: new Set(readSessionList().map((session) => session.id)),
+      gates: new Set(gates.map((gate) => gate.gateId)),
+      transcripts: new Set(
+        listTranscripts({ repoPath: SOURCE_ROOT }).map((transcript) => transcript.id),
+      ),
+      routes: new Set(listRoutes().map((route) => route.id)),
+      governance: new Set(featureList.features.map((feature) => feature.id)),
+    };
+
+    for (const change of changes) {
+      if (!change.linkId) continue;
+      expect(change.linkTo).toBeDefined();
+      expect(liveIds[change.linkTo!].has(change.linkId), `${change.linkTo}:${change.linkId}`).toBe(
+        true,
+      );
+    }
   });
 
   it('includes drift findings with actualPath when a rename is detected', async () => {

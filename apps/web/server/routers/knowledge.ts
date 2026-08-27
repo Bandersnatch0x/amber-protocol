@@ -1,5 +1,6 @@
 import { createRequire } from 'module';
 import { router, publicProcedure } from '../trpc';
+import { listRecentChanges } from '../lib/knowledge-recent';
 import { resolveRepoRoot } from '../lib/repo-root';
 import type {
   GraphLayer,
@@ -10,9 +11,9 @@ import type {
 } from '../../src/lib/knowledge-dto';
 
 const requireCli = createRequire(import.meta.url);
-const { buildKnowledgeGraph } = requireCli(
-  '../../../../scripts/lib/core/knowledge-graph.js',
-) as { buildKnowledgeGraph: (target: string) => RawGraph };
+const { buildKnowledgeGraph } = requireCli('../../../../scripts/lib/core/knowledge-graph.js') as {
+  buildKnowledgeGraph: (target: string) => RawGraph;
+};
 
 interface RawEdge {
   src: string;
@@ -52,11 +53,20 @@ interface RawGraph {
 }
 
 const NODE_KINDS = new Set<KnowledgeNode['kind']>([
-  'adr', 'artifact', 'wiki', 'knowledge', 'memory', 'architecture', 'feature',
+  'adr',
+  'artifact',
+  'wiki',
+  'knowledge',
+  'memory',
+  'architecture',
+  'feature',
 ]);
 const NODE_LAYERS = new Set<GraphLayer>(['decision', 'knowledge', 'implementation']);
 const EDGE_VERBS = new Set<KnowledgeEdgeDTO['verb']>([
-  'supersedes', 'builds-on', 'references', 'describes',
+  'supersedes',
+  'builds-on',
+  'references',
+  'describes',
 ]);
 const ORIGINS = new Set<'deterministic' | 'inferred'>(['deterministic', 'inferred']);
 
@@ -128,4 +138,5 @@ export const knowledgeRouter = router({
     const raw = buildKnowledgeGraph(repoRoot);
     return adaptGraph(raw);
   }),
+  recentChanges: publicProcedure.query(() => listRecentChanges(resolveRepoRoot())),
 });

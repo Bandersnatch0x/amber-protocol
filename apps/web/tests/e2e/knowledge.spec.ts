@@ -6,7 +6,9 @@ async function waitForGraph(page: Page) {
 }
 
 // Extract and assert mandatory counts from the subtitle.
-async function getSubtitleCounts(page: Page): Promise<{ visible: number; total: number; edges: number }> {
+async function getSubtitleCounts(
+  page: Page,
+): Promise<{ visible: number; total: number; edges: number }> {
   const subtitle = page.locator('p', { hasText: /nodes/ }).first();
   await expect(subtitle).toBeVisible();
   const text = await subtitle.textContent();
@@ -24,7 +26,9 @@ async function getSubtitleCounts(page: Page): Promise<{ visible: number; total: 
 }
 
 test.describe('Knowledge Map (/knowledge)', () => {
-  test('renders the graph with real node/edge counts — assertions are mandatory', async ({ page }) => {
+  test('renders the graph with real node/edge counts — assertions are mandatory', async ({
+    page,
+  }) => {
     await page.goto('/knowledge');
     await waitForGraph(page);
 
@@ -46,7 +50,9 @@ test.describe('Knowledge Map (/knowledge)', () => {
     await expect(page.locator('[role="alert"]')).not.toBeVisible();
   });
 
-  test('search hit reduces visible count; search miss yields zero visible nodes', async ({ page }) => {
+  test('search hit reduces visible count; search miss yields zero visible nodes', async ({
+    page,
+  }) => {
     await page.goto('/knowledge');
     await waitForGraph(page);
 
@@ -143,7 +149,9 @@ test.describe('Knowledge Map (/knowledge)', () => {
     await adrNode.click();
 
     // Source row visible
-    await expect(page.locator('dt', { hasText: /source/i }).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('dt', { hasText: /source/i }).first()).toBeVisible({
+      timeout: 5_000,
+    });
 
     // Context section: body excerpt rendered (P-1 fix delivers this)
     const contextHeading = page.locator('div', { hasText: /^context$/i }).first();
@@ -198,6 +206,73 @@ test.describe('Knowledge Map (/knowledge)', () => {
     await expect(driftSection).toBeVisible();
   });
 
+  test('recent and drift feed is live, pinned, capped, manually refreshed, and linked to real routes', async ({
+    page,
+  }) => {
+    let recentRequests = 0;
+    page.on('request', (request) => {
+      if (request.url().includes('/api/trpc/knowledge.recentChanges')) recentRequests += 1;
+    });
+
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    const panel = page.getByTestId('recent-drift-panel');
+    const rows = panel.getByTestId('recent-change');
+    await expect(panel).toBeVisible();
+    await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+
+    const count = await rows.count();
+    expect(count).toBe(50);
+    const sources = await rows.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('data-source')),
+    );
+    expect(sources).toContain('drift');
+    expect(sources).toContain('feature');
+    expect(sources).toContain('adr');
+
+    const firstNonDrift = sources.findIndex((source) => source !== 'drift');
+    expect(firstNonDrift).toBeGreaterThan(0);
+    expect(sources.slice(0, firstNonDrift).every((source) => source === 'drift')).toBe(true);
+    expect(sources.slice(firstNonDrift)).not.toContain('drift');
+
+    const requestsAfterLoad = recentRequests;
+    await page.waitForTimeout(1_200);
+    expect(recentRequests).toBe(requestsAfterLoad);
+    await panel.getByRole('button', { name: /^refresh$/i }).click();
+    await expect.poll(() => recentRequests).toBe(requestsAfterLoad + 1);
+
+    const links = panel.locator('a[data-link-to]');
+    const linkCount = await links.count();
+    expect(linkCount).toBeGreaterThan(0);
+    const targets = await links.evaluateAll((elements) =>
+      elements.map((element) => ({
+        href: element.getAttribute('href') ?? '',
+        linkTo: element.getAttribute('data-link-to') ?? '',
+        linkId: element.getAttribute('data-link-id') ?? '',
+      })),
+    );
+
+    for (const target of targets) {
+      expect(target.href).not.toMatch(/placeholder|fixture/i);
+      if (target.linkTo === 'sessions') expect(target.href).toContain(`/sessions/${target.linkId}`);
+      if (target.linkTo === 'transcripts') {
+        expect(target.href).toContain(`/transcripts/${target.linkId}`);
+      }
+      if (target.linkTo === 'routes') expect(target.href).toContain(`/routes/${target.linkId}`);
+      if (target.linkTo === 'gates') expect(target.href).toBe('/gates');
+      if (target.linkTo === 'governance') {
+        expect(target.href).toBe(
+          target.linkId
+            ? `/governance?featureId=${encodeURIComponent(target.linkId)}`
+            : '/governance',
+        );
+      }
+      const response = await page.request.get(target.href);
+      expect(response.ok(), target.href).toBe(true);
+    }
+  });
+
   test('adr:0003 (15 edges) shows edge rows and +N>0 in mini-context graph', async ({ page }) => {
     await page.goto('/knowledge');
     await waitForGraph(page);
@@ -216,7 +291,10 @@ test.describe('Knowledge Map (/knowledge)', () => {
     await expect(miniGraph).toBeVisible({ timeout: 3_000 });
 
     // +N overflow label is visible and positive (15 total > 8 shown → +7)
-    const plusN = miniGraph.locator('text').filter({ hasText: /^\+\d+$/ }).first();
+    const plusN = miniGraph
+      .locator('text')
+      .filter({ hasText: /^\+\d+$/ })
+      .first();
     await expect(plusN).toBeVisible({ timeout: 3_000 });
     const label = await plusN.textContent();
     expect(parseInt(label!.replace('+', ''), 10)).toBeGreaterThan(0);
