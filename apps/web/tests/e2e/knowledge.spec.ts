@@ -168,18 +168,25 @@ test.describe('Knowledge Map (/knowledge)', () => {
     await page.goto('/knowledge');
     await waitForGraph(page);
 
-    // feature:F001 is in the graph — the card renders its id in the node body
-    const f001 = page.locator('.react-flow__node').filter({ hasText: 'feature:F001' }).first();
+    const f001 = page.locator('.react-flow__node[data-id="feature:F001"]:visible');
     await expect(f001).toBeVisible({ timeout: 10_000 });
     await f001.click();
 
-    // Anchors section appears (F001 declares paths including the dead scaffolding.js)
-    const anchorsSection = page.locator('div', { hasText: /^anchors$/i }).first();
-    await expect(anchorsSection).toBeVisible({ timeout: 5_000 });
+    const detailCard = page.locator('aside > .card').first();
+    await expect(detailCard.getByText('feature:F001', { exact: true })).toBeVisible({
+      timeout: 5_000,
+    });
 
-    // Dead anchor label is present (standing drift finding: scaffolding.js → scaffold.js)
-    const deadLabel = page.locator('span', { hasText: /dead anchor/i }).first();
-    await expect(deadLabel).toBeVisible({ timeout: 3_000 });
+    await expect(detailCard.getByText(/^context$/i)).toBeVisible();
+    await expect(detailCard).toContainText('A project gains AGENTS.md/CLAUDE.md');
+
+    await expect(detailCard.getByText(/^anchors$/i)).toBeVisible();
+    const scaffoldingAnchor = detailCard.locator('li').filter({
+      hasText: /^scripts\/lib\/core\/scaffolding\.js/,
+    });
+    await expect(scaffoldingAnchor).toHaveCount(1);
+    await expect(scaffoldingAnchor).toContainText(/^scripts\/lib\/core\/scaffolding\.js/);
+    await expect(scaffoldingAnchor.getByText(/dead anchor|死锚点/i)).toBeVisible();
   });
 
   test('drift panel shows dead-anchor findings from the real tree', async ({ page }) => {
