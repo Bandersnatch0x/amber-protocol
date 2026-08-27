@@ -222,12 +222,14 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
   return (
     <div
       className={`rounded-md border px-2.5 py-1.5 min-w-[120px] max-w-[180px] shadow-sm transition-all ${c.fill} ${
-        selected
-          ? 'ring-2 ring-amber-500 shadow-glow-amber'
-          : highlight
-            ? 'ring-2 ring-amber-500/60'
-            : ''
-      } ${dimmed ? 'opacity-35' : ''}`}
+        drift
+          ? 'ring-2 ring-red-500'
+          : selected
+            ? 'ring-2 ring-amber-500'
+            : highlight
+              ? 'ring-2 ring-amber-500/60'
+              : ''
+      } ${selected ? 'shadow-glow-amber' : ''} ${dimmed ? 'opacity-35' : ''}`}
       style={{ borderLeft: `3px solid ${c.ring}` }}
     >
       <div className="flex items-center gap-1.5">
@@ -546,7 +548,12 @@ export function KnowledgeMapPage() {
                           </span>{' '}
                           → <span className="font-mono">{e.dst}</span>
                           {e.origin === 'inferred' && (
-                            <span className="ml-1 text-[9px] text-slate-400 italic">inferred</span>
+                            <span
+                              className="ml-1 text-[9px] text-slate-400 italic"
+                              title={`inferred · ${e.provenance?.model} · prompt ${e.provenance?.promptHash} · ${e.provenance?.timestamp}`}
+                            >
+                              inferred ({e.provenance?.model})
+                            </span>
                           )}
                         </li>
                       ))}
@@ -557,7 +564,12 @@ export function KnowledgeMapPage() {
                             {e.verb}
                           </span>
                           {e.origin === 'inferred' && (
-                            <span className="ml-1 text-[9px] text-slate-400 italic">inferred</span>
+                            <span
+                              className="ml-1 text-[9px] text-slate-400 italic"
+                              title={`inferred · ${e.provenance?.model} · prompt ${e.provenance?.promptHash} · ${e.provenance?.timestamp}`}
+                            >
+                              inferred ({e.provenance?.model})
+                            </span>
                           )}
                         </li>
                       ))}

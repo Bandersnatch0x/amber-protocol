@@ -1,5 +1,3 @@
-import type { Edge, Node } from '@xyflow/react';
-
 export type GraphLayer = 'decision' | 'knowledge' | 'implementation';
 
 export interface KnowledgeNode {
@@ -578,5 +576,3 @@ export const knowledgeGraphFixture: KnowledgeGraphDTO = {
     },
   ],
 };
-
-export type { Node, Edge };
