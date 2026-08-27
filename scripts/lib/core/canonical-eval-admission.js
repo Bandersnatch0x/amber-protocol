@@ -12,7 +12,8 @@
 const path = require("node:path");
 
 const { admitArtifact, showArtifact } = require("./canonical-artifacts");
-const { recordEvidence } = require("./evidence-receipts");
+const { isValidArtifactIdentity } = require("./canonical-artifact-contracts");
+const { recordEvidence, showEvidence } = require("./evidence-receipts");
 const { resolveActivePrincipal } = require("./principal-registry");
 const { sha256, canonicalJson } = require("./context-hash");
 const {
@@ -34,6 +35,30 @@ function fail(code, errors) {
 
 function isNonEmptyString(value) {
 	return typeof value === "string" && value.trim().length > 0;
+}
+
+function canonicalEqual(left, right) {
+	return canonicalJson(JSON.stringify(left)) === canonicalJson(JSON.stringify(right));
+}
+
+function inputOrDefault(input, key, defaultValue) {
+	return Object.prototype.hasOwnProperty.call(input, key) ? input[key] : defaultValue;
+}
+
+function idProblem(value, label) {
+	if (!isNonEmptyString(value))
+		return `${label} must be a non-empty string; got ${JSON.stringify(value)}`;
+	if (value.length > 200) return `${label} must carry at most 200 characters; got ${value.length}`;
+	return null;
+}
+
+function artifactIdentityProblem(value, label) {
+	if (!isNonEmptyString(value))
+		return `${label} must be a non-empty artifact identity; got ${JSON.stringify(value)}`;
+	if (!isValidArtifactIdentity(value)) {
+		return `${label} ${JSON.stringify(value)} is not a usable artifact identity (empty and pure-dot segments are rejected)`;
+	}
+	return null;
 }
 
 function resultHashOf(suite) {
@@ -99,6 +124,20 @@ function admitActiveDefinition(cwd, identity) {
 				],
 			};
 		}
+		const expectedBody = definitionBody();
+		const expectedExtensions = definitionEnvelope();
+		if (
+			current.body !== expectedBody ||
+			!canonicalEqual(current.envelope?.extensions ?? null, expectedExtensions)
+		) {
+			return {
+				ok: false,
+				code: "AMBER_E_INVALID_ARG",
+				errors: [
+					`eval definition "${identity}" is active but does not match the current instruction-surface Eval definition; admit a new compatible definition revision instead of reusing stale or unrelated provenance`,
+				],
+			};
+		}
 		return { ok: true, receipt: current, errors: [] };
 	}
 
@@ -159,23 +198,55 @@ function admitInstructionSurfaceEval(cwd, input = {}, opts = {}) {
 			`producer is required: canonical Eval admission records replayable Evidence through a registered producer Principal; got ${JSON.stringify(producer)}`,
 		]);
 	}
-	const suiteName = input.suite ?? SUITE_ID;
+	const suiteName = inputOrDefault(input, "suite", SUITE_ID);
 	if (suiteName !== SUITE_ID) {
 		return fail("AMBER_E_INVALID_ARG", [
 			`unknown eval suite ${JSON.stringify(suiteName)} (expected "${SUITE_ID}")`,
 		]);
 	}
-	const definitionIdentity = input.definitionIdentity || DEFAULT_DEFINITION_IDENTITY;
-	const evidenceSubject = input.subject || DEFAULT_EVIDENCE_SUBJECT;
-	if (!isNonEmptyString(definitionIdentity)) {
-		return fail("AMBER_E_INVALID_ARG", [
-			`definitionIdentity must be a non-empty artifact identity; got ${JSON.stringify(definitionIdentity)}`,
-		]);
+	const definitionIdentity = inputOrDefault(
+		input,
+		"definitionIdentity",
+		DEFAULT_DEFINITION_IDENTITY,
+	);
+	const evidenceSubject = inputOrDefault(input, "subject", DEFAULT_EVIDENCE_SUBJECT);
+	const definitionProblem = artifactIdentityProblem(definitionIdentity, "definitionIdentity");
+	if (definitionProblem !== null) return fail("AMBER_E_INVALID_ARG", [definitionProblem]);
+	const subjectProblem = idProblem(evidenceSubject, "subject");
+	if (subjectProblem !== null) return fail("AMBER_E_INVALID_ARG", [subjectProblem]);
+	const suite = runInstructionSurfaceEvals(cwd, opts);
+	const resultHash = resultHashOf(suite);
+	const outcomeIdentity = inputOrDefault(
+		input,
+		"outcomeIdentity",
+		`eval-result/instruction-surface/${hashSuffix(resultHash)}`,
+	);
+	const evidenceId = inputOrDefault(
+		input,
+		"evidenceId",
+		`evidence/eval-instruction-surface-${hashSuffix(resultHash)}`,
+	);
+	const outcomeProblem = artifactIdentityProblem(outcomeIdentity, "outcomeIdentity");
+	if (outcomeProblem !== null) return fail("AMBER_E_INVALID_ARG", [outcomeProblem]);
+	const evidenceProblem = idProblem(evidenceId, "evidenceId");
+	if (evidenceProblem !== null) return fail("AMBER_E_INVALID_ARG", [evidenceProblem]);
+	try {
+		if (showEvidence(cwd, evidenceId) !== null) {
+			return fail("AMBER_E_EVIDENCE_ALREADY_RECORDED", [
+				`evidence "${evidenceId}" is already recorded; canonical Eval admission will not write Eval artifacts that cannot be paired with a new Evidence receipt`,
+			]);
+		}
+	} catch (err) {
+		return fail(err.amberCode || "AMBER_E_EVIDENCE_REGISTRY_CORRUPT", [err.message || String(err)]);
 	}
-	if (!isNonEmptyString(evidenceSubject)) {
-		return fail("AMBER_E_INVALID_ARG", [
-			`subject must be a non-empty Evidence subject; got ${JSON.stringify(evidenceSubject)}`,
-		]);
+	try {
+		if (showArtifact(cwd, outcomeIdentity, { type: "eval-result" }) !== null) {
+			return fail("AMBER_E_ARTIFACT_CONFLICT", [
+				`eval result artifact "${outcomeIdentity}" already exists; canonical Eval admission will not write a duplicate outcome before Evidence is recorded`,
+			]);
+		}
+	} catch (err) {
+		return fail(err.amberCode || "AMBER_E_ARTIFACT_NOT_FOUND", [err.message || String(err)]);
 	}
 	try {
 		const resolvedProducer = resolveActivePrincipal(cwd, producer, { now: opts.now ?? new Date() });
@@ -186,18 +257,9 @@ function admitInstructionSurfaceEval(cwd, input = {}, opts = {}) {
 		]);
 	}
 
-	const suite = runInstructionSurfaceEvals(cwd, opts);
-	const resultHash = resultHashOf(suite);
 	const definitionResult = admitActiveDefinition(cwd, definitionIdentity);
 	if (!definitionResult.ok) return fail(definitionResult.code, definitionResult.errors);
 
-	const outcomeIdentity =
-		input.outcomeIdentity || `eval-result/instruction-surface/${hashSuffix(resultHash)}`;
-	if (!isNonEmptyString(outcomeIdentity)) {
-		return fail("AMBER_E_INVALID_ARG", [
-			`outcomeIdentity must be a non-empty artifact identity; got ${JSON.stringify(outcomeIdentity)}`,
-		]);
-	}
 	const outcomeResult = admitEvalOutcome(cwd, {
 		identity: outcomeIdentity,
 		suite,
@@ -207,13 +269,6 @@ function admitInstructionSurfaceEval(cwd, input = {}, opts = {}) {
 	});
 	if (!outcomeResult.ok) return fail(outcomeResult.code, outcomeResult.errors);
 
-	const evidenceId =
-		input.evidenceId || `evidence/eval-instruction-surface-${hashSuffix(resultHash)}`;
-	if (!isNonEmptyString(evidenceId)) {
-		return fail("AMBER_E_INVALID_ARG", [
-			`evidenceId must be a non-empty Evidence receipt id; got ${JSON.stringify(evidenceId)}`,
-		]);
-	}
 	const evidenceResult = recordEvidence(
 		cwd,
 		{

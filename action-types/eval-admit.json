@@ -7,6 +7,7 @@
 	"parameters": {
 		"producer": {
 			"type": "string",
+			"required": true,
 			"description": "Registered Principal that produced the replayable Eval Evidence receipt."
 		},
 		"suite": {

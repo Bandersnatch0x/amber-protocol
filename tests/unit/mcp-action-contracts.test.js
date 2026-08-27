@@ -52,6 +52,12 @@ test("COMMAND_CAPABILITIES covers every command the eight Action Types map to", 
 	}
 });
 
+test("eval admit requires producer in its Action Type schema", () => {
+	const action = loadRealActions().find((entry) => entry.actionTypeId === "amber.eval.admit");
+	assert.ok(action, "eval admit Action Type is registered");
+	assert.equal(action.parameters.producer.required, true);
+});
+
 test("context/load is untyped (§15.1 open point (c) cleanup)", () => {
 	assert.equal(COMMAND_CAPABILITIES["context/load"], undefined);
 	assert.equal(KNOWN_UNTYPED_SUBCOMMANDS.has("context/load"), true);

@@ -19,6 +19,75 @@ function payload(r) {
 	return outer.text ? JSON.parse(outer.text) : outer;
 }
 
+function registerEvalProducer(dir) {
+	const producer = runCli(
+		[
+			"principal",
+			"register",
+			"--id",
+			"ci-runner",
+			"--kind",
+			"service",
+			"--role",
+			"runner",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(producer.status, 0, producer.stderr || producer.stdout);
+}
+
+function admitWrongEvalDefinition(dir) {
+	const draft = runCli(
+		[
+			"artifact",
+			"admit",
+			"--target",
+			dir,
+			"--type",
+			"eval",
+			"--id",
+			"eval/instruction-surface",
+			"--body",
+			"# Wrong Eval",
+			"--extension",
+			"eval.contractVersion=1",
+			"--extension",
+			"eval.suiteId=wrong-suite",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(draft.status, 0, draft.stderr || draft.stdout);
+	const active = runCli(
+		[
+			"artifact",
+			"admit",
+			"--target",
+			dir,
+			"--type",
+			"eval",
+			"--id",
+			"eval/instruction-surface",
+			"--body",
+			"# Wrong Eval",
+			"--extension",
+			"eval.contractVersion=1",
+			"--extension",
+			"eval.suiteId=wrong-suite",
+			"--expected-head",
+			"1",
+			"--transition",
+			"activate",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(active.status, 0, active.stderr || active.stdout);
+}
+
 test("amber eval run reports a replayable instruction-surface suite without writing", () => {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-"));
 	const before = fs.existsSync(path.join(dir, ".amber"))
@@ -246,6 +315,169 @@ test("amber eval admit refuses an unregistered producer before writing Eval arti
 	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts", "evals")), false);
 	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts", "eval-results")), false);
 	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("amber eval admit rejects stale or unrelated active Eval definitions before writing results", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-admit-wrong-def-"));
+	registerEvalProducer(dir);
+	admitWrongEvalDefinition(dir);
+	const r = runCli(
+		[
+			"eval",
+			"admit",
+			"--target",
+			dir,
+			"--producer",
+			"ci-runner",
+			"--evidence-id",
+			"evidence/wrong-def",
+			"--yes",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	const outer = JSON.parse(r.stdout);
+	assert.equal(outer.code, "AMBER_E_INVALID_ARG");
+	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts", "eval-results")), false);
+	assert.equal(fs.existsSync(path.join(dir, ".amber", "evidence", "receipts.jsonl")), false);
+	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("amber eval admit validates evidence ids and duplicates before writing Eval results", () => {
+	const blank = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-admit-blank-id-"));
+	registerEvalProducer(blank);
+	const blankResult = runCli(
+		[
+			"eval",
+			"admit",
+			"--target",
+			blank,
+			"--producer",
+			"ci-runner",
+			"--evidence-id",
+			"",
+			"--outcome-id",
+			"eval-result/blank",
+			"--yes",
+			"--json",
+		],
+		blank,
+	);
+	assert.equal(blankResult.status, 1);
+	assert.equal(JSON.parse(blankResult.stdout).code, "AMBER_E_INVALID_ARG");
+	assert.equal(fs.existsSync(path.join(blank, ".amber", "artifacts", "eval-results")), false);
+	const blankOutcome = runCli(
+		[
+			"eval",
+			"admit",
+			"--target",
+			blank,
+			"--producer",
+			"ci-runner",
+			"--outcome-id",
+			"",
+			"--yes",
+			"--json",
+		],
+		blank,
+	);
+	assert.equal(blankOutcome.status, 1);
+	assert.equal(JSON.parse(blankOutcome.stdout).code, "AMBER_E_INVALID_ARG");
+	const overlongEvidence = runCli(
+		[
+			"eval",
+			"admit",
+			"--target",
+			blank,
+			"--producer",
+			"ci-runner",
+			"--evidence-id",
+			`evidence/${"x".repeat(250)}`,
+			"--outcome-id",
+			"eval-result/overlong",
+			"--yes",
+			"--json",
+		],
+		blank,
+	);
+	assert.equal(overlongEvidence.status, 1);
+	assert.equal(JSON.parse(overlongEvidence.stdout).code, "AMBER_E_INVALID_ARG");
+	const missingOverlongOutcome = runCli(
+		[
+			"artifact",
+			"show",
+			"--target",
+			blank,
+			"--type",
+			"eval-result",
+			"--id",
+			"eval-result/overlong",
+			"--json",
+		],
+		blank,
+	);
+	assert.equal(missingOverlongOutcome.status, 1);
+	fs.rmSync(blank, { recursive: true, force: true });
+
+	const duplicate = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-admit-duplicate-id-"));
+	registerEvalProducer(duplicate);
+	const recorded = runCli(
+		[
+			"evidence",
+			"record",
+			"--target",
+			duplicate,
+			"--id",
+			"evidence/same",
+			"--producer",
+			"ci-runner",
+			"--assurance",
+			"observed",
+			"--subject",
+			"manual",
+			"--status",
+			"pass",
+			"--json",
+		],
+		duplicate,
+	);
+	assert.equal(recorded.status, 0, recorded.stderr || recorded.stdout);
+	const duplicateResult = runCli(
+		[
+			"eval",
+			"admit",
+			"--target",
+			duplicate,
+			"--producer",
+			"ci-runner",
+			"--evidence-id",
+			"evidence/same",
+			"--outcome-id",
+			"eval-result/second",
+			"--yes",
+			"--json",
+		],
+		duplicate,
+	);
+	assert.equal(duplicateResult.status, 1);
+	assert.equal(JSON.parse(duplicateResult.stdout).code, "AMBER_E_EVIDENCE_ALREADY_RECORDED");
+	const missingOutcome = runCli(
+		[
+			"artifact",
+			"show",
+			"--target",
+			duplicate,
+			"--type",
+			"eval-result",
+			"--id",
+			"eval-result/second",
+			"--json",
+		],
+		duplicate,
+	);
+	assert.equal(missingOutcome.status, 1);
+	fs.rmSync(duplicate, { recursive: true, force: true });
 });
 
 test("amber eval run exits 1 when a Context Page imitates the breadcrumb", () => {

@@ -1590,7 +1590,7 @@ consume Approval, do not bind a Decision principal, and cannot widen execution a
 
 ```bash
 node scripts/amber.js eval run --target . --json
-node scripts/amber.js eval admit --target . --producer ci-runner --evidence-id evidence/eval-run --json
+node scripts/amber.js eval admit --target . --producer ci-runner --evidence-id evidence/eval-run --yes --json
 node scripts/amber.js eval list --target .
 node scripts/amber.js eval show --id eval.instruction-surface.mcp-tool-description --target .
 ```

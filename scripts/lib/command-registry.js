@@ -833,7 +833,7 @@ const COMMAND_HELP = {
 		"",
 		"Examples:",
 		"  amber eval run --target . --json",
-		"  amber eval admit --target . --producer ci-runner --evidence-id evidence/eval-run --json",
+		"  amber eval admit --target . --producer ci-runner --evidence-id evidence/eval-run --yes --json",
 		"  amber eval list --target .",
 		"  amber eval show --id eval.instruction-surface.mcp-tool-description --target .",
 	],
@@ -1386,7 +1386,7 @@ const COMMAND_OUTPUT = {
 		usage: [
 			"Usage: amber eval <run|list|show|admit> --target <repo> [--json]",
 			"       amber eval run --target <repo> [--suite instruction-surface] [--json]",
-			"       amber eval admit --target <repo> --producer <principal> [--suite instruction-surface] [--definition-id <identity>] [--outcome-id <identity>] [--evidence-id <id>] [--subject <subject>] [--json]",
+			"       amber eval admit --target <repo> --producer <principal> [--suite instruction-surface] [--definition-id <identity>] [--outcome-id <identity>] [--evidence-id <id>] [--subject <subject>] --yes [--json]",
 			"       amber eval list --target <repo> [--json]",
 			"       amber eval show --id <evalId> --target <repo> [--json]",
 		].join("\n"),
