@@ -120,7 +120,7 @@ const DEFAULT_MAX_OUTCOME_BYTES = 1024 * 1024;
 const COMPARATORS = Object.freeze({
 	numeric: Object.freeze(["eq", "ne", "lt", "le", "gt", "ge"]),
 	string: Object.freeze(["eq", "ne", "contains"]),
-	version: Object.freeze(["eq", "lt", "le", "gt", "ge"]),
+	version: Object.freeze(["lt", "le", "gt", "ge"]),
 });
 
 /** v1 failure behavior is deny-only: a failing gate denies. */

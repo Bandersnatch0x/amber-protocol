@@ -137,7 +137,7 @@ test("gate evaluation constants pin the comparator, clock, and schema contracts"
 	assert.deepEqual(SUPPORTED_GATE_EVALUATION_SCHEMA_VERSIONS, [1]);
 	assert.deepEqual(COMPARATORS.numeric, ["eq", "ne", "lt", "le", "gt", "ge"]);
 	assert.deepEqual(COMPARATORS.string, ["eq", "ne", "contains"]);
-	assert.deepEqual(COMPARATORS.version, ["eq", "lt", "le", "gt", "ge"]);
+	assert.deepEqual(COMPARATORS.version, ["lt", "le", "gt", "ge"]);
 	assert.deepEqual(FAIL_BEHAVIORS, ["deny"]);
 	assert.deepEqual(CLOCK_SOURCES, ["injected", "system"]);
 	assert.equal(SKEW_POLICY, "no-tolerance");
