@@ -91,6 +91,30 @@ test("projection status reports drift when canonical artifacts change", () => {
 	assert.equal(out.code, "AMBER_E_PROJECTION_DRIFT");
 });
 
+test("projection status propagates the typed code into the CLI result envelope (full-review finding 3)", () => {
+	// rebuild and query already propagate their typed code to the OUTER
+	// envelope (`code` next to `text`/`errors`); status used to carry it only
+	// inside the JSON text payload. Assert the envelope seam directly.
+	const dir = mkTarget("status-drift-code");
+	fs.mkdirSync(path.join(dir, ".amber", "context", "pages"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "context", "pages", "p1.json"),
+		JSON.stringify({ pageId: "p1", title: "Page 1", sources: {}, blocks: [] }),
+	);
+	runCli(["projection", "rebuild", "--type", "governance-graph", "--target", dir, "--json"], dir);
+	fs.writeFileSync(
+		path.join(dir, ".amber", "context", "pages", "p1.json"),
+		JSON.stringify({ pageId: "p1", title: "Changed", sources: {}, blocks: [] }),
+	);
+	const r = runCli(
+		["projection", "status", "--type", "governance-graph", "--target", dir, "--json"],
+		dir,
+	);
+	assert.equal(r.status, 1);
+	const outer = JSON.parse(r.stdout);
+	assert.equal(outer.code, "AMBER_E_PROJECTION_DRIFT", "the envelope code is machine-readable");
+});
+
 test("projection rebuild rejects an unknown type", () => {
 	const dir = mkTarget("badtype");
 	const r = runCli(["projection", "rebuild", "--type", "bogus", "--target", dir, "--json"], dir);
