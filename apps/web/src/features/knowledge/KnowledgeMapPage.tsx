@@ -16,14 +16,14 @@ import {
 } from '@xyflow/react';
 import * as d3 from 'd3-force';
 import '@xyflow/react/dist/style.css';
-import {
-  knowledgeGraphFixture,
-  type GraphLayer,
-  type KnowledgeEdgeDTO,
-  type KnowledgeGraphDTO,
-  type KnowledgeNode,
-  type RecentChangeItem,
-} from './fixture';
+import type {
+  GraphLayer,
+  KnowledgeEdgeDTO,
+  KnowledgeGraphDTO,
+  KnowledgeNode,
+  RecentChangeItem,
+} from './types';
+import { trpc } from '@/lib/trpc';
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import { MarkdownMessage } from '@/components/code/MarkdownMessage';
 
@@ -55,6 +55,7 @@ const STATUS_DOT: Record<string, string> = {
 const KIND_LABEL_KEYS: Record<string, I18nKey> = {
   adr: 'knowledge.kind.adr',
   artifact: 'knowledge.kind.artifact',
+  wiki: 'knowledge.kind.wiki',
   knowledge: 'knowledge.kind.wiki',
   memory: 'knowledge.kind.memory',
   architecture: 'knowledge.kind.architecture',
@@ -618,7 +619,38 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
 }
 
 export function KnowledgeMapPage() {
-  const dto = knowledgeGraphFixture;
+  const { data: dto, isLoading, error } = trpc.knowledge.graph.useQuery();
+  const { t } = useI18n();
+
+  if (isLoading) {
+    return (
+      <div className="page-container flex items-center justify-center min-h-[60vh]">
+        <div className="text-sm text-slate-500 dark:text-slate-400 animate-pulse">
+          {t('knowledge.loading')}
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !dto) {
+    return (
+      <div className="page-container flex items-center justify-center min-h-[60vh]">
+        <div className="card p-6 max-w-md text-center space-y-3">
+          <div className="text-sm font-medium text-red-700 dark:text-red-300">
+            {t('knowledge.errorTitle')}
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono break-all">
+            {error?.message ?? t('knowledge.errorUnknown')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <KnowledgeMapGraph dto={dto} />;
+}
+
+function KnowledgeMapGraph({ dto }: { dto: KnowledgeGraphDTO }) {
   const { t } = useI18n();
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('cluster');
   const [selectedId, setSelectedId] = useState<string | null>(null);

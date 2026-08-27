@@ -38,6 +38,26 @@ function prepareE2ERepoRoot(): string {
     recursive: true,
   });
 
+  // Seed knowledge-graph source files so /knowledge renders real data in E2E.
+  const knowledgeDirs: string[][] = [
+    ['docs', 'adr'],
+    ['docs', 'wiki', 'knowledge'],
+    ['docs', 'architecture'],
+  ];
+  for (const parts of knowledgeDirs) {
+    const srcDir = path.join(sourceRoot, ...parts);
+    const dstDir = path.join(fixtureRoot, ...parts);
+    if (fs.existsSync(srcDir)) {
+      fs.cpSync(srcDir, dstDir, { recursive: true });
+    }
+  }
+  for (const file of ['feature_list.json', 'MEMORY.md']) {
+    const srcFile = path.join(sourceRoot, file);
+    if (fs.existsSync(srcFile)) {
+      fs.copyFileSync(srcFile, path.join(fixtureRoot, file));
+    }
+  }
+
   return fixtureRoot;
 }
 
