@@ -18,6 +18,9 @@
 		"profiles/",
 		"skills/",
 		"src/",
+		"apps/web/server/lib/knowledge-qa.ts",
+		"apps/web/server/routers/knowledge.ts",
+		"apps/web/src/lib/knowledge-dto.ts",
 		"README.md",
 		"LICENSE",
 		"CHANGELOG.md"

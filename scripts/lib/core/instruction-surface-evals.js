@@ -28,7 +28,7 @@ const { BREADCRUMB_OPEN, printBreadcrumb, verifyPrintedBreadcrumb } = require(".
 
 const ROOT = path.resolve(__dirname, "../../..");
 const SUITE_ID = "instruction-surface";
-const SUITE_VERSION = 1;
+const SUITE_VERSION = 2;
 const ASSURANCE = "replayable";
 
 const EVAL_IDS = Object.freeze({

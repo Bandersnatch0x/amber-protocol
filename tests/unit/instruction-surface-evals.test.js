@@ -12,6 +12,7 @@ const path = require("node:path");
 
 const {
 	SUITE_ID,
+	SUITE_VERSION,
 	EVAL_IDS,
 	ASSURANCE,
 	runInstructionSurfaceEvals,
@@ -36,6 +37,8 @@ test("a clean target yields a replayable all-pass suite", () => {
 	const dir = tempDir("suite");
 	const suite = runInstructionSurfaceEvals(dir);
 	assert.equal(suite.suiteId, SUITE_ID);
+	assert.equal(suite.version, SUITE_VERSION);
+	assert.equal(suite.version, 2);
 	assert.equal(suite.assurance, ASSURANCE);
 	assert.equal(suite.overall, "pass", JSON.stringify(suite, null, 2));
 	assert.equal(suite.evalCount, 4);

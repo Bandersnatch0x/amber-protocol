@@ -1631,13 +1631,14 @@ Mechanism and invariants live in
 
 ## Eval Commands
 
-`amber eval` replays deterministic instruction-surface Evals (F050 Evidence; F058). The suite
-checks MCP tool descriptions, the Context quote boundary, and breadcrumb authenticity. `eval run`
-remains report-only: it does not write, does not call a model, and exits 0 only when every Eval
-passes. `eval admit` is the explicit F050 admission path: it replays the same suite, admits an
-active `eval` definition artifact plus a recorded `eval-result` artifact, then records replayable
-Evidence through the normal `.amber/evidence/` receipt path. Eval artifacts are not Approval, do not
-consume Approval, do not bind a Decision principal, and cannot widen execution authority.
+`amber eval` replays deterministic instruction-surface Evals (F050 Evidence; F058). Suite version 2
+contains four Evals covering MCP tool descriptions, QA contract-surface model independence, the
+Context quote boundary, and breadcrumb authenticity. `eval run` remains report-only: it does not
+write, does not call a model, and exits 0 only when every Eval passes. `eval admit` is the explicit
+F050 admission path: it replays the same suite, admits an active `eval` definition artifact plus a
+recorded `eval-result` artifact, then records replayable Evidence through the normal
+`.amber/evidence/` receipt path. Eval artifacts are not Approval, do not consume Approval, do not
+bind a Decision principal, and cannot widen execution authority.
 
 ```bash
 node scripts/amber.js eval run --target . --json
@@ -1658,9 +1659,9 @@ findings. Spec:
 
 Each Eval result carries `{evalId, version, status, assurance, scanned, findings}`. The `scanned`
 field is the population census the result was earned over: `actionTypes`, `functions`, and
-`modelScanFiles` for the MCP Eval; `loadouts` and `requests` for the Context Eval; `pages` for the
-Breadcrumb Eval. Target-local stores legitimately scan as zero on a fresh target; a pass is never
-vacuous:
+`modelScanFiles` for the MCP Eval; `qaModelScanFiles` and `qaModelScanPaths` for the QA contract-surface
+Eval; `loadouts` and `requests` for the Context Eval; `pages` for the Breadcrumb Eval. Target-local
+stores legitimately scan as zero on a fresh target; a pass is never vacuous:
 
 - An empty tool registry (zero Action Types and Functions scanned) fails the suite with
   `AMBER_E_EVAL_EMPTY_SCAN` instead of passing with zero findings; the same code fires when the
@@ -1680,6 +1681,12 @@ fragments so it cannot self-flag). It detects model providers and HTTP clients b
 `http.request(…)`). Ordinary identifiers and prose (`const request = …`, `handleRequest(…)`) do
 not match. The scan is a lexical tripwire over that fixed file set, not a proof of independence;
 `modelIndependent: true` means "no known model/network client reference in the scanned sources".
+
+The separate QA contract-surface Eval scans exactly `apps/web/server/lib/knowledge-qa.ts`,
+`apps/web/server/routers/knowledge.ts`, and `apps/web/src/lib/knowledge-dto.ts`. These files ship in
+the npm package so an installed CLI evaluates the same default population as a source checkout.
+`apps/web/server/lib/knowledge-llm.ts` is the provider adapter and remains deliberately outside both
+the QA census and the package allowlist.
 
 All Eval finding codes (the `AMBER_E_EVAL_*` family) are registered in the consolidated error
 catalog (`scripts/lib/core/error-catalog.js`) and are explainable with

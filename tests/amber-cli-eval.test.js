@@ -39,7 +39,46 @@ function registerEvalProducer(dir) {
 	assert.equal(producer.status, 0, producer.stderr || producer.stdout);
 }
 
-function admitWrongEvalDefinition(dir) {
+function admitStaleV1EvalDefinition(dir) {
+	const body = [
+		"# Eval Definition: instruction-surface",
+		"",
+		"Deterministic, model-independent assessment suite for Amber instruction surfaces.",
+		"Results supply replayable Evidence and never Approval or execution authority.",
+	].join("\n");
+	const evals = [
+		{
+			evalId: "eval.instruction-surface.mcp-tool-description",
+			surface: "MCP tool descriptions",
+			assurance: "replayable",
+		},
+		{
+			evalId: "eval.instruction-surface.context-quote-boundary",
+			surface: "Context quote boundary",
+			assurance: "replayable",
+		},
+		{
+			evalId: "eval.instruction-surface.breadcrumb-authenticity",
+			surface: "Breadcrumb authenticity",
+			assurance: "replayable",
+		},
+	];
+	const definitionArgs = [
+		"--body",
+		body,
+		"--extension",
+		"eval.contractVersion=1",
+		"--extension",
+		"eval.suiteId=instruction-surface",
+		"--extension",
+		"eval.suiteVersion=1",
+		"--extension",
+		"eval.assurance=replayable",
+		"--extension",
+		"eval.modelIndependent=true",
+		"--extension",
+		`eval.evals=${JSON.stringify(evals)}`,
+	];
 	const draft = runCli(
 		[
 			"artifact",
@@ -50,12 +89,7 @@ function admitWrongEvalDefinition(dir) {
 			"eval",
 			"--id",
 			"eval/instruction-surface",
-			"--body",
-			"# Wrong Eval",
-			"--extension",
-			"eval.contractVersion=1",
-			"--extension",
-			"eval.suiteId=wrong-suite",
+			...definitionArgs,
 			"--json",
 		],
 		dir,
@@ -71,12 +105,7 @@ function admitWrongEvalDefinition(dir) {
 			"eval",
 			"--id",
 			"eval/instruction-surface",
-			"--body",
-			"# Wrong Eval",
-			"--extension",
-			"eval.contractVersion=1",
-			"--extension",
-			"eval.suiteId=wrong-suite",
+			...definitionArgs,
 			"--expected-head",
 			"1",
 			"--transition",
@@ -97,6 +126,7 @@ test("amber eval run reports a replayable instruction-surface suite without writ
 	assert.equal(r.status, 0, r.stderr || r.stdout);
 	const suite = payload(r);
 	assert.equal(suite.suiteId, "instruction-surface");
+	assert.equal(suite.version, 2);
 	assert.equal(suite.assurance, "replayable");
 	assert.equal(suite.overall, "pass");
 	assert.equal(suite.evalCount, 4);
@@ -165,6 +195,16 @@ test("amber eval list and show expose the four Eval identities", () => {
 	);
 	assert.equal(shown.evalId, "eval.instruction-surface.mcp-tool-description");
 	fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("amber eval help documents suite version 2 and all four Eval surfaces", () => {
+	const r = runCli(["eval", "--help"], ROOT);
+	assert.equal(r.status, 0, r.stderr || r.stdout);
+	assert.match(r.stdout, /Version 2 contains four Evals/);
+	assert.match(r.stdout, /MCP tool descriptions/);
+	assert.match(r.stdout, /QA contract-surface/);
+	assert.match(r.stdout, /Context quote boundary/);
+	assert.match(r.stdout, /breadcrumb authenticity/);
 });
 
 test("amber eval admit writes canonical Eval artifacts and replayable Evidence", () => {
@@ -236,6 +276,8 @@ test("amber eval admit writes canonical Eval artifacts and replayable Evidence",
 	);
 	assert.equal(result.evidence.subject, "eval.instruction-surface");
 	assert.equal(result.evidence.status, "pass");
+	assert.equal(result.suite.version, 2);
+	assert.equal(result.suite.evalCount, 4);
 	assert.equal(result.suite.assurance, "replayable");
 	assert.equal(result.suite.modelIndependent, true);
 
@@ -257,6 +299,8 @@ test("amber eval admit writes canonical Eval artifacts and replayable Evidence",
 	);
 	assert.equal(shownDefinition.lifecycle, "active");
 	assert.equal(shownDefinition.envelope.extensions.eval.suiteId, "instruction-surface");
+	assert.equal(shownDefinition.envelope.extensions.eval.suiteVersion, 2);
+	assert.equal(shownDefinition.envelope.extensions.eval.evals.length, 4);
 
 	const shownOutcome = payload(
 		runCli(
@@ -282,11 +326,18 @@ test("amber eval admit writes canonical Eval artifacts and replayable Evidence",
 		shownOutcome.envelope.extensions.evalResult.definition.identity,
 		"eval/instruction-surface",
 	);
+	assert.equal(shownOutcome.envelope.extensions.evalResult.suiteVersion, 2);
+	assert.equal(shownOutcome.envelope.extensions.evalResult.result.version, 2);
+	assert.equal(shownOutcome.envelope.extensions.evalResult.result.evalCount, 4);
 
 	const evidence = payload(
 		runCli(["evidence", "show", "--target", dir, "--id", "evidence/eval-run", "--json"], dir),
 	);
 	assert.equal(evidence.assurance, "replayable");
+	assert.equal(evidence.environment.suiteVersion, "2");
+	const evidenceOutput = JSON.parse(evidence.outputs[0]);
+	assert.equal(evidenceOutput.version, 2);
+	assert.equal(evidenceOutput.evalCount, 4);
 	assert.equal(evidence.verifiedBy.length, 0);
 	const verified = runCli(
 		[
@@ -335,10 +386,10 @@ test("amber eval admit refuses an unregistered producer before writing Eval arti
 	fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("amber eval admit rejects stale or unrelated active Eval definitions before writing results", () => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-admit-wrong-def-"));
+test("amber eval admit rejects an active three-Eval version 1 definition before writing results", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-cli-eval-admit-stale-v1-"));
 	registerEvalProducer(dir);
-	admitWrongEvalDefinition(dir);
+	admitStaleV1EvalDefinition(dir);
 	const r = runCli(
 		[
 			"eval",

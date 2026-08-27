@@ -5,6 +5,12 @@ const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "../..");
 const BUNDLE_ROOT = path.join(ROOT, "dsh");
+const QA_MODEL_SCAN_FILES = [
+	"apps/web/server/lib/knowledge-qa.ts",
+	"apps/web/server/routers/knowledge.ts",
+	"apps/web/src/lib/knowledge-dto.ts",
+];
+const QA_PROVIDER_ADAPTER = "apps/web/server/lib/knowledge-llm.ts";
 
 function read(relativePath) {
 	return fs.readFileSync(path.join(BUNDLE_ROOT, relativePath), "utf8");
@@ -30,6 +36,11 @@ test("amber-protocol package ships every bundle runtime dependency", () => {
 	assert.equal(shipped.has("action-types/"), true);
 	assert.equal(shipped.has("action-functions/"), true);
 	assert.equal(shipped.has("skills/"), true);
+	assert.deepEqual(
+		manifest.files.filter((entry) => entry.startsWith("apps/web/")),
+		QA_MODEL_SCAN_FILES,
+	);
+	assert.equal(shipped.has(QA_PROVIDER_ADAPTER), false);
 });
 
 test("dsh bundle resolves Amber assets without checkout or profile paths", () => {
@@ -55,6 +66,25 @@ test("dsh bundle runtime resolves published Amber assets", () => {
 	assert.equal(paths.skillsDir, path.join(ROOT, "skills"));
 	assert.equal(fs.existsSync(paths.mcpScript), true);
 	assert.equal(fs.existsSync(paths.skillsDir), true);
+});
+
+test("npm pack dry-run ships every QA model scan source without the provider adapter", () => {
+	const { execFileSync } = require("node:child_process");
+	const npmCli = process.env.npm_execpath;
+	const command = npmCli ? process.execPath : "npm";
+	const args = npmCli ? [npmCli, "pack", "--dry-run", "--json"] : ["pack", "--dry-run", "--json"];
+	const raw = execFileSync(command, args, {
+		cwd: ROOT,
+		encoding: "utf8",
+		timeout: 30000,
+	});
+	const packed = JSON.parse(raw);
+	const shipped = new Set(packed[0].files.map((entry) => entry.path));
+
+	for (const rel of QA_MODEL_SCAN_FILES) {
+		assert.equal(shipped.has(rel), true, `npm pack missing QA scan source: ${rel}`);
+	}
+	assert.equal(shipped.has(QA_PROVIDER_ADAPTER), false, "npm pack must exclude provider adapter");
 });
 
 test("npm pack dry-run ships every declared bundle asset", () => {
