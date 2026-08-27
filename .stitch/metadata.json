@@ -2,8 +2,8 @@
   "title": "Amber Protocol Web Viewer",
   "projectId": "13148335678122809815",
   "projectUrl": "https://stitch.withgoogle.com/projects/13148335678122809815?pli=1",
-  "stitchMcpAvailable": false,
-  "stitchConnectionMode": "browser-harness",
+  "stitchMcpAvailable": true,
+  "stitchConnectionMode": "mcp",
   "designSystem": {
     "path": ".stitch/DESIGN.md",
     "name": "Amber Protocol Web Viewer",
@@ -19,7 +19,8 @@
     { "slug": "gates", "route": "/gates", "title": "Gates", "promptSection": "07 - Gates", "status": "review-passed-generated" },
     { "slug": "transcripts-list", "route": "/transcripts", "title": "Transcripts List", "promptSection": "08 - Transcripts List", "status": "review-passed-generated" },
     { "slug": "transcript-detail", "route": "/transcripts/$id", "title": "Transcript Detail", "promptSection": "09 - Transcript Detail", "status": "review-passed-generated" },
-    { "slug": "settings", "route": "/settings", "title": "Settings", "promptSection": "10 - Settings", "status": "review-passed-generated" }
+    { "slug": "settings", "route": "/settings", "title": "Settings", "promptSection": "10 - Settings", "status": "review-passed-generated" },
+    { "slug": "knowledge-map", "route": "/knowledge", "title": "Knowledge Map", "promptSection": "11 - Knowledge Map", "status": "prompt-drafted" }
   ],
   "notes": [
     "Stitch project was created through browser automation because Stitch MCP project tools were not exposed in this session.",
