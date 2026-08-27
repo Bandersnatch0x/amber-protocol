@@ -48,3 +48,29 @@ export interface RecentChangeItem {
   linkId?: string;
   linkLabel?: string;
 }
+
+export interface NodeSummaryDTO {
+  nodeId: string;
+  summary: string;
+  provenance: {
+    model: string;
+    timestamp: string;
+    promptHash: string;
+  };
+  origin: 'inferred';
+}
+
+export interface SemanticResultDTO {
+  available: boolean;
+  inferredEdges: KnowledgeEdgeDTO[];
+  nodeSummaries: NodeSummaryDTO[];
+  providerModel?: string;
+  timestamp?: string;
+  error?: string;
+}
+
+export interface LLMStatusDTO {
+  available: boolean;
+  provider?: string;
+  model?: string;
+}

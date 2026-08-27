@@ -2,12 +2,22 @@ import { createRequire } from 'module';
 import { router, publicProcedure } from '../trpc';
 import { listRecentChanges } from '../lib/knowledge-recent';
 import { resolveRepoRoot } from '../lib/repo-root';
+import { getStatus } from '../lib/knowledge-llm';
+import {
+  inferSemanticEdges,
+  inferNodeSummaries,
+  SEMANTIC_EDGES_PROMPT_HASH,
+  NODE_SUMMARY_PROMPT_HASH,
+} from '../lib/knowledge-llm-prompts';
 import type {
   GraphLayer,
   KnowledgeNode,
   KnowledgeGraphDTO,
   KnowledgeEdgeDTO,
   DriftFinding,
+  LLMStatusDTO,
+  SemanticResultDTO,
+  NodeSummaryDTO,
 } from '../../src/lib/knowledge-dto';
 
 const requireCli = createRequire(import.meta.url);
@@ -132,6 +142,8 @@ function adaptGraph(raw: RawGraph): KnowledgeGraphDTO {
   };
 }
 
+const CONTENT_KINDS = new Set(['adr', 'wiki', 'memory', 'architecture']);
+
 export const knowledgeRouter = router({
   graph: publicProcedure.query((): KnowledgeGraphDTO => {
     const repoRoot = resolveRepoRoot();
@@ -139,4 +151,75 @@ export const knowledgeRouter = router({
     return adaptGraph(raw);
   }),
   recentChanges: publicProcedure.query(() => listRecentChanges(resolveRepoRoot())),
+
+  semanticStatus: publicProcedure.query((): LLMStatusDTO => {
+    return getStatus();
+  }),
+
+  semantic: publicProcedure.query(async (): Promise<SemanticResultDTO> => {
+    const status = getStatus();
+    if (!status.available) {
+      return { available: false, inferredEdges: [], nodeSummaries: [] };
+    }
+
+    let raw: RawGraph;
+    try {
+      raw = buildKnowledgeGraph(resolveRepoRoot());
+    } catch (err) {
+      return {
+        available: true,
+        inferredEdges: [],
+        nodeSummaries: [],
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+
+    const nodes = raw.nodes.map(adaptNode);
+    const existingEdges = raw.edges
+      .filter((e) => EDGE_VERBS.has(e.verb as KnowledgeEdgeDTO['verb']))
+      .map((e) => ({ src: e.src, dst: e.dst, verb: e.verb }));
+
+    const timestamp = new Date().toISOString();
+    const model = status.model;
+
+    let inferredEdges: KnowledgeEdgeDTO[] = [];
+    let nodeSummaries: NodeSummaryDTO[] = [];
+    const errors: string[] = [];
+
+    try {
+      const contentNodes = nodes.filter((n) => CONTENT_KINDS.has(n.kind));
+      const inferred = await inferSemanticEdges(contentNodes, existingEdges);
+      inferredEdges = inferred.map((e) => ({
+        src: e.src,
+        dst: e.dst,
+        verb: e.verb,
+        origin: 'inferred' as const,
+        provenance: { model, timestamp, promptHash: SEMANTIC_EDGES_PROMPT_HASH },
+      }));
+    } catch (err) {
+      errors.push(`edges: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    try {
+      const summaryNodes = nodes.filter((n) => CONTENT_KINDS.has(n.kind) && n.body);
+      const summaries = await inferNodeSummaries(summaryNodes);
+      nodeSummaries = summaries.map((s) => ({
+        nodeId: s.nodeId,
+        summary: s.summary,
+        provenance: { model, timestamp, promptHash: NODE_SUMMARY_PROMPT_HASH },
+        origin: 'inferred' as const,
+      }));
+    } catch (err) {
+      errors.push(`summaries: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    return {
+      available: true,
+      inferredEdges,
+      nodeSummaries,
+      providerModel: model,
+      timestamp,
+      ...(errors.length > 0 ? { error: errors.join('; ') } : {}),
+    };
+  }),
 });

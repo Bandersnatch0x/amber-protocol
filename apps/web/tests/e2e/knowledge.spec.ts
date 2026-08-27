@@ -300,3 +300,54 @@ test.describe('Knowledge Map (/knowledge)', () => {
     expect(parseInt(label!.replace('+', ''), 10)).toBeGreaterThan(0);
   });
 });
+
+test.describe('Knowledge Map — semantic layer (no LLM_API_KEY in test env)', () => {
+  test('graph renders fully in deterministic-only mode when no LLM provider is configured', async ({
+    page,
+  }) => {
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    const { total } = await getSubtitleCounts(page);
+    expect(total).toBeGreaterThanOrEqual(100);
+
+    // Error state must not show
+    await expect(page.locator('[role="alert"]')).not.toBeVisible();
+    // Graph canvas must be visible
+    await expect(page.locator('.react-flow__renderer, .react-flow__viewport').first()).toBeVisible({
+      timeout: 5_000,
+    });
+  });
+
+  test('semantic-status banner is present and shows provider-not-configured message', async ({
+    page,
+  }) => {
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    const banner = page.getByTestId('semantic-status-banner');
+    await expect(banner).toBeVisible({ timeout: 5_000 });
+    const text = await banner.textContent();
+    expect(text).toMatch(/not configured|provider/i);
+  });
+
+  test('dashed inferred-edge legend line is visible alongside deterministic legend', async ({
+    page,
+  }) => {
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    // The legend bottom-left overlay must show both solid and dashed line indicators
+    await expect(page.locator('text=deterministic').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('text=inferred').first()).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('show-inferred checkbox is present and checked by default', async ({ page }) => {
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    const checkbox = page.getByRole('checkbox', { name: /inferred/i }).first();
+    await expect(checkbox).toBeVisible({ timeout: 5_000 });
+    await expect(checkbox).toBeChecked();
+  });
+});

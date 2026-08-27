@@ -5,4 +5,7 @@ export type {
   DriftFinding,
   KnowledgeGraphDTO,
   RecentChangeItem,
+  NodeSummaryDTO,
+  SemanticResultDTO,
+  LLMStatusDTO,
 } from '../../lib/knowledge-dto';

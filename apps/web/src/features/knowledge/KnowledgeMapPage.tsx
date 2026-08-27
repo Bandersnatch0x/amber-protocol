@@ -22,6 +22,9 @@ import type {
   KnowledgeGraphDTO,
   KnowledgeNode,
   RecentChangeItem,
+  SemanticResultDTO,
+  NodeSummaryDTO,
+  LLMStatusDTO,
 } from './types';
 import { trpc } from '@/lib/trpc';
 import { useI18n, type I18nKey } from '@/lib/i18n';
@@ -655,6 +658,15 @@ export function KnowledgeMapPage() {
     retry: false,
     staleTime: Infinity,
   });
+  const semanticStatusQuery = trpc.knowledge.semanticStatus.useQuery(undefined, {
+    staleTime: Infinity,
+    retry: false,
+  });
+  const semanticQuery = trpc.knowledge.semantic.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    enabled: semanticStatusQuery.data?.available === true,
+  });
   const { t } = useI18n();
 
   if (isLoading) {
@@ -699,6 +711,9 @@ export function KnowledgeMapPage() {
       recentIsFetching={recentQuery.isFetching}
       recentIsLoading={recentQuery.isLoading}
       onRefreshRecent={() => void recentQuery.refetch()}
+      semanticStatus={semanticStatusQuery.data ?? null}
+      semanticResult={semanticQuery.data ?? null}
+      semanticLoading={semanticQuery.isLoading}
     />
   );
 }
@@ -710,6 +725,9 @@ function KnowledgeMapGraph({
   recentIsFetching,
   recentIsLoading,
   onRefreshRecent,
+  semanticStatus,
+  semanticResult,
+  semanticLoading,
 }: {
   dto: KnowledgeGraphDTO;
   recentChanges: RecentChangeItem[];
@@ -717,6 +735,9 @@ function KnowledgeMapGraph({
   recentIsFetching: boolean;
   recentIsLoading: boolean;
   onRefreshRecent: () => void;
+  semanticStatus: LLMStatusDTO | null;
+  semanticResult: SemanticResultDTO | null;
+  semanticLoading: boolean;
 }) {
   const { t } = useI18n();
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('cluster');
@@ -727,9 +748,20 @@ function KnowledgeMapGraph({
   const [showInferred, setShowInferred] = useState(true);
   const [showDriftOnly, setShowDriftOnly] = useState(false);
 
-  const layout = useMemo(() => computeLayout(dto, layoutMode), [dto, layoutMode]);
+  // Merge inferred edges from the semantic layer (client-side only; never feeds back into DTO)
+  const mergedDto = useMemo((): KnowledgeGraphDTO => {
+    if (!semanticResult?.available || !semanticResult.inferredEdges.length) return dto;
+    return { ...dto, edges: [...dto.edges, ...semanticResult.inferredEdges] };
+  }, [dto, semanticResult]);
 
-  const nodeById = useMemo(() => new Map(dto.nodes.map((n) => [n.id, n])), [dto.nodes]);
+  const layout = useMemo(() => computeLayout(mergedDto, layoutMode), [mergedDto, layoutMode]);
+
+  const nodeById = useMemo(() => new Map(mergedDto.nodes.map((n) => [n.id, n])), [mergedDto.nodes]);
+
+  const summaryByNodeId = useMemo((): Map<string, NodeSummaryDTO> => {
+    if (!semanticResult?.nodeSummaries.length) return new Map();
+    return new Map(semanticResult.nodeSummaries.map((s) => [s.nodeId, s]));
+  }, [semanticResult]);
 
   const selected = useMemo(
     () => (selectedId ? (nodeById.get(selectedId) ?? null) : null),
@@ -740,7 +772,7 @@ function KnowledgeMapGraph({
     const q = search.trim().toLowerCase();
     if (!q) return null;
     return new Set(
-      dto.nodes
+      mergedDto.nodes
         .filter(
           (n) =>
             n.title.toLowerCase().includes(q) ||
@@ -750,46 +782,75 @@ function KnowledgeMapGraph({
         )
         .map((n) => n.id),
     );
-  }, [dto.nodes, search]);
+  }, [mergedDto.nodes, search]);
 
   const kindCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const n of dto.nodes) counts.set(n.kind, (counts.get(n.kind) ?? 0) + 1);
+    for (const n of mergedDto.nodes) counts.set(n.kind, (counts.get(n.kind) ?? 0) + 1);
     return counts;
-  }, [dto.nodes]);
+  }, [mergedDto.nodes]);
 
-  const driftNodeIds = useMemo(() => new Set(dto.drift.map((d) => d.nodeId)), [dto.drift]);
+  const driftNodeIds = useMemo(() => new Set(mergedDto.drift.map((d) => d.nodeId)), [mergedDto.drift]);
 
   const visibleIds = useMemo(() => {
     if (kindFilter.size === 0 && searchHits === null && !showDriftOnly) return null;
     const ids = new Set<string>();
-    for (const n of dto.nodes) {
+    for (const n of mergedDto.nodes) {
       if (kindFilter.size > 0 && !kindFilter.has(n.kind)) continue;
       if (searchHits !== null && !searchHits.has(n.id)) continue;
       if (showDriftOnly && !driftNodeIds.has(n.id)) continue;
       ids.add(n.id);
     }
     return ids;
-  }, [dto.nodes, kindFilter, searchHits, showDriftOnly, driftNodeIds]);
+  }, [mergedDto.nodes, kindFilter, searchHits, showDriftOnly, driftNodeIds]);
 
-  const visibleCount = visibleIds === null ? dto.nodes.length : visibleIds.size;
+  const visibleCount = visibleIds === null ? mergedDto.nodes.length : visibleIds.size;
 
   const kindLayer = useMemo(() => {
     const map = new Map<string, GraphLayer>();
-    for (const n of dto.nodes) if (!map.has(n.kind)) map.set(n.kind, n.layer);
+    for (const n of mergedDto.nodes) if (!map.has(n.kind)) map.set(n.kind, n.layer);
     return map;
-  }, [dto.nodes]);
+  }, [mergedDto.nodes]);
 
   const relatedOf = useCallback(
     (id: string) => ({
-      outgoing: dto.edges.filter((e) => e.src === id),
-      incoming: dto.edges.filter((e) => e.dst === id),
+      outgoing: mergedDto.edges.filter((e) => e.src === id),
+      incoming: mergedDto.edges.filter((e) => e.dst === id),
     }),
-    [dto.edges],
+    [mergedDto.edges],
   );
+
+  const semanticBanner = useMemo(() => {
+    if (semanticStatus === null) return null;
+    if (!semanticStatus.available) {
+      return { kind: 'unavailable' as const, message: t('knowledge.semantic.unavailable') };
+    }
+    if (semanticResult?.error && !semanticResult.inferredEdges.length) {
+      return {
+        kind: 'error' as const,
+        message: t('knowledge.semantic.error', { error: semanticResult.error }),
+      };
+    }
+    if (semanticLoading) {
+      return { kind: 'loading' as const, message: t('knowledge.semantic.loading') };
+    }
+    return null;
+  }, [semanticStatus, semanticResult, semanticLoading, t]);
 
   return (
     <div className="page-container">
+      {semanticBanner && (
+        <div
+          data-testid="semantic-status-banner"
+          className={`mb-3 rounded-md px-3 py-2 text-[11px] border ${
+            semanticBanner.kind === 'error'
+              ? 'border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200'
+              : 'border-slate-200 dark:border-obsidian-border bg-slate-50 dark:bg-obsidian-surface text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          {semanticBanner.message}
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
           <h1 className="text-lg font-headline font-semibold text-slate-900 dark:text-white">
@@ -798,9 +859,9 @@ function KnowledgeMapGraph({
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {t('knowledge.subtitle', {
               visible: visibleCount,
-              total: dto.nodes.length,
-              edges: dto.edges.length,
-              drift: dto.drift.length,
+              total: mergedDto.nodes.length,
+              edges: mergedDto.edges.length,
+              drift: mergedDto.drift.length,
             })}
           </p>
         </div>
@@ -887,7 +948,7 @@ function KnowledgeMapGraph({
           <div className="card bg-dot-matrix relative" style={{ height: '70vh', minHeight: 480 }}>
             <ReactFlowProvider>
               <FlowCanvas
-                dto={dto}
+                dto={mergedDto}
                 layout={layout}
                 selectedId={selectedId}
                 hoverId={hoverId}
@@ -955,8 +1016,31 @@ function KnowledgeMapGraph({
                 </div>
               )}
 
+              {summaryByNodeId.has(selected.id) && (
+                <div
+                  className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700"
+                  data-testid="inferred-summary"
+                >
+                  <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1 flex items-center gap-1.5">
+                    {t('knowledge.summary')}
+                    <span className="px-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-mono normal-case italic">
+                      {t('knowledge.semantic.badge')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    {summaryByNodeId.get(selected.id)!.summary}
+                  </p>
+                  <p className="text-[9px] text-slate-400 mt-1 italic">
+                    {t('knowledge.summary.provenance', {
+                      model: summaryByNodeId.get(selected.id)!.provenance.model,
+                      timestamp: summaryByNodeId.get(selected.id)!.provenance.timestamp.slice(0, 10),
+                    })}
+                  </p>
+                </div>
+              )}
+
               <MiniContextGraph
-                dto={dto}
+                dto={mergedDto}
                 centerId={selected.id}
                 nodeById={nodeById}
                 onSelect={setSelectedId}
@@ -1006,7 +1090,9 @@ function KnowledgeMapGraph({
                   </div>
                   <ul className="space-y-1">
                     {selected.paths.map((p) => {
-                      const dead = dto.drift.some((d) => d.nodeId === selected.id && d.path === p);
+                      const dead = mergedDto.drift.some(
+                        (d) => d.nodeId === selected.id && d.path === p,
+                      );
                       return (
                         <li
                           key={p}
