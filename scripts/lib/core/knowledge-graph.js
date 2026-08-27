@@ -92,12 +92,22 @@ function lineOf(text, needle) {
 
 // ── node builders ─────────────────────────────────────────────────────
 
-function makeNode({ id, kind, layer, title, sourcePath, status, updated, paths, revisions }) {
+const BODY_MAX = 2000;
+
+function bodyExcerpt(text) {
+	if (!text) return undefined;
+	const trimmed = String(text).trim();
+	if (!trimmed) return undefined;
+	return trimmed.length > BODY_MAX ? trimmed.slice(0, BODY_MAX) : trimmed;
+}
+
+function makeNode({ id, kind, layer, title, sourcePath, status, updated, paths, revisions, body }) {
 	const node = { id, kind, layer, title, sourcePath };
 	if (status !== undefined && status !== null) node.status = status;
 	if (updated !== undefined && updated !== null) node.updated = updated;
 	if (Array.isArray(paths) && paths.length > 0) node.paths = paths;
 	if (revisions !== undefined) node.revisions = revisions;
+	if (body !== undefined && body !== null) node.body = body;
 	node.provenance = PROVENANCE;
 	return node;
 }
@@ -269,6 +279,7 @@ function parseArtifacts(targetRoot) {
 		sourcePath: `.amber/artifacts/${TYPE_REGISTRY[entry.type]?.dir || entry.type}/${slugFor(entry.identity)}`,
 		revisions: entry.revisions,
 		traces: entry.head.traces || [],
+		text: entry.head.body,
 	}));
 }
 
@@ -673,6 +684,7 @@ function buildKnowledgeGraph(target) {
 				sourcePath: adr.sourcePath,
 				status: adr.status,
 				updated: adr.updated,
+				body: bodyExcerpt(adr.text),
 			}),
 		),
 		...artifacts.map((artifact) =>
@@ -684,6 +696,7 @@ function buildKnowledgeGraph(target) {
 				sourcePath: artifact.sourcePath,
 				status: artifact.status,
 				revisions: artifact.revisions,
+				body: bodyExcerpt(artifact.text),
 			}),
 		),
 		...wikiPages.map((page) =>
@@ -694,6 +707,7 @@ function buildKnowledgeGraph(target) {
 				title: page.title,
 				sourcePath: page.sourcePath,
 				updated: page.updated,
+				body: bodyExcerpt(page.text),
 			}),
 		),
 		...memorySections.map((section) =>
@@ -703,6 +717,7 @@ function buildKnowledgeGraph(target) {
 				layer: "knowledge",
 				title: section.title,
 				sourcePath: section.sourcePath,
+				body: bodyExcerpt(section.text),
 			}),
 		),
 		...architecturePages.map((page) =>
@@ -712,6 +727,7 @@ function buildKnowledgeGraph(target) {
 				layer: "knowledge",
 				title: page.title,
 				sourcePath: page.sourcePath,
+				body: bodyExcerpt(page.text),
 			}),
 		),
 		...features.map((feature) =>
@@ -723,6 +739,7 @@ function buildKnowledgeGraph(target) {
 				sourcePath: "feature_list.json",
 				status: feature.status,
 				paths: feature.paths,
+				body: bodyExcerpt(feature.text),
 			}),
 		),
 	];

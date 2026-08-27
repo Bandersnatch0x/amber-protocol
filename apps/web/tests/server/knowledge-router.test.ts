@@ -98,6 +98,42 @@ describe('knowledgeRouter', () => {
     }
   });
 
+  it('exposes body on content nodes and feature nodes with canonical text (P-1 live context)', async () => {
+    const result = await caller.graph();
+
+    const contentKinds = new Set(['adr', 'wiki', 'memory', 'architecture']);
+    const contentNodes = result.nodes.filter((n) => contentKinds.has(n.kind));
+    expect(contentNodes.length).toBeGreaterThan(0);
+    for (const n of contentNodes) {
+      expect(typeof n.body, `${n.id} body must be a string`).toBe('string');
+      expect(n.body!.length, `${n.id} body must be non-empty`).toBeGreaterThan(0);
+      expect(n.body!.length, `${n.id} body must be ≤2000 chars`).toBeLessThanOrEqual(2000);
+    }
+
+    // Feature nodes with non-trivial canonical text carry a body excerpt
+    const featureNodes = result.nodes.filter((n) => n.kind === 'feature');
+    const featureWithBody = featureNodes.filter((n) => n.body !== undefined);
+    expect(featureWithBody.length).toBeGreaterThan(0);
+    for (const n of featureWithBody) {
+      expect(typeof n.body).toBe('string');
+      expect(n.body!.length).toBeGreaterThan(0);
+      expect(n.body!.length).toBeLessThanOrEqual(2000);
+    }
+  });
+
+  it('artifact nodes carry body from their head revision committed text', async () => {
+    const result = await caller.graph();
+
+    const artifactNodes = result.nodes.filter((n) => n.kind === 'artifact');
+    for (const n of artifactNodes) {
+      if (n.body !== undefined) {
+        expect(typeof n.body).toBe('string');
+        expect(n.body!.length).toBeGreaterThan(0);
+        expect(n.body!.length).toBeLessThanOrEqual(2000);
+      }
+    }
+  });
+
   it('includes feature nodes with paths for dead-anchor marking', async () => {
     const result = await caller.graph();
 

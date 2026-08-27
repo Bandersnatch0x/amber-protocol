@@ -54,6 +54,11 @@
 						"type": "string",
 						"description": "Context page id merged into its source node as a property (ADR-0009)."
 					},
+					"body": {
+						"type": "string",
+						"maxLength": 2000,
+						"description": "Bounded Markdown/source excerpt from the node's canonical source (≤2000 chars). Present when canonical text is available: ADR/wiki/memory/architecture nodes use their source file text; feature nodes use the canonical feature_list.json fields (title, user_visible_behavior, verification, notes); artifact nodes use the head revision's committed body. Absent when no canonical text is available."
+					},
 					"revisions": {
 						"type": "integer",
 						"minimum": 1,

@@ -619,12 +619,16 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
 }
 
 export function KnowledgeMapPage() {
-  const { data: dto, isLoading, error } = trpc.knowledge.graph.useQuery();
+  const { data: dto, isLoading, error, refetch } = trpc.knowledge.graph.useQuery();
   const { t } = useI18n();
 
   if (isLoading) {
     return (
-      <div className="page-container flex items-center justify-center min-h-[60vh]">
+      <div
+        role="status"
+        aria-live="polite"
+        className="page-container flex items-center justify-center min-h-[60vh]"
+      >
         <div className="text-sm text-slate-500 dark:text-slate-400 animate-pulse">
           {t('knowledge.loading')}
         </div>
@@ -634,13 +638,21 @@ export function KnowledgeMapPage() {
 
   if (error || !dto) {
     return (
-      <div className="page-container flex items-center justify-center min-h-[60vh]">
+      <div
+        role="alert"
+        className="page-container flex items-center justify-center min-h-[60vh]"
+      >
         <div className="card p-6 max-w-md text-center space-y-3">
           <div className="text-sm font-medium text-red-700 dark:text-red-300">
             {t('knowledge.errorTitle')}
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 font-mono break-all">
             {error?.message ?? t('knowledge.errorUnknown')}
+          </div>
+          <div className="flex justify-center gap-3 pt-1">
+            <button type="button" onClick={() => void refetch()} className="btn-secondary text-sm">
+              {t('common.retry')}
+            </button>
           </div>
         </div>
       </div>

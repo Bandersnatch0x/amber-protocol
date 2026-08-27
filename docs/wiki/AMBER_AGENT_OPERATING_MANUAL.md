@@ -143,8 +143,12 @@ never invent architecture, commands, or business rules — mark unknowns as "nee
 
 - Data-first, developer-native (DESIGN.md): semantic colors (emerald/amber/crimson) communicate
   state only; no hero metrics, gradients, decorative shadows, or layout-property animation.
-- The viewer reads `.amber/` ONLY (ADR-0006). Do not add a `.harness` fallback; legacy repos must
-  run `amber migrate` first. Reviews should not re-suggest viewer legacy support.
+- The viewer's state reads are confined to `.amber/` (ADR-0006 governs the `.amber`-vs-legacy
+  `.harness` state-directory choice; it does not restrict explicitly authorised read-only corpus
+  queries). Do not add a `.harness` fallback; legacy repos must run `amber migrate` first.
+  F059 explicitly authorises the knowledge surface to load the committed corpus through the shared
+  confined read-only parser (`buildKnowledgeGraph`); those reads are zero-mutation and
+  repository-path-confined. Reviews should not re-suggest viewer legacy support.
 - Install with `npm install --legacy-peer-deps`. CLI code is CommonJS; web code is ES modules.
 
 ## 12. Issue Tracker And Triage

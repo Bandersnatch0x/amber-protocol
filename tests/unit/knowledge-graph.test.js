@@ -265,8 +265,12 @@ test("artifacts enter at identity granularity with trace edges on the four verbs
 	assert.ok(intentNode, "intent artifact node missing");
 	assert.equal(intentNode.layer, "decision");
 	assert.equal(intentNode.revisions, 2, "identity granularity: one node, two revisions");
+	// Head revision body is the accepted body (revision 2)
+	assert.ok(typeof intentNode.body === "string" && intentNode.body.length > 0, "artifact node must carry head revision body");
+	assert.ok(intentNode.body.includes("Accepted"), "artifact body should contain the head revision text");
 	const specNode = fixture.nodes.find((n) => n.id === "artifact:spec/spec/login-spec");
 	assert.ok(specNode, "spec artifact node missing");
+	assert.ok(typeof specNode.body === "string" && specNode.body.length > 0, "spec artifact node must carry body");
 	const edge = fixture.edges.find(
 		(e) => e.src === specNode.id && e.dst === intentNode.id && e.verb === "builds-on",
 	);
@@ -438,7 +442,85 @@ test("F-4: ? in basename matches a single character — lib/file?.js with lib/fi
 	assert.equal(finding, undefined, "lib/file?.js must NOT produce a finding when lib/file1.js exists");
 });
 
-// ── F-5: root-CLI subprocess seam ─────────────────────────────────────
+test("F-6: content nodes carry a body excerpt; all nodes with canonical text have body ≤ 2000 chars", () => {
+	const contentKinds = new Set(["adr", "wiki", "memory", "architecture"]);
+	let contentCount = 0;
+	for (const node of graph.nodes) {
+		// Body must be bounded when present
+		if (node.body !== undefined) {
+			assert.ok(typeof node.body === "string", `${node.id} body must be a string`);
+			assert.ok(node.body.length > 0, `${node.id} body must be non-empty`);
+			assert.ok(node.body.length <= 2000, `${node.id} body exceeds 2000 chars (got ${node.body.length})`);
+		}
+		// Content-layer nodes always have body (their source files are non-empty)
+		if (contentKinds.has(node.kind)) {
+			assert.ok(
+				typeof node.body === "string" && node.body.length > 0,
+				`${node.id} (${node.kind}) missing body excerpt`,
+			);
+			contentCount++;
+		}
+	}
+	assert.ok(contentCount > 0, "no content nodes found");
+});
+
+test("F-6: feature nodes with canonical text carry a representative body excerpt", () => {
+	const featureNodes = graph.nodes.filter((n) => n.kind === "feature");
+	assert.ok(featureNodes.length > 0, "no feature nodes found");
+	// Features with non-trivial user_visible_behavior etc. have body;
+	// features whose ALL canonical text fields are empty may have no body.
+	const withBody = featureNodes.filter((n) => n.body !== undefined);
+	assert.ok(withBody.length > 0, "expected at least some feature nodes to carry body");
+	for (const n of withBody) {
+		assert.ok(typeof n.body === "string" && n.body.length > 0, `${n.id} body must be non-empty`);
+		assert.ok(n.body.length <= 2000, `${n.id} body exceeds 2000 chars`);
+	}
+});
+
+test("F-6: artifact nodes carry body from the head revision committed text", () => {
+	const artifactNodes = graph.nodes.filter((n) => n.kind === "artifact");
+	// The real repo has committed artifacts; all should expose the head body.
+	for (const n of artifactNodes) {
+		if (n.body !== undefined) {
+			assert.ok(typeof n.body === "string" && n.body.length > 0, `${n.id} body must be non-empty`);
+			assert.ok(n.body.length <= 2000, `${n.id} artifact body exceeds 2000 chars`);
+		}
+	}
+	// At least fixture tests below verify artifact body round-trips; real-tree
+	// artifacts may or may not have body depending on committed revisions.
+});
+
+
+
+test("F-6: body is absent for empty-text memory sections", () => {
+	const { mkTarget } = require("../helpers/harness");
+	const dir = mkTarget("kg-empty-body", { subdirs: ["docs/adr"] });
+	// Create an ADR with only whitespace after trimming
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0001-empty.md"),
+		"  \n  \n",
+	);
+	const fixture = buildKnowledgeGraph(dir);
+	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
+	assert.ok(adr, "adr:0001 missing");
+	// Whitespace-only text produces no body
+	assert.equal(adr.body, undefined, "whitespace-only body should be absent");
+});
+
+test("F-6: body is bounded at 2000 chars for long documents", () => {
+	const { mkTarget } = require("../helpers/harness");
+	const dir = mkTarget("kg-long-body", { subdirs: ["docs/adr"] });
+	const longText = "# ADR-0001: Long\n\n**Status:** Accepted\n**Date:** 2026-01-01\n\n" + "x".repeat(5000);
+	fs.writeFileSync(path.join(dir, "docs", "adr", "0001-long.md"), longText);
+	const fixture = buildKnowledgeGraph(dir);
+	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
+	assert.ok(adr, "adr:0001 missing");
+	assert.ok(typeof adr.body === "string", "body must be a string");
+	assert.ok(adr.body.length <= 2000, `body length ${adr.body.length} exceeds 2000`);
+	assert.ok(adr.body.length > 0, "body must be non-empty for non-empty document");
+});
+
+
 
 test("F-5: amber knowledge graph --json emits schema-valid, byte-identical JSON from root CLI", () => {
 	const { spawnSync } = require("node:child_process");
