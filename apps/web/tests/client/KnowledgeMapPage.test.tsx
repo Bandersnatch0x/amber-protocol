@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { skipToken } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -108,6 +109,14 @@ const graph: KnowledgeGraphDTO = {
       sourcePath: 'docs/adr/0001-test.md',
       body: 'Some body text.',
     },
+    {
+      id: 'wiki:current',
+      kind: 'wiki',
+      layer: 'knowledge',
+      title: 'Current guidance',
+      sourcePath: 'docs/wiki/current.md',
+      body: 'Current guidance body.',
+    },
   ],
   edges: [],
   drift: [],
@@ -164,9 +173,12 @@ function semanticResult(result?: Partial<SemanticResultDTO>) {
   };
 }
 
-function askResult(enabled: boolean) {
+type AskInput = { question: string; focusNodeId?: string; allowExternal: true };
+
+function askResult(input: AskInput | typeof skipToken) {
+  const request = input === skipToken ? null : input;
   return {
-    data: enabled
+    data: request
       ? {
           status: 'ok' as const,
           answer: {
@@ -179,7 +191,13 @@ function askResult(enabled: boolean) {
           },
           omittedCount: 2,
           supersededBy: {},
+          request: {
+            question: request.question,
+            ...(request.focusNodeId ? { focusNodeId: request.focusNodeId } : {}),
+          },
           contextDigest: 'c'.repeat(64),
+          questionDigest: 'e'.repeat(64),
+          exchangeDigest: 'f'.repeat(64),
           provenance: {
             provider: 'stub',
             model: 'stub-model',
@@ -212,9 +230,7 @@ beforeEach(() => {
   });
   trpcMocks.semanticStatusUseQuery.mockReturnValue(semanticStatus(false));
   trpcMocks.semanticUseQuery.mockReturnValue(semanticResult({ available: false }));
-  trpcMocks.askUseQuery.mockImplementation((_input, options: { enabled?: boolean }) =>
-    askResult(options.enabled === true),
-  );
+  trpcMocks.askUseQuery.mockImplementation((input) => askResult(input));
 });
 
 afterEach(cleanup);
@@ -359,12 +375,11 @@ describe('KnowledgeMapPage semantic results and failures', () => {
 });
 
 describe('KnowledgeMapPage cited QA', () => {
-  it('submits only after disclosure and selects cited live map nodes', () => {
+  it('submits only after disclosure and keeps answer scope truthful during citation navigation', () => {
     renderPage();
     expect(trpcMocks.askUseQuery).toHaveBeenLastCalledWith(
-      { question: 'pending' },
+      skipToken,
       expect.objectContaining({
-        enabled: false,
         retry: false,
         refetchInterval: false,
         refetchOnReconnect: false,
@@ -374,7 +389,14 @@ describe('KnowledgeMapPage cited QA', () => {
     );
 
     fireEvent.click(screen.getByTestId('flow-node-feature:F059'));
-    fireEvent.click(screen.getByRole('tab', { name: 'Ask' }));
+    const detailButton = screen.getByRole('button', { name: 'Detail' });
+    const askButton = screen.getByRole('button', { name: 'Ask' });
+    expect(detailButton.getAttribute('aria-pressed')).toBe('true');
+    expect(askButton.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(askButton);
+    expect(detailButton.getAttribute('aria-pressed')).toBe('false');
+    expect(askButton.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByRole('tab')).toBeNull();
     expect(
       screen.getByText(/sends your question and deterministic repository context/i),
     ).toBeDefined();
@@ -384,24 +406,50 @@ describe('KnowledgeMapPage cited QA', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send question' }));
 
     expect(trpcMocks.askUseQuery).toHaveBeenLastCalledWith(
-      { question: 'What governs F059?', focusNodeId: 'feature:F059' },
-      expect.objectContaining({ enabled: true, retry: false, gcTime: 0 }),
+      {
+        question: 'What governs F059?',
+        focusNodeId: 'feature:F059',
+        allowExternal: true,
+      },
+      expect.objectContaining({ retry: false, gcTime: 0 }),
     );
     expect(screen.getByTestId('knowledge-ask-answer').textContent).toContain(
       'F059 is governed by ADR-0001.',
     );
+    expect(screen.getByTestId('knowledge-ask-submitted-question').textContent).toContain(
+      'What governs F059?',
+    );
+    expect(screen.getByTestId('knowledge-ask-submitted-focus').textContent).toContain(
+      'feature:F059',
+    );
     expect(screen.getByText('2 uncited claims omitted')).toBeDefined();
 
+    fireEvent.change(screen.getByLabelText('Question'), { target: { value: 'A different draft' } });
     fireEvent.click(screen.getByTestId('knowledge-citation-adr:0001'));
     expect(screen.getByTestId('flow-node-adr:0001').getAttribute('data-selected')).toBe('true');
+    expect(screen.getByTestId('knowledge-ask-submitted-question').textContent).toContain(
+      'What governs F059?',
+    );
+    expect(screen.getByTestId('knowledge-ask-submitted-question').textContent).not.toContain(
+      'A different draft',
+    );
+    expect(screen.getByTestId('knowledge-ask-submitted-focus').textContent).toContain(
+      'feature:F059',
+    );
     expect(screen.getByTestId('knowledge-ask-panel')).toBeDefined();
   });
 
-  it('marks superseded citations and selects their deterministic superseder', () => {
+  it('marks superseded citations and links every deterministic superseder in stable order', () => {
     trpcMocks.graphUseQuery.mockReturnValue({
       data: {
         ...graph,
         edges: [
+          {
+            src: 'wiki:current',
+            dst: 'feature:F059',
+            verb: 'supersedes',
+            origin: 'deterministic',
+          },
           {
             src: 'adr:0001',
             dst: 'feature:F059',
@@ -414,28 +462,37 @@ describe('KnowledgeMapPage cited QA', () => {
       error: null,
       refetch: trpcMocks.graphRefetch,
     });
-    trpcMocks.askUseQuery.mockImplementation((_input, options: { enabled?: boolean }) => {
-      const result = askResult(options.enabled === true);
-      if (result.data?.status === 'ok') result.data.supersededBy = { 'feature:F059': 'adr:0001' };
+    trpcMocks.askUseQuery.mockImplementation((input) => {
+      const result = askResult(input);
+      if (result.data?.status === 'ok') {
+        result.data.supersededBy = { 'feature:F059': ['adr:0001', 'wiki:current'] };
+      }
       return result;
     });
     renderPage();
-    fireEvent.click(screen.getByRole('tab', { name: 'Ask' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     fireEvent.change(screen.getByLabelText('Question'), { target: { value: 'What changed?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send question' }));
 
     expect(screen.getByText('superseded')).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'current: adr:0001' }));
+    const supersederButtons = screen.getAllByRole('button', { name: /^current:/ });
+    expect(supersederButtons.map((button) => button.textContent)).toEqual([
+      'current: adr:0001',
+      'current: wiki:current',
+    ]);
+    fireEvent.click(supersederButtons[0]);
     expect(screen.getByTestId('flow-node-adr:0001').getAttribute('data-selected')).toBe('true');
+    fireEvent.click(supersederButtons[1]);
+    expect(screen.getByTestId('flow-node-wiki:current').getAttribute('data-selected')).toBe('true');
   });
 
   it('renders stable errors without provider details', () => {
-    trpcMocks.askUseQuery.mockImplementation((_input, options: { enabled?: boolean }) => ({
-      ...askResult(false),
-      error: options.enabled ? new Error('secret provider detail') : null,
+    trpcMocks.askUseQuery.mockImplementation((input) => ({
+      ...askResult(skipToken),
+      error: input === skipToken ? null : new Error('secret provider detail'),
     }));
     renderPage();
-    fireEvent.click(screen.getByRole('tab', { name: 'Ask' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     fireEvent.change(screen.getByLabelText('Question'), { target: { value: 'Question' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send question' }));
 
@@ -445,23 +502,24 @@ describe('KnowledgeMapPage cited QA', () => {
   });
 
   it('renders unavailable and loading states without hiding the map', () => {
-    trpcMocks.askUseQuery.mockImplementation((_input, options: { enabled?: boolean }) => ({
-      ...askResult(false),
-      data: options.enabled
-        ? { status: 'unavailable' as const, reason: 'not-configured' as const }
-        : undefined,
+    trpcMocks.askUseQuery.mockImplementation((input) => ({
+      ...askResult(skipToken),
+      data:
+        input === skipToken
+          ? undefined
+          : { status: 'unavailable' as const, reason: 'not-configured' as const },
     }));
     const { rerender } = renderPage();
-    fireEvent.click(screen.getByRole('tab', { name: 'Ask' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     fireEvent.change(screen.getByLabelText('Question'), { target: { value: 'Question' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send question' }));
     expect(
       screen.getByText('Ask is unavailable because no LLM provider is configured.'),
     ).toBeDefined();
 
-    trpcMocks.askUseQuery.mockImplementation((_input, options: { enabled?: boolean }) => ({
-      ...askResult(false),
-      isFetching: options.enabled === true,
+    trpcMocks.askUseQuery.mockImplementation((input) => ({
+      ...askResult(skipToken),
+      isFetching: input !== skipToken,
     }));
     rerender(
       <I18nProvider initialLanguage="en">
@@ -483,7 +541,7 @@ describe('KnowledgeMapPage i18n', () => {
 
   it('renders the Ask disclosure and controls in zh-CN', () => {
     renderPage('zh-CN');
-    fireEvent.click(screen.getByRole('tab', { name: '提问' }));
+    fireEvent.click(screen.getByRole('button', { name: '提问' }));
     expect(screen.getByText('向知识地图提问')).toBeDefined();
     expect(screen.getByText(/确定性仓库上下文/)).toBeDefined();
     expect(screen.getByRole('button', { name: '发送问题' })).toBeDefined();

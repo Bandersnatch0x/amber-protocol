@@ -81,8 +81,14 @@ export type KnowledgeAskResultDTO =
       status: 'ok';
       answer: { segments: KnowledgeAnswerSegmentDTO[] };
       omittedCount: number;
-      supersededBy: Record<string, string>;
+      supersededBy: Record<string, string[]>;
+      request: {
+        question: string;
+        focusNodeId?: string;
+      };
       contextDigest: string;
+      questionDigest: string;
+      exchangeDigest: string;
       provenance: {
         provider: string;
         model: string;

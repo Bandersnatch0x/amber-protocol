@@ -5,7 +5,7 @@ import type {
   KnowledgeAskResultDTO,
   KnowledgeGraphDTO,
 } from '../../src/lib/knowledge-dto';
-import { complete, getCacheIdentity } from './knowledge-llm';
+import { completeWithMetadata } from './knowledge-llm';
 
 const requireCli = createRequire(import.meta.url);
 const { sha256Hex, canonicalJson } = requireCli('../../../../scripts/lib/core/context-hash.js') as {
@@ -170,7 +170,7 @@ export function validateCitedAnswer(
 ): {
   segments: KnowledgeAnswerSegmentDTO[];
   omittedCount: number;
-  supersededBy: Record<string, string>;
+  supersededBy: Record<string, string[]>;
 } {
   let parsed: unknown;
   try {
@@ -197,17 +197,19 @@ export function validateCitedAnswer(
 
   if (segments.length === 0) throw new KnowledgeAskError('uncitable-answer');
   const citedIds = new Set(segments.flatMap((segment) => segment.citations));
-  const supersededBy = Object.fromEntries(
-    stable(
-      snapshot.edges.filter(
-        (edge) =>
-          edge.origin === 'deterministic' && edge.verb === 'supersedes' && citedIds.has(edge.dst),
-      ),
-      (edge) => `${edge.dst}\0${edge.src}`,
-    )
-      .filter((edge, index, edges) => index === 0 || edges[index - 1].dst !== edge.dst)
-      .map((edge) => [edge.dst, edge.src]),
-  );
+  const supersededBy: Record<string, string[]> = {};
+  for (const edge of stable(
+    snapshot.edges.filter(
+      (candidate) =>
+        candidate.origin === 'deterministic' &&
+        candidate.verb === 'supersedes' &&
+        citedIds.has(candidate.dst),
+    ),
+    (candidate) => `${candidate.dst}\0${candidate.src}`,
+  )) {
+    const superseders = (supersededBy[edge.dst] ??= []);
+    if (!superseders.includes(edge.src)) superseders.push(edge.src);
+  }
   return { segments, omittedCount, supersededBy };
 }
 
@@ -217,23 +219,25 @@ export async function answerKnowledgeQuestion(
   focusNodeId?: string,
 ): Promise<KnowledgeAskResultDTO> {
   const assembly = assembleKnowledgeContext(snapshot, focusNodeId);
-  const identity = getCacheIdentity();
-  const raw = await complete(
-    'cited-qa',
-    CITED_QA_PROMPT,
-    JSON.stringify({ question, context: assembly.context }),
-  );
-  const answer = validateCitedAnswer(raw, snapshot);
+  const userMessage = JSON.stringify({ question, context: assembly.context });
+  const exchange = await completeWithMetadata('cited-qa', CITED_QA_PROMPT, userMessage);
+  const answer = validateCitedAnswer(exchange.output, snapshot);
   return {
     status: 'ok',
     answer: { segments: answer.segments },
     omittedCount: answer.omittedCount,
     supersededBy: answer.supersededBy,
+    request: {
+      question,
+      ...(focusNodeId ? { focusNodeId } : {}),
+    },
     contextDigest: assembly.contextDigest,
+    questionDigest: sha256Hex(question),
+    exchangeDigest: sha256Hex(userMessage),
     provenance: {
-      provider: identity.provider,
-      model: identity.model,
-      timestamp: new Date().toISOString(),
+      provider: exchange.identity.provider,
+      model: exchange.identity.model,
+      timestamp: exchange.timestamp,
       promptHash: CITED_QA_PROMPT_HASH,
     },
   };

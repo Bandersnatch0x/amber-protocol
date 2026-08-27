@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from '@tanstack/react-router';
+import { skipToken } from '@tanstack/react-query';
 import {
   Background,
   BackgroundVariant,
@@ -652,6 +653,180 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
   );
 }
 
+function KnowledgeAskForm({
+  question,
+  onQuestionChange,
+  onSubmit,
+  focusNode,
+  isFetching,
+}: {
+  question: string;
+  onQuestionChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  focusNode: KnowledgeNode | null;
+  isFetching: boolean;
+}) {
+  const { t } = useI18n();
+  return (
+    <form className="mt-3 space-y-3" onSubmit={onSubmit}>
+      <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-200">
+        {t('knowledge.ask.questionLabel')}
+        <textarea
+          value={question}
+          onChange={(event) => onQuestionChange(event.target.value)}
+          placeholder={t('knowledge.ask.placeholder')}
+          maxLength={2_000}
+          rows={4}
+          className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-obsidian-border dark:bg-obsidian-surface dark:text-slate-200"
+        />
+      </label>
+      <div className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 text-[10px] text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
+        {t('knowledge.ask.disclosure')}
+      </div>
+      <div className="text-[10px] text-slate-500 dark:text-slate-400">
+        {focusNode ? t('knowledge.ask.focus', { id: focusNode.id }) : t('knowledge.ask.noFocus')}
+      </div>
+      <button
+        type="submit"
+        disabled={isFetching || question.trim().length === 0}
+        className="btn-secondary w-full text-xs disabled:opacity-50"
+      >
+        {isFetching ? t('knowledge.ask.loading') : t('knowledge.ask.submit')}
+      </button>
+    </form>
+  );
+}
+
+function KnowledgeAskStatus({
+  result,
+  errorCode,
+}: {
+  result: KnowledgeAskResultDTO | undefined;
+  errorCode: string | null;
+}) {
+  const { t } = useI18n();
+  const errorMessage = errorCode?.includes('context-overflow')
+    ? t('knowledge.ask.overflow')
+    : errorCode?.includes('uncitable-answer')
+      ? t('knowledge.ask.uncitable')
+      : errorCode?.includes('invalid-focus-node')
+        ? t('knowledge.ask.invalidFocus')
+        : errorCode
+          ? t('knowledge.ask.error')
+          : null;
+  if (result?.status === 'unavailable') {
+    return (
+      <div role="status" className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        {result.reason === 'invalid-config'
+          ? t('knowledge.ask.invalidConfig')
+          : t('knowledge.ask.unavailable')}
+      </div>
+    );
+  }
+  return errorMessage ? (
+    <div role="alert" className="mt-3 text-xs text-red-700 dark:text-red-300">
+      {errorMessage}
+    </div>
+  ) : null;
+}
+
+function KnowledgeCitation({
+  citation,
+  supersederIds,
+  nodeById,
+  onSelect,
+}: {
+  citation: string;
+  supersederIds: string[];
+  nodeById: Map<string, KnowledgeNode>;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onSelect(citation)}
+        data-testid={`knowledge-citation-${citation}`}
+        className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono text-[10px] text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+        title={nodeById.get(citation)?.title}
+      >
+        {citation}
+      </button>
+      {supersederIds.length > 0 && (
+        <span className="rounded bg-slate-100 px-1 py-0.5 text-[9px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          {t('knowledge.ask.superseded')}
+        </span>
+      )}
+      {supersederIds.map((supersederId) => (
+        <button
+          key={supersederId}
+          type="button"
+          onClick={() => onSelect(supersederId)}
+          className="text-[9px] text-blue-700 underline hover:text-blue-800 dark:text-blue-300"
+        >
+          {t('knowledge.ask.supersededBy', { id: supersederId })}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+function KnowledgeAskAnswer({
+  result,
+  nodeById,
+  onSelect,
+}: {
+  result: Extract<KnowledgeAskResultDTO, { status: 'ok' }>;
+  nodeById: Map<string, KnowledgeNode>;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="mt-4 space-y-3" data-testid="knowledge-ask-answer">
+      <div className="text-[10px] uppercase tracking-wide text-slate-400">
+        {t('knowledge.ask.result')}
+      </div>
+      <div className="rounded-md bg-slate-50 px-2.5 py-2 text-[10px] text-slate-600 dark:bg-obsidian-surface dark:text-slate-300">
+        <div data-testid="knowledge-ask-submitted-question">
+          {t('knowledge.ask.submittedQuestion', { question: result.request.question })}
+        </div>
+        <div data-testid="knowledge-ask-submitted-focus">
+          {result.request.focusNodeId
+            ? t('knowledge.ask.submittedFocus', { id: result.request.focusNodeId })
+            : t('knowledge.ask.submittedNoFocus')}
+        </div>
+      </div>
+      {result.answer.segments.map((segment, index) => (
+        <div
+          key={`${index}:${segment.text}`}
+          className="rounded-md border border-slate-200 p-2.5 dark:border-obsidian-border"
+        >
+          <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-200">
+            {segment.text}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5" aria-label={t('knowledge.ask.citations')}>
+            {segment.citations.map((citation) => (
+              <KnowledgeCitation
+                key={citation}
+                citation={citation}
+                supersederIds={result.supersededBy[citation] ?? []}
+                nodeById={nodeById}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+      {result.omittedCount > 0 && (
+        <div role="status" className="text-[10px] text-amber-700 dark:text-amber-300">
+          {t('knowledge.ask.omitted', { count: result.omittedCount })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KnowledgeAskPanel({
   question,
   onQuestionChange,
@@ -674,16 +849,6 @@ function KnowledgeAskPanel({
   onSelect: (id: string) => void;
 }) {
   const { t } = useI18n();
-  const errorMessage = errorCode?.includes('context-overflow')
-    ? t('knowledge.ask.overflow')
-    : errorCode?.includes('uncitable-answer')
-      ? t('knowledge.ask.uncitable')
-      : errorCode?.includes('invalid-focus-node')
-        ? t('knowledge.ask.invalidFocus')
-        : errorCode
-          ? t('knowledge.ask.error')
-          : null;
-
   return (
     <div className="card p-4 max-h-[70vh] overflow-y-auto" data-testid="knowledge-ask-panel">
       <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -692,102 +857,16 @@ function KnowledgeAskPanel({
       <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
         {t('knowledge.ask.description')}
       </p>
-      <form className="mt-3 space-y-3" onSubmit={onSubmit}>
-        <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-200">
-          {t('knowledge.ask.questionLabel')}
-          <textarea
-            value={question}
-            onChange={(event) => onQuestionChange(event.target.value)}
-            placeholder={t('knowledge.ask.placeholder')}
-            maxLength={2_000}
-            rows={4}
-            className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/30 dark:border-obsidian-border dark:bg-obsidian-surface dark:text-slate-200"
-          />
-        </label>
-        <div className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 text-[10px] text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
-          {t('knowledge.ask.disclosure')}
-        </div>
-        <div className="text-[10px] text-slate-500 dark:text-slate-400">
-          {focusNode ? t('knowledge.ask.focus', { id: focusNode.id }) : t('knowledge.ask.noFocus')}
-        </div>
-        <button
-          type="submit"
-          disabled={isFetching || question.trim().length === 0}
-          className="btn-secondary w-full text-xs disabled:opacity-50"
-        >
-          {isFetching ? t('knowledge.ask.loading') : t('knowledge.ask.submit')}
-        </button>
-      </form>
-
-      {result?.status === 'unavailable' && (
-        <div role="status" className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-          {result.reason === 'invalid-config'
-            ? t('knowledge.ask.invalidConfig')
-            : t('knowledge.ask.unavailable')}
-        </div>
-      )}
-      {errorMessage && (
-        <div role="alert" className="mt-3 text-xs text-red-700 dark:text-red-300">
-          {errorMessage}
-        </div>
-      )}
+      <KnowledgeAskForm
+        question={question}
+        onQuestionChange={onQuestionChange}
+        onSubmit={onSubmit}
+        focusNode={focusNode}
+        isFetching={isFetching}
+      />
+      <KnowledgeAskStatus result={result} errorCode={errorCode} />
       {result?.status === 'ok' && (
-        <div className="mt-4 space-y-3" data-testid="knowledge-ask-answer">
-          <div className="text-[10px] uppercase tracking-wide text-slate-400">
-            {t('knowledge.ask.result')}
-          </div>
-          {result.answer.segments.map((segment, index) => (
-            <div
-              key={`${index}:${segment.text}`}
-              className="rounded-md border border-slate-200 p-2.5 dark:border-obsidian-border"
-            >
-              <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-200">
-                {segment.text}
-              </p>
-              <div
-                className="mt-2 flex flex-wrap gap-1.5"
-                aria-label={t('knowledge.ask.citations')}
-              >
-                {segment.citations.map((citation) => {
-                  const node = nodeById.get(citation);
-                  const supersederId = result.supersededBy[citation];
-                  return (
-                    <span key={citation} className="inline-flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onSelect(citation)}
-                        data-testid={`knowledge-citation-${citation}`}
-                        className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 font-mono text-[10px] text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-                        title={node?.title}
-                      >
-                        {citation}
-                      </button>
-                      {supersederId && (
-                        <>
-                          <span className="rounded bg-slate-100 px-1 py-0.5 text-[9px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                            {t('knowledge.ask.superseded')}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onSelect(supersederId)}
-                            className="text-[9px] text-blue-700 underline hover:text-blue-800 dark:text-blue-300"
-                          >
-                            {t('knowledge.ask.supersededBy', { id: supersederId })}
-                          </button>
-                        </>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          {result.omittedCount > 0 && (
-            <div role="status" className="text-[10px] text-amber-700 dark:text-amber-300">
-              {t('knowledge.ask.omitted', { count: result.omittedCount })}
-            </div>
-          )}
-        </div>
+        <KnowledgeAskAnswer result={result} nodeById={nodeById} onSelect={onSelect} />
       )}
     </div>
   );
@@ -918,9 +997,12 @@ function KnowledgeMapGraph({
   const [showDriftOnly, setShowDriftOnly] = useState(false);
   const [railView, setRailView] = useState<'detail' | 'ask'>('detail');
   const [question, setQuestion] = useState('');
-  const [askInput, setAskInput] = useState<{ question: string; focusNodeId?: string } | null>(null);
-  const askQuery = trpc.knowledge.ask.useQuery(askInput ?? { question: 'pending' }, {
-    enabled: askInput !== null,
+  const [askInput, setAskInput] = useState<{
+    question: string;
+    focusNodeId?: string;
+    allowExternal: true;
+  } | null>(null);
+  const askQuery = trpc.knowledge.ask.useQuery(askInput ?? skipToken, {
     retry: false,
     refetchInterval: false,
     refetchOnReconnect: false,
@@ -956,6 +1038,7 @@ function KnowledgeMapGraph({
     const nextInput = {
       question: trimmed,
       ...(selectedId ? { focusNodeId: selectedId } : {}),
+      allowExternal: true as const,
     };
     if (
       askInput?.question === nextInput.question &&
@@ -1224,15 +1307,14 @@ function KnowledgeMapGraph({
         <aside className="w-full lg:w-96 shrink-0 space-y-4">
           <div
             className="flex rounded-lg border border-slate-200 bg-white p-1 dark:border-obsidian-border dark:bg-obsidian-elevated"
-            role="tablist"
+            role="group"
             aria-label={t('knowledge.rail.label')}
           >
             {(['detail', 'ask'] as const).map((view) => (
               <button
                 key={view}
                 type="button"
-                role="tab"
-                aria-selected={railView === view}
+                aria-pressed={railView === view}
                 onClick={() => setRailView(view)}
                 className={`flex-1 rounded px-3 py-1.5 text-xs transition-colors ${
                   railView === view

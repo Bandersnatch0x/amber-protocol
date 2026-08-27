@@ -51,12 +51,21 @@ const snapshot: KnowledgeGraphDTO = {
       sourcePath: 'd.md',
       body: 'D body',
     },
+    {
+      id: 'node:e',
+      kind: 'wiki',
+      layer: 'knowledge',
+      title: 'E',
+      sourcePath: 'e.md',
+      body: 'E body',
+    },
   ],
   edges: [
     { src: 'node:b', dst: 'node:c', verb: 'references', origin: 'deterministic' },
     { src: 'node:a', dst: 'node:b', verb: 'builds-on', origin: 'deterministic' },
     { src: 'node:c', dst: 'node:d', verb: 'describes', origin: 'deterministic' },
     { src: 'node:a', dst: 'node:d', verb: 'references', origin: 'inferred' },
+    { src: 'node:e', dst: 'node:c', verb: 'supersedes', origin: 'deterministic' },
     { src: 'node:d', dst: 'node:c', verb: 'supersedes', origin: 'deterministic' },
   ],
   drift: [
@@ -189,7 +198,23 @@ describe('cited answer validation', () => {
     ).toThrowError(new KnowledgeAskError('uncitable-answer'));
   });
 
-  it('keeps citations to superseded nodes valid', () => {
+  it('accepts snapshot-valid citations outside the focused context', () => {
+    const assembly = assembleKnowledgeContext(snapshot, 'node:a');
+    expect(assembly.nodeIds.has('node:d')).toBe(false);
+
+    expect(
+      validateCitedAnswer(
+        JSON.stringify({ segments: [{ text: 'Snapshot-scoped.', citations: ['node:d'] }] }),
+        snapshot,
+      ),
+    ).toEqual({
+      segments: [{ text: 'Snapshot-scoped.', citations: ['node:d'] }],
+      omittedCount: 0,
+      supersededBy: {},
+    });
+  });
+
+  it('keeps citations to superseded nodes valid and preserves every superseder', () => {
     expect(
       validateCitedAnswer(
         JSON.stringify({ segments: [{ text: 'Historical.', citations: ['node:c'] }] }),
@@ -198,7 +223,7 @@ describe('cited answer validation', () => {
     ).toEqual({
       segments: [{ text: 'Historical.', citations: ['node:c'] }],
       omittedCount: 0,
-      supersededBy: { 'node:c': 'node:d' },
+      supersededBy: { 'node:c': ['node:d', 'node:e'] },
     });
   });
 });
@@ -207,7 +232,9 @@ describe('knowledge.ask query', () => {
   const caller = knowledgeRouter.createCaller({});
 
   it('returns unavailable without a key and remains query-only', async () => {
-    await expect(caller.ask({ question: 'What is current?' })).resolves.toEqual({
+    await expect(
+      caller.ask({ allowExternal: true, question: 'What is current?' }),
+    ).resolves.toEqual({
       status: 'unavailable',
       reason: 'not-configured',
     });
@@ -221,19 +248,36 @@ describe('knowledge.ask query', () => {
   it('uses one stateless uncached exchange per ask and sends the digested context', async () => {
     useStub();
     const llm = await import('@server/lib/knowledge-llm');
-    const completeSpy = vi.spyOn(llm, 'complete');
+    const completeSpy = vi.spyOn(llm, 'completeWithMetadata');
 
-    const first = await caller.ask({ question: 'What exists?' });
-    const second = await caller.ask({ question: 'What exists?' });
+    const first = await caller.ask({ allowExternal: true, question: 'What exists?' });
+    const second = await caller.ask({ allowExternal: true, question: 'What exists?' });
 
     expect(first.status).toBe('ok');
     expect(second.status).toBe('ok');
     expect(completeSpy).toHaveBeenCalledTimes(2);
     for (const call of completeSpy.mock.calls) {
       expect(call[0]).toBe('cited-qa');
-      const request = JSON.parse(call[2]) as { context: string };
-      const digest = crypto.createHash('sha256').update(request.context, 'utf8').digest('hex');
-      expect(first.status === 'ok' && first.contextDigest).toBe(digest);
+      const userMessage = call[2];
+      const request = JSON.parse(userMessage) as { question: string; context: string };
+      expect(request.question).toBe('What exists?');
+      const contextDigest = crypto
+        .createHash('sha256')
+        .update(request.context, 'utf8')
+        .digest('hex');
+      const questionDigest = crypto
+        .createHash('sha256')
+        .update(request.question, 'utf8')
+        .digest('hex');
+      const exchangeDigest = crypto.createHash('sha256').update(userMessage, 'utf8').digest('hex');
+      expect(first.status === 'ok' && first.contextDigest).toBe(contextDigest);
+      expect(first.status === 'ok' && first.questionDigest).toBe(questionDigest);
+      expect(first.status === 'ok' && first.exchangeDigest).toBe(exchangeDigest);
+      expect(first.status === 'ok' && first.request).toEqual({ question: 'What exists?' });
+      expect(first.status === 'ok' && first.provenance).toMatchObject({
+        provider: 'stub',
+        model: 'stub-model',
+      });
     }
     expect(llmCache.size).toBe(0);
     expect(llmCache.inflightSize).toBe(0);
@@ -246,7 +290,7 @@ describe('knowledge.ask query', () => {
     const createWriteStream = vi.spyOn(fs, 'createWriteStream');
     const promiseWriteFile = vi.spyOn(fs.promises, 'writeFile');
 
-    const result = await caller.ask({ question: 'What exists?' });
+    const result = await caller.ask({ allowExternal: true, question: 'What exists?' });
     expect(result.status).toBe('ok');
     expect(writeFile).not.toHaveBeenCalled();
     expect(appendFile).not.toHaveBeenCalled();
@@ -254,25 +298,60 @@ describe('knowledge.ask query', () => {
     expect(promiseWriteFile).not.toHaveBeenCalled();
   });
 
+  it('rejects absent or false external acknowledgement before graph or provider work', async () => {
+    useStub();
+    const graphReader = await import('@server/lib/knowledge-graph-reader');
+    const graphSpy = vi.spyOn(graphReader, 'readKnowledgeGraphSnapshot');
+    const exchangeSpy = vi.spyOn(await import('@server/lib/knowledge-llm'), 'completeWithMetadata');
+    const callAsk = caller.ask as (input: unknown) => Promise<unknown>;
+
+    await expect(callAsk({ question: 'What exists?' })).rejects.toThrow();
+    await expect(callAsk({ question: 'What exists?', allowExternal: false })).rejects.toThrow();
+    expect(graphSpy).not.toHaveBeenCalled();
+    expect(exchangeSpy).not.toHaveBeenCalled();
+  });
+
   it('rejects invalid inputs and invalid focus before provider invocation', async () => {
     useStub();
-    const completeSpy = vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete');
+    const completeSpy = vi.spyOn(await import('@server/lib/knowledge-llm'), 'completeWithMetadata');
 
-    await expect(caller.ask({ question: '' })).rejects.toThrow();
-    await expect(caller.ask({ question: 'Question', focusNodeId: 'missing' })).rejects.toThrow(
-      'invalid-focus-node',
-    );
+    await expect(caller.ask({ allowExternal: true, question: '' })).rejects.toThrow();
+    await expect(
+      caller.ask({ allowExternal: true, question: 'Question', focusNodeId: 'missing' }),
+    ).rejects.toThrow('invalid-focus-node');
     expect(completeSpy).not.toHaveBeenCalled();
+  });
+
+  it('redacts malformed provider JSON behind a stable error', async () => {
+    useStub();
+    vi.spyOn(
+      await import('@server/lib/knowledge-llm'),
+      'completeWithMetadata',
+    ).mockResolvedValueOnce({
+      output: 'not-json secret-provider-payload',
+      identity: { provider: 'stub', model: 'stub-model', endpoint: 'stub://local' },
+      timestamp: '2026-08-28T00:00:00.000Z',
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const error = await caller
+      .ask({ allowExternal: true, question: 'What exists?' })
+      .catch((cause: unknown) => cause);
+    expect(error).toMatchObject({ message: 'knowledge-answer-unavailable' });
+    expect(JSON.stringify(error)).not.toContain('secret-provider-payload');
   });
 
   it('redacts provider failures behind a stable error', async () => {
     useStub();
-    vi.spyOn(await import('@server/lib/knowledge-llm'), 'complete').mockRejectedValueOnce(
-      new Error('secret-token https://private.example'),
-    );
+    vi.spyOn(
+      await import('@server/lib/knowledge-llm'),
+      'completeWithMetadata',
+    ).mockRejectedValueOnce(new Error('secret-token https://private.example'));
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    await expect(caller.ask({ question: 'What exists?' })).rejects.toMatchObject({
+    await expect(
+      caller.ask({ allowExternal: true, question: 'What exists?' }),
+    ).rejects.toMatchObject({
       message: 'knowledge-answer-unavailable',
     });
   });

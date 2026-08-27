@@ -26,8 +26,20 @@ interface LLMConfig {
   baseUrl: string;
 }
 
+export interface LLMExchangeResult {
+  output: string;
+  identity: {
+    provider: LLMProvider;
+    model: string;
+    endpoint: string;
+  };
+  timestamp: string;
+}
+
 const PROVIDERS = new Set<LLMProvider>(['openai', 'anthropic', 'stub']);
 const DEFAULT_MODEL = 'gpt-4o-mini';
+const MAX_MODEL_LENGTH = 256;
+const MAX_MODEL_BYTES = 512;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const MAX_OUTPUT_TOKENS = 2_048;
@@ -45,6 +57,18 @@ function parseProvider(value: string | undefined): LLMProvider {
     throw new KnowledgeLLMError('invalid-provider');
   }
   return provider as LLMProvider;
+}
+
+function parseModel(value: string | undefined): string {
+  const model = (value === undefined ? DEFAULT_MODEL : value).trim();
+  if (
+    model.length === 0 ||
+    model.length > MAX_MODEL_LENGTH ||
+    Buffer.byteLength(model, 'utf8') > MAX_MODEL_BYTES
+  ) {
+    throw new KnowledgeLLMError('invalid-model');
+  }
+  return model;
 }
 
 function isLoopbackHost(hostname: string): boolean {
@@ -87,7 +111,7 @@ function readConfig(): LLMConfig {
   return {
     apiKey,
     provider,
-    model: process.env.LLM_MODEL ?? DEFAULT_MODEL,
+    model: parseModel(process.env.LLM_MODEL),
     baseUrl: validateBaseUrl(provider, process.env.LLM_BASE_URL ?? ''),
   };
 }
@@ -114,16 +138,35 @@ export async function complete(
   userMessage: string,
   signal?: AbortSignal,
 ): Promise<string> {
+  return (await completeWithMetadata(purpose, systemPrompt, userMessage, signal)).output;
+}
+
+export async function completeWithMetadata(
+  purpose: LLMFacadePurpose,
+  systemPrompt: string,
+  userMessage: string,
+  signal?: AbortSignal,
+): Promise<LLMExchangeResult> {
   const config = readConfig();
   if (!config.apiKey) throw new KnowledgeLLMError('not-configured');
 
-  if (config.provider === 'stub') {
-    return buildStubResponse(purpose, userMessage);
-  }
-  if (config.provider === 'anthropic') {
-    return completeAnthropic(config, systemPrompt, userMessage, signal);
-  }
-  return completeOpenAI(config, systemPrompt, userMessage, signal);
+  const timestamp = new Date().toISOString();
+  const output =
+    config.provider === 'stub'
+      ? buildStubResponse(purpose, userMessage)
+      : config.provider === 'anthropic'
+        ? await completeAnthropic(config, systemPrompt, userMessage, signal)
+        : await completeOpenAI(config, systemPrompt, userMessage, signal);
+
+  return {
+    output,
+    identity: {
+      provider: config.provider,
+      model: config.model,
+      endpoint: config.baseUrl,
+    },
+    timestamp,
+  };
 }
 
 function buildStubResponse(purpose: LLMFacadePurpose, userMessage: string): string {

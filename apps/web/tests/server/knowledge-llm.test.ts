@@ -10,7 +10,12 @@ import {
   inferNodeSummaries,
   inferSemanticEdges,
 } from '@server/lib/knowledge-llm-prompts';
-import { complete, getCacheIdentity, getStatus } from '@server/lib/knowledge-llm';
+import {
+  complete,
+  completeWithMetadata,
+  getCacheIdentity,
+  getStatus,
+} from '@server/lib/knowledge-llm';
 import { knowledgeRouter, selectSemanticInputs } from '@server/routers/knowledge';
 
 const ENV_KEYS = [
@@ -66,6 +71,23 @@ describe('provider configuration and network bounds', () => {
   });
 
   it.each([
+    ['blank', '   '],
+    ['character-oversized', 'm'.repeat(257)],
+    ['byte-oversized', '界'.repeat(171)],
+  ])('rejects %s model configuration before fetch or provenance exposure', async (_name, model) => {
+    setEnv('LLM_API_KEY', 'secret');
+    setEnv('LLM_PROVIDER', 'openai');
+    setEnv('LLM_MODEL', model);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    expect(getStatus()).toEqual({ available: false, reason: 'invalid-config' });
+    expect(() => getCacheIdentity()).toThrow('invalid-model');
+    await expect(complete('semantic-edges', 'system', '{}')).rejects.toThrow('invalid-model');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
     'http://provider.example/v1',
     'ftp://provider.example/v1',
     'https://user:password@provider.example/v1',
@@ -87,6 +109,29 @@ describe('provider configuration and network bounds', () => {
       expect(getCacheIdentity().endpoint).toContain(baseUrl.replace(/\/$/, ''));
     },
   );
+
+  it('returns metadata from the same config used for the provider request', async () => {
+    setEnv('LLM_API_KEY', 'secret');
+    setEnv('LLM_PROVIDER', 'openai');
+    setEnv('LLM_MODEL', 'model-before');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { model: string };
+        expect(body.model).toBe('model-before');
+        setEnv('LLM_MODEL', 'model-after');
+        return Promise.resolve(
+          Response.json({ choices: [{ message: { content: '{"edges":[]}' } }] }),
+        );
+      }),
+    );
+
+    const exchange = await completeWithMetadata('semantic-edges', 'system', '{}');
+    expect(exchange.output).toBe('{"edges":[]}');
+    expect(exchange.identity.model).toBe('model-before');
+    expect(exchange.identity.provider).toBe('openai');
+    expect(exchange.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
 
   it('aborts a stalled provider call at the configured bounded timeout', async () => {
     setEnv('LLM_API_KEY', 'secret');

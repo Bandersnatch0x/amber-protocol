@@ -40,6 +40,7 @@ const askInputSchema = z.object({
       'focus-node-id-too-large',
     )
     .optional(),
+  allowExternal: z.literal(true),
 });
 
 export function selectSemanticInputs(nodes: KnowledgeNode[]): {

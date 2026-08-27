@@ -338,7 +338,7 @@ test.describe('Knowledge Map — semantic layer without a provider', () => {
   test('keeps the deterministic map usable when Ask has no provider', async ({ page }) => {
     await page.goto('/knowledge');
     await waitForGraph(page);
-    await page.getByRole('tab', { name: 'Ask' }).click();
+    await page.getByRole('button', { name: 'Ask' }).click();
     await page.getByLabel('Question').fill('What governs this repository?');
     await page.getByRole('button', { name: 'Send question' }).click();
 
@@ -421,7 +421,11 @@ test.describe('Knowledge Map — user-triggered semantic stub', () => {
 
     await page.goto('/knowledge');
     await waitForGraph(page);
-    await page.getByRole('tab', { name: 'Ask' }).click();
+    const askButton = page.getByRole('button', { name: 'Ask' });
+    await expect(askButton).toHaveAttribute('aria-pressed', 'false');
+    await askButton.click();
+    await expect(askButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('tab')).toHaveCount(0);
     await expect(page.getByTestId('knowledge-ask-panel')).toContainText(
       /sends your question and deterministic repository context/i,
     );
@@ -433,10 +437,26 @@ test.describe('Knowledge Map — user-triggered semantic stub', () => {
 
     const answer = page.getByTestId('knowledge-ask-answer');
     await expect(answer).toContainText(/deterministic knowledge graph includes/i);
+    await expect(page.getByTestId('knowledge-ask-submitted-question')).toContainText(
+      'What knowledge is available?',
+    );
+    await expect(page.getByTestId('knowledge-ask-submitted-focus')).toContainText(
+      /submitted without a focus/i,
+    );
+    await page.getByLabel('Question').fill('A different draft');
     const citation = answer.getByTestId('knowledge-citation-adr:0001');
     await expect(citation).toBeVisible();
     await citation.click();
     await expect(page.getByTestId('knowledge-node-adr:0001')).toHaveClass(/border-amber-400/);
+    await expect(page.getByTestId('knowledge-ask-submitted-question')).toContainText(
+      'What knowledge is available?',
+    );
+    await expect(page.getByTestId('knowledge-ask-submitted-question')).not.toContainText(
+      'A different draft',
+    );
+    await expect(page.getByTestId('knowledge-ask-submitted-focus')).toContainText(
+      /submitted without a focus/i,
+    );
     await expect(
       page.locator('.react-flow__renderer, .react-flow__viewport').first(),
     ).toBeVisible();
