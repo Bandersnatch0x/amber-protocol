@@ -20,6 +20,8 @@ const {
 	REGISTRY_SCHEMA_VERSION,
 	SUPPORTED_REGISTRY_SCHEMA_VERSIONS,
 	DEFAULT_MAX_REGISTRY_BYTES,
+	GENESIS_HASH,
+	chainHash,
 	parseTimestamp,
 	principalStatus,
 	listPrincipals,
@@ -28,7 +30,7 @@ const {
 	revokePrincipal,
 	resolveActivePrincipal,
 } = require("../../scripts/lib/core/principal-registry");
-const { writeJSONL, appendJSONL } = require("../../scripts/lib/core/jsonl");
+const { writeJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-principal-${label}-`));
@@ -36,6 +38,23 @@ function mkTarget(label) {
 
 function registryPathOf(dir) {
 	return path.join(dir, ".amber", "principals", "registry.jsonl");
+}
+
+/**
+ * Chain a sequence of hand-built ledger bodies the way the writers do: each
+ * event binds the previous event's hash (the genesis constant first), and the
+ * event's own hash covers its full canonical content. Fixtures for verdicts
+ * the fold checks AFTER the chain walk must arrive chained or they trip the
+ * chain verification instead of the verdict under test.
+ */
+function withChain(events) {
+	let prevHash = GENESIS_HASH;
+	return events.map((event) => {
+		const hash = chainHash(event, prevHash);
+		const chained = { ...event, prevHash, hash };
+		prevHash = hash;
+		return chained;
+	});
 }
 
 /**
@@ -52,6 +71,7 @@ function storedPrincipal(id, principalKind = "human") {
 		role: null,
 		membership: null,
 		capability: null,
+		scope: null,
 		validFrom: null,
 		validTo: null,
 		issuer: null,
@@ -96,6 +116,7 @@ test("register appends one immutable event and returns the folded record", () =>
 			role: "tech-lead",
 			membership: "acme",
 			capability: "approve-deployments",
+			scope: null,
 			validFrom: "2026-01-01",
 			validTo: "2027-01-01",
 			issuer: "acme-it",
@@ -120,7 +141,18 @@ test("register appends one immutable event and returns the folded record", () =>
 	assert.equal(events[0].kind, "registered");
 	assert.equal(events[0].schemaVersion, 1);
 	assert.equal(events[0].principal.id, "alice@example.com");
-	assert.deepEqual(Object.keys(events[0]).sort(), ["at", "kind", "principal", "schemaVersion"]);
+	assert.deepEqual(Object.keys(events[0]).sort(), [
+		"at",
+		"hash",
+		"kind",
+		"prevHash",
+		"principal",
+		"schemaVersion",
+	]);
+	// The first event binds the genesis constant; the stored hash is the
+	// canonical-content hash the fold re-verifies on every read.
+	assert.equal(events[0].prevHash, GENESIS_HASH);
+	assert.equal(events[0].hash, chainHash(events[0], GENESIS_HASH));
 });
 
 test("register validates input as AMBER_E_INVALID_ARG before any state is touched", () => {
@@ -193,7 +225,18 @@ test("revoke appends a terminal event; double revoke and unknown id are stable e
 		.map((line) => JSON.parse(line));
 	assert.equal(events.length, 2);
 	assert.equal(events[1].kind, "revoked");
-	assert.deepEqual(Object.keys(events[1]).sort(), ["at", "id", "kind", "reason", "schemaVersion"]);
+	assert.deepEqual(Object.keys(events[1]).sort(), [
+		"at",
+		"hash",
+		"id",
+		"kind",
+		"prevHash",
+		"reason",
+		"schemaVersion",
+	]);
+	// The revoked event binds the registered event's hash — the chain grows.
+	assert.equal(events[1].prevHash, events[0].hash);
+	assert.equal(events[1].hash, chainHash(events[1], events[0].hash));
 });
 
 test("show and list fold the ledger deterministically (first-seen order)", () => {
@@ -267,6 +310,7 @@ test("resolveActivePrincipal resolves authority against the registry at the call
 		role: "tech-lead",
 		membership: null,
 		capability: null,
+		scope: null,
 		validFrom: "2026-01-01",
 		validTo: "2027-01-01",
 		issuer: null,
@@ -332,6 +376,42 @@ test("the registry size ceiling refuses an append before any durable state is to
 	}
 });
 
+test("the under-lock ceiling re-check measures the real chained event, not the body alone", () => {
+	const dir = mkTarget("ceiling-chain");
+	registerPrincipal(dir, { id: "alice@example.com", principalKind: "human" });
+
+	const bytes = fs.statSync(registryPathOf(dir)).size;
+	// The revoke body alone (without the chain fields) is deterministic in
+	// length: same keys, same value shapes, and a 24-char ISO timestamp — key
+	// order cannot change a JSON string's length.
+	const bodyLine = `${JSON.stringify({
+		kind: "revoked",
+		schemaVersion: 1,
+		at: "2026-01-01T00:00:00.000Z",
+		id: "alice@example.com",
+		reason: null,
+	})}\n`;
+	const previous = process.env.AMBER_PRINCIPAL_MAX_REGISTRY_BYTES;
+	try {
+		// Room for the body the PRE-lock check measures, but not once
+		// prevHash/hash (~146 bytes) are attached to the real event: only the
+		// under-lock re-check on the exact line can refuse this append.
+		process.env.AMBER_PRINCIPAL_MAX_REGISTRY_BYTES = String(bytes + bodyLine.length + 16);
+		const refused = revokePrincipal(dir, { id: "alice@example.com" });
+		assert.equal(refused.ok, false);
+		assert.equal(refused.code, "AMBER_E_PRINCIPAL_REGISTRY_CEILING");
+		assert.match(refused.errors[0], /AMBER_PRINCIPAL_MAX_REGISTRY_BYTES/);
+		assert.equal(
+			JSON.parse(fs.readFileSync(registryPathOf(dir), "utf8").trim().split("\n").at(-1)).kind,
+			"registered",
+			"no revoke event was appended",
+		);
+	} finally {
+		if (previous === undefined) delete process.env.AMBER_PRINCIPAL_MAX_REGISTRY_BYTES;
+		else process.env.AMBER_PRINCIPAL_MAX_REGISTRY_BYTES = previous;
+	}
+});
+
 test("a corrupt ledger fails closed on every seam; an unsupported version keeps its own code", () => {
 	// Every case names the stable code its verdict carries. Corruption is
 	// AMBER_E_PRINCIPAL_REGISTRY_CORRUPT; an event declaring an unsupported
@@ -382,93 +462,128 @@ test("a corrupt ledger fails closed on every seam; an unsupported version keeps 
 		[
 			"unknown event kind",
 			(dir) =>
-				writeJSONL(registryPathOf(dir), [
-					{ kind: "deleted", schemaVersion: 1, at: "2026-01-01T00:00:00Z", id: "a" },
-				]),
+				writeJSONL(
+					registryPathOf(dir),
+					withChain([{ kind: "deleted", schemaVersion: 1, at: "2026-01-01T00:00:00Z", id: "a" }]),
+				),
 			/unknown kind "deleted"/,
 		],
 		[
 			"unknown registered-event field",
 			(dir) =>
-				writeJSONL(registryPathOf(dir), [
-					{
-						kind: "registered",
-						schemaVersion: 1,
-						at: "2026-01-01T00:00:00Z",
-						principal: { id: "a", principalKind: "human" },
-						note: "x",
-					},
-				]),
+				writeJSONL(
+					registryPathOf(dir),
+					withChain([
+						{
+							kind: "registered",
+							schemaVersion: 1,
+							at: "2026-01-01T00:00:00Z",
+							principal: { id: "a", principalKind: "human" },
+							note: "x",
+						},
+					]),
+				),
 			/registered event carrying unknown field "note"/,
 		],
 		[
 			"malformed principal record",
 			(dir) =>
-				writeJSONL(registryPathOf(dir), [
-					{
-						kind: "registered",
-						schemaVersion: 1,
-						at: "2026-01-01T00:00:00Z",
-						principal: { id: "a", principalKind: "robot" },
-					},
-				]),
+				writeJSONL(
+					registryPathOf(dir),
+					withChain([
+						{
+							kind: "registered",
+							schemaVersion: 1,
+							at: "2026-01-01T00:00:00Z",
+							principal: { id: "a", principalKind: "robot" },
+						},
+					]),
+				),
 			/principalKind "robot" is outside the closed set/,
 		],
 		[
 			"principal record with unknown field",
 			(dir) =>
-				writeJSONL(registryPathOf(dir), [
-					{
-						kind: "registered",
-						schemaVersion: 1,
-						at: "2026-01-01T00:00:00Z",
-						principal: { id: "a", principalKind: "human", nickname: "al" },
-					},
-				]),
+				writeJSONL(
+					registryPathOf(dir),
+					withChain([
+						{
+							kind: "registered",
+							schemaVersion: 1,
+							at: "2026-01-01T00:00:00Z",
+							principal: { id: "a", principalKind: "human", nickname: "al" },
+						},
+					]),
+				),
 			/unknown field "nickname"/,
 		],
 		[
 			"double registration",
-			(dir) => {
-				const event = {
-					kind: "registered",
-					schemaVersion: 1,
-					at: "2026-01-01T00:00:00Z",
-					principal: storedPrincipal("a"),
-				};
-				writeJSONL(registryPathOf(dir), [event, event]);
-			},
+			(dir) =>
+				writeJSONL(
+					registryPathOf(dir),
+					withChain([
+						{
+							kind: "registered",
+							schemaVersion: 1,
+							at: "2026-01-01T00:00:00Z",
+							principal: storedPrincipal("a"),
+						},
+						{
+							kind: "registered",
+							schemaVersion: 1,
+							at: "2026-01-02T00:00:00Z",
+							principal: storedPrincipal("a"),
+						},
+					]),
+				),
 			/registers "a" a second time.*edited in place/,
 		],
 		[
 			"revocation of an unregistered id",
 			(dir) =>
-				writeJSONL(registryPathOf(dir), [
-					{ kind: "revoked", schemaVersion: 1, at: "2026-01-01T00:00:00Z", id: "a", reason: null },
-				]),
+				writeJSONL(
+					registryPathOf(dir),
+					withChain([
+						{
+							kind: "revoked",
+							schemaVersion: 1,
+							at: "2026-01-01T00:00:00Z",
+							id: "a",
+							reason: null,
+						},
+					]),
+				),
 			/revokes "a", which was never registered/,
 		],
 		[
 			"double revocation",
-			(dir) => {
-				writeJSONL(registryPathOf(dir), [
-					{
-						kind: "registered",
-						schemaVersion: 1,
-						at: "2026-01-01T00:00:00Z",
-						principal: storedPrincipal("a"),
-					},
-				]);
-				const revoked = {
-					kind: "revoked",
-					schemaVersion: 1,
-					at: "2026-01-02T00:00:00Z",
-					id: "a",
-					reason: null,
-				};
-				appendJSONL(registryPathOf(dir), revoked);
-				appendJSONL(registryPathOf(dir), revoked);
-			},
+			(dir) =>
+				writeJSONL(
+					registryPathOf(dir),
+					withChain([
+						{
+							kind: "registered",
+							schemaVersion: 1,
+							at: "2026-01-01T00:00:00Z",
+							principal: storedPrincipal("a"),
+						},
+						{
+							kind: "revoked",
+							schemaVersion: 1,
+							at: "2026-01-02T00:00:00Z",
+							id: "a",
+							reason: null,
+						},
+						{
+							kind: "revoked",
+							schemaVersion: 1,
+							at: "2026-01-03T00:00:00Z",
+							id: "a",
+							reason: null,
+						},
+					]),
+				),
 			/revokes "a" a second time/,
 		],
 	];
@@ -519,4 +634,144 @@ test("an unsupported schema version is its own stable code, distinct from corrup
 	const write = registerPrincipal(dir, { id: "b", principalKind: "human" });
 	assert.equal(write.ok, false);
 	assert.equal(write.code, "AMBER_E_PRINCIPAL_REGISTRY_UNSUPPORTED_VERSION");
+});
+
+test("an in-place edit of a stored event fails the hash chain on every seam (tamper evidence)", () => {
+	// A writer-built ledger (a valid chain), then one event's CONTENT is
+	// edited in place without recomputing its hash. The registry is the AC4
+	// trust root — laundering a service principalKind into "human" must fail
+	// closed everywhere, never fold to a forged-but-plausible state.
+	const dir = mkTarget("tamper");
+	registerPrincipal(dir, { id: "svc", principalKind: "service", capability: "deploy" });
+	registerPrincipal(dir, { id: "alice", principalKind: "human" });
+
+	const lines = fs.readFileSync(registryPathOf(dir), "utf8").trim().split("\n");
+	const first = JSON.parse(lines[0]);
+	assert.equal(first.principal.principalKind, "service");
+	first.principal.principalKind = "human";
+	lines[0] = JSON.stringify(first);
+	fs.writeFileSync(registryPathOf(dir), `${lines.join("\n")}\n`);
+
+	assert.throws(
+		() => listPrincipals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_PRINCIPAL_REGISTRY_CORRUPT" &&
+			/hash that does not match its content/.test(err.message),
+		"the edited event's stored hash no longer covers its content",
+	);
+	const write = registerPrincipal(dir, { id: "bob", principalKind: "human" });
+	assert.equal(write.ok, false);
+	assert.equal(write.code, "AMBER_E_PRINCIPAL_REGISTRY_CORRUPT");
+});
+
+test("splicing an event's prevHash breaks the chain (reordering/removal detection)", () => {
+	const dir = mkTarget("splice");
+	const events = withChain([
+		{
+			kind: "registered",
+			schemaVersion: 1,
+			at: "2026-01-01T00:00:00Z",
+			principal: storedPrincipal("a"),
+		},
+		{
+			kind: "registered",
+			schemaVersion: 1,
+			at: "2026-01-02T00:00:00Z",
+			principal: storedPrincipal("b"),
+		},
+	]);
+	// Event 2 re-binds the genesis constant instead of event 1's hash — the
+	// signature of a removed or reordered predecessor.
+	events[1].prevHash = GENESIS_HASH;
+	writeJSONL(registryPathOf(dir), events);
+	assert.throws(
+		() => listPrincipals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_PRINCIPAL_REGISTRY_CORRUPT" &&
+			/breaks the hash chain/.test(err.message),
+	);
+});
+
+test("a fresh registry write lock fails a concurrent writer with its own stable code; a stale lock is reclaimed", () => {
+	const dir = mkTarget("lock");
+	registerPrincipal(dir, { id: "a", principalKind: "human" });
+
+	// A lock young enough to be live: the second writer fails closed with the
+	// conflict code, never racing the in-flight append.
+	const lockPath = path.join(dir, ".amber", "principals", "registry.lock");
+	fs.writeFileSync(lockPath, "");
+	const conflicted = registerPrincipal(dir, { id: "b", principalKind: "human" });
+	assert.equal(conflicted.ok, false);
+	assert.equal(conflicted.code, "AMBER_E_PRINCIPAL_REGISTRY_LOCK");
+	assert.match(conflicted.errors[0], /another principal registry write is in flight/i);
+	const conflictedRevoke = revokePrincipal(dir, { id: "a" });
+	assert.equal(conflictedRevoke.ok, false);
+	assert.equal(conflictedRevoke.code, "AMBER_E_PRINCIPAL_REGISTRY_LOCK");
+	assert.equal(
+		JSON.parse(fs.readFileSync(registryPathOf(dir), "utf8").trim().split("\n").at(-1)).principal.id,
+		"a",
+		"no event was appended while the lock was held",
+	);
+
+	// A lock older than the stale window belongs to a crashed holder — the
+	// registry is not bricked by a leftover lock file.
+	const stale = new Date(Date.now() - 60_000);
+	fs.utimesSync(lockPath, stale, stale);
+	const reclaimed = registerPrincipal(dir, { id: "b", principalKind: "human" });
+	assert.equal(reclaimed.ok, true, (reclaimed.errors || []).join("; "));
+	assert.equal(fs.existsSync(lockPath), false, "the reclaimed lock is removed on release");
+	assert.equal(
+		JSON.parse(fs.readFileSync(registryPathOf(dir), "utf8").trim().split("\n").at(-1)).principal.id,
+		"b",
+	);
+});
+
+test("scope is a first-class registry field: stored, folded, and snapshotted for Decision binding", () => {
+	const dir = mkTarget("scope");
+	const result = registerPrincipal(dir, {
+		id: "carol",
+		principalKind: "human",
+		role: "tech-lead",
+		scope: "team-a",
+	});
+	assert.equal(result.ok, true, (result.errors || []).join("; "));
+	assert.equal(result.record.scope, "team-a");
+
+	assert.equal(showPrincipal(dir, "carol").scope, "team-a");
+	const resolved = resolveActivePrincipal(dir, "carol", { now: NOW });
+	assert.equal(resolved.ok, true);
+	assert.equal(resolved.principal.scope, "team-a");
+
+	const bad = registerPrincipal(dir, { id: "dave", principalKind: "human", scope: "" });
+	assert.equal(bad.ok, false);
+	assert.equal(bad.code, "AMBER_E_INVALID_ARG");
+	assert.match(bad.errors[0], /scope must be a non-empty string or null/);
+});
+
+test("a date-time without an explicit zone is rejected (windows must not be machine-timezone-dependent)", () => {
+	const dir = mkTarget("zone");
+	const zoneless = registerPrincipal(dir, {
+		id: "a",
+		principalKind: "human",
+		validFrom: "2026-01-01T09:00:00",
+	});
+	assert.equal(zoneless.ok, false);
+	assert.equal(zoneless.code, "AMBER_E_INVALID_ARG");
+	assert.match(zoneless.errors[0], /carrying an explicit zone/);
+	assert.equal(fs.existsSync(registryPathOf(dir)), false, "no durable state was touched");
+
+	// Bare dates still parse (UTC midnight); zoned date-times parse; only the
+	// zoneless date-TIME is ambiguous and therefore refused.
+	const bareDate = registerPrincipal(dir, {
+		id: "b",
+		principalKind: "human",
+		validFrom: "2026-01-01",
+	});
+	assert.equal(bareDate.ok, true, (bareDate.errors || []).join("; "));
+	const zoned = registerPrincipal(dir, {
+		id: "c",
+		principalKind: "human",
+		validTo: "2027-01-01T00:00:00+02:00",
+	});
+	assert.equal(zoned.ok, true, (zoned.errors || []).join("; "));
 });

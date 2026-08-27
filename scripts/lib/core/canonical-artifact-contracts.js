@@ -197,6 +197,27 @@ const SUPPORTED_ENVELOPE_SCHEMA_VERSIONS = Object.freeze([1]);
  */
 const DECISION_KINDS = Object.freeze(["acceptance", "approval", "review"]);
 
+/** The closed set of Principal kinds: humans and service identities. */
+const PRINCIPAL_KINDS = Object.freeze(["human", "service"]);
+
+/**
+ * The closed field set of the frozen principal snapshot a decision Envelope
+ * carries: exactly the Principal registry's stored record (admission freezes
+ * principalRecordOf's output), so any other key or shape on a stored
+ * Envelope is hand-edited state.
+ */
+const PRINCIPAL_SNAPSHOT_FIELDS = Object.freeze([
+	"id",
+	"principalKind",
+	"role",
+	"membership",
+	"capability",
+	"scope",
+	"validFrom",
+	"validTo",
+	"issuer",
+]);
+
 /**
  * The closed set of core Envelope field names (F049 ticket 06, #223). An
  * Envelope carrying a top-level field outside this set was written by a newer
@@ -354,11 +375,30 @@ function decisionBindingProblem(envelope) {
 		typeof principal.id !== "string" ||
 		principal.id.length === 0 ||
 		typeof principal.principalKind !== "string" ||
-		!["human", "service"].includes(principal.principalKind)
+		!PRINCIPAL_KINDS.includes(principal.principalKind)
 	) {
 		return {
 			code: "AMBER_E_DECISION_PRINCIPAL_REQUIRED",
-			message: `the decision Envelope for "${envelope.identity}" revision ${envelope.revision} carries a malformed principal binding ${JSON.stringify(principal)}: the verified snapshot must bind { id, principalKind: human|service, role, membership, capability, issuer }`,
+			message: `the decision Envelope for "${envelope.identity}" revision ${envelope.revision} carries a malformed principal binding ${JSON.stringify(principal)}: the verified snapshot must bind { id, principalKind: human|service, role, membership, capability, scope, validFrom, validTo, issuer }`,
+		};
+	}
+	// The snapshot's closed field set: admission freezes the registry's
+	// 9-field record, so an unknown key or a non-string optional field on a
+	// stored Envelope is hand-edited state, exactly like an unknown
+	// top-level Envelope field.
+	const snapshotKeys = Object.keys(principal).sort();
+	if (
+		snapshotKeys.length !== PRINCIPAL_SNAPSHOT_FIELDS.length ||
+		snapshotKeys.some((field) => !PRINCIPAL_SNAPSHOT_FIELDS.includes(field)) ||
+		["role", "membership", "capability", "scope", "validFrom", "validTo", "issuer"].some(
+			(field) =>
+				principal[field] !== null &&
+				!(typeof principal[field] === "string" && principal[field].length > 0),
+		)
+	) {
+		return {
+			code: "AMBER_E_DECISION_PRINCIPAL_REQUIRED",
+			message: `the decision Envelope for "${envelope.identity}" revision ${envelope.revision} carries a malformed principal binding ${JSON.stringify(principal)}: the snapshot must bind exactly the frozen registry record fields (${PRINCIPAL_SNAPSHOT_FIELDS.join(", ")}) with every optional field null or a non-empty string`,
 		};
 	}
 	// Human-only slots are a binding invariant, not just an admission gate:

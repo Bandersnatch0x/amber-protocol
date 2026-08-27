@@ -767,6 +767,15 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_ARTIFACT_SIZE_CEILING", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_PRINCIPAL_REGISTRY_LOCK: {
+		title: "Another principal registry write is in flight",
+		cause:
+			"A concurrent register/revoke holds the registry lock (.amber/principals/registry.lock, fresh within the stale window), so the conflicting write is refused instead of racing the in-flight one — two racing writers would both pass the pre-check and append, producing a duplicate event the fold treats as corruption.",
+		remedy:
+			"Retry once the in-flight register/revoke completes; a lock older than the stale window (30 s) is a crashed holder and is reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_PRINCIPAL_REGISTRY_CORRUPT", "AMBER_E_ARTIFACT_IDEMPOTENCY_CONFLICT"],
+	},
 	AMBER_E_PRINCIPAL_ALREADY_REGISTERED: {
 		title: "Principal id is already registered",
 		cause:

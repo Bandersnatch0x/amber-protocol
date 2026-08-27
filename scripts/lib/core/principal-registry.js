@@ -51,10 +51,12 @@
  */
 
 const fs = require("node:fs");
+const path = require("node:path");
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
+const { sha256Hex } = require("./context-hash");
 
 const REGISTRY_CORRUPT_CODE = "AMBER_E_PRINCIPAL_REGISTRY_CORRUPT";
 const UNSUPPORTED_VERSION_CODE = "AMBER_E_PRINCIPAL_REGISTRY_UNSUPPORTED_VERSION";
@@ -66,6 +68,9 @@ const REVOKED_CODE = "AMBER_E_PRINCIPAL_REVOKED";
 const EXPIRED_CODE = "AMBER_E_PRINCIPAL_EXPIRED";
 const NOT_YET_VALID_CODE = "AMBER_E_PRINCIPAL_NOT_YET_VALID";
 const INVALID_ARG_CODE = "AMBER_E_INVALID_ARG";
+const LOCK_CONFLICT_CODE = "AMBER_E_PRINCIPAL_REGISTRY_LOCK";
+
+const LOCK_STALE_MS = 30_000;
 
 /** Version of the registry event contract this module writes and reads. */
 const REGISTRY_SCHEMA_VERSION = 1;
@@ -85,26 +90,136 @@ const DEFAULT_MAX_REGISTRY_BYTES = 1024 * 1024;
 
 // Closed field sets per event kind: an event carrying a top-level field
 // outside its kind's contract is corruption on read, never silently dropped.
-const REGISTERED_EVENT_FIELDS = Object.freeze(["kind", "schemaVersion", "at", "principal"]);
-const REVOKED_EVENT_FIELDS = Object.freeze(["kind", "schemaVersion", "at", "id", "reason"]);
+// Every event also carries the hash chain (prevHash/hash, F050 review F-5):
+// hash = sha256(prevHash + canonicalize(event-without-hash)) — the loop-ledger
+// pattern — so an in-place edit of any stored event breaks the chain on fold.
+const REGISTERED_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"principal",
+	"prevHash",
+	"hash",
+]);
+const REVOKED_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"reason",
+	"prevHash",
+	"hash",
+]);
 const PRINCIPAL_FIELDS = Object.freeze([
 	"id",
 	"principalKind",
 	"role",
 	"membership",
 	"capability",
+	"scope",
 	"validFrom",
 	"validTo",
 	"issuer",
 ]);
 
-// ISO-8601 calendar date, optionally with a time and zone offset. Dates
-// without a time parse as UTC midnight, so a bare date is a usable bound.
+const GENESIS_HASH = "0".repeat(64);
+
+function sortKeys(value) {
+	if (Array.isArray(value)) return value.map(sortKeys);
+	if (value && typeof value === "object") {
+		return Object.keys(value)
+			.sort()
+			.reduce((acc, key) => {
+				if (key !== "hash") acc[key] = sortKeys(value[key]);
+				return acc;
+			}, {});
+	}
+	return value;
+}
+
+function chainHash(event, prevHash) {
+	const body = { ...event, prevHash };
+	delete body.hash;
+	// sortKeys runs AFTER the prevHash merge: merging first and sorting second
+	// is what makes the canonical body identical from the writer (which builds
+	// the event without prevHash) and from the fold (which reads it back with
+	// prevHash already present) — insertion order never leaks into the hash.
+	return sha256Hex(prevHash + JSON.stringify(sortKeys(body)));
+}
+
+// The chain head: the last event's hash, or the genesis constant for an empty
+// registry. Kept in sync with foldRegistry's walk by construction — the
+// writers read the tail under the registry lock, so a stale head cannot race
+// a concurrent append.
+function chainHeadHash(cwd) {
+	const events = readLedgerFailClosed(
+		registryPath(cwd),
+		REGISTRY_CORRUPT_CODE,
+		"principal registry",
+	);
+	return events.length > 0 && typeof events[events.length - 1].hash === "string"
+		? events[events.length - 1].hash
+		: GENESIS_HASH;
+}
+
+// ISO-8601 calendar date, optionally with a time and zone offset. A bare
+// date parses as UTC midnight; a date-TIME must carry an explicit zone (Z or
+// ±hh:mm) — a zoneless date-time would parse as LOCAL time and make validity
+// windows machine-timezone-dependent (F050 review F-7).
 const ISO_TIMESTAMP_PATTERN =
-	/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})?)?$/;
+	/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2}))?$/;
 
 function registryPath(cwd) {
 	return statePathForCreate(cwd, "principals", "registry.jsonl");
+}
+
+// F050 review F-1: the register/revoke writers are check-then-append, and the
+// fold treats a duplicate `registered` (or second `revoked`) event as
+// corruption — two racing writers would both pass the pre-check and both
+// append, permanently bricking the registry with a misleading diagnosis. The
+// artifact store's admit.lock pattern serializes exactly this class: an
+// exclusive create-with-wx lock file, stale after LOCK_STALE_MS (a crashed
+// holder releases the registry; a live one fails the second writer with a
+// stable conflict code instead of racing it).
+function acquireRegistryLock(cwd) {
+	const dir = path.dirname(registryPath(cwd));
+	const lockPath = path.join(dir, "registry.lock");
+	try {
+		fs.mkdirSync(dir, { recursive: true });
+	} catch (err) {
+		throw registryCorrupt(`cannot create the principals directory (${dir}): ${err.message}`);
+	}
+	for (;;) {
+		try {
+			const fd = fs.openSync(lockPath, "wx");
+			fs.writeFileSync(fd, String(Date.now()), "utf8");
+			fs.closeSync(fd);
+			let released = false;
+			return () => {
+				if (released) return;
+				released = true;
+				fs.rmSync(lockPath, { force: true });
+			};
+		} catch (err) {
+			if (err.code !== "EEXIST") {
+				throw registryCorrupt(`cannot create the registry lock (${lockPath}): ${err.message}`);
+			}
+			let age;
+			try {
+				age = Date.now() - fs.statSync(lockPath).mtimeMs;
+			} catch {
+				continue;
+			}
+			if (age > LOCK_STALE_MS) {
+				fs.rmSync(lockPath, { force: true });
+				continue;
+			}
+			throw typedError(
+				LOCK_CONFLICT_CODE,
+				`another principal registry write is in flight (${lockPath} is fresh); the conflicting write is refused rather than racing it — retry once the in-flight register/revoke completes`,
+			);
+		}
+	}
 }
 
 function registryCorrupt(message) {
@@ -137,6 +252,7 @@ function principalInputProblem({
 	role,
 	membership,
 	capability,
+	scope,
 	validFrom,
 	validTo,
 	issuer,
@@ -151,6 +267,7 @@ function principalInputProblem({
 		["role", role],
 		["membership", membership],
 		["capability", capability],
+		["scope", scope],
 		["issuer", issuer],
 	]) {
 		if (!isNullableNonEmptyString(value)) {
@@ -163,7 +280,7 @@ function principalInputProblem({
 	]) {
 		if (value === null || value === undefined) continue;
 		if (parseTimestamp(value) === null) {
-			return `${label} must be an ISO-8601 date or date-time (e.g. 2026-01-31 or 2026-01-31T09:00:00Z) or null; got ${JSON.stringify(value)}`;
+			return `${label} must be an ISO-8601 date, or a date-time carrying an explicit zone (Z or ±hh:mm) — e.g. 2026-01-31 or 2026-01-31T09:00:00Z — or null; got ${JSON.stringify(value)}`;
 		}
 	}
 	const from = validFrom ? parseTimestamp(validFrom) : null;
@@ -181,6 +298,7 @@ function principalRecordOf(principal) {
 		role: principal.role ?? null,
 		membership: principal.membership ?? null,
 		capability: principal.capability ?? null,
+		scope: principal.scope ?? null,
 		validFrom: principal.validFrom ?? null,
 		validTo: principal.validTo ?? null,
 		issuer: principal.issuer ?? null,
@@ -209,7 +327,15 @@ function storedPrincipalProblem(principal, lineIndex) {
 	if (!PRINCIPAL_KINDS.includes(principal.principalKind)) {
 		return `registry event ${lineIndex} carries a principal record whose principalKind ${JSON.stringify(principal.principalKind)} is outside the closed set (${PRINCIPAL_KINDS.join(", ")})`;
 	}
-	for (const field of ["role", "membership", "capability", "validFrom", "validTo", "issuer"]) {
+	for (const field of [
+		"role",
+		"membership",
+		"capability",
+		"scope",
+		"validFrom",
+		"validTo",
+		"issuer",
+	]) {
 		if (!isNullableNonEmptyString(principal[field])) {
 			return `registry event ${lineIndex} carries a principal record whose ${field} is neither null nor a non-empty string; got ${JSON.stringify(principal[field])}`;
 		}
@@ -236,6 +362,7 @@ function foldRegistry(cwd) {
 		"principal registry",
 	);
 	const byId = new Map();
+	let prevHash = GENESIS_HASH;
 	for (let index = 0; index < events.length; index += 1) {
 		const lineIndex = index + 1;
 		const event = events[index];
@@ -259,6 +386,21 @@ function foldRegistry(cwd) {
 		if (typeof event.at !== "string" || event.at.length === 0) {
 			throw registryCorrupt(
 				`principal registry event ${lineIndex} carries no timestamp ("at"); got ${JSON.stringify(event.at)}`,
+			);
+		}
+		// F050 review F-5: verify the tamper-evident hash chain before trusting
+		// the event's content. The registry is the AC4 trust root (a forged
+		// principalKind "human" launders a service identity into a human-only
+		// slot), so — like every other governed ledger — an in-place edit of a
+		// stored event must fail the fold closed.
+		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash) {
+			throw registryCorrupt(
+				`principal registry event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`,
+			);
+		}
+		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash) {
+			throw registryCorrupt(
+				`principal registry event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`,
 			);
 		}
 		if (event.kind === "registered") {
@@ -321,6 +463,7 @@ function foldRegistry(cwd) {
 				`principal registry event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is registered, revoked`,
 			);
 		}
+		prevHash = event.hash;
 	}
 	return [...byId.values()];
 }
@@ -451,7 +594,7 @@ function registryAppendWithinCeiling(cwd, event) {
  *
  * @param {string} cwd - Repository root.
  * @param {object} input - { id, principalKind, role, membership, capability,
- *        validFrom, validTo, issuer } (optional fields null by default).
+ *        scope, validFrom, validTo, issuer } (optional fields null by default).
  * @returns {{ok: boolean, code: string|null, record: object|null, errors: string[]}}
  * @throws {Error} Typed AMBER_E_INVALID_ARG when the ceiling override env is
  *         set but garbage (resolvePositiveIntCeiling's contract: a typo'd
@@ -465,13 +608,24 @@ function registerPrincipal(
 		role = null,
 		membership = null,
 		capability = null,
+		scope = null,
 		validFrom = null,
 		validTo = null,
 		issuer = null,
 	},
 ) {
 	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
-	const input = { id, principalKind, role, membership, capability, validFrom, validTo, issuer };
+	const input = {
+		id,
+		principalKind,
+		role,
+		membership,
+		capability,
+		scope,
+		validFrom,
+		validTo,
+		issuer,
+	};
 	const inputProblem = principalInputProblem(input);
 	if (inputProblem !== null) return fail(INVALID_ARG_CODE, [inputProblem]);
 
@@ -489,7 +643,7 @@ function registerPrincipal(
 	}
 
 	const at = new Date().toISOString();
-	const event = {
+	const body = {
 		kind: "registered",
 		schemaVersion: REGISTRY_SCHEMA_VERSION,
 		at,
@@ -497,18 +651,54 @@ function registerPrincipal(
 	};
 	// The ceiling resolution throws its typed argument error (garbage env
 	// override), never a silent default — the writer propagates it.
-	const ceilingCheck = registryAppendWithinCeiling(cwd, event);
+	const ceilingCheck = registryAppendWithinCeiling(cwd, body);
 	if (ceilingCheck.wouldExceed) {
 		return fail(SIZE_CEILING_CODE, [
 			`appending the registration for "${id}" would grow the principal registry beyond its size ceiling of ${ceilingCheck.ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — split principals across repositories or raise the ceiling deliberately`,
 		]);
 	}
+	let release;
 	try {
-		appendJSONL(registryPath(cwd), event);
+		release = acquireRegistryLock(cwd);
 	} catch (err) {
-		return fail(REGISTRY_CORRUPT_CODE, [
-			`failed to append the registration event for "${id}" to the principal registry: ${err.message}`,
-		]);
+		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
+	}
+	try {
+		// Under the lock, re-check the exact invariants the fold enforces:
+		// the ceiling (the file grew) and the duplicate id (a racing writer
+		// already appended between the pre-check and the lock).
+		let fresh;
+		try {
+			fresh = foldRegistry(cwd);
+		} catch (err) {
+			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
+		}
+		if (fresh.some((record) => record.id === id)) {
+			return fail(ALREADY_REGISTERED_CODE, [
+				`principal "${id}" is already registered; a principal id is registered at most once — register a distinct id`,
+			]);
+		}
+		const prevHash = chainHeadHash(cwd);
+		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
+		// The real event carries the chain fields the pre-lock check could not
+		// count (and the file may have grown while waiting for the lock):
+		// re-check the ceiling on the exact line about to be appended, still
+		// before the append itself.
+		const underLockCeiling = registryAppendWithinCeiling(cwd, event);
+		if (underLockCeiling.wouldExceed) {
+			return fail(SIZE_CEILING_CODE, [
+				`appending the registration for "${id}" would grow the principal registry beyond its size ceiling of ${underLockCeiling.ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — split principals across repositories or raise the ceiling deliberately`,
+			]);
+		}
+		try {
+			appendJSONL(registryPath(cwd), event);
+		} catch (err) {
+			return fail(REGISTRY_CORRUPT_CODE, [
+				`failed to append the registration event for "${id}" to the principal registry: ${err.message}`,
+			]);
+		}
+	} finally {
+		release();
 	}
 	return {
 		ok: true,
@@ -568,7 +758,7 @@ function revokePrincipal(cwd, { id, reason = null }) {
 	}
 
 	const at = new Date().toISOString();
-	const event = {
+	const body = {
 		kind: "revoked",
 		schemaVersion: REGISTRY_SCHEMA_VERSION,
 		at,
@@ -577,18 +767,58 @@ function revokePrincipal(cwd, { id, reason = null }) {
 	};
 	// The ceiling resolution throws its typed argument error (garbage env
 	// override), never a silent default — the writer propagates it.
-	const ceilingCheck = registryAppendWithinCeiling(cwd, event);
+	const ceilingCheck = registryAppendWithinCeiling(cwd, body);
 	if (ceilingCheck.wouldExceed) {
 		return fail(SIZE_CEILING_CODE, [
 			`appending the revocation for "${id}" would grow the principal registry beyond its size ceiling of ${ceilingCheck.ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`,
 		]);
 	}
+	let release;
 	try {
-		appendJSONL(registryPath(cwd), event);
+		release = acquireRegistryLock(cwd);
 	} catch (err) {
-		return fail(REGISTRY_CORRUPT_CODE, [
-			`failed to append the revocation event for "${id}" to the principal registry: ${err.message}`,
-		]);
+		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
+	}
+	try {
+		// Under the lock, re-check the invariants the fold enforces: the
+		// target still exists and has not already been revoked by a racing
+		// writer that appended between the pre-check and the lock.
+		let fresh;
+		try {
+			fresh = foldRegistry(cwd);
+		} catch (err) {
+			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
+		}
+		const current = fresh.find((record) => record.id === id);
+		if (!current) {
+			return fail(NOT_FOUND_CODE, [
+				`principal "${id}" is not registered; revocation applies to a registered principal — register it first (amber principal register)`,
+			]);
+		}
+		if (current.revokedAt !== null) {
+			return fail(ALREADY_REVOKED_CODE, [
+				`principal "${id}" was already revoked at ${current.revokedAt}; revocation is terminal`,
+			]);
+		}
+		const prevHash = chainHeadHash(cwd);
+		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
+		// Same under-lock ceiling re-check as the register writer: the chained
+		// event is the exact line about to be appended.
+		const underLockCeiling = registryAppendWithinCeiling(cwd, event);
+		if (underLockCeiling.wouldExceed) {
+			return fail(SIZE_CEILING_CODE, [
+				`appending the revocation for "${id}" would grow the principal registry beyond its size ceiling of ${underLockCeiling.ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`,
+			]);
+		}
+		try {
+			appendJSONL(registryPath(cwd), event);
+		} catch (err) {
+			return fail(REGISTRY_CORRUPT_CODE, [
+				`failed to append the revocation event for "${id}" to the principal registry: ${err.message}`,
+			]);
+		}
+	} finally {
+		release();
 	}
 	return {
 		ok: true,
@@ -603,6 +833,8 @@ module.exports = {
 	REGISTRY_SCHEMA_VERSION,
 	SUPPORTED_REGISTRY_SCHEMA_VERSIONS,
 	DEFAULT_MAX_REGISTRY_BYTES,
+	GENESIS_HASH,
+	chainHash,
 	parseTimestamp,
 	principalStatus,
 	listPrincipals,

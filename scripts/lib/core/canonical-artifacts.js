@@ -1759,6 +1759,31 @@ function admitArtifact(
 	}
 	let result;
 	try {
+		// F050 review F-6: the principal was verified pre-lock; the registry
+		// writers append under their own lock, so a revocation (or expiry
+		// boundary) can land between that verify and this append. Re-verify
+		// under the artifact lock so the frozen snapshot never claims an
+		// authority the registry no longer grants at append time.
+		if (type === "decision") {
+			let reverified;
+			try {
+				reverified = resolveActivePrincipal(cwd, principal, { now: new Date() });
+			} catch (err) {
+				return fail(err.amberCode || "AMBER_E_PRINCIPAL_REGISTRY_CORRUPT", [err.message]);
+			}
+			if (!reverified.ok) {
+				return fail(reverified.code, [reverified.message]);
+			}
+			if (
+				(decisionKind === "acceptance" || decisionKind === "approval") &&
+				reverified.principal.principalKind !== "human"
+			) {
+				return fail(DECISION_HUMAN_SLOT_REQUIRED_CODE, [
+					`${decisionKind === "acceptance" ? "an" : "a"} ${decisionKind} Decision is a human-only authority slot, but principal "${principal}" is a ${reverified.principal.principalKind} identity; formal acceptance and approval require an independently authenticated human — agents and service identities cannot occupy a human approval slot (a review Decision is the only kind a service principal may carry)`,
+				]);
+			}
+			principalSnapshot = Object.freeze(reverified.principal);
+		}
 		result = admitUnderLock(dir, type, identity, body, provenance, expected, key, fail, {
 			transition: transitionName,
 			scope: scopeTag,

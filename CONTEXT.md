@@ -72,6 +72,18 @@ _Avoid_: idea, request, ticket, prompt
 A durable governance artifact that refines an accepted Intent into requirements, design constraints, alternatives, and unresolved concerns. A Spec can be approved for planning without authorizing implementation or execution.
 _Avoid_: design doc, implementation plan, proposal
 
+**Decision Artifact**:
+A canonical planning artifact recording one point-in-time authority act by a registered Principal — acceptance, approval, or review — bound to exactly one committed revision it decides. Its lifecycle is the single state `recorded`; an amended Decision is a new revision, never an in-place edit.
+_Avoid_: audit log line, mutable status field, chat message
+
+**Decision Kind**:
+The closed set `acceptance | approval | review`. Acceptance and Approval are human-only slots a service identity can never occupy; a Review may be carried by a service Principal.
+_Avoid_: sign-off, signoff type, verdict
+
+**Principal Registry**:
+The repository-local append-only ledger under `.amber/principals/` registering the humans and service identities that can act with authority, each with kind, role, membership, capability, scope, validity window, issuer, and terminal revocation state. It is the trust root Decision admission verifies against; its events are hash-chained and an in-place edit fails every read closed.
+_Avoid_: user database, identity provider, session store
+
 **Eval**:
 A versioned, reproducible assessment definition and its recorded outcome for a declared behavior, artifact, or policy. An Eval supplies Evidence to a Gate; it is not an Approval and cannot widen execution authority.
 _Avoid_: benchmark score, model confidence, test log

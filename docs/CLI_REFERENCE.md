@@ -399,17 +399,33 @@ Artifact Body (Markdown) to a machine-actionable Artifact Envelope in one atomic
 through durable prepared/committed/aborted journal records. Only committed revisions are visible;
 history is append-only and immutable — there is no in-place mutation path for a committed revision.
 
-Registered Artifact Types form a closed registry: **intent**, **spec**, and **plan**, each with a
-closed lifecycle of named transitions. Admitting a revision without a transition carries the type's
-initial state (`draft`); `--transition <name>` applies a registered transition — `accept`
-(intent: draft → accepted) or `approve` (spec/plan: draft → approved) — as a **new revision**
-superseding the head. A transition that is not registered fails closed as
-`AMBER_E_ARTIFACT_TRANSITION_UNKNOWN`; one that does not apply from the current head's lifecycle
-state fails closed as `AMBER_E_ARTIFACT_TRANSITION_INVALID`.
+Registered Artifact Types form a closed registry: **intent**, **spec**, **plan**, and **decision**.
+The planning types each have a closed lifecycle of named transitions. Admitting a revision without
+a transition carries the type's initial state (`draft`); `--transition <name>` applies a
+registered transition — `accept` (intent: draft → accepted) or `approve` (spec/plan: draft →
+approved) — as a **new revision** superseding the head. A transition that is not registered fails
+closed as `AMBER_E_ARTIFACT_TRANSITION_UNKNOWN`; one that does not apply from the current head's
+lifecycle state fails closed as `AMBER_E_ARTIFACT_TRANSITION_INVALID`. A **decision** is different:
+it records a point-in-time authority act, so its lifecycle is the single state `recorded` with no
+transitions — an amended Decision is a new revision of the same identity, admitted fresh.
+
+A Decision admission (F050) binds the acting **Principal**: `--decision-kind
+<acceptance|approval|review>` and `--principal <id>` are required for `--type decision` and
+rejected for every other type. The principal is verified against the Principal registry
+(`amber principal`, below) at admission time — twice: pre-lock and again under the artifact
+lock, so a revocation that lands in between still fails the admission. Acceptance and Approval
+are human-only authority slots: binding a service principal fails closed as
+`AMBER_E_DECISION_HUMAN_SLOT_REQUIRED`; only a Review may be carried by a service identity. The
+verified principal snapshot is frozen into the Envelope (canonical admission content — the same
+Body bound to a different principal is a different admission), and every Decision must `decide`
+exactly one committed revision of a registered type via the `decides` trace
+(`--trace decides:<type>:<identity>[@<revision>]` — the target type must be declared explicitly
+because a Decision may record against any registered type).
 
 Typed Trace lineage is a versioned registry: `refines` (spec → intent), `realizes` (plan → spec),
-and `supersedes` (any type → a different artifact of the same type), each with direction, scope,
-and cardinality. Required planning lineage is enforced at admission: **a Spec must refine exactly
+`supersedes` (any type → a different artifact of the same type), and `decides` (decision → any
+registered type, target type declared explicitly), each with direction, scope, and cardinality.
+Required planning lineage is enforced at admission: **a Spec must refine exactly
 one accepted Intent revision and a Plan must realize exactly one approved Spec revision** —
 omitting the required trace fails closed as `AMBER_E_ARTIFACT_TRACE_CARDINALITY`, a generic or
 unregistered relation fails as `AMBER_E_ARTIFACT_TRACE_UNKNOWN` (it cannot satisfy required
@@ -586,6 +602,45 @@ Envelope's `committedAt` breaks the envelopeHash and fails every verification re
 
 Committed revisions and their typed Traces project into the Governance Graph — see
 `projection rebuild --type governance-graph` below.
+
+### principal register / show / list / revoke
+
+The Principal registry (F050) roots the humans and service identities that can act with authority
+in this repository. Every Decision artifact binds its acting Principal, verified against this
+registry at admission time: registered, unrevoked, and inside its validity window.
+
+The registry is governed state, not incidental metadata: an append-only event ledger under
+`.amber/principals/registry.jsonl` (registered and revoked events, each chained to its predecessor
+by a tamper-evident hash — an in-place edit breaks the chain and fails every read closed as
+`AMBER_E_PRINCIPAL_REGISTRY_CORRUPT`), fail-closed on corruption and unsupported schema versions,
+with a size ceiling (`AMBER_PRINCIPAL_MAX_REGISTRY_BYTES`, default 1 MiB) checked before any
+durable state is touched. Writers serialize through `.amber/principals/registry.lock`: a concurrent
+register/revoke fails with `AMBER_E_PRINCIPAL_REGISTRY_LOCK` instead of racing (a crash-stale lock
+is reclaimed automatically after 30 s). A principal id is registered at most once and revocation is
+terminal — a revoked id cannot be re-registered, and re-revocation fails as
+`AMBER_E_PRINCIPAL_ALREADY_REVOKED`.
+
+`register` binds identity (`--id`), kind (`--kind human|service`), and the optional qualifications
+`--role`, `--membership`, `--capability`, `--scope`, `--issuer`, and the half-open validity window
+`--valid-from`/`--valid-to` (ISO-8601; a date-time must carry an explicit zone — `Z` or offset —
+because a zoneless time would be machine-local). `show`/`list` derive the current status
+(`active | revoked | expired | not-yet-valid`) against the read clock; the stored record never
+carries a derived status.
+
+```bash
+# register a human principal
+node scripts/amber.js principal register --target . --id alice@example.com --kind human --role tech-lead --json
+
+# register a service principal with a bounded validity window
+node scripts/amber.js principal register --target . --id ci-bot --kind service --capability deploy --valid-to 2027-01-01 --json
+
+# inspect one principal / list all with derived statuses
+node scripts/amber.js principal show --target . --id alice@example.com --json
+node scripts/amber.js principal list --target . --json
+
+# revoke terminally (a revoked principal can no longer bind new Decisions)
+node scripts/amber.js principal revoke --target . --id alice@example.com --reason "left the team" --json
+```
 
 ### projection rebuild / status / query (Governance Graph of artifact revisions)
 

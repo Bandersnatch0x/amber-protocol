@@ -18,6 +18,7 @@ const {
 	TRACE_REGISTRY_VERSION,
 	TRACE_TYPES,
 	DECISION_KINDS,
+	decisionBindingProblem,
 	lifecycleForAdmission,
 	transitionFor,
 	registeredTransitionsOf,
@@ -303,6 +304,170 @@ test("trace shape validation rejects malformed trace records before any registry
 			type: "refines",
 			to: { type: "intent", identity: "intent/a", revision: 2 },
 		}),
+		null,
+	);
+});
+
+// F050 #226 fix round (review F-8/F-4) — the decision binding read seam.
+// decisionBindingProblem is shared by committedProjection, so these verdicts
+// decide what a STORED Envelope may carry; the writer seam can never produce
+// a malformed binding (it constructs the snapshot through registry
+// verification), so every failure here is hand-edited or foreign-writer state.
+
+function principalSnapshot(overrides = {}) {
+	return {
+		id: "alice@example.com",
+		principalKind: "human",
+		role: null,
+		membership: null,
+		capability: null,
+		scope: null,
+		validFrom: null,
+		validTo: null,
+		issuer: null,
+		...overrides,
+	};
+}
+
+function decisionEnvelope(decisionKind, principal) {
+	return {
+		type: "decision",
+		identity: "decision/d1",
+		revision: 1,
+		decisionKind,
+		principal,
+	};
+}
+
+test("decisionBindingProblem: only decision Envelopes carry the decision-only fields", () => {
+	// A non-decision Envelope carrying either field is an unknown-field
+	// verdict, exactly like any other core-field-set drift.
+	const kindOnly = decisionBindingProblem({
+		type: "intent",
+		identity: "intent/i1",
+		revision: 2,
+		decisionKind: "approval",
+	});
+	assert.equal(kindOnly.code, "AMBER_E_ARTIFACT_UNKNOWN_FIELD");
+	assert.match(kindOnly.message, /intent artifact but carries decision-only field "decisionKind"/);
+
+	const principalOnly = decisionBindingProblem({
+		type: "spec",
+		identity: "spec/s1",
+		revision: 1,
+		principal: principalSnapshot(),
+	});
+	assert.equal(principalOnly.code, "AMBER_E_ARTIFACT_UNKNOWN_FIELD");
+	assert.match(principalOnly.message, /spec artifact but carries decision-only field "principal"/);
+
+	const both = decisionBindingProblem({
+		type: "plan",
+		identity: "plan/p1",
+		revision: 1,
+		decisionKind: "review",
+		principal: principalSnapshot(),
+	});
+	assert.equal(both.code, "AMBER_E_ARTIFACT_UNKNOWN_FIELD");
+	assert.match(both.message, /decision-only fields "decisionKind", "principal"/);
+
+	// An envelope carrying neither field on any type is clean.
+	assert.equal(
+		decisionBindingProblem({ type: "intent", identity: "intent/i1", revision: 1 }),
+		null,
+	);
+	assert.equal(decisionBindingProblem(null), null);
+});
+
+test("decisionBindingProblem: the decision kind is a closed set", () => {
+	const missing = decisionBindingProblem(decisionEnvelope(undefined, principalSnapshot()));
+	assert.equal(missing.code, "AMBER_E_DECISION_KIND_INVALID");
+	assert.match(missing.message, /carries no decisionKind/);
+
+	const unknown = decisionBindingProblem(decisionEnvelope("sign-off", principalSnapshot()));
+	assert.equal(unknown.code, "AMBER_E_DECISION_KIND_INVALID");
+	assert.match(unknown.message, /outside the closed kind set \(acceptance, approval, review\)/);
+});
+
+test("decisionBindingProblem: every Decision binds a well-formed principal snapshot", () => {
+	const missing = decisionBindingProblem(decisionEnvelope("review"));
+	assert.equal(missing.code, "AMBER_E_DECISION_PRINCIPAL_REQUIRED");
+	assert.match(missing.message, /carries no principal binding/);
+
+	const notAnObject = decisionBindingProblem(decisionEnvelope("review", "alice"));
+	assert.equal(notAnObject.code, "AMBER_E_DECISION_PRINCIPAL_REQUIRED");
+
+	const badKind = decisionBindingProblem(
+		decisionEnvelope("review", principalSnapshot({ principalKind: "robot" })),
+	);
+	assert.equal(badKind.code, "AMBER_E_DECISION_PRINCIPAL_REQUIRED");
+	assert.match(badKind.message, /principalKind: human\|service/);
+
+	// The snapshot's closed field set: an unknown key is hand-edited state.
+	const unknownField = decisionBindingProblem(
+		decisionEnvelope("review", principalSnapshot({ nickname: "al" })),
+	);
+	assert.equal(unknownField.code, "AMBER_E_DECISION_PRINCIPAL_REQUIRED");
+	assert.match(unknownField.message, /must bind exactly the frozen registry record fields/);
+
+	// A missing field is the same closed-set verdict.
+	const missingField = decisionBindingProblem(
+		decisionEnvelope("review", {
+			id: "alice@example.com",
+			principalKind: "human",
+			role: null,
+			membership: null,
+			capability: null,
+			scope: null,
+			validFrom: null,
+			validTo: null,
+		}),
+	);
+	assert.equal(missingField.code, "AMBER_E_DECISION_PRINCIPAL_REQUIRED");
+
+	// Optional fields must be null or a non-empty string.
+	const emptyString = decisionBindingProblem(
+		decisionEnvelope("review", principalSnapshot({ role: "" })),
+	);
+	assert.equal(emptyString.code, "AMBER_E_DECISION_PRINCIPAL_REQUIRED");
+	const nonString = decisionBindingProblem(
+		decisionEnvelope("review", principalSnapshot({ scope: 42 })),
+	);
+	assert.equal(nonString.code, "AMBER_E_DECISION_PRINCIPAL_REQUIRED");
+});
+
+test("decisionBindingProblem: acceptance and approval are human-only slots on the read seam too", () => {
+	const service = decisionBindingProblem(
+		decisionEnvelope("acceptance", principalSnapshot({ principalKind: "service", id: "ci-bot" })),
+	);
+	assert.equal(service.code, "AMBER_E_DECISION_HUMAN_SLOT_REQUIRED");
+	assert.match(
+		service.message,
+		/human-only slots that admission can never bind to a service identity/,
+	);
+
+	const serviceApproval = decisionBindingProblem(
+		decisionEnvelope("approval", principalSnapshot({ principalKind: "service", id: "ci-bot" })),
+	);
+	assert.equal(serviceApproval.code, "AMBER_E_DECISION_HUMAN_SLOT_REQUIRED");
+
+	// A service principal MAY carry a review decision; a human carries any kind.
+	assert.equal(
+		decisionBindingProblem(
+			decisionEnvelope(
+				"review",
+				principalSnapshot({ principalKind: "service", id: "ci-bot", capability: "deploy" }),
+			),
+		),
+		null,
+	);
+	assert.equal(decisionBindingProblem(decisionEnvelope("acceptance", principalSnapshot())), null);
+
+	// The full 9-field snapshot with populated optional fields (scope included)
+	// is the exact frozen registry record shape.
+	assert.equal(
+		decisionBindingProblem(
+			decisionEnvelope("approval", principalSnapshot({ scope: "team-a", issuer: "acme-it" })),
+		),
 		null,
 	);
 });
