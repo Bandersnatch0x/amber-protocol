@@ -40,10 +40,14 @@ function prepareE2ERepoRoot(): string {
   });
 
   // Seed knowledge-graph source files so /knowledge renders real data in E2E.
+  // docs/knowledge-corpus is the committed context projection the graph
+  // reader has required since the F059 T7 unification; without it every
+  // /knowledge load fails with AMBER_E_PROJECTION_MISSING.
   const knowledgeDirs: string[][] = [
     ['docs', 'adr'],
     ['docs', 'wiki', 'knowledge'],
     ['docs', 'architecture'],
+    ['docs', 'knowledge-corpus'],
   ];
   for (const parts of knowledgeDirs) {
     const srcDir = path.join(sourceRoot, ...parts);
