@@ -373,7 +373,7 @@ function MiniContextGraph({
         {t('knowledge.contextGraph')}
       </div>
       <svg
-        viewBox="0 0 320 168"
+        viewBox={`0 0 ${MINI_GEOMETRY.viewBoxW} ${MINI_GEOMETRY.viewBoxH}`}
         className="w-full h-auto rounded-md border border-slate-200 dark:border-obsidian-border bg-slate-50 dark:bg-obsidian-surface"
         role="img"
         aria-label={t('knowledge.contextGraph')}
