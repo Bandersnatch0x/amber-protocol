@@ -258,6 +258,13 @@ const FLAG_SPECS = {
 	"--intent": { key: "intent" },
 	"--eval": { key: "evalVal" },
 	"--eval-result": { key: "evalResult" },
+	// F055 ticket 1 (#283): retention classification flags (--now, --type,
+	// and --id are shared with existing surfaces).
+	"--record": { key: "record" },
+	"--retention-class": { key: "retentionClass" },
+	"--policy": { key: "policy" },
+	"--sensitivity": { key: "sensitivity" },
+	"--minimized": { key: "minimized", kind: "boolean" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

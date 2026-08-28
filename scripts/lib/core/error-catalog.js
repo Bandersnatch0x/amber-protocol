@@ -2089,6 +2089,48 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_MAINTAIN_PROPOSAL_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_RETENTION_INVALID: {
+		title: "Retention classification input rejected",
+		cause:
+			"The classification is malformed: an unknown retention class or sensitivity, a policy pin that does not declare the class's ttlMs/legalBasis in its retention extensions, declared secret or personal content without a minimization marker, or an invalid record pin.",
+		remedy:
+			"Fix the flagged field; declare the class basis in the committed tenant retention Policy's extensions carrier, and minimize sensitive content before classification.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_NOT_FOUND", "AMBER_E_RETENTION_CORRUPT"],
+	},
+	AMBER_E_RETENTION_NOT_FOUND: {
+		title: "Retention record not committed",
+		cause: "The record pin does not resolve to a committed canonical artifact revision.",
+		remedy:
+			"Admit the record through the canonical artifact surface first, then classify the exact committed revision.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_INVALID", "AMBER_E_ARTIFACT_NOT_FOUND"],
+	},
+	AMBER_E_RETENTION_CORRUPT: {
+		title: "Retention classification ledger corrupt",
+		cause:
+			"The classification ledger under .amber/retention/ has a broken hash chain, an invalid event shape, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/retention/classifications.jsonl from version control or a backup; the ledger is append-only and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_LOCK", "AMBER_E_RETENTION_INVALID"],
+	},
+	AMBER_E_RETENTION_LOCK: {
+		title: "Retention ledger lock contended",
+		cause: "Another process holds the retention ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent retention operation finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_CORRUPT", "AMBER_E_MAINTAIN_LOCK"],
+	},
+	AMBER_E_RETENTION_SIZE_CEILING: {
+		title: "Retention ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_RETENTION_MAX_CLASSIFICATIONS_BYTES).",
+		remedy:
+			"Raise AMBER_RETENTION_MAX_CLASSIFICATIONS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

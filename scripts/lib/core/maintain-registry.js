@@ -39,7 +39,7 @@
 const crypto = require("node:crypto");
 const path = require("node:path");
 
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
+const { readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
@@ -47,9 +47,8 @@ const { canonicalJson } = require("./context-hash");
 const {
 	GENESIS_HASH,
 	chainHash,
-	chainHeadHash,
 	acquireLedgerLock,
-	appendWithinCeiling: sharedAppendWithinCeiling,
+	appendLedgerEvent,
 } = require("./registry-ledger");
 
 const MAINTAIN_DETECTOR_SCHEMA_VERSION = 1;
@@ -428,80 +427,6 @@ function resolveRegistryDecision(cwd, decision, label = "detector registration")
 	};
 }
 
-function maintainAppendFailure(code) {
-	return (err) => ({
-		ok: false,
-		code: err.amberCode || code,
-		record: null,
-		errors: [err.message || String(err)],
-	});
-}
-
-// Guard contract: any non-null guard result is returned verbatim without
-// appending; `derive(fold)` picks the caller's record after the append.
-// `body` may be a factory evaluated against the in-lock fold, for events
-// whose shape depends on current ledger state.
-function appendLedgerEvent(cwd, options, body, guard, derive) {
-	const failure = maintainAppendFailure(options.corruptCode);
-	let release;
-	try {
-		release = options.acquire(cwd);
-	} catch (err) {
-		return failure(err);
-	}
-	try {
-		let folded;
-		try {
-			folded = options.fold(cwd);
-		} catch (err) {
-			return failure(err);
-		}
-		const guardVerdict = guard(folded);
-		if (guardVerdict !== null) return guardVerdict;
-		const eventBody = typeof body === "function" ? body(folded) : body;
-		let prevHash;
-		try {
-			prevHash = chainHeadHash(options.path(cwd), options.corruptCode, options.label);
-		} catch (err) {
-			return failure(err);
-		}
-		const event = { ...eventBody, prevHash, hash: chainHash(eventBody, prevHash) };
-		let ceiling;
-		try {
-			ceiling = sharedAppendWithinCeiling({
-				ledgerPath: options.path(cwd),
-				event,
-				envName: options.envName,
-				defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
-				label: options.label,
-			});
-		} catch (err) {
-			return failure(err);
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: options.sizeCeilingCode,
-				record: null,
-				errors: [`${options.label} event would exceed ${ceiling.ceiling} bytes`],
-			};
-		try {
-			appendJSONL(options.path(cwd), event);
-		} catch (err) {
-			return failure(err);
-		}
-		let record;
-		try {
-			record = derive(options.fold(cwd)) ?? null;
-		} catch (err) {
-			return failure(err);
-		}
-		return { ok: true, code: null, record, errors: [] };
-	} finally {
-		release();
-	}
-}
-
 const DETECTOR_LEDGER = Object.freeze({
 	acquire: acquireDetectorLock,
 	fold: foldDetectors,
@@ -509,6 +434,7 @@ const DETECTOR_LEDGER = Object.freeze({
 	corruptCode: MAINTAIN_CORRUPT_CODE,
 	sizeCeilingCode: MAINTAIN_SIZE_CEILING_CODE,
 	envName: "AMBER_MAINTAIN_MAX_DETECTORS_BYTES",
+	defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
 	label: "maintain detector registry",
 });
 
@@ -692,6 +618,7 @@ const FINDING_LEDGER = Object.freeze({
 	corruptCode: FINDING_CORRUPT_CODE,
 	sizeCeilingCode: FINDING_SIZE_CEILING_CODE,
 	envName: "AMBER_MAINTAIN_MAX_FINDINGS_BYTES",
+	defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
 	label: "maintain finding ledger",
 });
 
@@ -1084,6 +1011,7 @@ const PROPOSAL_LEDGER = Object.freeze({
 	corruptCode: PROPOSAL_CORRUPT_CODE,
 	sizeCeilingCode: PROPOSAL_SIZE_CEILING_CODE,
 	envName: "AMBER_MAINTAIN_MAX_PROPOSALS_BYTES",
+	defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
 	label: "maintain proposal ledger",
 });
 

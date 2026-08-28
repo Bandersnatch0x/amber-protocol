@@ -1349,6 +1349,44 @@ Error codes: `AMBER_E_MAINTAIN_INVALID`, `AMBER_E_MAINTAIN_EXISTS`, `AMBER_E_MAI
 `AMBER_E_MAINTAIN_PROPOSAL_CORRUPT`, `AMBER_E_MAINTAIN_PROPOSAL_LOCK`,
 `AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING`.
 
+### retention classify / evaluate / classifications
+
+Classify records into governed retention classes and evaluate expiry deterministically (F055 T1).
+A classification binds one committed canonical record (`<type>:<identity>@<revision>`) to a
+protocol-defined retention class — `ephemeral|operational|governance|audit`, fixed semantics —
+whose TTL and legal basis resolve at classification time from a committed, versioned tenant
+retention Policy artifact: the Policy revision's extensions carrier declares
+`{ retention: { classes: { <class>: { ttlMs, legalBasis } } } }`, and a pin that does not declare
+the class refuses. Classifications are immutable events in the hash-chained ledger
+`.amber/retention/classifications.jsonl` — re-classification appends a new event and the latest
+classification per record is effective; nothing is ever edited in place. T1 deliberately classifies
+committed canonical records only; ledger subjects (evidence receipts, adapter read receipts, and
+the other raw-byte holders) enter the surface with the T3 deletion-candidate enumeration and its
+Holder registry.
+
+Declared secret or personal content refuses classification unless an explicit `--minimized` marker
+rides the event (and the marker without declared sensitivity refuses): deletion is not the first
+privacy control, and unsafe raw content never enters a ledger — a validly re-chained forged event
+carrying extra content fields fails the closed field set.
+
+`evaluate` is deterministic and read-only: each record's `expired-eligible|retained` verdict is a
+pure function of its latest recorded classification (`classifiedAt + ttlMs`, half-open — expiry at
+exactly `expiresAt`) and the injected `--now` clock. Report-only: evaluation never writes and
+nothing is deleted (deletion execution is F055 T3/T4, behind its own governance).
+
+```bash
+node scripts/amber.js retention classify --target . --record spec:spec/login@2 \
+  --retention-class operational --policy policy/tenant-retention@1 --json
+node scripts/amber.js retention classify --target . --record eval-result:eval-result/session-raw@1 \
+  --retention-class ephemeral --policy policy/tenant-retention@1 \
+  --sensitivity personal --minimized --json
+node scripts/amber.js retention evaluate --target . --now 2026-08-29T00:00:00.000Z --json
+node scripts/amber.js retention classifications --target . --type spec --json
+```
+
+Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
+`AMBER_E_RETENTION_CORRUPT`, `AMBER_E_RETENTION_LOCK`, `AMBER_E_RETENTION_SIZE_CEILING`.
+
 ## Handoff Commands
 
 ### handoff

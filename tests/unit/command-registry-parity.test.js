@@ -37,6 +37,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"runner",
 	"release",
 	"maintain",
+	"retention",
 	"review",
 	"accept",
 	"learnings",

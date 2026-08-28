@@ -1259,6 +1259,35 @@ const COMMAND_HELP = {
 		"  amber maintain complete --target . --fingerprint sha256:<64-hex> --intent intent/maintain-x@1 --eval eval/maintain-check@1 --eval-result eval-result/maintain-check-run@1 --json",
 		"  amber maintain rollup --target . --limit 100 --json",
 	],
+	retention: [
+		"Classify records into governed retention classes and evaluate expiry",
+		"deterministically (F055 T1).",
+		"A classification binds one committed record to a protocol retention",
+		"class (ephemeral|operational|governance|audit) whose TTL and legal",
+		"basis resolve at classification time from a committed, versioned",
+		"tenant retention Policy artifact (its extensions carrier declares",
+		"{ retention: { classes: { <class>: { ttlMs, legalBasis } } } }).",
+		"Classifications are immutable hash-chained ledger events under",
+		".amber/retention/ — re-classification appends, never edits — and",
+		"declared secret or personal content refuses classification unless an",
+		"explicit minimization marker rides the event: unsafe raw content",
+		"never enters a ledger. `evaluate` is deterministic and read-only:",
+		"each record's expired-eligible|retained verdict derives from its",
+		"latest classification and an injected clock — report-only, nothing",
+		"is deleted.",
+		"",
+		"Subcommands:",
+		"  classify --record <type>:<identity>@<rev> --retention-class <class>",
+		"        --policy <identity>@<rev> [--sensitivity <none|secret|personal>]",
+		"        [--minimized]",
+		"  evaluate [--now <iso>]",
+		"  classifications [--type <type>] [--id <identity>]",
+		"",
+		"Examples:",
+		"  amber retention classify --target . --record spec:spec/login@2 --retention-class operational --policy policy/tenant-retention@1 --json",
+		"  amber retention evaluate --target . --now 2026-08-29T00:00:00.000Z --json",
+		"  amber retention classifications --target . --type spec --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -1683,6 +1712,14 @@ const COMMAND_OUTPUT = {
 			"       amber maintain proposals --target <repo> [--fingerprint <sha256:...>] [--json]",
 		].join("\n"),
 	},
+	retention: {
+		usage: [
+			"Usage: amber retention <classify|evaluate|classifications> --target <repo> [--json]",
+			"       amber retention classify --target <repo> --record <type>:<identity>@<rev> --retention-class ephemeral|operational|governance|audit --policy <identity>@<rev> [--sensitivity none|secret|personal] [--minimized] [--json]",
+			"       amber retention evaluate --target <repo> [--now <iso>] [--json]",
+			"       amber retention classifications --target <repo> [--type <type>] [--id <identity>] [--json]",
+		].join("\n"),
+	},
 };
 
 const DEFAULT_OUTPUT = Object.freeze({ dryRun: false, summary: false, usage: null });
@@ -1699,6 +1736,7 @@ const COMMANDS = Object.freeze([
 	"runner",
 	"release",
 	"maintain",
+	"retention",
 	"review",
 	"accept",
 	"learnings",
@@ -1752,6 +1790,7 @@ const TIER_BY_COMMAND = {
 	runner: "core",
 	release: "core",
 	maintain: "core",
+	retention: "core",
 	review: "core",
 	accept: "core",
 	learnings: "core",

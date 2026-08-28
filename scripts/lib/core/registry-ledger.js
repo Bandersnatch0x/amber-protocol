@@ -15,7 +15,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { readLedgerFailClosed } = require("./jsonl");
+const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { typedError } = require("./error-catalog");
 const { sha256Hex } = require("./context-hash");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
@@ -181,6 +181,78 @@ function appendWithinCeiling({ ledgerPath, event, envName, defaultBytes, label }
 	return { ceiling, wouldExceed: currentBytes + Buffer.byteLength(line, "utf8") > ceiling };
 }
 
+// Shared governed-append orchestration: lock → fold → guard → chain-head →
+// ceiling → append → re-fold → derive. Guard contract: any non-null guard
+// result is returned verbatim without appending; `derive(fold)` picks the
+// caller's record after the append. `body` may be a factory evaluated
+// against the in-lock fold (after the guard, same fold object), for events
+// whose shape depends on current ledger state.
+function appendLedgerEvent(cwd, options, body, guard, derive) {
+	const failure = (err) => ({
+		ok: false,
+		code: err.amberCode || options.corruptCode,
+		record: null,
+		errors: [err.message || String(err)],
+	});
+	let release;
+	try {
+		release = options.acquire(cwd);
+	} catch (err) {
+		return failure(err);
+	}
+	try {
+		let folded;
+		try {
+			folded = options.fold(cwd);
+		} catch (err) {
+			return failure(err);
+		}
+		const guardVerdict = guard(folded);
+		if (guardVerdict !== null) return guardVerdict;
+		const eventBody = typeof body === "function" ? body(folded) : body;
+		let prevHash;
+		try {
+			prevHash = chainHeadHash(options.path(cwd), options.corruptCode, options.label);
+		} catch (err) {
+			return failure(err);
+		}
+		const event = { ...eventBody, prevHash, hash: chainHash(eventBody, prevHash) };
+		let ceiling;
+		try {
+			ceiling = appendWithinCeiling({
+				ledgerPath: options.path(cwd),
+				event,
+				envName: options.envName,
+				defaultBytes: options.defaultBytes,
+				label: options.label,
+			});
+		} catch (err) {
+			return failure(err);
+		}
+		if (ceiling.wouldExceed)
+			return {
+				ok: false,
+				code: options.sizeCeilingCode,
+				record: null,
+				errors: [`${options.label} event would exceed ${ceiling.ceiling} bytes`],
+			};
+		try {
+			appendJSONL(options.path(cwd), event);
+		} catch (err) {
+			return failure(err);
+		}
+		let record;
+		try {
+			record = derive(options.fold(cwd)) ?? null;
+		} catch (err) {
+			return failure(err);
+		}
+		return { ok: true, code: null, record, errors: [] };
+	} finally {
+		release();
+	}
+}
+
 module.exports = {
 	GENESIS_HASH,
 	DEFAULT_LOCK_STALE_MS,
@@ -188,4 +260,5 @@ module.exports = {
 	chainHeadHash,
 	acquireLedgerLock,
 	appendWithinCeiling,
+	appendLedgerEvent,
 };
