@@ -2,6 +2,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -11,6 +12,10 @@ const { writeJSONL } = require("../scripts/lib/core/jsonl");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
+
+function sha256Bytes(buffer) {
+	return `sha256:${crypto.createHash("sha256").update(buffer).digest("hex")}`;
+}
 
 function runCli(args, cwd) {
 	return spawnSync(process.execPath, [CLI, ...args], {
@@ -207,9 +212,99 @@ test("adapter read reports corrupt registry through the JSON envelope", () => {
 	assert.equal(envelope(read).code, "AMBER_E_ADAPTER_REGISTRY_CORRUPT");
 });
 
+test("adapter read reports expected source hash conflicts", () => {
+	const dir = mkTarget("hash-conflict");
+	fs.mkdirSync(path.join(dir, "legacy"), { recursive: true });
+	const original = Buffer.from("original");
+	fs.writeFileSync(path.join(dir, "legacy", "item.json"), original);
+	assert.equal(registerAdapterCli(dir).status, 0);
+	fs.writeFileSync(path.join(dir, "legacy", "item.json"), "changed");
+	const read = runCli(
+		[
+			"adapter",
+			"read",
+			"--id",
+			"adapter/legacy",
+			"--source",
+			"legacy/item.json",
+			"--record-id",
+			"legacy-1",
+			"--expected-source-hash",
+			sha256Bytes(original),
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(read.status, 1);
+	const out = payload(read);
+	assert.equal(envelope(read).code, "AMBER_E_ADAPTER_CONFLICT");
+	assert.equal(out.receipt.status, "conflict");
+	assert.match(out.receipt.stateReason, /hash changed/);
+});
+
+test("adapter candidate prepares valid candidates and receipts unmapped sources", () => {
+	const dir = mkTarget("candidate");
+	fs.mkdirSync(path.join(dir, "legacy"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, "legacy", "candidate.json"),
+		`${JSON.stringify({
+			id: "legacy-1",
+			scope: "F051",
+			artifact: { type: "intent", identity: "intent/from-cli", body: "# From CLI\n" },
+		})}\n`,
+	);
+	assert.equal(registerAdapterCli(dir).status, 0);
+	const admitted = runCli(
+		[
+			"adapter",
+			"candidate",
+			"--id",
+			"adapter/legacy",
+			"--source",
+			"legacy/candidate.json",
+			"--record-id",
+			"legacy-1",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(admitted.status, 0, admitted.stderr || admitted.stdout);
+	assert.equal(fs.existsSync(path.join(dir, ".amber", "artifacts")), false);
+	assert.equal(payload(admitted).candidate.identity, "intent/from-cli");
+	assert.equal(payload(admitted).state, "fresh");
+
+	fs.writeFileSync(path.join(dir, "legacy", "bad.json"), '{"id":"legacy-2"}\n');
+	const unmapped = runCli(
+		[
+			"adapter",
+			"candidate",
+			"--id",
+			"adapter/legacy",
+			"--source",
+			"legacy/bad.json",
+			"--record-id",
+			"legacy-2",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(unmapped.status, 1);
+	const unmappedOut = payload(unmapped);
+	assert.equal(envelope(unmapped).code, "AMBER_E_ADAPTER_UNMAPPED");
+	assert.equal(unmappedOut.state, "unmapped");
+	assert.equal(unmappedOut.receipt.status, "unmapped");
+});
+
 test("adapter help is registered", () => {
 	const r = runCli(["adapter", "--help"], ROOT);
 	assert.equal(r.status, 0, r.stderr);
 	assert.ok(r.stdout.includes("adapter register"));
 	assert.ok(r.stdout.includes("adapter read"));
+	assert.ok(r.stdout.includes("adapter candidate"));
 });

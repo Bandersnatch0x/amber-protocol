@@ -1376,6 +1376,24 @@ const CATALOG = {
 		layer: "Observability",
 		related: ["AMBER_E_ADAPTER_SOURCE_MISSING", "AMBER_E_ADAPTER_READ_FORBIDDEN"],
 	},
+	AMBER_E_ADAPTER_CONFLICT: {
+		title: "Adapter record is conflicting",
+		cause:
+			"The Adapter read or migration candidate detected contradictory authority signals, such as a changed expected source hash, duplicate target identity, cross-scope mapping, or contradictory source records.",
+		remedy:
+			"Resolve the source conflict, choose the correct canonical target and scope, then retry with a fresh source hash or explicit supersession intent.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_STALE", "AMBER_E_ARTIFACT_CONFLICT"],
+	},
+	AMBER_E_ADAPTER_UNMAPPED: {
+		title: "Adapter record is unmapped",
+		cause:
+			"The Adapter source was readable, but its shape or selected record did not provide a deterministic migration candidate.",
+		remedy:
+			"Declare a complete candidate shape with record id, artifact type, identity, body, and scope, or leave the legacy record unmapped until a human resolves the mapping.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_INVALID", "AMBER_E_ARTIFACT_UNKNOWN_TYPE"],
+	},
 	AMBER_E_ADAPTER_REGISTRY_CORRUPT: {
 		title: "Adapter registry is corrupt",
 		cause:
@@ -1553,6 +1571,33 @@ const CATALOG = {
 			"Repair feature_list.json to valid JSON (restore it from version control if it was hand-edited), then re-run amber knowledge graph.",
 		layer: "Context",
 		related: ["AMBER_E_KNOWLEDGE_GRAPH_INVALID", "AMBER_E_KB_CORRUPT"],
+	},
+	AMBER_E_KNOWLEDGE_MANIFEST_INVALID: {
+		title: "F059 knowledge context manifest census or identity check failed",
+		cause:
+			"The discovered ADR / wiki / architecture document counts do not match the committed 24+10+9 corpus, or two rows share the same id, pageId, sourceNodeId, or sourcePath. This is an intentional gate: the manifest is a deliberate, reviewed snapshot of the F059 corpus. Adding a new ADR, wiki knowledge page, or architecture doc requires a conscious bump to EXPECTED_COUNTS and a fresh context-sync run.",
+		remedy:
+			"Run `amber knowledge context-manifest --target <repo>` to diagnose which category is over/under count. If the new document should be part of the corpus, update EXPECTED_COUNTS in scripts/lib/core/knowledge-projection.js and re-run `amber knowledge context-sync --target <repo>`.",
+		layer: "Verification",
+		related: ["AMBER_E_KNOWLEDGE_GRAPH_SOURCE", "AMBER_E_KNOWLEDGE_SOURCE_STALE"],
+	},
+	AMBER_E_KNOWLEDGE_SOURCE_INVALID: {
+		title: "Unknown knowledge graph source option",
+		cause:
+			"The `source` option passed to `buildKnowledgeGraph` is neither \"projection\" (the default, production path) nor \"tree\" (the explicit zero-mutation parity path). No other source values are defined.",
+		remedy:
+			"Pass `{ source: \"projection\" }` for production reads or `{ source: \"tree\" }` for explicit tree-reader parity checks. Both read from the committed corpus; projection reads from the tracked knowledge-base projection output, tree reads directly from source files.",
+		layer: "Context",
+		related: ["AMBER_E_KNOWLEDGE_GRAPH_INVALID", "AMBER_E_KNOWLEDGE_MANIFEST_INVALID"],
+	},
+	AMBER_E_KNOWLEDGE_SOURCE_STALE: {
+		title: "F059 managed knowledge page source is stale",
+		cause:
+			"One or more mutable source files (ADR, wiki, or architecture documents) referenced by the committed F059 knowledge context pages have changed since the pages were last synced. The production graph reader refuses to serve stale content to prevent the graph from silently diverging from the current repository state.",
+		remedy:
+			"Run `amber knowledge context-sync --target <repo>` to resync managed pages to the current source content, then re-run `amber knowledge graph`.",
+		layer: "Verification",
+		related: ["AMBER_E_KNOWLEDGE_MANIFEST_INVALID", "AMBER_E_CONTEXT_SOURCE_STALE"],
 	},
 };
 

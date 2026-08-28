@@ -938,20 +938,30 @@ node scripts/amber.js projection invalidate --subject spec/spec/login-spec@2 \
 node scripts/amber.js projection status --type governance-graph --target . --json
 ```
 
-### adapter register / read / show / list / receipts
+### adapter register / read / candidate / show / list / receipts
 
 Read-only Adapters (F051) let Amber inspect legacy or external records before Cutover without
 mutating either the source or Canonical Artifacts. An Adapter registration declares source owner,
 supported record type/version, exact scope, identity mapping, freshness, and read-only permissions.
 `adapter read` reads one source file under the target root and appends an immutable read receipt
 under `.amber/adapters/read-receipts.jsonl` with adapter id/version, record id/type/version, scope,
-source path, exact source bytes (base64), source byte length, raw-byte digest, status
-(`fresh|stale|unavailable|conflict|unmapped`), timestamp, and provenance. Missing sources append an
-`unavailable` receipt; old sources append a `stale` receipt and return `AMBER_E_ADAPTER_STALE`.
-The external source remains authoritative until a later explicit Cutover Decision.
+source path, exact source bytes (base64), source byte length, raw-byte digest, expected source hash
+when supplied, status (`fresh|stale|unavailable|conflict|unmapped`), state reason, timestamp, and
+provenance. Missing sources append an `unavailable` receipt; old sources append a `stale` receipt and
+return `AMBER_E_ADAPTER_STALE`; changed expected hashes append a `conflict` receipt and return
+`AMBER_E_ADAPTER_CONFLICT`. The external source remains authoritative until a later explicit Cutover
+Decision.
 
 The Adapter registry and read-receipt ledger are hash-chained and fail closed on in-place edits.
-The command never calls Canonical Artifact admission; receipts are governance observations only.
+`adapter read` never calls Canonical Artifact admission; receipts are governance observations only.
+`adapter candidate` reads the same source, extracts a deterministic migration candidate, and returns
+a normal Canonical Artifact admission payload for a separate `artifact admit` call. The source JSON is
+either one record object or `{ "records": [ ... ] }`; each record may use `id` or `recordId`, optional
+`scope` (or `tenant` when identical), and either an `artifact` object or equivalent flat
+`artifactType`, `artifactIdentity`, `artifactScope`, `body`, `traces`, `extensions`, `transition`,
+`idempotencyKey`, `expectedHead`, and `supersedes` fields. Unknown fields and unknown shapes append
+`unmapped` receipts; duplicate identities, contradictory aliases, cross-scope records, and
+contradictory records append `conflict` receipts.
 
 ```bash
 node scripts/amber.js adapter register --target . --id adapter/legacy \
@@ -959,6 +969,9 @@ node scripts/amber.js adapter register --target . --id adapter/legacy \
   --scope F051 --identity-map path --freshness-ms 86400000 --allow-path legacy --json
 
 node scripts/amber.js adapter read --target . --id adapter/legacy \
+  --source legacy/item.json --record-id legacy-1 --record-version v1 \
+  --expected-source-hash sha256:<64-hex-chars> --json
+node scripts/amber.js adapter candidate --target . --id adapter/legacy \
   --source legacy/item.json --record-id legacy-1 --record-version v1 --json
 node scripts/amber.js adapter show --target . --id adapter/legacy --json
 node scripts/amber.js adapter list --target . --json
@@ -967,9 +980,10 @@ node scripts/amber.js adapter receipts --target . --id adapter/legacy --json
 
 Error codes: `AMBER_E_ADAPTER_INVALID`, `AMBER_E_ADAPTER_NOT_FOUND`,
 `AMBER_E_ADAPTER_READ_FORBIDDEN`, `AMBER_E_ADAPTER_SOURCE_MISSING`, `AMBER_E_ADAPTER_STALE`,
-`AMBER_E_ADAPTER_REGISTRY_CORRUPT`, `AMBER_E_ADAPTER_REGISTRY_LOCK`,
-`AMBER_E_ADAPTER_SIZE_CEILING`, `AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT`,
-`AMBER_E_ADAPTER_READ_RECEIPT_LOCK`, `AMBER_E_ADAPTER_READ_RECEIPT_SIZE_CEILING`.
+`AMBER_E_ADAPTER_CONFLICT`, `AMBER_E_ADAPTER_UNMAPPED`, `AMBER_E_ADAPTER_REGISTRY_CORRUPT`,
+`AMBER_E_ADAPTER_REGISTRY_LOCK`, `AMBER_E_ADAPTER_SIZE_CEILING`,
+`AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT`, `AMBER_E_ADAPTER_READ_RECEIPT_LOCK`,
+`AMBER_E_ADAPTER_READ_RECEIPT_SIZE_CEILING`.
 
 ## Handoff Commands
 

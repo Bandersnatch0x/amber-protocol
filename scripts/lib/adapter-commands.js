@@ -26,6 +26,7 @@ function missingValueFlag(args) {
 		["allowPath", "--allow-path"],
 		["source", "--source"],
 		["recordId", "--record-id"],
+		["expectedSourceHash", "--expected-source-hash"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -93,7 +94,7 @@ function registerInput(args) {
 
 const dispatch = defineCommand({
 	command: "adapter",
-	actions: ["register", "read", "show", "list", "receipts"],
+	actions: ["register", "read", "candidate", "show", "list", "receipts"],
 	handlers: {
 		register: (args) => {
 			const { registerAdapter } = require("./core/adapter-registry");
@@ -138,11 +139,59 @@ const dispatch = defineCommand({
 				recordId: String(args.recordId),
 				recordType: args.recordType === undefined ? null : String(args.recordType),
 				recordVersion: args.recordVersion === undefined ? null : String(args.recordVersion),
+				expectedSourceHash:
+					args.expectedSourceHash === undefined ? null : String(args.expectedSourceHash),
 				scope: args.scope === undefined ? null : String(args.scope),
 			});
 			return {
 				text: result.receipt
 					? JSON.stringify({ receipt: result.receipt, source: result.source }, null, 2)
+					: "",
+				errors: result.errors,
+				warnings: [],
+				exitCode: result.ok ? 0 : 1,
+				...(result.code ? { code: result.code } : {}),
+			};
+		},
+		candidate: (args) => {
+			const { prepareMigrationCandidate } = require("./core/adapter-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "adapter/legacy"],
+				["source", "--source", "legacy/item.json"],
+				["recordId", "--record-id", "legacy-1"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const result = prepareMigrationCandidate(target.value, {
+				id: String(args.id),
+				source: String(args.source),
+				recordId: String(args.recordId),
+				recordType: args.recordType === undefined ? null : String(args.recordType),
+				recordVersion: args.recordVersion === undefined ? null : String(args.recordVersion),
+				expectedSourceHash:
+					args.expectedSourceHash === undefined ? null : String(args.expectedSourceHash),
+				scope: args.scope === undefined ? null : String(args.scope),
+			});
+			return {
+				text: result.receipt
+					? JSON.stringify(
+						{
+							state: result.state,
+							receipt: result.receipt,
+							source: result.source,
+							candidate: result.candidate,
+						},
+						null,
+						2,
+					)
 					: "",
 				errors: result.errors,
 				warnings: [],
