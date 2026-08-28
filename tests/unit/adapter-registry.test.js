@@ -8,7 +8,6 @@ const os = require("node:os");
 const path = require("node:path");
 
 const {
-	ADAPTER_SCHEMA_VERSION,
 	ADAPTER_READ_RECEIPT_SCHEMA_VERSION,
 	GENESIS_HASH,
 	chainHash,
@@ -19,12 +18,18 @@ const {
 	prepareMigrationCandidate,
 	compareAdapterShadow,
 	listShadowComparisons,
+	recordCutover,
+	recordCutoverRollback,
+	listCutovers,
 	listReadReceipts,
 	registryPath,
 	receiptPath,
 	comparisonPath,
+	cutoverPath,
 } = require("../../scripts/lib/core/adapter-registry");
 const { admitArtifact, showArtifact } = require("../../scripts/lib/core/canonical-artifacts");
+const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
+const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
 const { writeJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkTarget(label) {
@@ -566,9 +571,23 @@ test("shadow comparison records coverage, hashes, dispositions, and deterministi
 		}).ok,
 		true,
 	);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "intent",
+			identity: "intent/extended",
+			body: "# Extended\n",
+			scope: "F051",
+			extensions: { legacy: { migrated: "true" } },
+		}).ok,
+		true,
+	);
 	fs.writeFileSync(
 		path.join(dir, "legacy", "mapped.json"),
 		`${JSON.stringify({ id: "mapped", scope: "F051", artifact: { type: "intent", identity: "intent/mapped", body: mappedBody } })}\n`,
+	);
+	fs.writeFileSync(
+		path.join(dir, "legacy", "extended.json"),
+		`${JSON.stringify({ id: "extended", scope: "F051", artifact: { type: "intent", identity: "intent/extended", body: "# Extended\n" } })}\n`,
 	);
 	fs.writeFileSync(
 		path.join(dir, "legacy", "unmapped.json"),
@@ -593,7 +612,7 @@ test("shadow comparison records coverage, hashes, dispositions, and deterministi
 	const fixture = {
 		id: "adapter/legacy",
 		fixtureId: "shadow-fixture",
-		expectedTotal: 6,
+		expectedTotal: 7,
 		items: [
 			{
 				recordId: "mapped",
@@ -614,17 +633,22 @@ test("shadow comparison records coverage, hashes, dispositions, and deterministi
 				disposition: "resolve-conflict",
 			},
 			{ recordId: "missing", source: "legacy/missing.json", disposition: "restore-source" },
+			{
+				recordId: "extended",
+				source: "legacy/extended.json",
+				target: { type: "intent", identity: "intent/extended", revision: 1 },
+			},
 		],
 	};
 	const first = compareAdapterShadow(dir, fixture, { now: new Date("2026-08-27T00:00:00.000Z") });
 	assert.equal(first.ok, true, (first.errors || []).join("; "));
 	assert.deepEqual(first.receipt.coverage, {
 		scope: "F051",
-		total: 6,
+		total: 7,
 		mapped: 1,
 		unmapped: 1,
 		stale: 1,
-		conflict: 2,
+		conflict: 3,
 		unavailable: 1,
 	});
 	assert.match(first.receipt.sourceSetHash, /^sha256:[0-9a-f]{64}$/);
@@ -636,6 +660,8 @@ test("shadow comparison records coverage, hashes, dispositions, and deterministi
 	assert.equal(first.receipt.items[2].status, "conflict");
 	assert.match(first.receipt.items[2].reason, /scope/);
 	assert.equal(first.receipt.items[1].disposition, "defer");
+	assert.equal(first.receipt.items[6].status, "conflict");
+	assert.match(first.receipt.items[6].reason, /extensions/);
 	const second = compareAdapterShadow(dir, fixture, { now: new Date("2026-08-27T00:00:00.000Z") });
 	assert.equal(second.ok, true, (second.errors || []).join("; "));
 	assert.equal(second.receipt.comparisonHash, first.receipt.comparisonHash);
@@ -694,6 +720,469 @@ test("shadow comparison requires unmapped disposition and detects tampering", ()
 	assert.throws(
 		() => listShadowComparisons(nonObjectDir),
 		(err) => err.amberCode === "AMBER_E_ADAPTER_COMPARISON_CORRUPT",
+	);
+});
+
+function decisionFixture(dir, identity, principal, opts = {}) {
+	const { anchor = "intent/mapped", kind = "approval", scope = "F051" } = opts;
+	const decision = admitArtifact(dir, {
+		type: "decision",
+		identity,
+		body: `# Decision ${identity}\n`,
+		decisionKind: kind,
+		principal,
+		scope,
+		traces: [{ type: "decides", to: { type: "intent", identity: anchor } }],
+	});
+	assert.equal(decision.ok, true, (decision.errors || []).join("; "));
+	return decision.receipt;
+}
+
+/** Record one F050 Evidence receipt so cutover/rollback references resolve. */
+function evidenceFixture(dir, id, producer = "legacy-team") {
+	const recorded = recordEvidence(dir, {
+		id,
+		producer,
+		assurance: "observed",
+		scope: "F051",
+		subject: "adapter/legacy ownership transfer",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: null,
+		status: "pass",
+	});
+	assert.equal(recorded.ok, true, (recorded.errors || []).join("; "));
+}
+
+function cutoverFixture(dir) {
+	fs.mkdirSync(path.join(dir, "legacy"), { recursive: true });
+	registerFixture(dir);
+	const body = "# Mapped\n";
+	fs.writeFileSync(
+		path.join(dir, "legacy", "mapped.json"),
+		`${JSON.stringify({ id: "mapped", scope: "F051", artifact: { type: "intent", identity: "intent/mapped", body } })}\n`,
+	);
+	assert.equal(
+		admitArtifact(dir, { type: "intent", identity: "intent/mapped", body, scope: "F051" }).ok,
+		true,
+	);
+	const compared = compareAdapterShadow(dir, {
+		id: "adapter/legacy",
+		fixtureId: "cutover-fixture",
+		expectedTotal: 1,
+		items: [
+			{
+				recordId: "mapped",
+				source: "legacy/mapped.json",
+				target: { type: "intent", identity: "intent/mapped", revision: 1 },
+			},
+		],
+	});
+	assert.equal(compared.ok, true, (compared.errors || []).join("; "));
+	assert.equal(
+		registerPrincipal(dir, { id: "alice@example.com", principalKind: "human" }).ok,
+		true,
+	);
+	assert.equal(registerPrincipal(dir, { id: "legacy-team", principalKind: "human" }).ok, true);
+	decisionFixture(dir, "decision/cutover-1", "alice@example.com");
+	evidenceFixture(dir, "evidence/rollback-plan");
+	evidenceFixture(dir, "evidence/rollback-run");
+	return { comparisonIndex: compared.receipt.index };
+}
+
+/** Register a same-shape adapter under a different owner and record a
+ *  resolved one-item comparison for it; returns the comparison index. */
+function ownerVariantComparison(dir, id, owner, fixtureId) {
+	registerFixture(dir, { id, owner });
+	const compared = compareAdapterShadow(dir, {
+		id,
+		fixtureId,
+		expectedTotal: 1,
+		items: [
+			{
+				recordId: "mapped",
+				source: "legacy/mapped.json",
+				target: { type: "intent", identity: "intent/mapped", revision: 1 },
+			},
+		],
+	});
+	assert.equal(compared.ok, true, (compared.errors || []).join("; "));
+	return compared.receipt.index;
+}
+
+function cutoverInput(overrides = {}) {
+	return {
+		id: "adapter/legacy",
+		cutoverId: "cutover/gen-1",
+		artifactType: "intent",
+		generation: "gen-1",
+		comparisonIndex: 0,
+		decision: { identity: "decision/cutover-1", revision: 1 },
+		confirmedBy: "legacy-team",
+		rollbackEvidence: "evidence/rollback-plan",
+		...overrides,
+	};
+}
+
+test("cutover binds resolved comparison, human decision, and independent confirmation", () => {
+	const dir = mkTarget("cutover");
+	const { comparisonIndex } = cutoverFixture(dir);
+
+	const separationSelf = recordCutover(dir, cutoverInput({ confirmedBy: "alice@example.com" }));
+	assert.equal(separationSelf.ok, false);
+	assert.equal(separationSelf.code, "AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION");
+	const separationStranger = recordCutover(dir, cutoverInput({ confirmedBy: "someone-else" }));
+	assert.equal(separationStranger.code, "AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION");
+
+	const selfIndex = ownerVariantComparison(dir, "adapter/self", "alice@example.com", "self-fx");
+	decisionFixture(dir, "decision/self-1", "alice@example.com");
+	const selfOwned = recordCutover(
+		dir,
+		cutoverInput({
+			id: "adapter/self",
+			cutoverId: "cutover/self",
+			comparisonIndex: selfIndex,
+			decision: { identity: "decision/self-1", revision: 1 },
+			confirmedBy: "alice@example.com",
+		}),
+	);
+	assert.equal(selfOwned.ok, false);
+	assert.equal(selfOwned.code, "AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION");
+	assert.match(selfOwned.errors[0], /independent/);
+
+	const ghostIndex = ownerVariantComparison(dir, "adapter/ghost", "ghost-team", "ghost-fx");
+	decisionFixture(dir, "decision/ghost-1", "alice@example.com");
+	const unregisteredOwner = recordCutover(
+		dir,
+		cutoverInput({
+			id: "adapter/ghost",
+			cutoverId: "cutover/ghost",
+			comparisonIndex: ghostIndex,
+			decision: { identity: "decision/ghost-1", revision: 1 },
+			confirmedBy: "ghost-team",
+		}),
+	);
+	assert.equal(unregisteredOwner.ok, false);
+	assert.equal(unregisteredOwner.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+	assert.match(unregisteredOwner.errors[0], /not registered/);
+
+	assert.equal(
+		registerPrincipal(dir, { id: "ci-owner", principalKind: "service", capability: "execute" }).ok,
+		true,
+	);
+	const serviceIndex = ownerVariantComparison(dir, "adapter/service", "ci-owner", "service-fx");
+	decisionFixture(dir, "decision/service-1", "alice@example.com");
+	const serviceOwner = recordCutover(
+		dir,
+		cutoverInput({
+			id: "adapter/service",
+			cutoverId: "cutover/service",
+			comparisonIndex: serviceIndex,
+			decision: { identity: "decision/service-1", revision: 1 },
+			confirmedBy: "ci-owner",
+		}),
+	);
+	assert.equal(serviceOwner.ok, false);
+	assert.equal(serviceOwner.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+	assert.match(serviceOwner.errors[0], /human-only/);
+
+	decisionFixture(dir, "decision/review-only", "alice@example.com", { kind: "review" });
+	const reviewOnly = recordCutover(
+		dir,
+		cutoverInput({ decision: { identity: "decision/review-only", revision: 1 } }),
+	);
+	assert.equal(reviewOnly.ok, false);
+	assert.equal(reviewOnly.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+
+	assert.equal(
+		admitArtifact(dir, { type: "intent", identity: "intent/unscoped", body: "# U\n" }).ok,
+		true,
+	);
+	decisionFixture(dir, "decision/unscoped", "alice@example.com", {
+		anchor: "intent/unscoped",
+		scope: null,
+	});
+	const wrongScope = recordCutover(
+		dir,
+		cutoverInput({ decision: { identity: "decision/unscoped", revision: 1 } }),
+	);
+	assert.equal(wrongScope.ok, false);
+	assert.equal(wrongScope.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+	assert.match(wrongScope.errors[0], /scope/);
+
+	const ghostEvidence = recordCutover(dir, cutoverInput({ rollbackEvidence: "evidence/ghost" }));
+	assert.equal(ghostEvidence.ok, false);
+	assert.equal(ghostEvidence.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+	assert.match(ghostEvidence.errors[0], /Evidence receipt/);
+
+	const typeMismatch = recordCutover(
+		dir,
+		cutoverInput({ comparisonIndex, artifactType: "decision", cutoverId: "cutover/type" }),
+	);
+	assert.equal(typeMismatch.ok, false);
+	assert.equal(typeMismatch.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+	assert.match(typeMismatch.errors[0], /maps no decision targets/);
+
+	const result = recordCutover(dir, cutoverInput({ comparisonIndex }));
+	assert.equal(result.ok, true, (result.errors || []).join("; "));
+	assert.equal(result.record.status, "cut");
+	assert.equal(result.record.sourceOwner, "legacy-team");
+	assert.equal(result.record.decision.principal, "alice@example.com");
+	assert.match(result.record.comparisonHash, /^sha256:[0-9a-f]{64}$/);
+
+	const spent = recordCutover(dir, cutoverInput({ cutoverId: "cutover/gen-1-again" }));
+	assert.equal(spent.ok, false);
+	assert.equal(spent.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+	assert.match(spent.errors[0], /single-use/);
+
+	decisionFixture(dir, "decision/cutover-dup", "alice@example.com");
+	const duplicate = recordCutover(
+		dir,
+		cutoverInput({
+			cutoverId: "cutover/gen-1-again",
+			decision: { identity: "decision/cutover-dup", revision: 1 },
+		}),
+	);
+	assert.equal(duplicate.ok, false);
+	assert.equal(duplicate.code, "AMBER_E_ADAPTER_CUTOVER_EXISTS");
+	assert.equal(listCutovers(dir, { adapterId: "adapter/legacy" }).length, 1);
+});
+
+test("cutover refuses unresolved shadow coverage", () => {
+	const dir = mkTarget("cutover-unresolved");
+	const { comparisonIndex } = cutoverFixture(dir);
+	const unresolved = compareAdapterShadow(dir, {
+		id: "adapter/legacy",
+		fixtureId: "unresolved",
+		expectedTotal: 1,
+		items: [{ recordId: "missing", source: "legacy/missing.json", disposition: "restore-source" }],
+	});
+	assert.equal(unresolved.ok, true, (unresolved.errors || []).join("; "));
+	assert.equal(unresolved.receipt.coverage.unavailable, 1);
+	const refused = recordCutover(
+		dir,
+		cutoverInput({ comparisonIndex: unresolved.receipt.index, cutoverId: "cutover/unresolved" }),
+	);
+	assert.equal(refused.ok, false);
+	assert.equal(refused.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+	assert.match(refused.errors[0], /unresolved/);
+	assert.equal(recordCutover(dir, cutoverInput({ comparisonIndex })).ok, true);
+});
+
+test("post-cutover divergence appends a Finding, degrades reads, and never auto-syncs", () => {
+	const dir = mkTarget("cutover-divergence");
+	const { comparisonIndex } = cutoverFixture(dir);
+	assert.equal(recordCutover(dir, cutoverInput({ comparisonIndex })).ok, true);
+
+	const clean = readAdapterRecord(dir, {
+		id: "adapter/legacy",
+		source: "legacy/mapped.json",
+		recordId: "mapped",
+	});
+	assert.equal(clean.ok, true, (clean.errors || []).join("; "));
+
+	fs.writeFileSync(
+		path.join(dir, "legacy", "mapped.json"),
+		`${JSON.stringify({ id: "mapped", scope: "F051", artifact: { type: "intent", identity: "intent/mapped", body: "# Drifted\n" } })}\n`,
+	);
+	const diverged = readAdapterRecord(dir, {
+		id: "adapter/legacy",
+		source: "legacy/mapped.json",
+		recordId: "mapped",
+	});
+	assert.equal(diverged.ok, false);
+	assert.equal(diverged.code, "AMBER_E_ADAPTER_CUTOVER_DIVERGED");
+	assert.equal(diverged.divergence.cutoverId, "cutover/gen-1");
+	assert.match(diverged.divergence.expectedSourceHash, /^sha256:[0-9a-f]{64}$/);
+
+	const repeat = readAdapterRecord(dir, {
+		id: "adapter/legacy",
+		source: "legacy/mapped.json",
+		recordId: "mapped",
+	});
+	assert.equal(repeat.code, "AMBER_E_ADAPTER_CUTOVER_DIVERGED");
+	const bypass = readAdapterRecord(dir, {
+		id: "adapter/legacy",
+		source: "legacy/mapped.json",
+		recordId: "fresh-alias",
+	});
+	assert.equal(bypass.code, "AMBER_E_ADAPTER_CUTOVER_DIVERGED");
+	assert.equal(bypass.divergence.recordId, "mapped");
+	const [record] = listCutovers(dir, { adapterId: "adapter/legacy" });
+	assert.equal(record.status, "degraded");
+	assert.equal(record.divergences.length, 1);
+	assert.equal(showArtifact(dir, "intent/mapped").body, "# Mapped\n");
+
+	fs.writeFileSync(
+		path.join(dir, "legacy", "new.json"),
+		`${JSON.stringify({ id: "new", scope: "F051", artifact: { type: "intent", identity: "intent/new", body: "# New\n" } })}\n`,
+	);
+	const addition = readAdapterRecord(dir, {
+		id: "adapter/legacy",
+		source: "legacy/new.json",
+		recordId: "new",
+	});
+	assert.equal(addition.ok, false);
+	assert.equal(addition.code, "AMBER_E_ADAPTER_CUTOVER_DIVERGED");
+	assert.equal(addition.divergence.expectedSourceHash, null);
+	assert.equal(listCutovers(dir, { adapterId: "adapter/legacy" })[0].divergences.length, 2);
+});
+
+test("divergence degrades every active cutover bound to the drifted source", () => {
+	const dir = mkTarget("cutover-multi");
+	const { comparisonIndex } = cutoverFixture(dir);
+	assert.equal(recordCutover(dir, cutoverInput({ comparisonIndex })).ok, true);
+	decisionFixture(dir, "decision/cutover-gen2", "alice@example.com");
+	const second = recordCutover(
+		dir,
+		cutoverInput({
+			comparisonIndex,
+			cutoverId: "cutover/gen-2",
+			generation: "gen-2",
+			decision: { identity: "decision/cutover-gen2", revision: 1 },
+		}),
+	);
+	assert.equal(second.ok, true, (second.errors || []).join("; "));
+
+	fs.writeFileSync(
+		path.join(dir, "legacy", "mapped.json"),
+		`${JSON.stringify({ id: "mapped", scope: "F051", artifact: { type: "intent", identity: "intent/mapped", body: "# Drifted\n" } })}\n`,
+	);
+	const diverged = readAdapterRecord(dir, {
+		id: "adapter/legacy",
+		source: "legacy/mapped.json",
+		recordId: "mapped",
+	});
+	assert.equal(diverged.code, "AMBER_E_ADAPTER_CUTOVER_DIVERGED");
+	assert.deepEqual(
+		listCutovers(dir, { adapterId: "adapter/legacy" }).map((entry) => entry.status),
+		["degraded", "degraded"],
+	);
+});
+
+test("post-cutover divergence blocks migration candidate preparation", () => {
+	const dir = mkTarget("cutover-candidate");
+	const { comparisonIndex } = cutoverFixture(dir);
+	assert.equal(recordCutover(dir, cutoverInput({ comparisonIndex })).ok, true);
+
+	fs.writeFileSync(
+		path.join(dir, "legacy", "mapped.json"),
+		`${JSON.stringify({ id: "mapped", scope: "F051", artifact: { type: "intent", identity: "intent/mapped", body: "# Drifted\n" } })}\n`,
+	);
+	const blocked = prepareMigrationCandidate(dir, {
+		id: "adapter/legacy",
+		source: "legacy/mapped.json",
+		recordId: "mapped",
+	});
+	assert.equal(blocked.ok, false);
+	assert.equal(blocked.code, "AMBER_E_ADAPTER_CUTOVER_DIVERGED");
+	assert.equal(blocked.candidate, null);
+	assert.equal(blocked.divergence.cutoverId, "cutover/gen-1");
+	assert.equal(listCutovers(dir, { adapterId: "adapter/legacy" })[0].status, "degraded");
+});
+
+test("rollback is a new governed decision and history stays immutable", () => {
+	const dir = mkTarget("cutover-rollback");
+	const { comparisonIndex } = cutoverFixture(dir);
+	assert.equal(recordCutover(dir, cutoverInput({ comparisonIndex })).ok, true);
+
+	const reuse = recordCutoverRollback(dir, {
+		cutoverId: "cutover/gen-1",
+		decision: { identity: "decision/cutover-1", revision: 1 },
+		confirmedBy: "legacy-team",
+		evidence: "evidence/rollback-run",
+	});
+	assert.equal(reuse.ok, false);
+	assert.equal(reuse.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+
+	decisionFixture(dir, "decision/rollback-1", "alice@example.com");
+	const missing = recordCutoverRollback(dir, {
+		cutoverId: "cutover/ghost",
+		decision: { identity: "decision/rollback-1", revision: 1 },
+		confirmedBy: "legacy-team",
+		evidence: "evidence/rollback-run",
+	});
+	assert.equal(missing.code, "AMBER_E_ADAPTER_CUTOVER_NOT_FOUND");
+
+	const rolled = recordCutoverRollback(dir, {
+		cutoverId: "cutover/gen-1",
+		decision: { identity: "decision/rollback-1", revision: 1 },
+		confirmedBy: "legacy-team",
+		evidence: "evidence/rollback-run",
+	});
+	assert.equal(rolled.ok, true, (rolled.errors || []).join("; "));
+	assert.equal(rolled.record.status, "rolled-back");
+	assert.equal(rolled.record.rollback.decision.identity, "decision/rollback-1");
+
+	const again = recordCutoverRollback(dir, {
+		cutoverId: "cutover/gen-1",
+		decision: { identity: "decision/rollback-1", revision: 1 },
+		confirmedBy: "legacy-team",
+		evidence: "evidence/rollback-run",
+	});
+	assert.equal(again.code, "AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK");
+
+	fs.writeFileSync(
+		path.join(dir, "legacy", "mapped.json"),
+		`${JSON.stringify({ id: "mapped", scope: "F051", artifact: { type: "intent", identity: "intent/mapped", body: "# Drifted\n" } })}\n`,
+	);
+	const afterRollback = readAdapterRecord(dir, {
+		id: "adapter/legacy",
+		source: "legacy/mapped.json",
+		recordId: "mapped",
+	});
+	assert.equal(afterRollback.ok, true, (afterRollback.errors || []).join("; "));
+	assert.equal(listCutovers(dir)[0].status, "rolled-back");
+
+	const renewed = recordCutover(dir, cutoverInput({ cutoverId: "cutover/gen-1-renewed" }));
+	assert.equal(renewed.ok, false);
+	assert.equal(renewed.code, "AMBER_E_ADAPTER_CUTOVER_INVALID");
+
+	decisionFixture(dir, "decision/cutover-2", "alice@example.com");
+	const renewedFresh = recordCutover(
+		dir,
+		cutoverInput({
+			cutoverId: "cutover/gen-1-renewed",
+			decision: { identity: "decision/cutover-2", revision: 1 },
+		}),
+	);
+	assert.equal(renewedFresh.ok, true, (renewedFresh.errors || []).join("; "));
+	assert.equal(renewedFresh.record.status, "cut");
+});
+
+test("partial-scope cutover leaves other adapters and scopes untouched", () => {
+	const dir = mkTarget("cutover-partial");
+	const { comparisonIndex } = cutoverFixture(dir);
+	assert.equal(recordCutover(dir, cutoverInput({ comparisonIndex })).ok, true);
+
+	registerFixture(dir, {
+		id: "adapter/other",
+		owner: "other-team",
+		scope: "F052",
+		permissions: { readOnly: true, allowedPaths: ["other"] },
+	});
+	fs.mkdirSync(path.join(dir, "other"), { recursive: true });
+	fs.writeFileSync(path.join(dir, "other", "item.json"), "untouched");
+	const read = readAdapterRecord(dir, {
+		id: "adapter/other",
+		source: "other/item.json",
+		recordId: "other-1",
+	});
+	assert.equal(read.ok, true, (read.errors || []).join("; "));
+	assert.equal(listCutovers(dir, { adapterId: "adapter/other" }).length, 0);
+});
+
+test("tampered cutover ledger fails closed", () => {
+	const dir = mkTarget("cutover-tamper");
+	const { comparisonIndex } = cutoverFixture(dir);
+	assert.equal(recordCutover(dir, cutoverInput({ comparisonIndex })).ok, true);
+	const event = JSON.parse(fs.readFileSync(cutoverPath(dir), "utf8"));
+	event.confirmedBy = "edited";
+	writeJSONL(cutoverPath(dir), [event]);
+	assert.throws(
+		() => listCutovers(dir),
+		(err) => err.amberCode === "AMBER_E_ADAPTER_CUTOVER_CORRUPT",
 	);
 });
 

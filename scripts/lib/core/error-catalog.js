@@ -1491,6 +1491,84 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_ADAPTER_COMPARISON_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_ADAPTER_CUTOVER_INVALID: {
+		title: "Cutover request is invalid",
+		cause:
+			"A cutover or rollback request is missing required bindings: scoped identity, resolved shadow comparison evidence, a committed human Decision, or rollback evidence — or a rollback tried to reuse the original cutover Decision.",
+		remedy:
+			"Bind the cutover to a resolved shadow comparison, a committed acceptance/approval Decision, explicit generation and rollback evidence, and use a new Decision for rollback.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_COMPARISON_INVALID", "AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_EXISTS: {
+		title: "An active cutover already covers this scope",
+		cause:
+			"A cutover for the same adapter, artifact type, scope, and generation is already recorded and not rolled back.",
+		remedy:
+			"Roll the existing cutover back with a new governed Decision before recording another one for the same generation.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_INVALID", "AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_NOT_FOUND: {
+		title: "Cutover is not recorded",
+		cause: "A rollback named a cutover id that is absent from the cutover ledger.",
+		remedy:
+			"Use the cutover id recorded by `amber adapter cutover` (see `amber adapter cutovers`).",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_INVALID"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION: {
+		title: "Cutover lacks independent owner confirmation",
+		cause:
+			"The confirming identity is not the declared source owner, or it equals the deciding principal — one side would seize authority alone.",
+		remedy:
+			"Have the source owner confirm independently of the human principal who carries the cutover or rollback Decision.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_INVALID", "AMBER_E_DECISION_HUMAN_SLOT_REQUIRED"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_DIVERGED: {
+		title: "Post-cutover source divergence detected",
+		cause:
+			"After Cutover, an Adapter read observed source bytes whose hash differs from the hash bound at comparison time. The legacy source is historical/diagnostic only.",
+		remedy:
+			"Treat the Finding as evidence: investigate the legacy change; divergence never restores legacy authority or auto-syncs canonical state.",
+		layer: "Observability",
+		related: ["AMBER_E_ADAPTER_CONFLICT", "AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK: {
+		title: "Cutover is already rolled back",
+		cause:
+			"A rollback targeted a cutover whose rollback Decision is already recorded; rollback history is immutable.",
+		remedy:
+			"Record a new cutover with fresh comparison evidence and a new Decision instead of re-rolling history.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_NOT_FOUND", "AMBER_E_ADAPTER_CUTOVER_EXISTS"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_CORRUPT: {
+		title: "Adapter cutover ledger is corrupt",
+		cause:
+			"The cutover ledger has a corrupt JSONL line, broken hash chain, unknown field, missing field, unsupported schema version, or an event referencing an impossible cutover state.",
+		remedy:
+			"Restore .amber/adapters/cutovers.jsonl from version control; cutover, rollback, and divergence events are append-only and never edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_COMPARISON_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_LOCK: {
+		title: "Another Adapter cutover write is in flight",
+		cause:
+			"A fresh .amber/adapters/cutovers.lock exists, so this cutover append was refused instead of racing another writer.",
+		remedy:
+			"Retry after the in-flight cutover completes; locks older than 30 seconds are reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_SIZE_CEILING: {
+		title: "Adapter cutover ledger exceeds its size ceiling",
+		cause: "Appending the cutover event would exceed the cutover ledger size ceiling.",
+		remedy: "Keep cutover records bounded or deliberately raise AMBER_ADAPTER_MAX_CUTOVER_BYTES.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

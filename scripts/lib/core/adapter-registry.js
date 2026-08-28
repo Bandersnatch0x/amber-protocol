@@ -16,7 +16,9 @@ const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { resolvePathWithin } = require("./fs-utils");
 const { typedError } = require("./error-catalog");
-const { bodyHash, listArtifactRevisions } = require("./canonical-artifacts");
+const { ARTIFACT_TYPES, bodyHash, listArtifactRevisions } = require("./canonical-artifacts");
+const { resolveActivePrincipal } = require("./principal-registry");
+const { showEvidence } = require("./evidence-receipts");
 const { canonicalJson } = require("./context-hash");
 const {
 	GENESIS_HASH,
@@ -218,6 +220,85 @@ const COMPARISON_INPUT_FIELDS = Object.freeze([
 	"items",
 ]);
 const MAX_COMPARISON_ITEMS = 100;
+const ADAPTER_CUTOVER_SCHEMA_VERSION = 1;
+const SUPPORTED_ADAPTER_CUTOVER_SCHEMA_VERSIONS = Object.freeze([1]);
+const CUTOVER_CORRUPT_CODE = "AMBER_E_ADAPTER_CUTOVER_CORRUPT";
+const CUTOVER_LOCK_CODE = "AMBER_E_ADAPTER_CUTOVER_LOCK";
+const CUTOVER_SIZE_CEILING_CODE = "AMBER_E_ADAPTER_CUTOVER_SIZE_CEILING";
+const CUTOVER_INVALID_CODE = "AMBER_E_ADAPTER_CUTOVER_INVALID";
+const CUTOVER_EXISTS_CODE = "AMBER_E_ADAPTER_CUTOVER_EXISTS";
+const CUTOVER_NOT_FOUND_CODE = "AMBER_E_ADAPTER_CUTOVER_NOT_FOUND";
+const CUTOVER_OWNER_SEPARATION_CODE = "AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION";
+const CUTOVER_DIVERGED_CODE = "AMBER_E_ADAPTER_CUTOVER_DIVERGED";
+const CUTOVER_ROLLED_BACK_CODE = "AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK";
+const CUTOVER_DECISION_KINDS = Object.freeze(["acceptance", "approval"]);
+const CUTOVER_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"cutoverId",
+	"adapterId",
+	"adapterVersion",
+	"artifactType",
+	"scope",
+	"generation",
+	"sourceOwner",
+	"comparisonIndex",
+	"comparisonHash",
+	"sourceSetHash",
+	"targetSetHash",
+	"decision",
+	"confirmedBy",
+	"rollbackEvidence",
+	"prevHash",
+	"hash",
+]);
+const CUTOVER_DECISION_FIELDS = Object.freeze([
+	"identity",
+	"revision",
+	"decisionKind",
+	"principal",
+]);
+const CUTOVER_ROLLBACK_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"cutoverId",
+	"decision",
+	"confirmedBy",
+	"evidence",
+	"prevHash",
+	"hash",
+]);
+const CUTOVER_DIVERGENCE_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"cutoverId",
+	"recordId",
+	"source",
+	"expectedSourceHash",
+	"observedSourceHash",
+	"prevHash",
+	"hash",
+]);
+const CUTOVER_INPUT_FIELDS = Object.freeze([
+	"id",
+	"cutoverId",
+	"artifactType",
+	"scope",
+	"generation",
+	"comparisonIndex",
+	"decision",
+	"confirmedBy",
+	"rollbackEvidence",
+]);
+const CUTOVER_ROLLBACK_INPUT_FIELDS = Object.freeze([
+	"cutoverId",
+	"decision",
+	"confirmedBy",
+	"evidence",
+]);
 
 function registryPath(cwd) {
 	return statePathForCreate(cwd, "adapters", "registry.jsonl");
@@ -231,6 +312,10 @@ function comparisonPath(cwd) {
 	return statePathForCreate(cwd, "adapters", "shadow-comparisons.jsonl");
 }
 
+function cutoverPath(cwd) {
+	return statePathForCreate(cwd, "adapters", "cutovers.jsonl");
+}
+
 function adapterCorrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
 }
@@ -241,6 +326,10 @@ function receiptCorrupt(message) {
 
 function comparisonCorrupt(message) {
 	return typedError(COMPARISON_CORRUPT_CODE, message);
+}
+
+function cutoverCorrupt(message) {
+	return typedError(CUTOVER_CORRUPT_CODE, message);
 }
 
 function isPlainObject(value) {
@@ -380,6 +469,17 @@ function acquireComparisonLock(cwd) {
 	});
 }
 
+function acquireCutoverLock(cwd) {
+	return acquireLedgerLock({
+		dirPath: path.dirname(cutoverPath(cwd)),
+		lockName: "cutovers.lock",
+		conflictCode: CUTOVER_LOCK_CODE,
+		corruptCode: CUTOVER_CORRUPT_CODE,
+		label: "adapter cutover ledger",
+		staleMs: LOCK_STALE_MS,
+	});
+}
+
 function appendAdapterWithinCeiling(cwd, event) {
 	return sharedAppendWithinCeiling({
 		ledgerPath: registryPath(cwd),
@@ -407,6 +507,16 @@ function appendComparisonWithinCeiling(cwd, event) {
 		envName: "AMBER_ADAPTER_MAX_COMPARISON_BYTES",
 		defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
 		label: "adapter shadow comparison ledger",
+	});
+}
+
+function appendCutoverWithinCeiling(cwd, event) {
+	return sharedAppendWithinCeiling({
+		ledgerPath: cutoverPath(cwd),
+		event,
+		envName: "AMBER_ADAPTER_MAX_CUTOVER_BYTES",
+		defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
+		label: "adapter cutover ledger",
 	});
 }
 
@@ -793,6 +903,741 @@ function appendShadowComparison(cwd, body) {
 	} finally {
 		release();
 	}
+}
+
+function cutoverDecisionProblem(value, label) {
+	if (!isPlainObject(value)) return `${label} must be an object`;
+	const closed = closedFieldProblem(value, CUTOVER_DECISION_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(value.identity)) return `${label}.identity must be a non-empty string`;
+	if (!Number.isInteger(value.revision) || value.revision < 1)
+		return `${label}.revision must be a positive integer`;
+	if (!CUTOVER_DECISION_KINDS.includes(value.decisionKind))
+		return `${label}.decisionKind must be one of ${CUTOVER_DECISION_KINDS.join(", ")}`;
+	if (!isNonEmptyString(value.principal)) return `${label}.principal must be a non-empty string`;
+	return null;
+}
+
+// Shape-only validation for one stored event per kind (string | null),
+// mirroring receiptEventProblem/comparisonEventProblem; fold-state checks
+// (hash chain, unknown ids, terminal transitions) stay in the fold walk.
+function cutoverEventProblem(event, lineIndex) {
+	const closed = closedFieldProblem(
+		event,
+		CUTOVER_EVENT_FIELDS,
+		`adapter cutover event ${lineIndex}`,
+	);
+	if (closed !== null) return closed;
+	for (const field of [
+		"at",
+		"cutoverId",
+		"adapterId",
+		"adapterVersion",
+		"artifactType",
+		"scope",
+		"generation",
+		"sourceOwner",
+		"confirmedBy",
+		"rollbackEvidence",
+	]) {
+		if (!isNonEmptyString(event[field]))
+			return `adapter cutover event ${lineIndex}.${field} must be a non-empty string`;
+	}
+	if (!Number.isInteger(event.comparisonIndex) || event.comparisonIndex < 0)
+		return `adapter cutover event ${lineIndex}.comparisonIndex must be a non-negative integer`;
+	for (const field of ["comparisonHash", "sourceSetHash", "targetSetHash"]) {
+		const problem = hashProblem(event[field], `adapter cutover event ${lineIndex}.${field}`);
+		if (problem !== null) return problem;
+	}
+	return cutoverDecisionProblem(event.decision, `adapter cutover event ${lineIndex}.decision`);
+}
+
+function rollbackEventProblem(event, lineIndex) {
+	const closed = closedFieldProblem(
+		event,
+		CUTOVER_ROLLBACK_EVENT_FIELDS,
+		`adapter cutover event ${lineIndex}`,
+	);
+	if (closed !== null) return closed;
+	for (const field of ["at", "cutoverId", "confirmedBy", "evidence"]) {
+		if (!isNonEmptyString(event[field]))
+			return `adapter cutover event ${lineIndex}.${field} must be a non-empty string`;
+	}
+	return cutoverDecisionProblem(event.decision, `adapter cutover event ${lineIndex}.decision`);
+}
+
+function divergenceEventProblem(event, lineIndex) {
+	const closed = closedFieldProblem(
+		event,
+		CUTOVER_DIVERGENCE_EVENT_FIELDS,
+		`adapter cutover event ${lineIndex}`,
+	);
+	if (closed !== null) return closed;
+	for (const field of ["at", "cutoverId", "recordId", "source"]) {
+		if (!isNonEmptyString(event[field]))
+			return `adapter cutover event ${lineIndex}.${field} must be a non-empty string`;
+	}
+	// expectedSourceHash null = an addition (the bound evidence never
+	// covered this source); observedSourceHash null = a deletion.
+	return (
+		hashProblem(event.expectedSourceHash, `adapter cutover event ${lineIndex}.expectedSourceHash`, {
+			nullable: true,
+		}) ??
+		hashProblem(event.observedSourceHash, `adapter cutover event ${lineIndex}.observedSourceHash`, {
+			nullable: true,
+		})
+	);
+}
+
+function foldCutovers(cwd) {
+	const events = readLedgerFailClosed(
+		cutoverPath(cwd),
+		CUTOVER_CORRUPT_CODE,
+		"adapter cutover ledger",
+	);
+	let prevHash = GENESIS_HASH;
+	const byId = new Map();
+	const records = [];
+	events.forEach((event, index) => {
+		const lineIndex = index + 1;
+		if (!isPlainObject(event))
+			throw cutoverCorrupt(`adapter cutover event ${lineIndex} is not an object`);
+		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
+			throw cutoverCorrupt(`adapter cutover event ${lineIndex} breaks the hash chain`);
+		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+			throw cutoverCorrupt(
+				`adapter cutover event ${lineIndex} carries a hash that does not match its content`,
+			);
+		if (!SUPPORTED_ADAPTER_CUTOVER_SCHEMA_VERSIONS.includes(event.schemaVersion))
+			throw cutoverCorrupt(
+				`adapter cutover event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+			);
+		if (event.kind === "cutover") {
+			const problem = cutoverEventProblem(event, lineIndex);
+			if (problem !== null) throw cutoverCorrupt(problem);
+			if (byId.has(event.cutoverId))
+				throw cutoverCorrupt(
+					`cutover ${JSON.stringify(event.cutoverId)} is recorded more than once`,
+				);
+			const { prevHash: _prev, hash: _hash, ...body } = event;
+			const record = { ...body, index, divergences: [], rollback: null };
+			byId.set(event.cutoverId, record);
+			records.push(record);
+		} else if (event.kind === "rollback") {
+			const problem = rollbackEventProblem(event, lineIndex);
+			if (problem !== null) throw cutoverCorrupt(problem);
+			const record = byId.get(event.cutoverId);
+			if (!record)
+				throw cutoverCorrupt(
+					`adapter cutover event ${lineIndex} rolls back unknown cutover ${JSON.stringify(event.cutoverId)}`,
+				);
+			if (record.rollback !== null)
+				throw cutoverCorrupt(
+					`adapter cutover event ${lineIndex} rolls back ${JSON.stringify(event.cutoverId)} twice`,
+				);
+			record.rollback = {
+				at: event.at,
+				decision: event.decision,
+				confirmedBy: event.confirmedBy,
+				evidence: event.evidence,
+			};
+		} else if (event.kind === "divergence") {
+			const problem = divergenceEventProblem(event, lineIndex);
+			if (problem !== null) throw cutoverCorrupt(problem);
+			const record = byId.get(event.cutoverId);
+			if (!record)
+				throw cutoverCorrupt(
+					`adapter cutover event ${lineIndex} records divergence for unknown cutover ${JSON.stringify(event.cutoverId)}`,
+				);
+			if (record.rollback !== null)
+				throw cutoverCorrupt(
+					`adapter cutover event ${lineIndex} records divergence after ${JSON.stringify(event.cutoverId)} was rolled back`,
+				);
+			record.divergences.push({
+				at: event.at,
+				recordId: event.recordId,
+				source: event.source,
+				expectedSourceHash: event.expectedSourceHash,
+				observedSourceHash: event.observedSourceHash,
+			});
+		} else {
+			throw cutoverCorrupt(
+				`adapter cutover event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+			);
+		}
+		prevHash = event.hash;
+	});
+	return records.map((record) => ({
+		...record,
+		status:
+			record.rollback !== null ? "rolled-back" : record.divergences.length > 0 ? "degraded" : "cut",
+	}));
+}
+
+function cutoverAppendFailure(err) {
+	return {
+		ok: false,
+		code: err.amberCode || CUTOVER_CORRUPT_CODE,
+		record: null,
+		errors: [err.message || String(err)],
+	};
+}
+
+function appendCutoverEvent(cwd, body, guard = null) {
+	let release;
+	try {
+		release = acquireCutoverLock(cwd);
+	} catch (err) {
+		return cutoverAppendFailure(err);
+	}
+	try {
+		let records;
+		try {
+			records = foldCutovers(cwd);
+		} catch (err) {
+			return cutoverAppendFailure(err);
+		}
+		// Guard contract: any non-null guard result is returned verbatim
+		// without appending — a refusal ({ok:false,...}) or a success
+		// sentinel (e.g. the divergence dedupe skips).
+		const guardVerdict = guard ? guard(records) : null;
+		if (guardVerdict !== null) return guardVerdict;
+		let prevHash;
+		try {
+			prevHash = chainHeadHash(cutoverPath(cwd), CUTOVER_CORRUPT_CODE, "adapter cutover ledger");
+		} catch (err) {
+			return cutoverAppendFailure(err);
+		}
+		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
+		let ceiling;
+		try {
+			ceiling = appendCutoverWithinCeiling(cwd, event);
+		} catch (err) {
+			return cutoverAppendFailure(err);
+		}
+		if (ceiling.wouldExceed)
+			return {
+				ok: false,
+				code: CUTOVER_SIZE_CEILING_CODE,
+				record: null,
+				errors: [`adapter cutover event would exceed ${ceiling.ceiling} bytes`],
+			};
+		try {
+			appendJSONL(cutoverPath(cwd), event);
+		} catch (err) {
+			return cutoverAppendFailure(err);
+		}
+		let record;
+		try {
+			record = foldCutovers(cwd).find((entry) => entry.cutoverId === body.cutoverId) ?? null;
+		} catch (err) {
+			return cutoverAppendFailure(err);
+		}
+		return { ok: true, code: null, record, errors: [] };
+	} finally {
+		release();
+	}
+}
+
+function cutoverDecisionInputProblem(decision) {
+	if (!isPlainObject(decision)) return `decision must be an object carrying identity and revision`;
+	const unknown = unknownFieldProblem(decision, ["identity", "revision"], "decision");
+	if (unknown !== null) return unknown;
+	if (!isNonEmptyString(decision.identity)) return `decision.identity must be a non-empty string`;
+	if (!Number.isInteger(decision.revision) || decision.revision < 1)
+		return `decision.revision must be a positive integer`;
+	return null;
+}
+
+function resolveCommittedDecision(cwd, decision, expectedScope) {
+	let revisions;
+	try {
+		revisions = listArtifactRevisions(cwd);
+	} catch (err) {
+		return {
+			ok: false,
+			code: err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT",
+			errors: [err.message || String(err)],
+		};
+	}
+	const match = revisions.find(
+		(revision) =>
+			revision.type === "decision" &&
+			revision.identity === decision.identity &&
+			revision.revision === decision.revision,
+	);
+	if (!match)
+		return {
+			ok: false,
+			code: CUTOVER_INVALID_CODE,
+			errors: [
+				`decision ${JSON.stringify(decision.identity)}@${decision.revision} is not a committed Decision artifact`,
+			],
+		};
+	if ((match.scope ?? null) !== expectedScope)
+		return {
+			ok: false,
+			code: CUTOVER_INVALID_CODE,
+			errors: [
+				`decision ${JSON.stringify(decision.identity)}@${decision.revision} is scoped to ${JSON.stringify(match.scope ?? null)}, not this cutover's scope ${JSON.stringify(expectedScope)}; authority does not transfer across scope boundaries`,
+			],
+		};
+	if (!CUTOVER_DECISION_KINDS.includes(match.decisionKind))
+		return {
+			ok: false,
+			code: CUTOVER_INVALID_CODE,
+			errors: [
+				`cutover authority requires a human acceptance or approval Decision; ${JSON.stringify(decision.identity)}@${decision.revision} carries decisionKind ${JSON.stringify(match.decisionKind)}`,
+			],
+		};
+	const principal = match.principal?.id;
+	if (!isNonEmptyString(principal))
+		return {
+			ok: false,
+			code: CUTOVER_INVALID_CODE,
+			errors: [
+				`decision ${JSON.stringify(decision.identity)}@${decision.revision} carries no verified principal snapshot`,
+			],
+		};
+	return {
+		ok: true,
+		decision: {
+			identity: decision.identity,
+			revision: decision.revision,
+			decisionKind: match.decisionKind,
+			principal,
+		},
+	};
+}
+
+// Independent owner confirmation (T4): the confirming party must BE the
+// registered source owner, must be independent of the deciding principal,
+// and must resolve as an ACTIVE registered HUMAN Principal — an unverified
+// free string proves nothing about who actually confirmed.
+function confirmedOwnerProblem(cwd, adapter, confirmedBy, decisionPrincipal, opts = {}) {
+	if (confirmedBy !== adapter.owner)
+		return {
+			code: CUTOVER_OWNER_SEPARATION_CODE,
+			message: `independent confirmation must come from the source owner ${JSON.stringify(adapter.owner)}; got ${JSON.stringify(confirmedBy)}`,
+		};
+	if (confirmedBy === decisionPrincipal)
+		return {
+			code: CUTOVER_OWNER_SEPARATION_CODE,
+			message: `the confirming source owner must be independent of the deciding principal ${JSON.stringify(decisionPrincipal)}; one side cannot seize authority alone`,
+		};
+	let resolved;
+	try {
+		resolved = resolveActivePrincipal(cwd, confirmedBy, {
+			now: opts.now instanceof Date ? opts.now : new Date(),
+		});
+	} catch (err) {
+		return { code: err.amberCode || CUTOVER_INVALID_CODE, message: err.message || String(err) };
+	}
+	if (!resolved.ok) return { code: CUTOVER_INVALID_CODE, message: resolved.message };
+	if (resolved.principal.principalKind !== "human")
+		return {
+			code: CUTOVER_INVALID_CODE,
+			message: `owner confirmation is a human-only slot; principal ${JSON.stringify(confirmedBy)} is registered as ${JSON.stringify(resolved.principal.principalKind)}`,
+		};
+	return null;
+}
+
+// Evidence references must resolve against the F050 Evidence ledger — an
+// unresolvable free string proves nothing about rollback preparedness.
+function evidenceReferenceProblem(cwd, reference, label) {
+	let receipt;
+	try {
+		receipt = showEvidence(cwd, reference);
+	} catch (err) {
+		return { code: err.amberCode || CUTOVER_INVALID_CODE, message: err.message || String(err) };
+	}
+	if (receipt === null)
+		return {
+			code: CUTOVER_INVALID_CODE,
+			message: `${label} ${JSON.stringify(reference)} names no recorded Evidence receipt; record it first (amber evidence record)`,
+		};
+	return null;
+}
+
+function decisionSpentBy(records, decision) {
+	for (const record of records) {
+		if (
+			record.decision.identity === decision.identity &&
+			record.decision.revision === decision.revision
+		)
+			return record.cutoverId;
+		if (
+			record.rollback !== null &&
+			record.rollback.decision.identity === decision.identity &&
+			record.rollback.decision.revision === decision.revision
+		)
+			return record.cutoverId;
+	}
+	return null;
+}
+
+function recordCutover(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input)) return fail(CUTOVER_INVALID_CODE, ["cutover input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, CUTOVER_INPUT_FIELDS, "cutover input");
+	if (inputClosed !== null) return fail(CUTOVER_INVALID_CODE, [inputClosed]);
+	if (!isNonEmptyString(input.id))
+		return fail(INVALID_ARG_CODE, [`id must be a non-empty adapter id`]);
+	for (const field of [
+		"cutoverId",
+		"artifactType",
+		"generation",
+		"confirmedBy",
+		"rollbackEvidence",
+	]) {
+		if (!isNonEmptyString(input[field]))
+			return fail(CUTOVER_INVALID_CODE, [`${field} must be a non-empty string`]);
+	}
+	if (!ARTIFACT_TYPES.includes(input.artifactType))
+		return fail(CUTOVER_INVALID_CODE, [
+			`artifactType ${JSON.stringify(input.artifactType)} is not a registered canonical type (${ARTIFACT_TYPES.join(", ")})`,
+		]);
+	if (!Number.isInteger(input.comparisonIndex) || input.comparisonIndex < 0)
+		return fail(CUTOVER_INVALID_CODE, ["comparisonIndex must be a non-negative integer"]);
+	const decisionProblem = cutoverDecisionInputProblem(input.decision);
+	if (decisionProblem !== null) return fail(CUTOVER_INVALID_CODE, [decisionProblem]);
+	let adapter;
+	try {
+		adapter = showAdapter(cwd, input.id);
+	} catch (err) {
+		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (adapter === null)
+		return fail(NOT_FOUND_CODE, [`adapter ${JSON.stringify(input.id)} is not registered`]);
+	if (input.scope !== undefined && input.scope !== null && !isNonEmptyString(input.scope))
+		return fail(CUTOVER_INVALID_CODE, ["scope must be null or a non-empty string"]);
+	const scope = input.scope ?? adapter.scope;
+	if (scope !== adapter.scope)
+		return fail(READ_FORBIDDEN_CODE, [
+			`adapter ${JSON.stringify(input.id)} is scoped to ${JSON.stringify(adapter.scope)}, not ${JSON.stringify(scope)}`,
+		]);
+	let comparisons;
+	try {
+		comparisons = foldShadowComparisons(cwd);
+	} catch (err) {
+		return fail(err.amberCode || COMPARISON_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	const comparison = comparisons[input.comparisonIndex];
+	if (!comparison)
+		return fail(CUTOVER_INVALID_CODE, [
+			`comparisonIndex ${input.comparisonIndex} names no recorded shadow comparison`,
+		]);
+	if (comparison.adapterId !== input.id || comparison.scope !== scope)
+		return fail(CUTOVER_INVALID_CODE, [
+			`comparison ${input.comparisonIndex} belongs to ${JSON.stringify(comparison.adapterId)} scope ${JSON.stringify(comparison.scope)}, not this cutover`,
+		]);
+	const unresolved = ["stale", "conflict", "unavailable"].filter(
+		(state) => comparison.coverage[state] > 0,
+	);
+	if (unresolved.length > 0)
+		return fail(CUTOVER_INVALID_CODE, [
+			`comparison ${input.comparisonIndex} still carries unresolved ${unresolved.join(", ")} coverage; cutover requires resolved shadow evidence`,
+		]);
+	const typeCovered = comparison.items.some(
+		(item) => item.status === "mapped" && item.target?.type === input.artifactType,
+	);
+	if (!typeCovered)
+		return fail(CUTOVER_INVALID_CODE, [
+			`comparison ${input.comparisonIndex} maps no ${input.artifactType} targets; a cutover's artifactType claim must rest on matching shadow evidence`,
+		]);
+	const resolved = resolveCommittedDecision(cwd, input.decision, scope);
+	if (!resolved.ok) return fail(resolved.code, resolved.errors);
+	const confirmation = confirmedOwnerProblem(
+		cwd,
+		adapter,
+		input.confirmedBy,
+		resolved.decision.principal,
+		opts,
+	);
+	if (confirmation !== null) return fail(confirmation.code, [confirmation.message]);
+	const evidenceProblem = evidenceReferenceProblem(cwd, input.rollbackEvidence, "rollbackEvidence");
+	if (evidenceProblem !== null) return fail(evidenceProblem.code, [evidenceProblem.message]);
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	return appendCutoverEvent(
+		cwd,
+		{
+			kind: "cutover",
+			schemaVersion: ADAPTER_CUTOVER_SCHEMA_VERSION,
+			at,
+			cutoverId: input.cutoverId,
+			adapterId: adapter.id,
+			adapterVersion: adapter.adapterVersion,
+			artifactType: input.artifactType,
+			scope,
+			generation: input.generation,
+			sourceOwner: adapter.owner,
+			comparisonIndex: input.comparisonIndex,
+			comparisonHash: comparison.comparisonHash,
+			sourceSetHash: comparison.sourceSetHash,
+			targetSetHash: comparison.targetSetHash,
+			decision: resolved.decision,
+			confirmedBy: input.confirmedBy,
+			rollbackEvidence: input.rollbackEvidence,
+		},
+		(records) => {
+			if (records.some((record) => record.cutoverId === input.cutoverId))
+				return fail(CUTOVER_INVALID_CODE, [
+					`cutoverId ${JSON.stringify(input.cutoverId)} is already recorded`,
+				]);
+			const spentBy = decisionSpentBy(records, input.decision);
+			if (spentBy !== null)
+				return fail(CUTOVER_INVALID_CODE, [
+					`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized cutover ${JSON.stringify(spentBy)}; a cutover Decision is single-use`,
+				]);
+			const active = records.find(
+				(record) =>
+					record.status !== "rolled-back" &&
+					record.adapterId === adapter.id &&
+					record.artifactType === input.artifactType &&
+					record.scope === scope &&
+					record.generation === input.generation,
+			);
+			if (active)
+				return fail(CUTOVER_EXISTS_CODE, [
+					`cutover ${JSON.stringify(active.cutoverId)} already covers ${adapter.id}/${input.artifactType}/${scope}/${input.generation}; roll it back before recording a new one`,
+				]);
+			return null;
+		},
+	);
+}
+
+// Rollback refusals shared by the pre-lock fast path and the under-lock
+// guard: the cutover must exist, must not already be rolled back (history
+// is immutable), and the rollback Decision must be unspent (single-use).
+// Returns the located cutover alongside the verdict so callers need not
+// repeat the lookup.
+function rollbackRefusal(records, input) {
+	const cutover = records.find((record) => record.cutoverId === input.cutoverId) ?? null;
+	if (cutover === null)
+		return {
+			cutover,
+			problem: {
+				code: CUTOVER_NOT_FOUND_CODE,
+				errors: [`cutover ${JSON.stringify(input.cutoverId)} is not recorded`],
+			},
+		};
+	if (cutover.status === "rolled-back")
+		return {
+			cutover,
+			problem: {
+				code: CUTOVER_ROLLED_BACK_CODE,
+				errors: [
+					`cutover ${JSON.stringify(input.cutoverId)} is already rolled back; rollback never rewrites history`,
+				],
+			},
+		};
+	const spentBy = decisionSpentBy(records, input.decision);
+	if (spentBy !== null)
+		return {
+			cutover,
+			problem: {
+				code: CUTOVER_INVALID_CODE,
+				errors: [
+					`rollback is a new governed Decision; ${JSON.stringify(input.decision.identity)}@${input.decision.revision} is already spent on cutover ${JSON.stringify(spentBy)}`,
+				],
+			},
+		};
+	return { cutover, problem: null };
+}
+
+function recordCutoverRollback(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(CUTOVER_INVALID_CODE, ["rollback input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, CUTOVER_ROLLBACK_INPUT_FIELDS, "rollback input");
+	if (inputClosed !== null) return fail(CUTOVER_INVALID_CODE, [inputClosed]);
+	for (const field of ["cutoverId", "confirmedBy", "evidence"]) {
+		if (!isNonEmptyString(input[field]))
+			return fail(CUTOVER_INVALID_CODE, [`${field} must be a non-empty string`]);
+	}
+	const decisionProblem = cutoverDecisionInputProblem(input.decision);
+	if (decisionProblem !== null) return fail(CUTOVER_INVALID_CODE, [decisionProblem]);
+	let records;
+	try {
+		records = foldCutovers(cwd);
+	} catch (err) {
+		return fail(err.amberCode || CUTOVER_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	const { cutover, problem } = rollbackRefusal(records, input);
+	if (problem !== null) return fail(problem.code, problem.errors);
+	const resolved = resolveCommittedDecision(cwd, input.decision, cutover.scope);
+	if (!resolved.ok) return fail(resolved.code, resolved.errors);
+	let adapter;
+	try {
+		adapter = showAdapter(cwd, cutover.adapterId);
+	} catch (err) {
+		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (adapter === null)
+		return fail(NOT_FOUND_CODE, [`adapter ${JSON.stringify(cutover.adapterId)} is not registered`]);
+	const confirmation = confirmedOwnerProblem(
+		cwd,
+		adapter,
+		input.confirmedBy,
+		resolved.decision.principal,
+		opts,
+	);
+	if (confirmation !== null) return fail(confirmation.code, [confirmation.message]);
+	const evidenceProblem = evidenceReferenceProblem(cwd, input.evidence, "evidence");
+	if (evidenceProblem !== null) return fail(evidenceProblem.code, [evidenceProblem.message]);
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	return appendCutoverEvent(
+		cwd,
+		{
+			kind: "rollback",
+			schemaVersion: ADAPTER_CUTOVER_SCHEMA_VERSION,
+			at,
+			cutoverId: input.cutoverId,
+			decision: resolved.decision,
+			confirmedBy: input.confirmedBy,
+			evidence: input.evidence,
+		},
+		(current) => {
+			const locked = rollbackRefusal(current, input);
+			return locked.problem === null ? null : fail(locked.problem.code, locked.problem.errors);
+		},
+	);
+}
+
+function listCutovers(cwd, { adapterId = null, scope = null } = {}) {
+	return foldCutovers(cwd).filter(
+		(record) =>
+			(adapterId === null || record.adapterId === adapterId) &&
+			(scope === null || record.scope === scope),
+	);
+}
+
+// The Finding identity used for dedupe — shared by the pre-lock check and
+// the under-lock guard so the two cannot drift.
+function sameFinding(entry, finding) {
+	return (
+		entry.recordId === finding.recordId &&
+		entry.source === finding.source &&
+		entry.observedSourceHash === finding.observedSourceHash
+	);
+}
+
+// Append one divergence Finding (pre-lock deduped, re-checked under lock).
+// A "rolled-back" skip means the cutover lost authority between the fold
+// and the locked append, so the Finding does not apply to it; a
+// "duplicate" skip means a concurrent reader already recorded the same
+// Finding — the divergence is still real.
+function appendDivergenceFinding(cwd, cutover, finding, opts) {
+	if (cutover.divergences.some((entry) => sameFinding(entry, finding)))
+		return { ok: true, code: null, skipped: "duplicate", errors: [] };
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	return appendCutoverEvent(
+		cwd,
+		{
+			kind: "divergence",
+			schemaVersion: ADAPTER_CUTOVER_SCHEMA_VERSION,
+			at,
+			...finding,
+		},
+		(current) => {
+			const target = current.find((record) => record.cutoverId === cutover.cutoverId);
+			if (!target || target.status === "rolled-back")
+				return { ok: true, code: null, skipped: "rolled-back", errors: [] };
+			if (target.divergences.some((entry) => sameFinding(entry, finding)))
+				return { ok: true, code: null, skipped: "duplicate", errors: [] };
+			return null;
+		},
+	);
+}
+
+function detectCutoverDivergence(cwd, receipt, opts = {}) {
+	if (!fs.existsSync(cutoverPath(cwd))) return null;
+	let active;
+	try {
+		active = foldCutovers(cwd).filter(
+			(record) =>
+				record.status !== "rolled-back" &&
+				record.adapterId === receipt.adapterId &&
+				record.scope === receipt.scope,
+		);
+	} catch (err) {
+		return {
+			ok: false,
+			code: err.amberCode || CUTOVER_CORRUPT_CODE,
+			errors: [err.message || String(err)],
+		};
+	}
+	if (active.length === 0) return null;
+	let comparisons;
+	try {
+		comparisons = foldShadowComparisons(cwd);
+	} catch (err) {
+		return {
+			ok: false,
+			code: err.amberCode || COMPARISON_CORRUPT_CODE,
+			errors: [err.message || String(err)],
+		};
+	}
+	const receiptSource = relativePathForAllowedCheck(receipt.source);
+	let reported = null;
+	let covered = false;
+	let uncovered = null;
+	for (const cutover of active) {
+		const comparison = comparisons[cutover.comparisonIndex];
+		if (!comparison || comparison.comparisonHash !== cutover.comparisonHash)
+			return {
+				ok: false,
+				code: CUTOVER_CORRUPT_CODE,
+				errors: [
+					`cutover ${JSON.stringify(cutover.cutoverId)} binds comparison ${cutover.comparisonIndex}, which no longer matches its recorded comparisonHash`,
+				],
+			};
+		// The item match keys on the source path alone: recordId is
+		// caller-chosen on every read, so matching on it would let a fresh
+		// --record-id read the same diverged file as a clean read. The
+		// Finding binds the shadow-evidence item's recordId — the identity
+		// the cutover evidence actually covers.
+		const item = comparison.items.find(
+			(entry) =>
+				relativePathForAllowedCheck(entry.source) === receiptSource && entry.sourceHash !== null,
+		);
+		if (!item) {
+			if (uncovered === null) uncovered = cutover;
+			continue;
+		}
+		covered = true;
+		if (receipt.sourceHash === item.sourceHash) continue;
+		const finding = {
+			cutoverId: cutover.cutoverId,
+			recordId: item.recordId,
+			source: item.source,
+			expectedSourceHash: item.sourceHash,
+			observedSourceHash: receipt.sourceHash,
+		};
+		const appended = appendDivergenceFinding(cwd, cutover, finding, opts);
+		if (!appended.ok) return { ok: false, code: appended.code, errors: appended.errors };
+		if (appended.skipped === "rolled-back") continue;
+		// Every active cutover contradicted by the drifted source records
+		// its own Finding; the first one is the reported verdict.
+		if (reported === null) reported = finding;
+	}
+	if (reported !== null) return { ok: true, finding: reported };
+	// A readable source that NO active cutover's shadow evidence covers is
+	// an addition to a cut-over scope: the legacy source is historical
+	// only, so new records there are Findings, never consumable data.
+	if (!covered && uncovered !== null && receipt.sourceHash !== null) {
+		const finding = {
+			cutoverId: uncovered.cutoverId,
+			recordId: receipt.recordId,
+			source: receiptSource,
+			expectedSourceHash: null,
+			observedSourceHash: receipt.sourceHash,
+		};
+		const appended = appendDivergenceFinding(cwd, uncovered, finding, opts);
+		if (!appended.ok) return { ok: false, code: appended.code, errors: appended.errors };
+		if (appended.skipped !== "rolled-back") return { ok: true, finding };
+	}
+	return null;
 }
 
 function registerAdapter(cwd, input = {}, opts = {}) {
@@ -1529,8 +2374,36 @@ function finishRead(cwd, prepared) {
 	};
 }
 
+// Post-cutover divergence hook for the read and migration-candidate
+// surfaces: once ownership transferred, a changed legacy source is a
+// recorded governance Finding, never silently consumable data. Shadow
+// comparisons also produce receipts but deliberately stay unguarded —
+// they are how divergence evidence is gathered for rollback/renewal.
+function withDivergenceCheck(cwd, read, opts) {
+	if (read.receipt === null) return read;
+	const divergence = detectCutoverDivergence(cwd, read.receipt, opts);
+	if (divergence === null) return read;
+	if (!divergence.ok)
+		return {
+			...read,
+			ok: false,
+			code: divergence.code,
+			errors: [...read.errors, ...divergence.errors],
+		};
+	return {
+		...read,
+		ok: false,
+		code: CUTOVER_DIVERGED_CODE,
+		divergence: divergence.finding,
+		errors: [
+			...read.errors,
+			`post-cutover source divergence for ${JSON.stringify(read.receipt.recordId)} under cutover ${JSON.stringify(divergence.finding.cutoverId)}: the legacy source is historical/diagnostic only and never restores authority`,
+		],
+	};
+}
+
 function readAdapterRecord(cwd, input = {}, opts = {}) {
-	return finishRead(cwd, prepareAdapterRead(cwd, input, opts));
+	return withDivergenceCheck(cwd, finishRead(cwd, prepareAdapterRead(cwd, input, opts)), opts);
 }
 
 function candidateAdmissionPayload(candidate, receipt) {
@@ -1564,6 +2437,7 @@ function candidateAdmissionPayload(candidate, receipt) {
 
 function prepareMigrationCandidate(cwd, input = {}, opts = {}) {
 	const prepared = prepareAdapterRead(cwd, input, opts);
+	const guardedRead = (state) => withDivergenceCheck(cwd, finishRead(cwd, state), opts);
 	if (prepared.receiptBody === null) {
 		return {
 			ok: false,
@@ -1576,7 +2450,7 @@ function prepareMigrationCandidate(cwd, input = {}, opts = {}) {
 		};
 	}
 	if (!prepared.ok) {
-		const read = finishRead(cwd, prepared);
+		const read = guardedRead(prepared);
 		return { ...read, state: prepared.state, candidate: null };
 	}
 	const parsed = migrationCandidateFromSource(
@@ -1585,7 +2459,7 @@ function prepareMigrationCandidate(cwd, input = {}, opts = {}) {
 		prepared.receiptBody.scope,
 	);
 	if (!parsed.ok) {
-		const read = finishRead(cwd, {
+		const read = guardedRead({
 			...prepared,
 			ok: false,
 			code: parsed.code,
@@ -1599,7 +2473,7 @@ function prepareMigrationCandidate(cwd, input = {}, opts = {}) {
 		});
 		return { ...read, state: parsed.status, candidate: null };
 	}
-	const read = finishRead(cwd, prepared);
+	const read = guardedRead(prepared);
 	if (!read.ok) return { ...read, state: prepared.state, candidate: null };
 	return {
 		ok: true,
@@ -1669,7 +2543,7 @@ function targetReceiptFromArtifact(artifact) {
 		envelopeHash: artifact.envelopeHash,
 		scope: artifact.scope ?? null,
 		traces: artifact.traces || [],
-		extensions: artifact.extensions ?? null,
+		extensions: artifact.envelope?.extensions ?? null,
 		transition: artifact.transition ?? null,
 		supersedes: artifact.supersedes ?? null,
 	};
@@ -2007,8 +2881,12 @@ module.exports = {
 	prepareMigrationCandidate,
 	compareAdapterShadow,
 	listShadowComparisons,
+	recordCutover,
+	recordCutoverRollback,
+	listCutovers,
 	listReadReceipts,
 	registryPath,
 	receiptPath,
 	comparisonPath,
+	cutoverPath,
 };

@@ -938,7 +938,7 @@ node scripts/amber.js projection invalidate --subject spec/spec/login-spec@2 \
 node scripts/amber.js projection status --type governance-graph --target . --json
 ```
 
-### adapter register / read / candidate / compare / comparisons / show / list / receipts
+### adapter register / read / candidate / compare / comparisons / cutover / rollback / cutovers / show / list / receipts
 
 Read-only Adapters (F051) let Amber inspect legacy or external records before Cutover without
 mutating either the source or Canonical Artifacts. An Adapter registration declares source owner,
@@ -971,6 +971,24 @@ target set hashes, coverage counts (`mapped|unmapped|stale|conflict|unavailable`
 source/target hashes, and a deterministic `comparisonHash`. `adapter comparisons` lists the immutable
 receipts.
 
+`adapter cutover` records the explicit Cutover Decision that transfers canonical ownership for one
+adapter, artifact type, scope, and generation. It binds a resolved shadow comparison (no stale,
+conflict, or unavailable coverage, and mapping at least one target of the claimed artifact type), a
+committed human `acceptance`/`approval` Decision artifact
+(`--decision-identity` + `--revision`, scoped to the cutover's scope), independent source-owner
+confirmation (`--confirmed-by` must be the adapter's declared owner, must resolve as an active
+registered human Principal, and must differ from the deciding principal), and named rollback
+evidence (`--rollback-evidence` and rollback `--evidence` must name recorded F050 Evidence
+receipts). One active cutover per adapter/type/scope/generation; the hash-chained ledger under
+`.amber/adapters/cutovers.jsonl` is append-only. After cutover, an `adapter read` or `adapter
+candidate` that observes source bytes diverging from the bound comparison hash — or a readable
+legacy source the bound evidence never covered — appends an immutable divergence Finding, returns
+`AMBER_E_ADAPTER_CUTOVER_DIVERGED`, and degrades every contradicted cutover (`cut → degraded`) —
+divergence never restores legacy authority or auto-syncs canonical state.
+`adapter rollback` is a new governed Decision (it cannot reuse the cutover's Decision) with its own
+confirmation and evidence; history stays immutable and `adapter cutovers` lists every record with
+derived status (`cut|degraded|rolled-back`).
+
 ```bash
 node scripts/amber.js adapter register --target . --id adapter/legacy \
   --adapter-owner legacy-team --record-type legacy-ticket --record-version v1 \
@@ -984,6 +1002,14 @@ node scripts/amber.js adapter candidate --target . --id adapter/legacy \
 node scripts/amber.js adapter compare --target . --id adapter/legacy \
   --fixture fixtures/adapter-shadow.json --json
 node scripts/amber.js adapter comparisons --target . --id adapter/legacy --json
+node scripts/amber.js adapter cutover --target . --id adapter/legacy \
+  --cutover-id cutover/legacy-gen-1 --artifact-type intent --generation gen-1 \
+  --comparison-index 0 --decision-identity decision/cutover-legacy --revision 1 \
+  --confirmed-by legacy-team --rollback-evidence evidence/rollback-plan --json
+node scripts/amber.js adapter rollback --target . --cutover-id cutover/legacy-gen-1 \
+  --decision-identity decision/rollback-legacy --revision 1 \
+  --confirmed-by legacy-team --evidence evidence/rollback-run --json
+node scripts/amber.js adapter cutovers --target . --id adapter/legacy --json
 node scripts/amber.js adapter show --target . --id adapter/legacy --json
 node scripts/amber.js adapter list --target . --json
 node scripts/amber.js adapter receipts --target . --id adapter/legacy --json
@@ -996,7 +1022,12 @@ Error codes: `AMBER_E_ADAPTER_INVALID`, `AMBER_E_ADAPTER_NOT_FOUND`,
 `AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT`, `AMBER_E_ADAPTER_READ_RECEIPT_LOCK`,
 `AMBER_E_ADAPTER_READ_RECEIPT_SIZE_CEILING`, `AMBER_E_ADAPTER_COMPARISON_INVALID`,
 `AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING`, `AMBER_E_ADAPTER_COMPARISON_CORRUPT`,
-`AMBER_E_ADAPTER_COMPARISON_LOCK`, `AMBER_E_ADAPTER_COMPARISON_SIZE_CEILING`.
+`AMBER_E_ADAPTER_COMPARISON_LOCK`, `AMBER_E_ADAPTER_COMPARISON_SIZE_CEILING`,
+`AMBER_E_ADAPTER_CUTOVER_INVALID`, `AMBER_E_ADAPTER_CUTOVER_EXISTS`,
+`AMBER_E_ADAPTER_CUTOVER_NOT_FOUND`, `AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION`,
+`AMBER_E_ADAPTER_CUTOVER_DIVERGED`, `AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK`,
+`AMBER_E_ADAPTER_CUTOVER_CORRUPT`, `AMBER_E_ADAPTER_CUTOVER_LOCK`,
+`AMBER_E_ADAPTER_CUTOVER_SIZE_CEILING`.
 
 ## Handoff Commands
 
