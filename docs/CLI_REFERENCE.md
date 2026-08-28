@@ -1158,7 +1158,7 @@ Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_
 `AMBER_E_RUNNER_EXECUTION_CORRUPT`, `AMBER_E_RUNNER_EXECUTION_LOCK`,
 `AMBER_E_RUNNER_EXECUTION_SIZE_CEILING`.
 
-### release prepare / authorize / deploy / rollback / transactions / show / list
+### release prepare / authorize / deploy / rollback / transactions / status / receipts / show / list
 
 Prepare governed release candidates (F053 T1). A candidate immutably binds one exact Change — a
 40-hex commit sha plus committed Canonical Artifact revisions — together with recorded F050
@@ -1226,7 +1226,20 @@ node scripts/amber.js release deploy --target . --id release/web-42 \
 node scripts/amber.js release rollback --target . --id release/web-42 \
   --request-hash sha256:<64-hex-chars> --json
 node scripts/amber.js release transactions --target . --id release/web-42 --json
+node scripts/amber.js release status --target . --id release/web-42 --json
+node scripts/amber.js release receipts --target . --id release/web-42 --json
 ```
+
+`release status` derives one lifecycle state per release across every ledger
+(`prepared|authorized|deploying|deployed|aborted|rolled-back`) — a rollback counts only once its
+own execution committed, and any settled-but-uncommitted execution reads as aborted. `release receipts` assembles
+the verifiable audit projection read-only: exact inputs (releaseHash, commit, policy and
+capability pins, environment), the authorization bindings, and per-operation the real executor
+identity, timestamps, settlement outcome, output digest, assurance fields, and the credential
+BOUNDARY (purpose/scope/expiry — deliberately never the handle, so no receipt field can carry or
+leak a credential value); any missing or tampered link fails closed through its ledger's typed
+code. The MCP capability registry carries no release verb, so deploy and rollback can only ever be
+approval-required submissions (F053 T4).
 
 Error codes: `AMBER_E_RELEASE_INVALID`, `AMBER_E_RELEASE_EXISTS`, `AMBER_E_RELEASE_NOT_FOUND`,
 `AMBER_E_RELEASE_CORRUPT`, `AMBER_E_RELEASE_LOCK`, `AMBER_E_RELEASE_SIZE_CEILING`,

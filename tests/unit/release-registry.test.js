@@ -38,6 +38,9 @@ const {
 	deployRelease,
 	rollbackRelease,
 	listReleaseTransactions,
+	RELEASE_STATUSES,
+	releaseStatus,
+	releaseReceipt,
 } = require("../../scripts/lib/core/release-registry");
 const { grantApproval } = require("../../scripts/lib/core/approval-registry");
 const { evaluateGate } = require("../../scripts/lib/core/gate-evaluation");
@@ -890,4 +893,140 @@ test("tampered transaction ledger fails every read closed", () => {
 		() => listReleaseTransactions(dir),
 		(err) => err.amberCode === "AMBER_E_RELEASE_TX_CORRUPT",
 	);
+});
+
+// ── F053 T4 (#277): release receipts, status & audit projection ──
+
+function settleReceiptFor(dir, requestHash, overrides = {}) {
+	assert.equal(
+		prepareRunnerExecution(dir, {
+			requestHash,
+			runner: { id: "runner/ci", version: "1.0.0", integrityDigest: DIGEST },
+		}).ok,
+		true,
+	);
+	return settleRunnerExecution(dir, {
+		requestHash,
+		receipt: {
+			runner: { id: "runner/ci", version: "1.0.0", integrityDigest: DIGEST },
+			exitCode: 0,
+			signal: null,
+			timedOut: false,
+			startedAt: "2026-08-29T01:00:00.000Z",
+			finishedAt: "2026-08-29T01:02:00.000Z",
+			durationMs: 120_000,
+			outputsDigest: DIGEST,
+			scope: { repository: "repo/main", paths: ["deploy/staging/web"] },
+			sandboxAssurance: "observed",
+			credentialAssurance: "observed",
+			...overrides,
+		},
+	});
+}
+
+test("release status derives one lifecycle state across every ledger", () => {
+	assert.deepEqual(RELEASE_STATUSES, [
+		"prepared",
+		"authorized",
+		"deploying",
+		"deployed",
+		"aborted",
+		"rolled-back",
+	]);
+	const dir = mkTarget("status");
+	assert.equal(releaseStatus(dir, "release/ghost"), null);
+	const candidate = stagingFixture(dir);
+	assert.equal(releaseStatus(dir, "release/web-42"), "prepared");
+	approvalFixture(dir, "approval/rel-1", `release:staging:${candidate.releaseHash}`);
+	assert.equal(authorizeRelease(dir, stagingAuthorizeInput(), { now: NOW }).ok, true);
+	assert.equal(releaseStatus(dir, "release/web-42"), "authorized");
+	const deployHash = authorizedRequestFixture(dir, "a");
+	assert.equal(
+		deployRelease(dir, { releaseId: "release/web-42", requestHash: deployHash }).ok,
+		true,
+	);
+	assert.equal(releaseStatus(dir, "release/web-42"), "deploying");
+	assert.equal(settleReceiptFor(dir, deployHash).ok, true);
+	assert.equal(releaseStatus(dir, "release/web-42"), "deployed");
+	const rollbackHash = authorizedRequestFixture(dir, "b");
+	assert.equal(
+		rollbackRelease(dir, { releaseId: "release/web-42", requestHash: rollbackHash }).ok,
+		true,
+	);
+	assert.equal(releaseStatus(dir, "release/web-42"), "deployed");
+	assert.equal(settleReceiptFor(dir, rollbackHash).ok, true);
+	assert.equal(releaseStatus(dir, "release/web-42"), "rolled-back");
+});
+
+test("a failed deployment reads as aborted, never as success", () => {
+	const dir = mkTarget("status-aborted");
+	const { requestHash } = transactionFixture(dir);
+	assert.equal(deployRelease(dir, { releaseId: "release/web-42", requestHash }).ok, true);
+	const failed = settleReceiptFor(dir, requestHash, { exitCode: 3 });
+	assert.equal(failed.ok, false);
+	assert.equal(releaseStatus(dir, "release/web-42"), "aborted");
+});
+
+test("the release receipt binds executor, boundary, and settlement without values", () => {
+	const dir = mkTarget("receipt");
+	const { requestHash } = transactionFixture(dir);
+	assert.equal(deployRelease(dir, { releaseId: "release/web-42", requestHash }).ok, true);
+	assert.equal(settleReceiptFor(dir, requestHash).ok, true);
+
+	const missing = releaseReceipt(dir, "release/ghost");
+	assert.equal(missing.code, "AMBER_E_RELEASE_NOT_FOUND");
+
+	const projected = releaseReceipt(dir, "release/web-42");
+	assert.equal(projected.ok, true, (projected.errors || []).join("; "));
+	const receipt = projected.receipt;
+	assert.equal(receipt.status, "deployed");
+	assert.equal(receipt.inputs.commit, COMMIT);
+	assert.equal(receipt.authorization.approvalId, "approval/rel-1");
+	assert.equal(receipt.operations.length, 1);
+	const operation = receipt.operations[0];
+	assert.equal(operation.operation, "deploy");
+	assert.deepEqual(operation.executor, {
+		id: "runner/ci",
+		version: "1.0.0",
+		integrityDigest: DIGEST,
+	});
+	assert.equal(operation.settlement.outcome, "committed");
+	assert.equal(operation.settlement.resultIntegrity, "receipt-bound");
+	assert.deepEqual(operation.credentialBoundary, {
+		purpose: "staging-deploy",
+		scope: "deploy/staging",
+		expiresAt: "2026-08-29T12:00:00.000Z",
+	});
+	// The boundary carries no handle and no value.
+	assert.equal(JSON.stringify(receipt).includes(CREDENTIAL_HANDLE.handle), false);
+
+	// A vanished cross-link fails the receipt closed: the transaction rides
+	// a request that is no longer recorded.
+	const requestsLedger = path.join(dir, ".amber", "runner", "requests.jsonl");
+	const preserved = fs.readFileSync(requestsLedger, "utf8");
+	fs.rmSync(requestsLedger);
+	const vanished = releaseReceipt(dir, "release/web-42");
+	assert.equal(vanished.ok, false);
+	assert.equal(vanished.code, "AMBER_E_RELEASE_TX_CORRUPT");
+	assert.match(vanished.errors[0], /no longer recorded/);
+	fs.writeFileSync(requestsLedger, preserved);
+
+	// A tampered transaction ledger fails the receipt closed.
+	const event = JSON.parse(fs.readFileSync(transactionsPath(dir), "utf8"));
+	event.releaseHash = `sha256:${"d".repeat(64)}`;
+	writeJSONL(transactionsPath(dir), [event]);
+	const tampered = releaseReceipt(dir, "release/web-42");
+	assert.equal(tampered.ok, false);
+	assert.equal(tampered.code, "AMBER_E_RELEASE_TX_CORRUPT");
+});
+
+test("the MCP seam exposes no release execution surface", () => {
+	const { COMMAND_CAPABILITIES } = require("../../scripts/lib/mcp-action-contracts");
+	// Deploy and rollback stay approval-required-only submissions: the MCP
+	// capability registry carries no release verb at all, so no
+	// registry-proven read-only variant can ever auto-execute one.
+	const releaseCapabilities = Object.keys(COMMAND_CAPABILITIES).filter((key) =>
+		key.split(/[\s.:/-]/).includes("release"),
+	);
+	assert.deepEqual(releaseCapabilities, []);
 });
