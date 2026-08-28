@@ -28,6 +28,7 @@ import type {
   NodeSummaryDTO,
   LLMStatusDTO,
 } from './types';
+import { MAX_CONTEXT_NODES } from '@/lib/knowledge-dto';
 import { trpc } from '@/lib/trpc';
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import { MarkdownMessage } from '@/components/code/MarkdownMessage';
@@ -39,9 +40,9 @@ const LAYER_COLORS: Record<string, { dot: string; badge: string; stroke: string 
     stroke: '#f59e0b',
   },
   knowledge: {
-    dot: 'bg-blue-500',
+    dot: 'bg-cobalt',
     badge: 'bg-blue-100 text-blue-900 dark:bg-blue-950/50 dark:text-blue-200',
-    stroke: '#3b82f6',
+    stroke: '#2563EB',
   },
   implementation: {
     dot: 'bg-slate-500',
@@ -50,18 +51,21 @@ const LAYER_COLORS: Record<string, { dot: string; badge: string; stroke: string 
   },
 };
 
-const STATUS_DOT: Record<string, string> = {
-  passing: 'bg-emerald-500',
-  accepted: 'bg-emerald-500',
-  Accepted: 'bg-emerald-500',
-  committed: 'bg-emerald-500',
-};
+// Real ADR statuses carry trailing notes ("Accepted (2026-08-26)"), so the
+// leading word decides, not the whole string.
+const HEALTHY_STATUS_PREFIXES = ['accepted', 'passing', 'committed'];
+
+function statusDotClass(status: string): string {
+  const normalized = status.trim().toLowerCase();
+  return HEALTHY_STATUS_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+    ? 'bg-emerald-500'
+    : 'bg-slate-400';
+}
 
 const KIND_LABEL_KEYS: Record<string, I18nKey> = {
   adr: 'knowledge.kind.adr',
   artifact: 'knowledge.kind.artifact',
   wiki: 'knowledge.kind.wiki',
-  knowledge: 'knowledge.kind.wiki',
   memory: 'knowledge.kind.memory',
   architecture: 'knowledge.kind.architecture',
   feature: 'knowledge.kind.feature',
@@ -78,13 +82,21 @@ interface KnowledgeNodeData extends Record<string, unknown> {
   neighbor: boolean;
 }
 
-function computeLayout(
+const LAYER_ORDER = ['decision', 'knowledge', 'implementation'] as const;
+const LAYERED_COLUMNS = 14;
+const LAYERED_COLUMN_WIDTH = 200;
+const LAYERED_ROW_HEIGHT = 120;
+
+type SimNode = KnowledgeNode & d3.SimulationNodeDatum;
+type SimLink = { source: string; target: string };
+
+export function computeLayout(
   dto: KnowledgeGraphDTO,
   mode: LayoutMode,
 ): Map<string, { x: number; y: number }> {
-  const nodes = dto.nodes.map((n) => ({ ...n }));
+  const nodes: SimNode[] = dto.nodes.map((n) => ({ ...n }));
   const index = new Map(nodes.map((n) => [n.id, n]));
-  const links = dto.edges
+  const links: SimLink[] = dto.edges
     .map((e) => ({ source: e.src, target: e.dst }))
     .filter((l) => index.has(l.source) && index.has(l.target));
 
@@ -96,48 +108,50 @@ function computeLayout(
       implementation: [],
     };
     for (const n of nodes) layers[n.layer].push(n);
-    const layerY: Record<string, number> = { decision: -480, knowledge: 0, implementation: 480 };
-    for (const [layer, items] of Object.entries(layers)) {
+    let bandTop = 0;
+    for (const layer of LAYER_ORDER) {
+      const items = layers[layer];
       items.forEach((n, i) => {
-        const col = i % 14;
-        const row = Math.floor(i / 14);
-        positions.set(n.id, { x: (col - 6.5) * 200, y: layerY[layer] + row * 120 });
+        const col = i % LAYERED_COLUMNS;
+        const row = Math.floor(i / LAYERED_COLUMNS);
+        positions.set(n.id, {
+          x: (col - (LAYERED_COLUMNS - 1) / 2) * LAYERED_COLUMN_WIDTH,
+          y: bandTop + row * LAYERED_ROW_HEIGHT,
+        });
       });
+      const rows = Math.ceil(items.length / LAYERED_COLUMNS);
+      bandTop += (rows + 1) * LAYERED_ROW_HEIGHT;
     }
     return positions;
   }
 
+  const centroids: Record<string, { x: number; y: number }> = {
+    decision: { x: -560, y: -280 },
+    knowledge: { x: 400, y: -220 },
+    implementation: { x: 0, y: 460 },
+  };
+  const clusterForce: d3.Force<SimNode, undefined> = (alpha) => {
+    for (const n of nodes) {
+      const c = centroids[n.layer];
+      n.x = (n.x ?? 0) + (c.x - (n.x ?? 0)) * 0.05 * alpha;
+      n.y = (n.y ?? 0) + (c.y - (n.y ?? 0)) * 0.05 * alpha;
+    }
+  };
+
   const simulation = d3
-    .forceSimulation(nodes as never[])
+    .forceSimulation<SimNode>(nodes)
     .force(
       'link',
       d3
-        .forceLink(links)
-        .id((d: never) => (d as KnowledgeNode).id)
+        .forceLink<SimNode, SimLink>(links)
+        .id((d) => d.id)
         .distance(170)
         .strength(0.4),
     )
-    .force('charge', d3.forceManyBody().strength(-420))
-    .force('collide', d3.forceCollide(108))
-    .force('center', d3.forceCenter(0, 0))
-    .force(
-      'cluster',
-      (() => {
-        const centroids: Record<string, { x: number; y: number }> = {
-          decision: { x: -560, y: -280 },
-          knowledge: { x: 400, y: -220 },
-          implementation: { x: 0, y: 460 },
-        };
-        const f = (alpha: number) => {
-          for (const n of nodes) {
-            const c = centroids[n.layer];
-            n.x = (n.x ?? 0) + (c.x - (n.x ?? 0)) * 0.05 * alpha;
-            n.y = (n.y ?? 0) + (c.y - (n.y ?? 0)) * 0.05 * alpha;
-          }
-        };
-        return f as unknown as d3.Force<KnowledgeNode, undefined>;
-      })(),
-    )
+    .force('charge', d3.forceManyBody<SimNode>().strength(-420))
+    .force('collide', d3.forceCollide<SimNode>(108))
+    .force('center', d3.forceCenter<SimNode>(0, 0))
+    .force('cluster', clusterForce)
     .stop();
 
   for (let i = 0; i < 320; i += 1) simulation.tick();
@@ -159,9 +173,7 @@ const KIND_LOCAL_TARGET: Record<string, RecentChangeItem['linkTo']> = {
   feature: 'gates',
   adr: 'governance',
   artifact: 'governance',
-  knowledge: 'transcripts',
-  architecture: 'transcripts',
-  memory: 'transcripts',
+  wiki: 'governance',
 };
 
 function LocalJumpLink({
@@ -243,6 +255,97 @@ function LocalJumpLink({
   return null;
 }
 
+const MINI_CX = 160;
+const MINI_CY = 84;
+const MINI_RX = 116;
+const MINI_RY = 70;
+const MINI_MAX_NEIGHBORS = 8;
+const MINI_CENTER_W = 116;
+const MINI_CENTER_H = 24;
+const MINI_SATELLITE_W = 80;
+const MINI_SATELLITE_H = 20;
+
+interface MiniRelation {
+  verb: string;
+  dir: 'out' | 'in';
+  inferred: boolean;
+}
+
+interface MiniNeighbor {
+  other: KnowledgeNode;
+  relations: MiniRelation[];
+  x: number;
+  y: number;
+}
+
+export const MINI_GEOMETRY = {
+  cx: MINI_CX,
+  cy: MINI_CY,
+  rx: MINI_RX,
+  ry: MINI_RY,
+  maxNeighbors: MINI_MAX_NEIGHBORS,
+  centerW: MINI_CENTER_W,
+  centerH: MINI_CENTER_H,
+  satelliteW: MINI_SATELLITE_W,
+  satelliteH: MINI_SATELLITE_H,
+  viewBoxW: 320,
+  viewBoxH: 168,
+} as const;
+
+export function clipSegmentToRect(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  halfW: number,
+  halfH: number,
+): { x: number; y: number } {
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  if (dx === 0 && dy === 0) return { x: toX, y: toY };
+  const scaleX = dx === 0 ? Infinity : halfW / Math.abs(dx);
+  const scaleY = dy === 0 ? Infinity : halfH / Math.abs(dy);
+  const scale = Math.min(scaleX, scaleY, 1);
+  return { x: toX - dx * scale, y: toY - dy * scale };
+}
+
+export function buildMiniNeighbors(
+  edges: KnowledgeEdgeDTO[],
+  centerId: string,
+  nodeById: Map<string, KnowledgeNode>,
+): { shown: MiniNeighbor[]; hidden: number; cx: number; cy: number } {
+  const byNeighbor = new Map<string, MiniNeighbor>();
+  for (const e of edges) {
+    const isOut = e.src === centerId && nodeById.has(e.dst);
+    const isIn = e.dst === centerId && nodeById.has(e.src);
+    if (!isOut && !isIn) continue;
+    const other = nodeById.get(isOut ? e.dst : e.src)!;
+    const relation = {
+      verb: e.verb,
+      dir: isOut ? ('out' as const) : ('in' as const),
+      inferred: e.origin === 'inferred',
+    };
+    const existing = byNeighbor.get(other.id);
+    if (existing) {
+      const duplicate = existing.relations.some(
+        (r) => r.verb === relation.verb && r.dir === relation.dir,
+      );
+      if (!duplicate) existing.relations.push(relation);
+      continue;
+    }
+    byNeighbor.set(other.id, { other, relations: [relation], x: 0, y: 0 });
+  }
+  const all = [...byNeighbor.values()];
+  const shown = all.slice(0, MINI_MAX_NEIGHBORS);
+  const hidden = all.length - shown.length;
+  shown.forEach((it, i) => {
+    const angle = (i / shown.length) * Math.PI * 2 - Math.PI / 2;
+    it.x = MINI_CX + MINI_RX * Math.cos(angle);
+    it.y = MINI_CY + MINI_RY * Math.sin(angle);
+  });
+  return { shown, hidden, cx: MINI_CX, cy: MINI_CY };
+}
+
 function MiniContextGraph({
   dto,
   centerId,
@@ -256,49 +359,10 @@ function MiniContextGraph({
 }) {
   const { t } = useI18n();
   const center = nodeById.get(centerId);
-  const items = useMemo(() => {
-    const out: Array<{
-      other: KnowledgeNode;
-      verb: string;
-      dir: 'out' | 'in';
-      inferred: boolean;
-      x: number;
-      y: number;
-    }> = [];
-    for (const e of dto.edges) {
-      if (e.src === centerId && nodeById.has(e.dst)) {
-        out.push({
-          other: nodeById.get(e.dst)!,
-          verb: e.verb,
-          dir: 'out',
-          inferred: e.origin === 'inferred',
-          x: 0,
-          y: 0,
-        });
-      } else if (e.dst === centerId && nodeById.has(e.src)) {
-        out.push({
-          other: nodeById.get(e.src)!,
-          verb: e.verb,
-          dir: 'in',
-          inferred: e.origin === 'inferred',
-          x: 0,
-          y: 0,
-        });
-      }
-    }
-    const shown = out.slice(0, 8);
-    const hidden = out.length - shown.length;
-    const cx = 160;
-    const cy = 84;
-    const rx = 118;
-    const ry = 62;
-    shown.forEach((it, i) => {
-      const angle = (i / shown.length) * Math.PI * 2 - Math.PI / 2;
-      it.x = cx + rx * Math.cos(angle);
-      it.y = cy + ry * Math.sin(angle);
-    });
-    return { shown, hidden, cx, cy };
-  }, [dto.edges, centerId, nodeById]);
+  const items = useMemo(
+    () => buildMiniNeighbors(dto.edges, centerId, nodeById),
+    [dto.edges, centerId, nodeById],
+  );
 
   if (!center) return null;
   if (items.shown.length === 0) return null;
@@ -309,7 +373,7 @@ function MiniContextGraph({
         {t('knowledge.contextGraph')}
       </div>
       <svg
-        viewBox="0 0 320 168"
+        viewBox={`0 0 ${MINI_GEOMETRY.viewBoxW} ${MINI_GEOMETRY.viewBoxH}`}
         className="w-full h-auto rounded-md border border-slate-200 dark:border-obsidian-border bg-slate-50 dark:bg-obsidian-surface"
         role="img"
         aria-label={t('knowledge.contextGraph')}
@@ -327,43 +391,73 @@ function MiniContextGraph({
             <path d="M0,0 L8,4 L0,8 z" className="fill-slate-400" />
           </marker>
         </defs>
-        {items.shown.map((it) => {
-          const x1 = it.dir === 'out' ? items.cx : it.x;
-          const y1 = it.dir === 'out' ? items.cy : it.y;
-          const x2 = it.dir === 'out' ? it.x : items.cx;
-          const y2 = it.dir === 'out' ? it.y : items.cy;
-          const midX = (x1 + x2) / 2;
-          const midY = (y1 + y2) / 2;
-          return (
-            <g key={`${it.dir}:${it.other.id}:${it.verb}`}>
-              <line
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                className={it.inferred ? 'stroke-slate-400' : 'stroke-slate-500'}
-                strokeWidth={1.2}
-                strokeDasharray={it.inferred ? '4 3' : undefined}
-                markerEnd="url(#mini-arrow)"
-              />
-              <text
-                x={midX}
-                y={midY - 3}
-                textAnchor="middle"
-                fontSize={8}
-                className="fill-amber-700 dark:fill-amber-300"
-              >
-                {it.verb}
-              </text>
-            </g>
-          );
-        })}
+        {items.shown.flatMap((it) =>
+          it.relations.map((rel, relIndex) => {
+            const outgoing = rel.dir === 'out';
+            const sx = outgoing ? items.cx : it.x;
+            const sy = outgoing ? items.cy : it.y;
+            const ex = outgoing ? it.x : items.cx;
+            const ey = outgoing ? it.y : items.cy;
+            const targetHalfW = (outgoing ? MINI_SATELLITE_W : MINI_CENTER_W) / 2;
+            const targetHalfH = (outgoing ? MINI_SATELLITE_H : MINI_CENTER_H) / 2;
+            const sourceHalfW = (outgoing ? MINI_CENTER_W : MINI_SATELLITE_W) / 2;
+            const sourceHalfH = (outgoing ? MINI_CENTER_H : MINI_SATELLITE_H) / 2;
+            const spread = (relIndex - (it.relations.length - 1) / 2) * 7;
+            const baseX = it.x - items.cx;
+            const baseY = it.y - items.cy;
+            const len = Math.hypot(baseX, baseY) || 1;
+            const offX = (-baseY / len) * spread;
+            const offY = (baseX / len) * spread;
+            const head = clipSegmentToRect(
+              sx + offX,
+              sy + offY,
+              ex + offX,
+              ey + offY,
+              targetHalfW,
+              targetHalfH,
+            );
+            const tail = clipSegmentToRect(
+              ex + offX,
+              ey + offY,
+              sx + offX,
+              sy + offY,
+              sourceHalfW,
+              sourceHalfH,
+            );
+            const midX = (tail.x + head.x) / 2;
+            const midY = (tail.y + head.y) / 2;
+            const labelY = midY - 3 + (relIndex - (it.relations.length - 1) / 2) * 11;
+            return (
+              <g key={`${rel.dir}:${it.other.id}:${rel.verb}`}>
+                <line
+                  x1={tail.x}
+                  y1={tail.y}
+                  x2={head.x}
+                  y2={head.y}
+                  className={rel.inferred ? 'stroke-slate-400' : 'stroke-slate-500'}
+                  strokeWidth={1.2}
+                  strokeDasharray={rel.inferred ? '4 3' : undefined}
+                  markerEnd="url(#mini-arrow)"
+                />
+                <text
+                  x={midX}
+                  y={labelY}
+                  textAnchor="middle"
+                  fontSize={8}
+                  className="fill-amber-700 dark:fill-amber-300"
+                >
+                  {rel.verb}
+                </text>
+              </g>
+            );
+          }),
+        )}
         <g>
           <rect
-            x={items.cx - 58}
-            y={items.cy - 12}
-            width={116}
-            height={24}
+            x={items.cx - MINI_CENTER_W / 2}
+            y={items.cy - MINI_CENTER_H / 2}
+            width={MINI_CENTER_W}
+            height={MINI_CENTER_H}
             rx={6}
             className="fill-amber-100 dark:fill-amber-950/60"
             stroke="#f59e0b"
@@ -384,18 +478,21 @@ function MiniContextGraph({
           const c = LAYER_COLORS[it.other.layer];
           const label =
             it.other.title.length > 17 ? `${it.other.title.slice(0, 16)}…` : it.other.title;
-          const w = 86;
+          const relationSummary = it.relations
+            .map((r) => (r.dir === 'out' ? `→ ${r.verb}` : `← ${r.verb}`))
+            .join(', ');
           return (
             <g
               key={`node:${it.other.id}`}
               onClick={() => onSelect(it.other.id)}
               className="cursor-pointer"
             >
+              <title>{`${it.other.title} (${relationSummary})`}</title>
               <rect
-                x={it.x - w / 2}
-                y={it.y - 10}
-                width={w}
-                height={20}
+                x={it.x - MINI_SATELLITE_W / 2}
+                y={it.y - MINI_SATELLITE_H / 2}
+                width={MINI_SATELLITE_W}
+                height={MINI_SATELLITE_H}
                 rx={5}
                 className="fill-white dark:fill-obsidian-elevated"
                 stroke={c.stroke}
@@ -414,7 +511,7 @@ function MiniContextGraph({
           );
         })}
         {items.hidden > 0 && (
-          <text x={items.cx} y={164} textAnchor="middle" fontSize={8.5} className="fill-slate-400">
+          <text x={4} y={12} textAnchor="start" fontSize={8.5} className="fill-slate-400">
             +{items.hidden}
           </text>
         )}
@@ -514,7 +611,7 @@ function FlowCanvas({
           },
           label: connected ? e.verb : undefined,
           labelStyle: { fill: '#b45309', fontSize: 10, fontWeight: 600 },
-          labelBgStyle: { fill: '#fffbeb' },
+          labelBgStyle: { fill: '#fde68a' },
           labelBgPadding: [3, 1] as [number, number],
           labelBgBorderRadius: 3,
           markerEnd: {
@@ -544,7 +641,6 @@ function FlowCanvas({
       minZoom={0.05}
       maxZoom={2}
       fitView
-      proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
       <Controls position="bottom-right" showInteractive={false} />
@@ -571,7 +667,7 @@ function EdgeRow({
   const other = nodeById.get(otherId);
   const verb = (
     <span className="font-mono text-[9px] uppercase text-amber-600 dark:text-amber-300 shrink-0">
-      {incoming ? '→' : ''} {edge.verb} {incoming ? '' : '→'}
+      {incoming ? '←' : '→'} {edge.verb}
     </span>
   );
   return (
@@ -581,16 +677,19 @@ function EdgeRow({
         className="w-full text-left rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5 hover:border-amber-300 dark:hover:border-amber-700/60 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 transition-colors"
       >
         <div className="flex items-center gap-1.5">
-          {incoming && verb}
+          {verb}
           <span className="text-slate-700 dark:text-slate-200 truncate">
             {other?.title ?? otherId}
           </span>
-          {!incoming && verb}
         </div>
         {edge.origin === 'inferred' && (
           <span
             className="ml-0.5 text-[9px] text-slate-400 italic"
-            title={`inferred · ${edge.provenance?.provider}/${edge.provenance?.model} · prompt ${edge.provenance?.promptHash} · ${edge.provenance?.timestamp}`}
+            title={t('knowledge.inferredTooltip', {
+              model: `${edge.provenance?.provider}/${edge.provenance?.model}`,
+              hash: edge.provenance?.promptHash ?? '',
+              time: edge.provenance?.timestamp ?? '',
+            })}
           >
             {t('knowledge.inferredLabel')} ({edge.provenance?.provider}/{edge.provenance?.model})
           </span>
@@ -638,11 +737,7 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
         {drift ? (
           <span className="w-2 h-2 rounded-full bg-red-500 ring-2 ring-red-300 dark:ring-red-900 shrink-0" />
         ) : dto.status ? (
-          <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              STATUS_DOT[dto.status] ?? 'bg-slate-400'
-            }`}
-          />
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDotClass(dto.status)}`} />
         ) : null}
       </div>
       <div className="text-[11px] leading-snug text-slate-800 dark:text-slate-200 line-clamp-2 font-medium">
@@ -659,14 +754,17 @@ function KnowledgeAskForm({
   onSubmit,
   focusNode,
   isFetching,
+  nodeCount,
 }: {
   question: string;
   onQuestionChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   focusNode: KnowledgeNode | null;
   isFetching: boolean;
+  nodeCount: number;
 }) {
   const { t } = useI18n();
+  const overCap = !focusNode && nodeCount > MAX_CONTEXT_NODES;
   return (
     <form className="mt-3 space-y-3" onSubmit={onSubmit}>
       <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-200">
@@ -683,8 +781,18 @@ function KnowledgeAskForm({
       <div className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 text-[10px] text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
         {t('knowledge.ask.disclosure')}
       </div>
-      <div className="text-[10px] text-slate-500 dark:text-slate-400">
-        {focusNode ? t('knowledge.ask.focus', { id: focusNode.id }) : t('knowledge.ask.noFocus')}
+      <div
+        className={
+          overCap
+            ? 'text-[10px] text-amber-700 dark:text-amber-300'
+            : 'text-[10px] text-slate-500 dark:text-slate-400'
+        }
+      >
+        {overCap
+          ? t('knowledge.ask.overCap', { nodes: nodeCount, cap: MAX_CONTEXT_NODES })
+          : focusNode
+            ? t('knowledge.ask.focus', { id: focusNode.id })
+            : t('knowledge.ask.noFocus')}
       </div>
       <button
         type="submit"
@@ -837,6 +945,7 @@ function KnowledgeAskPanel({
   errorCode,
   nodeById,
   onSelect,
+  nodeCount,
 }: {
   question: string;
   onQuestionChange: (value: string) => void;
@@ -847,6 +956,7 @@ function KnowledgeAskPanel({
   errorCode: string | null;
   nodeById: Map<string, KnowledgeNode>;
   onSelect: (id: string) => void;
+  nodeCount: number;
 }) {
   const { t } = useI18n();
   return (
@@ -863,6 +973,7 @@ function KnowledgeAskPanel({
         onSubmit={onSubmit}
         focusNode={focusNode}
         isFetching={isFetching}
+        nodeCount={nodeCount}
       />
       <KnowledgeAskStatus result={result} errorCode={errorCode} />
       {result?.status === 'ok' && (
@@ -874,7 +985,17 @@ function KnowledgeAskPanel({
 
 export function KnowledgeMapPage() {
   const [semanticRequested, setSemanticRequested] = useState(false);
-  const { data: dto, isLoading, error, refetch } = trpc.knowledge.graph.useQuery();
+  const {
+    data: dto,
+    isLoading,
+    error,
+    refetch,
+  } = trpc.knowledge.graph.useQuery(undefined, {
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
+    retry: false,
+  });
   const recentQuery = trpc.knowledge.recentChanges.useQuery(undefined, {
     refetchInterval: false,
     refetchOnReconnect: false,
@@ -1182,9 +1303,16 @@ function KnowledgeMapGraph({
             {t('knowledge.subtitle', {
               visible: visibleCount,
               total: mergedDto.nodes.length,
-              edges: mergedDto.edges.length,
+              edges: dto.edges.length,
               drift: mergedDto.drift.length,
             })}
+            {mergedDto.edges.length > dto.edges.length && (
+              <span className="ml-1 italic">
+                {t('knowledge.subtitle.inferredSuffix', {
+                  inferred: mergedDto.edges.length - dto.edges.length,
+                })}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -1287,7 +1415,7 @@ function KnowledgeMapGraph({
                 {t('knowledge.legend.decision')}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />{' '}
+                <span className="w-2 h-2 rounded-full bg-cobalt" />{' '}
                 {t('knowledge.legend.knowledge')}
               </div>
               <div className="flex items-center gap-1.5">
@@ -1337,6 +1465,7 @@ function KnowledgeMapGraph({
               errorCode={askQuery.error?.message ?? null}
               nodeById={nodeById}
               onSelect={setSelectedId}
+              nodeCount={mergedDto.nodes.length}
             />
           ) : selected ? (
             <div className="card p-4 max-h-[70vh] overflow-y-auto">
@@ -1568,7 +1697,7 @@ function KnowledgeMapGraph({
                   >
                     <div className="flex gap-2 items-baseline">
                       <span className="font-mono text-slate-400 shrink-0">
-                        {r.time ? r.time.slice(0, 10) : r.source}
+                        {r.time ? r.time.slice(0, 10) : ''}
                       </span>
                       <span className="truncate" title={r.title}>
                         {r.title}

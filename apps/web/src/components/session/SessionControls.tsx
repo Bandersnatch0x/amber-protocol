@@ -89,7 +89,10 @@ export function SessionControls({ sessionId, status, onActionSettled }: SessionC
     resumeMutation.isPending ||
     abortMutation.isPending;
 
-  const execute = async (mutation: typeof startMutation, action: string) => {
+  const execute = async (
+    mutation: { mutateAsync: (input: { sessionId: string }) => Promise<unknown> },
+    action: string,
+  ) => {
     setError(null);
     setWarning(null);
     setConfirmationState(null);

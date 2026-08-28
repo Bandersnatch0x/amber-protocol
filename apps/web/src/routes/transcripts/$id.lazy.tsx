@@ -263,18 +263,18 @@ function TranscriptDetailPage() {
             <button
               type="button"
               onClick={() => saveDigest.mutate({ id })}
-              disabled={saveDigest.isLoading}
+              disabled={saveDigest.isPending}
               className="btn-secondary px-3 py-1.5 text-xs"
             >
-              {saveDigest.isLoading ? t('common.saving') : t('transcripts.detail.saveDigest')}
+              {saveDigest.isPending ? t('common.saving') : t('transcripts.detail.saveDigest')}
             </button>
             <button
               type="button"
               onClick={() => proposeRegressions.mutate({ id })}
-              disabled={proposeRegressions.isLoading}
+              disabled={proposeRegressions.isPending}
               className="btn-secondary px-3 py-1.5 text-xs"
             >
-              {proposeRegressions.isLoading
+              {proposeRegressions.isPending
                 ? t('transcripts.detail.scanning')
                 : t('transcripts.detail.proposeRegressions')}
             </button>

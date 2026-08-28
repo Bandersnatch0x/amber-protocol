@@ -284,52 +284,6 @@ function parseArtifacts(targetRoot) {
 	}));
 }
 
-// ── context page merge (ADR-0009) ─────────────────────────────────────
-
-// A context page whose source ref names a node's sourcePath merges into the
-// node as a property, never as a node of its own.
-function contextPagesBySource(targetRoot) {
-	const { statePath } = require("../state-dir-resolver");
-	const pagesDir = statePath(targetRoot, "context", "pages");
-	if (!fs.existsSync(pagesDir)) return new Map();
-	// Matches .amber/artifacts/<dir>/<slug>/rev-N.md so we can map to the identity dir.
-	const ARTIFACT_REV_RE = /^(\.amber\/artifacts\/[^/]+\/[^/]+)\/rev-\d+\.md$/;
-	const bySource = new Map();
-	for (const name of fs.readdirSync(pagesDir).sort()) {
-		if (!name.endsWith(".json")) continue;
-		const filePath = path.join(pagesDir, name);
-		let text;
-		try {
-			text = fs.readFileSync(filePath, "utf8");
-		} catch (err) {
-			if (err.code === "ENOENT") continue;
-			throw typedError(ERROR_CODES.source, `could not read context page ${name}: ${err.message}`);
-		}
-		let page;
-		try {
-			page = JSON.parse(text);
-		} catch (e) {
-			throw typedError(ERROR_CODES.source, `context page ${name} is not valid JSON: ${e.message}`);
-		}
-		if (!page || typeof page !== "object" || !page.pageId || !page.sources) {
-			throw typedError(
-				ERROR_CODES.source,
-				`context page ${name} has unexpected shape (missing pageId or sources)`,
-			);
-		}
-		for (const source of Object.values(page.sources)) {
-			if (!source || typeof source.ref !== "string") continue;
-			// Strip #Lx-Ly fragment so the ref matches a node's sourcePath.
-			let ref = toPosix(stripRange(source.ref));
-			// Map artifact body file refs to their identity directory.
-			const artifactMatch = ARTIFACT_REV_RE.exec(ref);
-			if (artifactMatch) ref = artifactMatch[1];
-			if (ref && !bySource.has(ref)) bySource.set(ref, page.pageId);
-		}
-	}
-	return bySource;
-}
-
 // ── edge discovery ────────────────────────────────────────────────────
 
 const ADR_REF = /ADR-(\d{1,4})/g;
@@ -377,14 +331,23 @@ function buildEdges({
 	nodeIds,
 }) {
 	const edges = [];
-	const seen = new Set();
+	const byKey = new Map();
 	const addEdge = (src, dst, verb, evidence) => {
 		if (src === dst || !nodeIds.has(src) || !nodeIds.has(dst)) return;
 		const key = `${src}\u0000${verb}\u0000${dst}`;
-		if (seen.has(key)) return;
-		seen.add(key);
+		const existing = byKey.get(key);
+		if (existing) {
+			if (!evidence) return;
+			if (!existing.evidence) existing.evidence = [];
+			const duplicate = existing.evidence.some(
+				(item) => item.path === evidence.path && item.line === evidence.line,
+			);
+			if (!duplicate) existing.evidence.push(evidence);
+			return;
+		}
 		const edge = { src, dst, verb, provenance: PROVENANCE };
 		if (evidence) edge.evidence = [evidence];
+		byKey.set(key, edge);
 		edges.push(edge);
 	};
 	const padAdr = (match) => `adr:${match[1].padStart(4, "0")}`;
@@ -392,15 +355,21 @@ function buildEdges({
 	// decision layer: ADR header lineage + body -> feature describes.
 	for (const adr of adrs) {
 		for (const block of adrHeaderBlocks(adr.text)) {
-			for (const [dst] of matchTargets(block.text, ADR_REF, padAdr)) {
-				addEdge(adr.id, dst, block.verb, { path: adr.sourcePath, line: block.line });
+			// A header block spans several lines; evidence must point at the line
+			// that names this target, not at the block's first line.
+			const lineIn = (token) => {
+				const within = lineOf(block.text, token);
+				return within === null ? block.line : block.line + within - 1;
+			};
+			for (const [dst, token] of matchTargets(block.text, ADR_REF, padAdr)) {
+				addEdge(adr.id, dst, block.verb, { path: adr.sourcePath, line: lineIn(token) });
 			}
-			for (const [dst] of matchTargets(
+			for (const [dst, token] of matchTargets(
 				block.text,
 				ARCHITECTURE_REF,
 				(m) => `architecture:${m[1]}`,
 			)) {
-				addEdge(adr.id, dst, block.verb, { path: adr.sourcePath, line: block.line });
+				addEdge(adr.id, dst, block.verb, { path: adr.sourcePath, line: lineIn(token) });
 			}
 		}
 		for (const [dst, token] of matchTargets(adr.text, FEATURE_REF, (m) => `feature:F${m[1]}`)) {

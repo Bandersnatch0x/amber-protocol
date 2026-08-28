@@ -193,3 +193,23 @@ the GitHub mirrors; this Spec is the content authority that supersedes them for 
 The earlier "LLM never authors map content" decision was revoked by product choice with guardrails
 intact: deterministic and inferred artifacts stay forcibly distinct in DTO and UI, and governance
 audit can always tell which edges are file evidence.
+
+## Post-delivery amendments
+
+Recorded from the #267 review so these constraints are documented rather than folklore; each
+already holds in the shipped implementation.
+
+- **Ask requires explicit consent.** `knowledge.ask` takes `allowExternal: z.literal(true)`, so a
+  request that omits the acknowledgement is rejected before any provider call. This is stricter
+  than the disclosure described above, and deliberately so.
+- **The semantic cache key is a superset.** Beyond `(source content hash, promptHash, model)` the
+  cache also binds provider and endpoint, so swapping providers can never serve another provider's
+  inference. Narrowing the key would weaken that isolation.
+- **Node provenance stops at the CLI output.** Every node in the deterministic stream carries
+  `provenance: 'deterministic'` in the schema-validated graph; the web DTO omits the field because
+  the read-time layer never produces inferred *nodes* — only inferred edges and summaries, which do
+  carry it. An absent field on `KnowledgeNode` is by design, not an omission.
+- **Artifact trace verbs are folded on purpose.** The Governance Graph (ADR-0021) keeps
+  `refines` / `realizes` / `supersedes` per resolved Trace; this map folds `refines` and `realizes`
+  into `builds-on`, and `decides` into `references`, to stay inside its four-verb vocabulary. The
+  finer distinction stays recoverable from the Governance Graph, never from this map.

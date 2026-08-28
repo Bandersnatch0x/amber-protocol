@@ -101,19 +101,21 @@ function SessionDetailPage() {
       retry: false,
       // Polling fallback: keep asking for the job until it reaches a terminal
       // status; SSE events usually land the same update sooner.
-      refetchInterval: (data) =>
-        data && isTerminalVerificationJobStatus(data.status) ? false : 2000,
+      refetchInterval: (query) => {
+        const job = query.state.data;
+        return job && isTerminalVerificationJobStatus(job.status) ? false : 2000;
+      },
     },
   );
 
   const verificationProgress = useMemo(
     () =>
       resolveVerificationProgress({
-        isSubmitting: runVerification.isLoading,
+        isSubmitting: runVerification.isPending,
         submission: runVerification.data,
         job: verificationJob.data,
       }),
-    [runVerification.isLoading, runVerification.data, verificationJob.data],
+    [runVerification.isPending, runVerification.data, verificationJob.data],
   );
   const jobInProgress =
     verificationProgress.phase === 'submitting' || verificationProgress.phase === 'running';
@@ -472,7 +474,7 @@ function SessionDetailPage() {
             lifecycle={lifecycleFromNext(lifecycleNext.data)}
             isLoading={completionCheck.isLoading || lifecycleNext.isLoading}
             error={completionCheck.error ?? lifecycleNext.error}
-            isVerifying={runVerification.isLoading || jobInProgress}
+            isVerifying={runVerification.isPending || jobInProgress}
             verificationError={runVerification.error?.message ?? verificationProgress.error}
             verificationResult={
               verificationProgress.phase === 'settled' ? verificationProgress.result : null

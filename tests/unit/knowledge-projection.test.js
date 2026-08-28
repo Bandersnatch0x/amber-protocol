@@ -37,7 +37,7 @@ function createCorpus(label) {
 	const root = mkTarget(label, {
 		subdirs: ["docs/adr", "docs/wiki/knowledge", "docs/architecture"],
 	});
-	for (let index = 1; index <= 24; index += 1) {
+	for (let index = 1; index <= 25; index += 1) {
 		const number = String(index).padStart(4, "0");
 		writeFile(
 			root,
@@ -84,11 +84,11 @@ function commandJson(args, cwd) {
 	return outer.text ? JSON.parse(outer.text) : outer;
 }
 
-test("F059 manifest derives the exact 43-row corpus from the real tree", () => {
+test("F059 manifest derives the exact 44-row corpus from the real tree", () => {
 	const result = buildKnowledgeContextManifest(REPO_ROOT);
 	assert.equal(result.ok, true, result.errors.join("; "));
 	assert.deepEqual(result.manifest.counts, EXPECTED_COUNTS);
-	assert.equal(result.manifest.rows.length, 43);
+	assert.equal(result.manifest.rows.length, 44);
 	for (const field of ["id", "sourceNodeId", "pageId", "sourcePath"]) {
 		const values = result.manifest.rows.map((row) => row[field]);
 		assert.equal(new Set(values).size, values.length, `${field} must be unique`);
@@ -104,19 +104,19 @@ test("F059 context sync drives request, ingest, verify, and projection idempoten
 	const first = syncKnowledgeContextPages(root);
 	assert.equal(first.ok, true, JSON.stringify(first.errors));
 	assert.deepEqual(first.manifest.counts, EXPECTED_COUNTS);
-	assert.equal(first.actions.length, 43);
-	assert.equal(first.actions.filter((action) => action.outcome === "accepted").length, 43);
-	assert.equal(first.verification.summary.total, 43);
-	assert.equal(first.verification.summary.ok, 43);
+	assert.equal(first.actions.length, 44);
+	assert.equal(first.actions.filter((action) => action.outcome === "accepted").length, 44);
+	assert.equal(first.verification.summary.total, 44);
+	assert.equal(first.verification.summary.ok, 44);
 	assert.ok(first.projection.outputHash);
 	const rows = readKnowledgeBaseProjection(root);
-	assert.equal(rows.length, 43);
+	assert.equal(rows.length, 44);
 
 	const second = syncKnowledgeContextPages(root);
 	assert.equal(second.ok, true, JSON.stringify(second.errors));
-	assert.equal(second.actions.length, 43);
-	assert.equal(second.actions.filter((action) => action.outcome === "unchanged").length, 43);
-	assert.equal(second.verification.summary.ok, 43);
+	assert.equal(second.actions.length, 44);
+	assert.equal(second.actions.filter((action) => action.outcome === "unchanged").length, 44);
+	assert.equal(second.verification.summary.ok, 44);
 });
 
 test("F059 context verification reports stale, obsolete, and tampered pages", () => {
@@ -194,7 +194,7 @@ test("F059 CLI context-sync and knowledge graph use the projection path", () => 
 	const sync = commandJson(["knowledge", "context-sync", "--target", root], root);
 	assert.equal(sync.ok, true);
 	assert.deepEqual(sync.counts, EXPECTED_COUNTS);
-	assert.equal(sync.verification.summary.total, 43);
+	assert.equal(sync.verification.summary.total, 44);
 	const graphRun = spawnSync(
 		process.execPath,
 		[CLI, "knowledge", "graph", "--target", root, "--json"],
@@ -217,10 +217,14 @@ test("F059 clean git-ls-files corpus produces graph with no prior .amber/ state"
 	assert.equal(exitCode, 0, JSON.stringify(result.errors));
 	assert.equal(result.errors.length, 0);
 	const graph = JSON.parse(result.text);
-	assert.ok(graph.nodes.length >= 43, "must include at least the 43 committed corpus nodes");
-	// All 43 committed corpus nodes must have contextPage set via the committed manifest
+	assert.ok(graph.nodes.length >= 44, "must include at least the 44 committed corpus nodes");
+	// All 44 committed corpus nodes must have contextPage set via the committed manifest
 	const withContextPage = graph.nodes.filter((n) => n.contextPage);
-	assert.equal(withContextPage.length, 43, "exactly 43 nodes must have contextPage (the committed corpus)");
+	assert.equal(
+		withContextPage.length,
+		44,
+		"exactly 44 nodes must have contextPage (the committed corpus)",
+	);
 	// Byte-identical to tree-reader (parity seam)
 	assert.equal(result.text, serializeKnowledgeGraph(buildKnowledgeGraphFromTree(REPO_ROOT)));
 });
@@ -264,9 +268,13 @@ test("F059 git-archive clean clone: projection and tree-reader produce exact byt
 			treeBytes,
 			"projection and tree-reader must produce byte-identical output on clean archive",
 		);
-		// Exactly 43 nodes must have contextPage
+		// Exactly 44 nodes must have contextPage
 		const withContextPage = projGraph.nodes.filter((n) => n.contextPage);
-		assert.equal(withContextPage.length, 43, "exactly 43 nodes must have contextPage on clean archive");
+		assert.equal(
+			withContextPage.length,
+			44,
+			"exactly 44 nodes must have contextPage on clean archive",
+		);
 	} finally {
 		fs.rmSync(archiveDir, { recursive: true, force: true });
 	}
@@ -280,7 +288,11 @@ test("F059 context-sync pages carry explicit ownership fields and provisional ma
 	assert.equal(page.generatedBy, "context-sync");
 	assert.equal(page.artifact_type, "knowledge-context-page");
 	assert.equal(page.manifestId, "f059-knowledge-context-pages");
-	assert.equal(page.assurance.maturity, "provisional", "HITL checkpoint pending — must not be reviewed");
+	assert.equal(
+		page.assurance.maturity,
+		"provisional",
+		"HITL checkpoint pending — must not be reviewed",
+	);
 });
 
 test("F059 reader excludes unrelated categorized page not in committed manifest", () => {
@@ -301,7 +313,7 @@ test("F059 reader excludes unrelated categorized page not in committed manifest"
 	writeJson(root, path.relative(root, outputPath), output);
 	// Reader must filter this out — only manifest members pass
 	const rows = readKnowledgeBaseProjection(root);
-	assert.equal(rows.length, 43, "must return exactly 43 manifest members, not 44");
+	assert.equal(rows.length, 44, "must return exactly 44 manifest members, not 45");
 	assert.ok(!rows.find((r) => r.pageId === "knowledge-wiki-unrelated-extra"));
 });
 
@@ -317,7 +329,10 @@ test("F059 reader fails closed with AMBER_E_KNOWLEDGE_SOURCE_STALE when source i
 	assert.throws(
 		() => readKnowledgeBaseProjection(root),
 		(err) => {
-			assert.ok(err.amberCode === "AMBER_E_KNOWLEDGE_SOURCE_STALE", `unexpected code: ${err.amberCode}`);
+			assert.ok(
+				err.amberCode === "AMBER_E_KNOWLEDGE_SOURCE_STALE",
+				`unexpected code: ${err.amberCode}`,
+			);
 			return true;
 		},
 	);
@@ -355,30 +370,35 @@ test("F059 context-sync blocks collision when an unmanaged page occupies the tar
 		sources: { source: { ref: "docs/adr/0001-governance-first-artifact-first.md" } },
 		blocks: [{ type: "prose", sources: ["source"], text: "Human content." }],
 	};
-	fs.writeFileSync(path.join(pageDir, "knowledge-adr-0001.json"), JSON.stringify(collision, null, 2) + "\n", "utf8");
+	fs.writeFileSync(
+		path.join(pageDir, "knowledge-adr-0001.json"),
+		JSON.stringify(collision, null, 2) + "\n",
+		"utf8",
+	);
 	const result = syncKnowledgeContextPages(root);
 	const action = result.actions.find((a) => a.pageId === "knowledge-adr-0001");
-	assert.equal(action.outcome, "blocked", "must not overwrite a page with foreign ownership markers");
+	assert.equal(
+		action.outcome,
+		"blocked",
+		"must not overwrite a page with foreign ownership markers",
+	);
 });
 
-test("F059 exact 43-row manifest replacement detection rejects 42-member manifest", () => {
+test("F059 exact 44-row manifest replacement detection rejects 43-member manifest", () => {
 	const root = createCorpus("kg-replacement-detect");
 	syncKnowledgeContextPages(root);
 	// Tamper the committed manifest to remove one ADR row
 	const manifestPath = committedManifestPath(root);
 	const manifest = readJson(manifestPath);
-	manifest.rows = manifest.rows.filter((r) => r.pageId !== "knowledge-adr-0024");
-	manifest.counts.adr = 23;
-	manifest.counts.total = 42;
+	manifest.rows = manifest.rows.filter((r) => r.pageId !== "knowledge-adr-0025");
+	manifest.counts.adr = 24;
+	manifest.counts.total = 43;
 	writeJson(root, path.relative(root, manifestPath), manifest);
-	// Reader must fail — manifest has only 23 ADR rows, not 24
+	// Reader must fail — manifest has only 24 ADR rows, not 25
 	assert.throws(
 		() => readKnowledgeBaseProjection(root),
 		(err) => {
-			assert.ok(
-				err.amberCode === "AMBER_E_PROJECTION_DRIFT",
-				`unexpected code: ${err.amberCode}`,
-			);
+			assert.ok(err.amberCode === "AMBER_E_PROJECTION_DRIFT", `unexpected code: ${err.amberCode}`);
 			return true;
 		},
 	);
@@ -387,14 +407,24 @@ test("F059 exact 43-row manifest replacement detection rejects 42-member manifes
 test("F059 tracked package state: docs/knowledge-corpus/ contains manifest and projection output", () => {
 	// Verify the committed corpus files are present in the real repository tree.
 	// This is the package/tracked-state check: a clean clone must have these files.
-	const manifestFile = path.join(REPO_ROOT, COMMITTED_CORPUS_DIR, "knowledge-context-manifest.json");
+	const manifestFile = path.join(
+		REPO_ROOT,
+		COMMITTED_CORPUS_DIR,
+		"knowledge-context-manifest.json",
+	);
 	const projectionFile = path.join(REPO_ROOT, COMMITTED_CORPUS_DIR, "knowledge-base.output.json");
-	assert.ok(fs.existsSync(manifestFile), `committed manifest must exist at ${COMMITTED_CORPUS_DIR}`);
-	assert.ok(fs.existsSync(projectionFile), `committed projection must exist at ${COMMITTED_CORPUS_DIR}`);
+	assert.ok(
+		fs.existsSync(manifestFile),
+		`committed manifest must exist at ${COMMITTED_CORPUS_DIR}`,
+	);
+	assert.ok(
+		fs.existsSync(projectionFile),
+		`committed projection must exist at ${COMMITTED_CORPUS_DIR}`,
+	);
 	const manifest = readJson(manifestFile);
 	assert.equal(manifest.manifestId, "f059-knowledge-context-pages");
 	assert.deepEqual(manifest.counts, EXPECTED_COUNTS);
-	assert.equal(manifest.rows.length, 43);
+	assert.equal(manifest.rows.length, 44);
 	const projection = readJson(projectionFile);
-	assert.equal(projection.pages.length, 43);
+	assert.equal(projection.pages.length, 44);
 });

@@ -6,9 +6,9 @@
   metadata?: {
     version?: string;
     author?: string;
-    tags?: string[];
+    tags?: readonly string[];
   };
-  gates?: Array<{ id: string }>;
+  gates?: ReadonlyArray<{ id: string }>;
 }
 
 interface StageLike {
