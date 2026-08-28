@@ -1446,6 +1446,204 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_ADAPTER_COMPARISON_INVALID: {
+		title: "Adapter shadow comparison fixture is invalid",
+		cause:
+			"A shadow comparison request is missing a bounded fixture, carries unknown fields, or names malformed source/target records.",
+		remedy:
+			"Provide a fixture with explicit recordId, source, optional target, and disposition for every unmapped item.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG", "AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING"],
+	},
+	AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING: {
+		title: "Adapter shadow comparison coverage is incomplete",
+		cause:
+			"A comparison found an unmapped item without the required disposition, so coverage could not be recorded completely.",
+		remedy:
+			"Record an explicit disposition for every unmapped item, then rerun the bounded shadow comparison.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_UNMAPPED", "AMBER_E_ADAPTER_COMPARISON_INVALID"],
+	},
+	AMBER_E_ADAPTER_COMPARISON_CORRUPT: {
+		title: "Adapter shadow comparison ledger is corrupt",
+		cause:
+			"The shadow comparison ledger has a corrupt JSONL line, broken hash chain, unknown field, missing field, unsupported schema version, or invalid coverage accounting.",
+		remedy:
+			"Restore .amber/adapters/shadow-comparisons.jsonl from version control; every comparison appends a receipt rather than mutating historical ones.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_COMPARISON_LOCK: {
+		title: "Another Adapter shadow comparison write is in flight",
+		cause:
+			"A fresh .amber/adapters/shadow-comparisons.lock exists, so this comparison append was refused instead of racing another writer.",
+		remedy:
+			"Retry after the in-flight comparison completes; locks older than 30 seconds are reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_COMPARISON_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_COMPARISON_SIZE_CEILING: {
+		title: "Adapter shadow comparison ledger exceeds its size ceiling",
+		cause:
+			"Appending the Adapter shadow comparison receipt would exceed the comparison ledger size ceiling.",
+		remedy:
+			"Keep comparison fixtures bounded or deliberately raise AMBER_ADAPTER_MAX_COMPARISON_BYTES.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_COMPARISON_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_INVALID: {
+		title: "Cutover request is invalid",
+		cause:
+			"A cutover or rollback request is missing required bindings: scoped identity, resolved shadow comparison evidence, a committed human Decision, or rollback evidence — or a rollback tried to reuse the original cutover Decision.",
+		remedy:
+			"Bind the cutover to a resolved shadow comparison, a committed acceptance/approval Decision, explicit generation and rollback evidence, and use a new Decision for rollback.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_COMPARISON_INVALID", "AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_EXISTS: {
+		title: "An active cutover already covers this scope",
+		cause:
+			"A cutover for the same adapter, artifact type, scope, and generation is already recorded and not rolled back.",
+		remedy:
+			"Roll the existing cutover back with a new governed Decision before recording another one for the same generation.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_INVALID", "AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_NOT_FOUND: {
+		title: "Cutover is not recorded",
+		cause: "A rollback named a cutover id that is absent from the cutover ledger.",
+		remedy:
+			"Use the cutover id recorded by `amber adapter cutover` (see `amber adapter cutovers`).",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_INVALID"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION: {
+		title: "Cutover lacks independent owner confirmation",
+		cause:
+			"The confirming identity is not the declared source owner, or it equals the deciding principal — one side would seize authority alone.",
+		remedy:
+			"Have the source owner confirm independently of the human principal who carries the cutover or rollback Decision.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_INVALID", "AMBER_E_DECISION_HUMAN_SLOT_REQUIRED"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_DIVERGED: {
+		title: "Post-cutover source divergence detected",
+		cause:
+			"After Cutover, an Adapter read observed source bytes whose hash differs from the hash bound at comparison time. The legacy source is historical/diagnostic only.",
+		remedy:
+			"Treat the Finding as evidence: investigate the legacy change; divergence never restores legacy authority or auto-syncs canonical state.",
+		layer: "Observability",
+		related: ["AMBER_E_ADAPTER_CONFLICT", "AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK: {
+		title: "Cutover is already rolled back",
+		cause:
+			"A rollback targeted a cutover whose rollback Decision is already recorded; rollback history is immutable.",
+		remedy:
+			"Record a new cutover with fresh comparison evidence and a new Decision instead of re-rolling history.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_NOT_FOUND", "AMBER_E_ADAPTER_CUTOVER_EXISTS"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_CORRUPT: {
+		title: "Adapter cutover ledger is corrupt",
+		cause:
+			"The cutover ledger has a corrupt JSONL line, broken hash chain, unknown field, missing field, unsupported schema version, or an event referencing an impossible cutover state.",
+		remedy:
+			"Restore .amber/adapters/cutovers.jsonl from version control; cutover, rollback, and divergence events are append-only and never edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_COMPARISON_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_LOCK: {
+		title: "Another Adapter cutover write is in flight",
+		cause:
+			"A fresh .amber/adapters/cutovers.lock exists, so this cutover append was refused instead of racing another writer.",
+		remedy:
+			"Retry after the in-flight cutover completes; locks older than 30 seconds are reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_CUTOVER_SIZE_CEILING: {
+		title: "Adapter cutover ledger exceeds its size ceiling",
+		cause: "Appending the cutover event would exceed the cutover ledger size ceiling.",
+		remedy: "Keep cutover records bounded or deliberately raise AMBER_ADAPTER_MAX_CUTOVER_BYTES.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_CUTOVER_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	// F052 T1 (#255): controlled Runner & capability registry codes.
+	AMBER_E_RUNNER_INVALID: {
+		title: "Runner registry input is invalid",
+		cause:
+			"A runner or capability registration carried an unknown field, malformed value, unregistered effect, non-human or out-of-scope Decision, or a reused (single-use) registration Decision.",
+		remedy:
+			"Fix the flagged field; bind a fresh committed human acceptance/approval Decision (unscoped) admitted via `amber artifact admit --type decision`.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_EXISTS", "AMBER_E_RUNNER_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_RUNNER_EXISTS: {
+		title: "Runner version already registered",
+		cause: "A runner id/version pair was registered a second time; registrations are immutable.",
+		remedy: "Register a new version for a new build (see `amber runner list`).",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_INVALID"],
+	},
+	AMBER_E_RUNNER_NOT_FOUND: {
+		title: "Runner is not registered",
+		cause: "An operation named a runner id absent from the runner registry.",
+		remedy: "Register the runner first (`amber runner register`) or use a registered id.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_VERSION_DRIFT"],
+	},
+	AMBER_E_RUNNER_VERSION_DRIFT: {
+		title: "Runner version drifted from the registry",
+		cause:
+			"The presented runner version is not a registered version of that runner id; an unknown build holds no execution identity.",
+		remedy:
+			"Register the new version as a governed mutation (`amber runner register`) or present a registered version.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_NOT_FOUND", "AMBER_E_RUNNER_INTEGRITY_MISMATCH"],
+	},
+	AMBER_E_RUNNER_INTEGRITY_MISMATCH: {
+		title: "Runner integrity digest mismatch",
+		cause:
+			"The presented integrity digest does not match the digest registered for that runner id/version; the executor cannot be verified.",
+		remedy:
+			"Verify the runner build; if it legitimately changed, register a new version with the new digest.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_VERSION_DRIFT"],
+	},
+	AMBER_E_RUNNER_CAPABILITY_EXISTS: {
+		title: "Runner capability already registered",
+		cause:
+			"A runnerId/runnerVersion/name/capabilityVersion quadruple was registered a second time; capability contracts are immutable and each runner version declares its own set.",
+		remedy: "Register a new capabilityVersion when the contract changes.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_INVALID"],
+	},
+	AMBER_E_RUNNER_REGISTRY_CORRUPT: {
+		title: "Runner registry failed verification",
+		cause:
+			"The hash-chained runner registry has a broken chain, edited event, unsupported schema version, duplicate registration, or capability for an unknown runner.",
+		remedy:
+			"Treat the ledger as evidence; restore .amber/runner/registry.jsonl from history and investigate the tamper.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REGISTRY_LOCK", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_RUNNER_REGISTRY_LOCK: {
+		title: "Runner registry is locked",
+		cause: "Another process holds the runner registry lock (stale locks reclaim after 30 seconds).",
+		remedy: "Retry after the concurrent registration finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_RUNNER_REGISTRY_SIZE_CEILING: {
+		title: "Runner registry size ceiling reached",
+		cause:
+			"Appending the event would grow the registry past its byte ceiling (default 1 MiB, AMBER_RUNNER_MAX_REGISTRY_BYTES).",
+		remedy:
+			"Raise AMBER_RUNNER_MAX_REGISTRY_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REGISTRY_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
@@ -1584,9 +1782,9 @@ const CATALOG = {
 	AMBER_E_KNOWLEDGE_SOURCE_INVALID: {
 		title: "Unknown knowledge graph source option",
 		cause:
-			"The `source` option passed to `buildKnowledgeGraph` is neither \"projection\" (the default, production path) nor \"tree\" (the explicit zero-mutation parity path). No other source values are defined.",
+			'The `source` option passed to `buildKnowledgeGraph` is neither "projection" (the default, production path) nor "tree" (the explicit zero-mutation parity path). No other source values are defined.',
 		remedy:
-			"Pass `{ source: \"projection\" }` for production reads or `{ source: \"tree\" }` for explicit tree-reader parity checks. Both read from the committed corpus; projection reads from the tracked knowledge-base projection output, tree reads directly from source files.",
+			'Pass `{ source: "projection" }` for production reads or `{ source: "tree" }` for explicit tree-reader parity checks. Both read from the committed corpus; projection reads from the tracked knowledge-base projection output, tree reads directly from source files.',
 		layer: "Context",
 		related: ["AMBER_E_KNOWLEDGE_GRAPH_INVALID", "AMBER_E_KNOWLEDGE_MANIFEST_INVALID"],
 	},

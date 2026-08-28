@@ -938,7 +938,7 @@ node scripts/amber.js projection invalidate --subject spec/spec/login-spec@2 \
 node scripts/amber.js projection status --type governance-graph --target . --json
 ```
 
-### adapter register / read / candidate / show / list / receipts
+### adapter register / read / candidate / compare / comparisons / cutover / rollback / cutovers / show / list / receipts
 
 Read-only Adapters (F051) let Amber inspect legacy or external records before Cutover without
 mutating either the source or Canonical Artifacts. An Adapter registration declares source owner,
@@ -952,16 +952,42 @@ return `AMBER_E_ADAPTER_STALE`; changed expected hashes append a `conflict` rece
 `AMBER_E_ADAPTER_CONFLICT`. The external source remains authoritative until a later explicit Cutover
 Decision.
 
-The Adapter registry and read-receipt ledger are hash-chained and fail closed on in-place edits.
-`adapter read` never calls Canonical Artifact admission; receipts are governance observations only.
-`adapter candidate` reads the same source, extracts a deterministic migration candidate, and returns
-a normal Canonical Artifact admission payload for a separate `artifact admit` call. The source JSON is
-either one record object or `{ "records": [ ... ] }`; each record may use `id` or `recordId`, optional
-`scope` (or `tenant` when identical), and either an `artifact` object or equivalent flat
-`artifactType`, `artifactIdentity`, `artifactScope`, `body`, `traces`, `extensions`, `transition`,
-`idempotencyKey`, `expectedHead`, and `supersedes` fields. Unknown fields and unknown shapes append
-`unmapped` receipts; duplicate identities, contradictory aliases, cross-scope records, and
-contradictory records append `conflict` receipts.
+The Adapter registry, read-receipt ledger, and shadow-comparison ledger are hash-chained and fail
+closed on in-place edits. `adapter read` never calls Canonical Artifact admission; receipts are
+governance observations only. `adapter candidate` reads the same source, extracts a deterministic
+migration candidate, and returns a normal Canonical Artifact admission payload for a separate
+`artifact admit` call. The source JSON is either one record object or `{ "records": [ ... ] }`; each
+record may use `id` or `recordId`, optional `scope` (or `tenant` when identical), and either an
+`artifact` object or equivalent flat `artifactType`, `artifactIdentity`, `artifactScope`, `body`,
+`traces`, `extensions`, `transition`, `idempotencyKey`, `expectedHead`, and `supersedes` fields.
+Unknown fields and unknown shapes append `unmapped` receipts; duplicate identities, contradictory
+aliases, cross-scope records, and contradictory records append `conflict` receipts.
+
+`adapter compare` takes a bounded JSON fixture with `fixtureId`, `expectedTotal`, optional `scope`, and
+`items`. Each item declares `recordId`, `source`, optional `recordType`/`recordVersion`/
+`expectedSourceHash`, an optional canonical `target` (`type`, `identity`, and explicit `revision`),
+and a required `disposition` when no target is declared. A comparison receipt records source and
+target set hashes, coverage counts (`mapped|unmapped|stale|conflict|unavailable`), per-item
+source/target hashes, and a deterministic `comparisonHash`. `adapter comparisons` lists the immutable
+receipts.
+
+`adapter cutover` records the explicit Cutover Decision that transfers canonical ownership for one
+adapter, artifact type, scope, and generation. It binds a resolved shadow comparison (no stale,
+conflict, or unavailable coverage, and mapping at least one target of the claimed artifact type), a
+committed human `acceptance`/`approval` Decision artifact
+(`--decision-identity` + `--revision`, scoped to the cutover's scope), independent source-owner
+confirmation (`--confirmed-by` must be the adapter's declared owner, must resolve as an active
+registered human Principal, and must differ from the deciding principal), and named rollback
+evidence (`--rollback-evidence` and rollback `--evidence` must name recorded F050 Evidence
+receipts). One active cutover per adapter/type/scope/generation; the hash-chained ledger under
+`.amber/adapters/cutovers.jsonl` is append-only. After cutover, an `adapter read` or `adapter
+candidate` that observes source bytes diverging from the bound comparison hash — or a readable
+legacy source the bound evidence never covered — appends an immutable divergence Finding, returns
+`AMBER_E_ADAPTER_CUTOVER_DIVERGED`, and degrades every contradicted cutover (`cut → degraded`) —
+divergence never restores legacy authority or auto-syncs canonical state.
+`adapter rollback` is a new governed Decision (it cannot reuse the cutover's Decision) with its own
+confirmation and evidence; history stays immutable and `adapter cutovers` lists every record with
+derived status (`cut|degraded|rolled-back`).
 
 ```bash
 node scripts/amber.js adapter register --target . --id adapter/legacy \
@@ -973,6 +999,17 @@ node scripts/amber.js adapter read --target . --id adapter/legacy \
   --expected-source-hash sha256:<64-hex-chars> --json
 node scripts/amber.js adapter candidate --target . --id adapter/legacy \
   --source legacy/item.json --record-id legacy-1 --record-version v1 --json
+node scripts/amber.js adapter compare --target . --id adapter/legacy \
+  --fixture fixtures/adapter-shadow.json --json
+node scripts/amber.js adapter comparisons --target . --id adapter/legacy --json
+node scripts/amber.js adapter cutover --target . --id adapter/legacy \
+  --cutover-id cutover/legacy-gen-1 --artifact-type intent --generation gen-1 \
+  --comparison-index 0 --decision-identity decision/cutover-legacy --revision 1 \
+  --confirmed-by legacy-team --rollback-evidence evidence/rollback-plan --json
+node scripts/amber.js adapter rollback --target . --cutover-id cutover/legacy-gen-1 \
+  --decision-identity decision/rollback-legacy --revision 1 \
+  --confirmed-by legacy-team --evidence evidence/rollback-run --json
+node scripts/amber.js adapter cutovers --target . --id adapter/legacy --json
 node scripts/amber.js adapter show --target . --id adapter/legacy --json
 node scripts/amber.js adapter list --target . --json
 node scripts/amber.js adapter receipts --target . --id adapter/legacy --json
@@ -983,7 +1020,51 @@ Error codes: `AMBER_E_ADAPTER_INVALID`, `AMBER_E_ADAPTER_NOT_FOUND`,
 `AMBER_E_ADAPTER_CONFLICT`, `AMBER_E_ADAPTER_UNMAPPED`, `AMBER_E_ADAPTER_REGISTRY_CORRUPT`,
 `AMBER_E_ADAPTER_REGISTRY_LOCK`, `AMBER_E_ADAPTER_SIZE_CEILING`,
 `AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT`, `AMBER_E_ADAPTER_READ_RECEIPT_LOCK`,
-`AMBER_E_ADAPTER_READ_RECEIPT_SIZE_CEILING`.
+`AMBER_E_ADAPTER_READ_RECEIPT_SIZE_CEILING`, `AMBER_E_ADAPTER_COMPARISON_INVALID`,
+`AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING`, `AMBER_E_ADAPTER_COMPARISON_CORRUPT`,
+`AMBER_E_ADAPTER_COMPARISON_LOCK`, `AMBER_E_ADAPTER_COMPARISON_SIZE_CEILING`,
+`AMBER_E_ADAPTER_CUTOVER_INVALID`, `AMBER_E_ADAPTER_CUTOVER_EXISTS`,
+`AMBER_E_ADAPTER_CUTOVER_NOT_FOUND`, `AMBER_E_ADAPTER_CUTOVER_OWNER_SEPARATION`,
+`AMBER_E_ADAPTER_CUTOVER_DIVERGED`, `AMBER_E_ADAPTER_CUTOVER_ROLLED_BACK`,
+`AMBER_E_ADAPTER_CUTOVER_CORRUPT`, `AMBER_E_ADAPTER_CUTOVER_LOCK`,
+`AMBER_E_ADAPTER_CUTOVER_SIZE_CEILING`.
+
+### runner register / capability / show / list
+
+Register controlled Runners and their closed operation capabilities (F052). A Runner is an
+EXTERNAL executor identity — id, version, integrity digest, and owner — and Amber never spawns
+anything (ADR-0022): the registry defines who may execute and what, not an execution path. Each
+capability is a closed record (registered name, versioned contract, declared effects from the
+closed vocabulary `read|prepare|diagnose|write-target|deploy|rollback`, optional path-prefix scope
+shape, timeout bound, credential requirement `none|scoped`, rollback declaration) — there is no
+command field anywhere, so callers can never smuggle shell text through the registry.
+
+Registration is a human-approved governance mutation: every event binds a committed, unscoped
+human `acceptance`/`approval` Decision (`--decision-identity` + `--revision`, principal verified
+against the Principal registry), and a registration Decision is single-use across the ledger.
+Events append to the hash-chained ledger under `.amber/runner/registry.jsonl`; a runner id/version
+pair registers at most once, and each capability binds one registered runner version
+(runnerId/runnerVersion/name/capabilityVersion registers at most once), so every registered Runner
+version declares its own closed capability set. Reads
+fail closed on tamper, and runner resolution distinguishes unknown id, version drift, and
+integrity-digest mismatch — an unverified executor holds no execution identity.
+
+```bash
+node scripts/amber.js runner register --target . --id runner/ci \
+  --runner-version 1.0.0 --integrity sha256:<64-hex-chars> \
+  --runner-owner platform-team --decision-identity decision/runner-ci --revision 1 --json
+node scripts/amber.js runner capability --target . --id runner/ci \
+  --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 \
+  --effect deploy --path-prefix deploy/staging --timeout-ms 600000 --credential scoped \
+  --rollback runbook/staging-rollback --decision-identity decision/cap-deploy --revision 1 --json
+node scripts/amber.js runner show --target . --id runner/ci --json
+node scripts/amber.js runner list --target . --json
+```
+
+Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_NOT_FOUND`,
+`AMBER_E_RUNNER_VERSION_DRIFT`, `AMBER_E_RUNNER_INTEGRITY_MISMATCH`,
+`AMBER_E_RUNNER_CAPABILITY_EXISTS`, `AMBER_E_RUNNER_REGISTRY_CORRUPT`,
+`AMBER_E_RUNNER_REGISTRY_LOCK`, `AMBER_E_RUNNER_REGISTRY_SIZE_CEILING`.
 
 ## Handoff Commands
 
