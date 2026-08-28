@@ -1644,6 +1644,91 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_RUNNER_REGISTRY_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	// F052 T2 (#256): execution request & policy-derived risk codes.
+	AMBER_E_RUNNER_CAPABILITY_NOT_FOUND: {
+		title: "Runner capability is not registered",
+		cause:
+			"An execution request named a runnerId/runnerVersion/name/capabilityVersion quadruple absent from the runner registry.",
+		remedy:
+			"Register the capability (`amber runner capability`) or request a registered one (see `amber runner show`).",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_NOT_FOUND", "AMBER_E_RUNNER_VERSION_DRIFT"],
+	},
+	AMBER_E_RUNNER_REQUEST_INVALID: {
+		title: "Runner request input is invalid",
+		cause:
+			"A request or authorization carried an unknown field or malformed value; malformed input has no reliable identity, so nothing was recorded.",
+		remedy: "Fix the flagged field and resubmit; the closed field sets are listed in the message.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_DENIED", "AMBER_E_RUNNER_REQUEST_CORRUPT"],
+	},
+	AMBER_E_RUNNER_REQUEST_EXISTS: {
+		title: "Runner request already recorded",
+		cause:
+			"An identical request hash is already pending, or the named request is already authorized — an authorization is single-use.",
+		remedy:
+			"Reuse the pending request (`amber runner requests`), or submit a changed request that derives a new hash.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_INVALID"],
+	},
+	AMBER_E_RUNNER_REQUEST_NOT_FOUND: {
+		title: "Runner request is not recorded",
+		cause: "An authorization named a request hash absent from the request ledger.",
+		remedy: "Submit the request first (`amber runner request`) and authorize its returned hash.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_EXISTS"],
+	},
+	AMBER_E_RUNNER_REQUEST_DENIED: {
+		title: "Runner request denied by capability facts",
+		cause:
+			"The request tried to widen the registered capability: an undeclared effect, a timeout above the bound, a different credential class, or a path outside the declared prefixes. The denial is recorded append-only.",
+		remedy:
+			"Request only what the registered capability declares, or register a new capability version through governance.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_INVALID", "AMBER_E_RUNNER_CAPABILITY_EXISTS"],
+	},
+	AMBER_E_RUNNER_REQUEST_DRIFT: {
+		title: "Runner request drifted from current authority",
+		cause:
+			"The stored request no longer re-derives under the current risk policy version, or its capability is no longer resolvable — changed authority makes stale approvals unusable.",
+		remedy: "Submit a fresh request under the current policy and obtain a new approval for it.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH", "AMBER_E_RUNNER_VERSION_DRIFT"],
+	},
+	AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH: {
+		title: "Approval does not bind this runner request",
+		cause:
+			"The named approval is unrecorded, or its subject is not exactly runner-request:<environment>:<requestHash> for this request — one authorization binds one request hash and environment.",
+		remedy:
+			"Grant an approval whose subject is the request's approvalBinding (`amber approval grant --subject <binding>`).",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_DRIFT", "AMBER_E_APPROVAL_NOT_FOUND"],
+	},
+	AMBER_E_RUNNER_REQUEST_CORRUPT: {
+		title: "Runner request ledger failed verification",
+		cause:
+			"The hash-chained request ledger has a broken chain, edited event, unsupported schema version, duplicate request hash, or authorization for an unknown request.",
+		remedy:
+			"Treat the ledger as evidence; restore .amber/runner/requests.jsonl from history and investigate the tamper.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_LOCK", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_RUNNER_REQUEST_LOCK: {
+		title: "Runner request ledger is locked",
+		cause: "Another process holds the request ledger lock (stale locks reclaim after 30 seconds).",
+		remedy: "Retry after the concurrent request settles.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_CORRUPT"],
+	},
+	AMBER_E_RUNNER_REQUEST_SIZE_CEILING: {
+		title: "Runner request ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_RUNNER_MAX_REQUESTS_BYTES).",
+		remedy:
+			"Raise AMBER_RUNNER_MAX_REQUESTS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
