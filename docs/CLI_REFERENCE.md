@@ -1029,7 +1029,7 @@ Error codes: `AMBER_E_ADAPTER_INVALID`, `AMBER_E_ADAPTER_NOT_FOUND`,
 `AMBER_E_ADAPTER_CUTOVER_CORRUPT`, `AMBER_E_ADAPTER_CUTOVER_LOCK`,
 `AMBER_E_ADAPTER_CUTOVER_SIZE_CEILING`.
 
-### runner register / capability / request / authorize / requests / show / list
+### runner register / capability / request / authorize / requests / prepare / settle / abort / rolled-back / executions / show / list
 
 Register controlled Runners and their closed operation capabilities (F052). A Runner is an
 EXTERNAL executor identity — id, version, integrity digest, and owner — and Amber never spawns
@@ -1094,6 +1094,28 @@ credential handle) fail closed, and the rehearsing party can never approve its o
 (`AMBER_E_RUNNER_REQUEST_SEPARATION`). `runner requests` lists every attempt
 (`requested|authorized|denied`) in append order.
 
+Execution settles durably in the hash-chained journal `.amber/runner/executions.jsonl` — Amber
+never spawns anything (ADR-0022); the registered EXTERNAL Runner executes and submits one result
+receipt. `runner prepare` binds one registered executor to one authorized request: the presented
+runner must BE the runner the request named (id + version), must still resolve against the
+registry (unknown identity, version drift, integrity mismatch fail closed), and one request hash
+settles at most one execution — a concurrent prepare refuses. `runner settle` takes the runner's
+result receipt (a bounded JSON file: executor pin, exit code/signal/timeout, timings, outputs
+digest, touched scope, sandbox + credential assurance claims) and AMBER derives the outcome —
+timeout, signal, non-zero exit, and any repository/path outside the authorized target all record
+their explicit non-committed outcome and return its stable code, so execution never reports fake
+success and no attempt disappears. Sandbox assurance and credential assurance are runner-claimed
+fields from the F050 recordable vocabulary (`verified` is never recordable at settlement), while
+`resultIntegrity: receipt-bound` binds a canonical hash of the exact receipt into the journal —
+three separate fields, three independent Gate inputs (the `executionGateInputs`
+read seam projects them per settlement; Gate-contract wiring rides the F053 release surface).
+The authorized timeout bound is enforced at settlement — a receipt running past
+`timeoutMs` settles `timed-out` even when the runner claims otherwise. `runner abort` terminally records an
+execution that will never produce a receipt (outcome stays `attempted`), and `runner rolled-back`
+records that a committed execution was reverted, binding the rollback-run Evidence — history never
+rewrites. `runner executions` lists settlements by outcome
+(`attempted|timed-out|failed|committed|rolled-back`).
+
 ```bash
 node scripts/amber.js runner request --target . --id runner/ci \
   --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 \
@@ -1109,6 +1131,15 @@ node scripts/amber.js runner authorize --target . --request-hash sha256:<64-hex-
   --approval approval/deploy-42 --decision-identity decision/deploy-42 \
   --body "# Authorize staging deploy" --trace decides:intent:intent/deploy --json
 node scripts/amber.js runner requests --target . --environment staging --json
+node scripts/amber.js runner prepare --target . --request-hash sha256:<64-hex-chars> \
+  --id runner/ci --runner-version 1.0.0 --integrity sha256:<64-hex-chars> --json
+node scripts/amber.js runner settle --target . --request-hash sha256:<64-hex-chars> \
+  --receipt receipts/deploy-42.json --json
+node scripts/amber.js runner abort --target . --request-hash sha256:<64-hex-chars> \
+  --reason "runner lost; no result receipt" --json
+node scripts/amber.js runner rolled-back --target . --request-hash sha256:<64-hex-chars> \
+  --evidence evidence/rollback-run --reason "staging deploy reverted" --json
+node scripts/amber.js runner executions --target . --status committed --json
 ```
 
 Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_NOT_FOUND`,
@@ -1120,7 +1151,12 @@ Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_
 `AMBER_E_RUNNER_REQUEST_DENIED`, `AMBER_E_RUNNER_REQUEST_DRIFT`,
 `AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH`, `AMBER_E_RUNNER_REQUEST_SEPARATION`,
 `AMBER_E_RUNNER_REQUEST_CORRUPT`, `AMBER_E_RUNNER_REQUEST_LOCK`,
-`AMBER_E_RUNNER_REQUEST_SIZE_CEILING`.
+`AMBER_E_RUNNER_REQUEST_SIZE_CEILING`, `AMBER_E_RUNNER_EXECUTION_INVALID`,
+`AMBER_E_RUNNER_EXECUTION_EXISTS`, `AMBER_E_RUNNER_EXECUTION_NOT_FOUND`,
+`AMBER_E_RUNNER_EXECUTION_STATE`, `AMBER_E_RUNNER_EXECUTION_TIMEOUT`,
+`AMBER_E_RUNNER_EXECUTION_FAILED`, `AMBER_E_RUNNER_EXECUTION_SCOPE`,
+`AMBER_E_RUNNER_EXECUTION_CORRUPT`, `AMBER_E_RUNNER_EXECUTION_LOCK`,
+`AMBER_E_RUNNER_EXECUTION_SIZE_CEILING`.
 
 ## Handoff Commands
 

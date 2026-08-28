@@ -20,7 +20,7 @@ const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { showApproval, consumeApproval } = require("./approval-registry");
-const { showEvidence } = require("./evidence-receipts");
+const { showEvidence, RECORDABLE_ASSURANCE } = require("./evidence-receipts");
 const { canonicalJson } = require("./context-hash");
 const {
 	GENESIS_HASH,
@@ -873,8 +873,8 @@ function riskOf(effects) {
 	return RISK_LEVELS[highest];
 }
 
-function requestHashOf(request) {
-	return sha256Bytes(Buffer.from(canonicalJson(JSON.stringify(request))));
+function canonicalHashOf(value) {
+	return sha256Bytes(Buffer.from(canonicalJson(JSON.stringify(value))));
 }
 
 function approvalBindingOf(environment, requestHash) {
@@ -1236,28 +1236,33 @@ function capabilityRefusal(input, capability) {
 	return null;
 }
 
-// Resolve a rehearsal Evidence reference fail-closed. A missing receipt is
-// a policy refusal (null code); a corrupt Evidence ledger is an
-// infrastructure fault and keeps its own typed code — it is never
-// re-labeled as a denial.
-function rehearsalRefusal(cwd, rehearsal) {
-	let receipt;
+// Resolve one Evidence receipt fail-closed: a corrupt Evidence ledger
+// keeps its own typed code (infrastructure fault, never a policy verdict);
+// an absent receipt returns { receipt: null, code: null } for the caller
+// to phrase.
+function resolveEvidenceReceipt(cwd, id, fallbackCode) {
 	try {
-		receipt = showEvidence(cwd, rehearsal);
+		return { receipt: showEvidence(cwd, id), code: null, reason: null };
 	} catch (err) {
 		return {
 			receipt: null,
-			code: err.amberCode || REQUEST_CORRUPT_CODE,
+			code: err.amberCode || fallbackCode,
 			reason: err.message || String(err),
 		};
 	}
-	if (receipt === null)
+}
+
+// A missing rehearsal receipt is a policy refusal (null code).
+function rehearsalRefusal(cwd, rehearsal) {
+	const resolved = resolveEvidenceReceipt(cwd, rehearsal, REQUEST_CORRUPT_CODE);
+	if (resolved.code !== null) return resolved;
+	if (resolved.receipt === null)
 		return {
-			receipt,
+			receipt: null,
 			code: null,
 			reason: `rehearsal ${JSON.stringify(rehearsal)} names no recorded Evidence receipt; rehearse the rollback and record it first (amber evidence record)`,
 		};
-	return { receipt, code: null, reason: null };
+	return resolved;
 }
 
 // The per-environment admission verdict, judged against the REGISTERED
@@ -1386,7 +1391,7 @@ function submitRunnerRequest(cwd, input = {}, opts = {}) {
 		return fail(REQUEST_INVALID_CODE, [
 			`capability effects ${resolved.capability.effects.join(", ")} carry no risk classification under policy version ${RISK_POLICY_VERSION}`,
 		]);
-	const requestHash = requestHashOf({
+	const requestHash = canonicalHashOf({
 		schemaVersion: RUNNER_REQUEST_SCHEMA_VERSION,
 		...shaped,
 		riskPolicyVersion: RISK_POLICY_VERSION,
@@ -1430,7 +1435,7 @@ function requestDriftProblem(cwd, record) {
 	const risk = riskOf(resolved.capability.effects);
 	if (risk === null)
 		return `capability effects ${resolved.capability.effects.join(", ")} carry no risk classification under policy version ${RISK_POLICY_VERSION}`;
-	const rederived = requestHashOf({
+	const rederived = canonicalHashOf({
 		schemaVersion: record.schemaVersion,
 		capability: record.capability,
 		target: record.target,
@@ -1572,6 +1577,732 @@ function listRunnerRequests(cwd, { environment = null, status = null } = {}) {
 		);
 }
 
+// ── F052 T4 (#258): execution settlement, receipts & assurance separation ─
+//
+// Execution settles durably: an authorized request is PREPARED for one
+// registered executor, the external Runner submits one result receipt, and
+// Amber — never the runner — derives the terminal outcome. Every attempt
+// is recorded (attempted/timed-out/failed/committed/rolled-back here;
+// denied lives on the request ledger), non-zero exit, signal, timeout, and
+// scope mismatch fail explicitly, and sandbox assurance, credential
+// assurance, and result integrity stay separate fields so one proof can
+// never imply another. Amber spawns nothing (ADR-0022).
+
+const RUNNER_EXECUTION_SCHEMA_VERSION = 1;
+const SUPPORTED_RUNNER_EXECUTION_SCHEMA_VERSIONS = Object.freeze([1]);
+const DEFAULT_MAX_RUNNER_EXECUTIONS_BYTES = 1024 * 1024;
+
+const EXECUTION_OUTCOMES = Object.freeze([
+	"attempted",
+	"timed-out",
+	"failed",
+	"committed",
+	"rolled-back",
+]);
+// The outcomes a settlement event may carry — exactly what deriveOutcome
+// can produce (attempted and rolled-back are derived states, never
+// settled events).
+const SETTLED_OUTCOMES = Object.freeze(["committed", "timed-out", "failed"]);
+// The only value writable at settlement: the event binds a canonical hash
+// of the exact receipt, and the hash chain fails every read closed on
+// tamper. Independent of the runner-CLAIMED assurance fields by design.
+const RESULT_INTEGRITY = Object.freeze(["receipt-bound"]);
+
+const EXECUTION_INVALID_CODE = "AMBER_E_RUNNER_EXECUTION_INVALID";
+const EXECUTION_EXISTS_CODE = "AMBER_E_RUNNER_EXECUTION_EXISTS";
+const EXECUTION_NOT_FOUND_CODE = "AMBER_E_RUNNER_EXECUTION_NOT_FOUND";
+const EXECUTION_STATE_CODE = "AMBER_E_RUNNER_EXECUTION_STATE";
+const EXECUTION_TIMEOUT_CODE = "AMBER_E_RUNNER_EXECUTION_TIMEOUT";
+const EXECUTION_FAILED_CODE = "AMBER_E_RUNNER_EXECUTION_FAILED";
+const EXECUTION_SCOPE_CODE = "AMBER_E_RUNNER_EXECUTION_SCOPE";
+const EXECUTION_CORRUPT_CODE = "AMBER_E_RUNNER_EXECUTION_CORRUPT";
+const EXECUTION_LOCK_CODE = "AMBER_E_RUNNER_EXECUTION_LOCK";
+const EXECUTION_SIZE_CEILING_CODE = "AMBER_E_RUNNER_EXECUTION_SIZE_CEILING";
+
+const EXECUTION_RUNNER_FIELDS = Object.freeze(["id", "version", "integrityDigest"]);
+const PREPARE_INPUT_FIELDS = Object.freeze(["requestHash", "runner"]);
+const SETTLE_INPUT_FIELDS = Object.freeze(["requestHash", "receipt"]);
+const ABORT_INPUT_FIELDS = Object.freeze(["requestHash", "reason"]);
+const EXECUTION_ROLLBACK_INPUT_FIELDS = Object.freeze(["requestHash", "evidence", "reason"]);
+const RESULT_RECEIPT_FIELDS = Object.freeze([
+	"runner",
+	"exitCode",
+	"signal",
+	"timedOut",
+	"startedAt",
+	"finishedAt",
+	"durationMs",
+	"outputsDigest",
+	"scope",
+	"sandboxAssurance",
+	"credentialAssurance",
+]);
+const PREPARED_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"requestHash",
+	"runner",
+	"prevHash",
+	"hash",
+]);
+const SETTLED_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"requestHash",
+	"outcome",
+	"reason",
+	"receipt",
+	"receiptHash",
+	"resultIntegrity",
+	"prevHash",
+	"hash",
+]);
+const ABORTED_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"requestHash",
+	"reason",
+	"prevHash",
+	"hash",
+]);
+const ROLLED_BACK_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"requestHash",
+	"evidence",
+	"reason",
+	"prevHash",
+	"hash",
+]);
+
+function executionsPath(cwd) {
+	return statePathForCreate(cwd, "runner", "executions.jsonl");
+}
+
+function executionCorrupt(message) {
+	return typedError(EXECUTION_CORRUPT_CODE, message);
+}
+
+function acquireExecutionLock(cwd) {
+	return acquireLedgerLock({
+		dirPath: path.dirname(executionsPath(cwd)),
+		lockName: "executions.lock",
+		conflictCode: EXECUTION_LOCK_CODE,
+		corruptCode: EXECUTION_CORRUPT_CODE,
+		label: "runner execution journal",
+		staleMs: LOCK_STALE_MS,
+	});
+}
+
+function appendExecutionWithinCeiling(cwd, event) {
+	return sharedAppendWithinCeiling({
+		ledgerPath: executionsPath(cwd),
+		event,
+		envName: "AMBER_RUNNER_MAX_EXECUTIONS_BYTES",
+		defaultBytes: DEFAULT_MAX_RUNNER_EXECUTIONS_BYTES,
+		label: "runner execution journal",
+	});
+}
+
+function executionRunnerProblem(value, label) {
+	if (!isPlainObject(value)) return `${label} must be an object`;
+	const closed = closedFieldProblem(value, EXECUTION_RUNNER_FIELDS, label);
+	if (closed !== null) return closed;
+	for (const field of ["id", "version"]) {
+		if (!isNonEmptyString(value[field])) return `${label}.${field} must be a non-empty string`;
+	}
+	if (!INTEGRITY_DIGEST_PATTERN.test(value.integrityDigest ?? ""))
+		return `${label}.integrityDigest must be a sha256:<64-hex> string`;
+	return null;
+}
+
+// The result receipt an external Runner submits. Assurance fields carry
+// the F050 recordable vocabulary: "verified" is never recordable at
+// settlement — only an independent verification could ever promote it.
+function resultReceiptProblem(value, label) {
+	if (!isPlainObject(value)) return `${label} must be an object`;
+	const closed = closedFieldProblem(value, RESULT_RECEIPT_FIELDS, label);
+	if (closed !== null) return closed;
+	const runner = executionRunnerProblem(value.runner, `${label}.runner`);
+	if (runner !== null) return runner;
+	if (value.exitCode !== null && !Number.isInteger(value.exitCode))
+		return `${label}.exitCode must be null or an integer`;
+	if (value.signal !== null && !isNonEmptyString(value.signal))
+		return `${label}.signal must be null or a non-empty string`;
+	if (typeof value.timedOut !== "boolean") return `${label}.timedOut must be a boolean`;
+	if (value.exitCode === null && value.signal === null && value.timedOut !== true)
+		return `${label} carries no termination cause; a result declares an exit code, a signal, or a timeout`;
+	for (const field of ["startedAt", "finishedAt"]) {
+		if (!isNonEmptyString(value[field]) || Number.isNaN(Date.parse(value[field])))
+			return `${label}.${field} must be an ISO-8601 timestamp`;
+	}
+	if (Date.parse(value.finishedAt) < Date.parse(value.startedAt))
+		return `${label}.finishedAt must not precede startedAt`;
+	if (!Number.isInteger(value.durationMs) || value.durationMs < 0)
+		return `${label}.durationMs must be a non-negative integer`;
+	if (value.durationMs > Date.parse(value.finishedAt) - Date.parse(value.startedAt))
+		return `${label}.durationMs exceeds the receipt's own startedAt→finishedAt window; a partial or inconsistent result never settles`;
+	if (value.outputsDigest !== null && !INTEGRITY_DIGEST_PATTERN.test(value.outputsDigest))
+		return `${label}.outputsDigest must be null or a sha256:<64-hex> string`;
+	const scope = requestTargetProblem(value.scope, `${label}.scope`);
+	if (scope !== null) return scope;
+	for (const field of ["sandboxAssurance", "credentialAssurance"]) {
+		if (!RECORDABLE_ASSURANCE.includes(value[field]))
+			return `${label}.${field} must be one of ${RECORDABLE_ASSURANCE.join(", ")}; "verified" is never recordable at settlement — only an independent verification promotes it`;
+	}
+	return null;
+}
+
+function preparedEventProblem(event, lineIndex) {
+	const closed = closedFieldProblem(
+		event,
+		PREPARED_EVENT_FIELDS,
+		`runner execution event ${lineIndex}`,
+	);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(event.at))
+		return `runner execution event ${lineIndex}.at must be a non-empty string`;
+	if (!INTEGRITY_DIGEST_PATTERN.test(event.requestHash ?? ""))
+		return `runner execution event ${lineIndex}.requestHash must be a sha256:<64-hex> string`;
+	return executionRunnerProblem(event.runner, `runner execution event ${lineIndex}.runner`);
+}
+
+function settledEventProblem(event, lineIndex) {
+	const closed = closedFieldProblem(
+		event,
+		SETTLED_EVENT_FIELDS,
+		`runner execution event ${lineIndex}`,
+	);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(event.at))
+		return `runner execution event ${lineIndex}.at must be a non-empty string`;
+	if (!INTEGRITY_DIGEST_PATTERN.test(event.requestHash ?? ""))
+		return `runner execution event ${lineIndex}.requestHash must be a sha256:<64-hex> string`;
+	if (!SETTLED_OUTCOMES.includes(event.outcome))
+		return `runner execution event ${lineIndex}.outcome must be one of ${SETTLED_OUTCOMES.join(", ")}`;
+	if (event.reason !== null && !isNonEmptyString(event.reason))
+		return `runner execution event ${lineIndex}.reason must be null or a non-empty string`;
+	const receipt = resultReceiptProblem(
+		event.receipt,
+		`runner execution event ${lineIndex}.receipt`,
+	);
+	if (receipt !== null) return receipt;
+	if (event.receiptHash !== canonicalHashOf(event.receipt))
+		return `runner execution event ${lineIndex}.receiptHash does not match its stored receipt`;
+	if (!RESULT_INTEGRITY.includes(event.resultIntegrity))
+		return `runner execution event ${lineIndex}.resultIntegrity must be one of ${RESULT_INTEGRITY.join(", ")}`;
+	return null;
+}
+
+function abortedEventProblem(event, lineIndex) {
+	const closed = closedFieldProblem(
+		event,
+		ABORTED_EVENT_FIELDS,
+		`runner execution event ${lineIndex}`,
+	);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(event.at))
+		return `runner execution event ${lineIndex}.at must be a non-empty string`;
+	if (!INTEGRITY_DIGEST_PATTERN.test(event.requestHash ?? ""))
+		return `runner execution event ${lineIndex}.requestHash must be a sha256:<64-hex> string`;
+	if (!isNonEmptyString(event.reason))
+		return `runner execution event ${lineIndex}.reason must be a non-empty string`;
+	return null;
+}
+
+function rolledBackEventProblem(event, lineIndex) {
+	const closed = closedFieldProblem(
+		event,
+		ROLLED_BACK_EVENT_FIELDS,
+		`runner execution event ${lineIndex}`,
+	);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(event.at))
+		return `runner execution event ${lineIndex}.at must be a non-empty string`;
+	if (!INTEGRITY_DIGEST_PATTERN.test(event.requestHash ?? ""))
+		return `runner execution event ${lineIndex}.requestHash must be a sha256:<64-hex> string`;
+	for (const field of ["evidence", "reason"]) {
+		if (!isNonEmptyString(event[field]))
+			return `runner execution event ${lineIndex}.${field} must be a non-empty string`;
+	}
+	return null;
+}
+
+function foldRunnerExecutions(cwd) {
+	const events = readLedgerFailClosed(
+		executionsPath(cwd),
+		EXECUTION_CORRUPT_CODE,
+		"runner execution journal",
+	);
+	let prevHash = GENESIS_HASH;
+	const byHash = new Map();
+	const records = [];
+	events.forEach((event, index) => {
+		const lineIndex = index + 1;
+		if (!isPlainObject(event))
+			throw executionCorrupt(`runner execution event ${lineIndex} is not an object`);
+		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
+			throw executionCorrupt(`runner execution event ${lineIndex} breaks the hash chain`);
+		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+			throw executionCorrupt(
+				`runner execution event ${lineIndex} carries a hash that does not match its content`,
+			);
+		if (!SUPPORTED_RUNNER_EXECUTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+			throw executionCorrupt(
+				`runner execution event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+			);
+		if (event.kind === "prepared") {
+			const problem = preparedEventProblem(event, lineIndex);
+			if (problem !== null) throw executionCorrupt(problem);
+			if (byHash.has(event.requestHash))
+				throw executionCorrupt(
+					`runner execution event ${lineIndex} prepares ${JSON.stringify(event.requestHash)} twice`,
+				);
+			const record = {
+				requestHash: event.requestHash,
+				runner: event.runner,
+				preparedAt: event.at,
+				settlement: null,
+				aborted: null,
+				rollback: null,
+				index,
+			};
+			byHash.set(event.requestHash, record);
+			records.push(record);
+		} else if (event.kind === "settled") {
+			const problem = settledEventProblem(event, lineIndex);
+			if (problem !== null) throw executionCorrupt(problem);
+			const record = byHash.get(event.requestHash);
+			if (!record)
+				throw executionCorrupt(
+					`runner execution event ${lineIndex} settles unprepared ${JSON.stringify(event.requestHash)}`,
+				);
+			if (record.settlement !== null || record.aborted !== null)
+				throw executionCorrupt(
+					`runner execution event ${lineIndex} settles ${JSON.stringify(event.requestHash)} after its terminal event`,
+				);
+			record.settlement = {
+				at: event.at,
+				outcome: event.outcome,
+				reason: event.reason,
+				receipt: event.receipt,
+				receiptHash: event.receiptHash,
+				resultIntegrity: event.resultIntegrity,
+			};
+		} else if (event.kind === "aborted") {
+			const problem = abortedEventProblem(event, lineIndex);
+			if (problem !== null) throw executionCorrupt(problem);
+			const record = byHash.get(event.requestHash);
+			if (!record)
+				throw executionCorrupt(
+					`runner execution event ${lineIndex} aborts unprepared ${JSON.stringify(event.requestHash)}`,
+				);
+			if (record.settlement !== null || record.aborted !== null)
+				throw executionCorrupt(
+					`runner execution event ${lineIndex} aborts ${JSON.stringify(event.requestHash)} after its terminal event`,
+				);
+			record.aborted = { at: event.at, reason: event.reason };
+		} else if (event.kind === "rolled-back") {
+			const problem = rolledBackEventProblem(event, lineIndex);
+			if (problem !== null) throw executionCorrupt(problem);
+			const record = byHash.get(event.requestHash);
+			if (!record)
+				throw executionCorrupt(
+					`runner execution event ${lineIndex} rolls back unprepared ${JSON.stringify(event.requestHash)}`,
+				);
+			if (record.settlement === null || record.settlement.outcome !== "committed")
+				throw executionCorrupt(
+					`runner execution event ${lineIndex} rolls back ${JSON.stringify(event.requestHash)}, which never committed`,
+				);
+			if (record.rollback !== null)
+				throw executionCorrupt(
+					`runner execution event ${lineIndex} rolls back ${JSON.stringify(event.requestHash)} twice`,
+				);
+			record.rollback = { at: event.at, evidence: event.evidence, reason: event.reason };
+		} else {
+			throw executionCorrupt(
+				`runner execution event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+			);
+		}
+		prevHash = event.hash;
+	});
+	return records.map((record) => ({
+		...record,
+		status:
+			record.rollback !== null
+				? "rolled-back"
+				: record.settlement !== null
+					? record.settlement.outcome
+					: "attempted",
+		terminal: record.settlement !== null || record.aborted !== null,
+	}));
+}
+
+function executionAppendFailure(err) {
+	return {
+		ok: false,
+		code: err.amberCode || EXECUTION_CORRUPT_CODE,
+		record: null,
+		errors: [err.message || String(err)],
+	};
+}
+
+// Guard contract: any non-null guard result is returned verbatim without
+// appending; `derive(fold)` picks the caller's record after the append.
+function appendExecutionEvent(cwd, body, guard, derive) {
+	let release;
+	try {
+		release = acquireExecutionLock(cwd);
+	} catch (err) {
+		return executionAppendFailure(err);
+	}
+	try {
+		let folded;
+		try {
+			folded = foldRunnerExecutions(cwd);
+		} catch (err) {
+			return executionAppendFailure(err);
+		}
+		const guardVerdict = guard(folded);
+		if (guardVerdict !== null) return guardVerdict;
+		let prevHash;
+		try {
+			prevHash = chainHeadHash(
+				executionsPath(cwd),
+				EXECUTION_CORRUPT_CODE,
+				"runner execution journal",
+			);
+		} catch (err) {
+			return executionAppendFailure(err);
+		}
+		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
+		let ceiling;
+		try {
+			ceiling = appendExecutionWithinCeiling(cwd, event);
+		} catch (err) {
+			return executionAppendFailure(err);
+		}
+		if (ceiling.wouldExceed)
+			return {
+				ok: false,
+				code: EXECUTION_SIZE_CEILING_CODE,
+				record: null,
+				errors: [`runner execution event would exceed ${ceiling.ceiling} bytes`],
+			};
+		try {
+			appendJSONL(executionsPath(cwd), event);
+		} catch (err) {
+			return executionAppendFailure(err);
+		}
+		let record;
+		try {
+			record = derive(foldRunnerExecutions(cwd)) ?? null;
+		} catch (err) {
+			return executionAppendFailure(err);
+		}
+		return { ok: true, code: null, record, errors: [] };
+	} finally {
+		release();
+	}
+}
+
+/**
+ * Prepare one authorized request for execution by one registered Runner.
+ * The presented executor must BE the runner the request named
+ * (id + version), must resolve against the registry (unknown identity,
+ * version drift, and integrity mismatch fail closed), and a request hash
+ * settles at most one execution lifecycle — a concurrent prepare refuses.
+ */
+function prepareRunnerExecution(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(EXECUTION_INVALID_CODE, ["prepare input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, PREPARE_INPUT_FIELDS, "prepare input");
+	if (inputClosed !== null) return fail(EXECUTION_INVALID_CODE, [inputClosed]);
+	if (!INTEGRITY_DIGEST_PATTERN.test(input.requestHash ?? ""))
+		return fail(EXECUTION_INVALID_CODE, ["requestHash must be a sha256:<64-hex> string"]);
+	const runnerProblem = executionRunnerProblem(input.runner, "runner");
+	if (runnerProblem !== null) return fail(EXECUTION_INVALID_CODE, [runnerProblem]);
+	let request;
+	try {
+		request = foldRunnerRequests(cwd).requests.find(
+			(entry) => entry.requestHash === input.requestHash,
+		);
+	} catch (err) {
+		return fail(err.amberCode || REQUEST_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (!request)
+		return fail(EXECUTION_NOT_FOUND_CODE, [
+			`request ${JSON.stringify(input.requestHash)} is not recorded`,
+		]);
+	if (request.status !== "authorized")
+		return fail(EXECUTION_STATE_CODE, [
+			`request ${JSON.stringify(input.requestHash)} is ${JSON.stringify(request.status)}; execution follows authorization`,
+		]);
+	if (
+		request.capability.runnerId !== input.runner.id ||
+		request.capability.runnerVersion !== input.runner.version
+	)
+		return fail(EXECUTION_INVALID_CODE, [
+			`the request names runner ${JSON.stringify(runnerKey(request.capability.runnerId, request.capability.runnerVersion))}; ${JSON.stringify(runnerKey(input.runner.id, input.runner.version))} cannot execute it`,
+		]);
+	const resolved = resolveRunner(cwd, input.runner);
+	if (!resolved.ok) return fail(resolved.code, resolved.errors);
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	return appendExecutionEvent(
+		cwd,
+		{
+			kind: "prepared",
+			schemaVersion: RUNNER_EXECUTION_SCHEMA_VERSION,
+			at,
+			requestHash: input.requestHash,
+			runner: input.runner,
+		},
+		(fold) =>
+			fold.some((record) => record.requestHash === input.requestHash)
+				? fail(EXECUTION_EXISTS_CODE, [
+						`request ${JSON.stringify(input.requestHash)} already entered execution settlement; one authorization settles at most one execution`,
+					])
+				: null,
+		(fold) => fold.find((record) => record.requestHash === input.requestHash),
+	);
+}
+
+// Amber derives the outcome from the receipt — a runner never classifies
+// its own result. First violation wins: timeout, then signal, then exit
+// code, then scope confinement.
+function deriveOutcome(receipt, request) {
+	// The authorized bound is enforced here, never trusted from the claim:
+	// a receipt running past request.timeoutMs is timed-out even when the
+	// runner says otherwise.
+	if (receipt.timedOut === true || receipt.durationMs > request.timeoutMs)
+		return {
+			outcome: "timed-out",
+			code: EXECUTION_TIMEOUT_CODE,
+			reason: `runner ran ${receipt.durationMs} ms against the authorized bound of ${request.timeoutMs} ms${receipt.timedOut ? " and reported timeout" : " without reporting timeout"}`,
+		};
+	if (receipt.signal !== null)
+		return {
+			outcome: "failed",
+			code: EXECUTION_FAILED_CODE,
+			reason: `runner terminated by signal ${JSON.stringify(receipt.signal)}`,
+		};
+	if (receipt.exitCode !== 0)
+		return {
+			outcome: "failed",
+			code: EXECUTION_FAILED_CODE,
+			reason: `runner exited non-zero (${receipt.exitCode})`,
+		};
+	if (receipt.scope.repository !== request.target.repository)
+		return {
+			outcome: "failed",
+			code: EXECUTION_SCOPE_CODE,
+			reason: `receipt touches repository ${JSON.stringify(receipt.scope.repository)}, outside the authorized ${JSON.stringify(request.target.repository)}`,
+		};
+	for (const touched of receipt.scope.paths) {
+		if (!request.target.paths.some((granted) => underPrefix(touched, granted)))
+			return {
+				outcome: "failed",
+				code: EXECUTION_SCOPE_CODE,
+				reason: `receipt touches path ${JSON.stringify(touched)}, outside the authorized target paths ${request.target.paths.join(", ")}`,
+			};
+	}
+	return { outcome: "committed", code: null, reason: null };
+}
+
+/**
+ * Settle one prepared execution from the external Runner's result receipt.
+ * The receipt's executor pin must equal the prepared pin and still resolve
+ * against the registry; a non-committed outcome is RECORDED and returned
+ * as its stable code — execution never reports fake success, and no
+ * attempt disappears.
+ */
+function settleRunnerExecution(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(EXECUTION_INVALID_CODE, ["settle input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, SETTLE_INPUT_FIELDS, "settle input");
+	if (inputClosed !== null) return fail(EXECUTION_INVALID_CODE, [inputClosed]);
+	if (!INTEGRITY_DIGEST_PATTERN.test(input.requestHash ?? ""))
+		return fail(EXECUTION_INVALID_CODE, ["requestHash must be a sha256:<64-hex> string"]);
+	const receiptProblem = resultReceiptProblem(input.receipt, "receipt");
+	if (receiptProblem !== null) return fail(EXECUTION_INVALID_CODE, [receiptProblem]);
+	let request;
+	try {
+		request = foldRunnerRequests(cwd).requests.find(
+			(entry) => entry.requestHash === input.requestHash,
+		);
+	} catch (err) {
+		return fail(err.amberCode || REQUEST_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (!request)
+		return fail(EXECUTION_NOT_FOUND_CODE, [
+			`request ${JSON.stringify(input.requestHash)} is not recorded`,
+		]);
+	const resolved = resolveRunner(cwd, input.receipt.runner);
+	if (!resolved.ok) return fail(resolved.code, resolved.errors);
+	const verdict = deriveOutcome(input.receipt, request);
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	const appended = appendExecutionEvent(
+		cwd,
+		{
+			kind: "settled",
+			schemaVersion: RUNNER_EXECUTION_SCHEMA_VERSION,
+			at,
+			requestHash: input.requestHash,
+			outcome: verdict.outcome,
+			reason: verdict.reason,
+			receipt: input.receipt,
+			receiptHash: canonicalHashOf(input.receipt),
+			resultIntegrity: "receipt-bound",
+		},
+		(fold) => {
+			const record = fold.find((entry) => entry.requestHash === input.requestHash);
+			if (!record)
+				return fail(EXECUTION_STATE_CODE, [
+					`request ${JSON.stringify(input.requestHash)} was never prepared; settlement follows preparation`,
+				]);
+			if (record.terminal)
+				return fail(EXECUTION_STATE_CODE, [
+					`execution for ${JSON.stringify(input.requestHash)} already settled as ${JSON.stringify(record.status)}; settlement is immutable`,
+				]);
+			if (
+				record.runner.id !== input.receipt.runner.id ||
+				record.runner.version !== input.receipt.runner.version ||
+				record.runner.integrityDigest !== input.receipt.runner.integrityDigest
+			)
+				return fail(EXECUTION_INVALID_CODE, [
+					`the receipt's executor ${JSON.stringify(runnerKey(input.receipt.runner.id, input.receipt.runner.version))} is not the prepared executor ${JSON.stringify(runnerKey(record.runner.id, record.runner.version))}`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.requestHash === input.requestHash),
+	);
+	if (!appended.ok) return appended;
+	if (verdict.code !== null)
+		return { ...appended, ok: false, code: verdict.code, errors: [verdict.reason] };
+	return appended;
+}
+
+/**
+ * Abort one prepared execution that will never produce a result receipt
+ * (lost runner, missing receipt). The attempt stays recorded as its own
+ * terminal `attempted` state — an abort is bookkeeping, never erasure.
+ */
+function abortRunnerExecution(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input)) return fail(EXECUTION_INVALID_CODE, ["abort input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, ABORT_INPUT_FIELDS, "abort input");
+	if (inputClosed !== null) return fail(EXECUTION_INVALID_CODE, [inputClosed]);
+	if (!INTEGRITY_DIGEST_PATTERN.test(input.requestHash ?? ""))
+		return fail(EXECUTION_INVALID_CODE, ["requestHash must be a sha256:<64-hex> string"]);
+	if (!isNonEmptyString(input.reason))
+		return fail(EXECUTION_INVALID_CODE, ["reason must be a non-empty string"]);
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	return appendExecutionEvent(
+		cwd,
+		{
+			kind: "aborted",
+			schemaVersion: RUNNER_EXECUTION_SCHEMA_VERSION,
+			at,
+			requestHash: input.requestHash,
+			reason: input.reason,
+		},
+		(fold) => {
+			const record = fold.find((entry) => entry.requestHash === input.requestHash);
+			if (!record)
+				return fail(EXECUTION_NOT_FOUND_CODE, [
+					`request ${JSON.stringify(input.requestHash)} was never prepared`,
+				]);
+			if (record.terminal)
+				return fail(EXECUTION_STATE_CODE, [
+					`execution for ${JSON.stringify(input.requestHash)} already settled as ${JSON.stringify(record.status)}; an abort never rewrites a settlement`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.requestHash === input.requestHash),
+	);
+}
+
+/**
+ * Record that a COMMITTED execution was rolled back, binding the Evidence
+ * of the rollback run. History stays immutable: the committed settlement
+ * remains, and the rolled-back outcome is one more append-only fact.
+ */
+function markRunnerExecutionRolledBack(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(EXECUTION_INVALID_CODE, ["rollback input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, EXECUTION_ROLLBACK_INPUT_FIELDS, "rollback input");
+	if (inputClosed !== null) return fail(EXECUTION_INVALID_CODE, [inputClosed]);
+	if (!INTEGRITY_DIGEST_PATTERN.test(input.requestHash ?? ""))
+		return fail(EXECUTION_INVALID_CODE, ["requestHash must be a sha256:<64-hex> string"]);
+	for (const field of ["evidence", "reason"]) {
+		if (!isNonEmptyString(input[field]))
+			return fail(EXECUTION_INVALID_CODE, [`${field} must be a non-empty string`]);
+	}
+	const evidence = resolveEvidenceReceipt(cwd, input.evidence, EXECUTION_CORRUPT_CODE);
+	if (evidence.code !== null) return fail(evidence.code, [evidence.reason]);
+	if (evidence.receipt === null)
+		return fail(EXECUTION_INVALID_CODE, [
+			`evidence ${JSON.stringify(input.evidence)} names no recorded Evidence receipt; record the rollback run first (amber evidence record)`,
+		]);
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	return appendExecutionEvent(
+		cwd,
+		{
+			kind: "rolled-back",
+			schemaVersion: RUNNER_EXECUTION_SCHEMA_VERSION,
+			at,
+			requestHash: input.requestHash,
+			evidence: input.evidence,
+			reason: input.reason,
+		},
+		(fold) => {
+			const record = fold.find((entry) => entry.requestHash === input.requestHash);
+			if (!record)
+				return fail(EXECUTION_NOT_FOUND_CODE, [
+					`request ${JSON.stringify(input.requestHash)} was never prepared`,
+				]);
+			if (record.settlement === null || record.settlement.outcome !== "committed")
+				return fail(EXECUTION_STATE_CODE, [
+					`execution for ${JSON.stringify(input.requestHash)} is ${JSON.stringify(record.status)}; only a committed execution can be rolled back`,
+				]);
+			if (record.rollback !== null)
+				return fail(EXECUTION_STATE_CODE, [
+					`execution for ${JSON.stringify(input.requestHash)} is already rolled back; history never rewrites`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.requestHash === input.requestHash),
+	);
+}
+
+function showRunnerExecution(cwd, requestHash) {
+	return foldRunnerExecutions(cwd).find((record) => record.requestHash === requestHash) ?? null;
+}
+
+function listRunnerExecutions(cwd, { status = null } = {}) {
+	return foldRunnerExecutions(cwd).filter((record) => status === null || record.status === status);
+}
+
+// The three independently consumable Gate inputs of one settlement — a
+// Gate may require any one without implying the others (full Gate-contract
+// wiring rides the F053 release surface).
+function executionGateInputs(cwd, requestHash) {
+	const record = showRunnerExecution(cwd, requestHash);
+	if (record === null || record.settlement === null) return null;
+	return Object.freeze({
+		sandboxAssurance: record.settlement.receipt.sandboxAssurance,
+		credentialAssurance: record.settlement.receipt.credentialAssurance,
+		resultIntegrity: record.settlement.resultIntegrity,
+	});
+}
+
 module.exports = {
 	RUNNER_REGISTRY_SCHEMA_VERSION,
 	SUPPORTED_RUNNER_REGISTRY_SCHEMA_VERSIONS,
@@ -1604,4 +2335,18 @@ module.exports = {
 	authorizeRunnerRequest,
 	showRunnerRequest,
 	listRunnerRequests,
+	RUNNER_EXECUTION_SCHEMA_VERSION,
+	SUPPORTED_RUNNER_EXECUTION_SCHEMA_VERSIONS,
+	DEFAULT_MAX_RUNNER_EXECUTIONS_BYTES,
+	EXECUTION_OUTCOMES,
+	SETTLED_OUTCOMES,
+	RESULT_INTEGRITY,
+	executionsPath,
+	prepareRunnerExecution,
+	settleRunnerExecution,
+	abortRunnerExecution,
+	markRunnerExecutionRolledBack,
+	showRunnerExecution,
+	listRunnerExecutions,
+	executionGateInputs,
 };

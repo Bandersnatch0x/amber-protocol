@@ -1,17 +1,22 @@
 "use strict";
 
-// F052 public CLI seam for controlled Runner & capability registration and
-// governed execution requests. This adapter parses flags only; the core
-// owns every registry/request verdict and never spawns anything — a
-// registered Runner is an external executor identity, not an execution
-// path (ADR-0022).
+// F052 public CLI seam for controlled Runner & capability registration,
+// governed execution requests, and durable execution settlement. This
+// adapter parses flags only; the core owns every registry/request/
+// settlement verdict and never spawns anything — a registered Runner is an
+// external executor identity, not an execution path (ADR-0022).
+
+const fs = require("node:fs");
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
+const { resolvePathWithin } = require("./core/fs-utils");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
 
 const READ_FAILURE_CODE = "AMBER_E_RUNNER_REGISTRY_CORRUPT";
 const REQUEST_READ_FAILURE_CODE = "AMBER_E_RUNNER_REQUEST_CORRUPT";
+const EXECUTION_READ_FAILURE_CODE = "AMBER_E_RUNNER_EXECUTION_CORRUPT";
+const MAX_RECEIPT_FILE_BYTES = 512 * 1024;
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -38,6 +43,9 @@ function missingValueFlag(args) {
 		["environment", "--environment"],
 		["inputHashVal", "--input-hash"],
 		["requestHash", "--request-hash"],
+		["receipt", "--receipt"],
+		["reason", "--reason"],
+		["evidence", "--evidence"],
 		["credentialHandle", "--credential-handle"],
 		["credentialPurpose", "--credential-purpose"],
 		["credentialScope", "--credential-scope"],
@@ -103,9 +111,62 @@ function resultEnvelope(result) {
 	};
 }
 
+// The result receipt is a bounded JSON file (mirroring the adapter
+// comparison fixture pattern): too rich for flags, still confined to the
+// target and capped.
+function readReceiptFile(target, receipt) {
+	if (receipt === undefined || receipt === null || String(receipt).trim().length === 0) {
+		return { error: `--receipt is required and must be a non-empty path` };
+	}
+	let fullPath;
+	try {
+		fullPath = resolvePathWithin(target, String(receipt), {
+			label: "Runner result receipt",
+			canonicalExisting: true,
+		});
+	} catch (err) {
+		return { error: err.message || String(err) };
+	}
+	let size;
+	try {
+		size = fs.statSync(fullPath).size;
+	} catch (err) {
+		return { error: err.message || String(err) };
+	}
+	if (size > MAX_RECEIPT_FILE_BYTES) {
+		return {
+			error: `--receipt is ${size} bytes, above the ${MAX_RECEIPT_FILE_BYTES} byte ceiling`,
+		};
+	}
+	let text;
+	try {
+		text = fs.readFileSync(fullPath, "utf8");
+	} catch (err) {
+		return { error: err.message || String(err) };
+	}
+	try {
+		return { value: JSON.parse(text) };
+	} catch (err) {
+		return { error: `--receipt must contain JSON: ${err.message}` };
+	}
+}
+
 const dispatch = defineCommand({
 	command: "runner",
-	actions: ["register", "capability", "request", "authorize", "requests", "show", "list"],
+	actions: [
+		"register",
+		"capability",
+		"request",
+		"authorize",
+		"requests",
+		"prepare",
+		"settle",
+		"abort",
+		"rolled-back",
+		"executions",
+		"show",
+		"list",
+	],
 	handlers: {
 		register: (args) => {
 			const { registerRunner } = require("./core/runner-registry");
@@ -318,6 +379,127 @@ const dispatch = defineCommand({
 				};
 			} catch (err) {
 				const failure = readFailure(args, err, REQUEST_READ_FAILURE_CODE);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+		},
+		prepare: (args) => {
+			const { prepareRunnerExecution } = require("./core/runner-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["requestHash", "--request-hash", "sha256:<64-hex>"],
+				["id", "--id", "runner/ci"],
+				["runnerVersion", "--runner-version", "1.0.0"],
+				["integrity", "--integrity", "sha256:<64-hex>"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			return resultEnvelope(
+				prepareRunnerExecution(target.value, {
+					requestHash: String(args.requestHash),
+					runner: {
+						id: String(args.id),
+						version: String(args.runnerVersion),
+						integrityDigest: String(args.integrity),
+					},
+				}),
+			);
+		},
+		settle: (args) => {
+			const { settleRunnerExecution } = require("./core/runner-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const requestHash = requiredString(args, "requestHash", "--request-hash", "sha256:<64-hex>");
+			if (requestHash.error) return invalidArg(requestHash.error);
+			const receipt = readReceiptFile(target.value, args.receipt);
+			if (receipt.error) return invalidArg(receipt.error);
+			return resultEnvelope(
+				settleRunnerExecution(target.value, {
+					requestHash: requestHash.value,
+					receipt: receipt.value,
+				}),
+			);
+		},
+		abort: (args) => {
+			const { abortRunnerExecution } = require("./core/runner-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["requestHash", "--request-hash", "sha256:<64-hex>"],
+				["reason", "--reason", '"runner lost; no receipt"'],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			return resultEnvelope(
+				abortRunnerExecution(target.value, {
+					requestHash: String(args.requestHash),
+					reason: String(args.reason),
+				}),
+			);
+		},
+		"rolled-back": (args) => {
+			const { markRunnerExecutionRolledBack } = require("./core/runner-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["requestHash", "--request-hash", "sha256:<64-hex>"],
+				["evidence", "--evidence", "evidence/rollback-run"],
+				["reason", "--reason", '"staging deploy reverted"'],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			return resultEnvelope(
+				markRunnerExecutionRolledBack(target.value, {
+					requestHash: String(args.requestHash),
+					evidence: String(args.evidence),
+					reason: String(args.reason),
+				}),
+			);
+		},
+		executions: (args) => {
+			const { listRunnerExecutions, EXECUTION_OUTCOMES } = require("./core/runner-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const status = args.status === undefined ? null : String(args.status);
+			if (status !== null && !EXECUTION_OUTCOMES.includes(status)) {
+				return invalidArg(
+					`--status must be one of ${EXECUTION_OUTCOMES.join(", ")}; got ${JSON.stringify(args.status)}`,
+				);
+			}
+			try {
+				return {
+					text: JSON.stringify(listRunnerExecutions(target.value, { status }), null, 2),
+				};
+			} catch (err) {
+				const failure = readFailure(args, err, EXECUTION_READ_FAILURE_CODE);
 				return { ...failure.result, exitCode: failure.exitCode };
 			}
 		},
