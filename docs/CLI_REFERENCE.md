@@ -1158,6 +1158,83 @@ Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_
 `AMBER_E_RUNNER_EXECUTION_CORRUPT`, `AMBER_E_RUNNER_EXECUTION_LOCK`,
 `AMBER_E_RUNNER_EXECUTION_SIZE_CEILING`.
 
+### release prepare / authorize / deploy / rollback / transactions / show / list
+
+Prepare governed release candidates (F053 T1). A candidate immutably binds one exact Change — a
+40-hex commit sha plus committed Canonical Artifact revisions — together with recorded F050
+Evidence, per-axis Review findings (`logic`, `security`, `specCompliance`: each a recorded
+Evidence receipt reference, structurally never an approval — AI review supplements code ownership,
+it never replaces it), the target environment, a versioned release Policy artifact revision, one
+registered F052 Runner capability pin, the credentials class, and a rollback plan Evidence
+reference. Every reference must resolve fail-closed before it becomes releasable material, the
+closed content hashes into a canonical `releaseHash` (so any drift invalidates downstream
+authorization instead of silently retargeting it), and one releaseId prepares at most once into
+the hash-chained ledger `.amber/release/candidates.jsonl`. Preparation is a governance write: it
+never deploys and touches no git state.
+
+```bash
+node scripts/amber.js release prepare --target . --id release/web-42 \
+  --commit <40-hex-sha> --change-artifact spec:spec/login@2 \
+  --evidence-item evidence/test-run --review-logic evidence/review-logic \
+  --review-security evidence/review-security --review-spec evidence/review-spec \
+  --environment staging --release-policy policy/release@1 \
+  --runner runner/ci --runner-version 1.0.0 --capability deploy.staging-web \
+  --capability-version 1 --credential scoped --rollback evidence/rollback-plan --json
+node scripts/amber.js release show --target . --id release/web-42 --json
+node scripts/amber.js release list --target . --environment staging --json
+```
+
+`release authorize` is per-environment, separate from execution, and always human (F053 T2), into
+the hash-chained ledger `.amber/release/authorizations.jsonl` (one authorization per release).
+Stale authority never authorizes: the candidate must re-derive to its recorded `releaseHash`, its
+capability must still resolve, and a newer committed revision of the pinned release Policy
+invalidates the candidate (`AMBER_E_RELEASE_DRIFT`). Staging consumes one named single-use F050
+Approval whose subject is exactly `release:staging:<releaseHash>` (settling the human Decision
+atomically) plus a rollback rehearsal Evidence receipt whose producer is not the approver.
+Production binds branch-protection Evidence, TWO distinct committed human Decisions (code owner
+and release manager — neither may have produced any Evidence the release binds: the submitting
+side never satisfies a required approval), passing release and environment Gate outcomes from the
+F050 gate ledger, a `runbook.*` capability pin, and the scoped credentials class; the two
+Decisions are single-use across the authorization ledger.
+
+```bash
+node scripts/amber.js release authorize --target . --id release/web-42 \
+  --approval approval/rel-1 --decision-identity decision/rel-1 \
+  --body "# Authorize staging release" --trace decides:intent:intent/release \
+  --rehearsal evidence/rehearsal-run --json
+node scripts/amber.js release authorize --target . --id release/prod-7 \
+  --branch-protection evidence/branch-protection --code-owner decision/code-owner@1 \
+  --release-manager decision/release-manager@1 --release-gate-index 0 \
+  --environment-gate-index 1 --json
+```
+
+`release deploy` and `release rollback` are separate target-write transactions executed ONLY
+through the F052 controlled-runner surface (F053 T3), recorded in the hash-chained ledger
+`.amber/release/transactions.jsonl`. A transaction binds one AUTHORIZED release (drift re-checked)
+to one AUTHORIZED F052 request whose pins must equal the candidate's — same capability quadruple,
+same environment, same credentials class (`AMBER_E_RELEASE_TX_MISMATCH`). One deploy per release,
+one transaction per request (a concurrent second use refuses); rollback follows deployment on the
+SAME releaseHash and must ride its own request, never the deployment's. The transaction's outcome
+is a read-time projection of the F052 settlement journal (`pending` until settled, then
+`attempted|timed-out|failed|committed|rolled-back`) — a failed or partial deployment reads as
+exactly that, never as success. Transaction records carry only ids and hashes: no credential value
+and no git surface can ride in them.
+
+```bash
+node scripts/amber.js release deploy --target . --id release/web-42 \
+  --request-hash sha256:<64-hex-chars> --json
+node scripts/amber.js release rollback --target . --id release/web-42 \
+  --request-hash sha256:<64-hex-chars> --json
+node scripts/amber.js release transactions --target . --id release/web-42 --json
+```
+
+Error codes: `AMBER_E_RELEASE_INVALID`, `AMBER_E_RELEASE_EXISTS`, `AMBER_E_RELEASE_NOT_FOUND`,
+`AMBER_E_RELEASE_CORRUPT`, `AMBER_E_RELEASE_LOCK`, `AMBER_E_RELEASE_SIZE_CEILING`,
+`AMBER_E_RELEASE_DRIFT`, `AMBER_E_RELEASE_SEPARATION`, `AMBER_E_RELEASE_APPROVAL_MISMATCH`,
+`AMBER_E_RELEASE_GATE`, `AMBER_E_RELEASE_AUTH_CORRUPT`, `AMBER_E_RELEASE_AUTH_LOCK`,
+`AMBER_E_RELEASE_AUTH_SIZE_CEILING`, `AMBER_E_RELEASE_TX_STATE`, `AMBER_E_RELEASE_TX_MISMATCH`,
+`AMBER_E_RELEASE_TX_CORRUPT`, `AMBER_E_RELEASE_TX_LOCK`, `AMBER_E_RELEASE_TX_SIZE_CEILING`.
+
 ## Handoff Commands
 
 ### handoff

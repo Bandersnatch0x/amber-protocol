@@ -269,10 +269,7 @@ export function buildKnowledgeGraph(
  * recent-changes feed) — the shared core interface governance-report also
  * consumes. Delegates through the module object; no extra depth.
  */
-export function inspectMaintenance(
-	target: string,
-	registryPath?: string,
-): Record<string, unknown>;
+export function inspectMaintenance(target: string, registryPath?: string): Record<string, unknown>;
 
 /** Read-only re-export of core/context-hash.js sha256Hex (raw hex sha256 of a UTF-8 string). */
 export function sha256Hex(text: string): string;
