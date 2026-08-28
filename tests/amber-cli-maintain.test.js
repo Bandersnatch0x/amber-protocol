@@ -1,8 +1,9 @@
 "use strict";
 
-// F054 T1 (#279) — `amber maintain` CLI seam: governed detector
-// registration, deterministic detection with exact + integrity fixtures,
-// fail-closed refusals with stable codes, and help registration.
+// F054 T1 (#279), T2 (#280), T3 (#281) — `amber maintain` CLI seam:
+// governed detector registration, deterministic detection, trigger
+// proposals, owner triage with exact + integrity fixtures, fail-closed
+// refusals with stable codes, and help registration.
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -219,12 +220,16 @@ test("maintain help and unknown actions route through the shared dispatcher", ()
 	assert.match(help.stdout, /register-detector/);
 	assert.match(help.stdout, /deterministic Findings/);
 	assert.match(help.stdout, /propose --finding-index <n>/);
+	assert.match(
+		help.stdout,
+		/triage --fingerprint <sha256:\.\.\.> --outcome <fix\|schedule\|dismiss>/,
+	);
 	assert.match(help.stdout, /proposals \[--fingerprint <sha256:\.\.\.>\]/);
 	const unknown = runCli(["maintain", "promote", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/maintain requires register-detector, detect, propose, detectors, findings, or proposals/,
+		/maintain requires register-detector, detect, propose, triage, detectors, findings, or proposals/,
 	);
 });
 
@@ -324,4 +329,143 @@ test("maintain propose refusals carry stable codes and fail reads closed", () =>
 	);
 	assert.equal(blocked.status, 1);
 	assert.equal(envelope(blocked).code, "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT");
+});
+
+function triageArgs(fingerprint, overrides = {}) {
+	const flags = {
+		"--fingerprint": fingerprint,
+		"--outcome": "schedule",
+		"--reason": "next sprint",
+		"--decision-identity": "decision/triage-1",
+		"--revision": "1",
+		...overrides,
+	};
+	const args = ["maintain", "triage", "--target", ".", "--json"];
+	for (const [flag, value] of Object.entries(flags)) {
+		if (value !== null) args.push(flag, value);
+	}
+	return args;
+}
+
+test("maintain triage settles each outcome and only fix yields a candidate", () => {
+	const dir = mkTarget("triage");
+	fixtureRepo(dir, [
+		"decision/detector-1",
+		"decision/triage-1",
+		"decision/triage-2",
+		"decision/triage-3",
+	]);
+	assert.equal(runCli(registerArgs(), dir).status, 0);
+	assert.equal(runCli(detectArgs(), dir).status, 0);
+	const opened = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "0", "--json"],
+		dir,
+	);
+	assert.equal(opened.status, 0, opened.stderr || opened.stdout);
+	const fingerprint = payload(opened).proposal.fingerprint;
+
+	const scheduled = runCli(triageArgs(fingerprint), dir);
+	assert.equal(scheduled.status, 0, scheduled.stderr || scheduled.stdout);
+	assert.equal(payload(scheduled).proposal.status, "triaged");
+	assert.equal(payload(scheduled).proposal.triage.outcome, "schedule");
+	assert.equal(payload(scheduled).proposal.triage.reason, "next sprint");
+	// The owner identity is the verified principal snapshot, not a flag.
+	assert.equal(payload(scheduled).proposal.triage.decision.principal, "alice@example.com");
+	assert.equal(payload(scheduled).candidate, null);
+
+	// Triage unblocks re-entry: the next observation opens a new proposal.
+	assert.equal(runCli(detectArgs({ "--observation-hash": HASH_B }), dir).status, 0);
+	const reopened = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "1", "--json"],
+		dir,
+	);
+	assert.equal(reopened.status, 0, reopened.stderr || reopened.stdout);
+	assert.equal(payload(reopened).action, "opened");
+
+	const fixed = runCli(
+		triageArgs(fingerprint, {
+			"--outcome": "fix",
+			"--reason": null,
+			"--decision-identity": "decision/triage-2",
+		}),
+		dir,
+	);
+	assert.equal(fixed.status, 0, fixed.stderr || fixed.stdout);
+	const candidate = payload(fixed).candidate;
+	assert.equal(candidate.type, "intent");
+	assert.match(candidate.identity, /^intent\/maintain\/[0-9a-f]{16}$/);
+	assert.match(candidate.body, /Evidence \(maintain Findings\)/);
+	// Nothing is auto-admitted: the candidate identity is not a committed
+	// artifact until a human takes it through the normal surface.
+	const show = runCli(
+		["artifact", "show", "--target", ".", "--type", "intent", "--id", candidate.identity, "--json"],
+		dir,
+	);
+	assert.equal(show.status, 1);
+	assert.equal(envelope(show).code, "AMBER_E_ARTIFACT_NOT_FOUND");
+
+	// The next observation reopens once more; that proposal dismisses with
+	// its reason preserved.
+	assert.equal(
+		runCli(detectArgs({ "--observation-hash": `sha256:${"c".repeat(64)}` }), dir).status,
+		0,
+	);
+	const third = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "2", "--json"],
+		dir,
+	);
+	assert.equal(third.status, 0, third.stderr || third.stdout);
+	assert.equal(payload(third).action, "opened");
+	const dismissed = runCli(
+		triageArgs(payload(third).proposal.fingerprint, {
+			"--outcome": "dismiss",
+			"--reason": "expected load test",
+			"--decision-identity": "decision/triage-3",
+		}),
+		dir,
+	);
+	assert.equal(dismissed.status, 0, dismissed.stderr || dismissed.stdout);
+	assert.equal(payload(dismissed).proposal.triage.outcome, "dismiss");
+	assert.equal(payload(dismissed).proposal.triage.reason, "expected load test");
+	assert.equal(payload(dismissed).candidate, null);
+});
+
+test("maintain triage refusals carry stable codes", () => {
+	const dir = mkTarget("triage-refusals");
+	fixtureRepo(dir, ["decision/detector-1", "decision/triage-1"]);
+	assert.equal(runCli(registerArgs(), dir).status, 0);
+	assert.equal(runCli(detectArgs(), dir).status, 0);
+	const opened = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "0", "--json"],
+		dir,
+	);
+	const fingerprint = payload(opened).proposal.fingerprint;
+
+	const missingOutcome = runCli(triageArgs(fingerprint, { "--outcome": null }), dir);
+	assert.equal(missingOutcome.status, 1);
+	assert.equal(envelope(missingOutcome).code, "AMBER_E_INVALID_ARG");
+	assert.match(envelope(missingOutcome).errors[0], /--outcome is required/);
+
+	const vocabulary = runCli(triageArgs(fingerprint, { "--outcome": "promote" }), dir);
+	assert.equal(vocabulary.status, 1);
+	assert.equal(envelope(vocabulary).code, "AMBER_E_MAINTAIN_INVALID");
+
+	const missingReason = runCli(triageArgs(fingerprint, { "--reason": null }), dir);
+	assert.equal(missingReason.status, 1);
+	assert.equal(envelope(missingReason).code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(envelope(missingReason).errors[0], /must preserve a non-empty reason/);
+
+	const fixWithReason = runCli(triageArgs(fingerprint, { "--outcome": "fix" }), dir);
+	assert.equal(fixWithReason.status, 1);
+	assert.equal(envelope(fixWithReason).code, "AMBER_E_MAINTAIN_INVALID");
+
+	const ghost = runCli(triageArgs(`sha256:${"f".repeat(64)}`), dir);
+	assert.equal(ghost.status, 1);
+	assert.equal(envelope(ghost).code, "AMBER_E_MAINTAIN_NOT_FOUND");
+
+	assert.equal(runCli(triageArgs(fingerprint), dir).status, 0);
+	const closed = runCli(triageArgs(fingerprint), dir);
+	assert.equal(closed.status, 1);
+	assert.equal(envelope(closed).code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(envelope(closed).errors[0], /triage of a closed proposal refuses/);
 });

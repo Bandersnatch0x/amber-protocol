@@ -1,9 +1,9 @@
 "use strict";
 
 // F054 public CLI seam for Control Band detectors, deterministic
-// Findings, and Trigger Proposals. This adapter parses flags only; the
-// core owns every verdict, is target-read-only, and never mutates
-// canonical or target state.
+// Findings, Trigger Proposals, and owner triage. This adapter parses
+// flags only; the core owns every verdict, is target-read-only, and
+// never mutates canonical or target state.
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
@@ -37,6 +37,8 @@ function missingValueFlag(args) {
 		["observationHash", "--observation-hash"],
 		["fingerprint", "--fingerprint"],
 		["findingIndex", "--finding-index"],
+		["outcome", "--outcome"],
+		["reason", "--reason"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -104,7 +106,15 @@ function resultEnvelope(result) {
 
 const dispatch = defineCommand({
 	command: "maintain",
-	actions: ["register-detector", "detect", "propose", "detectors", "findings", "proposals"],
+	actions: [
+		"register-detector",
+		"detect",
+		"propose",
+		"triage",
+		"detectors",
+		"findings",
+		"proposals",
+	],
 	handlers: {
 		"register-detector": (args) => {
 			const { registerDetector } = require("./core/maintain-registry");
@@ -221,6 +231,38 @@ const dispatch = defineCommand({
 				...resultEnvelope(result),
 				text: result.ok
 					? JSON.stringify({ action: result.action, proposal: result.record }, null, 2)
+					: "",
+			};
+		},
+		triage: (args) => {
+			const { triage } = require("./core/maintain-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["fingerprint", "--fingerprint", "sha256:<64-hex>"],
+				["outcome", "--outcome", "fix"],
+				["decisionIdentity", "--decision-identity", "decision/triage-1"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const revision = positiveInt(args, "revision", "--revision");
+			if (revision.error) return invalidArg(revision.error);
+			const result = triage(target.value, {
+				fingerprint: String(args.fingerprint),
+				outcome: String(args.outcome),
+				reason: args.reason === undefined ? null : String(args.reason),
+				decision: { identity: String(args.decisionIdentity), revision: revision.value },
+			});
+			return {
+				...resultEnvelope(result),
+				text: result.ok
+					? JSON.stringify({ proposal: result.record, candidate: result.candidate }, null, 2)
 					: "",
 			};
 		},

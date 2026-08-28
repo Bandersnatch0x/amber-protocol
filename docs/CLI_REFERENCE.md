@@ -1248,16 +1248,16 @@ Error codes: `AMBER_E_RELEASE_INVALID`, `AMBER_E_RELEASE_EXISTS`, `AMBER_E_RELEA
 `AMBER_E_RELEASE_AUTH_SIZE_CEILING`, `AMBER_E_RELEASE_TX_STATE`, `AMBER_E_RELEASE_TX_MISMATCH`,
 `AMBER_E_RELEASE_TX_CORRUPT`, `AMBER_E_RELEASE_TX_LOCK`, `AMBER_E_RELEASE_TX_SIZE_CEILING`.
 
-### maintain register-detector / detect / propose / detectors / findings / proposals
+### maintain register-detector / detect / propose / triage / detectors / findings / proposals
 
-Register Control Band detectors, record deterministic Findings (F054 T1), and derive Trigger
-Proposals (F054 T2). A detector is a versioned, model-independent Control Band definition —
-metric, source, numeric baseline, closed comparator rules (`ge|gt|le|lt`, the last matching rule
-wins), evaluation window, scope, cooldown, observation ceiling, and the one permitted output type
-(`finding`) — registered into the hash-chained ledger `.amber/maintain/detectors.jsonl` behind a
-single-use committed human acceptance/approval Decision (mirroring the F052 registry contract).
-Registered versions are immutable: a changed definition registers a new version, never an
-overwrite.
+Register Control Band detectors, record deterministic Findings (F054 T1), derive Trigger
+Proposals (F054 T2), and triage them (F054 T3). A detector is a versioned, model-independent
+Control Band definition — metric, source, numeric baseline, closed comparator rules
+(`ge|gt|le|lt`, the last matching rule wins), evaluation window, scope, cooldown, observation
+ceiling, and the one permitted output type (`finding`) — registered into the hash-chained ledger
+`.amber/maintain/detectors.jsonl` behind a single-use committed human acceptance/approval Decision
+(mirroring the F052 registry contract). Registered versions are immutable: a changed definition
+registers a new version, never an overwrite.
 
 `detect` is target-read-only and model-independent: it evaluates one declared observation fixture
 (subject, window, value, input hash) against one registered detector version — the verdict is a
@@ -1285,6 +1285,19 @@ outside cooldown the open proposal must be triaged before a new one may open, so
 condition escalates to a human instead of multiplying. Proposals are immutable and append-only;
 the ledger fails every read closed on tamper.
 
+`triage` binds one open proposal to one committed human acceptance/approval Decision
+(registry-verified principal — the service owner) under the closed vocabulary
+`fix|schedule|dismiss`. `schedule` and `dismiss` must carry preserved reasons and close the
+proposal reviewably (it stays listable with its outcome, reason, and owner identity); a triaged
+fingerprint is unblocked, so the next out-of-band observation opens a fresh proposal. Only `fix`
+returns a CANDIDATE Intent admission payload — a prepare-only input mirroring F051 migration
+candidates that carries the detector, subject, scope, tier, fingerprint, and referenced Finding
+evidence — and triage itself never mutates canonical state: the candidate must still pass normal
+canonical Intent admission, scope, Policy, and Acceptance, so nothing is ever auto-admitted.
+Triage Decisions are single-use across the maintain ledgers (a Decision spent on a detector
+registration or an earlier triage refuses), triage of a closed proposal refuses, and validly
+re-chained forgeries against the closed-proposal or single-use invariants fail every read closed.
+
 ```bash
 node scripts/amber.js maintain register-detector --target . --id detector/error-rate \
   --detector-version 1 --metric http-5xx-rate --source observability/api \
@@ -1296,6 +1309,11 @@ node scripts/amber.js maintain detect --target . --id detector/error-rate \
   --window-from 2026-08-29T00:00:00.000Z --window-to 2026-08-29T01:00:00.000Z \
   --value 120 --observation-hash sha256:<64-hex-chars> --json
 node scripts/amber.js maintain propose --target . --finding-index 0 --json
+node scripts/amber.js maintain triage --target . --fingerprint sha256:<64-hex-chars> \
+  --outcome schedule --reason "next sprint" \
+  --decision-identity decision/triage-1 --revision 1 --json
+node scripts/amber.js maintain triage --target . --fingerprint sha256:<64-hex-chars> \
+  --outcome fix --decision-identity decision/triage-2 --revision 1 --json
 node scripts/amber.js maintain detectors --target . --json
 node scripts/amber.js maintain findings --target . --id detector/error-rate --json
 node scripts/amber.js maintain findings --target . --fingerprint sha256:<64-hex-chars> --json

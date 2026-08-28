@@ -250,6 +250,9 @@ const FLAG_SPECS = {
 	"--fingerprint": { key: "fingerprint" },
 	// F054 ticket 2 (#280): Trigger Proposal flags.
 	"--finding-index": { key: "findingIndex" },
+	// F054 ticket 3 (#281): owner triage flags (--fingerprint, --reason,
+	// --decision-identity, and --revision are shared with existing surfaces).
+	"--outcome": { key: "outcome" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

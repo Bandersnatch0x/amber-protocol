@@ -1,6 +1,8 @@
 "use strict";
 
 // F054 T1 (#279) — Control Band detectors & deterministic Findings.
+// F054 T2 (#280) — Trigger Proposals & cooldown dedup.
+// F054 T3 (#281) — Owner triage & governed Intent re-entry.
 //
 // Tests assert externally visible behavior: governed detector registration
 // binding a single-use committed human Decision, immutable detector
@@ -38,6 +40,8 @@ const {
 	proposalsPath,
 	propose,
 	listProposals,
+	TRIAGE_OUTCOMES,
+	triage,
 } = require("../../scripts/lib/core/maintain-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
@@ -710,4 +714,272 @@ test("a tampered proposal ledger fails every read closed", () => {
 	const blocked = propose(dir, { findingIndex: 2 }, { now: NOW });
 	assert.equal(blocked.ok, false);
 	assert.equal(blocked.code, "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT");
+});
+
+// One open proposal for the default detector observation, ready to triage.
+function triageFixture(dir) {
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	const opened = propose(dir, { findingIndex: 0 }, { now: NOW });
+	assert.equal(opened.action, "opened");
+	decisionFixture(dir, "decision/triage-1");
+	return opened.record.fingerprint;
+}
+
+function triageInput(fingerprint, overrides = {}) {
+	return {
+		fingerprint,
+		outcome: "schedule",
+		reason: "next sprint",
+		decision: { identity: "decision/triage-1", revision: 1 },
+		...overrides,
+	};
+}
+
+test("triage schedule closes the proposal reviewably and unblocks re-entry", () => {
+	assert.deepEqual([...TRIAGE_OUTCOMES], ["fix", "schedule", "dismiss"]);
+	const dir = mkTarget("triage-schedule");
+	const fingerprint = triageFixture(dir);
+	const settled = triage(dir, triageInput(fingerprint), { now: NOW });
+	assert.equal(settled.ok, true, (settled.errors || []).join("; "));
+	assert.equal(settled.candidate, null);
+	assert.equal(settled.record.status, "triaged");
+	assert.deepEqual(settled.record.triage, {
+		at: NOW.toISOString(),
+		outcome: "schedule",
+		reason: "next sprint",
+		decision: {
+			identity: "decision/triage-1",
+			revision: 1,
+			decisionKind: "approval",
+			principal: "alice@example.com",
+		},
+	});
+	assert.equal(listProposals(dir).length, 1);
+	assert.equal(listProposals(dir)[0].status, "triaged");
+	const closed = triage(dir, triageInput(fingerprint), { now: NOW });
+	assert.equal(closed.ok, false);
+	assert.equal(closed.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(closed.errors[0], /triage of a closed proposal refuses/);
+	// Triage unblocks the fingerprint: the next observation opens a NEW
+	// proposal and the triaged one stays listed for review.
+	assert.equal(detect(dir, observation({ inputHash: HASH_B }), { now: NOW }).ok, true);
+	const reopened = propose(dir, { findingIndex: 1 }, { now: NOW });
+	assert.equal(reopened.ok, true, (reopened.errors || []).join("; "));
+	assert.equal(reopened.action, "opened");
+	assert.equal(listProposals(dir).length, 2);
+	assert.equal(listProposals(dir)[0].status, "triaged");
+	assert.equal(listProposals(dir)[1].status, "open");
+});
+
+test("schedule and dismiss must preserve reasons; fix must not carry one", () => {
+	const dir = mkTarget("triage-reason");
+	const fingerprint = triageFixture(dir);
+	const missing = triage(dir, triageInput(fingerprint, { reason: null }), { now: NOW });
+	assert.equal(missing.ok, false);
+	assert.equal(missing.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(missing.errors[0], /must preserve a non-empty reason/);
+	const dismissed = triage(
+		dir,
+		triageInput(fingerprint, { outcome: "dismiss", reason: "expected load test" }),
+		{ now: NOW },
+	);
+	assert.equal(dismissed.ok, true, (dismissed.errors || []).join("; "));
+	assert.equal(dismissed.record.triage.outcome, "dismiss");
+	assert.equal(dismissed.record.triage.reason, "expected load test");
+	assert.equal(dismissed.candidate, null);
+});
+
+test("triage fix returns a candidate Intent payload and mutates nothing canonical", () => {
+	const dir = mkTarget("triage-fix");
+	const fingerprint = triageFixture(dir);
+	const withReason = triage(dir, triageInput(fingerprint, { outcome: "fix" }), { now: NOW });
+	assert.equal(withReason.ok, false);
+	assert.equal(withReason.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(withReason.errors[0], /reason is preserved only for schedule and dismiss/);
+	const before = snapshotOutsideMaintain(dir);
+	const detectorBytes = fs.readFileSync(detectorsPath(dir), "utf8");
+	const findingBytes = fs.readFileSync(findingsPath(dir), "utf8");
+	const fixed = triage(dir, triageInput(fingerprint, { outcome: "fix", reason: null }), {
+		now: NOW,
+	});
+	assert.equal(fixed.ok, true, (fixed.errors || []).join("; "));
+	assert.equal(fixed.record.status, "triaged");
+	assert.equal(fixed.record.triage.reason, null);
+	assert.equal(fixed.candidate.type, "intent");
+	assert.match(fixed.candidate.identity, /^intent\/maintain\/[0-9a-f]{16}$/);
+	assert.equal(fixed.candidate.scope, "service/api");
+	assert.match(fixed.candidate.body, /detector\/error-rate@1/);
+	assert.match(fixed.candidate.body, /- finding 0: value 120 \(warn\)/);
+	assert.ok(fixed.candidate.body.includes(fingerprint));
+	// No canonical mutation: the artifact journal and every other ledger
+	// outside .amber/maintain are byte-identical, and within maintain the
+	// triage wrote only the proposals ledger.
+	assert.deepEqual(snapshotOutsideMaintain(dir), before);
+	assert.equal(fs.readFileSync(detectorsPath(dir), "utf8"), detectorBytes);
+	assert.equal(fs.readFileSync(findingsPath(dir), "utf8"), findingBytes);
+	// The candidate is a plain admission payload for the NORMAL surface.
+	const admitted = admitArtifact(dir, fixed.candidate);
+	assert.equal(admitted.ok, true, (admitted.errors || []).join("; "));
+});
+
+test("triage decisions are single-use across the maintain ledgers", () => {
+	const dir = mkTarget("triage-single-use");
+	const fingerprint = triageFixture(dir);
+	// decision/detector-1 already authorized the detector registration.
+	const spent = triage(
+		dir,
+		triageInput(fingerprint, { decision: { identity: "decision/detector-1", revision: 1 } }),
+		{ now: NOW },
+	);
+	assert.equal(spent.ok, false);
+	assert.equal(spent.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(spent.errors[0], /already authorized detector/);
+	assert.match(spent.errors[0], /single-use across the maintain ledgers/);
+	assert.equal(triage(dir, triageInput(fingerprint), { now: NOW }).ok, true);
+	// A second fingerprint cannot reuse the spent triage decision.
+	assert.equal(
+		detect(
+			dir,
+			observation({
+				window: { from: "2026-08-29T01:00:00.000Z", to: "2026-08-29T01:30:00.000Z" },
+				inputHash: HASH_B,
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const second = propose(dir, { findingIndex: 1 }, { now: NOW });
+	assert.equal(second.action, "opened");
+	const reused = triage(dir, triageInput(second.record.fingerprint), { now: NOW });
+	assert.equal(reused.ok, false);
+	assert.equal(reused.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(reused.errors[0], /already triaged the proposal/);
+	// … and the reverse direction: a Decision spent by a triage can never
+	// authorize a detector registration afterwards.
+	const registered = registerDetector(
+		dir,
+		detectorInput({ version: "2", decision: { identity: "decision/triage-1", revision: 1 } }),
+		{ now: NOW },
+	);
+	assert.equal(registered.ok, false);
+	assert.equal(registered.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(registered.errors[0], /already triaged the proposal/);
+	assert.match(registered.errors[0], /single-use across the maintain ledgers/);
+});
+
+test("triage refuses ghosts, non-human authority, and out-of-vocabulary outcomes", () => {
+	const dir = mkTarget("triage-authority");
+	const fingerprint = triageFixture(dir);
+	const unknown = triage(dir, triageInput(`sha256:${"f".repeat(64)}`), { now: NOW });
+	assert.equal(unknown.ok, false);
+	assert.equal(unknown.code, "AMBER_E_MAINTAIN_NOT_FOUND");
+	const vocabulary = triage(dir, triageInput(fingerprint, { outcome: "promote" }), { now: NOW });
+	assert.equal(vocabulary.ok, false);
+	assert.match(vocabulary.errors[0], /outcome must be one of fix, schedule, dismiss/);
+	const smuggled = triage(dir, triageInput(fingerprint, { body: "# intent" }), { now: NOW });
+	assert.equal(smuggled.ok, false);
+	assert.match(smuggled.errors[0], /unknown field "body"/);
+	const ghost = triage(
+		dir,
+		triageInput(fingerprint, { decision: { identity: "decision/ghost", revision: 1 } }),
+		{ now: NOW },
+	);
+	assert.equal(ghost.ok, false);
+	assert.match(ghost.errors[0], /not a committed Decision artifact/);
+	decisionFixture(dir, "decision/review-2", { kind: "review" });
+	const review = triage(
+		dir,
+		triageInput(fingerprint, { decision: { identity: "decision/review-2", revision: 1 } }),
+		{ now: NOW },
+	);
+	assert.equal(review.ok, false);
+	assert.match(
+		review.errors[0],
+		/maintain triage requires a human acceptance or approval Decision/,
+	);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "intent",
+			identity: "intent/scoped",
+			body: "# S\n",
+			scope: "F054",
+		}).ok,
+		true,
+	);
+	decisionFixture(dir, "decision/scoped-2", { scope: "F054" });
+	const scoped = triage(
+		dir,
+		triageInput(fingerprint, { decision: { identity: "decision/scoped-2", revision: 1 } }),
+		{ now: NOW },
+	);
+	assert.equal(scoped.ok, false);
+	assert.match(scoped.errors[0], /maintain triage is repository-global/);
+});
+
+test("re-chained triage forgeries cannot bypass the closed-proposal and single-use invariants", () => {
+	const dir = mkTarget("triage-forgery");
+	const fingerprint = triageFixture(dir);
+	assert.equal(triage(dir, triageInput(fingerprint), { now: NOW }).ok, true);
+	const events = readEvents(proposalsPath(dir));
+	const settled = events[events.length - 1];
+	const chained = (body, prevHash) => ({ ...body, prevHash, hash: chainHash(body, prevHash) });
+	const { prevHash: _prev, hash: _hash, ...triageBody } = settled;
+	// A second triage of the same (now closed) proposal.
+	writeEvents(proposalsPath(dir), [...events, chained(triageBody, settled.hash)]);
+	assert.throws(
+		() => listProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
+			/triages an already-triaged proposal/.test(err.message),
+	);
+	// Evidence appended onto a triaged proposal.
+	const evidenceBody = {
+		kind: "evidence",
+		schemaVersion: 1,
+		at: settled.at,
+		observedAt: settled.at,
+		fingerprint,
+		findingIndex: 3,
+	};
+	writeEvents(proposalsPath(dir), [...events, chained(evidenceBody, settled.hash)]);
+	assert.throws(
+		() => listProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
+			/appends evidence to a triaged proposal/.test(err.message),
+	);
+	// A reopened proposal triaged with the already-spent decision.
+	const reopenBody = {
+		kind: "proposal",
+		schemaVersion: 1,
+		at: settled.at,
+		observedAt: settled.at,
+		fingerprint,
+		detectorId: "detector/error-rate",
+		detectorVersion: "1",
+		subject: "service/api",
+		scope: "service/api",
+		tier: "warn",
+		cooldownMs: 3600000,
+		findingIndex: 5,
+	};
+	const reopened = chained(reopenBody, settled.hash);
+	writeEvents(proposalsPath(dir), [...events, reopened, chained(triageBody, reopened.hash)]);
+	assert.throws(
+		() => listProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
+			/reuses triage decision/.test(err.message),
+	);
+	// An out-of-vocabulary outcome fails shape validation even re-chained.
+	const promoted = { ...triageBody, outcome: "promote" };
+	writeEvents(proposalsPath(dir), [...events, reopened, chained(promoted, reopened.hash)]);
+	assert.throws(
+		() => listProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
+			/outcome must be one of fix, schedule, dismiss/.test(err.message),
+	);
 });

@@ -19,6 +19,13 @@
 // it. Repeats inside the detector's cooldown append Finding references to
 // the open proposal instead of duplicating it; outside cooldown a new
 // proposal may open only when the prior one is triaged.
+//
+// Triage (F054 T3, #281) binds one open proposal to one committed human
+// Decision under the closed vocabulary fix|schedule|dismiss. schedule and
+// dismiss preserve their reasons and close the proposal reviewably; only
+// fix returns a CANDIDATE Intent admission payload that must still pass
+// the normal canonical artifact surface — nothing is auto-admitted, so
+// re-entry remains human-governed.
 
 const crypto = require("node:crypto");
 const path = require("node:path");
@@ -58,6 +65,8 @@ const DETECTOR_COMPARATORS = Object.freeze(Object.keys(COMPARATOR_PREDICATES));
 const DETECTOR_OUTPUT_TYPES = Object.freeze(["finding"]);
 // Human-only authority slots, mirroring the F050/F051/F052 contract.
 const MAINTAIN_DECISION_KINDS = Object.freeze(["acceptance", "approval"]);
+// The closed triage vocabulary: only fix re-enters the Intent pipeline.
+const TRIAGE_OUTCOMES = Object.freeze(["fix", "schedule", "dismiss"]);
 
 const MAINTAIN_INVALID_CODE = "AMBER_E_MAINTAIN_INVALID";
 const MAINTAIN_EXISTS_CODE = "AMBER_E_MAINTAIN_EXISTS";
@@ -229,6 +238,17 @@ function decisionShapeProblem(value, label) {
 	return null;
 }
 
+// The caller-facing identity@revision pin, before registry resolution.
+function decisionPinProblem(value) {
+	if (!isPlainObject(value)) return "decision must be an object carrying identity and revision";
+	const unknown = unknownFieldProblem(value, ["identity", "revision"], "decision");
+	if (unknown !== null) return unknown;
+	if (!isNonEmptyString(value.identity)) return "decision.identity must be a non-empty string";
+	if (!Number.isInteger(value.revision) || value.revision < 1)
+		return "decision.revision must be a positive integer";
+	return null;
+}
+
 function rulesProblem(rules, label) {
 	if (!Array.isArray(rules) || rules.length === 0)
 		return `${label} must be a non-empty array of deterministic tier rules`;
@@ -337,7 +357,8 @@ function decisionSpentBy(detectors, decision) {
 
 // Registration authority: a committed human acceptance/approval Decision
 // with a verified principal snapshot, mirroring the F051/F052 contract.
-function resolveRegistryDecision(cwd, decision) {
+// `label` names the requesting surface in refusal messages.
+function resolveRegistryDecision(cwd, decision, label = "detector registration") {
 	let revisions;
 	try {
 		revisions = listArtifactRevisions(cwd);
@@ -367,7 +388,7 @@ function resolveRegistryDecision(cwd, decision) {
 			ok: false,
 			code: MAINTAIN_INVALID_CODE,
 			errors: [
-				`decision ${JSON.stringify(decision.identity)}@${decision.revision} is scoped to ${JSON.stringify(match.scope)}; detector registration is repository-global and binds an unscoped Decision`,
+				`decision ${JSON.stringify(decision.identity)}@${decision.revision} is scoped to ${JSON.stringify(match.scope)}; ${label} is repository-global and binds an unscoped Decision`,
 			],
 		};
 	if (!MAINTAIN_DECISION_KINDS.includes(match.decisionKind))
@@ -375,7 +396,7 @@ function resolveRegistryDecision(cwd, decision) {
 			ok: false,
 			code: MAINTAIN_INVALID_CODE,
 			errors: [
-				`detector registration requires a human acceptance or approval Decision; ${JSON.stringify(decision.identity)}@${decision.revision} carries decisionKind ${JSON.stringify(match.decisionKind)}`,
+				`${label} requires a human acceptance or approval Decision; ${JSON.stringify(decision.identity)}@${decision.revision} carries decisionKind ${JSON.stringify(match.decisionKind)}`,
 			],
 		};
 	const principal = match.principal?.id;
@@ -495,18 +516,27 @@ function registerDetector(cwd, input = {}, opts = {}) {
 	if (inputClosed !== null) return fail(MAINTAIN_INVALID_CODE, [inputClosed]);
 	const shape = detectorShapeProblem(input, "detector input");
 	if (shape !== null) return fail(MAINTAIN_INVALID_CODE, [shape]);
-	if (!isPlainObject(input.decision))
-		return fail(MAINTAIN_INVALID_CODE, [
-			"decision must be an object carrying identity and revision",
-		]);
-	const pinProblem = unknownFieldProblem(input.decision, ["identity", "revision"], "decision");
+	const pinProblem = decisionPinProblem(input.decision);
 	if (pinProblem !== null) return fail(MAINTAIN_INVALID_CODE, [pinProblem]);
-	if (!isNonEmptyString(input.decision.identity))
-		return fail(MAINTAIN_INVALID_CODE, ["decision.identity must be a non-empty string"]);
-	if (!Number.isInteger(input.decision.revision) || input.decision.revision < 1)
-		return fail(MAINTAIN_INVALID_CODE, ["decision.revision must be a positive integer"]);
 	const resolved = resolveRegistryDecision(cwd, input.decision);
 	if (!resolved.ok) return fail(resolved.code, resolved.errors);
+	// Single-use ACROSS the maintain ledgers, both directions: a Decision
+	// spent by a triage can never also authorize a registration.
+	let triageSpender;
+	try {
+		triageSpender = foldProposals(cwd).find(
+			(entry) =>
+				entry.triage !== null &&
+				entry.triage.decision.identity === input.decision.identity &&
+				entry.triage.decision.revision === input.decision.revision,
+		);
+	} catch (err) {
+		return fail(err.amberCode || PROPOSAL_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (triageSpender)
+		return fail(MAINTAIN_INVALID_CODE, [
+			`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already triaged the proposal for ${JSON.stringify(triageSpender.fingerprint)}; a Decision is single-use across the maintain ledgers`,
+		]);
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
 	return appendLedgerEvent(
 		cwd,
@@ -791,9 +821,36 @@ const PROPOSAL_EVIDENCE_EVENT_FIELDS = Object.freeze([
 	"prevHash",
 	"hash",
 ]);
+const TRIAGE_INPUT_FIELDS = Object.freeze(["fingerprint", "outcome", "reason", "decision"]);
+const TRIAGE_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"fingerprint",
+	"outcome",
+	"reason",
+	"decision",
+	"prevHash",
+	"hash",
+]);
 
 function proposalEventProblem(event, lineIndex) {
 	const label = `maintain proposal event ${lineIndex}`;
+	if (event.kind === "triage") {
+		const closed = closedFieldProblem(event, TRIAGE_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		if (!isNonEmptyString(event.at)) return `${label}.at must be a non-empty string`;
+		if (!HASH_PATTERN.test(event.fingerprint ?? ""))
+			return `${label}.fingerprint must be a sha256:<64-hex> string`;
+		if (!TRIAGE_OUTCOMES.includes(event.outcome))
+			return `${label}.outcome must be one of ${TRIAGE_OUTCOMES.join(", ")}`;
+		if (event.outcome === "fix") {
+			if (event.reason !== null) return `${label}.reason must be null for a fix triage`;
+		} else if (!isNonEmptyString(event.reason)) {
+			return `${label}.reason must be a preserved non-empty string for ${event.outcome}`;
+		}
+		return decisionShapeProblem(event.decision, `${label}.decision`);
+	}
 	if (event.kind === "proposal") {
 		const closed = closedFieldProblem(event, PROPOSAL_EVENT_FIELDS, label);
 		if (closed !== null) return closed;
@@ -842,14 +899,15 @@ function foldProposals(cwd) {
 			throw proposalCorrupt(
 				`maintain proposal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
 			);
-		if (event.kind !== "proposal" && event.kind !== "evidence")
+		if (event.kind !== "proposal" && event.kind !== "evidence" && event.kind !== "triage")
 			throw proposalCorrupt(
 				`maintain proposal event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
 			);
 		const problem = proposalEventProblem(event, lineIndex);
 		if (problem !== null) throw proposalCorrupt(problem);
 		if (event.kind === "proposal") {
-			if (byFingerprint.has(event.fingerprint))
+			const current = byFingerprint.get(event.fingerprint);
+			if (current && current.status === "open")
 				throw proposalCorrupt(
 					`maintain proposal event ${lineIndex} reopens fingerprint ${JSON.stringify(event.fingerprint)} while a proposal is open`,
 				);
@@ -859,15 +917,20 @@ function foldProposals(cwd) {
 				status: "open",
 				findings: [findingIndex],
 				lastObservedAt: observedAt,
+				triage: null,
 				index,
 			};
 			proposals.push(proposal);
 			byFingerprint.set(event.fingerprint, proposal);
-		} else {
+		} else if (event.kind === "evidence") {
 			const proposal = byFingerprint.get(event.fingerprint);
 			if (!proposal)
 				throw proposalCorrupt(
 					`maintain proposal event ${lineIndex} appends evidence to unknown fingerprint ${JSON.stringify(event.fingerprint)}`,
+				);
+			if (proposal.status !== "open")
+				throw proposalCorrupt(
+					`maintain proposal event ${lineIndex} appends evidence to a triaged proposal`,
 				);
 			if (proposal.findings.includes(event.findingIndex))
 				throw proposalCorrupt(
@@ -877,6 +940,33 @@ function foldProposals(cwd) {
 			// An out-of-order (older) append never regresses the anchor.
 			if (Date.parse(event.observedAt) > Date.parse(proposal.lastObservedAt))
 				proposal.lastObservedAt = event.observedAt;
+		} else {
+			const proposal = byFingerprint.get(event.fingerprint);
+			if (!proposal)
+				throw proposalCorrupt(
+					`maintain proposal event ${lineIndex} triages unknown fingerprint ${JSON.stringify(event.fingerprint)}`,
+				);
+			if (proposal.status !== "open")
+				throw proposalCorrupt(
+					`maintain proposal event ${lineIndex} triages an already-triaged proposal`,
+				);
+			const spender = proposals.find(
+				(entry) =>
+					entry.triage !== null &&
+					entry.triage.decision.identity === event.decision.identity &&
+					entry.triage.decision.revision === event.decision.revision,
+			);
+			if (spender)
+				throw proposalCorrupt(
+					`maintain proposal event ${lineIndex} reuses triage decision ${JSON.stringify(event.decision.identity)}@${event.decision.revision}`,
+				);
+			proposal.status = "triaged";
+			proposal.triage = {
+				at: event.at,
+				outcome: event.outcome,
+				reason: event.reason,
+				decision: event.decision,
+			};
 		}
 		prevHash = event.hash;
 	});
@@ -892,6 +982,15 @@ const PROPOSAL_LEDGER = Object.freeze({
 	envName: "AMBER_MAINTAIN_MAX_PROPOSALS_BYTES",
 	label: "maintain proposal ledger",
 });
+
+// The latest proposal for a fingerprint carries its live state; earlier
+// triaged proposals stay listed for review but no longer bind it.
+function currentProposalFor(fold, fingerprint) {
+	for (let index = fold.length - 1; index >= 0; index -= 1) {
+		if (fold[index].fingerprint === fingerprint) return fold[index];
+	}
+	return null;
+}
 
 /**
  * Derive one immutable Trigger Proposal from one recorded out-of-band
@@ -932,8 +1031,9 @@ function propose(cwd, input = {}, opts = {}) {
 		PROPOSAL_LEDGER,
 		// The factory re-derives its branch from its own fold, so it agrees
 		// with the guard without depending on evaluation order.
-		(fold) =>
-			fold.some((entry) => entry.fingerprint === finding.fingerprint)
+		(fold) => {
+			const current = currentProposalFor(fold, finding.fingerprint);
+			return current !== null && current.status === "open"
 				? {
 						kind: "evidence",
 						schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
@@ -955,14 +1055,15 @@ function propose(cwd, input = {}, opts = {}) {
 						tier: finding.tier,
 						cooldownMs: detector.cooldownMs,
 						findingIndex: finding.index,
-					},
+					};
+		},
 		(fold) => {
-			const open = fold.find((entry) => entry.fingerprint === finding.fingerprint) ?? null;
-			if (open === null) {
+			const current = currentProposalFor(fold, finding.fingerprint);
+			if (current === null || current.status !== "open") {
 				action = "opened";
 				return null;
 			}
-			if (open.findings.includes(finding.index))
+			if (current.findings.includes(finding.index))
 				return fail(MAINTAIN_INVALID_CODE, [
 					`finding ${finding.index} is already referenced by the open proposal for ${JSON.stringify(finding.fingerprint)}`,
 				]);
@@ -970,7 +1071,7 @@ function propose(cwd, input = {}, opts = {}) {
 			// observation is correlation, not a new storm — it appends. The
 			// window is half-open, mirroring Approval validity: a delta of
 			// exactly cooldownMs is already outside.
-			const delta = Date.parse(finding.at) - Date.parse(open.lastObservedAt);
+			const delta = Date.parse(finding.at) - Date.parse(current.lastObservedAt);
 			if (delta >= detector.cooldownMs)
 				return fail(PROPOSAL_EXISTS_CODE, [
 					`an open proposal for ${JSON.stringify(finding.fingerprint)} is outside its ${detector.cooldownMs} ms cooldown and must be triaged before a new proposal may open`,
@@ -978,7 +1079,7 @@ function propose(cwd, input = {}, opts = {}) {
 			action = "appended";
 			return null;
 		},
-		(fold) => fold.find((entry) => entry.fingerprint === finding.fingerprint),
+		(fold) => currentProposalFor(fold, finding.fingerprint),
 	);
 	return { ...result, action: result.ok ? action : null };
 }
@@ -987,6 +1088,132 @@ function listProposals(cwd, { fingerprint = null } = {}) {
 	return foldProposals(cwd).filter(
 		(entry) => fingerprint === null || entry.fingerprint === fingerprint,
 	);
+}
+
+// The prepare-only CANDIDATE Intent admission payload a fix triage
+// returns, mirroring F051 migration candidates: a plain input for the
+// normal canonical artifact surface. Nothing is auto-admitted — the
+// candidate still faces Intent admission, scope, Policy, and Acceptance.
+// The identity derives from the fingerprint deliberately, so re-fixing a
+// reopened proposal revises the SAME Intent (a second admission passes
+// expectedHead through the normal CAS rules).
+function candidateIntentFor(proposal, findings) {
+	const referenced = findings.filter((entry) => proposal.findings.includes(entry.index));
+	return {
+		type: "intent",
+		identity: `intent/maintain/${proposal.fingerprint.slice(7, 23)}`,
+		body: [
+			`# Fix ${proposal.subject}: ${proposal.detectorId}@${proposal.detectorVersion} out of band`,
+			"",
+			`Control Band detector ${proposal.detectorId}@${proposal.detectorVersion} observed ${proposal.subject} at tier ${proposal.tier} in scope ${proposal.scope}.`,
+			"",
+			`Fingerprint: ${proposal.fingerprint}`,
+			"",
+			"Evidence (maintain Findings):",
+			...referenced.map(
+				(entry) =>
+					`- finding ${entry.index}: value ${entry.value} (${entry.tier}) over ${entry.window.from} .. ${entry.window.to}, input ${entry.inputHash}`,
+			),
+			"",
+		].join("\n"),
+		scope: proposal.scope,
+	};
+}
+
+/**
+ * Bind one open Trigger Proposal to one committed human Decision under
+ * the closed fix|schedule|dismiss vocabulary. schedule and dismiss
+ * preserve their reasons and close the proposal reviewably; only fix
+ * additionally returns a prepare-only candidate Intent admission payload
+ * — triage itself never mutates canonical state, and the Decision is
+ * single-use across the maintain ledgers.
+ */
+function triage(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, candidate: null, errors });
+	if (!isPlainObject(input)) return fail(MAINTAIN_INVALID_CODE, ["triage input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, TRIAGE_INPUT_FIELDS, "triage input");
+	if (inputClosed !== null) return fail(MAINTAIN_INVALID_CODE, [inputClosed]);
+	if (!HASH_PATTERN.test(input.fingerprint ?? ""))
+		return fail(MAINTAIN_INVALID_CODE, ["fingerprint must be a sha256:<64-hex> string"]);
+	if (!TRIAGE_OUTCOMES.includes(input.outcome))
+		return fail(MAINTAIN_INVALID_CODE, [`outcome must be one of ${TRIAGE_OUTCOMES.join(", ")}`]);
+	const reason = input.reason ?? null;
+	if (input.outcome === "fix") {
+		if (reason !== null)
+			return fail(MAINTAIN_INVALID_CODE, [
+				"a fix triage carries its rationale in the candidate Intent body; reason is preserved only for schedule and dismiss",
+			]);
+	} else if (!isNonEmptyString(reason)) {
+		return fail(MAINTAIN_INVALID_CODE, [
+			`a ${input.outcome} triage must preserve a non-empty reason`,
+		]);
+	}
+	const pinProblem = decisionPinProblem(input.decision);
+	if (pinProblem !== null) return fail(MAINTAIN_INVALID_CODE, [pinProblem]);
+	const resolved = resolveRegistryDecision(cwd, input.decision, "maintain triage");
+	if (!resolved.ok) return fail(resolved.code, resolved.errors);
+	let registrationSpender;
+	try {
+		registrationSpender = decisionSpentBy(foldDetectors(cwd), input.decision);
+	} catch (err) {
+		return fail(err.amberCode || MAINTAIN_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (registrationSpender !== null)
+		return fail(MAINTAIN_INVALID_CODE, [
+			`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized detector ${JSON.stringify(registrationSpender)}; a Decision is single-use across the maintain ledgers`,
+		]);
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	let candidate = null;
+	const result = appendLedgerEvent(
+		cwd,
+		PROPOSAL_LEDGER,
+		{
+			kind: "triage",
+			schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
+			at,
+			fingerprint: input.fingerprint,
+			outcome: input.outcome,
+			reason,
+			decision: resolved.decision,
+		},
+		(fold) => {
+			const current = currentProposalFor(fold, input.fingerprint);
+			if (current === null)
+				return fail(MAINTAIN_NOT_FOUND_CODE, [
+					`no proposal exists for ${JSON.stringify(input.fingerprint)}`,
+				]);
+			if (current.status !== "open")
+				return fail(MAINTAIN_INVALID_CODE, [
+					`the proposal for ${JSON.stringify(input.fingerprint)} is already triaged (${current.triage.outcome}); triage of a closed proposal refuses`,
+				]);
+			const spender = fold.find(
+				(entry) =>
+					entry.triage !== null &&
+					entry.triage.decision.identity === input.decision.identity &&
+					entry.triage.decision.revision === input.decision.revision,
+			);
+			if (spender)
+				return fail(MAINTAIN_INVALID_CODE, [
+					`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already triaged the proposal for ${JSON.stringify(spender.fingerprint)}; a Decision is single-use across the maintain ledgers`,
+				]);
+			if (input.outcome === "fix") {
+				// Folded under the proposal lock: evidence is only appended
+				// while this lock is held, so the candidate sees every
+				// Finding the proposal references.
+				let findings;
+				try {
+					findings = foldFindings(cwd);
+				} catch (err) {
+					return fail(err.amberCode || FINDING_CORRUPT_CODE, [err.message || String(err)]);
+				}
+				candidate = candidateIntentFor(current, findings);
+			}
+			return null;
+		},
+		(fold) => currentProposalFor(fold, input.fingerprint),
+	);
+	if (!result.ok) return { ...result, candidate: null };
+	return { ...result, candidate };
 }
 
 module.exports = {
@@ -1012,4 +1239,6 @@ module.exports = {
 	proposalsPath,
 	propose,
 	listProposals,
+	TRIAGE_OUTCOMES,
+	triage,
 };
