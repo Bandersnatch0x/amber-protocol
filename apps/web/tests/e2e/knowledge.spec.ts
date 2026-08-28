@@ -40,8 +40,12 @@ function expectLightShell(channels: number[]): void {
 // The subtitle count words are localized; parameterize so en and zh tests
 // share one wait + parse path.
 const SUBTITLE_PATTERNS = {
-  en: { marker: /nodes/, nodes: /(\d+)\/(\d+)\s+nodes/, edges: /(\d+)\s+edges/ },
-  zh: { marker: /节点/, nodes: /(\d+)\/(\d+)\s*节点/, edges: /(\d+)\s*条边/ },
+  en: {
+    marker: /nodes/,
+    nodes: /(\d+)\/(\d+)\s+nodes/,
+    edges: /(\d+)\s+deterministic\s+edges/,
+  },
+  zh: { marker: /节点/, nodes: /(\d+)\/(\d+)\s*节点/, edges: /(\d+)\s*条确定性边/ },
 } as const;
 type SubtitleLocale = keyof typeof SUBTITLE_PATTERNS;
 
