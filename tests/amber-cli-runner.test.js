@@ -239,7 +239,7 @@ test("runner refusals carry stable codes", () => {
 	assert.match(envelope(trailingPrefix).errors[0], /--path-prefix requires a value/);
 });
 
-test("runner request and authorize form the governed execution request lifecycle", () => {
+test("runner request, authorize, prepare, and settle form the governed execution lifecycle", () => {
 	const dir = mkTarget("request");
 	assert.equal(
 		registerPrincipal(dir, { id: "alice@example.com", principalKind: "human" }).ok,
@@ -389,6 +389,67 @@ test("runner request and authorize form the governed execution request lifecycle
 		listed.map((entry) => entry.status),
 		["authorized", "denied"],
 	);
+
+	const prepared = runCli(
+		[
+			"runner",
+			"prepare",
+			"--request-hash",
+			request.requestHash,
+			"--id",
+			"runner/ci",
+			"--runner-version",
+			"1.0.0",
+			"--integrity",
+			DIGEST,
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
+	assert.equal(payload(prepared).status, "attempted");
+
+	const receiptPath = path.join(dir, "receipt.json");
+	fs.writeFileSync(
+		receiptPath,
+		JSON.stringify({
+			runner: { id: "runner/ci", version: "1.0.0", integrityDigest: DIGEST },
+			exitCode: 0,
+			signal: null,
+			timedOut: false,
+			startedAt: "2026-08-28T01:00:00.000Z",
+			finishedAt: "2026-08-28T01:02:00.000Z",
+			durationMs: 120000,
+			outputsDigest: DIGEST,
+			scope: { repository: "repo/main", paths: ["deploy/staging/web"] },
+			sandboxAssurance: "observed",
+			credentialAssurance: "observed",
+		}),
+	);
+	const settled = runCli(
+		[
+			"runner",
+			"settle",
+			"--request-hash",
+			request.requestHash,
+			"--receipt",
+			"receipt.json",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(settled.status, 0, settled.stderr || settled.stdout);
+	assert.equal(payload(settled).status, "committed");
+
+	const executions = payload(
+		runCli(["runner", "executions", "--status", "committed", "--target", dir, "--json"], dir),
+	);
+	assert.equal(executions.length, 1);
+	assert.equal(executions[0].settlement.resultIntegrity, "receipt-bound");
 });
 
 test("runner help is registered", () => {

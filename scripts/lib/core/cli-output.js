@@ -209,6 +209,9 @@ const FLAG_SPECS = {
 	"--credential-scope": { key: "credentialScope" },
 	"--credential-expires": { key: "credentialExpires" },
 	"--rehearsal": { key: "rehearsal" },
+	// F052 ticket 4 (#258): execution settlement flags (--evidence,
+	// --reason, and --status are shared with the existing surfaces).
+	"--receipt": { key: "receipt" },
 	"--identity-map": { key: "identityMap" },
 	"--freshness-ms": { key: "freshnessMs" },
 	"--allow-path": { key: "allowPath" },

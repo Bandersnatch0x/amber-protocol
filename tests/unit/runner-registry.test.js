@@ -45,6 +45,19 @@ const {
 	authorizeRunnerRequest,
 	showRunnerRequest,
 	listRunnerRequests,
+	RUNNER_EXECUTION_SCHEMA_VERSION,
+	SUPPORTED_RUNNER_EXECUTION_SCHEMA_VERSIONS,
+	EXECUTION_OUTCOMES,
+	RESULT_INTEGRITY,
+	executionsPath,
+	prepareRunnerExecution,
+	settleRunnerExecution,
+	abortRunnerExecution,
+	markRunnerExecutionRolledBack,
+	showRunnerExecution,
+	listRunnerExecutions,
+	executionGateInputs,
+	SETTLED_OUTCOMES,
 } = require("../../scripts/lib/core/runner-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
@@ -919,4 +932,308 @@ test("a stale environment profile version fails authorization closed", () => {
 	assert.equal(drifted.ok, false);
 	assert.equal(drifted.code, "AMBER_E_RUNNER_REQUEST_DRIFT");
 	assert.match(drifted.errors[0], /environment profile version/);
+});
+
+// ── F052 T4 (#258): execution settlement, receipts & assurance ──
+
+/** An authorized staging deploy ready for execution; returns its hash. */
+function executionFixture(dir) {
+	requestFixture(dir);
+	const submitted = submitRunnerRequest(dir, requestInput(), { now: NOW });
+	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
+	approvalFixture(dir, "approval/req-1", submitted.record.approvalBinding);
+	const authorized = authorizeRunnerRequest(dir, authorizeInput(submitted.record.requestHash), {
+		now: NOW,
+	});
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+	return submitted.record.requestHash;
+}
+
+const RUNNER_PIN = Object.freeze({ id: "runner/ci", version: "1.0.0", integrityDigest: DIGEST });
+
+function resultReceipt(overrides = {}) {
+	return {
+		runner: { ...RUNNER_PIN },
+		exitCode: 0,
+		signal: null,
+		timedOut: false,
+		startedAt: "2026-08-28T01:00:00.000Z",
+		finishedAt: "2026-08-28T01:02:00.000Z",
+		durationMs: 120_000,
+		outputsDigest: DIGEST,
+		scope: { repository: "repo/main", paths: ["deploy/staging/web"] },
+		sandboxAssurance: "observed",
+		credentialAssurance: "observed",
+		...overrides,
+	};
+}
+
+test("execution constants pin the outcome vocabulary and integrity field", () => {
+	assert.equal(RUNNER_EXECUTION_SCHEMA_VERSION, 1);
+	assert.deepEqual(SUPPORTED_RUNNER_EXECUTION_SCHEMA_VERSIONS, [1]);
+	assert.deepEqual(EXECUTION_OUTCOMES, [
+		"attempted",
+		"timed-out",
+		"failed",
+		"committed",
+		"rolled-back",
+	]);
+	assert.deepEqual(SETTLED_OUTCOMES, ["committed", "timed-out", "failed"]);
+	assert.deepEqual(RESULT_INTEGRITY, ["receipt-bound"]);
+});
+
+test("preparation binds one registered executor to one authorized request", () => {
+	const dir = mkTarget("prepare");
+	requestFixture(dir);
+	const submitted = submitRunnerRequest(dir, requestInput(), { now: NOW });
+	assert.equal(submitted.ok, true);
+	const hash = submitted.record.requestHash;
+
+	const early = prepareRunnerExecution(dir, { requestHash: hash, runner: { ...RUNNER_PIN } });
+	assert.equal(early.code, "AMBER_E_RUNNER_EXECUTION_STATE");
+	assert.match(early.errors[0], /execution follows authorization/);
+
+	approvalFixture(dir, "approval/req-1", submitted.record.approvalBinding);
+	assert.equal(authorizeRunnerRequest(dir, authorizeInput(hash), { now: NOW }).ok, true);
+
+	const ghost = prepareRunnerExecution(dir, {
+		requestHash: `sha256:${"f".repeat(64)}`,
+		runner: { ...RUNNER_PIN },
+	});
+	assert.equal(ghost.code, "AMBER_E_RUNNER_EXECUTION_NOT_FOUND");
+
+	const stranger = prepareRunnerExecution(dir, {
+		requestHash: hash,
+		runner: { ...RUNNER_PIN, id: "runner/other" },
+	});
+	assert.equal(stranger.code, "AMBER_E_RUNNER_EXECUTION_INVALID");
+	assert.match(stranger.errors[0], /cannot execute it/);
+
+	const drifted = prepareRunnerExecution(dir, {
+		requestHash: hash,
+		runner: { ...RUNNER_PIN, integrityDigest: `sha256:${"c".repeat(64)}` },
+	});
+	assert.equal(drifted.code, "AMBER_E_RUNNER_INTEGRITY_MISMATCH");
+
+	const prepared = prepareRunnerExecution(dir, { requestHash: hash, runner: { ...RUNNER_PIN } });
+	assert.equal(prepared.ok, true, (prepared.errors || []).join("; "));
+	assert.equal(prepared.record.status, "attempted");
+	assert.equal(prepared.record.terminal, false);
+
+	const concurrent = prepareRunnerExecution(dir, { requestHash: hash, runner: { ...RUNNER_PIN } });
+	assert.equal(concurrent.code, "AMBER_E_RUNNER_EXECUTION_EXISTS");
+});
+
+test("Amber derives the outcome; execution never reports fake success", () => {
+	const dir = mkTarget("settle");
+	const hash = executionFixture(dir);
+
+	const unprepared = settleRunnerExecution(dir, { requestHash: hash, receipt: resultReceipt() });
+	assert.equal(unprepared.code, "AMBER_E_RUNNER_EXECUTION_STATE");
+
+	assert.equal(
+		prepareRunnerExecution(dir, { requestHash: hash, runner: { ...RUNNER_PIN } }).ok,
+		true,
+	);
+
+	const claimed = settleRunnerExecution(dir, {
+		requestHash: hash,
+		receipt: resultReceipt({ sandboxAssurance: "verified" }),
+	});
+	assert.equal(claimed.code, "AMBER_E_RUNNER_EXECUTION_INVALID");
+	assert.match(claimed.errors[0], /never recordable at settlement/);
+
+	const causeless = settleRunnerExecution(dir, {
+		requestHash: hash,
+		receipt: resultReceipt({ exitCode: null }),
+	});
+	assert.equal(causeless.code, "AMBER_E_RUNNER_EXECUTION_INVALID");
+	assert.match(causeless.errors[0], /no termination cause/);
+
+	const inconsistent = settleRunnerExecution(dir, {
+		requestHash: hash,
+		receipt: resultReceipt({ durationMs: 999_999 }),
+	});
+	assert.equal(inconsistent.code, "AMBER_E_RUNNER_EXECUTION_INVALID");
+	assert.match(inconsistent.errors[0], /exceeds the receipt's own/);
+
+	const escaped = settleRunnerExecution(dir, {
+		requestHash: hash,
+		receipt: resultReceipt({
+			scope: { repository: "repo/main", paths: ["deploy/staging/../../etc"] },
+		}),
+	});
+	assert.equal(escaped.ok, false);
+	assert.equal(escaped.code, "AMBER_E_RUNNER_EXECUTION_SCOPE");
+	assert.equal(escaped.record.status, "failed");
+	assert.match(escaped.record.settlement.reason, /outside the authorized target paths/);
+	assert.equal(escaped.record.settlement.resultIntegrity, "receipt-bound");
+	assert.equal(escaped.record.settlement.receipt.sandboxAssurance, "observed");
+
+	const again = settleRunnerExecution(dir, { requestHash: hash, receipt: resultReceipt() });
+	assert.equal(again.code, "AMBER_E_RUNNER_EXECUTION_STATE");
+	assert.match(again.errors[0], /settlement is immutable/);
+});
+
+test("timeout, signal, and non-zero exit settle as their explicit outcomes", () => {
+	const dir = mkTarget("settle-outcomes");
+	const hash = executionFixture(dir);
+	assert.equal(
+		prepareRunnerExecution(dir, { requestHash: hash, runner: { ...RUNNER_PIN } }).ok,
+		true,
+	);
+
+	// The runner does not report timeout, but the wall clock ran past the
+	// authorized bound: Amber derives timed-out from the bound, never from
+	// the claim.
+	const overBound = settleRunnerExecution(dir, {
+		requestHash: hash,
+		receipt: resultReceipt({
+			finishedAt: "2026-08-28T01:10:00.000Z",
+			durationMs: 350_000,
+		}),
+	});
+	assert.equal(overBound.ok, false);
+	assert.equal(overBound.code, "AMBER_E_RUNNER_EXECUTION_TIMEOUT");
+	assert.equal(overBound.record.status, "timed-out");
+	assert.match(overBound.record.settlement.reason, /without reporting timeout/);
+	assert.equal(showRunnerExecution(dir, hash).status, "timed-out");
+	assert.equal(listRunnerExecutions(dir, { status: "timed-out" }).length, 1);
+});
+
+test("committed executions settle, roll back with evidence, and stay immutable", () => {
+	const dir = mkTarget("settle-commit");
+	const hash = executionFixture(dir);
+	assert.equal(
+		prepareRunnerExecution(dir, { requestHash: hash, runner: { ...RUNNER_PIN } }).ok,
+		true,
+	);
+
+	const premature = markRunnerExecutionRolledBack(dir, {
+		requestHash: hash,
+		evidence: "evidence/rehearsal-1",
+		reason: "nothing committed yet",
+	});
+	assert.equal(premature.code, "AMBER_E_RUNNER_EXECUTION_STATE");
+
+	const committed = settleRunnerExecution(dir, { requestHash: hash, receipt: resultReceipt() });
+	assert.equal(committed.ok, true, (committed.errors || []).join("; "));
+	assert.equal(committed.record.status, "committed");
+	assert.equal(committed.record.settlement.outcome, "committed");
+	assert.deepEqual(executionGateInputs(dir, hash), {
+		sandboxAssurance: "observed",
+		credentialAssurance: "observed",
+		resultIntegrity: "receipt-bound",
+	});
+	assert.equal(executionGateInputs(dir, `sha256:${"f".repeat(64)}`), null);
+
+	const ghostEvidence = markRunnerExecutionRolledBack(dir, {
+		requestHash: hash,
+		evidence: "evidence/ghost",
+		reason: "reverted",
+	});
+	assert.equal(ghostEvidence.code, "AMBER_E_RUNNER_EXECUTION_INVALID");
+	assert.match(ghostEvidence.errors[0], /names no recorded Evidence receipt/);
+
+	const rolledBack = markRunnerExecutionRolledBack(dir, {
+		requestHash: hash,
+		evidence: "evidence/rehearsal-1",
+		reason: "staging deploy reverted",
+	});
+	assert.equal(rolledBack.ok, true, (rolledBack.errors || []).join("; "));
+	assert.equal(rolledBack.record.status, "rolled-back");
+
+	const twice = markRunnerExecutionRolledBack(dir, {
+		requestHash: hash,
+		evidence: "evidence/rehearsal-1",
+		reason: "again",
+	});
+	assert.equal(twice.code, "AMBER_E_RUNNER_EXECUTION_STATE");
+});
+
+test("an abandoned execution aborts explicitly and stays recorded", () => {
+	const dir = mkTarget("abort");
+	const hash = executionFixture(dir);
+	assert.equal(
+		prepareRunnerExecution(dir, { requestHash: hash, runner: { ...RUNNER_PIN } }).ok,
+		true,
+	);
+
+	const aborted = abortRunnerExecution(dir, {
+		requestHash: hash,
+		reason: "runner lost; no result receipt arrived",
+	});
+	assert.equal(aborted.ok, true, (aborted.errors || []).join("; "));
+	assert.equal(aborted.record.status, "attempted");
+	assert.equal(aborted.record.terminal, true);
+
+	const late = settleRunnerExecution(dir, { requestHash: hash, receipt: resultReceipt() });
+	assert.equal(late.code, "AMBER_E_RUNNER_EXECUTION_STATE");
+	assert.equal(listRunnerExecutions(dir, { status: "attempted" }).length, 1);
+});
+
+test("tampered execution journal fails every read closed", () => {
+	const dir = mkTarget("execution-tamper");
+	const hash = executionFixture(dir);
+	assert.equal(
+		prepareRunnerExecution(dir, { requestHash: hash, runner: { ...RUNNER_PIN } }).ok,
+		true,
+	);
+	assert.equal(
+		settleRunnerExecution(dir, { requestHash: hash, receipt: resultReceipt() }).ok,
+		true,
+	);
+
+	const lines = fs
+		.readFileSync(executionsPath(dir), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	lines[1].receipt.exitCode = 1;
+	writeJSONL(executionsPath(dir), lines);
+	assert.throws(
+		() => listRunnerExecutions(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_RUNNER_EXECUTION_CORRUPT" && /hash chain|match/.test(err.message),
+	);
+
+	// Even a tamper that REWRITES the chain hashes trips the dedicated
+	// receiptHash binding: the receipt cannot be swapped under a valid
+	// chain.
+	const rewritten = lines.map(({ prevHash: _prev, hash: _hash, ...body }) => body);
+	rewritten[1] = { ...rewritten[1], receipt: { ...rewritten[1].receipt, exitCode: 1 } };
+	let prev = GENESIS_HASH;
+	const rechained = rewritten.map((body) => {
+		const event = { ...body, prevHash: prev, hash: chainHash(body, prev) };
+		prev = event.hash;
+		return event;
+	});
+	writeJSONL(executionsPath(dir), rechained);
+	assert.throws(
+		() => listRunnerExecutions(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_RUNNER_EXECUTION_CORRUPT" &&
+			/receiptHash does not match/.test(err.message),
+	);
+
+	// A removed event is a chain break in its own right.
+	writeJSONL(executionsPath(dir), [rechained[1]]);
+	assert.throws(
+		() => listRunnerExecutions(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_RUNNER_EXECUTION_CORRUPT" &&
+			/breaks the hash chain/.test(err.message),
+	);
+});
+
+test("the MCP seam exposes no runner execution surface", () => {
+	const { COMMAND_CAPABILITIES } = require("../../scripts/lib/mcp-action-contracts");
+	// Target-write execution is returned approval-required and never
+	// spawned (ADR-0022/F018): the MCP capability registry carries no
+	// runner verb at all, so no registry-proven read-only variant can ever
+	// auto-execute one.
+	const runnerCapabilities = Object.keys(COMMAND_CAPABILITIES).filter((key) =>
+		key.split(/[\s.:/-]/).includes("runner"),
+	);
+	assert.deepEqual(runnerCapabilities, []);
 });

@@ -1738,6 +1738,91 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_RUNNER_REQUEST_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	// F052 T4 (#258): execution settlement & receipt codes.
+	AMBER_E_RUNNER_EXECUTION_INVALID: {
+		title: "Runner execution input is invalid",
+		cause:
+			"A prepare/settle/abort/rolled-back call carried an unknown field, malformed value, a receipt claiming verified assurance, an unresolvable Evidence reference, or an executor pin that is not the prepared (or requested) runner.",
+		remedy: "Fix the flagged field; the closed field sets and vocabularies are in the message.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_EXECUTION_STATE", "AMBER_E_RUNNER_EXECUTION_CORRUPT"],
+	},
+	AMBER_E_RUNNER_EXECUTION_EXISTS: {
+		title: "Runner execution already prepared",
+		cause:
+			"A second prepare named a request hash that already entered execution settlement; one authorization settles at most one execution.",
+		remedy: "Settle or abort the live execution; a re-run needs a fresh request and authorization.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_EXECUTION_STATE"],
+	},
+	AMBER_E_RUNNER_EXECUTION_NOT_FOUND: {
+		title: "Runner execution is not recorded",
+		cause: "An operation named a request hash absent from the request ledger or never prepared.",
+		remedy:
+			"Prepare the authorized request first (`amber runner prepare`); see `amber runner executions`.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_NOT_FOUND"],
+	},
+	AMBER_E_RUNNER_EXECUTION_STATE: {
+		title: "Runner execution lifecycle refusal",
+		cause:
+			"The operation does not fit the settlement state: settling an unprepared or already-terminal execution, preparing an unauthorized request, aborting after settlement, or rolling back a non-committed execution.",
+		remedy:
+			"Inspect the derived state (`amber runner executions`) and follow prepared → settled/aborted.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_EXECUTION_EXISTS", "AMBER_E_RUNNER_EXECUTION_INVALID"],
+	},
+	AMBER_E_RUNNER_EXECUTION_TIMEOUT: {
+		title: "Runner execution timed out",
+		cause:
+			"The result receipt reports a timeout; the timed-out outcome is recorded append-only and never reads as success.",
+		remedy: "Investigate the runner; a retry needs a fresh request and authorization.",
+		layer: "Verification",
+		related: ["AMBER_E_RUNNER_EXECUTION_FAILED"],
+	},
+	AMBER_E_RUNNER_EXECUTION_FAILED: {
+		title: "Runner execution failed",
+		cause:
+			"The result receipt reports a non-zero exit code or a terminating signal; the failed outcome is recorded append-only and never reads as success.",
+		remedy: "Investigate the runner output; a retry needs a fresh request and authorization.",
+		layer: "Verification",
+		related: ["AMBER_E_RUNNER_EXECUTION_TIMEOUT", "AMBER_E_RUNNER_EXECUTION_SCOPE"],
+	},
+	AMBER_E_RUNNER_EXECUTION_SCOPE: {
+		title: "Runner execution escaped its authorized scope",
+		cause:
+			"The result receipt reports a repository or path outside the authorized target; the failed outcome is recorded append-only — an approved operation can never widen its blast radius silently.",
+		remedy:
+			"Treat as an incident: audit the runner, then request a corrected, re-authorized operation.",
+		layer: "Verification",
+		related: ["AMBER_E_RUNNER_EXECUTION_FAILED"],
+	},
+	AMBER_E_RUNNER_EXECUTION_CORRUPT: {
+		title: "Runner execution journal failed verification",
+		cause:
+			"The hash-chained execution journal has a broken chain, edited event, unsupported schema version, settlement without preparation, double settlement, or a receipt that no longer matches its recorded receiptHash.",
+		remedy:
+			"Treat the journal as evidence; restore .amber/runner/executions.jsonl from history and investigate the tamper.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_EXECUTION_LOCK", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_RUNNER_EXECUTION_LOCK: {
+		title: "Runner execution journal is locked",
+		cause:
+			"Another process holds the execution journal lock (stale locks reclaim after 30 seconds).",
+		remedy: "Retry after the concurrent settlement finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_EXECUTION_CORRUPT"],
+	},
+	AMBER_E_RUNNER_EXECUTION_SIZE_CEILING: {
+		title: "Runner execution journal size ceiling reached",
+		cause:
+			"Appending the event would grow the journal past its byte ceiling (default 1 MiB, AMBER_RUNNER_MAX_EXECUTIONS_BYTES).",
+		remedy:
+			"Raise AMBER_RUNNER_MAX_EXECUTIONS_BYTES deliberately or archive the journal through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_EXECUTION_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
