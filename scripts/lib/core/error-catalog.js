@@ -2156,6 +2156,65 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_RETENTION_HOLD_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_RETENTION_HOLDER_CORRUPT: {
+		title: "Retention Holder registry corrupt",
+		cause:
+			"The holder registry under .amber/retention/ has a broken hash chain, an invalid event shape, a duplicate registration, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/retention/holders.jsonl from version control or a backup; the registry is append-only and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_CANDIDATE_CORRUPT", "AMBER_E_RETENTION_HOLDER_LOCK"],
+	},
+	AMBER_E_RETENTION_HOLDER_LOCK: {
+		title: "Retention Holder registry lock contended",
+		cause: "Another process holds the holder registry lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent holder operation finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_HOLDER_CORRUPT", "AMBER_E_RETENTION_LOCK"],
+	},
+	AMBER_E_RETENTION_HOLDER_SIZE_CEILING: {
+		title: "Retention Holder registry size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_RETENTION_MAX_HOLDERS_BYTES).",
+		remedy:
+			"Raise AMBER_RETENTION_MAX_HOLDERS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_HOLDER_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_RETENTION_CANDIDATE_CORRUPT: {
+		title: "Deletion candidate ledger corrupt",
+		cause:
+			"The candidate ledger under .amber/retention/ has a broken hash chain, an invalid event shape, a reused candidate id, an authorization of an unknown or already-authorized candidate, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/retention/candidates.jsonl from version control or a backup; candidates are immutable and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_HOLDER_CORRUPT", "AMBER_E_RETENTION_CANDIDATE_LOCK"],
+	},
+	AMBER_E_RETENTION_CANDIDATE_LOCK: {
+		title: "Deletion candidate ledger lock contended",
+		cause: "Another process holds the candidate ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent candidate operation finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_CANDIDATE_CORRUPT", "AMBER_E_RETENTION_LOCK"],
+	},
+	AMBER_E_RETENTION_CANDIDATE_SIZE_CEILING: {
+		title: "Deletion candidate ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_RETENTION_MAX_CANDIDATES_BYTES).",
+		remedy:
+			"Raise AMBER_RETENTION_MAX_CANDIDATES_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_CANDIDATE_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_RETENTION_DRIFT: {
+		title: "Deletion candidate drifted since review",
+		cause:
+			"Re-deriving the candidate content at its recorded clock no longer matches the reviewed candidateHash: records, Legal Holds, registered Holders, or proposed effects changed after preparation.",
+		remedy:
+			"Prepare a fresh candidate, review the new enumeration, and authorize the new candidateHash.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_CANDIDATE_CORRUPT", "AMBER_E_RETENTION_INVALID"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

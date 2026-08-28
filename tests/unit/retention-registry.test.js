@@ -35,9 +35,21 @@ const {
 	hold,
 	releaseHold,
 	listHolds,
+	HOLDER_SURFACES,
+	CANDIDATE_STATUSES,
+	holdersPath,
+	registerHolder,
+	listHolders,
+	candidatesPath,
+	prepareDeletionCandidate,
+	authorizeDeletion,
+	showDeletionCandidate,
+	listDeletionCandidates,
 } = require("../../scripts/lib/core/retention-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
+const { registerAdapter } = require("../../scripts/lib/core/adapter-registry");
+const { grantApproval } = require("../../scripts/lib/core/approval-registry");
 
 function mkTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-retention-${label}-`));
@@ -604,4 +616,363 @@ test("a tampered hold ledger fails every read closed", () => {
 			err.amberCode === "AMBER_E_RETENTION_HOLD_CORRUPT" &&
 			/releases an already-released hold/.test(err.message),
 	);
+});
+
+/** Adapter + holder decisions on top of the hold fixture. */
+function deletionFixture(dir) {
+	retentionFixture(dir);
+	holdFixture(dir, ["decision/hold-1", "decision/holder-1", "decision/holder-2"]);
+	const registered = registerAdapter(dir, {
+		id: "adapter/store",
+		owner: "storage-team",
+		adapterVersion: "1",
+		recordTypes: [{ type: "canonical-record", versions: ["v1"] }],
+		scope: "F055",
+		identityMapping: { strategy: "path" },
+		freshness: { maxAgeMs: 86_400_000 },
+		permissions: { readOnly: true, allowedPaths: ["store"] },
+	});
+	assert.equal(registered.ok, true, (registered.errors || []).join("; "));
+}
+
+function holderInput(overrides = {}) {
+	return {
+		id: "holder/canonical-body",
+		version: "1",
+		surface: "canonical-body",
+		adapter: { id: "adapter/store", version: "1" },
+		decision: { identity: "decision/holder-1", revision: 1 },
+		...overrides,
+	};
+}
+
+test("a Holder binds one closed surface to a registered Adapter pin", () => {
+	assert.deepEqual(
+		[...HOLDER_SURFACES],
+		["canonical-body", "raw-output", "cache", "index", "export", "subscription", "external"],
+	);
+	assert.deepEqual([...CANDIDATE_STATUSES], ["prepared", "authorized"]);
+	const dir = mkTarget("holder");
+	deletionFixture(dir);
+	const registered = registerHolder(dir, holderInput(), { now: NOW });
+	assert.equal(registered.ok, true, (registered.errors || []).join("; "));
+	assert.equal(registered.record.surface, "canonical-body");
+	assert.deepEqual(registered.record.adapter, { id: "adapter/store", version: "1" });
+	assert.equal(registered.record.decision.principal, "legal@example.com");
+	assert.equal(listHolders(dir).length, 1);
+	const cases = [
+		[holderInput({ surface: "everything" }), /surface must be one of/],
+		[
+			holderInput({ adapter: { id: "adapter/ghost", version: "1" } }),
+			/adapter "adapter\/ghost" is not registered/,
+		],
+		[
+			holderInput({ adapter: { id: "adapter/store", version: "9" } }),
+			/registered at version "1", not the pinned "9"/,
+		],
+		[
+			holderInput({ decision: { identity: "decision/holder-2", revision: 1 } }),
+			/already registered; a changed declaration registers a new version/,
+		],
+		[
+			holderInput({ id: "holder/second" }),
+			/already authorized holder "holder\/canonical-body@1"; a registration Decision is single-use/,
+		],
+	];
+	for (const [input, pattern] of cases) {
+		const result = registerHolder(dir, input, { now: NOW });
+		assert.equal(result.ok, false, JSON.stringify(input));
+		assert.match(result.errors[0], pattern);
+	}
+});
+
+test("a deletion candidate reviews everything and deletes nothing", () => {
+	const dir = mkTarget("candidate");
+	deletionFixture(dir);
+	assert.equal(registerHolder(dir, holderInput(), { now: NOW }).ok, true);
+	// Nothing eligible yet: preparing refuses instead of reviewing nothing.
+	const premature = prepareDeletionCandidate(dir, { id: "deletion/1" }, { now: NOW });
+	assert.equal(premature.ok, false);
+	assert.match(premature.errors[0], /no record is expired-eligible/);
+	assert.equal(classify(dir, classifyInput(), { now: NOW }).ok, true);
+	const expired = new Date(NOW.getTime() + HOUR_MS);
+	const before = {
+		classifications: fs.readFileSync(classificationsPath(dir), "utf8"),
+		holders: fs.readFileSync(holdersPath(dir), "utf8"),
+	};
+	const prepared = prepareDeletionCandidate(dir, { id: "deletion/1" }, { now: expired });
+	assert.equal(prepared.ok, true, (prepared.errors || []).join("; "));
+	assert.equal(prepared.record.status, "prepared");
+	assert.equal(prepared.record.records.length, 1);
+	assert.equal(prepared.record.records[0].legalBasis, "ops-contract");
+	assert.deepEqual(prepared.record.records[0].record, {
+		type: "intent",
+		identity: "intent/login",
+		revision: 1,
+	});
+	assert.deepEqual(prepared.record.excludedHeld, []);
+	assert.equal(prepared.record.holders.length, 1);
+	assert.equal(prepared.record.effects.length, 1);
+	assert.equal(prepared.record.effects[0].effect, "delete");
+	assert.match(prepared.record.candidateHash, /^sha256:[0-9a-f]{64}$/);
+	// Governance-write only: the other retention ledgers are untouched
+	// (no hold ledger exists yet, and none appears).
+	assert.equal(fs.readFileSync(classificationsPath(dir), "utf8"), before.classifications);
+	assert.equal(fs.readFileSync(holdersPath(dir), "utf8"), before.holders);
+	assert.equal(fs.existsSync(holdsPath(dir)), false);
+	const duplicate = prepareDeletionCandidate(dir, { id: "deletion/1" }, { now: expired });
+	assert.equal(duplicate.ok, false);
+	assert.match(duplicate.errors[0], /already exists/);
+	// With the only record held, nothing is eligible and preparing refuses
+	// (the exclusion listing is covered by the mixed-record test).
+	assert.equal(hold(dir, holdInput(), { now: NOW }).ok, true);
+	const heldCandidate = prepareDeletionCandidate(dir, { id: "deletion/2" }, { now: expired });
+	assert.equal(heldCandidate.ok, false);
+	assert.match(heldCandidate.errors[0], /no record is expired-eligible/);
+});
+
+test("a candidate names held exclusions while eligible records remain", () => {
+	const dir = mkTarget("candidate-held");
+	deletionFixture(dir);
+	assert.equal(registerHolder(dir, holderInput(), { now: NOW }).ok, true);
+	// Two records: one held, one eligible.
+	assert.equal(
+		admitArtifact(dir, { type: "intent", identity: "intent/other", body: "# O\n" }).ok,
+		true,
+	);
+	assert.equal(classify(dir, classifyInput(), { now: NOW }).ok, true);
+	assert.equal(
+		classify(
+			dir,
+			classifyInput({ record: { type: "intent", identity: "intent/other", revision: 1 } }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(hold(dir, holdInput(), { now: NOW }).ok, true);
+	const expired = new Date(NOW.getTime() + HOUR_MS);
+	const prepared = prepareDeletionCandidate(dir, { id: "deletion/1" }, { now: expired });
+	assert.equal(prepared.ok, true, (prepared.errors || []).join("; "));
+	assert.equal(prepared.record.records.length, 1);
+	assert.equal(prepared.record.records[0].record.identity, "intent/other");
+	assert.equal(prepared.record.excludedHeld.length, 1);
+	assert.equal(prepared.record.excludedHeld[0].record.identity, "intent/login");
+	assert.deepEqual(prepared.record.excludedHeld[0].heldBy, ["hold/litigation-42"]);
+	// Zero registered Holders refuses by construction.
+	const bare = mkTarget("candidate-bare");
+	retentionFixture(bare);
+	assert.equal(classify(bare, classifyInput(), { now: NOW }).ok, true);
+	const noHolder = prepareDeletionCandidate(bare, { id: "deletion/1" }, { now: expired });
+	assert.equal(noHolder.ok, false);
+	assert.match(noHolder.errors[0], /no Holder is registered/);
+});
+
+test("authorization is bounded to exactly what was reviewed", () => {
+	const dir = mkTarget("authorize");
+	deletionFixture(dir);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(registerHolder(dir, holderInput(), { now: NOW }).ok, true);
+	assert.equal(classify(dir, classifyInput(), { now: NOW }).ok, true);
+	const expired = new Date(NOW.getTime() + HOUR_MS);
+	const prepared = prepareDeletionCandidate(dir, { id: "deletion/1" }, { now: expired });
+	assert.equal(prepared.ok, true);
+	const binding = `retention-deletion:${prepared.record.candidateHash}`;
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/deletion-1",
+				approver: "bob@example.com",
+				scope: null,
+				subject: binding,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: expired },
+		).ok,
+		true,
+	);
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/other",
+				approver: "bob@example.com",
+				scope: null,
+				subject: "retention-deletion:sha256:" + "0".repeat(64),
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: expired },
+		).ok,
+		true,
+	);
+	const authorizeInput = (overrides = {}) => ({
+		id: "deletion/1",
+		approval: "approval/deletion-1",
+		decisionIdentity: "decision/deletion-consume-1",
+		body: "# Authorize deletion\n",
+		traces: [{ type: "decides", to: { type: "intent", identity: "intent/retention" } }],
+		scope: null,
+		...overrides,
+	});
+	const mismatched = authorizeDeletion(dir, authorizeInput({ approval: "approval/other" }), {
+		now: expired,
+	});
+	assert.equal(mismatched.ok, false);
+	assert.match(mismatched.errors[0], /not this candidate's binding/);
+	const ghost = authorizeDeletion(dir, authorizeInput({ id: "deletion/ghost" }), {
+		now: expired,
+	});
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_RETENTION_NOT_FOUND");
+	const authorized = authorizeDeletion(dir, authorizeInput(), { now: expired });
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+	assert.equal(authorized.record.status, "authorized");
+	assert.equal(authorized.record.authorization.approvalId, "approval/deletion-1");
+	assert.equal(authorized.consumption.receipt.revision >= 1, true);
+	assert.equal(showDeletionCandidate(dir, "deletion/1").status, "authorized");
+	assert.equal(listDeletionCandidates(dir, { status: "authorized" }).length, 1);
+	const again = authorizeDeletion(dir, authorizeInput(), { now: expired });
+	assert.equal(again.ok, false);
+	assert.match(again.errors[0], /already authorized; an authorization is single-use/);
+});
+
+test("drift between review and authorization refuses", () => {
+	const dir = mkTarget("drift");
+	deletionFixture(dir);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(registerHolder(dir, holderInput(), { now: NOW }).ok, true);
+	assert.equal(classify(dir, classifyInput(), { now: NOW }).ok, true);
+	const expired = new Date(NOW.getTime() + HOUR_MS);
+	const prepared = prepareDeletionCandidate(dir, { id: "deletion/1" }, { now: expired });
+	assert.equal(prepared.ok, true);
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/deletion-1",
+				approver: "bob@example.com",
+				scope: null,
+				subject: `retention-deletion:${prepared.record.candidateHash}`,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: expired },
+		).ok,
+		true,
+	);
+	// A new Holder registered after review changes the coverage.
+	assert.equal(
+		registerHolder(
+			dir,
+			holderInput({
+				id: "holder/cache",
+				surface: "cache",
+				decision: { identity: "decision/holder-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const drifted = authorizeDeletion(
+		dir,
+		{
+			id: "deletion/1",
+			approval: "approval/deletion-1",
+			decisionIdentity: "decision/deletion-consume-1",
+			body: "# Authorize deletion\n",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/retention" } }],
+			scope: null,
+		},
+		{ now: expired },
+	);
+	assert.equal(drifted.ok, false);
+	assert.equal(drifted.code, "AMBER_E_RETENTION_DRIFT");
+	assert.match(drifted.errors[0], /no longer matches what was reviewed/);
+	// A new Legal Hold covering a reviewed record drifts the candidate too.
+	const second = prepareDeletionCandidate(dir, { id: "deletion/2" }, { now: expired });
+	assert.equal(second.ok, true, (second.errors || []).join("; "));
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/deletion-2",
+				approver: "bob@example.com",
+				scope: null,
+				subject: `retention-deletion:${second.record.candidateHash}`,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: expired },
+		).ok,
+		true,
+	);
+	assert.equal(hold(dir, holdInput(), { now: NOW }).ok, true);
+	const heldDrift = authorizeDeletion(
+		dir,
+		{
+			id: "deletion/2",
+			approval: "approval/deletion-2",
+			decisionIdentity: "decision/deletion-consume-2",
+			body: "# Authorize deletion\n",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/retention" } }],
+			scope: null,
+		},
+		{ now: expired },
+	);
+	assert.equal(heldDrift.ok, false);
+	assert.equal(heldDrift.code, "AMBER_E_RETENTION_DRIFT");
+});
+
+test("a tampered holder registry fails every read closed", () => {
+	const dir = mkTarget("holder-tamper");
+	deletionFixture(dir);
+	assert.equal(registerHolder(dir, holderInput(), { now: NOW }).ok, true);
+	assert.equal(
+		registerHolder(
+			dir,
+			holderInput({
+				id: "holder/cache",
+				surface: "cache",
+				decision: { identity: "decision/holder-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const events = readEvents(holdersPath(dir));
+	events[1].surface = "export";
+	writeEvents(holdersPath(dir), events);
+	assert.throws(
+		() => listHolders(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_RETENTION_HOLDER_CORRUPT" &&
+			/does not match its content/.test(err.message),
+	);
+	assert.equal(classify(dir, classifyInput(), { now: NOW }).ok, true);
+	const blocked = prepareDeletionCandidate(
+		dir,
+		{ id: "deletion/1" },
+		{ now: new Date(NOW.getTime() + HOUR_MS) },
+	);
+	assert.equal(blocked.ok, false);
+	assert.equal(blocked.code, "AMBER_E_RETENTION_HOLDER_CORRUPT");
+});
+
+test("a tampered candidate ledger fails every read closed", () => {
+	const dir = mkTarget("candidate-tamper");
+	deletionFixture(dir);
+	assert.equal(registerHolder(dir, holderInput(), { now: NOW }).ok, true);
+	assert.equal(classify(dir, classifyInput(), { now: NOW }).ok, true);
+	const expired = new Date(NOW.getTime() + HOUR_MS);
+	assert.equal(prepareDeletionCandidate(dir, { id: "deletion/1" }, { now: expired }).ok, true);
+	const events = readEvents(candidatesPath(dir));
+	events[0].candidateHash = `sha256:${"0".repeat(64)}`;
+	writeEvents(candidatesPath(dir), events);
+	assert.throws(
+		() => listDeletionCandidates(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_RETENTION_CANDIDATE_CORRUPT" &&
+			/does not match its content/.test(err.message),
+	);
+	const blocked = prepareDeletionCandidate(dir, { id: "deletion/2" }, { now: expired });
+	assert.equal(blocked.ok, false);
+	assert.equal(blocked.code, "AMBER_E_RETENTION_CANDIDATE_CORRUPT");
 });

@@ -265,6 +265,11 @@ const FLAG_SPECS = {
 	"--policy": { key: "policy" },
 	"--sensitivity": { key: "sensitivity" },
 	"--minimized": { key: "minimized", kind: "boolean" },
+	// F055 ticket 3 (#285): Holder registry & deletion candidate flags
+	// (--surface, --adapter-version, --approval, --body, --trace, and
+	// --scope are shared with existing surfaces).
+	"--holder-version": { key: "holderVersion" },
+	"--adapter": { key: "adapter" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

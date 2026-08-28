@@ -1,15 +1,19 @@
 "use strict";
 
 // F055 public CLI seam for retention classification, deterministic
-// expiry evaluation, and the Legal Hold lifecycle. This adapter parses
-// flags only; the core owns every verdict, evaluation is read-only, and
-// nothing is ever deleted here.
+// expiry evaluation, the Legal Hold lifecycle, the Holder registry, and
+// deletion candidates with bounded authorization. This adapter parses
+// flags only; the core owns every verdict, candidates are governance
+// writes, and no content is ever deleted here.
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
+const { parseTraceFlags } = require("./canonical-artifact-commands");
 
 const READ_FAILURE_CODE = "AMBER_E_RETENTION_CORRUPT";
 const HOLD_READ_FAILURE_CODE = "AMBER_E_RETENTION_HOLD_CORRUPT";
+const HOLDER_READ_FAILURE_CODE = "AMBER_E_RETENTION_HOLDER_CORRUPT";
+const CANDIDATE_READ_FAILURE_CODE = "AMBER_E_RETENTION_CANDIDATE_CORRUPT";
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -29,6 +33,14 @@ function missingValueFlag(args) {
 		["decisionIdentity", "--decision-identity"],
 		["revision", "--revision"],
 		["status", "--status"],
+		["holderVersion", "--holder-version"],
+		["adapter", "--adapter"],
+		["adapterVersion", "--adapter-version"],
+		["surface", "--surface"],
+		["approval", "--approval"],
+		["body", "--body"],
+		["scope", "--scope"],
+		["traceVal", "--trace"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -96,7 +108,19 @@ function positiveInt(args, key, flag) {
 
 const dispatch = defineCommand({
 	command: "retention",
-	actions: ["classify", "evaluate", "classifications", "hold", "release", "holds"],
+	actions: [
+		"classify",
+		"evaluate",
+		"classifications",
+		"hold",
+		"release",
+		"holds",
+		"holder",
+		"holders",
+		"candidate",
+		"authorize",
+		"candidates",
+	],
 	handlers: {
 		classify: (args) => {
 			const { classify } = require("./core/retention-registry");
@@ -260,6 +284,129 @@ const dispatch = defineCommand({
 				return { text: JSON.stringify(listHolds(target.value, { status }), null, 2) };
 			} catch (err) {
 				const failure = readFailure(args, err, HOLD_READ_FAILURE_CODE);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+		},
+		holder: (args) => {
+			const { registerHolder } = require("./core/retention-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "holder/canonical-body"],
+				["holderVersion", "--holder-version", "1"],
+				["surface", "--surface", "canonical-body"],
+				["adapter", "--adapter", "adapter/store"],
+				["adapterVersion", "--adapter-version", "1.0.0"],
+				["decisionIdentity", "--decision-identity", "decision/holder-1"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const revision = positiveInt(args, "revision", "--revision");
+			if (revision.error) return invalidArg(revision.error);
+			return resultEnvelope(
+				registerHolder(target.value, {
+					id: String(args.id),
+					version: String(args.holderVersion),
+					surface: String(args.surface),
+					adapter: { id: String(args.adapter), version: String(args.adapterVersion) },
+					decision: { identity: String(args.decisionIdentity), revision: revision.value },
+				}),
+			);
+		},
+		holders: (args) => {
+			const { listHolders } = require("./core/retention-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			try {
+				return { text: JSON.stringify(listHolders(target.value), null, 2) };
+			} catch (err) {
+				const failure = readFailure(args, err, HOLDER_READ_FAILURE_CODE);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+		},
+		candidate: (args) => {
+			const { prepareDeletionCandidate } = require("./core/retention-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "deletion/2026-08");
+			if (id.error) return invalidArg(id.error);
+			let now;
+			if (args.now !== undefined) {
+				now = new Date(String(args.now));
+				if (Number.isNaN(now.getTime()))
+					return invalidArg(`--now must be an ISO-8601 timestamp; got ${JSON.stringify(args.now)}`);
+			}
+			return resultEnvelope(
+				prepareDeletionCandidate(target.value, { id: id.value }, now ? { now } : {}),
+			);
+		},
+		authorize: (args) => {
+			const { authorizeDeletion } = require("./core/retention-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "deletion/2026-08"],
+				["approval", "--approval", "approval/deletion-42"],
+				["decisionIdentity", "--decision-identity", "decision/deletion-42"],
+				["body", "--body", '"# Authorize deletion"'],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const traces = parseTraceFlags(args.traceArgs);
+			if (traces.error) return invalidArg(traces.error);
+			return resultEnvelope(
+				authorizeDeletion(target.value, {
+					id: String(args.id),
+					approval: String(args.approval),
+					decisionIdentity: String(args.decisionIdentity),
+					body: String(args.body),
+					traces: traces.value,
+					scope: args.scope === undefined ? null : String(args.scope),
+				}),
+			);
+		},
+		candidates: (args) => {
+			const { listDeletionCandidates, CANDIDATE_STATUSES } = require("./core/retention-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const status = args.status === undefined ? null : String(args.status);
+			if (status !== null && !CANDIDATE_STATUSES.includes(status))
+				return invalidArg(
+					`--status must be one of ${CANDIDATE_STATUSES.join(", ")}; got ${JSON.stringify(args.status)}`,
+				);
+			try {
+				return {
+					text: JSON.stringify(listDeletionCandidates(target.value, { status }), null, 2),
+				};
+			} catch (err) {
+				const failure = readFailure(args, err, CANDIDATE_READ_FAILURE_CODE);
 				return { ...failure.result, exitCode: failure.exitCode };
 			}
 		},

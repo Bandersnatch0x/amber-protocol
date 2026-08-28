@@ -1349,10 +1349,11 @@ Error codes: `AMBER_E_MAINTAIN_INVALID`, `AMBER_E_MAINTAIN_EXISTS`, `AMBER_E_MAI
 `AMBER_E_MAINTAIN_PROPOSAL_CORRUPT`, `AMBER_E_MAINTAIN_PROPOSAL_LOCK`,
 `AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING`.
 
-### retention classify / evaluate / classifications / hold / release / holds
+### retention classify / evaluate / classifications / hold / release / holds / holder / holders / candidate / authorize / candidates
 
 Classify records into governed retention classes, evaluate expiry deterministically (F055 T1),
-and govern Legal Holds (F055 T2). A classification binds one committed canonical record
+govern Legal Holds (F055 T2), and review deletion candidates with bounded authorization (F055
+T3). A classification binds one committed canonical record
 (`<type>:<identity>@<revision>`) to a
 protocol-defined retention class — `ephemeral|operational|governance|audit`, fixed semantics —
 whose TTL and legal basis resolve at classification time from a committed, versioned tenant
@@ -1385,6 +1386,21 @@ single-use human Decision (double-release and ghost-release refuse; a validly re
 release fails the read closed), and a released hold stays listable forever — a hold can end, but it
 can never disappear, so Legal Hold never becomes an invisible permanent exception.
 
+A registered Holder declares one copy-holding surface —
+`canonical-body|raw-output|cache|index|export|subscription|external` — with its registered F051
+Adapter pin (id + version, both verified) behind a single-use committed human Decision, immutable
+per version, in `.amber/retention/holders.jsonl`. A deletion `candidate` is a governance-write
+only: it enumerates the exact expired-eligible records at a declared clock with their full
+retention basis, names the Legal Hold exclusions (`excludedHeld` with `heldBy`), lists every
+registered Holder, and proposes the per-Holder `delete` effects — content is never touched, zero
+eligible records or zero registered Holders refuse (a transaction with no Holders could
+"complete" without deleting anywhere), and the closed content hashes into a canonical
+`candidateHash`. `authorize` consumes one single-use Approval whose subject is
+`retention-deletion:<candidateHash>` after re-deriving the candidate content at its recorded
+clock — changed records, holds, Holders, or effects refuse with `AMBER_E_RETENTION_DRIFT`, and the
+consumption settles the human Decision atomically. Execution and settlement are F055 T4, behind
+their own governance.
+
 ```bash
 node scripts/amber.js retention classify --target . --record spec:spec/login@2 \
   --retention-class operational --policy policy/tenant-retention@1 --json
@@ -1399,12 +1415,24 @@ node scripts/amber.js retention hold --target . --id hold/litigation-42 \
 node scripts/amber.js retention release --target . --id hold/litigation-42 \
   --decision-identity decision/release-42 --revision 1 --json
 node scripts/amber.js retention holds --target . --status active --json
+node scripts/amber.js retention holder --target . --id holder/canonical-body \
+  --holder-version 1 --surface canonical-body --adapter adapter/store --adapter-version 1 \
+  --decision-identity decision/holder-1 --revision 1 --json
+node scripts/amber.js retention candidate --target . --id deletion/2026-08 \
+  --now 2026-08-29T00:00:00.000Z --json
+node scripts/amber.js retention authorize --target . --id deletion/2026-08 \
+  --approval approval/deletion-42 --decision-identity decision/deletion-42 \
+  --body "# Authorize deletion" --trace decides:intent:intent/retention --json
+node scripts/amber.js retention candidates --target . --status prepared --json
 ```
 
 Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
 `AMBER_E_RETENTION_CORRUPT`, `AMBER_E_RETENTION_LOCK`, `AMBER_E_RETENTION_SIZE_CEILING`,
 `AMBER_E_RETENTION_HOLD_CORRUPT`, `AMBER_E_RETENTION_HOLD_LOCK`,
-`AMBER_E_RETENTION_HOLD_SIZE_CEILING`.
+`AMBER_E_RETENTION_HOLD_SIZE_CEILING`, `AMBER_E_RETENTION_HOLDER_CORRUPT`,
+`AMBER_E_RETENTION_HOLDER_LOCK`, `AMBER_E_RETENTION_HOLDER_SIZE_CEILING`,
+`AMBER_E_RETENTION_CANDIDATE_CORRUPT`, `AMBER_E_RETENTION_CANDIDATE_LOCK`,
+`AMBER_E_RETENTION_CANDIDATE_SIZE_CEILING`, `AMBER_E_RETENTION_DRIFT`.
 
 ## Handoff Commands
 

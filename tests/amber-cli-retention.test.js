@@ -12,7 +12,13 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { admitArtifact } = require("../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../scripts/lib/core/principal-registry");
-const { classificationsPath, holdsPath } = require("../scripts/lib/core/retention-registry");
+const { registerAdapter } = require("../scripts/lib/core/adapter-registry");
+const { grantApproval } = require("../scripts/lib/core/approval-registry");
+const {
+	classificationsPath,
+	holdsPath,
+	candidatesPath,
+} = require("../scripts/lib/core/retention-registry");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -175,13 +181,130 @@ test("retention help and unknown actions route through the shared dispatcher", (
 	assert.match(help.stdout, /classify --record <type>:<identity>@<rev>/);
 	assert.match(help.stdout, /evaluate \[--now <iso>\]/);
 	assert.match(help.stdout, /hold --id <hold-id>/);
-	assert.match(help.stdout, /holds \[--status <active\|released>\]/);
+	assert.match(help.stdout, /holder --id <holder-id> --holder-version <v>/);
+	assert.match(help.stdout, /candidate --id <candidate-id> \[--now <iso>\]/);
+	assert.match(help.stdout, /candidates \[--status <prepared\|authorized>\]/);
 	const unknown = runCli(["retention", "delete", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/retention requires classify, evaluate, classifications, hold, release, or holds/,
+		/retention requires classify, evaluate, classifications, hold, release, holds, holder, holders, candidate, authorize, or candidates/,
 	);
+});
+
+test("retention holder, candidate, and bounded authorization at the CLI seam", () => {
+	const dir = mkTarget("deletion");
+	fixtureRepo(dir);
+	holdDecisionFixture(dir, ["decision/holder-1"]);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(
+		registerAdapter(dir, {
+			id: "adapter/store",
+			owner: "storage-team",
+			adapterVersion: "1",
+			recordTypes: [{ type: "canonical-record", versions: ["v1"] }],
+			scope: "F055",
+			identityMapping: { strategy: "path" },
+			freshness: { maxAgeMs: 86_400_000 },
+			permissions: { readOnly: true, allowedPaths: ["store"] },
+		}).ok,
+		true,
+	);
+	assert.equal(runCli(classifyArgs(), dir).status, 0);
+
+	const holder = runCli(
+		[
+			"retention",
+			"holder",
+			"--target",
+			".",
+			"--id",
+			"holder/canonical-body",
+			"--holder-version",
+			"1",
+			"--surface",
+			"canonical-body",
+			"--adapter",
+			"adapter/store",
+			"--adapter-version",
+			"1",
+			"--decision-identity",
+			"decision/holder-1",
+			"--revision",
+			"1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(holder.status, 0, holder.stderr || holder.stdout);
+	assert.equal(payload(holder).surface, "canonical-body");
+	const holders = runCli(["retention", "holders", "--target", ".", "--json"], dir);
+	assert.equal(payload(holders).length, 1);
+
+	const farFuture = "2036-01-01T00:00:00.000Z";
+	const candidate = runCli(
+		["retention", "candidate", "--target", ".", "--id", "deletion/1", "--now", farFuture, "--json"],
+		dir,
+	);
+	assert.equal(candidate.status, 0, candidate.stderr || candidate.stdout);
+	assert.equal(payload(candidate).status, "prepared");
+	assert.equal(payload(candidate).records.length, 1);
+	const candidateHash = payload(candidate).candidateHash;
+
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/deletion-1",
+				approver: "bob@example.com",
+				scope: null,
+				subject: `retention-deletion:${candidateHash}`,
+				validUntil: "2037-01-01T00:00:00.000Z",
+			},
+			{ now: new Date(Date.now() - 60_000) },
+		).ok,
+		true,
+	);
+	const authorized = runCli(
+		[
+			"retention",
+			"authorize",
+			"--target",
+			".",
+			"--id",
+			"deletion/1",
+			"--approval",
+			"approval/deletion-1",
+			"--decision-identity",
+			"decision/deletion-consume-1",
+			"--body",
+			"# Authorize deletion",
+			"--trace",
+			"decides:intent:intent/login",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(authorized.status, 0, authorized.stderr || authorized.stdout);
+	assert.equal(payload(authorized).status, "authorized");
+	assert.equal(payload(authorized).authorization.approvalId, "approval/deletion-1");
+
+	const listed = runCli(
+		["retention", "candidates", "--target", ".", "--status", "authorized", "--json"],
+		dir,
+	);
+	assert.equal(payload(listed).length, 1);
+	const badStatus = runCli(
+		["retention", "candidates", "--target", ".", "--status", "everything", "--json"],
+		dir,
+	);
+	assert.equal(badStatus.status, 1);
+	assert.equal(envelope(badStatus).code, "AMBER_E_INVALID_ARG");
+
+	fs.appendFileSync(candidatesPath(dir), '{"kind":"candidate"}\n');
+	const corrupt = runCli(["retention", "candidates", "--target", ".", "--json"], dir);
+	assert.equal(corrupt.status, 1);
+	assert.equal(envelope(corrupt).code, "AMBER_E_RETENTION_CANDIDATE_CORRUPT");
 });
 
 function holdDecisionFixture(dir, decisionIdentities) {
