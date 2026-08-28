@@ -833,3 +833,11 @@ _Avoid_: deployment package, project dump, execution grant
 **Phase Gate**:
 A staged promotion checkpoint requiring complete deterministic evidence, compatibility proof, invariant non-regression, and explicit authorization. Rollback preserves append-only lineage and returns to the last fully evidenced generation or Checkpoint without destructive or silent fallback.
 _Avoid_: sprint boundary, release approval, silent rollback
+
+**Code Node**:
+A deterministic knowledge-graph node representing one product source file (kind `code`, implementation layer, id `code:<POSIX path>`), produced by compiler-API parsing of the committed tree. Its exported-symbol table rides as a node property, not as child nodes; test files stay out of the graph.
+_Avoid_: symbol node, AST node, file vertex
+
+**Anchors Edge**:
+The deterministic `feature -[anchors]-> code` edge linking a feature to an existing Code Node it declares as an implementation anchor. It exists only when the target Code Node exists — a dead anchor never becomes a dangling edge and keeps surfacing as a drift finding. Supersedes the F059 "anchors are a node property, never a ghost edge" rule for targets that are now nodes (ADR-0025).
+_Avoid_: ghost edge, anchor property, path link
