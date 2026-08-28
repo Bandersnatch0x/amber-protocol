@@ -17,6 +17,8 @@ All capability is exposed through one CLI entry point.
 
 Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, gates, evidence, and routing rules; read before nontrivial tasks.
 
+Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acceptance with exit criteria; follow it when planning, implementing, or accepting a change (full-test pass is followed by a mandatory two-axis review + spec compliance stage).
+
 ## Entry point
 
 ```bash
