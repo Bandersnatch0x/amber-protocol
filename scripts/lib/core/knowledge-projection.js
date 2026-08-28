@@ -169,7 +169,8 @@ function sourceObjectFromRequest(request) {
 }
 
 function pagePayloadForRow(targetRoot, row, request) {
-	const { text } = readSource(targetRoot, row.sourcePath);
+	const { text: rawText } = readSource(targetRoot, row.sourcePath);
+	const text = rawText.replace(/\r\n/g, "\n");
 	const { source } = sourceObjectFromRequest(request);
 	return {
 		schemaVersion: "1.2.0",
@@ -293,7 +294,7 @@ function syncKnowledgeContextPages(targetRoot, { refresh = false } = {}) {
 function contextPageText(page) {
 	return (page.blocks || [])
 		.filter((block) => block && block.type === "prose" && Array.isArray(block.sources))
-		.map((block) => block.text || "")
+		.map((block) => (block.text || "").replace(/\r\n/g, "\n"))
 		.join("\n\n");
 }
 

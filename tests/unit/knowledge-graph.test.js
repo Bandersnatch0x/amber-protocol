@@ -288,22 +288,17 @@ test("artifacts enter at identity granularity with trace edges on the four verbs
 });
 
 test("a context page merges into its source node as a property", () => {
-	const dir = mkTarget("kg-context", { subdirs: ["docs/adr"] });
+	// The tree parity seam reads contextPage mappings from the committed manifest at
+	// docs/knowledge-corpus/knowledge-context-manifest.json, never from .amber/.
+	const dir = mkTarget("kg-context", { subdirs: ["docs/adr", "docs/knowledge-corpus"] });
 	fs.writeFileSync(
 		path.join(dir, "docs", "adr", "0001-test-decision.md"),
 		"# ADR-0001: Test decision\n\n**Status:** Accepted\n**Date:** 2026-01-01\n",
 	);
-	addPage(dir, "test-decision-page", {
-		title: "Test decision page",
-		sources: {
-			s1: {
-				kind: "file",
-				ref: "docs/adr/0001-test-decision.md",
-				rawHash: "sha256:0",
-				mutable: true,
-			},
-		},
-		blocks: [{ type: "prose", sources: ["s1"], text: "distilled" }],
+	writeJson(dir, "docs/knowledge-corpus/knowledge-context-manifest.json", {
+		schemaVersion: "1.0.0",
+		manifestId: "f059-knowledge-context-pages",
+		rows: [{ pageId: "test-decision-page", sourcePath: "docs/adr/0001-test-decision.md" }],
 	});
 	const fixture = buildKnowledgeGraphFromTree(dir);
 	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
@@ -332,30 +327,28 @@ test("rename detection requires prefix-related stems in the same directory", () 
 // ── F-2: context-page source ref normalization ────────────────────────
 
 test("F-2: context page with #L range fragment merges into its source node", () => {
-	const dir = mkTarget("kg-cp-range", { subdirs: ["docs/adr"] });
+	// The committed manifest stores a clean sourcePath (no #L fragment); the tree
+	// seam matches nodes by sourcePath, not by the raw source ref.
+	const dir = mkTarget("kg-cp-range", { subdirs: ["docs/adr", "docs/knowledge-corpus"] });
 	fs.writeFileSync(
 		path.join(dir, "docs", "adr", "0001-test-decision.md"),
 		"# ADR-0001: Test decision\n\n**Status:** Accepted\n**Date:** 2026-01-01\n",
 	);
-	addPage(dir, "test-fragmented-page", {
-		title: "Fragmented ref page",
-		sources: {
-			s1: {
-				kind: "file",
-				ref: "docs/adr/0001-test-decision.md#L1-L5",
-				rawHash: "sha256:0",
-				mutable: true,
-			},
-		},
-		blocks: [{ type: "prose", sources: ["s1"], text: "distilled" }],
+	writeJson(dir, "docs/knowledge-corpus/knowledge-context-manifest.json", {
+		schemaVersion: "1.0.0",
+		manifestId: "f059-knowledge-context-pages",
+		rows: [{ pageId: "test-fragmented-page", sourcePath: "docs/adr/0001-test-decision.md" }],
 	});
 	const fixture = buildKnowledgeGraphFromTree(dir);
 	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
 	assert.ok(adr, "adr:0001 node missing");
-	assert.equal(adr.contextPage, "test-fragmented-page", "context page with #L range did not merge");
+	assert.equal(adr.contextPage, "test-fragmented-page", "context page did not merge via committed manifest");
 });
 
 test("F-2: context page sourcing a canonical-artifact body file merges into the artifact node", () => {
+	// Artifact body-file context pages are only merged when the sourcePath appears
+	// in the committed manifest (docs/knowledge-corpus/knowledge-context-manifest.json).
+	// Without a manifest entry the tree seam does not set contextPage.
 	const dir = mkTarget("kg-cp-artifact");
 	const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 	const admission = admitArtifact(dir, {
@@ -364,30 +357,27 @@ test("F-2: context page sourcing a canonical-artifact body file merges into the 
 		body: "# Intent: cp-test\n",
 	});
 	assert.equal(admission.ok, true, JSON.stringify(admission.errors));
-	// The artifact's body file is .amber/artifacts/intents/<slug>/rev-1.md
 	const slugFor = (identity) => String(identity).replace(/[^a-zA-Z0-9._-]+/g, "_");
 	const artifactSlug = slugFor("intent/cp-test");
-	const artifactRevPath = `.amber/artifacts/intents/${artifactSlug}/rev-1.md`;
-	addPage(dir, "artifact-context-page", {
-		title: "Artifact context page",
-		sources: {
-			s1: {
-				kind: "file",
-				ref: `${artifactRevPath}#L1-L1`,
-				rawHash: "sha256:0",
-				mutable: false,
-			},
-		},
-		blocks: [{ type: "prose", sources: ["s1"], text: "distilled artifact" }],
+	const artifactIdentityPath = `.amber/artifacts/intents/${artifactSlug}`;
+
+	// Without a manifest: no contextPage on the artifact node.
+	const withoutManifest = buildKnowledgeGraphFromTree(dir);
+	const nodeWithout = withoutManifest.nodes.find((n) => n.id === "artifact:intent/intent/cp-test");
+	assert.ok(nodeWithout, "artifact node missing");
+	assert.equal(nodeWithout.contextPage, undefined, "must not set contextPage without manifest entry");
+
+	// With manifest entry mapping the identity path: contextPage is set.
+	fs.mkdirSync(path.join(dir, "docs", "knowledge-corpus"), { recursive: true });
+	writeJson(dir, "docs/knowledge-corpus/knowledge-context-manifest.json", {
+		schemaVersion: "1.0.0",
+		manifestId: "f059-knowledge-context-pages",
+		rows: [{ pageId: "artifact-context-page", sourcePath: artifactIdentityPath }],
 	});
-	const fixture = buildKnowledgeGraphFromTree(dir);
-	const artifactNode = fixture.nodes.find((n) => n.id === `artifact:intent/intent/cp-test`);
-	assert.ok(artifactNode, "artifact node missing");
-	assert.equal(
-		artifactNode.contextPage,
-		"artifact-context-page",
-		"context page with artifact file ref did not merge into artifact node",
-	);
+	const withManifest = buildKnowledgeGraphFromTree(dir);
+	const nodeWith = withManifest.nodes.find((n) => n.id === "artifact:intent/intent/cp-test");
+	assert.ok(nodeWith, "artifact node missing after adding manifest");
+	assert.equal(nodeWith.contextPage, "artifact-context-page", "contextPage must be set from manifest");
 });
 
 // ── F-3: repository-boundary confinement ─────────────────────────────

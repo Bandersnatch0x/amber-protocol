@@ -218,8 +218,50 @@ test("F059 clean git-ls-files corpus produces graph with no prior .amber/ state"
 	assert.equal(result.errors.length, 0);
 	const graph = JSON.parse(result.text);
 	assert.ok(graph.nodes.length >= 43, "must include at least the 43 committed corpus nodes");
+	// All 43 committed corpus nodes must have contextPage set via the committed manifest
+	const withContextPage = graph.nodes.filter((n) => n.contextPage);
+	assert.equal(withContextPage.length, 43, "exactly 43 nodes must have contextPage (the committed corpus)");
 	// Byte-identical to tree-reader (parity seam)
 	assert.equal(result.text, serializeKnowledgeGraph(buildKnowledgeGraphFromTree(REPO_ROOT)));
+});
+
+test("F059 git-archive clean clone: projection and tree-reader produce exact byte-identical output with contextPage", () => {
+	// Build a real git archive from HEAD, extract to a temp dir, run both paths,
+	// and assert exact serialized byte equality — the production acceptance test.
+	const os = require("node:os");
+	const archiveDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-kg-archive-"));
+	try {
+		const archive = spawnSync("git", ["archive", "HEAD", "--format=tar"], {
+			cwd: REPO_ROOT,
+			encoding: "buffer",
+		});
+		assert.equal(archive.status, 0, `git archive failed: ${archive.stderr.toString()}`);
+		const tar = spawnSync("tar", ["-x", "-C", archiveDir], {
+			input: archive.stdout,
+			encoding: "buffer",
+		});
+		assert.equal(tar.status, 0, `tar extraction failed: ${tar.stderr.toString()}`);
+		// Verify committed corpus is present
+		assert.ok(
+			fs.existsSync(path.join(archiveDir, "docs/knowledge-corpus/knowledge-context-manifest.json")),
+			"committed manifest must be present in archive",
+		);
+		assert.ok(
+			fs.existsSync(path.join(archiveDir, "docs/knowledge-corpus/knowledge-base.output.json")),
+			"committed projection must be present in archive",
+		);
+		// Both paths must produce byte-identical output
+		const projGraph = buildKnowledgeGraph(archiveDir);
+		const treeGraph = buildKnowledgeGraphFromTree(archiveDir);
+		const projBytes = serializeKnowledgeGraph(projGraph);
+		const treeBytes = serializeKnowledgeGraph(treeGraph);
+		assert.equal(projBytes, treeBytes, "projection and tree-reader must produce byte-identical output on clean archive");
+		// Exactly 43 nodes must have contextPage
+		const withContextPage = projGraph.nodes.filter((n) => n.contextPage);
+		assert.equal(withContextPage.length, 43, "exactly 43 nodes must have contextPage on clean archive");
+	} finally {
+		fs.rmSync(archiveDir, { recursive: true, force: true });
+	}
 });
 
 test("F059 context-sync pages carry explicit ownership fields and provisional maturity", () => {

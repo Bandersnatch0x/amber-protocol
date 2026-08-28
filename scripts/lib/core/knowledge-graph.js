@@ -66,7 +66,7 @@ const ERROR_CODES = Object.freeze({
 
 function readTextIfPresent(file) {
 	try {
-		return fs.readFileSync(file, "utf8");
+		return fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n");
 	} catch (err) {
 		if (err.code === "ENOENT") return null;
 		throw typedError(ERROR_CODES.source, `could not read ${file}: ${err.message}`);
@@ -656,12 +656,33 @@ function buildDrift(targetRoot, features) {
 	return findings;
 }
 
+// Build the sourcePath→pageId map from the committed F059 manifest at
+// docs/knowledge-corpus/knowledge-context-manifest.json.  The tree parity seam
+// uses this so contextPage assignments are identical to the projection path on a
+// clean archive where .amber/ is absent.
+function committedContextPagesBySource(targetRoot) {
+	const { committedManifestPath } = require("./knowledge-projection");
+	const manifestPath = committedManifestPath(targetRoot);
+	if (!fs.existsSync(manifestPath)) return new Map();
+	let manifest;
+	try {
+		manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	} catch {
+		return new Map();
+	}
+	const bySource = new Map();
+	for (const row of manifest.rows || []) {
+		if (row.sourcePath && row.pageId) bySource.set(toPosix(row.sourcePath), row.pageId);
+	}
+	return bySource;
+}
+
 function readDocumentsFromTree(targetRoot) {
 	return {
 		adrs: parseAdrs(targetRoot),
 		wikiPages: parseWikiPages(targetRoot),
 		architecturePages: parseArchitecturePages(targetRoot),
-		pagesBySource: contextPagesBySource(targetRoot),
+		pagesBySource: committedContextPagesBySource(targetRoot),
 	};
 }
 
