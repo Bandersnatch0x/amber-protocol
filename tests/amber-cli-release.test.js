@@ -14,6 +14,7 @@ const { admitArtifact } = require("../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../scripts/lib/core/principal-registry");
 const { recordEvidence } = require("../scripts/lib/core/evidence-receipts");
 const { registerRunner, registerRunnerCapability } = require("../scripts/lib/core/runner-registry");
+const { grantApproval } = require("../scripts/lib/core/approval-registry");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -171,6 +172,59 @@ test("release prepare, show, and list form the governed candidate lifecycle", ()
 		runCli(["release", "list", "--environment", "staging", "--target", dir, "--json"], dir),
 	);
 	assert.equal(listed.length, 1);
+
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	const rehearsal = recordEvidence(dir, {
+		id: "evidence/rehearsal-run",
+		producer: "carol@example.com",
+		assurance: "observed",
+		scope: "F053",
+		subject: "staging rollback rehearsal run",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: null,
+		status: "pass",
+	});
+	assert.equal(rehearsal.ok, true, (rehearsal.errors || []).join("; "));
+	const granted = grantApproval(
+		dir,
+		{
+			id: "approval/rel-cli",
+			approver: "bob@example.com",
+			scope: null,
+			subject: `release:staging:${candidate.releaseHash}`,
+			validUntil: "2027-01-01T00:00:00.000Z",
+		},
+		// The CLI authorize below runs on the real clock, so the grant's
+		// validity window must already be open in real time.
+		{ now: new Date(Date.now() - 60_000) },
+	);
+	assert.equal(granted.ok, true, (granted.errors || []).join("; "));
+	const authorized = runCli(
+		[
+			"release",
+			"authorize",
+			"--id",
+			"release/web-42",
+			"--approval",
+			"approval/rel-cli",
+			"--decision-identity",
+			"decision/rel-cli",
+			"--body",
+			"# Authorize staging release",
+			"--trace",
+			"decides:intent:intent/release-cli",
+			"--rehearsal",
+			"evidence/rehearsal-run",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(authorized.status, 0, authorized.stderr || authorized.stdout);
+	assert.equal(payload(authorized).approvalId, "approval/rel-cli");
 
 	const badPin = runCli(
 		[

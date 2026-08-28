@@ -223,6 +223,13 @@ const FLAG_SPECS = {
 	"--review-spec": { key: "reviewSpec" },
 	"--release-policy": { key: "releasePolicy" },
 	"--runner": { key: "runner" },
+	// F053 ticket 2 (#275): release authorization flags (--approval, --body,
+	// --trace, --rehearsal, and --scope are shared with existing surfaces).
+	"--branch-protection": { key: "branchProtection" },
+	"--code-owner": { key: "codeOwner" },
+	"--release-manager": { key: "releaseManager" },
+	"--release-gate-index": { key: "releaseGateIndex" },
+	"--environment-gate-index": { key: "environmentGateIndex" },
 	"--identity-map": { key: "identityMap" },
 	"--freshness-ms": { key: "freshnessMs" },
 	"--allow-path": { key: "allowPath" },

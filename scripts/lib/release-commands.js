@@ -6,6 +6,7 @@
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
+const { parseTraceFlags } = require("./canonical-artifact-commands");
 
 const READ_FAILURE_CODE = "AMBER_E_RELEASE_CORRUPT";
 
@@ -30,6 +31,17 @@ function missingValueFlag(args) {
 		["capabilityVersion", "--capability-version"],
 		["credential", "--credential"],
 		["rollback", "--rollback"],
+		["approval", "--approval"],
+		["decisionIdentity", "--decision-identity"],
+		["body", "--body"],
+		["traceVal", "--trace"],
+		["scope", "--scope"],
+		["rehearsal", "--rehearsal"],
+		["branchProtection", "--branch-protection"],
+		["codeOwner", "--code-owner"],
+		["releaseManager", "--release-manager"],
+		["releaseGateIndex", "--release-gate-index"],
+		["environmentGateIndex", "--environment-gate-index"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -80,7 +92,7 @@ function parsePolicyPin(raw) {
 
 const dispatch = defineCommand({
 	command: "release",
-	actions: ["prepare", "show", "list"],
+	actions: ["prepare", "authorize", "show", "list"],
 	handlers: {
 		prepare: (args) => {
 			const { prepareReleaseCandidate } = require("./core/release-registry");
@@ -145,6 +157,64 @@ const dispatch = defineCommand({
 				credentialsClass: String(args.credential),
 				rollbackPlan: String(args.rollback),
 			});
+			return {
+				text: result.ok ? JSON.stringify(result.record, null, 2) : "",
+				errors: result.errors,
+				warnings: [],
+				exitCode: result.ok ? 0 : 1,
+				...(result.code ? { code: result.code } : {}),
+			};
+		},
+		authorize: (args) => {
+			const { authorizeRelease } = require("./core/release-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "release/web-42");
+			if (id.error) return invalidArg(id.error);
+			const input = { releaseId: id.value };
+			if (args.approval !== undefined) input.approval = String(args.approval);
+			if (args.decisionIdentity !== undefined)
+				input.decisionIdentity = String(args.decisionIdentity);
+			if (args.body !== undefined) input.body = String(args.body);
+			if (args.traceArgs !== undefined) {
+				const traces = parseTraceFlags(args.traceArgs);
+				if (traces.error) return invalidArg(traces.error);
+				input.traces = traces.value;
+			}
+			if (args.scope !== undefined) input.scope = String(args.scope);
+			if (args.rehearsal !== undefined) input.rehearsal = String(args.rehearsal);
+			if (args.branchProtection !== undefined)
+				input.branchProtection = String(args.branchProtection);
+			for (const [key, flag] of [
+				["codeOwner", "--code-owner"],
+				["releaseManager", "--release-manager"],
+			]) {
+				if (args[key] === undefined) continue;
+				const pin = parsePolicyPin(args[key]);
+				if (pin.error)
+					return invalidArg(
+						`${flag} must be <identity>@<revision> (e.g. ${flag} decision/code-owner@1); got ${JSON.stringify(args[key])}`,
+					);
+				input[key] = pin.value;
+			}
+			for (const [key, flag] of [
+				["releaseGateIndex", "--release-gate-index"],
+				["environmentGateIndex", "--environment-gate-index"],
+			]) {
+				if (args[key] === undefined) continue;
+				const index = Number(args[key]);
+				if (!Number.isInteger(index) || index < 0 || String(args[key]).trim().length === 0)
+					return invalidArg(
+						`${flag} must be a non-negative integer; got ${JSON.stringify(args[key])}`,
+					);
+				input[key] = index;
+			}
+			const result = authorizeRelease(target.value, input);
 			return {
 				text: result.ok ? JSON.stringify(result.record, null, 2) : "",
 				errors: result.errors,

@@ -24,7 +24,16 @@ const {
 	prepareReleaseCandidate,
 	showReleaseCandidate,
 	listReleaseCandidates,
+	RELEASE_AUTHORIZATION_SCHEMA_VERSION,
+	SUPPORTED_RELEASE_AUTHORIZATION_SCHEMA_VERSIONS,
+	RELEASE_DECISION_KINDS,
+	authorizationsPath,
+	authorizeRelease,
+	showReleaseAuthorization,
+	listReleaseAuthorizations,
 } = require("../../scripts/lib/core/release-registry");
+const { grantApproval } = require("../../scripts/lib/core/approval-registry");
+const { evaluateGate } = require("../../scripts/lib/core/gate-evaluation");
 const {
 	registerRunner,
 	registerRunnerCapability,
@@ -288,5 +297,371 @@ test("tampered candidate ledger fails every read closed", () => {
 	assert.throws(
 		() => listReleaseCandidates(dir),
 		(err) => err.amberCode === "AMBER_E_RELEASE_CORRUPT",
+	);
+});
+
+// ── F053 T2 (#275): staging & production release authorization ──
+
+/** Grant one approval whose subject is the release binding; asserts ok. */
+function approvalFixture(dir, id, subject, approver = "bob@example.com") {
+	const granted = grantApproval(
+		dir,
+		{ id, approver, scope: null, subject, validUntil: "2027-01-01T00:00:00.000Z" },
+		{ now: NOW },
+	);
+	assert.equal(granted.ok, true, (granted.errors || []).join("; "));
+}
+
+/** A prepared staging candidate plus bob (approver) and a rehearsal
+ *  receipt produced by carol; returns the candidate record. */
+function stagingFixture(dir) {
+	releaseFixture(dir);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	const recorded = recordEvidence(dir, {
+		id: "evidence/rehearsal-run",
+		producer: "carol@example.com",
+		assurance: "observed",
+		scope: "F053",
+		subject: "staging rollback rehearsal run",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: null,
+		status: "pass",
+	});
+	assert.equal(recorded.ok, true, (recorded.errors || []).join("; "));
+	const prepared = prepareReleaseCandidate(dir, candidateInput(), { now: NOW });
+	assert.equal(prepared.ok, true, (prepared.errors || []).join("; "));
+	return prepared.record;
+}
+
+function stagingAuthorizeInput(overrides = {}) {
+	return {
+		releaseId: "release/web-42",
+		approval: "approval/rel-1",
+		decisionIdentity: "decision/rel-1",
+		body: "# Authorize release\n",
+		traces: [{ type: "decides", to: { type: "intent", identity: "intent/release" } }],
+		scope: null,
+		rehearsal: "evidence/rehearsal-run",
+		...overrides,
+	};
+}
+
+test("authorization constants pin the decision kinds and schema contract", () => {
+	assert.equal(RELEASE_AUTHORIZATION_SCHEMA_VERSION, 1);
+	assert.deepEqual(SUPPORTED_RELEASE_AUTHORIZATION_SCHEMA_VERSIONS, [1]);
+	assert.deepEqual(RELEASE_DECISION_KINDS, ["acceptance", "approval"]);
+});
+
+test("staging authorization consumes one named approval with independent rehearsal", () => {
+	const dir = mkTarget("auth-staging");
+	const candidate = stagingFixture(dir);
+
+	const ghost = authorizeRelease(dir, stagingAuthorizeInput({ releaseId: "release/ghost" }));
+	assert.equal(ghost.code, "AMBER_E_RELEASE_NOT_FOUND");
+
+	const noApproval = authorizeRelease(dir, stagingAuthorizeInput(), { now: NOW });
+	assert.equal(noApproval.code, "AMBER_E_RELEASE_APPROVAL_MISMATCH");
+
+	approvalFixture(dir, "approval/other", "spec/login@2");
+	const mismatch = authorizeRelease(dir, stagingAuthorizeInput({ approval: "approval/other" }), {
+		now: NOW,
+	});
+	assert.equal(mismatch.code, "AMBER_E_RELEASE_APPROVAL_MISMATCH");
+	assert.match(mismatch.errors[0], /one authorization binds one release and environment/);
+
+	approvalFixture(
+		dir,
+		"approval/self",
+		`release:staging:${candidate.releaseHash}`,
+		"carol@example.com",
+	);
+	const vouched = authorizeRelease(dir, stagingAuthorizeInput({ approval: "approval/self" }), {
+		now: NOW,
+	});
+	assert.equal(vouched.code, "AMBER_E_RELEASE_SEPARATION");
+	assert.match(vouched.errors[0], /cannot approve its own rehearsal/);
+
+	approvalFixture(dir, "approval/rel-1", `release:staging:${candidate.releaseHash}`);
+	const authorized = authorizeRelease(dir, stagingAuthorizeInput(), { now: NOW });
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+	assert.equal(authorized.record.environment, "staging");
+	assert.equal(authorized.record.approvalId, "approval/rel-1");
+	assert.equal(authorized.record.decision.revision, authorized.consumption.receipt.revision);
+	assert.equal(authorized.record.branchProtection, null);
+
+	const replay = authorizeRelease(
+		dir,
+		stagingAuthorizeInput({ decisionIdentity: "decision/rel-2" }),
+		{ now: NOW },
+	);
+	assert.equal(replay.code, "AMBER_E_RELEASE_EXISTS");
+	assert.equal(showReleaseAuthorization(dir, "release/web-42").releaseId, "release/web-42");
+	assert.equal(listReleaseAuthorizations(dir, { environment: "staging" }).length, 1);
+
+	// A second authorization exercises the fold's chain advance: two
+	// chained events must both verify on read.
+	const second = prepareReleaseCandidate(dir, candidateInput({ releaseId: "release/web-44" }), {
+		now: NOW,
+	});
+	assert.equal(second.ok, true, (second.errors || []).join("; "));
+	approvalFixture(dir, "approval/rel-2", `release:staging:${second.record.releaseHash}`);
+	const chained = authorizeRelease(
+		dir,
+		stagingAuthorizeInput({
+			releaseId: "release/web-44",
+			approval: "approval/rel-2",
+			decisionIdentity: "decision/rel-3",
+		}),
+		{ now: NOW },
+	);
+	assert.equal(chained.ok, true, (chained.errors || []).join("; "));
+	assert.equal(listReleaseAuthorizations(dir, { environment: "staging" }).length, 2);
+});
+
+test("a newer release policy revision invalidates the stale candidate", () => {
+	const dir = mkTarget("auth-drift");
+	const candidate = stagingFixture(dir);
+	const supersede = admitArtifact(dir, {
+		type: "policy",
+		identity: "policy/release",
+		body: "# Policy v2\n",
+		supersedes: 1,
+	});
+	assert.equal(supersede.ok, true, (supersede.errors || []).join("; "));
+	approvalFixture(dir, "approval/rel-1", `release:staging:${candidate.releaseHash}`);
+	const drifted = authorizeRelease(dir, stagingAuthorizeInput(), { now: NOW });
+	assert.equal(drifted.ok, false);
+	assert.equal(drifted.code, "AMBER_E_RELEASE_DRIFT");
+	assert.match(drifted.errors[0], /newer revision/);
+});
+
+test("production authorization binds two humans, gates, and a runbook capability", () => {
+	const dir = mkTarget("auth-production");
+	releaseFixture(dir);
+	assert.equal(registerPrincipal(dir, { id: "dave@example.com", principalKind: "human" }).ok, true);
+	assert.equal(registerPrincipal(dir, { id: "erin@example.com", principalKind: "human" }).ok, true);
+	// Runbook capability for production.
+	const capDecision = admitArtifact(dir, {
+		type: "decision",
+		identity: "decision/cap-runbook",
+		body: "# runbook cap\n",
+		decisionKind: "approval",
+		principal: "alice@example.com",
+		traces: [{ type: "decides", to: { type: "intent", identity: "intent/release" } }],
+	});
+	assert.equal(capDecision.ok, true, (capDecision.errors || []).join("; "));
+	assert.equal(
+		registerRunnerCapability(dir, {
+			runnerId: "runner/ci",
+			runnerVersion: "1.0.0",
+			name: "runbook.restart-web",
+			capabilityVersion: "1",
+			effects: ["deploy"],
+			pathPrefixes: ["deploy/staging"],
+			timeoutMsMax: 600_000,
+			credentialRequirement: "scoped",
+			rollback: "runbook/staging-rollback",
+			decision: { identity: "decision/cap-runbook", revision: 1 },
+		}).ok,
+		true,
+	);
+	// Branch protection evidence + two human decisions from non-producers.
+	const branch = recordEvidence(dir, {
+		id: "evidence/branch-protection",
+		producer: "carol@example.com",
+		assurance: "observed",
+		scope: "F053",
+		subject: "branch protection audit",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: null,
+		status: "pass",
+	});
+	assert.equal(branch.ok, true, (branch.errors || []).join("; "));
+	for (const [identity, principal] of [
+		["decision/code-owner", "dave@example.com"],
+		["decision/release-manager", "erin@example.com"],
+		["decision/by-producer", "carol@example.com"],
+	]) {
+		const decision = admitArtifact(dir, {
+			type: "decision",
+			identity,
+			body: `# ${identity}\n`,
+			decisionKind: "approval",
+			principal,
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/release" } }],
+		});
+		assert.equal(decision.ok, true, (decision.errors || []).join("; "));
+	}
+	// Two passing gate outcomes.
+	const gateEvidence = recordEvidence(dir, {
+		id: "evidence/gate-run",
+		producer: "carol@example.com",
+		assurance: "observed",
+		scope: null,
+		subject: "release/web-42",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: ["ok"],
+		status: "pass",
+	});
+	assert.equal(gateEvidence.ok, true, (gateEvidence.errors || []).join("; "));
+	const gate = admitArtifact(dir, {
+		type: "gate",
+		identity: "gate/release",
+		body: "# Gate\n",
+		extensions: {
+			gate: { require: [{ evidenceType: "release/web-42", assurance: "observed" }] },
+		},
+	});
+	assert.equal(gate.ok, true, (gate.errors || []).join("; "));
+	for (let i = 0; i < 2; i += 1) {
+		const outcome = evaluateGate(
+			dir,
+			{ gate: "gate/release", subject: "release/web-42" },
+			{ now: new Date("2026-08-29T01:00:00.000Z") },
+		);
+		assert.equal(outcome.ok, true, (outcome.errors || []).join("; "));
+		assert.equal(outcome.outcome.verdict, "pass");
+	}
+	const prepared = prepareReleaseCandidate(
+		dir,
+		candidateInput({
+			environment: "production",
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "runbook.restart-web",
+				capabilityVersion: "1",
+			},
+		}),
+		{ now: NOW },
+	);
+	assert.equal(prepared.ok, true, (prepared.errors || []).join("; "));
+
+	const productionInput = {
+		releaseId: "release/web-42",
+		branchProtection: "evidence/branch-protection",
+		codeOwner: { identity: "decision/code-owner", revision: 1 },
+		releaseManager: { identity: "decision/release-manager", revision: 1 },
+		releaseGateIndex: 0,
+		environmentGateIndex: 1,
+	};
+
+	const sameHuman = authorizeRelease(dir, {
+		...productionInput,
+		releaseManager: { identity: "decision/code-owner", revision: 1 },
+	});
+	assert.equal(sameHuman.code, "AMBER_E_RELEASE_SEPARATION");
+	assert.match(sameHuman.errors[0], /distinct humans/);
+
+	const producerSlot = authorizeRelease(dir, {
+		...productionInput,
+		codeOwner: { identity: "decision/by-producer", revision: 1 },
+	});
+	assert.equal(producerSlot.code, "AMBER_E_RELEASE_SEPARATION");
+	assert.match(producerSlot.errors[0], /produced Evidence this release binds/);
+
+	const ghostGate = authorizeRelease(dir, { ...productionInput, releaseGateIndex: 9 });
+	assert.equal(ghostGate.code, "AMBER_E_RELEASE_GATE");
+
+	const sameGate = authorizeRelease(dir, { ...productionInput, environmentGateIndex: 0 });
+	assert.equal(sameGate.code, "AMBER_E_RELEASE_GATE");
+	assert.match(sameGate.errors[0], /separate controls/);
+
+	// A fail verdict is a recorded outcome, not a command error (F050);
+	// index 2 records a foreign subject, refused on the subject binding.
+	const foreignGate = evaluateGate(
+		dir,
+		{ gate: "gate/release", subject: "release/other" },
+		{ now: new Date("2026-08-29T01:00:00.000Z") },
+	);
+	assert.equal(foreignGate.ok, true, (foreignGate.errors || []).join("; "));
+	const wrongSubject = authorizeRelease(dir, { ...productionInput, environmentGateIndex: 2 });
+	assert.equal(wrongSubject.code, "AMBER_E_RELEASE_GATE");
+	assert.match(wrongSubject.errors[0], /own subject/);
+
+	const authorized = authorizeRelease(dir, productionInput);
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+	assert.equal(authorized.record.environment, "production");
+	assert.equal(authorized.record.codeOwner.principal, "dave@example.com");
+	assert.equal(authorized.record.releaseManager.principal, "erin@example.com");
+	assert.equal(authorized.record.approvalId, null);
+
+	// An authorization Decision is single-use across the ledger: the spent
+	// code-owner Decision cannot authorize a second release.
+	const second = prepareReleaseCandidate(
+		dir,
+		candidateInput({
+			releaseId: "release/web-43",
+			environment: "production",
+			evidence: ["evidence/test-run", "evidence/gate-run"],
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "runbook.restart-web",
+				capabilityVersion: "1",
+			},
+		}),
+		{ now: NOW },
+	);
+	assert.equal(second.ok, true, (second.errors || []).join("; "));
+	const gateEvidence43 = recordEvidence(dir, {
+		id: "evidence/gate-run-43",
+		producer: "carol@example.com",
+		assurance: "observed",
+		scope: null,
+		subject: "release/web-43",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: ["ok"],
+		status: "pass",
+	});
+	assert.equal(gateEvidence43.ok, true, (gateEvidence43.errors || []).join("; "));
+	const gate43 = admitArtifact(dir, {
+		type: "gate",
+		identity: "gate/release-43",
+		body: "# Gate 43\n",
+		extensions: {
+			gate: { require: [{ evidenceType: "release/web-43", assurance: "observed" }] },
+		},
+	});
+	assert.equal(gate43.ok, true, (gate43.errors || []).join("; "));
+	for (let i = 0; i < 2; i += 1) {
+		const replayGate = evaluateGate(
+			dir,
+			{ gate: "gate/release-43", subject: "release/web-43" },
+			{ now: new Date("2026-08-29T02:00:00.000Z") },
+		);
+		assert.equal(replayGate.ok, true, (replayGate.errors || []).join("; "));
+		assert.equal(replayGate.outcome.verdict, "pass");
+	}
+	const spent = authorizeRelease(dir, {
+		...productionInput,
+		releaseId: "release/web-43",
+		releaseGateIndex: 3,
+		environmentGateIndex: 4,
+	});
+	assert.equal(spent.ok, false);
+	assert.equal(spent.code, "AMBER_E_RELEASE_INVALID", (spent.errors || []).join("; "));
+	assert.match(spent.errors[0], /single-use/);
+});
+
+test("tampered authorization ledger fails every read closed", () => {
+	const dir = mkTarget("auth-tamper");
+	const candidate = stagingFixture(dir);
+	approvalFixture(dir, "approval/rel-1", `release:staging:${candidate.releaseHash}`);
+	assert.equal(authorizeRelease(dir, stagingAuthorizeInput(), { now: NOW }).ok, true);
+	const event = JSON.parse(fs.readFileSync(authorizationsPath(dir), "utf8"));
+	event.approvalId = "approval/edited";
+	writeJSONL(authorizationsPath(dir), [event]);
+	assert.throws(
+		() => listReleaseAuthorizations(dir),
+		(err) => err.amberCode === "AMBER_E_RELEASE_AUTH_CORRUPT",
 	);
 });

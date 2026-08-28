@@ -1182,6 +1182,12 @@ const COMMAND_HELP = {
 		"        --release-policy <identity>@<rev> --runner <runner-id> --runner-version <v>",
 		"        --capability <name> --capability-version <v> --credential <none|scoped>",
 		"        --rollback <evidence-id>",
+		"  authorize --id <release-id>",
+		"        staging: --approval <id> --decision-identity <identity> --body <markdown>",
+		"        [--trace decides:<type>:<identity>] [--scope <scope>] --rehearsal <evidence-id>",
+		"        production: --branch-protection <evidence-id> --code-owner <identity>@<rev>",
+		"        --release-manager <identity>@<rev> --release-gate-index <n>",
+		"        --environment-gate-index <n>",
 		"  show --id <release-id>",
 		"  list [--environment <env>]",
 		"",
@@ -1570,8 +1576,9 @@ const COMMAND_OUTPUT = {
 	},
 	release: {
 		usage: [
-			"Usage: amber release <prepare|show|list> --target <repo> [--json]",
+			"Usage: amber release <prepare|authorize|show|list> --target <repo> [--json]",
 			"       amber release prepare --target <repo> --id <release-id> --commit <40-hex> --change-artifact <type>:<identity>@<rev> --evidence-item <evidence-id> --review-logic <evidence-id> --review-security <evidence-id> --review-spec <evidence-id> --environment development|staging|production --release-policy <identity>@<rev> --runner <runner-id> --runner-version <version> --capability <name> --capability-version <version> --credential none|scoped --rollback <evidence-id> [--json]",
+			"       amber release authorize --target <repo> --id <release-id> [--approval <id>] [--decision-identity <identity>] [--body <markdown>] [--trace <decides:...>] [--scope <scope>] [--rehearsal <evidence-id>] [--branch-protection <evidence-id>] [--code-owner <identity>@<rev>] [--release-manager <identity>@<rev>] [--release-gate-index <n>] [--environment-gate-index <n>] [--json]",
 			"       amber release show --target <repo> --id <release-id> [--json]",
 			"       amber release list --target <repo> [--environment <env>] [--json]",
 		].join("\n"),

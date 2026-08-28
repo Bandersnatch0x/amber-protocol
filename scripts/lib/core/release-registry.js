@@ -21,6 +21,8 @@ const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { ARTIFACT_TYPES, listArtifactRevisions } = require("./canonical-artifacts");
 const { showEvidence } = require("./evidence-receipts");
+const { showApproval, consumeApproval } = require("./approval-registry");
+const { showGateOutcome } = require("./gate-evaluation");
 const {
 	ENVIRONMENTS,
 	CREDENTIAL_REQUIREMENTS,
@@ -46,6 +48,7 @@ const REVIEW_AXES = Object.freeze(["logic", "security", "specCompliance"]);
 
 const RELEASE_INVALID_CODE = "AMBER_E_RELEASE_INVALID";
 const RELEASE_EXISTS_CODE = "AMBER_E_RELEASE_EXISTS";
+const RELEASE_NOT_FOUND_CODE = "AMBER_E_RELEASE_NOT_FOUND";
 const RELEASE_CORRUPT_CODE = "AMBER_E_RELEASE_CORRUPT";
 const RELEASE_LOCK_CODE = "AMBER_E_RELEASE_LOCK";
 const RELEASE_SIZE_CEILING_CODE = "AMBER_E_RELEASE_SIZE_CEILING";
@@ -299,6 +302,7 @@ function foldReleaseCandidates(cwd) {
 		byId.add(event.releaseId);
 		const { prevHash: _prev, hash: _hash, ...body } = event;
 		candidates.push({ ...body, index });
+		prevHash = event.hash;
 	});
 	return candidates;
 }
@@ -497,6 +501,646 @@ function listReleaseCandidates(cwd, { environment = null } = {}) {
 	);
 }
 
+// ── F053 T2 (#275): staging & production release authorization ────────────
+//
+// Authorization is per-environment, separate from execution, and always
+// human: staging consumes one named single-use F050 Approval bound to
+// `release:staging:<releaseHash>` plus a rollback rehearsal receipt whose
+// producer is not the approver; production binds branch-protection
+// Evidence, TWO distinct human Decisions (code owner and release manager,
+// neither of whom produced any bound Evidence), passing release and
+// environment Gate outcomes, a runbook.* capability, and the scoped
+// credentials class. Stale authority never authorizes: the candidate must
+// re-derive to its recorded releaseHash, its capability must still
+// resolve, and a newer revision of the pinned release Policy invalidates
+// the candidate outright.
+
+const RELEASE_AUTHORIZATION_SCHEMA_VERSION = 1;
+const SUPPORTED_RELEASE_AUTHORIZATION_SCHEMA_VERSIONS = Object.freeze([1]);
+const DEFAULT_MAX_RELEASE_AUTHORIZATIONS_BYTES = 1024 * 1024;
+
+// Human-only authority slots, mirroring the F050/F051/F052 contract.
+const RELEASE_DECISION_KINDS = Object.freeze(["acceptance", "approval"]);
+
+const RELEASE_AUTH_CORRUPT_CODE = "AMBER_E_RELEASE_AUTH_CORRUPT";
+const RELEASE_AUTH_LOCK_CODE = "AMBER_E_RELEASE_AUTH_LOCK";
+const RELEASE_AUTH_SIZE_CEILING_CODE = "AMBER_E_RELEASE_AUTH_SIZE_CEILING";
+const RELEASE_DRIFT_CODE = "AMBER_E_RELEASE_DRIFT";
+const RELEASE_SEPARATION_CODE = "AMBER_E_RELEASE_SEPARATION";
+const RELEASE_APPROVAL_MISMATCH_CODE = "AMBER_E_RELEASE_APPROVAL_MISMATCH";
+const RELEASE_GATE_CODE = "AMBER_E_RELEASE_GATE";
+
+const AUTHORIZE_INPUT_FIELDS = Object.freeze([
+	"releaseId",
+	"approval",
+	"decisionIdentity",
+	"body",
+	"traces",
+	"scope",
+	"rehearsal",
+	"branchProtection",
+	"codeOwner",
+	"releaseManager",
+	"releaseGateIndex",
+	"environmentGateIndex",
+]);
+const DECISION_PIN_FIELDS = Object.freeze(["identity", "revision"]);
+const BOUND_DECISION_FIELDS = Object.freeze(["identity", "revision", "decisionKind", "principal"]);
+// One closed event set for both environments: the fields the OTHER
+// environment does not bind are null, and the stored-shape validator
+// enforces exactly that nullness per environment.
+const AUTHORIZED_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"releaseId",
+	"releaseHash",
+	"environment",
+	"approvalId",
+	"decision",
+	"rehearsal",
+	"branchProtection",
+	"codeOwner",
+	"releaseManager",
+	"releaseGateIndex",
+	"environmentGateIndex",
+	"prevHash",
+	"hash",
+]);
+
+function authorizationsPath(cwd) {
+	return statePathForCreate(cwd, "release", "authorizations.jsonl");
+}
+
+function releaseAuthCorrupt(message) {
+	return typedError(RELEASE_AUTH_CORRUPT_CODE, message);
+}
+
+function acquireAuthorizationLock(cwd) {
+	return acquireLedgerLock({
+		dirPath: path.dirname(authorizationsPath(cwd)),
+		lockName: "authorizations.lock",
+		conflictCode: RELEASE_AUTH_LOCK_CODE,
+		corruptCode: RELEASE_AUTH_CORRUPT_CODE,
+		label: "release authorization ledger",
+		staleMs: LOCK_STALE_MS,
+	});
+}
+
+function appendAuthorizationWithinCeiling(cwd, event) {
+	return sharedAppendWithinCeiling({
+		ledgerPath: authorizationsPath(cwd),
+		event,
+		envName: "AMBER_RELEASE_MAX_AUTHORIZATIONS_BYTES",
+		defaultBytes: DEFAULT_MAX_RELEASE_AUTHORIZATIONS_BYTES,
+		label: "release authorization ledger",
+	});
+}
+
+function boundDecisionProblem(value, label) {
+	if (!isPlainObject(value)) return `${label} must be an object`;
+	const closed = closedFieldProblem(value, BOUND_DECISION_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(value.identity)) return `${label}.identity must be a non-empty string`;
+	if (!Number.isInteger(value.revision) || value.revision < 1)
+		return `${label}.revision must be a positive integer`;
+	if (!RELEASE_DECISION_KINDS.includes(value.decisionKind))
+		return `${label}.decisionKind must be one of ${RELEASE_DECISION_KINDS.join(", ")}`;
+	if (!isNonEmptyString(value.principal)) return `${label}.principal must be a non-empty string`;
+	return null;
+}
+
+function authorizedEventProblem(event, lineIndex) {
+	const label = `release authorization event ${lineIndex}`;
+	const closed = closedFieldProblem(event, AUTHORIZED_EVENT_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(event.at)) return `${label}.at must be a non-empty string`;
+	if (!isNonEmptyString(event.releaseId)) return `${label}.releaseId must be a non-empty string`;
+	if (!/^sha256:[0-9a-f]{64}$/.test(event.releaseHash ?? ""))
+		return `${label}.releaseHash must be a sha256:<64-hex> string`;
+	if (!ENVIRONMENTS.includes(event.environment))
+		return `${label}.environment must be one of ${ENVIRONMENTS.join(", ")}`;
+	if (event.environment === "production") {
+		for (const field of ["approvalId", "rehearsal"]) {
+			if (event[field] !== null) return `${label}.${field} must be null for production`;
+		}
+		if (event.decision !== null) return `${label}.decision must be null for production`;
+		if (!isNonEmptyString(event.branchProtection))
+			return `${label}.branchProtection must be a recorded Evidence receipt id`;
+		for (const slot of ["codeOwner", "releaseManager"]) {
+			const problem = boundDecisionProblem(event[slot], `${label}.${slot}`);
+			if (problem !== null) return problem;
+		}
+		for (const field of ["releaseGateIndex", "environmentGateIndex"]) {
+			if (!Number.isInteger(event[field]) || event[field] < 0)
+				return `${label}.${field} must be a non-negative integer`;
+		}
+		return null;
+	}
+	for (const field of ["branchProtection"]) {
+		if (event[field] !== null) return `${label}.${field} must be null outside production`;
+	}
+	for (const slot of ["codeOwner", "releaseManager"]) {
+		if (event[slot] !== null) return `${label}.${slot} must be null outside production`;
+	}
+	for (const field of ["releaseGateIndex", "environmentGateIndex"]) {
+		if (event[field] !== null) return `${label}.${field} must be null outside production`;
+	}
+	if (!isNonEmptyString(event.approvalId)) return `${label}.approvalId must be a non-empty string`;
+	const decision = closedFieldProblem(
+		event.decision ?? {},
+		DECISION_PIN_FIELDS,
+		`${label}.decision`,
+	);
+	if (!isPlainObject(event.decision) || decision !== null)
+		return decision ?? `${label}.decision must be an object`;
+	if (!isNonEmptyString(event.decision.identity))
+		return `${label}.decision.identity must be a non-empty string`;
+	if (!Number.isInteger(event.decision.revision) || event.decision.revision < 1)
+		return `${label}.decision.revision must be a positive integer`;
+	if (!isNonEmptyString(event.rehearsal))
+		return `${label}.rehearsal must be a recorded Evidence receipt id`;
+	return null;
+}
+
+function foldReleaseAuthorizations(cwd) {
+	const events = readLedgerFailClosed(
+		authorizationsPath(cwd),
+		RELEASE_AUTH_CORRUPT_CODE,
+		"release authorization ledger",
+	);
+	let prevHash = GENESIS_HASH;
+	const byId = new Set();
+	const authorizations = [];
+	events.forEach((event, index) => {
+		const lineIndex = index + 1;
+		if (!isPlainObject(event))
+			throw releaseAuthCorrupt(`release authorization event ${lineIndex} is not an object`);
+		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
+			throw releaseAuthCorrupt(`release authorization event ${lineIndex} breaks the hash chain`);
+		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+			throw releaseAuthCorrupt(
+				`release authorization event ${lineIndex} carries a hash that does not match its content`,
+			);
+		if (!SUPPORTED_RELEASE_AUTHORIZATION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+			throw releaseAuthCorrupt(
+				`release authorization event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+			);
+		if (event.kind !== "authorized")
+			throw releaseAuthCorrupt(
+				`release authorization event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+			);
+		const problem = authorizedEventProblem(event, lineIndex);
+		if (problem !== null) throw releaseAuthCorrupt(problem);
+		if (byId.has(event.releaseId))
+			throw releaseAuthCorrupt(
+				`release ${JSON.stringify(event.releaseId)} is authorized more than once`,
+			);
+		byId.add(event.releaseId);
+		const { prevHash: _prev, hash: _hash, ...body } = event;
+		authorizations.push({ ...body, index });
+		prevHash = event.hash;
+	});
+	return authorizations;
+}
+
+function authorizationAppendFailure(err) {
+	return {
+		ok: false,
+		code: err.amberCode || RELEASE_AUTH_CORRUPT_CODE,
+		record: null,
+		errors: [err.message || String(err)],
+	};
+}
+
+// Guard contract: any non-null guard result is returned verbatim without
+// appending; `derive(fold)` picks the caller's record after the append.
+function appendAuthorizationEvent(cwd, body, guard, derive) {
+	let release;
+	try {
+		release = acquireAuthorizationLock(cwd);
+	} catch (err) {
+		return authorizationAppendFailure(err);
+	}
+	try {
+		let folded;
+		try {
+			folded = foldReleaseAuthorizations(cwd);
+		} catch (err) {
+			return authorizationAppendFailure(err);
+		}
+		const guardVerdict = guard(folded);
+		if (guardVerdict !== null) return guardVerdict;
+		let prevHash;
+		try {
+			prevHash = chainHeadHash(
+				authorizationsPath(cwd),
+				RELEASE_AUTH_CORRUPT_CODE,
+				"release authorizations",
+			);
+		} catch (err) {
+			return authorizationAppendFailure(err);
+		}
+		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
+		let ceiling;
+		try {
+			ceiling = appendAuthorizationWithinCeiling(cwd, event);
+		} catch (err) {
+			return authorizationAppendFailure(err);
+		}
+		if (ceiling.wouldExceed)
+			return {
+				ok: false,
+				code: RELEASE_AUTH_SIZE_CEILING_CODE,
+				record: null,
+				errors: [`release authorization event would exceed ${ceiling.ceiling} bytes`],
+			};
+		try {
+			appendJSONL(authorizationsPath(cwd), event);
+		} catch (err) {
+			return authorizationAppendFailure(err);
+		}
+		let record;
+		try {
+			record = derive(foldReleaseAuthorizations(cwd)) ?? null;
+		} catch (err) {
+			return authorizationAppendFailure(err);
+		}
+		return { ok: true, code: null, record, errors: [] };
+	} finally {
+		release();
+	}
+}
+
+// Stale authority never authorizes: the stored candidate must re-derive
+// to its recorded releaseHash, its capability must still resolve, and a
+// newer committed revision of the pinned release Policy invalidates it.
+function candidateDriftProblem(cwd, candidate, revisions) {
+	const rederived = canonicalHashOf({
+		schemaVersion: candidate.schemaVersion,
+		change: candidate.change,
+		evidence: candidate.evidence,
+		review: candidate.review,
+		environment: candidate.environment,
+		policy: candidate.policy,
+		capability: candidate.capability,
+		credentialsClass: candidate.credentialsClass,
+		rollbackPlan: candidate.rollbackPlan,
+	});
+	if (rederived !== candidate.releaseHash)
+		return `release ${JSON.stringify(candidate.releaseId)} no longer re-derives to its recorded releaseHash`;
+	const capability = resolveRequestCapability(cwd, candidate.capability);
+	if (!capability.ok)
+		return `the registered capability behind this release is no longer resolvable (${capability.errors[0]})`;
+	const newest = revisions
+		.filter(
+			(revision) => revision.type === "policy" && revision.identity === candidate.policy.identity,
+		)
+		.reduce((max, revision) => Math.max(max, revision.revision), 0);
+	if (newest > candidate.policy.revision)
+		return `release policy ${JSON.stringify(candidate.policy.identity)} has a newer revision ${newest} than the pinned ${candidate.policy.revision}; changed authority makes stale candidates unusable`;
+	return null;
+}
+
+// The producer ids behind every Evidence receipt the candidate binds —
+// the "submitting side" for separation-of-duties purposes.
+function boundProducerIds(cwd, candidate) {
+	const ids = new Set();
+	const references = [
+		...candidate.evidence,
+		...REVIEW_AXES.map((axis) => candidate.review[axis]),
+		candidate.rollbackPlan,
+	];
+	for (const reference of references) {
+		const receipt = showEvidence(cwd, reference);
+		if (receipt === null)
+			throw releaseAuthCorrupt(
+				`release ${JSON.stringify(candidate.releaseId)} binds Evidence ${JSON.stringify(reference)} that is no longer recorded`,
+			);
+		ids.add(receipt.producer.id);
+	}
+	return ids;
+}
+
+// One committed human Decision (acceptance|approval) with its verified
+// principal snapshot, or a refusal.
+function resolveReleaseDecision(revisions, pin, label) {
+	const match = revisions.find(
+		(revision) =>
+			revision.type === "decision" &&
+			revision.identity === pin.identity &&
+			revision.revision === pin.revision,
+	);
+	if (!match)
+		return {
+			ok: false,
+			reason: `${label} ${JSON.stringify(pin.identity)}@${pin.revision} is not a committed Decision artifact`,
+		};
+	if (!RELEASE_DECISION_KINDS.includes(match.decisionKind))
+		return {
+			ok: false,
+			reason: `${label} requires a human acceptance or approval Decision; ${JSON.stringify(pin.identity)}@${pin.revision} carries decisionKind ${JSON.stringify(match.decisionKind)}`,
+		};
+	const principal = match.principal?.id;
+	if (!isNonEmptyString(principal))
+		return {
+			ok: false,
+			reason: `${label} ${JSON.stringify(pin.identity)}@${pin.revision} carries no verified principal snapshot`,
+		};
+	return {
+		ok: true,
+		decision: {
+			identity: pin.identity,
+			revision: pin.revision,
+			decisionKind: match.decisionKind,
+			principal,
+		},
+	};
+}
+
+function decisionPinProblem(value, label) {
+	if (!isPlainObject(value)) return `${label} must be an object carrying identity and revision`;
+	const closed = closedFieldProblem(value, DECISION_PIN_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(value.identity)) return `${label}.identity must be a non-empty string`;
+	if (!Number.isInteger(value.revision) || value.revision < 1)
+		return `${label}.revision must be a positive integer`;
+	return null;
+}
+
+/**
+ * Authorize one prepared release for its environment. Staging consumes a
+ * named single-use Approval and binds an independent rollback rehearsal;
+ * production binds branch protection, two distinct human Decisions kept
+ * apart from every bound Evidence producer, passing release and
+ * environment Gates, a runbook capability, and the scoped credentials
+ * class. One release authorizes at most once.
+ */
+function authorizeRelease(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(RELEASE_INVALID_CODE, ["authorize input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, AUTHORIZE_INPUT_FIELDS, "authorize input");
+	if (inputClosed !== null) return fail(RELEASE_INVALID_CODE, [inputClosed]);
+	if (!isNonEmptyString(input.releaseId))
+		return fail(RELEASE_INVALID_CODE, ["releaseId must be a non-empty string"]);
+	let candidate;
+	try {
+		candidate = showReleaseCandidate(cwd, input.releaseId);
+	} catch (err) {
+		return fail(err.amberCode || RELEASE_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (candidate === null)
+		return fail(RELEASE_NOT_FOUND_CODE, [
+			`release candidate ${JSON.stringify(input.releaseId)} is not prepared`,
+		]);
+	let revisions;
+	try {
+		revisions = listArtifactRevisions(cwd);
+	} catch (err) {
+		return fail(err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT", [err.message || String(err)]);
+	}
+	const drift = candidateDriftProblem(cwd, candidate, revisions);
+	if (drift !== null) return fail(RELEASE_DRIFT_CODE, [drift]);
+
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	const base = {
+		kind: "authorized",
+		schemaVersion: RELEASE_AUTHORIZATION_SCHEMA_VERSION,
+		at,
+		releaseId: candidate.releaseId,
+		releaseHash: candidate.releaseHash,
+		environment: candidate.environment,
+		approvalId: null,
+		decision: null,
+		rehearsal: null,
+		branchProtection: null,
+		codeOwner: null,
+		releaseManager: null,
+		releaseGateIndex: null,
+		environmentGateIndex: null,
+	};
+
+	if (candidate.environment === "production") {
+		for (const field of ["approval", "decisionIdentity", "body", "traces", "scope", "rehearsal"]) {
+			if (input[field] !== undefined)
+				return fail(RELEASE_INVALID_CODE, [
+					`${field} is a staging binding; production authorization binds decisions and gates`,
+				]);
+		}
+		if (!candidate.capability.name.startsWith("runbook."))
+			return fail(RELEASE_INVALID_CODE, [
+				`production releases deploy only through runbook.* capabilities; the candidate pins ${JSON.stringify(candidate.capability.name)}`,
+			]);
+		if (candidate.credentialsClass !== "scoped")
+			return fail(RELEASE_INVALID_CODE, [
+				`production releases require the scoped credentials class; the candidate declares ${JSON.stringify(candidate.credentialsClass)}`,
+			]);
+		if (!isNonEmptyString(input.branchProtection))
+			return fail(RELEASE_INVALID_CODE, [
+				"branchProtection must be a recorded Evidence receipt id",
+			]);
+		const branch = evidenceRefusal(cwd, input.branchProtection, "branchProtection");
+		if (branch !== null) {
+			if (branch.code !== null) return fail(branch.code, [branch.reason]);
+			return fail(RELEASE_INVALID_CODE, [branch.reason]);
+		}
+		for (const [slot, pin] of [
+			["codeOwner", input.codeOwner],
+			["releaseManager", input.releaseManager],
+		]) {
+			const problem = decisionPinProblem(pin, slot);
+			if (problem !== null) return fail(RELEASE_INVALID_CODE, [problem]);
+		}
+		const codeOwner = resolveReleaseDecision(revisions, input.codeOwner, "codeOwner");
+		if (!codeOwner.ok) return fail(RELEASE_INVALID_CODE, [codeOwner.reason]);
+		const releaseManager = resolveReleaseDecision(
+			revisions,
+			input.releaseManager,
+			"releaseManager",
+		);
+		if (!releaseManager.ok) return fail(RELEASE_INVALID_CODE, [releaseManager.reason]);
+		if (codeOwner.decision.principal === releaseManager.decision.principal)
+			return fail(RELEASE_SEPARATION_CODE, [
+				`code owner and release manager must be distinct humans; both decisions bind ${JSON.stringify(codeOwner.decision.principal)}`,
+			]);
+		let producers;
+		try {
+			producers = boundProducerIds(cwd, candidate);
+			// The branch-protection receipt is bound by THIS authorization:
+			// its producer is on the submitting side too.
+			producers.add(showEvidence(cwd, input.branchProtection).producer.id);
+		} catch (err) {
+			return fail(err.amberCode || RELEASE_AUTH_CORRUPT_CODE, [err.message || String(err)]);
+		}
+		for (const slot of [codeOwner.decision, releaseManager.decision]) {
+			if (producers.has(slot.principal))
+				return fail(RELEASE_SEPARATION_CODE, [
+					`${JSON.stringify(slot.principal)} produced Evidence this release binds and cannot also approve it; the submitting side never satisfies a required approval`,
+				]);
+		}
+		if (input.releaseGateIndex === input.environmentGateIndex)
+			return fail(RELEASE_GATE_CODE, [
+				`releaseGateIndex and environmentGateIndex both name outcome ${input.releaseGateIndex}; the release Gate and the environment Gate are separate controls`,
+			]);
+		for (const [label, index] of [
+			["releaseGateIndex", input.releaseGateIndex],
+			["environmentGateIndex", input.environmentGateIndex],
+		]) {
+			if (!Number.isInteger(index) || index < 0)
+				return fail(RELEASE_INVALID_CODE, [`${label} must be a non-negative integer`]);
+			let outcome;
+			try {
+				outcome = showGateOutcome(cwd, { index });
+			} catch (err) {
+				return fail(err.amberCode || RELEASE_GATE_CODE, [err.message || String(err)]);
+			}
+			if (outcome === null)
+				return fail(RELEASE_GATE_CODE, [`${label} ${index} names no recorded Gate outcome`]);
+			if (outcome.subject !== candidate.releaseId)
+				return fail(RELEASE_GATE_CODE, [
+					`${label} ${index} records subject ${JSON.stringify(outcome.subject)}, not this release ${JSON.stringify(candidate.releaseId)}; a Gate outcome authorizes only its own subject`,
+				]);
+			if (outcome.verdict !== "pass")
+				return fail(RELEASE_GATE_CODE, [
+					`${label} ${index} records verdict ${JSON.stringify(outcome.verdict)}; production authorization requires a passing Gate outcome`,
+				]);
+		}
+		return appendAuthorizationEvent(
+			cwd,
+			{
+				...base,
+				branchProtection: input.branchProtection,
+				codeOwner: codeOwner.decision,
+				releaseManager: releaseManager.decision,
+				releaseGateIndex: input.releaseGateIndex,
+				environmentGateIndex: input.environmentGateIndex,
+			},
+			(fold) => {
+				if (fold.some((entry) => entry.releaseId === candidate.releaseId))
+					return fail(RELEASE_EXISTS_CODE, [
+						`release ${JSON.stringify(candidate.releaseId)} is already authorized; an authorization is single-use`,
+					]);
+				const spender = fold.find((entry) =>
+					[entry.codeOwner, entry.releaseManager, entry.decision].some(
+						(slot) =>
+							slot !== null &&
+							[input.codeOwner, input.releaseManager].some(
+								(pin) => slot.identity === pin.identity && slot.revision === pin.revision,
+							),
+					),
+				);
+				if (spender)
+					return fail(RELEASE_INVALID_CODE, [
+						`a bound Decision already authorized release ${JSON.stringify(spender.releaseId)}; an authorization Decision is single-use`,
+					]);
+				return null;
+			},
+			(fold) => fold.find((entry) => entry.releaseId === candidate.releaseId),
+		);
+	}
+
+	// Staging (and development) path: one named single-use Approval plus an
+	// independent rollback rehearsal receipt.
+	for (const field of [
+		"branchProtection",
+		"codeOwner",
+		"releaseManager",
+		"releaseGateIndex",
+		"environmentGateIndex",
+	]) {
+		if (input[field] !== undefined)
+			return fail(RELEASE_INVALID_CODE, [
+				`${field} is a production binding; ${candidate.environment} authorization consumes a named Approval`,
+			]);
+	}
+	for (const field of ["approval", "decisionIdentity", "body", "rehearsal"]) {
+		if (!isNonEmptyString(input[field]))
+			return fail(RELEASE_INVALID_CODE, [`${field} must be a non-empty string`]);
+	}
+	const rehearsal = evidenceRefusal(cwd, input.rehearsal, "rehearsal");
+	if (rehearsal !== null) {
+		if (rehearsal.code !== null) return fail(rehearsal.code, [rehearsal.reason]);
+		return fail(RELEASE_INVALID_CODE, [rehearsal.reason]);
+	}
+	const binding = `release:${candidate.environment}:${candidate.releaseHash}`;
+	let approval;
+	try {
+		approval = showApproval(cwd, input.approval, { now: opts.now });
+	} catch (err) {
+		return fail(err.amberCode || RELEASE_AUTH_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (approval === null)
+		return fail(RELEASE_APPROVAL_MISMATCH_CODE, [
+			`approval ${JSON.stringify(input.approval)} is not recorded`,
+		]);
+	if (approval.subject !== binding)
+		return fail(RELEASE_APPROVAL_MISMATCH_CODE, [
+			`approval ${JSON.stringify(input.approval)} authorizes subject ${JSON.stringify(approval.subject)}, not this release's binding ${JSON.stringify(binding)}; one authorization binds one release and environment`,
+		]);
+	let rehearsalReceipt;
+	try {
+		rehearsalReceipt = showEvidence(cwd, input.rehearsal);
+	} catch (err) {
+		return fail(err.amberCode || RELEASE_AUTH_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (rehearsalReceipt.producer.id === approval.approver.id)
+		return fail(RELEASE_SEPARATION_CODE, [
+			`approval ${JSON.stringify(input.approval)} was granted by ${JSON.stringify(approval.approver.id)}, who also produced the rehearsal Evidence ${JSON.stringify(input.rehearsal)}; the rehearsing party cannot approve its own rehearsal`,
+		]);
+	let consumed = null;
+	// The guard completes this object from the consumption receipt before
+	// the append hashes the event body.
+	const decision = { identity: input.decisionIdentity, revision: 1 };
+	const appended = appendAuthorizationEvent(
+		cwd,
+		{
+			...base,
+			approvalId: input.approval,
+			decision,
+			rehearsal: input.rehearsal,
+		},
+		(fold) => {
+			if (fold.some((entry) => entry.releaseId === candidate.releaseId))
+				return fail(RELEASE_EXISTS_CODE, [
+					`release ${JSON.stringify(candidate.releaseId)} is already authorized; an authorization is single-use`,
+				]);
+			// Consumption is the point of no return: it settles the human
+			// Decision atomically under the approval ledger's own lock. A
+			// ceiling/write failure AFTER this point leaves the consumed
+			// approval and settled Decision as the auditable recovery trail.
+			const consumption = consumeApproval(
+				cwd,
+				{
+					id: input.approval,
+					decisionIdentity: input.decisionIdentity,
+					body: input.body,
+					traces: input.traces ?? [],
+					scope: input.scope ?? null,
+				},
+				opts,
+			);
+			if (!consumption.ok) return fail(consumption.code, consumption.errors);
+			consumed = consumption;
+			decision.revision = consumption.receipt.revision;
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.releaseId === candidate.releaseId),
+	);
+	if (!appended.ok) return appended;
+	return { ...appended, consumption: consumed };
+}
+
+function showReleaseAuthorization(cwd, releaseId) {
+	return foldReleaseAuthorizations(cwd).find((entry) => entry.releaseId === releaseId) ?? null;
+}
+
+function listReleaseAuthorizations(cwd, { environment = null } = {}) {
+	return foldReleaseAuthorizations(cwd).filter(
+		(entry) => environment === null || entry.environment === environment,
+	);
+}
+
 module.exports = {
 	RELEASE_CANDIDATE_SCHEMA_VERSION,
 	SUPPORTED_RELEASE_CANDIDATE_SCHEMA_VERSIONS,
@@ -508,4 +1152,12 @@ module.exports = {
 	prepareReleaseCandidate,
 	showReleaseCandidate,
 	listReleaseCandidates,
+	RELEASE_AUTHORIZATION_SCHEMA_VERSION,
+	SUPPORTED_RELEASE_AUTHORIZATION_SCHEMA_VERSIONS,
+	DEFAULT_MAX_RELEASE_AUTHORIZATIONS_BYTES,
+	RELEASE_DECISION_KINDS,
+	authorizationsPath,
+	authorizeRelease,
+	showReleaseAuthorization,
+	listReleaseAuthorizations,
 };
