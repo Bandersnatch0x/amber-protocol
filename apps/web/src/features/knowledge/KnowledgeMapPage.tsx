@@ -40,9 +40,9 @@ const LAYER_COLORS: Record<string, { dot: string; badge: string; stroke: string 
     stroke: '#f59e0b',
   },
   knowledge: {
-    dot: 'bg-blue-500',
+    dot: 'bg-cobalt',
     badge: 'bg-blue-100 text-blue-900 dark:bg-blue-950/50 dark:text-blue-200',
-    stroke: '#3b82f6',
+    stroke: '#2563EB',
   },
   implementation: {
     dot: 'bg-slate-500',
@@ -51,12 +51,16 @@ const LAYER_COLORS: Record<string, { dot: string; badge: string; stroke: string 
   },
 };
 
-const STATUS_DOT: Record<string, string> = {
-  passing: 'bg-emerald-500',
-  accepted: 'bg-emerald-500',
-  Accepted: 'bg-emerald-500',
-  committed: 'bg-emerald-500',
-};
+// Real ADR statuses carry trailing notes ("Accepted (2026-08-26)"), so the
+// leading word decides, not the whole string.
+const HEALTHY_STATUS_PREFIXES = ['accepted', 'passing', 'committed'];
+
+function statusDotClass(status: string): string {
+  const normalized = status.trim().toLowerCase();
+  return HEALTHY_STATUS_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+    ? 'bg-emerald-500'
+    : 'bg-slate-400';
+}
 
 const KIND_LABEL_KEYS: Record<string, I18nKey> = {
   adr: 'knowledge.kind.adr',
@@ -607,7 +611,7 @@ function FlowCanvas({
           },
           label: connected ? e.verb : undefined,
           labelStyle: { fill: '#b45309', fontSize: 10, fontWeight: 600 },
-          labelBgStyle: { fill: '#fffbeb' },
+          labelBgStyle: { fill: '#fde68a' },
           labelBgPadding: [3, 1] as [number, number],
           labelBgBorderRadius: 3,
           markerEnd: {
@@ -682,7 +686,11 @@ function EdgeRow({
         {edge.origin === 'inferred' && (
           <span
             className="ml-0.5 text-[9px] text-slate-400 italic"
-            title={`inferred · ${edge.provenance?.provider}/${edge.provenance?.model} · prompt ${edge.provenance?.promptHash} · ${edge.provenance?.timestamp}`}
+            title={t('knowledge.inferredTooltip', {
+              model: `${edge.provenance?.provider}/${edge.provenance?.model}`,
+              hash: edge.provenance?.promptHash ?? '',
+              time: edge.provenance?.timestamp ?? '',
+            })}
           >
             {t('knowledge.inferredLabel')} ({edge.provenance?.provider}/{edge.provenance?.model})
           </span>
@@ -730,11 +738,7 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
         {drift ? (
           <span className="w-2 h-2 rounded-full bg-red-500 ring-2 ring-red-300 dark:ring-red-900 shrink-0" />
         ) : dto.status ? (
-          <span
-            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              STATUS_DOT[dto.status] ?? 'bg-slate-400'
-            }`}
-          />
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDotClass(dto.status)}`} />
         ) : null}
       </div>
       <div className="text-[11px] leading-snug text-slate-800 dark:text-slate-200 line-clamp-2 font-medium">
@@ -1412,7 +1416,7 @@ function KnowledgeMapGraph({
                 {t('knowledge.legend.decision')}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />{' '}
+                <span className="w-2 h-2 rounded-full bg-cobalt" />{' '}
                 {t('knowledge.legend.knowledge')}
               </div>
               <div className="flex items-center gap-1.5">
@@ -1694,7 +1698,7 @@ function KnowledgeMapGraph({
                   >
                     <div className="flex gap-2 items-baseline">
                       <span className="font-mono text-slate-400 shrink-0">
-                        {r.time ? r.time.slice(0, 10) : r.source}
+                        {r.time ? r.time.slice(0, 10) : ''}
                       </span>
                       <span className="truncate" title={r.title}>
                         {r.title}

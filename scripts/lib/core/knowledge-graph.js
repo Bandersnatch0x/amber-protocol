@@ -284,52 +284,6 @@ function parseArtifacts(targetRoot) {
 	}));
 }
 
-// ── context page merge (ADR-0009) ─────────────────────────────────────
-
-// A context page whose source ref names a node's sourcePath merges into the
-// node as a property, never as a node of its own.
-function contextPagesBySource(targetRoot) {
-	const { statePath } = require("../state-dir-resolver");
-	const pagesDir = statePath(targetRoot, "context", "pages");
-	if (!fs.existsSync(pagesDir)) return new Map();
-	// Matches .amber/artifacts/<dir>/<slug>/rev-N.md so we can map to the identity dir.
-	const ARTIFACT_REV_RE = /^(\.amber\/artifacts\/[^/]+\/[^/]+)\/rev-\d+\.md$/;
-	const bySource = new Map();
-	for (const name of fs.readdirSync(pagesDir).sort()) {
-		if (!name.endsWith(".json")) continue;
-		const filePath = path.join(pagesDir, name);
-		let text;
-		try {
-			text = fs.readFileSync(filePath, "utf8");
-		} catch (err) {
-			if (err.code === "ENOENT") continue;
-			throw typedError(ERROR_CODES.source, `could not read context page ${name}: ${err.message}`);
-		}
-		let page;
-		try {
-			page = JSON.parse(text);
-		} catch (e) {
-			throw typedError(ERROR_CODES.source, `context page ${name} is not valid JSON: ${e.message}`);
-		}
-		if (!page || typeof page !== "object" || !page.pageId || !page.sources) {
-			throw typedError(
-				ERROR_CODES.source,
-				`context page ${name} has unexpected shape (missing pageId or sources)`,
-			);
-		}
-		for (const source of Object.values(page.sources)) {
-			if (!source || typeof source.ref !== "string") continue;
-			// Strip #Lx-Ly fragment so the ref matches a node's sourcePath.
-			let ref = toPosix(stripRange(source.ref));
-			// Map artifact body file refs to their identity directory.
-			const artifactMatch = ARTIFACT_REV_RE.exec(ref);
-			if (artifactMatch) ref = artifactMatch[1];
-			if (ref && !bySource.has(ref)) bySource.set(ref, page.pageId);
-		}
-	}
-	return bySource;
-}
-
 // ── edge discovery ────────────────────────────────────────────────────
 
 const ADR_REF = /ADR-(\d{1,4})/g;

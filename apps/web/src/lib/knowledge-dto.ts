@@ -48,6 +48,7 @@ export interface KnowledgeGraphDTO {
   nodes: KnowledgeNode[];
   edges: KnowledgeEdgeDTO[];
   drift: DriftFinding[];
+  /** Always empty here; live aggregation is the separate recentChanges query. */
   recentChanges: RecentChangeItem[];
 }
 
