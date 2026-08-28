@@ -1,19 +1,37 @@
+<div align="center">
+
 # Amber Protocol
+
+> **让 AI 编码会话可审查、有闸门、可交接。**
 
 <p align="center">
   <img src="./assets/brand/amber-protocol-logo.png" alt="Amber Protocol 标志" width="160" />
 </p>
 
-[English](./README.md)
-
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
 ![CI](https://github.com/Bandersnatch0x/amber-protocol/workflows/CI/badge.svg)
-![Node Version](https://img.shields.io/badge/node-%5E20.19%20%7C%7C%20%5E22.12%20%7C%7C%20%3E%3D23-brightgreen)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/npm/v/amber-protocol)
+![npm](https://img.shields.io/npm/v/amber-protocol?style=flat-square)
+![Node Version](https://img.shields.io/badge/node-%5E20.19%20%7C%7C%20%5E22.12%20%7C%7C%20%3E%3D23-brightgreen?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
 
-**状态：** 稳定版 | **版本：** 1.0.0 · [里程碑与测试状态 →](./ROADMAP.md)
+<p align="center">
+  <a href="#安装">安装</a> ·
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#核心概念">核心概念</a> ·
+  <a href="#文档">文档</a> ·
+  <a href="./README.md">English</a>
+</p>
+
+<p align="center">
+  面向 AI 辅助工程的仓库本地治理层——计划、闸门、审批与交接<br />
+  全部以可检视的文件形式存放在你的仓库里。<br />
+  <b>状态：</b>稳定版 · <a href="./ROADMAP.md">里程碑与测试状态 →</a>
+</p>
+
+</div>
+
+---
 
 Amber Protocol 是一个面向 AI 辅助工程的仓库本地治理层。当团队让 AI agent 在仓库里工作时，难的不再是写代码——而是搞清楚做了什么、是否安全保留、如何交接、如何证明已被审查。Amber 把这些环节显式化：它准备面向 agent 的上下文，记录审批与闸门，用只读检查验证状态，并生成交接与审计产物——全部以文件形式存放在你的仓库里。
 
@@ -167,4 +185,4 @@ MIT 许可证 —— 详见 [LICENSE](./LICENSE)。
 
 ---
 
-**Amber Protocol** —— 为工程团队提供仓库本地 AI 编码治理。
+<p align="center"><b>Amber Protocol</b> —— 为工程团队提供仓库本地 AI 编码治理。</p>
