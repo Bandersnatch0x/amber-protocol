@@ -198,3 +198,42 @@ test("each invariant is a real check — satisfied only when its artifact exists
 	const withLedger = checkInvariantNonRegression(dir);
 	assert.equal(withLedger.invariants.find((i) => i.id === "inv-3").satisfied, true);
 });
+
+// ── Gate/validator agreement (#270) ───────────────────────────
+
+function profileEvidence(dir) {
+	return gatherPhaseEvidence(dir, "phase-2").find(
+		(e) => e.requirement === "personal-node profile declared",
+	);
+}
+
+test("a bogus profile value satisfies neither the phase-2 gate nor inv-2", () => {
+	const dir = mkTarget("gate-bogus-profile");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "profile.json"),
+		JSON.stringify({ deploymentProfile: "bogus" }),
+	);
+	assert.equal(profileEvidence(dir).satisfied, false);
+	const inv2 = checkInvariantNonRegression(dir).invariants.find((i) => i.id === "inv-2");
+	assert.equal(inv2.satisfied, false);
+});
+
+test("malformed profile JSON satisfies neither the phase-2 gate nor inv-2", () => {
+	const dir = mkTarget("gate-malformed-profile");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "profile.json"), "{ bad json");
+	assert.equal(profileEvidence(dir).satisfied, false);
+	const inv2 = checkInvariantNonRegression(dir).invariants.find((i) => i.id === "inv-2");
+	assert.equal(inv2.satisfied, false);
+});
+
+test("any enum-valid declared profile satisfies the phase-2 gate", () => {
+	const dir = mkTarget("gate-valid-profile");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "profile.json"),
+		JSON.stringify({ deploymentProfile: "team-hub" }),
+	);
+	assert.equal(profileEvidence(dir).satisfied, true);
+});

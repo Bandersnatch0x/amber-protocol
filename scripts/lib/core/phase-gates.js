@@ -44,14 +44,11 @@ function hasContextPages(cwd) {
 }
 
 function hasProfile(cwd) {
-	const profilePath = statePath(cwd, "profile.json");
-	if (!fs.existsSync(profilePath)) return false;
-	try {
-		const raw = JSON.parse(fs.readFileSync(profilePath, "utf8"));
-		return typeof raw.deploymentProfile === "string";
-	} catch {
-		return false;
-	}
+	// Delegate to the one profile parser (#270): the gate must not be
+	// satisfiable by a declaration the profile validator rejects.
+	const { readProfileFile } = require("./deployment-profile");
+	const { deploymentProfile, source, errors } = readProfileFile(cwd);
+	return source === "profile-file" && errors.length === 0 && deploymentProfile !== null;
 }
 
 function hasEnvelopes(cwd) {
