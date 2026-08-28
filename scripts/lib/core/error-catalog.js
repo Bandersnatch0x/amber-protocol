@@ -1823,6 +1823,56 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_RUNNER_EXECUTION_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	// F053 T1 (#274): release candidate codes.
+	AMBER_E_RELEASE_INVALID: {
+		title: "Release candidate input is invalid",
+		cause:
+			"The candidate carried an unknown field, malformed value, or a reference that does not resolve: an uncommitted artifact revision or policy revision, an unrecorded Evidence/Review/rollback-plan receipt, or an unregistered capability pin.",
+		remedy:
+			"Fix the flagged field; every reference must resolve before it becomes releasable material.",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_EXISTS", "AMBER_E_RELEASE_CORRUPT"],
+	},
+	AMBER_E_RELEASE_EXISTS: {
+		title: "Release candidate already prepared",
+		cause: "A candidate with this releaseId is already recorded; candidates are immutable.",
+		remedy: "Prepare a new releaseId for a new binding (see `amber release list`).",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_INVALID"],
+	},
+	AMBER_E_RELEASE_NOT_FOUND: {
+		title: "Release candidate is not prepared",
+		cause: "An operation named a releaseId absent from the candidate ledger.",
+		remedy: "Prepare the candidate first (`amber release prepare`).",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_EXISTS"],
+	},
+	AMBER_E_RELEASE_CORRUPT: {
+		title: "Release candidate ledger failed verification",
+		cause:
+			"The hash-chained candidate ledger has a broken chain, edited event, unsupported schema version, or duplicate releaseId.",
+		remedy:
+			"Treat the ledger as evidence; restore .amber/release/candidates.jsonl from history and investigate the tamper.",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_LOCK", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_RELEASE_LOCK: {
+		title: "Release candidate ledger is locked",
+		cause:
+			"Another process holds the candidate ledger lock (stale locks reclaim after 30 seconds).",
+		remedy: "Retry after the concurrent preparation finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_CORRUPT"],
+	},
+	AMBER_E_RELEASE_SIZE_CEILING: {
+		title: "Release candidate ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_RELEASE_MAX_CANDIDATES_BYTES).",
+		remedy:
+			"Raise AMBER_RELEASE_MAX_CANDIDATES_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

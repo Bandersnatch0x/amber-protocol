@@ -93,6 +93,7 @@ const { gateDispatch } = require("./gate-commands");
 const { policyDispatch } = require("./policy-commands");
 const { adapterDispatch } = require("./adapter-commands");
 const { runnerDispatch } = require("./runner-commands");
+const { releaseDispatch } = require("./release-commands");
 const { orgAuditDispatch } = require("./org-audit-commands");
 const { hooksDispatch } = require("./hooks-commands");
 const { bindCommandHandlers } = require("./command-registry");
@@ -1072,6 +1073,10 @@ function handleRunner(args) {
 	return runnerDispatch(args);
 }
 
+function handleRelease(args) {
+	return releaseDispatch(args);
+}
+
 function handleExplain(args) {
 	const { explain } = require("./explain-command");
 	const r = explain(args);
@@ -1173,6 +1178,7 @@ const COMMAND_HANDLERS = {
 	policy: handlePolicy,
 	adapter: handleAdapter,
 	runner: handleRunner,
+	release: handleRelease,
 	review: handleReview,
 	accept: handleAccept,
 	learnings: handleLearnings,

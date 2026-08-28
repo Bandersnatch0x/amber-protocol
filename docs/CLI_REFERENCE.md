@@ -1158,6 +1158,35 @@ Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_
 `AMBER_E_RUNNER_EXECUTION_CORRUPT`, `AMBER_E_RUNNER_EXECUTION_LOCK`,
 `AMBER_E_RUNNER_EXECUTION_SIZE_CEILING`.
 
+### release prepare / show / list
+
+Prepare governed release candidates (F053 T1). A candidate immutably binds one exact Change — a
+40-hex commit sha plus committed Canonical Artifact revisions — together with recorded F050
+Evidence, per-axis Review findings (`logic`, `security`, `specCompliance`: each a recorded
+Evidence receipt reference, structurally never an approval — AI review supplements code ownership,
+it never replaces it), the target environment, a versioned release Policy artifact revision, one
+registered F052 Runner capability pin, the credentials class, and a rollback plan Evidence
+reference. Every reference must resolve fail-closed before it becomes releasable material, the
+closed content hashes into a canonical `releaseHash` (so any drift invalidates downstream
+authorization instead of silently retargeting it), and one releaseId prepares at most once into
+the hash-chained ledger `.amber/release/candidates.jsonl`. Preparation is a governance write: it
+never deploys and touches no git state.
+
+```bash
+node scripts/amber.js release prepare --target . --id release/web-42 \
+  --commit <40-hex-sha> --change-artifact spec:spec/login@2 \
+  --evidence-item evidence/test-run --review-logic evidence/review-logic \
+  --review-security evidence/review-security --review-spec evidence/review-spec \
+  --environment staging --release-policy policy/release@1 \
+  --runner runner/ci --runner-version 1.0.0 --capability deploy.staging-web \
+  --capability-version 1 --credential scoped --rollback evidence/rollback-plan --json
+node scripts/amber.js release show --target . --id release/web-42 --json
+node scripts/amber.js release list --target . --environment staging --json
+```
+
+Error codes: `AMBER_E_RELEASE_INVALID`, `AMBER_E_RELEASE_EXISTS`, `AMBER_E_RELEASE_NOT_FOUND`,
+`AMBER_E_RELEASE_CORRUPT`, `AMBER_E_RELEASE_LOCK`, `AMBER_E_RELEASE_SIZE_CEILING`.
+
 ## Handoff Commands
 
 ### handoff

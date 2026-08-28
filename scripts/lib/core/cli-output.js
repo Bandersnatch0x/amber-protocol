@@ -212,6 +212,17 @@ const FLAG_SPECS = {
 	// F052 ticket 4 (#258): execution settlement flags (--evidence,
 	// --reason, and --status are shared with the existing surfaces).
 	"--receipt": { key: "receipt" },
+	// F053 ticket 1 (#274): release candidate flags (--id, --environment,
+	// --runner-version, --capability, --capability-version, --credential,
+	// and --rollback are shared with the F052 surfaces).
+	"--commit": { key: "commit" },
+	"--change-artifact": { key: "changeArtifactVal", accumulate: "changeArtifacts" },
+	"--evidence-item": { key: "evidenceItemVal", accumulate: "evidenceItems" },
+	"--review-logic": { key: "reviewLogic" },
+	"--review-security": { key: "reviewSecurity" },
+	"--review-spec": { key: "reviewSpec" },
+	"--release-policy": { key: "releasePolicy" },
+	"--runner": { key: "runner" },
 	"--identity-map": { key: "identityMap" },
 	"--freshness-ms": { key: "freshnessMs" },
 	"--allow-path": { key: "allowPath" },

@@ -1164,6 +1164,31 @@ const COMMAND_HELP = {
 		'  amber runner authorize --target . --request-hash sha256:<64-hex> --approval approval/deploy-42 --decision-identity decision/deploy-42 --body "# Authorize" --trace decides:intent:intent/deploy --json',
 		"  amber runner show --target . --id runner/ci --json",
 	],
+	release: [
+		"Prepare governed release candidates (F053 T1).",
+		"A candidate immutably binds one exact Change (commit + committed Artifact",
+		"revisions), recorded Evidence, per-axis Review findings (logic, security,",
+		"spec compliance — Evidence references, never approvals), the target",
+		"environment, a versioned release Policy artifact, one registered F052",
+		"Runner capability pin, the credentials class, and a rollback plan into a",
+		"canonical releaseHash. Preparation is a governance write: it never deploys",
+		"and touches no git state; any drift invalidates downstream authorization.",
+		"",
+		"Subcommands:",
+		"  prepare --id <release-id> --commit <40-hex> --change-artifact <type>:<identity>@<rev>",
+		"        [--change-artifact ...] --evidence-item <evidence-id> [--evidence-item ...]",
+		"        --review-logic <evidence-id> --review-security <evidence-id>",
+		"        --review-spec <evidence-id> --environment <development|staging|production>",
+		"        --release-policy <identity>@<rev> --runner <runner-id> --runner-version <v>",
+		"        --capability <name> --capability-version <v> --credential <none|scoped>",
+		"        --rollback <evidence-id>",
+		"  show --id <release-id>",
+		"  list [--environment <env>]",
+		"",
+		"Examples:",
+		"  amber release prepare --target . --id release/web-42 --commit <40-hex> --change-artifact spec:spec/login@2 --evidence-item evidence/test-run --review-logic evidence/review-logic --review-security evidence/review-security --review-spec evidence/review-spec --environment staging --release-policy policy/release@1 --runner runner/ci --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 --credential scoped --rollback evidence/rollback-plan --json",
+		"  amber release show --target . --id release/web-42 --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -1543,6 +1568,14 @@ const COMMAND_OUTPUT = {
 			"       amber adapter receipts --target <repo> [--id <adapter-id>] [--json]",
 		].join("\n"),
 	},
+	release: {
+		usage: [
+			"Usage: amber release <prepare|show|list> --target <repo> [--json]",
+			"       amber release prepare --target <repo> --id <release-id> --commit <40-hex> --change-artifact <type>:<identity>@<rev> --evidence-item <evidence-id> --review-logic <evidence-id> --review-security <evidence-id> --review-spec <evidence-id> --environment development|staging|production --release-policy <identity>@<rev> --runner <runner-id> --runner-version <version> --capability <name> --capability-version <version> --credential none|scoped --rollback <evidence-id> [--json]",
+			"       amber release show --target <repo> --id <release-id> [--json]",
+			"       amber release list --target <repo> [--environment <env>] [--json]",
+		].join("\n"),
+	},
 	runner: {
 		usage: [
 			"Usage: amber runner <register|capability|request|authorize|requests|prepare|settle|abort|rolled-back|executions|show|list> --target <repo> [--json]",
@@ -1574,6 +1607,7 @@ const COMMANDS = Object.freeze([
 	"policy",
 	"adapter",
 	"runner",
+	"release",
 	"review",
 	"accept",
 	"learnings",
@@ -1625,6 +1659,7 @@ const TIER_BY_COMMAND = {
 	policy: "core",
 	adapter: "core",
 	runner: "core",
+	release: "core",
 	review: "core",
 	accept: "core",
 	learnings: "core",

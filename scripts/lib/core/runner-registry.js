@@ -2328,6 +2328,7 @@ module.exports = {
 	registerRunner,
 	registerRunnerCapability,
 	resolveRunner,
+	resolveRequestCapability,
 	showRunner,
 	listRunners,
 	listRunnerCapabilities,
