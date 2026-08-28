@@ -186,6 +186,17 @@ const dispatch = defineCommand({
 					...(built.code ? { code: built.code } : {}),
 				};
 			}
+			if (type === "knowledge-base") {
+				const { rebuildKnowledgeBaseProjection } = require("./core/knowledge-projection");
+				const built = rebuildKnowledgeBaseProjection(targetRoot);
+				return {
+					text: built.ok ? JSON.stringify(built.manifest, null, 2) : "",
+					errors: built.errors,
+					warnings: [],
+					exitCode: built.ok ? 0 : 1,
+					...(built.code ? { code: built.code } : {}),
+				};
+			}
 			// Default builder: derive a deterministic read-only summary from canonical pages.
 			const built = rebuildProjection(targetRoot, type, (state) => ({
 				projection: type,

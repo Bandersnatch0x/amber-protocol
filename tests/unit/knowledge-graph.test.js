@@ -16,8 +16,7 @@ const path = require("node:path");
 const {
 	SCHEMA_VERSION,
 	EDGE_VERBS,
-	ERROR_CODES,
-	buildKnowledgeGraph,
+	buildKnowledgeGraphFromTree,
 	serializeKnowledgeGraph,
 } = require("../../scripts/lib/core/knowledge-graph");
 const { validate } = require("../../scripts/lib/core/schema-contract");
@@ -28,7 +27,7 @@ const { mkTarget, addPage, writeJson } = require("../helpers/harness");
 const REPO_ROOT = path.join(__dirname, "..", "..");
 
 // One build over the real tree, shared by the invariant tests (read-only).
-const graph = buildKnowledgeGraph(REPO_ROOT);
+const graph = buildKnowledgeGraphFromTree(REPO_ROOT);
 
 // ── schema validity ───────────────────────────────────────────────────
 
@@ -53,8 +52,8 @@ test("three layers only; four verbs only", () => {
 // ── byte-stability ────────────────────────────────────────────────────
 
 test("recompute over an unchanged tree is byte-identical", () => {
-	const first = serializeKnowledgeGraph(buildKnowledgeGraph(REPO_ROOT));
-	const second = serializeKnowledgeGraph(buildKnowledgeGraph(REPO_ROOT));
+	const first = serializeKnowledgeGraph(buildKnowledgeGraphFromTree(REPO_ROOT));
+	const second = serializeKnowledgeGraph(buildKnowledgeGraphFromTree(REPO_ROOT));
 	assert.equal(first, second);
 });
 
@@ -208,23 +207,25 @@ test("live anchors (including glob anchors) produce no findings", () => {
 
 // ── CLI seam: the `knowledge graph` action ────────────────────────────
 
-test("knowledge graph dispatch emits the canonical bytes and exit 0", () => {
+test("knowledge graph dispatch emits projected bytes matching the explicit tree-reader baseline", () => {
+	const { syncKnowledgeContextPages } = require("../../scripts/lib/core/knowledge-projection");
+	const synced = syncKnowledgeContextPages(REPO_ROOT);
+	assert.equal(synced.ok, true, JSON.stringify(synced.errors));
 	const { result, exitCode, bypassPrint } = knowledgeDispatch({
 		_: ["graph"],
 		target: REPO_ROOT,
 	});
 	assert.equal(exitCode, 0);
 	assert.equal(bypassPrint, true, "always prints the raw graph bytes");
-	assert.equal(result.text, serializeKnowledgeGraph(buildKnowledgeGraph(REPO_ROOT)));
+	assert.equal(result.text, serializeKnowledgeGraph(buildKnowledgeGraphFromTree(REPO_ROOT)));
 	assert.deepEqual(result.errors, []);
 });
 
-test("knowledge graph fails closed with a typed error on a corrupt source", () => {
-	const dir = mkTarget("kg-corrupt");
-	fs.writeFileSync(path.join(dir, "feature_list.json"), "{ not json");
+test("knowledge graph fails closed with a typed error when the projection is missing", () => {
+	const dir = mkTarget("kg-missing-projection");
 	const { result, exitCode } = knowledgeDispatch({ _: ["graph"], target: dir });
 	assert.equal(exitCode, 1);
-	assert.equal(result.code, ERROR_CODES.source);
+	assert.equal(result.code, "AMBER_E_PROJECTION_MISSING");
 	assert.ok(result.errors.length > 0);
 });
 
@@ -232,7 +233,7 @@ test("knowledge graph fails closed with a typed error on a corrupt source", () =
 
 test("an empty target yields an empty, still schema-valid graph", () => {
 	const dir = mkTarget("kg-empty");
-	const empty = buildKnowledgeGraph(dir);
+	const empty = buildKnowledgeGraphFromTree(dir);
 	assert.deepEqual(empty, { schemaVersion: SCHEMA_VERSION, nodes: [], edges: [], drift: [] });
 });
 
@@ -260,17 +261,26 @@ test("artifacts enter at identity granularity with trace edges on the four verbs
 	});
 	assert.equal(spec.ok, true, JSON.stringify(spec.errors));
 
-	const fixture = buildKnowledgeGraph(dir);
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	const intentNode = fixture.nodes.find((n) => n.id === "artifact:intent/intent/login-bug");
 	assert.ok(intentNode, "intent artifact node missing");
 	assert.equal(intentNode.layer, "decision");
 	assert.equal(intentNode.revisions, 2, "identity granularity: one node, two revisions");
 	// Head revision body is the accepted body (revision 2)
-	assert.ok(typeof intentNode.body === "string" && intentNode.body.length > 0, "artifact node must carry head revision body");
-	assert.ok(intentNode.body.includes("Accepted"), "artifact body should contain the head revision text");
+	assert.ok(
+		typeof intentNode.body === "string" && intentNode.body.length > 0,
+		"artifact node must carry head revision body",
+	);
+	assert.ok(
+		intentNode.body.includes("Accepted"),
+		"artifact body should contain the head revision text",
+	);
 	const specNode = fixture.nodes.find((n) => n.id === "artifact:spec/spec/login-spec");
 	assert.ok(specNode, "spec artifact node missing");
-	assert.ok(typeof specNode.body === "string" && specNode.body.length > 0, "spec artifact node must carry body");
+	assert.ok(
+		typeof specNode.body === "string" && specNode.body.length > 0,
+		"spec artifact node must carry body",
+	);
 	const edge = fixture.edges.find(
 		(e) => e.src === specNode.id && e.dst === intentNode.id && e.verb === "builds-on",
 	);
@@ -295,7 +305,7 @@ test("a context page merges into its source node as a property", () => {
 		},
 		blocks: [{ type: "prose", sources: ["s1"], text: "distilled" }],
 	});
-	const fixture = buildKnowledgeGraph(dir);
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
 	assert.ok(adr);
 	assert.equal(adr.contextPage, "test-decision-page");
@@ -311,7 +321,7 @@ test("rename detection requires prefix-related stems in the same directory", () 
 			{ id: "F002", title: "t", status: "passing", paths: ["lib/unrelated-thing.js"] },
 		],
 	});
-	const fixture = buildKnowledgeGraph(dir);
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	const renamed = fixture.drift.find((d) => d.nodeId === "feature:F001");
 	assert.equal(renamed.actualPath, "lib/scaffold.js");
 	const unmatched = fixture.drift.find((d) => d.nodeId === "feature:F002");
@@ -339,7 +349,7 @@ test("F-2: context page with #L range fragment merges into its source node", () 
 		},
 		blocks: [{ type: "prose", sources: ["s1"], text: "distilled" }],
 	});
-	const fixture = buildKnowledgeGraph(dir);
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
 	assert.ok(adr, "adr:0001 node missing");
 	assert.equal(adr.contextPage, "test-fragmented-page", "context page with #L range did not merge");
@@ -370,7 +380,7 @@ test("F-2: context page sourcing a canonical-artifact body file merges into the 
 		},
 		blocks: [{ type: "prose", sources: ["s1"], text: "distilled artifact" }],
 	});
-	const fixture = buildKnowledgeGraph(dir);
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	const artifactNode = fixture.nodes.find((n) => n.id === `artifact:intent/intent/cp-test`);
 	assert.ok(artifactNode, "artifact node missing");
 	assert.equal(
@@ -395,7 +405,7 @@ test("F-3: ../ anchor produces a dead-anchor finding without probing outside the
 			},
 		],
 	});
-	const fixture = buildKnowledgeGraph(dir);
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	// real.js is alive — no finding for it
 	const realFinding = fixture.drift.find((d) => d.path === "lib/real.js");
 	assert.equal(realFinding, undefined, "live path reported dead");
@@ -421,7 +431,7 @@ test("F-4: dir-wildcard pattern matching no directory produces a finding", () =>
 			},
 		],
 	});
-	const fixture = buildKnowledgeGraph(dir);
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	const finding = fixture.drift.find(
 		(d) => d.nodeId === "feature:F001" && d.path === "missing*/also-missing.js",
 	);
@@ -433,13 +443,15 @@ test("F-4: ? in basename matches a single character — lib/file?.js with lib/fi
 	const dir = mkTarget("kg-glob-qmark", { subdirs: ["lib"] });
 	fs.writeFileSync(path.join(dir, "lib", "file1.js"), "x");
 	writeJson(dir, "feature_list.json", {
-		features: [
-			{ id: "F001", title: "t", status: "passing", paths: ["lib/file?.js"] },
-		],
+		features: [{ id: "F001", title: "t", status: "passing", paths: ["lib/file?.js"] }],
 	});
-	const fixture = buildKnowledgeGraph(dir);
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	const finding = fixture.drift.find((d) => d.nodeId === "feature:F001");
-	assert.equal(finding, undefined, "lib/file?.js must NOT produce a finding when lib/file1.js exists");
+	assert.equal(
+		finding,
+		undefined,
+		"lib/file?.js must NOT produce a finding when lib/file1.js exists",
+	);
 });
 
 test("F-6: content nodes carry a body excerpt; all nodes with canonical text have body ≤ 2000 chars", () => {
@@ -450,7 +462,10 @@ test("F-6: content nodes carry a body excerpt; all nodes with canonical text hav
 		if (node.body !== undefined) {
 			assert.ok(typeof node.body === "string", `${node.id} body must be a string`);
 			assert.ok(node.body.length > 0, `${node.id} body must be non-empty`);
-			assert.ok(node.body.length <= 2000, `${node.id} body exceeds 2000 chars (got ${node.body.length})`);
+			assert.ok(
+				node.body.length <= 2000,
+				`${node.id} body exceeds 2000 chars (got ${node.body.length})`,
+			);
 		}
 		// Content-layer nodes always have body (their source files are non-empty)
 		if (contentKinds.has(node.kind)) {
@@ -490,17 +505,12 @@ test("F-6: artifact nodes carry body from the head revision committed text", () 
 	// artifacts may or may not have body depending on committed revisions.
 });
 
-
-
 test("F-6: body is absent for empty-text memory sections", () => {
 	const { mkTarget } = require("../helpers/harness");
 	const dir = mkTarget("kg-empty-body", { subdirs: ["docs/adr"] });
 	// Create an ADR with only whitespace after trimming
-	fs.writeFileSync(
-		path.join(dir, "docs", "adr", "0001-empty.md"),
-		"  \n  \n",
-	);
-	const fixture = buildKnowledgeGraph(dir);
+	fs.writeFileSync(path.join(dir, "docs", "adr", "0001-empty.md"), "  \n  \n");
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
 	assert.ok(adr, "adr:0001 missing");
 	// Whitespace-only text produces no body
@@ -510,9 +520,10 @@ test("F-6: body is absent for empty-text memory sections", () => {
 test("F-6: body is bounded at 2000 chars for long documents", () => {
 	const { mkTarget } = require("../helpers/harness");
 	const dir = mkTarget("kg-long-body", { subdirs: ["docs/adr"] });
-	const longText = "# ADR-0001: Long\n\n**Status:** Accepted\n**Date:** 2026-01-01\n\n" + "x".repeat(5000);
+	const longText =
+		"# ADR-0001: Long\n\n**Status:** Accepted\n**Date:** 2026-01-01\n\n" + "x".repeat(5000);
 	fs.writeFileSync(path.join(dir, "docs", "adr", "0001-long.md"), longText);
-	const fixture = buildKnowledgeGraph(dir);
+	const fixture = buildKnowledgeGraphFromTree(dir);
 	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
 	assert.ok(adr, "adr:0001 missing");
 	assert.ok(typeof adr.body === "string", "body must be a string");
@@ -520,18 +531,15 @@ test("F-6: body is bounded at 2000 chars for long documents", () => {
 	assert.ok(adr.body.length > 0, "body must be non-empty for non-empty document");
 });
 
-
-
 test("F-5: amber knowledge graph --json emits schema-valid, byte-identical JSON from root CLI", () => {
 	const { spawnSync } = require("node:child_process");
 	const { validate } = require("../../scripts/lib/core/schema-contract");
 	const amber = path.join(REPO_ROOT, "scripts", "amber.js");
 	const run = () =>
-		spawnSync(
-			process.execPath,
-			[amber, "knowledge", "graph", "--target", REPO_ROOT, "--json"],
-			{ cwd: REPO_ROOT, encoding: "utf8" },
-		);
+		spawnSync(process.execPath, [amber, "knowledge", "graph", "--target", REPO_ROOT, "--json"], {
+			cwd: REPO_ROOT,
+			encoding: "utf8",
+		});
 
 	const first = run();
 	assert.equal(first.status, 0, `exit code non-zero; stderr: ${first.stderr}`);
@@ -568,7 +576,10 @@ test("F-5: amber knowledge graph --json emits schema-valid, byte-identical JSON 
 	assert.ok(edge("adr:0005", "supersedes", "adr:0002"), "adr:0005 supersedes adr:0002");
 	assert.ok(edge("adr:0007", "builds-on", "adr:0003"), "adr:0007 builds-on adr:0003");
 	assert.ok(edge("adr:0007", "builds-on", "adr:0006"), "adr:0007 builds-on adr:0006");
-	assert.ok(edge("adr:0007", "supersedes", "architecture:web-viewer"), "adr:0007 supersedes architecture:web-viewer");
+	assert.ok(
+		edge("adr:0007", "supersedes", "architecture:web-viewer"),
+		"adr:0007 supersedes architecture:web-viewer",
+	);
 	assert.ok(edge("adr:0008", "builds-on", "adr:0003"), "adr:0008 builds-on adr:0003");
 	assert.ok(edge("adr:0008", "builds-on", "adr:0007"), "adr:0008 builds-on adr:0007");
 	assert.ok(edge("feature:F007", "references", "adr:0003"), "feature:F007 references adr:0003");

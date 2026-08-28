@@ -655,21 +655,60 @@ function buildDrift(targetRoot, features) {
 	return findings;
 }
 
-// ── build + validate ──────────────────────────────────────────────────
+function readDocumentsFromTree(targetRoot) {
+	return {
+		adrs: parseAdrs(targetRoot),
+		wikiPages: parseWikiPages(targetRoot),
+		architecturePages: parseArchitecturePages(targetRoot),
+		pagesBySource: contextPagesBySource(targetRoot),
+	};
+}
 
-/**
- * Build the deterministic knowledge graph for a target repository.
- * Read-only; validated against schemas/knowledge-graph.schema.json before
- * return (fail-closed with AMBER_E_KNOWLEDGE_GRAPH_INVALID).
- * @param {string} target - Target repository root.
- * @returns {{schemaVersion: string, nodes: object[], edges: object[], drift: object[]}}
- */
-function buildKnowledgeGraph(target) {
-	const targetRoot = path.resolve(target || process.cwd());
+function readDocumentsFromProjection(targetRoot) {
+	const { readKnowledgeBaseProjection } = require("./knowledge-projection");
+	const rows = readKnowledgeBaseProjection(targetRoot);
+	const adrs = [];
+	const wikiPages = [];
+	const architecturePages = [];
+	const pagesBySource = new Map();
+	for (const row of rows) {
+		pagesBySource.set(row.sourcePath, row.pageId);
+		if (row.category === "adr") {
+			const number = row.sourceNodeId.replace(/^adr:/, "");
+			const status = (/^\*\*Status:\*\*\s*(.+)$/m.exec(row.text) || [])[1]?.trim() || null;
+			const updated = (/^\*\*Date:\*\*\s*(\d{4}-\d{2}-\d{2})/m.exec(row.text) || [])[1] || null;
+			adrs.push({
+				id: row.sourceNodeId,
+				number,
+				sourcePath: row.sourcePath,
+				text: row.text,
+				title: row.title,
+				status,
+				updated,
+			});
+		} else if (row.category === "wiki") {
+			const front = /^---\n([\s\S]*?)\n---/.exec(row.text);
+			wikiPages.push({
+				id: row.sourceNodeId,
+				sourcePath: row.sourcePath,
+				text: row.text,
+				title: row.title,
+				updated: front ? (/^updated_at:\s*"?([^"\n]+)"?\s*$/m.exec(front[1]) || [])[1] : null,
+			});
+		} else if (row.category === "architecture") {
+			architecturePages.push({
+				id: row.sourceNodeId,
+				sourcePath: row.sourcePath,
+				text: row.text,
+				title: row.title,
+			});
+		}
+	}
+	return { adrs, wikiPages, architecturePages, pagesBySource };
+}
 
-	const adrs = parseAdrs(targetRoot);
-	const wikiPages = parseWikiPages(targetRoot);
-	const architecturePages = parseArchitecturePages(targetRoot);
+function buildKnowledgeGraphFromSources(targetRoot, documents) {
+	const { adrs, wikiPages, architecturePages, pagesBySource } = documents;
 	const memorySections = parseMemorySections(targetRoot);
 	const features = parseFeatures(targetRoot);
 	const artifacts = parseArtifacts(targetRoot);
@@ -745,7 +784,6 @@ function buildKnowledgeGraph(target) {
 	];
 	nodes.sort((a, b) => (a.id < b.id ? -1 : 1));
 
-	const pagesBySource = contextPagesBySource(targetRoot);
 	if (pagesBySource.size > 0) {
 		for (const node of nodes) {
 			const pageId = pagesBySource.get(node.sourcePath);
@@ -765,7 +803,10 @@ function buildKnowledgeGraph(target) {
 	});
 	const drift = buildDrift(targetRoot, features);
 
-	const graph = { schemaVersion: SCHEMA_VERSION, nodes, edges, drift };
+	return { schemaVersion: SCHEMA_VERSION, nodes, edges, drift };
+}
+
+function validateGraph(graph) {
 	const validate = compileSchema("knowledge-graph");
 	if (!validate(graph)) {
 		throw typedError(
@@ -774,6 +815,33 @@ function buildKnowledgeGraph(target) {
 		);
 	}
 	return graph;
+}
+
+function buildKnowledgeGraphFromTree(target) {
+	const targetRoot = path.resolve(target || process.cwd());
+	return validateGraph(
+		buildKnowledgeGraphFromSources(targetRoot, readDocumentsFromTree(targetRoot)),
+	);
+}
+
+/**
+ * Build the deterministic knowledge graph for a target repository.
+ * Production reads the knowledge-base projection; use {source: "tree"} or
+ * buildKnowledgeGraphFromTree() only for explicit parity verification.
+ * @param {string} target - Target repository root.
+ * @param {{source?: "projection"|"tree"}} [options]
+ * @returns {{schemaVersion: string, nodes: object[], edges: object[], drift: object[]}}
+ */
+function buildKnowledgeGraph(target, options = {}) {
+	const targetRoot = path.resolve(target || process.cwd());
+	const source = options.source || "projection";
+	if (source === "tree") return buildKnowledgeGraphFromTree(targetRoot);
+	if (source !== "projection") {
+		throw typedError(ERROR_CODES.source, `unknown knowledge graph source: ${source}`);
+	}
+	return validateGraph(
+		buildKnowledgeGraphFromSources(targetRoot, readDocumentsFromProjection(targetRoot)),
+	);
 }
 
 /** Canonical serialization: the byte-stable form both surfaces emit. */
@@ -786,5 +854,6 @@ module.exports = {
 	EDGE_VERBS,
 	ERROR_CODES,
 	buildKnowledgeGraph,
+	buildKnowledgeGraphFromTree,
 	serializeKnowledgeGraph,
 };

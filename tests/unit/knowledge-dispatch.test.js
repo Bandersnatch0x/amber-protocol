@@ -45,7 +45,7 @@ test("unknown action: exit 1, guidance on the printResult path", () => {
 	assert.equal(envelope.exitCode, 1);
 	assert.equal(envelope.bypassPrint, undefined);
 	assert.deepEqual(envelope.result.errors, [
-		"knowledge requires admit, list, status, retire, query, or graph.",
+		"knowledge requires admit, list, status, retire, query, graph, context-manifest, context-sync, or context-review-sample.",
 	]);
 	assert.deepEqual(envelope.result.warnings, []);
 });
