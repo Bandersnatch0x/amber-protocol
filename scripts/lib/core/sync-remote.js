@@ -269,8 +269,9 @@ function validateEnvelope(envelope) {
  * @param {string} artifactType - One of ARTIFACT_TYPES.
  * @param {string} relPath - Repository-relative path to the artifact.
  * @returns {object} The envelope.
- * @throws {Error} When the artifact is missing, the type is unknown, or the
- *   path is not canonical for the type (see resolveSyncArtifact).
+ * @throws {Error} When the artifact is missing, the type is unknown, the
+ *   path is not canonical for the type (see resolveSyncArtifact), or the
+ *   deployment profile declaration is invalid.
  */
 function envelopeFromArtifact(cwd, artifactType, relPath) {
 	const canonicalPath = resolveSyncArtifact(cwd, artifactType, relPath);
@@ -280,6 +281,9 @@ function envelopeFromArtifact(cwd, artifactType, relPath) {
 	}
 	const identity = resolveIdentity(cwd);
 	const profile = resolveDeploymentProfile(cwd);
+	if (profile.errors.length > 0) {
+		throw new Error(`invalid deployment profile declaration: ${profile.errors.join("; ")}`);
+	}
 	const hash = hashFile(absPath);
 	return {
 		schemaVersion: ENVELOPE_SCHEMA_VERSION,
@@ -292,7 +296,7 @@ function envelopeFromArtifact(cwd, artifactType, relPath) {
 			repositoryGeneration: identity.repositoryGeneration,
 		},
 		origin: {
-			profile: profile.deploymentProfile || "personal-node",
+			profile: profile.deploymentProfile,
 			personId: identity.personId || undefined,
 			agentId: identity.agentId || undefined,
 		},

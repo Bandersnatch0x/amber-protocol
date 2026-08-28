@@ -280,6 +280,47 @@ test("packEnvelope uses the deployment profile identity", () => {
 	assert.equal(packed.envelope.origin.profile, "team-hub");
 });
 
+test("packEnvelope refuses an invalid deployment profile declaration", () => {
+	const dir = mkTarget("profile-invalid", { git: true });
+	writeArtifact(dir, PAGE, "x");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, ".amber", "profile.json"),
+		JSON.stringify({ deploymentProfile: "bogus" }),
+	);
+	const packed = packEnvelope(dir, "context-page", PAGE);
+	assert.equal(packed.envelope, null);
+	assert.ok(packed.errors.some((e) => e.includes("invalid deployment profile declaration")));
+});
+
+test("packEnvelope refuses a malformed deployment profile file", () => {
+	const dir = mkTarget("profile-malformed", { git: true });
+	writeArtifact(dir, PAGE, "x");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "profile.json"), "{ bad json");
+	const packed = packEnvelope(dir, "context-page", PAGE);
+	assert.equal(packed.envelope, null);
+	assert.ok(packed.errors.some((e) => e.includes("invalid deployment profile declaration")));
+});
+
+test("packEnvelope refuses a non-object deployment profile file", () => {
+	const dir = mkTarget("profile-non-object", { git: true });
+	writeArtifact(dir, PAGE, "x");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(dir, ".amber", "profile.json"), JSON.stringify(["team-hub"]));
+	const packed = packEnvelope(dir, "context-page", PAGE);
+	assert.equal(packed.envelope, null);
+	assert.ok(packed.errors.some((e) => e.includes("invalid deployment profile declaration")));
+});
+
+test("packEnvelope defaults origin.profile when no declaration exists", () => {
+	const dir = mkTarget("profile-absent", { git: true });
+	writeArtifact(dir, PAGE, "x");
+	const packed = packEnvelope(dir, "context-page", PAGE);
+	assert.equal(packed.errors.length, 0);
+	assert.equal(packed.envelope.origin.profile, "personal-node");
+});
+
 // ── F035 S1: canonical artifact path and allowlist ────────────
 
 test("ARTIFACT_PATH_REGISTRY covers every ARTIFACT_TYPES entry", () => {
