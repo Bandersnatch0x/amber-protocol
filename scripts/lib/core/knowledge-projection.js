@@ -22,6 +22,7 @@ const PROJECTION_RULE_VERSION = 1;
 // offending paths named, whenever the tree and the committed census disagree in either
 // direction. No hardcoded counts: issues/0007 (ruling C) removed EXPECTED_COUNTS.
 const SAMPLE_LIMIT = 6;
+const RESYNC_REMEDY = "run `amber knowledge context-sync` and commit the regenerated corpus";
 
 const ERROR_CODES = Object.freeze({
 	manifest: "AMBER_E_KNOWLEDGE_MANIFEST_INVALID",
@@ -156,12 +157,12 @@ function membershipErrors(derivedRows, committedRows) {
 	const missingFromTree = [...committedByPath.keys()].filter((p) => !derivedByPath.has(p)).sort();
 	if (notAdmitted.length > 0) {
 		errors.push(
-			`${notAdmitted.length} document(s) in the tree are not in the committed census: ${notAdmitted.join(", ")} — run \`amber knowledge context-sync\` and commit the regenerated corpus`,
+			`${notAdmitted.length} document(s) in the tree are not in the committed census: ${notAdmitted.join(", ")} — ${RESYNC_REMEDY}`,
 		);
 	}
 	if (missingFromTree.length > 0) {
 		errors.push(
-			`committed census lists ${missingFromTree.length} document(s) missing from the tree: ${missingFromTree.join(", ")} — restore the file(s) or run \`amber knowledge context-sync\` and commit the regenerated corpus`,
+			`committed census lists ${missingFromTree.length} document(s) missing from the tree: ${missingFromTree.join(", ")} — restore the file(s) or ${RESYNC_REMEDY}`,
 		);
 	}
 	const derivedCounts = countsOf(derivedRows);
@@ -176,16 +177,13 @@ function membershipErrors(derivedRows, committedRows) {
 	return errors;
 }
 
-function censusErrors(rows) {
-	return { counts: countsOf(rows), errors: duplicateErrors(rows) };
-}
-
 function buildKnowledgeContextManifest(targetRoot) {
 	const root = path.resolve(targetRoot || process.cwd());
 	const rows = [...listAdrRows(root), ...listWikiRows(root), ...listArchitectureRows(root)].sort(
 		(a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
 	);
-	const { counts, errors } = censusErrors(rows);
+	const counts = countsOf(rows);
+	const errors = duplicateErrors(rows);
 	const manifest = {
 		schemaVersion: MANIFEST_SCHEMA_VERSION,
 		manifestId: "f059-knowledge-context-pages",
@@ -431,7 +429,7 @@ function readKnowledgeBaseProjection(targetRoot) {
 		.sort();
 	if (missingProjection.length > 0) {
 		errors.push(
-			`committed projection output is missing page(s) for: ${missingProjection.join(", ")} — run \`amber knowledge context-sync\` and commit the regenerated corpus`,
+			`committed projection output is missing page(s) for: ${missingProjection.join(", ")} — ${RESYNC_REMEDY}`,
 		);
 	}
 	const derivedRows = [...listAdrRows(root), ...listWikiRows(root), ...listArchitectureRows(root)];

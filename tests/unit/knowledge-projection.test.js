@@ -467,8 +467,16 @@ test("F059 tracked package state: docs/knowledge-corpus/ contains manifest and p
 	);
 	const manifest = readJson(manifestFile);
 	assert.equal(manifest.manifestId, "f059-knowledge-context-pages");
-	assert.deepEqual(manifest.counts, FIXTURE_COUNTS);
-	assert.equal(manifest.rows.length, 44);
+	// Single-source census (issues/0007): no hardcoded counts against the real repo.
+	// The committed manifest must be self-consistent: declared counts match its own rows.
+	assert.ok(manifest.rows.length > 0, "committed census must not be empty");
+	const actualCounts = {
+		adr: manifest.rows.filter((row) => row.category === "adr").length,
+		wiki: manifest.rows.filter((row) => row.category === "wiki").length,
+		architecture: manifest.rows.filter((row) => row.category === "architecture").length,
+		total: manifest.rows.length,
+	};
+	assert.deepEqual(manifest.counts, actualCounts);
 	const projection = readJson(projectionFile);
-	assert.equal(projection.pages.length, 44);
+	assert.equal(projection.pages.length, manifest.rows.length);
 });

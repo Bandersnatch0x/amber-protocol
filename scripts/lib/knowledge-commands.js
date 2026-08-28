@@ -49,12 +49,15 @@ const dispatch = defineCommand({
 			const result = buildKnowledgeContextManifest(target);
 			const errors = [...result.errors];
 			// Validate against the census's single source of truth when it exists;
-			// on a bootstrap tree there is nothing to compare against yet.
+			// on a bootstrap tree there is nothing to compare against yet. A manifest
+			// that exists but cannot be parsed is corruption, and fails closed.
 			try {
 				const committed = JSON.parse(fs.readFileSync(committedManifestPath(target), "utf8"));
 				errors.push(...membershipErrors(result.manifest.rows, committed.rows || []));
-			} catch {
-				// No committed manifest yet — rendering alone is the outcome.
+			} catch (err) {
+				if (err.code !== "ENOENT") {
+					errors.push(`committed census manifest is unreadable: ${err.message}`);
+				}
 			}
 			return {
 				text: JSON.stringify(result.manifest, null, 2),
