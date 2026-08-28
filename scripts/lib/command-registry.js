@@ -1200,6 +1200,35 @@ const COMMAND_HELP = {
 		"  amber release prepare --target . --id release/web-42 --commit <40-hex> --change-artifact spec:spec/login@2 --evidence-item evidence/test-run --review-logic evidence/review-logic --review-security evidence/review-security --review-spec evidence/review-spec --environment staging --release-policy policy/release@1 --runner runner/ci --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 --credential scoped --rollback evidence/rollback-plan --json",
 		"  amber release show --target . --id release/web-42 --json",
 	],
+	maintain: [
+		"Register Control Band detectors and record deterministic Findings (F054 T1).",
+		"A detector is a versioned, model-independent Control Band definition —",
+		"metric, source, numeric baseline, closed comparator rules (ge|gt|le|lt,",
+		"last matching rule wins), evaluation window, scope, cooldown, observation",
+		"ceiling, and the one permitted output type (finding) — registered as a",
+		"human-approved governance mutation behind a single-use committed Decision.",
+		"`detect` is target-read-only: it evaluates one declared observation",
+		"fixture against the registered definition; an in-band verdict appends",
+		"nothing, and an out-of-band verdict appends one immutable Finding",
+		"carrying the detector version, input and baseline hashes, the tier",
+		"verdict, and a stable fingerprint (subject + rule version + scope +",
+		"window). Both ledgers are hash-chained and fail every read closed.",
+		"",
+		"Subcommands:",
+		"  register-detector --id <detector-id> --detector-version <v> --metric <name>",
+		"        --source <origin> --baseline <number> --rule <tier>:<ge|gt|le|lt>:<threshold>",
+		"        [--rule ...] --window-ms <n> --scope <scope> --cooldown-ms <n>",
+		"        --max-observations <n> --decision-identity <identity> --revision <n>",
+		"  detect --id <detector-id> --detector-version <v> --subject <subject>",
+		"        --window-from <iso> --window-to <iso> --value <number>",
+		"        --observation-hash <sha256:...>",
+		"  detectors",
+		"  findings [--id <detector-id>] [--fingerprint <sha256:...>]",
+		"",
+		"Examples:",
+		"  amber maintain register-detector --target . --id detector/error-rate --detector-version 1 --metric http-5xx-rate --source observability/api --baseline 10 --rule warn:ge:100 --rule page:ge:500 --window-ms 3600000 --scope service/api --cooldown-ms 3600000 --max-observations 100 --decision-identity decision/detector-error-rate --revision 1 --json",
+		"  amber maintain detect --target . --id detector/error-rate --detector-version 1 --subject service/api --window-from 2026-08-29T00:00:00.000Z --window-to 2026-08-29T01:00:00.000Z --value 120 --observation-hash sha256:<64-hex> --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -1610,6 +1639,15 @@ const COMMAND_OUTPUT = {
 			"       amber runner list --target <repo> [--json]",
 		].join("\n"),
 	},
+	maintain: {
+		usage: [
+			"Usage: amber maintain <register-detector|detect|detectors|findings> --target <repo> [--json]",
+			"       amber maintain register-detector --target <repo> --id <detector-id> --detector-version <version> --metric <name> --source <origin> --baseline <number> --rule <tier>:<ge|gt|le|lt>:<threshold> [--rule ...] --window-ms <n> --scope <scope> --cooldown-ms <n> --max-observations <n> --decision-identity <identity> --revision <n> [--json]",
+			"       amber maintain detect --target <repo> --id <detector-id> --detector-version <version> --subject <subject> --window-from <iso> --window-to <iso> --value <number> --observation-hash <sha256:...> [--json]",
+			"       amber maintain detectors --target <repo> [--json]",
+			"       amber maintain findings --target <repo> [--id <detector-id>] [--fingerprint <sha256:...>] [--json]",
+		].join("\n"),
+	},
 };
 
 const DEFAULT_OUTPUT = Object.freeze({ dryRun: false, summary: false, usage: null });
@@ -1625,6 +1663,7 @@ const COMMANDS = Object.freeze([
 	"adapter",
 	"runner",
 	"release",
+	"maintain",
 	"review",
 	"accept",
 	"learnings",
@@ -1677,6 +1716,7 @@ const TIER_BY_COMMAND = {
 	adapter: "core",
 	runner: "core",
 	release: "core",
+	maintain: "core",
 	review: "core",
 	accept: "core",
 	learnings: "core",

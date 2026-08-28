@@ -1248,6 +1248,50 @@ Error codes: `AMBER_E_RELEASE_INVALID`, `AMBER_E_RELEASE_EXISTS`, `AMBER_E_RELEA
 `AMBER_E_RELEASE_AUTH_SIZE_CEILING`, `AMBER_E_RELEASE_TX_STATE`, `AMBER_E_RELEASE_TX_MISMATCH`,
 `AMBER_E_RELEASE_TX_CORRUPT`, `AMBER_E_RELEASE_TX_LOCK`, `AMBER_E_RELEASE_TX_SIZE_CEILING`.
 
+### maintain register-detector / detect / detectors / findings
+
+Register Control Band detectors and record deterministic Findings (F054 T1). A detector is a
+versioned, model-independent Control Band definition — metric, source, numeric baseline, closed
+comparator rules (`ge|gt|le|lt`, the last matching rule wins), evaluation window, scope, cooldown,
+observation ceiling, and the one permitted output type (`finding`) — registered into the
+hash-chained ledger `.amber/maintain/detectors.jsonl` behind a single-use committed human
+acceptance/approval Decision (mirroring the F052 registry contract). Registered versions are
+immutable: a changed definition registers a new version, never an overwrite.
+
+`detect` is target-read-only and model-independent: it evaluates one declared observation fixture
+(subject, window, value, input hash) against one registered detector version — the verdict is a
+pure function of the definition and the observation. An in-band verdict returns without writing
+anything (it re-derives reproducibly on demand from the definition plus the observation, so
+recording it would only add noise); an out-of-band verdict appends one immutable Finding to
+`.amber/maintain/findings.jsonl` carrying the detector version, the observation's `inputHash`, the
+definition's `baselineHash` (baseline + rules, so a changed definition is a visibly different
+basis), the deterministic tier verdict, and a stable fingerprint derived from subject + rule
+version + scope + window (keyed by detector id so two detectors sharing scope and version can
+never collide) — repeated observations of the same condition correlate on one fingerprint instead
+of multiplying. Detection never mutates the target, never touches canonical artifacts, and never
+promotes anything; a window wider than the detector declares refuses. Both ledgers fail every read
+closed on tamper.
+
+```bash
+node scripts/amber.js maintain register-detector --target . --id detector/error-rate \
+  --detector-version 1 --metric http-5xx-rate --source observability/api \
+  --baseline 10 --rule warn:ge:100 --rule page:ge:500 --window-ms 3600000 \
+  --scope service/api --cooldown-ms 3600000 --max-observations 100 \
+  --decision-identity decision/detector-error-rate --revision 1 --json
+node scripts/amber.js maintain detect --target . --id detector/error-rate \
+  --detector-version 1 --subject service/api \
+  --window-from 2026-08-29T00:00:00.000Z --window-to 2026-08-29T01:00:00.000Z \
+  --value 120 --observation-hash sha256:<64-hex-chars> --json
+node scripts/amber.js maintain detectors --target . --json
+node scripts/amber.js maintain findings --target . --id detector/error-rate --json
+node scripts/amber.js maintain findings --target . --fingerprint sha256:<64-hex-chars> --json
+```
+
+Error codes: `AMBER_E_MAINTAIN_INVALID`, `AMBER_E_MAINTAIN_EXISTS`, `AMBER_E_MAINTAIN_NOT_FOUND`,
+`AMBER_E_MAINTAIN_CORRUPT`, `AMBER_E_MAINTAIN_LOCK`, `AMBER_E_MAINTAIN_SIZE_CEILING`,
+`AMBER_E_MAINTAIN_FINDING_CORRUPT`, `AMBER_E_MAINTAIN_FINDING_LOCK`,
+`AMBER_E_MAINTAIN_FINDING_SIZE_CEILING`.
+
 ## Handoff Commands
 
 ### handoff

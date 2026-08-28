@@ -1979,6 +1979,82 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_RELEASE_TX_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_MAINTAIN_INVALID: {
+		title: "Maintain detector input rejected",
+		cause:
+			"The detector definition or observation fixture is malformed: a missing or non-numeric field, an unknown comparator or reserved tier, a window wider than the detector declares, or a registration Decision that is absent, non-human, or already spent.",
+		remedy:
+			"Fix the flagged field, register a changed definition as a new detector version, and authorize each registration with a fresh committed human acceptance or approval Decision.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_EXISTS", "AMBER_E_MAINTAIN_NOT_FOUND"],
+	},
+	AMBER_E_MAINTAIN_EXISTS: {
+		title: "Maintain detector version already registered",
+		cause:
+			"A detector with the same id and version is already in the registry; registered detector versions are immutable.",
+		remedy:
+			"Register the changed definition under a new version instead of overwriting the existing one.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_INVALID", "AMBER_E_MAINTAIN_NOT_FOUND"],
+	},
+	AMBER_E_MAINTAIN_NOT_FOUND: {
+		title: "Maintain detector not registered",
+		cause: "No detector with the requested id and version exists in the registry.",
+		remedy:
+			"Register the detector version first (amber maintain register-detector) or list registered detectors with amber maintain detectors.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_EXISTS", "AMBER_E_MAINTAIN_INVALID"],
+	},
+	AMBER_E_MAINTAIN_CORRUPT: {
+		title: "Maintain detector registry corrupt",
+		cause:
+			"The detector ledger under .amber/maintain/ has a broken hash chain, an invalid event shape, a duplicate registration, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/maintain/detectors.jsonl from version control or a backup; the ledger is append-only and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_FINDING_CORRUPT", "AMBER_E_MAINTAIN_LOCK"],
+	},
+	AMBER_E_MAINTAIN_LOCK: {
+		title: "Maintain detector registry lock contended",
+		cause: "Another process holds the detector registry lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent maintain operation finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_CORRUPT", "AMBER_E_MAINTAIN_FINDING_LOCK"],
+	},
+	AMBER_E_MAINTAIN_SIZE_CEILING: {
+		title: "Maintain detector registry size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_MAINTAIN_MAX_DETECTORS_BYTES).",
+		remedy:
+			"Raise AMBER_MAINTAIN_MAX_DETECTORS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_MAINTAIN_FINDING_CORRUPT: {
+		title: "Maintain finding ledger corrupt",
+		cause:
+			"The finding ledger under .amber/maintain/ has a broken hash chain, an invalid event shape, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/maintain/findings.jsonl from version control or a backup; Findings are immutable and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_CORRUPT", "AMBER_E_MAINTAIN_FINDING_LOCK"],
+	},
+	AMBER_E_MAINTAIN_FINDING_LOCK: {
+		title: "Maintain finding ledger lock contended",
+		cause: "Another process holds the finding ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent detection finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_FINDING_CORRUPT", "AMBER_E_MAINTAIN_LOCK"],
+	},
+	AMBER_E_MAINTAIN_FINDING_SIZE_CEILING: {
+		title: "Maintain finding ledger size ceiling reached",
+		cause:
+			"Appending the Finding would grow the ledger past its byte ceiling (default 1 MiB, AMBER_MAINTAIN_MAX_FINDINGS_BYTES).",
+		remedy:
+			"Raise AMBER_MAINTAIN_MAX_FINDINGS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_FINDING_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
