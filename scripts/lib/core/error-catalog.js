@@ -1446,6 +1446,51 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_ADAPTER_COMPARISON_INVALID: {
+		title: "Adapter shadow comparison fixture is invalid",
+		cause:
+			"A shadow comparison request is missing a bounded fixture, carries unknown fields, or names malformed source/target records.",
+		remedy:
+			"Provide a fixture with explicit recordId, source, optional target, and disposition for every unmapped item.",
+		layer: "Governance",
+		related: ["AMBER_E_INVALID_ARG", "AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING"],
+	},
+	AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING: {
+		title: "Adapter shadow comparison coverage is incomplete",
+		cause:
+			"A comparison found an unmapped item without the required disposition, so coverage could not be recorded completely.",
+		remedy:
+			"Record an explicit disposition for every unmapped item, then rerun the bounded shadow comparison.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_UNMAPPED", "AMBER_E_ADAPTER_COMPARISON_INVALID"],
+	},
+	AMBER_E_ADAPTER_COMPARISON_CORRUPT: {
+		title: "Adapter shadow comparison ledger is corrupt",
+		cause:
+			"The shadow comparison ledger has a corrupt JSONL line, broken hash chain, unknown field, missing field, unsupported schema version, or invalid coverage accounting.",
+		remedy:
+			"Restore .amber/adapters/shadow-comparisons.jsonl from version control; every comparison appends a receipt rather than mutating historical ones.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_COMPARISON_LOCK: {
+		title: "Another Adapter shadow comparison write is in flight",
+		cause:
+			"A fresh .amber/adapters/shadow-comparisons.lock exists, so this comparison append was refused instead of racing another writer.",
+		remedy:
+			"Retry after the in-flight comparison completes; locks older than 30 seconds are reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_COMPARISON_CORRUPT"],
+	},
+	AMBER_E_ADAPTER_COMPARISON_SIZE_CEILING: {
+		title: "Adapter shadow comparison ledger exceeds its size ceiling",
+		cause:
+			"Appending the Adapter shadow comparison receipt would exceed the comparison ledger size ceiling.",
+		remedy:
+			"Keep comparison fixtures bounded or deliberately raise AMBER_ADAPTER_MAX_COMPARISON_BYTES.",
+		layer: "Governance",
+		related: ["AMBER_E_ADAPTER_COMPARISON_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
@@ -1584,9 +1629,9 @@ const CATALOG = {
 	AMBER_E_KNOWLEDGE_SOURCE_INVALID: {
 		title: "Unknown knowledge graph source option",
 		cause:
-			"The `source` option passed to `buildKnowledgeGraph` is neither \"projection\" (the default, production path) nor \"tree\" (the explicit zero-mutation parity path). No other source values are defined.",
+			'The `source` option passed to `buildKnowledgeGraph` is neither "projection" (the default, production path) nor "tree" (the explicit zero-mutation parity path). No other source values are defined.',
 		remedy:
-			"Pass `{ source: \"projection\" }` for production reads or `{ source: \"tree\" }` for explicit tree-reader parity checks. Both read from the committed corpus; projection reads from the tracked knowledge-base projection output, tree reads directly from source files.",
+			'Pass `{ source: "projection" }` for production reads or `{ source: "tree" }` for explicit tree-reader parity checks. Both read from the committed corpus; projection reads from the tracked knowledge-base projection output, tree reads directly from source files.',
 		layer: "Context",
 		related: ["AMBER_E_KNOWLEDGE_GRAPH_INVALID", "AMBER_E_KNOWLEDGE_MANIFEST_INVALID"],
 	},

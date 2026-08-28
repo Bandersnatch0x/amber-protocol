@@ -1074,6 +1074,7 @@ const COMMAND_HELP = {
 		"identity mapping, freshness, and read-only permissions. Pre-Cutover reads",
 		"never mutate Canonical Artifacts; migration candidates become normal Artifact admission payloads",
 		"and receipts record fresh/stale/unavailable/conflict/unmapped with exact source bytes/digest.",
+		"Shadow comparison writes bounded coverage receipts with source and target hashes.",
 		"",
 		"Subcommands:",
 		"  register --id <id> --adapter-owner <owner> --record-type <type>",
@@ -1081,6 +1082,8 @@ const COMMAND_HELP = {
 		"        --freshness-ms <n> [--allow-path <prefix>] [--adapter-version <v>]",
 		"  read --id <id> --source <path> --record-id <id> [--record-type <type>] [--record-version <v>] [--expected-source-hash <hash>] [--scope <scope>]",
 		"  candidate --id <id> --source <path> --record-id <id> [--record-type <type>] [--record-version <v>] [--expected-source-hash <hash>] [--scope <scope>]",
+		"  compare --id <id> --fixture <json> [--scope <scope>]",
+		"  comparisons [--id <adapter-id>] [--scope <scope>]",
 		"  show --id <id>",
 		"  list",
 		"  receipts [--id <adapter-id>]",
@@ -1089,6 +1092,7 @@ const COMMAND_HELP = {
 		"  amber adapter register --target . --id adapter/legacy --adapter-owner legacy-team --record-type legacy-ticket --record-version v1 --scope F051 --identity-map path --freshness-ms 86400000 --allow-path legacy --json",
 		"  amber adapter read --target . --id adapter/legacy --source legacy/item.json --record-id legacy-1 --record-version v1 --json",
 		"  amber adapter candidate --target . --id adapter/legacy --source legacy/item.json --record-id legacy-1 --record-version v1 --json",
+		"  amber adapter compare --target . --id adapter/legacy --fixture fixtures/adapter-shadow.json --json",
 	],
 };
 
@@ -1455,10 +1459,12 @@ const COMMAND_OUTPUT = {
 	},
 	adapter: {
 		usage: [
-			"Usage: amber adapter <register|read|candidate|show|list|receipts> --target <repo> [--json]",
+			"Usage: amber adapter <register|read|candidate|compare|comparisons|show|list|receipts> --target <repo> [--json]",
 			"       amber adapter register --target <repo> --id <id> --adapter-owner <owner> --record-type <type> --record-version <version> --scope <scope> --identity-map <strategy> --freshness-ms <ms> [--allow-path <prefix>] [--adapter-version <version>] [--json]",
 			"       amber adapter read --target <repo> --id <id> --source <path> --record-id <id> [--record-type <type>] [--record-version <version>] [--expected-source-hash <sha256:...>] [--scope <scope>] [--json]",
 			"       amber adapter candidate --target <repo> --id <id> --source <path> --record-id <id> [--record-type <type>] [--record-version <version>] [--expected-source-hash <sha256:...>] [--scope <scope>] [--json]",
+			"       amber adapter compare --target <repo> --id <id> --fixture <json> [--scope <scope>] [--json]",
+			"       amber adapter comparisons --target <repo> [--id <adapter-id>] [--scope <scope>] [--json]",
 			"       amber adapter show --target <repo> --id <id> [--json]",
 			"       amber adapter list --target <repo> [--json]",
 			"       amber adapter receipts --target <repo> [--id <adapter-id>] [--json]",

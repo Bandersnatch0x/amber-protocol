@@ -1,13 +1,18 @@
 "use strict";
 
-// F051 ticket 1 (#233) — public CLI seam for read-only Adapter registration
-// and read receipts. This adapter parses flags only; the core owns every
-// registry/read/receipt verdict and never mutates Canonical Artifacts.
+// F051 public CLI seam for read-only Adapter registration, read receipts,
+// migration candidate preparation, and shadow comparison receipts. This adapter
+// parses flags only; the core owns every registry/read/comparison verdict and
+// never mutates Canonical Artifacts.
+
+const fs = require("node:fs");
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
+const { resolvePathWithin } = require("./core/fs-utils");
 
 const READ_FAILURE_CODE = "AMBER_E_ADAPTER_REGISTRY_CORRUPT";
+const MAX_COMPARISON_FIXTURE_BYTES = 512 * 1024;
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -27,6 +32,7 @@ function missingValueFlag(args) {
 		["source", "--source"],
 		["recordId", "--record-id"],
 		["expectedSourceHash", "--expected-source-hash"],
+		["fixture", "--fixture"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -92,9 +98,46 @@ function registerInput(args) {
 	};
 }
 
+function readFixture(target, fixture) {
+	if (fixture === undefined || fixture === null || String(fixture).trim().length === 0) {
+		return { error: `--fixture is required and must be a non-empty path` };
+	}
+	let fullPath;
+	try {
+		fullPath = resolvePathWithin(target, String(fixture), {
+			label: "Adapter comparison fixture",
+			canonicalExisting: true,
+		});
+	} catch (err) {
+		return { error: err.message || String(err) };
+	}
+	let size;
+	try {
+		size = fs.statSync(fullPath).size;
+	} catch (err) {
+		return { error: err.message || String(err) };
+	}
+	if (size > MAX_COMPARISON_FIXTURE_BYTES) {
+		return {
+			error: `--fixture is ${size} bytes, above the ${MAX_COMPARISON_FIXTURE_BYTES} byte ceiling`,
+		};
+	}
+	let text;
+	try {
+		text = fs.readFileSync(fullPath, "utf8");
+	} catch (err) {
+		return { error: err.message || String(err) };
+	}
+	try {
+		return { value: JSON.parse(text) };
+	} catch (err) {
+		return { error: `--fixture must contain JSON: ${err.message}` };
+	}
+}
+
 const dispatch = defineCommand({
 	command: "adapter",
-	actions: ["register", "read", "candidate", "show", "list", "receipts"],
+	actions: ["register", "read", "candidate", "compare", "comparisons", "show", "list", "receipts"],
 	handlers: {
 		register: (args) => {
 			const { registerAdapter } = require("./core/adapter-registry");
@@ -183,21 +226,82 @@ const dispatch = defineCommand({
 			return {
 				text: result.receipt
 					? JSON.stringify(
-						{
-							state: result.state,
-							receipt: result.receipt,
-							source: result.source,
-							candidate: result.candidate,
-						},
-						null,
-						2,
-					)
+							{
+								state: result.state,
+								receipt: result.receipt,
+								source: result.source,
+								candidate: result.candidate,
+							},
+							null,
+							2,
+						)
 					: "",
 				errors: result.errors,
 				warnings: [],
 				exitCode: result.ok ? 0 : 1,
 				...(result.code ? { code: result.code } : {}),
 			};
+		},
+		compare: (args) => {
+			const { compareAdapterShadow } = require("./core/adapter-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "adapter/legacy");
+			if (id.error) return invalidArg(id.error);
+			const fixture = readFixture(target.value, args.fixture);
+			if (fixture.error) return invalidArg(fixture.error);
+			if (
+				fixture.value === null ||
+				typeof fixture.value !== "object" ||
+				Array.isArray(fixture.value)
+			) {
+				return invalidArg("--fixture must contain a JSON object");
+			}
+			const result = compareAdapterShadow(target.value, {
+				...fixture.value,
+				id: id.value,
+				scope: args.scope === undefined ? fixture.value.scope : String(args.scope),
+			});
+			return {
+				text: result.receipt ? JSON.stringify(result.receipt, null, 2) : "",
+				errors: result.errors,
+				warnings: [],
+				exitCode: result.ok ? 0 : 1,
+				...(result.code ? { code: result.code } : {}),
+			};
+		},
+		comparisons: (args) => {
+			const { listShadowComparisons } = require("./core/adapter-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const adapterId = args.id === undefined ? null : String(args.id);
+			if (adapterId !== null && adapterId.trim().length === 0) {
+				return invalidArg(`--id must be non-empty when provided; got ${JSON.stringify(args.id)}`);
+			}
+			const scope = args.scope === undefined ? null : String(args.scope);
+			if (scope !== null && scope.trim().length === 0) {
+				return invalidArg(
+					`--scope must be non-empty when provided; got ${JSON.stringify(args.scope)}`,
+				);
+			}
+			try {
+				return {
+					text: JSON.stringify(listShadowComparisons(target.value, { adapterId, scope }), null, 2),
+				};
+			} catch (err) {
+				const failure = readFailure(args, err, "AMBER_E_ADAPTER_COMPARISON_CORRUPT");
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
 		},
 		show: (args) => {
 			const { showAdapter } = require("./core/adapter-registry");

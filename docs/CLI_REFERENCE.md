@@ -938,7 +938,7 @@ node scripts/amber.js projection invalidate --subject spec/spec/login-spec@2 \
 node scripts/amber.js projection status --type governance-graph --target . --json
 ```
 
-### adapter register / read / candidate / show / list / receipts
+### adapter register / read / candidate / compare / comparisons / show / list / receipts
 
 Read-only Adapters (F051) let Amber inspect legacy or external records before Cutover without
 mutating either the source or Canonical Artifacts. An Adapter registration declares source owner,
@@ -952,16 +952,24 @@ return `AMBER_E_ADAPTER_STALE`; changed expected hashes append a `conflict` rece
 `AMBER_E_ADAPTER_CONFLICT`. The external source remains authoritative until a later explicit Cutover
 Decision.
 
-The Adapter registry and read-receipt ledger are hash-chained and fail closed on in-place edits.
-`adapter read` never calls Canonical Artifact admission; receipts are governance observations only.
-`adapter candidate` reads the same source, extracts a deterministic migration candidate, and returns
-a normal Canonical Artifact admission payload for a separate `artifact admit` call. The source JSON is
-either one record object or `{ "records": [ ... ] }`; each record may use `id` or `recordId`, optional
-`scope` (or `tenant` when identical), and either an `artifact` object or equivalent flat
-`artifactType`, `artifactIdentity`, `artifactScope`, `body`, `traces`, `extensions`, `transition`,
-`idempotencyKey`, `expectedHead`, and `supersedes` fields. Unknown fields and unknown shapes append
-`unmapped` receipts; duplicate identities, contradictory aliases, cross-scope records, and
-contradictory records append `conflict` receipts.
+The Adapter registry, read-receipt ledger, and shadow-comparison ledger are hash-chained and fail
+closed on in-place edits. `adapter read` never calls Canonical Artifact admission; receipts are
+governance observations only. `adapter candidate` reads the same source, extracts a deterministic
+migration candidate, and returns a normal Canonical Artifact admission payload for a separate
+`artifact admit` call. The source JSON is either one record object or `{ "records": [ ... ] }`; each
+record may use `id` or `recordId`, optional `scope` (or `tenant` when identical), and either an
+`artifact` object or equivalent flat `artifactType`, `artifactIdentity`, `artifactScope`, `body`,
+`traces`, `extensions`, `transition`, `idempotencyKey`, `expectedHead`, and `supersedes` fields.
+Unknown fields and unknown shapes append `unmapped` receipts; duplicate identities, contradictory
+aliases, cross-scope records, and contradictory records append `conflict` receipts.
+
+`adapter compare` takes a bounded JSON fixture with `fixtureId`, `expectedTotal`, optional `scope`, and
+`items`. Each item declares `recordId`, `source`, optional `recordType`/`recordVersion`/
+`expectedSourceHash`, an optional canonical `target` (`type`, `identity`, and explicit `revision`),
+and a required `disposition` when no target is declared. A comparison receipt records source and
+target set hashes, coverage counts (`mapped|unmapped|stale|conflict|unavailable`), per-item
+source/target hashes, and a deterministic `comparisonHash`. `adapter comparisons` lists the immutable
+receipts.
 
 ```bash
 node scripts/amber.js adapter register --target . --id adapter/legacy \
@@ -973,6 +981,9 @@ node scripts/amber.js adapter read --target . --id adapter/legacy \
   --expected-source-hash sha256:<64-hex-chars> --json
 node scripts/amber.js adapter candidate --target . --id adapter/legacy \
   --source legacy/item.json --record-id legacy-1 --record-version v1 --json
+node scripts/amber.js adapter compare --target . --id adapter/legacy \
+  --fixture fixtures/adapter-shadow.json --json
+node scripts/amber.js adapter comparisons --target . --id adapter/legacy --json
 node scripts/amber.js adapter show --target . --id adapter/legacy --json
 node scripts/amber.js adapter list --target . --json
 node scripts/amber.js adapter receipts --target . --id adapter/legacy --json
@@ -983,7 +994,9 @@ Error codes: `AMBER_E_ADAPTER_INVALID`, `AMBER_E_ADAPTER_NOT_FOUND`,
 `AMBER_E_ADAPTER_CONFLICT`, `AMBER_E_ADAPTER_UNMAPPED`, `AMBER_E_ADAPTER_REGISTRY_CORRUPT`,
 `AMBER_E_ADAPTER_REGISTRY_LOCK`, `AMBER_E_ADAPTER_SIZE_CEILING`,
 `AMBER_E_ADAPTER_READ_RECEIPT_CORRUPT`, `AMBER_E_ADAPTER_READ_RECEIPT_LOCK`,
-`AMBER_E_ADAPTER_READ_RECEIPT_SIZE_CEILING`.
+`AMBER_E_ADAPTER_READ_RECEIPT_SIZE_CEILING`, `AMBER_E_ADAPTER_COMPARISON_INVALID`,
+`AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING`, `AMBER_E_ADAPTER_COMPARISON_CORRUPT`,
+`AMBER_E_ADAPTER_COMPARISON_LOCK`, `AMBER_E_ADAPTER_COMPARISON_SIZE_CEILING`.
 
 ## Handoff Commands
 

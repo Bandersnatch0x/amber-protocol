@@ -17,9 +17,12 @@ const {
 	listAdapters,
 	readAdapterRecord,
 	prepareMigrationCandidate,
+	compareAdapterShadow,
+	listShadowComparisons,
 	listReadReceipts,
 	registryPath,
 	receiptPath,
+	comparisonPath,
 } = require("../../scripts/lib/core/adapter-registry");
 const { admitArtifact, showArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { writeJSONL } = require("../../scripts/lib/core/jsonl");
@@ -484,6 +487,32 @@ test("migration candidates record unmapped and conflict states without bypassing
 	assert.equal(identityAlias.code, "AMBER_E_ADAPTER_CONFLICT");
 	assert.match(identityAlias.receipt.stateReason, /contradictory id and recordId/);
 
+	const headAliasDir = mkTarget("candidate-head-alias-conflict");
+	fs.mkdirSync(path.join(headAliasDir, "legacy"), { recursive: true });
+	fs.writeFileSync(
+		path.join(headAliasDir, "legacy", "item.json"),
+		`${JSON.stringify({
+			id: "legacy-1",
+			scope: "F051",
+			artifact: {
+				type: "intent",
+				identity: "intent/head-alias",
+				body: "# Alias\n",
+				supersedes: 1,
+				expectedHead: 2,
+			},
+		})}\n`,
+	);
+	registerFixture(headAliasDir);
+	const headAlias = prepareMigrationCandidate(headAliasDir, {
+		id: "adapter/legacy",
+		source: "legacy/item.json",
+		recordId: "legacy-1",
+	});
+	assert.equal(headAlias.ok, false);
+	assert.equal(headAlias.code, "AMBER_E_ADAPTER_CONFLICT");
+	assert.match(headAlias.receipt.stateReason, /contradictory supersedes and expectedHead/);
+
 	const contradictionDir = mkTarget("candidate-contradiction");
 	fs.mkdirSync(path.join(contradictionDir, "legacy"), { recursive: true });
 	fs.writeFileSync(
@@ -514,6 +543,160 @@ test("migration candidates record unmapped and conflict states without bypassing
 	assert.match(contradiction.receipt.stateReason, /contradictory/);
 });
 
+test("shadow comparison records coverage, hashes, dispositions, and deterministic replay", () => {
+	const dir = mkTarget("shadow");
+	fs.mkdirSync(path.join(dir, "legacy"), { recursive: true });
+	registerFixture(dir);
+	const mappedBody = "# Mapped\n";
+	assert.equal(
+		admitArtifact(dir, {
+			type: "intent",
+			identity: "intent/mapped",
+			body: mappedBody,
+			scope: "F051",
+		}).ok,
+		true,
+	);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "intent",
+			identity: "intent/scope-mismatch",
+			body: "# Scope\n",
+			scope: "other-scope",
+		}).ok,
+		true,
+	);
+	fs.writeFileSync(
+		path.join(dir, "legacy", "mapped.json"),
+		`${JSON.stringify({ id: "mapped", scope: "F051", artifact: { type: "intent", identity: "intent/mapped", body: mappedBody } })}\n`,
+	);
+	fs.writeFileSync(
+		path.join(dir, "legacy", "unmapped.json"),
+		`${JSON.stringify({ id: "unmapped", scope: "F051", artifact: { type: "intent", identity: "intent/new", body: "# New\n" } })}\n`,
+	);
+	fs.writeFileSync(
+		path.join(dir, "legacy", "scope-mismatch.json"),
+		`${JSON.stringify({ id: "scope-mismatch", scope: "F051", artifact: { type: "intent", identity: "intent/scope-mismatch", body: "# Scope\n" } })}\n`,
+	);
+	fs.writeFileSync(
+		path.join(dir, "legacy", "stale.json"),
+		`${JSON.stringify({ id: "stale", scope: "F051", artifact: { type: "intent", identity: "intent/stale", body: "# Stale\n" } })}\n`,
+	);
+	const original = Buffer.from(JSON.stringify({ id: "changed" }));
+	fs.writeFileSync(path.join(dir, "legacy", "changed.json"), original);
+	fs.writeFileSync(
+		path.join(dir, "legacy", "changed.json"),
+		JSON.stringify({ id: "changed", v: 2 }),
+	);
+	const old = new Date("2000-01-01T00:00:00.000Z");
+	fs.utimesSync(path.join(dir, "legacy", "stale.json"), old, old);
+	const fixture = {
+		id: "adapter/legacy",
+		fixtureId: "shadow-fixture",
+		expectedTotal: 6,
+		items: [
+			{
+				recordId: "mapped",
+				source: "legacy/mapped.json",
+				target: { type: "intent", identity: "intent/mapped", revision: 1 },
+			},
+			{ recordId: "unmapped", source: "legacy/unmapped.json", disposition: "defer" },
+			{
+				recordId: "scope-mismatch",
+				source: "legacy/scope-mismatch.json",
+				target: { type: "intent", identity: "intent/scope-mismatch", revision: 1 },
+			},
+			{ recordId: "stale", source: "legacy/stale.json", disposition: "refresh-source" },
+			{
+				recordId: "changed",
+				source: "legacy/changed.json",
+				expectedSourceHash: sha256Bytes(original),
+				disposition: "resolve-conflict",
+			},
+			{ recordId: "missing", source: "legacy/missing.json", disposition: "restore-source" },
+		],
+	};
+	const first = compareAdapterShadow(dir, fixture, { now: new Date("2026-08-27T00:00:00.000Z") });
+	assert.equal(first.ok, true, (first.errors || []).join("; "));
+	assert.deepEqual(first.receipt.coverage, {
+		scope: "F051",
+		total: 6,
+		mapped: 1,
+		unmapped: 1,
+		stale: 1,
+		conflict: 2,
+		unavailable: 1,
+	});
+	assert.match(first.receipt.sourceSetHash, /^sha256:[0-9a-f]{64}$/);
+	assert.match(first.receipt.targetSetHash, /^sha256:[0-9a-f]{64}$/);
+	assert.equal(
+		first.receipt.items[0].target.contentHash,
+		showArtifact(dir, "intent/mapped").contentHash,
+	);
+	assert.equal(first.receipt.items[2].status, "conflict");
+	assert.match(first.receipt.items[2].reason, /scope/);
+	assert.equal(first.receipt.items[1].disposition, "defer");
+	const second = compareAdapterShadow(dir, fixture, { now: new Date("2026-08-27T00:00:00.000Z") });
+	assert.equal(second.ok, true, (second.errors || []).join("; "));
+	assert.equal(second.receipt.comparisonHash, first.receipt.comparisonHash);
+	assert.equal(listShadowComparisons(dir).length, 2);
+});
+
+test("shadow comparison requires unmapped disposition and detects tampering", () => {
+	const dir = mkTarget("shadow-errors");
+	fs.mkdirSync(path.join(dir, "legacy"), { recursive: true });
+	fs.writeFileSync(
+		path.join(dir, "legacy", "unmapped.json"),
+		`${JSON.stringify({ id: "unmapped", scope: "F051", artifact: { type: "intent", identity: "intent/new", body: "# New\n" } })}\n`,
+	);
+	registerFixture(dir);
+	const missingFixtureId = compareAdapterShadow(dir, {
+		id: "adapter/legacy",
+		expectedTotal: 1,
+		items: [{ recordId: "unmapped", source: "legacy/unmapped.json", disposition: "defer" }],
+	});
+	assert.equal(missingFixtureId.ok, false);
+	assert.equal(missingFixtureId.code, "AMBER_E_ADAPTER_COMPARISON_INVALID");
+	const missingCoverage = compareAdapterShadow(dir, {
+		id: "adapter/legacy",
+		fixtureId: "missing-coverage",
+		expectedTotal: 2,
+		items: [{ recordId: "unmapped", source: "legacy/unmapped.json", disposition: "defer" }],
+	});
+	assert.equal(missingCoverage.ok, false);
+	assert.equal(missingCoverage.code, "AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING");
+	const missingDisposition = compareAdapterShadow(dir, {
+		id: "adapter/legacy",
+		fixtureId: "missing-disposition",
+		expectedTotal: 1,
+		items: [{ recordId: "unmapped", source: "legacy/unmapped.json" }],
+	});
+	assert.equal(missingDisposition.ok, false);
+	assert.equal(missingDisposition.code, "AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING");
+	const ok = compareAdapterShadow(dir, {
+		id: "adapter/legacy",
+		fixtureId: "with-disposition",
+		expectedTotal: 1,
+		items: [{ recordId: "unmapped", source: "legacy/unmapped.json", disposition: "defer" }],
+	});
+	assert.equal(ok.ok, true, (ok.errors || []).join("; "));
+	const event = JSON.parse(fs.readFileSync(comparisonPath(dir), "utf8"));
+	event.fixtureHash = sha256Bytes(Buffer.from("tampered"));
+	event.hash = chainHash(event, GENESIS_HASH);
+	writeJSONL(comparisonPath(dir), [event]);
+	assert.throws(
+		() => listShadowComparisons(dir),
+		(err) => err.amberCode === "AMBER_E_ADAPTER_COMPARISON_CORRUPT",
+	);
+
+	const nonObjectDir = mkTarget("shadow-non-object");
+	writeJSONL(comparisonPath(nonObjectDir), [null]);
+	assert.throws(
+		() => listShadowComparisons(nonObjectDir),
+		(err) => err.amberCode === "AMBER_E_ADAPTER_COMPARISON_CORRUPT",
+	);
+});
+
 test("schema v1 read receipts remain readable after v2 state fields", () => {
 	const dir = mkTarget("receipt-v1");
 	const body = {
@@ -533,7 +716,9 @@ test("schema v1 read receipts remain readable after v2 state fields", () => {
 		status: "fresh",
 		provenance: "adapter:adapter/legacy@1",
 	};
-	writeJSONL(receiptPath(dir), [{ ...body, prevHash: GENESIS_HASH, hash: chainHash(body, GENESIS_HASH) }]);
+	writeJSONL(receiptPath(dir), [
+		{ ...body, prevHash: GENESIS_HASH, hash: chainHash(body, GENESIS_HASH) },
+	]);
 	const receipts = listReadReceipts(dir);
 	assert.equal(receipts.length, 1);
 	assert.equal(receipts[0].schemaVersion, 1);

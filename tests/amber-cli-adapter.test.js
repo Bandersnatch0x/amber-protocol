@@ -8,6 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { registryPath } = require("../scripts/lib/core/adapter-registry");
+const { admitArtifact } = require("../scripts/lib/core/canonical-artifacts");
 const { writeJSONL } = require("../scripts/lib/core/jsonl");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -301,10 +302,95 @@ test("adapter candidate prepares valid candidates and receipts unmapped sources"
 	assert.equal(unmappedOut.receipt.status, "unmapped");
 });
 
+test("adapter compare records bounded shadow comparison receipts", () => {
+	const dir = mkTarget("compare");
+	fs.mkdirSync(path.join(dir, "legacy"), { recursive: true });
+	const body = "# From compare\n";
+	fs.writeFileSync(
+		path.join(dir, "legacy", "mapped.json"),
+		`${JSON.stringify({ id: "mapped", scope: "F051", artifact: { type: "intent", identity: "intent/compare", body } })}\n`,
+	);
+	fs.writeFileSync(
+		path.join(dir, "legacy", "unmapped.json"),
+		`${JSON.stringify({ id: "unmapped", scope: "F051", artifact: { type: "intent", identity: "intent/unmapped", body: "# Later\n" } })}\n`,
+	);
+	assert.equal(registerAdapterCli(dir).status, 0);
+	assert.equal(
+		admitArtifact(dir, { type: "intent", identity: "intent/compare", body, scope: "F051" }).ok,
+		true,
+	);
+	const fixturePath = path.join(dir, "legacy", "shadow.json");
+	fs.writeFileSync(
+		fixturePath,
+		`${JSON.stringify({
+			fixtureId: "cli-shadow",
+			expectedTotal: 2,
+			items: [
+				{
+					recordId: "mapped",
+					source: "legacy/mapped.json",
+					target: { type: "intent", identity: "intent/compare", revision: 1 },
+				},
+				{ recordId: "unmapped", source: "legacy/unmapped.json", disposition: "defer" },
+			],
+		})}\n`,
+	);
+	const compared = runCli(
+		[
+			"adapter",
+			"compare",
+			"--id",
+			"adapter/legacy",
+			"--fixture",
+			"legacy/shadow.json",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(compared.status, 0, compared.stderr || compared.stdout);
+	const out = payload(compared);
+	assert.equal(out.coverage.mapped, 1);
+	assert.equal(out.coverage.unmapped, 1);
+	assert.match(out.comparisonHash, /^sha256:[0-9a-f]{64}$/);
+	const listed = payload(
+		runCli(["adapter", "comparisons", "--id", "adapter/legacy", "--target", dir, "--json"], dir),
+	);
+	assert.equal(listed.length, 1);
+	assert.equal(listed[0].fixtureId, "cli-shadow");
+
+	fs.writeFileSync(
+		fixturePath,
+		`${JSON.stringify({
+			fixtureId: "missing-disposition",
+			expectedTotal: 1,
+			items: [{ recordId: "unmapped", source: "legacy/unmapped.json" }],
+		})}\n`,
+	);
+	const missingDisposition = runCli(
+		[
+			"adapter",
+			"compare",
+			"--id",
+			"adapter/legacy",
+			"--fixture",
+			"legacy/shadow.json",
+			"--target",
+			dir,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(missingDisposition.status, 1);
+	assert.equal(envelope(missingDisposition).code, "AMBER_E_ADAPTER_COMPARISON_COVERAGE_MISSING");
+});
+
 test("adapter help is registered", () => {
 	const r = runCli(["adapter", "--help"], ROOT);
 	assert.equal(r.status, 0, r.stderr);
 	assert.ok(r.stdout.includes("adapter register"));
 	assert.ok(r.stdout.includes("adapter read"));
 	assert.ok(r.stdout.includes("adapter candidate"));
+	assert.ok(r.stdout.includes("adapter compare"));
 });
