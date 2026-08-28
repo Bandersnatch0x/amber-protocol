@@ -1569,6 +1569,81 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_ADAPTER_CUTOVER_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	// F052 T1 (#255): controlled Runner & capability registry codes.
+	AMBER_E_RUNNER_INVALID: {
+		title: "Runner registry input is invalid",
+		cause:
+			"A runner or capability registration carried an unknown field, malformed value, unregistered effect, non-human or out-of-scope Decision, or a reused (single-use) registration Decision.",
+		remedy:
+			"Fix the flagged field; bind a fresh committed human acceptance/approval Decision (unscoped) admitted via `amber artifact admit --type decision`.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_EXISTS", "AMBER_E_RUNNER_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_RUNNER_EXISTS: {
+		title: "Runner version already registered",
+		cause: "A runner id/version pair was registered a second time; registrations are immutable.",
+		remedy: "Register a new version for a new build (see `amber runner list`).",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_INVALID"],
+	},
+	AMBER_E_RUNNER_NOT_FOUND: {
+		title: "Runner is not registered",
+		cause: "An operation named a runner id absent from the runner registry.",
+		remedy: "Register the runner first (`amber runner register`) or use a registered id.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_VERSION_DRIFT"],
+	},
+	AMBER_E_RUNNER_VERSION_DRIFT: {
+		title: "Runner version drifted from the registry",
+		cause:
+			"The presented runner version is not a registered version of that runner id; an unknown build holds no execution identity.",
+		remedy:
+			"Register the new version as a governed mutation (`amber runner register`) or present a registered version.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_NOT_FOUND", "AMBER_E_RUNNER_INTEGRITY_MISMATCH"],
+	},
+	AMBER_E_RUNNER_INTEGRITY_MISMATCH: {
+		title: "Runner integrity digest mismatch",
+		cause:
+			"The presented integrity digest does not match the digest registered for that runner id/version; the executor cannot be verified.",
+		remedy:
+			"Verify the runner build; if it legitimately changed, register a new version with the new digest.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_VERSION_DRIFT"],
+	},
+	AMBER_E_RUNNER_CAPABILITY_EXISTS: {
+		title: "Runner capability already registered",
+		cause:
+			"A runnerId/runnerVersion/name/capabilityVersion quadruple was registered a second time; capability contracts are immutable and each runner version declares its own set.",
+		remedy: "Register a new capabilityVersion when the contract changes.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_INVALID"],
+	},
+	AMBER_E_RUNNER_REGISTRY_CORRUPT: {
+		title: "Runner registry failed verification",
+		cause:
+			"The hash-chained runner registry has a broken chain, edited event, unsupported schema version, duplicate registration, or capability for an unknown runner.",
+		remedy:
+			"Treat the ledger as evidence; restore .amber/runner/registry.jsonl from history and investigate the tamper.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REGISTRY_LOCK", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_RUNNER_REGISTRY_LOCK: {
+		title: "Runner registry is locked",
+		cause: "Another process holds the runner registry lock (stale locks reclaim after 30 seconds).",
+		remedy: "Retry after the concurrent registration finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REGISTRY_CORRUPT"],
+	},
+	AMBER_E_RUNNER_REGISTRY_SIZE_CEILING: {
+		title: "Runner registry size ceiling reached",
+		cause:
+			"Appending the event would grow the registry past its byte ceiling (default 1 MiB, AMBER_RUNNER_MAX_REGISTRY_BYTES).",
+		remedy:
+			"Raise AMBER_RUNNER_MAX_REGISTRY_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REGISTRY_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

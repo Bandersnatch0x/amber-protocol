@@ -186,6 +186,18 @@ const FLAG_SPECS = {
 	"--comparison-index": { key: "comparisonIndex" },
 	"--confirmed-by": { key: "confirmedBy" },
 	"--rollback-evidence": { key: "rollbackEvidence" },
+	// F052 ticket 1 (#255): Runner registry flags (--id, --capability,
+	// --decision-identity, --revision, and --rollback are shared with the
+	// F050/F051 surfaces).
+	"--runner-version": { key: "runnerVersion" },
+	"--integrity": { key: "integrity" },
+	"--runner-owner": { key: "runnerOwner" },
+	"--capability-version": { key: "capabilityVersion" },
+	"--effect": { key: "effectVal", accumulate: "effects" },
+	"--path-prefix": { key: "pathPrefixVal", accumulate: "pathPrefixes" },
+	"--timeout-ms": { key: "timeoutMs" },
+	"--credential": { key: "credential" },
+	"--rollback": { key: "rollback" },
 	"--identity-map": { key: "identityMap" },
 	"--freshness-ms": { key: "freshnessMs" },
 	"--allow-path": { key: "allowPath" },

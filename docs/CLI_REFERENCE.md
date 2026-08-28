@@ -1029,6 +1029,43 @@ Error codes: `AMBER_E_ADAPTER_INVALID`, `AMBER_E_ADAPTER_NOT_FOUND`,
 `AMBER_E_ADAPTER_CUTOVER_CORRUPT`, `AMBER_E_ADAPTER_CUTOVER_LOCK`,
 `AMBER_E_ADAPTER_CUTOVER_SIZE_CEILING`.
 
+### runner register / capability / show / list
+
+Register controlled Runners and their closed operation capabilities (F052). A Runner is an
+EXTERNAL executor identity — id, version, integrity digest, and owner — and Amber never spawns
+anything (ADR-0022): the registry defines who may execute and what, not an execution path. Each
+capability is a closed record (registered name, versioned contract, declared effects from the
+closed vocabulary `read|prepare|diagnose|write-target|deploy|rollback`, optional path-prefix scope
+shape, timeout bound, credential requirement `none|scoped`, rollback declaration) — there is no
+command field anywhere, so callers can never smuggle shell text through the registry.
+
+Registration is a human-approved governance mutation: every event binds a committed, unscoped
+human `acceptance`/`approval` Decision (`--decision-identity` + `--revision`, principal verified
+against the Principal registry), and a registration Decision is single-use across the ledger.
+Events append to the hash-chained ledger under `.amber/runner/registry.jsonl`; a runner id/version
+pair registers at most once, and each capability binds one registered runner version
+(runnerId/runnerVersion/name/capabilityVersion registers at most once), so every registered Runner
+version declares its own closed capability set. Reads
+fail closed on tamper, and runner resolution distinguishes unknown id, version drift, and
+integrity-digest mismatch — an unverified executor holds no execution identity.
+
+```bash
+node scripts/amber.js runner register --target . --id runner/ci \
+  --runner-version 1.0.0 --integrity sha256:<64-hex-chars> \
+  --runner-owner platform-team --decision-identity decision/runner-ci --revision 1 --json
+node scripts/amber.js runner capability --target . --id runner/ci \
+  --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 \
+  --effect deploy --path-prefix deploy/staging --timeout-ms 600000 --credential scoped \
+  --rollback runbook/staging-rollback --decision-identity decision/cap-deploy --revision 1 --json
+node scripts/amber.js runner show --target . --id runner/ci --json
+node scripts/amber.js runner list --target . --json
+```
+
+Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_NOT_FOUND`,
+`AMBER_E_RUNNER_VERSION_DRIFT`, `AMBER_E_RUNNER_INTEGRITY_MISMATCH`,
+`AMBER_E_RUNNER_CAPABILITY_EXISTS`, `AMBER_E_RUNNER_REGISTRY_CORRUPT`,
+`AMBER_E_RUNNER_REGISTRY_LOCK`, `AMBER_E_RUNNER_REGISTRY_SIZE_CEILING`.
+
 ## Handoff Commands
 
 ### handoff

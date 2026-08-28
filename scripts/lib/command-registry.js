@@ -1106,6 +1106,31 @@ const COMMAND_HELP = {
 		"  amber adapter compare --target . --id adapter/legacy --fixture fixtures/adapter-shadow.json --json",
 		"  amber adapter cutover --target . --id adapter/legacy --cutover-id cutover/legacy-gen-1 --artifact-type intent --generation gen-1 --comparison-index 0 --decision-identity decision/cutover-legacy --revision 1 --confirmed-by legacy-team --rollback-evidence evidence/rollback-plan --json",
 	],
+	runner: [
+		"Register controlled Runners and their closed operation capabilities (F052).",
+		"A Runner is an EXTERNAL executor identity: id, version, integrity digest, owner,",
+		"and closed capabilities (declared effects, path scope shape, timeout bound,",
+		"credential requirement, rollback declaration) — never command text, and Amber",
+		"never spawns anything (ADR-0022). Registration is a human-approved governance",
+		"mutation binding a single-use committed human Decision; unknown runner, version",
+		"drift, and integrity mismatch fail closed.",
+		"",
+		"Subcommands:",
+		"  register --id <id> --runner-version <v> --integrity <sha256:...>",
+		"        --runner-owner <owner> --decision-identity <identity> --revision <n>",
+		"  capability --id <runner-id> --runner-version <v> --capability <name>",
+		"        --capability-version <v>",
+		"        --effect <effect> [--effect <effect> ...] [--path-prefix <prefix> ...]",
+		"        --timeout-ms <n> --credential <none|scoped> --rollback <declaration>",
+		"        --decision-identity <identity> --revision <n>",
+		"  show --id <id>",
+		"  list",
+		"",
+		"Examples:",
+		"  amber runner register --target . --id runner/ci --runner-version 1.0.0 --integrity sha256:<64-hex> --runner-owner platform-team --decision-identity decision/runner-ci --revision 1 --json",
+		"  amber runner capability --target . --id runner/ci --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 --effect deploy --path-prefix deploy/staging --timeout-ms 600000 --credential scoped --rollback runbook/staging-rollback --decision-identity decision/cap-deploy --revision 1 --json",
+		"  amber runner show --target . --id runner/ci --json",
+	],
 };
 
 const OPTION_PATTERN = /--[a-z][a-z0-9-]*/g;
@@ -1485,6 +1510,15 @@ const COMMAND_OUTPUT = {
 			"       amber adapter receipts --target <repo> [--id <adapter-id>] [--json]",
 		].join("\n"),
 	},
+	runner: {
+		usage: [
+			"Usage: amber runner <register|capability|show|list> --target <repo> [--json]",
+			"       amber runner register --target <repo> --id <id> --runner-version <version> --integrity <sha256:...> --runner-owner <owner> --decision-identity <identity> --revision <n> [--json]",
+			"       amber runner capability --target <repo> --id <runner-id> --runner-version <version> --capability <name> --capability-version <version> --effect <effect> [--effect <effect>] [--path-prefix <prefix>] --timeout-ms <n> --credential none|scoped --rollback <declaration> --decision-identity <identity> --revision <n> [--json]",
+			"       amber runner show --target <repo> --id <id> [--json]",
+			"       amber runner list --target <repo> [--json]",
+		].join("\n"),
+	},
 };
 
 const DEFAULT_OUTPUT = Object.freeze({ dryRun: false, summary: false, usage: null });
@@ -1498,6 +1532,7 @@ const COMMANDS = Object.freeze([
 	"gate",
 	"policy",
 	"adapter",
+	"runner",
 	"review",
 	"accept",
 	"learnings",
@@ -1548,6 +1583,7 @@ const TIER_BY_COMMAND = {
 	gate: "core",
 	policy: "core",
 	adapter: "core",
+	runner: "core",
 	review: "core",
 	accept: "core",
 	learnings: "core",
