@@ -42,7 +42,9 @@ function readProfileFile(cwd) {
 		return {
 			deploymentProfile: null,
 			source: "profile-file",
-			errors: [`Malformed deployment profile file (not valid JSON): ${path.relative(cwd, filePath)}`],
+			errors: [
+				`Malformed deployment profile file (not valid JSON): ${path.relative(cwd, filePath)}`,
+			],
 		};
 	}
 	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {

@@ -1144,12 +1144,7 @@ test("CLI: malformed --trace values are rejected with the stable arg code (never
 	// a non-digit suffix after the last '@' now belongs to the IDENTITY
 	// ("intent/a@abc"), so it fails later with TRACE_TARGET_NOT_FOUND instead
 	// of INVALID_ARG (covered by its own test below).
-	for (const garbage of [
-		"bogus",
-		"refines:",
-		":intent/a",
-		"refines:intent/a@0",
-	]) {
+	for (const garbage of ["bogus", "refines:", ":intent/a", "refines:intent/a@0"]) {
 		const r = runCli(
 			[
 				"artifact",
