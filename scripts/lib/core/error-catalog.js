@@ -2131,6 +2131,31 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_RETENTION_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_RETENTION_HOLD_CORRUPT: {
+		title: "Legal Hold ledger corrupt",
+		cause:
+			"The hold ledger under .amber/retention/ has a broken hash chain, an invalid event shape, a reused hold id, a release of an unknown or already-released hold, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/retention/holds.jsonl from version control or a backup; holds are immutable and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_CORRUPT", "AMBER_E_RETENTION_HOLD_LOCK"],
+	},
+	AMBER_E_RETENTION_HOLD_LOCK: {
+		title: "Legal Hold ledger lock contended",
+		cause: "Another process holds the hold ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent hold operation finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_HOLD_CORRUPT", "AMBER_E_RETENTION_LOCK"],
+	},
+	AMBER_E_RETENTION_HOLD_SIZE_CEILING: {
+		title: "Legal Hold ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_RETENTION_MAX_HOLDS_BYTES).",
+		remedy:
+			"Raise AMBER_RETENTION_MAX_HOLDS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_HOLD_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

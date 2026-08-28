@@ -1,6 +1,7 @@
 "use strict";
 
 // F055 T1 (#283) — retention classes & deterministic expiry evaluation.
+// F055 T2 (#284) — Legal Hold registry with human-only lifecycle.
 //
 // Report-only eligibility becomes governed classification: each admitted
 // record binds one protocol-defined retention class whose TTL and legal
@@ -10,6 +11,12 @@
 // Declared secret or personal raw content refuses classification unless
 // an explicit minimization marker rides the event: deletion is not the
 // first privacy control, and unsafe raw content never enters a ledger.
+//
+// A Legal Hold binds scope, reason, and issuer behind single-use
+// committed human Decisions for both creation and release. Holds have
+// priority over TTL: evaluation reports a held record as retained-by-hold
+// regardless of expiry, naming the hold — no silent bypass, no invisible
+// permanent exception, and a released hold stays listable forever.
 
 const path = require("node:path");
 
@@ -48,6 +55,13 @@ const RETENTION_NOT_FOUND_CODE = "AMBER_E_RETENTION_NOT_FOUND";
 const RETENTION_CORRUPT_CODE = "AMBER_E_RETENTION_CORRUPT";
 const RETENTION_LOCK_CODE = "AMBER_E_RETENTION_LOCK";
 const RETENTION_SIZE_CEILING_CODE = "AMBER_E_RETENTION_SIZE_CEILING";
+const HOLD_CORRUPT_CODE = "AMBER_E_RETENTION_HOLD_CORRUPT";
+const HOLD_LOCK_CODE = "AMBER_E_RETENTION_HOLD_LOCK";
+const HOLD_SIZE_CEILING_CODE = "AMBER_E_RETENTION_HOLD_SIZE_CEILING";
+
+// Human-only authority slots, mirroring the F050/F052/F054 contract.
+const RETENTION_DECISION_KINDS = Object.freeze(["acceptance", "approval"]);
+const HOLD_STATUSES = Object.freeze(["active", "released"]);
 
 const CLASSIFY_INPUT_FIELDS = Object.freeze([
 	"record",
@@ -366,15 +380,24 @@ function evaluateRetention(cwd, opts = {}) {
 	if (Number.isNaN(now.getTime()))
 		return fail(RETENTION_INVALID_CODE, ["now must be a valid clock"]);
 	let fold;
+	let holds;
 	try {
 		fold = foldClassifications(cwd);
+		holds = foldHolds(cwd);
 	} catch (err) {
 		return fail(err.amberCode || RETENTION_CORRUPT_CODE, [err.message || String(err)]);
 	}
 	const entries = effectiveClassifications(fold).map((entry) => {
 		const expiresAt = new Date(Date.parse(entry.at) + entry.ttlMs).toISOString();
-		// Half-open like Approval validity: expiry at exactly expiresAt.
-		const verdict = now.getTime() >= Date.parse(expiresAt) ? "expired-eligible" : "retained";
+		const heldBy = activeHoldsFor(holds, entry.record);
+		// Legal Hold has priority over TTL; otherwise the window is
+		// half-open like Approval validity: expiry at exactly expiresAt.
+		const verdict =
+			heldBy.length > 0
+				? "retained-by-hold"
+				: now.getTime() >= Date.parse(expiresAt)
+					? "expired-eligible"
+					: "retained";
 		return {
 			record: entry.record,
 			retentionClass: entry.retentionClass,
@@ -385,6 +408,7 @@ function evaluateRetention(cwd, opts = {}) {
 			minimized: entry.minimized,
 			classifiedAt: entry.at,
 			expiresAt,
+			heldBy,
 			verdict,
 		};
 	});
@@ -408,6 +432,377 @@ function listClassifications(cwd, { type = null, identity = null } = {}) {
 		.map((entry) => ({ ...entry, current: currentIndexes.has(entry.index) }));
 }
 
+function holdsPath(cwd) {
+	return statePathForCreate(cwd, "retention", "holds.jsonl");
+}
+
+function holdCorrupt(message) {
+	return typedError(HOLD_CORRUPT_CODE, message);
+}
+
+function acquireHoldLock(cwd) {
+	return acquireLedgerLock({
+		dirPath: path.dirname(holdsPath(cwd)),
+		lockName: "holds.lock",
+		conflictCode: HOLD_LOCK_CODE,
+		corruptCode: HOLD_CORRUPT_CODE,
+		label: "retention hold ledger",
+		staleMs: LOCK_STALE_MS,
+	});
+}
+
+// A hold scope names EITHER one exact record pin or one subject identity
+// (every revision of that identity) — never both, never free text.
+const HOLD_SCOPE_FIELDS = Object.freeze(["record", "subject"]);
+const HOLD_INPUT_FIELDS = Object.freeze(["id", "scope", "reason", "decision"]);
+const RELEASE_INPUT_FIELDS = Object.freeze(["id", "decision"]);
+const DECISION_PIN_FIELDS = Object.freeze(["identity", "revision"]);
+const DECISION_SNAPSHOT_FIELDS = Object.freeze([
+	"identity",
+	"revision",
+	"decisionKind",
+	"principal",
+]);
+const HOLD_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"scope",
+	"reason",
+	"decision",
+	"prevHash",
+	"hash",
+]);
+const RELEASE_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"decision",
+	"prevHash",
+	"hash",
+]);
+
+function holdScopeProblem(value, label) {
+	if (!isPlainObject(value)) return `${label} must be an object`;
+	const unknown = unknownFieldProblem(value, HOLD_SCOPE_FIELDS, label);
+	if (unknown !== null) return unknown;
+	const hasRecord = "record" in value;
+	const hasSubject = "subject" in value;
+	if (hasRecord === hasSubject) return `${label} must name exactly one of record or subject`;
+	if (hasRecord) return recordPinProblem(value.record, `${label}.record`);
+	if (!isNonEmptyString(value.subject)) return `${label}.subject must be a non-empty string`;
+	return null;
+}
+
+function decisionSnapshotProblem(value, label) {
+	if (!isPlainObject(value)) return `${label} must be an object`;
+	const closed = closedFieldProblem(value, DECISION_SNAPSHOT_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(value.identity)) return `${label}.identity must be a non-empty string`;
+	if (!Number.isInteger(value.revision) || value.revision < 1)
+		return `${label}.revision must be a positive integer`;
+	if (!RETENTION_DECISION_KINDS.includes(value.decisionKind))
+		return `${label}.decisionKind must be one of ${RETENTION_DECISION_KINDS.join(", ")}`;
+	if (!isNonEmptyString(value.principal)) return `${label}.principal must be a non-empty string`;
+	return null;
+}
+
+function holdEventProblem(event, lineIndex) {
+	const label = `retention hold event ${lineIndex}`;
+	if (event.kind === "hold") {
+		const closed = closedFieldProblem(event, HOLD_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
+			return `${label}.at must be an ISO-8601 timestamp`;
+		if (!isNonEmptyString(event.id)) return `${label}.id must be a non-empty string`;
+		const scope = holdScopeProblem(event.scope, `${label}.scope`);
+		if (scope !== null) return scope;
+		if (!isNonEmptyString(event.reason)) return `${label}.reason must be a non-empty string`;
+		return decisionSnapshotProblem(event.decision, `${label}.decision`);
+	}
+	const closed = closedFieldProblem(event, RELEASE_EVENT_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
+		return `${label}.at must be an ISO-8601 timestamp`;
+	if (!isNonEmptyString(event.id)) return `${label}.id must be a non-empty string`;
+	return decisionSnapshotProblem(event.decision, `${label}.decision`);
+}
+
+function foldHolds(cwd) {
+	const events = readLedgerFailClosed(holdsPath(cwd), HOLD_CORRUPT_CODE, "retention hold ledger");
+	let prevHash = GENESIS_HASH;
+	const holds = [];
+	const byId = new Map();
+	events.forEach((event, index) => {
+		const lineIndex = index + 1;
+		if (!isPlainObject(event))
+			throw holdCorrupt(`retention hold event ${lineIndex} is not an object`);
+		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
+			throw holdCorrupt(`retention hold event ${lineIndex} breaks the hash chain`);
+		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+			throw holdCorrupt(
+				`retention hold event ${lineIndex} carries a hash that does not match its content`,
+			);
+		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+			throw holdCorrupt(
+				`retention hold event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+			);
+		if (event.kind !== "hold" && event.kind !== "release")
+			throw holdCorrupt(
+				`retention hold event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+			);
+		const problem = holdEventProblem(event, lineIndex);
+		if (problem !== null) throw holdCorrupt(problem);
+		if (event.kind === "hold") {
+			if (byId.has(event.id))
+				throw holdCorrupt(
+					`retention hold event ${lineIndex} reuses hold id ${JSON.stringify(event.id)}`,
+				);
+			const { prevHash: _prev, hash: _hash, at, decision, ...body } = event;
+			const hold = {
+				...body,
+				issuer: decision,
+				effectiveAt: at,
+				status: "active",
+				release: null,
+				index,
+			};
+			holds.push(hold);
+			byId.set(event.id, hold);
+		} else {
+			const hold = byId.get(event.id);
+			if (!hold)
+				throw holdCorrupt(
+					`retention hold event ${lineIndex} releases unknown hold ${JSON.stringify(event.id)}`,
+				);
+			if (hold.status !== "active")
+				throw holdCorrupt(`retention hold event ${lineIndex} releases an already-released hold`);
+			hold.status = "released";
+			hold.release = { at: event.at, decision: event.decision };
+		}
+		prevHash = event.hash;
+	});
+	return holds;
+}
+
+const HOLD_LEDGER = Object.freeze({
+	acquire: acquireHoldLock,
+	fold: foldHolds,
+	path: holdsPath,
+	corruptCode: HOLD_CORRUPT_CODE,
+	sizeCeilingCode: HOLD_SIZE_CEILING_CODE,
+	envName: "AMBER_RETENTION_MAX_HOLDS_BYTES",
+	defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
+	label: "retention hold ledger",
+});
+
+function decisionPinProblem(value) {
+	if (!isPlainObject(value)) return "decision must be an object carrying identity and revision";
+	const unknown = unknownFieldProblem(value, DECISION_PIN_FIELDS, "decision");
+	if (unknown !== null) return unknown;
+	if (!isNonEmptyString(value.identity)) return "decision.identity must be a non-empty string";
+	if (!Number.isInteger(value.revision) || value.revision < 1)
+		return "decision.revision must be a positive integer";
+	return null;
+}
+
+// Hold authority mirrors the F052/F054 contract: a committed, unscoped,
+// human acceptance/approval Decision with a verified principal snapshot.
+function resolveHoldDecision(revisions, decision, label) {
+	const match = revisions.find(
+		(revision) =>
+			revision.type === "decision" &&
+			revision.identity === decision.identity &&
+			revision.revision === decision.revision,
+	);
+	if (!match)
+		return {
+			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} is not a committed Decision artifact`,
+		};
+	if ((match.scope ?? null) !== null)
+		return {
+			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} is scoped to ${JSON.stringify(match.scope)}; ${label} is repository-global and binds an unscoped Decision`,
+		};
+	if (!RETENTION_DECISION_KINDS.includes(match.decisionKind))
+		return {
+			problem: `${label} requires a human acceptance or approval Decision; ${JSON.stringify(decision.identity)}@${decision.revision} carries decisionKind ${JSON.stringify(match.decisionKind)}`,
+		};
+	const principal = match.principal?.id;
+	if (!isNonEmptyString(principal))
+		return {
+			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} carries no verified principal snapshot`,
+		};
+	return {
+		decision: {
+			identity: decision.identity,
+			revision: decision.revision,
+			decisionKind: match.decisionKind,
+			principal,
+		},
+	};
+}
+
+// A Decision is single-use across the hold ledger: creation and release
+// events both spend one.
+function holdDecisionSpender(holds, decision) {
+	for (const hold of holds) {
+		if (hold.issuer.identity === decision.identity && hold.issuer.revision === decision.revision)
+			return `hold ${JSON.stringify(hold.id)}`;
+		if (
+			hold.release !== null &&
+			hold.release.decision.identity === decision.identity &&
+			hold.release.decision.revision === decision.revision
+		)
+			return `the release of hold ${JSON.stringify(hold.id)}`;
+	}
+	return null;
+}
+
+/**
+ * Create one Legal Hold: scope, preserved reason, issuer (the verified
+ * principal of a single-use committed human Decision), and effective
+ * time, appended immutably. A hold can never be edited — only released
+ * by a second human Decision.
+ */
+function hold(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input)) return fail(RETENTION_INVALID_CODE, ["hold input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(RETENTION_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(input, HOLD_INPUT_FIELDS, "hold input");
+	if (inputClosed !== null) return fail(RETENTION_INVALID_CODE, [inputClosed]);
+	if (!isNonEmptyString(input.id))
+		return fail(RETENTION_INVALID_CODE, ["id must be a non-empty string"]);
+	const scopeProblem = holdScopeProblem(input.scope, "scope");
+	if (scopeProblem !== null) return fail(RETENTION_INVALID_CODE, [scopeProblem]);
+	if (!isNonEmptyString(input.reason))
+		return fail(RETENTION_INVALID_CODE, ["reason must be a preserved non-empty string"]);
+	const pinProblem = decisionPinProblem(input.decision);
+	if (pinProblem !== null) return fail(RETENTION_INVALID_CODE, [pinProblem]);
+	let revisions;
+	try {
+		revisions = listArtifactRevisions(cwd);
+	} catch (err) {
+		return fail(err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT", [err.message || String(err)]);
+	}
+	const resolved = resolveHoldDecision(revisions, input.decision, "a Legal Hold");
+	if (resolved.problem) return fail(RETENTION_INVALID_CODE, [resolved.problem]);
+	return appendLedgerEvent(
+		cwd,
+		HOLD_LEDGER,
+		{
+			kind: "hold",
+			schemaVersion: RETENTION_SCHEMA_VERSION,
+			at: now.toISOString(),
+			id: input.id,
+			scope: input.scope.record
+				? {
+						record: {
+							type: input.scope.record.type,
+							identity: input.scope.record.identity,
+							revision: input.scope.record.revision,
+						},
+					}
+				: { subject: input.scope.subject },
+			reason: input.reason,
+			decision: resolved.decision,
+		},
+		(fold) => {
+			if (fold.some((entry) => entry.id === input.id))
+				return fail(RETENTION_INVALID_CODE, [
+					`hold ${JSON.stringify(input.id)} already exists; holds are immutable and release is a separate Decision`,
+				]);
+			const spender = holdDecisionSpender(fold, input.decision);
+			if (spender !== null)
+				return fail(RETENTION_INVALID_CODE, [
+					`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized ${spender}; a Decision is single-use across the hold ledger`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.id === input.id),
+	);
+}
+
+/**
+ * Release one active Legal Hold behind its own single-use committed
+ * human Decision. The released hold stays listable forever — a hold can
+ * end, but it can never disappear.
+ */
+function releaseHold(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(RETENTION_INVALID_CODE, ["release input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(RETENTION_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(input, RELEASE_INPUT_FIELDS, "release input");
+	if (inputClosed !== null) return fail(RETENTION_INVALID_CODE, [inputClosed]);
+	if (!isNonEmptyString(input.id))
+		return fail(RETENTION_INVALID_CODE, ["id must be a non-empty string"]);
+	const pinProblem = decisionPinProblem(input.decision);
+	if (pinProblem !== null) return fail(RETENTION_INVALID_CODE, [pinProblem]);
+	let revisions;
+	try {
+		revisions = listArtifactRevisions(cwd);
+	} catch (err) {
+		return fail(err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT", [err.message || String(err)]);
+	}
+	const resolved = resolveHoldDecision(revisions, input.decision, "a Legal Hold release");
+	if (resolved.problem) return fail(RETENTION_INVALID_CODE, [resolved.problem]);
+	return appendLedgerEvent(
+		cwd,
+		HOLD_LEDGER,
+		{
+			kind: "release",
+			schemaVersion: RETENTION_SCHEMA_VERSION,
+			at: now.toISOString(),
+			id: input.id,
+			decision: resolved.decision,
+		},
+		(fold) => {
+			const existing = fold.find((entry) => entry.id === input.id) ?? null;
+			if (existing === null)
+				return fail(RETENTION_NOT_FOUND_CODE, [`hold ${JSON.stringify(input.id)} does not exist`]);
+			if (existing.status !== "active")
+				return fail(RETENTION_INVALID_CODE, [
+					`hold ${JSON.stringify(input.id)} is already released; a release cannot repeat`,
+				]);
+			const spender = holdDecisionSpender(fold, input.decision);
+			if (spender !== null)
+				return fail(RETENTION_INVALID_CODE, [
+					`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized ${spender}; a Decision is single-use across the hold ledger`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.id === input.id),
+	);
+}
+
+function listHolds(cwd, { status = null } = {}) {
+	return foldHolds(cwd).filter((entry) => status === null || entry.status === status);
+}
+
+// The active holds whose scope covers one record: an exact record pin or
+// a subject naming the record's identity. Subject matching is deliberately
+// type-agnostic and revision-agnostic — over-matching is fail-safe for a
+// hold, which can only ever retain more.
+function activeHoldsFor(holds, record) {
+	return holds
+		.filter(
+			(entry) =>
+				entry.status === "active" &&
+				(entry.scope.record
+					? entry.scope.record.type === record.type &&
+						entry.scope.record.identity === record.identity &&
+						entry.scope.record.revision === record.revision
+					: entry.scope.subject === record.identity),
+		)
+		.map((entry) => entry.id);
+}
+
 module.exports = {
 	RETENTION_SCHEMA_VERSION,
 	SUPPORTED_RETENTION_SCHEMA_VERSIONS,
@@ -421,4 +816,10 @@ module.exports = {
 	classify,
 	evaluateRetention,
 	listClassifications,
+	RETENTION_DECISION_KINDS,
+	HOLD_STATUSES,
+	holdsPath,
+	hold,
+	releaseHold,
+	listHolds,
 };

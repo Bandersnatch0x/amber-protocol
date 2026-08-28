@@ -29,8 +29,15 @@ const {
 	classify,
 	evaluateRetention,
 	listClassifications,
+	RETENTION_DECISION_KINDS,
+	HOLD_STATUSES,
+	holdsPath,
+	hold,
+	releaseHold,
+	listHolds,
 } = require("../../scripts/lib/core/retention-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
+const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 
 function mkTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-retention-${label}-`));
@@ -281,5 +288,320 @@ test("a tampered classification ledger fails every read closed", () => {
 		(err) =>
 			err.amberCode === "AMBER_E_RETENTION_CORRUPT" &&
 			/unknown field "rawContent"/.test(err.message),
+	);
+});
+
+/** Principal + intent + one committed human Decision per identity. */
+function holdFixture(dir, decisionIdentities) {
+	assert.equal(
+		registerPrincipal(dir, { id: "legal@example.com", principalKind: "human" }).ok,
+		true,
+	);
+	assert.equal(
+		admitArtifact(dir, { type: "intent", identity: "intent/retention", body: "# R\n" }).ok,
+		true,
+	);
+	for (const identity of decisionIdentities) {
+		const decision = admitArtifact(dir, {
+			type: "decision",
+			identity,
+			body: `# ${identity}\n`,
+			decisionKind: "approval",
+			principal: "legal@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/retention" } }],
+		});
+		assert.equal(decision.ok, true, (decision.errors || []).join("; "));
+	}
+}
+
+function holdInput(overrides = {}) {
+	return {
+		id: "hold/litigation-42",
+		scope: { subject: "intent/login" },
+		reason: "litigation hold",
+		decision: { identity: "decision/hold-1", revision: 1 },
+		...overrides,
+	};
+}
+
+test("a Legal Hold binds scope, reason, issuer, and effective time immutably", () => {
+	assert.deepEqual([...HOLD_STATUSES], ["active", "released"]);
+	assert.deepEqual([...RETENTION_DECISION_KINDS], ["acceptance", "approval"]);
+	const dir = mkTarget("hold");
+	retentionFixture(dir);
+	holdFixture(dir, ["decision/hold-1", "decision/hold-2"]);
+	const created = hold(dir, holdInput(), { now: NOW });
+	assert.equal(created.ok, true, (created.errors || []).join("; "));
+	assert.equal(created.record.id, "hold/litigation-42");
+	assert.deepEqual(created.record.scope, { subject: "intent/login" });
+	assert.equal(created.record.reason, "litigation hold");
+	assert.equal(created.record.effectiveAt, NOW.toISOString());
+	assert.equal(created.record.status, "active");
+	assert.equal(created.record.release, null);
+	assert.deepEqual(created.record.issuer, {
+		identity: "decision/hold-1",
+		revision: 1,
+		decisionKind: "approval",
+		principal: "legal@example.com",
+	});
+	const duplicate = hold(
+		dir,
+		holdInput({ decision: { identity: "decision/hold-2", revision: 1 } }),
+		{ now: NOW },
+	);
+	assert.equal(duplicate.ok, false);
+	assert.equal(duplicate.code, "AMBER_E_RETENTION_INVALID");
+	assert.match(duplicate.errors[0], /already exists/);
+	// A record-scoped hold is also expressible.
+	const recordScoped = hold(
+		dir,
+		holdInput({
+			id: "hold/record-1",
+			scope: { record: { type: "intent", identity: "intent/login", revision: 1 } },
+			decision: { identity: "decision/hold-2", revision: 1 },
+		}),
+		{ now: NOW },
+	);
+	assert.equal(recordScoped.ok, true, (recordScoped.errors || []).join("; "));
+});
+
+test("Legal Hold overrides TTL and release restores ordinary expiry", () => {
+	const dir = mkTarget("hold-priority");
+	retentionFixture(dir);
+	holdFixture(dir, ["decision/hold-1", "decision/release-1"]);
+	assert.equal(classify(dir, classifyInput(), { now: NOW }).ok, true);
+	const expired = new Date(NOW.getTime() + HOUR_MS);
+	assert.equal(
+		evaluateRetention(dir, { now: expired }).record.entries[0].verdict,
+		"expired-eligible",
+	);
+	assert.equal(hold(dir, holdInput(), { now: NOW }).ok, true);
+	const held = evaluateRetention(dir, { now: expired }).record.entries[0];
+	assert.equal(held.verdict, "retained-by-hold");
+	assert.deepEqual(held.heldBy, ["hold/litigation-42"]);
+	const released = releaseHold(
+		dir,
+		{
+			id: "hold/litigation-42",
+			decision: { identity: "decision/release-1", revision: 1 },
+		},
+		{ now: expired },
+	);
+	assert.equal(released.ok, true, (released.errors || []).join("; "));
+	assert.equal(released.record.status, "released");
+	assert.deepEqual(released.record.release.decision.identity, "decision/release-1");
+	// Ordinary expiry is restored, and the released hold stays listable.
+	assert.equal(
+		evaluateRetention(dir, { now: expired }).record.entries[0].verdict,
+		"expired-eligible",
+	);
+	assert.equal(listHolds(dir).length, 1);
+	assert.equal(listHolds(dir, { status: "released" }).length, 1);
+	assert.equal(listHolds(dir, { status: "active" }).length, 0);
+});
+
+test("record-pinned holds retain exactly their revision; subject holds cover every revision", () => {
+	const dir = mkTarget("hold-scope");
+	retentionFixture(dir);
+	holdFixture(dir, ["decision/hold-1", "decision/hold-2"]);
+	// A second committed revision of the record, classified separately.
+	assert.equal(
+		admitArtifact(dir, {
+			type: "intent",
+			identity: "intent/login",
+			body: "# L2\n",
+			expectedHead: 1,
+		}).ok,
+		true,
+	);
+	assert.equal(classify(dir, classifyInput(), { now: NOW }).ok, true);
+	assert.equal(
+		classify(
+			dir,
+			classifyInput({ record: { type: "intent", identity: "intent/login", revision: 2 } }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const expired = new Date(NOW.getTime() + HOUR_MS);
+	// Record-pinned hold on revision 1 only.
+	assert.equal(
+		hold(
+			dir,
+			holdInput({
+				id: "hold/rev-1",
+				scope: { record: { type: "intent", identity: "intent/login", revision: 1 } },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	let entries = evaluateRetention(dir, { now: expired }).record.entries;
+	assert.equal(entries.find((entry) => entry.record.revision === 1).verdict, "retained-by-hold");
+	assert.deepEqual(entries.find((entry) => entry.record.revision === 1).heldBy, ["hold/rev-1"]);
+	assert.equal(entries.find((entry) => entry.record.revision === 2).verdict, "expired-eligible");
+	// Subject hold covers every revision of the identity.
+	assert.equal(
+		hold(
+			dir,
+			holdInput({
+				id: "hold/subject",
+				scope: { subject: "intent/login" },
+				decision: { identity: "decision/hold-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	entries = evaluateRetention(dir, { now: expired }).record.entries;
+	assert.deepEqual(entries.find((entry) => entry.record.revision === 1).heldBy, [
+		"hold/rev-1",
+		"hold/subject",
+	]);
+	assert.deepEqual(entries.find((entry) => entry.record.revision === 2).heldBy, ["hold/subject"]);
+	assert.equal(entries.find((entry) => entry.record.revision === 2).verdict, "retained-by-hold");
+});
+
+test("hold and release Decisions are single-use and human-only", () => {
+	const dir = mkTarget("hold-authority");
+	retentionFixture(dir);
+	holdFixture(dir, ["decision/hold-1", "decision/release-1"]);
+	assert.equal(hold(dir, holdInput(), { now: NOW }).ok, true);
+	// The creation Decision can never also create or release another hold.
+	const reused = hold(dir, holdInput({ id: "hold/second", scope: { subject: "intent/other" } }), {
+		now: NOW,
+	});
+	assert.equal(reused.ok, false);
+	assert.match(reused.errors[0], /single-use across the hold ledger/);
+	assert.equal(
+		releaseHold(
+			dir,
+			{ id: "hold/litigation-42", decision: { identity: "decision/hold-1", revision: 1 } },
+			{ now: NOW },
+		).ok,
+		false,
+	);
+	// Release settles once; double-release and ghost-release refuse.
+	assert.equal(
+		releaseHold(
+			dir,
+			{ id: "hold/litigation-42", decision: { identity: "decision/release-1", revision: 1 } },
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const again = releaseHold(
+		dir,
+		{ id: "hold/litigation-42", decision: { identity: "decision/release-1", revision: 1 } },
+		{ now: NOW },
+	);
+	assert.equal(again.ok, false);
+	assert.match(again.errors[0], /already released/);
+	// … and a spent release Decision can never create a new hold either.
+	const spentRelease = hold(
+		dir,
+		holdInput({
+			id: "hold/third",
+			scope: { subject: "intent/third" },
+			decision: { identity: "decision/release-1", revision: 1 },
+		}),
+		{ now: NOW },
+	);
+	assert.equal(spentRelease.ok, false);
+	assert.match(spentRelease.errors[0], /already authorized the release of hold/);
+	const ghost = releaseHold(
+		dir,
+		{ id: "hold/ghost", decision: { identity: "decision/release-1", revision: 1 } },
+		{ now: NOW },
+	);
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_RETENTION_NOT_FOUND");
+	// Non-human and scoped Decisions refuse; ghosts refuse.
+	const unknownDecision = hold(
+		dir,
+		holdInput({ id: "hold/x", decision: { identity: "decision/ghost", revision: 1 } }),
+		{ now: NOW },
+	);
+	assert.equal(unknownDecision.ok, false);
+	assert.match(unknownDecision.errors[0], /not a committed Decision artifact/);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "decision",
+			identity: "decision/review-1",
+			body: "# r\n",
+			decisionKind: "review",
+			principal: "legal@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/retention" } }],
+		}).ok,
+		true,
+	);
+	const review = hold(
+		dir,
+		holdInput({ id: "hold/x", decision: { identity: "decision/review-1", revision: 1 } }),
+		{ now: NOW },
+	);
+	assert.equal(review.ok, false);
+	assert.match(review.errors[0], /requires a human acceptance or approval Decision/);
+	const bothScopes = hold(
+		dir,
+		holdInput({
+			id: "hold/x",
+			scope: {
+				subject: "intent/login",
+				record: { type: "intent", identity: "intent/login", revision: 1 },
+			},
+		}),
+		{ now: NOW },
+	);
+	assert.equal(bothScopes.ok, false);
+	assert.match(bothScopes.errors[0], /exactly one of record or subject/);
+});
+
+test("a tampered hold ledger fails every read closed", () => {
+	const dir = mkTarget("hold-tamper");
+	retentionFixture(dir);
+	holdFixture(dir, ["decision/hold-1", "decision/hold-2"]);
+	assert.equal(hold(dir, holdInput(), { now: NOW }).ok, true);
+	assert.equal(
+		hold(
+			dir,
+			holdInput({
+				id: "hold/second",
+				scope: { subject: "intent/other" },
+				decision: { identity: "decision/hold-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const events = readEvents(holdsPath(dir));
+	events[1].reason = "edited";
+	writeEvents(holdsPath(dir), events);
+	assert.throws(
+		() => listHolds(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_RETENTION_HOLD_CORRUPT" &&
+			/does not match its content/.test(err.message),
+	);
+	const evaluated = evaluateRetention(dir, { now: NOW });
+	assert.equal(evaluated.ok, false);
+	assert.equal(evaluated.code, "AMBER_E_RETENTION_HOLD_CORRUPT");
+	// A validly re-chained release of a released hold fails closed too.
+	const clean = events.slice(0, 1);
+	const releaseBody = {
+		kind: "release",
+		schemaVersion: 1,
+		at: NOW.toISOString(),
+		id: "hold/litigation-42",
+		decision: clean[0].decision,
+	};
+	const chained = (body, prevHash) => ({ ...body, prevHash, hash: chainHash(body, prevHash) });
+	const first = chained(releaseBody, clean[0].hash);
+	writeEvents(holdsPath(dir), [clean[0], first, chained(releaseBody, first.hash)]);
+	assert.throws(
+		() => listHolds(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_RETENTION_HOLD_CORRUPT" &&
+			/releases an already-released hold/.test(err.message),
 	);
 });

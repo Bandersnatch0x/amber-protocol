@@ -11,7 +11,8 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { admitArtifact } = require("../scripts/lib/core/canonical-artifacts");
-const { classificationsPath } = require("../scripts/lib/core/retention-registry");
+const { registerPrincipal } = require("../scripts/lib/core/principal-registry");
+const { classificationsPath, holdsPath } = require("../scripts/lib/core/retention-registry");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -173,10 +174,179 @@ test("retention help and unknown actions route through the shared dispatcher", (
 	assert.equal(help.status, 0, help.stderr);
 	assert.match(help.stdout, /classify --record <type>:<identity>@<rev>/);
 	assert.match(help.stdout, /evaluate \[--now <iso>\]/);
+	assert.match(help.stdout, /hold --id <hold-id>/);
+	assert.match(help.stdout, /holds \[--status <active\|released>\]/);
 	const unknown = runCli(["retention", "delete", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/retention requires classify, evaluate, or classifications/,
+		/retention requires classify, evaluate, classifications, hold, release, or holds/,
 	);
+});
+
+function holdDecisionFixture(dir, decisionIdentities) {
+	assert.equal(
+		registerPrincipal(dir, { id: "legal@example.com", principalKind: "human" }).ok,
+		true,
+	);
+	for (const identity of decisionIdentities) {
+		const decision = admitArtifact(dir, {
+			type: "decision",
+			identity,
+			body: `# ${identity}\n`,
+			decisionKind: "approval",
+			principal: "legal@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/login" } }],
+		});
+		assert.equal(decision.ok, true, (decision.errors || []).join("; "));
+	}
+}
+
+test("retention hold overrides expiry and release restores it at the CLI seam", () => {
+	const dir = mkTarget("hold");
+	fixtureRepo(dir);
+	holdDecisionFixture(dir, ["decision/hold-1", "decision/release-1"]);
+	assert.equal(runCli(classifyArgs(), dir).status, 0);
+
+	const created = runCli(
+		[
+			"retention",
+			"hold",
+			"--target",
+			".",
+			"--id",
+			"hold/litigation-42",
+			"--subject",
+			"intent/login",
+			"--reason",
+			"litigation hold",
+			"--decision-identity",
+			"decision/hold-1",
+			"--revision",
+			"1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(created.status, 0, created.stderr || created.stdout);
+	assert.equal(payload(created).status, "active");
+	assert.equal(payload(created).issuer.principal, "legal@example.com");
+
+	const farFuture = "2036-01-01T00:00:00.000Z";
+	const held = runCli(
+		["retention", "evaluate", "--target", ".", "--now", farFuture, "--json"],
+		dir,
+	);
+	assert.equal(held.status, 0, held.stderr || held.stdout);
+	assert.equal(payload(held).entries[0].verdict, "retained-by-hold");
+	assert.deepEqual(payload(held).entries[0].heldBy, ["hold/litigation-42"]);
+
+	const scopeless = runCli(
+		[
+			"retention",
+			"hold",
+			"--target",
+			".",
+			"--id",
+			"hold/x",
+			"--reason",
+			"r",
+			"--decision-identity",
+			"decision/release-1",
+			"--revision",
+			"1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(scopeless.status, 1);
+	assert.equal(envelope(scopeless).code, "AMBER_E_INVALID_ARG");
+	assert.match(envelope(scopeless).errors[0], /exactly one of --record/);
+
+	const released = runCli(
+		[
+			"retention",
+			"release",
+			"--target",
+			".",
+			"--id",
+			"hold/litigation-42",
+			"--decision-identity",
+			"decision/release-1",
+			"--revision",
+			"1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(released.status, 0, released.stderr || released.stdout);
+	assert.equal(payload(released).status, "released");
+	const restored = runCli(
+		["retention", "evaluate", "--target", ".", "--now", farFuture, "--json"],
+		dir,
+	);
+	assert.equal(payload(restored).entries[0].verdict, "expired-eligible");
+
+	const again = runCli(
+		[
+			"retention",
+			"release",
+			"--target",
+			".",
+			"--id",
+			"hold/litigation-42",
+			"--decision-identity",
+			"decision/release-1",
+			"--revision",
+			"1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(again.status, 1);
+	assert.equal(envelope(again).code, "AMBER_E_RETENTION_INVALID");
+	assert.match(envelope(again).errors[0], /already released/);
+
+	const holds = runCli(["retention", "holds", "--target", ".", "--json"], dir);
+	assert.equal(holds.status, 0, holds.stderr || holds.stdout);
+	assert.equal(payload(holds).length, 1);
+	assert.equal(payload(holds)[0].status, "released");
+
+	// The spent creation Decision can never authorize another hold.
+	const spent = runCli(
+		[
+			"retention",
+			"hold",
+			"--target",
+			".",
+			"--id",
+			"hold/second",
+			"--subject",
+			"intent/other",
+			"--reason",
+			"r",
+			"--decision-identity",
+			"decision/hold-1",
+			"--revision",
+			"1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(spent.status, 1);
+	assert.equal(envelope(spent).code, "AMBER_E_RETENTION_INVALID");
+	assert.match(envelope(spent).errors[0], /single-use across the hold ledger/);
+
+	const badStatus = runCli(
+		["retention", "holds", "--target", ".", "--status", "everything", "--json"],
+		dir,
+	);
+	assert.equal(badStatus.status, 1);
+	assert.equal(envelope(badStatus).code, "AMBER_E_INVALID_ARG");
+	assert.match(envelope(badStatus).errors[0], /--status must be one of active, released/);
+
+	fs.appendFileSync(holdsPath(dir), '{"kind":"hold"}\n');
+	const corrupt = runCli(["retention", "holds", "--target", ".", "--json"], dir);
+	assert.equal(corrupt.status, 1);
+	assert.equal(envelope(corrupt).code, "AMBER_E_RETENTION_HOLD_CORRUPT");
 });

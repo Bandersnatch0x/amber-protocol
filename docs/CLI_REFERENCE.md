@@ -1349,10 +1349,11 @@ Error codes: `AMBER_E_MAINTAIN_INVALID`, `AMBER_E_MAINTAIN_EXISTS`, `AMBER_E_MAI
 `AMBER_E_MAINTAIN_PROPOSAL_CORRUPT`, `AMBER_E_MAINTAIN_PROPOSAL_LOCK`,
 `AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING`.
 
-### retention classify / evaluate / classifications
+### retention classify / evaluate / classifications / hold / release / holds
 
-Classify records into governed retention classes and evaluate expiry deterministically (F055 T1).
-A classification binds one committed canonical record (`<type>:<identity>@<revision>`) to a
+Classify records into governed retention classes, evaluate expiry deterministically (F055 T1),
+and govern Legal Holds (F055 T2). A classification binds one committed canonical record
+(`<type>:<identity>@<revision>`) to a
 protocol-defined retention class — `ephemeral|operational|governance|audit`, fixed semantics —
 whose TTL and legal basis resolve at classification time from a committed, versioned tenant
 retention Policy artifact: the Policy revision's extensions carrier declares
@@ -1374,6 +1375,16 @@ pure function of its latest recorded classification (`classifiedAt + ttlMs`, hal
 exactly `expiresAt`) and the injected `--now` clock. Report-only: evaluation never writes and
 nothing is deleted (deletion execution is F055 T3/T4, behind its own governance).
 
+A Legal Hold binds scope — one exact record pin OR one subject identity (every revision of that
+identity, deliberately type-agnostic: over-matching is fail-safe for a hold, which can only ever
+retain more) — a preserved reason, and the issuer (the verified principal of a single-use committed
+human acceptance/approval Decision) with its effective time into the hash-chained ledger
+`.amber/retention/holds.jsonl`. Holds have priority over TTL: evaluation reports a held record as
+`retained-by-hold` naming the holds in `heldBy`, regardless of expiry. Release is a second
+single-use human Decision (double-release and ghost-release refuse; a validly re-chained second
+release fails the read closed), and a released hold stays listable forever — a hold can end, but it
+can never disappear, so Legal Hold never becomes an invisible permanent exception.
+
 ```bash
 node scripts/amber.js retention classify --target . --record spec:spec/login@2 \
   --retention-class operational --policy policy/tenant-retention@1 --json
@@ -1382,10 +1393,18 @@ node scripts/amber.js retention classify --target . --record eval-result:eval-re
   --sensitivity personal --minimized --json
 node scripts/amber.js retention evaluate --target . --now 2026-08-29T00:00:00.000Z --json
 node scripts/amber.js retention classifications --target . --type spec --json
+node scripts/amber.js retention hold --target . --id hold/litigation-42 \
+  --subject spec/login --reason "litigation hold" \
+  --decision-identity decision/hold-42 --revision 1 --json
+node scripts/amber.js retention release --target . --id hold/litigation-42 \
+  --decision-identity decision/release-42 --revision 1 --json
+node scripts/amber.js retention holds --target . --status active --json
 ```
 
 Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
-`AMBER_E_RETENTION_CORRUPT`, `AMBER_E_RETENTION_LOCK`, `AMBER_E_RETENTION_SIZE_CEILING`.
+`AMBER_E_RETENTION_CORRUPT`, `AMBER_E_RETENTION_LOCK`, `AMBER_E_RETENTION_SIZE_CEILING`,
+`AMBER_E_RETENTION_HOLD_CORRUPT`, `AMBER_E_RETENTION_HOLD_LOCK`,
+`AMBER_E_RETENTION_HOLD_SIZE_CEILING`.
 
 ## Handoff Commands
 
