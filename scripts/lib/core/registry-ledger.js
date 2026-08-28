@@ -172,7 +172,7 @@ function acquireLedgerLock({
 function appendWithinCeiling({ ledgerPath, event, envName, defaultBytes, label }) {
 	const ceiling = resolvePositiveIntCeiling(envName, defaultBytes, `${label} size ceiling`);
 	const line = `${JSON.stringify(event)}\n`;
-	let currentBytes = 0;
+	let currentBytes;
 	try {
 		currentBytes = fs.existsSync(ledgerPath) ? fs.statSync(ledgerPath).size : 0;
 	} catch {
