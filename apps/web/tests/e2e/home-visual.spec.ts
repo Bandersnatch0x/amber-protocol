@@ -1,22 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import fs from 'fs';
-import path from 'path';
-
-const artifactDir = path.resolve(process.cwd(), '..', '..', 'output', 'playwright');
+import { capture } from './lib/artifacts';
 
 async function openStableHome(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1, name: 'Operator Console' })).toBeVisible();
   await expect(page.getByText('E2E fixture session', { exact: true }).first()).toBeVisible();
-}
-
-async function capture(page: Page, name: string): Promise<void> {
-  fs.mkdirSync(artifactDir, { recursive: true });
-  await page.screenshot({
-    path: path.join(artifactDir, name),
-    fullPage: true,
-    animations: 'disabled',
-  });
 }
 
 test.describe('Operator Console visual contracts', () => {
@@ -90,13 +78,13 @@ test.describe('Operator Console visual contracts', () => {
           card: renderedChannels(getComputedStyle(element).backgroundColor),
         };
       });
-    // Tailwind v4 emits palette colors as oklch() and regenerated the slate
-    // ramp, so the anchors are the v4-rendered sRGB channels (v3's hexes
-    // #0f172a/#1e293b land a couple of channels off). oklch -> sRGB round-
-    // trips can also wobble one rounding step, hence the ±1 tolerance.
+    // Anchors are the rendered sRGB channels of the Obsidian & Amber Pulse
+    // v10 tokens (.stitch/DESIGN.md): page = obsidian-void #080B10, card =
+    // obsidian-surface #0F141C. Color-function round-trips can wobble one
+    // rounding step, hence the ±1 tolerance.
     const expected: Record<'page' | 'card', number[]> = {
-      page: [15, 23, 43],
-      card: [29, 41, 61],
+      page: [8, 11, 16],
+      card: [15, 20, 28],
     };
     for (const key of ['page', 'card'] as const) {
       palette[key].forEach((channel, index) => {
@@ -133,9 +121,7 @@ test.describe('Operator Console visual contracts', () => {
     await capture(page, 'operator-console-webgl-fallback.png');
   });
 
-  test('reduced motion removes scanning motion and collapses transition timing', async ({
-    page,
-  }) => {
+  test('reduced motion removes the scanning overlay', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
     await openStableHome(page);
@@ -144,16 +130,12 @@ test.describe('Operator Console visual contracts', () => {
       true,
     );
 
+    // Motion reduction is component-scoped since the obsidian shell redesign:
+    // experience.css hides the scan overlay and AmberField stops its render
+    // loop; there is no global duration-collapse rule to assert anymore.
     // The scan overlay only exists inside the opt-in showcase; expand it.
     await page.locator('details summary', { hasText: 'Lifecycle visualization' }).click();
     await expect(page.locator('.amber-field__scan')).toBeHidden();
-
-    const timing = await page.locator('main').evaluate((element) => ({
-      animationDuration: getComputedStyle(element).animationDuration,
-      transitionDuration: getComputedStyle(element).transitionDuration,
-    }));
-    expect(timing.animationDuration).toMatch(/^(0\.01ms|0\.00001s|1e-05s)$/);
-    expect(timing.transitionDuration).toMatch(/^(0\.01ms|0\.00001s|1e-05s)$/);
 
     await capture(page, 'operator-console-reduced-motion.png');
   });
