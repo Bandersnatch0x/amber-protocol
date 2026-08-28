@@ -39,10 +39,20 @@ function readProfileFile(cwd) {
 	try {
 		raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
 	} catch {
-		return base;
+		return {
+			deploymentProfile: null,
+			source: "profile-file",
+			errors: [`Malformed deployment profile file (not valid JSON): ${path.relative(cwd, filePath)}`],
+		};
 	}
 	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-		return base;
+		return {
+			deploymentProfile: null,
+			source: "profile-file",
+			errors: [
+				`Malformed deployment profile file (expected a JSON object): ${path.relative(cwd, filePath)}`,
+			],
+		};
 	}
 	const profile = raw.deploymentProfile;
 	if (typeof profile !== "string" || !DEPLOYMENT_PROFILES.includes(profile)) {

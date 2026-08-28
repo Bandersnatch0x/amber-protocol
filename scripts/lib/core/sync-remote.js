@@ -280,6 +280,9 @@ function envelopeFromArtifact(cwd, artifactType, relPath) {
 	}
 	const identity = resolveIdentity(cwd);
 	const profile = resolveDeploymentProfile(cwd);
+	if (profile.errors.length > 0) {
+		throw new Error(`invalid deployment profile declaration: ${profile.errors.join("; ")}`);
+	}
 	const hash = hashFile(absPath);
 	return {
 		schemaVersion: ENVELOPE_SCHEMA_VERSION,
