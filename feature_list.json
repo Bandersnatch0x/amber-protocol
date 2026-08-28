@@ -1705,7 +1705,7 @@
 					"command": "node scripts/amber.js eval run --target . && npm test && npm --prefix apps/web test; apps/web: npx playwright test tests/e2e/knowledge.spec.ts + npm run test:e2e:semantic",
 					"result": "eval 4/4 pass (assurance replayable); knowledge e2e 21/21 green on live CLI data incl. en/zh i18n + dual theme; root suite 3165/3168 (2 npm-pack ETIMEDOUT load flakes, dsh-bundle rerun 6/6 green, + 1 hygiene finding on transient session scratch JSONs, not part of the change); web vitest 663/663",
 					"date": "2026-08-28",
-					"notes": "knowledge graph --json byte-stable at 105 nodes / 92 edges / 2 drift findings incl. feature:F059; T8 fixed the e2e fixture gap by seeding committed docs/knowledge-corpus into the hermetic root"
+					"notes": "knowledge graph --json byte-stable at 105 nodes (incl. feature:F059) / 92 edges / 2 drift findings (feature:F001, feature:F007); T8 fixed the e2e fixture gap by seeding committed docs/knowledge-corpus into the hermetic root"
 				}
 			],
 			"notes": [
