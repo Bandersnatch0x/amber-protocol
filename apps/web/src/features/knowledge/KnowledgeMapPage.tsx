@@ -667,7 +667,7 @@ function EdgeRow({
   const other = nodeById.get(otherId);
   const verb = (
     <span className="font-mono text-[9px] uppercase text-amber-600 dark:text-amber-300 shrink-0">
-      {incoming ? '→' : ''} {edge.verb} {incoming ? '' : '→'}
+      {incoming ? '←' : '→'} {edge.verb}
     </span>
   );
   return (
@@ -677,11 +677,10 @@ function EdgeRow({
         className="w-full text-left rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5 hover:border-amber-300 dark:hover:border-amber-700/60 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 transition-colors"
       >
         <div className="flex items-center gap-1.5">
-          {incoming && verb}
+          {verb}
           <span className="text-slate-700 dark:text-slate-200 truncate">
             {other?.title ?? otherId}
           </span>
-          {!incoming && verb}
         </div>
         {edge.origin === 'inferred' && (
           <span
