@@ -48,7 +48,7 @@ Changing profile does not rewrite Identity or Amber Core artifacts. Moving Perso
 | Source and Resolution ownership | #145, #147, #148, #149, #155 | ADR-0009, ADR-0012 | Amend ADR-0009 to make Context Page the Core form of the broader Knowledge Record lifecycle; amend ADR-0012 for ownership-bearing versioned interchange. |
 | Conflict preservation and governed resolution | #145, #147, #148, #155 | ADR-0004, ADR-0015 | Preserve ADR-0004's evidence discipline and ADR-0015's review-blocker remediation contracts. |
 | Tenant and Repository isolation | #145, #146, #151, #152 | ADR-0012 | Amend ADR-0012 so isolation is structural in versioned protocol and schema contracts. |
-| No hidden authority or execution | #145, #147, #149, #153, #154, #157 | ADR-0001, ADR-0003, ADR-0005 | Amend ADR-0001 for distributed non-execution; preserve ADR-0003's narrow governed exception and ADR-0005's execution removal. |
+| No hidden authority or execution | #145, #147, #149, #153, #154, #157 | ADR-0001, ADR-0003, ADR-0005 | Amend ADR-0001 for distributed non-execution; preserve ADR-0003's narrow governed exception and ADR-0005's execution removal. ADR-0020 Stage A (accepted after this matrix) rides ADR-0003's preserved exception for the governed local sync commit. |
 
 ## ADR disposition
 

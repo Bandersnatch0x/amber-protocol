@@ -30,9 +30,26 @@ const {
 	showRunner,
 	listRunners,
 	listRunnerCapabilities,
+	RUNNER_REQUEST_SCHEMA_VERSION,
+	SUPPORTED_RUNNER_REQUEST_SCHEMA_VERSIONS,
+	ENVIRONMENTS,
+	ENVIRONMENT_PROFILE_VERSION,
+	ENVIRONMENT_PROFILES,
+	CREDENTIAL_MAX_TTL_MS,
+	REQUEST_STATUSES,
+	RISK_LEVELS,
+	RISK_POLICY_VERSION,
+	EFFECT_RISK,
+	requestsPath,
+	submitRunnerRequest,
+	authorizeRunnerRequest,
+	showRunnerRequest,
+	listRunnerRequests,
 } = require("../../scripts/lib/core/runner-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
+const { grantApproval } = require("../../scripts/lib/core/approval-registry");
+const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
 const { writeJSONL } = require("../../scripts/lib/core/jsonl");
 
 function mkTarget(label) {
@@ -346,4 +363,560 @@ test("tampered runner registry fails every read closed", () => {
 		(err) =>
 			err.amberCode === "AMBER_E_RUNNER_REGISTRY_CORRUPT" && /unknown runner/.test(err.message),
 	);
+});
+
+// ── F052 T2 (#256): execution requests & policy-derived risk ──
+
+const NOW = new Date("2026-08-28T00:00:00.000Z");
+
+/** Registered runner + capability, approver (bob), and rehearsal Evidence
+ *  produced by carol — three distinct parties for separation checks. */
+function requestFixture(dir) {
+	registryFixture(dir);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(
+		registerPrincipal(dir, { id: "carol@example.com", principalKind: "human" }).ok,
+		true,
+	);
+	assert.equal(registerRunner(dir, runnerInput()).ok, true);
+	decisionFixture(dir, "decision/cap-1");
+	assert.equal(registerRunnerCapability(dir, capabilityInput()).ok, true);
+	rehearsalFixture(dir);
+}
+
+/** Record the carol-produced rollback-rehearsal Evidence receipt. */
+function rehearsalFixture(dir) {
+	const recorded = recordEvidence(dir, {
+		id: "evidence/rehearsal-1",
+		producer: "carol@example.com",
+		assurance: "observed",
+		scope: "F052",
+		subject: "staging rollback rehearsal",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: null,
+		status: "pass",
+	});
+	assert.equal(recorded.ok, true, (recorded.errors || []).join("; "));
+}
+
+const CREDENTIAL = Object.freeze({
+	handle: "cred-7f3a",
+	purpose: "staging-deploy",
+	scope: "deploy/staging",
+	expiresAt: "2026-08-28T12:00:00.000Z",
+});
+
+function requestInput(overrides = {}) {
+	return {
+		capability: {
+			runnerId: "runner/ci",
+			runnerVersion: "1.0.0",
+			name: "deploy.staging-web",
+			capabilityVersion: "1",
+		},
+		target: { repository: "repo/main", paths: ["deploy/staging/web"] },
+		scope: null,
+		environment: "staging",
+		inputHashes: [DIGEST],
+		timeoutMs: 300_000,
+		effects: ["deploy"],
+		credentialRequirement: "scoped",
+		credential: { ...CREDENTIAL },
+		rehearsal: "evidence/rehearsal-1",
+		rollback: "runbook/staging-rollback",
+		...overrides,
+	};
+}
+
+/** Grant one approval whose subject is the request's binding; asserts ok. */
+function approvalFixture(dir, id, subject) {
+	const granted = grantApproval(
+		dir,
+		{
+			id,
+			approver: "bob@example.com",
+			scope: null,
+			subject,
+			validUntil: "2027-01-01T00:00:00.000Z",
+		},
+		{ now: NOW },
+	);
+	assert.equal(granted.ok, true, (granted.errors || []).join("; "));
+}
+
+function authorizeInput(requestHash, overrides = {}) {
+	return {
+		requestHash,
+		approval: "approval/req-1",
+		decisionIdentity: "decision/req-1",
+		body: "# Authorize request\n",
+		traces: [{ type: "decides", to: { type: "intent", identity: "intent/runner" } }],
+		scope: null,
+		...overrides,
+	};
+}
+
+test("request constants pin the environments and the risk policy", () => {
+	assert.equal(RUNNER_REQUEST_SCHEMA_VERSION, 1);
+	assert.deepEqual(SUPPORTED_RUNNER_REQUEST_SCHEMA_VERSIONS, [1]);
+	assert.deepEqual(ENVIRONMENTS, ["development", "staging", "production"]);
+	assert.deepEqual(REQUEST_STATUSES, ["requested", "authorized", "denied"]);
+	assert.equal(ENVIRONMENT_PROFILE_VERSION, 1);
+	assert.equal(CREDENTIAL_MAX_TTL_MS, 24 * 60 * 60 * 1000);
+	assert.deepEqual(ENVIRONMENT_PROFILES, {
+		development: {
+			allowedEffects: ["read", "prepare", "diagnose", "write-target"],
+			requiresIsolatedScope: true,
+			rehearsalEffects: [],
+			credentialEffects: [],
+			runbookNamespace: null,
+		},
+		staging: {
+			allowedEffects: ["read", "prepare", "diagnose", "deploy", "rollback"],
+			requiresIsolatedScope: false,
+			rehearsalEffects: ["deploy", "rollback"],
+			credentialEffects: ["deploy", "rollback"],
+			runbookNamespace: null,
+		},
+		production: {
+			allowedEffects: ["read", "prepare", "diagnose"],
+			requiresIsolatedScope: false,
+			rehearsalEffects: [],
+			credentialEffects: [],
+			runbookNamespace: "runbook.",
+		},
+	});
+	assert.deepEqual(RISK_LEVELS, ["low", "medium", "high"]);
+	assert.equal(RISK_POLICY_VERSION, 1);
+	assert.deepEqual(EFFECT_RISK, {
+		read: "low",
+		prepare: "low",
+		diagnose: "low",
+		"write-target": "medium",
+		deploy: "high",
+		rollback: "high",
+	});
+});
+
+test("a request derives its risk from capability facts, never from the caller", () => {
+	const dir = mkTarget("request");
+	requestFixture(dir);
+
+	const withRisk = submitRunnerRequest(dir, requestInput({ risk: "low" }));
+	assert.equal(withRisk.ok, false);
+	assert.equal(withRisk.code, "AMBER_E_RUNNER_REQUEST_INVALID");
+	assert.match(withRisk.errors[0], /unknown field/);
+
+	const submitted = submitRunnerRequest(dir, requestInput(), { now: NOW });
+	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
+	assert.equal(submitted.record.status, "requested");
+	assert.equal(submitted.record.risk, "high");
+	assert.equal(submitted.record.riskPolicyVersion, RISK_POLICY_VERSION);
+	assert.match(submitted.record.requestHash, /^sha256:[0-9a-f]{64}$/);
+	assert.equal(
+		submitted.record.approvalBinding,
+		`runner-request:staging:${submitted.record.requestHash}`,
+	);
+
+	const duplicate = submitRunnerRequest(dir, requestInput(), { now: NOW });
+	assert.equal(duplicate.code, "AMBER_E_RUNNER_REQUEST_EXISTS");
+
+	const ghostCapability = submitRunnerRequest(
+		dir,
+		requestInput({
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "deploy.ghost",
+				capabilityVersion: "1",
+			},
+		}),
+	);
+	assert.equal(ghostCapability.code, "AMBER_E_RUNNER_CAPABILITY_NOT_FOUND");
+	assert.equal(ghostCapability.record.status, "denied");
+	assert.match(ghostCapability.record.reason, /not registered/);
+
+	// Requesting a SUBSET of a capability's effects never lowers the risk
+	// class: the registered effect set is the authority the request draws
+	// on. deploy.staging-probe declares read+deploy; a read-only request
+	// against it is still deploy-class.
+	decisionFixture(dir, "decision/cap-probe");
+	assert.equal(
+		registerRunnerCapability(
+			dir,
+			capabilityInput({
+				name: "deploy.staging-probe",
+				effects: ["read", "deploy"],
+				decision: { identity: "decision/cap-probe", revision: 1 },
+			}),
+		).ok,
+		true,
+	);
+	const subset = submitRunnerRequest(
+		dir,
+		requestInput({
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "deploy.staging-probe",
+				capabilityVersion: "1",
+			},
+			effects: ["read"],
+		}),
+		{ now: NOW },
+	);
+	assert.equal(subset.ok, true, (subset.errors || []).join("; "));
+	assert.equal(subset.record.risk, "high");
+
+	assert.equal(showRunnerRequest(dir, submitted.record.requestHash).status, "requested");
+	assert.equal(showRunnerRequest(dir, `sha256:${"f".repeat(64)}`), null);
+	assert.equal(listRunnerRequests(dir, { status: "denied" }).length, 1);
+});
+
+test("widening the registered capability is a recorded denial, not silence", () => {
+	const dir = mkTarget("request-denied");
+	requestFixture(dir);
+
+	const widened = submitRunnerRequest(dir, requestInput({ effects: ["deploy", "write-target"] }), {
+		now: NOW,
+	});
+	assert.equal(widened.ok, false);
+	assert.equal(widened.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.equal(widened.record.status, "denied");
+	assert.match(widened.record.reason, /does not declare/);
+
+	const slower = submitRunnerRequest(dir, requestInput({ timeoutMs: 600_001 }), { now: NOW });
+	assert.equal(slower.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(slower.record.reason, /exceeds the registered capability bound/);
+
+	const credential = submitRunnerRequest(
+		dir,
+		requestInput({ credentialRequirement: "none", credential: null }),
+		{ now: NOW },
+	);
+	assert.equal(credential.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(credential.record.reason, /does not match/);
+
+	const escape = submitRunnerRequest(
+		dir,
+		requestInput({ target: { repository: "repo/main", paths: ["deploy/staging/../../etc"] } }),
+		{ now: NOW },
+	);
+	assert.equal(escape.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(escape.record.reason, /outside the registered path prefixes/);
+
+	const denials = listRunnerRequests(dir, { status: "denied" });
+	assert.equal(denials.length, 4);
+	assert.equal(listRunnerRequests(dir).length, 4);
+});
+
+test("authorization consumes a single-use approval bound to hash and environment", () => {
+	const dir = mkTarget("authorize");
+	requestFixture(dir);
+	const submitted = submitRunnerRequest(dir, requestInput(), { now: NOW });
+	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
+	const hash = submitted.record.requestHash;
+
+	const ghost = authorizeRunnerRequest(dir, authorizeInput(`sha256:${"f".repeat(64)}`), {
+		now: NOW,
+	});
+	assert.equal(ghost.code, "AMBER_E_RUNNER_REQUEST_NOT_FOUND");
+
+	const noApproval = authorizeRunnerRequest(dir, authorizeInput(hash), { now: NOW });
+	assert.equal(noApproval.code, "AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH");
+
+	approvalFixture(dir, "approval/other", "spec/login@2");
+	const mismatch = authorizeRunnerRequest(
+		dir,
+		authorizeInput(hash, { approval: "approval/other" }),
+		{ now: NOW },
+	);
+	assert.equal(mismatch.code, "AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH");
+	assert.match(mismatch.errors[0], /one authorization binds one request hash and environment/);
+
+	approvalFixture(dir, "approval/req-1", submitted.record.approvalBinding);
+	const authorized = authorizeRunnerRequest(dir, authorizeInput(hash), { now: NOW });
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+	assert.equal(authorized.record.status, "authorized");
+	assert.equal(authorized.record.authorization.approvalId, "approval/req-1");
+	assert.equal(authorized.record.authorization.decision.identity, "decision/req-1");
+	assert.equal(
+		authorized.record.authorization.decision.revision,
+		authorized.consumption.receipt.revision,
+	);
+
+	const replay = authorizeRunnerRequest(
+		dir,
+		authorizeInput(hash, { decisionIdentity: "decision/req-2" }),
+		{ now: NOW },
+	);
+	assert.equal(replay.code, "AMBER_E_RUNNER_REQUEST_EXISTS");
+	assert.match(replay.errors[0], /single-use/);
+});
+
+test("a stale risk policy version fails authorization closed", () => {
+	const dir = mkTarget("request-drift");
+	requestFixture(dir);
+	const submitted = submitRunnerRequest(dir, requestInput(), { now: NOW });
+	assert.equal(submitted.ok, true);
+	const hash = submitted.record.requestHash;
+
+	// Rebuild the single requested event as if a different policy version
+	// had classified it: authorization must refuse stale authority.
+	const event = JSON.parse(fs.readFileSync(requestsPath(dir), "utf8"));
+	const { prevHash: _prev, hash: _hash, ...body } = event;
+	const stale = { ...body, riskPolicyVersion: RISK_POLICY_VERSION + 1 };
+	writeJSONL(requestsPath(dir), [
+		{ ...stale, prevHash: GENESIS_HASH, hash: chainHash(stale, GENESIS_HASH) },
+	]);
+
+	approvalFixture(dir, "approval/req-1", submitted.record.approvalBinding);
+	const drifted = authorizeRunnerRequest(dir, authorizeInput(hash), { now: NOW });
+	assert.equal(drifted.ok, false);
+	assert.equal(drifted.code, "AMBER_E_RUNNER_REQUEST_DRIFT");
+	assert.match(drifted.errors[0], /policy version/);
+});
+
+test("tampered request ledger fails every read closed", () => {
+	const dir = mkTarget("request-tamper");
+	requestFixture(dir);
+	assert.equal(submitRunnerRequest(dir, requestInput(), { now: NOW }).ok, true);
+	const event = JSON.parse(fs.readFileSync(requestsPath(dir), "utf8"));
+	event.risk = "low";
+	writeJSONL(requestsPath(dir), [event]);
+	assert.throws(
+		() => listRunnerRequests(dir),
+		(err) => err.amberCode === "AMBER_E_RUNNER_REQUEST_CORRUPT",
+	);
+});
+
+test("environment profiles gate what a request may even ask for", () => {
+	const dir = mkTarget("environment");
+	requestFixture(dir);
+	decisionFixture(dir, "decision/cap-dev");
+	assert.equal(
+		registerRunnerCapability(
+			dir,
+			capabilityInput({
+				name: "dev.write",
+				effects: ["write-target"],
+				pathPrefixes: null,
+				credentialRequirement: "none",
+				decision: { identity: "decision/cap-dev", revision: 1 },
+			}),
+		).ok,
+		true,
+	);
+	const devCapability = {
+		runnerId: "runner/ci",
+		runnerVersion: "1.0.0",
+		name: "dev.write",
+		capabilityVersion: "1",
+	};
+	const devRequest = {
+		capability: devCapability,
+		effects: ["write-target"],
+		environment: "development",
+		credentialRequirement: "none",
+		credential: null,
+		rehearsal: null,
+	};
+
+	const unscoped = submitRunnerRequest(dir, requestInput({ ...devRequest, scope: null }), {
+		now: NOW,
+	});
+	assert.equal(unscoped.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(unscoped.record.reason, /isolated target scope/);
+
+	const scoped = submitRunnerRequest(dir, requestInput({ ...devRequest, scope: "F052" }), {
+		now: NOW,
+	});
+	assert.equal(scoped.ok, true, (scoped.errors || []).join("; "));
+
+	const devDeploy = submitRunnerRequest(dir, requestInput({ environment: "development" }), {
+		now: NOW,
+	});
+	assert.equal(devDeploy.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(devDeploy.record.reason, /not admitted in development/);
+
+	const stagingWrite = submitRunnerRequest(
+		dir,
+		requestInput({ ...devRequest, environment: "staging" }),
+		{ now: NOW },
+	);
+	assert.equal(stagingWrite.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(stagingWrite.record.reason, /not admitted in staging/);
+
+	const unrehearsed = submitRunnerRequest(dir, requestInput({ rehearsal: null }), { now: NOW });
+	assert.equal(unrehearsed.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(unrehearsed.record.reason, /rollback rehearsal Evidence/);
+
+	const ghostRehearsal = submitRunnerRequest(dir, requestInput({ rehearsal: "evidence/ghost" }), {
+		now: NOW,
+	});
+	assert.equal(ghostRehearsal.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(ghostRehearsal.record.reason, /names no recorded Evidence receipt/);
+
+	const productionDeploy = submitRunnerRequest(dir, requestInput({ environment: "production" }), {
+		now: NOW,
+	});
+	assert.equal(productionDeploy.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(productionDeploy.record.reason, /not admitted in production/);
+
+	decisionFixture(dir, "decision/cap-nocred");
+	assert.equal(
+		registerRunnerCapability(
+			dir,
+			capabilityInput({
+				name: "deploy.nocred",
+				credentialRequirement: "none",
+				decision: { identity: "decision/cap-nocred", revision: 1 },
+			}),
+		).ok,
+		true,
+	);
+	const uncredentialed = submitRunnerRequest(
+		dir,
+		requestInput({
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "deploy.nocred",
+				capabilityVersion: "1",
+			},
+			credentialRequirement: "none",
+			credential: null,
+		}),
+		{ now: NOW },
+	);
+	assert.equal(uncredentialed.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(uncredentialed.record.reason, /scoped credential declaration/);
+
+	decisionFixture(dir, "decision/cap-runbook");
+	assert.equal(
+		registerRunnerCapability(
+			dir,
+			capabilityInput({
+				name: "runbook.restart-web",
+				effects: ["deploy"],
+				decision: { identity: "decision/cap-runbook", revision: 1 },
+			}),
+		).ok,
+		true,
+	);
+	const runbook = submitRunnerRequest(
+		dir,
+		requestInput({
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "runbook.restart-web",
+				capabilityVersion: "1",
+			},
+			environment: "production",
+			rehearsal: null,
+		}),
+		{ now: NOW },
+	);
+	assert.equal(runbook.ok, true, (runbook.errors || []).join("; "));
+	assert.equal(runbook.record.environmentProfileVersion, ENVIRONMENT_PROFILE_VERSION);
+});
+
+test("credential declarations are opaque short-lived handles, never secrets", () => {
+	const dir = mkTarget("credential");
+	requestFixture(dir);
+
+	const missing = submitRunnerRequest(dir, requestInput({ credential: null }));
+	assert.equal(missing.code, "AMBER_E_RUNNER_REQUEST_INVALID");
+	assert.match(missing.errors[0], /required when credentialRequirement/);
+
+	const smuggled = submitRunnerRequest(
+		dir,
+		requestInput({ credential: { ...CREDENTIAL, secret: "hunter2" } }),
+	);
+	assert.equal(smuggled.code, "AMBER_E_RUNNER_REQUEST_INVALID");
+	assert.match(smuggled.errors[0], /unknown field/);
+
+	const expired = submitRunnerRequest(
+		dir,
+		requestInput({ credential: { ...CREDENTIAL, expiresAt: "2026-01-01T00:00:00.000Z" } }),
+		{ now: NOW },
+	);
+	assert.equal(expired.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(expired.record.reason, /expired/);
+
+	const overlong = submitRunnerRequest(
+		dir,
+		requestInput({ credential: { ...CREDENTIAL, expiresAt: "2026-09-01T00:00:00.000Z" } }),
+		{ now: NOW },
+	);
+	assert.equal(overlong.code, "AMBER_E_RUNNER_REQUEST_DENIED");
+	assert.match(overlong.record.reason, /short-lived bound/);
+
+	const shortLived = submitRunnerRequest(
+		dir,
+		requestInput({ credential: { ...CREDENTIAL, expiresAt: "2026-08-28T06:00:00.000Z" } }),
+		{ now: NOW },
+	);
+	assert.equal(shortLived.ok, true, (shortLived.errors || []).join("; "));
+	approvalFixture(dir, "approval/req-1", shortLived.record.approvalBinding);
+	const lapsed = authorizeRunnerRequest(dir, authorizeInput(shortLived.record.requestHash), {
+		now: new Date("2026-08-28T07:00:00.000Z"),
+	});
+	assert.equal(lapsed.ok, false);
+	assert.equal(lapsed.code, "AMBER_E_RUNNER_REQUEST_DRIFT");
+	assert.match(lapsed.errors[0], /expired/);
+});
+
+test("the rehearsing party cannot approve its own rehearsal", () => {
+	const dir = mkTarget("separation");
+	requestFixture(dir);
+	const submitted = submitRunnerRequest(dir, requestInput(), { now: NOW });
+	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
+
+	const selfGrant = grantApproval(
+		dir,
+		{
+			id: "approval/self",
+			approver: "carol@example.com",
+			scope: null,
+			subject: submitted.record.approvalBinding,
+			validUntil: "2027-01-01T00:00:00.000Z",
+		},
+		{ now: NOW },
+	);
+	assert.equal(selfGrant.ok, true, (selfGrant.errors || []).join("; "));
+	const vouched = authorizeRunnerRequest(
+		dir,
+		authorizeInput(submitted.record.requestHash, { approval: "approval/self" }),
+		{ now: NOW },
+	);
+	assert.equal(vouched.ok, false);
+	assert.equal(vouched.code, "AMBER_E_RUNNER_REQUEST_SEPARATION");
+	assert.match(vouched.errors[0], /cannot approve its own rehearsal/);
+	assert.equal(showRunnerRequest(dir, submitted.record.requestHash).status, "requested");
+});
+
+test("a stale environment profile version fails authorization closed", () => {
+	const dir = mkTarget("profile-drift");
+	requestFixture(dir);
+	const submitted = submitRunnerRequest(dir, requestInput(), { now: NOW });
+	assert.equal(submitted.ok, true);
+
+	const event = JSON.parse(fs.readFileSync(requestsPath(dir), "utf8"));
+	const { prevHash: _prev, hash: _hash, ...body } = event;
+	const stale = { ...body, environmentProfileVersion: ENVIRONMENT_PROFILE_VERSION + 1 };
+	writeJSONL(requestsPath(dir), [
+		{ ...stale, prevHash: GENESIS_HASH, hash: chainHash(stale, GENESIS_HASH) },
+	]);
+
+	approvalFixture(dir, "approval/req-1", submitted.record.approvalBinding);
+	const drifted = authorizeRunnerRequest(dir, authorizeInput(submitted.record.requestHash), {
+		now: NOW,
+	});
+	assert.equal(drifted.ok, false);
+	assert.equal(drifted.code, "AMBER_E_RUNNER_REQUEST_DRIFT");
+	assert.match(drifted.errors[0], /environment profile version/);
 });

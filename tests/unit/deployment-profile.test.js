@@ -44,13 +44,49 @@ test("readProfileFile returns parsed profile when present", () => {
 	assert.equal(profile.source, "profile-file");
 });
 
-test("readProfileFile returns default on malformed JSON", () => {
+test("readProfileFile fails closed on malformed JSON", () => {
 	const dir = mkTarget("malformed");
 	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
 	fs.writeFileSync(path.join(dir, PROFILE_FILE), "{ bad json");
 	const profile = readProfileFile(dir);
-	assert.equal(profile.deploymentProfile, DEFAULT_PROFILE);
-	assert.equal(profile.source, "default");
+	assert.equal(profile.deploymentProfile, null);
+	assert.equal(profile.source, "profile-file");
+	assert.ok(profile.errors.some((e) => e.includes("not valid JSON")));
+});
+
+test("readProfileFile fails closed on non-object JSON", () => {
+	const dir = mkTarget("non-object");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(dir, PROFILE_FILE), JSON.stringify(["personal-node"]));
+	const profile = readProfileFile(dir);
+	assert.equal(profile.deploymentProfile, null);
+	assert.equal(profile.source, "profile-file");
+	assert.ok(profile.errors.some((e) => e.includes("expected a JSON object")));
+});
+
+test("validateDeploymentProfile fails for malformed JSON", () => {
+	const dir = mkTarget("validate-malformed");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(dir, PROFILE_FILE), "{ bad json");
+	const result = validateDeploymentProfile(dir);
+	assert.equal(result.valid, false);
+	assert.equal(result.deploymentProfile, null);
+});
+
+test("validateDeploymentProfile fails for non-object JSON", () => {
+	const dir = mkTarget("validate-non-object");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(dir, PROFILE_FILE), JSON.stringify(["personal-node"]));
+	const result = validateDeploymentProfile(dir);
+	assert.equal(result.valid, false);
+	assert.equal(result.deploymentProfile, null);
+});
+
+test("validateDeploymentProfile passes for an absent declaration (default)", () => {
+	const dir = mkTarget("validate-absent");
+	const result = validateDeploymentProfile(dir);
+	assert.equal(result.valid, true);
+	assert.equal(result.deploymentProfile, DEFAULT_PROFILE);
 });
 
 test("readProfileFile rejects an unknown deployment profile", () => {

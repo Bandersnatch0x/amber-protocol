@@ -147,8 +147,8 @@ Spec, and the implementation.
 
 - `/knowledge` follows `.stitch/DESIGN.md` (Obsidian & Amber Pulse v10): master-detail with a
   right rail, amber/cobalt dual accents, dual theme, no new visual grammar.
-- Rendering: `@xyflow/react` v12 + `d3-force` (see
-  `docs/research/graph-rendering-library-choice.md`); the DTO stays renderer-agnostic.
+- Rendering: `@xyflow/react` v12 + `d3-force` (rationale recorded in the internal research
+  archive: `docs/research/graph-rendering-library-choice.md`); the DTO stays renderer-agnostic.
 - Node detail shows source path, context, anchors (with dead-anchor marking), and edge rows;
   a mini context graph renders the 1-hop neighborhood with verb labels and a `+N` indicator
   beyond the visible cut.

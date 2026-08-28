@@ -188,7 +188,9 @@ const FLAG_SPECS = {
 	"--rollback-evidence": { key: "rollbackEvidence" },
 	// F052 ticket 1 (#255): Runner registry flags (--id, --capability,
 	// --decision-identity, --revision, and --rollback are shared with the
-	// F050/F051 surfaces).
+	// F050/F051 surfaces). F052 ticket 2 (#256) adds the request flags
+	// (--repository, --path, --body, --trace, --approval, and --status are
+	// shared with the existing surfaces).
 	"--runner-version": { key: "runnerVersion" },
 	"--integrity": { key: "integrity" },
 	"--runner-owner": { key: "runnerOwner" },
@@ -198,6 +200,15 @@ const FLAG_SPECS = {
 	"--timeout-ms": { key: "timeoutMs" },
 	"--credential": { key: "credential" },
 	"--rollback": { key: "rollback" },
+	"--environment": { key: "environment" },
+	"--input-hash": { key: "inputHashVal", accumulate: "inputHashes" },
+	"--request-hash": { key: "requestHash" },
+	// F052 ticket 3 (#257): environment boundary flags.
+	"--credential-handle": { key: "credentialHandle" },
+	"--credential-purpose": { key: "credentialPurpose" },
+	"--credential-scope": { key: "credentialScope" },
+	"--credential-expires": { key: "credentialExpires" },
+	"--rehearsal": { key: "rehearsal" },
 	"--identity-map": { key: "identityMap" },
 	"--freshness-ms": { key: "freshnessMs" },
 	"--allow-path": { key: "allowPath" },

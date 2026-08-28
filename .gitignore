@@ -56,8 +56,14 @@ terminals/
 .archive/
 .scratch/
 
+# Local ticket store (spec/research/wayfinder tickets live here; GitHub carries bug reports only)
+issues/
+
 # New Superpowers workflow artifacts (historical tracked records remain versioned)
 docs/superpowers/
+
+# Internal research archive — kept local, not published to the public tree
+docs/research/
 
 # Logs
 *.log

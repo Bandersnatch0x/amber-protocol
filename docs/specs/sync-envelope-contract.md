@@ -94,7 +94,8 @@ artifact path must already resolve canonically and the file must exist; the
 envelope gets `schemaVersion: "1.0.0"`, a fresh `crypto.randomUUID()`
 `envelopeId`, the canonical path plus its `sha256:` hash, structural identity
 from `resolveIdentity(cwd)`, origin profile from
-`resolveDeploymentProfile(cwd)` (falling back to `personal-node`),
+`resolveDeploymentProfile(cwd)` (an absent declaration falls back to
+`personal-node`; an invalid declaration refuses the pack),
 `createdAt` as the current ISO timestamp, and
 `versionNegotiation: { amberProtocolVersion: <running Amber package
 version>, minCompatibleVersion: "1.0.0", capabilities:
@@ -277,8 +278,11 @@ replaying the proposed operations, or by the governed Stage A surface below.
 ADR-0020 Stage A (F041) authorizes exactly one governed execution surface:
 `amber sync session push --execute --yes` (core: `executeTransport` in
 `scripts/lib/core/sync-transport.js`). Gate order, each governed refusal
-recorded in the hash-chained transport ledger
-(`.amber/sync/transport/ledger.jsonl`):
+(policy deny, missing approval) and each execution outcome recorded in the
+hash-chained transport ledger
+(`.amber/sync/transport/ledger.jsonl`); the identity gate's
+`APPROVAL_REQUIRED` exits precede an attempt and are not ledger records
+(ADR-0020 §Recorded):
 
 1. **Report.** Build the F040 report; no envelopes → typed `no-change`
    outcome (exit 0, nothing executed).

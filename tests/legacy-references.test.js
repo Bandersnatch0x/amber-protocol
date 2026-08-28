@@ -34,6 +34,7 @@ const ALLOWLIST = [
 	"docs/quality/release-readiness-1.3.12.md", // historical release-readiness record
 	"docs/superpowers/plans/",
 	"docs/superpowers/specs/",
+	"docs/research/", // internal research archive — gitignored, local-only, never in CI checkouts
 	"docs/examples/", // historical review artifacts generated from real read-only trials
 	"docs/adoption-self/", // self-adoption report (auto-generated, contains legacy project path)
 	"docs/wiki/PHASE_B_ALPHA_TASKS.md", // era-noted historical task list

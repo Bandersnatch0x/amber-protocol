@@ -17,6 +17,8 @@ All capability is exposed through one CLI entry point.
 
 Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, gates, evidence, and routing rules; read before nontrivial tasks.
 
+Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acceptance with exit criteria; follow it when planning, implementing, or accepting a change (full-test pass is followed by a mandatory two-axis review + spec compliance stage).
+
 ## Entry point
 
 ```bash
@@ -65,7 +67,9 @@ Use `node scripts/amber.js --all` for deprecated and expert compatibility comman
 - Amber never runs `git push`. The one gated exception to "no live git": ADR-0020 Stage A
   (`amber sync session push --execute --yes`) performs the local `git add` + `git commit` of sync
   envelopes behind identity, policy, single-use approval, path-and-state confinement, and a
-  tamper-evident transport ledger; every other git interaction stays read-only.
+  tamper-evident transport ledger. Two narrower non-push git writes exist behind their own
+  surfaces: the typed `ledger seal` tag and session worktree add/remove (`worktree-manager.js`);
+  every other git interaction stays read-only.
 
 ## Governance philosophy (operational-ontology positioning)
 

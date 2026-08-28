@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Operating manual: `docs/wiki/AMBER_AGENT_OPERATING_MANUAL.md` — boundaries, gates, evidence, and routing rules; read before nontrivial tasks.
 
+Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acceptance with exit criteria; follow it when planning, implementing, or accepting a change (full-test pass is followed by a mandatory two-axis review + spec compliance stage).
+
 ## Project Overview
 
 **Amber Protocol** (formerly Coding Harness) is a repository-local governance and control layer for agent-assisted engineering. It provides installation, auditing, validation, and maintenance capabilities for project files that help agents understand codebases, track feature state, and hand off work cleanly.
