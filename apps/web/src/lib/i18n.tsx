@@ -33,7 +33,8 @@ const en = {
   'nav.skipToContent': 'Skip to main content',
   'knowledge.title': 'Knowledge & Decision Map',
   'knowledge.subtitle':
-    '{visible}/{total} nodes · {edges} edges · {drift} drift findings · deterministic parse of committed artifacts',
+    '{visible}/{total} nodes · {edges} deterministic edges · {drift} drift findings · deterministic parse of committed artifacts',
+  'knowledge.subtitle.inferredSuffix': '+ {inferred} inferred edges (read-time, not persisted)',
   'knowledge.searchPlaceholder': 'Search nodes by title, id, status, content...',
   'knowledge.layout.cluster': 'cluster',
   'knowledge.layout.layered': 'layered',
@@ -1037,7 +1038,8 @@ const zh: Record<TranslationKey, string> = {
   'nav.skipToContent': '\u8df3\u8f6c\u5230\u4e3b\u8981\u5185\u5bb9',
   'knowledge.title': '知识与决策地图',
   'knowledge.subtitle':
-    '{visible}/{total} 节点 · {edges} 条边 · {drift} 项漂移 · 提交工件的确定性解析',
+    '{visible}/{total} 节点 · {edges} 条确定性边 · {drift} 项漂移 · 提交工件的确定性解析',
+  'knowledge.subtitle.inferredSuffix': '+ {inferred} 条推断边（读取时生成，不持久化）',
   'knowledge.searchPlaceholder': '按标题、ID、状态、内容搜索节点…',
   'knowledge.layout.cluster': '聚簇',
   'knowledge.layout.layered': '分层',

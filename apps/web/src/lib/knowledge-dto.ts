@@ -2,7 +2,7 @@ export type GraphLayer = 'decision' | 'knowledge' | 'implementation';
 
 export interface KnowledgeNode {
   id: string;
-  kind: 'adr' | 'artifact' | 'wiki' | 'knowledge' | 'memory' | 'architecture' | 'feature';
+  kind: 'adr' | 'artifact' | 'wiki' | 'memory' | 'architecture' | 'feature';
   layer: GraphLayer;
   title: string;
   status?: string;

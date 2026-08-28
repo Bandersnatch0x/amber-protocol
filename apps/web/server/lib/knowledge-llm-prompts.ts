@@ -16,7 +16,7 @@ const SEMANTIC_EDGES_PROMPT =
   `You are a knowledge-graph analyst. Given a list of nodes from a software repository's
 knowledge graph, identify unlisted semantic relationships between them.
 
-Each node has: id, kind (adr|artifact|wiki|knowledge|memory|architecture|feature), title, and optional body.
+Each node has: id, kind (adr|artifact|wiki|memory|architecture|feature), title, and optional body.
 Return ONLY a JSON object with an "edges" array. Each edge must have:
   src   – id of the source node (the declarer)
   dst   – id of the target node (the declared)

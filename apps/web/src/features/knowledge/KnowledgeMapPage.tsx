@@ -61,7 +61,6 @@ const KIND_LABEL_KEYS: Record<string, I18nKey> = {
   adr: 'knowledge.kind.adr',
   artifact: 'knowledge.kind.artifact',
   wiki: 'knowledge.kind.wiki',
-  knowledge: 'knowledge.kind.wiki',
   memory: 'knowledge.kind.memory',
   architecture: 'knowledge.kind.architecture',
   feature: 'knowledge.kind.feature',
@@ -159,9 +158,7 @@ const KIND_LOCAL_TARGET: Record<string, RecentChangeItem['linkTo']> = {
   feature: 'gates',
   adr: 'governance',
   artifact: 'governance',
-  knowledge: 'transcripts',
-  architecture: 'transcripts',
-  memory: 'transcripts',
+  wiki: 'governance',
 };
 
 function LocalJumpLink({
@@ -243,6 +240,46 @@ function LocalJumpLink({
   return null;
 }
 
+const MINI_CX = 160;
+const MINI_CY = 84;
+const MINI_RX = 116;
+const MINI_RY = 70;
+const MINI_MAX_NEIGHBORS = 8;
+const MINI_CENTER_W = 116;
+const MINI_CENTER_H = 24;
+const MINI_SATELLITE_W = 80;
+const MINI_SATELLITE_H = 20;
+
+interface MiniRelation {
+  verb: string;
+  dir: 'out' | 'in';
+  inferred: boolean;
+}
+
+interface MiniNeighbor {
+  other: KnowledgeNode;
+  relations: MiniRelation[];
+  x: number;
+  y: number;
+}
+
+function clipSegmentToRect(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  halfW: number,
+  halfH: number,
+): { x: number; y: number } {
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  if (dx === 0 && dy === 0) return { x: toX, y: toY };
+  const scaleX = dx === 0 ? Infinity : halfW / Math.abs(dx);
+  const scaleY = dy === 0 ? Infinity : halfH / Math.abs(dy);
+  const scale = Math.min(scaleX, scaleY, 1);
+  return { x: toX - dx * scale, y: toY - dy * scale };
+}
+
 function MiniContextGraph({
   dto,
   centerId,
@@ -257,47 +294,36 @@ function MiniContextGraph({
   const { t } = useI18n();
   const center = nodeById.get(centerId);
   const items = useMemo(() => {
-    const out: Array<{
-      other: KnowledgeNode;
-      verb: string;
-      dir: 'out' | 'in';
-      inferred: boolean;
-      x: number;
-      y: number;
-    }> = [];
+    const byNeighbor = new Map<string, MiniNeighbor>();
     for (const e of dto.edges) {
-      if (e.src === centerId && nodeById.has(e.dst)) {
-        out.push({
-          other: nodeById.get(e.dst)!,
-          verb: e.verb,
-          dir: 'out',
-          inferred: e.origin === 'inferred',
-          x: 0,
-          y: 0,
-        });
-      } else if (e.dst === centerId && nodeById.has(e.src)) {
-        out.push({
-          other: nodeById.get(e.src)!,
-          verb: e.verb,
-          dir: 'in',
-          inferred: e.origin === 'inferred',
-          x: 0,
-          y: 0,
-        });
+      const isOut = e.src === centerId && nodeById.has(e.dst);
+      const isIn = e.dst === centerId && nodeById.has(e.src);
+      if (!isOut && !isIn) continue;
+      const other = nodeById.get(isOut ? e.dst : e.src)!;
+      const relation = {
+        verb: e.verb,
+        dir: isOut ? ('out' as const) : ('in' as const),
+        inferred: e.origin === 'inferred',
+      };
+      const existing = byNeighbor.get(other.id);
+      if (existing) {
+        const duplicate = existing.relations.some(
+          (r) => r.verb === relation.verb && r.dir === relation.dir,
+        );
+        if (!duplicate) existing.relations.push(relation);
+        continue;
       }
+      byNeighbor.set(other.id, { other, relations: [relation], x: 0, y: 0 });
     }
-    const shown = out.slice(0, 8);
-    const hidden = out.length - shown.length;
-    const cx = 160;
-    const cy = 84;
-    const rx = 118;
-    const ry = 62;
+    const all = [...byNeighbor.values()];
+    const shown = all.slice(0, MINI_MAX_NEIGHBORS);
+    const hidden = all.length - shown.length;
     shown.forEach((it, i) => {
       const angle = (i / shown.length) * Math.PI * 2 - Math.PI / 2;
-      it.x = cx + rx * Math.cos(angle);
-      it.y = cy + ry * Math.sin(angle);
+      it.x = MINI_CX + MINI_RX * Math.cos(angle);
+      it.y = MINI_CY + MINI_RY * Math.sin(angle);
     });
-    return { shown, hidden, cx, cy };
+    return { shown, hidden, cx: MINI_CX, cy: MINI_CY };
   }, [dto.edges, centerId, nodeById]);
 
   if (!center) return null;
@@ -327,43 +353,73 @@ function MiniContextGraph({
             <path d="M0,0 L8,4 L0,8 z" className="fill-slate-400" />
           </marker>
         </defs>
-        {items.shown.map((it) => {
-          const x1 = it.dir === 'out' ? items.cx : it.x;
-          const y1 = it.dir === 'out' ? items.cy : it.y;
-          const x2 = it.dir === 'out' ? it.x : items.cx;
-          const y2 = it.dir === 'out' ? it.y : items.cy;
-          const midX = (x1 + x2) / 2;
-          const midY = (y1 + y2) / 2;
-          return (
-            <g key={`${it.dir}:${it.other.id}:${it.verb}`}>
-              <line
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                className={it.inferred ? 'stroke-slate-400' : 'stroke-slate-500'}
-                strokeWidth={1.2}
-                strokeDasharray={it.inferred ? '4 3' : undefined}
-                markerEnd="url(#mini-arrow)"
-              />
-              <text
-                x={midX}
-                y={midY - 3}
-                textAnchor="middle"
-                fontSize={8}
-                className="fill-amber-700 dark:fill-amber-300"
-              >
-                {it.verb}
-              </text>
-            </g>
-          );
-        })}
+        {items.shown.flatMap((it) =>
+          it.relations.map((rel, relIndex) => {
+            const outgoing = rel.dir === 'out';
+            const sx = outgoing ? items.cx : it.x;
+            const sy = outgoing ? items.cy : it.y;
+            const ex = outgoing ? it.x : items.cx;
+            const ey = outgoing ? it.y : items.cy;
+            const targetHalfW = (outgoing ? MINI_SATELLITE_W : MINI_CENTER_W) / 2;
+            const targetHalfH = (outgoing ? MINI_SATELLITE_H : MINI_CENTER_H) / 2;
+            const sourceHalfW = (outgoing ? MINI_CENTER_W : MINI_SATELLITE_W) / 2;
+            const sourceHalfH = (outgoing ? MINI_CENTER_H : MINI_SATELLITE_H) / 2;
+            const spread = (relIndex - (it.relations.length - 1) / 2) * 7;
+            const baseX = it.x - items.cx;
+            const baseY = it.y - items.cy;
+            const len = Math.hypot(baseX, baseY) || 1;
+            const offX = (-baseY / len) * spread;
+            const offY = (baseX / len) * spread;
+            const head = clipSegmentToRect(
+              sx + offX,
+              sy + offY,
+              ex + offX,
+              ey + offY,
+              targetHalfW,
+              targetHalfH,
+            );
+            const tail = clipSegmentToRect(
+              ex + offX,
+              ey + offY,
+              sx + offX,
+              sy + offY,
+              sourceHalfW,
+              sourceHalfH,
+            );
+            const midX = (tail.x + head.x) / 2;
+            const midY = (tail.y + head.y) / 2;
+            const labelY = midY - 3 + (relIndex - (it.relations.length - 1) / 2) * 11;
+            return (
+              <g key={`${rel.dir}:${it.other.id}:${rel.verb}`}>
+                <line
+                  x1={tail.x}
+                  y1={tail.y}
+                  x2={head.x}
+                  y2={head.y}
+                  className={rel.inferred ? 'stroke-slate-400' : 'stroke-slate-500'}
+                  strokeWidth={1.2}
+                  strokeDasharray={rel.inferred ? '4 3' : undefined}
+                  markerEnd="url(#mini-arrow)"
+                />
+                <text
+                  x={midX}
+                  y={labelY}
+                  textAnchor="middle"
+                  fontSize={8}
+                  className="fill-amber-700 dark:fill-amber-300"
+                >
+                  {rel.verb}
+                </text>
+              </g>
+            );
+          }),
+        )}
         <g>
           <rect
-            x={items.cx - 58}
-            y={items.cy - 12}
-            width={116}
-            height={24}
+            x={items.cx - MINI_CENTER_W / 2}
+            y={items.cy - MINI_CENTER_H / 2}
+            width={MINI_CENTER_W}
+            height={MINI_CENTER_H}
             rx={6}
             className="fill-amber-100 dark:fill-amber-950/60"
             stroke="#f59e0b"
@@ -384,18 +440,21 @@ function MiniContextGraph({
           const c = LAYER_COLORS[it.other.layer];
           const label =
             it.other.title.length > 17 ? `${it.other.title.slice(0, 16)}…` : it.other.title;
-          const w = 86;
+          const relationSummary = it.relations
+            .map((r) => (r.dir === 'out' ? `→ ${r.verb}` : `← ${r.verb}`))
+            .join(', ');
           return (
             <g
               key={`node:${it.other.id}`}
               onClick={() => onSelect(it.other.id)}
               className="cursor-pointer"
             >
+              <title>{`${it.other.title} (${relationSummary})`}</title>
               <rect
-                x={it.x - w / 2}
-                y={it.y - 10}
-                width={w}
-                height={20}
+                x={it.x - MINI_SATELLITE_W / 2}
+                y={it.y - MINI_SATELLITE_H / 2}
+                width={MINI_SATELLITE_W}
+                height={MINI_SATELLITE_H}
                 rx={5}
                 className="fill-white dark:fill-obsidian-elevated"
                 stroke={c.stroke}
@@ -414,7 +473,7 @@ function MiniContextGraph({
           );
         })}
         {items.hidden > 0 && (
-          <text x={items.cx} y={164} textAnchor="middle" fontSize={8.5} className="fill-slate-400">
+          <text x={4} y={12} textAnchor="start" fontSize={8.5} className="fill-slate-400">
             +{items.hidden}
           </text>
         )}
@@ -544,7 +603,6 @@ function FlowCanvas({
       minZoom={0.05}
       maxZoom={2}
       fitView
-      proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
       <Controls position="bottom-right" showInteractive={false} />
@@ -874,7 +932,17 @@ function KnowledgeAskPanel({
 
 export function KnowledgeMapPage() {
   const [semanticRequested, setSemanticRequested] = useState(false);
-  const { data: dto, isLoading, error, refetch } = trpc.knowledge.graph.useQuery();
+  const {
+    data: dto,
+    isLoading,
+    error,
+    refetch,
+  } = trpc.knowledge.graph.useQuery(undefined, {
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
+    retry: false,
+  });
   const recentQuery = trpc.knowledge.recentChanges.useQuery(undefined, {
     refetchInterval: false,
     refetchOnReconnect: false,
@@ -1182,9 +1250,16 @@ function KnowledgeMapGraph({
             {t('knowledge.subtitle', {
               visible: visibleCount,
               total: mergedDto.nodes.length,
-              edges: mergedDto.edges.length,
+              edges: dto.edges.length,
               drift: mergedDto.drift.length,
             })}
+            {mergedDto.edges.length > dto.edges.length && (
+              <span className="ml-1 italic">
+                {t('knowledge.subtitle.inferredSuffix', {
+                  inferred: mergedDto.edges.length - dto.edges.length,
+                })}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">

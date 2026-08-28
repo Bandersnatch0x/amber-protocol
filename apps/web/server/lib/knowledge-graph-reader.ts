@@ -53,7 +53,6 @@ const NODE_KINDS = new Set<KnowledgeNode['kind']>([
   'adr',
   'artifact',
   'wiki',
-  'knowledge',
   'memory',
   'architecture',
   'feature',
