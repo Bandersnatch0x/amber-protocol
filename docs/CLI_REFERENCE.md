@@ -1158,7 +1158,7 @@ Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_
 `AMBER_E_RUNNER_EXECUTION_CORRUPT`, `AMBER_E_RUNNER_EXECUTION_LOCK`,
 `AMBER_E_RUNNER_EXECUTION_SIZE_CEILING`.
 
-### release prepare / authorize / show / list
+### release prepare / authorize / deploy / rollback / transactions / show / list
 
 Prepare governed release candidates (F053 T1). A candidate immutably binds one exact Change — a
 40-hex commit sha plus committed Canonical Artifact revisions — together with recorded F050
@@ -1208,11 +1208,32 @@ node scripts/amber.js release authorize --target . --id release/prod-7 \
   --environment-gate-index 1 --json
 ```
 
+`release deploy` and `release rollback` are separate target-write transactions executed ONLY
+through the F052 controlled-runner surface (F053 T3), recorded in the hash-chained ledger
+`.amber/release/transactions.jsonl`. A transaction binds one AUTHORIZED release (drift re-checked)
+to one AUTHORIZED F052 request whose pins must equal the candidate's — same capability quadruple,
+same environment, same credentials class (`AMBER_E_RELEASE_TX_MISMATCH`). One deploy per release,
+one transaction per request (a concurrent second use refuses); rollback follows deployment on the
+SAME releaseHash and must ride its own request, never the deployment's. The transaction's outcome
+is a read-time projection of the F052 settlement journal (`pending` until settled, then
+`attempted|timed-out|failed|committed|rolled-back`) — a failed or partial deployment reads as
+exactly that, never as success. Transaction records carry only ids and hashes: no credential value
+and no git surface can ride in them.
+
+```bash
+node scripts/amber.js release deploy --target . --id release/web-42 \
+  --request-hash sha256:<64-hex-chars> --json
+node scripts/amber.js release rollback --target . --id release/web-42 \
+  --request-hash sha256:<64-hex-chars> --json
+node scripts/amber.js release transactions --target . --id release/web-42 --json
+```
+
 Error codes: `AMBER_E_RELEASE_INVALID`, `AMBER_E_RELEASE_EXISTS`, `AMBER_E_RELEASE_NOT_FOUND`,
 `AMBER_E_RELEASE_CORRUPT`, `AMBER_E_RELEASE_LOCK`, `AMBER_E_RELEASE_SIZE_CEILING`,
 `AMBER_E_RELEASE_DRIFT`, `AMBER_E_RELEASE_SEPARATION`, `AMBER_E_RELEASE_APPROVAL_MISMATCH`,
 `AMBER_E_RELEASE_GATE`, `AMBER_E_RELEASE_AUTH_CORRUPT`, `AMBER_E_RELEASE_AUTH_LOCK`,
-`AMBER_E_RELEASE_AUTH_SIZE_CEILING`.
+`AMBER_E_RELEASE_AUTH_SIZE_CEILING`, `AMBER_E_RELEASE_TX_STATE`, `AMBER_E_RELEASE_TX_MISMATCH`,
+`AMBER_E_RELEASE_TX_CORRUPT`, `AMBER_E_RELEASE_TX_LOCK`, `AMBER_E_RELEASE_TX_SIZE_CEILING`.
 
 ## Handoff Commands
 

@@ -1934,6 +1934,51 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_RELEASE_AUTH_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	// F053 T3 (#276): release transaction codes.
+	AMBER_E_RELEASE_TX_STATE: {
+		title: "Release transaction lifecycle refusal",
+		cause:
+			"The transaction does not fit the release lifecycle: deploying an unauthorized release, riding an unrecorded or unauthorized F052 request, or rolling back a release that never deployed.",
+		remedy:
+			"Authorize the release and its F052 request first; rollback follows deployment (see `amber release transactions`).",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_TX_MISMATCH", "AMBER_E_RELEASE_EXISTS"],
+	},
+	AMBER_E_RELEASE_TX_MISMATCH: {
+		title: "Release transaction does not match its release",
+		cause:
+			"The F052 request pins a different capability, environment, or credentials class than the release candidate, or a rollback tried to reuse the deployment's own request.",
+		remedy:
+			"Submit an F052 request that pins exactly what the candidate binds; rollback rides its own authorized request.",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_TX_STATE", "AMBER_E_RELEASE_DRIFT"],
+	},
+	AMBER_E_RELEASE_TX_CORRUPT: {
+		title: "Release transaction ledger failed verification",
+		cause:
+			"The hash-chained transaction ledger has a broken chain, edited event, unsupported schema version, duplicate operation, rollback without deployment, or a request riding two transactions.",
+		remedy:
+			"Treat the ledger as evidence; restore .amber/release/transactions.jsonl from history and investigate the tamper.",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_TX_LOCK", "AMBER_E_LEDGER_TAMPERED"],
+	},
+	AMBER_E_RELEASE_TX_LOCK: {
+		title: "Release transaction ledger is locked",
+		cause:
+			"Another process holds the transaction ledger lock (stale locks reclaim after 30 seconds).",
+		remedy: "Retry after the concurrent transaction finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_TX_CORRUPT"],
+	},
+	AMBER_E_RELEASE_TX_SIZE_CEILING: {
+		title: "Release transaction ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_RELEASE_MAX_TRANSACTIONS_BYTES).",
+		remedy:
+			"Raise AMBER_RELEASE_MAX_TRANSACTIONS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RELEASE_TX_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

@@ -31,12 +31,23 @@ const {
 	authorizeRelease,
 	showReleaseAuthorization,
 	listReleaseAuthorizations,
+	RELEASE_TRANSACTION_SCHEMA_VERSION,
+	SUPPORTED_RELEASE_TRANSACTION_SCHEMA_VERSIONS,
+	RELEASE_TX_OPERATIONS,
+	transactionsPath,
+	deployRelease,
+	rollbackRelease,
+	listReleaseTransactions,
 } = require("../../scripts/lib/core/release-registry");
 const { grantApproval } = require("../../scripts/lib/core/approval-registry");
 const { evaluateGate } = require("../../scripts/lib/core/gate-evaluation");
 const {
 	registerRunner,
 	registerRunnerCapability,
+	submitRunnerRequest,
+	authorizeRunnerRequest,
+	prepareRunnerExecution,
+	settleRunnerExecution,
 } = require("../../scripts/lib/core/runner-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
@@ -663,5 +674,220 @@ test("tampered authorization ledger fails every read closed", () => {
 	assert.throws(
 		() => listReleaseAuthorizations(dir),
 		(err) => err.amberCode === "AMBER_E_RELEASE_AUTH_CORRUPT",
+	);
+});
+
+// ── F053 T3 (#276): deployment & rollback execution binding ──
+
+const CREDENTIAL_HANDLE = Object.freeze({
+	handle: "cred-9b2c",
+	purpose: "staging-deploy",
+	scope: "deploy/staging",
+	expiresAt: "2026-08-29T12:00:00.000Z",
+});
+
+/** Submit + authorize one F052 request matching the fixture candidate;
+ *  returns its requestHash. inputHashes vary per call so every request
+ *  derives a distinct hash. */
+function authorizedRequestFixture(dir, salt, overrides = {}) {
+	const submitted = submitRunnerRequest(
+		dir,
+		{
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "deploy.staging-web",
+				capabilityVersion: "1",
+			},
+			target: { repository: "repo/main", paths: ["deploy/staging/web"] },
+			scope: null,
+			environment: "staging",
+			inputHashes: [`sha256:${salt.repeat(64).slice(0, 64)}`],
+			timeoutMs: 300_000,
+			effects: ["deploy"],
+			credentialRequirement: "scoped",
+			credential: { ...CREDENTIAL_HANDLE },
+			rehearsal: "evidence/rehearsal-run",
+			rollback: "runbook/staging-rollback",
+			...overrides,
+		},
+		{ now: NOW },
+	);
+	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
+	const hash = submitted.record.requestHash;
+	approvalFixture(dir, `approval/req-${salt}`, submitted.record.approvalBinding);
+	const authorized = authorizeRunnerRequest(
+		dir,
+		{
+			requestHash: hash,
+			approval: `approval/req-${salt}`,
+			decisionIdentity: `decision/req-${salt}`,
+			body: "# Authorize request\n",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/release" } }],
+			scope: null,
+		},
+		{ now: NOW },
+	);
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+	return hash;
+}
+
+/** Authorized staging release + one authorized matching request. */
+function transactionFixture(dir) {
+	const candidate = stagingFixture(dir);
+	approvalFixture(dir, "approval/rel-1", `release:staging:${candidate.releaseHash}`);
+	const authorized = authorizeRelease(dir, stagingAuthorizeInput(), { now: NOW });
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+	const requestHash = authorizedRequestFixture(dir, "a");
+	return { candidate, requestHash };
+}
+
+test("transaction constants pin the operations and schema contract", () => {
+	assert.equal(RELEASE_TRANSACTION_SCHEMA_VERSION, 1);
+	assert.deepEqual(SUPPORTED_RELEASE_TRANSACTION_SCHEMA_VERSIONS, [1]);
+	assert.deepEqual(RELEASE_TX_OPERATIONS, ["deploy", "rollback"]);
+});
+
+test("deploy binds one authorized release to one matching authorized request", () => {
+	const dir = mkTarget("tx-deploy");
+	const candidate = stagingFixture(dir);
+	approvalFixture(dir, "approval/rel-1", `release:staging:${candidate.releaseHash}`);
+
+	const unauthorized = deployRelease(dir, {
+		releaseId: "release/web-42",
+		requestHash: `sha256:${"f".repeat(64)}`,
+	});
+	assert.equal(unauthorized.code, "AMBER_E_RELEASE_TX_STATE");
+	assert.match(unauthorized.errors[0], /not authorized/);
+
+	const authorized = authorizeRelease(dir, stagingAuthorizeInput(), { now: NOW });
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+
+	const ghostRequest = deployRelease(dir, {
+		releaseId: "release/web-42",
+		requestHash: `sha256:${"f".repeat(64)}`,
+	});
+	assert.equal(ghostRequest.code, "AMBER_E_RELEASE_TX_STATE");
+	assert.match(ghostRequest.errors[0], /not recorded/);
+
+	const capOther = admitArtifact(dir, {
+		type: "decision",
+		identity: "decision/cap-other",
+		body: "# cap other\n",
+		decisionKind: "approval",
+		principal: "alice@example.com",
+		traces: [{ type: "decides", to: { type: "intent", identity: "intent/release" } }],
+	});
+	assert.equal(capOther.ok, true, (capOther.errors || []).join("; "));
+	assert.equal(
+		registerRunnerCapability(dir, {
+			runnerId: "runner/ci",
+			runnerVersion: "1.0.0",
+			name: "deploy.other",
+			capabilityVersion: "1",
+			effects: ["deploy"],
+			pathPrefixes: ["deploy/staging"],
+			timeoutMsMax: 600_000,
+			credentialRequirement: "scoped",
+			rollback: "runbook/staging-rollback",
+			decision: { identity: "decision/cap-other", revision: 1 },
+		}).ok,
+		true,
+	);
+	const foreignHash = authorizedRequestFixture(dir, "b", {
+		capability: {
+			runnerId: "runner/ci",
+			runnerVersion: "1.0.0",
+			name: "deploy.other",
+			capabilityVersion: "1",
+		},
+	});
+	const mismatch = deployRelease(dir, {
+		releaseId: "release/web-42",
+		requestHash: foreignHash,
+	});
+	assert.equal(mismatch.code, "AMBER_E_RELEASE_TX_MISMATCH");
+	assert.match(mismatch.errors[0], /pins capability/);
+
+	const matching = authorizedRequestFixture(dir, "c");
+	const deployed = deployRelease(dir, { releaseId: "release/web-42", requestHash: matching });
+	assert.equal(deployed.ok, true, (deployed.errors || []).join("; "));
+	assert.equal(deployed.record.operation, "deploy");
+	assert.equal(deployed.record.releaseHash, candidate.releaseHash);
+
+	const again = deployRelease(dir, { releaseId: "release/web-42", requestHash: matching });
+	assert.equal(again.code, "AMBER_E_RELEASE_EXISTS");
+
+	// Credential values never ride a transaction record.
+	assert.equal(JSON.stringify(deployed.record).includes(CREDENTIAL_HANDLE.handle), false);
+});
+
+test("rollback follows deployment on its own request, and outcomes project from F052", () => {
+	const dir = mkTarget("tx-rollback");
+	const { requestHash } = transactionFixture(dir);
+
+	const premature = rollbackRelease(dir, {
+		releaseId: "release/web-42",
+		requestHash,
+	});
+	assert.equal(premature.code, "AMBER_E_RELEASE_TX_STATE");
+	assert.match(premature.errors[0], /never deployed/);
+
+	assert.equal(deployRelease(dir, { releaseId: "release/web-42", requestHash }).ok, true);
+
+	const reused = rollbackRelease(dir, { releaseId: "release/web-42", requestHash });
+	assert.equal(reused.code, "AMBER_E_RELEASE_TX_MISMATCH");
+	assert.match(reused.errors[0], /its own authorized request/);
+
+	const rollbackHash = authorizedRequestFixture(dir, "d");
+	const rolled = rollbackRelease(dir, { releaseId: "release/web-42", requestHash: rollbackHash });
+	assert.equal(rolled.ok, true, (rolled.errors || []).join("; "));
+	assert.equal(rolled.record.operation, "rollback");
+
+	// Outcomes project from the F052 settlement journal at read time.
+	const pending = listReleaseTransactions(dir, { releaseId: "release/web-42" });
+	assert.deepEqual(
+		pending.map((entry) => entry.outcome),
+		["pending", "pending"],
+	);
+	assert.equal(
+		prepareRunnerExecution(dir, {
+			requestHash,
+			runner: { id: "runner/ci", version: "1.0.0", integrityDigest: DIGEST },
+		}).ok,
+		true,
+	);
+	const settled = settleRunnerExecution(dir, {
+		requestHash,
+		receipt: {
+			runner: { id: "runner/ci", version: "1.0.0", integrityDigest: DIGEST },
+			exitCode: 0,
+			signal: null,
+			timedOut: false,
+			startedAt: "2026-08-29T01:00:00.000Z",
+			finishedAt: "2026-08-29T01:02:00.000Z",
+			durationMs: 120_000,
+			outputsDigest: DIGEST,
+			scope: { repository: "repo/main", paths: ["deploy/staging/web"] },
+			sandboxAssurance: "observed",
+			credentialAssurance: "observed",
+		},
+	});
+	assert.equal(settled.ok, true, (settled.errors || []).join("; "));
+	const projected = listReleaseTransactions(dir, { releaseId: "release/web-42" });
+	assert.equal(projected[0].outcome, "committed");
+	assert.equal(projected[1].outcome, "pending");
+});
+
+test("tampered transaction ledger fails every read closed", () => {
+	const dir = mkTarget("tx-tamper");
+	const { requestHash } = transactionFixture(dir);
+	assert.equal(deployRelease(dir, { releaseId: "release/web-42", requestHash }).ok, true);
+	const event = JSON.parse(fs.readFileSync(transactionsPath(dir), "utf8"));
+	event.requestHash = `sha256:${"e".repeat(64)}`;
+	writeJSONL(transactionsPath(dir), [event]);
+	assert.throws(
+		() => listReleaseTransactions(dir),
+		(err) => err.amberCode === "AMBER_E_RELEASE_TX_CORRUPT",
 	);
 });

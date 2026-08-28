@@ -27,6 +27,8 @@ const {
 	ENVIRONMENTS,
 	CREDENTIAL_REQUIREMENTS,
 	resolveRequestCapability,
+	showRunnerRequest,
+	showRunnerExecution,
 } = require("./runner-registry");
 const { canonicalJson } = require("./context-hash");
 const {
@@ -1141,6 +1143,415 @@ function listReleaseAuthorizations(cwd, { environment = null } = {}) {
 	);
 }
 
+// ── F053 T3 (#276): deployment & rollback execution binding ───────────────
+//
+// Deployment and rollback are separate target-write transactions executed
+// ONLY through the F052 controlled-runner surface: a transaction binds one
+// authorized release to one authorized F052 request whose pins must equal
+// the candidate's, and the execution itself settles in the F052 journal —
+// the transaction's outcome is a read-time projection of that settlement,
+// so a failed or partial deployment reads as exactly that, never as
+// success. Transactions carry only ids and hashes: no credential value,
+// and no git surface, can ride in them.
+
+const RELEASE_TRANSACTION_SCHEMA_VERSION = 1;
+const SUPPORTED_RELEASE_TRANSACTION_SCHEMA_VERSIONS = Object.freeze([1]);
+const DEFAULT_MAX_RELEASE_TRANSACTIONS_BYTES = 1024 * 1024;
+
+const RELEASE_TX_OPERATIONS = Object.freeze(["deploy", "rollback"]);
+
+const RELEASE_TX_STATE_CODE = "AMBER_E_RELEASE_TX_STATE";
+const RELEASE_TX_MISMATCH_CODE = "AMBER_E_RELEASE_TX_MISMATCH";
+const RELEASE_TX_CORRUPT_CODE = "AMBER_E_RELEASE_TX_CORRUPT";
+const RELEASE_TX_LOCK_CODE = "AMBER_E_RELEASE_TX_LOCK";
+const RELEASE_TX_SIZE_CEILING_CODE = "AMBER_E_RELEASE_TX_SIZE_CEILING";
+
+const TRANSACTION_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"releaseId",
+	"releaseHash",
+	"requestHash",
+	"prevHash",
+	"hash",
+]);
+const TRANSACTION_INPUT_FIELDS = Object.freeze(["releaseId", "requestHash"]);
+
+function transactionsPath(cwd) {
+	return statePathForCreate(cwd, "release", "transactions.jsonl");
+}
+
+function releaseTxCorrupt(message) {
+	return typedError(RELEASE_TX_CORRUPT_CODE, message);
+}
+
+function acquireTransactionLock(cwd) {
+	return acquireLedgerLock({
+		dirPath: path.dirname(transactionsPath(cwd)),
+		lockName: "transactions.lock",
+		conflictCode: RELEASE_TX_LOCK_CODE,
+		corruptCode: RELEASE_TX_CORRUPT_CODE,
+		label: "release transaction ledger",
+		staleMs: LOCK_STALE_MS,
+	});
+}
+
+function appendTransactionWithinCeiling(cwd, event) {
+	return sharedAppendWithinCeiling({
+		ledgerPath: transactionsPath(cwd),
+		event,
+		envName: "AMBER_RELEASE_MAX_TRANSACTIONS_BYTES",
+		defaultBytes: DEFAULT_MAX_RELEASE_TRANSACTIONS_BYTES,
+		label: "release transaction ledger",
+	});
+}
+
+function transactionEventProblem(event, lineIndex) {
+	const label = `release transaction event ${lineIndex}`;
+	const closed = closedFieldProblem(event, TRANSACTION_EVENT_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!RELEASE_TX_OPERATIONS.includes(event.kind))
+		return `${label}.kind must be one of ${RELEASE_TX_OPERATIONS.join(", ")}`;
+	if (!isNonEmptyString(event.at)) return `${label}.at must be a non-empty string`;
+	if (!isNonEmptyString(event.releaseId)) return `${label}.releaseId must be a non-empty string`;
+	for (const field of ["releaseHash", "requestHash"]) {
+		if (!/^sha256:[0-9a-f]{64}$/.test(event[field] ?? ""))
+			return `${label}.${field} must be a sha256:<64-hex> string`;
+	}
+	return null;
+}
+
+function foldReleaseTransactions(cwd) {
+	const events = readLedgerFailClosed(
+		transactionsPath(cwd),
+		RELEASE_TX_CORRUPT_CODE,
+		"release transaction ledger",
+	);
+	let prevHash = GENESIS_HASH;
+	const seen = new Set();
+	const byRequest = new Set();
+	const transactions = [];
+	events.forEach((event, index) => {
+		const lineIndex = index + 1;
+		if (!isPlainObject(event))
+			throw releaseTxCorrupt(`release transaction event ${lineIndex} is not an object`);
+		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
+			throw releaseTxCorrupt(`release transaction event ${lineIndex} breaks the hash chain`);
+		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+			throw releaseTxCorrupt(
+				`release transaction event ${lineIndex} carries a hash that does not match its content`,
+			);
+		if (!SUPPORTED_RELEASE_TRANSACTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+			throw releaseTxCorrupt(
+				`release transaction event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+			);
+		const problem = transactionEventProblem(event, lineIndex);
+		if (problem !== null) throw releaseTxCorrupt(problem);
+		const key = `${event.kind}:${event.releaseId}`;
+		if (seen.has(key))
+			throw releaseTxCorrupt(
+				`release ${JSON.stringify(event.releaseId)} records ${event.kind} more than once`,
+			);
+		if (event.kind === "rollback" && !seen.has(`deploy:${event.releaseId}`))
+			throw releaseTxCorrupt(
+				`release transaction event ${lineIndex} rolls back ${JSON.stringify(event.releaseId)}, which never deployed`,
+			);
+		if (byRequest.has(event.requestHash))
+			throw releaseTxCorrupt(
+				`request ${JSON.stringify(event.requestHash)} rides more than one release transaction`,
+			);
+		seen.add(key);
+		byRequest.add(event.requestHash);
+		const { prevHash: _prev, hash: _hash, ...body } = event;
+		transactions.push({ ...body, operation: event.kind, index });
+		prevHash = event.hash;
+	});
+	return transactions;
+}
+
+function transactionAppendFailure(err) {
+	return {
+		ok: false,
+		code: err.amberCode || RELEASE_TX_CORRUPT_CODE,
+		record: null,
+		errors: [err.message || String(err)],
+	};
+}
+
+// Guard contract: any non-null guard result is returned verbatim without
+// appending; `derive(fold)` picks the caller's record after the append.
+function appendTransactionEvent(cwd, body, guard, derive) {
+	let release;
+	try {
+		release = acquireTransactionLock(cwd);
+	} catch (err) {
+		return transactionAppendFailure(err);
+	}
+	try {
+		let folded;
+		try {
+			folded = foldReleaseTransactions(cwd);
+		} catch (err) {
+			return transactionAppendFailure(err);
+		}
+		const guardVerdict = guard(folded);
+		if (guardVerdict !== null) return guardVerdict;
+		let prevHash;
+		try {
+			prevHash = chainHeadHash(
+				transactionsPath(cwd),
+				RELEASE_TX_CORRUPT_CODE,
+				"release transactions",
+			);
+		} catch (err) {
+			return transactionAppendFailure(err);
+		}
+		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
+		let ceiling;
+		try {
+			ceiling = appendTransactionWithinCeiling(cwd, event);
+		} catch (err) {
+			return transactionAppendFailure(err);
+		}
+		if (ceiling.wouldExceed)
+			return {
+				ok: false,
+				code: RELEASE_TX_SIZE_CEILING_CODE,
+				record: null,
+				errors: [`release transaction event would exceed ${ceiling.ceiling} bytes`],
+			};
+		try {
+			appendJSONL(transactionsPath(cwd), event);
+		} catch (err) {
+			return transactionAppendFailure(err);
+		}
+		let record;
+		try {
+			record = derive(foldReleaseTransactions(cwd)) ?? null;
+		} catch (err) {
+			return transactionAppendFailure(err);
+		}
+		return { ok: true, code: null, record, errors: [] };
+	} finally {
+		release();
+	}
+}
+
+// The F052 request a transaction rides must be authorized and must bind
+// exactly what the candidate pinned: same capability, same environment,
+// same credentials class — an approved release can never widen into a
+// different operation.
+function transactionRequestProblem(cwd, candidate, requestHash) {
+	let request;
+	try {
+		request = showRunnerRequest(cwd, requestHash);
+	} catch (err) {
+		return { code: err.amberCode || RELEASE_TX_CORRUPT_CODE, reason: err.message || String(err) };
+	}
+	if (request === null)
+		return {
+			code: RELEASE_TX_STATE_CODE,
+			reason: `request ${JSON.stringify(requestHash)} is not recorded; submit and authorize the F052 request first`,
+		};
+	if (request.status !== "authorized")
+		return {
+			code: RELEASE_TX_STATE_CODE,
+			reason: `request ${JSON.stringify(requestHash)} is ${JSON.stringify(request.status)}; a release transaction rides only an authorized request`,
+		};
+	const pin = candidate.capability;
+	const requestPin = request.capability;
+	if (
+		requestPin.runnerId !== pin.runnerId ||
+		requestPin.runnerVersion !== pin.runnerVersion ||
+		requestPin.name !== pin.name ||
+		requestPin.capabilityVersion !== pin.capabilityVersion
+	)
+		return {
+			code: RELEASE_TX_MISMATCH_CODE,
+			reason: `request ${JSON.stringify(requestHash)} pins capability ${JSON.stringify(`${requestPin.runnerId}@${requestPin.runnerVersion}/${requestPin.name}@${requestPin.capabilityVersion}`)}, not the release's ${JSON.stringify(`${pin.runnerId}@${pin.runnerVersion}/${pin.name}@${pin.capabilityVersion}`)}`,
+		};
+	if (request.environment !== candidate.environment)
+		return {
+			code: RELEASE_TX_MISMATCH_CODE,
+			reason: `request ${JSON.stringify(requestHash)} targets ${JSON.stringify(request.environment)}, not the release's ${JSON.stringify(candidate.environment)}`,
+		};
+	if (request.credentialRequirement !== candidate.credentialsClass)
+		return {
+			code: RELEASE_TX_MISMATCH_CODE,
+			reason: `request ${JSON.stringify(requestHash)} declares credentialRequirement ${JSON.stringify(request.credentialRequirement)}, not the release's credentials class ${JSON.stringify(candidate.credentialsClass)}`,
+		};
+	return null;
+}
+
+// Shared preamble for both transaction verbs: shape, prepared candidate,
+// recorded authorization, and freedom from drift.
+function transactionPreamble(cwd, input) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return { failure: fail(RELEASE_INVALID_CODE, ["transaction input must be an object"]) };
+	const inputClosed = unknownFieldProblem(input, TRANSACTION_INPUT_FIELDS, "transaction input");
+	if (inputClosed !== null) return { failure: fail(RELEASE_INVALID_CODE, [inputClosed]) };
+	if (!isNonEmptyString(input.releaseId))
+		return { failure: fail(RELEASE_INVALID_CODE, ["releaseId must be a non-empty string"]) };
+	if (!/^sha256:[0-9a-f]{64}$/.test(input.requestHash ?? ""))
+		return {
+			failure: fail(RELEASE_INVALID_CODE, ["requestHash must be a sha256:<64-hex> string"]),
+		};
+	let candidate;
+	try {
+		candidate = showReleaseCandidate(cwd, input.releaseId);
+	} catch (err) {
+		return { failure: fail(err.amberCode || RELEASE_CORRUPT_CODE, [err.message || String(err)]) };
+	}
+	if (candidate === null)
+		return {
+			failure: fail(RELEASE_NOT_FOUND_CODE, [
+				`release candidate ${JSON.stringify(input.releaseId)} is not prepared`,
+			]),
+		};
+	let authorization;
+	try {
+		authorization = showReleaseAuthorization(cwd, input.releaseId);
+	} catch (err) {
+		return {
+			failure: fail(err.amberCode || RELEASE_AUTH_CORRUPT_CODE, [err.message || String(err)]),
+		};
+	}
+	if (authorization === null)
+		return {
+			failure: fail(RELEASE_TX_STATE_CODE, [
+				`release ${JSON.stringify(input.releaseId)} is not authorized; a transaction follows authorization`,
+			]),
+		};
+	let revisions;
+	try {
+		revisions = listArtifactRevisions(cwd);
+	} catch (err) {
+		return {
+			failure: fail(err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT", [
+				err.message || String(err),
+			]),
+		};
+	}
+	const drift = candidateDriftProblem(cwd, candidate, revisions);
+	if (drift !== null) return { failure: fail(RELEASE_DRIFT_CODE, [drift]) };
+	const request = transactionRequestProblem(cwd, candidate, input.requestHash);
+	if (request !== null) return { failure: fail(request.code, [request.reason]) };
+	return { candidate, fail };
+}
+
+/**
+ * Bind one authorized release to one authorized F052 deployment request.
+ * One deploy per release, one transaction per request — a concurrent
+ * second use refuses instead of racing.
+ */
+function deployRelease(cwd, input = {}, opts = {}) {
+	const preamble = transactionPreamble(cwd, input);
+	if (preamble.failure) return preamble.failure;
+	const { candidate, fail } = preamble;
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	return appendTransactionEvent(
+		cwd,
+		{
+			kind: "deploy",
+			schemaVersion: RELEASE_TRANSACTION_SCHEMA_VERSION,
+			at,
+			releaseId: candidate.releaseId,
+			releaseHash: candidate.releaseHash,
+			requestHash: input.requestHash,
+		},
+		(fold) => {
+			if (
+				fold.some(
+					(entry) => entry.operation === "deploy" && entry.releaseId === candidate.releaseId,
+				)
+			)
+				return fail(RELEASE_EXISTS_CODE, [
+					`release ${JSON.stringify(candidate.releaseId)} already has a deploy transaction; one authorization deploys at most once`,
+				]);
+			if (fold.some((entry) => entry.requestHash === input.requestHash))
+				return fail(RELEASE_EXISTS_CODE, [
+					`request ${JSON.stringify(input.requestHash)} already rides a release transaction`,
+				]);
+			return null;
+		},
+		(fold) =>
+			fold.find((entry) => entry.operation === "deploy" && entry.releaseId === candidate.releaseId),
+	);
+}
+
+/**
+ * Bind the rollback of one DEPLOYED release to its own authorized F052
+ * request on the same releaseHash — recovery can never target an
+ * unrelated version, and it never reuses the deployment's request.
+ */
+function rollbackRelease(cwd, input = {}, opts = {}) {
+	const preamble = transactionPreamble(cwd, input);
+	if (preamble.failure) return preamble.failure;
+	const { candidate, fail } = preamble;
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	return appendTransactionEvent(
+		cwd,
+		{
+			kind: "rollback",
+			schemaVersion: RELEASE_TRANSACTION_SCHEMA_VERSION,
+			at,
+			releaseId: candidate.releaseId,
+			releaseHash: candidate.releaseHash,
+			requestHash: input.requestHash,
+		},
+		(fold) => {
+			const deploy = fold.find(
+				(entry) => entry.operation === "deploy" && entry.releaseId === candidate.releaseId,
+			);
+			if (!deploy)
+				return fail(RELEASE_TX_STATE_CODE, [
+					`release ${JSON.stringify(candidate.releaseId)} never deployed; rollback follows deployment`,
+				]);
+			if (deploy.requestHash === input.requestHash)
+				return fail(RELEASE_TX_MISMATCH_CODE, [
+					`rollback must ride its own authorized request, not the deployment's ${JSON.stringify(input.requestHash)}`,
+				]);
+			if (
+				fold.some(
+					(entry) => entry.operation === "rollback" && entry.releaseId === candidate.releaseId,
+				)
+			)
+				return fail(RELEASE_EXISTS_CODE, [
+					`release ${JSON.stringify(candidate.releaseId)} already has a rollback transaction`,
+				]);
+			if (fold.some((entry) => entry.requestHash === input.requestHash))
+				return fail(RELEASE_EXISTS_CODE, [
+					`request ${JSON.stringify(input.requestHash)} already rides a release transaction`,
+				]);
+			return null;
+		},
+		(fold) =>
+			fold.find(
+				(entry) => entry.operation === "rollback" && entry.releaseId === candidate.releaseId,
+			),
+	);
+}
+
+// A transaction's outcome is the F052 settlement it rides, projected at
+// read time: no settlement yet reads as "pending" — absence of Evidence
+// never means success.
+function withExecutionProjection(cwd, transaction) {
+	const execution = showRunnerExecution(cwd, transaction.requestHash);
+	return {
+		...transaction,
+		execution,
+		outcome: execution === null ? "pending" : execution.status,
+	};
+}
+
+function listReleaseTransactions(cwd, { releaseId = null } = {}) {
+	return foldReleaseTransactions(cwd)
+		.filter((entry) => releaseId === null || entry.releaseId === releaseId)
+		.map((entry) => withExecutionProjection(cwd, entry));
+}
+
 module.exports = {
 	RELEASE_CANDIDATE_SCHEMA_VERSION,
 	SUPPORTED_RELEASE_CANDIDATE_SCHEMA_VERSIONS,
@@ -1160,4 +1571,11 @@ module.exports = {
 	authorizeRelease,
 	showReleaseAuthorization,
 	listReleaseAuthorizations,
+	RELEASE_TRANSACTION_SCHEMA_VERSION,
+	SUPPORTED_RELEASE_TRANSACTION_SCHEMA_VERSIONS,
+	RELEASE_TX_OPERATIONS,
+	transactionsPath,
+	deployRelease,
+	rollbackRelease,
+	listReleaseTransactions,
 };

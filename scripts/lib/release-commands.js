@@ -42,6 +42,7 @@ function missingValueFlag(args) {
 		["releaseManager", "--release-manager"],
 		["releaseGateIndex", "--release-gate-index"],
 		["environmentGateIndex", "--environment-gate-index"],
+		["requestHash", "--request-hash"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -92,7 +93,7 @@ function parsePolicyPin(raw) {
 
 const dispatch = defineCommand({
 	command: "release",
-	actions: ["prepare", "authorize", "show", "list"],
+	actions: ["prepare", "authorize", "deploy", "rollback", "transactions", "show", "list"],
 	handlers: {
 		prepare: (args) => {
 			const { prepareReleaseCandidate } = require("./core/release-registry");
@@ -223,6 +224,30 @@ const dispatch = defineCommand({
 				...(result.code ? { code: result.code } : {}),
 			};
 		},
+		deploy: (args) => transactionHandler(args, "deployRelease"),
+		rollback: (args) => transactionHandler(args, "rollbackRelease"),
+		transactions: (args) => {
+			const { listReleaseTransactions } = require("./core/release-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const releaseId = args.id === undefined ? null : String(args.id);
+			if (releaseId !== null && releaseId.trim().length === 0) {
+				return invalidArg(`--id must be non-empty when provided; got ${JSON.stringify(args.id)}`);
+			}
+			try {
+				return {
+					text: JSON.stringify(listReleaseTransactions(target.value, { releaseId }), null, 2),
+				};
+			} catch (err) {
+				const failure = readFailure(args, err, "AMBER_E_RELEASE_TX_CORRUPT");
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+		},
 		show: (args) => {
 			const { showReleaseCandidate } = require("./core/release-registry");
 			const truncated = missingValueFlag(args);
@@ -278,6 +303,35 @@ const dispatch = defineCommand({
 		},
 	},
 });
+
+// deploy and rollback share one flag contract; the core owns which
+// lifecycle rules apply per operation.
+function transactionHandler(args, verb) {
+	const core = require("./core/release-registry");
+	const truncated = missingValueFlag(args);
+	if (truncated)
+		return invalidArg(`${truncated} requires a value; it was the last token on the command line`);
+	const target = targetValue(args);
+	if (target.error) return invalidArg(target.error);
+	for (const [key, flag, example] of [
+		["id", "--id", "release/web-42"],
+		["requestHash", "--request-hash", "sha256:<64-hex>"],
+	]) {
+		const required = requiredString(args, key, flag, example);
+		if (required.error) return invalidArg(required.error);
+	}
+	const result = core[verb](target.value, {
+		releaseId: String(args.id),
+		requestHash: String(args.requestHash),
+	});
+	return {
+		text: result.ok ? JSON.stringify(result.record, null, 2) : "",
+		errors: result.errors,
+		warnings: [],
+		exitCode: result.ok ? 0 : 1,
+		...(result.code ? { code: result.code } : {}),
+	};
+}
 
 function releaseDispatch(args) {
 	return dispatch(args._?.[0], args);
