@@ -13,6 +13,7 @@ const { spawnSync } = require("node:child_process");
 const { admitArtifact } = require("../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../scripts/lib/core/principal-registry");
 const { grantApproval } = require("../scripts/lib/core/approval-registry");
+const { recordEvidence } = require("../scripts/lib/core/evidence-receipts");
 const { registerRunner, registerRunnerCapability } = require("../scripts/lib/core/runner-registry");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -246,11 +247,28 @@ test("runner request and authorize form the governed execution request lifecycle
 	);
 	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
 	assert.equal(
+		registerPrincipal(dir, { id: "carol@example.com", principalKind: "human" }).ok,
+		true,
+	);
+	assert.equal(
 		admitArtifact(dir, { type: "intent", identity: "intent/runner-cli", body: "# R\n" }).ok,
 		true,
 	);
 	decisionFixture(dir, "decision/runner-cli");
 	decisionFixture(dir, "decision/cap-cli");
+	const rehearsed = recordEvidence(dir, {
+		id: "evidence/rehearsal-cli",
+		producer: "carol@example.com",
+		assurance: "observed",
+		scope: "F052",
+		subject: "staging rollback rehearsal",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: null,
+		status: "pass",
+	});
+	assert.equal(rehearsed.ok, true, (rehearsed.errors || []).join("; "));
 	const registered = registerRunner(dir, {
 		id: "runner/ci",
 		version: "1.0.0",
@@ -298,6 +316,16 @@ test("runner request and authorize form the governed execution request lifecycle
 		"deploy",
 		"--credential",
 		"scoped",
+		"--credential-handle",
+		"cred-7f3a",
+		"--credential-purpose",
+		"staging-deploy",
+		"--credential-scope",
+		"deploy/staging",
+		"--credential-expires",
+		new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+		"--rehearsal",
+		"evidence/rehearsal-cli",
 		"--rollback",
 		"runbook/staging-rollback",
 		"--target",

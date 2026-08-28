@@ -203,6 +203,12 @@ const FLAG_SPECS = {
 	"--environment": { key: "environment" },
 	"--input-hash": { key: "inputHashVal", accumulate: "inputHashes" },
 	"--request-hash": { key: "requestHash" },
+	// F052 ticket 3 (#257): environment boundary flags.
+	"--credential-handle": { key: "credentialHandle" },
+	"--credential-purpose": { key: "credentialPurpose" },
+	"--credential-scope": { key: "credentialScope" },
+	"--credential-expires": { key: "credentialExpires" },
+	"--rehearsal": { key: "rehearsal" },
 	"--identity-map": { key: "identityMap" },
 	"--freshness-ms": { key: "freshnessMs" },
 	"--allow-path": { key: "allowPath" },

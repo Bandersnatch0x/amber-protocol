@@ -20,6 +20,7 @@ const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { showApproval, consumeApproval } = require("./approval-registry");
+const { showEvidence } = require("./evidence-receipts");
 const { canonicalJson } = require("./context-hash");
 const {
 	GENESIS_HASH,
@@ -672,6 +673,46 @@ const DEFAULT_MAX_RUNNER_REQUESTS_BYTES = 1024 * 1024;
 
 const ENVIRONMENTS = Object.freeze(["development", "staging", "production"]);
 const REQUEST_STATUSES = Object.freeze(["requested", "authorized", "denied"]);
+// The versioned, code-pinned environment profiles: closed per-environment
+// admission rules judged against the REGISTERED capability's effect set.
+// The profile version is bound into every requestHash, so a changed
+// profile makes stale approvals unusable (drift), never silently laxer.
+const ENVIRONMENT_PROFILE_VERSION = 1;
+// Short-lived means bounded: a declared credential handle may live at most
+// this long past the submission instant. Part of the profile contract —
+// changing it bumps ENVIRONMENT_PROFILE_VERSION.
+const CREDENTIAL_MAX_TTL_MS = 24 * 60 * 60 * 1000;
+const ENVIRONMENT_PROFILES = Object.freeze({
+	// Development is isolated and policy-gated: experiments may write, but
+	// only inside a declared isolation scope, and never deploy or roll back.
+	development: Object.freeze({
+		allowedEffects: Object.freeze(["read", "prepare", "diagnose", "write-target"]),
+		requiresIsolatedScope: true,
+		rehearsalEffects: Object.freeze([]),
+		credentialEffects: Object.freeze([]),
+		runbookNamespace: null,
+	}),
+	// Staging admits only allowlisted deploy/rollback capabilities, and a
+	// request drawing on them must carry rollback rehearsal Evidence and a
+	// short-lived scoped credential declaration.
+	staging: Object.freeze({
+		allowedEffects: Object.freeze(["read", "prepare", "diagnose", "deploy", "rollback"]),
+		requiresIsolatedScope: false,
+		rehearsalEffects: Object.freeze(["deploy", "rollback"]),
+		credentialEffects: Object.freeze(["deploy", "rollback"]),
+		runbookNamespace: null,
+	}),
+	// Production grants no generic target-write: preparation, diagnosis,
+	// and capabilities registered in the runbook.* namespace (registration
+	// is itself a human-approved governance mutation) only.
+	production: Object.freeze({
+		allowedEffects: Object.freeze(["read", "prepare", "diagnose"]),
+		requiresIsolatedScope: false,
+		rehearsalEffects: Object.freeze([]),
+		credentialEffects: Object.freeze([]),
+		runbookNamespace: "runbook.",
+	}),
+});
 const RISK_LEVELS = Object.freeze(["low", "medium", "high"]);
 const RISK_POLICY_VERSION = 1;
 const EFFECT_RISK = Object.freeze({
@@ -690,6 +731,7 @@ const REQUEST_NOT_FOUND_CODE = "AMBER_E_RUNNER_REQUEST_NOT_FOUND";
 const REQUEST_DENIED_CODE = "AMBER_E_RUNNER_REQUEST_DENIED";
 const REQUEST_DRIFT_CODE = "AMBER_E_RUNNER_REQUEST_DRIFT";
 const APPROVAL_MISMATCH_CODE = "AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH";
+const REQUEST_SEPARATION_CODE = "AMBER_E_RUNNER_REQUEST_SEPARATION";
 const REQUEST_CORRUPT_CODE = "AMBER_E_RUNNER_REQUEST_CORRUPT";
 const REQUEST_LOCK_CODE = "AMBER_E_RUNNER_REQUEST_LOCK";
 const REQUEST_SIZE_CEILING_CODE = "AMBER_E_RUNNER_REQUEST_SIZE_CEILING";
@@ -710,8 +752,11 @@ const REQUEST_INPUT_FIELDS = Object.freeze([
 	"timeoutMs",
 	"effects",
 	"credentialRequirement",
+	"credential",
+	"rehearsal",
 	"rollback",
 ]);
+const CREDENTIAL_HANDLE_FIELDS = Object.freeze(["handle", "purpose", "scope", "expiresAt"]);
 const AUTHORIZE_INPUT_FIELDS = Object.freeze([
 	"requestHash",
 	"approval",
@@ -733,9 +778,12 @@ const REQUESTED_EVENT_FIELDS = Object.freeze([
 	"timeoutMs",
 	"effects",
 	"credentialRequirement",
+	"credential",
+	"rehearsal",
 	"rollback",
 	"riskPolicyVersion",
 	"risk",
+	"environmentProfileVersion",
 	"approvalBinding",
 	"prevHash",
 	"hash",
@@ -865,6 +913,27 @@ function inputHashesProblem(value, label) {
 	return null;
 }
 
+// A credential declaration is an OPAQUE handle (reference, purpose, scope,
+// expiry) — the closed field set is how "no secret values in ledgers or
+// receipts" is enforced structurally: there is no field a secret could
+// ride in.
+function credentialHandleProblem(value, requirement, label) {
+	if (requirement === "none") {
+		if (value !== null) return `${label} must be null when credentialRequirement is "none"`;
+		return null;
+	}
+	if (!isPlainObject(value))
+		return `${label} is required when credentialRequirement is "scoped": a closed opaque handle {handle, purpose, scope, expiresAt}`;
+	const closed = closedFieldProblem(value, CREDENTIAL_HANDLE_FIELDS, label);
+	if (closed !== null) return closed;
+	for (const field of CREDENTIAL_HANDLE_FIELDS) {
+		if (!isNonEmptyString(value[field])) return `${label}.${field} must be a non-empty string`;
+	}
+	if (Number.isNaN(Date.parse(value.expiresAt)))
+		return `${label}.expiresAt must be an ISO-8601 timestamp`;
+	return null;
+}
+
 // The capability/target/scope/environment context shared by requested and
 // denied events (and request input).
 function requestContextProblem(value, label) {
@@ -891,6 +960,14 @@ function requestShapeProblem(value, label) {
 	if (effects !== null) return effects;
 	if (!CREDENTIAL_REQUIREMENTS.includes(value.credentialRequirement))
 		return `${label}.credentialRequirement must be one of ${CREDENTIAL_REQUIREMENTS.join(", ")}`;
+	const credential = credentialHandleProblem(
+		value.credential,
+		value.credentialRequirement,
+		`${label}.credential`,
+	);
+	if (credential !== null) return credential;
+	if (value.rehearsal !== null && !isNonEmptyString(value.rehearsal))
+		return `${label}.rehearsal must be null or a recorded Evidence receipt id`;
 	if (!isNonEmptyString(value.rollback))
 		return `${label}.rollback must be a non-empty declaration ("none" when the capability has no compensation)`;
 	return null;
@@ -913,6 +990,8 @@ function requestedEventProblem(event, lineIndex) {
 		return `runner request event ${lineIndex}.riskPolicyVersion must be a positive integer`;
 	if (!RISK_LEVELS.includes(event.risk))
 		return `runner request event ${lineIndex}.risk must be one of ${RISK_LEVELS.join(", ")}`;
+	if (!Number.isInteger(event.environmentProfileVersion) || event.environmentProfileVersion < 1)
+		return `runner request event ${lineIndex}.environmentProfileVersion must be a positive integer`;
 	if (event.approvalBinding !== approvalBindingOf(event.environment, event.requestHash))
 		return `runner request event ${lineIndex}.approvalBinding does not match its environment and requestHash`;
 	return null;
@@ -1157,13 +1236,94 @@ function capabilityRefusal(input, capability) {
 	return null;
 }
 
+// Resolve a rehearsal Evidence reference fail-closed. A missing receipt is
+// a policy refusal (null code); a corrupt Evidence ledger is an
+// infrastructure fault and keeps its own typed code — it is never
+// re-labeled as a denial.
+function rehearsalRefusal(cwd, rehearsal) {
+	let receipt;
+	try {
+		receipt = showEvidence(cwd, rehearsal);
+	} catch (err) {
+		return {
+			receipt: null,
+			code: err.amberCode || REQUEST_CORRUPT_CODE,
+			reason: err.message || String(err),
+		};
+	}
+	if (receipt === null)
+		return {
+			receipt,
+			code: null,
+			reason: `rehearsal ${JSON.stringify(rehearsal)} names no recorded Evidence receipt; rehearse the rollback and record it first (amber evidence record)`,
+		};
+	return { receipt, code: null, reason: null };
+}
+
+// The per-environment admission verdict, judged against the REGISTERED
+// capability's effect set (the authority class, same basis as risk): a
+// profile refusal is environment policy, recorded as a denial.
+// null when admitted; { code: null, reason } for a policy denial; a typed
+// { code, reason } for an infrastructure fault that must not be recorded
+// as a denial.
+function environmentRefusal(cwd, shaped, capability, now) {
+	const denial = (reason) => ({ code: null, reason });
+	const profile = ENVIRONMENT_PROFILES[shaped.environment];
+	const runbook =
+		profile.runbookNamespace !== null && capability.name.startsWith(profile.runbookNamespace);
+	if (!runbook) {
+		for (const effect of capability.effects) {
+			if (!profile.allowedEffects.includes(effect))
+				return denial(
+					`capability effect ${JSON.stringify(effect)} is not admitted in ${shaped.environment} (allowed: ${profile.allowedEffects.join(", ")}${profile.runbookNamespace ? `; runbook.* capabilities are the separately approved exception` : ""})`,
+				);
+		}
+	}
+	if (profile.requiresIsolatedScope && shaped.scope === null)
+		return denial(
+			`${shaped.environment} requires an isolated target scope; declare a non-null scope so experiments cannot mutate the main working state`,
+		);
+	const needsRehearsal = capability.effects.some((effect) =>
+		profile.rehearsalEffects.includes(effect),
+	);
+	if (needsRehearsal && shaped.rehearsal === null)
+		return denial(
+			`${shaped.environment} admits deploy/rollback capabilities only with rollback rehearsal Evidence; declare --rehearsal <evidence-id>`,
+		);
+	if (shaped.rehearsal !== null) {
+		const rehearsal = rehearsalRefusal(cwd, shaped.rehearsal);
+		if (rehearsal.code !== null) return rehearsal;
+		if (rehearsal.reason !== null) return denial(rehearsal.reason);
+	}
+	const needsCredential = capability.effects.some((effect) =>
+		profile.credentialEffects.includes(effect),
+	);
+	if (needsCredential && shaped.credential === null)
+		return denial(
+			`${shaped.environment} admits deploy/rollback capabilities only with a short-lived scoped credential declaration; the registered capability declares credentialRequirement ${JSON.stringify(capability.credentialRequirement)}`,
+		);
+	if (shaped.credential !== null) {
+		const expiresAt = new Date(shaped.credential.expiresAt);
+		if (expiresAt <= now)
+			return denial(
+				`credential handle ${JSON.stringify(shaped.credential.handle)} expired at ${shaped.credential.expiresAt}; credentials are short-lived and scoped`,
+			);
+		if (expiresAt.getTime() - now.getTime() > CREDENTIAL_MAX_TTL_MS)
+			return denial(
+				`credential handle ${JSON.stringify(shaped.credential.handle)} lives past the short-lived bound (${CREDENTIAL_MAX_TTL_MS} ms); declare an expiry within it`,
+			);
+	}
+	return null;
+}
+
 /**
  * Declare one intended execution. Malformed input refuses without touching
  * the ledger (it has no reliable identity); a well-formed request that the
- * registered capability facts refuse appends an immutable `denied` event —
- * no attempt disappears. A valid request derives its risk from the pinned
- * policy, records a `requested` event, and returns the approval binding a
- * human must grant (`runner-request:<environment>:<requestHash>`).
+ * registered capability facts or the environment profile refuse appends an
+ * immutable `denied` event — no attempt disappears. A valid request
+ * derives its risk from the pinned policy, records a `requested` event,
+ * and returns the approval binding a human must grant
+ * (`runner-request:<environment>:<requestHash>`).
  */
 function submitRunnerRequest(cwd, input = {}, opts = {}) {
 	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
@@ -1179,11 +1339,14 @@ function submitRunnerRequest(cwd, input = {}, opts = {}) {
 		timeoutMs: input.timeoutMs,
 		effects: input.effects,
 		credentialRequirement: input.credentialRequirement,
+		credential: input.credential ?? null,
+		rehearsal: input.rehearsal ?? null,
 		rollback: input.rollback,
 	};
 	const shape = requestShapeProblem(shaped, "request input");
 	if (shape !== null) return fail(REQUEST_INVALID_CODE, [shape]);
-	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	const at = now.toISOString();
 	// A shape-valid attempt carries reliable identity, so every refusal
 	// from here on is recorded append-only — no attempt disappears.
 	const deny = (code, reason) => {
@@ -1209,6 +1372,12 @@ function submitRunnerRequest(cwd, input = {}, opts = {}) {
 	if (!resolved.ok) return deny(resolved.code, resolved.errors[0]);
 	const refusal = capabilityRefusal(shaped, resolved.capability);
 	if (refusal !== null) return deny(REQUEST_DENIED_CODE, refusal);
+	const environmentProblem = environmentRefusal(cwd, shaped, resolved.capability, now);
+	if (environmentProblem !== null) {
+		if (environmentProblem.code !== null)
+			return fail(environmentProblem.code, [environmentProblem.reason]);
+		return deny(REQUEST_DENIED_CODE, environmentProblem.reason);
+	}
 	// The authority class is the REGISTERED capability's declared effect
 	// set, not the caller's subset — requesting one low-risk effect of a
 	// deploy-capable capability is still a deploy-class authorization.
@@ -1222,6 +1391,7 @@ function submitRunnerRequest(cwd, input = {}, opts = {}) {
 		...shaped,
 		riskPolicyVersion: RISK_POLICY_VERSION,
 		risk,
+		environmentProfileVersion: ENVIRONMENT_PROFILE_VERSION,
 	});
 	return appendRequestEvent(
 		cwd,
@@ -1233,6 +1403,7 @@ function submitRunnerRequest(cwd, input = {}, opts = {}) {
 			...shaped,
 			riskPolicyVersion: RISK_POLICY_VERSION,
 			risk,
+			environmentProfileVersion: ENVIRONMENT_PROFILE_VERSION,
 			approvalBinding: approvalBindingOf(shaped.environment, requestHash),
 		},
 		(fold) =>
@@ -1254,6 +1425,8 @@ function requestDriftProblem(cwd, record) {
 		return `the registered capability behind this request is no longer resolvable (${resolved.errors[0]})`;
 	if (record.riskPolicyVersion !== RISK_POLICY_VERSION)
 		return `request was risk-classified under policy version ${record.riskPolicyVersion}, but the current policy is version ${RISK_POLICY_VERSION}; changed authority makes stale approvals unusable`;
+	if (record.environmentProfileVersion !== ENVIRONMENT_PROFILE_VERSION)
+		return `request was admitted under environment profile version ${record.environmentProfileVersion}, but the current profile is version ${ENVIRONMENT_PROFILE_VERSION}; changed authority makes stale approvals unusable`;
 	const risk = riskOf(resolved.capability.effects);
 	if (risk === null)
 		return `capability effects ${resolved.capability.effects.join(", ")} carry no risk classification under policy version ${RISK_POLICY_VERSION}`;
@@ -1267,9 +1440,12 @@ function requestDriftProblem(cwd, record) {
 		timeoutMs: record.timeoutMs,
 		effects: record.effects,
 		credentialRequirement: record.credentialRequirement,
+		credential: record.credential,
+		rehearsal: record.rehearsal,
 		rollback: record.rollback,
 		riskPolicyVersion: record.riskPolicyVersion,
 		risk,
+		environmentProfileVersion: record.environmentProfileVersion,
 	});
 	if (rederived !== record.requestHash)
 		return `request ${JSON.stringify(record.requestHash)} no longer re-derives under the current policy`;
@@ -1333,6 +1509,24 @@ function authorizeRunnerRequest(cwd, input = {}, opts = {}) {
 				return fail(APPROVAL_MISMATCH_CODE, [
 					`approval ${JSON.stringify(input.approval)} authorizes subject ${JSON.stringify(approval.subject)}, not this request's binding ${JSON.stringify(record.approvalBinding)}; one authorization binds one request hash and environment`,
 				]);
+			// Short-lived means short-lived: a credential handle that expired
+			// between request and authorization closes the window.
+			const authNow = opts.now instanceof Date ? opts.now : new Date();
+			if (record.credential !== null && new Date(record.credential.expiresAt) <= authNow)
+				return fail(REQUEST_DRIFT_CODE, [
+					`credential handle ${JSON.stringify(record.credential.handle)} expired at ${record.credential.expiresAt}; request a fresh handle and a fresh authorization`,
+				]);
+			if (record.rehearsal !== null) {
+				const rehearsal = rehearsalRefusal(cwd, record.rehearsal);
+				if (rehearsal.code !== null) return fail(rehearsal.code, [rehearsal.reason]);
+				if (rehearsal.reason !== null) return fail(REQUEST_DRIFT_CODE, [rehearsal.reason]);
+				// Separation of duties: whoever rehearsed the rollback cannot
+				// also be the approver — one side never vouches for itself.
+				if (rehearsal.receipt.producer.id === approval.approver.id)
+					return fail(REQUEST_SEPARATION_CODE, [
+						`approval ${JSON.stringify(input.approval)} was granted by ${JSON.stringify(approval.approver.id)}, who also produced the rehearsal Evidence ${JSON.stringify(record.rehearsal)}; the rehearsing party cannot approve its own rehearsal`,
+					]);
+			}
 			// Consumption is the point of no return: it settles the human
 			// Decision atomically under the approval ledger's own lock. A
 			// ceiling/write failure AFTER this point leaves the consumed
@@ -1389,6 +1583,9 @@ module.exports = {
 	CREDENTIAL_REQUIREMENTS,
 	RUNNER_DECISION_KINDS,
 	ENVIRONMENTS,
+	ENVIRONMENT_PROFILE_VERSION,
+	ENVIRONMENT_PROFILES,
+	CREDENTIAL_MAX_TTL_MS,
 	REQUEST_STATUSES,
 	RISK_LEVELS,
 	RISK_POLICY_VERSION,

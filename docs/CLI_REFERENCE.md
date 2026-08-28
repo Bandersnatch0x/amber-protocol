@@ -1071,11 +1071,27 @@ the request contract carries no risk field and requesting a subset of effects ne
 class, so a caller can never classify its own operation. A shape-valid request that names an
 unregistered runner/version/capability, or tries to widen the registered capability (undeclared
 effect, timeout above the bound, different credential class, path outside the declared prefixes),
-is recorded as an immutable `denied` event — no attempt disappears. `runner authorize` consumes a
-single-use F050 Approval whose subject is
+is recorded as an immutable `denied` event — no attempt disappears.
+
+Versioned environment profiles gate what each environment may even be asked (the profile version
+is bound into the `requestHash`, so a changed profile makes stale approvals unusable):
+development requires an isolated non-null scope and admits no deploy/rollback; staging admits
+allowlisted deploy/rollback capabilities only with rollback rehearsal Evidence
+(`--rehearsal <evidence-id>`, resolved against the F050 Evidence ledger); production grants no
+generic target-write — preparation, diagnosis, and `runbook.*`-registered capabilities only.
+When the registered capability requires a scoped credential, the request declares an OPAQUE
+short-lived handle (`--credential-handle`, `--credential-purpose`, `--credential-scope`,
+`--credential-expires`) — the closed field set means no secret value can ride in a ledger or
+receipt; a handle may live at most 24 hours, and an over-long or expired handle refuses at
+submission and again at authorization. A staging deploy/rollback capability registered without a
+scoped credential requirement is not admissible in staging at all.
+
+`runner authorize` consumes a single-use F050 Approval whose subject is
 exactly the request's `approvalBinding` (`runner-request:<environment>:<requestHash>`), settling
 the human Decision atomically; replay, an already-authorized request, and drift (a stale risk
-policy version or an unresolvable capability) fail closed. `runner requests` lists every attempt
+policy or environment profile version, an unresolvable capability or rehearsal, an expired
+credential handle) fail closed, and the rehearsing party can never approve its own rehearsal
+(`AMBER_E_RUNNER_REQUEST_SEPARATION`). `runner requests` lists every attempt
 (`requested|authorized|denied`) in append order.
 
 ```bash
@@ -1083,7 +1099,9 @@ node scripts/amber.js runner request --target . --id runner/ci \
   --runner-version 1.0.0 --capability deploy.staging-web --capability-version 1 \
   --repository repo/main --path deploy/staging/web --environment staging \
   --input-hash sha256:<64-hex-chars> --timeout-ms 300000 --effect deploy \
-  --credential scoped --rollback runbook/staging-rollback --json
+  --credential scoped --credential-handle cred-7f3a --credential-purpose staging-deploy \
+  --credential-scope deploy/staging --credential-expires 2027-01-01T00:00:00.000Z \
+  --rehearsal evidence/rehearsal-1 --rollback runbook/staging-rollback --json
 node scripts/amber.js approval grant --target . --id approval/deploy-42 \
   --approver bob@example.com --subject "runner-request:staging:sha256:<64-hex-chars>" \
   --valid-until 2027-01-01T00:00:00.000Z --json
@@ -1100,8 +1118,9 @@ Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_
 `AMBER_E_RUNNER_REGISTRY_SIZE_CEILING`, `AMBER_E_RUNNER_REQUEST_INVALID`,
 `AMBER_E_RUNNER_REQUEST_EXISTS`, `AMBER_E_RUNNER_REQUEST_NOT_FOUND`,
 `AMBER_E_RUNNER_REQUEST_DENIED`, `AMBER_E_RUNNER_REQUEST_DRIFT`,
-`AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH`, `AMBER_E_RUNNER_REQUEST_CORRUPT`,
-`AMBER_E_RUNNER_REQUEST_LOCK`, `AMBER_E_RUNNER_REQUEST_SIZE_CEILING`.
+`AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH`, `AMBER_E_RUNNER_REQUEST_SEPARATION`,
+`AMBER_E_RUNNER_REQUEST_CORRUPT`, `AMBER_E_RUNNER_REQUEST_LOCK`,
+`AMBER_E_RUNNER_REQUEST_SIZE_CEILING`.
 
 ## Handoff Commands
 

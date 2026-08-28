@@ -38,6 +38,11 @@ function missingValueFlag(args) {
 		["environment", "--environment"],
 		["inputHashVal", "--input-hash"],
 		["requestHash", "--request-hash"],
+		["credentialHandle", "--credential-handle"],
+		["credentialPurpose", "--credential-purpose"],
+		["credentialScope", "--credential-scope"],
+		["credentialExpires", "--credential-expires"],
+		["rehearsal", "--rehearsal"],
 		["approval", "--approval"],
 		["body", "--body"],
 		["traceVal", "--trace"],
@@ -204,6 +209,27 @@ const dispatch = defineCommand({
 				return invalidArg(`--effect is required at least once (e.g. --effect deploy)`);
 			const timeout = positiveInt(args, "timeoutMs", "--timeout-ms");
 			if (timeout.error) return invalidArg(timeout.error);
+			const credentialFlags = [
+				["credentialHandle", "--credential-handle", "cred-7f3a"],
+				["credentialPurpose", "--credential-purpose", "staging-deploy"],
+				["credentialScope", "--credential-scope", "deploy/staging"],
+				["credentialExpires", "--credential-expires", "2027-01-01T00:00:00.000Z"],
+			];
+			let credential = null;
+			if (credentialFlags.some(([key]) => args[key] !== undefined)) {
+				const values = {};
+				for (const [key, flag, example] of credentialFlags) {
+					const required = requiredString(args, key, flag, example);
+					if (required.error) return invalidArg(required.error);
+					values[key] = required.value;
+				}
+				credential = {
+					handle: values.credentialHandle,
+					purpose: values.credentialPurpose,
+					scope: values.credentialScope,
+					expiresAt: values.credentialExpires,
+				};
+			}
 			return resultEnvelope(
 				submitRunnerRequest(target.value, {
 					capability: {
@@ -224,6 +250,8 @@ const dispatch = defineCommand({
 					timeoutMs: timeout.value,
 					effects: args.effects.map((effect) => String(effect)),
 					credentialRequirement: String(args.credential),
+					credential,
+					rehearsal: args.rehearsal === undefined ? null : String(args.rehearsal),
 					rollback: String(args.rollback),
 				}),
 			);

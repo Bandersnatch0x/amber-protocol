@@ -1679,21 +1679,30 @@ const CATALOG = {
 		related: ["AMBER_E_RUNNER_REQUEST_EXISTS"],
 	},
 	AMBER_E_RUNNER_REQUEST_DENIED: {
-		title: "Runner request denied by capability facts",
+		title: "Runner request denied by capability facts or environment profile",
 		cause:
-			"The request tried to widen the registered capability: an undeclared effect, a timeout above the bound, a different credential class, or a path outside the declared prefixes. The denial is recorded append-only.",
+			"The request tried to widen the registered capability (undeclared effect, timeout above the bound, different credential class, path outside the declared prefixes) or fell outside the environment profile (effect not admitted, missing isolated scope, missing/unresolvable rollback rehearsal Evidence, missing/over-long/expired credential handle). The denial is recorded append-only.",
 		remedy:
-			"Request only what the registered capability declares, or register a new capability version through governance.",
+			"Request only what the registered capability and the environment profile admit, or register a new capability version through governance.",
 		layer: "Governance",
 		related: ["AMBER_E_RUNNER_REQUEST_INVALID", "AMBER_E_RUNNER_CAPABILITY_EXISTS"],
 	},
 	AMBER_E_RUNNER_REQUEST_DRIFT: {
 		title: "Runner request drifted from current authority",
 		cause:
-			"The stored request no longer re-derives under the current risk policy version, or its capability is no longer resolvable — changed authority makes stale approvals unusable.",
+			"The stored request no longer re-derives under the current risk policy or environment profile version, its capability is no longer resolvable, its credential handle expired, or its rehearsal Evidence no longer resolves — changed authority makes stale approvals unusable.",
 		remedy: "Submit a fresh request under the current policy and obtain a new approval for it.",
 		layer: "Governance",
 		related: ["AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH", "AMBER_E_RUNNER_VERSION_DRIFT"],
+	},
+	AMBER_E_RUNNER_REQUEST_SEPARATION: {
+		title: "Runner authorization violates separation of duties",
+		cause:
+			"The approval's approver also produced the rollback rehearsal Evidence the request binds; one side cannot vouch for its own rehearsal.",
+		remedy:
+			"Have an independent registered human grant the approval, or record rehearsal Evidence from a different producer.",
+		layer: "Governance",
+		related: ["AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH", "AMBER_E_RUNNER_REQUEST_DRIFT"],
 	},
 	AMBER_E_RUNNER_REQUEST_APPROVAL_MISMATCH: {
 		title: "Approval does not bind this runner request",
