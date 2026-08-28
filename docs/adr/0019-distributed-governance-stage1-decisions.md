@@ -33,7 +33,7 @@ The sync envelope and structural identity schemas are added as new files: `schem
 
 ### D4: Identity bootstrap — Hybrid
 
-Personal Node bootstraps identity via git inference for Person/Agent (zero-config default from `git config user.name`/`user.email`) with `.amber/identity.json` as an optional override for Tenant/Organization/explicit identity. When `.amber/identity.json` is present, it wins over git inference. Default Tenant is `local`, default Organization is `personal`.
+Personal Node bootstraps identity via git inference for Person/Agent (zero-config default from `git config user.name`/`user.email`) with `.amber/identity.json` as an optional override for Tenant/Organization/explicit identity. When `.amber/identity.json` is present, it wins over git inference. Default Tenant is `local`, default Organization is `personal`. As shipped, git inference covers `personId` only; `agentId` is never inferred and requires explicit declaration.
 
 **Rationale.** Person/Agent are low-risk local display identifiers — git config is the de facto developer identity and inferring it is zero-friction. Tenant/Organization affect admission/mapping when joining Team Hub — they need explicit declaration. The hybrid satisfies the baseline's "one explicit deterministic local Tenant, Organization, and Person scope": defaults are explicit (hardcoded, not guessed) and deterministic (always the same), and the override seam (`.amber/identity.json`) provides explicit identity when needed. For solo Personal Node use, it is zero-config; for Team Hub joining, it is explicit.
 

@@ -95,8 +95,10 @@ Any executing option must answer all six concerns the F035 plan named. Mapped ag
 five preconditions:
 
 1. **Declared (policy input).** The command set is closed and pinned: exactly `git add
-   .amber/sync`, `git commit -m "amber sync: N envelope(s)"` (message derived from the report,
-   never caller-supplied), and — Stage B only — `git push` with no URL/refspec arguments. No
+   .amber/sync` (narrowed by adjudication 4 as shipped: `.amber/sync/envelopes` +
+   `.amber/sync/transport/decisions`), `git commit -m "amber sync: N envelope(s)"` (message
+   derived from the report, never caller-supplied), and — Stage B only — `git push` with no
+   URL/refspec arguments. No
    `reset`, `checkout`, `clean`, `rebase`, or `push --force` is ever declared or executable. This
    preserves ADR-0003 precondition 1 (declared, not ad hoc) while shrinking the declared surface to
    three deterministic verbs.
@@ -117,13 +119,18 @@ five preconditions:
    if the index already holds staged changes or the working tree carries user-owned changes outside
    `.amber/sync` that could be swept into the commit; and the pull-side ledgers
    (`applied.jsonl`, `refused.jsonl`, `conflicts.jsonl`) are carried as files but never written or
-   rewritten by transport. This gate is genuinely weaker than worktree isolation and must be tested
+   rewritten by transport (adjudication 4 later excluded them from the staged pathspec entirely —
+   they are local-only and never shared). This gate is genuinely weaker than worktree isolation and
+   must be tested
    adversarially (dirty-tree mix-ins, pre-staged index, symlinked sync paths) before Stage A ships.
 5. **Recorded (execution evidence).** Every attempt — denied, unapproved, executed, failed —
    appends to a tamper-evident hash-chain ledger in the loop-ledger family, recording the approval
    key consumed, the proposed-ops fingerprint (envelope ids + affected paths from the preparation
    report), the git exit codes, captured stderr, and the resulting commit sha. Evidence kind: a
-   `transport-record`, booked like every other evidence artifact.
+   `transport-record`, booked like every other evidence artifact. That enumeration is exhaustive:
+   an `APPROVAL_REQUIRED` exit (the identity gate's non-TTY refusal, or the F019-shaped
+   `approvalRequired` envelope on a TTY) is an authorization inquiry *before* an attempt exists
+   and is deliberately not a ledger record class.
 
 **Remote-write authorization (Stage B).** Push may target only the repository's already-configured
 origin — the same remote `identity.js` reads to normalize `repositoryId` — never a caller-supplied
@@ -276,7 +283,9 @@ identity (non-TTY without `--yes` fails closed; TTY without `--yes` gets the F01
 lines) → single-use approval (`amber sync session approve --reviewer <name>`, loop-ledger shape,
 `latestUnconsumedApproval`) → path-and-state confinement (pre-staged index refuses — `git commit`
 commits the whole index; every staged path must realpath inside the repository) → execution gates,
-with every attempt appended to the hash-chained transport ledger
+with every attempt (denied, unapproved, executed, failed — the identity gate's `APPROVAL_REQUIRED`
+exits precede an attempt and are not ledgered, per gate item 5) appended to the hash-chained
+transport ledger
 (`.amber/sync/transport/ledger.jsonl`, never itself staged). Execution stages exactly
 `.amber/sync/envelopes` + `.amber/sync/transport/decisions` (decision records at
 `.amber/sync/transport/decisions/<batchId>.json`), commits with the derived message, records the

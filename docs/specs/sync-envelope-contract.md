@@ -277,8 +277,11 @@ replaying the proposed operations, or by the governed Stage A surface below.
 ADR-0020 Stage A (F041) authorizes exactly one governed execution surface:
 `amber sync session push --execute --yes` (core: `executeTransport` in
 `scripts/lib/core/sync-transport.js`). Gate order, each governed refusal
-recorded in the hash-chained transport ledger
-(`.amber/sync/transport/ledger.jsonl`):
+(policy deny, missing approval) and each execution outcome recorded in the
+hash-chained transport ledger
+(`.amber/sync/transport/ledger.jsonl`); the identity gate's
+`APPROVAL_REQUIRED` exits precede an attempt and are not ledger records
+(ADR-0020 §Recorded):
 
 1. **Report.** Build the F040 report; no envelopes → typed `no-change`
    outcome (exit 0, nothing executed).
