@@ -229,11 +229,13 @@ test("malformed profile JSON satisfies neither the phase-2 gate nor inv-2", () =
 });
 
 test("any enum-valid declared profile satisfies the phase-2 gate", () => {
-	const dir = mkTarget("gate-valid-profile");
-	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
-	fs.writeFileSync(
-		path.join(dir, ".amber", "profile.json"),
-		JSON.stringify({ deploymentProfile: "team-hub" }),
-	);
-	assert.equal(profileEvidence(dir).satisfied, true);
+	for (const declared of ["team-hub", "organization", "personal-node"]) {
+		const dir = mkTarget(`gate-valid-profile-${declared}`);
+		fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+		fs.writeFileSync(
+			path.join(dir, ".amber", "profile.json"),
+			JSON.stringify({ deploymentProfile: declared }),
+		);
+		assert.equal(profileEvidence(dir).satisfied, true, `gate must accept ${declared}`);
+	}
 });

@@ -73,6 +73,22 @@ test("validateDeploymentProfile fails for malformed JSON", () => {
 	assert.equal(result.deploymentProfile, null);
 });
 
+test("validateDeploymentProfile fails for non-object JSON", () => {
+	const dir = mkTarget("validate-non-object");
+	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(dir, PROFILE_FILE), JSON.stringify(["personal-node"]));
+	const result = validateDeploymentProfile(dir);
+	assert.equal(result.valid, false);
+	assert.equal(result.deploymentProfile, null);
+});
+
+test("validateDeploymentProfile passes for an absent declaration (default)", () => {
+	const dir = mkTarget("validate-absent");
+	const result = validateDeploymentProfile(dir);
+	assert.equal(result.valid, true);
+	assert.equal(result.deploymentProfile, DEFAULT_PROFILE);
+});
+
 test("readProfileFile rejects an unknown deployment profile", () => {
 	const dir = mkTarget("unknown", { profile: { deploymentProfile: "bogus" } });
 	const profile = readProfileFile(dir);

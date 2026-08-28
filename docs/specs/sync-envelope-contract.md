@@ -94,7 +94,8 @@ artifact path must already resolve canonically and the file must exist; the
 envelope gets `schemaVersion: "1.0.0"`, a fresh `crypto.randomUUID()`
 `envelopeId`, the canonical path plus its `sha256:` hash, structural identity
 from `resolveIdentity(cwd)`, origin profile from
-`resolveDeploymentProfile(cwd)` (falling back to `personal-node`),
+`resolveDeploymentProfile(cwd)` (an absent declaration falls back to
+`personal-node`; an invalid declaration refuses the pack),
 `createdAt` as the current ISO timestamp, and
 `versionNegotiation: { amberProtocolVersion: <running Amber package
 version>, minCompatibleVersion: "1.0.0", capabilities:

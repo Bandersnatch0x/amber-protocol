@@ -127,7 +127,8 @@ five preconditions:
    appends to a tamper-evident hash-chain ledger in the loop-ledger family, recording the approval
    key consumed, the proposed-ops fingerprint (envelope ids + affected paths from the preparation
    report), the git exit codes, captured stderr, and the resulting commit sha. Evidence kind: a
-   `transport-record`, booked like every other evidence artifact. That enumeration is exhaustive:
+   `transport-record`, booked like every other evidence artifact. That enumeration is exhaustive
+   for attempt records (the ledger also carries `downgraded` and `approved` records):
    an `APPROVAL_REQUIRED` exit (the identity gate's non-TTY refusal, or the F019-shaped
    `approvalRequired` envelope on a TTY) is an authorization inquiry *before* an attempt exists
    and is deliberately not a ledger record class.
