@@ -1,4 +1,35 @@
 import { test, expect, type Page } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
+
+const artifactDir = path.resolve(process.cwd(), '..', '..', 'output', 'playwright');
+
+async function capture(page: Page, name: string): Promise<void> {
+  fs.mkdirSync(artifactDir, { recursive: true });
+  await page.screenshot({
+    path: path.join(artifactDir, name),
+    fullPage: true,
+    animations: 'disabled',
+  });
+}
+
+// Rendered sRGB channels of the app shell background. Tailwind emits palette
+// colors as oklch(), so computed-style strings are not comparable across
+// versions; normalize through a 1x1 canvas like home-visual.spec.ts does.
+async function pageBackgroundChannels(page: Page): Promise<number[]> {
+  return page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return [-1, -1, -1];
+    const shell = document.querySelector('.min-h-screen');
+    if (!shell) return [-1, -1, -1];
+    ctx.fillStyle = getComputedStyle(shell).backgroundColor;
+    ctx.fillRect(0, 0, 1, 1);
+    return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
+  });
+}
 
 // Wait for the knowledge graph to finish loading by checking the subtitle shows counts.
 async function waitForGraph(page: Page) {
@@ -460,5 +491,129 @@ test.describe('Knowledge Map — user-triggered semantic stub', () => {
     await expect(
       page.locator('.react-flow__renderer, .react-flow__viewport').first(),
     ).toBeVisible();
+  });
+});
+
+test.describe('Knowledge Map — i18n (en/zh)', () => {
+  test('renders /knowledge fully in zh-CN: title, subtitle counts, controls, panels', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('amber-web-language', 'zh-CN'));
+    await page.goto('/knowledge');
+
+    await expect(page.getByRole('heading', { level: 1, name: '知识与决策地图' })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+
+    // The zh subtitle carries the same real-count contract as the en suite.
+    const subtitle = page.locator('p', { hasText: /节点/ }).first();
+    await expect(subtitle).toBeVisible({ timeout: 15_000 });
+    const text = (await subtitle.textContent()) ?? '';
+    const nodeMatch = /(\d+)\/(\d+)\s*节点/.exec(text);
+    expect(nodeMatch, `zh subtitle "${text}" must match "X/Y 节点"`).not.toBeNull();
+    expect(parseInt(nodeMatch![2], 10)).toBeGreaterThanOrEqual(100);
+    const edgeMatch = /(\d+)\s*条边/.exec(text);
+    expect(edgeMatch, `zh subtitle "${text}" must match "Z 条边"`).not.toBeNull();
+    expect(parseInt(edgeMatch![1], 10)).toBeGreaterThanOrEqual(80);
+
+    // Translated controls: search, layout modes, right-rail views.
+    await expect(page.locator('input[type="search"]')).toHaveAttribute(
+      'placeholder',
+      '按标题、ID、状态、内容搜索节点…',
+    );
+    await expect(page.getByRole('button', { name: '聚簇' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '分层' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '提问' })).toBeVisible();
+
+    // Recent & Drift panel in zh with its refresh control.
+    const panel = page.getByTestId('recent-drift-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel.getByText('最近变更与漂移').first()).toBeVisible();
+    await expect(panel.getByRole('button', { name: '刷新' })).toBeVisible();
+
+    await capture(page, 'knowledge-zh-light.png');
+  });
+
+  test('the header language toggle switches /knowledge live between en and zh', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('amber-web-language', 'en'));
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Knowledge & Decision Map' }),
+    ).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+    const toggle = page.getByRole('button', { name: 'Switch language' });
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+
+    await expect(page.getByRole('heading', { level: 1, name: '知识与决策地图' })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+    // The live graph survives the switch.
+    await expect(page.locator('p', { hasText: /节点/ }).first()).toBeVisible();
+    await expect(page.locator('.react-flow__node').first()).toBeVisible();
+
+    await toggle.click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Knowledge & Decision Map' }),
+    ).toBeVisible();
+    const { total } = await getSubtitleCounts(page);
+    expect(total).toBeGreaterThanOrEqual(100);
+  });
+});
+
+test.describe('Knowledge Map — dual theme', () => {
+  test('dark color scheme applies the dark palette without losing the graph', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    const channels = await pageBackgroundChannels(page);
+    // Dark shell surface: every rendered channel is dark. The token itself
+    // (dark:bg-obsidian-void) is a design detail; the contract is darkness.
+    for (const channel of channels) {
+      expect(channel).toBeGreaterThanOrEqual(0);
+      expect(channel).toBeLessThan(60);
+    }
+
+    const { total, edges } = await getSubtitleCounts(page);
+    expect(total).toBeGreaterThanOrEqual(100);
+    expect(edges).toBeGreaterThanOrEqual(80);
+    await expect(page.getByTestId('recent-drift-panel')).toBeVisible();
+    await expect(page.locator('.react-flow__node').first()).toBeVisible();
+
+    await capture(page, 'knowledge-desktop-dark.png');
+  });
+
+  test('the in-app theme toggle flips /knowledge between light and dark live', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    const lightChannels = await pageBackgroundChannels(page);
+    for (const channel of lightChannels) {
+      expect(channel).toBeGreaterThan(200);
+    }
+
+    const toggle = page.getByRole('button', { name: /toggle theme/i });
+    await toggle.click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    const darkChannels = await pageBackgroundChannels(page);
+    for (const channel of darkChannels) {
+      expect(channel).toBeGreaterThanOrEqual(0);
+      expect(channel).toBeLessThan(60);
+    }
+    // The graph stays rendered and countable after the flip.
+    await expect(page.locator('.react-flow__node').first()).toBeVisible();
+    const { total } = await getSubtitleCounts(page);
+    expect(total).toBeGreaterThanOrEqual(100);
+
+    await toggle.click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
   });
 });
