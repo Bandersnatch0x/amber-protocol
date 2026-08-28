@@ -27,6 +27,12 @@ const { resolveStateDirForRead } = require("./state-dir-resolver");
 const loopPolicy = require("./core/loop-policy");
 const loopLedger = require("./core/loop-ledger");
 const { isLegalTransition, STATES } = require("./session-state-machine");
+// F059 T2–T5 seam-debt repayment: read-only re-exports so the web knowledge
+// surfaces (graph reader, recent feed, cited QA, LLM prompt identity) require
+// this adapter instead of deep core modules. No extra depth, no writes.
+const { buildKnowledgeGraph } = require("./core/knowledge-graph");
+const { sha256Hex, canonicalJson } = require("./core/context-hash");
+const maintenance = require("./core/maintenance");
 
 /**
  * Containment guard for caller-supplied session ids — the CLI-side twin of
@@ -434,6 +440,19 @@ const SESSION_STATES = Object.freeze({
 	PAUSED: STATES.PAUSED,
 });
 
+/**
+ * Maintenance inspection re-export (F059 recent-changes feed). Delegates
+ * through the module object so a test stub on maintenance.inspectMaintenance
+ * stays observable — the same late-binding pattern maintenance.js itself uses.
+ *
+ * @param {string} target
+ * @param {string} [registryPath]
+ * @returns {Record<string, unknown>}
+ */
+function inspectMaintenance(target, registryPath) {
+	return maintenance.inspectMaintenance(target, registryPath);
+}
+
 module.exports = {
 	evaluateLifecycleNext,
 	getCompletionStatus,
@@ -446,4 +465,9 @@ module.exports = {
 	appendVerificationLedgerRecord,
 	isLegalSessionTransition,
 	SESSION_STATES,
+	// F059 knowledge-surface re-exports (read-only, no extra depth).
+	buildKnowledgeGraph,
+	inspectMaintenance,
+	sha256Hex,
+	canonicalJson,
 };

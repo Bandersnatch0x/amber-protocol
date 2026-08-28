@@ -248,6 +248,38 @@ export const SESSION_STATES: Readonly<{
 	PAUSED: string;
 }>;
 
+export type KnowledgeGraphSnapshot = {
+	schemaVersion: string;
+	nodes: Array<Record<string, unknown>>;
+	edges: Array<Record<string, unknown>>;
+	drift: Array<Record<string, unknown>>;
+};
+
+/**
+ * Read-only re-export of core/knowledge-graph.js buildKnowledgeGraph (F059):
+ * the deterministic parser's production (projection) read. No extra depth.
+ */
+export function buildKnowledgeGraph(
+	target: string,
+	options?: { source?: "projection" | "tree" },
+): KnowledgeGraphSnapshot;
+
+/**
+ * Read-only re-export of core/maintenance.js inspectMaintenance (F059
+ * recent-changes feed) — the shared core interface governance-report also
+ * consumes. Delegates through the module object; no extra depth.
+ */
+export function inspectMaintenance(
+	target: string,
+	registryPath?: string,
+): Record<string, unknown>;
+
+/** Read-only re-export of core/context-hash.js sha256Hex (raw hex sha256 of a UTF-8 string). */
+export function sha256Hex(text: string): string;
+
+/** Read-only re-export of core/context-hash.js canonicalJson (stable canonical JSON string). */
+export function canonicalJson(json: string): string;
+
 /** Runtime module shape for createRequire cast — single SSOT with the functions above. */
 export type WebAdapter = {
 	evaluateLifecycleNext: typeof evaluateLifecycleNext;
@@ -261,4 +293,8 @@ export type WebAdapter = {
 	appendVerificationLedgerRecord: typeof appendVerificationLedgerRecord;
 	isLegalSessionTransition: typeof isLegalSessionTransition;
 	SESSION_STATES: typeof SESSION_STATES;
+	buildKnowledgeGraph: typeof buildKnowledgeGraph;
+	inspectMaintenance: typeof inspectMaintenance;
+	sha256Hex: typeof sha256Hex;
+	canonicalJson: typeof canonicalJson;
 };

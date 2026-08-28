@@ -8,7 +8,7 @@ import type {
 } from '../../src/lib/knowledge-dto';
 
 const requireCli = createRequire(import.meta.url);
-const { buildKnowledgeGraph } = requireCli('../../../../scripts/lib/core/knowledge-graph.js') as {
+const { buildKnowledgeGraph } = requireCli('../../../../scripts/lib/web-adapter.js') as {
   buildKnowledgeGraph: (target: string) => RawGraph;
 };
 

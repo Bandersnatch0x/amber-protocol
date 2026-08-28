@@ -8,7 +8,7 @@ import type {
 import { completeWithMetadata } from './knowledge-llm';
 
 const requireCli = createRequire(import.meta.url);
-const { sha256Hex, canonicalJson } = requireCli('../../../../scripts/lib/core/context-hash.js') as {
+const { sha256Hex, canonicalJson } = requireCli('../../../../scripts/lib/web-adapter.js') as {
   sha256Hex: (value: string) => string;
   canonicalJson: (value: string) => string;
 };

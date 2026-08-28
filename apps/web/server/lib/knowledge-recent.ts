@@ -11,10 +11,10 @@ import { readSessionList } from './session-reader';
 import { listTranscripts } from './transcript-service';
 
 const requireCli = createRequire(import.meta.url);
-const { buildKnowledgeGraph } = requireCli('../../../../scripts/lib/core/knowledge-graph.js') as {
+const { buildKnowledgeGraph } = requireCli('../../../../scripts/lib/web-adapter.js') as {
   buildKnowledgeGraph: (target: string) => RawGraph;
 };
-const { inspectMaintenance } = requireCli('../../../../scripts/lib/core/maintenance.js') as {
+const { inspectMaintenance } = requireCli('../../../../scripts/lib/web-adapter.js') as {
   inspectMaintenance: (target: string, registryPath?: string) => MaintenanceInspection;
 };
 
