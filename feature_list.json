@@ -1680,6 +1680,46 @@
 				"scripts/lib/core/instruction-surface-evals.js",
 				"scripts/lib/eval-commands.js"
 			]
+		},
+		{
+			"id": "F059",
+			"priority": 59,
+			"area": "knowledge",
+			"title": "Knowledge & Decision Map",
+			"user_visible_behavior": "A read-only /knowledge surface maps ADRs, wiki/memory/architecture pages, and features with four deterministic verb edges, dead-anchor drift findings, a Recent & Drift panel with real jump links, a labeled read-time LLM semantic layer, and cited QA, all fed by amber knowledge graph --json.",
+			"status": "passing",
+			"verification": [
+				"node scripts/amber.js knowledge graph --json (schema-valid, byte-stable recompute)",
+				"node scripts/amber.js eval run --target . (four Evals incl. QA contract-surface scan)",
+				"npm test",
+				"apps/web: npx playwright test tests/e2e/knowledge.spec.ts + npm run test:e2e:semantic (live CLI data, en/zh i18n, dual theme)"
+			],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F059 #25\"",
+					"result": "T1-T7 delivered and closed (#247-#253); T7 landed as 6 F059 commits 85f89d2..3d96c9d with HITL approval",
+					"date": "2026-08-28",
+					"notes": "T8 close-out #254: feature registration + live-data verification sweep"
+				},
+				{
+					"command": "node scripts/amber.js eval run --target . && npm test && npm --prefix apps/web test; apps/web: npx playwright test tests/e2e/knowledge.spec.ts + npm run test:e2e:semantic",
+					"result": "eval 4/4 pass (assurance replayable); knowledge e2e 21/21 green on live CLI data incl. en/zh i18n + dual theme; root suite 3165/3168 (2 npm-pack ETIMEDOUT load flakes, dsh-bundle rerun 6/6 green, + 1 hygiene finding on transient session scratch JSONs, not part of the change); web vitest 663/663",
+					"date": "2026-08-28",
+					"notes": "knowledge graph --json byte-stable at 105 nodes / 92 edges / 2 drift findings incl. feature:F059; T8 fixed the e2e fixture gap by seeding committed docs/knowledge-corpus into the hermetic root"
+				}
+			],
+			"notes": [
+				"GitHub mirror #246; tickets #247-#253 closed; T8 close-out #254.",
+				"Spec docs/specs/F059-knowledge-decision-map.md unchanged since registration 19202ac; normalized UTF-8 sha256 c6f37e3a72fc04f7e560ec1b72be8c59ecae98ec8522f25ef8d89f21845c0fdc."
+			],
+			"paths": [
+				"docs/specs/F059-knowledge-decision-map.md",
+				"scripts/lib/core/knowledge-graph.js",
+				"schemas/knowledge-graph.schema.json",
+				"apps/web/server/routers/knowledge.ts",
+				"apps/web/src/features/knowledge/KnowledgeMapPage.tsx"
+			],
+			"updated": "2026-08-28"
 		}
 	]
 }
