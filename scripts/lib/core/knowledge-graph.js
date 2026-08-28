@@ -61,6 +61,7 @@ const EDGE_VERBS = Object.freeze(["supersedes", "builds-on", "references", "desc
 const ERROR_CODES = Object.freeze({
 	invalid: "AMBER_E_KNOWLEDGE_GRAPH_INVALID",
 	source: "AMBER_E_KNOWLEDGE_GRAPH_SOURCE",
+	sourceInvalid: "AMBER_E_KNOWLEDGE_SOURCE_INVALID",
 });
 
 function readTextIfPresent(file) {
@@ -837,7 +838,7 @@ function buildKnowledgeGraph(target, options = {}) {
 	const source = options.source || "projection";
 	if (source === "tree") return buildKnowledgeGraphFromTree(targetRoot);
 	if (source !== "projection") {
-		throw typedError(ERROR_CODES.source, `unknown knowledge graph source: ${source}`);
+		throw typedError(ERROR_CODES.sourceInvalid, `unknown knowledge graph source: ${source}`);
 	}
 	return validateGraph(
 		buildKnowledgeGraphFromSources(targetRoot, readDocumentsFromProjection(targetRoot)),

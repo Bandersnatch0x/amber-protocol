@@ -14,12 +14,18 @@ const { typedError } = require("./error-catalog");
 
 const MANIFEST_SCHEMA_VERSION = "1.0.0";
 const PROJECTION_RULE_VERSION = 1;
+// Intentional deliberate gate: this census (24 ADR + 10 wiki + 9 architecture = 43 total) is the
+// reviewed snapshot of the F059 knowledge corpus. Adding or removing any document in
+// docs/adr/, docs/wiki/knowledge/, or docs/architecture/ requires a conscious update here
+// and a fresh `amber knowledge context-sync` run to rebuild the committed corpus.
+// AMBER_E_KNOWLEDGE_MANIFEST_INVALID fires on any deviation — by design, not accident.
 const EXPECTED_COUNTS = Object.freeze({ adr: 24, wiki: 10, architecture: 9, total: 43 });
 const SAMPLE_LIMIT = 6;
 
 const ERROR_CODES = Object.freeze({
-	manifest: "AMBER_E_KNOWLEDGE_GRAPH_SOURCE",
+	manifest: "AMBER_E_KNOWLEDGE_MANIFEST_INVALID",
 	projection: "AMBER_E_PROJECTION_DRIFT",
+	staleSource: "AMBER_E_KNOWLEDGE_SOURCE_STALE",
 });
 
 function toPosix(value) {
@@ -172,9 +178,12 @@ function pagePayloadForRow(targetRoot, row, request) {
 		knowledgeKind: row.category === "adr" ? "decision" : "pattern",
 		sourceNodeId: row.sourceNodeId,
 		sourceCategory: row.category,
+		artifact_type: "knowledge-context-page",
+		generatedBy: "context-sync",
+		manifestId: "f059-knowledge-context-pages",
 		sources: { source },
 		blocks: [{ type: "prose", sources: ["source"], text }],
-		assurance: { confidence: "high", maturity: "reviewed" },
+		assurance: { confidence: "high", maturity: "provisional" },
 	};
 }
 
@@ -182,6 +191,11 @@ function generatedPageMatchesRow(page, row, currentText = null) {
 	if (!page || page.pageId !== row.pageId || page.sourceNodeId !== row.sourceNodeId) return false;
 	const source = page.sources && page.sources.source;
 	if (!source || source.ref !== row.sourcePath) return false;
+	// When explicit ownership markers are present they must match the context-sync identity.
+	// Pages without markers are treated as manageable (migration path for pre-ownership-field pages).
+	if (page.generatedBy !== undefined && page.generatedBy !== "context-sync") return false;
+	if (page.artifact_type !== undefined && page.artifact_type !== "knowledge-context-page") return false;
+	if (page.manifestId !== undefined && page.manifestId !== "f059-knowledge-context-pages") return false;
 	if (currentText === null) return true;
 	return page.blocks && page.blocks.length === 1 && page.blocks[0].text === currentText;
 }
@@ -247,6 +261,20 @@ function syncKnowledgeContextPages(targetRoot, { refresh = false } = {}) {
 	const blocked = actions.filter((action) => action.errors && action.errors.length > 0);
 	const verification = verifyPages(root);
 	const projected = rebuildKnowledgeBaseProjection(root);
+	// Write committed corpus to docs/knowledge-corpus/ (tracked in git) so clean-archive reads
+	// work without prior mutation to .amber/. Written only on a clean projection rebuild.
+	if (projected.ok) {
+		const corpusDir = committedCorpusDir(root);
+		fs.mkdirSync(corpusDir, { recursive: true });
+		fs.writeFileSync(
+			committedManifestPath(root),
+			`${JSON.stringify(manifestResult.manifest, null, 2)}\n`,
+			"utf8",
+		);
+		// Copy the projection output to the tracked corpus directory.
+		const amberOutputPath = path.join(projectionsDir(root), "knowledge-base.output.json");
+		fs.copyFileSync(amberOutputPath, committedProjectionOutputPath(root));
+	}
 	return {
 		ok: blocked.length === 0 && verification.ok && projected.ok,
 		code: blocked.length > 0 ? ERROR_CODES.manifest : verification.code || projected.code || null,
@@ -288,37 +316,64 @@ function pageRowFromProjectionPage(page) {
 	};
 }
 
-function knowledgeBaseProjectionOutputPath(targetRoot) {
-	return path.join(projectionsDir(targetRoot), "knowledge-base.output.json");
+// Committed knowledge corpus path: tracked in git at docs/knowledge-corpus/ so a clean archive
+// (or CI clone) can run `amber knowledge graph` without any prior mutation to .amber/.
+// context-sync writes here in addition to .amber/; the production reader reads exclusively here.
+const COMMITTED_CORPUS_DIR = "docs/knowledge-corpus";
+
+function committedCorpusDir(targetRoot) {
+	return path.join(path.resolve(targetRoot || process.cwd()), COMMITTED_CORPUS_DIR);
+}
+
+function committedManifestPath(targetRoot) {
+	return path.join(committedCorpusDir(targetRoot), "knowledge-context-manifest.json");
+}
+
+function committedProjectionOutputPath(targetRoot) {
+	return path.join(committedCorpusDir(targetRoot), "knowledge-base.output.json");
 }
 
 function readKnowledgeBaseProjection(targetRoot) {
 	const root = path.resolve(targetRoot || process.cwd());
-	const status = projectionStatus(root, "knowledge-base");
-	if (!status.ok) {
+
+	// Load committed manifest from the tracked docs/knowledge-corpus/ path.
+	// This file is written by context-sync and committed to git, so it is available
+	// in a clean archive without any prior mutation to .amber/.
+	let committedManifest;
+	try {
+		committedManifest = JSON.parse(fs.readFileSync(committedManifestPath(root), "utf8"));
+	} catch (err) {
 		throw typedError(
-			status.code || ERROR_CODES.projection,
-			`knowledge-base projection unavailable: ${status.detail}`,
+			"AMBER_E_PROJECTION_MISSING",
+			`knowledge-base committed manifest unavailable at ${COMMITTED_CORPUS_DIR}: ${err.message} — run \`amber knowledge context-sync --target <repo>\` to build and commit the corpus`,
 		);
 	}
-	const outputPath = knowledgeBaseProjectionOutputPath(root);
+	const manifestRowsByPageId = new Map(
+		(committedManifest.rows || []).map((row) => [row.pageId, row]),
+	);
+
+	// Load committed projection output from the tracked docs/knowledge-corpus/ path.
 	let output;
 	try {
-		output = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-	} catch (error) {
+		output = JSON.parse(fs.readFileSync(committedProjectionOutputPath(root), "utf8"));
+	} catch (err) {
 		throw typedError(
-			ERROR_CODES.projection,
-			`knowledge-base projection output unreadable: ${error.message}`,
+			"AMBER_E_PROJECTION_MISSING",
+			`knowledge-base committed projection output unavailable at ${COMMITTED_CORPUS_DIR}: ${err.message} — run \`amber knowledge context-sync --target <repo>\``,
 		);
 	}
 	const pages = Array.isArray(output.pages) ? output.pages : [];
+
+	// Filter to exact manifest members only (excludes unrelated categorized pages).
 	const rows = pages
 		.map(pageRowFromProjectionPage)
 		.filter(Boolean)
-		.filter((row) => ["adr", "wiki", "architecture"].includes(row.category))
+		.filter((row) => manifestRowsByPageId.has(row.pageId))
 		.sort((a, b) =>
 			a.sourceNodeId < b.sourceNodeId ? -1 : a.sourceNodeId > b.sourceNodeId ? 1 : 0,
 		);
+
+	// Validate census against the committed manifest's declared counts.
 	const { errors } = censusErrors(rows);
 	if (errors.length > 0) {
 		throw typedError(
@@ -326,6 +381,33 @@ function readKnowledgeBaseProjection(targetRoot) {
 			`knowledge-base projection manifest mismatch: ${errors.join("; ")}`,
 		);
 	}
+
+	// Verify mutable source freshness: current source hashes must match the manifest snapshot.
+	// This prevents serving a graph that silently diverges from the current repository state.
+	// Use normHash (whitespace-normalized) so CRLF/LF line-ending differences on Windows
+	// do not produce false-positive stale detections between checkout and clean archive.
+	const stalePages = [];
+	for (const row of rows) {
+		const manifestRow = manifestRowsByPageId.get(row.pageId);
+		let currentNormHash;
+		try {
+			const full = resolvePathWithin(root, row.sourcePath, { label: "Knowledge manifest source" });
+			currentNormHash = hashFile(full).normHash;
+		} catch {
+			stalePages.push(`${row.pageId} (source missing: ${row.sourcePath})`);
+			continue;
+		}
+		if (currentNormHash !== manifestRow.source.normHash) {
+			stalePages.push(`${row.pageId} (${row.sourcePath})`);
+		}
+	}
+	if (stalePages.length > 0) {
+		throw typedError(
+			ERROR_CODES.staleSource,
+			`knowledge-base managed sources are stale: ${stalePages.join(", ")} — run \`amber knowledge context-sync --target <repo>\``,
+		);
+	}
+
 	return rows;
 }
 
@@ -405,10 +487,13 @@ module.exports = {
 	MANIFEST_SCHEMA_VERSION,
 	PROJECTION_RULE_VERSION,
 	EXPECTED_COUNTS,
+	COMMITTED_CORPUS_DIR,
 	ERROR_CODES,
 	buildKnowledgeContextManifest,
 	syncKnowledgeContextPages,
 	readKnowledgeBaseProjection,
 	rebuildKnowledgeBaseProjection,
 	buildHumanReviewSample,
+	committedManifestPath,
+	committedProjectionOutputPath,
 };

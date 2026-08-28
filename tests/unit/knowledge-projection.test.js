@@ -8,8 +8,11 @@ const { spawnSync } = require("node:child_process");
 
 const {
 	EXPECTED_COUNTS,
+	COMMITTED_CORPUS_DIR,
 	buildHumanReviewSample,
 	buildKnowledgeContextManifest,
+	committedManifestPath,
+	committedProjectionOutputPath,
 	readKnowledgeBaseProjection,
 	syncKnowledgeContextPages,
 } = require("../../scripts/lib/core/knowledge-projection");
@@ -168,7 +171,7 @@ test("F059 graph production path reads projection and matches tree-reader bytes"
 
 test("F059 graph production path fails closed when projection is absent", () => {
 	const root = createCorpus("kg-no-projection");
-	assert.throws(() => buildKnowledgeGraph(root), /knowledge-base projection unavailable/);
+	assert.throws(() => buildKnowledgeGraph(root), /committed manifest unavailable/);
 });
 
 test("F059 review sample spans ADR, wiki, and architecture pages", () => {
@@ -199,4 +202,149 @@ test("F059 CLI context-sync and knowledge graph use the projection path", () => 
 	);
 	assert.equal(graphRun.status, 0, graphRun.stderr || graphRun.stdout);
 	assert.equal(graphRun.stdout.trim(), serializeKnowledgeGraph(buildKnowledgeGraphFromTree(root)));
+});
+
+// ── Additional tests covering two-axis review findings ────────────────
+
+test("F059 clean git-ls-files corpus produces graph with no prior .amber/ state", () => {
+	// Simulate what git archive delivers: only tracked files from docs/knowledge-corpus/.
+	// Uses REPO_ROOT's committed corpus directly (the production path).
+	// No context-sync or .amber/ writes are needed.
+	const { result, exitCode } = require("../../scripts/lib/knowledge-commands").knowledgeDispatch({
+		_: ["graph"],
+		target: REPO_ROOT,
+	});
+	assert.equal(exitCode, 0, JSON.stringify(result.errors));
+	assert.equal(result.errors.length, 0);
+	const graph = JSON.parse(result.text);
+	assert.ok(graph.nodes.length >= 43, "must include at least the 43 committed corpus nodes");
+	// Byte-identical to tree-reader (parity seam)
+	assert.equal(result.text, serializeKnowledgeGraph(buildKnowledgeGraphFromTree(REPO_ROOT)));
+});
+
+test("F059 context-sync pages carry explicit ownership fields and provisional maturity", () => {
+	const root = createCorpus("kg-ownership");
+	syncKnowledgeContextPages(root);
+	const pagePath = path.join(root, ".amber", "context", "pages", "knowledge-adr-0001.json");
+	const page = readJson(pagePath);
+	assert.equal(page.generatedBy, "context-sync");
+	assert.equal(page.artifact_type, "knowledge-context-page");
+	assert.equal(page.manifestId, "f059-knowledge-context-pages");
+	assert.equal(page.assurance.maturity, "provisional", "HITL checkpoint pending — must not be reviewed");
+});
+
+test("F059 reader excludes unrelated categorized page not in committed manifest", () => {
+	const root = createCorpus("kg-unrelated-page");
+	syncKnowledgeContextPages(root);
+	// Inject an unrelated wiki page directly into the projection output
+	const outputPath = committedProjectionOutputPath(root);
+	const output = readJson(outputPath);
+	output.pages.push({
+		pageId: "knowledge-wiki-unrelated-extra",
+		title: "Unrelated",
+		knowledgeKind: "pattern",
+		sourceNodeId: "wiki:unrelated-extra",
+		sourceCategory: "wiki",
+		sources: { source: { kind: "wiki", ref: "docs/wiki/knowledge/unrelated/unrelated.md" } },
+		blocks: [{ type: "prose", sources: ["source"], text: "Unrelated content." }],
+	});
+	writeJson(root, path.relative(root, outputPath), output);
+	// Reader must filter this out — only manifest members pass
+	const rows = readKnowledgeBaseProjection(root);
+	assert.equal(rows.length, 43, "must return exactly 43 manifest members, not 44");
+	assert.ok(!rows.find((r) => r.pageId === "knowledge-wiki-unrelated-extra"));
+});
+
+test("F059 reader fails closed with AMBER_E_KNOWLEDGE_SOURCE_STALE when source is modified", () => {
+	const root = createCorpus("kg-stale-source-reader");
+	syncKnowledgeContextPages(root);
+	// Modify a source file after sync
+	writeFile(
+		root,
+		"docs/wiki/knowledge/topic-01/topic-01.md",
+		'---\ntitle: "Topic 1 MODIFIED"\nupdated_at: "2026-02-01"\n---\n\nChanged source text.\n',
+	);
+	assert.throws(
+		() => readKnowledgeBaseProjection(root),
+		(err) => {
+			assert.ok(err.amberCode === "AMBER_E_KNOWLEDGE_SOURCE_STALE", `unexpected code: ${err.amberCode}`);
+			return true;
+		},
+	);
+});
+
+test("F059 reader fails with AMBER_E_PROJECTION_MISSING when committed corpus is absent", () => {
+	const root = createCorpus("kg-missing-corpus");
+	// Do NOT run sync — no committed corpus files exist
+	assert.throws(
+		() => readKnowledgeBaseProjection(root),
+		(err) => {
+			assert.ok(
+				err.amberCode === "AMBER_E_PROJECTION_MISSING",
+				`unexpected code: ${err.amberCode}`,
+			);
+			return true;
+		},
+	);
+});
+
+test("F059 context-sync blocks collision when an unmanaged page occupies the target pageId", () => {
+	const root = createCorpus("kg-collision");
+	// Write a hand-authored page that structurally matches a managed row but has wrong ownership
+	const pageDir = path.join(root, ".amber", "context", "pages");
+	fs.mkdirSync(pageDir, { recursive: true });
+	const collision = {
+		schemaVersion: "1.2.0",
+		pageId: "knowledge-adr-0001",
+		title: "Hand-authored override",
+		knowledgeKind: "decision",
+		sourceNodeId: "adr:0001",
+		sourceCategory: "adr",
+		generatedBy: "human-author",
+		artifact_type: "knowledge-context-page",
+		sources: { source: { ref: "docs/adr/0001-governance-first-artifact-first.md" } },
+		blocks: [{ type: "prose", sources: ["source"], text: "Human content." }],
+	};
+	fs.writeFileSync(path.join(pageDir, "knowledge-adr-0001.json"), JSON.stringify(collision, null, 2) + "\n", "utf8");
+	const result = syncKnowledgeContextPages(root);
+	const action = result.actions.find((a) => a.pageId === "knowledge-adr-0001");
+	assert.equal(action.outcome, "blocked", "must not overwrite a page with foreign ownership markers");
+});
+
+test("F059 exact 43-row manifest replacement detection rejects 42-member manifest", () => {
+	const root = createCorpus("kg-replacement-detect");
+	syncKnowledgeContextPages(root);
+	// Tamper the committed manifest to remove one ADR row
+	const manifestPath = committedManifestPath(root);
+	const manifest = readJson(manifestPath);
+	manifest.rows = manifest.rows.filter((r) => r.pageId !== "knowledge-adr-0024");
+	manifest.counts.adr = 23;
+	manifest.counts.total = 42;
+	writeJson(root, path.relative(root, manifestPath), manifest);
+	// Reader must fail — manifest has only 23 ADR rows, not 24
+	assert.throws(
+		() => readKnowledgeBaseProjection(root),
+		(err) => {
+			assert.ok(
+				err.amberCode === "AMBER_E_PROJECTION_DRIFT",
+				`unexpected code: ${err.amberCode}`,
+			);
+			return true;
+		},
+	);
+});
+
+test("F059 tracked package state: docs/knowledge-corpus/ contains manifest and projection output", () => {
+	// Verify the committed corpus files are present in the real repository tree.
+	// This is the package/tracked-state check: a clean clone must have these files.
+	const manifestFile = path.join(REPO_ROOT, COMMITTED_CORPUS_DIR, "knowledge-context-manifest.json");
+	const projectionFile = path.join(REPO_ROOT, COMMITTED_CORPUS_DIR, "knowledge-base.output.json");
+	assert.ok(fs.existsSync(manifestFile), `committed manifest must exist at ${COMMITTED_CORPUS_DIR}`);
+	assert.ok(fs.existsSync(projectionFile), `committed projection must exist at ${COMMITTED_CORPUS_DIR}`);
+	const manifest = readJson(manifestFile);
+	assert.equal(manifest.manifestId, "f059-knowledge-context-pages");
+	assert.deepEqual(manifest.counts, EXPECTED_COUNTS);
+	assert.equal(manifest.rows.length, 43);
+	const projection = readJson(projectionFile);
+	assert.equal(projection.pages.length, 43);
 });

@@ -1,0 +1,535 @@
+{
+  "schemaVersion": "1.0.0",
+  "manifestId": "f059-knowledge-context-pages",
+  "expectedCounts": {
+    "adr": 24,
+    "wiki": 10,
+    "architecture": 9,
+    "total": 43
+  },
+  "counts": {
+    "adr": 24,
+    "wiki": 10,
+    "architecture": 9,
+    "total": 43
+  },
+  "rows": [
+    {
+      "id": "knowledge:adr:0001",
+      "category": "adr",
+      "sourceNodeId": "adr:0001",
+      "pageId": "knowledge-adr-0001",
+      "sourcePath": "docs/adr/0001-governance-first-artifact-first.md",
+      "title": "Governance-first, artifact-first protocol",
+      "source": {
+        "rawHash": "sha256:0131a7626b266eda54f902d94bba9d6151100141d7e43c5a220427be7e326aaa",
+        "normHash": "sha256:27d27a22d55c7ce4a46de174140853604481829c0b5974f27b858945e137d902"
+      }
+    },
+    {
+      "id": "knowledge:adr:0002",
+      "category": "adr",
+      "sourceNodeId": "adr:0002",
+      "pageId": "knowledge-adr-0002",
+      "sourcePath": "docs/adr/0002-v2-execution-scope.md",
+      "title": "V2 Execution Scope — Experimental Isolation",
+      "source": {
+        "rawHash": "sha256:d38711c58f87fd3701b56958bdda11fe0c18d7322e904b89a583e6bc3c13e86d",
+        "normHash": "sha256:d5d53fc6687ce3a8a3e317c6d1700d29ae757a9882e6d4502abdc4dc3bacf23d"
+      }
+    },
+    {
+      "id": "knowledge:adr:0003",
+      "category": "adr",
+      "sourceNodeId": "adr:0003",
+      "pageId": "knowledge-adr-0003",
+      "sourcePath": "docs/adr/0003-governance-gated-execution.md",
+      "title": "Governance-Gated Execution (L2)",
+      "source": {
+        "rawHash": "sha256:86d5c247dbf1216c1c3abd81806b783c961374e155726949d40c9d21a0aab68e",
+        "normHash": "sha256:ef9db620853647dd7335708c0bf76cd7fddbce06921a4042beef25daf78a9122"
+      }
+    },
+    {
+      "id": "knowledge:adr:0004",
+      "category": "adr",
+      "sourceNodeId": "adr:0004",
+      "pageId": "knowledge-adr-0004",
+      "sourcePath": "docs/adr/0004-evidence-grade-verification.md",
+      "title": "Evidence-Grade Verification",
+      "source": {
+        "rawHash": "sha256:e438514914992244ba0414e16ec6eecf34311a36a7527f86e8c9bc2f5d6f1816",
+        "normHash": "sha256:2d4952d4d4ece96d9f5970a7f8b61116b98bf0df1b9aaea57322cd6768b4002c"
+      }
+    },
+    {
+      "id": "knowledge:adr:0005",
+      "category": "adr",
+      "sourceNodeId": "adr:0005",
+      "pageId": "knowledge-adr-0005",
+      "sourcePath": "docs/adr/0005-experimental-execution-removal.md",
+      "title": "Experimental Execution Removal — Supersedes ADR-0002 Preservation",
+      "source": {
+        "rawHash": "sha256:1fd683c290cd5ec21f74232fb426291d448d419eeb2c60dfdd9285b4ea8e1d3d",
+        "normHash": "sha256:dca4c9107c9a34c171ad10e36cd3b12079cf007aa2e83d4932de5bb6a83f360f"
+      }
+    },
+    {
+      "id": "knowledge:adr:0006",
+      "category": "adr",
+      "sourceNodeId": "adr:0006",
+      "pageId": "knowledge-adr-0006",
+      "sourcePath": "docs/adr/0006-viewer-amber-only.md",
+      "title": "Web viewer is `.amber`-only",
+      "source": {
+        "rawHash": "sha256:c7ebfb5ff57ef08c7ff5a04dae4fbdef13034b9400bf43d9f3d5de976359bde3",
+        "normHash": "sha256:8e34d3bfb85ba67a9089d6d2af2208be4d569b5153a80c5b38a52e0983e2121a"
+      }
+    },
+    {
+      "id": "knowledge:adr:0007",
+      "category": "adr",
+      "sourceNodeId": "adr:0007",
+      "pageId": "knowledge-adr-0007",
+      "sourcePath": "docs/adr/0007-web-viewer-role.md",
+      "title": "Web console role — supervised action viewer",
+      "source": {
+        "rawHash": "sha256:76f5bd40566fb9de2922f4b796e9ec2cecf1af109d8fa3a68ddae19c08d92001",
+        "normHash": "sha256:fd7c8c0a1e8fc0da292e75a1d13184c77d1cf78ed95c6593fa627681dc2edcee"
+      }
+    },
+    {
+      "id": "knowledge:adr:0008",
+      "category": "adr",
+      "sourceNodeId": "adr:0008",
+      "pageId": "knowledge-adr-0008",
+      "sourcePath": "docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
+      "title": "Workflow Effectiveness Review — a separate read-only assessment beside Governance Readiness",
+      "source": {
+        "rawHash": "sha256:c6c544be2c1509f3c99da82c78d97f813e8164fed3028a71db50aed96d937276",
+        "normHash": "sha256:2837f788f0d39183661064f85ab41e86210c840bde6aba592fd94100de9e0e73"
+      }
+    },
+    {
+      "id": "knowledge:adr:0009",
+      "category": "adr",
+      "sourceNodeId": "adr:0009",
+      "pageId": "knowledge-adr-0009",
+      "sourcePath": "docs/adr/0009-contract-driven-context-distillation.md",
+      "title": "Contract-Driven Context Distillation — Amber Governs, Agents Generate",
+      "source": {
+        "rawHash": "sha256:750b685176e178f0c7bdb1a40c28b4da67865366e479126de099bee81fe6ea1a",
+        "normHash": "sha256:29da2cd0e8a6d4cdb259b8ee1daf8f6222ed90e287b18047d96eca6444c2feb5"
+      }
+    },
+    {
+      "id": "knowledge:adr:0010",
+      "category": "adr",
+      "sourceNodeId": "adr:0010",
+      "pageId": "knowledge-adr-0010",
+      "sourcePath": "docs/adr/0010-context-loadout.md",
+      "title": "Context Loadout — Amber Governs the Agent's Context Window",
+      "source": {
+        "rawHash": "sha256:f7ca54d44422976ab45745ab06499ec369d06610ad838c3cb81791c208183f3b",
+        "normHash": "sha256:b019d6cf978657ce9701d39f7810962058ee143b3652edb536b061b626b9e272"
+      }
+    },
+    {
+      "id": "knowledge:adr:0011",
+      "category": "adr",
+      "sourceNodeId": "adr:0011",
+      "pageId": "knowledge-adr-0011",
+      "sourcePath": "docs/adr/0011-safety-philosophy-upgrades.md",
+      "title": "Safety Philosophy Upgrades — Confidence Gating and Explicit Fail-Closed (T1)",
+      "source": {
+        "rawHash": "sha256:c8ebd871b03f51383f192693bfd0298cf6635b1f5a1883a0cec0e6819833322a",
+        "normHash": "sha256:afcc99e8fc599882acdf2d3b4c7bbc707afdeed5a10133c7dabd0bc3b3b86fe6"
+      }
+    },
+    {
+      "id": "knowledge:adr:0012",
+      "category": "adr",
+      "sourceNodeId": "adr:0012",
+      "pageId": "knowledge-adr-0012",
+      "sourcePath": "docs/adr/0012-protocol-and-schema-versioning.md",
+      "title": "Protocol and Schema Versioning — Execution Routing and Context Persistence",
+      "source": {
+        "rawHash": "sha256:dcc341c3229ac0bbc6c53ce5ed95bbe2c344734e857b868379aef5f9eed9fb73",
+        "normHash": "sha256:bee0fe5572f65163fcf1c2f0eddf45749ad67619ead1c7069d2eddc57e50496c"
+      }
+    },
+    {
+      "id": "knowledge:adr:0013",
+      "category": "adr",
+      "sourceNodeId": "adr:0013",
+      "pageId": "knowledge-adr-0013",
+      "sourcePath": "docs/adr/0013-no-progress-detection.md",
+      "title": "No-Progress Detection — a workflow-effectiveness signal, not a new error code",
+      "source": {
+        "rawHash": "sha256:9c308cd08a9ea610151b4b66512fc3b007059efad7d69b3b2845eb1172934c5d",
+        "normHash": "sha256:2b46cf9af54f59c152fac55b36a517c029e98cb9eb39243c60af94f37b89ebde"
+      }
+    },
+    {
+      "id": "knowledge:adr:0014",
+      "category": "adr",
+      "sourceNodeId": "adr:0014",
+      "pageId": "knowledge-adr-0014",
+      "sourcePath": "docs/adr/0014-routing-advisor.md",
+      "title": "Routing Advisor — objective-driven `amber next` (T5.8)",
+      "source": {
+        "rawHash": "sha256:e573d4495019ea7330eb4811f91603c2787f3745ed2a2d3163733f7189897320",
+        "normHash": "sha256:8ebdeb2eea84e2cc1201e4eee6c10b272ce1887546ddb0d9fc86811f09fd1417"
+      }
+    },
+    {
+      "id": "knowledge:adr:0015",
+      "category": "adr",
+      "sourceNodeId": "adr:0015",
+      "pageId": "knowledge-adr-0015",
+      "sourcePath": "docs/adr/0015-review-blocker-remediation-contracts.md",
+      "title": "Review Blocker Remediation Contracts",
+      "source": {
+        "rawHash": "sha256:9c7c6c4f1bd939989aff00154e4fc2a49317cfcbf5ab0d5d5ae6dbacd2b0ec12",
+        "normHash": "sha256:9fb88cfbb0623a7bc16842d83ccbde49b9bbaef3efa5609703cc32b9895375a1"
+      }
+    },
+    {
+      "id": "knowledge:adr:0016",
+      "category": "adr",
+      "sourceNodeId": "adr:0016",
+      "pageId": "knowledge-adr-0016",
+      "sourcePath": "docs/adr/0016-deep-governance-decision-seams.md",
+      "title": "Deep Governance Decision Seams",
+      "source": {
+        "rawHash": "sha256:49e39219671f65f9943cf69fef90c457934ede8c179d410e665dc5fb0bc3b657",
+        "normHash": "sha256:d26520c10d22a4563098954f1bc0f89a11861b06de1416a392e15dc77b5c1403"
+      }
+    },
+    {
+      "id": "knowledge:adr:0017",
+      "category": "adr",
+      "sourceNodeId": "adr:0017",
+      "pageId": "knowledge-adr-0017",
+      "sourcePath": "docs/adr/0017-live-observability-artifact-polling.md",
+      "title": "Live observability via artifact polling and SSE invalidation",
+      "source": {
+        "rawHash": "sha256:1e995c732f66454116f618d2e14fe27a4613e1bd7653e02167a266c09dd2ee65",
+        "normHash": "sha256:b60fb7e598ed620fbd57987edf3b4227d6e91ca34e5a9a7ec0c8fdc4553d899a"
+      }
+    },
+    {
+      "id": "knowledge:adr:0018",
+      "category": "adr",
+      "sourceNodeId": "adr:0018",
+      "pageId": "knowledge-adr-0018",
+      "sourcePath": "docs/adr/0018-governed-memory-layer.md",
+      "title": "Governed Memory Layer — Registry-Backed Memory with Governed Promotion",
+      "source": {
+        "rawHash": "sha256:f1b3c44cf8791a0406d09a732250b80744532878d9af093ec89cee06f1b03ab5",
+        "normHash": "sha256:0a59d7bf8466a333bb8c9f8d9253cdf25ca954576dedb22938c78f353c73c35a"
+      }
+    },
+    {
+      "id": "knowledge:adr:0019",
+      "category": "adr",
+      "sourceNodeId": "adr:0019",
+      "pageId": "knowledge-adr-0019",
+      "sourcePath": "docs/adr/0019-distributed-governance-stage1-decisions.md",
+      "title": "Distributed Governance Stage 1 — Contract-First Ordering, Envelope Schema Placement, and Identity Bootstrap",
+      "source": {
+        "rawHash": "sha256:368874549ccc287370564bac9aee2b4c38785cb555faf00f830cba326649dc64",
+        "normHash": "sha256:69f52df310721ab62b72c9c71582914a3d6a8984e580e3b3f0102baca47927f6"
+      }
+    },
+    {
+      "id": "knowledge:adr:0020",
+      "category": "adr",
+      "sourceNodeId": "adr:0020",
+      "pageId": "knowledge-adr-0020",
+      "sourcePath": "docs/adr/0020-governed-live-git-transport.md",
+      "title": "Governed Live Git Transport for the Sync Runtime",
+      "source": {
+        "rawHash": "sha256:0a69267b84c95be2bae399eb735546261f66be6462526e1317ee20bf90198ece",
+        "normHash": "sha256:20ecffaf5bb3e5caa5693e6dd07fa27fdb6cec1e3daa58f45e8b1cbddfe3482b"
+      }
+    },
+    {
+      "id": "knowledge:adr:0021",
+      "category": "adr",
+      "sourceNodeId": "adr:0021",
+      "pageId": "knowledge-adr-0021",
+      "sourcePath": "docs/adr/0021-canonical-artifact-governance-graph-integration.md",
+      "title": "Canonical Artifacts Reuse the Governance Graph Projection",
+      "source": {
+        "rawHash": "sha256:eff39bbd38fcc612ec743678f4d41f257600e6e79d78d2110520c55662c7fc39",
+        "normHash": "sha256:37a3285b18c2eddfe7716e8a813e85a3de85ec2e7219fefd549164dc5ba03e99"
+      }
+    },
+    {
+      "id": "knowledge:adr:0022",
+      "category": "adr",
+      "sourceNodeId": "adr:0022",
+      "pageId": "knowledge-adr-0022",
+      "sourcePath": "docs/adr/0022-pilot-execution-boundary-and-external-evidence.md",
+      "title": "2.0 Pilot Is Governance-Only with Admissible External Evidence",
+      "source": {
+        "rawHash": "sha256:970874b0b9db09f11b6ca2503b71e0445ab1556b27e9f42b7e2d2fced55ab405",
+        "normHash": "sha256:03c749d754758e791849112e11415137edeb83abc0070f6105e80d552e69ca21"
+      }
+    },
+    {
+      "id": "knowledge:adr:0023",
+      "category": "adr",
+      "sourceNodeId": "adr:0023",
+      "pageId": "knowledge-adr-0023",
+      "sourcePath": "docs/adr/0023-canonical-artifact-body-envelope-hash.md",
+      "title": "Canonical Artifacts Bind a Human Body to a Versioned Envelope",
+      "source": {
+        "rawHash": "sha256:05da95ad269e9ec8127d90e6b2758077993468e5ddfbb2013977a61a938c6ca5",
+        "normHash": "sha256:65d47ee950b6691d6d191ef47f3d1f0251f6c61e4cb35426557091decf22ca00"
+      }
+    },
+    {
+      "id": "knowledge:adr:0024",
+      "category": "adr",
+      "sourceNodeId": "adr:0024",
+      "pageId": "knowledge-adr-0024",
+      "sourcePath": "docs/adr/0024-read-only-adapters-and-explicit-cutover.md",
+      "title": "Legacy and External Records Migrate through Read-Only Adapters",
+      "source": {
+        "rawHash": "sha256:a690370d0dd27f810dcf890ce2a3c942fed1f6050ffb5d02c9c08915116f378b",
+        "normHash": "sha256:a9d171453253ef3750da0fef2f0fa9c615250faf30912c68a0b332510da0e79d"
+      }
+    },
+    {
+      "id": "knowledge:architecture:context-threat-model",
+      "category": "architecture",
+      "sourceNodeId": "architecture:context-threat-model",
+      "pageId": "knowledge-architecture-context-threat-model",
+      "sourcePath": "docs/architecture/context-threat-model.md",
+      "title": "Context Threat Model",
+      "source": {
+        "rawHash": "sha256:3f11eb2a60951b4ca201f45ba12107fa671f5e78ea3c16a43114e580a66c8158",
+        "normHash": "sha256:a6bfe2ac7d52e0a0e947e03f7035f4e2c2c811d4ea03b415c21059b203ead52c"
+      }
+    },
+    {
+      "id": "knowledge:architecture:data-flow",
+      "category": "architecture",
+      "sourceNodeId": "architecture:data-flow",
+      "pageId": "knowledge-architecture-data-flow",
+      "sourcePath": "docs/architecture/data-flow.md",
+      "title": "Data Flow",
+      "source": {
+        "rawHash": "sha256:c9523780a5fd44fad44978e7cbf280ff50d413f9d8946a3260ac9e169885b576",
+        "normHash": "sha256:c59f7fec26dab3157ec601f5ffbaec092e139dc66d8a86ba8ec1ed62d6a0e781"
+      }
+    },
+    {
+      "id": "knowledge:architecture:distributed-governance-baseline",
+      "category": "architecture",
+      "sourceNodeId": "architecture:distributed-governance-baseline",
+      "pageId": "knowledge-architecture-distributed-governance-baseline",
+      "sourcePath": "docs/architecture/distributed-governance-baseline.md",
+      "title": "Distributed Governance Architecture Baseline",
+      "source": {
+        "rawHash": "sha256:f5e66ca35443f77fba7237d7a01f6b85538329a15e725219c62480fc20271d83",
+        "normHash": "sha256:97c2b4710f1add0dc5dd5706c8a5745ae13d55ee3deae479932a880b647124db"
+      }
+    },
+    {
+      "id": "knowledge:architecture:extension-points",
+      "category": "architecture",
+      "sourceNodeId": "architecture:extension-points",
+      "pageId": "knowledge-architecture-extension-points",
+      "sourcePath": "docs/architecture/extension-points.md",
+      "title": "Extension Points",
+      "source": {
+        "rawHash": "sha256:f1409ffa526fdc6f148d2d4dbf7755ec4addd6e2dc13d5a4bcfa1d71dfd2c267",
+        "normHash": "sha256:13bde50114b96680de59e3fd8188a67566ac236f03519269ee0a431dabe4ca21"
+      }
+    },
+    {
+      "id": "knowledge:architecture:governance-model",
+      "category": "architecture",
+      "sourceNodeId": "architecture:governance-model",
+      "pageId": "knowledge-architecture-governance-model",
+      "sourcePath": "docs/architecture/governance-model.md",
+      "title": "Governance Model Architecture",
+      "source": {
+        "rawHash": "sha256:e83880fed42b48d1581924fd7b944189f66cec18c6b4e2d76ee4265d6c24688c",
+        "normHash": "sha256:8208bf5610733151d146de66d40f2f26ad490b50d37312fbaef569c4f210c78e"
+      }
+    },
+    {
+      "id": "knowledge:architecture:overview",
+      "category": "architecture",
+      "sourceNodeId": "architecture:overview",
+      "pageId": "knowledge-architecture-overview",
+      "sourcePath": "docs/architecture/overview.md",
+      "title": "System Architecture",
+      "source": {
+        "rawHash": "sha256:fb579e95567c7c083a25377725be9e470cffd397a86c69396bb0380ab138661c",
+        "normHash": "sha256:3da26faf352e4d665f47508a34c4e807dabe28b2a161a91de60a3b956e441c8b"
+      }
+    },
+    {
+      "id": "knowledge:architecture:route-engine",
+      "category": "architecture",
+      "sourceNodeId": "architecture:route-engine",
+      "pageId": "knowledge-architecture-route-engine",
+      "sourcePath": "docs/architecture/route-engine.md",
+      "title": "Route Engine Architecture",
+      "source": {
+        "rawHash": "sha256:5d704ffed136c11ab2b27f2457329ad0088fa3436ab7f96c83dfd5f2c5acda28",
+        "normHash": "sha256:2bdefc99cd1170615464c46a8cec9fb251ea5eadafb80474a54b98e321389910"
+      }
+    },
+    {
+      "id": "knowledge:architecture:session-lifecycle",
+      "category": "architecture",
+      "sourceNodeId": "architecture:session-lifecycle",
+      "pageId": "knowledge-architecture-session-lifecycle",
+      "sourcePath": "docs/architecture/session-lifecycle.md",
+      "title": "Session Lifecycle Architecture",
+      "source": {
+        "rawHash": "sha256:371f2701674ae9a03dc8fc233c405280acd163819936d378fdda07ae29ac4418",
+        "normHash": "sha256:6d8c6f7d28783ce23696c61f5abd4cf1b9b38577629e8c502fcf8e505c747941"
+      }
+    },
+    {
+      "id": "knowledge:architecture:web-viewer",
+      "category": "architecture",
+      "sourceNodeId": "architecture:web-viewer",
+      "pageId": "knowledge-architecture-web-viewer",
+      "sourcePath": "docs/architecture/web-viewer.md",
+      "title": "Web Viewer Architecture",
+      "source": {
+        "rawHash": "sha256:741acc76ee4b6da4c9a6a25861e5d3577e58f57c4922493ecb6974352f05aec0",
+        "normHash": "sha256:1025be71907735d6358bcc6e9c4102baa49d87f840daadc0f52271dce92f61a5"
+      }
+    },
+    {
+      "id": "knowledge:wiki:adoption-system",
+      "category": "wiki",
+      "sourceNodeId": "wiki:adoption-system",
+      "pageId": "knowledge-wiki-adoption-system",
+      "sourcePath": "docs/wiki/knowledge/adoption-system/adoption-system.md",
+      "title": "Adoption System",
+      "source": {
+        "rawHash": "sha256:327f1b10c5e23a760667f47d86ea5230a81eaba9213ed2c6cfc05b66055d1886",
+        "normHash": "sha256:ec35600aa34bdc5656ab30b090e27b8b5b5a85e61e44e7b2f00a4f43d0469950"
+      }
+    },
+    {
+      "id": "knowledge:wiki:cli-architecture-command-dispatch",
+      "category": "wiki",
+      "sourceNodeId": "wiki:cli-architecture-command-dispatch",
+      "pageId": "knowledge-wiki-cli-architecture-command-dispatch",
+      "sourcePath": "docs/wiki/knowledge/cli-architecture-command-dispatch/cli-architecture-command-dispatch.md",
+      "title": "CLI Architecture & Command Dispatch",
+      "source": {
+        "rawHash": "sha256:f4006d82a282ae4fcb2e839f15257f155802b29285543fef2999200fa2751168",
+        "normHash": "sha256:167f5f08d805e6851cd1550a7eaabe97f7a2613dd3489e1ddb58537440b6896d"
+      }
+    },
+    {
+      "id": "knowledge:wiki:governance-model-seven-layers",
+      "category": "wiki",
+      "sourceNodeId": "wiki:governance-model-seven-layers",
+      "pageId": "knowledge-wiki-governance-model-seven-layers",
+      "sourcePath": "docs/wiki/knowledge/governance-model-seven-layers/governance-model-seven-layers.md",
+      "title": "Governance Model & Seven Layers",
+      "source": {
+        "rawHash": "sha256:945850ad76c2490819b6a0a332625a05122600e97035aadede2587f24da7e9bf",
+        "normHash": "sha256:0bd568fc2f945d211d35c9bd2cf3e791888075ee5d7ff59a0bf2099fe8a2fe4b"
+      }
+    },
+    {
+      "id": "knowledge:wiki:handoff-continuity",
+      "category": "wiki",
+      "sourceNodeId": "wiki:handoff-continuity",
+      "pageId": "knowledge-wiki-handoff-continuity",
+      "sourcePath": "docs/wiki/knowledge/handoff-continuity/handoff-continuity.md",
+      "title": "Handoff & Continuity",
+      "source": {
+        "rawHash": "sha256:0f11a97c52d92b37ea6eb3df33f9e506f07f12fd0047372bafeb3ea30c7c08bb",
+        "normHash": "sha256:bbaa4f6e30b91ece6acd012d54ca90cf7ceadadd7faf6c74e089ba0cad330ef2"
+      }
+    },
+    {
+      "id": "knowledge:wiki:loop-engineering-governed-execution",
+      "category": "wiki",
+      "sourceNodeId": "wiki:loop-engineering-governed-execution",
+      "pageId": "knowledge-wiki-loop-engineering-governed-execution",
+      "sourcePath": "docs/wiki/knowledge/loop-engineering-governed-execution/loop-engineering-governed-execution.md",
+      "title": "Loop Engineering & Governed Execution",
+      "source": {
+        "rawHash": "sha256:7477b5885e911137fe44637b4f79a98eecd9f5f86345735f80f5145d2abcb100",
+        "normHash": "sha256:5b277595fa38ec69230546b0e1af8f1102ff9eee82f40e04c31af40a0a67fe98"
+      }
+    },
+    {
+      "id": "knowledge:wiki:schema-validation-layer",
+      "category": "wiki",
+      "sourceNodeId": "wiki:schema-validation-layer",
+      "pageId": "knowledge-wiki-schema-validation-layer",
+      "sourcePath": "docs/wiki/knowledge/schema-validation-layer/schema-validation-layer.md",
+      "title": "Schema & Validation Layer",
+      "source": {
+        "rawHash": "sha256:015987a8685f7ad3b4176dc75e95852ba0835f5860ac232988f62533cd2a49eb",
+        "normHash": "sha256:a39abf94ef346f1f422933d538d09abc2266b17de110704cf0e9bdb0931521b3"
+      }
+    },
+    {
+      "id": "knowledge:wiki:security-migration-utilities",
+      "category": "wiki",
+      "sourceNodeId": "wiki:security-migration-utilities",
+      "pageId": "knowledge-wiki-security-migration-utilities",
+      "sourcePath": "docs/wiki/knowledge/security-migration-utilities/security-migration-utilities.md",
+      "title": "Security & Migration Utilities",
+      "source": {
+        "rawHash": "sha256:4adf6ed3e21cf1b9b4a5dd1cdeb1cb853e37e66eebb1db3abe49d3a8cc445ab0",
+        "normHash": "sha256:b1e6528c8ebd0355f4061f6953c13c1897b58fb60af2f502b7084fc75b6a93b2"
+      }
+    },
+    {
+      "id": "knowledge:wiki:session-lifecycle-management",
+      "category": "wiki",
+      "sourceNodeId": "wiki:session-lifecycle-management",
+      "pageId": "knowledge-wiki-session-lifecycle-management",
+      "sourcePath": "docs/wiki/knowledge/session-lifecycle-management/session-lifecycle-management.md",
+      "title": "Session & Lifecycle Management",
+      "source": {
+        "rawHash": "sha256:61653f1c0e434bdf8a076820bcd72b8715836721346fa17e260d5958de3f2ac0",
+        "normHash": "sha256:a9fe6442865cd3e8b63b1ece101fa9203d921fbc7997410e8b0ea590f5e7cf3d"
+      }
+    },
+    {
+      "id": "knowledge:wiki:skills-platform-generation",
+      "category": "wiki",
+      "sourceNodeId": "wiki:skills-platform-generation",
+      "pageId": "knowledge-wiki-skills-platform-generation",
+      "sourcePath": "docs/wiki/knowledge/skills-platform-generation/skills-platform-generation.md",
+      "title": "Skills & Platform Generation",
+      "source": {
+        "rawHash": "sha256:0daf9588300dafc667b8fd3e4a91173ae4fa59f76d153cd1505ddfaa8f65b469",
+        "normHash": "sha256:8e660c553126e870d7c0089983362eb8ccc90ad63316e58f21ace91a28be91e6"
+      }
+    },
+    {
+      "id": "knowledge:wiki:web-dashboard",
+      "category": "wiki",
+      "sourceNodeId": "wiki:web-dashboard",
+      "pageId": "knowledge-wiki-web-dashboard",
+      "sourcePath": "docs/wiki/knowledge/web-dashboard/web-dashboard.md",
+      "title": "Web Dashboard",
+      "source": {
+        "rawHash": "sha256:ee25d7b393bac2265ec1e59931fac0725a47c91504df691b5e6b038d65e1151b",
+        "normHash": "sha256:893f8c4c1225f3310234cbaf3a042a1c9d1de0eab41d5f79f2bc1de2bb76fe2e"
+      }
+    }
+  ],
+  "manifestHash": "sha256:4727d72a247175d855fc4d627b9bbbee946ee94e62de56e7f310d6b585a7db15"
+}

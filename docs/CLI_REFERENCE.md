@@ -1859,6 +1859,48 @@ target binding; if a fixture declares `target`, the binding must match the selec
 age and eligibility but does not delete or rewrite requests, payloads, pages, verification evidence,
 Loadouts, or projections. See the [Context threat model](architecture/context-threat-model.md).
 
+## Knowledge Graph Commands
+
+`amber knowledge` is the F059 deterministic knowledge-graph surface. The production read path uses
+a committed corpus at `docs/knowledge-corpus/` (tracked in git) so `amber knowledge graph` succeeds
+on a clean clone without any prior mutation to `.amber/`.
+
+**Intentional census gate:** the F059 corpus is a deliberate, reviewed snapshot of exactly
+24 ADR + 10 wiki + 9 architecture documents (43 total). Adding any document in those directories
+will fail `context-manifest` and `context-sync` until `EXPECTED_COUNTS` in
+`scripts/lib/core/knowledge-projection.js` is updated and a fresh `context-sync --refresh` run
+is committed. This is by design — the gate forces conscious corpus inclusion.
+
+```bash
+# Deterministic knowledge graph (reads committed docs/knowledge-corpus/)
+node scripts/amber.js knowledge graph --target . --json
+
+# Inspect the current F059 corpus manifest (24 ADR + 10 wiki + 9 arch = 43 rows)
+node scripts/amber.js knowledge context-manifest --target . --json
+
+# Build / refresh the committed corpus (writes docs/knowledge-corpus/ — then commit the changes)
+node scripts/amber.js knowledge context-sync   --target .             # create/skip unchanged pages
+node scripts/amber.js knowledge context-sync   --target . --refresh   # force re-ingest all 43 pages
+
+# Prepare HITL review sample (6 pages spanning all three categories — requires human review before close)
+node scripts/amber.js knowledge context-review-sample --target . --output .scratch/review-sample.json
+
+# Other knowledge base subcommands
+node scripts/amber.js knowledge admit  --target . --page <id> --auth <approval-id>
+node scripts/amber.js knowledge list   --target .
+node scripts/amber.js knowledge status --target . --id <id>
+node scripts/amber.js knowledge retire --target . --id <id> --reason "<reason>"
+node scripts/amber.js knowledge query  --target . --scope <scope>
+```
+
+The `context-sync` command writes `.amber/context/pages/knowledge-*.json` (ADR-0009 pipeline)
+**and** `docs/knowledge-corpus/` (committed production corpus). Commit the updated
+`docs/knowledge-corpus/` files after every `context-sync` run that changes the corpus. Pages are
+generated with `maturity: "provisional"` — they require human review before the maturity can be
+advanced to `reviewed`.
+
+See `scripts/lib/core/knowledge-projection.js` and `docs/specs/F059-knowledge-decision-map.md`.
+
 ## Memory Commands
 
 `amber memory` is the ADR-0018 Governed Memory Layer surface: a governed write-back pipeline for
