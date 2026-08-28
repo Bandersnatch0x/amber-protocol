@@ -409,7 +409,11 @@ test("F-2: context page with #L range fragment merges into its source node", () 
 	const fixture = buildKnowledgeGraphFromTree(dir);
 	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
 	assert.ok(adr, "adr:0001 node missing");
-	assert.equal(adr.contextPage, "test-fragmented-page", "context page did not merge via committed manifest");
+	assert.equal(
+		adr.contextPage,
+		"test-fragmented-page",
+		"context page did not merge via committed manifest",
+	);
 });
 
 test("F-2: context page sourcing a canonical-artifact body file merges into the artifact node", () => {
@@ -432,7 +436,11 @@ test("F-2: context page sourcing a canonical-artifact body file merges into the 
 	const withoutManifest = buildKnowledgeGraphFromTree(dir);
 	const nodeWithout = withoutManifest.nodes.find((n) => n.id === "artifact:intent/intent/cp-test");
 	assert.ok(nodeWithout, "artifact node missing");
-	assert.equal(nodeWithout.contextPage, undefined, "must not set contextPage without manifest entry");
+	assert.equal(
+		nodeWithout.contextPage,
+		undefined,
+		"must not set contextPage without manifest entry",
+	);
 
 	// With manifest entry mapping the identity path: contextPage is set.
 	fs.mkdirSync(path.join(dir, "docs", "knowledge-corpus"), { recursive: true });
@@ -444,7 +452,11 @@ test("F-2: context page sourcing a canonical-artifact body file merges into the 
 	const withManifest = buildKnowledgeGraphFromTree(dir);
 	const nodeWith = withManifest.nodes.find((n) => n.id === "artifact:intent/intent/cp-test");
 	assert.ok(nodeWith, "artifact node missing after adding manifest");
-	assert.equal(nodeWith.contextPage, "artifact-context-page", "contextPage must be set from manifest");
+	assert.equal(
+		nodeWith.contextPage,
+		"artifact-context-page",
+		"contextPage must be set from manifest",
+	);
 });
 
 // ── F-3: repository-boundary confinement ─────────────────────────────
@@ -622,9 +634,9 @@ test("F-5: amber knowledge graph --json emits schema-valid, byte-identical JSON 
 	);
 	assert.ok(f007, "F007 drift finding missing in CLI output");
 
-	// Population bounds: at minimum the 43 committed corpus nodes must appear.
-	// The graph also includes features, artifacts, and memory nodes — use >=43 as the floor.
-	assert.ok(parsed.nodes.length >= 43, `expected >=43 nodes, got ${parsed.nodes.length}`);
+	// Population bounds: at minimum the 44 committed corpus nodes must appear.
+	// The graph also includes features, artifacts, and memory nodes — use >=44 as the floor.
+	assert.ok(parsed.nodes.length >= 44, `expected >=44 nodes, got ${parsed.nodes.length}`);
 	assert.ok(parsed.edges.length >= 80, `expected >=80 edges, got ${parsed.edges.length}`);
 
 	// Independently derivable edges (from reading the ADR source files directly)

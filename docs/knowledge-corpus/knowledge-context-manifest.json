@@ -2,16 +2,16 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "expectedCounts": {
-    "adr": 24,
+    "adr": 25,
     "wiki": 10,
     "architecture": 9,
-    "total": 43
+    "total": 44
   },
   "counts": {
-    "adr": 24,
+    "adr": 25,
     "wiki": 10,
     "architecture": 9,
-    "total": 43
+    "total": 44
   },
   "rows": [
     {
@@ -303,6 +303,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0025",
+      "category": "adr",
+      "sourceNodeId": "adr:0025",
+      "pageId": "knowledge-adr-0025",
+      "sourcePath": "docs/adr/0025-code-nodes-and-anchors-edges.md",
+      "title": "Code Nodes Enter the Knowledge Graph; Anchors Become First-Class Edges",
+      "source": {
+        "rawHash": "sha256:89e95b88580cfc19a66d158f28a64df46420f1d34b5851e4b3cb766036d8ddd8",
+        "normHash": "sha256:62c535f752fafd40849cbb982e476c4fd4f274ca5d96a6757e3f4f81b124a528"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -531,5 +543,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:b771e7a34565fb59d647c3d35f92081149d4d8a55f0e9bf785e291adf4ddd2aa"
+  "manifestHash": "sha256:211ce34a0e000adbdd4db0be049d06367d79269612c2fc1870899c542240c270"
 }
