@@ -14,12 +14,12 @@ const { typedError } = require("./error-catalog");
 
 const MANIFEST_SCHEMA_VERSION = "1.0.0";
 const PROJECTION_RULE_VERSION = 1;
-// Intentional deliberate gate: this census (24 ADR + 10 wiki + 9 architecture = 43 total) is the
+// Intentional deliberate gate: this census (25 ADR + 10 wiki + 9 architecture = 44 total) is the
 // reviewed snapshot of the F059 knowledge corpus. Adding or removing any document in
 // docs/adr/, docs/wiki/knowledge/, or docs/architecture/ requires a conscious update here
 // and a fresh `amber knowledge context-sync` run to rebuild the committed corpus.
 // AMBER_E_KNOWLEDGE_MANIFEST_INVALID fires on any deviation — by design, not accident.
-const EXPECTED_COUNTS = Object.freeze({ adr: 24, wiki: 10, architecture: 9, total: 43 });
+const EXPECTED_COUNTS = Object.freeze({ adr: 25, wiki: 10, architecture: 9, total: 44 });
 const SAMPLE_LIMIT = 6;
 
 const ERROR_CODES = Object.freeze({
@@ -195,8 +195,10 @@ function generatedPageMatchesRow(page, row, currentText = null) {
 	// When explicit ownership markers are present they must match the context-sync identity.
 	// Pages without markers are treated as manageable (migration path for pre-ownership-field pages).
 	if (page.generatedBy !== undefined && page.generatedBy !== "context-sync") return false;
-	if (page.artifact_type !== undefined && page.artifact_type !== "knowledge-context-page") return false;
-	if (page.manifestId !== undefined && page.manifestId !== "f059-knowledge-context-pages") return false;
+	if (page.artifact_type !== undefined && page.artifact_type !== "knowledge-context-page")
+		return false;
+	if (page.manifestId !== undefined && page.manifestId !== "f059-knowledge-context-pages")
+		return false;
 	if (currentText === null) return true;
 	return page.blocks && page.blocks.length === 1 && page.blocks[0].text === currentText;
 }

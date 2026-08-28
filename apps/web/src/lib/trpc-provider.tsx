@@ -8,12 +8,13 @@ function queryDefaults({
   autoRefresh,
   refreshInterval,
 }: Pick<Settings, 'autoRefresh' | 'refreshInterval'>) {
+  const refetchInterval: number | false = autoRefresh ? refreshInterval * 1000 : false;
   return {
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 1,
-    refetchInterval: autoRefresh ? refreshInterval * 1000 : false,
+    refetchInterval,
   };
 }
 

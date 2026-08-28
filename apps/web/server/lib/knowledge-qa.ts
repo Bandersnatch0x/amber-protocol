@@ -5,6 +5,7 @@ import type {
   KnowledgeAskResultDTO,
   KnowledgeGraphDTO,
 } from '../../src/lib/knowledge-dto';
+import { MAX_CONTEXT_NODES } from '../../src/lib/knowledge-dto';
 import { completeWithMetadata } from './knowledge-llm';
 
 const requireCli = createRequire(import.meta.url);
@@ -29,7 +30,6 @@ Rules:
 - Do not include markdown fences or fields other than segments, text, and citations.`.trim();
 export const CITED_QA_PROMPT_HASH = sha256Hex(`${CITED_QA_PROMPT_VERSION}\0${CITED_QA_PROMPT}`);
 
-const MAX_CONTEXT_NODES = 256;
 const MAX_CONTEXT_EDGES = 512;
 const MAX_CONTEXT_DRIFT = 256;
 const MAX_CONTEXT_BYTES = 512 * 1024;
@@ -85,8 +85,15 @@ interface ContextAssembly {
   nodeIds: Set<string>;
 }
 
+// Byte order, matching the deterministic graph builder: localeCompare is
+// ICU/locale sensitive, so the same snapshot could otherwise digest
+// differently on differently configured servers.
 function stable<T>(items: readonly T[], key: (item: T) => string): T[] {
-  return [...items].sort((left, right) => key(left).localeCompare(key(right)));
+  return [...items].sort((left, right) => {
+    const a = key(left);
+    const b = key(right);
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
 }
 
 function focusedNodeIds(snapshot: KnowledgeGraphDTO, focusNodeId?: string): Set<string> {

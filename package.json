@@ -74,7 +74,7 @@
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write . && npm --prefix apps/web run format",
 		"format:check": "prettier --check . && npm --prefix apps/web run format:check",
-		"typecheck": "cd apps/web && npx tsc --noEmit"
+		"typecheck": "npm --prefix apps/web run typecheck"
 	},
 	"lint-staged": {
 		"*.{js,mjs,cjs,json,md,yml,yaml}": "prettier --write",

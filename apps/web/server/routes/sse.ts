@@ -12,6 +12,10 @@ export function handleSSE(req: Request, res: Response): void {
   }
 
   const { sessionId } = req.params;
+  if (typeof sessionId !== 'string') {
+    res.status(400).json({ error: 'Invalid session id' });
+    return;
+  }
 
   // Verify session exists
   const session = readSessionById(sessionId);

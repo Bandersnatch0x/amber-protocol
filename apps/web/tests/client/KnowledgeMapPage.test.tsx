@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KnowledgeMapPage } from '@/features/knowledge/KnowledgeMapPage';
 import { I18nProvider } from '@/lib/i18n';
 import type { KnowledgeGraphDTO, SemanticResultDTO } from '@/lib/knowledge-dto';
+import { MAX_CONTEXT_NODES } from '@/lib/knowledge-dto';
 
 const trpcMocks = vi.hoisted(() => ({
   graphRefetch: vi.fn(),
@@ -530,6 +531,44 @@ describe('KnowledgeMapPage cited QA', () => {
       true,
     );
     expect(screen.getByTestId('react-flow')).toBeDefined();
+  });
+});
+
+describe('KnowledgeMapPage Ask context ceiling', () => {
+  function oversizedGraph(): KnowledgeGraphDTO {
+    const nodes = Array.from({ length: MAX_CONTEXT_NODES + 1 }, (_, index) => ({
+      id: `feature:F${index}`,
+      kind: 'feature' as const,
+      layer: 'implementation' as const,
+      title: `Feature ${index}`,
+      sourcePath: 'feature_list.json',
+    }));
+    return { ...graph, nodes };
+  }
+
+  beforeEach(() => {
+    trpcMocks.graphUseQuery.mockReturnValue({
+      data: oversizedGraph(),
+      isLoading: false,
+      error: null,
+      refetch: trpcMocks.graphRefetch,
+    });
+  });
+
+  it('warns before submission when an unfocused question would overflow the context', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+
+    expect(screen.getByText(/past the 256-node context ceiling/)).toBeDefined();
+  });
+
+  it('replaces the warning with the focus hint once a node is selected', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('flow-node-feature:F0'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+
+    expect(screen.queryByText(/past the 256-node context ceiling/)).toBeNull();
+    expect(screen.getByText(/Focused on feature:F0/)).toBeDefined();
   });
 });
 

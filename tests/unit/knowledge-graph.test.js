@@ -324,6 +324,73 @@ test("rename detection requires prefix-related stems in the same directory", () 
 	assert.equal(unmatched.actualPath, undefined);
 });
 
+test("evidence points at the line naming the target, not the header block's first line", () => {
+	const dir = mkTarget("kg-evidence-line", { subdirs: ["docs/adr"] });
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0001-base.md"),
+		"# ADR-0001: Base\n\n**Status:** Accepted\n**Date:** 2026-01-01\n",
+	);
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0002-second.md"),
+		"# ADR-0002: Second\n\n**Status:** Accepted\n**Date:** 2026-01-01\n",
+	);
+	// The block starts on line 5, which names ADR-0001; ADR-0002 is named on line 6.
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0003-multi-line-header.md"),
+		[
+			"# ADR-0003: Multi line header",
+			"",
+			"**Status:** Accepted",
+			"**Date:** 2026-01-01",
+			"**Builds on:** [ADR-0001](0001-base.md) named on the block's first line,",
+			"[ADR-0002](0002-second.md) named on the second line of the same block.",
+			"",
+		].join("\n"),
+	);
+
+	const fixture = buildKnowledgeGraphFromTree(dir);
+	const lineFor = (dst) =>
+		fixture.edges.find((e) => e.src === "adr:0003" && e.dst === dst).evidence[0].line;
+
+	assert.equal(lineFor("adr:0001"), 5);
+	assert.equal(lineFor("adr:0002"), 6);
+});
+
+test("evidence accumulates when one relation is declared in two header blocks", () => {
+	// Accumulation needs the same (src, verb, dst) to appear twice: within one
+	// document matchTargets already dedupes by target, so two separate blocks
+	// naming the same ADR are the real shape this contract protects.
+	const dir = mkTarget("kg-evidence-multi", { subdirs: ["docs/adr"] });
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0001-base.md"),
+		"# ADR-0001: Base\n\n**Status:** Accepted\n**Date:** 2026-01-01\n",
+	);
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0002-two-blocks.md"),
+		[
+			"# ADR-0002: Two blocks",
+			"",
+			"**Status:** Accepted",
+			"**Builds on:** [ADR-0001](0001-base.md) in the first block.",
+			"",
+			"## Later",
+			"",
+			"**Builds on:** [ADR-0001](0001-base.md) again in a second block.",
+			"",
+		].join("\n"),
+	);
+
+	const fixture = buildKnowledgeGraphFromTree(dir);
+	const edge = fixture.edges.find((e) => e.src === "adr:0002" && e.dst === "adr:0001");
+
+	assert.ok(edge, "expected one builds-on edge for the repeated declaration");
+	assert.deepEqual(
+		edge.evidence.map((item) => item.line),
+		[4, 8],
+		"both declaring sites survive, in scan order",
+	);
+});
+
 // ── F-2: context-page source ref normalization ────────────────────────
 
 test("F-2: context page with #L range fragment merges into its source node", () => {
@@ -342,7 +409,11 @@ test("F-2: context page with #L range fragment merges into its source node", () 
 	const fixture = buildKnowledgeGraphFromTree(dir);
 	const adr = fixture.nodes.find((n) => n.id === "adr:0001");
 	assert.ok(adr, "adr:0001 node missing");
-	assert.equal(adr.contextPage, "test-fragmented-page", "context page did not merge via committed manifest");
+	assert.equal(
+		adr.contextPage,
+		"test-fragmented-page",
+		"context page did not merge via committed manifest",
+	);
 });
 
 test("F-2: context page sourcing a canonical-artifact body file merges into the artifact node", () => {
@@ -365,7 +436,11 @@ test("F-2: context page sourcing a canonical-artifact body file merges into the 
 	const withoutManifest = buildKnowledgeGraphFromTree(dir);
 	const nodeWithout = withoutManifest.nodes.find((n) => n.id === "artifact:intent/intent/cp-test");
 	assert.ok(nodeWithout, "artifact node missing");
-	assert.equal(nodeWithout.contextPage, undefined, "must not set contextPage without manifest entry");
+	assert.equal(
+		nodeWithout.contextPage,
+		undefined,
+		"must not set contextPage without manifest entry",
+	);
 
 	// With manifest entry mapping the identity path: contextPage is set.
 	fs.mkdirSync(path.join(dir, "docs", "knowledge-corpus"), { recursive: true });
@@ -377,7 +452,11 @@ test("F-2: context page sourcing a canonical-artifact body file merges into the 
 	const withManifest = buildKnowledgeGraphFromTree(dir);
 	const nodeWith = withManifest.nodes.find((n) => n.id === "artifact:intent/intent/cp-test");
 	assert.ok(nodeWith, "artifact node missing after adding manifest");
-	assert.equal(nodeWith.contextPage, "artifact-context-page", "contextPage must be set from manifest");
+	assert.equal(
+		nodeWith.contextPage,
+		"artifact-context-page",
+		"contextPage must be set from manifest",
+	);
 });
 
 // ── F-3: repository-boundary confinement ─────────────────────────────
@@ -555,9 +634,9 @@ test("F-5: amber knowledge graph --json emits schema-valid, byte-identical JSON 
 	);
 	assert.ok(f007, "F007 drift finding missing in CLI output");
 
-	// Population bounds: at minimum the 43 committed corpus nodes must appear.
-	// The graph also includes features, artifacts, and memory nodes — use >=43 as the floor.
-	assert.ok(parsed.nodes.length >= 43, `expected >=43 nodes, got ${parsed.nodes.length}`);
+	// Population bounds: at minimum the 44 committed corpus nodes must appear.
+	// The graph also includes features, artifacts, and memory nodes — use >=44 as the floor.
+	assert.ok(parsed.nodes.length >= 44, `expected >=44 nodes, got ${parsed.nodes.length}`);
 	assert.ok(parsed.edges.length >= 80, `expected >=80 edges, got ${parsed.edges.length}`);
 
 	// Independently derivable edges (from reading the ADR source files directly)

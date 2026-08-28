@@ -1,8 +1,20 @@
 export type GraphLayer = 'decision' | 'knowledge' | 'implementation';
 
+/**
+ * Node ceiling shared by the QA context assembly and the semantic layer, which
+ * both refuse rather than truncate past it. Server enforcement and the UI's
+ * pre-emptive hint read the same number.
+ */
+export const MAX_CONTEXT_NODES = 256;
+
+/**
+ * Nodes in this stream are always deterministic, so `provenance` stops at the
+ * CLI output the schema validates; only inferred edges and summaries carry it
+ * here. See ADR-0021 and the F059 spec's deterministic-layer section.
+ */
 export interface KnowledgeNode {
   id: string;
-  kind: 'adr' | 'artifact' | 'wiki' | 'knowledge' | 'memory' | 'architecture' | 'feature';
+  kind: 'adr' | 'artifact' | 'wiki' | 'memory' | 'architecture' | 'feature';
   layer: GraphLayer;
   title: string;
   status?: string;
@@ -36,6 +48,7 @@ export interface KnowledgeGraphDTO {
   nodes: KnowledgeNode[];
   edges: KnowledgeEdgeDTO[];
   drift: DriftFinding[];
+  /** Always empty here; live aggregation is the separate recentChanges query. */
   recentChanges: RecentChangeItem[];
 }
 

@@ -76,12 +76,10 @@ export default {
       boxShadow: {
         'glow-amber': '0 0 24px -2px rgba(245, 158, 11, 0.25)',
         'glow-cobalt': '0 0 24px -2px rgba(37, 99, 235, 0.3)',
-        'tactile-card':
-          '0 4px 20px -2px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05)',
+        'tactile-card': '0 4px 20px -2px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05)',
         'tactile-card-dark':
           '0 8px 32px -4px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.07)',
-        'floating-command':
-          '0 24px 64px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+        'floating-command': '0 24px 64px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.08)',
         'floating-command-dark':
           '0 24px 64px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.12)',
       },

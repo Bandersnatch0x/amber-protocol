@@ -103,8 +103,18 @@ function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
     <div className="fixed inset-0 bg-slate-950/60 dark:bg-slate-950/80 backdrop-blur-sm z-50 flex items-start justify-center pt-24">
       <div className="bg-white dark:bg-obsidian-elevated rounded-xl border border-slate-200 dark:border-obsidian-border w-full max-w-lg shadow-floating-command dark:shadow-floating-command-dark overflow-hidden animate-fade-in">
         <div className="p-3 border-b border-slate-200 dark:border-obsidian-border flex items-center gap-2.5">
-          <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="w-4 h-4 text-slate-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           <input
             autoFocus
@@ -122,7 +132,9 @@ function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
           </kbd>
         </div>
         <div className="p-2 space-y-1 text-xs">
-          <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400">导航快捷项</div>
+          <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400">
+            导航快捷项
+          </div>
           {filtered.map((action) => (
             <div
               key={action.path}
@@ -208,7 +220,10 @@ function AppShell() {
             </kbd>
           </button>
 
-          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono text-slate-500 dark:text-slate-400" title="实时连接正常">
+          <div
+            className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono text-slate-500 dark:text-slate-400"
+            title="实时连接正常"
+          >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-slate-700 dark:text-slate-300 font-medium">Live</span>
           </div>
