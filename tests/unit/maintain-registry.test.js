@@ -33,6 +33,11 @@ const {
 	listDetectors,
 	detect,
 	listFindings,
+	MAINTAIN_PROPOSAL_SCHEMA_VERSION,
+	SUPPORTED_MAINTAIN_PROPOSAL_SCHEMA_VERSIONS,
+	proposalsPath,
+	propose,
+	listProposals,
 } = require("../../scripts/lib/core/maintain-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
@@ -499,4 +504,210 @@ test("a tampered finding ledger fails every read closed", () => {
 			err.amberCode === "AMBER_E_MAINTAIN_FINDING_CORRUPT" &&
 			/breaks the hash chain/.test(err.message),
 	);
+});
+
+test("propose pins the proposal schema contract and derives only from a recorded Finding", () => {
+	assert.equal(MAINTAIN_PROPOSAL_SCHEMA_VERSION, 1);
+	assert.deepEqual([...SUPPORTED_MAINTAIN_PROPOSAL_SCHEMA_VERSIONS], [1]);
+	const dir = mkTarget("propose");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	const smuggled = propose(dir, { findingIndex: 0, body: "# smuggled intent" }, { now: NOW });
+	assert.equal(smuggled.ok, false);
+	assert.equal(smuggled.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(smuggled.errors[0], /unknown field "body"/);
+	const negative = propose(dir, { findingIndex: -1 }, { now: NOW });
+	assert.equal(negative.ok, false);
+	assert.equal(negative.code, "AMBER_E_MAINTAIN_INVALID");
+	const ghost = propose(dir, { findingIndex: 9 }, { now: NOW });
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_MAINTAIN_NOT_FOUND");
+	const opened = propose(dir, { findingIndex: 0 }, { now: NOW });
+	assert.equal(opened.ok, true, (opened.errors || []).join("; "));
+	assert.equal(opened.action, "opened");
+	const finding = listFindings(dir)[0];
+	assert.equal(opened.record.kind, "proposal");
+	assert.equal(opened.record.status, "open");
+	assert.equal(opened.record.fingerprint, finding.fingerprint);
+	assert.equal(opened.record.detectorId, finding.detectorId);
+	assert.equal(opened.record.detectorVersion, finding.detectorVersion);
+	assert.equal(opened.record.subject, finding.subject);
+	assert.equal(opened.record.scope, finding.scope);
+	assert.equal(opened.record.tier, finding.tier);
+	assert.equal(opened.record.cooldownMs, 3_600_000);
+	assert.deepEqual(opened.record.findings, [0]);
+	assert.equal("body" in opened.record, false);
+});
+
+test("in-cooldown repeats append onto the open proposal instead of duplicating it", () => {
+	const dir = mkTarget("cooldown-append");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation({ inputHash: HASH_B }), { now: NOW }).ok, true);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	const repeat = propose(dir, { findingIndex: 1 }, { now: new Date("2026-08-29T02:30:00.000Z") });
+	assert.equal(repeat.ok, true, (repeat.errors || []).join("; "));
+	assert.equal(repeat.action, "appended");
+	assert.deepEqual(repeat.record.findings, [0, 1]);
+	assert.equal(listProposals(dir).length, 1);
+	const duplicate = propose(dir, { findingIndex: 1 }, { now: NOW });
+	assert.equal(duplicate.ok, false);
+	assert.equal(duplicate.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(duplicate.errors[0], /already referenced/);
+});
+
+test("the cooldown window is half-open and the anchor never regresses", () => {
+	const dir = mkTarget("cooldown-boundary");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	const detectAt = (iso, inputHash) =>
+		assert.equal(detect(dir, observation({ inputHash }), { now: new Date(iso) }).ok, true);
+	detectAt("2026-08-29T02:00:00.000Z", HASH_A);
+	detectAt("2026-08-29T02:59:59.999Z", HASH_B);
+	detectAt("2026-08-29T03:00:00.000Z", `sha256:${"c".repeat(64)}`);
+	detectAt("2026-08-29T01:00:00.000Z", `sha256:${"d".repeat(64)}`);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	// delta 3599999 ms < cooldownMs 3600000 — inside, appends.
+	assert.equal(propose(dir, { findingIndex: 1 }, { now: NOW }).action, "appended");
+	// An older observation appends without regressing the anchor …
+	assert.equal(propose(dir, { findingIndex: 3 }, { now: NOW }).action, "appended");
+	assert.equal(listProposals(dir)[0].lastObservedAt, "2026-08-29T02:59:59.999Z");
+	// … so the next observation measures 1 ms from the true latest — inside.
+	assert.equal(propose(dir, { findingIndex: 2 }, { now: NOW }).action, "appended");
+	// A repeat exactly cooldownMs after the latest observation is outside.
+	detectAt("2026-08-29T04:00:00.000Z", `sha256:${"e".repeat(64)}`);
+	const boundary = propose(dir, { findingIndex: 4 }, { now: NOW });
+	assert.equal(boundary.ok, false);
+	assert.equal(boundary.code, "AMBER_E_MAINTAIN_PROPOSAL_EXISTS");
+});
+
+test("outside cooldown an open proposal must be triaged before a new one may open", () => {
+	const dir = mkTarget("cooldown-escalate");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput({ cooldownMs: 1 }), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(
+		detect(dir, observation({ inputHash: HASH_B }), {
+			now: new Date("2026-08-29T03:00:00.000Z"),
+		}).ok,
+		true,
+	);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	const escalated = propose(
+		dir,
+		{ findingIndex: 1 },
+		{ now: new Date("2026-08-29T03:00:00.000Z") },
+	);
+	assert.equal(escalated.ok, false);
+	assert.equal(escalated.code, "AMBER_E_MAINTAIN_PROPOSAL_EXISTS");
+	assert.match(escalated.errors[0], /must be triaged/);
+	assert.equal(listProposals(dir).length, 1);
+	assert.deepEqual(listProposals(dir)[0].findings, [0]);
+});
+
+test("proposals separate by fingerprint and filter on it", () => {
+	const dir = mkTarget("propose-split");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(
+		detect(
+			dir,
+			observation({
+				window: { from: "2026-08-29T01:00:00.000Z", to: "2026-08-29T01:30:00.000Z" },
+				inputHash: HASH_B,
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	assert.equal(propose(dir, { findingIndex: 1 }, { now: NOW }).action, "opened");
+	const proposals = listProposals(dir);
+	assert.equal(proposals.length, 2);
+	assert.notEqual(proposals[0].fingerprint, proposals[1].fingerprint);
+	assert.equal(listProposals(dir, { fingerprint: proposals[0].fingerprint }).length, 1);
+});
+
+test("no proposal field can carry an admission payload even on a valid chain", () => {
+	const dir = mkTarget("propose-payload");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	const events = readEvents(proposalsPath(dir));
+	const { hash: _hash, ...rest } = events[0];
+	const forged = { ...rest, body: "# smuggled admission payload" };
+	forged.hash = chainHash(forged, forged.prevHash);
+	writeEvents(proposalsPath(dir), [forged]);
+	assert.throws(
+		() => listProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
+			/unknown field "body"/.test(err.message),
+	);
+});
+
+test("validly re-chained forgeries cannot bypass the proposal invariants", () => {
+	const dir = mkTarget("propose-forgery");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	const base = readEvents(proposalsPath(dir));
+	const open = base[0];
+	const { prevHash: _prev, hash: _hash, ...openBody } = open;
+	const chained = (body) => ({ ...body, prevHash: open.hash, hash: chainHash(body, open.hash) });
+	const evidence = (overrides) =>
+		chained({
+			kind: "evidence",
+			schemaVersion: 1,
+			at: open.at,
+			observedAt: open.observedAt,
+			fingerprint: open.fingerprint,
+			findingIndex: 0,
+			...overrides,
+		});
+	const forgeries = [
+		// Reopening an open fingerprint would create a duplicate proposal.
+		[chained(openBody), /reopens fingerprint/],
+		// Evidence must land on a known open proposal.
+		[evidence({ fingerprint: HASH_B }), /unknown fingerprint/],
+		// One Finding is referenced at most once per proposal.
+		[evidence({}), /repeats finding 0/],
+	];
+	for (const [event, pattern] of forgeries) {
+		writeEvents(proposalsPath(dir), [open, event]);
+		assert.throws(
+			() => listProposals(dir),
+			(err) => err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" && pattern.test(err.message),
+			pattern.source,
+		);
+	}
+});
+
+test("a tampered proposal ledger fails every read closed", () => {
+	const dir = mkTarget("propose-tamper");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation({ inputHash: HASH_B }), { now: NOW }).ok, true);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	assert.equal(propose(dir, { findingIndex: 1 }, { now: NOW }).action, "appended");
+	const events = readEvents(proposalsPath(dir));
+	events[1].findingIndex = 0;
+	writeEvents(proposalsPath(dir), events);
+	assert.throws(
+		() => listProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
+			/does not match its content/.test(err.message),
+	);
+	const detection = detect(dir, observation({ value: 700, inputHash: HASH_B }), { now: NOW });
+	assert.equal(detection.ok, true);
+	const blocked = propose(dir, { findingIndex: 2 }, { now: NOW });
+	assert.equal(blocked.ok, false);
+	assert.equal(blocked.code, "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT");
 });

@@ -1,6 +1,7 @@
 "use strict";
 
 // F054 T1 (#279) — Control Band detectors & deterministic Findings.
+// F054 T2 (#280) — Trigger Proposals & cooldown dedup.
 //
 // A detector is a versioned, model-independent Control Band definition:
 // metric, source, baseline, deterministic tier rules, window, scope,
@@ -11,6 +12,13 @@
 // never change the detector verdict. Fingerprints are stable functions of
 // subject + rule version + scope + window, so repeated observations
 // correlate instead of multiplying.
+//
+// An out-of-band Finding derives one immutable Trigger Proposal keyed by
+// its fingerprint — a maintain-ledger record, structurally never a
+// canonical artifact, so automation can surface work but can never start
+// it. Repeats inside the detector's cooldown append Finding references to
+// the open proposal instead of duplicating it; outside cooldown a new
+// proposal may open only when the prior one is triaged.
 
 const crypto = require("node:crypto");
 const path = require("node:path");
@@ -32,6 +40,8 @@ const MAINTAIN_DETECTOR_SCHEMA_VERSION = 1;
 const SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS = Object.freeze([1]);
 const MAINTAIN_FINDING_SCHEMA_VERSION = 1;
 const SUPPORTED_MAINTAIN_FINDING_SCHEMA_VERSIONS = Object.freeze([1]);
+const MAINTAIN_PROPOSAL_SCHEMA_VERSION = 1;
+const SUPPORTED_MAINTAIN_PROPOSAL_SCHEMA_VERSIONS = Object.freeze([1]);
 const DEFAULT_MAX_MAINTAIN_BYTES = 1024 * 1024;
 const LOCK_STALE_MS = 30_000;
 
@@ -58,6 +68,10 @@ const MAINTAIN_SIZE_CEILING_CODE = "AMBER_E_MAINTAIN_SIZE_CEILING";
 const FINDING_CORRUPT_CODE = "AMBER_E_MAINTAIN_FINDING_CORRUPT";
 const FINDING_LOCK_CODE = "AMBER_E_MAINTAIN_FINDING_LOCK";
 const FINDING_SIZE_CEILING_CODE = "AMBER_E_MAINTAIN_FINDING_SIZE_CEILING";
+const PROPOSAL_EXISTS_CODE = "AMBER_E_MAINTAIN_PROPOSAL_EXISTS";
+const PROPOSAL_CORRUPT_CODE = "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT";
+const PROPOSAL_LOCK_CODE = "AMBER_E_MAINTAIN_PROPOSAL_LOCK";
+const PROPOSAL_SIZE_CEILING_CODE = "AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING";
 
 const HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
 
@@ -395,6 +409,8 @@ function maintainAppendFailure(code) {
 
 // Guard contract: any non-null guard result is returned verbatim without
 // appending; `derive(fold)` picks the caller's record after the append.
+// `body` may be a factory evaluated against the in-lock fold, for events
+// whose shape depends on current ledger state.
 function appendLedgerEvent(cwd, options, body, guard, derive) {
 	const failure = maintainAppendFailure(options.corruptCode);
 	let release;
@@ -412,13 +428,14 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 		}
 		const guardVerdict = guard(folded);
 		if (guardVerdict !== null) return guardVerdict;
+		const eventBody = typeof body === "function" ? body(folded) : body;
 		let prevHash;
 		try {
 			prevHash = chainHeadHash(options.path(cwd), options.corruptCode, options.label);
 		} catch (err) {
 			return failure(err);
 		}
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
+		const event = { ...eventBody, prevHash, hash: chainHash(eventBody, prevHash) };
 		let ceiling;
 		try {
 			ceiling = sharedAppendWithinCeiling({
@@ -724,11 +741,261 @@ function listFindings(cwd, { detectorId = null, fingerprint = null } = {}) {
 	);
 }
 
+function proposalsPath(cwd) {
+	return statePathForCreate(cwd, "maintain", "proposals.jsonl");
+}
+
+function proposalCorrupt(message) {
+	return typedError(PROPOSAL_CORRUPT_CODE, message);
+}
+
+function acquireProposalLock(cwd) {
+	return acquireLedgerLock({
+		dirPath: path.dirname(proposalsPath(cwd)),
+		lockName: "proposals.lock",
+		conflictCode: PROPOSAL_LOCK_CODE,
+		corruptCode: PROPOSAL_CORRUPT_CODE,
+		label: "maintain proposal ledger",
+		staleMs: LOCK_STALE_MS,
+	});
+}
+
+const PROPOSE_INPUT_FIELDS = Object.freeze(["findingIndex"]);
+// Structurally not an Intent: the closed sets carry identities, hashes,
+// times, and Finding references only — no field can hold an admission
+// payload. `observedAt` copies the referenced Finding's recorded time so
+// the cooldown measures observation-to-observation distance.
+const PROPOSAL_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"observedAt",
+	"fingerprint",
+	"detectorId",
+	"detectorVersion",
+	"subject",
+	"scope",
+	"tier",
+	"cooldownMs",
+	"findingIndex",
+	"prevHash",
+	"hash",
+]);
+const PROPOSAL_EVIDENCE_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"observedAt",
+	"fingerprint",
+	"findingIndex",
+	"prevHash",
+	"hash",
+]);
+
+function proposalEventProblem(event, lineIndex) {
+	const label = `maintain proposal event ${lineIndex}`;
+	if (event.kind === "proposal") {
+		const closed = closedFieldProblem(event, PROPOSAL_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		for (const field of ["at", "detectorId", "detectorVersion", "subject", "scope", "tier"]) {
+			if (!isNonEmptyString(event[field])) return `${label}.${field} must be a non-empty string`;
+		}
+		if (!Number.isInteger(event.cooldownMs) || event.cooldownMs < 1)
+			return `${label}.cooldownMs must be a positive integer`;
+	} else {
+		const closed = closedFieldProblem(event, PROPOSAL_EVIDENCE_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		if (!isNonEmptyString(event.at)) return `${label}.at must be a non-empty string`;
+	}
+	if (!HASH_PATTERN.test(event.fingerprint ?? ""))
+		return `${label}.fingerprint must be a sha256:<64-hex> string`;
+	if (!isNonEmptyString(event.observedAt) || Number.isNaN(Date.parse(event.observedAt)))
+		return `${label}.observedAt must be an ISO-8601 timestamp`;
+	if (!Number.isInteger(event.findingIndex) || event.findingIndex < 0)
+		return `${label}.findingIndex must be a non-negative integer`;
+	return null;
+}
+
+// Projects one entry per opened proposal: `findings` accumulates the
+// opening Finding plus every evidence append, `lastObservedAt` tracks the
+// latest referenced observation time the cooldown is measured against.
+function foldProposals(cwd) {
+	const events = readLedgerFailClosed(
+		proposalsPath(cwd),
+		PROPOSAL_CORRUPT_CODE,
+		"maintain proposal ledger",
+	);
+	let prevHash = GENESIS_HASH;
+	const proposals = [];
+	const byFingerprint = new Map();
+	events.forEach((event, index) => {
+		const lineIndex = index + 1;
+		if (!isPlainObject(event))
+			throw proposalCorrupt(`maintain proposal event ${lineIndex} is not an object`);
+		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
+			throw proposalCorrupt(`maintain proposal event ${lineIndex} breaks the hash chain`);
+		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+			throw proposalCorrupt(
+				`maintain proposal event ${lineIndex} carries a hash that does not match its content`,
+			);
+		if (!SUPPORTED_MAINTAIN_PROPOSAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
+			throw proposalCorrupt(
+				`maintain proposal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+			);
+		if (event.kind !== "proposal" && event.kind !== "evidence")
+			throw proposalCorrupt(
+				`maintain proposal event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+			);
+		const problem = proposalEventProblem(event, lineIndex);
+		if (problem !== null) throw proposalCorrupt(problem);
+		if (event.kind === "proposal") {
+			if (byFingerprint.has(event.fingerprint))
+				throw proposalCorrupt(
+					`maintain proposal event ${lineIndex} reopens fingerprint ${JSON.stringify(event.fingerprint)} while a proposal is open`,
+				);
+			const { prevHash: _prev, hash: _hash, findingIndex, observedAt, ...body } = event;
+			const proposal = {
+				...body,
+				status: "open",
+				findings: [findingIndex],
+				lastObservedAt: observedAt,
+				index,
+			};
+			proposals.push(proposal);
+			byFingerprint.set(event.fingerprint, proposal);
+		} else {
+			const proposal = byFingerprint.get(event.fingerprint);
+			if (!proposal)
+				throw proposalCorrupt(
+					`maintain proposal event ${lineIndex} appends evidence to unknown fingerprint ${JSON.stringify(event.fingerprint)}`,
+				);
+			if (proposal.findings.includes(event.findingIndex))
+				throw proposalCorrupt(
+					`maintain proposal event ${lineIndex} repeats finding ${event.findingIndex}`,
+				);
+			proposal.findings.push(event.findingIndex);
+			// An out-of-order (older) append never regresses the anchor.
+			if (Date.parse(event.observedAt) > Date.parse(proposal.lastObservedAt))
+				proposal.lastObservedAt = event.observedAt;
+		}
+		prevHash = event.hash;
+	});
+	return proposals;
+}
+
+const PROPOSAL_LEDGER = Object.freeze({
+	acquire: acquireProposalLock,
+	fold: foldProposals,
+	path: proposalsPath,
+	corruptCode: PROPOSAL_CORRUPT_CODE,
+	sizeCeilingCode: PROPOSAL_SIZE_CEILING_CODE,
+	envName: "AMBER_MAINTAIN_MAX_PROPOSALS_BYTES",
+	label: "maintain proposal ledger",
+});
+
+/**
+ * Derive one immutable Trigger Proposal from one recorded out-of-band
+ * Finding — never from caller input: every proposal field copies from the
+ * Finding and the registered detector version it names. One open proposal
+ * per fingerprint: a repeat inside the detector's cooldown (measured
+ * against the proposal's latest recorded observation) appends the Finding
+ * as evidence; outside cooldown the open proposal must be triaged before
+ * a new one may open, so untriaged conditions escalate to a human instead
+ * of multiplying.
+ */
+function propose(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, action: null, errors });
+	if (!isPlainObject(input))
+		return fail(MAINTAIN_INVALID_CODE, ["propose input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, PROPOSE_INPUT_FIELDS, "propose input");
+	if (inputClosed !== null) return fail(MAINTAIN_INVALID_CODE, [inputClosed]);
+	if (!Number.isInteger(input.findingIndex) || input.findingIndex < 0)
+		return fail(MAINTAIN_INVALID_CODE, ["findingIndex must be a non-negative integer"]);
+	let finding;
+	let detector;
+	try {
+		finding = foldFindings(cwd).find((entry) => entry.index === input.findingIndex) ?? null;
+		if (finding !== null) detector = showDetector(cwd, finding.detectorId, finding.detectorVersion);
+	} catch (err) {
+		return fail(err.amberCode || FINDING_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (finding === null)
+		return fail(MAINTAIN_NOT_FOUND_CODE, [`finding ${input.findingIndex} is not recorded`]);
+	if (!detector)
+		return fail(MAINTAIN_NOT_FOUND_CODE, [
+			`detector ${JSON.stringify(detectorKey(finding.detectorId, finding.detectorVersion))} is not registered`,
+		]);
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	let action = null;
+	const result = appendLedgerEvent(
+		cwd,
+		PROPOSAL_LEDGER,
+		// The factory re-derives its branch from its own fold, so it agrees
+		// with the guard without depending on evaluation order.
+		(fold) =>
+			fold.some((entry) => entry.fingerprint === finding.fingerprint)
+				? {
+						kind: "evidence",
+						schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
+						at,
+						observedAt: finding.at,
+						fingerprint: finding.fingerprint,
+						findingIndex: finding.index,
+					}
+				: {
+						kind: "proposal",
+						schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
+						at,
+						observedAt: finding.at,
+						fingerprint: finding.fingerprint,
+						detectorId: finding.detectorId,
+						detectorVersion: finding.detectorVersion,
+						subject: finding.subject,
+						scope: finding.scope,
+						tier: finding.tier,
+						cooldownMs: detector.cooldownMs,
+						findingIndex: finding.index,
+					},
+		(fold) => {
+			const open = fold.find((entry) => entry.fingerprint === finding.fingerprint) ?? null;
+			if (open === null) {
+				action = "opened";
+				return null;
+			}
+			if (open.findings.includes(finding.index))
+				return fail(MAINTAIN_INVALID_CODE, [
+					`finding ${finding.index} is already referenced by the open proposal for ${JSON.stringify(finding.fingerprint)}`,
+				]);
+			// A finding observed earlier than the proposal's latest referenced
+			// observation is correlation, not a new storm — it appends. The
+			// window is half-open, mirroring Approval validity: a delta of
+			// exactly cooldownMs is already outside.
+			const delta = Date.parse(finding.at) - Date.parse(open.lastObservedAt);
+			if (delta >= detector.cooldownMs)
+				return fail(PROPOSAL_EXISTS_CODE, [
+					`an open proposal for ${JSON.stringify(finding.fingerprint)} is outside its ${detector.cooldownMs} ms cooldown and must be triaged before a new proposal may open`,
+				]);
+			action = "appended";
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.fingerprint === finding.fingerprint),
+	);
+	return { ...result, action: result.ok ? action : null };
+}
+
+function listProposals(cwd, { fingerprint = null } = {}) {
+	return foldProposals(cwd).filter(
+		(entry) => fingerprint === null || entry.fingerprint === fingerprint,
+	);
+}
+
 module.exports = {
 	MAINTAIN_DETECTOR_SCHEMA_VERSION,
 	SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS,
 	MAINTAIN_FINDING_SCHEMA_VERSION,
 	SUPPORTED_MAINTAIN_FINDING_SCHEMA_VERSIONS,
+	MAINTAIN_PROPOSAL_SCHEMA_VERSION,
+	SUPPORTED_MAINTAIN_PROPOSAL_SCHEMA_VERSIONS,
 	DEFAULT_MAX_MAINTAIN_BYTES,
 	DETECTOR_COMPARATORS,
 	DETECTOR_OUTPUT_TYPES,
@@ -742,4 +1009,7 @@ module.exports = {
 	listDetectors,
 	detect,
 	listFindings,
+	proposalsPath,
+	propose,
+	listProposals,
 };

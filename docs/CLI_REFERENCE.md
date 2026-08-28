@@ -1248,15 +1248,16 @@ Error codes: `AMBER_E_RELEASE_INVALID`, `AMBER_E_RELEASE_EXISTS`, `AMBER_E_RELEA
 `AMBER_E_RELEASE_AUTH_SIZE_CEILING`, `AMBER_E_RELEASE_TX_STATE`, `AMBER_E_RELEASE_TX_MISMATCH`,
 `AMBER_E_RELEASE_TX_CORRUPT`, `AMBER_E_RELEASE_TX_LOCK`, `AMBER_E_RELEASE_TX_SIZE_CEILING`.
 
-### maintain register-detector / detect / detectors / findings
+### maintain register-detector / detect / propose / detectors / findings / proposals
 
-Register Control Band detectors and record deterministic Findings (F054 T1). A detector is a
-versioned, model-independent Control Band definition — metric, source, numeric baseline, closed
-comparator rules (`ge|gt|le|lt`, the last matching rule wins), evaluation window, scope, cooldown,
-observation ceiling, and the one permitted output type (`finding`) — registered into the
-hash-chained ledger `.amber/maintain/detectors.jsonl` behind a single-use committed human
-acceptance/approval Decision (mirroring the F052 registry contract). Registered versions are
-immutable: a changed definition registers a new version, never an overwrite.
+Register Control Band detectors, record deterministic Findings (F054 T1), and derive Trigger
+Proposals (F054 T2). A detector is a versioned, model-independent Control Band definition —
+metric, source, numeric baseline, closed comparator rules (`ge|gt|le|lt`, the last matching rule
+wins), evaluation window, scope, cooldown, observation ceiling, and the one permitted output type
+(`finding`) — registered into the hash-chained ledger `.amber/maintain/detectors.jsonl` behind a
+single-use committed human acceptance/approval Decision (mirroring the F052 registry contract).
+Registered versions are immutable: a changed definition registers a new version, never an
+overwrite.
 
 `detect` is target-read-only and model-independent: it evaluates one declared observation fixture
 (subject, window, value, input hash) against one registered detector version — the verdict is a
@@ -1272,6 +1273,18 @@ of multiplying. Detection never mutates the target, never touches canonical arti
 promotes anything; a window wider than the detector declares refuses. Both ledgers fail every read
 closed on tamper.
 
+`propose` derives one immutable Trigger Proposal from one recorded out-of-band Finding — never
+from caller input: every proposal field copies from the Finding and the registered detector
+version it names (the closed event sets carry identities, hashes, times, and Finding references
+only, so no field can smuggle an admission payload — a proposal is a maintain-ledger record in
+`.amber/maintain/proposals.jsonl`, structurally never a canonical artifact, and automation cannot
+start work unilaterally). One open proposal per fingerprint: a repeated observation inside the
+detector's declared cooldown (measured observation-to-observation) appends its Finding reference
+onto the open proposal instead of duplicating it, and re-referencing the same Finding refuses;
+outside cooldown the open proposal must be triaged before a new one may open, so an untriaged
+condition escalates to a human instead of multiplying. Proposals are immutable and append-only;
+the ledger fails every read closed on tamper.
+
 ```bash
 node scripts/amber.js maintain register-detector --target . --id detector/error-rate \
   --detector-version 1 --metric http-5xx-rate --source observability/api \
@@ -1282,15 +1295,19 @@ node scripts/amber.js maintain detect --target . --id detector/error-rate \
   --detector-version 1 --subject service/api \
   --window-from 2026-08-29T00:00:00.000Z --window-to 2026-08-29T01:00:00.000Z \
   --value 120 --observation-hash sha256:<64-hex-chars> --json
+node scripts/amber.js maintain propose --target . --finding-index 0 --json
 node scripts/amber.js maintain detectors --target . --json
 node scripts/amber.js maintain findings --target . --id detector/error-rate --json
 node scripts/amber.js maintain findings --target . --fingerprint sha256:<64-hex-chars> --json
+node scripts/amber.js maintain proposals --target . --fingerprint sha256:<64-hex-chars> --json
 ```
 
 Error codes: `AMBER_E_MAINTAIN_INVALID`, `AMBER_E_MAINTAIN_EXISTS`, `AMBER_E_MAINTAIN_NOT_FOUND`,
 `AMBER_E_MAINTAIN_CORRUPT`, `AMBER_E_MAINTAIN_LOCK`, `AMBER_E_MAINTAIN_SIZE_CEILING`,
 `AMBER_E_MAINTAIN_FINDING_CORRUPT`, `AMBER_E_MAINTAIN_FINDING_LOCK`,
-`AMBER_E_MAINTAIN_FINDING_SIZE_CEILING`.
+`AMBER_E_MAINTAIN_FINDING_SIZE_CEILING`, `AMBER_E_MAINTAIN_PROPOSAL_EXISTS`,
+`AMBER_E_MAINTAIN_PROPOSAL_CORRUPT`, `AMBER_E_MAINTAIN_PROPOSAL_LOCK`,
+`AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING`.
 
 ## Handoff Commands
 

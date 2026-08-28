@@ -218,10 +218,110 @@ test("maintain help and unknown actions route through the shared dispatcher", ()
 	assert.equal(help.status, 0, help.stderr);
 	assert.match(help.stdout, /register-detector/);
 	assert.match(help.stdout, /deterministic Findings/);
+	assert.match(help.stdout, /propose --finding-index <n>/);
+	assert.match(help.stdout, /proposals \[--fingerprint <sha256:\.\.\.>\]/);
 	const unknown = runCli(["maintain", "promote", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/maintain requires register-detector, detect, detectors, or findings/,
+		/maintain requires register-detector, detect, propose, detectors, findings, or proposals/,
 	);
+});
+
+test("maintain propose opens once per fingerprint and appends in-cooldown repeats", () => {
+	const dir = mkTarget("propose");
+	fixtureRepo(dir, ["decision/detector-1"]);
+	assert.equal(runCli(registerArgs(), dir).status, 0);
+	assert.equal(runCli(detectArgs(), dir).status, 0);
+	assert.equal(runCli(detectArgs({ "--observation-hash": HASH_B }), dir).status, 0);
+
+	const opened = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "0", "--json"],
+		dir,
+	);
+	assert.equal(opened.status, 0, opened.stderr || opened.stdout);
+	assert.equal(payload(opened).action, "opened");
+	assert.equal(payload(opened).proposal.status, "open");
+	assert.deepEqual(payload(opened).proposal.findings, [0]);
+	assert.equal("body" in payload(opened).proposal, false);
+
+	const appended = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "1", "--json"],
+		dir,
+	);
+	assert.equal(appended.status, 0, appended.stderr || appended.stdout);
+	assert.equal(payload(appended).action, "appended");
+	assert.deepEqual(payload(appended).proposal.findings, [0, 1]);
+
+	const duplicate = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "1", "--json"],
+		dir,
+	);
+	assert.equal(duplicate.status, 1);
+	assert.equal(envelope(duplicate).code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(envelope(duplicate).errors[0], /already referenced/);
+
+	const proposals = runCli(["maintain", "proposals", "--target", ".", "--json"], dir);
+	assert.equal(proposals.status, 0, proposals.stderr || proposals.stdout);
+	assert.equal(payload(proposals).length, 1);
+	const fingerprint = payload(proposals)[0].fingerprint;
+	const filtered = runCli(
+		["maintain", "proposals", "--target", ".", "--fingerprint", fingerprint, "--json"],
+		dir,
+	);
+	assert.equal(payload(filtered).length, 1);
+});
+
+test("maintain propose escalates to triage outside the declared cooldown", () => {
+	const dir = mkTarget("propose-cooldown");
+	fixtureRepo(dir, ["decision/detector-1"]);
+	assert.equal(runCli(registerArgs({ "--cooldown-ms": "1" }), dir).status, 0);
+	assert.equal(runCli(detectArgs(), dir).status, 0);
+	assert.equal(runCli(detectArgs({ "--observation-hash": HASH_B }), dir).status, 0);
+	assert.equal(
+		runCli(["maintain", "propose", "--target", ".", "--finding-index", "0", "--json"], dir).status,
+		0,
+	);
+	const escalated = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "1", "--json"],
+		dir,
+	);
+	assert.equal(escalated.status, 1);
+	assert.equal(envelope(escalated).code, "AMBER_E_MAINTAIN_PROPOSAL_EXISTS");
+	assert.match(envelope(escalated).errors[0], /must be triaged/);
+});
+
+test("maintain propose refusals carry stable codes and fail reads closed", () => {
+	const dir = mkTarget("propose-refusals");
+	fixtureRepo(dir, ["decision/detector-1"]);
+	assert.equal(runCli(registerArgs(), dir).status, 0);
+	assert.equal(runCli(detectArgs(), dir).status, 0);
+
+	const missing = runCli(["maintain", "propose", "--target", ".", "--json"], dir);
+	assert.equal(missing.status, 1);
+	assert.equal(envelope(missing).code, "AMBER_E_INVALID_ARG");
+	assert.match(envelope(missing).errors[0], /--finding-index must be a non-negative integer/);
+
+	const ghost = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "9", "--json"],
+		dir,
+	);
+	assert.equal(ghost.status, 1);
+	assert.equal(envelope(ghost).code, "AMBER_E_MAINTAIN_NOT_FOUND");
+
+	assert.equal(
+		runCli(["maintain", "propose", "--target", ".", "--finding-index", "0", "--json"], dir).status,
+		0,
+	);
+	const proposalsLedger = path.join(path.dirname(findingsPath(dir)), "proposals.jsonl");
+	fs.appendFileSync(proposalsLedger, '{"kind":"proposal"}\n');
+	const corrupt = runCli(["maintain", "proposals", "--target", ".", "--json"], dir);
+	assert.equal(corrupt.status, 1);
+	assert.equal(envelope(corrupt).code, "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT");
+	const blocked = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "0", "--json"],
+		dir,
+	);
+	assert.equal(blocked.status, 1);
+	assert.equal(envelope(blocked).code, "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT");
 });

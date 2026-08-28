@@ -1,14 +1,16 @@
 "use strict";
 
-// F054 public CLI seam for Control Band detectors & deterministic
-// Findings. This adapter parses flags only; the core owns every verdict,
-// is target-read-only, and never mutates canonical or target state.
+// F054 public CLI seam for Control Band detectors, deterministic
+// Findings, and Trigger Proposals. This adapter parses flags only; the
+// core owns every verdict, is target-read-only, and never mutates
+// canonical or target state.
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
 
 const READ_FAILURE_CODE = "AMBER_E_MAINTAIN_CORRUPT";
 const FINDING_READ_FAILURE_CODE = "AMBER_E_MAINTAIN_FINDING_CORRUPT";
+const PROPOSAL_READ_FAILURE_CODE = "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT";
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -34,6 +36,7 @@ function missingValueFlag(args) {
 		["value", "--value"],
 		["observationHash", "--observation-hash"],
 		["fingerprint", "--fingerprint"],
+		["findingIndex", "--finding-index"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -101,7 +104,7 @@ function resultEnvelope(result) {
 
 const dispatch = defineCommand({
 	command: "maintain",
-	actions: ["register-detector", "detect", "detectors", "findings"],
+	actions: ["register-detector", "detect", "propose", "detectors", "findings", "proposals"],
 	handlers: {
 		"register-detector": (args) => {
 			const { registerDetector } = require("./core/maintain-registry");
@@ -194,6 +197,33 @@ const dispatch = defineCommand({
 				}),
 			);
 		},
+		propose: (args) => {
+			const { propose } = require("./core/maintain-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const findingIndex = Number(args.findingIndex);
+			if (
+				args.findingIndex === undefined ||
+				String(args.findingIndex).trim().length === 0 ||
+				!Number.isInteger(findingIndex) ||
+				findingIndex < 0
+			)
+				return invalidArg(
+					`--finding-index must be a non-negative integer; got ${JSON.stringify(args.findingIndex)}`,
+				);
+			const result = propose(target.value, { findingIndex });
+			return {
+				...resultEnvelope(result),
+				text: result.ok
+					? JSON.stringify({ action: result.action, proposal: result.record }, null, 2)
+					: "",
+			};
+		},
 		detectors: (args) => {
 			const { listDetectors } = require("./core/maintain-registry");
 			const truncated = missingValueFlag(args);
@@ -233,6 +263,27 @@ const dispatch = defineCommand({
 				};
 			} catch (err) {
 				const failure = readFailure(args, err, FINDING_READ_FAILURE_CODE);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+		},
+		proposals: (args) => {
+			const { listProposals } = require("./core/maintain-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const fingerprint = args.fingerprint === undefined ? null : String(args.fingerprint);
+			if (fingerprint !== null && fingerprint.trim().length === 0)
+				return invalidArg(
+					`--fingerprint must be non-empty when provided; got ${JSON.stringify(args.fingerprint)}`,
+				);
+			try {
+				return { text: JSON.stringify(listProposals(target.value, { fingerprint }), null, 2) };
+			} catch (err) {
+				const failure = readFailure(args, err, PROPOSAL_READ_FAILURE_CODE);
 				return { ...failure.result, exitCode: failure.exitCode };
 			}
 		},

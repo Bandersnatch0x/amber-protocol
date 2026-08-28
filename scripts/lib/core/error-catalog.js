@@ -2055,6 +2055,40 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_MAINTAIN_FINDING_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_MAINTAIN_PROPOSAL_EXISTS: {
+		title: "Open Trigger Proposal must be triaged first",
+		cause:
+			"An open proposal already exists for this fingerprint and the new Finding falls outside the detector's declared cooldown window; a new proposal may open only when the prior one is triaged.",
+		remedy:
+			"Triage the open proposal (amber maintain proposals shows it); in-cooldown repeats append onto it automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_PROPOSAL_CORRUPT", "AMBER_E_MAINTAIN_INVALID"],
+	},
+	AMBER_E_MAINTAIN_PROPOSAL_CORRUPT: {
+		title: "Maintain proposal ledger corrupt",
+		cause:
+			"The proposal ledger under .amber/maintain/ has a broken hash chain, an invalid event shape, evidence for an unknown fingerprint, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/maintain/proposals.jsonl from version control or a backup; proposals are immutable and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_FINDING_CORRUPT", "AMBER_E_MAINTAIN_PROPOSAL_LOCK"],
+	},
+	AMBER_E_MAINTAIN_PROPOSAL_LOCK: {
+		title: "Maintain proposal ledger lock contended",
+		cause: "Another process holds the proposal ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent proposal operation finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_PROPOSAL_CORRUPT", "AMBER_E_MAINTAIN_LOCK"],
+	},
+	AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING: {
+		title: "Maintain proposal ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_MAINTAIN_MAX_PROPOSALS_BYTES).",
+		remedy:
+			"Raise AMBER_MAINTAIN_MAX_PROPOSALS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_PROPOSAL_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

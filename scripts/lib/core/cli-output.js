@@ -248,6 +248,8 @@ const FLAG_SPECS = {
 	"--value": { key: "value" },
 	"--observation-hash": { key: "observationHash" },
 	"--fingerprint": { key: "fingerprint" },
+	// F054 ticket 2 (#280): Trigger Proposal flags.
+	"--finding-index": { key: "findingIndex" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },
