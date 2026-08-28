@@ -377,14 +377,23 @@ function buildEdges({
 	nodeIds,
 }) {
 	const edges = [];
-	const seen = new Set();
+	const byKey = new Map();
 	const addEdge = (src, dst, verb, evidence) => {
 		if (src === dst || !nodeIds.has(src) || !nodeIds.has(dst)) return;
 		const key = `${src}\u0000${verb}\u0000${dst}`;
-		if (seen.has(key)) return;
-		seen.add(key);
+		const existing = byKey.get(key);
+		if (existing) {
+			if (!evidence) return;
+			if (!existing.evidence) existing.evidence = [];
+			const duplicate = existing.evidence.some(
+				(item) => item.path === evidence.path && item.line === evidence.line,
+			);
+			if (!duplicate) existing.evidence.push(evidence);
+			return;
+		}
 		const edge = { src, dst, verb, provenance: PROVENANCE };
 		if (evidence) edge.evidence = [evidence];
+		byKey.set(key, edge);
 		edges.push(edge);
 	};
 	const padAdr = (match) => `adr:${match[1].padStart(4, "0")}`;
@@ -392,15 +401,21 @@ function buildEdges({
 	// decision layer: ADR header lineage + body -> feature describes.
 	for (const adr of adrs) {
 		for (const block of adrHeaderBlocks(adr.text)) {
-			for (const [dst] of matchTargets(block.text, ADR_REF, padAdr)) {
-				addEdge(adr.id, dst, block.verb, { path: adr.sourcePath, line: block.line });
+			// A header block spans several lines; evidence must point at the line
+			// that names this target, not at the block's first line.
+			const lineIn = (token) => {
+				const within = lineOf(block.text, token);
+				return within === null ? block.line : block.line + within - 1;
+			};
+			for (const [dst, token] of matchTargets(block.text, ADR_REF, padAdr)) {
+				addEdge(adr.id, dst, block.verb, { path: adr.sourcePath, line: lineIn(token) });
 			}
-			for (const [dst] of matchTargets(
+			for (const [dst, token] of matchTargets(
 				block.text,
 				ARCHITECTURE_REF,
 				(m) => `architecture:${m[1]}`,
 			)) {
-				addEdge(adr.id, dst, block.verb, { path: adr.sourcePath, line: block.line });
+				addEdge(adr.id, dst, block.verb, { path: adr.sourcePath, line: lineIn(token) });
 			}
 		}
 		for (const [dst, token] of matchTargets(adr.text, FEATURE_REF, (m) => `feature:F${m[1]}`)) {

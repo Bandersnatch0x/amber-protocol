@@ -324,6 +324,73 @@ test("rename detection requires prefix-related stems in the same directory", () 
 	assert.equal(unmatched.actualPath, undefined);
 });
 
+test("evidence points at the line naming the target, not the header block's first line", () => {
+	const dir = mkTarget("kg-evidence-line", { subdirs: ["docs/adr"] });
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0001-base.md"),
+		"# ADR-0001: Base\n\n**Status:** Accepted\n**Date:** 2026-01-01\n",
+	);
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0002-second.md"),
+		"# ADR-0002: Second\n\n**Status:** Accepted\n**Date:** 2026-01-01\n",
+	);
+	// The block starts on line 5, which names ADR-0001; ADR-0002 is named on line 6.
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0003-multi-line-header.md"),
+		[
+			"# ADR-0003: Multi line header",
+			"",
+			"**Status:** Accepted",
+			"**Date:** 2026-01-01",
+			"**Builds on:** [ADR-0001](0001-base.md) named on the block's first line,",
+			"[ADR-0002](0002-second.md) named on the second line of the same block.",
+			"",
+		].join("\n"),
+	);
+
+	const fixture = buildKnowledgeGraphFromTree(dir);
+	const lineFor = (dst) =>
+		fixture.edges.find((e) => e.src === "adr:0003" && e.dst === dst).evidence[0].line;
+
+	assert.equal(lineFor("adr:0001"), 5);
+	assert.equal(lineFor("adr:0002"), 6);
+});
+
+test("evidence accumulates when one relation is declared in two header blocks", () => {
+	// Accumulation needs the same (src, verb, dst) to appear twice: within one
+	// document matchTargets already dedupes by target, so two separate blocks
+	// naming the same ADR are the real shape this contract protects.
+	const dir = mkTarget("kg-evidence-multi", { subdirs: ["docs/adr"] });
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0001-base.md"),
+		"# ADR-0001: Base\n\n**Status:** Accepted\n**Date:** 2026-01-01\n",
+	);
+	fs.writeFileSync(
+		path.join(dir, "docs", "adr", "0002-two-blocks.md"),
+		[
+			"# ADR-0002: Two blocks",
+			"",
+			"**Status:** Accepted",
+			"**Builds on:** [ADR-0001](0001-base.md) in the first block.",
+			"",
+			"## Later",
+			"",
+			"**Builds on:** [ADR-0001](0001-base.md) again in a second block.",
+			"",
+		].join("\n"),
+	);
+
+	const fixture = buildKnowledgeGraphFromTree(dir);
+	const edge = fixture.edges.find((e) => e.src === "adr:0002" && e.dst === "adr:0001");
+
+	assert.ok(edge, "expected one builds-on edge for the repeated declaration");
+	assert.deepEqual(
+		edge.evidence.map((item) => item.line),
+		[4, 8],
+		"both declaring sites survive, in scan order",
+	);
+});
+
 // ── F-2: context-page source ref normalization ────────────────────────
 
 test("F-2: context page with #L range fragment merges into its source node", () => {

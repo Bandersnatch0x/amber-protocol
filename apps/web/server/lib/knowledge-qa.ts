@@ -85,8 +85,15 @@ interface ContextAssembly {
   nodeIds: Set<string>;
 }
 
+// Byte order, matching the deterministic graph builder: localeCompare is
+// ICU/locale sensitive, so the same snapshot could otherwise digest
+// differently on differently configured servers.
 function stable<T>(items: readonly T[], key: (item: T) => string): T[] {
-  return [...items].sort((left, right) => key(left).localeCompare(key(right)));
+  return [...items].sort((left, right) => {
+    const a = key(left);
+    const b = key(right);
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
 }
 
 function focusedNodeIds(snapshot: KnowledgeGraphDTO, focusNodeId?: string): Set<string> {
