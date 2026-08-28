@@ -1,17 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import fs from 'fs';
-import path from 'path';
-
-const artifactDir = path.resolve(process.cwd(), '..', '..', 'output', 'playwright');
-
-async function capture(page: Page, name: string): Promise<void> {
-  fs.mkdirSync(artifactDir, { recursive: true });
-  await page.screenshot({
-    path: path.join(artifactDir, name),
-    fullPage: true,
-    animations: 'disabled',
-  });
-}
+import { capture } from './lib/artifacts';
 
 // Rendered sRGB channels of the app shell background. Tailwind emits palette
 // colors as oklch(), so computed-style strings are not comparable across
@@ -31,23 +19,53 @@ async function pageBackgroundChannels(page: Page): Promise<number[]> {
   });
 }
 
+// Shell-background contracts: the exact tokens are design details; the
+// contract is that dark surfaces render dark and light surfaces render light.
+const DARK_MAX = 60;
+const LIGHT_MIN = 200;
+
+function expectDarkShell(channels: number[]): void {
+  for (const channel of channels) {
+    expect(channel).toBeGreaterThanOrEqual(0);
+    expect(channel).toBeLessThan(DARK_MAX);
+  }
+}
+
+function expectLightShell(channels: number[]): void {
+  for (const channel of channels) {
+    expect(channel).toBeGreaterThan(LIGHT_MIN);
+  }
+}
+
+// The subtitle count words are localized; parameterize so en and zh tests
+// share one wait + parse path.
+const SUBTITLE_PATTERNS = {
+  en: { marker: /nodes/, nodes: /(\d+)\/(\d+)\s+nodes/, edges: /(\d+)\s+edges/ },
+  zh: { marker: /节点/, nodes: /(\d+)\/(\d+)\s*节点/, edges: /(\d+)\s*条边/ },
+} as const;
+type SubtitleLocale = keyof typeof SUBTITLE_PATTERNS;
+
 // Wait for the knowledge graph to finish loading by checking the subtitle shows counts.
-async function waitForGraph(page: Page) {
-  await expect(page.locator('p', { hasText: /nodes/ }).first()).toBeVisible({ timeout: 15_000 });
+async function waitForGraph(page: Page, locale: SubtitleLocale = 'en') {
+  await expect(
+    page.locator('p', { hasText: SUBTITLE_PATTERNS[locale].marker }).first(),
+  ).toBeVisible({ timeout: 15_000 });
 }
 
 // Extract and assert mandatory counts from the subtitle.
 async function getSubtitleCounts(
   page: Page,
+  locale: SubtitleLocale = 'en',
 ): Promise<{ visible: number; total: number; edges: number }> {
-  const subtitle = page.locator('p', { hasText: /nodes/ }).first();
+  const patterns = SUBTITLE_PATTERNS[locale];
+  const subtitle = page.locator('p', { hasText: patterns.marker }).first();
   await expect(subtitle).toBeVisible();
   const text = await subtitle.textContent();
 
-  const nodeMatch = /(\d+)\/(\d+)\s+nodes/.exec(text ?? '');
-  expect(nodeMatch, `subtitle "${text}" must match "X/Y nodes"`).not.toBeNull();
-  const edgeMatch = /(\d+)\s+edges/.exec(text ?? '');
-  expect(edgeMatch, `subtitle "${text}" must match "Z edges"`).not.toBeNull();
+  const nodeMatch = patterns.nodes.exec(text ?? '');
+  expect(nodeMatch, `subtitle "${text}" must match ${patterns.nodes}`).not.toBeNull();
+  const edgeMatch = patterns.edges.exec(text ?? '');
+  expect(edgeMatch, `subtitle "${text}" must match ${patterns.edges}`).not.toBeNull();
 
   return {
     visible: parseInt(nodeMatch![1], 10),
@@ -495,7 +513,7 @@ test.describe('Knowledge Map — user-triggered semantic stub', () => {
 });
 
 test.describe('Knowledge Map — i18n (en/zh)', () => {
-  test('renders /knowledge fully in zh-CN: title, subtitle counts, controls, panels', async ({
+  test('renders /knowledge fully in zh-CN: title, counts, panels, node detail, Ask view', async ({
     page,
   }) => {
     await page.addInitScript(() => localStorage.setItem('amber-web-language', 'zh-CN'));
@@ -507,15 +525,10 @@ test.describe('Knowledge Map — i18n (en/zh)', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
 
     // The zh subtitle carries the same real-count contract as the en suite.
-    const subtitle = page.locator('p', { hasText: /节点/ }).first();
-    await expect(subtitle).toBeVisible({ timeout: 15_000 });
-    const text = (await subtitle.textContent()) ?? '';
-    const nodeMatch = /(\d+)\/(\d+)\s*节点/.exec(text);
-    expect(nodeMatch, `zh subtitle "${text}" must match "X/Y 节点"`).not.toBeNull();
-    expect(parseInt(nodeMatch![2], 10)).toBeGreaterThanOrEqual(100);
-    const edgeMatch = /(\d+)\s*条边/.exec(text);
-    expect(edgeMatch, `zh subtitle "${text}" must match "Z 条边"`).not.toBeNull();
-    expect(parseInt(edgeMatch![1], 10)).toBeGreaterThanOrEqual(80);
+    await waitForGraph(page, 'zh');
+    const { total, edges } = await getSubtitleCounts(page, 'zh');
+    expect(total).toBeGreaterThanOrEqual(100);
+    expect(edges).toBeGreaterThanOrEqual(80);
 
     // Translated controls: search, layout modes, right-rail views.
     await expect(page.locator('input[type="search"]')).toHaveAttribute(
@@ -532,7 +545,37 @@ test.describe('Knowledge Map — i18n (en/zh)', () => {
     await expect(panel.getByText('最近变更与漂移').first()).toBeVisible();
     await expect(panel.getByRole('button', { name: '刷新' })).toBeVisible();
 
+    // Node detail in zh: feature:F001 exposes source, context, anchors with
+    // the dead-anchor badge, and the gates jump link (feature kind → 关卡).
+    const f001 = page.locator('.react-flow__node[data-id="feature:F001"]:visible');
+    await expect(f001).toBeVisible({ timeout: 10_000 });
+    await f001.click();
+
+    const detailCard = page.locator('aside > .card').first();
+    await expect(detailCard.getByText('feature:F001', { exact: true })).toBeVisible({
+      timeout: 5_000,
+    });
+    await expect(detailCard.locator('dt', { hasText: '来源' }).first()).toBeVisible();
+    await expect(detailCard.getByText(/^上下文$/).first()).toBeVisible();
+    await expect(detailCard.getByText(/^锚点$/).first()).toBeVisible();
+    await expect(detailCard.getByText('死锚点').first()).toBeVisible();
+    await expect(detailCard.locator('a', { hasText: '关卡' }).first()).toBeVisible();
+
     await capture(page, 'knowledge-zh-light.png');
+
+    // Ask view in zh: title, description, question form, disclosure, focus hint.
+    await page.getByRole('button', { name: '提问' }).click();
+    const askPanel = page.getByTestId('knowledge-ask-panel');
+    await expect(askPanel).toBeVisible();
+    await expect(askPanel.getByText('向知识地图提问')).toBeVisible();
+    await expect(askPanel.getByText('回答仅使用当前确定性关系图快照。')).toBeVisible();
+    await expect(page.getByLabel('问题')).toBeVisible();
+    await expect(askPanel.getByRole('button', { name: '发送问题' })).toBeVisible();
+    await expect(
+      askPanel.getByText(/提交后会将您的问题和确定性仓库上下文发送给已配置的 LLM 提供者/),
+    ).toBeVisible();
+
+    await capture(page, 'knowledge-zh-ask.png');
   });
 
   test('the header language toggle switches /knowledge live between en and zh', async ({
@@ -553,7 +596,7 @@ test.describe('Knowledge Map — i18n (en/zh)', () => {
     await expect(page.getByRole('heading', { level: 1, name: '知识与决策地图' })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
     // The live graph survives the switch.
-    await expect(page.locator('p', { hasText: /节点/ }).first()).toBeVisible();
+    await waitForGraph(page, 'zh');
     await expect(page.locator('.react-flow__node').first()).toBeVisible();
 
     await toggle.click();
@@ -572,13 +615,9 @@ test.describe('Knowledge Map — dual theme', () => {
     await waitForGraph(page);
 
     await expect(page.locator('html')).toHaveClass(/dark/);
-    const channels = await pageBackgroundChannels(page);
     // Dark shell surface: every rendered channel is dark. The token itself
     // (dark:bg-obsidian-void) is a design detail; the contract is darkness.
-    for (const channel of channels) {
-      expect(channel).toBeGreaterThanOrEqual(0);
-      expect(channel).toBeLessThan(60);
-    }
+    expectDarkShell(await pageBackgroundChannels(page));
 
     const { total, edges } = await getSubtitleCounts(page);
     expect(total).toBeGreaterThanOrEqual(100);
@@ -595,19 +634,12 @@ test.describe('Knowledge Map — dual theme', () => {
     await waitForGraph(page);
 
     await expect(page.locator('html')).not.toHaveClass(/dark/);
-    const lightChannels = await pageBackgroundChannels(page);
-    for (const channel of lightChannels) {
-      expect(channel).toBeGreaterThan(200);
-    }
+    expectLightShell(await pageBackgroundChannels(page));
 
     const toggle = page.getByRole('button', { name: /toggle theme/i });
     await toggle.click();
     await expect(page.locator('html')).toHaveClass(/dark/);
-    const darkChannels = await pageBackgroundChannels(page);
-    for (const channel of darkChannels) {
-      expect(channel).toBeGreaterThanOrEqual(0);
-      expect(channel).toBeLessThan(60);
-    }
+    expectDarkShell(await pageBackgroundChannels(page));
     // The graph stays rendered and countable after the flip.
     await expect(page.locator('.react-flow__node').first()).toBeVisible();
     const { total } = await getSubtitleCounts(page);
