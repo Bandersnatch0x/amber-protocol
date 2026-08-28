@@ -229,18 +229,22 @@ test("F059 git-archive clean clone: projection and tree-reader produce exact byt
 	// Build a real git archive from HEAD, extract to a temp dir, run both paths,
 	// and assert exact serialized byte equality — the production acceptance test.
 	const os = require("node:os");
+	const { execFileSync } = require("node:child_process");
 	const archiveDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-kg-archive-"));
 	try {
-		const archive = spawnSync("git", ["archive", "HEAD", "--format=tar"], {
+		// Use a large maxBuffer to accommodate the full repo tar output.
+		const tarBytes = execFileSync("git", ["archive", "HEAD", "--format=tar"], {
 			cwd: REPO_ROOT,
-			encoding: "buffer",
+			maxBuffer: 100 * 1024 * 1024,
 		});
-		assert.equal(archive.status, 0, `git archive failed: ${archive.stderr.toString()}`);
-		const tar = spawnSync("tar", ["-x", "-C", archiveDir], {
-			input: archive.stdout,
+		// Extract via spawnSync with cwd instead of -C to avoid Windows drive-letter issue.
+		const extracted = spawnSync("tar", ["-x"], {
+			cwd: archiveDir,
+			input: tarBytes,
 			encoding: "buffer",
+			maxBuffer: 100 * 1024 * 1024,
 		});
-		assert.equal(tar.status, 0, `tar extraction failed: ${tar.stderr.toString()}`);
+		assert.equal(extracted.status, 0, `tar extraction failed: ${extracted.stderr.toString()}`);
 		// Verify committed corpus is present
 		assert.ok(
 			fs.existsSync(path.join(archiveDir, "docs/knowledge-corpus/knowledge-context-manifest.json")),
@@ -255,7 +259,11 @@ test("F059 git-archive clean clone: projection and tree-reader produce exact byt
 		const treeGraph = buildKnowledgeGraphFromTree(archiveDir);
 		const projBytes = serializeKnowledgeGraph(projGraph);
 		const treeBytes = serializeKnowledgeGraph(treeGraph);
-		assert.equal(projBytes, treeBytes, "projection and tree-reader must produce byte-identical output on clean archive");
+		assert.equal(
+			projBytes,
+			treeBytes,
+			"projection and tree-reader must produce byte-identical output on clean archive",
+		);
 		// Exactly 43 nodes must have contextPage
 		const withContextPage = projGraph.nodes.filter((n) => n.contextPage);
 		assert.equal(withContextPage.length, 43, "exactly 43 nodes must have contextPage on clean archive");
