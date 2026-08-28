@@ -77,10 +77,15 @@ interface KnowledgeNodeData extends Record<string, unknown> {
   neighbor: boolean;
 }
 
+const LAYER_ORDER = ['decision', 'knowledge', 'implementation'] as const;
+const LAYERED_COLUMNS = 14;
+const LAYERED_COLUMN_WIDTH = 200;
+const LAYERED_ROW_HEIGHT = 120;
+
 type SimNode = KnowledgeNode & d3.SimulationNodeDatum;
 type SimLink = { source: string; target: string };
 
-function computeLayout(
+export function computeLayout(
   dto: KnowledgeGraphDTO,
   mode: LayoutMode,
 ): Map<string, { x: number; y: number }> {
@@ -98,13 +103,19 @@ function computeLayout(
       implementation: [],
     };
     for (const n of nodes) layers[n.layer].push(n);
-    const layerY: Record<string, number> = { decision: -480, knowledge: 0, implementation: 480 };
-    for (const [layer, items] of Object.entries(layers)) {
+    let bandTop = 0;
+    for (const layer of LAYER_ORDER) {
+      const items = layers[layer];
       items.forEach((n, i) => {
-        const col = i % 14;
-        const row = Math.floor(i / 14);
-        positions.set(n.id, { x: (col - 6.5) * 200, y: layerY[layer] + row * 120 });
+        const col = i % LAYERED_COLUMNS;
+        const row = Math.floor(i / LAYERED_COLUMNS);
+        positions.set(n.id, {
+          x: (col - (LAYERED_COLUMNS - 1) / 2) * LAYERED_COLUMN_WIDTH,
+          y: bandTop + row * LAYERED_ROW_HEIGHT,
+        });
       });
+      const rows = Math.ceil(items.length / LAYERED_COLUMNS);
+      bandTop += (rows + 1) * LAYERED_ROW_HEIGHT;
     }
     return positions;
   }
@@ -262,7 +273,21 @@ interface MiniNeighbor {
   y: number;
 }
 
-function clipSegmentToRect(
+export const MINI_GEOMETRY = {
+  cx: MINI_CX,
+  cy: MINI_CY,
+  rx: MINI_RX,
+  ry: MINI_RY,
+  maxNeighbors: MINI_MAX_NEIGHBORS,
+  centerW: MINI_CENTER_W,
+  centerH: MINI_CENTER_H,
+  satelliteW: MINI_SATELLITE_W,
+  satelliteH: MINI_SATELLITE_H,
+  viewBoxW: 320,
+  viewBoxH: 168,
+} as const;
+
+export function clipSegmentToRect(
   fromX: number,
   fromY: number,
   toX: number,
@@ -279,6 +304,43 @@ function clipSegmentToRect(
   return { x: toX - dx * scale, y: toY - dy * scale };
 }
 
+export function buildMiniNeighbors(
+  edges: KnowledgeEdgeDTO[],
+  centerId: string,
+  nodeById: Map<string, KnowledgeNode>,
+): { shown: MiniNeighbor[]; hidden: number; cx: number; cy: number } {
+  const byNeighbor = new Map<string, MiniNeighbor>();
+  for (const e of edges) {
+    const isOut = e.src === centerId && nodeById.has(e.dst);
+    const isIn = e.dst === centerId && nodeById.has(e.src);
+    if (!isOut && !isIn) continue;
+    const other = nodeById.get(isOut ? e.dst : e.src)!;
+    const relation = {
+      verb: e.verb,
+      dir: isOut ? ('out' as const) : ('in' as const),
+      inferred: e.origin === 'inferred',
+    };
+    const existing = byNeighbor.get(other.id);
+    if (existing) {
+      const duplicate = existing.relations.some(
+        (r) => r.verb === relation.verb && r.dir === relation.dir,
+      );
+      if (!duplicate) existing.relations.push(relation);
+      continue;
+    }
+    byNeighbor.set(other.id, { other, relations: [relation], x: 0, y: 0 });
+  }
+  const all = [...byNeighbor.values()];
+  const shown = all.slice(0, MINI_MAX_NEIGHBORS);
+  const hidden = all.length - shown.length;
+  shown.forEach((it, i) => {
+    const angle = (i / shown.length) * Math.PI * 2 - Math.PI / 2;
+    it.x = MINI_CX + MINI_RX * Math.cos(angle);
+    it.y = MINI_CY + MINI_RY * Math.sin(angle);
+  });
+  return { shown, hidden, cx: MINI_CX, cy: MINI_CY };
+}
+
 function MiniContextGraph({
   dto,
   centerId,
@@ -292,38 +354,10 @@ function MiniContextGraph({
 }) {
   const { t } = useI18n();
   const center = nodeById.get(centerId);
-  const items = useMemo(() => {
-    const byNeighbor = new Map<string, MiniNeighbor>();
-    for (const e of dto.edges) {
-      const isOut = e.src === centerId && nodeById.has(e.dst);
-      const isIn = e.dst === centerId && nodeById.has(e.src);
-      if (!isOut && !isIn) continue;
-      const other = nodeById.get(isOut ? e.dst : e.src)!;
-      const relation = {
-        verb: e.verb,
-        dir: isOut ? ('out' as const) : ('in' as const),
-        inferred: e.origin === 'inferred',
-      };
-      const existing = byNeighbor.get(other.id);
-      if (existing) {
-        const duplicate = existing.relations.some(
-          (r) => r.verb === relation.verb && r.dir === relation.dir,
-        );
-        if (!duplicate) existing.relations.push(relation);
-        continue;
-      }
-      byNeighbor.set(other.id, { other, relations: [relation], x: 0, y: 0 });
-    }
-    const all = [...byNeighbor.values()];
-    const shown = all.slice(0, MINI_MAX_NEIGHBORS);
-    const hidden = all.length - shown.length;
-    shown.forEach((it, i) => {
-      const angle = (i / shown.length) * Math.PI * 2 - Math.PI / 2;
-      it.x = MINI_CX + MINI_RX * Math.cos(angle);
-      it.y = MINI_CY + MINI_RY * Math.sin(angle);
-    });
-    return { shown, hidden, cx: MINI_CX, cy: MINI_CY };
-  }, [dto.edges, centerId, nodeById]);
+  const items = useMemo(
+    () => buildMiniNeighbors(dto.edges, centerId, nodeById),
+    [dto.edges, centerId, nodeById],
+  );
 
   if (!center) return null;
   if (items.shown.length === 0) return null;
