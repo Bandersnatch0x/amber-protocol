@@ -207,7 +207,6 @@ function setupStrictContext(dir, options = {}) {
 
 function baseInput(overrides = {}) {
 	return {
-		policies: { org: "policy/org", tenant: "policy/tenant", ...(overrides.policies || {}) },
 		subject: SUBJECT,
 		submitter: "dev@example.com",
 		capability: "release",

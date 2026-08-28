@@ -19,6 +19,7 @@ export default [
 			"templates/",
 			"test-workflows/",
 			"test-reports/",
+			".qoder/worktrees/",
 		],
 	},
 	js.configs.recommended,
