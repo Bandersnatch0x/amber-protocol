@@ -28,6 +28,7 @@ import type {
   NodeSummaryDTO,
   LLMStatusDTO,
 } from './types';
+import { MAX_CONTEXT_NODES } from '@/lib/knowledge-dto';
 import { trpc } from '@/lib/trpc';
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import { MarkdownMessage } from '@/components/code/MarkdownMessage';
@@ -750,14 +751,17 @@ function KnowledgeAskForm({
   onSubmit,
   focusNode,
   isFetching,
+  nodeCount,
 }: {
   question: string;
   onQuestionChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   focusNode: KnowledgeNode | null;
   isFetching: boolean;
+  nodeCount: number;
 }) {
   const { t } = useI18n();
+  const overCap = !focusNode && nodeCount > MAX_CONTEXT_NODES;
   return (
     <form className="mt-3 space-y-3" onSubmit={onSubmit}>
       <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-200">
@@ -774,8 +778,18 @@ function KnowledgeAskForm({
       <div className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 text-[10px] text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
         {t('knowledge.ask.disclosure')}
       </div>
-      <div className="text-[10px] text-slate-500 dark:text-slate-400">
-        {focusNode ? t('knowledge.ask.focus', { id: focusNode.id }) : t('knowledge.ask.noFocus')}
+      <div
+        className={
+          overCap
+            ? 'text-[10px] text-amber-700 dark:text-amber-300'
+            : 'text-[10px] text-slate-500 dark:text-slate-400'
+        }
+      >
+        {overCap
+          ? t('knowledge.ask.overCap', { nodes: nodeCount, cap: MAX_CONTEXT_NODES })
+          : focusNode
+            ? t('knowledge.ask.focus', { id: focusNode.id })
+            : t('knowledge.ask.noFocus')}
       </div>
       <button
         type="submit"
@@ -928,6 +942,7 @@ function KnowledgeAskPanel({
   errorCode,
   nodeById,
   onSelect,
+  nodeCount,
 }: {
   question: string;
   onQuestionChange: (value: string) => void;
@@ -938,6 +953,7 @@ function KnowledgeAskPanel({
   errorCode: string | null;
   nodeById: Map<string, KnowledgeNode>;
   onSelect: (id: string) => void;
+  nodeCount: number;
 }) {
   const { t } = useI18n();
   return (
@@ -954,6 +970,7 @@ function KnowledgeAskPanel({
         onSubmit={onSubmit}
         focusNode={focusNode}
         isFetching={isFetching}
+        nodeCount={nodeCount}
       />
       <KnowledgeAskStatus result={result} errorCode={errorCode} />
       {result?.status === 'ok' && (
@@ -1445,6 +1462,7 @@ function KnowledgeMapGraph({
               errorCode={askQuery.error?.message ?? null}
               nodeById={nodeById}
               onSelect={setSelectedId}
+              nodeCount={mergedDto.nodes.length}
             />
           ) : selected ? (
             <div className="card p-4 max-h-[70vh] overflow-y-auto">

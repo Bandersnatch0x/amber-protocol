@@ -107,6 +107,8 @@ const en = {
     'Submitting sends your question and deterministic repository context to the configured LLM provider. Nothing is persisted.',
   'knowledge.ask.focus': 'Focused on {id} and its two-hop neighborhood.',
   'knowledge.ask.noFocus': 'No node focus; the bounded full snapshot will be used.',
+  'knowledge.ask.overCap':
+    'This graph has {nodes} nodes, past the {cap}-node context ceiling. Select a node first — an unfocused question would be refused.',
   'knowledge.ask.submit': 'Send question',
   'knowledge.ask.loading': 'Asking…',
   'knowledge.ask.unavailable': 'Ask is unavailable because no LLM provider is configured.',
@@ -1107,6 +1109,8 @@ const zh: Record<TranslationKey, string> = {
     '提交后会将您的问题和确定性仓库上下文发送给已配置的 LLM 提供者。不会持久化任何内容。',
   'knowledge.ask.focus': '聚焦于 {id} 及其两跳邻域。',
   'knowledge.ask.noFocus': '未选择焦点节点；将使用有界的完整快照。',
+  'knowledge.ask.overCap':
+    '当前图有 {nodes} 个节点，超过 {cap} 个节点的上下文上限。请先选中一个节点——未聚焦的提问会被拒绝。',
   'knowledge.ask.submit': '发送问题',
   'knowledge.ask.loading': '正在提问…',
   'knowledge.ask.unavailable': '未配置 LLM 提供者，提问功能不可用。',
