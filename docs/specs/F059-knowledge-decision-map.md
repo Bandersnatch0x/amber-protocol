@@ -117,7 +117,7 @@ Spec, and the implementation.
 - Cache: in-process memory only, keyed `(source content hash, promptHash, model)`, no TTL,
   in-flight request sharing, LRU cap 200, cleared on restart. Cited QA is never cached.
 - Context pages for projection unification are distilled through the ADR-0009 pipeline under a
-  human-reviewed 43-row manifest, with batch request loop, deterministic ingest judging, and
+  human-reviewed committed census manifest, with batch request loop, deterministic ingest judging, and
   sampled human review. `knowledge admit` is not required: projections depend on pages only.
 
 ### Cited QA
@@ -209,6 +209,11 @@ already holds in the shipped implementation.
   `provenance: 'deterministic'` in the schema-validated graph; the web DTO omits the field because
   the read-time layer never produces inferred *nodes* — only inferred edges and summaries, which do
   carry it. An absent field on `KnowledgeNode` is by design, not an omission.
+- **The census is single-sourced (issues/0007).** The corpus counts that shipped as a hardcoded
+  gate now live only in the committed manifest under `docs/knowledge-corpus/`; reads fail closed,
+  with paths named, whenever the tree and that manifest disagree in either direction. Admitting a
+  document is reviewing the regenerated manifest diff — the "43 artifacts" above is the corpus as
+  delivered, not a frozen number.
 - **Artifact trace verbs are folded on purpose.** The Governance Graph (ADR-0021) keeps
   `refines` / `realizes` / `supersedes` per resolved Trace; this map folds `refines` and `realizes`
   into `builds-on`, and `decides` into `references`, to stay inside its four-verb vocabulary. The

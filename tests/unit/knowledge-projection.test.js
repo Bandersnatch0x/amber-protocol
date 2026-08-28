@@ -7,7 +7,6 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const {
-	EXPECTED_COUNTS,
 	COMMITTED_CORPUS_DIR,
 	buildHumanReviewSample,
 	buildKnowledgeContextManifest,
@@ -25,6 +24,10 @@ const { verifyPages } = require("../../scripts/lib/core/context-verify");
 const { mkTarget, readJson, writeJson } = require("../helpers/harness");
 
 const REPO_ROOT = path.join(__dirname, "..", "..");
+
+// The synthetic corpus built by createCorpus owns its own census (25/10/9);
+// the production census's single source of truth is the committed manifest.
+const FIXTURE_COUNTS = Object.freeze({ adr: 25, wiki: 10, architecture: 9, total: 44 });
 const CLI = path.join(REPO_ROOT, "scripts", "amber.js");
 
 function writeFile(root, relPath, text) {
@@ -84,16 +87,21 @@ function commandJson(args, cwd) {
 	return outer.text ? JSON.parse(outer.text) : outer;
 }
 
-test("F059 manifest derives the exact 44-row corpus from the real tree", () => {
+test("F059 manifest derived from the real tree matches the committed census", () => {
 	const result = buildKnowledgeContextManifest(REPO_ROOT);
 	assert.equal(result.ok, true, result.errors.join("; "));
-	assert.deepEqual(result.manifest.counts, EXPECTED_COUNTS);
-	assert.equal(result.manifest.rows.length, 44);
+	const committed = readJson(
+		path.join(REPO_ROOT, COMMITTED_CORPUS_DIR, "knowledge-context-manifest.json"),
+	);
+	assert.deepEqual(result.manifest.counts, committed.counts);
+	assert.deepEqual(
+		result.manifest.rows.map((row) => row.sourcePath),
+		committed.rows.map((row) => row.sourcePath),
+	);
 	for (const field of ["id", "sourceNodeId", "pageId", "sourcePath"]) {
 		const values = result.manifest.rows.map((row) => row[field]);
 		assert.equal(new Set(values).size, values.length, `${field} must be unique`);
 	}
-	assert.equal(result.manifest.rows.filter((row) => row.category === "wiki").length, 10);
 	assert.ok(
 		result.manifest.rows.every((row) => fs.existsSync(path.join(REPO_ROOT, row.sourcePath))),
 	);
@@ -103,7 +111,7 @@ test("F059 context sync drives request, ingest, verify, and projection idempoten
 	const root = createCorpus("kg-context-sync");
 	const first = syncKnowledgeContextPages(root);
 	assert.equal(first.ok, true, JSON.stringify(first.errors));
-	assert.deepEqual(first.manifest.counts, EXPECTED_COUNTS);
+	assert.deepEqual(first.manifest.counts, FIXTURE_COUNTS);
 	assert.equal(first.actions.length, 44);
 	assert.equal(first.actions.filter((action) => action.outcome === "accepted").length, 44);
 	assert.equal(first.verification.summary.total, 44);
@@ -193,7 +201,7 @@ test("F059 CLI context-sync and knowledge graph use the projection path", () => 
 	const root = createCorpus("kg-cli-sync");
 	const sync = commandJson(["knowledge", "context-sync", "--target", root], root);
 	assert.equal(sync.ok, true);
-	assert.deepEqual(sync.counts, EXPECTED_COUNTS);
+	assert.deepEqual(sync.counts, FIXTURE_COUNTS);
 	assert.equal(sync.verification.summary.total, 44);
 	const graphRun = spawnSync(
 		process.execPath,
@@ -394,14 +402,50 @@ test("F059 exact 44-row manifest replacement detection rejects 43-member manifes
 	manifest.counts.adr = 24;
 	manifest.counts.total = 43;
 	writeJson(root, path.relative(root, manifestPath), manifest);
-	// Reader must fail — manifest has only 24 ADR rows, not 25
+	// Reader must fail closed and NAME the path the tampered census dropped —
+	// fixing the counts alongside the rows must not help.
 	assert.throws(
 		() => readKnowledgeBaseProjection(root),
 		(err) => {
 			assert.ok(err.amberCode === "AMBER_E_PROJECTION_DRIFT", `unexpected code: ${err.amberCode}`);
+			assert.match(err.message, /not in the committed census/);
+			assert.match(err.message, /docs\/adr\/0025-decision-0025\.md/);
 			return true;
 		},
 	);
+});
+
+test("0007 drill: admitting a new ADR is exactly write, sync, commit corpus", () => {
+	const root = createCorpus("kg-admission-drill");
+	syncKnowledgeContextPages(root);
+	assert.equal(readKnowledgeBaseProjection(root).length, FIXTURE_COUNTS.total);
+
+	// Step 1 — write the document. The read gate now fails closed and NAMES it.
+	writeFile(
+		root,
+		"docs/adr/0026-new-decision.md",
+		"# ADR-0026: New decision\n\n**Status:** Accepted\n**Date:** 2026-02-01\n\nDecision 0026 describes F001.\n",
+	);
+	assert.throws(
+		() => readKnowledgeBaseProjection(root),
+		(err) => {
+			assert.ok(err.amberCode === "AMBER_E_PROJECTION_DRIFT", `unexpected code: ${err.amberCode}`);
+			assert.match(err.message, /docs\/adr\/0026-new-decision\.md/);
+			return true;
+		},
+	);
+
+	// Step 2 — sync regenerates the committed census; no constant to bump anywhere.
+	const sync = syncKnowledgeContextPages(root);
+	assert.equal(sync.ok, true, JSON.stringify(sync.errors));
+
+	// Step 3 — committing the regenerated corpus is the admission; reads are green
+	// and the new member is present by name.
+	const rows = readKnowledgeBaseProjection(root);
+	assert.equal(rows.length, FIXTURE_COUNTS.total + 1);
+	assert.ok(rows.some((row) => row.pageId === "knowledge-adr-0026"));
+	const committed = readJson(committedManifestPath(root));
+	assert.ok(committed.rows.some((row) => row.sourcePath === "docs/adr/0026-new-decision.md"));
 });
 
 test("F059 tracked package state: docs/knowledge-corpus/ contains manifest and projection output", () => {
@@ -423,7 +467,7 @@ test("F059 tracked package state: docs/knowledge-corpus/ contains manifest and p
 	);
 	const manifest = readJson(manifestFile);
 	assert.equal(manifest.manifestId, "f059-knowledge-context-pages");
-	assert.deepEqual(manifest.counts, EXPECTED_COUNTS);
+	assert.deepEqual(manifest.counts, FIXTURE_COUNTS);
 	assert.equal(manifest.rows.length, 44);
 	const projection = readJson(projectionFile);
 	assert.equal(projection.pages.length, 44);

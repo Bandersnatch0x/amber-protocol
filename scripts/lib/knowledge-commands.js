@@ -39,13 +39,28 @@ const dispatch = defineCommand({
 			return { text: serializeKnowledgeGraph(graph), bypassPrint: true };
 		},
 		"context-manifest": (args) => {
-			const { buildKnowledgeContextManifest } = require("./core/knowledge-projection");
-			const result = buildKnowledgeContextManifest(resolveTarget(args));
+			const {
+				buildKnowledgeContextManifest,
+				membershipErrors,
+				committedManifestPath,
+			} = require("./core/knowledge-projection");
+			const fs = require("node:fs");
+			const target = resolveTarget(args);
+			const result = buildKnowledgeContextManifest(target);
+			const errors = [...result.errors];
+			// Validate against the census's single source of truth when it exists;
+			// on a bootstrap tree there is nothing to compare against yet.
+			try {
+				const committed = JSON.parse(fs.readFileSync(committedManifestPath(target), "utf8"));
+				errors.push(...membershipErrors(result.manifest.rows, committed.rows || []));
+			} catch {
+				// No committed manifest yet — rendering alone is the outcome.
+			}
 			return {
 				text: JSON.stringify(result.manifest, null, 2),
-				errors: result.errors,
+				errors,
 				warnings: [],
-				exitCode: result.ok ? 0 : 1,
+				exitCode: errors.length === 0 ? 0 : 1,
 			};
 		},
 		"context-sync": (args) => {

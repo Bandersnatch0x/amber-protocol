@@ -14,12 +14,13 @@ const { typedError } = require("./error-catalog");
 
 const MANIFEST_SCHEMA_VERSION = "1.0.0";
 const PROJECTION_RULE_VERSION = 1;
-// Intentional deliberate gate: this census (25 ADR + 10 wiki + 9 architecture = 44 total) is the
-// reviewed snapshot of the F059 knowledge corpus. Adding or removing any document in
-// docs/adr/, docs/wiki/knowledge/, or docs/architecture/ requires a conscious update here
-// and a fresh `amber knowledge context-sync` run to rebuild the committed corpus.
-// AMBER_E_KNOWLEDGE_MANIFEST_INVALID fires on any deviation — by design, not accident.
-const EXPECTED_COUNTS = Object.freeze({ adr: 25, wiki: 10, architecture: 9, total: 44 });
+// Intentional deliberate gate, single-sourced: the committed manifest under
+// docs/knowledge-corpus/ is the census's one source of truth. Adding or removing any
+// document in docs/adr/, docs/wiki/knowledge/, or docs/architecture/ requires a fresh
+// `amber knowledge context-sync` run and committing the regenerated corpus — the
+// conscious-admission act is reviewing that manifest diff. Reads fail closed, with the
+// offending paths named, whenever the tree and the committed census disagree in either
+// direction. No hardcoded counts: issues/0007 (ruling C) removed EXPECTED_COUNTS.
 const SAMPLE_LIMIT = 6;
 
 const ERROR_CODES = Object.freeze({
@@ -123,18 +124,18 @@ function listArchitectureRows(targetRoot) {
 		});
 }
 
-function censusErrors(rows) {
+function countsOf(rows) {
 	const counts = {
 		adr: rows.filter((row) => row.category === "adr").length,
 		wiki: rows.filter((row) => row.category === "wiki").length,
 		architecture: rows.filter((row) => row.category === "architecture").length,
 	};
 	counts.total = rows.length;
+	return counts;
+}
+
+function duplicateErrors(rows) {
 	const errors = [];
-	for (const [kind, expected] of Object.entries(EXPECTED_COUNTS)) {
-		if (counts[kind] !== expected)
-			errors.push(`expected ${expected} ${kind} row(s), found ${counts[kind]}`);
-	}
 	for (const field of ["id", "sourceNodeId", "pageId", "sourcePath"]) {
 		const values = rows.map((row) => row[field]);
 		const duplicates = [
@@ -142,7 +143,41 @@ function censusErrors(rows) {
 		];
 		for (const value of duplicates) errors.push(`duplicate ${field}: ${value}`);
 	}
-	return { counts, errors };
+	return errors;
+}
+
+// Bidirectional membership gate between the tree-derived census and the committed
+// manifest: every disagreement is named, never summarized away.
+function membershipErrors(derivedRows, committedRows) {
+	const errors = [];
+	const derivedByPath = new Map(derivedRows.map((row) => [row.sourcePath, row]));
+	const committedByPath = new Map(committedRows.map((row) => [row.sourcePath, row]));
+	const notAdmitted = [...derivedByPath.keys()].filter((p) => !committedByPath.has(p)).sort();
+	const missingFromTree = [...committedByPath.keys()].filter((p) => !derivedByPath.has(p)).sort();
+	if (notAdmitted.length > 0) {
+		errors.push(
+			`${notAdmitted.length} document(s) in the tree are not in the committed census: ${notAdmitted.join(", ")} — run \`amber knowledge context-sync\` and commit the regenerated corpus`,
+		);
+	}
+	if (missingFromTree.length > 0) {
+		errors.push(
+			`committed census lists ${missingFromTree.length} document(s) missing from the tree: ${missingFromTree.join(", ")} — restore the file(s) or run \`amber knowledge context-sync\` and commit the regenerated corpus`,
+		);
+	}
+	const derivedCounts = countsOf(derivedRows);
+	const committedCounts = countsOf(committedRows);
+	for (const kind of ["adr", "wiki", "architecture", "total"]) {
+		if (derivedCounts[kind] !== committedCounts[kind]) {
+			errors.push(
+				`census count mismatch for ${kind}: tree has ${derivedCounts[kind]}, committed manifest has ${committedCounts[kind]}`,
+			);
+		}
+	}
+	return errors;
+}
+
+function censusErrors(rows) {
+	return { counts: countsOf(rows), errors: duplicateErrors(rows) };
 }
 
 function buildKnowledgeContextManifest(targetRoot) {
@@ -154,7 +189,6 @@ function buildKnowledgeContextManifest(targetRoot) {
 	const manifest = {
 		schemaVersion: MANIFEST_SCHEMA_VERSION,
 		manifestId: "f059-knowledge-context-pages",
-		expectedCounts: EXPECTED_COUNTS,
 		counts,
 		rows,
 	};
@@ -376,8 +410,32 @@ function readKnowledgeBaseProjection(targetRoot) {
 			a.sourceNodeId < b.sourceNodeId ? -1 : a.sourceNodeId > b.sourceNodeId ? 1 : 0,
 		);
 
-	// Validate census against the committed manifest's declared counts.
-	const { errors } = censusErrors(rows);
+	// Validate the census against its single source of truth: the committed manifest.
+	// (1) duplicates, (2) the manifest's declared counts must match its own rows —
+	// a tampered manifest cannot both drop a row and fix the numbers — and (3) the
+	// tree-derived census must equal the committed membership in both directions.
+	const errors = duplicateErrors(rows);
+	const committedRows = committedManifest.rows || [];
+	const declaredCounts = committedManifest.counts || {};
+	const actualCommittedCounts = countsOf(committedRows);
+	for (const kind of ["adr", "wiki", "architecture", "total"]) {
+		if (declaredCounts[kind] !== actualCommittedCounts[kind]) {
+			errors.push(
+				`committed manifest declares ${declaredCounts[kind]} ${kind} row(s) but contains ${actualCommittedCounts[kind]}`,
+			);
+		}
+	}
+	const missingProjection = committedRows
+		.filter((row) => !rows.some((r) => r.pageId === row.pageId))
+		.map((row) => row.pageId)
+		.sort();
+	if (missingProjection.length > 0) {
+		errors.push(
+			`committed projection output is missing page(s) for: ${missingProjection.join(", ")} — run \`amber knowledge context-sync\` and commit the regenerated corpus`,
+		);
+	}
+	const derivedRows = [...listAdrRows(root), ...listWikiRows(root), ...listArchitectureRows(root)];
+	errors.push(...membershipErrors(derivedRows, committedRows));
 	if (errors.length > 0) {
 		throw typedError(
 			ERROR_CODES.projection,
@@ -489,9 +547,9 @@ function buildHumanReviewSample(targetRoot, { limit = SAMPLE_LIMIT } = {}) {
 module.exports = {
 	MANIFEST_SCHEMA_VERSION,
 	PROJECTION_RULE_VERSION,
-	EXPECTED_COUNTS,
 	COMMITTED_CORPUS_DIR,
 	ERROR_CODES,
+	membershipErrors,
 	buildKnowledgeContextManifest,
 	syncKnowledgeContextPages,
 	readKnowledgeBaseProjection,

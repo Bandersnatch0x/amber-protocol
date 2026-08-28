@@ -638,7 +638,7 @@ const COMMAND_HELP = {
 		"        builds-on, references, describes), dead-anchor drift findings.",
 		"        Read-only, schema-validated (knowledge-graph.schema.json),",
 		"        byte-identical on recompute over an unchanged tree.",
-		"  context-manifest      Render and validate the F059 44-row context-page manifest.",
+		"  context-manifest      Render the context-page manifest and validate it against the committed census.",
 		"  context-sync [--refresh]",
 		"        Idempotently drive context request/ingest/verify for the manifest and rebuild",
 		"        the knowledge-base projection. Existing unmanaged pages are never overwritten.",
