@@ -1248,11 +1248,12 @@ Error codes: `AMBER_E_RELEASE_INVALID`, `AMBER_E_RELEASE_EXISTS`, `AMBER_E_RELEA
 `AMBER_E_RELEASE_AUTH_SIZE_CEILING`, `AMBER_E_RELEASE_TX_STATE`, `AMBER_E_RELEASE_TX_MISMATCH`,
 `AMBER_E_RELEASE_TX_CORRUPT`, `AMBER_E_RELEASE_TX_LOCK`, `AMBER_E_RELEASE_TX_SIZE_CEILING`.
 
-### maintain register-detector / detect / propose / triage / detectors / findings / proposals
+### maintain register-detector / detect / propose / triage / complete / rollup / detectors / findings / proposals
 
 Register Control Band detectors, record deterministic Findings (F054 T1), derive Trigger
-Proposals (F054 T2), and triage them (F054 T3). A detector is a versioned, model-independent
-Control Band definition — metric, source, numeric baseline, closed comparator rules
+Proposals (F054 T2), triage them (F054 T3), and close the loop with completion records and
+bounded rollups (F054 T4). A detector is a versioned, model-independent Control Band definition —
+metric, source, numeric baseline, closed comparator rules
 (`ge|gt|le|lt`, the last matching rule wins), evaluation window, scope, cooldown, observation
 ceiling, and the one permitted output type (`finding`) — registered into the hash-chained ledger
 `.amber/maintain/detectors.jsonl` behind a single-use committed human acceptance/approval Decision
@@ -1298,6 +1299,23 @@ Triage Decisions are single-use across the maintain ledgers (a Decision spent on
 registration or an earlier triage refuses), triage of a closed proposal refuses, and validly
 re-chained forgeries against the closed-proposal or single-use invariants fail every read closed.
 
+Staleness is derived at read time, never edited in place: `findings` and `proposals` listings
+carry `stale`/`staleReasons` — `detector-superseded` when the entry's detector version is no
+longer the newest registered version of that detector id, `observation-superseded` when a later
+Finding re-presents the same fingerprint with a different input hash — so prior results become
+stale rather than silently reinterpreted. `complete` closes a fix-triaged proposal by appending
+one immutable record binding fingerprint → committed candidate Intent revision → committed `eval`
+and `eval-result` artifact pins (F058 types), so a shipped fix becomes a regression signal; the
+intent pin must be the fingerprint-derived candidate identity (`intent/maintain/<16-hex>`), every
+pin must resolve to a committed revision of the exact type, and the pinned `eval-result` must
+record the pinned `eval` as its definition (the F058 extensions carrier) — anything unresolved or
+unlinked refuses, and a proposal completes at most once. How recent the pinned Eval revisions are
+is the completer's judgment, reviewed at Acceptance; the record pins the exact revisions so that
+judgment is auditable. `rollup` is a read-only deterministic aggregation within a
+declared `--limit`: counts by tier, status, and derived staleness over the first N entries of each
+ledger in append order, with an explicit `truncated` marker — never hidden truncation — and
+stable, sorted key ordering.
+
 ```bash
 node scripts/amber.js maintain register-detector --target . --id detector/error-rate \
   --detector-version 1 --metric http-5xx-rate --source observability/api \
@@ -1314,6 +1332,10 @@ node scripts/amber.js maintain triage --target . --fingerprint sha256:<64-hex-ch
   --decision-identity decision/triage-1 --revision 1 --json
 node scripts/amber.js maintain triage --target . --fingerprint sha256:<64-hex-chars> \
   --outcome fix --decision-identity decision/triage-2 --revision 1 --json
+node scripts/amber.js maintain complete --target . --fingerprint sha256:<64-hex-chars> \
+  --intent intent/maintain-x@1 --eval eval/maintain-check@1 \
+  --eval-result eval-result/maintain-check-run@1 --json
+node scripts/amber.js maintain rollup --target . --limit 100 --json
 node scripts/amber.js maintain detectors --target . --json
 node scripts/amber.js maintain findings --target . --id detector/error-rate --json
 node scripts/amber.js maintain findings --target . --fingerprint sha256:<64-hex-chars> --json

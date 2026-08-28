@@ -253,6 +253,11 @@ const FLAG_SPECS = {
 	// F054 ticket 3 (#281): owner triage flags (--fingerprint, --reason,
 	// --decision-identity, and --revision are shared with existing surfaces).
 	"--outcome": { key: "outcome" },
+	// F054 ticket 4 (#282): fix completion pins (--limit is shared with
+	// existing surfaces).
+	"--intent": { key: "intent" },
+	"--eval": { key: "evalVal" },
+	"--eval-result": { key: "evalResult" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

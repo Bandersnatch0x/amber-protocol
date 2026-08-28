@@ -26,6 +26,15 @@
 // fix returns a CANDIDATE Intent admission payload that must still pass
 // the normal canonical artifact surface — nothing is auto-admitted, so
 // re-entry remains human-governed.
+//
+// Staleness (F054 T4, #282) is derived at read time, never edited in
+// place: a Finding (and its proposal chain) reads stale when a newer
+// detector version is registered or a later observation re-presents the
+// same fingerprint with different input. Completing a fix-triaged
+// proposal appends one immutable record binding fingerprint → committed
+// Intent → committed Eval definition + Eval result pins, so a shipped
+// fix becomes a regression signal. Rollups are deterministic within a
+// declared bound and mark truncation explicitly.
 
 const crypto = require("node:crypto");
 const path = require("node:path");
@@ -763,12 +772,42 @@ function detect(cwd, input = {}, opts = {}) {
 	return { ...appended, tier };
 }
 
-function listFindings(cwd, { detectorId = null, fingerprint = null } = {}) {
-	return foldFindings(cwd).filter(
+// Staleness is derived at read time, never edited: prior results become
+// stale rather than silently reinterpreted.
+function latestDetectorFor(detectors, id) {
+	const versions = detectors.filter((entry) => entry.id === id);
+	return versions.length > 0 ? versions[versions.length - 1] : null;
+}
+
+function findingStaleReasons(finding, detectors, findings) {
+	const reasons = [];
+	const latest = latestDetectorFor(detectors, finding.detectorId);
+	if (latest !== null && latest.version !== finding.detectorVersion)
+		reasons.push("detector-superseded");
+	const represented = findings.some(
 		(entry) =>
-			(detectorId === null || entry.detectorId === detectorId) &&
-			(fingerprint === null || entry.fingerprint === fingerprint),
+			entry.index > finding.index &&
+			entry.fingerprint === finding.fingerprint &&
+			entry.inputHash !== finding.inputHash,
 	);
+	if (represented) reasons.push("observation-superseded");
+	return reasons;
+}
+
+function withStaleness(entry, reasons) {
+	return { ...entry, stale: reasons.length > 0, staleReasons: reasons };
+}
+
+function listFindings(cwd, { detectorId = null, fingerprint = null } = {}) {
+	const detectors = foldDetectors(cwd);
+	const findings = foldFindings(cwd);
+	return findings
+		.filter(
+			(entry) =>
+				(detectorId === null || entry.detectorId === detectorId) &&
+				(fingerprint === null || entry.fingerprint === fingerprint),
+		)
+		.map((entry) => withStaleness(entry, findingStaleReasons(entry, detectors, findings)));
 }
 
 function proposalsPath(cwd) {
@@ -833,9 +872,51 @@ const TRIAGE_EVENT_FIELDS = Object.freeze([
 	"prevHash",
 	"hash",
 ]);
+const ARTIFACT_PIN_FIELDS = Object.freeze(["identity", "revision"]);
+const COMPLETE_INPUT_FIELDS = Object.freeze(["fingerprint", "intent", "eval", "evalResult"]);
+const COMPLETION_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"fingerprint",
+	"proposalIndex",
+	"intent",
+	"eval",
+	"evalResult",
+	"prevHash",
+	"hash",
+]);
+
+function artifactPinProblem(value, label) {
+	if (!isPlainObject(value)) return `${label} must be an object carrying identity and revision`;
+	const closed = closedFieldProblem(value, ARTIFACT_PIN_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(value.identity)) return `${label}.identity must be a non-empty string`;
+	if (!Number.isInteger(value.revision) || value.revision < 1)
+		return `${label}.revision must be a positive integer`;
+	return null;
+}
 
 function proposalEventProblem(event, lineIndex) {
 	const label = `maintain proposal event ${lineIndex}`;
+	if (event.kind === "completion") {
+		const closed = closedFieldProblem(event, COMPLETION_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		if (!isNonEmptyString(event.at)) return `${label}.at must be a non-empty string`;
+		if (!HASH_PATTERN.test(event.fingerprint ?? ""))
+			return `${label}.fingerprint must be a sha256:<64-hex> string`;
+		if (!Number.isInteger(event.proposalIndex) || event.proposalIndex < 0)
+			return `${label}.proposalIndex must be a non-negative integer`;
+		for (const [field, pinLabel] of [
+			["intent", `${label}.intent`],
+			["eval", `${label}.eval`],
+			["evalResult", `${label}.evalResult`],
+		]) {
+			const pin = artifactPinProblem(event[field], pinLabel);
+			if (pin !== null) return pin;
+		}
+		return null;
+	}
 	if (event.kind === "triage") {
 		const closed = closedFieldProblem(event, TRIAGE_EVENT_FIELDS, label);
 		if (closed !== null) return closed;
@@ -899,7 +980,12 @@ function foldProposals(cwd) {
 			throw proposalCorrupt(
 				`maintain proposal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
 			);
-		if (event.kind !== "proposal" && event.kind !== "evidence" && event.kind !== "triage")
+		if (
+			event.kind !== "proposal" &&
+			event.kind !== "evidence" &&
+			event.kind !== "triage" &&
+			event.kind !== "completion"
+		)
 			throw proposalCorrupt(
 				`maintain proposal event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
 			);
@@ -918,6 +1004,7 @@ function foldProposals(cwd) {
 				findings: [findingIndex],
 				lastObservedAt: observedAt,
 				triage: null,
+				completion: null,
 				index,
 			};
 			proposals.push(proposal);
@@ -940,6 +1027,23 @@ function foldProposals(cwd) {
 			// An out-of-order (older) append never regresses the anchor.
 			if (Date.parse(event.observedAt) > Date.parse(proposal.lastObservedAt))
 				proposal.lastObservedAt = event.observedAt;
+		} else if (event.kind === "completion") {
+			const proposal = proposals.find((entry) => entry.index === event.proposalIndex);
+			if (!proposal || proposal.fingerprint !== event.fingerprint)
+				throw proposalCorrupt(
+					`maintain proposal event ${lineIndex} completes unknown proposal ${event.proposalIndex} for ${JSON.stringify(event.fingerprint)}`,
+				);
+			if (proposal.status !== "triaged" || proposal.triage.outcome !== "fix")
+				throw proposalCorrupt(
+					`maintain proposal event ${lineIndex} completes a proposal that is not fix-triaged`,
+				);
+			proposal.status = "completed";
+			proposal.completion = {
+				at: event.at,
+				intent: event.intent,
+				eval: event.eval,
+				evalResult: event.evalResult,
+			};
 		} else {
 			const proposal = byFingerprint.get(event.fingerprint);
 			if (!proposal)
@@ -1084,10 +1188,27 @@ function propose(cwd, input = {}, opts = {}) {
 	return { ...result, action: result.ok ? action : null };
 }
 
+// A proposal chain inherits staleness from its detector version and its
+// referenced Findings.
+function proposalStaleReasons(proposal, detectors, findings) {
+	const reasons = new Set();
+	const latest = latestDetectorFor(detectors, proposal.detectorId);
+	if (latest !== null && latest.version !== proposal.detectorVersion)
+		reasons.add("detector-superseded");
+	for (const index of proposal.findings) {
+		const finding = findings.find((entry) => entry.index === index);
+		if (!finding) continue;
+		for (const reason of findingStaleReasons(finding, detectors, findings)) reasons.add(reason);
+	}
+	return [...reasons].sort();
+}
+
 function listProposals(cwd, { fingerprint = null } = {}) {
-	return foldProposals(cwd).filter(
-		(entry) => fingerprint === null || entry.fingerprint === fingerprint,
-	);
+	const detectors = foldDetectors(cwd);
+	const findings = foldFindings(cwd);
+	return foldProposals(cwd)
+		.filter((entry) => fingerprint === null || entry.fingerprint === fingerprint)
+		.map((entry) => withStaleness(entry, proposalStaleReasons(entry, detectors, findings)));
 }
 
 // The prepare-only CANDIDATE Intent admission payload a fix triage
@@ -1216,6 +1337,204 @@ function triage(cwd, input = {}, opts = {}) {
 	return { ...result, candidate };
 }
 
+// A pinned reference resolves only to a committed revision of the
+// expected type; anything else refuses instead of dangling.
+function resolveArtifactPin(revisions, pin, type, label) {
+	const match = revisions.find(
+		(revision) =>
+			revision.type === type &&
+			revision.identity === pin.identity &&
+			revision.revision === pin.revision,
+	);
+	if (!match)
+		return `${label} ${JSON.stringify(pin.identity)}@${pin.revision} does not resolve to a committed ${type} artifact revision`;
+	return null;
+}
+
+/**
+ * Complete one fix-triaged proposal by binding its fingerprint to the
+ * committed Intent it re-entered as and the committed Eval definition and
+ * Eval result that now watch the fix — a shipped fix becomes a regression
+ * signal. Unresolved references refuse; the record is append-only.
+ */
+function complete(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(MAINTAIN_INVALID_CODE, ["complete input must be an object"]);
+	const inputClosed = unknownFieldProblem(input, COMPLETE_INPUT_FIELDS, "complete input");
+	if (inputClosed !== null) return fail(MAINTAIN_INVALID_CODE, [inputClosed]);
+	if (!HASH_PATTERN.test(input.fingerprint ?? ""))
+		return fail(MAINTAIN_INVALID_CODE, ["fingerprint must be a sha256:<64-hex> string"]);
+	for (const [field, label] of [
+		["intent", "intent"],
+		["eval", "eval"],
+		["evalResult", "evalResult"],
+	]) {
+		const pin = artifactPinProblem(input[field], label);
+		if (pin !== null) return fail(MAINTAIN_INVALID_CODE, [pin]);
+	}
+	// The AC binds the CANDIDATE Intent identity: completion re-enters as
+	// the fingerprint-derived Intent the fix triage returned, never as an
+	// unrelated Intent.
+	const candidateIdentity = `intent/maintain/${input.fingerprint.slice(7, 23)}`;
+	if (input.intent.identity !== candidateIdentity)
+		return fail(MAINTAIN_INVALID_CODE, [
+			`intent must reference the candidate Intent identity ${JSON.stringify(candidateIdentity)} derived from the fingerprint; got ${JSON.stringify(input.intent.identity)}`,
+		]);
+	let revisions;
+	try {
+		revisions = listArtifactRevisions(cwd);
+	} catch (err) {
+		return fail(err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT", [err.message || String(err)]);
+	}
+	for (const [field, type, label] of [
+		["intent", "intent", "intent"],
+		["eval", "eval", "eval"],
+		["evalResult", "eval-result", "evalResult"],
+	]) {
+		const unresolved = resolveArtifactPin(revisions, input[field], type, label);
+		if (unresolved !== null) return fail(MAINTAIN_INVALID_CODE, [unresolved]);
+	}
+	// The pinned result must be a result OF the pinned definition: F058
+	// eval-results record their definition pin in the extensions carrier.
+	const resultRevision = revisions.find(
+		(revision) =>
+			revision.type === "eval-result" &&
+			revision.identity === input.evalResult.identity &&
+			revision.revision === input.evalResult.revision,
+	);
+	const definition = resultRevision.envelope?.extensions?.evalResult?.definition ?? null;
+	if (
+		!isPlainObject(definition) ||
+		definition.identity !== input.eval.identity ||
+		definition.revision !== input.eval.revision
+	)
+		return fail(MAINTAIN_INVALID_CODE, [
+			`evalResult ${JSON.stringify(input.evalResult.identity)}@${input.evalResult.revision} does not record eval ${JSON.stringify(input.eval.identity)}@${input.eval.revision} as its definition; the completion pins must belong together`,
+		]);
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	// Completion targets the latest fix-triaged, uncompleted proposal for
+	// the fingerprint; the event pins that proposal's opening index.
+	const eligibleIn = (fold) =>
+		[...fold]
+			.reverse()
+			.find(
+				(entry) =>
+					entry.fingerprint === input.fingerprint &&
+					entry.status === "triaged" &&
+					entry.triage.outcome === "fix",
+			) ?? null;
+	let targetIndex = null;
+	return appendLedgerEvent(
+		cwd,
+		PROPOSAL_LEDGER,
+		(fold) => {
+			// The guard ran first on this same fold, so a target exists; the
+			// -1 fallback fails event validation closed if that ever changes.
+			const target = eligibleIn(fold);
+			return {
+				kind: "completion",
+				schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
+				at,
+				fingerprint: input.fingerprint,
+				proposalIndex: target ? target.index : -1,
+				intent: { identity: input.intent.identity, revision: input.intent.revision },
+				eval: { identity: input.eval.identity, revision: input.eval.revision },
+				evalResult: {
+					identity: input.evalResult.identity,
+					revision: input.evalResult.revision,
+				},
+			};
+		},
+		(fold) => {
+			if (!fold.some((entry) => entry.fingerprint === input.fingerprint))
+				return fail(MAINTAIN_NOT_FOUND_CODE, [
+					`no proposal exists for ${JSON.stringify(input.fingerprint)}`,
+				]);
+			const eligible = eligibleIn(fold);
+			if (eligible === null)
+				return fail(MAINTAIN_INVALID_CODE, [
+					`no fix-triaged proposal awaits completion for ${JSON.stringify(input.fingerprint)}`,
+				]);
+			targetIndex = eligible.index;
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.index === targetIndex),
+	);
+}
+
+/**
+ * Deterministic rollup within a declared bound: counts by tier, status,
+ * and derived staleness over the first `limit` entries of each ledger in
+ * append order. Truncation is an explicit marker, never hidden.
+ */
+function rollup(cwd, { limit } = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!Number.isInteger(limit) || limit < 1)
+		return fail(MAINTAIN_INVALID_CODE, ["limit must be a declared positive integer bound"]);
+	let detectors;
+	let findings;
+	let proposals;
+	try {
+		detectors = foldDetectors(cwd);
+		findings = foldFindings(cwd);
+		proposals = foldProposals(cwd);
+	} catch (err) {
+		return fail(err.amberCode || MAINTAIN_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	const countBy = (entries, keyOf) => {
+		const counts = new Map();
+		for (const entry of entries) {
+			const key = keyOf(entry);
+			counts.set(key, (counts.get(key) ?? 0) + 1);
+		}
+		// Code-unit order keeps the projection deterministic across hosts.
+		return Object.fromEntries(
+			[...counts.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+		);
+	};
+	const staleCount = (entries, reasonsOf) =>
+		entries.reduce((total, entry) => (reasonsOf(entry).length > 0 ? total + 1 : total), 0);
+	const scannedFindings = findings.slice(0, limit);
+	const scannedProposals = proposals.slice(0, limit);
+	const staleFindings = staleCount(scannedFindings, (entry) =>
+		findingStaleReasons(entry, detectors, findings),
+	);
+	const staleProposals = staleCount(scannedProposals, (entry) =>
+		proposalStaleReasons(entry, detectors, findings),
+	);
+	return {
+		ok: true,
+		code: null,
+		record: {
+			bounds: {
+				limit,
+				findingsScanned: scannedFindings.length,
+				findingsTotal: findings.length,
+				proposalsScanned: scannedProposals.length,
+				proposalsTotal: proposals.length,
+				truncated: findings.length > limit || proposals.length > limit,
+			},
+			findings: {
+				byTier: countBy(scannedFindings, (entry) => entry.tier),
+				stale: staleFindings,
+				fresh: scannedFindings.length - staleFindings,
+			},
+			proposals: {
+				byStatus: {
+					open: scannedProposals.filter((entry) => entry.status === "open").length,
+					triaged: scannedProposals.filter((entry) => entry.status === "triaged").length,
+					completed: scannedProposals.filter((entry) => entry.status === "completed").length,
+				},
+				byTier: countBy(scannedProposals, (entry) => entry.tier),
+				stale: staleProposals,
+				fresh: scannedProposals.length - staleProposals,
+			},
+		},
+		errors: [],
+	};
+}
+
 module.exports = {
 	MAINTAIN_DETECTOR_SCHEMA_VERSION,
 	SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS,
@@ -1241,4 +1560,6 @@ module.exports = {
 	listProposals,
 	TRIAGE_OUTCOMES,
 	triage,
+	complete,
+	rollup,
 };

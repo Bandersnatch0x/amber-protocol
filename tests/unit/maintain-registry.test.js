@@ -3,6 +3,7 @@
 // F054 T1 (#279) — Control Band detectors & deterministic Findings.
 // F054 T2 (#280) — Trigger Proposals & cooldown dedup.
 // F054 T3 (#281) — Owner triage & governed Intent re-entry.
+// F054 T4 (#282) — Staleness, Eval write-back & deterministic rollups.
 //
 // Tests assert externally visible behavior: governed detector registration
 // binding a single-use committed human Decision, immutable detector
@@ -42,6 +43,8 @@ const {
 	listProposals,
 	TRIAGE_OUTCOMES,
 	triage,
+	complete,
+	rollup,
 } = require("../../scripts/lib/core/maintain-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
@@ -982,4 +985,314 @@ test("re-chained triage forgeries cannot bypass the closed-proposal and single-u
 			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
 			/outcome must be one of fix, schedule, dismiss/.test(err.message),
 	);
+});
+
+test("staleness is derived at read time and never edits a ledger", () => {
+	const dir = mkTarget("staleness");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	assert.equal(listFindings(dir)[0].stale, false);
+	assert.deepEqual(listFindings(dir)[0].staleReasons, []);
+	assert.equal(listProposals(dir)[0].stale, false);
+	const findingBytes = fs.readFileSync(findingsPath(dir), "utf8");
+	const proposalBytes = fs.readFileSync(proposalsPath(dir), "utf8");
+	// A newer registered detector version supersedes the version-pinned
+	// finding and its proposal chain.
+	decisionFixture(dir, "decision/detector-2");
+	assert.equal(
+		registerDetector(
+			dir,
+			detectorInput({
+				version: "2",
+				baseline: 20,
+				decision: { identity: "decision/detector-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(listFindings(dir)[0].stale, true);
+	assert.deepEqual(listFindings(dir)[0].staleReasons, ["detector-superseded"]);
+	assert.equal(listProposals(dir)[0].stale, true);
+	assert.deepEqual(listProposals(dir)[0].staleReasons, ["detector-superseded"]);
+	// A later observation re-presenting the fingerprint with different
+	// input supersedes the earlier finding.
+	assert.equal(detect(dir, observation({ inputHash: HASH_B }), { now: NOW }).ok, true);
+	assert.deepEqual(listFindings(dir)[0].staleReasons, [
+		"detector-superseded",
+		"observation-superseded",
+	]);
+	assert.equal(listFindings(dir)[1].staleReasons.includes("observation-superseded"), false);
+	// Derived, never edited: staleness rewrote nothing — the findings
+	// ledger only grew append-only and the proposals ledger is untouched.
+	assert.ok(fs.readFileSync(findingsPath(dir), "utf8").startsWith(findingBytes));
+	assert.equal(fs.readFileSync(proposalsPath(dir), "utf8"), proposalBytes);
+});
+
+// Admit the committed intent + eval + eval-result pins a completion binds.
+// The eval-result records its definition pin in the extensions carrier,
+// mirroring the F058 admission path.
+function completionPinsFixture(dir, candidate) {
+	assert.equal(admitArtifact(dir, candidate).ok, true);
+	assert.equal(
+		admitArtifact(dir, { type: "eval", identity: "eval/maintain-check", body: "# Eval\n" }).ok,
+		true,
+	);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "eval-result",
+			identity: "eval-result/maintain-check-run",
+			body: "# Result\n",
+			extensions: {
+				evalResult: { definition: { identity: "eval/maintain-check", revision: 1 } },
+			},
+		}).ok,
+		true,
+	);
+	return {
+		intent: { identity: candidate.identity, revision: 1 },
+		eval: { identity: "eval/maintain-check", revision: 1 },
+		evalResult: { identity: "eval-result/maintain-check-run", revision: 1 },
+	};
+}
+
+test("complete binds a fix-triaged proposal to committed intent and eval pins", () => {
+	const dir = mkTarget("complete");
+	const fingerprint = triageFixture(dir);
+	const candidateIdentity = `intent/maintain/${fingerprint.slice(7, 23)}`;
+	const unrelated = complete(
+		dir,
+		{
+			fingerprint,
+			intent: { identity: "intent/ghost", revision: 1 },
+			eval: { identity: "eval/ghost", revision: 1 },
+			evalResult: { identity: "eval-result/ghost", revision: 1 },
+		},
+		{ now: NOW },
+	);
+	assert.equal(unrelated.ok, false);
+	assert.equal(unrelated.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(unrelated.errors[0], /must reference the candidate Intent identity/);
+	const premature = complete(
+		dir,
+		{
+			fingerprint,
+			intent: { identity: candidateIdentity, revision: 1 },
+			eval: { identity: "eval/ghost", revision: 1 },
+			evalResult: { identity: "eval-result/ghost", revision: 1 },
+		},
+		{ now: NOW },
+	);
+	assert.equal(premature.ok, false);
+	assert.equal(premature.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(premature.errors[0], /does not resolve to a committed intent artifact revision/);
+	const fixed = triage(dir, triageInput(fingerprint, { outcome: "fix", reason: null }), {
+		now: NOW,
+	});
+	assert.equal(fixed.ok, true);
+	assert.equal(fixed.candidate.identity, candidateIdentity);
+	const pins = completionPinsFixture(dir, fixed.candidate);
+	const wrongType = complete(
+		dir,
+		{ ...pins, fingerprint, eval: { identity: fixed.candidate.identity, revision: 1 } },
+		{ now: NOW },
+	);
+	assert.equal(wrongType.ok, false);
+	assert.match(wrongType.errors[0], /does not resolve to a committed eval artifact revision/);
+	// An eval-result that never ran the pinned eval cannot settle the pins.
+	assert.equal(
+		admitArtifact(dir, {
+			type: "eval-result",
+			identity: "eval-result/unlinked",
+			body: "# R\n",
+			extensions: {
+				evalResult: { definition: { identity: "eval/other", revision: 1 } },
+			},
+		}).ok,
+		true,
+	);
+	const unlinked = complete(
+		dir,
+		{ ...pins, fingerprint, evalResult: { identity: "eval-result/unlinked", revision: 1 } },
+		{ now: NOW },
+	);
+	assert.equal(unlinked.ok, false);
+	assert.match(unlinked.errors[0], /the completion pins must belong together/);
+	const settled = complete(dir, { fingerprint, ...pins }, { now: NOW });
+	assert.equal(settled.ok, true, (settled.errors || []).join("; "));
+	assert.equal(settled.record.status, "completed");
+	assert.deepEqual(settled.record.completion, {
+		at: NOW.toISOString(),
+		intent: pins.intent,
+		eval: pins.eval,
+		evalResult: pins.evalResult,
+	});
+	// Append-only: completing again refuses, and the triage stays bound.
+	assert.equal(settled.record.triage.outcome, "fix");
+	const again = complete(dir, { fingerprint, ...pins }, { now: NOW });
+	assert.equal(again.ok, false);
+	assert.equal(again.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(again.errors[0], /no fix-triaged proposal awaits completion/);
+	assert.equal(listProposals(dir)[0].status, "completed");
+});
+
+test("complete refuses open, scheduled, and unknown proposals", () => {
+	const dir = mkTarget("complete-refusals");
+	const fingerprint = triageFixture(dir);
+	const ghostFingerprint = `sha256:${"f".repeat(64)}`;
+	for (const fp of [fingerprint, ghostFingerprint]) {
+		assert.equal(
+			admitArtifact(dir, {
+				type: "intent",
+				identity: `intent/maintain/${fp.slice(7, 23)}`,
+				body: "# Candidate\n",
+			}).ok,
+			true,
+		);
+	}
+	assert.equal(
+		admitArtifact(dir, { type: "eval", identity: "eval/maintain-check", body: "# E\n" }).ok,
+		true,
+	);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "eval-result",
+			identity: "eval-result/maintain-check-run",
+			body: "# R\n",
+			extensions: {
+				evalResult: { definition: { identity: "eval/maintain-check", revision: 1 } },
+			},
+		}).ok,
+		true,
+	);
+	const pinsFor = (fp) => ({
+		intent: { identity: `intent/maintain/${fp.slice(7, 23)}`, revision: 1 },
+		eval: { identity: "eval/maintain-check", revision: 1 },
+		evalResult: { identity: "eval-result/maintain-check-run", revision: 1 },
+	});
+	const open = complete(dir, { fingerprint, ...pinsFor(fingerprint) }, { now: NOW });
+	assert.equal(open.ok, false);
+	assert.equal(open.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(open.errors[0], /no fix-triaged proposal awaits completion/);
+	assert.equal(triage(dir, triageInput(fingerprint), { now: NOW }).ok, true);
+	const scheduled = complete(dir, { fingerprint, ...pinsFor(fingerprint) }, { now: NOW });
+	assert.equal(scheduled.ok, false);
+	assert.match(scheduled.errors[0], /no fix-triaged proposal awaits completion/);
+	const unknown = complete(
+		dir,
+		{ fingerprint: ghostFingerprint, ...pinsFor(ghostFingerprint) },
+		{ now: NOW },
+	);
+	assert.equal(unknown.ok, false);
+	assert.equal(unknown.code, "AMBER_E_MAINTAIN_NOT_FOUND");
+	const smuggled = complete(
+		dir,
+		{ fingerprint, ...pinsFor(fingerprint), body: "# intent" },
+		{ now: NOW },
+	);
+	assert.equal(smuggled.ok, false);
+	assert.match(smuggled.errors[0], /unknown field "body"/);
+	// A corrupt maintain ledger fails the rollup closed too.
+	fs.appendFileSync(proposalsPath(dir), '{"kind":"proposal"}\n');
+	const corrupt = rollup(dir, { limit: 10 });
+	assert.equal(corrupt.ok, false);
+	assert.equal(corrupt.code, "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT");
+});
+
+test("re-chained completion forgeries fail every read closed", () => {
+	const dir = mkTarget("complete-forgery");
+	const fingerprint = triageFixture(dir);
+	const fixed = triage(dir, triageInput(fingerprint, { outcome: "fix", reason: null }), {
+		now: NOW,
+	});
+	const pins = completionPinsFixture(dir, fixed.candidate);
+	assert.equal(complete(dir, { fingerprint, ...pins }, { now: NOW }).ok, true);
+	const events = readEvents(proposalsPath(dir));
+	const settled = events[events.length - 1];
+	const chained = (body, prevHash) => ({ ...body, prevHash, hash: chainHash(body, prevHash) });
+	const { prevHash: _prev, hash: _hash, ...completionBody } = settled;
+	// A second completion of the same proposal is not fix-triaged anymore.
+	writeEvents(proposalsPath(dir), [...events, chained(completionBody, settled.hash)]);
+	assert.throws(
+		() => listProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
+			/completes a proposal that is not fix-triaged/.test(err.message),
+	);
+	// A completion pointed at a proposal index that never opened.
+	writeEvents(proposalsPath(dir), [
+		...events,
+		chained({ ...completionBody, proposalIndex: 9 }, settled.hash),
+	]);
+	assert.throws(
+		() => listProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
+			/completes unknown proposal 9/.test(err.message),
+	);
+});
+
+test("rollup is deterministic within its declared bound and marks truncation", () => {
+	const dir = mkTarget("rollup");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation({ value: 600, inputHash: HASH_B }), { now: NOW }).ok, true);
+	assert.equal(
+		detect(
+			dir,
+			observation({
+				window: { from: "2026-08-29T01:00:00.000Z", to: "2026-08-29T01:30:00.000Z" },
+				inputHash: `sha256:${"c".repeat(64)}`,
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	assert.equal(propose(dir, { findingIndex: 2 }, { now: NOW }).action, "opened");
+	decisionFixture(dir, "decision/triage-rollup");
+	assert.equal(
+		triage(
+			dir,
+			triageInput(listProposals(dir)[1].fingerprint, {
+				decision: { identity: "decision/triage-rollup", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const bounded = rollup(dir, { limit: 100 });
+	assert.equal(bounded.ok, true, (bounded.errors || []).join("; "));
+	assert.deepEqual(bounded.record, {
+		bounds: {
+			limit: 100,
+			findingsScanned: 3,
+			findingsTotal: 3,
+			proposalsScanned: 2,
+			proposalsTotal: 2,
+			truncated: false,
+		},
+		findings: { byTier: { page: 1, warn: 2 }, stale: 1, fresh: 2 },
+		proposals: {
+			byStatus: { open: 1, triaged: 1, completed: 0 },
+			byTier: { warn: 2 },
+			stale: 1,
+			fresh: 1,
+		},
+	});
+	// The same repository state always rolls up identically.
+	assert.deepEqual(rollup(dir, { limit: 100 }).record, bounded.record);
+	const truncated = rollup(dir, { limit: 1 });
+	assert.equal(truncated.ok, true);
+	assert.equal(truncated.record.bounds.truncated, true);
+	assert.equal(truncated.record.bounds.findingsScanned, 1);
+	assert.deepEqual(truncated.record.findings.byTier, { warn: 1 });
+	assert.equal(truncated.record.proposals.byStatus.open, 1);
+	const unbounded = rollup(dir, {});
+	assert.equal(unbounded.ok, false);
+	assert.equal(unbounded.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(unbounded.errors[0], /limit must be a declared positive integer bound/);
 });

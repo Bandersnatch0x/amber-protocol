@@ -224,12 +224,14 @@ test("maintain help and unknown actions route through the shared dispatcher", ()
 		help.stdout,
 		/triage --fingerprint <sha256:\.\.\.> --outcome <fix\|schedule\|dismiss>/,
 	);
+	assert.match(help.stdout, /complete --fingerprint <sha256:\.\.\.> --intent <identity>@<rev>/);
+	assert.match(help.stdout, /rollup --limit <n>/);
 	assert.match(help.stdout, /proposals \[--fingerprint <sha256:\.\.\.>\]/);
 	const unknown = runCli(["maintain", "promote", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/maintain requires register-detector, detect, propose, triage, detectors, findings, or proposals/,
+		/maintain requires register-detector, detect, propose, triage, complete, rollup, detectors, findings, or proposals/,
 	);
 });
 
@@ -468,4 +470,171 @@ test("maintain triage refusals carry stable codes", () => {
 	assert.equal(closed.status, 1);
 	assert.equal(envelope(closed).code, "AMBER_E_MAINTAIN_INVALID");
 	assert.match(envelope(closed).errors[0], /triage of a closed proposal refuses/);
+});
+
+test("maintain complete and rollup close the loop with declared bounds", () => {
+	const dir = mkTarget("complete");
+	fixtureRepo(dir, ["decision/detector-1", "decision/triage-1"]);
+	assert.equal(runCli(registerArgs(), dir).status, 0);
+	assert.equal(runCli(detectArgs(), dir).status, 0);
+	const opened = runCli(
+		["maintain", "propose", "--target", ".", "--finding-index", "0", "--json"],
+		dir,
+	);
+	const fingerprint = payload(opened).proposal.fingerprint;
+	const fixed = runCli(triageArgs(fingerprint, { "--outcome": "fix", "--reason": null }), dir);
+	assert.equal(fixed.status, 0, fixed.stderr || fixed.stdout);
+	const candidate = payload(fixed).candidate;
+	assert.equal(admitArtifact(dir, candidate).ok, true);
+	assert.equal(
+		admitArtifact(dir, { type: "eval", identity: "eval/maintain-check", body: "# E\n" }).ok,
+		true,
+	);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "eval-result",
+			identity: "eval-result/maintain-check-run",
+			body: "# R\n",
+			extensions: {
+				evalResult: { definition: { identity: "eval/maintain-check", revision: 1 } },
+			},
+		}).ok,
+		true,
+	);
+
+	const unrelated = runCli(
+		[
+			"maintain",
+			"complete",
+			"--target",
+			".",
+			"--fingerprint",
+			fingerprint,
+			"--intent",
+			"intent/ghost@1",
+			"--eval",
+			"eval/maintain-check@1",
+			"--eval-result",
+			"eval-result/maintain-check-run@1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(unrelated.status, 1);
+	assert.equal(envelope(unrelated).code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(envelope(unrelated).errors[0], /must reference the candidate Intent identity/);
+
+	const unresolved = runCli(
+		[
+			"maintain",
+			"complete",
+			"--target",
+			".",
+			"--fingerprint",
+			fingerprint,
+			"--intent",
+			`${candidate.identity}@2`,
+			"--eval",
+			"eval/maintain-check@1",
+			"--eval-result",
+			"eval-result/maintain-check-run@1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(unresolved.status, 1);
+	assert.equal(envelope(unresolved).code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(envelope(unresolved).errors[0], /does not resolve to a committed intent/);
+
+	const badPin = runCli(
+		[
+			"maintain",
+			"complete",
+			"--target",
+			".",
+			"--fingerprint",
+			fingerprint,
+			"--intent",
+			candidate.identity,
+			"--eval",
+			"eval/maintain-check@1",
+			"--eval-result",
+			"eval-result/maintain-check-run@1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(badPin.status, 1);
+	assert.equal(envelope(badPin).code, "AMBER_E_INVALID_ARG");
+	assert.match(envelope(badPin).errors[0], /--intent must be <identity>@<revision>/);
+
+	const completed = runCli(
+		[
+			"maintain",
+			"complete",
+			"--target",
+			".",
+			"--fingerprint",
+			fingerprint,
+			"--intent",
+			`${candidate.identity}@1`,
+			"--eval",
+			"eval/maintain-check@1",
+			"--eval-result",
+			"eval-result/maintain-check-run@1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(completed.status, 0, completed.stderr || completed.stdout);
+	assert.equal(payload(completed).status, "completed");
+	assert.deepEqual(payload(completed).completion.eval, {
+		identity: "eval/maintain-check",
+		revision: 1,
+	});
+
+	// A newer detector version renders the chain stale in listings.
+	assert.equal(
+		admitArtifact(dir, {
+			type: "decision",
+			identity: "decision/detector-2",
+			body: "# d2\n",
+			decisionKind: "approval",
+			principal: "alice@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/maintain" } }],
+		}).ok,
+		true,
+	);
+	assert.equal(
+		runCli(
+			registerArgs({
+				"--detector-version": "2",
+				"--baseline": "20",
+				"--decision-identity": "decision/detector-2",
+			}),
+			dir,
+		).status,
+		0,
+	);
+	const findings = runCli(["maintain", "findings", "--target", ".", "--json"], dir);
+	assert.equal(payload(findings)[0].stale, true);
+	assert.deepEqual(payload(findings)[0].staleReasons, ["detector-superseded"]);
+
+	const rollup = runCli(["maintain", "rollup", "--target", ".", "--limit", "100", "--json"], dir);
+	assert.equal(rollup.status, 0, rollup.stderr || rollup.stdout);
+	assert.deepEqual(payload(rollup).bounds, {
+		limit: 100,
+		findingsScanned: 1,
+		findingsTotal: 1,
+		proposalsScanned: 1,
+		proposalsTotal: 1,
+		truncated: false,
+	});
+	assert.deepEqual(payload(rollup).proposals.byStatus, { open: 0, triaged: 0, completed: 1 });
+	assert.equal(payload(rollup).findings.stale, 1);
+
+	const unbounded = runCli(["maintain", "rollup", "--target", ".", "--json"], dir);
+	assert.equal(unbounded.status, 1);
+	assert.equal(envelope(unbounded).code, "AMBER_E_INVALID_ARG");
+	assert.match(envelope(unbounded).errors[0], /--limit must be a positive integer/);
 });

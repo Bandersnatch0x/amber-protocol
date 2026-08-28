@@ -1,9 +1,9 @@
 "use strict";
 
 // F054 public CLI seam for Control Band detectors, deterministic
-// Findings, Trigger Proposals, and owner triage. This adapter parses
-// flags only; the core owns every verdict, is target-read-only, and
-// never mutates canonical or target state.
+// Findings, Trigger Proposals, owner triage, fix completion, and bounded
+// rollups. This adapter parses flags only; the core owns every verdict,
+// is target-read-only, and never mutates canonical or target state.
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const { resolveTarget, readFailure } = require("./command-helpers");
@@ -39,6 +39,10 @@ function missingValueFlag(args) {
 		["findingIndex", "--finding-index"],
 		["outcome", "--outcome"],
 		["reason", "--reason"],
+		["intent", "--intent"],
+		["evalVal", "--eval"],
+		["evalResult", "--eval-result"],
+		["limit", "--limit"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -93,6 +97,17 @@ function parseRule(raw) {
 	return { value: { tier: match[1], comparator: match[2], threshold: Number(match[3]) } };
 }
 
+// Grammar: <identity>@<revision> — one committed artifact revision pin.
+function parsePin(raw, flag) {
+	const match = /^(.+)@([1-9]\d*)$/.exec(String(raw));
+	if (!match) {
+		return {
+			error: `${flag} must be <identity>@<revision> (e.g. ${flag} eval/maintain-check@1); got ${JSON.stringify(raw)}`,
+		};
+	}
+	return { value: { identity: match[1], revision: Number(match[2]) } };
+}
+
 function resultEnvelope(result) {
 	// A null record is detect's in-band verdict: a tier with nothing appended.
 	return {
@@ -111,6 +126,8 @@ const dispatch = defineCommand({
 		"detect",
 		"propose",
 		"triage",
+		"complete",
+		"rollup",
 		"detectors",
 		"findings",
 		"proposals",
@@ -265,6 +282,44 @@ const dispatch = defineCommand({
 					? JSON.stringify({ proposal: result.record, candidate: result.candidate }, null, 2)
 					: "",
 			};
+		},
+		complete: (args) => {
+			const { complete } = require("./core/maintain-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const fingerprint = requiredString(args, "fingerprint", "--fingerprint", "sha256:<64-hex>");
+			if (fingerprint.error) return invalidArg(fingerprint.error);
+			const pins = {};
+			for (const [key, flag, field] of [
+				["intent", "--intent", "intent"],
+				["evalVal", "--eval", "eval"],
+				["evalResult", "--eval-result", "evalResult"],
+			]) {
+				const required = requiredString(args, key, flag, "identity@1");
+				if (required.error) return invalidArg(required.error);
+				const pin = parsePin(args[key], flag);
+				if (pin.error) return invalidArg(pin.error);
+				pins[field] = pin.value;
+			}
+			return resultEnvelope(complete(target.value, { fingerprint: fingerprint.value, ...pins }));
+		},
+		rollup: (args) => {
+			const { rollup } = require("./core/maintain-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const limit = positiveInt(args, "limit", "--limit");
+			if (limit.error) return invalidArg(limit.error);
+			return resultEnvelope(rollup(target.value, { limit: limit.value }));
 		},
 		detectors: (args) => {
 			const { listDetectors } = require("./core/maintain-registry");
