@@ -38,7 +38,11 @@ function RoutesPage() {
 
   const filteredSections = useMemo(() => {
     if (!grouped)
-      return [] as Array<{ key: string; labelKey: I18nKey; routes: (typeof grouped)[string] }>;
+      return [] as Array<{
+        key: string;
+        labelKey: I18nKey;
+        routes: NonNullable<typeof grouped>[string];
+      }>;
     const query = searchQuery.trim().toLowerCase();
 
     return categoryOrder

@@ -77,13 +77,16 @@ interface KnowledgeNodeData extends Record<string, unknown> {
   neighbor: boolean;
 }
 
+type SimNode = KnowledgeNode & d3.SimulationNodeDatum;
+type SimLink = { source: string; target: string };
+
 function computeLayout(
   dto: KnowledgeGraphDTO,
   mode: LayoutMode,
 ): Map<string, { x: number; y: number }> {
-  const nodes = dto.nodes.map((n) => ({ ...n }));
+  const nodes: SimNode[] = dto.nodes.map((n) => ({ ...n }));
   const index = new Map(nodes.map((n) => [n.id, n]));
-  const links = dto.edges
+  const links: SimLink[] = dto.edges
     .map((e) => ({ source: e.src, target: e.dst }))
     .filter((l) => index.has(l.source) && index.has(l.target));
 
@@ -106,37 +109,33 @@ function computeLayout(
     return positions;
   }
 
+  const centroids: Record<string, { x: number; y: number }> = {
+    decision: { x: -560, y: -280 },
+    knowledge: { x: 400, y: -220 },
+    implementation: { x: 0, y: 460 },
+  };
+  const clusterForce: d3.Force<SimNode, undefined> = (alpha) => {
+    for (const n of nodes) {
+      const c = centroids[n.layer];
+      n.x = (n.x ?? 0) + (c.x - (n.x ?? 0)) * 0.05 * alpha;
+      n.y = (n.y ?? 0) + (c.y - (n.y ?? 0)) * 0.05 * alpha;
+    }
+  };
+
   const simulation = d3
-    .forceSimulation(nodes as never[])
+    .forceSimulation<SimNode>(nodes)
     .force(
       'link',
       d3
-        .forceLink(links)
-        .id((d: never) => (d as KnowledgeNode).id)
+        .forceLink<SimNode, SimLink>(links)
+        .id((d) => d.id)
         .distance(170)
         .strength(0.4),
     )
-    .force('charge', d3.forceManyBody().strength(-420))
-    .force('collide', d3.forceCollide(108))
-    .force('center', d3.forceCenter(0, 0))
-    .force(
-      'cluster',
-      (() => {
-        const centroids: Record<string, { x: number; y: number }> = {
-          decision: { x: -560, y: -280 },
-          knowledge: { x: 400, y: -220 },
-          implementation: { x: 0, y: 460 },
-        };
-        const f = (alpha: number) => {
-          for (const n of nodes) {
-            const c = centroids[n.layer];
-            n.x = (n.x ?? 0) + (c.x - (n.x ?? 0)) * 0.05 * alpha;
-            n.y = (n.y ?? 0) + (c.y - (n.y ?? 0)) * 0.05 * alpha;
-          }
-        };
-        return f as unknown as d3.Force<KnowledgeNode, undefined>;
-      })(),
-    )
+    .force('charge', d3.forceManyBody<SimNode>().strength(-420))
+    .force('collide', d3.forceCollide<SimNode>(108))
+    .force('center', d3.forceCenter<SimNode>(0, 0))
+    .force('cluster', clusterForce)
     .stop();
 
   for (let i = 0; i < 320; i += 1) simulation.tick();

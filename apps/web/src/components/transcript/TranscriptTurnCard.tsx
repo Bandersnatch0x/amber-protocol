@@ -112,7 +112,7 @@ export function TranscriptTurnCard({ turn, denoise, startTime }: TranscriptTurnC
       {toolOnly && (
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           {t('transcripts.detail.assistantRequested', {
-            tools: turn.tools.map(translateToolLabel).join(', '),
+            tools: turn.tools?.map(translateToolLabel).join(', ') ?? '',
           })}
         </p>
       )}

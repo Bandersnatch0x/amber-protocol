@@ -1,3 +1,5 @@
+import type { KnowledgeEdgeDTO, KnowledgeGraphDTO, KnowledgeNode } from './types';
+
 export type {
   GraphLayer,
   KnowledgeNode,
@@ -674,7 +676,7 @@ const nodes: KnowledgeNode[] = [
   })),
   ...WIKI_NODES.map(([id, title, body]): KnowledgeNode => ({
     id,
-    kind: 'knowledge',
+    kind: 'wiki',
     layer: 'knowledge',
     title,
     sourcePath: `docs/wiki/knowledge/${id.split(':')[1]}/${id.split(':')[1]}.md`,
@@ -950,28 +952,48 @@ const edges: KnowledgeEdgeDTO[] = [
     dst: 'knowledge:amber-ontology-mcp',
     verb: 'references',
     origin: 'inferred',
-    provenance: { model: 'stub-model', timestamp: '2026-08-27T09:30:00Z', promptHash: 'b3f1c9e2' },
+    provenance: {
+      provider: 'stub-provider',
+      model: 'stub-model',
+      timestamp: '2026-08-27T09:30:00Z',
+      promptHash: 'b3f1c9e2',
+    },
   },
   {
     src: 'architecture:web-viewer',
     dst: 'architecture:core-engine',
     verb: 'builds-on',
     origin: 'inferred',
-    provenance: { model: 'stub-model', timestamp: '2026-08-27T09:30:00Z', promptHash: 'b3f1c9e2' },
+    provenance: {
+      provider: 'stub-provider',
+      model: 'stub-model',
+      timestamp: '2026-08-27T09:30:00Z',
+      promptHash: 'b3f1c9e2',
+    },
   },
   {
     src: 'feature:F058',
     dst: 'knowledge:eval-suite',
     verb: 'references',
     origin: 'inferred',
-    provenance: { model: 'stub-model', timestamp: '2026-08-27T09:30:00Z', promptHash: 'b3f1c9e2' },
+    provenance: {
+      provider: 'stub-provider',
+      model: 'stub-model',
+      timestamp: '2026-08-27T09:30:00Z',
+      promptHash: 'b3f1c9e2',
+    },
   },
   {
     src: 'knowledge:principal-governance',
     dst: 'artifact:F050-decision',
     verb: 'references',
     origin: 'inferred',
-    provenance: { model: 'stub-model', timestamp: '2026-08-27T09:30:00Z', promptHash: 'b3f1c9e2' },
+    provenance: {
+      provider: 'stub-provider',
+      model: 'stub-model',
+      timestamp: '2026-08-27T09:30:00Z',
+      promptHash: 'b3f1c9e2',
+    },
   },
 ];
 

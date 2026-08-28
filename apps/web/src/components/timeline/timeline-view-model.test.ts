@@ -2,6 +2,7 @@
 import {
   buildTimelineView,
   getTimelineSearchText,
+  type TimelineEventEntry,
   type TimelineViewEntry,
 } from './timeline-view-model';
 import type { SessionEvent } from '@/lib/types/session-events';
@@ -56,8 +57,8 @@ describe('buildTimelineView', () => {
     },
   ];
 
-  function getVisible(entries: TimelineViewEntry[]): TimelineViewEntry[] {
-    return entries.filter((entry) => entry.kind === 'event');
+  function getVisible(entries: TimelineViewEntry[]): TimelineEventEntry[] {
+    return entries.filter((entry): entry is TimelineEventEntry => entry.kind === 'event');
   }
 
   it('preserves global numbering after filtering', () => {
