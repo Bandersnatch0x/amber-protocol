@@ -122,6 +122,33 @@ test("admit with different content and no expected head fails closed as conflict
 	assert.equal(fork.code, "AMBER_E_ARTIFACT_CONFLICT");
 });
 
+test("credential-looking material in the Body refuses before any durable state (F055 story 2)", () => {
+	const dir = mkTarget("credential-leak");
+	const leaky = admitArtifact(dir, {
+		type: "intent",
+		identity: "intent/leaky",
+		body: "# Restore\n\nCall the API with Bearer abcdef0123456789 while we rotate.\n",
+	});
+	assert.equal(leaky.ok, false);
+	assert.equal(leaky.code, "AMBER_E_ARTIFACT_CREDENTIAL_LEAK");
+	assert.match(leaky.errors[0], /credential material/);
+	assert.match(leaky.errors[0], /minimize/);
+	// Nothing durable was touched: no home, no journal.
+	assert.equal(
+		fs.existsSync(path.join(dir, ".amber", "artifacts", "intents", "intent_leaky")),
+		false,
+	);
+	// Minimized (redacted) content admits normally.
+	assert.equal(
+		admitArtifact(dir, {
+			type: "intent",
+			identity: "intent/leaky",
+			body: "# Restore\n\nCall the API through the scoped credential boundary.\n",
+		}).ok,
+		true,
+	);
+});
+
 test("admit stores Body + Envelope atomically and returns a full receipt", () => {
 	const dir = mkTarget("receipt");
 	const result = admitIntent(dir);

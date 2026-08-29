@@ -803,6 +803,15 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_INVALID_ARG", "AMBER_E_PROJECTION_RESOURCE_CEILING"],
 	},
+	AMBER_E_ARTIFACT_CREDENTIAL_LEAK: {
+		title: "Credential material refused at canonical admission",
+		cause:
+			"The Artifact Body carries what looks like credential material (a bearer/basic token, JWT, provider key, PEM block, or key=value secret); secret raw content is rejected before canonical storage — deletion is never the first privacy control (F055).",
+		remedy:
+			"Minimize the content: redact the credential material and re-admit; reference secrets only through their governed credential boundaries.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_CREDENTIAL_LEAK", "AMBER_E_MAINTAIN_CREDENTIAL_LEAK"],
+	},
 	// --- F050 Decisions, Gates & Evidence Assurance (ticket 1, #226) ---
 	// Principal registry + Decision artifacts. The registry family covers the
 	// append-only ledger under .amber/principals/registry.jsonl; the decision

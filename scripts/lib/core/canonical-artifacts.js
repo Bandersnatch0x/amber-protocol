@@ -132,6 +132,7 @@ const { findTraceCycle, danglingPreparedRevisions } = require("./canonical-artif
 // artifact store the consumer (no cycle: principal-registry imports neither
 // this module nor the contracts).
 const { resolveActivePrincipal } = require("./principal-registry");
+const { credentialLeakProblem } = require("./registry-ledger");
 
 const ARTIFACT_STATUSES = Object.freeze(["prepared", "committed", "aborted"]);
 
@@ -166,6 +167,7 @@ const NOT_FOUND_CODE = "AMBER_E_ARTIFACT_NOT_FOUND";
 // constant here.)
 const UNSUPPORTED_VERSION_CODE = "AMBER_E_ARTIFACT_UNSUPPORTED_VERSION";
 const SIZE_CEILING_CODE = "AMBER_E_ARTIFACT_SIZE_CEILING";
+const CREDENTIAL_LEAK_CODE = "AMBER_E_ARTIFACT_CREDENTIAL_LEAK";
 // F050 ticket 1 (#226): Decision admission codes — the Decision kind closed
 // set, the acting-Principal binding, and the human-only authority slots.
 const DECISION_KIND_INVALID_CODE = "AMBER_E_DECISION_KIND_INVALID";
@@ -1629,6 +1631,18 @@ function admitArtifact(
 	if (bodyBytes > ceilings.maxBodyBytes) {
 		return fail(SIZE_CEILING_CODE, [
 			`the Body is ${bodyBytes} bytes, above the admission ceiling of ${ceilings.maxBodyBytes} bytes (AMBER_ARTIFACT_MAX_BODY_BYTES); an oversized artifact is refused at admission and never reaches the journal — split the artifact or raise the ceiling deliberately`,
+		]);
+	}
+
+	// F055 story 2: secret raw content is rejected before canonical
+	// storage — deletion is not the first privacy control. The shared
+	// credential heuristic refuses well-known secret shapes in the Body;
+	// the remedy is minimization (redact the material) and re-admission,
+	// never an override flag that would smuggle a secret past the boundary.
+	const bodyLeak = credentialLeakProblem(body, "the Artifact Body");
+	if (bodyLeak !== null) {
+		return fail(CREDENTIAL_LEAK_CODE, [
+			`${bodyLeak}; minimize (redact) the credential material and re-admit — canonical storage never holds a secret`,
 		]);
 	}
 

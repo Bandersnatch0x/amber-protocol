@@ -531,6 +531,12 @@ store via `AMBER_ARTIFACT_MAX_BODY_BYTES` / `AMBER_ARTIFACT_MAX_ENVELOPE_BYTES` 
 integers; a set-but-garbage override — non-integer, zero, or negative — fails closed as
 `AMBER_E_INVALID_ARG`, never a silent default).
 
+Secret raw content is rejected before canonical storage (F055 story 2 — deletion is never the
+first privacy control): a Body carrying credential-looking material (a bearer/basic token, JWT,
+provider key, PEM block, or key=value secret) refuses with `AMBER_E_ARTIFACT_CREDENTIAL_LEAK`
+before any durable state is touched; minimize (redact) the material and re-admit — there is no
+override flag.
+
 Admission is idempotent on the **full canonical envelope content** (schema version, type, identity,
 supersedes, bodyHash, provenance, and — since ticket 03 — the named transition, scope, and resolved
 trace set, and — since ticket 06 — the extension namespaces; the lifecycle state itself is derived
