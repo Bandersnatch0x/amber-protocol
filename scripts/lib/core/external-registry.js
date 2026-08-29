@@ -22,6 +22,7 @@ const { listArtifactRevisions } = require("./canonical-artifacts");
 const { canonicalJson } = require("./context-hash");
 const { showAdapter } = require("./adapter-registry");
 const { consumeApproval, showApproval } = require("./approval-registry");
+const { showEvidence } = require("./evidence-receipts");
 const {
 	GENESIS_HASH,
 	chainHash,
@@ -60,8 +61,16 @@ const EXTERNAL_DRIFT_CODE = "AMBER_E_EXTERNAL_DRIFT";
 const PROPOSAL_CORRUPT_CODE = "AMBER_E_EXTERNAL_PROPOSAL_CORRUPT";
 const PROPOSAL_LOCK_CODE = "AMBER_E_EXTERNAL_PROPOSAL_LOCK";
 const PROPOSAL_SIZE_CEILING_CODE = "AMBER_E_EXTERNAL_PROPOSAL_SIZE_CEILING";
+const EXEC_CORRUPT_CODE = "AMBER_E_EXTERNAL_EXEC_CORRUPT";
+const EXEC_LOCK_CODE = "AMBER_E_EXTERNAL_EXEC_LOCK";
+const EXEC_SIZE_CEILING_CODE = "AMBER_E_EXTERNAL_EXEC_SIZE_CEILING";
+const CREDENTIAL_LEAK_CODE = "AMBER_E_EXTERNAL_CREDENTIAL_LEAK";
 
 const PROPOSAL_STATUSES = Object.freeze(["proposed", "authorized"]);
+// What the external Adapter may declare on its result receipt.
+const DECLARED_STATUSES = Object.freeze(["committed", "failed", "denied", "unknown"]);
+// What Amber derives — never the adapter.
+const EXECUTION_OUTCOMES = Object.freeze(["denied", "attempted", "committed", "failed", "unknown"]);
 
 // One slug grammar for every external-facing name: no whitespace, no URL
 // scheme, no shell metacharacters — a command or remote URL cannot ride.
@@ -515,7 +524,7 @@ function canonicalHashOf(value) {
 		.digest("hex")}`;
 }
 
-const PAYLOAD_HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
+const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const EFFECT_PIN_FIELDS = Object.freeze(["id", "version"]);
 const PROPOSAL_EVENT_FIELDS = Object.freeze([
 	"kind",
@@ -574,13 +583,13 @@ function proposalEventProblem(event, lineIndex) {
 			const slug = slugProblem(event[field], fieldLabel);
 			if (slug !== null) return slug;
 		}
-		if (!PAYLOAD_HASH_PATTERN.test(event.payloadHash ?? ""))
+		if (!SHA256_PATTERN.test(event.payloadHash ?? ""))
 			return `${label}.payloadHash must be a sha256:<64-hex> string`;
 		if (!EXTERNAL_CREDENTIALS.includes(event.credentials))
 			return `${label}.credentials must be one of ${EXTERNAL_CREDENTIALS.join(", ")}`;
 		const compensation = compensationProblem(event.compensation, `${label}.compensation`);
 		if (compensation !== null) return compensation;
-		if (!PAYLOAD_HASH_PATTERN.test(event.requestHash ?? ""))
+		if (!SHA256_PATTERN.test(event.requestHash ?? ""))
 			return `${label}.requestHash must be a sha256:<64-hex> string`;
 		return null;
 	}
@@ -756,7 +765,7 @@ function proposeExternalEffect(cwd, input = {}, opts = {}) {
 		return fail(EXTERNAL_INVALID_CODE, ["id must be a non-empty string"]);
 	const pinProblem = effectPinProblem(input.effect, "proposal input.effect");
 	if (pinProblem !== null) return fail(EXTERNAL_INVALID_CODE, [pinProblem]);
-	if (!PAYLOAD_HASH_PATTERN.test(input.payloadHash ?? ""))
+	if (!SHA256_PATTERN.test(input.payloadHash ?? ""))
 		return fail(EXTERNAL_INVALID_CODE, [
 			"payloadHash must be a sha256:<64-hex> string — the canonical hash of the exact payload under review; the payload itself never enters the ledger",
 		]);
@@ -904,6 +913,645 @@ function listExternalProposals(cwd, { status = null } = {}) {
 	return foldProposals(cwd).filter((entry) => status === null || entry.status === status);
 }
 
+// ---------------------------------------------------------------------------
+// F056 T3 (#290) — Adapter execution, settlement & credential boundary.
+// Missing output never means success, and no credential material ever
+// rides a record: the closed event shapes carry no handle/value field at
+// all, and Amber — never the adapter — derives every terminal outcome.
+// ---------------------------------------------------------------------------
+
+function executionsPath(cwd) {
+	return statePathForCreate(cwd, "external", "executions.jsonl");
+}
+
+function executionCorrupt(message) {
+	return typedError(EXEC_CORRUPT_CODE, message);
+}
+
+function acquireExecutionLock(cwd) {
+	return acquireLedgerLock({
+		dirPath: path.dirname(executionsPath(cwd)),
+		lockName: "executions.lock",
+		conflictCode: EXEC_LOCK_CODE,
+		corruptCode: EXEC_CORRUPT_CODE,
+		label: "external execution ledger",
+		staleMs: LOCK_STALE_MS,
+	});
+}
+
+// Well-known credential shapes refuse in any external-facing field —
+// belt-and-braces on top of the closed shapes that carry no handle slot.
+const CREDENTIAL_MATERIAL_PATTERN =
+	/(bearer\s|basic\s|eyJ[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{10,}|xox[a-z]-|AKIA[0-9A-Z]{10,}|-----BEGIN|api[-_]?key\s*[=:]|secret\s*[=:]|password\s*[=:]|token\s*[=:])/i;
+
+function credentialLeakProblem(value, label) {
+	if (typeof value !== "string") return null;
+	if (CREDENTIAL_MATERIAL_PATTERN.test(value))
+		return `${label} carries what looks like credential material; credentials never ride a record, receipt, or error — only the purpose/scope/expiry boundary is ever stored`;
+	return null;
+}
+
+const CREDENTIAL_BOUNDARY_FIELDS = Object.freeze(["purpose", "scope", "expiresAt"]);
+
+// The stored boundary is purpose/scope/expiry only: no field for a
+// handle or value exists, so credential material cannot ride the ledger.
+function credentialBoundaryProblem(value, label, at, timeoutMs) {
+	if (!isPlainObject(value)) return `${label} must be an object`;
+	const closed = closedFieldProblem(value, CREDENTIAL_BOUNDARY_FIELDS, label);
+	if (closed !== null) return closed;
+	for (const field of ["purpose", "scope"]) {
+		const slug = slugProblem(value[field], `${label}.${field}`);
+		if (slug !== null) return slug;
+		const leak = credentialLeakProblem(value[field], `${label}.${field}`);
+		if (leak !== null) return leak;
+	}
+	if (!isNonEmptyString(value.expiresAt) || Number.isNaN(Date.parse(value.expiresAt)))
+		return `${label}.expiresAt must be an ISO-8601 timestamp`;
+	const atMs = Date.parse(at);
+	const expiresMs = Date.parse(value.expiresAt);
+	if (expiresMs <= atMs)
+		return `${label}.expiresAt must be strictly after the execution clock; a credential boundary is short-lived`;
+	if (expiresMs - atMs > timeoutMs)
+		return `${label}.expiresAt must not outlive the contract's declared timeout (${timeoutMs}ms); a credential boundary is bounded by the operation it serves`;
+	return null;
+}
+
+const EXECUTION_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"request",
+	"effect",
+	"adapter",
+	"operation",
+	"target",
+	"scope",
+	"idempotency",
+	"timeoutMs",
+	"credential",
+	"prevHash",
+	"hash",
+]);
+const SETTLEMENT_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"externalRecordId",
+	"requestDigest",
+	"responseDigest",
+	"declared",
+	"outcome",
+	"prevHash",
+	"hash",
+]);
+const RECONCILIATION_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"evidence",
+	"externalRecordId",
+	"prevHash",
+	"hash",
+]);
+
+/**
+ * Amber's outcome derivation — the adapter declares, Amber decides:
+ * - committed requires the real external record id AND the response
+ *   digest; missing output reads as its refusal, never success.
+ * - failed/denied hold only with the response digest that proves the
+ *   interpretation; without it the request is merely `attempted`
+ *   (submitted, unconfirmed — it may have landed).
+ * - unknown must carry no output at all; a record id on any
+ *   non-committed declaration refuses (a created record settles as
+ *   committed or reconciles — it never hides behind a failure).
+ */
+function deriveOutcome(receipt) {
+	const { externalRecordId, responseDigest, declared } = receipt;
+	if (declared === "committed") {
+		if (externalRecordId === null || responseDigest === null)
+			return {
+				problem:
+					"a committed receipt names the real external record id and the response digest; missing output reads as its refusal, never success",
+			};
+		return { outcome: "committed" };
+	}
+	if (externalRecordId !== null)
+		return {
+			problem: `a receipt naming a created external record cannot declare ${JSON.stringify(declared)}; it settles as committed or reconciles`,
+		};
+	if (declared === "unknown") {
+		if (responseDigest !== null)
+			return {
+				problem:
+					"an output-bearing receipt cannot declare unknown; declare what the response showed",
+			};
+		return { outcome: "unknown" };
+	}
+	return { outcome: responseDigest === null ? "attempted" : declared };
+}
+
+function settlementReceiptProblem(event, label) {
+	if (event.externalRecordId !== null) {
+		const slug = slugProblem(event.externalRecordId, `${label}.externalRecordId`);
+		if (slug !== null) return slug;
+	}
+	if (!SHA256_PATTERN.test(event.requestDigest ?? ""))
+		return `${label}.requestDigest must be a sha256:<64-hex> string — the digest of exactly what was submitted`;
+	if (event.responseDigest !== null && !SHA256_PATTERN.test(event.responseDigest))
+		return `${label}.responseDigest must be null or a sha256:<64-hex> string`;
+	if (!DECLARED_STATUSES.includes(event.declared))
+		return `${label}.declared must be one of ${DECLARED_STATUSES.join(", ")}`;
+	return null;
+}
+
+function executionEventProblem(event, lineIndex) {
+	const label = `external execution event ${lineIndex}`;
+	if (event.kind === "execution") {
+		const closed = closedFieldProblem(event, EXECUTION_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
+			return `${label}.at must be an ISO-8601 timestamp`;
+		for (const field of ["id", "request"]) {
+			if (!isNonEmptyString(event[field])) return `${label}.${field} must be a non-empty string`;
+			const leak = credentialLeakProblem(event[field], `${label}.${field}`);
+			if (leak !== null) return leak;
+		}
+		const effectPin = effectPinProblem(event.effect, `${label}.effect`);
+		if (effectPin !== null) return effectPin;
+		const adapterPin = adapterPinProblem(event.adapter, `${label}.adapter`);
+		if (adapterPin !== null) return adapterPin;
+		if (!isNonEmptyString(event.operation) || !OPERATION_PATTERN.test(event.operation))
+			return `${label}.operation must match ${OPERATION_PATTERN}`;
+		for (const [field, fieldLabel] of [
+			["target", `${label}.target`],
+			["scope", `${label}.scope`],
+		]) {
+			const slug = slugProblem(event[field], fieldLabel);
+			if (slug !== null) return slug;
+		}
+		if (!EXTERNAL_IDEMPOTENCY.includes(event.idempotency))
+			return `${label}.idempotency must be one of ${EXTERNAL_IDEMPOTENCY.join(", ")}`;
+		if (
+			!Number.isInteger(event.timeoutMs) ||
+			event.timeoutMs < 1 ||
+			event.timeoutMs > MAX_EXTERNAL_TIMEOUT_MS
+		)
+			return `${label}.timeoutMs must be a positive integer no greater than ${MAX_EXTERNAL_TIMEOUT_MS}`;
+		if (event.credential !== null) {
+			const boundary = credentialBoundaryProblem(
+				event.credential,
+				`${label}.credential`,
+				event.at,
+				event.timeoutMs,
+			);
+			if (boundary !== null) return boundary;
+		}
+		return null;
+	}
+	if (event.kind === "settlement") {
+		const closed = closedFieldProblem(event, SETTLEMENT_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
+			return `${label}.at must be an ISO-8601 timestamp`;
+		if (!isNonEmptyString(event.id)) return `${label}.id must be a non-empty string`;
+		const receipt = settlementReceiptProblem(event, label);
+		if (receipt !== null) return receipt;
+		for (const field of ["id", "externalRecordId"]) {
+			const leak = credentialLeakProblem(event[field], `${label}.${field}`);
+			if (leak !== null) return leak;
+		}
+		if (!EXECUTION_OUTCOMES.includes(event.outcome))
+			return `${label}.outcome must be one of ${EXECUTION_OUTCOMES.join(", ")}`;
+		return null;
+	}
+	const closed = closedFieldProblem(event, RECONCILIATION_EVENT_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
+		return `${label}.at must be an ISO-8601 timestamp`;
+	for (const field of ["id", "evidence"]) {
+		if (!isNonEmptyString(event[field])) return `${label}.${field} must be a non-empty string`;
+		const leak = credentialLeakProblem(event[field], `${label}.${field}`);
+		if (leak !== null) return leak;
+	}
+	const recordSlug = slugProblem(event.externalRecordId, `${label}.externalRecordId`);
+	if (recordSlug !== null) return recordSlug;
+	return credentialLeakProblem(event.externalRecordId, `${label}.externalRecordId`);
+}
+
+function foldExecutions(cwd) {
+	const events = readLedgerFailClosed(
+		executionsPath(cwd),
+		EXEC_CORRUPT_CODE,
+		"external execution ledger",
+	);
+	let prevHash = GENESIS_HASH;
+	const executions = [];
+	const byId = new Map();
+	events.forEach((event, index) => {
+		const lineIndex = index + 1;
+		if (!isPlainObject(event))
+			throw executionCorrupt(`external execution event ${lineIndex} is not an object`);
+		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
+			throw executionCorrupt(`external execution event ${lineIndex} breaks the hash chain`);
+		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+			throw executionCorrupt(
+				`external execution event ${lineIndex} carries a hash that does not match its content`,
+			);
+		if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
+			throw executionCorrupt(
+				`external execution event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+			);
+		if (!["execution", "settlement", "reconciliation"].includes(event.kind))
+			throw executionCorrupt(
+				`external execution event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+			);
+		const problem = executionEventProblem(event, lineIndex);
+		if (problem !== null) throw executionCorrupt(problem);
+		if (event.kind === "execution") {
+			if (byId.has(event.id))
+				throw executionCorrupt(
+					`external execution event ${lineIndex} reuses execution id ${JSON.stringify(event.id)}`,
+				);
+			const { prevHash: _prev, hash: _hash, at, ...body } = event;
+			const execution = {
+				...body,
+				preparedAt: at,
+				status: "prepared",
+				settlement: null,
+				reconciliation: null,
+				outcome: null,
+				index,
+			};
+			executions.push(execution);
+			byId.set(event.id, execution);
+		} else if (event.kind === "settlement") {
+			const execution = byId.get(event.id);
+			if (!execution)
+				throw executionCorrupt(
+					`external execution event ${lineIndex} settles unknown execution ${JSON.stringify(event.id)}`,
+				);
+			if (execution.status !== "prepared")
+				throw executionCorrupt(
+					`external execution event ${lineIndex} re-settles a settled execution; settled outcomes never re-settle`,
+				);
+			// The recorded outcome must be exactly what Amber derives from
+			// the receipt — a rewritten verdict fails the read closed.
+			const derived = deriveOutcome(event);
+			if (derived.problem || derived.outcome !== event.outcome)
+				throw executionCorrupt(
+					`external execution event ${lineIndex} carries an outcome the receipt does not derive; Amber, never the adapter, derives the outcome`,
+				);
+			execution.status = "settled";
+			execution.outcome = event.outcome;
+			execution.settlement = {
+				at: event.at,
+				externalRecordId: event.externalRecordId,
+				requestDigest: event.requestDigest,
+				responseDigest: event.responseDigest,
+				declared: event.declared,
+			};
+		} else {
+			const execution = byId.get(event.id);
+			if (!execution)
+				throw executionCorrupt(
+					`external execution event ${lineIndex} reconciles unknown execution ${JSON.stringify(event.id)}`,
+				);
+			if (execution.status !== "settled" || execution.outcome !== "unknown")
+				throw executionCorrupt(
+					`external execution event ${lineIndex} reconciles an execution whose outcome is not unknown; reconciliation is the only path from unknown to committed`,
+				);
+			execution.outcome = "committed";
+			execution.reconciliation = {
+				at: event.at,
+				evidence: event.evidence,
+				externalRecordId: event.externalRecordId,
+			};
+		}
+		prevHash = event.hash;
+	});
+	return executions;
+}
+
+const EXECUTION_LEDGER = Object.freeze({
+	acquire: acquireExecutionLock,
+	fold: foldExecutions,
+	path: executionsPath,
+	corruptCode: EXEC_CORRUPT_CODE,
+	sizeCeilingCode: EXEC_SIZE_CEILING_CODE,
+	envName: "AMBER_EXTERNAL_MAX_EXECUTIONS_BYTES",
+	defaultBytes: DEFAULT_MAX_EXTERNAL_BYTES,
+	label: "external execution ledger",
+});
+
+/**
+ * Prepare one execution for an AUTHORIZED request: the executed
+ * operation, target, scope, and Adapter pin come only from the reviewed
+ * contract snapshot — caller input can never supply a command,
+ * executable, or URL. The request content is re-derived one last time so
+ * changed external semantics refuse even after authorization, and the
+ * credential boundary stores purpose/scope/expiry only.
+ */
+function executeExternalEffect(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(EXTERNAL_INVALID_CODE, ["execute input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(EXTERNAL_INVALID_CODE, ["now must be a valid clock"]);
+	const at = now.toISOString();
+	const inputClosed = unknownFieldProblem(input, ["id", "request", "credential"], "execute input");
+	if (inputClosed !== null) return fail(EXTERNAL_INVALID_CODE, [inputClosed]);
+	for (const field of ["id", "request"]) {
+		if (!isNonEmptyString(input[field]))
+			return fail(EXTERNAL_INVALID_CODE, [`${field} must be a non-empty string`]);
+		const leak = credentialLeakProblem(input[field], field);
+		if (leak !== null) return fail(CREDENTIAL_LEAK_CODE, [leak]);
+	}
+	let proposal;
+	try {
+		proposal = showExternalProposal(cwd, input.request);
+	} catch (err) {
+		return fail(err.amberCode || PROPOSAL_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (proposal === null)
+		return fail(EXTERNAL_NOT_FOUND_CODE, [
+			`proposal ${JSON.stringify(input.request)} does not exist`,
+		]);
+	if (proposal.status !== "authorized")
+		return fail(EXTERNAL_INVALID_CODE, [
+			`proposal ${JSON.stringify(input.request)} is not authorized; execution follows authorization`,
+		]);
+	const derived = deriveRequestContent(cwd, proposal.effect, proposal.payloadHash);
+	if (derived.problem) return fail(derived.problem.code, derived.problem.errors);
+	if (derived.notFound) return fail(EXTERNAL_DRIFT_CODE, [derived.notFound]);
+	if (derived.drift) return fail(EXTERNAL_DRIFT_CODE, [derived.drift]);
+	if (derived.content.requestHash !== proposal.requestHash)
+		return fail(EXTERNAL_DRIFT_CODE, [
+			`proposal ${JSON.stringify(input.request)} no longer matches what was authorized; propose and review a fresh request`,
+		]);
+	let contract;
+	try {
+		contract = showExternalEffect(cwd, proposal.effect.id, proposal.effect.version);
+	} catch (err) {
+		return fail(err.amberCode || EXTERNAL_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	const credential = input.credential ?? null;
+	if (contract.credentials === "none" && credential !== null)
+		return fail(EXTERNAL_INVALID_CODE, [
+			`effect ${JSON.stringify(contract.id)} declares credentials "none"; no credential boundary rides this execution`,
+		]);
+	if (contract.credentials === "scoped") {
+		if (credential === null)
+			return fail(EXTERNAL_INVALID_CODE, [
+				`effect ${JSON.stringify(contract.id)} declares scoped credentials; the execution binds a purpose/scope/expiry credential boundary (never a handle or value)`,
+			]);
+		const boundary = credentialBoundaryProblem(credential, "credential", at, contract.timeoutMs);
+		if (boundary !== null) {
+			return fail(
+				/credential material/.test(boundary) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
+				[boundary],
+			);
+		}
+	}
+	return appendLedgerEvent(
+		cwd,
+		EXECUTION_LEDGER,
+		{
+			kind: "execution",
+			schemaVersion: EXTERNAL_SCHEMA_VERSION,
+			at,
+			id: input.id,
+			request: proposal.id,
+			effect: proposal.effect,
+			adapter: proposal.adapter,
+			operation: contract.operation,
+			target: proposal.target,
+			scope: proposal.scope,
+			idempotency: contract.idempotency,
+			timeoutMs: contract.timeoutMs,
+			credential:
+				credential === null
+					? null
+					: {
+							purpose: credential.purpose,
+							scope: credential.scope,
+							expiresAt: credential.expiresAt,
+						},
+		},
+		(fold) => {
+			if (fold.some((entry) => entry.id === input.id))
+				return fail(EXTERNAL_INVALID_CODE, [
+					`execution ${JSON.stringify(input.id)} already exists; open a new execution id`,
+				]);
+			const attempts = fold.filter((entry) => entry.request === proposal.id);
+			// ANY committed attempt blocks forever — an older unknown that
+			// was reconciled to committed must not be bypassed by a newer
+			// failed retry.
+			const committed = attempts.find((entry) => entry.outcome === "committed");
+			if (committed)
+				return fail(EXTERNAL_INVALID_CODE, [
+					`request ${JSON.stringify(proposal.id)} already committed externally (execution ${JSON.stringify(committed.id)}); a retry never creates a duplicate external record`,
+				]);
+			const latest = attempts.length > 0 ? attempts[attempts.length - 1] : null;
+			if (latest === null) return null;
+			if (latest.status === "prepared")
+				return fail(EXTERNAL_INVALID_CODE, [
+					`execution ${JSON.stringify(latest.id)} is still open for this request; settle it before retrying`,
+				]);
+			// failed/denied re-execute freely; an unconfirmed outcome
+			// (attempted/unknown) may already have landed externally, so
+			// only a contract declared idempotent may retry through it.
+			if (
+				["attempted", "unknown"].includes(latest.outcome) &&
+				contract.idempotency !== "idempotent"
+			)
+				return fail(EXTERNAL_INVALID_CODE, [
+					`request ${JSON.stringify(proposal.id)} has an unconfirmed ${JSON.stringify(latest.outcome)} outcome and the contract declares at-most-once; reconcile with independent Evidence instead of retrying`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.id === input.id),
+	);
+}
+
+/**
+ * Settle one execution from the Adapter's declared result receipt. The
+ * receipt declares; Amber derives the terminal outcome and records both.
+ * Settled outcomes never re-settle, and credential-looking material in
+ * any field refuses before anything is written.
+ */
+function settleExternalExecution(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input)) return fail(EXTERNAL_INVALID_CODE, ["settle input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(EXTERNAL_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(
+		input,
+		["id", "externalRecordId", "requestDigest", "responseDigest", "declared"],
+		"settle input",
+	);
+	if (inputClosed !== null) return fail(EXTERNAL_INVALID_CODE, [inputClosed]);
+	if (!isNonEmptyString(input.id))
+		return fail(EXTERNAL_INVALID_CODE, ["id must be a non-empty string"]);
+	const idLeak = credentialLeakProblem(input.id, "id");
+	if (idLeak !== null) return fail(CREDENTIAL_LEAK_CODE, [idLeak]);
+	const receipt = {
+		externalRecordId: input.externalRecordId ?? null,
+		requestDigest: input.requestDigest,
+		responseDigest: input.responseDigest ?? null,
+		declared: input.declared,
+	};
+	const shape = settlementReceiptProblem(receipt, "receipt");
+	if (shape !== null) return fail(EXTERNAL_INVALID_CODE, [shape]);
+	if (receipt.externalRecordId !== null) {
+		const leak = credentialLeakProblem(receipt.externalRecordId, "receipt.externalRecordId");
+		if (leak !== null) return fail(CREDENTIAL_LEAK_CODE, [leak]);
+	}
+	const derived = deriveOutcome(receipt);
+	if (derived.problem) return fail(EXTERNAL_INVALID_CODE, [derived.problem]);
+	return appendLedgerEvent(
+		cwd,
+		EXECUTION_LEDGER,
+		{
+			kind: "settlement",
+			schemaVersion: EXTERNAL_SCHEMA_VERSION,
+			at: now.toISOString(),
+			id: input.id,
+			externalRecordId: receipt.externalRecordId,
+			requestDigest: receipt.requestDigest,
+			responseDigest: receipt.responseDigest,
+			declared: receipt.declared,
+			outcome: derived.outcome,
+		},
+		(fold) => {
+			const execution = fold.find((entry) => entry.id === input.id) ?? null;
+			if (execution === null)
+				return fail(EXTERNAL_NOT_FOUND_CODE, [
+					`execution ${JSON.stringify(input.id)} does not exist`,
+				]);
+			if (execution.status !== "prepared")
+				return fail(EXTERNAL_INVALID_CODE, [
+					`execution ${JSON.stringify(input.id)} is already settled; settled outcomes never re-settle`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.id === input.id),
+	);
+}
+
+/**
+ * Reconcile one unknown outcome to committed — the only path, and only
+ * through recorded Evidence from a producer independent of the approver
+ * who authorized the request.
+ */
+function reconcileExternalExecution(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(EXTERNAL_INVALID_CODE, ["reconcile input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(EXTERNAL_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(
+		input,
+		["id", "evidence", "externalRecordId"],
+		"reconcile input",
+	);
+	if (inputClosed !== null) return fail(EXTERNAL_INVALID_CODE, [inputClosed]);
+	for (const field of ["id", "evidence"]) {
+		if (!isNonEmptyString(input[field]))
+			return fail(EXTERNAL_INVALID_CODE, [`${field} must be a non-empty string`]);
+		const leak = credentialLeakProblem(input[field], field);
+		if (leak !== null) return fail(CREDENTIAL_LEAK_CODE, [leak]);
+	}
+	const recordSlug = slugProblem(input.externalRecordId, "externalRecordId");
+	if (recordSlug !== null) return fail(EXTERNAL_INVALID_CODE, [recordSlug]);
+	const leak = credentialLeakProblem(input.externalRecordId, "externalRecordId");
+	if (leak !== null) return fail(CREDENTIAL_LEAK_CODE, [leak]);
+	return appendLedgerEvent(
+		cwd,
+		EXECUTION_LEDGER,
+		{
+			kind: "reconciliation",
+			schemaVersion: EXTERNAL_SCHEMA_VERSION,
+			at: now.toISOString(),
+			id: input.id,
+			evidence: input.evidence,
+			externalRecordId: input.externalRecordId,
+		},
+		(fold) => {
+			const execution = fold.find((entry) => entry.id === input.id) ?? null;
+			if (execution === null)
+				return fail(EXTERNAL_NOT_FOUND_CODE, [
+					`execution ${JSON.stringify(input.id)} does not exist`,
+				]);
+			if (execution.status !== "settled" || execution.outcome !== "unknown")
+				return fail(EXTERNAL_INVALID_CODE, [
+					`execution ${JSON.stringify(input.id)} has outcome ${JSON.stringify(execution.outcome ?? execution.status)}; reconciliation is the only path from unknown to committed`,
+				]);
+			// One request commits at most once: while a retry is open or
+			// another attempt already committed, this unknown cannot also
+			// become committed.
+			const sibling = fold.find(
+				(entry) =>
+					entry.request === execution.request &&
+					entry.id !== execution.id &&
+					(entry.status === "prepared" || entry.outcome === "committed"),
+			);
+			if (sibling)
+				return fail(EXTERNAL_INVALID_CODE, [
+					`execution ${JSON.stringify(sibling.id)} for the same request is ${sibling.status === "prepared" ? "still open" : "already committed"}; a request commits at most once`,
+				]);
+			let evidence;
+			try {
+				evidence = showEvidence(cwd, input.evidence);
+			} catch (err) {
+				return fail(err.amberCode || EXEC_CORRUPT_CODE, [err.message || String(err)]);
+			}
+			if (evidence === null)
+				return fail(EXTERNAL_INVALID_CODE, [
+					`evidence ${JSON.stringify(input.evidence)} is not recorded; an unknown result becomes committed only through recorded reconciliation Evidence`,
+				]);
+			let approverId;
+			try {
+				const proposal = showExternalProposal(cwd, execution.request);
+				const approval =
+					proposal?.authorization == null
+						? null
+						: showApproval(cwd, proposal.authorization.approvalId, { now });
+				approverId = approval?.approver?.id ?? null;
+			} catch (err) {
+				return fail(err.amberCode || PROPOSAL_CORRUPT_CODE, [err.message || String(err)]);
+			}
+			if (approverId === null)
+				return fail(EXEC_CORRUPT_CODE, [
+					`execution ${JSON.stringify(input.id)} cannot resolve the authorizing approver; reconciliation requires the recorded authorization chain`,
+				]);
+			// Independence is enforced at write time by design: the event
+			// records the evidence REFERENCE (the receipt itself carries
+			// the producer snapshot in its own ledger), and the hash chain
+			// protects the recorded reference from rewrites.
+			if (evidence.producer.id === approverId)
+				return fail(EXTERNAL_INVALID_CODE, [
+					`evidence ${JSON.stringify(input.evidence)} was produced by the authorizing approver ${JSON.stringify(approverId)}; reconciliation requires an independent producer`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.id === input.id),
+	);
+}
+
+function showExternalExecution(cwd, id) {
+	return foldExecutions(cwd).find((entry) => entry.id === id) ?? null;
+}
+
+function listExternalExecutions(cwd, { request = null } = {}) {
+	return foldExecutions(cwd).filter((entry) => request === null || entry.request === request);
+}
+
 module.exports = {
 	EXTERNAL_SCHEMA_VERSION,
 	SUPPORTED_EXTERNAL_SCHEMA_VERSIONS,
@@ -925,4 +1573,12 @@ module.exports = {
 	authorizeExternalEffect,
 	showExternalProposal,
 	listExternalProposals,
+	DECLARED_STATUSES,
+	EXECUTION_OUTCOMES,
+	executionsPath,
+	executeExternalEffect,
+	settleExternalExecution,
+	reconcileExternalExecution,
+	showExternalExecution,
+	listExternalExecutions,
 };

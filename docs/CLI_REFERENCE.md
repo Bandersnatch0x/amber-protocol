@@ -1461,10 +1461,11 @@ Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
 `AMBER_E_RETENTION_TX_CORRUPT`, `AMBER_E_RETENTION_TX_LOCK`,
 `AMBER_E_RETENTION_TX_SIZE_CEILING`, `AMBER_E_RETENTION_TOMBSTONE`.
 
-### external register / effects / propose / authorize / proposals
+### external register / effects / propose / authorize / proposals / execute / settle / reconcile / status
 
-Register External Effect contracts, propose exact requests, and authorize them drift-bound
-(F056 T1-T2). Amber forbids arbitrary account-bearing external operations: the only thing that can
+Register External Effect contracts, propose exact requests, authorize them drift-bound, and settle
+governed executions (F056 T1-T3). Amber forbids arbitrary account-bearing external operations: the
+only thing that can
 ever execute externally is a registered effect contract. Each contract declares the external
 `--owner`, one closed system type
 (`ticketing|code-review|notification|deployment|storage`), one registered operation name (lowercase
@@ -1500,8 +1501,35 @@ external record. `authorize` consumes one single-use Approval whose subject bind
 against the current registries refuses `AMBER_E_EXTERNAL_DRIFT` when a newer effect version was
 registered or the contract's Adapter pin no longer matches — a stale authorization can never ride
 changed external semantics. `proposals` lists the requests read-only (optionally filtered by
-`--status proposed|authorized`). Nothing under this command executes an external operation —
-execution and settlement are later F056 tickets, behind their own governance.
+`--status proposed|authorized`).
+
+Missing output never means success, and no credential material ever rides a record (T3):
+`execute` prepares one execution for an AUTHORIZED request into the hash-chained ledger
+`.amber/external/executions.jsonl` — the operation, target, scope, and Adapter pin come only from
+the reviewed contract snapshot (caller input can never supply a command, executable, or URL; the
+request re-derives one last time so post-authorization drift refuses), and a scoped-credentials
+contract binds a short-lived credential boundary (`--credential-purpose` + `--credential-scope` +
+`--credential-expires`, expiry bounded by the contract's `timeoutMs`, which the execution
+snapshots so the fold re-validates the same bound) whose stored shape carries
+purpose/scope/expiry ONLY — no handle or value field exists, and token-shaped material in any
+field refuses with `AMBER_E_EXTERNAL_CREDENTIAL_LEAK` at write time and fails the read closed on
+a validly re-chained forgery. One execution is open per request at a
+time; a committed request never re-executes, and an unconfirmed (`attempted|unknown`) outcome
+retries only under a contract declared `idempotent` (at-most-once reconciles instead). `settle`
+records the Adapter's declared result receipt — real external record id, request/response digests
+(`sha256:<64-hex>`), declared status (`committed|failed|denied|unknown`) — and Amber, never the
+adapter, derives the terminal outcome (`denied|attempted|committed|failed|unknown`): committed
+requires the record id AND response digest (missing output reads as its refusal, never success),
+a claimed failure/denial without the response digest that proves the interpretation downgrades to
+`attempted`, a record id on a non-committed declaration refuses, settled outcomes never
+re-settle, and the fold re-derives every stored outcome so a validly re-chained rewritten verdict
+fails the read closed. `reconcile` is the only path from `unknown` to `committed`: it binds a
+recorded Evidence receipt whose producer is independent of the authorizing approver plus the real
+external record id, and refuses while another execution for the same request is open or already
+committed — a request commits at most once. `status` reads one execution with its settlement and
+reconciliation. Nothing
+under this command executes an external operation — the external Adapter performs the operation
+outside Amber and submits the declared receipt.
 
 ```bash
 node scripts/amber.js external register --target . --id effect/ticket-comment \
@@ -1524,12 +1552,23 @@ node scripts/amber.js external authorize --target . --id request/ticket-comment-
   --approval approval/external-42 --decision-identity decision/external-42 \
   --body "# Authorize external effect" --trace decides:intent:intent/external --json
 node scripts/amber.js external proposals --target . --status proposed --json
+node scripts/amber.js external execute --target . --id execution/ticket-comment-1 \
+  --request request/ticket-comment-288 --credential-purpose comment.create \
+  --credential-scope tracker/amber-protocol --credential-expires 2026-08-29T00:00:30.000Z --json
+node scripts/amber.js external settle --target . --id execution/ticket-comment-1 \
+  --external-record TRACK-1234 --request-digest sha256:<64-hex> \
+  --response-digest sha256:<64-hex> --status committed --json
+node scripts/amber.js external reconcile --target . --id execution/ticket-comment-1 \
+  --evidence evidence/reconcile-1 --external-record TRACK-1234 --json
+node scripts/amber.js external status --target . --id execution/ticket-comment-1 --json
 ```
 
 Error codes: `AMBER_E_EXTERNAL_INVALID`, `AMBER_E_EXTERNAL_CORRUPT`, `AMBER_E_EXTERNAL_LOCK`,
 `AMBER_E_EXTERNAL_SIZE_CEILING`, `AMBER_E_EXTERNAL_NOT_FOUND`, `AMBER_E_EXTERNAL_DRIFT`,
 `AMBER_E_EXTERNAL_PROPOSAL_CORRUPT`, `AMBER_E_EXTERNAL_PROPOSAL_LOCK`,
-`AMBER_E_EXTERNAL_PROPOSAL_SIZE_CEILING`.
+`AMBER_E_EXTERNAL_PROPOSAL_SIZE_CEILING`, `AMBER_E_EXTERNAL_EXEC_CORRUPT`,
+`AMBER_E_EXTERNAL_EXEC_LOCK`, `AMBER_E_EXTERNAL_EXEC_SIZE_CEILING`,
+`AMBER_E_EXTERNAL_CREDENTIAL_LEAK`.
 
 ## Handoff Commands
 

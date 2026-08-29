@@ -36,11 +36,20 @@ const {
 	authorizeExternalEffect,
 	showExternalProposal,
 	listExternalProposals,
+	DECLARED_STATUSES,
+	EXECUTION_OUTCOMES,
+	executionsPath,
+	executeExternalEffect,
+	settleExternalExecution,
+	reconcileExternalExecution,
+	showExternalExecution,
+	listExternalExecutions,
 } = require("../../scripts/lib/core/external-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const { registerAdapter } = require("../../scripts/lib/core/adapter-registry");
 const { grantApproval, showApproval } = require("../../scripts/lib/core/approval-registry");
+const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
 
 function mkTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-external-${label}-`));
@@ -817,4 +826,634 @@ test("a fresh proposal lock held by another writer refuses proposing", () => {
 	assert.equal(contended.code, "AMBER_E_EXTERNAL_PROPOSAL_LOCK");
 	fs.rmSync(lockPath);
 	assert.equal(proposeExternalEffect(dir, input, { now: NOW }).ok, true);
+});
+
+// ---------------------------------------------------------------------------
+// F056 T3 (#290) — Adapter execution, settlement & credential boundary.
+// ---------------------------------------------------------------------------
+
+const JWT_LIKE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature";
+
+/** Propose request/1 against effect/ticket-comment@1 and authorize it. */
+function authorizedRequestFixture(dir, decisionIdentities = ["decision/effect-1"]) {
+	proposalFixture(dir, decisionIdentities);
+	const proposed = proposeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: PAYLOAD,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true, (proposed.errors || []).join("; "));
+	grantRequestApproval(dir, "approval/external-1", proposed.record.requestHash);
+	const authorized = authorizeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			approval: "approval/external-1",
+			decisionIdentity: "decision/external-consume-1",
+			body: "# Authorize external effect\n",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
+		},
+		{ now: NOW },
+	);
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+}
+
+function boundary(overrides = {}) {
+	return {
+		purpose: "comment.create",
+		scope: "tracker/amber-protocol",
+		expiresAt: new Date(NOW.getTime() + 30_000).toISOString(),
+		...overrides,
+	};
+}
+
+function executeInput(overrides = {}) {
+	return { id: "execution/1", request: "request/1", credential: boundary(), ...overrides };
+}
+
+test("execute prepares only from the reviewed contract snapshot with a credential boundary", () => {
+	const dir = mkTarget("execute");
+	authorizedRequestFixture(dir);
+	assert.deepEqual([...DECLARED_STATUSES], ["committed", "failed", "denied", "unknown"]);
+	assert.deepEqual(
+		[...EXECUTION_OUTCOMES],
+		["denied", "attempted", "committed", "failed", "unknown"],
+	);
+	const ghost = executeExternalEffect(dir, executeInput({ request: "request/ghost" }), {
+		now: NOW,
+	});
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_EXTERNAL_NOT_FOUND");
+	const missingBoundary = executeExternalEffect(dir, executeInput({ credential: null }), {
+		now: NOW,
+	});
+	assert.equal(missingBoundary.ok, false);
+	assert.match(missingBoundary.errors[0], /binds a purpose\/scope\/expiry credential boundary/);
+	const longLived = executeExternalEffect(
+		dir,
+		executeInput({
+			credential: boundary({ expiresAt: new Date(NOW.getTime() + 60_000).toISOString() }),
+		}),
+		{ now: NOW },
+	);
+	assert.equal(longLived.ok, false);
+	assert.match(longLived.errors[0], /must not outlive the contract's declared timeout/);
+	const expired = executeExternalEffect(
+		dir,
+		executeInput({ credential: boundary({ expiresAt: NOW.toISOString() }) }),
+		{ now: NOW },
+	);
+	assert.equal(expired.ok, false);
+	assert.match(expired.errors[0], /strictly after the execution clock/);
+	const leaked = executeExternalEffect(
+		dir,
+		executeInput({ credential: boundary({ purpose: JWT_LIKE }) }),
+		{ now: NOW },
+	);
+	assert.equal(leaked.ok, false);
+	assert.equal(leaked.code, "AMBER_E_EXTERNAL_CREDENTIAL_LEAK");
+	const smuggledHandle = executeExternalEffect(
+		dir,
+		executeInput({ credential: { ...boundary(), handle: "vault://token" } }),
+		{ now: NOW },
+	);
+	assert.equal(smuggledHandle.ok, false);
+	assert.match(smuggledHandle.errors[0], /unknown field "handle"/);
+	const tokenId = executeExternalEffect(dir, executeInput({ id: "ghp_abcdef123456" }), {
+		now: NOW,
+	});
+	assert.equal(tokenId.ok, false);
+	assert.equal(tokenId.code, "AMBER_E_EXTERNAL_CREDENTIAL_LEAK");
+	assert.equal(fs.existsSync(executionsPath(dir)), false);
+
+	const prepared = executeExternalEffect(dir, executeInput(), { now: NOW });
+	assert.equal(prepared.ok, true, (prepared.errors || []).join("; "));
+	assert.equal(prepared.record.request, "request/1");
+	assert.deepEqual(prepared.record.effect, { id: "effect/ticket-comment", version: "1" });
+	assert.deepEqual(prepared.record.adapter, { id: "adapter/tracker", version: "1" });
+	assert.equal(prepared.record.operation, "comment.create");
+	assert.equal(prepared.record.target, "tracker/amber-protocol");
+	assert.equal(prepared.record.idempotency, "idempotent");
+	assert.equal(prepared.record.timeoutMs, 30_000);
+	assert.deepEqual(prepared.record.credential, boundary());
+	assert.equal(prepared.record.status, "prepared");
+	assert.equal(prepared.record.outcome, null);
+	const open = executeExternalEffect(dir, executeInput({ id: "execution/2" }), { now: NOW });
+	assert.equal(open.ok, false);
+	assert.match(open.errors[0], /is still open for this request; settle it before retrying/);
+	const unauthorizedProposal = proposeExternalEffect(
+		dir,
+		{
+			id: "request/2",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: `sha256:${"b".repeat(64)}`,
+		},
+		{ now: NOW },
+	);
+	assert.equal(unauthorizedProposal.ok, true);
+	const unauthorized = executeExternalEffect(
+		dir,
+		executeInput({ id: "execution/2", request: "request/2" }),
+		{ now: NOW },
+	);
+	assert.equal(unauthorized.ok, false);
+	assert.match(unauthorized.errors[0], /is not authorized; execution follows authorization/);
+});
+
+test("a credentials-none contract refuses any credential boundary", () => {
+	const dir = mkTarget("credential-none");
+	proposalFixture(dir, ["decision/effect-1", "decision/effect-2"]);
+	assert.equal(
+		registerExternalEffect(
+			dir,
+			effectInput({
+				id: "effect/announce",
+				operation: "message.post",
+				credentials: "none",
+				decision: { identity: "decision/effect-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const proposed = proposeExternalEffect(
+		dir,
+		{ id: "request/1", effect: { id: "effect/announce", version: "1" }, payloadHash: PAYLOAD },
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true, (proposed.errors || []).join("; "));
+	grantRequestApproval(dir, "approval/external-1", proposed.record.requestHash);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/1",
+				approval: "approval/external-1",
+				decisionIdentity: "decision/external-consume-1",
+				body: "# Authorize\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const boundaryRefused = executeExternalEffect(dir, executeInput(), { now: NOW });
+	assert.equal(boundaryRefused.ok, false);
+	assert.match(boundaryRefused.errors[0], /declares credentials "none"; no credential boundary/);
+	const bare = executeExternalEffect(dir, executeInput({ credential: null }), { now: NOW });
+	assert.equal(bare.ok, true, (bare.errors || []).join("; "));
+	assert.equal(bare.record.credential, null);
+});
+
+function settleInput(overrides = {}) {
+	return {
+		id: "execution/1",
+		externalRecordId: "TRACK-1234",
+		requestDigest: `sha256:${"d".repeat(64)}`,
+		responseDigest: `sha256:${"e".repeat(64)}`,
+		declared: "committed",
+		...overrides,
+	};
+}
+
+test("Amber, never the adapter, derives the settlement outcome", () => {
+	const dir = mkTarget("settle");
+	authorizedRequestFixture(dir);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+
+	const ghost = settleExternalExecution(dir, settleInput({ id: "execution/ghost" }), { now: NOW });
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_EXTERNAL_NOT_FOUND");
+	const missingOutput = settleExternalExecution(dir, settleInput({ externalRecordId: null }), {
+		now: NOW,
+	});
+	assert.equal(missingOutput.ok, false);
+	assert.equal(missingOutput.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(missingOutput.errors[0], /missing output reads as its refusal, never success/);
+	const hiddenRecord = settleExternalExecution(dir, settleInput({ declared: "failed" }), {
+		now: NOW,
+	});
+	assert.equal(hiddenRecord.ok, false);
+	assert.match(hiddenRecord.errors[0], /cannot declare "failed"; it settles as committed/);
+	const hiddenDenied = settleExternalExecution(dir, settleInput({ declared: "denied" }), {
+		now: NOW,
+	});
+	assert.equal(hiddenDenied.ok, false);
+	assert.match(hiddenDenied.errors[0], /cannot declare "denied"; it settles as committed/);
+	const chattyUnknown = settleExternalExecution(
+		dir,
+		settleInput({ declared: "unknown", externalRecordId: null }),
+		{ now: NOW },
+	);
+	assert.equal(chattyUnknown.ok, false);
+	assert.match(chattyUnknown.errors[0], /an output-bearing receipt cannot declare unknown/);
+	const badDigest = settleExternalExecution(dir, settleInput({ requestDigest: "sha256:xyz" }), {
+		now: NOW,
+	});
+	assert.equal(badDigest.ok, false);
+	assert.match(badDigest.errors[0], /requestDigest must be a sha256:<64-hex> string/);
+	const leakedRecord = settleExternalExecution(dir, settleInput({ externalRecordId: JWT_LIKE }), {
+		now: NOW,
+	});
+	assert.equal(leakedRecord.ok, false);
+	assert.equal(leakedRecord.code, "AMBER_E_EXTERNAL_CREDENTIAL_LEAK");
+
+	const committed = settleExternalExecution(dir, settleInput(), { now: NOW });
+	assert.equal(committed.ok, true, (committed.errors || []).join("; "));
+	assert.equal(committed.record.status, "settled");
+	assert.equal(committed.record.outcome, "committed");
+	assert.equal(committed.record.settlement.declared, "committed");
+	const again = settleExternalExecution(dir, settleInput(), { now: NOW });
+	assert.equal(again.ok, false);
+	assert.match(again.errors[0], /settled outcomes never re-settle/);
+	const committedRetry = executeExternalEffect(dir, executeInput({ id: "execution/2" }), {
+		now: NOW,
+	});
+	assert.equal(committedRetry.ok, false);
+	assert.match(committedRetry.errors[0], /a retry never creates a duplicate external record/);
+	assert.equal(showExternalExecution(dir, "execution/1").outcome, "committed");
+	assert.equal(listExternalExecutions(dir, { request: "request/1" }).length, 1);
+});
+
+test("an unproven failure downgrades to attempted and retries by declared idempotency", () => {
+	const dir = mkTarget("attempted");
+	authorizedRequestFixture(dir);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+	const failed = settleExternalExecution(
+		dir,
+		settleInput({ externalRecordId: null, declared: "failed" }),
+		{ now: NOW },
+	);
+	assert.equal(failed.ok, true, (failed.errors || []).join("; "));
+	assert.equal(failed.record.outcome, "failed");
+	// failed re-executes freely.
+	assert.equal(
+		executeExternalEffect(dir, executeInput({ id: "execution/2" }), { now: NOW }).ok,
+		true,
+	);
+	const attempted = settleExternalExecution(
+		dir,
+		settleInput({
+			id: "execution/2",
+			externalRecordId: null,
+			responseDigest: null,
+			declared: "failed",
+		}),
+		{ now: NOW },
+	);
+	assert.equal(attempted.ok, true, (attempted.errors || []).join("; "));
+	assert.equal(attempted.record.outcome, "attempted");
+	// A proven denial derives denied — and denied re-executes freely too.
+	assert.equal(
+		executeExternalEffect(dir, executeInput({ id: "execution/2b" }), { now: NOW }).ok,
+		true,
+	);
+	const denied = settleExternalExecution(
+		dir,
+		settleInput({ id: "execution/2b", externalRecordId: null, declared: "denied" }),
+		{ now: NOW },
+	);
+	assert.equal(denied.ok, true, (denied.errors || []).join("; "));
+	assert.equal(denied.record.outcome, "denied");
+	// The contract declares idempotent, so an unconfirmed outcome retries.
+	assert.equal(
+		executeExternalEffect(dir, executeInput({ id: "execution/3" }), { now: NOW }).ok,
+		true,
+	);
+	const unknown = settleExternalExecution(
+		dir,
+		settleInput({
+			id: "execution/3",
+			externalRecordId: null,
+			responseDigest: null,
+			declared: "unknown",
+		}),
+		{ now: NOW },
+	);
+	assert.equal(unknown.ok, true, (unknown.errors || []).join("; "));
+	assert.equal(unknown.record.outcome, "unknown");
+});
+
+test("an at-most-once contract never retries through an unconfirmed outcome", () => {
+	const dir = mkTarget("at-most-once");
+	proposalFixture(dir, ["decision/effect-1", "decision/effect-2"]);
+	assert.equal(
+		registerExternalEffect(
+			dir,
+			effectInput({
+				id: "effect/announce",
+				operation: "message.post",
+				idempotency: "at-most-once",
+				decision: { identity: "decision/effect-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const proposed = proposeExternalEffect(
+		dir,
+		{ id: "request/1", effect: { id: "effect/announce", version: "1" }, payloadHash: PAYLOAD },
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true);
+	grantRequestApproval(dir, "approval/external-1", proposed.record.requestHash);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/1",
+				approval: "approval/external-1",
+				decisionIdentity: "decision/external-consume-1",
+				body: "# Authorize\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			settleInput({
+				externalRecordId: null,
+				responseDigest: null,
+				declared: "unknown",
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const retry = executeExternalEffect(dir, executeInput({ id: "execution/2" }), { now: NOW });
+	assert.equal(retry.ok, false);
+	assert.equal(retry.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(retry.errors[0], /at-most-once; reconcile with independent Evidence/);
+});
+
+test("reconciliation is the only path from unknown to committed and needs an independent producer", () => {
+	const dir = mkTarget("reconcile");
+	authorizedRequestFixture(dir);
+	assert.equal(
+		registerPrincipal(dir, { id: "auditor@example.com", principalKind: "service" }).ok,
+		true,
+	);
+	const evidenceInput = (id, producer) => ({
+		id,
+		producer,
+		assurance: "observed",
+		scope: null,
+		subject: "external/execution-1",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: null,
+		status: "pass",
+	});
+	assert.equal(
+		recordEvidence(dir, evidenceInput("evidence/reconcile-1", "auditor@example.com")).ok,
+		true,
+	);
+	assert.equal(
+		recordEvidence(dir, evidenceInput("evidence/self-serve", "bob@example.com")).ok,
+		true,
+	);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+	const reconcileInput = (overrides = {}) => ({
+		id: "execution/1",
+		evidence: "evidence/reconcile-1",
+		externalRecordId: "TRACK-1234",
+		...overrides,
+	});
+	const premature = reconcileExternalExecution(dir, reconcileInput(), { now: NOW });
+	assert.equal(premature.ok, false);
+	assert.match(premature.errors[0], /reconciliation is the only path from unknown to committed/);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			settleInput({ externalRecordId: null, responseDigest: null, declared: "unknown" }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const ghostEvidence = reconcileExternalExecution(
+		dir,
+		reconcileInput({ evidence: "evidence/ghost" }),
+		{ now: NOW },
+	);
+	assert.equal(ghostEvidence.ok, false);
+	assert.match(ghostEvidence.errors[0], /is not recorded/);
+	const selfServe = reconcileExternalExecution(
+		dir,
+		reconcileInput({ evidence: "evidence/self-serve" }),
+		{ now: NOW },
+	);
+	assert.equal(selfServe.ok, false);
+	assert.match(selfServe.errors[0], /reconciliation requires an independent producer/);
+	const leaked = reconcileExternalExecution(dir, reconcileInput({ externalRecordId: JWT_LIKE }), {
+		now: NOW,
+	});
+	assert.equal(leaked.ok, false);
+	assert.equal(leaked.code, "AMBER_E_EXTERNAL_CREDENTIAL_LEAK");
+	const reconciled = reconcileExternalExecution(dir, reconcileInput(), { now: NOW });
+	assert.equal(reconciled.ok, true, (reconciled.errors || []).join("; "));
+	assert.equal(reconciled.record.outcome, "committed");
+	assert.equal(reconciled.record.reconciliation.evidence, "evidence/reconcile-1");
+	assert.equal(reconciled.record.reconciliation.externalRecordId, "TRACK-1234");
+	const again = reconcileExternalExecution(dir, reconcileInput(), { now: NOW });
+	assert.equal(again.ok, false);
+	assert.match(again.errors[0], /reconciliation is the only path from unknown to committed/);
+});
+
+test("one request commits at most once across retries and reconciliation", () => {
+	const dir = mkTarget("single-commit");
+	authorizedRequestFixture(dir);
+	assert.equal(
+		registerPrincipal(dir, { id: "auditor@example.com", principalKind: "service" }).ok,
+		true,
+	);
+	assert.equal(
+		recordEvidence(dir, {
+			id: "evidence/reconcile-1",
+			producer: "auditor@example.com",
+			assurance: "observed",
+			scope: null,
+			subject: "external/execution-1",
+			inputs: null,
+			tools: null,
+			environment: null,
+			outputs: null,
+			status: "pass",
+		}).ok,
+		true,
+	);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			settleInput({ externalRecordId: null, responseDigest: null, declared: "unknown" }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	// An idempotent retry opens; the older unknown cannot reconcile while
+	// a sibling is open.
+	assert.equal(
+		executeExternalEffect(dir, executeInput({ id: "execution/2" }), { now: NOW }).ok,
+		true,
+	);
+	const reconcileInput = {
+		id: "execution/1",
+		evidence: "evidence/reconcile-1",
+		externalRecordId: "TRACK-1234",
+	};
+	const openSibling = reconcileExternalExecution(dir, reconcileInput, { now: NOW });
+	assert.equal(openSibling.ok, false);
+	assert.match(openSibling.errors[0], /still open; a request commits at most once/);
+	// The retry commits; the older unknown can never also become committed.
+	assert.equal(
+		settleExternalExecution(dir, settleInput({ id: "execution/2" }), { now: NOW }).ok,
+		true,
+	);
+	const committedSibling = reconcileExternalExecution(dir, reconcileInput, { now: NOW });
+	assert.equal(committedSibling.ok, false);
+	assert.match(committedSibling.errors[0], /already committed; a request commits at most once/);
+	const retry = executeExternalEffect(dir, executeInput({ id: "execution/3" }), { now: NOW });
+	assert.equal(retry.ok, false);
+	assert.match(retry.errors[0], /already committed externally/);
+	assert.ok(retry.errors[0].includes('execution "execution/2"'));
+});
+
+test("a reconciled commit blocks later retries even behind a newer failure", () => {
+	const dir = mkTarget("reconciled-blocks");
+	authorizedRequestFixture(dir);
+	assert.equal(
+		registerPrincipal(dir, { id: "auditor@example.com", principalKind: "service" }).ok,
+		true,
+	);
+	assert.equal(
+		recordEvidence(dir, {
+			id: "evidence/reconcile-1",
+			producer: "auditor@example.com",
+			assurance: "observed",
+			scope: null,
+			subject: "external/execution-1",
+			inputs: null,
+			tools: null,
+			environment: null,
+			outputs: null,
+			status: "pass",
+		}).ok,
+		true,
+	);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			settleInput({ externalRecordId: null, responseDigest: null, declared: "unknown" }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		executeExternalEffect(dir, executeInput({ id: "execution/2" }), { now: NOW }).ok,
+		true,
+	);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			settleInput({ id: "execution/2", externalRecordId: null, declared: "failed" }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	// The older unknown reconciles to committed while the latest attempt
+	// is a failure...
+	assert.equal(
+		reconcileExternalExecution(
+			dir,
+			{ id: "execution/1", evidence: "evidence/reconcile-1", externalRecordId: "TRACK-1234" },
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	// ...and the committed older attempt still blocks any new retry.
+	const retry = executeExternalEffect(dir, executeInput({ id: "execution/3" }), { now: NOW });
+	assert.equal(retry.ok, false);
+	assert.match(retry.errors[0], /already committed externally/);
+	assert.ok(retry.errors[0].includes('execution "execution/1"'));
+});
+
+test("a tampered execution ledger fails every read closed", () => {
+	const dir = mkTarget("exec-tamper");
+	authorizedRequestFixture(dir);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+	assert.equal(
+		settleExternalExecution(dir, settleInput({ externalRecordId: null, declared: "failed" }), {
+			now: NOW,
+		}).ok,
+		true,
+	);
+	const pristine = readEvents(executionsPath(dir));
+	const tampered = JSON.parse(JSON.stringify(pristine));
+	tampered[1].outcome = "committed";
+	writeEvents(executionsPath(dir), tampered);
+	assert.throws(
+		() => showExternalExecution(dir, "execution/1"),
+		(err) =>
+			err.amberCode === "AMBER_E_EXTERNAL_EXEC_CORRUPT" &&
+			/does not match its content/.test(err.message),
+	);
+	// A validly re-chained rewritten verdict fails the derivation check:
+	// the adapter's declaration can never become a different outcome.
+	const { hash: _hash, ...settledBody } = tampered[1];
+	const forged = { ...settledBody };
+	forged.hash = chainHash(forged, forged.prevHash);
+	writeEvents(executionsPath(dir), [pristine[0], forged]);
+	assert.throws(
+		() => showExternalExecution(dir, "execution/1"),
+		(err) =>
+			err.amberCode === "AMBER_E_EXTERNAL_EXEC_CORRUPT" &&
+			/Amber, never the adapter, derives the outcome/.test(err.message),
+	);
+	// A validly re-chained leak forgery fails the read closed: credential
+	// material cannot ride even a consistently re-hashed ledger.
+	const leakForged = { ...settledBody, externalRecordId: JWT_LIKE, declared: "committed" };
+	leakForged.outcome = "committed";
+	leakForged.responseDigest = `sha256:${"e".repeat(64)}`;
+	leakForged.hash = chainHash(leakForged, leakForged.prevHash);
+	writeEvents(executionsPath(dir), [pristine[0], leakForged]);
+	assert.throws(
+		() => showExternalExecution(dir, "execution/1"),
+		(err) =>
+			err.amberCode === "AMBER_E_EXTERNAL_EXEC_CORRUPT" && /credential material/.test(err.message),
+	);
+	// A validly re-chained second settlement of a settled execution fails
+	// the fold closed too.
+	const duplicate = { ...pristine[1] };
+	delete duplicate.hash;
+	duplicate.prevHash = pristine[1].hash;
+	duplicate.hash = chainHash(duplicate, duplicate.prevHash);
+	writeEvents(executionsPath(dir), [...pristine, duplicate]);
+	assert.throws(
+		() => showExternalExecution(dir, "execution/1"),
+		(err) =>
+			err.amberCode === "AMBER_E_EXTERNAL_EXEC_CORRUPT" &&
+			/settled outcomes never re-settle/.test(err.message),
+	);
+});
+
+test("a fresh execution lock held by another writer refuses preparing", () => {
+	const dir = mkTarget("exec-lock");
+	authorizedRequestFixture(dir);
+	const lockPath = path.join(dir, ".amber", "external", "executions.lock");
+	fs.writeFileSync(lockPath, "holder-token-1");
+	const contended = executeExternalEffect(dir, executeInput(), { now: NOW });
+	assert.equal(contended.ok, false);
+	assert.equal(contended.code, "AMBER_E_EXTERNAL_EXEC_LOCK");
+	fs.rmSync(lockPath);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
 });

@@ -11,6 +11,15 @@ const { parseTraceFlags } = require("./canonical-artifact-commands");
 
 const READ_FAILURE_CODE = "AMBER_E_EXTERNAL_CORRUPT";
 const PROPOSAL_READ_FAILURE_CODE = "AMBER_E_EXTERNAL_PROPOSAL_CORRUPT";
+const EXEC_READ_FAILURE_CODE = "AMBER_E_EXTERNAL_EXEC_CORRUPT";
+
+function clockValue(args) {
+	if (args.now === undefined) return { value: null };
+	const now = new Date(String(args.now));
+	if (Number.isNaN(now.getTime()))
+		return { error: `--now must be an ISO-8601 timestamp; got ${JSON.stringify(args.now)}` };
+	return { value: now };
+}
 
 function invalidArg(message) {
 	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
@@ -40,6 +49,15 @@ function missingValueFlag(args) {
 		["body", "--body"],
 		["traceVal", "--trace"],
 		["status", "--status"],
+		["request", "--request"],
+		["externalRecord", "--external-record"],
+		["requestDigest", "--request-digest"],
+		["responseDigest", "--response-digest"],
+		["evidence", "--evidence"],
+		["credentialPurpose", "--credential-purpose"],
+		["credentialScope", "--credential-scope"],
+		["credentialExpires", "--credential-expires"],
+		["now", "--now"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -96,7 +114,17 @@ function parseEffectPin(raw) {
 
 const dispatch = defineCommand({
 	command: "external",
-	actions: ["register", "effects", "propose", "authorize", "proposals"],
+	actions: [
+		"register",
+		"effects",
+		"propose",
+		"authorize",
+		"proposals",
+		"execute",
+		"settle",
+		"reconcile",
+		"status",
+	],
 	handlers: {
 		register: (args) => {
 			const { registerExternalEffect } = require("./core/external-registry");
@@ -263,6 +291,143 @@ const dispatch = defineCommand({
 				const failure = readFailure(args, err, PROPOSAL_READ_FAILURE_CODE);
 				return { ...failure.result, exitCode: failure.exitCode };
 			}
+		},
+		execute: (args) => {
+			const { executeExternalEffect } = require("./core/external-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "execution/ticket-comment-1"],
+				["request", "--request", "request/ticket-comment-288"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			const boundaryFlags = [
+				["credentialPurpose", "--credential-purpose"],
+				["credentialScope", "--credential-scope"],
+				["credentialExpires", "--credential-expires"],
+			];
+			const present = boundaryFlags.filter(([key]) => args[key] !== undefined);
+			if (present.length > 0 && present.length < boundaryFlags.length)
+				return invalidArg(
+					"a credential boundary declares --credential-purpose, --credential-scope, and --credential-expires together; a partial boundary refuses",
+				);
+			const credential =
+				present.length === 0
+					? null
+					: {
+							purpose: String(args.credentialPurpose),
+							scope: String(args.credentialScope),
+							expiresAt: String(args.credentialExpires),
+						};
+			return resultEnvelope(
+				executeExternalEffect(
+					target.value,
+					{ id: String(args.id), request: String(args.request), credential },
+					clock.value === null ? {} : { now: clock.value },
+				),
+			);
+		},
+		settle: (args) => {
+			const { settleExternalExecution } = require("./core/external-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "execution/ticket-comment-1"],
+				["requestDigest", "--request-digest", "sha256:<64-hex>"],
+				["status", "--status", "committed"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			return resultEnvelope(
+				settleExternalExecution(
+					target.value,
+					{
+						id: String(args.id),
+						externalRecordId:
+							args.externalRecord === undefined ? null : String(args.externalRecord),
+						requestDigest: String(args.requestDigest),
+						responseDigest: args.responseDigest === undefined ? null : String(args.responseDigest),
+						declared: String(args.status),
+					},
+					clock.value === null ? {} : { now: clock.value },
+				),
+			);
+		},
+		reconcile: (args) => {
+			const { reconcileExternalExecution } = require("./core/external-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "execution/ticket-comment-1"],
+				["evidence", "--evidence", "evidence/reconcile-1"],
+				["externalRecord", "--external-record", "TRACK-1234"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			return resultEnvelope(
+				reconcileExternalExecution(
+					target.value,
+					{
+						id: String(args.id),
+						evidence: String(args.evidence),
+						externalRecordId: String(args.externalRecord),
+					},
+					clock.value === null ? {} : { now: clock.value },
+				),
+			);
+		},
+		status: (args) => {
+			const { showExternalExecution } = require("./core/external-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "execution/ticket-comment-1");
+			if (id.error) return invalidArg(id.error);
+			let record;
+			try {
+				record = showExternalExecution(target.value, id.value);
+			} catch (err) {
+				const failure = readFailure(args, err, EXEC_READ_FAILURE_CODE);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+			if (record === null)
+				return {
+					text: "",
+					errors: [`execution ${JSON.stringify(id.value)} does not exist`],
+					warnings: [],
+					exitCode: 1,
+					code: "AMBER_E_EXTERNAL_NOT_FOUND",
+				};
+			return { text: JSON.stringify(record, null, 2) };
 		},
 	},
 });

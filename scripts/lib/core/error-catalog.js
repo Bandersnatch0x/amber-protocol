@@ -2326,6 +2326,40 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_EXTERNAL_PROPOSAL_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_EXTERNAL_EXEC_CORRUPT: {
+		title: "External execution ledger corrupt",
+		cause:
+			"The execution ledger under .amber/external/ has a broken hash chain, an invalid event shape, a reused execution id, a re-settlement, a reconciliation of a non-unknown outcome, an outcome the receipt does not derive, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/external/executions.jsonl from version control or a backup; the ledger is append-only and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_PROPOSAL_CORRUPT", "AMBER_E_EXTERNAL_EXEC_LOCK"],
+	},
+	AMBER_E_EXTERNAL_EXEC_LOCK: {
+		title: "External execution ledger lock contended",
+		cause: "Another process holds the execution ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent execution, settlement, or reconciliation finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_EXEC_CORRUPT", "AMBER_E_EXTERNAL_PROPOSAL_LOCK"],
+	},
+	AMBER_E_EXTERNAL_EXEC_SIZE_CEILING: {
+		title: "External execution ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_EXTERNAL_MAX_EXECUTIONS_BYTES).",
+		remedy:
+			"Raise AMBER_EXTERNAL_MAX_EXECUTIONS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_EXEC_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_EXTERNAL_CREDENTIAL_LEAK: {
+		title: "Credential material refused in an external record",
+		cause:
+			"A field on an execution, receipt, or reconciliation carries what looks like credential material (a bearer/basic token, JWT, provider key, PEM block, or key=value secret); only the purpose/scope/expiry boundary is ever stored, and no stored shape carries a handle or value field.",
+		remedy:
+			"Strip the credential material and resubmit; reference credentials only through the declared purpose/scope/expiry boundary.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_INVALID", "AMBER_E_EXTERNAL_EXEC_CORRUPT"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

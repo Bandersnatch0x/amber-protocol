@@ -15,7 +15,12 @@ const { admitArtifact } = require("../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../scripts/lib/core/principal-registry");
 const { registerAdapter } = require("../scripts/lib/core/adapter-registry");
 const { grantApproval } = require("../scripts/lib/core/approval-registry");
-const { effectsPath, proposalsPath } = require("../scripts/lib/core/external-registry");
+const { recordEvidence } = require("../scripts/lib/core/evidence-receipts");
+const {
+	effectsPath,
+	proposalsPath,
+	executionsPath,
+} = require("../scripts/lib/core/external-registry");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -335,18 +340,208 @@ test("external propose, authorize, and proposals govern the request lifecycle", 
 	assert.equal(envelope(corrupt).code, "AMBER_E_EXTERNAL_PROPOSAL_CORRUPT");
 });
 
+test("external execute, settle, reconcile, and status govern the execution boundary", () => {
+	const dir = mkTarget("executions");
+	fixtureRepo(dir, ["decision/effect-1", "decision/effect-2"]);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(
+		registerPrincipal(dir, { id: "auditor@example.com", principalKind: "service" }).ok,
+		true,
+	);
+	assert.equal(runCli(registerArgs(), dir).status, 0);
+	const authorizeRequest = (requestId, payloadHash, suffix) => {
+		const proposed = runCli(
+			[
+				"external",
+				"propose",
+				"--target",
+				".",
+				"--id",
+				requestId,
+				"--effect",
+				"effect/ticket-comment@1",
+				"--payload-hash",
+				payloadHash,
+				"--json",
+			],
+			dir,
+		);
+		assert.equal(proposed.status, 0, proposed.stderr || proposed.stdout);
+		assert.equal(
+			grantApproval(dir, {
+				id: `approval/external-${suffix}`,
+				approver: "bob@example.com",
+				scope: null,
+				subject: `external-effect:${payload(proposed).requestHash}`,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			}).ok,
+			true,
+		);
+		const authorized = runCli(
+			[
+				"external",
+				"authorize",
+				"--target",
+				".",
+				"--id",
+				requestId,
+				"--approval",
+				`approval/external-${suffix}`,
+				"--decision-identity",
+				`decision/external-consume-${suffix}`,
+				"--body",
+				"# Authorize external effect",
+				"--trace",
+				"decides:intent:intent/external",
+				"--json",
+			],
+			dir,
+		);
+		assert.equal(authorized.status, 0, authorized.stderr || authorized.stdout);
+	};
+	authorizeRequest("request/1", `sha256:${"a".repeat(64)}`, "1");
+	const executeArgs = (overrides = {}) => {
+		const flags = {
+			"--id": "execution/1",
+			"--request": "request/1",
+			"--credential-purpose": "comment.create",
+			"--credential-scope": "tracker/amber-protocol",
+			"--credential-expires": "2026-08-29T00:00:30.000Z",
+			"--now": "2026-08-29T00:00:00.000Z",
+			...overrides,
+		};
+		const args = ["external", "execute", "--target", ".", "--json"];
+		for (const [flag, value] of Object.entries(flags)) {
+			if (value !== null) args.push(flag, value);
+		}
+		return args;
+	};
+	const partial = runCli(executeArgs({ "--credential-scope": null }), dir);
+	assert.equal(partial.status, 1);
+	assert.equal(envelope(partial).code, "AMBER_E_INVALID_ARG");
+	assert.match(envelope(partial).errors[0], /a partial boundary refuses/);
+	const executed = runCli(executeArgs(), dir);
+	assert.equal(executed.status, 0, executed.stderr || executed.stdout);
+	assert.equal(payload(executed).status, "prepared");
+	assert.deepEqual(payload(executed).credential, {
+		purpose: "comment.create",
+		scope: "tracker/amber-protocol",
+		expiresAt: "2026-08-29T00:00:30.000Z",
+	});
+	const settleArgs = (overrides = {}) => {
+		const flags = {
+			"--id": "execution/1",
+			"--external-record": "TRACK-1234",
+			"--request-digest": `sha256:${"d".repeat(64)}`,
+			"--response-digest": `sha256:${"e".repeat(64)}`,
+			"--status": "committed",
+			...overrides,
+		};
+		const args = ["external", "settle", "--target", ".", "--json"];
+		for (const [flag, value] of Object.entries(flags)) {
+			if (value !== null) args.push(flag, value);
+		}
+		return args;
+	};
+	// Credential redaction: a token-shaped external record id refuses.
+	const redacted = runCli(
+		settleArgs({ "--external-record": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.x.y" }),
+		dir,
+	);
+	assert.equal(redacted.status, 1);
+	assert.equal(envelope(redacted).code, "AMBER_E_EXTERNAL_CREDENTIAL_LEAK");
+	// Missing output never means success.
+	const missingOutput = runCli(settleArgs({ "--response-digest": null }), dir);
+	assert.equal(missingOutput.status, 1);
+	assert.equal(envelope(missingOutput).code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(envelope(missingOutput).errors[0], /never success/);
+	const settled = runCli(settleArgs(), dir);
+	assert.equal(settled.status, 0, settled.stderr || settled.stdout);
+	assert.equal(payload(settled).outcome, "committed");
+	const shown = runCli(
+		["external", "status", "--target", ".", "--id", "execution/1", "--json"],
+		dir,
+	);
+	assert.equal(shown.status, 0);
+	assert.equal(payload(shown).settlement.declared, "committed");
+
+	// Unknown outcome reconciles only through independent Evidence.
+	authorizeRequest("request/2", `sha256:${"b".repeat(64)}`, "2");
+	assert.equal(
+		runCli(executeArgs({ "--id": "execution/2", "--request": "request/2" }), dir).status,
+		0,
+	);
+	const unknown = runCli(
+		settleArgs({
+			"--id": "execution/2",
+			"--external-record": null,
+			"--response-digest": null,
+			"--status": "unknown",
+		}),
+		dir,
+	);
+	assert.equal(unknown.status, 0, unknown.stderr || unknown.stdout);
+	assert.equal(payload(unknown).outcome, "unknown");
+	assert.equal(
+		recordEvidence(dir, {
+			id: "evidence/reconcile-1",
+			producer: "auditor@example.com",
+			assurance: "observed",
+			scope: null,
+			subject: "external/execution-2",
+			inputs: null,
+			tools: null,
+			environment: null,
+			outputs: null,
+			status: "pass",
+		}).ok,
+		true,
+	);
+	const reconciled = runCli(
+		[
+			"external",
+			"reconcile",
+			"--target",
+			".",
+			"--id",
+			"execution/2",
+			"--evidence",
+			"evidence/reconcile-1",
+			"--external-record",
+			"TRACK-5678",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(reconciled.status, 0, reconciled.stderr || reconciled.stdout);
+	assert.equal(payload(reconciled).outcome, "committed");
+
+	// A tampered receipt fails every read closed.
+	fs.appendFileSync(executionsPath(dir), '{"kind":"settlement"}\n');
+	const corrupt = runCli(
+		["external", "status", "--target", ".", "--id", "execution/1", "--json"],
+		dir,
+	);
+	assert.equal(corrupt.status, 1);
+	assert.equal(envelope(corrupt).code, "AMBER_E_EXTERNAL_EXEC_CORRUPT");
+});
+
 test("external help and unknown actions route through the shared dispatcher", () => {
 	const dir = mkTarget("help");
 	const help = runCli(["external", "--help"], dir);
 	assert.equal(help.status, 0, help.stderr || help.stdout);
-	assert.match(help.stdout, /amber external <register\|effects\|propose\|authorize\|proposals>/);
+	assert.match(
+		help.stdout,
+		/amber external <register\|effects\|propose\|authorize\|proposals\|execute\|settle\|reconcile\|status>/,
+	);
 	assert.match(help.stdout, /--irreversible/);
 	assert.match(help.stdout, /--payload-hash/);
+	assert.match(help.stdout, /--request-digest/);
 
 	const unknown = runCli(["external", "bogus", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/external requires register, effects, propose, authorize, or proposals/,
+		/external requires register, effects, propose, authorize, proposals, execute, settle, reconcile, or status/,
 	);
 });

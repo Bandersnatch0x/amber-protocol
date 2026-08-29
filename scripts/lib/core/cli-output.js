@@ -290,6 +290,13 @@ const FLAG_SPECS = {
 	// --body, --trace, --status, and --scope are shared with existing
 	// surfaces).
 	"--payload-hash": { key: "payloadHash" },
+	// F056 ticket 3 (#290): execution settlement flags (--id, --request,
+	// --status, --evidence, --now, --credential-purpose,
+	// --credential-scope, and --credential-expires are shared with
+	// existing surfaces).
+	"--external-record": { key: "externalRecord" },
+	"--request-digest": { key: "requestDigest" },
+	"--response-digest": { key: "responseDigest" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },
