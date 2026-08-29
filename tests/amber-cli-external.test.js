@@ -1,8 +1,9 @@
 "use strict";
 
-// F056 T1 (#288) — `amber external` CLI seam: governed effect contract
-// registration, read-only listing, fail-closed refusals with stable
-// codes, and help registration.
+// F056 — `amber external` CLI seam: governed effect contract
+// registration (T1 #288), request proposals with drift-bound
+// authorization (T2 #289), read-only listing, fail-closed refusals with
+// stable codes, and help registration.
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
@@ -13,7 +14,8 @@ const { spawnSync } = require("node:child_process");
 const { admitArtifact } = require("../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../scripts/lib/core/principal-registry");
 const { registerAdapter } = require("../scripts/lib/core/adapter-registry");
-const { effectsPath } = require("../scripts/lib/core/external-registry");
+const { grantApproval } = require("../scripts/lib/core/approval-registry");
+const { effectsPath, proposalsPath } = require("../scripts/lib/core/external-registry");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -212,14 +214,139 @@ test("external effects fails closed on a corrupt ledger", () => {
 	assert.equal(envelope(blocked).code, "AMBER_E_EXTERNAL_CORRUPT");
 });
 
+test("external propose, authorize, and proposals govern the request lifecycle", () => {
+	const dir = mkTarget("proposals");
+	fixtureRepo(dir, ["decision/effect-1", "decision/effect-2"]);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(runCli(registerArgs(), dir).status, 0);
+	const payloadA = `sha256:${"a".repeat(64)}`;
+	const proposeArgs = (overrides = {}) => {
+		const flags = {
+			"--id": "request/1",
+			"--effect": "effect/ticket-comment@1",
+			"--payload-hash": payloadA,
+			...overrides,
+		};
+		const args = ["external", "propose", "--target", ".", "--json"];
+		for (const [flag, value] of Object.entries(flags)) {
+			if (value !== null) args.push(flag, value);
+		}
+		return args;
+	};
+	const badPin = runCli(proposeArgs({ "--effect": "effect/ticket-comment" }), dir);
+	assert.equal(badPin.status, 1);
+	assert.equal(envelope(badPin).code, "AMBER_E_INVALID_ARG");
+	assert.match(envelope(badPin).errors[0], /--effect must be <id>@<version>/);
+
+	const proposed = runCli(proposeArgs(), dir);
+	assert.equal(proposed.status, 0, proposed.stderr || proposed.stdout);
+	const proposedRecord = payload(proposed);
+	assert.equal(proposedRecord.status, "proposed");
+
+	const duplicate = runCli(proposeArgs({ "--id": "request/2" }), dir);
+	assert.equal(duplicate.status, 1);
+	assert.equal(envelope(duplicate).code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(envelope(duplicate).errors[0], /already proposed as "request\/1"/);
+
+	assert.equal(
+		grantApproval(dir, {
+			id: "approval/external-1",
+			approver: "bob@example.com",
+			scope: null,
+			subject: `external-effect:${proposedRecord.requestHash}`,
+			validUntil: "2036-01-01T00:00:00.000Z",
+		}).ok,
+		true,
+	);
+	// A changed payload is a different request: its hash never matches
+	// the granted approval's binding.
+	const changedPayload = runCli(
+		proposeArgs({ "--id": "request/2", "--payload-hash": `sha256:${"b".repeat(64)}` }),
+		dir,
+	);
+	assert.equal(changedPayload.status, 0);
+	const authorizeArgs = (overrides = {}) => {
+		const flags = {
+			"--id": "request/1",
+			"--approval": "approval/external-1",
+			"--decision-identity": "decision/external-consume-1",
+			"--body": "# Authorize external effect",
+			"--trace": "decides:intent:intent/external",
+			...overrides,
+		};
+		const args = ["external", "authorize", "--target", ".", "--json"];
+		for (const [flag, value] of Object.entries(flags)) {
+			if (value !== null) args.push(flag, value);
+		}
+		return args;
+	};
+	const mismatched = runCli(authorizeArgs({ "--id": "request/2" }), dir);
+	assert.equal(mismatched.status, 1);
+	assert.equal(envelope(mismatched).code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(envelope(mismatched).errors[0], /not this proposal's binding/);
+
+	const authorized = runCli(authorizeArgs(), dir);
+	assert.equal(authorized.status, 0, authorized.stderr || authorized.stdout);
+	assert.equal(payload(authorized).status, "authorized");
+	assert.equal(payload(authorized).authorization.approvalId, "approval/external-1");
+
+	const listed = runCli(
+		["external", "proposals", "--target", ".", "--status", "authorized", "--json"],
+		dir,
+	);
+	assert.equal(payload(listed).length, 1);
+	const badStatus = runCli(
+		["external", "proposals", "--target", ".", "--status", "everything", "--json"],
+		dir,
+	);
+	assert.equal(badStatus.status, 1);
+	assert.equal(envelope(badStatus).code, "AMBER_E_INVALID_ARG");
+
+	// Drift: a new effect version registered after the proposal refuses
+	// the remaining request's authorization.
+	assert.equal(
+		grantApproval(dir, {
+			id: "approval/external-2",
+			approver: "bob@example.com",
+			scope: null,
+			subject: `external-effect:${payload(changedPayload).requestHash}`,
+			validUntil: "2036-01-01T00:00:00.000Z",
+		}).ok,
+		true,
+	);
+	const nextVersion = runCli(
+		registerArgs({
+			"--effect-version": "2",
+			"--decision-identity": "decision/effect-2",
+		}),
+		dir,
+	);
+	assert.equal(nextVersion.status, 0, nextVersion.stderr || nextVersion.stdout);
+	const drifted = runCli(
+		authorizeArgs({ "--id": "request/2", "--approval": "approval/external-2" }),
+		dir,
+	);
+	assert.equal(drifted.status, 1);
+	assert.equal(envelope(drifted).code, "AMBER_E_EXTERNAL_DRIFT");
+
+	fs.appendFileSync(proposalsPath(dir), '{"kind":"proposal"}\n');
+	const corrupt = runCli(["external", "proposals", "--target", ".", "--json"], dir);
+	assert.equal(corrupt.status, 1);
+	assert.equal(envelope(corrupt).code, "AMBER_E_EXTERNAL_PROPOSAL_CORRUPT");
+});
+
 test("external help and unknown actions route through the shared dispatcher", () => {
 	const dir = mkTarget("help");
 	const help = runCli(["external", "--help"], dir);
 	assert.equal(help.status, 0, help.stderr || help.stdout);
-	assert.match(help.stdout, /amber external <register\|effects>/);
+	assert.match(help.stdout, /amber external <register\|effects\|propose\|authorize\|proposals>/);
 	assert.match(help.stdout, /--irreversible/);
+	assert.match(help.stdout, /--payload-hash/);
 
 	const unknown = runCli(["external", "bogus", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);
-	assert.match(envelope(unknown).errors[0], /external requires register, or effects/);
+	assert.match(
+		envelope(unknown).errors[0],
+		/external requires register, effects, propose, authorize, or proposals/,
+	);
 });

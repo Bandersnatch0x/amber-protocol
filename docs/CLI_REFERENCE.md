@@ -1461,11 +1461,12 @@ Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
 `AMBER_E_RETENTION_TX_CORRUPT`, `AMBER_E_RETENTION_TX_LOCK`,
 `AMBER_E_RETENTION_TX_SIZE_CEILING`, `AMBER_E_RETENTION_TOMBSTONE`.
 
-### external register / effects
+### external register / effects / propose / authorize / proposals
 
-Register External Effect contracts and read the registry (F056 T1). Amber forbids arbitrary
-account-bearing external operations: the only thing that can ever execute externally is a
-registered effect contract. Each contract declares the external `--owner`, one closed system type
+Register External Effect contracts, propose exact requests, and authorize them drift-bound
+(F056 T1-T2). Amber forbids arbitrary account-bearing external operations: the only thing that can
+ever execute externally is a registered effect contract. Each contract declares the external
+`--owner`, one closed system type
 (`ticketing|code-review|notification|deployment|storage`), one registered operation name (lowercase
 dotted, never a command line), the exact external `--external-target` and `--scope`, idempotency
 behavior (`idempotent|at-most-once`), a credentials class (`none|scoped`), the receipt fields the
@@ -1484,9 +1485,23 @@ external-facing name — including the effect version and each receipt field nam
 (no whitespace, no URL scheme, no shell metacharacters, no `..` traversal segments), so free-form
 execution vectors refuse by construction, and a validly re-chained forged event carrying
 a smuggled field fails the closed event shape. `effects` is a read-only projection (optionally
-filtered by `--system`) that fails closed on a corrupt ledger. Nothing under this command executes
-an external operation — execution and settlement are later F056 tickets, behind their own
-governance.
+filtered by `--system`) that fails closed on a corrupt ledger.
+
+Review binds exactly what will happen (T2): `propose` is a governance-write into the hash-chained
+ledger `.amber/external/proposals.jsonl` that binds one registered effect version (which must be
+the contract's current head), the contract's exact target and scope, the canonical
+`--payload-hash` (`sha256:<64-hex>` of the exact payload under review — the payload itself never
+enters the ledger), the credentials class, and the declared compensation into a canonical
+`requestHash`. Idempotency binds external owner + effect + target + scope + payloadHash: an
+identical request refuses naming the existing proposal, so a retry can never create a duplicate
+external record. `authorize` consumes one single-use Approval whose subject binds
+`external-effect:<requestHash>` and settles the human Decision atomically with the consumption
+(a failed admission leaves the authorization unconsumed and the proposal proposed); re-derivation
+against the current registries refuses `AMBER_E_EXTERNAL_DRIFT` when a newer effect version was
+registered or the contract's Adapter pin no longer matches — a stale authorization can never ride
+changed external semantics. `proposals` lists the requests read-only (optionally filtered by
+`--status proposed|authorized`). Nothing under this command executes an external operation —
+execution and settlement are later F056 tickets, behind their own governance.
 
 ```bash
 node scripts/amber.js external register --target . --id effect/ticket-comment \
@@ -1503,10 +1518,18 @@ node scripts/amber.js external register --target . --id effect/announce \
   --adapter adapter/tracker --adapter-version 1 \
   --decision-identity decision/effect-2 --revision 1 --json
 node scripts/amber.js external effects --target . --system ticketing --json
+node scripts/amber.js external propose --target . --id request/ticket-comment-288 \
+  --effect effect/ticket-comment@1 --payload-hash sha256:<64-hex> --json
+node scripts/amber.js external authorize --target . --id request/ticket-comment-288 \
+  --approval approval/external-42 --decision-identity decision/external-42 \
+  --body "# Authorize external effect" --trace decides:intent:intent/external --json
+node scripts/amber.js external proposals --target . --status proposed --json
 ```
 
 Error codes: `AMBER_E_EXTERNAL_INVALID`, `AMBER_E_EXTERNAL_CORRUPT`, `AMBER_E_EXTERNAL_LOCK`,
-`AMBER_E_EXTERNAL_SIZE_CEILING`.
+`AMBER_E_EXTERNAL_SIZE_CEILING`, `AMBER_E_EXTERNAL_NOT_FOUND`, `AMBER_E_EXTERNAL_DRIFT`,
+`AMBER_E_EXTERNAL_PROPOSAL_CORRUPT`, `AMBER_E_EXTERNAL_PROPOSAL_LOCK`,
+`AMBER_E_EXTERNAL_PROPOSAL_SIZE_CEILING`.
 
 ## Handoff Commands
 

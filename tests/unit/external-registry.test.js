@@ -30,10 +30,17 @@ const {
 	registerExternalEffect,
 	showExternalEffect,
 	listExternalEffects,
+	PROPOSAL_STATUSES,
+	proposalsPath,
+	proposeExternalEffect,
+	authorizeExternalEffect,
+	showExternalProposal,
+	listExternalProposals,
 } = require("../../scripts/lib/core/external-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const { registerAdapter } = require("../../scripts/lib/core/adapter-registry");
+const { grantApproval, showApproval } = require("../../scripts/lib/core/approval-registry");
 
 function mkTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-external-${label}-`));
@@ -442,4 +449,372 @@ test("the effect ledger byte ceiling refuses growth without writing", () => {
 		delete process.env.AMBER_EXTERNAL_MAX_EFFECTS_BYTES;
 	}
 	assert.equal(registerExternalEffect(dir, effectInput(), { now: NOW }).ok, true);
+});
+
+// ---------------------------------------------------------------------------
+// F056 T2 (#289) — proposals & drift-bound authorization.
+// ---------------------------------------------------------------------------
+
+const PAYLOAD = `sha256:${"a".repeat(64)}`;
+
+/** T1 fixture + registered effect + a human approver. */
+function proposalFixture(dir, decisionIdentities = ["decision/effect-1"]) {
+	externalFixture(dir, decisionIdentities);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(registerExternalEffect(dir, effectInput(), { now: NOW }).ok, true);
+}
+
+function grantRequestApproval(dir, id, requestHash) {
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id,
+				approver: "bob@example.com",
+				scope: null,
+				subject: `external-effect:${requestHash}`,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+}
+
+test("propose binds the registered contract into a canonical requestHash", () => {
+	const dir = mkTarget("propose");
+	proposalFixture(dir);
+	const proposed = proposeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: PAYLOAD,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true, (proposed.errors || []).join("; "));
+	assert.equal(proposed.record.owner, "platform-team");
+	assert.deepEqual(proposed.record.effect, { id: "effect/ticket-comment", version: "1" });
+	assert.deepEqual(proposed.record.adapter, { id: "adapter/tracker", version: "1" });
+	assert.equal(proposed.record.target, "tracker/amber-protocol");
+	assert.equal(proposed.record.scope, "issues");
+	assert.equal(proposed.record.payloadHash, PAYLOAD);
+	assert.equal(proposed.record.credentials, "scoped");
+	assert.deepEqual(proposed.record.compensation, {
+		kind: "effect",
+		effect: "effect/ticket-comment-delete",
+	});
+	assert.match(proposed.record.requestHash, /^sha256:[0-9a-f]{64}$/);
+	assert.equal(proposed.record.status, "proposed");
+	assert.equal(proposed.record.authorization, null);
+	const events = readEvents(proposalsPath(dir));
+	assert.equal(events[0].prevHash, GENESIS_HASH);
+	assert.equal(chainHash(events[0], GENESIS_HASH), events[0].hash);
+	assert.equal(showExternalProposal(dir, "request/1").requestHash, proposed.record.requestHash);
+	assert.deepEqual([...PROPOSAL_STATUSES], ["proposed", "authorized"]);
+	assert.equal(listExternalProposals(dir, { status: "proposed" }).length, 1);
+	assert.equal(listExternalProposals(dir, { status: "authorized" }).length, 0);
+});
+
+test("an identical request refuses naming the existing proposal", () => {
+	const dir = mkTarget("idempotency");
+	proposalFixture(dir);
+	const effect = { id: "effect/ticket-comment", version: "1" };
+	assert.equal(
+		proposeExternalEffect(dir, { id: "request/1", effect, payloadHash: PAYLOAD }, { now: NOW }).ok,
+		true,
+	);
+	const reusedId = proposeExternalEffect(
+		dir,
+		{ id: "request/1", effect, payloadHash: `sha256:${"b".repeat(64)}` },
+		{ now: NOW },
+	);
+	assert.equal(reusedId.ok, false);
+	assert.equal(reusedId.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(reusedId.errors[0], /already exists; propose a new id/);
+	const duplicate = proposeExternalEffect(
+		dir,
+		{ id: "request/2", effect, payloadHash: PAYLOAD },
+		{ now: NOW },
+	);
+	assert.equal(duplicate.ok, false);
+	assert.equal(duplicate.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(duplicate.errors[0], /already proposed as "request\/1"/);
+	assert.equal(
+		proposeExternalEffect(
+			dir,
+			{ id: "request/2", effect, payloadHash: `sha256:${"b".repeat(64)}` },
+			{ now: NOW },
+		).ok,
+		true,
+	);
+});
+
+test("propose refuses ghost effects, stale pins, and malformed payload hashes", () => {
+	const dir = mkTarget("propose-refusals");
+	proposalFixture(dir, ["decision/effect-1", "decision/effect-2"]);
+	const pin = { id: "effect/ticket-comment", version: "1" };
+	const badHash = proposeExternalEffect(
+		dir,
+		{ id: "request/1", effect: pin, payloadHash: "sha256:xyz" },
+		{ now: NOW },
+	);
+	assert.equal(badHash.ok, false);
+	assert.equal(badHash.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(badHash.errors[0], /payloadHash must be a sha256:<64-hex> string/);
+	const ghost = proposeExternalEffect(
+		dir,
+		{ id: "request/1", effect: { id: "effect/ghost", version: "1" }, payloadHash: PAYLOAD },
+		{ now: NOW },
+	);
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_EXTERNAL_NOT_FOUND");
+	const smuggled = proposeExternalEffect(
+		dir,
+		{ id: "request/1", effect: pin, payloadHash: PAYLOAD, note: "x" },
+		{ now: NOW },
+	);
+	assert.equal(smuggled.ok, false);
+	assert.match(smuggled.errors[0], /unknown field "note"/);
+	assert.equal(
+		registerExternalEffect(
+			dir,
+			effectInput({ version: "2", decision: { identity: "decision/effect-2", revision: 1 } }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const stale = proposeExternalEffect(
+		dir,
+		{ id: "request/1", effect: pin, payloadHash: PAYLOAD },
+		{ now: NOW },
+	);
+	assert.equal(stale.ok, false);
+	assert.equal(stale.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(stale.errors[0], /registered at version "2", not the pinned "1"/);
+	assert.equal(fs.existsSync(proposalsPath(dir)), false);
+});
+
+test("authorize consumes a single-use Approval bound to the requestHash atomically", () => {
+	const dir = mkTarget("authorize");
+	proposalFixture(dir);
+	const proposed = proposeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: PAYLOAD,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true);
+	grantRequestApproval(dir, "approval/external-1", proposed.record.requestHash);
+	grantRequestApproval(dir, "approval/other", `sha256:${"0".repeat(64)}`);
+	const authorizeInput = (overrides = {}) => ({
+		id: "request/1",
+		approval: "approval/external-1",
+		decisionIdentity: "decision/external-consume-1",
+		body: "# Authorize external effect\n",
+		traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
+		scope: null,
+		...overrides,
+	});
+	const mismatched = authorizeExternalEffect(dir, authorizeInput({ approval: "approval/other" }), {
+		now: NOW,
+	});
+	assert.equal(mismatched.ok, false);
+	assert.match(mismatched.errors[0], /not this proposal's binding/);
+	const unrecorded = authorizeExternalEffect(dir, authorizeInput({ approval: "approval/ghost" }), {
+		now: NOW,
+	});
+	assert.equal(unrecorded.ok, false);
+	assert.match(unrecorded.errors[0], /is not recorded/);
+	const ghost = authorizeExternalEffect(dir, authorizeInput({ id: "request/ghost" }), {
+		now: NOW,
+	});
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_EXTERNAL_NOT_FOUND");
+	const authorized = authorizeExternalEffect(dir, authorizeInput(), { now: NOW });
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+	assert.equal(authorized.record.status, "authorized");
+	assert.equal(authorized.record.authorization.approvalId, "approval/external-1");
+	assert.equal(
+		authorized.record.authorization.decision.revision,
+		authorized.consumption.receipt.revision,
+	);
+	assert.equal(showApproval(dir, "approval/external-1", { now: NOW }).status, "consumed");
+	assert.equal(listExternalProposals(dir, { status: "authorized" }).length, 1);
+	const again = authorizeExternalEffect(dir, authorizeInput(), { now: NOW });
+	assert.equal(again.ok, false);
+	assert.match(again.errors[0], /already authorized; an authorization is single-use/);
+});
+
+test("effect-version drift between proposal and authorization refuses", () => {
+	const dir = mkTarget("drift");
+	proposalFixture(dir, ["decision/effect-1", "decision/effect-2"]);
+	const proposed = proposeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: PAYLOAD,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true);
+	grantRequestApproval(dir, "approval/external-1", proposed.record.requestHash);
+	assert.equal(
+		registerExternalEffect(
+			dir,
+			effectInput({
+				version: "2",
+				timeoutMs: 60_000,
+				decision: { identity: "decision/effect-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const drifted = authorizeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			approval: "approval/external-1",
+			decisionIdentity: "decision/external-consume-1",
+			body: "# Authorize external effect\n",
+		},
+		{ now: NOW },
+	);
+	assert.equal(drifted.ok, false);
+	assert.equal(drifted.code, "AMBER_E_EXTERNAL_DRIFT");
+	assert.match(drifted.errors[0], /registered at version "2", not the pinned "1"/);
+	// The refusal is before the point of no return: the approval stays
+	// unconsumed and the proposal stays proposed.
+	assert.equal(showApproval(dir, "approval/external-1", { now: NOW }).status, "granted");
+	assert.equal(showExternalProposal(dir, "request/1").status, "proposed");
+});
+
+test("out-of-band registry loss surfaces as drift at authorization", () => {
+	const dir = mkTarget("registry-loss");
+	proposalFixture(dir);
+	const proposed = proposeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: PAYLOAD,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true);
+	grantRequestApproval(dir, "approval/external-1", proposed.record.requestHash);
+	const authorizeInput = {
+		id: "request/1",
+		approval: "approval/external-1",
+		decisionIdentity: "decision/external-consume-1",
+		body: "# Authorize external effect\n",
+	};
+	// Governed writes cannot change an Adapter's version (duplicate ids
+	// refuse), so the adapter clause only fires on out-of-band loss or
+	// replacement of the Adapter ledger — it still refuses closed.
+	const adapterLedger = path.join(dir, ".amber", "adapters", "registry.jsonl");
+	const adapterEvents = fs.readFileSync(adapterLedger, "utf8");
+	fs.rmSync(adapterLedger);
+	const adapterDrift = authorizeExternalEffect(dir, authorizeInput, { now: NOW });
+	assert.equal(adapterDrift.ok, false);
+	assert.equal(adapterDrift.code, "AMBER_E_EXTERNAL_DRIFT");
+	assert.match(adapterDrift.errors[0], /register a new effect version against the current Adapter/);
+	fs.writeFileSync(adapterLedger, adapterEvents);
+	fs.rmSync(effectsPath(dir));
+	const effectLoss = authorizeExternalEffect(dir, authorizeInput, { now: NOW });
+	assert.equal(effectLoss.ok, false);
+	assert.equal(effectLoss.code, "AMBER_E_EXTERNAL_DRIFT");
+	assert.match(effectLoss.errors[0], /is not registered/);
+	assert.equal(showApproval(dir, "approval/external-1", { now: NOW }).status, "granted");
+});
+
+test("the proposal ledger byte ceiling refuses growth without writing", () => {
+	const dir = mkTarget("proposal-ceiling");
+	proposalFixture(dir);
+	process.env.AMBER_EXTERNAL_MAX_PROPOSALS_BYTES = "64";
+	try {
+		const capped = proposeExternalEffect(
+			dir,
+			{
+				id: "request/1",
+				effect: { id: "effect/ticket-comment", version: "1" },
+				payloadHash: PAYLOAD,
+			},
+			{ now: NOW },
+		);
+		assert.equal(capped.ok, false);
+		assert.equal(capped.code, "AMBER_E_EXTERNAL_PROPOSAL_SIZE_CEILING");
+		assert.equal(fs.existsSync(proposalsPath(dir)), false);
+	} finally {
+		delete process.env.AMBER_EXTERNAL_MAX_PROPOSALS_BYTES;
+	}
+});
+
+test("a tampered proposal ledger fails every read closed", () => {
+	const dir = mkTarget("proposal-tamper");
+	proposalFixture(dir);
+	assert.equal(
+		proposeExternalEffect(
+			dir,
+			{
+				id: "request/1",
+				effect: { id: "effect/ticket-comment", version: "1" },
+				payloadHash: PAYLOAD,
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const pristine = readEvents(proposalsPath(dir));
+	const tampered = JSON.parse(JSON.stringify(pristine));
+	tampered[0].payloadHash = `sha256:${"c".repeat(64)}`;
+	writeEvents(proposalsPath(dir), tampered);
+	assert.throws(
+		() => listExternalProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_EXTERNAL_PROPOSAL_CORRUPT" &&
+			/does not match its content/.test(err.message),
+	);
+	// A validly re-chained authorization of a proposal that was never
+	// made fails the fold closed.
+	const forged = {
+		kind: "authorized",
+		schemaVersion: 1,
+		at: NOW.toISOString(),
+		id: "request/ghost",
+		approvalId: "approval/forged",
+		decision: { identity: "decision/forged", revision: 1 },
+		prevHash: pristine[0].hash,
+	};
+	forged.hash = chainHash(forged, forged.prevHash);
+	writeEvents(proposalsPath(dir), [...pristine, forged]);
+	assert.throws(
+		() => showExternalProposal(dir, "request/1"),
+		(err) =>
+			err.amberCode === "AMBER_E_EXTERNAL_PROPOSAL_CORRUPT" &&
+			/authorizes unknown proposal/.test(err.message),
+	);
+});
+
+test("a fresh proposal lock held by another writer refuses proposing", () => {
+	const dir = mkTarget("proposal-lock");
+	proposalFixture(dir);
+	const lockPath = path.join(dir, ".amber", "external", "proposals.lock");
+	fs.writeFileSync(lockPath, "holder-token-1");
+	const input = {
+		id: "request/1",
+		effect: { id: "effect/ticket-comment", version: "1" },
+		payloadHash: PAYLOAD,
+	};
+	const contended = proposeExternalEffect(dir, input, { now: NOW });
+	assert.equal(contended.ok, false);
+	assert.equal(contended.code, "AMBER_E_EXTERNAL_PROPOSAL_LOCK");
+	fs.rmSync(lockPath);
+	assert.equal(proposeExternalEffect(dir, input, { now: NOW }).ok, true);
 });

@@ -286,6 +286,10 @@ const FLAG_SPECS = {
 	"--receipt-field": { key: "receiptFieldVal", accumulate: "receiptFields" },
 	"--compensation-effect": { key: "compensationEffect" },
 	"--irreversible": { key: "irreversible", kind: "boolean" },
+	// F056 ticket 2 (#289): proposal flags (--id, --effect, --approval,
+	// --body, --trace, --status, and --scope are shared with existing
+	// surfaces).
+	"--payload-hash": { key: "payloadHash" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

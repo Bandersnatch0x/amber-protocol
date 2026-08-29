@@ -2283,6 +2283,49 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_EXTERNAL_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_EXTERNAL_NOT_FOUND: {
+		title: "External Effect record not found",
+		cause:
+			"The referenced effect contract or proposal is not registered: proposals bind a registered contract, and authorization binds an existing proposal.",
+		remedy:
+			"List the registry with amber external effects or amber external proposals, or register/propose first.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_INVALID", "AMBER_E_EXTERNAL_CORRUPT"],
+	},
+	AMBER_E_EXTERNAL_DRIFT: {
+		title: "External request drifted since proposal",
+		cause:
+			"Re-deriving the request content no longer matches the reviewed requestHash: a newer effect version was registered, the contract's Adapter pin no longer matches the registry, or the effect ledger changed after the proposal.",
+		remedy:
+			"Propose a fresh request against the current effect version, review the new requestHash, and authorize that.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_PROPOSAL_CORRUPT", "AMBER_E_EXTERNAL_INVALID"],
+	},
+	AMBER_E_EXTERNAL_PROPOSAL_CORRUPT: {
+		title: "External proposal ledger corrupt",
+		cause:
+			"The proposal ledger under .amber/external/ has a broken hash chain, an invalid event shape, a reused proposal id, an authorization of an unknown or already-authorized proposal, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/external/proposals.jsonl from version control or a backup; the ledger is append-only and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_CORRUPT", "AMBER_E_EXTERNAL_PROPOSAL_LOCK"],
+	},
+	AMBER_E_EXTERNAL_PROPOSAL_LOCK: {
+		title: "External proposal ledger lock contended",
+		cause: "Another process holds the proposal ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent proposal or authorization finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_PROPOSAL_CORRUPT", "AMBER_E_EXTERNAL_LOCK"],
+	},
+	AMBER_E_EXTERNAL_PROPOSAL_SIZE_CEILING: {
+		title: "External proposal ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_EXTERNAL_MAX_PROPOSALS_BYTES).",
+		remedy:
+			"Raise AMBER_EXTERNAL_MAX_PROPOSALS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_PROPOSAL_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
