@@ -2249,6 +2249,40 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_RETENTION_TX_CORRUPT", "AMBER_E_GATE_EXPIRED"],
 	},
+	AMBER_E_EXTERNAL_INVALID: {
+		title: "External Effect contract invalid",
+		cause:
+			"The contract violates the closed shape: an unknown/missing field, an out-of-vocabulary system, idempotency, or credentials class, a name that could smuggle a command or URL, a malformed compensation declaration, an out-of-bound timeout, an unresolved or version-mismatched Adapter pin, a non-committed/scoped/non-human Decision, an already-registered id@version, or a reused registration Decision.",
+		remedy:
+			"Fix the reported field, register the Adapter or a new effect version first, or bind a fresh single-use committed human Decision, then re-run register.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_EXTERNAL_CORRUPT: {
+		title: "External Effect ledger corrupt",
+		cause:
+			"The effect ledger under .amber/external/ has a broken hash chain, an invalid event shape, a duplicate id@version, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/external/effects.jsonl from version control or a backup; the ledger is append-only and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_INVALID", "AMBER_E_EXTERNAL_LOCK"],
+	},
+	AMBER_E_EXTERNAL_LOCK: {
+		title: "External Effect ledger lock contended",
+		cause: "Another process holds the effect ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent registration finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_CORRUPT", "AMBER_E_RETENTION_LOCK"],
+	},
+	AMBER_E_EXTERNAL_SIZE_CEILING: {
+		title: "External Effect ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_EXTERNAL_MAX_EFFECTS_BYTES).",
+		remedy:
+			"Raise AMBER_EXTERNAL_MAX_EFFECTS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_EXTERNAL_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

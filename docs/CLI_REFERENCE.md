@@ -1461,6 +1461,53 @@ Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
 `AMBER_E_RETENTION_TX_CORRUPT`, `AMBER_E_RETENTION_TX_LOCK`,
 `AMBER_E_RETENTION_TX_SIZE_CEILING`, `AMBER_E_RETENTION_TOMBSTONE`.
 
+### external register / effects
+
+Register External Effect contracts and read the registry (F056 T1). Amber forbids arbitrary
+account-bearing external operations: the only thing that can ever execute externally is a
+registered effect contract. Each contract declares the external `--owner`, one closed system type
+(`ticketing|code-review|notification|deployment|storage`), one registered operation name (lowercase
+dotted, never a command line), the exact external `--external-target` and `--scope`, idempotency
+behavior (`idempotent|at-most-once`), a credentials class (`none|scoped`), the receipt fields the
+external system must return (`--receipt-field`, repeatable, at least one), a compensation
+declaration — exactly one of a named compensating effect (`--compensation-effect`) or an explicit
+`--irreversible` marker — a bounded `--timeout-ms` (at most 24h), and the one registered F051
+Adapter pin (`--adapter` + `--adapter-version`, verified against the Adapter registry at
+registration) that owns the API.
+
+Registration settles behind a single-use committed human Decision — `acceptance|approval` with a
+verified principal snapshot, unscoped, mirroring the F052/F055 authority contract; a reused
+Decision refuses — into the hash-chained append-only ledger `.amber/external/effects.jsonl`, and
+is immutable per effect `id@version`: changed external semantics register a new version, and stale
+pins refuse downstream. No contract field can carry a command, executable, or remote URL: every
+external-facing name — including the effect version and each receipt field name — is a closed slug
+(no whitespace, no URL scheme, no shell metacharacters, no `..` traversal segments), so free-form
+execution vectors refuse by construction, and a validly re-chained forged event carrying
+a smuggled field fails the closed event shape. `effects` is a read-only projection (optionally
+filtered by `--system`) that fails closed on a corrupt ledger. Nothing under this command executes
+an external operation — execution and settlement are later F056 tickets, behind their own
+governance.
+
+```bash
+node scripts/amber.js external register --target . --id effect/ticket-comment \
+  --effect-version 1 --owner platform-team --system ticketing --operation comment.create \
+  --external-target tracker/amber-protocol --scope issues --idempotency idempotent \
+  --credential scoped --receipt-field commentId \
+  --compensation-effect effect/ticket-comment-delete --timeout-ms 30000 \
+  --adapter adapter/tracker --adapter-version 1 \
+  --decision-identity decision/effect-1 --revision 1 --json
+node scripts/amber.js external register --target . --id effect/announce \
+  --effect-version 1 --owner platform-team --system notification --operation message.post \
+  --external-target chat/eng-releases --scope announcements --idempotency at-most-once \
+  --credential scoped --receipt-field messageId --irreversible --timeout-ms 30000 \
+  --adapter adapter/tracker --adapter-version 1 \
+  --decision-identity decision/effect-2 --revision 1 --json
+node scripts/amber.js external effects --target . --system ticketing --json
+```
+
+Error codes: `AMBER_E_EXTERNAL_INVALID`, `AMBER_E_EXTERNAL_CORRUPT`, `AMBER_E_EXTERNAL_LOCK`,
+`AMBER_E_EXTERNAL_SIZE_CEILING`.
+
 ## Handoff Commands
 
 ### handoff

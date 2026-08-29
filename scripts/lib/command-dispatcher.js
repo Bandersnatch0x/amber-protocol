@@ -96,6 +96,7 @@ const { runnerDispatch } = require("./runner-commands");
 const { releaseDispatch } = require("./release-commands");
 const { maintainDispatch } = require("./maintain-commands");
 const { retentionDispatch } = require("./retention-commands");
+const { externalDispatch } = require("./external-commands");
 const { orgAuditDispatch } = require("./org-audit-commands");
 const { hooksDispatch } = require("./hooks-commands");
 const { bindCommandHandlers } = require("./command-registry");
@@ -1087,6 +1088,10 @@ function handleRetention(args) {
 	return retentionDispatch(args);
 }
 
+function handleExternal(args) {
+	return externalDispatch(args);
+}
+
 function handleExplain(args) {
 	const { explain } = require("./explain-command");
 	const r = explain(args);
@@ -1191,6 +1196,7 @@ const COMMAND_HANDLERS = {
 	release: handleRelease,
 	maintain: handleMaintain,
 	retention: handleRetention,
+	external: handleExternal,
 	review: handleReview,
 	accept: handleAccept,
 	learnings: handleLearnings,

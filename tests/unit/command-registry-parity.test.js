@@ -38,6 +38,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"release",
 	"maintain",
 	"retention",
+	"external",
 	"review",
 	"accept",
 	"learnings",
