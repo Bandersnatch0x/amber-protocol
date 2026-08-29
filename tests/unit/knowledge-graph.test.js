@@ -180,6 +180,73 @@ test("anchors stay node properties; an existing anchored file additionally becom
 	);
 });
 
+test("F060 population: known product files are Code Nodes carrying their exported-symbol tables", () => {
+	const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+	for (const rel of [
+		"scripts/amber.js",
+		"scripts/lib/core/knowledge-graph.js",
+		"scripts/lib/core/code-graph.js",
+		"apps/web/src/features/knowledge/KnowledgeMapPage.tsx",
+		"apps/web/server/lib/knowledge-graph-reader.ts",
+	]) {
+		const node = byId.get(`code:${rel}`);
+		assert.ok(node, `missing code node for ${rel}`);
+		assert.equal(node.kind, "code");
+		assert.equal(node.title, rel.split("/").pop());
+	}
+	const parser = byId.get("code:scripts/lib/core/knowledge-graph.js");
+	const names = (parser.symbols || []).map((s) => s.name);
+	assert.ok(names.includes("buildKnowledgeGraph"), `symbols missing: ${names.join(",")}`);
+	assert.ok(names.includes("serializeKnowledgeGraph"));
+	const reader = byId.get("code:apps/web/server/lib/knowledge-graph-reader.ts");
+	assert.ok((reader.symbols || []).some((s) => s.name === "readKnowledgeGraphSnapshot"));
+});
+
+test("F060 population: imports edges carry per-statement evidence in the declaring file", () => {
+	const edge = graph.edges.find(
+		(e) =>
+			e.src === "code:scripts/lib/core/knowledge-graph.js" &&
+			e.verb === "imports" &&
+			e.dst === "code:scripts/lib/core/code-graph.js",
+	);
+	assert.ok(edge, "knowledge-graph.js must import code-graph.js");
+	assert.ok(Array.isArray(edge.evidence) && edge.evidence.length > 0);
+	for (const item of edge.evidence) {
+		assert.equal(item.path, "scripts/lib/core/knowledge-graph.js");
+		assert.ok(Number.isInteger(item.line) && item.line >= 1);
+	}
+});
+
+test("F060 population: F059's declared code anchors are real anchors edges", () => {
+	const find = (dst) =>
+		graph.edges.find((e) => e.src === "feature:F059" && e.verb === "anchors" && e.dst === dst);
+	assert.ok(find("code:scripts/lib/core/knowledge-graph.js"));
+	assert.ok(find("code:apps/web/src/features/knowledge/KnowledgeMapPage.tsx"));
+	// The declared markdown/schema anchors are not Code Nodes: property only.
+	assert.ok(!find("code:docs/specs/F059-knowledge-decision-map.md"));
+	assert.equal(
+		graph.edges.find(
+			(e) => e.verb === "anchors" && e.dst === "code:schemas/knowledge-graph.schema.json",
+		),
+		undefined,
+	);
+});
+
+test("F060 scope: tests, docs payload, dependencies, and declarations never become Code Nodes", () => {
+	for (const node of graph.nodes) {
+		if (node.kind !== "code") continue;
+		assert.ok(!/(^|\/)tests?\//.test(node.sourcePath), `test container leaked: ${node.sourcePath}`);
+		assert.ok(!/\.(test|spec)\./.test(node.sourcePath), `test file leaked: ${node.sourcePath}`);
+		assert.ok(!node.sourcePath.startsWith("docs/"), `docs payload leaked: ${node.sourcePath}`);
+		assert.ok(!node.sourcePath.includes("node_modules/"), `dependency leaked: ${node.sourcePath}`);
+		assert.ok(!/\.d\.(ts|mts|cts)$/.test(node.sourcePath), `declaration leaked: ${node.sourcePath}`);
+	}
+});
+
+test("F060 provenance: the toolchain block records the loaded compiler version", () => {
+	assert.deepEqual(graph.toolchain, { typescript: typescriptVersion() });
+});
+
 test("known real edges are discovered with evidence", () => {
 	const find = (src, verb, dst) =>
 		graph.edges.find((e) => e.src === src && e.verb === verb && e.dst === dst);
