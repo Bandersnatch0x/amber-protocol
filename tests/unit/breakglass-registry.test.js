@@ -18,6 +18,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const {
+	useBreakGlass,
 	BREAKGLASS_SCHEMA_VERSION,
 	SUPPORTED_BREAKGLASS_SCHEMA_VERSIONS,
 	DEFAULT_MAX_BREAKGLASS_BYTES,
@@ -39,11 +40,19 @@ const {
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const { registerAdapter } = require("../../scripts/lib/core/adapter-registry");
-const { registerExternalEffect } = require("../../scripts/lib/core/external-registry");
+const {
+	registerExternalEffect,
+	proposeExternalEffect,
+	authorizeExternalEffect,
+} = require("../../scripts/lib/core/external-registry");
+const { grantApproval } = require("../../scripts/lib/core/approval-registry");
 const {
 	registerRunner,
 	registerRunnerCapability,
+	submitRunnerRequest,
+	authorizeRunnerRequest,
 } = require("../../scripts/lib/core/runner-registry");
+const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
 
 function mkTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-breakglass-${label}-`));
@@ -158,7 +167,7 @@ test("break-glass constants pin the vocabulary and bound contracts", () => {
 	assert.deepEqual([...BREAKGLASS_CREDENTIALS], ["none", "scoped"]);
 	assert.deepEqual([...BREAKGLASS_RISKS], ["low", "medium", "high", "critical"]);
 	assert.deepEqual([...BREAKGLASS_DECISION_KINDS], ["acceptance", "approval"]);
-	assert.deepEqual([...GRANT_STATUSES], ["granted", "revoked", "expired"]);
+	assert.deepEqual([...GRANT_STATUSES], ["granted", "used", "revoked", "expired"]);
 });
 
 test("grant binds a verified capability behind a single-use human Decision", () => {
@@ -580,4 +589,561 @@ test("the grant ledger byte ceiling refuses growth without writing", () => {
 		delete process.env.AMBER_BREAKGLASS_MAX_GRANTS_BYTES;
 	}
 	assert.equal(grantBreakGlass(dir, grantInput(), { now: NOW }).ok, true);
+});
+
+// ---------------------------------------------------------------------------
+// F057 T2 (#293) — atomic one-use consumption bound to the underlying
+// admission.
+// ---------------------------------------------------------------------------
+
+const USE_AT = new Date(NOW.getTime() + 30 * 60_000);
+
+/** Grant + an AUTHORIZED underlying F056 proposal matching it exactly. */
+function usableGrantFixture(dir) {
+	grantFixture(dir, ["decision/breakglass-1", "decision/effect-1"]);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(grantBreakGlass(dir, grantInput(), { now: NOW }).ok, true);
+	const proposed = proposeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: `sha256:${"a".repeat(64)}`,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true, (proposed.errors || []).join("; "));
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/external-1",
+				approver: "bob@example.com",
+				scope: null,
+				subject: `external-effect:${proposed.record.requestHash}`,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/1",
+				approval: "approval/external-1",
+				decisionIdentity: "decision/external-consume-1",
+				body: "# Authorize external effect\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	return proposed.record.requestHash;
+}
+
+test("use spends the grant atomically with the authorized underlying admission", () => {
+	const dir = mkTarget("use");
+	const requestHash = usableGrantFixture(dir);
+	const ghost = useBreakGlass(
+		dir,
+		{ id: "breakglass/ghost", reference: "request/1" },
+		{ now: USE_AT },
+	);
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_BREAKGLASS_NOT_FOUND");
+	const used = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/1" },
+		{ now: USE_AT },
+	);
+	assert.equal(used.ok, true, (used.errors || []).join("; "));
+	assert.equal(used.record.status, "used");
+	assert.deepEqual(used.record.use.reference, { kind: "external", id: "request/1" });
+	assert.equal(used.record.use.requestHash, requestHash);
+	// One-use: a spent grant refuses every later use — replay is
+	// impossible even with a different reference.
+	const again = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/1" },
+		{ now: USE_AT },
+	);
+	assert.equal(again.ok, false);
+	assert.match(again.errors[0], /is already used; a break-glass authorization is one-use/);
+	// A used grant is terminal: it cannot be revoked either.
+	assert.equal(
+		admitArtifact(dir, {
+			type: "decision",
+			identity: "decision/breakglass-revoke-1",
+			body: "# revoke\n",
+			decisionKind: "approval",
+			principal: "legal@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+		}).ok,
+		true,
+	);
+	const revokeUsed = revokeBreakGlass(
+		dir,
+		{
+			id: "breakglass/incident-42-restore",
+			reason: "too late",
+			decision: { identity: "decision/breakglass-revoke-1", revision: 1 },
+		},
+		{ now: USE_AT },
+	);
+	assert.equal(revokeUsed.ok, false);
+	assert.match(revokeUsed.errors[0], /is already used; a spent authorization ended through use/);
+	assert.equal(
+		showBreakGlassGrant(dir, "breakglass/incident-42-restore", { now: USE_AT }).status,
+		"used",
+	);
+	assert.equal(listBreakGlassGrants(dir, { status: "used", now: USE_AT }).length, 1);
+});
+
+test("a failed admission never consumes and a grant cannot widen itself", () => {
+	const dir = mkTarget("no-widen");
+	usableGrantFixture(dir);
+	const cases = [
+		[{ id: "breakglass/incident-42-restore", reference: "request/ghost" }, /does not exist/],
+	];
+	for (const [input, pattern] of cases) {
+		const refused = useBreakGlass(dir, input, { now: USE_AT });
+		assert.equal(refused.ok, false);
+		assert.equal(refused.code, "AMBER_E_BREAKGLASS_INVALID");
+		assert.match(refused.errors[0], pattern);
+	}
+	// An unauthorized proposal refuses: break-glass never substitutes for
+	// the underlying authorization.
+	assert.equal(
+		proposeExternalEffect(
+			dir,
+			{
+				id: "request/2",
+				effect: { id: "effect/ticket-comment", version: "1" },
+				payloadHash: `sha256:${"b".repeat(64)}`,
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const unauthorized = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/2" },
+		{ now: USE_AT },
+	);
+	assert.equal(unauthorized.ok, false);
+	assert.match(unauthorized.errors[0], /never substitutes for the underlying authorization/);
+	// A reference riding a DIFFERENT effect refuses: the grant pinned one
+	// capability and can never widen to another.
+	assert.equal(
+		admitArtifact(dir, {
+			type: "decision",
+			identity: "decision/effect-2",
+			body: "# decision/effect-2\n",
+			decisionKind: "approval",
+			principal: "legal@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+		}).ok,
+		true,
+	);
+	assert.equal(
+		registerExternalEffect(
+			dir,
+			{
+				id: "effect/announce",
+				version: "1",
+				owner: "platform-team",
+				system: "notification",
+				operation: "message.post",
+				target: "tracker/amber-protocol",
+				scope: "issues",
+				idempotency: "idempotent",
+				credentials: "scoped",
+				receiptFields: ["messageId"],
+				compensation: { kind: "irreversible" },
+				timeoutMs: 30_000,
+				adapter: { id: "adapter/tracker", version: "1" },
+				decision: { identity: "decision/effect-2", revision: 1 },
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const proposedOther = proposeExternalEffect(
+		dir,
+		{
+			id: "request/3",
+			effect: { id: "effect/announce", version: "1" },
+			payloadHash: `sha256:${"c".repeat(64)}`,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposedOther.ok, true, (proposedOther.errors || []).join("; "));
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/external-2",
+				approver: "bob@example.com",
+				scope: null,
+				subject: `external-effect:${proposedOther.record.requestHash}`,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/3",
+				approval: "approval/external-2",
+				decisionIdentity: "decision/external-consume-2",
+				body: "# Authorize\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const widened = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/3" },
+		{ now: USE_AT },
+	);
+	assert.equal(widened.ok, false);
+	assert.equal(widened.code, "AMBER_E_BREAKGLASS_INVALID");
+	assert.match(widened.errors[0], /rides effect "effect\/announce"@1, not the granted capability/);
+	// Every refusal left the grant unconsumed.
+	assert.equal(
+		showBreakGlassGrant(dir, "breakglass/incident-42-restore", { now: USE_AT }).status,
+		"granted",
+	);
+	// Consuming succeeds afterwards: nothing was spent by the failures.
+	assert.equal(
+		useBreakGlass(
+			dir,
+			{ id: "breakglass/incident-42-restore", reference: "request/1" },
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+});
+
+test("use refuses outside the half-open window and after revocation", () => {
+	const dir = mkTarget("window");
+	usableGrantFixture(dir);
+	const notYet = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/1" },
+		{ now: new Date(NOW.getTime() - 1) },
+	);
+	assert.equal(notYet.ok, false);
+	assert.match(notYet.errors[0], /is not valid yet; the window opens at/);
+	// Half-open boundary: exactly validUntil refuses.
+	const boundary = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/1" },
+		{ now: new Date(NOW.getTime() + HOUR_MS) },
+	);
+	assert.equal(boundary.ok, false);
+	assert.match(boundary.errors[0], /expired at .*; emergency authority never outlives its window/);
+	const lastInstant = new Date(NOW.getTime() + HOUR_MS - 1);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "decision",
+			identity: "decision/breakglass-revoke-1",
+			body: "# revoke\n",
+			decisionKind: "approval",
+			principal: "legal@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+		}).ok,
+		true,
+	);
+	assert.equal(
+		revokeBreakGlass(
+			dir,
+			{
+				id: "breakglass/incident-42-restore",
+				reason: "compromise",
+				decision: { identity: "decision/breakglass-revoke-1", revision: 1 },
+			},
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	const revoked = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/1" },
+		{ now: lastInstant },
+	);
+	assert.equal(revoked.ok, false);
+	assert.match(revoked.errors[0], /revocation blocks future use immediately/);
+});
+
+test("re-chained double-use and out-of-window use forgeries fail every read closed", () => {
+	const dir = mkTarget("use-tamper");
+	usableGrantFixture(dir);
+	assert.equal(
+		useBreakGlass(
+			dir,
+			{ id: "breakglass/incident-42-restore", reference: "request/1" },
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	const pristine = readEvents(grantsPath(dir));
+	// A validly re-chained second use of the spent grant fails the fold.
+	const duplicate = { ...pristine[1] };
+	delete duplicate.hash;
+	duplicate.prevHash = pristine[1].hash;
+	duplicate.hash = chainHash(duplicate, duplicate.prevHash);
+	writeEvents(grantsPath(dir), [...pristine, duplicate]);
+	assert.throws(
+		() => listBreakGlassGrants(dir, { now: USE_AT }),
+		(err) =>
+			err.amberCode === "AMBER_E_BREAKGLASS_CORRUPT" &&
+			/uses a spent grant; a break-glass authorization is one-use/.test(err.message),
+	);
+	// A changed request hash is an in-place rewrite: the hash chain
+	// fails the read closed.
+	const changedHash = JSON.parse(JSON.stringify(pristine));
+	changedHash[1].requestHash = `sha256:${"f".repeat(64)}`;
+	writeEvents(grantsPath(dir), changedHash);
+	assert.throws(
+		() => listBreakGlassGrants(dir, { now: USE_AT }),
+		(err) =>
+			err.amberCode === "AMBER_E_BREAKGLASS_CORRUPT" &&
+			/does not match its content/.test(err.message),
+	);
+	// A validly re-chained use forged with the wrong reference kind fails
+	// the re-derivation against the granted capability kind.
+	const { hash: _kindHash, ...kindBody } = pristine[1];
+	const wrongKind = {
+		...kindBody,
+		reference: { kind: "runner", id: kindBody.reference.id },
+	};
+	wrongKind.hash = chainHash(wrongKind, wrongKind.prevHash);
+	writeEvents(grantsPath(dir), [pristine[0], wrongKind]);
+	assert.throws(
+		() => listBreakGlassGrants(dir, { now: USE_AT }),
+		(err) =>
+			err.amberCode === "AMBER_E_BREAKGLASS_CORRUPT" &&
+			/not the granted "external" capability/.test(err.message),
+	);
+	// A validly re-chained use rewritten outside the window fails closed:
+	// the use instant is re-derivable against the grant window.
+	const { hash: _hash, ...useBody } = pristine[1];
+	const outside = { ...useBody, at: new Date(NOW.getTime() + 2 * HOUR_MS).toISOString() };
+	outside.hash = chainHash(outside, outside.prevHash);
+	writeEvents(grantsPath(dir), [pristine[0], outside]);
+	assert.throws(
+		() => listBreakGlassGrants(dir, { now: USE_AT }),
+		(err) =>
+			err.amberCode === "AMBER_E_BREAKGLASS_CORRUPT" &&
+			/outside its validity window/.test(err.message),
+	);
+});
+
+test("concurrent lock contention refuses use without consuming", () => {
+	const dir = mkTarget("use-lock");
+	usableGrantFixture(dir);
+	const lockPath = path.join(dir, ".amber", "breakglass", "grants.lock");
+	fs.writeFileSync(lockPath, "holder-token-1");
+	const contended = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/1" },
+		{ now: USE_AT },
+	);
+	assert.equal(contended.ok, false);
+	assert.equal(contended.code, "AMBER_E_BREAKGLASS_LOCK");
+	fs.rmSync(lockPath);
+	assert.equal(
+		useBreakGlass(
+			dir,
+			{ id: "breakglass/incident-42-restore", reference: "request/1" },
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+});
+
+test("a runner-capability grant admits only the matching authorized runner request", () => {
+	const dir = mkTarget("runner-use");
+	decisionsFixture(dir, [
+		"decision/breakglass-1",
+		"decision/breakglass-2",
+		"decision/runner-1",
+		"decision/cap-1",
+	]);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(
+		registerPrincipal(dir, { id: "carol@example.com", principalKind: "human" }).ok,
+		true,
+	);
+	assert.equal(
+		registerRunner(dir, {
+			id: "runner/ci",
+			version: "1.0.0",
+			integrityDigest: `sha256:${"a".repeat(64)}`,
+			owner: "platform-team",
+			decision: { identity: "decision/runner-1", revision: 1 },
+		}).ok,
+		true,
+	);
+	assert.equal(
+		registerRunnerCapability(dir, {
+			runnerId: "runner/ci",
+			runnerVersion: "1.0.0",
+			name: "deploy.staging-web",
+			capabilityVersion: "1",
+			effects: ["deploy"],
+			pathPrefixes: ["deploy/staging"],
+			timeoutMsMax: 600_000,
+			credentialRequirement: "scoped",
+			rollback: "runbook/staging-rollback",
+			decision: { identity: "decision/cap-1", revision: 1 },
+		}).ok,
+		true,
+	);
+	assert.equal(
+		recordEvidence(dir, {
+			id: "evidence/rehearsal-1",
+			producer: "carol@example.com",
+			assurance: "observed",
+			scope: "F052",
+			subject: "staging rollback rehearsal",
+			inputs: null,
+			tools: null,
+			environment: null,
+			outputs: null,
+			status: "pass",
+		}).ok,
+		true,
+	);
+	const runnerPin = {
+		kind: "runner",
+		runnerId: "runner/ci",
+		runnerVersion: "1.0.0",
+		name: "deploy.staging-web",
+		capabilityVersion: "1",
+	};
+	assert.equal(
+		grantBreakGlass(
+			dir,
+			grantInput({
+				capability: runnerPin,
+				target: "repo/main",
+				scope: "deploy",
+				environment: "staging",
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	// A second grant in a different environment cannot admit the same
+	// request: environment is an equality axis for runner references.
+	assert.equal(
+		grantBreakGlass(
+			dir,
+			grantInput({
+				id: "breakglass/incident-42-prod",
+				capability: runnerPin,
+				target: "repo/main",
+				scope: "deploy",
+				environment: "production",
+				decision: { identity: "decision/breakglass-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const submitted = submitRunnerRequest(
+		dir,
+		{
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "deploy.staging-web",
+				capabilityVersion: "1",
+			},
+			target: { repository: "repo/main", paths: ["deploy/staging/web"] },
+			scope: "deploy",
+			environment: "staging",
+			inputHashes: [`sha256:${"b".repeat(64)}`],
+			timeoutMs: 300_000,
+			effects: ["deploy"],
+			credentialRequirement: "scoped",
+			credential: {
+				handle: "cred-7f3a",
+				purpose: "staging-deploy",
+				scope: "deploy/staging",
+				expiresAt: new Date(NOW.getTime() + 12 * HOUR_MS).toISOString(),
+			},
+			rehearsal: "evidence/rehearsal-1",
+			rollback: "runbook/staging-rollback",
+		},
+		{ now: NOW },
+	);
+	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
+	const hash = submitted.record.requestHash;
+	// An unauthorized runner request refuses without consuming.
+	const unauthorized = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: hash },
+		{ now: USE_AT },
+	);
+	assert.equal(unauthorized.ok, false);
+	assert.match(unauthorized.errors[0], /never substitutes for the underlying authorization/);
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/req-1",
+				approver: "bob@example.com",
+				scope: null,
+				subject: submitted.record.approvalBinding,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		authorizeRunnerRequest(
+			dir,
+			{
+				requestHash: hash,
+				approval: "approval/req-1",
+				decisionIdentity: "decision/req-1",
+				body: "# Authorize request\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+				scope: null,
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	// The wrong-environment grant refuses: a grant cannot widen itself.
+	const wrongEnvironment = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-prod", reference: hash },
+		{ now: USE_AT },
+	);
+	assert.equal(wrongEnvironment.ok, false);
+	assert.match(
+		wrongEnvironment.errors[0],
+		/runs in environment "staging", not the granted "production"/,
+	);
+	const used = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: hash },
+		{ now: USE_AT },
+	);
+	assert.equal(used.ok, true, (used.errors || []).join("; "));
+	assert.deepEqual(used.record.use.reference, { kind: "runner", id: hash });
+	assert.equal(used.record.use.requestHash, hash);
 });

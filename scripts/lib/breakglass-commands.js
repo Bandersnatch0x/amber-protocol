@@ -29,6 +29,7 @@ function missingValueFlag(args) {
 		["validUntil", "--valid-until"],
 		["reviewBy", "--review-by"],
 		["reason", "--reason"],
+		["request", "--request"],
 		["decisionIdentity", "--decision-identity"],
 		["revision", "--revision"],
 		["status", "--status"],
@@ -112,7 +113,7 @@ function resultEnvelope(result) {
 
 const dispatch = defineCommand({
 	command: "breakglass",
-	actions: ["grant", "revoke", "grants"],
+	actions: ["grant", "revoke", "grants", "use", "show"],
 	handlers: {
 		grant: (args) => {
 			const { grantBreakGlass } = require("./core/breakglass-registry");
@@ -201,6 +202,66 @@ const dispatch = defineCommand({
 					clock.value === null ? {} : { now: clock.value },
 				),
 			);
+		},
+		use: (args) => {
+			const { useBreakGlass } = require("./core/breakglass-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "breakglass/incident-42-restore"],
+				["request", "--request", "request/ticket-comment-288"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			return resultEnvelope(
+				useBreakGlass(
+					target.value,
+					{ id: String(args.id), reference: String(args.request) },
+					clock.value === null ? {} : { now: clock.value },
+				),
+			);
+		},
+		show: (args) => {
+			const { showBreakGlassGrant } = require("./core/breakglass-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "breakglass/incident-42-restore");
+			if (id.error) return invalidArg(id.error);
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			let record;
+			try {
+				record = showBreakGlassGrant(
+					target.value,
+					id.value,
+					clock.value === null ? {} : { now: clock.value },
+				);
+			} catch (err) {
+				const failure = readFailure(args, err, READ_FAILURE_CODE);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+			if (record === null)
+				return {
+					text: "",
+					errors: [`grant ${JSON.stringify(id.value)} does not exist`],
+					warnings: [],
+					exitCode: 1,
+					code: "AMBER_E_BREAKGLASS_NOT_FOUND",
+				};
+			return { text: JSON.stringify(record, null, 2) };
 		},
 		grants: (args) => {
 			const { listBreakGlassGrants, GRANT_STATUSES } = require("./core/breakglass-registry");

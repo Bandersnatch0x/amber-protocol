@@ -15,6 +15,11 @@ const { registerPrincipal } = require("../scripts/lib/core/principal-registry");
 const { registerAdapter } = require("../scripts/lib/core/adapter-registry");
 const { registerExternalEffect } = require("../scripts/lib/core/external-registry");
 const { grantsPath } = require("../scripts/lib/core/breakglass-registry");
+const {
+	proposeExternalEffect,
+	authorizeExternalEffect,
+} = require("../scripts/lib/core/external-registry");
+const { grantApproval } = require("../scripts/lib/core/approval-registry");
 
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.join(ROOT, "scripts", "amber.js");
@@ -218,7 +223,7 @@ test("breakglass refusals carry stable codes and never write", () => {
 	assert.equal(fs.existsSync(grantsPath(dir)), false);
 
 	const badStatus = runCli(
-		["breakglass", "grants", "--target", ".", "--status", "used", "--json"],
+		["breakglass", "grants", "--target", ".", "--status", "consumed", "--json"],
 		dir,
 	);
 	assert.equal(badStatus.status, 1);
@@ -242,15 +247,111 @@ test("breakglass grants fails closed on a corrupt ledger", () => {
 	assert.equal(envelope(blocked).code, "AMBER_E_BREAKGLASS_CORRUPT");
 });
 
+test("breakglass use spends the grant once against the authorized underlying request", () => {
+	const dir = mkTarget("use");
+	fixtureRepo(dir);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(runCli(grantArgs(), dir).status, 0);
+	const proposed = proposeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: `sha256:${"a".repeat(64)}`,
+		},
+		{ now: new Date("2026-08-29T00:00:00.000Z") },
+	);
+	assert.equal(proposed.ok, true, (proposed.errors || []).join("; "));
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/external-1",
+				approver: "bob@example.com",
+				scope: null,
+				subject: `external-effect:${proposed.record.requestHash}`,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: new Date("2026-08-29T00:00:00.000Z") },
+		).ok,
+		true,
+	);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/1",
+				approval: "approval/external-1",
+				decisionIdentity: "decision/external-consume-1",
+				body: "# Authorize external effect\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+			},
+			{ now: new Date("2026-08-29T00:00:00.000Z") },
+		).ok,
+		true,
+	);
+	const useArgs = (overrides = {}) => {
+		const flags = {
+			"--id": "breakglass/incident-42-restore",
+			"--request": "request/1",
+			"--now": "2026-08-29T00:30:00.000Z",
+			...overrides,
+		};
+		const args = ["breakglass", "use", "--target", ".", "--json"];
+		for (const [flag, value] of Object.entries(flags)) {
+			if (value !== null) args.push(flag, value);
+		}
+		return args;
+	};
+	// Expiry boundary: exactly validUntil refuses, half-open.
+	const expired = runCli(useArgs({ "--now": "2026-08-29T01:00:00.000Z" }), dir);
+	assert.equal(expired.status, 1);
+	assert.equal(envelope(expired).code, "AMBER_E_BREAKGLASS_INVALID");
+	assert.match(envelope(expired).errors[0], /never outlives its window/);
+	const used = runCli(useArgs(), dir);
+	assert.equal(used.status, 0, used.stderr || used.stdout);
+	assert.equal(payload(used).status, "used");
+	assert.equal(payload(used).use.requestHash, proposed.record.requestHash);
+	const again = runCli(useArgs(), dir);
+	assert.equal(again.status, 1);
+	assert.equal(envelope(again).code, "AMBER_E_BREAKGLASS_INVALID");
+	assert.match(envelope(again).errors[0], /one-use/);
+	const shown = runCli(
+		[
+			"breakglass",
+			"show",
+			"--target",
+			".",
+			"--id",
+			"breakglass/incident-42-restore",
+			"--now",
+			"2026-08-29T00:45:00.000Z",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(shown.status, 0, shown.stderr || shown.stdout);
+	assert.equal(payload(shown).status, "used");
+	const ghost = runCli(
+		["breakglass", "show", "--target", ".", "--id", "breakglass/ghost", "--json"],
+		dir,
+	);
+	assert.equal(ghost.status, 1);
+	assert.equal(envelope(ghost).code, "AMBER_E_BREAKGLASS_NOT_FOUND");
+});
+
 test("breakglass help and unknown actions route through the shared dispatcher", () => {
 	const dir = mkTarget("help");
 	const help = runCli(["breakglass", "--help"], dir);
 	assert.equal(help.status, 0, help.stderr || help.stdout);
-	assert.match(help.stdout, /amber breakglass <grant\|revoke\|grants>/);
+	assert.match(help.stdout, /amber breakglass <grant\|revoke\|grants\|use\|show>/);
 	assert.match(help.stdout, /--review-by/);
 	assert.match(help.stdout, /never a flag, a reusable token, or an/);
 
 	const unknown = runCli(["breakglass", "bogus", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);
-	assert.match(envelope(unknown).errors[0], /breakglass requires grant, revoke, or grants/);
+	assert.match(
+		envelope(unknown).errors[0],
+		/breakglass requires grant, revoke, grants, use, or show/,
+	);
 });

@@ -1588,9 +1588,9 @@ Error codes: `AMBER_E_EXTERNAL_INVALID`, `AMBER_E_EXTERNAL_CORRUPT`, `AMBER_E_EX
 `AMBER_E_EXTERNAL_EXEC_LOCK`, `AMBER_E_EXTERNAL_EXEC_SIZE_CEILING`,
 `AMBER_E_EXTERNAL_CREDENTIAL_LEAK`.
 
-### breakglass grant / revoke / grants
+### breakglass grant / revoke / grants / use / show
 
-Grant, revoke, and list break-glass authorizations (F057 T1). Break-glass is a distinct, one-use
+Grant, use, revoke, and list break-glass authorizations (F057 T1-T2). Break-glass is a distinct, one-use
 HUMAN authorization for a production emergency — never a flag, a reusable token, or an
 Agent-granted exception, and neither `--yes` nor `--force` ever routes here. A grant is limited by
 one registered capability — an F052 runner capability pin
@@ -1611,14 +1611,29 @@ self-grant, enforced at Decision admission) into the hash-chained append-only le
 `.amber/breakglass/grants.jsonl`; one emergency Decision authorizes exactly one act (a grant OR a
 revocation), never two. `revoke` is a second single-use human Decision that immediately blocks
 future use with a preserved reason. Status derives read-time at the injected `--now`
-(`granted|revoked|expired`; revocation always wins; expiry lands at exactly `validUntil`; a grant
+(`granted|used|revoked|expired`; a terminal use wins, then revocation; expiry lands at exactly
+`validUntil`; a grant
 whose window has not opened yet still reads `granted` — consumption separately refuses outside
 the window), and
 history is never rewritten: revoked and expired grants stay listable forever with their original
 content intact. Every grant-facing name is a closed slug (no whitespace, URL scheme, shell
 metacharacters, or `..` traversal) and credential-looking material refuses with
 `AMBER_E_BREAKGLASS_CREDENTIAL_LEAK` — the audit trail
-carries no secret. Nothing under this command executes anything.
+carries no secret.
+
+Replay is impossible (T2): `use` spends the one-use authorization atomically with the underlying
+admission under the ledger lock — concurrent callers cannot double-spend, and a failed admission
+never consumes. The `--request` reference must be the ALREADY-AUTHORIZED underlying request (an
+F056 proposal id for an `external:` grant, or an F052 runner `requestHash` for a `runner:` grant)
+riding exactly the granted capability at the granted target and scope (runner requests also bind
+the granted environment; external contracts carry no environment axis) — a grant can never widen
+itself, and break-glass never substitutes for the underlying authorization. Consumption refuses a
+revoked grant, a window that has not opened, and expiry at exactly `validUntil` (half-open, no
+skew tolerance); the use event records the exact admitted request hash, and a validly re-chained
+use outside the window or of a spent grant fails every read closed. A used grant is terminal: it
+cannot be revoked or re-used, `used` wins the read-time status derivation, and `show` reads one
+grant with its use, revocation, and window state. Nothing under this command executes anything —
+the underlying capability still runs only through its own governed F052/F056 surface.
 
 ```bash
 node scripts/amber.js breakglass grant --target . --id breakglass/incident-42-restore \
@@ -1632,6 +1647,10 @@ node scripts/amber.js breakglass revoke --target . --id breakglass/incident-42-r
   --reason "credential compromise suspected" \
   --decision-identity decision/breakglass-revoke-42 --revision 1 --json
 node scripts/amber.js breakglass grants --target . --status granted \
+  --now 2026-08-29T00:30:00.000Z --json
+node scripts/amber.js breakglass use --target . --id breakglass/incident-42-restore \
+  --request request/ticket-comment-288 --now 2026-08-29T00:30:00.000Z --json
+node scripts/amber.js breakglass show --target . --id breakglass/incident-42-restore \
   --now 2026-08-29T00:30:00.000Z --json
 ```
 

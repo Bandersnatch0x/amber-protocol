@@ -19,8 +19,8 @@ const { readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
-const { resolveRequestCapability } = require("./runner-registry");
-const { showExternalEffect } = require("./external-registry");
+const { resolveRequestCapability, showRunnerRequest } = require("./runner-registry");
+const { showExternalEffect, showExternalProposal } = require("./external-registry");
 const {
 	GENESIS_HASH,
 	chainHash,
@@ -43,7 +43,7 @@ const BREAKGLASS_CREDENTIALS = Object.freeze(["none", "scoped"]);
 const BREAKGLASS_RISKS = Object.freeze(["low", "medium", "high", "critical"]);
 // Human-only authority slots, mirroring the F050/F052/F055/F056 contract.
 const BREAKGLASS_DECISION_KINDS = Object.freeze(["acceptance", "approval"]);
-const GRANT_STATUSES = Object.freeze(["granted", "revoked", "expired"]);
+const GRANT_STATUSES = Object.freeze(["granted", "used", "revoked", "expired"]);
 
 const BREAKGLASS_INVALID_CODE = "AMBER_E_BREAKGLASS_INVALID";
 const BREAKGLASS_NOT_FOUND_CODE = "AMBER_E_BREAKGLASS_NOT_FOUND";
@@ -167,6 +167,18 @@ const REVOKE_EVENT_FIELDS = Object.freeze([
 	"prevHash",
 	"hash",
 ]);
+const USE_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"reference",
+	"requestHash",
+	"prevHash",
+	"hash",
+]);
+const USE_REFERENCE_FIELDS = Object.freeze(["kind", "id"]);
+const REQUEST_HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
 
 function capabilityPinProblem(value, label) {
 	if (!isPlainObject(value)) return `${label} must be an object`;
@@ -251,16 +263,35 @@ function grantEventProblem(event, lineIndex) {
 		if (shape !== null) return shape;
 		return decisionSnapshotProblem(event.decision, `${label}.decision`);
 	}
-	const closed = closedFieldProblem(event, REVOKE_EVENT_FIELDS, label);
+	if (event.kind === "revoke") {
+		const closed = closedFieldProblem(event, REVOKE_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		const at = isoProblem(event.at, `${label}.at`);
+		if (at !== null) return at;
+		if (!isNonEmptyString(event.id)) return `${label}.id must be a non-empty string`;
+		if (!isNonEmptyString(event.reason))
+			return `${label}.reason must preserve a non-empty reason; a revocation is accountable`;
+		const leak = credentialLeakProblem(event.reason, `${label}.reason`);
+		if (leak !== null) return leak;
+		return decisionSnapshotProblem(event.decision, `${label}.decision`);
+	}
+	const closed = closedFieldProblem(event, USE_EVENT_FIELDS, label);
 	if (closed !== null) return closed;
 	const at = isoProblem(event.at, `${label}.at`);
 	if (at !== null) return at;
 	if (!isNonEmptyString(event.id)) return `${label}.id must be a non-empty string`;
-	if (!isNonEmptyString(event.reason))
-		return `${label}.reason must preserve a non-empty reason; a revocation is accountable`;
-	const leak = credentialLeakProblem(event.reason, `${label}.reason`);
-	if (leak !== null) return leak;
-	return decisionSnapshotProblem(event.decision, `${label}.decision`);
+	if (!isPlainObject(event.reference)) return `${label}.reference must be an object`;
+	const refClosed = closedFieldProblem(event.reference, USE_REFERENCE_FIELDS, `${label}.reference`);
+	if (refClosed !== null) return refClosed;
+	if (!BREAKGLASS_CAPABILITY_KINDS.includes(event.reference.kind))
+		return `${label}.reference.kind must be one of ${BREAKGLASS_CAPABILITY_KINDS.join(", ")}`;
+	if (!isNonEmptyString(event.reference.id))
+		return `${label}.reference.id must be a non-empty string`;
+	const refLeak = credentialLeakProblem(event.reference.id, `${label}.reference.id`);
+	if (refLeak !== null) return refLeak;
+	if (!REQUEST_HASH_PATTERN.test(event.requestHash ?? ""))
+		return `${label}.requestHash must be a sha256:<64-hex> string — the exact admitted request`;
+	return null;
 }
 
 function foldGrants(cwd) {
@@ -286,7 +317,7 @@ function foldGrants(cwd) {
 			throw breakglassCorrupt(
 				`break-glass event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
 			);
-		if (event.kind !== "grant" && event.kind !== "revoke")
+		if (!["grant", "revoke", "use"].includes(event.kind))
 			throw breakglassCorrupt(
 				`break-glass event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
 			);
@@ -298,10 +329,10 @@ function foldGrants(cwd) {
 					`break-glass event ${lineIndex} reuses grant id ${JSON.stringify(event.id)}`,
 				);
 			const { prevHash: _prev, hash: _hash, at, ...body } = event;
-			const grant = { ...body, grantedAt: at, revocation: null, index };
+			const grant = { ...body, grantedAt: at, revocation: null, use: null, index };
 			grants.push(grant);
 			byId.set(event.id, grant);
-		} else {
+		} else if (event.kind === "revoke") {
 			const grant = byId.get(event.id);
 			if (!grant)
 				throw breakglassCorrupt(
@@ -311,7 +342,41 @@ function foldGrants(cwd) {
 				throw breakglassCorrupt(
 					`break-glass event ${lineIndex} revokes an already-revoked grant; history is never rewritten`,
 				);
+			if (grant.use !== null)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} revokes a used grant; a spent authorization already ended through use`,
+				);
 			grant.revocation = { at: event.at, reason: event.reason, decision: event.decision };
+		} else {
+			const grant = byId.get(event.id);
+			if (!grant)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} uses unknown grant ${JSON.stringify(event.id)}`,
+				);
+			if (grant.use !== null)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} uses a spent grant; a break-glass authorization is one-use`,
+				);
+			if (grant.revocation !== null)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} uses a revoked grant; revocation blocks future use immediately`,
+				);
+			// Re-derivable facts fail closed: the reference kind must be the
+			// granted capability kind, and the use instant must sit inside
+			// the half-open window — a validly re-chained forgery of either
+			// fails every read. (The reference id itself is a cross-ledger
+			// fact and is enforced at write time; the hash chain protects
+			// the recorded value from in-place rewrites.)
+			if (event.reference.kind !== grant.capability.kind)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} uses grant ${JSON.stringify(event.id)} through a ${JSON.stringify(event.reference.kind)} reference, not the granted ${JSON.stringify(grant.capability.kind)} capability`,
+				);
+			const usedMs = Date.parse(event.at);
+			if (usedMs < Date.parse(grant.validFrom) || usedMs >= Date.parse(grant.validUntil))
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} uses grant ${JSON.stringify(event.id)} outside its validity window`,
+				);
+			grant.use = { at: event.at, reference: event.reference, requestHash: event.requestHash };
 		}
 		prevHash = event.hash;
 	});
@@ -329,13 +394,15 @@ const GRANT_LEDGER = Object.freeze({
 	label: "break-glass grant ledger",
 });
 
-// Status is a pure read-time derivation: revocation always wins, expiry
-// derives from the injected clock against the half-open window, and the
-// original grant record is preserved untouched in every state. A grant
+// Status is a pure read-time derivation: a terminal use wins, then
+// revocation, then expiry at the injected clock against the half-open
+// window, and the original grant record is preserved untouched in every
+// state. A grant
 // whose window has not opened yet still reads "granted" — the status
 // vocabulary is fixed, the window anchors to the grant instant at mint,
 // and consumption (T2) separately refuses outside [validFrom, validUntil).
 function grantStatusAt(grant, nowMs) {
+	if (grant.use !== null) return "used";
 	if (grant.revocation !== null) return "revoked";
 	if (nowMs >= Date.parse(grant.validUntil)) return "expired";
 	return "granted";
@@ -619,6 +686,10 @@ function revokeBreakGlass(cwd, input = {}, opts = {}) {
 				return fail(BREAKGLASS_INVALID_CODE, [
 					`grant ${JSON.stringify(input.id)} is already revoked; history is never rewritten`,
 				]);
+			if (grant.use !== null)
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`grant ${JSON.stringify(input.id)} is already used; a spent authorization ended through use`,
+				]);
 			const spender = grantDecisionSpender(fold, input.decision);
 			if (spender !== null)
 				return fail(BREAKGLASS_INVALID_CODE, [
@@ -629,6 +700,163 @@ function revokeBreakGlass(cwd, input = {}, opts = {}) {
 		(fold) => {
 			const record = fold.find((entry) => entry.id === input.id);
 			return record ? projectGrant(record, now.getTime()) : null;
+		},
+	);
+}
+
+// ---------------------------------------------------------------------------
+// F057 T2 (#293) — atomic one-use consumption bound to the underlying
+// admission. Replay is impossible: the grant spends atomically with the
+// reference it admits, under the ledger lock, and a failed admission
+// never consumes.
+// ---------------------------------------------------------------------------
+
+// The underlying reference must ride EXACTLY the capability the grant
+// pinned, at the grant's exact target and scope — a grant can never
+// widen itself. Runner requests also bind the grant's environment;
+// external contracts carry no environment field, so the grant's declared
+// environment is recorded context there, not an equality axis.
+function resolveUseReference(cwd, grant, referenceId) {
+	if (grant.capability.kind === "external") {
+		let proposal;
+		try {
+			proposal = showExternalProposal(cwd, referenceId);
+		} catch (err) {
+			return { problem: err.message || String(err), code: err.amberCode };
+		}
+		if (proposal === null)
+			return {
+				problem: `proposal ${JSON.stringify(referenceId)} does not exist; break-glass admits only a prepared underlying request`,
+			};
+		if (proposal.status !== "authorized")
+			return {
+				problem: `proposal ${JSON.stringify(referenceId)} is not authorized; break-glass never substitutes for the underlying authorization`,
+			};
+		if (
+			proposal.effect.id !== grant.capability.id ||
+			proposal.effect.version !== grant.capability.version
+		)
+			return {
+				problem: `proposal ${JSON.stringify(referenceId)} rides effect ${JSON.stringify(proposal.effect.id)}@${proposal.effect.version}, not the granted capability ${JSON.stringify(grant.capability.id)}@${grant.capability.version}; a grant cannot widen itself`,
+			};
+		if (proposal.target !== grant.target || proposal.scope !== grant.scope)
+			return {
+				problem: `proposal ${JSON.stringify(referenceId)} targets ${JSON.stringify(proposal.target)} scope ${JSON.stringify(proposal.scope)}, not the granted target ${JSON.stringify(grant.target)} scope ${JSON.stringify(grant.scope)}; a grant cannot widen itself`,
+			};
+		return { requestHash: proposal.requestHash };
+	}
+	let request;
+	try {
+		request = showRunnerRequest(cwd, referenceId);
+	} catch (err) {
+		return { problem: err.message || String(err), code: err.amberCode };
+	}
+	if (request === null)
+		return {
+			problem: `runner request ${JSON.stringify(referenceId)} does not exist; break-glass admits only a prepared underlying request`,
+		};
+	if (request.status !== "authorized")
+		return {
+			problem: `runner request ${JSON.stringify(referenceId)} is not authorized; break-glass never substitutes for the underlying authorization`,
+		};
+	const pin = grant.capability;
+	const capability = request.capability;
+	if (
+		capability.runnerId !== pin.runnerId ||
+		capability.runnerVersion !== pin.runnerVersion ||
+		capability.name !== pin.name ||
+		capability.capabilityVersion !== pin.capabilityVersion
+	)
+		return {
+			problem: `runner request ${JSON.stringify(referenceId)} rides capability ${JSON.stringify(capability.name)}@${capability.capabilityVersion} of ${JSON.stringify(capability.runnerId)}@${capability.runnerVersion}, not the granted pin; a grant cannot widen itself`,
+		};
+	if (request.environment !== grant.environment)
+		return {
+			problem: `runner request ${JSON.stringify(referenceId)} runs in environment ${JSON.stringify(request.environment)}, not the granted ${JSON.stringify(grant.environment)}; a grant cannot widen itself`,
+		};
+	if (request.target?.repository !== grant.target || (request.scope ?? null) !== grant.scope)
+		return {
+			problem: `runner request ${JSON.stringify(referenceId)} targets repository ${JSON.stringify(request.target?.repository)} scope ${JSON.stringify(request.scope ?? null)}, not the granted target ${JSON.stringify(grant.target)} scope ${JSON.stringify(grant.scope)}; a grant cannot widen itself`,
+		};
+	return { requestHash: referenceId };
+}
+
+/**
+ * Use one break-glass grant: the one-use authorization spends atomically
+ * with the underlying admission under the ledger lock — concurrent
+ * callers cannot double-spend, a failed admission leaves the grant
+ * granted, and a spent grant refuses every later use. Consumption
+ * refuses outside the half-open validity window at the injected clock
+ * and after revocation, and the use event records the exact admitted
+ * request hash.
+ */
+function useBreakGlass(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input)) return fail(BREAKGLASS_INVALID_CODE, ["use input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(BREAKGLASS_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(input, ["id", "reference"], "use input");
+	if (inputClosed !== null) return fail(BREAKGLASS_INVALID_CODE, [inputClosed]);
+	const idSlug = slugProblem(input.id, "id");
+	if (idSlug !== null)
+		return fail(
+			/credential material/.test(idSlug) ? BREAKGLASS_LEAK_CODE : BREAKGLASS_INVALID_CODE,
+			[idSlug],
+		);
+	if (!isNonEmptyString(input.reference))
+		return fail(BREAKGLASS_INVALID_CODE, ["reference must be a non-empty string"]);
+	const referenceLeak = credentialLeakProblem(input.reference, "reference");
+	if (referenceLeak !== null) return fail(BREAKGLASS_LEAK_CODE, [referenceLeak]);
+	const nowMs = now.getTime();
+	// The guard stashes the resolved admission; the body factory then
+	// builds the event after the guard, so no sentinel value can ever
+	// reach the ledger.
+	let admitted = null;
+	return appendLedgerEvent(
+		cwd,
+		GRANT_LEDGER,
+		() => ({
+			kind: "use",
+			schemaVersion: BREAKGLASS_SCHEMA_VERSION,
+			at: now.toISOString(),
+			id: input.id,
+			reference: { kind: admitted.kind, id: input.reference },
+			requestHash: admitted.requestHash,
+		}),
+		(fold) => {
+			const grant = fold.find((entry) => entry.id === input.id) ?? null;
+			if (grant === null)
+				return fail(BREAKGLASS_NOT_FOUND_CODE, [
+					`grant ${JSON.stringify(input.id)} does not exist`,
+				]);
+			if (grant.use !== null)
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`grant ${JSON.stringify(input.id)} is already used; a break-glass authorization is one-use`,
+				]);
+			if (grant.revocation !== null)
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`grant ${JSON.stringify(input.id)} is revoked; revocation blocks future use immediately`,
+				]);
+			if (nowMs < Date.parse(grant.validFrom))
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`grant ${JSON.stringify(input.id)} is not valid yet; the window opens at ${grant.validFrom}`,
+				]);
+			if (nowMs >= Date.parse(grant.validUntil))
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`grant ${JSON.stringify(input.id)} expired at ${grant.validUntil}; emergency authority never outlives its window`,
+				]);
+			const resolved = resolveUseReference(cwd, grant, input.reference);
+			if (resolved.problem)
+				return fail(/CORRUPT/.test(resolved.code || "") ? resolved.code : BREAKGLASS_INVALID_CODE, [
+					resolved.problem,
+				]);
+			admitted = { kind: grant.capability.kind, requestHash: resolved.requestHash };
+			return null;
+		},
+		(fold) => {
+			const record = fold.find((entry) => entry.id === input.id);
+			return record ? projectGrant(record, nowMs) : null;
 		},
 	);
 }
@@ -662,6 +890,7 @@ module.exports = {
 	grantsPath,
 	grantBreakGlass,
 	revokeBreakGlass,
+	useBreakGlass,
 	showBreakGlassGrant,
 	listBreakGlassGrants,
 };
