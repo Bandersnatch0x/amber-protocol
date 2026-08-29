@@ -47,13 +47,14 @@ const { typedError } = require("./error-catalog");
 const { listArtifactRevisions, ARTIFACT_TYPES } = require("./canonical-artifacts");
 const { canonicalJson } = require("./context-hash");
 const { showAdapter } = require("./adapter-registry");
-const { consumeApproval, showApproval } = require("./approval-registry");
+const { consumeSubjectBoundApproval } = require("./approval-registry");
 const {
 	GENESIS_HASH,
 	chainHash,
 	acquireLedgerLock,
 	appendLedgerEvent,
 	credentialLeakProblem,
+	chainLinkProblem,
 	isPlainObject,
 	isNonEmptyString,
 	closedFieldProblem,
@@ -223,14 +224,8 @@ function foldClassifications(cwd) {
 	const classifications = [];
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw retentionCorrupt(`retention classification event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw retentionCorrupt(`retention classification event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw retentionCorrupt(
-				`retention classification event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "retention classification");
+		if (link !== null) throw retentionCorrupt(link);
 		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw retentionCorrupt(
 				`retention classification event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -560,14 +555,8 @@ function foldHolds(cwd) {
 	const byId = new Map();
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw holdCorrupt(`retention hold event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw holdCorrupt(`retention hold event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw holdCorrupt(
-				`retention hold event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "retention hold");
+		if (link !== null) throw holdCorrupt(link);
 		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw holdCorrupt(
 				`retention hold event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -869,14 +858,8 @@ function foldHolders(cwd) {
 	const holders = [];
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw holderCorrupt(`retention holder event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw holderCorrupt(`retention holder event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw holderCorrupt(
-				`retention holder event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "retention holder");
+		if (link !== null) throw holderCorrupt(link);
 		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw holderCorrupt(
 				`retention holder event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -1091,14 +1074,8 @@ function foldCandidates(cwd) {
 	const byId = new Map();
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw candidateCorrupt(`retention candidate event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw candidateCorrupt(`retention candidate event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw candidateCorrupt(
-				`retention candidate event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "retention candidate");
+		if (link !== null) throw candidateCorrupt(link);
 		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw candidateCorrupt(
 				`retention candidate event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -1323,30 +1300,23 @@ function authorizeDeletion(cwd, input = {}, opts = {}) {
 				return fail(RETENTION_DRIFT_CODE, [
 					`candidate ${JSON.stringify(input.id)} no longer matches what was reviewed (records, holds, Holders, or effects changed); prepare and review a fresh candidate`,
 				]);
-			let approval;
-			try {
-				approval = showApproval(cwd, input.approval, { now: opts.now });
-			} catch (err) {
-				return fail(err.amberCode || CANDIDATE_CORRUPT_CODE, [err.message || String(err)]);
-			}
-			if (approval === null)
-				return fail(RETENTION_INVALID_CODE, [
-					`approval ${JSON.stringify(input.approval)} is not recorded`,
-				]);
 			const binding = `retention-deletion:${candidate.candidateHash}`;
-			if (approval.subject !== binding)
-				return fail(RETENTION_INVALID_CODE, [
-					`approval ${JSON.stringify(input.approval)} authorizes subject ${JSON.stringify(approval.subject)}, not this candidate's binding ${JSON.stringify(binding)}; one authorization binds one reviewed candidate hash`,
-				]);
 			// Consumption is the point of no return: it settles the human
 			// Decision atomically under the approval ledger's own lock. A
 			// ceiling/write failure AFTER this point leaves the consumed
 			// approval and settled Decision as the auditable source of
 			// truth for manual recovery — the candidate stays prepared.
-			const consumption = consumeApproval(
+			const settled = consumeSubjectBoundApproval(
 				cwd,
 				{
 					id: input.approval,
+					binding,
+					decision,
+					fail,
+					corruptCode: CANDIDATE_CORRUPT_CODE,
+					invalidCode: RETENTION_INVALID_CODE,
+					subjectMismatch: (approval) =>
+						`approval ${JSON.stringify(input.approval)} authorizes subject ${JSON.stringify(approval.subject)}, not this candidate's binding ${JSON.stringify(binding)}; one authorization binds one reviewed candidate hash`,
 					decisionIdentity: input.decisionIdentity,
 					body: input.body,
 					traces: input.traces ?? [],
@@ -1354,9 +1324,8 @@ function authorizeDeletion(cwd, input = {}, opts = {}) {
 				},
 				opts,
 			);
-			if (!consumption.ok) return fail(consumption.code, consumption.errors);
-			consumed = consumption;
-			decision.revision = consumption.receipt.revision;
+			if (settled.verdict !== null) return settled.verdict;
+			consumed = settled.consumption;
 			return null;
 		},
 		(fold) => fold.find((entry) => entry.id === input.id),
@@ -1485,14 +1454,8 @@ function foldTransactions(cwd) {
 	const byCandidate = new Set();
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw transactionCorrupt(`retention transaction event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw transactionCorrupt(`retention transaction event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw transactionCorrupt(
-				`retention transaction event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "retention transaction");
+		if (link !== null) throw transactionCorrupt(link);
 		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw transactionCorrupt(
 				`retention transaction event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,

@@ -1079,6 +1079,67 @@ function decisionScopeOf(target, scope) {
 }
 
 /**
+ * The shared subject-bound consumption ceremony for a governed authorize
+ * guard (the F055/F056 surfaces): resolve one approval, require it to be
+ * recorded and to bind exactly `binding` as its subject, then consume it
+ * — atomically settling the authorized Decision — and backfill
+ * `decision.revision` from the consumption receipt. Runs INSIDE the
+ * caller's ledger guard, so a failed admission leaves the approval
+ * unconsumed and the caller's own event un-appended.
+ *
+ * The caller owns every refusal envelope and text: `fail(code, errors)`
+ * builds its guard verdict, `corruptCode` maps a corrupt approval read,
+ * `invalidCode` maps the existence refusal, and `subjectMismatch(approval)`
+ * renders the caller's own binding refusal message. This module never
+ * imports the calling registries — everything arrives as data/callbacks.
+ *
+ * @param {string} cwd - Repository root.
+ * @param {object} spec - { id, binding, decision, fail, corruptCode,
+ *   invalidCode, subjectMismatch, decisionIdentity, body, traces, scope }.
+ * @param {object} [opts] - { now } clock injection, forwarded verbatim.
+ * @returns {{verdict: object, consumption: null} | {verdict: null, consumption: object}}
+ */
+function consumeSubjectBoundApproval(
+	cwd,
+	{
+		id,
+		binding,
+		decision,
+		fail,
+		corruptCode,
+		invalidCode,
+		subjectMismatch,
+		decisionIdentity,
+		body,
+		traces,
+		scope,
+	},
+	opts = {},
+) {
+	let approval;
+	try {
+		approval = showApproval(cwd, id, { now: opts.now });
+	} catch (err) {
+		return {
+			verdict: fail(err.amberCode || corruptCode, [err.message || String(err)]),
+			consumption: null,
+		};
+	}
+	if (approval === null)
+		return {
+			verdict: fail(invalidCode, [`approval ${JSON.stringify(id)} is not recorded`]),
+			consumption: null,
+		};
+	if (approval.subject !== binding)
+		return { verdict: fail(invalidCode, [subjectMismatch(approval)]), consumption: null };
+	const consumption = consumeApproval(cwd, { id, decisionIdentity, body, traces, scope }, opts);
+	if (!consumption.ok)
+		return { verdict: fail(consumption.code, consumption.errors), consumption: null };
+	decision.revision = consumption.receipt.revision;
+	return { verdict: null, consumption };
+}
+
+/**
  * The current status of one approval record against a clock: consumption is
  * terminal, revocation wins over the validity window, and the window is
  * half-open [validAt, validUntil) — "expired" is derived at read time and
@@ -1132,6 +1193,7 @@ module.exports = {
 	grantApproval,
 	revokeApproval,
 	consumeApproval,
+	consumeSubjectBoundApproval,
 	showApproval,
 	listApprovals,
 };

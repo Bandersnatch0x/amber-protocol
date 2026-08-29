@@ -51,6 +51,7 @@ const {
 	acquireLedgerLock,
 	appendLedgerEvent,
 	credentialLeakProblem,
+	chainLinkProblem,
 	isPlainObject,
 	isNonEmptyString,
 	closedFieldProblem,
@@ -311,14 +312,8 @@ function foldDetectors(cwd) {
 	const detectors = [];
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw maintainCorrupt(`maintain detector event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw maintainCorrupt(`maintain detector event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw maintainCorrupt(
-				`maintain detector event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "maintain detector");
+		if (link !== null) throw maintainCorrupt(link);
 		if (!SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw maintainCorrupt(
 				`maintain detector event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -381,6 +376,116 @@ const DETECTOR_LEDGER = Object.freeze({
 	label: "maintain detector registry",
 });
 
+// The declared owner is the ONLY principal whose Decision may triage
+// this detector's proposals: service-owner triage is a registered,
+// verified human identity, never a free string.
+// Returns { code, errors } or null.
+function detectorOwnerProblem(cwd, owner, now) {
+	if (!isNonEmptyString(owner))
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: ["owner must name the declared service owner; triage belongs to the owner"],
+		};
+	let ownerPrincipal;
+	try {
+		ownerPrincipal = resolveActivePrincipal(cwd, owner, { now });
+	} catch (err) {
+		return { code: err.amberCode || MAINTAIN_CORRUPT_CODE, errors: [err.message || String(err)] };
+	}
+	if (!ownerPrincipal.ok) return { code: MAINTAIN_INVALID_CODE, errors: [ownerPrincipal.message] };
+	if (ownerPrincipal.principal.principalKind !== "human")
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: [
+				`owner ${JSON.stringify(owner)} is not a human principal; service-owner triage is human-governed`,
+			],
+		};
+	return null;
+}
+
+// The optional Policy pin names the committed policy revision the
+// detector's thresholds depend on — a newer committed revision makes
+// dependent evaluations stale rather than silently reinterpreted.
+// Returns { code, errors } or null.
+function detectorPolicyProblem(cwd, policy) {
+	if (policy === null) return null;
+	const policyPin = artifactPinProblem(policy, "detector input.policy");
+	if (policyPin !== null) return { code: MAINTAIN_INVALID_CODE, errors: [policyPin] };
+	let revisions;
+	try {
+		revisions = listArtifactRevisions(cwd);
+	} catch (err) {
+		return {
+			code: err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT",
+			errors: [err.message || String(err)],
+		};
+	}
+	const committed = revisions.some(
+		(revision) =>
+			revision.type === "policy" &&
+			revision.identity === policy.identity &&
+			revision.revision === policy.revision,
+	);
+	if (!committed)
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: [
+				`policy ${JSON.stringify(policy.identity)}@${policy.revision} is not a committed policy artifact revision; a detector pins the Policy its thresholds depend on`,
+			],
+		};
+	return null;
+}
+
+// A triage Decision is single-use across the maintain ledgers: the
+// proposal fold names the spender when one exists. Returns the refusal
+// message or null; the caller owns the error code.
+function triageDecisionSpendProblem(proposals, decision) {
+	const spender = proposals.find(
+		(entry) =>
+			entry.triage !== null &&
+			entry.triage.decision.identity === decision.identity &&
+			entry.triage.decision.revision === decision.revision,
+	);
+	if (!spender) return null;
+	return `decision ${JSON.stringify(decision.identity)}@${decision.revision} already triaged the proposal for ${JSON.stringify(spender.fingerprint)}; a Decision is single-use across the maintain ledgers`;
+}
+
+// Single-use ACROSS the maintain ledgers, both directions: a Decision
+// spent by a triage can never also authorize a registration.
+// Returns { code, errors } or null.
+function decisionSpentByTriageProblem(cwd, decision) {
+	let problem;
+	try {
+		problem = triageDecisionSpendProblem(foldProposals(cwd), decision);
+	} catch (err) {
+		return { code: err.amberCode || PROPOSAL_CORRUPT_CODE, errors: [err.message || String(err)] };
+	}
+	return problem === null ? null : { code: MAINTAIN_INVALID_CODE, errors: [problem] };
+}
+
+// The in-lock registration guards: a detector id/version pair registers
+// at most once, and the registration Decision is single-use in this
+// ledger. Returns { code, errors } or null.
+function detectorRegistrationProblem(fold, input) {
+	const key = detectorKey(input.id, input.version);
+	if (fold.some((entry) => detectorKey(entry.id, entry.version) === key))
+		return {
+			code: MAINTAIN_EXISTS_CODE,
+			errors: [
+				`detector ${JSON.stringify(key)} is already registered; a changed definition registers a new version`,
+			],
+		};
+	const spentBy = decisionSpentBy(fold, input.decision);
+	if (spentBy !== null)
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: [
+				`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized ${JSON.stringify(spentBy)}; a registration Decision is single-use`,
+			],
+		};
+	return null;
+}
+
 /**
  * Register one versioned Control Band detector as a human-approved
  * governance mutation: a detector id/version pair registers at most once,
@@ -394,74 +499,19 @@ function registerDetector(cwd, input = {}, opts = {}) {
 	if (inputClosed !== null) return fail(MAINTAIN_INVALID_CODE, [inputClosed]);
 	const shape = detectorShapeProblem(input, "detector input");
 	if (shape !== null) return fail(MAINTAIN_INVALID_CODE, [shape]);
-	// The declared owner is the ONLY principal whose Decision may triage
-	// this detector's proposals: service-owner triage is a registered,
-	// verified human identity, never a free string.
-	if (!isNonEmptyString(input.owner))
-		return fail(MAINTAIN_INVALID_CODE, [
-			"owner must name the declared service owner; triage belongs to the owner",
-		]);
-	let ownerPrincipal;
-	try {
-		ownerPrincipal = resolveActivePrincipal(cwd, input.owner, {
-			now: opts.now instanceof Date ? opts.now : new Date(),
-		});
-	} catch (err) {
-		return fail(err.amberCode || MAINTAIN_CORRUPT_CODE, [err.message || String(err)]);
-	}
-	if (!ownerPrincipal.ok) return fail(MAINTAIN_INVALID_CODE, [ownerPrincipal.message]);
-	if (ownerPrincipal.principal.principalKind !== "human")
-		return fail(MAINTAIN_INVALID_CODE, [
-			`owner ${JSON.stringify(input.owner)} is not a human principal; service-owner triage is human-governed`,
-		]);
-	// The optional Policy pin names the committed policy revision the
-	// detector's thresholds depend on — a newer committed revision makes
-	// dependent evaluations stale rather than silently reinterpreted.
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	const owner = detectorOwnerProblem(cwd, input.owner, now);
+	if (owner !== null) return fail(owner.code, owner.errors);
 	const policy = input.policy ?? null;
-	if (policy !== null) {
-		const policyPin = artifactPinProblem(policy, "detector input.policy");
-		if (policyPin !== null) return fail(MAINTAIN_INVALID_CODE, [policyPin]);
-		let revisions;
-		try {
-			revisions = listArtifactRevisions(cwd);
-		} catch (err) {
-			return fail(err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT", [
-				err.message || String(err),
-			]);
-		}
-		const committed = revisions.some(
-			(revision) =>
-				revision.type === "policy" &&
-				revision.identity === policy.identity &&
-				revision.revision === policy.revision,
-		);
-		if (!committed)
-			return fail(MAINTAIN_INVALID_CODE, [
-				`policy ${JSON.stringify(policy.identity)}@${policy.revision} is not a committed policy artifact revision; a detector pins the Policy its thresholds depend on`,
-			]);
-	}
+	const policyProblem = detectorPolicyProblem(cwd, policy);
+	if (policyProblem !== null) return fail(policyProblem.code, policyProblem.errors);
 	const pinProblem = decisionPinProblem(input.decision);
 	if (pinProblem !== null) return fail(MAINTAIN_INVALID_CODE, [pinProblem]);
 	const resolved = resolveRegistryDecision(cwd, input.decision);
 	if (!resolved.ok) return fail(resolved.code, resolved.errors);
-	// Single-use ACROSS the maintain ledgers, both directions: a Decision
-	// spent by a triage can never also authorize a registration.
-	let triageSpender;
-	try {
-		triageSpender = foldProposals(cwd).find(
-			(entry) =>
-				entry.triage !== null &&
-				entry.triage.decision.identity === input.decision.identity &&
-				entry.triage.decision.revision === input.decision.revision,
-		);
-	} catch (err) {
-		return fail(err.amberCode || PROPOSAL_CORRUPT_CODE, [err.message || String(err)]);
-	}
-	if (triageSpender)
-		return fail(MAINTAIN_INVALID_CODE, [
-			`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already triaged the proposal for ${JSON.stringify(triageSpender.fingerprint)}; a Decision is single-use across the maintain ledgers`,
-		]);
-	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	const crossSpend = decisionSpentByTriageProblem(cwd, input.decision);
+	if (crossSpend !== null) return fail(crossSpend.code, crossSpend.errors);
+	const at = now.toISOString();
 	return appendLedgerEvent(
 		cwd,
 		DETECTOR_LEDGER,
@@ -485,17 +535,8 @@ function registerDetector(cwd, input = {}, opts = {}) {
 			decision: resolved.decision,
 		},
 		(fold) => {
-			const key = detectorKey(input.id, input.version);
-			if (fold.some((entry) => detectorKey(entry.id, entry.version) === key))
-				return fail(MAINTAIN_EXISTS_CODE, [
-					`detector ${JSON.stringify(key)} is already registered; a changed definition registers a new version`,
-				]);
-			const spentBy = decisionSpentBy(fold, input.decision);
-			if (spentBy !== null)
-				return fail(MAINTAIN_INVALID_CODE, [
-					`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized ${JSON.stringify(spentBy)}; a registration Decision is single-use`,
-				]);
-			return null;
+			const problem = detectorRegistrationProblem(fold, input);
+			return problem === null ? null : fail(problem.code, problem.errors);
 		},
 		(fold) =>
 			fold.find(
@@ -577,14 +618,8 @@ function foldFindings(cwd) {
 	const findings = [];
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw findingCorrupt(`maintain finding event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw findingCorrupt(`maintain finding event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw findingCorrupt(
-				`maintain finding event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "maintain finding");
+		if (link !== null) throw findingCorrupt(link);
 		if (!SUPPORTED_MAINTAIN_FINDING_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw findingCorrupt(
 				`maintain finding event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -903,6 +938,106 @@ function proposalEventProblem(event, lineIndex) {
 	return null;
 }
 
+// The per-kind state appliers foldProposals dispatches to; structural
+// impossibilities (the writers can never produce them) read as corruption
+// and throw.
+
+function applyProposalOpened(proposals, byFingerprint, event, lineIndex) {
+	const current = byFingerprint.get(event.fingerprint);
+	if (current && current.status === "open")
+		throw proposalCorrupt(
+			`maintain proposal event ${lineIndex} reopens fingerprint ${JSON.stringify(event.fingerprint)} while a proposal is open`,
+		);
+	const { prevHash: _prev, hash: _hash, findingIndex, observedAt, ...body } = event;
+	const proposal = {
+		...body,
+		status: "open",
+		findings: [findingIndex],
+		lastObservedAt: observedAt,
+		triage: null,
+		completion: null,
+		index: lineIndex - 1,
+	};
+	proposals.push(proposal);
+	byFingerprint.set(event.fingerprint, proposal);
+}
+
+function applyProposalEvidence(byFingerprint, event, lineIndex) {
+	const proposal = byFingerprint.get(event.fingerprint);
+	if (!proposal)
+		throw proposalCorrupt(
+			`maintain proposal event ${lineIndex} appends evidence to unknown fingerprint ${JSON.stringify(event.fingerprint)}`,
+		);
+	if (proposal.status !== "open")
+		throw proposalCorrupt(
+			`maintain proposal event ${lineIndex} appends evidence to a triaged proposal`,
+		);
+	if (proposal.findings.includes(event.findingIndex))
+		throw proposalCorrupt(
+			`maintain proposal event ${lineIndex} repeats finding ${event.findingIndex}`,
+		);
+	proposal.findings.push(event.findingIndex);
+	// An out-of-order (older) append never regresses the anchor.
+	if (Date.parse(event.observedAt) > Date.parse(proposal.lastObservedAt))
+		proposal.lastObservedAt = event.observedAt;
+}
+
+function applyProposalCompletion(proposals, event, lineIndex) {
+	const proposal = proposals.find((entry) => entry.index === event.proposalIndex);
+	if (!proposal || proposal.fingerprint !== event.fingerprint)
+		throw proposalCorrupt(
+			`maintain proposal event ${lineIndex} completes unknown proposal ${event.proposalIndex} for ${JSON.stringify(event.fingerprint)}`,
+		);
+	if (proposal.status !== "triaged" || proposal.triage.outcome !== "fix")
+		throw proposalCorrupt(
+			`maintain proposal event ${lineIndex} completes a proposal that is not fix-triaged`,
+		);
+	proposal.status = "completed";
+	proposal.completion = {
+		at: event.at,
+		intent: event.intent,
+		eval: event.eval,
+		evalResult: event.evalResult,
+	};
+}
+
+function applyProposalTriage(proposals, byFingerprint, event, lineIndex) {
+	const proposal = byFingerprint.get(event.fingerprint);
+	if (!proposal)
+		throw proposalCorrupt(
+			`maintain proposal event ${lineIndex} triages unknown fingerprint ${JSON.stringify(event.fingerprint)}`,
+		);
+	if (proposal.status !== "open")
+		throw proposalCorrupt(
+			`maintain proposal event ${lineIndex} triages an already-triaged proposal`,
+		);
+	const spender = proposals.find(
+		(entry) =>
+			entry.triage !== null &&
+			entry.triage.decision.identity === event.decision.identity &&
+			entry.triage.decision.revision === event.decision.revision,
+	);
+	if (spender)
+		throw proposalCorrupt(
+			`maintain proposal event ${lineIndex} reuses triage decision ${JSON.stringify(event.decision.identity)}@${event.decision.revision}`,
+		);
+	proposal.status = "triaged";
+	proposal.triage = {
+		at: event.at,
+		outcome: event.outcome,
+		reason: event.reason,
+		decision: event.decision,
+	};
+}
+
+function applyProposalEvent(proposals, byFingerprint, event, lineIndex) {
+	if (event.kind === "proposal")
+		return applyProposalOpened(proposals, byFingerprint, event, lineIndex);
+	if (event.kind === "evidence") return applyProposalEvidence(byFingerprint, event, lineIndex);
+	if (event.kind === "completion") return applyProposalCompletion(proposals, event, lineIndex);
+	return applyProposalTriage(proposals, byFingerprint, event, lineIndex);
+}
+
 // Projects one entry per opened proposal: `findings` accumulates the
 // opening Finding plus every evidence append, `lastObservedAt` tracks the
 // latest referenced observation time the cooldown is measured against.
@@ -917,14 +1052,8 @@ function foldProposals(cwd) {
 	const byFingerprint = new Map();
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw proposalCorrupt(`maintain proposal event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw proposalCorrupt(`maintain proposal event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw proposalCorrupt(
-				`maintain proposal event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "maintain proposal");
+		if (link !== null) throw proposalCorrupt(link);
 		if (!SUPPORTED_MAINTAIN_PROPOSAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw proposalCorrupt(
 				`maintain proposal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -940,87 +1069,7 @@ function foldProposals(cwd) {
 			);
 		const problem = proposalEventProblem(event, lineIndex);
 		if (problem !== null) throw proposalCorrupt(problem);
-		if (event.kind === "proposal") {
-			const current = byFingerprint.get(event.fingerprint);
-			if (current && current.status === "open")
-				throw proposalCorrupt(
-					`maintain proposal event ${lineIndex} reopens fingerprint ${JSON.stringify(event.fingerprint)} while a proposal is open`,
-				);
-			const { prevHash: _prev, hash: _hash, findingIndex, observedAt, ...body } = event;
-			const proposal = {
-				...body,
-				status: "open",
-				findings: [findingIndex],
-				lastObservedAt: observedAt,
-				triage: null,
-				completion: null,
-				index,
-			};
-			proposals.push(proposal);
-			byFingerprint.set(event.fingerprint, proposal);
-		} else if (event.kind === "evidence") {
-			const proposal = byFingerprint.get(event.fingerprint);
-			if (!proposal)
-				throw proposalCorrupt(
-					`maintain proposal event ${lineIndex} appends evidence to unknown fingerprint ${JSON.stringify(event.fingerprint)}`,
-				);
-			if (proposal.status !== "open")
-				throw proposalCorrupt(
-					`maintain proposal event ${lineIndex} appends evidence to a triaged proposal`,
-				);
-			if (proposal.findings.includes(event.findingIndex))
-				throw proposalCorrupt(
-					`maintain proposal event ${lineIndex} repeats finding ${event.findingIndex}`,
-				);
-			proposal.findings.push(event.findingIndex);
-			// An out-of-order (older) append never regresses the anchor.
-			if (Date.parse(event.observedAt) > Date.parse(proposal.lastObservedAt))
-				proposal.lastObservedAt = event.observedAt;
-		} else if (event.kind === "completion") {
-			const proposal = proposals.find((entry) => entry.index === event.proposalIndex);
-			if (!proposal || proposal.fingerprint !== event.fingerprint)
-				throw proposalCorrupt(
-					`maintain proposal event ${lineIndex} completes unknown proposal ${event.proposalIndex} for ${JSON.stringify(event.fingerprint)}`,
-				);
-			if (proposal.status !== "triaged" || proposal.triage.outcome !== "fix")
-				throw proposalCorrupt(
-					`maintain proposal event ${lineIndex} completes a proposal that is not fix-triaged`,
-				);
-			proposal.status = "completed";
-			proposal.completion = {
-				at: event.at,
-				intent: event.intent,
-				eval: event.eval,
-				evalResult: event.evalResult,
-			};
-		} else {
-			const proposal = byFingerprint.get(event.fingerprint);
-			if (!proposal)
-				throw proposalCorrupt(
-					`maintain proposal event ${lineIndex} triages unknown fingerprint ${JSON.stringify(event.fingerprint)}`,
-				);
-			if (proposal.status !== "open")
-				throw proposalCorrupt(
-					`maintain proposal event ${lineIndex} triages an already-triaged proposal`,
-				);
-			const spender = proposals.find(
-				(entry) =>
-					entry.triage !== null &&
-					entry.triage.decision.identity === event.decision.identity &&
-					entry.triage.decision.revision === event.decision.revision,
-			);
-			if (spender)
-				throw proposalCorrupt(
-					`maintain proposal event ${lineIndex} reuses triage decision ${JSON.stringify(event.decision.identity)}@${event.decision.revision}`,
-				);
-			proposal.status = "triaged";
-			proposal.triage = {
-				at: event.at,
-				outcome: event.outcome,
-				reason: event.reason,
-				decision: event.decision,
-			};
-		}
+		applyProposalEvent(proposals, byFingerprint, event, lineIndex);
 		prevHash = event.hash;
 	});
 	return proposals;
@@ -1055,6 +1104,70 @@ function currentOpenProposalForSubject(fold, detectorId, subject) {
 		if (entry.detectorId === detectorId && entry.subject === subject && entry.status === "open")
 			return entry;
 	}
+	return null;
+}
+
+// The evidence-vs-proposal branch: a repeat while a proposal is open for
+// the detector + subject appends the Finding as evidence; otherwise the
+// Finding opens a new proposal copying only recorded facts.
+function proposalEventBodyFor(finding, detector, open, at) {
+	return open !== null
+		? {
+				kind: "evidence",
+				schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
+				at,
+				observedAt: finding.at,
+				fingerprint: open.fingerprint,
+				findingIndex: finding.index,
+			}
+		: {
+				kind: "proposal",
+				schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
+				at,
+				observedAt: finding.at,
+				fingerprint: finding.fingerprint,
+				detectorId: finding.detectorId,
+				detectorVersion: finding.detectorVersion,
+				subject: finding.subject,
+				scope: finding.scope,
+				tier: finding.tier,
+				cooldownMs: detector.cooldownMs,
+				findingIndex: finding.index,
+			};
+}
+
+// The storm/cooldown refusals for one open proposal.
+// Returns { code, errors } or null (the Finding may append as evidence).
+function proposeCooldownProblem(open, finding, detector) {
+	if (open.findings.includes(finding.index))
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: [
+				`finding ${finding.index} is already referenced by the open proposal for ${JSON.stringify(open.fingerprint)}`,
+			],
+		};
+	// A finding observed earlier than the proposal's latest referenced
+	// observation is correlation, not a new storm — it appends. The
+	// window is half-open, mirroring Approval validity: a delta of
+	// exactly cooldownMs is already outside.
+	const delta = Date.parse(finding.at) - Date.parse(open.lastObservedAt);
+	if (delta >= detector.cooldownMs)
+		return {
+			code: PROPOSAL_EXISTS_CODE,
+			errors: [
+				`an open proposal for ${JSON.stringify(open.fingerprint)} is outside its ${detector.cooldownMs} ms cooldown and must be triaged before a new proposal may open`,
+			],
+		};
+	// The declared resource limit bounds the evidence chain: an
+	// open proposal never references more than maxObservations
+	// observations — the dead knob is now the storm ceiling.
+	if (open.findings.length >= detector.maxObservations)
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: [
+				`the open proposal for ${JSON.stringify(open.fingerprint)} already references its declared maxObservations (${detector.maxObservations}); triage it before recording more evidence`,
+			],
+		};
 	return null;
 }
 
@@ -1098,58 +1211,21 @@ function propose(cwd, input = {}, opts = {}) {
 		PROPOSAL_LEDGER,
 		// The factory re-derives its branch from its own fold, so it agrees
 		// with the guard without depending on evaluation order.
-		(fold) => {
-			const open = currentOpenProposalForSubject(fold, finding.detectorId, finding.subject);
-			return open !== null
-				? {
-						kind: "evidence",
-						schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
-						at,
-						observedAt: finding.at,
-						fingerprint: open.fingerprint,
-						findingIndex: finding.index,
-					}
-				: {
-						kind: "proposal",
-						schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
-						at,
-						observedAt: finding.at,
-						fingerprint: finding.fingerprint,
-						detectorId: finding.detectorId,
-						detectorVersion: finding.detectorVersion,
-						subject: finding.subject,
-						scope: finding.scope,
-						tier: finding.tier,
-						cooldownMs: detector.cooldownMs,
-						findingIndex: finding.index,
-					};
-		},
+		(fold) =>
+			proposalEventBodyFor(
+				finding,
+				detector,
+				currentOpenProposalForSubject(fold, finding.detectorId, finding.subject),
+				at,
+			),
 		(fold) => {
 			const open = currentOpenProposalForSubject(fold, finding.detectorId, finding.subject);
 			if (open === null) {
 				action = "opened";
 				return null;
 			}
-			if (open.findings.includes(finding.index))
-				return fail(MAINTAIN_INVALID_CODE, [
-					`finding ${finding.index} is already referenced by the open proposal for ${JSON.stringify(open.fingerprint)}`,
-				]);
-			// A finding observed earlier than the proposal's latest referenced
-			// observation is correlation, not a new storm — it appends. The
-			// window is half-open, mirroring Approval validity: a delta of
-			// exactly cooldownMs is already outside.
-			const delta = Date.parse(finding.at) - Date.parse(open.lastObservedAt);
-			if (delta >= detector.cooldownMs)
-				return fail(PROPOSAL_EXISTS_CODE, [
-					`an open proposal for ${JSON.stringify(open.fingerprint)} is outside its ${detector.cooldownMs} ms cooldown and must be triaged before a new proposal may open`,
-				]);
-			// The declared resource limit bounds the evidence chain: an
-			// open proposal never references more than maxObservations
-			// observations — the dead knob is now the storm ceiling.
-			if (open.findings.length >= detector.maxObservations)
-				return fail(MAINTAIN_INVALID_CODE, [
-					`the open proposal for ${JSON.stringify(open.fingerprint)} already references its declared maxObservations (${detector.maxObservations}); triage it before recording more evidence`,
-				]);
+			const problem = proposeCooldownProblem(open, finding, detector);
+			if (problem !== null) return fail(problem.code, problem.errors);
 			action = "appended";
 			return null;
 		},
@@ -1215,6 +1291,82 @@ function candidateIntentFor(proposal, findings) {
 	};
 }
 
+// The closed triage vocabulary pairs fix with a null reason and
+// schedule/dismiss with a preserved, credential-free reason.
+// Returns { code, errors } or null.
+function triageReasonProblem(outcome, reason) {
+	if (outcome === "fix") {
+		if (reason !== null)
+			return {
+				code: MAINTAIN_INVALID_CODE,
+				errors: [
+					"a fix triage carries its rationale in the candidate Intent body; reason is preserved only for schedule and dismiss",
+				],
+			};
+	} else if (!isNonEmptyString(reason)) {
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: [`a ${outcome} triage must preserve a non-empty reason`],
+		};
+	} else {
+		const leak = credentialLeakProblem(reason, "reason");
+		if (leak !== null) return { code: MAINTAIN_LEAK_CODE, errors: [leak] };
+	}
+	return null;
+}
+
+// Single-use ACROSS the maintain ledgers, both directions: a Decision
+// spent by a detector registration can never also triage a proposal.
+// Returns { code, errors } or null.
+function decisionSpentByRegistrationProblem(cwd, decision) {
+	let registrationSpender;
+	try {
+		registrationSpender = decisionSpentBy(foldDetectors(cwd), decision);
+	} catch (err) {
+		return { code: err.amberCode || MAINTAIN_CORRUPT_CODE, errors: [err.message || String(err)] };
+	}
+	if (registrationSpender === null) return null;
+	return {
+		code: MAINTAIN_INVALID_CODE,
+		errors: [
+			`decision ${JSON.stringify(decision.identity)}@${decision.revision} already authorized detector ${JSON.stringify(registrationSpender)}; a Decision is single-use across the maintain ledgers`,
+		],
+	};
+}
+
+// Service-owner triage: the proposal's detector version names the ONLY
+// principal whose Decision may triage it. A v1 detector (owner folded to
+// null) keeps its any-human latitude. Returns { code, errors } or null.
+function triageOwnerProblem(cwd, proposal, principal) {
+	let ownedBy;
+	try {
+		ownedBy = showDetector(cwd, proposal.detectorId, proposal.detectorVersion);
+	} catch (err) {
+		return { code: err.amberCode || MAINTAIN_CORRUPT_CODE, errors: [err.message || String(err)] };
+	}
+	if (ownedBy !== null && ownedBy.owner !== null && ownedBy.owner !== principal)
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: [
+				`triage of ${JSON.stringify(proposal.fingerprint)} belongs to the declared service owner ${JSON.stringify(ownedBy.owner)}; the decision principal ${JSON.stringify(principal)} does not own detector ${JSON.stringify(detectorKey(proposal.detectorId, proposal.detectorVersion))}`,
+			],
+		};
+	return null;
+}
+
+// Folded under the proposal lock: evidence is only appended while this
+// lock is held, so the candidate sees every Finding the proposal
+// references. Returns { candidate } or { code, errors }.
+function fixCandidateFor(cwd, proposal) {
+	let findings;
+	try {
+		findings = foldFindings(cwd);
+	} catch (err) {
+		return { code: err.amberCode || FINDING_CORRUPT_CODE, errors: [err.message || String(err)] };
+	}
+	return { candidate: candidateIntentFor(proposal, findings) };
+}
+
 /**
  * Bind one open Trigger Proposal to one committed human Decision under
  * the closed fix|schedule|dismiss vocabulary. schedule and dismiss
@@ -1233,33 +1385,14 @@ function triage(cwd, input = {}, opts = {}) {
 	if (!TRIAGE_OUTCOMES.includes(input.outcome))
 		return fail(MAINTAIN_INVALID_CODE, [`outcome must be one of ${TRIAGE_OUTCOMES.join(", ")}`]);
 	const reason = input.reason ?? null;
-	if (input.outcome === "fix") {
-		if (reason !== null)
-			return fail(MAINTAIN_INVALID_CODE, [
-				"a fix triage carries its rationale in the candidate Intent body; reason is preserved only for schedule and dismiss",
-			]);
-	} else if (!isNonEmptyString(reason)) {
-		return fail(MAINTAIN_INVALID_CODE, [
-			`a ${input.outcome} triage must preserve a non-empty reason`,
-		]);
-	} else {
-		const leak = credentialLeakProblem(reason, "reason");
-		if (leak !== null) return fail(MAINTAIN_LEAK_CODE, [leak]);
-	}
+	const reasonProblem = triageReasonProblem(input.outcome, reason);
+	if (reasonProblem !== null) return fail(reasonProblem.code, reasonProblem.errors);
 	const pinProblem = decisionPinProblem(input.decision);
 	if (pinProblem !== null) return fail(MAINTAIN_INVALID_CODE, [pinProblem]);
 	const resolved = resolveRegistryDecision(cwd, input.decision, "maintain triage");
 	if (!resolved.ok) return fail(resolved.code, resolved.errors);
-	let registrationSpender;
-	try {
-		registrationSpender = decisionSpentBy(foldDetectors(cwd), input.decision);
-	} catch (err) {
-		return fail(err.amberCode || MAINTAIN_CORRUPT_CODE, [err.message || String(err)]);
-	}
-	if (registrationSpender !== null)
-		return fail(MAINTAIN_INVALID_CODE, [
-			`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized detector ${JSON.stringify(registrationSpender)}; a Decision is single-use across the maintain ledgers`,
-		]);
+	const crossSpend = decisionSpentByRegistrationProblem(cwd, input.decision);
+	if (crossSpend !== null) return fail(crossSpend.code, crossSpend.errors);
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
 	let candidate = null;
 	const result = appendLedgerEvent(
@@ -1284,44 +1417,14 @@ function triage(cwd, input = {}, opts = {}) {
 				return fail(MAINTAIN_INVALID_CODE, [
 					`the proposal for ${JSON.stringify(input.fingerprint)} is already triaged (${current.triage.outcome}); triage of a closed proposal refuses`,
 				]);
-			// Service-owner triage: the proposal's detector version names
-			// the ONLY principal whose Decision may triage it. A v1
-			// detector (owner folded to null) keeps its any-human latitude.
-			let ownedBy;
-			try {
-				ownedBy = showDetector(cwd, current.detectorId, current.detectorVersion);
-			} catch (err) {
-				return fail(err.amberCode || MAINTAIN_CORRUPT_CODE, [err.message || String(err)]);
-			}
-			if (
-				ownedBy !== null &&
-				ownedBy.owner !== null &&
-				ownedBy.owner !== resolved.decision.principal
-			)
-				return fail(MAINTAIN_INVALID_CODE, [
-					`triage of ${JSON.stringify(input.fingerprint)} belongs to the declared service owner ${JSON.stringify(ownedBy.owner)}; the decision principal ${JSON.stringify(resolved.decision.principal)} does not own detector ${JSON.stringify(detectorKey(current.detectorId, current.detectorVersion))}`,
-				]);
-			const spender = fold.find(
-				(entry) =>
-					entry.triage !== null &&
-					entry.triage.decision.identity === input.decision.identity &&
-					entry.triage.decision.revision === input.decision.revision,
-			);
-			if (spender)
-				return fail(MAINTAIN_INVALID_CODE, [
-					`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already triaged the proposal for ${JSON.stringify(spender.fingerprint)}; a Decision is single-use across the maintain ledgers`,
-				]);
+			const owner = triageOwnerProblem(cwd, current, resolved.decision.principal);
+			if (owner !== null) return fail(owner.code, owner.errors);
+			const spent = triageDecisionSpendProblem(fold, input.decision);
+			if (spent !== null) return fail(MAINTAIN_INVALID_CODE, [spent]);
 			if (input.outcome === "fix") {
-				// Folded under the proposal lock: evidence is only appended
-				// while this lock is held, so the candidate sees every
-				// Finding the proposal references.
-				let findings;
-				try {
-					findings = foldFindings(cwd);
-				} catch (err) {
-					return fail(err.amberCode || FINDING_CORRUPT_CODE, [err.message || String(err)]);
-				}
-				candidate = candidateIntentFor(current, findings);
+				const fix = fixCandidateFor(cwd, current);
+				if (fix.code) return fail(fix.code, fix.errors);
+				candidate = fix.candidate;
 			}
 			return null;
 		},
@@ -1343,6 +1446,79 @@ function resolveArtifactPin(revisions, pin, type, label) {
 	if (!match)
 		return `${label} ${JSON.stringify(pin.identity)}@${pin.revision} does not resolve to a committed ${type} artifact revision`;
 	return null;
+}
+
+// The completion pins must resolve and belong together: the Intent is
+// the fingerprint-derived CANDIDATE identity the fix triage returned,
+// every pin resolves to a committed revision of its expected type, and
+// the pinned eval-result records the pinned Eval definition (F058
+// eval-results record their definition pin in the extensions carrier).
+// Returns { code, errors } or null.
+function completionPinsProblem(cwd, input) {
+	// The AC binds the CANDIDATE Intent identity: completion re-enters as
+	// the fingerprint-derived Intent the fix triage returned, never as an
+	// unrelated Intent.
+	const candidateIdentity = `intent/maintain/${input.fingerprint.slice(7, 23)}`;
+	if (input.intent.identity !== candidateIdentity)
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: [
+				`intent must reference the candidate Intent identity ${JSON.stringify(candidateIdentity)} derived from the fingerprint; got ${JSON.stringify(input.intent.identity)}`,
+			],
+		};
+	let revisions;
+	try {
+		revisions = listArtifactRevisions(cwd);
+	} catch (err) {
+		return {
+			code: err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT",
+			errors: [err.message || String(err)],
+		};
+	}
+	for (const [field, type, label] of [
+		["intent", "intent", "intent"],
+		["eval", "eval", "eval"],
+		["evalResult", "eval-result", "evalResult"],
+	]) {
+		const unresolved = resolveArtifactPin(revisions, input[field], type, label);
+		if (unresolved !== null) return { code: MAINTAIN_INVALID_CODE, errors: [unresolved] };
+	}
+	// The pinned result must be a result OF the pinned definition.
+	const resultRevision = revisions.find(
+		(revision) =>
+			revision.type === "eval-result" &&
+			revision.identity === input.evalResult.identity &&
+			revision.revision === input.evalResult.revision,
+	);
+	const definition = resultRevision.envelope?.extensions?.evalResult?.definition ?? null;
+	if (
+		!isPlainObject(definition) ||
+		definition.identity !== input.eval.identity ||
+		definition.revision !== input.eval.revision
+	)
+		return {
+			code: MAINTAIN_INVALID_CODE,
+			errors: [
+				`evalResult ${JSON.stringify(input.evalResult.identity)}@${input.evalResult.revision} does not record eval ${JSON.stringify(input.eval.identity)}@${input.eval.revision} as its definition; the completion pins must belong together`,
+			],
+		};
+	return null;
+}
+
+// Completion targets the latest fix-triaged, uncompleted proposal for
+// the fingerprint; the completion event pins that proposal's opening
+// index.
+function latestFixTriagedFor(fold, fingerprint) {
+	return (
+		[...fold]
+			.reverse()
+			.find(
+				(entry) =>
+					entry.fingerprint === fingerprint &&
+					entry.status === "triaged" &&
+					entry.triage.outcome === "fix",
+			) ?? null
+	);
 }
 
 /**
@@ -1367,57 +1543,9 @@ function complete(cwd, input = {}, opts = {}) {
 		const pin = artifactPinProblem(input[field], label);
 		if (pin !== null) return fail(MAINTAIN_INVALID_CODE, [pin]);
 	}
-	// The AC binds the CANDIDATE Intent identity: completion re-enters as
-	// the fingerprint-derived Intent the fix triage returned, never as an
-	// unrelated Intent.
-	const candidateIdentity = `intent/maintain/${input.fingerprint.slice(7, 23)}`;
-	if (input.intent.identity !== candidateIdentity)
-		return fail(MAINTAIN_INVALID_CODE, [
-			`intent must reference the candidate Intent identity ${JSON.stringify(candidateIdentity)} derived from the fingerprint; got ${JSON.stringify(input.intent.identity)}`,
-		]);
-	let revisions;
-	try {
-		revisions = listArtifactRevisions(cwd);
-	} catch (err) {
-		return fail(err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT", [err.message || String(err)]);
-	}
-	for (const [field, type, label] of [
-		["intent", "intent", "intent"],
-		["eval", "eval", "eval"],
-		["evalResult", "eval-result", "evalResult"],
-	]) {
-		const unresolved = resolveArtifactPin(revisions, input[field], type, label);
-		if (unresolved !== null) return fail(MAINTAIN_INVALID_CODE, [unresolved]);
-	}
-	// The pinned result must be a result OF the pinned definition: F058
-	// eval-results record their definition pin in the extensions carrier.
-	const resultRevision = revisions.find(
-		(revision) =>
-			revision.type === "eval-result" &&
-			revision.identity === input.evalResult.identity &&
-			revision.revision === input.evalResult.revision,
-	);
-	const definition = resultRevision.envelope?.extensions?.evalResult?.definition ?? null;
-	if (
-		!isPlainObject(definition) ||
-		definition.identity !== input.eval.identity ||
-		definition.revision !== input.eval.revision
-	)
-		return fail(MAINTAIN_INVALID_CODE, [
-			`evalResult ${JSON.stringify(input.evalResult.identity)}@${input.evalResult.revision} does not record eval ${JSON.stringify(input.eval.identity)}@${input.eval.revision} as its definition; the completion pins must belong together`,
-		]);
+	const pins = completionPinsProblem(cwd, input);
+	if (pins !== null) return fail(pins.code, pins.errors);
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
-	// Completion targets the latest fix-triaged, uncompleted proposal for
-	// the fingerprint; the event pins that proposal's opening index.
-	const eligibleIn = (fold) =>
-		[...fold]
-			.reverse()
-			.find(
-				(entry) =>
-					entry.fingerprint === input.fingerprint &&
-					entry.status === "triaged" &&
-					entry.triage.outcome === "fix",
-			) ?? null;
 	let targetIndex = null;
 	return appendLedgerEvent(
 		cwd,
@@ -1425,7 +1553,7 @@ function complete(cwd, input = {}, opts = {}) {
 		(fold) => {
 			// The guard ran first on this same fold, so a target exists; the
 			// -1 fallback fails event validation closed if that ever changes.
-			const target = eligibleIn(fold);
+			const target = latestFixTriagedFor(fold, input.fingerprint);
 			return {
 				kind: "completion",
 				schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
@@ -1445,7 +1573,7 @@ function complete(cwd, input = {}, opts = {}) {
 				return fail(MAINTAIN_NOT_FOUND_CODE, [
 					`no proposal exists for ${JSON.stringify(input.fingerprint)}`,
 				]);
-			const eligible = eligibleIn(fold);
+			const eligible = latestFixTriagedFor(fold, input.fingerprint);
 			if (eligible === null)
 				return fail(MAINTAIN_INVALID_CODE, [
 					`no fix-triaged proposal awaits completion for ${JSON.stringify(input.fingerprint)}`,

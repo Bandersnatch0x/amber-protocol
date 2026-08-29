@@ -21,7 +21,7 @@ const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { canonicalJson } = require("./context-hash");
 const { showAdapter } = require("./adapter-registry");
-const { consumeApproval, showApproval } = require("./approval-registry");
+const { consumeSubjectBoundApproval, showApproval } = require("./approval-registry");
 const { showEvidence } = require("./evidence-receipts");
 const {
 	GENESIS_HASH,
@@ -29,6 +29,7 @@ const {
 	acquireLedgerLock,
 	appendLedgerEvent,
 	credentialLeakProblem,
+	chainLinkProblem,
 	isCredentialLeakProblem,
 	isPlainObject,
 	isNonEmptyString,
@@ -305,14 +306,8 @@ function foldEffects(cwd) {
 	const effects = [];
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw externalCorrupt(`external effect event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw externalCorrupt(`external effect event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw externalCorrupt(
-				`external effect event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "external effect");
+		if (link !== null) throw externalCorrupt(link);
 		if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw externalCorrupt(
 				`external effect event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -362,6 +357,88 @@ function effectDecisionSpender(effects, decision) {
 	return spender ? effectKey(spender.id, spender.version) : null;
 }
 
+// The registration input prologue: closed fields, the contract shape,
+// the declared payload schema (shape, credential boundary, and a
+// registration-time compile verdict), and the Decision pin.
+// Returns { code, errors } or null.
+function effectRegistrationInputProblem(input) {
+	const inputClosed = unknownFieldProblem(input, EFFECT_INPUT_FIELDS, "effect input");
+	if (inputClosed !== null) return { code: EXTERNAL_INVALID_CODE, errors: [inputClosed] };
+	const shape = effectShapeProblem(input, "effect input");
+	if (shape !== null) return { code: EXTERNAL_INVALID_CODE, errors: [shape] };
+	const schemaProblem = inputSchemaProblem(input.inputSchema, "effect input.inputSchema");
+	if (schemaProblem !== null)
+		return {
+			code: isCredentialLeakProblem(schemaProblem) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
+			errors: [schemaProblem],
+		};
+	// The declared schema must compile: a contract whose payload shape is
+	// not checkable declares nothing.
+	try {
+		compileInline(input.inputSchema);
+	} catch (err) {
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`effect input.inputSchema does not compile as a JSON schema: ${err.message || String(err)}`,
+			],
+		};
+	}
+	const pinProblem = decisionPinProblem(input.decision);
+	if (pinProblem !== null) return { code: EXTERNAL_INVALID_CODE, errors: [pinProblem] };
+	return null;
+}
+
+// The pinned Adapter must be registered at exactly the pinned version:
+// an External Effect binds a registered Adapter, and a drifted pin
+// refuses. Returns { code, errors } or null.
+function effectAdapterPinProblem(cwd, pin) {
+	let adapter;
+	try {
+		adapter = showAdapter(cwd, pin.id);
+	} catch (err) {
+		return { code: err.amberCode || EXTERNAL_CORRUPT_CODE, errors: [err.message || String(err)] };
+	}
+	if (adapter === null)
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`adapter ${JSON.stringify(pin.id)} is not registered; an External Effect binds a registered Adapter`,
+			],
+		};
+	if (adapter.adapterVersion !== pin.version)
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`adapter ${JSON.stringify(pin.id)} is registered at version ${JSON.stringify(adapter.adapterVersion)}, not the pinned ${JSON.stringify(pin.version)}`,
+			],
+		};
+	return null;
+}
+
+// The in-lock registration guards: an effect id/version pair registers
+// at most once, and the registration Decision is single-use in this
+// ledger. Returns { code, errors } or null.
+function effectRegistrationProblem(fold, input) {
+	const key = effectKey(input.id, input.version);
+	if (fold.some((entry) => effectKey(entry.id, entry.version) === key))
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`external effect ${JSON.stringify(key)} is already registered; changed external semantics register a new version`,
+			],
+		};
+	const spender = effectDecisionSpender(fold, input.decision);
+	if (spender !== null)
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized effect ${JSON.stringify(spender)}; a registration Decision is single-use`,
+			],
+		};
+	return null;
+}
+
 /**
  * Register one External Effect contract behind a single-use committed
  * human Decision. Registered versions are immutable — changed external
@@ -373,41 +450,10 @@ function registerExternalEffect(cwd, input = {}, opts = {}) {
 	const now = opts.now instanceof Date ? opts.now : new Date();
 	if (Number.isNaN(now.getTime()))
 		return fail(EXTERNAL_INVALID_CODE, ["now must be a valid clock"]);
-	const inputClosed = unknownFieldProblem(input, EFFECT_INPUT_FIELDS, "effect input");
-	if (inputClosed !== null) return fail(EXTERNAL_INVALID_CODE, [inputClosed]);
-	const shape = effectShapeProblem(input, "effect input");
-	if (shape !== null) return fail(EXTERNAL_INVALID_CODE, [shape]);
-	const schemaProblem = inputSchemaProblem(input.inputSchema, "effect input.inputSchema");
-	if (schemaProblem !== null)
-		return fail(
-			isCredentialLeakProblem(schemaProblem) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
-			[schemaProblem],
-		);
-	// The declared schema must compile: a contract whose payload shape is
-	// not checkable declares nothing.
-	try {
-		compileInline(input.inputSchema);
-	} catch (err) {
-		return fail(EXTERNAL_INVALID_CODE, [
-			`effect input.inputSchema does not compile as a JSON schema: ${err.message || String(err)}`,
-		]);
-	}
-	const pinProblem = decisionPinProblem(input.decision);
-	if (pinProblem !== null) return fail(EXTERNAL_INVALID_CODE, [pinProblem]);
-	let adapter;
-	try {
-		adapter = showAdapter(cwd, input.adapter.id);
-	} catch (err) {
-		return fail(err.amberCode || EXTERNAL_CORRUPT_CODE, [err.message || String(err)]);
-	}
-	if (adapter === null)
-		return fail(EXTERNAL_INVALID_CODE, [
-			`adapter ${JSON.stringify(input.adapter.id)} is not registered; an External Effect binds a registered Adapter`,
-		]);
-	if (adapter.adapterVersion !== input.adapter.version)
-		return fail(EXTERNAL_INVALID_CODE, [
-			`adapter ${JSON.stringify(input.adapter.id)} is registered at version ${JSON.stringify(adapter.adapterVersion)}, not the pinned ${JSON.stringify(input.adapter.version)}`,
-		]);
+	const inputProblem = effectRegistrationInputProblem(input);
+	if (inputProblem !== null) return fail(inputProblem.code, inputProblem.errors);
+	const adapterProblem = effectAdapterPinProblem(cwd, input.adapter);
+	if (adapterProblem !== null) return fail(adapterProblem.code, adapterProblem.errors);
 	let revisions;
 	try {
 		revisions = listArtifactRevisions(cwd);
@@ -443,17 +489,8 @@ function registerExternalEffect(cwd, input = {}, opts = {}) {
 			decision: resolved.decision,
 		},
 		(fold) => {
-			const key = effectKey(input.id, input.version);
-			if (fold.some((entry) => effectKey(entry.id, entry.version) === key))
-				return fail(EXTERNAL_INVALID_CODE, [
-					`external effect ${JSON.stringify(key)} is already registered; changed external semantics register a new version`,
-				]);
-			const spender = effectDecisionSpender(fold, input.decision);
-			if (spender !== null)
-				return fail(EXTERNAL_INVALID_CODE, [
-					`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized effect ${JSON.stringify(spender)}; a registration Decision is single-use`,
-				]);
-			return null;
+			const problem = effectRegistrationProblem(fold, input);
+			return problem === null ? null : fail(problem.code, problem.errors);
 		},
 		(fold) =>
 			fold.find(
@@ -622,14 +659,8 @@ function foldProposals(cwd) {
 	const byId = new Map();
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw proposalCorrupt(`external proposal event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw proposalCorrupt(`external proposal event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw proposalCorrupt(
-				`external proposal event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "external proposal");
+		if (link !== null) throw proposalCorrupt(link);
 		if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw proposalCorrupt(
 				`external proposal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -876,30 +907,23 @@ function authorizeExternalEffect(cwd, input = {}, opts = {}) {
 				return fail(EXTERNAL_DRIFT_CODE, [
 					`proposal ${JSON.stringify(input.id)} no longer matches what was reviewed; propose and review a fresh request`,
 				]);
-			let approval;
-			try {
-				approval = showApproval(cwd, input.approval, { now: opts.now });
-			} catch (err) {
-				return fail(err.amberCode || PROPOSAL_CORRUPT_CODE, [err.message || String(err)]);
-			}
-			if (approval === null)
-				return fail(EXTERNAL_INVALID_CODE, [
-					`approval ${JSON.stringify(input.approval)} is not recorded`,
-				]);
 			const binding = `external-effect:${proposal.requestHash}`;
-			if (approval.subject !== binding)
-				return fail(EXTERNAL_INVALID_CODE, [
-					`approval ${JSON.stringify(input.approval)} authorizes subject ${JSON.stringify(approval.subject)}, not this proposal's binding ${JSON.stringify(binding)}; one authorization binds one reviewed request hash`,
-				]);
 			// Consumption is the point of no return: it settles the human
 			// Decision atomically under the approval ledger's own lock. A
 			// ceiling/write failure AFTER this point leaves the consumed
 			// approval and settled Decision as the auditable source of
 			// truth for manual recovery — the proposal stays proposed.
-			const consumption = consumeApproval(
+			const settled = consumeSubjectBoundApproval(
 				cwd,
 				{
 					id: input.approval,
+					binding,
+					decision,
+					fail,
+					corruptCode: PROPOSAL_CORRUPT_CODE,
+					invalidCode: EXTERNAL_INVALID_CODE,
+					subjectMismatch: (approval) =>
+						`approval ${JSON.stringify(input.approval)} authorizes subject ${JSON.stringify(approval.subject)}, not this proposal's binding ${JSON.stringify(binding)}; one authorization binds one reviewed request hash`,
 					decisionIdentity: input.decisionIdentity,
 					body: input.body,
 					traces: input.traces ?? [],
@@ -907,9 +931,8 @@ function authorizeExternalEffect(cwd, input = {}, opts = {}) {
 				},
 				opts,
 			);
-			if (!consumption.ok) return fail(consumption.code, consumption.errors);
-			consumed = consumption;
-			decision.revision = consumption.receipt.revision;
+			if (settled.verdict !== null) return settled.verdict;
+			consumed = settled.consumption;
 			return null;
 		},
 		(fold) => fold.find((entry) => entry.id === input.id),
@@ -1153,14 +1176,8 @@ function foldExecutions(cwd) {
 	const byId = new Map();
 	events.forEach((event, index) => {
 		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw executionCorrupt(`external execution event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw executionCorrupt(`external execution event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw executionCorrupt(
-				`external execution event ${lineIndex} carries a hash that does not match its content`,
-			);
+		const link = chainLinkProblem(event, prevHash, lineIndex, "external execution");
+		if (link !== null) throw executionCorrupt(link);
 		if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
 			throw executionCorrupt(
 				`external execution event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
@@ -1247,6 +1264,107 @@ const EXECUTION_LEDGER = Object.freeze({
 	label: "external execution ledger",
 });
 
+// The declared credential class binds the execution: "none" refuses any
+// boundary, "scoped" requires a purpose/scope/expiry boundary (never a
+// handle or value) bounded by the contract's timeout.
+// Returns { code, errors } or null.
+function executionCredentialProblem(contract, credential, at) {
+	if (contract.credentials === "none" && credential !== null)
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`effect ${JSON.stringify(contract.id)} declares credentials "none"; no credential boundary rides this execution`,
+			],
+		};
+	if (contract.credentials === "scoped") {
+		if (credential === null)
+			return {
+				code: EXTERNAL_INVALID_CODE,
+				errors: [
+					`effect ${JSON.stringify(contract.id)} declares scoped credentials; the execution binds a purpose/scope/expiry credential boundary (never a handle or value)`,
+				],
+			};
+		const boundary = credentialBoundaryProblem(credential, "credential", at, contract.timeoutMs);
+		if (boundary !== null)
+			return {
+				code: isCredentialLeakProblem(boundary) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
+				errors: [boundary],
+			};
+	}
+	return null;
+}
+
+// The retry/idempotency guards for one request's attempt history: a
+// duplicate execution id refuses, ANY committed attempt blocks forever
+// (an older unknown that was reconciled to committed must not be bypassed
+// by a newer failed retry), an open attempt settles first, and an
+// unconfirmed outcome (attempted/unknown) retries only through a contract
+// declared idempotent. Returns { code, errors } or null.
+function executionRetryProblem(fold, proposal, contract, executionId) {
+	if (fold.some((entry) => entry.id === executionId))
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [`execution ${JSON.stringify(executionId)} already exists; open a new execution id`],
+		};
+	const attempts = fold.filter((entry) => entry.request === proposal.id);
+	const committed = attempts.find((entry) => entry.outcome === "committed");
+	if (committed)
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`request ${JSON.stringify(proposal.id)} already committed externally (execution ${JSON.stringify(committed.id)}); a retry never creates a duplicate external record`,
+			],
+		};
+	const latest = attempts.length > 0 ? attempts[attempts.length - 1] : null;
+	if (latest === null) return null;
+	if (latest.status === "prepared")
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`execution ${JSON.stringify(latest.id)} is still open for this request; settle it before retrying`,
+			],
+		};
+	// failed/denied re-execute freely; an unconfirmed outcome
+	// (attempted/unknown) may already have landed externally, so
+	// only a contract declared idempotent may retry through it.
+	if (["attempted", "unknown"].includes(latest.outcome) && contract.idempotency !== "idempotent")
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`request ${JSON.stringify(proposal.id)} has an unconfirmed ${JSON.stringify(latest.outcome)} outcome and the contract declares at-most-once; reconcile with independent Evidence instead of retrying`,
+			],
+		};
+	return null;
+}
+
+// The prepared execution event copies the executed operation, target,
+// scope, and Adapter pin only from the reviewed contract snapshot —
+// caller input contributes ids and the bounded credential boundary.
+function executionEventBodyFor(input, proposal, contract, credential, at) {
+	return {
+		kind: "execution",
+		schemaVersion: EXTERNAL_SCHEMA_VERSION,
+		at,
+		id: input.id,
+		request: proposal.id,
+		effect: proposal.effect,
+		adapter: proposal.adapter,
+		operation: contract.operation,
+		target: proposal.target,
+		scope: proposal.scope,
+		idempotency: contract.idempotency,
+		timeoutMs: contract.timeoutMs,
+		credential:
+			credential === null
+				? null
+				: {
+						purpose: credential.purpose,
+						scope: credential.scope,
+						expiresAt: credential.expiresAt,
+					},
+	};
+}
+
 /**
  * Prepare one execution for an AUTHORIZED request: the executed
  * operation, target, scope, and Adapter pin come only from the reviewed
@@ -1300,79 +1418,15 @@ function executeExternalEffect(cwd, input = {}, opts = {}) {
 		return fail(err.amberCode || EXTERNAL_CORRUPT_CODE, [err.message || String(err)]);
 	}
 	const credential = input.credential ?? null;
-	if (contract.credentials === "none" && credential !== null)
-		return fail(EXTERNAL_INVALID_CODE, [
-			`effect ${JSON.stringify(contract.id)} declares credentials "none"; no credential boundary rides this execution`,
-		]);
-	if (contract.credentials === "scoped") {
-		if (credential === null)
-			return fail(EXTERNAL_INVALID_CODE, [
-				`effect ${JSON.stringify(contract.id)} declares scoped credentials; the execution binds a purpose/scope/expiry credential boundary (never a handle or value)`,
-			]);
-		const boundary = credentialBoundaryProblem(credential, "credential", at, contract.timeoutMs);
-		if (boundary !== null) {
-			return fail(
-				isCredentialLeakProblem(boundary) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
-				[boundary],
-			);
-		}
-	}
+	const credentialProblem = executionCredentialProblem(contract, credential, at);
+	if (credentialProblem !== null) return fail(credentialProblem.code, credentialProblem.errors);
 	return appendLedgerEvent(
 		cwd,
 		EXECUTION_LEDGER,
-		{
-			kind: "execution",
-			schemaVersion: EXTERNAL_SCHEMA_VERSION,
-			at,
-			id: input.id,
-			request: proposal.id,
-			effect: proposal.effect,
-			adapter: proposal.adapter,
-			operation: contract.operation,
-			target: proposal.target,
-			scope: proposal.scope,
-			idempotency: contract.idempotency,
-			timeoutMs: contract.timeoutMs,
-			credential:
-				credential === null
-					? null
-					: {
-							purpose: credential.purpose,
-							scope: credential.scope,
-							expiresAt: credential.expiresAt,
-						},
-		},
+		executionEventBodyFor(input, proposal, contract, credential, at),
 		(fold) => {
-			if (fold.some((entry) => entry.id === input.id))
-				return fail(EXTERNAL_INVALID_CODE, [
-					`execution ${JSON.stringify(input.id)} already exists; open a new execution id`,
-				]);
-			const attempts = fold.filter((entry) => entry.request === proposal.id);
-			// ANY committed attempt blocks forever — an older unknown that
-			// was reconciled to committed must not be bypassed by a newer
-			// failed retry.
-			const committed = attempts.find((entry) => entry.outcome === "committed");
-			if (committed)
-				return fail(EXTERNAL_INVALID_CODE, [
-					`request ${JSON.stringify(proposal.id)} already committed externally (execution ${JSON.stringify(committed.id)}); a retry never creates a duplicate external record`,
-				]);
-			const latest = attempts.length > 0 ? attempts[attempts.length - 1] : null;
-			if (latest === null) return null;
-			if (latest.status === "prepared")
-				return fail(EXTERNAL_INVALID_CODE, [
-					`execution ${JSON.stringify(latest.id)} is still open for this request; settle it before retrying`,
-				]);
-			// failed/denied re-execute freely; an unconfirmed outcome
-			// (attempted/unknown) may already have landed externally, so
-			// only a contract declared idempotent may retry through it.
-			if (
-				["attempted", "unknown"].includes(latest.outcome) &&
-				contract.idempotency !== "idempotent"
-			)
-				return fail(EXTERNAL_INVALID_CODE, [
-					`request ${JSON.stringify(proposal.id)} has an unconfirmed ${JSON.stringify(latest.outcome)} outcome and the contract declares at-most-once; reconcile with independent Evidence instead of retrying`,
-				]);
-			return null;
+			const problem = executionRetryProblem(fold, proposal, contract, input.id);
+			return problem === null ? null : fail(problem.code, problem.errors);
 		},
 		(fold) => fold.find((entry) => entry.id === input.id),
 	);
@@ -1444,6 +1498,73 @@ function settleExternalExecution(cwd, input = {}, opts = {}) {
 	);
 }
 
+// One request commits at most once: while a retry is open or another
+// attempt already committed, an unknown outcome cannot also become
+// committed. Returns { code, errors } or null.
+function reconciliationSiblingProblem(fold, execution) {
+	const sibling = fold.find(
+		(entry) =>
+			entry.request === execution.request &&
+			entry.id !== execution.id &&
+			(entry.status === "prepared" || entry.outcome === "committed"),
+	);
+	if (!sibling) return null;
+	return {
+		code: EXTERNAL_INVALID_CODE,
+		errors: [
+			`execution ${JSON.stringify(sibling.id)} for the same request is ${sibling.status === "prepared" ? "still open" : "already committed"}; a request commits at most once`,
+		],
+	};
+}
+
+// Reconciliation Evidence must exist and come from a producer independent
+// of the approver who authorized the request. Independence is enforced at
+// write time by design: the event records the evidence REFERENCE (the
+// receipt itself carries the producer snapshot in its own ledger), and
+// the hash chain protects the recorded reference from rewrites.
+// Returns { code, errors } or null.
+function reconciliationIndependenceProblem(cwd, execution, evidenceId, now) {
+	let evidence;
+	try {
+		evidence = showEvidence(cwd, evidenceId);
+	} catch (err) {
+		return { code: err.amberCode || EXEC_CORRUPT_CODE, errors: [err.message || String(err)] };
+	}
+	if (evidence === null)
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`evidence ${JSON.stringify(evidenceId)} is not recorded; an unknown result becomes committed only through recorded reconciliation Evidence`,
+			],
+		};
+	let approverId;
+	try {
+		const proposal = showExternalProposal(cwd, execution.request);
+		const approval =
+			proposal?.authorization == null
+				? null
+				: showApproval(cwd, proposal.authorization.approvalId, { now });
+		approverId = approval?.approver?.id ?? null;
+	} catch (err) {
+		return { code: err.amberCode || PROPOSAL_CORRUPT_CODE, errors: [err.message || String(err)] };
+	}
+	if (approverId === null)
+		return {
+			code: EXEC_CORRUPT_CODE,
+			errors: [
+				`execution ${JSON.stringify(execution.id)} cannot resolve the authorizing approver; reconciliation requires the recorded authorization chain`,
+			],
+		};
+	if (evidence.producer.id === approverId)
+		return {
+			code: EXTERNAL_INVALID_CODE,
+			errors: [
+				`evidence ${JSON.stringify(evidenceId)} was produced by the authorizing approver ${JSON.stringify(approverId)}; reconciliation requires an independent producer`,
+			],
+		};
+	return null;
+}
+
 /**
  * Reconcile one unknown outcome to committed — the only path, and only
  * through recorded Evidence from a producer independent of the approver
@@ -1493,52 +1614,10 @@ function reconcileExternalExecution(cwd, input = {}, opts = {}) {
 				return fail(EXTERNAL_INVALID_CODE, [
 					`execution ${JSON.stringify(input.id)} has outcome ${JSON.stringify(execution.outcome ?? execution.status)}; reconciliation is the only path from unknown to committed`,
 				]);
-			// One request commits at most once: while a retry is open or
-			// another attempt already committed, this unknown cannot also
-			// become committed.
-			const sibling = fold.find(
-				(entry) =>
-					entry.request === execution.request &&
-					entry.id !== execution.id &&
-					(entry.status === "prepared" || entry.outcome === "committed"),
-			);
-			if (sibling)
-				return fail(EXTERNAL_INVALID_CODE, [
-					`execution ${JSON.stringify(sibling.id)} for the same request is ${sibling.status === "prepared" ? "still open" : "already committed"}; a request commits at most once`,
-				]);
-			let evidence;
-			try {
-				evidence = showEvidence(cwd, input.evidence);
-			} catch (err) {
-				return fail(err.amberCode || EXEC_CORRUPT_CODE, [err.message || String(err)]);
-			}
-			if (evidence === null)
-				return fail(EXTERNAL_INVALID_CODE, [
-					`evidence ${JSON.stringify(input.evidence)} is not recorded; an unknown result becomes committed only through recorded reconciliation Evidence`,
-				]);
-			let approverId;
-			try {
-				const proposal = showExternalProposal(cwd, execution.request);
-				const approval =
-					proposal?.authorization == null
-						? null
-						: showApproval(cwd, proposal.authorization.approvalId, { now });
-				approverId = approval?.approver?.id ?? null;
-			} catch (err) {
-				return fail(err.amberCode || PROPOSAL_CORRUPT_CODE, [err.message || String(err)]);
-			}
-			if (approverId === null)
-				return fail(EXEC_CORRUPT_CODE, [
-					`execution ${JSON.stringify(input.id)} cannot resolve the authorizing approver; reconciliation requires the recorded authorization chain`,
-				]);
-			// Independence is enforced at write time by design: the event
-			// records the evidence REFERENCE (the receipt itself carries
-			// the producer snapshot in its own ledger), and the hash chain
-			// protects the recorded reference from rewrites.
-			if (evidence.producer.id === approverId)
-				return fail(EXTERNAL_INVALID_CODE, [
-					`evidence ${JSON.stringify(input.evidence)} was produced by the authorizing approver ${JSON.stringify(approverId)}; reconciliation requires an independent producer`,
-				]);
+			const sibling = reconciliationSiblingProblem(fold, execution);
+			if (sibling !== null) return fail(sibling.code, sibling.errors);
+			const independence = reconciliationIndependenceProblem(cwd, execution, input.evidence, now);
+			if (independence !== null) return fail(independence.code, independence.errors);
 			return null;
 		},
 		(fold) => fold.find((entry) => entry.id === input.id),

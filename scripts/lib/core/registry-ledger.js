@@ -254,6 +254,18 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 	}
 }
 
+// The chain-walk prologue every governed fold shares: object shape, link,
+// and content hash. Returns the problem text (the caller owns the corrupt
+// error type) or null.
+function chainLinkProblem(event, prevHash, lineIndex, label) {
+	if (!isPlainObject(event)) return `${label} event ${lineIndex} is not an object`;
+	if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
+		return `${label} event ${lineIndex} breaks the hash chain`;
+	if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+		return `${label} event ${lineIndex} carries a hash that does not match its content`;
+	return null;
+}
+
 // ── Shared registry validators (acceptance review S1) ───────────────────
 // The governed registries (maintain/retention/external/breakglass) share
 // one validation vocabulary: plain-object/non-empty-string primitives,
@@ -372,6 +384,7 @@ module.exports = {
 	appendLedgerEvent,
 	credentialLeakProblem,
 	isCredentialLeakProblem,
+	chainLinkProblem,
 	isPlainObject,
 	isNonEmptyString,
 	quotedList,
