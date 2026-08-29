@@ -8,14 +8,15 @@
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const {
-	readFailure,
 	invalidArg,
 	targetValue,
 	requiredString,
 	positiveInt,
 	clockValue,
 	resultEnvelope,
-	missingValueFlag: firstMissingFlagValue,
+	missingValueFlagError,
+	readFailureEnvelope,
+	parseRevisionPin,
 } = require("./command-helpers");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
 
@@ -51,8 +52,8 @@ const VALUE_FLAGS = [
 	["target", "--target"],
 ];
 
-function missingValueFlag(args) {
-	return firstMissingFlagValue(args, VALUE_FLAGS);
+function argsGuard(args) {
+	return missingValueFlagError(args, VALUE_FLAGS);
 }
 
 // Grammar: <type>:<identity>@<revision> — one committed record pin.
@@ -66,15 +67,8 @@ function parseRecord(raw) {
 	return { value: { type: match[1], identity: match[2], revision: Number(match[3]) } };
 }
 
-// Grammar: <identity>@<revision> — one committed policy revision pin.
 function parsePolicyPin(raw) {
-	const match = /^(.+)@([1-9]\d*)$/.exec(String(raw));
-	if (!match) {
-		return {
-			error: `--policy must be <identity>@<revision> (e.g. --policy policy/tenant-retention@1); got ${JSON.stringify(raw)}`,
-		};
-	}
-	return { value: { identity: match[1], revision: Number(match[2]) } };
+	return parseRevisionPin(raw, "--policy", "policy/tenant-retention@1");
 }
 
 const dispatch = defineCommand({
@@ -99,11 +93,8 @@ const dispatch = defineCommand({
 	handlers: {
 		classify: (args) => {
 			const { classify } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -130,11 +121,8 @@ const dispatch = defineCommand({
 		},
 		evaluate: (args) => {
 			const { evaluateRetention } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const clock = clockValue(args);
@@ -145,11 +133,8 @@ const dispatch = defineCommand({
 		},
 		classifications: (args) => {
 			const { listClassifications } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const type = args.type === undefined ? null : String(args.type);
@@ -165,17 +150,13 @@ const dispatch = defineCommand({
 					text: JSON.stringify(listClassifications(target.value, { type, identity }), null, 2),
 				};
 			} catch (err) {
-				const failure = readFailure(args, err, READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, READ_FAILURE_CODE);
 			}
 		},
 		hold: (args) => {
 			const { hold } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -216,11 +197,8 @@ const dispatch = defineCommand({
 		},
 		release: (args) => {
 			const { releaseHold } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -241,11 +219,8 @@ const dispatch = defineCommand({
 		},
 		holds: (args) => {
 			const { listHolds, HOLD_STATUSES } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const status = args.status === undefined ? null : String(args.status);
@@ -256,17 +231,13 @@ const dispatch = defineCommand({
 			try {
 				return { text: JSON.stringify(listHolds(target.value, { status }), null, 2) };
 			} catch (err) {
-				const failure = readFailure(args, err, HOLD_READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, HOLD_READ_FAILURE_CODE);
 			}
 		},
 		holder: (args) => {
 			const { registerHolder } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -294,27 +265,20 @@ const dispatch = defineCommand({
 		},
 		holders: (args) => {
 			const { listHolders } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			try {
 				return { text: JSON.stringify(listHolders(target.value), null, 2) };
 			} catch (err) {
-				const failure = readFailure(args, err, HOLDER_READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, HOLDER_READ_FAILURE_CODE);
 			}
 		},
 		candidate: (args) => {
 			const { prepareDeletionCandidate } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const id = requiredString(args, "id", "--id", "deletion/2026-08");
@@ -331,11 +295,8 @@ const dispatch = defineCommand({
 		},
 		authorize: (args) => {
 			const { authorizeDeletion } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -362,11 +323,8 @@ const dispatch = defineCommand({
 		},
 		candidates: (args) => {
 			const { listDeletionCandidates, CANDIDATE_STATUSES } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const status = args.status === undefined ? null : String(args.status);
@@ -379,17 +337,13 @@ const dispatch = defineCommand({
 					text: JSON.stringify(listDeletionCandidates(target.value, { status }), null, 2),
 				};
 			} catch (err) {
-				const failure = readFailure(args, err, CANDIDATE_READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, CANDIDATE_READ_FAILURE_CODE);
 			}
 		},
 		execute: (args) => {
 			const { executeDeletion } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -408,11 +362,8 @@ const dispatch = defineCommand({
 		},
 		settle: (args) => {
 			const { settleHolder } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -436,11 +387,8 @@ const dispatch = defineCommand({
 		},
 		status: (args) => {
 			const { deletionStatus } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const id = requiredString(args, "id", "--id", "deletion-tx/2026-08");
@@ -449,11 +397,8 @@ const dispatch = defineCommand({
 		},
 		proof: (args) => {
 			const { deletionProof } = require("./core/retention-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const id = requiredString(args, "id", "--id", "deletion-tx/2026-08");

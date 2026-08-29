@@ -29,6 +29,7 @@ const {
 	acquireLedgerLock,
 	appendLedgerEvent,
 	credentialLeakProblem,
+	isCredentialLeakProblem,
 	isPlainObject,
 	isNonEmptyString,
 	closedFieldProblem,
@@ -379,7 +380,7 @@ function registerExternalEffect(cwd, input = {}, opts = {}) {
 	const schemaProblem = inputSchemaProblem(input.inputSchema, "effect input.inputSchema");
 	if (schemaProblem !== null)
 		return fail(
-			/credential material/.test(schemaProblem) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
+			isCredentialLeakProblem(schemaProblem) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
 			[schemaProblem],
 		);
 	// The declared schema must compile: a contract whose payload shape is
@@ -527,7 +528,7 @@ const PROPOSAL_EVENT_FIELDS = Object.freeze([
 	"prevHash",
 	"hash",
 ]);
-const PROPOSAL_EVENT_FIELDS_V1 = Object.freeze(
+const PROPOSAL_EVENT_FIELDS_LEGACY = Object.freeze(
 	PROPOSAL_EVENT_FIELDS.filter((field) => field !== "compensates"),
 );
 const PROPOSAL_AUTHORIZED_EVENT_FIELDS = Object.freeze([
@@ -555,7 +556,7 @@ function proposalEventProblem(event, lineIndex) {
 	if (event.kind === "proposal") {
 		const closed = closedFieldProblem(
 			event,
-			event.schemaVersion === 1 ? PROPOSAL_EVENT_FIELDS_V1 : PROPOSAL_EVENT_FIELDS,
+			event.schemaVersion >= 2 ? PROPOSAL_EVENT_FIELDS : PROPOSAL_EVENT_FIELDS_LEGACY,
 			label,
 		);
 		if (closed !== null) return closed;
@@ -1311,7 +1312,7 @@ function executeExternalEffect(cwd, input = {}, opts = {}) {
 		const boundary = credentialBoundaryProblem(credential, "credential", at, contract.timeoutMs);
 		if (boundary !== null) {
 			return fail(
-				/credential material/.test(boundary) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
+				isCredentialLeakProblem(boundary) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
 				[boundary],
 			);
 		}

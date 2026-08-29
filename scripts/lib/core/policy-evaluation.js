@@ -25,6 +25,7 @@ const { parseTimestamp, resolveActivePrincipal } = require("./principal-registry
 const { showApproval } = require("./approval-registry");
 const { showEvidence } = require("./evidence-receipts");
 const { showGateOutcome } = require("./gate-evaluation");
+const { overdueBreakGlassReviews } = require("./breakglass-registry");
 const { showArtifact } = require("./canonical-artifacts");
 
 const POLICY_EVALUATION_SCHEMA_VERSION = 1;
@@ -630,7 +631,6 @@ function collectBreakGlassOverdueReasons(cwd, entries, evalNow) {
 	if (declaring.length === 0) return { ok: true, reasons: [] };
 	let overdue;
 	try {
-		const { overdueBreakGlassReviews } = require("./breakglass-registry");
 		overdue = overdueBreakGlassReviews(cwd, { now: evalNow });
 	} catch (err) {
 		return {

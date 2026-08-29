@@ -7,14 +7,14 @@
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const {
-	readFailure,
 	invalidArg,
 	targetValue,
 	requiredString,
 	positiveInt,
 	clockValue,
 	resultEnvelope,
-	missingValueFlag: firstMissingFlagValue,
+	missingValueFlagError,
+	readFailureEnvelope,
 } = require("./command-helpers");
 
 const READ_FAILURE_CODE = "AMBER_E_BREAKGLASS_CORRUPT";
@@ -46,8 +46,8 @@ const VALUE_FLAGS = [
 	["target", "--target"],
 ];
 
-function missingValueFlag(args) {
-	return firstMissingFlagValue(args, VALUE_FLAGS);
+function argsGuard(args) {
+	return missingValueFlagError(args, VALUE_FLAGS);
 }
 
 // Grammar: one kind-prefixed registered-capability pin —
@@ -82,11 +82,8 @@ const dispatch = defineCommand({
 	handlers: {
 		grant: (args) => {
 			const { grantBreakGlass } = require("./core/breakglass-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -137,11 +134,8 @@ const dispatch = defineCommand({
 		},
 		revoke: (args) => {
 			const { revokeBreakGlass } = require("./core/breakglass-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -170,11 +164,8 @@ const dispatch = defineCommand({
 		},
 		use: (args) => {
 			const { useBreakGlass } = require("./core/breakglass-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -196,11 +187,8 @@ const dispatch = defineCommand({
 		},
 		show: (args) => {
 			const { showBreakGlassGrant } = require("./core/breakglass-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const id = requiredString(args, "id", "--id", "breakglass/incident-42-restore");
@@ -215,8 +203,7 @@ const dispatch = defineCommand({
 					clock.value === null ? {} : { now: clock.value },
 				);
 			} catch (err) {
-				const failure = readFailure(args, err, READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, READ_FAILURE_CODE);
 			}
 			if (record === null)
 				return {
@@ -230,11 +217,8 @@ const dispatch = defineCommand({
 		},
 		settle: (args) => {
 			const { settleBreakGlass } = require("./core/breakglass-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -256,11 +240,8 @@ const dispatch = defineCommand({
 		},
 		review: (args) => {
 			const { reviewBreakGlass } = require("./core/breakglass-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -295,11 +276,8 @@ const dispatch = defineCommand({
 		},
 		status: (args) => {
 			const { breakGlassStatus } = require("./core/breakglass-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const id = requiredString(args, "id", "--id", "breakglass/incident-42-restore");
@@ -314,8 +292,7 @@ const dispatch = defineCommand({
 					clock.value === null ? {} : { now: clock.value },
 				);
 			} catch (err) {
-				const failure = readFailure(args, err, READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, READ_FAILURE_CODE);
 			}
 			if (record === null)
 				return {
@@ -329,11 +306,8 @@ const dispatch = defineCommand({
 		},
 		grants: (args) => {
 			const { listBreakGlassGrants, GRANT_STATUSES } = require("./core/breakglass-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const status = args.status === undefined ? null : String(args.status);
@@ -352,8 +326,7 @@ const dispatch = defineCommand({
 					),
 				};
 			} catch (err) {
-				const failure = readFailure(args, err, READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, READ_FAILURE_CODE);
 			}
 		},
 	},

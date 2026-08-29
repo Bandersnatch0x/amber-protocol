@@ -67,6 +67,7 @@ const path = require("node:path");
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
+const { deletionTombstones } = require("./retention-registry");
 const {
 	GENESIS_HASH,
 	chainHash,
@@ -978,9 +979,7 @@ function evaluateGate(cwd, input = {}, opts = {}) {
 	// unrelated free-text phrasing stays out of reach because requirements
 	// join evidence on these same subject strings. The match is
 	// deliberately type-agnostic (identity@revision): over-blocking is
-	// fail-safe. Lazy require: retention depends on approval-registry, not
-	// on gates.
-	const { deletionTombstones } = require("./retention-registry");
+	// fail-safe.
 	let tombstones;
 	try {
 		tombstones = deletionTombstones(cwd);

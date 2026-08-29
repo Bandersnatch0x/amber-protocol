@@ -143,7 +143,7 @@ const DETECTOR_EVENT_FIELDS = Object.freeze([
 	"prevHash",
 	"hash",
 ]);
-const DETECTOR_EVENT_FIELDS_V1 = Object.freeze(
+const DETECTOR_EVENT_FIELDS_LEGACY = Object.freeze(
 	DETECTOR_EVENT_FIELDS.filter((field) => field !== "owner" && field !== "policy"),
 );
 const DETECT_INPUT_FIELDS = Object.freeze([
@@ -278,7 +278,7 @@ function detectorEventProblem(event, lineIndex) {
 	const label = `maintain detector event ${lineIndex}`;
 	const closed = closedFieldProblem(
 		event,
-		event.schemaVersion === 1 ? DETECTOR_EVENT_FIELDS_V1 : DETECTOR_EVENT_FIELDS,
+		event.schemaVersion >= 2 ? DETECTOR_EVENT_FIELDS : DETECTOR_EVENT_FIELDS_LEGACY,
 		label,
 	);
 	if (closed !== null) return closed;

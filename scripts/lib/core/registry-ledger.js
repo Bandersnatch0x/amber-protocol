@@ -356,6 +356,12 @@ function credentialLeakProblem(value, label) {
 	return null;
 }
 
+// One home for the heuristic's message signature: callers map a leak
+// problem onto their registry's dedicated code without re-matching text.
+function isCredentialLeakProblem(problem) {
+	return typeof problem === "string" && problem.includes("credential material");
+}
+
 module.exports = {
 	GENESIS_HASH,
 	DEFAULT_LOCK_STALE_MS,
@@ -365,6 +371,7 @@ module.exports = {
 	appendWithinCeiling,
 	appendLedgerEvent,
 	credentialLeakProblem,
+	isCredentialLeakProblem,
 	isPlainObject,
 	isNonEmptyString,
 	quotedList,

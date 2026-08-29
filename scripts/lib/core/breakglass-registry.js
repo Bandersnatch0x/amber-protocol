@@ -36,6 +36,7 @@ const {
 	acquireLedgerLock,
 	appendLedgerEvent,
 	credentialLeakProblem,
+	isCredentialLeakProblem,
 	isPlainObject,
 	isNonEmptyString,
 	closedFieldProblem,
@@ -97,7 +98,7 @@ function slugRefusal(value, label) {
 	const problem = slugProblem(value, label);
 	if (problem === null) return null;
 	return {
-		code: /credential material/.test(problem) ? BREAKGLASS_LEAK_CODE : BREAKGLASS_INVALID_CODE,
+		code: isCredentialLeakProblem(problem) ? BREAKGLASS_LEAK_CODE : BREAKGLASS_INVALID_CODE,
 		message: problem,
 	};
 }
@@ -657,7 +658,7 @@ function grantBreakGlass(cwd, input = {}, opts = {}) {
 	const inputClosed = unknownFieldProblem(input, GRANT_INPUT_FIELDS, "grant input");
 	if (inputClosed !== null) return fail(BREAKGLASS_INVALID_CODE, [inputClosed]);
 	const leakCode = (problem) =>
-		/credential material/.test(problem) ? BREAKGLASS_LEAK_CODE : BREAKGLASS_INVALID_CODE;
+		isCredentialLeakProblem(problem) ? BREAKGLASS_LEAK_CODE : BREAKGLASS_INVALID_CODE;
 	const shape = grantShapeProblem(input, "grant input");
 	if (shape !== null) return fail(leakCode(shape), [shape]);
 	// The window anchors to the grant instant (F050 mirror, no skew

@@ -133,6 +133,31 @@ function missingValueFlag(args, valueFlags) {
 	return null;
 }
 
+// The shared refusal envelope for a truncated flag: the template lives
+// once here instead of once per handler.
+function missingValueFlagError(args, valueFlags) {
+	const flag = missingValueFlag(args, valueFlags);
+	if (flag === null) return null;
+	return invalidArg(`${flag} requires a value; it was the last token on the command line`);
+}
+
+// readFailure flattened into the command envelope shape in one step.
+function readFailureEnvelope(args, err, fallbackCode) {
+	const failure = readFailure(args, err, fallbackCode);
+	return { ...failure.result, exitCode: failure.exitCode };
+}
+
+// Grammar: <identity>@<revision> — one committed artifact revision pin.
+function parseRevisionPin(raw, flag, example) {
+	const match = /^(.+)@([1-9]\d*)$/.exec(String(raw));
+	if (!match) {
+		return {
+			error: `${flag} must be <identity>@<revision> (e.g. ${flag} ${example}); got ${JSON.stringify(raw)}`,
+		};
+	}
+	return { value: { identity: match[1], revision: Number(match[2]) } };
+}
+
 module.exports = {
 	resolveTarget,
 	unknownAction,
@@ -146,4 +171,7 @@ module.exports = {
 	clockValue,
 	resultEnvelope,
 	missingValueFlag,
+	missingValueFlagError,
+	readFailureEnvelope,
+	parseRevisionPin,
 };

@@ -7,13 +7,15 @@
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const {
-	readFailure,
 	invalidArg,
 	targetValue,
 	requiredString,
 	positiveInt,
 	clockValue,
-	missingValueFlag: firstMissingFlagValue,
+	resultEnvelope: sharedResultEnvelope,
+	missingValueFlagError,
+	readFailureEnvelope,
+	parseRevisionPin,
 } = require("./command-helpers");
 
 const READ_FAILURE_CODE = "AMBER_E_MAINTAIN_CORRUPT";
@@ -52,8 +54,8 @@ const VALUE_FLAGS = [
 	["target", "--target"],
 ];
 
-function missingValueFlag(args) {
-	return firstMissingFlagValue(args, VALUE_FLAGS);
+function argsGuard(args) {
+	return missingValueFlagError(args, VALUE_FLAGS);
 }
 
 function requiredNumber(args, key, flag) {
@@ -66,18 +68,11 @@ function requiredNumber(args, key, flag) {
 	return { value };
 }
 
-// Grammar: <tier>:<comparator>:<threshold> — one deterministic rule.
-// Grammar: <identity>@<revision> — one committed policy revision pin.
 function parsePolicyPin(raw) {
-	const match = /^(.+)@([1-9]\d*)$/.exec(String(raw));
-	if (!match) {
-		return {
-			error: `--policy must be <identity>@<revision> (e.g. --policy policy/error-budget@1); got ${JSON.stringify(raw)}`,
-		};
-	}
-	return { value: { identity: match[1], revision: Number(match[2]) } };
+	return parseRevisionPin(raw, "--policy", "policy/error-budget@1");
 }
 
+// Grammar: <tier>:<comparator>:<threshold> — one deterministic rule.
 function parseRule(raw) {
 	const match = /^([a-z][a-z0-9-]*):(ge|gt|le|lt):(-?\d+(?:\.\d+)?)$/.exec(String(raw));
 	if (!match) {
@@ -88,26 +83,15 @@ function parseRule(raw) {
 	return { value: { tier: match[1], comparator: match[2], threshold: Number(match[3]) } };
 }
 
-// Grammar: <identity>@<revision> — one committed artifact revision pin.
 function parsePin(raw, flag) {
-	const match = /^(.+)@([1-9]\d*)$/.exec(String(raw));
-	if (!match) {
-		return {
-			error: `${flag} must be <identity>@<revision> (e.g. ${flag} eval/maintain-check@1); got ${JSON.stringify(raw)}`,
-		};
-	}
-	return { value: { identity: match[1], revision: Number(match[2]) } };
+	return parseRevisionPin(raw, flag, "eval/maintain-check@1");
 }
 
 function resultEnvelope(result) {
 	// A null record is detect's in-band verdict: a tier with nothing appended.
-	return {
-		text: result.ok ? JSON.stringify(result.record ?? { tier: result.tier }, null, 2) : "",
-		errors: result.errors,
-		warnings: [],
-		exitCode: result.ok ? 0 : 1,
-		...(result.code ? { code: result.code } : {}),
-	};
+	return sharedResultEnvelope(
+		result.ok && result.record == null ? { ...result, record: { tier: result.tier } } : result,
+	);
 }
 
 const dispatch = defineCommand({
@@ -126,11 +110,8 @@ const dispatch = defineCommand({
 	handlers: {
 		"register-detector": (args) => {
 			const { registerDetector } = require("./core/maintain-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -199,11 +180,8 @@ const dispatch = defineCommand({
 		},
 		detect: (args) => {
 			const { detect } = require("./core/maintain-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -238,11 +216,8 @@ const dispatch = defineCommand({
 		},
 		propose: (args) => {
 			const { propose } = require("./core/maintain-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const findingIndex = Number(args.findingIndex);
@@ -271,11 +246,8 @@ const dispatch = defineCommand({
 		},
 		triage: (args) => {
 			const { triage } = require("./core/maintain-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -309,11 +281,8 @@ const dispatch = defineCommand({
 		},
 		complete: (args) => {
 			const { complete } = require("./core/maintain-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const fingerprint = requiredString(args, "fingerprint", "--fingerprint", "sha256:<64-hex>");
@@ -342,11 +311,8 @@ const dispatch = defineCommand({
 		},
 		rollup: (args) => {
 			const { rollup } = require("./core/maintain-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const limit = positiveInt(args, "limit", "--limit");
@@ -355,27 +321,20 @@ const dispatch = defineCommand({
 		},
 		detectors: (args) => {
 			const { listDetectors } = require("./core/maintain-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			try {
 				return { text: JSON.stringify(listDetectors(target.value), null, 2) };
 			} catch (err) {
-				const failure = readFailure(args, err, READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, READ_FAILURE_CODE);
 			}
 		},
 		findings: (args) => {
 			const { listFindings } = require("./core/maintain-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const detectorId = args.id === undefined ? null : String(args.id);
@@ -391,17 +350,13 @@ const dispatch = defineCommand({
 					text: JSON.stringify(listFindings(target.value, { detectorId, fingerprint }), null, 2),
 				};
 			} catch (err) {
-				const failure = readFailure(args, err, FINDING_READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, FINDING_READ_FAILURE_CODE);
 			}
 		},
 		proposals: (args) => {
 			const { listProposals } = require("./core/maintain-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const fingerprint = args.fingerprint === undefined ? null : String(args.fingerprint);
@@ -412,8 +367,7 @@ const dispatch = defineCommand({
 			try {
 				return { text: JSON.stringify(listProposals(target.value, { fingerprint }), null, 2) };
 			} catch (err) {
-				const failure = readFailure(args, err, PROPOSAL_READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, PROPOSAL_READ_FAILURE_CODE);
 			}
 		},
 	},

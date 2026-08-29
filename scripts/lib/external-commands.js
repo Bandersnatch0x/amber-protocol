@@ -7,14 +7,14 @@
 
 const { defineCommand } = require("./subcommand-dispatcher");
 const {
-	readFailure,
 	invalidArg,
 	targetValue,
 	requiredString,
 	positiveInt,
 	clockValue,
 	resultEnvelope,
-	missingValueFlag: firstMissingFlagValue,
+	missingValueFlagError,
+	readFailureEnvelope,
 } = require("./command-helpers");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
 
@@ -59,8 +59,8 @@ const VALUE_FLAGS = [
 	["target", "--target"],
 ];
 
-function missingValueFlag(args) {
-	return firstMissingFlagValue(args, VALUE_FLAGS);
+function argsGuard(args) {
+	return missingValueFlagError(args, VALUE_FLAGS);
 }
 
 // Grammar: <id>@<version> — one registered effect contract pin.
@@ -92,11 +92,8 @@ const dispatch = defineCommand({
 	handlers: {
 		register: (args) => {
 			const { registerExternalEffect } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -170,11 +167,8 @@ const dispatch = defineCommand({
 		},
 		effects: (args) => {
 			const { listExternalEffects, EXTERNAL_SYSTEMS } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const system = args.system === undefined ? null : String(args.system);
@@ -187,17 +181,13 @@ const dispatch = defineCommand({
 					text: JSON.stringify(listExternalEffects(target.value, { system }), null, 2),
 				};
 			} catch (err) {
-				const failure = readFailure(args, err, READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, READ_FAILURE_CODE);
 			}
 		},
 		propose: (args) => {
 			const { proposeExternalEffect } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -220,11 +210,8 @@ const dispatch = defineCommand({
 		},
 		authorize: (args) => {
 			const { authorizeExternalEffect } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -251,11 +238,8 @@ const dispatch = defineCommand({
 		},
 		proposals: (args) => {
 			const { listExternalProposals, PROPOSAL_STATUSES } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const status = args.status === undefined ? null : String(args.status);
@@ -268,17 +252,13 @@ const dispatch = defineCommand({
 					text: JSON.stringify(listExternalProposals(target.value, { status }), null, 2),
 				};
 			} catch (err) {
-				const failure = readFailure(args, err, PROPOSAL_READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, PROPOSAL_READ_FAILURE_CODE);
 			}
 		},
 		execute: (args) => {
 			const { executeExternalEffect } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -318,11 +298,8 @@ const dispatch = defineCommand({
 		},
 		settle: (args) => {
 			const { settleExternalExecution } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -352,11 +329,8 @@ const dispatch = defineCommand({
 		},
 		reconcile: (args) => {
 			const { reconcileExternalExecution } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -383,11 +357,8 @@ const dispatch = defineCommand({
 		},
 		compensate: (args) => {
 			const { compensateExternalEffect } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			for (const [key, flag, example] of [
@@ -414,11 +385,8 @@ const dispatch = defineCommand({
 		},
 		transactions: (args) => {
 			const { listExternalTransactions } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			try {
@@ -432,17 +400,13 @@ const dispatch = defineCommand({
 					),
 				};
 			} catch (err) {
-				const failure = readFailure(args, err, EXEC_READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, EXEC_READ_FAILURE_CODE);
 			}
 		},
 		status: (args) => {
 			const { showExternalExecution } = require("./core/external-registry");
-			const truncated = missingValueFlag(args);
-			if (truncated)
-				return invalidArg(
-					`${truncated} requires a value; it was the last token on the command line`,
-				);
+			const guard = argsGuard(args);
+			if (guard) return guard;
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
 			const id = requiredString(args, "id", "--id", "execution/ticket-comment-1");
@@ -451,8 +415,7 @@ const dispatch = defineCommand({
 			try {
 				record = showExternalExecution(target.value, id.value);
 			} catch (err) {
-				const failure = readFailure(args, err, EXEC_READ_FAILURE_CODE);
-				return { ...failure.result, exitCode: failure.exitCode };
+				return readFailureEnvelope(args, err, EXEC_READ_FAILURE_CODE);
 			}
 			if (record === null)
 				return {
