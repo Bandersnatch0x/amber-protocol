@@ -516,6 +516,67 @@ test("external execute, settle, reconcile, and status govern the execution bound
 	assert.equal(reconciled.status, 0, reconciled.stderr || reconciled.stdout);
 	assert.equal(payload(reconciled).outcome, "committed");
 
+	// Compensation is a NEW governed proposal referencing the original;
+	// the projection alone links them.
+	assert.equal(
+		runCli(
+			registerArgs({
+				"--id": "effect/ticket-comment-delete",
+				"--operation": "comment.delete",
+				"--compensation-effect": null,
+				"--irreversible": true,
+				"--decision-identity": "decision/effect-2",
+			}),
+			dir,
+		).status,
+		0,
+	);
+	const compensated = runCli(
+		[
+			"external",
+			"compensate",
+			"--target",
+			".",
+			"--id",
+			"request/undo-1",
+			"--execution",
+			"execution/1",
+			"--payload-hash",
+			`sha256:${"c".repeat(64)}`,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(compensated.status, 0, compensated.stderr || compensated.stdout);
+	assert.equal(payload(compensated).compensates, "execution/1");
+	const duplicateLineage = runCli(
+		[
+			"external",
+			"compensate",
+			"--target",
+			".",
+			"--id",
+			"request/undo-2",
+			"--execution",
+			"execution/1",
+			"--payload-hash",
+			`sha256:${"d".repeat(64)}`,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(duplicateLineage.status, 1);
+	assert.equal(envelope(duplicateLineage).code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(envelope(duplicateLineage).errors[0], /already has compensation proposal/);
+	const transactions = runCli(
+		["external", "transactions", "--target", ".", "--request", "request/1", "--json"],
+		dir,
+	);
+	assert.equal(transactions.status, 0, transactions.stderr || transactions.stdout);
+	assert.equal(payload(transactions).length, 1);
+	assert.equal(payload(transactions)[0].compensated, false);
+	assert.equal(payload(transactions)[0].compensatedBy.proposal, "request/undo-1");
+
 	// A tampered receipt fails every read closed.
 	fs.appendFileSync(executionsPath(dir), '{"kind":"settlement"}\n');
 	const corrupt = runCli(
@@ -524,6 +585,9 @@ test("external execute, settle, reconcile, and status govern the execution bound
 	);
 	assert.equal(corrupt.status, 1);
 	assert.equal(envelope(corrupt).code, "AMBER_E_EXTERNAL_EXEC_CORRUPT");
+	const corruptTransactions = runCli(["external", "transactions", "--target", ".", "--json"], dir);
+	assert.equal(corruptTransactions.status, 1);
+	assert.equal(envelope(corruptTransactions).code, "AMBER_E_EXTERNAL_EXEC_CORRUPT");
 });
 
 test("external help and unknown actions route through the shared dispatcher", () => {
@@ -532,7 +596,7 @@ test("external help and unknown actions route through the shared dispatcher", ()
 	assert.equal(help.status, 0, help.stderr || help.stdout);
 	assert.match(
 		help.stdout,
-		/amber external <register\|effects\|propose\|authorize\|proposals\|execute\|settle\|reconcile\|status>/,
+		/amber external <register\|effects\|propose\|authorize\|proposals\|execute\|settle\|reconcile\|status\|compensate\|transactions>/,
 	);
 	assert.match(help.stdout, /--irreversible/);
 	assert.match(help.stdout, /--payload-hash/);
@@ -542,6 +606,6 @@ test("external help and unknown actions route through the shared dispatcher", ()
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/external requires register, effects, propose, authorize, proposals, execute, settle, reconcile, or status/,
+		/external requires register, effects, propose, authorize, proposals, execute, settle, reconcile, status, compensate, or transactions/,
 	);
 });

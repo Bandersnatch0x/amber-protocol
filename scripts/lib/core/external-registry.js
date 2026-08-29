@@ -30,8 +30,11 @@ const {
 	appendLedgerEvent,
 } = require("./registry-ledger");
 
-const EXTERNAL_SCHEMA_VERSION = 1;
-const SUPPORTED_EXTERNAL_SCHEMA_VERSIONS = Object.freeze([1]);
+// v2 added the required `compensates` linkage to proposal events (F056
+// T4); v1 proposal events written before it stay readable with a null
+// linkage, and every other event kind shares one shape across versions.
+const EXTERNAL_SCHEMA_VERSION = 2;
+const SUPPORTED_EXTERNAL_SCHEMA_VERSIONS = Object.freeze([1, 2]);
 const DEFAULT_MAX_EXTERNAL_BYTES = 1024 * 1024;
 // Timeouts are bounded (24h) so a contract can never declare an
 // effectively unbounded external operation.
@@ -539,10 +542,14 @@ const PROPOSAL_EVENT_FIELDS = Object.freeze([
 	"payloadHash",
 	"credentials",
 	"compensation",
+	"compensates",
 	"requestHash",
 	"prevHash",
 	"hash",
 ]);
+const PROPOSAL_EVENT_FIELDS_V1 = Object.freeze(
+	PROPOSAL_EVENT_FIELDS.filter((field) => field !== "compensates"),
+);
 const PROPOSAL_AUTHORIZED_EVENT_FIELDS = Object.freeze([
 	"kind",
 	"schemaVersion",
@@ -566,7 +573,11 @@ function effectPinProblem(value, label) {
 function proposalEventProblem(event, lineIndex) {
 	const label = `external proposal event ${lineIndex}`;
 	if (event.kind === "proposal") {
-		const closed = closedFieldProblem(event, PROPOSAL_EVENT_FIELDS, label);
+		const closed = closedFieldProblem(
+			event,
+			event.schemaVersion === 1 ? PROPOSAL_EVENT_FIELDS_V1 : PROPOSAL_EVENT_FIELDS,
+			label,
+		);
 		if (closed !== null) return closed;
 		if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
 			return `${label}.at must be an ISO-8601 timestamp`;
@@ -589,6 +600,12 @@ function proposalEventProblem(event, lineIndex) {
 			return `${label}.credentials must be one of ${EXTERNAL_CREDENTIALS.join(", ")}`;
 		const compensation = compensationProblem(event.compensation, `${label}.compensation`);
 		if (compensation !== null) return compensation;
+		if (event.compensates !== undefined && event.compensates !== null) {
+			if (!isNonEmptyString(event.compensates))
+				return `${label}.compensates must be null or the original execution id`;
+			const leak = credentialLeakProblem(event.compensates, `${label}.compensates`);
+			if (leak !== null) return leak;
+		}
 		if (!SHA256_PATTERN.test(event.requestHash ?? ""))
 			return `${label}.requestHash must be a sha256:<64-hex> string`;
 		return null;
@@ -650,6 +667,7 @@ function foldProposals(cwd) {
 			const { prevHash: _prev, hash: _hash, at, ...body } = event;
 			const proposal = {
 				...body,
+				compensates: event.compensates ?? null,
 				proposedAt: at,
 				status: "proposed",
 				authorization: null,
@@ -773,7 +791,13 @@ function proposeExternalEffect(cwd, input = {}, opts = {}) {
 	if (derived.problem) return fail(derived.problem.code, derived.problem.errors);
 	if (derived.notFound) return fail(EXTERNAL_NOT_FOUND_CODE, [derived.notFound]);
 	if (derived.drift) return fail(EXTERNAL_INVALID_CODE, [derived.drift]);
-	const { content } = derived;
+	return appendProposal(cwd, input.id, derived.content, null, now, () => null);
+}
+
+// The shared proposal append for plain requests and compensations: the
+// same idempotency identity and duplicate naming apply to both.
+function appendProposal(cwd, id, content, compensates, now, extraGuard) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
 	return appendLedgerEvent(
 		cwd,
 		PROPOSAL_LEDGER,
@@ -781,7 +805,7 @@ function proposeExternalEffect(cwd, input = {}, opts = {}) {
 			kind: "proposal",
 			schemaVersion: EXTERNAL_SCHEMA_VERSION,
 			at: now.toISOString(),
-			id: input.id,
+			id,
 			owner: content.owner,
 			effect: content.effect,
 			adapter: content.adapter,
@@ -790,21 +814,29 @@ function proposeExternalEffect(cwd, input = {}, opts = {}) {
 			payloadHash: content.payloadHash,
 			credentials: content.credentials,
 			compensation: content.compensation,
+			compensates,
 			requestHash: content.requestHash,
 		},
 		(fold) => {
-			if (fold.some((entry) => entry.id === input.id))
+			if (fold.some((entry) => entry.id === id))
 				return fail(EXTERNAL_INVALID_CODE, [
-					`proposal ${JSON.stringify(input.id)} already exists; propose a new id for a new request`,
+					`proposal ${JSON.stringify(id)} already exists; propose a new id for a new request`,
 				]);
+			const guarded = extraGuard(fold);
+			if (guarded !== null) return guarded;
+			// The requestHash identity is shared by plain requests and
+			// compensations: identical external semantics never duplicate,
+			// whatever review path proposed them.
 			const duplicate = fold.find((entry) => entry.requestHash === content.requestHash);
 			if (duplicate)
 				return fail(EXTERNAL_INVALID_CODE, [
-					`an identical request (owner + effect + target + scope + payloadHash) is already proposed as ${JSON.stringify(duplicate.id)}; a retry re-reads the existing proposal instead of duplicating the external record`,
+					compensates === null
+						? `an identical request (owner + effect + target + scope + payloadHash) is already proposed as ${JSON.stringify(duplicate.id)}; a retry re-reads the existing proposal instead of duplicating the external record`
+						: `an identical request is already proposed as ${JSON.stringify(duplicate.id)}; a compensation shares the request idempotency identity — compensate with a distinct payload or complete the existing request`,
 				]);
 			return null;
 		},
-		(fold) => fold.find((entry) => entry.id === input.id),
+		(fold) => fold.find((entry) => entry.id === id),
 	);
 }
 
@@ -1552,6 +1584,147 @@ function listExternalExecutions(cwd, { request = null } = {}) {
 	return foldExecutions(cwd).filter((entry) => request === null || entry.request === request);
 }
 
+// ---------------------------------------------------------------------------
+// F056 T4 (#291) — compensation effects & the transactions projection.
+// External state history stays complete: compensation is a NEW governed
+// effect riding the full proposal/authorization/execution pipeline, and
+// the compensated linkage exists only in the read-time projection — the
+// original outcome is never rewritten.
+// ---------------------------------------------------------------------------
+
+/**
+ * Open a compensation proposal for one committed (or failed-partial)
+ * execution. The compensating effect is exactly the one the ORIGINAL
+ * contract declared — an irreversible contract refuses — and the new
+ * proposal records the original execution id as its compensates linkage,
+ * then rides the normal T2/T3 pipeline (own requestHash, own
+ * authorization, own execution, own receipt).
+ */
+function compensateExternalEffect(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(EXTERNAL_INVALID_CODE, ["compensate input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(EXTERNAL_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(
+		input,
+		["id", "execution", "payloadHash"],
+		"compensate input",
+	);
+	if (inputClosed !== null) return fail(EXTERNAL_INVALID_CODE, [inputClosed]);
+	for (const field of ["id", "execution"]) {
+		if (!isNonEmptyString(input[field]))
+			return fail(EXTERNAL_INVALID_CODE, [`${field} must be a non-empty string`]);
+		const leak = credentialLeakProblem(input[field], field);
+		if (leak !== null) return fail(CREDENTIAL_LEAK_CODE, [leak]);
+	}
+	if (!SHA256_PATTERN.test(input.payloadHash ?? ""))
+		return fail(EXTERNAL_INVALID_CODE, [
+			"payloadHash must be a sha256:<64-hex> string — the canonical hash of the exact compensating payload under review",
+		]);
+	let original;
+	try {
+		original = showExternalExecution(cwd, input.execution);
+	} catch (err) {
+		return fail(err.amberCode || EXEC_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (original === null)
+		return fail(EXTERNAL_NOT_FOUND_CODE, [
+			`execution ${JSON.stringify(input.execution)} does not exist`,
+		]);
+	if (!["committed", "failed"].includes(original.outcome))
+		return fail(EXTERNAL_INVALID_CODE, [
+			`execution ${JSON.stringify(input.execution)} has outcome ${JSON.stringify(original.outcome ?? original.status)}; only a committed or failed effect compensates — an unknown outcome reconciles first, and attempted or denied outcomes retry through the same request`,
+		]);
+	let contract;
+	try {
+		contract = showExternalEffect(cwd, original.effect.id, original.effect.version);
+	} catch (err) {
+		return fail(err.amberCode || EXTERNAL_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (contract === null)
+		return fail(EXTERNAL_CORRUPT_CODE, [
+			`execution ${JSON.stringify(input.execution)} references effect ${JSON.stringify(original.effect.id)}@${original.effect.version} that the registry no longer resolves`,
+		]);
+	if (contract.compensation.kind === "irreversible")
+		return fail(EXTERNAL_INVALID_CODE, [
+			`effect ${JSON.stringify(contract.id)}@${contract.version} declares irreversibility; an irreversible contract refuses compensation — the recorded outcome stands`,
+		]);
+	// Compensation rides exactly the declared compensating effect at its
+	// current head — never a caller-chosen operation.
+	let head;
+	try {
+		head = showExternalEffect(cwd, contract.compensation.effect);
+	} catch (err) {
+		return fail(err.amberCode || EXTERNAL_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (head === null)
+		return fail(EXTERNAL_INVALID_CODE, [
+			`compensating effect ${JSON.stringify(contract.compensation.effect)} is not registered; register the declared compensation contract before compensating`,
+		]);
+	const derived = deriveRequestContent(
+		cwd,
+		{ id: head.id, version: head.version },
+		input.payloadHash,
+	);
+	if (derived.problem) return fail(derived.problem.code, derived.problem.errors);
+	if (derived.notFound) return fail(EXTERNAL_NOT_FOUND_CODE, [derived.notFound]);
+	if (derived.drift) return fail(EXTERNAL_INVALID_CODE, [derived.drift]);
+	// Deliberate ruling: ONE compensation lineage per original, whatever
+	// state it reaches — external state history stays complete and a
+	// second undo can never race the first. A failed compensation
+	// execution retries under the same proposal; a compensation that
+	// dead-ends is a governance decision recorded in the lineage.
+	return appendProposal(cwd, input.id, derived.content, input.execution, now, (fold) => {
+		const existing = fold.find((entry) => entry.compensates === input.execution);
+		if (existing)
+			return fail(EXTERNAL_INVALID_CODE, [
+				`execution ${JSON.stringify(input.execution)} already has compensation proposal ${JSON.stringify(existing.id)}; one compensation lineage per original — external state history stays complete`,
+			]);
+		return null;
+	});
+}
+
+/**
+ * The read-time transactions projection: every execution joined with its
+ * compensation lineage. Nothing here writes — the original outcome is
+ * never rewritten, and `compensated` flips only when a compensating
+ * execution actually committed.
+ */
+function listExternalTransactions(cwd, { request = null } = {}) {
+	const proposals = foldProposals(cwd);
+	const executions = foldExecutions(cwd);
+	return executions
+		.filter((entry) => request === null || entry.request === request)
+		.map((entry) => {
+			const lineage = proposals.find((proposal) => proposal.compensates === entry.id) ?? null;
+			if (lineage === null) return { ...entry, compensatedBy: null, compensated: false };
+			const committed =
+				executions.find(
+					(candidate) => candidate.request === lineage.id && candidate.outcome === "committed",
+				) ?? null;
+			return {
+				...entry,
+				compensatedBy: {
+					proposal: lineage.id,
+					requestHash: lineage.requestHash,
+					status: lineage.status,
+					execution: committed === null ? null : committed.id,
+					// A reconciled compensation became committed at its
+					// reconciliation, not at the earlier unknown settlement.
+					settledAt:
+						committed === null
+							? null
+							: committed.reconciliation === null
+								? committed.settlement.at
+								: committed.reconciliation.at,
+				},
+				compensated: committed !== null,
+			};
+		});
+}
+
 module.exports = {
 	EXTERNAL_SCHEMA_VERSION,
 	SUPPORTED_EXTERNAL_SCHEMA_VERSIONS,
@@ -1581,4 +1754,6 @@ module.exports = {
 	reconcileExternalExecution,
 	showExternalExecution,
 	listExternalExecutions,
+	compensateExternalEffect,
+	listExternalTransactions,
 };

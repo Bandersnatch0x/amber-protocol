@@ -1461,10 +1461,11 @@ Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
 `AMBER_E_RETENTION_TX_CORRUPT`, `AMBER_E_RETENTION_TX_LOCK`,
 `AMBER_E_RETENTION_TX_SIZE_CEILING`, `AMBER_E_RETENTION_TOMBSTONE`.
 
-### external register / effects / propose / authorize / proposals / execute / settle / reconcile / status
+### external register / effects / propose / authorize / proposals / execute / settle / reconcile / status / compensate / transactions
 
-Register External Effect contracts, propose exact requests, authorize them drift-bound, and settle
-governed executions (F056 T1-T3). Amber forbids arbitrary account-bearing external operations: the
+Register External Effect contracts, propose exact requests, authorize them drift-bound, settle
+governed executions, and compensate committed effects (F056 T1-T4). Amber forbids arbitrary
+account-bearing external operations: the
 only thing that can
 ever execute externally is a registered effect contract. Each contract declares the external
 `--owner`, one closed system type
@@ -1531,6 +1532,20 @@ reconciliation. Nothing
 under this command executes an external operation — the external Adapter performs the operation
 outside Amber and submits the declared receipt.
 
+External state history stays complete (T4): compensation is a NEW governed effect, never a
+rewrite. `compensate` opens a fresh proposal for one committed (or failed-partial) execution — it
+rides exactly the compensation the ORIGINAL contract declared (an irreversible contract refuses
+outright; an undeclared/unregistered compensating contract refuses), records the original
+execution id as its `compensates` linkage, enforces one compensation lineage per original, and
+then goes through its own authorization, execution, and receipt like any request. The original
+outcome is never rewritten: `transactions` is the read-time projection joining every execution
+with its compensation lineage, and `compensated` flips only when a compensating execution
+actually committed. The external surface opens no ungoverned door: no MCP capability resolves to
+the `external` command (external writes are approval-required submissions, never spawned), and
+the ADR-0020 self-owned git transport exception stays isolated — the external registry shares no
+transport-specific module, code, or state path with the sync transport and never spawns a process
+(both test-pinned).
+
 ```bash
 node scripts/amber.js external register --target . --id effect/ticket-comment \
   --effect-version 1 --owner platform-team --system ticketing --operation comment.create \
@@ -1561,6 +1576,9 @@ node scripts/amber.js external settle --target . --id execution/ticket-comment-1
 node scripts/amber.js external reconcile --target . --id execution/ticket-comment-1 \
   --evidence evidence/reconcile-1 --external-record TRACK-1234 --json
 node scripts/amber.js external status --target . --id execution/ticket-comment-1 --json
+node scripts/amber.js external compensate --target . --id request/undo-ticket-comment-1 \
+  --execution execution/ticket-comment-1 --payload-hash sha256:<64-hex> --json
+node scripts/amber.js external transactions --target . --request request/ticket-comment-288 --json
 ```
 
 Error codes: `AMBER_E_EXTERNAL_INVALID`, `AMBER_E_EXTERNAL_CORRUPT`, `AMBER_E_EXTERNAL_LOCK`,

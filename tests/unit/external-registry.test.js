@@ -44,6 +44,8 @@ const {
 	reconcileExternalExecution,
 	showExternalExecution,
 	listExternalExecutions,
+	compensateExternalEffect,
+	listExternalTransactions,
 } = require("../../scripts/lib/core/external-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
@@ -124,8 +126,8 @@ function writeEvents(ledgerPath, events) {
 }
 
 test("external constants pin the system, idempotency, credentials, and bound contracts", () => {
-	assert.equal(EXTERNAL_SCHEMA_VERSION, 1);
-	assert.deepEqual([...SUPPORTED_EXTERNAL_SCHEMA_VERSIONS], [1]);
+	assert.equal(EXTERNAL_SCHEMA_VERSION, 2);
+	assert.deepEqual([...SUPPORTED_EXTERNAL_SCHEMA_VERSIONS], [1, 2]);
 	assert.equal(DEFAULT_MAX_EXTERNAL_BYTES, 1024 * 1024);
 	assert.equal(MAX_EXTERNAL_TIMEOUT_MS, 24 * 3_600_000);
 	assert.deepEqual(
@@ -1456,4 +1458,365 @@ test("a fresh execution lock held by another writer refuses preparing", () => {
 	assert.equal(contended.code, "AMBER_E_EXTERNAL_EXEC_LOCK");
 	fs.rmSync(lockPath);
 	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+});
+
+// ---------------------------------------------------------------------------
+// F056 T4 (#291) — compensation effects, MCP non-execution & transport
+// isolation.
+// ---------------------------------------------------------------------------
+
+/** Authorized + executed original, with the declared compensating effect
+ *  registered so compensation can ride the pipeline. */
+function committedOriginalFixture(dir) {
+	proposalFixture(dir, ["decision/effect-1", "decision/effect-2"]);
+	assert.equal(
+		registerExternalEffect(
+			dir,
+			effectInput({
+				id: "effect/ticket-comment-delete",
+				operation: "comment.delete",
+				compensation: { kind: "irreversible" },
+				decision: { identity: "decision/effect-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const proposed = proposeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: PAYLOAD,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true, (proposed.errors || []).join("; "));
+	grantRequestApproval(dir, "approval/external-1", proposed.record.requestHash);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/1",
+				approval: "approval/external-1",
+				decisionIdentity: "decision/external-consume-1",
+				body: "# Authorize external effect\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+}
+
+test("compensation opens a new governed proposal referencing the original", () => {
+	const dir = mkTarget("compensate");
+	committedOriginalFixture(dir);
+	const compensateInput = (overrides = {}) => ({
+		id: "request/undo-1",
+		execution: "execution/1",
+		payloadHash: `sha256:${"b".repeat(64)}`,
+		...overrides,
+	});
+	// A still-open execution has no terminal outcome to compensate.
+	const premature = compensateExternalEffect(dir, compensateInput(), { now: NOW });
+	assert.equal(premature.ok, false);
+	assert.equal(premature.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(premature.errors[0], /only a committed or failed effect compensates/);
+	assert.equal(settleExternalExecution(dir, settleInput(), { now: NOW }).ok, true);
+	const ghost = compensateExternalEffect(dir, compensateInput({ execution: "execution/ghost" }), {
+		now: NOW,
+	});
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_EXTERNAL_NOT_FOUND");
+	const compensated = compensateExternalEffect(dir, compensateInput(), { now: NOW });
+	assert.equal(compensated.ok, true, (compensated.errors || []).join("; "));
+	assert.equal(compensated.record.compensates, "execution/1");
+	assert.deepEqual(compensated.record.effect, {
+		id: "effect/ticket-comment-delete",
+		version: "1",
+	});
+	assert.equal(compensated.record.status, "proposed");
+	const duplicate = compensateExternalEffect(
+		dir,
+		compensateInput({ id: "request/undo-2", payloadHash: `sha256:${"c".repeat(64)}` }),
+		{ now: NOW },
+	);
+	assert.equal(duplicate.ok, false);
+	assert.match(duplicate.errors[0], /already has compensation proposal "request\/undo-1"/);
+
+	// The compensation rides the full pipeline: own authorization, own
+	// execution, own receipt.
+	grantRequestApproval(dir, "approval/external-2", compensated.record.requestHash);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/undo-1",
+				approval: "approval/external-2",
+				decisionIdentity: "decision/external-consume-2",
+				body: "# Authorize compensation\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		executeExternalEffect(
+			dir,
+			executeInput({ id: "execution/undo-1", request: "request/undo-1" }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	let transactions = listExternalTransactions(dir, { request: "request/1" });
+	assert.equal(transactions.length, 1);
+	assert.equal(transactions[0].compensated, false);
+	assert.equal(transactions[0].compensatedBy.proposal, "request/undo-1");
+	assert.equal(transactions[0].compensatedBy.execution, null);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			settleInput({ id: "execution/undo-1", externalRecordId: "TRACK-1234-DEL" }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	transactions = listExternalTransactions(dir, { request: "request/1" });
+	assert.equal(transactions[0].compensated, true);
+	assert.equal(transactions[0].compensatedBy.execution, "execution/undo-1");
+	// The original outcome is never rewritten: the linkage is read-time.
+	assert.equal(showExternalExecution(dir, "execution/1").outcome, "committed");
+	assert.equal(showExternalExecution(dir, "execution/1").compensated, undefined);
+	const compensationRow = listExternalTransactions(dir, { request: "request/undo-1" })[0];
+	assert.equal(compensationRow.compensated, false);
+	assert.equal(compensationRow.compensatedBy, null);
+});
+
+test("an irreversible contract refuses compensation and unregistered compensations refuse", () => {
+	const dir = mkTarget("irreversible");
+	proposalFixture(dir, ["decision/effect-1", "decision/effect-2"]);
+	// The default fixture contract declares effect/ticket-comment-delete,
+	// which is NOT registered here.
+	const proposed = proposeExternalEffect(
+		dir,
+		{
+			id: "request/1",
+			effect: { id: "effect/ticket-comment", version: "1" },
+			payloadHash: PAYLOAD,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposed.ok, true);
+	grantRequestApproval(dir, "approval/external-1", proposed.record.requestHash);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/1",
+				approval: "approval/external-1",
+				decisionIdentity: "decision/external-consume-1",
+				body: "# Authorize\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(executeExternalEffect(dir, executeInput(), { now: NOW }).ok, true);
+	assert.equal(settleExternalExecution(dir, settleInput(), { now: NOW }).ok, true);
+	const unregistered = compensateExternalEffect(
+		dir,
+		{ id: "request/undo-1", execution: "execution/1", payloadHash: `sha256:${"b".repeat(64)}` },
+		{ now: NOW },
+	);
+	assert.equal(unregistered.ok, false);
+	assert.equal(unregistered.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(unregistered.errors[0], /register the declared compensation contract/);
+
+	// An irreversible original refuses compensation outright.
+	assert.equal(
+		registerExternalEffect(
+			dir,
+			effectInput({
+				id: "effect/announce",
+				operation: "message.post",
+				compensation: { kind: "irreversible" },
+				decision: { identity: "decision/effect-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const proposedB = proposeExternalEffect(
+		dir,
+		{
+			id: "request/2",
+			effect: { id: "effect/announce", version: "1" },
+			payloadHash: `sha256:${"c".repeat(64)}`,
+		},
+		{ now: NOW },
+	);
+	assert.equal(proposedB.ok, true);
+	grantRequestApproval(dir, "approval/external-2", proposedB.record.requestHash);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/2",
+				approval: "approval/external-2",
+				decisionIdentity: "decision/external-consume-2",
+				body: "# Authorize\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		executeExternalEffect(dir, executeInput({ id: "execution/2", request: "request/2" }), {
+			now: NOW,
+		}).ok,
+		true,
+	);
+	assert.equal(
+		settleExternalExecution(dir, settleInput({ id: "execution/2", externalRecordId: "MSG-1" }), {
+			now: NOW,
+		}).ok,
+		true,
+	);
+	const refused = compensateExternalEffect(
+		dir,
+		{ id: "request/undo-2", execution: "execution/2", payloadHash: `sha256:${"d".repeat(64)}` },
+		{ now: NOW },
+	);
+	assert.equal(refused.ok, false);
+	assert.equal(refused.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(refused.errors[0], /an irreversible contract refuses compensation/);
+});
+
+test("the MCP seam exposes no external execution surface", () => {
+	const { COMMAND_CAPABILITIES } = require("../../scripts/lib/mcp-action-contracts");
+	// External writes are approval-required submissions only and never
+	// spawned (ADR-0022/F018): the MCP capability registry carries no
+	// external verb at all, so no registry-proven read-only variant can
+	// ever auto-execute one.
+	const externalCapabilities = Object.keys(COMMAND_CAPABILITIES).filter((key) =>
+		key.split(/[\s.:/-]/).includes("external"),
+	);
+	assert.deepEqual(externalCapabilities, []);
+});
+
+test("the external registry never touches the sync transport surface", () => {
+	// ADR-0020's self-owned git transport exception stays isolated: the
+	// external surface shares no module, code, or state path with it,
+	// and never spawns a process.
+	const sources = ["scripts/lib/core/external-registry.js", "scripts/lib/external-commands.js"].map(
+		(file) => fs.readFileSync(path.join(__dirname, "..", "..", file), "utf8"),
+	);
+	for (const source of sources) {
+		assert.equal(/sync-transport|transport-ledger|AMBER_E_SYNC/.test(source), false);
+		assert.equal(/child_process|execSync|spawn/.test(source), false);
+	}
+	const dir = mkTarget("isolation");
+	for (const ledger of [effectsPath(dir), proposalsPath(dir), executionsPath(dir)]) {
+		assert.match(ledger.replaceAll("\\", "/"), /\.amber\/external\//);
+	}
+});
+
+test("v1 proposal events without the compensates linkage stay readable", () => {
+	const dir = mkTarget("v1-proposals");
+	proposalFixture(dir);
+	assert.equal(
+		proposeExternalEffect(
+			dir,
+			{
+				id: "request/1",
+				effect: { id: "effect/ticket-comment", version: "1" },
+				payloadHash: PAYLOAD,
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	// Rewrite the ledger as a schemaVersion-1 event without compensates —
+	// exactly what the committed T2/T3 code wrote before the linkage
+	// existed — re-chained validly.
+	const pristine = readEvents(proposalsPath(dir));
+	const { hash: _hash, compensates: _compensates, ...v1Body } = pristine[0];
+	const v1 = { ...v1Body, schemaVersion: 1 };
+	v1.hash = chainHash(v1, v1.prevHash);
+	writeEvents(proposalsPath(dir), [v1]);
+	const folded = showExternalProposal(dir, "request/1");
+	assert.equal(folded.compensates, null);
+	assert.equal(folded.schemaVersion, 1);
+	// A v1 event smuggling the field it predates refuses.
+	const smuggled = { ...v1Body, schemaVersion: 1, compensates: "execution/1" };
+	delete smuggled.hash;
+	smuggled.hash = chainHash(smuggled, smuggled.prevHash);
+	writeEvents(proposalsPath(dir), [smuggled]);
+	assert.throws(
+		() => showExternalProposal(dir, "request/1"),
+		(err) =>
+			err.amberCode === "AMBER_E_EXTERNAL_PROPOSAL_CORRUPT" &&
+			/unknown field "compensates"/.test(err.message),
+	);
+});
+
+test("a compensation proposal drift-refuses at authorization like any request", () => {
+	const dir = mkTarget("compensation-drift");
+	committedOriginalFixture(dir);
+	assert.equal(settleExternalExecution(dir, settleInput(), { now: NOW }).ok, true);
+	const compensated = compensateExternalEffect(
+		dir,
+		{
+			id: "request/undo-1",
+			execution: "execution/1",
+			payloadHash: `sha256:${"b".repeat(64)}`,
+		},
+		{ now: NOW },
+	);
+	assert.equal(compensated.ok, true, (compensated.errors || []).join("; "));
+	grantRequestApproval(dir, "approval/external-2", compensated.record.requestHash);
+	// A new version of the compensating contract registered after the
+	// compensation proposal drifts its authorization closed.
+	assert.equal(
+		admitArtifact(dir, {
+			type: "decision",
+			identity: "decision/effect-3",
+			body: "# decision/effect-3\n",
+			decisionKind: "approval",
+			principal: "legal@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
+		}).ok,
+		true,
+	);
+	assert.equal(
+		registerExternalEffect(
+			dir,
+			effectInput({
+				id: "effect/ticket-comment-delete",
+				version: "2",
+				operation: "comment.delete",
+				compensation: { kind: "irreversible" },
+				decision: { identity: "decision/effect-3", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const drifted = authorizeExternalEffect(
+		dir,
+		{
+			id: "request/undo-1",
+			approval: "approval/external-2",
+			decisionIdentity: "decision/external-consume-2",
+			body: "# Authorize compensation\n",
+		},
+		{ now: NOW },
+	);
+	assert.equal(drifted.ok, false);
+	assert.equal(drifted.code, "AMBER_E_EXTERNAL_DRIFT");
 });

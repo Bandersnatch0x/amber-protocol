@@ -297,6 +297,9 @@ const FLAG_SPECS = {
 	"--external-record": { key: "externalRecord" },
 	"--request-digest": { key: "requestDigest" },
 	"--response-digest": { key: "responseDigest" },
+	// F056 ticket 4 (#291): compensation flags (--id, --payload-hash, and
+	// --request are shared with existing surfaces).
+	"--execution": { key: "execution" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

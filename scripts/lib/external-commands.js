@@ -50,6 +50,7 @@ function missingValueFlag(args) {
 		["traceVal", "--trace"],
 		["status", "--status"],
 		["request", "--request"],
+		["execution", "--execution"],
 		["externalRecord", "--external-record"],
 		["requestDigest", "--request-digest"],
 		["responseDigest", "--response-digest"],
@@ -124,6 +125,8 @@ const dispatch = defineCommand({
 		"settle",
 		"reconcile",
 		"status",
+		"compensate",
+		"transactions",
 	],
 	handlers: {
 		register: (args) => {
@@ -400,6 +403,61 @@ const dispatch = defineCommand({
 					clock.value === null ? {} : { now: clock.value },
 				),
 			);
+		},
+		compensate: (args) => {
+			const { compensateExternalEffect } = require("./core/external-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "request/undo-ticket-comment-1"],
+				["execution", "--execution", "execution/ticket-comment-1"],
+				["payloadHash", "--payload-hash", "sha256:<64-hex>"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			return resultEnvelope(
+				compensateExternalEffect(
+					target.value,
+					{
+						id: String(args.id),
+						execution: String(args.execution),
+						payloadHash: String(args.payloadHash),
+					},
+					clock.value === null ? {} : { now: clock.value },
+				),
+			);
+		},
+		transactions: (args) => {
+			const { listExternalTransactions } = require("./core/external-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			try {
+				return {
+					text: JSON.stringify(
+						listExternalTransactions(target.value, {
+							request: args.request === undefined ? null : String(args.request),
+						}),
+						null,
+						2,
+					),
+				};
+			} catch (err) {
+				const failure = readFailure(args, err, EXEC_READ_FAILURE_CODE);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
 		},
 		status: (args) => {
 			const { showExternalExecution } = require("./core/external-registry");
