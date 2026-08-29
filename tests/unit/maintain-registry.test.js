@@ -15,7 +15,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 
 const {
@@ -48,10 +47,14 @@ const {
 } = require("../../scripts/lib/core/maintain-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
+const {
+	mkLedgerTarget,
+	readEvents,
+	writeEvents,
+	seedDecisionFixture,
+} = require("../helpers/harness");
 
-function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-maintain-${label}-`));
-}
+const mkTarget = mkLedgerTarget("amber-maintain");
 
 const HASH_A = `sha256:${"a".repeat(64)}`;
 const HASH_B = `sha256:${"b".repeat(64)}`;
@@ -79,15 +82,12 @@ function decisionFixture(dir, identity, opts = {}) {
 
 /** Principal + intent + decision anchors every registration test needs. */
 function registryFixture(dir) {
-	assert.equal(
-		registerPrincipal(dir, { id: "alice@example.com", principalKind: "human" }).ok,
-		true,
-	);
-	assert.equal(
-		admitArtifact(dir, { type: "intent", identity: "intent/maintain", body: "# Maintain\n" }).ok,
-		true,
-	);
-	decisionFixture(dir, "decision/detector-1");
+	seedDecisionFixture(dir, {
+		principal: "alice@example.com",
+		intent: "intent/maintain",
+		body: "# Maintain\n",
+		identities: ["decision/detector-1"],
+	});
 }
 
 function detectorInput(overrides = {}) {
@@ -123,18 +123,6 @@ function observation(overrides = {}) {
 		inputHash: HASH_A,
 		...overrides,
 	};
-}
-
-function readEvents(ledgerPath) {
-	return fs
-		.readFileSync(ledgerPath, "utf8")
-		.split("\n")
-		.filter((line) => line.trim().length > 0)
-		.map((line) => JSON.parse(line));
-}
-
-function writeEvents(ledgerPath, events) {
-	fs.writeFileSync(ledgerPath, events.map((event) => JSON.stringify(event)).join("\n") + "\n");
 }
 
 /** Every file under .amber except maintain/, as sorted [path, bytes] pairs. */

@@ -13,7 +13,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 
 const {
@@ -64,10 +63,14 @@ const {
 	governanceGraphSource,
 	governanceGraphCheckpoint,
 } = require("../../scripts/lib/core/governance-graph");
+const {
+	mkLedgerTarget,
+	readEvents,
+	writeEvents,
+	seedDecisionFixture,
+} = require("../helpers/harness");
 
-function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-retention-${label}-`));
-}
+const mkTarget = mkLedgerTarget("amber-retention");
 
 const NOW = new Date("2026-08-29T00:00:00.000Z");
 const HOUR_MS = 3_600_000;
@@ -103,18 +106,6 @@ function classifyInput(overrides = {}) {
 		policy: { identity: "policy/tenant-retention", revision: 1 },
 		...overrides,
 	};
-}
-
-function readEvents(ledgerPath) {
-	return fs
-		.readFileSync(ledgerPath, "utf8")
-		.split("\n")
-		.filter((line) => line.trim().length > 0)
-		.map((line) => JSON.parse(line));
-}
-
-function writeEvents(ledgerPath, events) {
-	fs.writeFileSync(ledgerPath, events.map((event) => JSON.stringify(event)).join("\n") + "\n");
 }
 
 test("retention constants pin the class, sensitivity, and schema contracts", () => {
@@ -319,25 +310,12 @@ test("a tampered classification ledger fails every read closed", () => {
 
 /** Principal + intent + one committed human Decision per identity. */
 function holdFixture(dir, decisionIdentities) {
-	assert.equal(
-		registerPrincipal(dir, { id: "legal@example.com", principalKind: "human" }).ok,
-		true,
-	);
-	assert.equal(
-		admitArtifact(dir, { type: "intent", identity: "intent/retention", body: "# R\n" }).ok,
-		true,
-	);
-	for (const identity of decisionIdentities) {
-		const decision = admitArtifact(dir, {
-			type: "decision",
-			identity,
-			body: `# ${identity}\n`,
-			decisionKind: "approval",
-			principal: "legal@example.com",
-			traces: [{ type: "decides", to: { type: "intent", identity: "intent/retention" } }],
-		});
-		assert.equal(decision.ok, true, (decision.errors || []).join("; "));
-	}
+	seedDecisionFixture(dir, {
+		principal: "legal@example.com",
+		intent: "intent/retention",
+		body: "# R\n",
+		identities: decisionIdentities,
+	});
 }
 
 function holdInput(overrides = {}) {

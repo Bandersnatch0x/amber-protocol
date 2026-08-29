@@ -14,7 +14,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 
 const {
@@ -62,10 +61,14 @@ const {
 	settleRunnerExecution,
 } = require("../../scripts/lib/core/runner-registry");
 const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
+const {
+	mkLedgerTarget,
+	readEvents,
+	writeEvents,
+	seedDecisionFixture,
+} = require("../helpers/harness");
 
-function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-breakglass-${label}-`));
-}
+const mkTarget = mkLedgerTarget("amber-breakglass");
 
 const NOW = new Date("2026-08-29T00:00:00.000Z");
 const HOUR_MS = 3_600_000;
@@ -73,25 +76,12 @@ const JWT_LIKE = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature";
 
 /** Principal + intent + one committed human Decision per identity. */
 function decisionsFixture(dir, identities) {
-	assert.equal(
-		registerPrincipal(dir, { id: "legal@example.com", principalKind: "human" }).ok,
-		true,
-	);
-	assert.equal(
-		admitArtifact(dir, { type: "intent", identity: "intent/breakglass", body: "# B\n" }).ok,
-		true,
-	);
-	for (const identity of identities) {
-		const decision = admitArtifact(dir, {
-			type: "decision",
-			identity,
-			body: `# ${identity}\n`,
-			decisionKind: "approval",
-			principal: "legal@example.com",
-			traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
-		});
-		assert.equal(decision.ok, true, (decision.errors || []).join("; "));
-	}
+	seedDecisionFixture(dir, {
+		principal: "legal@example.com",
+		intent: "intent/breakglass",
+		body: "# B\n",
+		identities,
+	});
 }
 
 /** Decisions + one registered F056 external effect the grant can pin. */
@@ -153,18 +143,6 @@ function grantInput(overrides = {}) {
 		decision: { identity: "decision/breakglass-1", revision: 1 },
 		...overrides,
 	};
-}
-
-function readEvents(ledgerPath) {
-	return fs
-		.readFileSync(ledgerPath, "utf8")
-		.split("\n")
-		.filter((line) => line.trim().length > 0)
-		.map((line) => JSON.parse(line));
-}
-
-function writeEvents(ledgerPath, events) {
-	fs.writeFileSync(ledgerPath, events.map((event) => JSON.stringify(event)).join("\n") + "\n");
 }
 
 test("break-glass constants pin the vocabulary and bound contracts", () => {

@@ -12,7 +12,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 
 const {
@@ -52,34 +51,25 @@ const { registerPrincipal } = require("../../scripts/lib/core/principal-registry
 const { registerAdapter } = require("../../scripts/lib/core/adapter-registry");
 const { grantApproval, showApproval } = require("../../scripts/lib/core/approval-registry");
 const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
+const {
+	mkLedgerTarget,
+	readEvents,
+	writeEvents,
+	seedDecisionFixture,
+} = require("../helpers/harness");
 
-function mkTarget(label) {
-	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-external-${label}-`));
-}
+const mkTarget = mkLedgerTarget("amber-external");
 
 const NOW = new Date("2026-08-29T00:00:00.000Z");
 
 /** Principal + intent + one committed human Decision per identity + Adapter. */
 function externalFixture(dir, decisionIdentities = ["decision/effect-1"]) {
-	assert.equal(
-		registerPrincipal(dir, { id: "legal@example.com", principalKind: "human" }).ok,
-		true,
-	);
-	assert.equal(
-		admitArtifact(dir, { type: "intent", identity: "intent/external", body: "# X\n" }).ok,
-		true,
-	);
-	for (const identity of decisionIdentities) {
-		const decision = admitArtifact(dir, {
-			type: "decision",
-			identity,
-			body: `# ${identity}\n`,
-			decisionKind: "approval",
-			principal: "legal@example.com",
-			traces: [{ type: "decides", to: { type: "intent", identity: "intent/external" } }],
-		});
-		assert.equal(decision.ok, true, (decision.errors || []).join("; "));
-	}
+	seedDecisionFixture(dir, {
+		principal: "legal@example.com",
+		intent: "intent/external",
+		body: "# X\n",
+		identities: decisionIdentities,
+	});
 	const registered = registerAdapter(dir, {
 		id: "adapter/tracker",
 		owner: "platform-team",
@@ -112,18 +102,6 @@ function effectInput(overrides = {}) {
 		decision: { identity: "decision/effect-1", revision: 1 },
 		...overrides,
 	};
-}
-
-function readEvents(ledgerPath) {
-	return fs
-		.readFileSync(ledgerPath, "utf8")
-		.split("\n")
-		.filter((line) => line.trim().length > 0)
-		.map((line) => JSON.parse(line));
-}
-
-function writeEvents(ledgerPath, events) {
-	fs.writeFileSync(ledgerPath, events.map((event) => JSON.stringify(event)).join("\n") + "\n");
 }
 
 test("external constants pin the system, idempotency, credentials, and bound contracts", () => {
