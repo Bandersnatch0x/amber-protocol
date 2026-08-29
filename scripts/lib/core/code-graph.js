@@ -32,7 +32,6 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { createRequire } = require("node:module");
 
 const { sha256Hex } = require("./context-hash");
 const { typedError } = require("./error-catalog");
@@ -70,16 +69,6 @@ function loadTypeScript() {
 	if (tsModule) return tsModule;
 	try {
 		tsModule = require("typescript");
-		return tsModule;
-	} catch {
-		// Repo layouts that carry typescript only in the web package still
-		// resolve the same single copy through this anchored fallback.
-	}
-	try {
-		const webRequire = createRequire(
-			path.join(__dirname, "..", "..", "..", "apps", "web", "package.json"),
-		);
-		tsModule = webRequire("typescript");
 		return tsModule;
 	} catch {
 		throw typedError(

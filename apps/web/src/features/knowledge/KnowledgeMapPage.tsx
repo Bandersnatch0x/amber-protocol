@@ -29,8 +29,12 @@ import type {
   NodeSummaryDTO,
   LLMStatusDTO,
 } from './types';
-import { MAX_CONTEXT_NODES } from '@/lib/knowledge-dto';
-import { buildKnowledgeAnalytics, type KnowledgeAnalytics } from './map-analytics';
+import { MAX_CONTEXT_NODES, isDocumentNode } from '@/lib/knowledge-dto';
+import {
+  LAYER_ORDER,
+  buildKnowledgeAnalytics,
+  type KnowledgeAnalytics,
+} from './map-analytics';
 import {
   FOUNDATION_NODE_ID,
   anomalyKey,
@@ -102,7 +106,6 @@ interface KnowledgeNodeData extends Record<string, unknown> {
   onToggleExpand: ((featureId: string) => void) | null;
 }
 
-const LAYER_ORDER = ['decision', 'knowledge', 'implementation'] as const;
 const LAYERED_COLUMNS = 14;
 const LAYERED_COLUMN_WIDTH = 200;
 const LAYERED_ROW_HEIGHT = 120;
@@ -1511,7 +1514,7 @@ function KnowledgeMapGraph({
   // The QA/semantic ceiling is document-scale: Code Nodes never enter the
   // LLM layer, so the pre-emptive hint counts documents only.
   const documentNodeCount = useMemo(
-    () => mergedDto.nodes.filter((n) => n.kind !== 'code').length,
+    () => mergedDto.nodes.filter(isDocumentNode).length,
     [mergedDto.nodes],
   );
 

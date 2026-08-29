@@ -7,6 +7,7 @@ import { getStatus } from '../lib/knowledge-llm';
 import { inferSemanticEdges, inferNodeSummaries } from '../lib/knowledge-llm-prompts';
 import { readKnowledgeGraphSnapshot } from '../lib/knowledge-graph-reader';
 import { answerKnowledgeQuestion, KnowledgeAskError } from '../lib/knowledge-qa';
+import { isDocumentNode } from '../../src/lib/knowledge-dto';
 import type {
   KnowledgeAskResultDTO,
   KnowledgeNode,
@@ -53,7 +54,7 @@ export function selectSemanticInputs(
 } {
   // Document surface only (F060): Code Nodes never enter the LLM layer, and
   // the imports/anchors edges vanish with their code endpoints.
-  const documentNodes = nodes.filter((node) => node.kind !== 'code');
+  const documentNodes = nodes.filter(isDocumentNode);
   const documentIds = new Set(documentNodes.map((node) => node.id));
   return {
     edgeNodes: documentNodes,

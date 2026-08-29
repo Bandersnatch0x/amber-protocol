@@ -245,43 +245,53 @@ describe('knowledge.ask query', () => {
     ).toBe(true);
   });
 
-  it('uses one stateless uncached exchange per ask and sends the digested context', async () => {
-    useStub();
-    const llm = await import('@server/lib/knowledge-llm');
-    const completeSpy = vi.spyOn(llm, 'completeWithMetadata');
+  // Two router asks rebuild the real-repo schemaVersion 2 graph, and the F060
+  // code extraction makes each cold build seconds-scale under full-suite
+  // load; the subject here is digest plumbing, never extraction speed.
+  it(
+    'uses one stateless uncached exchange per ask and sends the digested context',
+    { timeout: 30_000 },
+    async () => {
+      useStub();
+      const llm = await import('@server/lib/knowledge-llm');
+      const completeSpy = vi.spyOn(llm, 'completeWithMetadata');
 
-    const first = await caller.ask({ allowExternal: true, question: 'What exists?' });
-    const second = await caller.ask({ allowExternal: true, question: 'What exists?' });
+      const first = await caller.ask({ allowExternal: true, question: 'What exists?' });
+      const second = await caller.ask({ allowExternal: true, question: 'What exists?' });
 
-    expect(first.status).toBe('ok');
-    expect(second.status).toBe('ok');
-    expect(completeSpy).toHaveBeenCalledTimes(2);
-    for (const call of completeSpy.mock.calls) {
-      expect(call[0]).toBe('cited-qa');
-      const userMessage = call[2];
-      const request = JSON.parse(userMessage) as { question: string; context: string };
-      expect(request.question).toBe('What exists?');
-      const contextDigest = crypto
-        .createHash('sha256')
-        .update(request.context, 'utf8')
-        .digest('hex');
-      const questionDigest = crypto
-        .createHash('sha256')
-        .update(request.question, 'utf8')
-        .digest('hex');
-      const exchangeDigest = crypto.createHash('sha256').update(userMessage, 'utf8').digest('hex');
-      expect(first.status === 'ok' && first.contextDigest).toBe(contextDigest);
-      expect(first.status === 'ok' && first.questionDigest).toBe(questionDigest);
-      expect(first.status === 'ok' && first.exchangeDigest).toBe(exchangeDigest);
-      expect(first.status === 'ok' && first.request).toEqual({ question: 'What exists?' });
-      expect(first.status === 'ok' && first.provenance).toMatchObject({
-        provider: 'stub',
-        model: 'stub-model',
-      });
-    }
-    expect(llmCache.size).toBe(0);
-    expect(llmCache.inflightSize).toBe(0);
-  });
+      expect(first.status).toBe('ok');
+      expect(second.status).toBe('ok');
+      expect(completeSpy).toHaveBeenCalledTimes(2);
+      for (const call of completeSpy.mock.calls) {
+        expect(call[0]).toBe('cited-qa');
+        const userMessage = call[2];
+        const request = JSON.parse(userMessage) as { question: string; context: string };
+        expect(request.question).toBe('What exists?');
+        const contextDigest = crypto
+          .createHash('sha256')
+          .update(request.context, 'utf8')
+          .digest('hex');
+        const questionDigest = crypto
+          .createHash('sha256')
+          .update(request.question, 'utf8')
+          .digest('hex');
+        const exchangeDigest = crypto
+          .createHash('sha256')
+          .update(userMessage, 'utf8')
+          .digest('hex');
+        expect(first.status === 'ok' && first.contextDigest).toBe(contextDigest);
+        expect(first.status === 'ok' && first.questionDigest).toBe(questionDigest);
+        expect(first.status === 'ok' && first.exchangeDigest).toBe(exchangeDigest);
+        expect(first.status === 'ok' && first.request).toEqual({ question: 'What exists?' });
+        expect(first.status === 'ok' && first.provenance).toMatchObject({
+          provider: 'stub',
+          model: 'stub-model',
+        });
+      }
+      expect(llmCache.size).toBe(0);
+      expect(llmCache.inflightSize).toBe(0);
+    },
+  );
 
   it('performs no filesystem writes', async () => {
     useStub();

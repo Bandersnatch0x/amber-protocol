@@ -17,6 +17,14 @@ export interface CodeSymbol {
 }
 
 /**
+ * The document-scale rule shared by every LLM-adjacent seam (F060): Code
+ * Nodes never enter QA context, semantic inference, or the ceiling math.
+ */
+export function isDocumentNode(node: Pick<KnowledgeNode, 'kind'>): boolean {
+  return node.kind !== 'code';
+}
+
+/**
  * Nodes in this stream are always deterministic, so `provenance` stops at the
  * CLI output the schema validates; only inferred edges and summaries carry it
  * here. See ADR-0021 and the F059 spec's deterministic-layer section. Code

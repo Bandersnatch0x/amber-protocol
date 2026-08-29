@@ -5,7 +5,7 @@ import type {
   KnowledgeAskResultDTO,
   KnowledgeGraphDTO,
 } from '../../src/lib/knowledge-dto';
-import { MAX_CONTEXT_NODES } from '../../src/lib/knowledge-dto';
+import { MAX_CONTEXT_NODES, isDocumentNode } from '../../src/lib/knowledge-dto';
 import { completeWithMetadata } from './knowledge-llm';
 
 const requireCli = createRequire(import.meta.url);
@@ -92,7 +92,7 @@ interface ContextAssembly {
  * their hashes stay byte-identical to F059.
  */
 function documentScope(snapshot: KnowledgeGraphDTO): KnowledgeGraphDTO {
-  const nodes = snapshot.nodes.filter((node) => node.kind !== 'code');
+  const nodes = snapshot.nodes.filter(isDocumentNode);
   const documentIds = new Set(nodes.map((node) => node.id));
   return {
     ...snapshot,
