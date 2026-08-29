@@ -1831,6 +1831,11 @@ function deletionProof(cwd, id) {
 
 // Deleted records project as tombstones: minimal stable identity plus the
 // proof reference, never content — pending transactions read as pending.
+// Cross-ledger integrity fails closed: a transaction whose candidate does
+// not resolve (candidates ledger removed, emptied, or truncated) throws
+// instead of silently dropping the tombstone — otherwise a deleted record
+// would project live with content hashes and the Gate guard would stop
+// firing.
 function deletionTombstones(cwd) {
 	const transactions = foldTransactions(cwd);
 	if (transactions.length === 0) return [];
@@ -1838,7 +1843,11 @@ function deletionTombstones(cwd) {
 	const tombstones = [];
 	for (const transaction of transactions) {
 		const candidate = candidates.find((entry) => entry.id === transaction.candidateId);
-		if (!candidate) continue;
+		if (!candidate)
+			throw typedError(
+				TX_CORRUPT_CODE,
+				`deletion transaction ${JSON.stringify(transaction.id)} references candidate ${JSON.stringify(transaction.candidateId)} that does not resolve in the candidate ledger; tombstone derivation fails closed — restore .amber/retention/candidates.jsonl (a missing ledger half never reads as empty)`,
+			);
 		for (const entry of candidate.records) {
 			tombstones.push({
 				record: entry.record,

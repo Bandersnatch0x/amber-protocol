@@ -971,22 +971,27 @@ function evaluateGate(cwd, input = {}, opts = {}) {
 	// deletion-pending records refuse Gate evaluation instead of letting
 	// historical existence satisfy content, replay, or freshness Gates.
 	// The guard binds at the SUBJECT seam because Evidence receipts carry
-	// free-text subjects with no record linkage - refusing the subject
-	// blocks every receipt about it, a conservative superset. The match is
+	// free-text subjects with no record linkage — refusing a subject blocks
+	// every receipt about it. It covers the evaluation's input subject HERE
+	// (before the gate artifact resolves) and every per-requirement subject
+	// override AFTER contract resolution below; a receipt recorded under an
+	// unrelated free-text phrasing stays out of reach because requirements
+	// join evidence on these same subject strings. The match is
 	// deliberately type-agnostic (identity@revision): over-blocking is
 	// fail-safe. Lazy require: retention depends on approval-registry, not
 	// on gates.
+	const { deletionTombstones } = require("./retention-registry");
+	let tombstones;
+	try {
+		tombstones = deletionTombstones(cwd);
+	} catch (err) {
+		return fail(err.amberCode || "AMBER_E_RETENTION_TX_CORRUPT", [err.message || String(err)]);
+	}
+	const tombstoneOf = (value) =>
+		tombstones.find((entry) => `${entry.record.identity}@${entry.record.revision}` === value) ??
+		null;
 	{
-		const { deletionTombstones } = require("./retention-registry");
-		let tombstones;
-		try {
-			tombstones = deletionTombstones(cwd);
-		} catch (err) {
-			return fail(err.amberCode || "AMBER_E_RETENTION_TX_CORRUPT", [err.message || String(err)]);
-		}
-		const tombstone = tombstones.find(
-			(entry) => `${entry.record.identity}@${entry.record.revision}` === subject,
-		);
+		const tombstone = tombstoneOf(subject);
 		if (tombstone) {
 			return fail("AMBER_E_RETENTION_TOMBSTONE", [
 				`subject ${JSON.stringify(subject)} is ${tombstone.status} under deletion transaction ${JSON.stringify(tombstone.transactionId)}; historical existence is not current proof — a deleted record cannot satisfy content, replay, or freshness Gates`,
@@ -1043,6 +1048,19 @@ function evaluateGate(cwd, input = {}, opts = {}) {
 	// The evidence read seam is the fold's derived records (effective
 	// assurance, verified promotion included); its failures propagate its
 	// own codes.
+	// Per-requirement subject overrides join evidence exactly like the
+	// input subject does, so they pass the same tombstone guard: a gate
+	// naming a deleted record in requirement.subject cannot pull its
+	// Evidence while the input subject differs.
+	for (const requirement of [...contract.require, ...(contract.anyOf ?? []).flat()]) {
+		if (requirement.subject === undefined) continue;
+		const tombstone = tombstoneOf(requirement.subject);
+		if (tombstone) {
+			return fail("AMBER_E_RETENTION_TOMBSTONE", [
+				`requirement subject ${JSON.stringify(requirement.subject)} of gate "${gate}" is ${tombstone.status} under deletion transaction ${JSON.stringify(tombstone.transactionId)}; historical existence is not current proof — a deleted record cannot satisfy content, replay, or freshness Gates`,
+			]);
+		}
+	}
 	let records;
 	try {
 		records = listEvidence(cwd);

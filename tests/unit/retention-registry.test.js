@@ -1285,6 +1285,28 @@ test("deleted records project as tombstones and refuse Gate evaluation", () => {
 	assert.equal(JSON.stringify(settledGraph).includes(liveNode.contentHash), false);
 	const deletedGate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/login@1" });
 	assert.equal(deletedGate.code, "AMBER_E_RETENTION_TOMBSTONE");
+	// A per-requirement subject override joins evidence exactly like the
+	// input subject, so it passes the same guard: a gate naming the deleted
+	// record in requirement.subject cannot pull its Evidence while the
+	// input subject differs.
+	assert.equal(
+		admitArtifact(dir, {
+			type: "gate",
+			identity: "gate/tombstone-probe",
+			body: "# Gate: tombstone probe\n",
+			extensions: {
+				gate: { require: [{ evidenceType: "probe", subject: "intent/login@1" }] },
+			},
+		}).ok,
+		true,
+	);
+	const overrideGate = evaluateGate(dir, {
+		gate: "gate/tombstone-probe",
+		subject: "intent/other@1",
+	});
+	assert.equal(overrideGate.ok, false);
+	assert.equal(overrideGate.code, "AMBER_E_RETENTION_TOMBSTONE");
+	assert.match(overrideGate.errors[0], /requirement subject "intent\/login@1"/);
 	// A corrupt transaction ledger fails the gate seam closed too.
 	fs.appendFileSync(transactionsPath(dir), '{"kind":"execution"}\n');
 	const corruptGate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/login@1" });
@@ -1292,6 +1314,32 @@ test("deleted records project as tombstones and refuse Gate evaluation", () => {
 	assert.equal(corruptGate.code, "AMBER_E_RETENTION_TX_CORRUPT");
 	// The graph build reads through the same fail-closed seam: a corrupt
 	// transaction ledger refuses the projection, never a partial graph.
+	assert.throws(
+		() => buildGovernanceGraph(dir),
+		(err) => err.amberCode === "AMBER_E_RETENTION_TX_CORRUPT",
+	);
+});
+
+test("a transaction referencing an unresolvable candidate fails tombstone reads closed", () => {
+	const dir = mkTarget("tombstone-cross");
+	const expired = authorizedFixture(dir);
+	assert.equal(
+		executeDeletion(dir, { id: "tx/1", candidateId: "deletion/1" }, { now: expired }).ok,
+		true,
+	);
+	// Removing the candidates ledger must not read as "no candidates":
+	// vanishing tombstones would let the deleted record project live with
+	// content hashes and the Gate guard would stop firing.
+	fs.rmSync(candidatesPath(dir));
+	assert.throws(
+		() => deletionTombstones(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_RETENTION_TX_CORRUPT" &&
+			/does not resolve in the candidate ledger/.test(err.message),
+	);
+	const gate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/login@1" });
+	assert.equal(gate.ok, false);
+	assert.equal(gate.code, "AMBER_E_RETENTION_TX_CORRUPT");
 	assert.throws(
 		() => buildGovernanceGraph(dir),
 		(err) => err.amberCode === "AMBER_E_RETENTION_TX_CORRUPT",

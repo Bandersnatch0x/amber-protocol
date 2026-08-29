@@ -56,6 +56,9 @@ governance metadata remain.
   erasure.
 - Projection tombstones preserve minimal stable identity and Proof reference but cannot expose or
   reconstruct deleted content.
+- Tombstone and Proof reads fail closed across ledgers: a deletion transaction whose candidate no
+  longer resolves (candidate ledger removed, emptied, or truncated) refuses the read instead of
+  treating the missing half as empty — tombstones never silently vanish.
 - Historical Evidence may prove that an event occurred but cannot satisfy a new Gate requiring raw
   content, replay, or current freshness.
 
