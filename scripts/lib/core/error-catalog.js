@@ -2108,9 +2108,9 @@ const CATALOG = {
 	AMBER_E_KNOWLEDGE_MANIFEST_INVALID: {
 		title: "F059 knowledge context manifest census or identity check failed",
 		cause:
-			"The discovered ADR / wiki / architecture document counts do not match the committed 24+10+9 corpus, or two rows share the same id, pageId, sourceNodeId, or sourcePath. This is an intentional gate: the manifest is a deliberate, reviewed snapshot of the F059 corpus. Adding a new ADR, wiki knowledge page, or architecture doc requires a conscious bump to EXPECTED_COUNTS and a fresh context-sync run.",
+			"The tree-derived ADR / wiki / architecture documents disagree with the committed census manifest (a document was added or removed without re-admitting the corpus), or two rows share the same id, pageId, sourceNodeId, or sourcePath. This is an intentional gate: the committed manifest under docs/knowledge-corpus/ is the census's single source of truth, and the conscious-admission act is reviewing its diff.",
 		remedy:
-			"Run `amber knowledge context-manifest --target <repo>` to diagnose which category is over/under count. If the new document should be part of the corpus, update EXPECTED_COUNTS in scripts/lib/core/knowledge-projection.js and re-run `amber knowledge context-sync --target <repo>`.",
+			"Run `amber knowledge context-manifest --target <repo>` to see the named membership deltas. If the change is intended, run `amber knowledge context-sync --target <repo>` and commit the regenerated docs/knowledge-corpus/ manifest and projection output.",
 		layer: "Verification",
 		related: ["AMBER_E_KNOWLEDGE_GRAPH_SOURCE", "AMBER_E_KNOWLEDGE_SOURCE_STALE"],
 	},

@@ -93,7 +93,17 @@ function parsePolicyPin(raw) {
 
 const dispatch = defineCommand({
 	command: "release",
-	actions: ["prepare", "authorize", "deploy", "rollback", "transactions", "show", "list"],
+	actions: [
+		"prepare",
+		"authorize",
+		"deploy",
+		"rollback",
+		"transactions",
+		"status",
+		"receipts",
+		"show",
+		"list",
+	],
 	handlers: {
 		prepare: (args) => {
 			const { prepareReleaseCandidate } = require("./core/release-registry");
@@ -247,6 +257,54 @@ const dispatch = defineCommand({
 				const failure = readFailure(args, err, "AMBER_E_RELEASE_TX_CORRUPT");
 				return { ...failure.result, exitCode: failure.exitCode };
 			}
+		},
+		status: (args) => {
+			const { releaseStatus } = require("./core/release-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "release/web-42");
+			if (id.error) return invalidArg(id.error);
+			try {
+				const status = releaseStatus(target.value, id.value);
+				if (status === null) {
+					return {
+						text: "",
+						errors: [`release candidate ${JSON.stringify(id.value)} is not prepared`],
+						warnings: [],
+						exitCode: 1,
+						code: "AMBER_E_RELEASE_NOT_FOUND",
+					};
+				}
+				return { text: JSON.stringify({ releaseId: id.value, status }, null, 2) };
+			} catch (err) {
+				const failure = readFailure(args, err, "AMBER_E_RELEASE_TX_CORRUPT");
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+		},
+		receipts: (args) => {
+			const { releaseReceipt } = require("./core/release-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "release/web-42");
+			if (id.error) return invalidArg(id.error);
+			const result = releaseReceipt(target.value, id.value);
+			return {
+				text: result.ok ? JSON.stringify(result.receipt, null, 2) : "",
+				errors: result.errors,
+				warnings: [],
+				exitCode: result.ok ? 0 : 1,
+				...(result.code ? { code: result.code } : {}),
+			};
 		},
 		show: (args) => {
 			const { showReleaseCandidate } = require("./core/release-registry");

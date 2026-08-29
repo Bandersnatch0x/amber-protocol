@@ -1158,7 +1158,7 @@ Error codes: `AMBER_E_RUNNER_INVALID`, `AMBER_E_RUNNER_EXISTS`, `AMBER_E_RUNNER_
 `AMBER_E_RUNNER_EXECUTION_CORRUPT`, `AMBER_E_RUNNER_EXECUTION_LOCK`,
 `AMBER_E_RUNNER_EXECUTION_SIZE_CEILING`.
 
-### release prepare / authorize / deploy / rollback / transactions / show / list
+### release prepare / authorize / deploy / rollback / transactions / status / receipts / show / list
 
 Prepare governed release candidates (F053 T1). A candidate immutably binds one exact Change — a
 40-hex commit sha plus committed Canonical Artifact revisions — together with recorded F050
@@ -1226,7 +1226,20 @@ node scripts/amber.js release deploy --target . --id release/web-42 \
 node scripts/amber.js release rollback --target . --id release/web-42 \
   --request-hash sha256:<64-hex-chars> --json
 node scripts/amber.js release transactions --target . --id release/web-42 --json
+node scripts/amber.js release status --target . --id release/web-42 --json
+node scripts/amber.js release receipts --target . --id release/web-42 --json
 ```
+
+`release status` derives one lifecycle state per release across every ledger
+(`prepared|authorized|deploying|deployed|aborted|rolled-back`) — a rollback counts only once its
+own execution committed, and any settled-but-uncommitted execution reads as aborted. `release receipts` assembles
+the verifiable audit projection read-only: exact inputs (releaseHash, commit, policy and
+capability pins, environment), the authorization bindings, and per-operation the real executor
+identity, timestamps, settlement outcome, output digest, assurance fields, and the credential
+BOUNDARY (purpose/scope/expiry — deliberately never the handle, so no receipt field can carry or
+leak a credential value); any missing or tampered link fails closed through its ledger's typed
+code. The MCP capability registry carries no release verb, so deploy and rollback can only ever be
+approval-required submissions (F053 T4).
 
 Error codes: `AMBER_E_RELEASE_INVALID`, `AMBER_E_RELEASE_EXISTS`, `AMBER_E_RELEASE_NOT_FOUND`,
 `AMBER_E_RELEASE_CORRUPT`, `AMBER_E_RELEASE_LOCK`, `AMBER_E_RELEASE_SIZE_CEILING`,
@@ -2115,22 +2128,24 @@ Loadouts, or projections. See the [Context threat model](architecture/context-th
 a committed corpus at `docs/knowledge-corpus/` (tracked in git) so `amber knowledge graph` succeeds
 on a clean clone without any prior mutation to `.amber/`.
 
-**Intentional census gate:** the F059 corpus is a deliberate, reviewed snapshot of exactly
-24 ADR + 10 wiki + 9 architecture documents (43 total). Adding any document in those directories
-will fail `context-manifest` and `context-sync` until `EXPECTED_COUNTS` in
-`scripts/lib/core/knowledge-projection.js` is updated and a fresh `context-sync --refresh` run
-is committed. This is by design — the gate forces conscious corpus inclusion.
+**Intentional census gate, single-sourced:** the committed manifest at
+`docs/knowledge-corpus/knowledge-context-manifest.json` is the census's one source of truth.
+Adding or removing any document under `docs/adr/`, `docs/wiki/knowledge/`, or
+`docs/architecture/` makes reads fail closed with the offending paths named — in both
+directions (a tree document not yet admitted; a census row whose file vanished) — until a fresh
+`context-sync` run is committed. Admission is deliberate by construction: the reviewed artifact
+is the regenerated manifest diff in your commit, not a constant in code.
 
 ```bash
 # Deterministic knowledge graph (reads committed docs/knowledge-corpus/)
 node scripts/amber.js knowledge graph --target . --json
 
-# Inspect the current F059 corpus manifest (24 ADR + 10 wiki + 9 arch = 43 rows)
+# Render the tree-derived manifest and validate it against the committed census
 node scripts/amber.js knowledge context-manifest --target . --json
 
 # Build / refresh the committed corpus (writes docs/knowledge-corpus/ — then commit the changes)
 node scripts/amber.js knowledge context-sync   --target .             # create/skip unchanged pages
-node scripts/amber.js knowledge context-sync   --target . --refresh   # force re-ingest all 43 pages
+node scripts/amber.js knowledge context-sync   --target . --refresh   # force re-ingest every page
 
 # Prepare HITL review sample (6 pages spanning all three categories — requires human review before close)
 node scripts/amber.js knowledge context-review-sample --target . --output .scratch/review-sample.json

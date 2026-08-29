@@ -1552,6 +1552,165 @@ function listReleaseTransactions(cwd, { releaseId = null } = {}) {
 		.map((entry) => withExecutionProjection(cwd, entry));
 }
 
+// ── F053 T4 (#277): release receipts, status & audit projection ───────────
+//
+// Pure read-time projection over the candidate, authorization, and
+// transaction ledgers plus the F052 request/execution journals: nothing is
+// written, every broken or tampered link fails closed through its own
+// ledger's typed code, and no credential VALUE (not even the opaque
+// handle) ever appears — a receipt records the credential boundary, never
+// the credential.
+
+const RELEASE_STATUSES = Object.freeze([
+	"prepared",
+	"authorized",
+	"deploying",
+	"deployed",
+	"aborted",
+	"rolled-back",
+]);
+
+// One transaction's projection: pending settlements read as in-flight;
+// anything not committed reads as aborted — never as success.
+function transactionOutcome(cwd, transaction) {
+	const execution = showRunnerExecution(cwd, transaction.requestHash);
+	if (execution === null || !execution.terminal) return { phase: "in-flight", execution };
+	return {
+		phase: execution.status === "committed" ? "committed" : "aborted",
+		execution,
+	};
+}
+
+/**
+ * One derived lifecycle state per release, spanning every ledger:
+ * prepared → authorized → deploying → deployed | aborted → rolled-back.
+ * A rollback transaction only counts once its own execution committed.
+ */
+function releaseStatus(cwd, releaseId) {
+	const candidate = showReleaseCandidate(cwd, releaseId);
+	if (candidate === null) return null;
+	const authorization = showReleaseAuthorization(cwd, releaseId);
+	if (authorization === null) return "prepared";
+	const transactions = foldReleaseTransactions(cwd).filter(
+		(entry) => entry.releaseId === releaseId,
+	);
+	const deploy = transactions.find((entry) => entry.operation === "deploy");
+	if (!deploy) return "authorized";
+	const rollback = transactions.find((entry) => entry.operation === "rollback");
+	if (rollback && transactionOutcome(cwd, rollback).phase === "committed") return "rolled-back";
+	const outcome = transactionOutcome(cwd, deploy);
+	if (outcome.phase === "in-flight") return "deploying";
+	return outcome.phase === "committed" ? "deployed" : "aborted";
+}
+
+// The credential BOUNDARY a request declared: purpose, scope, and expiry —
+// deliberately not the opaque handle, so no receipt field could ever be
+// mistaken for (or leak) a credential value.
+function credentialBoundaryOf(request) {
+	if (request.credential === null) return null;
+	return {
+		purpose: request.credential.purpose,
+		scope: request.credential.scope,
+		expiresAt: request.credential.expiresAt,
+	};
+}
+
+/**
+ * The verifiable release receipt: exact inputs, per-transaction executor,
+ * operation, credential boundary, timestamps, settlement, and output
+ * digest — assembled read-only, failing closed when any link is missing.
+ */
+function releaseReceipt(cwd, releaseId) {
+	const fail = (code, errors) => ({ ok: false, code, receipt: null, errors });
+	let candidate;
+	try {
+		candidate = showReleaseCandidate(cwd, releaseId);
+	} catch (err) {
+		return fail(err.amberCode || RELEASE_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (candidate === null)
+		return fail(RELEASE_NOT_FOUND_CODE, [
+			`release candidate ${JSON.stringify(releaseId)} is not prepared`,
+		]);
+	let authorization;
+	let transactions;
+	try {
+		authorization = showReleaseAuthorization(cwd, releaseId);
+		transactions = foldReleaseTransactions(cwd).filter((entry) => entry.releaseId === releaseId);
+	} catch (err) {
+		return fail(err.amberCode || RELEASE_AUTH_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	const operations = [];
+	for (const transaction of transactions) {
+		let request;
+		let execution;
+		try {
+			request = showRunnerRequest(cwd, transaction.requestHash);
+			execution = showRunnerExecution(cwd, transaction.requestHash);
+		} catch (err) {
+			return fail(err.amberCode || RELEASE_TX_CORRUPT_CODE, [err.message || String(err)]);
+		}
+		if (request === null)
+			return fail(RELEASE_TX_CORRUPT_CODE, [
+				`transaction ${transaction.operation} of ${JSON.stringify(releaseId)} rides request ${JSON.stringify(transaction.requestHash)}, which is no longer recorded`,
+			]);
+		operations.push({
+			operation: transaction.operation,
+			requestHash: transaction.requestHash,
+			at: transaction.at,
+			credentialBoundary: credentialBoundaryOf(request),
+			executor: execution === null ? null : execution.runner,
+			preparedAt: execution === null ? null : execution.preparedAt,
+			settlement:
+				execution === null || execution.settlement === null
+					? null
+					: {
+							at: execution.settlement.at,
+							outcome: execution.settlement.outcome,
+							reason: execution.settlement.reason,
+							outputsDigest: execution.settlement.receipt.outputsDigest,
+							resultIntegrity: execution.settlement.resultIntegrity,
+							sandboxAssurance: execution.settlement.receipt.sandboxAssurance,
+							credentialAssurance: execution.settlement.receipt.credentialAssurance,
+						},
+		});
+	}
+	let status;
+	try {
+		status = releaseStatus(cwd, releaseId);
+	} catch (err) {
+		return fail(err.amberCode || RELEASE_TX_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	return {
+		ok: true,
+		code: null,
+		receipt: {
+			releaseId: candidate.releaseId,
+			releaseHash: candidate.releaseHash,
+			status,
+			inputs: {
+				commit: candidate.change.commit,
+				environment: candidate.environment,
+				policy: candidate.policy,
+				capability: candidate.capability,
+				credentialsClass: candidate.credentialsClass,
+			},
+			authorization:
+				authorization === null
+					? null
+					: {
+							at: authorization.at,
+							environment: authorization.environment,
+							approvalId: authorization.approvalId,
+							codeOwner: authorization.codeOwner,
+							releaseManager: authorization.releaseManager,
+						},
+			operations,
+		},
+		errors: [],
+	};
+}
+
 module.exports = {
 	RELEASE_CANDIDATE_SCHEMA_VERSION,
 	SUPPORTED_RELEASE_CANDIDATE_SCHEMA_VERSIONS,
@@ -1578,4 +1737,7 @@ module.exports = {
 	deployRelease,
 	rollbackRelease,
 	listReleaseTransactions,
+	RELEASE_STATUSES,
+	releaseStatus,
+	releaseReceipt,
 };
