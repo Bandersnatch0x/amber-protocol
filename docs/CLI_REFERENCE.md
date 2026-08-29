@@ -1255,7 +1255,10 @@ Proposals (F054 T2), triage them (F054 T3), and close the loop with completion r
 bounded rollups (F054 T4). A detector is a versioned, model-independent Control Band definition —
 metric, source, numeric baseline, closed comparator rules
 (`ge|gt|le|lt`, the last matching rule wins), evaluation window, scope, cooldown, observation
-ceiling, and the one permitted output type (`finding`) — registered into the hash-chained ledger
+ceiling, the one permitted output type (`finding`), a declared service owner (`--owner`, a
+registered human Principal verified at registration — service-owner triage is human-governed), and
+an optional Policy pin (`--policy <identity>@<revision>`, a committed `policy` artifact revision
+binding the detector to the policy basis it encodes) — registered into the hash-chained ledger
 `.amber/maintain/detectors.jsonl` behind a single-use committed human acceptance/approval Decision
 (mirroring the F052 registry contract). Registered versions are immutable: a changed definition
 registers a new version, never an overwrite.
@@ -1279,18 +1282,24 @@ from caller input: every proposal field copies from the Finding and the register
 version it names (the closed event sets carry identities, hashes, times, and Finding references
 only, so no field can smuggle an admission payload — a proposal is a maintain-ledger record in
 `.amber/maintain/proposals.jsonl`, structurally never a canonical artifact, and automation cannot
-start work unilaterally). One open proposal per fingerprint: a repeated observation inside the
-detector's declared cooldown (measured observation-to-observation) appends its Finding reference
-onto the open proposal instead of duplicating it, and re-referencing the same Finding refuses;
-outside cooldown the open proposal must be triaged before a new one may open, so an untriaged
-condition escalates to a human instead of multiplying. Proposals are immutable and append-only;
-the ledger fails every read closed on tamper.
+start work unilaterally). One open proposal per detector + subject: a repeated out-of-band
+observation of the same subject inside the detector's declared cooldown (measured
+observation-to-observation, across sliding windows) appends its Finding reference onto the open
+proposal instead of duplicating it — a storm that slides through many windows correlates into one
+proposal — and re-referencing the same Finding refuses; the detector's declared `maxObservations`
+bounds the open proposal's evidence chain, so an unbounded storm cannot grow one proposal without
+a human triaging it; outside cooldown the open proposal must be triaged before a new one may open,
+so an untriaged condition escalates to a human instead of multiplying. Proposals are immutable and
+append-only; the ledger fails every read closed on tamper.
 
-`triage` binds one open proposal to one committed human acceptance/approval Decision
-(registry-verified principal — the service owner) under the closed vocabulary
-`fix|schedule|dismiss`. `schedule` and `dismiss` must carry preserved reasons and close the
+`triage` binds one open proposal to one committed human acceptance/approval Decision under the
+closed vocabulary `fix|schedule|dismiss`. Triage of a detector that declares a service owner is
+enforced to that owner: the Decision's registry-verified principal must be the detector's declared
+`owner`, so triage authority is the declared service owner, not any human with a Decision (v1
+detector events predate the owner field and keep their any-human latitude). `schedule` and
+`dismiss` must carry preserved reasons and close the
 proposal reviewably (it stays listable with its outcome, reason, and owner identity); a triaged
-fingerprint is unblocked, so the next out-of-band observation opens a fresh proposal. Only `fix`
+subject is unblocked, so the next out-of-band observation opens a fresh proposal. Only `fix`
 returns a CANDIDATE Intent admission payload — a prepare-only input mirroring F051 migration
 candidates that carries the detector, subject, scope, tier, fingerprint, and referenced Finding
 evidence — and triage itself never mutates canonical state: the candidate must still pass normal
@@ -1302,8 +1311,9 @@ re-chained forgeries against the closed-proposal or single-use invariants fail e
 Staleness is derived at read time, never edited in place: `findings` and `proposals` listings
 carry `stale`/`staleReasons` — `detector-superseded` when the entry's detector version is no
 longer the newest registered version of that detector id, `observation-superseded` when a later
-Finding re-presents the same fingerprint with a different input hash — so prior results become
-stale rather than silently reinterpreted. `complete` closes a fix-triaged proposal by appending
+Finding re-presents the same fingerprint with a different input hash, `policy-superseded` when the
+entry's detector version pins a Policy artifact whose identity has a newer committed revision — so
+prior results become stale rather than silently reinterpreted. `complete` closes a fix-triaged proposal by appending
 one immutable record binding fingerprint → committed candidate Intent revision → committed `eval`
 and `eval-result` artifact pins (F058 types), so a shipped fix becomes a regression signal; the
 intent pin must be the fingerprint-derived candidate identity (`intent/maintain/<16-hex>`), every
@@ -1321,6 +1331,7 @@ node scripts/amber.js maintain register-detector --target . --id detector/error-
   --detector-version 1 --metric http-5xx-rate --source observability/api \
   --baseline 10 --rule warn:ge:100 --rule page:ge:500 --window-ms 3600000 \
   --scope service/api --cooldown-ms 3600000 --max-observations 100 \
+  --owner alice@example.com --policy policy/error-budget@1 \
   --decision-identity decision/detector-error-rate --revision 1 --json
 node scripts/amber.js maintain detect --target . --id detector/error-rate \
   --detector-version 1 --subject service/api \

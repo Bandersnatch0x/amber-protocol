@@ -106,6 +106,8 @@ function detectorInput(overrides = {}) {
 		cooldownMs: 3_600_000,
 		maxObservations: 100,
 		outputType: "finding",
+		owner: "alice@example.com",
+		policy: null,
 		decision: { identity: "decision/detector-1", revision: 1 },
 		...overrides,
 	};
@@ -155,8 +157,8 @@ function snapshotOutsideMaintain(dir) {
 }
 
 test("maintain constants pin the schema, comparator, output, and authority contracts", () => {
-	assert.equal(MAINTAIN_DETECTOR_SCHEMA_VERSION, 1);
-	assert.deepEqual([...SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS], [1]);
+	assert.equal(MAINTAIN_DETECTOR_SCHEMA_VERSION, 2);
+	assert.deepEqual([...SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS], [1, 2]);
 	assert.equal(MAINTAIN_FINDING_SCHEMA_VERSION, 1);
 	assert.deepEqual([...SUPPORTED_MAINTAIN_FINDING_SCHEMA_VERSIONS], [1]);
 	assert.equal(DEFAULT_MAX_MAINTAIN_BYTES, 1024 * 1024);
@@ -614,11 +616,14 @@ test("outside cooldown an open proposal must be triaged before a new one may ope
 	assert.deepEqual(listProposals(dir)[0].findings, [0]);
 });
 
-test("proposals separate by fingerprint and filter on it", () => {
+test("proposals separate by subject while sliding windows correlate", () => {
 	const dir = mkTarget("propose-split");
 	registryFixture(dir);
 	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
 	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	// A sliding window mints a new fingerprint but the SAME storm
+	// identity (detector + subject): inside the cooldown it appends to
+	// the open proposal instead of opening a parallel one.
 	assert.equal(
 		detect(
 			dir,
@@ -630,11 +635,15 @@ test("proposals separate by fingerprint and filter on it", () => {
 		).ok,
 		true,
 	);
+	// A different subject is a different condition: it opens separately.
+	assert.equal(detect(dir, observation({ subject: "service/web" }), { now: NOW }).ok, true);
 	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
-	assert.equal(propose(dir, { findingIndex: 1 }, { now: NOW }).action, "opened");
+	assert.equal(propose(dir, { findingIndex: 1 }, { now: NOW }).action, "appended");
+	assert.equal(propose(dir, { findingIndex: 2 }, { now: NOW }).action, "opened");
 	const proposals = listProposals(dir);
 	assert.equal(proposals.length, 2);
 	assert.notEqual(proposals[0].fingerprint, proposals[1].fingerprint);
+	assert.deepEqual(proposals[0].findings, [0, 1]);
 	assert.equal(listProposals(dir, { fingerprint: proposals[0].fingerprint }).length, 1);
 });
 
@@ -1244,7 +1253,7 @@ test("rollup is deterministic within its declared bound and marks truncation", (
 		detect(
 			dir,
 			observation({
-				window: { from: "2026-08-29T01:00:00.000Z", to: "2026-08-29T01:30:00.000Z" },
+				subject: "service/web",
 				inputHash: `sha256:${"c".repeat(64)}`,
 			}),
 			{ now: NOW },
@@ -1295,4 +1304,166 @@ test("rollup is deterministic within its declared bound and marks truncation", (
 	assert.equal(unbounded.ok, false);
 	assert.equal(unbounded.code, "AMBER_E_MAINTAIN_INVALID");
 	assert.match(unbounded.errors[0], /limit must be a declared positive integer bound/);
+});
+
+// ---------------------------------------------------------------------------
+// Acceptance-review fixes: service-owner triage (P3), Policy staleness
+// (P1), maxObservations enforcement (P2), sliding-window storms (P9).
+// ---------------------------------------------------------------------------
+
+test("registration verifies the declared service owner", () => {
+	const dir = mkTarget("owner");
+	registryFixture(dir);
+	const missing = registerDetector(dir, detectorInput({ owner: " " }), { now: NOW });
+	assert.equal(missing.ok, false);
+	assert.match(missing.errors[0], /owner must name the declared service owner/);
+	const ghost = registerDetector(dir, detectorInput({ owner: "ghost@example.com" }), {
+		now: NOW,
+	});
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.equal(
+		registerPrincipal(dir, { id: "bot@example.com", principalKind: "service" }).ok,
+		true,
+	);
+	const service = registerDetector(dir, detectorInput({ owner: "bot@example.com" }), {
+		now: NOW,
+	});
+	assert.equal(service.ok, false);
+	assert.match(service.errors[0], /service-owner triage is human-governed/);
+	const registered = registerDetector(dir, detectorInput(), { now: NOW });
+	assert.equal(registered.ok, true, (registered.errors || []).join("; "));
+	assert.equal(registered.record.owner, "alice@example.com");
+	assert.equal(registered.record.policy, null);
+});
+
+test("triage belongs to the declared service owner; v1 detectors keep their latitude", () => {
+	const dir = mkTarget("owner-triage");
+	registryFixture(dir);
+	assert.equal(
+		registerPrincipal(dir, { id: "mallory@example.com", principalKind: "human" }).ok,
+		true,
+	);
+	assert.equal(registerDetector(dir, detectorInput(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	const fingerprint = listProposals(dir)[0].fingerprint;
+	// A Decision by a different human refuses: the owner is the ONLY
+	// principal whose Decision may triage this detector's proposals.
+	const stranger = admitArtifact(dir, {
+		type: "decision",
+		identity: "decision/stranger-triage",
+		body: "# stranger\n",
+		decisionKind: "approval",
+		principal: "mallory@example.com",
+		traces: [{ type: "decides", to: { type: "intent", identity: "intent/maintain" } }],
+	});
+	assert.equal(stranger.ok, true, (stranger.errors || []).join("; "));
+	const refused = triage(
+		dir,
+		triageInput(fingerprint, {
+			decision: { identity: "decision/stranger-triage", revision: 1 },
+		}),
+		{ now: NOW },
+	);
+	assert.equal(refused.ok, false);
+	assert.equal(refused.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(refused.errors[0], /belongs to the declared service owner "alice@example.com"/);
+	// The owner's own Decision triages.
+	decisionFixture(dir, "decision/owner-triage");
+	assert.equal(
+		triage(
+			dir,
+			triageInput(fingerprint, {
+				decision: { identity: "decision/owner-triage", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	// A v1 detector event (before owner existed) folds owner/policy to
+	// null and keeps the any-human latitude — history stays readable.
+	const events = readEvents(detectorsPath(dir));
+	const { hash: _hash, owner: _owner, policy: _policy, ...v1Body } = events[0];
+	const v1 = { ...v1Body, schemaVersion: 1 };
+	v1.hash = chainHash(v1, v1.prevHash);
+	writeEvents(detectorsPath(dir), [v1]);
+	const folded = listDetectors(dir)[0];
+	assert.equal(folded.schemaVersion, 1);
+	assert.equal(folded.owner, null);
+	assert.equal(folded.policy, null);
+	// A v1 event smuggling the fields it predates refuses.
+	const smuggled = { ...v1Body, schemaVersion: 1, owner: "alice@example.com" };
+	delete smuggled.hash;
+	smuggled.hash = chainHash(smuggled, smuggled.prevHash);
+	writeEvents(detectorsPath(dir), [smuggled]);
+	assert.throws(
+		() => listDetectors(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_CORRUPT" && /unknown field "owner"/.test(err.message),
+	);
+});
+
+test("a newer committed Policy revision makes dependent evaluations stale", () => {
+	const dir = mkTarget("policy-stale");
+	registryFixture(dir);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "policy",
+			identity: "policy/error-budget",
+			body: "# Error budget v1\n",
+		}).ok,
+		true,
+	);
+	const ghost = registerDetector(
+		dir,
+		detectorInput({ policy: { identity: "policy/ghost", revision: 1 } }),
+		{ now: NOW },
+	);
+	assert.equal(ghost.ok, false);
+	assert.match(ghost.errors[0], /is not a committed policy artifact revision/);
+	assert.equal(
+		registerDetector(
+			dir,
+			detectorInput({ policy: { identity: "policy/error-budget", revision: 1 } }),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	assert.deepEqual(listFindings(dir)[0].staleReasons, []);
+	// Committing revision 2 of the pinned Policy stales the evaluation —
+	// prior results become stale rather than silently reinterpreted.
+	assert.equal(
+		admitArtifact(dir, {
+			type: "policy",
+			identity: "policy/error-budget",
+			body: "# Error budget v2\n",
+			expectedHead: 1,
+		}).ok,
+		true,
+	);
+	assert.deepEqual(listFindings(dir)[0].staleReasons, ["policy-superseded"]);
+	assert.equal(listFindings(dir)[0].stale, true);
+	assert.deepEqual(listProposals(dir)[0].staleReasons, ["policy-superseded"]);
+});
+
+test("the declared maxObservations bounds the open proposal's evidence chain", () => {
+	const dir = mkTarget("max-observations");
+	registryFixture(dir);
+	assert.equal(registerDetector(dir, detectorInput({ maxObservations: 2 }), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation(), { now: NOW }).ok, true);
+	assert.equal(detect(dir, observation({ inputHash: HASH_B }), { now: NOW }).ok, true);
+	assert.equal(
+		detect(dir, observation({ inputHash: `sha256:${"c".repeat(64)}` }), { now: NOW }).ok,
+		true,
+	);
+	assert.equal(propose(dir, { findingIndex: 0 }, { now: NOW }).action, "opened");
+	assert.equal(propose(dir, { findingIndex: 1 }, { now: NOW }).action, "appended");
+	const capped = propose(dir, { findingIndex: 2 }, { now: NOW });
+	assert.equal(capped.ok, false);
+	assert.equal(capped.code, "AMBER_E_MAINTAIN_INVALID");
+	assert.match(capped.errors[0], /already references its declared maxObservations \(2\)/);
+	assert.deepEqual(listProposals(dir)[0].findings, [0, 1]);
 });

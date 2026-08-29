@@ -43,6 +43,7 @@ const { readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
+const { resolveActivePrincipal } = require("./principal-registry");
 const { canonicalJson } = require("./context-hash");
 const {
 	GENESIS_HASH,
@@ -51,8 +52,11 @@ const {
 	appendLedgerEvent,
 } = require("./registry-ledger");
 
-const MAINTAIN_DETECTOR_SCHEMA_VERSION = 1;
-const SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS = Object.freeze([1]);
+// v2 added the required service `owner` and the optional `policy` pin
+// (acceptance review P1/P3); v1 detector events stay readable with both
+// folded to null — triage of a v1 detector keeps its any-human latitude.
+const MAINTAIN_DETECTOR_SCHEMA_VERSION = 2;
+const SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS = Object.freeze([1, 2]);
 const MAINTAIN_FINDING_SCHEMA_VERSION = 1;
 const SUPPORTED_MAINTAIN_FINDING_SCHEMA_VERSIONS = Object.freeze([1]);
 const MAINTAIN_PROPOSAL_SCHEMA_VERSION = 1;
@@ -104,6 +108,8 @@ const DETECTOR_INPUT_FIELDS = Object.freeze([
 	"cooldownMs",
 	"maxObservations",
 	"outputType",
+	"owner",
+	"policy",
 	"decision",
 ]);
 const DECISION_FIELDS = Object.freeze(["identity", "revision", "decisionKind", "principal"]);
@@ -123,10 +129,15 @@ const DETECTOR_EVENT_FIELDS = Object.freeze([
 	"cooldownMs",
 	"maxObservations",
 	"outputType",
+	"owner",
+	"policy",
 	"decision",
 	"prevHash",
 	"hash",
 ]);
+const DETECTOR_EVENT_FIELDS_V1 = Object.freeze(
+	DETECTOR_EVENT_FIELDS.filter((field) => field !== "owner" && field !== "policy"),
+);
 const DETECT_INPUT_FIELDS = Object.freeze([
 	"detectorId",
 	"detectorVersion",
@@ -301,11 +312,23 @@ function detectorShapeProblem(value, label) {
 
 function detectorEventProblem(event, lineIndex) {
 	const label = `maintain detector event ${lineIndex}`;
-	const closed = closedFieldProblem(event, DETECTOR_EVENT_FIELDS, label);
+	const closed = closedFieldProblem(
+		event,
+		event.schemaVersion === 1 ? DETECTOR_EVENT_FIELDS_V1 : DETECTOR_EVENT_FIELDS,
+		label,
+	);
 	if (closed !== null) return closed;
 	if (!isNonEmptyString(event.at)) return `${label}.at must be a non-empty string`;
 	const shape = detectorShapeProblem(event, label);
 	if (shape !== null) return shape;
+	if (event.schemaVersion !== 1) {
+		if (!isNonEmptyString(event.owner))
+			return `${label}.owner must name the declared service owner`;
+		if (event.policy !== null) {
+			const pin = artifactPinProblem(event.policy, `${label}.policy`);
+			if (pin !== null) return pin;
+		}
+	}
 	return decisionShapeProblem(event.decision, `${label}.decision`);
 }
 
@@ -347,7 +370,7 @@ function foldDetectors(cwd) {
 			throw maintainCorrupt(`detector ${JSON.stringify(key)} is registered more than once`);
 		keys.add(key);
 		const { prevHash: _prev, hash: _hash, ...body } = event;
-		detectors.push({ ...body, index });
+		detectors.push({ ...body, owner: event.owner ?? null, policy: event.policy ?? null, index });
 		prevHash = event.hash;
 	});
 	return detectors;
@@ -451,6 +474,52 @@ function registerDetector(cwd, input = {}, opts = {}) {
 	if (inputClosed !== null) return fail(MAINTAIN_INVALID_CODE, [inputClosed]);
 	const shape = detectorShapeProblem(input, "detector input");
 	if (shape !== null) return fail(MAINTAIN_INVALID_CODE, [shape]);
+	// The declared owner is the ONLY principal whose Decision may triage
+	// this detector's proposals: service-owner triage is a registered,
+	// verified human identity, never a free string.
+	if (!isNonEmptyString(input.owner))
+		return fail(MAINTAIN_INVALID_CODE, [
+			"owner must name the declared service owner; triage belongs to the owner",
+		]);
+	let ownerPrincipal;
+	try {
+		ownerPrincipal = resolveActivePrincipal(cwd, input.owner, {
+			now: opts.now instanceof Date ? opts.now : new Date(),
+		});
+	} catch (err) {
+		return fail(err.amberCode || MAINTAIN_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (!ownerPrincipal.ok) return fail(MAINTAIN_INVALID_CODE, [ownerPrincipal.message]);
+	if (ownerPrincipal.principal.principalKind !== "human")
+		return fail(MAINTAIN_INVALID_CODE, [
+			`owner ${JSON.stringify(input.owner)} is not a human principal; service-owner triage is human-governed`,
+		]);
+	// The optional Policy pin names the committed policy revision the
+	// detector's thresholds depend on — a newer committed revision makes
+	// dependent evaluations stale rather than silently reinterpreted.
+	const policy = input.policy ?? null;
+	if (policy !== null) {
+		const policyPin = artifactPinProblem(policy, "detector input.policy");
+		if (policyPin !== null) return fail(MAINTAIN_INVALID_CODE, [policyPin]);
+		let revisions;
+		try {
+			revisions = listArtifactRevisions(cwd);
+		} catch (err) {
+			return fail(err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT", [
+				err.message || String(err),
+			]);
+		}
+		const committed = revisions.some(
+			(revision) =>
+				revision.type === "policy" &&
+				revision.identity === policy.identity &&
+				revision.revision === policy.revision,
+		);
+		if (!committed)
+			return fail(MAINTAIN_INVALID_CODE, [
+				`policy ${JSON.stringify(policy.identity)}@${policy.revision} is not a committed policy artifact revision; a detector pins the Policy its thresholds depend on`,
+			]);
+	}
 	const pinProblem = decisionPinProblem(input.decision);
 	if (pinProblem !== null) return fail(MAINTAIN_INVALID_CODE, [pinProblem]);
 	const resolved = resolveRegistryDecision(cwd, input.decision);
@@ -491,6 +560,8 @@ function registerDetector(cwd, input = {}, opts = {}) {
 			cooldownMs: input.cooldownMs,
 			maxObservations: input.maxObservations,
 			outputType: input.outputType,
+			owner: input.owner,
+			policy,
 			decision: resolved.decision,
 		},
 		(fold) => {
@@ -706,7 +777,7 @@ function latestDetectorFor(detectors, id) {
 	return versions.length > 0 ? versions[versions.length - 1] : null;
 }
 
-function findingStaleReasons(finding, detectors, findings) {
+function findingStaleReasons(finding, detectors, findings, revisions = null) {
 	const reasons = [];
 	const latest = latestDetectorFor(detectors, finding.detectorId);
 	if (latest !== null && latest.version !== finding.detectorVersion)
@@ -718,6 +789,25 @@ function findingStaleReasons(finding, detectors, findings) {
 			entry.inputHash !== finding.inputHash,
 	);
 	if (represented) reasons.push("observation-superseded");
+	// A newer committed revision of the pinned Policy makes evaluations
+	// under the OWN detector version stale — Policy changes never
+	// silently reinterpret prior results.
+	const own =
+		detectors.find(
+			(entry) => entry.id === finding.detectorId && entry.version === finding.detectorVersion,
+		) ?? null;
+	if (
+		own !== null &&
+		own.policy !== null &&
+		revisions !== null &&
+		revisions.some(
+			(revision) =>
+				revision.type === "policy" &&
+				revision.identity === own.policy.identity &&
+				revision.revision > own.policy.revision,
+		)
+	)
+		reasons.push("policy-superseded");
 	return reasons;
 }
 
@@ -725,16 +815,25 @@ function withStaleness(entry, reasons) {
 	return { ...entry, stale: reasons.length > 0, staleReasons: reasons };
 }
 
+// The artifact journal is consulted only when some detector pins a
+// Policy, so policy-free repositories never pay (or fail on) that read.
+function policyRevisionsFor(cwd, detectors) {
+	return detectors.some((entry) => entry.policy !== null) ? listArtifactRevisions(cwd) : null;
+}
+
 function listFindings(cwd, { detectorId = null, fingerprint = null } = {}) {
 	const detectors = foldDetectors(cwd);
 	const findings = foldFindings(cwd);
+	const revisions = policyRevisionsFor(cwd, detectors);
 	return findings
 		.filter(
 			(entry) =>
 				(detectorId === null || entry.detectorId === detectorId) &&
 				(fingerprint === null || entry.fingerprint === fingerprint),
 		)
-		.map((entry) => withStaleness(entry, findingStaleReasons(entry, detectors, findings)));
+		.map((entry) =>
+			withStaleness(entry, findingStaleReasons(entry, detectors, findings, revisions)),
+		);
 }
 
 function proposalsPath(cwd) {
@@ -1024,15 +1123,28 @@ function currentProposalFor(fold, fingerprint) {
 	return null;
 }
 
+// The storm identity spans windows: one OPEN proposal per detector id +
+// subject, whatever exact window each observation carried, so a sliding
+// window can never mint a storm of parallel proposals.
+function currentOpenProposalForSubject(fold, detectorId, subject) {
+	for (let index = fold.length - 1; index >= 0; index -= 1) {
+		const entry = fold[index];
+		if (entry.detectorId === detectorId && entry.subject === subject && entry.status === "open")
+			return entry;
+	}
+	return null;
+}
+
 /**
  * Derive one immutable Trigger Proposal from one recorded out-of-band
  * Finding — never from caller input: every proposal field copies from the
  * Finding and the registered detector version it names. One open proposal
- * per fingerprint: a repeat inside the detector's cooldown (measured
- * against the proposal's latest recorded observation) appends the Finding
- * as evidence; outside cooldown the open proposal must be triaged before
+ * per detector + subject ACROSS windows: a repeat inside the detector's
+ * cooldown (measured against the proposal's latest recorded observation)
+ * appends the Finding as evidence even when a sliding window minted a new
+ * fingerprint; outside cooldown the open proposal must be triaged before
  * a new one may open, so untriaged conditions escalate to a human instead
- * of multiplying.
+ * of multiplying. The declared maxObservations bounds the evidence chain.
  */
 function propose(cwd, input = {}, opts = {}) {
 	const fail = (code, errors) => ({ ok: false, code, record: null, action: null, errors });
@@ -1064,14 +1176,14 @@ function propose(cwd, input = {}, opts = {}) {
 		// The factory re-derives its branch from its own fold, so it agrees
 		// with the guard without depending on evaluation order.
 		(fold) => {
-			const current = currentProposalFor(fold, finding.fingerprint);
-			return current !== null && current.status === "open"
+			const open = currentOpenProposalForSubject(fold, finding.detectorId, finding.subject);
+			return open !== null
 				? {
 						kind: "evidence",
 						schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
 						at,
 						observedAt: finding.at,
-						fingerprint: finding.fingerprint,
+						fingerprint: open.fingerprint,
 						findingIndex: finding.index,
 					}
 				: {
@@ -1090,35 +1202,42 @@ function propose(cwd, input = {}, opts = {}) {
 					};
 		},
 		(fold) => {
-			const current = currentProposalFor(fold, finding.fingerprint);
-			if (current === null || current.status !== "open") {
+			const open = currentOpenProposalForSubject(fold, finding.detectorId, finding.subject);
+			if (open === null) {
 				action = "opened";
 				return null;
 			}
-			if (current.findings.includes(finding.index))
+			if (open.findings.includes(finding.index))
 				return fail(MAINTAIN_INVALID_CODE, [
-					`finding ${finding.index} is already referenced by the open proposal for ${JSON.stringify(finding.fingerprint)}`,
+					`finding ${finding.index} is already referenced by the open proposal for ${JSON.stringify(open.fingerprint)}`,
 				]);
 			// A finding observed earlier than the proposal's latest referenced
 			// observation is correlation, not a new storm — it appends. The
 			// window is half-open, mirroring Approval validity: a delta of
 			// exactly cooldownMs is already outside.
-			const delta = Date.parse(finding.at) - Date.parse(current.lastObservedAt);
+			const delta = Date.parse(finding.at) - Date.parse(open.lastObservedAt);
 			if (delta >= detector.cooldownMs)
 				return fail(PROPOSAL_EXISTS_CODE, [
-					`an open proposal for ${JSON.stringify(finding.fingerprint)} is outside its ${detector.cooldownMs} ms cooldown and must be triaged before a new proposal may open`,
+					`an open proposal for ${JSON.stringify(open.fingerprint)} is outside its ${detector.cooldownMs} ms cooldown and must be triaged before a new proposal may open`,
+				]);
+			// The declared resource limit bounds the evidence chain: an
+			// open proposal never references more than maxObservations
+			// observations — the dead knob is now the storm ceiling.
+			if (open.findings.length >= detector.maxObservations)
+				return fail(MAINTAIN_INVALID_CODE, [
+					`the open proposal for ${JSON.stringify(open.fingerprint)} already references its declared maxObservations (${detector.maxObservations}); triage it before recording more evidence`,
 				]);
 			action = "appended";
 			return null;
 		},
-		(fold) => currentProposalFor(fold, finding.fingerprint),
+		(fold) => currentOpenProposalForSubject(fold, finding.detectorId, finding.subject),
 	);
 	return { ...result, action: result.ok ? action : null };
 }
 
 // A proposal chain inherits staleness from its detector version and its
 // referenced Findings.
-function proposalStaleReasons(proposal, detectors, findings) {
+function proposalStaleReasons(proposal, detectors, findings, revisions = null) {
 	const reasons = new Set();
 	const latest = latestDetectorFor(detectors, proposal.detectorId);
 	if (latest !== null && latest.version !== proposal.detectorVersion)
@@ -1126,7 +1245,8 @@ function proposalStaleReasons(proposal, detectors, findings) {
 	for (const index of proposal.findings) {
 		const finding = findings.find((entry) => entry.index === index);
 		if (!finding) continue;
-		for (const reason of findingStaleReasons(finding, detectors, findings)) reasons.add(reason);
+		for (const reason of findingStaleReasons(finding, detectors, findings, revisions))
+			reasons.add(reason);
 	}
 	return [...reasons].sort();
 }
@@ -1134,9 +1254,12 @@ function proposalStaleReasons(proposal, detectors, findings) {
 function listProposals(cwd, { fingerprint = null } = {}) {
 	const detectors = foldDetectors(cwd);
 	const findings = foldFindings(cwd);
+	const revisions = policyRevisionsFor(cwd, detectors);
 	return foldProposals(cwd)
 		.filter((entry) => fingerprint === null || entry.fingerprint === fingerprint)
-		.map((entry) => withStaleness(entry, proposalStaleReasons(entry, detectors, findings)));
+		.map((entry) =>
+			withStaleness(entry, proposalStaleReasons(entry, detectors, findings, revisions)),
+		);
 }
 
 // The prepare-only CANDIDATE Intent admission payload a fix triage
@@ -1234,6 +1357,23 @@ function triage(cwd, input = {}, opts = {}) {
 			if (current.status !== "open")
 				return fail(MAINTAIN_INVALID_CODE, [
 					`the proposal for ${JSON.stringify(input.fingerprint)} is already triaged (${current.triage.outcome}); triage of a closed proposal refuses`,
+				]);
+			// Service-owner triage: the proposal's detector version names
+			// the ONLY principal whose Decision may triage it. A v1
+			// detector (owner folded to null) keeps its any-human latitude.
+			let ownedBy;
+			try {
+				ownedBy = showDetector(cwd, current.detectorId, current.detectorVersion);
+			} catch (err) {
+				return fail(err.amberCode || MAINTAIN_CORRUPT_CODE, [err.message || String(err)]);
+			}
+			if (
+				ownedBy !== null &&
+				ownedBy.owner !== null &&
+				ownedBy.owner !== resolved.decision.principal
+			)
+				return fail(MAINTAIN_INVALID_CODE, [
+					`triage of ${JSON.stringify(input.fingerprint)} belongs to the declared service owner ${JSON.stringify(ownedBy.owner)}; the decision principal ${JSON.stringify(resolved.decision.principal)} does not own detector ${JSON.stringify(detectorKey(current.detectorId, current.detectorVersion))}`,
 				]);
 			const spender = fold.find(
 				(entry) =>
@@ -1425,11 +1565,12 @@ function rollup(cwd, { limit } = {}) {
 		entries.reduce((total, entry) => (reasonsOf(entry).length > 0 ? total + 1 : total), 0);
 	const scannedFindings = findings.slice(0, limit);
 	const scannedProposals = proposals.slice(0, limit);
+	const revisions = policyRevisionsFor(cwd, detectors);
 	const staleFindings = staleCount(scannedFindings, (entry) =>
-		findingStaleReasons(entry, detectors, findings),
+		findingStaleReasons(entry, detectors, findings, revisions),
 	);
 	const staleProposals = staleCount(scannedProposals, (entry) =>
-		proposalStaleReasons(entry, detectors, findings),
+		proposalStaleReasons(entry, detectors, findings, revisions),
 	);
 	return {
 		ok: true,

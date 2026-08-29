@@ -75,6 +75,7 @@ function registerArgs(overrides = {}) {
 		"--scope": "service/api",
 		"--cooldown-ms": "3600000",
 		"--max-observations": "100",
+		"--owner": "alice@example.com",
 		"--decision-identity": "decision/detector-1",
 		"--revision": "1",
 		...overrides,

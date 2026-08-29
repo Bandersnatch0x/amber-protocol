@@ -28,6 +28,8 @@ function missingValueFlag(args) {
 		["scope", "--scope"],
 		["cooldownMs", "--cooldown-ms"],
 		["maxObservations", "--max-observations"],
+		["owner", "--owner"],
+		["policy", "--policy"],
 		["decisionIdentity", "--decision-identity"],
 		["revision", "--revision"],
 		["subject", "--subject"],
@@ -87,6 +89,17 @@ function positiveInt(args, key, flag) {
 }
 
 // Grammar: <tier>:<comparator>:<threshold> — one deterministic rule.
+// Grammar: <identity>@<revision> — one committed policy revision pin.
+function parsePolicyPin(raw) {
+	const match = /^(.+)@([1-9]\d*)$/.exec(String(raw));
+	if (!match) {
+		return {
+			error: `--policy must be <identity>@<revision> (e.g. --policy policy/error-budget@1); got ${JSON.stringify(raw)}`,
+		};
+	}
+	return { value: { identity: match[1], revision: Number(match[2]) } };
+}
+
 function parseRule(raw) {
 	const match = /^([a-z][a-z0-9-]*):(ge|gt|le|lt):(-?\d+(?:\.\d+)?)$/.exec(String(raw));
 	if (!match) {
@@ -148,6 +161,7 @@ const dispatch = defineCommand({
 				["metric", "--metric", "http-5xx-rate"],
 				["source", "--source", "observability/api"],
 				["scope", "--scope", "service/api"],
+				["owner", "--owner", "alice@example.com"],
 				["decisionIdentity", "--decision-identity", "decision/detector-1"],
 			]) {
 				const required = requiredString(args, key, flag, example);
@@ -174,6 +188,12 @@ const dispatch = defineCommand({
 				if (parsed.error) return invalidArg(parsed.error);
 				numbers[key] = parsed.value;
 			}
+			let policy = null;
+			if (args.policy !== undefined) {
+				const pin = parsePolicyPin(args.policy);
+				if (pin.error) return invalidArg(pin.error);
+				policy = pin.value;
+			}
 			return resultEnvelope(
 				registerDetector(target.value, {
 					id: String(args.id),
@@ -187,6 +207,8 @@ const dispatch = defineCommand({
 					cooldownMs: numbers.cooldownMs,
 					maxObservations: numbers.maxObservations,
 					outputType: "finding",
+					owner: String(args.owner),
+					policy,
 					decision: { identity: String(args.decisionIdentity), revision: numbers.revision },
 				}),
 			);
