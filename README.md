@@ -220,7 +220,7 @@ amber handoff validate --target .
 ```
 
 <details>
-<summary><b>More command surfaces</b> — workflow effectiveness · learnings · loops · context · memory · commit-time enforcement</summary>
+<summary><b>More command surfaces</b> — workflow effectiveness · learnings · loops · context · memory · operations registries · commit-time enforcement</summary>
 
 #### `amber workflow` — workflow effectiveness (ADR-0008)
 
@@ -324,6 +324,60 @@ amber memory book    --target . --entry-id sha256:... --yes         # register t
 amber memory book    --target . --ratify --claim "<heading>" --yes     # ratify a human direct edit (γ-free)
 amber memory status  --target . --json                             # entries / gamma / alpha
 ```
+
+#### `amber maintain` / `retention` / `external` / `breakglass` — governed operations registries (F054–F057)
+
+Four hash-chained, append-only registries under `.amber/<family>/` extend the same contract to
+operations: Control Band detectors whose out-of-band observations become deterministic Findings
+(`maintain`), governed retention classes with deterministic expiry, Legal Holds, and settled
+deletion (`retention`), registered External Effect contracts whose proposals are approval-required
+(`external`), and one-use human emergency authorizations with a mandatory post-review
+(`breakglass`). Every mutation settles behind a single-use committed human Decision, and nothing
+here executes anything itself.
+
+```bash
+# F054 — register a Control Band detector, then evaluate one declared observation
+amber maintain register-detector --target . --id detector/error-rate \
+  --detector-version 1 --metric http-5xx-rate --source observability/api \
+  --baseline 10 --rule warn:ge:100 --window-ms 3600000 --scope service/api \
+  --cooldown-ms 3600000 --max-observations 100 --owner alice@example.com \
+  --decision-identity decision/detector-error-rate --revision 1
+amber maintain detect --target . --id detector/error-rate --detector-version 1 \
+  --subject service/api --window-from 2026-08-29T00:00:00.000Z \
+  --window-to 2026-08-29T01:00:00.000Z --value 120 --observation-hash sha256:<64-hex>
+
+# F055 — classify a record into a governed retention class, then derive expiry read-only
+amber retention classify --target . --record spec:spec/login@2 \
+  --retention-class operational --policy policy/tenant-retention@1
+amber retention evaluate --target . --now 2026-08-29T00:00:00.000Z --json
+
+# F056 — register an External Effect contract; propose an exact request (--yes confirms the
+# submission — authorization stays a separate single-use human Approval)
+amber external register --target . --id effect/ticket-comment --effect-version 1 \
+  --owner platform-team --system ticketing --operation comment.create \
+  --external-target tracker/amber-protocol --scope issues \
+  --input-schema '{"type":"object","required":["body"]}' --idempotency idempotent \
+  --credential scoped --receipt-field commentId \
+  --compensation-effect effect/ticket-comment-delete --timeout-ms 30000 \
+  --adapter adapter/tracker --adapter-version 1 \
+  --decision-identity decision/effect-1 --revision 1
+amber external propose --target . --id request/ticket-comment-288 \
+  --effect effect/ticket-comment@1 --payload-hash sha256:<64-hex> --yes
+
+# F057 — grant a one-use break-glass authorization (--yes confirms the submission, never the
+# emergency itself), then spend it on the already-authorized underlying request
+amber breakglass grant --target . --id breakglass/incident-42-restore \
+  --incident incident/42 --purpose restore-login-service \
+  --capability external:effect/ticket-comment@1 --exact-target tracker/amber-protocol \
+  --scope issues --environment production --risk high --credential scoped \
+  --valid-from 2026-08-29T00:00:00.000Z --valid-until 2026-08-29T01:00:00.000Z \
+  --review-by 2026-09-01T00:00:00.000Z \
+  --decision-identity decision/breakglass-42 --revision 1 --yes
+amber breakglass use --target . --id breakglass/incident-42-restore \
+  --request request/ticket-comment-288
+```
+
+Full surfaces, triage/hold/settlement verbs, and error codes: [CLI reference](./docs/CLI_REFERENCE.md).
 
 #### Mechanical enforcement (opt-in)
 

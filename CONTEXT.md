@@ -96,6 +96,10 @@ _Avoid_: permission flag, role assignment, session token, mutable approval state
 The atomic settlement of one Approval and the Decision it authorizes: the Decision is admitted (kind `approval`, principal = the frozen approver) and the single-use `consumed` event is appended binding the Decision's identity and revision, or nothing is written at all. One authorization can never be replayed.
 _Avoid_: token redemption, approval check, gate pass
 
+**Break-glass Grant**:
+A distinct one-use human emergency authorization under `.amber/breakglass/grants.jsonl`, bound to one registered capability pin (an F052 runner capability or an F056 External Effect), the exact target, scope, and environment, an incident reference, a preserved purpose, a half-open validity window of at most 24h, and a mandatory post-review deadline. It settles behind a single-use committed human Decision, spends atomically against the already-authorized underlying request, is terminal on use, and is never a flag, a reusable token, or an Agent-granted exception — neither `--yes` nor `--force` ever routes here.
+_Avoid_: force flag, standing emergency credential
+
 **Gate Contract**:
 A versioned canonical artifact of the registered `gate` type declaring what admission through a Gate requires — required Evidence types and Assurance levels, thresholds under registered comparators, bounded explicit `anyOf` alternatives, Decision owners, expiry, dependencies, and deny-only failure behavior — carried under the Envelope's `extensions` carrier in the `gate` namespace. The reviewable contract itself; evaluation consumes it but never modifies it.
 _Avoid_: quality bar, scoring rubric, model confidence, weighted criteria
@@ -496,6 +500,10 @@ _Avoid_: approval request, automatic transition, job
 An explicit service-owner disposition of a Finding: `fix`, `schedule`, or `dismiss`. Only `fix` may create a candidate Intent, which still passes the ordinary Intent Gate.
 _Avoid_: auto-remediation, severity score, classifier output
 
+**Service Owner**:
+The registered human Principal a Control Band detector declares at registration (`--owner`, verified against the Principal registry). Triage authority for that detector's Trigger Proposals is enforced to this owner: the triage Decision's registry-verified principal must be the declared owner, not any human who holds a Decision.
+_Avoid_: any-human triage, team alias
+
 ## Continuity
 
 **Handoff**:
@@ -608,6 +616,10 @@ _Avoid_: importer, synchronizer, migration rewrite
 An explicit, bounded, reversible decision that changes the Canonical Owner for a declared artifact type or scope after compatibility and rollback evidence pass. Cutover never silently rewrites historical records.
 _Avoid_: migration complete, takeover, sync
 
+**External Effect**:
+A registered contract for one third-party write — external owner, one closed system type (`ticketing|code-review|notification|deployment|storage`), one registered operation name, the exact external target and scope, a declared input schema, idempotency behavior, a credentials class, the receipt fields the external system must return, a named compensating effect or an explicit irreversibility marker, and a bounded timeout — executed only through its one registered Adapter pin and made live only under its own dedicated accepted ADR. The only thing that can ever execute externally is a registered effect contract.
+_Avoid_: generic account-bearing CLI, arbitrary HTTP
+
 ## Navigation
 
 **Service Package**:
@@ -717,6 +729,18 @@ _Avoid_: soft delete, hidden backup, empty record
 **Retention Hold**:
 An explicit scoped Policy or Resolution that prevents destruction of governed content and its required Evidence until the owning context records release or replacement. It does not silently widen access or suspend privacy minimization.
 _Avoid_: permanent retention, administrator note, backup lock
+
+**Legal Hold**:
+The F055 realization of a Retention Hold for a legal obligation: an explicit hold created and released only by single-use committed human Decisions, binding its scope — one exact record pin or one subject identity — a preserved leak-checked reason, and the issuing principal into the hash-chained ledger under `.amber/retention/holds.jsonl`. It has priority over TTL-based expiry (a held record evaluates `retained-by-hold` regardless of `expiresAt`), and a released hold stays listable forever — a hold can end but never disappear.
+_Avoid_: invisible permanent exception, administrator note, silent hold
+
+**Holder**:
+A registered copy-holding surface for governed content — `canonical-body|raw-output|cache|index|export|subscription|external` — bound to a registered F051 Adapter pin (id and version, both verified) behind a single-use committed human Decision, immutable per version under `.amber/retention/holders.jsonl`. Every Holder settles a deletion independently with its own receipt, and an unsettled Holder keeps the transaction `deletion-pending` — coverage is never overclaimed.
+_Avoid_: implicit replica, best-effort copy list
+
+**Deletion Proof**:
+The minimal record derived read-only and only from full settled coverage of one deletion transaction: transaction identity, declared coverage (records with retention class, legal basis, and policy pins; Holders with surfaces), per-Holder receipts, the consumed authorization, settlement time, and a controlled proof fingerprint salted with the ledger-internal execution hash. It is never a claim of universal physical erasure and never a public reconstructable content hash — no deleted content rides any field.
+_Avoid_: erasure certificate, public content hash
 
 **Security Incident Posture**:
 The fail-closed response to compromise, replay, downgrade, cross-scope reuse, or Corruption: preserve claims and Evidence, expose affected scope and uncertainty, revoke or fence impacted identities, bindings, and generations, and require the owning context's Resolution or governed recovery. Unaffected scopes continue only when their checks pass.
