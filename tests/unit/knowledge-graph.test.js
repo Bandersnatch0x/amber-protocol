@@ -239,7 +239,10 @@ test("F060 scope: tests, docs payload, dependencies, and declarations never beco
 		assert.ok(!/\.(test|spec)\./.test(node.sourcePath), `test file leaked: ${node.sourcePath}`);
 		assert.ok(!node.sourcePath.startsWith("docs/"), `docs payload leaked: ${node.sourcePath}`);
 		assert.ok(!node.sourcePath.includes("node_modules/"), `dependency leaked: ${node.sourcePath}`);
-		assert.ok(!/\.d\.(ts|mts|cts)$/.test(node.sourcePath), `declaration leaked: ${node.sourcePath}`);
+		assert.ok(
+			!/\.d\.(ts|mts|cts)$/.test(node.sourcePath),
+			`declaration leaked: ${node.sourcePath}`,
+		);
 	}
 });
 

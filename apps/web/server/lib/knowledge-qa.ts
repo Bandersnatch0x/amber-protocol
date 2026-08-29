@@ -97,9 +97,7 @@ function documentScope(snapshot: KnowledgeGraphDTO): KnowledgeGraphDTO {
   return {
     ...snapshot,
     nodes,
-    edges: snapshot.edges.filter(
-      (edge) => documentIds.has(edge.src) && documentIds.has(edge.dst),
-    ),
+    edges: snapshot.edges.filter((edge) => documentIds.has(edge.src) && documentIds.has(edge.dst)),
     drift: snapshot.drift.filter((finding) => documentIds.has(finding.nodeId)),
   };
 }
