@@ -518,7 +518,7 @@ describe('knowledge semantic router', () => {
     expect(promiseWriteFile).not.toHaveBeenCalled();
   });
 
-  it('makes every supported graph node kind eligible for semantic inference', () => {
+  it('keeps every document kind semantic-eligible and excludes Code Nodes and their edges (F060)', () => {
     const kinds = [
       'adr',
       'artifact',
@@ -528,7 +528,7 @@ describe('knowledge semantic router', () => {
       'architecture',
       'feature',
     ] as const;
-    const allKinds = kinds.map((kind) => ({
+    const documentNodes = kinds.map((kind) => ({
       id: `${kind}:test`,
       kind,
       layer: 'knowledge' as const,
@@ -536,10 +536,26 @@ describe('knowledge semantic router', () => {
       sourcePath: `${kind}.md`,
       body: `${kind} body`,
     }));
+    const codeNode = {
+      id: 'code:scripts/lib/core/example.js',
+      kind: 'code' as const,
+      layer: 'implementation' as const,
+      title: 'example.js',
+      sourcePath: 'scripts/lib/core/example.js',
+      body: 'never summarised',
+    };
+    const edges = [
+      { src: 'adr:test', dst: 'feature:test', verb: 'describes', origin: 'deterministic' as const },
+      { src: 'feature:test', dst: codeNode.id, verb: 'anchors', origin: 'deterministic' as const },
+      { src: codeNode.id, dst: codeNode.id, verb: 'imports', origin: 'deterministic' as const },
+    ];
 
-    const selected = selectSemanticInputs(allKinds);
+    const selected = selectSemanticInputs([...documentNodes, codeNode], edges);
     expect(selected.edgeNodes.map((node) => node.kind)).toEqual(kinds);
     expect(selected.summaryNodes.map((node) => node.kind)).toEqual(kinds);
+    expect(selected.existingEdges).toEqual([
+      { src: 'adr:test', dst: 'feature:test', verb: 'describes' },
+    ]);
   });
 
   it('returns bounded stable facade errors without leaking provider details', async () => {

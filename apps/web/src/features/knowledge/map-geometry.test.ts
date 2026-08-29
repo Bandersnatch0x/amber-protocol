@@ -22,7 +22,14 @@ function edge(src: string, dst: string, verb: KnowledgeEdgeDTO['verb']): Knowled
 }
 
 function graph(nodes: KnowledgeNode[], edges: KnowledgeEdgeDTO[] = []): KnowledgeGraphDTO {
-  return { schemaVersion: '1', nodes, edges, drift: [], recentChanges: [] };
+  return {
+    schemaVersion: '2',
+    toolchain: { typescript: '0.0.0-test' },
+    nodes,
+    edges,
+    drift: [],
+    recentChanges: [],
+  };
 }
 
 describe('computeLayout — layered mode', () => {

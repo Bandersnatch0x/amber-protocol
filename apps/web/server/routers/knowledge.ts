@@ -43,13 +43,24 @@ const askInputSchema = z.object({
   allowExternal: z.literal(true),
 });
 
-export function selectSemanticInputs(nodes: KnowledgeNode[]): {
+export function selectSemanticInputs(
+  nodes: KnowledgeNode[],
+  edges: KnowledgeEdgeDTO[],
+): {
   edgeNodes: KnowledgeNode[];
   summaryNodes: KnowledgeNode[];
+  existingEdges: Array<{ src: string; dst: string; verb: string }>;
 } {
+  // Document surface only (F060): Code Nodes never enter the LLM layer, and
+  // the imports/anchors edges vanish with their code endpoints.
+  const documentNodes = nodes.filter((node) => node.kind !== 'code');
+  const documentIds = new Set(documentNodes.map((node) => node.id));
   return {
-    edgeNodes: nodes,
-    summaryNodes: nodes.filter((node) => node.body),
+    edgeNodes: documentNodes,
+    summaryNodes: documentNodes.filter((node) => node.body),
+    existingEdges: edges
+      .filter((edge) => documentIds.has(edge.src) && documentIds.has(edge.dst))
+      .map((edge) => ({ src: edge.src, dst: edge.dst, verb: edge.verb })),
   };
 }
 
@@ -82,15 +93,10 @@ export const knowledgeRouter = router({
       };
     }
 
-    const semanticInputs = selectSemanticInputs(snapshot.nodes);
-    const existingEdges = snapshot.edges.map((edge) => ({
-      src: edge.src,
-      dst: edge.dst,
-      verb: edge.verb,
-    }));
+    const semanticInputs = selectSemanticInputs(snapshot.nodes, snapshot.edges);
 
     const [edgeOutcome, summaryOutcome] = await Promise.allSettled([
-      inferSemanticEdges(semanticInputs.edgeNodes, existingEdges),
+      inferSemanticEdges(semanticInputs.edgeNodes, semanticInputs.existingEdges),
       inferNodeSummaries(semanticInputs.summaryNodes),
     ]);
     const errors: string[] = [];
