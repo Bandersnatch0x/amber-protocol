@@ -1523,7 +1523,10 @@ Adapter pin (`--adapter` + `--adapter-version`, verified against the Adapter reg
 registration) that owns the API. Pre-v3 effect events predate the schema declaration and read
 with `inputSchema: null`; a legacy event smuggling one fails the closed event shape. Per ADR-0027,
 execution and settlement are governance settlement only, and a concrete external-write capability
-becomes live only with its own Adapter contract plus its own dedicated accepted ADR.
+becomes live only with its own Adapter contract plus its own dedicated accepted ADR. MCP surfaces
+external writes as exactly one approval-required contract — the proposal submission
+(`amber.external.propose`, human-approved, no read-only variant, test-pinned) — and never spawns
+it; the CLI's typed seam requires the explicit `--yes` confirmation on `propose`.
 
 Registration settles behind a single-use committed human Decision — `acceptance|approval` with a
 verified principal snapshot, unscoped, mirroring the F052/F055 authority contract; a reused
@@ -1611,7 +1614,7 @@ node scripts/amber.js external register --target . --id effect/announce \
   --decision-identity decision/effect-2 --revision 1 --json
 node scripts/amber.js external effects --target . --system ticketing --json
 node scripts/amber.js external propose --target . --id request/ticket-comment-288 \
-  --effect effect/ticket-comment@1 --payload-hash sha256:<64-hex> --json
+  --effect effect/ticket-comment@1 --payload-hash sha256:<64-hex> --yes --json
 node scripts/amber.js external authorize --target . --id request/ticket-comment-288 \
   --approval approval/external-42 --decision-identity decision/external-42 \
   --body "# Authorize external effect" --trace decides:intent:intent/external --json
@@ -1712,9 +1715,12 @@ follows Policy, visibility never disappears.
 No ungoverned door opens (T4): neither `--force` nor `--yes` is ever interpreted as break-glass —
 the handlers never consult those flags (test-pinned source scan plus a behavioral pin that the
 same refusal returns with or without them), so ordinary confirmation cannot bypass the distinct
-Decision family. No MCP capability resolves to the `breakglass` command (test-pinned like the
-runner/release/external verbs): break-glass is returned approval-required and the underlying
-capability is never started by MCP. The ADR-0020 self-owned git transport exception stays
+Decision family. MCP surfaces break-glass as exactly one approval-required contract — the grant
+submission (`amber.breakglass.grant`, human-approved, no read-only variant, test-pinned) — and
+never executes it: the underlying capability is never started by MCP, and every other break-glass
+verb stays off the MCP surface entirely. The CLI's typed seam additionally requires the explicit
+`--yes` confirmation on `grant` (this confirms the SUBMISSION; it is never interpreted as the
+emergency authorization itself, which stays the committed human Decision). The ADR-0020 self-owned git transport exception stays
 isolated — the break-glass surface shares no transport-specific module, code, or state path with
 the sync transport, never spawns a process, and confines every ledger under `.amber/breakglass/`
 (test-pinned). Break-glass waives nothing: identity, target confinement, receipt, journal,
@@ -1728,7 +1734,7 @@ node scripts/amber.js breakglass grant --target . --id breakglass/incident-42-re
   --scope issues --environment production --risk high --credential scoped \
   --valid-from 2026-08-29T00:00:00.000Z --valid-until 2026-08-29T01:00:00.000Z \
   --review-by 2026-09-01T00:00:00.000Z \
-  --decision-identity decision/breakglass-42 --revision 1 --json
+  --decision-identity decision/breakglass-42 --revision 1 --yes --json
 node scripts/amber.js breakglass revoke --target . --id breakglass/incident-42-restore \
   --reason "credential compromise suspected" \
   --decision-identity decision/breakglass-revoke-42 --revision 1 --json

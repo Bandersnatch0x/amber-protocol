@@ -1638,16 +1638,28 @@ test("re-chained settlement and review forgeries fail every read closed", () => 
 // integrity.
 // ---------------------------------------------------------------------------
 
-test("the MCP seam exposes no break-glass surface", () => {
-	const { COMMAND_CAPABILITIES } = require("../../scripts/lib/mcp-action-contracts");
-	// Break-glass is returned approval-required and never executed
-	// (ADR-0022/F018): the MCP capability registry carries no break-glass
-	// verb at all, so no registry-proven read-only variant can ever wield
-	// emergency authority.
+test("the MCP seam surfaces break-glass as approval-required only", () => {
+	const {
+		COMMAND_CAPABILITIES,
+		isReadOnlyExecutable,
+	} = require("../../scripts/lib/mcp-action-contracts");
+	// F057 story 14: break-glass is returned as an approval-required
+	// contract and never executed. Exactly one break-glass verb is
+	// registered — the grant submission — and it is a human-approved write
+	// with no read-only variant, so no registry-proven path can ever wield
+	// emergency authority or start the underlying capability.
 	const breakglassCapabilities = Object.keys(COMMAND_CAPABILITIES).filter((key) =>
 		key.split(/[\s.:/-]/).includes("breakglass"),
 	);
-	assert.deepEqual(breakglassCapabilities, []);
+	assert.deepEqual(breakglassCapabilities, ["breakglass/grant"]);
+	const capability = COMMAND_CAPABILITIES["breakglass/grant"];
+	assert.equal(capability.effect, "write");
+	assert.equal(capability.approver, "human");
+	assert.equal(capability.directReadOnlyExec, false);
+	const action = JSON.parse(
+		fs.readFileSync(path.join(__dirname, "..", "..", "action-types", "breakglass-grant.json")),
+	);
+	assert.equal(isReadOnlyExecutable(action), false, "the grant action can never auto-execute");
 });
 
 test("ordinary confirmation flags never route into break-glass", () => {

@@ -1698,16 +1698,28 @@ test("an irreversible contract refuses compensation and unregistered compensatio
 	assert.match(refused.errors[0], /an irreversible contract refuses compensation/);
 });
 
-test("the MCP seam exposes no external execution surface", () => {
-	const { COMMAND_CAPABILITIES } = require("../../scripts/lib/mcp-action-contracts");
-	// External writes are approval-required submissions only and never
-	// spawned (ADR-0022/F018): the MCP capability registry carries no
-	// external verb at all, so no registry-proven read-only variant can
-	// ever auto-execute one.
+test("the MCP seam surfaces external writes as approval-required only", () => {
+	const {
+		COMMAND_CAPABILITIES,
+		isReadOnlyExecutable,
+	} = require("../../scripts/lib/mcp-action-contracts");
+	// F056 story 12: external-write Actions are returned as approval-required
+	// proposal contracts and never spawned. Exactly one external verb is
+	// registered — the proposal entry — and it is a human-approved write
+	// with no read-only variant, so no registry-proven path can ever
+	// auto-execute an external effect.
 	const externalCapabilities = Object.keys(COMMAND_CAPABILITIES).filter((key) =>
 		key.split(/[\s.:/-]/).includes("external"),
 	);
-	assert.deepEqual(externalCapabilities, []);
+	assert.deepEqual(externalCapabilities, ["external/propose"]);
+	const capability = COMMAND_CAPABILITIES["external/propose"];
+	assert.equal(capability.effect, "write");
+	assert.equal(capability.approver, "human");
+	assert.equal(capability.directReadOnlyExec, false);
+	const action = JSON.parse(
+		fs.readFileSync(path.join(__dirname, "..", "..", "action-types", "external-propose.json")),
+	);
+	assert.equal(isReadOnlyExecutable(action), false, "the proposal action can never auto-execute");
 });
 
 test("the external registry never touches the sync transport surface", () => {

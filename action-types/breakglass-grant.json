@@ -1,0 +1,115 @@
+{
+	"actionTypeId": "amber.breakglass.grant",
+	"version": 1,
+	"title": "Grant a break-glass authorization",
+	"goal": "Submit one distinct, one-use emergency authorization bound to a registered capability, exact target and scope, environment, incident, purpose, half-open validity window, and mandatory post-review deadline. Returned approval-required; MCP never wields emergency authority and never starts the underlying capability (F057 story 14).",
+	"mode": "interactive",
+	"parameters": {
+		"grantId": {
+			"type": "string",
+			"required": true,
+			"description": "Grant id (e.g. breakglass/incident-42-restore)."
+		},
+		"incident": {
+			"type": "string",
+			"required": true,
+			"description": "Incident reference (e.g. incident/42)."
+		},
+		"purpose": {
+			"type": "string",
+			"required": true,
+			"description": "Declared emergency purpose (e.g. restore-login-service)."
+		},
+		"capability": {
+			"type": "string",
+			"required": true,
+			"description": "Registered capability pin: external:<effect-id>@<version> or runner:<runnerId>@<runnerVersion>/<name>@<capabilityVersion>."
+		},
+		"exactTarget": {
+			"type": "string",
+			"required": true,
+			"description": "Exact target the grant is confined to."
+		},
+		"scope": {
+			"type": "string",
+			"required": true,
+			"description": "Exact scope the grant is confined to."
+		},
+		"environment": {
+			"type": "string",
+			"required": true,
+			"description": "Environment the grant is confined to (e.g. production)."
+		},
+		"risk": {
+			"type": "string",
+			"required": true,
+			"description": "Declared risk: low|medium|high|critical."
+		},
+		"credential": {
+			"type": "string",
+			"required": true,
+			"description": "Credential class: none|scoped."
+		},
+		"validFrom": {
+			"type": "string",
+			"required": true,
+			"description": "ISO-8601 window open (half-open [validFrom, validUntil), at most 24h)."
+		},
+		"validUntil": {
+			"type": "string",
+			"required": true,
+			"description": "ISO-8601 window close (exclusive)."
+		},
+		"reviewBy": {
+			"type": "string",
+			"required": true,
+			"description": "ISO-8601 mandatory post-review deadline (after the window, within 30 days)."
+		},
+		"decisionIdentity": {
+			"type": "string",
+			"required": true,
+			"description": "Committed human acceptance/approval Decision identity authorizing the grant."
+		},
+		"revision": {
+			"type": "string",
+			"required": true,
+			"description": "Committed Decision revision."
+		}
+	},
+	"submissionCriteria": ["approval-required"],
+	"effects": {
+		"edits": [".amber/breakglass/grants.jsonl"],
+		"sideEffects": ["ledger-append"],
+		"rollback": false
+	},
+	"evidenceRequired": ["breakglass-grant"],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#break-glass",
+		"approver": ["human"],
+		"evidence": ["breakglass-grant"],
+		"circuitBreaker": true,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "breakglass",
+		"subcommand": "grant",
+		"args": [
+			{ "flag": "--id", "source": "parameters.grantId" },
+			{ "flag": "--incident", "source": "parameters.incident" },
+			{ "flag": "--purpose", "source": "parameters.purpose" },
+			{ "flag": "--capability", "source": "parameters.capability" },
+			{ "flag": "--exact-target", "source": "parameters.exactTarget" },
+			{ "flag": "--scope", "source": "parameters.scope" },
+			{ "flag": "--environment", "source": "parameters.environment" },
+			{ "flag": "--risk", "source": "parameters.risk" },
+			{ "flag": "--credential", "source": "parameters.credential" },
+			{ "flag": "--valid-from", "source": "parameters.validFrom" },
+			{ "flag": "--valid-until", "source": "parameters.validUntil" },
+			{ "flag": "--review-by", "source": "parameters.reviewBy" },
+			{ "flag": "--decision-identity", "source": "parameters.decisionIdentity" },
+			{ "flag": "--revision", "source": "parameters.revision" },
+			{ "flag": "--json", "flagOnly": true }
+		]
+	}
+}

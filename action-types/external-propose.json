@@ -1,0 +1,49 @@
+{
+	"actionTypeId": "amber.external.propose",
+	"version": 1,
+	"title": "Propose an external side effect",
+	"goal": "Bind one registered External Effect contract, its exact target and scope, and the canonical payload hash into a reviewable proposal — the approval-required entry to any third-party write. Nothing external is touched; MCP never starts an External Adapter (F056 story 12).",
+	"mode": "interactive",
+	"parameters": {
+		"proposalId": {
+			"type": "string",
+			"required": true,
+			"description": "Proposal id (e.g. request/ticket-comment-288)."
+		},
+		"effect": {
+			"type": "string",
+			"required": true,
+			"description": "Registered effect contract pin, <id>@<version> (e.g. effect/ticket-comment@1)."
+		},
+		"payloadHash": {
+			"type": "string",
+			"required": true,
+			"description": "sha256:<64-hex> canonical hash of the exact payload under review; the payload itself never enters a ledger."
+		}
+	},
+	"submissionCriteria": ["approval-required"],
+	"effects": {
+		"edits": [".amber/external/proposals.jsonl"],
+		"sideEffects": ["ledger-append"],
+		"rollback": false
+	},
+	"evidenceRequired": ["external-proposal"],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#external-effects",
+		"approver": ["human"],
+		"evidence": ["external-proposal"],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "external",
+		"subcommand": "propose",
+		"args": [
+			{ "flag": "--id", "source": "parameters.proposalId" },
+			{ "flag": "--effect", "source": "parameters.effect" },
+			{ "flag": "--payload-hash", "source": "parameters.payloadHash" },
+			{ "flag": "--json", "flagOnly": true }
+		]
+	}
+}

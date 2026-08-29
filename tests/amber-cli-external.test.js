@@ -233,7 +233,7 @@ test("external propose, authorize, and proposals govern the request lifecycle", 
 			"--payload-hash": payloadA,
 			...overrides,
 		};
-		const args = ["external", "propose", "--target", ".", "--json"];
+		const args = ["external", "propose", "--target", ".", "--yes", "--json"];
 		for (const [flag, value] of Object.entries(flags)) {
 			if (value !== null) args.push(flag, value);
 		}
@@ -357,6 +357,7 @@ test("external execute, settle, reconcile, and status govern the execution bound
 				"propose",
 				"--target",
 				".",
+				"--yes",
 				"--id",
 				requestId,
 				"--effect",
@@ -607,6 +608,6 @@ test("external help and unknown actions route through the shared dispatcher", ()
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/external requires register, effects, propose, authorize, proposals, execute, settle, reconcile, status, compensate, or transactions/,
+		/Governed command has no Action Type mapping: external\/bogus/,
 	);
 });

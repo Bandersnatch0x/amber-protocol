@@ -178,6 +178,26 @@ const COMMAND_CAPABILITIES = {
 		edits: [".amber/artifacts/evals/", ".amber/artifacts/eval-results/", ".amber/evidence/"],
 		sideEffects: ["ledger-append"],
 	},
+	// F056 story 12 / F057 story 14: external-write and break-glass Actions
+	// surface as approval-required contracts and are NEVER spawned — no
+	// read-only variant exists, so the adapter can only return the
+	// submission. Execution stays on the governed CLI surface.
+	"external/propose": {
+		effect: "write",
+		approver: "human",
+		evidence: "external-proposal",
+		directReadOnlyExec: false,
+		edits: [".amber/external/proposals.jsonl"],
+		sideEffects: ["ledger-append"],
+	},
+	"breakglass/grant": {
+		effect: "write",
+		approver: "human",
+		evidence: "breakglass-grant",
+		directReadOnlyExec: false,
+		edits: [".amber/breakglass/grants.jsonl"],
+		sideEffects: ["ledger-append"],
+	},
 };
 
 // ---- capability derivation (single shape for JSON → declared values) ----

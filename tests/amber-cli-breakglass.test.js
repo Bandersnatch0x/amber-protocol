@@ -127,7 +127,7 @@ function grantArgs(overrides = {}) {
 		"--now": "2026-08-29T00:00:00.000Z",
 		...overrides,
 	};
-	const args = ["breakglass", "grant", "--target", ".", "--json"];
+	const args = ["breakglass", "grant", "--target", ".", "--yes", "--json"];
 	for (const [flag, value] of Object.entries(flags)) {
 		if (value !== null) args.push(flag, value);
 	}
@@ -488,7 +488,7 @@ test("breakglass help and unknown actions route through the shared dispatcher", 
 	);
 	assert.match(help.stdout, /--review-by/);
 	assert.match(help.stdout, /never a flag, a reusable token, or an/);
-	assert.match(help.stdout, /No MCP capability resolves to this command/);
+	assert.match(help.stdout, /MCP surfaces only the approval-required grant contract/);
 
 	// F057 T4 (#295): --force/--yes are inert here — the same refusal
 	// comes back with or without them; ordinary confirmation is never
@@ -533,6 +533,6 @@ test("breakglass help and unknown actions route through the shared dispatcher", 
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/breakglass requires grant, revoke, grants, use, show, settle, review, or status/,
+		/Governed command has no Action Type mapping: breakglass\/bogus/,
 	);
 });
