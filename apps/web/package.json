@@ -26,6 +26,8 @@
     "@trpc/server": "^11.18.0",
     "@xyflow/react": "^12.11.5",
     "d3-force": "^3.0.0",
+    "graphology": "^0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
     "highlight.js": "^11.11.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
