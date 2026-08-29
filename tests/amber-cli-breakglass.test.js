@@ -93,6 +93,7 @@ function fixtureRepo(dir, identities = ["decision/breakglass-1", "decision/effec
 				operation: "comment.create",
 				target: "tracker/amber-protocol",
 				scope: "issues",
+				inputSchema: { type: "object", required: ["body"] },
 				idempotency: "idempotent",
 				credentials: "scoped",
 				receiptFields: ["commentId"],

@@ -92,6 +92,7 @@ function registerArgs(overrides = {}) {
 		"--operation": "comment.create",
 		"--external-target": "tracker/amber-protocol",
 		"--scope": "issues",
+		"--input-schema": '{"type":"object","required":["body"]}',
 		"--idempotency": "idempotent",
 		"--credential": "scoped",
 		"--receipt-field": "commentId",

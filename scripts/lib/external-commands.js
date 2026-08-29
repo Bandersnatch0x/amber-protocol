@@ -34,6 +34,7 @@ function missingValueFlag(args) {
 		["operation", "--operation"],
 		["externalTarget", "--external-target"],
 		["scope", "--scope"],
+		["inputSchema", "--input-schema"],
 		["idempotency", "--idempotency"],
 		["credential", "--credential"],
 		["receiptFieldVal", "--receipt-field"],
@@ -160,6 +161,21 @@ const dispatch = defineCommand({
 				return invalidArg(
 					"--receipt-field is required at least once: the contract declares which receipt fields the external system must return (e.g. --receipt-field commentId)",
 				);
+			const rawSchema = requiredString(
+				args,
+				"inputSchema",
+				"--input-schema",
+				'{"type":"object","required":["body"]}',
+			);
+			if (rawSchema.error) return invalidArg(rawSchema.error);
+			let inputSchema;
+			try {
+				inputSchema = JSON.parse(String(args.inputSchema));
+			} catch {
+				return invalidArg(
+					`--input-schema must be a JSON object declaring the operation's payload shape; got unparseable JSON ${JSON.stringify(String(args.inputSchema))}`,
+				);
+			}
 			const irreversible = args.irreversible === true;
 			const compensationEffect =
 				args.compensationEffect === undefined ? null : String(args.compensationEffect);
@@ -179,6 +195,7 @@ const dispatch = defineCommand({
 				operation: String(args.operation),
 				target: String(args.externalTarget),
 				scope: String(args.scope),
+				inputSchema,
 				idempotency: String(args.idempotency),
 				credentials: String(args.credential),
 				receiptFields,

@@ -102,6 +102,7 @@ function effectInput(overrides = {}) {
 		operation: "comment.create",
 		target: "tracker/amber-protocol",
 		scope: "issues",
+		inputSchema: { type: "object", required: ["body"] },
 		idempotency: "idempotent",
 		credentials: "scoped",
 		receiptFields: ["commentId"],
@@ -126,8 +127,8 @@ function writeEvents(ledgerPath, events) {
 }
 
 test("external constants pin the system, idempotency, credentials, and bound contracts", () => {
-	assert.equal(EXTERNAL_SCHEMA_VERSION, 2);
-	assert.deepEqual([...SUPPORTED_EXTERNAL_SCHEMA_VERSIONS], [1, 2]);
+	assert.equal(EXTERNAL_SCHEMA_VERSION, 3);
+	assert.deepEqual([...SUPPORTED_EXTERNAL_SCHEMA_VERSIONS], [1, 2, 3]);
 	assert.equal(DEFAULT_MAX_EXTERNAL_BYTES, 1024 * 1024);
 	assert.equal(MAX_EXTERNAL_TIMEOUT_MS, 24 * 3_600_000);
 	assert.deepEqual(
@@ -1762,6 +1763,60 @@ test("v1 proposal events without the compensates linkage stay readable", () => {
 		(err) =>
 			err.amberCode === "AMBER_E_EXTERNAL_PROPOSAL_CORRUPT" &&
 			/unknown field "compensates"/.test(err.message),
+	);
+});
+
+test("the declared input schema is required, must compile, and legacy events fold to null", () => {
+	const dir = mkTarget("input-schema");
+	externalFixture(dir);
+	const missing = registerExternalEffect(dir, effectInput({ inputSchema: undefined }), {
+		now: NOW,
+	});
+	assert.equal(missing.ok, false);
+	assert.match(missing.errors[0], /inputSchema must be a JSON-schema object/);
+	const boolean = registerExternalEffect(dir, effectInput({ inputSchema: true }), { now: NOW });
+	assert.equal(boolean.ok, false);
+	assert.match(boolean.errors[0], /must be a JSON-schema object/);
+	const broken = registerExternalEffect(dir, effectInput({ inputSchema: { type: "nonsense" } }), {
+		now: NOW,
+	});
+	assert.equal(broken.ok, false);
+	assert.equal(broken.code, "AMBER_E_EXTERNAL_INVALID");
+	assert.match(broken.errors[0], /does not compile as a JSON schema/);
+	// The schema is ledger-bound free text: credential-looking material
+	// refuses before anything is written.
+	const leaky = registerExternalEffect(
+		dir,
+		effectInput({
+			inputSchema: { type: "object", description: "send Bearer abcdef0123456789 along" },
+		}),
+		{ now: NOW },
+	);
+	assert.equal(leaky.ok, false);
+	assert.equal(leaky.code, "AMBER_E_EXTERNAL_CREDENTIAL_LEAK");
+	const registered = registerExternalEffect(dir, effectInput(), { now: NOW });
+	assert.equal(registered.ok, true, (registered.errors || []).join("; "));
+	assert.deepEqual(registered.record.inputSchema, { type: "object", required: ["body"] });
+	// Rewrite the ledger as a schemaVersion-2 event without inputSchema --
+	// exactly what the committed T1 code wrote before the declaration
+	// existed -- re-chained validly.
+	const pristine = readEvents(effectsPath(dir));
+	const { hash: _hash, inputSchema: _schema, ...legacyBody } = pristine[0];
+	const legacy = { ...legacyBody, schemaVersion: 2 };
+	legacy.hash = chainHash(legacy, legacy.prevHash);
+	writeEvents(effectsPath(dir), [legacy]);
+	const folded = showExternalEffect(dir, "effect/ticket-comment");
+	assert.equal(folded.inputSchema, null);
+	assert.equal(folded.schemaVersion, 2);
+	// A legacy event smuggling the field it predates refuses.
+	const smuggled = { ...legacyBody, schemaVersion: 2, inputSchema: { type: "object" } };
+	smuggled.hash = chainHash(smuggled, smuggled.prevHash);
+	writeEvents(effectsPath(dir), [smuggled]);
+	assert.throws(
+		() => showExternalEffect(dir, "effect/ticket-comment"),
+		(err) =>
+			err.amberCode === "AMBER_E_EXTERNAL_CORRUPT" &&
+			/unknown field "inputSchema"/.test(err.message),
 	);
 });
 

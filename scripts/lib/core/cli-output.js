@@ -282,6 +282,7 @@ const FLAG_SPECS = {
 	"--system": { key: "system" },
 	"--operation": { key: "operation" },
 	"--external-target": { key: "externalTarget" },
+	"--input-schema": { key: "inputSchema" },
 	"--idempotency": { key: "idempotency" },
 	"--receipt-field": { key: "receiptFieldVal", accumulate: "receiptFields" },
 	"--compensation-effect": { key: "compensationEffect" },

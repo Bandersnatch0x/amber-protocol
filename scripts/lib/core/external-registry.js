@@ -30,12 +30,18 @@ const {
 	appendLedgerEvent,
 	credentialLeakProblem,
 } = require("./registry-ledger");
+const { compileInline } = require("./schema-contract");
 
 // v2 added the required `compensates` linkage to proposal events (F056
 // T4); v1 proposal events written before it stay readable with a null
-// linkage, and every other event kind shares one shape across versions.
-const EXTERNAL_SCHEMA_VERSION = 2;
-const SUPPORTED_EXTERNAL_SCHEMA_VERSIONS = Object.freeze([1, 2]);
+// linkage. v3 added the required `inputSchema` declaration to effect
+// events (acceptance review P5): the contract declares the operation's
+// payload shape as a compilable JSON schema. v1/v2 effect events stay
+// readable with `inputSchema` folded to null — those contracts declared
+// no payload shape — and every other event kind shares one shape across
+// versions.
+const EXTERNAL_SCHEMA_VERSION = 3;
+const SUPPORTED_EXTERNAL_SCHEMA_VERSIONS = Object.freeze([1, 2, 3]);
 const DEFAULT_MAX_EXTERNAL_BYTES = 1024 * 1024;
 // Timeouts are bounded (24h) so a contract can never declare an
 // effectively unbounded external operation.
@@ -89,6 +95,7 @@ const EFFECT_INPUT_FIELDS = Object.freeze([
 	"operation",
 	"target",
 	"scope",
+	"inputSchema",
 	"idempotency",
 	"credentials",
 	"receiptFields",
@@ -117,6 +124,7 @@ const EFFECT_EVENT_FIELDS = Object.freeze([
 	"operation",
 	"target",
 	"scope",
+	"inputSchema",
 	"idempotency",
 	"credentials",
 	"receiptFields",
@@ -127,6 +135,11 @@ const EFFECT_EVENT_FIELDS = Object.freeze([
 	"prevHash",
 	"hash",
 ]);
+// v1/v2 effect events predate the declared input schema; the closed set
+// keeps a legacy event from smuggling one in.
+const EFFECT_EVENT_FIELDS_LEGACY = Object.freeze(
+	EFFECT_EVENT_FIELDS.filter((field) => field !== "inputSchema"),
+);
 
 function effectsPath(cwd) {
 	return statePathForCreate(cwd, "external", "effects.jsonl");
@@ -223,6 +236,17 @@ function adapterPinProblem(value, label) {
 	return null;
 }
 
+// Structural contract of the declared payload schema: one JSON-schema
+// OBJECT (a bare boolean schema declares nothing reviewable), free of
+// credential-looking material — the schema is ledger-bound free text and
+// this registry owns the credential boundary. Whether it COMPILES is a
+// registration-time verdict (compileInline), never a read-time one.
+function inputSchemaProblem(value, label) {
+	if (!isPlainObject(value))
+		return `${label} must be a JSON-schema object declaring the operation's payload shape`;
+	return credentialLeakProblem(JSON.stringify(value), label);
+}
+
 function decisionPinProblem(value) {
 	if (!isPlainObject(value)) return "decision must be an object carrying identity and revision";
 	const unknown = unknownFieldProblem(value, DECISION_PIN_FIELDS, "decision");
@@ -287,12 +311,20 @@ function effectShapeProblem(value, label) {
 
 function effectEventProblem(event, lineIndex) {
 	const label = `external effect event ${lineIndex}`;
-	const closed = closedFieldProblem(event, EFFECT_EVENT_FIELDS, label);
+	const closed = closedFieldProblem(
+		event,
+		event.schemaVersion >= 3 ? EFFECT_EVENT_FIELDS : EFFECT_EVENT_FIELDS_LEGACY,
+		label,
+	);
 	if (closed !== null) return closed;
 	if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
 		return `${label}.at must be an ISO-8601 timestamp`;
 	const shape = effectShapeProblem(event, label);
 	if (shape !== null) return shape;
+	if (event.schemaVersion >= 3) {
+		const schema = inputSchemaProblem(event.inputSchema, `${label}.inputSchema`);
+		if (schema !== null) return schema;
+	}
 	return decisionSnapshotProblem(event.decision, `${label}.decision`);
 }
 
@@ -334,7 +366,7 @@ function foldEffects(cwd) {
 			throw externalCorrupt(`external effect ${JSON.stringify(key)} is registered more than once`);
 		keys.add(key);
 		const { prevHash: _prev, hash: _hash, ...body } = event;
-		effects.push({ ...body, index });
+		effects.push({ ...body, inputSchema: event.inputSchema ?? null, index });
 		prevHash = event.hash;
 	});
 	return effects;
@@ -413,6 +445,21 @@ function registerExternalEffect(cwd, input = {}, opts = {}) {
 	if (inputClosed !== null) return fail(EXTERNAL_INVALID_CODE, [inputClosed]);
 	const shape = effectShapeProblem(input, "effect input");
 	if (shape !== null) return fail(EXTERNAL_INVALID_CODE, [shape]);
+	const schemaProblem = inputSchemaProblem(input.inputSchema, "effect input.inputSchema");
+	if (schemaProblem !== null)
+		return fail(
+			/credential material/.test(schemaProblem) ? CREDENTIAL_LEAK_CODE : EXTERNAL_INVALID_CODE,
+			[schemaProblem],
+		);
+	// The declared schema must compile: a contract whose payload shape is
+	// not checkable declares nothing.
+	try {
+		compileInline(input.inputSchema);
+	} catch (err) {
+		return fail(EXTERNAL_INVALID_CODE, [
+			`effect input.inputSchema does not compile as a JSON schema: ${err.message || String(err)}`,
+		]);
+	}
 	const pinProblem = decisionPinProblem(input.decision);
 	if (pinProblem !== null) return fail(EXTERNAL_INVALID_CODE, [pinProblem]);
 	let adapter;
@@ -451,6 +498,7 @@ function registerExternalEffect(cwd, input = {}, opts = {}) {
 			operation: input.operation,
 			target: input.target,
 			scope: input.scope,
+			inputSchema: input.inputSchema,
 			idempotency: input.idempotency,
 			credentials: input.credentials,
 			receiptFields: [...input.receiptFields],

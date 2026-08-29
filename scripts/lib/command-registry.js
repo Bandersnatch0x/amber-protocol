@@ -1424,6 +1424,7 @@ const COMMAND_HELP = {
 		"  register --id <effect-id> --effect-version <v> --owner <owner>",
 		"        --system <system> --operation <operation>",
 		"        --external-target <target> --scope <scope>",
+		"        --input-schema <json-schema>",
 		"        --idempotency <idempotent|at-most-once>",
 		"        --credential <none|scoped>",
 		"        --receipt-field <name> [--receipt-field <name> ...]",
@@ -1452,7 +1453,7 @@ const COMMAND_HELP = {
 		"  transactions [--request <proposal-id>]",
 		"",
 		"Examples:",
-		"  amber external register --target . --id effect/ticket-comment --effect-version 1 --owner platform-team --system ticketing --operation comment.create --external-target tracker/amber-protocol --scope issues --idempotency idempotent --credential scoped --receipt-field commentId --compensation-effect effect/ticket-comment-delete --timeout-ms 30000 --adapter adapter/tracker --adapter-version 1 --decision-identity decision/effect-1 --revision 1 --json",
+		'  amber external register --target . --id effect/ticket-comment --effect-version 1 --owner platform-team --system ticketing --operation comment.create --external-target tracker/amber-protocol --scope issues --input-schema \'{"type":"object"}\' --idempotency idempotent --credential scoped --receipt-field commentId --compensation-effect effect/ticket-comment-delete --timeout-ms 30000 --adapter adapter/tracker --adapter-version 1 --decision-identity decision/effect-1 --revision 1 --json',
 		"  amber external effects --target . --system ticketing --json",
 		"  amber external propose --target . --id request/ticket-comment-288 --effect effect/ticket-comment@1 --payload-hash sha256:<64-hex> --json",
 		'  amber external authorize --target . --id request/ticket-comment-288 --approval approval/external-42 --decision-identity decision/external-42 --body "# Authorize external effect" --json',
@@ -2000,7 +2001,7 @@ const COMMAND_OUTPUT = {
 	external: {
 		usage: [
 			"Usage: amber external <register|effects|propose|authorize|proposals|execute|settle|reconcile|status|compensate|transactions> --target <repo> [--json]",
-			"       amber external register --target <repo> --id <effect-id> --effect-version <version> --owner <owner> --system ticketing|code-review|notification|deployment|storage --operation <operation> --external-target <target> --scope <scope> --idempotency idempotent|at-most-once --credential none|scoped --receipt-field <name> (--compensation-effect <effect-id> | --irreversible) --timeout-ms <n> --adapter <adapter-id> --adapter-version <version> --decision-identity <identity> --revision <n> [--json]",
+			"       amber external register --target <repo> --id <effect-id> --effect-version <version> --owner <owner> --system ticketing|code-review|notification|deployment|storage --operation <operation> --external-target <target> --scope <scope> --input-schema <json-schema> --idempotency idempotent|at-most-once --credential none|scoped --receipt-field <name> (--compensation-effect <effect-id> | --irreversible) --timeout-ms <n> --adapter <adapter-id> --adapter-version <version> --decision-identity <identity> --revision <n> [--json]",
 			"       amber external effects --target <repo> [--system <system>] [--json]",
 			"       amber external propose --target <repo> --id <proposal-id> --effect <effect-id>@<version> --payload-hash <sha256:...> [--json]",
 			"       amber external authorize --target <repo> --id <proposal-id> --approval <id> --decision-identity <identity> --body <markdown> [--trace <decides:...>] [--scope <scope>] [--json]",
