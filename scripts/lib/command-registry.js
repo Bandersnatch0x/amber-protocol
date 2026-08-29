@@ -1970,7 +1970,7 @@ const COMMAND_OUTPUT = {
 	maintain: {
 		usage: [
 			"Usage: amber maintain <register-detector|detect|propose|triage|complete|rollup|detectors|findings|proposals> --target <repo> [--json]",
-			"       amber maintain register-detector --target <repo> --id <detector-id> --detector-version <version> --metric <name> --source <origin> --baseline <number> --rule <tier>:<ge|gt|le|lt>:<threshold> [--rule ...] --window-ms <n> --scope <scope> --cooldown-ms <n> --max-observations <n> --owner <principal> [--policy <identity>@<revision>] --decision-identity <identity> --revision <n> [--json]",
+			"       amber maintain register-detector --target <repo> --id <detector-id> --detector-version <version> --metric <name> --source <origin> --baseline <number> --rule <tier>:<ge|gt|le|lt>:<threshold> [--rule ...] --window-ms <n> --scope <scope> --cooldown-ms <n> --max-observations <n> --owner <principal> [--policy <identity>@<revision>] --decision-identity <identity> --revision <n> [--now <iso>] [--json]",
 			"       amber maintain detect --target <repo> --id <detector-id> --detector-version <version> --subject <subject> --window-from <iso> --window-to <iso> --value <number> --observation-hash <sha256:...> [--json]",
 			"       amber maintain propose --target <repo> --finding-index <n> [--json]",
 			"       amber maintain triage --target <repo> --fingerprint <sha256:...> --outcome fix|schedule|dismiss [--reason <text>] --decision-identity <identity> --revision <n> [--json]",

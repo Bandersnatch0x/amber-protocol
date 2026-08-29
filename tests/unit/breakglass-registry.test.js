@@ -1638,6 +1638,103 @@ test("re-chained settlement and review forgeries fail every read closed", () => 
 // integrity.
 // ---------------------------------------------------------------------------
 
+test("clock skew has no tolerance across the grant lifecycle", () => {
+	// F057 Testing Decisions name a clock-skew integrity fixture: every
+	// boundary is exact at the injected governance clock, in both
+	// directions, with zero tolerance.
+	const dir = mkTarget("clock-skew");
+	grantFixture(dir, ["decision/breakglass-1", "decision/effect-1", "decision/breakglass-2"]);
+	// Backdating by exactly 1ms refuses: validFrom must be at or after the
+	// grant clock.
+	const backdated = grantBreakGlass(
+		dir,
+		grantInput({ validFrom: new Date(NOW.getTime() - 1).toISOString() }),
+		{ now: NOW },
+	);
+	assert.equal(backdated.ok, false);
+	assert.match(backdated.errors[0], /cannot backdate its window/);
+	// At exactly the grant clock the window opens.
+	assert.equal(grantBreakGlass(dir, grantInput(), { now: NOW }).ok, true);
+	const authorize = (requestId, approvalId, decisionId) => {
+		const proposed = proposeExternalEffect(
+			dir,
+			{
+				id: requestId,
+				effect: { id: "effect/ticket-comment", version: "1" },
+				payloadHash: `sha256:${"a".repeat(64)}`,
+			},
+			{ now: NOW },
+		);
+		assert.equal(proposed.ok, true, (proposed.errors || []).join("; "));
+		assert.equal(
+			grantApproval(
+				dir,
+				{
+					id: approvalId,
+					approver: "bob@example.com",
+					scope: null,
+					subject: `external-effect:${proposed.record.requestHash}`,
+					validUntil: "2036-01-01T00:00:00.000Z",
+				},
+				{ now: NOW },
+			).ok,
+			true,
+		);
+		assert.equal(
+			authorizeExternalEffect(
+				dir,
+				{
+					id: requestId,
+					approval: approvalId,
+					decisionIdentity: decisionId,
+					body: "# Authorize external effect\n",
+					traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+				},
+				{ now: NOW },
+			).ok,
+			true,
+		);
+	};
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	authorize("request/1", "approval/skew-1", "decision/skew-consume-1");
+	// 1ms before the window opens refuses; at exactly validUntil the grant
+	// is already expired (half-open window, no tolerance in either
+	// direction).
+	const early = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/1" },
+		{ now: new Date(Date.parse(grantInput().validFrom) - 1) },
+	);
+	assert.equal(early.ok, false);
+	assert.match(early.errors[0], /is not valid yet/);
+	const atExpiry = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/1" },
+		{ now: new Date(Date.parse(grantInput().validUntil)) },
+	);
+	assert.equal(atExpiry.ok, false);
+	assert.match(atExpiry.errors[0], /expired at/);
+	// 1ms inside the window consumes.
+	const lastMs = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: "request/1" },
+		{ now: new Date(Date.parse(grantInput().validUntil) - 1) },
+	);
+	assert.equal(lastMs.ok, true, (lastMs.errors || []).join("; "));
+	// reviewBy must sit strictly after validUntil: equality refuses.
+	const flushReview = grantBreakGlass(
+		dir,
+		grantInput({
+			id: "breakglass/incident-43",
+			reviewBy: grantInput().validUntil,
+			decision: { identity: "decision/breakglass-2", revision: 1 },
+		}),
+		{ now: NOW },
+	);
+	assert.equal(flushReview.ok, false);
+	assert.match(flushReview.errors[0], /strictly after validUntil/);
+});
+
 test("the MCP seam surfaces break-glass as approval-required only", () => {
 	const {
 		COMMAND_CAPABILITIES,

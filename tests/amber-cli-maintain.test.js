@@ -105,6 +105,18 @@ function detectArgs(overrides = {}) {
 	return args;
 }
 
+test("maintain verbs accept the injected --now governance clock", () => {
+	const dir = mkTarget("clock");
+	fixtureRepo(dir, ["decision/detector-1"]);
+	const at = "2026-08-29T12:00:00.000Z";
+	const registered = runCli(registerArgs({ "--now": at }), dir);
+	assert.equal(registered.status, 0, registered.stderr || registered.stdout);
+	assert.equal(payload(registered).at, at);
+	const garbage = runCli(registerArgs({ "--now": "yesterday" }), dir);
+	assert.equal(garbage.status, 1);
+	assert.match(envelope(garbage).errors[0], /--now must be an ISO-8601 timestamp/);
+});
+
 test("maintain register-detector, detect, detectors, and findings form the governed lifecycle", () => {
 	const dir = mkTarget("lifecycle");
 	fixtureRepo(dir, ["decision/detector-1"]);

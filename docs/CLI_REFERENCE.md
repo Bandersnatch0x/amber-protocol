@@ -1690,7 +1690,11 @@ registries, so those axes are not derivably enforceable and remain post-review o
 human-only Decision slots are enforced at admission). A used grant is terminal: it
 cannot be revoked or re-used, `used` wins the read-time status derivation, and `show` reads one
 grant with its use, revocation, and window state. Nothing under this command executes anything —
-the underlying capability still runs only through its own governed F052/F056 surface.
+the underlying capability still runs only through its own governed F052/F056 surface. An
+emergency F053 release is covered the same way: the release deploy rides an authorized F052
+request, so the break-glass use, the runner request, and the release transaction all carry the
+same `requestHash` — the linkage is derivable across the three ledgers (test-pinned), never a
+duplicate record.
 
 An emergency attempt cannot disappear (T3): `settle` binds the used grant to the REAL underlying
 receipt — an F056 execution id (which must settle the admitted request) or the F052 runner request

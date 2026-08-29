@@ -12,6 +12,7 @@ const {
 	targetValue,
 	requiredString,
 	positiveInt,
+	clockValue,
 	missingValueFlag: firstMissingFlagValue,
 } = require("./command-helpers");
 
@@ -47,6 +48,7 @@ const VALUE_FLAGS = [
 	["evalVal", "--eval"],
 	["evalResult", "--eval-result"],
 	["limit", "--limit"],
+	["now", "--now"],
 	["target", "--target"],
 ];
 
@@ -170,23 +172,29 @@ const dispatch = defineCommand({
 				if (pin.error) return invalidArg(pin.error);
 				policy = pin.value;
 			}
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
 			return resultEnvelope(
-				registerDetector(target.value, {
-					id: String(args.id),
-					version: String(args.detectorVersion),
-					metric: String(args.metric),
-					source: String(args.source),
-					baseline: baseline.value,
-					rules,
-					windowMs: numbers.windowMs,
-					scope: String(args.scope),
-					cooldownMs: numbers.cooldownMs,
-					maxObservations: numbers.maxObservations,
-					outputType: "finding",
-					owner: String(args.owner),
-					policy,
-					decision: { identity: String(args.decisionIdentity), revision: numbers.revision },
-				}),
+				registerDetector(
+					target.value,
+					{
+						id: String(args.id),
+						version: String(args.detectorVersion),
+						metric: String(args.metric),
+						source: String(args.source),
+						baseline: baseline.value,
+						rules,
+						windowMs: numbers.windowMs,
+						scope: String(args.scope),
+						cooldownMs: numbers.cooldownMs,
+						maxObservations: numbers.maxObservations,
+						outputType: "finding",
+						owner: String(args.owner),
+						policy,
+						decision: { identity: String(args.decisionIdentity), revision: numbers.revision },
+					},
+					clock.value ? { now: clock.value } : {},
+				),
 			);
 		},
 		detect: (args) => {
@@ -211,15 +219,21 @@ const dispatch = defineCommand({
 			}
 			const value = requiredNumber(args, "value", "--value");
 			if (value.error) return invalidArg(value.error);
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
 			return resultEnvelope(
-				detect(target.value, {
-					detectorId: String(args.id),
-					detectorVersion: String(args.detectorVersion),
-					subject: String(args.subject),
-					window: { from: String(args.windowFrom), to: String(args.windowTo) },
-					value: value.value,
-					inputHash: String(args.observationHash),
-				}),
+				detect(
+					target.value,
+					{
+						detectorId: String(args.id),
+						detectorVersion: String(args.detectorVersion),
+						subject: String(args.subject),
+						window: { from: String(args.windowFrom), to: String(args.windowTo) },
+						value: value.value,
+						inputHash: String(args.observationHash),
+					},
+					clock.value ? { now: clock.value } : {},
+				),
 			);
 		},
 		propose: (args) => {
@@ -241,7 +255,13 @@ const dispatch = defineCommand({
 				return invalidArg(
 					`--finding-index must be a non-negative integer; got ${JSON.stringify(args.findingIndex)}`,
 				);
-			const result = propose(target.value, { findingIndex });
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			const result = propose(
+				target.value,
+				{ findingIndex },
+				clock.value ? { now: clock.value } : {},
+			);
 			return {
 				...resultEnvelope(result),
 				text: result.ok
@@ -268,12 +288,18 @@ const dispatch = defineCommand({
 			}
 			const revision = positiveInt(args, "revision", "--revision");
 			if (revision.error) return invalidArg(revision.error);
-			const result = triage(target.value, {
-				fingerprint: String(args.fingerprint),
-				outcome: String(args.outcome),
-				reason: args.reason === undefined ? null : String(args.reason),
-				decision: { identity: String(args.decisionIdentity), revision: revision.value },
-			});
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			const result = triage(
+				target.value,
+				{
+					fingerprint: String(args.fingerprint),
+					outcome: String(args.outcome),
+					reason: args.reason === undefined ? null : String(args.reason),
+					decision: { identity: String(args.decisionIdentity), revision: revision.value },
+				},
+				clock.value ? { now: clock.value } : {},
+			);
 			return {
 				...resultEnvelope(result),
 				text: result.ok
@@ -304,7 +330,15 @@ const dispatch = defineCommand({
 				if (pin.error) return invalidArg(pin.error);
 				pins[field] = pin.value;
 			}
-			return resultEnvelope(complete(target.value, { fingerprint: fingerprint.value, ...pins }));
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			return resultEnvelope(
+				complete(
+					target.value,
+					{ fingerprint: fingerprint.value, ...pins },
+					clock.value ? { now: clock.value } : {},
+				),
+			);
 		},
 		rollup: (args) => {
 			const { rollup } = require("./core/maintain-registry");

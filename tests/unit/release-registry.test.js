@@ -43,6 +43,7 @@ const {
 	releaseReceipt,
 } = require("../../scripts/lib/core/release-registry");
 const { grantApproval } = require("../../scripts/lib/core/approval-registry");
+const { grantBreakGlass, useBreakGlass } = require("../../scripts/lib/core/breakglass-registry");
 const { evaluateGate } = require("../../scripts/lib/core/gate-evaluation");
 const {
 	registerRunner,
@@ -744,6 +745,68 @@ function transactionFixture(dir) {
 	const requestHash = authorizedRequestFixture(dir, "a");
 	return { candidate, requestHash };
 }
+
+test("an emergency grant admits the release-bound request and ledgers join on requestHash", () => {
+	// F057: "underlying target-write behavior still uses the registered
+	// F052/F053/F056 capability". The emergency linkage to a release is
+	// derivable, not duplicated: the break-glass use, the F052 runner
+	// request, and the F053 release transaction all carry the same
+	// requestHash.
+	const dir = mkTarget("breakglass-join");
+	const candidate = stagingFixture(dir);
+	approvalFixture(dir, "approval/rel-1", `release:staging:${candidate.releaseHash}`);
+	assert.equal(authorizeRelease(dir, stagingAuthorizeInput(), { now: NOW }).ok, true);
+	const requestHash = authorizedRequestFixture(dir, "e", { scope: "deploy" });
+	const bgDecision = admitArtifact(dir, {
+		type: "decision",
+		identity: "decision/bg-1",
+		body: "# decision/bg-1\n",
+		decisionKind: "approval",
+		principal: "alice@example.com",
+		traces: [{ type: "decides", to: { type: "intent", identity: "intent/release" } }],
+	});
+	assert.equal(bgDecision.ok, true, (bgDecision.errors || []).join("; "));
+	const granted = grantBreakGlass(
+		dir,
+		{
+			id: "breakglass/incident-9",
+			incident: "incident/9",
+			purpose: "emergency-staging-deploy",
+			capability: {
+				kind: "runner",
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "deploy.staging-web",
+				capabilityVersion: "1",
+			},
+			target: "repo/main",
+			scope: "deploy",
+			environment: "staging",
+			risk: "high",
+			credentials: "scoped",
+			validFrom: NOW.toISOString(),
+			validUntil: new Date(NOW.getTime() + 3_600_000).toISOString(),
+			reviewBy: new Date(NOW.getTime() + 72 * 3_600_000).toISOString(),
+			decision: { identity: "decision/bg-1", revision: 1 },
+		},
+		{ now: NOW },
+	);
+	assert.equal(granted.ok, true, (granted.errors || []).join("; "));
+	const used = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-9", reference: requestHash },
+		{ now: NOW },
+	);
+	assert.equal(used.ok, true, (used.errors || []).join("; "));
+	assert.equal(used.record.use.requestHash, requestHash);
+	// The release deploy rides the very same authorized request.
+	const deployed = deployRelease(dir, { releaseId: "release/web-42", requestHash }, { now: NOW });
+	assert.equal(deployed.ok, true, (deployed.errors || []).join("; "));
+	// Join proven: break-glass use.reference.id === release
+	// transaction.requestHash === F052 requestHash.
+	assert.equal(used.record.use.reference.kind, "runner");
+	assert.equal(used.record.use.reference.id, deployed.record.requestHash);
+});
 
 test("transaction constants pin the operations and schema contract", () => {
 	assert.equal(RELEASE_TRANSACTION_SCHEMA_VERSION, 1);
