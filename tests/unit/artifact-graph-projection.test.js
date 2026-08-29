@@ -42,7 +42,10 @@ const {
 	governanceGraphFromState,
 	queryGraph,
 } = require("../../scripts/lib/core/governance-graph");
-const { ARTIFACT_GRAPH_RULE_VERSION } = require("../../scripts/lib/core/artifact-graph-projection");
+const {
+	ARTIFACT_GRAPH_RULE_VERSION,
+	artifactGraphLayer,
+} = require("../../scripts/lib/core/artifact-graph-projection");
 const { TRACE_REGISTRY_VERSION } = require("../../scripts/lib/core/canonical-artifact-contracts");
 const {
 	SCHEMA_VERSION,
@@ -638,4 +641,86 @@ test("an unscoped query over artifact nodes stays bounded with a truncation flag
 	assert.equal(full.ok, true);
 	assert.equal(full.truncated, false);
 	assert.equal(full.nodes.length, graph.nodes.length);
+});
+
+// ── F055 P4: deletion tombstones in the artifact layer (rule v3) ─
+
+test("deletion tombstones redact nodes and withhold their outgoing trace edges", () => {
+	assert.equal(ARTIFACT_GRAPH_RULE_VERSION, 3, "tombstones are a visible rule change");
+	const revision = (type, identity, rev, traces = []) => ({
+		type,
+		identity,
+		revision: rev,
+		lifecycle: "draft",
+		scope: null,
+		supersedes: null,
+		contentHash: `sha256:${"a".repeat(64)}`,
+		envelopeHash: "b".repeat(64),
+		provenance: { source: "test" },
+		committedAt: "2026-08-29T00:00:00.000Z",
+		traces,
+	});
+	const revisions = [
+		revision("intent", "intent/a", 1),
+		revision("spec", "spec/b", 1, [
+			{ type: "refines", to: { type: "intent", identity: "intent/a", revision: 1 } },
+		]),
+		revision("plan", "plan/c", 1, [
+			{ type: "realizes", to: { type: "spec", identity: "spec/b", revision: 1 } },
+		]),
+	];
+
+	const live = artifactGraphLayer(revisions, []);
+	assert.ok(
+		live.nodes.every((n) => n.tombstone === null),
+		"untouched nodes carry tombstone: null",
+	);
+	assert.equal(live.edges.length, 2);
+
+	const layer = artifactGraphLayer(revisions, [
+		{
+			record: { type: "spec", identity: "spec/b", revision: 1 },
+			transactionId: "tx/1",
+			status: "deletion-pending",
+		},
+	]);
+	const tombstoned = layer.nodes.find((n) => n.id === "spec/spec/b@1");
+	assert.deepEqual(tombstoned.tombstone, { status: "deletion-pending", transactionId: "tx/1" });
+	// Minimal stable identity plus the transaction reference — every
+	// content-bearing field is redacted so the projection cannot recreate
+	// or fingerprint deleted content.
+	assert.equal(tombstoned.artifactType, "spec");
+	assert.equal(tombstoned.identity, "spec/b");
+	assert.equal(tombstoned.revision, 1);
+	assert.equal(tombstoned.lifecycle, null);
+	assert.equal(tombstoned.contentHash, null);
+	assert.equal(tombstoned.envelopeHash, null);
+	assert.equal(tombstoned.provenance, null);
+	assert.equal(tombstoned.committedAt, null);
+	// The tombstoned revision's own trace edge is withheld; the live plan's
+	// edge TOWARD the tombstone survives because it derives from the live
+	// revision's committed content.
+	assert.deepEqual(
+		layer.edges.map((e) => `${e.source} -${e.type}-> ${e.target}`),
+		["plan/plan/c@1 -realizes-> spec/spec/b@1"],
+	);
+
+	// Deterministic selection when several transactions name one record:
+	// a settled deletion beats a pending one, regardless of input order.
+	const both = artifactGraphLayer(revisions, [
+		{
+			record: { type: "spec", identity: "spec/b", revision: 1 },
+			transactionId: "tx/2",
+			status: "deletion-pending",
+		},
+		{
+			record: { type: "spec", identity: "spec/b", revision: 1 },
+			transactionId: "tx/1",
+			status: "deleted",
+		},
+	]);
+	assert.deepEqual(both.nodes.find((n) => n.id === "spec/spec/b@1").tombstone, {
+		status: "deleted",
+		transactionId: "tx/1",
+	});
 });

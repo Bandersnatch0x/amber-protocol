@@ -884,11 +884,18 @@ Intent/Spec/Plan revision and one typed edge per resolved Trace (`refines`, `rea
   an in-place status edit.
 - Rebuild is deterministic: identical committed state produces the identical result hash. The
   receipt (the manifest under `.amber/projections/governance-graph.json`) records the source
-  checkpoint (`rebuild_checkpoint`/`sourceHash` — a digest of the pages plus the committed revision
-  references with their Envelope hashes), the projection rule and Trace contract versions
-  (`projection_rule_versions`; the artifact-layer rules are at version 2, whose node `committedAt`
-  now derives from the hash-covered Envelope field), the schema version, the result hash
-  (`outputHash`), and the Amber protocol version.
+  checkpoint (`rebuild_checkpoint`/`sourceHash` — a digest of the pages, the committed revision
+  references with their Envelope hashes, and the deletion tombstone state), the projection rule and
+  Trace contract versions (`projection_rule_versions`; the artifact-layer rules are at version 3,
+  which added deletion tombstones on top of v2's hash-covered Envelope `committedAt`), the schema
+  version, the result hash (`outputHash`), and the Amber protocol version.
+- Records named by an F055 deletion transaction project as redacted tombstone nodes: minimal
+  stable identity plus `tombstone: { status: deleted|deletion-pending, transactionId }`, every
+  content-bearing field (hashes, provenance, lifecycle, scope, committedAt) nulled, and the
+  revision's own outgoing trace edges withheld — projections never recreate deleted content. Edges
+  from live revisions toward a tombstone survive (they derive from the live revision's committed
+  content), untouched nodes carry `tombstone: null`, and the checkpoint covers tombstone state, so
+  an executing or settling deletion drifts a previously rebuilt projection.
 - `projection status --type governance-graph` certifies currency against the same checkpoint:
   committing a new artifact revision drifts the projection until it is rebuilt.
 - `projection query` keeps the existing bounded-read contract: an exact scope resolves one node
@@ -1428,7 +1435,14 @@ execution hash — never a reconstructable public content hash, and no deleted c
 Deleted records project as tombstones (stable identity + transaction reference,
 `deleted|deletion-pending`), and a tombstoned subject refuses Gate evaluation with
 `AMBER_E_RETENTION_TOMBSTONE`: historical existence is not current proof, so a deleted record can
-never satisfy content, replay, or freshness Gates.
+never satisfy content, replay, or freshness Gates. The Governance Graph consumes the same seam: a
+tombstoned record projects as a redacted tombstone node — minimal stable identity plus the
+transaction reference, every content-bearing field (hashes, provenance, lifecycle, scope) nulled
+and its outgoing trace edges withheld, so projections never recreate deleted content — and the
+projection checkpoint covers tombstone state, so an executing or settling deletion drifts a
+previously rebuilt graph instead of leaving it certified current. Execution and settlement are
+enabled by the dedicated accepted ADR-0026: they are governance settlement only — Amber deletes no
+bytes and dispatches no Adapter; the Holder-side effect happens in the owning system.
 
 ```bash
 node scripts/amber.js retention classify --target . --record spec:spec/login@2 \

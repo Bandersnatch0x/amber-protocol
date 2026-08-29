@@ -54,7 +54,18 @@
 // the receipt checkpoints against. The graph's edge ordering was also made
 // a total order with a canonical tiebreaker (finding F-2) — same edges for
 // the same store, now independent of raw page `sources` key order.
-const ARTIFACT_GRAPH_RULE_VERSION = 2;
+//
+// Version 3 (F055 acceptance review, P4): deletion tombstones. A committed
+// revision named by a coordinated-deletion transaction projects as a
+// tombstone — minimal stable identity plus the deletion transaction
+// reference and its settlement status (`deleted` / `deletion-pending`) —
+// with every content-bearing field (hashes, provenance, lifecycle, scope,
+// committedAt) redacted and its outgoing trace edges withheld, so the
+// projection cannot recreate or fingerprint deleted content (F055:
+// "projections do not recreate content"). Tombstones arrive as data from
+// the caller (the retention ledgers stay this module's only source through
+// that seam), and untouched nodes carry `tombstone: null`.
+const ARTIFACT_GRAPH_RULE_VERSION = 3;
 
 const ARTIFACT_NODE_TYPE = "artifact-revision";
 
@@ -68,10 +79,33 @@ function artifactGraphNodeId(type, identity, revision) {
 	return `${type}/${identity}@${revision}`;
 }
 
-/** The read-only reference card of one committed revision. */
-function artifactGraphNode(revision) {
+/**
+ * The read-only reference card of one committed revision. A revision named
+ * by a deletion transaction projects as a tombstone instead: minimal stable
+ * identity plus the transaction reference — every content-bearing field is
+ * redacted so the card cannot recreate or fingerprint deleted content.
+ */
+function artifactGraphNode(revision, tombstone = null) {
+	const id = artifactGraphNodeId(revision.type, revision.identity, revision.revision);
+	if (tombstone !== null) {
+		return {
+			id,
+			type: ARTIFACT_NODE_TYPE,
+			artifactType: revision.type,
+			identity: revision.identity,
+			revision: revision.revision,
+			lifecycle: null,
+			scope: null,
+			supersedes: null,
+			contentHash: null,
+			envelopeHash: null,
+			provenance: null,
+			committedAt: null,
+			tombstone: { status: tombstone.status, transactionId: tombstone.transactionId },
+		};
+	}
 	return {
-		id: artifactGraphNodeId(revision.type, revision.identity, revision.revision),
+		id,
 		type: ARTIFACT_NODE_TYPE,
 		artifactType: revision.type,
 		identity: revision.identity,
@@ -83,6 +117,7 @@ function artifactGraphNode(revision) {
 		envelopeHash: revision.envelopeHash ?? null,
 		provenance: revision.provenance ?? null,
 		committedAt: revision.committedAt ?? null,
+		tombstone: null,
 	};
 }
 
@@ -112,18 +147,53 @@ function compareRefs(a, b) {
 	return a[2] - b[2];
 }
 
+// One tombstone per record, chosen deterministically when several deletion
+// transactions name the same revision: a settled `deleted` beats a
+// `deletion-pending`, then the lexicographically smallest transaction id —
+// never input order.
+function tombstoneIndex(tombstones) {
+	const byId = new Map();
+	for (const entry of Array.isArray(tombstones) ? tombstones : []) {
+		const record = entry?.record;
+		if (!record) continue;
+		const id = artifactGraphNodeId(record.type, record.identity, record.revision);
+		const current = byId.get(id);
+		if (current === undefined || tombstonePrecedes(entry, current)) byId.set(id, entry);
+	}
+	return byId;
+}
+
+function tombstonePrecedes(a, b) {
+	if (a.status !== b.status) return a.status === "deleted";
+	return a.transactionId < b.transactionId;
+}
+
 /**
  * The artifact layer of the Governance Graph: one node per committed
  * revision and one typed edge per resolved Trace, canonically ordered.
+ * Revisions named by a deletion transaction project as redacted tombstone
+ * nodes and their outgoing trace edges are withheld (rule v3) — edges from
+ * live revisions TOWARD a tombstone survive, because they derive from the
+ * live revision's own committed content.
  * @param {Array<object>} revisions - Committed revision snapshots in any
  *        order; the layer output is ordered canonically so it is a pure
  *        function of the committed content.
+ * @param {Array<object>} tombstones - Deletion tombstone entries
+ *        (`{record, transactionId, status}`) from the retention seam.
  * @returns {{nodes: Array<object>, edges: Array<object>, ruleVersion: number}}
  */
-function artifactGraphLayer(revisions) {
+function artifactGraphLayer(revisions, tombstones = []) {
 	const list = Array.isArray(revisions) ? revisions : [];
-	const nodes = list.map(artifactGraphNode).sort(compareNodes);
-	const edges = list.flatMap(artifactGraphEdgesOf).sort(compareEdges);
+	const index = tombstoneIndex(tombstones);
+	const idOf = (revision) =>
+		artifactGraphNodeId(revision.type, revision.identity, revision.revision);
+	const nodes = list
+		.map((revision) => artifactGraphNode(revision, index.get(idOf(revision)) ?? null))
+		.sort(compareNodes);
+	const edges = list
+		.filter((revision) => !index.has(idOf(revision)))
+		.flatMap(artifactGraphEdgesOf)
+		.sort(compareEdges);
 	return { nodes, edges, ruleVersion: ARTIFACT_GRAPH_RULE_VERSION };
 }
 
@@ -150,6 +220,32 @@ function artifactSourceFingerprint(revisions) {
 		.sort(compareRefs);
 }
 
+/**
+ * The canonical fingerprint of the deletion tombstone state: sorted
+ * `[type, identity, revision, transactionId, status]` tuples. The caller
+ * folds it into the projection's source checkpoint so a new or settled
+ * deletion transaction drifts the projection instead of leaving a stale
+ * content-bearing graph certified current.
+ * @param {Array<object>} tombstones - Deletion tombstone entries.
+ * @returns {Array<Array>} Sorted tuples.
+ */
+function tombstoneFingerprint(tombstones) {
+	return (Array.isArray(tombstones) ? tombstones : [])
+		.map((entry) => [
+			entry.record.type,
+			entry.record.identity,
+			entry.record.revision,
+			entry.transactionId,
+			entry.status,
+		])
+		.sort((a, b) => {
+			for (let i = 0; i < a.length; i += 1) {
+				if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+			}
+			return 0;
+		});
+}
+
 module.exports = {
 	ARTIFACT_GRAPH_RULE_VERSION,
 	ARTIFACT_NODE_TYPE,
@@ -158,4 +254,5 @@ module.exports = {
 	artifactGraphEdgesOf,
 	artifactGraphLayer,
 	artifactSourceFingerprint,
+	tombstoneFingerprint,
 };

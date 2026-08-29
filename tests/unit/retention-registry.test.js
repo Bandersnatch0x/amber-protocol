@@ -59,6 +59,11 @@ const { registerPrincipal } = require("../../scripts/lib/core/principal-registry
 const { registerAdapter } = require("../../scripts/lib/core/adapter-registry");
 const { grantApproval } = require("../../scripts/lib/core/approval-registry");
 const { evaluateGate } = require("../../scripts/lib/core/gate-evaluation");
+const {
+	buildGovernanceGraph,
+	governanceGraphSource,
+	governanceGraphCheckpoint,
+} = require("../../scripts/lib/core/governance-graph");
 
 function mkTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-retention-${label}-`));
@@ -1192,6 +1197,13 @@ test("the Deletion Proof derives only from full settled coverage", () => {
 test("deleted records project as tombstones and refuse Gate evaluation", () => {
 	const dir = mkTarget("tombstone");
 	const expired = authorizedFixture(dir);
+	// Pre-deletion baseline: the record projects as a live content-bearing
+	// node and the projection checkpoint covers the tombstone state.
+	const beforeGraph = buildGovernanceGraph(dir);
+	const liveNode = beforeGraph.nodes.find((n) => n.id === "intent/intent/login@1");
+	assert.equal(liveNode.tombstone, null);
+	assert.match(liveNode.contentHash, /^sha256:[0-9a-f]{64}$/);
+	const beforeCheckpoint = governanceGraphCheckpoint(governanceGraphSource(dir));
 	assert.equal(
 		executeDeletion(dir, { id: "tx/1", candidateId: "deletion/1" }, { now: expired }).ok,
 		true,
@@ -1203,6 +1215,22 @@ test("deleted records project as tombstones and refuse Gate evaluation", () => {
 		transactionId: "tx/1",
 		status: "deletion-pending",
 	});
+	// The Governance Graph projects the record as a redacted tombstone (P4):
+	// minimal stable identity plus the transaction reference, no
+	// content-bearing fields, and the checkpoint drifts so a projection
+	// rebuilt before the deletion cannot stay certified current.
+	const pendingGraph = buildGovernanceGraph(dir);
+	const pendingNode = pendingGraph.nodes.find((n) => n.id === "intent/intent/login@1");
+	assert.deepEqual(pendingNode.tombstone, { status: "deletion-pending", transactionId: "tx/1" });
+	assert.equal(pendingNode.contentHash, null);
+	assert.equal(pendingNode.envelopeHash, null);
+	assert.equal(pendingNode.lifecycle, null);
+	assert.equal(
+		pendingGraph.nodes.find((n) => n.id === "intent/intent/retention@1").tombstone,
+		null,
+		"untouched records keep their live reference cards",
+	);
+	assert.notEqual(governanceGraphCheckpoint(governanceGraphSource(dir)), beforeCheckpoint);
 	// A deletion-pending subject already refuses Gate evaluation — the
 	// guard fires before the gate artifact resolves.
 	const pendingGate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/login@1" });
@@ -1225,6 +1253,13 @@ test("deleted records project as tombstones and refuse Gate evaluation", () => {
 	);
 	tombstones = deletionTombstones(dir);
 	assert.equal(tombstones[0].status, "deleted");
+	const settledGraph = buildGovernanceGraph(dir);
+	assert.equal(
+		settledGraph.nodes.find((n) => n.id === "intent/intent/login@1").tombstone.status,
+		"deleted",
+	);
+	// The deleted record's public content hash rides no projection field.
+	assert.equal(JSON.stringify(settledGraph).includes(liveNode.contentHash), false);
 	const deletedGate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/login@1" });
 	assert.equal(deletedGate.code, "AMBER_E_RETENTION_TOMBSTONE");
 	// A corrupt transaction ledger fails the gate seam closed too.
@@ -1232,6 +1267,12 @@ test("deleted records project as tombstones and refuse Gate evaluation", () => {
 	const corruptGate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/login@1" });
 	assert.equal(corruptGate.ok, false);
 	assert.equal(corruptGate.code, "AMBER_E_RETENTION_TX_CORRUPT");
+	// The graph build reads through the same fail-closed seam: a corrupt
+	// transaction ledger refuses the projection, never a partial graph.
+	assert.throws(
+		() => buildGovernanceGraph(dir),
+		(err) => err.amberCode === "AMBER_E_RETENTION_TX_CORRUPT",
+	);
 });
 
 test("a fresh transaction lock held by another writer refuses settlement", () => {

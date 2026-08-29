@@ -137,7 +137,7 @@ test("projection rebuild projects committed artifact revisions as nodes with typ
 	assert.equal(manifest.projection_type, "governance-graph");
 	assert.match(manifest.rebuild_checkpoint, /^sha256:[0-9a-f]{64}$/);
 	assert.match(manifest.outputHash, /^sha256:[0-9a-f]{64}$/);
-	assert.deepEqual(manifest.projection_rule_versions, { artifactGraph: 2, traceContract: 1 });
+	assert.deepEqual(manifest.projection_rule_versions, { artifactGraph: 3, traceContract: 1 });
 	assert.equal(manifest.schemaVersion, "1.0.0");
 
 	// The durable output carries the graph: one node per committed revision,

@@ -31,7 +31,12 @@
 const { sha256, canonicalJson } = require("./context-hash");
 const { readCanonicalPages: canonicalPages } = require("./context-store");
 const { listArtifactRevisions } = require("./canonical-artifacts");
-const { artifactGraphLayer, artifactSourceFingerprint } = require("./artifact-graph-projection");
+const {
+	artifactGraphLayer,
+	artifactSourceFingerprint,
+	tombstoneFingerprint,
+} = require("./artifact-graph-projection");
+const { deletionTombstones } = require("./retention-registry");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 const { typedError } = require("./error-catalog");
 
@@ -76,38 +81,49 @@ function parseScope(scope) {
 }
 
 /**
- * Source state of the Governance Graph projection: canonical context pages
- * plus every committed Canonical Artifact revision (F049 ticket 05, #222).
- * Both halves are read through fail-closed canonical readers, so a corrupt
- * page set or artifact store throws instead of feeding the projection a
- * partial source.
+ * Source state of the Governance Graph projection: canonical context pages,
+ * every committed Canonical Artifact revision (F049 ticket 05, #222), and
+ * the deletion tombstone state (F055): the records named by coordinated
+ * deletion transactions, which project as redacted tombstones instead of
+ * content-bearing nodes. All three halves are read through fail-closed
+ * canonical readers, so a corrupt page set, artifact store, or retention
+ * ledger throws instead of feeding the projection a partial source.
  * @param {string} targetRoot - Repository root.
- * @returns {{artifacts: Array<object>, artifactRevisions: Array<object>}}
+ * @returns {{artifacts: Array<object>, artifactRevisions: Array<object>, tombstones: Array<object>}}
  */
 function governanceGraphSource(targetRoot) {
 	return {
 		artifacts: canonicalPages(targetRoot),
 		artifactRevisions: listArtifactRevisions(targetRoot),
+		tombstones: deletionTombstones(targetRoot),
 	};
 }
 
 /**
  * Source checkpoint of the Governance Graph projection: a tamper-evident
- * digest of BOTH canonical sources. The page half is the canonical page
+ * digest of ALL canonical sources. The page half is the canonical page
  * set; the artifact half is the committed revision references with their
  * Envelope hashes (an Envelope hash covers the full revision content —
- * bodyHash, provenance, lifecycle, scope, resolved traces), so the
- * checkpoint changes exactly when either source changes. A rebuild records
- * this checkpoint in its receipt; a status check compares against it.
- * @param {{artifacts: Array<object>, artifactRevisions: Array<object>}} source
+ * bodyHash, provenance, lifecycle, scope, resolved traces); the tombstone
+ * half is the deletion transaction state per record — so the checkpoint
+ * changes exactly when any source changes, and a deletion settling after a
+ * rebuild drifts the projection instead of leaving a content-bearing graph
+ * certified current. A rebuild records this checkpoint in its receipt; a
+ * status check compares against it.
+ * @param {{artifacts: Array<object>, artifactRevisions: Array<object>, tombstones: Array<object>}} source
  * @returns {string} `sha256:<64 hex>`
  */
-function governanceGraphCheckpoint({ artifacts = [], artifactRevisions = [] } = {}) {
+function governanceGraphCheckpoint({
+	artifacts = [],
+	artifactRevisions = [],
+	tombstones = [],
+} = {}) {
 	return sha256(
 		canonicalJson(
 			JSON.stringify({
 				artifacts,
 				artifactRevisions: artifactSourceFingerprint(artifactRevisions),
+				tombstones: tombstoneFingerprint(tombstones),
 			}),
 		),
 	);
@@ -208,13 +224,17 @@ function compareEdges(a, b) {
  * query could return; a scoped query's neighborhood is a subset of these
  * nodes and therefore bounded by the same ceiling.
  *
- * @param {{artifacts?: Array<object>, artifactRevisions?: Array<object>}} state
+ * @param {{artifacts?: Array<object>, artifactRevisions?: Array<object>, tombstones?: Array<object>}} state
  * @returns {{nodes: Array<object>, edges: Array<object>, sourceHash: string}}
  * @throws {Error} Typed AMBER_E_PROJECTION_RESOURCE_CEILING when the merged
  *         graph exceeds its node or edge ceiling.
  */
-function governanceGraphFromState({ artifacts = [], artifactRevisions = [] } = {}) {
-	const layer = artifactGraphLayer(artifactRevisions);
+function governanceGraphFromState({
+	artifacts = [],
+	artifactRevisions = [],
+	tombstones = [],
+} = {}) {
+	const layer = artifactGraphLayer(artifactRevisions, tombstones);
 	const nodes = [...pageNodes(artifacts), ...layer.nodes].sort(compareNodes);
 	const edges = [...pageEdges(artifacts), ...layer.edges].sort(compareEdges);
 	const { maxNodes, maxEdges } = graphResourceCeilings();
