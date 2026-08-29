@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 25,
+    "adr": 27,
     "wiki": 10,
     "architecture": 9,
-    "total": 44
+    "total": 46
   },
   "rows": [
     {
@@ -40,7 +40,7 @@
       "sourcePath": "docs/adr/0003-governance-gated-execution.md",
       "title": "Governance-Gated Execution (L2)",
       "source": {
-        "rawHash": "sha256:2bbdbfa052d7cb37a4e02fd83a883b8c604290c07a45fc43996412f3eadf3ac8",
+        "rawHash": "sha256:86d5c247dbf1216c1c3abd81806b783c961374e155726949d40c9d21a0aab68e",
         "normHash": "sha256:ef9db620853647dd7335708c0bf76cd7fddbce06921a4042beef25daf78a9122"
       }
     },
@@ -52,7 +52,7 @@
       "sourcePath": "docs/adr/0004-evidence-grade-verification.md",
       "title": "Evidence-Grade Verification",
       "source": {
-        "rawHash": "sha256:bbd1eea3f27876926b96f2de1e40893629bb78092524ef91d7b7054768acbf5e",
+        "rawHash": "sha256:e438514914992244ba0414e16ec6eecf34311a36a7527f86e8c9bc2f5d6f1816",
         "normHash": "sha256:2d4952d4d4ece96d9f5970a7f8b61116b98bf0df1b9aaea57322cd6768b4002c"
       }
     },
@@ -64,7 +64,7 @@
       "sourcePath": "docs/adr/0005-experimental-execution-removal.md",
       "title": "Experimental Execution Removal — Supersedes ADR-0002 Preservation",
       "source": {
-        "rawHash": "sha256:c402c2f7c9774a0c7fd5a8a131b9ccbf18977de7f353d7dc40c6c5eba14de86e",
+        "rawHash": "sha256:1fd683c290cd5ec21f74232fb426291d448d419eeb2c60dfdd9285b4ea8e1d3d",
         "normHash": "sha256:dca4c9107c9a34c171ad10e36cd3b12079cf007aa2e83d4932de5bb6a83f360f"
       }
     },
@@ -208,7 +208,7 @@
       "sourcePath": "docs/adr/0017-live-observability-artifact-polling.md",
       "title": "Live observability via artifact polling and SSE invalidation",
       "source": {
-        "rawHash": "sha256:1d7532101953ab831f64740227aef5ba8fbc66ef97dadfe1dee320395e0176d4",
+        "rawHash": "sha256:1e995c732f66454116f618d2e14fe27a4613e1bd7653e02167a266c09dd2ee65",
         "normHash": "sha256:b60fb7e598ed620fbd57987edf3b4227d6e91ca34e5a9a7ec0c8fdc4553d899a"
       }
     },
@@ -220,7 +220,7 @@
       "sourcePath": "docs/adr/0018-governed-memory-layer.md",
       "title": "Governed Memory Layer — Registry-Backed Memory with Governed Promotion",
       "source": {
-        "rawHash": "sha256:f701f9a1fa580cd098df7378acad92285ceb0725e4c3a5d145b2514fa5aca23e",
+        "rawHash": "sha256:f1b3c44cf8791a0406d09a732250b80744532878d9af093ec89cee06f1b03ab5",
         "normHash": "sha256:0a59d7bf8466a333bb8c9f8d9253cdf25ca954576dedb22938c78f353c73c35a"
       }
     },
@@ -309,6 +309,30 @@
       }
     },
     {
+      "id": "knowledge:adr:0026",
+      "category": "adr",
+      "sourceNodeId": "adr:0026",
+      "pageId": "knowledge-adr-0026",
+      "sourcePath": "docs/adr/0026-deletion-execution-gate.md",
+      "title": "Deletion Execution Is Governance Settlement, Never Content Destruction",
+      "source": {
+        "rawHash": "sha256:c906f90efd2763d975e4c9b6f2b4d6fee086fd3bef7eb6a3f7fda357d5fe337f",
+        "normHash": "sha256:5051b85ba50a431a91446355497c6cc9c74ca9960e6ae32f9a3f8ae840e13a10"
+      }
+    },
+    {
+      "id": "knowledge:adr:0027",
+      "category": "adr",
+      "sourceNodeId": "adr:0027",
+      "pageId": "knowledge-adr-0027",
+      "sourcePath": "docs/adr/0027-external-write-activation-gate.md",
+      "title": "External-Write Capability Activates Per Contract, Never By Surface",
+      "source": {
+        "rawHash": "sha256:5c1533fe4cb34948d143f95de2efa8dc222f3e004692645577415d7224e77bbb",
+        "normHash": "sha256:cd0a402072491101862afe0a3efa064e39f89e201e9384198fb1d509a58a943b"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -364,7 +388,7 @@
       "sourcePath": "docs/architecture/governance-model.md",
       "title": "Governance Model Architecture",
       "source": {
-        "rawHash": "sha256:285707a30839ead98ebb3eebcce88abacd57109ebeb558149effd72a3ff6d39e",
+        "rawHash": "sha256:e83880fed42b48d1581924fd7b944189f66cec18c6b4e2d76ee4265d6c24688c",
         "normHash": "sha256:8208bf5610733151d146de66d40f2f26ad490b50d37312fbaef569c4f210c78e"
       }
     },
@@ -424,7 +448,7 @@
       "sourcePath": "docs/wiki/knowledge/adoption-system/adoption-system.md",
       "title": "Adoption System",
       "source": {
-        "rawHash": "sha256:2b7831d71a54fb5063f600d130fe2e810834b9efb4dac471ef8d2e68304247e0",
+        "rawHash": "sha256:327f1b10c5e23a760667f47d86ea5230a81eaba9213ed2c6cfc05b66055d1886",
         "normHash": "sha256:ec35600aa34bdc5656ab30b090e27b8b5b5a85e61e44e7b2f00a4f43d0469950"
       }
     },
@@ -448,7 +472,7 @@
       "sourcePath": "docs/wiki/knowledge/governance-model-seven-layers/governance-model-seven-layers.md",
       "title": "Governance Model & Seven Layers",
       "source": {
-        "rawHash": "sha256:8d1c0a6527f1fa67225030f34ac23b889ad18905aa5ca33bde1ef9f0e6518dd2",
+        "rawHash": "sha256:945850ad76c2490819b6a0a332625a05122600e97035aadede2587f24da7e9bf",
         "normHash": "sha256:0bd568fc2f945d211d35c9bd2cf3e791888075ee5d7ff59a0bf2099fe8a2fe4b"
       }
     },
@@ -460,7 +484,7 @@
       "sourcePath": "docs/wiki/knowledge/handoff-continuity/handoff-continuity.md",
       "title": "Handoff & Continuity",
       "source": {
-        "rawHash": "sha256:8f2bb00ba11d364bdd51b514a701dad00fca24c9b7cf5cdf5abda64f45417be0",
+        "rawHash": "sha256:0f11a97c52d92b37ea6eb3df33f9e506f07f12fd0047372bafeb3ea30c7c08bb",
         "normHash": "sha256:bbaa4f6e30b91ece6acd012d54ca90cf7ceadadd7faf6c74e089ba0cad330ef2"
       }
     },
@@ -472,7 +496,7 @@
       "sourcePath": "docs/wiki/knowledge/loop-engineering-governed-execution/loop-engineering-governed-execution.md",
       "title": "Loop Engineering & Governed Execution",
       "source": {
-        "rawHash": "sha256:af0ec56c2d91824ade5eaceacee8426bc3bdc49b72b0a61bbdf5106d5b34d6c3",
+        "rawHash": "sha256:7477b5885e911137fe44637b4f79a98eecd9f5f86345735f80f5145d2abcb100",
         "normHash": "sha256:5b277595fa38ec69230546b0e1af8f1102ff9eee82f40e04c31af40a0a67fe98"
       }
     },
@@ -484,7 +508,7 @@
       "sourcePath": "docs/wiki/knowledge/schema-validation-layer/schema-validation-layer.md",
       "title": "Schema & Validation Layer",
       "source": {
-        "rawHash": "sha256:e896c7f5cb70fade809fd88f2b5832140bb7c8538c20bf753ab9afc440e1e130",
+        "rawHash": "sha256:015987a8685f7ad3b4176dc75e95852ba0835f5860ac232988f62533cd2a49eb",
         "normHash": "sha256:a39abf94ef346f1f422933d538d09abc2266b17de110704cf0e9bdb0931521b3"
       }
     },
@@ -496,7 +520,7 @@
       "sourcePath": "docs/wiki/knowledge/security-migration-utilities/security-migration-utilities.md",
       "title": "Security & Migration Utilities",
       "source": {
-        "rawHash": "sha256:066bf8fb1cf2509b4cc5d0637315a80f6e6ed9213f31c21c7681cf44e0bdab04",
+        "rawHash": "sha256:4adf6ed3e21cf1b9b4a5dd1cdeb1cb853e37e66eebb1db3abe49d3a8cc445ab0",
         "normHash": "sha256:b1e6528c8ebd0355f4061f6953c13c1897b58fb60af2f502b7084fc75b6a93b2"
       }
     },
@@ -508,7 +532,7 @@
       "sourcePath": "docs/wiki/knowledge/session-lifecycle-management/session-lifecycle-management.md",
       "title": "Session & Lifecycle Management",
       "source": {
-        "rawHash": "sha256:b0d21f48e7ba5b7a8b88b90c8d100c286739d4b798e4f11fd0b1a470561cc25c",
+        "rawHash": "sha256:61653f1c0e434bdf8a076820bcd72b8715836721346fa17e260d5958de3f2ac0",
         "normHash": "sha256:a9fe6442865cd3e8b63b1ece101fa9203d921fbc7997410e8b0ea590f5e7cf3d"
       }
     },
@@ -520,7 +544,7 @@
       "sourcePath": "docs/wiki/knowledge/skills-platform-generation/skills-platform-generation.md",
       "title": "Skills & Platform Generation",
       "source": {
-        "rawHash": "sha256:3340f08eceb964d2ae70a1bee79ef4a5986c1ac3f847fe954ccf9950d074f57b",
+        "rawHash": "sha256:0daf9588300dafc667b8fd3e4a91173ae4fa59f76d153cd1505ddfaa8f65b469",
         "normHash": "sha256:8e660c553126e870d7c0089983362eb8ccc90ad63316e58f21ace91a28be91e6"
       }
     },
@@ -532,10 +556,10 @@
       "sourcePath": "docs/wiki/knowledge/web-dashboard/web-dashboard.md",
       "title": "Web Dashboard",
       "source": {
-        "rawHash": "sha256:60a1bf32f1f3f9555893bfe4e7977dedc58681cc47869a3058eb6902225bf771",
+        "rawHash": "sha256:ee25d7b393bac2265ec1e59931fac0725a47c91504df691b5e6b038d65e1151b",
         "normHash": "sha256:893f8c4c1225f3310234cbaf3a042a1c9d1de0eab41d5f79f2bc1de2bb76fe2e"
       }
     }
   ],
-  "manifestHash": "sha256:c23e897a513bbd769c9d057b3ff76c879e9c2c16fcb5cebed1090ec14039c127"
+  "manifestHash": "sha256:ac265554c80c1eed63c4d999116f1853e9da722f35fb0f9dbdac644022bdc695"
 }

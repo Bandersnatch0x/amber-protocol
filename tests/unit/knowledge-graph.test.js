@@ -634,9 +634,9 @@ test("F-5: amber knowledge graph --json emits schema-valid, byte-identical JSON 
 	);
 	assert.ok(f007, "F007 drift finding missing in CLI output");
 
-	// Population bounds: at minimum the 44 committed corpus nodes must appear.
-	// The graph also includes features, artifacts, and memory nodes — use >=44 as the floor.
-	assert.ok(parsed.nodes.length >= 44, `expected >=44 nodes, got ${parsed.nodes.length}`);
+	// Population bounds: at minimum the 46 committed corpus nodes must appear.
+	// The graph also includes features, artifacts, and memory nodes — use >=46 as the floor.
+	assert.ok(parsed.nodes.length >= 46, `expected >=46 nodes, got ${parsed.nodes.length}`);
 	assert.ok(parsed.edges.length >= 80, `expected >=80 edges, got ${parsed.edges.length}`);
 
 	// Independently derivable edges (from reading the ADR source files directly)
