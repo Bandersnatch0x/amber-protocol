@@ -31,7 +31,6 @@ const {
 	credentialLeakProblem,
 	isPlainObject,
 	isNonEmptyString,
-	quotedList,
 	closedFieldProblem,
 	unknownFieldProblem,
 	decisionPinProblem,
