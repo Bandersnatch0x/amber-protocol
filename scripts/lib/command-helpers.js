@@ -68,10 +68,82 @@ function readFailure(args, err, fallbackCode) {
 	};
 }
 
+// ── Shared per-flag seam helpers (acceptance review S2) ─────────────────
+// The governed-registry command seams (maintain/retention/external/
+// breakglass) compose one flag-parsing vocabulary: the invalid-arg
+// envelope, target resolution, required strings, positive integers, the
+// injected --now clock, the ok/record result envelope, and the
+// truncated-flag probe. Each seam keeps only its own flag table and any
+// registry-specific envelope variant.
+
+function invalidArg(message) {
+	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
+}
+
+function targetValue(args) {
+	if (args.target === undefined || args.target === null) return { value: resolveTarget(args) };
+	const target = String(args.target);
+	if (target.trim().length === 0)
+		return { error: `--target must be non-empty; got ${JSON.stringify(args.target)}` };
+	return { value: target };
+}
+
+function requiredString(args, key, flag, example) {
+	const value = args[key] === undefined ? null : String(args[key]);
+	if (value === null || value.trim().length === 0) {
+		return {
+			error: `${flag} is required and must be non-empty (e.g. ${flag} ${example}); got ${JSON.stringify(args[key])}`,
+		};
+	}
+	return { value };
+}
+
+function positiveInt(args, key, flag) {
+	const value = Number(args[key]);
+	if (!Number.isInteger(value) || value < 1)
+		return { error: `${flag} must be a positive integer; got ${JSON.stringify(args[key])}` };
+	return { value };
+}
+
+function clockValue(args) {
+	if (args.now === undefined) return { value: null };
+	const now = new Date(String(args.now));
+	if (Number.isNaN(now.getTime()))
+		return { error: `--now must be an ISO-8601 timestamp; got ${JSON.stringify(args.now)}` };
+	return { value: now };
+}
+
+function resultEnvelope(result) {
+	return {
+		text: result.ok ? JSON.stringify(result.record, null, 2) : "",
+		errors: result.errors,
+		warnings: [],
+		exitCode: result.ok ? 0 : 1,
+		...(result.code ? { code: result.code } : {}),
+	};
+}
+
+// A value-bearing flag that was the last token on the command line parses
+// as undefined; naming it beats a generic failure. Each seam passes its
+// own [argsKey, flag] table.
+function missingValueFlag(args, valueFlags) {
+	for (const [key, flag] of valueFlags) {
+		if (key in args && args[key] === undefined) return flag;
+	}
+	return null;
+}
+
 module.exports = {
 	resolveTarget,
 	unknownAction,
 	shapeResult,
 	requireSessionId,
 	readFailure,
+	invalidArg,
+	targetValue,
+	requiredString,
+	positiveInt,
+	clockValue,
+	resultEnvelope,
+	missingValueFlag,
 };

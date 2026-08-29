@@ -36,6 +36,13 @@ const {
 	acquireLedgerLock,
 	appendLedgerEvent,
 	credentialLeakProblem,
+	isPlainObject,
+	isNonEmptyString,
+	quotedList,
+	closedFieldProblem,
+	unknownFieldProblem,
+	decisionPinProblem,
+	resolveRegistrationDecision,
 } = require("./registry-ledger");
 
 const BREAKGLASS_SCHEMA_VERSION = 1;
@@ -83,40 +90,6 @@ function acquireGrantLock(cwd) {
 		label: "break-glass grant ledger",
 		staleMs: LOCK_STALE_MS,
 	});
-}
-
-function isPlainObject(value) {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value) {
-	return typeof value === "string" && value.trim().length > 0;
-}
-
-function quotedList(values) {
-	return values.map((value) => JSON.stringify(value)).join(", ");
-}
-
-function closedFieldProblem(value, fields, label) {
-	const unknown = Object.keys(value)
-		.filter((key) => !fields.includes(key))
-		.sort();
-	if (unknown.length > 0) {
-		return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
-	}
-	const missing = fields.filter((field) => !(field in value));
-	if (missing.length > 0) {
-		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed field set is ${fields.join(", ")}`;
-	}
-	return null;
-}
-
-function unknownFieldProblem(value, fields, label) {
-	const unknown = Object.keys(value)
-		.filter((key) => !fields.includes(key))
-		.sort();
-	if (unknown.length === 0) return null;
-	return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
 }
 
 // The shared refusal shape for a slug-validated input field: a leak
@@ -588,37 +561,7 @@ function projectGrant(grant, nowMs) {
 // human-only slots), so Agents, service identities, and executors can
 // never satisfy the emergency authorization.
 function resolveGrantDecision(revisions, decision, label) {
-	const match = revisions.find(
-		(revision) =>
-			revision.type === "decision" &&
-			revision.identity === decision.identity &&
-			revision.revision === decision.revision,
-	);
-	if (!match)
-		return {
-			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} is not a committed Decision artifact`,
-		};
-	if ((match.scope ?? null) !== null)
-		return {
-			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} is scoped to ${JSON.stringify(match.scope)}; ${label} is repository-global and binds an unscoped Decision`,
-		};
-	if (!BREAKGLASS_DECISION_KINDS.includes(match.decisionKind))
-		return {
-			problem: `${label} requires a human acceptance or approval Decision; ${JSON.stringify(decision.identity)}@${decision.revision} carries decisionKind ${JSON.stringify(match.decisionKind)}`,
-		};
-	const principal = match.principal?.id;
-	if (!isNonEmptyString(principal))
-		return {
-			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} carries no verified principal snapshot`,
-		};
-	return {
-		decision: {
-			identity: decision.identity,
-			revision: decision.revision,
-			decisionKind: match.decisionKind,
-			principal,
-		},
-	};
+	return resolveRegistrationDecision(revisions, decision, BREAKGLASS_DECISION_KINDS, label);
 }
 
 // Single-use is scoped to the grant ledger domain, matching the
@@ -645,16 +588,6 @@ function grantDecisionSpender(grants, decision) {
 		)
 			return `the post-review of grant ${JSON.stringify(grant.id)}`;
 	}
-	return null;
-}
-
-function decisionPinProblem(value) {
-	if (!isPlainObject(value)) return "decision must be an object carrying identity and revision";
-	const unknown = unknownFieldProblem(value, ["identity", "revision"], "decision");
-	if (unknown !== null) return unknown;
-	if (!isNonEmptyString(value.identity)) return "decision.identity must be a non-empty string";
-	if (!Number.isInteger(value.revision) || value.revision < 1)
-		return "decision.revision must be a positive integer";
 	return null;
 }
 

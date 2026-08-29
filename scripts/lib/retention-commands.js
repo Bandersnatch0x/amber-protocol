@@ -7,7 +7,16 @@
 // writes, and no content is ever deleted here.
 
 const { defineCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const {
+	readFailure,
+	invalidArg,
+	targetValue,
+	requiredString,
+	positiveInt,
+	clockValue,
+	resultEnvelope,
+	missingValueFlag: firstMissingFlagValue,
+} = require("./command-helpers");
 const { parseTraceFlags } = require("./canonical-artifact-commands");
 
 const READ_FAILURE_CODE = "AMBER_E_RETENTION_CORRUPT";
@@ -15,59 +24,35 @@ const HOLD_READ_FAILURE_CODE = "AMBER_E_RETENTION_HOLD_CORRUPT";
 const HOLDER_READ_FAILURE_CODE = "AMBER_E_RETENTION_HOLDER_CORRUPT";
 const CANDIDATE_READ_FAILURE_CODE = "AMBER_E_RETENTION_CANDIDATE_CORRUPT";
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
+const VALUE_FLAGS = [
+	["record", "--record"],
+	["retentionClass", "--retention-class"],
+	["policy", "--policy"],
+	["sensitivity", "--sensitivity"],
+	["now", "--now"],
+	["type", "--type"],
+	["id", "--id"],
+	["subject", "--subject"],
+	["reason", "--reason"],
+	["decisionIdentity", "--decision-identity"],
+	["revision", "--revision"],
+	["status", "--status"],
+	["holderVersion", "--holder-version"],
+	["adapter", "--adapter"],
+	["adapterVersion", "--adapter-version"],
+	["surface", "--surface"],
+	["approval", "--approval"],
+	["body", "--body"],
+	["scope", "--scope"],
+	["traceVal", "--trace"],
+	["candidate", "--candidate"],
+	["holder", "--holder"],
+	["receiptHash", "--receipt-hash"],
+	["target", "--target"],
+];
 
 function missingValueFlag(args) {
-	const valueFlags = [
-		["record", "--record"],
-		["retentionClass", "--retention-class"],
-		["policy", "--policy"],
-		["sensitivity", "--sensitivity"],
-		["now", "--now"],
-		["type", "--type"],
-		["id", "--id"],
-		["subject", "--subject"],
-		["reason", "--reason"],
-		["decisionIdentity", "--decision-identity"],
-		["revision", "--revision"],
-		["status", "--status"],
-		["holderVersion", "--holder-version"],
-		["adapter", "--adapter"],
-		["adapterVersion", "--adapter-version"],
-		["surface", "--surface"],
-		["approval", "--approval"],
-		["body", "--body"],
-		["scope", "--scope"],
-		["traceVal", "--trace"],
-		["candidate", "--candidate"],
-		["holder", "--holder"],
-		["receiptHash", "--receipt-hash"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
-
-function targetValue(args) {
-	if (args.target === undefined || args.target === null) return { value: resolveTarget(args) };
-	const target = String(args.target);
-	if (target.trim().length === 0)
-		return { error: `--target must be non-empty; got ${JSON.stringify(args.target)}` };
-	return { value: target };
-}
-
-function requiredString(args, key, flag, example) {
-	const value = args[key] === undefined ? null : String(args[key]);
-	if (value === null || value.trim().length === 0) {
-		return {
-			error: `${flag} is required and must be non-empty (e.g. ${flag} ${example}); got ${JSON.stringify(args[key])}`,
-		};
-	}
-	return { value };
+	return firstMissingFlagValue(args, VALUE_FLAGS);
 }
 
 // Grammar: <type>:<identity>@<revision> — one committed record pin.
@@ -90,23 +75,6 @@ function parsePolicyPin(raw) {
 		};
 	}
 	return { value: { identity: match[1], revision: Number(match[2]) } };
-}
-
-function resultEnvelope(result) {
-	return {
-		text: result.ok ? JSON.stringify(result.record, null, 2) : "",
-		errors: result.errors,
-		warnings: [],
-		exitCode: result.ok ? 0 : 1,
-		...(result.code ? { code: result.code } : {}),
-	};
-}
-
-function positiveInt(args, key, flag) {
-	const value = Number(args[key]);
-	if (!Number.isInteger(value) || value < 1)
-		return { error: `${flag} must be a positive integer; got ${JSON.stringify(args[key])}` };
-	return { value };
 }
 
 const dispatch = defineCommand({
@@ -169,13 +137,11 @@ const dispatch = defineCommand({
 				);
 			const target = targetValue(args);
 			if (target.error) return invalidArg(target.error);
-			let now;
-			if (args.now !== undefined) {
-				now = new Date(String(args.now));
-				if (Number.isNaN(now.getTime()))
-					return invalidArg(`--now must be an ISO-8601 timestamp; got ${JSON.stringify(args.now)}`);
-			}
-			return resultEnvelope(evaluateRetention(target.value, now ? { now } : {}));
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			return resultEnvelope(
+				evaluateRetention(target.value, clock.value ? { now: clock.value } : {}),
+			);
 		},
 		classifications: (args) => {
 			const { listClassifications } = require("./core/retention-registry");
@@ -353,14 +319,14 @@ const dispatch = defineCommand({
 			if (target.error) return invalidArg(target.error);
 			const id = requiredString(args, "id", "--id", "deletion/2026-08");
 			if (id.error) return invalidArg(id.error);
-			let now;
-			if (args.now !== undefined) {
-				now = new Date(String(args.now));
-				if (Number.isNaN(now.getTime()))
-					return invalidArg(`--now must be an ISO-8601 timestamp; got ${JSON.stringify(args.now)}`);
-			}
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
 			return resultEnvelope(
-				prepareDeletionCandidate(target.value, { id: id.value }, now ? { now } : {}),
+				prepareDeletionCandidate(
+					target.value,
+					{ id: id.value },
+					clock.value ? { now: clock.value } : {},
+				),
 			);
 		},
 		authorize: (args) => {

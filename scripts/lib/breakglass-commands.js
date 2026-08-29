@@ -6,78 +6,48 @@
 // --force ever routes into this surface.
 
 const { defineCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const {
+	readFailure,
+	invalidArg,
+	targetValue,
+	requiredString,
+	positiveInt,
+	clockValue,
+	resultEnvelope,
+	missingValueFlag: firstMissingFlagValue,
+} = require("./command-helpers");
 
 const READ_FAILURE_CODE = "AMBER_E_BREAKGLASS_CORRUPT";
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
+const VALUE_FLAGS = [
+	["id", "--id"],
+	["incident", "--incident"],
+	["purpose", "--purpose"],
+	["capability", "--capability"],
+	["exactTarget", "--exact-target"],
+	["scope", "--scope"],
+	["environment", "--environment"],
+	["risk", "--risk"],
+	["credential", "--credential"],
+	["validFrom", "--valid-from"],
+	["validUntil", "--valid-until"],
+	["reviewBy", "--review-by"],
+	["reason", "--reason"],
+	["request", "--request"],
+	["receipt", "--receipt"],
+	["outcome", "--outcome"],
+	["necessity", "--necessity"],
+	["impact", "--impact"],
+	["followUp", "--follow-up"],
+	["decisionIdentity", "--decision-identity"],
+	["revision", "--revision"],
+	["status", "--status"],
+	["now", "--now"],
+	["target", "--target"],
+];
 
 function missingValueFlag(args) {
-	const valueFlags = [
-		["id", "--id"],
-		["incident", "--incident"],
-		["purpose", "--purpose"],
-		["capability", "--capability"],
-		["exactTarget", "--exact-target"],
-		["scope", "--scope"],
-		["environment", "--environment"],
-		["risk", "--risk"],
-		["credential", "--credential"],
-		["validFrom", "--valid-from"],
-		["validUntil", "--valid-until"],
-		["reviewBy", "--review-by"],
-		["reason", "--reason"],
-		["request", "--request"],
-		["receipt", "--receipt"],
-		["outcome", "--outcome"],
-		["necessity", "--necessity"],
-		["impact", "--impact"],
-		["followUp", "--follow-up"],
-		["decisionIdentity", "--decision-identity"],
-		["revision", "--revision"],
-		["status", "--status"],
-		["now", "--now"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
-
-function targetValue(args) {
-	if (args.target === undefined || args.target === null) return { value: resolveTarget(args) };
-	const target = String(args.target);
-	if (target.trim().length === 0)
-		return { error: `--target must be non-empty; got ${JSON.stringify(args.target)}` };
-	return { value: target };
-}
-
-function requiredString(args, key, flag, example) {
-	const value = args[key] === undefined ? null : String(args[key]);
-	if (value === null || value.trim().length === 0) {
-		return {
-			error: `${flag} is required and must be non-empty (e.g. ${flag} ${example}); got ${JSON.stringify(args[key])}`,
-		};
-	}
-	return { value };
-}
-
-function positiveInt(args, key, flag) {
-	const value = Number(args[key]);
-	if (!Number.isInteger(value) || value < 1)
-		return { error: `${flag} must be a positive integer; got ${JSON.stringify(args[key])}` };
-	return { value };
-}
-
-function clockValue(args) {
-	if (args.now === undefined) return { value: null };
-	const now = new Date(String(args.now));
-	if (Number.isNaN(now.getTime()))
-		return { error: `--now must be an ISO-8601 timestamp; got ${JSON.stringify(args.now)}` };
-	return { value: now };
+	return firstMissingFlagValue(args, VALUE_FLAGS);
 }
 
 // Grammar: one kind-prefixed registered-capability pin —
@@ -103,16 +73,6 @@ function parseCapabilityPin(raw) {
 	}
 	return {
 		error: `--capability must be runner:<runnerId>@<runnerVersion>/<name>@<capabilityVersion> or external:<effect-id>@<version>; got ${JSON.stringify(raw)}`,
-	};
-}
-
-function resultEnvelope(result) {
-	return {
-		text: result.ok ? JSON.stringify(result.record, null, 2) : "",
-		errors: result.errors,
-		warnings: [],
-		exitCode: result.ok ? 0 : 1,
-		...(result.code ? { code: result.code } : {}),
 	};
 }
 

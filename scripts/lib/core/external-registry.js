@@ -29,6 +29,13 @@ const {
 	acquireLedgerLock,
 	appendLedgerEvent,
 	credentialLeakProblem,
+	isPlainObject,
+	isNonEmptyString,
+	quotedList,
+	closedFieldProblem,
+	unknownFieldProblem,
+	decisionPinProblem,
+	resolveRegistrationDecision,
 } = require("./registry-ledger");
 const { compileInline } = require("./schema-contract");
 
@@ -106,7 +113,6 @@ const EFFECT_INPUT_FIELDS = Object.freeze([
 ]);
 const COMPENSATION_FIELDS = Object.freeze(["kind", "effect"]);
 const ADAPTER_PIN_FIELDS = Object.freeze(["id", "version"]);
-const DECISION_PIN_FIELDS = Object.freeze(["identity", "revision"]);
 const DECISION_SNAPSHOT_FIELDS = Object.freeze([
 	"identity",
 	"revision",
@@ -160,40 +166,6 @@ function acquireEffectLock(cwd) {
 	});
 }
 
-function isPlainObject(value) {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNonEmptyString(value) {
-	return typeof value === "string" && value.trim().length > 0;
-}
-
-function quotedList(values) {
-	return values.map((value) => JSON.stringify(value)).join(", ");
-}
-
-function closedFieldProblem(value, fields, label) {
-	const unknown = Object.keys(value)
-		.filter((key) => !fields.includes(key))
-		.sort();
-	if (unknown.length > 0) {
-		return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
-	}
-	const missing = fields.filter((field) => !(field in value));
-	if (missing.length > 0) {
-		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed field set is ${fields.join(", ")}`;
-	}
-	return null;
-}
-
-function unknownFieldProblem(value, fields, label) {
-	const unknown = Object.keys(value)
-		.filter((key) => !fields.includes(key))
-		.sort();
-	if (unknown.length === 0) return null;
-	return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
-}
-
 // A registered name can never be an execution vector: URL schemes,
 // whitespace, shell metacharacters, and ".." traversal segments refuse.
 function slugProblem(value, label) {
@@ -245,16 +217,6 @@ function inputSchemaProblem(value, label) {
 	if (!isPlainObject(value))
 		return `${label} must be a JSON-schema object declaring the operation's payload shape`;
 	return credentialLeakProblem(JSON.stringify(value), label);
-}
-
-function decisionPinProblem(value) {
-	if (!isPlainObject(value)) return "decision must be an object carrying identity and revision";
-	const unknown = unknownFieldProblem(value, DECISION_PIN_FIELDS, "decision");
-	if (unknown !== null) return unknown;
-	if (!isNonEmptyString(value.identity)) return "decision.identity must be a non-empty string";
-	if (!Number.isInteger(value.revision) || value.revision < 1)
-		return "decision.revision must be a positive integer";
-	return null;
 }
 
 function decisionSnapshotProblem(value, label) {
@@ -386,37 +348,7 @@ const EFFECT_LEDGER = Object.freeze({
 // Registration authority mirrors the F052/F055 contract: a committed,
 // unscoped, human acceptance/approval Decision with a verified principal.
 function resolveEffectDecision(revisions, decision, label) {
-	const match = revisions.find(
-		(revision) =>
-			revision.type === "decision" &&
-			revision.identity === decision.identity &&
-			revision.revision === decision.revision,
-	);
-	if (!match)
-		return {
-			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} is not a committed Decision artifact`,
-		};
-	if ((match.scope ?? null) !== null)
-		return {
-			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} is scoped to ${JSON.stringify(match.scope)}; ${label} is repository-global and binds an unscoped Decision`,
-		};
-	if (!EXTERNAL_DECISION_KINDS.includes(match.decisionKind))
-		return {
-			problem: `${label} requires a human acceptance or approval Decision; ${JSON.stringify(decision.identity)}@${decision.revision} carries decisionKind ${JSON.stringify(match.decisionKind)}`,
-		};
-	const principal = match.principal?.id;
-	if (!isNonEmptyString(principal))
-		return {
-			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} carries no verified principal snapshot`,
-		};
-	return {
-		decision: {
-			identity: decision.identity,
-			revision: decision.revision,
-			decisionKind: match.decisionKind,
-			principal,
-		},
-	};
+	return resolveRegistrationDecision(revisions, decision, EXTERNAL_DECISION_KINDS, label);
 }
 
 // Single-use is scoped to the effect ledger domain, matching the

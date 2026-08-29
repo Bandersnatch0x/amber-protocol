@@ -6,69 +6,52 @@
 // is target-read-only, and never mutates canonical or target state.
 
 const { defineCommand } = require("./subcommand-dispatcher");
-const { resolveTarget, readFailure } = require("./command-helpers");
+const {
+	readFailure,
+	invalidArg,
+	targetValue,
+	requiredString,
+	positiveInt,
+	missingValueFlag: firstMissingFlagValue,
+} = require("./command-helpers");
 
 const READ_FAILURE_CODE = "AMBER_E_MAINTAIN_CORRUPT";
 const FINDING_READ_FAILURE_CODE = "AMBER_E_MAINTAIN_FINDING_CORRUPT";
 const PROPOSAL_READ_FAILURE_CODE = "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT";
 
-function invalidArg(message) {
-	return { text: "", errors: [message], warnings: [], exitCode: 1, code: "AMBER_E_INVALID_ARG" };
-}
+const VALUE_FLAGS = [
+	["id", "--id"],
+	["detectorVersion", "--detector-version"],
+	["metric", "--metric"],
+	["source", "--source"],
+	["baseline", "--baseline"],
+	["ruleVal", "--rule"],
+	["windowMs", "--window-ms"],
+	["scope", "--scope"],
+	["cooldownMs", "--cooldown-ms"],
+	["maxObservations", "--max-observations"],
+	["owner", "--owner"],
+	["policy", "--policy"],
+	["decisionIdentity", "--decision-identity"],
+	["revision", "--revision"],
+	["subject", "--subject"],
+	["windowFrom", "--window-from"],
+	["windowTo", "--window-to"],
+	["value", "--value"],
+	["observationHash", "--observation-hash"],
+	["fingerprint", "--fingerprint"],
+	["findingIndex", "--finding-index"],
+	["outcome", "--outcome"],
+	["reason", "--reason"],
+	["intent", "--intent"],
+	["evalVal", "--eval"],
+	["evalResult", "--eval-result"],
+	["limit", "--limit"],
+	["target", "--target"],
+];
 
 function missingValueFlag(args) {
-	const valueFlags = [
-		["id", "--id"],
-		["detectorVersion", "--detector-version"],
-		["metric", "--metric"],
-		["source", "--source"],
-		["baseline", "--baseline"],
-		["ruleVal", "--rule"],
-		["windowMs", "--window-ms"],
-		["scope", "--scope"],
-		["cooldownMs", "--cooldown-ms"],
-		["maxObservations", "--max-observations"],
-		["owner", "--owner"],
-		["policy", "--policy"],
-		["decisionIdentity", "--decision-identity"],
-		["revision", "--revision"],
-		["subject", "--subject"],
-		["windowFrom", "--window-from"],
-		["windowTo", "--window-to"],
-		["value", "--value"],
-		["observationHash", "--observation-hash"],
-		["fingerprint", "--fingerprint"],
-		["findingIndex", "--finding-index"],
-		["outcome", "--outcome"],
-		["reason", "--reason"],
-		["intent", "--intent"],
-		["evalVal", "--eval"],
-		["evalResult", "--eval-result"],
-		["limit", "--limit"],
-		["target", "--target"],
-	];
-	for (const [key, flag] of valueFlags) {
-		if (key in args && args[key] === undefined) return flag;
-	}
-	return null;
-}
-
-function targetValue(args) {
-	if (args.target === undefined || args.target === null) return { value: resolveTarget(args) };
-	const target = String(args.target);
-	if (target.trim().length === 0)
-		return { error: `--target must be non-empty; got ${JSON.stringify(args.target)}` };
-	return { value: target };
-}
-
-function requiredString(args, key, flag, example) {
-	const value = args[key] === undefined ? null : String(args[key]);
-	if (value === null || value.trim().length === 0) {
-		return {
-			error: `${flag} is required and must be non-empty (e.g. ${flag} ${example}); got ${JSON.stringify(args[key])}`,
-		};
-	}
-	return { value };
+	return firstMissingFlagValue(args, VALUE_FLAGS);
 }
 
 function requiredNumber(args, key, flag) {
@@ -78,13 +61,6 @@ function requiredNumber(args, key, flag) {
 	const value = Number(raw);
 	if (!Number.isFinite(value))
 		return { error: `${flag} must be a finite number; got ${JSON.stringify(raw)}` };
-	return { value };
-}
-
-function positiveInt(args, key, flag) {
-	const value = Number(args[key]);
-	if (!Number.isInteger(value) || value < 1)
-		return { error: `${flag} must be a positive integer; got ${JSON.stringify(args[key])}` };
 	return { value };
 }
 

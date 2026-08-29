@@ -254,6 +254,96 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 	}
 }
 
+// ── Shared registry validators (acceptance review S1) ───────────────────
+// The governed registries (maintain/retention/external/breakglass) share
+// one validation vocabulary: plain-object/non-empty-string primitives,
+// closed field sets, the {identity, revision} Decision pin, and the
+// committed-unscoped-human-Decision resolver. One canonical signature
+// lives here; per-registry latitude stays in the caller (labels, kind
+// sets, and error-code mapping).
+
+function isPlainObject(value) {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value) {
+	return typeof value === "string" && value.trim().length > 0;
+}
+
+function quotedList(values) {
+	return values.map((value) => JSON.stringify(value)).join(", ");
+}
+
+function closedFieldProblem(value, fields, label) {
+	const unknown = Object.keys(value)
+		.filter((key) => !fields.includes(key))
+		.sort();
+	if (unknown.length > 0) {
+		return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
+	}
+	const missing = fields.filter((field) => !(field in value));
+	if (missing.length > 0) {
+		return `${label} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed field set is ${fields.join(", ")}`;
+	}
+	return null;
+}
+
+function unknownFieldProblem(value, fields, label) {
+	const unknown = Object.keys(value)
+		.filter((key) => !fields.includes(key))
+		.sort();
+	if (unknown.length === 0) return null;
+	return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
+}
+
+function decisionPinProblem(value) {
+	if (!isPlainObject(value)) return "decision must be an object carrying identity and revision";
+	const unknown = unknownFieldProblem(value, ["identity", "revision"], "decision");
+	if (unknown !== null) return unknown;
+	if (!isNonEmptyString(value.identity)) return "decision.identity must be a non-empty string";
+	if (!Number.isInteger(value.revision) || value.revision < 1)
+		return "decision.revision must be a positive integer";
+	return null;
+}
+
+// Resolve one committed, unscoped Decision artifact revision whose kind
+// is inside the caller's closed human-authority set, freezing the
+// verified principal snapshot. Returns {decision} on success or
+// {problem} with the refusal text; the caller owns the error code.
+function resolveRegistrationDecision(revisions, decision, kinds, label) {
+	const match = revisions.find(
+		(revision) =>
+			revision.type === "decision" &&
+			revision.identity === decision.identity &&
+			revision.revision === decision.revision,
+	);
+	if (!match)
+		return {
+			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} is not a committed Decision artifact`,
+		};
+	if ((match.scope ?? null) !== null)
+		return {
+			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} is scoped to ${JSON.stringify(match.scope)}; ${label} is repository-global and binds an unscoped Decision`,
+		};
+	if (!kinds.includes(match.decisionKind))
+		return {
+			problem: `${label} requires a human acceptance or approval Decision; ${JSON.stringify(decision.identity)}@${decision.revision} carries decisionKind ${JSON.stringify(match.decisionKind)}`,
+		};
+	const principal = match.principal?.id;
+	if (!isNonEmptyString(principal))
+		return {
+			problem: `decision ${JSON.stringify(decision.identity)}@${decision.revision} carries no verified principal snapshot`,
+		};
+	return {
+		decision: {
+			identity: decision.identity,
+			revision: decision.revision,
+			decisionKind: match.decisionKind,
+			principal,
+		},
+	};
+}
+
 // Well-known credential shapes refuse in any ledger-bound field —
 // belt-and-braces on top of closed shapes that carry no handle slot.
 const CREDENTIAL_MATERIAL_PATTERN =
@@ -275,4 +365,11 @@ module.exports = {
 	appendWithinCeiling,
 	appendLedgerEvent,
 	credentialLeakProblem,
+	isPlainObject,
+	isNonEmptyString,
+	quotedList,
+	closedFieldProblem,
+	unknownFieldProblem,
+	decisionPinProblem,
+	resolveRegistrationDecision,
 };
