@@ -13,11 +13,13 @@ const { spawnSync } = require("node:child_process");
 const { admitArtifact } = require("../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../scripts/lib/core/principal-registry");
 const { registerAdapter } = require("../scripts/lib/core/adapter-registry");
-const { registerExternalEffect } = require("../scripts/lib/core/external-registry");
 const { grantsPath } = require("../scripts/lib/core/breakglass-registry");
 const {
+	registerExternalEffect,
 	proposeExternalEffect,
 	authorizeExternalEffect,
+	executeExternalEffect,
+	settleExternalExecution,
 } = require("../scripts/lib/core/external-registry");
 const { grantApproval } = require("../scripts/lib/core/approval-registry");
 
@@ -239,6 +241,12 @@ test("breakglass grants fails closed on a corrupt ledger", () => {
 	const corrupt = runCli(["breakglass", "grants", "--target", ".", "--json"], dir);
 	assert.equal(corrupt.status, 1);
 	assert.equal(envelope(corrupt).code, "AMBER_E_BREAKGLASS_CORRUPT");
+	const corruptStatus = runCli(
+		["breakglass", "status", "--target", ".", "--id", "breakglass/incident-42-restore", "--json"],
+		dir,
+	);
+	assert.equal(corruptStatus.status, 1);
+	assert.equal(envelope(corruptStatus).code, "AMBER_E_BREAKGLASS_CORRUPT");
 	const blocked = runCli(
 		grantArgs({ "--id": "breakglass/second", "--decision-identity": "decision/effect-1" }),
 		dir,
@@ -338,13 +346,140 @@ test("breakglass use spends the grant once against the authorized underlying req
 	);
 	assert.equal(ghost.status, 1);
 	assert.equal(envelope(ghost).code, "AMBER_E_BREAKGLASS_NOT_FOUND");
+
+	// Settlement binds the real underlying receipt through the CLI.
+	assert.equal(
+		executeExternalEffect(
+			dir,
+			{
+				id: "execution/1",
+				request: "request/1",
+				credential: {
+					purpose: "comment.create",
+					scope: "tracker/amber-protocol",
+					expiresAt: "2026-08-29T00:30:30.000Z",
+				},
+			},
+			{ now: new Date("2026-08-29T00:30:00.000Z") },
+		).ok,
+		true,
+	);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			{
+				id: "execution/1",
+				externalRecordId: "TRACK-1234",
+				requestDigest: `sha256:${"d".repeat(64)}`,
+				responseDigest: `sha256:${"e".repeat(64)}`,
+				declared: "committed",
+			},
+			{ now: new Date("2026-08-29T00:31:00.000Z") },
+		).ok,
+		true,
+	);
+	const settled = runCli(
+		[
+			"breakglass",
+			"settle",
+			"--target",
+			".",
+			"--id",
+			"breakglass/incident-42-restore",
+			"--receipt",
+			"execution/1",
+			"--now",
+			"2026-08-29T00:32:00.000Z",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(settled.status, 0, settled.stderr || settled.stdout);
+	assert.equal(payload(settled).settlement.outcome, "committed");
+
+	// The overdue post-review is a visible projection, and the review
+	// lands behind a fresh human Decision.
+	const overdue = runCli(
+		[
+			"breakglass",
+			"status",
+			"--target",
+			".",
+			"--id",
+			"breakglass/incident-42-restore",
+			"--now",
+			"2026-09-02T00:00:00.000Z",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(overdue.status, 0, overdue.stderr || overdue.stdout);
+	assert.equal(payload(overdue).reviewOverdue, true);
+	assert.equal(
+		admitArtifact(dir, {
+			type: "decision",
+			identity: "decision/breakglass-review-1",
+			body: "# review\n",
+			decisionKind: "approval",
+			principal: "legal@example.com",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+		}).ok,
+		true,
+	);
+	const reviewed = runCli(
+		[
+			"breakglass",
+			"review",
+			"--target",
+			".",
+			"--id",
+			"breakglass/incident-42-restore",
+			"--outcome",
+			"service restored",
+			"--necessity",
+			"release path was 40 minutes out",
+			"--impact",
+			"one ticket comment created",
+			"--follow-up",
+			"add a standing runbook",
+			"--decision-identity",
+			"decision/breakglass-review-1",
+			"--revision",
+			"1",
+			"--now",
+			"2026-09-02T00:00:00.000Z",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(reviewed.status, 0, reviewed.stderr || reviewed.stdout);
+	const finalStatus = runCli(
+		[
+			"breakglass",
+			"status",
+			"--target",
+			".",
+			"--id",
+			"breakglass/incident-42-restore",
+			"--now",
+			"2026-09-02T01:00:00.000Z",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(payload(finalStatus).reviewOverdue, false);
+	assert.equal(payload(finalStatus).reviewLate, true);
+	assert.equal(payload(finalStatus).review.followUp, "add a standing runbook");
 });
 
 test("breakglass help and unknown actions route through the shared dispatcher", () => {
 	const dir = mkTarget("help");
 	const help = runCli(["breakglass", "--help"], dir);
 	assert.equal(help.status, 0, help.stderr || help.stdout);
-	assert.match(help.stdout, /amber breakglass <grant\|revoke\|grants\|use\|show>/);
+	assert.match(
+		help.stdout,
+		/amber breakglass <grant\|revoke\|grants\|use\|show\|settle\|review\|status>/,
+	);
 	assert.match(help.stdout, /--review-by/);
 	assert.match(help.stdout, /never a flag, a reusable token, or an/);
 
@@ -352,6 +487,6 @@ test("breakglass help and unknown actions route through the shared dispatcher", 
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/breakglass requires grant, revoke, grants, use, or show/,
+		/breakglass requires grant, revoke, grants, use, show, settle, review, or status/,
 	);
 });

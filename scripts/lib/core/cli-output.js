@@ -309,6 +309,12 @@ const FLAG_SPECS = {
 	"--risk": { key: "risk" },
 	"--exact-target": { key: "exactTarget" },
 	"--review-by": { key: "reviewBy" },
+	// F057 ticket 3 (#294): post-review flags (--id, --outcome, --receipt,
+	// --decision-identity, --revision, and --now are shared with existing
+	// surfaces).
+	"--necessity": { key: "necessity" },
+	"--impact": { key: "impact" },
+	"--follow-up": { key: "followUp" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

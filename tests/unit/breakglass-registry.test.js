@@ -19,6 +19,9 @@ const path = require("node:path");
 
 const {
 	useBreakGlass,
+	settleBreakGlass,
+	reviewBreakGlass,
+	breakGlassStatus,
 	BREAKGLASS_SCHEMA_VERSION,
 	SUPPORTED_BREAKGLASS_SCHEMA_VERSIONS,
 	DEFAULT_MAX_BREAKGLASS_BYTES,
@@ -44,6 +47,8 @@ const {
 	registerExternalEffect,
 	proposeExternalEffect,
 	authorizeExternalEffect,
+	executeExternalEffect,
+	settleExternalExecution,
 } = require("../../scripts/lib/core/external-registry");
 const { grantApproval } = require("../../scripts/lib/core/approval-registry");
 const {
@@ -51,6 +56,8 @@ const {
 	registerRunnerCapability,
 	submitRunnerRequest,
 	authorizeRunnerRequest,
+	prepareRunnerExecution,
+	settleRunnerExecution,
 } = require("../../scripts/lib/core/runner-registry");
 const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
 
@@ -1146,4 +1153,478 @@ test("a runner-capability grant admits only the matching authorized runner reque
 	assert.equal(used.ok, true, (used.errors || []).join("; "));
 	assert.deepEqual(used.record.use.reference, { kind: "runner", id: hash });
 	assert.equal(used.record.use.requestHash, hash);
+});
+
+// ---------------------------------------------------------------------------
+// F057 T3 (#294) — outcome settlement linkage & mandatory post-review.
+// ---------------------------------------------------------------------------
+
+test("settlement binds the used grant to the real underlying receipt", () => {
+	const dir = mkTarget("settle");
+	usableGrantFixture(dir);
+	assert.equal(
+		registerPrincipal(dir, { id: "auditor@example.com", principalKind: "service" }).ok,
+		true,
+	);
+	// Settlement follows use.
+	const premature = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: "execution/1" },
+		{ now: USE_AT },
+	);
+	assert.equal(premature.ok, false);
+	assert.match(premature.errors[0], /was never used; settlement follows use/);
+	assert.equal(
+		useBreakGlass(
+			dir,
+			{ id: "breakglass/incident-42-restore", reference: "request/1" },
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	// A claim without a real reference refuses.
+	const ghost = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: "execution/ghost" },
+		{ now: USE_AT },
+	);
+	assert.equal(ghost.ok, false);
+	assert.match(ghost.errors[0], /never substitutes a claim for execution Evidence/);
+	// The underlying execution must be SETTLED first: missing output
+	// never means success.
+	assert.equal(
+		executeExternalEffect(
+			dir,
+			{
+				id: "execution/1",
+				request: "request/1",
+				credential: {
+					purpose: "comment.create",
+					scope: "tracker/amber-protocol",
+					expiresAt: new Date(USE_AT.getTime() + 30_000).toISOString(),
+				},
+			},
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	const unsettled = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: "execution/1" },
+		{ now: USE_AT },
+	);
+	assert.equal(unsettled.ok, false);
+	assert.match(unsettled.errors[0], /is not settled; missing output never means success/);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			{
+				id: "execution/1",
+				externalRecordId: "TRACK-1234",
+				requestDigest: `sha256:${"d".repeat(64)}`,
+				responseDigest: `sha256:${"e".repeat(64)}`,
+				declared: "committed",
+			},
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	// An execution settling a DIFFERENT request refuses: the receipt must
+	// settle exactly the admitted request.
+	assert.equal(
+		proposeExternalEffect(
+			dir,
+			{
+				id: "request/other",
+				effect: { id: "effect/ticket-comment", version: "1" },
+				payloadHash: `sha256:${"9".repeat(64)}`,
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/external-other",
+				approver: "bob@example.com",
+				scope: null,
+				subject: `external-effect:${showBreakGlassGrant(dir, "breakglass/incident-42-restore", { now: USE_AT }) && require("../../scripts/lib/core/external-registry").showExternalProposal(dir, "request/other").requestHash}`,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		authorizeExternalEffect(
+			dir,
+			{
+				id: "request/other",
+				approval: "approval/external-other",
+				decisionIdentity: "decision/external-consume-other",
+				body: "# Authorize\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		executeExternalEffect(
+			dir,
+			{
+				id: "execution/other",
+				request: "request/other",
+				credential: {
+					purpose: "comment.create",
+					scope: "tracker/amber-protocol",
+					expiresAt: new Date(USE_AT.getTime() + 30_000).toISOString(),
+				},
+			},
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			{
+				id: "execution/other",
+				externalRecordId: "TRACK-OTHER",
+				requestDigest: `sha256:${"d".repeat(64)}`,
+				responseDigest: `sha256:${"e".repeat(64)}`,
+				declared: "committed",
+			},
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	const wrongRequest = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: "execution/other" },
+		{ now: USE_AT },
+	);
+	assert.equal(wrongRequest.ok, false);
+	assert.match(wrongRequest.errors[0], /settles request "request\/other", not the admitted/);
+	const settled = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: "execution/1" },
+		{ now: USE_AT },
+	);
+	assert.equal(settled.ok, true, (settled.errors || []).join("; "));
+	assert.deepEqual(settled.record.settlement.receipt, { kind: "external", id: "execution/1" });
+	assert.equal(settled.record.settlement.outcome, "committed");
+	assert.deepEqual(settled.record.settlement.remedy, { kind: "irreversible", reference: null });
+	const again = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: "execution/1" },
+		{ now: USE_AT },
+	);
+	assert.equal(again.ok, false);
+	assert.match(again.errors[0], /already settled; emergency history is never rewritten/);
+});
+
+test("a runner settlement links the derived terminal status and rollback declaration", () => {
+	const dir = mkTarget("runner-settle");
+	decisionsFixture(dir, ["decision/breakglass-1", "decision/runner-1", "decision/cap-1"]);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(
+		registerPrincipal(dir, { id: "carol@example.com", principalKind: "human" }).ok,
+		true,
+	);
+	const DIGEST = `sha256:${"a".repeat(64)}`;
+	assert.equal(
+		registerRunner(dir, {
+			id: "runner/ci",
+			version: "1.0.0",
+			integrityDigest: DIGEST,
+			owner: "platform-team",
+			decision: { identity: "decision/runner-1", revision: 1 },
+		}).ok,
+		true,
+	);
+	assert.equal(
+		registerRunnerCapability(dir, {
+			runnerId: "runner/ci",
+			runnerVersion: "1.0.0",
+			name: "deploy.staging-web",
+			capabilityVersion: "1",
+			effects: ["deploy"],
+			pathPrefixes: ["deploy/staging"],
+			timeoutMsMax: 600_000,
+			credentialRequirement: "scoped",
+			rollback: "runbook/staging-rollback",
+			decision: { identity: "decision/cap-1", revision: 1 },
+		}).ok,
+		true,
+	);
+	assert.equal(
+		recordEvidence(dir, {
+			id: "evidence/rehearsal-1",
+			producer: "carol@example.com",
+			assurance: "observed",
+			scope: "F052",
+			subject: "staging rollback rehearsal",
+			inputs: null,
+			tools: null,
+			environment: null,
+			outputs: null,
+			status: "pass",
+		}).ok,
+		true,
+	);
+	assert.equal(
+		grantBreakGlass(
+			dir,
+			grantInput({
+				capability: {
+					kind: "runner",
+					runnerId: "runner/ci",
+					runnerVersion: "1.0.0",
+					name: "deploy.staging-web",
+					capabilityVersion: "1",
+				},
+				target: "repo/main",
+				scope: "deploy",
+				environment: "staging",
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const submitted = submitRunnerRequest(
+		dir,
+		{
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "deploy.staging-web",
+				capabilityVersion: "1",
+			},
+			target: { repository: "repo/main", paths: ["deploy/staging/web"] },
+			scope: "deploy",
+			environment: "staging",
+			inputHashes: [`sha256:${"b".repeat(64)}`],
+			timeoutMs: 300_000,
+			effects: ["deploy"],
+			credentialRequirement: "scoped",
+			credential: {
+				handle: "cred-7f3a",
+				purpose: "staging-deploy",
+				scope: "deploy/staging",
+				expiresAt: new Date(NOW.getTime() + 12 * HOUR_MS).toISOString(),
+			},
+			rehearsal: "evidence/rehearsal-1",
+			rollback: "runbook/staging-rollback",
+		},
+		{ now: NOW },
+	);
+	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
+	const hash = submitted.record.requestHash;
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/req-1",
+				approver: "bob@example.com",
+				scope: null,
+				subject: submitted.record.approvalBinding,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		authorizeRunnerRequest(
+			dir,
+			{
+				requestHash: hash,
+				approval: "approval/req-1",
+				decisionIdentity: "decision/req-1",
+				body: "# Authorize request\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+				scope: null,
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		useBreakGlass(dir, { id: "breakglass/incident-42-restore", reference: hash }, { now: USE_AT })
+			.ok,
+		true,
+	);
+	// A receipt other than the admitted request hash refuses.
+	const wrongReceipt = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: `sha256:${"1".repeat(64)}` },
+		{ now: USE_AT },
+	);
+	assert.equal(wrongReceipt.ok, false);
+	assert.match(wrongReceipt.errors[0], /is not the admitted request/);
+	// A non-terminal execution has no outcome to link yet.
+	const RUNNER_PIN = { id: "runner/ci", version: "1.0.0", integrityDigest: DIGEST };
+	assert.equal(
+		prepareRunnerExecution(dir, { requestHash: hash, runner: { ...RUNNER_PIN } }).ok,
+		true,
+	);
+	const unterminated = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: hash },
+		{ now: USE_AT },
+	);
+	assert.equal(unterminated.ok, false);
+	assert.match(unterminated.errors[0], /has no terminal outcome yet/);
+	const runnerSettled = settleRunnerExecution(dir, {
+		requestHash: hash,
+		receipt: {
+			runner: { ...RUNNER_PIN },
+			exitCode: 1,
+			signal: null,
+			timedOut: false,
+			startedAt: new Date(USE_AT.getTime() + 1_000).toISOString(),
+			finishedAt: new Date(USE_AT.getTime() + 2_000).toISOString(),
+			durationMs: 1_000,
+			outputsDigest: DIGEST,
+			scope: { repository: "repo/main", paths: ["deploy/staging/web"] },
+			sandboxAssurance: "observed",
+			credentialAssurance: "observed",
+		},
+	});
+	// A failed outcome is RECORDED and returned as its stable code —
+	// execution never reports fake success, and no attempt disappears.
+	assert.equal(runnerSettled.ok, false);
+	assert.equal(runnerSettled.code, "AMBER_E_RUNNER_EXECUTION_FAILED");
+	assert.equal(runnerSettled.record.status, "failed");
+	// A FAILED underlying outcome records — an emergency attempt cannot
+	// disappear — and the declared rollback runbook rides the remedy.
+	const settled = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: hash },
+		{ now: USE_AT },
+	);
+	assert.equal(settled.ok, true, (settled.errors || []).join("; "));
+	assert.equal(settled.record.settlement.outcome, "failed");
+	assert.deepEqual(settled.record.settlement.remedy, {
+		kind: "rollback",
+		reference: "runbook/staging-rollback",
+	});
+});
+
+test("the mandatory post-review lands against the declared deadline", () => {
+	const dir = mkTarget("review");
+	grantFixture(dir, ["decision/breakglass-1", "decision/effect-1", "decision/breakglass-review-1"]);
+	assert.equal(grantBreakGlass(dir, grantInput(), { now: NOW }).ok, true);
+	const reviewInput = (overrides = {}) => ({
+		id: "breakglass/incident-42-restore",
+		outcome: "service restored",
+		necessity: "release path was 40 minutes out",
+		impact: "one ticket comment created",
+		followUp: "add a standing runbook",
+		decision: { identity: "decision/breakglass-review-1", revision: 1 },
+		...overrides,
+	});
+	// A review before the grant ended refuses.
+	const early = reviewBreakGlass(dir, reviewInput(), { now: USE_AT });
+	assert.equal(early.ok, false);
+	assert.match(early.errors[0], /has not ended; a post-review follows use, revocation, or expiry/);
+	// A grant Decision cannot double as the review Decision.
+	const afterExpiry = new Date(NOW.getTime() + 2 * HOUR_MS);
+	const reused = reviewBreakGlass(
+		dir,
+		reviewInput({ decision: { identity: "decision/breakglass-1", revision: 1 } }),
+		{ now: afterExpiry },
+	);
+	assert.equal(reused.ok, false);
+	assert.match(reused.errors[0], /already authorized grant .*single-use/);
+	// An empty field refuses: a post-review is accountable.
+	const empty = reviewBreakGlass(dir, reviewInput({ necessity: " " }), { now: afterExpiry });
+	assert.equal(empty.ok, false);
+	assert.match(empty.errors[0], /must preserve a non-empty necessity/);
+	// Overdue is a visible read-time projection before the review lands.
+	const pastDeadline = new Date(NOW.getTime() + 73 * HOUR_MS);
+	assert.equal(
+		breakGlassStatus(dir, "breakglass/incident-42-restore", { now: pastDeadline }).reviewOverdue,
+		true,
+	);
+	assert.equal(
+		breakGlassStatus(dir, "breakglass/incident-42-restore", { now: USE_AT }).reviewOverdue,
+		false,
+	);
+	// A late review is still recordable — and reads flagged; the boundary
+	// is half-open (exactly reviewBy is late).
+	const exactlyDeadline = new Date(NOW.getTime() + 72 * HOUR_MS);
+	assert.equal(exactlyDeadline.toISOString(), grantInput().reviewBy);
+	const late = reviewBreakGlass(dir, reviewInput(), { now: pastDeadline });
+	assert.equal(late.ok, true, (late.errors || []).join("; "));
+	const status = breakGlassStatus(dir, "breakglass/incident-42-restore", { now: pastDeadline });
+	assert.equal(status.review.necessity, "release path was 40 minutes out");
+	assert.equal(status.reviewOverdue, false);
+	assert.equal(status.reviewLate, true);
+	assert.equal(Date.parse(status.review.at) >= Date.parse(status.reviewBy), true);
+	const again = reviewBreakGlass(dir, reviewInput(), { now: pastDeadline });
+	assert.equal(again.ok, false);
+	assert.match(again.errors[0], /already reviewed; one post-review per grant/);
+	assert.equal(breakGlassStatus(dir, "breakglass/ghost", { now: NOW }), null);
+});
+
+test("re-chained settlement and review forgeries fail every read closed", () => {
+	const dir = mkTarget("t3-tamper");
+	grantFixture(dir);
+	assert.equal(grantBreakGlass(dir, grantInput(), { now: NOW }).ok, true);
+	const pristine = readEvents(grantsPath(dir));
+	// A validly re-chained settlement of an unused grant fails the fold.
+	const forgedSettlement = {
+		kind: "settlement",
+		schemaVersion: 1,
+		at: NOW.toISOString(),
+		id: "breakglass/incident-42-restore",
+		receipt: { kind: "external", id: "execution/forged" },
+		outcome: "committed",
+		remedy: { kind: "irreversible", reference: null },
+		prevHash: pristine[0].hash,
+	};
+	forgedSettlement.hash = chainHash(forgedSettlement, forgedSettlement.prevHash);
+	writeEvents(grantsPath(dir), [...pristine, forgedSettlement]);
+	assert.throws(
+		() => listBreakGlassGrants(dir, { now: NOW }),
+		(err) =>
+			err.amberCode === "AMBER_E_BREAKGLASS_CORRUPT" &&
+			/settles an unused grant; settlement follows use/.test(err.message),
+	);
+	// A validly re-chained settlement through the WRONG capability kind
+	// fails the re-derivation even when the grant was used: the receipt
+	// kind is in-ledger derivable. (Covered indirectly by the unused
+	// refusal above for this fixture; the kind check is exercised by the
+	// runner-vs-external settlement suites.)
+	// A validly re-chained review before the grant ended fails the fold:
+	// the review instant is re-derivable against the window.
+	const forgedReview = {
+		kind: "review",
+		schemaVersion: 1,
+		at: NOW.toISOString(),
+		id: "breakglass/incident-42-restore",
+		outcome: "fine",
+		necessity: "none",
+		impact: "none",
+		followUp: "none",
+		decision: {
+			identity: "decision/forged",
+			revision: 1,
+			decisionKind: "approval",
+			principal: "legal@example.com",
+		},
+		prevHash: pristine[0].hash,
+	};
+	forgedReview.hash = chainHash(forgedReview, forgedReview.prevHash);
+	writeEvents(grantsPath(dir), [...pristine, forgedReview]);
+	assert.throws(
+		() => listBreakGlassGrants(dir, { now: NOW }),
+		(err) =>
+			err.amberCode === "AMBER_E_BREAKGLASS_CORRUPT" &&
+			/reviews grant .* before it ended/.test(err.message),
+	);
 });

@@ -1588,9 +1588,9 @@ Error codes: `AMBER_E_EXTERNAL_INVALID`, `AMBER_E_EXTERNAL_CORRUPT`, `AMBER_E_EX
 `AMBER_E_EXTERNAL_EXEC_LOCK`, `AMBER_E_EXTERNAL_EXEC_SIZE_CEILING`,
 `AMBER_E_EXTERNAL_CREDENTIAL_LEAK`.
 
-### breakglass grant / revoke / grants / use / show
+### breakglass grant / revoke / grants / use / show / settle / review / status
 
-Grant, use, revoke, and list break-glass authorizations (F057 T1-T2). Break-glass is a distinct, one-use
+Grant, use, settle, review, and list break-glass authorizations (F057 T1-T3). Break-glass is a distinct, one-use
 HUMAN authorization for a production emergency — never a flag, a reusable token, or an
 Agent-granted exception, and neither `--yes` nor `--force` ever routes here. A grant is limited by
 one registered capability — an F052 runner capability pin
@@ -1635,6 +1635,21 @@ cannot be revoked or re-used, `used` wins the read-time status derivation, and `
 grant with its use, revocation, and window state. Nothing under this command executes anything —
 the underlying capability still runs only through its own governed F052/F056 surface.
 
+An emergency attempt cannot disappear (T3): `settle` binds the used grant to the REAL underlying
+receipt — an F056 execution id (which must settle the admitted request) or the F052 runner request
+hash — and derives the outcome (including failures and partial outcomes) plus the declared
+rollback/compensation linkage from the underlying registry, never from the caller; a claim without
+a resolvable reference refuses (break-glass never substitutes a claim for execution Evidence), an
+unsettled underlying execution refuses, and one settlement per grant records immutably. `review`
+is the mandatory human post-review: `--outcome`, `--necessity`, `--impact`, and `--follow-up`
+(non-empty, preserved, leak-checked) behind a single-use committed human Decision, valid only
+after the grant ENDED through use, revocation, or expiry (a re-chained review before the end fails
+every read closed) — one review per grant, and a late review is still recordable but reads
+flagged. `status` projects the full lifecycle at the injected clock: the grant with its use,
+settlement, and review plus read-time `reviewOverdue` (ended + past `reviewBy` + unreviewed) and
+`reviewLate` flags — Policy consumers can fail closed on an overdue review, so review can never be
+silently skipped.
+
 ```bash
 node scripts/amber.js breakglass grant --target . --id breakglass/incident-42-restore \
   --incident incident/42 --purpose restore-login-service \
@@ -1652,6 +1667,14 @@ node scripts/amber.js breakglass use --target . --id breakglass/incident-42-rest
   --request request/ticket-comment-288 --now 2026-08-29T00:30:00.000Z --json
 node scripts/amber.js breakglass show --target . --id breakglass/incident-42-restore \
   --now 2026-08-29T00:30:00.000Z --json
+node scripts/amber.js breakglass settle --target . --id breakglass/incident-42-restore \
+  --receipt execution/ticket-comment-1 --json
+node scripts/amber.js breakglass review --target . --id breakglass/incident-42-restore \
+  --outcome "service restored" --necessity "release path was 40 minutes out" \
+  --impact "one ticket comment created" --follow-up "add a standing runbook" \
+  --decision-identity decision/breakglass-review-42 --revision 1 --json
+node scripts/amber.js breakglass status --target . --id breakglass/incident-42-restore \
+  --now 2026-09-01T00:00:00.000Z --json
 ```
 
 Error codes: `AMBER_E_BREAKGLASS_INVALID`, `AMBER_E_BREAKGLASS_NOT_FOUND`,

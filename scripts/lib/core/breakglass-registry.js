@@ -19,8 +19,16 @@ const { readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
-const { resolveRequestCapability, showRunnerRequest } = require("./runner-registry");
-const { showExternalEffect, showExternalProposal } = require("./external-registry");
+const {
+	resolveRequestCapability,
+	showRunnerRequest,
+	showRunnerExecution,
+} = require("./runner-registry");
+const {
+	showExternalEffect,
+	showExternalProposal,
+	showExternalExecution,
+} = require("./external-registry");
 const {
 	GENESIS_HASH,
 	chainHash,
@@ -110,6 +118,17 @@ function unknownFieldProblem(value, fields, label) {
 	return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
 }
 
+// The shared refusal shape for a slug-validated input field: a leak
+// carries its dedicated code, every other slug problem is invalid.
+function slugRefusal(value, label) {
+	const problem = slugProblem(value, label);
+	if (problem === null) return null;
+	return {
+		code: /credential material/.test(problem) ? BREAKGLASS_LEAK_CODE : BREAKGLASS_INVALID_CODE,
+		message: problem,
+	};
+}
+
 function slugProblem(value, label) {
 	if (!isNonEmptyString(value)) return `${label} must be a non-empty string`;
 	if (value.includes("://"))
@@ -179,6 +198,34 @@ const USE_EVENT_FIELDS = Object.freeze([
 ]);
 const USE_REFERENCE_FIELDS = Object.freeze(["kind", "id"]);
 const REQUEST_HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
+const SETTLEMENT_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"receipt",
+	"outcome",
+	"remedy",
+	"prevHash",
+	"hash",
+]);
+const SETTLEMENT_RECEIPT_FIELDS = Object.freeze(["kind", "id"]);
+const REMEDY_FIELDS = Object.freeze(["kind", "reference"]);
+const REMEDY_KINDS = Object.freeze(["rollback", "compensation", "irreversible"]);
+const REVIEW_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"outcome",
+	"necessity",
+	"impact",
+	"followUp",
+	"decision",
+	"prevHash",
+	"hash",
+]);
+const REVIEW_TEXT_FIELDS = Object.freeze(["outcome", "necessity", "impact", "followUp"]);
 
 function capabilityPinProblem(value, label) {
 	if (!isPlainObject(value)) return `${label} must be an object`;
@@ -275,6 +322,59 @@ function grantEventProblem(event, lineIndex) {
 		if (leak !== null) return leak;
 		return decisionSnapshotProblem(event.decision, `${label}.decision`);
 	}
+	if (event.kind === "settlement") {
+		const closed = closedFieldProblem(event, SETTLEMENT_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		const at = isoProblem(event.at, `${label}.at`);
+		if (at !== null) return at;
+		if (!isNonEmptyString(event.id)) return `${label}.id must be a non-empty string`;
+		if (!isPlainObject(event.receipt)) return `${label}.receipt must be an object`;
+		const receiptClosed = closedFieldProblem(
+			event.receipt,
+			SETTLEMENT_RECEIPT_FIELDS,
+			`${label}.receipt`,
+		);
+		if (receiptClosed !== null) return receiptClosed;
+		if (!BREAKGLASS_CAPABILITY_KINDS.includes(event.receipt.kind))
+			return `${label}.receipt.kind must be one of ${BREAKGLASS_CAPABILITY_KINDS.join(", ")}`;
+		if (!isNonEmptyString(event.receipt.id))
+			return `${label}.receipt.id must be a non-empty string`;
+		const receiptLeak = credentialLeakProblem(event.receipt.id, `${label}.receipt.id`);
+		if (receiptLeak !== null) return receiptLeak;
+		if (!isNonEmptyString(event.outcome))
+			return `${label}.outcome must record the underlying outcome; an emergency attempt cannot disappear`;
+		const outcomeLeak = credentialLeakProblem(event.outcome, `${label}.outcome`);
+		if (outcomeLeak !== null) return outcomeLeak;
+		if (!isPlainObject(event.remedy)) return `${label}.remedy must be an object`;
+		const remedyClosed = closedFieldProblem(event.remedy, REMEDY_FIELDS, `${label}.remedy`);
+		if (remedyClosed !== null) return remedyClosed;
+		if (!REMEDY_KINDS.includes(event.remedy.kind))
+			return `${label}.remedy.kind must be one of ${REMEDY_KINDS.join(", ")}`;
+		if (event.remedy.kind === "irreversible") {
+			if (event.remedy.reference !== null)
+				return `${label}.remedy declares irreversibility and carries no reference`;
+		} else if (!isNonEmptyString(event.remedy.reference)) {
+			return `${label}.remedy.reference must name the declared rollback or compensation`;
+		} else {
+			const remedyLeak = credentialLeakProblem(event.remedy.reference, `${label}.remedy.reference`);
+			if (remedyLeak !== null) return remedyLeak;
+		}
+		return null;
+	}
+	if (event.kind === "review") {
+		const closed = closedFieldProblem(event, REVIEW_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		const at = isoProblem(event.at, `${label}.at`);
+		if (at !== null) return at;
+		if (!isNonEmptyString(event.id)) return `${label}.id must be a non-empty string`;
+		for (const field of REVIEW_TEXT_FIELDS) {
+			if (!isNonEmptyString(event[field]))
+				return `${label}.${field} must preserve a non-empty ${field}; a post-review is accountable`;
+			const leak = credentialLeakProblem(event[field], `${label}.${field}`);
+			if (leak !== null) return leak;
+		}
+		return decisionSnapshotProblem(event.decision, `${label}.decision`);
+	}
 	const closed = closedFieldProblem(event, USE_EVENT_FIELDS, label);
 	if (closed !== null) return closed;
 	const at = isoProblem(event.at, `${label}.at`);
@@ -317,7 +417,7 @@ function foldGrants(cwd) {
 			throw breakglassCorrupt(
 				`break-glass event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
 			);
-		if (!["grant", "revoke", "use"].includes(event.kind))
+		if (!["grant", "revoke", "use", "settlement", "review"].includes(event.kind))
 			throw breakglassCorrupt(
 				`break-glass event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
 			);
@@ -329,7 +429,15 @@ function foldGrants(cwd) {
 					`break-glass event ${lineIndex} reuses grant id ${JSON.stringify(event.id)}`,
 				);
 			const { prevHash: _prev, hash: _hash, at, ...body } = event;
-			const grant = { ...body, grantedAt: at, revocation: null, use: null, index };
+			const grant = {
+				...body,
+				grantedAt: at,
+				revocation: null,
+				use: null,
+				settlement: null,
+				review: null,
+				index,
+			};
 			grants.push(grant);
 			byId.set(event.id, grant);
 		} else if (event.kind === "revoke") {
@@ -347,7 +455,7 @@ function foldGrants(cwd) {
 					`break-glass event ${lineIndex} revokes a used grant; a spent authorization already ended through use`,
 				);
 			grant.revocation = { at: event.at, reason: event.reason, decision: event.decision };
-		} else {
+		} else if (event.kind === "use") {
 			const grant = byId.get(event.id);
 			if (!grant)
 				throw breakglassCorrupt(
@@ -377,6 +485,67 @@ function foldGrants(cwd) {
 					`break-glass event ${lineIndex} uses grant ${JSON.stringify(event.id)} outside its validity window`,
 				);
 			grant.use = { at: event.at, reference: event.reference, requestHash: event.requestHash };
+		}
+		if (event.kind === "settlement") {
+			const grant = byId.get(event.id);
+			if (!grant)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} settles unknown grant ${JSON.stringify(event.id)}`,
+				);
+			if (grant.use === null)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} settles an unused grant; settlement follows use`,
+				);
+			if (grant.settlement !== null)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} re-settles grant ${JSON.stringify(event.id)}; emergency history is never rewritten`,
+				);
+			if (event.receipt.kind !== grant.capability.kind)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} settles grant ${JSON.stringify(event.id)} through a ${JSON.stringify(event.receipt.kind)} receipt, not the granted ${JSON.stringify(grant.capability.kind)} capability`,
+				);
+			// A runner receipt IS the admitted request hash — in-ledger
+			// derivable, so a validly re-chained swap fails the read.
+			if (event.receipt.kind === "runner" && event.receipt.id !== grant.use.reference.id)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} settles grant ${JSON.stringify(event.id)} against receipt ${JSON.stringify(event.receipt.id)}, not the admitted request ${JSON.stringify(grant.use.reference.id)}`,
+				);
+			grant.settlement = {
+				at: event.at,
+				receipt: event.receipt,
+				outcome: event.outcome,
+				remedy: event.remedy,
+			};
+		}
+		if (event.kind === "review") {
+			const grant = byId.get(event.id);
+			if (!grant)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} reviews unknown grant ${JSON.stringify(event.id)}`,
+				);
+			if (grant.review !== null)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} re-reviews grant ${JSON.stringify(event.id)}; one post-review per grant`,
+				);
+			// A review lands only after the grant ENDED: through use,
+			// revocation, or expiry (re-derivable from the review instant
+			// against the window).
+			if (
+				grant.use === null &&
+				grant.revocation === null &&
+				Date.parse(event.at) < Date.parse(grant.validUntil)
+			)
+				throw breakglassCorrupt(
+					`break-glass event ${lineIndex} reviews grant ${JSON.stringify(event.id)} before it ended; a post-review follows use, revocation, or expiry`,
+				);
+			grant.review = {
+				at: event.at,
+				outcome: event.outcome,
+				necessity: event.necessity,
+				impact: event.impact,
+				followUp: event.followUp,
+				decision: event.decision,
+			};
 		}
 		prevHash = event.hash;
 	});
@@ -452,8 +621,9 @@ function resolveGrantDecision(revisions, decision, label) {
 }
 
 // Single-use is scoped to the grant ledger domain, matching the
-// per-registry mirror convention — and it spans BOTH event kinds: one
-// Decision can authorize one grant or one revocation, never two acts.
+// per-registry mirror convention — and it spans EVERY Decision-bearing
+// event kind: one Decision authorizes one act (a grant, a revocation, or
+// a post-review), never two.
 function grantDecisionSpender(grants, decision) {
 	for (const grant of grants) {
 		if (
@@ -467,6 +637,12 @@ function grantDecisionSpender(grants, decision) {
 			grant.revocation.decision.revision === decision.revision
 		)
 			return `the revocation of grant ${JSON.stringify(grant.id)}`;
+		if (
+			grant.review !== null &&
+			grant.review.decision.identity === decision.identity &&
+			grant.review.decision.revision === decision.revision
+		)
+			return `the post-review of grant ${JSON.stringify(grant.id)}`;
 	}
 	return null;
 }
@@ -643,12 +819,8 @@ function revokeBreakGlass(cwd, input = {}, opts = {}) {
 		return fail(BREAKGLASS_INVALID_CODE, ["now must be a valid clock"]);
 	const inputClosed = unknownFieldProblem(input, ["id", "reason", "decision"], "revoke input");
 	if (inputClosed !== null) return fail(BREAKGLASS_INVALID_CODE, [inputClosed]);
-	const idSlug = slugProblem(input.id, "id");
-	if (idSlug !== null)
-		return fail(
-			/credential material/.test(idSlug) ? BREAKGLASS_LEAK_CODE : BREAKGLASS_INVALID_CODE,
-			[idSlug],
-		);
+	const idRefusal = slugRefusal(input.id, "id");
+	if (idRefusal !== null) return fail(idRefusal.code, [idRefusal.message]);
 	if (!isNonEmptyString(input.reason))
 		return fail(BREAKGLASS_INVALID_CODE, [
 			"reason must preserve a non-empty reason; a revocation is accountable",
@@ -798,12 +970,8 @@ function useBreakGlass(cwd, input = {}, opts = {}) {
 		return fail(BREAKGLASS_INVALID_CODE, ["now must be a valid clock"]);
 	const inputClosed = unknownFieldProblem(input, ["id", "reference"], "use input");
 	if (inputClosed !== null) return fail(BREAKGLASS_INVALID_CODE, [inputClosed]);
-	const idSlug = slugProblem(input.id, "id");
-	if (idSlug !== null)
-		return fail(
-			/credential material/.test(idSlug) ? BREAKGLASS_LEAK_CODE : BREAKGLASS_INVALID_CODE,
-			[idSlug],
-		);
+	const idRefusal = slugRefusal(input.id, "id");
+	if (idRefusal !== null) return fail(idRefusal.code, [idRefusal.message]);
 	if (!isNonEmptyString(input.reference))
 		return fail(BREAKGLASS_INVALID_CODE, ["reference must be a non-empty string"]);
 	const referenceLeak = credentialLeakProblem(input.reference, "reference");
@@ -861,6 +1029,272 @@ function useBreakGlass(cwd, input = {}, opts = {}) {
 	);
 }
 
+// ---------------------------------------------------------------------------
+// F057 T3 (#294) — outcome settlement linkage & mandatory post-review.
+// An emergency attempt cannot disappear: settlement binds the used grant
+// to the REAL underlying receipt (failures and partials record), and the
+// mandatory human post-review lands against the declared deadline — an
+// overdue review is a visible read-time projection.
+// ---------------------------------------------------------------------------
+
+// Resolve the claimed receipt against the underlying registry and derive
+// the outcome and remedy from it — a claim without a real reference
+// refuses, and break-glass never substitutes a claim for execution
+// Evidence.
+function resolveSettlementReceipt(cwd, grant, receiptId) {
+	if (grant.capability.kind === "external") {
+		let execution;
+		try {
+			execution = showExternalExecution(cwd, receiptId);
+		} catch (err) {
+			return { problem: err.message || String(err), code: err.amberCode };
+		}
+		if (execution === null)
+			return {
+				problem: `execution ${JSON.stringify(receiptId)} does not exist; break-glass never substitutes a claim for execution Evidence`,
+			};
+		if (execution.request !== grant.use.reference.id)
+			return {
+				problem: `execution ${JSON.stringify(receiptId)} settles request ${JSON.stringify(execution.request)}, not the admitted ${JSON.stringify(grant.use.reference.id)}`,
+			};
+		if (execution.status !== "settled")
+			return {
+				problem: `execution ${JSON.stringify(receiptId)} is not settled; missing output never means success — settle the underlying execution first`,
+			};
+		if (execution.outcome === "unknown")
+			return {
+				problem: `execution ${JSON.stringify(receiptId)} settled unknown; an unknown outcome reconciles through independent Evidence before break-glass settles`,
+			};
+		let proposal;
+		try {
+			proposal = showExternalProposal(cwd, grant.use.reference.id);
+		} catch (err) {
+			return { problem: err.message || String(err), code: err.amberCode };
+		}
+		if (proposal === null)
+			return {
+				problem: `proposal ${JSON.stringify(grant.use.reference.id)} no longer resolves; break-glass never substitutes a claim for execution Evidence`,
+			};
+		return {
+			outcome: execution.outcome,
+			remedy:
+				proposal.compensation.kind === "irreversible"
+					? { kind: "irreversible", reference: null }
+					: { kind: "compensation", reference: proposal.compensation.effect },
+		};
+	}
+	if (receiptId !== grant.use.reference.id)
+		return {
+			problem: `runner receipt ${JSON.stringify(receiptId)} is not the admitted request ${JSON.stringify(grant.use.reference.id)}; a runner execution settles under its own request hash`,
+		};
+	let execution;
+	try {
+		execution = showRunnerExecution(cwd, receiptId);
+	} catch (err) {
+		return { problem: err.message || String(err), code: err.amberCode };
+	}
+	if (execution === null)
+		return {
+			problem: `runner execution ${JSON.stringify(receiptId)} does not exist; break-glass never substitutes a claim for execution Evidence`,
+		};
+	// The runner fold derives status (committed|timed-out|failed|
+	// rolled-back, or attempted for an aborted attempt) and terminality;
+	// an attempt that is not terminal has no outcome to link yet.
+	if (execution.terminal !== true)
+		return {
+			problem: `runner execution ${JSON.stringify(receiptId)} has no terminal outcome yet; settle the underlying execution first`,
+		};
+	let request;
+	try {
+		request = showRunnerRequest(cwd, receiptId);
+	} catch (err) {
+		return { problem: err.message || String(err), code: err.amberCode };
+	}
+	if (request === null)
+		return {
+			problem: `runner request ${JSON.stringify(receiptId)} no longer resolves; break-glass never substitutes a claim for execution Evidence`,
+		};
+	return {
+		outcome: execution.status,
+		// F052 declares rollback "none" when no compensation exists — that
+		// IS declared irreversibility, never a remedy reference.
+		remedy:
+			request.rollback === "none"
+				? { kind: "irreversible", reference: null }
+				: { kind: "rollback", reference: request.rollback },
+	};
+}
+
+/**
+ * Settle one used grant against the real underlying receipt: the outcome
+ * (including failures and partial outcomes) and the declared rollback or
+ * compensation linkage derive from the underlying registry — never from
+ * the caller — and record immutably. One settlement per grant.
+ */
+function settleBreakGlass(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(BREAKGLASS_INVALID_CODE, ["settle input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(BREAKGLASS_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(input, ["id", "receipt"], "settle input");
+	if (inputClosed !== null) return fail(BREAKGLASS_INVALID_CODE, [inputClosed]);
+	const idRefusal = slugRefusal(input.id, "id");
+	if (idRefusal !== null) return fail(idRefusal.code, [idRefusal.message]);
+	if (!isNonEmptyString(input.receipt))
+		return fail(BREAKGLASS_INVALID_CODE, [
+			"receipt must name the real underlying receipt; a claim without a reference refuses",
+		]);
+	const receiptLeak = credentialLeakProblem(input.receipt, "receipt");
+	if (receiptLeak !== null) return fail(BREAKGLASS_LEAK_CODE, [receiptLeak]);
+	const nowMs = now.getTime();
+	let resolved = null;
+	return appendLedgerEvent(
+		cwd,
+		GRANT_LEDGER,
+		() => ({
+			kind: "settlement",
+			schemaVersion: BREAKGLASS_SCHEMA_VERSION,
+			at: now.toISOString(),
+			id: input.id,
+			receipt: { kind: resolved.kind, id: input.receipt },
+			outcome: resolved.outcome,
+			remedy: resolved.remedy,
+		}),
+		(fold) => {
+			const grant = fold.find((entry) => entry.id === input.id) ?? null;
+			if (grant === null)
+				return fail(BREAKGLASS_NOT_FOUND_CODE, [
+					`grant ${JSON.stringify(input.id)} does not exist`,
+				]);
+			if (grant.use === null)
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`grant ${JSON.stringify(input.id)} was never used; settlement follows use`,
+				]);
+			if (grant.settlement !== null)
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`grant ${JSON.stringify(input.id)} is already settled; emergency history is never rewritten`,
+				]);
+			const receipt = resolveSettlementReceipt(cwd, grant, input.receipt);
+			if (receipt.problem)
+				return fail(/CORRUPT/.test(receipt.code || "") ? receipt.code : BREAKGLASS_INVALID_CODE, [
+					receipt.problem,
+				]);
+			resolved = {
+				kind: grant.capability.kind,
+				outcome: receipt.outcome,
+				remedy: receipt.remedy,
+			};
+			return null;
+		},
+		(fold) => {
+			const record = fold.find((entry) => entry.id === input.id);
+			return record ? projectGrant(record, nowMs) : null;
+		},
+	);
+}
+
+/**
+ * Record the mandatory human post-review for one ended grant: outcome,
+ * necessity, impact, and follow-up — non-empty and preserved — behind a
+ * single-use committed human Decision. One review per grant; a late
+ * review is still recordable and reads flagged against the declared
+ * deadline.
+ */
+function reviewBreakGlass(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(BREAKGLASS_INVALID_CODE, ["review input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(BREAKGLASS_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(
+		input,
+		["id", "outcome", "necessity", "impact", "followUp", "decision"],
+		"review input",
+	);
+	if (inputClosed !== null) return fail(BREAKGLASS_INVALID_CODE, [inputClosed]);
+	const idRefusal = slugRefusal(input.id, "id");
+	if (idRefusal !== null) return fail(idRefusal.code, [idRefusal.message]);
+	for (const field of REVIEW_TEXT_FIELDS) {
+		if (!isNonEmptyString(input[field]))
+			return fail(BREAKGLASS_INVALID_CODE, [
+				`${field} must preserve a non-empty ${field}; a post-review is accountable`,
+			]);
+		const leak = credentialLeakProblem(input[field], field);
+		if (leak !== null) return fail(BREAKGLASS_LEAK_CODE, [leak]);
+	}
+	const pinProblem = decisionPinProblem(input.decision);
+	if (pinProblem !== null) return fail(BREAKGLASS_INVALID_CODE, [pinProblem]);
+	let revisions;
+	try {
+		revisions = listArtifactRevisions(cwd);
+	} catch (err) {
+		return fail(err.amberCode || "AMBER_E_ARTIFACT_JOURNAL_CORRUPT", [err.message || String(err)]);
+	}
+	const resolved = resolveGrantDecision(revisions, input.decision, "a break-glass post-review");
+	if (resolved.problem) return fail(BREAKGLASS_INVALID_CODE, [resolved.problem]);
+	const nowMs = now.getTime();
+	return appendLedgerEvent(
+		cwd,
+		GRANT_LEDGER,
+		{
+			kind: "review",
+			schemaVersion: BREAKGLASS_SCHEMA_VERSION,
+			at: now.toISOString(),
+			id: input.id,
+			outcome: input.outcome,
+			necessity: input.necessity,
+			impact: input.impact,
+			followUp: input.followUp,
+			decision: resolved.decision,
+		},
+		(fold) => {
+			const grant = fold.find((entry) => entry.id === input.id) ?? null;
+			if (grant === null)
+				return fail(BREAKGLASS_NOT_FOUND_CODE, [
+					`grant ${JSON.stringify(input.id)} does not exist`,
+				]);
+			if (grant.review !== null)
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`grant ${JSON.stringify(input.id)} is already reviewed; one post-review per grant`,
+				]);
+			if (grant.use === null && grant.revocation === null && nowMs < Date.parse(grant.validUntil))
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`grant ${JSON.stringify(input.id)} has not ended; a post-review follows use, revocation, or expiry`,
+				]);
+			const spender = grantDecisionSpender(fold, input.decision);
+			if (spender !== null)
+				return fail(BREAKGLASS_INVALID_CODE, [
+					`decision ${JSON.stringify(input.decision.identity)}@${input.decision.revision} already authorized ${spender}; an emergency Decision is single-use`,
+				]);
+			return null;
+		},
+		(fold) => {
+			const record = fold.find((entry) => entry.id === input.id);
+			return record ? projectGrant(record, nowMs) : null;
+		},
+	);
+}
+
+// The full lifecycle projection at the injected clock: status, the use,
+// settlement, and review records, and the read-time review flags — an
+// overdue post-review is visible, and Policy consumers can fail closed
+// on it. Nothing here writes.
+function breakGlassStatus(cwd, id, opts = {}) {
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	const grant = foldGrants(cwd).find((entry) => entry.id === id) ?? null;
+	if (grant === null) return null;
+	const nowMs = now.getTime();
+	const projected = projectGrant(grant, nowMs);
+	const ended = projected.status !== "granted";
+	const reviewOverdue = grant.review === null && ended && nowMs >= Date.parse(grant.reviewBy);
+	const reviewLate =
+		grant.review !== null && Date.parse(grant.review.at) >= Date.parse(grant.reviewBy);
+	return { ...projected, reviewOverdue, reviewLate };
+}
+
 function showBreakGlassGrant(cwd, id, opts = {}) {
 	const now = opts.now instanceof Date ? opts.now : new Date();
 	const grant = foldGrants(cwd).find((entry) => entry.id === id) ?? null;
@@ -891,6 +1325,9 @@ module.exports = {
 	grantBreakGlass,
 	revokeBreakGlass,
 	useBreakGlass,
+	settleBreakGlass,
+	reviewBreakGlass,
+	breakGlassStatus,
 	showBreakGlassGrant,
 	listBreakGlassGrants,
 };

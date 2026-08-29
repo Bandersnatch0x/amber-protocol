@@ -30,6 +30,11 @@ function missingValueFlag(args) {
 		["reviewBy", "--review-by"],
 		["reason", "--reason"],
 		["request", "--request"],
+		["receipt", "--receipt"],
+		["outcome", "--outcome"],
+		["necessity", "--necessity"],
+		["impact", "--impact"],
+		["followUp", "--follow-up"],
 		["decisionIdentity", "--decision-identity"],
 		["revision", "--revision"],
 		["status", "--status"],
@@ -113,7 +118,7 @@ function resultEnvelope(result) {
 
 const dispatch = defineCommand({
 	command: "breakglass",
-	actions: ["grant", "revoke", "grants", "use", "show"],
+	actions: ["grant", "revoke", "grants", "use", "show", "settle", "review", "status"],
 	handlers: {
 		grant: (args) => {
 			const { grantBreakGlass } = require("./core/breakglass-registry");
@@ -245,6 +250,105 @@ const dispatch = defineCommand({
 			let record;
 			try {
 				record = showBreakGlassGrant(
+					target.value,
+					id.value,
+					clock.value === null ? {} : { now: clock.value },
+				);
+			} catch (err) {
+				const failure = readFailure(args, err, READ_FAILURE_CODE);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+			if (record === null)
+				return {
+					text: "",
+					errors: [`grant ${JSON.stringify(id.value)} does not exist`],
+					warnings: [],
+					exitCode: 1,
+					code: "AMBER_E_BREAKGLASS_NOT_FOUND",
+				};
+			return { text: JSON.stringify(record, null, 2) };
+		},
+		settle: (args) => {
+			const { settleBreakGlass } = require("./core/breakglass-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "breakglass/incident-42-restore"],
+				["receipt", "--receipt", "execution/ticket-comment-1"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			return resultEnvelope(
+				settleBreakGlass(
+					target.value,
+					{ id: String(args.id), receipt: String(args.receipt) },
+					clock.value === null ? {} : { now: clock.value },
+				),
+			);
+		},
+		review: (args) => {
+			const { reviewBreakGlass } = require("./core/breakglass-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "breakglass/incident-42-restore"],
+				["outcome", "--outcome", '"service restored"'],
+				["necessity", "--necessity", '"release path was 40 minutes out"'],
+				["impact", "--impact", '"one ticket comment created"'],
+				["followUp", "--follow-up", '"add a standing runbook"'],
+				["decisionIdentity", "--decision-identity", "decision/breakglass-review-42"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			const revision = positiveInt(args, "revision", "--revision");
+			if (revision.error) return invalidArg(revision.error);
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			return resultEnvelope(
+				reviewBreakGlass(
+					target.value,
+					{
+						id: String(args.id),
+						outcome: String(args.outcome),
+						necessity: String(args.necessity),
+						impact: String(args.impact),
+						followUp: String(args.followUp),
+						decision: { identity: String(args.decisionIdentity), revision: revision.value },
+					},
+					clock.value === null ? {} : { now: clock.value },
+				),
+			);
+		},
+		status: (args) => {
+			const { breakGlassStatus } = require("./core/breakglass-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "breakglass/incident-42-restore");
+			if (id.error) return invalidArg(id.error);
+			const clock = clockValue(args);
+			if (clock.error) return invalidArg(clock.error);
+			let record;
+			try {
+				record = breakGlassStatus(
 					target.value,
 					id.value,
 					clock.value === null ? {} : { now: clock.value },
