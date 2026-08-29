@@ -2588,6 +2588,16 @@ const CATALOG = {
 		layer: "Verification",
 		related: ["AMBER_E_KNOWLEDGE_MANIFEST_INVALID", "AMBER_E_CONTEXT_SOURCE_STALE"],
 	},
+	// F060 (ADR-0025): the knowledge graph's code layer.
+	AMBER_E_KNOWLEDGE_TOOLCHAIN_MISSING: {
+		title: "Code-layer extraction toolchain is unavailable",
+		cause:
+			"The schemaVersion 2 knowledge graph extracts file-level Code Nodes through the TypeScript compiler API, and no `typescript` module could be resolved from the amber-protocol installation. The graph fails closed rather than emitting a code-less graph whose bytes would silently depend on the environment.",
+		remedy:
+			"Run `npm install` at the amber-protocol root so the pinned `typescript` dependency is present, then re-run amber knowledge graph.",
+		layer: "Context",
+		related: ["AMBER_E_KNOWLEDGE_GRAPH_SOURCE", "AMBER_E_KNOWLEDGE_GRAPH_INVALID"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing

@@ -1,10 +1,12 @@
 "use strict";
 
-// F059 T1 (#247): deterministic knowledge-graph parser + `knowledge graph`.
+// F059 T1 (#247) + F060 code layer (ADR-0025): deterministic knowledge-graph
+// parser + `knowledge graph`.
 //
 // The highest CLI seam is `amber knowledge graph --json` (spec § Testing
 // Decisions): schema validity, byte-stable recompute, the full node/edge
-// population against the REAL repository tree, and the standing F001/F007
+// population against the REAL repository tree — including file-level Code
+// Nodes and the imports/anchors verbs — and the standing F001/F007
 // dead-anchor findings. Population is asserted through invariants (every
 // source document has its node), never exact counts.
 
@@ -19,6 +21,7 @@ const {
 	buildKnowledgeGraphFromTree,
 	serializeKnowledgeGraph,
 } = require("../../scripts/lib/core/knowledge-graph");
+const { typescriptVersion } = require("../../scripts/lib/core/code-graph");
 const { validate } = require("../../scripts/lib/core/schema-contract");
 const { knowledgeDispatch } = require("../../scripts/lib/knowledge-commands");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
@@ -43,7 +46,7 @@ test("provenance is present and deterministic on every node and edge", () => {
 	for (const edge of graph.edges) assert.equal(edge.provenance, "deterministic");
 });
 
-test("three layers only; four verbs only", () => {
+test("three layers only; six verbs only", () => {
 	const layers = new Set(graph.nodes.map((n) => n.layer));
 	assert.deepEqual([...layers].sort(), ["decision", "implementation", "knowledge"]);
 	for (const edge of graph.edges) assert.ok(EDGE_VERBS.includes(edge.verb), edge.verb);
@@ -133,10 +136,21 @@ test("every architecture page, wiki knowledge page, and MEMORY.md section has a 
 	assert.equal(graph.nodes.filter((n) => n.kind === "memory").length, memorySections.length);
 });
 
-test("code files are not nodes; every edge endpoint resolves to a node", () => {
+test("code files are file-level nodes (ADR-0025); every edge endpoint resolves to a node", () => {
 	const ids = new Set(graph.nodes.map((n) => n.id));
 	for (const node of graph.nodes) {
-		assert.match(node.id, /^(adr|artifact|wiki|memory|architecture|feature):/);
+		assert.match(node.id, /^(adr|artifact|wiki|memory|architecture|feature|code):/);
+	}
+	const codeNodes = graph.nodes.filter((n) => n.kind === "code");
+	assert.ok(codeNodes.length > 0, "expected the product code corpus as nodes");
+	for (const node of codeNodes) {
+		assert.equal(node.layer, "implementation");
+		assert.equal(node.id, `code:${node.sourcePath}`);
+		assert.ok(!node.sourcePath.includes("\\"), `non-POSIX sourcePath: ${node.sourcePath}`);
+		assert.ok(
+			fs.existsSync(path.join(REPO_ROOT, node.sourcePath)),
+			`code node for missing file: ${node.sourcePath}`,
+		);
 	}
 	for (const edge of graph.edges) {
 		assert.ok(ids.has(edge.src), `dangling src ${edge.src}`);
@@ -145,13 +159,25 @@ test("code files are not nodes; every edge endpoint resolves to a node", () => {
 	}
 });
 
-test("anchors are node properties, never edges", () => {
+test("anchors stay node properties; an existing anchored file additionally becomes an anchors edge", () => {
 	const f001 = graph.nodes.find((n) => n.id === "feature:F001");
 	assert.ok(f001.paths.includes("scripts/lib/core/scaffolding.js"));
-	// No edge points at a bare path — every endpoint is a kind-prefixed id
-	// (asserted above), so a declared path can only surface as a property.
 	const f058 = graph.nodes.find((n) => n.id === "feature:F058");
 	assert.ok(Array.isArray(f058.paths) && f058.paths.length > 0);
+	// Every anchors edge is feature -> existing code node, never a bare path.
+	const ids = new Set(graph.nodes.map((n) => n.id));
+	const anchors = graph.edges.filter((e) => e.verb === "anchors");
+	assert.ok(anchors.length > 0, "expected anchors edges for live code anchors");
+	for (const edge of anchors) {
+		assert.match(edge.src, /^feature:/);
+		assert.match(edge.dst, /^code:/);
+		assert.ok(ids.has(edge.dst));
+	}
+	// The standing dead anchor (F001 scaffolding.js) never became an edge.
+	assert.ok(
+		!anchors.some((e) => e.dst === "code:scripts/lib/core/scaffolding.js"),
+		"dead anchor must not produce a dangling edge",
+	);
 });
 
 test("known real edges are discovered with evidence", () => {
@@ -234,7 +260,13 @@ test("knowledge graph fails closed with a typed error when the projection is mis
 test("an empty target yields an empty, still schema-valid graph", () => {
 	const dir = mkTarget("kg-empty");
 	const empty = buildKnowledgeGraphFromTree(dir);
-	assert.deepEqual(empty, { schemaVersion: SCHEMA_VERSION, nodes: [], edges: [], drift: [] });
+	assert.deepEqual(empty, {
+		schemaVersion: SCHEMA_VERSION,
+		toolchain: { typescript: typescriptVersion() },
+		nodes: [],
+		edges: [],
+		drift: [],
+	});
 });
 
 test("artifacts enter at identity granularity with trace edges on the four verbs", () => {

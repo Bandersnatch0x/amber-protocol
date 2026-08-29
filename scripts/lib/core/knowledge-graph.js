@@ -1,12 +1,13 @@
 "use strict";
 
-// F059 T1 (#247): deterministic knowledge-graph parser.
+// F059 T1 (#247) + F060 code layer (ADR-0025): deterministic knowledge-graph parser.
 //
 // The repository's knowledge corpus as a schema-validated graph, shared by
 // the CLI (`amber knowledge graph`) and — in T2 — the web server, loaded
 // in-process by both so the two surfaces never diverge.
 //
-// Three-layer ontology (docs/specs/F059-knowledge-decision-map.md):
+// Three-layer ontology (docs/specs/F059-knowledge-decision-map.md, extended
+// by docs/specs/F060-knowledge-map-v2-code-graph.md):
 //   decision        adr:*        docs/adr/*.md
 //                   artifact:*   committed Canonical Artifacts at identity
 //                                granularity (.amber/artifacts/, F049 read seam)
@@ -14,8 +15,10 @@
 //                   memory:*     MEMORY.md `##` sections
 //                   architecture:* docs/architecture/*.md
 //   implementation  feature:*    feature_list.json
+//                   code:*       product source files (code-graph.js walk;
+//                                exported-symbol table as a node property)
 //
-// Exactly four edge verbs, directed declarer -> declared. The deterministic
+// Exactly six edge verbs, directed declarer -> declared. The deterministic
 // discovery rules (this module's contract — a pure function of the tree):
 //   supersedes  ADR `**Supersedes...:**` header blocks (ADR-#### and
 //               docs/architecture/<page>.md targets); artifact `supersedes`
@@ -26,7 +29,13 @@
 //               page by path; feature entries naming ADR-####; artifact
 //               `decides` Traces.
 //   describes   decision/knowledge bodies naming a registered feature id.
-// `anchors` (a feature's declared paths) is a node property, never an edge.
+//   imports     file-level code dependency, aggregated per file pair
+//               (code-graph.js extraction; never overloads `references`).
+//   anchors     feature -> code, only when the feature's declared path is a
+//               Code Node in the tree (ADR-0025). A dead anchor never
+//               becomes a dangling edge — it stays a drift finding; the
+//               property-only rule stands for globs, directories, and any
+//               other non-node target.
 //
 // Drift: a dead-anchor finding (declared path absent from the tree) attaches
 // to the declaring node, carrying the detected actual path on a rename
@@ -52,10 +61,18 @@ const { compileSchema, formatErrors } = require("./schema-contract");
 const { typedError } = require("./error-catalog");
 const { resolvePathWithin } = require("./fs-utils");
 const { stripRange } = require("./context-sources");
+const { extractCodeCorpus, typescriptVersion } = require("./code-graph");
 
-const SCHEMA_VERSION = "1";
+const SCHEMA_VERSION = "2";
 const PROVENANCE = "deterministic";
-const EDGE_VERBS = Object.freeze(["supersedes", "builds-on", "references", "describes"]);
+const EDGE_VERBS = Object.freeze([
+	"supersedes",
+	"builds-on",
+	"references",
+	"describes",
+	"imports",
+	"anchors",
+]);
 
 // This surface's error vocabulary (registered in error-catalog.js).
 const ERROR_CODES = Object.freeze({
@@ -102,11 +119,24 @@ function bodyExcerpt(text) {
 	return trimmed.length > BODY_MAX ? trimmed.slice(0, BODY_MAX) : trimmed;
 }
 
-function makeNode({ id, kind, layer, title, sourcePath, status, updated, paths, revisions, body }) {
+function makeNode({
+	id,
+	kind,
+	layer,
+	title,
+	sourcePath,
+	status,
+	updated,
+	paths,
+	symbols,
+	revisions,
+	body,
+}) {
 	const node = { id, kind, layer, title, sourcePath };
 	if (status !== undefined && status !== null) node.status = status;
 	if (updated !== undefined && updated !== null) node.updated = updated;
 	if (Array.isArray(paths) && paths.length > 0) node.paths = paths;
+	if (Array.isArray(symbols) && symbols.length > 0) node.symbols = symbols;
 	if (revisions !== undefined) node.revisions = revisions;
 	if (body !== undefined && body !== null) node.body = body;
 	node.provenance = PROVENANCE;
@@ -328,6 +358,7 @@ function buildEdges({
 	memorySections,
 	features,
 	artifacts,
+	codeImports,
 	nodeIds,
 }) {
 	const edges = [];
@@ -427,6 +458,23 @@ function buildEdges({
 			const target = trace?.to;
 			if (!verb || !target || !target.type || !target.identity) continue;
 			addEdge(artifact.id, `artifact:${target.type}/${target.identity}`, verb, null);
+		}
+	}
+
+	// code layer (F060): file-level dependencies, aggregated per file pair.
+	for (const item of codeImports) {
+		for (const evidence of item.evidence) {
+			addEdge(`code:${item.src}`, `code:${item.dst}`, "imports", evidence);
+		}
+	}
+
+	// anchors (ADR-0025): a feature's declared path that is a Code Node
+	// becomes a real edge; globs, directories, and dead paths stay properties.
+	for (const feature of features) {
+		for (const declared of feature.paths) {
+			if (nodeIds.has(`code:${declared}`)) {
+				addEdge(feature.id, `code:${declared}`, "anchors", { path: "feature_list.json" });
+			}
 		}
 	}
 
@@ -703,6 +751,9 @@ function buildKnowledgeGraphFromSources(targetRoot, documents) {
 	const memorySections = parseMemorySections(targetRoot);
 	const features = parseFeatures(targetRoot);
 	const artifacts = parseArtifacts(targetRoot);
+	// The code layer is a pure function of the tree in both source modes, so
+	// projection and tree reads stay byte-identical (F060; ADR-0025).
+	const codeCorpus = extractCodeCorpus(targetRoot);
 
 	const nodes = [
 		...adrs.map((adr) =>
@@ -772,6 +823,16 @@ function buildKnowledgeGraphFromSources(targetRoot, documents) {
 				body: bodyExcerpt(feature.text),
 			}),
 		),
+		...codeCorpus.files.map((file) =>
+			makeNode({
+				id: `code:${file.sourcePath}`,
+				kind: "code",
+				layer: "implementation",
+				title: file.sourcePath.split("/").pop(),
+				sourcePath: file.sourcePath,
+				symbols: file.symbols,
+			}),
+		),
 	];
 	nodes.sort((a, b) => (a.id < b.id ? -1 : 1));
 
@@ -790,11 +851,18 @@ function buildKnowledgeGraphFromSources(targetRoot, documents) {
 		memorySections,
 		features,
 		artifacts,
+		codeImports: codeCorpus.imports,
 		nodeIds,
 	});
 	const drift = buildDrift(targetRoot, features);
 
-	return { schemaVersion: SCHEMA_VERSION, nodes, edges, drift };
+	return {
+		schemaVersion: SCHEMA_VERSION,
+		toolchain: { typescript: typescriptVersion() },
+		nodes,
+		edges,
+		drift,
+	};
 }
 
 function validateGraph(graph) {
