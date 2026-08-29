@@ -28,6 +28,7 @@ const {
 	chainHash,
 	acquireLedgerLock,
 	appendLedgerEvent,
+	credentialLeakProblem,
 } = require("./registry-ledger");
 
 // v2 added the required `compensates` linkage to proposal events (F056
@@ -969,18 +970,6 @@ function acquireExecutionLock(cwd) {
 		label: "external execution ledger",
 		staleMs: LOCK_STALE_MS,
 	});
-}
-
-// Well-known credential shapes refuse in any external-facing field —
-// belt-and-braces on top of the closed shapes that carry no handle slot.
-const CREDENTIAL_MATERIAL_PATTERN =
-	/(bearer\s|basic\s|eyJ[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{10,}|xox[a-z]-|AKIA[0-9A-Z]{10,}|-----BEGIN|api[-_]?key\s*[=:]|secret\s*[=:]|password\s*[=:]|token\s*[=:])/i;
-
-function credentialLeakProblem(value, label) {
-	if (typeof value !== "string") return null;
-	if (CREDENTIAL_MATERIAL_PATTERN.test(value))
-		return `${label} carries what looks like credential material; credentials never ride a record, receipt, or error — only the purpose/scope/expiry boundary is ever stored`;
-	return null;
 }
 
 const CREDENTIAL_BOUNDARY_FIELDS = Object.freeze(["purpose", "scope", "expiresAt"]);

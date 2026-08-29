@@ -1,17 +1,18 @@
 "use strict";
 
-// Shared append-only ledger primitives for Amber's governed registries (the
-// principal registry and the evidence receipts ledger). Each registry keeps
-// its own file, event kinds, closed field sets, and stable codes; this module
-// owns exactly the three disciplines every governed ledger shares, so an
-// in-place edit fails closed identically everywhere:
+// Shared append-only ledger primitives for Amber's governed registries.
+// Each registry keeps its own file, event kinds, closed field sets, and
+// stable codes; this module owns the disciplines every governed ledger
+// shares, so an in-place edit fails closed identically everywhere:
 //   1. the tamper-evident hash chain (loop-ledger pattern):
 //      hash = sha256(prevHash + canonicalize(event-without-its-own-hash))
 //   2. the exclusive append lock (admit.lock pattern): create-with-wx, stale
 //      after a bounded window (a crashed holder releases the ledger; a live
 //      one fails the second writer with the registry's own conflict code)
 //   3. the append size ceiling, checked before any durable state is touched
-//      (on the body first, then under the lock on the exact chained event).
+//      (on the body first, then under the lock on the exact chained event)
+//   4. the credential-material refusal shared by every ledger-bound field
+//      (credentialLeakProblem), so no registry can store a secret.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -253,6 +254,18 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 	}
 }
 
+// Well-known credential shapes refuse in any ledger-bound field —
+// belt-and-braces on top of closed shapes that carry no handle slot.
+const CREDENTIAL_MATERIAL_PATTERN =
+	/(bearer\s|basic\s|eyJ[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{10,}|xox[a-z]-|AKIA[0-9A-Z]{10,}|-----BEGIN|api[-_]?key\s*[=:]|secret\s*[=:]|password\s*[=:]|token\s*[=:])/i;
+
+function credentialLeakProblem(value, label) {
+	if (typeof value !== "string") return null;
+	if (CREDENTIAL_MATERIAL_PATTERN.test(value))
+		return `${label} carries what looks like credential material; credentials never ride a record, receipt, or error — only the purpose/scope/expiry boundary is ever stored`;
+	return null;
+}
+
 module.exports = {
 	GENESIS_HASH,
 	DEFAULT_LOCK_STALE_MS,
@@ -261,4 +274,5 @@ module.exports = {
 	acquireLedgerLock,
 	appendWithinCeiling,
 	appendLedgerEvent,
+	credentialLeakProblem,
 };

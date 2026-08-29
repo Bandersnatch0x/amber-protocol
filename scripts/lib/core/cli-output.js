@@ -300,6 +300,15 @@ const FLAG_SPECS = {
 	// F056 ticket 4 (#291): compensation flags (--id, --payload-hash, and
 	// --request are shared with existing surfaces).
 	"--execution": { key: "execution" },
+	// F057 ticket 1 (#292): break-glass grant flags (--id, --capability,
+	// --scope, --environment, --credential, --valid-from, --valid-until,
+	// --reason, --decision-identity, --revision, --status, and --now are
+	// shared with existing surfaces).
+	"--incident": { key: "incident" },
+	"--purpose": { key: "purpose" },
+	"--risk": { key: "risk" },
+	"--exact-target": { key: "exactTarget" },
+	"--review-by": { key: "reviewBy" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

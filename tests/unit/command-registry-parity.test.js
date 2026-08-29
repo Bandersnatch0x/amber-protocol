@@ -39,6 +39,7 @@ const PUBLIC_COMMAND_ORDER = [
 	"maintain",
 	"retention",
 	"external",
+	"breakglass",
 	"review",
 	"accept",
 	"learnings",

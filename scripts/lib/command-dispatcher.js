@@ -97,6 +97,7 @@ const { releaseDispatch } = require("./release-commands");
 const { maintainDispatch } = require("./maintain-commands");
 const { retentionDispatch } = require("./retention-commands");
 const { externalDispatch } = require("./external-commands");
+const { breakglassDispatch } = require("./breakglass-commands");
 const { orgAuditDispatch } = require("./org-audit-commands");
 const { hooksDispatch } = require("./hooks-commands");
 const { bindCommandHandlers } = require("./command-registry");
@@ -1092,6 +1093,10 @@ function handleExternal(args) {
 	return externalDispatch(args);
 }
 
+function handleBreakglass(args) {
+	return breakglassDispatch(args);
+}
+
 function handleExplain(args) {
 	const { explain } = require("./explain-command");
 	const r = explain(args);
@@ -1197,6 +1202,7 @@ const COMMAND_HANDLERS = {
 	maintain: handleMaintain,
 	retention: handleRetention,
 	external: handleExternal,
+	breakglass: handleBreakglass,
 	review: handleReview,
 	accept: handleAccept,
 	learnings: handleLearnings,

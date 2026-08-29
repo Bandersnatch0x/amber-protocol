@@ -1588,6 +1588,57 @@ Error codes: `AMBER_E_EXTERNAL_INVALID`, `AMBER_E_EXTERNAL_CORRUPT`, `AMBER_E_EX
 `AMBER_E_EXTERNAL_EXEC_LOCK`, `AMBER_E_EXTERNAL_EXEC_SIZE_CEILING`,
 `AMBER_E_EXTERNAL_CREDENTIAL_LEAK`.
 
+### breakglass grant / revoke / grants
+
+Grant, revoke, and list break-glass authorizations (F057 T1). Break-glass is a distinct, one-use
+HUMAN authorization for a production emergency — never a flag, a reusable token, or an
+Agent-granted exception, and neither `--yes` nor `--force` ever routes here. A grant is limited by
+one registered capability — an F052 runner capability pin
+(`--capability runner:<runnerId>@<runnerVersion>/<name>@<capabilityVersion>`) or an F056 external
+effect pin (`--capability external:<effect-id>@<version>`), verified against its own registry, so
+break-glass reaches only what is already governed and never arbitrary shell or HTTP — plus the
+exact `--exact-target` and `--scope`, `--environment`, `--purpose`, `--incident` reference,
+`--risk` (`low|medium|high|critical`), a credential class (`--credential none|scoped`), a short
+half-open validity window `[--valid-from, --valid-until)` of at most 24h at the injected
+governance clock — anchored to the grant instant with no skew tolerance (no backdating, no
+born-expired grant, and no window deferred more than 24h: a deferred window is a standing
+authorization, not an emergency) — and a mandatory post-review deadline (`--review-by`, strictly
+after the window and within 30 days of it closing).
+
+Granting settles behind a single-use committed human Decision (`acceptance|approval` with a
+verified principal snapshot; Agents and service identities cannot satisfy the slot — no
+self-grant, enforced at Decision admission) into the hash-chained append-only ledger
+`.amber/breakglass/grants.jsonl`; one emergency Decision authorizes exactly one act (a grant OR a
+revocation), never two. `revoke` is a second single-use human Decision that immediately blocks
+future use with a preserved reason. Status derives read-time at the injected `--now`
+(`granted|revoked|expired`; revocation always wins; expiry lands at exactly `validUntil`; a grant
+whose window has not opened yet still reads `granted` — consumption separately refuses outside
+the window), and
+history is never rewritten: revoked and expired grants stay listable forever with their original
+content intact. Every grant-facing name is a closed slug (no whitespace, URL scheme, shell
+metacharacters, or `..` traversal) and credential-looking material refuses with
+`AMBER_E_BREAKGLASS_CREDENTIAL_LEAK` — the audit trail
+carries no secret. Nothing under this command executes anything.
+
+```bash
+node scripts/amber.js breakglass grant --target . --id breakglass/incident-42-restore \
+  --incident incident/42 --purpose restore-login-service \
+  --capability external:effect/ticket-comment@1 --exact-target tracker/amber-protocol \
+  --scope issues --environment production --risk high --credential scoped \
+  --valid-from 2026-08-29T00:00:00.000Z --valid-until 2026-08-29T01:00:00.000Z \
+  --review-by 2026-09-01T00:00:00.000Z \
+  --decision-identity decision/breakglass-42 --revision 1 --json
+node scripts/amber.js breakglass revoke --target . --id breakglass/incident-42-restore \
+  --reason "credential compromise suspected" \
+  --decision-identity decision/breakglass-revoke-42 --revision 1 --json
+node scripts/amber.js breakglass grants --target . --status granted \
+  --now 2026-08-29T00:30:00.000Z --json
+```
+
+Error codes: `AMBER_E_BREAKGLASS_INVALID`, `AMBER_E_BREAKGLASS_NOT_FOUND`,
+`AMBER_E_BREAKGLASS_CORRUPT`, `AMBER_E_BREAKGLASS_LOCK`, `AMBER_E_BREAKGLASS_SIZE_CEILING`,
+`AMBER_E_BREAKGLASS_CREDENTIAL_LEAK`.
+
 ## Handoff Commands
 
 ### handoff

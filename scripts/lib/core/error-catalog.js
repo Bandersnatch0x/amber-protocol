@@ -2360,6 +2360,56 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_EXTERNAL_INVALID", "AMBER_E_EXTERNAL_EXEC_CORRUPT"],
 	},
+	AMBER_E_BREAKGLASS_INVALID: {
+		title: "Break-glass grant invalid",
+		cause:
+			"The grant or revocation violates the contract: an unknown/missing field, an out-of-vocabulary risk or credentials class, a name that could smuggle a command, URL, or credential material, an oversized or inverted validity window, a post-review deadline outside its bound, an unresolved capability pin, a non-committed/scoped/non-human Decision, a reused emergency Decision, a duplicate grant id, or a double revocation.",
+		remedy:
+			"Fix the reported field, register the capability first, or bind a fresh single-use committed human Decision, then re-run the command.",
+		layer: "Governance",
+		related: ["AMBER_E_BREAKGLASS_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_BREAKGLASS_NOT_FOUND: {
+		title: "Break-glass grant not found",
+		cause: "No grant with the requested id exists in the break-glass ledger.",
+		remedy: "List grants with amber breakglass grants, or grant the authorization first.",
+		layer: "Governance",
+		related: ["AMBER_E_BREAKGLASS_INVALID", "AMBER_E_BREAKGLASS_CORRUPT"],
+	},
+	AMBER_E_BREAKGLASS_CORRUPT: {
+		title: "Break-glass grant ledger corrupt",
+		cause:
+			"The grant ledger under .amber/breakglass/ has a broken hash chain, an invalid event shape, a reused grant id, a double revocation, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/breakglass/grants.jsonl from version control or a backup; the ledger is append-only and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_BREAKGLASS_INVALID", "AMBER_E_BREAKGLASS_LOCK"],
+	},
+	AMBER_E_BREAKGLASS_LOCK: {
+		title: "Break-glass grant ledger lock contended",
+		cause: "Another process holds the grant ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent grant or revocation finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_BREAKGLASS_CORRUPT", "AMBER_E_EXTERNAL_LOCK"],
+	},
+	AMBER_E_BREAKGLASS_SIZE_CEILING: {
+		title: "Break-glass grant ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_BREAKGLASS_MAX_GRANTS_BYTES).",
+		remedy:
+			"Raise AMBER_BREAKGLASS_MAX_GRANTS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_BREAKGLASS_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_BREAKGLASS_CREDENTIAL_LEAK: {
+		title: "Credential material refused in a break-glass record",
+		cause:
+			"A grant or revocation field carries what looks like credential material (a bearer/basic token, JWT, provider key, PEM block, or key=value secret); emergency credentials stay opaque and the audit trail carries no secret.",
+		remedy:
+			"Strip the credential material and resubmit; reference credentials only through the declared credential class.",
+		layer: "Governance",
+		related: ["AMBER_E_BREAKGLASS_INVALID", "AMBER_E_EXTERNAL_CREDENTIAL_LEAK"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:
