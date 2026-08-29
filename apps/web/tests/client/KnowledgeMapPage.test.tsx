@@ -92,7 +92,8 @@ vi.mock('@xyflow/react', async () => {
 });
 
 const graph: KnowledgeGraphDTO = {
-  schemaVersion: '1',
+  schemaVersion: '2',
+  toolchain: { typescript: '0.0.0-test' },
   nodes: [
     {
       id: 'feature:F059',
@@ -324,7 +325,11 @@ describe('KnowledgeMapPage semantic results and failures', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /send repository titles and excerpts/i }));
 
-    expect(screen.getByTestId('flow-edge-e0').getAttribute('data-stroke-dasharray')).toBe('6 4');
+    expect(
+      screen
+        .getByTestId('flow-edge-adr:0001|describes|feature:F059|inferred')
+        .getAttribute('data-stroke-dasharray'),
+    ).toBe('6 4');
     fireEvent.click(screen.getByTestId('flow-node-adr:0001'));
     expect(screen.getByText(/inferred \(stub\/stub-model\)/i)).toBeDefined();
     expect(screen.getByTestId('inferred-summary').textContent).toContain(
@@ -584,5 +589,117 @@ describe('KnowledgeMapPage i18n', () => {
     expect(screen.getByText('向知识地图提问')).toBeDefined();
     expect(screen.getByText(/确定性仓库上下文/)).toBeDefined();
     expect(screen.getByRole('button', { name: '发送问题' })).toBeDefined();
+  });
+});
+
+describe('KnowledgeMapPage F060 fold and expansion', () => {
+  function codeGraph(): KnowledgeGraphDTO {
+    return {
+      ...graph,
+      nodes: [
+        ...graph.nodes,
+        {
+          id: 'code:src/a.ts',
+          kind: 'code',
+          layer: 'implementation',
+          title: 'a.ts',
+          sourcePath: 'src/a.ts',
+          symbols: [{ name: 'alphaExport', startLine: 1, startCol: 1 }],
+        },
+        {
+          id: 'code:src/hub.ts',
+          kind: 'code',
+          layer: 'implementation',
+          title: 'hub.ts',
+          sourcePath: 'src/hub.ts',
+          symbols: [{ name: 'hubExport', startLine: 1, startCol: 1 }],
+        },
+        {
+          id: 'code:src/b.ts',
+          kind: 'code',
+          layer: 'implementation',
+          title: 'b.ts',
+          sourcePath: 'src/b.ts',
+          symbols: [],
+        },
+        {
+          id: 'code:src/c.ts',
+          kind: 'code',
+          layer: 'implementation',
+          title: 'c.ts',
+          sourcePath: 'src/c.ts',
+          symbols: [],
+        },
+      ],
+      edges: [
+        { src: 'feature:F059', dst: 'code:src/a.ts', verb: 'anchors', origin: 'deterministic' },
+        { src: 'code:src/a.ts', dst: 'code:src/hub.ts', verb: 'imports', origin: 'deterministic' },
+        { src: 'code:src/b.ts', dst: 'code:src/hub.ts', verb: 'imports', origin: 'deterministic' },
+        { src: 'code:src/c.ts', dst: 'code:src/hub.ts', verb: 'imports', origin: 'deterministic' },
+      ],
+    };
+  }
+
+  beforeEach(() => {
+    trpcMocks.graphUseQuery.mockReturnValue({
+      data: codeGraph(),
+      isLoading: false,
+      error: null,
+      refetch: trpcMocks.graphRefetch,
+    });
+  });
+
+  it('folds code by default and reports the folded count', () => {
+    renderPage();
+    expect(screen.queryByTestId('flow-node-code:src/a.ts')).toBeNull();
+    expect(screen.queryByTestId('flow-node-code:src/hub.ts')).toBeNull();
+    expect(screen.getByTestId('folded-count').textContent).toContain('4');
+  });
+
+  it('expands and collapses a feature neighbourhood from the detail entry point', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('flow-node-feature:F059'));
+    fireEvent.click(screen.getByTestId('detail-expand-implementation'));
+
+    // anchored file plus its one-hop import; hub.ts aggregates (in-degree 3 > p99? no —
+    // aggregation only fires for analytics members; with this fixture hub is the top
+    // in-degree code node so it may render either plainly or aggregated; the anchored
+    // file must always appear.
+    expect(screen.getByTestId('flow-node-code:src/a.ts')).toBeDefined();
+
+    fireEvent.click(screen.getByTestId('detail-expand-implementation'));
+    expect(screen.queryByTestId('flow-node-code:src/a.ts')).toBeNull();
+  });
+
+  it('never aggregates in a tiny corpus (strict >p99) — the hub renders plainly with the toggle available', () => {
+    renderPage();
+    fireEvent.click(screen.getByTestId('flow-node-feature:F059'));
+    fireEvent.click(screen.getByTestId('detail-expand-implementation'));
+
+    // nearest-rank p99 over four code in-degrees equals the max, and the
+    // aggregation rule is strictly above p99 — so no shared foundation here.
+    expect(screen.queryByTestId('flow-node-foundation:shared-code')).toBeNull();
+    expect(screen.getByTestId('flow-node-code:src/hub.ts')).toBeDefined();
+    expect(screen.getByLabelText(/aggregate shared foundation/i)).toBeDefined();
+  });
+
+  it('search pierces the fold by exported symbol and expands the owning feature on selection', () => {
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/exported symbols/i), {
+      target: { value: 'alphaExport' },
+    });
+    const hit = screen.getByTestId('pierce-hit-code:src/a.ts');
+    expect(hit.textContent).toContain('feature:F059');
+    fireEvent.click(hit);
+    expect(screen.getByTestId('flow-node-code:src/a.ts')).toBeDefined();
+    expect(screen.getByTestId('flow-node-code:src/a.ts').getAttribute('data-selected')).toBe(
+      'true',
+    );
+  });
+
+  it('keeps the Ask ceiling hint document-scale despite code nodes', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+    expect(screen.queryByText(/past the 256-node context ceiling/)).toBeNull();
   });
 });
