@@ -26,6 +26,17 @@
 // per-Holder effects — content is never touched. Authorization consumes
 // one scoped Approval bound to the candidate's canonical hash; any drift
 // in what was reviewed refuses the authorization.
+//
+// Settlement (F055 T4, #286) can never overclaim: an authorized candidate
+// opens one deletion transaction, every registered Holder settles
+// independently through a declared receipt, and the transaction reads
+// deletion-pending while ANY Holder is unsettled. A retry re-targets only
+// unsettled Holders — a settled Holder's effects can never repeat. The
+// minimal Deletion Proof derives read-only from full coverage and carries
+// a controlled salted fingerprint, never a reconstructable public content
+// hash and never deleted content. Deleted records project as tombstones,
+// and a tombstoned subject refuses Gate evaluation: historical existence
+// is not current proof.
 
 const crypto = require("node:crypto");
 const path = require("node:path");
@@ -78,6 +89,9 @@ const CANDIDATE_CORRUPT_CODE = "AMBER_E_RETENTION_CANDIDATE_CORRUPT";
 const CANDIDATE_LOCK_CODE = "AMBER_E_RETENTION_CANDIDATE_LOCK";
 const CANDIDATE_SIZE_CEILING_CODE = "AMBER_E_RETENTION_CANDIDATE_SIZE_CEILING";
 const RETENTION_DRIFT_CODE = "AMBER_E_RETENTION_DRIFT";
+const TX_CORRUPT_CODE = "AMBER_E_RETENTION_TX_CORRUPT";
+const TX_LOCK_CODE = "AMBER_E_RETENTION_TX_LOCK";
+const TX_SIZE_CEILING_CODE = "AMBER_E_RETENTION_TX_SIZE_CEILING";
 
 // Human-only authority slots, mirroring the F050/F052/F054 contract.
 const RETENTION_DECISION_KINDS = Object.freeze(["acceptance", "approval"]);
@@ -93,6 +107,9 @@ const HOLDER_SURFACES = Object.freeze([
 	"external",
 ]);
 const CANDIDATE_STATUSES = Object.freeze(["prepared", "authorized"]);
+// A Holder settles independently; only "settled" counts toward coverage.
+const SETTLEMENT_STATUSES = Object.freeze(["settled", "refused", "failed", "unavailable"]);
+const TRANSACTION_STATUSES = Object.freeze(["deletion-pending", "completed"]);
 
 const CLASSIFY_INPUT_FIELDS = Object.freeze([
 	"record",
@@ -1419,6 +1436,483 @@ function listDeletionCandidates(cwd, { status = null } = {}) {
 	return foldCandidates(cwd).filter((entry) => status === null || entry.status === status);
 }
 
+function transactionsPath(cwd) {
+	return statePathForCreate(cwd, "retention", "transactions.jsonl");
+}
+
+function transactionCorrupt(message) {
+	return typedError(TX_CORRUPT_CODE, message);
+}
+
+function acquireTransactionLock(cwd) {
+	return acquireLedgerLock({
+		dirPath: path.dirname(transactionsPath(cwd)),
+		lockName: "transactions.lock",
+		conflictCode: TX_LOCK_CODE,
+		corruptCode: TX_CORRUPT_CODE,
+		label: "retention transaction ledger",
+		staleMs: LOCK_STALE_MS,
+	});
+}
+
+const EXECUTION_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"id",
+	"candidateId",
+	"candidateHash",
+	"holders",
+	"prevHash",
+	"hash",
+]);
+const SETTLEMENT_EVENT_FIELDS = Object.freeze([
+	"kind",
+	"schemaVersion",
+	"at",
+	"transactionId",
+	"holder",
+	"status",
+	"adapter",
+	"receiptHash",
+	"prevHash",
+	"hash",
+]);
+const HOLDER_PIN_FIELDS = Object.freeze(["id", "version"]);
+
+function transactionEventProblem(event, lineIndex) {
+	const label = `retention transaction event ${lineIndex}`;
+	if (event.kind === "execution") {
+		const closed = closedFieldProblem(event, EXECUTION_EVENT_FIELDS, label);
+		if (closed !== null) return closed;
+		if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
+			return `${label}.at must be an ISO-8601 timestamp`;
+		for (const field of ["id", "candidateId"]) {
+			if (!isNonEmptyString(event[field])) return `${label}.${field} must be a non-empty string`;
+		}
+		if (!/^sha256:[0-9a-f]{64}$/.test(event.candidateHash ?? ""))
+			return `${label}.candidateHash must be a sha256:<64-hex> string`;
+		if (!Array.isArray(event.holders) || event.holders.length === 0)
+			return `${label}.holders must be a non-empty array`;
+		for (let position = 0; position < event.holders.length; position += 1) {
+			const entry = event.holders[position];
+			const entryLabel = `${label}.holders[${position}]`;
+			if (!isPlainObject(entry)) return `${entryLabel} must be an object`;
+			const entryClosed = closedFieldProblem(
+				entry,
+				["id", "version", "surface", "adapter"],
+				entryLabel,
+			);
+			if (entryClosed !== null) return entryClosed;
+			for (const field of ["id", "version"]) {
+				if (!isNonEmptyString(entry[field]))
+					return `${entryLabel}.${field} must be a non-empty string`;
+			}
+			if (!HOLDER_SURFACES.includes(entry.surface))
+				return `${entryLabel}.surface must be one of ${HOLDER_SURFACES.join(", ")}`;
+			const entryAdapter = adapterPinProblem(entry.adapter, `${entryLabel}.adapter`);
+			if (entryAdapter !== null) return entryAdapter;
+		}
+		return null;
+	}
+	const closed = closedFieldProblem(event, SETTLEMENT_EVENT_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(event.at) || Number.isNaN(Date.parse(event.at)))
+		return `${label}.at must be an ISO-8601 timestamp`;
+	if (!isNonEmptyString(event.transactionId))
+		return `${label}.transactionId must be a non-empty string`;
+	if (!isPlainObject(event.holder)) return `${label}.holder must be an object`;
+	const holderClosed = closedFieldProblem(event.holder, HOLDER_PIN_FIELDS, `${label}.holder`);
+	if (holderClosed !== null) return holderClosed;
+	if (!SETTLEMENT_STATUSES.includes(event.status))
+		return `${label}.status must be one of ${SETTLEMENT_STATUSES.join(", ")}`;
+	const adapter = adapterPinProblem(event.adapter, `${label}.adapter`);
+	if (adapter !== null) return adapter;
+	if (!/^sha256:[0-9a-f]{64}$/.test(event.receiptHash ?? ""))
+		return `${label}.receiptHash must be a sha256:<64-hex> string`;
+	return null;
+}
+
+// Projects one entry per transaction: `settlements` maps each covered
+// Holder to its LATEST declared receipt, and `status` derives from full
+// coverage — deletion-pending while any Holder is unsettled.
+function foldTransactions(cwd) {
+	const events = readLedgerFailClosed(
+		transactionsPath(cwd),
+		TX_CORRUPT_CODE,
+		"retention transaction ledger",
+	);
+	let prevHash = GENESIS_HASH;
+	const transactions = [];
+	const byId = new Map();
+	const byCandidate = new Set();
+	events.forEach((event, index) => {
+		const lineIndex = index + 1;
+		if (!isPlainObject(event))
+			throw transactionCorrupt(`retention transaction event ${lineIndex} is not an object`);
+		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
+			throw transactionCorrupt(`retention transaction event ${lineIndex} breaks the hash chain`);
+		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+			throw transactionCorrupt(
+				`retention transaction event ${lineIndex} carries a hash that does not match its content`,
+			);
+		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+			throw transactionCorrupt(
+				`retention transaction event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+			);
+		if (event.kind !== "execution" && event.kind !== "settlement")
+			throw transactionCorrupt(
+				`retention transaction event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+			);
+		const problem = transactionEventProblem(event, lineIndex);
+		if (problem !== null) throw transactionCorrupt(problem);
+		if (event.kind === "execution") {
+			if (byId.has(event.id))
+				throw transactionCorrupt(
+					`retention transaction event ${lineIndex} reuses transaction id ${JSON.stringify(event.id)}`,
+				);
+			if (byCandidate.has(event.candidateId))
+				throw transactionCorrupt(
+					`retention transaction event ${lineIndex} re-executes candidate ${JSON.stringify(event.candidateId)}`,
+				);
+			const { prevHash: _prev, hash, at, ...body } = event;
+			const transaction = {
+				...body,
+				executedAt: at,
+				executionHash: hash,
+				settlements: {},
+				index,
+			};
+			transactions.push(transaction);
+			byId.set(event.id, transaction);
+			byCandidate.add(event.candidateId);
+		} else {
+			const transaction = byId.get(event.transactionId);
+			if (!transaction)
+				throw transactionCorrupt(
+					`retention transaction event ${lineIndex} settles unknown transaction ${JSON.stringify(event.transactionId)}`,
+				);
+			const key = holderKey(event.holder.id, event.holder.version);
+			const covered = transaction.holders.find(
+				(entry) => holderKey(entry.id, entry.version) === key,
+			);
+			if (!covered)
+				throw transactionCorrupt(
+					`retention transaction event ${lineIndex} settles Holder ${JSON.stringify(key)} outside the transaction's declared coverage`,
+				);
+			const prior = transaction.settlements[key];
+			if (prior && prior.status === "settled")
+				throw transactionCorrupt(
+					`retention transaction event ${lineIndex} re-settles Holder ${JSON.stringify(key)}; a completed deletion effect can never repeat`,
+				);
+			transaction.settlements[key] = {
+				at: event.at,
+				status: event.status,
+				adapter: event.adapter,
+				receiptHash: event.receiptHash,
+			};
+		}
+		prevHash = event.hash;
+	});
+	for (const transaction of transactions) {
+		const allSettled = transaction.holders.every((entry) => {
+			const settlement = transaction.settlements[holderKey(entry.id, entry.version)];
+			return settlement !== undefined && settlement.status === "settled";
+		});
+		transaction.status = allSettled ? "completed" : "deletion-pending";
+	}
+	return transactions;
+}
+
+const TRANSACTION_LEDGER = Object.freeze({
+	acquire: acquireTransactionLock,
+	fold: foldTransactions,
+	path: transactionsPath,
+	corruptCode: TX_CORRUPT_CODE,
+	sizeCeilingCode: TX_SIZE_CEILING_CODE,
+	envName: "AMBER_RETENTION_MAX_TRANSACTIONS_BYTES",
+	defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
+	label: "retention transaction ledger",
+});
+
+/**
+ * Open one deletion transaction from one AUTHORIZED candidate: the
+ * transaction snapshots the reviewed Holder coverage, and a candidate
+ * executes at most once — a retry never re-opens completed deletion
+ * effects, it settles the same transaction's unsettled Holders.
+ */
+function executeDeletion(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(RETENTION_INVALID_CODE, ["execute input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(RETENTION_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(input, ["id", "candidateId"], "execute input");
+	if (inputClosed !== null) return fail(RETENTION_INVALID_CODE, [inputClosed]);
+	for (const field of ["id", "candidateId"]) {
+		if (!isNonEmptyString(input[field]))
+			return fail(RETENTION_INVALID_CODE, [`${field} must be a non-empty string`]);
+	}
+	let candidate;
+	try {
+		candidate = showDeletionCandidate(cwd, input.candidateId);
+	} catch (err) {
+		return fail(err.amberCode || CANDIDATE_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (candidate === null)
+		return fail(RETENTION_NOT_FOUND_CODE, [
+			`candidate ${JSON.stringify(input.candidateId)} does not exist`,
+		]);
+	if (candidate.status !== "authorized")
+		return fail(RETENTION_INVALID_CODE, [
+			`candidate ${JSON.stringify(input.candidateId)} is not authorized; deletion executes only what a human authorized`,
+		]);
+	return appendLedgerEvent(
+		cwd,
+		TRANSACTION_LEDGER,
+		{
+			kind: "execution",
+			schemaVersion: RETENTION_SCHEMA_VERSION,
+			at: now.toISOString(),
+			id: input.id,
+			candidateId: candidate.id,
+			candidateHash: candidate.candidateHash,
+			holders: candidate.holders,
+		},
+		(fold) => {
+			if (fold.some((entry) => entry.id === input.id))
+				return fail(RETENTION_INVALID_CODE, [
+					`transaction ${JSON.stringify(input.id)} already exists`,
+				]);
+			if (fold.some((entry) => entry.candidateId === input.candidateId))
+				return fail(RETENTION_INVALID_CODE, [
+					`candidate ${JSON.stringify(input.candidateId)} already executed; duplicate execution refuses — retry settles the existing transaction's unsettled Holders`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.id === input.id),
+	);
+}
+
+/**
+ * Settle one covered Holder with a declared receipt. Every Holder settles
+ * independently; a settled Holder refuses re-settlement so a retry can
+ * never repeat a completed deletion effect, while refused, failed, and
+ * unavailable Holders stay retryable.
+ */
+function settleHolder(cwd, input = {}, opts = {}) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	if (!isPlainObject(input))
+		return fail(RETENTION_INVALID_CODE, ["settle input must be an object"]);
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	if (Number.isNaN(now.getTime()))
+		return fail(RETENTION_INVALID_CODE, ["now must be a valid clock"]);
+	const inputClosed = unknownFieldProblem(
+		input,
+		["transactionId", "holder", "status", "receiptHash"],
+		"settle input",
+	);
+	if (inputClosed !== null) return fail(RETENTION_INVALID_CODE, [inputClosed]);
+	if (!isNonEmptyString(input.transactionId))
+		return fail(RETENTION_INVALID_CODE, ["transactionId must be a non-empty string"]);
+	if (!isPlainObject(input.holder))
+		return fail(RETENTION_INVALID_CODE, ["holder must be an object carrying id and version"]);
+	const holderClosed = closedFieldProblem(input.holder, HOLDER_PIN_FIELDS, "holder");
+	if (holderClosed !== null) return fail(RETENTION_INVALID_CODE, [holderClosed]);
+	for (const field of ["id", "version"]) {
+		if (!isNonEmptyString(input.holder[field]))
+			return fail(RETENTION_INVALID_CODE, [`holder.${field} must be a non-empty string`]);
+	}
+	if (!SETTLEMENT_STATUSES.includes(input.status))
+		return fail(RETENTION_INVALID_CODE, [
+			`status must be one of ${SETTLEMENT_STATUSES.join(", ")}`,
+		]);
+	if (!/^sha256:[0-9a-f]{64}$/.test(input.receiptHash ?? ""))
+		return fail(RETENTION_INVALID_CODE, ["receiptHash must be a sha256:<64-hex> string"]);
+	const key = holderKey(input.holder.id, input.holder.version);
+	return appendLedgerEvent(
+		cwd,
+		TRANSACTION_LEDGER,
+		// Adapter provenance copies from the transaction's reviewed Holder
+		// coverage — a settlement can never declare a different executor.
+		// The guard ran first on this same fold, so both lookups succeed; a
+		// null fallback fails event validation closed if that ever changes.
+		(fold) => {
+			const transaction = fold.find((entry) => entry.id === input.transactionId) ?? null;
+			const covered =
+				transaction === null
+					? null
+					: (transaction.holders.find((entry) => holderKey(entry.id, entry.version) === key) ??
+						null);
+			return {
+				kind: "settlement",
+				schemaVersion: RETENTION_SCHEMA_VERSION,
+				at: now.toISOString(),
+				transactionId: input.transactionId,
+				holder: { id: input.holder.id, version: input.holder.version },
+				status: input.status,
+				adapter: covered === null ? null : covered.adapter,
+				receiptHash: input.receiptHash,
+			};
+		},
+		(fold) => {
+			const transaction = fold.find((entry) => entry.id === input.transactionId) ?? null;
+			if (transaction === null)
+				return fail(RETENTION_NOT_FOUND_CODE, [
+					`transaction ${JSON.stringify(input.transactionId)} does not exist`,
+				]);
+			const covered = transaction.holders.find(
+				(entry) => holderKey(entry.id, entry.version) === key,
+			);
+			if (!covered)
+				return fail(RETENTION_INVALID_CODE, [
+					`Holder ${JSON.stringify(key)} is outside the transaction's declared coverage; a settlement binds a reviewed Holder`,
+				]);
+			const prior = transaction.settlements[key];
+			if (prior && prior.status === "settled")
+				return fail(RETENTION_INVALID_CODE, [
+					`Holder ${JSON.stringify(key)} already settled; a completed deletion effect can never repeat — retry targets only unsettled Holders`,
+				]);
+			return null;
+		},
+		(fold) => fold.find((entry) => entry.id === input.transactionId),
+	);
+}
+
+function deletionStatus(cwd, id) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	let transaction;
+	try {
+		transaction = foldTransactions(cwd).find((entry) => entry.id === id) ?? null;
+	} catch (err) {
+		return fail(err.amberCode || TX_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (transaction === null)
+		return fail(RETENTION_NOT_FOUND_CODE, [`transaction ${JSON.stringify(id)} does not exist`]);
+	const holders = transaction.holders.map((entry) => ({
+		holder: { id: entry.id, version: entry.version },
+		surface: entry.surface,
+		adapter: entry.adapter,
+		settlement: transaction.settlements[holderKey(entry.id, entry.version)] ?? null,
+	}));
+	return {
+		ok: true,
+		code: null,
+		record: {
+			id: transaction.id,
+			candidateId: transaction.candidateId,
+			candidateHash: transaction.candidateHash,
+			executedAt: transaction.executedAt,
+			status: transaction.status,
+			holders,
+			unsettled: holders
+				.filter((entry) => entry.settlement === null || entry.settlement.status !== "settled")
+				.map((entry) => holderKey(entry.holder.id, entry.holder.version)),
+		},
+		errors: [],
+	};
+}
+
+/**
+ * The minimal Deletion Proof, derived read-only and ONLY from full
+ * coverage: transaction identity, declared coverage, per-Holder receipts,
+ * policy and legal-basis pins, settlement time, and a controlled salted
+ * proof fingerprint (salted with the ledger-internal execution hash — not
+ * reconstructable from public content, and never a content hash). It
+ * states declared, settled coverage — never universal physical erasure.
+ */
+function deletionProof(cwd, id) {
+	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
+	const status = deletionStatus(cwd, id);
+	if (!status.ok) return status;
+	if (status.record.status !== "completed")
+		return fail(RETENTION_INVALID_CODE, [
+			`transaction ${JSON.stringify(id)} is deletion-pending; the Proof states only settled coverage and can never overclaim`,
+		]);
+	let candidate;
+	try {
+		candidate = showDeletionCandidate(cwd, status.record.candidateId);
+	} catch (err) {
+		return fail(err.amberCode || CANDIDATE_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	if (candidate === null)
+		return fail(RETENTION_NOT_FOUND_CODE, [
+			`candidate ${JSON.stringify(status.record.candidateId)} does not exist`,
+		]);
+	let transaction;
+	try {
+		transaction = foldTransactions(cwd).find((entry) => entry.id === id) ?? null;
+	} catch (err) {
+		return fail(err.amberCode || TX_CORRUPT_CODE, [err.message || String(err)]);
+	}
+	// The append-only ledger cannot lose the transaction between the two
+	// folds; fail closed anyway rather than dereference a hole.
+	if (transaction === null)
+		return fail(TX_CORRUPT_CODE, [`transaction ${JSON.stringify(id)} vanished between reads`]);
+	const settledAt = status.record.holders
+		.map((entry) => entry.settlement.at)
+		.sort()
+		.at(-1);
+	return {
+		ok: true,
+		code: null,
+		record: {
+			transactionId: id,
+			candidateId: candidate.id,
+			candidateHash: candidate.candidateHash,
+			declaredCoverage: {
+				records: candidate.records.map((entry) => ({
+					record: entry.record,
+					retentionClass: entry.retentionClass,
+					legalBasis: entry.legalBasis,
+					policy: entry.policy,
+				})),
+				holders: status.record.holders.map((entry) => ({
+					holder: entry.holder,
+					surface: entry.surface,
+				})),
+			},
+			receipts: status.record.holders.map((entry) => ({
+				holder: entry.holder,
+				adapter: entry.adapter,
+				status: entry.settlement.status,
+				receiptHash: entry.settlement.receiptHash,
+				at: entry.settlement.at,
+			})),
+			authorization: candidate.authorization,
+			settledAt,
+			proofFingerprint: canonicalHashOf({
+				salt: transaction.executionHash,
+				transactionId: id,
+				candidateHash: candidate.candidateHash,
+			}),
+		},
+		errors: [],
+	};
+}
+
+// Deleted records project as tombstones: minimal stable identity plus the
+// proof reference, never content — pending transactions read as pending.
+function deletionTombstones(cwd) {
+	const transactions = foldTransactions(cwd);
+	if (transactions.length === 0) return [];
+	const candidates = foldCandidates(cwd);
+	const tombstones = [];
+	for (const transaction of transactions) {
+		const candidate = candidates.find((entry) => entry.id === transaction.candidateId);
+		if (!candidate) continue;
+		for (const entry of candidate.records) {
+			tombstones.push({
+				record: entry.record,
+				transactionId: transaction.id,
+				status: transaction.status === "completed" ? "deleted" : "deletion-pending",
+			});
+		}
+	}
+	return tombstones;
+}
+
 module.exports = {
 	RETENTION_SCHEMA_VERSION,
 	SUPPORTED_RETENTION_SCHEMA_VERSIONS,
@@ -1448,4 +1942,12 @@ module.exports = {
 	authorizeDeletion,
 	showDeletionCandidate,
 	listDeletionCandidates,
+	SETTLEMENT_STATUSES,
+	TRANSACTION_STATUSES,
+	transactionsPath,
+	executeDeletion,
+	settleHolder,
+	deletionStatus,
+	deletionProof,
+	deletionTombstones,
 };

@@ -1349,11 +1349,12 @@ Error codes: `AMBER_E_MAINTAIN_INVALID`, `AMBER_E_MAINTAIN_EXISTS`, `AMBER_E_MAI
 `AMBER_E_MAINTAIN_PROPOSAL_CORRUPT`, `AMBER_E_MAINTAIN_PROPOSAL_LOCK`,
 `AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING`.
 
-### retention classify / evaluate / classifications / hold / release / holds / holder / holders / candidate / authorize / candidates
+### retention classify / evaluate / classifications / hold / release / holds / holder / holders / candidate / authorize / candidates / execute / settle / status / proof
 
 Classify records into governed retention classes, evaluate expiry deterministically (F055 T1),
-govern Legal Holds (F055 T2), and review deletion candidates with bounded authorization (F055
-T3). A classification binds one committed canonical record
+govern Legal Holds (F055 T2), review deletion candidates with bounded authorization (F055 T3),
+and settle coordinated deletion with a minimal Proof (F055 T4). A classification binds one
+committed canonical record
 (`<type>:<identity>@<revision>`) to a
 protocol-defined retention class — `ephemeral|operational|governance|audit`, fixed semantics —
 whose TTL and legal basis resolve at classification time from a committed, versioned tenant
@@ -1401,6 +1402,23 @@ clock — changed records, holds, Holders, or effects refuse with `AMBER_E_RETEN
 consumption settles the human Decision atomically. Execution and settlement are F055 T4, behind
 their own governance.
 
+`execute` opens exactly one deletion transaction per AUTHORIZED candidate in the hash-chained
+ledger `.amber/retention/transactions.jsonl`, snapshotting the reviewed Holder coverage — a merely
+prepared candidate and duplicate execution both refuse. Every covered Holder settles independently
+(`settle`, closed statuses `settled|refused|failed|unavailable`, with the reviewed adapter pin
+recorded as provenance and a declared `receiptHash`): the transaction reads `deletion-pending`
+while ANY Holder is unsettled — Amber cannot overclaim completion — a settled Holder refuses
+re-settlement in any status (a validly re-chained repeat fails the read closed), and a retry
+targets only unsettled Holders. `proof` derives the minimal Deletion Proof read-only and ONLY from
+full settled coverage: transaction identity, declared coverage (records with their retention
+class, legal basis, and policy pins; Holders with surfaces), per-Holder receipts, the consumed
+authorization, settlement time, and a controlled proof fingerprint salted with the ledger-internal
+execution hash — never a reconstructable public content hash, and no deleted content in any field.
+Deleted records project as tombstones (stable identity + transaction reference,
+`deleted|deletion-pending`), and a tombstoned subject refuses Gate evaluation with
+`AMBER_E_RETENTION_TOMBSTONE`: historical existence is not current proof, so a deleted record can
+never satisfy content, replay, or freshness Gates.
+
 ```bash
 node scripts/amber.js retention classify --target . --record spec:spec/login@2 \
   --retention-class operational --policy policy/tenant-retention@1 --json
@@ -1424,6 +1442,13 @@ node scripts/amber.js retention authorize --target . --id deletion/2026-08 \
   --approval approval/deletion-42 --decision-identity decision/deletion-42 \
   --body "# Authorize deletion" --trace decides:intent:intent/retention --json
 node scripts/amber.js retention candidates --target . --status prepared --json
+node scripts/amber.js retention execute --target . --id deletion-tx/2026-08 \
+  --candidate deletion/2026-08 --json
+node scripts/amber.js retention settle --target . --id deletion-tx/2026-08 \
+  --holder holder/canonical-body --holder-version 1 --status settled \
+  --receipt-hash sha256:<64-hex-chars> --json
+node scripts/amber.js retention status --target . --id deletion-tx/2026-08 --json
+node scripts/amber.js retention proof --target . --id deletion-tx/2026-08 --json
 ```
 
 Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
@@ -1432,7 +1457,9 @@ Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
 `AMBER_E_RETENTION_HOLD_SIZE_CEILING`, `AMBER_E_RETENTION_HOLDER_CORRUPT`,
 `AMBER_E_RETENTION_HOLDER_LOCK`, `AMBER_E_RETENTION_HOLDER_SIZE_CEILING`,
 `AMBER_E_RETENTION_CANDIDATE_CORRUPT`, `AMBER_E_RETENTION_CANDIDATE_LOCK`,
-`AMBER_E_RETENTION_CANDIDATE_SIZE_CEILING`, `AMBER_E_RETENTION_DRIFT`.
+`AMBER_E_RETENTION_CANDIDATE_SIZE_CEILING`, `AMBER_E_RETENTION_DRIFT`,
+`AMBER_E_RETENTION_TX_CORRUPT`, `AMBER_E_RETENTION_TX_LOCK`,
+`AMBER_E_RETENTION_TX_SIZE_CEILING`, `AMBER_E_RETENTION_TOMBSTONE`.
 
 ## Handoff Commands
 

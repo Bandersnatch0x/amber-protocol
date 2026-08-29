@@ -967,6 +967,32 @@ function evaluateGate(cwd, input = {}, opts = {}) {
 			`revision must be a positive integer when provided (the committed gate revision to evaluate; defaults to the current committed head); got ${JSON.stringify(revision)}`,
 		]);
 	}
+	// F055 T4 (#286): a tombstoned subject cannot be re-proven. Deleted or
+	// deletion-pending records refuse Gate evaluation instead of letting
+	// historical existence satisfy content, replay, or freshness Gates.
+	// The guard binds at the SUBJECT seam because Evidence receipts carry
+	// free-text subjects with no record linkage - refusing the subject
+	// blocks every receipt about it, a conservative superset. The match is
+	// deliberately type-agnostic (identity@revision): over-blocking is
+	// fail-safe. Lazy require: retention depends on approval-registry, not
+	// on gates.
+	{
+		const { deletionTombstones } = require("./retention-registry");
+		let tombstones;
+		try {
+			tombstones = deletionTombstones(cwd);
+		} catch (err) {
+			return fail(err.amberCode || "AMBER_E_RETENTION_TX_CORRUPT", [err.message || String(err)]);
+		}
+		const tombstone = tombstones.find(
+			(entry) => `${entry.record.identity}@${entry.record.revision}` === subject,
+		);
+		if (tombstone) {
+			return fail("AMBER_E_RETENTION_TOMBSTONE", [
+				`subject ${JSON.stringify(subject)} is ${tombstone.status} under deletion transaction ${JSON.stringify(tombstone.transactionId)}; historical existence is not current proof — a deleted record cannot satisfy content, replay, or freshness Gates`,
+			]);
+		}
+	}
 	const clock = evaluationClockValue(input, opts);
 	if (!clock.ok) return fail(INVALID_ARG_CODE, [clock.message]);
 	const evalNow = clock.date;

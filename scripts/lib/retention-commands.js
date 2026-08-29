@@ -41,6 +41,9 @@ function missingValueFlag(args) {
 		["body", "--body"],
 		["scope", "--scope"],
 		["traceVal", "--trace"],
+		["candidate", "--candidate"],
+		["holder", "--holder"],
+		["receiptHash", "--receipt-hash"],
 		["target", "--target"],
 	];
 	for (const [key, flag] of valueFlags) {
@@ -120,6 +123,10 @@ const dispatch = defineCommand({
 		"candidate",
 		"authorize",
 		"candidates",
+		"execute",
+		"settle",
+		"status",
+		"proof",
 	],
 	handlers: {
 		classify: (args) => {
@@ -409,6 +416,83 @@ const dispatch = defineCommand({
 				const failure = readFailure(args, err, CANDIDATE_READ_FAILURE_CODE);
 				return { ...failure.result, exitCode: failure.exitCode };
 			}
+		},
+		execute: (args) => {
+			const { executeDeletion } = require("./core/retention-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "deletion-tx/2026-08"],
+				["candidate", "--candidate", "deletion/2026-08"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			return resultEnvelope(
+				executeDeletion(target.value, {
+					id: String(args.id),
+					candidateId: String(args.candidate),
+				}),
+			);
+		},
+		settle: (args) => {
+			const { settleHolder } = require("./core/retention-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			for (const [key, flag, example] of [
+				["id", "--id", "deletion-tx/2026-08"],
+				["holder", "--holder", "holder/canonical-body"],
+				["holderVersion", "--holder-version", "1"],
+				["status", "--status", "settled"],
+				["receiptHash", "--receipt-hash", "sha256:<64-hex>"],
+			]) {
+				const required = requiredString(args, key, flag, example);
+				if (required.error) return invalidArg(required.error);
+			}
+			return resultEnvelope(
+				settleHolder(target.value, {
+					transactionId: String(args.id),
+					holder: { id: String(args.holder), version: String(args.holderVersion) },
+					status: String(args.status),
+					receiptHash: String(args.receiptHash),
+				}),
+			);
+		},
+		status: (args) => {
+			const { deletionStatus } = require("./core/retention-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "deletion-tx/2026-08");
+			if (id.error) return invalidArg(id.error);
+			return resultEnvelope(deletionStatus(target.value, id.value));
+		},
+		proof: (args) => {
+			const { deletionProof } = require("./core/retention-registry");
+			const truncated = missingValueFlag(args);
+			if (truncated)
+				return invalidArg(
+					`${truncated} requires a value; it was the last token on the command line`,
+				);
+			const target = targetValue(args);
+			if (target.error) return invalidArg(target.error);
+			const id = requiredString(args, "id", "--id", "deletion-tx/2026-08");
+			if (id.error) return invalidArg(id.error);
+			return resultEnvelope(deletionProof(target.value, id.value));
 		},
 	},
 });

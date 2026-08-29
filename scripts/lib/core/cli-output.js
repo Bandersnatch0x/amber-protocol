@@ -270,6 +270,11 @@ const FLAG_SPECS = {
 	// --scope are shared with existing surfaces).
 	"--holder-version": { key: "holderVersion" },
 	"--adapter": { key: "adapter" },
+	// F055 ticket 4 (#286): deletion transaction flags (--id, --status,
+	// and --holder-version are shared with existing surfaces).
+	"--candidate": { key: "candidate" },
+	"--holder": { key: "holder" },
+	"--receipt-hash": { key: "receiptHash" },
 	"--all": { key: "all", kind: "boolean" },
 	"--explain": { key: "explain", kind: "boolean" },
 	"--strict": { key: "strict", kind: "boolean" },

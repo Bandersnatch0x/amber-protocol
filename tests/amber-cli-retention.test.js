@@ -184,11 +184,13 @@ test("retention help and unknown actions route through the shared dispatcher", (
 	assert.match(help.stdout, /holder --id <holder-id> --holder-version <v>/);
 	assert.match(help.stdout, /candidate --id <candidate-id> \[--now <iso>\]/);
 	assert.match(help.stdout, /candidates \[--status <prepared\|authorized>\]/);
+	assert.match(help.stdout, /execute --id <transaction-id> --candidate <candidate-id>/);
+	assert.match(help.stdout, /proof --id <transaction-id>/);
 	const unknown = runCli(["retention", "delete", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);
 	assert.match(
 		envelope(unknown).errors[0],
-		/retention requires classify, evaluate, classifications, hold, release, holds, holder, holders, candidate, authorize, or candidates/,
+		/retention requires classify, evaluate, classifications, hold, release, holds, holder, holders, candidate, authorize, candidates, execute, settle, status, or proof/,
 	);
 });
 
@@ -300,6 +302,67 @@ test("retention holder, candidate, and bounded authorization at the CLI seam", (
 	);
 	assert.equal(badStatus.status, 1);
 	assert.equal(envelope(badStatus).code, "AMBER_E_INVALID_ARG");
+
+	// Execute, settle the Holder, and derive the Proof.
+	const executed = runCli(
+		[
+			"retention",
+			"execute",
+			"--target",
+			".",
+			"--id",
+			"tx/1",
+			"--candidate",
+			"deletion/1",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(executed.status, 0, executed.stderr || executed.stdout);
+	assert.equal(payload(executed).status, "deletion-pending");
+
+	const prematureProof = runCli(
+		["retention", "proof", "--target", ".", "--id", "tx/1", "--json"],
+		dir,
+	);
+	assert.equal(prematureProof.status, 1);
+	assert.equal(envelope(prematureProof).code, "AMBER_E_RETENTION_INVALID");
+	assert.match(envelope(prematureProof).errors[0], /the Proof states only settled coverage/);
+
+	const receiptHash = `sha256:${"c".repeat(64)}`;
+	const settled = runCli(
+		[
+			"retention",
+			"settle",
+			"--target",
+			".",
+			"--id",
+			"tx/1",
+			"--holder",
+			"holder/canonical-body",
+			"--holder-version",
+			"1",
+			"--status",
+			"settled",
+			"--receipt-hash",
+			receiptHash,
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(settled.status, 0, settled.stderr || settled.stdout);
+	assert.equal(payload(settled).status, "completed");
+
+	const txStatus = runCli(["retention", "status", "--target", ".", "--id", "tx/1", "--json"], dir);
+	assert.equal(txStatus.status, 0, txStatus.stderr || txStatus.stdout);
+	assert.equal(payload(txStatus).status, "completed");
+	assert.deepEqual(payload(txStatus).unsettled, []);
+
+	const proof = runCli(["retention", "proof", "--target", ".", "--id", "tx/1", "--json"], dir);
+	assert.equal(proof.status, 0, proof.stderr || proof.stdout);
+	assert.equal(payload(proof).transactionId, "tx/1");
+	assert.equal(payload(proof).receipts[0].receiptHash, receiptHash);
+	assert.match(payload(proof).proofFingerprint, /^sha256:[0-9a-f]{64}$/);
 
 	fs.appendFileSync(candidatesPath(dir), '{"kind":"candidate"}\n');
 	const corrupt = runCli(["retention", "candidates", "--target", ".", "--json"], dir);

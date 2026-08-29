@@ -2215,6 +2215,40 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_RETENTION_CANDIDATE_CORRUPT", "AMBER_E_RETENTION_INVALID"],
 	},
+	AMBER_E_RETENTION_TX_CORRUPT: {
+		title: "Deletion transaction ledger corrupt",
+		cause:
+			"The transaction ledger under .amber/retention/ has a broken hash chain, an invalid event shape, a duplicate execution, a settlement outside declared coverage, a re-settlement of a settled Holder, or an unsupported schema version — reads fail closed.",
+		remedy:
+			"Restore .amber/retention/transactions.jsonl from version control or a backup; the ledger is append-only and must not be edited in place.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_CANDIDATE_CORRUPT", "AMBER_E_RETENTION_TX_LOCK"],
+	},
+	AMBER_E_RETENTION_TX_LOCK: {
+		title: "Deletion transaction ledger lock contended",
+		cause: "Another process holds the transaction ledger lock (fresh within its stale window).",
+		remedy: "Retry after the concurrent settlement finishes.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_TX_CORRUPT", "AMBER_E_RETENTION_LOCK"],
+	},
+	AMBER_E_RETENTION_TX_SIZE_CEILING: {
+		title: "Deletion transaction ledger size ceiling reached",
+		cause:
+			"Appending the event would grow the ledger past its byte ceiling (default 1 MiB, AMBER_RETENTION_MAX_TRANSACTIONS_BYTES).",
+		remedy:
+			"Raise AMBER_RETENTION_MAX_TRANSACTIONS_BYTES deliberately or archive the ledger through a governed migration.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_TX_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_RETENTION_TOMBSTONE: {
+		title: "Subject is tombstoned by a deletion transaction",
+		cause:
+			"The gated subject's record is deleted or deletion-pending under a recorded deletion transaction; historical existence is not current proof, so a tombstoned record cannot satisfy content, replay, or freshness Gates.",
+		remedy:
+			"Gate a live record instead; the tombstone preserves only the stable identity and the Deletion Proof reference.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_TX_CORRUPT", "AMBER_E_GATE_EXPIRED"],
+	},
 	AMBER_E_SYNC_TRANSPORT_COMMIT_FAILED: {
 		title: "Sync transport git command failed",
 		cause:

@@ -45,11 +45,20 @@ const {
 	authorizeDeletion,
 	showDeletionCandidate,
 	listDeletionCandidates,
+	SETTLEMENT_STATUSES,
+	TRANSACTION_STATUSES,
+	transactionsPath,
+	executeDeletion,
+	settleHolder,
+	deletionStatus,
+	deletionProof,
+	deletionTombstones,
 } = require("../../scripts/lib/core/retention-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const { registerAdapter } = require("../../scripts/lib/core/adapter-registry");
 const { grantApproval } = require("../../scripts/lib/core/approval-registry");
+const { evaluateGate } = require("../../scripts/lib/core/gate-evaluation");
 
 function mkTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-retention-${label}-`));
@@ -975,4 +984,304 @@ test("a tampered candidate ledger fails every read closed", () => {
 	const blocked = prepareDeletionCandidate(dir, { id: "deletion/2" }, { now: expired });
 	assert.equal(blocked.ok, false);
 	assert.equal(blocked.code, "AMBER_E_RETENTION_CANDIDATE_CORRUPT");
+});
+
+const HASH_A = `sha256:${"a".repeat(64)}`;
+const HASH_B = `sha256:${"b".repeat(64)}`;
+
+/** Two Holders, one classified record, one AUTHORIZED candidate. */
+function authorizedFixture(dir) {
+	deletionFixture(dir);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(registerHolder(dir, holderInput(), { now: NOW }).ok, true);
+	assert.equal(
+		registerHolder(
+			dir,
+			holderInput({
+				id: "holder/cache",
+				surface: "cache",
+				decision: { identity: "decision/holder-2", revision: 1 },
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(classify(dir, classifyInput(), { now: NOW }).ok, true);
+	const expired = new Date(NOW.getTime() + HOUR_MS);
+	const prepared = prepareDeletionCandidate(dir, { id: "deletion/1" }, { now: expired });
+	assert.equal(prepared.ok, true, (prepared.errors || []).join("; "));
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/deletion-1",
+				approver: "bob@example.com",
+				scope: null,
+				subject: `retention-deletion:${prepared.record.candidateHash}`,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: expired },
+		).ok,
+		true,
+	);
+	const authorized = authorizeDeletion(
+		dir,
+		{
+			id: "deletion/1",
+			approval: "approval/deletion-1",
+			decisionIdentity: "decision/deletion-consume-1",
+			body: "# Authorize deletion\n",
+			traces: [{ type: "decides", to: { type: "intent", identity: "intent/retention" } }],
+			scope: null,
+		},
+		{ now: expired },
+	);
+	assert.equal(authorized.ok, true, (authorized.errors || []).join("; "));
+	return expired;
+}
+
+function settleInput(overrides = {}) {
+	return {
+		transactionId: "tx/1",
+		holder: { id: "holder/canonical-body", version: "1" },
+		status: "settled",
+		receiptHash: HASH_A,
+		...overrides,
+	};
+}
+
+test("execute opens exactly one transaction per authorized candidate", () => {
+	assert.deepEqual([...SETTLEMENT_STATUSES], ["settled", "refused", "failed", "unavailable"]);
+	assert.deepEqual([...TRANSACTION_STATUSES], ["deletion-pending", "completed"]);
+	const dir = mkTarget("execute");
+	const expired = authorizedFixture(dir);
+	const executed = executeDeletion(
+		dir,
+		{ id: "tx/1", candidateId: "deletion/1" },
+		{ now: expired },
+	);
+	assert.equal(executed.ok, true, (executed.errors || []).join("; "));
+	assert.equal(executed.record.status, "deletion-pending");
+	assert.equal(executed.record.holders.length, 2);
+	// A merely prepared candidate refuses execution.
+	const later = new Date(NOW.getTime() + 2 * HOUR_MS);
+	assert.equal(prepareDeletionCandidate(dir, { id: "deletion/2" }, { now: later }).ok, true);
+	const unauthorized = executeDeletion(
+		dir,
+		{ id: "tx/2", candidateId: "deletion/2" },
+		{ now: later },
+	);
+	assert.equal(unauthorized.ok, false);
+	assert.match(
+		unauthorized.errors[0],
+		/is not authorized; deletion executes only what a human authorized/,
+	);
+	const ghost = executeDeletion(
+		dir,
+		{ id: "tx/2", candidateId: "deletion/ghost" },
+		{ now: expired },
+	);
+	assert.equal(ghost.ok, false);
+	assert.equal(ghost.code, "AMBER_E_RETENTION_NOT_FOUND");
+	const duplicateTx = executeDeletion(
+		dir,
+		{ id: "tx/1", candidateId: "deletion/1" },
+		{ now: expired },
+	);
+	assert.equal(duplicateTx.ok, false);
+	assert.match(duplicateTx.errors[0], /already exists/);
+	const duplicateCandidate = executeDeletion(
+		dir,
+		{ id: "tx/2", candidateId: "deletion/1" },
+		{ now: expired },
+	);
+	assert.equal(duplicateCandidate.ok, false);
+	assert.match(duplicateCandidate.errors[0], /already executed; duplicate execution refuses/);
+});
+
+test("every Holder settles independently and a settled Holder can never repeat", () => {
+	const dir = mkTarget("settle");
+	const expired = authorizedFixture(dir);
+	assert.equal(
+		executeDeletion(dir, { id: "tx/1", candidateId: "deletion/1" }, { now: expired }).ok,
+		true,
+	);
+	// A failed settlement keeps the transaction pending and retryable.
+	const failed = settleHolder(dir, settleInput({ status: "failed" }), { now: expired });
+	assert.equal(failed.ok, true, (failed.errors || []).join("; "));
+	assert.equal(failed.record.status, "deletion-pending");
+	// refused and unavailable are equally retryable non-coverage states.
+	assert.equal(settleHolder(dir, settleInput({ status: "refused" }), { now: expired }).ok, true);
+	assert.equal(
+		settleHolder(dir, settleInput({ status: "unavailable" }), { now: expired }).ok,
+		true,
+	);
+	assert.equal(deletionStatus(dir, "tx/1").record.status, "deletion-pending");
+	let status = deletionStatus(dir, "tx/1");
+	assert.deepEqual(status.record.unsettled, ["holder/canonical-body@1", "holder/cache@1"]);
+	// Retry settles the failed Holder; adapter provenance is recorded.
+	const retried = settleHolder(dir, settleInput({ receiptHash: HASH_B }), { now: expired });
+	assert.equal(retried.ok, true, (retried.errors || []).join("; "));
+	status = deletionStatus(dir, "tx/1");
+	assert.equal(status.record.status, "deletion-pending");
+	assert.deepEqual(status.record.unsettled, ["holder/cache@1"]);
+	assert.deepEqual(status.record.holders[0].settlement.adapter, {
+		id: "adapter/store",
+		version: "1",
+	});
+	// A settled Holder refuses re-settlement in any status.
+	const repeat = settleHolder(dir, settleInput({ status: "failed" }), { now: expired });
+	assert.equal(repeat.ok, false);
+	assert.match(repeat.errors[0], /already settled; a completed deletion effect can never repeat/);
+	// Outside declared coverage refuses.
+	const outside = settleHolder(dir, settleInput({ holder: { id: "holder/ghost", version: "1" } }), {
+		now: expired,
+	});
+	assert.equal(outside.ok, false);
+	assert.match(outside.errors[0], /outside the transaction's declared coverage/);
+	// Completion requires full coverage.
+	assert.equal(
+		settleHolder(dir, settleInput({ holder: { id: "holder/cache", version: "1" } }), {
+			now: expired,
+		}).ok,
+		true,
+	);
+	assert.equal(deletionStatus(dir, "tx/1").record.status, "completed");
+	assert.deepEqual(deletionStatus(dir, "tx/1").record.unsettled, []);
+});
+
+test("the Deletion Proof derives only from full settled coverage", () => {
+	const dir = mkTarget("proof");
+	const expired = authorizedFixture(dir);
+	assert.equal(
+		executeDeletion(dir, { id: "tx/1", candidateId: "deletion/1" }, { now: expired }).ok,
+		true,
+	);
+	const premature = deletionProof(dir, "tx/1");
+	assert.equal(premature.ok, false);
+	assert.match(premature.errors[0], /deletion-pending; the Proof states only settled coverage/);
+	assert.equal(settleHolder(dir, settleInput(), { now: expired }).ok, true);
+	assert.equal(
+		settleHolder(
+			dir,
+			settleInput({ holder: { id: "holder/cache", version: "1" }, receiptHash: HASH_B }),
+			{ now: expired },
+		).ok,
+		true,
+	);
+	const proof = deletionProof(dir, "tx/1");
+	assert.equal(proof.ok, true, (proof.errors || []).join("; "));
+	assert.equal(proof.record.transactionId, "tx/1");
+	assert.equal(proof.record.candidateId, "deletion/1");
+	assert.equal(proof.record.declaredCoverage.records.length, 1);
+	assert.equal(proof.record.declaredCoverage.records[0].legalBasis, "ops-contract");
+	assert.equal(proof.record.declaredCoverage.holders.length, 2);
+	assert.equal(proof.record.receipts.length, 2);
+	assert.equal(proof.record.receipts[0].status, "settled");
+	assert.equal(proof.record.authorization.approvalId, "approval/deletion-1");
+	assert.equal(proof.record.settledAt, expired.toISOString());
+	// Controlled fingerprint: sha256, salted, not the candidate hash, and
+	// stable across derivations.
+	assert.match(proof.record.proofFingerprint, /^sha256:[0-9a-f]{64}$/);
+	assert.notEqual(proof.record.proofFingerprint, proof.record.candidateHash);
+	assert.equal(deletionProof(dir, "tx/1").record.proofFingerprint, proof.record.proofFingerprint);
+	// No deleted content rides any proof field.
+	assert.equal(JSON.stringify(proof.record).includes("# L"), false);
+});
+
+test("deleted records project as tombstones and refuse Gate evaluation", () => {
+	const dir = mkTarget("tombstone");
+	const expired = authorizedFixture(dir);
+	assert.equal(
+		executeDeletion(dir, { id: "tx/1", candidateId: "deletion/1" }, { now: expired }).ok,
+		true,
+	);
+	let tombstones = deletionTombstones(dir);
+	assert.equal(tombstones.length, 1);
+	assert.deepEqual(tombstones[0], {
+		record: { type: "intent", identity: "intent/login", revision: 1 },
+		transactionId: "tx/1",
+		status: "deletion-pending",
+	});
+	// A deletion-pending subject already refuses Gate evaluation — the
+	// guard fires before the gate artifact resolves.
+	const pendingGate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/login@1" });
+	assert.equal(pendingGate.ok, false);
+	assert.equal(pendingGate.code, "AMBER_E_RETENTION_TOMBSTONE");
+	assert.match(pendingGate.errors[0], /historical existence is not current proof/);
+	// An unaffected subject falls through to normal gate resolution.
+	const liveGate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/other@1" });
+	assert.equal(liveGate.ok, false);
+	assert.notEqual(liveGate.code, "AMBER_E_RETENTION_TOMBSTONE");
+	// After full settlement the tombstone reads deleted.
+	assert.equal(settleHolder(dir, settleInput(), { now: expired }).ok, true);
+	assert.equal(
+		settleHolder(
+			dir,
+			settleInput({ holder: { id: "holder/cache", version: "1" }, receiptHash: HASH_B }),
+			{ now: expired },
+		).ok,
+		true,
+	);
+	tombstones = deletionTombstones(dir);
+	assert.equal(tombstones[0].status, "deleted");
+	const deletedGate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/login@1" });
+	assert.equal(deletedGate.code, "AMBER_E_RETENTION_TOMBSTONE");
+	// A corrupt transaction ledger fails the gate seam closed too.
+	fs.appendFileSync(transactionsPath(dir), '{"kind":"execution"}\n');
+	const corruptGate = evaluateGate(dir, { gate: "gate/ghost", subject: "intent/login@1" });
+	assert.equal(corruptGate.ok, false);
+	assert.equal(corruptGate.code, "AMBER_E_RETENTION_TX_CORRUPT");
+});
+
+test("a fresh transaction lock held by another writer refuses settlement", () => {
+	const dir = mkTarget("tx-lock");
+	const expired = authorizedFixture(dir);
+	assert.equal(
+		executeDeletion(dir, { id: "tx/1", candidateId: "deletion/1" }, { now: expired }).ok,
+		true,
+	);
+	const lockPath = path.join(dir, ".amber", "retention", "transactions.lock");
+	fs.writeFileSync(lockPath, "holder-token-1");
+	const contended = settleHolder(dir, settleInput(), { now: expired });
+	assert.equal(contended.ok, false);
+	assert.equal(contended.code, "AMBER_E_RETENTION_TX_LOCK");
+	fs.rmSync(lockPath);
+	assert.equal(settleHolder(dir, settleInput(), { now: expired }).ok, true);
+});
+
+test("a tampered transaction ledger fails every read closed", () => {
+	const dir = mkTarget("tx-tamper");
+	const expired = authorizedFixture(dir);
+	assert.equal(
+		executeDeletion(dir, { id: "tx/1", candidateId: "deletion/1" }, { now: expired }).ok,
+		true,
+	);
+	assert.equal(settleHolder(dir, settleInput(), { now: expired }).ok, true);
+	const pristine = readEvents(transactionsPath(dir));
+	const events = JSON.parse(JSON.stringify(pristine));
+	events[1].receiptHash = HASH_B;
+	writeEvents(transactionsPath(dir), events);
+	const status = deletionStatus(dir, "tx/1");
+	assert.equal(status.ok, false);
+	assert.equal(status.code, "AMBER_E_RETENTION_TX_CORRUPT");
+	const blockedSettle = settleHolder(
+		dir,
+		settleInput({ holder: { id: "holder/cache", version: "1" } }),
+		{ now: expired },
+	);
+	assert.equal(blockedSettle.ok, false);
+	assert.equal(blockedSettle.code, "AMBER_E_RETENTION_TX_CORRUPT");
+	// A validly re-chained re-settlement of a settled Holder fails closed.
+	const chained = (body, prevHash) => ({ ...body, prevHash, hash: chainHash(body, prevHash) });
+	const { prevHash: _prev, hash: _hash, ...settledBody } = pristine[1];
+	writeEvents(transactionsPath(dir), [
+		pristine[0],
+		pristine[1],
+		chained({ ...settledBody, receiptHash: HASH_B }, pristine[1].hash),
+	]);
+	const rechained = deletionStatus(dir, "tx/1");
+	assert.equal(rechained.ok, false);
+	assert.equal(rechained.code, "AMBER_E_RETENTION_TX_CORRUPT");
+	assert.match(rechained.errors[0], /can never repeat/);
 });
