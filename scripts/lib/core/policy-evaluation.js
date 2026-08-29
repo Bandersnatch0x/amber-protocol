@@ -61,6 +61,7 @@ const POLICY_CONTRACT_FIELDS = Object.freeze([
 ]);
 const POLICY_RULE_FIELDS = Object.freeze([
 	"requireSeparationOfDuties",
+	"denyBreakGlassOverdueReview",
 	"denyPrincipals",
 	"denyCapabilities",
 	"denyScopes",
@@ -254,6 +255,20 @@ function policyRulesProblem(rules, label) {
 			return {
 				code: POLICY_INVALID_CODE,
 				message: `${label}.requireSeparationOfDuties must be true when present; got ${JSON.stringify(rules.requireSeparationOfDuties)}`,
+			};
+		}
+	}
+	if (rules.denyBreakGlassOverdueReview !== undefined) {
+		if (rules.denyBreakGlassOverdueReview === false) {
+			return {
+				code: POLICY_CONFLICT_CODE,
+				message: `${label}.denyBreakGlassOverdueReview cannot be false: lower policy may only tighten the org/tenant ceiling and an overdue break-glass post-review is never waived`,
+			};
+		}
+		if (rules.denyBreakGlassOverdueReview !== true) {
+			return {
+				code: POLICY_INVALID_CODE,
+				message: `${label}.denyBreakGlassOverdueReview must be true when present; got ${JSON.stringify(rules.denyBreakGlassOverdueReview)}`,
 			};
 		}
 	}
@@ -602,6 +617,40 @@ function collectDenyRuleReasons(entries, { actors, capability, scopes }) {
 	return reasons;
 }
 
+// P8 (F057): a stack layer may declare denyBreakGlassOverdueReview — a
+// deny-only clause consuming the break-glass registry's overdue-review
+// projection. An ended emergency grant whose mandatory post-review is
+// overdue at the evaluation clock denies strict consumption under every
+// declaring layer, so review cannot be silently skipped; a corrupt grant
+// ledger refuses before any outcome is appended.
+function collectBreakGlassOverdueReasons(cwd, entries, evalNow) {
+	const declaring = entries.filter(
+		(entry) => (entry.contract.rules || {}).denyBreakGlassOverdueReview === true,
+	);
+	if (declaring.length === 0) return { ok: true, reasons: [] };
+	let overdue;
+	try {
+		const { overdueBreakGlassReviews } = require("./breakglass-registry");
+		overdue = overdueBreakGlassReviews(cwd, { now: evalNow });
+	} catch (err) {
+		return {
+			ok: false,
+			code: err.amberCode || "AMBER_E_BREAKGLASS_CORRUPT",
+			errors: [err.message || String(err)],
+		};
+	}
+	const reasons = [];
+	for (const entry of declaring) {
+		for (const grant of overdue) {
+			pushUnique(
+				reasons,
+				`${entry.layer} policy "${entry.identity}" denies consumption while break-glass grant "${grant.id}" has an overdue post-review (due ${grant.reviewBy}); emergency review cannot be silently skipped`,
+			);
+		}
+	}
+	return { ok: true, reasons };
+}
+
 function resolveDelegation(entries, { delegator, submitter, capability, subject, evalNowMs }) {
 	if (delegator === null) return { ok: true, delegation: null, reasons: [] };
 	for (const entry of entries) {
@@ -877,6 +926,9 @@ function evaluatePolicy(cwd, input = {}, opts = {}) {
 	})) {
 		pushUnique(reasons, reason);
 	}
+	const breakGlassOverdue = collectBreakGlassOverdueReasons(cwd, stack.entries, evalNow);
+	if (!breakGlassOverdue.ok) return fail(breakGlassOverdue.code, breakGlassOverdue.errors);
+	for (const reason of breakGlassOverdue.reasons) pushUnique(reasons, reason);
 
 	if (delegatorPrincipalSnapshot !== null) {
 		if (delegatorPrincipalSnapshot.capability !== input.capability) {

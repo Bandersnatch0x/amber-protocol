@@ -829,9 +829,13 @@ stale, unsupported, missing, or conflicting policy refuses before any outcome is
 
 Contract keys: `policyVersion` (v1), `layer` (`org|tenant|repo|play|gate`), optional
 `validUntil`, optional `maxPolicyAgeMs`, `rules`, and `delegations`. Rules are deny-only:
-`denyPrincipals`, `denyCapabilities`, `denyScopes`, and `requireSeparationOfDuties: true`. Lower
-layers cannot relax the ceiling; unsupported allow/relax keys and
-`requireSeparationOfDuties: false` fail closed. Delegations are direct only, may be declared only by
+`denyPrincipals`, `denyCapabilities`, `denyScopes`, `requireSeparationOfDuties: true`, and
+`denyBreakGlassOverdueReview: true` (F057 P8 — a declaring layer denies strict consumption while
+any ended break-glass grant's mandatory post-review is overdue at the evaluation clock, so
+emergency review cannot be silently skipped; a corrupt grant ledger refuses before any outcome).
+Lower layers cannot relax the ceiling; unsupported allow/relax keys,
+`requireSeparationOfDuties: false`, and `denyBreakGlassOverdueReview: false` fail closed.
+Delegations are direct only, may be declared only by
 org/tenant policies, and must match the named delegator, delegate, exact capability, exact
 subject/scope, and half-open validity window. The delegator principal itself must carry that same
 capability and scope; chains are never followed.
@@ -1664,7 +1668,12 @@ the granted environment; external contracts carry no environment axis) — a gra
 itself, and break-glass never substitutes for the underlying authorization. Consumption refuses a
 revoked grant, a window that has not opened, and expiry at exactly `validUntil` (half-open, no
 skew tolerance); the use event records the exact admitted request hash, and a validly re-chained
-use outside the window or of a spent grant fails every read closed. A used grant is terminal: it
+use outside the window or of a spent grant fails every read closed. Separation of duties is
+enforced on every derivable axis: a runner request whose rollback-rehearsal Evidence was produced
+by the emergency approver refuses admission — Evidence producers cannot satisfy the required human
+emergency authorization slot (submitter and executor principals are not recorded by the underlying
+registries, so those axes are not derivably enforceable and remain post-review obligations; the
+human-only Decision slots are enforced at admission). A used grant is terminal: it
 cannot be revoked or re-used, `used` wins the read-time status derivation, and `show` reads one
 grant with its use, revocation, and window state. Nothing under this command executes anything —
 the underlying capability still runs only through its own governed F052/F056 surface.
@@ -1674,15 +1683,20 @@ receipt — an F056 execution id (which must settle the admitted request) or the
 hash — and derives the outcome (including failures and partial outcomes) plus the declared
 rollback/compensation linkage from the underlying registry, never from the caller; a claim without
 a resolvable reference refuses (break-glass never substitutes a claim for execution Evidence), an
-unsettled underlying execution refuses, and one settlement per grant records immutably. `review`
+unsettled underlying execution refuses, an external outcome whose reconciliation Evidence was
+produced by the emergency approver refuses (the Evidence that turned unknown into committed cannot
+come from the human who authorized the emergency), and one settlement per grant records immutably.
+`review`
 is the mandatory human post-review: `--outcome`, `--necessity`, `--impact`, and `--follow-up`
 (non-empty, preserved, leak-checked) behind a single-use committed human Decision, valid only
 after the grant ENDED through use, revocation, or expiry (a re-chained review before the end fails
 every read closed) — one review per grant, and a late review is still recordable but reads
 flagged. `status` projects the full lifecycle at the injected clock: the grant with its use,
 settlement, and review plus read-time `reviewOverdue` (ended + past `reviewBy` + unreviewed) and
-`reviewLate` flags — Policy consumers can fail closed on an overdue review, so review can never be
-silently skipped.
+`reviewLate` flags. Policy consumes the overdue projection through the declared deny-only
+`denyBreakGlassOverdueReview` rule (see `policy evaluate`): a declaring layer denies strict
+consumption while any post-review is overdue, so review can never be silently skipped — blocking
+follows Policy, visibility never disappears.
 
 No ungoverned door opens (T4): neither `--force` nor `--yes` is ever interpreted as break-glass —
 the handlers never consult those flags (test-pinned source scan plus a behavioral pin that the

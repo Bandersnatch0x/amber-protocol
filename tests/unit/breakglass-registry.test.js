@@ -38,6 +38,7 @@ const {
 	grantBreakGlass,
 	revokeBreakGlass,
 	showBreakGlassGrant,
+	overdueBreakGlassReviews,
 	listBreakGlassGrants,
 } = require("../../scripts/lib/core/breakglass-registry");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
@@ -49,6 +50,7 @@ const {
 	authorizeExternalEffect,
 	executeExternalEffect,
 	settleExternalExecution,
+	reconcileExternalExecution,
 } = require("../../scripts/lib/core/external-registry");
 const { grantApproval } = require("../../scripts/lib/core/approval-registry");
 const {
@@ -1680,4 +1682,263 @@ test("the break-glass registry never touches the sync transport surface", () => 
 	}
 	const dir = mkTarget("isolation");
 	assert.match(grantsPath(dir).replaceAll("\\", "/"), /\.amber\/breakglass\//);
+});
+
+// ---------------------------------------------------------------------------
+// F057 acceptance review P7/P8 -- derivable separation of duties and the
+// overdue post-review projection Policy consumes.
+// ---------------------------------------------------------------------------
+
+test("an emergency approver cannot produce the Evidence that settles the emergency", () => {
+	const dir = mkTarget("sod-evidence");
+	usableGrantFixture(dir);
+	assert.equal(
+		useBreakGlass(
+			dir,
+			{ id: "breakglass/incident-42-restore", reference: "request/1" },
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	assert.equal(
+		executeExternalEffect(
+			dir,
+			{
+				id: "execution/1",
+				request: "request/1",
+				credential: {
+					purpose: "comment.create",
+					scope: "tracker/amber-protocol",
+					expiresAt: new Date(USE_AT.getTime() + 30_000).toISOString(),
+				},
+			},
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	assert.equal(
+		settleExternalExecution(
+			dir,
+			{ id: "execution/1", requestDigest: `sha256:${"d".repeat(64)}`, declared: "unknown" },
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	// Reconciliation Evidence produced by the EMERGENCY approver passes the
+	// underlying independence check (the external authorizer is bob), but
+	// the emergency authorization slot is stricter: legal granted the
+	// break-glass, so legal's Evidence cannot settle it.
+	assert.equal(
+		recordEvidence(dir, {
+			id: "evidence/reconcile-1",
+			producer: "legal@example.com",
+			assurance: "observed",
+			scope: "F056",
+			subject: "external record TRACK-1234 verified",
+			inputs: null,
+			tools: null,
+			environment: null,
+			outputs: null,
+			status: "pass",
+		}).ok,
+		true,
+	);
+	assert.equal(
+		reconcileExternalExecution(
+			dir,
+			{ id: "execution/1", evidence: "evidence/reconcile-1", externalRecordId: "TRACK-1234" },
+			{ now: USE_AT },
+		).ok,
+		true,
+	);
+	const refused = settleBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", receipt: "execution/1" },
+		{ now: USE_AT },
+	);
+	assert.equal(refused.ok, false);
+	assert.equal(refused.code, "AMBER_E_BREAKGLASS_INVALID");
+	assert.match(
+		refused.errors[0],
+		/Evidence producers cannot satisfy the required human emergency authorization slot/,
+	);
+	assert.equal(
+		showBreakGlassGrant(dir, "breakglass/incident-42-restore", { now: USE_AT }).settlement,
+		null,
+	);
+});
+
+test("a rollback-rehearsal produced by the emergency approver refuses admission", () => {
+	const dir = mkTarget("sod-rehearsal");
+	decisionsFixture(dir, ["decision/breakglass-1", "decision/runner-1", "decision/cap-1"]);
+	assert.equal(registerPrincipal(dir, { id: "bob@example.com", principalKind: "human" }).ok, true);
+	assert.equal(
+		registerRunner(dir, {
+			id: "runner/ci",
+			version: "1.0.0",
+			integrityDigest: `sha256:${"a".repeat(64)}`,
+			owner: "platform-team",
+			decision: { identity: "decision/runner-1", revision: 1 },
+		}).ok,
+		true,
+	);
+	assert.equal(
+		registerRunnerCapability(dir, {
+			runnerId: "runner/ci",
+			runnerVersion: "1.0.0",
+			name: "deploy.staging-web",
+			capabilityVersion: "1",
+			effects: ["deploy"],
+			pathPrefixes: ["deploy/staging"],
+			timeoutMsMax: 600_000,
+			credentialRequirement: "scoped",
+			rollback: "runbook/staging-rollback",
+			decision: { identity: "decision/cap-1", revision: 1 },
+		}).ok,
+		true,
+	);
+	// The rehearsal Evidence is produced by the very human who authorizes
+	// the emergency below.
+	assert.equal(
+		recordEvidence(dir, {
+			id: "evidence/rehearsal-legal",
+			producer: "legal@example.com",
+			assurance: "observed",
+			scope: "F052",
+			subject: "staging rollback rehearsal",
+			inputs: null,
+			tools: null,
+			environment: null,
+			outputs: null,
+			status: "pass",
+		}).ok,
+		true,
+	);
+	assert.equal(
+		grantBreakGlass(
+			dir,
+			grantInput({
+				capability: {
+					kind: "runner",
+					runnerId: "runner/ci",
+					runnerVersion: "1.0.0",
+					name: "deploy.staging-web",
+					capabilityVersion: "1",
+				},
+				target: "repo/main",
+				scope: "deploy",
+				environment: "staging",
+			}),
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const submitted = submitRunnerRequest(
+		dir,
+		{
+			capability: {
+				runnerId: "runner/ci",
+				runnerVersion: "1.0.0",
+				name: "deploy.staging-web",
+				capabilityVersion: "1",
+			},
+			target: { repository: "repo/main", paths: ["deploy/staging/web"] },
+			scope: "deploy",
+			environment: "staging",
+			inputHashes: [`sha256:${"b".repeat(64)}`],
+			timeoutMs: 300_000,
+			effects: ["deploy"],
+			credentialRequirement: "scoped",
+			credential: {
+				handle: "cred-7f3a",
+				purpose: "staging-deploy",
+				scope: "deploy/staging",
+				expiresAt: new Date(NOW.getTime() + 12 * HOUR_MS).toISOString(),
+			},
+			rehearsal: "evidence/rehearsal-legal",
+			rollback: "runbook/staging-rollback",
+		},
+		{ now: NOW },
+	);
+	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
+	const hash = submitted.record.requestHash;
+	assert.equal(
+		grantApproval(
+			dir,
+			{
+				id: "approval/req-1",
+				approver: "bob@example.com",
+				scope: null,
+				subject: submitted.record.approvalBinding,
+				validUntil: "2036-01-01T00:00:00.000Z",
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	assert.equal(
+		authorizeRunnerRequest(
+			dir,
+			{
+				requestHash: hash,
+				approval: "approval/req-1",
+				decisionIdentity: "decision/req-1",
+				body: "# Authorize request\n",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/breakglass" } }],
+				scope: null,
+			},
+			{ now: NOW },
+		).ok,
+		true,
+	);
+	const refused = useBreakGlass(
+		dir,
+		{ id: "breakglass/incident-42-restore", reference: hash },
+		{ now: USE_AT },
+	);
+	assert.equal(refused.ok, false);
+	assert.match(
+		refused.errors[0],
+		/Evidence producers cannot satisfy the required human emergency authorization slot/,
+	);
+	// A refusal never consumes: the grant still reads granted.
+	assert.equal(
+		showBreakGlassGrant(dir, "breakglass/incident-42-restore", { now: USE_AT }).status,
+		"granted",
+	);
+});
+
+test("overdue post-reviews project for Policy consumption and clear once reviewed", () => {
+	const dir = mkTarget("overdue-reviews");
+	grantFixture(dir, ["decision/breakglass-1", "decision/effect-1", "decision/review-1"]);
+	assert.equal(grantBreakGlass(dir, grantInput(), { now: NOW }).ok, true);
+	// A live grant is never overdue, and an ended grant is not overdue
+	// before its declared deadline.
+	assert.deepEqual(overdueBreakGlassReviews(dir, { now: NOW }), []);
+	assert.deepEqual(
+		overdueBreakGlassReviews(dir, { now: new Date(NOW.getTime() + 2 * HOUR_MS) }),
+		[],
+	);
+	const overdueAt = new Date(NOW.getTime() + 80 * HOUR_MS);
+	assert.deepEqual(overdueBreakGlassReviews(dir, { now: overdueAt }), [
+		{ id: "breakglass/incident-42-restore", reviewBy: grantInput().reviewBy },
+	]);
+	// The mandatory review lands (late but recorded) and the projection
+	// clears -- Policy consumers stop denying.
+	assert.equal(
+		reviewBreakGlass(
+			dir,
+			{
+				id: "breakglass/incident-42-restore",
+				outcome: "incident resolved",
+				necessity: "primary path was down",
+				impact: "one ticket comment",
+				followUp: "add an alarm for the primary path",
+				decision: { identity: "decision/review-1", revision: 1 },
+			},
+			{ now: overdueAt },
+		).ok,
+		true,
+	);
+	assert.deepEqual(overdueBreakGlassReviews(dir, { now: overdueAt }), []);
 });

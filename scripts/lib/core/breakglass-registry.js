@@ -29,6 +29,7 @@ const {
 	showExternalProposal,
 	showExternalExecution,
 } = require("./external-registry");
+const { showEvidence } = require("./evidence-receipts");
 const {
 	GENESIS_HASH,
 	chainHash,
@@ -950,6 +951,24 @@ function resolveUseReference(cwd, grant, referenceId) {
 		return {
 			problem: `runner request ${JSON.stringify(referenceId)} targets repository ${JSON.stringify(request.target?.repository)} scope ${JSON.stringify(request.scope ?? null)}, not the granted target ${JSON.stringify(grant.target)} scope ${JSON.stringify(grant.scope)}; a grant cannot widen itself`,
 		};
+	// Derivable separation of duties (F057): an Evidence producer on the
+	// underlying request cannot be the human who authorized the emergency.
+	// Submitter and executor principals are not recorded by the underlying
+	// registries, so those axes are not derivably enforceable — they stay
+	// post-review obligations; the human-only Decision slots are enforced
+	// at grant/revoke/review admission.
+	if (isNonEmptyString(request.rehearsal)) {
+		let rehearsal;
+		try {
+			rehearsal = showEvidence(cwd, request.rehearsal);
+		} catch (err) {
+			return { problem: err.message || String(err), code: err.amberCode };
+		}
+		if (rehearsal !== null && rehearsal.producer.id === grant.decision.principal)
+			return {
+				problem: `rollback-rehearsal Evidence ${JSON.stringify(request.rehearsal)} was produced by the emergency approver ${JSON.stringify(grant.decision.principal)}; Evidence producers cannot satisfy the required human emergency authorization slot`,
+			};
+	}
 	return { requestHash: referenceId };
 }
 
@@ -1065,6 +1084,21 @@ function resolveSettlementReceipt(cwd, grant, receiptId) {
 			return {
 				problem: `execution ${JSON.stringify(receiptId)} settled unknown; an unknown outcome reconciles through independent Evidence before break-glass settles`,
 			};
+		// Derivable separation of duties (F057): the Evidence that turned an
+		// unknown outcome committed cannot come from the human who authorized
+		// the emergency.
+		if (execution.reconciliation !== null) {
+			let evidence;
+			try {
+				evidence = showEvidence(cwd, execution.reconciliation.evidence);
+			} catch (err) {
+				return { problem: err.message || String(err), code: err.amberCode };
+			}
+			if (evidence !== null && evidence.producer.id === grant.decision.principal)
+				return {
+					problem: `reconciliation Evidence ${JSON.stringify(execution.reconciliation.evidence)} was produced by the emergency approver ${JSON.stringify(grant.decision.principal)}; Evidence producers cannot satisfy the required human emergency authorization slot`,
+				};
+		}
 		let proposal;
 		try {
 			proposal = showExternalProposal(cwd, grant.use.reference.id);
@@ -1301,6 +1335,24 @@ function showBreakGlassGrant(cwd, id, opts = {}) {
 	return grant === null ? null : projectGrant(grant, now.getTime());
 }
 
+// The P8 seam Policy evaluation consumes: every ended grant whose
+// mandatory post-review is overdue at the clock. Read-only; a stack that
+// declares the break-glass overdue-review deny rule fails strict
+// consumption closed on a non-empty result, so review cannot be silently
+// skipped.
+function overdueBreakGlassReviews(cwd, opts = {}) {
+	const now = opts.now instanceof Date ? opts.now : new Date();
+	const nowMs = now.getTime();
+	return foldGrants(cwd)
+		.filter(
+			(grant) =>
+				grantStatusAt(grant, nowMs) !== "granted" &&
+				grant.review === null &&
+				nowMs >= Date.parse(grant.reviewBy),
+		)
+		.map((grant) => ({ id: grant.id, reviewBy: grant.reviewBy }));
+}
+
 function listBreakGlassGrants(cwd, { status = null, now = null } = {}) {
 	const clock = now instanceof Date ? now : new Date();
 	return foldGrants(cwd)
@@ -1329,5 +1381,6 @@ module.exports = {
 	reviewBreakGlass,
 	breakGlassStatus,
 	showBreakGlassGrant,
+	overdueBreakGlassReviews,
 	listBreakGlassGrants,
 };

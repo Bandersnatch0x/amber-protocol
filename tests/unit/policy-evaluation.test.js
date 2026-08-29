@@ -32,6 +32,13 @@ const {
 	listPolicyOutcomes,
 } = require("../../scripts/lib/core/policy-evaluation");
 const { writeJSONL } = require("../../scripts/lib/core/jsonl");
+const { registerAdapter } = require("../../scripts/lib/core/adapter-registry");
+const { registerExternalEffect } = require("../../scripts/lib/core/external-registry");
+const {
+	grantBreakGlass,
+	reviewBreakGlass,
+	grantsPath: breakGlassGrantsPath,
+} = require("../../scripts/lib/core/breakglass-registry");
 
 const SUBJECT = "spec/login@2";
 const EVAL_NOW = new Date("2026-08-10T00:00:00.000Z");
@@ -546,4 +553,148 @@ test("the outcome ledger fails closed on tamper and honors lock and ceiling", ()
 	} finally {
 		delete process.env.AMBER_POLICY_MAX_OUTCOME_BYTES;
 	}
+});
+
+// P8 (F057): Policy consumes the break-glass overdue-review projection
+// through the declared deny-only clause.
+function overdueBreakGlassFixture(dir) {
+	const minted = new Date("2026-08-01T00:00:00.000Z");
+	assert.equal(
+		admitArtifact(dir, { type: "intent", identity: "intent/incident", body: "# Incident\n" }).ok,
+		true,
+	);
+	for (const identity of ["decision/bg-effect", "decision/bg-grant", "decision/bg-review"]) {
+		assert.equal(
+			admitArtifact(dir, {
+				type: "decision",
+				identity,
+				body: `# ${identity}\n`,
+				decisionKind: "approval",
+				principal: "alice@example.com",
+				traces: [{ type: "decides", to: { type: "intent", identity: "intent/incident" } }],
+			}).ok,
+			true,
+		);
+	}
+	assert.equal(
+		registerAdapter(dir, {
+			id: "adapter/tracker",
+			owner: "platform-team",
+			adapterVersion: "1",
+			recordTypes: [{ type: "ticket", versions: ["v1"] }],
+			scope: "F057",
+			identityMapping: { strategy: "path" },
+			freshness: { maxAgeMs: 86_400_000 },
+			permissions: { readOnly: true, allowedPaths: ["tracker"] },
+		}).ok,
+		true,
+	);
+	assert.equal(
+		registerExternalEffect(
+			dir,
+			{
+				id: "effect/ticket-comment",
+				version: "1",
+				owner: "platform-team",
+				system: "ticketing",
+				operation: "comment.create",
+				target: "tracker/amber-protocol",
+				scope: "issues",
+				inputSchema: { type: "object" },
+				idempotency: "idempotent",
+				credentials: "scoped",
+				receiptFields: ["commentId"],
+				compensation: { kind: "irreversible" },
+				timeoutMs: 30_000,
+				adapter: { id: "adapter/tracker", version: "1" },
+				decision: { identity: "decision/bg-effect", revision: 1 },
+			},
+			{ now: minted },
+		).ok,
+		true,
+	);
+	const granted = grantBreakGlass(
+		dir,
+		{
+			id: "breakglass/incident-9",
+			incident: "incident/9",
+			purpose: "restore-login-service",
+			capability: { kind: "external", id: "effect/ticket-comment", version: "1" },
+			target: "tracker/amber-protocol",
+			scope: "issues",
+			environment: "production",
+			risk: "high",
+			credentials: "scoped",
+			validFrom: "2026-08-01T00:00:00.000Z",
+			validUntil: "2026-08-01T01:00:00.000Z",
+			reviewBy: "2026-08-05T00:00:00.000Z",
+			decision: { identity: "decision/bg-grant", revision: 1 },
+		},
+		{ now: minted },
+	);
+	assert.equal(granted.ok, true, (granted.errors || []).join("; "));
+}
+
+test("an overdue break-glass post-review denies strict consumption when Policy declares it", () => {
+	const dir = mkTarget("breakglass-overdue");
+	setupStrictContext(dir, { org: { rules: { denyBreakGlassOverdueReview: true } } });
+	overdueBreakGlassFixture(dir);
+	// The grant expired 2026-08-01 and its review was due 2026-08-05; at
+	// EVAL_NOW (2026-08-10) the declaring org layer denies consumption.
+	const denied = evaluatePolicy(dir, baseInput(), {});
+	assert.equal(denied.ok, false);
+	assert.equal(denied.code, "AMBER_E_POLICY_DENIED");
+	assert.equal(denied.outcome.verdict, "deny");
+	assert.ok(
+		denied.outcome.reasons.some((reason) =>
+			reason.includes('break-glass grant "breakglass/incident-9" has an overdue post-review'),
+		),
+	);
+	// The mandatory review lands (late but recorded); the same context
+	// passes -- blocking follows Policy, visibility never disappears.
+	assert.equal(
+		reviewBreakGlass(
+			dir,
+			{
+				id: "breakglass/incident-9",
+				outcome: "incident resolved",
+				necessity: "primary path was down",
+				impact: "one ticket comment",
+				followUp: "add an alarm for the primary path",
+				decision: { identity: "decision/bg-review", revision: 1 },
+			},
+			{ now: EVAL_NOW },
+		).ok,
+		true,
+	);
+	const passed = evaluatePolicy(dir, baseInput(), {});
+	assert.equal(passed.ok, true, (passed.errors || []).join("; "));
+	assert.equal(passed.outcome.verdict, "pass");
+	assert.equal(readLedger(dir).length, 2);
+	// Deny-only: a lower layer declaring the clause false refuses as a
+	// relaxation conflict before any outcome is appended.
+	admitActivePolicy(dir, "repo", { rules: { denyBreakGlassOverdueReview: false } }, "policy/relax");
+	const relaxed = evaluatePolicy(dir, baseInput({ policies: { repo: "policy/relax" } }), {});
+	assert.equal(relaxed.ok, false);
+	assert.equal(relaxed.code, "AMBER_E_POLICY_CONFLICT");
+	assert.equal(relaxed.outcome, null);
+	assert.match(relaxed.errors[0], /never waived/);
+	// A corrupt grant ledger refuses before any outcome is appended.
+	fs.appendFileSync(breakGlassGrantsPath(dir), '{"kind":"grant"}\n');
+	const corrupt = evaluatePolicy(dir, baseInput(), {});
+	assert.equal(corrupt.ok, false);
+	assert.equal(corrupt.code, "AMBER_E_BREAKGLASS_CORRUPT");
+	assert.equal(corrupt.outcome, null);
+	assert.equal(readLedger(dir).length, 2);
+});
+
+test("a stack that does not declare the break-glass clause never reads the grant ledger", () => {
+	const dir = mkTarget("breakglass-undeclared");
+	setupStrictContext(dir);
+	overdueBreakGlassFixture(dir);
+	// Overdue state exists, but no layer declares the clause: consumption
+	// passes -- consequences for an overdue review are Policy's to declare.
+	const result = evaluatePolicy(dir, baseInput(), {});
+	assert.equal(result.ok, true, (result.errors || []).join("; "));
+	assert.equal(result.outcome.verdict, "pass");
 });
