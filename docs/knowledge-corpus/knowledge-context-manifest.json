@@ -1,12 +1,6 @@
 {
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
-  "expectedCounts": {
-    "adr": 25,
-    "wiki": 10,
-    "architecture": 9,
-    "total": 44
-  },
   "counts": {
     "adr": 25,
     "wiki": 10,
@@ -543,5 +537,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:211ce34a0e000adbdd4db0be049d06367d79269612c2fc1870899c542240c270"
+  "manifestHash": "sha256:c23e897a513bbd769c9d057b3ff76c879e9c2c16fcb5cebed1090ec14039c127"
 }

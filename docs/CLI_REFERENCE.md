@@ -2314,22 +2314,24 @@ Loadouts, or projections. See the [Context threat model](architecture/context-th
 a committed corpus at `docs/knowledge-corpus/` (tracked in git) so `amber knowledge graph` succeeds
 on a clean clone without any prior mutation to `.amber/`.
 
-**Intentional census gate:** the F059 corpus is a deliberate, reviewed snapshot of exactly
-24 ADR + 10 wiki + 9 architecture documents (43 total). Adding any document in those directories
-will fail `context-manifest` and `context-sync` until `EXPECTED_COUNTS` in
-`scripts/lib/core/knowledge-projection.js` is updated and a fresh `context-sync --refresh` run
-is committed. This is by design — the gate forces conscious corpus inclusion.
+**Intentional census gate, single-sourced:** the committed manifest at
+`docs/knowledge-corpus/knowledge-context-manifest.json` is the census's one source of truth.
+Adding or removing any document under `docs/adr/`, `docs/wiki/knowledge/`, or
+`docs/architecture/` makes reads fail closed with the offending paths named — in both
+directions (a tree document not yet admitted; a census row whose file vanished) — until a fresh
+`context-sync` run is committed. Admission is deliberate by construction: the reviewed artifact
+is the regenerated manifest diff in your commit, not a constant in code.
 
 ```bash
 # Deterministic knowledge graph (reads committed docs/knowledge-corpus/)
 node scripts/amber.js knowledge graph --target . --json
 
-# Inspect the current F059 corpus manifest (24 ADR + 10 wiki + 9 arch = 43 rows)
+# Render the tree-derived manifest and validate it against the committed census
 node scripts/amber.js knowledge context-manifest --target . --json
 
 # Build / refresh the committed corpus (writes docs/knowledge-corpus/ — then commit the changes)
 node scripts/amber.js knowledge context-sync   --target .             # create/skip unchanged pages
-node scripts/amber.js knowledge context-sync   --target . --refresh   # force re-ingest all 43 pages
+node scripts/amber.js knowledge context-sync   --target . --refresh   # force re-ingest every page
 
 # Prepare HITL review sample (6 pages spanning all three categories — requires human review before close)
 node scripts/amber.js knowledge context-review-sample --target . --output .scratch/review-sample.json
