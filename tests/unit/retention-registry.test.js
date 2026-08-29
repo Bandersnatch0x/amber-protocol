@@ -583,6 +583,29 @@ test("hold and release Decisions are single-use and human-only", () => {
 	assert.match(bothScopes.errors[0], /exactly one of record or subject/);
 });
 
+test("credential-looking material refuses in the preserved hold reason", () => {
+	const dir = mkTarget("hold-leak");
+	retentionFixture(dir);
+	holdFixture(dir, ["decision/hold-1"]);
+	const leaky = hold(dir, holdInput({ reason: "hold until token=abc123 rotates" }), { now: NOW });
+	assert.equal(leaky.ok, false);
+	assert.equal(leaky.code, "AMBER_E_RETENTION_CREDENTIAL_LEAK");
+	assert.match(leaky.errors[0], /credential material/);
+	// A validly re-chained forged hold event carrying credential material
+	// fails every read closed.
+	assert.equal(hold(dir, holdInput(), { now: NOW }).ok, true);
+	const events = readEvents(holdsPath(dir));
+	const { hash: _hash, ...body } = events[0];
+	const forged = { ...body, reason: "litigation Bearer abcdef0123456789 hold" };
+	forged.hash = chainHash(forged, forged.prevHash);
+	writeEvents(holdsPath(dir), [forged]);
+	assert.throws(
+		() => listHolds(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_RETENTION_HOLD_CORRUPT" && /credential material/.test(err.message),
+	);
+});
+
 test("a tampered hold ledger fails every read closed", () => {
 	const dir = mkTarget("hold-tamper");
 	retentionFixture(dir);

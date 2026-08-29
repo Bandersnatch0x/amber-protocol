@@ -2089,6 +2089,14 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_MAINTAIN_PROPOSAL_CORRUPT", "AMBER_E_INVALID_ARG"],
 	},
+	AMBER_E_MAINTAIN_CREDENTIAL_LEAK: {
+		title: "Credential material refused in a maintain record",
+		cause:
+			"A triage reason carries what looks like credential material (a bearer/basic token, JWT, provider key, PEM block, or key=value secret); ledger-bound free text carries no secret.",
+		remedy: "Strip the credential material from the reason and resubmit the triage.",
+		layer: "Governance",
+		related: ["AMBER_E_MAINTAIN_INVALID", "AMBER_E_BREAKGLASS_CREDENTIAL_LEAK"],
+	},
 	AMBER_E_RETENTION_INVALID: {
 		title: "Retention classification input rejected",
 		cause:
@@ -2097,6 +2105,14 @@ const CATALOG = {
 			"Fix the flagged field; declare the class basis in the committed tenant retention Policy's extensions carrier, and minimize sensitive content before classification.",
 		layer: "Governance",
 		related: ["AMBER_E_RETENTION_NOT_FOUND", "AMBER_E_RETENTION_CORRUPT"],
+	},
+	AMBER_E_RETENTION_CREDENTIAL_LEAK: {
+		title: "Credential material refused in a retention record",
+		cause:
+			"A Legal Hold reason carries what looks like credential material (a bearer/basic token, JWT, provider key, PEM block, or key=value secret); ledger-bound free text carries no secret.",
+		remedy: "Strip the credential material from the reason and resubmit the hold.",
+		layer: "Governance",
+		related: ["AMBER_E_RETENTION_INVALID", "AMBER_E_BREAKGLASS_CREDENTIAL_LEAK"],
 	},
 	AMBER_E_RETENTION_NOT_FOUND: {
 		title: "Retention record not committed",

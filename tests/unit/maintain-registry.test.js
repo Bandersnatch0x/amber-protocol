@@ -803,6 +803,34 @@ test("schedule and dismiss must preserve reasons; fix must not carry one", () =>
 	assert.equal(dismissed.candidate, null);
 });
 
+test("credential-looking material refuses in the preserved triage reason", () => {
+	const dir = mkTarget("triage-leak");
+	const fingerprint = triageFixture(dir);
+	const leaky = triage(
+		dir,
+		triageInput(fingerprint, { reason: "unblock with Bearer abcdef0123456789 first" }),
+		{ now: NOW },
+	);
+	assert.equal(leaky.ok, false);
+	assert.equal(leaky.code, "AMBER_E_MAINTAIN_CREDENTIAL_LEAK");
+	assert.match(leaky.errors[0], /credential material/);
+	// A validly re-chained forged triage event carrying credential
+	// material fails every read closed.
+	assert.equal(triage(dir, triageInput(fingerprint), { now: NOW }).ok, true);
+	const events = readEvents(proposalsPath(dir));
+	const triaged = events[events.length - 1];
+	const { hash: _hash, ...body } = triaged;
+	const forged = { ...body, reason: "rotate secret=hunter2 later" };
+	forged.hash = chainHash(forged, forged.prevHash);
+	writeEvents(proposalsPath(dir), [...events.slice(0, -1), forged]);
+	assert.throws(
+		() => listProposals(dir),
+		(err) =>
+			err.amberCode === "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT" &&
+			/credential material/.test(err.message),
+	);
+});
+
 test("triage fix returns a candidate Intent payload and mutates nothing canonical", () => {
 	const dir = mkTarget("triage-fix");
 	const fingerprint = triageFixture(dir);

@@ -50,6 +50,7 @@ const {
 	chainHash,
 	acquireLedgerLock,
 	appendLedgerEvent,
+	credentialLeakProblem,
 } = require("./registry-ledger");
 
 // v2 added the required service `owner` and the optional `policy` pin
@@ -93,6 +94,7 @@ const PROPOSAL_EXISTS_CODE = "AMBER_E_MAINTAIN_PROPOSAL_EXISTS";
 const PROPOSAL_CORRUPT_CODE = "AMBER_E_MAINTAIN_PROPOSAL_CORRUPT";
 const PROPOSAL_LOCK_CODE = "AMBER_E_MAINTAIN_PROPOSAL_LOCK";
 const PROPOSAL_SIZE_CEILING_CODE = "AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING";
+const MAINTAIN_LEAK_CODE = "AMBER_E_MAINTAIN_CREDENTIAL_LEAK";
 
 const HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
 
@@ -955,6 +957,9 @@ function proposalEventProblem(event, lineIndex) {
 			if (event.reason !== null) return `${label}.reason must be null for a fix triage`;
 		} else if (!isNonEmptyString(event.reason)) {
 			return `${label}.reason must be a preserved non-empty string for ${event.outcome}`;
+		} else {
+			const leak = credentialLeakProblem(event.reason, `${label}.reason`);
+			if (leak !== null) return leak;
 		}
 		return decisionShapeProblem(event.decision, `${label}.decision`);
 	}
@@ -1319,6 +1324,9 @@ function triage(cwd, input = {}, opts = {}) {
 		return fail(MAINTAIN_INVALID_CODE, [
 			`a ${input.outcome} triage must preserve a non-empty reason`,
 		]);
+	} else {
+		const leak = credentialLeakProblem(reason, "reason");
+		if (leak !== null) return fail(MAINTAIN_LEAK_CODE, [leak]);
 	}
 	const pinProblem = decisionPinProblem(input.decision);
 	if (pinProblem !== null) return fail(MAINTAIN_INVALID_CODE, [pinProblem]);

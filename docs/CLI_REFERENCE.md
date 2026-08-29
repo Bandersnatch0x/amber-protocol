@@ -1308,7 +1308,9 @@ closed vocabulary `fix|schedule|dismiss`. Triage of a detector that declares a s
 enforced to that owner: the Decision's registry-verified principal must be the detector's declared
 `owner`, so triage authority is the declared service owner, not any human with a Decision (v1
 detector events predate the owner field and keep their any-human latitude). `schedule` and
-`dismiss` must carry preserved reasons and close the
+`dismiss` must carry preserved reasons — leak-checked: credential-looking material refuses with
+`AMBER_E_MAINTAIN_CREDENTIAL_LEAK`, and a validly re-chained forged reason fails every read
+closed — and close the
 proposal reviewably (it stays listable with its outcome, reason, and owner identity); a triaged
 subject is unblocked, so the next out-of-band observation opens a fresh proposal. Only `fix`
 returns a CANDIDATE Intent admission payload — a prepare-only input mirroring F051 migration
@@ -1369,7 +1371,7 @@ Error codes: `AMBER_E_MAINTAIN_INVALID`, `AMBER_E_MAINTAIN_EXISTS`, `AMBER_E_MAI
 `AMBER_E_MAINTAIN_FINDING_CORRUPT`, `AMBER_E_MAINTAIN_FINDING_LOCK`,
 `AMBER_E_MAINTAIN_FINDING_SIZE_CEILING`, `AMBER_E_MAINTAIN_PROPOSAL_EXISTS`,
 `AMBER_E_MAINTAIN_PROPOSAL_CORRUPT`, `AMBER_E_MAINTAIN_PROPOSAL_LOCK`,
-`AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING`.
+`AMBER_E_MAINTAIN_PROPOSAL_SIZE_CEILING`, `AMBER_E_MAINTAIN_CREDENTIAL_LEAK`.
 
 ### retention classify / evaluate / classifications / hold / release / holds / holder / holders / candidate / authorize / candidates / execute / settle / status / proof
 
@@ -1401,7 +1403,9 @@ nothing is deleted (deletion execution is F055 T3/T4, behind its own governance)
 
 A Legal Hold binds scope — one exact record pin OR one subject identity (every revision of that
 identity, deliberately type-agnostic: over-matching is fail-safe for a hold, which can only ever
-retain more) — a preserved reason, and the issuer (the verified principal of a single-use committed
+retain more) — a preserved reason (leak-checked: credential-looking material refuses with
+`AMBER_E_RETENTION_CREDENTIAL_LEAK`, and a validly re-chained forged reason fails every read
+closed), and the issuer (the verified principal of a single-use committed
 human acceptance/approval Decision) with its effective time into the hash-chained ledger
 `.amber/retention/holds.jsonl`. Holds have priority over TTL: evaluation reports a held record as
 `retained-by-hold` naming the holds in `heldBy`, regardless of expiry. Release is a second
@@ -1488,7 +1492,8 @@ Error codes: `AMBER_E_RETENTION_INVALID`, `AMBER_E_RETENTION_NOT_FOUND`,
 `AMBER_E_RETENTION_CANDIDATE_CORRUPT`, `AMBER_E_RETENTION_CANDIDATE_LOCK`,
 `AMBER_E_RETENTION_CANDIDATE_SIZE_CEILING`, `AMBER_E_RETENTION_DRIFT`,
 `AMBER_E_RETENTION_TX_CORRUPT`, `AMBER_E_RETENTION_TX_LOCK`,
-`AMBER_E_RETENTION_TX_SIZE_CEILING`, `AMBER_E_RETENTION_TOMBSTONE`.
+`AMBER_E_RETENTION_TX_SIZE_CEILING`, `AMBER_E_RETENTION_TOMBSTONE`,
+`AMBER_E_RETENTION_CREDENTIAL_LEAK`.
 
 ### external register / effects / propose / authorize / proposals / execute / settle / reconcile / status / compensate / transactions
 

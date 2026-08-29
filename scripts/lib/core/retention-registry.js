@@ -53,6 +53,7 @@ const {
 	chainHash,
 	acquireLedgerLock,
 	appendLedgerEvent,
+	credentialLeakProblem,
 } = require("./registry-ledger");
 
 const RETENTION_SCHEMA_VERSION = 1;
@@ -75,6 +76,7 @@ const RETENTION_CLASSES = Object.freeze(["ephemeral", "operational", "governance
 const RETENTION_SENSITIVITIES = Object.freeze(["none", "secret", "personal"]);
 
 const RETENTION_INVALID_CODE = "AMBER_E_RETENTION_INVALID";
+const RETENTION_LEAK_CODE = "AMBER_E_RETENTION_CREDENTIAL_LEAK";
 const RETENTION_NOT_FOUND_CODE = "AMBER_E_RETENTION_NOT_FOUND";
 const RETENTION_CORRUPT_CODE = "AMBER_E_RETENTION_CORRUPT";
 const RETENTION_LOCK_CODE = "AMBER_E_RETENTION_LOCK";
@@ -568,6 +570,8 @@ function holdEventProblem(event, lineIndex) {
 		const scope = holdScopeProblem(event.scope, `${label}.scope`);
 		if (scope !== null) return scope;
 		if (!isNonEmptyString(event.reason)) return `${label}.reason must be a non-empty string`;
+		const leak = credentialLeakProblem(event.reason, `${label}.reason`);
+		if (leak !== null) return leak;
 		return decisionSnapshotProblem(event.decision, `${label}.decision`);
 	}
 	const closed = closedFieldProblem(event, RELEASE_EVENT_FIELDS, label);
@@ -728,6 +732,8 @@ function hold(cwd, input = {}, opts = {}) {
 	if (scopeProblem !== null) return fail(RETENTION_INVALID_CODE, [scopeProblem]);
 	if (!isNonEmptyString(input.reason))
 		return fail(RETENTION_INVALID_CODE, ["reason must be a preserved non-empty string"]);
+	const reasonLeak = credentialLeakProblem(input.reason, "reason");
+	if (reasonLeak !== null) return fail(RETENTION_LEAK_CODE, [reasonLeak]);
 	const pinProblem = decisionPinProblem(input.decision);
 	if (pinProblem !== null) return fail(RETENTION_INVALID_CODE, [pinProblem]);
 	let revisions;
