@@ -223,7 +223,9 @@
 									"loop",
 									"status",
 									"memory",
-									"eval"
+									"eval",
+									"external",
+									"breakglass"
 								]
 							},
 							"subcommand": { "type": "string" },
@@ -242,7 +244,9 @@
 						"loop",
 						"status",
 						"memory",
-						"eval"
+						"eval",
+						"external",
+						"breakglass"
 					],
 					"description": "Amber CLI command family this action maps to."
 				},
