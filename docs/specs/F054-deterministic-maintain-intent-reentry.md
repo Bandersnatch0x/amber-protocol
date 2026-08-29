@@ -45,7 +45,7 @@ must pass normal Intent admission. A shipped fix adds or updates an Eval.
   from subject, rule version, scope, and window.
 - Repeated observations inside a cooldown append Evidence to the existing fingerprint rather than
   create duplicate Trigger Proposals.
-- Triage Decisions are human, scoped, and restricted to fix, schedule, or dismiss.
+- Triage Decisions are human, single-use across the maintain ledgers, and restricted to fix, schedule, or dismiss.
 - Only fix creates a candidate Intent. Candidate Intent still requires canonical admission,
   Acceptance, Spec, Plan, and subsequent Gates.
 - Detector, baseline, fixture, threshold, or Policy changes make dependent evaluations stale.

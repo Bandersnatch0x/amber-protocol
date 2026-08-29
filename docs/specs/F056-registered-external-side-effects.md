@@ -41,8 +41,11 @@ compensated outcome is journaled.
 
 - External effects are a separate boundary class from target-write and governance-write.
 - Each registered effect contract declares external owner, system type, operation, exact target and
-  scope, input schema, idempotency behavior, credentials class, expected response, receipt,
-  compensation or irreversibility, timeout, and stable failures.
+  scope, input schema, idempotency behavior, credentials class, the expected receipt fields (the
+  response the external system must return), compensation or irreversibility, and a bounded
+  timeout. Failures settle under the surface's fixed declared-status and outcome vocabulary with
+  stable error codes; they are a surface contract, not a per-contract field (ADR-0027 §2 records
+  the same list).
 - Proposal is governance-write only. Authorization is a separate human Decision bound to canonical
   request hash, Adapter version, credentials class, and expiry.
 - Execution is performed only by the registered Adapter under a dedicated accepted ADR. Caller

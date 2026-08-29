@@ -84,5 +84,8 @@ governance metadata remain.
 
 ## Further Notes
 
-Enabling deletion execution requires a dedicated accepted ADR. Until then, existing retention
-surfaces remain report-only.
+Enabling deletion execution requires a dedicated accepted ADR. ADR-0026 records that decision and
+its deliberate narrowing of story 7: execution and settlement are governance settlement over
+DECLARED per-Holder receipts (`--receipt-hash`, declaration-backed) — Amber dispatches no Adapter
+and deletes no bytes; an Adapter-executed deletion capability that returns a verifiable receipt
+requires its own future ADR on top of the F056 external-effect governance.
