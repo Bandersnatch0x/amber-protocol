@@ -1590,7 +1590,7 @@ Error codes: `AMBER_E_EXTERNAL_INVALID`, `AMBER_E_EXTERNAL_CORRUPT`, `AMBER_E_EX
 
 ### breakglass grant / revoke / grants / use / show / settle / review / status
 
-Grant, use, settle, review, and list break-glass authorizations (F057 T1-T3). Break-glass is a distinct, one-use
+Grant, use, settle, review, and list break-glass authorizations (F057 T1-T4). Break-glass is a distinct, one-use
 HUMAN authorization for a production emergency — never a flag, a reusable token, or an
 Agent-granted exception, and neither `--yes` nor `--force` ever routes here. A grant is limited by
 one registered capability — an F052 runner capability pin
@@ -1649,6 +1649,18 @@ flagged. `status` projects the full lifecycle at the injected clock: the grant w
 settlement, and review plus read-time `reviewOverdue` (ended + past `reviewBy` + unreviewed) and
 `reviewLate` flags — Policy consumers can fail closed on an overdue review, so review can never be
 silently skipped.
+
+No ungoverned door opens (T4): neither `--force` nor `--yes` is ever interpreted as break-glass —
+the handlers never consult those flags (test-pinned source scan plus a behavioral pin that the
+same refusal returns with or without them), so ordinary confirmation cannot bypass the distinct
+Decision family. No MCP capability resolves to the `breakglass` command (test-pinned like the
+runner/release/external verbs): break-glass is returned approval-required and the underlying
+capability is never started by MCP. The ADR-0020 self-owned git transport exception stays
+isolated — the break-glass surface shares no transport-specific module, code, or state path with
+the sync transport, never spawns a process, and confines every ledger under `.amber/breakglass/`
+(test-pinned). Break-glass waives nothing: identity, target confinement, receipt, journal,
+redaction, and audit requirements stay enforced by the underlying F050/F052/F056 surfaces it
+composes.
 
 ```bash
 node scripts/amber.js breakglass grant --target . --id breakglass/incident-42-restore \

@@ -324,6 +324,11 @@ test("breakglass use spends the grant once against the authorized underlying req
 	assert.equal(again.status, 1);
 	assert.equal(envelope(again).code, "AMBER_E_BREAKGLASS_INVALID");
 	assert.match(envelope(again).errors[0], /one-use/);
+	// F057 T4 (#295): --force cannot override one-use — the spent grant
+	// returns the identical refusal.
+	const forcedReplay = runCli([...useArgs(), "--force", "--yes"], dir);
+	assert.equal(forcedReplay.status, 1);
+	assert.deepEqual(envelope(forcedReplay).errors, envelope(again).errors);
 	const shown = runCli(
 		[
 			"breakglass",
@@ -482,6 +487,46 @@ test("breakglass help and unknown actions route through the shared dispatcher", 
 	);
 	assert.match(help.stdout, /--review-by/);
 	assert.match(help.stdout, /never a flag, a reusable token, or an/);
+	assert.match(help.stdout, /No MCP capability resolves to this command/);
+
+	// F057 T4 (#295): --force/--yes are inert here — the same refusal
+	// comes back with or without them; ordinary confirmation is never
+	// break-glass.
+	const bare = runCli(
+		[
+			"breakglass",
+			"use",
+			"--target",
+			".",
+			"--id",
+			"breakglass/ghost",
+			"--request",
+			"request/1",
+			"--json",
+		],
+		dir,
+	);
+	const forced = runCli(
+		[
+			"breakglass",
+			"use",
+			"--target",
+			".",
+			"--id",
+			"breakglass/ghost",
+			"--request",
+			"request/1",
+			"--force",
+			"--yes",
+			"--json",
+		],
+		dir,
+	);
+	assert.equal(bare.status, 1);
+	assert.equal(forced.status, 1);
+	assert.equal(envelope(bare).code, "AMBER_E_BREAKGLASS_NOT_FOUND");
+	assert.equal(envelope(forced).code, envelope(bare).code);
+	assert.deepEqual(envelope(forced).errors, envelope(bare).errors);
 
 	const unknown = runCli(["breakglass", "bogus", "--target", ".", "--json"], dir);
 	assert.equal(unknown.status, 1);

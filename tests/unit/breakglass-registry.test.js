@@ -1628,3 +1628,54 @@ test("re-chained settlement and review forgeries fail every read closed", () => 
 			/reviews grant .* before it ended/.test(err.message),
 	);
 });
+
+// ---------------------------------------------------------------------------
+// F057 T4 (#295) — no-force semantics, MCP non-execution & boundary
+// integrity.
+// ---------------------------------------------------------------------------
+
+test("the MCP seam exposes no break-glass surface", () => {
+	const { COMMAND_CAPABILITIES } = require("../../scripts/lib/mcp-action-contracts");
+	// Break-glass is returned approval-required and never executed
+	// (ADR-0022/F018): the MCP capability registry carries no break-glass
+	// verb at all, so no registry-proven read-only variant can ever wield
+	// emergency authority.
+	const breakglassCapabilities = Object.keys(COMMAND_CAPABILITIES).filter((key) =>
+		key.split(/[\s.:/-]/).includes("breakglass"),
+	);
+	assert.deepEqual(breakglassCapabilities, []);
+});
+
+test("ordinary confirmation flags never route into break-glass", () => {
+	// Neither --force nor --yes is interpreted as break-glass anywhere on
+	// this surface: the handlers never consult those keys, so ordinary
+	// confirmation cannot bypass the distinct Decision family.
+	const sources = [
+		"scripts/lib/breakglass-commands.js",
+		"scripts/lib/core/breakglass-registry.js",
+	].map((file) => fs.readFileSync(path.join(__dirname, "..", "..", file), "utf8"));
+	for (const source of sources) {
+		assert.equal(/args\.(force|yes)\b/.test(source), false);
+		assert.equal(/\byes\s*===|\bforce\s*===/.test(source), false);
+		// The flag tables use quoted keys, so a smuggled ["force","--force"]
+		// row would trip the literal ban too.
+		assert.equal(/["'](force|yes)["']/.test(source), false);
+	}
+});
+
+test("the break-glass registry never touches the sync transport surface", () => {
+	// ADR-0020's self-owned git transport exception stays isolated: the
+	// break-glass surface shares no transport-specific module, code, or
+	// state path with it, never spawns a process, and confines every
+	// ledger under .amber/breakglass/. Break-glass waives nothing.
+	const sources = [
+		"scripts/lib/core/breakglass-registry.js",
+		"scripts/lib/breakglass-commands.js",
+	].map((file) => fs.readFileSync(path.join(__dirname, "..", "..", file), "utf8"));
+	for (const source of sources) {
+		assert.equal(/sync-transport|transport-ledger|AMBER_E_SYNC/.test(source), false);
+		assert.equal(/child_process|execSync|spawn/.test(source), false);
+	}
+	const dir = mkTarget("isolation");
+	assert.match(grantsPath(dir).replaceAll("\\", "/"), /\.amber\/breakglass\//);
+});
