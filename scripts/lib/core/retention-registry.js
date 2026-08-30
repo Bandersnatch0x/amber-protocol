@@ -38,10 +38,6 @@
 // and a tombstoned subject refuses Gate evaluation: historical existence
 // is not current proof.
 
-const path = require("node:path");
-
-const { readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions, ARTIFACT_TYPES } = require("./canonical-artifacts");
 const { showAdapter } = require("./adapter-registry");
@@ -49,10 +45,7 @@ const { consumeSubjectBoundApproval } = require("./approval-registry");
 const {
 	GENESIS_HASH,
 	chainHash,
-	acquireLedgerLock,
-	appendLedgerEvent,
 	credentialLeakProblem,
-	chainLinkProblem,
 	isPlainObject,
 	isNonEmptyString,
 	closedFieldProblem,
@@ -63,6 +56,7 @@ const {
 	canonicalHashOf,
 	findDecisionSpend,
 } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 
 const RETENTION_SCHEMA_VERSION = 1;
 const SUPPORTED_RETENTION_SCHEMA_VERSIONS = Object.freeze([1]);
@@ -70,7 +64,6 @@ const DEFAULT_MAX_RETENTION_BYTES = 1024 * 1024;
 // TTLs are bounded (100 years) so classifiedAt + ttlMs can never overflow
 // the Date range and crash evaluation instead of failing closed.
 const MAX_RETENTION_TTL_MS = 100 * 365 * 24 * 3_600_000;
-const LOCK_STALE_MS = 30_000;
 
 // Protocol-defined retention classes with fixed semantics; TTL and legal
 // basis are NOT defined here — they resolve from the pinned tenant Policy.
@@ -145,24 +138,218 @@ const CLASSIFICATION_EVENT_FIELDS = Object.freeze([
 	"hash",
 ]);
 
-function classificationsPath(cwd) {
-	return statePathForCreate(cwd, "retention", "classifications.jsonl");
-}
+// F061 follow-up (#305) — the ledger ritual for all five retention
+// ledgers is assembled by `defineLedgerFamily` (ADR-0028), byte-
+// identically to the hand-written ceremony it replaces: same paths under
+// `.amber/retention/` (`classifications.jsonl` / `holds.jsonl` /
+// `holders.jsonl` / `candidates.jsonl` / `transactions.jsonl`), same
+// lock names (the 30s stale bound now rides the shared default), same
+// stable codes and labels ("retention classification ledger" /
+// "retention hold ledger" / "retention holder registry" / "retention
+// candidate ledger" / "retention transaction ledger" in lock/read/
+// ceiling refusals, "retention classification" / "retention hold" /
+// "retention holder" / "retention candidate" / "retention transaction"
+// as the per-event chain-walk prefixes), and the same fold interleaving
+// — the chain link first, then the family's domain checks, per event in
+// ledger order. Only the domain half is declared here: the closed event
+// shapes, the per-kind hold/candidate/transaction appliers
+// (`applyHoldEvent` / `applyCandidateEvent` / `applyTransactionEvent`
+// in the T2/T3/T4 sections below), the `issuer` slot the hold fold
+// projects (a ledger record shape the Decision spender scans, protected
+// byte-for-byte), the single-use Decision spender shells, the
+// drift-bound authorization, and the independent Holder settlement /
+// deletion-pending coverage rules stay this family's own.
+const RETENTION_FAMILY = defineLedgerFamily({
+	dir: "retention",
+	label: "retention registry",
+	ledgers: [
+		{
+			name: "classifications",
+			fileName: "classifications.jsonl",
+			lockName: "classifications.lock",
+			conflictCode: RETENTION_LOCK_CODE,
+			corruptCode: RETENTION_CORRUPT_CODE,
+			sizeCeilingCode: RETENTION_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RETENTION_MAX_CLASSIFICATIONS_BYTES",
+				defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
+			},
+			label: "retention classification ledger",
+			eventLabel: "retention classification",
+			fold: {
+				init: () => ({ classifications: [] }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw retentionCorrupt(
+							`retention classification event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (event.kind !== "classification")
+						throw retentionCorrupt(
+							`retention classification event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = classificationEventProblem(event, lineIndex);
+					if (problem !== null) throw retentionCorrupt(problem);
+					const { prevHash: _prev, hash: _hash, ...body } = event;
+					state.classifications.push({ ...body, index: lineIndex - 1 });
+				},
+				result: (state) => state.classifications,
+			},
+		},
+		{
+			name: "holds",
+			fileName: "holds.jsonl",
+			lockName: "holds.lock",
+			conflictCode: HOLD_LOCK_CODE,
+			corruptCode: HOLD_CORRUPT_CODE,
+			sizeCeilingCode: HOLD_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RETENTION_MAX_HOLDS_BYTES",
+				defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
+			},
+			label: "retention hold ledger",
+			eventLabel: "retention hold",
+			fold: {
+				init: () => ({ holds: [], byId: new Map() }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw holdCorrupt(
+							`retention hold event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (event.kind !== "hold" && event.kind !== "release")
+						throw holdCorrupt(
+							`retention hold event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = holdEventProblem(event, lineIndex);
+					if (problem !== null) throw holdCorrupt(problem);
+					applyHoldEvent(state.holds, state.byId, event, lineIndex);
+				},
+				result: (state) => state.holds,
+			},
+		},
+		{
+			name: "holders",
+			fileName: "holders.jsonl",
+			lockName: "holders.lock",
+			conflictCode: HOLDER_LOCK_CODE,
+			corruptCode: HOLDER_CORRUPT_CODE,
+			sizeCeilingCode: HOLDER_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RETENTION_MAX_HOLDERS_BYTES",
+				defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
+			},
+			label: "retention holder registry",
+			eventLabel: "retention holder",
+			fold: {
+				init: () => ({ keys: new Set(), holders: [] }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw holderCorrupt(
+							`retention holder event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (event.kind !== "holder")
+						throw holderCorrupt(
+							`retention holder event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = holderEventProblem(event, lineIndex);
+					if (problem !== null) throw holderCorrupt(problem);
+					const key = holderKey(event.id, event.version);
+					if (state.keys.has(key))
+						throw holderCorrupt(
+							`retention holder ${JSON.stringify(key)} is registered more than once`,
+						);
+					state.keys.add(key);
+					const { prevHash: _prev, hash: _hash, ...body } = event;
+					state.holders.push({ ...body, index: lineIndex - 1 });
+				},
+				result: (state) => state.holders,
+			},
+		},
+		{
+			name: "candidates",
+			fileName: "candidates.jsonl",
+			lockName: "candidates.lock",
+			conflictCode: CANDIDATE_LOCK_CODE,
+			corruptCode: CANDIDATE_CORRUPT_CODE,
+			sizeCeilingCode: CANDIDATE_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RETENTION_MAX_CANDIDATES_BYTES",
+				defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
+			},
+			label: "retention candidate ledger",
+			eventLabel: "retention candidate",
+			fold: {
+				init: () => ({ candidates: [], byId: new Map() }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw candidateCorrupt(
+							`retention candidate event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (event.kind !== "candidate" && event.kind !== "authorized")
+						throw candidateCorrupt(
+							`retention candidate event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = candidateEventProblem(event, lineIndex);
+					if (problem !== null) throw candidateCorrupt(problem);
+					applyCandidateEvent(state.candidates, state.byId, event, lineIndex);
+				},
+				result: (state) => state.candidates,
+			},
+		},
+		{
+			name: "transactions",
+			fileName: "transactions.jsonl",
+			lockName: "transactions.lock",
+			conflictCode: TX_LOCK_CODE,
+			corruptCode: TX_CORRUPT_CODE,
+			sizeCeilingCode: TX_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RETENTION_MAX_TRANSACTIONS_BYTES",
+				defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
+			},
+			label: "retention transaction ledger",
+			eventLabel: "retention transaction",
+			fold: {
+				init: () => ({ transactions: [], byId: new Map(), byCandidate: new Set() }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw transactionCorrupt(
+							`retention transaction event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (event.kind !== "execution" && event.kind !== "settlement")
+						throw transactionCorrupt(
+							`retention transaction event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = transactionEventProblem(event, lineIndex);
+					if (problem !== null) throw transactionCorrupt(problem);
+					applyTransactionEvent(
+						state.transactions,
+						state.byId,
+						state.byCandidate,
+						event,
+						lineIndex,
+					);
+				},
+				// Status derives from full coverage AFTER the whole walk:
+				// deletion-pending while ANY covered Holder is unsettled.
+				result: (state) => {
+					for (const transaction of state.transactions) {
+						const allSettled = transaction.holders.every((entry) => {
+							const settlement = transaction.settlements[holderKey(entry.id, entry.version)];
+							return settlement !== undefined && settlement.status === "settled";
+						});
+						transaction.status = allSettled ? "completed" : "deletion-pending";
+					}
+					return state.transactions;
+				},
+			},
+		},
+	],
+});
 
-function retentionCorrupt(message) {
-	return typedError(RETENTION_CORRUPT_CODE, message);
-}
-
-function acquireClassificationLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(classificationsPath(cwd)),
-		lockName: "classifications.lock",
-		conflictCode: RETENTION_LOCK_CODE,
-		corruptCode: RETENTION_CORRUPT_CODE,
-		label: "retention classification ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
+const CLASSIFICATION_LEDGER = RETENTION_FAMILY.ledgers.classifications;
+const classificationsPath = CLASSIFICATION_LEDGER.path;
+const retentionCorrupt = CLASSIFICATION_LEDGER.corrupt;
+const foldClassifications = CLASSIFICATION_LEDGER.fold;
 
 function recordPinProblem(value, label) {
 	if (!isPlainObject(value)) return `${label} must be an object`;
@@ -214,46 +401,6 @@ function classificationEventProblem(event, lineIndex) {
 function recordKey(record) {
 	return `${record.type}:${record.identity}@${record.revision}`;
 }
-
-function foldClassifications(cwd) {
-	const events = readLedgerFailClosed(
-		classificationsPath(cwd),
-		RETENTION_CORRUPT_CODE,
-		"retention classification ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const classifications = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "retention classification");
-		if (link !== null) throw retentionCorrupt(link);
-		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw retentionCorrupt(
-				`retention classification event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind !== "classification")
-			throw retentionCorrupt(
-				`retention classification event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = classificationEventProblem(event, lineIndex);
-		if (problem !== null) throw retentionCorrupt(problem);
-		const { prevHash: _prev, hash: _hash, ...body } = event;
-		classifications.push({ ...body, index });
-		prevHash = event.hash;
-	});
-	return classifications;
-}
-
-const CLASSIFICATION_LEDGER = Object.freeze({
-	acquire: acquireClassificationLock,
-	fold: foldClassifications,
-	path: classificationsPath,
-	corruptCode: RETENTION_CORRUPT_CODE,
-	sizeCeilingCode: RETENTION_SIZE_CEILING_CODE,
-	envName: "AMBER_RETENTION_MAX_CLASSIFICATIONS_BYTES",
-	defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
-	label: "retention classification ledger",
-});
 
 // The effective retention basis a committed tenant Policy declares for one
 // class, carried in the Policy revision's extensions carrier under the
@@ -355,9 +502,8 @@ function classify(cwd, input = {}, opts = {}) {
 	const resolved = resolvePolicyBasis(revisions, input.policy, input.retentionClass);
 	if (resolved.problem) return fail(RETENTION_INVALID_CODE, [resolved.problem]);
 	const at = now.toISOString();
-	return appendLedgerEvent(
+	return CLASSIFICATION_LEDGER.append(
 		cwd,
-		CLASSIFICATION_LEDGER,
 		{
 			kind: "classification",
 			schemaVersion: RETENTION_SCHEMA_VERSION,
@@ -450,25 +596,6 @@ function listClassifications(cwd, { type = null, identity = null } = {}) {
 		.map((entry) => ({ ...entry, current: currentIndexes.has(entry.index) }));
 }
 
-function holdsPath(cwd) {
-	return statePathForCreate(cwd, "retention", "holds.jsonl");
-}
-
-function holdCorrupt(message) {
-	return typedError(HOLD_CORRUPT_CODE, message);
-}
-
-function acquireHoldLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(holdsPath(cwd)),
-		lockName: "holds.lock",
-		conflictCode: HOLD_LOCK_CODE,
-		corruptCode: HOLD_CORRUPT_CODE,
-		label: "retention hold ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
 // A hold scope names EITHER one exact record pin or one subject identity
 // (every revision of that identity) — never both, never free text.
 const HOLD_SCOPE_FIELDS = Object.freeze(["record", "subject"]);
@@ -534,67 +661,44 @@ function holdEventProblem(event, lineIndex) {
 	return decisionSnapshotProblem(event.decision, `${label}.decision`);
 }
 
-function foldHolds(cwd) {
-	const events = readLedgerFailClosed(holdsPath(cwd), HOLD_CORRUPT_CODE, "retention hold ledger");
-	let prevHash = GENESIS_HASH;
-	const holds = [];
-	const byId = new Map();
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "retention hold");
-		if (link !== null) throw holdCorrupt(link);
-		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+// The family-owned domain applier for one chain-verified, shape-checked
+// hold-ledger event: a hold registers once per id and projects its
+// Decision into the `issuer` slot the spender scans, a release flips
+// exactly one active hold — released holds stay listable forever.
+function applyHoldEvent(holds, byId, event, lineIndex) {
+	if (event.kind === "hold") {
+		if (byId.has(event.id))
 			throw holdCorrupt(
-				`retention hold event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+				`retention hold event ${lineIndex} reuses hold id ${JSON.stringify(event.id)}`,
 			);
-		if (event.kind !== "hold" && event.kind !== "release")
-			throw holdCorrupt(
-				`retention hold event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = holdEventProblem(event, lineIndex);
-		if (problem !== null) throw holdCorrupt(problem);
-		if (event.kind === "hold") {
-			if (byId.has(event.id))
-				throw holdCorrupt(
-					`retention hold event ${lineIndex} reuses hold id ${JSON.stringify(event.id)}`,
-				);
-			const { prevHash: _prev, hash: _hash, at, decision, ...body } = event;
-			const hold = {
-				...body,
-				issuer: decision,
-				effectiveAt: at,
-				status: "active",
-				release: null,
-				index,
-			};
-			holds.push(hold);
-			byId.set(event.id, hold);
-		} else {
-			const hold = byId.get(event.id);
-			if (!hold)
-				throw holdCorrupt(
-					`retention hold event ${lineIndex} releases unknown hold ${JSON.stringify(event.id)}`,
-				);
-			if (hold.status !== "active")
-				throw holdCorrupt(`retention hold event ${lineIndex} releases an already-released hold`);
-			hold.status = "released";
-			hold.release = { at: event.at, decision: event.decision };
-		}
-		prevHash = event.hash;
-	});
-	return holds;
+		const { prevHash: _prev, hash: _hash, at, decision, ...body } = event;
+		const hold = {
+			...body,
+			issuer: decision,
+			effectiveAt: at,
+			status: "active",
+			release: null,
+			index: lineIndex - 1,
+		};
+		holds.push(hold);
+		byId.set(event.id, hold);
+		return;
+	}
+	const hold = byId.get(event.id);
+	if (!hold)
+		throw holdCorrupt(
+			`retention hold event ${lineIndex} releases unknown hold ${JSON.stringify(event.id)}`,
+		);
+	if (hold.status !== "active")
+		throw holdCorrupt(`retention hold event ${lineIndex} releases an already-released hold`);
+	hold.status = "released";
+	hold.release = { at: event.at, decision: event.decision };
 }
 
-const HOLD_LEDGER = Object.freeze({
-	acquire: acquireHoldLock,
-	fold: foldHolds,
-	path: holdsPath,
-	corruptCode: HOLD_CORRUPT_CODE,
-	sizeCeilingCode: HOLD_SIZE_CEILING_CODE,
-	envName: "AMBER_RETENTION_MAX_HOLDS_BYTES",
-	defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
-	label: "retention hold ledger",
-});
+const HOLD_LEDGER = RETENTION_FAMILY.ledgers.holds;
+const holdsPath = HOLD_LEDGER.path;
+const holdCorrupt = HOLD_LEDGER.corrupt;
+const foldHolds = HOLD_LEDGER.fold;
 
 // Hold authority mirrors the F052/F054 contract: a committed, unscoped,
 // human acceptance/approval Decision with a verified principal snapshot.
@@ -644,9 +748,8 @@ function hold(cwd, input = {}, opts = {}) {
 	}
 	const resolved = resolveHoldDecision(revisions, input.decision, "a Legal Hold");
 	if (resolved.problem) return fail(RETENTION_INVALID_CODE, [resolved.problem]);
-	return appendLedgerEvent(
+	return HOLD_LEDGER.append(
 		cwd,
-		HOLD_LEDGER,
 		{
 			kind: "hold",
 			schemaVersion: RETENTION_SCHEMA_VERSION,
@@ -706,9 +809,8 @@ function releaseHold(cwd, input = {}, opts = {}) {
 	}
 	const resolved = resolveHoldDecision(revisions, input.decision, "a Legal Hold release");
 	if (resolved.problem) return fail(RETENTION_INVALID_CODE, [resolved.problem]);
-	return appendLedgerEvent(
+	return HOLD_LEDGER.append(
 		cwd,
-		HOLD_LEDGER,
 		{
 			kind: "release",
 			schemaVersion: RETENTION_SCHEMA_VERSION,
@@ -757,25 +859,6 @@ function activeHoldsFor(holds, record) {
 		.map((entry) => entry.id);
 }
 
-function holdersPath(cwd) {
-	return statePathForCreate(cwd, "retention", "holders.jsonl");
-}
-
-function holderCorrupt(message) {
-	return typedError(HOLDER_CORRUPT_CODE, message);
-}
-
-function acquireHolderLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(holdersPath(cwd)),
-		lockName: "holders.lock",
-		conflictCode: HOLDER_LOCK_CODE,
-		corruptCode: HOLDER_CORRUPT_CODE,
-		label: "retention holder registry",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
 const HOLDER_INPUT_FIELDS = Object.freeze(["id", "version", "surface", "adapter", "decision"]);
 const ADAPTER_PIN_FIELDS = Object.freeze(["id", "version"]);
 const HOLDER_EVENT_FIELDS = Object.freeze([
@@ -820,50 +903,10 @@ function holderKey(id, version) {
 	return `${id}@${version}`;
 }
 
-function foldHolders(cwd) {
-	const events = readLedgerFailClosed(
-		holdersPath(cwd),
-		HOLDER_CORRUPT_CODE,
-		"retention holder registry",
-	);
-	let prevHash = GENESIS_HASH;
-	const keys = new Set();
-	const holders = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "retention holder");
-		if (link !== null) throw holderCorrupt(link);
-		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw holderCorrupt(
-				`retention holder event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind !== "holder")
-			throw holderCorrupt(
-				`retention holder event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = holderEventProblem(event, lineIndex);
-		if (problem !== null) throw holderCorrupt(problem);
-		const key = holderKey(event.id, event.version);
-		if (keys.has(key))
-			throw holderCorrupt(`retention holder ${JSON.stringify(key)} is registered more than once`);
-		keys.add(key);
-		const { prevHash: _prev, hash: _hash, ...body } = event;
-		holders.push({ ...body, index });
-		prevHash = event.hash;
-	});
-	return holders;
-}
-
-const HOLDER_LEDGER = Object.freeze({
-	acquire: acquireHolderLock,
-	fold: foldHolders,
-	path: holdersPath,
-	corruptCode: HOLDER_CORRUPT_CODE,
-	sizeCeilingCode: HOLDER_SIZE_CEILING_CODE,
-	envName: "AMBER_RETENTION_MAX_HOLDERS_BYTES",
-	defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
-	label: "retention holder registry",
-});
+const HOLDER_LEDGER = RETENTION_FAMILY.ledgers.holders;
+const holdersPath = HOLDER_LEDGER.path;
+const holderCorrupt = HOLDER_LEDGER.corrupt;
+const foldHolders = HOLDER_LEDGER.fold;
 
 function holderDecisionSpender(holders, decision) {
 	const spent = findDecisionSpend(holders, decision, ["decision"]);
@@ -917,9 +960,8 @@ function registerHolder(cwd, input = {}, opts = {}) {
 	}
 	const resolved = resolveHoldDecision(revisions, input.decision, "Holder registration");
 	if (resolved.problem) return fail(RETENTION_INVALID_CODE, [resolved.problem]);
-	return appendLedgerEvent(
+	return HOLDER_LEDGER.append(
 		cwd,
-		HOLDER_LEDGER,
 		{
 			kind: "holder",
 			schemaVersion: RETENTION_SCHEMA_VERSION,
@@ -952,25 +994,6 @@ function registerHolder(cwd, input = {}, opts = {}) {
 
 function listHolders(cwd) {
 	return foldHolders(cwd);
-}
-
-function candidatesPath(cwd) {
-	return statePathForCreate(cwd, "retention", "candidates.jsonl");
-}
-
-function candidateCorrupt(message) {
-	return typedError(CANDIDATE_CORRUPT_CODE, message);
-}
-
-function acquireCandidateLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(candidatesPath(cwd)),
-		lockName: "candidates.lock",
-		conflictCode: CANDIDATE_LOCK_CODE,
-		corruptCode: CANDIDATE_CORRUPT_CODE,
-		label: "retention candidate ledger",
-		staleMs: LOCK_STALE_MS,
-	});
 }
 
 const CANDIDATE_EVENT_FIELDS = Object.freeze([
@@ -1032,76 +1055,48 @@ function candidateEventProblem(event, lineIndex) {
 	return null;
 }
 
-function foldCandidates(cwd) {
-	const events = readLedgerFailClosed(
-		candidatesPath(cwd),
-		CANDIDATE_CORRUPT_CODE,
-		"retention candidate ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const candidates = [];
-	const byId = new Map();
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "retention candidate");
-		if (link !== null) throw candidateCorrupt(link);
-		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+// The family-owned domain applier for one chain-verified, shape-checked
+// candidate-ledger event: a candidate registers once per id, an
+// authorization flips exactly one prepared candidate.
+function applyCandidateEvent(candidates, byId, event, lineIndex) {
+	if (event.kind === "candidate") {
+		if (byId.has(event.id))
 			throw candidateCorrupt(
-				`retention candidate event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+				`retention candidate event ${lineIndex} reuses candidate id ${JSON.stringify(event.id)}`,
 			);
-		if (event.kind !== "candidate" && event.kind !== "authorized")
-			throw candidateCorrupt(
-				`retention candidate event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = candidateEventProblem(event, lineIndex);
-		if (problem !== null) throw candidateCorrupt(problem);
-		if (event.kind === "candidate") {
-			if (byId.has(event.id))
-				throw candidateCorrupt(
-					`retention candidate event ${lineIndex} reuses candidate id ${JSON.stringify(event.id)}`,
-				);
-			const { prevHash: _prev, hash: _hash, at, ...body } = event;
-			const candidate = {
-				...body,
-				preparedAt: at,
-				status: "prepared",
-				authorization: null,
-				index,
-			};
-			candidates.push(candidate);
-			byId.set(event.id, candidate);
-		} else {
-			const candidate = byId.get(event.id);
-			if (!candidate)
-				throw candidateCorrupt(
-					`retention candidate event ${lineIndex} authorizes unknown candidate ${JSON.stringify(event.id)}`,
-				);
-			if (candidate.status !== "prepared")
-				throw candidateCorrupt(
-					`retention candidate event ${lineIndex} authorizes an already-authorized candidate`,
-				);
-			candidate.status = "authorized";
-			candidate.authorization = {
-				at: event.at,
-				approvalId: event.approvalId,
-				decision: event.decision,
-			};
-		}
-		prevHash = event.hash;
-	});
-	return candidates;
+		const { prevHash: _prev, hash: _hash, at, ...body } = event;
+		const candidate = {
+			...body,
+			preparedAt: at,
+			status: "prepared",
+			authorization: null,
+			index: lineIndex - 1,
+		};
+		candidates.push(candidate);
+		byId.set(event.id, candidate);
+		return;
+	}
+	const candidate = byId.get(event.id);
+	if (!candidate)
+		throw candidateCorrupt(
+			`retention candidate event ${lineIndex} authorizes unknown candidate ${JSON.stringify(event.id)}`,
+		);
+	if (candidate.status !== "prepared")
+		throw candidateCorrupt(
+			`retention candidate event ${lineIndex} authorizes an already-authorized candidate`,
+		);
+	candidate.status = "authorized";
+	candidate.authorization = {
+		at: event.at,
+		approvalId: event.approvalId,
+		decision: event.decision,
+	};
 }
 
-const CANDIDATE_LEDGER = Object.freeze({
-	acquire: acquireCandidateLock,
-	fold: foldCandidates,
-	path: candidatesPath,
-	corruptCode: CANDIDATE_CORRUPT_CODE,
-	sizeCeilingCode: CANDIDATE_SIZE_CEILING_CODE,
-	envName: "AMBER_RETENTION_MAX_CANDIDATES_BYTES",
-	defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
-	label: "retention candidate ledger",
-});
+const CANDIDATE_LEDGER = RETENTION_FAMILY.ledgers.candidates;
+const candidatesPath = CANDIDATE_LEDGER.path;
+const candidateCorrupt = CANDIDATE_LEDGER.corrupt;
+const foldCandidates = CANDIDATE_LEDGER.fold;
 
 // The deterministic candidate content: exactly what a reviewer sees and
 // exactly what the authorization hash binds.
@@ -1192,9 +1187,8 @@ function prepareDeletionCandidate(cwd, input = {}, opts = {}) {
 		return fail(RETENTION_INVALID_CODE, [
 			"no Holder is registered; register the copy-holding surfaces before proposing deletion",
 		]);
-	return appendLedgerEvent(
+	return CANDIDATE_LEDGER.append(
 		cwd,
-		CANDIDATE_LEDGER,
 		{
 			kind: "candidate",
 			schemaVersion: RETENTION_SCHEMA_VERSION,
@@ -1242,9 +1236,8 @@ function authorizeDeletion(cwd, input = {}, opts = {}) {
 	// The guard completes this object from the consumption receipt before
 	// the append hashes the event body.
 	const decision = { identity: input.decisionIdentity, revision: 1 };
-	const appended = appendLedgerEvent(
+	const appended = CANDIDATE_LEDGER.append(
 		cwd,
-		CANDIDATE_LEDGER,
 		{
 			kind: "authorized",
 			schemaVersion: RETENTION_SCHEMA_VERSION,
@@ -1309,25 +1302,6 @@ function showDeletionCandidate(cwd, id) {
 
 function listDeletionCandidates(cwd, { status = null } = {}) {
 	return foldCandidates(cwd).filter((entry) => status === null || entry.status === status);
-}
-
-function transactionsPath(cwd) {
-	return statePathForCreate(cwd, "retention", "transactions.jsonl");
-}
-
-function transactionCorrupt(message) {
-	return typedError(TX_CORRUPT_CODE, message);
-}
-
-function acquireTransactionLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(transactionsPath(cwd)),
-		lockName: "transactions.lock",
-		conflictCode: TX_LOCK_CODE,
-		corruptCode: TX_CORRUPT_CODE,
-		label: "retention transaction ledger",
-		staleMs: LOCK_STALE_MS,
-	});
 }
 
 const EXECUTION_EVENT_FIELDS = Object.freeze([
@@ -1410,99 +1384,61 @@ function transactionEventProblem(event, lineIndex) {
 
 // Projects one entry per transaction: `settlements` maps each covered
 // Holder to its LATEST declared receipt, and `status` derives from full
-// coverage — deletion-pending while any Holder is unsettled.
-function foldTransactions(cwd) {
-	const events = readLedgerFailClosed(
-		transactionsPath(cwd),
-		TX_CORRUPT_CODE,
-		"retention transaction ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const transactions = [];
-	const byId = new Map();
-	const byCandidate = new Set();
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "retention transaction");
-		if (link !== null) throw transactionCorrupt(link);
-		if (!SUPPORTED_RETENTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+// coverage — deletion-pending while any Holder is unsettled. This is the
+// family-owned domain applier for one chain-verified, shape-checked
+// transaction-ledger event: an execution opens once per id and once per
+// candidate, and a settled Holder's effects can never repeat.
+function applyTransactionEvent(transactions, byId, byCandidate, event, lineIndex) {
+	if (event.kind === "execution") {
+		if (byId.has(event.id))
 			throw transactionCorrupt(
-				`retention transaction event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+				`retention transaction event ${lineIndex} reuses transaction id ${JSON.stringify(event.id)}`,
 			);
-		if (event.kind !== "execution" && event.kind !== "settlement")
+		if (byCandidate.has(event.candidateId))
 			throw transactionCorrupt(
-				`retention transaction event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+				`retention transaction event ${lineIndex} re-executes candidate ${JSON.stringify(event.candidateId)}`,
 			);
-		const problem = transactionEventProblem(event, lineIndex);
-		if (problem !== null) throw transactionCorrupt(problem);
-		if (event.kind === "execution") {
-			if (byId.has(event.id))
-				throw transactionCorrupt(
-					`retention transaction event ${lineIndex} reuses transaction id ${JSON.stringify(event.id)}`,
-				);
-			if (byCandidate.has(event.candidateId))
-				throw transactionCorrupt(
-					`retention transaction event ${lineIndex} re-executes candidate ${JSON.stringify(event.candidateId)}`,
-				);
-			const { prevHash: _prev, hash, at, ...body } = event;
-			const transaction = {
-				...body,
-				executedAt: at,
-				executionHash: hash,
-				settlements: {},
-				index,
-			};
-			transactions.push(transaction);
-			byId.set(event.id, transaction);
-			byCandidate.add(event.candidateId);
-		} else {
-			const transaction = byId.get(event.transactionId);
-			if (!transaction)
-				throw transactionCorrupt(
-					`retention transaction event ${lineIndex} settles unknown transaction ${JSON.stringify(event.transactionId)}`,
-				);
-			const key = holderKey(event.holder.id, event.holder.version);
-			const covered = transaction.holders.find(
-				(entry) => holderKey(entry.id, entry.version) === key,
-			);
-			if (!covered)
-				throw transactionCorrupt(
-					`retention transaction event ${lineIndex} settles Holder ${JSON.stringify(key)} outside the transaction's declared coverage`,
-				);
-			const prior = transaction.settlements[key];
-			if (prior && prior.status === "settled")
-				throw transactionCorrupt(
-					`retention transaction event ${lineIndex} re-settles Holder ${JSON.stringify(key)}; a completed deletion effect can never repeat`,
-				);
-			transaction.settlements[key] = {
-				at: event.at,
-				status: event.status,
-				adapter: event.adapter,
-				receiptHash: event.receiptHash,
-			};
-		}
-		prevHash = event.hash;
-	});
-	for (const transaction of transactions) {
-		const allSettled = transaction.holders.every((entry) => {
-			const settlement = transaction.settlements[holderKey(entry.id, entry.version)];
-			return settlement !== undefined && settlement.status === "settled";
-		});
-		transaction.status = allSettled ? "completed" : "deletion-pending";
+		const { prevHash: _prev, hash, at, ...body } = event;
+		const transaction = {
+			...body,
+			executedAt: at,
+			executionHash: hash,
+			settlements: {},
+			index: lineIndex - 1,
+		};
+		transactions.push(transaction);
+		byId.set(event.id, transaction);
+		byCandidate.add(event.candidateId);
+		return;
 	}
-	return transactions;
+	const transaction = byId.get(event.transactionId);
+	if (!transaction)
+		throw transactionCorrupt(
+			`retention transaction event ${lineIndex} settles unknown transaction ${JSON.stringify(event.transactionId)}`,
+		);
+	const key = holderKey(event.holder.id, event.holder.version);
+	const covered = transaction.holders.find((entry) => holderKey(entry.id, entry.version) === key);
+	if (!covered)
+		throw transactionCorrupt(
+			`retention transaction event ${lineIndex} settles Holder ${JSON.stringify(key)} outside the transaction's declared coverage`,
+		);
+	const prior = transaction.settlements[key];
+	if (prior && prior.status === "settled")
+		throw transactionCorrupt(
+			`retention transaction event ${lineIndex} re-settles Holder ${JSON.stringify(key)}; a completed deletion effect can never repeat`,
+		);
+	transaction.settlements[key] = {
+		at: event.at,
+		status: event.status,
+		adapter: event.adapter,
+		receiptHash: event.receiptHash,
+	};
 }
 
-const TRANSACTION_LEDGER = Object.freeze({
-	acquire: acquireTransactionLock,
-	fold: foldTransactions,
-	path: transactionsPath,
-	corruptCode: TX_CORRUPT_CODE,
-	sizeCeilingCode: TX_SIZE_CEILING_CODE,
-	envName: "AMBER_RETENTION_MAX_TRANSACTIONS_BYTES",
-	defaultBytes: DEFAULT_MAX_RETENTION_BYTES,
-	label: "retention transaction ledger",
-});
+const TRANSACTION_LEDGER = RETENTION_FAMILY.ledgers.transactions;
+const transactionsPath = TRANSACTION_LEDGER.path;
+const transactionCorrupt = TRANSACTION_LEDGER.corrupt;
+const foldTransactions = TRANSACTION_LEDGER.fold;
 
 /**
  * Open one deletion transaction from one AUTHORIZED candidate: the
@@ -1537,9 +1473,8 @@ function executeDeletion(cwd, input = {}, opts = {}) {
 		return fail(RETENTION_INVALID_CODE, [
 			`candidate ${JSON.stringify(input.candidateId)} is not authorized; deletion executes only what a human authorized`,
 		]);
-	return appendLedgerEvent(
+	return TRANSACTION_LEDGER.append(
 		cwd,
-		TRANSACTION_LEDGER,
 		{
 			kind: "execution",
 			schemaVersion: RETENTION_SCHEMA_VERSION,
@@ -1600,9 +1535,8 @@ function settleHolder(cwd, input = {}, opts = {}) {
 	if (!/^sha256:[0-9a-f]{64}$/.test(input.receiptHash ?? ""))
 		return fail(RETENTION_INVALID_CODE, ["receiptHash must be a sha256:<64-hex> string"]);
 	const key = holderKey(input.holder.id, input.holder.version);
-	return appendLedgerEvent(
+	return TRANSACTION_LEDGER.append(
 		cwd,
-		TRANSACTION_LEDGER,
 		// Adapter provenance copies from the transaction's reviewed Holder
 		// coverage — a settlement can never declare a different executor.
 		// The guard ran first on this same fold, so both lookups succeed; a
