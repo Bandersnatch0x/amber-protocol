@@ -2074,6 +2074,49 @@
 				"surfaces": ["docs/specs/F060-knowledge-map-v2-code-graph.md"],
 				"owner": "command"
 			}
+		},
+		{
+			"id": "F061",
+			"priority": 61,
+			"area": "governance",
+			"title": "Ledger Family Factory & Decision Primitives",
+			"user_visible_behavior": "A governed family's ledger ritual (paths, locks, fail-closed reads, governed appends, chain-walked folds) is declared through one defineLedgerFamily call composing the registry-ledger primitive core, and the Decision snapshot validator, canonical hash, and spend-scan kernel have a single source; migrations are byte-identical.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/registry-ledger-decision-primitives.test.js tests/unit/ledger-family.test.js tests/unit/breakglass-ledger-bytes.test.js tests/unit/breakglass-registry.test.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"#298\" --grep=\"#299\" --grep=\"#300\"",
+					"result": "T1 fd7ec1e (+cdde425 census follow-up) / T2 14a2907 / T3 0f403e2 — decision primitives, defineLedgerFamily factory, byte-identical breakglass tracer",
+					"date": "2026-08-30",
+					"notes": "Grill-adjudicated spec docs/specs/F061-ledger-family-factory.md; ADR-0028; tickets #297-#301."
+				},
+				{
+					"command": "npm test",
+					"result": "3454/3454 pass, 0 fail on the T3 worktree (.scratch/t3-npm-test.log); mainline anchors green with the known dsh-bundle npm-pack ETIMEDOUT flake re-run 6/6",
+					"date": "2026-08-30",
+					"notes": "Existing family behavior suites ran unedited as the byte-compatibility regression net; the golden-ledger byte comparison (recorded pre-migration) passes."
+				}
+			],
+			"notes": [
+				"Landing covers T1-T3 plus this registration (T4). Follow-up migrations — external, maintain, retention (full dialect); adapter, runner, release, approval, evidence-receipts, principal, gate-evaluation, policy-evaluation (primitive dialect upgrading per ADR-0028 decision 1) — proceed one ticket per family."
+			],
+			"paths": [
+				"docs/specs/F061-ledger-family-factory.md",
+				"docs/adr/0028-ledger-family-factory-and-decision-primitives.md",
+				"scripts/lib/core/registry-ledger.js",
+				"scripts/lib/core/ledger-family.js",
+				"scripts/lib/core/breakglass-registry.js"
+			],
+			"updated": "2026-08-30",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-30",
+				"surfaces": ["docs/specs/F061-ledger-family-factory.md"],
+				"owner": "script"
+			}
 		}
 	]
 }
