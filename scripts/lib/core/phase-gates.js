@@ -44,11 +44,11 @@ function hasContextPages(cwd) {
 }
 
 function hasProfile(cwd) {
-	// Delegate to the one profile parser (#270): the gate must not be
-	// satisfiable by a declaration the profile validator rejects.
-	const { readProfileFile } = require("./deployment-profile");
-	const { deploymentProfile, source, errors } = readProfileFile(cwd);
-	return source === "profile-file" && errors.length === 0 && deploymentProfile !== null;
+	// Delegate to the one profile parser and shared predicate (#270, #273):
+	// the gate must not be satisfiable by a declaration the profile validator
+	// rejects, and the absent-file default is not a declaration.
+	const { hasDeclaredValidProfile } = require("./deployment-profile");
+	return hasDeclaredValidProfile(cwd);
 }
 
 function hasEnvelopes(cwd) {

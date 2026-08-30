@@ -18,7 +18,7 @@ const path = require("node:path");
 
 const { hashText } = require("./context-hash");
 const { resolveIdentity } = require("./identity");
-const { resolveDeploymentProfile } = require("./deployment-profile");
+const { resolveDeploymentProfile, isInvalidDeclaration } = require("./deployment-profile");
 const { resolvePathWithin, toPortablePath } = require("./fs-utils");
 const { validateSyncEnvelope } = require("./sync-envelope-contract");
 const { statePathForCreate } = require("../state-dir-resolver");
@@ -281,7 +281,7 @@ function envelopeFromArtifact(cwd, artifactType, relPath) {
 	}
 	const identity = resolveIdentity(cwd);
 	const profile = resolveDeploymentProfile(cwd);
-	if (profile.errors.length > 0) {
+	if (isInvalidDeclaration(profile)) {
 		throw new Error(`invalid deployment profile declaration: ${profile.errors.join("; ")}`);
 	}
 	const hash = hashFile(absPath);
