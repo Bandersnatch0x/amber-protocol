@@ -14,6 +14,19 @@
 // unwalked read, so a family assembled here cannot drift back into a
 // private append or an unchained fold.
 //
+// ADR-0028 Amendment (2026-08-30): the declaration vocabulary carries
+// exactly two CLOSED optional extensions, both demanded by recorded family
+// test contracts (#306 re-open ruling). A ledger may declare
+// `fold.preLink(event, lineIndex)`, executed per event immediately BEFORE
+// the chain-link check, for families whose recorded contract adjudicates
+// domain problems (e.g. an unsupported schemaVersion's dedicated code)
+// ahead of chain problems; its throw semantics are `fold.apply`'s.
+// And a ledger may declare `ceiling.message(event, ceiling)`, overriding
+// the shared ceiling refusal wording with its recorded per-family text;
+// absent, the shared orchestration wording rides unchanged. `preLink`
+// never sees the previous hash, so neither extension reopens a path to a
+// private append or an unchained read.
+//
 // A declaration problem is an assembly-time programming error, not a
 // runtime governance refusal: the factory throws a plain TypeError at
 // definition time, so a malformed family can never half-install. Runtime
@@ -51,8 +64,14 @@ const LEDGER_FIELDS = Object.freeze([
 	"eventLabel",
 	"fold",
 ]);
-const CEILING_FIELDS = Object.freeze(["envName", "defaultBytes"]);
-const FOLD_FIELDS = Object.freeze(["init", "apply", "result"]);
+const CEILING_FIELDS = Object.freeze(["envName", "defaultBytes", "message"]);
+// The optional knobs (ADR-0028 Amendment) validate against the full closed
+// set only when declared; the required subsets keep every original field
+// mandatory and the missing-field refusals byte-stable for the families
+// that declare neither.
+const REQUIRED_CEILING_FIELDS = Object.freeze(["envName", "defaultBytes"]);
+const FOLD_FIELDS = Object.freeze(["init", "apply", "result", "preLink"]);
+const REQUIRED_FOLD_FIELDS = Object.freeze(["init", "apply", "result"]);
 // The uniqueness axes inside one family: two ledgers sharing a file or a
 // lock would silently corrupt or serialize each other.
 const UNIQUE_LEDGER_AXES = Object.freeze(["name", "fileName", "lockName"]);
@@ -73,21 +92,33 @@ function segmentProblem(value, label) {
 
 function ceilingProblem(ceiling, label) {
 	if (!isPlainObject(ceiling)) return `${label} must be an object`;
-	const closed = closedFieldProblem(ceiling, CEILING_FIELDS, label);
+	const closed = closedFieldProblem(
+		ceiling,
+		"message" in ceiling ? CEILING_FIELDS : REQUIRED_CEILING_FIELDS,
+		label,
+	);
 	if (closed !== null) return closed;
 	if (!isNonEmptyString(ceiling.envName)) return `${label}.envName must be a non-empty string`;
 	if (!Number.isInteger(ceiling.defaultBytes) || ceiling.defaultBytes < 1)
 		return `${label}.defaultBytes must be a positive integer`;
+	if ("message" in ceiling && typeof ceiling.message !== "function")
+		return `${label}.message must be a function`;
 	return null;
 }
 
 function foldProblem(fold, label) {
 	if (!isPlainObject(fold)) return `${label} must be an object`;
-	const closed = closedFieldProblem(fold, FOLD_FIELDS, label);
+	const closed = closedFieldProblem(
+		fold,
+		"preLink" in fold ? FOLD_FIELDS : REQUIRED_FOLD_FIELDS,
+		label,
+	);
 	if (closed !== null) return closed;
-	for (const field of FOLD_FIELDS) {
+	for (const field of REQUIRED_FOLD_FIELDS) {
 		if (typeof fold[field] !== "function") return `${label}.${field} must be a function`;
 	}
+	if ("preLink" in fold && typeof fold.preLink !== "function")
+		return `${label}.preLink must be a function`;
 	return null;
 }
 
@@ -121,8 +152,11 @@ function ledgerProblem(ledger, label) {
 function buildLedger(dir, ledger) {
 	const { fileName, lockName, conflictCode, corruptCode, sizeCeilingCode, label, eventLabel } =
 		ledger;
-	const { envName, defaultBytes } = ledger.ceiling;
+	const { envName, defaultBytes, message: ceilingMessage } = ledger.ceiling;
 	const domainFold = ledger.fold;
+	// The optional pre-link step (ADR-0028 Amendment), captured at assembly
+	// time like the rest of the declaration table.
+	const preLink = domainFold.preLink ?? null;
 	const ledgerPath = (cwd) => statePathForCreate(cwd, dir, fileName);
 	const corrupt = (message) => typedError(corruptCode, message);
 	// The append lock is deliberately NOT exposed on the surface: it exists
@@ -136,16 +170,19 @@ function buildLedger(dir, ledger) {
 			corruptCode,
 			label,
 		});
-	// The fold read: fail-closed raw read, then per event the chain link
-	// FIRST and the family's domain step second — the same interleaving
-	// every hand-written family fold performs, so corruption surfaces in
-	// ledger order, never grouped by check.
+	// The fold read: fail-closed raw read, then per event the declared
+	// pre-link step (when the family's recorded contract adjudicates domain
+	// problems ahead of chain problems), the chain link, and the family's
+	// domain step — the same interleaving every hand-written family fold
+	// performs, so corruption surfaces in ledger order, never grouped by
+	// check.
 	const fold = (cwd) => {
 		const events = readLedgerFailClosed(ledgerPath(cwd), corruptCode, label);
 		let prevHash = GENESIS_HASH;
 		const state = domainFold.init();
 		events.forEach((event, index) => {
 			const lineIndex = index + 1;
+			if (preLink !== null) preLink(event, lineIndex);
 			const link = chainLinkProblem(event, prevHash, lineIndex, eventLabel);
 			if (link !== null) throw corrupt(link);
 			domainFold.apply(state, event, lineIndex);
@@ -154,7 +191,8 @@ function buildLedger(dir, ledger) {
 		return domainFold.result(state);
 	};
 	// The appendLedgerEvent options table, shaped exactly like every
-	// family's hand-written *_LEDGER constant.
+	// family's hand-written *_LEDGER constant; `ceilingMessage` is undefined
+	// unless the ledger declared its own ceiling refusal wording.
 	const options = Object.freeze({
 		acquire,
 		fold,
@@ -163,6 +201,7 @@ function buildLedger(dir, ledger) {
 		sizeCeilingCode,
 		envName,
 		defaultBytes,
+		ceilingMessage,
 		label,
 	});
 	return Object.freeze({
@@ -199,12 +238,23 @@ function buildLedger(dir, ledger) {
  *       conflictCode:    stable code for a fresh-lock conflict,
  *       corruptCode:     stable code every fail-closed read throws,
  *       sizeCeilingCode: stable code for a refused oversized append,
- *       ceiling:         { envName, defaultBytes } append-size bound,
+ *       ceiling:         { envName, defaultBytes } append-size bound;
+ *                        optional `message(event, ceiling)` overrides the
+ *                        shared ceiling refusal wording with the family's
+ *                        recorded text (ADR-0028 Amendment) — `event` is
+ *                        the exact chained line refused, `ceiling` the
+ *                        resolved byte bound,
  *       label:           the ledger's name in lock/read/ceiling refusals,
  *       eventLabel:      the per-event prefix in chain-walk problems
  *                        ("<eventLabel> event <n> ..."),
  *       fold: {          the family-owned domain half of the fold read:
  *         init:   () => state              fresh state per read,
+ *         preLink: (event, lineIndex)      OPTIONAL (ADR-0028 Amendment):
+ *                 executed per event immediately BEFORE the chain-link
+ *                 check, for families whose recorded contract adjudicates
+ *                 domain problems ahead of chain problems; throw semantics
+ *                 are `apply`'s (it never sees the previous hash, so it
+ *                 can never stand in for the chain walk),
  *         apply:  (state, event, lineIndex) domain-validate + apply one
  *                 chain-verified event (throw the ledger's corrupt error
  *                 on a domain impossibility),

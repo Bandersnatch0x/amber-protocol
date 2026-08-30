@@ -197,7 +197,10 @@ function appendWithinCeiling({ ledgerPath, event, envName, defaultBytes, label }
 // result is returned verbatim without appending; `derive(fold)` picks the
 // caller's record after the append. `body` may be a factory evaluated
 // against the in-lock fold (after the guard, same fold object), for events
-// whose shape depends on current ledger state.
+// whose shape depends on current ledger state. Optional
+// `options.ceilingMessage(event, ceiling)` (ADR-0028 Amendment) overrides
+// the shared ceiling refusal wording; absent, the shared wording rides
+// unchanged.
 function appendLedgerEvent(cwd, options, body, guard, derive) {
 	const failure = (err) => ({
 		ok: false,
@@ -245,7 +248,11 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 				ok: false,
 				code: options.sizeCeilingCode,
 				record: null,
-				errors: [`${options.label} event would exceed ${ceiling.ceiling} bytes`],
+				errors: [
+					options.ceilingMessage
+						? options.ceilingMessage(event, ceiling.ceiling)
+						: `${options.label} event would exceed ${ceiling.ceiling} bytes`,
+				],
 			};
 		try {
 			appendJSONL(options.path(cwd), event);

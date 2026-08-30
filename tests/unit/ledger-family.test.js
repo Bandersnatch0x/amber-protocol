@@ -524,3 +524,131 @@ test("a family declares several ledgers, each with its own independent ritual", 
 		readEvents(family.ledgers.retirements.path(dir))[0].hash,
 	);
 });
+
+// ── ADR-0028 Amendment: the two closed optional extensions ───────────────
+
+test("a declared preLink step adjudicates its verdict before the chain walk", () => {
+	const SYNTH_VERSION_CODE = "AMBER_E_SYNTH_UNSUPPORTED_VERSION";
+	const declaration = validDeclaration();
+	declaration.ledgers[0].fold = {
+		...SIGNAL_FOLD,
+		preLink: (event, lineIndex) => {
+			if (event.schemaVersion !== 1)
+				throw typedError(
+					SYNTH_VERSION_CODE,
+					`synthetic signal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+				);
+		},
+	};
+	const family = defineLedgerFamily(declaration);
+	const dir = mkTarget("prelink");
+	// An UNCHAINED fixture carrying an unsupported version — the recorded
+	// contract the extension exists for: the version verdict must win over
+	// the chain walk, which would otherwise report a broken link.
+	fs.mkdirSync(path.dirname(family.ledgers.signals.path(dir)), { recursive: true });
+	writeEvents(family.ledgers.signals.path(dir), [
+		{ kind: "emit", schemaVersion: 2, at: AT, id: "s-1", note: "first", decision: pin("d-1") },
+	]);
+	assert.throws(
+		() => family.ledgers.signals.fold(dir),
+		(err) =>
+			err.amberCode === SYNTH_VERSION_CODE &&
+			/synthetic signal event 1 declares unsupported schemaVersion 2/.test(err.message),
+	);
+	// The SAME fixture bytes through the family that declares no preLink:
+	// behavior is unchanged — the chain-first walk reports the break.
+	assert.throws(
+		() => FAMILY.ledgers.signals.fold(dir),
+		(err) =>
+			err.amberCode === SYNTH_CORRUPT_CODE &&
+			/synthetic signal event 1 breaks the hash chain/.test(err.message),
+	);
+	// A green chained ledger folds through the preLink family untouched:
+	// the step observes every event but adjudicates only its own verdict.
+	const greenDir = mkTarget("prelink-green");
+	const emitted = family.ledgers.signals.append(
+		greenDir,
+		{ kind: "emit", schemaVersion: 1, at: AT, id: "s-1", note: "first", decision: pin("d-1") },
+		() => null,
+		(signals) => signals[0] ?? null,
+	);
+	assert.equal(emitted.ok, true, (emitted.errors || []).join("; "));
+	assert.deepEqual(
+		family.ledgers.signals.fold(greenDir).map((signal) => signal.id),
+		["s-1"],
+	);
+});
+
+test("a declared ceiling message overrides the shared wording; absent, the shared wording rides", () => {
+	const declaration = validDeclaration();
+	declaration.ledgers[0].ceiling = {
+		envName: SYNTH_ENV,
+		defaultBytes: 1,
+		message: (event, ceiling) =>
+			`appending signal ${JSON.stringify(event.id)} would exceed the synthetic bound of ${ceiling} bytes`,
+	};
+	const worded = defineLedgerFamily(declaration);
+	const dir = mkTarget("ceiling-message");
+	const refused = worded.ledgers.signals.append(
+		dir,
+		{ kind: "emit", schemaVersion: 1, at: AT, id: "s-1", note: "first", decision: pin("d-1") },
+		() => null,
+		(signals) => signals[0] ?? null,
+	);
+	assert.equal(refused.ok, false);
+	assert.equal(refused.code, SYNTH_SIZE_CEILING_CODE);
+	// The override sees the exact chained line refused and the resolved bound.
+	assert.equal(
+		refused.errors[0],
+		'appending signal "s-1" would exceed the synthetic bound of 1 bytes',
+	);
+	assert.equal(fs.existsSync(worded.ledgers.signals.path(dir)), false);
+	// The default fallback: the same tiny bound WITHOUT a declared message
+	// keeps the shared orchestration wording byte-for-byte.
+	const bare = validDeclaration();
+	bare.ledgers[0].ceiling.defaultBytes = 1;
+	const shared = defineLedgerFamily(bare);
+	const sharedRefusal = shared.ledgers.signals.append(
+		mkTarget("ceiling-message-default"),
+		{ kind: "emit", schemaVersion: 1, at: AT, id: "s-1", note: "first", decision: pin("d-1") },
+		() => null,
+		(signals) => signals[0] ?? null,
+	);
+	assert.equal(sharedRefusal.ok, false);
+	assert.equal(sharedRefusal.errors[0], "synthetic signal ledger event would exceed 1 bytes");
+});
+
+test("the two optional knobs stay closed: a malformed preLink or ceiling message refuses at definition time", () => {
+	const cases = [
+		[
+			"a preLink that is not a function",
+			(d) => {
+				d.ledgers[0].fold.preLink = 42;
+			},
+			/declaration\.ledgers\[0\]\.fold\.preLink must be a function/,
+		],
+		[
+			"a ceiling message that is not a function",
+			(d) => {
+				d.ledgers[0].ceiling.message = "custom wording";
+			},
+			/declaration\.ledgers\[0\]\.ceiling\.message must be a function/,
+		],
+		[
+			"an unknown fold knob beside the closed extension",
+			(d) => {
+				d.ledgers[0].fold.postLink = () => {};
+			},
+			/declaration\.ledgers\[0\]\.fold carries unknown field "postLink"/,
+		],
+	];
+	for (const [scenario, mutate, message] of cases) {
+		const declaration = validDeclaration();
+		mutate(declaration);
+		assert.throws(
+			() => defineLedgerFamily(declaration),
+			{ name: "TypeError", message },
+			`${scenario} must refuse`,
+		);
+	}
+});
