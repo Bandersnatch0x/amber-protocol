@@ -95,7 +95,9 @@ envelope gets `schemaVersion: "1.0.0"`, a fresh `crypto.randomUUID()`
 `envelopeId`, the canonical path plus its `sha256:` hash, structural identity
 from `resolveIdentity(cwd)`, origin profile from
 `resolveDeploymentProfile(cwd)` (an absent declaration falls back to
-`personal-node`; an invalid declaration refuses the pack),
+`personal-node`; an invalid declaration refuses the pack — the declaration
+mechanism, its fail-closed resolution states, and its CLI surface are
+specified in `docs/specs/deployment-profiles.md`),
 `createdAt` as the current ISO timestamp, and
 `versionNegotiation: { amberProtocolVersion: <running Amber package
 version>, minCompatibleVersion: "1.0.0", capabilities:
@@ -381,6 +383,9 @@ persisted conflicts and surface through the summary, not as session errors.
   `unpackEnvelope`)
 - Identity resolution: `scripts/lib/core/identity.js` (`resolveIdentity`,
   `normalizeRemoteUrl`, `resolveRepositoryId`)
+- Deployment-profile declaration (the `origin.profile` source):
+  `scripts/lib/core/deployment-profile.js` — contract in
+  `docs/specs/deployment-profiles.md`
 - Ledgers, apply, replay: `scripts/lib/core/sync-conflicts.js`
 - Pull/push/session and the preparation report: `scripts/lib/core/sync-session.js`
 - Governed transport execution (ADR-0020 Stage A), transport approval and
