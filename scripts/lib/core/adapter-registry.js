@@ -26,6 +26,7 @@ const {
 	chainHeadHash,
 	acquireLedgerLock,
 	appendWithinCeiling: sharedAppendWithinCeiling,
+	findDecisionSpend,
 } = require("./registry-ledger");
 
 const ADAPTER_SCHEMA_VERSION = 1;
@@ -1260,20 +1261,8 @@ function evidenceReferenceProblem(cwd, reference, label) {
 }
 
 function decisionSpentBy(records, decision) {
-	for (const record of records) {
-		if (
-			record.decision.identity === decision.identity &&
-			record.decision.revision === decision.revision
-		)
-			return record.cutoverId;
-		if (
-			record.rollback !== null &&
-			record.rollback.decision.identity === decision.identity &&
-			record.rollback.decision.revision === decision.revision
-		)
-			return record.cutoverId;
-	}
-	return null;
+	const spent = findDecisionSpend(records, decision, ["decision", "rollback.decision"]);
+	return spent ? spent.record.cutoverId : null;
 }
 
 function recordCutover(cwd, input = {}, opts = {}) {

@@ -13,12 +13,15 @@
 //      (on the body first, then under the lock on the exact chained event)
 //   4. the credential-material refusal shared by every ledger-bound field
 //      (credentialLeakProblem), so no registry can store a secret.
+//   5. the Decision primitives (ADR-0028): the kinds-parameterized decision
+//      snapshot validator, the canonical content hash, and the single
+//      spend-scan kernel every family spender shell consumes.
 
 const fs = require("node:fs");
 const path = require("node:path");
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
 const { typedError } = require("./error-catalog");
-const { sha256Hex } = require("./context-hash");
+const { sha256Hex, canonicalJson } = require("./context-hash");
 const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 
 const GENESIS_HASH = "0".repeat(64);
@@ -53,6 +56,13 @@ function chainHash(event, prevHash) {
 	// the event without prevHash) and from the fold (which reads it back with
 	// prevHash already present).
 	return sha256Hex(prevHash + JSON.stringify(sortKeys(body)));
+}
+
+// The canonical content hash governed registries store and re-derive
+// (`sha256:` + hex of the key-sorted JSON, hashed as UTF-8): one source,
+// so a fingerprint computed by one family always re-derives in another.
+function canonicalHashOf(value) {
+	return `sha256:${sha256Hex(canonicalJson(JSON.stringify(value)))}`;
 }
 
 // The chain head: the last event's hash, or the genesis constant for an empty
@@ -356,6 +366,52 @@ function resolveRegistrationDecision(revisions, decision, kinds, label) {
 	};
 }
 
+// The frozen Decision snapshot a governed event stores after resolution.
+// The closed kind set stays per-registry latitude, passed as `kinds`.
+const DECISION_SNAPSHOT_FIELDS = Object.freeze([
+	"identity",
+	"revision",
+	"decisionKind",
+	"principal",
+]);
+
+function decisionSnapshotProblem(value, kinds, label) {
+	if (!isPlainObject(value)) return `${label} must be an object`;
+	const closed = closedFieldProblem(value, DECISION_SNAPSHOT_FIELDS, label);
+	if (closed !== null) return closed;
+	if (!isNonEmptyString(value.identity)) return `${label}.identity must be a non-empty string`;
+	if (!Number.isInteger(value.revision) || value.revision < 1)
+		return `${label}.revision must be a positive integer`;
+	if (!kinds.includes(value.decisionKind))
+		return `${label}.decisionKind must be one of ${kinds.join(", ")}`;
+	if (!isNonEmptyString(value.principal)) return `${label}.principal must be a non-empty string`;
+	return null;
+}
+
+// The single spend-scan kernel (ADR-0028): walk folded records in ledger
+// order and each record's declared slot paths in declaration order; the
+// first slot already carrying the pinned Decision names the spend as
+// {record, slot}, or null when the Decision is unspent. A dot-separated
+// slot path reads through nested objects; a null or missing step reads
+// as unspent. The family shells own return shapes and refusal wording.
+function findDecisionSpend(records, decision, slots) {
+	for (const record of records) {
+		for (const slot of slots) {
+			let pin = record;
+			for (const step of slot.split(".")) {
+				pin = isPlainObject(pin) ? pin[step] : null;
+			}
+			if (
+				isPlainObject(pin) &&
+				pin.identity === decision.identity &&
+				pin.revision === decision.revision
+			)
+				return { record, slot };
+		}
+	}
+	return null;
+}
+
 // Well-known credential shapes refuse in any ledger-bound field —
 // belt-and-braces on top of closed shapes that carry no handle slot.
 const CREDENTIAL_MATERIAL_PATTERN =
@@ -392,4 +448,8 @@ module.exports = {
 	unknownFieldProblem,
 	decisionPinProblem,
 	resolveRegistrationDecision,
+	DECISION_SNAPSHOT_FIELDS,
+	decisionSnapshotProblem,
+	canonicalHashOf,
+	findDecisionSpend,
 };

@@ -36,7 +36,6 @@
 // fix becomes a regression signal. Rollups are deterministic within a
 // declared bound and mark truncation explicitly.
 
-const crypto = require("node:crypto");
 const path = require("node:path");
 
 const { readLedgerFailClosed } = require("./jsonl");
@@ -44,7 +43,6 @@ const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { resolveActivePrincipal } = require("./principal-registry");
-const { canonicalJson } = require("./context-hash");
 const {
 	GENESIS_HASH,
 	chainHash,
@@ -58,6 +56,8 @@ const {
 	unknownFieldProblem,
 	decisionPinProblem,
 	resolveRegistrationDecision,
+	canonicalHashOf,
+	findDecisionSpend,
 } = require("./registry-ledger");
 
 // v2 added the required service `owner` and the optional `policy` pin
@@ -212,13 +212,6 @@ function acquireFindingLock(cwd) {
 	});
 }
 
-function canonicalHashOf(value) {
-	return `sha256:${crypto
-		.createHash("sha256")
-		.update(Buffer.from(canonicalJson(JSON.stringify(value))))
-		.digest("hex")}`;
-}
-
 function decisionShapeProblem(value, label) {
 	if (!isPlainObject(value)) return `${label} must be an object`;
 	const closed = closedFieldProblem(value, DECISION_FIELDS, label);
@@ -337,12 +330,8 @@ function foldDetectors(cwd) {
 
 // A registration Decision is single-use across the detector registry.
 function decisionSpentBy(detectors, decision) {
-	const spender = detectors.find(
-		(entry) =>
-			entry.decision.identity === decision.identity &&
-			entry.decision.revision === decision.revision,
-	);
-	return spender ? detectorKey(spender.id, spender.version) : null;
+	const spent = findDecisionSpend(detectors, decision, ["decision"]);
+	return spent ? detectorKey(spent.record.id, spent.record.version) : null;
 }
 
 // Registration authority: a committed human acceptance/approval Decision
@@ -440,14 +429,9 @@ function detectorPolicyProblem(cwd, policy) {
 // proposal fold names the spender when one exists. Returns the refusal
 // message or null; the caller owns the error code.
 function triageDecisionSpendProblem(proposals, decision) {
-	const spender = proposals.find(
-		(entry) =>
-			entry.triage !== null &&
-			entry.triage.decision.identity === decision.identity &&
-			entry.triage.decision.revision === decision.revision,
-	);
-	if (!spender) return null;
-	return `decision ${JSON.stringify(decision.identity)}@${decision.revision} already triaged the proposal for ${JSON.stringify(spender.fingerprint)}; a Decision is single-use across the maintain ledgers`;
+	const spent = findDecisionSpend(proposals, decision, ["triage.decision"]);
+	if (spent === null) return null;
+	return `decision ${JSON.stringify(decision.identity)}@${decision.revision} already triaged the proposal for ${JSON.stringify(spent.record.fingerprint)}; a Decision is single-use across the maintain ledgers`;
 }
 
 // Single-use ACROSS the maintain ledgers, both directions: a Decision

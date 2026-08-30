@@ -13,13 +13,11 @@
 // free-form execution vectors by construction.
 
 const path = require("node:path");
-const crypto = require("node:crypto");
 
 const { readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
-const { canonicalJson } = require("./context-hash");
 const { showAdapter } = require("./adapter-registry");
 const { consumeSubjectBoundApproval, showApproval } = require("./approval-registry");
 const { showEvidence } = require("./evidence-receipts");
@@ -37,6 +35,9 @@ const {
 	unknownFieldProblem,
 	decisionPinProblem,
 	resolveRegistrationDecision,
+	decisionSnapshotProblem: sharedDecisionSnapshotProblem,
+	canonicalHashOf,
+	findDecisionSpend,
 } = require("./registry-ledger");
 const { compileInline } = require("./schema-contract");
 
@@ -114,12 +115,6 @@ const EFFECT_INPUT_FIELDS = Object.freeze([
 ]);
 const COMPENSATION_FIELDS = Object.freeze(["kind", "effect"]);
 const ADAPTER_PIN_FIELDS = Object.freeze(["id", "version"]);
-const DECISION_SNAPSHOT_FIELDS = Object.freeze([
-	"identity",
-	"revision",
-	"decisionKind",
-	"principal",
-]);
 const EFFECT_EVENT_FIELDS = Object.freeze([
 	"kind",
 	"schemaVersion",
@@ -221,16 +216,7 @@ function inputSchemaProblem(value, label) {
 }
 
 function decisionSnapshotProblem(value, label) {
-	if (!isPlainObject(value)) return `${label} must be an object`;
-	const closed = closedFieldProblem(value, DECISION_SNAPSHOT_FIELDS, label);
-	if (closed !== null) return closed;
-	if (!isNonEmptyString(value.identity)) return `${label}.identity must be a non-empty string`;
-	if (!Number.isInteger(value.revision) || value.revision < 1)
-		return `${label}.revision must be a positive integer`;
-	if (!EXTERNAL_DECISION_KINDS.includes(value.decisionKind))
-		return `${label}.decisionKind must be one of ${EXTERNAL_DECISION_KINDS.join(", ")}`;
-	if (!isNonEmptyString(value.principal)) return `${label}.principal must be a non-empty string`;
-	return null;
+	return sharedDecisionSnapshotProblem(value, EXTERNAL_DECISION_KINDS, label);
 }
 
 // The contract shape shared by register input and stored event.
@@ -349,12 +335,8 @@ function resolveEffectDecision(revisions, decision, label) {
 // Single-use is scoped to the effect ledger domain, matching the
 // per-registry F052/F055 mirror convention.
 function effectDecisionSpender(effects, decision) {
-	const spender = effects.find(
-		(entry) =>
-			entry.decision.identity === decision.identity &&
-			entry.decision.revision === decision.revision,
-	);
-	return spender ? effectKey(spender.id, spender.version) : null;
+	const spent = findDecisionSpend(effects, decision, ["decision"]);
+	return spent ? effectKey(spent.record.id, spent.record.version) : null;
 }
 
 // The registration input prologue: closed fields, the contract shape,
@@ -536,13 +518,6 @@ function acquireProposalLock(cwd) {
 		label: "external proposal ledger",
 		staleMs: LOCK_STALE_MS,
 	});
-}
-
-function canonicalHashOf(value) {
-	return `sha256:${crypto
-		.createHash("sha256")
-		.update(Buffer.from(canonicalJson(JSON.stringify(value))))
-		.digest("hex")}`;
 }
 
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;

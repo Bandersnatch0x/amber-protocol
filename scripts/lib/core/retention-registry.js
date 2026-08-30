@@ -38,14 +38,12 @@
 // and a tombstoned subject refuses Gate evaluation: historical existence
 // is not current proof.
 
-const crypto = require("node:crypto");
 const path = require("node:path");
 
 const { readLedgerFailClosed } = require("./jsonl");
 const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions, ARTIFACT_TYPES } = require("./canonical-artifacts");
-const { canonicalJson } = require("./context-hash");
 const { showAdapter } = require("./adapter-registry");
 const { consumeSubjectBoundApproval } = require("./approval-registry");
 const {
@@ -61,6 +59,9 @@ const {
 	unknownFieldProblem,
 	decisionPinProblem,
 	resolveRegistrationDecision,
+	decisionSnapshotProblem: sharedDecisionSnapshotProblem,
+	canonicalHashOf,
+	findDecisionSpend,
 } = require("./registry-ledger");
 
 const RETENTION_SCHEMA_VERSION = 1;
@@ -473,12 +474,6 @@ function acquireHoldLock(cwd) {
 const HOLD_SCOPE_FIELDS = Object.freeze(["record", "subject"]);
 const HOLD_INPUT_FIELDS = Object.freeze(["id", "scope", "reason", "decision"]);
 const RELEASE_INPUT_FIELDS = Object.freeze(["id", "decision"]);
-const DECISION_SNAPSHOT_FIELDS = Object.freeze([
-	"identity",
-	"revision",
-	"decisionKind",
-	"principal",
-]);
 const HOLD_EVENT_FIELDS = Object.freeze([
 	"kind",
 	"schemaVersion",
@@ -513,16 +508,7 @@ function holdScopeProblem(value, label) {
 }
 
 function decisionSnapshotProblem(value, label) {
-	if (!isPlainObject(value)) return `${label} must be an object`;
-	const closed = closedFieldProblem(value, DECISION_SNAPSHOT_FIELDS, label);
-	if (closed !== null) return closed;
-	if (!isNonEmptyString(value.identity)) return `${label}.identity must be a non-empty string`;
-	if (!Number.isInteger(value.revision) || value.revision < 1)
-		return `${label}.revision must be a positive integer`;
-	if (!RETENTION_DECISION_KINDS.includes(value.decisionKind))
-		return `${label}.decisionKind must be one of ${RETENTION_DECISION_KINDS.join(", ")}`;
-	if (!isNonEmptyString(value.principal)) return `${label}.principal must be a non-empty string`;
-	return null;
+	return sharedDecisionSnapshotProblem(value, RETENTION_DECISION_KINDS, label);
 }
 
 function holdEventProblem(event, lineIndex) {
@@ -619,17 +605,11 @@ function resolveHoldDecision(revisions, decision, label) {
 // A Decision is single-use across the hold ledger: creation and release
 // events both spend one.
 function holdDecisionSpender(holds, decision) {
-	for (const hold of holds) {
-		if (hold.issuer.identity === decision.identity && hold.issuer.revision === decision.revision)
-			return `hold ${JSON.stringify(hold.id)}`;
-		if (
-			hold.release !== null &&
-			hold.release.decision.identity === decision.identity &&
-			hold.release.decision.revision === decision.revision
-		)
-			return `the release of hold ${JSON.stringify(hold.id)}`;
-	}
-	return null;
+	const spent = findDecisionSpend(holds, decision, ["issuer", "release.decision"]);
+	if (spent === null) return null;
+	return spent.slot === "issuer"
+		? `hold ${JSON.stringify(spent.record.id)}`
+		: `the release of hold ${JSON.stringify(spent.record.id)}`;
 }
 
 /**
@@ -777,13 +757,6 @@ function activeHoldsFor(holds, record) {
 		.map((entry) => entry.id);
 }
 
-function canonicalHashOf(value) {
-	return `sha256:${crypto
-		.createHash("sha256")
-		.update(Buffer.from(canonicalJson(JSON.stringify(value))))
-		.digest("hex")}`;
-}
-
 function holdersPath(cwd) {
 	return statePathForCreate(cwd, "retention", "holders.jsonl");
 }
@@ -893,12 +866,8 @@ const HOLDER_LEDGER = Object.freeze({
 });
 
 function holderDecisionSpender(holders, decision) {
-	const spender = holders.find(
-		(entry) =>
-			entry.decision.identity === decision.identity &&
-			entry.decision.revision === decision.revision,
-	);
-	return spender ? holderKey(spender.id, spender.version) : null;
+	const spent = findDecisionSpend(holders, decision, ["decision"]);
+	return spent ? holderKey(spent.record.id, spent.record.version) : null;
 }
 
 /**

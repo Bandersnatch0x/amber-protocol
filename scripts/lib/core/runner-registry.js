@@ -12,7 +12,6 @@
 // event binds a committed human Decision whose principal is verified against
 // the Principal registry, and a Decision is single-use across the ledger.
 
-const crypto = require("node:crypto");
 const path = require("node:path");
 
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
@@ -21,13 +20,14 @@ const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { showApproval, consumeApproval } = require("./approval-registry");
 const { showEvidence, RECORDABLE_ASSURANCE } = require("./evidence-receipts");
-const { canonicalJson } = require("./context-hash");
 const {
 	GENESIS_HASH,
 	chainHash,
 	chainHeadHash,
 	acquireLedgerLock,
 	appendWithinCeiling: sharedAppendWithinCeiling,
+	canonicalHashOf,
+	findDecisionSpend,
 } = require("./registry-ledger");
 
 const RUNNER_REGISTRY_SCHEMA_VERSION = 1;
@@ -385,19 +385,15 @@ function resolveRegistryDecision(cwd, decision) {
 // A registry Decision is single-use across the whole ledger: one human
 // approval authorizes exactly one registration event.
 function registryDecisionSpentBy({ runners, capabilities }, decision) {
-	const spender = [...runners, ...capabilities].find(
-		(record) =>
-			record.decision.identity === decision.identity &&
-			record.decision.revision === decision.revision,
-	);
-	if (!spender) return null;
-	return spender.kind === "runner"
-		? runnerKey(spender.id, spender.version)
+	const spent = findDecisionSpend([...runners, ...capabilities], decision, ["decision"]);
+	if (spent === null) return null;
+	return spent.record.kind === "runner"
+		? runnerKey(spent.record.id, spent.record.version)
 		: capabilityKey(
-				spender.runnerId,
-				spender.runnerVersion,
-				spender.name,
-				spender.capabilityVersion,
+				spent.record.runnerId,
+				spent.record.runnerVersion,
+				spent.record.name,
+				spent.record.capabilityVersion,
 			);
 }
 
@@ -841,10 +837,6 @@ function appendRequestWithinCeiling(cwd, event) {
 	});
 }
 
-function sha256Bytes(buffer) {
-	return `sha256:${crypto.createHash("sha256").update(buffer).digest("hex")}`;
-}
-
 // Normalized posix form for prefix confinement, mirroring the adapter
 // registry's allowed-path discipline so ".." and separator spellings
 // cannot escape a declared prefix.
@@ -871,10 +863,6 @@ function riskOf(effects) {
 		highest = Math.max(highest, level);
 	}
 	return RISK_LEVELS[highest];
-}
-
-function canonicalHashOf(value) {
-	return sha256Bytes(Buffer.from(canonicalJson(JSON.stringify(value))));
 }
 
 function approvalBindingOf(environment, requestHash) {
