@@ -27,9 +27,9 @@ security risk. F061 is the feature that acts on this record.
    full-orchestration dialect (`appendLedgerEvent`). Primitive-dialect families upgrade inside
    their own migration tickets; a family that provably cannot upgrade byte-identically records
    the variance in its ticket and re-opens this decision — the factory never grows a second
-   mode preemptively. *(Amended 2026-08-30 — see Amendment below: the re-open clause fired on
-   #306 with evidence from three families; the dialect stays single, the declaration vocabulary
-   gains two closed extensions.)*
+   mode preemptively. *(Amended 2026-08-30 — see Amendments below: the re-open clause fired on
+   #306 and again on #307; the dialect stays single, the declaration vocabulary gains closed
+   extensions demanded by recorded test contracts.)*
 2. **Byte-compatibility is the contract.** Migrations preserve error codes, refusal wording,
    ledger record shapes, and lock file names byte-for-byte. The existing family behavior
    suites (12,116 lines) are the regression net and are never edited to make a migration pass.
@@ -94,3 +94,26 @@ extensions:
 This is not preemptive growth: both extensions exist only because three families' recorded
 test contracts demand them, and neither reopens a path to a private append or an unchained
 read.
+
+## Amendment (2026-08-30) — chain-link wording as a third closed extension
+
+The re-open clause fired again on the second primitive-dialect migration (#307, approval).
+Measured variance, pinned by an unedited behavior suite: the approval splice-tamper test
+asserts the corruption message includes `prevHash`, and the recorded chain-break / hash-
+mismatch texts append "— the ledger was edited in place". The factory's shared
+`chainLinkProblem` wording is the short form (`"<label> event N breaks the hash chain"` /
+`"carries a hash that does not match its content"`), which does not contain `prevHash`.
+The same long wording is built into `evidence-receipts.js`, `gate-evaluation.js`, and
+`policy-evaluation.js`, so the variance is again systemic.
+
+Ruling (same closed-extension shape as the #306 amendment): the dialect stays single —
+the shared chain check still runs, `preLink` still never sees the previous hash — and
+the declaration vocabulary gains one more **closed** extension:
+
+3. an optional per-ledger `fold.chainWording(kind, event, lineIndex, label)` override,
+   keyed by `"not-object"` / `"broken"` / `"mismatch"`, defaulting to the shared
+   orchestration wording so already-migrated families that declare neither this nor the
+   #306 knobs are byte-unaffected.
+
+This is not a second chain dialect: the factory still computes the link problem; the
+hook only replaces the refusal text.

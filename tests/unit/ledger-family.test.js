@@ -525,7 +525,7 @@ test("a family declares several ledgers, each with its own independent ritual", 
 	);
 });
 
-// ── ADR-0028 Amendment: the two closed optional extensions ───────────────
+// ── ADR-0028 Amendments: the closed optional extensions ──────────────────
 
 test("a declared preLink step adjudicates its verdict before the chain walk", () => {
 	const SYNTH_VERSION_CODE = "AMBER_E_SYNTH_UNSUPPORTED_VERSION";
@@ -618,7 +618,53 @@ test("a declared ceiling message overrides the shared wording; absent, the share
 	assert.equal(sharedRefusal.errors[0], "synthetic signal ledger event would exceed 1 bytes");
 });
 
-test("the two optional knobs stay closed: a malformed preLink or ceiling message refuses at definition time", () => {
+test("a declared chainWording override replaces the shared chain-break text; absent, the shared wording rides", () => {
+	const declaration = validDeclaration();
+	declaration.ledgers[0].fold = {
+		...SIGNAL_FOLD,
+		chainWording: (kind, _event, lineIndex, label) =>
+			kind === "broken"
+				? `${label} event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`
+				: undefined,
+	};
+	const worded = defineLedgerFamily(declaration);
+	const emitWorded = (dir, { id, note, decision }) =>
+		worded.ledgers.signals.append(
+			dir,
+			{ kind: "emit", schemaVersion: 1, at: AT, id, note, decision },
+			() => null,
+			(signals) => signals.find((signal) => signal.id === id) ?? null,
+		);
+	const dir = mkTarget("chain-wording");
+	assert.equal(emitWorded(dir, { id: "s-1", note: "first", decision: pin("d-1") }).ok, true);
+	assert.equal(emitWorded(dir, { id: "s-2", note: "second", decision: pin("d-2") }).ok, true);
+	const ledgerPath = worded.ledgers.signals.path(dir);
+	const events = readEvents(ledgerPath);
+	writeEvents(ledgerPath, [events[0], { ...events[1], prevHash: GENESIS_HASH }]);
+	assert.throws(
+		() => worded.ledgers.signals.fold(dir),
+		(err) =>
+			err.amberCode === SYNTH_CORRUPT_CODE &&
+			/prevHash does not match the previous event's hash/.test(err.message),
+	);
+	// The same splice through the family that declares no chainWording:
+	// behavior is unchanged — the shared short form rides.
+	const sharedDir = mkTarget("chain-wording-default");
+	assert.equal(emitSignal(sharedDir, { id: "s-1", note: "first", decision: pin("d-1") }).ok, true);
+	assert.equal(emitSignal(sharedDir, { id: "s-2", note: "second", decision: pin("d-2") }).ok, true);
+	const sharedPath = FAMILY.ledgers.signals.path(sharedDir);
+	const sharedEvents = readEvents(sharedPath);
+	writeEvents(sharedPath, [sharedEvents[0], { ...sharedEvents[1], prevHash: GENESIS_HASH }]);
+	assert.throws(
+		() => FAMILY.ledgers.signals.fold(sharedDir),
+		(err) =>
+			err.amberCode === SYNTH_CORRUPT_CODE &&
+			/synthetic signal event 2 breaks the hash chain/.test(err.message) &&
+			!/prevHash/.test(err.message),
+	);
+});
+
+test("the optional knobs stay closed: a malformed preLink, chainWording, or ceiling message refuses at definition time", () => {
 	const cases = [
 		[
 			"a preLink that is not a function",
@@ -626,6 +672,13 @@ test("the two optional knobs stay closed: a malformed preLink or ceiling message
 				d.ledgers[0].fold.preLink = 42;
 			},
 			/declaration\.ledgers\[0\]\.fold\.preLink must be a function/,
+		],
+		[
+			"a chainWording that is not a function",
+			(d) => {
+				d.ledgers[0].fold.chainWording = "custom wording";
+			},
+			/declaration\.ledgers\[0\]\.fold\.chainWording must be a function/,
 		],
 		[
 			"a ceiling message that is not a function",

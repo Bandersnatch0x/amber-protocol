@@ -273,13 +273,26 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 
 // The chain-walk prologue every governed fold shares: object shape, link,
 // and content hash. Returns the problem text (the caller owns the corrupt
-// error type) or null.
-function chainLinkProblem(event, prevHash, lineIndex, label) {
-	if (!isPlainObject(event)) return `${label} event ${lineIndex} is not an object`;
+// error type) or null. Optional `wording(kind, event, lineIndex, label)`
+// (ADR-0028 Amendment, #307) overrides the shared refusal text per kind
+// (`"not-object"` / `"broken"` / `"mismatch"`) so a family whose recorded
+// contract names `prevHash` or appends "edited in place" keeps that
+// wording; absent, the shared orchestration text rides unchanged.
+function chainLinkProblem(event, prevHash, lineIndex, label, wording) {
+	const text = (kind, fallback) => {
+		if (typeof wording !== "function") return fallback;
+		const override = wording(kind, event, lineIndex, label);
+		return typeof override === "string" && override.length > 0 ? override : fallback;
+	};
+	if (!isPlainObject(event))
+		return text("not-object", `${label} event ${lineIndex} is not an object`);
 	if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-		return `${label} event ${lineIndex} breaks the hash chain`;
+		return text("broken", `${label} event ${lineIndex} breaks the hash chain`);
 	if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-		return `${label} event ${lineIndex} carries a hash that does not match its content`;
+		return text(
+			"mismatch",
+			`${label} event ${lineIndex} carries a hash that does not match its content`,
+		);
 	return null;
 }
 
