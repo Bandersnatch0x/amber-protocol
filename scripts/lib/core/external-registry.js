@@ -12,11 +12,6 @@
 // carry a command, executable, or remote URL: the closed shape refuses
 // free-form execution vectors by construction.
 
-const path = require("node:path");
-
-const { readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
-const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { showAdapter } = require("./adapter-registry");
 const { consumeSubjectBoundApproval, showApproval } = require("./approval-registry");
@@ -24,10 +19,7 @@ const { showEvidence } = require("./evidence-receipts");
 const {
 	GENESIS_HASH,
 	chainHash,
-	acquireLedgerLock,
-	appendLedgerEvent,
 	credentialLeakProblem,
-	chainLinkProblem,
 	isCredentialLeakProblem,
 	isPlainObject,
 	isNonEmptyString,
@@ -39,6 +31,7 @@ const {
 	canonicalHashOf,
 	findDecisionSpend,
 } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 const { compileInline } = require("./schema-contract");
 
 // v2 added the required `compensates` linkage to proposal events (F056
@@ -55,7 +48,6 @@ const DEFAULT_MAX_EXTERNAL_BYTES = 1024 * 1024;
 // Timeouts are bounded (24h) so a contract can never declare an
 // effectively unbounded external operation.
 const MAX_EXTERNAL_TIMEOUT_MS = 24 * 3_600_000;
-const LOCK_STALE_MS = 30_000;
 
 // The closed external system vocabulary a contract may declare.
 const EXTERNAL_SYSTEMS = Object.freeze([
@@ -142,25 +134,6 @@ const EFFECT_EVENT_FIELDS = Object.freeze([
 const EFFECT_EVENT_FIELDS_LEGACY = Object.freeze(
 	EFFECT_EVENT_FIELDS.filter((field) => field !== "inputSchema"),
 );
-
-function effectsPath(cwd) {
-	return statePathForCreate(cwd, "external", "effects.jsonl");
-}
-
-function externalCorrupt(message) {
-	return typedError(EXTERNAL_CORRUPT_CODE, message);
-}
-
-function acquireEffectLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(effectsPath(cwd)),
-		lockName: "effects.lock",
-		conflictCode: EXTERNAL_LOCK_CODE,
-		corruptCode: EXTERNAL_CORRUPT_CODE,
-		label: "external effect registry",
-		staleMs: LOCK_STALE_MS,
-	});
-}
 
 // A registered name can never be an execution vector: URL schemes,
 // whitespace, shell metacharacters, and ".." traversal segments refuse.
@@ -281,50 +254,135 @@ function effectKey(id, version) {
 	return `${id}@${version}`;
 }
 
-function foldEffects(cwd) {
-	const events = readLedgerFailClosed(
-		effectsPath(cwd),
-		EXTERNAL_CORRUPT_CODE,
-		"external effect registry",
-	);
-	let prevHash = GENESIS_HASH;
-	const keys = new Set();
-	const effects = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "external effect");
-		if (link !== null) throw externalCorrupt(link);
-		if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw externalCorrupt(
-				`external effect event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind !== "effect")
-			throw externalCorrupt(
-				`external effect event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = effectEventProblem(event, lineIndex);
-		if (problem !== null) throw externalCorrupt(problem);
-		const key = effectKey(event.id, event.version);
-		if (keys.has(key))
-			throw externalCorrupt(`external effect ${JSON.stringify(key)} is registered more than once`);
-		keys.add(key);
-		const { prevHash: _prev, hash: _hash, ...body } = event;
-		effects.push({ ...body, inputSchema: event.inputSchema ?? null, index });
-		prevHash = event.hash;
-	});
-	return effects;
-}
-
-const EFFECT_LEDGER = Object.freeze({
-	acquire: acquireEffectLock,
-	fold: foldEffects,
-	path: effectsPath,
-	corruptCode: EXTERNAL_CORRUPT_CODE,
-	sizeCeilingCode: EXTERNAL_SIZE_CEILING_CODE,
-	envName: "AMBER_EXTERNAL_MAX_EFFECTS_BYTES",
-	defaultBytes: DEFAULT_MAX_EXTERNAL_BYTES,
-	label: "external effect registry",
+// F061 follow-up (#303) — the ledger ritual for all three external
+// ledgers is assembled by `defineLedgerFamily` (ADR-0028), byte-
+// identically to the hand-written ceremony it replaces: same paths under
+// `.amber/external/` (`effects.jsonl` / `proposals.jsonl` /
+// `executions.jsonl`), same lock names (the 30s stale bound now rides the
+// shared default), same stable codes and labels ("external effect
+// registry" / "external proposal ledger" / "external execution ledger" in
+// lock/read/ceiling refusals, "external effect" / "external proposal" /
+// "external execution" as the per-event chain-walk prefixes), and the
+// same fold interleaving — the chain link first, then the family's domain
+// checks, per event in ledger order. Only the domain half is declared
+// here: the schema and kind gates, the closed event shapes, and the
+// per-kind appliers (`applyProposalEvent` and `applyExecutionEvent` in
+// their T2/T3 sections below) stay this family's own rules.
+const EXTERNAL_FAMILY = defineLedgerFamily({
+	dir: "external",
+	label: "external registry",
+	ledgers: [
+		{
+			name: "effects",
+			fileName: "effects.jsonl",
+			lockName: "effects.lock",
+			conflictCode: EXTERNAL_LOCK_CODE,
+			corruptCode: EXTERNAL_CORRUPT_CODE,
+			sizeCeilingCode: EXTERNAL_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_EXTERNAL_MAX_EFFECTS_BYTES",
+				defaultBytes: DEFAULT_MAX_EXTERNAL_BYTES,
+			},
+			label: "external effect registry",
+			eventLabel: "external effect",
+			fold: {
+				init: () => ({ keys: new Set(), effects: [] }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw externalCorrupt(
+							`external effect event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (event.kind !== "effect")
+						throw externalCorrupt(
+							`external effect event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = effectEventProblem(event, lineIndex);
+					if (problem !== null) throw externalCorrupt(problem);
+					const key = effectKey(event.id, event.version);
+					if (state.keys.has(key))
+						throw externalCorrupt(
+							`external effect ${JSON.stringify(key)} is registered more than once`,
+						);
+					state.keys.add(key);
+					const { prevHash: _prev, hash: _hash, ...body } = event;
+					state.effects.push({
+						...body,
+						inputSchema: event.inputSchema ?? null,
+						index: lineIndex - 1,
+					});
+				},
+				result: (state) => state.effects,
+			},
+		},
+		{
+			name: "proposals",
+			fileName: "proposals.jsonl",
+			lockName: "proposals.lock",
+			conflictCode: PROPOSAL_LOCK_CODE,
+			corruptCode: PROPOSAL_CORRUPT_CODE,
+			sizeCeilingCode: PROPOSAL_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_EXTERNAL_MAX_PROPOSALS_BYTES",
+				defaultBytes: DEFAULT_MAX_EXTERNAL_BYTES,
+			},
+			label: "external proposal ledger",
+			eventLabel: "external proposal",
+			fold: {
+				init: () => ({ proposals: [], byId: new Map() }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw proposalCorrupt(
+							`external proposal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (event.kind !== "proposal" && event.kind !== "authorized")
+						throw proposalCorrupt(
+							`external proposal event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = proposalEventProblem(event, lineIndex);
+					if (problem !== null) throw proposalCorrupt(problem);
+					applyProposalEvent(state.proposals, state.byId, event, lineIndex);
+				},
+				result: (state) => state.proposals,
+			},
+		},
+		{
+			name: "executions",
+			fileName: "executions.jsonl",
+			lockName: "executions.lock",
+			conflictCode: EXEC_LOCK_CODE,
+			corruptCode: EXEC_CORRUPT_CODE,
+			sizeCeilingCode: EXEC_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_EXTERNAL_MAX_EXECUTIONS_BYTES",
+				defaultBytes: DEFAULT_MAX_EXTERNAL_BYTES,
+			},
+			label: "external execution ledger",
+			eventLabel: "external execution",
+			fold: {
+				init: () => ({ executions: [], byId: new Map() }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw executionCorrupt(
+							`external execution event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (!["execution", "settlement", "reconciliation"].includes(event.kind))
+						throw executionCorrupt(
+							`external execution event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = executionEventProblem(event, lineIndex);
+					if (problem !== null) throw executionCorrupt(problem);
+					applyExecutionEvent(state.executions, state.byId, event, lineIndex);
+				},
+				result: (state) => state.executions,
+			},
+		},
+	],
 });
+
+const EFFECT_LEDGER = EXTERNAL_FAMILY.ledgers.effects;
+const effectsPath = EFFECT_LEDGER.path;
+const externalCorrupt = EFFECT_LEDGER.corrupt;
+const foldEffects = EFFECT_LEDGER.fold;
 
 // Registration authority mirrors the F052/F055 contract: a committed,
 // unscoped, human acceptance/approval Decision with a verified principal.
@@ -444,9 +502,8 @@ function registerExternalEffect(cwd, input = {}, opts = {}) {
 	}
 	const resolved = resolveEffectDecision(revisions, input.decision, "External Effect registration");
 	if (resolved.problem) return fail(EXTERNAL_INVALID_CODE, [resolved.problem]);
-	return appendLedgerEvent(
+	return EFFECT_LEDGER.append(
 		cwd,
-		EFFECT_LEDGER,
 		{
 			kind: "effect",
 			schemaVersion: EXTERNAL_SCHEMA_VERSION,
@@ -500,25 +557,6 @@ function listExternalEffects(cwd, { system = null } = {}) {
 // and authorization consumes a single-use Approval bound to that hash —
 // effect-version or Adapter-version drift since proposal refuses.
 // ---------------------------------------------------------------------------
-
-function proposalsPath(cwd) {
-	return statePathForCreate(cwd, "external", "proposals.jsonl");
-}
-
-function proposalCorrupt(message) {
-	return typedError(PROPOSAL_CORRUPT_CODE, message);
-}
-
-function acquireProposalLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(proposalsPath(cwd)),
-		lockName: "proposals.lock",
-		conflictCode: PROPOSAL_LOCK_CODE,
-		corruptCode: PROPOSAL_CORRUPT_CODE,
-		label: "external proposal ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
 
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const EFFECT_PIN_FIELDS = Object.freeze(["id", "version"]);
@@ -623,77 +661,49 @@ function proposalEventProblem(event, lineIndex) {
 	return null;
 }
 
-function foldProposals(cwd) {
-	const events = readLedgerFailClosed(
-		proposalsPath(cwd),
-		PROPOSAL_CORRUPT_CODE,
-		"external proposal ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const proposals = [];
-	const byId = new Map();
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "external proposal");
-		if (link !== null) throw proposalCorrupt(link);
-		if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
+// The family-owned domain applier for one chain-verified, shape-checked
+// proposal-ledger event: a proposal registers once per id, an
+// authorization flips exactly one proposed record.
+function applyProposalEvent(proposals, byId, event, lineIndex) {
+	if (event.kind === "proposal") {
+		if (byId.has(event.id))
 			throw proposalCorrupt(
-				`external proposal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+				`external proposal event ${lineIndex} reuses proposal id ${JSON.stringify(event.id)}`,
 			);
-		if (event.kind !== "proposal" && event.kind !== "authorized")
-			throw proposalCorrupt(
-				`external proposal event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = proposalEventProblem(event, lineIndex);
-		if (problem !== null) throw proposalCorrupt(problem);
-		if (event.kind === "proposal") {
-			if (byId.has(event.id))
-				throw proposalCorrupt(
-					`external proposal event ${lineIndex} reuses proposal id ${JSON.stringify(event.id)}`,
-				);
-			const { prevHash: _prev, hash: _hash, at, ...body } = event;
-			const proposal = {
-				...body,
-				compensates: event.compensates ?? null,
-				proposedAt: at,
-				status: "proposed",
-				authorization: null,
-				index,
-			};
-			proposals.push(proposal);
-			byId.set(event.id, proposal);
-		} else {
-			const proposal = byId.get(event.id);
-			if (!proposal)
-				throw proposalCorrupt(
-					`external proposal event ${lineIndex} authorizes unknown proposal ${JSON.stringify(event.id)}`,
-				);
-			if (proposal.status !== "proposed")
-				throw proposalCorrupt(
-					`external proposal event ${lineIndex} authorizes an already-authorized proposal`,
-				);
-			proposal.status = "authorized";
-			proposal.authorization = {
-				at: event.at,
-				approvalId: event.approvalId,
-				decision: event.decision,
-			};
-		}
-		prevHash = event.hash;
-	});
-	return proposals;
+		const { prevHash: _prev, hash: _hash, at, ...body } = event;
+		const proposal = {
+			...body,
+			compensates: event.compensates ?? null,
+			proposedAt: at,
+			status: "proposed",
+			authorization: null,
+			index: lineIndex - 1,
+		};
+		proposals.push(proposal);
+		byId.set(event.id, proposal);
+		return;
+	}
+	const proposal = byId.get(event.id);
+	if (!proposal)
+		throw proposalCorrupt(
+			`external proposal event ${lineIndex} authorizes unknown proposal ${JSON.stringify(event.id)}`,
+		);
+	if (proposal.status !== "proposed")
+		throw proposalCorrupt(
+			`external proposal event ${lineIndex} authorizes an already-authorized proposal`,
+		);
+	proposal.status = "authorized";
+	proposal.authorization = {
+		at: event.at,
+		approvalId: event.approvalId,
+		decision: event.decision,
+	};
 }
 
-const PROPOSAL_LEDGER = Object.freeze({
-	acquire: acquireProposalLock,
-	fold: foldProposals,
-	path: proposalsPath,
-	corruptCode: PROPOSAL_CORRUPT_CODE,
-	sizeCeilingCode: PROPOSAL_SIZE_CEILING_CODE,
-	envName: "AMBER_EXTERNAL_MAX_PROPOSALS_BYTES",
-	defaultBytes: DEFAULT_MAX_EXTERNAL_BYTES,
-	label: "external proposal ledger",
-});
+const PROPOSAL_LEDGER = EXTERNAL_FAMILY.ledgers.proposals;
+const proposalsPath = PROPOSAL_LEDGER.path;
+const proposalCorrupt = PROPOSAL_LEDGER.corrupt;
+const foldProposals = PROPOSAL_LEDGER.fold;
 
 // The deterministic request content: exactly what a reviewer sees and
 // exactly what the authorization hash binds. The pinned effect version
@@ -785,9 +795,8 @@ function proposeExternalEffect(cwd, input = {}, opts = {}) {
 // same idempotency identity and duplicate naming apply to both.
 function appendProposal(cwd, id, content, compensates, now, extraGuard) {
 	const fail = (code, errors) => ({ ok: false, code, record: null, errors });
-	return appendLedgerEvent(
+	return PROPOSAL_LEDGER.append(
 		cwd,
-		PROPOSAL_LEDGER,
 		{
 			kind: "proposal",
 			schemaVersion: EXTERNAL_SCHEMA_VERSION,
@@ -853,9 +862,8 @@ function authorizeExternalEffect(cwd, input = {}, opts = {}) {
 	// The guard completes this object from the consumption receipt before
 	// the append hashes the event body.
 	const decision = { identity: input.decisionIdentity, revision: 1 };
-	const appended = appendLedgerEvent(
+	const appended = PROPOSAL_LEDGER.append(
 		cwd,
-		PROPOSAL_LEDGER,
 		{
 			kind: "authorized",
 			schemaVersion: EXTERNAL_SCHEMA_VERSION,
@@ -930,25 +938,6 @@ function listExternalProposals(cwd, { status = null } = {}) {
 // rides a record: the closed event shapes carry no handle/value field at
 // all, and Amber — never the adapter — derives every terminal outcome.
 // ---------------------------------------------------------------------------
-
-function executionsPath(cwd) {
-	return statePathForCreate(cwd, "external", "executions.jsonl");
-}
-
-function executionCorrupt(message) {
-	return typedError(EXEC_CORRUPT_CODE, message);
-}
-
-function acquireExecutionLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(executionsPath(cwd)),
-		lockName: "executions.lock",
-		conflictCode: EXEC_LOCK_CODE,
-		corruptCode: EXEC_CORRUPT_CODE,
-		label: "external execution ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
 
 const CREDENTIAL_BOUNDARY_FIELDS = Object.freeze(["purpose", "scope", "expiresAt"]);
 
@@ -1140,104 +1129,79 @@ function executionEventProblem(event, lineIndex) {
 	return credentialLeakProblem(event.externalRecordId, `${label}.externalRecordId`);
 }
 
-function foldExecutions(cwd) {
-	const events = readLedgerFailClosed(
-		executionsPath(cwd),
-		EXEC_CORRUPT_CODE,
-		"external execution ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const executions = [];
-	const byId = new Map();
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "external execution");
-		if (link !== null) throw executionCorrupt(link);
-		if (!SUPPORTED_EXTERNAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
+// The family-owned domain applier for one chain-verified, shape-checked
+// execution-ledger event: an execution opens once per id, a settlement
+// records exactly the outcome Amber derives from its receipt, and a
+// reconciliation is the only path from unknown to committed.
+function applyExecutionEvent(executions, byId, event, lineIndex) {
+	if (event.kind === "execution") {
+		if (byId.has(event.id))
 			throw executionCorrupt(
-				`external execution event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+				`external execution event ${lineIndex} reuses execution id ${JSON.stringify(event.id)}`,
 			);
-		if (!["execution", "settlement", "reconciliation"].includes(event.kind))
+		const { prevHash: _prev, hash: _hash, at, ...body } = event;
+		const execution = {
+			...body,
+			preparedAt: at,
+			status: "prepared",
+			settlement: null,
+			reconciliation: null,
+			outcome: null,
+			index: lineIndex - 1,
+		};
+		executions.push(execution);
+		byId.set(event.id, execution);
+		return;
+	}
+	if (event.kind === "settlement") {
+		const execution = byId.get(event.id);
+		if (!execution)
 			throw executionCorrupt(
-				`external execution event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+				`external execution event ${lineIndex} settles unknown execution ${JSON.stringify(event.id)}`,
 			);
-		const problem = executionEventProblem(event, lineIndex);
-		if (problem !== null) throw executionCorrupt(problem);
-		if (event.kind === "execution") {
-			if (byId.has(event.id))
-				throw executionCorrupt(
-					`external execution event ${lineIndex} reuses execution id ${JSON.stringify(event.id)}`,
-				);
-			const { prevHash: _prev, hash: _hash, at, ...body } = event;
-			const execution = {
-				...body,
-				preparedAt: at,
-				status: "prepared",
-				settlement: null,
-				reconciliation: null,
-				outcome: null,
-				index,
-			};
-			executions.push(execution);
-			byId.set(event.id, execution);
-		} else if (event.kind === "settlement") {
-			const execution = byId.get(event.id);
-			if (!execution)
-				throw executionCorrupt(
-					`external execution event ${lineIndex} settles unknown execution ${JSON.stringify(event.id)}`,
-				);
-			if (execution.status !== "prepared")
-				throw executionCorrupt(
-					`external execution event ${lineIndex} re-settles a settled execution; settled outcomes never re-settle`,
-				);
-			// The recorded outcome must be exactly what Amber derives from
-			// the receipt — a rewritten verdict fails the read closed.
-			const derived = deriveOutcome(event);
-			if (derived.problem || derived.outcome !== event.outcome)
-				throw executionCorrupt(
-					`external execution event ${lineIndex} carries an outcome the receipt does not derive; Amber, never the adapter, derives the outcome`,
-				);
-			execution.status = "settled";
-			execution.outcome = event.outcome;
-			execution.settlement = {
-				at: event.at,
-				externalRecordId: event.externalRecordId,
-				requestDigest: event.requestDigest,
-				responseDigest: event.responseDigest,
-				declared: event.declared,
-			};
-		} else {
-			const execution = byId.get(event.id);
-			if (!execution)
-				throw executionCorrupt(
-					`external execution event ${lineIndex} reconciles unknown execution ${JSON.stringify(event.id)}`,
-				);
-			if (execution.status !== "settled" || execution.outcome !== "unknown")
-				throw executionCorrupt(
-					`external execution event ${lineIndex} reconciles an execution whose outcome is not unknown; reconciliation is the only path from unknown to committed`,
-				);
-			execution.outcome = "committed";
-			execution.reconciliation = {
-				at: event.at,
-				evidence: event.evidence,
-				externalRecordId: event.externalRecordId,
-			};
-		}
-		prevHash = event.hash;
-	});
-	return executions;
+		if (execution.status !== "prepared")
+			throw executionCorrupt(
+				`external execution event ${lineIndex} re-settles a settled execution; settled outcomes never re-settle`,
+			);
+		// The recorded outcome must be exactly what Amber derives from
+		// the receipt — a rewritten verdict fails the read closed.
+		const derived = deriveOutcome(event);
+		if (derived.problem || derived.outcome !== event.outcome)
+			throw executionCorrupt(
+				`external execution event ${lineIndex} carries an outcome the receipt does not derive; Amber, never the adapter, derives the outcome`,
+			);
+		execution.status = "settled";
+		execution.outcome = event.outcome;
+		execution.settlement = {
+			at: event.at,
+			externalRecordId: event.externalRecordId,
+			requestDigest: event.requestDigest,
+			responseDigest: event.responseDigest,
+			declared: event.declared,
+		};
+		return;
+	}
+	const execution = byId.get(event.id);
+	if (!execution)
+		throw executionCorrupt(
+			`external execution event ${lineIndex} reconciles unknown execution ${JSON.stringify(event.id)}`,
+		);
+	if (execution.status !== "settled" || execution.outcome !== "unknown")
+		throw executionCorrupt(
+			`external execution event ${lineIndex} reconciles an execution whose outcome is not unknown; reconciliation is the only path from unknown to committed`,
+		);
+	execution.outcome = "committed";
+	execution.reconciliation = {
+		at: event.at,
+		evidence: event.evidence,
+		externalRecordId: event.externalRecordId,
+	};
 }
 
-const EXECUTION_LEDGER = Object.freeze({
-	acquire: acquireExecutionLock,
-	fold: foldExecutions,
-	path: executionsPath,
-	corruptCode: EXEC_CORRUPT_CODE,
-	sizeCeilingCode: EXEC_SIZE_CEILING_CODE,
-	envName: "AMBER_EXTERNAL_MAX_EXECUTIONS_BYTES",
-	defaultBytes: DEFAULT_MAX_EXTERNAL_BYTES,
-	label: "external execution ledger",
-});
+const EXECUTION_LEDGER = EXTERNAL_FAMILY.ledgers.executions;
+const executionsPath = EXECUTION_LEDGER.path;
+const executionCorrupt = EXECUTION_LEDGER.corrupt;
+const foldExecutions = EXECUTION_LEDGER.fold;
 
 // The declared credential class binds the execution: "none" refuses any
 // boundary, "scoped" requires a purpose/scope/expiry boundary (never a
@@ -1395,9 +1359,8 @@ function executeExternalEffect(cwd, input = {}, opts = {}) {
 	const credential = input.credential ?? null;
 	const credentialProblem = executionCredentialProblem(contract, credential, at);
 	if (credentialProblem !== null) return fail(credentialProblem.code, credentialProblem.errors);
-	return appendLedgerEvent(
+	return EXECUTION_LEDGER.append(
 		cwd,
-		EXECUTION_LEDGER,
 		executionEventBodyFor(input, proposal, contract, credential, at),
 		(fold) => {
 			const problem = executionRetryProblem(fold, proposal, contract, input.id);
@@ -1443,9 +1406,8 @@ function settleExternalExecution(cwd, input = {}, opts = {}) {
 	}
 	const derived = deriveOutcome(receipt);
 	if (derived.problem) return fail(EXTERNAL_INVALID_CODE, [derived.problem]);
-	return appendLedgerEvent(
+	return EXECUTION_LEDGER.append(
 		cwd,
-		EXECUTION_LEDGER,
 		{
 			kind: "settlement",
 			schemaVersion: EXTERNAL_SCHEMA_VERSION,
@@ -1568,9 +1530,8 @@ function reconcileExternalExecution(cwd, input = {}, opts = {}) {
 	if (recordSlug !== null) return fail(EXTERNAL_INVALID_CODE, [recordSlug]);
 	const leak = credentialLeakProblem(input.externalRecordId, "externalRecordId");
 	if (leak !== null) return fail(CREDENTIAL_LEAK_CODE, [leak]);
-	return appendLedgerEvent(
+	return EXECUTION_LEDGER.append(
 		cwd,
-		EXECUTION_LEDGER,
 		{
 			kind: "reconciliation",
 			schemaVersion: EXTERNAL_SCHEMA_VERSION,
