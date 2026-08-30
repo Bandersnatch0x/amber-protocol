@@ -25,7 +25,7 @@ Dev workflow: `docs/agents/dev-workflow.md` — stage pipeline from idea to acce
 node scripts/amber.js <command> --target <repo>
 ```
 
-The governed registry families — `maintain`, `retention`, `external`, `breakglass` (and the other `.amber/` ledgers) — compose `scripts/lib/core/registry-ledger.js`, the shared governed-ledger core owning the tamper-evident chain hash, the exclusive append lock, ceiling-bounded appends, and the shared field validators (closed field sets, Decision pins, credential-leak refusal), so an in-place edit fails closed identically everywhere.
+The governed registry families — `maintain`, `retention`, `external`, `breakglass` (and the other `.amber/` ledgers) — compose `scripts/lib/core/registry-ledger.js`, the shared governed-ledger core owning the tamper-evident chain hash, the exclusive append lock, ceiling-bounded appends, the shared field validators (closed field sets, Decision pins, credential-leak refusal), and the Decision primitives (the kinds-parameterized snapshot validator, the canonical content hash, and the single spend-scan kernel), so an in-place edit fails closed identically everywhere. A family's ledger ritual (paths, locks, fail-closed reads, governed appends, chain-walked folds) is declared through `defineLedgerFamily` (`scripts/lib/core/ledger-family.js`, ADR-0028) — the one admission path for new families; `breakglass` is assembled through it today and the remaining families migrate one ticket at a time.
 
 ## Core commands
 
