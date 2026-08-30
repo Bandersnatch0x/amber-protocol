@@ -25,11 +25,12 @@ plan's deviation table names the follow-up this ADR must be: a design covering *
 isolation, execution evidence, remote-write authorization, and recovery** before any live transport
 is added.
 
-Because ADR-0019 D1 chose git as the envelope carrier (`.amber/sync/envelopes/` committed to the
-shared Team Hub repository and exchanged via git remote), "live transport" is exactly three git
-verbs on the target repository: `git add .amber/sync`, `git commit`, `git push`. There is no bespoke
-transport protocol to govern — the question is narrow and concrete: may Amber execute those three
-verbs, and under what gates?
+Because ADR-0019 D1 chose git as the envelope carrier (precision note, #273 follow-up: D1
+deferred the carrier decision — git is settled here, in this ADR) (`.amber/sync/envelopes/`
+committed to the shared Team Hub repository and exchanged via git remote), "live transport" is
+exactly three git verbs on the target repository: `git add .amber/sync`, `git commit`, `git push`.
+There is no bespoke transport protocol to govern — the question is narrow and concrete: may Amber
+execute those three verbs, and under what gates?
 
 The standing boundaries (root `agents.md`, operating manual §1 and §7) apply: read-only first; Amber
 never auto-executes target-project commands; user files are never overwritten without explicit
