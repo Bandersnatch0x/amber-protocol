@@ -11,20 +11,22 @@
 // and the half-open validity window [validAt, validUntil).
 //
 // Consumption is atomic with the authorized Decision's settlement: the
-// consume writer takes the approvals lock, re-verifies every lifecycle
-// invariant under it (granted, not revoked, not consumed, inside the window
-// at the evaluation clock), admits the Decision artifact (decisionKind
-// "approval", principal = the approval's frozen approver), and only then
-// appends the `consumed` event binding the Decision's identity and revision
-// from the admission receipt. If the admission fails, no consumed event is
-// written and the authorization stays unconsumed; one authorization can
-// therefore never be replayed — a second consumer fails closed with the
-// stable AMBER_E_APPROVAL_ALREADY_CONSUMED code (checked pre-lock AND under
-// the lock, exactly like the evidence duplicate-id discipline).
+// consume writer's governed-append guard (under the approvals lock)
+// re-verifies every lifecycle invariant (granted, not revoked, not consumed,
+// inside the window at the evaluation clock), admits the Decision artifact
+// (decisionKind "approval", principal = the approval's frozen approver), and
+// only then does the orchestration append the `consumed` event binding the
+// Decision's identity and revision from the admission receipt. If the
+// admission fails, no consumed event is written and the authorization stays
+// unconsumed; one authorization can therefore never be replayed — a second
+// consumer fails closed with the stable AMBER_E_APPROVAL_ALREADY_CONSUMED
+// code (checked pre-lock AND under the lock, exactly like the evidence
+// duplicate-id discipline).
 //
 // The lock ordering is fixed and deadlock-free: the approvals lock is only
 // ever taken BEFORE the artifact admission lock (consume), never the
-// reverse — no artifact-store path takes the approvals lock.
+// reverse — no artifact-store path takes the approvals lock. The consume
+// guard runs inside `appendLedgerEvent`, so that order is the factory's.
 //
 // The ledger never stores derived state: the effective status
 // (granted | revoked | consumed | expired) is computed by the read seams
@@ -36,17 +38,13 @@
 // half-open, validAt <= now < validUntil — at exactly validUntil the
 // authorization is expired, mirroring principalStatus's `at >= to`).
 
-const path = require("node:path");
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const {
 	GENESIS_HASH,
 	chainHash,
-	chainHeadHash: sharedChainHeadHash,
-	acquireLedgerLock,
 	appendWithinCeiling: sharedAppendWithinCeiling,
 } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 const { resolveActivePrincipal, parseTimestamp } = require("./principal-registry");
 const { admitArtifact } = require("./canonical-artifacts");
 
@@ -63,8 +61,6 @@ const REVOKED_CODE = "AMBER_E_APPROVAL_REVOKED";
 const NOT_YET_VALID_CODE = "AMBER_E_APPROVAL_NOT_YET_VALID";
 const HUMAN_SLOT_REQUIRED_CODE = "AMBER_E_APPROVAL_HUMAN_SLOT_REQUIRED";
 const INVALID_ARG_CODE = "AMBER_E_INVALID_ARG";
-
-const LOCK_STALE_MS = 30_000;
 
 /** Version of the approval event contract this module writes and reads. */
 const APPROVAL_SCHEMA_VERSION = 1;
@@ -153,27 +149,8 @@ const PRINCIPAL_SNAPSHOT_FIELDS = Object.freeze([
 	"issuer",
 ]);
 
-function approvalLedgerPath(cwd) {
-	return statePathForCreate(cwd, "approvals", "registry.jsonl");
-}
-
 function approvalCorrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
-}
-
-function chainHeadHashOf(cwd) {
-	return sharedChainHeadHash(approvalLedgerPath(cwd), REGISTRY_CORRUPT_CODE, "approval registry");
-}
-
-function acquireApprovalLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(approvalLedgerPath(cwd)),
-		lockName: "approvals.lock",
-		conflictCode: LOCK_CONFLICT_CODE,
-		corruptCode: REGISTRY_CORRUPT_CODE,
-		label: "approval registry",
-		staleMs: LOCK_STALE_MS,
-	});
 }
 
 function isNullableNonEmptyString(value) {
@@ -290,218 +267,278 @@ function consumptionVerdict(records, id, now) {
 	return { ok: true, target };
 }
 
+// The pre-chain half of the fold (the declared `fold.preLink` step,
+// ADR-0028 Amendment): the registry's recorded contract adjudicates the
+// event's shape, schemaVersion, and timestamp BEFORE the chain link, so an
+// unchained or hand-edited event still gets the dedicated version verdict
+// (AMBER_E_APPROVAL_UNSUPPORTED_VERSION) instead of a generic chain problem.
+function approvalPreLink(event, lineIndex) {
+	if (event === null || typeof event !== "object" || Array.isArray(event)) {
+		throw approvalCorrupt(
+			`approval registry event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
+		);
+	}
+	const schemaVersion = event.schemaVersion;
+	if (!Number.isInteger(schemaVersion)) {
+		throw approvalCorrupt(
+			`approval registry event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(schemaVersion)}`,
+		);
+	}
+	if (!SUPPORTED_APPROVAL_SCHEMA_VERSIONS.includes(schemaVersion)) {
+		throw typedError(
+			UNSUPPORTED_VERSION_CODE,
+			`approval registry event ${lineIndex} declares schemaVersion ${JSON.stringify(schemaVersion)}, but this reader supports ${SUPPORTED_APPROVAL_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted — upgrade amber or rebuild the ledger under the supported schema version`,
+		);
+	}
+	if (typeof event.at !== "string" || event.at.length === 0) {
+		throw approvalCorrupt(
+			`approval registry event ${lineIndex} carries no timestamp ("at"); got ${JSON.stringify(event.at)}`,
+		);
+	}
+}
+
+// The domain half of the fold, applied to each chain-verified event.
+// Fail-closed sequence invariants: the grant/revoke/consume writers check
+// the current state BEFORE appending, so the ledger can only ever hold, per
+// id, one `granted` event followed by at most one of `revoked` or
+// `consumed` — anything else was hand-edited. State is the byId map in
+// grant order; the fold's projection is its values.
+function applyApprovalEvent(byId, event, lineIndex) {
+	if (event.kind === "granted") {
+		const unknown = Object.keys(event)
+			.filter((key) => !GRANTED_EVENT_FIELDS.includes(key))
+			.sort();
+		if (unknown.length > 0) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} is a granted event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${GRANTED_EVENT_FIELDS.join(", ")}`,
+			);
+		}
+		const snapshotProblem = storedSnapshotProblem(event.approver, lineIndex, "approver");
+		if (snapshotProblem !== null) throw approvalCorrupt(snapshotProblem);
+		if (
+			typeof event.approvalId !== "string" ||
+			event.approvalId.length === 0 ||
+			event.approvalId.length > MAX_ID_CHARS
+		) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} carries an approvalId that is not a non-empty string of at most ${MAX_ID_CHARS} characters; got ${JSON.stringify(event.approvalId)}`,
+			);
+		}
+		if (
+			!isNullableNonEmptyString(event.scope) ||
+			(event.scope !== null && event.scope.length > MAX_SCOPE_CHARS)
+		) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} carries a scope that is neither null nor a non-empty string of at most ${MAX_SCOPE_CHARS} characters; got ${JSON.stringify(event.scope)}`,
+			);
+		}
+		if (
+			typeof event.subject !== "string" ||
+			event.subject.length === 0 ||
+			event.subject.length > MAX_SUBJECT_CHARS
+		) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} carries a subject that is not a non-empty string of at most ${MAX_SUBJECT_CHARS} characters; got ${JSON.stringify(event.subject)}`,
+			);
+		}
+		for (const field of ["validAt", "validUntil", "recordedAt"]) {
+			if (typeof event[field] !== "string" || parseTimestamp(event[field]) === null) {
+				throw approvalCorrupt(
+					`approval registry event ${lineIndex} carries a ${field} that is not an ISO-8601 date or zoned date-time; got ${JSON.stringify(event[field])}`,
+				);
+			}
+		}
+		const clockProblem = storedClockProblem(event, lineIndex, "granted");
+		if (clockProblem !== null) throw approvalCorrupt(clockProblem);
+		if (byId.has(event.approvalId)) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} grants "${event.approvalId}" a second time; an approval id is granted exactly once (a re-grant is a new id), so the writers can never append this — the ledger was edited in place`,
+			);
+		}
+		byId.set(event.approvalId, {
+			id: event.approvalId,
+			approver: event.approver,
+			scope: event.scope,
+			subject: event.subject,
+			validAt: event.validAt,
+			validUntil: event.validUntil,
+			recordedAt: event.recordedAt,
+			revokedAt: null,
+			revoker: null,
+			consumedAt: null,
+			decisionIdentity: null,
+			decisionRevision: null,
+		});
+	} else if (event.kind === "revoked") {
+		const unknown = Object.keys(event)
+			.filter((key) => !REVOKED_EVENT_FIELDS.includes(key))
+			.sort();
+		if (unknown.length > 0) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} is a revoked event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${REVOKED_EVENT_FIELDS.join(", ")}`,
+			);
+		}
+		const snapshotProblem = storedSnapshotProblem(event.revoker, lineIndex, "revoker");
+		if (snapshotProblem !== null) throw approvalCorrupt(snapshotProblem);
+		if (typeof event.approvalId !== "string" || event.approvalId.length === 0) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} is a revoked event whose approvalId is not a non-empty string; got ${JSON.stringify(event.approvalId)}`,
+			);
+		}
+		const clockProblem = storedClockProblem(event, lineIndex, "revoked");
+		if (clockProblem !== null) throw approvalCorrupt(clockProblem);
+		const record = byId.get(event.approvalId);
+		if (record === undefined) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} revokes "${event.approvalId}", which was never granted; the revoke writer only appends for a granted approval — the ledger was edited in place`,
+			);
+		}
+		if (record.revokedAt !== null) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} revokes "${event.approvalId}" a second time; revocation is append-once per approval, so the writers can never append this — the ledger was edited in place`,
+			);
+		}
+		if (record.consumedAt !== null) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} revokes "${event.approvalId}", which was already consumed at ${record.consumedAt}; consumption is terminal (history is not rewritten), so the revoke writer refuses it — the ledger was edited in place`,
+			);
+		}
+		record.revokedAt = event.at;
+		record.revoker = event.revoker;
+	} else if (event.kind === "consumed") {
+		const unknown = Object.keys(event)
+			.filter((key) => !CONSUMED_EVENT_FIELDS.includes(key))
+			.sort();
+		if (unknown.length > 0) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} is a consumed event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${CONSUMED_EVENT_FIELDS.join(", ")}`,
+			);
+		}
+		if (typeof event.approvalId !== "string" || event.approvalId.length === 0) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} is a consumed event whose approvalId is not a non-empty string; got ${JSON.stringify(event.approvalId)}`,
+			);
+		}
+		if (typeof event.decisionIdentity !== "string" || event.decisionIdentity.length === 0) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} is a consumed event whose decisionIdentity is not a non-empty string; got ${JSON.stringify(event.decisionIdentity)} — a consumption binds the Decision it settled`,
+			);
+		}
+		if (!Number.isInteger(event.decisionRevision) || event.decisionRevision < 1) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} is a consumed event whose decisionRevision is not a positive integer; got ${JSON.stringify(event.decisionRevision)} — a consumption binds the Decision revision from its admission receipt`,
+			);
+		}
+		const clockProblem = storedClockProblem(event, lineIndex, "consumed");
+		if (clockProblem !== null) throw approvalCorrupt(clockProblem);
+		const record = byId.get(event.approvalId);
+		if (record === undefined) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} consumes "${event.approvalId}", which was never granted; the consume writer only appends for a granted approval — the ledger was edited in place`,
+			);
+		}
+		if (record.consumedAt !== null) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} consumes "${event.approvalId}" a second time; an authorization is single-use, so the writers can never append this — the ledger was edited in place`,
+			);
+		}
+		if (record.revokedAt !== null) {
+			throw approvalCorrupt(
+				`approval registry event ${lineIndex} consumes "${event.approvalId}", which was revoked at ${record.revokedAt}; the consume writer refuses a revoked approval, so the writers can never append this — the ledger was edited in place`,
+			);
+		}
+		record.consumedAt = event.at;
+		record.decisionIdentity = event.decisionIdentity;
+		record.decisionRevision = event.decisionRevision;
+	} else {
+		throw approvalCorrupt(
+			`approval registry event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is granted, revoked, consumed`,
+		);
+	}
+}
+
+// The recorded chain-link refusal wording (the declared `fold.chainWording`
+// override, ADR-0028 Amendment #307): the shared chain check still runs;
+// this only replaces the text so the splice-tamper suite still sees
+// `prevHash` and "edited in place".
+function approvalChainWording(kind, event, lineIndex, label) {
+	if (kind === "broken") {
+		return `${label} event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`;
+	}
+	if (kind === "mismatch") {
+		return `${label} event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`;
+	}
+	return `${label} event ${lineIndex} is not an object; got ${JSON.stringify(event)}`;
+}
+
+// The registry's recorded ceiling refusal wording (the declared
+// `ceiling.message` override, ADR-0028 Amendment): it names the env
+// override and the per-operation guidance. The writers' pre-lock body
+// checks reuse the same wording, so a refusal reads identically from
+// either check site.
+function approvalCeilingMessage(event, ceiling) {
+	if (event.kind === "granted") {
+		return `appending the grant for "${event.approvalId}" would grow the approval registry beyond its size ceiling of ${ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — raise the ceiling deliberately`;
+	}
+	if (event.kind === "revoked") {
+		return `appending the revocation for "${event.approvalId}" would grow the approval registry beyond its size ceiling of ${ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`;
+	}
+	return `appending the consumption event for "${event.approvalId}" would grow the approval registry beyond its size ceiling of ${ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — raise the ceiling deliberately`;
+}
+
+// F061 follow-up (#307) — the registry's ledger ritual is assembled by
+// `defineLedgerFamily` (ADR-0028), byte-identically to the hand-written
+// ceremony it replaces: the same path (`.amber/approvals/registry.jsonl`),
+// lock name (`approvals.lock`; the 30s stale bound now rides the shared
+// default), stable codes, and "approval registry" label in lock/read
+// refusals and as the per-event problem prefix. This family declares the
+// Amendment extensions: `fold.preLink` keeps the pre-chain shape/version/
+// timestamp adjudication (approvalPreLink above), `fold.chainWording`
+// keeps the recorded chain-break wording that names `prevHash` and
+// "edited in place" (approvalChainWording above), and `ceiling.message`
+// keeps the recorded ceiling wording (approvalCeilingMessage above). Only
+// the domain half is declared here: the closed per-kind event shapes, the
+// grant-once and terminal revoke/consume invariants (applyApprovalEvent),
+// and the grant-order fold stay this family's own.
+const APPROVAL_FAMILY = defineLedgerFamily({
+	dir: "approvals",
+	label: "approval registry",
+	ledgers: [
+		{
+			name: "registry",
+			fileName: "registry.jsonl",
+			lockName: "approvals.lock",
+			conflictCode: LOCK_CONFLICT_CODE,
+			corruptCode: REGISTRY_CORRUPT_CODE,
+			sizeCeilingCode: SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_APPROVAL_MAX_REGISTRY_BYTES",
+				defaultBytes: DEFAULT_MAX_APPROVAL_BYTES,
+				message: approvalCeilingMessage,
+			},
+			label: "approval registry",
+			eventLabel: "approval registry",
+			fold: {
+				init: () => new Map(),
+				preLink: approvalPreLink,
+				chainWording: approvalChainWording,
+				apply: applyApprovalEvent,
+				result: (byId) => [...byId.values()],
+			},
+		},
+	],
+});
+
+const APPROVAL_LEDGER = APPROVAL_FAMILY.ledgers.registry;
+
 /**
- * Fold the ledger: verify the hash chain, the closed event field sets, the
- * stored shapes (approver/revoker snapshots, bounded strings, parseable
- * timestamps, recorded clock source and skew policy), and the sequencing
- * invariants (one granted per id; revoked/consumed only after granted and at
- * most once each; consumed implies not-revoked — a revoked-then-consumed
- * sequence is one the writers can never produce). Returns the stored-state
- * records in grant order; the derived status is computed by the read seams.
+ * Fold the ledger: fail-closed raw read, preLink, chain walk, domain apply
+ * — per event in ledger order. Returns the stored-state records in grant
+ * order; the derived status is computed by the read seams.
  * @returns {Array<object>} The stored approval records, in grant order.
  * @throws {Error} Typed AMBER_E_* on any corruption.
  */
-function foldApprovals(cwd) {
-	const events = readLedgerFailClosed(
-		approvalLedgerPath(cwd),
-		REGISTRY_CORRUPT_CODE,
-		"approval registry",
-	);
-	const byId = new Map();
-	let prevHash = GENESIS_HASH;
-	for (let index = 0; index < events.length; index += 1) {
-		const lineIndex = index + 1;
-		const event = events[index];
-		if (event === null || typeof event !== "object" || Array.isArray(event)) {
-			throw approvalCorrupt(
-				`approval registry event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
-			);
-		}
-		const schemaVersion = event.schemaVersion;
-		if (!Number.isInteger(schemaVersion)) {
-			throw approvalCorrupt(
-				`approval registry event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(schemaVersion)}`,
-			);
-		}
-		if (!SUPPORTED_APPROVAL_SCHEMA_VERSIONS.includes(schemaVersion)) {
-			throw typedError(
-				UNSUPPORTED_VERSION_CODE,
-				`approval registry event ${lineIndex} declares schemaVersion ${JSON.stringify(schemaVersion)}, but this reader supports ${SUPPORTED_APPROVAL_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted — upgrade amber or rebuild the ledger under the supported schema version`,
-			);
-		}
-		if (typeof event.at !== "string" || event.at.length === 0) {
-			throw approvalCorrupt(
-				`approval registry event ${lineIndex} carries no timestamp ("at"); got ${JSON.stringify(event.at)}`,
-			);
-		}
-		// The tamper-evident chain runs before any content is trusted (the
-		// shared F-5 discipline): an in-place edit of any stored event breaks
-		// the chain on fold.
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash) {
-			throw approvalCorrupt(
-				`approval registry event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`,
-			);
-		}
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash) {
-			throw approvalCorrupt(
-				`approval registry event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`,
-			);
-		}
-		if (event.kind === "granted") {
-			const unknown = Object.keys(event)
-				.filter((key) => !GRANTED_EVENT_FIELDS.includes(key))
-				.sort();
-			if (unknown.length > 0) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} is a granted event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${GRANTED_EVENT_FIELDS.join(", ")}`,
-				);
-			}
-			const snapshotProblem = storedSnapshotProblem(event.approver, lineIndex, "approver");
-			if (snapshotProblem !== null) throw approvalCorrupt(snapshotProblem);
-			if (
-				typeof event.approvalId !== "string" ||
-				event.approvalId.length === 0 ||
-				event.approvalId.length > MAX_ID_CHARS
-			) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} carries an approvalId that is not a non-empty string of at most ${MAX_ID_CHARS} characters; got ${JSON.stringify(event.approvalId)}`,
-				);
-			}
-			if (
-				!isNullableNonEmptyString(event.scope) ||
-				(event.scope !== null && event.scope.length > MAX_SCOPE_CHARS)
-			) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} carries a scope that is neither null nor a non-empty string of at most ${MAX_SCOPE_CHARS} characters; got ${JSON.stringify(event.scope)}`,
-				);
-			}
-			if (
-				typeof event.subject !== "string" ||
-				event.subject.length === 0 ||
-				event.subject.length > MAX_SUBJECT_CHARS
-			) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} carries a subject that is not a non-empty string of at most ${MAX_SUBJECT_CHARS} characters; got ${JSON.stringify(event.subject)}`,
-				);
-			}
-			for (const field of ["validAt", "validUntil", "recordedAt"]) {
-				if (typeof event[field] !== "string" || parseTimestamp(event[field]) === null) {
-					throw approvalCorrupt(
-						`approval registry event ${lineIndex} carries a ${field} that is not an ISO-8601 date or zoned date-time; got ${JSON.stringify(event[field])}`,
-					);
-				}
-			}
-			const clockProblem = storedClockProblem(event, lineIndex, "granted");
-			if (clockProblem !== null) throw approvalCorrupt(clockProblem);
-			if (byId.has(event.approvalId)) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} grants "${event.approvalId}" a second time; an approval id is granted exactly once (a re-grant is a new id), so the writers can never append this — the ledger was edited in place`,
-				);
-			}
-			byId.set(event.approvalId, {
-				id: event.approvalId,
-				approver: event.approver,
-				scope: event.scope,
-				subject: event.subject,
-				validAt: event.validAt,
-				validUntil: event.validUntil,
-				recordedAt: event.recordedAt,
-				revokedAt: null,
-				revoker: null,
-				consumedAt: null,
-				decisionIdentity: null,
-				decisionRevision: null,
-			});
-		} else if (event.kind === "revoked") {
-			const unknown = Object.keys(event)
-				.filter((key) => !REVOKED_EVENT_FIELDS.includes(key))
-				.sort();
-			if (unknown.length > 0) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} is a revoked event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${REVOKED_EVENT_FIELDS.join(", ")}`,
-				);
-			}
-			const snapshotProblem = storedSnapshotProblem(event.revoker, lineIndex, "revoker");
-			if (snapshotProblem !== null) throw approvalCorrupt(snapshotProblem);
-			if (typeof event.approvalId !== "string" || event.approvalId.length === 0) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} is a revoked event whose approvalId is not a non-empty string; got ${JSON.stringify(event.approvalId)}`,
-				);
-			}
-			const clockProblem = storedClockProblem(event, lineIndex, "revoked");
-			if (clockProblem !== null) throw approvalCorrupt(clockProblem);
-			const record = byId.get(event.approvalId);
-			if (record === undefined) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} revokes "${event.approvalId}", which was never granted; the revoke writer only appends for a granted approval — the ledger was edited in place`,
-				);
-			}
-			if (record.revokedAt !== null) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} revokes "${event.approvalId}" a second time; revocation is append-once per approval, so the writers can never append this — the ledger was edited in place`,
-				);
-			}
-			if (record.consumedAt !== null) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} revokes "${event.approvalId}", which was already consumed at ${record.consumedAt}; consumption is terminal (history is not rewritten), so the revoke writer refuses it — the ledger was edited in place`,
-				);
-			}
-			record.revokedAt = event.at;
-			record.revoker = event.revoker;
-		} else if (event.kind === "consumed") {
-			const unknown = Object.keys(event)
-				.filter((key) => !CONSUMED_EVENT_FIELDS.includes(key))
-				.sort();
-			if (unknown.length > 0) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} is a consumed event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${CONSUMED_EVENT_FIELDS.join(", ")}`,
-				);
-			}
-			if (typeof event.approvalId !== "string" || event.approvalId.length === 0) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} is a consumed event whose approvalId is not a non-empty string; got ${JSON.stringify(event.approvalId)}`,
-				);
-			}
-			if (typeof event.decisionIdentity !== "string" || event.decisionIdentity.length === 0) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} is a consumed event whose decisionIdentity is not a non-empty string; got ${JSON.stringify(event.decisionIdentity)} — a consumption binds the Decision it settled`,
-				);
-			}
-			if (!Number.isInteger(event.decisionRevision) || event.decisionRevision < 1) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} is a consumed event whose decisionRevision is not a positive integer; got ${JSON.stringify(event.decisionRevision)} — a consumption binds the Decision revision from its admission receipt`,
-				);
-			}
-			const clockProblem = storedClockProblem(event, lineIndex, "consumed");
-			if (clockProblem !== null) throw approvalCorrupt(clockProblem);
-			const record = byId.get(event.approvalId);
-			if (record === undefined) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} consumes "${event.approvalId}", which was never granted; the consume writer only appends for a granted approval — the ledger was edited in place`,
-				);
-			}
-			if (record.consumedAt !== null) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} consumes "${event.approvalId}" a second time; an authorization is single-use, so the writers can never append this — the ledger was edited in place`,
-				);
-			}
-			if (record.revokedAt !== null) {
-				throw approvalCorrupt(
-					`approval registry event ${lineIndex} consumes "${event.approvalId}", which was revoked at ${record.revokedAt}; the consume writer refuses a revoked approval, so the writers can never append this — the ledger was edited in place`,
-				);
-			}
-			record.consumedAt = event.at;
-			record.decisionIdentity = event.decisionIdentity;
-			record.decisionRevision = event.decisionRevision;
-		} else {
-			throw approvalCorrupt(
-				`approval registry event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is granted, revoked, consumed`,
-			);
-		}
-		prevHash = event.hash;
-	}
-	return [...byId.values()];
-}
+const foldApprovals = APPROVAL_LEDGER.fold;
 
 /**
  * The stored clock-source/skew-policy contract on fold: the closed clock
@@ -553,17 +590,27 @@ function storedSnapshotProblem(snapshot, lineIndex, role) {
 	return null;
 }
 
-// The ledger append ceiling: refuse an event that would grow the ledger past
-// its bound BEFORE any durable state is touched (shared discipline with the
-// principal and evidence registries through registry-ledger).
+// The ledger append ceiling's PRE-LOCK body check: refuse an event that
+// would already exceed the bound before the lock is even taken (shared
+// discipline, registry-ledger.js — the governed append re-checks under the
+// lock on the exact chained event, whose chain fields this body check
+// cannot count). It also resolves the env override, so a garbage
+// AMBER_APPROVAL_MAX_REGISTRY_BYTES throws its typed argument error — the
+// writers catch it and return it as a typed fail, matching the recorded
+// grant/revoke/consume contract.
 function appendWithinCeiling(cwd, event) {
 	return sharedAppendWithinCeiling({
-		ledgerPath: approvalLedgerPath(cwd),
+		ledgerPath: APPROVAL_LEDGER.path(cwd),
 		event,
 		envName: "AMBER_APPROVAL_MAX_REGISTRY_BYTES",
 		defaultBytes: DEFAULT_MAX_APPROVAL_BYTES,
 		label: "approval registry",
 	});
+}
+
+function fromAppend(result, now) {
+	if (!result.ok) return { ok: false, code: result.code, approval: null, errors: result.errors };
+	return { ok: true, code: null, approval: withStatus(result.record, now), errors: [] };
 }
 
 /**
@@ -662,67 +709,26 @@ function grantApproval(cwd, { id, approver, scope = null, subject, validUntil },
 		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
 	}
 	if (ceilingCheck.wouldExceed) {
-		return fail(SIZE_CEILING_CODE, [
-			`appending the grant for "${id}" would grow the approval registry beyond its size ceiling of ${ceilingCheck.ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — raise the ceiling deliberately`,
-		]);
+		return fail(SIZE_CEILING_CODE, [approvalCeilingMessage(body, ceilingCheck.ceiling)]);
 	}
-	let release;
-	try {
-		release = acquireApprovalLock(cwd);
-	} catch (err) {
-		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-	}
-	let granted;
-	try {
-		// Under the lock, re-check the exact invariants the fold enforces: the
-		// duplicate id (a racing writer appended between the pre-check and the
-		// lock) and the ledger's integrity.
-		let fresh;
-		try {
-			fresh = foldApprovals(cwd);
-		} catch (err) {
-			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-		}
-		if (fresh.some((record) => record.id === id)) {
-			return fail(ALREADY_GRANTED_CODE, [
-				`approval "${id}" is already granted; an approval id is granted exactly once — grant a distinct id instead`,
-			]);
-		}
-		const prevHash = chainHeadHashOf(cwd);
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		// The real event carries the chain fields the pre-lock check could not
-		// count (and the file may have grown while waiting for the lock).
-		const underLockCeiling = appendWithinCeiling(cwd, event);
-		if (underLockCeiling.wouldExceed) {
-			return fail(SIZE_CEILING_CODE, [
-				`appending the grant for "${id}" would grow the approval registry beyond its size ceiling of ${underLockCeiling.ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — raise the ceiling deliberately`,
-			]);
-		}
-		try {
-			appendJSONL(approvalLedgerPath(cwd), event);
-		} catch (err) {
-			return fail(REGISTRY_CORRUPT_CODE, [
-				`failed to append the granted event for "${id}" to the approval registry: ${err.message}`,
-			]);
-		}
-		granted = {
-			id,
-			approver: body.approver,
-			scope,
-			subject,
-			validAt: body.validAt,
-			validUntil,
-			recordedAt: body.recordedAt,
-			revokedAt: null,
-			revoker: null,
-			consumedAt: null,
-			decisionIdentity: null,
-			decisionRevision: null,
-		};
-	} finally {
-		release();
-	}
-	return { ok: true, code: null, approval: withStatus(granted, now), errors: [] };
+	// The governed append (lock → fold → guard → chain → ceiling → append →
+	// re-fold): under the lock, the guard re-checks the exact invariant the
+	// fold enforces — a racing writer's duplicate id — and the orchestration
+	// re-checks the ceiling on the exact chained line about to be appended.
+	return fromAppend(
+		APPROVAL_LEDGER.append(
+			cwd,
+			body,
+			(fresh) =>
+				fresh.some((record) => record.id === id)
+					? fail(ALREADY_GRANTED_CODE, [
+							`approval "${id}" is already granted; an approval id is granted exactly once — grant a distinct id instead`,
+						])
+					: null,
+			(fold) => fold.find((record) => record.id === id),
+		),
+		now,
+	);
 }
 
 /**
@@ -791,84 +797,52 @@ function revokeApproval(cwd, { id, revoker }, opts = {}) {
 		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
 	}
 	if (ceilingCheck.wouldExceed) {
-		return fail(SIZE_CEILING_CODE, [
-			`appending the revocation for "${id}" would grow the approval registry beyond its size ceiling of ${ceilingCheck.ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`,
-		]);
+		return fail(SIZE_CEILING_CODE, [approvalCeilingMessage(body, ceilingCheck.ceiling)]);
 	}
-	let release;
-	try {
-		release = acquireApprovalLock(cwd);
-	} catch (err) {
-		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-	}
-	try {
-		// Under the lock, re-check the invariants the fold enforces: the
-		// target still exists and has not been revoked or consumed by a
-		// racing writer that appended between the pre-check and the lock.
-		let fresh;
-		try {
-			fresh = foldApprovals(cwd);
-		} catch (err) {
-			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-		}
-		const target = fresh.find((record) => record.id === id);
-		if (!target) {
-			return fail(NOT_FOUND_CODE, [
-				`approval "${id}" is not recorded; revocation applies to a granted approval — grant it first (amber approval grant)`,
-			]);
-		}
-		if (target.revokedAt !== null) {
-			return fail(ALREADY_REVOKED_CODE, [
-				`approval "${id}" was already revoked at ${target.revokedAt}; revocation is terminal`,
-			]);
-		}
-		if (target.consumedAt !== null) {
-			return fail(ALREADY_CONSUMED_CODE, [
-				`approval "${id}" was already consumed at ${target.consumedAt}; consumption is terminal and history is not rewritten`,
-			]);
-		}
-		const prevHash = chainHeadHashOf(cwd);
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		const underLockCeiling = appendWithinCeiling(cwd, event);
-		if (underLockCeiling.wouldExceed) {
-			return fail(SIZE_CEILING_CODE, [
-				`appending the revocation for "${id}" would grow the approval registry beyond its size ceiling of ${underLockCeiling.ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`,
-			]);
-		}
-		try {
-			appendJSONL(approvalLedgerPath(cwd), event);
-		} catch (err) {
-			return fail(REGISTRY_CORRUPT_CODE, [
-				`failed to append the revoked event for "${id}" to the approval registry: ${err.message}`,
-			]);
-		}
-	} finally {
-		release();
-	}
-	return {
-		ok: true,
-		code: null,
-		approval: withStatus(
-			{
-				...existing,
-				revokedAt: at,
-				revoker: Object.freeze({ ...acting.principal }),
+	// The governed append: under the lock, the guard re-checks the invariants
+	// the fold enforces — the target still exists and has not already been
+	// revoked or consumed by a racing writer that appended between the
+	// pre-check and the lock — and the orchestration re-checks the ceiling
+	// on the exact chained line about to be appended.
+	return fromAppend(
+		APPROVAL_LEDGER.append(
+			cwd,
+			body,
+			(fresh) => {
+				const target = fresh.find((record) => record.id === id);
+				if (!target) {
+					return fail(NOT_FOUND_CODE, [
+						`approval "${id}" is not recorded; revocation applies to a granted approval — grant it first (amber approval grant)`,
+					]);
+				}
+				if (target.revokedAt !== null) {
+					return fail(ALREADY_REVOKED_CODE, [
+						`approval "${id}" was already revoked at ${target.revokedAt}; revocation is terminal`,
+					]);
+				}
+				if (target.consumedAt !== null) {
+					return fail(ALREADY_CONSUMED_CODE, [
+						`approval "${id}" was already consumed at ${target.consumedAt}; consumption is terminal and history is not rewritten`,
+					]);
+				}
+				return null;
 			},
-			now,
+			(fold) => fold.find((record) => record.id === id),
 		),
-		errors: [],
-	};
+		now,
+	);
 }
 
 /**
  * Consume one Approval: the atomic settlement of the authorization and its
- * authorized Decision. Under the approvals registry lock the approval is
- * re-verified (granted, unrevoked, unconsumed, inside its half-open window
- * at the evaluation clock), the Decision artifact is admitted
+ * authorized Decision. The governed-append guard (under the approvals lock)
+ * re-verifies the approval (granted, unrevoked, unconsumed, inside its
+ * half-open window at the evaluation clock), admits the Decision artifact
  * (decisionKind "approval", principal = the approval's frozen approver —
  * the approval IS the human authorization, so the caller passes no
- * principal), and only then is the single-use `consumed` event appended,
- * binding the Decision's identity and revision from the admission receipt.
+ * principal), and only then does the orchestration append the single-use
+ * `consumed` event, binding the Decision's identity and revision from the
+ * admission receipt.
  *
  * If the Decision admission fails, NO consumed event is written and the
  * authorization stays unconsumed (the admission's own code is reported). A
@@ -929,134 +903,121 @@ function consumeApproval(
 	if (scopeVerdict.error !== null) return fail(INVALID_ARG_CODE, [scopeVerdict.error]);
 
 	const at = now.toISOString();
+	const clockSource = clockSourceOf(opts);
+	// The guard stashes the admission receipt; the body factory then builds
+	// the event after the guard, so no sentinel value can ever reach the
+	// ledger. Failed admission returns from the guard without appending.
+	let admissionReceipt = null;
 
-	let release;
-	try {
-		release = acquireApprovalLock(cwd);
-	} catch (err) {
-		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-	}
-	try {
-		// Under the lock, re-fold and re-verify every invariant: a racing
-		// consumer (or revocation) may have appended between the pre-check
-		// and the lock.
-		let fresh;
-		try {
-			fresh = foldApprovals(cwd);
-		} catch (err) {
-			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-		}
-		const locked = consumptionVerdict(fresh, id, now);
-		if (!locked.ok) return fail(locked.code, [locked.message]);
-		const target = locked.target;
-		const lockedScope = decisionScopeOf(target, scope);
-		if (lockedScope.error !== null) return fail(INVALID_ARG_CODE, [lockedScope.error]);
-
-		// The consumed line's exact length depends on the admission's revision
-		// and on the chain fields — all of which exist only after the Decision
-		// settles. The ceiling probe therefore runs UNDER the lock and BEFORE
-		// the admission, padded with structurally dominating dummies: a
-		// 10-digit revision (every realistic head) and 64-char hex chain
-		// placeholders exactly as long as the real prevHash/hash. A probe that
-		// passes cannot hide an exact line that would refuse, so the Decision
-		// is never admitted into an approval whose consumption cannot be
-		// recorded (review F-1: the pre-fix probe omitted the chain fields and
-		// could orphan a settled Decision into a near-saturated ledger).
-		const ceilingProbe = {
+	const result = APPROVAL_LEDGER.append(
+		cwd,
+		() => ({
 			kind: "consumed",
 			schemaVersion: APPROVAL_SCHEMA_VERSION,
 			at,
 			approvalId: id,
 			decisionIdentity,
-			decisionRevision: 9_999_999_999,
-			clockSource: clockSourceOf(opts),
+			decisionRevision: admissionReceipt.revision,
+			clockSource,
 			skewPolicy: SKEW_POLICY,
-			prevHash: "0".repeat(64),
-			hash: "0".repeat(64),
-		};
-		let probe;
-		try {
-			probe = appendWithinCeiling(cwd, ceilingProbe);
-		} catch (err) {
-			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-		}
-		if (probe.wouldExceed) {
-			return fail(SIZE_CEILING_CODE, [
-				`appending the consumption event for "${id}" would grow the approval registry beyond its size ceiling of ${probe.ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — raise the ceiling deliberately`,
-			]);
-		}
+		}),
+		(fresh) => {
+			// Under the lock, re-fold and re-verify every invariant: a racing
+			// consumer (or revocation) may have appended between the pre-check
+			// and the lock.
+			const locked = consumptionVerdict(fresh, id, now);
+			if (!locked.ok) return fail(locked.code, [locked.message]);
+			const target = locked.target;
+			const lockedScope = decisionScopeOf(target, scope);
+			if (lockedScope.error !== null) return fail(INVALID_ARG_CODE, [lockedScope.error]);
 
-		// The Decision admission runs UNDER the approvals lock: consumption
-		// and settlement are one transaction. The artifact store takes only
-		// its own admission lock (never the approvals lock), so this nesting
-		// is deadlock-free. The approver id from the frozen grant snapshot is
-		// the acting principal — the approval IS the human authorization, and
-		// admitArtifact re-verifies it against the registry (double
-		// verification; both must pass).
-		const admission = admitArtifact(cwd, {
-			type: "decision",
-			identity: decisionIdentity,
-			body,
-			decisionKind: "approval",
-			principal: target.approver.id,
-			scope: lockedScope.value,
-			traces,
-		});
-		if (!admission.ok) {
-			// No consumed event is written; the approval stays unconsumed.
-			return fail(admission.code, admission.errors);
-		}
-		const decisionRevision = admission.receipt.revision;
+			// The consumed line's exact length depends on the admission's
+			// revision and on the chain fields — all of which exist only
+			// after the Decision settles. The ceiling probe therefore runs
+			// UNDER the lock and BEFORE the admission, padded with
+			// structurally dominating dummies: a 10-digit revision (every
+			// realistic head) and 64-char hex chain placeholders exactly as
+			// long as the real prevHash/hash. A probe that passes cannot hide
+			// an exact line that would refuse, so the Decision is never
+			// admitted into an approval whose consumption cannot be recorded
+			// (review F-1: the pre-fix probe omitted the chain fields and
+			// could orphan a settled Decision into a near-saturated ledger).
+			const ceilingProbe = {
+				kind: "consumed",
+				schemaVersion: APPROVAL_SCHEMA_VERSION,
+				at,
+				approvalId: id,
+				decisionIdentity,
+				decisionRevision: 9_999_999_999,
+				clockSource,
+				skewPolicy: SKEW_POLICY,
+				prevHash: "0".repeat(64),
+				hash: "0".repeat(64),
+			};
+			let probe;
+			try {
+				probe = appendWithinCeiling(cwd, ceilingProbe);
+			} catch (err) {
+				return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
+			}
+			if (probe.wouldExceed) {
+				return fail(SIZE_CEILING_CODE, [approvalCeilingMessage(ceilingProbe, probe.ceiling)]);
+			}
 
-		const eventBody = {
-			kind: "consumed",
-			schemaVersion: APPROVAL_SCHEMA_VERSION,
-			at,
-			approvalId: id,
-			decisionIdentity,
-			decisionRevision,
-			clockSource: clockSourceOf(opts),
-			skewPolicy: SKEW_POLICY,
-		};
-		const prevHash = chainHeadHashOf(cwd);
-		const event = { ...eventBody, prevHash, hash: chainHash(eventBody, prevHash) };
-		// Belt-and-braces on the exact chained event. Structurally
-		// unreachable: the dominating probe above already refused a ledger
-		// that could not hold a line at least this long, and both run under
-		// the lock against the same file size. If it ever fires after a
-		// successful admission, the Decision is orphaned — surfaced by name,
-		// never silently dropped.
-		const underLockCeiling = appendWithinCeiling(cwd, event);
-		if (underLockCeiling.wouldExceed) {
-			return fail(SIZE_CEILING_CODE, [
-				`appending the consumption event for "${id}" would grow the approval registry beyond its size ceiling of ${underLockCeiling.ceiling} bytes (AMBER_APPROVAL_MAX_REGISTRY_BYTES); decision "${decisionIdentity}" (revision ${decisionRevision}) was admitted but its consumption could not be recorded — the approval reads as unconsumed: raise the ceiling and settle a fresh Decision under a new approval id`,
+			// The Decision admission runs UNDER the approvals lock:
+			// consumption and settlement are one transaction. The artifact
+			// store takes only its own admission lock (never the approvals
+			// lock), so this nesting is deadlock-free. The approver id from
+			// the frozen grant snapshot is the acting principal — the
+			// approval IS the human authorization, and admitArtifact
+			// re-verifies it against the registry (double verification; both
+			// must pass).
+			const admission = admitArtifact(cwd, {
+				type: "decision",
+				identity: decisionIdentity,
+				body,
+				decisionKind: "approval",
+				principal: target.approver.id,
+				scope: lockedScope.value,
+				traces,
+			});
+			if (!admission.ok) {
+				// No consumed event is written; the approval stays unconsumed.
+				return fail(admission.code, admission.errors);
+			}
+			admissionReceipt = admission.receipt;
+			return null;
+		},
+		(fold) => fold.find((record) => record.id === id),
+	);
+	if (!result.ok) {
+		// Admission already happened inside the guard: restore the recorded
+		// orphan-Decision wording (ADR-0028 decision 2). The dummy probe
+		// makes this path structurally unreachable; the factory ceiling
+		// text still claims "before any durable state is touched".
+		if (admissionReceipt !== null) {
+			const decisionRevision = admissionReceipt.revision;
+			if (result.code === SIZE_CEILING_CODE) {
+				return fail(SIZE_CEILING_CODE, [
+					String(result.errors[0]).replace(
+						"; the write is refused before any durable state is touched — raise the ceiling deliberately",
+						`; decision "${decisionIdentity}" (revision ${decisionRevision}) was admitted but its consumption could not be recorded — the approval reads as unconsumed: raise the ceiling and settle a fresh Decision under a new approval id`,
+					),
+				]);
+			}
+			return fail(result.code, [
+				`failed to append the consumed event for "${id}" to the approval registry: ${result.errors[0]}; decision "${decisionIdentity}" (revision ${decisionRevision}) was admitted but its consumption could not be recorded — the approval reads as unconsumed`,
 			]);
 		}
-		try {
-			appendJSONL(approvalLedgerPath(cwd), event);
-		} catch (err) {
-			return fail(REGISTRY_CORRUPT_CODE, [
-				`failed to append the consumed event for "${id}" to the approval registry: ${err.message}; decision "${decisionIdentity}" (revision ${decisionRevision}) was admitted but its consumption could not be recorded — the approval reads as unconsumed`,
-			]);
-		}
-		return {
-			ok: true,
-			code: null,
-			approval: withStatus(
-				{
-					...target,
-					consumedAt: at,
-					decisionIdentity,
-					decisionRevision,
-				},
-				now,
-			),
-			receipt: admission.receipt,
-			errors: [],
-		};
-	} finally {
-		release();
+		return { ok: false, code: result.code, approval: null, receipt: null, errors: result.errors };
 	}
+	return {
+		ok: true,
+		code: null,
+		approval: withStatus(result.record, now),
+		receipt: admissionReceipt,
+		errors: [],
+	};
 }
 
 /**
