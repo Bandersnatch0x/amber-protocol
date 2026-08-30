@@ -23,17 +23,13 @@
 // verifiedBy list are computed by the read seams (fold) — a later
 // verification changes what a read returns without rewriting any event.
 
-const path = require("node:path");
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const {
 	GENESIS_HASH,
 	chainHash,
-	chainHeadHash: sharedChainHeadHash,
-	acquireLedgerLock,
 	appendWithinCeiling: sharedAppendWithinCeiling,
 } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 const { resolveActivePrincipal } = require("./principal-registry");
 
 const REGISTRY_CORRUPT_CODE = "AMBER_E_EVIDENCE_REGISTRY_CORRUPT";
@@ -47,8 +43,6 @@ const ASSURANCE_FORBIDDEN_CODE = "AMBER_E_EVIDENCE_ASSURANCE_FORBIDDEN";
 const SELF_VERIFICATION_CODE = "AMBER_E_EVIDENCE_SELF_VERIFICATION";
 const REPLAY_OF_CONFLICT_CODE = "AMBER_E_EVIDENCE_REPLAY_OF_CONFLICT";
 const INVALID_ARG_CODE = "AMBER_E_INVALID_ARG";
-
-const LOCK_STALE_MS = 30_000;
 
 /** Version of the receipt event contract this module writes and reads. */
 const EVIDENCE_SCHEMA_VERSION = 1;
@@ -139,27 +133,8 @@ const PRINCIPAL_SNAPSHOT_FIELDS = Object.freeze([
 	"issuer",
 ]);
 
-function evidenceLedgerPath(cwd) {
-	return statePathForCreate(cwd, "evidence", "receipts.jsonl");
-}
-
 function evidenceCorrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
-}
-
-function chainHeadHashOf(cwd) {
-	return sharedChainHeadHash(evidenceLedgerPath(cwd), REGISTRY_CORRUPT_CODE, "evidence ledger");
-}
-
-function acquireEvidenceLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(evidenceLedgerPath(cwd)),
-		lockName: "receipts.lock",
-		conflictCode: LOCK_CONFLICT_CODE,
-		corruptCode: REGISTRY_CORRUPT_CODE,
-		label: "evidence ledger",
-		staleMs: LOCK_STALE_MS,
-	});
 }
 
 function isNullableNonEmptyString(value) {
@@ -321,129 +296,179 @@ function replayOfProblem(assurance, replayOf) {
 	return null;
 }
 
-/**
- * Fold the ledger: verify the hash chain, the closed event field sets, the
- * receipt contract (including the frozen producer snapshot shape), and the
- * sequencing invariants (one recorded event per id; verification only for a
- * recorded id). Returns the derived records — effective assurance and
- * verifiedBy computed, never stored.
- * @returns {Array<object>} The derived evidence records, in first-recorded order.
- * @throws {Error} Typed AMBER_E_* on any corruption.
- */
-function foldEvidence(cwd) {
-	const events = readLedgerFailClosed(
-		evidenceLedgerPath(cwd),
-		REGISTRY_CORRUPT_CODE,
-		"evidence ledger",
-	);
-	const byId = new Map();
-	let prevHash = GENESIS_HASH;
-	for (let index = 0; index < events.length; index += 1) {
-		const lineIndex = index + 1;
-		const event = events[index];
-		if (event === null || typeof event !== "object" || Array.isArray(event)) {
-			throw evidenceCorrupt(
-				`evidence ledger event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
-			);
-		}
-		const schemaVersion = event.schemaVersion;
-		if (!Number.isInteger(schemaVersion)) {
-			throw evidenceCorrupt(
-				`evidence ledger event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(schemaVersion)}`,
-			);
-		}
-		if (!SUPPORTED_EVIDENCE_SCHEMA_VERSIONS.includes(schemaVersion)) {
-			throw typedError(
-				UNSUPPORTED_VERSION_CODE,
-				`evidence ledger event ${lineIndex} declares schemaVersion ${JSON.stringify(schemaVersion)}, but this reader supports ${SUPPORTED_EVIDENCE_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted — upgrade amber or rebuild the ledger under the supported schema version`,
-			);
-		}
-		if (typeof event.at !== "string" || event.at.length === 0) {
-			throw evidenceCorrupt(
-				`evidence ledger event ${lineIndex} carries no timestamp ("at"); got ${JSON.stringify(event.at)}`,
-			);
-		}
-		// The tamper-evident chain runs before any content is trusted (the
-		// principal registry's F-5 discipline, shared through registry-ledger).
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash) {
-			throw evidenceCorrupt(
-				`evidence ledger event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`,
-			);
-		}
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash) {
-			throw evidenceCorrupt(
-				`evidence ledger event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`,
-			);
-		}
-		if (event.kind === "recorded") {
-			const unknown = Object.keys(event)
-				.filter((key) => !RECORDED_EVENT_FIELDS.includes(key))
-				.sort();
-			if (unknown.length > 0) {
-				throw evidenceCorrupt(
-					`evidence ledger event ${lineIndex} is a recorded event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${RECORDED_EVENT_FIELDS.join(", ")}`,
-				);
-			}
-			const receiptProblem = storedReceiptProblem(event.receipt, lineIndex);
-			if (receiptProblem !== null) throw evidenceCorrupt(receiptProblem);
-			if (byId.has(event.receipt.id)) {
-				throw evidenceCorrupt(
-					`evidence ledger event ${lineIndex} records "${event.receipt.id}" a second time; an evidence id is recorded exactly once (a re-run is a new receipt), so the writers can never append this — the ledger was edited in place`,
-				);
-			}
-			byId.set(event.receipt.id, {
-				...event.receipt,
-				verifiedBy: [],
-			});
-		} else if (event.kind === "verified") {
-			const unknown = Object.keys(event)
-				.filter((key) => !VERIFIED_EVENT_FIELDS.includes(key))
-				.sort();
-			if (unknown.length > 0) {
-				throw evidenceCorrupt(
-					`evidence ledger event ${lineIndex} is a verified event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${VERIFIED_EVENT_FIELDS.join(", ")}`,
-				);
-			}
-			if (typeof event.evidenceId !== "string" || event.evidenceId.length === 0) {
-				throw evidenceCorrupt(
-					`evidence ledger event ${lineIndex} is a verified event whose evidenceId is not a non-empty string; got ${JSON.stringify(event.evidenceId)}`,
-				);
-			}
-			const snapshotProblem = storedSnapshotProblem(event.verifier, lineIndex, "verifier");
-			if (snapshotProblem !== null) throw evidenceCorrupt(snapshotProblem);
-			const record = byId.get(event.evidenceId);
-			if (record === undefined) {
-				throw evidenceCorrupt(
-					`evidence ledger event ${lineIndex} verifies "${event.evidenceId}", which was never recorded; the verify writer only appends for a recorded receipt — the ledger was edited in place`,
-				);
-			}
-			if (event.verifier.id === record.producer.id) {
-				throw evidenceCorrupt(
-					`evidence ledger event ${lineIndex} has "${event.verifier.id}" verifying its own evidence "${event.evidenceId}"; the verify writer refuses self-verification, so the writers can never append this — the ledger was edited in place`,
-				);
-			}
-			if (record.verifiedBy.some((entry) => entry.verifier.id === event.verifier.id)) {
-				throw evidenceCorrupt(
-					`evidence ledger event ${lineIndex} has "${event.verifier.id}" verifying "${event.evidenceId}" a second time; the verify writer records a verification exactly once per verifier, so the writers can never append this — the ledger was edited in place`,
-				);
-			}
-			record.verifiedBy.push({
-				verifier: event.verifier,
-				verifiedAt: event.at,
-			});
-		} else {
-			throw evidenceCorrupt(
-				`evidence ledger event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is recorded, verified`,
-			);
-		}
-		prevHash = event.hash;
+// The pre-chain half of the fold (the declared `fold.preLink` step,
+// ADR-0028 Amendment): the ledger's recorded contract adjudicates the
+// event's shape, schemaVersion, and timestamp BEFORE the chain link, so an
+// unchained or hand-edited event still gets the dedicated version verdict
+// (AMBER_E_EVIDENCE_UNSUPPORTED_VERSION) instead of a generic chain problem.
+function evidencePreLink(event, lineIndex) {
+	if (event === null || typeof event !== "object" || Array.isArray(event)) {
+		throw evidenceCorrupt(
+			`evidence ledger event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
+		);
 	}
-	return [...byId.values()].map((record) => ({
+	const schemaVersion = event.schemaVersion;
+	if (!Number.isInteger(schemaVersion)) {
+		throw evidenceCorrupt(
+			`evidence ledger event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(schemaVersion)}`,
+		);
+	}
+	if (!SUPPORTED_EVIDENCE_SCHEMA_VERSIONS.includes(schemaVersion)) {
+		throw typedError(
+			UNSUPPORTED_VERSION_CODE,
+			`evidence ledger event ${lineIndex} declares schemaVersion ${JSON.stringify(schemaVersion)}, but this reader supports ${SUPPORTED_EVIDENCE_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted — upgrade amber or rebuild the ledger under the supported schema version`,
+		);
+	}
+	if (typeof event.at !== "string" || event.at.length === 0) {
+		throw evidenceCorrupt(
+			`evidence ledger event ${lineIndex} carries no timestamp ("at"); got ${JSON.stringify(event.at)}`,
+		);
+	}
+}
+
+// The domain half of the fold, applied to each chain-verified event.
+// Fail-closed sequence invariants: the record/verify writers check the
+// current state BEFORE appending, so the ledger can only ever hold, per
+// id, one `recorded` event followed by at most one `verified` event per
+// verifier — anything else was hand-edited. State is the byId map in
+// first-recorded order; the fold's projection derives assurance.
+function applyEvidenceEvent(byId, event, lineIndex) {
+	if (event.kind === "recorded") {
+		const unknown = Object.keys(event)
+			.filter((key) => !RECORDED_EVENT_FIELDS.includes(key))
+			.sort();
+		if (unknown.length > 0) {
+			throw evidenceCorrupt(
+				`evidence ledger event ${lineIndex} is a recorded event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${RECORDED_EVENT_FIELDS.join(", ")}`,
+			);
+		}
+		const receiptProblem = storedReceiptProblem(event.receipt, lineIndex);
+		if (receiptProblem !== null) throw evidenceCorrupt(receiptProblem);
+		if (byId.has(event.receipt.id)) {
+			throw evidenceCorrupt(
+				`evidence ledger event ${lineIndex} records "${event.receipt.id}" a second time; an evidence id is recorded exactly once (a re-run is a new receipt), so the writers can never append this — the ledger was edited in place`,
+			);
+		}
+		byId.set(event.receipt.id, {
+			...event.receipt,
+			verifiedBy: [],
+		});
+	} else if (event.kind === "verified") {
+		const unknown = Object.keys(event)
+			.filter((key) => !VERIFIED_EVENT_FIELDS.includes(key))
+			.sort();
+		if (unknown.length > 0) {
+			throw evidenceCorrupt(
+				`evidence ledger event ${lineIndex} is a verified event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${VERIFIED_EVENT_FIELDS.join(", ")}`,
+			);
+		}
+		if (typeof event.evidenceId !== "string" || event.evidenceId.length === 0) {
+			throw evidenceCorrupt(
+				`evidence ledger event ${lineIndex} is a verified event whose evidenceId is not a non-empty string; got ${JSON.stringify(event.evidenceId)}`,
+			);
+		}
+		const snapshotProblem = storedSnapshotProblem(event.verifier, lineIndex, "verifier");
+		if (snapshotProblem !== null) throw evidenceCorrupt(snapshotProblem);
+		const record = byId.get(event.evidenceId);
+		if (record === undefined) {
+			throw evidenceCorrupt(
+				`evidence ledger event ${lineIndex} verifies "${event.evidenceId}", which was never recorded; the verify writer only appends for a recorded receipt — the ledger was edited in place`,
+			);
+		}
+		if (event.verifier.id === record.producer.id) {
+			throw evidenceCorrupt(
+				`evidence ledger event ${lineIndex} has "${event.verifier.id}" verifying its own evidence "${event.evidenceId}"; the verify writer refuses self-verification, so the writers can never append this — the ledger was edited in place`,
+			);
+		}
+		if (record.verifiedBy.some((entry) => entry.verifier.id === event.verifier.id)) {
+			throw evidenceCorrupt(
+				`evidence ledger event ${lineIndex} has "${event.verifier.id}" verifying "${event.evidenceId}" a second time; the verify writer records a verification exactly once per verifier, so the writers can never append this — the ledger was edited in place`,
+			);
+		}
+		record.verifiedBy.push({
+			verifier: event.verifier,
+			verifiedAt: event.at,
+		});
+	} else {
+		throw evidenceCorrupt(
+			`evidence ledger event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is recorded, verified`,
+		);
+	}
+}
+
+function evidenceChainWording(kind, event, lineIndex, label) {
+	if (kind === "broken") {
+		return `${label} event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`;
+	}
+	if (kind === "mismatch") {
+		return `${label} event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`;
+	}
+	return `${label} event ${lineIndex} is not an object; got ${JSON.stringify(event)}`;
+}
+
+function evidenceCeilingMessage(event, ceiling) {
+	if (event.kind === "recorded") {
+		return `appending the receipt for "${event.receipt.id}" would grow the evidence ledger beyond its size ceiling of ${ceiling} bytes (AMBER_EVIDENCE_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — keep outputs bounded or raise the ceiling deliberately`;
+	}
+	return `appending the verification for "${event.evidenceId}" would grow the evidence ledger beyond its size ceiling of ${ceiling} bytes (AMBER_EVIDENCE_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`;
+}
+
+function projectEvidenceRecord(record) {
+	return {
 		...record,
 		assurance: record.verifiedBy.length > 0 ? "verified" : record.assurance,
 		recordedAssurance: record.assurance,
-	}));
+	};
 }
+
+// F061 follow-up (#308) — the ledger ritual is assembled by
+// `defineLedgerFamily` (ADR-0028), byte-identically to the hand-written
+// ceremony it replaces: the same path (`.amber/evidence/receipts.jsonl`),
+// lock name (`receipts.lock`; the 30s stale bound now rides the shared
+// default), stable codes, and "evidence ledger" label in lock/read
+// refusals and as the per-event problem prefix. This family declares the
+// Amendment extensions: `fold.preLink` (pre-chain shape/version/at),
+// `fold.chainWording` (recorded prevHash / edited-in-place chain text),
+// and `ceiling.message` (AMBER_EVIDENCE_MAX_REGISTRY_BYTES wording).
+const EVIDENCE_FAMILY = defineLedgerFamily({
+	dir: "evidence",
+	label: "evidence ledger",
+	ledgers: [
+		{
+			name: "receipts",
+			fileName: "receipts.jsonl",
+			lockName: "receipts.lock",
+			conflictCode: LOCK_CONFLICT_CODE,
+			corruptCode: REGISTRY_CORRUPT_CODE,
+			sizeCeilingCode: SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_EVIDENCE_MAX_REGISTRY_BYTES",
+				defaultBytes: DEFAULT_MAX_EVIDENCE_BYTES,
+				message: evidenceCeilingMessage,
+			},
+			label: "evidence ledger",
+			eventLabel: "evidence ledger",
+			fold: {
+				init: () => new Map(),
+				preLink: evidencePreLink,
+				chainWording: evidenceChainWording,
+				apply: applyEvidenceEvent,
+				result: (byId) => [...byId.values()].map(projectEvidenceRecord),
+			},
+		},
+	],
+});
+
+const EVIDENCE_LEDGER = EVIDENCE_FAMILY.ledgers.receipts;
+
+/**
+ * Fold the ledger: fail-closed raw read, preLink, chain walk, domain apply
+ * — per event in ledger order. Returns the derived records — effective
+ * assurance and verifiedBy computed, never stored.
+ * @returns {Array<object>} The derived evidence records, in first-recorded order.
+ * @throws {Error} Typed AMBER_E_* on any corruption.
+ */
+const foldEvidence = EVIDENCE_LEDGER.fold;
 
 /**
  * The stored receipt contract on fold: closed field set, closed assurance and
@@ -581,17 +606,19 @@ function storedSnapshotProblem(snapshot, lineIndex, role) {
 	return null;
 }
 
-// The ledger append ceiling: refuse an event that would grow the ledger past
-// its bound BEFORE any durable state is touched (shared discipline with the
-// principal registry through registry-ledger).
 function appendWithinCeiling(cwd, event) {
 	return sharedAppendWithinCeiling({
-		ledgerPath: evidenceLedgerPath(cwd),
+		ledgerPath: EVIDENCE_LEDGER.path(cwd),
 		event,
 		envName: "AMBER_EVIDENCE_MAX_REGISTRY_BYTES",
 		defaultBytes: DEFAULT_MAX_EVIDENCE_BYTES,
 		label: "evidence ledger",
 	});
+}
+
+function fromAppend(result) {
+	if (!result.ok) return { ok: false, code: result.code, receipt: null, errors: result.errors };
+	return { ok: true, code: null, receipt: result.record, errors: [] };
 }
 
 /**
@@ -712,62 +739,21 @@ function recordEvidence(cwd, input, opts = {}) {
 		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
 	}
 	if (ceilingCheck.wouldExceed) {
-		return fail(SIZE_CEILING_CODE, [
-			`appending the receipt for "${id}" would grow the evidence ledger beyond its size ceiling of ${ceilingCheck.ceiling} bytes (AMBER_EVIDENCE_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — keep outputs bounded or raise the ceiling deliberately`,
-		]);
+		return fail(SIZE_CEILING_CODE, [evidenceCeilingMessage(body, ceilingCheck.ceiling)]);
 	}
-	let release;
-	try {
-		release = acquireEvidenceLock(cwd);
-	} catch (err) {
-		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-	}
-	try {
-		// Under the lock, re-check the exact invariants the fold enforces: the
-		// duplicate id (a racing writer appended between the pre-check and the
-		// lock) and the ledger's integrity.
-		let fresh;
-		try {
-			fresh = foldEvidence(cwd);
-		} catch (err) {
-			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-		}
-		if (fresh.some((record) => record.id === id)) {
-			return fail(ALREADY_RECORDED_CODE, [
-				`evidence "${id}" is already recorded; an evidence id is recorded exactly once — record the re-run under a distinct id`,
-			]);
-		}
-		const prevHash = chainHeadHashOf(cwd);
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		// The real event carries the chain fields the pre-lock check could not
-		// count (and the file may have grown while waiting for the lock).
-		const underLockCeiling = appendWithinCeiling(cwd, event);
-		if (underLockCeiling.wouldExceed) {
-			return fail(SIZE_CEILING_CODE, [
-				`appending the receipt for "${id}" would grow the evidence ledger beyond its size ceiling of ${underLockCeiling.ceiling} bytes (AMBER_EVIDENCE_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — keep outputs bounded or raise the ceiling deliberately`,
-			]);
-		}
-		try {
-			appendJSONL(evidenceLedgerPath(cwd), event);
-		} catch (err) {
-			return fail(REGISTRY_CORRUPT_CODE, [
-				`failed to append the receipt for "${id}" to the evidence ledger: ${err.message}`,
-			]);
-		}
-	} finally {
-		release();
-	}
-	return {
-		ok: true,
-		code: null,
-		receipt: {
-			...body.receipt,
-			assurance,
-			recordedAssurance: assurance,
-			verifiedBy: [],
-		},
-		errors: [],
-	};
+	return fromAppend(
+		EVIDENCE_LEDGER.append(
+			cwd,
+			body,
+			(fresh) =>
+				fresh.some((record) => record.id === id)
+					? fail(ALREADY_RECORDED_CODE, [
+							`evidence "${id}" is already recorded; an evidence id is recorded exactly once — record the re-run under a distinct id`,
+						])
+					: null,
+			(fold) => fold.find((record) => record.id === id),
+		),
+	);
 }
 
 /**
@@ -842,78 +828,38 @@ function verifyEvidence(cwd, { id, verifier }, opts = {}) {
 		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
 	}
 	if (ceilingCheck.wouldExceed) {
-		return fail(SIZE_CEILING_CODE, [
-			`appending the verification for "${id}" would grow the evidence ledger beyond its size ceiling of ${ceilingCheck.ceiling} bytes (AMBER_EVIDENCE_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`,
-		]);
+		return fail(SIZE_CEILING_CODE, [evidenceCeilingMessage(body, ceilingCheck.ceiling)]);
 	}
-	let freshTarget;
-	let release;
-	try {
-		release = acquireEvidenceLock(cwd);
-	} catch (err) {
-		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-	}
-	try {
-		let fresh;
-		try {
-			fresh = foldEvidence(cwd);
-		} catch (err) {
-			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-		}
-		freshTarget = fresh.find((record) => record.id === id);
-		if (!freshTarget) {
-			return fail(NOT_FOUND_CODE, [
-				`evidence "${id}" is not recorded; verification applies to a recorded receipt`,
-			]);
-		}
-		if (resolvedVerifier.principal.id === freshTarget.producer.id) {
-			return fail(SELF_VERIFICATION_CODE, [
-				`principal "${verifier}" produced evidence "${id}" and cannot also verify it: verification requires an independent registered principal`,
-			]);
-		}
-		if (
-			freshTarget.verifiedBy.some((entry) => entry.verifier.id === resolvedVerifier.principal.id)
-		) {
-			return fail(ALREADY_VERIFIED_CODE, [
-				`principal "${verifier}" already verified evidence "${id}"; a verification is recorded exactly once per verifier`,
-			]);
-		}
-		const prevHash = chainHeadHashOf(cwd);
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		const underLockCeiling = appendWithinCeiling(cwd, event);
-		if (underLockCeiling.wouldExceed) {
-			return fail(SIZE_CEILING_CODE, [
-				`appending the verification for "${id}" would grow the evidence ledger beyond its size ceiling of ${underLockCeiling.ceiling} bytes (AMBER_EVIDENCE_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`,
-			]);
-		}
-		try {
-			appendJSONL(evidenceLedgerPath(cwd), event);
-		} catch (err) {
-			return fail(REGISTRY_CORRUPT_CODE, [
-				`failed to append the verification for "${id}" to the evidence ledger: ${err.message}`,
-			]);
-		}
-	} finally {
-		release();
-	}
-	// The append is durable; if this confirming fold still fails, the write
-	// happened — report the derived record rather than leaking a raw throw
-	// through the result-object seam.
-	let updated;
-	try {
-		updated = foldEvidence(cwd).find((record) => record.id === id);
-	} catch {
-		updated = {
-			...freshTarget,
-			verifiedBy: [
-				...freshTarget.verifiedBy,
-				{ verifier: Object.freeze({ ...resolvedVerifier.principal }), verifiedAt: at },
-			],
-			assurance: "verified",
-			recordedAssurance: freshTarget.recordedAssurance,
-		};
-	}
-	return { ok: true, code: null, receipt: updated ?? null, errors: [] };
+	return fromAppend(
+		EVIDENCE_LEDGER.append(
+			cwd,
+			body,
+			(fresh) => {
+				const freshTarget = fresh.find((record) => record.id === id);
+				if (!freshTarget) {
+					return fail(NOT_FOUND_CODE, [
+						`evidence "${id}" is not recorded; verification applies to a recorded receipt`,
+					]);
+				}
+				if (resolvedVerifier.principal.id === freshTarget.producer.id) {
+					return fail(SELF_VERIFICATION_CODE, [
+						`principal "${verifier}" produced evidence "${id}" and cannot also verify it: verification requires an independent registered principal`,
+					]);
+				}
+				if (
+					freshTarget.verifiedBy.some(
+						(entry) => entry.verifier.id === resolvedVerifier.principal.id,
+					)
+				) {
+					return fail(ALREADY_VERIFIED_CODE, [
+						`principal "${verifier}" already verified evidence "${id}"; a verification is recorded exactly once per verifier`,
+					]);
+				}
+				return null;
+			},
+			(fold) => fold.find((record) => record.id === id),
+		),
+	);
 }
 
 /**
