@@ -44,6 +44,8 @@ const {
 	unknownFieldProblem,
 	decisionPinProblem,
 	resolveRegistrationDecision,
+	decisionSnapshotProblem: sharedDecisionSnapshotProblem,
+	findDecisionSpend,
 } = require("./registry-ledger");
 
 const BREAKGLASS_SCHEMA_VERSION = 1;
@@ -125,12 +127,6 @@ const RUNNER_PIN_FIELDS = Object.freeze([
 	"capabilityVersion",
 ]);
 const EXTERNAL_PIN_FIELDS = Object.freeze(["kind", "id", "version"]);
-const DECISION_SNAPSHOT_FIELDS = Object.freeze([
-	"identity",
-	"revision",
-	"decisionKind",
-	"principal",
-]);
 const GRANT_EVENT_FIELDS = Object.freeze([
 	"kind",
 	"schemaVersion",
@@ -226,16 +222,7 @@ function capabilityPinProblem(value, label) {
 }
 
 function decisionSnapshotProblem(value, label) {
-	if (!isPlainObject(value)) return `${label} must be an object`;
-	const closed = closedFieldProblem(value, DECISION_SNAPSHOT_FIELDS, label);
-	if (closed !== null) return closed;
-	if (!isNonEmptyString(value.identity)) return `${label}.identity must be a non-empty string`;
-	if (!Number.isInteger(value.revision) || value.revision < 1)
-		return `${label}.revision must be a positive integer`;
-	if (!BREAKGLASS_DECISION_KINDS.includes(value.decisionKind))
-		return `${label}.decisionKind must be one of ${BREAKGLASS_DECISION_KINDS.join(", ")}`;
-	if (!isNonEmptyString(value.principal)) return `${label}.principal must be a non-empty string`;
-	return null;
+	return sharedDecisionSnapshotProblem(value, BREAKGLASS_DECISION_KINDS, label);
 }
 
 function isoProblem(value, label) {
@@ -588,26 +575,17 @@ function resolveGrantDecision(revisions, decision, label) {
 // event kind: one Decision authorizes one act (a grant, a revocation, or
 // a post-review), never two.
 function grantDecisionSpender(grants, decision) {
-	for (const grant of grants) {
-		if (
-			grant.decision.identity === decision.identity &&
-			grant.decision.revision === decision.revision
-		)
-			return `grant ${JSON.stringify(grant.id)}`;
-		if (
-			grant.revocation !== null &&
-			grant.revocation.decision.identity === decision.identity &&
-			grant.revocation.decision.revision === decision.revision
-		)
-			return `the revocation of grant ${JSON.stringify(grant.id)}`;
-		if (
-			grant.review !== null &&
-			grant.review.decision.identity === decision.identity &&
-			grant.review.decision.revision === decision.revision
-		)
-			return `the post-review of grant ${JSON.stringify(grant.id)}`;
-	}
-	return null;
+	const spent = findDecisionSpend(grants, decision, [
+		"decision",
+		"revocation.decision",
+		"review.decision",
+	]);
+	if (spent === null) return null;
+	if (spent.slot === "revocation.decision")
+		return `the revocation of grant ${JSON.stringify(spent.record.id)}`;
+	if (spent.slot === "review.decision")
+		return `the post-review of grant ${JSON.stringify(spent.record.id)}`;
+	return `grant ${JSON.stringify(spent.record.id)}`;
 }
 
 // The shared single-use refusal every Decision-bearing guard applies.

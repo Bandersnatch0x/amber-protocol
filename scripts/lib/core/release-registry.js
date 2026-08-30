@@ -13,7 +13,6 @@
 // canonical releaseHash covers the full closed content, so any drift
 // invalidates downstream authorization instead of silently retargeting it.
 
-const crypto = require("node:crypto");
 const path = require("node:path");
 
 const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
@@ -30,13 +29,13 @@ const {
 	showRunnerRequest,
 	showRunnerExecution,
 } = require("./runner-registry");
-const { canonicalJson } = require("./context-hash");
 const {
 	GENESIS_HASH,
 	chainHash,
 	chainHeadHash,
 	acquireLedgerLock,
 	appendWithinCeiling: sharedAppendWithinCeiling,
+	canonicalHashOf,
 } = require("./registry-ledger");
 
 const RELEASE_CANDIDATE_SCHEMA_VERSION = 1;
@@ -156,13 +155,6 @@ function unknownFieldProblem(value, fields, label) {
 		.sort();
 	if (unknown.length === 0) return null;
 	return `${label} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${fields.join(", ")}`;
-}
-
-function canonicalHashOf(value) {
-	return `sha256:${crypto
-		.createHash("sha256")
-		.update(Buffer.from(canonicalJson(JSON.stringify(value))))
-		.digest("hex")}`;
 }
 
 function artifactPinProblem(value, label) {
