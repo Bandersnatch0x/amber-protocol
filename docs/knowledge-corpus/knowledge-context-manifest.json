@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 27,
+    "adr": 28,
     "wiki": 10,
     "architecture": 9,
-    "total": 46
+    "total": 47
   },
   "rows": [
     {
@@ -333,6 +333,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0028",
+      "category": "adr",
+      "sourceNodeId": "adr:0028",
+      "pageId": "knowledge-adr-0028",
+      "sourcePath": "docs/adr/0028-ledger-family-factory-and-decision-primitives.md",
+      "title": "Ledger Families Compose One Factory; Decision Primitives Live in the Primitive Layer",
+      "source": {
+        "rawHash": "sha256:3f28c9ebd82228ec9c040e135e49c0fdf75a0bf8c5c1200f0f89db1cbad5398b",
+        "normHash": "sha256:1d229f0abf597c6804bf524eee86d0b1a5cd1cf32cf5627757bfd78639604c81"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -561,5 +573,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:b4ca4676d8553da1d4cf8438d493c8ba47823bf7af96c1c2a24aa4f9ac33f3fa"
+  "manifestHash": "sha256:edc8b25932ea2fd0976481bfa72dc70fdf89bfc42d7a84a013eafc648ad26ba7"
 }

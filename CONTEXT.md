@@ -294,6 +294,18 @@ _Avoid_: implicit consent, permission flag, Resolution
 The named role accountable for a governed decision at a Gate. A Decision Owner may rely on Evidence and other Approval records, but cannot delegate the decision to a model or infer it from an Artifact status field.
 _Avoid_: assignee, reviewer, approver (when the role is broader than an authorization)
 
+**Ledger Family**:
+A governed registry whose hash-chained ledgers, exclusive append lock, ceiling-bounded appends, closed field sets, and fail-closed reads are declared through the shared factory (`defineLedgerFamily`) rather than hand-written per family. A Ledger Family never owns a private chain or validation dialect.
+_Avoid_: ad-hoc ledger, per-registry fork, hand-rolled registry
+
+**Decision Pin**:
+The `{identity, revision}` reference that binds a governed record to one committed human Decision revision. A Decision Pin never points at an uncommitted draft and never substitutes for the Decision itself.
+_Avoid_: decision copy, loose reference, revision guess
+
+**Decision Spend**:
+The single-use consumption judgment for a pinned human Decision: one shared scan kernel walks a family's declared ledger slots and refuses any second use. Families keep their own slots, refusal wording, and return shapes; a spent Decision is terminal.
+_Avoid_: approval reuse, soft lock, idempotent replay
+
 **Provenance Envelope**:
 The mandatory provenance carried by every durable Governance Graph node, edge, Domain Fact/Event projection, and Inference: source and Resolution owners, source identity and content hash, actor, originating Action or causal parent, explicit scope, derivation kind, confidence or assurance, valid and recorded time, correlation/causal metadata, and source-stream predecessor metadata when available. An Inference also records its rule/version and every input identity and hash.
 _Avoid_: citation string, optional metadata, source label
