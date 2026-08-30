@@ -203,7 +203,7 @@ test("each invariant is a real check — satisfied only when its artifact exists
 
 function profileEvidence(dir) {
 	return gatherPhaseEvidence(dir, "phase-2").find(
-		(e) => e.requirement === "personal-node profile declared",
+		(e) => e.requirement === "valid deployment profile declared",
 	);
 }
 
