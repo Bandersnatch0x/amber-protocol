@@ -13,11 +13,6 @@
 // behind single-use committed human Decisions, and history is never
 // rewritten: a revoked or expired grant stays listable forever.
 
-const path = require("node:path");
-
-const { readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
-const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const {
 	resolveRequestCapability,
@@ -33,10 +28,7 @@ const { showEvidence } = require("./evidence-receipts");
 const {
 	GENESIS_HASH,
 	chainHash,
-	acquireLedgerLock,
-	appendLedgerEvent,
 	credentialLeakProblem,
-	chainLinkProblem,
 	isCredentialLeakProblem,
 	isPlainObject,
 	isNonEmptyString,
@@ -47,6 +39,7 @@ const {
 	decisionSnapshotProblem: sharedDecisionSnapshotProblem,
 	findDecisionSpend,
 } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 
 const BREAKGLASS_SCHEMA_VERSION = 1;
 const SUPPORTED_BREAKGLASS_SCHEMA_VERSIONS = Object.freeze([1]);
@@ -55,7 +48,6 @@ const DEFAULT_MAX_BREAKGLASS_BYTES = 1024 * 1024;
 // mandatory post-review must land within 30 days of the window closing.
 const MAX_BREAKGLASS_WINDOW_MS = 24 * 3_600_000;
 const MAX_REVIEW_DELAY_MS = 30 * 24 * 3_600_000;
-const LOCK_STALE_MS = 30_000;
 
 const BREAKGLASS_CAPABILITY_KINDS = Object.freeze(["runner", "external"]);
 const BREAKGLASS_CREDENTIALS = Object.freeze(["none", "scoped"]);
@@ -75,25 +67,6 @@ const BREAKGLASS_LEAK_CODE = "AMBER_E_BREAKGLASS_CREDENTIAL_LEAK";
 // scheme, no shell metacharacters, no ".." traversal — a command,
 // executable, or remote URL can never ride an emergency grant.
 const SLUG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
-
-function grantsPath(cwd) {
-	return statePathForCreate(cwd, "breakglass", "grants.jsonl");
-}
-
-function breakglassCorrupt(message) {
-	return typedError(BREAKGLASS_CORRUPT_CODE, message);
-}
-
-function acquireGrantLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(grantsPath(cwd)),
-		lockName: "grants.lock",
-		conflictCode: BREAKGLASS_LOCK_CODE,
-		corruptCode: BREAKGLASS_CORRUPT_CODE,
-		label: "break-glass grant ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
 
 // The shared refusal shape for a slug-validated input field: a leak
 // carries its dedicated code, every other slug problem is invalid.
@@ -503,45 +476,58 @@ function applyGrantEvent(grants, byId, event, lineIndex) {
 	return applyGrantReview(byId, event, lineIndex);
 }
 
-function foldGrants(cwd) {
-	const events = readLedgerFailClosed(
-		grantsPath(cwd),
-		BREAKGLASS_CORRUPT_CODE,
-		"break-glass grant ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const grants = [];
-	const byId = new Map();
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "break-glass");
-		if (link !== null) throw breakglassCorrupt(link);
-		if (!SUPPORTED_BREAKGLASS_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw breakglassCorrupt(
-				`break-glass event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (!["grant", "revoke", "use", "settlement", "review"].includes(event.kind))
-			throw breakglassCorrupt(
-				`break-glass event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = grantEventProblem(event, lineIndex);
-		if (problem !== null) throw breakglassCorrupt(problem);
-		applyGrantEvent(grants, byId, event, lineIndex);
-		prevHash = event.hash;
-	});
-	return grants;
-}
-
-const GRANT_LEDGER = Object.freeze({
-	acquire: acquireGrantLock,
-	fold: foldGrants,
-	path: grantsPath,
-	corruptCode: BREAKGLASS_CORRUPT_CODE,
-	sizeCeilingCode: BREAKGLASS_SIZE_CEILING_CODE,
-	envName: "AMBER_BREAKGLASS_MAX_GRANTS_BYTES",
-	defaultBytes: DEFAULT_MAX_BREAKGLASS_BYTES,
-	label: "break-glass grant ledger",
+// F061 T3 (#300) — the ledger ritual is assembled by `defineLedgerFamily`
+// (ADR-0028), byte-identically to the hand-written ceremony it replaces:
+// same path (`.amber/breakglass/grants.jsonl`), same `grants.lock` name
+// (the 30s stale bound now rides the shared default), same stable codes
+// and labels ("break-glass grant ledger" in lock/read/ceiling refusals,
+// "break-glass" as the per-event chain-walk prefix), and the same fold
+// interleaving — the chain link first, then the family's domain checks,
+// per event in ledger order. Only the domain half is declared here: the
+// schema and kind gates, the closed event shapes, and the per-kind
+// appliers stay this family's own rules.
+const BREAKGLASS_FAMILY = defineLedgerFamily({
+	dir: "breakglass",
+	label: "break-glass registry",
+	ledgers: [
+		{
+			name: "grants",
+			fileName: "grants.jsonl",
+			lockName: "grants.lock",
+			conflictCode: BREAKGLASS_LOCK_CODE,
+			corruptCode: BREAKGLASS_CORRUPT_CODE,
+			sizeCeilingCode: BREAKGLASS_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_BREAKGLASS_MAX_GRANTS_BYTES",
+				defaultBytes: DEFAULT_MAX_BREAKGLASS_BYTES,
+			},
+			label: "break-glass grant ledger",
+			eventLabel: "break-glass",
+			fold: {
+				init: () => ({ grants: [], byId: new Map() }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_BREAKGLASS_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw breakglassCorrupt(
+							`break-glass event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (!["grant", "revoke", "use", "settlement", "review"].includes(event.kind))
+						throw breakglassCorrupt(
+							`break-glass event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = grantEventProblem(event, lineIndex);
+					if (problem !== null) throw breakglassCorrupt(problem);
+					applyGrantEvent(state.grants, state.byId, event, lineIndex);
+				},
+				result: (state) => state.grants,
+			},
+		},
+	],
 });
+
+const GRANT_LEDGER = BREAKGLASS_FAMILY.ledgers.grants;
+const grantsPath = GRANT_LEDGER.path;
+const breakglassCorrupt = GRANT_LEDGER.corrupt;
+const foldGrants = GRANT_LEDGER.fold;
 
 // Status is a pure read-time derivation: a terminal use wins, then
 // revocation, then expiry at the injected clock against the half-open
@@ -710,9 +696,8 @@ function grantBreakGlass(cwd, input = {}, opts = {}) {
 	}
 	const resolved = resolveGrantDecision(revisions, input.decision, "a break-glass grant");
 	if (resolved.problem) return fail(BREAKGLASS_INVALID_CODE, [resolved.problem]);
-	return appendLedgerEvent(
+	return GRANT_LEDGER.append(
 		cwd,
-		GRANT_LEDGER,
 		{
 			kind: "grant",
 			schemaVersion: BREAKGLASS_SCHEMA_VERSION,
@@ -779,9 +764,8 @@ function revokeBreakGlass(cwd, input = {}, opts = {}) {
 	}
 	const resolved = resolveGrantDecision(revisions, input.decision, "a break-glass revocation");
 	if (resolved.problem) return fail(BREAKGLASS_INVALID_CODE, [resolved.problem]);
-	return appendLedgerEvent(
+	return GRANT_LEDGER.append(
 		cwd,
-		GRANT_LEDGER,
 		{
 			kind: "revoke",
 			schemaVersion: BREAKGLASS_SCHEMA_VERSION,
@@ -948,9 +932,8 @@ function useBreakGlass(cwd, input = {}, opts = {}) {
 	// builds the event after the guard, so no sentinel value can ever
 	// reach the ledger.
 	let admitted = null;
-	return appendLedgerEvent(
+	return GRANT_LEDGER.append(
 		cwd,
-		GRANT_LEDGER,
 		() => ({
 			kind: "use",
 			schemaVersion: BREAKGLASS_SCHEMA_VERSION,
@@ -1142,9 +1125,8 @@ function settleBreakGlass(cwd, input = {}, opts = {}) {
 	if (receiptLeak !== null) return fail(BREAKGLASS_LEAK_CODE, [receiptLeak]);
 	const nowMs = now.getTime();
 	let resolved = null;
-	return appendLedgerEvent(
+	return GRANT_LEDGER.append(
 		cwd,
-		GRANT_LEDGER,
 		() => ({
 			kind: "settlement",
 			schemaVersion: BREAKGLASS_SCHEMA_VERSION,
@@ -1237,9 +1219,8 @@ function reviewBreakGlass(cwd, input = {}, opts = {}) {
 	const resolved = resolveGrantDecision(revisions, input.decision, "a break-glass post-review");
 	if (resolved.problem) return fail(BREAKGLASS_INVALID_CODE, [resolved.problem]);
 	const nowMs = now.getTime();
-	return appendLedgerEvent(
+	return GRANT_LEDGER.append(
 		cwd,
-		GRANT_LEDGER,
 		{
 			kind: "review",
 			schemaVersion: BREAKGLASS_SCHEMA_VERSION,
