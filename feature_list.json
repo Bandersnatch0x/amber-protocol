@@ -2067,7 +2067,13 @@
 				"apps/web/src/features/knowledge/",
 				"apps/web/server/lib/knowledge-graph-reader.ts"
 			],
-			"updated": "2026-08-30"
+			"updated": "2026-08-30",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-08-30",
+				"surfaces": ["docs/specs/F060-knowledge-map-v2-code-graph.md"],
+				"owner": "command"
+			}
 		}
 	]
 }
