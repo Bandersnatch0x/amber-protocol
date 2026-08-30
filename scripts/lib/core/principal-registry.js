@@ -50,18 +50,13 @@
  * status frozen at write time.
  */
 
-const fs = require("node:fs");
-const path = require("node:path");
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const {
 	GENESIS_HASH,
 	chainHash,
-	chainHeadHash: sharedChainHeadHash,
-	acquireLedgerLock,
 	appendWithinCeiling: sharedAppendWithinCeiling,
 } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 
 const REGISTRY_CORRUPT_CODE = "AMBER_E_PRINCIPAL_REGISTRY_CORRUPT";
 const UNSUPPORTED_VERSION_CODE = "AMBER_E_PRINCIPAL_REGISTRY_UNSUPPORTED_VERSION";
@@ -74,8 +69,6 @@ const EXPIRED_CODE = "AMBER_E_PRINCIPAL_EXPIRED";
 const NOT_YET_VALID_CODE = "AMBER_E_PRINCIPAL_NOT_YET_VALID";
 const INVALID_ARG_CODE = "AMBER_E_INVALID_ARG";
 const LOCK_CONFLICT_CODE = "AMBER_E_PRINCIPAL_REGISTRY_LOCK";
-
-const LOCK_STALE_MS = 30_000;
 
 /** Version of the registry event contract this module writes and reads. */
 const REGISTRY_SCHEMA_VERSION = 1;
@@ -133,36 +126,6 @@ const PRINCIPAL_FIELDS = Object.freeze([
 // windows machine-timezone-dependent (F050 review F-7).
 const ISO_TIMESTAMP_PATTERN =
 	/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2}))?$/;
-
-function registryPath(cwd) {
-	return statePathForCreate(cwd, "principals", "registry.jsonl");
-}
-
-// The chain/lock disciplines live in registry-ledger.js (shared with the
-// evidence receipts ledger); the imports at the top of this module re-export
-// GENESIS_HASH/chainHash for consumers that chain hand-built fixtures.
-function chainHeadHash(cwd) {
-	return sharedChainHeadHash(registryPath(cwd), REGISTRY_CORRUPT_CODE, "principal registry");
-}
-
-// F050 review F-1: the register/revoke writers are check-then-append, and the
-// fold treats a duplicate `registered` (or second `revoked`) event as
-// corruption — two racing writers would both pass the pre-check and both
-// append, permanently bricking the registry with a misleading diagnosis. The
-// artifact store's admit.lock pattern serializes exactly this class: an
-// exclusive create-with-wx lock file, stale after LOCK_STALE_MS (a crashed
-// holder releases the registry; a live one fails the second writer with a
-// stable conflict code instead of racing it).
-function acquireRegistryLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(registryPath(cwd)),
-		lockName: "registry.lock",
-		conflictCode: LOCK_CONFLICT_CODE,
-		corruptCode: REGISTRY_CORRUPT_CODE,
-		label: "principal registry",
-		staleMs: LOCK_STALE_MS,
-	});
-}
 
 function registryCorrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
@@ -285,130 +248,172 @@ function storedPrincipalProblem(principal, lineIndex) {
 	return null;
 }
 
+// The pre-chain half of the fold (the declared `fold.preLink` step,
+// ADR-0028 Amendment): the registry's recorded contract adjudicates the
+// event's shape, schemaVersion, and timestamp BEFORE the chain link, so an
+// unchained or hand-edited event still gets the dedicated version verdict
+// (AMBER_E_PRINCIPAL_REGISTRY_UNSUPPORTED_VERSION) on every seam instead
+// of a generic chain problem.
+function registryPreLink(event, lineIndex) {
+	if (event === null || typeof event !== "object" || Array.isArray(event)) {
+		throw registryCorrupt(
+			`principal registry event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
+		);
+	}
+	const schemaVersion = event.schemaVersion;
+	if (!Number.isInteger(schemaVersion)) {
+		throw registryCorrupt(
+			`principal registry event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(schemaVersion)}`,
+		);
+	}
+	if (!SUPPORTED_REGISTRY_SCHEMA_VERSIONS.includes(schemaVersion)) {
+		throw typedError(
+			UNSUPPORTED_VERSION_CODE,
+			`principal registry event ${lineIndex} declares schemaVersion ${JSON.stringify(schemaVersion)}, but this reader supports ${SUPPORTED_REGISTRY_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted — upgrade amber or rebuild the registry under the supported schema version`,
+		);
+	}
+	if (typeof event.at !== "string" || event.at.length === 0) {
+		throw registryCorrupt(
+			`principal registry event ${lineIndex} carries no timestamp ("at"); got ${JSON.stringify(event.at)}`,
+		);
+	}
+}
+
+// The domain half of the fold, applied to each chain-verified event.
+// Fail-closed sequence invariants: the register/revoke writers check the
+// current state BEFORE appending, so the ledger can only ever hold, per id,
+// one `registered` event followed by at most one `revoked` event — anything
+// else was hand-edited. State is the byId map in first-seen (registration)
+// order; the fold's projection is its values.
+function applyRegistryEvent(byId, event, lineIndex) {
+	if (event.kind === "registered") {
+		const unknown = Object.keys(event)
+			.filter((key) => !REGISTERED_EVENT_FIELDS.includes(key))
+			.sort();
+		if (unknown.length > 0) {
+			throw registryCorrupt(
+				`principal registry event ${lineIndex} is a registered event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${REGISTERED_EVENT_FIELDS.join(", ")}`,
+			);
+		}
+		const principalProblem = storedPrincipalProblem(event.principal, lineIndex);
+		if (principalProblem !== null) throw registryCorrupt(principalProblem);
+		const id = event.principal.id;
+		if (byId.has(id)) {
+			throw registryCorrupt(
+				`principal registry event ${lineIndex} registers "${id}" a second time; a principal id is registered exactly once and revocation is terminal, so the writers can never append this — the ledger was edited in place`,
+			);
+		}
+		byId.set(id, {
+			...principalRecordOf(event.principal),
+			registeredAt: event.at,
+			revokedAt: null,
+			revokedReason: null,
+		});
+	} else if (event.kind === "revoked") {
+		const unknown = Object.keys(event)
+			.filter((key) => !REVOKED_EVENT_FIELDS.includes(key))
+			.sort();
+		if (unknown.length > 0) {
+			throw registryCorrupt(
+				`principal registry event ${lineIndex} is a revoked event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${REVOKED_EVENT_FIELDS.join(", ")}`,
+			);
+		}
+		if (typeof event.id !== "string" || event.id.length === 0) {
+			throw registryCorrupt(
+				`principal registry event ${lineIndex} is a revoked event whose id is not a non-empty string; got ${JSON.stringify(event.id)}`,
+			);
+		}
+		if (!isNullableNonEmptyString(event.reason)) {
+			throw registryCorrupt(
+				`principal registry event ${lineIndex} is a revoked event whose reason is neither null nor a non-empty string; got ${JSON.stringify(event.reason)}`,
+			);
+		}
+		const record = byId.get(event.id);
+		if (record === undefined) {
+			throw registryCorrupt(
+				`principal registry event ${lineIndex} revokes "${event.id}", which was never registered; the revoke writer only appends for a registered principal — the ledger was edited in place`,
+			);
+		}
+		if (record.revokedAt !== null) {
+			throw registryCorrupt(
+				`principal registry event ${lineIndex} revokes "${event.id}" a second time; revocation is append-once per principal, so the writers can never append this — the ledger was edited in place`,
+			);
+		}
+		record.revokedAt = event.at;
+		record.revokedReason = event.reason ?? null;
+	} else {
+		throw registryCorrupt(
+			`principal registry event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is registered, revoked`,
+		);
+	}
+}
+
+// The registry's recorded ceiling refusal wording (the declared
+// `ceiling.message` override, ADR-0028 Amendment): it names the env
+// override and the per-operation guidance. The writers' pre-lock body
+// checks reuse the same wording, so a refusal reads identically from
+// either check site.
+function registryCeilingMessage(event, ceiling) {
+	return event.kind === "registered"
+		? `appending the registration for "${event.principal.id}" would grow the principal registry beyond its size ceiling of ${ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — split principals across repositories or raise the ceiling deliberately`
+		: `appending the revocation for "${event.id}" would grow the principal registry beyond its size ceiling of ${ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`;
+}
+
+// F061 follow-up (#306) — the registry's ledger ritual is assembled by
+// `defineLedgerFamily` (ADR-0028), byte-identically to the hand-written
+// ceremony it replaces: the same path (`.amber/principals/registry.jsonl`),
+// lock name (`registry.lock`; the 30s stale bound now rides the shared
+// default), stable codes, and "principal registry" label in lock/read
+// refusals and as the per-event problem prefix. This family declares both
+// Amendment extensions: `fold.preLink` keeps the pre-chain shape/version/
+// timestamp adjudication (registryPreLink above) and `ceiling.message`
+// keeps the recorded ceiling wording (registryCeilingMessage above). Only
+// the domain half is declared here: the closed per-kind event shapes, the
+// register-once and terminal-revocation invariants (applyRegistryEvent),
+// and the first-seen fold order stay this family's own.
+const PRINCIPAL_FAMILY = defineLedgerFamily({
+	dir: "principals",
+	label: "principal registry",
+	ledgers: [
+		{
+			name: "registry",
+			fileName: "registry.jsonl",
+			lockName: "registry.lock",
+			conflictCode: LOCK_CONFLICT_CODE,
+			corruptCode: REGISTRY_CORRUPT_CODE,
+			sizeCeilingCode: SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_PRINCIPAL_MAX_REGISTRY_BYTES",
+				defaultBytes: DEFAULT_MAX_REGISTRY_BYTES,
+				message: registryCeilingMessage,
+			},
+			label: "principal registry",
+			eventLabel: "principal registry",
+			fold: {
+				init: () => new Map(),
+				preLink: registryPreLink,
+				apply: applyRegistryEvent,
+				result: (byId) => [...byId.values()],
+			},
+		},
+	],
+});
+
+const REGISTRY_LEDGER = PRINCIPAL_FAMILY.ledgers.registry;
+const registryPath = REGISTRY_LEDGER.path;
+
 /**
  * Fold the append-only registry events to the current state of every
- * principal, first-seen (registration) order. Fail-closed sequence
- * invariants: the register/revoke writers check the current state BEFORE
- * appending, so the ledger can only ever hold, per id, one `registered` event
- * followed by at most one `revoked` event — anything else was hand-edited.
+ * principal, first-seen (registration) order (the family's assembled fold
+ * read: fail-closed raw read, preLink, chain walk, domain apply — per
+ * event in ledger order).
  * @param {string} cwd - Repository root.
  * @returns {Array<object>} Current principal records (see principalStatus).
  * @throws {Error} Typed AMBER_E_PRINCIPAL_REGISTRY_CORRUPT /
  *         AMBER_E_PRINCIPAL_REGISTRY_UNSUPPORTED_VERSION when the ledger is
  *         corrupt or declares an unsupported version.
  */
-function foldRegistry(cwd) {
-	const events = readLedgerFailClosed(
-		registryPath(cwd),
-		REGISTRY_CORRUPT_CODE,
-		"principal registry",
-	);
-	const byId = new Map();
-	let prevHash = GENESIS_HASH;
-	for (let index = 0; index < events.length; index += 1) {
-		const lineIndex = index + 1;
-		const event = events[index];
-		if (event === null || typeof event !== "object" || Array.isArray(event)) {
-			throw registryCorrupt(
-				`principal registry event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
-			);
-		}
-		const schemaVersion = event.schemaVersion;
-		if (!Number.isInteger(schemaVersion)) {
-			throw registryCorrupt(
-				`principal registry event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(schemaVersion)}`,
-			);
-		}
-		if (!SUPPORTED_REGISTRY_SCHEMA_VERSIONS.includes(schemaVersion)) {
-			throw typedError(
-				UNSUPPORTED_VERSION_CODE,
-				`principal registry event ${lineIndex} declares schemaVersion ${JSON.stringify(schemaVersion)}, but this reader supports ${SUPPORTED_REGISTRY_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted — upgrade amber or rebuild the registry under the supported schema version`,
-			);
-		}
-		if (typeof event.at !== "string" || event.at.length === 0) {
-			throw registryCorrupt(
-				`principal registry event ${lineIndex} carries no timestamp ("at"); got ${JSON.stringify(event.at)}`,
-			);
-		}
-		// F050 review F-5: verify the tamper-evident hash chain before trusting
-		// the event's content. The registry is the AC4 trust root (a forged
-		// principalKind "human" launders a service identity into a human-only
-		// slot), so — like every other governed ledger — an in-place edit of a
-		// stored event must fail the fold closed.
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash) {
-			throw registryCorrupt(
-				`principal registry event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`,
-			);
-		}
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash) {
-			throw registryCorrupt(
-				`principal registry event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`,
-			);
-		}
-		if (event.kind === "registered") {
-			const unknown = Object.keys(event)
-				.filter((key) => !REGISTERED_EVENT_FIELDS.includes(key))
-				.sort();
-			if (unknown.length > 0) {
-				throw registryCorrupt(
-					`principal registry event ${lineIndex} is a registered event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${REGISTERED_EVENT_FIELDS.join(", ")}`,
-				);
-			}
-			const principalProblem = storedPrincipalProblem(event.principal, lineIndex);
-			if (principalProblem !== null) throw registryCorrupt(principalProblem);
-			const id = event.principal.id;
-			if (byId.has(id)) {
-				throw registryCorrupt(
-					`principal registry event ${lineIndex} registers "${id}" a second time; a principal id is registered exactly once and revocation is terminal, so the writers can never append this — the ledger was edited in place`,
-				);
-			}
-			byId.set(id, {
-				...principalRecordOf(event.principal),
-				registeredAt: event.at,
-				revokedAt: null,
-				revokedReason: null,
-			});
-		} else if (event.kind === "revoked") {
-			const unknown = Object.keys(event)
-				.filter((key) => !REVOKED_EVENT_FIELDS.includes(key))
-				.sort();
-			if (unknown.length > 0) {
-				throw registryCorrupt(
-					`principal registry event ${lineIndex} is a revoked event carrying unknown field${unknown.length > 1 ? "s" : ""} ${unknown.map((field) => `"${field}"`).join(", ")}; the closed field set is ${REVOKED_EVENT_FIELDS.join(", ")}`,
-				);
-			}
-			if (typeof event.id !== "string" || event.id.length === 0) {
-				throw registryCorrupt(
-					`principal registry event ${lineIndex} is a revoked event whose id is not a non-empty string; got ${JSON.stringify(event.id)}`,
-				);
-			}
-			if (!isNullableNonEmptyString(event.reason)) {
-				throw registryCorrupt(
-					`principal registry event ${lineIndex} is a revoked event whose reason is neither null nor a non-empty string; got ${JSON.stringify(event.reason)}`,
-				);
-			}
-			const record = byId.get(event.id);
-			if (record === undefined) {
-				throw registryCorrupt(
-					`principal registry event ${lineIndex} revokes "${event.id}", which was never registered; the revoke writer only appends for a registered principal — the ledger was edited in place`,
-				);
-			}
-			if (record.revokedAt !== null) {
-				throw registryCorrupt(
-					`principal registry event ${lineIndex} revokes "${event.id}" a second time; revocation is append-once per principal, so the writers can never append this — the ledger was edited in place`,
-				);
-			}
-			record.revokedAt = event.at;
-			record.revokedReason = event.reason ?? null;
-		} else {
-			throw registryCorrupt(
-				`principal registry event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is registered, revoked`,
-			);
-		}
-		prevHash = event.hash;
-	}
-	return [...byId.values()];
-}
+const foldRegistry = REGISTRY_LEDGER.fold;
 
 /**
  * The current status of one principal record against a clock: revoked wins
@@ -508,9 +513,13 @@ function resolveActivePrincipal(cwd, id, { now = new Date() } = {}) {
 	return { ok: true, principal: principalRecordOf(record) };
 }
 
-// The registry append ceiling: refuse an event that would grow the ledger
-// past its bound BEFORE any durable state is touched (shared discipline,
-// registry-ledger.js).
+// The registry append ceiling's PRE-LOCK body check: refuse an event that
+// would already exceed the bound before the lock is even taken (shared
+// discipline, registry-ledger.js — the governed append re-checks under the
+// lock on the exact chained event, whose chain fields this body check
+// cannot count). It also resolves the env override, so a garbage
+// AMBER_PRINCIPAL_MAX_REGISTRY_BYTES throws its typed argument error out
+// of the writers before any state is touched.
 function registryAppendWithinCeiling(cwd, event) {
 	return sharedAppendWithinCeiling({
 		ledgerPath: registryPath(cwd),
@@ -590,64 +599,23 @@ function registerPrincipal(
 	// override), never a silent default — the writer propagates it.
 	const ceilingCheck = registryAppendWithinCeiling(cwd, body);
 	if (ceilingCheck.wouldExceed) {
-		return fail(SIZE_CEILING_CODE, [
-			`appending the registration for "${id}" would grow the principal registry beyond its size ceiling of ${ceilingCheck.ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — split principals across repositories or raise the ceiling deliberately`,
-		]);
+		return fail(SIZE_CEILING_CODE, [registryCeilingMessage(body, ceilingCheck.ceiling)]);
 	}
-	let release;
-	try {
-		release = acquireRegistryLock(cwd);
-	} catch (err) {
-		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-	}
-	try {
-		// Under the lock, re-check the exact invariants the fold enforces:
-		// the ceiling (the file grew) and the duplicate id (a racing writer
-		// already appended between the pre-check and the lock).
-		let fresh;
-		try {
-			fresh = foldRegistry(cwd);
-		} catch (err) {
-			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-		}
-		if (fresh.some((record) => record.id === id)) {
-			return fail(ALREADY_REGISTERED_CODE, [
-				`principal "${id}" is already registered; a principal id is registered at most once — register a distinct id`,
-			]);
-		}
-		const prevHash = chainHeadHash(cwd);
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		// The real event carries the chain fields the pre-lock check could not
-		// count (and the file may have grown while waiting for the lock):
-		// re-check the ceiling on the exact line about to be appended, still
-		// before the append itself.
-		const underLockCeiling = registryAppendWithinCeiling(cwd, event);
-		if (underLockCeiling.wouldExceed) {
-			return fail(SIZE_CEILING_CODE, [
-				`appending the registration for "${id}" would grow the principal registry beyond its size ceiling of ${underLockCeiling.ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched — split principals across repositories or raise the ceiling deliberately`,
-			]);
-		}
-		try {
-			appendJSONL(registryPath(cwd), event);
-		} catch (err) {
-			return fail(REGISTRY_CORRUPT_CODE, [
-				`failed to append the registration event for "${id}" to the principal registry: ${err.message}`,
-			]);
-		}
-	} finally {
-		release();
-	}
-	return {
-		ok: true,
-		code: null,
-		record: {
-			...principalRecordOf(input),
-			registeredAt: at,
-			revokedAt: null,
-			revokedReason: null,
-		},
-		errors: [],
-	};
+	// The governed append (lock → fold → guard → chain → ceiling → append →
+	// re-fold): under the lock, the guard re-checks the exact invariant the
+	// fold enforces — a racing writer's duplicate id — and the orchestration
+	// re-checks the ceiling on the exact chained line about to be appended.
+	return REGISTRY_LEDGER.append(
+		cwd,
+		body,
+		(fresh) =>
+			fresh.some((record) => record.id === id)
+				? fail(ALREADY_REGISTERED_CODE, [
+						`principal "${id}" is already registered; a principal id is registered at most once — register a distinct id`,
+					])
+				: null,
+		(fold) => fold.find((record) => record.id === id),
+	);
 }
 
 /**
@@ -706,63 +674,32 @@ function revokePrincipal(cwd, { id, reason = null }) {
 	// override), never a silent default — the writer propagates it.
 	const ceilingCheck = registryAppendWithinCeiling(cwd, body);
 	if (ceilingCheck.wouldExceed) {
-		return fail(SIZE_CEILING_CODE, [
-			`appending the revocation for "${id}" would grow the principal registry beyond its size ceiling of ${ceilingCheck.ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`,
-		]);
+		return fail(SIZE_CEILING_CODE, [registryCeilingMessage(body, ceilingCheck.ceiling)]);
 	}
-	let release;
-	try {
-		release = acquireRegistryLock(cwd);
-	} catch (err) {
-		return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-	}
-	try {
-		// Under the lock, re-check the invariants the fold enforces: the
-		// target still exists and has not already been revoked by a racing
-		// writer that appended between the pre-check and the lock.
-		let fresh;
-		try {
-			fresh = foldRegistry(cwd);
-		} catch (err) {
-			return fail(err.amberCode || REGISTRY_CORRUPT_CODE, [err.message]);
-		}
-		const current = fresh.find((record) => record.id === id);
-		if (!current) {
-			return fail(NOT_FOUND_CODE, [
-				`principal "${id}" is not registered; revocation applies to a registered principal — register it first (amber principal register)`,
-			]);
-		}
-		if (current.revokedAt !== null) {
-			return fail(ALREADY_REVOKED_CODE, [
-				`principal "${id}" was already revoked at ${current.revokedAt}; revocation is terminal`,
-			]);
-		}
-		const prevHash = chainHeadHash(cwd);
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		// Same under-lock ceiling re-check as the register writer: the chained
-		// event is the exact line about to be appended.
-		const underLockCeiling = registryAppendWithinCeiling(cwd, event);
-		if (underLockCeiling.wouldExceed) {
-			return fail(SIZE_CEILING_CODE, [
-				`appending the revocation for "${id}" would grow the principal registry beyond its size ceiling of ${underLockCeiling.ceiling} bytes (AMBER_PRINCIPAL_MAX_REGISTRY_BYTES); the write is refused before any durable state is touched`,
-			]);
-		}
-		try {
-			appendJSONL(registryPath(cwd), event);
-		} catch (err) {
-			return fail(REGISTRY_CORRUPT_CODE, [
-				`failed to append the revocation event for "${id}" to the principal registry: ${err.message}`,
-			]);
-		}
-	} finally {
-		release();
-	}
-	return {
-		ok: true,
-		code: null,
-		record: { ...existing, revokedAt: at, revokedReason: reason ?? null },
-		errors: [],
-	};
+	// The governed append: under the lock, the guard re-checks the invariants
+	// the fold enforces — the target still exists and has not already been
+	// revoked by a racing writer that appended between the pre-check and the
+	// lock — and the orchestration re-checks the ceiling on the exact chained
+	// line about to be appended.
+	return REGISTRY_LEDGER.append(
+		cwd,
+		body,
+		(fresh) => {
+			const record = fresh.find((entry) => entry.id === id);
+			if (!record) {
+				return fail(NOT_FOUND_CODE, [
+					`principal "${id}" is not registered; revocation applies to a registered principal — register it first (amber principal register)`,
+				]);
+			}
+			if (record.revokedAt !== null) {
+				return fail(ALREADY_REVOKED_CODE, [
+					`principal "${id}" was already revoked at ${record.revokedAt}; revocation is terminal`,
+				]);
+			}
+			return null;
+		},
+		(fold) => fold.find((record) => record.id === id),
+	);
 }
 
 module.exports = {
