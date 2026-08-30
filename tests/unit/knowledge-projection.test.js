@@ -225,13 +225,13 @@ test("F059 clean git-ls-files corpus produces graph with no prior .amber/ state"
 	assert.equal(exitCode, 0, JSON.stringify(result.errors));
 	assert.equal(result.errors.length, 0);
 	const graph = JSON.parse(result.text);
-	assert.ok(graph.nodes.length >= 46, "must include at least the 46 committed corpus nodes");
-	// All 46 committed corpus nodes must have contextPage set via the committed manifest
+	assert.ok(graph.nodes.length >= 47, "must include at least the 47 committed corpus nodes");
+	// All 47 committed corpus nodes must have contextPage set via the committed manifest
 	const withContextPage = graph.nodes.filter((n) => n.contextPage);
 	assert.equal(
 		withContextPage.length,
-		46,
-		"exactly 46 nodes must have contextPage (the committed corpus)",
+		47,
+		"exactly 47 nodes must have contextPage (the committed corpus)",
 	);
 	// Byte-identical to tree-reader (parity seam)
 	assert.equal(result.text, serializeKnowledgeGraph(buildKnowledgeGraphFromTree(REPO_ROOT)));
@@ -276,12 +276,12 @@ test("F059 git-archive clean clone: projection and tree-reader produce exact byt
 			treeBytes,
 			"projection and tree-reader must produce byte-identical output on clean archive",
 		);
-		// Exactly 46 nodes must have contextPage
+		// Exactly 47 nodes must have contextPage
 		const withContextPage = projGraph.nodes.filter((n) => n.contextPage);
 		assert.equal(
 			withContextPage.length,
-			46,
-			"exactly 46 nodes must have contextPage on clean archive",
+			47,
+			"exactly 47 nodes must have contextPage on clean archive",
 		);
 	} finally {
 		fs.rmSync(archiveDir, { recursive: true, force: true });
