@@ -27,7 +27,9 @@ security risk. F061 is the feature that acts on this record.
    full-orchestration dialect (`appendLedgerEvent`). Primitive-dialect families upgrade inside
    their own migration tickets; a family that provably cannot upgrade byte-identically records
    the variance in its ticket and re-opens this decision — the factory never grows a second
-   mode preemptively.
+   mode preemptively. *(Amended 2026-08-30 — see Amendment below: the re-open clause fired on
+   #306 with evidence from three families; the dialect stays single, the declaration vocabulary
+   gains two closed extensions.)*
 2. **Byte-compatibility is the contract.** Migrations preserve error codes, refusal wording,
    ledger record shapes, and lock file names byte-for-byte. The existing family behavior
    suites (12,116 lines) are the regression net and are never edited to make a migration pass.
@@ -67,3 +69,28 @@ before they benefit.
 - `docs/specs/F061-ledger-family-factory.md` (tickets T1–T4 and follow-up cadence)
 - Architecture-deepening survey 2026-08-30 (opportunities 1 and 2; 3–5 explicitly out of
   scope)
+
+## Amendment (2026-08-30) — evidence-driven extension of the declaration vocabulary
+
+The decision-1 re-open clause fired on the first primitive-dialect migration (#306,
+principal). Measured variance, pinned by unedited behavior suites: the principal fold
+validates `schemaVersion`/`at` **before** the chain link on every event (its suite asserts
+the dedicated version code on unchained fixtures at five seams, where the factory's
+chain-first walk reports corruption instead — code and wording both change), and its
+in-lock ceiling refusal names `AMBER_PRINCIPAL_MAX_REGISTRY_BYTES` where the orchestration
+wording is generic. The same fold order is built into `approval-registry.js` and
+`evidence-receipts.js`, so the variance is systemic, not a one-family quirk.
+
+Ruling (user adjudication, 2026-08-30): the dialect stays single — one orchestration, no
+private appends or folds — and the declaration vocabulary gains exactly two **closed**
+extensions:
+
+1. an optional per-ledger `fold.preLink(event, lineIndex)` hook, executed per event
+   immediately before the chain-link check, for families whose recorded contract adjudicates
+   domain problems ahead of chain problems;
+2. an optional per-ledger ceiling refusal wording override, defaulting to the shared
+   orchestration wording so the four already-migrated families are byte-unaffected.
+
+This is not preemptive growth: both extensions exist only because three families' recorded
+test contracts demand them, and neither reopens a path to a private append or an unchained
+read.

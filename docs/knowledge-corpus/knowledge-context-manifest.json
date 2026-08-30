@@ -340,8 +340,8 @@
       "sourcePath": "docs/adr/0028-ledger-family-factory-and-decision-primitives.md",
       "title": "Ledger Families Compose One Factory; Decision Primitives Live in the Primitive Layer",
       "source": {
-        "rawHash": "sha256:3f28c9ebd82228ec9c040e135e49c0fdf75a0bf8c5c1200f0f89db1cbad5398b",
-        "normHash": "sha256:1d229f0abf597c6804bf524eee86d0b1a5cd1cf32cf5627757bfd78639604c81"
+        "rawHash": "sha256:bd8721a201569a9681d61f089c2f96f37e8c55a679b2f7cfe5ae43d34add461c",
+        "normHash": "sha256:ad114b231efc6f0baf20fccfa697ebb68bf42caf1fbcf3c8ab10e2829fdc0871"
       }
     },
     {
@@ -573,5 +573,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:edc8b25932ea2fd0976481bfa72dc70fdf89bfc42d7a84a013eafc648ad26ba7"
+  "manifestHash": "sha256:d64af0abf5895a851c4a801799d61dcb8479f655df1afa22668a72289d5bb234"
 }
