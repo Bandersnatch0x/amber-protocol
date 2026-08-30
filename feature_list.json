@@ -2081,7 +2081,7 @@
 			"area": "governance",
 			"title": "Ledger Family Factory & Decision Primitives",
 			"user_visible_behavior": "A governed family's ledger ritual (paths, locks, fail-closed reads, governed appends, chain-walked folds) is declared through one defineLedgerFamily call composing the registry-ledger primitive core, and the Decision snapshot validator, canonical hash, and spend-scan kernel have a single source; migrations are byte-identical.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/registry-ledger-decision-primitives.test.js tests/unit/ledger-family.test.js tests/unit/breakglass-ledger-bytes.test.js tests/unit/breakglass-registry.test.js",
 				"npm test"
