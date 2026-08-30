@@ -75,7 +75,10 @@ Use `node scripts/amber.js --all` for deprecated and expert compatibility comman
   envelopes behind identity, policy, single-use approval, path-and-state confinement, and a
   tamper-evident transport ledger. Two narrower non-push git writes exist behind their own
   surfaces: the typed `ledger seal` tag and session worktree add/remove (`worktree-manager.js`);
-  every other git interaction stays read-only.
+  every other git interaction stays read-only. The only live `git push` in this repository
+  belongs to the operator-run release helper `scripts/release-v1.0.0-rc.1.sh` — outside the
+  `amber` command surface, behind an explicit interactive confirmation (`scripts/release.js`
+  only prints the push command for a human to run).
 
 ## Governance philosophy (operational-ontology positioning)
 

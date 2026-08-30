@@ -4,7 +4,7 @@
 **Date:** 2026-08-21
 **Builds on:** [ADR-0009](0009-contract-driven-context-distillation.md) (contract-driven distillation — the governed
 knowledge pipeline whose parts and topology this layer reuses),
-[ADR-0003](0003-governed-gated-execution.md) (the narrow, human-gated mutation seam that MCP approval-required
+[ADR-0003](0003-governance-gated-execution.md) (the narrow, human-gated mutation seam that MCP approval-required
 memory actions inherit)
 **Context:** Wayfinder map
 [#169 "Governed Memory Layer"](https://github.com/Bandersnatch0x/amber-protocol/issues/169), closed through six

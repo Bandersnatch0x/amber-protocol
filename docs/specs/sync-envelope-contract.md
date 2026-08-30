@@ -13,8 +13,9 @@
 > hand-rolled structural validation is forbidden. Semantic refusals are
 > preserved append-only in `.amber/sync/conflicts.jsonl` and are never marked
 > applied; structurally invalid envelopes fail explicitly WITHOUT a conflict
-> entry. Transport is report-only by default (decision D1): Amber proposes
-> git operations as structured, schema-governed operations
+> entry. Transport is report-only by default (F035 plan decision D1 — distinct
+> from ADR-0019 D1, which deferred the transport-technology choice): Amber
+> proposes git operations as structured, schema-governed operations
 > (`schemas/sync-transport-report.schema.json`, F040 / ADR-0020 D5) for a
 > human or external executor to replay. ADR-0020 Stage A (F041) adds ONE
 > governed execution surface — `amber sync session push --execute --yes`
@@ -267,13 +268,15 @@ into `errors`. Returns `{ applied, conflicts, errors }`. Because the
 snapshots are taken once before the pass, markings made during a pass take
 effect for the next pass.
 
-## Transport contract — decision D1 + ADR-0020 Stage A (传输契约)
+## Transport contract — F035 plan decision D1 + ADR-0020 Stage A (传输契约)
 
 The default transport surface is preparation/report-only: `pushEnvelopes`
 never executes `git add`, `git commit`, or `git push`, and the only git
 invocation on that surface is the read-only `git remote` listing used to
 compute `remoteConfigured`. Envelopes are still *carried* by git
-(ADR-0019 D1): the `.amber/sync/envelopes/` directory is committed to the
+(ADR-0019 D1 deferred the transport-technology choice to Stage 3; ADR-0020
+settled it on git carriage): the `.amber/sync/envelopes/` directory is
+committed to the
 shared Team Hub repository and exchanged via git remote — by a human
 replaying the proposed operations, or by the governed Stage A surface below.
 

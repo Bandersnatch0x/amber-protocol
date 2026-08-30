@@ -251,7 +251,7 @@ An immutable Runtime-owned record for negotiation, Delivery, Checkpoint, acknowl
 _Avoid_: Domain Fact, command, authority grant
 
 **Sync Envelope**:
-The single versioned immutable wrapper used by every Deployment Profile for a Domain Fact or Domain Event. It carries type and protocol versions, Tenant and governed-subject scope, explicit Repository scope state, stream and Source Replica generation, local sequence, actor, time, content hash, provenance, and causal identity.
+The single versioned immutable wrapper used by every Deployment Profile for exactly one governed artifact. Envelope schema 1.0.0 carries the envelope schema version, envelope identity, artifact type and content-hashed artifact reference, structural identity (Tenant, Repository, Repository generation), origin (Deployment Profile, Person, Agent), creation time, protocol version and capability negotiation, and optional Conflict records. Stream, Source Replica generation, local sequence, and causal identity are reserved vocabulary for later schema versions and are not fields of schema 1.0.0.
 _Avoid_: transport frame, global log entry, unscoped payload
 
 **Source Replica**:
