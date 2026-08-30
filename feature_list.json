@@ -1494,14 +1494,7 @@
 			"user_visible_behavior": "All JSON-schema validation routes through one cached, format-registered schema-contract adapter; no module instantiates Ajv directly",
 			"status": "accepted",
 			"verification": ["node --test tests/unit/schema-contract.test.js", "npm test"],
-			"evidence": [
-				{
-					"command": "",
-					"result": "",
-					"date": "2026-08-25",
-					"notes": ""
-				}
-			],
+			"evidence": [{ "command": "", "result": "", "date": "2026-08-25", "notes": "" }],
 			"notes": [],
 			"paths": [
 				"scripts/lib/core/schema-contract.js",
@@ -1660,26 +1653,345 @@
 			"updated": "2026-08-26"
 		},
 		{
+			"id": "F049",
+			"priority": 49,
+			"area": "governance",
+			"title": "Canonical Planning Artifacts",
+			"user_visible_behavior": "Intent, Spec, and Plan are admitted as immutable Body/Envelope revisions with deterministic lineage and projection.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/canonical-artifacts.test.js tests/unit/canonical-artifact-contracts.test.js tests/unit/canonical-artifact-versioning.test.js tests/unit/artifact-graph-projection.test.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F049\"",
+					"result": "13 commits 42a71ce..2a03a6a — atomic Body+Envelope admission, journal settlement, append-only revisions (ADR-0023)",
+					"date": "2026-08-30",
+					"notes": "Registered retroactively; implementation predates registration."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline on master a725a58."
+				}
+			],
+			"notes": [
+				"Status backfilled 2026-08-30: shipped and verified before feature registration; full-scope review findings closed through 23e997a/4b54143/66a197f/1a40172/a725a58."
+			],
+			"paths": [
+				"docs/specs/F049-canonical-planning-artifacts.md",
+				"scripts/lib/canonical-artifact-commands.js",
+				"scripts/lib/core/canonical-artifacts.js"
+			],
+			"updated": "2026-08-30"
+		},
+		{
+			"id": "F050",
+			"priority": 50,
+			"area": "governance",
+			"title": "Decisions, Gates & Evidence Assurance",
+			"user_visible_behavior": "Human Decisions, deterministic Gates, scoped Approval, and four-level Evidence Assurance remain distinct and fail closed.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/principal-registry.test.js tests/unit/evidence-receipts.test.js tests/unit/approval-registry.test.js tests/unit/gate-evaluation.test.js tests/unit/policy-evaluation.test.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F050\"",
+					"result": "21 commits 422cd8e..b3b4512 — Principal registry, Decision artifacts, Evidence assurance, Approval lifecycle, Gate & Policy evaluation",
+					"date": "2026-08-30",
+					"notes": "Registered retroactively; implementation predates registration."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline on master a725a58."
+				}
+			],
+			"notes": [
+				"Status backfilled 2026-08-30: shipped and verified before feature registration; full-scope review findings closed through 23e997a/4b54143/66a197f/1a40172/a725a58."
+			],
+			"paths": [
+				"docs/specs/F050-decisions-gates-evidence-assurance.md",
+				"scripts/lib/principal-commands.js",
+				"scripts/lib/core/principal-registry.js",
+				"scripts/lib/core/evidence-receipts.js",
+				"scripts/lib/core/approval-registry.js",
+				"scripts/lib/core/gate-evaluation.js",
+				"scripts/lib/core/policy-evaluation.js"
+			],
+			"updated": "2026-08-30"
+		},
+		{
+			"id": "F051",
+			"priority": 51,
+			"area": "governance",
+			"title": "Read-only Adapters & Explicit Cutover",
+			"user_visible_behavior": "Legacy and external records enter through read-only Adapters until an explicit scoped Cutover changes Canonical Owner.",
+			"status": "passing",
+			"verification": ["node --test tests/unit/adapter-registry.test.js", "npm test"],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F051\"",
+					"result": "6 commits c057b99..d53d033 — Adapter registry, byte-preserving read receipts, explicit cutover & rollback",
+					"date": "2026-08-30",
+					"notes": "Registered retroactively; implementation predates registration."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline on master a725a58."
+				}
+			],
+			"notes": [
+				"Status backfilled 2026-08-30: shipped and verified before feature registration; full-scope review findings closed through 23e997a/4b54143/66a197f/1a40172/a725a58."
+			],
+			"paths": [
+				"docs/specs/F051-read-only-adapters-explicit-cutover.md",
+				"scripts/lib/adapter-commands.js",
+				"scripts/lib/core/adapter-registry.js"
+			],
+			"updated": "2026-08-30"
+		},
+		{
+			"id": "F052",
+			"priority": 52,
+			"area": "execution",
+			"title": "Controlled Runner & Environment Boundaries",
+			"user_visible_behavior": "Only registered Runner capabilities execute within explicit Development, Staging, and Production boundaries.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/runner-registry.test.js tests/unit/session-runner-ack.test.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F052\"",
+					"result": "10 commits 81dd31a..66a197f — Runner & capability registry, environment boundaries, settlement & assurance separation",
+					"date": "2026-08-30",
+					"notes": "Registered retroactively; implementation predates registration."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline on master a725a58; earlier registry-parity red resolved by a725a58."
+				}
+			],
+			"notes": [
+				"Status backfilled 2026-08-30: shipped and verified before feature registration; full-scope review findings closed through 23e997a/4b54143/66a197f/1a40172/a725a58."
+			],
+			"paths": [
+				"docs/specs/F052-controlled-runner-environment-boundaries.md",
+				"scripts/lib/runner-commands.js",
+				"scripts/lib/core/runner-registry.js"
+			],
+			"updated": "2026-08-30"
+		},
+		{
+			"id": "F053",
+			"priority": 53,
+			"area": "delivery",
+			"title": "Release Prepare, Deploy & Rollback",
+			"user_visible_behavior": "A verified release is prepared, independently authorized, deployed, and rolled back through environment Gates and real receipts.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/release-registry.test.js tests/unit/release-workflow.test.js tests/unit/verify-release.test.js",
+				"npm test"
+			],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F053\"",
+					"result": "7 commits e061a04..3366131 — release prepare/deploy/rollback, staging & production authorization, receipts & status projection",
+					"date": "2026-08-30",
+					"notes": "Registered retroactively; implementation predates registration."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline on master a725a58."
+				}
+			],
+			"notes": [
+				"Status backfilled 2026-08-30: shipped and verified before feature registration; full-scope review findings closed through 23e997a/4b54143/66a197f/1a40172/a725a58."
+			],
+			"paths": [
+				"docs/specs/F053-release-prepare-deploy-rollback.md",
+				"scripts/lib/release-commands.js",
+				"scripts/lib/core/release-registry.js"
+			],
+			"updated": "2026-08-30"
+		},
+		{
+			"id": "F054",
+			"priority": 54,
+			"area": "maintenance",
+			"title": "Deterministic Maintain & Intent Re-entry",
+			"user_visible_behavior": "Deterministic Control Bands create Findings for human triage and only a fix Decision creates a candidate Intent.",
+			"status": "passing",
+			"verification": ["node --test tests/unit/maintain-registry.test.js", "npm test"],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F054\"",
+					"result": "7 commits b73b055..035c54e — Control Band detectors, deterministic Findings, triage & candidate Intent re-entry",
+					"date": "2026-08-30",
+					"notes": "Registered retroactively; implementation predates registration."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline on master a725a58."
+				}
+			],
+			"notes": [
+				"Status backfilled 2026-08-30: shipped and verified before feature registration; full-scope review findings closed through 23e997a/4b54143/66a197f/1a40172/a725a58."
+			],
+			"paths": [
+				"docs/specs/F054-deterministic-maintain-intent-reentry.md",
+				"scripts/lib/maintain-commands.js",
+				"scripts/lib/core/maintain-registry.js"
+			],
+			"updated": "2026-08-30"
+		},
+		{
+			"id": "F055",
+			"priority": 55,
+			"area": "privacy",
+			"title": "Retention, Coordinated Deletion & Proof",
+			"user_visible_behavior": "Approved deletion coordinates registered Holders, respects Legal Hold, and proves only declared settled coverage.",
+			"status": "passing",
+			"verification": ["node --test tests/unit/retention-registry.test.js", "npm test"],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F055\"",
+					"result": "10 commits 4c4aa14..1a40172 — retention classes, deterministic expiry, Legal Holds, Holder settlement, Deletion Proof",
+					"date": "2026-08-30",
+					"notes": "Registered retroactively; implementation predates registration."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline on master a725a58."
+				}
+			],
+			"notes": [
+				"Status backfilled 2026-08-30: shipped and verified before feature registration; full-scope review findings closed through 23e997a/4b54143/66a197f/1a40172/a725a58."
+			],
+			"paths": [
+				"docs/specs/F055-retention-coordinated-deletion-proof.md",
+				"scripts/lib/retention-commands.js",
+				"scripts/lib/core/retention-registry.js"
+			],
+			"updated": "2026-08-30"
+		},
+		{
+			"id": "F056",
+			"priority": 56,
+			"area": "integrations",
+			"title": "Registered External Side Effects",
+			"user_visible_behavior": "External writes execute only through registered scoped Adapters with human authorization, receipts, and compensation.",
+			"status": "passing",
+			"verification": ["node --test tests/unit/external-registry.test.js", "npm test"],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F056\"",
+					"result": "9 commits 0121d2d..66a197f — effect contract registry, drift-bound authorization, execute/settle/reconcile/compensate",
+					"date": "2026-08-30",
+					"notes": "Registered retroactively; implementation predates registration."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline on master a725a58; MCP enum admission fixed by a725a58."
+				}
+			],
+			"notes": [
+				"Status backfilled 2026-08-30: shipped and verified before feature registration; full-scope review findings closed through 23e997a/4b54143/66a197f/1a40172/a725a58."
+			],
+			"paths": [
+				"docs/specs/F056-registered-external-side-effects.md",
+				"scripts/lib/external-commands.js",
+				"scripts/lib/core/external-registry.js"
+			],
+			"updated": "2026-08-30"
+		},
+		{
+			"id": "F057",
+			"priority": 57,
+			"area": "security",
+			"title": "Break-glass Authorization",
+			"user_visible_behavior": "Emergency capability is human-authorized, exact-scope, time-limited, single-use, auditable, and post-reviewed.",
+			"status": "passing",
+			"verification": ["node --test tests/unit/breakglass-registry.test.js", "npm test"],
+			"evidence": [
+				{
+					"command": "git log --oneline --grep=\"F057\"",
+					"result": "9 commits 2a03a6a..3366131 — single-use grants, atomic use with the underlying request, settle, mandatory post-review",
+					"date": "2026-08-30",
+					"notes": "Registered retroactively; implementation predates registration."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline on master a725a58; MCP enum admission fixed by a725a58."
+				}
+			],
+			"notes": [
+				"Status backfilled 2026-08-30: shipped and verified before feature registration; full-scope review findings closed through 23e997a/4b54143/66a197f/1a40172/a725a58."
+			],
+			"paths": [
+				"docs/specs/F057-break-glass-authorization.md",
+				"scripts/lib/breakglass-commands.js",
+				"scripts/lib/core/breakglass-registry.js"
+			],
+			"updated": "2026-08-30"
+		},
+		{
 			"id": "F058",
 			"priority": 58,
 			"area": "verification",
 			"title": "Instruction-Surface Adversarial Evals",
 			"user_visible_behavior": "A deterministic F050 Eval suite reports whether MCP tool descriptions, the Context quote boundary, and breadcrumb authenticity still hold; results are Evidence, not Approval.",
-			"status": "in_progress",
+			"status": "passing",
 			"verification": [
 				"amber eval run --suite instruction-surface --target .",
 				"npm test (instruction-surface eval suites green)"
 			],
-			"evidence": [],
+			"evidence": [
+				{
+					"command": "node scripts/amber.js eval run --suite instruction-surface --target .",
+					"result": "4/4 pass (assurance replayable): mcp-tool-description, qa-contract-model-independence, context-quote-boundary, breadcrumb-authenticity (.scratch/goal-f058-eval-run.log)",
+					"date": "2026-08-30",
+					"notes": "Suite version 2 on master a725a58; exit 0."
+				},
+				{
+					"command": "npm test",
+					"result": "3403/3403 pass, 188 suites, 0 fail (.scratch/goal-baseline-npm-test.log)",
+					"date": "2026-08-30",
+					"notes": "Full-suite baseline including instruction-surface eval suites."
+				}
+			],
 			"notes": [
 				"First F050 Eval pack. Model-independent; does not call a host agent or TAP scanner.",
-				"GitHub mirror #224; T2 suite-seam tests #225 closed."
+				"GitHub mirror #224; T2 suite-seam tests #225 closed.",
+				"Close-out 2026-08-30: suite v2 shipped (0b4fce1..bc2e6e2); eval admit remains the explicit F050 T7 admission path."
 			],
 			"paths": [
 				"docs/specs/F058-instruction-surface-adversarial-evals.md",
 				"scripts/lib/core/instruction-surface-evals.js",
 				"scripts/lib/eval-commands.js"
-			]
+			],
+			"updated": "2026-08-30"
 		},
 		{
 			"id": "F059",
