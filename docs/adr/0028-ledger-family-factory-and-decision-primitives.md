@@ -117,3 +117,19 @@ the declaration vocabulary gains one more **closed** extension:
 
 This is not a second chain dialect: the factory still computes the link problem; the
 hook only replaces the refusal text.
+
+## Amendment (2026-08-31) - chain-head refusal labels
+
+The release migration (#311) exposed one more recorded primitive-dialect variance: its
+append path uses the ledger label (`release candidate ledger`) for lock, fold, and ceiling
+refusals, but historically passed the plural label (`release candidates`) to the separate
+chain-head read. Reusing one factory label would change the unreadable-ledger refusal text
+on that append path while leaving normal lifecycle bytes unchanged.
+
+Ruling: the dialect remains single and the shared chain-head read remains mandatory. The
+declaration vocabulary gains one closed compatibility field:
+
+4. an optional per-ledger `chainHeadLabel`, used only for the chain-head read performed by
+   the shared append and the exposed `chainHead` surface; when absent, the ledger's normal
+   `label` remains the default. It cannot change lock, fold, or ceiling labels, and it does
+   not provide an alternate read or append path.

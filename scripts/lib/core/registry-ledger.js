@@ -199,8 +199,9 @@ function appendWithinCeiling({ ledgerPath, event, envName, defaultBytes, label }
 // against the in-lock fold (after the guard, same fold object), for events
 // whose shape depends on current ledger state. Optional
 // `options.ceilingMessage(event, ceiling)` (ADR-0028 Amendment) overrides
-// the shared ceiling refusal wording; absent, the shared wording rides
-// unchanged.
+// the shared ceiling refusal wording; `options.chainHeadLabel` (ADR-0028
+// Amendment) optionally preserves a family-specific label for the chain-head
+// read; absent, the shared label rides unchanged.
 function appendLedgerEvent(cwd, options, body, guard, derive) {
 	const failure = (err) => ({
 		ok: false,
@@ -226,7 +227,11 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 		const eventBody = typeof body === "function" ? body(folded) : body;
 		let prevHash;
 		try {
-			prevHash = chainHeadHash(options.path(cwd), options.corruptCode, options.label);
+			prevHash = chainHeadHash(
+				options.path(cwd),
+				options.corruptCode,
+				options.chainHeadLabel ?? options.label,
+			);
 		} catch (err) {
 			return failure(err);
 		}

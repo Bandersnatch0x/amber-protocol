@@ -13,10 +13,6 @@
 // canonical releaseHash covers the full closed content, so any drift
 // invalidates downstream authorization instead of silently retargeting it.
 
-const path = require("node:path");
-
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { ARTIFACT_TYPES, listArtifactRevisions } = require("./canonical-artifacts");
 const { showEvidence } = require("./evidence-receipts");
@@ -29,19 +25,12 @@ const {
 	showRunnerRequest,
 	showRunnerExecution,
 } = require("./runner-registry");
-const {
-	GENESIS_HASH,
-	chainHash,
-	chainHeadHash,
-	acquireLedgerLock,
-	appendWithinCeiling: sharedAppendWithinCeiling,
-	canonicalHashOf,
-} = require("./registry-ledger");
+const { GENESIS_HASH, chainHash, canonicalHashOf } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 
 const RELEASE_CANDIDATE_SCHEMA_VERSION = 1;
 const SUPPORTED_RELEASE_CANDIDATE_SCHEMA_VERSIONS = Object.freeze([1]);
 const DEFAULT_MAX_RELEASE_CANDIDATES_BYTES = 1024 * 1024;
-const LOCK_STALE_MS = 30_000;
 
 // The review axes a candidate must carry — each a recorded Evidence
 // reference, never an approval: AI review supplements code ownership.
@@ -95,32 +84,11 @@ const PREPARED_EVENT_FIELDS = Object.freeze([
 ]);
 
 function candidatesPath(cwd) {
-	return statePathForCreate(cwd, "release", "candidates.jsonl");
+	return CANDIDATE_LEDGER.path(cwd);
 }
 
 function releaseCorrupt(message) {
 	return typedError(RELEASE_CORRUPT_CODE, message);
-}
-
-function acquireReleaseLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(candidatesPath(cwd)),
-		lockName: "candidates.lock",
-		conflictCode: RELEASE_LOCK_CODE,
-		corruptCode: RELEASE_CORRUPT_CODE,
-		label: "release candidate ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function appendCandidateWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: candidatesPath(cwd),
-		event,
-		envName: "AMBER_RELEASE_MAX_CANDIDATES_BYTES",
-		defaultBytes: DEFAULT_MAX_RELEASE_CANDIDATES_BYTES,
-		label: "release candidate ledger",
-	});
 }
 
 function isPlainObject(value) {
@@ -260,109 +228,30 @@ function preparedEventProblem(event, lineIndex) {
 	return null;
 }
 
-function foldReleaseCandidates(cwd) {
-	const events = readLedgerFailClosed(
-		candidatesPath(cwd),
-		RELEASE_CORRUPT_CODE,
-		"release candidate ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const byId = new Set();
-	const candidates = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw releaseCorrupt(`release candidate event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw releaseCorrupt(`release candidate event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw releaseCorrupt(
-				`release candidate event ${lineIndex} carries a hash that does not match its content`,
-			);
-		if (!SUPPORTED_RELEASE_CANDIDATE_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw releaseCorrupt(
-				`release candidate event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind !== "prepared")
-			throw releaseCorrupt(
-				`release candidate event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = preparedEventProblem(event, lineIndex);
-		if (problem !== null) throw releaseCorrupt(problem);
-		if (byId.has(event.releaseId))
-			throw releaseCorrupt(
-				`release candidate ${JSON.stringify(event.releaseId)} is recorded more than once`,
-			);
-		byId.add(event.releaseId);
-		const { prevHash: _prev, hash: _hash, ...body } = event;
-		candidates.push({ ...body, index });
-		prevHash = event.hash;
-	});
-	return candidates;
-}
-
-function releaseAppendFailure(err) {
-	return {
-		ok: false,
-		code: err.amberCode || RELEASE_CORRUPT_CODE,
-		record: null,
-		errors: [err.message || String(err)],
-	};
+function applyCandidateEvent(state, event, lineIndex) {
+	if (!SUPPORTED_RELEASE_CANDIDATE_SCHEMA_VERSIONS.includes(event.schemaVersion))
+		throw releaseCorrupt(
+			`release candidate event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		);
+	if (event.kind !== "prepared")
+		throw releaseCorrupt(
+			`release candidate event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+		);
+	const problem = preparedEventProblem(event, lineIndex);
+	if (problem !== null) throw releaseCorrupt(problem);
+	if (state.byId.has(event.releaseId))
+		throw releaseCorrupt(
+			`release candidate ${JSON.stringify(event.releaseId)} is recorded more than once`,
+		);
+	state.byId.add(event.releaseId);
+	const { prevHash: _prev, hash: _hash, ...body } = event;
+	state.candidates.push({ ...body, index: lineIndex - 1 });
 }
 
 // Guard contract: any non-null guard result is returned verbatim without
 // appending; `derive(fold)` picks the caller's record after the append.
 function appendCandidateEvent(cwd, body, guard, derive) {
-	let release;
-	try {
-		release = acquireReleaseLock(cwd);
-	} catch (err) {
-		return releaseAppendFailure(err);
-	}
-	try {
-		let folded;
-		try {
-			folded = foldReleaseCandidates(cwd);
-		} catch (err) {
-			return releaseAppendFailure(err);
-		}
-		const guardVerdict = guard(folded);
-		if (guardVerdict !== null) return guardVerdict;
-		let prevHash;
-		try {
-			prevHash = chainHeadHash(candidatesPath(cwd), RELEASE_CORRUPT_CODE, "release candidates");
-		} catch (err) {
-			return releaseAppendFailure(err);
-		}
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendCandidateWithinCeiling(cwd, event);
-		} catch (err) {
-			return releaseAppendFailure(err);
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: RELEASE_SIZE_CEILING_CODE,
-				record: null,
-				errors: [`release candidate event would exceed ${ceiling.ceiling} bytes`],
-			};
-		try {
-			appendJSONL(candidatesPath(cwd), event);
-		} catch (err) {
-			return releaseAppendFailure(err);
-		}
-		let record;
-		try {
-			record = derive(foldReleaseCandidates(cwd)) ?? null;
-		} catch (err) {
-			return releaseAppendFailure(err);
-		}
-		return { ok: true, code: null, record, errors: [] };
-	} finally {
-		release();
-	}
+	return CANDIDATE_LEDGER.append(cwd, body, guard, derive);
 }
 
 // One committed artifact revision, or a reason string.
@@ -563,32 +452,11 @@ const AUTHORIZED_EVENT_FIELDS = Object.freeze([
 ]);
 
 function authorizationsPath(cwd) {
-	return statePathForCreate(cwd, "release", "authorizations.jsonl");
+	return AUTHORIZATION_LEDGER.path(cwd);
 }
 
 function releaseAuthCorrupt(message) {
 	return typedError(RELEASE_AUTH_CORRUPT_CODE, message);
-}
-
-function acquireAuthorizationLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(authorizationsPath(cwd)),
-		lockName: "authorizations.lock",
-		conflictCode: RELEASE_AUTH_LOCK_CODE,
-		corruptCode: RELEASE_AUTH_CORRUPT_CODE,
-		label: "release authorization ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function appendAuthorizationWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: authorizationsPath(cwd),
-		event,
-		envName: "AMBER_RELEASE_MAX_AUTHORIZATIONS_BYTES",
-		defaultBytes: DEFAULT_MAX_RELEASE_AUTHORIZATIONS_BYTES,
-		label: "release authorization ledger",
-	});
 }
 
 function boundDecisionProblem(value, label) {
@@ -657,113 +525,30 @@ function authorizedEventProblem(event, lineIndex) {
 	return null;
 }
 
-function foldReleaseAuthorizations(cwd) {
-	const events = readLedgerFailClosed(
-		authorizationsPath(cwd),
-		RELEASE_AUTH_CORRUPT_CODE,
-		"release authorization ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const byId = new Set();
-	const authorizations = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw releaseAuthCorrupt(`release authorization event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw releaseAuthCorrupt(`release authorization event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw releaseAuthCorrupt(
-				`release authorization event ${lineIndex} carries a hash that does not match its content`,
-			);
-		if (!SUPPORTED_RELEASE_AUTHORIZATION_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw releaseAuthCorrupt(
-				`release authorization event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind !== "authorized")
-			throw releaseAuthCorrupt(
-				`release authorization event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = authorizedEventProblem(event, lineIndex);
-		if (problem !== null) throw releaseAuthCorrupt(problem);
-		if (byId.has(event.releaseId))
-			throw releaseAuthCorrupt(
-				`release ${JSON.stringify(event.releaseId)} is authorized more than once`,
-			);
-		byId.add(event.releaseId);
-		const { prevHash: _prev, hash: _hash, ...body } = event;
-		authorizations.push({ ...body, index });
-		prevHash = event.hash;
-	});
-	return authorizations;
-}
-
-function authorizationAppendFailure(err) {
-	return {
-		ok: false,
-		code: err.amberCode || RELEASE_AUTH_CORRUPT_CODE,
-		record: null,
-		errors: [err.message || String(err)],
-	};
+function applyAuthorizationEvent(state, event, lineIndex) {
+	if (!SUPPORTED_RELEASE_AUTHORIZATION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+		throw releaseAuthCorrupt(
+			`release authorization event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		);
+	if (event.kind !== "authorized")
+		throw releaseAuthCorrupt(
+			`release authorization event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+		);
+	const problem = authorizedEventProblem(event, lineIndex);
+	if (problem !== null) throw releaseAuthCorrupt(problem);
+	if (state.byId.has(event.releaseId))
+		throw releaseAuthCorrupt(
+			`release ${JSON.stringify(event.releaseId)} is authorized more than once`,
+		);
+	state.byId.add(event.releaseId);
+	const { prevHash: _prev, hash: _hash, ...body } = event;
+	state.authorizations.push({ ...body, index: lineIndex - 1 });
 }
 
 // Guard contract: any non-null guard result is returned verbatim without
 // appending; `derive(fold)` picks the caller's record after the append.
 function appendAuthorizationEvent(cwd, body, guard, derive) {
-	let release;
-	try {
-		release = acquireAuthorizationLock(cwd);
-	} catch (err) {
-		return authorizationAppendFailure(err);
-	}
-	try {
-		let folded;
-		try {
-			folded = foldReleaseAuthorizations(cwd);
-		} catch (err) {
-			return authorizationAppendFailure(err);
-		}
-		const guardVerdict = guard(folded);
-		if (guardVerdict !== null) return guardVerdict;
-		let prevHash;
-		try {
-			prevHash = chainHeadHash(
-				authorizationsPath(cwd),
-				RELEASE_AUTH_CORRUPT_CODE,
-				"release authorizations",
-			);
-		} catch (err) {
-			return authorizationAppendFailure(err);
-		}
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendAuthorizationWithinCeiling(cwd, event);
-		} catch (err) {
-			return authorizationAppendFailure(err);
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: RELEASE_AUTH_SIZE_CEILING_CODE,
-				record: null,
-				errors: [`release authorization event would exceed ${ceiling.ceiling} bytes`],
-			};
-		try {
-			appendJSONL(authorizationsPath(cwd), event);
-		} catch (err) {
-			return authorizationAppendFailure(err);
-		}
-		let record;
-		try {
-			record = derive(foldReleaseAuthorizations(cwd)) ?? null;
-		} catch (err) {
-			return authorizationAppendFailure(err);
-		}
-		return { ok: true, code: null, record, errors: [] };
-	} finally {
-		release();
-	}
+	return AUTHORIZATION_LEDGER.append(cwd, body, guard, derive);
 }
 
 // Stale authority never authorizes: the stored candidate must re-derive
@@ -1171,32 +956,11 @@ const TRANSACTION_EVENT_FIELDS = Object.freeze([
 const TRANSACTION_INPUT_FIELDS = Object.freeze(["releaseId", "requestHash"]);
 
 function transactionsPath(cwd) {
-	return statePathForCreate(cwd, "release", "transactions.jsonl");
+	return TRANSACTION_LEDGER.path(cwd);
 }
 
 function releaseTxCorrupt(message) {
 	return typedError(RELEASE_TX_CORRUPT_CODE, message);
-}
-
-function acquireTransactionLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(transactionsPath(cwd)),
-		lockName: "transactions.lock",
-		conflictCode: RELEASE_TX_LOCK_CODE,
-		corruptCode: RELEASE_TX_CORRUPT_CODE,
-		label: "release transaction ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function appendTransactionWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: transactionsPath(cwd),
-		event,
-		envName: "AMBER_RELEASE_MAX_TRANSACTIONS_BYTES",
-		defaultBytes: DEFAULT_MAX_RELEASE_TRANSACTIONS_BYTES,
-		label: "release transaction ledger",
-	});
 }
 
 function transactionEventProblem(event, lineIndex) {
@@ -1214,120 +978,126 @@ function transactionEventProblem(event, lineIndex) {
 	return null;
 }
 
-function foldReleaseTransactions(cwd) {
-	const events = readLedgerFailClosed(
-		transactionsPath(cwd),
-		RELEASE_TX_CORRUPT_CODE,
-		"release transaction ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const seen = new Set();
-	const byRequest = new Set();
-	const transactions = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw releaseTxCorrupt(`release transaction event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw releaseTxCorrupt(`release transaction event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw releaseTxCorrupt(
-				`release transaction event ${lineIndex} carries a hash that does not match its content`,
-			);
-		if (!SUPPORTED_RELEASE_TRANSACTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw releaseTxCorrupt(
-				`release transaction event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		const problem = transactionEventProblem(event, lineIndex);
-		if (problem !== null) throw releaseTxCorrupt(problem);
-		const key = `${event.kind}:${event.releaseId}`;
-		if (seen.has(key))
-			throw releaseTxCorrupt(
-				`release ${JSON.stringify(event.releaseId)} records ${event.kind} more than once`,
-			);
-		if (event.kind === "rollback" && !seen.has(`deploy:${event.releaseId}`))
-			throw releaseTxCorrupt(
-				`release transaction event ${lineIndex} rolls back ${JSON.stringify(event.releaseId)}, which never deployed`,
-			);
-		if (byRequest.has(event.requestHash))
-			throw releaseTxCorrupt(
-				`request ${JSON.stringify(event.requestHash)} rides more than one release transaction`,
-			);
-		seen.add(key);
-		byRequest.add(event.requestHash);
-		const { prevHash: _prev, hash: _hash, ...body } = event;
-		transactions.push({ ...body, operation: event.kind, index });
-		prevHash = event.hash;
-	});
-	return transactions;
+function applyTransactionEvent(state, event, lineIndex) {
+	if (!SUPPORTED_RELEASE_TRANSACTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+		throw releaseTxCorrupt(
+			`release transaction event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		);
+	const problem = transactionEventProblem(event, lineIndex);
+	if (problem !== null) throw releaseTxCorrupt(problem);
+	const key = `${event.kind}:${event.releaseId}`;
+	if (state.seen.has(key))
+		throw releaseTxCorrupt(
+			`release ${JSON.stringify(event.releaseId)} records ${event.kind} more than once`,
+		);
+	if (event.kind === "rollback" && !state.seen.has(`deploy:${event.releaseId}`))
+		throw releaseTxCorrupt(
+			`release transaction event ${lineIndex} rolls back ${JSON.stringify(event.releaseId)}, which never deployed`,
+		);
+	if (state.byRequest.has(event.requestHash))
+		throw releaseTxCorrupt(
+			`request ${JSON.stringify(event.requestHash)} rides more than one release transaction`,
+		);
+	state.seen.add(key);
+	state.byRequest.add(event.requestHash);
+	const { prevHash: _prev, hash: _hash, ...body } = event;
+	state.transactions.push({ ...body, operation: event.kind, index: lineIndex - 1 });
 }
 
-function transactionAppendFailure(err) {
-	return {
-		ok: false,
-		code: err.amberCode || RELEASE_TX_CORRUPT_CODE,
-		record: null,
-		errors: [err.message || String(err)],
-	};
+// F061 follow-up (#311) - the three primitive-dialect release ledgers now
+// share the full orchestration supplied by `defineLedgerFamily` (ADR-0028).
+// Their domain validation and projections stay local so the recorded release
+// error codes, wording, and record shapes remain unchanged.
+const RELEASE_FAMILY = defineLedgerFamily({
+	dir: "release",
+	label: "release registry",
+	ledgers: [
+		{
+			name: "candidates",
+			fileName: "candidates.jsonl",
+			lockName: "candidates.lock",
+			conflictCode: RELEASE_LOCK_CODE,
+			corruptCode: RELEASE_CORRUPT_CODE,
+			sizeCeilingCode: RELEASE_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RELEASE_MAX_CANDIDATES_BYTES",
+				defaultBytes: DEFAULT_MAX_RELEASE_CANDIDATES_BYTES,
+				message: (_event, ceiling) => `release candidate event would exceed ${ceiling} bytes`,
+			},
+			label: "release candidate ledger",
+			chainHeadLabel: "release candidates",
+			eventLabel: "release candidate",
+			fold: {
+				init: () => ({ byId: new Set(), candidates: [] }),
+				apply: applyCandidateEvent,
+				result: (state) => state.candidates,
+			},
+		},
+		{
+			name: "authorizations",
+			fileName: "authorizations.jsonl",
+			lockName: "authorizations.lock",
+			conflictCode: RELEASE_AUTH_LOCK_CODE,
+			corruptCode: RELEASE_AUTH_CORRUPT_CODE,
+			sizeCeilingCode: RELEASE_AUTH_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RELEASE_MAX_AUTHORIZATIONS_BYTES",
+				defaultBytes: DEFAULT_MAX_RELEASE_AUTHORIZATIONS_BYTES,
+				message: (_event, ceiling) => `release authorization event would exceed ${ceiling} bytes`,
+			},
+			label: "release authorization ledger",
+			chainHeadLabel: "release authorizations",
+			eventLabel: "release authorization",
+			fold: {
+				init: () => ({ byId: new Set(), authorizations: [] }),
+				apply: applyAuthorizationEvent,
+				result: (state) => state.authorizations,
+			},
+		},
+		{
+			name: "transactions",
+			fileName: "transactions.jsonl",
+			lockName: "transactions.lock",
+			conflictCode: RELEASE_TX_LOCK_CODE,
+			corruptCode: RELEASE_TX_CORRUPT_CODE,
+			sizeCeilingCode: RELEASE_TX_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RELEASE_MAX_TRANSACTIONS_BYTES",
+				defaultBytes: DEFAULT_MAX_RELEASE_TRANSACTIONS_BYTES,
+				message: (_event, ceiling) => `release transaction event would exceed ${ceiling} bytes`,
+			},
+			label: "release transaction ledger",
+			chainHeadLabel: "release transactions",
+			eventLabel: "release transaction",
+			fold: {
+				init: () => ({ seen: new Set(), byRequest: new Set(), transactions: [] }),
+				apply: applyTransactionEvent,
+				result: (state) => state.transactions,
+			},
+		},
+	],
+});
+
+const CANDIDATE_LEDGER = RELEASE_FAMILY.ledgers.candidates;
+const AUTHORIZATION_LEDGER = RELEASE_FAMILY.ledgers.authorizations;
+const TRANSACTION_LEDGER = RELEASE_FAMILY.ledgers.transactions;
+
+function foldReleaseCandidates(cwd) {
+	return CANDIDATE_LEDGER.fold(cwd);
+}
+
+function foldReleaseAuthorizations(cwd) {
+	return AUTHORIZATION_LEDGER.fold(cwd);
+}
+
+function foldReleaseTransactions(cwd) {
+	return TRANSACTION_LEDGER.fold(cwd);
 }
 
 // Guard contract: any non-null guard result is returned verbatim without
 // appending; `derive(fold)` picks the caller's record after the append.
 function appendTransactionEvent(cwd, body, guard, derive) {
-	let release;
-	try {
-		release = acquireTransactionLock(cwd);
-	} catch (err) {
-		return transactionAppendFailure(err);
-	}
-	try {
-		let folded;
-		try {
-			folded = foldReleaseTransactions(cwd);
-		} catch (err) {
-			return transactionAppendFailure(err);
-		}
-		const guardVerdict = guard(folded);
-		if (guardVerdict !== null) return guardVerdict;
-		let prevHash;
-		try {
-			prevHash = chainHeadHash(
-				transactionsPath(cwd),
-				RELEASE_TX_CORRUPT_CODE,
-				"release transactions",
-			);
-		} catch (err) {
-			return transactionAppendFailure(err);
-		}
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendTransactionWithinCeiling(cwd, event);
-		} catch (err) {
-			return transactionAppendFailure(err);
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: RELEASE_TX_SIZE_CEILING_CODE,
-				record: null,
-				errors: [`release transaction event would exceed ${ceiling.ceiling} bytes`],
-			};
-		try {
-			appendJSONL(transactionsPath(cwd), event);
-		} catch (err) {
-			return transactionAppendFailure(err);
-		}
-		let record;
-		try {
-			record = derive(foldReleaseTransactions(cwd)) ?? null;
-		} catch (err) {
-			return transactionAppendFailure(err);
-		}
-		return { ok: true, code: null, record, errors: [] };
-	} finally {
-		release();
-	}
+	return TRANSACTION_LEDGER.append(cwd, body, guard, derive);
 }
 
 // The F052 request a transaction rides must be authorized and must bind

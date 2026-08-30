@@ -55,6 +55,8 @@ scripts/lib/command-help.js -> Command definitions, help, output policy, and sta
 scripts/lib/command-dispatcher.js -> Command handlers, startup registry binding, and dispatch
 scripts/lib/cli-typed-seam.js -> CLI projection of the shared Action capability registry
 scripts/lib/context/          -> Public Context Interface and command adapter boundary
+scripts/lib/core/registry-ledger.js -> Shared tamper-evident ledger and Decision primitives
+scripts/lib/core/ledger-family.js -> Declarative factory for full-orchestration ledger families
 scripts/lib/core/             -> Domain modules (adoption-*, loops, doctor, profiles, etc.); imported directly (no facade — ADR-0005)
 scripts/lib/core/context-*.js -> Context lifecycle, assurance evidence, projections, benchmarks, source adapters, retention, and Loadout assembly
 scripts/lib/core/governed-runner.js -> Governed execution gates (ledger, policy, confidence, approval, worktree)

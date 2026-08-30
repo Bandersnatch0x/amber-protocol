@@ -27,10 +27,13 @@
 // appends "edited in place" keeps that text (#307). And a ledger may
 // declare `ceiling.message(event, ceiling)`, overriding the shared
 // ceiling refusal wording with its recorded per-family text; absent,
-// the shared orchestration wording rides unchanged. `preLink` never
-// sees the previous hash, and `chainWording` only replaces text after
-// the shared chain check has already fired, so neither reopens a path
-// to a private append or an unchained read.
+// the shared orchestration wording rides unchanged. A ledger may also
+// declare `chainHeadLabel` when its legacy append path used a different
+// label for the chain-head read than for lock/read/ceiling refusals; absent,
+// the ledger label rides unchanged. `preLink` never sees the previous hash,
+// `chainWording` only replaces text after the shared chain check has already
+// fired, and `chainHeadLabel` only selects the read label, so none reopens a
+// path to a private append or an unchained read.
 //
 // A declaration problem is an assembly-time programming error, not a
 // runtime governance refusal: the factory throws a plain TypeError at
@@ -57,7 +60,7 @@ const {
 // one entry per ledger — nothing else, so an unknown knob fails loudly
 // instead of silently doing nothing.
 const DECLARATION_FIELDS = Object.freeze(["dir", "label", "ledgers"]);
-const LEDGER_FIELDS = Object.freeze([
+const REQUIRED_LEDGER_FIELDS = Object.freeze([
 	"name",
 	"fileName",
 	"lockName",
@@ -69,6 +72,7 @@ const LEDGER_FIELDS = Object.freeze([
 	"eventLabel",
 	"fold",
 ]);
+const OPTIONAL_LEDGER_FIELDS = Object.freeze(["chainHeadLabel"]);
 const CEILING_FIELDS = Object.freeze(["envName", "defaultBytes", "message"]);
 // The optional knobs (ADR-0028 Amendment) validate against the full closed
 // set only when declared; the required subsets keep every original field
@@ -129,9 +133,13 @@ function foldProblem(fold, label) {
 	return null;
 }
 
+function declaredLedgerFields(ledger) {
+	return REQUIRED_LEDGER_FIELDS.concat(OPTIONAL_LEDGER_FIELDS.filter((field) => field in ledger));
+}
+
 function ledgerProblem(ledger, label) {
 	if (!isPlainObject(ledger)) return `${label} must be an object`;
-	const closed = closedFieldProblem(ledger, LEDGER_FIELDS, label);
+	const closed = closedFieldProblem(ledger, declaredLedgerFields(ledger), label);
 	if (closed !== null) return closed;
 	for (const field of [
 		"name",
@@ -147,6 +155,8 @@ function ledgerProblem(ledger, label) {
 		const segment = segmentProblem(ledger[field], `${label}.${field}`);
 		if (segment !== null) return segment;
 	}
+	if ("chainHeadLabel" in ledger && !isNonEmptyString(ledger.chainHeadLabel))
+		return `${label}.chainHeadLabel must be a non-empty string`;
 	const ceiling = ceilingProblem(ledger.ceiling, `${label}.ceiling`);
 	if (ceiling !== null) return ceiling;
 	return foldProblem(ledger.fold, `${label}.fold`);
@@ -159,10 +169,11 @@ function ledgerProblem(ledger, label) {
 function buildLedger(dir, ledger) {
 	const { fileName, lockName, conflictCode, corruptCode, sizeCeilingCode, label, eventLabel } =
 		ledger;
+	const chainHeadLabel = ledger.chainHeadLabel ?? label;
 	const { envName, defaultBytes, message: ceilingMessage } = ledger.ceiling;
 	const domainFold = ledger.fold;
-	// The optional pre-link step and chain-wording override (ADR-0028
-	// Amendments), captured at assembly time like the rest of the
+	// The optional chain-head label, pre-link step, and chain-wording override
+	// (ADR-0028 Amendments), captured at assembly time like the rest of the
 	// declaration table.
 	const preLink = domainFold.preLink ?? null;
 	const chainWording = domainFold.chainWording ?? null;
@@ -211,6 +222,7 @@ function buildLedger(dir, ledger) {
 		envName,
 		defaultBytes,
 		ceilingMessage,
+		chainHeadLabel,
 		label,
 	});
 	return Object.freeze({
@@ -223,7 +235,7 @@ function buildLedger(dir, ledger) {
 		ceiling: Object.freeze({ envName, defaultBytes }),
 		path: ledgerPath,
 		corrupt,
-		chainHead: (cwd) => chainHeadHash(ledgerPath(cwd), corruptCode, label),
+		chainHead: (cwd) => chainHeadHash(ledgerPath(cwd), corruptCode, chainHeadLabel),
 		fold,
 		append: (cwd, body, guard, derive) => appendLedgerEvent(cwd, options, body, guard, derive),
 	});
@@ -254,6 +266,8 @@ function buildLedger(dir, ledger) {
  *                        the exact chained line refused, `ceiling` the
  *                        resolved byte bound,
  *       label:           the ledger's name in lock/read/ceiling refusals,
+ *       chainHeadLabel:  OPTIONAL label for chain-head read refusals; when
+ *                        absent, `label` is used,
  *       eventLabel:      the per-event prefix in chain-walk problems
  *                        ("<eventLabel> event <n> ..."),
  *       fold: {          the family-owned domain half of the fold read:
