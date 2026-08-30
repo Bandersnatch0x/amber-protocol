@@ -12,22 +12,14 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { resolvePathWithin } = require("./fs-utils");
 const { typedError } = require("./error-catalog");
 const { ARTIFACT_TYPES, bodyHash, listArtifactRevisions } = require("./canonical-artifacts");
 const { resolveActivePrincipal } = require("./principal-registry");
 const { showEvidence } = require("./evidence-receipts");
 const { canonicalJson } = require("./context-hash");
-const {
-	GENESIS_HASH,
-	chainHash,
-	chainHeadHash,
-	acquireLedgerLock,
-	appendWithinCeiling: sharedAppendWithinCeiling,
-	findDecisionSpend,
-} = require("./registry-ledger");
+const { GENESIS_HASH, chainHash, findDecisionSpend } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 
 const ADAPTER_SCHEMA_VERSION = 1;
 const ADAPTER_READ_RECEIPT_SCHEMA_VERSION = 2;
@@ -36,7 +28,6 @@ const SUPPORTED_ADAPTER_SCHEMA_VERSIONS = Object.freeze([1]);
 const SUPPORTED_ADAPTER_READ_RECEIPT_SCHEMA_VERSIONS = Object.freeze([1, 2]);
 const SUPPORTED_ADAPTER_SHADOW_COMPARISON_SCHEMA_VERSIONS = Object.freeze([1]);
 const DEFAULT_MAX_ADAPTER_BYTES = 1024 * 1024;
-const LOCK_STALE_MS = 30_000;
 
 const REGISTRY_CORRUPT_CODE = "AMBER_E_ADAPTER_REGISTRY_CORRUPT";
 const REGISTRY_LOCK_CODE = "AMBER_E_ADAPTER_REGISTRY_LOCK";
@@ -301,22 +292,6 @@ const CUTOVER_ROLLBACK_INPUT_FIELDS = Object.freeze([
 	"evidence",
 ]);
 
-function registryPath(cwd) {
-	return statePathForCreate(cwd, "adapters", "registry.jsonl");
-}
-
-function receiptPath(cwd) {
-	return statePathForCreate(cwd, "adapters", "read-receipts.jsonl");
-}
-
-function comparisonPath(cwd) {
-	return statePathForCreate(cwd, "adapters", "shadow-comparisons.jsonl");
-}
-
-function cutoverPath(cwd) {
-	return statePathForCreate(cwd, "adapters", "cutovers.jsonl");
-}
-
 function adapterCorrupt(message) {
 	return typedError(REGISTRY_CORRUPT_CODE, message);
 }
@@ -437,130 +412,222 @@ function adapterProblem(adapter) {
 	return null;
 }
 
-function acquireAdapterLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(registryPath(cwd)),
-		lockName: "registry.lock",
-		conflictCode: REGISTRY_LOCK_CODE,
-		corruptCode: REGISTRY_CORRUPT_CODE,
-		label: "adapter registry",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function acquireReceiptLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(receiptPath(cwd)),
-		lockName: "read-receipts.lock",
-		conflictCode: RECEIPT_LOCK_CODE,
-		corruptCode: RECEIPT_CORRUPT_CODE,
-		label: "adapter read receipt ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function acquireComparisonLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(comparisonPath(cwd)),
-		lockName: "shadow-comparisons.lock",
-		conflictCode: COMPARISON_LOCK_CODE,
-		corruptCode: COMPARISON_CORRUPT_CODE,
-		label: "adapter shadow comparison ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function acquireCutoverLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(cutoverPath(cwd)),
-		lockName: "cutovers.lock",
-		conflictCode: CUTOVER_LOCK_CODE,
-		corruptCode: CUTOVER_CORRUPT_CODE,
-		label: "adapter cutover ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function appendAdapterWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: registryPath(cwd),
+function applyAdapterEvent(records, event, lineIndex) {
+	const closed = closedFieldProblem(
 		event,
-		envName: "AMBER_ADAPTER_MAX_REGISTRY_BYTES",
-		defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
-		label: "adapter registry",
-	});
-}
-
-function appendReceiptWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: receiptPath(cwd),
-		event,
-		envName: "AMBER_ADAPTER_MAX_RECEIPT_BYTES",
-		defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
-		label: "adapter read receipt ledger",
-	});
-}
-
-function appendComparisonWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: comparisonPath(cwd),
-		event,
-		envName: "AMBER_ADAPTER_MAX_COMPARISON_BYTES",
-		defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
-		label: "adapter shadow comparison ledger",
-	});
-}
-
-function appendCutoverWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: cutoverPath(cwd),
-		event,
-		envName: "AMBER_ADAPTER_MAX_CUTOVER_BYTES",
-		defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
-		label: "adapter cutover ledger",
-	});
-}
-
-function foldAdapters(cwd) {
-	const events = readLedgerFailClosed(registryPath(cwd), REGISTRY_CORRUPT_CODE, "adapter registry");
-	const records = [];
-	let prevHash = GENESIS_HASH;
-	for (let index = 0; index < events.length; index += 1) {
-		const event = events[index];
-		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw adapterCorrupt(`adapter registry event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw adapterCorrupt(`adapter registry event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw adapterCorrupt(
-				`adapter registry event ${lineIndex} carries a hash that does not match its content`,
-			);
-		const closed = closedFieldProblem(
-			event,
-			REGISTERED_EVENT_FIELDS,
-			`adapter registry event ${lineIndex}`,
+		REGISTERED_EVENT_FIELDS,
+		`adapter registry event ${lineIndex}`,
+	);
+	if (closed !== null) throw adapterCorrupt(closed);
+	if (event.kind !== "registered")
+		throw adapterCorrupt(
+			`adapter registry event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
 		);
-		if (closed !== null) throw adapterCorrupt(closed);
-		if (event.kind !== "registered")
-			throw adapterCorrupt(
-				`adapter registry event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		if (!SUPPORTED_ADAPTER_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw adapterCorrupt(
-				`adapter registry event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (!isNonEmptyString(event.at))
-			throw adapterCorrupt(`adapter registry event ${lineIndex} has no timestamp`);
-		const problem = adapterProblem(event.adapter);
-		if (problem !== null) throw adapterCorrupt(`adapter registry event ${lineIndex} ${problem}`);
-		if (records.some((record) => record.id === event.adapter.id))
-			throw adapterCorrupt(`adapter "${event.adapter.id}" is registered more than once`);
-		records.push({ ...event.adapter, registeredAt: event.at });
-		prevHash = event.hash;
-	}
-	return records;
+	if (!SUPPORTED_ADAPTER_SCHEMA_VERSIONS.includes(event.schemaVersion))
+		throw adapterCorrupt(
+			`adapter registry event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		);
+	if (!isNonEmptyString(event.at))
+		throw adapterCorrupt(`adapter registry event ${lineIndex} has no timestamp`);
+	const problem = adapterProblem(event.adapter);
+	if (problem !== null) throw adapterCorrupt(`adapter registry event ${lineIndex} ${problem}`);
+	if (records.some((record) => record.id === event.adapter.id))
+		throw adapterCorrupt(`adapter "${event.adapter.id}" is registered more than once`);
+	records.push({ ...event.adapter, registeredAt: event.at });
 }
+
+function applyReceiptEvent(receipts, event, lineIndex) {
+	const problem = receiptEventProblem(event, lineIndex);
+	if (problem !== null) throw receiptCorrupt(problem);
+	receipts.push(event);
+}
+
+function applyComparisonEvent(comparisons, event, lineIndex) {
+	const problem = comparisonEventProblem(event, lineIndex);
+	if (problem !== null) throw comparisonCorrupt(problem);
+	comparisons.push(event);
+}
+
+function applyCutoverEvent(state, event, lineIndex) {
+	if (!SUPPORTED_ADAPTER_CUTOVER_SCHEMA_VERSIONS.includes(event.schemaVersion))
+		throw cutoverCorrupt(
+			`adapter cutover event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		);
+	if (event.kind === "cutover") {
+		const problem = cutoverEventProblem(event, lineIndex);
+		if (problem !== null) throw cutoverCorrupt(problem);
+		if (state.byId.has(event.cutoverId))
+			throw cutoverCorrupt(`cutover ${JSON.stringify(event.cutoverId)} is recorded more than once`);
+		const { prevHash: _prev, hash: _hash, ...body } = event;
+		const record = { ...body, index: lineIndex - 1, divergences: [], rollback: null };
+		state.byId.set(event.cutoverId, record);
+		state.records.push(record);
+	} else if (event.kind === "rollback") {
+		const problem = rollbackEventProblem(event, lineIndex);
+		if (problem !== null) throw cutoverCorrupt(problem);
+		const record = state.byId.get(event.cutoverId);
+		if (!record)
+			throw cutoverCorrupt(
+				`adapter cutover event ${lineIndex} rolls back unknown cutover ${JSON.stringify(event.cutoverId)}`,
+			);
+		if (record.rollback !== null)
+			throw cutoverCorrupt(
+				`adapter cutover event ${lineIndex} rolls back ${JSON.stringify(event.cutoverId)} twice`,
+			);
+		record.rollback = {
+			at: event.at,
+			decision: event.decision,
+			confirmedBy: event.confirmedBy,
+			evidence: event.evidence,
+		};
+	} else if (event.kind === "divergence") {
+		const problem = divergenceEventProblem(event, lineIndex);
+		if (problem !== null) throw cutoverCorrupt(problem);
+		const record = state.byId.get(event.cutoverId);
+		if (!record)
+			throw cutoverCorrupt(
+				`adapter cutover event ${lineIndex} records divergence for unknown cutover ${JSON.stringify(event.cutoverId)}`,
+			);
+		if (record.rollback !== null)
+			throw cutoverCorrupt(
+				`adapter cutover event ${lineIndex} records divergence after ${JSON.stringify(event.cutoverId)} was rolled back`,
+			);
+		record.divergences.push({
+			at: event.at,
+			recordId: event.recordId,
+			source: event.source,
+			expectedSourceHash: event.expectedSourceHash,
+			observedSourceHash: event.observedSourceHash,
+		});
+	} else {
+		throw cutoverCorrupt(
+			`adapter cutover event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+		);
+	}
+}
+
+function omitEventChainWording(kind, _event, lineIndex, label) {
+	if (kind === "broken") return `${label} ${lineIndex} breaks the hash chain`;
+	if (kind === "mismatch")
+		return `${label} ${lineIndex} carries a hash that does not match its content`;
+	return `${label} ${lineIndex} is not an object`;
+}
+
+// F061 follow-up (#309) — four adapter ledgers assembled by
+// `defineLedgerFamily` (ADR-0028). Chain-first fold (no preLink). Receipts
+// and shadow-comparisons omit the shared "event" infix via chainWording;
+// every ledger declares ceiling.message for its recorded refusal text.
+const ADAPTER_FAMILY = defineLedgerFamily({
+	dir: "adapters",
+	label: "adapter registry",
+	ledgers: [
+		{
+			name: "registry",
+			fileName: "registry.jsonl",
+			lockName: "registry.lock",
+			conflictCode: REGISTRY_LOCK_CODE,
+			corruptCode: REGISTRY_CORRUPT_CODE,
+			sizeCeilingCode: SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_ADAPTER_MAX_REGISTRY_BYTES",
+				defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
+				message: (event, ceiling) =>
+					`registering adapter "${event.adapter.id}" would exceed the adapter registry ceiling of ${ceiling} bytes`,
+			},
+			label: "adapter registry",
+			eventLabel: "adapter registry",
+			fold: {
+				init: () => [],
+				apply: applyAdapterEvent,
+				result: (records) => records,
+			},
+		},
+		{
+			name: "receipts",
+			fileName: "read-receipts.jsonl",
+			lockName: "read-receipts.lock",
+			conflictCode: RECEIPT_LOCK_CODE,
+			corruptCode: RECEIPT_CORRUPT_CODE,
+			sizeCeilingCode: RECEIPT_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_ADAPTER_MAX_RECEIPT_BYTES",
+				defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
+				message: (_event, ceiling) => `adapter read receipt would exceed ${ceiling} bytes`,
+			},
+			label: "adapter read receipt ledger",
+			eventLabel: "adapter read receipt",
+			fold: {
+				init: () => [],
+				chainWording: omitEventChainWording,
+				apply: applyReceiptEvent,
+				result: (receipts) => receipts.map((event, index) => ({ ...event, index })),
+			},
+		},
+		{
+			name: "comparisons",
+			fileName: "shadow-comparisons.jsonl",
+			lockName: "shadow-comparisons.lock",
+			conflictCode: COMPARISON_LOCK_CODE,
+			corruptCode: COMPARISON_CORRUPT_CODE,
+			sizeCeilingCode: COMPARISON_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_ADAPTER_MAX_COMPARISON_BYTES",
+				defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
+				message: (_event, ceiling) => `adapter shadow comparison would exceed ${ceiling} bytes`,
+			},
+			label: "adapter shadow comparison ledger",
+			eventLabel: "adapter shadow comparison",
+			fold: {
+				init: () => [],
+				chainWording: omitEventChainWording,
+				apply: applyComparisonEvent,
+				result: (comparisons) => comparisons.map((event, index) => ({ ...event, index })),
+			},
+		},
+		{
+			name: "cutovers",
+			fileName: "cutovers.jsonl",
+			lockName: "cutovers.lock",
+			conflictCode: CUTOVER_LOCK_CODE,
+			corruptCode: CUTOVER_CORRUPT_CODE,
+			sizeCeilingCode: CUTOVER_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_ADAPTER_MAX_CUTOVER_BYTES",
+				defaultBytes: DEFAULT_MAX_ADAPTER_BYTES,
+				message: (_event, ceiling) => `adapter cutover event would exceed ${ceiling} bytes`,
+			},
+			label: "adapter cutover ledger",
+			eventLabel: "adapter cutover",
+			fold: {
+				init: () => ({ byId: new Map(), records: [] }),
+				apply: applyCutoverEvent,
+				result: (state) =>
+					state.records.map((record) => ({
+						...record,
+						status:
+							record.rollback !== null
+								? "rolled-back"
+								: record.divergences.length > 0
+									? "degraded"
+									: "cut",
+					})),
+			},
+		},
+	],
+});
+
+const ADAPTER_LEDGER = ADAPTER_FAMILY.ledgers.registry;
+const RECEIPT_LEDGER = ADAPTER_FAMILY.ledgers.receipts;
+const COMPARISON_LEDGER = ADAPTER_FAMILY.ledgers.comparisons;
+const CUTOVER_LEDGER = ADAPTER_FAMILY.ledgers.cutovers;
+const registryPath = ADAPTER_LEDGER.path;
+const receiptPath = RECEIPT_LEDGER.path;
+const comparisonPath = COMPARISON_LEDGER.path;
+const cutoverPath = CUTOVER_LEDGER.path;
+const foldAdapters = ADAPTER_LEDGER.fold;
+const foldReadReceipts = RECEIPT_LEDGER.fold;
+const foldShadowComparisons = COMPARISON_LEDGER.fold;
+const foldCutovers = CUTOVER_LEDGER.fold;
 
 function receiptFieldsForVersion(schemaVersion) {
 	return schemaVersion === 1 ? RECEIPT_EVENT_FIELDS_V1 : RECEIPT_EVENT_FIELDS_V2;
@@ -627,28 +694,6 @@ function receiptEventProblem(event, lineIndex) {
 	if (sha256Bytes(decoded) !== event.sourceHash)
 		return `adapter read receipt ${lineIndex}.sourceHash must match decoded sourceBytes`;
 	return null;
-}
-
-function foldReadReceipts(cwd) {
-	const events = readLedgerFailClosed(
-		receiptPath(cwd),
-		RECEIPT_CORRUPT_CODE,
-		"adapter read receipt ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	return events.map((event, index) => {
-		const lineIndex = index + 1;
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw receiptCorrupt(`adapter read receipt ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw receiptCorrupt(
-				`adapter read receipt ${lineIndex} carries a hash that does not match its content`,
-			);
-		const problem = receiptEventProblem(event, lineIndex);
-		if (problem !== null) throw receiptCorrupt(problem);
-		prevHash = event.hash;
-		return { ...event, index };
-	});
 }
 
 function countProblem(value, label) {
@@ -822,88 +867,15 @@ function comparisonEventProblem(event, lineIndex) {
 	return null;
 }
 
-function foldShadowComparisons(cwd) {
-	const events = readLedgerFailClosed(
-		comparisonPath(cwd),
-		COMPARISON_CORRUPT_CODE,
-		"adapter shadow comparison ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	return events.map((event, index) => {
-		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw comparisonCorrupt(`adapter shadow comparison ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw comparisonCorrupt(`adapter shadow comparison ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw comparisonCorrupt(
-				`adapter shadow comparison ${lineIndex} carries a hash that does not match its content`,
-			);
-		const problem = comparisonEventProblem(event, lineIndex);
-		if (problem !== null) throw comparisonCorrupt(problem);
-		prevHash = event.hash;
-		return { ...event, index };
-	});
-}
-
 function appendShadowComparison(cwd, body) {
-	let release;
-	try {
-		release = acquireComparisonLock(cwd);
-	} catch (err) {
-		return {
-			ok: false,
-			code: err.amberCode || COMPARISON_CORRUPT_CODE,
-			receipt: null,
-			errors: [err.message || String(err)],
-		};
-	}
-	try {
-		let current;
-		try {
-			current = foldShadowComparisons(cwd);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || COMPARISON_CORRUPT_CODE,
-				receipt: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		const prevHash = current.length > 0 ? current[current.length - 1].hash : GENESIS_HASH;
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendComparisonWithinCeiling(cwd, event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || COMPARISON_CORRUPT_CODE,
-				receipt: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: COMPARISON_SIZE_CEILING_CODE,
-				receipt: null,
-				errors: [`adapter shadow comparison would exceed ${ceiling.ceiling} bytes`],
-			};
-		try {
-			appendJSONL(comparisonPath(cwd), event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: COMPARISON_CORRUPT_CODE,
-				receipt: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		return { ok: true, code: null, receipt: { ...event, index: current.length }, errors: [] };
-	} finally {
-		release();
-	}
+	const result = COMPARISON_LEDGER.append(
+		cwd,
+		body,
+		() => null,
+		(comparisons) => comparisons[comparisons.length - 1] ?? null,
+	);
+	if (!result.ok) return { ok: false, code: result.code, receipt: null, errors: result.errors };
+	return { ok: true, code: null, receipt: result.record, errors: [] };
 }
 
 function cutoverDecisionProblem(value, label) {
@@ -990,154 +962,13 @@ function divergenceEventProblem(event, lineIndex) {
 	);
 }
 
-function foldCutovers(cwd) {
-	const events = readLedgerFailClosed(
-		cutoverPath(cwd),
-		CUTOVER_CORRUPT_CODE,
-		"adapter cutover ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const byId = new Map();
-	const records = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw cutoverCorrupt(`adapter cutover event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw cutoverCorrupt(`adapter cutover event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw cutoverCorrupt(
-				`adapter cutover event ${lineIndex} carries a hash that does not match its content`,
-			);
-		if (!SUPPORTED_ADAPTER_CUTOVER_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw cutoverCorrupt(
-				`adapter cutover event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind === "cutover") {
-			const problem = cutoverEventProblem(event, lineIndex);
-			if (problem !== null) throw cutoverCorrupt(problem);
-			if (byId.has(event.cutoverId))
-				throw cutoverCorrupt(
-					`cutover ${JSON.stringify(event.cutoverId)} is recorded more than once`,
-				);
-			const { prevHash: _prev, hash: _hash, ...body } = event;
-			const record = { ...body, index, divergences: [], rollback: null };
-			byId.set(event.cutoverId, record);
-			records.push(record);
-		} else if (event.kind === "rollback") {
-			const problem = rollbackEventProblem(event, lineIndex);
-			if (problem !== null) throw cutoverCorrupt(problem);
-			const record = byId.get(event.cutoverId);
-			if (!record)
-				throw cutoverCorrupt(
-					`adapter cutover event ${lineIndex} rolls back unknown cutover ${JSON.stringify(event.cutoverId)}`,
-				);
-			if (record.rollback !== null)
-				throw cutoverCorrupt(
-					`adapter cutover event ${lineIndex} rolls back ${JSON.stringify(event.cutoverId)} twice`,
-				);
-			record.rollback = {
-				at: event.at,
-				decision: event.decision,
-				confirmedBy: event.confirmedBy,
-				evidence: event.evidence,
-			};
-		} else if (event.kind === "divergence") {
-			const problem = divergenceEventProblem(event, lineIndex);
-			if (problem !== null) throw cutoverCorrupt(problem);
-			const record = byId.get(event.cutoverId);
-			if (!record)
-				throw cutoverCorrupt(
-					`adapter cutover event ${lineIndex} records divergence for unknown cutover ${JSON.stringify(event.cutoverId)}`,
-				);
-			if (record.rollback !== null)
-				throw cutoverCorrupt(
-					`adapter cutover event ${lineIndex} records divergence after ${JSON.stringify(event.cutoverId)} was rolled back`,
-				);
-			record.divergences.push({
-				at: event.at,
-				recordId: event.recordId,
-				source: event.source,
-				expectedSourceHash: event.expectedSourceHash,
-				observedSourceHash: event.observedSourceHash,
-			});
-		} else {
-			throw cutoverCorrupt(
-				`adapter cutover event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		}
-		prevHash = event.hash;
-	});
-	return records.map((record) => ({
-		...record,
-		status:
-			record.rollback !== null ? "rolled-back" : record.divergences.length > 0 ? "degraded" : "cut",
-	}));
-}
-
-function cutoverAppendFailure(err) {
-	return {
-		ok: false,
-		code: err.amberCode || CUTOVER_CORRUPT_CODE,
-		record: null,
-		errors: [err.message || String(err)],
-	};
-}
-
 function appendCutoverEvent(cwd, body, guard = null) {
-	let release;
-	try {
-		release = acquireCutoverLock(cwd);
-	} catch (err) {
-		return cutoverAppendFailure(err);
-	}
-	try {
-		let records;
-		try {
-			records = foldCutovers(cwd);
-		} catch (err) {
-			return cutoverAppendFailure(err);
-		}
-		// Guard contract: any non-null guard result is returned verbatim
-		// without appending — a refusal ({ok:false,...}) or a success
-		// sentinel (e.g. the divergence dedupe skips).
-		const guardVerdict = guard ? guard(records) : null;
-		if (guardVerdict !== null) return guardVerdict;
-		let prevHash;
-		try {
-			prevHash = chainHeadHash(cutoverPath(cwd), CUTOVER_CORRUPT_CODE, "adapter cutover ledger");
-		} catch (err) {
-			return cutoverAppendFailure(err);
-		}
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendCutoverWithinCeiling(cwd, event);
-		} catch (err) {
-			return cutoverAppendFailure(err);
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: CUTOVER_SIZE_CEILING_CODE,
-				record: null,
-				errors: [`adapter cutover event would exceed ${ceiling.ceiling} bytes`],
-			};
-		try {
-			appendJSONL(cutoverPath(cwd), event);
-		} catch (err) {
-			return cutoverAppendFailure(err);
-		}
-		let record;
-		try {
-			record = foldCutovers(cwd).find((entry) => entry.cutoverId === body.cutoverId) ?? null;
-		} catch (err) {
-			return cutoverAppendFailure(err);
-		}
-		return { ok: true, code: null, record, errors: [] };
-	} finally {
-		release();
-	}
+	return CUTOVER_LEDGER.append(
+		cwd,
+		body,
+		guard ?? (() => null),
+		(records) => records.find((entry) => entry.cutoverId === body.cutoverId) ?? null,
+	);
 }
 
 function cutoverDecisionInputProblem(decision) {
@@ -1642,74 +1473,24 @@ function registerAdapter(cwd, input = {}, opts = {}) {
 	};
 	const problem = adapterProblem(adapter);
 	if (problem !== null) return { ok: false, code: INVALID_CODE, adapter: null, errors: [problem] };
-	let release;
-	try {
-		release = acquireAdapterLock(cwd);
-	} catch (err) {
-		return {
-			ok: false,
-			code: err.amberCode || REGISTRY_CORRUPT_CODE,
-			adapter: null,
-			errors: [err.message || String(err)],
-		};
-	}
-	try {
-		let current;
-		try {
-			current = foldAdapters(cwd);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || REGISTRY_CORRUPT_CODE,
-				adapter: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		if (current.some((record) => record.id === adapter.id))
-			return {
-				ok: false,
-				code: INVALID_CODE,
-				adapter: null,
-				errors: [`adapter "${adapter.id}" is already registered`],
-			};
-		const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
-		const body = { kind: "registered", schemaVersion: ADAPTER_SCHEMA_VERSION, at, adapter };
-		const prevHash = chainHeadHash(registryPath(cwd), REGISTRY_CORRUPT_CODE, "adapter registry");
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendAdapterWithinCeiling(cwd, event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || REGISTRY_CORRUPT_CODE,
-				adapter: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: SIZE_CEILING_CODE,
-				adapter: null,
-				errors: [
-					`registering adapter "${adapter.id}" would exceed the adapter registry ceiling of ${ceiling.ceiling} bytes`,
-				],
-			};
-		try {
-			appendJSONL(registryPath(cwd), event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: REGISTRY_CORRUPT_CODE,
-				adapter: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		return { ok: true, code: null, adapter: { ...adapter, registeredAt: at }, errors: [] };
-	} finally {
-		release();
-	}
+	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
+	const body = { kind: "registered", schemaVersion: ADAPTER_SCHEMA_VERSION, at, adapter };
+	const result = ADAPTER_LEDGER.append(
+		cwd,
+		body,
+		(current) =>
+			current.some((record) => record.id === adapter.id)
+				? {
+						ok: false,
+						code: INVALID_CODE,
+						adapter: null,
+						errors: [`adapter "${adapter.id}" is already registered`],
+					}
+				: null,
+		(fold) => fold.find((record) => record.id === adapter.id),
+	);
+	if (!result.ok) return { ok: false, code: result.code, adapter: null, errors: result.errors };
+	return { ok: true, code: null, adapter: result.record, errors: [] };
 }
 
 function showAdapter(cwd, id) {
@@ -2059,64 +1840,14 @@ function sourcePayload(bytes, sourceHash) {
 }
 
 function appendReadReceipt(cwd, body) {
-	let release;
-	try {
-		release = acquireReceiptLock(cwd);
-	} catch (err) {
-		return {
-			ok: false,
-			code: err.amberCode || RECEIPT_CORRUPT_CODE,
-			receipt: null,
-			errors: [err.message || String(err)],
-		};
-	}
-	try {
-		let current;
-		try {
-			current = foldReadReceipts(cwd);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || RECEIPT_CORRUPT_CODE,
-				receipt: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		const prevHash = current.length > 0 ? current[current.length - 1].hash : GENESIS_HASH;
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendReceiptWithinCeiling(cwd, event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || RECEIPT_CORRUPT_CODE,
-				receipt: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		if (ceiling.wouldExceed) {
-			return {
-				ok: false,
-				code: RECEIPT_SIZE_CEILING_CODE,
-				receipt: null,
-				errors: [`adapter read receipt would exceed ${ceiling.ceiling} bytes`],
-			};
-		}
-		try {
-			appendJSONL(receiptPath(cwd), event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: RECEIPT_CORRUPT_CODE,
-				receipt: null,
-				errors: [err.message || String(err)],
-			};
-		}
-		return { ok: true, code: null, receipt: { ...event, index: current.length }, errors: [] };
-	} finally {
-		release();
-	}
+	const result = RECEIPT_LEDGER.append(
+		cwd,
+		body,
+		() => null,
+		(receipts) => receipts[receipts.length - 1] ?? null,
+	);
+	if (!result.ok) return { ok: false, code: result.code, receipt: null, errors: result.errors };
+	return { ok: true, code: null, receipt: result.record, errors: [] };
 }
 
 function prepareAdapterRead(
