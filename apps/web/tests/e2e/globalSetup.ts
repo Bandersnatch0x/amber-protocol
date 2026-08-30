@@ -48,6 +48,8 @@ function prepareE2ERepoRoot(): string {
     ['docs', 'wiki', 'knowledge'],
     ['docs', 'architecture'],
     ['docs', 'knowledge-corpus'],
+    ['docs', 'specs'],
+    ['schemas'],
   ];
   for (const parts of knowledgeDirs) {
     const srcDir = path.join(sourceRoot, ...parts);
@@ -56,6 +58,38 @@ function prepareE2ERepoRoot(): string {
       fs.cpSync(srcDir, dstDir, { recursive: true });
     }
   }
+
+  // F060 code layer: the fixture carries the real product code corpus so the
+  // schemaVersion 2 graph has Code Nodes, imports edges, and anchors edges —
+  // fold/expansion, pierce-search, and shared-foundation e2e run against
+  // live extraction. node_modules and build output never enter.
+  const codeDirs: string[][] = [
+    ['scripts'],
+    ['src'],
+    ['apps', 'web', 'src'],
+    ['apps', 'web', 'server'],
+  ];
+  for (const parts of codeDirs) {
+    const srcDir = path.join(sourceRoot, ...parts);
+    const dstDir = path.join(fixtureRoot, ...parts);
+    if (!fs.existsSync(srcDir)) continue;
+    fs.cpSync(srcDir, dstDir, {
+      recursive: true,
+      filter: (source) => {
+        const base = path.basename(source);
+        return base !== 'node_modules' && base !== 'dist' && base !== 'output';
+      },
+    });
+  }
+  for (const tsconfigName of fs
+    .readdirSync(path.join(sourceRoot, 'apps', 'web'))
+    .filter((name) => /^tsconfig.*\.json$/.test(name))) {
+    fs.copyFileSync(
+      path.join(sourceRoot, 'apps', 'web', tsconfigName),
+      path.join(fixtureRoot, 'apps', 'web', tsconfigName),
+    );
+  }
+
   for (const file of ['feature_list.json', 'MEMORY.md']) {
     const srcFile = path.join(sourceRoot, file);
     if (fs.existsSync(srcFile)) {
@@ -67,8 +101,11 @@ function prepareE2ERepoRoot(): string {
   const featureList = JSON.parse(fs.readFileSync(featureListPath, 'utf8')) as {
     features: Array<{ id: string; paths?: string[] }>;
   };
+  // F001/F007 keep their standing dead anchors; F059 keeps real paths so the
+  // F060 fold/expansion e2e exercises live anchors edges.
+  const keepPaths = new Set(['F001', 'F007', 'F059']);
   for (const feature of featureList.features) {
-    if (feature.id !== 'F001' && feature.id !== 'F007') feature.paths = [];
+    if (!keepPaths.has(feature.id)) feature.paths = [];
   }
   fs.writeFileSync(featureListPath, JSON.stringify(featureList, null, 2));
 

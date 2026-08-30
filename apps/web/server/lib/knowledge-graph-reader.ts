@@ -1,5 +1,6 @@
 import { createRequire } from 'module';
 import type {
+  CodeSymbol,
   DriftFinding,
   GraphLayer,
   KnowledgeEdgeDTO,
@@ -37,13 +38,15 @@ interface RawNode {
   status?: string;
   updated?: string;
   paths?: string[];
+  symbols?: CodeSymbol[];
   contextPage?: string;
   revisions?: number;
   body?: string;
 }
 
 interface RawGraph {
-  schemaVersion: '1';
+  schemaVersion: '2';
+  toolchain: { typescript: string };
   nodes: RawNode[];
   edges: RawEdge[];
   drift: RawDrift[];
@@ -56,6 +59,7 @@ const NODE_KINDS = new Set<KnowledgeNode['kind']>([
   'memory',
   'architecture',
   'feature',
+  'code',
 ]);
 const NODE_LAYERS = new Set<GraphLayer>(['decision', 'knowledge', 'implementation']);
 const EDGE_VERBS = new Set<KnowledgeEdgeDTO['verb']>([
@@ -63,6 +67,8 @@ const EDGE_VERBS = new Set<KnowledgeEdgeDTO['verb']>([
   'builds-on',
   'references',
   'describes',
+  'imports',
+  'anchors',
 ]);
 const ORIGINS = new Set<KnowledgeEdgeDTO['origin']>(['deterministic', 'inferred']);
 
@@ -82,6 +88,7 @@ function adaptNode(node: RawNode): KnowledgeNode {
     ...(node.status !== undefined ? { status: node.status } : {}),
     ...(node.updated !== undefined ? { updated: node.updated } : {}),
     ...(node.paths !== undefined ? { paths: node.paths } : {}),
+    ...(node.symbols !== undefined ? { symbols: node.symbols } : {}),
     ...(node.contextPage !== undefined ? { contextPage: node.contextPage } : {}),
     ...(node.revisions !== undefined ? { revisions: node.revisions } : {}),
     ...(node.body !== undefined ? { body: node.body } : {}),
@@ -121,6 +128,7 @@ export function readKnowledgeGraphSnapshot(repoRoot: string): KnowledgeGraphDTO 
   const raw = buildKnowledgeGraph(repoRoot);
   return {
     schemaVersion: raw.schemaVersion,
+    toolchain: raw.toolchain,
     nodes: raw.nodes.map(adaptNode),
     edges: raw.edges.map(adaptEdge),
     drift: raw.drift.map(adaptDrift),

@@ -998,7 +998,8 @@ const edges: KnowledgeEdgeDTO[] = [
 ];
 
 export const knowledgeGraphFixture: KnowledgeGraphDTO = {
-  schemaVersion: '1',
+  schemaVersion: '2',
+  toolchain: { typescript: '0.0.0-fixture' },
   nodes,
   edges,
   drift: [

@@ -12,6 +12,7 @@ import {
   ReactFlowProvider,
   type Edge,
   type Node,
+  type NodeChange,
   type NodeMouseHandler,
   useReactFlow,
 } from '@xyflow/react';
@@ -28,7 +29,22 @@ import type {
   NodeSummaryDTO,
   LLMStatusDTO,
 } from './types';
-import { MAX_CONTEXT_NODES } from '@/lib/knowledge-dto';
+import { MAX_CONTEXT_NODES, isDocumentNode } from '@/lib/knowledge-dto';
+import {
+  LAYER_ORDER,
+  buildKnowledgeAnalytics,
+  type KnowledgeAnalytics,
+} from './map-analytics';
+import {
+  FOUNDATION_NODE_ID,
+  anomalyKey,
+  buildRenderGraph,
+  codeNeighbourhoodOf,
+  owningFeaturesOf,
+  searchKnowledgeNodes,
+  type RenderGraph,
+  type RenderNode,
+} from './map-render-graph';
 import { trpc } from '@/lib/trpc';
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import { MarkdownMessage } from '@/components/code/MarkdownMessage';
@@ -69,32 +85,44 @@ const KIND_LABEL_KEYS: Record<string, I18nKey> = {
   memory: 'knowledge.kind.memory',
   architecture: 'knowledge.kind.architecture',
   feature: 'knowledge.kind.feature',
+  code: 'knowledge.kind.code',
+  foundation: 'knowledge.kind.foundation',
 };
 
 type LayoutMode = 'cluster' | 'layered';
 
 interface KnowledgeNodeData extends Record<string, unknown> {
-  dto: KnowledgeNode;
+  node: RenderNode;
   drift: boolean;
   highlight: boolean;
   dimmed: boolean;
   selected: boolean;
   neighbor: boolean;
+  godNode: boolean;
+  communityId: string | null;
+  /** Feature affordance: live anchored-code count (0 hides the chip). */
+  anchorsCount: number;
+  expanded: boolean;
+  onToggleExpand: ((featureId: string) => void) | null;
 }
 
-const LAYER_ORDER = ['decision', 'knowledge', 'implementation'] as const;
 const LAYERED_COLUMNS = 14;
 const LAYERED_COLUMN_WIDTH = 200;
 const LAYERED_ROW_HEIGHT = 120;
 
-type SimNode = KnowledgeNode & d3.SimulationNodeDatum;
+interface LayoutInput {
+  nodes: ReadonlyArray<{ id: string; layer: GraphLayer }>;
+  edges: ReadonlyArray<{ src: string; dst: string }>;
+}
+
+type SimNode = { id: string; layer: GraphLayer } & d3.SimulationNodeDatum;
 type SimLink = { source: string; target: string };
 
 export function computeLayout(
-  dto: KnowledgeGraphDTO,
+  dto: LayoutInput,
   mode: LayoutMode,
 ): Map<string, { x: number; y: number }> {
-  const nodes: SimNode[] = dto.nodes.map((n) => ({ ...n }));
+  const nodes: SimNode[] = dto.nodes.map((n) => ({ id: n.id, layer: n.layer }));
   const index = new Map(nodes.map((n) => [n.id, n]));
   const links: SimLink[] = dto.edges
     .map((e) => ({ source: e.src, target: e.dst }))
@@ -102,7 +130,7 @@ export function computeLayout(
 
   if (mode === 'layered') {
     const positions = new Map<string, { x: number; y: number }>();
-    const layers: Record<string, KnowledgeNode[]> = {
+    const layers: Record<string, SimNode[]> = {
       decision: [],
       knowledge: [],
       implementation: [],
@@ -160,9 +188,12 @@ export function computeLayout(
   return positions;
 }
 
-function neighborIdsOf(dto: KnowledgeGraphDTO, id: string): Set<string> {
+function neighborIdsOf(
+  edges: ReadonlyArray<{ src: string; dst: string }>,
+  id: string,
+): Set<string> {
   const ids = new Set<string>([id]);
-  for (const e of dto.edges) {
+  for (const e of edges) {
     if (e.src === id) ids.add(e.dst);
     if (e.dst === id) ids.add(e.src);
   }
@@ -521,7 +552,7 @@ function MiniContextGraph({
 }
 
 function FlowCanvas({
-  dto,
+  graph,
   layout,
   selectedId,
   hoverId,
@@ -530,8 +561,14 @@ function FlowCanvas({
   visibleIds,
   searchHits,
   showInferred,
+  driftNodeIds,
+  godNodeIds,
+  communityOf,
+  anchorsCountByFeature,
+  expandedFeatures,
+  onToggleExpand,
 }: {
-  dto: KnowledgeGraphDTO;
+  graph: RenderGraph;
   layout: Map<string, { x: number; y: number }>;
   selectedId: string | null;
   hoverId: string | null;
@@ -540,21 +577,49 @@ function FlowCanvas({
   visibleIds: Set<string> | null;
   searchHits: Set<string> | null;
   showInferred: boolean;
+  driftNodeIds: Set<string>;
+  godNodeIds: Set<string>;
+  communityOf: Record<string, string>;
+  anchorsCountByFeature: Map<string, number>;
+  expandedFeatures: ReadonlySet<string>;
+  onToggleExpand: (featureId: string) => void;
 }) {
-  const driftNodeIds = useMemo(() => new Set(dto.drift.map((d) => d.nodeId)), [dto.drift]);
   const { fitView } = useReactFlow();
   const activeId = hoverId ?? selectedId;
   const activeNeighbors = useMemo(
-    () => (activeId ? neighborIdsOf(dto, activeId) : null),
-    [dto, activeId],
+    () => (activeId ? neighborIdsOf(graph.edges, activeId) : null),
+    [graph.edges, activeId],
   );
+
+  // Session-scoped drag (ticket #265): native xyflow drag, positions live in
+  // React state only; a layout change or refresh returns to the
+  // deterministic layout. Nothing is persisted.
+  const [dragOverrides, setDragOverrides] = useState<Map<string, { x: number; y: number }>>(
+    () => new Map(),
+  );
+  const [dragLayout, setDragLayout] = useState(layout);
+  if (dragLayout !== layout) {
+    setDragLayout(layout);
+    setDragOverrides(new Map());
+  }
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setDragOverrides((previous) => {
+      let next: Map<string, { x: number; y: number }> | null = null;
+      for (const change of changes) {
+        if (change.type !== 'position' || !change.position) continue;
+        if (!next) next = new Map(previous);
+        next.set(change.id, change.position);
+      }
+      return next ?? previous;
+    });
+  }, []);
 
   const flowNodes: Node<KnowledgeNodeData>[] = useMemo(
     () =>
-      dto.nodes
+      graph.nodes
         .filter((n) => visibleIds === null || visibleIds.has(n.id))
         .map((n) => {
-          const pos = layout.get(n.id) ?? { x: 0, y: 0 };
+          const pos = dragOverrides.get(n.id) ?? layout.get(n.id) ?? { x: 0, y: 0 };
           const isHit = searchHits === null || searchHits.has(n.id);
           const isActiveNeighbor = activeNeighbors?.has(n.id) ?? false;
           const outsideActive = activeNeighbors !== null && !isActiveNeighbor;
@@ -562,51 +627,69 @@ function FlowCanvas({
             id: n.id,
             position: pos,
             data: {
-              dto: n,
+              node: n,
               drift: driftNodeIds.has(n.id),
               highlight: searchHits !== null && isHit,
               dimmed: (searchHits !== null && !isHit) || outsideActive,
               selected: n.id === selectedId,
               neighbor: activeNeighbors !== null && isActiveNeighbor && n.id !== activeId,
+              godNode: godNodeIds.has(n.id),
+              communityId: communityOf[n.id] ?? null,
+              anchorsCount: n.kind === 'feature' ? (anchorsCountByFeature.get(n.id) ?? 0) : 0,
+              expanded: expandedFeatures.has(n.id),
+              onToggleExpand: n.kind === 'feature' ? onToggleExpand : null,
             },
             type: 'knowledge',
           } satisfies Node<KnowledgeNodeData>;
         }),
     [
-      dto.nodes,
+      graph.nodes,
       layout,
+      dragOverrides,
       driftNodeIds,
       visibleIds,
       searchHits,
       selectedId,
       activeNeighbors,
       activeId,
+      godNodeIds,
+      communityOf,
+      anchorsCountByFeature,
+      expandedFeatures,
+      onToggleExpand,
     ],
   );
 
+  const visibleKey = useMemo(() => graph.nodes.map((n) => n.id).join('|'), [graph.nodes]);
   useEffect(() => {
     const t = window.setTimeout(() => void fitView({ padding: 0.15, duration: 400 }), 60);
     return () => window.clearTimeout(t);
-  }, [fitView, visibleIds]);
+  }, [fitView, visibleIds, visibleKey]);
 
   const flowEdges: Edge[] = useMemo(() => {
     const nodeIds = new Set(flowNodes.map((n) => n.id));
-    return dto.edges
+    return graph.edges
       .filter((e) => showInferred || e.origin !== 'inferred')
       .filter((e) => nodeIds.has(e.src) && nodeIds.has(e.dst))
-      .map((e, i) => {
+      .map((e) => {
         const connected = activeId !== null && (e.src === activeId || e.dst === activeId);
-        const stroke = connected ? '#f59e0b' : e.origin === 'inferred' ? '#94a3b8' : '#7c8da4';
+        const stroke = connected
+          ? '#f59e0b'
+          : e.anomalous
+            ? '#8b5cf6'
+            : e.origin === 'inferred'
+              ? '#94a3b8'
+              : '#7c8da4';
         return {
-          id: `e${i}`,
+          id: e.id,
           source: e.src,
           target: e.dst,
           className: e.origin === 'inferred' ? 'knowledge-edge-inferred' : undefined,
           animated: connected,
           style: {
             stroke,
-            strokeWidth: connected ? 2.4 : 1.6,
-            strokeDasharray: e.origin === 'inferred' ? '6 4' : undefined,
+            strokeWidth: connected ? 2.4 : e.anomalous ? 2 : 1.6,
+            strokeDasharray: e.origin === 'inferred' ? '6 4' : e.aggregated ? '3 3' : undefined,
             opacity: connected ? 1 : 0.7,
           },
           label: connected ? e.verb : undefined,
@@ -622,7 +705,7 @@ function FlowCanvas({
           },
         };
       });
-  }, [dto.edges, flowNodes, showInferred, activeId]);
+  }, [graph.edges, flowNodes, showInferred, activeId]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => onSelect(node.id),
@@ -634,6 +717,7 @@ function FlowCanvas({
       nodes={flowNodes}
       edges={flowEdges}
       nodeTypes={nodeTypes}
+      onNodesChange={onNodesChange}
       onNodeClick={handleNodeClick}
       onNodeMouseEnter={(_e, node) => onHover(node.id)}
       onNodeMouseLeave={() => onHover(null)}
@@ -700,16 +784,30 @@ function EdgeRow({
 }
 
 function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
-  const { dto, drift, highlight, dimmed, selected, neighbor } = data;
+  const {
+    node,
+    drift,
+    highlight,
+    dimmed,
+    selected,
+    neighbor,
+    godNode,
+    communityId,
+    anchorsCount,
+    expanded,
+    onToggleExpand,
+  } = data;
   const { t } = useI18n();
-  const c = LAYER_COLORS[dto.layer];
+  const c = LAYER_COLORS[node.layer];
   const active = selected || neighbor;
+  const isFoundation = node.kind === 'foundation';
+  const status = node.dto?.status;
   return (
     <div
-      data-testid={`knowledge-node-${dto.id}`}
+      data-testid={`knowledge-node-${node.id}`}
       className={`group rounded-lg border px-2.5 py-2 min-w-[128px] max-w-[190px] shadow-sm transition-all duration-150
-        bg-white dark:bg-obsidian-elevated
-        ${selected ? 'border-amber-400 dark:border-amber-600 shadow-glow-amber' : 'border-slate-200 dark:border-obsidian-border'}
+        ${isFoundation ? 'bg-violet-50 dark:bg-violet-950/40 border-violet-300 dark:border-violet-800' : 'bg-white dark:bg-obsidian-elevated'}
+        ${selected ? 'border-amber-400 dark:border-amber-600 shadow-glow-amber' : isFoundation ? '' : 'border-slate-200 dark:border-obsidian-border'}
         ${neighbor ? 'border-amber-300/70 dark:border-amber-700/60' : ''}
         ${drift ? 'ring-2 ring-red-500' : highlight ? 'ring-2 ring-amber-500/60' : ''}
         ${dimmed ? 'opacity-30' : 'hover:-translate-y-0.5 hover:shadow-md'}
@@ -729,21 +827,67 @@ function KnowledgeFlowNode({ data }: { data: KnowledgeNodeData }) {
       />
       <div className="flex items-center justify-between gap-1.5 mb-1">
         <span
-          className={`inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded ${c.badge}`}
+          className={`inline-flex items-center gap-1 text-[9px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded ${
+            isFoundation
+              ? 'bg-violet-100 text-violet-900 dark:bg-violet-950/60 dark:text-violet-200'
+              : c.badge
+          }`}
         >
-          <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-          {t(KIND_LABEL_KEYS[dto.kind])}
+          <span className={`w-1.5 h-1.5 rounded-full ${isFoundation ? 'bg-violet-500' : c.dot}`} />
+          {t(KIND_LABEL_KEYS[node.kind])}
         </span>
-        {drift ? (
-          <span className="w-2 h-2 rounded-full bg-red-500 ring-2 ring-red-300 dark:ring-red-900 shrink-0" />
-        ) : dto.status ? (
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDotClass(dto.status)}`} />
-        ) : null}
+        <span className="inline-flex items-center gap-1 shrink-0">
+          {godNode && (
+            <span
+              data-testid="god-node-badge"
+              title={t('knowledge.godNode.tooltip')}
+              className="text-[8px] font-mono uppercase px-1 py-0.5 rounded bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/50 dark:text-fuchsia-200"
+            >
+              ▲ {t('knowledge.godNode.badge')}
+            </span>
+          )}
+          {drift ? (
+            <span className="w-2 h-2 rounded-full bg-red-500 ring-2 ring-red-300 dark:ring-red-900 shrink-0" />
+          ) : status ? (
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDotClass(status)}`} />
+          ) : null}
+        </span>
       </div>
       <div className="text-[11px] leading-snug text-slate-800 dark:text-slate-200 line-clamp-2 font-medium">
-        {dto.title}
+        {node.title}
       </div>
-      <div className="text-[9px] font-mono text-slate-400 mt-1 truncate">{dto.id}</div>
+      {isFoundation ? (
+        <div className="text-[9px] font-mono text-violet-600 dark:text-violet-300 mt-1">
+          {t('knowledge.foundation.members', { count: node.memberIds?.length ?? 0 })}
+        </div>
+      ) : (
+        <div className="text-[9px] font-mono text-slate-400 mt-1 truncate">{node.id}</div>
+      )}
+      <div className="flex items-center gap-1 mt-1">
+        {communityId && (
+          <span className="text-[8px] font-mono px-1 rounded bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            {communityId}
+          </span>
+        )}
+        {anchorsCount > 0 && onToggleExpand && (
+          <button
+            type="button"
+            data-testid={`expand-toggle-${node.id}`}
+            title={t('knowledge.fold.anchorsChip', { count: anchorsCount })}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleExpand(node.id);
+            }}
+            className={`text-[8px] font-mono px-1 py-0.5 rounded border transition-colors ${
+              expanded
+                ? 'border-emerald-400 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
+                : 'border-slate-300 bg-slate-50 text-slate-600 hover:border-emerald-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300'
+            }`}
+          >
+            ⚓ {anchorsCount} {expanded ? '▾' : '▸'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -983,6 +1127,168 @@ function KnowledgeAskPanel({
   );
 }
 
+function KnowledgeAnalyticsPanel({
+  analytics,
+  nodeById,
+  onSelect,
+}: {
+  analytics: KnowledgeAnalytics;
+  nodeById: Map<string, KnowledgeNode>;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const percent = (value: number) => Math.round(value * 1000) / 10;
+  return (
+    <div className="card p-4 max-h-[70vh] overflow-y-auto" data-testid="knowledge-analytics-report">
+      <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+        {t('knowledge.analytics.title')}
+      </h2>
+      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+        {t('knowledge.analytics.description')}
+      </p>
+      <p className="mt-2 text-[11px] font-mono text-slate-600 dark:text-slate-300">
+        {t('knowledge.analytics.metrics', {
+          nodes: analytics.metrics.nodeCount,
+          edges: analytics.metrics.edgeCount,
+          communities: analytics.metrics.communityCount,
+          largest: percent(analytics.metrics.largestCommunityShare),
+          singleton: percent(analytics.metrics.weightedSingletonShare),
+        })}
+      </p>
+
+      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+        <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
+          {t('knowledge.analytics.godNodes')}
+        </div>
+        {analytics.godNodes.map((board) => (
+          <div key={board.layer} className="mb-2">
+            <div className="text-[10px] font-mono text-slate-400">
+              {board.layer} · p99 = {board.threshold}
+            </div>
+            <ul className="mt-1 space-y-1">
+              {board.entries.map((entry) => (
+                <li key={entry.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(entry.id)}
+                    className="w-full text-left rounded border border-slate-200 dark:border-obsidian-border px-2 py-1 hover:border-fuchsia-300 dark:hover:border-fuchsia-800 transition-colors"
+                  >
+                    <span className="font-mono text-[10px] text-slate-700 dark:text-slate-200 break-all">
+                      {entry.id}
+                    </span>
+                    <span className="ml-1.5 text-[10px] text-fuchsia-700 dark:text-fuchsia-300">
+                      {t('knowledge.analytics.godNodeRow', {
+                        degree: entry.degree,
+                        inDegree: entry.inDegree,
+                        outDegree: entry.outDegree,
+                      })}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+        <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
+          {t('knowledge.analytics.communities')}
+        </div>
+        <ul className="space-y-1">
+          {analytics.communities.slice(0, 8).map((community) => (
+            <li
+              key={community.id}
+              className="text-[10px] font-mono text-slate-600 dark:text-slate-300"
+            >
+              {t('knowledge.analytics.communityRow', {
+                id: community.id,
+                size: community.size,
+                sample: nodeById.get(community.members[0])?.title ?? community.members[0],
+              })}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+        <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
+          {t('knowledge.analytics.anomalies')}
+        </div>
+        <p className="text-[10px] text-slate-400 mb-1.5">{t('knowledge.analytics.neutral')}</p>
+        {analytics.anomalies.length === 0 ? (
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+            {t('knowledge.analytics.anomaliesEmpty')}
+          </div>
+        ) : (
+          <ul className="space-y-1">
+            {analytics.anomalies.map((mark) => (
+              <li key={`${mark.src}:${mark.verb}:${mark.dst}:${mark.reason}`}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(mark.src)}
+                  className="w-full text-left rounded border border-violet-200 dark:border-violet-900/60 px-2 py-1 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 transition-colors"
+                >
+                  <div className="font-mono text-[10px] text-slate-700 dark:text-slate-200 break-all">
+                    {mark.src} -[{mark.verb}]→ {mark.dst}
+                  </div>
+                  <div className="text-[9px] text-violet-700 dark:text-violet-300">
+                    {t(`knowledge.analytics.reason.${mark.reason}` as I18nKey)} · {mark.detail}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FoundationDetailPanel({
+  memberIds,
+  nodeById,
+  inDegreeP99,
+  onSelect,
+}: {
+  memberIds: string[];
+  nodeById: Map<string, KnowledgeNode>;
+  inDegreeP99: number;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="card p-4 max-h-[70vh] overflow-y-auto" data-testid="foundation-detail-panel">
+      <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-900 dark:bg-violet-950/60 dark:text-violet-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+        {t('knowledge.kind.foundation')}
+      </span>
+      <h2 className="mt-2 text-sm font-semibold text-slate-900 dark:text-white leading-snug">
+        {t('knowledge.foundation.members', { count: memberIds.length })}
+      </h2>
+      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+        {t('knowledge.foundation.description')} (p99 = {inDegreeP99})
+      </p>
+      <ul className="mt-3 space-y-1">
+        {memberIds.map((memberId) => (
+          <li key={memberId}>
+            <button
+              type="button"
+              data-testid={`foundation-member-${memberId}`}
+              onClick={() => onSelect(memberId)}
+              className="w-full text-left rounded-md border border-slate-200 dark:border-obsidian-border px-2 py-1.5 hover:border-violet-300 dark:hover:border-violet-800 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 transition-colors"
+            >
+              <span className="font-mono text-[10px] text-slate-700 dark:text-slate-200 break-all">
+                {nodeById.get(memberId)?.sourcePath ?? memberId}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function KnowledgeMapPage() {
   const [semanticRequested, setSemanticRequested] = useState(false);
   const {
@@ -1116,7 +1422,12 @@ function KnowledgeMapGraph({
   const [kindFilter, setKindFilter] = useState<Set<string>>(new Set());
   const [showInferred, setShowInferred] = useState(true);
   const [showDriftOnly, setShowDriftOnly] = useState(false);
-  const [railView, setRailView] = useState<'detail' | 'ask'>('detail');
+  // Expansion state machine (ticket #265): multiple features may be expanded
+  // at once; re-invoking an expanded entry collapses that neighbourhood;
+  // session-only — never the URL, never storage.
+  const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
+  const [aggregateFoundation, setAggregateFoundation] = useState(true);
+  const [railView, setRailView] = useState<'detail' | 'ask' | 'analytics'>('detail');
   const [question, setQuestion] = useState('');
   const [askInput, setAskInput] = useState<{
     question: string;
@@ -1132,15 +1443,62 @@ function KnowledgeMapGraph({
     gcTime: 0,
   });
 
+  const toggleExpand = useCallback((featureId: string) => {
+    setExpandedFeatures((previous) => {
+      const next = new Set(previous);
+      if (next.has(featureId)) next.delete(featureId);
+      else next.add(featureId);
+      return next;
+    });
+  }, []);
+  const collapseAll = useCallback(() => setExpandedFeatures(new Set()), []);
+
   // Merge inferred edges from the semantic layer (client-side only; never feeds back into DTO)
   const mergedDto = useMemo((): KnowledgeGraphDTO => {
     if (!semanticResult?.available || !semanticResult.inferredEdges.length) return dto;
     return { ...dto, edges: [...dto.edges, ...semanticResult.inferredEdges] };
   }, [dto, semanticResult]);
 
-  const layout = useMemo(() => computeLayout(mergedDto, layoutMode), [mergedDto, layoutMode]);
+  // Read-time analytics over the deterministic graph (F060) — never persisted.
+  const analytics: KnowledgeAnalytics = useMemo(
+    () => buildKnowledgeAnalytics({ nodes: dto.nodes, edges: dto.edges }),
+    [dto],
+  );
+  const anomalousKeys = useMemo(
+    () => new Set(analytics.anomalies.map((mark) => anomalyKey(mark))),
+    [analytics],
+  );
+  const godNodeIds = useMemo(
+    () => new Set(analytics.godNodes.flatMap((board) => board.entries.map((entry) => entry.id))),
+    [analytics],
+  );
+
+  // Folded-by-default render graph (ticket #264): document scale plus the
+  // expanded code neighbourhoods; shared-foundation aggregation lives here in
+  // the renderer only.
+  const renderGraph = useMemo(
+    () =>
+      buildRenderGraph(mergedDto, {
+        expandedFeatures,
+        aggregateFoundation,
+        foundationMembers: analytics.codeAggregation.memberIds,
+        anomalousKeys,
+      }),
+    [mergedDto, expandedFeatures, aggregateFoundation, analytics, anomalousKeys],
+  );
+
+  const layout = useMemo(() => computeLayout(renderGraph, layoutMode), [renderGraph, layoutMode]);
 
   const nodeById = useMemo(() => new Map(mergedDto.nodes.map((n) => [n.id, n])), [mergedDto.nodes]);
+
+  const anchorsCountByFeature = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const edge of mergedDto.edges) {
+      if (edge.verb !== 'anchors') continue;
+      counts.set(edge.src, (counts.get(edge.src) ?? 0) + 1);
+    }
+    return counts;
+  }, [mergedDto.edges]);
 
   const summaryByNodeId = useMemo((): Map<string, NodeSummaryDTO> => {
     if (!semanticResult?.nodeSummaries.length) return new Map();
@@ -1151,6 +1509,14 @@ function KnowledgeMapGraph({
     () => (selectedId ? (nodeById.get(selectedId) ?? null) : null),
     [nodeById, selectedId],
   );
+  const selectedFoundation = selectedId === FOUNDATION_NODE_ID;
+
+  // The QA/semantic ceiling is document-scale: Code Nodes never enter the
+  // LLM layer, so the pre-emptive hint counts documents only.
+  const documentNodeCount = useMemo(
+    () => mergedDto.nodes.filter(isDocumentNode).length,
+    [mergedDto.nodes],
+  );
 
   const submitQuestion = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1158,7 +1524,7 @@ function KnowledgeMapGraph({
     if (!trimmed || askQuery.isFetching) return;
     const nextInput = {
       question: trimmed,
-      ...(selectedId ? { focusNodeId: selectedId } : {}),
+      ...(selectedId && !selectedFoundation ? { focusNodeId: selectedId } : {}),
       allowExternal: true as const,
     };
     if (
@@ -1171,27 +1537,48 @@ function KnowledgeMapGraph({
     setAskInput(nextInput);
   };
 
+  // Search pierces the fold (ticket #265): the domain includes folded code
+  // nodes by path and exported symbol name.
   const searchHits = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return null;
-    return new Set(
-      mergedDto.nodes
-        .filter(
-          (n) =>
-            n.title.toLowerCase().includes(q) ||
-            n.id.toLowerCase().includes(q) ||
-            (n.status ?? '').toLowerCase().includes(q) ||
-            (n.body ?? '').toLowerCase().includes(q),
-        )
-        .map((n) => n.id),
-    );
+    return searchKnowledgeNodes(mergedDto.nodes, q);
   }, [mergedDto.nodes, search]);
+
+  // Folded code hits surface as a pierce list; selecting one auto-expands
+  // the owning feature neighbourhood and selects the node.
+  const foldedSearchHits = useMemo(() => {
+    if (searchHits === null) return [];
+    const rendered = new Set(renderGraph.nodes.map((n) => n.id));
+    return [...searchHits]
+      .filter((id) => id.startsWith('code:') && !rendered.has(id))
+      .sort()
+      .slice(0, 8)
+      .map((id) => ({ id, owners: owningFeaturesOf(mergedDto, id) }));
+  }, [searchHits, renderGraph.nodes, mergedDto]);
+
+  const pierceTo = useCallback(
+    (codeId: string, owners: string[]) => {
+      if (owners.length > 0) {
+        setExpandedFeatures((previous) => {
+          const next = new Set(previous);
+          next.add(owners[0]);
+          return next;
+        });
+      }
+      setSelectedId(codeId);
+    },
+    [setSelectedId],
+  );
 
   const kindCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const n of mergedDto.nodes) counts.set(n.kind, (counts.get(n.kind) ?? 0) + 1);
+    for (const n of renderGraph.nodes) {
+      if (n.kind === 'foundation') continue;
+      counts.set(n.kind, (counts.get(n.kind) ?? 0) + 1);
+    }
     return counts;
-  }, [mergedDto.nodes]);
+  }, [renderGraph.nodes]);
 
   const driftNodeIds = useMemo(
     () => new Set(mergedDto.drift.map((d) => d.nodeId)),
@@ -1201,16 +1588,17 @@ function KnowledgeMapGraph({
   const visibleIds = useMemo(() => {
     if (kindFilter.size === 0 && searchHits === null && !showDriftOnly) return null;
     const ids = new Set<string>();
-    for (const n of mergedDto.nodes) {
-      if (kindFilter.size > 0 && !kindFilter.has(n.kind)) continue;
+    for (const n of renderGraph.nodes) {
+      const effectiveKind = n.kind === 'foundation' ? 'code' : n.kind;
+      if (kindFilter.size > 0 && !kindFilter.has(effectiveKind)) continue;
       if (searchHits !== null && !searchHits.has(n.id)) continue;
-      if (showDriftOnly && !driftNodeIds.has(n.id)) continue;
+      if (showDriftOnly && n.kind !== 'foundation' && !driftNodeIds.has(n.id)) continue;
       ids.add(n.id);
     }
     return ids;
-  }, [mergedDto.nodes, kindFilter, searchHits, showDriftOnly, driftNodeIds]);
+  }, [renderGraph.nodes, kindFilter, searchHits, showDriftOnly, driftNodeIds]);
 
-  const visibleCount = visibleIds === null ? mergedDto.nodes.length : visibleIds.size;
+  const visibleCount = visibleIds === null ? renderGraph.nodes.length : visibleIds.size;
 
   const kindLayer = useMemo(() => {
     const map = new Map<string, GraphLayer>();
@@ -1225,6 +1613,35 @@ function KnowledgeMapGraph({
     }),
     [mergedDto.edges],
   );
+
+  // Feature detail annotation: where its anchored code sits (communities and
+  // high fan-in members) — analytics stay visible while folded.
+  const featureCodeSummary = useMemo(() => {
+    if (!selected || selected.kind !== 'feature') return null;
+    const neighbourhood = codeNeighbourhoodOf(mergedDto, selected.id);
+    if (neighbourhood.size === 0) return null;
+    const communities = [
+      ...new Set(
+        [...neighbourhood]
+          .map((id) => analytics.communityOf[id])
+          .filter((id): id is string => id !== undefined),
+      ),
+    ].sort();
+    const hubs = analytics.codeAggregation.memberIds.filter((id) => neighbourhood.has(id)).length;
+    return { communities, hubs, size: neighbourhood.size };
+  }, [selected, mergedDto, analytics]);
+
+  const selectedDegree = useMemo(() => {
+    if (!selected) return null;
+    let inDegree = 0;
+    let outDegree = 0;
+    for (const edge of mergedDto.edges) {
+      if (edge.origin !== 'deterministic') continue;
+      if (edge.src === selected.id) outDegree += 1;
+      if (edge.dst === selected.id) inDegree += 1;
+    }
+    return { inDegree, outDegree };
+  }, [selected, mergedDto.edges]);
 
   const semanticBanner = useMemo(() => {
     if (semanticStatusError) {
@@ -1306,6 +1723,11 @@ function KnowledgeMapGraph({
               edges: dto.edges.length,
               drift: mergedDto.drift.length,
             })}
+            {renderGraph.foldedCodeCount > 0 && (
+              <span className="ml-1" data-testid="folded-count">
+                {t('knowledge.fold.foldedSuffix', { folded: renderGraph.foldedCodeCount })}
+              </span>
+            )}
             {mergedDto.edges.length > dto.edges.length && (
               <span className="ml-1 italic">
                 {t('knowledge.subtitle.inferredSuffix', {
@@ -1316,6 +1738,23 @@ function KnowledgeMapGraph({
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={collapseAll}
+            disabled={expandedFeatures.size === 0}
+            className="btn-secondary px-2 py-1 text-[11px] disabled:opacity-40"
+          >
+            {t('knowledge.fold.collapseAll')}
+          </button>
+          <label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={aggregateFoundation}
+              onChange={(e) => setAggregateFoundation(e.target.checked)}
+              className="accent-violet-500"
+            />
+            {t('knowledge.fold.aggregate')}
+          </label>
           <label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
@@ -1395,10 +1834,40 @@ function KnowledgeMapGraph({
             })}
           </div>
 
+          {foldedSearchHits.length > 0 && (
+            <div
+              data-testid="pierce-search-hits"
+              className="mb-3 rounded-md border border-slate-200 dark:border-obsidian-border bg-slate-50 dark:bg-obsidian-surface px-2.5 py-2"
+            >
+              <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">
+                {t('knowledge.fold.searchHits', { count: foldedSearchHits.length })}
+              </div>
+              <ul className="space-y-1">
+                {foldedSearchHits.map((hit) => (
+                  <li key={hit.id}>
+                    <button
+                      type="button"
+                      data-testid={`pierce-hit-${hit.id}`}
+                      onClick={() => pierceTo(hit.id, hit.owners)}
+                      className="w-full text-left rounded border border-slate-200 dark:border-obsidian-border px-2 py-1 text-[10px] font-mono text-slate-600 dark:text-slate-300 hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors"
+                    >
+                      {hit.id.slice('code:'.length)}
+                      <span className="ml-1.5 text-slate-400 not-italic">
+                        {hit.owners.length > 0
+                          ? t('knowledge.fold.searchHitAction', { feature: hit.owners[0] })
+                          : t('knowledge.fold.searchHitUnowned')}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="card bg-dot-matrix relative" style={{ height: '70vh', minHeight: 480 }}>
             <ReactFlowProvider>
               <FlowCanvas
-                dto={mergedDto}
+                graph={renderGraph}
                 layout={layout}
                 selectedId={selectedId}
                 hoverId={hoverId}
@@ -1407,6 +1876,12 @@ function KnowledgeMapGraph({
                 visibleIds={visibleIds}
                 searchHits={searchHits}
                 showInferred={showInferred}
+                driftNodeIds={driftNodeIds}
+                godNodeIds={godNodeIds}
+                communityOf={analytics.communityOf}
+                anchorsCountByFeature={anchorsCountByFeature}
+                expandedFeatures={expandedFeatures}
+                onToggleExpand={toggleExpand}
               />
             </ReactFlowProvider>
             <div className="absolute bottom-3 left-3 bg-white/90 dark:bg-obsidian-surface/90 backdrop-blur rounded-md border border-slate-200 dark:border-obsidian-border px-3 py-2 text-[10px] text-slate-500 dark:text-slate-400 space-y-1 pointer-events-none">
@@ -1438,7 +1913,7 @@ function KnowledgeMapGraph({
             role="group"
             aria-label={t('knowledge.rail.label')}
           >
-            {(['detail', 'ask'] as const).map((view) => (
+            {(['detail', 'ask', 'analytics'] as const).map((view) => (
               <button
                 key={view}
                 type="button"
@@ -1459,13 +1934,26 @@ function KnowledgeMapGraph({
               question={question}
               onQuestionChange={setQuestion}
               onSubmit={submitQuestion}
-              focusNode={selected}
+              focusNode={selectedFoundation ? null : selected}
               result={askQuery.data}
               isFetching={askQuery.isFetching}
               errorCode={askQuery.error?.message ?? null}
               nodeById={nodeById}
               onSelect={setSelectedId}
-              nodeCount={mergedDto.nodes.length}
+              nodeCount={documentNodeCount}
+            />
+          ) : railView === 'analytics' ? (
+            <KnowledgeAnalyticsPanel
+              analytics={analytics}
+              nodeById={nodeById}
+              onSelect={setSelectedId}
+            />
+          ) : selectedFoundation ? (
+            <FoundationDetailPanel
+              memberIds={renderGraph.foundationMemberIds}
+              nodeById={nodeById}
+              inDegreeP99={analytics.codeAggregation.inDegreeP99}
+              onSelect={setSelectedId}
             />
           ) : selected ? (
             <div className="card p-4 max-h-[70vh] overflow-y-auto">
@@ -1488,6 +1976,75 @@ function KnowledgeMapGraph({
                 {selected.title}
               </h2>
               <div className="text-[11px] font-mono text-slate-400 mt-1">{selected.id}</div>
+
+              {selected.kind === 'feature' && (anchorsCountByFeature.get(selected.id) ?? 0) > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  <button
+                    type="button"
+                    data-testid="detail-expand-implementation"
+                    onClick={() => toggleExpand(selected.id)}
+                    className="btn-secondary w-full text-xs"
+                  >
+                    {expandedFeatures.has(selected.id)
+                      ? t('knowledge.fold.collapse')
+                      : t('knowledge.fold.expand')}
+                  </button>
+                  {featureCodeSummary && (
+                    <p
+                      className="text-[10px] text-slate-500 dark:text-slate-400"
+                      data-testid="feature-code-summary"
+                    >
+                      {t('knowledge.feature.codeSummary', {
+                        communities: featureCodeSummary.communities.join(', ') || '—',
+                        hubs: featureCodeSummary.hubs,
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {(selected.kind === 'code' || analytics.communityOf[selected.id]) && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                  {analytics.communityOf[selected.id] && (
+                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      {t('knowledge.community')} {analytics.communityOf[selected.id]}
+                    </span>
+                  )}
+                  {selectedDegree && (
+                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      {t('knowledge.degree')} {selectedDegree.inDegree + selectedDegree.outDegree} (
+                      {selectedDegree.inDegree} in / {selectedDegree.outDegree} out)
+                    </span>
+                  )}
+                  {godNodeIds.has(selected.id) && (
+                    <span
+                      title={t('knowledge.godNode.tooltip')}
+                      className="px-1.5 py-0.5 rounded bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/50 dark:text-fuchsia-200 uppercase"
+                    >
+                      ▲ {t('knowledge.godNode.badge')}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {selected.kind === 'code' && (selected.symbols?.length ?? 0) > 0 && (
+                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">
+                    {t('knowledge.symbols')} ({selected.symbols!.length})
+                  </div>
+                  <ul className="max-h-40 overflow-y-auto space-y-0.5" data-testid="code-symbols">
+                    {selected.symbols!.slice(0, 60).map((symbol) => (
+                      <li
+                        key={symbol.name}
+                        className="font-mono text-[10px] text-slate-600 dark:text-slate-300"
+                      >
+                        {symbol.name}
+                        <span className="text-slate-400"> :{symbol.startLine}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {selected.body && (
                 <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">

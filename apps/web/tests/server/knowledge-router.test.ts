@@ -37,7 +37,8 @@ describe('knowledgeRouter', () => {
   it('is mounted on the app router under the knowledge key', async () => {
     const result = await appCaller.knowledge.graph();
 
-    expect(result.schemaVersion).toBe('1');
+    expect(result.schemaVersion).toBe('2');
+    expect(result.toolchain.typescript).toMatch(/^\d+\.\d+\.\d+/);
     expect(Array.isArray(result.nodes)).toBe(true);
     expect(result.nodes.length).toBeGreaterThan(0);
   });

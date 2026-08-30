@@ -87,10 +87,21 @@ test.describe('Knowledge Map (/knowledge)', () => {
 
     const { visible, total, edges } = await getSubtitleCounts(page);
 
-    // Counts are real and non-trivial — regression guard.
+    // Counts are real and non-trivial — regression guard. With the F060 code
+    // layer the total includes Code Nodes, which fold by default: the
+    // rendered view stays document scale.
     expect(total).toBeGreaterThanOrEqual(100);
-    expect(visible).toBe(total); // no filter active on initial load
+    expect(visible).toBeGreaterThanOrEqual(80);
+    expect(visible).toBeLessThan(total); // code nodes folded on initial load
     expect(edges).toBeGreaterThanOrEqual(80);
+
+    // The folded count is reported and consistent with visible/total.
+    const folded = page.getByTestId('folded-count');
+    await expect(folded).toBeVisible();
+    const foldedText = (await folded.textContent()) ?? '';
+    const foldedMatch = /(\d+)/.exec(foldedText);
+    expect(foldedMatch).not.toBeNull();
+    expect(visible + parseInt(foldedMatch![1], 10)).toBe(total);
   });
 
   test('does not render fixture-only sentinel content', async ({ page }) => {
@@ -241,7 +252,9 @@ test.describe('Knowledge Map (/knowledge)', () => {
     await expect(detailCard.getByText(/^context$/i)).toBeVisible();
     await expect(detailCard).toContainText('A project gains AGENTS.md/CLAUDE.md');
 
-    await expect(detailCard.getByText(/^anchors$/i)).toBeVisible();
+    // The mini context graph also renders "anchors" as a verb label now
+    // (F060 made anchors real edges), so scope to the section heading div.
+    await expect(detailCard.locator('div', { hasText: /^anchors$/i }).first()).toBeVisible();
     const scaffoldingAnchor = detailCard.locator('li').filter({
       hasText: /^scripts\/lib\/core\/scaffolding\.js/,
     });
@@ -537,7 +550,7 @@ test.describe('Knowledge Map — i18n (en/zh)', () => {
     // Translated controls: search, layout modes, right-rail views.
     await expect(page.locator('input[type="search"]')).toHaveAttribute(
       'placeholder',
-      '按标题、ID、状态、内容搜索节点…',
+      '按标题、ID、状态、内容、代码路径、导出符号搜索…',
     );
     await expect(page.getByRole('button', { name: '聚簇' })).toBeVisible();
     await expect(page.getByRole('button', { name: '分层' })).toBeVisible();
@@ -651,5 +664,111 @@ test.describe('Knowledge Map — dual theme', () => {
 
     await toggle.click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);
+  });
+
+  test('F060: code folds by default and a feature affordance expands and collapses its neighbourhood', async ({
+    page,
+  }) => {
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    // Folded default: zero code nodes on the canvas.
+    expect(await page.locator('[data-testid^="knowledge-node-code:"]').count()).toBe(0);
+
+    // F059 anchors real code — its affordance chip expands the neighbourhood.
+    const chip = page.getByTestId('expand-toggle-feature:F059');
+    await expect(chip).toBeVisible({ timeout: 10_000 });
+    await chip.click();
+    await expect(
+      page.getByTestId('knowledge-node-code:scripts/lib/core/knowledge-graph.js'),
+    ).toBeVisible({ timeout: 10_000 });
+
+    const { visible: expandedVisible, total } = await getSubtitleCounts(page);
+    expect(expandedVisible).toBeLessThan(total); // never a whole-graph floodgate
+
+    // Collapse-all returns to the document scale.
+    await page.getByRole('button', { name: /collapse all code/i }).click();
+    await expect(
+      page.getByTestId('knowledge-node-code:scripts/lib/core/knowledge-graph.js'),
+    ).not.toBeVisible();
+    expect(await page.locator('[data-testid^="knowledge-node-code:"]').count()).toBe(0);
+  });
+
+  test('F060: shared-foundation super-node aggregates high fan-in code; member jump without un-aggregation', async ({
+    page,
+  }) => {
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    await page.getByTestId('expand-toggle-feature:F059').click();
+
+    // knowledge-graph.js imports fs-utils.js, a p99 fan-in member — the
+    // super-node must appear instead of the member.
+    const foundation = page.getByTestId('knowledge-node-foundation:shared-code');
+    await expect(foundation).toBeVisible({ timeout: 10_000 });
+    expect(
+      await page
+        .locator('[data-testid="knowledge-node-code:scripts/lib/core/fs-utils.js"]')
+        .count(),
+    ).toBe(0);
+
+    // Detail panel lists members with per-member jumps; the canvas keeps the
+    // super-node (no un-aggregation).
+    await foundation.click();
+    await expect(page.getByTestId('foundation-detail-panel')).toBeVisible();
+    await page.getByTestId('foundation-member-code:scripts/lib/core/fs-utils.js').click();
+    await expect(page.getByTestId('knowledge-node-foundation:shared-code')).toBeVisible();
+    await expect(
+      page.locator('dd.font-mono', { hasText: 'scripts/lib/core/fs-utils.js' }),
+    ).toBeVisible();
+
+    // The user-facing toggle pours the members back as plain nodes.
+    await page.getByLabel(/aggregate shared foundation/i).click();
+    await expect(
+      page.getByTestId('knowledge-node-code:scripts/lib/core/fs-utils.js'),
+    ).toBeVisible();
+    expect(
+      await page.locator('[data-testid="knowledge-node-foundation:shared-code"]').count(),
+    ).toBe(0);
+  });
+
+  test('F060: search pierces the fold by exported symbol and auto-expands the owning feature', async ({
+    page,
+  }) => {
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    const searchBox = page.locator('input[type="search"]');
+    await searchBox.fill('serializeKnowledgeGraph');
+    await expect(page.getByTestId('pierce-search-hits')).toBeVisible({ timeout: 5_000 });
+
+    const hit = page.getByTestId('pierce-hit-code:scripts/lib/core/knowledge-graph.js');
+    await expect(hit).toBeVisible();
+    await hit.click();
+
+    // The owning feature neighbourhood expanded and the node is selected.
+    await expect(
+      page.getByTestId('knowledge-node-code:scripts/lib/core/knowledge-graph.js'),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('div', { hasText: /^exported symbols/i }).first()).toBeVisible();
+  });
+
+  test('F060: god-node badges and the analytics report stay available on the folded view', async ({
+    page,
+  }) => {
+    await page.goto('/knowledge');
+    await waitForGraph(page);
+
+    // Document-layer god nodes badge while everything is folded.
+    expect(await page.getByTestId('god-node-badge').count()).toBeGreaterThanOrEqual(1);
+
+    // The readable deterministic report.
+    await page.getByRole('button', { name: /^analytics$/i }).click();
+    const report = page.getByTestId('knowledge-analytics-report');
+    await expect(report).toBeVisible();
+    await expect(report.getByText(/p99/i).first()).toBeVisible();
+    const reportText = (await report.textContent()) ?? '';
+    expect(reportText).toMatch(/communities/i);
+    expect(reportText).toMatch(/c\d+/);
   });
 });

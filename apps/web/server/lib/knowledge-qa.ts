@@ -5,7 +5,7 @@ import type {
   KnowledgeAskResultDTO,
   KnowledgeGraphDTO,
 } from '../../src/lib/knowledge-dto';
-import { MAX_CONTEXT_NODES } from '../../src/lib/knowledge-dto';
+import { MAX_CONTEXT_NODES, isDocumentNode } from '../../src/lib/knowledge-dto';
 import { completeWithMetadata } from './knowledge-llm';
 
 const requireCli = createRequire(import.meta.url);
@@ -85,6 +85,23 @@ interface ContextAssembly {
   nodeIds: Set<string>;
 }
 
+/**
+ * The read-time LLM layer is a document surface (F060): Code Nodes and the
+ * code-only verbs never enter context, citations, or the ceiling math. The
+ * imports/anchors edges vanish with their code endpoints, so prompts and
+ * their hashes stay byte-identical to F059.
+ */
+function documentScope(snapshot: KnowledgeGraphDTO): KnowledgeGraphDTO {
+  const nodes = snapshot.nodes.filter(isDocumentNode);
+  const documentIds = new Set(nodes.map((node) => node.id));
+  return {
+    ...snapshot,
+    nodes,
+    edges: snapshot.edges.filter((edge) => documentIds.has(edge.src) && documentIds.has(edge.dst)),
+    drift: snapshot.drift.filter((finding) => documentIds.has(finding.nodeId)),
+  };
+}
+
 // Byte order, matching the deterministic graph builder: localeCompare is
 // ICU/locale sensitive, so the same snapshot could otherwise digest
 // differently on differently configured servers.
@@ -137,13 +154,14 @@ export function assembleKnowledgeContext(
   focusNodeId: string | undefined,
   promptVersion = CITED_QA_PROMPT_VERSION,
 ): ContextAssembly {
-  const includedIds = focusedNodeIds(snapshot, focusNodeId);
+  const scoped = documentScope(snapshot);
+  const includedIds = focusedNodeIds(scoped, focusNodeId);
   const nodes = stable(
-    snapshot.nodes.filter((node) => includedIds.has(node.id)),
+    scoped.nodes.filter((node) => includedIds.has(node.id)),
     (node) => node.id,
   );
   const edges = stable(
-    snapshot.edges.filter(
+    scoped.edges.filter(
       (edge) =>
         edge.origin === 'deterministic' && includedIds.has(edge.src) && includedIds.has(edge.dst),
     ),
@@ -155,7 +173,7 @@ export function assembleKnowledgeContext(
     ...(evidence ? { evidence } : {}),
   }));
   const drift = stable(
-    snapshot.drift.filter((finding) => includedIds.has(finding.nodeId)),
+    scoped.drift.filter((finding) => includedIds.has(finding.nodeId)),
     (finding) => `${finding.nodeId}\0${finding.path}\0${finding.detail}`,
   );
   const context = canonicalJson(
@@ -186,7 +204,7 @@ export function validateCitedAnswer(
     throw new Error('invalid-json');
   }
   const answer = ProviderAnswerSchema.parse(parsed);
-  const validNodeIds = new Set(snapshot.nodes.map((node) => node.id));
+  const validNodeIds = new Set(documentScope(snapshot).nodes.map((node) => node.id));
   const segments: KnowledgeAnswerSegmentDTO[] = [];
   let omittedCount = 0;
 

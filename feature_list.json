@@ -2032,6 +2032,42 @@
 				"apps/web/src/features/knowledge/KnowledgeMapPage.tsx"
 			],
 			"updated": "2026-08-28"
+		},
+		{
+			"id": "F060",
+			"priority": 60,
+			"area": "knowledge",
+			"title": "Knowledge Map v2 — code graph & interaction upgrade",
+			"user_visible_behavior": "The knowledge graph gains a deterministic code layer (file-level Code Nodes with exported-symbol tables, imports edges, feature anchors edges) at schemaVersion 2, read-time analytics (per-layer p99 god nodes, Louvain communities with a connectivity post-split, two neutral anomaly detectors), and a folded-by-default /knowledge map: per-feature expansion with a global collapse, a shared-foundation super-node aggregated in the renderer only, session-scoped drag, and search that pierces the fold by path and exported symbol.",
+			"status": "passing",
+			"verification": [
+				"node scripts/amber.js knowledge graph --target . --json (schemaVersion 2, schema-valid, byte-stable recompute, projection==tree parity)",
+				"node --test tests/unit/code-graph.test.js tests/unit/knowledge-graph.test.js (synthetic-corpus extraction + real-tree population invariants)",
+				"npm test",
+				"apps/web: npx vitest run (analytics determinism property tests, render-graph fold contracts) + npx playwright test tests/e2e/knowledge.spec.ts (fold/expansion/aggregation/pierce-search/badges on live extraction)"
+			],
+			"evidence": [
+				{
+					"command": "node scripts/amber.js knowledge graph --target . --json && npm test && npm --prefix apps/web test; apps/web: npx playwright test tests/e2e/knowledge.spec.ts",
+					"result": "graph byte-stable at schemaVersion 2 (494 nodes incl. 395 code / 1441 edges incl. 1212 imports + 126 anchors / 2 standing drift findings, worktree without .amber artifacts); root suite 3415/3415; web vitest 704/704; knowledge e2e 22/22 in a real browser against live extraction",
+					"date": "2026-08-30",
+					"notes": "analytics measured on the real tree: implementation p99=35 (fs-utils.js 92°), 62 communities, largest 17.8%, weighted singletons 0% — flip condition not triggered; 3 shared-foundation members; 9 rare-pair + 7 bridge anomaly marks"
+				}
+			],
+			"notes": [
+				"Spec docs/specs/F060-knowledge-map-v2-code-graph.md (wayfinder map #260; decisions #259/#261-#265; ADR-0025).",
+				"Registration follows the F059 registry convention; the spec §Further Notes minimal JSON (id, title, spec path, paths) is embedded verbatim in this entry.",
+				"The read-time LLM layer stays document-scale: Code Nodes never enter QA/semantic context, so F059 prompts and hashes are byte-identical."
+			],
+			"paths": [
+				"docs/specs/F060-knowledge-map-v2-code-graph.md",
+				"scripts/lib/core/knowledge-graph.js",
+				"scripts/lib/core/code-graph.js",
+				"schemas/knowledge-graph.schema.json",
+				"apps/web/src/features/knowledge/",
+				"apps/web/server/lib/knowledge-graph-reader.ts"
+			],
+			"updated": "2026-08-30"
 		}
 	]
 }

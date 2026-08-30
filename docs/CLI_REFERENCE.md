@@ -2651,7 +2651,8 @@ directions (a tree document not yet admitted; a census row whose file vanished) 
 is the regenerated manifest diff in your commit, not a constant in code.
 
 ```bash
-# Deterministic knowledge graph (reads committed docs/knowledge-corpus/)
+# Deterministic knowledge graph, schemaVersion 2 (documents from committed
+# docs/knowledge-corpus/; file-level Code Nodes extracted from the tree — F060/ADR-0025)
 node scripts/amber.js knowledge graph --target . --json
 
 # Render the tree-derived manifest and validate it against the committed census

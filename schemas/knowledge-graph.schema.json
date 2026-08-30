@@ -2,19 +2,28 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "amber/knowledge-graph.schema.json",
 	"title": "Knowledge Graph",
-	"description": "Deterministic knowledge-graph contract (F059): the repository's knowledge corpus as a three-layer, four-verb graph shared by `amber knowledge graph --json` and the web knowledge surface. The graph is a pure function of the committed tree: stable order, no absolute paths, byte-identical on recompute. Every node and edge carries provenance; this deterministic layer emits only \"deterministic\" — \"inferred\" is reserved for the read-time LLM layer, which is never persisted.",
+	"description": "Deterministic knowledge-graph contract (F059, extended by the F060 code layer per ADR-0025): the repository's knowledge corpus as a three-layer, six-verb graph shared by `amber knowledge graph --json` and the web knowledge surface. The graph is a pure function of the committed tree: stable order, no absolute paths, byte-identical on recompute. Every node and edge carries provenance; this deterministic layer emits only \"deterministic\" — \"inferred\" is reserved for the read-time LLM layer, which is never persisted. Read-time analytics (god nodes, communities, anomaly marks) are never part of these bytes.",
 	"type": "object",
-	"required": ["schemaVersion", "nodes", "edges", "drift"],
+	"required": ["schemaVersion", "toolchain", "nodes", "edges", "drift"],
 	"additionalProperties": false,
 	"properties": {
 		"schemaVersion": {
 			"type": "string",
-			"enum": ["1"],
-			"description": "Graph schema version. Bumped on breaking shape changes (ADR-0012)."
+			"enum": ["2"],
+			"description": "Graph schema version. Bumped on breaking shape changes (ADR-0012); version 2 admits Code Nodes and the imports/anchors verbs (ADR-0025)."
+		},
+		"toolchain": {
+			"type": "object",
+			"required": ["typescript"],
+			"additionalProperties": false,
+			"description": "Extraction toolchain provenance: the exact compiler version behind the code layer, so a byte diff across environments is explainable (F060 determinism discipline).",
+			"properties": {
+				"typescript": { "type": "string", "minLength": 1 }
+			}
 		},
 		"nodes": {
 			"type": "array",
-			"description": "Graph nodes in stable id order. Code files are not nodes; artifacts enter at identity granularity.",
+			"description": "Graph nodes in stable id order. Product source files enter as file-level Code Nodes (ADR-0025); test files stay out; artifacts enter at identity granularity.",
 			"items": {
 				"type": "object",
 				"required": ["id", "kind", "layer", "title", "sourcePath", "provenance"],
@@ -22,17 +31,17 @@
 				"properties": {
 					"id": {
 						"type": "string",
-						"pattern": "^(adr|artifact|wiki|memory|architecture|feature):.+$",
-						"description": "Kind-prefixed node id, unique across the graph."
+						"pattern": "^(adr|artifact|wiki|memory|architecture|feature|code):.+$",
+						"description": "Kind-prefixed node id, unique across the graph. Code Nodes use code:<POSIX path>."
 					},
 					"kind": {
 						"type": "string",
-						"enum": ["adr", "artifact", "wiki", "memory", "architecture", "feature"]
+						"enum": ["adr", "artifact", "wiki", "memory", "architecture", "feature", "code"]
 					},
 					"layer": {
 						"type": "string",
 						"enum": ["decision", "knowledge", "implementation"],
-						"description": "Three-layer ontology: decision (adr, artifact), knowledge (wiki, memory, architecture), implementation (feature)."
+						"description": "Three-layer ontology: decision (adr, artifact), knowledge (wiki, memory, architecture), implementation (feature, code)."
 					},
 					"title": { "type": "string", "minLength": 1 },
 					"status": { "type": "string" },
@@ -48,7 +57,21 @@
 					"paths": {
 						"type": "array",
 						"items": { "type": "string", "minLength": 1 },
-						"description": "Declared anchors (a node property, never a ghost edge)."
+						"description": "Declared anchors. Still a node property; a declared path that is itself a Code Node additionally becomes an anchors edge (ADR-0025)."
+					},
+					"symbols": {
+						"type": "array",
+						"description": "Exported-symbol table of a Code Node (never child nodes): 1-based positions, sorted by (startLine, startCol, name), deduplicated by name.",
+						"items": {
+							"type": "object",
+							"required": ["name", "startLine", "startCol"],
+							"additionalProperties": false,
+							"properties": {
+								"name": { "type": "string", "minLength": 1 },
+								"startLine": { "type": "integer", "minimum": 1 },
+								"startCol": { "type": "integer", "minimum": 1 }
+							}
+						}
 					},
 					"contextPage": {
 						"type": "string",
@@ -57,7 +80,7 @@
 					"body": {
 						"type": "string",
 						"maxLength": 2000,
-						"description": "Bounded Markdown/source excerpt from the node's canonical source (≤2000 chars). Present when canonical text is available: ADR/wiki/memory/architecture nodes use their source file text; feature nodes use the canonical feature_list.json fields (title, user_visible_behavior, verification, notes); artifact nodes use the head revision's committed body. Absent when no canonical text is available."
+						"description": "Bounded Markdown/source excerpt from the node's canonical source (≤2000 chars). Present when canonical text is available: ADR/wiki/memory/architecture nodes use their source file text; feature nodes use the canonical feature_list.json fields (title, user_visible_behavior, verification, notes); artifact nodes use the head revision's committed body. Absent when no canonical text is available; Code Nodes carry no body — their symbols table is the excerpt."
 					},
 					"revisions": {
 						"type": "integer",
@@ -70,7 +93,7 @@
 		},
 		"edges": {
 			"type": "array",
-			"description": "Directed declarer -> declared edges in stable (src, verb, dst) order. Exactly four verbs.",
+			"description": "Directed declarer -> declared edges in stable (src, verb, dst) order. Exactly six verbs: the four document verbs keep their F059 semantics; imports carries file-level code dependency (aggregated per file pair, never overloading references); anchors links feature -> code only when the declared path is a Code Node.",
 			"items": {
 				"type": "object",
 				"required": ["src", "dst", "verb", "provenance"],
@@ -80,7 +103,7 @@
 					"dst": { "type": "string", "minLength": 1 },
 					"verb": {
 						"type": "string",
-						"enum": ["supersedes", "builds-on", "references", "describes"]
+						"enum": ["supersedes", "builds-on", "references", "describes", "imports", "anchors"]
 					},
 					"provenance": { "type": "string", "enum": ["deterministic", "inferred"] },
 					"evidence": {
@@ -95,14 +118,14 @@
 								"line": { "type": "integer", "minimum": 1 }
 							}
 						},
-						"description": "Where the declaring document names the target."
+						"description": "Where the declaring document names the target; for imports edges, each import statement in the declaring file."
 					}
 				}
 			}
 		},
 		"drift": {
 			"type": "array",
-			"description": "Dead-anchor findings attached to the declaring node, in stable (nodeId, path) order.",
+			"description": "Dead-anchor findings attached to the declaring node, in stable (nodeId, path) order. A dead anchor never becomes a dangling edge (ADR-0025).",
 			"items": {
 				"type": "object",
 				"required": ["nodeId", "kind", "path", "detail"],

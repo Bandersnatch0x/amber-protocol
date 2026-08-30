@@ -102,7 +102,8 @@
 	"license": "MIT",
 	"dependencies": {
 		"ajv": "^8.20.0",
-		"ajv-formats": "^3.0.1"
+		"ajv-formats": "^3.0.1",
+		"typescript": "^6.0.3"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

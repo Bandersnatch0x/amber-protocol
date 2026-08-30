@@ -59,10 +59,20 @@ function listRootSessions() {
 }
 const sessionsBefore = new Set(listRootSessions());
 
-const result = spawnSync(process.execPath, ["--test", ...files], {
-	stdio: "inherit",
-	cwd: ROOT,
-});
+// Relative paths keep the command line inside the Windows 32K limit even
+// from a deep worktree root (325 absolute paths overflow it: ENAMETOOLONG).
+const result = spawnSync(
+	process.execPath,
+	["--test", ...files.map((file) => path.relative(ROOT, file))],
+	{
+		stdio: "inherit",
+		cwd: ROOT,
+	},
+);
+if (result.error) {
+	console.error(`[amber] test runner failed to launch: ${result.error.message}`);
+	process.exit(1);
+}
 
 const leaked = listRootSessions().filter((id) => !sessionsBefore.has(id));
 if (leaked.length > 0) {
