@@ -14,8 +14,6 @@
 
 const path = require("node:path");
 
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { showApproval, consumeApproval } = require("./approval-registry");
@@ -23,17 +21,14 @@ const { showEvidence, RECORDABLE_ASSURANCE } = require("./evidence-receipts");
 const {
 	GENESIS_HASH,
 	chainHash,
-	chainHeadHash,
-	acquireLedgerLock,
-	appendWithinCeiling: sharedAppendWithinCeiling,
 	canonicalHashOf,
 	findDecisionSpend,
 } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 
 const RUNNER_REGISTRY_SCHEMA_VERSION = 1;
 const SUPPORTED_RUNNER_REGISTRY_SCHEMA_VERSIONS = Object.freeze([1]);
 const DEFAULT_MAX_RUNNER_REGISTRY_BYTES = 1024 * 1024;
-const LOCK_STALE_MS = 30_000;
 
 // The closed effect vocabulary capabilities declare. Risk derivation (T2)
 // and environment profiles (T3) reason over these facts, so a free-text
@@ -115,32 +110,11 @@ const INTEGRITY_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const CAPABILITY_NAME_PATTERN = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/;
 
 function registryPath(cwd) {
-	return statePathForCreate(cwd, "runner", "registry.jsonl");
+	return REGISTRY_LEDGER.path(cwd);
 }
 
 function runnerCorrupt(message) {
 	return typedError(CORRUPT_CODE, message);
-}
-
-function acquireRunnerLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(registryPath(cwd)),
-		lockName: "registry.lock",
-		conflictCode: LOCK_CODE,
-		corruptCode: CORRUPT_CODE,
-		label: "runner registry",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function appendRunnerWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: registryPath(cwd),
-		event,
-		envName: "AMBER_RUNNER_MAX_REGISTRY_BYTES",
-		defaultBytes: DEFAULT_MAX_RUNNER_REGISTRY_BYTES,
-		label: "runner registry",
-	});
 }
 
 function isPlainObject(value) {
@@ -261,61 +235,186 @@ function capabilityKey(runnerId, runnerVersion, name, capabilityVersion) {
 	return `${runnerId}@${runnerVersion}/${name}@${capabilityVersion}`;
 }
 
-function foldRunnerRegistry(cwd) {
-	const events = readLedgerFailClosed(registryPath(cwd), CORRUPT_CODE, "runner registry");
-	let prevHash = GENESIS_HASH;
-	const runners = [];
-	const capabilities = [];
-	const runnerVersions = new Set();
-	const capabilityKeys = new Set();
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		if (!isPlainObject(event)) throw runnerCorrupt(`runner event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw runnerCorrupt(`runner event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
+function applyRegistryEvent(state, event, lineIndex) {
+	if (!SUPPORTED_RUNNER_REGISTRY_SCHEMA_VERSIONS.includes(event.schemaVersion))
+		throw runnerCorrupt(
+			`runner event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		);
+	if (event.kind === "runner") {
+		const problem = runnerEventProblem(event, lineIndex);
+		if (problem !== null) throw runnerCorrupt(problem);
+		const key = runnerKey(event.id, event.version);
+		if (state.runnerVersions.has(key))
+			throw runnerCorrupt(`runner ${JSON.stringify(key)} is registered more than once`);
+		state.runnerVersions.add(key);
+		const { prevHash: _prev, hash: _hash, ...body } = event;
+		state.runners.push({ ...body, index: lineIndex - 1 });
+	} else if (event.kind === "capability") {
+		const problem = capabilityEventProblem(event, lineIndex);
+		if (problem !== null) throw runnerCorrupt(problem);
+		if (!state.runnerVersions.has(runnerKey(event.runnerId, event.runnerVersion)))
 			throw runnerCorrupt(
-				`runner event ${lineIndex} carries a hash that does not match its content`,
+				`runner event ${lineIndex} registers a capability for unknown runner ${JSON.stringify(runnerKey(event.runnerId, event.runnerVersion))}`,
 			);
-		if (!SUPPORTED_RUNNER_REGISTRY_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw runnerCorrupt(
-				`runner event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		const key = capabilityKey(
+			event.runnerId,
+			event.runnerVersion,
+			event.name,
+			event.capabilityVersion,
+		);
+		if (state.capabilityKeys.has(key))
+			throw runnerCorrupt(`capability ${JSON.stringify(key)} is registered more than once`);
+		state.capabilityKeys.add(key);
+		const { prevHash: _prev, hash: _hash, ...body } = event;
+		state.capabilities.push({ ...body, index: lineIndex - 1 });
+	} else {
+		throw runnerCorrupt(
+			`runner event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+		);
+	}
+}
+
+function applyRequestEvent(state, event, lineIndex) {
+	if (!SUPPORTED_RUNNER_REQUEST_SCHEMA_VERSIONS.includes(event.schemaVersion))
+		throw requestCorrupt(
+			`runner request event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		);
+	if (event.kind === "requested") {
+		const problem = requestedEventProblem(event, lineIndex);
+		if (problem !== null) throw requestCorrupt(problem);
+		if (state.byHash.has(event.requestHash))
+			throw requestCorrupt(
+				`request ${JSON.stringify(event.requestHash)} is recorded more than once`,
 			);
-		if (event.kind === "runner") {
-			const problem = runnerEventProblem(event, lineIndex);
-			if (problem !== null) throw runnerCorrupt(problem);
-			const key = runnerKey(event.id, event.version);
-			if (runnerVersions.has(key))
-				throw runnerCorrupt(`runner ${JSON.stringify(key)} is registered more than once`);
-			runnerVersions.add(key);
-			const { prevHash: _prev, hash: _hash, ...body } = event;
-			runners.push({ ...body, index });
-		} else if (event.kind === "capability") {
-			const problem = capabilityEventProblem(event, lineIndex);
-			if (problem !== null) throw runnerCorrupt(problem);
-			if (!runnerVersions.has(runnerKey(event.runnerId, event.runnerVersion)))
-				throw runnerCorrupt(
-					`runner event ${lineIndex} registers a capability for unknown runner ${JSON.stringify(runnerKey(event.runnerId, event.runnerVersion))}`,
-				);
-			const key = capabilityKey(
-				event.runnerId,
-				event.runnerVersion,
-				event.name,
-				event.capabilityVersion,
+		const { prevHash: _prev, hash: _hash, ...body } = event;
+		const record = { ...body, index: lineIndex - 1, authorization: null };
+		state.byHash.set(event.requestHash, record);
+		state.requests.push(record);
+	} else if (event.kind === "denied") {
+		const problem = deniedEventProblem(event, lineIndex);
+		if (problem !== null) throw requestCorrupt(problem);
+		const { prevHash: _prev, hash: _hash, ...body } = event;
+		state.denials.push({ ...body, index: lineIndex - 1 });
+	} else if (event.kind === "authorized") {
+		const problem = authorizedEventProblem(event, lineIndex);
+		if (problem !== null) throw requestCorrupt(problem);
+		const record = state.byHash.get(event.requestHash);
+		if (!record)
+			throw requestCorrupt(
+				`runner request event ${lineIndex} authorizes unknown request ${JSON.stringify(event.requestHash)}`,
 			);
-			if (capabilityKeys.has(key))
-				throw runnerCorrupt(`capability ${JSON.stringify(key)} is registered more than once`);
-			capabilityKeys.add(key);
-			const { prevHash: _prev, hash: _hash, ...body } = event;
-			capabilities.push({ ...body, index });
-		} else {
-			throw runnerCorrupt(
-				`runner event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+		if (record.authorization !== null)
+			throw requestCorrupt(
+				`runner request event ${lineIndex} authorizes ${JSON.stringify(event.requestHash)} twice`,
 			);
-		}
-		prevHash = event.hash;
-	});
-	return { runners, capabilities };
+		record.authorization = {
+			at: event.at,
+			approvalId: event.approvalId,
+			decision: event.decision,
+		};
+	} else {
+		throw requestCorrupt(
+			`runner request event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+		);
+	}
+}
+
+function applyPreparedExecutionEvent(state, event, lineIndex) {
+	const problem = preparedEventProblem(event, lineIndex);
+	if (problem !== null) throw executionCorrupt(problem);
+	if (state.byHash.has(event.requestHash))
+		throw executionCorrupt(
+			`runner execution event ${lineIndex} prepares ${JSON.stringify(event.requestHash)} twice`,
+		);
+	const record = {
+		requestHash: event.requestHash,
+		runner: event.runner,
+		preparedAt: event.at,
+		settlement: null,
+		aborted: null,
+		rollback: null,
+		index: lineIndex - 1,
+	};
+	state.byHash.set(event.requestHash, record);
+	state.records.push(record);
+}
+
+function applySettledExecutionEvent(state, event, lineIndex) {
+	const problem = settledEventProblem(event, lineIndex);
+	if (problem !== null) throw executionCorrupt(problem);
+	const record = state.byHash.get(event.requestHash);
+	if (!record)
+		throw executionCorrupt(
+			`runner execution event ${lineIndex} settles unprepared ${JSON.stringify(event.requestHash)}`,
+		);
+	if (record.settlement !== null || record.aborted !== null)
+		throw executionCorrupt(
+			`runner execution event ${lineIndex} settles ${JSON.stringify(event.requestHash)} after its terminal event`,
+		);
+	record.settlement = {
+		at: event.at,
+		outcome: event.outcome,
+		reason: event.reason,
+		receipt: event.receipt,
+		receiptHash: event.receiptHash,
+		resultIntegrity: event.resultIntegrity,
+	};
+}
+
+function applyAbortedExecutionEvent(state, event, lineIndex) {
+	const problem = abortedEventProblem(event, lineIndex);
+	if (problem !== null) throw executionCorrupt(problem);
+	const record = state.byHash.get(event.requestHash);
+	if (!record)
+		throw executionCorrupt(
+			`runner execution event ${lineIndex} aborts unprepared ${JSON.stringify(event.requestHash)}`,
+		);
+	if (record.settlement !== null || record.aborted !== null)
+		throw executionCorrupt(
+			`runner execution event ${lineIndex} aborts ${JSON.stringify(event.requestHash)} after its terminal event`,
+		);
+	record.aborted = { at: event.at, reason: event.reason };
+}
+
+function applyRolledBackExecutionEvent(state, event, lineIndex) {
+	const problem = rolledBackEventProblem(event, lineIndex);
+	if (problem !== null) throw executionCorrupt(problem);
+	const record = state.byHash.get(event.requestHash);
+	if (!record)
+		throw executionCorrupt(
+			`runner execution event ${lineIndex} rolls back unprepared ${JSON.stringify(event.requestHash)}`,
+		);
+	if (record.settlement === null || record.settlement.outcome !== "committed")
+		throw executionCorrupt(
+			`runner execution event ${lineIndex} rolls back ${JSON.stringify(event.requestHash)}, which never committed`,
+		);
+	if (record.rollback !== null)
+		throw executionCorrupt(
+			`runner execution event ${lineIndex} rolls back ${JSON.stringify(event.requestHash)} twice`,
+		);
+	record.rollback = { at: event.at, evidence: event.evidence, reason: event.reason };
+}
+
+function applyExecutionEvent(state, event, lineIndex) {
+	if (!SUPPORTED_RUNNER_EXECUTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
+		throw executionCorrupt(
+			`runner execution event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+		);
+	switch (event.kind) {
+		case "prepared":
+			return applyPreparedExecutionEvent(state, event, lineIndex);
+		case "settled":
+			return applySettledExecutionEvent(state, event, lineIndex);
+		case "aborted":
+			return applyAbortedExecutionEvent(state, event, lineIndex);
+		case "rolled-back":
+			return applyRolledBackExecutionEvent(state, event, lineIndex);
+		default:
+			break;
+	}
+	throw executionCorrupt(
+		`runner execution event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+	);
 }
 
 // Registration authority: a committed human acceptance/approval Decision
@@ -407,63 +506,26 @@ function decisionInputProblem(decision) {
 	return null;
 }
 
-function runnerAppendFailure(err) {
-	return {
-		ok: false,
-		code: err.amberCode || CORRUPT_CODE,
-		record: null,
-		errors: [err.message || String(err)],
-	};
+function foldRunnerRegistry(cwd) {
+	return REGISTRY_LEDGER.fold(cwd);
 }
 
 // Guard contract: any non-null guard result is returned verbatim without
 // appending.
 function appendRegistryEvent(cwd, body, guard) {
-	let release;
-	try {
-		release = acquireRunnerLock(cwd);
-	} catch (err) {
-		return runnerAppendFailure(err);
-	}
-	try {
-		let folded;
-		try {
-			folded = foldRunnerRegistry(cwd);
-		} catch (err) {
-			return runnerAppendFailure(err);
-		}
-		const guardVerdict = guard(folded);
-		if (guardVerdict !== null) return guardVerdict;
-		let prevHash;
-		try {
-			prevHash = chainHeadHash(registryPath(cwd), CORRUPT_CODE, "runner registry");
-		} catch (err) {
-			return runnerAppendFailure(err);
-		}
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendRunnerWithinCeiling(cwd, event);
-		} catch (err) {
-			return runnerAppendFailure(err);
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: SIZE_CEILING_CODE,
-				record: null,
-				errors: [`runner registry event would exceed ${ceiling.ceiling} bytes`],
-			};
-		try {
-			appendJSONL(registryPath(cwd), event);
-		} catch (err) {
-			return runnerAppendFailure(err);
-		}
-		const { prevHash: _prev, hash: _hash, ...record } = event;
-		return { ok: true, code: null, record, errors: [] };
-	} finally {
-		release();
-	}
+	return REGISTRY_LEDGER.append(cwd, body, guard, (fold) => {
+		if (body.kind === "runner")
+			return fold.runners.find(
+				(runner) => runner.id === body.id && runner.version === body.version,
+			);
+		return fold.capabilities.find(
+			(capability) =>
+				capability.runnerId === body.runnerId &&
+				capability.runnerVersion === body.runnerVersion &&
+				capability.name === body.name &&
+				capability.capabilityVersion === body.capabilityVersion,
+		);
+	});
 }
 
 function registerRunner(cwd, input = {}, opts = {}) {
@@ -809,32 +871,19 @@ const AUTHORIZED_EVENT_FIELDS = Object.freeze([
 const AUTHORIZED_DECISION_FIELDS = Object.freeze(["identity", "revision"]);
 
 function requestsPath(cwd) {
-	return statePathForCreate(cwd, "runner", "requests.jsonl");
+	return REQUEST_LEDGER.path(cwd);
 }
 
 function requestCorrupt(message) {
 	return typedError(REQUEST_CORRUPT_CODE, message);
 }
 
-function acquireRequestLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(requestsPath(cwd)),
-		lockName: "requests.lock",
-		conflictCode: REQUEST_LOCK_CODE,
-		corruptCode: REQUEST_CORRUPT_CODE,
-		label: "runner request ledger",
-		staleMs: LOCK_STALE_MS,
-	});
+function foldRunnerRequests(cwd) {
+	return REQUEST_LEDGER.fold(cwd);
 }
 
-function appendRequestWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: requestsPath(cwd),
-		event,
-		envName: "AMBER_RUNNER_MAX_REQUESTS_BYTES",
-		defaultBytes: DEFAULT_MAX_RUNNER_REQUESTS_BYTES,
-		label: "runner request ledger",
-	});
+function appendRequestEvent(cwd, body, guard, derive) {
+	return REQUEST_LEDGER.append(cwd, body, guard, derive);
 }
 
 // Normalized posix form for prefix confinement, mirroring the adapter
@@ -1027,140 +1076,6 @@ function authorizedEventProblem(event, lineIndex) {
 	if (!Number.isInteger(event.decision.revision) || event.decision.revision < 1)
 		return `runner request event ${lineIndex}.decision.revision must be a positive integer`;
 	return null;
-}
-
-function foldRunnerRequests(cwd) {
-	const events = readLedgerFailClosed(requestsPath(cwd), REQUEST_CORRUPT_CODE, "runner requests");
-	let prevHash = GENESIS_HASH;
-	const requests = [];
-	const denials = [];
-	const byHash = new Map();
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw requestCorrupt(`runner request event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw requestCorrupt(`runner request event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw requestCorrupt(
-				`runner request event ${lineIndex} carries a hash that does not match its content`,
-			);
-		if (!SUPPORTED_RUNNER_REQUEST_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw requestCorrupt(
-				`runner request event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind === "requested") {
-			const problem = requestedEventProblem(event, lineIndex);
-			if (problem !== null) throw requestCorrupt(problem);
-			if (byHash.has(event.requestHash))
-				throw requestCorrupt(
-					`request ${JSON.stringify(event.requestHash)} is recorded more than once`,
-				);
-			const { prevHash: _prev, hash: _hash, ...body } = event;
-			const record = { ...body, index, authorization: null };
-			byHash.set(event.requestHash, record);
-			requests.push(record);
-		} else if (event.kind === "denied") {
-			const problem = deniedEventProblem(event, lineIndex);
-			if (problem !== null) throw requestCorrupt(problem);
-			const { prevHash: _prev, hash: _hash, ...body } = event;
-			denials.push({ ...body, index });
-		} else if (event.kind === "authorized") {
-			const problem = authorizedEventProblem(event, lineIndex);
-			if (problem !== null) throw requestCorrupt(problem);
-			const record = byHash.get(event.requestHash);
-			if (!record)
-				throw requestCorrupt(
-					`runner request event ${lineIndex} authorizes unknown request ${JSON.stringify(event.requestHash)}`,
-				);
-			if (record.authorization !== null)
-				throw requestCorrupt(
-					`runner request event ${lineIndex} authorizes ${JSON.stringify(event.requestHash)} twice`,
-				);
-			record.authorization = {
-				at: event.at,
-				approvalId: event.approvalId,
-				decision: event.decision,
-			};
-		} else {
-			throw requestCorrupt(
-				`runner request event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		}
-		prevHash = event.hash;
-	});
-	return {
-		requests: requests.map((record) => ({
-			...record,
-			status: record.authorization === null ? "requested" : "authorized",
-		})),
-		denials: denials.map((record) => ({ ...record, status: "denied" })),
-	};
-}
-
-function requestAppendFailure(err) {
-	return {
-		ok: false,
-		code: err.amberCode || REQUEST_CORRUPT_CODE,
-		record: null,
-		errors: [err.message || String(err)],
-	};
-}
-
-// Guard contract: any non-null guard result is returned verbatim without
-// appending. On success the ledger is re-folded INSIDE the lock and
-// `derive(fold)` picks the caller's derived record.
-function appendRequestEvent(cwd, body, guard, derive) {
-	let release;
-	try {
-		release = acquireRequestLock(cwd);
-	} catch (err) {
-		return requestAppendFailure(err);
-	}
-	try {
-		let folded;
-		try {
-			folded = foldRunnerRequests(cwd);
-		} catch (err) {
-			return requestAppendFailure(err);
-		}
-		const guardVerdict = guard(folded);
-		if (guardVerdict !== null) return guardVerdict;
-		let prevHash;
-		try {
-			prevHash = chainHeadHash(requestsPath(cwd), REQUEST_CORRUPT_CODE, "runner requests");
-		} catch (err) {
-			return requestAppendFailure(err);
-		}
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendRequestWithinCeiling(cwd, event);
-		} catch (err) {
-			return requestAppendFailure(err);
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: REQUEST_SIZE_CEILING_CODE,
-				record: null,
-				errors: [`runner request event would exceed ${ceiling.ceiling} bytes`],
-			};
-		try {
-			appendJSONL(requestsPath(cwd), event);
-		} catch (err) {
-			return requestAppendFailure(err);
-		}
-		let record;
-		try {
-			record = derive(foldRunnerRequests(cwd)) ?? null;
-		} catch (err) {
-			return requestAppendFailure(err);
-		}
-		return { ok: true, code: null, record, errors: [] };
-	} finally {
-		release();
-	}
 }
 
 // Locate the registered capability the request names, distinguishing
@@ -1668,32 +1583,19 @@ const ROLLED_BACK_EVENT_FIELDS = Object.freeze([
 ]);
 
 function executionsPath(cwd) {
-	return statePathForCreate(cwd, "runner", "executions.jsonl");
+	return EXECUTION_LEDGER.path(cwd);
 }
 
 function executionCorrupt(message) {
 	return typedError(EXECUTION_CORRUPT_CODE, message);
 }
 
-function acquireExecutionLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(executionsPath(cwd)),
-		lockName: "executions.lock",
-		conflictCode: EXECUTION_LOCK_CODE,
-		corruptCode: EXECUTION_CORRUPT_CODE,
-		label: "runner execution journal",
-		staleMs: LOCK_STALE_MS,
-	});
+function foldRunnerExecutions(cwd) {
+	return EXECUTION_LEDGER.fold(cwd);
 }
 
-function appendExecutionWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: executionsPath(cwd),
-		event,
-		envName: "AMBER_RUNNER_MAX_EXECUTIONS_BYTES",
-		defaultBytes: DEFAULT_MAX_RUNNER_EXECUTIONS_BYTES,
-		label: "runner execution journal",
-	});
+function appendExecutionEvent(cwd, body, guard, derive) {
+	return EXECUTION_LEDGER.append(cwd, body, guard, derive);
 }
 
 function executionRunnerProblem(value, label) {
@@ -1820,183 +1722,102 @@ function rolledBackEventProblem(event, lineIndex) {
 	return null;
 }
 
-function foldRunnerExecutions(cwd) {
-	const events = readLedgerFailClosed(
-		executionsPath(cwd),
-		EXECUTION_CORRUPT_CODE,
-		"runner execution journal",
-	);
-	let prevHash = GENESIS_HASH;
-	const byHash = new Map();
-	const records = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		if (!isPlainObject(event))
-			throw executionCorrupt(`runner execution event ${lineIndex} is not an object`);
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash)
-			throw executionCorrupt(`runner execution event ${lineIndex} breaks the hash chain`);
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash)
-			throw executionCorrupt(
-				`runner execution event ${lineIndex} carries a hash that does not match its content`,
-			);
-		if (!SUPPORTED_RUNNER_EXECUTION_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw executionCorrupt(
-				`runner execution event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind === "prepared") {
-			const problem = preparedEventProblem(event, lineIndex);
-			if (problem !== null) throw executionCorrupt(problem);
-			if (byHash.has(event.requestHash))
-				throw executionCorrupt(
-					`runner execution event ${lineIndex} prepares ${JSON.stringify(event.requestHash)} twice`,
-				);
-			const record = {
-				requestHash: event.requestHash,
-				runner: event.runner,
-				preparedAt: event.at,
-				settlement: null,
-				aborted: null,
-				rollback: null,
-				index,
-			};
-			byHash.set(event.requestHash, record);
-			records.push(record);
-		} else if (event.kind === "settled") {
-			const problem = settledEventProblem(event, lineIndex);
-			if (problem !== null) throw executionCorrupt(problem);
-			const record = byHash.get(event.requestHash);
-			if (!record)
-				throw executionCorrupt(
-					`runner execution event ${lineIndex} settles unprepared ${JSON.stringify(event.requestHash)}`,
-				);
-			if (record.settlement !== null || record.aborted !== null)
-				throw executionCorrupt(
-					`runner execution event ${lineIndex} settles ${JSON.stringify(event.requestHash)} after its terminal event`,
-				);
-			record.settlement = {
-				at: event.at,
-				outcome: event.outcome,
-				reason: event.reason,
-				receipt: event.receipt,
-				receiptHash: event.receiptHash,
-				resultIntegrity: event.resultIntegrity,
-			};
-		} else if (event.kind === "aborted") {
-			const problem = abortedEventProblem(event, lineIndex);
-			if (problem !== null) throw executionCorrupt(problem);
-			const record = byHash.get(event.requestHash);
-			if (!record)
-				throw executionCorrupt(
-					`runner execution event ${lineIndex} aborts unprepared ${JSON.stringify(event.requestHash)}`,
-				);
-			if (record.settlement !== null || record.aborted !== null)
-				throw executionCorrupt(
-					`runner execution event ${lineIndex} aborts ${JSON.stringify(event.requestHash)} after its terminal event`,
-				);
-			record.aborted = { at: event.at, reason: event.reason };
-		} else if (event.kind === "rolled-back") {
-			const problem = rolledBackEventProblem(event, lineIndex);
-			if (problem !== null) throw executionCorrupt(problem);
-			const record = byHash.get(event.requestHash);
-			if (!record)
-				throw executionCorrupt(
-					`runner execution event ${lineIndex} rolls back unprepared ${JSON.stringify(event.requestHash)}`,
-				);
-			if (record.settlement === null || record.settlement.outcome !== "committed")
-				throw executionCorrupt(
-					`runner execution event ${lineIndex} rolls back ${JSON.stringify(event.requestHash)}, which never committed`,
-				);
-			if (record.rollback !== null)
-				throw executionCorrupt(
-					`runner execution event ${lineIndex} rolls back ${JSON.stringify(event.requestHash)} twice`,
-				);
-			record.rollback = { at: event.at, evidence: event.evidence, reason: event.reason };
-		} else {
-			throw executionCorrupt(
-				`runner execution event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		}
-		prevHash = event.hash;
-	});
-	return records.map((record) => ({
-		...record,
-		status:
-			record.rollback !== null
-				? "rolled-back"
-				: record.settlement !== null
-					? record.settlement.outcome
-					: "attempted",
-		terminal: record.settlement !== null || record.aborted !== null,
-	}));
-}
+// F061 follow-up (#310) — three runner ledgers assembled by
+// `defineLedgerFamily` (ADR-0028). Fold is chain-first (no preLink).
+// Registry ceiling wording matches the shared default; requests and
+// executions declare ceiling.message for the recorded "event would exceed"
+// text. Domain apply lives in applyRegistryEvent / applyRequestEvent /
+// applyExecutionEvent.
+const RUNNER_FAMILY = defineLedgerFamily({
+	dir: "runner",
+	label: "runner registry",
+	ledgers: [
+		{
+			name: "registry",
+			fileName: "registry.jsonl",
+			lockName: "registry.lock",
+			conflictCode: LOCK_CODE,
+			corruptCode: CORRUPT_CODE,
+			sizeCeilingCode: SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RUNNER_MAX_REGISTRY_BYTES",
+				defaultBytes: DEFAULT_MAX_RUNNER_REGISTRY_BYTES,
+			},
+			label: "runner registry",
+			eventLabel: "runner",
+			fold: {
+				init: () => ({
+					runners: [],
+					capabilities: [],
+					runnerVersions: new Set(),
+					capabilityKeys: new Set(),
+				}),
+				apply: applyRegistryEvent,
+				result: (state) => ({ runners: state.runners, capabilities: state.capabilities }),
+			},
+		},
+		{
+			name: "requests",
+			fileName: "requests.jsonl",
+			lockName: "requests.lock",
+			conflictCode: REQUEST_LOCK_CODE,
+			corruptCode: REQUEST_CORRUPT_CODE,
+			sizeCeilingCode: REQUEST_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RUNNER_MAX_REQUESTS_BYTES",
+				defaultBytes: DEFAULT_MAX_RUNNER_REQUESTS_BYTES,
+				message: (_event, ceiling) => `runner request event would exceed ${ceiling} bytes`,
+			},
+			label: "runner request ledger",
+			eventLabel: "runner request",
+			fold: {
+				init: () => ({ requests: [], denials: [], byHash: new Map() }),
+				apply: applyRequestEvent,
+				result: (state) => ({
+					requests: state.requests.map((record) => ({
+						...record,
+						status: record.authorization === null ? "requested" : "authorized",
+					})),
+					denials: state.denials.map((record) => ({ ...record, status: "denied" })),
+				}),
+			},
+		},
+		{
+			name: "executions",
+			fileName: "executions.jsonl",
+			lockName: "executions.lock",
+			conflictCode: EXECUTION_LOCK_CODE,
+			corruptCode: EXECUTION_CORRUPT_CODE,
+			sizeCeilingCode: EXECUTION_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_RUNNER_MAX_EXECUTIONS_BYTES",
+				defaultBytes: DEFAULT_MAX_RUNNER_EXECUTIONS_BYTES,
+				message: (_event, ceiling) => `runner execution event would exceed ${ceiling} bytes`,
+			},
+			label: "runner execution journal",
+			eventLabel: "runner execution",
+			fold: {
+				init: () => ({ byHash: new Map(), records: [] }),
+				apply: applyExecutionEvent,
+				result: (state) =>
+					state.records.map((record) => ({
+						...record,
+						status:
+							record.rollback !== null
+								? "rolled-back"
+								: record.settlement !== null
+									? record.settlement.outcome
+									: "attempted",
+						terminal: record.settlement !== null || record.aborted !== null,
+					})),
+			},
+		},
+	],
+});
 
-function executionAppendFailure(err) {
-	return {
-		ok: false,
-		code: err.amberCode || EXECUTION_CORRUPT_CODE,
-		record: null,
-		errors: [err.message || String(err)],
-	};
-}
-
-// Guard contract: any non-null guard result is returned verbatim without
-// appending; `derive(fold)` picks the caller's record after the append.
-function appendExecutionEvent(cwd, body, guard, derive) {
-	let release;
-	try {
-		release = acquireExecutionLock(cwd);
-	} catch (err) {
-		return executionAppendFailure(err);
-	}
-	try {
-		let folded;
-		try {
-			folded = foldRunnerExecutions(cwd);
-		} catch (err) {
-			return executionAppendFailure(err);
-		}
-		const guardVerdict = guard(folded);
-		if (guardVerdict !== null) return guardVerdict;
-		let prevHash;
-		try {
-			prevHash = chainHeadHash(
-				executionsPath(cwd),
-				EXECUTION_CORRUPT_CODE,
-				"runner execution journal",
-			);
-		} catch (err) {
-			return executionAppendFailure(err);
-		}
-		const event = { ...body, prevHash, hash: chainHash(body, prevHash) };
-		let ceiling;
-		try {
-			ceiling = appendExecutionWithinCeiling(cwd, event);
-		} catch (err) {
-			return executionAppendFailure(err);
-		}
-		if (ceiling.wouldExceed)
-			return {
-				ok: false,
-				code: EXECUTION_SIZE_CEILING_CODE,
-				record: null,
-				errors: [`runner execution event would exceed ${ceiling.ceiling} bytes`],
-			};
-		try {
-			appendJSONL(executionsPath(cwd), event);
-		} catch (err) {
-			return executionAppendFailure(err);
-		}
-		let record;
-		try {
-			record = derive(foldRunnerExecutions(cwd)) ?? null;
-		} catch (err) {
-			return executionAppendFailure(err);
-		}
-		return { ok: true, code: null, record, errors: [] };
-	} finally {
-		release();
-	}
-}
+const REGISTRY_LEDGER = RUNNER_FAMILY.ledgers.registry;
+const REQUEST_LEDGER = RUNNER_FAMILY.ledgers.requests;
+const EXECUTION_LEDGER = RUNNER_FAMILY.ledgers.executions;
 
 /**
  * Prepare one authorized request for execution by one registered Runner.
