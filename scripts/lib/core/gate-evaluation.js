@@ -63,17 +63,10 @@
 // owners and dependencies), with no v1 semantics attached — the evaluator
 // never invents authority the contract does not spell out.
 
-const path = require("node:path");
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
 const { deletionTombstones } = require("./retention-registry");
-const {
-	GENESIS_HASH,
-	chainHash,
-	acquireLedgerLock,
-	appendWithinCeiling: sharedAppendWithinCeiling,
-} = require("./registry-ledger");
+const { GENESIS_HASH, chainHash } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 const { parseTimestamp } = require("./principal-registry");
 const { ASSURANCE_LEVELS, listEvidence } = require("./evidence-receipts");
 const { showArtifact } = require("./canonical-artifacts");
@@ -87,8 +80,6 @@ const EXPIRED_CODE = "AMBER_E_GATE_EXPIRED";
 const UNSUPPORTED_COMPARATOR_CODE = "AMBER_E_GATE_UNSUPPORTED_COMPARATOR";
 const FAIL_BEHAVIOR_UNSUPPORTED_CODE = "AMBER_E_GATE_FAIL_BEHAVIOR_UNSUPPORTED";
 const INVALID_ARG_CODE = "AMBER_E_INVALID_ARG";
-
-const LOCK_STALE_MS = 30_000;
 
 /** Version of the outcome event contract this module writes and reads. */
 const GATE_EVALUATION_SCHEMA_VERSION = 1;
@@ -203,10 +194,6 @@ const ALL_COMPARATORS = new Set([
 // pre-release/build suffixes (the comparator contract is order, not flavor).
 const DOT_NUMERIC_PATTERN = /^\d+(?:\.\d+)*$/;
 const DECIMAL_NUMBER_PATTERN = /^-?(?:\d+|\d+\.\d+|\.\d+)$/;
-
-function outcomeLedgerPath(cwd) {
-	return statePathForCreate(cwd, "gates", "outcomes.jsonl");
-}
 
 function outcomeCorrupt(message) {
 	return typedError(OUTCOME_REGISTRY_CORRUPT_CODE, message);
@@ -694,27 +681,6 @@ function evaluateRequirement(requirement, effectiveSubject, records, evalNowMs, 
 
 // ── Outcome ledger (append-only, hash-chained, write-locked) ──
 
-function acquireOutcomeLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(outcomeLedgerPath(cwd)),
-		lockName: "outcomes.lock",
-		conflictCode: OUTCOME_REGISTRY_LOCK_CODE,
-		corruptCode: OUTCOME_REGISTRY_CORRUPT_CODE,
-		label: "gate outcome ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function appendWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: outcomeLedgerPath(cwd),
-		event,
-		envName: "AMBER_GATE_MAX_OUTCOME_BYTES",
-		defaultBytes: DEFAULT_MAX_OUTCOME_BYTES,
-		label: "gate outcome ledger",
-	});
-}
-
 function thresholdDetailProblem(threshold, label) {
 	if (!isPlainObject(threshold))
 		return `${label} is not an object; got ${JSON.stringify(threshold)}`;
@@ -805,134 +771,163 @@ function anyOfDetailProblem(set, label) {
 	return null;
 }
 
-/**
- * Fold the outcome ledger: verify the hash chain, the closed event field
- * set (unknown AND missing fields are corruption), the closed kind/verdict/
- * clock-source/skew-policy sets, and the schema version. Returns the stored
- * events with their derived 0-based line index.
- * @returns {Array<object>} The outcome records, in append order.
- * @throws {Error} Typed AMBER_E_* on any corruption.
- */
-function foldOutcomes(cwd) {
-	const events = readLedgerFailClosed(
-		outcomeLedgerPath(cwd),
-		OUTCOME_REGISTRY_CORRUPT_CODE,
-		"gate outcome ledger",
-	);
-	const records = [];
-	let prevHash = GENESIS_HASH;
-	for (let index = 0; index < events.length; index += 1) {
-		const lineIndex = index + 1;
-		const event = events[index];
-		if (!isPlainObject(event)) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
-			);
-		}
-		if (!Number.isInteger(event.schemaVersion)) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(event.schemaVersion)}`,
-			);
-		}
-		if (!SUPPORTED_GATE_EVALUATION_SCHEMA_VERSIONS.includes(event.schemaVersion)) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} declares schemaVersion ${JSON.stringify(event.schemaVersion)}, but this reader supports ${SUPPORTED_GATE_EVALUATION_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted`,
-			);
-		}
-		// The tamper-evident chain runs before any content is trusted (the
-		// shared registry-ledger discipline).
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`,
-			);
-		}
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`,
-			);
-		}
-		const unknown = Object.keys(event)
-			.filter((key) => !OUTCOME_EVENT_FIELDS.includes(key))
-			.sort();
-		if (unknown.length > 0) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${OUTCOME_EVENT_FIELDS.join(", ")}`,
-			);
-		}
-		const missing = OUTCOME_EVENT_FIELDS.filter((field) => !(field in event));
-		if (missing.length > 0) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed field set is ${OUTCOME_EVENT_FIELDS.join(", ")}`,
-			);
-		}
-		if (event.kind !== "evaluated") {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is evaluated`,
-			);
-		}
-		if (!CLOCK_SOURCES.includes(event.clockSource)) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries clockSource ${JSON.stringify(event.clockSource)} outside the closed set (${CLOCK_SOURCES.join(", ")})`,
-			);
-		}
-		if (event.skewPolicy !== SKEW_POLICY) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries skewPolicy ${JSON.stringify(event.skewPolicy)}, but the recorded policy is fixed (${SKEW_POLICY})`,
-			);
-		}
-		if (!VERDICTS.includes(event.verdict)) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries verdict ${JSON.stringify(event.verdict)} outside the closed set (${VERDICTS.join(", ")})`,
-			);
-		}
-		if (!isNonEmptyString(event.at)) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries no timestamp ("at"); got ${JSON.stringify(event.at)}`,
-			);
-		}
-		for (const field of ["gate", "subject", "gateContentHash"]) {
-			if (!isNonEmptyString(event[field])) {
-				throw outcomeCorrupt(
-					`gate outcome ledger event ${lineIndex} carries a ${field} that is not a non-empty string; got ${JSON.stringify(event[field])}`,
-				);
-			}
-		}
-		if (!isPositiveInt(event.gateRevision)) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries a gateRevision that is not a positive integer; got ${JSON.stringify(event.gateRevision)}`,
-			);
-		}
-		if (
-			!isPlainObject(event.details) ||
-			!Array.isArray(event.details.requirements) ||
-			!Array.isArray(event.details.anyOf)
-		) {
-			throw outcomeCorrupt(
-				`gate outcome ledger event ${lineIndex} carries a details object that is not { requirements: [...], anyOf: [...] }; got ${JSON.stringify(event.details)}`,
-			);
-		}
-		for (let detailIndex = 0; detailIndex < event.details.requirements.length; detailIndex += 1) {
-			const problem = requirementDetailProblem(
-				event.details.requirements[detailIndex],
-				`details.requirements[${detailIndex}]`,
-			);
-			if (problem !== null) {
-				throw outcomeCorrupt(`gate outcome ledger event ${lineIndex} carries ${problem}`);
-			}
-		}
-		for (let setIndex = 0; setIndex < event.details.anyOf.length; setIndex += 1) {
-			const problem = anyOfDetailProblem(
-				event.details.anyOf[setIndex],
-				`details.anyOf[${setIndex}]`,
-			);
-			if (problem !== null) {
-				throw outcomeCorrupt(`gate outcome ledger event ${lineIndex} carries ${problem}`);
-			}
-		}
-		records.push({ ...event, index });
-		prevHash = event.hash;
+// The hand-written fold checked these fields before the chain walk. Keep that
+// recorded refusal order as the family's explicit pre-link domain step.
+function validateOutcomeBeforeLink(event, lineIndex) {
+	if (!isPlainObject(event)) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
+		);
 	}
-	return records;
+	if (!Number.isInteger(event.schemaVersion)) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(event.schemaVersion)}`,
+		);
+	}
+	if (!SUPPORTED_GATE_EVALUATION_SCHEMA_VERSIONS.includes(event.schemaVersion)) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} declares schemaVersion ${JSON.stringify(event.schemaVersion)}, but this reader supports ${SUPPORTED_GATE_EVALUATION_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted`,
+		);
+	}
+}
+
+function outcomeChainWording(kind, event, lineIndex, label) {
+	if (kind === "not-object")
+		return `${label} event ${lineIndex} is not an object; got ${JSON.stringify(event)}`;
+	if (kind === "broken")
+		return `${label} event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`;
+	if (kind === "mismatch")
+		return `${label} event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`;
+	return null;
+}
+
+function validateOutcomeClosedFields(event, lineIndex) {
+	const unknown = Object.keys(event)
+		.filter((key) => !OUTCOME_EVENT_FIELDS.includes(key))
+		.sort();
+	if (unknown.length > 0) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} carries unknown field${unknown.length > 1 ? "s" : ""} ${quotedList(unknown)}; the closed field set is ${OUTCOME_EVENT_FIELDS.join(", ")}`,
+		);
+	}
+	const missing = OUTCOME_EVENT_FIELDS.filter((field) => !(field in event));
+	if (missing.length > 0) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} is missing field${missing.length > 1 ? "s" : ""} ${quotedList(missing)}; the closed field set is ${OUTCOME_EVENT_FIELDS.join(", ")}`,
+		);
+	}
+}
+
+function validateOutcomeMetadata(event, lineIndex) {
+	if (event.kind !== "evaluated") {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is evaluated`,
+		);
+	}
+	if (!CLOCK_SOURCES.includes(event.clockSource)) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} carries clockSource ${JSON.stringify(event.clockSource)} outside the closed set (${CLOCK_SOURCES.join(", ")})`,
+		);
+	}
+	if (event.skewPolicy !== SKEW_POLICY) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} carries skewPolicy ${JSON.stringify(event.skewPolicy)}, but the recorded policy is fixed (${SKEW_POLICY})`,
+		);
+	}
+	if (!VERDICTS.includes(event.verdict)) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} carries verdict ${JSON.stringify(event.verdict)} outside the closed set (${VERDICTS.join(", ")})`,
+		);
+	}
+	if (!isNonEmptyString(event.at)) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} carries no timestamp ("at"); got ${JSON.stringify(event.at)}`,
+		);
+	}
+	for (const field of ["gate", "subject", "gateContentHash"]) {
+		if (!isNonEmptyString(event[field])) {
+			throw outcomeCorrupt(
+				`gate outcome ledger event ${lineIndex} carries a ${field} that is not a non-empty string; got ${JSON.stringify(event[field])}`,
+			);
+		}
+	}
+	if (!isPositiveInt(event.gateRevision)) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} carries a gateRevision that is not a positive integer; got ${JSON.stringify(event.gateRevision)}`,
+		);
+	}
+	if (
+		!isPlainObject(event.details) ||
+		!Array.isArray(event.details.requirements) ||
+		!Array.isArray(event.details.anyOf)
+	) {
+		throw outcomeCorrupt(
+			`gate outcome ledger event ${lineIndex} carries a details object that is not { requirements: [...], anyOf: [...] }; got ${JSON.stringify(event.details)}`,
+		);
+	}
+}
+
+function validateOutcomeDetails(details, lineIndex) {
+	for (let detailIndex = 0; detailIndex < details.requirements.length; detailIndex += 1) {
+		const problem = requirementDetailProblem(
+			details.requirements[detailIndex],
+			`details.requirements[${detailIndex}]`,
+		);
+		if (problem !== null) {
+			throw outcomeCorrupt(`gate outcome ledger event ${lineIndex} carries ${problem}`);
+		}
+	}
+	for (let setIndex = 0; setIndex < details.anyOf.length; setIndex += 1) {
+		const problem = anyOfDetailProblem(details.anyOf[setIndex], `details.anyOf[${setIndex}]`);
+		if (problem !== null) {
+			throw outcomeCorrupt(`gate outcome ledger event ${lineIndex} carries ${problem}`);
+		}
+	}
+}
+
+function applyOutcomeEvent(records, event, lineIndex) {
+	validateOutcomeClosedFields(event, lineIndex);
+	validateOutcomeMetadata(event, lineIndex);
+	validateOutcomeDetails(event.details, lineIndex);
+	records.push({ ...event, index: lineIndex - 1 });
+}
+
+const OUTCOME_FAMILY = defineLedgerFamily({
+	dir: "gates",
+	label: "gate outcome ledger",
+	ledgers: [
+		{
+			name: "outcomes",
+			fileName: "outcomes.jsonl",
+			lockName: "outcomes.lock",
+			conflictCode: OUTCOME_REGISTRY_LOCK_CODE,
+			corruptCode: OUTCOME_REGISTRY_CORRUPT_CODE,
+			sizeCeilingCode: OUTCOME_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_GATE_MAX_OUTCOME_BYTES",
+				defaultBytes: DEFAULT_MAX_OUTCOME_BYTES,
+				message: (event, ceiling) =>
+					`appending the outcome for gate "${event.gate}" would grow the gate outcome ledger beyond its size ceiling of ${ceiling} bytes (AMBER_GATE_MAX_OUTCOME_BYTES); the write is refused before any durable state is touched — raise the ceiling deliberately or keep the contract bounded`,
+			},
+			label: "gate outcome ledger",
+			appendMessage: (event, error) =>
+				`failed to append the outcome for gate "${event.gate}" to the gate outcome ledger: ${error.message || String(error)}`,
+			eventLabel: "gate outcome ledger",
+			fold: {
+				init: () => [],
+				preLink: validateOutcomeBeforeLink,
+				chainWording: outcomeChainWording,
+				apply: applyOutcomeEvent,
+				result: (records) => records,
+			},
+		},
+	],
+});
+
+const OUTCOME_LEDGER = OUTCOME_FAMILY.ledgers.outcomes;
+
+function foldOutcomes(cwd) {
+	return OUTCOME_LEDGER.fold(cwd);
 }
 
 // ── Public seams ──
@@ -1117,45 +1112,14 @@ function evaluateGate(cwd, input = {}, opts = {}) {
 		},
 	};
 
-	let release;
-	try {
-		release = acquireOutcomeLock(cwd);
-	} catch (err) {
-		return fail(err.amberCode || OUTCOME_REGISTRY_CORRUPT_CODE, [err.message || String(err)]);
-	}
-	try {
-		// Fold under the lock: the chain head and the line count both come
-		// from one verified read, so a racing append cannot slip between
-		// them (the shared lock is the only serializer).
-		let folded;
-		try {
-			folded = foldOutcomes(cwd);
-		} catch (err) {
-			return fail(err.amberCode || OUTCOME_REGISTRY_CORRUPT_CODE, [err.message || String(err)]);
-		}
-		const prevHash = folded.length > 0 ? folded[folded.length - 1].hash : GENESIS_HASH;
-		const index = folded.length;
-		const event = { ...eventBody, prevHash, hash: chainHash(eventBody, prevHash) };
-		// The event is fully known before the append (nothing depends on a
-		// nested admission), so the ceiling probe runs on the exact chained
-		// event — a probe that passes cannot hide a line that would refuse.
-		const ceiling = appendWithinCeiling(cwd, event);
-		if (ceiling.wouldExceed) {
-			return fail(OUTCOME_SIZE_CEILING_CODE, [
-				`appending the outcome for gate "${gate}" would grow the gate outcome ledger beyond its size ceiling of ${ceiling.ceiling} bytes (AMBER_GATE_MAX_OUTCOME_BYTES); the write is refused before any durable state is touched — raise the ceiling deliberately or keep the contract bounded`,
-			]);
-		}
-		try {
-			appendJSONL(outcomeLedgerPath(cwd), event);
-		} catch (err) {
-			return fail(OUTCOME_REGISTRY_CORRUPT_CODE, [
-				`failed to append the outcome for gate "${gate}" to the gate outcome ledger: ${err.message || String(err)}`,
-			]);
-		}
-		return { ok: true, code: null, outcome: { ...event, index }, errors: [] };
-	} finally {
-		release();
-	}
+	const appended = OUTCOME_LEDGER.append(
+		cwd,
+		eventBody,
+		() => null,
+		(records) => records[records.length - 1] ?? null,
+	);
+	if (!appended.ok) return fail(appended.code, appended.errors);
+	return { ok: true, code: null, outcome: appended.record, errors: [] };
 }
 
 /**

@@ -133,3 +133,18 @@ declaration vocabulary gains one closed compatibility field:
    the shared append and the exposed `chainHead` surface; when absent, the ledger's normal
    `label` remains the default. It cannot change lock, fold, or ceiling labels, and it does
    not provide an alternate read or append path.
+
+## Amendment (2026-08-31) - append I/O refusal wording
+
+The gate migration (#312) exposed one final recorded primitive-dialect variance: its append
+path wrapped a low-level JSONL write failure in a gate-specific refusal message. The shared
+append previously returned only the underlying I/O message, changing the refusal wording even
+though the error code stayed `AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT`.
+
+Ruling: the dialect remains single and the shared append remains the only write path. The
+declaration vocabulary gains one closed compatibility field:
+
+5. an optional per-ledger `appendMessage(event, error)` override, used only when the shared
+   append's final JSONL write fails. It receives the exact chained event and underlying error;
+   absent, the shared error wording remains the default. It cannot alter lock, fold, chain,
+   ceiling, or append ordering.

@@ -201,13 +201,14 @@ function appendWithinCeiling({ ledgerPath, event, envName, defaultBytes, label }
 // `options.ceilingMessage(event, ceiling)` (ADR-0028 Amendment) overrides
 // the shared ceiling refusal wording; `options.chainHeadLabel` (ADR-0028
 // Amendment) optionally preserves a family-specific label for the chain-head
-// read; absent, the shared label rides unchanged.
+// read; absent, the shared label rides unchanged. `options.appendMessage`
+// optionally preserves a family-specific append I/O refusal wording.
 function appendLedgerEvent(cwd, options, body, guard, derive) {
-	const failure = (err) => ({
+	const failure = (err, message = null) => ({
 		ok: false,
 		code: err.amberCode || options.corruptCode,
 		record: null,
-		errors: [err.message || String(err)],
+		errors: [message ?? (err.message || String(err))],
 	});
 	let release;
 	try {
@@ -262,7 +263,7 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 		try {
 			appendJSONL(options.path(cwd), event);
 		} catch (err) {
-			return failure(err);
+			return failure(err, options.appendMessage?.(event, err));
 		}
 		let record;
 		try {

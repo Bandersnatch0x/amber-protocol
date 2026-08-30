@@ -618,6 +618,32 @@ test("a declared ceiling message overrides the shared wording; absent, the share
 	assert.equal(sharedRefusal.errors[0], "synthetic signal ledger event would exceed 1 bytes");
 });
 
+test("a declared append message preserves family-specific write failures", () => {
+	const declaration = validDeclaration();
+	declaration.ledgers[0].appendMessage = (event, error) =>
+		`synthetic append ${JSON.stringify(event.id)}: ${error.message}`;
+	const worded = defineLedgerFamily(declaration);
+	const dir = mkTarget("append-message");
+	const originalAppendFileSync = fs.appendFileSync;
+	fs.appendFileSync = () => {
+		throw new Error("disk full");
+	};
+	try {
+		const refused = worded.ledgers.signals.append(
+			dir,
+			{ kind: "emit", schemaVersion: 1, at: AT, id: "s-1", note: "first", decision: pin("d-1") },
+			() => null,
+			(signals) => signals[0] ?? null,
+		);
+		assert.equal(refused.ok, false);
+		assert.equal(refused.code, SYNTH_CORRUPT_CODE);
+		assert.equal(refused.errors[0], 'synthetic append "s-1": disk full');
+		assert.equal(fs.existsSync(worded.ledgers.signals.path(dir)), false);
+	} finally {
+		fs.appendFileSync = originalAppendFileSync;
+	}
+});
+
 test("a declared chainWording override replaces the shared chain-break text; absent, the shared wording rides", () => {
 	const declaration = validDeclaration();
 	declaration.ledgers[0].fold = {
@@ -664,7 +690,7 @@ test("a declared chainWording override replaces the shared chain-break text; abs
 	);
 });
 
-test("the optional knobs stay closed: a malformed preLink, chainWording, or ceiling message refuses at definition time", () => {
+test("the optional knobs stay closed: malformed compatibility hooks refuse at definition time", () => {
 	const cases = [
 		[
 			"a preLink that is not a function",
@@ -686,6 +712,13 @@ test("the optional knobs stay closed: a malformed preLink, chainWording, or ceil
 				d.ledgers[0].ceiling.message = "custom wording";
 			},
 			/declaration\.ledgers\[0\]\.ceiling\.message must be a function/,
+		],
+		[
+			"an append message that is not a function",
+			(d) => {
+				d.ledgers[0].appendMessage = "custom wording";
+			},
+			/declaration\.ledgers\[0\]\.appendMessage must be a function/,
 		],
 		[
 			"an unknown fold knob beside the closed extension",

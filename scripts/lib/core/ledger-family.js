@@ -34,6 +34,9 @@
 // `chainWording` only replaces text after the shared chain check has already
 // fired, and `chainHeadLabel` only selects the read label, so none reopens a
 // path to a private append or an unchained read.
+// A ledger may additionally declare `appendMessage(event, error)` when its
+// legacy append path wrapped a low-level I/O refusal in family-specific text;
+// the shared append remains the only write path.
 //
 // A declaration problem is an assembly-time programming error, not a
 // runtime governance refusal: the factory throws a plain TypeError at
@@ -72,7 +75,7 @@ const REQUIRED_LEDGER_FIELDS = Object.freeze([
 	"eventLabel",
 	"fold",
 ]);
-const OPTIONAL_LEDGER_FIELDS = Object.freeze(["chainHeadLabel"]);
+const OPTIONAL_LEDGER_FIELDS = Object.freeze(["chainHeadLabel", "appendMessage"]);
 const CEILING_FIELDS = Object.freeze(["envName", "defaultBytes", "message"]);
 // The optional knobs (ADR-0028 Amendment) validate against the full closed
 // set only when declared; the required subsets keep every original field
@@ -157,6 +160,8 @@ function ledgerProblem(ledger, label) {
 	}
 	if ("chainHeadLabel" in ledger && !isNonEmptyString(ledger.chainHeadLabel))
 		return `${label}.chainHeadLabel must be a non-empty string`;
+	if ("appendMessage" in ledger && typeof ledger.appendMessage !== "function")
+		return `${label}.appendMessage must be a function`;
 	const ceiling = ceilingProblem(ledger.ceiling, `${label}.ceiling`);
 	if (ceiling !== null) return ceiling;
 	return foldProblem(ledger.fold, `${label}.fold`);
@@ -167,8 +172,16 @@ function ledgerProblem(ledger, label) {
 // ceiling, and fail-closed read disciplines; the family's fold owns every
 // domain rule.
 function buildLedger(dir, ledger) {
-	const { fileName, lockName, conflictCode, corruptCode, sizeCeilingCode, label, eventLabel } =
-		ledger;
+	const {
+		fileName,
+		lockName,
+		conflictCode,
+		corruptCode,
+		sizeCeilingCode,
+		label,
+		eventLabel,
+		appendMessage,
+	} = ledger;
 	const chainHeadLabel = ledger.chainHeadLabel ?? label;
 	const { envName, defaultBytes, message: ceilingMessage } = ledger.ceiling;
 	const domainFold = ledger.fold;
@@ -223,6 +236,7 @@ function buildLedger(dir, ledger) {
 		defaultBytes,
 		ceilingMessage,
 		chainHeadLabel,
+		appendMessage,
 		label,
 	});
 	return Object.freeze({
@@ -266,6 +280,8 @@ function buildLedger(dir, ledger) {
  *                        the exact chained line refused, `ceiling` the
  *                        resolved byte bound,
  *       label:           the ledger's name in lock/read/ceiling refusals,
+ *       appendMessage:   OPTIONAL function preserving append I/O refusal
+ *                        wording for the exact chained event,
  *       chainHeadLabel:  OPTIONAL label for chain-head read refusals; when
  *                        absent, `label` is used,
  *       eventLabel:      the per-event prefix in chain-walk problems
