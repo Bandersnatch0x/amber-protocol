@@ -36,20 +36,12 @@
 // fix becomes a regression signal. Rollups are deterministic within a
 // declared bound and mark truncation explicitly.
 
-const path = require("node:path");
-
-const { readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
-const { typedError } = require("./error-catalog");
 const { listArtifactRevisions } = require("./canonical-artifacts");
 const { resolveActivePrincipal } = require("./principal-registry");
 const {
 	GENESIS_HASH,
 	chainHash,
-	acquireLedgerLock,
-	appendLedgerEvent,
 	credentialLeakProblem,
-	chainLinkProblem,
 	isPlainObject,
 	isNonEmptyString,
 	closedFieldProblem,
@@ -59,6 +51,7 @@ const {
 	canonicalHashOf,
 	findDecisionSpend,
 } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 
 // v2 added the required service `owner` and the optional `policy` pin
 // (acceptance review P1/P3); v1 detector events stay readable with both
@@ -70,7 +63,6 @@ const SUPPORTED_MAINTAIN_FINDING_SCHEMA_VERSIONS = Object.freeze([1]);
 const MAINTAIN_PROPOSAL_SCHEMA_VERSION = 1;
 const SUPPORTED_MAINTAIN_PROPOSAL_SCHEMA_VERSIONS = Object.freeze([1]);
 const DEFAULT_MAX_MAINTAIN_BYTES = 1024 * 1024;
-const LOCK_STALE_MS = 30_000;
 
 // The deterministic comparator vocabulary a tier rule may use; validation
 // derives from the same map that evaluates, so the two cannot drift.
@@ -174,43 +166,146 @@ const FINDING_EVENT_FIELDS = Object.freeze([
 	"hash",
 ]);
 
-function detectorsPath(cwd) {
-	return statePathForCreate(cwd, "maintain", "detectors.jsonl");
-}
+// F061 follow-up (#304) — the ledger ritual for all three maintain
+// ledgers is assembled by `defineLedgerFamily` (ADR-0028), byte-
+// identically to the hand-written ceremony it replaces: same paths under
+// `.amber/maintain/` (`detectors.jsonl` / `findings.jsonl` /
+// `proposals.jsonl`), same lock names (the 30s stale bound now rides the
+// shared default), same stable codes and labels ("maintain detector
+// registry" / "maintain finding ledger" / "maintain proposal ledger" in
+// lock/read/ceiling refusals, "maintain detector" / "maintain finding" /
+// "maintain proposal" as the per-event chain-walk prefixes), and the
+// same fold interleaving — the chain link first, then the family's domain
+// checks, per event in ledger order. Only the domain half is declared
+// here: the schema and kind gates, the closed event shapes, the per-kind
+// proposal appliers (`applyProposalEvent` in the T2/T3 sections below),
+// the cross-ledger single-use Decision spends, and the triage/completion/
+// rollup rules stay this family's own.
+const MAINTAIN_FAMILY = defineLedgerFamily({
+	dir: "maintain",
+	label: "maintain registry",
+	ledgers: [
+		{
+			name: "detectors",
+			fileName: "detectors.jsonl",
+			lockName: "detectors.lock",
+			conflictCode: MAINTAIN_LOCK_CODE,
+			corruptCode: MAINTAIN_CORRUPT_CODE,
+			sizeCeilingCode: MAINTAIN_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_MAINTAIN_MAX_DETECTORS_BYTES",
+				defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
+			},
+			label: "maintain detector registry",
+			eventLabel: "maintain detector",
+			fold: {
+				init: () => ({ keys: new Set(), detectors: [] }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw maintainCorrupt(
+							`maintain detector event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (event.kind !== "detector")
+						throw maintainCorrupt(
+							`maintain detector event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = detectorEventProblem(event, lineIndex);
+					if (problem !== null) throw maintainCorrupt(problem);
+					const key = detectorKey(event.id, event.version);
+					if (state.keys.has(key))
+						throw maintainCorrupt(`detector ${JSON.stringify(key)} is registered more than once`);
+					state.keys.add(key);
+					const { prevHash: _prev, hash: _hash, ...body } = event;
+					state.detectors.push({
+						...body,
+						owner: event.owner ?? null,
+						policy: event.policy ?? null,
+						index: lineIndex - 1,
+					});
+				},
+				result: (state) => state.detectors,
+			},
+		},
+		{
+			name: "findings",
+			fileName: "findings.jsonl",
+			lockName: "findings.lock",
+			conflictCode: FINDING_LOCK_CODE,
+			corruptCode: FINDING_CORRUPT_CODE,
+			sizeCeilingCode: FINDING_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_MAINTAIN_MAX_FINDINGS_BYTES",
+				defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
+			},
+			label: "maintain finding ledger",
+			eventLabel: "maintain finding",
+			fold: {
+				init: () => ({ findings: [] }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_MAINTAIN_FINDING_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw findingCorrupt(
+							`maintain finding event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (event.kind !== "finding")
+						throw findingCorrupt(
+							`maintain finding event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = findingEventProblem(event, lineIndex);
+					if (problem !== null) throw findingCorrupt(problem);
+					const { prevHash: _prev, hash: _hash, ...body } = event;
+					state.findings.push({ ...body, index: lineIndex - 1 });
+				},
+				result: (state) => state.findings,
+			},
+		},
+		{
+			name: "proposals",
+			fileName: "proposals.jsonl",
+			lockName: "proposals.lock",
+			conflictCode: PROPOSAL_LOCK_CODE,
+			corruptCode: PROPOSAL_CORRUPT_CODE,
+			sizeCeilingCode: PROPOSAL_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: "AMBER_MAINTAIN_MAX_PROPOSALS_BYTES",
+				defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
+			},
+			label: "maintain proposal ledger",
+			eventLabel: "maintain proposal",
+			fold: {
+				init: () => ({ proposals: [], byFingerprint: new Map() }),
+				apply: (state, event, lineIndex) => {
+					if (!SUPPORTED_MAINTAIN_PROPOSAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
+						throw proposalCorrupt(
+							`maintain proposal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
+						);
+					if (
+						event.kind !== "proposal" &&
+						event.kind !== "evidence" &&
+						event.kind !== "triage" &&
+						event.kind !== "completion"
+					)
+						throw proposalCorrupt(
+							`maintain proposal event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
+						);
+					const problem = proposalEventProblem(event, lineIndex);
+					if (problem !== null) throw proposalCorrupt(problem);
+					applyProposalEvent(state.proposals, state.byFingerprint, event, lineIndex);
+				},
+				result: (state) => state.proposals,
+			},
+		},
+	],
+});
 
-function findingsPath(cwd) {
-	return statePathForCreate(cwd, "maintain", "findings.jsonl");
-}
+const DETECTOR_LEDGER = MAINTAIN_FAMILY.ledgers.detectors;
+const detectorsPath = DETECTOR_LEDGER.path;
+const maintainCorrupt = DETECTOR_LEDGER.corrupt;
+const foldDetectors = DETECTOR_LEDGER.fold;
 
-function maintainCorrupt(message) {
-	return typedError(MAINTAIN_CORRUPT_CODE, message);
-}
-
-function findingCorrupt(message) {
-	return typedError(FINDING_CORRUPT_CODE, message);
-}
-
-function acquireDetectorLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(detectorsPath(cwd)),
-		lockName: "detectors.lock",
-		conflictCode: MAINTAIN_LOCK_CODE,
-		corruptCode: MAINTAIN_CORRUPT_CODE,
-		label: "maintain detector registry",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function acquireFindingLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(findingsPath(cwd)),
-		lockName: "findings.lock",
-		conflictCode: FINDING_LOCK_CODE,
-		corruptCode: FINDING_CORRUPT_CODE,
-		label: "maintain finding ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
+const FINDING_LEDGER = MAINTAIN_FAMILY.ledgers.findings;
+const findingsPath = FINDING_LEDGER.path;
+const findingCorrupt = FINDING_LEDGER.corrupt;
+const foldFindings = FINDING_LEDGER.fold;
 
 function decisionShapeProblem(value, label) {
 	if (!isPlainObject(value)) return `${label} must be an object`;
@@ -294,40 +389,6 @@ function detectorKey(id, version) {
 	return `${id}@${version}`;
 }
 
-function foldDetectors(cwd) {
-	const events = readLedgerFailClosed(
-		detectorsPath(cwd),
-		MAINTAIN_CORRUPT_CODE,
-		"maintain detector registry",
-	);
-	let prevHash = GENESIS_HASH;
-	const keys = new Set();
-	const detectors = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "maintain detector");
-		if (link !== null) throw maintainCorrupt(link);
-		if (!SUPPORTED_MAINTAIN_DETECTOR_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw maintainCorrupt(
-				`maintain detector event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind !== "detector")
-			throw maintainCorrupt(
-				`maintain detector event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = detectorEventProblem(event, lineIndex);
-		if (problem !== null) throw maintainCorrupt(problem);
-		const key = detectorKey(event.id, event.version);
-		if (keys.has(key))
-			throw maintainCorrupt(`detector ${JSON.stringify(key)} is registered more than once`);
-		keys.add(key);
-		const { prevHash: _prev, hash: _hash, ...body } = event;
-		detectors.push({ ...body, owner: event.owner ?? null, policy: event.policy ?? null, index });
-		prevHash = event.hash;
-	});
-	return detectors;
-}
-
 // A registration Decision is single-use across the detector registry.
 function decisionSpentBy(detectors, decision) {
 	const spent = findDecisionSpend(detectors, decision, ["decision"]);
@@ -353,17 +414,6 @@ function resolveRegistryDecision(cwd, decision, label = "detector registration")
 		return { ok: false, code: MAINTAIN_INVALID_CODE, errors: [resolved.problem] };
 	return { ok: true, decision: resolved.decision };
 }
-
-const DETECTOR_LEDGER = Object.freeze({
-	acquire: acquireDetectorLock,
-	fold: foldDetectors,
-	path: detectorsPath,
-	corruptCode: MAINTAIN_CORRUPT_CODE,
-	sizeCeilingCode: MAINTAIN_SIZE_CEILING_CODE,
-	envName: "AMBER_MAINTAIN_MAX_DETECTORS_BYTES",
-	defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
-	label: "maintain detector registry",
-});
 
 // The declared owner is the ONLY principal whose Decision may triage
 // this detector's proposals: service-owner triage is a registered,
@@ -496,9 +546,8 @@ function registerDetector(cwd, input = {}, opts = {}) {
 	const crossSpend = decisionSpentByTriageProblem(cwd, input.decision);
 	if (crossSpend !== null) return fail(crossSpend.code, crossSpend.errors);
 	const at = now.toISOString();
-	return appendLedgerEvent(
+	return DETECTOR_LEDGER.append(
 		cwd,
-		DETECTOR_LEDGER,
 		{
 			kind: "detector",
 			schemaVersion: MAINTAIN_DETECTOR_SCHEMA_VERSION,
@@ -592,46 +641,6 @@ function findingEventProblem(event, lineIndex) {
 	return null;
 }
 
-function foldFindings(cwd) {
-	const events = readLedgerFailClosed(
-		findingsPath(cwd),
-		FINDING_CORRUPT_CODE,
-		"maintain finding ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const findings = [];
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "maintain finding");
-		if (link !== null) throw findingCorrupt(link);
-		if (!SUPPORTED_MAINTAIN_FINDING_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw findingCorrupt(
-				`maintain finding event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (event.kind !== "finding")
-			throw findingCorrupt(
-				`maintain finding event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = findingEventProblem(event, lineIndex);
-		if (problem !== null) throw findingCorrupt(problem);
-		const { prevHash: _prev, hash: _hash, ...body } = event;
-		findings.push({ ...body, index });
-		prevHash = event.hash;
-	});
-	return findings;
-}
-
-const FINDING_LEDGER = Object.freeze({
-	acquire: acquireFindingLock,
-	fold: foldFindings,
-	path: findingsPath,
-	corruptCode: FINDING_CORRUPT_CODE,
-	sizeCeilingCode: FINDING_SIZE_CEILING_CODE,
-	envName: "AMBER_MAINTAIN_MAX_FINDINGS_BYTES",
-	defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
-	label: "maintain finding ledger",
-});
-
 // The deterministic tier verdict: the LAST matching rule wins so
 // definitions list tiers from least to most severe; no rule matching
 // reads as the reserved in-band verdict.
@@ -684,9 +693,8 @@ function detect(cwd, input = {}, opts = {}) {
 	const tier = tierOf(detector, input.value);
 	if (tier === "in-band") return { ok: true, code: null, record: null, tier, errors: [] };
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
-	const appended = appendLedgerEvent(
+	const appended = FINDING_LEDGER.append(
 		cwd,
-		FINDING_LEDGER,
 		{
 			kind: "finding",
 			schemaVersion: MAINTAIN_FINDING_SCHEMA_VERSION,
@@ -773,25 +781,6 @@ function listFindings(cwd, { detectorId = null, fingerprint = null } = {}) {
 		.map((entry) =>
 			withStaleness(entry, findingStaleReasons(entry, detectors, findings, revisions)),
 		);
-}
-
-function proposalsPath(cwd) {
-	return statePathForCreate(cwd, "maintain", "proposals.jsonl");
-}
-
-function proposalCorrupt(message) {
-	return typedError(PROPOSAL_CORRUPT_CODE, message);
-}
-
-function acquireProposalLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(proposalsPath(cwd)),
-		lockName: "proposals.lock",
-		conflictCode: PROPOSAL_LOCK_CODE,
-		corruptCode: PROPOSAL_CORRUPT_CODE,
-		label: "maintain proposal ledger",
-		staleMs: LOCK_STALE_MS,
-	});
 }
 
 const PROPOSE_INPUT_FIELDS = Object.freeze(["findingIndex"]);
@@ -1025,50 +1014,10 @@ function applyProposalEvent(proposals, byFingerprint, event, lineIndex) {
 // Projects one entry per opened proposal: `findings` accumulates the
 // opening Finding plus every evidence append, `lastObservedAt` tracks the
 // latest referenced observation time the cooldown is measured against.
-function foldProposals(cwd) {
-	const events = readLedgerFailClosed(
-		proposalsPath(cwd),
-		PROPOSAL_CORRUPT_CODE,
-		"maintain proposal ledger",
-	);
-	let prevHash = GENESIS_HASH;
-	const proposals = [];
-	const byFingerprint = new Map();
-	events.forEach((event, index) => {
-		const lineIndex = index + 1;
-		const link = chainLinkProblem(event, prevHash, lineIndex, "maintain proposal");
-		if (link !== null) throw proposalCorrupt(link);
-		if (!SUPPORTED_MAINTAIN_PROPOSAL_SCHEMA_VERSIONS.includes(event.schemaVersion))
-			throw proposalCorrupt(
-				`maintain proposal event ${lineIndex} declares unsupported schemaVersion ${JSON.stringify(event.schemaVersion)}`,
-			);
-		if (
-			event.kind !== "proposal" &&
-			event.kind !== "evidence" &&
-			event.kind !== "triage" &&
-			event.kind !== "completion"
-		)
-			throw proposalCorrupt(
-				`maintain proposal event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}`,
-			);
-		const problem = proposalEventProblem(event, lineIndex);
-		if (problem !== null) throw proposalCorrupt(problem);
-		applyProposalEvent(proposals, byFingerprint, event, lineIndex);
-		prevHash = event.hash;
-	});
-	return proposals;
-}
-
-const PROPOSAL_LEDGER = Object.freeze({
-	acquire: acquireProposalLock,
-	fold: foldProposals,
-	path: proposalsPath,
-	corruptCode: PROPOSAL_CORRUPT_CODE,
-	sizeCeilingCode: PROPOSAL_SIZE_CEILING_CODE,
-	envName: "AMBER_MAINTAIN_MAX_PROPOSALS_BYTES",
-	defaultBytes: DEFAULT_MAX_MAINTAIN_BYTES,
-	label: "maintain proposal ledger",
-});
+const PROPOSAL_LEDGER = MAINTAIN_FAMILY.ledgers.proposals;
+const proposalsPath = PROPOSAL_LEDGER.path;
+const proposalCorrupt = PROPOSAL_LEDGER.corrupt;
+const foldProposals = PROPOSAL_LEDGER.fold;
 
 // The latest proposal for a fingerprint carries its live state; earlier
 // triaged proposals stay listed for review but no longer bind it.
@@ -1190,9 +1139,8 @@ function propose(cwd, input = {}, opts = {}) {
 		]);
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
 	let action = null;
-	const result = appendLedgerEvent(
+	const result = PROPOSAL_LEDGER.append(
 		cwd,
-		PROPOSAL_LEDGER,
 		// The factory re-derives its branch from its own fold, so it agrees
 		// with the guard without depending on evaluation order.
 		(fold) =>
@@ -1379,9 +1327,8 @@ function triage(cwd, input = {}, opts = {}) {
 	if (crossSpend !== null) return fail(crossSpend.code, crossSpend.errors);
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
 	let candidate = null;
-	const result = appendLedgerEvent(
+	const result = PROPOSAL_LEDGER.append(
 		cwd,
-		PROPOSAL_LEDGER,
 		{
 			kind: "triage",
 			schemaVersion: MAINTAIN_PROPOSAL_SCHEMA_VERSION,
@@ -1531,9 +1478,8 @@ function complete(cwd, input = {}, opts = {}) {
 	if (pins !== null) return fail(pins.code, pins.errors);
 	const at = (opts.now instanceof Date ? opts.now : new Date()).toISOString();
 	let targetIndex = null;
-	return appendLedgerEvent(
+	return PROPOSAL_LEDGER.append(
 		cwd,
-		PROPOSAL_LEDGER,
 		(fold) => {
 			// The guard ran first on this same fold, so a target exists; the
 			// -1 fallback fails event validation closed if that ever changes.
