@@ -22,6 +22,27 @@ const DEFAULT_PROFILE = "personal-node";
 // Canonical location of the profile declaration (documentation shape; reads
 // go through the state-dir seam so a legacy .harness profile stays visible).
 const PROFILE_FILE = ".amber/profile.json";
+// Resolution sources (closed set): "default" when no declaration file exists,
+// "profile-file" when the declaration file was read — valid or not.
+const PROFILE_SOURCE_DEFAULT = "default";
+const PROFILE_SOURCE_FILE = "profile-file";
+
+// One error shape for every failed declaration read (#273 S1): fail closed
+// with a null profile, the profile-file source, and one explanatory error.
+function invalidDeclaration(message) {
+	return { deploymentProfile: null, source: PROFILE_SOURCE_FILE, errors: [message] };
+}
+
+/**
+ * The one "declaration invalid" reading (#273 S3), shared by the validator,
+ * the phase gates, and the envelope producer: a resolution is invalid exactly
+ * when the parser reported errors. Absence is not invalid — it defaults.
+ * @param {{errors: string[]}} resolution - A readProfileFile(...) result.
+ * @returns {boolean}
+ */
+function isInvalidDeclaration(resolution) {
+	return resolution.errors.length > 0;
+}
 
 /**
  * Read and validate the deployment profile file.
@@ -31,7 +52,7 @@ const PROFILE_FILE = ".amber/profile.json";
  */
 function readProfileFile(cwd) {
 	const filePath = statePath(cwd, "profile.json");
-	const base = { deploymentProfile: DEFAULT_PROFILE, source: "default", errors: [] };
+	const base = { deploymentProfile: DEFAULT_PROFILE, source: PROFILE_SOURCE_DEFAULT, errors: [] };
 	if (!fs.existsSync(filePath)) {
 		return base;
 	}
@@ -39,34 +60,38 @@ function readProfileFile(cwd) {
 	try {
 		raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
 	} catch {
-		return {
-			deploymentProfile: null,
-			source: "profile-file",
-			errors: [
-				`Malformed deployment profile file (not valid JSON): ${path.relative(cwd, filePath)}`,
-			],
-		};
+		return invalidDeclaration(
+			`Malformed deployment profile file (not valid JSON): ${path.relative(cwd, filePath)}`,
+		);
 	}
 	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-		return {
-			deploymentProfile: null,
-			source: "profile-file",
-			errors: [
-				`Malformed deployment profile file (expected a JSON object): ${path.relative(cwd, filePath)}`,
-			],
-		};
+		return invalidDeclaration(
+			`Malformed deployment profile file (expected a JSON object): ${path.relative(cwd, filePath)}`,
+		);
 	}
 	const profile = raw.deploymentProfile;
 	if (typeof profile !== "string" || !DEPLOYMENT_PROFILES.includes(profile)) {
-		return {
-			deploymentProfile: null,
-			source: "profile-file",
-			errors: [
-				`Unknown deployment profile "${profile}". Expected one of: ${DEPLOYMENT_PROFILES.join(", ")}`,
-			],
-		};
+		return invalidDeclaration(
+			`Unknown deployment profile "${profile}". Expected one of: ${DEPLOYMENT_PROFILES.join(", ")}`,
+		);
 	}
-	return { deploymentProfile: profile, source: "profile-file", errors: [] };
+	return { deploymentProfile: profile, source: PROFILE_SOURCE_FILE, errors: [] };
+}
+
+/**
+ * Shared predicate (#273 S2): a deployment profile is DECLARED (the file
+ * exists) and VALID (it parses to one of DEPLOYMENT_PROFILES). The absent-file
+ * default does not satisfy it. Phase-2 gate evidence and inv-2 read this.
+ * @param {string} cwd - Repository root.
+ * @returns {boolean}
+ */
+function hasDeclaredValidProfile(cwd) {
+	const resolution = readProfileFile(cwd);
+	return (
+		resolution.source === PROFILE_SOURCE_FILE &&
+		!isInvalidDeclaration(resolution) &&
+		resolution.deploymentProfile !== null
+	);
 }
 
 /**
@@ -105,8 +130,12 @@ function resolveDeploymentProfile(cwd) {
  * @returns {{valid: boolean, deploymentProfile: string|null, errors: string[]}}
  */
 function validateDeploymentProfile(cwd) {
-	const { deploymentProfile, errors } = readProfileFile(cwd);
-	return { valid: errors.length === 0, deploymentProfile, errors };
+	const resolution = readProfileFile(cwd);
+	return {
+		valid: !isInvalidDeclaration(resolution),
+		deploymentProfile: resolution.deploymentProfile,
+		errors: resolution.errors,
+	};
 }
 
 /**
@@ -115,12 +144,13 @@ function validateDeploymentProfile(cwd) {
  * @returns {object} Profile declaration, identity, and sources.
  */
 function showDeploymentProfile(cwd) {
-	const { deploymentProfile, source: profileSource, errors } = readProfileFile(cwd);
+	const resolution = readProfileFile(cwd);
+	const { deploymentProfile, source: profileSource, errors } = resolution;
 	const identity = resolveIdentity(cwd);
 	return {
 		deploymentProfile,
 		identity,
-		source: errors.length > 0 ? "invalid" : profileSource,
+		source: isInvalidDeclaration(resolution) ? "invalid" : profileSource,
 		profileSource,
 		identitySource: identity.source,
 		errors,
@@ -131,6 +161,10 @@ module.exports = {
 	DEPLOYMENT_PROFILES,
 	DEFAULT_PROFILE,
 	PROFILE_FILE,
+	PROFILE_SOURCE_DEFAULT,
+	PROFILE_SOURCE_FILE,
+	isInvalidDeclaration,
+	hasDeclaredValidProfile,
 	readProfileFile,
 	writeProfileFile,
 	resolveDeploymentProfile,

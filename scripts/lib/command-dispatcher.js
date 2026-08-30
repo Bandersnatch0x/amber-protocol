@@ -1276,6 +1276,10 @@ function dispatch(command, args) {
 	const response = dispatchTypedInvocation(command, args, () => registration.handler(args));
 	const addDeprecationWarning = (resolvedResponse) => {
 		if (!DEPRECATED_COMMANDS.has(command)) return resolvedResponse;
+		// UNDOC-9 (#273): `profile deployment` is not deprecated — it is the one
+		// supported deployment-profile declaration surface, and 'amber governance'
+		// has no equivalent. Only the legacy profile actions carry the warning.
+		if (command === "profile" && args._?.[0] === "deployment") return resolvedResponse;
 		const msg =
 			`⚠️  DEPRECATED: 'amber ${command}' will be removed in a future version. ` +
 			"Use 'amber governance' or 'amber maintenance' for equivalent functionality.";

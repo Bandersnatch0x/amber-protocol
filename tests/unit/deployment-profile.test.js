@@ -8,6 +8,10 @@ const path = require("node:path");
 const {
 	DEPLOYMENT_PROFILES,
 	DEFAULT_PROFILE,
+	PROFILE_SOURCE_DEFAULT,
+	PROFILE_SOURCE_FILE,
+	isInvalidDeclaration,
+	hasDeclaredValidProfile,
 	readProfileFile,
 	writeProfileFile,
 	resolveDeploymentProfile,
@@ -169,4 +173,66 @@ test("showDeploymentProfile fails closed on invalid profile file", () => {
 	const shown = showDeploymentProfile(dir);
 	assert.equal(shown.deploymentProfile, null);
 	assert.ok(shown.errors.length > 0);
+});
+
+// ── Shared predicates and source constants (#273 S1-S3) ───────
+
+test("source constants match the strings readProfileFile emits", () => {
+	assert.equal(PROFILE_SOURCE_DEFAULT, "default");
+	assert.equal(PROFILE_SOURCE_FILE, "profile-file");
+	const absent = readProfileFile(mkTarget("const-absent"));
+	assert.equal(absent.source, PROFILE_SOURCE_DEFAULT);
+	const declared = readProfileFile(
+		mkTarget("const-declared", { profile: { deploymentProfile: "team-hub" } }),
+	);
+	assert.equal(declared.source, PROFILE_SOURCE_FILE);
+});
+
+test("isInvalidDeclaration is false for the absent default and any valid declaration", () => {
+	assert.equal(isInvalidDeclaration(readProfileFile(mkTarget("pred-absent"))), false);
+	for (const declared of DEPLOYMENT_PROFILES) {
+		const dir = mkTarget(`pred-valid-${declared}`, { profile: { deploymentProfile: declared } });
+		assert.equal(isInvalidDeclaration(readProfileFile(dir)), false);
+	}
+});
+
+test("isInvalidDeclaration is true for malformed, non-object, and unknown-value declarations", () => {
+	const malformed = mkTarget("pred-malformed");
+	fs.mkdirSync(path.join(malformed, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(malformed, PROFILE_FILE), "{ bad json");
+	assert.equal(isInvalidDeclaration(readProfileFile(malformed)), true);
+
+	const nonObject = mkTarget("pred-non-object");
+	fs.mkdirSync(path.join(nonObject, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(nonObject, PROFILE_FILE), JSON.stringify(["personal-node"]));
+	assert.equal(isInvalidDeclaration(readProfileFile(nonObject)), true);
+
+	const unknown = mkTarget("pred-unknown", { profile: { deploymentProfile: "bogus" } });
+	assert.equal(isInvalidDeclaration(readProfileFile(unknown)), true);
+});
+
+test("hasDeclaredValidProfile requires a declaration — the absent default does not satisfy it", () => {
+	assert.equal(hasDeclaredValidProfile(mkTarget("declared-absent")), false);
+});
+
+test("hasDeclaredValidProfile accepts every enum-valid declared profile", () => {
+	for (const declared of DEPLOYMENT_PROFILES) {
+		const dir = mkTarget(`declared-${declared}`, { profile: { deploymentProfile: declared } });
+		assert.equal(hasDeclaredValidProfile(dir), true, `must accept ${declared}`);
+	}
+});
+
+test("hasDeclaredValidProfile rejects malformed, non-object, and unknown declarations", () => {
+	const malformed = mkTarget("declared-malformed");
+	fs.mkdirSync(path.join(malformed, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(malformed, PROFILE_FILE), "{ bad json");
+	assert.equal(hasDeclaredValidProfile(malformed), false);
+
+	const nonObject = mkTarget("declared-non-object");
+	fs.mkdirSync(path.join(nonObject, ".amber"), { recursive: true });
+	fs.writeFileSync(path.join(nonObject, PROFILE_FILE), JSON.stringify(["personal-node"]));
+	assert.equal(hasDeclaredValidProfile(nonObject), false);
+
+	const unknown = mkTarget("declared-unknown", { profile: { deploymentProfile: "bogus" } });
+	assert.equal(hasDeclaredValidProfile(unknown), false);
 });

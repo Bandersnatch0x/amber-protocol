@@ -107,6 +107,29 @@ test("legacy profile inspect still works", () => {
 	assert.match(r.stdout + r.stderr, /No project profile file specified/);
 });
 
+// ── UNDOC-9 (#273): deprecation is scoped to the legacy actions ──
+
+test("profile deployment carries no deprecation warning (supported surface)", () => {
+	const dir = mkTarget("nodeprecation");
+	const r = runCli(["profile", "deployment", "show", "--target", dir, "--json"], dir);
+	assert.equal(r.status, 0, r.stderr);
+	const outer = JSON.parse(r.stdout);
+	assert.ok(
+		!(outer.warnings || []).some((w) => w.includes("DEPRECATED")),
+		`deployment subcommand must not warn as deprecated: ${JSON.stringify(outer.warnings)}`,
+	);
+});
+
+test("legacy profile inspect still warns as deprecated", () => {
+	const dir = mkTarget("stilldeprecated");
+	const r = runCli(["profile", "inspect", "--target", dir, "--json"], dir);
+	const outer = JSON.parse(r.stdout);
+	assert.ok(
+		(outer.warnings || []).some((w) => w.includes("DEPRECATED")),
+		`legacy action keeps the deprecation warning: ${JSON.stringify(outer.warnings)}`,
+	);
+});
+
 test("profile deployment with unknown subcommand errors", () => {
 	const dir = mkTarget("unknownsub");
 	const r = runCli(["profile", "deployment", "bogus", "--target", dir, "--json"], dir);

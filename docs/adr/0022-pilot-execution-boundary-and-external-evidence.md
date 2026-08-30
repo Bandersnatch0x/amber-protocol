@@ -3,7 +3,7 @@
 **Status:** Accepted (2026-08-26)
 **Date:** 2026-08-26
 **Builds on:** [ADR-0001](0001-governance-first-artifact-first.md) (no live agent runtime),
-[ADR-0003](0003-governed-gated-execution.md) (governed execution preconditions),
+[ADR-0003](0003-governance-gated-execution.md) (governed execution preconditions),
 [ADR-0004](0004-evidence-grade-verification.md) (evidence-grade verification),
 [ADR-0005](0005-experimental-execution-removal.md) (execution removal)
 

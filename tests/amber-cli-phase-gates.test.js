@@ -30,7 +30,7 @@ function setupPhase0(dir) {
 			blocks: [],
 		}),
 	);
-	// inv-2: deployment profile resolvable
+	// inv-2: valid deployment profile declared
 	fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
 	fs.writeFileSync(
 		path.join(dir, ".amber", "profile.json"),

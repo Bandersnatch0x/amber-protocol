@@ -16,7 +16,7 @@ The Amber Core remains repository-local, offline-capable, inspectable, and autho
 state, decisions, evidence, approvals, context, and accepted knowledge. This is unchanged.
 
 The amendment adds that the Core may be *progressively configured* as a Personal Node, Team Hub,
-or Organization Control Plane deployment profile (baseline §Deployment Profiles). These profiles
+or Organization Profile deployment (baseline §Deployment Profiles). These profiles
 add optional distributed contexts — Sync Runtime, Governance Graph, Governed Knowledge Base,
 Visualization Workbench, and Organization Control Plane — that are:
 

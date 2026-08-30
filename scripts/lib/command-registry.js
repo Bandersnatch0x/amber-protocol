@@ -147,8 +147,13 @@ const COMMAND_HELP = {
 	pack: "Inspect or validate declarative workflow packs without executing them.",
 	ledger:
 		"Export, seal, or verify-anchoring for Amber's tamper-evident ledgers. export emits JSON/CSV/OTLP-JSON for SIEM.",
-	profile:
-		"⚠️  DEPRECATED: Inspect declarative project profiles. Will be removed in v2 — use 'amber governance' instead.",
+	profile: [
+		"⚠️  DEPRECATED (legacy `inspect` action only): Inspect declarative project profiles. Will be removed in v2 — use 'amber governance' instead.",
+		"",
+		"NOT deprecated: `profile deployment <show|set|validate|resolve>` declares and reads the",
+		"deployment profile (`.amber/profile.json`) and remains the only supported surface for it;",
+		"'amber governance' cannot set a deployment profile. Contract: docs/specs/deployment-profiles.md.",
+	],
 	task: "⚠️  DEPRECATED: Prepare isolated task ledger, evidence, replay, and worktree artifacts. Will be removed in v2.",
 	result:
 		"⚠️  DEPRECATED: Inspect replayable task result artifacts without relying on chat history. Will be removed in v2.",

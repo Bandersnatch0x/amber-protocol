@@ -21,7 +21,7 @@ const PHASES = Object.freeze(["phase-0", "phase-1", "phase-2", "phase-3", "phase
 const PHASE_REQUIREMENTS = Object.freeze({
 	"phase-0": ["canonical artifacts present", "identity resolves"],
 	"phase-1": ["envelope schema validated", "compatibility negotiation proven"],
-	"phase-2": ["personal-node profile declared", "offline capture proven"],
+	"phase-2": ["valid deployment profile declared", "offline capture proven"],
 	"phase-3": ["sync session proven", "conflict preservation proven"],
 	"phase-4": [
 		"projections rebuildable",
@@ -44,11 +44,11 @@ function hasContextPages(cwd) {
 }
 
 function hasProfile(cwd) {
-	// Delegate to the one profile parser (#270): the gate must not be
-	// satisfiable by a declaration the profile validator rejects.
-	const { readProfileFile } = require("./deployment-profile");
-	const { deploymentProfile, source, errors } = readProfileFile(cwd);
-	return source === "profile-file" && errors.length === 0 && deploymentProfile !== null;
+	// Delegate to the one profile parser and shared predicate (#270, #273):
+	// the gate must not be satisfiable by a declaration the profile validator
+	// rejects, and the absent-file default is not a declaration.
+	const { hasDeclaredValidProfile } = require("./deployment-profile");
+	return hasDeclaredValidProfile(cwd);
 }
 
 function hasEnvelopes(cwd) {
@@ -92,7 +92,7 @@ function requirementSatisfied(cwd, requirement) {
 			);
 		case "compatibility negotiation proven":
 			return hasEnvelopes(cwd);
-		case "personal-node profile declared":
+		case "valid deployment profile declared":
 			return hasProfile(cwd);
 		case "offline capture proven":
 			return hasEnvelopes(cwd);
@@ -225,7 +225,7 @@ function listTransitions(cwd) {
 function checkInvariantNonRegression(cwd) {
 	const invariants = [
 		{ id: "inv-1", name: "canonical artifacts exist", satisfied: hasContextPages(cwd) },
-		{ id: "inv-2", name: "deployment profile resolvable", satisfied: hasProfile(cwd) },
+		{ id: "inv-2", name: "valid deployment profile declared", satisfied: hasProfile(cwd) },
 		{
 			id: "inv-3",
 			name: "no silent fallback (transitions append-only)",

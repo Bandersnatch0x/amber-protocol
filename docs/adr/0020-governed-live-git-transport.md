@@ -4,7 +4,7 @@
 "Adjudicated decisions" below)
 **Date:** 2026-08-25
 **Builds on:** [ADR-0001](0001-governance-first-artifact-first.md) (governance-first, artifact-first),
-[ADR-0003](0003-governed-gated-execution.md) (the five governed-execution preconditions),
+[ADR-0003](0003-governance-gated-execution.md) (the five governed-execution preconditions),
 [ADR-0011](0011-safety-philosophy-upgrades.md) (confidence bands, explicit fail-closed),
 [ADR-0019](0019-distributed-governance-stage1-decisions.md) (envelopes are carried by git)
 **Authority:** F035 plan decision D1
@@ -297,7 +297,7 @@ preparation.
 
 ## Related
 
-- [ADR-0001](0001-governance-first-artifact-first.md), [ADR-0003](0003-governed-gated-execution.md),
+- [ADR-0001](0001-governance-first-artifact-first.md), [ADR-0003](0003-governance-gated-execution.md),
   [ADR-0005](0005-experimental-execution-removal.md), [ADR-0011](0011-safety-philosophy-upgrades.md),
   [ADR-0012](0012-protocol-and-schema-versioning.md), [ADR-0018](0018-governed-memory-layer.md),
   [ADR-0019](0019-distributed-governance-stage1-decisions.md)
