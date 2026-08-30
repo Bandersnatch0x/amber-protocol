@@ -7,7 +7,7 @@
 			"paths": ["scripts/lib/core/scaffolding.js", "scripts/amber.js"],
 			"title": "Amber scaffold install (init)",
 			"user_visible_behavior": "A project gains AGENTS.md/CLAUDE.md, feature_list.json, and a wiki skeleton, with existing files preserved (idempotent).",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node scripts/amber.js init --target <repo> is idempotent and skips existing files",
 				"npm test (init/scaffolding suites green)"
@@ -22,7 +22,7 @@
 			"paths": ["scripts/lib/core/"],
 			"title": "Doctor validation",
 			"user_visible_behavior": "amber doctor reports whether a repo's Amber setup is usable and internally consistent.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": ["node scripts/amber.js doctor --target .", "npm run doctor"],
 			"evidence": ["npm test: doctor suites green"],
 			"notes": []
@@ -34,7 +34,7 @@
 			"paths": ["scripts/lib/route-commands.js", "routes/"],
 			"title": "Route engine",
 			"user_visible_behavior": "Routes (feature-standard, bugfix-quick, refactor-safe) can be listed, inspected, validated, and dry-run tested; session goals auto-match via goalPattern.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node scripts/amber.js route list",
 				"node scripts/amber.js route test bugfix-quick --dry-run"
@@ -49,7 +49,7 @@
 			"paths": ["scripts/lib/session-commands.js"],
 			"title": "Session lifecycle",
 			"user_visible_behavior": "Sessions can be started, listed, status-checked, aborted, and continued from checkpoints.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": ["node scripts/amber.js session list", "npm run test:load"],
 			"evidence": [
 				"sequential load test: 20 sessions completed <2min",
@@ -64,7 +64,7 @@
 			"paths": ["scripts/lib/governance-commands.js"],
 			"title": "Governance report & approval gates",
 			"user_visible_behavior": "amber governance report scores the delivery loop and emits structured next actions; gates enforce human approval before completion.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node scripts/amber.js governance report --target .",
 				"npm test: governance suites green"
@@ -79,7 +79,7 @@
 			"paths": ["scripts/lib/core/handoff-bundle.js"],
 			"title": "Handoff reports",
 			"user_visible_behavior": "amber handoff produces a portable handoff bundle for clean session continuity.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node scripts/amber.js handoff --target .",
 				"npm test: handoff suites green"
@@ -94,7 +94,7 @@
 			"paths": ["scripts/lib/core/loops/", "src/migration/"],
 			"title": "Governed loop execution (ADR-0003)",
 			"user_visible_behavior": "Loop contracts run only behind four gates: policy rules, explicit one-shot approval, isolated worktree, and a tamper-evident ledger.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node scripts/amber.js loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --target . --dry-run --json",
 				"node scripts/run-tests.js tests/unit/loop-ledger.test.js"
@@ -113,7 +113,7 @@
 			"paths": ["apps/web/"],
 			"title": "Web viewer (Phase C)",
 			"user_visible_behavior": "A Vite + React + tRPC viewer renders sessions, timelines, ledgers, and governance state.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": ["cd apps/web && npm test", "cd apps/web && npm run build"],
 			"evidence": ["web vitest 382/0 passing"],
 			"notes": ["Owns its TS toolchain; excluded from root eslint."]
@@ -319,7 +319,7 @@
 			"area": "context",
 			"title": "Governed Context knowledge lifecycle",
 			"user_visible_behavior": "Context Pages carry governed knowledge classification and supersession lineage; Loadouts exclude superseded knowledge, derived indexes are rebuildable, benchmarks are deterministic, and optional source adapters remain behind the existing ingest boundary.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/context-adapter.test.js tests/unit/context-dependency-boundary.test.js tests/unit/context-schema.test.js tests/unit/context-verify-refresh-stats.test.js tests/unit/error-catalog.test.js tests/unit/parse-args.test.js",
 				"source-isolation review of git diff d75750f48b2fa9511ea87b127d4e361be48fd755 96d3cc1ec795c5ff322e049938601221f1b7df86",
@@ -1658,7 +1658,7 @@
 			"area": "governance",
 			"title": "Canonical Planning Artifacts",
 			"user_visible_behavior": "Intent, Spec, and Plan are admitted as immutable Body/Envelope revisions with deterministic lineage and projection.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/canonical-artifacts.test.js tests/unit/canonical-artifact-contracts.test.js tests/unit/canonical-artifact-versioning.test.js tests/unit/artifact-graph-projection.test.js",
 				"npm test"
@@ -1693,7 +1693,7 @@
 			"area": "governance",
 			"title": "Decisions, Gates & Evidence Assurance",
 			"user_visible_behavior": "Human Decisions, deterministic Gates, scoped Approval, and four-level Evidence Assurance remain distinct and fail closed.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/principal-registry.test.js tests/unit/evidence-receipts.test.js tests/unit/approval-registry.test.js tests/unit/gate-evaluation.test.js tests/unit/policy-evaluation.test.js",
 				"npm test"
@@ -1732,7 +1732,7 @@
 			"area": "governance",
 			"title": "Read-only Adapters & Explicit Cutover",
 			"user_visible_behavior": "Legacy and external records enter through read-only Adapters until an explicit scoped Cutover changes Canonical Owner.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": ["node --test tests/unit/adapter-registry.test.js", "npm test"],
 			"evidence": [
 				{
@@ -1764,7 +1764,7 @@
 			"area": "execution",
 			"title": "Controlled Runner & Environment Boundaries",
 			"user_visible_behavior": "Only registered Runner capabilities execute within explicit Development, Staging, and Production boundaries.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/runner-registry.test.js tests/unit/session-runner-ack.test.js",
 				"npm test"
@@ -1799,7 +1799,7 @@
 			"area": "delivery",
 			"title": "Release Prepare, Deploy & Rollback",
 			"user_visible_behavior": "A verified release is prepared, independently authorized, deployed, and rolled back through environment Gates and real receipts.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node --test tests/unit/release-registry.test.js tests/unit/release-workflow.test.js tests/unit/verify-release.test.js",
 				"npm test"
@@ -1834,7 +1834,7 @@
 			"area": "maintenance",
 			"title": "Deterministic Maintain & Intent Re-entry",
 			"user_visible_behavior": "Deterministic Control Bands create Findings for human triage and only a fix Decision creates a candidate Intent.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": ["node --test tests/unit/maintain-registry.test.js", "npm test"],
 			"evidence": [
 				{
@@ -1866,7 +1866,7 @@
 			"area": "privacy",
 			"title": "Retention, Coordinated Deletion & Proof",
 			"user_visible_behavior": "Approved deletion coordinates registered Holders, respects Legal Hold, and proves only declared settled coverage.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": ["node --test tests/unit/retention-registry.test.js", "npm test"],
 			"evidence": [
 				{
@@ -1898,7 +1898,7 @@
 			"area": "integrations",
 			"title": "Registered External Side Effects",
 			"user_visible_behavior": "External writes execute only through registered scoped Adapters with human authorization, receipts, and compensation.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": ["node --test tests/unit/external-registry.test.js", "npm test"],
 			"evidence": [
 				{
@@ -1930,7 +1930,7 @@
 			"area": "security",
 			"title": "Break-glass Authorization",
 			"user_visible_behavior": "Emergency capability is human-authorized, exact-scope, time-limited, single-use, auditable, and post-reviewed.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": ["node --test tests/unit/breakglass-registry.test.js", "npm test"],
 			"evidence": [
 				{
@@ -1962,7 +1962,7 @@
 			"area": "verification",
 			"title": "Instruction-Surface Adversarial Evals",
 			"user_visible_behavior": "A deterministic F050 Eval suite reports whether MCP tool descriptions, the Context quote boundary, and breadcrumb authenticity still hold; results are Evidence, not Approval.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"amber eval run --suite instruction-surface --target .",
 				"npm test (instruction-surface eval suites green)"
@@ -1999,7 +1999,7 @@
 			"area": "knowledge",
 			"title": "Knowledge & Decision Map",
 			"user_visible_behavior": "A read-only /knowledge surface maps ADRs, wiki/memory/architecture pages, and features with four deterministic verb edges, dead-anchor drift findings, a Recent & Drift panel with real jump links, a labeled read-time LLM semantic layer, and cited QA, all fed by amber knowledge graph --json.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node scripts/amber.js knowledge graph --json (schema-valid, byte-stable recompute)",
 				"node scripts/amber.js eval run --target . (four Evals incl. QA contract-surface scan)",
@@ -2039,7 +2039,7 @@
 			"area": "knowledge",
 			"title": "Knowledge Map v2 — code graph & interaction upgrade",
 			"user_visible_behavior": "The knowledge graph gains a deterministic code layer (file-level Code Nodes with exported-symbol tables, imports edges, feature anchors edges) at schemaVersion 2, read-time analytics (per-layer p99 god nodes, Louvain communities with a connectivity post-split, two neutral anomaly detectors), and a folded-by-default /knowledge map: per-feature expansion with a global collapse, a shared-foundation super-node aggregated in the renderer only, session-scoped drag, and search that pierces the fold by path and exported symbol.",
-			"status": "passing",
+			"status": "accepted",
 			"verification": [
 				"node scripts/amber.js knowledge graph --target . --json (schemaVersion 2, schema-valid, byte-stable recompute, projection==tree parity)",
 				"node --test tests/unit/code-graph.test.js tests/unit/knowledge-graph.test.js (synthetic-corpus extraction + real-tree population invariants)",
