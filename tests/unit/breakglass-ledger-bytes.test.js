@@ -30,6 +30,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -62,6 +63,8 @@ const GOLDEN_PATH = path.join(
 	"breakglass",
 	"grants-lifecycle.golden.jsonl",
 );
+const GOLDEN_BYTES = 3198;
+const GOLDEN_SHA256 = "a5c0b8d6f63c860a33c23c0508fd3dfcf0d3805bc041916d4267fa52f07f8b10";
 
 const NOW = new Date("2026-08-29T00:00:00.000Z");
 const HOUR_MS = 3_600_000;
@@ -289,11 +292,17 @@ test("the factory-assembled grant ledger is byte-identical to the pre-migration 
 		readEvents(ledgerPath).map((event) => event.kind),
 		["grant", "grant", "use", "settlement", "revoke", "review"],
 	);
-	if (process.env.AMBER_RECORD_BREAKGLASS_GOLDEN === "1") {
-		fs.mkdirSync(path.dirname(GOLDEN_PATH), { recursive: true });
-		fs.writeFileSync(GOLDEN_PATH, actual);
-	}
 	const golden = fs.readFileSync(GOLDEN_PATH);
+	assert.equal(
+		golden.byteLength,
+		GOLDEN_BYTES,
+		"the recorded pre-migration breakglass golden size changed unexpectedly",
+	);
+	assert.equal(
+		crypto.createHash("sha256").update(golden).digest("hex"),
+		GOLDEN_SHA256,
+		"the recorded pre-migration breakglass golden changed unexpectedly",
+	);
 	assert.equal(
 		actual.equals(golden),
 		true,

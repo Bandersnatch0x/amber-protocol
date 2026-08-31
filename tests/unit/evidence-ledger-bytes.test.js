@@ -38,6 +38,7 @@
 
 const { test, mock } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -49,6 +50,8 @@ const mkTarget = mkLedgerTarget("amber-evidence-bytes");
 
 const FIXTURES_DIR = path.join(__dirname, "..", "fixtures", "evidence");
 const GOLDEN = path.join(FIXTURES_DIR, "receipts-lifecycle.golden.jsonl");
+const GOLDEN_BYTES = 1710;
+const GOLDEN_SHA256 = "ef25995d04368a29b13a70820bc05d79a5ff5bee79770767c12d305e1dbf6c21";
 
 const RECORD_RUN1_AT = new Date("2026-08-30T12:00:00.000Z");
 const RECORD_RUN2_AT = new Date("2026-08-30T12:00:01.000Z");
@@ -139,12 +142,18 @@ test("the factory-assembled evidence ledger is byte-identical to the pre-migrati
 		"the mocked ambient clock must pin every stored timestamp",
 	);
 	assert.equal(events[2].evidenceId, "evidence/run-1");
-	if (process.env.AMBER_RECORD_EVIDENCE_GOLDEN === "1") {
-		fs.mkdirSync(FIXTURES_DIR, { recursive: true });
-		fs.writeFileSync(GOLDEN, fs.readFileSync(ledgerPath));
-	}
 	const actual = fs.readFileSync(ledgerPath);
 	const golden = fs.readFileSync(GOLDEN);
+	assert.equal(
+		golden.byteLength,
+		GOLDEN_BYTES,
+		"the recorded pre-migration evidence golden size changed unexpectedly",
+	);
+	assert.equal(
+		crypto.createHash("sha256").update(golden).digest("hex"),
+		GOLDEN_SHA256,
+		"the recorded pre-migration evidence golden changed unexpectedly",
+	);
 	assert.equal(
 		actual.equals(golden),
 		true,

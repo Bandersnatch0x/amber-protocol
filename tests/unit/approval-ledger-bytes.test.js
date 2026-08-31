@@ -35,6 +35,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -51,6 +52,8 @@ const mkTarget = mkLedgerTarget("amber-approval-bytes");
 
 const FIXTURES_DIR = path.join(__dirname, "..", "fixtures", "approval");
 const GOLDEN = path.join(FIXTURES_DIR, "registry-lifecycle.golden.jsonl");
+const GOLDEN_BYTES = 2128;
+const GOLDEN_SHA256 = "5716820c9f8d5d4dff907b1de0e760ea2f07194b1ea3027cfd607e09632cbdab";
 
 // One distinct clock per write, so recordedAt/revokedAt/consumedAt
 // discriminate the events and a wrong-clock regression cannot alias into
@@ -167,12 +170,18 @@ test("the factory-assembled approval registry is byte-identical to the pre-migra
 	assert.equal(events[2].approvalId, "approval/deploy-7");
 	assert.equal(events[3].approvalId, "approval/login-42");
 	assert.equal(events[3].decisionIdentity, "decision/login-approved");
-	if (process.env.AMBER_RECORD_APPROVAL_GOLDEN === "1") {
-		fs.mkdirSync(FIXTURES_DIR, { recursive: true });
-		fs.writeFileSync(GOLDEN, fs.readFileSync(ledgerPath));
-	}
 	const actual = fs.readFileSync(ledgerPath);
 	const golden = fs.readFileSync(GOLDEN);
+	assert.equal(
+		golden.byteLength,
+		GOLDEN_BYTES,
+		"the recorded pre-migration approval golden size changed unexpectedly",
+	);
+	assert.equal(
+		crypto.createHash("sha256").update(golden).digest("hex"),
+		GOLDEN_SHA256,
+		"the recorded pre-migration approval golden changed unexpectedly",
+	);
 	assert.equal(
 		actual.equals(golden),
 		true,

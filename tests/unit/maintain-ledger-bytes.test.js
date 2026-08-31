@@ -37,6 +37,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -61,6 +62,12 @@ const GOLDEN = Object.freeze({
 	findings: path.join(FIXTURES_DIR, "findings-lifecycle.golden.jsonl"),
 	proposals: path.join(FIXTURES_DIR, "proposals-lifecycle.golden.jsonl"),
 });
+const GOLDEN_SHA256 = Object.freeze({
+	detectors: "8396a52b6df9f34cb973ff361323275f248e32d62787d237967644d9045fef60",
+	findings: "70d41244c69b572e631fcd2b15aa02e13288ff330a738b5798e4e9d7adae8b19",
+	proposals: "256668104d3e0b212feb68e422a3059693748095be443452018037f45616257e",
+});
+const GOLDEN_BYTES = Object.freeze({ detectors: 1414, findings: 1380, proposals: 1852 });
 
 const HASH_A = `sha256:${"a".repeat(64)}`;
 const HASH_B = `sha256:${"b".repeat(64)}`;
@@ -235,15 +242,19 @@ test("the factory-assembled maintain ledgers are byte-identical to the pre-migra
 		readEvents(ledgers.proposals).find((event) => event.kind === "triage").outcome,
 		"fix",
 	);
-	if (process.env.AMBER_RECORD_MAINTAIN_GOLDEN === "1") {
-		fs.mkdirSync(FIXTURES_DIR, { recursive: true });
-		for (const name of Object.keys(GOLDEN)) {
-			fs.writeFileSync(GOLDEN[name], fs.readFileSync(ledgers[name]));
-		}
-	}
 	for (const name of Object.keys(GOLDEN)) {
 		const actual = fs.readFileSync(ledgers[name]);
 		const golden = fs.readFileSync(GOLDEN[name]);
+		assert.equal(
+			golden.byteLength,
+			GOLDEN_BYTES[name],
+			`the recorded pre-migration ${name} golden size changed unexpectedly`,
+		);
+		assert.equal(
+			crypto.createHash("sha256").update(golden).digest("hex"),
+			GOLDEN_SHA256[name],
+			`the recorded pre-migration ${name} golden changed unexpectedly`,
+		);
 		assert.equal(
 			actual.equals(golden),
 			true,

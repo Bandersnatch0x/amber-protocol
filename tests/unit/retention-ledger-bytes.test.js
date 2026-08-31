@@ -41,6 +41,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -75,6 +76,20 @@ const GOLDEN = Object.freeze({
 	holders: path.join(FIXTURES_DIR, "holders-lifecycle.golden.jsonl"),
 	candidates: path.join(FIXTURES_DIR, "candidates-lifecycle.golden.jsonl"),
 	transactions: path.join(FIXTURES_DIR, "transactions-lifecycle.golden.jsonl"),
+});
+const GOLDEN_SHA256 = Object.freeze({
+	classifications: "f536125e69997be8a65c562e941ef4cd0fd2e711250f531f9f2b8e449814c157",
+	holds: "c00c6a9227e3482b3764b3dfcbc10fe3f32ac33d170249a6e5dfc6c553889555",
+	holders: "848470fe14fce04373853b8d3f34599db3b6dc08331c7429f851a9c16919b25a",
+	candidates: "b75714f6e0d45c02200187760b90d8a43e6de4959ee25ee4bd8acb38c1513e73",
+	transactions: "7d34fdcaf5d67189ff246af077cbc545cd98a710b745ad56a161613e4cdd5601",
+});
+const GOLDEN_BYTES = Object.freeze({
+	classifications: 942,
+	holds: 1234,
+	holders: 886,
+	candidates: 1658,
+	transactions: 1939,
 });
 
 const HASH_A = `sha256:${"a".repeat(64)}`;
@@ -345,15 +360,19 @@ test("the factory-assembled retention ledgers are byte-identical to the pre-migr
 			.map((event) => event.status),
 		["failed", "settled", "settled"],
 	);
-	if (process.env.AMBER_RECORD_RETENTION_GOLDEN === "1") {
-		fs.mkdirSync(FIXTURES_DIR, { recursive: true });
-		for (const name of Object.keys(GOLDEN)) {
-			fs.writeFileSync(GOLDEN[name], fs.readFileSync(ledgers[name]));
-		}
-	}
 	for (const name of Object.keys(GOLDEN)) {
 		const actual = fs.readFileSync(ledgers[name]);
 		const golden = fs.readFileSync(GOLDEN[name]);
+		assert.equal(
+			golden.byteLength,
+			GOLDEN_BYTES[name],
+			`the recorded pre-migration ${name} golden size changed unexpectedly`,
+		);
+		assert.equal(
+			crypto.createHash("sha256").update(golden).digest("hex"),
+			GOLDEN_SHA256[name],
+			`the recorded pre-migration ${name} golden changed unexpectedly`,
+		);
 		assert.equal(
 			actual.equals(golden),
 			true,

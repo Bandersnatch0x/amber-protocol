@@ -36,6 +36,7 @@
 
 const { test, mock } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -62,6 +63,18 @@ const GOLDEN = Object.freeze({
 	receipts: path.join(FIXTURES_DIR, "read-receipts-lifecycle.golden.jsonl"),
 	comparisons: path.join(FIXTURES_DIR, "shadow-comparisons-lifecycle.golden.jsonl"),
 	cutovers: path.join(FIXTURES_DIR, "cutovers-lifecycle.golden.jsonl"),
+});
+const GOLDEN_SHA256 = Object.freeze({
+	registry: "fc5eae3bc31cab200905275f377d082505ab271fd9bf2e0c95bf716330f89e6f",
+	receipts: "cc5b1226da60ccaf6fc432e51be64e75d0915a6d7708bd3a3923f1af8e87a0aa",
+	comparisons: "12e33eddce7c7a1ed59afb46419bdedcf09ccab8fb9c5a3e1b3b438ff4644cc3",
+	cutovers: "4c484f2fbb4d3389ca2f8bcc8bc82ca737c1f08e05169294180a93fe05cd6b6c",
+});
+const GOLDEN_BYTES = Object.freeze({
+	registry: 505,
+	receipts: 756,
+	comparisons: 1519,
+	cutovers: 1296,
 });
 
 const NOW = new Date("2026-08-30T12:00:00.000Z");
@@ -242,15 +255,19 @@ test("the factory-assembled adapter ledgers are byte-identical to the pre-migrat
 		readEvents(ledgers.cutovers).map((event) => event.kind),
 		["cutover", "rollback"],
 	);
-	if (process.env.AMBER_RECORD_ADAPTER_GOLDEN === "1") {
-		fs.mkdirSync(FIXTURES_DIR, { recursive: true });
-		for (const name of Object.keys(GOLDEN)) {
-			fs.writeFileSync(GOLDEN[name], fs.readFileSync(ledgers[name]));
-		}
-	}
 	for (const name of Object.keys(GOLDEN)) {
 		const actual = fs.readFileSync(ledgers[name]);
 		const golden = fs.readFileSync(GOLDEN[name]);
+		assert.equal(
+			golden.byteLength,
+			GOLDEN_BYTES[name],
+			`the recorded pre-migration ${name} golden size changed unexpectedly`,
+		);
+		assert.equal(
+			crypto.createHash("sha256").update(golden).digest("hex"),
+			GOLDEN_SHA256[name],
+			`the recorded pre-migration ${name} golden changed unexpectedly`,
+		);
 		assert.equal(
 			actual.equals(golden),
 			true,

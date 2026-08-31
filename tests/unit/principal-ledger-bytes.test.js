@@ -38,6 +38,7 @@
 
 const { test, mock } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -48,6 +49,8 @@ const mkTarget = mkLedgerTarget("amber-principal-bytes");
 
 const FIXTURES_DIR = path.join(__dirname, "..", "fixtures", "principal");
 const GOLDEN = path.join(FIXTURES_DIR, "registry-lifecycle.golden.jsonl");
+const GOLDEN_BYTES = 1106;
+const GOLDEN_SHA256 = "941944aaa6df92ddb97908676ec59e934a53f066911837ed0cdb1f43b314d5c1";
 
 // One distinct clock per write, so registeredAt/revokedAt discriminate the
 // events and a wrong-clock regression cannot alias into a byte match.
@@ -117,12 +120,18 @@ test("the factory-assembled principal registry is byte-identical to the pre-migr
 	);
 	assert.equal(events[2].id, "alice@example.com");
 	assert.equal(events[2].reason, "offboarded");
-	if (process.env.AMBER_RECORD_PRINCIPAL_GOLDEN === "1") {
-		fs.mkdirSync(FIXTURES_DIR, { recursive: true });
-		fs.writeFileSync(GOLDEN, fs.readFileSync(ledgerPath));
-	}
 	const actual = fs.readFileSync(ledgerPath);
 	const golden = fs.readFileSync(GOLDEN);
+	assert.equal(
+		golden.byteLength,
+		GOLDEN_BYTES,
+		"the recorded pre-migration principal golden size changed unexpectedly",
+	);
+	assert.equal(
+		crypto.createHash("sha256").update(golden).digest("hex"),
+		GOLDEN_SHA256,
+		"the recorded pre-migration principal golden changed unexpectedly",
+	);
 	assert.equal(
 		actual.equals(golden),
 		true,

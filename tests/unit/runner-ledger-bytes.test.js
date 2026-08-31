@@ -35,6 +35,7 @@
 
 const { test, mock } = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -63,6 +64,12 @@ const GOLDEN = Object.freeze({
 	requests: path.join(FIXTURES_DIR, "requests-lifecycle.golden.jsonl"),
 	executions: path.join(FIXTURES_DIR, "executions-lifecycle.golden.jsonl"),
 });
+const GOLDEN_SHA256 = Object.freeze({
+	registry: "a2493061687c1b8aa20897723eaf75bc10a47ed0cdce9aeaf0928ac68e6f545b",
+	requests: "ef667b68808a2104235947203c9c2b4a33915d979469130c54ddab6307a9caf1",
+	executions: "c597bf21bab2e30afcd6a1758c9406f41e052939ac660f61e58b785cf20e6cfb",
+});
+const GOLDEN_BYTES = Object.freeze({ registry: 1069, requests: 1469, executions: 1427 });
 
 const DIGEST = `sha256:${"a".repeat(64)}`;
 const NOW = new Date("2026-08-28T00:00:00.000Z");
@@ -277,15 +284,19 @@ test("the factory-assembled runner ledgers are byte-identical to the pre-migrati
 		readEvents(ledgers.executions).map((event) => event.kind),
 		["prepared", "settled"],
 	);
-	if (process.env.AMBER_RECORD_RUNNER_GOLDEN === "1") {
-		fs.mkdirSync(FIXTURES_DIR, { recursive: true });
-		for (const name of Object.keys(GOLDEN)) {
-			fs.writeFileSync(GOLDEN[name], fs.readFileSync(ledgers[name]));
-		}
-	}
 	for (const name of Object.keys(GOLDEN)) {
 		const actual = fs.readFileSync(ledgers[name]);
 		const golden = fs.readFileSync(GOLDEN[name]);
+		assert.equal(
+			golden.byteLength,
+			GOLDEN_BYTES[name],
+			`the recorded pre-migration ${name} golden size changed unexpectedly`,
+		);
+		assert.equal(
+			crypto.createHash("sha256").update(golden).digest("hex"),
+			GOLDEN_SHA256[name],
+			`the recorded pre-migration ${name} golden changed unexpectedly`,
+		);
 		assert.equal(
 			actual.equals(golden),
 			true,
