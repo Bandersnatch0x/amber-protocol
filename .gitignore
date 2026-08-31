@@ -38,6 +38,7 @@ tests/.tmp/
 apps/web/.playwright-cli/
 apps/web/.tanstack/
 apps/web/screenshots/
+apps/web/output/
 
 # Local architecture review input (F016 acceptance uses the tracked suffixed report)
 output/adr-architecture-assessment.md
