@@ -48,6 +48,7 @@ const FLAG_SPECS = {
 	"--out": { key: "out" },
 	"--format": { key: "format" },
 	"--scope": { key: "scope" },
+	"--query": { key: "query" },
 	"--suite": { key: "suite" },
 	"--definition-id": { key: "definitionIdentity" },
 	"--outcome-id": { key: "outcomeIdentity" },

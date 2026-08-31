@@ -2598,6 +2598,25 @@ const CATALOG = {
 		layer: "Context",
 		related: ["AMBER_E_KNOWLEDGE_GRAPH_SOURCE", "AMBER_E_KNOWLEDGE_GRAPH_INVALID"],
 	},
+	// 0009 (#0009): the read-time document index (amber knowledge search).
+	AMBER_E_KNOWLEDGE_INDEX_SOURCE: {
+		title: "Knowledge index source tree is unreadable",
+		cause:
+			"The search surface walk could not read the target tree — the target path is absent, or a directory the walk descended into vanished or refused reads. An absent target is not an empty index; the read-time index fails closed so a misspelled --target never reads as a silently-empty result set.",
+		remedy:
+			"Re-run with a valid --target <repo> whose root directory exists and is readable. The index is recomputed read-only each query; nothing is persisted to repair.",
+		layer: "Context",
+		related: ["AMBER_E_KNOWLEDGE_GRAPH_SOURCE"],
+	},
+	AMBER_E_KNOWLEDGE_INDEX_INVALID: {
+		title: "Knowledge search query is invalid",
+		cause:
+			"The --query value is empty or not a string. Search matching is boolean-hit + deterministic byte order with no weights or model confidence; an empty query would match the entire surface and is refused rather than returning an unbounded result set.",
+		remedy:
+			"Re-run with a non-empty --query <text>. Use --limit <n> to bound the returned prefix; the index is read-time computed and zero-persistence.",
+		layer: "Tooling",
+		related: ["AMBER_E_KNOWLEDGE_INDEX_SOURCE"],
+	},
 };
 
 // Format an error string that carries its code + remedy, matching the existing

@@ -15,6 +15,7 @@ const dispatch = defineCommand({
 		"retire",
 		"query",
 		"graph",
+		"search",
 		"context-manifest",
 		"context-sync",
 		"context-review-sample",
@@ -37,6 +38,54 @@ const dispatch = defineCommand({
 				return { ...failure.result, exitCode: failure.exitCode };
 			}
 			return { text: serializeKnowledgeGraph(graph), bypassPrint: true };
+		},
+		// 0009 (#0009): the read-time document index. Read-only, deterministic,
+		// fail-closed, zero weights, zero model confidence. The index is
+		// recomputed per query; nothing is persisted or cached.
+		search: (args) => {
+			const {
+				buildKnowledgeIndex,
+				searchKnowledge,
+				ERROR_CODES,
+			} = require("./core/knowledge-index");
+			if (typeof args.query !== "string" || args.query.length === 0) {
+				const failure = readFailure(
+					args,
+					{
+						amberCode: ERROR_CODES.invalid,
+						message: "search requires a non-empty --query <text>",
+					},
+					ERROR_CODES.invalid,
+				);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+			let index;
+			try {
+				index = buildKnowledgeIndex(resolveTarget(args));
+			} catch (err) {
+				const failure = readFailure(args, err, ERROR_CODES.source);
+				return { ...failure.result, exitCode: failure.exitCode };
+			}
+			const limit = args.limit ? Number(args.limit) : undefined;
+			const results = searchKnowledge(index, args.query, {
+				limit: Number.isFinite(limit) && limit > 0 ? limit : undefined,
+			});
+			return {
+				text: JSON.stringify(
+					{
+						ok: true,
+						query: args.query,
+						count: results.length,
+						results,
+					},
+					null,
+					2,
+				),
+				errors: [],
+				warnings: [],
+				exitCode: 0,
+				bypassPrint: true,
+			};
 		},
 		"context-manifest": (args) => {
 			const {
