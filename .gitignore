@@ -46,6 +46,9 @@ output/adr-architecture-assessment.md
 # Local design-skill (impeccable) working artifacts
 .impeccable/
 
+# Local share bundle (generated artifacts, not source)
+output/amber-protocol-share/
+
 # Package dry-run and local archive output
 npm-pack-dry-run.json
 *.tgz
