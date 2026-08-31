@@ -16,6 +16,44 @@ function read(relativePath) {
 	return fs.readFileSync(path.join(BUNDLE_ROOT, relativePath), "utf8");
 }
 
+// Hang guard, not a performance assertion (#302). These tests assert WHICH files
+// npm ships, never how fast it packs, so the budget only has to outlast a
+// legitimately slow run and still catch a truly wedged npm.
+//
+// Derivation on this repo (measured 2026-08-31):
+//   idle, 3 runs each:  cwd=ROOT ~2.05 s (2044/2096/2100 ms) | cwd=dsh ~1.36 s
+//   during a full `npm test`, 10 samples at cwd=ROOT:
+//     9053 20352 20729 17201 10936 10941 13136 9400 17606 14591 ms
+//     => 4.4x-10.1x amplification, peak 20.7 s
+// That peak is what killed the old 30 s budget: it left only ~1.45x headroom,
+// so adding the parallel worktree runs named in #302 on top of a full suite
+// crosses 30 s and both cases die together — which is exactly how they failed,
+// in pairs, four times in one day. 120 s is ~5.8x over the measured peak and
+// ~57x over idle.
+// A retry is deliberately NOT added: the failure is a budget too close to the
+// measured peak, not a machine that never calms down, and a retry would double
+// the worst case to buy a hypothetical.
+const PACK_TIMEOUT_MS = 120_000;
+
+// maxBuffer is deliberately left at the Node default (1 MB): the measured JSON
+// output is 41.8 KB for ROOT (373 files) and 0.9 KB for dsh (5 files), a 25x
+// headroom, and buffer overflow surfaces as ENOBUFS rather than the ETIMEDOUT
+// this ticket tracked. Nothing to fix here.
+function packDryRun(cwd) {
+	const { execFileSync } = require("node:child_process");
+	// Under `npm test`, npm_execpath points at npm-cli.js: invoke it through the
+	// current node binary instead of the `npm` shim, which is one process fewer.
+	const npmCli = process.env.npm_execpath;
+	const command = npmCli ? process.execPath : "npm";
+	const args = npmCli ? [npmCli, "pack", "--dry-run", "--json"] : ["pack", "--dry-run", "--json"];
+	const raw = execFileSync(command, args, {
+		cwd,
+		encoding: "utf8",
+		timeout: PACK_TIMEOUT_MS,
+	});
+	return JSON.parse(raw);
+}
+
 test("dsh bundle declares its public install contract", () => {
 	const manifest = JSON.parse(read("package.json"));
 	const amberManifest = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
@@ -69,16 +107,7 @@ test("dsh bundle runtime resolves published Amber assets", () => {
 });
 
 test("npm pack dry-run ships every QA model scan source without the provider adapter", () => {
-	const { execFileSync } = require("node:child_process");
-	const npmCli = process.env.npm_execpath;
-	const command = npmCli ? process.execPath : "npm";
-	const args = npmCli ? [npmCli, "pack", "--dry-run", "--json"] : ["pack", "--dry-run", "--json"];
-	const raw = execFileSync(command, args, {
-		cwd: ROOT,
-		encoding: "utf8",
-		timeout: 30000,
-	});
-	const packed = JSON.parse(raw);
+	const packed = packDryRun(ROOT);
 	const shipped = new Set(packed[0].files.map((entry) => entry.path));
 
 	for (const rel of QA_MODEL_SCAN_FILES) {
@@ -88,17 +117,8 @@ test("npm pack dry-run ships every QA model scan source without the provider ada
 });
 
 test("npm pack dry-run ships every declared bundle asset", () => {
-	const { execFileSync } = require("node:child_process");
 	const manifest = JSON.parse(read("package.json"));
-	const npmCli = process.env.npm_execpath;
-	const command = npmCli ? process.execPath : "npm";
-	const args = npmCli ? [npmCli, "pack", "--dry-run", "--json"] : ["pack", "--dry-run", "--json"];
-	const raw = execFileSync(command, args, {
-		cwd: BUNDLE_ROOT,
-		encoding: "utf8",
-		timeout: 30000,
-	});
-	const packed = JSON.parse(raw);
+	const packed = packDryRun(BUNDLE_ROOT);
 
 	const shipped = new Set();
 	for (const entry of packed[0].files) shipped.add(entry.path);
