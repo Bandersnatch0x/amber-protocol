@@ -112,11 +112,7 @@ test("the factory-assembled principal registry is byte-identical to the pre-migr
 	);
 	assert.deepEqual(
 		events.map((event) => event.at),
-		[
-			REGISTER_ALICE_AT.toISOString(),
-			REGISTER_SVC_AT.toISOString(),
-			REVOKE_ALICE_AT.toISOString(),
-		],
+		[REGISTER_ALICE_AT.toISOString(), REGISTER_SVC_AT.toISOString(), REVOKE_ALICE_AT.toISOString()],
 		"the mocked ambient clock must pin every stored timestamp",
 	);
 	assert.equal(events[2].id, "alice@example.com");

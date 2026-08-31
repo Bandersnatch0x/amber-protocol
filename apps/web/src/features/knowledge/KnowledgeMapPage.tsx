@@ -30,11 +30,7 @@ import type {
   LLMStatusDTO,
 } from './types';
 import { MAX_CONTEXT_NODES, isDocumentNode } from '@/lib/knowledge-dto';
-import {
-  LAYER_ORDER,
-  buildKnowledgeAnalytics,
-  type KnowledgeAnalytics,
-} from './map-analytics';
+import { LAYER_ORDER, buildKnowledgeAnalytics, type KnowledgeAnalytics } from './map-analytics';
 import {
   FOUNDATION_NODE_ID,
   anomalyKey,
