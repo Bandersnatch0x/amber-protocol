@@ -13,7 +13,9 @@ Last Reviewed: 2026-07-16
 Loop contracts describe bounded improvement work, but do not schedule or execute it
 by themselves. Inspection, recommendation, and `loop run` default to read-only or
 dry-run behavior. Real command execution is an explicit alternate path protected by
-policy, one-shot approval, worktree isolation, and a tamper-evident ledger.
+policy, one-shot approval, worktree isolation, and a tamper-evident ledger. ADR-0003
+authorized this governed execution path as an evolution of Amber's no-execution
+stance, and F007 implements the four gates described below.
 
 ## Key Files
 

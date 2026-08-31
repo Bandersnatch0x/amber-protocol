@@ -38,7 +38,9 @@ and restore legacy state with explicit boundaries.
 - `src/migration/rollback.js` creates timestamped backups, discovers available backup
   files, and restores selected content.
 - `scripts/lib/migrate-command.js` coordinates migration CLI options and result
-  reporting.
+  reporting. Since ADR-0012, `amber migrate` also backfills the protocol versioning
+  fields into existing artifacts; that backfill runs in the default migrate flow
+  coordinated by this module.
 
 ```mermaid
 flowchart LR

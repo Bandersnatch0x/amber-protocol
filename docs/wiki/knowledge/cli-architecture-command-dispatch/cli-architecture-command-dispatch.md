@@ -55,6 +55,11 @@ functions; durable behavior and artifact generation live under `scripts/lib/core
    on stdout. `--json` still prints the structured result (including `errors`) on
    stdout.
 
+Since F039 unified the command envelope, `defineCommand`
+(`scripts/lib/subcommand-dispatcher.js`) owns routing, aliasing, the result envelope,
+and exit-code derivation for the command-family adapters, and the `*-commands` modules
+bind declarative handler tables into that one composition.
+
 ```mermaid
 flowchart LR
     Shell["node scripts/amber.js"] --> Entry["parse args and validate command"]

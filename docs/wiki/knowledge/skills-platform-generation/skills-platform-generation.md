@@ -14,7 +14,8 @@ Amber maintains one canonical skill definition per capability and generates the
 platform-specific surfaces from it. The five directories under `skills/` are authored
 inputs: the `amber` router plus four deep journeys. Claude Code, Codex/Cursor, and
 Gemini files are products of the generator and must remain reproducible from those
-inputs.
+inputs. The router and the four deep journeys are the skill surface introduced by
+F019 (intent router + deep journey skills).
 
 ## Source and Outputs
 
@@ -52,7 +53,9 @@ flowchart LR
 
 The generator interprets skill metadata and body content, then renders the format each
 platform expects. Check mode computes the same products without accepting drift, which
-makes the canonical skill and generated outputs a single tested contract.
+makes the canonical skill and generated outputs a single tested contract. F031 keeps
+every shipped skill's frontmatter command in lockstep with the Command registry:
+generation fails when a skill invents or stales a command.
 
 ## Development Rules
 

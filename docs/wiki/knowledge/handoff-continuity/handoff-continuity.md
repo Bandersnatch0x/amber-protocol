@@ -13,7 +13,9 @@ Last Reviewed: 2026-07-16
 Amber has three complementary continuity surfaces. A concise session handoff captures
 the current working state, task progress files provide incremental recovery points,
 and a portable handoff bundle packages verified continuation evidence. None of these
-replaces source control or turns an unverified claim into completion evidence.
+replaces source control or turns an unverified claim into completion evidence. The
+portable bundle surface (`scripts/lib/core/handoff-bundle.js`) is the delivery of F006
+(Handoff reports).
 
 ## Key Files and Artifacts
 

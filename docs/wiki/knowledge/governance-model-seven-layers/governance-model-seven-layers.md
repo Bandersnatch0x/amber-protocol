@@ -14,7 +14,10 @@ Amber orders controls from highest to lowest priority as Governance, Verificatio
 Observability, Lifecycle, Context, Tooling, and Execution. This is a decision rule,
 not seven independent runtimes: lower layers may act only within the constraints and
 evidence requirements established above them. The result is a repository-local
-governance system whose primary outputs are inspectable files and decisions.
+governance system whose primary outputs are inspectable files and decisions. The
+architecture-level view of the same control-first model lives in
+`docs/architecture/governance-model.md`, and the gated, human-triggered execution
+admitted at the Execution layer is the decision of ADR-0003.
 
 ## Layer Map
 

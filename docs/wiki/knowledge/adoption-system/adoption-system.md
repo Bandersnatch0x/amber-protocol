@@ -13,7 +13,10 @@ Last Reviewed: 2026-08-08
 The adoption system evaluates an existing repository and produces a reviewable path
 for adopting Amber. It separates observation, proposal, human decision, gating, and
 artifact packaging. The pipeline writes reports and plans; it does not silently apply
-the proposed repository changes.
+the proposed repository changes. Since F019 introduced the intent router and the deep
+journey skills, the `amber-diagnosis-adoption` journey is the recommended adoption
+entry point and prefers audit and governance inspection over this pipeline, whose
+deprecated `adoption` commands remain available through `amber --all`.
 
 ## Key Files
 

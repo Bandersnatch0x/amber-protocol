@@ -13,7 +13,12 @@ Last Reviewed: 2026-07-16
 Amber uses versioned JSON Schema for durable artifact contracts and focused runtime
 validators for repository-specific invariants. AJV is the root CLI's schema engine;
 `ajv-formats` supplies format checks. Validation happens before state is used or
-written, while schema-version checks produce explicit compatibility diagnostics.
+written, while schema-version checks produce explicit compatibility diagnostics. The
+artifact schemas in the table below carry the optional protocol-versioning fields
+(`amber_protocol_version`, `artifact_sequence`, `created_at`, `artifact_type`)
+mandated by ADR-0012, and the shared AJV setup named in the development rules is the
+schema-contract seam that F042 generalized (`scripts/lib/core/schema-contract.js`),
+so no module instantiates Ajv directly.
 
 ## Authoritative Schemas
 
