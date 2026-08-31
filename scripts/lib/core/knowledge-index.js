@@ -32,8 +32,10 @@
 //                  term — but never a term-suggestion output; a banned word
 //                  cannot propagate as a recommended surface).
 //
-// Determinism (0008 §4 hard rule): results sort by byte order
-// (path → plane → position), no locale, no timestamps, no randomness.
+// Determinism (0008 §4 hard rule): results sort by
+// (plane rank → path → position), the path compared as plain bytes — no
+// locale, no timestamps, no randomness. Plane rank is a declared structural
+// order by scarcity (see PLANE_ORDER), never a score.
 // Recompute over an unchanged tree is byte-identical (the graph contract's
 // twin). No weights, no model confidence, no thresholds: matching is boolean
 // hit + deterministic order (0009 second-stage hard constraint). Read-time
@@ -217,7 +219,10 @@ function parseContextLexicon(targetRoot) {
 
 /**
  * Build the read-time document index of a target repository. Pure function of
- * the committed tree; nothing is persisted.
+ * the WORKING tree (the walk reads the filesystem, not `git ls-files`, so
+ * gitignored local knowledge such as issues/ and docs/research/ is searchable —
+ * that is deliberate: the 0008 §6.2 surface includes issues/, and the baseline
+ * it measured was `grep -r` over the working tree). Nothing is persisted.
  * @param {string} target - Target repository root.
  * @returns {object} The index (an opaque structure consumed by searchKnowledge).
  */
@@ -239,10 +244,20 @@ function buildKnowledgeIndex(target) {
 
 // ── search ─────────────────────────────────────────────────────────────
 
+// Plane rank, the primary sort key. This is a DECLARED STRUCTURAL order, not a
+// score: no per-hit number, no tunable, no threshold — so the zero-weight rule
+// (0008 §4) is intact. The order is by scarcity, which is also precision:
+// lexicon (<=212 CONTEXT.md terms) < path (<= file count) < content
+// (unbounded — one query over this repo yields 4,490 content hits). Ranking
+// content first would let it drown the two planes this surface exists for at
+// any small --limit: the path plane is the file-name-invisibility cure
+// (0008 §6.2: "文件名本身不参与内容匹配" is exactly how grep-class search
+// behaves), and the lexicon plane is the cross-language entry point. The
+// preference is stated here rather than hidden in a weight.
 const PLANE_ORDER = Object.freeze({
-	content: 0,
+	lexicon: 0,
 	path: 1,
-	lexicon: 2,
+	content: 2,
 });
 
 /**
@@ -250,8 +265,9 @@ const PLANE_ORDER = Object.freeze({
  * byte order; no weights, no model confidence, no thresholds.
  *
  * Result shape (stable across recompute over an unchanged tree):
- *   { path, plane, position, matchKind, term?, snippet? }
- * sorted by (path, plane, position) in byte order.
+ *   { path, plane, position, matchKind, term? }
+ * sorted by (plane rank, path, position); --limit takes that ordered prefix,
+ * so a small limit shows the scarce planes rather than drowning in content.
  *
  * @param {object} index - The index from buildKnowledgeIndex.
  * @param {string} query - Non-empty query string.
@@ -367,13 +383,15 @@ function searchKnowledge(index, query, opts = {}) {
 		}
 	}
 
-	// Deterministic byte order: path, then plane (content < path < lexicon),
-	// then position. No locale. (Parity with knowledge-graph.js:480-485.)
+	// Deterministic order: plane rank (see PLANE_ORDER), then path, then
+	// position — plain byte comparison on the path, no locale (the comparison
+	// discipline of knowledge-graph.js:480-485). Total, stable, and a pure
+	// function of the inputs: recompute over an unchanged tree is identical.
 	hits.sort((a, b) => {
-		if (a.path !== b.path) return a.path < b.path ? -1 : 1;
 		const pa = PLANE_ORDER[a.plane];
 		const pb = PLANE_ORDER[b.plane];
 		if (pa !== pb) return pa - pb;
+		if (a.path !== b.path) return a.path < b.path ? -1 : 1;
 		return (a.position ?? 0) - (b.position ?? 0);
 	});
 

@@ -99,15 +99,15 @@ test("lexicon plane: _Avoid_ token is findable but never an expansion output", (
 
 // ── determinism / order ───────────────────────────────────────────────
 
-test("results are in deterministic byte order: path, then plane, then position", () => {
+test("results are in deterministic order: plane rank, then path, then position", () => {
 	const index = buildKnowledgeIndex(REPO_ROOT);
 	const results = searchKnowledge(index, "knowledge");
-	// The key mirrors the implementation's declared order (path, plane,
-	// position) with the plane mapped to its numeric rank and the position
-	// zero-padded, so the string sort is exactly the byte order the index
-	// produces (no locale, no model).
-	const PLANE_RANK = { content: 0, path: 1, lexicon: 2 };
-	const key = (r) => `${r.path} ${PLANE_RANK[r.plane]} ${String(r.position ?? 0).padStart(8, "0")}`;
+	// The key mirrors the implementation's declared order (plane rank, path,
+	// position) with the position zero-padded, so the string sort is exactly
+	// the order the index produces (no locale, no model). Plane rank is by
+	// scarcity: lexicon < path < content.
+	const PLANE_RANK = { lexicon: 0, path: 1, content: 2 };
+	const key = (r) => `${PLANE_RANK[r.plane]} ${r.path} ${String(r.position ?? 0).padStart(8, "0")}`;
 	const keys = results.map(key);
 	const sorted = [...keys].sort();
 	assert.deepEqual(keys, sorted, "byte-stable order, no locale");
@@ -152,6 +152,27 @@ test("--limit bounds the result set deterministically (top-N of the byte order)"
 	const limited = searchKnowledge(index, "test", { limit: 5 });
 	assert.ok(limited.length <= 5, "limit is respected");
 	assert.equal(limited.length, Math.min(full.length, 5), "limit takes the ordered prefix");
+});
+
+test("a small --limit surfaces the scarce planes, not just content", () => {
+	// The plane rank exists so the two planes this surface was built for stay
+	// visible under a small limit. "command-registry" is the R07 probe: the
+	// path plane is the only plane that can reach the file whose body never
+	// names itself, and content hits for the same query run into the dozens.
+	// Ordering content first would push the one hit that matters past any
+	// small --limit — that is the regression this pins.
+	const index = buildKnowledgeIndex(REPO_ROOT);
+	const limited = searchKnowledge(index, "command-registry", { limit: 3 });
+	assert.ok(
+		limited.some((r) => r.plane === "path"),
+		"the path plane is reachable within the first 3 results",
+	);
+	assert.ok(
+		limited.every((r) => r.plane !== "content") ||
+			limited.findIndex((r) => r.plane === "content") >
+				limited.findIndex((r) => r.plane === "path"),
+		"no content hit outranks a path hit",
+	);
 });
 
 // ── CLI seam (knowledge-commands.js search action) ────────────────────
