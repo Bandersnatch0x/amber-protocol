@@ -57,6 +57,7 @@
     "eslint-plugin-react-refresh": "^0.5.4",
     "express": "^5.2.1",
     "globals": "^6.1.0",
+    "graphology-types": "^0.24.8",
     "happy-dom": "^20.10.2",
     "postcss": "^8.4.0",
     "prettier": "^3.9.6",
