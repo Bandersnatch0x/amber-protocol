@@ -2101,7 +2101,8 @@
 				}
 			],
 			"notes": [
-				"Landing covers T1-T3 plus this registration (T4). Follow-up migrations — external, maintain, retention (full dialect); adapter, runner, release, approval, evidence-receipts, principal, gate-evaluation, policy-evaluation (primitive dialect upgrading per ADR-0028 decision 1) — proceed one ticket per family."
+				"Landing covers T1-T3 plus this registration (T4). Follow-up migrations (#303–#313) are all landed: 12 families / 27 ledgers assembled through defineLedgerFamily (external, maintain, retention, adapter, runner, release, approval, evidence-receipts, principal, gate-evaluation, policy-evaluation, breakglass).",
+				"Golden fixture hardening 44e8d82: removed 9 AMBER_RECORD_*_GOLDEN write-back branches, added fixed GOLDEN_BYTES + GOLDEN_SHA256 checks; spec-to-code review tri-fan aborted on local proxy 400/502, Standards/Spec PASS; acceptance review at .scratch/f061-all-followups-acceptance-review.md."
 			],
 			"paths": [
 				"docs/specs/F061-ledger-family-factory.md",
