@@ -49,10 +49,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { typedError } = require("./error-catalog");
-const {
-	CANONICAL_STATE_DIR,
-	LEGACY_STATE_DIR,
-} = require("../state-dir-resolver");
+const { CANONICAL_STATE_DIR, LEGACY_STATE_DIR } = require("../state-dir-resolver");
 
 const ERROR_CODES = Object.freeze({
 	source: "AMBER_E_KNOWLEDGE_INDEX_SOURCE",
@@ -83,35 +80,6 @@ const EXCLUDED_DIRS = new Set([
 // is skipped by content search (it may still appear in the path plane — its
 // path is a legitimate key, 0009 self-decision list #5).
 const BINARY_PROBE_BYTES = 8192;
-
-function toPosix(p) {
-	return String(p).replace(/\\/g, "/");
-}
-
-function isBinary(absPath) {
-	let fd;
-	try {
-		fd = fs.openSync(absPath, "r");
-		const buf = Buffer.alloc(BINARY_PROBE_BYTES);
-		const n = fs.readSync(fd, buf, 0, BINARY_PROBE_BYTES, 0);
-		// ponytail: NUL-byte heuristic, the same signal `grep -I` uses. A real
-		// text file may contain any byte except NUL; a binary almost always has
-		// one in its first chunk. Ceiling: pathological binaries with no NUL in
-		// the first 8 KB pass as text — grep -I has the identical blind spot.
-		return buf.slice(0, n).includes(0);
-	} catch (err) {
-		if (err.code === "ENOENT") return true; // vanished between walk and read
-		throw typedError(ERROR_CODES.source, `could not probe ${absPath}: ${err.message}`);
-	} finally {
-		if (fd !== undefined) {
-			try {
-				fs.closeSync(fd);
-			} catch {
-				/* ponytail: close failure is not a search concern */
-			}
-		}
-	}
-}
 
 // Sorted, symlink-free walk. POSIX-relative file paths only. Symlinks are
 // skipped (no follow) so an escaping link can never widen the surface.
@@ -322,15 +290,23 @@ function searchKnowledge(index, query, opts = {}) {
 	// Substring over the full surface, binary files skipped by NUL detection.
 	for (const rel of index.files) {
 		const abs = path.join(index.targetRoot, rel);
-		if (isBinary(abs)) continue;
-		let content;
+		let buf;
 		try {
-			content = fs.readFileSync(abs, "utf8");
+			buf = fs.readFileSync(abs);
 		} catch (err) {
 			if (err.code === "ENOENT") continue; // removed between walk and read
 			throw typedError(ERROR_CODES.source, `could not read ${rel}: ${err.message}`);
 		}
-		const normalized = content.replace(/\r\n/g, "\n");
+		// grep -I parity, in the same read: a NUL byte in the first chunk means
+		// binary. Probing with a separate open would double the syscalls per
+		// file across the whole surface for no extra signal.
+		// ponytail: NUL-byte heuristic, the signal `grep -I` uses. Ceiling —
+		// a pathological binary with no NUL in its first 8 KB reads as text;
+		// grep -I has the identical blind spot.
+		if (buf.subarray(0, BINARY_PROBE_BYTES).includes(0)) continue;
+		// toLowerCase (not toLocaleLowerCase): Unicode default case folding, so
+		// matching never depends on the host locale (0008 §4 no-locale rule).
+		const normalized = buf.toString("utf8").replace(/\r\n/g, "\n");
 		const lower = normalized.toLowerCase();
 		let from = 0;
 		let at;
