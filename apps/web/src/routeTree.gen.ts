@@ -9,36 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as KnowledgeRouteImport } from './routes/knowledge'
-import { Route as GovernanceRouteImport } from './routes/governance'
-import { Route as GatesRouteImport } from './routes/gates'
-import { Route as SessionsRouteRouteImport } from './routes/sessions/route'
-import { Route as RoutesRouteRouteImport } from './routes/routes/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as TranscriptsIndexRouteImport } from './routes/transcripts/index'
-import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
+import { Route as GatesRouteImport } from './routes/gates'
+import { Route as GovernanceRouteImport } from './routes/governance'
+import { Route as KnowledgeRouteImport } from './routes/knowledge'
+import { Route as RoutesRouteRouteImport } from './routes/routes/route'
+import { Route as SessionsRouteRouteImport } from './routes/sessions/route'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RoutesIndexRouteImport } from './routes/routes/index'
-import { Route as TranscriptsIdRouteImport } from './routes/transcripts/$id'
-import { Route as SessionsIdRouteRouteImport } from './routes/sessions/$id/route'
 import { Route as RoutesIdRouteRouteImport } from './routes/routes/$id/route'
-import { Route as SessionsIdIndexRouteImport } from './routes/sessions/$id/index'
+import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
+import { Route as SessionsIdRouteRouteImport } from './routes/sessions/$id/route'
+import { Route as TranscriptsIndexRouteImport } from './routes/transcripts/index'
+import { Route as TranscriptsIdRouteImport } from './routes/transcripts/$id'
 import { Route as RoutesIdIndexRouteImport } from './routes/routes/$id/index'
+import { Route as SessionsIdIndexRouteImport } from './routes/sessions/$id/index'
 import { Route as SessionsIdTimelineRouteImport } from './routes/sessions/$id/timeline'
 
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KnowledgeRoute = KnowledgeRouteImport.update({
-  id: '/knowledge',
-  path: '/knowledge',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GovernanceRoute = GovernanceRouteImport.update({
-  id: '/governance',
-  path: '/governance',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GatesRoute = GatesRouteImport.update({
@@ -46,9 +36,14 @@ const GatesRoute = GatesRouteImport.update({
   path: '/gates',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SessionsRouteRoute = SessionsRouteRouteImport.update({
-  id: '/sessions',
-  path: '/sessions',
+const GovernanceRoute = GovernanceRouteImport.update({
+  id: '/governance',
+  path: '/governance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KnowledgeRoute = KnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RoutesRouteRoute = RoutesRouteRouteImport.update({
@@ -56,25 +51,40 @@ const RoutesRouteRoute = RoutesRouteRouteImport.update({
   path: '/routes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SessionsRouteRoute = SessionsRouteRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TranscriptsIndexRoute = TranscriptsIndexRouteImport.update({
-  id: '/transcripts/',
-  path: '/transcripts/',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
+} as any)
+const RoutesIndexRoute = RoutesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => RoutesRouteRoute,
+} as any)
+const RoutesIdRouteRoute = RoutesIdRouteRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => RoutesRouteRoute,
 } as any)
 const SessionsIndexRoute = SessionsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => SessionsRouteRoute,
 } as any)
-const RoutesIndexRoute = RoutesIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => RoutesRouteRoute,
+const SessionsIdRouteRoute = SessionsIdRouteRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => SessionsRouteRoute,
+} as any)
+const TranscriptsIndexRoute = TranscriptsIndexRouteImport.update({
+  id: '/transcripts/',
+  path: '/transcripts/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TranscriptsIdRoute = TranscriptsIdRouteImport.update({
   id: '/transcripts/$id',
@@ -83,15 +93,10 @@ const TranscriptsIdRoute = TranscriptsIdRouteImport.update({
 } as any).lazy(() =>
   import('./routes/transcripts/$id.lazy').then((d) => d.Route),
 )
-const SessionsIdRouteRoute = SessionsIdRouteRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => SessionsRouteRoute,
-} as any)
-const RoutesIdRouteRoute = RoutesIdRouteRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => RoutesRouteRoute,
+const RoutesIdIndexRoute = RoutesIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => RoutesIdRouteRoute,
 } as any)
 const SessionsIdIndexRoute = SessionsIdIndexRouteImport.update({
   id: '/',
@@ -100,11 +105,6 @@ const SessionsIdIndexRoute = SessionsIdIndexRouteImport.update({
 } as any).lazy(() =>
   import('./routes/sessions/$id/index.lazy').then((d) => d.Route),
 )
-const RoutesIdIndexRoute = RoutesIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => RoutesIdRouteRoute,
-} as any)
 const SessionsIdTimelineRoute = SessionsIdTimelineRouteImport.update({
   id: '/timeline',
   path: '/timeline',
@@ -231,25 +231,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/knowledge': {
-      id: '/knowledge'
-      path: '/knowledge'
-      fullPath: '/knowledge'
-      preLoaderRoute: typeof KnowledgeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/governance': {
-      id: '/governance'
-      path: '/governance'
-      fullPath: '/governance'
-      preLoaderRoute: typeof GovernanceRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gates': {
@@ -259,11 +245,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GatesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/sessions': {
-      id: '/sessions'
-      path: '/sessions'
-      fullPath: '/sessions'
-      preLoaderRoute: typeof SessionsRouteRouteImport
+    '/governance': {
+      id: '/governance'
+      path: '/governance'
+      fullPath: '/governance'
+      preLoaderRoute: typeof GovernanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/knowledge': {
+      id: '/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof KnowledgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/routes': {
@@ -273,26 +266,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RoutesRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/sessions': {
+      id: '/sessions'
+      path: '/sessions'
+      fullPath: '/sessions'
+      preLoaderRoute: typeof SessionsRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/transcripts/': {
-      id: '/transcripts/'
-      path: '/transcripts'
-      fullPath: '/transcripts/'
-      preLoaderRoute: typeof TranscriptsIndexRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/sessions/': {
-      id: '/sessions/'
-      path: '/'
-      fullPath: '/sessions/'
-      preLoaderRoute: typeof SessionsIndexRouteImport
-      parentRoute: typeof SessionsRouteRoute
     }
     '/routes/': {
       id: '/routes/'
@@ -301,12 +287,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RoutesIndexRouteImport
       parentRoute: typeof RoutesRouteRoute
     }
-    '/transcripts/$id': {
-      id: '/transcripts/$id'
-      path: '/transcripts/$id'
-      fullPath: '/transcripts/$id'
-      preLoaderRoute: typeof TranscriptsIdRouteImport
-      parentRoute: typeof rootRouteImport
+    '/routes/$id': {
+      id: '/routes/$id'
+      path: '/$id'
+      fullPath: '/routes/$id'
+      preLoaderRoute: typeof RoutesIdRouteRouteImport
+      parentRoute: typeof RoutesRouteRoute
+    }
+    '/sessions/': {
+      id: '/sessions/'
+      path: '/'
+      fullPath: '/sessions/'
+      preLoaderRoute: typeof SessionsIndexRouteImport
+      parentRoute: typeof SessionsRouteRoute
     }
     '/sessions/$id': {
       id: '/sessions/$id'
@@ -315,19 +308,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIdRouteRouteImport
       parentRoute: typeof SessionsRouteRoute
     }
-    '/routes/$id': {
-      id: '/routes/$id'
-      path: '/$id'
-      fullPath: '/routes/$id'
-      preLoaderRoute: typeof RoutesIdRouteRouteImport
-      parentRoute: typeof RoutesRouteRoute
+    '/transcripts/': {
+      id: '/transcripts/'
+      path: '/transcripts'
+      fullPath: '/transcripts/'
+      preLoaderRoute: typeof TranscriptsIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/sessions/$id/': {
-      id: '/sessions/$id/'
-      path: '/'
-      fullPath: '/sessions/$id/'
-      preLoaderRoute: typeof SessionsIdIndexRouteImport
-      parentRoute: typeof SessionsIdRouteRoute
+    '/transcripts/$id': {
+      id: '/transcripts/$id'
+      path: '/transcripts/$id'
+      fullPath: '/transcripts/$id'
+      preLoaderRoute: typeof TranscriptsIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/routes/$id/': {
       id: '/routes/$id/'
@@ -335,6 +328,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/routes/$id/'
       preLoaderRoute: typeof RoutesIdIndexRouteImport
       parentRoute: typeof RoutesIdRouteRoute
+    }
+    '/sessions/$id/': {
+      id: '/sessions/$id/'
+      path: '/'
+      fullPath: '/sessions/$id/'
+      preLoaderRoute: typeof SessionsIdIndexRouteImport
+      parentRoute: typeof SessionsIdRouteRoute
     }
     '/sessions/$id/timeline': {
       id: '/sessions/$id/timeline'
