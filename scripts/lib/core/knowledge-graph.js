@@ -60,7 +60,6 @@ const path = require("node:path");
 const { compileSchema, formatErrors } = require("./schema-contract");
 const { typedError } = require("./error-catalog");
 const { resolvePathWithin } = require("./fs-utils");
-const { stripRange } = require("./context-sources");
 const { extractCodeCorpus, typescriptVersion } = require("./code-graph");
 
 const SCHEMA_VERSION = "2";

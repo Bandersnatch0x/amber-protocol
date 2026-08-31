@@ -8,7 +8,7 @@ const { ingestPayload } = require("./context-ingest");
 const { verifyPages } = require("./context-verify");
 const { readPage } = require("./context-store");
 const { hashFile, sha256 } = require("./context-hash");
-const { projectionStatus, rebuildProjection, projectionsDir } = require("./projection-registry");
+const { rebuildProjection, projectionsDir } = require("./projection-registry");
 const { resolvePathWithin } = require("./fs-utils");
 const { typedError } = require("./error-catalog");
 

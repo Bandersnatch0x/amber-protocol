@@ -25,8 +25,6 @@ const {
 	CLOCK_SOURCES,
 	DEFAULT_MAX_OUTCOME_BYTES,
 	MAX_OUTCOME_ENV,
-	GENESIS_HASH,
-	chainHash,
 	evaluatePolicy,
 	showPolicyOutcome,
 	listPolicyOutcomes,

@@ -25,7 +25,7 @@ const { typescriptVersion } = require("../../scripts/lib/core/code-graph");
 const { validate } = require("../../scripts/lib/core/schema-contract");
 const { knowledgeDispatch } = require("../../scripts/lib/knowledge-commands");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
-const { mkTarget, addPage, writeJson } = require("../helpers/harness");
+const { mkTarget, writeJson } = require("../helpers/harness");
 
 const REPO_ROOT = path.join(__dirname, "..", "..");
 
