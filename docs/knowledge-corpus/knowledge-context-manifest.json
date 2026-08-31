@@ -520,8 +520,8 @@
       "sourcePath": "docs/wiki/knowledge/schema-validation-layer/schema-validation-layer.md",
       "title": "Schema & Validation Layer",
       "source": {
-        "rawHash": "sha256:1cf677d400cf09afbac3922331985f88546ae993f7e1f88011e56d76cad3a9c1",
-        "normHash": "sha256:27056a4439e9c15235a80b0fb7e2b2a41bc21609276c32511507c2c61e1a6d2c"
+        "rawHash": "sha256:27d25b9b648ad664d024ca2a9eaef510f4f04abc70118938ee27ee4b6947fb78",
+        "normHash": "sha256:ffd4df09fef8ea3679b71f6b329b004f473a3b1e66d76cc395d56672b40cf2bb"
       }
     },
     {
@@ -573,5 +573,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:4cef70ef4a533d331391e83c34d8f69704af8b603284c0b696f6f7b0a103fb1a"
+  "manifestHash": "sha256:60dfdf4d3970a5c0f4abaeb06664d4387cb2eb3e17deb0d08af6573a5d6310d3"
 }
