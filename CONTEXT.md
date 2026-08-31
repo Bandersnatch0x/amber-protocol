@@ -164,6 +164,10 @@ _Avoid_: memory, note, doc, wiki page, article
 The request artifact Amber emits at `.amber/context/requests/<id>.json`: hash-bearing source references, the target schema, the instructions, the hard constraints, and the acceptance error codes. Amber writes it and judges the result; a host agent executes it. Amber never calls a model.
 _Avoid_: prompt, job, task, request payload
 
+**Governed Memory**:
+The registry-backed layer that gives durable agent knowledge one governed lifecycle across four layers — L1 session, L2 portable, L3 human-curated, L4 distilled — where a layer is defined by the triple *writer stance × volatility class × mutation policy*, never by storage location (ADR-0018). Entry identity lives only in the Amber-owned entry registry (`.amber/memory/registry/`, content-hash `entryId`, so revised content is a new entry); human-curated surfaces such as `MEMORY.md` never carry an id and stay the authority for their own text — `amber memory book` registers a surface's normHash read-only and Amber never writes the file. Write-back is gated, not automatic: Amber detects and gates, a host agent generates, a human approves; supersession replaces deletion.
+_Avoid_: agent memory, long-term memory, vector store, RAG index
+
 **Mutable Source** / **Immutable Source**:
 The two source classes a Context Page may cite. Mutable sources (code, live documents) carry a `rawHash` and a `normHash` and are staleness-checked; only a `normHash` change raises a refresh. Immutable sources (append-only ledger ranges, archived sessions, accepted ADRs) are hashed for tamper detection only.
 _Avoid_: static/dynamic source, fixed reference
@@ -273,6 +277,10 @@ _Avoid_: Delivery, reconnect, Continuity Handoff
 **Governance Graph**:
 A rebuildable, tenant- and repository-scoped projection of governance entities and their causal, provenance, temporal, and policy relationships. It is never a graph store authority or independent source of truth.
 _Avoid_: graph database, system of record, memory graph
+
+**Knowledge Graph**:
+The deterministic projection of a target repository's own document and code corpus as three layers — decision (`adr:*`, `artifact:*`), knowledge (`wiki:*`, `memory:*`, `architecture:*`), and implementation (`feature:*`, `code:*`) — joined by exactly six verbs: supersedes, builds-on, references, describes, imports, anchors (F059; F060 code layer, ADR-0025). It is a pure function of the tree: `amber knowledge graph` is byte-identical on recompute over an unchanged tree, schema-validated against `schemas/knowledge-graph.schema.json`, and every node and edge carries deterministic provenance. A declared path absent from the tree stays a dead-anchor drift finding and never becomes a dangling edge. Distinct from the Governance Graph, which projects governance entities rather than this repository's documents and code.
+_Avoid_: knowledge base, Governance Graph, semantic graph, embedding index
 
 **Decision**:
 An immutable, scoped governance record of a question, chosen outcome, rationale, alternatives and trade-offs, supporting and contradicting Evidence, actor and approver, lifecycle status, valid and recorded time, affected Artifacts, content hash, and provenance. It never records private reasoning.
