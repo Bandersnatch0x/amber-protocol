@@ -27,6 +27,7 @@ const { resolvePositiveIntCeiling } = require("./resource-ceilings");
 const GENESIS_HASH = "0".repeat(64);
 
 const DEFAULT_LOCK_STALE_MS = 30_000;
+const INVALID_ARG_CODE = "AMBER_E_INVALID_ARG";
 
 function sortKeys(value) {
 	if (Array.isArray(value)) return value.map(sortKeys);
@@ -247,6 +248,10 @@ function appendLedgerEvent(cwd, options, body, guard, derive) {
 				label: options.label,
 			});
 		} catch (err) {
+			// A malformed operator ceiling is an argument error, not a ledger
+			// refusal. Preserve the historical throw while the outer finally
+			// still releases the lock acquired for this append.
+			if (err.amberCode === INVALID_ARG_CODE) throw err;
 			return failure(err);
 		}
 		if (ceiling.wouldExceed)

@@ -10,16 +10,9 @@
 // lower layers can only add denials, never relax an upper layer, and the
 // completed policy outcome is appended to its own tamper-evident ledger.
 
-const path = require("node:path");
-const { appendJSONL, readLedgerFailClosed } = require("./jsonl");
-const { statePathForCreate } = require("../state-dir-resolver");
 const { typedError } = require("./error-catalog");
-const {
-	GENESIS_HASH,
-	chainHash,
-	acquireLedgerLock,
-	appendWithinCeiling: sharedAppendWithinCeiling,
-} = require("./registry-ledger");
+const { GENESIS_HASH, chainHash } = require("./registry-ledger");
+const { defineLedgerFamily } = require("./ledger-family");
 const { hashText, canonicalJson } = require("./context-hash");
 const { parseTimestamp, resolveActivePrincipal } = require("./principal-registry");
 const { showApproval } = require("./approval-registry");
@@ -37,8 +30,6 @@ const SKEW_POLICY = "no-tolerance";
 const CLOCK_SOURCES = Object.freeze(["injected", "system"]);
 const DEFAULT_MAX_OUTCOME_BYTES = 1024 * 1024;
 const MAX_OUTCOME_ENV = "AMBER_POLICY_MAX_OUTCOME_BYTES";
-const LOCK_STALE_MS = 30_000;
-
 const POLICY_MISSING_CODE = "AMBER_E_POLICY_MISSING";
 const POLICY_INVALID_CODE = "AMBER_E_POLICY_INVALID";
 const POLICY_UNSUPPORTED_VERSION_CODE = "AMBER_E_POLICY_UNSUPPORTED_VERSION";
@@ -106,10 +97,6 @@ const DELEGATION_REF_FIELDS = Object.freeze([
 	"policy",
 ]);
 const VERDICTS = Object.freeze(["pass", "deny"]);
-
-function outcomeLedgerPath(cwd) {
-	return statePathForCreate(cwd, "policies", "outcomes.jsonl");
-}
 
 function outcomeCorrupt(message) {
 	return typedError(OUTCOME_REGISTRY_CORRUPT_CODE, message);
@@ -712,58 +699,6 @@ function gateOutcomeRef(record, gateOutcomeIndex) {
 	};
 }
 
-function appendPolicyOutcome(cwd, eventBody) {
-	let release;
-	try {
-		release = acquireOutcomeLock(cwd);
-	} catch (err) {
-		return {
-			ok: false,
-			code: err.amberCode || OUTCOME_REGISTRY_CORRUPT_CODE,
-			errors: [err.message || String(err)],
-		};
-	}
-	try {
-		let folded;
-		try {
-			folded = foldOutcomes(cwd);
-		} catch (err) {
-			return {
-				ok: false,
-				code: err.amberCode || OUTCOME_REGISTRY_CORRUPT_CODE,
-				errors: [err.message || String(err)],
-			};
-		}
-		const prevHash = folded.length > 0 ? folded[folded.length - 1].hash : GENESIS_HASH;
-		const index = folded.length;
-		const event = { ...eventBody, prevHash, hash: chainHash(eventBody, prevHash) };
-		const ceiling = appendWithinCeiling(cwd, event);
-		if (ceiling.wouldExceed) {
-			return {
-				ok: false,
-				code: OUTCOME_SIZE_CEILING_CODE,
-				errors: [
-					`appending the policy outcome for subject "${eventBody.subject}" would grow the policy outcome ledger beyond its size ceiling of ${ceiling.ceiling} bytes (${MAX_OUTCOME_ENV}); the write is refused before any durable state is touched`,
-				],
-			};
-		}
-		try {
-			appendJSONL(outcomeLedgerPath(cwd), event);
-		} catch (err) {
-			return {
-				ok: false,
-				code: OUTCOME_REGISTRY_CORRUPT_CODE,
-				errors: [
-					`failed to append the policy outcome for subject "${eventBody.subject}" to the policy outcome ledger: ${err.message || String(err)}`,
-				],
-			};
-		}
-		return { ok: true, outcome: { ...event, index } };
-	} finally {
-		release();
-	}
-}
-
 function inputProblem(input) {
 	if (!isPlainObject(input)) return `input must be an object; got ${JSON.stringify(input)}`;
 	for (const [field, example] of [
@@ -974,33 +909,17 @@ function evaluatePolicy(cwd, input = {}, opts = {}) {
 		delegation: delegationResult.delegation,
 	};
 
-	const appended = appendPolicyOutcome(cwd, eventBody);
+	const appended = OUTCOME_LEDGER.append(
+		cwd,
+		eventBody,
+		() => null,
+		(records) => records[records.length - 1] ?? null,
+	);
 	if (!appended.ok) return fail(appended.code, appended.errors);
 	if (verdict === "pass") {
-		return { ok: true, code: null, outcome: appended.outcome, errors: [] };
+		return { ok: true, code: null, outcome: appended.record, errors: [] };
 	}
-	return fail(firstDenialCode(reasons), reasons, appended.outcome);
-}
-
-function acquireOutcomeLock(cwd) {
-	return acquireLedgerLock({
-		dirPath: path.dirname(outcomeLedgerPath(cwd)),
-		lockName: "outcomes.lock",
-		conflictCode: OUTCOME_REGISTRY_LOCK_CODE,
-		corruptCode: OUTCOME_REGISTRY_CORRUPT_CODE,
-		label: "policy outcome ledger",
-		staleMs: LOCK_STALE_MS,
-	});
-}
-
-function appendWithinCeiling(cwd, event) {
-	return sharedAppendWithinCeiling({
-		ledgerPath: outcomeLedgerPath(cwd),
-		event,
-		envName: MAX_OUTCOME_ENV,
-		defaultBytes: DEFAULT_MAX_OUTCOME_BYTES,
-		label: "policy outcome ledger",
-	});
+	return fail(firstDenialCode(reasons), reasons, appended.record);
 }
 
 function nullableStringProblem(value, label) {
@@ -1076,135 +995,183 @@ function delegationRefProblem(ref) {
 	return policyRefProblem(ref.policy, "delegation.policy");
 }
 
-function foldOutcomes(cwd) {
-	const events = readLedgerFailClosed(
-		outcomeLedgerPath(cwd),
-		OUTCOME_REGISTRY_CORRUPT_CODE,
-		"policy outcome ledger",
-	);
-	const records = [];
-	let prevHash = GENESIS_HASH;
-	for (let index = 0; index < events.length; index += 1) {
-		const lineIndex = index + 1;
-		const event = events[index];
-		if (!isPlainObject(event)) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
-			);
-		}
-		if (!Number.isInteger(event.schemaVersion)) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(event.schemaVersion)}`,
-			);
-		}
-		if (!SUPPORTED_POLICY_EVALUATION_SCHEMA_VERSIONS.includes(event.schemaVersion)) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} declares schemaVersion ${JSON.stringify(event.schemaVersion)}, but this reader supports ${SUPPORTED_POLICY_EVALUATION_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted`,
-			);
-		}
-		if (typeof event.prevHash !== "string" || event.prevHash !== prevHash) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`,
-			);
-		}
-		if (typeof event.hash !== "string" || chainHash(event, prevHash) !== event.hash) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`,
-			);
-		}
-		const closed = closedFieldsProblem(
-			event,
-			OUTCOME_EVENT_FIELDS,
-			`policy outcome ledger event ${lineIndex}`,
+// The hand-written fold checked the schema preamble before its chain walk.
+// Keep that recorded refusal order as the family's explicit pre-link step;
+// all remaining event validation stays in the chain-verified domain fold.
+function validateOutcomeBeforeLink(event, lineIndex) {
+	if (!isPlainObject(event)) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} is not an object; got ${JSON.stringify(event)}`,
 		);
-		if (closed !== null) throw outcomeCorrupt(closed);
-		if (event.kind !== "evaluated") {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is evaluated`,
-			);
-		}
-		if (!CLOCK_SOURCES.includes(event.clockSource)) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries clockSource ${JSON.stringify(event.clockSource)} outside the closed set (${CLOCK_SOURCES.join(", ")})`,
-			);
-		}
-		if (event.skewPolicy !== SKEW_POLICY) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries skewPolicy ${JSON.stringify(event.skewPolicy)}, but the recorded policy is fixed (${SKEW_POLICY})`,
-			);
-		}
-		if (!VERDICTS.includes(event.verdict)) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries verdict ${JSON.stringify(event.verdict)} outside the closed set (${VERDICTS.join(", ")})`,
-			);
-		}
-		for (const field of ["at", "subject", "submitter", "capability"]) {
-			if (!isNonEmptyString(event[field])) {
-				throw outcomeCorrupt(
-					`policy outcome ledger event ${lineIndex} carries a ${field} that is not a non-empty string; got ${JSON.stringify(event[field])}`,
-				);
-			}
-		}
-		if (!isPlainObject(event.policies)) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries policies that is not an object; got ${JSON.stringify(event.policies)}`,
-			);
-		}
-		const policyLayers = Object.keys(event.policies);
-		const unknownLayers = policyLayers.filter((layer) => !POLICY_LAYERS.includes(layer)).sort();
-		if (unknownLayers.length > 0) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries unknown policy layer${unknownLayers.length > 1 ? "s" : ""} ${quotedList(unknownLayers)}; the closed layer set is ${POLICY_LAYERS.join(", ")}`,
-			);
-		}
-		for (const layer of REQUIRED_POLICY_LAYERS) {
-			if (!Object.prototype.hasOwnProperty.call(event.policies, layer)) {
-				throw outcomeCorrupt(
-					`policy outcome ledger event ${lineIndex} is missing required policy layer ${layer}`,
-				);
-			}
-		}
-		for (const layer of policyLayers) {
-			const problem = policyRefProblem(event.policies[layer], `policies.${layer}`);
-			if (problem !== null)
-				throw outcomeCorrupt(`policy outcome ledger event ${lineIndex} carries ${problem}`);
-		}
-		const approvalProblem = approvalRefProblem(event.approval);
-		if (approvalProblem !== null) {
-			throw outcomeCorrupt(`policy outcome ledger event ${lineIndex} carries ${approvalProblem}`);
-		}
-		const gateProblem = gateOutcomeRefProblem(event.gateOutcome);
-		if (gateProblem !== null) {
-			throw outcomeCorrupt(`policy outcome ledger event ${lineIndex} carries ${gateProblem}`);
-		}
-		if (
-			!Array.isArray(event.reasons) ||
-			event.reasons.some((reason) => !isNonEmptyString(reason))
-		) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries reasons that are not an array of non-empty strings; got ${JSON.stringify(event.reasons)}`,
-			);
-		}
-		if (event.verdict === "pass" && event.reasons.length !== 0) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} has verdict pass but non-empty reasons; a passing outcome carries no denial reasons`,
-			);
-		}
-		if (event.verdict === "deny" && event.reasons.length === 0) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} has verdict deny but no reasons; a denial must explain why strict consumption failed`,
-			);
-		}
-		const delegationProblemText = delegationRefProblem(event.delegation);
-		if (delegationProblemText !== null) {
-			throw outcomeCorrupt(
-				`policy outcome ledger event ${lineIndex} carries ${delegationProblemText}`,
-			);
-		}
-		records.push({ ...event, index });
-		prevHash = event.hash;
 	}
-	return records;
+	if (!Number.isInteger(event.schemaVersion)) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} carries no integer schemaVersion; got ${JSON.stringify(event.schemaVersion)}`,
+		);
+	}
+	if (!SUPPORTED_POLICY_EVALUATION_SCHEMA_VERSIONS.includes(event.schemaVersion)) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} declares schemaVersion ${JSON.stringify(event.schemaVersion)}, but this reader supports ${SUPPORTED_POLICY_EVALUATION_SCHEMA_VERSIONS.join(", ")}; an event this reader cannot interpret is rejected rather than reinterpreted`,
+		);
+	}
+}
+
+function outcomeChainWording(kind, event, lineIndex, label) {
+	if (kind === "not-object")
+		return `${label} event ${lineIndex} is not an object; got ${JSON.stringify(event)}`;
+	if (kind === "broken")
+		return `${label} event ${lineIndex} breaks the hash chain: its prevHash does not match the previous event's hash — the ledger was edited in place`;
+	if (kind === "mismatch")
+		return `${label} event ${lineIndex} carries a hash that does not match its content — the ledger was edited in place`;
+	return null;
+}
+
+function validateOutcomeHeader(event, lineIndex) {
+	const closed = closedFieldsProblem(
+		event,
+		OUTCOME_EVENT_FIELDS,
+		`policy outcome ledger event ${lineIndex}`,
+	);
+	if (closed !== null) throw outcomeCorrupt(closed);
+	if (event.kind !== "evaluated") {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} carries unknown kind ${JSON.stringify(event.kind)}; the closed kind set is evaluated`,
+		);
+	}
+	if (!CLOCK_SOURCES.includes(event.clockSource)) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} carries clockSource ${JSON.stringify(event.clockSource)} outside the closed set (${CLOCK_SOURCES.join(", ")})`,
+		);
+	}
+	if (event.skewPolicy !== SKEW_POLICY) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} carries skewPolicy ${JSON.stringify(event.skewPolicy)}, but the recorded policy is fixed (${SKEW_POLICY})`,
+		);
+	}
+	if (!VERDICTS.includes(event.verdict)) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} carries verdict ${JSON.stringify(event.verdict)} outside the closed set (${VERDICTS.join(", ")})`,
+		);
+	}
+	for (const field of ["at", "subject", "submitter", "capability"]) {
+		if (!isNonEmptyString(event[field])) {
+			throw outcomeCorrupt(
+				`policy outcome ledger event ${lineIndex} carries a ${field} that is not a non-empty string; got ${JSON.stringify(event[field])}`,
+			);
+		}
+	}
+}
+
+function validateOutcomePolicies(event, lineIndex) {
+	if (!isPlainObject(event.policies)) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} carries policies that is not an object; got ${JSON.stringify(event.policies)}`,
+		);
+	}
+	const policyLayers = Object.keys(event.policies);
+	const unknownLayers = policyLayers.filter((layer) => !POLICY_LAYERS.includes(layer)).sort();
+	if (unknownLayers.length > 0) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} carries unknown policy layer${unknownLayers.length > 1 ? "s" : ""} ${quotedList(unknownLayers)}; the closed layer set is ${POLICY_LAYERS.join(", ")}`,
+		);
+	}
+	for (const layer of REQUIRED_POLICY_LAYERS) {
+		if (!Object.prototype.hasOwnProperty.call(event.policies, layer)) {
+			throw outcomeCorrupt(
+				`policy outcome ledger event ${lineIndex} is missing required policy layer ${layer}`,
+			);
+		}
+	}
+	for (const layer of policyLayers) {
+		const problem = policyRefProblem(event.policies[layer], `policies.${layer}`);
+		if (problem !== null)
+			throw outcomeCorrupt(`policy outcome ledger event ${lineIndex} carries ${problem}`);
+	}
+}
+
+function validateOutcomeReferences(event, lineIndex) {
+	const approvalProblem = approvalRefProblem(event.approval);
+	if (approvalProblem !== null) {
+		throw outcomeCorrupt(`policy outcome ledger event ${lineIndex} carries ${approvalProblem}`);
+	}
+	const gateProblem = gateOutcomeRefProblem(event.gateOutcome);
+	if (gateProblem !== null) {
+		throw outcomeCorrupt(`policy outcome ledger event ${lineIndex} carries ${gateProblem}`);
+	}
+}
+
+function validateOutcomeReasons(event, lineIndex) {
+	if (!Array.isArray(event.reasons) || event.reasons.some((reason) => !isNonEmptyString(reason))) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} carries reasons that are not an array of non-empty strings; got ${JSON.stringify(event.reasons)}`,
+		);
+	}
+	if (event.verdict === "pass" && event.reasons.length !== 0) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} has verdict pass but non-empty reasons; a passing outcome carries no denial reasons`,
+		);
+	}
+	if (event.verdict === "deny" && event.reasons.length === 0) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} has verdict deny but no reasons; a denial must explain why strict consumption failed`,
+		);
+	}
+}
+
+function validateOutcomeDelegation(event, lineIndex) {
+	const delegationProblemText = delegationRefProblem(event.delegation);
+	if (delegationProblemText !== null) {
+		throw outcomeCorrupt(
+			`policy outcome ledger event ${lineIndex} carries ${delegationProblemText}`,
+		);
+	}
+}
+
+function applyOutcomeEvent(records, event, lineIndex) {
+	validateOutcomeHeader(event, lineIndex);
+	validateOutcomePolicies(event, lineIndex);
+	validateOutcomeReferences(event, lineIndex);
+	validateOutcomeReasons(event, lineIndex);
+	validateOutcomeDelegation(event, lineIndex);
+	records.push({ ...event, index: lineIndex - 1 });
+}
+
+const OUTCOME_FAMILY = defineLedgerFamily({
+	dir: "policies",
+	label: "policy outcome ledger",
+	ledgers: [
+		{
+			name: "outcomes",
+			fileName: "outcomes.jsonl",
+			lockName: "outcomes.lock",
+			conflictCode: OUTCOME_REGISTRY_LOCK_CODE,
+			corruptCode: OUTCOME_REGISTRY_CORRUPT_CODE,
+			sizeCeilingCode: OUTCOME_SIZE_CEILING_CODE,
+			ceiling: {
+				envName: MAX_OUTCOME_ENV,
+				defaultBytes: DEFAULT_MAX_OUTCOME_BYTES,
+				message: (event, ceiling) =>
+					`appending the policy outcome for subject "${event.subject}" would grow the policy outcome ledger beyond its size ceiling of ${ceiling} bytes (${MAX_OUTCOME_ENV}); the write is refused before any durable state is touched`,
+			},
+			label: "policy outcome ledger",
+			appendMessage: (event, error) =>
+				`failed to append the policy outcome for subject "${event.subject}" to the policy outcome ledger: ${error.message || String(error)}`,
+			eventLabel: "policy outcome ledger",
+			fold: {
+				init: () => [],
+				preLink: validateOutcomeBeforeLink,
+				chainWording: outcomeChainWording,
+				apply: applyOutcomeEvent,
+				result: (records) => records,
+			},
+		},
+	],
+});
+
+const OUTCOME_LEDGER = OUTCOME_FAMILY.ledgers.outcomes;
+
+function foldOutcomes(cwd) {
+	return OUTCOME_LEDGER.fold(cwd);
 }
 
 function listPolicyOutcomes(

@@ -1,0 +1,22 @@
+{
+	"schemaVersion": 1,
+	"fixture": "outcomes-lifecycle.golden.jsonl",
+	"recordedBeforeFactoryAssembly": true,
+	"recordedAgainst": {
+		"commit": "1204602430bc2c6d8b05624039fc0702852588f7",
+		"source": "scripts/lib/core/policy-evaluation.js",
+		"sourceBlob": "a930a7bb5819456b138ef0932a35ed6a279fe90b",
+		"implementation": "hand-written policy outcome ledger"
+	},
+	"recordings": [
+		{
+			"bytes": 2062,
+			"sha256": "ec779a104a55adc7b0863fa4f33667bb3de3d0e9f7c53ea01180ae265a3c37dd"
+		},
+		{
+			"bytes": 2062,
+			"sha256": "ec779a104a55adc7b0863fa4f33667bb3de3d0e9f7c53ea01180ae265a3c37dd"
+		}
+	],
+	"reRecordAfterAssembly": false
+}
