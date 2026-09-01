@@ -1,7 +1,227 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from '@docusaurus/Link';
 import { Shield, Menu, X } from 'lucide-react';
+import * as THREE from 'three';
 import styles from './AmberHero.module.css';
+
+/**
+ * 3D Amber Crystal & Golden Particle Background
+ * Replaces generic video with an interactive, locally-rendered Amber Gem & Resin Particle Nebula.
+ */
+const AmberCrystalBackground: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || typeof window === 'undefined') return;
+
+    const canvas = canvasRef.current;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // Scene & Camera
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 1000);
+    camera.position.z = 190;
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: true,
+    });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // Ambient & Point Lights
+    const ambientLight = new THREE.AmbientLight(0x1a1205, 1.5);
+    scene.add(ambientLight);
+
+    const amberLight = new THREE.PointLight(0xf59e0b, 2.5, 400);
+    amberLight.position.set(0, 0, 50);
+    scene.add(amberLight);
+
+    // 1. Central Amber Crystal (Faceted Icosahedron)
+    const crystalGroup = new THREE.Group();
+    crystalGroup.position.set(window.innerWidth > 996 ? 90 : 0, 0, 0);
+    scene.add(crystalGroup);
+
+    // Outer wireframe shell
+    const outerGeo = new THREE.IcosahedronGeometry(48, 0);
+    const outerMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.25,
+    });
+    const outerCrystal = new THREE.Mesh(outerGeo, outerMat);
+    crystalGroup.add(outerCrystal);
+
+    // Inner translucent faceted crystal
+    const innerGeo = new THREE.IcosahedronGeometry(42, 0);
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0xd97706,
+      emissive: 0x78350f,
+      roughness: 0.15,
+      metalness: 0.85,
+      transparent: true,
+      opacity: 0.55,
+      flatShading: true,
+    });
+    const innerCrystal = new THREE.Mesh(innerGeo, innerMat);
+    crystalGroup.add(innerCrystal);
+
+    // Core Glowing Polyhedron
+    const coreGeo = new THREE.OctahedronGeometry(22, 0);
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0xfbbf24,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.7,
+    });
+    const coreCrystal = new THREE.Mesh(coreGeo, coreMat);
+    crystalGroup.add(coreCrystal);
+
+    // 2. Orbital Governance Rings (围绕琥珀内核的治理规则环)
+    const ringGeo1 = new THREE.TorusGeometry(68, 0.6, 16, 100);
+    const ringMat1 = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0.2,
+    });
+    const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
+    ring1.rotation.x = Math.PI / 3;
+    crystalGroup.add(ring1);
+
+    const ringGeo2 = new THREE.TorusGeometry(78, 0.4, 16, 100);
+    const ringMat2 = new THREE.MeshBasicMaterial({
+      color: 0xfbbf24,
+      transparent: true,
+      opacity: 0.15,
+    });
+    const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
+    ring2.rotation.y = Math.PI / 4;
+    ring2.rotation.x = Math.PI / 6;
+    crystalGroup.add(ring2);
+
+    // 3. Floating Amber Resin Particles & Embers (悬浮琥珀微粒与流光)
+    const particleCount = 200;
+    const particleGeo = new THREE.BufferGeometry();
+    const particlePos = new Float32Array(particleCount * 3);
+    const particleColors = new Float32Array(particleCount * 3);
+
+    const c1 = new THREE.Color(0xf59e0b); // Amber Gold
+    const c2 = new THREE.Color(0xfbbf24); // Amber Light
+    const c3 = new THREE.Color(0xd97706); // Deep Amber
+
+    for (let i = 0; i < particleCount; i++) {
+      particlePos[i * 3] = (Math.random() - 0.5) * 500;
+      particlePos[i * 3 + 1] = (Math.random() - 0.5) * 300;
+      particlePos[i * 3 + 2] = (Math.random() - 0.5) * 200;
+
+      const rand = Math.random();
+      const c = rand > 0.6 ? c1 : rand > 0.3 ? c2 : c3;
+      particleColors[i * 3] = c.r;
+      particleColors[i * 3 + 1] = c.g;
+      particleColors[i * 3 + 2] = c.b;
+    }
+
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+    particleGeo.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+
+    const particleMat = new THREE.PointsMaterial({
+      size: 3,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+    });
+
+    const particles = new THREE.Points(particleGeo, particleMat);
+    scene.add(particles);
+
+    // Animation Loop
+    let animationFrameId: number;
+    let clock = new THREE.Clock();
+    let mouseX = 0;
+    let mouseY = 0;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseX = (e.clientX / window.innerWidth - 0.5) * 0.3;
+      mouseY = (e.clientY / window.innerHeight - 0.5) * 0.3;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+
+    const animate = () => {
+      const time = clock.getElapsedTime();
+
+      // Rotate Amber Crystal with organic breathing motion
+      outerCrystal.rotation.y = time * 0.15;
+      outerCrystal.rotation.x = time * 0.08;
+
+      innerCrystal.rotation.y = -time * 0.2;
+      innerCrystal.rotation.z = time * 0.1;
+
+      coreCrystal.rotation.x = time * 0.3;
+      coreCrystal.rotation.y = time * 0.25;
+
+      ring1.rotation.z = time * 0.08;
+      ring2.rotation.z = -time * 0.06;
+
+      // Parallax with mouse
+      crystalGroup.rotation.y += (mouseX - crystalGroup.rotation.y) * 0.05;
+      crystalGroup.rotation.x += (mouseY - crystalGroup.rotation.x) * 0.05;
+
+      // Floating resin particles movement
+      const pos = particleGeo.attributes.position.array as Float32Array;
+      for (let i = 0; i < particleCount; i++) {
+        pos[i * 3 + 1] += Math.sin(time * 0.5 + pos[i * 3] * 0.01) * 0.08;
+        pos[i * 3] += Math.cos(time * 0.3 + pos[i * 3 + 1] * 0.01) * 0.04;
+      }
+      particleGeo.attributes.position.needsUpdate = true;
+
+      // Pulsing amber core glow
+      const scale = 1 + Math.sin(time * 2) * 0.04;
+      coreCrystal.scale.set(scale, scale, scale);
+
+      renderer.render(scene, camera);
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      const newW = window.innerWidth;
+      const newH = window.innerHeight;
+      camera.aspect = newW / newH;
+      camera.updateProjectionMatrix();
+      renderer.setSize(newW, newH);
+      crystalGroup.position.set(newW > 996 ? 90 : 0, 0, 0);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('resize', handleResize);
+      renderer.dispose();
+      outerGeo.dispose();
+      outerMat.dispose();
+      innerGeo.dispose();
+      innerMat.dispose();
+      coreGeo.dispose();
+      coreMat.dispose();
+      ringGeo1.dispose();
+      ringMat1.dispose();
+      ringGeo2.dispose();
+      ringMat2.dispose();
+      particleGeo.dispose();
+      particleMat.dispose();
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className={styles.crystalCanvas} />;
+};
 
 interface NavItemProps {
   number: string;
@@ -84,7 +304,7 @@ const ConnectorLine: React.FC<ConnectorLineProps> = ({ x1, y1, x2, y2, delay }) 
       y1={y1}
       x2={x2}
       y2={y2}
-      stroke="rgba(245, 158, 11, 0.3)"
+      stroke="rgba(245, 158, 11, 0.35)"
       strokeWidth="1"
       vectorEffect="non-scaling-stroke"
     />
@@ -167,15 +387,8 @@ export const AmberHero: React.FC = () => {
 
   return (
     <section className={styles.heroSection}>
-      {/* Background Atmosphere Video / Canvas Layer */}
-      <video
-        className="absolute inset-0 w-full h-full object-cover anim-fade-in opacity-30 pointer-events-none"
-        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260813_115057_94c3699b-0fd1-4124-bcf3-3626bb8c1f77.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
-      />
+      {/* 3D Amber Crystal & Resin Particle Nebula Background */}
+      <AmberCrystalBackground />
 
       <div className={styles.contentLayer}>
         {/* 7. Top Navigation */}
@@ -290,7 +503,7 @@ export const AmberHero: React.FC = () => {
             className={`${styles.ctaBtn} anim-fade-up`}
             style={{ animationDelay: '900ms' }}
           >
-            <span className={styles.ctaStar}>&#10022;</span>
+            <span className={styles.ctaGlyph}>◆</span>
             <span className={styles.ctaText}>Start Governed Workflow</span>
           </Link>
 
@@ -308,7 +521,7 @@ export const AmberHero: React.FC = () => {
               >
                 <polygon
                   points="0.5,0.5 279.5,0.5 279.5,167.5 30,167.5 0.5,137.5"
-                  fill="rgba(15,23,42,0.7)"
+                  fill="rgba(15,23,42,0.75)"
                   stroke="#F59E0B"
                   strokeWidth="1"
                   vectorEffect="non-scaling-stroke"
