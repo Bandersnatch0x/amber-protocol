@@ -1,7 +1,8 @@
 import React from 'react';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
-import useDocusaurusContext from '@docusaurus/core/lib/client/exports/useDocusaurusContext';
+import { AmberHero } from '../components/AmberHero';
+import { DataFlowDiagram } from '../components/DataFlowDiagram';
 import styles from './index.module.css';
 
 const PILLARS = [
@@ -89,89 +90,21 @@ const LIFECYCLE_STEPS = [
 ];
 
 export default function Home(): React.JSX.Element {
-  const { siteConfig } = useDocusaurusContext();
-
   return (
     <Layout
       title="Amber Protocol — Governance & Verifiable Assurance for AI Coding Agents"
       description="Repository-local governance layer, deterministic guardrails, tamper-evident ledgers, and four-level evidence receipts for agent-assisted software engineering."
     >
-      {/* Hero Section */}
-      <header className={styles.heroSection}>
-        <div className={styles.heroContainer}>
-          <div>
-            <div className={styles.heroBadge}>
-              <span className={styles.heroBadgeDot} />
-              Amber Protocol v1.6.0 • Agent Governance Layer
-            </div>
-            <h1 className={styles.heroTitle}>
-              Repository-Local Governance &amp;{' '}
-              <span className={styles.heroHighlight}>Verifiable Assurance</span>{' '}
-              for AI Coding Agents
-            </h1>
-            <p className={styles.heroSubtitle}>
-              Amber Protocol surrounds agent-assisted software engineering with deterministic
-              guardrails, tamper-evident ledgers, four-level evidence receipts, and multi-turn
-              handoffs — with zero hidden prompts and zero autonomous command execution.
-            </p>
-            <div className={styles.heroActions}>
-              <Link className={styles.primaryBtn} to="/start-here/first-governed-workflow">
-                Get Started (5 min) →
-              </Link>
-              <Link className={styles.secondaryBtn} to="/concepts">
-                Core Concepts
-              </Link>
-              <Link className={styles.secondaryBtn} to="/reference/cli">
-                CLI Reference (54 Verbs)
-              </Link>
-            </div>
-          </div>
+      {/* 1. Full-Screen Custom Hero Section */}
+      <AmberHero />
 
-          <div className={styles.heroTerminal}>
-            <div className={styles.terminalHeader}>
-              <span className={`${styles.terminalDot} ${styles.dotRed}`} />
-              <span className={`${styles.terminalDot} ${styles.dotYellow}`} />
-              <span className={`${styles.terminalDot} ${styles.dotGreen}`} />
-              <span className={styles.terminalTitle}>amber-governance-terminal</span>
-            </div>
-            <div className={styles.terminalBody}>
-              <div className={styles.terminalLine}>
-                <span className={styles.terminalPrompt}>$</span>
-                <span className={styles.terminalCmd}>amber audit --target .</span>
-                <div className={`${styles.terminalOutput} ${styles.terminalSuccess}`}>
-                  ✅ Target repository classified (readiness: 100%)
-                </div>
-              </div>
-              <div className={styles.terminalLine}>
-                <span className={styles.terminalPrompt}>$</span>
-                <span className={styles.terminalCmd}>amber doctor --target .</span>
-                <div className={`${styles.terminalOutput} ${styles.terminalSuccess}`}>
-                  ✅ 0 errors, 0 warnings. Guardrails verified.
-                </div>
-              </div>
-              <div className={styles.terminalLine}>
-                <span className={styles.terminalPrompt}>$</span>
-                <span className={styles.terminalCmd}>
-                  amber session start --goal &quot;Feature delivery&quot; --target .
-                </span>
-                <div className={styles.terminalOutput}>
-                  Session initialized with ID s-20260901-a1b2. Active timeline registered.
-                </div>
-              </div>
-              <div className={styles.terminalLine}>
-                <span className={styles.terminalPrompt}>$</span>
-                <span className={styles.terminalCmd}>amber next --target .</span>
-                <div className={`${styles.terminalOutput} ${styles.terminalSuccess}`}>
-                  👉 Recommended: amber plan --feature F024 --title &quot;Docs Site&quot;
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Pillars Grid */}
       <main>
+        {/* 2. Interactive Product Data Flow Section */}
+        <section className={styles.section} style={{ paddingTop: '4rem', paddingBottom: '2rem' }}>
+          <DataFlowDiagram />
+        </section>
+
+        {/* 3. Core Architecture Pillars */}
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
             <div className={styles.sectionBadge}>Core Architecture</div>
@@ -196,7 +129,7 @@ export default function Home(): React.JSX.Element {
           </div>
         </section>
 
-        {/* Five-Stage Governed Lifecycle */}
+        {/* 4. Five-Stage Governed Lifecycle Loop */}
         <section className={styles.workflowSection}>
           <div className={styles.workflowContainer}>
             <div className={styles.sectionHeader}>
@@ -221,7 +154,7 @@ export default function Home(): React.JSX.Element {
           </div>
         </section>
 
-        {/* Bottom CTA Banner */}
+        {/* 5. Bottom CTA Banner */}
         <section className={styles.section}>
           <div className={styles.ctaBanner}>
             <h2 className={styles.ctaTitle}>Ready to Govern Your AI-Assisted Workflows?</h2>
