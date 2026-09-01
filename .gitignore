@@ -15,6 +15,7 @@ build/
 .parcel-cache/
 .turbo/
 .vite/
+.docusaurus/
 *.tsbuildinfo
 
 # Local Harness and Amber runtime state

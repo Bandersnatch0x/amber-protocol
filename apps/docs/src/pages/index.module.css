@@ -1,0 +1,410 @@
+/* Amber Protocol Landing Page Styles */
+
+.heroSection {
+  position: relative;
+  overflow: hidden;
+  padding: 5rem 1.5rem 4rem;
+  background: radial-gradient(circle at 50% 20%, rgba(245, 158, 11, 0.08) 0%, rgba(15, 23, 42, 0) 70%),
+              linear-gradient(180deg, var(--amber-bg-primary) 0%, var(--amber-bg-secondary) 100%);
+  border-bottom: 1px solid var(--amber-border);
+}
+
+.heroContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+@media (max-width: 996px) {
+  .heroContainer {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 2.5rem;
+  }
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 9999px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--amber-500);
+  margin-bottom: 1.25rem;
+  letter-spacing: 0.02em;
+}
+
+.heroBadgeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--amber-500);
+  box-shadow: 0 0 8px var(--amber-500);
+}
+
+.heroTitle {
+  font-size: 2.75rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.03em;
+  color: var(--amber-text-primary);
+}
+
+.heroHighlight {
+  background: linear-gradient(135deg, var(--amber-400) 0%, var(--amber-600) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.heroSubtitle {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--amber-text-secondary);
+  margin-bottom: 2rem;
+  max-width: 540px;
+}
+
+@media (max-width: 996px) {
+  .heroSubtitle {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+@media (max-width: 996px) {
+  .heroActions {
+    justify-content: center;
+  }
+}
+
+.primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--amber-500) 0%, var(--amber-600) 100%);
+  color: #0f172a !important;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none !important;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+}
+
+.primaryBtn:hover {
+  background: linear-gradient(135deg, var(--amber-400) 0%, var(--amber-500) 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45);
+}
+
+.secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--amber-bg-surface);
+  color: var(--amber-text-primary) !important;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.35rem;
+  border-radius: 8px;
+  border: 1px solid var(--amber-border);
+  text-decoration: none !important;
+  transition: all 0.2s ease;
+}
+
+.secondaryBtn:hover {
+  border-color: var(--amber-500);
+  background: rgba(245, 158, 11, 0.08);
+  transform: translateY(-1px);
+}
+
+.heroTerminal {
+  background: #090d16;
+  border: 1px solid var(--amber-border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(245, 158, 11, 0.05);
+}
+
+.terminalHeader {
+  background: #0d131f;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--amber-border);
+}
+
+.terminalDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dotRed { background-color: #ef4444; }
+.dotYellow { background-color: #f59e0b; }
+.dotGreen { background-color: #10b981; }
+
+.terminalTitle {
+  font-size: 0.75rem;
+  font-family: var(--ifm-font-family-monospace);
+  color: var(--amber-text-muted);
+  margin-left: auto;
+}
+
+.terminalBody {
+  padding: 1.25rem 1.25rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.terminalLine {
+  margin-bottom: 0.75rem;
+}
+
+.terminalLine:last-child {
+  margin-bottom: 0;
+}
+
+.terminalPrompt {
+  color: var(--amber-500);
+  font-weight: bold;
+  margin-right: 0.5rem;
+}
+
+.terminalCmd {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.terminalOutput {
+  color: #94a3b8;
+  margin-top: 0.2rem;
+  padding-left: 1.25rem;
+  font-size: 0.8rem;
+}
+
+.terminalSuccess {
+  color: #10b981;
+}
+
+/* Pillars Section */
+.section {
+  padding: 5rem 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.sectionHeader {
+  text-align: center;
+  margin-bottom: 3.5rem;
+}
+
+.sectionBadge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--amber-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.sectionTitle {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+  color: var(--amber-text-primary);
+}
+
+.sectionSubtitle {
+  font-size: 1.05rem;
+  color: var(--amber-text-secondary);
+  max-width: 650px;
+  margin: 0 auto;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 996px) {
+  .grid3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: var(--amber-bg-surface);
+  border: 1px solid var(--amber-border);
+  border-radius: 12px;
+  padding: 1.75rem;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.card:hover {
+  border-color: var(--amber-500);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.cardIcon {
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.cardTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: var(--amber-text-primary);
+}
+
+.cardBody {
+  font-size: 0.925rem;
+  line-height: 1.55;
+  color: var(--amber-text-secondary);
+  flex-grow: 1;
+}
+
+.cardLink {
+  margin-top: 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--amber-500);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cardLink:hover {
+  text-decoration: underline;
+}
+
+/* Workflow Stage Section */
+.workflowSection {
+  background: var(--amber-bg-secondary);
+  border-top: 1px solid var(--amber-border);
+  border-bottom: 1px solid var(--amber-border);
+  padding: 5rem 1.5rem;
+}
+
+.workflowContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.timelineGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+@media (max-width: 996px) {
+  .timelineGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.timelineItem {
+  background: var(--amber-bg-surface);
+  border: 1px solid var(--amber-border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  position: relative;
+}
+
+.timelineStep {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--amber-500);
+  margin-bottom: 0.5rem;
+}
+
+.timelineTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--amber-text-primary);
+}
+
+.timelineCode {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.775rem;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--amber-400);
+  margin-bottom: 0.5rem;
+  display: inline-block;
+}
+
+.timelineDesc {
+  font-size: 0.85rem;
+  color: var(--amber-text-secondary);
+  line-height: 1.45;
+}
+
+/* CTA Banner */
+.ctaBanner {
+  background: radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0) 70%),
+              var(--amber-bg-surface);
+  border: 1px solid var(--amber-border);
+  border-radius: 16px;
+  padding: 4rem 2rem;
+  text-align: center;
+  margin: 4rem auto;
+  max-width: 1100px;
+}
+
+.ctaTitle {
+  font-size: 2.25rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: var(--amber-text-primary);
+}
+
+.ctaDesc {
+  font-size: 1.1rem;
+  color: var(--amber-text-secondary);
+  max-width: 600px;
+  margin: 0 auto 2rem;
+}

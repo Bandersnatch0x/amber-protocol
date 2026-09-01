@@ -1,5 +1,7 @@
 # Amber Protocol 快速开始
 
+> **Notice**: For the curated public documentation and the official First Governed Workflow, see the [Public Documentation Site](../../apps/docs/docs/start-here/index.md).
+
 Amber Protocol is a repository-local governance and control layer for agent-assisted engineering. It provides installation, auditing, validation, and maintenance capabilities for project files that help agents understand codebases, track feature state, and hand off work cleanly.
 
 ## Installation

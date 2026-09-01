@@ -50,6 +50,8 @@ const ALLOWLIST = [
 	"tests/amber-cli.test.js", // shim-forwarding subtest spawns legacy entrypoints
 	"package.json", // legacy bin alias
 	"package-lock.json",
+	"apps/web/package-lock.json",
+	"apps/docs/package-lock.json",
 	"correctness-review.md",
 	"correctness-review-round2.md",
 	"maintainability-review.md",
@@ -116,13 +118,15 @@ function* walk(dir) {
 	for (const entry of entries) {
 		const full = path.join(dir, entry.name);
 		if (entry.isDirectory()) {
-			// Skip generated/build output: .next embeds absolute paths that
+			// Skip generated/build output: .next and .docusaurus embed absolute paths that
 			// legitimately contain the on-disk repo folder name.
 			if (
 				entry.name === "node_modules" ||
 				entry.name === ".git" ||
 				entry.name === ".tmp" ||
 				entry.name === ".next" ||
+				entry.name === ".docusaurus" ||
+				entry.name === "build" ||
 				entry.name === "dist" ||
 				entry.name === "coverage"
 			)

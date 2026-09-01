@@ -14,6 +14,7 @@ export default [
 		ignores: [
 			"node_modules/",
 			"apps/web/",
+			"apps/docs/",
 			"coverage/",
 			"tests/fixtures/",
 			"templates/",
