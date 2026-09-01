@@ -1,7 +1,7 @@
 # ADR-0020: Governed Live Git Transport for the Sync Runtime
 
 **Status:** Accepted (2026-08-25 — the five open questions adjudicated by the repository owner; see
-"Adjudicated decisions" below)
+"Adjudicated decisions" below). Terminology correction recorded 2026-09-01 below.
 **Date:** 2026-08-25
 **Builds on:** [ADR-0001](0001-governance-first-artifact-first.md) (governance-first, artifact-first),
 [ADR-0003](0003-governance-gated-execution.md) (the five governed-execution preconditions),
@@ -124,13 +124,16 @@ five preconditions:
    they are local-only and never shared). This gate is genuinely weaker than worktree isolation and
    must be tested
    adversarially (dirty-tree mix-ins, pre-staged index, symlinked sync paths) before Stage A ships.
-5. **Recorded (execution evidence).** Every attempt — denied, unapproved, executed, failed —
-   appends to a tamper-evident hash-chain ledger in the loop-ledger family, recording the approval
-   key consumed, the proposed-ops fingerprint (envelope ids + affected paths from the preparation
-   report), the git exit codes, captured stderr, and the resulting commit sha. Evidence kind: a
-   `transport-record`, booked like every other evidence artifact. That enumeration is exhaustive
-   for attempt records (the ledger also carries `downgraded` and `approved` records):
-   an `APPROVAL_REQUIRED` exit (the identity gate's non-TTY refusal, or the F019-shaped
+5. **Recorded (execution evidence).** Every attempt — denied or executed, including a failed Stage A
+   git operation — appends to a tamper-evident hash-chain ledger in the loop-ledger family, recording the
+   approval key consumed, the proposed-ops fingerprint (envelope ids + affected paths from the
+   preparation report), the git exit codes, captured stderr, and the resulting commit sha. Evidence
+   kind: a `transport-record`, booked like every other evidence artifact. Attempt outcomes use the
+   existing `denied` and `executed` record kinds: an approval-gate refusal is `kind: "denied"` with
+   `gate: "approval"`, while a failed Stage A git operation is `kind: "executed"` with
+   `stopReason: "commit-failed"`. The ledger also carries `approved`, `downgraded`, and
+   `transport-decision` records. *(Corrected 2026-09-01 — see the identity-gate correction below.)*
+   An `APPROVAL_REQUIRED` exit (the identity gate's non-TTY refusal, or the F019-shaped
    `approvalRequired` envelope on a TTY) is an authorization inquiry *before* an attempt exists
    and is deliberately not a ledger record class.
 
@@ -285,9 +288,9 @@ identity (non-TTY without `--yes` fails closed; TTY without `--yes` gets the F01
 lines) → single-use approval (`amber sync session approve --reviewer <name>`, loop-ledger shape,
 `latestUnconsumedApproval`) → path-and-state confinement (pre-staged index refuses — `git commit`
 commits the whole index; every staged path must realpath inside the repository) → execution gates,
-with every attempt (denied, unapproved, executed, failed — the identity gate's `APPROVAL_REQUIRED`
-exits precede an attempt and are not ledgered, per gate item 5) appended to the hash-chained
-transport ledger
+with every attempt (denied or executed, including failed Stage A git operations — the identity gate's
+`APPROVAL_REQUIRED` exits precede an attempt and are not ledgered, per gate item 5) appended to the
+hash-chained transport ledger
 (`.amber/sync/transport/ledger.jsonl`, never itself staged). Execution stages exactly
 `.amber/sync/envelopes` + `.amber/sync/transport/decisions` (decision records at
 `.amber/sync/transport/decisions/<batchId>.json`), commits with the derived message, records the
@@ -295,6 +298,24 @@ sha, and maps nothing-to-commit to a typed idempotent outcome. `git push` is nev
 evaluated, or proposed by the executing path — Stage B remains unimplemented and requires its own
 accepted decision. The default `push` (no `--execute`) stays the byte-compatible report-only
 preparation.
+
+## Correction (2026-09-01) — identity-gate accounting and record vocabulary
+
+The original wording in gate item 5 and the Stage A summary used `unapproved` and `failed` as if
+they were transport-ledger `kind` values. They are conceptual outcomes, not record kinds emitted by
+the shipped implementation. The implementation records an approval-gate refusal as
+`kind: "denied"` with `gate: "approval"`, and a failed Stage A git operation as `kind: "executed"` with
+`stopReason: "commit-failed"`; the other existing kinds are `approved`, `downgraded`, and
+`transport-decision`.
+
+The #296 adjudication keeps the accepted boundary unchanged (**D1**): both identity-gate exits
+remain pre-attempt authorization inquiries and are deliberately not appended to the transport
+ledger. If future incident evidence reopens that decision, the record shape is fixed in advance
+(**D2**): use the existing `denied` kind with `gate: "identity"`, not a new record kind. The
+terminology repair itself is (**D3**): describe approval refusal as `denied` + `gate: "approval"`
+and commit failure as `executed` + `stopReason: "commit-failed"`, rather than inventing
+`unapproved` or `failed` kinds. No schema, code, or gate behavior changes in this correction; it
+makes the ADR's vocabulary match the implementation.
 
 ## Related
 
