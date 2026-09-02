@@ -276,14 +276,14 @@ test("F059 git-archive clean clone: projection and tree-reader produce exact byt
 			treeBytes,
 			"projection and tree-reader must produce byte-identical output on clean archive",
 		);
-		// Exactly 47 nodes must have contextPage. This reads `git archive HEAD`,
-		// not the working tree, so it stays at 47 until ADR-0029 is committed —
-		// bump it to 48 in the same commit that lands the ADR.
+		// Exactly 48 nodes must have contextPage. This reads `git archive HEAD`,
+		// not the working tree — ADR-0029 landed in af40ef9, so the committed
+		// corpus is 48 and the two counts agree again.
 		const withContextPage = projGraph.nodes.filter((n) => n.contextPage);
 		assert.equal(
 			withContextPage.length,
-			47,
-			"exactly 47 nodes must have contextPage on clean archive",
+			48,
+			"exactly 48 nodes must have contextPage on clean archive",
 		);
 	} finally {
 		fs.rmSync(archiveDir, { recursive: true, force: true });

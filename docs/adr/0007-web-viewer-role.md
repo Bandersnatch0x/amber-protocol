@@ -153,6 +153,14 @@ inline. Its contract is now:
   and executes in a background evidence job (`server/services/evidence-jobs.ts`).
 - `lifecycle.verificationJob({ jobId })` polls the job:
   `{ jobId, status: 'pending'|'running'|'denied'|'completed'|'failed'|'timeout', result?, error? }`.
+
+> **F062 boundary amendment (2026-09-02):** `runVerification` refuses any session whose Route
+> contains `verb` stages (`BAD_REQUEST`, pointing at `amber session run`/`session settle`) before
+> any job is created. Reason: this mutation writes `manifest.completedStages` directly
+> (`persistCompletedStage`), which on a verb route would diverge the projection from the
+> ledger-owned cursor — the same refusal the CLI's legacy verify guard applies
+> (`scripts/lib/session-commands.js`). Found by the F062 compliance audit (spec-compliance/,
+> REQ-09/REQ-13, 2026-09-02).
 - Job transitions broadcast the SSE event `evidence-job-changed`
   (`{ type, sessionId, jobId, status, timestamp }`), defined in
   `server/types/session-events.ts`.

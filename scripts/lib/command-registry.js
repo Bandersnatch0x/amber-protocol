@@ -206,7 +206,7 @@ const COMMAND_HELP = {
 		"  amber route test bugfix-quick --dry-run",
 	],
 	session: [
-		"Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, run, settle.",
+		"Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, lease, run, settle.",
 		"",
 		"Subcommands:",
 		'  start --goal "..." [--route <id>] [--budget <n>] [--worktree] [--mode interactive]',
@@ -228,9 +228,12 @@ const COMMAND_HELP = {
 		"      With --execute, runs --command and records the real exit code.",
 		"  approve --session <id> [--gate <gate-id>]",
 		"      Record a gate_passed event so complete-check sees approval evidence.",
+		"  lease --session <id> --owner-id <agent> --token-hash <hash>",
+		"      Reacquire the session lease for the current owner: a fresh token and a",
+		"      new fence (explicit, owner-bound; ADR-0029 §8.1).",
 		"  run --session <id> [--dry-run|--execute]",
 		"      Execute the current verb stage (F062). Dry-run resolves without executing.",
-		"  settle --session <id> --request-id <id> --result <status>",
+		"  settle --session <id> --request-id <id> --attempt-id <id> --request-hash <hash> --result <json>",
 		"      Settle a pending host-agent request and advance the cursor on success.",
 		"",
 		"Session completion flow:",
@@ -265,7 +268,7 @@ const COMMAND_HELP = {
 		"  amber session verify --session <session-id> --confirm",
 		"  amber session approve --session <session-id>",
 		"  amber session run --session <session-id> --dry-run",
-		"  amber session settle --session <session-id> --request-id <id> --result succeeded",
+		"  amber session settle --session <session-id> --request-id <id> --attempt-id <id> --request-hash <hash> --result '{\"status\":\"succeeded\"}'",
 	],
 	migrate: [
 		"Backfill version metadata in recognized Amber JSON artifacts, or migrate",
@@ -1861,7 +1864,7 @@ const COMMAND_OUTPUT = {
 	},
 	session: {
 		usage:
-			"Usage: amber session <start|status|list|abort|continue|complete-check|verify|approve|verify-ledger> [--target <repo>] [--session <id>] [--goal <goal>] [--json]",
+			"Usage: amber session <start|status|list|abort|continue|complete-check|verify|approve|verify-ledger|lease|run|settle> [--target <repo>] [--session <id>] [--goal <goal>] [--json]",
 	},
 	status: { usage: "Usage: amber status --target <repo> [--json]" },
 	drift: {

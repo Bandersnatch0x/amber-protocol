@@ -165,6 +165,18 @@ failure refuses the operation. No command silently transfers an expired Session 
 renewal/reacquisition is explicit, owner-bound, and creates a new fence. A request carrying an older
 fence can never settle a newer attempt.
 
+> **Implementation amendment (2026-09-02):** the proof of ownership is the token's SHA-256 digest
+> (the CLI `--token-hash` flag), not the raw token — the operator receives the raw token once,
+> hashes it, and presents the digest, which is compared against the persisted `tokenHash`. This is
+> a deliberate reading of "present the lease token": under the threat model where any process that
+> can read `.amber/` is already trusted (the state directory is Amber-governed repository state),
+> a raw-token round trip buys no additional security over digest equality, and the digest form
+> never places raw token material in a shell argument's process listing twice. Reacquisition is
+> implemented as `amber session lease --session <id> --owner-id <agent> --token-hash <digest>`:
+> owner-bound, minting a fresh token and fence + 1 for the same session. Dry-run `run` takes no
+> lock and verifies no lease — it is a read-only resolution (see the code comment at
+> `session-stage-runner.js`, "Dry-run projects the lease it WOULD run under").
+
 #### 8.2 The one cursor
 
 The canonical cursor is the ordered prefix of the selected, version-pinned Route in the Session
@@ -233,6 +245,16 @@ projection. Bounded execution and its settlement continue to use the existing `.
 ledger; Evidence receipts continue to use `.amber/evidence/`. No Work Item or parallel attempt tree
 is introduced. Timeline entries are observability projections and carry the request/attempt hash;
 they are never a second cursor.
+
+> **Implementation amendment (2026-09-02):** the executed-record placement above is inaccurate
+> against the measured baseline. `governed-runner` has never had a `.amber/executions/` home — its
+> `ledgerPath` is always caller-supplied, and `.amber/executions/` is the agent-orchestration
+> task-execution tree. For a session's bounded named command, the `executed` record lands in the
+> **session ledger** (`.amber/sessions/<id>/ledger.jsonl`), which is also the only self-consistent
+> placement: approval consumption is per-ledger (`latestUnconsumedApproval`), so the approval and
+> its consumption must share one hash chain. The records stay durable, hash-chained, and fully
+> correlated with the settled event via requestId/attemptId/evidenceId/outputDigest; the
+> compliance audit that caught this is `spec-compliance/` (2026-09-02, REQ-12).
 
 The commit order is: acquire/verify the lease lock; append the immutable request event; perform or
 return the attempt; record the Evidence receipt and any F052 execution settlement; append the

@@ -297,6 +297,36 @@ describe('lifecycleRouter', () => {
     ]);
   });
 
+  it('refuses verification on a route containing verb stages (F062 governed cursor)', async () => {
+    // Overwrite the seeded route with one containing a verb stage: the web
+    // verification surface writes manifest.completedStages directly
+    // (persistCompletedStage), which would diverge the projection from the
+    // ledger-owned verb cursor. The refusal is route-level, mirroring the
+    // CLI's legacy verify guard in scripts/lib/session-commands.js.
+    writeJson(path.join(repoRoot, 'routes', 'feature-standard.route.json'), {
+      routeId: 'feature-standard',
+      version: '1.0.0',
+      displayName: 'Verb Route',
+      description: 'Test route with a verb stage',
+      stages: [
+        {
+          name: 'check',
+          displayName: 'Check',
+          type: 'verb',
+          target: 'runner/ci@1.0.0#diagnose.check@1',
+        },
+      ],
+    });
+
+    await expect(caller.runVerification({ sessionId: 'session-1' })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('verb stages'),
+    });
+    // Nothing was written: no manifest projection change, no ledger record.
+    expect(readManifest('session-1').completedStages).toEqual([]);
+    expect(readLedger('session-1')).toEqual([]);
+  });
+
   it('persists the job result under .amber/tmp so an SSE disconnect cannot lose it', async () => {
     const accepted = await caller.runVerification({ sessionId: 'session-1' });
     const jobId = acceptedJobId(accepted);

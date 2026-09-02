@@ -12,6 +12,8 @@ const {
 	runGovernedCommand,
 } = require("../../scripts/lib/core/governed-runner");
 const { appendLedgerRecord, readLedger } = require("../../scripts/lib/core/loop-ledger");
+const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
+const { showEvidence } = require("../../scripts/lib/core/evidence-receipts");
 
 function tempTarget(label) {
 	return fs.mkdtempSync(path.join(os.tmpdir(), `amber-governed-${label}-`));
@@ -148,5 +150,52 @@ test("named command execution records commandId and matchedRule in the result an
 	assert.equal(result.ledgerRecord.commandId, rule.id);
 	assert.equal(result.ledgerRecord.action.command, rule.pattern);
 	assert.equal(readLedger(ledgerPath).at(-1).matchedRule, rule.id);
+	fs.rmSync(target, { recursive: true, force: true });
+});
+
+// Spec F062 Testing Decisions: "A run produces an Evidence receipt carrying an
+// output digest | traces to decision 5". A real git repo, a real named-command
+// execution, and the receipt read back from disk — not an in-memory claim.
+test("a named-command run produces an Evidence receipt carrying an output digest", () => {
+	const rule = {
+		id: "allow-node-version",
+		action: "allow",
+		match: "exact",
+		pattern: "node --version",
+	};
+	const target = gitTarget("evidence-digest", highConfidenceRules(rule));
+	registerPrincipal(target, { id: "ci@example.com", principalKind: "human" });
+
+	const ledgerPath = path.join(target, ".amber", "loops", "evidence-digest", "ledger.jsonl");
+	appendLedgerRecord(ledgerPath, { kind: "approved", approvalKey: "evidence-digest:approval" });
+	const result = runGovernedCommand({
+		target,
+		commandId: rule.id,
+		ledgerPath,
+		label: "evidence-digest",
+		producer: "ci@example.com",
+		evidenceId: "evidence/named/att-1",
+		capabilityPin: "runner/ci@1.0.0#diagnose.check@1",
+		requestId: "req-1",
+		attemptId: "att-1",
+	});
+
+	assert.deepEqual(result.errors, [], JSON.stringify(result));
+	assert.equal(result.executed, true);
+	assert.ok(result.evidence, "an Evidence receipt is bound to the run");
+	assert.match(result.outputDigest, /^sha256:[0-9a-f]{64}$/);
+
+	// The receipt persists under .amber/evidence/ with the digest.
+	const receipt = showEvidence(target, "evidence/named/att-1");
+	assert.ok(receipt, "the receipt exists on disk");
+	assert.match(receipt.outputDigest, /^sha256:[0-9a-f]{64}$/);
+	assert.equal(receipt.assurance, "replayable");
+	assert.equal(receipt.replayOf, "governed.named-command:node --version");
+
+	// The executed ledger record carries the digest and evidence id.
+	const executed = readLedger(ledgerPath).at(-1);
+	assert.equal(executed.kind, "executed");
+	assert.match(executed.outputDigest, /^sha256:[0-9a-f]{64}$/);
+	assert.equal(executed.evidenceId, "evidence/named/att-1");
 	fs.rmSync(target, { recursive: true, force: true });
 });

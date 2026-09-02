@@ -15,16 +15,42 @@
 			"required": true,
 			"description": "Request ID to settle."
 		},
+		"attemptId": {
+			"type": "string",
+			"required": true,
+			"description": "The pending request's own attempt id; a settlement binds one exact attempt."
+		},
+		"requestHash": {
+			"type": "string",
+			"required": true,
+			"description": "The pending request's idempotency key, binding the settlement to one exact request."
+		},
 		"result": {
 			"type": "string",
 			"required": true,
-			"description": "Settlement status (succeeded, failed, cancelled, unknown, timed_out, rejected)."
+			"description": "Settlement result as a JSON object with a closed status (succeeded, skipped, failed, cancelled, unknown, timed_out, rejected)."
+		},
+		"ownerId": {
+			"type": "string",
+			"required": true,
+			"description": "Lease owner (agentId); only the owner that created the request may settle it."
+		},
+		"tokenHash": {
+			"type": "string",
+			"required": true,
+			"description": "SHA-256 digest of the current lease token."
+		},
+		"leaseFence": {
+			"type": "string",
+			"required": true,
+			"description": "Current lease fence; a request carrying an older fence can never settle."
 		}
 	},
 	"submissionCriteria": [
 		"session exists and is active",
 		"request exists and is pending",
-		"result is a valid settlement status"
+		"attemptId, requestHash, ownerId, tokenHash, and leaseFence match the pending request and current lease",
+		"result is a valid closed-contract settlement JSON"
 	],
 	"effects": {
 		"edits": [
@@ -50,7 +76,12 @@
 		"args": [
 			{ "flag": "--session", "source": "parameters.sessionId" },
 			{ "flag": "--request-id", "source": "parameters.requestId" },
-			{ "flag": "--result", "source": "parameters.result" }
+			{ "flag": "--attempt-id", "source": "parameters.attemptId" },
+			{ "flag": "--request-hash", "source": "parameters.requestHash" },
+			{ "flag": "--result", "source": "parameters.result" },
+			{ "flag": "--owner-id", "source": "parameters.ownerId" },
+			{ "flag": "--token-hash", "source": "parameters.tokenHash" },
+			{ "flag": "--lease-fence", "source": "parameters.leaseFence" }
 		]
 	}
 }

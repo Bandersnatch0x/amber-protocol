@@ -112,6 +112,15 @@ const CATALOG = {
 		layer: "Execution",
 		related: ["AMBER_E_STAGE_ADAPTER_UNAVAILABLE"],
 	},
+	AMBER_E_EVIDENCE_MISSING: {
+		title: "Execution succeeded but no Evidence receipt was recorded",
+		cause:
+			"A governed named-command execution exited 0, but its Evidence receipt could not be recorded (for example, the producing principal is not registered, or the evidence ledger is unavailable). A succeeded settlement requires a valid Evidence binding, so the attempt settles as failed rather than advancing without proof.",
+		remedy:
+			"Register the producing principal (`amber principal register`) and confirm `.amber/evidence/` is writable, then re-run the stage — the retry mints a fresh attempt and a fresh receipt.",
+		layer: "Verification",
+		related: ["AMBER_E_STAGE_ADAPTER_UNAVAILABLE"],
+	},
 	AMBER_E_CONFIDENCE_GATE: {
 		title: "Command blocked by confidence gate",
 		cause:

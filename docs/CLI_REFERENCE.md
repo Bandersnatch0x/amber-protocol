@@ -222,6 +222,10 @@ node scripts/amber.js session verify-ledger --session <id>                      
 `verify-ledger` recomputes the session ledger's hash chain and reports `AMBER_E_LEDGER_TAMPERED` on
 any broken link.
 
+For a Route containing `verb` stages, `session verify` refuses outright and points at
+`session run`/`session settle`: the verb cursor advances only through the governed seam, and a
+legacy verify write to `completedStages` would corrupt its contiguous-prefix invariant (F062).
+
 ### session run / settle
 
 Advance a session by at most one `verb` stage ([F062](specs/F062-route-stage-verbs-named-commands.md),
@@ -237,14 +241,26 @@ node scripts/amber.js session run --session <id> --execute \
   --owner-id <agent> --token-hash <sha256> --lease-fence <n> --yes --target .
 
 # settle a pending host-agent request; only `succeeded` with an Evidence id advances the cursor.
+# The settlement binds one exact attempt: --attempt-id and --request-hash must match the
+# request returned by `session run` (the request hash is its idempotency key).
 node scripts/amber.js session settle --session <id> --request-id <request> \
+  --attempt-id <attempt> --request-hash <hash> \
   --result '{"status":"succeeded","exitCode":0,"evidenceId":"evidence/<id>"}' \
   --owner-id <agent> --token-hash <sha256> --lease-fence <n> --yes --target .
 ```
 
-The caller supplies only session identity, lease proof, and dry-run/execute intent. There is no
-`--stage`, `--target-capability`, `--command`, or provider selector: stage selection, capability
-resolution, and adapter choice all come from the session's own state.
+The caller supplies only session identity, the pending request's own binding (request id, attempt
+id, request hash), lease proof, and dry-run/execute intent. There is no `--stage`,
+`--target-capability`, `--command`, or provider selector: passing `--stage` or `--command` to
+`session run`/`session settle` is refused — stage selection, capability resolution, and adapter
+choice all come from the session's own state.
+
+A lease is minted by `amber session start --agent <id>`: the raw token is printed exactly once and
+never stored — only its SHA-256 digest reaches the manifest. Compute the digest and pass it as
+`--token-hash` within the lease's five-minute window. When the window passes, the owner reacquires
+explicitly — `amber session lease --session <id> --owner-id <agent> --token-hash <digest> --yes`
+mints a fresh token and a new fence for the same session; a request created under an older fence
+can never settle.
 
 `--result` statuses are `succeeded | skipped | failed | cancelled | unknown | timed_out | rejected`.
 Only `succeeded` (with an Evidence binding) — or `skipped` on a stage declared `optional` — advances

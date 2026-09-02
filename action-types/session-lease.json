@@ -1,0 +1,54 @@
+{
+	"actionTypeId": "amber.session.lease",
+	"version": 1,
+	"title": "Reacquire session lease",
+	"goal": "Reacquire the session lease for the current owner, minting a fresh token and a new fence (ADR-0029 §8.1).",
+	"mode": "interactive",
+	"parameters": {
+		"sessionId": {
+			"type": "string",
+			"required": true,
+			"description": "Session ID whose lease is reacquired."
+		},
+		"ownerId": {
+			"type": "string",
+			"required": true,
+			"description": "Current lease owner (agentId); reacquisition is owner-bound."
+		},
+		"tokenHash": {
+			"type": "string",
+			"required": true,
+			"description": "SHA-256 digest of the current lease token, proving current ownership (may be expired)."
+		}
+	},
+	"submissionCriteria": [
+		"session exists and is not terminal",
+		"ownerId and tokenHash match the current lease owner and digest"
+	],
+	"effects": {
+		"edits": [
+			".amber/sessions/<id>/manifest.json",
+			".amber/sessions/<id>/timeline.jsonl"
+		],
+		"sideEffects": ["timeline-event"],
+		"rollback": false
+	},
+	"evidenceRequired": [],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#session-lease",
+		"approver": ["system"],
+		"evidence": [],
+		"circuitBreaker": true,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "session",
+		"subcommand": "lease",
+		"args": [
+			{ "flag": "--session", "source": "parameters.sessionId" },
+			{ "flag": "--owner-id", "source": "parameters.ownerId" },
+			{ "flag": "--token-hash", "source": "parameters.tokenHash" }
+		]
+	}
+}

@@ -97,6 +97,17 @@ const COMMAND_CAPABILITIES = {
 		],
 		sideEffects: ["ledger-append", "timeline-event"],
 	},
+	// `session lease` reacquires the session lease for the CURRENT owner:
+	// explicit, owner-bound, minting a fresh token and a new fence (ADR-0029
+	// §8.1). It never transfers the session to another owner.
+	"session/lease": {
+		effect: "write",
+		approver: "system",
+		evidence: null,
+		directReadOnlyExec: false,
+		edits: [".amber/sessions/<id>/manifest.json", ".amber/sessions/<id>/timeline.jsonl"],
+		sideEffects: ["timeline-event"],
+	},
 	"session/status": {
 		effect: "read",
 		approver: "system",

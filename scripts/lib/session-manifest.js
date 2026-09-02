@@ -2,7 +2,6 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { SCHEMA_VERSION } = require("./schema-version-checker");
-const { writeJson } = require("./core/fs-utils");
 const { compileSchema } = require("./core/schema-contract");
 
 // Compiled at module scope so a broken schema install throws at require time,
@@ -94,9 +93,28 @@ function readAllSessionManifests(sessionsDir) {
 // hand-rolled `fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2))`
 // that 5 call sites used (bypassing writeJson). Does not mutate the input.
 // Returns the persisted manifest.
+//
+// The write is temp+rename so a crash mid-write can never leave a half-written
+// manifest — F062's projection refresh is specified as atomic ("atomically
+// refresh manifest and timeline projections").
 function writeSessionManifest(sessionDir, manifest) {
 	const persisted = { ...manifest, updatedAt: new Date(monotonicNowMs()).toISOString() };
-	writeJson(path.join(sessionDir, "manifest.json"), persisted);
+	const manifestPath = path.join(sessionDir, "manifest.json");
+	const tempPath = `${manifestPath}.${process.pid}.${Date.now()}.tmp`;
+	// The replaced writeJson created the directory; keep that contract or a
+	// first write into a fresh session dir ENOENTs on the temp file.
+	fs.mkdirSync(sessionDir, { recursive: true });
+	fs.writeFileSync(tempPath, JSON.stringify(persisted, null, 2));
+	try {
+		fs.renameSync(tempPath, manifestPath);
+	} catch (error) {
+		try {
+			fs.unlinkSync(tempPath);
+		} catch {
+			// the temp name is already gone
+		}
+		throw error;
+	}
 	return persisted;
 }
 

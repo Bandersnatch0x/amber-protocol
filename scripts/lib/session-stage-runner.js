@@ -25,6 +25,7 @@ const { loadTargetRoutes } = require("./route-loader");
 const { acquireLock, releaseLock } = require("./session-lock");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
 const { appendLedgerRecord, readLedger, verifyLedgerChain, latestUnconsumedApproval } = require("./core/loop-ledger");
+const { showEvidence } = require("./core/evidence-receipts");
 const { runGovernedCommand } = require("./core/governed-runner");
 const { codedError } = require("./core/error-catalog");
 
@@ -78,13 +79,18 @@ function lookupAdapter(capabilityPin) {
 }
 
 // Test-only seam. The frozen-at-review table cannot be mutated through any CLI
-// flag, Route file, or target-repository state; tests swap it wholesale and
-// restore the pristine constant afterwards. Nothing outside this module's test
-// suite calls this.
+// flag, Route file, or target-repository state; tests swap it wholesale and the
+// returned closure restores whatever was installed before the swap. Nothing
+// outside this module's test suite calls this.
 const PRISTINE_ADAPTER_TABLE = new Map(ADAPTER_TABLE);
 function _setAdapterTableForTest(entries) {
+	const previous = new Map(ADAPTER_TABLE);
 	ADAPTER_TABLE.clear();
 	if (entries) for (const entry of entries) ADAPTER_TABLE.set(entry.capabilityPin, { ...entry });
+	return () => {
+		ADAPTER_TABLE.clear();
+		for (const [pin, entry] of previous) ADAPTER_TABLE.set(pin, entry);
+	};
 }
 function _restoreAdapterTableForTest() {
 	ADAPTER_TABLE.clear();
@@ -148,7 +154,7 @@ function verifyLease(manifest, claim, now = new Date()) {
 	if (lease.fence !== claim.fence) {
 		return {
 			valid: false,
-			reason: `lease fence ${claim.fence} does not match the current fence ${lease.fence}; reacquire the lease`,
+			reason: `lease fence ${claim.fence} does not match the current fence ${lease.fence}; reacquire with amber session lease --session <id> --owner-id <agent> --token-hash <current digest>`,
 		};
 	}
 	// Half-open window [acquiredAt, expiresAt).
@@ -159,7 +165,7 @@ function verifyLease(manifest, claim, now = new Date()) {
 	if (now.getTime() >= expiresAt) {
 		return {
 			valid: false,
-			reason: `lease expired at ${lease.expiresAt}; reacquisition is explicit and creates a new fence`,
+			reason: `lease expired at ${lease.expiresAt}; reacquisition is explicit and creates a new fence — amber session lease --session <id> --owner-id <agent> --token-hash <current digest>`,
 		};
 	}
 	return { valid: true, reason: null };
@@ -319,12 +325,43 @@ function resolveVerbStage(projectRoot, route, records) {
 }
 
 /**
+ * Load a session and refuse terminal ones. Shared by run and settle so the
+ * existence/corrupt/terminal refusals cannot drift between the two verbs.
+ */
+function loadActiveSession(sessionDir, sessionId) {
+	const loaded = readSessionManifest(sessionDir);
+	if (!loaded || loaded.corrupt) {
+		return { problem: fail("AMBER_E_SESSION_INCOMPLETE", `session ${sessionId} is missing or corrupt`) };
+	}
+	if (["completed", "failed", "aborted"].includes(loaded.manifest.status)) {
+		return {
+			problem: fail(
+				"AMBER_E_SESSION_INCOMPLETE",
+				`session is ${loaded.manifest.status}; a terminal session accepts no run or settle`,
+			),
+		};
+	}
+	return { manifest: loaded.manifest };
+}
+
+function leaseProblem(manifest, options) {
+	const lease = verifyLease(manifest, {
+		ownerId: options.ownerId,
+		tokenHash: options.tokenHash,
+		fence: options.leaseFence,
+	});
+	return lease.valid ? null : fail("AMBER_E_INVALID_ARG", lease.reason);
+}
+
+/**
  * Advance the Session by at most one stage.
  *
  * Dry-run resolves and returns the request without creating an attempt or
- * touching the cursor. Execute-mode requires lease proof, takes the atomic
- * session lock BEFORE any cursor read (spec write order: acquire and verify the
- * lease lock first), appends the immutable request event, dispatches to the
+ * touching the cursor (lock-free reads). Execute-mode acquires the atomic
+ * session lock FIRST, then reads state and verifies the lease while the lock is
+ * held (ADR §8.1: "acquire the existing atomic Session lock before reading or
+ * writing state; while the lock is held they verify the token hash, fence, and
+ * unexpired window"), appends the immutable request event, dispatches to the
  * resolved adapter, and (for non-host-agent providers) settles in the same call.
  *
  * @param {string} projectRoot
@@ -335,44 +372,21 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 	const execute = options.execute === true;
 	const sessionDir = sessionDirOf(projectRoot, sessionId);
 
-	const loaded = readSessionManifest(sessionDir);
-	if (!loaded || loaded.corrupt) {
-		return fail("AMBER_E_SESSION_INCOMPLETE", `session ${sessionId} is missing or corrupt`);
-	}
-	const { manifest } = loaded;
-
-	if (["completed", "failed", "aborted"].includes(manifest.status)) {
-		return fail(
-			"AMBER_E_SESSION_INCOMPLETE",
-			`session is ${manifest.status}; a terminal session accepts no run or settle`,
-		);
-	}
-
-	// Execute-mode mutates state, so it needs lease proof AND the atomic lock.
-	// Dry-run reads only and stays lock-free.
-	if (execute) {
-		const lease = verifyLease(manifest, {
-			ownerId: options.ownerId,
-			tokenHash: options.tokenHash,
-			fence: options.leaseFence,
-		});
-		if (!lease.valid) return fail("AMBER_E_INVALID_ARG", lease.reason);
-	}
-
-	const { routes } = loadTargetRoutes(projectRoot);
-	const route = routes.find((entry) => entry.routeId === manifest.route.id);
-	if (!route) {
-		return fail("AMBER_E_ROUTE_NOT_FOUND", `route ${manifest.route.id} is not defined in the target`);
-	}
-
 	if (!execute) {
+		const session = loadActiveSession(sessionDir, sessionId);
+		if (session.problem) return session.problem;
+		const { routes } = loadTargetRoutes(projectRoot);
+		const route = routes.find((entry) => entry.routeId === session.manifest.route.id);
+		if (!route) {
+			return fail("AMBER_E_ROUTE_NOT_FOUND", `route ${session.manifest.route.id} is not defined in the target`);
+		}
 		const cursorRead = readCursorLedger(sessionDir);
 		if (!cursorRead.ok) return fail("AMBER_E_LEDGER_TAMPERED", cursorRead.reason);
 		const resolved = resolveVerbStage(projectRoot, route, cursorRead.records);
 		if (resolved.problem) return resolved.problem;
 		// Dry-run projects the lease it WOULD run under, without taking the lock.
-		resolved.fence = manifest.lease?.fence ?? 0;
-		resolved.ownerId = manifest.lease?.ownerId ?? null;
+		resolved.fence = session.manifest.lease?.fence ?? 0;
+		resolved.ownerId = session.manifest.lease?.ownerId ?? null;
 		resolved.execute = false;
 		resolved.requiresApproval = resolved.adapter.providerClass === "bounded-command";
 		// Dry-run creates no attempt and never advances the cursor.
@@ -381,7 +395,7 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 			dryRun: true,
 			request: buildRequest(
 				sessionId,
-				manifest,
+				session.manifest,
 				route,
 				resolved,
 				attemptsForStage(cursorRead.records, resolved.stage.name).length + 1,
@@ -394,7 +408,17 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 	const lock = acquireLock(projectRoot, sessionId);
 	if (!lock.success) return fail("AMBER_E_INVALID_ARG", lock.error);
 	try {
-		return executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, options);
+		// State is read and the lease verified while the lock is held.
+		const session = loadActiveSession(sessionDir, sessionId);
+		if (session.problem) return session.problem;
+		const refused = leaseProblem(session.manifest, options);
+		if (refused) return refused;
+		const { routes } = loadTargetRoutes(projectRoot);
+		const route = routes.find((entry) => entry.routeId === session.manifest.route.id);
+		if (!route) {
+			return fail("AMBER_E_ROUTE_NOT_FOUND", `route ${session.manifest.route.id} is not defined in the target`);
+		}
+		return executeAttempt(projectRoot, sessionId, sessionDir, session.manifest, route, options);
 	} finally {
 		releaseLock(projectRoot, sessionId);
 	}
@@ -493,6 +517,9 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 			stage: stage.name,
 			requestId: request.requestId,
 			attemptId: request.attemptId,
+			// The timeline carries the request/attempt hash, never cursor state
+			// (spec §"Durable records and crash recovery").
+			requestHash: request.idempotencyKey,
 			capabilityPin,
 			providerClass: adapter.providerClass,
 		},
@@ -528,21 +555,60 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 		});
 		if (outcome.executed) {
 			// A real execution settles in the same call, success or failure — the
-			// request never stays pending after the command ran.
-			const settled = settleInternal(projectRoot, sessionId, sessionDir, route, request, {
-				status: outcome.exitCode === 0 ? "succeeded" : "failed",
-				exitCode: outcome.exitCode,
-				outputDigest: outcome.outputDigest ?? null,
-				evidenceId: outcome.evidence?.id ?? null,
-				stdoutPreview: outcome.stdoutTail ?? "",
-				stderrPreview: outcome.stderrTail ?? "",
-			});
-			return outcome.exitCode === 0
+			// request never stays pending after the command ran. A succeeded
+			// settlement requires Evidence (closed contract), so an execution
+			// whose receipt could not be recorded settles as failed, never as
+			// succeeded-without-Evidence.
+			const evidenceId = outcome.evidence?.id ?? null;
+			const commandExitedZero = outcome.exitCode === 0;
+			const internalSettlement = commandExitedZero
+				? evidenceId
+					? {
+							status: "succeeded",
+							exitCode: outcome.exitCode,
+							outputDigest: outcome.outputDigest ?? null,
+							evidenceId,
+							stdoutPreview: outcome.stdoutTail ?? "",
+							stderrPreview: outcome.stderrTail ?? "",
+						}
+					: {
+							status: "failed",
+							exitCode: outcome.exitCode,
+							outputDigest: outcome.outputDigest ?? null,
+							errorCode: "AMBER_E_EVIDENCE_MISSING",
+							reason:
+								"execution exited 0 but no Evidence receipt was recorded; a succeeded settlement requires a valid Evidence binding",
+							stdoutPreview: outcome.stdoutTail ?? "",
+							stderrPreview: outcome.stderrTail ?? "",
+						}
+				: {
+						status: "failed",
+						exitCode: outcome.exitCode,
+						outputDigest: outcome.outputDigest ?? null,
+						stdoutPreview: outcome.stdoutTail ?? "",
+						stderrPreview: outcome.stderrTail ?? "",
+					};
+			// The internal path runs the same closed-contract validation the
+			// CLI settle seam runs, so a durable record can never hold a shape
+			// the seam would have refused.
+			const shapeProblem = settlementProblem(internalSettlement, stage);
+			if (shapeProblem) return fail("AMBER_E_INVALID_ARG", shapeProblem);
+			const settled = settleInternal(
+				projectRoot,
+				sessionId,
+				sessionDir,
+				route,
+				request,
+				internalSettlement,
+			);
+			return commandExitedZero && evidenceId
 				? settled
 				: {
 						...settled,
 						success: false,
-						message: `Command exited ${outcome.exitCode}`,
+						message: commandExitedZero
+							? "execution exited 0 but no Evidence receipt was recorded; the attempt settles as failed"
+							: `Command exited ${outcome.exitCode}`,
 						exitCode: 1,
 					};
 		}
@@ -569,6 +635,31 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 
 // ── settle ──────────────────────────────────────────────────────────────────
 
+// The closed result field set of the settle contract (spec §"`settle` result
+// and pending lifecycle"). Anything else in a submitted result fails closed
+// rather than being silently dropped.
+const CLOSED_RESULT_FIELDS = Object.freeze([
+	"status",
+	"startedAt",
+	"finishedAt",
+	"exitCode",
+	"signal",
+	"timedOut",
+	"outputDigest",
+	"stdoutPreview",
+	"stderrPreview",
+	"evidenceId",
+	"artifactRefs",
+	"errorCode",
+	"reason",
+]);
+
+function unknownSettlementFields(settlement) {
+	if (!settlement || typeof settlement !== "object") return null;
+	const unknown = Object.keys(settlement).filter((key) => !CLOSED_RESULT_FIELDS.includes(key));
+	return unknown.length > 0 ? unknown.sort() : null;
+}
+
 /**
  * Validate a settlement result against the closed contract. A non-zero exit
  * paired with `succeeded`, or a success without Evidence, fails closed.
@@ -576,6 +667,10 @@ function executeAttempt(projectRoot, sessionId, sessionDir, manifest, route, opt
 function settlementProblem(settlement, stage) {
 	if (!settlement || typeof settlement !== "object") {
 		return "settlement result must be an object";
+	}
+	const unknown = unknownSettlementFields(settlement);
+	if (unknown) {
+		return `settlement result carries unknown field(s) ${unknown.join(", ")}; the closed result contract admits only ${CLOSED_RESULT_FIELDS.join(", ")}`;
 	}
 	if (!SETTLEMENT_STATUSES.includes(settlement.status)) {
 		return `status must be one of ${SETTLEMENT_STATUSES.join(" | ")}; got ${JSON.stringify(settlement.status)}`;
@@ -624,9 +719,10 @@ function buildSettlementRecord(request, settlement) {
 }
 
 // The closed result fields of a settlement record — everything except the
-// bookkeeping stamp. Two settlements of one attempt must agree on all of them.
+// bookkeeping stamps and the ledger's chain fields. Two settlements of one
+// attempt must agree on all of them.
 function settlementFingerprint(record) {
-	const { recordedAt: _stamp, ...closed } = record;
+	const { recordedAt: _stamp, prevHash: _prev, hash: _hash, ...closed } = record;
 	return JSON.stringify(closed);
 }
 
@@ -645,7 +741,12 @@ function settleInternal(projectRoot, sessionId, sessionDir, route, request, sett
 	if (!advances) {
 		appendSessionEvent(sessionDir, {
 			type: "stage_failed",
-			data: { stage: request.stageName, requestId: request.requestId, status: settlement.status },
+			data: {
+				stage: request.stageName,
+				requestId: request.requestId,
+				requestHash: request.idempotencyKey,
+				status: settlement.status,
+			},
 		});
 		return {
 			success: true,
@@ -677,6 +778,7 @@ function settleInternal(projectRoot, sessionId, sessionDir, route, request, sett
 		data: {
 			stage: request.stageName,
 			requestId: request.requestId,
+			requestHash: request.idempotencyKey,
 			attemptId: request.attemptId,
 			status: settlement.status,
 		},
@@ -713,7 +815,8 @@ function refreshProjection(projectRoot, sessionId, sessionDir, route) {
  * (the request's idempotency key) plus lease proof whose owner matches the
  * owner the request was created under. An exact duplicate settlement — the same
  * closed result, not merely the same status — is idempotent; any difference is
- * a conflict.
+ * a conflict. The lock is taken before any state is read (ADR §8.1), and an
+ * advancing duplicate replays any projection a crash left unbuilt.
  *
  * @param {string} projectRoot
  * @param {string} sessionId
@@ -724,25 +827,23 @@ function refreshProjection(projectRoot, sessionId, sessionDir, route) {
 async function settleSessionRequest(projectRoot, sessionId, requestId, settlement, options = {}) {
 	const sessionDir = sessionDirOf(projectRoot, sessionId);
 
-	const loaded = readSessionManifest(sessionDir);
-	if (!loaded || loaded.corrupt) {
-		return fail("AMBER_E_SESSION_INCOMPLETE", `session ${sessionId} is missing or corrupt`);
+	const lock = acquireLock(projectRoot, sessionId);
+	if (!lock.success) return fail("AMBER_E_INVALID_ARG", lock.error);
+	try {
+		return settleLocked(projectRoot, sessionId, sessionDir, requestId, settlement, options);
+	} finally {
+		releaseLock(projectRoot, sessionId);
 	}
-	const { manifest } = loaded;
+}
 
-	if (["completed", "failed", "aborted"].includes(manifest.status)) {
-		return fail(
-			"AMBER_E_SESSION_INCOMPLETE",
-			`session is ${manifest.status}; a terminal session accepts no run or settle`,
-		);
-	}
+// The settle body, already inside the session lock.
+function settleLocked(projectRoot, sessionId, sessionDir, requestId, settlement, options) {
+	const session = loadActiveSession(sessionDir, sessionId);
+	if (session.problem) return session.problem;
+	const { manifest } = session;
 
-	const lease = verifyLease(manifest, {
-		ownerId: options.ownerId,
-		tokenHash: options.tokenHash,
-		fence: options.leaseFence,
-	});
-	if (!lease.valid) return fail("AMBER_E_INVALID_ARG", lease.reason);
+	const refused = leaseProblem(manifest, options);
+	if (refused) return refused;
 
 	const cursorRead = readCursorLedger(sessionDir);
 	if (!cursorRead.ok) return fail("AMBER_E_LEDGER_TAMPERED", cursorRead.reason);
@@ -776,25 +877,26 @@ async function settleSessionRequest(projectRoot, sessionId, requestId, settlemen
 			`request ${requestId} was created by owner ${request.leaseOwnerId}; only that owner may settle it`,
 		);
 	}
-
-	const existing = findSettlement(records, requestId);
-	if (existing) {
-		// Idempotent only when the resubmission is the SAME closed result — the
-		// same status with a different exit code or Evidence is a conflict.
-		const resubmitted = settlementFingerprint(buildSettlementRecord(request, settlement ?? {}));
-		if (resubmitted === settlementFingerprint(existing)) {
-			return { success: true, settled: true, duplicate: true, settlement: existing, request };
-		}
+	// A request carrying an older fence can never settle (ADR-0029 §8.1): the
+	// caller's fence already matched the manifest's CURRENT lease above, so a
+	// mismatch here means the lease was reacquired after this request was
+	// created — the request is stale and a fresh run must mint a new attempt.
+	if (request.leaseFence !== undefined && options.leaseFence !== request.leaseFence) {
 		return fail(
 			"AMBER_E_INVALID_ARG",
-			`request ${requestId} already settled with a different result; a different result for the same attempt is a conflict, not an update`,
+			`request ${requestId} was created under lease fence ${request.leaseFence} but the current lease fence is ${options.leaseFence}; a request carrying an older fence can never settle — run the stage again under the new fence`,
 		);
 	}
 
-	if (Date.parse(request.deadlineAt) <= Date.now()) {
+	// Unknown result fields fail closed even on a duplicate resubmission: an
+	// "exact duplicate" is the same CLOSED result, so a resubmission carrying
+	// extra fields is not the same result (spec: "Unknown fields ... fail
+	// closed").
+	const unknown = unknownSettlementFields(settlement);
+	if (unknown) {
 		return fail(
 			"AMBER_E_INVALID_ARG",
-			`request ${requestId} passed its deadline ${request.deadlineAt} and is expired; retry with a fresh run`,
+			`settlement result carries unknown field(s) ${unknown.join(", ")}; the closed result contract admits only ${CLOSED_RESULT_FIELDS.join(", ")}`,
 		);
 	}
 
@@ -805,15 +907,84 @@ async function settleSessionRequest(projectRoot, sessionId, requestId, settlemen
 	}
 	const stage = (route.stages || []).find((entry) => entry.name === request.stageName) || null;
 
+	const existing = findSettlement(records, requestId);
+	if (existing) {
+		// Idempotent only when the resubmission is the SAME closed result — the
+		// same status with a different exit code or Evidence is a conflict.
+		const resubmitted = settlementFingerprint(buildSettlementRecord(request, settlement ?? {}));
+		if (resubmitted !== settlementFingerprint(existing)) {
+			return fail(
+				"AMBER_E_INVALID_ARG",
+				`request ${requestId} already settled with a different result; a different result for the same attempt is a conflict, not an update`,
+			);
+		}
+		// Replay-to-rebuild (spec §"Durable records and crash recovery"): a crash
+		// between the settled event and the projection refresh must not lose the
+		// advancement. Complete the missing stage_completed and refresh the
+		// projection from the ledger — never inventing state it does not hold.
+		const advancing =
+			(existing.status === "succeeded" && existing.evidenceId) ||
+			(existing.status === "skipped" && stage?.optional === true);
+		if (advancing && !records.some((r) => r.kind === "stage_completed" && r.stage === request.stageName)) {
+			appendLedgerRecord(ledgerPathOf(sessionDir), {
+				schemaVersion: 2,
+				kind: "stage_completed",
+				sessionId,
+				stage: request.stageName,
+				requestId: request.requestId,
+				attemptId: request.attemptId,
+				evidenceId: existing.evidenceId,
+				outputDigest: existing.outputDigest,
+				recordedAt: new Date().toISOString(),
+				replayedFrom: requestId,
+			});
+		}
+		if (advancing) refreshProjection(projectRoot, sessionId, sessionDir, route);
+		return { success: true, settled: true, duplicate: true, settlement: existing, request };
+	}
+
+	if (Date.parse(request.deadlineAt) <= Date.now()) {
+		// pending → expired is a durable attempt transition, not just a refusal
+		// (spec: "or `pending → expired` when its deadline passes without
+		// settlement"). Record it so the attempt never disappears.
+		appendLedgerRecord(ledgerPathOf(sessionDir), {
+			schemaVersion: 2,
+			kind: "stage_attempt_expired",
+			requestId: request.requestId,
+			attemptId: request.attemptId,
+			stageName: request.stageName,
+			deadlineAt: request.deadlineAt,
+			recordedAt: new Date().toISOString(),
+		});
+		return fail(
+			"AMBER_E_INVALID_ARG",
+			`request ${requestId} passed its deadline ${request.deadlineAt} and is expired; retry with a fresh run`,
+		);
+	}
+
 	const problem = settlementProblem(settlement, stage);
 	if (problem) return fail("AMBER_E_INVALID_ARG", problem);
 
-	const lock = acquireLock(projectRoot, sessionId);
-	if (!lock.success) return fail("AMBER_E_INVALID_ARG", lock.error);
+	// A cursor advance requires a VALID Evidence binding, not just a non-empty
+	// id: the receipt must exist under .amber/evidence/ (fail-closed on a
+	// missing receipt — an orphaned id never advances).
+	if (settlement.status === "succeeded" && !evidenceReceiptExists(projectRoot, settlement.evidenceId)) {
+		return fail(
+			"AMBER_E_INVALID_ARG",
+			`evidence ${settlement.evidenceId} names no recorded Evidence receipt; record it first (amber evidence record) — a run without valid Evidence cannot advance the cursor`,
+		);
+	}
+
+	return settleInternal(projectRoot, sessionId, sessionDir, route, request, settlement);
+}
+
+// Does the named Evidence receipt exist? A corrupt Evidence ledger is an
+// infrastructure fault, not a policy verdict — it also refuses (fail-closed).
+function evidenceReceiptExists(projectRoot, evidenceId) {
 	try {
-		return settleInternal(projectRoot, sessionId, sessionDir, route, request, settlement);
-	} finally {
-		releaseLock(projectRoot, sessionId);
+		return showEvidence(projectRoot, evidenceId) !== null;
+	} catch {
+		return false;
 	}
 }
 

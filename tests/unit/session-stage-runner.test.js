@@ -7,12 +7,14 @@ const crypto = require("node:crypto");
 
 const stageRunner = require("../../scripts/lib/session-stage-runner");
 const { runSessionStage, settleSessionRequest, verifyLease, cursorFromLedger } = stageRunner;
+const { verifySession, approveSession, startSession, leaseSession } = require("../../scripts/lib/session-commands");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const {
 	registerRunner,
 	registerRunnerCapability,
 } = require("../../scripts/lib/core/runner-registry");
+const { recordEvidence } = require("../../scripts/lib/core/evidence-receipts");
 
 const PIN = "runner/ci@1.0.0#diagnose.check@1";
 const RUNNER_DIGEST = `sha256:${"a".repeat(64)}`;
@@ -114,10 +116,7 @@ const HOST_AGENT = {
 // change, not a new registry or a mutable target-repository record". Tests
 // therefore swap it wholesale through the module's test-only seam and restore
 // the pristine constant after each suite, never writing a target file.
-const withAdapters = (entries) => {
-	stageRunner._setAdapterTableForTest(entries);
-	return () => stageRunner._restoreAdapterTableForTest();
-};
+const withAdapters = (entries) => stageRunner._setAdapterTableForTest(entries);
 
 // Suites that need the pin mapped install it in before() and restore in
 // after() — describe bodies only register subtests, so a wrapper's finally
@@ -269,20 +268,50 @@ describe("session stage runner — run", () => {
 				{ name: "check", type: "verb", target: PIN, gateAfter: "user-approval" },
 				{ name: "second", type: "verb", target: PIN },
 			],
-			});
+		});
 		const first = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
 		await settleSessionRequest(
 			root,
 			"s1",
 			first.request.requestId,
-			{ status: "succeeded", exitCode: 0, evidenceId: "evidence/x" },
-			CLAIM,
+			{ status: "succeeded", exitCode: 0, evidenceId: settleEvidenceId(root) },
+			bindOf(first),
 		);
 		const blocked = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
 		assert.strictEqual(blocked.success, false);
 		assert.match(blocked.message, /user-approval/);
 	});
 });
+
+// Settle binding args: the pending request's own attempt id and idempotency
+// key (spec closed settle contract).
+const bindOf = (run) => ({
+	...CLAIM,
+	attemptId: run.request.attemptId,
+	requestHash: run.request.idempotencyKey,
+});
+
+// A succeeded settle requires a real, on-disk Evidence receipt (spec: "a
+// missing required Evidence receipt fail closed"), so tests that advance the
+// cursor must record one first. The producer must be a registered principal —
+// makeTarget registers alice@example.com. Each test gets its own root, so a
+// fixed id per root is unique.
+function settleEvidenceId(root) {
+	const recorded = recordEvidence(root, {
+		id: "evidence/stage-settle",
+		producer: "alice@example.com",
+		assurance: "observed",
+		scope: "F062",
+		subject: "spec/F062-settle-binding",
+		inputs: null,
+		tools: null,
+		environment: null,
+		outputs: null,
+		status: "pass",
+	});
+	assert.equal(recorded.ok, true, (recorded.errors || []).join("; "));
+	return "evidence/stage-settle";
+}
 
 describe("session stage runner — settle", () => {
 	installHostAdapter();
@@ -294,7 +323,7 @@ describe("session stage runner — settle", () => {
 			"s1",
 			run.request.requestId,
 			{ status: "failed", exitCode: 3 },
-			CLAIM,
+			bindOf(run),
 		);
 		assert.strictEqual(settled.success, true);
 		assert.strictEqual(settled.advanced, false);
@@ -306,8 +335,8 @@ describe("session stage runner — settle", () => {
 		const { root } = makeTarget();
 		const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
 		const body = { status: "failed", exitCode: 3 };
-		await settleSessionRequest(root, "s1", run.request.requestId, body, CLAIM);
-		const again = await settleSessionRequest(root, "s1", run.request.requestId, body, CLAIM);
+		await settleSessionRequest(root, "s1", run.request.requestId, body, bindOf(run));
+		const again = await settleSessionRequest(root, "s1", run.request.requestId, body, bindOf(run));
 		assert.strictEqual(again.success, true);
 		assert.strictEqual(again.duplicate, true);
 	});
@@ -315,16 +344,78 @@ describe("session stage runner — settle", () => {
 	it("refuses a different result for the same attempt", async () => {
 		const { root } = makeTarget();
 		const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
-		await settleSessionRequest(root, "s1", run.request.requestId, { status: "failed" }, CLAIM);
+		await settleSessionRequest(root, "s1", run.request.requestId, { status: "failed" }, bindOf(run));
 		const conflict = await settleSessionRequest(
 			root,
 			"s1",
 			run.request.requestId,
 			{ status: "succeeded", evidenceId: "evidence/x" },
-			CLAIM,
+			bindOf(run),
 		);
 		assert.strictEqual(conflict.success, false);
 		assert.match(conflict.message, /conflict/);
+	});
+
+	it("refuses unknown result fields (closed result contract)", async () => {
+		const { root } = makeTarget();
+		const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		const settled = await settleSessionRequest(
+			root,
+			"s1",
+			run.request.requestId,
+			{ status: "failed", exitCode: 3, evil: "smuggled" },
+			bindOf(run),
+		);
+		assert.strictEqual(settled.success, false);
+		assert.match(settled.message, /unknown field/);
+	});
+
+	it("refuses a succeeded settlement whose evidenceId names no recorded receipt", async () => {
+		const { root } = makeTarget();
+		const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		const settled = await settleSessionRequest(
+			root,
+			"s1",
+			run.request.requestId,
+			{ status: "succeeded", exitCode: 0, evidenceId: "evidence/ghost" },
+			bindOf(run),
+		);
+		assert.strictEqual(settled.success, false);
+		assert.match(settled.message, /names no recorded Evidence receipt/);
+		const manifest = JSON.parse(
+			fs.readFileSync(path.join(root, ".amber", "sessions", "s1", "manifest.json"), "utf8"),
+		);
+		assert.deepStrictEqual(manifest.completedStages, []);
+	});
+
+	it("records a durable stage_attempt_expired when the request deadline has passed", async () => {
+		const { root, sessionDir } = makeTarget();
+		// Hand-craft a pending request whose deadline is already past; the hash
+		// chain stays intact because appendLedgerRecord recomputes it.
+		const { appendLedgerRecord } = require("../../scripts/lib/core/loop-ledger");
+		appendLedgerRecord(path.join(sessionDir, "ledger.jsonl"), {
+			schemaVersion: 2,
+			kind: "stage_attempt_requested",
+			requestId: "req-expired",
+			attemptId: "att-1",
+			stageName: "check",
+			status: "pending",
+			idempotencyKey: "key-1",
+			leaseOwnerId: "agent-a",
+			leaseFence: 1,
+			deadlineAt: new Date(Date.now() - 1000).toISOString(),
+			recordedAt: new Date(Date.now() - 2000).toISOString(),
+		});
+		const claim = { ownerId: "agent-a", tokenHash: TOKEN_HASH, leaseFence: 1, attemptId: "att-1", requestHash: "key-1" };
+		const settled = await settleSessionRequest(root, "s1", "req-expired", { status: "failed" }, claim);
+		assert.strictEqual(settled.success, false);
+		assert.match(settled.message, /expired/);
+		const ledgerText = fs.readFileSync(path.join(sessionDir, "ledger.jsonl"), "utf8");
+		assert.match(ledgerText, /stage_attempt_expired/);
+		// The expiry re-fires: a second attempt on the same request also refuses.
+		const again = await settleSessionRequest(root, "s1", "req-expired", { status: "failed" }, claim);
+		assert.strictEqual(again.success, false);
+		assert.match(again.message, /expired/);
 	});
 
 	it("refuses succeeded without an Evidence binding", async () => {
@@ -335,7 +426,7 @@ describe("session stage runner — settle", () => {
 			"s1",
 			run.request.requestId,
 			{ status: "succeeded", exitCode: 0 },
-			CLAIM,
+			bindOf(run),
 		);
 		assert.strictEqual(settled.success, false);
 		assert.match(settled.message, /Evidence/);
@@ -349,7 +440,7 @@ describe("session stage runner — settle", () => {
 			"s1",
 			run.request.requestId,
 			{ status: "succeeded", exitCode: 7, evidenceId: "evidence/x" },
-			CLAIM,
+			bindOf(run),
 		);
 		assert.strictEqual(settled.success, false);
 		assert.match(settled.message, /non-zero exitCode/);
@@ -363,7 +454,7 @@ describe("session stage runner — settle", () => {
 			"s1",
 			run.request.requestId,
 			{ status: "skipped" },
-			CLAIM,
+			bindOf(run),
 		);
 		assert.strictEqual(settled.success, false);
 		assert.match(settled.message, /not optional/);
@@ -376,8 +467,8 @@ describe("session stage runner — settle", () => {
 			root,
 			"s1",
 			run.request.requestId,
-			{ status: "succeeded", exitCode: 0, evidenceId: "evidence/x" },
-			CLAIM,
+			{ status: "succeeded", exitCode: 0, evidenceId: settleEvidenceId(root) },
+			bindOf(run),
 		);
 		assert.strictEqual(settled.advanced, true);
 		const manifest = JSON.parse(fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"));
@@ -388,12 +479,75 @@ describe("session stage runner — settle", () => {
 	it("keeps a retry on the same stage with a fresh attempt number", async () => {
 		const { root } = makeTarget();
 		const first = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
-		await settleSessionRequest(root, "s1", first.request.requestId, { status: "failed" }, CLAIM);
+		await settleSessionRequest(root, "s1", first.request.requestId, { status: "failed" }, bindOf(first));
 		const retry = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
 		assert.strictEqual(retry.request.attemptNumber, 2);
 		assert.strictEqual(retry.request.stageName, "check");
 		assert.notStrictEqual(retry.request.requestId, first.request.requestId);
 		assert.notStrictEqual(retry.request.idempotencyKey, first.request.idempotencyKey);
+	});
+
+	it("refuses the same status with a different closed result", async () => {
+		const { root } = makeTarget();
+		const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		await settleSessionRequest(
+			root,
+			"s1",
+			run.request.requestId,
+			{ status: "failed", exitCode: 3 },
+			bindOf(run),
+		);
+		const conflict = await settleSessionRequest(
+			root,
+			"s1",
+			run.request.requestId,
+			{ status: "failed", exitCode: 4 },
+			bindOf(run),
+		);
+		assert.strictEqual(conflict.success, false);
+		assert.match(conflict.message, /conflict/);
+	});
+
+	it("refuses a settlement without the attempt binding", async () => {
+		const { root } = makeTarget();
+		const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		const settled = await settleSessionRequest(
+			root,
+			"s1",
+			run.request.requestId,
+			{ status: "failed" },
+			CLAIM,
+		);
+		assert.strictEqual(settled.success, false);
+		assert.match(settled.message, /--attempt-id/);
+	});
+
+	it("refuses a settlement with a mismatched request hash", async () => {
+		const { root } = makeTarget();
+		const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		const settled = await settleSessionRequest(
+			root,
+			"s1",
+			run.request.requestId,
+			{ status: "failed" },
+			{ ...bindOf(run), requestHash: "0".repeat(64) },
+		);
+		assert.strictEqual(settled.success, false);
+		assert.match(settled.message, /--request-hash/);
+	});
+
+	it("refuses a settlement from an owner other than the request creator", async () => {
+		const { root } = makeTarget();
+		const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		const settled = await settleSessionRequest(
+			root,
+			"s1",
+			run.request.requestId,
+			{ status: "failed" },
+			{ ...bindOf(run), ownerId: "agent-b" },
+		);
+		assert.strictEqual(settled.success, false);
+		assert.match(settled.message, /owner/);
 	});
 });
 
@@ -406,5 +560,228 @@ describe("session stage runner — cursor", () => {
 			{ kind: "stage_completed", stage: "b" },
 		];
 		assert.deepStrictEqual(cursorFromLedger(records), ["a", "b"]);
+	});
+});
+
+describe("session stage runner — legacy seams and lease minting", () => {
+	installHostAdapter();
+	it("legacy session verify refuses a verb route and points at run/settle", async () => {
+		const { root } = makeTarget();
+		const outcome = await verifySession(root, { sessionId: "s1" });
+		assert.strictEqual(outcome.exitCode, 1);
+		assert.match(outcome.text, /verb stages/);
+		assert.match(outcome.text, /session run/);
+		assert.match(outcome.text, /session settle/);
+	});
+
+	it("legacy session verify stays byte-compatible for a route without verb stages", async () => {
+		const { root } = makeTarget({
+			stages: [{ name: "verify", type: "command", target: "npm test" }],
+		});
+		const outcome = await verifySession(root, { sessionId: "s1" });
+		assert.strictEqual(outcome.exitCode, 0);
+	});
+
+	it("session approve unblocks a stage-level gateAfter without a route-level gates entry", async () => {
+		const { root } = makeTarget({
+			stages: [
+				{ name: "check", type: "verb", target: PIN, gateAfter: "user-approval" },
+				{ name: "second", type: "verb", target: PIN },
+			],
+		});
+		const before = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		await settleSessionRequest(
+			root,
+			"s1",
+			before.request.requestId,
+			{ status: "succeeded", exitCode: 0, evidenceId: settleEvidenceId(root) },
+			bindOf(before),
+		);
+		const blocked = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		assert.strictEqual(blocked.success, false);
+		assert.match(blocked.message, /user-approval/);
+
+		const approval = await approveSession(root, { sessionId: "s1", gate: "user-approval", yes: true });
+		assert.strictEqual(approval.exitCode, 0);
+
+		const after = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+		assert.strictEqual(after.success, true);
+		assert.strictEqual(after.request.stageName, "second");
+	});
+
+	it("a bounded-command refusal records a terminal rejected event and never advances", async () => {
+		const restore = withAdapters([
+			{
+				capabilityPin: PIN,
+				providerClass: "bounded-command",
+				adapterId: "governed-runner",
+				adapterVersion: "1",
+			},
+		]);
+		try {
+			// The fixture root is not a git repository, so governed-runner
+			// refuses before any execution — exercising the rejected path.
+			const { root, sessionDir } = makeTarget();
+			const outcome = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+			assert.strictEqual(outcome.success, false);
+
+			const ledger = fs.readFileSync(path.join(sessionDir, "ledger.jsonl"), "utf8");
+			const settled = ledger
+				.split("\n")
+				.filter(Boolean)
+				.map((line) => JSON.parse(line))
+				.filter((record) => record.kind === "stage_attempt_settled");
+			assert.strictEqual(settled.length, 1);
+			assert.strictEqual(settled[0].status, "rejected");
+
+			const manifest = JSON.parse(fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"));
+			assert.deepStrictEqual(manifest.completedStages, []);
+		} finally {
+			restore();
+		}
+	});
+
+	it("session start --agent mints a lease and returns the raw token exactly once", async () => {
+		const { root } = makeTarget();
+		const started = await startSession(root, {
+			goal: "probe the lease minting path",
+			route: "probe",
+			agent: "agent-a",
+		});
+		assert.strictEqual(started.exitCode, 0);
+		assert.match(started.text, /Lease token \(shown ONCE/);
+
+		const sessionDirActual = path.join(root, ".amber", "sessions", started.sessionId);
+		const manifest = JSON.parse(fs.readFileSync(path.join(sessionDirActual, "manifest.json"), "utf8"));
+		assert.ok(manifest.lease, "lease is on the manifest");
+		assert.strictEqual(manifest.lease.ownerId, "agent-a");
+		assert.strictEqual(manifest.lease.fence, 1);
+		assert.match(manifest.lease.tokenHash, /^[0-9a-f]{64}$/);
+		// The raw token is never persisted — only its digest is.
+		const rawToken = (started.text.match(/Lease token \(shown ONCE, not stored\): ([0-9a-f]{64})/) || [])[1];
+		assert.ok(rawToken, "the raw token is returned exactly once");
+		assert.ok(!JSON.stringify(manifest).includes(rawToken));
+	});
+
+	it("session lease reacquires for the owner, minting a new fence and token", async () => {
+		const { root, sessionDir } = makeTarget();
+		const reacquired = await leaseSession(root, {
+			sessionId: "s1",
+			ownerId: "agent-a",
+			tokenHash: TOKEN_HASH,
+		});
+		assert.strictEqual(reacquired.exitCode, 0);
+		assert.match(reacquired.text, /Fence: 1 → 2/);
+		assert.match(reacquired.text, /Lease token \(shown ONCE/);
+
+		const manifest = JSON.parse(fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"));
+		assert.strictEqual(manifest.lease.fence, 2);
+		assert.strictEqual(manifest.lease.ownerId, "agent-a");
+		assert.notStrictEqual(manifest.lease.tokenHash, TOKEN_HASH, "a fresh token digest is minted");
+		const rawToken = (reacquired.text.match(/Lease token \(shown ONCE, not stored\): ([0-9a-f]{64})/) || [])[1];
+		assert.ok(rawToken, "the raw token is returned exactly once");
+		assert.ok(!JSON.stringify(manifest).includes(rawToken));
+
+		const timeline = fs.readFileSync(path.join(sessionDir, "timeline.jsonl"), "utf8");
+		assert.match(timeline, /lease_reacquired/);
+	});
+
+	it("session lease refuses a wrong owner and a wrong token", async () => {
+		const { root } = makeTarget();
+		const wrongOwner = await leaseSession(root, {
+			sessionId: "s1",
+			ownerId: "agent-b",
+			tokenHash: TOKEN_HASH,
+		});
+		assert.strictEqual(wrongOwner.exitCode, 1);
+		assert.match(wrongOwner.text, /owner-bound/);
+
+		const wrongToken = await leaseSession(root, {
+			sessionId: "s1",
+			ownerId: "agent-a",
+			tokenHash: "0".repeat(64),
+		});
+		assert.strictEqual(wrongToken.exitCode, 1);
+		assert.match(wrongToken.text, /tokenHash/);
+	});
+
+	it("session lease refuses a terminal session", async () => {
+		const { root } = makeTarget({ status: "completed" });
+		const reacquired = await leaseSession(root, {
+			sessionId: "s1",
+			ownerId: "agent-a",
+			tokenHash: TOKEN_HASH,
+		});
+		assert.strictEqual(reacquired.exitCode, 1);
+		assert.match(reacquired.text, /already completed/);
+	});
+
+	it("session lease reacquires an EXPIRED lease and unblocks run/settle under the new fence", async () => {
+		const { root, sessionDir } = makeTarget();
+		installHostAdapter();
+		try {
+			// Backdate the lease past its window: run/settle must refuse it...
+			const manifestPath = path.join(sessionDir, "manifest.json");
+			const stale = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+			stale.lease.expiresAt = new Date(Date.now() - 1000).toISOString();
+			fs.writeFileSync(manifestPath, JSON.stringify(stale));
+
+			const refused = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+			assert.strictEqual(refused.success, false);
+			assert.match(refused.message, /expired at/);
+
+			// ...and reacquisition by the owner is exactly the recovery path.
+			const reacquired = await leaseSession(root, {
+				sessionId: "s1",
+				ownerId: "agent-a",
+				tokenHash: TOKEN_HASH,
+			});
+			assert.strictEqual(reacquired.exitCode, 0);
+
+			const fresh = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+			const freshClaim = {
+				ownerId: "agent-a",
+				tokenHash: fresh.lease.tokenHash,
+				leaseFence: fresh.lease.fence,
+			};
+			const run = await runSessionStage(root, "s1", { execute: true, ...freshClaim });
+			assert.strictEqual(run.success, true);
+			assert.strictEqual(run.pending, true);
+		} finally {
+			stageRunner._restoreAdapterTableForTest();
+		}
+	});
+
+	it("a request created under an older fence can never settle after reacquisition", async () => {
+		const { root, sessionDir } = makeTarget();
+		installHostAdapter();
+		try {
+			const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
+			assert.strictEqual(run.pending, true);
+
+			const reacquired = await leaseSession(root, {
+				sessionId: "s1",
+				ownerId: "agent-a",
+				tokenHash: TOKEN_HASH,
+			});
+			assert.strictEqual(reacquired.exitCode, 0);
+
+			const fresh = JSON.parse(fs.readFileSync(path.join(sessionDir, "manifest.json"), "utf8"));
+			const settled = await settleSessionRequest(
+				root,
+				"s1",
+				run.request.requestId,
+				{ status: "failed", exitCode: 1 },
+				{
+					...bindOf(run),
+					tokenHash: fresh.lease.tokenHash,
+					leaseFence: fresh.lease.fence,
+				},
+			);
+			assert.strictEqual(settled.success, false);
+			assert.match(settled.message, /older fence/);
+		} finally {
+			stageRunner._restoreAdapterTableForTest();
+		}
 	});
 });

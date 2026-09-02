@@ -2157,6 +2157,12 @@
 					"result": "pass",
 					"command": "npm run manifests && npm run doctor && npm run gen:agents:check && git diff --check",
 					"notes": "All repository gates green."
+				},
+				{
+					"date": "2026-09-02",
+					"result": "pass",
+					"command": "npm test",
+					"notes": "Compliance-audit fix round: 3537 tests, 0 failures; full log read whole from .scratch/f062-hardening-npm-test.log. Settle closed-contract hardening (unknown-fields whitelist on live and duplicate paths, request-fence binding, internal bounded path runs the same validation), lease reacquisition via amber session lease (fresh token, fence + 1, owner-bound), web runVerification verb-route guard, MCP settle Action Type binding repair, spec/ADR placement amendments, and the evidence-receipt output-digest test obligation. Audit: spec-compliance/ 17 REQs (14 implemented, 3 partial → gaps fixed or amended)."
 				}
 			],
 			"notes": [

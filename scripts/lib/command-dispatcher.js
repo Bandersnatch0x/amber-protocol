@@ -286,6 +286,17 @@ async function handleSession(args) {
 		if (!sessionResult) {
 			sessionResult = sessionCommands.verifyLedgerSession(targetRoot, args.session);
 		}
+	} else if (action === "lease") {
+		// F062 lease reacquisition (ADR-0029 §8.1): explicit, owner-bound, new
+		// fence. Owner proof is the same digest the run/settle seam uses.
+		sessionResult = requireSessionId(args, "lease");
+		if (!sessionResult) {
+			sessionResult = await sessionCommands.leaseSession(targetRoot, {
+				sessionId: args.session,
+				ownerId: args.ownerId,
+				tokenHash: args.tokenHash,
+			});
+		}
 	} else if (action === "run" || action === "settle") {
 		// F062 seam boundary (spec §"Legacy and external seams"): the run/settle
 		// seam rejects arbitrary stage selection and free-form command text.
@@ -339,7 +350,7 @@ async function handleSession(args) {
 		}
 	} else {
 		sessionResult = {
-			text: "session requires start, status, list, abort, continue, complete-check, complete, verify, verify-ledger, approve, run, or settle.",
+			text: "session requires start, status, list, abort, continue, complete-check, complete, verify, verify-ledger, approve, lease, run, or settle.",
 			exitCode: 1,
 		};
 	}

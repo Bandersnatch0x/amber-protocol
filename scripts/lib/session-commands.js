@@ -25,6 +25,7 @@ const { runEvidenceCommand } = require("./core/evidence-runner");
 const { recordFeatureEvidence } = require("./feature-commands");
 const { writeRunnerAck } = require("./runner-ack");
 const { runSessionStage, settleSessionRequest } = require("./session-stage-runner");
+const { acquireLock, releaseLock } = require("./session-lock");
 const {
 	resolveStateDirForRead,
 	resolveStateDirForCreate,
@@ -534,6 +535,19 @@ async function continueSession(projectRoot, options) {
 	}
 
 	if (checkpoint) {
+		// F062: a checkpoint restore writes completedStages directly, which
+		// would diverge the projection from a verb route's ledger-owned
+		// cursor. Refuse verb routes here, exactly as legacy verify does.
+		const { routes: continueRoutes } = loadTargetRoutes(projectRoot);
+		const continueRoute = continueRoutes.find((entry) => entry.routeId === manifest.route.id);
+		if ((continueRoute?.stages || []).some((stage) => stage && stage.type === "verb")) {
+			return rejectResume(
+				projectRoot,
+				sessionId,
+				options,
+				`Cannot restore checkpoint: route "${manifest.route.id}" contains verb stages, whose cursor advances only through the governed seam. Use: amber session run --session ${sessionId} [--execute] and amber session settle --session ${sessionId} --request-id <id> ...`,
+			);
+		}
 		manifest.currentStage = checkpoint.manifest.currentStage || manifest.currentStage;
 		manifest.completedStages =
 			checkpoint.manifest.completedStages || manifest.completedStages || [];
@@ -1013,6 +1027,98 @@ async function settleSession(projectRoot, options) {
 	return result(lines.join("\n"), 0);
 }
 
+// F062 lease reacquisition (ADR-0029 §8.1): explicit, owner-bound, minting a
+// fresh token and a NEW fence for the SAME session. The caller proves current
+// ownership with the same digest proof run/settle use — which MAY be expired,
+// since an expired lease held by the owner is exactly what reacquisition is
+// for. It never transfers the session to another owner and never invents
+// progress; pending requests created under the old fence can no longer settle.
+async function leaseSession(projectRoot, options) {
+	const { sessionId, ownerId, tokenHash } = options;
+
+	if (!sessionId) {
+		return result("Error: session lease requires --session <id>.", 1);
+	}
+	if (!ownerId || !tokenHash) {
+		return result(
+			"Error: session lease requires --owner-id <agent> and --token-hash <sha256 of the current lease token>.",
+			1,
+		);
+	}
+
+	const lock = acquireLock(projectRoot, sessionId);
+	if (!lock.success) {
+		return result(`Error: ${lock.error}`, 1);
+	}
+	try {
+		const loaded = requireSession(projectRoot, sessionId);
+		if (loaded.exitCode !== undefined) return loaded;
+		const { manifest, sessionDir } = loaded;
+
+		if (
+			manifest.status === "completed" ||
+			manifest.status === "aborted" ||
+			manifest.status === "failed"
+		) {
+			return result(`Cannot reacquire: session is already ${manifest.status}.`, 1);
+		}
+
+		const lease = manifest.lease;
+		if (!lease || typeof lease !== "object") {
+			return result(
+				"Session carries no lease; start the session with --agent to mint one.",
+				1,
+			);
+		}
+		if (lease.ownerId !== ownerId) {
+			return result(
+				`Lease owner is ${lease.ownerId}; reacquisition is owner-bound and never transfers the session to another owner.`,
+				1,
+			);
+		}
+		if (lease.tokenHash !== tokenHash) {
+			return result(
+				"Lease token does not match the recorded tokenHash; reacquisition requires proof of current ownership.",
+				1,
+			);
+		}
+
+		const token = crypto.randomBytes(32).toString("hex");
+		const acquiredAt = new Date().toISOString();
+		const ttlMs = 300_000;
+		const newLease = {
+			ownerId,
+			tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+			acquiredAt,
+			expiresAt: new Date(Date.parse(acquiredAt) + ttlMs).toISOString(),
+			ttlMs,
+			fence: (typeof lease.fence === "number" ? lease.fence : 0) + 1,
+		};
+
+		writeSessionManifest(sessionDir, { ...manifest, lease: newLease });
+
+		appendSessionEvent(sessionDir, {
+			type: "lease_reacquired",
+			data: { sessionId, ownerId, fence: newLease.fence },
+		});
+
+		return result(
+			[
+				`Session lease: ${sessionId}`,
+				`Owner: ${ownerId}`,
+				`Fence: ${lease.fence} → ${newLease.fence}`,
+				`Expires: ${newLease.expiresAt}`,
+				"",
+				`Lease token (shown ONCE, not stored): ${token}`,
+				`Prove it with: amber session run --execute --owner-id ${ownerId} --token-hash <sha256(token)> --lease-fence ${newLease.fence}`,
+			].join("\n"),
+			0,
+		);
+	} finally {
+		releaseLock(projectRoot, sessionId);
+	}
+}
+
 function findMostRecentNonCompletedSession(projectRoot) {
 	return findMostRecentSession(projectRoot, { excludeCompleted: true });
 }
@@ -1029,6 +1135,7 @@ module.exports = {
 	verifyLedgerSession,
 	runSession,
 	settleSession,
+	leaseSession,
 	getSessionsDir,
 	loadSessionManifest,
 	loadAllSessionManifests,

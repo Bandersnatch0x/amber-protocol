@@ -125,6 +125,24 @@ export const lifecycleRouter = router({
     const stage = resolveStage(session.manifest, stageName);
     const actualStageName = stage?.name ?? stageName;
     const displayName = stage?.displayName ?? actualStageName;
+
+    // F062 boundary: on a route containing verb stages the cursor is owned by
+    // the session ledger and advances only through `amber session run`/
+    // `session settle`. This mutation writes manifest.completedStages directly
+    // (persistCompletedStage), which would diverge the projection from the
+    // ledger-owned cursor — refuse the whole route, exactly as the CLI's
+    // legacy verify guard does (scripts/lib/session-commands.js).
+    const routeId = getRouteId(session.manifest);
+    const route = routeId ? getRouteById(routeId) : null;
+    if (route?.stages?.some((entry) => entry?.type === 'verb')) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          `Route ${routeId} contains verb stages; their cursor advances only through the governed seam. ` +
+          `Use: amber session run --session ${input.sessionId} [--execute] and amber session settle --session ${input.sessionId} --request-id <id> ...`,
+      });
+    }
+
     const command = resolveVerificationCommand({
       inputCommand: input.command,
       stage,

@@ -88,8 +88,8 @@
       "sourcePath": "docs/adr/0007-web-viewer-role.md",
       "title": "Web console role — supervised action viewer",
       "source": {
-        "rawHash": "sha256:76f5bd40566fb9de2922f4b796e9ec2cecf1af109d8fa3a68ddae19c08d92001",
-        "normHash": "sha256:fd7c8c0a1e8fc0da292e75a1d13184c77d1cf78ed95c6593fa627681dc2edcee"
+        "rawHash": "sha256:a624d79000cfcbdb4f4afca53f4ef3c1354d45c9a29afcd362bd958e9059fa7a",
+        "normHash": "sha256:3b3131d7df5126cecdc41219298055c6533901796f5a397e8f2003a10078fc5e"
       }
     },
     {
@@ -352,8 +352,8 @@
       "sourcePath": "docs/adr/0029-named-governed-commands-and-stage-verbs.md",
       "title": "Named Governed Commands and Registered Stage Verbs",
       "source": {
-        "rawHash": "sha256:01a81faa1492b4242648edbb648dfc95d7d98c43366cf916a3f7536980198781",
-        "normHash": "sha256:b90cc3bfb54f1b582c984c43d5fdef8a05a045a141b60009ddf11913c17fe43c"
+        "rawHash": "sha256:dbaee65c1f87d46c74e8572ebed70c22f659011a4dfe6627f17b4e0fcbf7c1b1",
+        "normHash": "sha256:faa4dbfe91b93ca925e60b698c694d0d5227e94ad3d58077cbd3c732cdb2063f"
       }
     },
     {
@@ -585,5 +585,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:663254bd96ce8a03c2e1e5697833df4ab99eca89fbb7a92f739d702c20a59dda"
+  "manifestHash": "sha256:185f21de8bd213ca6aa5b4017465b4a6242ceb1748b68865e4b0eafdd5dc6b36"
 }

@@ -132,6 +132,12 @@ Adjudications carried over from the 0025 map, in dependency order.
    a mapping with no home, that opens a new ticket with measured evidence — it does not add a tree
    to this spec.
 
+   *Implementation amendment (2026-09-02):* the executed record for a session's bounded named
+   command lands in the **session ledger** (`.amber/sessions/<id>/ledger.jsonl`), not
+   `.amber/executions/` — governed-runner's `ledgerPath` has always been caller-supplied, and
+   `.amber/executions/` is the agent-orchestration task-execution tree. See the dated amendment on
+   ADR-0029 §8.4 for the full rationale (approval consumption is per-ledger).
+
 9. **`schemaVersion` stays `const "1.0.0"` (0032 §2).** ADR-0012 grew this same schema by six
    fields without a bump and designated `amber_protocol_version` as the drift signal. Enum
    widening keeps every existing route valid; a `verb` route read by an older Amber fails
@@ -249,6 +255,11 @@ The pending request and every attempt transition are append-only events in
 lease projection. Bounded execution/F052 settlement remains under `.amber/executions/`, Evidence
 receipts under `.amber/evidence/`, and timeline entries are observability projections carrying the
 request/attempt hash, never another cursor.
+
+*Implementation amendment (2026-09-02):* "remains under `.amber/executions/`" is inaccurate
+against the measured baseline — see decision 8's amendment and ADR-0029 §8.4. The executed record
+for a session's bounded named command lands in the session ledger (the only self-consistent
+placement, since approval consumption is per-ledger).
 
 The write order is: acquire and verify the lease lock; append the immutable request event; perform
 or return the attempt; record the Evidence receipt and any F052 execution settlement; append the
