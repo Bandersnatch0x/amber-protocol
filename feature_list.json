@@ -4,7 +4,7 @@
 			"id": "F001",
 			"priority": 1,
 			"area": "context",
-			"paths": ["scripts/lib/core/scaffolding.js", "scripts/amber.js"],
+			"paths": ["scripts/lib/core/scaffold.js", "scripts/amber.js"],
 			"title": "Amber scaffold install (init)",
 			"user_visible_behavior": "A project gains AGENTS.md/CLAUDE.md, feature_list.json, and a wiki skeleton, with existing files preserved (idempotent).",
 			"status": "accepted",
@@ -12,7 +12,7 @@
 				"node scripts/amber.js init --target <repo> is idempotent and skips existing files",
 				"npm test (init/scaffolding suites green)"
 			],
-			"evidence": ["npm test: 1158/0 passing across Node 18/20/22 CI matrix"],
+			"evidence": ["npm test: 1158/0 passing on the supported CI matrix (Node 20.x and 22.x)"],
 			"notes": ["Self-dogfooded: amber init runs against this repo's own layout."]
 		},
 		{
@@ -91,7 +91,7 @@
 			"id": "F007",
 			"priority": 7,
 			"area": "governance",
-			"paths": ["scripts/lib/core/loops/", "src/migration/"],
+			"paths": ["scripts/lib/core/loops.js", "src/migration/"],
 			"title": "Governed loop execution (ADR-0003)",
 			"user_visible_behavior": "Loop contracts run only behind four gates: policy rules, explicit one-shot approval, isolated worktree, and a tamper-evident ledger.",
 			"status": "accepted",
@@ -2018,6 +2018,12 @@
 					"result": "eval 4/4 pass (assurance replayable); knowledge e2e 21/21 green on live CLI data incl. en/zh i18n + dual theme; root suite 3165/3168 (2 npm-pack ETIMEDOUT load flakes, dsh-bundle rerun 6/6 green, + 1 hygiene finding on transient session scratch JSONs, not part of the change); web vitest 663/663",
 					"date": "2026-08-28",
 					"notes": "knowledge graph --json byte-stable at 105 nodes (incl. feature:F059) / 92 edges / 2 drift findings (feature:F001, feature:F007); T8 fixed the e2e fixture gap by seeding committed docs/knowledge-corpus into the hermetic root"
+				},
+				{
+					"command": "node scripts/amber.js knowledge graph --target . --json",
+					"result": "status 0; schemaVersion 2; 512 nodes; 1491 edges; 0 drift findings",
+					"date": "2026-09-01",
+					"notes": "F001 and F007 feature paths now resolve to the live scaffold.js and loops.js files."
 				}
 			],
 			"notes": [
@@ -2117,6 +2123,75 @@
 				"date": "2026-08-30",
 				"surfaces": ["docs/specs/F061-ledger-family-factory.md"],
 				"owner": "script"
+			}
+		},
+		{
+			"id": "F062",
+			"priority": 62,
+			"area": "execution",
+			"title": "Route Stage Verbs & Named Governed Commands",
+			"user_visible_behavior": "A Session can resolve a Route verb stage to one registered F052 capability, run or settle one governed attempt through the existing gates, and advance its single cursor only from a valid recorded result.",
+			"status": "passing",
+			"verification": [
+				"node --test tests/unit/governed-runner.test.js tests/unit/route-commands.test.js tests/unit/session-stage-runner.test.js",
+				"npm test",
+				"npm run manifests",
+				"npm run doctor",
+				"npm run gen:agents:check"
+			],
+			"evidence": [
+				{
+					"date": "2026-09-02",
+					"result": "pass",
+					"command": "node --test tests/unit/session-stage-runner.test.js",
+					"notes": "T4 seam: 21/21 — adapter fail-closed (incl. external→F056), lease fence/owner/expiry refusal, dry-run no-write, host-agent pending, settlement idempotence/conflict/non-advance, retry attempt numbering, gateAfter blocking, cursor projection."
+				},
+				{
+					"date": "2026-09-02",
+					"result": "pass",
+					"command": "npm test",
+					"notes": "3517 tests, 0 feature failures; action-type parity and legacy-references guard green after enum/allowlist corrections."
+				},
+				{
+					"date": "2026-09-02",
+					"result": "pass",
+					"command": "npm run manifests && npm run doctor && npm run gen:agents:check && git diff --check",
+					"notes": "All repository gates green."
+				}
+			],
+			"notes": [
+				"Decision review completed 2026-09-02; implementation proceeds through issues 0034 → 0035/0036 → 0037 → 0038.",
+				"Normative sources: docs/specs/F062-route-stage-verbs-named-commands.md and docs/adr/0029-named-governed-commands-and-stage-verbs.md.",
+				"T4 landed as scripts/lib/session-stage-runner.js (deep module) wired through session run/settle, the CLI typed seam, and MCP action types amber.session.run/settle.",
+				"The adapter table is the ADR-0029 §7 in-code constant (empty on landing): every verb stage fails closed with AMBER_E_STAGE_ADAPTER_UNAVAILABLE until a pin is added by reviewed code change.",
+				"session-manifest schema gained the closed lease projection (ownerId/tokenHash/acquiredAt/expiresAt/ttlMs/fence, additionalProperties false)."
+			],
+			"paths": [
+				"docs/specs/F062-route-stage-verbs-named-commands.md",
+				"docs/adr/0029-named-governed-commands-and-stage-verbs.md",
+				"schemas/route.schema.json",
+				"schemas/session-manifest.schema.json",
+				"scripts/lib/core/governed-runner.js",
+				"scripts/lib/route-commands.js",
+				"scripts/lib/session-commands.js",
+				"scripts/lib/session-stage-runner.js",
+				"scripts/lib/command-dispatcher.js",
+				"scripts/lib/command-registry.js",
+				"scripts/lib/mcp-action-contracts.js",
+				"scripts/lib/core/cli-output.js",
+				"action-types/session-run.json",
+				"action-types/session-settle.json",
+				"docs/CLI_REFERENCE.md",
+				"tests/unit/session-stage-runner.test.js",
+				"scripts/sync-version.js",
+				".claude-plugin/settings.json"
+			],
+			"updated": "2026-09-02",
+			"learningWriteBack": {
+				"reviewed": true,
+				"date": "2026-09-02",
+				"surfaces": ["docs/specs/F062-route-stage-verbs-named-commands.md"],
+				"owner": "standard"
 			}
 		}
 	]

@@ -222,6 +222,55 @@ node scripts/amber.js session verify-ledger --session <id>                      
 `verify-ledger` recomputes the session ledger's hash chain and reports `AMBER_E_LEDGER_TAMPERED` on
 any broken link.
 
+### session run / settle
+
+Advance a session by at most one `verb` stage ([F062](specs/F062-route-stage-verbs-named-commands.md),
+[ADR-0029](adr/0029-named-governed-commands-and-stage-verbs.md)). The session ledger is the only
+cursor; `manifest.completedStages` and `currentStage` are projections of it.
+
+```bash
+# dry-run (default): resolve the current stage, capability, and adapter. Nothing is written.
+node scripts/amber.js session run --session <id> --target .
+
+# execute: record an attempt. Requires owner + lease proof and explicit approval.
+node scripts/amber.js session run --session <id> --execute \
+  --owner-id <agent> --token-hash <sha256> --lease-fence <n> --yes --target .
+
+# settle a pending host-agent request; only `succeeded` with an Evidence id advances the cursor.
+node scripts/amber.js session settle --session <id> --request-id <request> \
+  --result '{"status":"succeeded","exitCode":0,"evidenceId":"evidence/<id>"}' \
+  --owner-id <agent> --token-hash <sha256> --lease-fence <n> --yes --target .
+```
+
+The caller supplies only session identity, lease proof, and dry-run/execute intent. There is no
+`--stage`, `--target-capability`, `--command`, or provider selector: stage selection, capability
+resolution, and adapter choice all come from the session's own state.
+
+`--result` statuses are `succeeded | skipped | failed | cancelled | unknown | timed_out | rejected`.
+Only `succeeded` (with an Evidence binding) — or `skipped` on a stage declared `optional` — advances
+the cursor. A `succeeded` paired with a non-zero exit code, or without an Evidence id, is refused.
+Re-submitting the identical result is idempotent; a different result for the same attempt is a
+conflict, not an update. Retrying a failed stage creates a fresh attempt number and request id.
+
+**Bounded commands are read-only.** A `bounded-command` stage runs inside a disposable git worktree
+that is force-removed as soon as the command exits — only the exit code, output digest, and Evidence
+receipt survive. Any stage that must *produce files* is a `host-agent` stage, not a bounded command.
+Wiring an implement-type stage to a bounded command silently discards its output.
+
+#### Provider classes and the adapter table
+
+A `verb` stage's `target` is the capability pin `runnerId@version#capability@version`, resolved
+against the F052 runner/capability registry. The pin's provider class comes from the
+implementation-owned adapter table in `scripts/lib/session-stage-runner.js` (ADR-0029 §7): a
+reviewed code change, **not** a target-repository record — a Route supplies only the pin and can
+never select or override its adapter, and no CLI flag reaches the table. The four provider classes
+are `native`, `bounded-command`, `host-agent`, and `external`. A pin with no table entry fails closed
+(`AMBER_E_STAGE_ADAPTER_UNAVAILABLE`); `external` is refused by `session run`
+(`AMBER_E_STAGE_EXTERNAL_LIFECYCLE_REQUIRED`) and must go through the F056 external-effect lifecycle.
+
+A `host-agent` run records a pending request and stops: **Amber never starts the Agent.** The agent
+does the work and reports back through `session settle`.
+
 ## Route Commands
 
 ### route list

@@ -49,7 +49,7 @@
 			"properties": {
 				"name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
 				"displayName": { "type": "string" },
-				"type": { "enum": ["pack", "skill", "command", "gate"] },
+				"type": { "enum": ["pack", "skill", "command", "gate", "verb"] },
 				"target": { "type": "string" },
 				"gateAfter": { "type": "string" },
 				"optional": { "type": "boolean", "default": false },

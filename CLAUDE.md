@@ -249,6 +249,22 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 > conversation. This is context injection, not execution — it never runs target project commands,
 > never dispatches agents, and is never installed automatically.
 
+> **Boundary note (`.claude-plugin/hooks.json` is empty by design, ADR-0029 decision 11):** A
+> plugin-level hook applies to *every* installer. Shipping the per-turn breadcrumb there would make
+> it automatic and contradict the opt-in boundary above. Distribution therefore stays
+> `amber hooks breadcrumb install [--platform claude]`, which merges into the user's own
+> `.claude/settings.json`. JSON carries no comments, so this intent is recorded here: the empty
+> `hooks` array is a deliberate boundary, not a misconfiguration to be "fixed".
+
+> **Boundary note (stage verbs, F062/ADR-0029):** `amber session run --execute` advances at most one
+> Route `verb` stage, behind owner + lease proof, explicit approval, and the session ledger. The pin→
+> provider mapping lives only in the implementation-owned adapter table inside
+> `scripts/lib/session-stage-runner.js` (a reviewed code change, never a target-repository record); a
+> Route supplies the capability pin and can never select its own adapter. A `host-agent` stage records
+> a pending request and stops — **Amber never starts the Agent**; the result returns via
+> `amber session settle`. `external` is refused and must use the F056 lifecycle. A `bounded-command`
+> stage is read-only: its worktree is destroyed on exit, so it can back verification stages only.
+
 > **Boundary note (governed execution, ADR-0003):** Amber MAY run a loop contract's declared
 > `governed.command` via `amber loop run --execute`, but ONLY behind four gates — policy
 > (`.amber/governance/rules.json`), an explicit `amber loop approve` (one approval ⇒ one run),
@@ -303,7 +319,7 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 - **Adding new commands**: Add the Command definition (identity, tier, help, output policy, public order) in `scripts/lib/command-help.js`, implement the handler in `scripts/lib/command-dispatcher.js` (or a dedicated `*-commands.js` module bound there), and keep registry parity tests green. Default help exposes only `journey` and `core`; `--all` is the complete compatibility projection.
 - **Modifying schemas**: Update `schemas/*.schema.json` and ensure validators in `scripts/validate-*.js` are synced
 - **Schema validation**: compile every JSON Schema through `scripts/lib/core/schema-contract.js` (`compileSchema`/`compileInline`/`validate`); never instantiate Ajv elsewhere — `tests/unit/schema-contract-guard.test.js` fails the suite otherwise
-- **Adding templates**: Place in `templates/` and update `scripts/lib/core/scaffolding.js`
+- **Adding templates**: Place in `templates/` and update `scripts/lib/core/scaffold.js`
 - **Adding routes**: Create `.route.json` in `routes/` following `schemas/route.schema.json`
 - **Migration changes**: Add utilities to `src/migration/` with dry-run support
 
@@ -311,7 +327,7 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on pushes and PRs:
 
-- Tests on Node 18.x, 20.x, 22.x
+- Tests on Node 20.x and 22.x (Node 18 excluded; `engines.node` is `^20.19.0 || ^22.12.0 || >=23`)
 - Manifest validation
 - Doctor checks
 - CLI smoke tests
@@ -321,7 +337,9 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on pushes and PRs:
 
 ### Issue tracker
 
-Issues live in GitHub (`Bandersnatch0x/amber-protocol`); use the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Work items follow the authority and lifecycle rules in `docs/agents/issue-tracker.md`:
+new GitHub records are bugs; specifications live in `docs/specs/`; local tickets track
+research, review, and implementation work.
 
 ### Triage labels
 

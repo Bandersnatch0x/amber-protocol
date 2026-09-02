@@ -1,0 +1,56 @@
+{
+	"actionTypeId": "amber.session.settle",
+	"version": 1,
+	"title": "Settle pending request",
+	"goal": "Settle a pending host-agent request and advance the cursor on success.",
+	"mode": "interactive",
+	"parameters": {
+		"sessionId": {
+			"type": "string",
+			"required": true,
+			"description": "Session ID containing the pending request."
+		},
+		"requestId": {
+			"type": "string",
+			"required": true,
+			"description": "Request ID to settle."
+		},
+		"result": {
+			"type": "string",
+			"required": true,
+			"description": "Settlement status (succeeded, failed, cancelled, unknown, timed_out, rejected)."
+		}
+	},
+	"submissionCriteria": [
+		"session exists and is active",
+		"request exists and is pending",
+		"result is a valid settlement status"
+	],
+	"effects": {
+		"edits": [
+			".amber/sessions/<id>/ledger.jsonl",
+			".amber/sessions/<id>/timeline.jsonl",
+			".amber/sessions/<id>/manifest.json"
+		],
+		"sideEffects": ["ledger-append", "timeline-event"],
+		"rollback": false
+	},
+	"evidenceRequired": ["settlement-record"],
+	"timeout": 60,
+	"governance": {
+		"policy": "governance/policy.md#settlement",
+		"approver": ["system"],
+		"evidence": ["settlement-record"],
+		"circuitBreaker": true,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "session",
+		"subcommand": "settle",
+		"args": [
+			{ "flag": "--session", "source": "parameters.sessionId" },
+			{ "flag": "--request-id", "source": "parameters.requestId" },
+			{ "flag": "--result", "source": "parameters.result" }
+		]
+	}
+}

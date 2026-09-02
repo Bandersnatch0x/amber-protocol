@@ -37,6 +37,14 @@ const ALLOWLIST = [
 	"docs/research/", // internal research archive — gitignored, local-only, never in CI checkouts
 	"docs/examples/", // historical review artifacts generated from real read-only trials
 	"docs/adoption-self/", // self-adoption report (auto-generated, contains legacy project path)
+	// Generated provenance records: each embeds the absolute on-disk checkout
+	// path, which legitimately contains the repository folder name. Listed file
+	// by file rather than whitelisting docs/agents/, which also holds the active
+	// agent specs (issue-tracker, dev-workflow, triage-labels, domain).
+	"docs/agents/f013-f014-recovery.md",
+	"docs/agents/f013-f014-recovery.json",
+	"docs/agents/spec-source-migration.md",
+	"docs/agents/spec-source-migration.json",
 	"docs/wiki/PHASE_B_ALPHA_TASKS.md", // era-noted historical task list
 	".workflow/",
 	".mimocode/",

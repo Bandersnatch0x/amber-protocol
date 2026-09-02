@@ -72,6 +72,31 @@ const COMMAND_CAPABILITIES = {
 		],
 		sideEffects: ["timeline-event", "ledger-append"],
 	},
+	// `session run` without --execute resolves the next verb stage and returns
+	// the request: no attempt, no cursor move, nothing written. --execute is the
+	// writeFlag that upgrades it to a governed mutation, so MCP (which never
+	// binds writeFlags) only ever reaches the dry-run projection.
+	"session/run": {
+		effect: "read",
+		approver: "system",
+		evidence: null,
+		directReadOnlyExec: true,
+		edits: [],
+		sideEffects: [],
+		writeFlags: ["--execute"],
+	},
+	"session/settle": {
+		effect: "write",
+		approver: "system",
+		evidence: "settlement-record",
+		directReadOnlyExec: false,
+		edits: [
+			".amber/sessions/<id>/ledger.jsonl",
+			".amber/sessions/<id>/timeline.jsonl",
+			".amber/sessions/<id>/manifest.json",
+		],
+		sideEffects: ["ledger-append", "timeline-event"],
+	},
 	"session/status": {
 		effect: "read",
 		approver: "system",

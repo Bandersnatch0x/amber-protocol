@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const {
 	createManifest,
 	readSessionManifest,
@@ -23,6 +24,7 @@ const { appendLedgerRecord, verifyLedgerOutcome } = require("./core/loop-ledger"
 const { runEvidenceCommand } = require("./core/evidence-runner");
 const { recordFeatureEvidence } = require("./feature-commands");
 const { writeRunnerAck } = require("./runner-ack");
+const { runSessionStage, settleSessionRequest } = require("./session-stage-runner");
 const {
 	resolveStateDirForRead,
 	resolveStateDirForCreate,
@@ -213,6 +215,31 @@ async function startSession(projectRoot, options) {
 	if (mode) {
 		extras.mode = mode;
 		lines.push(`Mode: ${mode}`);
+	}
+
+	// F062 lease minting: an owner-claimed session gets a short-lived fencing
+	// lease so `session run --execute` / `session settle` can prove ownership.
+	// The raw token is returned ONCE here and never persisted — only its
+	// SHA-256 digest reaches the manifest (ADR-0029 §8.1). TTL matches the
+	// five-minute session-lock ceiling; execute-mode work must happen inside
+	// the window, and reacquisition is explicit (a fresh start), never silent.
+	if (agent) {
+		const token = crypto.randomBytes(32).toString("hex");
+		const acquiredAt = new Date().toISOString();
+		const ttlMs = 300_000;
+		extras.lease = {
+			ownerId: agent,
+			tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+			acquiredAt,
+			expiresAt: new Date(Date.parse(acquiredAt) + ttlMs).toISOString(),
+			ttlMs,
+			fence: 1,
+		};
+		lines.push("");
+		lines.push(`Lease token (shown ONCE, not stored): ${token}`);
+		lines.push(
+			"Prove it with: amber session run --execute --owner-id <agent> --token-hash <sha256(token)> --lease-fence 1",
+		);
 	}
 
 	if (fallbackWarning) {
@@ -587,6 +614,21 @@ async function verifySession(projectRoot, options) {
 	const { routes } = loadTargetRoutes(projectRoot);
 	const route = routes.find((r) => r.routeId === manifest.route.id);
 	const stages = route && Array.isArray(route.stages) ? route.stages : [];
+
+	// F062 legacy-seam guard: a Route containing a `verb` stage advances only
+	// through `session run`/`session settle`. Legacy verify writes
+	// completedStages, which would corrupt the verb cursor's contiguous-prefix
+	// invariant — so it refuses the whole operation and points at the new seam.
+	// (Spec §"Legacy and external seams": claim-only inspection may remain
+	// non-mutating; verify is always mutating, so there is no claim-only path.)
+	if (stages.some((s) => s && s.type === "verb")) {
+		return result(
+			`Cannot verify: route "${manifest.route.id}" contains verb stages, whose cursor advances only through the governed seam.\n` +
+				`Use: amber session run --session ${sessionId} [--execute] and amber session settle --session ${sessionId} --request-id <id> ...`,
+			1,
+		);
+	}
+
 	const verifyStage = route ? stages.find((s) => s.name === (stageName || "verify")) : null;
 	const actualStageName = (verifyStage && verifyStage.name) || stageName || "verify";
 	const stageDisplayName = (verifyStage && verifyStage.displayName) || actualStageName;
@@ -731,31 +773,38 @@ async function approveSession(projectRoot, options) {
 		return result(`Cannot approve: session is already ${manifest.status}.`, 1);
 	}
 
-	// Resolve route gates so we can name the gate being approved.
+	// Resolve route gates so we can name the gate being approved. A gate is
+	// approvable when it is declared in route.gates OR referenced by a stage's
+	// gateAfter — a stage-level gateAfter without a route-level entry still
+	// blocks the cursor (session run), so approve must be able to unblock it.
 	const { routes } = loadTargetRoutes(projectRoot);
 	const route = routes.find((r) => r.routeId === manifest.route.id);
 
-	const gates = route && Array.isArray(route.gates) ? route.gates : [];
-	if (!gateId && gates.length !== 1) {
-		if (gates.length === 0) {
+	const declaredGates = route && Array.isArray(route.gates) ? route.gates : [];
+	const stageGateIds = (route && Array.isArray(route.stages) ? route.stages : [])
+		.map((s) => s && s.gateAfter)
+		.filter(Boolean);
+	const gateIds = [...new Set([...declaredGates.map((g) => g.id), ...stageGateIds])];
+	if (!gateId && gateIds.length !== 1) {
+		if (gateIds.length === 0) {
 			return result(`Error: route "${manifest.route.id}" has no gates to approve.`, 1);
 		}
 		return result(
-			`Error: route has ${gates.length} gates — specify one with --gate <id>.\n` +
-				`Available: ${gates.map((g) => g.id).join(", ")}`,
+			`Error: route has ${gateIds.length} gates — specify one with --gate <id>.\n` +
+				`Available: ${gateIds.join(", ")}`,
 			1,
 		);
 	}
 
-	if (gateId && !gates.some((g) => g.id === gateId)) {
+	if (gateId && !gateIds.includes(gateId)) {
 		return result(
 			`Error: gate "${gateId}" not found in route "${manifest.route.id}".\n` +
-				`Available: ${gates.map((g) => g.id).join(", ") || "(none)"}`,
+				`Available: ${gateIds.join(", ") || "(none)"}`,
 			1,
 		);
 	}
 
-	const resolvedGateId = gateId || gates[0].id;
+	const resolvedGateId = gateId || gateIds[0];
 
 	// Identity gate: a "user-approval" gate must be approved by a human, not by an
 	// agent piping commands. In a non-interactive shell we refuse unless --yes is
@@ -797,7 +846,7 @@ async function approveSession(projectRoot, options) {
 	});
 
 	// Persist a .decision.json for the web viewer.
-	const isRealGate = gates.some((g) => g.id === resolvedGateId);
+	const isRealGate = declaredGates.some((g) => g.id === resolvedGateId);
 	let gateWarning = null;
 	if (isRealGate) {
 		if (!writeGateDecision(sessionDir, resolvedGateId, "approved")) {
@@ -809,10 +858,9 @@ async function approveSession(projectRoot, options) {
 	// completion, not a terminal-state transition; completeSession owns the only
 	// normal path to STATES.COMPLETED after strict completion evidence passes.
 	const gateEvents = readSessionEvents(sessionDir).filter((e) => e.type === "gate_passed");
-	const routeGateIds = gates.map((g) => g.id);
 	const allGatesPassed =
-		routeGateIds.length > 0 &&
-		routeGateIds.every((id) => gateEvents.some((e) => e.data && e.data.gateId === id));
+		gateIds.length > 0 &&
+		gateIds.every((id) => gateEvents.some((e) => e.data && e.data.gateId === id));
 	// Approval is still Session activity even though it does not change status.
 	// Refresh updatedAt so activity ordering remains accurate for readers.
 	writeSessionManifest(sessionDir, manifest);
@@ -822,9 +870,9 @@ async function approveSession(projectRoot, options) {
 		lines.push(
 			"All gates passed — approval requirements satisfied; session remains active pending verification and explicit completion.",
 		);
-	} else if (gates.length > 1) {
-		const pending = gates.filter((g) => !gateEvents.some((e) => e.data && e.data.gateId === g.id));
-		lines.push(`Pending gates: ${pending.map((g) => g.id).join(", ")}`);
+	} else if (gateIds.length > 1) {
+		const pending = gateIds.filter((id) => !gateEvents.some((e) => e.data && e.data.gateId === id));
+		lines.push(`Pending gates: ${pending.join(", ")}`);
 	}
 	if (gateWarning) {
 		lines.push(gateWarning);
@@ -851,6 +899,120 @@ function verifyLedgerSession(projectRoot, sessionId) {
 	return result(o.tamperedMessage, 1);
 }
 
+async function runSession(projectRoot, options) {
+	const { sessionId, execute, ownerId, tokenHash, leaseFence } = options;
+
+	if (!sessionId) {
+		return result("Error: session run requires --session <id>.", 1);
+	}
+
+	// Session existence, terminal-state, and lease refusals are all owned by the
+	// deep module; this wrapper only shapes its result for the CLI envelope.
+	const runResult = await runSessionStage(projectRoot, sessionId, {
+		execute: execute === true,
+		ownerId,
+		tokenHash,
+		leaseFence,
+	});
+
+	if (!runResult.success) {
+		return result(runResult.message || "Stage run failed", runResult.exitCode || 1);
+	}
+
+	const { request, duplicate, pending, dryRun: wasDryRun, providerClass } = runResult;
+	const lines = [
+		`Session run: ${sessionId}`,
+		`Stage: ${request.stageName} (${request.stageIndex + 1})`,
+		`Capability: ${request.capabilityPin}`,
+		`Adapter: ${request.adapterId}@${request.adapterVersion} (${providerClass})`,
+		`Request: ${request.requestId}`,
+		`Attempt: ${request.attemptNumber}`,
+	];
+
+	if (wasDryRun) {
+		lines.push("", "Dry-run: resolved only. No attempt was created and the cursor is unchanged.");
+	}
+	if (duplicate) {
+		lines.push("", "Idempotent: this request hash already exists; returning the recorded attempt.");
+	}
+	if (pending) {
+		lines.push(
+			"",
+			"Pending: a host-agent request was recorded. Amber does not start the Agent.",
+			`Settle it with: amber session settle --session ${sessionId} --request-id ${request.requestId} --result '{"status":"succeeded","evidenceId":"..."}'`,
+		);
+	}
+	if (runResult.settled) {
+		lines.push(
+			"",
+			`Settled: ${runResult.settlement.status}`,
+			runResult.advanced ? "Cursor advanced." : "Cursor unchanged.",
+		);
+	}
+
+	return result(lines.join("\n"), 0);
+}
+
+async function settleSession(projectRoot, options) {
+	const {
+		sessionId,
+		requestId,
+		attemptId,
+		requestHash,
+		settlementResult,
+		ownerId,
+		tokenHash,
+		leaseFence,
+	} = options;
+
+	if (!sessionId) {
+		return result("Error: session settle requires --session <id>.", 1);
+	}
+
+	if (!requestId) {
+		return result("Error: session settle requires --request-id <id>.", 1);
+	}
+
+	if (!settlementResult) {
+		return result("Error: session settle requires --result <json>.", 1);
+	}
+
+	// Session existence, terminal-state, and lease refusals are all owned by the
+	// deep module; this wrapper only shapes its result for the CLI envelope.
+	const settleResult = await settleSessionRequest(
+		projectRoot,
+		sessionId,
+		requestId,
+		settlementResult,
+		{ ownerId, tokenHash, leaseFence, attemptId, requestHash },
+	);
+
+	if (!settleResult.success) {
+		return result(settleResult.message || "Settlement failed", settleResult.exitCode || 1);
+	}
+
+	const { settlement, duplicate, advanced } = settleResult;
+	const lines = [
+		`Session settle: ${sessionId}`,
+		`Request: ${requestId}`,
+		`Stage: ${settlement.stageName}`,
+		`Status: ${settlement.status}`,
+	];
+
+	if (duplicate) {
+		lines.push("", "Idempotent: this exact result was already recorded.");
+	}
+
+	lines.push(
+		"",
+		advanced
+			? "Cursor advanced; the stage is recorded complete."
+			: "Cursor unchanged (non-advancing status, or no Evidence binding).",
+	);
+
+	return result(lines.join("\n"), 0);
+}
+
 function findMostRecentNonCompletedSession(projectRoot) {
 	return findMostRecentSession(projectRoot, { excludeCompleted: true });
 }
@@ -865,6 +1027,8 @@ module.exports = {
 	verifySession,
 	approveSession,
 	verifyLedgerSession,
+	runSession,
+	settleSession,
 	getSessionsDir,
 	loadSessionManifest,
 	loadAllSessionManifests,

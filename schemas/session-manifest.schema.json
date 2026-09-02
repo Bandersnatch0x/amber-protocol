@@ -47,6 +47,20 @@
 			"type": "string",
 			"description": "The deep-journey id selected by decideRouteJourney for this session's goal (e.g. amber-delivery). Persisted so the journey half of the routing decision is not lost."
 		},
+		"lease": {
+			"type": "object",
+			"description": "F062 session lease projection. `session run` and `session settle` require owner and lease proof; the raw token is never persisted, only its SHA-256 digest. Reacquisition is explicit and creates a new fence.",
+			"required": ["ownerId", "tokenHash", "acquiredAt", "expiresAt", "ttlMs", "fence"],
+			"additionalProperties": false,
+			"properties": {
+				"ownerId": { "type": "string", "minLength": 1 },
+				"tokenHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+				"acquiredAt": { "type": "string", "format": "date-time" },
+				"expiresAt": { "type": "string", "format": "date-time" },
+				"ttlMs": { "type": "integer", "minimum": 1, "maximum": 300000 },
+				"fence": { "type": "integer", "minimum": 0 }
+			}
+		},
 		"execution_context": {
 			"type": "object",
 			"properties": {

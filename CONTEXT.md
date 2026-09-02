@@ -16,6 +16,14 @@ _Avoid_: hosted platform, live agent runtime, dashboard
 Stable project knowledge under `docs/wiki/` in a target repository: architecture, runbooks, verification, and agent rules. Agents consult it rather than inventing facts.
 _Avoid_: docs, knowledge base, README
 
+**Public Documentation Site**:
+The independently deployable, reader-facing publication of curated Amber Protocol guidance and reference for people evaluating or adopting the product. It publishes a reviewed public corpus and is neither a target repository's Wiki nor the local Web Viewer.
+_Avoid_: Wiki, Web Viewer, docs page, documentation portal
+
+**Documentation Design System**:
+The docs-site-local set of visual tokens and reusable reading components that expresses the Public Documentation Site's identity and interaction rules without becoming a shared application UI library.
+_Avoid_: apps/web theme, shared UI package, full brand system
+
 **Agent Entrypoint**:
 A file in a target repository that tells an agent where project context, working rules, and verification live (e.g. `AGENTS.md`, `CLAUDE.md`). Read at agent startup.
 _Avoid_: prompt file, instruction blob, system prompt
@@ -59,6 +67,30 @@ _Avoid_: scoring details, diagnostic dump
 **Stage Reference**:
 The identifier naming which skill, pack, or command a route stage invokes.
 _Avoid_: stage target, step target
+
+**Stage Verb**:
+A registered, versioned capability that a Route stage may request through Amber's governed boundary. It names an allowed governance transition or action; it may be executed by Amber when it is an Amber-native Verb or through a separately governed Bounded Host Action, but it is never an arbitrary target-repository operation and cannot bypass Gate, Approval, Policy, or Evidence requirements.
+_Avoid_: prompt-only skill, arbitrary command, dynamic workflow
+
+**Governed Stage Execution**:
+A deterministic execution path for a registered Stage Verb that validates its contract, enforces its Gate and authority requirements, records its outcome, and preserves failure and recovery evidence. It may execute Amber-native governance work or a bounded host action, but it never invokes an unregistered command, model, or live worker runtime.
+_Avoid_: dynamic workflow, arbitrary runner, prompt dispatch
+
+**Bounded Host Action**:
+A target-repository or environment mutation explicitly declared by a Stage Verb and confined by its target scope, capability, approval, execution environment, output receipt, and recovery contract. In the Stage Verb architecture, Amber may execute this class through a default restricted runner using structured command arguments and explicit path/environment bounds; it is not a general-purpose shell or an authority grant.
+_Avoid_: arbitrary target command, unrestricted shell, Agent authority
+
+**Entry Skill**:
+An agent-facing instruction surface that presents or invokes a Stage Verb. It is loaded by a host platform and carries no authority of its own; it cannot replace the registered contract or its governed outcome.
+_Avoid_: executor, plugin, authority grant
+
+**Amber Work Runtime**:
+The upper Amber layer that turns a work objective into a resumable governed flow: it owns Work Item lifecycle, Route and stage selection, context loading, execution-provider dispatch, outcome capture, Gate progression, and replayable recovery. It is the operational bridge between platform entry surfaces and Amber Core; it is not a second governance authority or an unrestricted Agent runtime.
+_Avoid_: Amber Core, platform plugin, dynamic worker runtime
+
+**Work Item**:
+A durable unit of governed work that binds an objective to its Route, current stage, required artifacts, execution attempts, Evidence, and resume point. It is broader than a Feature and is not synonymous with a chat session, ticket, or prompt.
+_Avoid_: feature, issue, chat session, task prompt
 
 **Plan**:
 A durable governance artifact linking one feature to goal, vertical slices, verification steps, evidence schema, and approval state. Survives chat loss; advanced through Plan Gate, Review, and Accept.
@@ -540,6 +572,10 @@ _Avoid_: context file, memory file, state file
 The Governance Console's near-real-time rendered view of a Session's timeline events: the web console polls `timeline.jsonl` as the single source of truth while a session is active and uses SSE only as an invalidation signal. It presents recorded evidence; it is not a runtime interception of the agent.
 _Avoid_: live log, console stream, runtime trace
 
+**Documentation Site Health Signal**:
+A deterministic, non-telemetry indication that the Public Documentation Site's build, links, index, or published endpoint is usable, derived from repository checks, scheduled checks, availability probes, or reader reports rather than reader behavior tracking.
+_Avoid_: analytics, usage telemetry, reader tracking
+
 ## Agent Integration
 
 **Skill**:
@@ -591,7 +627,7 @@ The replayable evidence bundle and replay requirements for a prepared task. Pair
 _Avoid_: evidence pack, results folder, proof bundle
 
 **Execution Boundary**:
-The policy and capability boundary separating Amber's governance actions from target-repository or environment side effects. In 2.0, Amber may inspect, validate, plan, and record externally performed results; Evidence of an action does not grant Amber authority to perform it.
+The policy and capability boundary separating Amber's governance actions from target-repository or environment side effects. In the Stage Verb architecture, Amber may execute a contract-bound Bounded Host Action through its restricted runner; actions outside that contract remain host- or externally performed. Evidence of an action does not grant Amber authority to perform it.
 _Avoid_: runner permission, automation mode, sandbox alone
 
 **Replay**:
@@ -783,6 +819,10 @@ _Avoid_: single version, release number, generation alias
 **Compatibility Matrix**:
 A deterministic, scope-bound record of supported Version Domains, compatible ranges, required capability hashes, upgrade classes, policy and fence prerequisites, and unknown-version outcomes used by a profile gate. It never authorizes an unproven combination.
 _Avoid_: compatibility guess, fallback table, feature flag list
+
+**Documentation Version Surface**:
+The reader-facing current-version stamp, support matrix, and curated version-history or migration notes derived from repository release truth. It explains version differences without becoming a runtime multi-version switcher or a second hand-maintained source of truth.
+_Avoid_: version switcher, duplicated compatibility badge, registry authority
 
 **Migration Checkpoint**:
 A durable position after a bounded migration step has a settled outcome, validation evidence, and idempotency identity. Repeating the same identity returns the existing settlement or performs no operation; it never duplicates or rewrites canonical history.

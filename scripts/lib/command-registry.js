@@ -206,7 +206,7 @@ const COMMAND_HELP = {
 		"  amber route test bugfix-quick --dry-run",
 	],
 	session: [
-		"Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete.",
+		"Manage session lifecycle: start, status, list, abort, continue, complete-check, verify, approve, complete, run, settle.",
 		"",
 		"Subcommands:",
 		'  start --goal "..." [--route <id>] [--budget <n>] [--worktree] [--mode interactive]',
@@ -228,6 +228,10 @@ const COMMAND_HELP = {
 		"      With --execute, runs --command and records the real exit code.",
 		"  approve --session <id> [--gate <gate-id>]",
 		"      Record a gate_passed event so complete-check sees approval evidence.",
+		"  run --session <id> [--dry-run|--execute]",
+		"      Execute the current verb stage (F062). Dry-run resolves without executing.",
+		"  settle --session <id> --request-id <id> --result <status>",
+		"      Settle a pending host-agent request and advance the cursor on success.",
 		"",
 		"Session completion flow:",
 		'  amber session start --goal "..."',
@@ -260,6 +264,8 @@ const COMMAND_HELP = {
 		"  amber session complete-check --session <session-id>",
 		"  amber session verify --session <session-id> --confirm",
 		"  amber session approve --session <session-id>",
+		"  amber session run --session <session-id> --dry-run",
+		"  amber session settle --session <session-id> --request-id <id> --result succeeded",
 	],
 	migrate: [
 		"Backfill version metadata in recognized Amber JSON artifacts, or migrate",

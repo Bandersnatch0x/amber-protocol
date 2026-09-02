@@ -117,6 +117,11 @@ const RECEIPT_FIELDS = Object.freeze([
 	"tools",
 	"environment",
 	"outputs",
+	// Optional F062 execution digest.  It is deliberately optional so older
+	// receipts remain byte-identical and continue to fold, while execution
+	// receipts can bind their complete output envelope without smuggling it into
+	// the bounded preview array.
+	"outputDigest",
 	"status",
 	"replayOf",
 	"recordedAt",
@@ -556,6 +561,13 @@ function storedReceiptProblem(receipt, lineIndex) {
 	) {
 		return `evidence ledger event ${lineIndex} carries a receipt whose outputs is not an array of at most ${MAX_OUTPUTS} non-empty strings of at most ${MAX_OUTPUT_CHARS} characters; got ${JSON.stringify(receipt.outputs)}`;
 	}
+	if (
+		receipt.outputDigest !== undefined &&
+		(typeof receipt.outputDigest !== "string" ||
+			!/^sha256:[0-9a-f]{64}$/.test(receipt.outputDigest))
+	) {
+		return `evidence ledger event ${lineIndex} carries a receipt whose outputDigest is not a sha256:<64-hex> string; got ${JSON.stringify(receipt.outputDigest)}`;
+	}
 	const replayOf = receipt.replayOf;
 	if (
 		!isNullableNonEmptyString(replayOf) ||
@@ -644,6 +656,7 @@ function recordEvidence(cwd, input, opts = {}) {
 		tools = [],
 		environment = {},
 		outputs = [],
+		outputDigest,
 		status,
 		replayOf = null,
 	} = input;
@@ -655,6 +668,16 @@ function recordEvidence(cwd, input, opts = {}) {
 	const storedTools = tools ?? [];
 	const storedEnvironment = environment ?? {};
 	const storedOutputs = outputs ?? [];
+	const storedOutputDigest = outputDigest ?? undefined;
+	if (
+		storedOutputDigest !== undefined &&
+		(typeof storedOutputDigest !== "string" ||
+			!/^sha256:[0-9a-f]{64}$/.test(storedOutputDigest))
+	) {
+		return fail(INVALID_ARG_CODE, [
+			`outputDigest must be a sha256:<64-hex> string when provided; got ${JSON.stringify(storedOutputDigest)}`,
+		]);
+	}
 	if (typeof producer !== "string" || producer.trim().length === 0) {
 		return fail(INVALID_ARG_CODE, [
 			`producer is required: the receipt must bind the Principal that produced the evidence, verified against the registry (e.g. --producer ci-bot); got ${JSON.stringify(producer)}`,
@@ -727,6 +750,7 @@ function recordEvidence(cwd, input, opts = {}) {
 			tools: storedTools,
 			environment: storedEnvironment,
 			outputs: storedOutputs,
+			...(storedOutputDigest === undefined ? {} : { outputDigest: storedOutputDigest }),
 			status,
 			replayOf,
 			recordedAt: at,

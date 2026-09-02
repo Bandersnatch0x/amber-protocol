@@ -1,0 +1,38 @@
+{
+	"actionTypeId": "amber.session.run",
+	"version": 1,
+	"title": "Resolve the next session stage",
+	"goal": "Resolve the session's current verb stage — capability pin, adapter, and attempt identity — and return the request without executing it. Read-only: the MCP surface never passes --execute, so no attempt is created, no runner is started, and the cursor never moves.",
+	"mode": "dry-run",
+	"parameters": {
+		"sessionId": {
+			"type": "string",
+			"required": true,
+			"description": "Session id whose current stage is resolved."
+		}
+	},
+	"submissionCriteria": [
+		"session exists and is not completed, failed, or aborted",
+		"the current stage is a verb stage",
+		"no gate is blocking the current stage"
+	],
+	"effects": {
+		"edits": [],
+		"sideEffects": [],
+		"rollback": false
+	},
+	"evidenceRequired": [],
+	"timeout": 120,
+	"governance": {
+		"policy": "governance/policy.md#session-lifecycle",
+		"approver": ["system"],
+		"evidence": [],
+		"circuitBreaker": false,
+		"worktreeIsolation": false
+	},
+	"execution": {
+		"command": "session",
+		"subcommand": "run",
+		"args": [{ "flag": "--session", "source": "parameters.sessionId" }]
+	}
+}

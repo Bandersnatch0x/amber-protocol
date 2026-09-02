@@ -6,8 +6,8 @@
 // The highest CLI seam is `amber knowledge graph --json` (spec § Testing
 // Decisions): schema validity, byte-stable recompute, the full node/edge
 // population against the REAL repository tree — including file-level Code
-// Nodes and the imports/anchors verbs — and the standing F001/F007
-// dead-anchor findings. Population is asserted through invariants (every
+// Nodes and the imports/anchors verbs — with repaired F001/F007 anchors.
+// Population is asserted through invariants (every
 // source document has its node), never exact counts.
 
 const { test } = require("node:test");
@@ -161,7 +161,9 @@ test("code files are file-level nodes (ADR-0025); every edge endpoint resolves t
 
 test("anchors stay node properties; an existing anchored file additionally becomes an anchors edge", () => {
 	const f001 = graph.nodes.find((n) => n.id === "feature:F001");
-	assert.ok(f001.paths.includes("scripts/lib/core/scaffolding.js"));
+	assert.ok(f001.paths.includes("scripts/lib/core/scaffold.js"));
+	const f007 = graph.nodes.find((n) => n.id === "feature:F007");
+	assert.ok(f007.paths.includes("scripts/lib/core/loops.js"));
 	const f058 = graph.nodes.find((n) => n.id === "feature:F058");
 	assert.ok(Array.isArray(f058.paths) && f058.paths.length > 0);
 	// Every anchors edge is feature -> existing code node, never a bare path.
@@ -173,11 +175,12 @@ test("anchors stay node properties; an existing anchored file additionally becom
 		assert.match(edge.dst, /^code:/);
 		assert.ok(ids.has(edge.dst));
 	}
-	// The standing dead anchor (F001 scaffolding.js) never became an edge.
+	// Repaired F001/F007 anchors resolve to live code nodes.
 	assert.ok(
-		!anchors.some((e) => e.dst === "code:scripts/lib/core/scaffolding.js"),
-		"dead anchor must not produce a dangling edge",
+		anchors.some((e) => e.dst === "code:scripts/lib/core/scaffold.js"),
+		"F001 live anchor must produce an anchors edge",
 	);
+	assert.ok(anchors.some((e) => e.dst === "code:scripts/lib/core/loops.js"));
 });
 
 test("F060 population: known product files are Code Nodes carrying their exported-symbol tables", () => {
@@ -267,24 +270,22 @@ test("known real edges are discovered with evidence", () => {
 	assert.ok(find("feature:F007", "references", "adr:0003"));
 });
 
-// ── drift: the standing F001/F007 dead anchors ────────────────────────
+// ── drift: repaired F001/F007 anchors ─────────────────────────────────
 
-test("F001 dead anchor: scaffolding.js renamed to scaffold.js, attached to the declaring node", () => {
-	const finding = graph.drift.find(
-		(d) => d.nodeId === "feature:F001" && d.path === "scripts/lib/core/scaffolding.js",
+test("F001 anchor resolves to scaffold.js without drift", () => {
+	assert.equal(
+		graph.drift.find((d) => d.nodeId === "feature:F001"),
+		undefined,
+		"F001 should no longer drift",
 	);
-	assert.ok(finding, "F001 finding missing");
-	assert.equal(finding.kind, "dead-anchor");
-	assert.equal(finding.actualPath, "scripts/lib/core/scaffold.js");
 });
 
-test("F007 dead anchor: loops/ collapsed to loops.js, attached to the declaring node", () => {
-	const finding = graph.drift.find(
-		(d) => d.nodeId === "feature:F007" && d.path === "scripts/lib/core/loops/",
+test("F007 anchor resolves to loops.js without drift", () => {
+	assert.equal(
+		graph.drift.find((d) => d.nodeId === "feature:F007"),
+		undefined,
+		"F007 should no longer drift",
 	);
-	assert.ok(finding, "F007 finding missing");
-	assert.equal(finding.kind, "dead-anchor");
-	assert.equal(finding.actualPath, "scripts/lib/core/loops.js");
 });
 
 test("live anchors (including glob anchors) produce no findings", () => {
@@ -726,15 +727,8 @@ test("F-5: amber knowledge graph --json emits schema-valid, byte-identical JSON 
 	assert.equal(second.status, 0);
 	assert.equal(first.stdout, second.stdout, "output is not byte-identical on recompute");
 
-	// F001/F007 drift findings persist at the CLI seam
-	const f001 = parsed.drift.find(
-		(d) => d.nodeId === "feature:F001" && d.path === "scripts/lib/core/scaffolding.js",
-	);
-	assert.ok(f001, "F001 drift finding missing in CLI output");
-	const f007 = parsed.drift.find(
-		(d) => d.nodeId === "feature:F007" && d.path === "scripts/lib/core/loops/",
-	);
-	assert.ok(f007, "F007 drift finding missing in CLI output");
+	// The repaired production anchors leave the CLI graph drift-free.
+	assert.deepEqual(parsed.drift, [], "repaired anchors must leave no drift findings");
 
 	// Population bounds: at minimum the 46 committed corpus nodes must appear.
 	// The graph also includes features, artifacts, and memory nodes — use >=46 as the floor.

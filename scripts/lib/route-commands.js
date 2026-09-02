@@ -5,9 +5,13 @@ const { loadRoutes, loadRouteFile } = require("./route-loader");
 const { result } = require("./result");
 const { appendLedgerRecord, verifyLedgerOutcome } = require("./core/loop-ledger");
 const { runGovernedCommand } = require("./core/governed-runner");
+const { codedError } = require("./core/error-catalog");
+const { resolveRequestCapability } = require("./core/runner-registry");
 const { resolveStateDirForCreate } = require("./state-dir-resolver");
 
 const DEFAULT_ROUTES_DIR = path.join(__dirname, "../../routes");
+const VERB_TARGET_PATTERN = /^([^@#\s]+)@([^@#\s]+)#([^@#\s]+)@([^@#\s]+)$/;
+const VERB_TARGET_GRAMMAR = "runnerId@version#capability@version";
 
 function findRoute(routeId, routesDir) {
 	const { routes } = loadRoutes(routesDir);
@@ -112,6 +116,75 @@ function findStage(route, stageName) {
 	return (route.stages || []).find((s) => s.name === stageName) || null;
 }
 
+/**
+ * Parse the closed target grammar used by a route `verb` stage.
+ *
+ * The target is only a F052 capability pin.  It is deliberately not a
+ * command-like string and is never passed to a shell.  Runner and capability
+ * versions remain opaque here because F052 owns their validation rules.
+ */
+function parseVerbTarget(target) {
+	if (typeof target !== "string" || target.length === 0 || target.trim() !== target) {
+		return {
+			ok: false,
+			code: "AMBER_E_RUNNER_INVALID",
+			errors: [`verb stage target must match ${VERB_TARGET_GRAMMAR}`],
+		};
+	}
+	const match = VERB_TARGET_PATTERN.exec(target);
+	if (!match) {
+		return {
+			ok: false,
+			code: "AMBER_E_RUNNER_INVALID",
+			errors: [`verb stage target must match ${VERB_TARGET_GRAMMAR}`],
+		};
+	}
+	return {
+		ok: true,
+		code: null,
+		errors: [],
+		target,
+		pin: {
+			runnerId: match[1],
+			runnerVersion: match[2],
+			name: match[3],
+			capabilityVersion: match[4],
+		},
+	};
+}
+
+/**
+ * Resolve one route verb against the F052 registry.  This seam is shared by
+ * route guards and `session run`; neither caller may substitute command text
+ * or silently continue when the registry refuses the pin.
+ */
+function resolveVerbTarget(targetRoot, target) {
+	const parsed = parseVerbTarget(target);
+	if (!parsed.ok) return parsed;
+	try {
+		const resolved = resolveRequestCapability(targetRoot, parsed.pin);
+		return { ...parsed, ...resolved };
+	} catch (error) {
+		return {
+			...parsed,
+			ok: false,
+			code: error.amberCode || "AMBER_E_RUNNER_REGISTRY_CORRUPT",
+			errors: [error.message || String(error)],
+		};
+	}
+}
+
+function verbResolutionFailure(routeId, stageName, resolution) {
+	const message = resolution.errors?.[0] || `verb stage ${routeId}/${stageName} could not be resolved`;
+	const error = resolution.code ? codedError(resolution.code, message) : message;
+	return {
+		text: error,
+		errors: [error],
+		exitCode: 1,
+		code: resolution.code || "AMBER_E_RUNNER_INVALID",
+	};
+}
+
 function approveRouteStage(
 	routeId,
 	stageName,
@@ -157,6 +230,22 @@ function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_R
 			errors: [`Stage "${stageName}" not found in route ${routeId}.`],
 			exitCode: 1,
 		};
+	if (stage.type === "verb") {
+		const resolution = resolveVerbTarget(targetRoot, stage.target);
+		if (!resolution.ok) return verbResolutionFailure(routeId, stageName, resolution);
+		// F052 registrations confer an execution identity but do not make Amber a
+		// launcher (ADR-0022).  Resolve here as a fail-closed execution guard;
+		// session run owns the provider-specific execution/settlement path.
+		return {
+			text:
+				`Resolved ${routeId}/${stageName} -> ${stage.target}. ` +
+					"Execution is owned by session run; no runner was spawned.",
+			errors: [],
+			exitCode: 0,
+			executed: false,
+			capability: resolution.capability,
+		};
+	}
 	if (stage.type !== "command") {
 		const msg = `Only command stages can be executed; "${stageName}" is type "${stage.type}".`;
 		return { text: msg, errors: [msg], exitCode: 1 };
@@ -198,4 +287,6 @@ module.exports = {
 	executeRouteStage,
 	verifyRouteLedger,
 	routeLedgerPath,
+	parseVerbTarget,
+	resolveVerbTarget,
 };

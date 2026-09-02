@@ -286,9 +286,60 @@ async function handleSession(args) {
 		if (!sessionResult) {
 			sessionResult = sessionCommands.verifyLedgerSession(targetRoot, args.session);
 		}
+	} else if (action === "run" || action === "settle") {
+		// F062 seam boundary (spec §"Legacy and external seams"): the run/settle
+		// seam rejects arbitrary stage selection and free-form command text.
+		// --stage and --command exist for OTHER session subcommands; binding
+		// them here would smuggle selection through a typed seam.
+		if (args.stage || args.command) {
+			sessionResult = {
+				text:
+					`Error: session ${action} takes no --stage or --command. ` +
+					"Stage selection, capability, and adapter come from the session's own state (F062 closed seam).",
+				exitCode: 1,
+			};
+		} else if (action === "run") {
+			sessionResult = requireSessionId(args, "run");
+			if (!sessionResult) {
+				sessionResult = await sessionCommands.runSession(targetRoot, {
+					sessionId: args.session,
+					execute: args.execute === true,
+					ownerId: args.ownerId,
+					tokenHash: args.tokenHash,
+					leaseFence: args.leaseFence === undefined ? undefined : Number(args.leaseFence),
+				});
+			}
+		} else {
+			sessionResult = requireSessionId(args, "settle");
+			if (!sessionResult) {
+				let parsedResult;
+				let parseError = null;
+				if (typeof args.result === "string") {
+					try {
+						parsedResult = JSON.parse(args.result);
+					} catch (error) {
+						parseError = `Error: --result must be a JSON object: ${error.message}`;
+					}
+				} else {
+					parsedResult = args.result;
+				}
+				sessionResult = parseError
+					? { text: parseError, exitCode: 1 }
+					: await sessionCommands.settleSession(targetRoot, {
+							sessionId: args.session,
+							requestId: args.requestId,
+							attemptId: args.attemptId,
+							requestHash: args.requestHash,
+							settlementResult: parsedResult,
+							ownerId: args.ownerId,
+							tokenHash: args.tokenHash,
+							leaseFence: args.leaseFence === undefined ? undefined : Number(args.leaseFence),
+						});
+			}
+		}
 	} else {
 		sessionResult = {
-			text: "session requires start, status, list, abort, continue, complete-check, complete, verify, verify-ledger, or approve.",
+			text: "session requires start, status, list, abort, continue, complete-check, complete, verify, verify-ledger, approve, run, or settle.",
 			exitCode: 1,
 		};
 	}

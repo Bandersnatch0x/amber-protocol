@@ -85,6 +85,33 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_CONFIDENCE_GATE", "AMBER_E_LOOP_NOT_APPROVED"],
 	},
+	AMBER_E_COMMAND_ID_UNRESOLVED: {
+		title: "Named governed command could not be resolved",
+		cause:
+			"A governed named-command request did not resolve to exactly one allow rule with match=exact in .amber/governance/rules.json; caller-supplied command text is never used as a fallback.",
+		remedy:
+			"Add or repair the named rule in .amber/governance/rules.json with a unique id, action=allow, match=exact, and a non-empty pattern, then retry the governed execution that named it (commandId is program-supplied, not a CLI flag).",
+		layer: "Governance",
+		related: ["AMBER_E_POLICY_DENY", "AMBER_E_INVALID_ARG"],
+	},
+	AMBER_E_STAGE_ADAPTER_UNAVAILABLE: {
+		title: "Route stage adapter is absent or mismatched",
+		cause:
+			"A verb stage's capability pin has no entry in the implementation-owned adapter table, or the entry's provider class does not match the resolved capability. Provider selection is never route data or caller input, so there is no fallback adapter.",
+		remedy:
+			"Add or correct the pin's entry in the closed adapter table in scripts/lib/session-stage-runner.js (a reviewed code change, not a target-repository record), then re-run `amber session run`.",
+		layer: "Execution",
+		related: ["AMBER_E_RUNNER_NOT_FOUND", "AMBER_E_STAGE_EXTERNAL_LIFECYCLE_REQUIRED"],
+	},
+	AMBER_E_STAGE_EXTERNAL_LIFECYCLE_REQUIRED: {
+		title: "External effect attempted through a Session stage",
+		cause:
+			"The verb stage's capability maps to the `external` provider class. A Session attempt never performs an external effect; that lifecycle belongs to F056.",
+		remedy:
+			"Register and authorize the effect through `amber external` (propose → authorize → execute → settle) instead of `amber session run`.",
+		layer: "Execution",
+		related: ["AMBER_E_STAGE_ADAPTER_UNAVAILABLE"],
+	},
 	AMBER_E_CONFIDENCE_GATE: {
 		title: "Command blocked by confidence gate",
 		cause:
