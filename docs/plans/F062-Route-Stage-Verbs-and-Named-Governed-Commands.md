@@ -1,8 +1,8 @@
 # Plan: Route Stage Verbs and Named Governed Commands
 
 Feature: F062
-Status: implementation-ready
-User Confirmation: pending
+Status: accepted
+User Confirmation: confirmed
 
 ## Goal
 

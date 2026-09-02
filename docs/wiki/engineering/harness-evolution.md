@@ -237,3 +237,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F048-prettier-pre-commit-hook.md`
 - Review status: ready
 - Feature: F048 status → accepted in feature_list.json
+
+## 2026-09-02 docs/plans/F062-Route-Stage-Verbs-and-Named-Governed-Commands.md
+
+- Plan: `docs/plans/F062-Route-Stage-Verbs-and-Named-Governed-Commands.md`
+- Review status: ready
+- Feature: F062 status → accepted in feature_list.json
