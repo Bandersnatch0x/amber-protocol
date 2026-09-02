@@ -11,11 +11,47 @@ const { spawnSync } = require("node:child_process");
 const { resolveTarget } = require("./fs-utils");
 const { evaluateVerifyPolicy, loadVerifyPolicyRules } = require("./loop-policy");
 const { appendLedgerRecord } = require("./loop-ledger");
+const { resolvePositiveIntCeiling } = require("./resource-ceilings");
+const { typedError } = require("./error-catalog");
 
 const STDOUT_CAP = 4000;
 const STDERR_CAP = 2000;
 
-function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes = 5, subject = {} }) {
+// The default budget is env-overridable so an operator can raise it
+// deliberately for a repository whose verification suite legitimately runs
+// longer (#315: this repo's full `npm test` needs ~9 minutes against the old
+// hardcoded 5). A per-invocation budgetMinutes (the --budget-minutes flag) is
+// validated against a hard cap — a verification command that needs more than
+// an hour is not a verification.
+const DEFAULT_BUDGET_MINUTES = 5;
+const MAX_FLAG_BUDGET_MINUTES = 60;
+
+/**
+ * Resolve the verification budget in minutes. Unset falls back to the
+ * AMBER_VERIFY_BUDGET_MINUTES env override or the 5-minute default; a passed
+ * value must be an integer within [1, MAX_FLAG_BUDGET_MINUTES].
+ * @param {number|undefined} requested
+ * @returns {number}
+ * @throws {Error} Typed AMBER_E_INVALID_ARG on an out-of-range request.
+ */
+function resolveBudgetMinutes(requested) {
+	if (requested === undefined || requested === null) {
+		return resolvePositiveIntCeiling(
+			"AMBER_VERIFY_BUDGET_MINUTES",
+			DEFAULT_BUDGET_MINUTES,
+			"verification budget minutes",
+		);
+	}
+	if (!Number.isInteger(requested) || requested < 1 || requested > MAX_FLAG_BUDGET_MINUTES) {
+		throw typedError(
+			"AMBER_E_INVALID_ARG",
+			`must be an integer between 1 and ${MAX_FLAG_BUDGET_MINUTES} when passed; got ${String(requested)} — unset it for the default ${DEFAULT_BUDGET_MINUTES} (or the AMBER_VERIFY_BUDGET_MINUTES override)`,
+		);
+	}
+	return requested;
+}
+
+function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes, subject = {} }) {
 	const targetRoot = resolveTarget(target);
 
 	// Gate — verification policy (verify-rules.json; deny-wins, default-deny). Only
@@ -51,7 +87,7 @@ function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes = 5, su
 			shell: true,
 			cwd: targetRoot,
 			encoding: "utf8",
-			timeout: budgetMinutes * 60_000,
+			timeout: resolveBudgetMinutes(budgetMinutes) * 60_000,
 		});
 		// A null status means the process was killed (e.g. timeout/signal); treat as
 		// failure (-1) so a timed-out verify never records as passed.
@@ -97,4 +133,4 @@ function runEvidenceCommand({ target, command, ledgerPath, budgetMinutes = 5, su
 	};
 }
 
-module.exports = { runEvidenceCommand };
+module.exports = { runEvidenceCommand, resolveBudgetMinutes };

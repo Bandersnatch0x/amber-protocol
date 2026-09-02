@@ -541,6 +541,42 @@ describe("session-commands", () => {
 			assert.strictEqual(manifest.feature, "F001");
 		});
 
+		it("refuses an invalid --budget-minutes before running anything (#315)", async () => {
+			const start = await startSession(TEST_ROOT, {
+				goal: "fix budget validation bug",
+				route: "bugfix-quick",
+			});
+			await continueSession(TEST_ROOT, { sessionId: start.sessionId });
+
+			for (const bad of ["0", "61", "abc", "2.5"]) {
+				const refused = await verifySession(TEST_ROOT, {
+					sessionId: start.sessionId,
+					command: "npm test",
+					execute: true,
+					budgetMinutes: bad,
+				});
+				assert.strictEqual(refused.exitCode, 1, refused.text);
+				assert.match(refused.text, /--budget-minutes/);
+				assert.match(refused.text, /between 1 and 60/);
+			}
+
+			// Nothing ran: no verification records in the ledger.
+			const ledgerPath = path.join(
+				TEST_ROOT,
+				".amber",
+				"sessions",
+				start.sessionId,
+				"ledger.jsonl",
+			);
+			const records = fs.existsSync(ledgerPath)
+				? fs.readFileSync(ledgerPath, "utf8").split("\n").filter(Boolean)
+				: [];
+			assert.ok(
+				records.every((line) => !line.includes("verification_")),
+				"no verification record was written for a refused budget",
+			);
+		});
+
 		it("refluxes real (--execute) verification evidence into the bound feature", async () => {
 			addFeature(TEST_ROOT, { id: "F001", title: "greeting", area: "core" });
 			// The default verify policy only allow-lists `npm test`, so seed a

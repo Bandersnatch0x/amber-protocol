@@ -215,9 +215,15 @@ ledger. `verify` and `approve` also mirror the event into a hash-chain ledger
 
 ```bash
 node scripts/amber.js session verify   --session <id> --command "npm test" --result pass  --target . --confirm
+node scripts/amber.js session verify   --session <id> --command "npm test" --execute --budget-minutes 15 --target . --confirm
 node scripts/amber.js session approve  --session <id> [--gate <gate-id>] --yes            --target .
 node scripts/amber.js session verify-ledger --session <id>                                --target .
 ```
+
+`verify --execute` runs the command against the working copy and records its real exit code,
+bounded by a verification budget: 5 minutes by default, `--budget-minutes <n>` per invocation
+(integer 1–60), or the `AMBER_VERIFY_BUDGET_MINUTES` environment override for the default. A
+command killed by the budget records exit -1 and never counts as passed.
 
 `verify-ledger` recomputes the session ledger's hash chain and reports `AMBER_E_LEDGER_TAMPERED` on
 any broken link.

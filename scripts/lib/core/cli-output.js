@@ -35,6 +35,7 @@ const FLAG_SPECS = {
 	"--stage": { key: "stage" },
 	"--command": { key: "command" },
 	"--result": { key: "result" },
+	"--budget-minutes": { key: "budgetMinutes" },
 	"--id": { key: "id" },
 	"--area": { key: "area" },
 	"--behavior": { key: "behavior" },

@@ -21,7 +21,7 @@ const { promptYesNo } = require("./prompt");
 const { ensureContinuitySurfaces } = require("./continuity-surfaces");
 const { writeRouteGates, writeGateDecision } = require("./gate-writer");
 const { appendLedgerRecord, verifyLedgerOutcome } = require("./core/loop-ledger");
-const { runEvidenceCommand } = require("./core/evidence-runner");
+const { runEvidenceCommand, resolveBudgetMinutes } = require("./core/evidence-runner");
 const { recordFeatureEvidence } = require("./feature-commands");
 const { writeRunnerAck } = require("./runner-ack");
 const { runSessionStage, settleSessionRequest } = require("./session-stage-runner");
@@ -662,10 +662,22 @@ async function verifySession(projectRoot, options) {
 				1,
 			);
 		}
+		// #315: a per-invocation budget for long verification suites. Validated
+		// against the evidence runner's hard cap; unset keeps the 5-minute
+		// default (or the AMBER_VERIFY_BUDGET_MINUTES override).
+		let budgetMinutes;
+		if (options.budgetMinutes !== undefined && options.budgetMinutes !== null) {
+			try {
+				budgetMinutes = resolveBudgetMinutes(Number(options.budgetMinutes));
+			} catch (error) {
+				return result(`Error: --budget-minutes ${error.message}`, 1);
+			}
+		}
 		execResult = runEvidenceCommand({
 			target: projectRoot,
 			command,
 			ledgerPath,
+			...(budgetMinutes === undefined ? {} : { budgetMinutes }),
 			subject: { sessionId, stage: actualStageName },
 		});
 		if (execResult.denied) {

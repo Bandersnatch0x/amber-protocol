@@ -270,6 +270,7 @@ async function handleSession(args) {
 				result: args.result,
 				execute: args.execute,
 				feature: args.feature,
+				budgetMinutes: args.budgetMinutes,
 			});
 		}
 	} else if (action === "approve") {

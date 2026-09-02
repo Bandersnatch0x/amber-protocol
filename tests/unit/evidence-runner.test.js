@@ -122,3 +122,44 @@ test("denies a shell-composite command even when its head is allow-listed; nothi
 	assert.equal(recs[0].kind, "verification_denied");
 	fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// #315: the verification budget resolves from the flag, the env override, or
+// the 5-minute default — and fails closed on garbage.
+const { resolveBudgetMinutes } = require("../../scripts/lib/core/evidence-runner");
+
+test("resolveBudgetMinutes defaults to 5, honors the env override, and validates the flag range", () => {
+	assert.equal(resolveBudgetMinutes(undefined), 5);
+	assert.equal(resolveBudgetMinutes(null), 5);
+	assert.equal(resolveBudgetMinutes(1), 1);
+	assert.equal(resolveBudgetMinutes(15), 15);
+	assert.equal(resolveBudgetMinutes(60), 60);
+	for (const bad of [0, -1, 61, 5.5, Number.NaN, "10"]) {
+		assert.throws(
+			() => resolveBudgetMinutes(bad),
+			(error) => {
+				assert.match(String(error.message), /between 1 and 60/);
+				return true;
+			},
+			`expected ${JSON.stringify(bad)} to be refused`,
+		);
+	}
+
+	process.env.AMBER_VERIFY_BUDGET_MINUTES = "30";
+	try {
+		assert.equal(resolveBudgetMinutes(undefined), 30);
+		assert.equal(resolveBudgetMinutes(15), 15, "an explicit request wins over the env default");
+	} finally {
+		delete process.env.AMBER_VERIFY_BUDGET_MINUTES;
+	}
+
+	process.env.AMBER_VERIFY_BUDGET_MINUTES = "abc";
+	try {
+		assert.throws(
+			() => resolveBudgetMinutes(undefined),
+			/error/i,
+			"a set-but-garbage env override fails closed",
+		);
+	} finally {
+		delete process.env.AMBER_VERIFY_BUDGET_MINUTES;
+	}
+});
