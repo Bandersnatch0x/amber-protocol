@@ -209,7 +209,6 @@ const FLAG_SPECS = {
 	"--rollback": { key: "rollback" },
 	"--environment": { key: "environment" },
 	"--input-hash": { key: "inputHashVal", accumulate: "inputHashes" },
-	"--request-hash": { key: "requestHash" },
 	// F052 ticket 3 (#257): environment boundary flags.
 	"--credential-handle": { key: "credentialHandle" },
 	"--credential-purpose": { key: "credentialPurpose" },
