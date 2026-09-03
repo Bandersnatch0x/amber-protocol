@@ -34,7 +34,11 @@ const {
 
 const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function validateSessionId(sessionId) {
+// Path safety only: refuses traversal, separators, and anything outside the
+// id charset. Every id Amber mints is a UUID v4 (see validateSessionId), but
+// ids minted before that rule — legacy .harness sessions, pre-UUID manifests —
+// must stay readable, so lookups verify containment without demanding v4.
+function validateSessionIdForLookup(sessionId) {
 	if (!sessionId || typeof sessionId !== "string") {
 		return { valid: false, error: "Session ID is required" };
 	}
@@ -43,6 +47,15 @@ function validateSessionId(sessionId) {
 	}
 	if (!/^[\w-]+$/.test(sessionId)) {
 		return { valid: false, error: "Invalid session ID format" };
+	}
+	return { valid: true };
+}
+
+// Minting contract: an id Amber creates is always a UUID v4.
+function validateSessionId(sessionId) {
+	const containment = validateSessionIdForLookup(sessionId);
+	if (!containment.valid) {
+		return containment;
 	}
 	if (!SESSION_ID_PATTERN.test(sessionId)) {
 		return { valid: false, error: "Invalid session ID format" };
@@ -56,7 +69,7 @@ function getSessionsDir(projectRoot) {
 }
 
 function getSessionDir(projectRoot, sessionId) {
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		throw new Error(validation.error);
 	}
@@ -319,7 +332,7 @@ function statusSession(projectRoot, options) {
 		}
 	}
 
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -380,7 +393,7 @@ async function abortSession(projectRoot, options) {
 		return result("Error: --session-id is required", 1);
 	}
 
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -435,7 +448,7 @@ async function completeSession(projectRoot, options) {
 		return result("Error: session complete requires --session <id>.", 1);
 	}
 
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -516,7 +529,7 @@ async function continueSession(projectRoot, options) {
 		}
 	}
 
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -662,7 +675,7 @@ async function verifySession(projectRoot, options) {
 		return result("Error: session verify requires --session <id>.", 1);
 	}
 
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -842,7 +855,7 @@ async function approveSession(projectRoot, options) {
 		return result("Error: session approve requires --session <id>.", 1);
 	}
 
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -968,7 +981,7 @@ async function approveSession(projectRoot, options) {
 }
 
 function verifyLedgerSession(projectRoot, sessionId) {
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -992,7 +1005,7 @@ async function runSession(projectRoot, options) {
 		return result("Error: session run requires --session <id>.", 1);
 	}
 
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -1060,7 +1073,7 @@ async function settleSession(projectRoot, options) {
 		return result("Error: session settle requires --session <id>.", 1);
 	}
 
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -1122,7 +1135,7 @@ async function leaseSession(projectRoot, options) {
 		return result("Error: session lease requires --session <id>.", 1);
 	}
 
-	const validation = validateSessionId(sessionId);
+	const validation = validateSessionIdForLookup(sessionId);
 	if (!validation.valid) {
 		return result(`Error: ${validation.error}`, 1);
 	}
@@ -1153,10 +1166,7 @@ async function leaseSession(projectRoot, options) {
 
 		const lease = manifest.lease;
 		if (!lease || typeof lease !== "object") {
-			return result(
-				"Session carries no lease; start the session with --agent to mint one.",
-				1,
-			);
+			return result("Session carries no lease; start the session with --agent to mint one.", 1);
 		}
 		if (lease.ownerId !== ownerId) {
 			return result(

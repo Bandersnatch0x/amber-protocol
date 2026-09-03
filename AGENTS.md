@@ -32,13 +32,13 @@ The governed registry families — `maintain`, `retention`, `external`, `breakgl
 Default `amber` help projects the seven primary verbs — `audit`, `init`, `doctor`, `next`,
 `plan`, `handoff`, `session` (F063; visibility tiers change discovery, never command removal):
 
-- `audit` - Read-only readiness inspection
-- `init` - Install the V1 scaffold (skips existing files)
-- `doctor` - Validate the Amber setup
-- `next` - Deterministic route advice; never an LLM decision
-- `plan` - Scaffold a feature plan
-- `handoff` - Produce the portable continuation bundle
-- `session` - Inspect or manage session lifecycle
+- `node scripts/amber.js audit --target <repo>` - read-only readiness inspection.
+- `node scripts/amber.js init --target <repo>` - install the V1 scaffold (skips existing files).
+- `node scripts/amber.js doctor --target <repo>` - validate the Amber setup.
+- `node scripts/amber.js next --objective "<goal>" --target <repo>` - deterministic route advice; never an LLM decision.
+- `node scripts/amber.js plan --target <repo>` - scaffold a feature plan.
+- `node scripts/amber.js handoff --target <repo>` - produce the portable continuation bundle.
+- `node scripts/amber.js session <start|status|list|abort|continue> --target <repo>` - inspect or manage session lifecycle.
 
 ## Governance and platform commands (`amber --all`)
 

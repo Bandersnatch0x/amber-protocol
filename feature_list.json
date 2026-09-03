@@ -2245,9 +2245,6 @@
 			"paths": [
 				"scripts/lib/command-registry.js",
 				"scripts/amber.js",
-				"skills/amber-start",
-				"skills/amber-check",
-				"skills/amber-done",
 				"skills/amber",
 				"AGENTS.md",
 				"SPEC.md",

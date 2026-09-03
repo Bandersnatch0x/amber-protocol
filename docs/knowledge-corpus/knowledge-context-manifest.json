@@ -40,8 +40,8 @@
       "sourcePath": "docs/adr/0003-governance-gated-execution.md",
       "title": "Governance-Gated Execution (L2)",
       "source": {
-        "rawHash": "sha256:86d5c247dbf1216c1c3abd81806b783c961374e155726949d40c9d21a0aab68e",
-        "normHash": "sha256:ef9db620853647dd7335708c0bf76cd7fddbce06921a4042beef25daf78a9122"
+        "rawHash": "sha256:61a63e1db774469c6c708a315ca59ff0f8d79032f22d3c3b90732469d4b05585",
+        "normHash": "sha256:ee085ac3de5f95bdd80d0465476ded07b5fc6c83806fa28a5556be6b9614e7b2"
       }
     },
     {
@@ -64,8 +64,8 @@
       "sourcePath": "docs/adr/0005-experimental-execution-removal.md",
       "title": "Experimental Execution Removal — Supersedes ADR-0002 Preservation",
       "source": {
-        "rawHash": "sha256:1fd683c290cd5ec21f74232fb426291d448d419eeb2c60dfdd9285b4ea8e1d3d",
-        "normHash": "sha256:dca4c9107c9a34c171ad10e36cd3b12079cf007aa2e83d4932de5bb6a83f360f"
+        "rawHash": "sha256:f1323d55822eeaa2c100a23d9381b5306f23eeb269bfebf4eb9ae3523c12d375",
+        "normHash": "sha256:821f8099e5c482f61f5d09aeb199412408be1bc5b239472e220b157a88edd2e5"
       }
     },
     {
@@ -100,8 +100,8 @@
       "sourcePath": "docs/adr/0008-workflow-effectiveness-vs-governance-readiness.md",
       "title": "Workflow Effectiveness Review — a separate read-only assessment beside Governance Readiness",
       "source": {
-        "rawHash": "sha256:c6c544be2c1509f3c99da82c78d97f813e8164fed3028a71db50aed96d937276",
-        "normHash": "sha256:2837f788f0d39183661064f85ab41e86210c840bde6aba592fd94100de9e0e73"
+        "rawHash": "sha256:b2716af3aea3761eefcf6c93f12fefadd8d6e846573f51f66505c8e51ad65bf1",
+        "normHash": "sha256:23450f9d2632ecfdd59e943e39a873c4b9752f0a19370bcffeac09a0788c98ed"
       }
     },
     {
@@ -124,8 +124,8 @@
       "sourcePath": "docs/adr/0010-context-loadout.md",
       "title": "Context Loadout — Amber Governs the Agent's Context Window",
       "source": {
-        "rawHash": "sha256:f7ca54d44422976ab45745ab06499ec369d06610ad838c3cb81791c208183f3b",
-        "normHash": "sha256:b019d6cf978657ce9701d39f7810962058ee143b3652edb536b061b626b9e272"
+        "rawHash": "sha256:16dcabf2fcf1f7dff4d60d4482a1a96db6b080c0990e444eee9eaafac85d6feb",
+        "normHash": "sha256:3de8c939c016ecb91b298a05716bc7cbcd410a98aa13274c9626a04563db0fa0"
       }
     },
     {
@@ -184,8 +184,8 @@
       "sourcePath": "docs/adr/0015-review-blocker-remediation-contracts.md",
       "title": "Review Blocker Remediation Contracts",
       "source": {
-        "rawHash": "sha256:9c7c6c4f1bd939989aff00154e4fc2a49317cfcbf5ab0d5d5ae6dbacd2b0ec12",
-        "normHash": "sha256:9fb88cfbb0623a7bc16842d83ccbde49b9bbaef3efa5609703cc32b9895375a1"
+        "rawHash": "sha256:0506531e7f5fa08b8c5aab140dc3ff55ebd44f7a338a365030674204cac77db1",
+        "normHash": "sha256:3089a049ee384b7e86e63d68b97e2f65e1ffe51ab04aaa5a3482374c57df9f79"
       }
     },
     {
@@ -585,5 +585,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:8bcfa17dc3384a0baa04ff338794625a90c0b604eff26f3b20775879c3773604"
+  "manifestHash": "sha256:a6470621ccdb41e162d429f1c9667441e54bc7a94ac2a521f9cb5a6360f6f754"
 }
