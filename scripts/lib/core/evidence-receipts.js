@@ -671,8 +671,7 @@ function recordEvidence(cwd, input, opts = {}) {
 	const storedOutputDigest = outputDigest ?? undefined;
 	if (
 		storedOutputDigest !== undefined &&
-		(typeof storedOutputDigest !== "string" ||
-			!/^sha256:[0-9a-f]{64}$/.test(storedOutputDigest))
+		(typeof storedOutputDigest !== "string" || !/^sha256:[0-9a-f]{64}$/.test(storedOutputDigest))
 	) {
 		return fail(INVALID_ARG_CODE, [
 			`outputDigest must be a sha256:<64-hex> string when provided; got ${JSON.stringify(storedOutputDigest)}`,

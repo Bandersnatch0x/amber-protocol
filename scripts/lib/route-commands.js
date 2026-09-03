@@ -175,7 +175,8 @@ function resolveVerbTarget(targetRoot, target) {
 }
 
 function verbResolutionFailure(routeId, stageName, resolution) {
-	const message = resolution.errors?.[0] || `verb stage ${routeId}/${stageName} could not be resolved`;
+	const message =
+		resolution.errors?.[0] || `verb stage ${routeId}/${stageName} could not be resolved`;
 	const error = resolution.code ? codedError(resolution.code, message) : message;
 	return {
 		text: error,
@@ -239,7 +240,7 @@ function executeRouteStage(routeId, stageName, targetRoot, routesDir = DEFAULT_R
 		return {
 			text:
 				`Resolved ${routeId}/${stageName} -> ${stage.target}. ` +
-					"Execution is owned by session run; no runner was spawned.",
+				"Execution is owned by session run; no runner was spawned.",
 			errors: [],
 			exitCode: 0,
 			executed: false,

@@ -1077,10 +1077,7 @@ async function leaseSession(projectRoot, options) {
 
 		const lease = manifest.lease;
 		if (!lease || typeof lease !== "object") {
-			return result(
-				"Session carries no lease; start the session with --agent to mint one.",
-				1,
-			);
+			return result("Session carries no lease; start the session with --agent to mint one.", 1);
 		}
 		if (lease.ownerId !== ownerId) {
 			return result(

@@ -250,7 +250,7 @@ See `LOOP.md` for the operational description of Amber's loops (daily-amber-tria
 > never dispatches agents, and is never installed automatically.
 
 > **Boundary note (`.claude-plugin/hooks.json` is empty by design, ADR-0029 decision 11):** A
-> plugin-level hook applies to *every* installer. Shipping the per-turn breadcrumb there would make
+> plugin-level hook applies to _every_ installer. Shipping the per-turn breadcrumb there would make
 > it automatic and contradict the opt-in boundary above. Distribution therefore stays
 > `amber hooks breadcrumb install [--platform claude]`, which merges into the user's own
 > `.claude/settings.json`. JSON carries no comments, so this intent is recorded here: the empty

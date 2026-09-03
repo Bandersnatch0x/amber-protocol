@@ -62,9 +62,13 @@ describe("verb stage guard E2E (fail-closed direction)", () => {
 		const sessionId = (started.stdout.match(/Session created: (\S+)/) || [])[1];
 		assert.ok(sessionId, "session started");
 
-		const run = spawnSync("node", [CLI, "session", "run", "--session", sessionId, "--target", target], {
-			encoding: "utf8",
-		});
+		const run = spawnSync(
+			"node",
+			[CLI, "session", "run", "--session", sessionId, "--target", target],
+			{
+				encoding: "utf8",
+			},
+		);
 		assert.equal(run.status, 1, "dry-run run refuses: the pin names no registered runner");
 		assert.match(run.stdout + run.stderr, /AMBER_E_RUNNER_NOT_FOUND/);
 
