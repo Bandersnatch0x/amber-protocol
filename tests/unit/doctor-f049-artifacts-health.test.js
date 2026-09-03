@@ -158,9 +158,7 @@ test("corrupt artifact journal fails closed with AMBER_E_ARTIFACT_JOURNAL_CORRUP
 	assert.match(artifacts.detail, /AMBER_E_ARTIFACT_JOURNAL_CORRUPT/);
 	assert.match(artifacts.remedy, /amber artifact list/);
 	assert.match(artifacts.remedy, /amber artifact show/);
-	assert.ok(
-		result.errors.some((error) => error.includes("AMBER_E_ARTIFACT_JOURNAL_CORRUPT")),
-	);
+	assert.ok(result.errors.some((error) => error.includes("AMBER_E_ARTIFACT_JOURNAL_CORRUPT")));
 });
 
 test("tampered artifact Body fails closed with AMBER_E_ARTIFACT_HASH_MISMATCH", () => {
@@ -201,9 +199,7 @@ test("broken gate outcome hash chain fails closed with AMBER_E_GATE_OUTCOME_REGI
 	assert.match(gates.detail, /AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT/);
 	assert.match(gates.remedy, /amber gate list/);
 	assert.match(gates.remedy, /amber gate show/);
-	assert.ok(
-		result.errors.some((error) => error.includes("AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT")),
-	);
+	assert.ok(result.errors.some((error) => error.includes("AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT")));
 });
 
 test("unreadable gate outcome ledger fails closed with AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT", () => {
@@ -214,9 +210,7 @@ test("unreadable gate outcome ledger fails closed with AMBER_E_GATE_OUTCOME_REGI
 	const gates = checkNamed(result, GATES_CHECK);
 	assert.equal(gates.passed, false);
 	assert.match(gates.detail, /AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT/);
-	assert.ok(
-		result.errors.some((error) => error.includes("AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT")),
-	);
+	assert.ok(result.errors.some((error) => error.includes("AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT")));
 });
 
 test("broken approval registry hash chain fails closed with AMBER_E_APPROVAL_REGISTRY_CORRUPT", () => {
@@ -243,9 +237,7 @@ test("broken approval registry hash chain fails closed with AMBER_E_APPROVAL_REG
 	assert.match(approvals.detail, /AMBER_E_APPROVAL_REGISTRY_CORRUPT/);
 	assert.match(approvals.remedy, /amber approval list/);
 	assert.match(approvals.remedy, /amber approval show/);
-	assert.ok(
-		result.errors.some((error) => error.includes("AMBER_E_APPROVAL_REGISTRY_CORRUPT")),
-	);
+	assert.ok(result.errors.some((error) => error.includes("AMBER_E_APPROVAL_REGISTRY_CORRUPT")));
 });
 
 test("unreadable approval registry fails closed with AMBER_E_APPROVAL_REGISTRY_CORRUPT", () => {
@@ -256,9 +248,7 @@ test("unreadable approval registry fails closed with AMBER_E_APPROVAL_REGISTRY_C
 	const approvals = checkNamed(result, APPROVALS_CHECK);
 	assert.equal(approvals.passed, false);
 	assert.match(approvals.detail, /AMBER_E_APPROVAL_REGISTRY_CORRUPT/);
-	assert.ok(
-		result.errors.some((error) => error.includes("AMBER_E_APPROVAL_REGISTRY_CORRUPT")),
-	);
+	assert.ok(result.errors.some((error) => error.includes("AMBER_E_APPROVAL_REGISTRY_CORRUPT")));
 });
 
 test("doctor source reuses list/show read seams and adds no write/repair path", () => {
