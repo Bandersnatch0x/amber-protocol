@@ -107,9 +107,9 @@ describe('knowledgeRouter', () => {
     if (driftCount > 0) {
       const firstNonDrift = changes.findIndex((change) => change.source !== 'drift');
       expect(firstNonDrift).toBe(driftCount);
-      expect(
-        changes.slice(0, firstNonDrift).every((change) => change.source === 'drift'),
-      ).toBe(true);
+      expect(changes.slice(0, firstNonDrift).every((change) => change.source === 'drift')).toBe(
+        true,
+      );
       expect(changes.slice(firstNonDrift).some((change) => change.source === 'drift')).toBe(false);
     }
 
@@ -131,12 +131,14 @@ describe('knowledgeRouter', () => {
       {
         nodeId: 'feature:F001',
         path: 'scripts/lib/core/scaffolding.js',
-        detail: 'Anchored file does not exist — actual file is scripts/lib/core/scaffold.js (rename drift).',
+        detail:
+          'Anchored file does not exist — actual file is scripts/lib/core/scaffold.js (rename drift).',
       },
       {
         nodeId: 'feature:F007',
         path: 'scripts/lib/core/loops/',
-        detail: 'Anchored directory does not exist — actual is scripts/lib/core/loops.js (directory collapsed to file).',
+        detail:
+          'Anchored directory does not exist — actual is scripts/lib/core/loops.js (directory collapsed to file).',
       },
     ];
 

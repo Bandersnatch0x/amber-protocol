@@ -24,7 +24,12 @@ const { resolveVerbTarget } = require("./route-commands");
 const { loadTargetRoutes } = require("./route-loader");
 const { acquireLock, releaseLock } = require("./session-lock");
 const { resolveStateDirForRead } = require("./state-dir-resolver");
-const { appendLedgerRecord, readLedger, verifyLedgerChain, latestUnconsumedApproval } = require("./core/loop-ledger");
+const {
+	appendLedgerRecord,
+	readLedger,
+	verifyLedgerChain,
+	latestUnconsumedApproval,
+} = require("./core/loop-ledger");
 const { showEvidence } = require("./core/evidence-receipts");
 const { runGovernedCommand } = require("./core/governed-runner");
 const { codedError } = require("./core/error-catalog");
@@ -227,7 +232,14 @@ function routeHashOf(route) {
 	return crypto.createHash("sha256").update(JSON.stringify(clean), "utf8").digest("hex");
 }
 
-function idempotencyKeyOf({ sessionId, routeHash, stageName, capabilityPin, attemptNumber, fence }) {
+function idempotencyKeyOf({
+	sessionId,
+	routeHash,
+	stageName,
+	capabilityPin,
+	attemptNumber,
+	fence,
+}) {
 	return crypto
 		.createHash("sha256")
 		.update(
@@ -331,7 +343,9 @@ function resolveVerbStage(projectRoot, route, records) {
 function loadActiveSession(sessionDir, sessionId) {
 	const loaded = readSessionManifest(sessionDir);
 	if (!loaded || loaded.corrupt) {
-		return { problem: fail("AMBER_E_SESSION_INCOMPLETE", `session ${sessionId} is missing or corrupt`) };
+		return {
+			problem: fail("AMBER_E_SESSION_INCOMPLETE", `session ${sessionId} is missing or corrupt`),
+		};
 	}
 	if (["completed", "failed", "aborted"].includes(loaded.manifest.status)) {
 		return {
@@ -378,7 +392,10 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 		const { routes } = loadTargetRoutes(projectRoot);
 		const route = routes.find((entry) => entry.routeId === session.manifest.route.id);
 		if (!route) {
-			return fail("AMBER_E_ROUTE_NOT_FOUND", `route ${session.manifest.route.id} is not defined in the target`);
+			return fail(
+				"AMBER_E_ROUTE_NOT_FOUND",
+				`route ${session.manifest.route.id} is not defined in the target`,
+			);
 		}
 		const cursorRead = readCursorLedger(sessionDir);
 		if (!cursorRead.ok) return fail("AMBER_E_LEDGER_TAMPERED", cursorRead.reason);
@@ -416,7 +433,10 @@ async function runSessionStage(projectRoot, sessionId, options = {}) {
 		const { routes } = loadTargetRoutes(projectRoot);
 		const route = routes.find((entry) => entry.routeId === session.manifest.route.id);
 		if (!route) {
-			return fail("AMBER_E_ROUTE_NOT_FOUND", `route ${session.manifest.route.id} is not defined in the target`);
+			return fail(
+				"AMBER_E_ROUTE_NOT_FOUND",
+				`route ${session.manifest.route.id} is not defined in the target`,
+			);
 		}
 		return executeAttempt(projectRoot, sessionId, sessionDir, session.manifest, route, options);
 	} finally {
@@ -676,7 +696,11 @@ function settlementProblem(settlement, stage) {
 		return `status must be one of ${SETTLEMENT_STATUSES.join(" | ")}; got ${JSON.stringify(settlement.status)}`;
 	}
 	if (settlement.status === "succeeded") {
-		if (settlement.exitCode !== undefined && settlement.exitCode !== null && settlement.exitCode !== 0) {
+		if (
+			settlement.exitCode !== undefined &&
+			settlement.exitCode !== null &&
+			settlement.exitCode !== 0
+		) {
 			return `status "succeeded" cannot carry a non-zero exitCode (${settlement.exitCode})`;
 		}
 		if (!settlement.evidenceId) {
@@ -853,7 +877,10 @@ function settleLocked(projectRoot, sessionId, sessionDir, requestId, settlement,
 		(record) => record.kind === "stage_attempt_requested" && record.requestId === requestId,
 	);
 	if (!request) {
-		return fail("AMBER_E_INVALID_ARG", `no request ${requestId} is recorded for session ${sessionId}`);
+		return fail(
+			"AMBER_E_INVALID_ARG",
+			`no request ${requestId} is recorded for session ${sessionId}`,
+		);
 	}
 
 	// Binding contract: the settlement must name the pending attempt's own
@@ -903,7 +930,10 @@ function settleLocked(projectRoot, sessionId, sessionDir, requestId, settlement,
 	const { routes } = loadTargetRoutes(projectRoot);
 	const route = routes.find((entry) => entry.routeId === manifest.route.id);
 	if (!route) {
-		return fail("AMBER_E_ROUTE_NOT_FOUND", `route ${manifest.route.id} is not defined in the target`);
+		return fail(
+			"AMBER_E_ROUTE_NOT_FOUND",
+			`route ${manifest.route.id} is not defined in the target`,
+		);
 	}
 	const stage = (route.stages || []).find((entry) => entry.name === request.stageName) || null;
 
@@ -925,7 +955,10 @@ function settleLocked(projectRoot, sessionId, sessionDir, requestId, settlement,
 		const advancing =
 			(existing.status === "succeeded" && existing.evidenceId) ||
 			(existing.status === "skipped" && stage?.optional === true);
-		if (advancing && !records.some((r) => r.kind === "stage_completed" && r.stage === request.stageName)) {
+		if (
+			advancing &&
+			!records.some((r) => r.kind === "stage_completed" && r.stage === request.stageName)
+		) {
 			appendLedgerRecord(ledgerPathOf(sessionDir), {
 				schemaVersion: 2,
 				kind: "stage_completed",
@@ -968,7 +1001,10 @@ function settleLocked(projectRoot, sessionId, sessionDir, requestId, settlement,
 	// A cursor advance requires a VALID Evidence binding, not just a non-empty
 	// id: the receipt must exist under .amber/evidence/ (fail-closed on a
 	// missing receipt — an orphaned id never advances).
-	if (settlement.status === "succeeded" && !evidenceReceiptExists(projectRoot, settlement.evidenceId)) {
+	if (
+		settlement.status === "succeeded" &&
+		!evidenceReceiptExists(projectRoot, settlement.evidenceId)
+	) {
 		return fail(
 			"AMBER_E_INVALID_ARG",
 			`evidence ${settlement.evidenceId} names no recorded Evidence receipt; record it first (amber evidence record) — a run without valid Evidence cannot advance the cursor`,

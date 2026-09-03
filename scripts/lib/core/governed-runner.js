@@ -200,13 +200,13 @@ function evaluateExecutionPolicy(
 	}
 	return namedCommand
 		? {
-			target: targetRoot,
-			...metadata,
-			matchedRule: verdict.matchedRule,
-			verdict,
-			errors: [],
-			warnings: [],
-		}
+				target: targetRoot,
+				...metadata,
+				matchedRule: verdict.matchedRule,
+				verdict,
+				errors: [],
+				warnings: [],
+			}
 		: null;
 }
 
@@ -262,7 +262,13 @@ function canonicalOutputDigest({
 	};
 }
 
-function executeInWorktree(targetRoot, command, label, budgetMinutes, { captureDigest = false } = {}) {
+function executeInWorktree(
+	targetRoot,
+	command,
+	label,
+	budgetMinutes,
+	{ captureDigest = false } = {},
+) {
 	const safeLabel = String(label).replace(/[^A-Za-z0-9._-]/g, "-");
 	const runId = `glx-${safeLabel}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
 	const worktree = createWorktree(targetRoot, runId);
@@ -316,14 +322,14 @@ function executeInWorktree(targetRoot, command, label, budgetMinutes, { captureD
 			exitCode: -1,
 			...(captureDigest
 				? {
-					signal: error.signal || null,
-					timedOut: error.code === "ETIMEDOUT",
-					startedAt,
-					finishedAt,
-					terminalStatus: error.code === "ETIMEDOUT" ? "timed_out" : "failed",
-					stdout: Buffer.alloc(0),
-					stderr: Buffer.from(String(error.message || error), "utf8"),
-				}
+						signal: error.signal || null,
+						timedOut: error.code === "ETIMEDOUT",
+						startedAt,
+						finishedAt,
+						terminalStatus: error.code === "ETIMEDOUT" ? "timed_out" : "failed",
+						stdout: Buffer.alloc(0),
+						stderr: Buffer.from(String(error.message || error), "utf8"),
+					}
 				: { stdout: "", stderr: String(error.message || error).slice(-2000) }),
 		};
 	} finally {
@@ -368,7 +374,10 @@ function recordExecutionEvidence(targetRoot, execution, subject = {}) {
 		producer,
 		assurance: "replayable",
 		scope: subject.sessionId || null,
-		subject: subject.evidenceSubject || subject.subject || `command/${subject.commandId || execution.command}`,
+		subject:
+			subject.evidenceSubject ||
+			subject.subject ||
+			`command/${subject.commandId || execution.command}`,
 		inputs: [subject.commandId || execution.command],
 		tools: ["governed-runner"],
 		environment: {

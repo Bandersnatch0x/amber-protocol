@@ -167,18 +167,12 @@ describe("verb stage target resolution", () => {
 
 	it("fails closed for an unregistered runner and capability", () => {
 		const dir = mkVerbTarget();
-		const unknownRunner = resolveVerbTarget(
-			dir,
-			"runner/ghost@1.0.0#diagnose.check@1",
-		);
+		const unknownRunner = resolveVerbTarget(dir, "runner/ghost@1.0.0#diagnose.check@1");
 		assert.strictEqual(unknownRunner.ok, false);
 		assert.strictEqual(unknownRunner.code, "AMBER_E_RUNNER_NOT_FOUND");
 
 		registerVerbCapability(dir);
-		const unknownCapability = resolveVerbTarget(
-			dir,
-			"runner/ci@1.0.0#diagnose.ghost@1",
-		);
+		const unknownCapability = resolveVerbTarget(dir, "runner/ci@1.0.0#diagnose.ghost@1");
 		assert.strictEqual(unknownCapability.ok, false);
 		assert.strictEqual(unknownCapability.code, "AMBER_E_RUNNER_CAPABILITY_NOT_FOUND");
 		fs.rmSync(dir, { recursive: true, force: true });
@@ -188,17 +182,11 @@ describe("verb stage target resolution", () => {
 		const dir = mkVerbTarget();
 		registerVerbCapability(dir);
 
-		const runnerDrift = resolveVerbTarget(
-			dir,
-			"runner/ci@9.9.9#diagnose.check@1",
-		);
+		const runnerDrift = resolveVerbTarget(dir, "runner/ci@9.9.9#diagnose.check@1");
 		assert.strictEqual(runnerDrift.ok, false);
 		assert.strictEqual(runnerDrift.code, "AMBER_E_RUNNER_VERSION_DRIFT");
 
-		const capabilityDrift = resolveVerbTarget(
-			dir,
-			"runner/ci@1.0.0#diagnose.check@2",
-		);
+		const capabilityDrift = resolveVerbTarget(dir, "runner/ci@1.0.0#diagnose.check@2");
 		assert.strictEqual(capabilityDrift.ok, false);
 		assert.strictEqual(capabilityDrift.code, "AMBER_E_RUNNER_CAPABILITY_NOT_FOUND");
 		fs.rmSync(dir, { recursive: true, force: true });

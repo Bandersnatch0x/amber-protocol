@@ -269,7 +269,7 @@ const COMMAND_HELP = {
 		"  amber session verify --session <session-id> --confirm",
 		"  amber session approve --session <session-id>",
 		"  amber session run --session <session-id> --dry-run",
-		"  amber session settle --session <session-id> --request-id <id> --attempt-id <id> --request-hash <hash> --result '{\"status\":\"succeeded\"}'",
+		'  amber session settle --session <session-id> --request-id <id> --attempt-id <id> --request-hash <hash> --result \'{"status":"succeeded"}\'',
 	],
 	migrate: [
 		"Backfill version metadata in recognized Amber JSON artifacts, or migrate",

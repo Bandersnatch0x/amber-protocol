@@ -7,10 +7,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
-const {
-	resolveCommandId,
-	runGovernedCommand,
-} = require("../../scripts/lib/core/governed-runner");
+const { resolveCommandId, runGovernedCommand } = require("../../scripts/lib/core/governed-runner");
 const { appendLedgerRecord, readLedger } = require("../../scripts/lib/core/loop-ledger");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const { showEvidence } = require("../../scripts/lib/core/evidence-receipts");
@@ -76,7 +73,13 @@ test("resolveCommandId accepts only one exact allow rule and returns its pattern
 		pattern: "node --version",
 	};
 	const resolved = resolveCommandId(rule.id, { rules: [rule] });
-	assert.deepEqual(resolved, { ok: true, commandId: rule.id, command: rule.pattern, matchedRule: rule.id, rule });
+	assert.deepEqual(resolved, {
+		ok: true,
+		commandId: rule.id,
+		command: rule.pattern,
+		matchedRule: rule.id,
+		rule,
+	});
 });
 
 test("resolveCommandId distinguishes unknown, non-allow, and non-exact rules", () => {
