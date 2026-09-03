@@ -26,10 +26,7 @@
 		"ownerId and tokenHash match the current lease owner and digest"
 	],
 	"effects": {
-		"edits": [
-			".amber/sessions/<id>/manifest.json",
-			".amber/sessions/<id>/timeline.jsonl"
-		],
+		"edits": [".amber/sessions/<id>/manifest.json", ".amber/sessions/<id>/timeline.jsonl"],
 		"sideEffects": ["timeline-event"],
 		"rollback": false
 	},

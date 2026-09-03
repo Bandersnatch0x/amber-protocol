@@ -7,7 +7,12 @@ const crypto = require("node:crypto");
 
 const stageRunner = require("../../scripts/lib/session-stage-runner");
 const { runSessionStage, settleSessionRequest, verifyLease, cursorFromLedger } = stageRunner;
-const { verifySession, approveSession, startSession, leaseSession } = require("../../scripts/lib/session-commands");
+const {
+	verifySession,
+	approveSession,
+	startSession,
+	leaseSession,
+} = require("../../scripts/lib/session-commands");
 const { admitArtifact } = require("../../scripts/lib/core/canonical-artifacts");
 const { registerPrincipal } = require("../../scripts/lib/core/principal-registry");
 const {
@@ -136,9 +141,7 @@ describe("session stage runner — adapter resolution", () => {
 	});
 
 	it("fails closed when a different pin is the only mapped one", async () => {
-		const restore = withAdapters([
-			{ ...HOST_AGENT, capabilityPin: "runner/ci@1.0.0#other.cap@1" },
-		]);
+		const restore = withAdapters([{ ...HOST_AGENT, capabilityPin: "runner/ci@1.0.0#other.cap@1" }]);
 		try {
 			const { root } = makeTarget();
 			const outcome = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
@@ -344,7 +347,13 @@ describe("session stage runner — settle", () => {
 	it("refuses a different result for the same attempt", async () => {
 		const { root } = makeTarget();
 		const run = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
-		await settleSessionRequest(root, "s1", run.request.requestId, { status: "failed" }, bindOf(run));
+		await settleSessionRequest(
+			root,
+			"s1",
+			run.request.requestId,
+			{ status: "failed" },
+			bindOf(run),
+		);
 		const conflict = await settleSessionRequest(
 			root,
 			"s1",
@@ -406,14 +415,32 @@ describe("session stage runner — settle", () => {
 			deadlineAt: new Date(Date.now() - 1000).toISOString(),
 			recordedAt: new Date(Date.now() - 2000).toISOString(),
 		});
-		const claim = { ownerId: "agent-a", tokenHash: TOKEN_HASH, leaseFence: 1, attemptId: "att-1", requestHash: "key-1" };
-		const settled = await settleSessionRequest(root, "s1", "req-expired", { status: "failed" }, claim);
+		const claim = {
+			ownerId: "agent-a",
+			tokenHash: TOKEN_HASH,
+			leaseFence: 1,
+			attemptId: "att-1",
+			requestHash: "key-1",
+		};
+		const settled = await settleSessionRequest(
+			root,
+			"s1",
+			"req-expired",
+			{ status: "failed" },
+			claim,
+		);
 		assert.strictEqual(settled.success, false);
 		assert.match(settled.message, /expired/);
 		const ledgerText = fs.readFileSync(path.join(sessionDir, "ledger.jsonl"), "utf8");
 		assert.match(ledgerText, /stage_attempt_expired/);
 		// The expiry re-fires: a second attempt on the same request also refuses.
-		const again = await settleSessionRequest(root, "s1", "req-expired", { status: "failed" }, claim);
+		const again = await settleSessionRequest(
+			root,
+			"s1",
+			"req-expired",
+			{ status: "failed" },
+			claim,
+		);
 		assert.strictEqual(again.success, false);
 		assert.match(again.message, /expired/);
 	});
@@ -479,7 +506,13 @@ describe("session stage runner — settle", () => {
 	it("keeps a retry on the same stage with a fresh attempt number", async () => {
 		const { root } = makeTarget();
 		const first = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
-		await settleSessionRequest(root, "s1", first.request.requestId, { status: "failed" }, bindOf(first));
+		await settleSessionRequest(
+			root,
+			"s1",
+			first.request.requestId,
+			{ status: "failed" },
+			bindOf(first),
+		);
 		const retry = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
 		assert.strictEqual(retry.request.attemptNumber, 2);
 		assert.strictEqual(retry.request.stageName, "check");
@@ -601,7 +634,11 @@ describe("session stage runner — legacy seams and lease minting", () => {
 		assert.strictEqual(blocked.success, false);
 		assert.match(blocked.message, /user-approval/);
 
-		const approval = await approveSession(root, { sessionId: "s1", gate: "user-approval", yes: true });
+		const approval = await approveSession(root, {
+			sessionId: "s1",
+			gate: "user-approval",
+			yes: true,
+		});
 		assert.strictEqual(approval.exitCode, 0);
 
 		const after = await runSessionStage(root, "s1", { execute: true, ...CLAIM });
@@ -652,13 +689,17 @@ describe("session stage runner — legacy seams and lease minting", () => {
 		assert.match(started.text, /Lease token \(shown ONCE/);
 
 		const sessionDirActual = path.join(root, ".amber", "sessions", started.sessionId);
-		const manifest = JSON.parse(fs.readFileSync(path.join(sessionDirActual, "manifest.json"), "utf8"));
+		const manifest = JSON.parse(
+			fs.readFileSync(path.join(sessionDirActual, "manifest.json"), "utf8"),
+		);
 		assert.ok(manifest.lease, "lease is on the manifest");
 		assert.strictEqual(manifest.lease.ownerId, "agent-a");
 		assert.strictEqual(manifest.lease.fence, 1);
 		assert.match(manifest.lease.tokenHash, /^[0-9a-f]{64}$/);
 		// The raw token is never persisted — only its digest is.
-		const rawToken = (started.text.match(/Lease token \(shown ONCE, not stored\): ([0-9a-f]{64})/) || [])[1];
+		const rawToken = (started.text.match(
+			/Lease token \(shown ONCE, not stored\): ([0-9a-f]{64})/,
+		) || [])[1];
 		assert.ok(rawToken, "the raw token is returned exactly once");
 		assert.ok(!JSON.stringify(manifest).includes(rawToken));
 	});
@@ -678,7 +719,9 @@ describe("session stage runner — legacy seams and lease minting", () => {
 		assert.strictEqual(manifest.lease.fence, 2);
 		assert.strictEqual(manifest.lease.ownerId, "agent-a");
 		assert.notStrictEqual(manifest.lease.tokenHash, TOKEN_HASH, "a fresh token digest is minted");
-		const rawToken = (reacquired.text.match(/Lease token \(shown ONCE, not stored\): ([0-9a-f]{64})/) || [])[1];
+		const rawToken = (reacquired.text.match(
+			/Lease token \(shown ONCE, not stored\): ([0-9a-f]{64})/,
+		) || [])[1];
 		assert.ok(rawToken, "the raw token is returned exactly once");
 		assert.ok(!JSON.stringify(manifest).includes(rawToken));
 
