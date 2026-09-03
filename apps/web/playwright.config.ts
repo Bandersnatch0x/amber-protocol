@@ -23,9 +23,25 @@ function getE2EClaudeHome(): string {
   return path.join(os.tmpdir(), `amber-web-e2e-claude-home-${repoKey}`);
 }
 
+function getE2ECodexHome(): string {
+  const override = process.env.AMBER_E2E_CODEX_HOME;
+  if (override) return path.resolve(override);
+  const repoKey = path.resolve(process.cwd(), '..', '..').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(os.tmpdir(), `amber-web-e2e-codex-home-${repoKey}`);
+}
+
+function getE2ECursorHome(): string {
+  const override = process.env.AMBER_E2E_CURSOR_HOME;
+  if (override) return path.resolve(override);
+  const repoKey = path.resolve(process.cwd(), '..', '..').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(os.tmpdir(), `amber-web-e2e-cursor-home-${repoKey}`);
+}
+
 // Compute and set AMBER_REPO_ROOT early so webServer processes inherit it
 process.env.AMBER_REPO_ROOT = getE2ERepoRoot();
 process.env.AMBER_CLAUDE_HOME = getE2EClaudeHome();
+process.env.AMBER_CODEX_HOME = getE2ECodexHome();
+process.env.AMBER_CURSOR_HOME = getE2ECursorHome();
 const reuseExistingServer = process.env.AMBER_E2E_REUSE_SERVER === '1';
 // Explicit AMBER_E2E_API_PORT always wins (escape hatch). Playwright workers
 // re-import this config after the webServer is already bound, so a repeat
@@ -53,6 +69,8 @@ const e2eEnv = {
   ...process.env,
   AMBER_REPO_ROOT: process.env.AMBER_REPO_ROOT,
   AMBER_CLAUDE_HOME: process.env.AMBER_CLAUDE_HOME,
+  AMBER_CODEX_HOME: process.env.AMBER_CODEX_HOME,
+  AMBER_CURSOR_HOME: process.env.AMBER_CURSOR_HOME,
   PORT: String(apiPort),
   API_PORT: String(apiPort),
   VITE_DEV_PORT: String(clientPort),

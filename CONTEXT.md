@@ -658,6 +658,10 @@ _Avoid_: auto-fix, cleanup task, maintenance run
 A reviewable suggestion to turn a real failure into a repeatable assertion or test. Does not automatically modify the test suite; requires human approval.
 _Avoid_: regression test, bug fix, auto-fix
 
+**Improvement Suggestion**:
+A reviewable, evidence-clustered change to agent-facing knowledge files (`AGENTS.md`, `CLAUDE.md`, wiki pages, skill files). Produced by fingerprinting repeated tool-failure signals across repository-scoped host transcripts; Apply is all-or-nothing against an allowlist with optimistic concurrency and Undo. Never mutates product code, tests, or `MEMORY.md`.
+_Avoid_: auto-fix, improvement run, suggestion engine
+
 ## Product Boundary
 
 **Dynamic Workflow**:

@@ -2251,6 +2251,30 @@
 				".gitignore",
 				"docs/CLI_REFERENCE.md"
 			]
+		},
+		{
+			"id": "F064",
+			"priority": 64,
+			"area": "observability",
+			"title": "Improvement Suggestions (web, multi-host)",
+			"user_visible_behavior": "The web viewer lists Improvement Suggestion cards clustered from Claude, Codex, and Cursor transcripts for the current repository. A card shows an evidence count, host badges, a preview of an allowlisted wiki operation, and Apply / Dismiss / Snooze / Undo. Apply never writes product code, tests, or MEMORY.md.",
+			"status": "in_progress",
+			"verification": [
+				"apps/web vitest: suggestions cluster, apply, hosts, router",
+				"apps/web playwright: tests/e2e/suggestions.spec.ts"
+			],
+			"evidence": [],
+			"notes": [
+				"Web-only; no new default CLI verb.",
+				"Apply allowlist: AGENTS.md, CLAUDE.md, docs/wiki/**/*.md, skills/*/SKILL.md."
+			],
+			"paths": [
+				"apps/web/server/lib/suggestions/",
+				"apps/web/server/routers/suggestions.ts",
+				"apps/web/src/routes/suggestions/",
+				"docs/specs/F064-improvement-suggestions.md",
+				"docs/plans/F064-Improvement-suggestions.md"
+			]
 		}
 	]
 }

@@ -1,5 +1,10 @@
 import { seedFixtureSession } from './fixtures/seed';
 import { getE2EClaudeHome, seedE2ETranscriptFixture } from './fixtures/transcript-fixture';
+import {
+  getE2ECodexHome,
+  getE2ECursorHome,
+  seedE2ESuggestionFixtures,
+} from './fixtures/suggestions-fixture';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -152,4 +157,14 @@ export default function globalSetup(): void {
   }
   fs.rmSync(claudeHome, { recursive: true, force: true });
   seedE2ETranscriptFixture(repoRoot, claudeHome);
+
+  const codexHome = getE2ECodexHome();
+  const cursorHome = getE2ECursorHome();
+  for (const extraHome of [codexHome, cursorHome]) {
+    if (!path.resolve(extraHome).startsWith(path.resolve(os.tmpdir()) + path.sep)) {
+      throw new Error(`Refusing to prepare non-temp E2E host home: ${extraHome}`);
+    }
+    fs.rmSync(extraHome, { recursive: true, force: true });
+  }
+  seedE2ESuggestionFixtures(repoRoot, { claudeHome, codexHome, cursorHome });
 }

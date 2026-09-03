@@ -22,6 +22,8 @@ import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
 import { Route as SessionsIdRouteRouteImport } from './routes/sessions/$id/route'
 import { Route as TranscriptsIndexRouteImport } from './routes/transcripts/index'
 import { Route as TranscriptsIdRouteImport } from './routes/transcripts/$id'
+import { Route as SuggestionsIndexRouteImport } from './routes/suggestions/index'
+import { Route as SuggestionsIdRouteImport } from './routes/suggestions/$id'
 import { Route as RoutesIdIndexRouteImport } from './routes/routes/$id/index'
 import { Route as SessionsIdIndexRouteImport } from './routes/sessions/$id/index'
 import { Route as SessionsIdTimelineRouteImport } from './routes/sessions/$id/timeline'
@@ -93,6 +95,18 @@ const TranscriptsIdRoute = TranscriptsIdRouteImport.update({
 } as any).lazy(() =>
   import('./routes/transcripts/$id.lazy').then((d) => d.Route),
 )
+const SuggestionsIndexRoute = SuggestionsIndexRouteImport.update({
+  id: '/suggestions/',
+  path: '/suggestions/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuggestionsIdRoute = SuggestionsIdRouteImport.update({
+  id: '/suggestions/$id',
+  path: '/suggestions/$id',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/suggestions/$id.lazy').then((d) => d.Route),
+)
 const RoutesIdIndexRoute = RoutesIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -124,9 +138,11 @@ export interface FileRoutesByFullPath {
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
   '/transcripts/$id': typeof TranscriptsIdRoute
+  '/suggestions/$id': typeof SuggestionsIdRoute
   '/routes/': typeof RoutesIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/transcripts/': typeof TranscriptsIndexRoute
+  '/suggestions/': typeof SuggestionsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id/': typeof RoutesIdIndexRoute
   '/sessions/$id/': typeof SessionsIdIndexRoute
@@ -138,9 +154,11 @@ export interface FileRoutesByTo {
   '/knowledge': typeof KnowledgeRoute
   '/settings': typeof SettingsRoute
   '/transcripts/$id': typeof TranscriptsIdRoute
+  '/suggestions/$id': typeof SuggestionsIdRoute
   '/routes': typeof RoutesIndexRoute
   '/sessions': typeof SessionsIndexRoute
   '/transcripts': typeof TranscriptsIndexRoute
+  '/suggestions': typeof SuggestionsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id': typeof RoutesIdIndexRoute
   '/sessions/$id': typeof SessionsIdIndexRoute
@@ -157,9 +175,11 @@ export interface FileRoutesById {
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
   '/transcripts/$id': typeof TranscriptsIdRoute
+  '/suggestions/$id': typeof SuggestionsIdRoute
   '/routes/': typeof RoutesIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/transcripts/': typeof TranscriptsIndexRoute
+  '/suggestions/': typeof SuggestionsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id/': typeof RoutesIdIndexRoute
   '/sessions/$id/': typeof SessionsIdIndexRoute
@@ -177,9 +197,11 @@ export interface FileRouteTypes {
     | '/routes/$id'
     | '/sessions/$id'
     | '/transcripts/$id'
+    | '/suggestions/$id'
     | '/routes/'
     | '/sessions/'
     | '/transcripts/'
+    | '/suggestions/'
     | '/sessions/$id/timeline'
     | '/routes/$id/'
     | '/sessions/$id/'
@@ -191,9 +213,11 @@ export interface FileRouteTypes {
     | '/knowledge'
     | '/settings'
     | '/transcripts/$id'
+    | '/suggestions/$id'
     | '/routes'
     | '/sessions'
     | '/transcripts'
+    | '/suggestions'
     | '/sessions/$id/timeline'
     | '/routes/$id'
     | '/sessions/$id'
@@ -209,9 +233,11 @@ export interface FileRouteTypes {
     | '/routes/$id'
     | '/sessions/$id'
     | '/transcripts/$id'
+    | '/suggestions/$id'
     | '/routes/'
     | '/sessions/'
     | '/transcripts/'
+    | '/suggestions/'
     | '/sessions/$id/timeline'
     | '/routes/$id/'
     | '/sessions/$id/'
@@ -227,6 +253,8 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   TranscriptsIdRoute: typeof TranscriptsIdRoute
   TranscriptsIndexRoute: typeof TranscriptsIndexRoute
+  SuggestionsIdRoute: typeof SuggestionsIdRoute
+  SuggestionsIndexRoute: typeof SuggestionsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -322,6 +350,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TranscriptsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/suggestions/': {
+      id: '/suggestions/'
+      path: '/suggestions'
+      fullPath: '/suggestions/'
+      preLoaderRoute: typeof SuggestionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/suggestions/$id': {
+      id: '/suggestions/$id'
+      path: '/suggestions/$id'
+      fullPath: '/suggestions/$id'
+      preLoaderRoute: typeof SuggestionsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/routes/$id/': {
       id: '/routes/$id/'
       path: '/'
@@ -410,6 +452,8 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   TranscriptsIdRoute: TranscriptsIdRoute,
   TranscriptsIndexRoute: TranscriptsIndexRoute,
+  SuggestionsIdRoute: SuggestionsIdRoute,
+  SuggestionsIndexRoute: SuggestionsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -12,6 +12,11 @@ export const Route = createFileRoute('/')({ component: HomePage });
 const primarySurfaces = [
   { labelKey: 'nav.sessions', detailKey: 'home.surface.sessions.detail', to: '/sessions' },
   { labelKey: 'nav.gates', detailKey: 'home.surface.gates.detail', to: '/gates' },
+  {
+    labelKey: 'nav.suggestions',
+    detailKey: 'home.surface.suggestions.detail',
+    to: '/suggestions',
+  },
 ] as const;
 
 const secondarySurfaces = [
