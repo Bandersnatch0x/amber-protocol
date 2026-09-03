@@ -276,4 +276,4 @@ Set conservative budgets to limit blast radius:
 - Read [Policy Configuration Guide](POLICY_CONFIGURATION.md)
 - Review [Notification Policy Configuration](NOTIFICATION_SETUP.md)
 - Review [Troubleshooting Guide](TROUBLESHOOTING.md)
-- Explore [CLI Reference](CLI_REFERENCE.md)
+- Explore [CLI Reference](../CLI_REFERENCE.md)

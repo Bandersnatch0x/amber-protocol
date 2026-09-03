@@ -274,7 +274,7 @@ amber-protocol maintenance distill --target <dir> [--output <file>]
 | Option | Description |
 |--------|-------------|
 | `--target <dir>` | Target directory (default: current) |
-| `--output <file>` | Output path for the proposal (default: `docs/maintenance/distill-proposals.md`) |
+| `--output <file>` | Output path for the proposal (default: `docs/quality/distill-proposals.md`) |
 
 ---
 

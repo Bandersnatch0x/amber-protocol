@@ -8,7 +8,7 @@
 
 | #   | 阶段 | 命令 / skill                          | 职责                                          | 出口判据                                                                                                     |
 | --- | ---- | ------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| 1   | 路由 | `/ask-matt`                            | 判断当前情况该进哪个阶段                      | 指出下一个阶段命令                                                                                             |
+| 1   | 路由 | `/external-review`                            | 判断当前情况该进哪个阶段                      | 指出下一个阶段命令                                                                                             |
 | 2   | 探路 | `/wayfinder`                           | 超会话体量的工作 → 决策票地图（本地票仓 `issues/`） | 决策票全 resolved                                                                                              |
 | 3   | 拷问 | `/grill-with-docs`                     | 逼问计划，沉淀 ADR + 词汇                     | 无未决问题；决策写入 `docs/adr/` 与 `UBIQUITOUS_LANGUAGE.md`                                                   |
 | 4   | 成谱 | `/to-spec`                             | 会话 → spec，发布到本地票仓                   | spec 票建立（`issues/NNNN-<slug>.md`）                                                                         |
@@ -38,3 +38,16 @@
 ## 依赖
 
 阶段命令与横切机制都是用户全局 skills（`~/.agents/skills/`、`~/.claude/skills/`），不随本仓分发。缺失时按上表「职责」列手工执行等价步骤即可，流水线顺序不变。
+
+## 产物落盘规则（跨阶段生效）
+
+1. **三类产物三个家**：交付物进 `docs/` 对应子目录；本仓运行态进 `.amber/`；一切中间产物、外部 harness 输出、评审草稿、截图、日志进 `.scratch/<来源>/`。根级不新增任何文件。
+2. **外部 harness 只写 `.scratch/`**：legacy、external-review skill、external-host、design tool、design-quality 等工具的产物一律落 `.scratch/<harness-name>/`。它们的产物要进交付物，必须经阶段 7 评审后由人手工移入 `docs/`，并在票的 Log 里记录来源。
+3. **评审报告的归宿**：阶段 7 的评审报告先落 `.scratch/`；票关闭时，结论摘要进票的 Log，报告本体若有长期价值移入 `docs/quality/`，否则留在 `.scratch/` 随时可删。
+4. **一个 F-number 三个文件**：`docs/specs/F0NN-*.md`、`docs/plans/F0NN-*.md`、`feature_list.json` 条目（含 `paths`）。缺任何一个，`amber review` 应报 warning。
+5. **.gitignore 不是产物地图**：新增 ignore 条目前先问"这个产物为什么不在 `.scratch/`"。只有运行态和依赖才配单独条目。
+6. **每周 dogfood 附带目录健康检查**：`git status --short --untracked-files=all | wc -l` 在完整测试后应为 0；根级文件数、docs 子目录数作为 governance report 的 maintenance 维度输入（P2 候选）。
+
+## P2-04 目录大迁移延后
+
+根级文档（`ROADMAP.md`、`PRODUCT.md`、`UBIQUITOUS_LANGUAGE.md`）和 `docs/` 内历史布局的批量迁移已规划为 P2-04 阶段工作。执行前提：clean worktree、迁移计划、引用图检查、corpus 重生成。F063 P0 交付不含该迁移。

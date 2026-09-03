@@ -2,10 +2,15 @@
 
 Complete command reference for Amber Protocol CLI.
 
-Running `amber` or `amber --help` shows the journey and core governance projection.
-Run `amber --all` to list every deprecated and expert compatibility command. Hidden commands
-remain callable and retain `amber <command> --help`; F019 changes discovery, not command removal.
-For agent-guided work, invoke the `amber` router skill, which selects one of four deep journeys.
+Running `amber` or `amber --help` shows the seven primary verbs — `audit`, `init`,
+`doctor`, `next`, `plan`, `handoff`, `session` — with a one-line product statement.
+Run `amber --all` to list every governance, platform, deprecated, and expert
+command. Hidden commands remain callable and retain `amber <command> --help`;
+visibility tiers change discovery, never command removal (F019 introduced the
+tier registry; F063 tuned it to the seven-verb surface). For agent-guided work,
+invoke the `amber` router skill or the thin verb skills (`amber-start`,
+`amber-check`, `amber-done`); the four deep journey skills remain for the full
+process.
 
 ## Global Options
 
@@ -2819,6 +2824,6 @@ exits non-zero. CI runs it on pull requests and as a nightly dispatch job. Detai
 
 ## Next Steps
 
-- Return to [Autonomous Mode Guide](AUTONOMOUS_MODE_GUIDE.md)
-- Review [Policy Configuration](POLICY_CONFIGURATION.md)
-- Check [Troubleshooting Guide](TROUBLESHOOTING.md)
+- Return to [Autonomous Mode Guide](guides/AUTONOMOUS_MODE_GUIDE.md)
+- Review [Policy Configuration](guides/POLICY_CONFIGURATION.md)
+- Check [Troubleshooting Guide](guides/TROUBLESHOOTING.md)

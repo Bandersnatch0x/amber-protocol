@@ -445,15 +445,17 @@ describe("amber break-loop (CLI)", () => {
 		);
 	});
 
-	it("amber --help lists break-loop, and the registry places it next to learnings at tier core", () => {
-		const r = runCli(["--help"]);
+	it("amber --all lists break-loop; the registry keeps it next to learnings at platform tier (F063)", () => {
+		const r = runCli(["--all"]);
 		assert.equal(r.status, 0);
 		assert.match(r.stdout, /break-loop/);
 
 		assert.ok(COMMANDS.includes("break-loop"));
 		assert.equal(COMMANDS.indexOf("break-loop"), COMMANDS.indexOf("learnings") + 1);
-		assert.equal(COMMAND_TIERS["break-loop"], "core");
-		assert.ok(DEFAULT_COMMANDS.includes("break-loop"), "tier core → visible in default help");
+		// F063: break-loop is a governance primitive, not one of the seven
+		// primary verbs — it stays callable and visible under --all.
+		assert.equal(COMMAND_TIERS["break-loop"], "expert");
+		assert.ok(!DEFAULT_COMMANDS.includes("break-loop"), "platform tier → hidden from default help");
 	});
 });
 

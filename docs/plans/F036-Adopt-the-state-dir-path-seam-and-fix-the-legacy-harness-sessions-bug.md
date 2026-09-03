@@ -13,7 +13,7 @@ state-dir policy for itself — all `.amber` path construction routes through
 `state-dir-resolver`, so a future policy change (rename, env override) touches
 one module instead of 38 files.
 
-Source: `docs/reviews/architecture-survey-2026-08-24.md` Finding 2 (61 hardcoded
+Source: `docs/quality/reviews/architecture-survey-2026-08-24.md` Finding 2 (61 hardcoded
 `path.join(..., ".amber", ...)` sites across 38 files, bypassing the resolver;
 live audit-vs-session-list contradiction on legacy `.harness` repos at
 `scripts/lib/core/audit.js:502`).
@@ -50,8 +50,8 @@ live audit-vs-session-list contradiction on legacy `.harness` repos at
 ## Context manifests
 
 Entries are bare, comma- or space-separated knowledge-surface paths only — docs/specs contracts, wiki pages, ADRs, schema docs; code paths belong in the feature's booked paths, not here.
-- implement: docs/reviews/architecture-survey-2026-08-24.md
-- review: docs/reviews/architecture-survey-2026-08-24.md
+- implement: docs/quality/reviews/architecture-survey-2026-08-24.md
+- review: docs/quality/reviews/architecture-survey-2026-08-24.md
 
 ## Vertical Slices
 

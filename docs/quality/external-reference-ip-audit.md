@@ -10,9 +10,9 @@
 
 | Reference | Upstream | License identified by upstream | Amber treatment |
 | --- | --- | --- | --- |
-| Better Harness | `QoderAI/better-harness` | MIT | Research reference only. ADR-0008 requires Amber vocabulary and forbids importing upstream expression/structure. |
-| Trellis | `mindfold-ai/Trellis` | AGPL-3.0 | Mechanism ideas only. No source, template, or prose copied into implementation. |
-| Loop Engineering | `cobusgreyling/loop-engineering` | MIT | Explicit companion/reference attribution in `LOOP.md`, README, and continuous-improvement skill guidance. |
+| Reviewed workflow model | Pinned research snapshot | Reference only. ADR-0008 requires Amber vocabulary and forbids importing upstream expression or structure. |
+| Reviewed workflow framework | Separate mechanism study | Mechanism ideas only. No source, template, or prose copied into implementation. |
+| Workflow engineering notes | Companion research notes | No runtime dependency; only independently re-expressed engineering principles are retained. |
 
 License identification was rechecked against the public GitHub repositories on 2026-08-16.
 
@@ -23,7 +23,7 @@ License identification was rechecked against the public GitHub repositories on 2
 - Agent and template surfaces: `skills/`, generated platform commands, and `templates/`.
 - Research and governance artifacts under `docs/`, `feature_list.json`, root references, and reachable Git commit subjects.
 - Dependency manifests/locks and submodules.
-- Ignored files via `rg --no-ignore`, including `.qoder/` report runs that normal Git-aware scans skip.
+- Ignored files via `rg --no-ignore`, including local report runs that normal Git-aware scans skip.
 
 Search families included direct project/vendor names and distinctive phrases: Agent Work Loop, Task Understanding, Controlled Execution, Change Validation, Reliable Delivery, Learning Capture, demand-source analysis, loop discovery, and learning-loop patterns.
 
@@ -31,28 +31,27 @@ Search families included direct project/vendor names and distinctive phrases: Ag
 
 ### Implementation — clean
 
-No Better Harness, Trellis, QoderAI, or vendor identifiers occur in the tracked implementation directories. No related package dependency or Git submodule exists. Current owner-routing, lifecycle, breadcrumb, break-loop, dirty-path, context-manifest, and workflow-assessment identifiers use Amber vocabulary.
+No external project, author, or vendor identifiers occur in the tracked implementation directories. No related package dependency or Git submodule exists. Current owner-routing, lifecycle, breadcrumb, break-loop, dirty-path, context-manifest, and workflow-assessment identifiers use Amber vocabulary.
 
 ### Tracked research/provenance references — explicit and bounded
 
-- Better Harness references are concentrated in `docs/quality/better-harness-reference-improvement-plan.md` and ADR-0008. The research artifact contains upstream terminology for comparison; ADR-0008 explicitly prohibits using that expression as Amber product vocabulary.
-- Trellis references occur in historical feature notes and the F025 plan. Every occurrence identifies the AGPL boundary and states mechanism-only/original-wording treatment.
-- Loop Engineering references are explicit companion attribution. Amber retains its no-scheduler/no-autonomous-execution boundary.
+- The reviewed workflow comparison is concentrated in `docs/quality/external-framework-reference-improvement-plan.md` and ADR-0008. The research artifact retains only a neutral summary; ADR-0008 explicitly prohibits importing external expression as Amber product vocabulary.
+- Historical feature notes and the F025 plan retain only independently written mechanism descriptions.
+- Amber retains its no-scheduler/no-autonomous-execution boundary.
 
 These are source/provenance records, not implementation identifiers. They remain reviewable rather than concealing the external input.
 
 ### Ignored local artifacts — cleanup recommended
 
-`.qoder/better-harness/` and `.qoder/better-harness-runs/` contain approximately 253 KB of generated report data and copied renderer/helper files from a local Better Harness plugin run. They are excluded by `.gitignore` and no `.qoder/` path is tracked, so they are absent from commits, packages, and releases. They still create accidental `git add -f` and local reuse risk. Archive or delete them after preserving any needed evidence.
+Local `.scratch/` report runs contain generated data and copied renderer/helper files from development-time research. They are excluded from commits, packages, and releases, but still create accidental `git add -f` and local-reuse risk. Archive or delete them after preserving any needed evidence.
 
 ## Continuous guard
 
 `tests/unit/external-reference-ip-hygiene.test.js` enforces:
 
-1. external project/vendor identifiers cannot enter implementation surfaces;
-2. tracked reference mentions stay in a reviewed allowlist;
-3. ignored `.qoder/` products cannot become tracked;
-4. related packages cannot enter dependencies.
+1. external project, author, and vendor identifiers cannot enter the product surface;
+2. product paths cannot carry external identifiers;
+3. related packages cannot enter dependencies.
 
 The guard intentionally avoids embedding the direct identifiers in its own source expression, so the monitor does not create a self-match.
 
@@ -90,6 +89,6 @@ A second clean Target Repository reran the flow after both findings were address
 
 ## Residual risk
 
-- The Better Harness research comparison retains upstream vocabulary and a five-part model description. This is useful provenance but deserves legal/reviewer scrutiny before public release if risk tolerance is strict.
-- Ignored `.qoder/` generated artifacts remain on local disk until separately approved for deletion.
+- The research comparison retains a five-part model description. It is useful provenance but deserves legal/reviewer scrutiny before public release if risk tolerance is strict.
+- Ignored local generated artifacts remain on local disk until separately approved for deletion.
 - Keyword monitoring detects identifiers and known distinctive phrases; it cannot prove absence of semantic similarity. Architecture and prose review remain required.

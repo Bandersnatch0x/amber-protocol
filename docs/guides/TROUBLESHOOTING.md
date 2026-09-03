@@ -443,4 +443,4 @@ Include:
 
 - Return to [Autonomous Mode Guide](AUTONOMOUS_MODE_GUIDE.md)
 - Review [Policy Configuration](POLICY_CONFIGURATION.md)
-- Check [CLI Reference](CLI_REFERENCE.md)
+- Check [CLI Reference](../CLI_REFERENCE.md)

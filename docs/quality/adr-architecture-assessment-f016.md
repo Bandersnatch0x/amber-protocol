@@ -19,7 +19,7 @@ F016 已提交并保持 `passing`。针对 `origin/master...1b50dfb28ac05cab9f3a
 
 1. 以 `origin/master` 初始化临时 index。
 2. 将当前工作树完整加入临时 index，包括 F016 新增文件。
-3. 恢复约定排除项到基线：`output/**`、`.workbuddy/**`、`docs/quality/release-readiness-1.3.12.md`、`session-handoff.md`。
+3. 恢复约定排除项到基线：`output/**`、`.external-host/**`、`docs/quality/release-readiness-1.3.12.md`、`session-handoff.md`。
 4. 对 `git diff --cached --binary origin/master -- .` 执行 `git hash-object --stdin`。
 
 `output/**` 被排除是为了避免报告自引用；其余排除项属于用户已有或 F016 明确不接管的工作树内容。历史报告 `output/adr-architecture-assessment.md` 未被覆盖或修改。

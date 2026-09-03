@@ -95,7 +95,7 @@ test("valid --priority values are accepted and write a proposal", () => {
 
 // Pin the priority → category matrix so a future filter-table edit cannot
 // pass "accepted" tests while changing which sections land in the proposal
-// (grok L3 residual coverage gap). Uses the extracted propose with an
+// (external-host L3 residual coverage gap). Uses the extracted propose with an
 // injected inspect so we control every category without scaffolding disk.
 test("priority filter keeps the documented category matrix", () => {
 	const { proposeMaintenance } = require("../scripts/lib/core/maintenance-propose");

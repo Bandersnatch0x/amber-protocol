@@ -10,6 +10,9 @@ const {
 } = require("./lib/command-registry");
 const { dispatch } = require("./lib/command-dispatcher");
 
+const PRODUCT_LINE =
+	"Amber puts governance files in your repo so your AI coding session leaves an inspectable trail and the next session knows exactly where to pick up.";
+
 function usage(command, options = {}) {
 	if (command && COMMANDS.includes(command)) {
 		const usageLine = commandUsageLine(command);
@@ -19,23 +22,20 @@ function usage(command, options = {}) {
 
 	const visibleCommands = options.all ? COMMANDS : DEFAULT_COMMANDS;
 	const coreExamples = [
-		"  amber init --target path/to/repo",
 		"  amber audit --target path/to/repo",
-		"  amber wiki --target path/to/repo",
-		"  amber wiki knowledge plan --target path/to/repo",
-		"  amber wiki knowledge build --target path/to/repo",
-		"  amber handoff --target path/to/repo",
-		"  amber handoff bundle --target path/to/repo",
-		"  amber handoff validate --target path/to/repo",
+		"  amber init --target path/to/repo",
 		"  amber doctor --target path/to/repo",
-		"  amber governance report --target path/to/repo",
 		'  amber next --objective "implement a safe change" --target path/to/repo',
 		'  amber plan --target path/to/repo --feature F001 --title "Small slice"',
+		"  amber handoff --target path/to/repo",
+		"  amber session status --target path/to/repo",
+	];
+	const compatibilityExamples = [
+		"  amber wiki --target path/to/repo",
+		"  amber governance report --target path/to/repo",
 		"  amber gate --target path/to/repo --plan docs/plans/F001-small-slice.md",
 		"  amber review --target path/to/repo --plan docs/plans/F001-small-slice.md",
 		"  amber accept --target path/to/repo --plan docs/plans/F001-small-slice.md",
-	];
-	const compatibilityExamples = [
 		"  amber pack inspect --file workflow-packs/safe-amber-bootstrap.pack.json",
 		"  amber profile inspect --file profiles/default.profile.json",
 		"  amber task prepare --target path/to/repo --plan docs/plans/F001-small-slice.md --task slice-1",
@@ -48,10 +48,12 @@ function usage(command, options = {}) {
 	return [
 		"Usage: amber <command> --target <repo> [--json]",
 		"",
+		PRODUCT_LINE,
+		"",
 		`Commands: ${visibleCommands.join(", ")}`,
 		options.all
 			? "All commands are shown."
-			: "Run `amber --all` to show deprecated and expert commands.",
+			: "Run `amber --all` to show every governance and platform command.",
 		"Run `amber <command> --help` for command-specific options.",
 		"",
 		"Examples:",

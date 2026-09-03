@@ -19,4 +19,4 @@ The review of `origin/master...ef57fc5` exposed security and contract gaps acros
 
 - Existing local artifacts that relied on paths outside `--target`, omitted requests, self-declared scope, empty required tiers, or the incorrect Loadout shape are refused immediately.
 - Scaffold templates must install the Operating Manual, Route manifests, and Loadout Definition without overwriting user-authored files.
-- F016 acceptance excludes `docs/quality/release-readiness-1.3.12.md`, `.workbuddy/*`, and the historical assessment. The final handoff may reference F016, and a fresh architecture assessment must bind its claims to the final commit SHA.
+- F016 acceptance excludes `docs/quality/release-readiness-1.3.12.md`, `.external-host/*`, and the historical assessment. The final handoff may reference F016, and a fresh architecture assessment must bind its claims to the final commit SHA.

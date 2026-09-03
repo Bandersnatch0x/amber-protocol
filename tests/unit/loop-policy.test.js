@@ -116,7 +116,7 @@ test("loadPolicyRules warns + falls back to defaults when rules.json is unparsea
 		"a warning is surfaced so the silent-ignore trap is avoided",
 	);
 	// Pin surface-specific wording so a future fold cannot silently merge
-	// governed vs verify diagnostics (grok L3 residual coverage gap).
+	// governed vs verify diagnostics (external-host L3 residual coverage gap).
 	assert.match(captured, /rules\.json/, "names the governed rules file");
 	assert.match(
 		captured,

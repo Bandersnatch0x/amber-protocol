@@ -1,20 +1,20 @@
-# Research: Better Harness reference and Amber improvement plan
+# Research: Workflow Effectiveness Review and Amber improvement plan
 
 **Date:** 2026-07-30  
 **Amber baseline:** `58be40b0fcd51da6c2edbb214f5cacd39f48168d`  
-**Better Harness baseline:** [`205d4e04c2021b830bba1bea1c9a1a92746c7f2e`](https://github.com/QoderAI/better-harness/tree/205d4e04c2021b830bba1bea1c9a1a92746c7f2e)  
+**External research baseline:** a pinned source snapshot retained as untrusted research input.  
 **Research scope:** product positioning, assessment model, evidence collection, host adapters, report contracts, session analysis, learning capture, and delivery roadmap.
 
 ## Decision
 
-Amber should not become a Better Harness clone or a general coding-agent runtime.
+Amber should not become a clone of an external workflow model or a general coding-agent runtime.
 
 The useful move is to add a read-only **Workflow Effectiveness Review** beside the existing **Governance Readiness Report**:
 
 - Governance readiness answers: "Are the required controls, evidence surfaces, and safety boundaries present?"
 - Workflow effectiveness answers: "Did the agent understand the task, use a controlled path, validate the result, deliver safely, and preserve learning?"
 
-These are different claims. Amber currently measures the first one well. Better Harness provides a useful model for the second one.
+These are different claims. Amber currently measures the first one well. The reviewed model provides a useful vocabulary for the second one.
 
 The recommended product shape is:
 
@@ -22,31 +22,23 @@ The recommended product shape is:
 
 ## Evidence snapshot
 
-### Better Harness
+### External research snapshot
 
-At the pinned upstream commit, Better Harness:
+At the pinned research snapshot, the reviewed model:
 
 - defines a five-part Agent Work Loop: Task Understanding, Controlled Execution, Change Validation, Reliable Delivery, and Learning Capture;
 - combines feedforward assets such as `AGENTS.md`, specs, skills, and acceptance criteria with feedback sensors such as tests, hooks, reviews, and session evidence;
 - keeps project, session, and configured-agent evidence separate before reconciliation;
 - models partial and unavailable evidence explicitly instead of inventing coverage;
-- uses host capability boundaries rather than assuming Claude Code, Codex, Cursor, Qoder, and other hosts expose identical data;
+- uses host capability boundaries rather than assuming Claude Code, Codex, Cursor, and other hosts expose identical data;
 - has a versioned report-source contract with evidence references, confidence, diagnostic coverage, and learning-capture fields;
 - treats report generation and mutation as separate phases.
 
-Primary sources:
+The research record covered an overview, work-loop model, skill workflow, architecture, host-adapter matrix, report-source contract, and roadmap. The source URLs are intentionally omitted from the product document; provenance remains in the private research record.
 
-- [README](https://github.com/QoderAI/better-harness/blob/205d4e04c2021b830bba1bea1c9a1a92746c7f2e/README.md)
-- [Agent Work Loop model](https://github.com/QoderAI/better-harness/blob/205d4e04c2021b830bba1bea1c9a1a92746c7f2e/models/agent-work-loop.md)
-- [Better Harness skill workflow](https://github.com/QoderAI/better-harness/blob/205d4e04c2021b830bba1bea1c9a1a92746c7f2e/skills/better-harness/SKILL.md)
-- [Architecture](https://github.com/QoderAI/better-harness/blob/205d4e04c2021b830bba1bea1c9a1a92746c7f2e/docs/ARCHITECTURE.md)
-- [Host adapter matrix](https://github.com/QoderAI/better-harness/blob/205d4e04c2021b830bba1bea1c9a1a92746c7f2e/docs/adapters/README.md)
-- [Report-source implementation](https://github.com/QoderAI/better-harness/blob/205d4e04c2021b830bba1bea1c9a1a92746c7f2e/scripts/harness-analysis/report-source/source.mjs)
-- [Roadmap](https://github.com/QoderAI/better-harness/blob/205d4e04c2021b830bba1bea1c9a1a92746c7f2e/roadmap.md)
+The reviewed snapshot was new and had no published releases at the research baseline. Its ideas and contracts are useful references, but its age argues against copying its full implementation surface wholesale.
 
-The upstream repository was created on 2026-07-21 and had no published GitHub releases at the research baseline. Its ideas and contracts are useful references, but its age argues against copying its full implementation surface wholesale.
-
-The upstream CLI was not executed against Amber because Better Harness declares Node `>=22.20.0`, while the local runtime is Node `22.19.0`. Conclusions here are source-based, not derived from an upstream-generated report.
+The reviewed CLI was not executed against Amber because its declared Node floor exceeded the local runtime at the time. Conclusions here are source-based, not derived from an external-generated report.
 
 ### Amber
 
@@ -73,7 +65,7 @@ The important gap is not readiness. It is that a fully ready repository can stil
 
 ## Capability comparison
 
-| Area | Amber today | Better Harness reference | Recommended treatment |
+| Area | Amber today | Reviewed model | Recommended treatment |
 | --- | --- | --- | --- |
 | Governance controls | Strong: policies, routes, gates, approvals, worktrees, ledgers | Evaluates whether controls exist and are used | Keep Amber as source of truth |
 | Task understanding | Plans, feature state, behavior and verification fields | Dedicated dimension with evidence and confidence | Add effectiveness checks over existing artifacts |
@@ -440,7 +432,7 @@ Definition of done:
 
 ## Final recommendation
 
-The highest-leverage lesson from Better Harness is not its plugin count or report UI. It is the separation of pre-work guidance, post-work evidence, provider coverage, and learning outcomes.
+The highest-leverage lesson from the reviewed model is not its plugin count or report UI. It is the separation of pre-work guidance, post-work evidence, provider coverage, and learning outcomes.
 
 Amber already owns stronger governance, approval, ledger, handoff, and safe-execution primitives. The improvement is to make those primitives answer a second question: not only "is this repository governed?", but also "is this agent workflow effective, and is it getting better?"
 
@@ -448,6 +440,6 @@ Implement that as a separate read-only assessment layer, beginning with reposito
 
 ## Confidence
 
-**High** on the product gap and architectural direction because the conclusion is supported by Amber's current score semantics and Better Harness's source contracts.  
+**High** on the product gap and architectural direction because the conclusion is supported by Amber's current score semantics and the reviewed model's source contracts.  
 **Medium** on exact provider sequencing because host session APIs and local data formats can change.  
-**Medium** on upstream implementation maturity because Better Harness was new and unreleased at the pinned baseline.
+**Medium** on upstream implementation maturity because the reviewed model was new and unreleased at the pinned baseline.

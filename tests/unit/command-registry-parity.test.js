@@ -25,12 +25,14 @@ const {
 } = require("../../scripts/lib/command-registry.js");
 
 const PUBLIC_COMMAND_ORDER = [
-	"init",
 	"audit",
-	"wiki",
+	"init",
 	"doctor",
-	"handoff",
+	"next",
 	"plan",
+	"handoff",
+	"session",
+	"wiki",
 	"gate",
 	"policy",
 	"adapter",
@@ -55,7 +57,6 @@ const PUBLIC_COMMAND_ORDER = [
 	"loop",
 	"ledger",
 	"route",
-	"session",
 	"status",
 	"drift",
 	"sync",
@@ -65,7 +66,6 @@ const PUBLIC_COMMAND_ORDER = [
 	"security",
 	"feature",
 	"clean",
-	"next",
 	"explain",
 	"hooks",
 	"workflow",
@@ -111,6 +111,48 @@ test("Command tiers are the single visibility source", () => {
 		new Set(COMMANDS.filter((name) => COMMAND_TIERS[name] === "deprecated")),
 		DEPRECATED_COMMANDS,
 	);
+});
+
+// F063: the default help surface is exactly the seven primary verbs, in the
+// documented order. The set still derives from the tier registry (test above);
+// this pins the projection contract. Rendered through the real CLI process so
+// the assertions cover the projected text, not an internal structure.
+const { spawnSync } = require("node:child_process");
+const CLI_ENTRY = path.join(__dirname, "..", "..", "scripts", "amber.js");
+
+function runCliProjection(args) {
+	return spawnSync(process.execPath, [CLI_ENTRY, ...args], { encoding: "utf8" });
+}
+
+test("F063 default help projects the seven primary verbs in order", () => {
+	assert.deepEqual(DEFAULT_COMMANDS, ["audit", "init", "doctor", "next", "plan", "handoff", "session"]);
+	const help = runCliProjection(["--help"]);
+	assert.equal(help.status, 0);
+	assert.match(help.stdout, /^Commands: audit, init, doctor, next, plan, handoff, session$/m);
+	// The product line and the --all pointer make the projection navigable.
+	assert.match(help.stdout, /Amber puts governance files in your repo/);
+	assert.match(help.stdout, /amber --all/);
+	// One screen: the default help stays at or under 25 lines.
+	const lineCount = help.stdout.replace(/\n$/, "").split("\n").length;
+	assert.ok(lineCount <= 25, `help too long: ${lineCount} lines`);
+});
+
+test("F063 --all projects the complete registry in its canonical order", () => {
+	const all = runCliProjection(["--all"]);
+	assert.equal(all.status, 0);
+	assert.match(all.stdout, new RegExp(`^Commands: ${COMMANDS.join(", ")}$`, "m"));
+});
+
+test("F063 demoted platform commands stay callable and visible under --all", () => {
+	const all = runCliProjection(["--all"]);
+	assert.equal(all.status, 0);
+	for (const name of ["wiki", "gate", "review", "accept", "governance", "memory", "breakglass", "break-loop"]) {
+		assert.ok(COMMANDS.includes(name), `${name} still registered`);
+		assert.match(all.stdout, new RegExp(`\\b${name}\\b`), `${name} listed under --all`);
+		assert.ok(!DEFAULT_COMMANDS.includes(name), `${name} not in default projection`);
+		const help = runCliProjection([name, "--help"]);
+		assert.equal(help.status, 0, `${name} keeps its --help`);
+	}
 });
 
 test("Command Definitions project option contracts without a skill-only allowlist", () => {

@@ -6,9 +6,9 @@
 
 **第一次使用？从这里开始：**
 
-- [快速开始指南](user-guide/getting-started.md) - 安装、初始化和基本使用
-- [常见问题 FAQ](user-guide/faq.md) - 常见问题解答
-- [故障排查](user-guide/troubleshooting.md) - 问题诊断与解决
+- [快速开始指南](guides/user-getting-started.md) - 安装、初始化和基本使用
+- [常见问题 FAQ](guides/user-faq.md) - 常见问题解答
+- [故障排查](guides/user-troubleshooting.md) - 问题诊断与解决
 - [DeepSeek Harness 集成](../dsh/README.md) - 官方 `dsh-plugin` topic；`dsh plugin add` 原生 bundle 安装
 
 ## 🏗️ 架构与设计
@@ -33,10 +33,10 @@
 
 **生产环境部署：**
 
-- [部署指南](DEPLOYMENT.md) - 生产环境部署步骤
-- [监控设置](MONITORING_SETUP.md) - 监控系统配置
-- [通知设置](NOTIFICATION_SETUP.md) - 告警通知配置
-- [策略配置](POLICY_CONFIGURATION.md) - 治理策略设置
+- [部署指南](guides/DEPLOYMENT.md) - 生产环境部署步骤
+- [监控设置](guides/MONITORING_SETUP.md) - 监控系统配置
+- [通知设置](guides/NOTIFICATION_SETUP.md) - 告警通知配置
+- [策略配置](guides/POLICY_CONFIGURATION.md) - 治理策略设置
 - [回滚流程](quality/rollback-procedures.md) - 回滚操作指南
 
 ## 📖 API 参考
@@ -44,9 +44,9 @@
 **命令行与 API 文档：**
 
 - [CLI 命令参考](CLI_REFERENCE.md) - 完整命令行文档
-- [CLI 命令详解](api/cli-commands.md) - 命令详细说明
-- [Hooks API](api/hooks-api.md) - 钩子系统 API
-- [Skill API](api/skill-api.md) - 技能系统 API
+- [CLI 命令详解](reference/cli-commands.md) - 命令详细说明
+- [Hooks API](reference/hooks-api.md) - 钩子系统 API
+- [Skill API](reference/skill-api.md) - 技能系统 API
 
 ## ✅ 质量保障
 
@@ -72,13 +72,13 @@
 - [领域文档规范](agents/domain.md) - 领域知识组织
 - [Issue 追踪器](agents/issue-tracker.md) - Issue 管理指南
 - [分类标签](agents/triage-labels.md) - Issue 分类体系
-- [自主模式指南](AUTONOMOUS_MODE_GUIDE.md) - Agent 自主执行模式
+- [自主模式指南](guides/AUTONOMOUS_MODE_GUIDE.md) - Agent 自主执行模式
 
 ## 🔧 维护指南
 
 **项目维护者文档：**
 
-- [提案精简](maintenance/distill-proposals.md) - 提案管理流程
+- [提案精简](quality/distill-proposals.md) - 提案管理流程
 
 ## 📜 历史文档
 
@@ -92,11 +92,11 @@
 |------|------|
 | **GitHub 仓库** | [Bandersnatch0x/amber-protocol](https://github.com/Bandersnatch0x/amber-protocol) |
 | **Issue 追踪** | [GitHub Issues](https://github.com/Bandersnatch0x/amber-protocol/issues) |
-| **发布日志** | [CHANGELOG](release/CHANGELOG.md) |
-| **发布说明** | [RELEASE_NOTES](release/RELEASE_NOTES.md) |
+| **发布日志** | [CHANGELOG](product/release/CHANGELOG.md) |
+| **发布说明** | [RELEASE_NOTES](product/release/RELEASE_NOTES.md) |
 
 ---
 
-**最后更新：** 2026-06-30
+**最后更新：** 2026-09-03
 
 **文档版本：** 与 Amber Protocol v1.1.0 同步

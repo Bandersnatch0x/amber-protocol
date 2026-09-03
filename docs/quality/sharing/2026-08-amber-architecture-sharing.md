@@ -295,7 +295,7 @@ Route Gate（路由阶段间 user-approval）、Plan Gate（`amber gate --plan`�
 
 > 事实来源：竞品调研报告（Tina）。star 数等标注"待确认"的数据保持待确认表述。
 
-### 6.1 深度竞品一：Superpowers（obra/superpowers）
+### 6.1 深度竞品一：legacy（obra/legacy）
 
 **定位**：面向 coding agent 的"完整软件开发方法论"（agentic skills framework & software development methodology），由 Jesse Vincent 及 Prime Radiant 团队构建，MIT 许可。是目前安装量/star 数最高的 skills 框架之一（star 数各来源差异大：2026-02 约 40k，3 月约 118k，近期来源称约 180k–192k，**当前精确值待确认**）。
 
@@ -307,7 +307,7 @@ Route Gate（路由阶段间 user-approval）、Plan Gate（`amber gate --plan`�
 - **Subagents 与并行**：dispatching-parallel-agents 支持并发 subagent 工作流；
 - **Hook 机制**：依赖各 harness 的 session-start hook 注入 bootstrap。
 
-**分发**：插件市场分发，已覆盖 14+ 平台（Claude Code、Codex、Cursor、Gemini CLI、Devin CLI、Grok、Kimi Code 等）。多 harness 需分别安装。
+**分发**：插件市场分发，已覆盖 14+ 平台（Claude Code、Codex、Cursor、Gemini CLI、Devin CLI、external-host、Kimi Code 等）。多 harness 需分别安装。
 
 **优势**：生态规模最大、开箱即用、方法论成熟（TDD/计划/审查闭环）、跨平台广、社区活跃、支持数小时无人值守自主开发。
 
@@ -320,33 +320,33 @@ Route Gate（路由阶段间 user-approval）、Plan Gate（`amber gate --plan`�
 
 **来源**：
 
-- https://github.com/obra/superpowers
-- https://simonwillison.net/2025/Oct/10/superpowers/
+- https://github.com/obra/legacy
+- https://simonwillison.net/2025/Oct/10/legacy/
 - https://www.buildthisnow.com/blog/guide/mechanics/best-claude-code-setups-2026（star 数，待确认）
-- https://aiforautomation.io/news/2026-03-27-superpowers-claude-code-skill-118k-stars-tdd
+- https://aiforautomation.io/news/2026-03-27-legacy-claude-code-skill-118k-stars-tdd
 
-### 6.2 深度竞品二：Trellis（mindfold-ai/Trellis）
+### 6.2 深度竞品二：external workflow framework（mindfold-ai/external workflow framework）
 
-**项目识别说明**：搜索 "Trellis" 存在多个同名项目（roots/trellis = WordPress 部署工具、微软 TRELLIS = 3D 生成模型），均与 coding-agent 无关。当前 harness 语境下最活跃的 "Trellis" coding-agent 项目是 **mindfold-ai/Trellis**（自称 "The best agent harness"），被 ai-boost/awesome-harness-engineering 等 harness 资源列表收录，约 4.4k stars（SkillsLLM 快照，**当前精确值待确认**），AGPL-3.0 许可。
+**项目识别说明**：搜索 "external workflow framework" 存在多个同名项目（roots/external workflow framework = WordPress 部署工具、微软 external workflow framework = 3D 生成模型），均与 coding-agent 无关。当前 harness 语境下最活跃的 "external workflow framework" coding-agent 项目是 **mindfold-ai/external workflow framework**（自称 "The best agent harness"），被 ai-boost/awesome-harness-engineering 等 harness 资源列表收录，约 4.4k stars（SkillsLLM 快照，**当前精确值待确认**），AGPL-3.0 许可。
 
 **定位**：开箱即用的 AI 编码工程框架。核心主张：把 specs、tasks、memory 持久化到仓库内（文件即状态），让任何 coding agent 按团队工程标准工作，解决"每个会话从零开始"的问题。
 
 **核心机制**：
 
-- **仓库内状态**：`.trellis/spec/`（按包/分层作用域的编码规范）、`.trellis/tasks/`（PRD、实现上下文、审查上下文、任务状态）、`.trellis/workspace/`（journal，项目记忆）；
-- **4 阶段自动循环**：Plan（trellis-brainstorm 逐问澄清写 PRD，研究项交给 trellis-research sub-agent）→ Implement（trellis-implement sub-agent 按 PRD 写码，自动注入上下文，不 git commit）→ Verify（trellis-check sub-agent 对照 spec 审查 diff 并跑 lint/type-check/tests）→ Finish（trellis-update-spec 把新知识回写 `.trellis/spec/`，形成学习闭环）；
-- **多平台**：声称支持 22 个 AI 编码平台（自述，未独立验证），`trellis init` 按平台生成适配文件；
-- **分发**：`npm install -g @mindfoldhq/trellis`，要求 Node.js ≥18 + Python ≥3.9。
+- **仓库内状态**：`.external workflow framework/spec/`（按包/分层作用域的编码规范）、`.external workflow framework/tasks/`（PRD、实现上下文、审查上下文、任务状态）、`.external workflow framework/workspace/`（journal，项目记忆）；
+- **4 阶段自动循环**：Plan（external workflow framework-brainstorm 逐问澄清写 PRD，研究项交给 external workflow framework-research sub-agent）→ Implement（external workflow framework-implement sub-agent 按 PRD 写码，自动注入上下文，不 git commit）→ Verify（external workflow framework-check sub-agent 对照 spec 审查 diff 并跑 lint/type-check/tests）→ Finish（external workflow framework-update-spec 把新知识回写 `.external workflow framework/spec/`，形成学习闭环）；
+- **多平台**：声称支持 22 个 AI 编码平台（自述，未独立验证），`external workflow framework init` 按平台生成适配文件；
+- **分发**：`npm install -g @mindfoldhq/external workflow framework`，要求 Node.js ≥18 + Python ≥3.9。
 
 **优势**：文件即状态、spec 自动注入替代巨型 CLAUDE.md、有学习回写机制、多平台、个人 journal 与共享 spec 分离减少团队冲突。
 
-**劣势**：无审计账本/防篡改证据、无显式 fail-closed 门控、无 handoff bundle（靠 journal 近似）、生态规模远小于 Superpowers/Spec Kit、AGPL-3.0 对企业采用有顾虑（待确认实际影响）。
+**劣势**：无审计账本/防篡改证据、无显式 fail-closed 门控、无 handoff bundle（靠 journal 近似）、生态规模远小于 legacy/Spec Kit、AGPL-3.0 对企业采用有顾虑（待确认实际影响）。
 
 **来源**：
 
-- https://github.com/mindfold-ai/trellis
-- https://github.com/mindfold-ai/Trellis/blob/main/AGENTS.md
-- https://skillsllm.com/skill/trellis（star 数快照）
+- https://github.com/mindfold-ai/external workflow framework
+- https://github.com/mindfold-ai/external workflow framework/blob/main/AGENTS.md
+- https://skillsllm.com/skill/external workflow framework（star 数快照）
 - https://github.com/ai-boost/awesome-harness-engineering
 
 ### 6.3 同类扩展参照（简要）
@@ -380,13 +380,13 @@ Route Gate（路由阶段间 user-approval）、Plan Gate（`amber gate --plan`�
 
 ### 6.4 对比维度矩阵
 
-| 维度 | Amber Protocol | Superpowers | Trellis (mindfold) | GitHub Spec Kit | AWS Kiro | BMAD-METHOD | CC/Codex 原生 |
+| 维度 | Amber Protocol | legacy | external workflow framework (mindfold) | GitHub Spec Kit | AWS Kiro | BMAD-METHOD | CC/Codex 原生 |
 |---|---|---|---|---|---|---|---|
 | **定位层级** | 仓库本地治理层（审查/门控/交接/账本） | 工作流/方法论（skills 库） | 工程框架（spec+memory 持久化） | Spec 驱动工具包 | Spec 驱动 IDE（商业） | 敏捷方法论+角色编排 | 执行层 harness 底座 |
-| **状态管理** | 仓库内文件（.amber/ 制品、哈希链账本、handoff bundle） | 主要会话内，计划文档为辅 | 仓库内文件（.trellis/ spec/task/journal） | 仓库内文件（specs/、.specify/） | IDE 内+云服务（部分仓库文件） | 仓库内制品（briefs/specs/architecture） | 会话/上下文为主，少量文件 |
+| **状态管理** | 仓库内文件（.amber/ 制品、哈希链账本、handoff bundle） | 主要会话内，计划文档为辅 | 仓库内文件（.external workflow framework/ spec/task/journal） | 仓库内文件（specs/、.specify/） | IDE 内+云服务（部分仓库文件） | 仓库内制品（briefs/specs/architecture） | 会话/上下文为主，少量文件 |
 | **安全/闸门模型** | 四重门控 + fail-closed + dry-run 优先 + 审批门 | TDD 强制 + 两阶段审查 + 严重问题阻断 | 自动校验（lint/type-check/test 对照 spec） | constitution 原则 + analyze 一致性检查 | steering + hooks 自动化 | 决策显式化，无强制门控 | OS 沙箱 + 权限模式 |
 | **交接/上下文连续性** | handoff bundle/validate + context loadout 蒸馏（ADR-0009） | 弱（靠 plan 文档） | 中（journal + spec 回写） | 中（spec 制品留存） | 弱（IDE 会话） | 中（"context carries forward"理念） | 弱（session resume 有限） |
-| **多 agent 平台支持** | skills/ 适配 5+ 平台（Claude/Codex/Cursor/Gemini/Grok）+ MCP | 14+ 平台插件市场 | 22 平台（自称） | 30+ agent 集成 | 仅 Kiro IDE | 多工具（含 Web bundle） | 仅自家平台 |
+| **多 agent 平台支持** | skills/ 适配 5+ 平台（Claude/Codex/Cursor/Gemini/external-host）+ MCP | 14+ 平台插件市场 | 22 平台（自称） | 30+ agent 集成 | 仅 Kiro IDE | 多工具（含 Web bundle） | 仅自家平台 |
 | **是否执行代码** | 否（executesAnything: false，变异操作需审批） | 是（驱动 agent 实际写码、跑测试） | 是（implement/check sub-agent） | 是（implement 驱动 agent） | 是 | 是 | 是 |
 | **学习成本** | 高（35+ 命令、gates/evidence 概念体系） | 低（装插件即用） | 低-中（init + 4 阶段工作流） | 中（specify CLI + 命令序列） | 低（IDE 引导） | 中-高（方法论+角色概念） | 低 |
 
@@ -395,24 +395,24 @@ Route Gate（路由阶段间 user-approval）、Plan Gate（`amber gate --plan`�
 #### Amber 的独特卖点（7 条，相对竞品成立）
 
 1. **治理面（governance seam，F018）**：只有 registry 来源的只读变体可免审批执行，一切变异操作返回 approval-required 且永不由适配器代为执行——竞品均无此"执行权边界"设计。
-2. **Deterministic routing**：`next` 命令的路由建议是确定性推断而非 LLM 判断，与 Superpowers 的"skills 自动触发"（模型自主决策）形成鲜明对比。
+2. **Deterministic routing**：`next` 命令的路由建议是确定性推断而非 LLM 判断，与 legacy 的"skills 自动触发"（模型自主决策）形成鲜明对比。
 3. **Fail-closed 语义**：治理状态损坏或命令非零退出即 isError 失败关闭，无降级路径；竞品（除原生沙箱外）无此显式承诺。
-4. **Handoff bundle + validate**：可移植交接包是独有制品，Superpowers/Trellis/Spec Kit 均无对应物（Trellis journal 只是弱近似）。
-5. **上下文蒸馏（ADR-0009）**：契约驱动的上下文 loadout 管理，与 Trellis 的"自动注入 spec"方向相反——Amber 强调按需蒸馏与可验证，而非全量注入。
+4. **Handoff bundle + validate**：可移植交接包是独有制品，legacy/external workflow framework/Spec Kit 均无对应物（external workflow framework journal 只是弱近似）。
+5. **上下文蒸馏（ADR-0009）**：契约驱动的上下文 loadout 管理，与 external workflow framework 的"自动注入 spec"方向相反——Amber 强调按需蒸馏与可验证，而非全量注入。
 6. **防篡改证据**：哈希链账本（tamper-evident ledger）在竞品中无对标。
 7. **极简依赖与跨平台**：JavaScript CLI、仅 2 个运行时依赖、Windows/macOS/Linux 通吃。
 
 #### 如实评估的短板（5 条）
 
-1. **生态规模差距巨大**：Superpowers star 数约在十万量级且进入 Anthropic/xAI 官方 marketplace，Trellis/Spec Kit 均有数千至上万 stars 与活跃社区；Amber 的社区与第三方扩展生态目前**待确认**（仓库内未见公开社区入口数据），分享中应避免与竞品比拼规模。
-2. **上手门槛高**：35+ 命令 + gates/evidence/loadout 概念体系，学习成本显著高于"装插件即用"的 Superpowers 或"init 即走"的 Trellis。
-3. **不执行 = 依赖宿主**：Amber 的价值需宿主 agent 配合才能兑现，若宿主忽略治理制品，治理层形同虚设；而 Superpowers/Trellis 直接驱动执行，体验闭环更快。
-4. **竞品正在逼近部分特性**：Trellis 的"仓库内文件即状态"、Spec Kit 的 constitution/analyze、BMAD 的"决策显式+上下文携带"都在侵蚀 Amber 的部分叙事空间；Amber 需把差异化锚定在审计/门控/交接/fail-closed 这些竞品明确未覆盖的点上。
-5. **商业背书对比**：Kiro（AWS）、Spec Kit（GitHub）、Superpowers（Prime Radiant 商业化）均有机构背书，Amber 为企业采用时需更强的信任材料。
+1. **生态规模差距巨大**：legacy star 数约在十万量级且进入 Anthropic/xAI 官方 marketplace，external workflow framework/Spec Kit 均有数千至上万 stars 与活跃社区；Amber 的社区与第三方扩展生态目前**待确认**（仓库内未见公开社区入口数据），分享中应避免与竞品比拼规模。
+2. **上手门槛高**：35+ 命令 + gates/evidence/loadout 概念体系，学习成本显著高于"装插件即用"的 legacy 或"init 即走"的 external workflow framework。
+3. **不执行 = 依赖宿主**：Amber 的价值需宿主 agent 配合才能兑现，若宿主忽略治理制品，治理层形同虚设；而 legacy/external workflow framework 直接驱动执行，体验闭环更快。
+4. **竞品正在逼近部分特性**：external workflow framework 的"仓库内文件即状态"、Spec Kit 的 constitution/analyze、BMAD 的"决策显式+上下文携带"都在侵蚀 Amber 的部分叙事空间；Amber 需把差异化锚定在审计/门控/交接/fail-closed 这些竞品明确未覆盖的点上。
+5. **商业背书对比**：Kiro（AWS）、Spec Kit（GitHub）、legacy（Prime Radiant 商业化）均有机构背书，Amber 为企业采用时需更强的信任材料。
 
 #### 一句话总结
 
-**Amber 与竞品不在同一层竞争**——Superpowers/Trellis/BMAD 是"让 agent 干得更好"的过程层，Spec Kit/Kiro 是"先写 spec 再生成"的制品层，而 Amber 是"证明 agent 干的事可审查、可交接、失败即关闭"的治理层。
+**Amber 与竞品不在同一层竞争**——legacy/external workflow framework/BMAD 是"让 agent 干得更好"的过程层，Spec Kit/Kiro 是"先写 spec 再生成"的制品层，而 Amber 是"证明 agent 干的事可审查、可交接、失败即关闭"的治理层。
 
 ---
 
@@ -516,7 +516,7 @@ context request → 宿主 agent 仅按契约声明的源生成、逐块引用�
 ### 7.4 现成示例与对比素材
 
 - `docs/examples/README.md`：真实项目 adoption 工件全集——walkthrough、report、gate、status、bundle、next-actions、decision-record、apply-plan（dry-run）、selected-files 等，附每条生成命令；
-- `docs/research-harness-pattern-comparison.md`：中文对比研究——Amber（治理层）vs 某 macOS Rust 编码代理控制中心（编排/执行层）；9 个重合点（worktree 隔离、人工审批门、本地优先、显式状态机、无进展检测等）与 11 个可吸收点（其中 P1 三项已落地为 ADR-0011 置信度分级、fail-closed 显式化；ADR-0012 版本化）。
+- `docs/quality/research-harness-pattern-comparison.md`：中文对比研究——Amber（治理层）vs 某 macOS Rust 编码代理控制中心（编排/执行层）；9 个重合点（worktree 隔离、人工审批门、本地优先、显式状态机、无进展检测等）与 11 个可吸收点（其中 P1 三项已落地为 ADR-0011 置信度分级、fail-closed 显式化；ADR-0012 版本化）。
 
 ---
 
@@ -559,7 +559,7 @@ context request → 宿主 agent 仅按契约声明的源生成、逐块引用�
 | 测试 | Node.js 内置 test runner 经 `scripts/run-tests.js` 驱动；tests/ 含 unit（149 项）/integration/e2e/load/regression/migration/security 与按 roadmap 划分的 phase 测试；web 侧 vitest + Playwright |
 | 覆盖率 | c8，阈值 lines/statements 84、functions 90、branches 73，`check-coverage: true` |
 | CI 必过四件套 | `npm test`、`npm run manifests`、`npm run doctor`、`npm run gen:agents:check`；wiki 变更另跑 `node scripts/validate-wiki.js --target .` |
-| 多平台分发 | Claude Code（`.claude-plugin/` + `.claude/commands/`）、Codex/Cursor（`.agents/skills/`）、Gemini CLI（`.gemini/commands/amber/`）、Grok（`/loop`）；另有 DeepSeek Harness overlay（`dsh/`）与 npm/GitHub Packages 双渠道发布 |
+| 多平台分发 | Claude Code（`.claude-plugin/` + `.claude/commands/`）、Codex/Cursor（`.agents/skills/`）、Gemini CLI（`.gemini/commands/amber/`）、external-host（`/loop`）；另有 DeepSeek Harness overlay（`dsh/`）与 npm/GitHub Packages 双渠道发布 |
 | 发布 | conventional commits；推 `v*.*.*` tag 在 CI 全绿且无 rc/beta 后缀时自动发布；错误码目录 `scripts/lib/core/error-catalog.js` 配 `amber explain` |
 
 ### 9.2 关键文件与文档索引
@@ -572,7 +572,7 @@ context request → 宿主 agent 仅按契约声明的源生成、逐块引用�
 | MCP 设计 | `docs/wiki/amber-ontology-mcp.md`（v0.7，中文，可直接引用） |
 | ADR | `docs/adr/`（16 个），重点：ADR-0001（artifact-first）、ADR-0003（gated execution）、ADR-0004（证据分级）、ADR-0009（上下文蒸馏）、ADR-0010（Loadout）、ADR-0011（安全哲学）、ADR-0014（路由顾问）、ADR-0016（决策接缝） |
 | 示例 | `docs/examples/README.md` |
-| 既有对比研究 | `docs/research-harness-pattern-comparison.md` |
+| 既有对比研究 | `docs/quality/research-harness-pattern-comparison.md` |
 | CLI 入口 | `scripts/amber.js`；核心：`scripts/lib/amber-core.js`、`scripts/lib/core/`（约 79 模块） |
 | MCP | `scripts/amber-mcp.js`、`scripts/lib/mcp-*.js` |
 | Skills | `skills/`（5 个，SKILL.md 唯一事实源） |

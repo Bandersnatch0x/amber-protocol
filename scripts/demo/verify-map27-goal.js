@@ -6,8 +6,8 @@ const path = require("node:path");
 const { execSync } = require("node:child_process");
 
 const SCRATCH =
-	process.env.GROK_SCRATCH ||
-	"C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\grok-goal-7c8ace6dab20\\implementer";
+	process.env.EXTERNAL_HOST_SCRATCH ||
+	"C:\\Users\\AMSTER~1\\AppData\\Local\\Temp\\external-host-goal-7c8ace6dab20\\implementer";
 const ROOT = path.resolve(__dirname, "..", "..");
 
 fs.mkdirSync(SCRATCH, { recursive: true });

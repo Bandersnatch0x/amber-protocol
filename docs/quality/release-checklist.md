@@ -43,7 +43,7 @@ This checklist ensures quality and consistency for Amber Protocol releases.
 - [x] Excluded files NOT in package:
   - [x] No `package/tests/`
   - [x] No `package/.github/`
-  - [x] No `package/docs/superpowers/`
+  - [x] No `package/docs/legacy/`
   - [x] No `package/.git/`
   - [x] No `package/node_modules/`
 

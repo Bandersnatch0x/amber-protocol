@@ -68,7 +68,7 @@
 - Amber 刻意只占最上层：补充（complement）运行时，而非竞争
 - 核心准则："Faster execution never beats clearer governance"
 
-**讲稿提示**：画三层金字塔，把 Codex/Claude Code、Superpowers、Amber 分别钉在三层上。这张图后面竞品对比还会复用。
+**讲稿提示**：画三层金字塔，把 Codex/Claude Code、legacy、Amber 分别钉在三层上。这张图后面竞品对比还会复用。
 
 ---
 
@@ -148,7 +148,7 @@
 - 无匹配时建议走 plan gate，而不是猜执行路径
 - journey-router 确定性给出 journeyId："不要发明第五条 journey"
 
-**讲稿提示**：与 Superpowers 的"skills 自动触发（模型自主决策）"对比。反问："路由决策本身为什么可以交给概率系统？"
+**讲稿提示**：与 legacy 的"skills 自动触发（模型自主决策）"对比。反问："路由决策本身为什么可以交给概率系统？"
 
 ### 第 15 页 · Gates-Evidence：没有证据就只是声明（2 min）
 
@@ -180,23 +180,23 @@
 
 **讲稿提示**：快速过，但强调"边界写进产品说明"本身就是信任材料。为下一页 ADR-0003 精确表述埋伏笔。
 
-### 第 18 页 · 深度竞品：Superpowers（1.5 min）
+### 第 18 页 · 深度竞品：legacy（1.5 min）
 
 - 定位：coding agent 的完整开发方法论（skills 库），生态最大、14+ 平台（star 数待确认）
 - 机制：skills 自动触发、7 步工作流、强制 TDD、两阶段审查、subagent 并行
 - 优势：开箱即用、方法论成熟、支持长时间无人值守
 - 劣势：过程方法论而非治理层——无账本、无防篡改证据链、无 fail-closed、状态活在会话里、无 handoff bundle
 
-**讲稿提示**：先充分肯定 Superpowers 的工程价值，再落到"它回答'怎么干好'，不回答'怎么证明'"。来源：github.com/obra/superpowers。
+**讲稿提示**：先充分肯定 legacy 的工程价值，再落到"它回答'怎么干好'，不回答'怎么证明'"。来源：github.com/obra/legacy。
 
-### 第 19 页 · 深度竞品：Trellis（mindfold）（1.5 min）
+### 第 19 页 · 深度竞品：external workflow framework（mindfold）（1.5 min）
 
 - 定位：开箱即用编码框架，specs/tasks/memory 持久化进仓库（约 4.4k stars 快照，待确认；AGPL-3.0）
 - 机制：4 阶段自动循环 Plan→Implement→Verify→Finish，spec 自动注入，知识回写
 - 与 Amber 共鸣：也是"文件即状态"
 - 差距：无审计账本/防篡改证据、无 fail-closed 门控、无 handoff bundle（journal 只是弱近似）
 
-**讲稿提示**：指出同名项目消歧（roots/trellis、微软 TRELLIS 均无关），体现调研严谨。Trellis 是最接近的共鸣者，但缺治理内核。
+**讲稿提示**：指出同名项目消歧（roots/external workflow framework、微软 external workflow framework 均无关），体现调研严谨。external workflow framework 是最接近的共鸣者，但缺治理内核。
 
 ### 第 20 页 · 参照系：Spec Kit / Kiro / BMAD / 原生能力（1 min）
 
@@ -253,7 +253,7 @@
 - Amber 永不调用 LLM：零 LLM、仅 ajv 依赖、离线可用、确定性
 - Loadout：任务级上下文组装，词数预算约 4000，缺失必备工件 fail closed
 
-**讲稿提示**：全场第二个高潮。对比 Trellis 的"全量注入 spec"——Amber 是"按需蒸馏 + 可验证"。强调这个子系统本身不花一分 token。
+**讲稿提示**：全场第二个高潮。对比 external workflow framework 的"全量注入 spec"——Amber 是"按需蒸馏 + 可验证"。强调这个子系统本身不花一分 token。
 
 ### 第 26 页 · 从零落地：12 步 demo 清单（2 min）
 
@@ -286,9 +286,9 @@
 
 ## Q&A 预备问题
 
-### Q1：Amber 和 Superpowers 是什么关系？能一起用吗？
+### Q1：Amber 和 legacy 是什么关系？能一起用吗？
 
-**答**：不在同一层。Superpowers 是过程方法论（编排/执行层，教 agent 怎么干活），Amber 是治理层（证明干的事可审查、可交接）。两者可以叠加：Superpowers 驱动工作流，Amber 提供账本、闸门与交接包。区别在决策机制——Superpowers 靠 skills 自动触发（模型自主），Amber 靠确定性路由（永不 LLM）。
+**答**：不在同一层。legacy 是过程方法论（编排/执行层，教 agent 怎么干活），Amber 是治理层（证明干的事可审查、可交接）。两者可以叠加：legacy 驱动工作流，Amber 提供账本、闸门与交接包。区别在决策机制——legacy 靠 skills 自动触发（模型自主），Amber 靠确定性路由（永不 LLM）。
 
 ### Q2：为什么不直接做成 agent 运行时？
 

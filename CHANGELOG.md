@@ -440,7 +440,7 @@ Full suite 1134 passing (CLI) + web Vitest green; manifests/doctor/gen:agents gr
 
 ### Added — Artifact-first evidence layer, Phase 1
 
-Three boundary-safe, zero-new-dependency commands that make Amber's drift detection CI-deployable and its tamper-evident ledger SIEM-consumable and git-anchored. Design: `docs/superpowers/specs/2026-07-05-amber-artifact-first-evidence-layer-design.md`.
+Three boundary-safe, zero-new-dependency commands that make Amber's drift detection CI-deployable and its tamper-evident ledger SIEM-consumable and git-anchored. Design: `docs/legacy/specs/2026-07-05-amber-artifact-first-evidence-layer-design.md`.
 
 - **`amber drift`** — CI-native drift gate aggregating the artifact / wiki / scaffold detectors into one exit code (`0` clean / `1` any actionable drift). Supports `--scope`, `--format gh-annotations` (GitHub Actions `::warning` lines), and `--no-fail` for informational CI steps. Read-only, Verification-layer (same shape as `doctor`).
 - **`amber ledger export`** — SIEM/compliance bridge. Walks every `ledger.jsonl` (loops / routes / sessions) via `walkLedgers`, verifies each chain, and emits `json` (default), `csv`, or `otlp-json` (valid OTLP JSON encoding — no protobuf, no dependency). A broken chain is exported as `intact:false` and counted in `brokenCount` rather than refused.

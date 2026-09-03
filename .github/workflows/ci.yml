@@ -322,9 +322,9 @@ jobs:
             exit 1
           fi
 
-          # Check that superpowers docs are NOT included
-          if grep -q 'package/docs/superpowers/' package-manifest.txt; then
-            echo "ERROR: docs/superpowers/ should not be included"
+          # Check that legacy docs are NOT included
+          if grep -q 'package/docs/legacy/' package-manifest.txt; then
+            echo "ERROR: docs/legacy/ should not be included"
             exit 1
           fi
 

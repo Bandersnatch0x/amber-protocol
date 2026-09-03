@@ -13,7 +13,7 @@ The Context, Loadout, governed execution, routing, migration, workflow assessmen
 - Context: review of `origin/master...HEAD` found target escape paths, incomplete request binding, dropped confidence gates, a workflow facade cycle, unwired migrations, target-insensitive routing, cross-session no-progress signals, incomplete Loadout required artifacts, and five failing tests.
 - Proposed approach: enforce the fail-closed invariant once at each public interface, keep required governance artifacts separate from Context Pages, and preserve existing public exports while moving layout logic behind a deeper module.
 - Risks: lexical checks without real-path checks leave junction escapes; compatibility fallbacks would preserve the unsafe local contract; scaffold changes must keep the no-overwrite guarantee; broad test cleanup must not hide product defects.
-- Historical input: `output/adr-architecture-assessment.md` predates `ef57fc5`. It informed investigation but remains unchanged and is excluded from F016 acceptance evidence; `output/adr-architecture-assessment-f016.md` records the reviewed baseline, HEAD, and patch fingerprint.
+- Historical input: `output/adr-architecture-assessment.md` predates `ef57fc5`. It informed investigation but remains unchanged and is excluded from F016 acceptance evidence; `docs/quality/adr-architecture-assessment-f016.md` records the reviewed baseline, HEAD, and patch fingerprint.
 - Decision record: Q1-Q13 were confirmed as recommended on 2026-08-07 and are recorded in ADR-0015.
 
 ## Vertical Slices
@@ -35,7 +35,7 @@ The Context, Loadout, governed execution, routing, migration, workflow assessmen
 - Resume Point: Slices 1-10 and commit-SHA finalization are complete; 1621 full tests, all repository gates, and both final review axes pass with no unresolved finding.
 - Blockers: none for F016 implementation, verification, or evidence binding.
 - Next Action: prepare and verify the approved `1.4.0` release without modifying the excluded user-owned worktree files.
-- Recovery Instructions: reopen this plan and ADR-0015, inspect `git status`, and continue at the first unchecked vertical slice; preserve user-owned release-readiness, handoff, `.workbuddy`, and historical output changes.
+- Recovery Instructions: reopen this plan and ADR-0015, inspect `git status`, and continue at the first unchecked vertical slice; preserve user-owned release-readiness, handoff, `.external-host`, and historical output changes.
 
 ## Acceptance Criteria
 
@@ -48,7 +48,7 @@ The Context, Loadout, governed execution, routing, migration, workflow assessmen
 - `npm test`, manifests, doctor, generated-agent drift, and wiki validation all exit 0.
 - The final review has no unresolved findings, and the new architecture assessment names the exact baseline SHA, review HEAD SHA, reviewed patch fingerprint, and implementation commit SHA.
 - The commit-SHA binding identifies the implementation commit without requiring the evidence report to self-reference its own containing commit.
-- F016 does not modify `docs/quality/release-readiness-1.3.12.md`, `.workbuddy/*`, or the historical assessment as part of acceptance.
+- F016 does not modify `docs/quality/release-readiness-1.3.12.md`, `.external-host/*`, or the historical assessment as part of acceptance.
 - F016 preserves the current Amber phase boundary: it adds no dynamic workflow execution, live subagent dispatch, automatic target-project commands, unattended scheduling, or external-system writes.
 
 ## Verification

@@ -6,7 +6,7 @@
 
 **We're thrilled to announce that Amber Protocol Phase B is now Generally Available!**
 
-## Why Phase B Matters
+## Why Phase B matters
 
 AI-powered development tools have transformed how we write code. But the gap between "AI can generate code" and "AI can safely participate in a professional development workflow" has remained stubbornly wide.
 
@@ -70,6 +70,6 @@ Phase C development is already underway. Web-based project viewer. Team collabor
 
 - ⭐ Star the repository
 - 🐛 Report bugs via the project issue tracker
-- 📖 [Read the docs](../user-guide/getting-started.md)
+- 📖 [Read the docs](../../guides/user-getting-started.md)
 
 **Happy building!**

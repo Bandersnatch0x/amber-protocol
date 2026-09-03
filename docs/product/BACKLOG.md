@@ -31,7 +31,7 @@ This backlog tracks implementation status across the roadmap. V1 remains Safe Am
 
 - Phase B (routes, sessions, interactive + autonomous execution, checkpoint/continue, migration, daemon, governance) is implemented and covered by the root `tests/` suite. `error-recovery.js` and `health-checker.js` exist (earlier status docs that listed them as missing were stale).
 - Phase C (web viewer in `apps/web`) is implemented: sessions, routes, gates, settings, and timeline pages plus SSE real-time updates. Unit tests run under `npm test` in `apps/web`; Playwright e2e specs live in `apps/web/tests/e2e` and run in the CI `web` job (`npm run test:e2e`).
-- Phase D (production hardening) is implemented for the local viewer boundary: SSE endpoint auth is enforced via `validateSSEAuthToken` (401 on missing/invalid token), and client errors POST to `POST /api/errors` then fan out server-side via `error-forwarder` (Sentry/webhook env on the Node process — not dead `process.env` in the Vite client). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+- Phase D (production hardening) is implemented for the local viewer boundary: SSE endpoint auth is enforced via `validateSSEAuthToken` (401 on missing/invalid token), and client errors POST to `POST /api/errors` then fan out server-side via `error-forwarder` (Sentry/webhook env on the Node process — not dead `process.env` in the Vite client). See [docs/DEPLOYMENT.md](../guides/DEPLOYMENT.md).
 
 ## Gap fixes (audit pass)
 

@@ -3,7 +3,7 @@
 **Reviewer:** Maintainability subagent  
 **Date:** 2026-06-10  
 **Files inspected:** route-commands.js, session-commands.js, timeline-reader.js, timeline-writer.js, budget-tracker.js, harness.js, route.schema.json, session-manifest.schema.json, timeline-event.schema.json, validate-route.js, schema-version-checker.js, migrate-command.js, session-manifest.js  
-**Prior review docs at `docs/superpowers/plans/`:** No prior review feedback found.
+**Prior review docs at `docs/legacy/plans/`:** No prior review feedback found.
 
 ---
 
@@ -254,4 +254,4 @@ The `COMMANDS` array is checked on lines ~138–142, so unknown commands are cau
 | 10 | Stage estimates are well-structured | **NOTE** (no action) | N/A |
 | 11 | Naming is consistent | **NOTE** (no action) | N/A |
 | 12 | Multiple manifest writes in startSession/continueSession | **NOTE** | Low |
-| 13 | No prior review feedback found at `docs/superpowers/plans/` | **NOTE** | N/A |
+| 13 | No prior review feedback found at `docs/legacy/plans/` | **NOTE** | N/A |

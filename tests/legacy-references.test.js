@@ -28,15 +28,20 @@ const ALLOWLIST = [
 	"scripts/lib/state-dir-resolver.js",
 	"scripts/lib/state-migration.js",
 	"docs/legacy/",
-	"docs/reviews/", // historical review records
-	"docs/release/CHANGELOG.md",
-	"docs/release/RELEASE_NOTES.md",
+	"docs/quality/reviews/", // historical review records
+	"docs/product/release/CHANGELOG.md",
+	"docs/product/release/RELEASE_NOTES.md",
 	"docs/quality/release-readiness-1.3.12.md", // historical release-readiness record
-	"docs/superpowers/plans/",
-	"docs/superpowers/specs/",
-	"docs/research/", // internal research archive — gitignored, local-only, never in CI checkouts
+	"docs/legacy/plans/",
+	"docs/legacy/specs/",
+	"docs/research/", // internal research archive — moved to .scratch/research (F063); ignore entry kept as a guard
 	"docs/examples/", // historical review artifacts generated from real read-only trials
 	"docs/adoption-self/", // self-adoption report (auto-generated, contains legacy project path)
+	// F063 directory consolidation moved these historical records under docs/;
+	// they were root-level (outside SCAN_DIRS) before the move and carry the
+	// same era-accurate legacy mentions they always did.
+	"docs/product/RELEASE_GUIDE.md", // era-noted rc.1 release instructions
+	"docs/quality/coding-harness-adoption-report-2026-06-20t16-29-13-428z.md",
 	// Generated provenance records: each embeds the absolute on-disk checkout
 	// path, which legitimately contains the repository folder name. Listed file
 	// by file rather than whitelisting docs/agents/, which also holds the active
@@ -97,8 +102,7 @@ const ROOT_FILES = [
 	"README.zh-CN.md",
 	"SPEC.md",
 	"ROADMAP.md",
-	"BACKLOG.md",
-	"UBIQUITOUS_LANGUAGE.md",
+	"UBIQUITOUS_LANGUAGE.md", // deprecated glossary, P2-3 pending (references not yet grep-clean)
 	"package.json",
 ];
 

@@ -32,7 +32,7 @@
 | **技术栈** | JavaScript（CommonJS），仅 2 个运行时依赖（ajv + ajv-formats） |
 | **架构** | CLI（35 命令，注册表调度）+ React/tRPC Web 查看器 |
 | **安全** | Dry-run 优先，四重门控执行（策略 + 审批 + worktree + 哈希链账本） |
-| **引擎** | 通过 skills/ 集成 Claude Code / Codex / Cursor / Gemini CLI / Grok |
+| **引擎** | 通过 skills/ 集成 Claude Code / Codex / Cursor / Gemini CLI / external-host |
 | **约束** | 制品优先，只读默认，不运行动态工作流、不调度实时子 agent、不执行项目命令 |
 
 ---
@@ -90,7 +90,7 @@
 ### 3.5 多引擎集成
 
 两者都支持多个 AI 编码引擎：
-- **Amber**: 通过 `skills/` 目录生成 Claude Code / Codex / Cursor / Gemini CLI / Grok 的适配文件
+- **Amber**: 通过 `skills/` 目录生成 Claude Code / Codex / Cursor / Gemini CLI / external-host 的适配文件
 - **参考仓库**: 通过 EngineAdapter 契约统一 Codex CLI 和 Claude CLI，复用已有登录
 
 ### 3.6 会话/运行生命周期

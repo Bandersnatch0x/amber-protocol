@@ -18,8 +18,8 @@ Use this matrix before creating or moving a document:
 | Architecture decision | `docs/adr/` | Records an architectural decision and its rationale; it does not replace the specification that describes the resulting behavior. |
 | Implementation plan | `docs/plans/` | Describes sequencing and execution details; it is not normative and must not silently redefine a spec. |
 | Research, question, prototype, map, or task | `issues/` | Local, gitignored work records. They may link to a spec, ADR, or plan but do not own its content. |
-| Audit, migration, or provenance record | `docs/agents/` or `docs/reviews/` | Evidence about how a conclusion was reached; it does not become authoritative merely because it is detailed. |
-| Raw Agent/MATT/workflow output | `.scratch/`, `.workflow/`, `.qoder/`, `agent-tools/`, or the owning tool directory | Generated process material. Do not cite a route, transcript, packet, or report as the specification without promoting a reviewed conclusion. |
+| Audit, migration, or provenance record | `docs/agents/` or `docs/quality/reviews/` | Evidence about how a conclusion was reached; it does not become authoritative merely because it is detailed. |
+| Raw Agent/workflow output | `.scratch/`, `.workflow/`, `agent-tools/`, or the owning tool directory | Generated process material. Do not cite a route, transcript, packet, or report as the specification without promoting a reviewed conclusion. |
 | Feature catalog and implementation status | `feature_list.json` | An index of feature delivery state. It does not replace spec text or automatically change spec lifecycle state. |
 | New defect report | GitHub | The public issue tracker is for bugs and their triage history. |
 
@@ -68,17 +68,17 @@ the spec or catalog by assumption. Existing files with a missing or non-canonica
 require an evidence-backed normalization pass; do not fill them from `feature_list.json` by
 mechanical inference.
 
-### Agent and MATT artifacts
+### Agent-generated artifacts
 
-MATT/Agent-generated routes, packets, terminal transcripts, audit snapshots, and reports
+Agent-generated routes, packets, terminal transcripts, audit snapshots, and reports
 are process evidence. Store raw output in the tool/workflow locations above. Promote only a
 reviewed conclusion, and promote it to the correct authority layer: normative text to
 `docs/specs/`, an architectural choice to `docs/adr/`, an implementation plan to
-`docs/plans/`, and audit/provenance to `docs/agents/` or `docs/reviews/`. A generated report
+`docs/plans/`, and audit/provenance to `docs/agents/` or `docs/quality/reviews/`. A generated report
 may support a decision, but it must not be treated as the decision or as a spec by itself.
 
 In this repository, `docs/agents/spec-source-migration.md`/`.json` are migration provenance,
-`spec-compliance/` is a review-evidence package, and `.scratch/matt-workflow.route.json` is
+`spec-compliance/` is a review-evidence package, and `.scratch/agent-workflow.route.json` is
 workflow configuration. None of these is a canonical specification; each must point to a
 reviewed target under the appropriate authority directory.
 
@@ -92,7 +92,7 @@ Ask what the content *is*, not which agent produced it:
 4. If it is an open question, investigation, prototype, map, or task, write an `issues/`
    ticket and link any canonical documents.
 5. If it records an audit, migration, or source comparison, write `docs/agents/` or
-   `docs/reviews/`.
+   `docs/quality/reviews/`.
 6. If it is raw tool output, keep it in a generated/workflow location.
 7. If it is a newly discovered defect, use GitHub.
 

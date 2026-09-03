@@ -235,7 +235,7 @@ the first-round candidate list live in **[`docs/dogfood-weekly.md`](docs/dogfood
 - Not allowed: Automatic rewrite of existing target project docs
 - Not allowed: Scheduled loop execution (current product boundary)
 
-See `LOOP.md` for the operational description of Amber's loops (daily-amber-triage via contract + CI dogfooding + continuous improvement). Amber implements governed loop engineering — pair it with external `npx @cobusgreyling/loop-audit` and loop patterns for readiness scoring and simple STATE.md overlays.
+See `docs/product/LOOP.md` for the operational description of Amber's loops (daily-amber-triage via contract + CI dogfooding + continuous improvement). Amber implements governed loop engineering — pair it with external `npx @external-author/loop-audit` and loop patterns for readiness scoring and simple STATE.md overlays.
 
 > **Boundary note (governance enforcement):** Amber MAY install an **opt-in** git pre-commit guard
 > (`amber hooks install`) that enforces governance _metadata_ at commit time (e.g. a feature marked

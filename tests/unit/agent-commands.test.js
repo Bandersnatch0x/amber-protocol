@@ -488,6 +488,12 @@ describe("real skills integration", () => {
 		]);
 	});
 
+	it("F063 ships one router and four deep journeys", () => {
+		assert.equal(skills.filter((skill) => skill.amber?.kind === "router").length, 1);
+		assert.equal(skills.filter((skill) => skill.amber?.kind === "journey").length, 4);
+		assert.equal(skills.filter((skill) => !skill.amber?.kind).length, 0);
+	});
+
 	it("every skill command targets a real amber.js subcommand", () => {
 		for (const skill of skills) {
 			const name = extractCommandName(skill.amber.command);

@@ -115,7 +115,7 @@ function findDistillCandidates(projectRoot, options = {}) {
 
 	const sources = [
 		{
-			dir: path.join(root, "docs", "superpowers", "plans"),
+			dir: path.join(root, "docs", "legacy", "plans"),
 			extractors: [extractHeadings],
 		},
 		{

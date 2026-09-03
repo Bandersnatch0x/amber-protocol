@@ -139,7 +139,7 @@ test("mixed go + python evidence accumulates candidates from both languages", ()
 
 // DETECTORS order is load-bearing (python → go → rust). The mixed-language
 // test above only asserts membership; pin the sequence so a registry reorder
-// cannot silently reshuffle the audit candidate list (grok L3 residual gap).
+// cannot silently reshuffle the audit candidate list (external-host L3 residual gap).
 test("multi-language candidates preserve DETECTORS order: python before go before rust", () => {
 	const root = tempTarget();
 	// Feed evidence out of order — DETECTORS order, not input order, must win.

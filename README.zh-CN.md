@@ -150,11 +150,11 @@ Amber 把治理组织为七个控制层，并向安全侧倾斜——优先级�
 | 主题                            | 链接                                                                                                                                                                  |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 完整 CLI 参考                   | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md)                                                                                                                      |
-| 快速开始指南                    | [docs/user-guide/getting-started.md](./docs/user-guide/getting-started.md)                                                                                            |
+| 快速开始指南                    | [docs/guides/user-getting-started.md](./docs/guides/user-getting-started.md)                                                                                            |
 | 架构与治理模型                  | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md)                                                                                      |
-| 部署与运维                      | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)                                                                                                                            |
-| 监控 / 通知 / 策略              | [MONITORING_SETUP.md](./docs/MONITORING_SETUP.md) · [NOTIFICATION_SETUP.md](./docs/NOTIFICATION_SETUP.md) · [POLICY_CONFIGURATION.md](./docs/POLICY_CONFIGURATION.md) |
-| 故障排查                        | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)                                                                                                                  |
+| 部署与运维                      | [docs/DEPLOYMENT.md](./docs/guides/DEPLOYMENT.md)                                                                                                                            |
+| 监控 / 通知 / 策略              | [MONITORING_SETUP.md](./docs/guides/MONITORING_SETUP.md) · [NOTIFICATION_SETUP.md](./docs/guides/NOTIFICATION_SETUP.md) · [POLICY_CONFIGURATION.md](./docs/guides/POLICY_CONFIGURATION.md) |
+| 故障排查                        | [docs/TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md)                                                                                                                  |
 | 完整文档索引                    | [docs/README.md](./docs/README.md)                                                                                                                                    |
 | 规格与路线图                    | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                     |
 | DeepSeek Harness（`dsh`）叠加层 | [dsh/README.md](./dsh/README.md)                                                                                                                                      |

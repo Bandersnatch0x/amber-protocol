@@ -269,16 +269,9 @@ amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract d
 
 Live scheduling remains outside the current product boundary; `loop run` requires `--dry-run`.
 
-**Loop Engineering companion**
+**Continuous improvement companion**
 
-Amber provides the **governance and contract layer** (loop contracts, ledgers, hard stops, review gates, skills harness). Pair it with the [loop-engineering](https://github.com/cobusgreyling/loop-engineering) patterns and CLIs for operational readiness:
-
-- `npx @cobusgreyling/loop-audit . --suggest` — scores loop readiness (L1/L2/L3) and gives concrete suggestions
-- `npx @cobusgreyling/loop-cost` — token/cost estimation before scheduling
-- `LOOP.md` (this repo) — describes Amber's active loops using loop-engineering vocabulary
-- Simple `STATE.md` (optional overlay) — human + agent friendly memory spine compatible with daily-triage etc.
-
-See [LOOP.md](./LOOP.md) for Amber's self-described loops (Daily Amber Triage, CI validation, adoption flows) and how the two systems complement each other. Phased rollout (report → assisted → governed) is encouraged.
+Amber provides the **governance and contract layer** (loop contracts, ledgers, hard stops, review gates, and skills). Use [LOOP.md](docs/product/LOOP.md) for the active loops, their evidence boundaries, and the report → assisted → governed rollout model.
 
 #### `amber context` — contract-driven distillation and Loadouts
 
@@ -462,11 +455,11 @@ For the full boundary notes, see [SPEC.md](./SPEC.md).
 | Topic                               | Link                                                                                                                                                                  |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Full CLI reference                  | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md)                                                                                                                      |
-| Getting started guide               | [docs/user-guide/getting-started.md](./docs/user-guide/getting-started.md)                                                                                            |
+| Getting started guide               | [docs/guides/user-getting-started.md](./docs/guides/user-getting-started.md)                                                                                            |
 | Architecture & governance model     | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md)                                                                                      |
-| Deployment & ops                    | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)                                                                                                                            |
-| Monitoring / notifications / policy | [MONITORING_SETUP.md](./docs/MONITORING_SETUP.md) · [NOTIFICATION_SETUP.md](./docs/NOTIFICATION_SETUP.md) · [POLICY_CONFIGURATION.md](./docs/POLICY_CONFIGURATION.md) |
-| Troubleshooting                     | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md)                                                                                                                  |
+| Deployment & ops                    | [docs/DEPLOYMENT.md](./docs/guides/DEPLOYMENT.md)                                                                                                                            |
+| Monitoring / notifications / policy | [MONITORING_SETUP.md](./docs/guides/MONITORING_SETUP.md) · [NOTIFICATION_SETUP.md](./docs/guides/NOTIFICATION_SETUP.md) · [POLICY_CONFIGURATION.md](./docs/guides/POLICY_CONFIGURATION.md) |
+| Troubleshooting                     | [docs/TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md)                                                                                                                  |
 | Full docs index                     | [docs/README.md](./docs/README.md)                                                                                                                                    |
 | Spec & roadmap                      | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                     |
 | DeepSeek Harness (`dsh`) overlay    | [dsh/README.md](./dsh/README.md)                                                                                                                                      |

@@ -1626,7 +1626,7 @@ test("unknown command returns a clear error", () => {
 
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /Unknown command: work/);
-	assert.match(result.stderr, /init, audit, wiki, doctor, handoff, plan, gate/);
+	assert.match(result.stderr, /audit, init, doctor, next, plan, handoff, session/);
 });
 
 test("help scopes dry-run to commands that support it", () => {
@@ -1838,11 +1838,11 @@ test("session approval leaves a two-gate Session active until explicit completio
 
 test("maintenance distill writes a proposal from repeated plan headings", () => {
 	const target = tempDir("maintenance-distill");
-	fs.mkdirSync(path.join(target, "docs", "superpowers", "plans"), {
+	fs.mkdirSync(path.join(target, "docs", "legacy", "plans"), {
 		recursive: true,
 	});
-	fs.writeFileSync(path.join(target, "docs", "superpowers", "plans", "a.md"), "# Refactor auth\n");
-	fs.writeFileSync(path.join(target, "docs", "superpowers", "plans", "b.md"), "# Refactor auth\n");
+	fs.writeFileSync(path.join(target, "docs", "legacy", "plans", "a.md"), "# Refactor auth\n");
+	fs.writeFileSync(path.join(target, "docs", "legacy", "plans", "b.md"), "# Refactor auth\n");
 	const output = path.join(target, "docs", "maintenance", "distill-proposals.md");
 
 	const result = runHarness([

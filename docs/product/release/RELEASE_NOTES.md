@@ -70,4 +70,4 @@ Before public publication, maintainers must still verify npm account access, con
 
 ---
 
-[Documentation](../user-guide/getting-started.md) | [Changelog](../../CHANGELOG.md)
+[Documentation](../../guides/user-getting-started.md) | [Changelog](./CHANGELOG.md)

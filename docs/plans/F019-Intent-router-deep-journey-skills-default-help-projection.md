@@ -33,7 +33,7 @@ F018 把治理不变量沉到两个深度模块,`scripts/amber-mcp.js` 退化为
 
 来自 `architecture-review-final-20260812-005749.html`,按其自身排序为「安全不变量修复后」:
 
-1. **意图路由 + 渐进披露**(Strong)— 参考 `ask-matt` skill:一个 user-invoked router 路由到少数可组合 journey skill。选择知识集中(locality)、一份 skill 多平台(leverage)、意图→结果可测(tests)。
+1. **意图路由 + 渐进披露**(Strong)— 参考 `external-review` skill:一个 user-invoked router 路由到少数可组合 journey skill。选择知识集中(locality)、一份 skill 多平台(leverage)、意图→结果可测(tests)。
 2. **深化 Journey modules**(Strong)— 现有 skill 多为步骤清单,跨 session/route/context/evidence 的阶段判断、证据顺序、失败恢复知识分散;按用户旅程集中,治理原语留 implementation。
 3. **Typed governance seam + public projections**(Worth exploring)— Action Types 承载 typed invariants,MCP/CLI 做 adapter;默认 help 只投影 journey + 核心原语。
 
@@ -64,7 +64,7 @@ F018 把治理不变量沉到两个深度模块,`scripts/amber-mcp.js` 退化为
   - 默认 help(`scripts/amber.js` 的 `usage()`、`command-help.js`)把 35 命令并列展示,兼容/专家原语与用户 interface 同等曝光。
 - Proposed approach:
   - 引入**命令可见性注册表**(单一真相),`COMMAND_DEFINITIONS` 增 `tier`;默认 `amber` help 与生成命令只投影 `journey+core`。
-  - 建一个 **router skill**(ask-matt 风格):意图 → journey;目标→route 的子决策**委托 `amber next --objective`**(确定性,ADR-0014)。
+  - 建一个 **router skill**(external-review 风格):意图 → journey;目标→route 的子决策**委托 `amber next --objective`**(确定性,ADR-0014)。
   - 把 11 个浅 skill **重组为少数深度 journey skill**(建议 4 个:Governed delivery / Diagnosis & adoption / Context / Continuous improvement),每个拥有跨原语的顺序、证据顺序与失败恢复,调用确定性 implementation。
   - **CLI 穿入 typed seam**:对已有 Action Type 映射的命令族(session/route/context/governance/ledger/loop),让 CLI 执行路径复用 seam 的分类/校验,使 CLI 与 MCP 共享不变量;无映射的命令保留现 dispatcher。
 - Risks:
@@ -81,7 +81,7 @@ F018 把治理不变量沉到两个深度模块,`scripts/amber-mcp.js` 退化为
 - [x] Slice 2: 默认 help 分层投影(向后兼容)。
   - 默认 `amber`(无参/`--help`)只列 `journey+core`;`--all` 列全部;`amber help <cmd>` 仍给单命令全量。
   - 更新 `scripts/amber.js usage()` 与 `command-help.js`;测试覆盖三种入口。
-- [x] Slice 3: 意图 router skill(ask-matt 风格,确定性优先)。
+- [x] Slice 3: 意图 router skill(external-review 风格,确定性优先)。
   - 一个 user-invoked router skill:意图 → journey;目标→route 子决策委托 `amber next --objective`(ADR-0014,禁止 LLM 路由)。
   - 测试验证「意图→journey」映射与 `next --objective` 透传。
 - [x] Slice 4: 深度 journey skill(把 11 个浅 skill 重组为 ~4 个)。

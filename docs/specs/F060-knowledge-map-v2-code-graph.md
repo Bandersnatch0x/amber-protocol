@@ -2,7 +2,7 @@
 
 **Status:** Accepted (2026-08-30)
 **Depends on:** F059, ADR-0025, the F059 fix batch (#267)
-**Program:** [Amber Governed Capabilities](../roadmaps/amber-governed-capabilities-program.md)
+**Program:** [Amber Governed Capabilities](../product/amber-governed-capabilities-program.md)
 **Wayfinder map:** [#260](https://github.com/Bandersnatch0x/amber-protocol/issues/260) — every
 decision below carries its ticket lineage; this Spec is the content authority that supersedes
 those tickets for implementation.

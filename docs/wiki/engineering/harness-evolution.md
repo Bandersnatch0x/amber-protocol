@@ -243,3 +243,9 @@ Last Reviewed: 2026-08-13
 - Plan: `docs/plans/F062-Route-Stage-Verbs-and-Named-Governed-Commands.md`
 - Review status: ready
 - Feature: F062 status → accepted in feature_list.json
+
+## 2026-09-03 docs/plans/F063-Product-closeout-seven-verb-default-surface-verb-skills-spec-status-directory-co.md
+
+- Plan: `docs/plans/F063-Product-closeout-seven-verb-default-surface-verb-skills-spec-status-directory-co.md`
+- Review status: ready
+- Feature: F063 status → passing in feature_list.json (product closeout: seven-verb default help, amber-start/check/done verb skills, SPEC status header, directory consolidation per the 2026-09-02 product review)

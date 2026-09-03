@@ -1,14 +1,13 @@
-# Dependencies
-node_modules/
+# .gitignore — dependencies & build / runtime state / local tools / local working files.
+# Admission rule (docs/agents/dev-workflow.md §产物落盘规则): before adding an entry,
+# ask "why is this product not in .scratch/?" Only runtime state and dependencies qualify.
 
-# Test and coverage output
+# --- Dependencies & build ---
+node_modules/
 coverage/
 .nyc_output/
 test-results/
 playwright-report/
-output/playwright/
-
-# Build and cache output
 dist/
 build/
 .cache/
@@ -16,101 +15,59 @@ build/
 .turbo/
 .vite/
 *.tsbuildinfo
-
-# Local Harness and Amber runtime state
-.harness/
-.amber/
-.amber-legacy-harness-backup-*/
-
-# Claude Code local settings (personal config, not team-shared)
-.claude/settings.local.json
-.claude/worktrees/
-.claude/plans/
-
-# Test temp output
-tests/.tmp/
-
-# Local tool / screenshot artifacts
-.grok/
-.mimocode/
-.workbuddy/
-.playwright-cli/
-apps/web/.playwright-cli/
-apps/web/.tanstack/
-apps/web/screenshots/
-apps/web/output/
-
-# Local architecture review input (F016 acceptance uses the tracked suffixed report)
-output/adr-architecture-assessment.md
-
-# Local design-skill (impeccable) working artifacts
-.impeccable/
-
-# Local share bundle (generated artifacts, not source)
-output/amber-protocol-share/
-
-# Package dry-run and local archive output
+*.timestamp-*.mjs
 npm-pack-dry-run.json
 *.tgz
 
-# Local scratch dirs (agent transcripts, terminal state, archived drafts) —
-# not version-controlled
-agent-tools/
-terminals/
-.archive/
-.scratch/
-
-# Local ticket store (spec/research/wayfinder tickets live here; GitHub carries bug reports only)
+# --- Runtime state ---
+.amber/
+.harness/
+.amber-legacy-harness-backup-*/
+tests/.tmp/
+output/
 issues/
 
-# New Superpowers workflow artifacts (historical tracked records remain versioned)
-docs/superpowers/
-
-# Internal research archive — kept local, not published to the public tree
-docs/research/
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Environment files
-.env
-.env.*
-!.env.example
-
-# npm auth (contains GitHub tokens — use .github/npmrc-github-packages as template)
-.npmrc
-
-# OS and editor files
+# --- Local tools ---
+.grok/
+.mimocode/
+.workbuddy/
+.impeccable/
+.qoder/
+.playwright-cli/
+.tanstack/
+apps/web/screenshots/
+apps/web/output/
+.claude/settings.local.json
+.claude/worktrees/
+.claude/plans/
+.idea/
+.vscode/
 .DS_Store
 Thumbs.db
 Desktop.ini
-.idea/
-.vscode/
-.qoder/
-*.swp
-*.swo
+*.sw[po]
 *~
+.env
+.env.*
+!.env.example
+.npmrc
 
-# Vite writes a temp file next to a TS/MTS config while loading it
-*.timestamp-*.mjs
-
-# Local working files (notes, checklists, scratch data)
+# --- Local working files ---
+.scratch/
+agent-tools/
+terminals/
+.archive/
+test-reports/
+test-workflows/
+spec-compliance*/
+tests/fixtures/worktree-test-repo/
+# F063: these docs/ namespaces moved to .scratch/ (untracked); the entries stay
+# so a recreated docs/research or docs/legacy can never sneak into a commit.
+docs/research/
+docs/legacy/
+*.log
 notes.md
-MEMORY.md
 .release-checklist.md
 session-handoff.md
 tasks/
-# Governed shared memory (ADR-0018) — tracked by git by default, unlike the
-# local working files above; book entries via `amber memory book`.
-!/MEMORY.md
-feature_list.json
-!/feature_list.json
 问题清单.md
-
-# Local regression-test scratch (go-stock analysis reports and ad-hoc test scripts)
-test-reports/
-test-workflows/

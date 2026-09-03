@@ -82,8 +82,8 @@ node scripts/amber.js pack validate --file workflow-packs/security-audit.pack.js
 
 ## Next steps
 
-- [CLI Commands](../api/cli-commands.md) — Complete command reference
+- [CLI Commands](../reference/cli-commands.md) — Complete command reference
 - [Architecture](../architecture/overview.md) — How the pieces fit together
 - [SPEC.md](../../SPEC.md) — Product boundary and release criteria
-- [Troubleshooting](./troubleshooting.md) — Common issues and fixes
-- [FAQ](./faq.md) — Frequently asked questions
+- [Troubleshooting](./user-troubleshooting.md) — Common issues and fixes
+- [FAQ](./user-faq.md) — Frequently asked questions

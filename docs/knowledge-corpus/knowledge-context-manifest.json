@@ -400,8 +400,8 @@
       "sourcePath": "docs/architecture/extension-points.md",
       "title": "Extension Points",
       "source": {
-        "rawHash": "sha256:f1409ffa526fdc6f148d2d4dbf7755ec4addd6e2dc13d5a4bcfa1d71dfd2c267",
-        "normHash": "sha256:13bde50114b96680de59e3fd8188a67566ac236f03519269ee0a431dabe4ca21"
+        "rawHash": "sha256:824d55f24c4fd6c7f54e9fc15dbc7081bd0fdc4b31d8ebbc4580e18452f82d32",
+        "normHash": "sha256:ebd4a0c65726eda10dd11e812e13d3729efbf6d69ed6495b104f4561265a392e"
       }
     },
     {
@@ -585,5 +585,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:185f21de8bd213ca6aa5b4017465b4a6242ceb1748b68865e4b0eafdd5dc6b36"
+  "manifestHash": "sha256:8bcfa17dc3384a0baa04ff338794625a90c0b604eff26f3b20775879c3773604"
 }

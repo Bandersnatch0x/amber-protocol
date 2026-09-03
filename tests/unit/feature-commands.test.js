@@ -320,9 +320,20 @@ test("recordFeaturePaths keeps feature_list.json Prettier-clean after booking (f
 	assert.deepStrictEqual(readFeatures(dir).features[0].paths, ["docs/specs/contract.md"]);
 
 	// The repo's CI contract is prettier --check on JSON files; run it for real.
+	// --config pins the repo's .prettierrc.json: temp fixtures live outside the
+	// repo, so without it prettier falls back to its defaults (spaces, not tabs)
+	// and the check would test the wrong contract. Before F063 this test passed
+	// only because the old .gitignore's bare `feature_list.json` rule made
+	// prettier (ignorePath includes .gitignore) skip the fixture entirely.
 	const prettier = spawnSync(
 		process.execPath,
-		[require.resolve("prettier/bin/prettier.cjs"), "--check", listPath.split(path.sep).join("/")],
+		[
+			require.resolve("prettier/bin/prettier.cjs"),
+			"--check",
+			listPath.split(path.sep).join("/"),
+			"--config",
+			path.join(__dirname, "..", "..", ".prettierrc.json"),
+		],
 		{ encoding: "utf8", cwd: path.join(__dirname, "..", "..") },
 	);
 	assert.equal(

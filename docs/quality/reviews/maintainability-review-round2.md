@@ -47,7 +47,7 @@ The route-loading-and-matching logic is duplicated. `startSession` has the riche
 
 The same manual formatting pattern could appear elsewhere. There's no shared date-formatting utility in the codebase.
 
-**Recommendation:** Either use `toISOString().replace(/[:.]/g, "-")` (as `harness-core.js` line ~1900 already does in `timestampForFileName()`), or extract a shared `formatTimestamp(date)` function. The `timestampForFileName` in `harness-core.js` already does exactly this — but `rollback.js` can't import it without creating a dependency on the massive `harness-core.js` module. This argues for a tiny shared `date-utils.js`.
+**Recommendation:** Either use `toISOString().replace(/[:.]/g, "-")` (as `harness-core.js` line ~1900 already does in `timestampForFileName()`), or extract a shared `formattimestamp(date)` function. The `timestampForFileName` in `harness-core.js` already does exactly this — but `rollback.js` can't import it without creating a dependency on the massive `harness-core.js` module. This argues for a tiny shared `date-utils.js`.
 
 **Impact:** Minor deduplication. The current code works correctly.
 
