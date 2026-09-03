@@ -592,6 +592,65 @@ function doctor(target, options = {}) {
 		);
 	}
 
+	// Optional F049/F050 fail-closed integrity. Same skip-when-absent pattern
+	// as context/memory: doctor never writes, repairs, or rewrites journals —
+	// it only reports what the existing list/show read seams throw.
+	function checkOptionalGovernedRead(dirName, name, fallbackCode, remedy, inspect) {
+		if (!pathExists(statePath(targetRoot, dirName))) return;
+		try {
+			addCheck(name, true, inspect());
+		} catch (err) {
+			const code = err && err.amberCode ? err.amberCode : fallbackCode;
+			const detail = `${code}: ${err && err.message ? err.message : String(err)}`;
+			addCheck(name, false, detail, remedy);
+			errors.push(detail);
+		}
+	}
+
+	checkOptionalGovernedRead(
+		"artifacts",
+		"Canonical artifacts store",
+		"AMBER_E_ARTIFACT_JOURNAL_CORRUPT",
+		"amber artifact list --target . ; amber artifact show",
+		() => {
+			const { listArtifacts, showArtifact } = require("./canonical-artifacts");
+			const listed = listArtifacts(targetRoot);
+			for (const item of listed) {
+				showArtifact(targetRoot, item.identity, {
+					type: item.type,
+					revision: item.revision,
+				});
+			}
+			return listed.length === 0 ? "empty store" : `${listed.length} committed artifact(s)`;
+		},
+	);
+
+	checkOptionalGovernedRead(
+		"gates",
+		"Gate outcome ledger",
+		"AMBER_E_GATE_OUTCOME_REGISTRY_CORRUPT",
+		"amber gate list --target . ; amber gate show",
+		() => {
+			const { listGateOutcomes, showGateOutcome } = require("./gate-evaluation");
+			const listed = listGateOutcomes(targetRoot);
+			if (listed.length > 0) showGateOutcome(targetRoot, { index: listed[0].index });
+			return listed.length === 0 ? "empty ledger" : `${listed.length} outcome(s)`;
+		},
+	);
+
+	checkOptionalGovernedRead(
+		"approvals",
+		"Approval registry",
+		"AMBER_E_APPROVAL_REGISTRY_CORRUPT",
+		"amber approval list --target . ; amber approval show",
+		() => {
+			const { listApprovals, showApproval } = require("./approval-registry");
+			const listed = listApprovals(targetRoot);
+			if (listed.length > 0) showApproval(targetRoot, listed[0].id);
+			return listed.length === 0 ? "empty registry" : `${listed.length} approval(s)`;
+		},
+	);
+
 	return { target: targetRoot, classification, checks, errors, warnings };
 }
 
