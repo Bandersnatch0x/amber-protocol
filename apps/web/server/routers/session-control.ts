@@ -33,6 +33,8 @@ const ACTION_TARGET: Record<RunnerControlAction, SessionStatus> = {
   abort: 'aborted',
 };
 
+const sessionIdSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i, 'Invalid session ID format');
+
 /**
  * Map legacy web-only statuses onto CLI vocabulary for legality checks.
  * idle → created, running → executing. Canonical statuses pass through.
@@ -69,7 +71,7 @@ function canInvokeAction(action: RunnerControlAction, status: string): boolean {
   return isLegalSessionTransition(from, target);
 }
 
-const controlInputSchema = z.object({ sessionId: z.string() });
+const controlInputSchema = z.object({ sessionId: sessionIdSchema });
 const abortInputSchema = controlInputSchema.extend({ reason: z.string().optional() });
 
 function mergeWarnings(...warnings: Array<string | undefined>): string | undefined {

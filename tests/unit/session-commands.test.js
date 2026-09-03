@@ -300,7 +300,9 @@ describe("session-commands", () => {
 		});
 
 		it("returns error when session not found", () => {
-			const result = statusSession(TEST_ROOT, { sessionId: "does-not-exist" });
+			const result = statusSession(TEST_ROOT, {
+				sessionId: "550e8400-e29b-41d4-a716-446655440001",
+			});
 
 			assert.notEqual(result.exitCode, 0);
 			assert.ok(result.text.includes("not found"));

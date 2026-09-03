@@ -32,17 +32,43 @@ const {
 	CANONICAL_STATE_DIR,
 } = require("./state-dir-resolver");
 
+const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validateSessionId(sessionId) {
+	if (!sessionId || typeof sessionId !== "string") {
+		return { valid: false, error: "Session ID is required" };
+	}
+	if (sessionId.includes("..") || sessionId.includes("/") || sessionId.includes("\\")) {
+		return { valid: false, error: "Invalid session ID format" };
+	}
+	if (!/^[\w-]+$/.test(sessionId)) {
+		return { valid: false, error: "Invalid session ID format" };
+	}
+	if (!SESSION_ID_PATTERN.test(sessionId)) {
+		return { valid: false, error: "Invalid session ID format" };
+	}
+	return { valid: true };
+}
+
 function getSessionsDir(projectRoot) {
 	// Discovery/read path: prefers .amber, falls back to legacy .harness.
 	return path.join(resolveStateDirForRead(projectRoot), "sessions");
 }
 
 function getSessionDir(projectRoot, sessionId) {
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		throw new Error(validation.error);
+	}
 	return path.join(getSessionsDir(projectRoot), sessionId);
 }
 
 function getSessionDirForCreate(projectRoot, sessionId) {
 	// New sessions are always created under the canonical .amber state dir.
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		throw new Error(validation.error);
+	}
 	return path.join(resolveStateDirForCreate(projectRoot), "sessions", sessionId);
 }
 
@@ -293,6 +319,11 @@ function statusSession(projectRoot, options) {
 		}
 	}
 
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
+	}
+
 	const loaded = requireSession(projectRoot, sessionId);
 	if (loaded.exitCode !== undefined) return loaded; // error result from requireSession
 	const { manifest, sessionDir } = loaded;
@@ -349,6 +380,11 @@ async function abortSession(projectRoot, options) {
 		return result("Error: --session-id is required", 1);
 	}
 
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
+	}
+
 	const loaded = requireSession(projectRoot, sessionId);
 	if (loaded.exitCode !== undefined) return loaded;
 	const { manifest, sessionDir } = loaded;
@@ -397,6 +433,11 @@ async function completeSession(projectRoot, options) {
 
 	if (!sessionId) {
 		return result("Error: session complete requires --session <id>.", 1);
+	}
+
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
 	}
 
 	const loaded = requireSession(projectRoot, sessionId);
@@ -473,6 +514,11 @@ async function continueSession(projectRoot, options) {
 		if (!sessionId) {
 			return result("No resumable sessions found", 1);
 		}
+	}
+
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
 	}
 
 	const loaded = requireSession(projectRoot, sessionId);
@@ -614,6 +660,11 @@ async function verifySession(projectRoot, options) {
 
 	if (!sessionId) {
 		return result("Error: session verify requires --session <id>.", 1);
+	}
+
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
 	}
 
 	const loaded = requireSession(projectRoot, sessionId);
@@ -791,6 +842,11 @@ async function approveSession(projectRoot, options) {
 		return result("Error: session approve requires --session <id>.", 1);
 	}
 
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
+	}
+
 	const loaded = requireSession(projectRoot, sessionId);
 	if (loaded.exitCode !== undefined) return loaded;
 	const { manifest, sessionDir } = loaded;
@@ -912,6 +968,10 @@ async function approveSession(projectRoot, options) {
 }
 
 function verifyLedgerSession(projectRoot, sessionId) {
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
+	}
 	const loaded = requireSession(projectRoot, sessionId);
 	if (loaded.exitCode !== undefined) return loaded;
 	const { sessionDir } = loaded;
@@ -930,6 +990,11 @@ async function runSession(projectRoot, options) {
 
 	if (!sessionId) {
 		return result("Error: session run requires --session <id>.", 1);
+	}
+
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
 	}
 
 	// Session existence, terminal-state, and lease refusals are all owned by the
@@ -995,6 +1060,11 @@ async function settleSession(projectRoot, options) {
 		return result("Error: session settle requires --session <id>.", 1);
 	}
 
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
+	}
+
 	if (!requestId) {
 		return result("Error: session settle requires --request-id <id>.", 1);
 	}
@@ -1051,6 +1121,12 @@ async function leaseSession(projectRoot, options) {
 	if (!sessionId) {
 		return result("Error: session lease requires --session <id>.", 1);
 	}
+
+	const validation = validateSessionId(sessionId);
+	if (!validation.valid) {
+		return result(`Error: ${validation.error}`, 1);
+	}
+
 	if (!ownerId || !tokenHash) {
 		return result(
 			"Error: session lease requires --owner-id <agent> and --token-hash <sha256 of the current lease token>.",
@@ -1153,4 +1229,5 @@ module.exports = {
 	loadAllSessionManifests,
 	requireSession,
 	findMostRecentSession,
+	validateSessionId,
 };

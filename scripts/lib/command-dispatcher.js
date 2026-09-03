@@ -231,7 +231,7 @@ async function handleSession(args) {
 			});
 		}
 	} else if (action === "status") {
-		sessionResult = sessionCommands.statusSession(targetRoot, { sessionId: args._?.[1] });
+		sessionResult = sessionCommands.statusSession(targetRoot, { sessionId: args._?.[1] || args.session });
 	} else if (action === "list") {
 		sessionResult = sessionCommands.listSessions(targetRoot, {});
 	} else if (action === "abort") {
