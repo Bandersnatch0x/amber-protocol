@@ -15,6 +15,8 @@ export default [
 			"node_modules/",
 			"apps/web/",
 			"coverage/",
+			"issues/",
+			"output/",
 			"tests/fixtures/",
 			"templates/",
 			"test-workflows/",

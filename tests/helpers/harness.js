@@ -12,6 +12,7 @@
 //   addPage(root, pageId, { title, sources, blocks, createdAt })
 //   writeProfile(root, deploymentProfile)
 //   writeJson / readJson / readJsonl
+//   trackTempDir(dir) — register any temp dir for exit-time cleanup
 //
 // The governed-ledger registry suites (maintain / retention / external /
 // breakglass; ST-9) additionally share:
@@ -30,6 +31,33 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
+// Exit cleanup: every fixture root handed out here is removed when the test
+// process exits. Suites rarely unwind their own mkdtemp dirs, so without this
+// each run leaves hundreds of fixture trees behind in os.tmpdir().
+const tempDirs = new Set();
+
+/**
+ * Register a temp dir for removal at process exit. Exported so suites with
+ * their own local fixture builders can opt into the same cleanup.
+ * @param {string} dir - Directory to remove on exit.
+ * @returns {string} The same directory (chainable).
+ */
+function trackTempDir(dir) {
+	if (tempDirs.size === 0) {
+		process.once("exit", () => {
+			for (const temp of tempDirs) {
+				try {
+					fs.rmSync(temp, { recursive: true, force: true, maxRetries: 3 });
+				} catch {
+					// ponytail: best-effort — a locked fixture must never mask a test result.
+				}
+			}
+		});
+	}
+	tempDirs.add(dir);
+	return dir;
+}
+
 /**
  * Create a temp fixture root, optionally a git repo, with .amber created.
  * @param {string} label - Temp-dir label (uniqueness only).
@@ -37,7 +65,7 @@ const { spawnSync } = require("node:child_process");
  * @returns {string} Fixture root.
  */
 function mkTarget(label, { git = false, profile = null, amber = true, subdirs = [] } = {}) {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), `amber-${label}-`));
+	const dir = trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `amber-${label}-`)));
 	if (git) gitInit(dir);
 	if (amber) fs.mkdirSync(path.join(dir, ".amber"), { recursive: true });
 	for (const sub of subdirs) fs.mkdirSync(path.join(dir, sub), { recursive: true });
@@ -126,7 +154,7 @@ function readJsonl(file) {
  * @returns {(label: string) => string} Fixture-root factory.
  */
 function mkLedgerTarget(prefix) {
-	return (label) => fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-${label}-`));
+	return (label) => trackTempDir(fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-${label}-`)));
 }
 
 /** Read a chained-ledger JSONL file into its events (blank lines skipped). */
@@ -174,6 +202,7 @@ function seedDecisionFixture(dir, { principal, intent, identities, body = "# Int
 
 module.exports = {
 	mkTarget,
+	trackTempDir,
 	gitInit,
 	addPage,
 	writeProfile,
