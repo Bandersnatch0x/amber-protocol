@@ -22,6 +22,7 @@ export default [
 			"test-workflows/",
 			"test-reports/",
 			".external-tool/worktrees/",
+			"upper-shell/",
 		],
 	},
 	js.configs.recommended,
