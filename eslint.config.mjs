@@ -20,6 +20,7 @@ export default [
 			"test-workflows/",
 			"test-reports/",
 			".qoder/worktrees/",
+			"upper-shell/",
 		],
 	},
 	js.configs.recommended,
