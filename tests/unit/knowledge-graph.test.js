@@ -711,6 +711,8 @@ test("F-5: amber knowledge graph --json emits schema-valid, byte-identical JSON 
 		spawnSync(process.execPath, [amber, "knowledge", "graph", "--target", REPO_ROOT, "--json"], {
 			cwd: REPO_ROOT,
 			encoding: "utf8",
+			// ponytail: graph output crossed 1MB (default maxBuffer) in Sep 2026; 16MB ceiling, stream if it ever outgrows this
+			maxBuffer: 16 * 1024 * 1024,
 		});
 
 	const first = run();
