@@ -43,7 +43,7 @@
 | --- | --- |
 | 编码引擎 / 宿主 | 负责模型、agent loop、通用工具；Amber 经 skills / 插件 / MCP 挂载，不替代引擎 |
 | Upper Shell（可选） | 仅经 MCP 消费 Amber；变更必须走 Approval Bridge；禁止直接写 .amber/；禁止把 agent loop 实现进 Amber 内核（见 PR 322 与 upper-shell README） |
-| 旁路评估（如 Better Harness） | 可并列提供效果/证据洞察；不并入 Amber 内核承诺，不要求 Amber 变成评估平台 |
+| 旁路效果评估工具 | 可并列提供效果/证据洞察；不并入 Amber 内核承诺，不要求 Amber 变成评估平台 |
 
 ---
 
@@ -64,7 +64,7 @@
 
 - Web Viewer 深度商业化叙事
 - 分布式多仓 / 组织级同步作为首屏卖点
-- 与 Better Harness 的深度代码级捆绑
+- 不与外部评估工具做代码级捆绑
 
 实现可存在；首屏与对外一句定位不得升格。
 
