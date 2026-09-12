@@ -113,6 +113,15 @@ amber handoff validate --target my-project
 - `amber --all` — full compatibility command surface
 - [CLI reference](./docs/CLI_REFERENCE.md)
 
+Expert path (not the homepage main line): read-only continuous-improvement discovery via `amber loop recommend` (see `amber --all`):
+
+```bash
+amber loop recommend --target . --goal "continuous improvement" --json
+amber loop run --file workflow-packs/safe-amber-bootstrap.pack.json --contract daily-amber-triage --dry-run --json
+```
+
+`loop run` requires `--dry-run`; live scheduling stays out of product scope.
+
 ---
 
 ## Core Concepts
