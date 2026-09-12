@@ -34,24 +34,24 @@
 
 ## Positioning
 
-**Amber = the in-repo team replication layer: how a team safely uses AI on *this* codebase, written as handoff-ready file evidence.**
+**Amber = the in-repo team replication layer: how a team safely uses AI on _this_ codebase, written as handoff-ready file evidence.**
 
 It sits under your existing coding engine and adds governance plus evidence. It is not another agent runtime, and not an org-scale platform.
 
-| Amber is | Amber is not |
-| -------- | ------------ |
-| In-repo governance and evidence protocol | Org-scale Skill marketplace / plugin store |
-| Reviewable plans / gates / approvals / handoffs | Cross-repo gateway or cross-machine control dashboard |
-| Local conventions a team can replicate | Always-on scheduler / daemon that runs your project commands |
+| Amber is                                        | Amber is not                                                 |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| In-repo governance and evidence protocol        | Org-scale Skill marketplace / plugin store                   |
+| Reviewable plans / gates / approvals / handoffs | Cross-repo gateway or cross-machine control dashboard        |
+| Local conventions a team can replicate          | Always-on scheduler / daemon that runs your project commands |
 
 ---
 
 ## Layering
 
-| Layer | Role |
-| ----- | ---- |
-| **Engine** | Edit code, call tools, run models and the agent loop (provided by your chosen coding host) |
-| **Governance (Amber)** | Plans, gates, approvals, doctor/audit, handoff; evidence written as repo files |
+| Layer                      | Role                                                                                                       |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Engine**                 | Edit code, call tools, run models and the agent loop (provided by your chosen coding host)                 |
+| **Governance (Amber)**     | Plans, gates, approvals, doctor/audit, handoff; evidence written as repo files                             |
 | **Upper Shell (optional)** | Consumes Amber via MCP only; must not rewrite the `.amber` contract or push the agent loop into Amber core |
 
 Engines do the work; Amber proves what was done, whether it is safe to keep, and how to hand it off.
