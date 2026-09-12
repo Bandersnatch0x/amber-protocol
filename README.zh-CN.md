@@ -1,41 +1,50 @@
-<div align="center">
-
 # Amber Protocol
 
 > **让 AI 编码会话可审查、有闸门、可交接。**
+> 证据落在仓库文件里，不落在聊天记录里。
 
-<p align="center">
-  <img src="./assets/brand/amber-protocol-logo.png" alt="Amber Protocol 标志" width="160" />
-</p>
+仓库本地的团队复制层（team replication layer）——计划、闸门、审批与交接，以可检视文件存放在你的仓库里。状态：稳定版。
 
-![Amber Protocol](./assets/readme/amber-protocol-banner.png)
-
-![CI](https://github.com/Bandersnatch0x/amber-protocol/workflows/CI/badge.svg)
-![npm](https://img.shields.io/npm/v/amber-protocol?style=flat-square)
-![Node Version](https://img.shields.io/badge/node-%5E20.19%20%7C%7C%20%5E22.12%20%7C%7C%20%3E%3D23-brightgreen?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
-
-<p align="center">
-  <a href="#安装">安装</a> ·
-  <a href="#快速开始">快速开始</a> ·
-  <a href="#核心概念">核心概念</a> ·
-  <a href="#文档">文档</a> ·
-  <a href="./README.md">English</a>
-</p>
-
-<p align="center">
-  面向 AI 辅助工程的仓库本地治理层——计划、闸门、审批与交接<br />
-  全部以可检视的文件形式存放在你的仓库里。<br />
-  <b>状态：</b>稳定版 · <a href="./ROADMAP.md">里程碑与测试状态 →</a>
-</p>
-
-</div>
+导航：[定位](#定位) · [三层](#三层) · [硬非目标](#硬非目标) · [安装](#安装) · [快速开始](#快速开始约-10-分钟) · [Team Replication Charter](./docs/TEAM_REPLICATION_CHARTER.md) · [English README](./README.md)
 
 ---
 
-Amber Protocol 是一个面向 AI 辅助工程的仓库本地治理层。当团队让 AI agent 在仓库里工作时，难的不再是写代码——而是搞清楚做了什么、是否安全保留、如何交接、如何证明已被审查。Amber 把这些环节显式化：它准备面向 agent 的上下文，记录审批与闸门，用只读检查验证状态，并生成交接与审计产物——全部以文件形式存放在你的仓库里。
+## 定位
 
-它刻意保持保守。Amber 创建审查产物、dry-run 计划和审批记录。它**不会**运行 Dynamic Workflow、不会调用真实 subagent、不会执行你项目的命令，也不会重写你已有的文档。
+**Amber = 仓内团队复制层：把「如何安全用 AI 改这个仓」写成可交接的文件证据。**
+
+它挂在你已有的编码引擎之下，补治理与证据；不是又一个 agent 运行时，也不是组织级平台。
+
+| Amber 是 | Amber 不是 |
+| -------- | ---------- |
+| 仓库内的治理与证据协议 | 组织级 Skill 市场 / 插件商店 |
+| 可审查的计划 · 闸门 · 审批 · 交接 | 跨仓网关或跨机器总控看板 |
+| 可在团队间复制的本地约定 | 常驻调度 / 自动跑项目命令的 daemon |
+
+---
+
+## 三层
+
+| 层 | 职责 |
+| --- | --- |
+| 引擎 | 读改代码、调工具、跑模型与 agent loop（由你选用的编码宿主提供） |
+| 治理（Amber） | 计划、闸门、审批、doctor/audit、handoff；证据写入仓库文件 |
+| 可选上层壳 | 只经 MCP 消费 Amber；不改 .amber 契约，不把 loop 塞进 Amber 内核 |
+
+主线：引擎干活；Amber 证明「做了什么、是否可留、如何交接」。
+
+---
+
+## 硬非目标
+
+这些是产品边界，不是 TODO：
+
+1. 不替代编码引擎 / 不做通用 agent 运行时
+2. 不跑动态工作流、不调度 live subagent、不自动执行你的项目命令
+3. 不做组织级市场、跨仓网关、跨机器看板、always-on 调度器
+4. 不覆盖已有项目文档（init 与 wiki 只补缺失文件）
+
+完整边界见 [Team Replication Charter](./docs/TEAM_REPLICATION_CHARTER.md) 与 [SPEC.md](./SPEC.md)。
 
 ## 安装
 
@@ -55,22 +64,35 @@ npm install
 node scripts/amber.js --version
 ```
 
-## 快速开始
+## 快速开始（约 10 分钟）
 
-通过三个安全步骤把 Amber 引入既有仓库：
+首屏只保留这条路径：安装 → 审计 → 初始化 → 自检 →（可选）计划/闸门 → 交接。
 
 ```bash
-# 1. 对目标仓库做只读审计（不改动任何东西）
+# 1. 只读审计（不改仓库）
 amber audit --target my-project --summary
 
-# 2. 安装 Amber starter 文件（跳过任何已存在的文件）
+# 2. 写入 starter（跳过已有文件）
 amber init --target my-project
 
-# 3. 验证仓库现已具备预期的面向 agent 的表面
+# 3. 自检 agent 表面是否齐全
 amber doctor --target my-project
+
+# 4.（可选）立一项计划并看下一闸门
+amber plan --target my-project --feature F001 --title "…"
+amber next --target my-project
+
+# 5. 打出可携带的交接包并校验
+amber handoff bundle --target my-project
+amber handoff validate --target my-project
 ```
 
-`init` 和 `wiki` 永不覆盖已有文件。完整命令面见 [CLI 参考](./docs/CLI_REFERENCE.md)。
+`init` / `wiki` 永不覆盖已有文件。专家命令、dsh 插件、lifecycle 全表、Web Viewer 等见下方原文与：
+
+- `amber --all` — 完整兼容命令面
+- [CLI 参考](./docs/CLI_REFERENCE.md)
+
+---
 
 ## 在 DeepSeek Harness 里用
 
