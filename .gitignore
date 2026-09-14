@@ -28,6 +28,7 @@ output/
 issues/
 
 # --- Local tools ---
+.codex/
 .grok/
 .mimocode/
 .workbuddy/
