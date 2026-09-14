@@ -14,7 +14,7 @@ export const FIXTURE_GATE_ID = 'e2e-approval-gate';
 // session id so the baseline evidence (runner_ack etc.) stays pristine.
 export const APPROVE_CONSUMABLE_SESSION_ID = '00000000-0000-4000-8000-00000000e2a1';
 export const REJECT_CONSUMABLE_SESSION_ID = '00000000-0000-4000-8000-00000000e2b2';
-export const COMPLETED_FIXTURE_SESSION_ID = '00000000-0000-4000-8000-00000000c0mp';
+export const COMPLETED_FIXTURE_SESSION_ID = '00000000-0000-4000-8000-00000000e2ed';
 export const APPROVE_CONSUMABLE_GATE_ID = 'e2e-approve-consumable-gate';
 export const REJECT_CONSUMABLE_GATE_ID = 'e2e-reject-consumable-gate';
 
