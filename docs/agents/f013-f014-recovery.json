@@ -1,0 +1,385 @@
+{
+  "schema_version": "1.0.0",
+  "recovery_metadata": {
+    "generated_at": "2026-09-01T18:19:00+08:00",
+    "scope": "Historical provenance recovery for F013 and F014 across GitHub issues #76–#84",
+    "repository_root": "D:/code_space/.orca-workspaces/coding-harness/f013-f014-recovery-2026-09-01",
+    "total_evaluated_issues": 9,
+    "evaluated_issue_numbers": [
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84
+    ]
+  },
+  "core_analysis": {
+    "q1_proposals_and_implementations": "Issues #76–#84 defined and implemented two complete behavior-preserving module refactorings: F013 (#76, #79, #80, #83) deepened the Knowledge Plan module behind a public root facade and command adapter with an internal seam and CommonJS forwarding compatibility adapter; F014 (#77, #78, #81, #82, #84) deepened the Maintenance module into a two-outcome root facade (inspect/evidence) and a single 10-subcommand adapter, introducing honest non-blocking partial-state reporting across Workflow Effectiveness, Governance Report, and Adoption Report.",
+    "q2_local_canonical_targets": "Both features are directly backed by shipped production code (scripts/lib/knowledge-plan/*, scripts/lib/maintenance/*) and comprehensive unit/facade/adapter/interface test suites at HEAD. They are officially registered as completed iterations in docs/wiki/engineering/harness-evolution.md. Neither feature has a standalone file in docs/specs/ or docs/plans/, and neither has a dedicated ADR in docs/adr/.",
+    "q3_f013_f014_status": "F013 and F014 were neither renamed, superseded, nor abandoned. Their complete implementation landed on master across commits 5adbc0a, c96084a, b7cef47 (F013) and 937bd70, 2fafd57, f6f6363, cb83532 (F014). They were merely omitted from feature_list.json and standalone plan directories at implementation time, which was later explicitly documented in harness-evolution.md (commit ef99f3d).",
+    "q4_f015_f016_relationship": "F013/F014 are completely distinct from F015 and F016. F015 is 'Loop no-progress reporting' (ADR-0013, assessLoopProgress); F016 is 'Review blocker remediation' (ADR-0015, fail-closed boundaries for Context/Loadout). Any inference that issues #76–#84 belong to or are duplicated by F015/F016 is unsupported and contradicted by the repository code, git commit history, and plans.",
+    "q5_disposition_evidence": "The exact disposition for all nine issues is 'historical-provenance' with an 'omitted-from-feature-list' registry status. The evidence consists of 7 git commit SHAs, 9 closed GitHub issues with verification test pass logs, active production modules and tests at HEAD, and explicit log entries in docs/wiki/engineering/harness-evolution.md."
+  },
+  "issues": [
+    {
+      "issue_number": 76,
+      "title": "F013: Deepen Knowledge Plan module behind stable facade",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/76",
+      "state": "CLOSED",
+      "created_at": "2026-08-03T08:56:00Z",
+      "closed_at": "2026-08-03T16:57:24Z",
+      "feature_id": "F013",
+      "role": "parent_epic",
+      "parent_issue_number": null,
+      "sub_issue_numbers": [
+        79,
+        80,
+        83
+      ],
+      "commits": [
+        "5adbc0a3e8bfb7922b667ed6265180444762405d",
+        "c96084a2d90c063a127ed2006236370714d8c49f",
+        "b7cef4783fc21c33dc4750edd63ca5d02b011dd2"
+      ],
+      "proposes": "Deepen the Knowledge Plan module behind a stable root facade exposing six explicit use cases (inspect, report, validate, scaffold, build, plan) and a dedicated Governance Console command adapter, hiding loading, validation, YAML parsing, report formatting, materialization, and proposal mechanics behind an internal seam while preserving legacy CommonJS exports for one deprecation cycle.",
+      "implements": "Parent epic tracking the complete three-slice implementation of F013 (read-only flows via #79, write-capable flows via #80, and interface sealing/compat contracts via #83).",
+      "artifacts_at_head": {
+        "production_files": [
+          "scripts/lib/knowledge-plan/index.js",
+          "scripts/lib/knowledge-plan/adapters/command.js",
+          "scripts/lib/knowledge-plan/adapters/renderers.js",
+          "scripts/lib/knowledge-plan/internal/load.js",
+          "scripts/lib/knowledge-plan/internal/report.js",
+          "scripts/lib/knowledge-plan/internal/validate.js",
+          "scripts/lib/knowledge-plan/internal/scaffold.js",
+          "scripts/lib/knowledge-plan/internal/build.js",
+          "scripts/lib/knowledge-plan/internal/propose.js",
+          "scripts/lib/core/knowledge-plan.js",
+          "scripts/lib/command-dispatcher.js"
+        ],
+        "test_files": [
+          "tests/unit/knowledge-plan-facade.test.js",
+          "tests/unit/knowledge-plan-command-adapter.test.js",
+          "tests/unit/knowledge-plan-compat.test.js",
+          "tests/unit/knowledge-plan-interface.test.js"
+        ],
+        "documentation_files": [
+          "docs/wiki/engineering/harness-evolution.md"
+        ]
+      },
+      "canonical_disposition": "historical-provenance",
+      "confidence": "high",
+      "contradictions": [
+        "Omitted from feature_list.json despite being fully implemented, tested, and accepted in harness-evolution.md",
+        "No standalone docs/plans/F013-*.md or docs/specs/ file was authored; tracked exclusively through git commits and evolution log"
+      ],
+      "recommendation": "Maintain canonical disposition as historical-provenance. If feature_list.json is ever backfilled, add F013 as an accepted feature pointing to scripts/lib/knowledge-plan/ and its test suite."
+    },
+    {
+      "issue_number": 77,
+      "title": "F014: Deepen Maintenance evidence seam with partial-state reporting",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/77",
+      "state": "CLOSED",
+      "created_at": "2026-08-03T09:01:40Z",
+      "closed_at": "2026-08-03T17:59:06Z",
+      "feature_id": "F014",
+      "role": "parent_epic",
+      "parent_issue_number": null,
+      "sub_issue_numbers": [
+        78,
+        81,
+        82,
+        84
+      ],
+      "commits": [
+        "937bd70b9f75810445840b24237a7c234d13200e",
+        "2fafd57a56446dadd1df8203c15f1ffeb55ff124",
+        "f6f6363017c0478c59b30549da1617bf2744d11b",
+        "cb83532f098d9c55bf5d594f5dfed1e039ce1351"
+      ],
+      "proposes": "Deepen Maintenance behind two stable read-only facade outcomes (full inspection and focused evidence) and one dedicated Governance Console command adapter owning all 10 subcommands. Introduce non-blocking redacted partial-evidence warnings propagated across Workflow Effectiveness, Governance Report, and Adoption Report when individual records are corrupt.",
+      "implements": "Parent epic tracking the complete four-slice implementation of F014 (evidence facade via #78, partial-state propagation via #81, command adapter via #82, and interface sealing/compat contracts via #84).",
+      "artifacts_at_head": {
+        "production_files": [
+          "scripts/lib/maintenance/index.js",
+          "scripts/lib/maintenance/adapters/command.js",
+          "scripts/lib/maintenance/internal/evidence.js",
+          "scripts/lib/maintenance/internal/repository-evidence.js",
+          "scripts/lib/core/evolution-findings.js",
+          "scripts/lib/core/maintenance.js",
+          "scripts/lib/command-handler-families.js",
+          "scripts/lib/core/adoption-reports.js",
+          "scripts/lib/core/governance-report.js",
+          "scripts/lib/core/wiki-drift.js"
+        ],
+        "test_files": [
+          "tests/unit/maintenance-evidence-facade.test.js",
+          "tests/unit/workflow-assessment.test.js",
+          "tests/unit/maintenance-partial-propagation.test.js",
+          "tests/unit/maintenance-command-adapter.test.js",
+          "tests/unit/maintenance-compat.test.js",
+          "tests/unit/maintenance-dispatch.test.js",
+          "tests/unit/maintenance-interface.test.js"
+        ],
+        "documentation_files": [
+          "docs/wiki/engineering/harness-evolution.md"
+        ]
+      },
+      "canonical_disposition": "historical-provenance",
+      "confidence": "high",
+      "contradictions": [
+        "Omitted from feature_list.json despite being fully implemented, tested, and accepted in harness-evolution.md",
+        "No standalone docs/plans/F014-*.md or docs/specs/ file was authored; tracked exclusively through git commits and evolution log"
+      ],
+      "recommendation": "Maintain canonical disposition as historical-provenance. If feature_list.json is ever backfilled, add F014 as an accepted feature pointing to scripts/lib/maintenance/ and its test suite."
+    },
+    {
+      "issue_number": 78,
+      "title": "F014-M1: Expose honest Maintenance evidence outcome",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/78",
+      "state": "CLOSED",
+      "created_at": "2026-08-03T09:05:03Z",
+      "closed_at": "2026-08-03T17:31:16Z",
+      "feature_id": "F014",
+      "role": "sub_task",
+      "parent_issue_number": 77,
+      "sub_issue_numbers": [],
+      "commits": [
+        "937bd70b9f75810445840b24237a7c234d13200e"
+      ],
+      "proposes": "Expose a focused read-only Maintenance evidence facade (scripts/lib/maintenance/internal/evidence.js) and make Workflow Effectiveness consume it without loading Team Distribution registry state. Retain valid records, mark corrupt records as partial, and emit redacted warnings.",
+      "implements": "Created scripts/lib/maintenance/index.js exposing inspectMaintenanceEvidence, implemented internal/evidence.js with partial-state detection, and updated tests/unit/workflow-assessment.test.js and tests/unit/maintenance-evidence-facade.test.js.",
+      "artifacts_at_head": {
+        "production_files": [
+          "scripts/lib/maintenance/index.js",
+          "scripts/lib/maintenance/internal/evidence.js",
+          "scripts/lib/maintenance/internal/repository-evidence.js"
+        ],
+        "test_files": [
+          "tests/unit/maintenance-evidence-facade.test.js",
+          "tests/unit/workflow-assessment.test.js"
+        ],
+        "documentation_files": []
+      },
+      "canonical_disposition": "historical-provenance",
+      "confidence": "high",
+      "contradictions": [],
+      "recommendation": "Retain as historical provenance for F014 Step M1."
+    },
+    {
+      "issue_number": 79,
+      "title": "F013-K1: Deepen read-only Knowledge Plan flows",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/79",
+      "state": "CLOSED",
+      "created_at": "2026-08-03T09:05:12Z",
+      "closed_at": "2026-08-03T11:12:31Z",
+      "feature_id": "F013",
+      "role": "sub_task",
+      "parent_issue_number": 76,
+      "sub_issue_numbers": [],
+      "commits": [
+        "5adbc0a3e8bfb7922b667ed6265180444762405d"
+      ],
+      "proposes": "Route read-only Knowledge Plan flows (inspect, report, validate) through a new root facade and command adapter, moving parsing, schema validation, and reporting mechanics into scripts/lib/knowledge-plan/internal/.",
+      "implements": "Created scripts/lib/knowledge-plan/index.js, scripts/lib/knowledge-plan/adapters/command.js, scripts/lib/knowledge-plan/adapters/renderers.js, internal/load.js, internal/report.js, internal/validate.js, and added tests/unit/knowledge-plan-facade.test.js and tests/unit/knowledge-plan-command-adapter.test.js.",
+      "artifacts_at_head": {
+        "production_files": [
+          "scripts/lib/knowledge-plan/index.js",
+          "scripts/lib/knowledge-plan/adapters/command.js",
+          "scripts/lib/knowledge-plan/adapters/renderers.js",
+          "scripts/lib/knowledge-plan/internal/load.js",
+          "scripts/lib/knowledge-plan/internal/report.js",
+          "scripts/lib/knowledge-plan/internal/validate.js",
+          "scripts/lib/core/knowledge-plan.js",
+          "scripts/lib/command-dispatcher.js"
+        ],
+        "test_files": [
+          "tests/unit/knowledge-plan-facade.test.js",
+          "tests/unit/knowledge-plan-command-adapter.test.js"
+        ],
+        "documentation_files": []
+      },
+      "canonical_disposition": "historical-provenance",
+      "confidence": "high",
+      "contradictions": [],
+      "recommendation": "Retain as historical provenance for F013 Step K1."
+    },
+    {
+      "issue_number": 80,
+      "title": "F013-K2: Deepen write-capable Knowledge Plan flows",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/80",
+      "state": "CLOSED",
+      "created_at": "2026-08-03T09:06:13Z",
+      "closed_at": "2026-08-03T16:47:43Z",
+      "feature_id": "F013",
+      "role": "sub_task",
+      "parent_issue_number": 76,
+      "sub_issue_numbers": [],
+      "commits": [
+        "c96084a2d90c063a127ed2006236370714d8c49f"
+      ],
+      "proposes": "Route write-capable Knowledge Plan flows (default/scaffold, build/materialize, plan) through the root facade and command adapter, moving write mechanics under scripts/lib/knowledge-plan/internal/ while keeping output formats and legacy exports intact.",
+      "implements": "Created scripts/lib/knowledge-plan/internal/scaffold.js, internal/build.js, internal/propose.js, updated facade and command adapter to expose scaffold/build/plan, and expanded unit/adapter tests.",
+      "artifacts_at_head": {
+        "production_files": [
+          "scripts/lib/knowledge-plan/index.js",
+          "scripts/lib/knowledge-plan/adapters/command.js",
+          "scripts/lib/knowledge-plan/adapters/renderers.js",
+          "scripts/lib/knowledge-plan/internal/scaffold.js",
+          "scripts/lib/knowledge-plan/internal/build.js",
+          "scripts/lib/knowledge-plan/internal/propose.js",
+          "scripts/lib/core/knowledge-plan.js",
+          "scripts/lib/command-dispatcher.js"
+        ],
+        "test_files": [
+          "tests/unit/knowledge-plan-command-adapter.test.js",
+          "tests/unit/knowledge-plan-facade.test.js"
+        ],
+        "documentation_files": []
+      },
+      "canonical_disposition": "historical-provenance",
+      "confidence": "high",
+      "contradictions": [],
+      "recommendation": "Retain as historical provenance for F013 Step K2."
+    },
+    {
+      "issue_number": 81,
+      "title": "F014-M2: Propagate Maintenance partial state to Governance and Adoption",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/81",
+      "state": "CLOSED",
+      "created_at": "2026-08-03T09:06:15Z",
+      "closed_at": "2026-08-03T17:39:30Z",
+      "feature_id": "F014",
+      "role": "sub_task",
+      "parent_issue_number": 77,
+      "sub_issue_numbers": [],
+      "commits": [
+        "2fafd57a56446dadd1df8203c15f1ffeb55ff124"
+      ],
+      "proposes": "Make inspectMaintenance compose the focused evidence facade outcome from #78, and propagate partial evidence warnings to Governance Report and Adoption Report as non-blocking warnings while preserving valid data.",
+      "implements": "Extracted Amber Evolution findings to scripts/lib/core/evolution-findings.js, updated core/maintenance.js to compose the evidence facade, and added tests/unit/maintenance-partial-propagation.test.js.",
+      "artifacts_at_head": {
+        "production_files": [
+          "scripts/lib/core/evolution-findings.js",
+          "scripts/lib/core/maintenance.js",
+          "scripts/lib/maintenance/internal/evidence.js"
+        ],
+        "test_files": [
+          "tests/unit/maintenance-partial-propagation.test.js"
+        ],
+        "documentation_files": []
+      },
+      "canonical_disposition": "historical-provenance",
+      "confidence": "high",
+      "contradictions": [],
+      "recommendation": "Retain as historical provenance for F014 Step M2."
+    },
+    {
+      "issue_number": 82,
+      "title": "F014-M3: Route every Maintenance command through one adapter",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/82",
+      "state": "CLOSED",
+      "created_at": "2026-08-03T09:06:17Z",
+      "closed_at": "2026-08-03T17:50:38Z",
+      "feature_id": "F014",
+      "role": "sub_task",
+      "parent_issue_number": 77,
+      "sub_issue_numbers": [],
+      "commits": [
+        "f6f6363017c0478c59b30549da1617bf2744d11b"
+      ],
+      "proposes": "Route all 10 documented Maintenance subcommands through scripts/lib/maintenance/adapters/command.js, absorbing scaffold-drift and distill into the adapter and removing subcommand knowledge from the outer handler.",
+      "implements": "Created scripts/lib/maintenance/adapters/command.js, simplified scripts/lib/command-handler-families.js, and added tests/unit/maintenance-command-adapter.test.js.",
+      "artifacts_at_head": {
+        "production_files": [
+          "scripts/lib/maintenance/adapters/command.js",
+          "scripts/lib/command-handler-families.js"
+        ],
+        "test_files": [
+          "tests/unit/maintenance-command-adapter.test.js"
+        ],
+        "documentation_files": []
+      },
+      "canonical_disposition": "historical-provenance",
+      "confidence": "high",
+      "contradictions": [],
+      "recommendation": "Retain as historical provenance for F014 Step M3."
+    },
+    {
+      "issue_number": 83,
+      "title": "F013-K3: Seal Knowledge Plan interface and deprecation contract",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/83",
+      "state": "CLOSED",
+      "created_at": "2026-08-03T09:07:25Z",
+      "closed_at": "2026-08-03T16:57:21Z",
+      "feature_id": "F013",
+      "role": "sub_task",
+      "parent_issue_number": 76,
+      "sub_issue_numbers": [],
+      "commits": [
+        "b7cef4783fc21c33dc4750edd63ca5d02b011dd2"
+      ],
+      "proposes": "Contract and seal the Knowledge Plan interface with an import firewall preventing external imports into internal/ and a compatibility contract verifying legacy core/knowledge-plan.js forwards retained exports with a major-release deprecation policy.",
+      "implements": "Created tests/unit/knowledge-plan-interface.test.js and tests/unit/knowledge-plan-compat.test.js, and documented deprecation in CHANGELOG.md.",
+      "artifacts_at_head": {
+        "production_files": [
+          "scripts/lib/core/knowledge-plan.js",
+          "scripts/lib/knowledge-plan/index.js"
+        ],
+        "test_files": [
+          "tests/unit/knowledge-plan-interface.test.js",
+          "tests/unit/knowledge-plan-compat.test.js"
+        ],
+        "documentation_files": [
+          "CHANGELOG.md"
+        ]
+      },
+      "canonical_disposition": "historical-provenance",
+      "confidence": "high",
+      "contradictions": [],
+      "recommendation": "Retain as historical provenance for F013 Step K3."
+    },
+    {
+      "issue_number": 84,
+      "title": "F014-M4: Seal Maintenance interface and deprecation contract",
+      "url": "https://github.com/Bandersnatch0x/amber-protocol/issues/84",
+      "state": "CLOSED",
+      "created_at": "2026-08-03T09:07:25Z",
+      "closed_at": "2026-08-03T17:59:03Z",
+      "feature_id": "F014",
+      "role": "sub_task",
+      "parent_issue_number": 77,
+      "sub_issue_numbers": [],
+      "commits": [
+        "cb83532f098d9c55bf5d594f5dfed1e039ce1351"
+      ],
+      "proposes": "Contract and seal the Maintenance interface: all callers consume the root facade (inspect/evidence/staleDocs) or command adapter, test monkey-patching of exported bindings is eliminated, an import firewall seals internal/, and legacy core/maintenance.js forwards retained exports with a major-release deprecation policy.",
+      "implements": "Updated scripts/lib/core/adoption-reports.js, core/governance-report.js, core/wiki-drift.js, scripts/lib/maintenance/index.js, scripts/lib/core/maintenance.js, created tests/unit/maintenance-interface.test.js, tests/unit/maintenance-compat.test.js, refactored tests/unit/maintenance-dispatch.test.js, and updated CHANGELOG.md.",
+      "artifacts_at_head": {
+        "production_files": [
+          "scripts/lib/maintenance/index.js",
+          "scripts/lib/core/maintenance.js",
+          "scripts/lib/core/governance-report.js",
+          "scripts/lib/core/adoption-reports.js",
+          "scripts/lib/core/wiki-drift.js"
+        ],
+        "test_files": [
+          "tests/unit/maintenance-interface.test.js",
+          "tests/unit/maintenance-compat.test.js",
+          "tests/unit/maintenance-dispatch.test.js"
+        ],
+        "documentation_files": [
+          "CHANGELOG.md"
+        ]
+      },
+      "canonical_disposition": "historical-provenance",
+      "confidence": "high",
+      "contradictions": [],
+      "recommendation": "Retain as historical provenance for F014 Step M4."
+    }
+  ]
+}
