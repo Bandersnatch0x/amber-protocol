@@ -51,7 +51,10 @@ const FORBIDDEN_TERMS = [
 ].map(encoded);
 
 const FORBIDDEN_PATTERN = new RegExp(
-	[...FORBIDDEN_TERMS.map(escapeRegExp), `\\b${escapeRegExp(encoded([109, 97, 116, 116]))}\\b`].join("|"),
+	[
+		...FORBIDDEN_TERMS.map(escapeRegExp),
+		`\\b${escapeRegExp(encoded([109, 97, 116, 116]))}\\b`,
+	].join("|"),
 	"i",
 );
 
@@ -94,16 +97,12 @@ test("product surface contains no external tool or author identifiers", () => {
 });
 
 test("product surface paths contain no external identifiers", () => {
-	const offenders = productSurfaceFiles().filter((file) =>
-		FORBIDDEN_PATTERN.test(file),
-	);
+	const offenders = productSurfaceFiles().filter((file) => FORBIDDEN_PATTERN.test(file));
 	assert.deepEqual(offenders, []);
 });
 
 test("external tools are not runtime or development dependencies", () => {
-	const manifest = JSON.parse(
-		fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
-	);
+	const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 	const dependencyNames = Object.keys({
 		...(manifest.dependencies || {}),
 		...(manifest.devDependencies || {}),

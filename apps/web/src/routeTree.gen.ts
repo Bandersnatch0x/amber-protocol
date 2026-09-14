@@ -20,10 +20,10 @@ import { Route as RoutesIndexRouteImport } from './routes/routes/index'
 import { Route as RoutesIdRouteRouteImport } from './routes/routes/$id/route'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
 import { Route as SessionsIdRouteRouteImport } from './routes/sessions/$id/route'
-import { Route as TranscriptsIndexRouteImport } from './routes/transcripts/index'
-import { Route as TranscriptsIdRouteImport } from './routes/transcripts/$id'
 import { Route as SuggestionsIndexRouteImport } from './routes/suggestions/index'
 import { Route as SuggestionsIdRouteImport } from './routes/suggestions/$id'
+import { Route as TranscriptsIndexRouteImport } from './routes/transcripts/index'
+import { Route as TranscriptsIdRouteImport } from './routes/transcripts/$id'
 import { Route as RoutesIdIndexRouteImport } from './routes/routes/$id/index'
 import { Route as SessionsIdIndexRouteImport } from './routes/sessions/$id/index'
 import { Route as SessionsIdTimelineRouteImport } from './routes/sessions/$id/timeline'
@@ -83,18 +83,6 @@ const SessionsIdRouteRoute = SessionsIdRouteRouteImport.update({
   path: '/$id',
   getParentRoute: () => SessionsRouteRoute,
 } as any)
-const TranscriptsIndexRoute = TranscriptsIndexRouteImport.update({
-  id: '/transcripts/',
-  path: '/transcripts/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TranscriptsIdRoute = TranscriptsIdRouteImport.update({
-  id: '/transcripts/$id',
-  path: '/transcripts/$id',
-  getParentRoute: () => rootRouteImport,
-} as any).lazy(() =>
-  import('./routes/transcripts/$id.lazy').then((d) => d.Route),
-)
 const SuggestionsIndexRoute = SuggestionsIndexRouteImport.update({
   id: '/suggestions/',
   path: '/suggestions/',
@@ -106,6 +94,18 @@ const SuggestionsIdRoute = SuggestionsIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() =>
   import('./routes/suggestions/$id.lazy').then((d) => d.Route),
+)
+const TranscriptsIndexRoute = TranscriptsIndexRouteImport.update({
+  id: '/transcripts/',
+  path: '/transcripts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TranscriptsIdRoute = TranscriptsIdRouteImport.update({
+  id: '/transcripts/$id',
+  path: '/transcripts/$id',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/transcripts/$id.lazy').then((d) => d.Route),
 )
 const RoutesIdIndexRoute = RoutesIdIndexRouteImport.update({
   id: '/',
@@ -137,12 +137,12 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
-  '/transcripts/$id': typeof TranscriptsIdRoute
   '/suggestions/$id': typeof SuggestionsIdRoute
+  '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes/': typeof RoutesIndexRoute
   '/sessions/': typeof SessionsIndexRoute
-  '/transcripts/': typeof TranscriptsIndexRoute
   '/suggestions/': typeof SuggestionsIndexRoute
+  '/transcripts/': typeof TranscriptsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id/': typeof RoutesIdIndexRoute
   '/sessions/$id/': typeof SessionsIdIndexRoute
@@ -153,12 +153,12 @@ export interface FileRoutesByTo {
   '/governance': typeof GovernanceRoute
   '/knowledge': typeof KnowledgeRoute
   '/settings': typeof SettingsRoute
-  '/transcripts/$id': typeof TranscriptsIdRoute
   '/suggestions/$id': typeof SuggestionsIdRoute
+  '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes': typeof RoutesIndexRoute
   '/sessions': typeof SessionsIndexRoute
-  '/transcripts': typeof TranscriptsIndexRoute
   '/suggestions': typeof SuggestionsIndexRoute
+  '/transcripts': typeof TranscriptsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id': typeof RoutesIdIndexRoute
   '/sessions/$id': typeof SessionsIdIndexRoute
@@ -174,12 +174,12 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/routes/$id': typeof RoutesIdRouteRouteWithChildren
   '/sessions/$id': typeof SessionsIdRouteRouteWithChildren
-  '/transcripts/$id': typeof TranscriptsIdRoute
   '/suggestions/$id': typeof SuggestionsIdRoute
+  '/transcripts/$id': typeof TranscriptsIdRoute
   '/routes/': typeof RoutesIndexRoute
   '/sessions/': typeof SessionsIndexRoute
-  '/transcripts/': typeof TranscriptsIndexRoute
   '/suggestions/': typeof SuggestionsIndexRoute
+  '/transcripts/': typeof TranscriptsIndexRoute
   '/sessions/$id/timeline': typeof SessionsIdTimelineRoute
   '/routes/$id/': typeof RoutesIdIndexRoute
   '/sessions/$id/': typeof SessionsIdIndexRoute
@@ -196,12 +196,12 @@ export interface FileRouteTypes {
     | '/settings'
     | '/routes/$id'
     | '/sessions/$id'
-    | '/transcripts/$id'
     | '/suggestions/$id'
+    | '/transcripts/$id'
     | '/routes/'
     | '/sessions/'
-    | '/transcripts/'
     | '/suggestions/'
+    | '/transcripts/'
     | '/sessions/$id/timeline'
     | '/routes/$id/'
     | '/sessions/$id/'
@@ -212,12 +212,12 @@ export interface FileRouteTypes {
     | '/governance'
     | '/knowledge'
     | '/settings'
-    | '/transcripts/$id'
     | '/suggestions/$id'
+    | '/transcripts/$id'
     | '/routes'
     | '/sessions'
-    | '/transcripts'
     | '/suggestions'
+    | '/transcripts'
     | '/sessions/$id/timeline'
     | '/routes/$id'
     | '/sessions/$id'
@@ -232,12 +232,12 @@ export interface FileRouteTypes {
     | '/settings'
     | '/routes/$id'
     | '/sessions/$id'
-    | '/transcripts/$id'
     | '/suggestions/$id'
+    | '/transcripts/$id'
     | '/routes/'
     | '/sessions/'
-    | '/transcripts/'
     | '/suggestions/'
+    | '/transcripts/'
     | '/sessions/$id/timeline'
     | '/routes/$id/'
     | '/sessions/$id/'
@@ -251,10 +251,10 @@ export interface RootRouteChildren {
   GovernanceRoute: typeof GovernanceRoute
   KnowledgeRoute: typeof KnowledgeRoute
   SettingsRoute: typeof SettingsRoute
-  TranscriptsIdRoute: typeof TranscriptsIdRoute
-  TranscriptsIndexRoute: typeof TranscriptsIndexRoute
   SuggestionsIdRoute: typeof SuggestionsIdRoute
+  TranscriptsIdRoute: typeof TranscriptsIdRoute
   SuggestionsIndexRoute: typeof SuggestionsIndexRoute
+  TranscriptsIndexRoute: typeof TranscriptsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -336,20 +336,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIdRouteRouteImport
       parentRoute: typeof SessionsRouteRoute
     }
-    '/transcripts/': {
-      id: '/transcripts/'
-      path: '/transcripts'
-      fullPath: '/transcripts/'
-      preLoaderRoute: typeof TranscriptsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/transcripts/$id': {
-      id: '/transcripts/$id'
-      path: '/transcripts/$id'
-      fullPath: '/transcripts/$id'
-      preLoaderRoute: typeof TranscriptsIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/suggestions/': {
       id: '/suggestions/'
       path: '/suggestions'
@@ -362,6 +348,20 @@ declare module '@tanstack/react-router' {
       path: '/suggestions/$id'
       fullPath: '/suggestions/$id'
       preLoaderRoute: typeof SuggestionsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transcripts/': {
+      id: '/transcripts/'
+      path: '/transcripts'
+      fullPath: '/transcripts/'
+      preLoaderRoute: typeof TranscriptsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transcripts/$id': {
+      id: '/transcripts/$id'
+      path: '/transcripts/$id'
+      fullPath: '/transcripts/$id'
+      preLoaderRoute: typeof TranscriptsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/routes/$id/': {
@@ -450,10 +450,10 @@ const rootRouteChildren: RootRouteChildren = {
   GovernanceRoute: GovernanceRoute,
   KnowledgeRoute: KnowledgeRoute,
   SettingsRoute: SettingsRoute,
-  TranscriptsIdRoute: TranscriptsIdRoute,
-  TranscriptsIndexRoute: TranscriptsIndexRoute,
   SuggestionsIdRoute: SuggestionsIdRoute,
+  TranscriptsIdRoute: TranscriptsIdRoute,
   SuggestionsIndexRoute: SuggestionsIndexRoute,
+  TranscriptsIndexRoute: TranscriptsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

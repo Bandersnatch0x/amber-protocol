@@ -22,16 +22,8 @@ function writeFile(root, relativePath, content) {
 
 test("findDistillCandidates returns only repeated findings", () => {
 	const root = tempRoot();
-	writeFile(
-		root,
-		path.join("docs", "legacy", "plans", "a.md"),
-		"# Fix auth\n\n## Add tests\n",
-	);
-	writeFile(
-		root,
-		path.join("docs", "legacy", "plans", "b.md"),
-		"# Fix auth\n\n## Add tests\n",
-	);
+	writeFile(root, path.join("docs", "legacy", "plans", "a.md"), "# Fix auth\n\n## Add tests\n");
+	writeFile(root, path.join("docs", "legacy", "plans", "b.md"), "# Fix auth\n\n## Add tests\n");
 	writeFile(root, path.join("docs", "legacy", "plans", "c.md"), "# Unique plan\n");
 
 	const candidates = findDistillCandidates(root);

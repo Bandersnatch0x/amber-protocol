@@ -5,13 +5,11 @@
 # --- Dependencies & build ---
 node_modules/
 coverage/
-.nyc_output/
 test-results/
 playwright-report/
 dist/
 build/
 .cache/
-.parcel-cache/
 .turbo/
 .vite/
 *.tsbuildinfo
@@ -21,6 +19,7 @@ npm-pack-dry-run.json
 
 # --- Runtime state ---
 .amber/
+.amber-test-interactive/
 .harness/
 .amber-legacy-harness-backup-*/
 tests/.tmp/

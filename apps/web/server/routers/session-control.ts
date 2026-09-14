@@ -33,7 +33,12 @@ const ACTION_TARGET: Record<RunnerControlAction, SessionStatus> = {
   abort: 'aborted',
 };
 
-const sessionIdSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i, 'Invalid session ID format');
+const sessionIdSchema = z
+  .string()
+  .regex(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    'Invalid session ID format',
+  );
 
 /**
  * Map legacy web-only statuses onto CLI vocabulary for legality checks.

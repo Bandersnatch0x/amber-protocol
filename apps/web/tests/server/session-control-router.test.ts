@@ -62,9 +62,13 @@ const createRunnerControlRequest = runnerAck.createRunnerControlRequest as Retur
 const waitForRunnerAck = runnerAck.waitForRunnerAck as ReturnType<typeof vi.fn>;
 
 function mockSessionWithStatus(status: string): void {
-  readSessionById.mockReturnValue({ id: 'session-1', goal: 'test', status });
+  readSessionById.mockReturnValue({
+    id: '11111111-1111-4111-8111-111111111111',
+    goal: 'test',
+    status,
+  });
   persistSessionStatus.mockImplementation(async (_sessionId: string, nextStatus: string) => ({
-    id: 'session-1',
+    id: '11111111-1111-4111-8111-111111111111',
     goal: 'test',
     status: nextStatus,
   }));
@@ -90,69 +94,92 @@ describe('sessionControlRouter', () => {
     it('emits session_started and returns executing when transitioning from idle (via routed)', async () => {
       mockSessionWithStatus('idle');
 
-      const result = await caller.start({ sessionId: 'session-1' });
+      const result = await caller.start({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
       // idle→created pre-normalization then created→routed→executing (CLI SSOT)
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'routed');
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'executing');
-      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
-        type: 'route_selected',
-        data: {
-          sessionId: 'session-1',
-          fromState: 'created',
-          toState: 'routed',
-          source: 'web-control',
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'routed',
+      );
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'executing',
+      );
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          type: 'route_selected',
+          data: {
+            sessionId: '11111111-1111-4111-8111-111111111111',
+            fromState: 'created',
+            toState: 'routed',
+            source: 'web-control',
+          },
         },
-      });
-      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
-        type: 'session_started',
-        data: { sessionId: 'session-1', source: 'web-control' },
-      });
-      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
-        schemaVersion: 2,
-        kind: 'session_started',
-        sessionId: 'session-1',
-        source: 'web-control',
-        status: 'executing',
-      });
-      expect(sessionEvents.emitSessionStarted).toHaveBeenCalledWith('session-1');
+      );
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          type: 'session_started',
+          data: { sessionId: '11111111-1111-4111-8111-111111111111', source: 'web-control' },
+        },
+      );
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          schemaVersion: 2,
+          kind: 'session_started',
+          sessionId: '11111111-1111-4111-8111-111111111111',
+          source: 'web-control',
+          status: 'executing',
+        },
+      );
+      expect(sessionEvents.emitSessionStarted).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+      );
       expect(result.status).toBe('executing');
       expect(result.confirmed).toBe(true);
       expect(createRunnerControlRequest).toHaveBeenCalledWith({
-        sessionId: 'session-1',
+        sessionId: '11111111-1111-4111-8111-111111111111',
         action: 'start',
         requestedStatus: 'executing',
       });
       expect(waitForRunnerAck).toHaveBeenCalledWith({
-        sessionId: 'session-1',
+        sessionId: '11111111-1111-4111-8111-111111111111',
         action: 'start',
         requestedStatus: 'executing',
         requestId: 'start-request-1',
       });
-      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
-        type: 'runner_ack',
-        data: {
-          sessionId: 'session-1',
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          type: 'runner_ack',
+          data: {
+            sessionId: '11111111-1111-4111-8111-111111111111',
+            requestId: 'start-request-1',
+            action: 'start',
+            requestedStatus: 'executing',
+            runnerStatus: 'acked',
+            source: 'test-runner',
+            message: 'runner accepted',
+          },
+        },
+      );
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          schemaVersion: 2,
+          kind: 'runner_ack',
+          sessionId: '11111111-1111-4111-8111-111111111111',
           requestId: 'start-request-1',
           action: 'start',
           requestedStatus: 'executing',
           runnerStatus: 'acked',
           source: 'test-runner',
+          status: 'executing',
           message: 'runner accepted',
         },
-      });
-      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
-        schemaVersion: 2,
-        kind: 'runner_ack',
-        sessionId: 'session-1',
-        requestId: 'start-request-1',
-        action: 'start',
-        requestedStatus: 'executing',
-        runnerStatus: 'acked',
-        source: 'test-runner',
-        status: 'executing',
-        message: 'runner accepted',
-      });
+      );
       expect(result.runnerAck).toMatchObject({
         status: 'acked',
         requestId: 'start-request-1',
@@ -164,22 +191,25 @@ describe('sessionControlRouter', () => {
     it('from created routes through routed before executing (no direct created→executing)', async () => {
       mockSessionWithStatus('created');
 
-      const result = await caller.start({ sessionId: 'session-1' });
+      const result = await caller.start({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
       const persistCalls = persistSessionStatus.mock.calls.map(([, status]) => status);
       expect(persistCalls).toEqual(['routed', 'executing']);
-      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
-        type: 'route_selected',
-        data: {
-          sessionId: 'session-1',
-          fromState: 'created',
-          toState: 'routed',
-          source: 'web-control',
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          type: 'route_selected',
+          data: {
+            sessionId: '11111111-1111-4111-8111-111111111111',
+            fromState: 'created',
+            toState: 'routed',
+            source: 'web-control',
+          },
         },
-      });
+      );
       // Runner handshake only targets executing after routed is persisted
       expect(createRunnerControlRequest).toHaveBeenCalledWith({
-        sessionId: 'session-1',
+        sessionId: '11111111-1111-4111-8111-111111111111',
         action: 'start',
         requestedStatus: 'executing',
       });
@@ -192,12 +222,18 @@ describe('sessionControlRouter', () => {
     it('from routed goes directly to executing without an intermediate route step', async () => {
       mockSessionWithStatus('routed');
 
-      const result = await caller.start({ sessionId: 'session-1' });
+      const result = await caller.start({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'executing');
-      expect(persistSessionStatus).not.toHaveBeenCalledWith('session-1', 'routed');
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'executing',
+      );
+      expect(persistSessionStatus).not.toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'routed',
+      );
       expect(appendSessionTimelineEvent).not.toHaveBeenCalledWith(
-        'session-1',
+        '11111111-1111-4111-8111-111111111111',
         expect.objectContaining({ type: 'route_selected' }),
       );
       expect(result.status).toBe('executing');
@@ -206,15 +242,18 @@ describe('sessionControlRouter', () => {
     it('generates its own request id instead of accepting a caller-supplied id', async () => {
       mockSessionWithStatus('routed');
 
-      await caller.start({ sessionId: 'session-1', requestId: 'replay-request' } as never);
+      await caller.start({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        requestId: 'replay-request',
+      } as never);
 
       expect(createRunnerControlRequest).toHaveBeenCalledWith({
-        sessionId: 'session-1',
+        sessionId: '11111111-1111-4111-8111-111111111111',
         action: 'start',
         requestedStatus: 'executing',
       });
       expect(waitForRunnerAck).toHaveBeenCalledWith({
-        sessionId: 'session-1',
+        sessionId: '11111111-1111-4111-8111-111111111111',
         action: 'start',
         requestedStatus: 'executing',
         requestId: 'start-request-1',
@@ -224,9 +263,12 @@ describe('sessionControlRouter', () => {
     it('normalizes legacy running to executing when starting', async () => {
       mockSessionWithStatus('running');
 
-      const result = await caller.start({ sessionId: 'session-1' });
+      const result = await caller.start({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'executing');
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'executing',
+      );
       expect(result.status).toBe('executing');
       expect(sessionEvents.emitSessionStarted).not.toHaveBeenCalled();
     });
@@ -241,20 +283,23 @@ describe('sessionControlRouter', () => {
         receivedAt: '2026-07-08T00:00:00.000Z',
       }));
 
-      const result = await caller.start({ sessionId: 'session-1' });
+      const result = await caller.start({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
-      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
-        type: 'runner_timeout',
-        data: {
-          sessionId: 'session-1',
-          requestId: 'start-request-1',
-          action: 'start',
-          requestedStatus: 'executing',
-          runnerStatus: 'timeout',
-          source: 'runner-ack-timeout',
-          message: 'No runner ACK observed before timeout.',
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          type: 'runner_timeout',
+          data: {
+            sessionId: '11111111-1111-4111-8111-111111111111',
+            requestId: 'start-request-1',
+            action: 'start',
+            requestedStatus: 'executing',
+            runnerStatus: 'timeout',
+            source: 'runner-ack-timeout',
+            message: 'No runner ACK observed before timeout.',
+          },
         },
-      });
+      );
       expect(result.runnerAck).toMatchObject({
         status: 'timeout',
         requestId: 'start-request-1',
@@ -270,7 +315,9 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('routed');
       appendSessionTimelineEvent.mockRejectedValueOnce(new Error('timeline locked'));
 
-      await expect(caller.start({ sessionId: 'session-1' })).rejects.toThrow('timeline locked');
+      await expect(
+        caller.start({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('timeline locked');
 
       expect(waitForRunnerAck).not.toHaveBeenCalled();
       expect(persistSessionStatus).not.toHaveBeenCalled();
@@ -280,32 +327,34 @@ describe('sessionControlRouter', () => {
     it('rejects illegal transition from completed', async () => {
       mockSessionWithStatus('completed');
 
-      await expect(caller.start({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot start from status: completed',
-      );
+      await expect(
+        caller.start({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot start from status: completed');
       expect(sessionEvents.emitSessionStarted).not.toHaveBeenCalled();
     });
 
     it('rejects illegal transition from aborted', async () => {
       mockSessionWithStatus('aborted');
 
-      await expect(caller.start({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot start from status: aborted',
-      );
+      await expect(
+        caller.start({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot start from status: aborted');
     });
 
     it('rejects illegal transition from paused', async () => {
       mockSessionWithStatus('paused');
 
-      await expect(caller.start({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot start from status: paused',
-      );
+      await expect(
+        caller.start({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot start from status: paused');
     });
 
     it('throws Session not found when session does not exist', async () => {
       readSessionById.mockReturnValue(null);
 
-      await expect(caller.start({ sessionId: 'missing' })).rejects.toThrow('Session not found');
+      await expect(
+        caller.start({ sessionId: '22222222-2222-4222-8222-222222222222' }),
+      ).rejects.toThrow('Session not found');
       expect(sessionEvents.emitSessionStarted).not.toHaveBeenCalled();
     });
   });
@@ -314,21 +363,32 @@ describe('sessionControlRouter', () => {
     it('emits session_paused and returns paused when transitioning from running', async () => {
       mockSessionWithStatus('running');
 
-      const result = await caller.pause({ sessionId: 'session-1' });
+      const result = await caller.pause({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'paused');
-      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
-        type: 'session_paused',
-        data: { sessionId: 'session-1', source: 'web-control' },
-      });
-      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
-        schemaVersion: 2,
-        kind: 'session_paused',
-        sessionId: 'session-1',
-        source: 'web-control',
-        status: 'paused',
-      });
-      expect(sessionEvents.emitSessionPaused).toHaveBeenCalledWith('session-1');
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'paused',
+      );
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          type: 'session_paused',
+          data: { sessionId: '11111111-1111-4111-8111-111111111111', source: 'web-control' },
+        },
+      );
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          schemaVersion: 2,
+          kind: 'session_paused',
+          sessionId: '11111111-1111-4111-8111-111111111111',
+          source: 'web-control',
+          status: 'paused',
+        },
+      );
+      expect(sessionEvents.emitSessionPaused).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+      );
       expect(result.status).toBe('paused');
       expect(result.confirmed).toBe(true);
       expect(result.runnerAck).toMatchObject({
@@ -341,7 +401,7 @@ describe('sessionControlRouter', () => {
     it('is idempotent: returns paused without emitting when already paused', async () => {
       mockSessionWithStatus('paused');
 
-      const result = await caller.pause({ sessionId: 'session-1' });
+      const result = await caller.pause({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
       expect(result.status).toBe('paused');
       expect(sessionEvents.emitSessionPaused).not.toHaveBeenCalled();
@@ -350,23 +410,25 @@ describe('sessionControlRouter', () => {
     it('rejects illegal transition from idle', async () => {
       mockSessionWithStatus('idle');
 
-      await expect(caller.pause({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot pause from status: idle',
-      );
+      await expect(
+        caller.pause({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot pause from status: idle');
     });
 
     it('rejects illegal transition from completed', async () => {
       mockSessionWithStatus('completed');
 
-      await expect(caller.pause({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot pause from status: completed',
-      );
+      await expect(
+        caller.pause({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot pause from status: completed');
     });
 
     it('throws Session not found when session does not exist', async () => {
       readSessionById.mockReturnValue(null);
 
-      await expect(caller.pause({ sessionId: 'missing' })).rejects.toThrow('Session not found');
+      await expect(
+        caller.pause({ sessionId: '22222222-2222-4222-8222-222222222222' }),
+      ).rejects.toThrow('Session not found');
     });
   });
 
@@ -374,21 +436,32 @@ describe('sessionControlRouter', () => {
     it('persists, confirms, emits session_resumed, and returns executing from paused', async () => {
       mockSessionWithStatus('paused');
 
-      const result = await caller.resume({ sessionId: 'session-1' });
+      const result = await caller.resume({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'executing');
-      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
-        type: 'session_resumed',
-        data: { sessionId: 'session-1', source: 'web-control' },
-      });
-      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
-        schemaVersion: 2,
-        kind: 'session_resumed',
-        sessionId: 'session-1',
-        source: 'web-control',
-        status: 'executing',
-      });
-      expect(sessionEvents.emitSessionResumed).toHaveBeenCalledWith('session-1');
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'executing',
+      );
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          type: 'session_resumed',
+          data: { sessionId: '11111111-1111-4111-8111-111111111111', source: 'web-control' },
+        },
+      );
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          schemaVersion: 2,
+          kind: 'session_resumed',
+          sessionId: '11111111-1111-4111-8111-111111111111',
+          source: 'web-control',
+          status: 'executing',
+        },
+      );
+      expect(sessionEvents.emitSessionResumed).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+      );
       expect(result.status).toBe('executing');
       expect(result.confirmed).toBe(true);
       expect(result.runnerAck).toMatchObject({
@@ -408,7 +481,7 @@ describe('sessionControlRouter', () => {
         receivedAt: '2026-07-08T00:00:00.000Z',
       }));
 
-      const result = await caller.resume({ sessionId: 'session-1' });
+      const result = await caller.resume({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
       expect(persistSessionStatus).not.toHaveBeenCalled();
       expect(sessionEvents.emitSessionResumed).not.toHaveBeenCalled();
@@ -428,25 +501,34 @@ describe('sessionControlRouter', () => {
           runnerAckStatus: 'rejected',
         },
       });
-      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
-        type: 'runner_rejected',
-        data: {
-          sessionId: 'session-1',
-          requestId: 'resume-request-1',
-          action: 'resume',
-          requestedStatus: 'executing',
-          runnerStatus: 'rejected',
-          source: 'test-runner',
-          message: 'runner refused resume',
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          type: 'runner_rejected',
+          data: {
+            sessionId: '11111111-1111-4111-8111-111111111111',
+            requestId: 'resume-request-1',
+            action: 'resume',
+            requestedStatus: 'executing',
+            runnerStatus: 'rejected',
+            source: 'test-runner',
+            message: 'runner refused resume',
+          },
         },
-      });
+      );
     });
 
     it('rejects resume when persisted status cannot be confirmed', async () => {
       mockSessionWithStatus('paused');
-      persistSessionStatus.mockResolvedValue({ id: 'session-1', goal: 'test', status: 'paused' });
+      persistSessionStatus.mockResolvedValue({
+        id: '11111111-1111-4111-8111-111111111111',
+        goal: 'test',
+        status: 'paused',
+      });
 
-      await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
+      await expect(
+        caller.resume({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow(
         'Session status persistence was not confirmed: expected executing, got paused',
       );
       expect(sessionEvents.emitSessionResumed).not.toHaveBeenCalled();
@@ -455,9 +537,12 @@ describe('sessionControlRouter', () => {
     it('normalizes legacy running to executing without emitting when resuming', async () => {
       mockSessionWithStatus('running');
 
-      const result = await caller.resume({ sessionId: 'session-1' });
+      const result = await caller.resume({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'executing');
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'executing',
+      );
       expect(result.status).toBe('executing');
       expect(sessionEvents.emitSessionResumed).not.toHaveBeenCalled();
     });
@@ -465,33 +550,33 @@ describe('sessionControlRouter', () => {
     it('rejects illegal transition from aborted', async () => {
       mockSessionWithStatus('aborted');
 
-      await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot resume from status: aborted',
-      );
+      await expect(
+        caller.resume({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot resume from status: aborted');
     });
 
     it('rejects illegal transition from completed', async () => {
       mockSessionWithStatus('completed');
 
-      await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot resume from status: completed',
-      );
+      await expect(
+        caller.resume({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot resume from status: completed');
     });
 
     it('rejects illegal transition from idle', async () => {
       mockSessionWithStatus('idle');
 
-      await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot resume from status: idle',
-      );
+      await expect(
+        caller.resume({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot resume from status: idle');
     });
 
     it('rejects resume from routed (start owns routed→executing; resume is pause-only)', async () => {
       mockSessionWithStatus('routed');
 
-      await expect(caller.resume({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot resume from status: routed',
-      );
+      await expect(
+        caller.resume({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot resume from status: routed');
       expect(persistSessionStatus).not.toHaveBeenCalled();
       expect(sessionEvents.emitSessionResumed).not.toHaveBeenCalled();
     });
@@ -499,7 +584,9 @@ describe('sessionControlRouter', () => {
     it('throws Session not found when session does not exist', async () => {
       readSessionById.mockReturnValue(null);
 
-      await expect(caller.resume({ sessionId: 'missing' })).rejects.toThrow('Session not found');
+      await expect(
+        caller.resume({ sessionId: '22222222-2222-4222-8222-222222222222' }),
+      ).rejects.toThrow('Session not found');
     });
   });
 
@@ -507,22 +594,41 @@ describe('sessionControlRouter', () => {
     it('emits session_aborted and returns aborted when transitioning from running', async () => {
       mockSessionWithStatus('running');
 
-      const result = await caller.abort({ sessionId: 'session-1', reason: 'manual' });
-
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'aborted');
-      expect(appendSessionTimelineEvent).toHaveBeenCalledWith('session-1', {
-        type: 'session_aborted',
-        data: { sessionId: 'session-1', source: 'web-control', reason: 'manual' },
-      });
-      expect(appendSessionLedgerRecord).toHaveBeenCalledWith('session-1', {
-        schemaVersion: 2,
-        kind: 'session_aborted',
-        sessionId: 'session-1',
-        source: 'web-control',
-        status: 'aborted',
+      const result = await caller.abort({
+        sessionId: '11111111-1111-4111-8111-111111111111',
         reason: 'manual',
       });
-      expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith('session-1', 'manual');
+
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'aborted',
+      );
+      expect(appendSessionTimelineEvent).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          type: 'session_aborted',
+          data: {
+            sessionId: '11111111-1111-4111-8111-111111111111',
+            source: 'web-control',
+            reason: 'manual',
+          },
+        },
+      );
+      expect(appendSessionLedgerRecord).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          schemaVersion: 2,
+          kind: 'session_aborted',
+          sessionId: '11111111-1111-4111-8111-111111111111',
+          source: 'web-control',
+          status: 'aborted',
+          reason: 'manual',
+        },
+      );
+      expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'manual',
+      );
       expect(result.status).toBe('aborted');
       expect(result.confirmed).toBe(true);
       expect(result.runnerAck).toMatchObject({
@@ -536,9 +642,15 @@ describe('sessionControlRouter', () => {
       mockSessionWithStatus('running');
       appendSessionLedgerRecord.mockRejectedValue(new Error('ledger locked'));
 
-      const result = await caller.abort({ sessionId: 'session-1', reason: 'manual' });
+      const result = await caller.abort({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        reason: 'manual',
+      });
 
-      expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith('session-1', 'manual');
+      expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'manual',
+      );
       expect(result).toMatchObject({
         status: 'aborted',
         persisted: true,
@@ -550,17 +662,23 @@ describe('sessionControlRouter', () => {
     it('emits session_aborted when transitioning from paused', async () => {
       mockSessionWithStatus('paused');
 
-      const result = await caller.abort({ sessionId: 'session-1' });
+      const result = await caller.abort({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'aborted');
-      expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith('session-1', undefined);
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'aborted',
+      );
+      expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        undefined,
+      );
       expect(result.status).toBe('aborted');
     });
 
     it('is idempotent: returns aborted without emitting when already aborted', async () => {
       mockSessionWithStatus('aborted');
 
-      const result = await caller.abort({ sessionId: 'session-1' });
+      const result = await caller.abort({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
       expect(result.status).toBe('aborted');
       expect(sessionEvents.emitSessionAborted).not.toHaveBeenCalled();
@@ -569,25 +687,33 @@ describe('sessionControlRouter', () => {
     it('allows abort from idle via created→aborted (CLI SSOT after idle→created normalize)', async () => {
       mockSessionWithStatus('idle');
 
-      const result = await caller.abort({ sessionId: 'session-1' });
+      const result = await caller.abort({ sessionId: '11111111-1111-4111-8111-111111111111' });
 
-      expect(persistSessionStatus).toHaveBeenCalledWith('session-1', 'aborted');
-      expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith('session-1', undefined);
+      expect(persistSessionStatus).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        'aborted',
+      );
+      expect(sessionEvents.emitSessionAborted).toHaveBeenCalledWith(
+        '11111111-1111-4111-8111-111111111111',
+        undefined,
+      );
       expect(result.status).toBe('aborted');
     });
 
     it('rejects illegal transition from completed', async () => {
       mockSessionWithStatus('completed');
 
-      await expect(caller.abort({ sessionId: 'session-1' })).rejects.toThrow(
-        'Cannot abort from status: completed',
-      );
+      await expect(
+        caller.abort({ sessionId: '11111111-1111-4111-8111-111111111111' }),
+      ).rejects.toThrow('Cannot abort from status: completed');
     });
 
     it('throws Session not found when session does not exist', async () => {
       readSessionById.mockReturnValue(null);
 
-      await expect(caller.abort({ sessionId: 'missing' })).rejects.toThrow('Session not found');
+      await expect(
+        caller.abort({ sessionId: '22222222-2222-4222-8222-222222222222' }),
+      ).rejects.toThrow('Session not found');
     });
   });
 });

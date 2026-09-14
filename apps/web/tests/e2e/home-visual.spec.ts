@@ -3,12 +3,14 @@ import { capture } from './lib/artifacts';
 
 async function openStableHome(page: Page): Promise<void> {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1, name: 'Operator Console' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Trusted Continuation' })).toBeVisible();
   await expect(page.getByText('E2E fixture session', { exact: true }).first()).toBeVisible();
 }
 
-test.describe('Operator Console visual contracts', () => {
-  test('desktop keeps the product shell and the data-first first screen', async ({ page }) => {
+test.describe('Trusted Continuation Console visual contracts', () => {
+  test('desktop keeps the product shell and the journey-first decision surface', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.emulateMedia({ colorScheme: 'light' });
     await openStableHome(page);
@@ -21,12 +23,24 @@ test.describe('Operator Console visual contracts', () => {
     // so it must not consume first-screen space (data-first principle).
     await expect(page.locator('.amber-field')).toHaveCount(0);
 
-    // First screen keeps exactly five operational blocks: overview,
-    // next action, active sessions, pending gates, and entries.
-    await expect(page.getByText('Next Amber Action')).toBeVisible();
+    // The first decision surface names the common journey before exposing
+    // implementation-specific sessions, gates, and supporting views.
+    await expect(page.getByRole('heading', { name: 'Core Journey' })).toBeVisible();
+    const currentJourney = page.locator('[aria-current="step"]');
+    await expect(currentJourney).toContainText('J1');
+    await expect(currentJourney).toContainText('Adopt safely');
+    await expect(page.getByText('Continue Safely from Here')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Active Sessions' }).first()).toBeVisible();
+    await expect(page.getByTestId('repository-name')).toHaveText(/amber-web-e2e-/);
+    await expect(page.getByRole('heading', { name: 'Recent session outcomes' })).toBeVisible();
+    await expect(page.getByText('Completed', { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Pending Gates' }).first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Primary Workflows' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Continue the Journey' })).toBeVisible();
+
+    await expect(page.locator('a').filter({ hasText: 'AGENTS.md' })).toHaveAttribute(
+      'href',
+      '/governance',
+    );
 
     await capture(page, 'operator-console-desktop-light.png');
   });
@@ -45,6 +59,130 @@ test.describe('Operator Console visual contracts', () => {
     expect(viewportMetrics.scrollWidth).toBeLessThanOrEqual(viewportMetrics.clientWidth + 1);
 
     await capture(page, 'operator-console-mobile-light.png');
+  });
+
+  test('query failures keep the journey neutral and expose retry actions', async ({ page }) => {
+    await page.route('**/api/trpc/**', async (route) => {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+    });
+
+    await page.goto('/');
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Trusted Continuation' }),
+    ).toBeVisible();
+    await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
+    await expect(page.getByText('Current: Unavailable')).toBeVisible();
+
+    await expect(page.getByText('Next action unavailable')).toBeVisible();
+    await expect(page.getByText('Failed to load sessions')).toBeVisible();
+    await expect(page.getByText('Failed to load gates')).toBeVisible();
+    const retryButtons = page.getByRole('button', { name: 'Retry' });
+    await expect(retryButtons).toHaveCount(3);
+    await retryButtons.first().click();
+    await expect(page.getByText('Next action unavailable')).toBeVisible();
+
+    await capture(page, 'operator-console-query-failure.png');
+  });
+
+  test('loading state keeps the decision surface explicit while reads are pending', async ({
+    page,
+  }) => {
+    await page.route('**/api/trpc/**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      await route.continue();
+    });
+
+    await page.goto('/');
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Trusted Continuation' }),
+    ).toBeVisible();
+    await expect(page.locator('[aria-busy="true"]')).toHaveCount(3);
+    await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
+  });
+
+  test('empty reads show explicit empty states without inventing delivery progress', async ({
+    page,
+  }) => {
+    await page.route('**/api/trpc/**', async (route) => {
+      const url = route.request().url();
+      if (url.includes('/session.list,gate.list,lifecycle.next?')) {
+        const response = await route.fetch();
+        const payload = JSON.parse(await response.text());
+        if (Array.isArray(payload)) {
+          // Preserve the live lifecycle answer (so Journey remains J1 in the
+          // fixture) while replacing only the two collection reads with empty
+          // successful results.
+          payload[0] = { result: { data: { json: [] } } };
+          payload[1] = { result: { data: { json: [] } } };
+        }
+        await route.fulfill({
+          response,
+          body: JSON.stringify(payload),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto('/');
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Trusted Continuation' }),
+    ).toBeVisible();
+    await expect(page.getByRole('status')).toHaveCount(2);
+    await expect(page.getByRole('status').first()).toHaveText('No action required');
+    await expect(page.getByRole('status').last()).toHaveText('No action required');
+    await expect(page.locator('[aria-current="step"]')).toContainText('J1');
+    await expect(page.locator('[aria-current="step"]')).not.toContainText('Deliver');
+  });
+
+  test('all empty reads leave the current journey unavailable', async ({ page }) => {
+    await page.route('**/api/trpc/**', async (route) => {
+      const url = route.request().url();
+      if (url.includes('/session.list,gate.list,lifecycle.next?')) {
+        const response = await route.fetch();
+        const payload = JSON.parse(await response.text());
+        if (Array.isArray(payload)) {
+          payload[0] = { result: { data: { json: [] } } };
+          payload[1] = { result: { data: { json: [] } } };
+          payload[2] = {
+            result: {
+              data: {
+                json: {
+                  focus: { type: 'repository', id: null, autoSelected: false, othersPending: 0 },
+                  nextStep: null,
+                  lifecycle: [],
+                },
+              },
+            },
+          };
+        }
+        await route.fulfill({ response, body: JSON.stringify(payload) });
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto('/');
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Trusted Continuation' }),
+    ).toBeVisible();
+    await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
+    await expect(page.getByText('Current: Unavailable')).toBeVisible();
+    await expect(page.getByText('No action required').first()).toBeVisible();
+  });
+
+  test('Chinese locale keeps the same journey and authority boundary', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openStableHome(page);
+
+    await page.getByRole('button', { name: 'Switch language' }).click();
+
+    await expect(page.getByRole('heading', { level: 1, name: '可信续接控制台' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '核心用户旅程' })).toBeVisible();
+    await expect(page.locator('[aria-current="step"]')).toContainText('安全接入');
+    await expect(page.getByText('Agent 与 CLI 仍是受治理工作的权威入口。')).toBeVisible();
+
+    await capture(page, 'operator-console-desktop-zh.png');
   });
 
   test('dark mode applies the graphite surface palette', async ({ page }) => {
@@ -79,7 +217,7 @@ test.describe('Operator Console visual contracts', () => {
         };
       });
     // Anchors are the rendered sRGB channels of the Obsidian & Amber Pulse
-    // v10 tokens (.stitch/DESIGN.md): page = obsidian-void #080B10, card =
+    // v10 tokens (.design-tool/DESIGN.md): page = obsidian-void #080B10, card =
     // obsidian-surface #0F141C. Color-function round-trips can wobble one
     // rounding step, hence the ±1 tolerance.
     const expected: Record<'page' | 'card', number[]> = {

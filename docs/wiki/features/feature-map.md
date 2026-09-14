@@ -1,219 +1,120 @@
 # Feature Map
 
-> 状态来源：`feature_list.json`（所有 F-number）。成熟度按 accepted/in_progress/not_started 标注。
-> 最后更新：2026-09-02
+> 产品组合来源：`feature_list.json`。该文件是功能状态与证据的唯一权威；本页只定义用户价值、表面层级与旅程映射，不复制易过期的状态计数。
+> 最后更新：2026-09-04
 
----
+Amber 面向 **Coding-Agent-Enabled Repository**：维护者已经在真实交付中持续使用至少一个 Coding Agent，并需要让工作在换人、换 agent 或换会话后仍可审查、可证明、可继续。
 
-## 能力域一览
+核心结果不是“安装完成”或“生成了更多治理文件”，而是 **Trusted Continuation**：另一个人或 agent 在不读取旧聊天的情况下，仅凭仓库内 Amber 状态判断现状，并正确执行下一步。
 
-| # | 能力域 | 一句话价值 | 典型命令 | 成熟度 |
-|---|--------|-----------|---------|--------|
-| 1 | 脚手架安装 | 把治理文件放进你的 repo，一步完成，幂等安全 | `amber init` | ✅ 稳定 |
-| 2 | 健康检查 | 随时验证 Amber setup 是否一致可用 | `amber doctor` | ✅ 稳定 |
-| 3 | 交接与延续 | 任何人或 agent 都能从文件读懂当前状态并继续 | `amber handoff bundle` | ✅ 稳定 |
-| 4 | 计划与审批门控 | 让功能计划在实现前可见、可审、可追溯 | `amber plan` · `amber gate` | ✅ 稳定 |
-| 5 | 会话与路由 | 给每段工作分配路线、追踪阶段、支持断点续跑 | `amber session start/status/continue` | ✅ 稳定 |
-| 6 | 治理报告与审计 | 看清 AI coding 工作流的健康度与下一步安全动作 | `amber governance report` · `amber next` | ✅ 稳定 |
-| 7 | 受治理执行 | 在四道门后运行一次性命令，留下可验证的账本 | `amber loop run --execute` | ✅ 稳定（人工触发） |
-| 8 | 知识与上下文 | 把会话产出蒸馏为带溯源的知识页，供后续 agent 读取 | `amber context request` · `amber knowledge graph` | ✅ 稳定 |
-| 9 | 团队与工作流包 | 跨 repo 分发路由、规则包、团队预设，版本可回滚 | `amber team install` · `amber pack inspect` | ✅ 稳定 |
-| 10 | Web 可视化 | 浏览器里查看会话时间线、门控状态和知识图谱 | `cd apps/web && npm run dev` | ✅ 稳定 |
-| 11 | 安全与隐私治理 | 依存扫描、密钥检测、权限审查，作为声明式工作流包 | `amber security audit` | ✅ 稳定 |
-| 12 | 高级信任基础设施 | Principal、Decision、Evidence、Gate 的不可变账本 | （内部基础层，F049-F062） | ✅ 稳定（基础层） |
+## 编排模型
 
----
+功能表面按四层组织，而不是按命令或实现目录平铺：
 
-## 能力域详情
+1. **用户结果**：是否实现 Trusted Continuation。
+2. **用户旅程**：用户从什么触发情境进入、在何处得到结果。
+3. **能力带**：哪些能力前台可见、后台支撑、按需触发或保持冻结。
+4. **Feature 映射**：F-number 只承担实现追踪，不直接成为用户导航。
 
-### 1. 脚手架安装
+## Surface Tier
 
-给目标 repo 安装 Amber starter 文件，已有文件跳过，重跑幂等。
+| Tier | 含义 | 默认可见性 |
+| --- | --- | --- |
+| Core-visible | 用户完成 J0–J5 必须直接理解或操作的表面 | 默认文档和 Agent 入口可见 |
+| Core-hidden | 保证边界、证据和失败关闭语义的内部能力 | 由上层旅程调用，不作为新手入口 |
+| Conditional | 只有在上下文不足、重复摩擦或团队扩展时才出现 | 满足触发条件后显示 |
+| Expert | 涉及执行、发布、外部副作用或高保证治理 | 专家文档；显式审批后使用 |
+| Optional | 不改变权威状态的辅助观察表面 | 可安装、可关闭 |
+| Maintenance | 兼容、迁移、工具链或已完成修复 | 不进入产品导航 |
 
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F001 | Amber scaffold install (init) | accepted |
+## 八条能力带
 
-典型命令：`amber init --target path/to/repo`
-产出：`AGENTS.md` · `CLAUDE.md` · `feature_list.json` · `docs/wiki/` 骨架
+每个已登记 Feature 恰好归入一条能力带。Feature 的当前状态和验收证据仍从 `feature_list.json` 读取。
 
----
+| 能力带 | 用户结果 | Feature 映射 | Surface Tier | 产品取舍 |
+| --- | --- | --- | --- | --- |
+| A. 资格判断与安全接入 | 判断项目是否适配，并在不覆盖用户文件的前提下建立最小 Amber 表面 | F001, F002, F019, F063 | Core-visible | 继续投入；缩短首次理解时间 |
+| B. 可信续接与交付生命周期 | 把目标、计划、阶段、审批和交接串成可恢复的交付状态 | F003, F004, F006, F016, F026, F027, F032, F049, F062 | Core-visible | 主要价值楔子；优先用实地试点验证 |
+| C. 治理与保证内核 | 让身份、证据、决策、策略、账本和错误语义可核验且失败关闭 | F005, F012, F018, F036, F037, F038, F039, F042, F050, F058, F061 | Core-hidden | 稳定维护；不扩大默认表面 |
+| D. 上下文、知识与持续改进 | 在证据不足或摩擦重复时，修复上下文并沉淀可复用知识 | F017, F022, F023, F025, F028, F030, F033, F034, F054, F059, F060 | Conditional | 由实际缺口触发，不作为首次接入要求 |
+| E. 受控执行与发布 | 在明确边界内执行、发布、部署或回滚，并留下独立证据 | F007, F051, F052, F053 | Expert | 冻结扩张；只修复已证实缺陷 |
+| F. 组织级、外部与高风险动作 | 管理跨仓同步、保留删除、外部副作用和紧急授权 | F035, F040, F041, F055, F056, F057 | Expert | 等待两个独立团队的同类需求再解锁 |
+| G. Web Viewer 与改进建议 | 用只读视图帮助维护者判断现状、下一步和审查压力 | F008, F045, F046, F047, F064 | Optional | Web 保持观察表面；F064 仅服务 J7 实验 |
+| H. 兼容与工程维护 | 保持旧状态、发布、文档和 Web 工具链可用 | F009, F010, F011, F015, F020, F021, F024, F029, F031, F043, F044, F048 | Maintenance | 只做维护，不形成新产品叙事 |
 
-### 2. 健康检查
+## 核心用户旅程
 
-报告 Amber setup 是否完整、schema 是否有效、wiki 链接是否可达。
+默认产品只展示六条核心旅程。J0–J2 是首次采用路径，J3–J5 是重复价值路径。
 
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F002 | Doctor validation | accepted |
-| F012 | Pre-push hook rejects pi-rewind refs | accepted |
-| F031 | Keep skill frontmatter commands in lockstep | accepted |
+| Journey | 用户要完成的工作 | 主要能力带 | 结果证据 |
+| --- | --- | --- | --- |
+| J0 资格判断 | 确认这个既有项目是否值得接入 Amber | A，C 隐式支撑 | 只读审计结果与明确的采用/不采用理由 |
+| J1 安全接入 | 建立最小治理表面且不覆盖已有文件 | A，C 隐式支撑 | `doctor` 可复验的 setup |
+| J2 首次可信续接 | 让一个新上下文正确继续一次真实工作 | A，B，C 隐式支撑 | 新上下文不读旧聊天仍完成正确下一步 |
+| J3 日常治理交付 | 用统一前台完成 feature、bugfix 或 refactor | B，C 隐式支撑 | 计划、执行证据与可恢复 checkpoint |
+| J4 失败与中断恢复 | 在失败、暂停或上下文耗尽后恢复工作 | B，C；必要时 D | 失败被保留在正确阶段，恢复动作明确 |
+| J5 审查与验收 | 让 reviewer 基于证据做 go/no-go 决定 | B，C | 审批、审查、验收与交接记录可追溯 |
 
-典型命令：`amber doctor --target .`
-产出：pass/fail 报告，含具体修复建议
+统一前台语法是：
 
----
+```text
+Frame → Authorize → Work → Prove → Review → Handoff / Accept
+```
 
-### 3. 交接与延续
+`feature-standard`、`bugfix-quick`、`refactor-safe` 仍作为后台 Route 分型；它们不应迫使用户学习三套产品旅程。
 
-从当前 repo 状态生成可携带的交接包；验证是否可以安全移交。
+## 条件旅程与专家场景
 
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F006 | Handoff reports | accepted |
-| F026 | Finish-time dirty-path classification | accepted |
-| F027 | Role-scoped context manifests in plans | accepted |
-| F030 | Clarify learnings output | accepted |
-| F032 | Keep approval gates distinct from session completion | accepted |
+| Journey | 触发条件 | 主要能力带 | 默认策略 |
+| --- | --- | --- | --- |
+| J6 上下文修复 | Required Artifact 缺失、过期或来源不明 | B，D | 只修复已证明的上下文缺口 |
+| J7 学习与持续改进 | 同类摩擦跨至少两个会话重复出现 | D，G | 先形成可审建议，再由人决定是否晋级 |
+| J8 团队扩展 | 单仓试点已证明价值，且第二个团队提出同类需求 | A，B，C，D，F | 先复制边界和证据，不复制内部复杂度 |
+| J9 高保证治理 | 存在受控执行、外部副作用、删除或 break-glass 需要 | C，E，F | 专家场景；不进入默认漏斗 |
 
-典型命令：`amber handoff bundle --target .`
-产出：`session-handoff.md` 含 repo 状态、未提交变更分类、下一步动作
+## Journey × Capability Matrix
 
----
+`●` 表示用户直接感知，`○` 表示后台支撑，`△` 表示满足条件后出现。
 
-### 4. 计划与审批门控
+| Journey | A | B | C | D | E | F | G | H |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| J0 资格判断 | ● |  | ○ |  |  |  | △ | ○ |
+| J1 安全接入 | ● |  | ○ |  |  |  |  | ○ |
+| J2 首次可信续接 | ● | ● | ○ | △ |  |  | △ | ○ |
+| J3 日常治理交付 |  | ● | ○ | △ |  |  | △ | ○ |
+| J4 失败与中断恢复 |  | ● | ○ | △ |  |  | △ | ○ |
+| J5 审查与验收 |  | ● | ● |  |  |  | △ | ○ |
+| J6 上下文修复 |  | ● | ○ | ● |  |  | △ | ○ |
+| J7 学习与持续改进 |  |  | ○ | ● |  |  | △ | ○ |
+| J8 团队扩展 | ● | ● | ○ | ● |  | △ | △ | ○ |
+| J9 高保证治理 |  | △ | ● |  | ● | ● | △ | ○ |
 
-生成功能计划、垂直切片、验证步骤；在用户确认前阻止实现态。
+## 表面编排规则
 
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F005 | Governance report & approval gates | accepted |
-| F016 | Review blocker remediation | accepted |
-| F024 | Fix dogfood friction batch | accepted |
-| F025 | Break-loop post-mortem scaffold | accepted |
-| F028 | Durable owner routing for recurring friction | accepted |
-| F049 | Canonical Planning Artifacts | accepted |
+- **Agent host 是默认入口**：先表达目标，再由 Amber router 选择四个 canonical journey skill 之一。
+- **CLI 是可预测回退**：默认帮助只展示 `audit`、`init`、`doctor`、`next`、`plan`、`handoff`、`session` 七个动词。
+- **README 先展示 J0–J2**：用户应先理解适配、接入和首次可信续接，而不是高级治理对象。
+- **Web Viewer 是判断表面**：显示当前 Journey、下一步、会话、关卡和证据；不创建第二套工作流，也不成为权威写入面。
+- **高级能力按需解锁**：J8/J9 由 2×10 试点结果和至少两个独立团队的同类需求触发，不因 Feature 已实现而自动前置。
 
-典型命令：`amber plan --feature F042` → `amber gate --feature F042` → `amber review` → `amber accept`
-产出：`docs/plans/<date>-<slug>.md`，gates 通过前 implementation-ready 状态被阻断
+## 组合指标
 
----
+North Star：
 
-### 5. 会话与路由
+> 在不读取旧聊天记录的情况下，由另一个人或 agent 正确继续的真实工作比例。
 
-把目标（goal）和路由（route）绑在一起，以阶段为单位推进，支持断点续跑和多 session 并存。
+配套指标：
 
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F003 | Route engine | accepted |
-| F004 | Session lifecycle | accepted |
-| F032 | Keep approval gates distinct from session completion | accepted |
-| F062 | Route Stage Verbs & Named Governed Commands | accepted |
+- **Activation**：完成一次 J2 的项目比例，而不是执行过 `init` 的项目比例。
+- **Time to Trusted Continuation**：从 J0 开始到首次跨上下文正确续接所需时间。
+- **Recovery Success**：进入 J4 后，在不重建上下文的情况下恢复到正确阶段的比例。
+- **Review Confidence**：reviewer 无需追问旧聊天即可做出 go/no-go 决定的比例。
+- **Surface Load**：完成核心旅程前必须直接理解的概念与命令数量。
 
-典型命令：`amber session start --goal "..."` · `amber session status` · `amber next`
-产出：`.amber/sessions/<id>/` 下 manifest + timeline + checkpoint
+## 权威边界
 
----
-
-### 6. 治理报告与审计
-
-评分工作流健康度，给出结构化下一步；legacy .harness 状态透明可读。
-
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F005 | Governance report & approval gates | accepted |
-| F009 | Governance evidence reads resolve state dir | accepted |
-| F015 | Loop no-progress reporting | accepted |
-| F016 | Review blocker remediation | accepted |
-
-典型命令：`amber governance report --target .` · `amber adoption report --target .`
-产出：结构化 JSON/markdown 报告，含 readiness score 和行动清单
-
----
-
-### 7. 受治理执行
-
-在 policy + 单次 approval + git worktree 隔离 + 防篡改账本四道门后运行声明式命令。
-
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F007 | Governed loop execution (ADR-0003) | accepted |
-| F052 | Controlled Runner & Environment Boundaries | accepted |
-| F056 | Registered External Side Effects | accepted |
-| F057 | Break-glass Authorization | accepted |
-| F061 | Ledger Family Factory & Decision Primitives | accepted |
-| F062 | Route Stage Verbs & Named Governed Commands | accepted |
-
-典型命令：`amber loop approve --contract daily-amber-triage` → `amber loop run --execute`
-产出：执行账本条目 + 证据包，readyForLiveScheduling=false（需显式人工触发）
-
----
-
-### 8. 知识与上下文
-
-把会话证据蒸馏为带溯源的 Context Page；知识图谱映射 feature → code → ADR → wiki。
-
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F017 | Governed Context knowledge lifecycle | accepted |
-| F022 | Memory write-back pipeline | accepted |
-| F023 | Learning write-back triggers | accepted |
-| F028 | Durable owner routing for recurring friction | accepted |
-| F059 | Knowledge & Decision Map | accepted |
-| F060 | Knowledge Map v2 — code graph & interaction | accepted |
-
-典型命令：`amber context request --page <id>` · `amber knowledge graph --json`
-产出：`.amber/context/pages/` 下带块级溯源的 JSON 知识页；512 节点 / 1491 边知识图谱
-
----
-
-### 9. 团队与工作流包
-
-本地注册表管理工作流包、规则包、团队预设；版本可预览、可回滚。
-
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F018～F021 | Workflow assessment, profiles, standards, packs | accepted |
-| F033～F040 | Team distribution (V5): install/pin/update/rollback | accepted |
-
-典型命令：`amber team install --preset typescript` · `amber pack inspect feature-standard`
-产出：本地注册表元数据 + 兼容矩阵 + 差异预览（不自动覆盖用户定制）
-
----
-
-### 10. Web 可视化
-
-React + tRPC 查看器：实时会话时间线、路由定义、门控状态、知识图谱交互。
-
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F008 | Web viewer (Phase C) | accepted |
-| F041～F048 | Web toolchain upgrades (React 19, tRPC 11, Vite 8…) | accepted |
-| F059/F060 | Knowledge Map web surface | accepted |
-| F064 | Improvement Suggestions (web, multi-host) | in_progress |
-
-典型命令：`cd apps/web && npm run dev`（localhost:5173 + localhost:3001）
-产出：可视化 Session 生命周期 + 知识图谱交互界面
-
----
-
-### 11. 安全与隐私治理
-
-依存扫描、密钥检测、权限审查、数据保留——以声明式工作流包和 evidence receipts 呈现。
-
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F055 | Retention, Coordinated Deletion & Proof | accepted |
-| F057 | Break-glass Authorization | accepted |
-| F058 | Instruction-Surface Adversarial Evals | accepted |
-
-典型命令：`amber security audit --target .` · `amber eval run --suite instruction-surface`
-产出：可审计安全报告 + eval 结果（assurance: replayable）
-
----
-
-### 12. 高级信任基础设施
-
-不可变账本、Principal Registry、Evidence Assurance、Gate/Policy 评估——所有上层能力的信任根。
-
-| Feature | 标题 | 状态 |
-|---------|------|------|
-| F049 | Canonical Planning Artifacts | accepted |
-| F050 | Decisions, Gates & Evidence Assurance | accepted |
-| F051 | Read-only Adapters & Explicit Cutover | accepted |
-| F052 | Controlled Runner & Environment Boundaries | accepted |
-| F053 | Release Prepare, Deploy & Rollback | accepted |
-| F054 | Deterministic Maintain & Intent Re-entry | accepted |
-| F061 | Ledger Family Factory & Decision Primitives | accepted |
-
-> **说明：** 这个能力域是基础层，普通用户通常通过上层命令间接感知，不需要直接调用。
+- 状态、证据与 Feature 详情：`feature_list.json`
+- 目标用户、核心问题与价值主张：`docs/wiki/product/overview.md`
+- 旅程触发、步骤、结果与失败恢复：`docs/wiki/product/user-scenarios.md`
+- 目标环境与领域术语：`CONTEXT.md`、ADR-0030
+- Web Viewer 交互合同：`PRODUCT.md`

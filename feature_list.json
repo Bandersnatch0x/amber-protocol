@@ -1494,7 +1494,14 @@
 			"user_visible_behavior": "All JSON-schema validation routes through one cached, format-registered schema-contract adapter; no module instantiates Ajv directly",
 			"status": "accepted",
 			"verification": ["node --test tests/unit/schema-contract.test.js", "npm test"],
-			"evidence": [{ "command": "", "result": "", "date": "2026-08-25", "notes": "" }],
+			"evidence": [
+				{
+					"command": "",
+					"result": "",
+					"date": "2026-08-25",
+					"notes": ""
+				}
+			],
 			"notes": [],
 			"paths": [
 				"scripts/lib/core/schema-contract.js",
@@ -2211,17 +2218,11 @@
 			"id": "F063",
 			"priority": 63,
 			"area": "product",
-			"title": "Product Closeout: Seven-Verb Default Surface, Verb Skills, Spec Status, Directory Consolidation",
-			"user_visible_behavior": "A new user installs amber-protocol, runs amber --help, and sees seven primary verbs; the skills surface offers start/check/done verb skills; SPEC.md answers 'where is the project now'; the repository root and docs tree are consolidated with one home per artifact class.",
-			"status": "passing",
+			"title": "Product Closeout: Seven-Verb Default Surface, Agent Entry, Spec Status, Artifact Lifecycle",
+			"user_visible_behavior": "A user enters through one Amber router and four governed journeys; the deterministic CLI fallback shows seven primary verbs; SPEC.md answers 'where is the project now'; artifact lifecycle and packaged-surface boundaries stay enforceable without making bulk directory migration a release gate.",
+			"status": "accepted",
 			"verification": ["npm test"],
 			"evidence": [
-				{
-					"command": "npm test",
-					"result": "full suite green (pending final run)",
-					"date": "2026-09-03",
-					"notes": ""
-				},
 				{
 					"command": "npm test",
 					"result": "3542 passed, 0 failed (full log: .scratch/f063-npm-test-final3.log)",
@@ -2239,6 +2240,24 @@
 					"result": "516 nodes / 1526 edges / 0 drift; byte-stable double build; corpus context-sync accepted 9 rows",
 					"date": "2026-09-03",
 					"notes": ""
+				},
+				{
+					"command": "npm test",
+					"result": "3587 tests: 3585 passed; 2 failures attributed (1 concurrent-edit race on .gitignore budget, 1 real charter vocabulary defect) and both fixed + re-verified 9/9 (full log: .scratch/f063-landing-test-run.log)",
+					"date": "2026-09-15",
+					"notes": "landing run after reconciling with origin/master merge (Team Replication Charter, TS7)"
+				},
+				{
+					"command": "manifests/doctor/gen:agents:check/validate-wiki + amber --help + amber knowledge graph --json",
+					"result": "all green; seven-verb help 16 lines; knowledge graph 540 nodes / 1589 edges / 0 drift",
+					"date": "2026-09-15",
+					"notes": "two-axis review report: .scratch/f063-landing-review.md"
+				},
+				{
+					"command": "npm --prefix apps/web run typecheck / lint / test / build",
+					"result": "typecheck exit 0; lint 0 errors (32 pre-existing warnings); vitest exit 0; build exit 0",
+					"date": "2026-09-15",
+					"notes": "after minor dependency batch update"
 				}
 			],
 			"notes": [],
@@ -2247,10 +2266,15 @@
 				"scripts/amber.js",
 				"skills/amber",
 				"AGENTS.md",
+				"CONTEXT.md",
+				"PRODUCT.md",
 				"SPEC.md",
 				".gitignore",
-				"docs/CLI_REFERENCE.md"
-			]
+				"docs/CLI_REFERENCE.md",
+				"docs/adr/0030-coding-agent-enabled-repositories-and-trusted-continuation.md",
+				"docs/wiki/product/overview.md"
+			],
+			"updated": "2026-09-04"
 		},
 		{
 			"id": "F064",

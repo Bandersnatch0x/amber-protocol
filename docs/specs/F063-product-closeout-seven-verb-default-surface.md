@@ -209,12 +209,25 @@ Standard gates per ticket: `npm test` (full log written to disk and read whole),
 manifests`, `npm run doctor`, `npm run gen:agents:check`; wiki changes add
 `node scripts/validate-wiki.js --target .`.
 
+## Product Journey Alignment Amendment (2026-09-04)
+
+The approved product closeout adds one bounded, read-only alignment slice: the optional Web
+Viewer home may render the J0–J5 core journey, derive one current step from live lifecycle/session/
+Gate reads, and expose the same authority boundary as the Agent/CLI surfaces. This does not add a
+subsystem, execution capability, or second workflow; it only makes the existing inspection surface
+legible for the Coding-Agent-Enabled Repository journey. Loading, empty, and unavailable reads must
+remain explicit and must not be presented as a live current Journey.
+
+F064 Improvement Suggestions remains an optional conditional surface and is not part of the core
+journey promise or the default authority path.
+
 ## Out of Scope
 
 - Review P1-1/P1-2/P1-3/P1-4 and P2-1/P2-2/P2-3 (staged separately by the review itself).
 - Any command removal, renaming, or new subcommands; any schema or MCP surface change.
 - The docs site (issues/0012–0024 line) — publishes from the consolidated tree later.
-- Web viewer changes (apps/web untouched).
+- A standalone Web Viewer redesign, new server capability, or Viewer authority. The bounded
+  read-only J0–J5 alignment above is in scope; Agent/CLI surfaces remain authoritative.
 - Compressing CONTEXT.md vocabulary (P2-1) or moving PRODUCT.md (P2-2) — separate tickets.
 
 ## Further Notes

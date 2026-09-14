@@ -5,7 +5,17 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { statusSession, abortSession, continueSession, verifySession, approveSession, verifyLedgerSession, runSession, settleSession, leaseSession } = require("../../scripts/lib/session-commands");
+const {
+	statusSession,
+	abortSession,
+	continueSession,
+	verifySession,
+	approveSession,
+	verifyLedgerSession,
+	runSession,
+	settleSession,
+	leaseSession,
+} = require("../../scripts/lib/session-commands");
 
 test("statusSession rejects path traversal", () => {
 	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "amber-session-id-test-"));

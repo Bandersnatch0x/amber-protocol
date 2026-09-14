@@ -2,10 +2,10 @@
   "schemaVersion": "1.0.0",
   "manifestId": "f059-knowledge-context-pages",
   "counts": {
-    "adr": 29,
+    "adr": 30,
     "wiki": 10,
     "architecture": 9,
-    "total": 48
+    "total": 49
   },
   "rows": [
     {
@@ -357,6 +357,18 @@
       }
     },
     {
+      "id": "knowledge:adr:0030",
+      "category": "adr",
+      "sourceNodeId": "adr:0030",
+      "pageId": "knowledge-adr-0030",
+      "sourcePath": "docs/adr/0030-coding-agent-enabled-repositories-and-trusted-continuation.md",
+      "title": "Coding-Agent-Enabled Repositories and Trusted Continuation",
+      "source": {
+        "rawHash": "sha256:5ac22b6432856df9e810b11e40cb9de4bdac7f3b6e3eca1ff74bb475a9a2eac1",
+        "normHash": "sha256:7b3279cfad6292b76f3e2fd9f1b73c013fe9c9305d3719c0272cbd367fb9f560"
+      }
+    },
+    {
       "id": "knowledge:architecture:context-threat-model",
       "category": "architecture",
       "sourceNodeId": "architecture:context-threat-model",
@@ -585,5 +597,5 @@
       }
     }
   ],
-  "manifestHash": "sha256:a6470621ccdb41e162d429f1c9667441e54bc7a94ac2a521f9cb5a6360f6f754"
+  "manifestHash": "sha256:3949c47673b1139da21376e4039d54269497a9b144938fe169844241c232a517"
 }

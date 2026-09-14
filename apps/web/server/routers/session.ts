@@ -3,7 +3,12 @@ import { z } from 'zod';
 import { readSessionList, readSessionById, readTimelineEvents } from '../lib/session-reader';
 import { readSessionAuditSummary } from '../lib/session-audit-writer';
 
-const sessionIdSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i, 'Invalid session ID format');
+const sessionIdSchema = z
+  .string()
+  .regex(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    'Invalid session ID format',
+  );
 
 export const sessionRouter = router({
   list: publicProcedure.query(() => {
@@ -33,7 +38,9 @@ export const sessionRouter = router({
       });
     }),
 
-  auditSummary: publicProcedure.input(z.object({ sessionId: sessionIdSchema })).query(({ input }) => {
-    return readSessionAuditSummary(input.sessionId);
-  }),
+  auditSummary: publicProcedure
+    .input(z.object({ sessionId: sessionIdSchema }))
+    .query(({ input }) => {
+      return readSessionAuditSummary(input.sessionId);
+    }),
 });

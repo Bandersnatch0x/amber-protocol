@@ -32,6 +32,14 @@ _Avoid_: prompt file, instruction blob, system prompt
 A git repository that has an Amber scaffold and `.amber/` state and is subject to Amber governance. The CLI addresses it via `--target`.
 _Avoid_: target project, project, codebase
 
+**Coding-Agent-Enabled Repository**:
+A software repository whose maintainers already use one or more coding agents for recurring, real delivery work subject to human review. It may exist before Amber adoption; a one-off experiment or an installed tool with no recurring task use does not qualify.
+_Avoid_: AI-native repo, agent project, any repository with an AI plugin
+
+**Repository Maintainer**:
+A person responsible for delivery continuity and review in a Coding-Agent-Enabled Repository. It names Amber's primary product user, not every contributor or an authorization Principal.
+_Avoid_: project, repository, Operator, Principal
+
 **Amber Setup**:
 The complete installed Amber footprint in a target repository: root-level starter files plus the `.amber/` state directory. Validated by `doctor`.
 _Avoid_: Harness, installation, bootstrap
@@ -557,6 +565,10 @@ The registered human Principal a Control Band detector declares at registration 
 _Avoid_: any-human triage, team alias
 
 ## Continuity
+
+**Trusted Continuation**:
+The product outcome in which governed work can be resumed by another session, person, or agent from current Intent, Evidence, checkpoint, and Handoff without reconstructing state from chat history.
+_Avoid_: chat resume, context replay, handoff file alone
 
 **Handoff**:
 A human-readable snapshot that lets a person or agent resume governed work without chat history. The canonical handoff artifact is `session-handoff.md`, validated by the `handoff` command.

@@ -121,7 +121,7 @@ function groupMetadata(metadata: TranscriptMetadataItem[]): MetadataGroup[] {
   return Array.from(groups.values());
 }
 
-function formatTimestampRange(group: MetadataGroup): string | null {
+function formattimestampRange(group: MetadataGroup): string | null {
   if (!group.firstTimestamp) return null;
 
   const first = new Date(group.firstTimestamp).toLocaleString();
@@ -177,7 +177,7 @@ function MetadataPanel({ metadata }: { metadata: TranscriptMetadataItem[] }) {
           className="mt-3 divide-y divide-slate-200 rounded-md border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800"
         >
           {groups.map((group) => {
-            const timestampRange = formatTimestampRange(group);
+            const timestampRange = formattimestampRange(group);
 
             return (
               <div

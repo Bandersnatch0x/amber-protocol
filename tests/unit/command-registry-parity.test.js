@@ -125,7 +125,15 @@ function runCliProjection(args) {
 }
 
 test("F063 default help projects the seven primary verbs in order", () => {
-	assert.deepEqual(DEFAULT_COMMANDS, ["audit", "init", "doctor", "next", "plan", "handoff", "session"]);
+	assert.deepEqual(DEFAULT_COMMANDS, [
+		"audit",
+		"init",
+		"doctor",
+		"next",
+		"plan",
+		"handoff",
+		"session",
+	]);
 	const help = runCliProjection(["--help"]);
 	assert.equal(help.status, 0);
 	assert.match(help.stdout, /^Commands: audit, init, doctor, next, plan, handoff, session$/m);
@@ -146,7 +154,16 @@ test("F063 --all projects the complete registry in its canonical order", () => {
 test("F063 demoted platform commands stay callable and visible under --all", () => {
 	const all = runCliProjection(["--all"]);
 	assert.equal(all.status, 0);
-	for (const name of ["wiki", "gate", "review", "accept", "governance", "memory", "breakglass", "break-loop"]) {
+	for (const name of [
+		"wiki",
+		"gate",
+		"review",
+		"accept",
+		"governance",
+		"memory",
+		"breakglass",
+		"break-loop",
+	]) {
 		assert.ok(COMMANDS.includes(name), `${name} still registered`);
 		assert.match(all.stdout, new RegExp(`\\b${name}\\b`), `${name} listed under --all`);
 		assert.ok(!DEFAULT_COMMANDS.includes(name), `${name} not in default projection`);

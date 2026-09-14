@@ -2,8 +2,7 @@
 
 # Amber Protocol
 
-> **Make AI coding sessions reviewable, gated, and handoff-ready.**  
-> Evidence lives as files in the repo — not in chat transcripts.
+> **Turn AI coding work into trusted continuation.**
 
 ![Amber Protocol](./assets/readme/amber-protocol-banner.png)
 
@@ -13,9 +12,9 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
 
 <p align="center">
-  <a href="#positioning">Positioning</a> ·
-  <a href="#layering">Layering</a> ·
-  <a href="#what-amber-will-not-do">Hard non-goals</a> ·
+  <a href="#what-is-amber">What is Amber</a> ·
+  <a href="#who-it-is-for">Who it is for</a> ·
+  <a href="#product-journey">Journey</a> ·
   <a href="#installation">Install</a> ·
   <a href="#quick-start-about-10-minutes">Quick Start</a> ·
   <a href="./docs/TEAM_REPLICATION_CHARTER.md">Team Replication Charter</a> ·
@@ -23,8 +22,8 @@
 </p>
 
 <p align="center">
-  <b>Repository-local</b> team replication layer — plans, gates, approvals,<br />
-  and handoffs live as inspectable files inside your repo.<br />
+  For repositories already using coding agents in real delivery work.<br />
+  Plans, evidence, decisions, and handoffs stay inspectable beside the code.<br />
   <b>Status:</b> Stable · <a href="./ROADMAP.md">Milestones & test status →</a>
 </p>
 
@@ -32,7 +31,11 @@
 
 ---
 
-## Positioning
+## What is Amber?
+
+Amber Protocol is a repository-local governance layer for projects that already use coding agents in recurring, real delivery work. The hard part is no longer only producing code. It is preserving enough trustworthy state for the next person or agent to understand what happened, what was approved, what evidence exists, and what should happen next.
+
+Amber makes that state explicit through plans, sessions, evidence, decisions, and handoffs stored beside the code. Its core outcome is **Trusted Continuation**: another person or agent can enter without the old chat, identify the current state, and take one correct next step.
 
 **Amber = the in-repo team replication layer: how a team safely uses AI on _this_ codebase, written as handoff-ready file evidence.**
 
@@ -67,6 +70,46 @@ These are product boundaries, not TODOs:
 
 Full boundaries: [Team Replication Charter](./docs/TEAM_REPLICATION_CHARTER.md) and [SPEC.md](./SPEC.md).
 
+## Who it is for
+
+The target environment is a **Coding-Agent-Enabled Repository**: maintainers already use one or more coding agents for ongoing delivery under human review. A one-off experiment or a repository that merely installed an agent tool does not qualify.
+
+- **Primary user — Repository Maintainer:** accountable for the repository outcome and continuity.
+- **Working user — agent-assisted developer:** frames and performs bounded delivery work.
+- **Decision user — reviewer:** makes go/no-go decisions from plans, diffs, and evidence.
+
+## Why Amber?
+
+AI coding work becomes easier to trust when the workflow leaves inspectable evidence:
+
+- **Continue without the old chat:** plans, sessions, evidence, and handoffs make state portable across people and agents.
+- **Review from repository evidence:** decisions rest on inspectable artifacts, not a completion claim in a transcript.
+- **Recover at the right stage:** failures and interruptions remain attached to the step that produced them.
+- **Keep authority explicit:** human approvals and governed boundaries are records, not hidden runtime assumptions.
+
+## Product journey
+
+```text
+Fit -> Adopt -> First trusted continuation -> Deliver -> Recover -> Review / Accept
+```
+
+| Journey                 | User outcome                                                       | Default surface                                              | Completion evidence                                               |
+| ----------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------- |
+| J0 · Fit                | Decide whether Amber addresses a real continuity or review failure | `amber audit`                                                | Read-only findings and an explicit adopt/defer decision           |
+| J1 · Adopt              | Add the minimum repository-local surface without overwrites        | `amber init`, `amber doctor`                                 | A repeatable setup check                                          |
+| J2 · First continuation | Prove a fresh context can continue one real task correctly         | `amber next`, `amber plan`, `amber session`, `amber handoff` | A new person or agent acts correctly without reading the old chat |
+| J3 · Deliver            | Frame, authorize, work, prove, review, and hand off/accept         | Agent journey; CLI fallback                                  | Plan, session, command evidence, and checkpoint agree             |
+| J4 · Recover            | Resume after failure, pause, or context loss at the correct stage  | `amber session`, `amber next`, `amber handoff`               | Failure remains visible and the recovery action is bounded        |
+| J5 · Review / Accept    | Make a go/no-go decision from repository evidence                  | Plans, gates, evidence, Web Viewer                           | Review and acceptance can be explained without the transcript     |
+
+Feature, bugfix, and refactor routes remain backend policy. Users keep one frontstage model:
+
+```text
+Frame -> Authorize -> Work -> Prove -> Review -> Handoff / Accept
+```
+
+Context repair, continuous improvement, team expansion, and high-assurance operations are conditional paths. They do not block the first Trusted Continuation. See the [feature matrix](./docs/wiki/features/feature-map.md) and [complete journey definitions](./docs/wiki/product/user-scenarios.md).
+
 ## Installation
 
 ### From npm (Recommended)
@@ -87,31 +130,26 @@ node scripts/amber.js --version
 
 ## Quick Start (about 10 minutes)
 
-Homepage path only: install → audit → init → doctor → optional plan/gate → handoff.
+Use one real task to test whether Amber creates Trusted Continuation. File generation alone is not activation.
 
 ```bash
-# 1. Read-only audit (changes nothing)
-amber audit --target my-project --summary
+# J0 — establish fit without changing the project
+amber audit --target my-project
 
-# 2. Install starter files (skips anything that already exists)
+# J1 — install the minimum surface; existing files are skipped
 amber init --target my-project
-
-# 3. Verify agent-facing surfaces
 amber doctor --target my-project
 
-# 4. (Optional) create a plan and see the next gate
-amber plan --target my-project --feature F001 --title "…"
-amber next --target my-project
+# J2 — frame one real goal and follow the state-derived next step
+amber next --objective "finish the current API change" --target my-project
 
-# 5. Produce and validate a portable handoff bundle
-amber handoff bundle --target my-project
-amber handoff validate --target my-project
+# Generate a repository-local continuation bundle
+amber handoff --target my-project
 ```
 
-`init` / `wiki` never overwrite existing files. Expert commands, dsh plugin notes, full lifecycle tables, and Web Viewer live in later sections and:
+Now open a fresh agent session or ask another maintainer to inspect the repository **without the old chat**. Amber is activated only when that new context can explain the current state and take one correct next step.
 
-- `amber --all` — full compatibility command surface
-- [CLI reference](./docs/CLI_REFERENCE.md)
+`init` and `wiki` never overwrite existing files. Default help exposes seven fallback verbs: `audit`, `init`, `doctor`, `next`, `plan`, `handoff`, and `session`. `amber --all` keeps the expert and compatibility surface available. See the [CLI reference](./docs/CLI_REFERENCE.md).
 
 Expert path (not the homepage main line): read-only continuous-improvement discovery via `amber loop recommend` (see `amber --all`):
 
@@ -179,20 +217,20 @@ For the full boundary notes, see [SPEC.md](./SPEC.md).
 
 ## Documentation
 
-| Topic                               | Link                                                                                                                                                                  |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Full CLI reference                  | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md)                                                                                                                      |
-| Getting started guide               | [docs/guides/user-getting-started.md](./docs/guides/user-getting-started.md)                                                                                            |
-| Architecture & governance model     | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md)                                                                                      |
-| Deployment & ops                    | [docs/DEPLOYMENT.md](./docs/guides/DEPLOYMENT.md)                                                                                                                            |
+| Topic                               | Link                                                                                                                                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Full CLI reference                  | [docs/CLI_REFERENCE.md](./docs/CLI_REFERENCE.md)                                                                                                                                           |
+| Getting started guide               | [docs/guides/user-getting-started.md](./docs/guides/user-getting-started.md)                                                                                                               |
+| Architecture & governance model     | [docs/architecture/governance-model.md](./docs/architecture/governance-model.md)                                                                                                           |
+| Deployment & ops                    | [docs/DEPLOYMENT.md](./docs/guides/DEPLOYMENT.md)                                                                                                                                          |
 | Monitoring / notifications / policy | [MONITORING_SETUP.md](./docs/guides/MONITORING_SETUP.md) · [NOTIFICATION_SETUP.md](./docs/guides/NOTIFICATION_SETUP.md) · [POLICY_CONFIGURATION.md](./docs/guides/POLICY_CONFIGURATION.md) |
-| Troubleshooting                     | [docs/TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md)                                                                                                                  |
-| Full docs index                     | [docs/README.md](./docs/README.md)                                                                                                                                    |
-| Spec & roadmap                      | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                     |
-| DeepSeek Harness (`dsh`) overlay    | [dsh/README.md](./dsh/README.md)                                                                                                                                      |
-| Contributing                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                  |
+| Troubleshooting                     | [docs/TROUBLESHOOTING.md](./docs/guides/TROUBLESHOOTING.md)                                                                                                                                |
+| Full docs index                     | [docs/README.md](./docs/README.md)                                                                                                                                                         |
+| Spec & roadmap                      | [SPEC.md](./SPEC.md) · [ROADMAP.md](./ROADMAP.md)                                                                                                                                          |
+| DeepSeek Harness (`dsh`) overlay    | [dsh/README.md](./dsh/README.md)                                                                                                                                                           |
+| Contributing                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                                                                                                       |
 
-The web viewer (`apps/web`) provides a dashboard for sessions and timelines:
+The optional Web Viewer (`apps/web`) is a journey-aware inspector. It shows the current J0–J5 stage, the next governed action, active sessions, pending gates, and repository-local evidence. It reflects Amber state; it does not create a second workflow or replace the Agent/CLI authority surface.
 
 ```bash
 cd apps/web
