@@ -284,7 +284,13 @@ function inspectMaintenance(target, registryPath) {
 	const { collectEvidence } = require("../maintenance/internal/evidence");
 	const evidenceOutcome = collectEvidence(targetRoot);
 
-	return {
+	// Evolution Slice 2 (trusted-control evolution contract §3/§5): the
+	// structured attribution carrier rides the inspection ONLY when the
+	// producer has sufficient structured evidence (one distinct significant
+	// attributed finding). Field ABSENT = legacy inspection (B1 semantics);
+	// field PRESENT = the V1–V3 admission inputs flow to proposeMaintenance.
+	const attributionCarrier = evidenceOutcome.evolution.carrier;
+	const inspection = {
 		target: targetRoot,
 		readOnly: true,
 		staleDocs: staleDocsResult.staleDocs,
@@ -321,13 +327,32 @@ function inspectMaintenance(target, registryPath) {
 					latestVersion: null,
 				},
 		evolutionRollup: evidenceOutcome.evolution.significant,
+		structuredFindings: evidenceOutcome.evolution.structured,
+		// Recurrence evidence (trusted-control evolution contract §9, E8; plan
+		// Slice 4): the log's occurrence count over its declared window's
+		// exposure denominator. Report-only — `recurrenceRate` is null when the
+		// denominator is unavailable, and no improvement claim is computed.
+		recurrence: evidenceOutcome.evolution.recurrence,
 		regressionProposals: evidenceOutcome.regressionProposals,
 		evidenceAvailability: evidenceOutcome.availability,
 		scaffoldDrift: scaffoldDriftResult,
 		artifactDrift: detectArtifactDrift(targetRoot),
-		errors: loaded.errors,
+		errors: [...loaded.errors, ...(evidenceOutcome.errors || [])],
 		warnings: [...(loaded.warnings || []), ...(evidenceOutcome.warnings || [])],
 	};
+	if (attributionCarrier !== null) {
+		inspection.findingAttribution = attributionCarrier.findingAttribution;
+		if (attributionCarrier.evidenceReferences !== undefined) {
+			inspection.evidenceReferences = attributionCarrier.evidenceReferences;
+		}
+		if (attributionCarrier.expectedEffect !== undefined) {
+			inspection.expectedEffect = attributionCarrier.expectedEffect;
+		}
+		if (attributionCarrier.operations !== undefined) {
+			inspection.operations = attributionCarrier.operations;
+		}
+	}
+	return inspection;
 }
 
 // buildMaintenanceProposalContent + proposeMaintenance were extracted to

@@ -33,6 +33,22 @@ const { isLegalTransition, STATES } = require("./session-state-machine");
 const { buildKnowledgeGraph } = require("./core/knowledge-graph");
 const { sha256Hex, canonicalJson } = require("./core/context-hash");
 const maintenance = require("./core/maintenance");
+// Trusted-control evolution contract §3: the finding-attribution vocabulary and
+// validator are the single core authority; the web suggestion surface reaches
+// them only through this seam (seam guard). Frozen projection below — the web
+// can neither widen the closed enums nor fork the validation.
+const findingAttribution = require("./core/finding-attribution");
+// Trusted-control evolution contract §6/§8 (F064 Slice 3): the shared V1–V3
+// admission invariant and the `suggestion-review` ledger family live in core;
+// the web suggestion surface reaches them only through this seam — it can
+// neither fork the validity rules nor hand-write chain appends.
+const { validateEvolutionAdmission } = require("./core/evolution-validity");
+const suggestionReview = require("./core/ledger-suggestion-review");
+// Trusted-control evolution contract §9 / E8 (plan Slice 4): recurrence is a
+// rate over an exposure denominator, derived once in core. The web suggestion
+// surface reaches the derivation only through this seam — it can neither fork
+// the rate rule nor fabricate a number where the denominator is unknown.
+const recurrence = require("./core/recurrence");
 
 /**
  * Containment guard for caller-supplied session ids — the CLI-side twin of
@@ -453,6 +469,185 @@ function inspectMaintenance(target, registryPath) {
 	return maintenance.inspectMaintenance(target, registryPath);
 }
 
+/**
+ * Finding-attribution validation delegate (trusted-control evolution contract
+ * §3). Returns the core module's problem string or null — the web surface can
+ * neither relax nor duplicate the closed-set validation.
+ *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function attributionProblem(value) {
+	return findingAttribution.attributionProblem(value);
+}
+
+/**
+ * Frozen projection of the finding-attribution vocabulary so TS consumers can
+ * parity-check their local typing boundary against the runtime authority
+ * without importing a deep core module.
+ */
+const FINDING_ATTRIBUTION = Object.freeze({
+	ENTRY_SURFACES: findingAttribution.ENTRY_SURFACES,
+	IMPACT_SURFACES: findingAttribution.IMPACT_SURFACES,
+	RESPONSIBLE_ARTIFACTS: findingAttribution.RESPONSIBLE_ARTIFACTS,
+	FIELDS: findingAttribution.FIELDS,
+});
+
+/**
+ * Shared V1–V3 admission invariant delegate (trusted-control evolution
+ * contract §6): mechanical presence/shape checks executed by deterministic
+ * code — V1 resolvable evidence, V2 no capability reduction, V3 dual-axis
+ * effect statement. Delegates to the core SSOT unchanged; the web can
+ * neither relax nor duplicate it. Passing proves form, never semantic truth.
+ *
+ * @param {{ targetRoot: string, evidenceReferences?: unknown, operations?: unknown, expectedEffect?: unknown }} input
+ * @returns {{ ok: true } | { ok: false, code: string, detail: string }}
+ */
+function validateEvolutionAdmissionForWeb(input) {
+	return validateEvolutionAdmission(input);
+}
+
+/**
+ * Recurrence-measurement delegate (trusted-control evolution contract §9,
+ * E8). Derives one declared window's occurrence count, exposure denominator,
+ * and rate; `recurrenceRate` is `null` (reported as `unknown`) when the
+ * denominator is zero or unavailable — a number is never fabricated, and no
+ * before/after improvement claim is computed anywhere. Report-only: the caller
+ * carries the numbers, it never scores them.
+ *
+ * @param {{ occurrences?: unknown, transcriptsScanned?: unknown, window?: unknown }} input
+ * @returns {{ occurrences: number, transcriptsScanned: number | null, recurrenceRate: number | null, denominator: "measured" | "unknown", window: string }}
+ */
+function deriveRecurrenceForWeb(input) {
+	return recurrence.deriveRecurrence(input);
+}
+
+/**
+ * The declared F064 window label (the newest `ceiling` transcript files per
+ * host home — the same bound the collector applies).
+ *
+ * @param {number} ceiling
+ * @returns {string}
+ */
+function transcriptWindowLabelForWeb(ceiling) {
+	return recurrence.transcriptWindowLabel(ceiling);
+}
+
+/**
+ * Frozen projection of the recurrence denominator vocabulary (the runtime
+ * authority is core/recurrence.js; the closed state set).
+ */
+const RECURRENCE = Object.freeze({
+	DENOMINATOR_STATES: recurrence.RECURRENCE_DENOMINATOR_STATES,
+});
+
+// ── `suggestion-review` ledger family seam (contract §8, F064 Slice 3) ──
+// Every delegate below is a pass-through to the family assembled through
+// `defineLedgerFamily`; the adapter adds no policy of its own.
+
+/**
+ * Record card promotion (§8.2 `proposed`) — idempotent per fingerprint.
+ * @param {string} targetRoot
+ * @param {{ fingerprint: string, evidence: object[], hosts: string[], operations: object[], attribution: object }} input
+ */
+function ensureSuggestionProposed(targetRoot, input) {
+	return suggestionReview.ensureSuggestionProposed(targetRoot, input);
+}
+
+/**
+ * Record that admission passed V1–V3 (§8.2 `validated`) — idempotent per
+ * fingerprint; the fingerprint payload closes the correlation chain.
+ * @param {string} targetRoot
+ * @param {{ fingerprint: string }} input
+ */
+function recordSuggestionValidated(targetRoot, input) {
+	return suggestionReview.recordSuggestionValidated(targetRoot, input);
+}
+
+/**
+ * Record an admission-time validity rejection (§8.2 `rejected` with a
+ * `validity:*` reason code and redacted summary) — durable once per
+ * fingerprint; repeated failing scans do not grow the ledger.
+ * @param {string} targetRoot
+ * @param {{ fingerprint: string, reason: string, summary: string }} input
+ */
+function recordSuggestionValidityRejection(targetRoot, input) {
+	return suggestionReview.recordSuggestionValidityRejection(targetRoot, input);
+}
+
+/**
+ * Record an operator Dismiss (§8.2 `rejected` with the operator dismiss
+ * reason) — every dismiss action appends.
+ * @param {string} targetRoot
+ * @param {{ fingerprint: string, reason: string, summary: string }} input
+ */
+function recordSuggestionDismissal(targetRoot, input) {
+	return suggestionReview.recordSuggestionDismissal(targetRoot, input);
+}
+
+/**
+ * Record a successful Apply (§8.2 `applied`) with the applied-record digest
+ * (paths, before/after hashes — the bytes never ride the ledger).
+ * @param {string} targetRoot
+ * @param {{ fingerprint: string, applied: Array<{ path: string, beforeHash: string | null, afterHash: string | null }> }} input
+ */
+function recordSuggestionApplied(targetRoot, input) {
+	return suggestionReview.recordSuggestionApplied(targetRoot, input);
+}
+
+/**
+ * Record a successful Undo (§8.2 `undone`) with the restored-hashes digest.
+ * @param {string} targetRoot
+ * @param {{ fingerprint: string, restored: Array<{ path: string, hash: string | null }> }} input
+ */
+function recordSuggestionUndone(targetRoot, input) {
+	return suggestionReview.recordSuggestionUndone(targetRoot, input);
+}
+
+/**
+ * Fold the suggestion-review ledger (fail-closed chain walk + domain fold).
+ * A missing ledger reads as empty; corruption throws the typed corrupt code.
+ * @param {string} targetRoot
+ * @returns {Array<object>} One review record per fingerprint, first-proposed order.
+ */
+function foldSuggestionReview(targetRoot) {
+	return suggestionReview.foldSuggestionReview(targetRoot);
+}
+
+/**
+ * The rejection-history hint (§8.3): informative, read-side only, never
+ * blocking. Unknown on a missing/unreadable/corrupt ledger — never "no prior
+ * rejection".
+ * @param {string} targetRoot
+ * @param {string} fingerprint
+ * @returns {{ status: "none" } | { status: "unknown" } | { status: "rejected", reason: string, summary: string, at: string }}
+ */
+function suggestionReviewHistory(targetRoot, fingerprint) {
+	return suggestionReview.suggestionReviewHistory(targetRoot, fingerprint);
+}
+
+/**
+ * The §8.6 write-side precheck for Apply/Undo/Dismiss: chain walk, writer
+ * guard, lock probe, and ceiling probe against the projected event — BEFORE
+ * any target mutation, with nothing written on either outcome.
+ * @param {string} targetRoot
+ * @param {object} input - The same discriminated shape the record functions take.
+ * @returns {{ ok: true } | { ok: false, code: string, errors: string[] }}
+ */
+function precheckSuggestionReviewAppend(targetRoot, input) {
+	return suggestionReview.precheckSuggestionReviewAppend(targetRoot, input);
+}
+
+/**
+ * Frozen projection of the suggestion-review event vocabulary (the runtime
+ * authority is core/ledger-suggestion-review.js; the closed kind set of five).
+ */
+const SUGGESTION_REVIEW = Object.freeze({
+	KINDS: suggestionReview.SUGGESTION_REVIEW_KINDS,
+	VALIDATED_CHECKS: suggestionReview.VALIDATED_CHECKS,
+	CEILING_ENV_NAME: suggestionReview.CEILING_ENV_NAME,
+});
+
 module.exports = {
 	evaluateLifecycleNext,
 	getCompletionStatus,
@@ -470,4 +665,22 @@ module.exports = {
 	inspectMaintenance,
 	sha256Hex,
 	canonicalJson,
+	attributionProblem,
+	FINDING_ATTRIBUTION,
+	// Trusted-control evolution contract §6/§8 (F064 Slice 3).
+	validateEvolutionAdmission: validateEvolutionAdmissionForWeb,
+	ensureSuggestionProposed,
+	recordSuggestionValidated,
+	recordSuggestionValidityRejection,
+	recordSuggestionDismissal,
+	recordSuggestionApplied,
+	recordSuggestionUndone,
+	foldSuggestionReview,
+	suggestionReviewHistory,
+	precheckSuggestionReviewAppend,
+	SUGGESTION_REVIEW,
+	// Trusted-control evolution contract §9/E8 (F064 Slice 4).
+	deriveRecurrence: deriveRecurrenceForWeb,
+	transcriptWindowLabel: transcriptWindowLabelForWeb,
+	RECURRENCE,
 };

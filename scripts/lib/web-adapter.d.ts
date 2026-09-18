@@ -277,6 +277,218 @@ export function sha256Hex(text: string): string;
 /** Read-only re-export of core/context-hash.js canonicalJson (stable canonical JSON string). */
 export function canonicalJson(json: string): string;
 
+/**
+ * Read-only re-export of core/finding-attribution.js attributionProblem
+ * (trusted-control evolution contract §3): repo-style problem string or null
+ * for the closed four-field findingAttribution block. The web surface can
+ * neither relax nor duplicate the closed-set validation.
+ */
+export function attributionProblem(value: unknown): string | null;
+
+/**
+ * Frozen projection of the finding-attribution vocabulary (the runtime
+ * authority is core/finding-attribution.js; the arrays are the closed sets).
+ */
+export const FINDING_ATTRIBUTION: {
+  readonly ENTRY_SURFACES: readonly string[];
+  readonly IMPACT_SURFACES: readonly string[];
+  readonly RESPONSIBLE_ARTIFACTS: readonly string[];
+  readonly FIELDS: readonly string[];
+};
+
+// ── Trusted-control evolution contract §6/§8 (F064 Slice 3) ──
+
+export type EvolutionAdmissionInput = {
+  targetRoot: string;
+  evidenceReferences?: unknown;
+  operations?: unknown;
+  expectedEffect?: unknown;
+};
+
+export type EvolutionAdmissionResult =
+  | { ok: true }
+  | { ok: false; code: string; detail: string };
+
+/**
+ * Shared V1–V3 admission invariant (contract §6), delegated to the core SSOT
+ * unchanged: V1 resolvable evidence references, V2 no capability-registry
+ * reduction, V3 dual-axis effect statement. Passing proves form, never
+ * semantic truth (E5).
+ */
+export function validateEvolutionAdmission(
+  input: EvolutionAdmissionInput,
+): EvolutionAdmissionResult;
+
+// ── Trusted-control evolution contract §9/E8 (F064 Slice 4) ──
+
+export type RecurrenceDenominatorState = 'measured' | 'unknown';
+
+export type RecurrenceInput = {
+  occurrences?: unknown;
+  transcriptsScanned?: unknown;
+  window?: unknown;
+};
+
+/**
+ * One declared window's recurrence evidence. `recurrenceRate` is `null` —
+ * reported as `unknown` — when the exposure denominator is zero or
+ * unavailable; a number is never fabricated and no before/after improvement
+ * claim is computed (report-only, contract E8).
+ */
+export type RecurrenceEvidence = {
+  occurrences: number;
+  transcriptsScanned: number | null;
+  recurrenceRate: number | null;
+  denominator: RecurrenceDenominatorState;
+  window: string;
+};
+
+/** Derive one window's recurrence evidence (delegated to the core SSOT). */
+export function deriveRecurrence(input: RecurrenceInput): RecurrenceEvidence;
+
+/** The declared F064 window label for the collector's file ceiling. */
+export function transcriptWindowLabel(ceiling: number): string;
+
+/** Frozen projection of the recurrence denominator vocabulary. */
+export const RECURRENCE: {
+  readonly DENOMINATOR_STATES: readonly string[];
+};
+
+export type SuggestionReviewKind = 'proposed' | 'validated' | 'rejected' | 'applied' | 'undone';
+
+export type SuggestionReviewAppendResult =
+  | { ok: true; appended: boolean; record: Record<string, unknown> | null }
+  | { ok: false; code: string; record: null; errors: string[] };
+
+export type SuggestionAppliedDigestRecord = {
+  path: string;
+  beforeHash: string | null;
+  afterHash: string | null;
+};
+
+export type SuggestionRestoredDigestRecord = {
+  path: string;
+  hash: string | null;
+};
+
+/** Record card promotion (§8.2 `proposed`) — idempotent per fingerprint. */
+export function ensureSuggestionProposed(
+  targetRoot: string,
+  input: {
+    fingerprint: string;
+    evidence: object[];
+    hosts: string[];
+    operations: object[];
+    attribution: object;
+  },
+): SuggestionReviewAppendResult;
+
+/** Record an admission pass (§8.2 `validated`) — idempotent per fingerprint. */
+export function recordSuggestionValidated(
+  targetRoot: string,
+  input: { fingerprint: string },
+): SuggestionReviewAppendResult;
+
+/** Record an admission-time validity rejection (§8.2 `rejected`) — once per fingerprint. */
+export function recordSuggestionValidityRejection(
+  targetRoot: string,
+  input: { fingerprint: string; reason: string; summary: string },
+): SuggestionReviewAppendResult;
+
+/** Record an operator Dismiss (§8.2 `rejected`) — every dismiss appends. */
+export function recordSuggestionDismissal(
+  targetRoot: string,
+  input: { fingerprint: string; reason: string; summary: string },
+): SuggestionReviewAppendResult;
+
+/** Record a successful Apply (§8.2 `applied`) with the applied-record digest. */
+export function recordSuggestionApplied(
+  targetRoot: string,
+  input: { fingerprint: string; applied: SuggestionAppliedDigestRecord[] },
+): SuggestionReviewAppendResult;
+
+/** Record a successful Undo (§8.2 `undone`) with the restored-hashes digest. */
+export function recordSuggestionUndone(
+  targetRoot: string,
+  input: { fingerprint: string; restored: SuggestionRestoredDigestRecord[] },
+): SuggestionReviewAppendResult;
+
+/** One folded review record per fingerprint, first-proposed order. */
+export type SuggestionReviewRecord = {
+  fingerprint: string;
+  proposedAt: string;
+  evidenceDigest: string;
+  hosts: string[];
+  operationsDigest: string;
+  attribution: Record<string, unknown>;
+  validatedAt: string | null;
+  rejections: Array<{ reason: string; summary: string; at: string }>;
+  appliedCount: number;
+  undoneCount: number;
+  lastAppliedAt: string | null;
+  lastAppliedDigest: string | null;
+  lastUndoneAt: string | null;
+  lastRestoredDigest: string | null;
+};
+
+/**
+ * Fold the suggestion-review ledger: fail-closed chain walk plus the family
+ * domain fold. A missing ledger reads as empty; corruption throws the typed
+ * corrupt code (AMBER_E_SUGGESTION_REVIEW_CORRUPT).
+ */
+export function foldSuggestionReview(targetRoot: string): SuggestionReviewRecord[];
+
+export type SuggestionReviewHistory =
+  | { status: 'none' }
+  | { status: 'unknown' }
+  | { status: 'rejected'; reason: string; summary: string; at: string };
+
+/**
+ * The rejection-history hint (§8.3): informative, read-side only, never
+ * blocking. Unknown on a missing/unreadable/corrupt ledger — never "no prior
+ * rejection".
+ */
+export function suggestionReviewHistory(
+  targetRoot: string,
+  fingerprint: string,
+): SuggestionReviewHistory;
+
+export type SuggestionReviewPrecheckResult =
+  | { ok: true }
+  | { ok: false; code: string; errors: string[] };
+
+/**
+ * The §8.6 write-side precheck for Apply/Undo/Dismiss: chain walk, writer
+ * guard, lock probe, and ceiling probe against the projected event — BEFORE
+ * any target mutation, with nothing written on either outcome.
+ */
+export function precheckSuggestionReviewAppend(
+  targetRoot: string,
+  input:
+    | {
+        kind: 'proposed';
+        fingerprint: string;
+        evidence: object[];
+        hosts: string[];
+        operations: object[];
+        attribution: object;
+      }
+    | { kind: 'validated'; fingerprint: string }
+    | { kind: 'rejected'; fingerprint: string; reason: string; summary: string }
+    | { kind: 'applied'; fingerprint: string; applied: SuggestionAppliedDigestRecord[] }
+    | { kind: 'undone'; fingerprint: string; restored: SuggestionRestoredDigestRecord[] },
+): SuggestionReviewPrecheckResult;
+
+/**
+ * Frozen projection of the suggestion-review event vocabulary (the runtime
+ * authority is core/ledger-suggestion-review.js).
+ */
+export const SUGGESTION_REVIEW: {
+  readonly KINDS: readonly SuggestionReviewKind[];
+  readonly VALIDATED_CHECKS: Readonly<{ v1: 'pass'; v2: 'pass'; v3: 'pass' }>;
+  readonly CEILING_ENV_NAME: string;
+};
+
 /** Runtime module shape for createRequire cast — single SSOT with the functions above. */
 export type WebAdapter = {
 	evaluateLifecycleNext: typeof evaluateLifecycleNext;
@@ -294,4 +506,20 @@ export type WebAdapter = {
 	inspectMaintenance: typeof inspectMaintenance;
 	sha256Hex: typeof sha256Hex;
 	canonicalJson: typeof canonicalJson;
+	attributionProblem: typeof attributionProblem;
+	FINDING_ATTRIBUTION: typeof FINDING_ATTRIBUTION;
+	validateEvolutionAdmission: typeof validateEvolutionAdmission;
+	deriveRecurrence: typeof deriveRecurrence;
+	transcriptWindowLabel: typeof transcriptWindowLabel;
+	RECURRENCE: typeof RECURRENCE;
+	ensureSuggestionProposed: typeof ensureSuggestionProposed;
+	recordSuggestionValidated: typeof recordSuggestionValidated;
+	recordSuggestionValidityRejection: typeof recordSuggestionValidityRejection;
+	recordSuggestionDismissal: typeof recordSuggestionDismissal;
+	recordSuggestionApplied: typeof recordSuggestionApplied;
+	recordSuggestionUndone: typeof recordSuggestionUndone;
+	foldSuggestionReview: typeof foldSuggestionReview;
+	suggestionReviewHistory: typeof suggestionReviewHistory;
+	precheckSuggestionReviewAppend: typeof precheckSuggestionReviewAppend;
+	SUGGESTION_REVIEW: typeof SUGGESTION_REVIEW;
 };

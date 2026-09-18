@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -10,7 +10,7 @@ import {
   snoozeSuggestion,
   undoSuggestionById,
 } from '../server/lib/suggestions/service';
-import { applySuggestion } from '../server/lib/suggestions/apply';
+import { applySuggestion, undoSuggestion } from '../server/lib/suggestions/apply';
 import type { ImprovementSuggestion } from '../server/lib/suggestions/types';
 
 const ERROR_A = 'ENOENT: no such file or directory, open /tmp/foo-123/bar';
@@ -122,6 +122,42 @@ describe('Improvement Suggestions apply overlay', () => {
     expect(fs.existsSync(path.join(root, 'scripts/lib/core/doctor.js'))).toBe(false);
   });
 
+  it('refuses an update whose target changed under the card (content-hash staleness)', () => {
+    const card = openCard();
+    const rel = 'docs/wiki/agent/friction/existing.md';
+    const abs = path.join(root, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, 'draft-time bytes\n');
+
+    // The card was planned against the draft-time hash; the file has since
+    // changed, so Apply must refuse rather than clobber the newer bytes.
+    const forged: ImprovementSuggestion = {
+      ...card,
+      operations: [
+        {
+          verb: 'update',
+          artifactKind: 'wiki',
+          path: rel,
+          summary: 'should never land',
+          contents: 'planned bytes\n',
+          expectedHash: 'b'.repeat(64),
+        },
+      ],
+    };
+    const result = applySuggestion(root, forged);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('stale');
+    expect(fs.readFileSync(abs, 'utf8')).toBe('draft-time bytes\n');
+  });
+
+  it('refuses a second Apply of an already-applied card', () => {
+    const card = openCard();
+    expect(applySuggestionById(card.id, opts()).ok).toBe(true);
+    const again = applySuggestionById(card.id, opts());
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.code).toBe('already-applied');
+  });
+
   it('hides a dismissed card from the open filter', () => {
     const card = openCard();
     const dismissed = dismissSuggestion(card.id, opts());
@@ -142,5 +178,109 @@ describe('Improvement Suggestions apply overlay', () => {
       now: new Date('2026-06-25T00:00:00.000Z'),
     }).suggestions[0];
     expect(later.status).toBe('open');
+  });
+
+  // A second create on an allowlisted path; its target is sabotaged below so
+  // the commit loop's second write throws a real fs error mid-commit.
+  function twoOpCard(card: ImprovementSuggestion): ImprovementSuggestion {
+    const secondRel = card.operations[0].path.replace(/\.md$/, '-second.md');
+    return {
+      ...card,
+      operations: [
+        card.operations[0],
+        { ...card.operations[0], path: secondRel, summary: 'second write' },
+      ],
+    };
+  }
+
+  it('fails closed when an Apply commit write throws mid-commit (compensated rollback)', () => {
+    const card = openCard();
+    const forged = twoOpCard(card);
+    const firstRel = card.operations[0].path;
+    const abs1 = path.join(root, firstRel);
+
+    // Real I/O failure, no mock: the second create target is a directory, so
+    // its writeFileSync throws EISDIR after the first create already landed.
+    fs.mkdirSync(path.join(root, forged.operations[1].path), { recursive: true });
+
+    const result = applySuggestion(root, forged);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('commit-io-failed');
+      expect(result.message).toContain('pre-Apply state');
+    }
+    // No partial state: the earlier successful create is rolled back, the
+    // sabotaged target never got Apply bytes, and the card is still open.
+    expect(fs.existsSync(abs1)).toBe(false);
+    expect(fs.statSync(path.join(root, forged.operations[1].path)).isDirectory()).toBe(true);
+    expect(listSuggestions(opts()).suggestions[0].status).toBe('open');
+  });
+
+  it('fails closed when an Undo restore throws mid-commit (restored to post-Apply state)', () => {
+    const card = openCard();
+    const forged = twoOpCard(card);
+    expect(applySuggestion(root, forged).ok).toBe(true);
+    const abs1 = path.join(root, card.operations[0].path);
+    const abs2 = path.join(root, forged.operations[1].path);
+    const applied1 = fs.readFileSync(abs1, 'utf8');
+    const applied2 = fs.readFileSync(abs2, 'utf8');
+
+    // Undo restores created files by unlinking, in order: let the first
+    // restore succeed and the second throw. A plain read-only trick cannot
+    // fail the second unlink without also failing Undo's compensation, so
+    // the spy throws exactly once, on the second target unlink.
+    const realUnlink = fs.unlinkSync.bind(fs);
+    const targets = new Set([abs1, abs2]);
+    let targetUnlinks = 0;
+    vi.spyOn(fs, 'unlinkSync').mockImplementation(((p: fs.PathLike) => {
+      if (targets.has(p)) {
+        targetUnlinks += 1;
+        if (targetUnlinks === 2) throw new Error('simulated mid-commit unlink failure');
+      }
+      return realUnlink(p);
+    }) as typeof fs.unlinkSync);
+
+    const undone = undoSuggestion(root, forged);
+    vi.restoreAllMocks();
+    expect(undone.ok).toBe(false);
+    if (!undone.ok) {
+      expect(undone.code).toBe('commit-io-failed');
+      expect(undone.message).toContain('pre-Undo state');
+    }
+    // Exact post-Apply state: both files byte-identical, overlay untouched.
+    expect(fs.readFileSync(abs1, 'utf8')).toBe(applied1);
+    expect(fs.readFileSync(abs2, 'utf8')).toBe(applied2);
+    expect(listSuggestions(opts()).suggestions[0].status).toBe('applied');
+  });
+
+  it('returns an explicit degraded result when Apply mid-commit compensation itself fails', () => {
+    const card = openCard();
+    const forged = twoOpCard(card);
+    const firstRel = card.operations[0].path;
+    const abs1 = path.join(root, firstRel);
+
+    // The second write throws, and the rollback unlink fails too: the
+    // compensation cannot restore, so the result must name the affected
+    // paths and the reconciliation step instead of reporting success.
+    const realWrite = fs.writeFileSync.bind(fs);
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((p: fs.PathOrFileDescriptor, data: unknown) => {
+      if (String(p).endsWith('-second.md')) throw new Error('simulated mid-commit EIO');
+      return realWrite(p, data as string | Uint8Array);
+    }) as typeof fs.writeFileSync);
+    vi.spyOn(fs, 'unlinkSync').mockImplementation((() => {
+      throw new Error('simulated rollback failure');
+    }) as typeof fs.unlinkSync);
+
+    const result = applySuggestion(root, forged);
+    vi.restoreAllMocks();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('commit-io-degraded');
+      expect(result.message).toContain('DEGRADED STATE');
+      expect(result.message).toContain(firstRel);
+    }
+    // The partial state is by definition still there; it must be named
+    // loudly, never silent and never reported as success.
+    expect(fs.existsSync(abs1)).toBe(true);
   });
 });

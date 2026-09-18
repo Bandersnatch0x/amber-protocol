@@ -21,6 +21,7 @@ export default [
 			"templates/",
 			"test-workflows/",
 			"test-reports/",
+			".scratch/",
 			".external-tool/worktrees/",
 			"upper-shell/",
 		],

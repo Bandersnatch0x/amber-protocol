@@ -34,3 +34,42 @@ contain no independent domain rules. The distributed contexts extend the surface
 introduce a second authority or execution platform.
 
 The invariant traceability matrix (baseline rows 1, 2, 3, 12) directs this amendment.
+
+---
+
+## Amendment (0047, 2026-09-16): PEP coverage as an explicit contract over bounded evidence classes
+
+Per ticket 0047 (blind-spot ruling, option A) and the audit correction P1-04, this ADR is
+amended to make the policy-enforcement-point (PEP) coverage an explicit contract instead of an
+implied blanket guarantee. Amber's PEPs cover **all Amber-mediated side effects** — the
+governed-runner four gates, the F052 runner lifecycle, and the F056 external-effect lifecycle
+all pass the policy/approval boundary. Unmediated host-agent tool calls do not pass through
+Amber; they are a declared blind spot, not an intercepted surface.
+
+The amendment fixes four evidence classes so no record blends them:
+
+1. **Amber-recorded facts** (requests, authorizations, ledger events) are observed facts about
+   the mediation itself and claim nothing about external behavior.
+2. **Executor self-reports** (runner receipts, adapter declarations) are claims; comparing a
+   self-reported scope against an authorized bound is a fail-closed claim check that refuses
+   violations — it is never an independent observation.
+3. **Independently observed state** (a worktree read performed by an Amber-mediated command,
+   classified by `classifyDirtyPaths`) observes file state inside the repository only. It can
+   never establish the absence of network or out-of-repository effects, and it cannot attribute
+   an unmediated change to a principal.
+4. **Unobservable host actions** (direct host tool calls and egress) have no record point in
+   Amber — not even a claimed one — and their assurance stays unavailable.
+
+Consequences: out-of-scope post-hoc detection (declared path prefixes vs independently
+observed dirty paths) records a FAIL file-state fact under `AMBER_E_RUNNER_EXECUTION_SCOPE`
+without asserting actor attribution or network absence; a worktree diff never raises any
+statement above observed file state. Runtime interception (PreToolUse-level blocking) remains
+a possible future opt-in enhancement — never automatically installed, fail-open, and evaluated
+only after the 0059 Runtime Adapter contract is implemented — and this amendment claims no
+sandbox, runtime, or host-interception ownership.
+
+Provenance: `issues/0047-runtime-interception-boundary.md` (2026-09-15 ruling; corrected
+matrix appended 2026-09-16), audit P1-04 (`.scratch/product-scope-audit/0044-0060-2026-09-16-QjqMvx/REPORT.md` §5),
+canonical contract `docs/specs/trusted-control-context-runtime-contract.md` §2. The earlier
+amendment draft inside the ticket overstated what a worktree diff can establish; the ADR text
+above is the corrected, binding form.

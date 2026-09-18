@@ -288,6 +288,50 @@ const CATALOG = {
 		layer: "Governance",
 		related: ["AMBER_E_INVALID_ARG", "AMBER_E_STALENESS_REGISTRY_CORRUPT"],
 	},
+	AMBER_E_SUGGESTION_REVIEW_CORRUPT: {
+		title: "Suggestion review ledger is corrupt or unreadable",
+		cause:
+			"A suggestion-review ledger read hit a corrupt line, a broken hash chain, an unknown kind or field, or an event sequence the review writers could never produce (an unproposed fingerprint, a second proposal, an unvalidated apply, an unbalanced undo). An absent ledger reads as empty; this code only fires on real corruption — and on the write path it refuses the mutation rather than letting an audit event go missing.",
+		remedy:
+			"Restore .amber/suggestions/review.jsonl from a backup or version control if tracked; never edit the ledger in place — it is append-only governed state and every change is a proposed/validated/rejected/applied/undone event. If it is untracked and unrecoverable, reconcile the overlay (.amber/suggestions/state.json) by hand: it remains the current-state owner.",
+		layer: "Observability",
+		related: [
+			"AMBER_E_SUGGESTION_REVIEW_LOCK",
+			"AMBER_E_SUGGESTION_REVIEW_SIZE_CEILING",
+			"AMBER_E_EVIDENCE_REGISTRY_CORRUPT",
+		],
+	},
+	AMBER_E_SUGGESTION_REVIEW_LOCK: {
+		title: "Another suggestion review ledger write is in flight",
+		cause:
+			"A concurrent review writer holds .amber/suggestions/review.lock (fresh within the stale window), so the conflicting append or its §8.6 precheck is refused instead of racing the in-flight one.",
+		remedy:
+			"Retry once the in-flight write completes; a lock older than the stale window (30 s) is a crashed holder and is reclaimed automatically.",
+		layer: "Governance",
+		related: ["AMBER_E_SUGGESTION_REVIEW_CORRUPT", "AMBER_E_EVIDENCE_REGISTRY_LOCK"],
+	},
+	AMBER_E_SUGGESTION_REVIEW_SIZE_CEILING: {
+		title: "Suggestion review ledger exceeds its size ceiling",
+		cause:
+			"Appending the next review event would grow .amber/suggestions/review.jsonl beyond the size ceiling (default 1 MiB, env AMBER_SUGGESTION_REVIEW_MAX_BYTES), so the write — and any target mutation gated on its §8.6 precheck — is refused before durable state is touched.",
+		remedy:
+			"Keep rejection summaries bounded, or raise the ceiling deliberately via AMBER_SUGGESTION_REVIEW_MAX_BYTES (a positive integer; garbage fails closed as AMBER_E_INVALID_ARG).",
+		layer: "Governance",
+		related: [
+			"AMBER_E_SUGGESTION_REVIEW_CORRUPT",
+			"AMBER_E_EVIDENCE_SIZE_CEILING",
+			"AMBER_E_INVALID_ARG",
+		],
+	},
+	AMBER_E_SUGGESTION_REVIEW_STATE: {
+		title: "Suggestion review ledger state refuses this event",
+		cause:
+			"The per-kind writer guard refused the append against a fresh fold: a fingerprint is proposed exactly once, validated exactly once per proposal, Apply requires a validated proposal that is not already applied, and Undo requires a currently-applied proposal. The fold treats the same sequences as corruption when read back.",
+		remedy:
+			"Do not append review events by hand; drive the surface through the suggestion service (promotion at scan, Apply/Undo/Dismiss through the review actions), which only produces legal sequences.",
+		layer: "Governance",
+		related: ["AMBER_E_SUGGESTION_REVIEW_CORRUPT", "AMBER_E_INVALID_ARG"],
+	},
 	AMBER_E_CONTEXT_SCHEMA_INVALID: {
 		title: "Context page payload fails the page schema",
 		cause: "ingest received a payload that does not satisfy schemas/context-page.schema.json.",
