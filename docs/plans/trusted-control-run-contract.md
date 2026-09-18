@@ -1,10 +1,19 @@
 # Plan: Trusted Control Run Contract implementation
 
 Spec: `docs/specs/trusted-control-run-contract.md` (spec_id `trusted-control-run-contract`, status `proposed`, updated 2026-09-16)
-Status: proposed — **pending coordinator re-review; implementation NOT started**
+Feature: F062
+Status: implementation-ready
+User Confirmation: confirmed
 Origin ticket: `issues/0050-run-runscope-snapshot.md` (correction appended 2026-09-16)
 Baseline HEAD: `0a9cbeab85898bd043e1ab9f7c89ea71193cbb78`
 No new F-number is introduced; F064 and the feature catalog are untouched.
+
+## Context manifests
+
+Knowledge surfaces only (specs, ADRs, plan contracts); code paths ride F062's booked paths.
+
+- implement: docs/specs/trusted-control-run-contract.md, docs/plans/trusted-control-run-contract.md, docs/adr/0028-ledger-family-factory-and-decision-primitives.md, docs/adr/0012-schema-growth.md, issues/0050-run-runscope-snapshot.md
+- review: docs/specs/trusted-control-run-contract.md, docs/plans/trusted-control-run-contract.md, .scratch/orchestration/run-contract-impl-2026-09-19/REVIEW-spec-plan.md
 
 ## Goal
 
@@ -48,7 +57,7 @@ binding that grant writers already produce. Slices 1→2→3 are therefore
 capture → grant-binding → gate-consumption; 4-7 are the consumers, each gated on
 its owning ticket's adopted rereview.
 
-- [ ] **Slice 1 — Attempt capture: durable admission record (core, F062 surface).**
+- [x] **Slice 1 — Attempt capture: durable admission record (core, F062 surface).**
   Files: `scripts/lib/session-stage-runner.js` (primary),
   `scripts/lib/core/context-hash.js` (reuse, no change),
   `tests/unit/session-stage-runner*.test.js` (new/extended).
@@ -68,7 +77,7 @@ its owning ticket's adopted rereview.
   Acceptance: spec §10 tests 1/2/5/7/10 (same-prefix IDs, duplicate/retry,
   mutation isolation, ordered arrays, crash-left-requested, capture-then-pending).
 
-- [ ] **Slice 2 — Authorization binding fields (grant writers).**
+- [x] **Slice 2 — Authorization binding fields (grant writers).**
   Files: `scripts/lib/core/loop-ledger.js` (no shape change — fields live on
   callers), `scripts/lib/core/loop-execution.js` and route/session callers writing
   `approved` records, `scripts/lib/core/approval-registry.js`.
@@ -81,7 +90,7 @@ its owning ticket's adopted rereview.
   Acceptance: grant bound to a captured attempt is recorded; grant naming a
   non-existent attemptId is refused.
 
-- [ ] **Slice 3 — Pre-effect gate verification and consumption (core, governed-runner).**
+- [x] **Slice 3 — Pre-effect gate verification and consumption (core, governed-runner).**
   Files: `scripts/lib/core/governed-runner.js` (primary), `tests/unit/governed-runner*.test.js`.
   Work: in the gate path, before policy evaluation/execution/consumption — verify
   the resolved request hashes to the frozen `inputDigest`; verify the gate-loaded
@@ -94,7 +103,7 @@ its owning ticket's adopted rereview.
   Acceptance: tests 3/6/9 of spec §10 (consumed/capability-drift/mismatched-attempt
   grants; gate-time drift refuses pre-effect; request-digest mismatch refuses).
 
-- [ ] **Slice 4 — Evidence receipt join fields (0054 consumer).**
+- [x] **Slice 4 — Evidence receipt join fields (0054 consumer).**
   Files: `scripts/lib/core/governed-runner.js` (`recordExecutionEvidence`),
   `scripts/lib/core/evidence-receipts.js` (RECEIPT_FIELDS is closed — extend the
   `environment` contents, not the top-level set, unless 0054 adopts otherwise).
@@ -103,7 +112,7 @@ its owning ticket's adopted rereview.
   Acceptance: join present on new receipts; unjoinable receipts flagged, not
   silently accepted. **Gated on 0054 rereview adoption.**
 
-- [ ] **Slice 5 — Replay bundle per-attempt slices (0055 consumer).**
+- [x] **Slice 5 — Replay bundle per-attempt slices (0055 consumer).**
   Files: `scripts/lib/core/handoff-bundle.js`, new `replayPolicyDecision` read path.
   Work: `--replay-scope <sessionId|runId>` emits per-attempt frozen-record slices
   plus hash-pinned policy copies (one per policy version seen); replay verifies
@@ -113,7 +122,7 @@ its owning ticket's adopted rereview.
   Acceptance: test 4/8 of spec §10; offline bundle reproduces recorded verdicts with
   the working copy absent. **Gated on 0055 rereview adoption.**
 
-- [ ] **Slice 6 — Timeline run events (0056 consumer).**
+- [x] **Slice 6 — Timeline run events (0056 consumer).**
   Files: `scripts/lib/session-commands.js` / timeline append path,
   `schemas/timeline-event.schema.json` (optional fields only).
   Work: `run_started`/`run_completed`/`run_failed` per attempt carrying the full
@@ -121,7 +130,7 @@ its owning ticket's adopted rereview.
   Acceptance: events fire per attempt lifecycle; legacy events unchanged and never
   upgraded. **Gated on 0056 rereview adoption.**
 
-- [ ] **Slice 7 — Metrics fold (0054 consumer).**
+- [x] **Slice 7 — Metrics fold (0054 consumer).**
   Files: metrics projection (`governance-report` fold or the location 0060's PR
   sequence assigns).
   Work: attempt counters per spec §7 R2 — `attempts_requested_total`,
@@ -187,10 +196,25 @@ its owning ticket's adopted rereview.
 
 ## Resume Checkpoint
 
-- Resume Point: spec and plan proposed; zero slices started.
-- Blockers: coordinator two-axis review of the spec/plan; consumer-ticket rereviews
-  (0051/0054/0055/0056) adopted before slices 3-7.
-- Next Action: coordinator Standards + Spec review of
-  `docs/specs/trusted-control-run-contract.md` and this plan; then slice 1.
+- Resume Point: all seven slices delivered 2026-09-19 (session `24f45d7a`). Spec
+  §10 tests 1–10 pass at the public seams (19 new tests in
+  `tests/unit/run-contract.test.js`); full gates green —
+  `.scratch/orchestration/run-contract-impl-2026-09-19/` (`B8-dual-axis-review.md`,
+  `root-npm-test.log`, `gates.log`, `eslint.log`). Implementation choices the
+  review recorded: argv `[]` for shell-string commands; `constraints`/`context_scope`/
+  `contextHash` null until their owning surfaces derive them; grant selection by
+  mutual binding (R-AD-6) with R-AU-3 refusals evaluated against the selected
+  grant; `rejected` settlements excluded from `attempts_settled_total` so
+  `settled ⊆ admitted` holds; dry-run projects an open capture as a resume.
+- Blockers: the session's two human route gates (`user-approval-plan`,
+  `user-approval-implement`) await the user — the worker does not self-approve.
+- Next Action: user approves the two gates, then `amber session complete`.
 - Recovery Instructions: reopen this plan and continue at the first unchecked
   slice; do not regenerate unless the plan file is missing.
+
+## Evidence Schema
+
+- Command: npm test / node scripts/run-tests.js tests/unit/<suite> / npm run manifests / npm run doctor / npm run gen:agents:check
+- Result: pass/fail counts + exit codes per gate, logged under .scratch/orchestration/run-contract-impl-2026-09-19/
+- Date: 2026-09-19
+- Notes: per-slice targeted suite commands recorded beside the logs; two-axis review verdict in the same directory.

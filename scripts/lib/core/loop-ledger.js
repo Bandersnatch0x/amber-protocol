@@ -66,6 +66,13 @@ function verifyLedgerChain(ledgerPath) {
 
 // An approval is consumable until an `executed` record references its approvalKey.
 function latestUnconsumedApproval(records) {
+	return latestUnconsumedApprovalFor(records, null);
+}
+
+// Selection variant: among unconsumed grants, the latest one satisfying the
+// caller's match predicate (the run contract's mutual binding — an attempt
+// consumes the grant bound to it, never a foreign attempt's orphaned grant).
+function latestUnconsumedApprovalFor(records, match) {
 	const consumed = new Set(
 		records
 			.filter((r) => r.kind === "executed" && r.consumedApprovalKey)
@@ -74,7 +81,8 @@ function latestUnconsumedApproval(records) {
 	const open = records.filter(
 		(r) => r.kind === "approved" && r.approvalKey && !consumed.has(r.approvalKey),
 	);
-	return open.length ? open[open.length - 1] : null;
+	const selected = match ? open.filter(match) : open;
+	return selected.length ? selected[selected.length - 1] : null;
 }
 
 // Walk all GLX ledger homes (loops / routes / sessions) and call cb({ home, sub, ledgerPath })
@@ -120,6 +128,7 @@ module.exports = {
 	verifyLedgerChain,
 	verifyLedgerOutcome,
 	latestUnconsumedApproval,
+	latestUnconsumedApprovalFor,
 	walkLedgers,
 	GENESIS,
 };

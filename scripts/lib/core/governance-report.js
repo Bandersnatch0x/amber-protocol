@@ -13,6 +13,35 @@ const { gatherState, buildContext, inferNextStep } = require("./lifecycle");
 const { shellQuote } = require("./text-utils");
 const { detectNoProgress } = require("../workflow-assessment");
 const { loadSessionEvidence } = require("../session-evidence");
+const { walkLedgers, readLedger } = require("./loop-ledger");
+const { attemptMetricsOf } = require("./run-freeze");
+
+// Trusted-control run contract (spec §7 R2): attempt counters fold over the
+// session ledgers' capture population — the aggregate across all sessions.
+function collectAttemptMetrics(targetRoot) {
+	const stateDir = resolveStateDirForRead(targetRoot);
+	const totals = {
+		sessions: 0,
+		attempts_requested_total: 0,
+		attempts_admitted_total: 0,
+		attempts_denied_total: 0,
+		attempts_still_open: 0,
+		attempts_settled_total: {},
+	};
+	walkLedgers(stateDir, ({ home, ledgerPath }) => {
+		if (home !== "sessions") return;
+		totals.sessions += 1;
+		const metrics = attemptMetricsOf(readLedger(ledgerPath));
+		totals.attempts_requested_total += metrics.attempts_requested_total;
+		totals.attempts_admitted_total += metrics.attempts_admitted_total;
+		totals.attempts_denied_total += metrics.attempts_denied_total;
+		totals.attempts_still_open += metrics.attempts_still_open;
+		for (const [status, count] of Object.entries(metrics.attempts_settled_total)) {
+			totals.attempts_settled_total[status] = (totals.attempts_settled_total[status] ?? 0) + count;
+		}
+	});
+	return totals;
+}
 
 const PRODUCT_VALUE_LOOP =
 	"Assess repo -> Score risks -> Recommend next actions -> Run governed workflow -> Verify evidence -> Produce handoff bundle";
@@ -312,6 +341,7 @@ function buildGovernanceReport(target, options = {}) {
 		},
 		workflowEffectiveness: collectWorkflowEffectiveness(targetRoot, state.activeSessionId),
 		memoryChannelMix: collectMemoryChannelMix(targetRoot),
+		attemptMetrics: collectAttemptMetrics(targetRoot),
 		nextActions,
 		errors,
 		warnings: [...(readiness.warnings || []), ...(maintenance.warnings || [])],
@@ -418,8 +448,30 @@ function renderGovernanceReportMarkdown(report) {
 		"",
 		...renderMemoryChannelMixMarkdown(report.memoryChannelMix),
 		"",
+		"## Run Attempt Metrics",
+		"",
+		...renderAttemptMetricsMarkdown(report.attemptMetrics),
+		"",
 	];
 	return lines.join("\n");
+}
+
+function renderAttemptMetricsMarkdown(metrics) {
+	if (!metrics || metrics.sessions === 0) {
+		return ["- No session attempts recorded yet."];
+	}
+	const settled = Object.entries(metrics.attempts_settled_total)
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([status, count]) => `  - ${status}: ${count}`);
+	return [
+		`- Sessions with attempts: ${metrics.sessions}`,
+		`- attempts_requested_total: ${metrics.attempts_requested_total}`,
+		`- attempts_admitted_total: ${metrics.attempts_admitted_total}`,
+		`- attempts_denied_total: ${metrics.attempts_denied_total}`,
+		`- attempts_still_open (requested-not-yet-gated or expired): ${metrics.attempts_still_open}`,
+		"- attempts_settled_total{status}:",
+		...(settled.length > 0 ? settled : ["  - none"]),
+	];
 }
 
 function renderGovernanceReportText(report) {

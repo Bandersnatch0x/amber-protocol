@@ -10,6 +10,15 @@ const { renderHandoff } = require("../handoff-command");
 const { shellQuote } = require("./text-utils");
 const { readSessionEvents } = require("../session-timeline");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
+const { readLedger } = require("./loop-ledger");
+const { evaluateCommandPolicy } = require("./loop-policy");
+const {
+	contractHashOf,
+	inputDigestOf,
+	policyHashOf,
+	runIdOf,
+	scopeHashOf,
+} = require("./run-freeze");
 const {
 	REQUIRED_BUNDLE_FILES,
 	defaultBundleDir,
@@ -188,6 +197,162 @@ function buildManifest({ targetRoot, outputDir, generatedAt, report }) {
 	};
 }
 
+// ── trusted-control run contract: replay slices (Slice 5, spec §9) ──────────
+// A bundle that carries per-attempt frozen-record slices works offline after
+// the working copy is deleted: replay verifies value-hash integrity FIRST
+// (R-RP-1), then re-evaluates the stored evaluated request against the stored
+// hash-pinned rules with the pure policy seam (R-RP-2). Hash-only, missing-
+// body, and tampered-body records are NON_REPLAYABLE — never silently
+// degraded, never default-filled. Bundles spanning policy versions carry each
+// attempt's own policy copy (R-RP-4).
+
+const RUN_UUID_TOTAL = 36 + 1 + 36; // two UUIDs joined by one hyphen
+
+/**
+ * Parse a `--replay-scope` value: a sessionId, or a full derived runId
+ * (`run-{sessionId}-{attemptId}`, R-ID-1). A truncated runId never resolves
+ * (R-ID-2 — the display form is never an authority key).
+ * @returns {{sessionId: string, attemptId: string|null}|null}
+ */
+function parseReplayScope(scope) {
+	if (typeof scope !== "string" || scope.length === 0) return null;
+	if (scope.startsWith("run-")) {
+		const tuple = scope.slice(4);
+		if (tuple.length !== RUN_UUID_TOTAL) return null;
+		const sessionId = tuple.slice(0, 36);
+		const attemptId = tuple.slice(37);
+		if (tuple[36] !== "-") return null;
+		return { sessionId, attemptId };
+	}
+	return { sessionId: scope, attemptId: null };
+}
+
+/**
+ * Build one attempt's replay slice from its `stage_attempt_requested` record,
+ * verifying value-hash integrity before declaring it replayable.
+ */
+function attemptReplaySlice(record, records) {
+	const runId = runIdOf(record.sessionId, record.attemptId);
+	const base = {
+		runId,
+		sessionId: record.sessionId,
+		attemptId: record.attemptId,
+		requestId: record.requestId,
+		stageName: record.stageName,
+	};
+	const frozen = record.frozen;
+	if (!frozen || !record.inputDigest) {
+		return {
+			...base,
+			replayable: false,
+			reason:
+				"NON_REPLAYABLE: the attempt carries no frozen admission inputs (legacy record, R-FR-4 — never inferred)",
+		};
+	}
+	// R-RP-1: recompute all base hashes from the stored values and compare.
+	const problems = [];
+	if (policyHashOf(frozen.policy) !== frozen.hashes.policyHash) {
+		problems.push("policy value-hash mismatch");
+	}
+	if (frozen.scopeInputs && scopeHashOf(frozen.scopeInputs) !== frozen.hashes.scopeHash) {
+		problems.push("scopeInputs value-hash mismatch");
+	}
+	if (
+		frozen.hashes.contractHash !==
+		contractHashOf({
+			routeId: record.routeId,
+			routeVersion: record.routeVersion,
+			hashes: frozen.hashes,
+		})
+	) {
+		problems.push("contractHash mismatch");
+	}
+	const recomputedDigest = inputDigestOf({
+		resolvedCommand: frozen.evaluatedRequest?.resolvedCommand ?? null,
+		argv: frozen.evaluatedRequest?.argv ?? null,
+		capabilityPin: record.capabilityPin,
+		routeHash: record.routeHash,
+		stageName: record.stageName,
+		attemptNumber: record.attemptNumber,
+		fence: record.leaseFence,
+	});
+	if (recomputedDigest !== record.inputDigest) {
+		problems.push("request value-hash mismatch");
+	}
+	if (problems.length > 0) {
+		return { ...base, replayable: false, reason: `NON_REPLAYABLE: ${problems.join("; ")}` };
+	}
+	// The recorded admission verdict, joined by requestId (the fold source for
+	// the reproduced-verdict comparison).
+	const admitted = (records ?? []).find(
+		(candidate) => candidate.kind === "attempt_admitted" && candidate.requestId === record.requestId,
+	);
+	return {
+		...base,
+		replayable: true,
+		frozen,
+		inputDigest: record.inputDigest,
+		recordedVerdict: admitted ? admitted.policyVerdict ?? null : null,
+	};
+}
+
+/**
+ * R-RP-2: replay is a real deterministic evaluation — the stored evaluated
+ * request runs against the stored rules object; live rules, manifests, and
+ * registries are never consulted. A host-agent window froze no command, which
+ * is a recorded absence, not a replayable evaluation.
+ */
+function replayPolicyDecision(slice) {
+	if (!slice.replayable) {
+		return { runId: slice.runId, replayable: false, reason: slice.reason };
+	}
+	const command = slice.frozen?.evaluatedRequest?.resolvedCommand;
+	if (typeof command !== "string") {
+		return {
+			runId: slice.runId,
+			replayable: false,
+			reason: "NON_REPLAYABLE: the frozen request carries no resolved command (host-agent window)",
+		};
+	}
+	const verdict = evaluateCommandPolicy(command, slice.frozen.policy);
+	return {
+		runId: slice.runId,
+		replayable: true,
+		verdict: {
+			allowed: verdict.allowed === true,
+			matchedRule: verdict.matchedRule ?? null,
+			confidence: verdict.confidence ?? null,
+		},
+		recordedVerdict: slice.recordedVerdict ?? null,
+	};
+}
+
+/**
+ * Collect the per-attempt replay slices for a `--replay-scope` value (a
+ * sessionId, or a full runId narrowing to one attempt). The session must
+ * exist; an unknown scope is a bundle error, not an empty result.
+ */
+function collectAttemptReplaySlices(targetRoot, replayScope) {
+	const scope = parseReplayScope(replayScope);
+	if (!scope) {
+		return { ok: false, errors: [`--replay-scope must be a sessionId or a full runId (${replayScope})`] };
+	}
+	const sessionDir = path.join(resolveStateDirForRead(targetRoot), "sessions", scope.sessionId);
+	const ledgerPath = path.join(sessionDir, "ledger.jsonl");
+	if (!fs.existsSync(ledgerPath)) {
+		return { ok: false, errors: [`no session ledger exists for scope ${scope.sessionId}`] };
+	}
+	const records = readLedger(ledgerPath);
+	const requests = records.filter((record) => record.kind === "stage_attempt_requested");
+	const slices = requests
+		.filter((record) => scope.attemptId === null || record.attemptId === scope.attemptId)
+		.map((record) => {
+			const slice = attemptReplaySlice(record, records);
+			return { ...slice, replayDecision: replayPolicyDecision(slice) };
+		});
+	return { ok: true, sessionId: scope.sessionId, slices };
+}
+
 function writeHandoffBundle(target, options = {}) {
 	const targetRoot = resolveTarget(target);
 	const targetDisplay = options.targetDisplay || target || ".";
@@ -210,6 +375,35 @@ function writeHandoffBundle(target, options = {}) {
 	files.push(writeFile(outputDir, "next-actions.md", renderNextActions(report)));
 	files.push(writeFile(outputDir, "risks.md", renderRisks(report)));
 	files.push(writeFile(outputDir, "recovery-commands.md", renderRecoveryCommands(targetDisplay)));
+
+	// Slice 5 (spec §9): an optional per-attempt replay-slices file for
+	// `--replay-scope <sessionId|runId>` — frozen values plus the replay
+	// decisions, so the bundle reproduces recorded verdicts offline.
+	const bundleErrors = [];
+	if (options.replayScope) {
+		const slices = collectAttemptReplaySlices(targetRoot, options.replayScope);
+		if (!slices.ok) {
+			bundleErrors.push(...slices.errors);
+		} else {
+			const replayPath = writeFile(
+				outputDir,
+				"replay-slices.json",
+				`${JSON.stringify(
+					{
+						schemaVersion: 1,
+						artifactType: "amber-replay-slices",
+						scope: options.replayScope,
+						sessionId: slices.sessionId,
+						slices: slices.slices,
+					},
+					null,
+					2,
+				)}\n`,
+			);
+			files.push(replayPath);
+		}
+	}
+
 	files.push(
 		writeFile(
 			outputDir,
@@ -238,8 +432,9 @@ function writeHandoffBundle(target, options = {}) {
 		readinessScore: report.scores.overall,
 		decision: report.decision,
 		failedVerifications,
+		replayScope: options.replayScope ?? null,
 		text: `Handoff bundle written: ${outputDir}\nFiles: ${files.length}\nReadiness score: ${report.scores.overall}/100 (${report.decision})`,
-		errors: [...validation.errors, ...(handoffValidation.errors || [])],
+		errors: [...validation.errors, ...(handoffValidation.errors || []), ...bundleErrors],
 		warnings: [...validation.warnings, ...(handoffValidation.warnings || [])],
 	};
 }
@@ -307,4 +502,8 @@ module.exports = {
 	writeHandoffBundle,
 	validateHandoffBundle,
 	collectFailedVerifications,
+	parseReplayScope,
+	collectAttemptReplaySlices,
+	attemptReplaySlice,
+	replayPolicyDecision,
 };
