@@ -334,6 +334,11 @@ export function applySuggestion(
     for (const operation of card.operations) {
       const result = applyOne(repoRoot, operation);
       if (typeof result === 'string') {
+        // A stale refusal mid-commit must still restore every operation that
+        // already landed. This rollback ride sits inside the loop's fail-closed
+        // catch below: if the restore itself throws, the same §8.6 contract
+        // applies (compensateApply → commitIoFailed, degraded when
+        // compensation fails) — never a loud throw, never a silent partial.
         rollback(repoRoot, applied);
         return { ok: false, code: 'stale', message: result };
       }

@@ -2,8 +2,8 @@
 
 **Spec ID:** `trusted-control-evolution-contract`
 **Status:** proposed
-**Updated:** 2026-09-16
-**Review:** coordinator contract-review-01 findings (ST-01, B-SP-01..04) repaired on 2026-09-16; re-review pending. This status records the authority lifecycle only — it is not acceptance, and runtime implementation has not started.
+**Updated:** 2026-09-19
+**Review:** coordinator contract-review-01 findings (ST-01, B-SP-01..04) repaired on 2026-09-16; re-review pending. This status records the authority lifecycle only — it is not acceptance. Slices 1–6 of the implementation plan are delivered (2026-09-18); the 2026-09-19 post-land close-out (plan `docs/plans/F064-suggestion-review-closeout.md`, Slice 7 of the implementation plan) amended §5/§6/§8 from the dual-axis review backlog so the delivered code and this contract agree explicitly: the tightened §6 V1 reading, the two §8.6 write shapes, and §8.2 proposal rounds.
 **Adoption authority:** Goal packet `.scratch/orchestration/all-tickets-0044-0060-2026-09-16-5HXix4` (user-approved objective). This spec converts the 0048/0057 rulings — corrected per audit P1-07 — into canonical text. It is not a fabricated per-decision human ratification; residual choices are recorded as implementation choices in `docs/plans/trusted-control-evolution.md`.
 **Provenance:** `issues/0048-trajectory-attribution-adoption-boundary.md` and `issues/0057-evolution-proposal-evidence-contract.md` (original 2026-09-15 rulings; corrections appended 2026-09-16, both pending coordinator review); audit P1-07 and per-ticket recommendations (`.scratch/product-scope-audit/0044-0060-2026-09-16-QjqMvx/REPORT.md` §5, §7); consumer sources F064 (`docs/specs/F064-improvement-suggestions.md`), F054, F055, F052, F050, F058, ADR-0009, ADR-0018, ADR-0014, ADR-0028, issue 0051 (rules v2 / policyHash staleness).
 **Depends on:** F064 (Improvement Suggestions — the only realized proposal destination today), F054 (maintain Findings/Trigger Proposals/triage), F055 (retention classification and deletion proof), F052 (capability registration governance), F050 (Decisions/Approval/staleness), F058 (instruction-surface evals; eval non-authority), ADR-0009 (Distillation Contract topology), ADR-0018 (governed memory layer), ADR-0014 (`next` is not an LLM router), ADR-0028 (ledger family factory), 0051 rules v2 (behavior-surface destination; not yet landed — visible dependency).
@@ -133,7 +133,7 @@ rejection/retry, and retention.
 | Owner | The destination's producer: F064 planner (wiki-only today); host agent under a Distillation Contract for generated knowledge text; deterministic deriver for behavior-surface drafts (§7) |
 | Allowed action | Propose only |
 | Evidence | ≥1 evidence reference (V1): receipt id, F064 cluster evidence, transcript citation, or inspection reference |
-| Rejection/retry | Validity check V1–V3 at admission (§6); failure rejects the proposal before any review, records a rejection record (§8), and returns the reason code. Retry is a new proposal; the rejection-history hint is shown at its admission |
+| Rejection/retry | Validity check V1–V3 at admission (§6); failure rejects the proposal before any review, records a rejection record (§8), and returns the reason code. Retry is a new proposal (a retry whose cluster evidence changed opens a new §8.2 proposal round); the rejection-history hint is shown at its admission |
 | Retention | Per owning surface: F064 → suggestion-review ledger (§8); memory → `.amber/context/events.jsonl` (closed five-kind set); F054 → `.amber/maintain/`; maintenance → `.amber/maintenance/proposals/` |
 
 ### Stage 3 — Review
@@ -168,9 +168,18 @@ human review; only passing proposals enter the review queue.
 
 | Rule | Mechanical check | Reason code |
 | --- | --- | --- |
-| V1 no-evidence | The proposal carries ≥1 resolvable evidence reference (receipt id, cluster evidence, transcript citation, inspection reference) | `validity:no-evidence` |
+| V1 no-evidence | The proposal carries ≥1 evidence reference and every supplied reference resolves against its owning source (receipt id, cluster evidence, transcript citation, inspection reference) — an unresolvable citation fails V1 even when other references resolve | `validity:no-evidence` |
 | V2 capability-reduction | No declared operation deletes or downgrades a capability-registry entry | `validity:capability-reduction` |
 | V3 eval-only-claim | The effect statement is present and is not solely an eval reference; it names both axes (readiness + effectiveness) of the dual-axis assessment | `validity:eval-only-claim` |
+
+Amendment (2026-09-19, post-land close-out): V1's original "≥1 resolvable evidence
+reference" wording under-specified the delivered invariant, which requires every
+supplied reference to resolve. The tightened reading is normative and deliberate:
+citations are regenerated from the signals themselves at each admission, so a
+citation that does not resolve signals a real defect (a pruned source mid-scan or
+a collector bug) at the last boundary that can refuse it, and a proposal can
+always be repaired by dropping the dead reference and retrying. This is a form
+check only — the non-claims below are unchanged.
 
 Non-claims (normative): passing V1 proves an evidence reference exists, not that the
 evidence is true. Passing V3 proves a dual-axis statement is present, not that the
@@ -236,6 +245,26 @@ under `.amber/suggestions/review.jsonl`. Closed event-kind set of five:
 | `applied` | fingerprint, applied record digest (paths, before/after hashes) | Apply success |
 | `undone` | fingerprint, restored-hashes digest | Undo success |
 
+**Proposal rounds (amendment, 2026-09-19 post-land close-out).** The correlation
+chain may repeat per fingerprint: a rejected proposal may be retried, and a retry
+is a new proposal (§5 stage 2). A retry whose cluster evidence changed — a
+different evidence digest or host set than the current round — opens a **new
+proposal round**: a second `proposed` event carrying the retry's own evidence and
+operations digests, followed by that round's own outcome events. A re-surface
+with unchanged evidence rides the existing round (no second `proposed` event), so
+repeated scans of a stable rejected cluster never grow the ledger. `validated`
+belongs to the current round only: a round that already carries a rejection
+cannot be validated — the retry must propose first. An admission validity
+rejection is recorded once per round (operator Dismiss always appends). Applied
+and undone events stay balanced overall; a currently-applied fingerprint is past
+its admission decision and never re-proposes. The fold projects one record per
+fingerprint: the current round's proposal fields, the accumulated rejection
+list, and the round counters (`proposalCount`, `rejectionsSinceLastProposal`).
+Operations and attribution are derived surfaces and never open a round by
+themselves (the planner's wiki body embeds the plan date, which would otherwise
+reopen a round daily for an unchanged cluster); a new round's `proposed` event
+records their current digests.
+
 ### 8.3 Rejection-history hint
 
 At card admission, the fold over `suggestion-review` is queried by fingerprint. A
@@ -281,8 +310,24 @@ The §8.3 hint and E7 govern the **read side only** (the history lookup may degr
 to `unknown`). The write side has no such degradation: `proposed`, `validated`,
 `rejected`, `applied`, and `undone` are mandatory governed writes, and a corrupt,
 locked, or ceiling-exhausted ledger must never turn into "mutation succeeded, audit
-silently missing". Ordering for every state-changing F064 mutation (Apply shown;
-Undo/Dismiss/promotion follow the same shape):
+silently missing". Two write shapes exist, and the ordering binds them differently
+(amendment, 2026-09-19 post-land close-out):
+
+- **Target-mutation writes — Apply / Undo / Dismiss.** The target is mutated
+  before the audit append, so all three steps below apply in full: the precheck
+  precedes the mutation, and an audit-append failure after the mutation
+  compensates by byte-restore.
+- **Audit-only writes — promotion (`proposed`), admission validation
+  (`validated`), admission validity rejection (`rejected`).** The governed append
+  is itself the first and only durable write: there is no target mutation to
+  precheck or compensate. The append refuses fail-closed by construction — lock,
+  chain, and ceiling are checked before any byte lands — and the admission surface
+  refuses the card rather than expose it without its audit event (E12). A separate
+  caller-side pre-probe would add nothing and could false-refuse a
+  dedup-skipped promotion; the read side stays hint-only (E7).
+
+Ordering for every target-mutation F064 mutation (Apply shown; Undo/Dismiss
+follow the same shape):
 
 1. **Precheck (before any mutation):** walk the ledger chain, probe appendability
    (lock/ceiling), and validate target state (allowlist, content hash). Failure ⇒

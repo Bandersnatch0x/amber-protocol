@@ -9,7 +9,9 @@
 // checks executed by deterministic code — never a model, never a human:
 //
 //   V1 validity:no-evidence         ≥1 evidence reference, every reference
-//                                   resolved against its owning source.
+//                                   resolved against its owning source (the
+//                                   tightened reading is normative per the
+//                                   2026-09-19 §6 amendment).
 //   V2 validity:capability-reduction no declared operation deletes or
 //                                   downgrades a capability-registry entry.
 //   V3 validity:eval-only-claim     readiness AND effectiveness statements,

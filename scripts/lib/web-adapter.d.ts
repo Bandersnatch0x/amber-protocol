@@ -413,7 +413,7 @@ export function recordSuggestionUndone(
   input: { fingerprint: string; restored: SuggestionRestoredDigestRecord[] },
 ): SuggestionReviewAppendResult;
 
-/** One folded review record per fingerprint, first-proposed order. */
+/** One folded review record per fingerprint (current proposal round fields plus cumulative history), first-proposed order. */
 export type SuggestionReviewRecord = {
   fingerprint: string;
   proposedAt: string;
@@ -423,6 +423,11 @@ export type SuggestionReviewRecord = {
   attribution: Record<string, unknown>;
   validatedAt: string | null;
   rejections: Array<{ reason: string; summary: string; at: string }>;
+  /** §8.2 proposal rounds: how many `proposed` events this fingerprint has. */
+  /** §8.2 proposal rounds: how many `proposed` events this fingerprint has. */
+  proposalCount: number;
+  /** Rejections recorded since the current round's `proposed` event. */
+  rejectionsSinceLastProposal: number;
   appliedCount: number;
   undoneCount: number;
   lastAppliedAt: string | null;

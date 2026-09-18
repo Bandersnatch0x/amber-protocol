@@ -11,6 +11,7 @@ import {
   undoSuggestionById,
 } from '../server/lib/suggestions/service';
 import { applySuggestion, undoSuggestion } from '../server/lib/suggestions/apply';
+import { fileHash } from '../server/lib/suggestions/paths';
 import type { ImprovementSuggestion } from '../server/lib/suggestions/types';
 
 const ERROR_A = 'ENOENT: no such file or directory, open /tmp/foo-123/bar';
@@ -282,5 +283,103 @@ describe('Improvement Suggestions apply overlay', () => {
     // The partial state is by definition still there; it must be named
     // loudly, never silent and never reported as success.
     expect(fs.existsSync(abs1)).toBe(true);
+  });
+
+  // A double update on one allowlisted file: both operations pin the same
+  // draft-time hash, so the precheck plans both, but the second commit-time
+  // check sees the file after the first update and refuses stale — reaching
+  // the commit loop's stale-refusal rollback with a non-empty applied set.
+  function staleSecondOpCard(card: ImprovementSuggestion): ImprovementSuggestion {
+    const rel = 'docs/wiki/agent/friction/existing.md';
+    const abs = path.join(root, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, 'draft-time bytes\n');
+    const draftHash = fileHash(abs) as string;
+    return {
+      ...card,
+      operations: [
+        {
+          verb: 'update',
+          artifactKind: 'wiki',
+          path: rel,
+          summary: 'first update lands',
+          contents: 'first-update bytes\n',
+          expectedHash: draftHash,
+        },
+        {
+          verb: 'update',
+          artifactKind: 'wiki',
+          path: rel,
+          summary: 'second update must refuse stale',
+          contents: 'second-update bytes\n',
+          expectedHash: draftHash,
+        },
+      ],
+    };
+  }
+
+  it('routes a stale-refusal rollback failure through the compensation contract (compensated)', () => {
+    const card = openCard();
+    const forged = staleSecondOpCard(card);
+    const rel = forged.operations[0].path;
+    const abs = path.join(root, rel);
+    const draftBytes = fs.readFileSync(abs, 'utf8');
+
+    // The commit loop's stale branch calls rollback after op 1 landed. Let
+    // op 1's write succeed (call 1), fail the rollback restore (call 2), and
+    // let the compensation's restore succeed (call 3): the double failure
+    // must return the explicit commit-io-failed result — never a throw.
+    const realWrite = fs.writeFileSync.bind(fs);
+    let writes = 0;
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((p: fs.PathOrFileDescriptor, data: unknown) => {
+      if (String(p) === abs) {
+        writes += 1;
+        if (writes === 2) throw new Error('simulated stale-branch rollback failure');
+      }
+      return realWrite(p, data as string | Uint8Array);
+    }) as typeof fs.writeFileSync);
+
+    const result = applySuggestion(root, forged);
+    vi.restoreAllMocks();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('commit-io-failed');
+      expect(result.message).toContain('pre-Apply state');
+    }
+    // Compensation restored the exact draft-time bytes and the card stayed
+    // open — no partial state from the double failure.
+    expect(fs.readFileSync(abs, 'utf8')).toBe(draftBytes);
+    expect(listSuggestions(opts()).suggestions[0].status).toBe('open');
+  });
+
+  it('routes a stale-refusal rollback failure through the compensation contract (degraded)', () => {
+    const card = openCard();
+    const forged = staleSecondOpCard(card);
+    const rel = forged.operations[0].path;
+    const abs = path.join(root, rel);
+
+    // The restore write fails for the rollback AND the compensation, so the
+    // degraded result must name the affected path and the reconciliation step.
+    const realWrite = fs.writeFileSync.bind(fs);
+    let writes = 0;
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((p: fs.PathOrFileDescriptor, data: unknown) => {
+      if (String(p) === abs) {
+        writes += 1;
+        if (writes >= 2) throw new Error('simulated stale-branch rollback failure');
+      }
+      return realWrite(p, data as string | Uint8Array);
+    }) as typeof fs.writeFileSync);
+
+    const result = applySuggestion(root, forged);
+    vi.restoreAllMocks();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('commit-io-degraded');
+      expect(result.message).toContain('DEGRADED STATE');
+      expect(result.message).toContain(rel);
+    }
+    // The first update's bytes remain (compensation could not restore); the
+    // mismatch is the named degraded state, never success and never silent.
+    expect(fs.readFileSync(abs, 'utf8')).toBe('first-update bytes\n');
   });
 });

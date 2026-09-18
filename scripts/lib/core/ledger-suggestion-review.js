@@ -36,7 +36,19 @@
 // Write side (§8.6/E12): every append is a mandatory governed write —
 // corruption, lock, or ceiling refuses rather than degrading to a hint, and
 // `precheckSuggestionReviewAppend` lets Apply/Undo/Dismiss walk the chain and
-// probe appendability BEFORE any target mutation.
+// probe appendability BEFORE any target mutation. Promotion/validated/
+// validity-rejection are audit-only writes (§8.6): the governed append is the
+// first and only durable write, so the family append's own lock/chain/ceiling
+// refusals are the fail-closed gate — there is no target mutation to precheck.
+//
+// Proposal rounds (§8.2 amendment): a retry whose cluster evidence changed
+// (different evidence digest or host set) opens a new round — a second
+// `proposed` event followed by that round's own outcome events. An unchanged
+// re-surface rides the existing record, so rescans of a stable rejected
+// cluster never grow the ledger. `validated` belongs to the current round
+// only; validity rejections dedupe once per round. Operations/attribution are
+// derived surfaces and never open a round by themselves (the planner's wiki
+// body embeds the plan date), but a new round records their current digests.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -367,6 +379,32 @@ function eventShapeProblem(event, lineIndex) {
 	return null;
 }
 
+// Round-opening conditions (§8.2 proposal rounds): a second `proposed` event
+// is a legal retry only when the current round is closed by a rejection, the
+// fingerprint is not currently applied, and the cluster evidence changed. The
+// same predicate guards the writer (reviewGuard) and judges the fold, so a
+// violation on a chain-verified event is hand-edited state. Hosts compare as
+// sets (sorted, deduplicated) so an order-only or duplicate-entry difference
+// never opens a spurious round.
+function hostSetKey(hosts) {
+	return JSON.stringify(Array.isArray(hosts) ? [...new Set(hosts)].sort() : []);
+}
+
+function roundOpeningProblem(record, event) {
+	if (record.appliedCount !== record.undoneCount) {
+		return "the fingerprint is currently applied";
+	}
+	if (record.rejectionsSinceLastProposal === 0) {
+		return "the current proposal round is still open";
+	}
+	const evidenceChanged = event.evidenceDigest !== record.evidenceDigest;
+	const hostsChanged = hostSetKey(event.hosts) !== hostSetKey(record.hosts);
+	if (!evidenceChanged && !hostsChanged) {
+		return "the cluster evidence is unchanged (an unchanged re-surface rides the existing round)";
+	}
+	return null;
+}
+
 function applyReviewEvent(byFingerprint, event, lineIndex) {
 	const shape = eventShapeProblem(event, lineIndex);
 	if (shape !== null) throw reviewCorrupt(shape);
@@ -377,7 +415,22 @@ function applyReviewEvent(byFingerprint, event, lineIndex) {
 		);
 	if (event.kind === "proposed") {
 		if (record !== undefined) {
-			throw impossible(`proposes fingerprint "${event.fingerprint}" a second time`);
+			const opening = roundOpeningProblem(record, event);
+			if (opening !== null) {
+				throw impossible(`proposes fingerprint "${event.fingerprint}" a second time while ${opening}`);
+			}
+			// A legal retry opens a new round: the current-round fields move to
+			// the retry's proposal; the rejection history and applied/undone
+			// counters stay cumulative across rounds.
+			record.proposalCount += 1;
+			record.rejectionsSinceLastProposal = 0;
+			record.proposedAt = event.at;
+			record.evidenceDigest = event.evidenceDigest;
+			record.hosts = [...event.hosts];
+			record.operationsDigest = event.operationsDigest;
+			record.attribution = { ...event.attribution };
+			record.validatedAt = null;
+			return;
 		}
 		byFingerprint.set(event.fingerprint, {
 			fingerprint: event.fingerprint,
@@ -388,6 +441,8 @@ function applyReviewEvent(byFingerprint, event, lineIndex) {
 			attribution: { ...event.attribution },
 			validatedAt: null,
 			rejections: [],
+			proposalCount: 1,
+			rejectionsSinceLastProposal: 0,
 			appliedCount: 0,
 			undoneCount: 0,
 			lastAppliedAt: null,
@@ -406,10 +461,16 @@ function applyReviewEvent(byFingerprint, event, lineIndex) {
 		if (record.validatedAt !== null) {
 			throw impossible(`validates fingerprint "${event.fingerprint}" a second time`);
 		}
+		if (record.rejectionsSinceLastProposal > 0) {
+			throw impossible(
+				`validates fingerprint "${event.fingerprint}" in a round that was already rejected — a retry is a new proposal (§8.2 rounds)`,
+			);
+		}
 		record.validatedAt = event.at;
 		return;
 	}
 	if (event.kind === "rejected") {
+		record.rejectionsSinceLastProposal += 1;
 		record.rejections.push({ reason: event.reason, summary: event.summary, at: event.at });
 		return;
 	}
@@ -469,16 +530,25 @@ function findRecord(records, fingerprint) {
 
 // ── Writer policy: the per-kind guard evaluated against a fresh fold inside
 // the append lock. Any non-null result is returned verbatim by the family
-// append without writing. Sequence rules mirror the fold's integrity clauses.
+// append without writing. Sequence rules mirror the fold's integrity clauses,
+// including the §8.2 proposal-round rules for re-proposals.
 function reviewGuard(input) {
 	const fingerprint = input.fingerprint;
 	if (input.kind === "proposed") {
-		return (records) =>
-			findRecord(records, fingerprint) !== null
-				? fail(STATE_CODE, [
-						`fingerprint "${fingerprint}" is already proposed; a fingerprint is proposed exactly once — the durable rejection history rides the existing proposal`,
-					])
-				: null;
+		return (records) => {
+			const record = findRecord(records, fingerprint);
+			if (record === null) return null;
+			const opening = roundOpeningProblem(record, {
+				evidenceDigest: canonicalHashOf(input.evidence),
+				hosts: input.hosts,
+			});
+			if (opening !== null) {
+				return fail(STATE_CODE, [
+					`fingerprint "${fingerprint}" cannot be re-proposed while ${opening}; a retry opens a new proposal round only when the current round is closed by a rejection, the fingerprint is not currently applied, and the cluster evidence changed (§8.2 rounds)`,
+				]);
+			}
+			return null;
+		};
 	}
 	if (input.kind === "validated") {
 		return (records) => {
@@ -488,7 +558,12 @@ function reviewGuard(input) {
 			}
 			if (record.validatedAt !== null) {
 				return fail(STATE_CODE, [
-					`fingerprint "${fingerprint}" is already validated; the admission outcome is recorded exactly once per proposal`,
+					`fingerprint "${fingerprint}" is already validated; the admission outcome is recorded exactly once per proposal round`,
+				]);
+			}
+			if (record.rejectionsSinceLastProposal > 0) {
+				return fail(STATE_CODE, [
+					`fingerprint "${fingerprint}" was already rejected this round; a retry is a new proposal — re-propose with changed evidence before validating (§8.2 rounds)`,
 				]);
 			}
 			return null;
@@ -568,8 +643,15 @@ function racedToState(failure, cwd, stateSatisfied) {
 /**
  * Record the promotion of one suggestion card (§8.2 `proposed`): fingerprint,
  * evidence digest, hosts, planned-operations digest, attribution block.
- * Idempotent per fingerprint — a fingerprint is proposed exactly once; later
- * scans skip. Never stores raw evidence or operation contents (digests only).
+ * Never stores raw evidence or operation contents (digests only).
+ *
+ * Per §8.2 proposal rounds: an unchanged re-surface rides the existing record
+ * (skip, append nothing — rescans of a stable cluster never grow the ledger),
+ * and so does a currently-applied fingerprint (past its admission decision) or
+ * an open round whose proposal must not be silently replaced. A retry whose
+ * cluster evidence changed (different evidence digest or host set) after the
+ * current round was closed by a rejection opens a new round with its own
+ * `proposed` event.
  *
  * @param {string} cwd - Repository root.
  * @param {{ fingerprint: string, evidence: object[], hosts: string[], operations: object[], attribution: object }} input
@@ -578,8 +660,13 @@ function racedToState(failure, cwd, stateSatisfied) {
 function ensureSuggestionProposed(cwd, input) {
 	const pre = foldOrFailure(cwd);
 	if (pre.failure !== undefined) return pre.failure;
-	if (findRecord(pre.folded, input.fingerprint) !== null) {
-		return { ok: true, appended: false, record: null };
+	const existing = findRecord(pre.folded, input.fingerprint);
+	if (existing !== null) {
+		const roundOpenable = roundOpeningProblem(existing, {
+			evidenceDigest: canonicalHashOf(input.evidence),
+			hosts: input.hosts,
+		});
+		if (roundOpenable !== null) return { ok: true, appended: false, record: null };
 	}
 	const result = appendReviewEvent(cwd, { ...input, kind: "proposed" });
 	if (result.ok) return { ok: true, appended: true, record: result.record };
@@ -589,7 +676,9 @@ function ensureSuggestionProposed(cwd, input) {
 /**
  * Record that admission passed V1–V3 for one fingerprint (§8.2 `validated`).
  * The fingerprint payload closes the correlation chain. Idempotent per
- * fingerprint: a scan that re-validates an already-validated proposal skips.
+ * proposal round: a scan that re-validates an already-validated round skips,
+ * and the guard refuses to validate a round that was already rejected — that
+ * retry must re-propose first (§8.2 rounds).
  *
  * @param {string} cwd - Repository root.
  * @param {{ fingerprint: string }} input
@@ -613,9 +702,10 @@ function recordSuggestionValidated(cwd, input) {
 
 /**
  * Record an admission-time validity rejection (§8.2 `rejected` with a
- * `validity:*` reason code). Durable once per fingerprint: repeated scans of
- * the same failing cluster do not grow the ledger — the first rejection is
- * the durable record the rejection-history hint reports.
+ * `validity:*` reason code). Durable once per proposal round (§8.2 rounds):
+ * repeated scans of the same failing round do not grow the ledger — the
+ * round's first rejection is its durable record — while a retry that opens a
+ * new round records its own rejection (the reason may differ).
  *
  * @param {string} cwd - Repository root.
  * @param {{ fingerprint: string, reason: string, summary: string }} input
@@ -630,7 +720,7 @@ function recordSuggestionValidityRejection(cwd, input) {
 	const pre = foldOrFailure(cwd);
 	if (pre.failure !== undefined) return pre.failure;
 	const existing = findRecord(pre.folded, input.fingerprint);
-	if (existing !== null && existing.rejections.length > 0) {
+	if (existing !== null && existing.rejectionsSinceLastProposal > 0) {
 		return { ok: true, appended: false, record: null };
 	}
 	const result = appendReviewEvent(cwd, { ...input, kind: "rejected" });
@@ -638,7 +728,7 @@ function recordSuggestionValidityRejection(cwd, input) {
 	return racedToState(
 		result,
 		cwd,
-		(records) => (findRecord(records, input.fingerprint)?.rejections.length ?? 0) > 0,
+		(records) => (findRecord(records, input.fingerprint)?.rejectionsSinceLastProposal ?? 0) > 0,
 	);
 }
 

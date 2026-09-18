@@ -314,6 +314,52 @@ CLI verb / MCP Action / schema change / eval claim. Evidence: new
 55/55 green, root typecheck/manifests/doctor/gen:agents:check green, targeted
 ESLint clean — `results/B6.md` + `results/B6-*.log`.
 
+### Slice 7 — Post-land review close-out (follow-up backlog; 2026-09-19)
+
+Closes the four items in the packet's follow-up backlog
+(`.scratch/orchestration/all-tickets-0044-0060-2026-09-16-5HXix4/results/Follow-up-backlog.md`)
+raised by the dual-axis review and the FINAL-ACCEPT recheck. Gated plan:
+`docs/plans/F064-suggestion-review-closeout.md`.
+
+1. **§6 V1 tightened reading made normative (spec amendment, no code change).**
+   The delivered invariant requires every supplied evidence reference to
+   resolve; §6 originally said only "≥1 resolvable". The spec now states the
+   tightened reading with its rationale (citations regenerate per scan from the
+   signals themselves, so a dead citation is a real defect surfaced at the last
+   refusing boundary) — code and spec agree explicitly.
+2. **§8.6 two write shapes (spec precision amendment, no code change).**
+   Apply/Undo/Dismiss keep precheck → target mutation → audit → compensation.
+   Promotion/`validated`/validity-`rejected` are named audit-only writes: the
+   governed append is the first and only durable write and refuses fail-closed
+   (lock/chain/ceiling) by construction; there is no target mutation to precheck,
+   and a caller-side pre-probe could false-refuse a dedup-skipped promotion.
+3. **§8.2 proposal rounds (code + spec).** A retry whose cluster evidence
+   changed (different evidence digest or host set) opens a new proposal round —
+   a second `proposed` event with its own digests and its own outcome;
+   `validated` belongs to the current round only (a rejected round must
+   re-propose); validity rejections dedupe once per round; an unchanged
+   re-surface, a currently-applied fingerprint, and an open round all ride the
+   existing record, so rescans of a stable cluster never grow the ledger.
+   Operations/attribution never open a round alone (the planner's wiki body
+   embeds the plan date). Fold integrity clauses and writer guards share one
+   round-opening predicate; the folded record and `web-adapter.d.ts` gain
+   additive `proposalCount` / `rejectionsSinceLastProposal`. Event payloads and
+   `schemaVersion` are unchanged (backward-compatible fold).
+4. **Apply stale-branch rollback contract proven (tests + comment, no behavior
+   change).** The recheck's residual observation ("stale-refusal rollback would
+   throw loudly") does not match the committed code: the branch sits inside the
+   commit loop's fail-closed catch, so a double failure already routes through
+   `compensateApply`/`commitIoFailed`. Two regression tests now pin both
+   outcomes (stale refusal + failing restore → compensated `commit-io-failed`
+   with restored draft bytes; compensation also failing → `commit-io-degraded`
+   naming the path and the reconciliation step), and the branch carries the
+   contract comment.
+
+**Progress (2026-09-19, B7): delivered.** Evidence: focused suggestion suites
+70/70 (review 20, apply 12), full gates in
+`results/B7-*.log` (this close-out). Web-visible card behavior unchanged; no new
+CLI verb, MCP Action, schema file, or `amber next` change.
+
 ## Compatibility
 
 - Overlay schema and semantics unchanged; existing `.amber/suggestions/state.json`

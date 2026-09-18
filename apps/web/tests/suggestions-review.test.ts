@@ -154,14 +154,21 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
     expect(rejected.ok).toBe(true);
 
     // The scenario changed: admission now passes and the card is exposed
-    // carrying the notice — the hint never blocks.
+    // carrying the notice — the hint never blocks. The scan's proposal
+    // content differs from the seeded round (fresh evidence, planner
+    // operations), so the retry opens a new §8.2 proposal round before its
+    // validation: proposed(round 1) → rejected → proposed(round 2) → validated.
     const cards = list().suggestions;
     expect(cards).toHaveLength(1);
     expect(cards[0].rejectionHistory).toMatchObject({
       status: 'rejected',
       reason: 'validity:eval-only-claim',
     });
-    expect(ledgerKinds()).toEqual(['proposed', 'rejected', 'validated']);
+    expect(ledgerKinds()).toEqual(['proposed', 'rejected', 'proposed', 'validated']);
+    const [record] = adapter.foldSuggestionReview(root);
+    expect(record.proposalCount).toBe(2);
+    expect(record.rejectionsSinceLastProposal).toBe(0);
+    expect(record.rejections).toHaveLength(1);
   });
 
   it('a corrupt review ledger fails the surface closed (E12 write side) and the hint reports unknown', () => {
@@ -172,6 +179,181 @@ describe('Improvement Suggestions review ledger (evolution contract §8)', () =>
 
     expect(() => list()).toThrow(/AMBER_E_SUGGESTION_REVIEW_CORRUPT/);
     expect(adapter.suggestionReviewHistory(root, 'any-fingerprint')).toEqual({ status: 'unknown' });
+  });
+
+  // ── §8.2 proposal rounds: a retry is a new proposal, deduped per round ──
+
+  function proposalInput(fingerprint: string, evidence: object[], hosts: string[]) {
+    return {
+      fingerprint,
+      evidence,
+      hosts,
+      operations: [{ verb: 'create', path: 'docs/wiki/agent/friction/rounds.md', summary: 's' }],
+      attribution: {
+        entrySurface: 'tool-output',
+        impactSurface: 'context',
+        failureMode: 'enoent',
+        responsibleArtifact: 'wiki',
+      },
+    };
+  }
+
+  it('an unchanged re-surface rides the existing round; a changed-evidence retry opens a new one (§8.2)', () => {
+    const fingerprint = `fp-rounds-${(seamCounter += 1)}`;
+    const input = proposalInput(fingerprint, [{ host: 'claude', transcriptId: 't1', excerpt: 'e' }], ['claude']);
+
+    expect(adapter.ensureSuggestionProposed(root, input)).toMatchObject({ ok: true, appended: true });
+    expect(
+      adapter.recordSuggestionValidityRejection(root, {
+        fingerprint,
+        reason: 'validity:no-evidence',
+        summary: 'first round fails',
+      }),
+    ).toMatchObject({ ok: true, appended: true });
+
+    // An unchanged re-surface (the same failing cluster rescanned) rides the
+    // existing round: no second proposed event, no second same-round rejection.
+    expect(adapter.ensureSuggestionProposed(root, input)).toEqual({
+      ok: true,
+      appended: false,
+      record: null,
+    });
+    expect(
+      adapter.recordSuggestionValidityRejection(root, {
+        fingerprint,
+        reason: 'validity:no-evidence',
+        summary: 'same round again',
+      }),
+    ).toEqual({ ok: true, appended: false, record: null });
+    expect(ledgerKinds()).toEqual(['proposed', 'rejected']);
+
+    // A rejected round cannot be validated — the retry must re-propose first.
+    const refused = adapter.recordSuggestionValidated(root, { fingerprint });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.code).toBe('AMBER_E_SUGGESTION_REVIEW_STATE');
+      expect(refused.errors[0]).toContain('already rejected this round');
+    }
+
+    // Retry with changed cluster evidence: a new round with its own proposal.
+    expect(
+      adapter.ensureSuggestionProposed(root, {
+        ...input,
+        evidence: [{ host: 'claude', transcriptId: 't2', excerpt: 'different friction' }],
+      }),
+    ).toMatchObject({ ok: true, appended: true });
+    expect(ledgerKinds()).toEqual(['proposed', 'rejected', 'proposed']);
+    const [round2] = adapter
+      .foldSuggestionReview(root)
+      .filter((entry) => entry.fingerprint === fingerprint);
+    expect(round2.proposalCount).toBe(2);
+    expect(round2.rejectionsSinceLastProposal).toBe(0);
+    expect(round2.validatedAt).toBeNull();
+    expect(round2.rejections).toHaveLength(1);
+
+    // The new round records its own rejection; the hint reports the latest.
+    expect(
+      adapter.recordSuggestionValidityRejection(root, {
+        fingerprint,
+        reason: 'validity:eval-only-claim',
+        summary: 'second round fails differently',
+      }),
+    ).toMatchObject({ ok: true, appended: true });
+    expect(adapter.suggestionReviewHistory(root, fingerprint)).toMatchObject({
+      status: 'rejected',
+      reason: 'validity:eval-only-claim',
+    });
+
+    // Round 3 passes and is applied; a currently-applied fingerprint is past
+    // its admission decision and never re-proposes, even with changed evidence.
+    expect(
+      adapter.ensureSuggestionProposed(root, {
+        ...input,
+        evidence: [{ host: 'claude', transcriptId: 't3', excerpt: 'third round' }],
+      }),
+    ).toMatchObject({ ok: true, appended: true });
+    expect(adapter.recordSuggestionValidated(root, { fingerprint }).ok).toBe(true);
+    expect(
+      adapter.recordSuggestionApplied(root, {
+        fingerprint,
+        applied: [
+          { path: 'docs/wiki/agent/friction/rounds.md', beforeHash: null, afterHash: 'a'.repeat(64) },
+        ],
+      }).ok,
+    ).toBe(true);
+    expect(
+      adapter.ensureSuggestionProposed(root, {
+        ...input,
+        evidence: [{ host: 'claude', transcriptId: 't4', excerpt: 'while applied' }],
+      }),
+    ).toEqual({ ok: true, appended: false, record: null });
+    expect(ledgerKinds()).toEqual([
+      'proposed',
+      'rejected',
+      'proposed',
+      'rejected',
+      'proposed',
+      'validated',
+      'applied',
+    ]);
+
+    // After an Undo the same round continues (no re-proposal): undo, then the
+    // re-apply on the same proposal is legal again.
+    expect(
+      adapter.recordSuggestionUndone(root, {
+        fingerprint,
+        restored: [{ path: 'docs/wiki/agent/friction/rounds.md', hash: null }],
+      }).ok,
+    ).toBe(true);
+    expect(
+      adapter.ensureSuggestionProposed(root, {
+        ...input,
+        evidence: [{ host: 'claude', transcriptId: 't5', excerpt: 'after undo' }],
+      }),
+    ).toEqual({ ok: true, appended: false, record: null });
+    expect(
+      adapter.recordSuggestionApplied(root, {
+        fingerprint,
+        applied: [
+          { path: 'docs/wiki/agent/friction/rounds.md', beforeHash: null, afterHash: 'b'.repeat(64) },
+        ],
+      }).ok,
+    ).toBe(true);
+    expect(ledgerKinds()).toEqual([
+      'proposed',
+      'rejected',
+      'proposed',
+      'rejected',
+      'proposed',
+      'validated',
+      'applied',
+      'undone',
+      'applied',
+    ]);
+  });
+
+  it('a host-set change also opens a new proposal round (§8.2)', () => {
+    const fingerprint = `fp-rounds-hosts-${(seamCounter += 1)}`;
+    const input = proposalInput(fingerprint, [{ host: 'claude', transcriptId: 't1', excerpt: 'e' }], ['claude']);
+
+    expect(adapter.ensureSuggestionProposed(root, input)).toMatchObject({ ok: true, appended: true });
+    expect(
+      adapter.recordSuggestionValidityRejection(root, {
+        fingerprint,
+        reason: 'validity:no-evidence',
+        summary: 'first round fails',
+      }),
+    ).toMatchObject({ ok: true, appended: true });
+
+    // Same evidence, but the cluster gained a host: the proposal is new.
+    expect(
+      adapter.ensureSuggestionProposed(root, { ...input, hosts: ['claude', 'codex'] }),
+    ).toMatchObject({ ok: true, appended: true });
+    const [record] = adapter
+      .foldSuggestionReview(root)
+      .filter((entry) => entry.fingerprint === fingerprint);
+    expect(record.proposalCount).toBe(2);
+    expect(record.hosts).toEqual(['claude', 'codex']);
   });
 
   // ── V1–V3 pass/fail matrices at the card admission boundary (§6) ──
