@@ -144,6 +144,15 @@ const CATALOG = {
 		layer: "Observability",
 		related: ["AMBER_E_KB_CORRUPT"],
 	},
+	AMBER_E_RUN_EVENTS_CORRUPT: {
+		title: "Session timeline chain is broken",
+		cause:
+			"a chained run-event's prevHash or body hash no longer verifies — the timeline was edited in place after chaining began. Legacy plaintext lines (pre-chain) are a tolerated prefix and never verified.",
+		remedy:
+			"Restore timeline.jsonl from version control or a backup; chained events are append-only and must not be edited in place.",
+		layer: "Observability",
+		related: ["AMBER_E_LEDGER_TAMPERED"],
+	},
 	// --- Fail-closed ledger reads (F035-S5 decision D4: absence is empty, not corruption) ---
 	AMBER_E_KB_CORRUPT: {
 		title: "Knowledge ledger is corrupt or unreadable",

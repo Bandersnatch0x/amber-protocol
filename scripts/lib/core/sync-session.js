@@ -31,7 +31,29 @@ const path = require("node:path");
 const { replayEnvelopes, listConflicts, listRefusedEnvelopeIds } = require("./sync-conflicts");
 const { collectFilesBySuffix, toPortablePath } = require("./fs-utils");
 const { statePath, statePathForCreate } = require("../state-dir-resolver");
-const { gitExec } = require("./git-exec");
+// §5.5 split (governance contract G-9): the LOGIC is Core; the git EXECUTION
+// source is Adapter-injected (lazily defaulting to the Coding-domain seam).
+// Core never imports git-exec/git-workflow-detector at module load (G1/G8).
+let gitAdapterForsyncSession = null;
+function defaultGitAdapterForThisModule() {
+	if (gitAdapterForsyncSession === null) {
+		const gitExec = require("./git-exec");
+		let detector = null;
+		try { detector = require("./git-workflow-detector"); } catch { detector = {}; }
+		gitAdapterForsyncSession = {
+			gitExec: gitExec.gitExec,
+		};
+	}
+	return gitAdapterForsyncSession;
+}
+
+/**
+ * Test/adapter seam: inject the git runner. Pass null to restore the default.
+ */
+function setGitAdapterForThisModule(adapter) {
+	gitAdapterForsyncSession = adapter;
+}
+
 const { validateSyncTransportReport } = require("./sync-transport-report-contract");
 
 /**
@@ -82,7 +104,7 @@ function listEnvelopes(cwd) {
  * @returns {boolean}
  */
 function hasRemote(cwd) {
-	const res = gitExec(cwd, ["remote"]);
+	const res = defaultGitAdapterForThisModule().gitExec(cwd, ["remote"]);
 	return res.ok && res.stdout.length > 0;
 }
 
@@ -242,7 +264,7 @@ function runSyncSession(cwd) {
 	};
 }
 
-module.exports = {
+module.exports = { setGitAdapterForThisModule,
 	createSyncSession,
 	listEnvelopes,
 	pushEnvelopes,

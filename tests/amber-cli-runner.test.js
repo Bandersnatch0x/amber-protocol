@@ -340,7 +340,8 @@ test("runner request, authorize, prepare, and settle form the governed execution
 	assert.equal(submitted.status, 0, submitted.stderr || submitted.stdout);
 	const request = payload(submitted);
 	assert.equal(request.status, "requested");
-	assert.equal(request.risk, "high");
+	// §7.2 escalation: scoped credential on deploy ⇒ critical.
+	assert.equal(request.risk, "critical");
 	assert.equal(request.approvalBinding, `runner-request:staging:${request.requestHash}`);
 
 	const denied = runCli(

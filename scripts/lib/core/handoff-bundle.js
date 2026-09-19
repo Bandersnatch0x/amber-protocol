@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
 
 const { validateHandoff } = require("./audit");
 const { resolveTarget } = require("./fs-utils");
@@ -11,7 +12,7 @@ const { shellQuote } = require("./text-utils");
 const { readSessionEvents } = require("../session-timeline");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
 const { readLedger } = require("./loop-ledger");
-const { evaluateCommandPolicy } = require("./loop-policy");
+const { evaluateCommandPolicy, loadPolicyRules } = require("./loop-policy");
 const {
 	contractHashOf,
 	inputDigestOf,
@@ -350,7 +351,182 @@ function collectAttemptReplaySlices(targetRoot, replayScope) {
 			const slice = attemptReplaySlice(record, records);
 			return { ...slice, replayDecision: replayPolicyDecision(slice) };
 		});
-	return { ok: true, sessionId: scope.sessionId, slices };
+	return { ok: true, sessionId: scope.sessionId, slices, records, sessionDir };
+}
+
+// ── governance contract §9: R0 nine-file bundle + R1 comparison report ──────
+
+/**
+ * R1 — decision replay as a pure read-only comparison (§9.2). Re-run the pure
+ * policy evaluation over each stored evaluated request against a SPECIFIED
+ * (default: CURRENT) rules version and compare {original decision, new
+ * decision, original matchedRule, new matchedRule} per event — "how would the
+ * same inputs be judged today". The original side reads the recorded
+ * admission verdict; the replayed side runs the CURRENT rules unless a
+ * specific version is injected. The output is a COMPARISON REPORT, not
+ * pass/fail. NON_REPLAYABLE slices (legacy v1 events, missing input
+ * snapshots) count in `nonReplayable` — never default-filled.
+ */
+function replayPolicyDecisions(targetRoot, replayScope, { rules = null } = {}) {
+	const collected = collectAttemptReplaySlices(targetRoot, replayScope);
+	if (!collected.ok) return collected;
+	const currentRules = rules ?? loadPolicyRules(targetRoot);
+	const rows = [];
+	let exact = 0;
+	let compatible = 0;
+	let drifted = 0;
+	let nonReplayable = 0;
+	for (const slice of collected.slices) {
+		const decision = slice.replayDecision;
+		if (!decision.replayable) {
+			nonReplayable += 1;
+			rows.push({
+				runId: slice.runId,
+				state: "NON_REPLAYABLE",
+				reason: decision.reason,
+				original: null,
+				replayed: null,
+			});
+			continue;
+		}
+		const command = slice.frozen?.evaluatedRequest?.resolvedCommand;
+		if (typeof command !== "string") {
+			nonReplayable += 1;
+			rows.push({
+				runId: slice.runId,
+				state: "NON_REPLAYABLE",
+				reason: "NON_REPLAYABLE: the frozen request carries no resolved command (host-agent window)",
+				original: null,
+				replayed: null,
+			});
+			continue;
+		}
+		// R-RP-2/R1: hash-verify first, then re-evaluate against the SPECIFIED
+		// (default current) rules — the stored policy copy rides the bundle for
+		// R-RP-4's multi-version case, but the comparison target is today's.
+		const originalAllowed = decision.recordedVerdict
+			? decision.recordedVerdict.matchedRule !== null || decision.recordedVerdict.commandId !== null
+			: null;
+		const original = {
+			allowed: originalAllowed,
+			matchedRule: decision.recordedVerdict?.matchedRule ?? null,
+		};
+		const replayVerdict = evaluateCommandPolicy(command, currentRules);
+		const replayed = {
+			allowed: replayVerdict.allowed === true,
+			matchedRule: replayVerdict.matchedRule ?? null,
+		};
+		let state;
+		if (original.allowed !== null && original.allowed === replayed.allowed) {
+			if (original.matchedRule === replayed.matchedRule) {
+				state = "EXACT";
+				exact += 1;
+			} else {
+				// Decision unchanged, matchedRule changed (§9.2 COMPATIBLE).
+				state = "COMPATIBLE";
+				compatible += 1;
+			}
+		} else {
+			state = "DRIFTED";
+			drifted += 1;
+		}
+		rows.push({ runId: slice.runId, state, original, replayed });
+	}
+	return {
+		ok: true,
+		sessionId: collected.sessionId,
+		report: {
+			evaluated: collected.slices.length,
+			exact,
+			compatible,
+			drifted,
+			nonReplayable,
+		},
+		rows,
+	};
+}
+
+/**
+ * R0 — the nine-file `replay/` bundle (§9.1): the authorization chain
+ * (policy → approval → execution → evidence) rebuildable from `replay/`
+ * alone. Files are emitted only when their source exists; the manifest
+ * hashes every emitted file so `handoff validate` can fail closed on a
+ * tampered replay directory.
+ */
+function buildReplayBundle(targetRoot, replayScope) {
+	const collected = collectAttemptReplaySlices(targetRoot, replayScope);
+	if (!collected.ok) return collected;
+	const stateRoot = resolveStateDirForRead(targetRoot);
+	const { records, sessionDir } = collected;
+
+	const manifestCopy = path.join(sessionDir, "manifest.json");
+	const evidenceDir = path.join(stateRoot, "evidence");
+	const receiptsPath = path.join(evidenceDir, "receipts.jsonl");
+	const policyVersions = [];
+	for (const slice of collected.slices) {
+		if (!slice.frozen?.policy) continue;
+		const serialized = JSON.stringify(slice.frozen.policy);
+		if (!policyVersions.some((entry) => entry.json === serialized)) {
+			policyVersions.push({ json: serialized, hash: policyHashOf(slice.frozen.policy) });
+		}
+	}
+
+	const files = {};
+	files["session-manifest.json"] = fs.existsSync(manifestCopy)
+		? fs.readFileSync(manifestCopy, "utf8")
+		: null;
+	const governed = records.filter((record) =>
+		["policy.evaluated", "executed", "budget.exhausted", "attempt_admitted", "attempt_denied"].includes(
+			record.kind,
+		),
+	);
+	files["governed-ledger.jsonl"] =
+		governed.length > 0 ? governed.map((record) => JSON.stringify(record)).join("\n") + "\n" : null;
+	files["policy.json"] = policyVersions.map((entry) => ({
+		policyHash: entry.hash,
+		rules: JSON.parse(entry.json),
+	}));
+	files["approvals.jsonl"] = (() => {
+		const approvals = records.filter((record) => record.kind === "approved");
+		return approvals.length > 0
+			? approvals.map((record) => JSON.stringify(record)).join("\n") + "\n"
+			: null;
+	})();
+	files["capabilities.json"] = (() => {
+		const pins = [...new Set(collected.slices.map((slice) => slice.frozen?.capabilityRecords?.[0]).filter(Boolean))];
+		return pins.length > 0 ? pins : null;
+	})();
+	files["receipts.jsonl"] = fs.existsSync(receiptsPath)
+		? fs.readFileSync(receiptsPath, "utf8")
+		: null;
+	files["timeline.jsonl"] = (() => {
+		const timelinePath = path.join(sessionDir, "timeline.jsonl");
+		return fs.existsSync(timelinePath) ? fs.readFileSync(timelinePath, "utf8") : null;
+	})();
+
+	const manifest = {
+		schemaVersion: 1,
+		artifactType: "amber-replay-bundle",
+		scope: replayScope,
+		sessionId: collected.sessionId,
+		generatedAt: new Date().toISOString(),
+		files: {},
+	};
+	for (const [name, content] of Object.entries(files)) {
+		// Structured files (policy.json, capabilities.json) hash their
+		// canonical serialization; text files hash verbatim.
+		if (content === null) continue;
+		const serialized = typeof content === "string" ? content : JSON.stringify(content, null, 2);
+		files[name] = serialized;
+		manifest.files[name] = `sha256:${crypto.createHash("sha256").update(serialized, "utf8").digest("hex")}`;
+	}
+	return {
+		ok: true,
+		sessionId: collected.sessionId,
+		slices: collected.slices,
+		manifest,
+		files,
+	};
 }
 
 function writeHandoffBundle(target, options = {}) {
@@ -401,6 +577,24 @@ function writeHandoffBundle(target, options = {}) {
 				)}\n`,
 			);
 			files.push(replayPath);
+		}
+		// §9.1 R0: the nine-file `replay/` directory — the authorization chain
+		// rebuildable from replay/ alone, hash-pinned by replay/manifest.json.
+		const replayBundle = buildReplayBundle(targetRoot, options.replayScope);
+		if (!replayBundle.ok) {
+			bundleErrors.push(...replayBundle.errors);
+		} else {
+			for (const [name, content] of Object.entries(replayBundle.files)) {
+				if (content === null) continue;
+				files.push(writeFile(path.join(outputDir, "replay"), name, content));
+			}
+			files.push(
+				writeFile(
+					path.join(outputDir, "replay"),
+					"manifest.json",
+					`${JSON.stringify(replayBundle.manifest, null, 2)}\n`,
+				),
+			);
 		}
 	}
 
@@ -506,4 +700,6 @@ module.exports = {
 	collectAttemptReplaySlices,
 	attemptReplaySlice,
 	replayPolicyDecision,
+	replayPolicyDecisions,
+	buildReplayBundle,
 };

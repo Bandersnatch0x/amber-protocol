@@ -63,15 +63,61 @@ function matches(rule, command) {
 	return false;
 }
 
-// Pure function: deny wins, then allow, then defaultAction.
-function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
+// The closed five-value decision enumeration (governance contract §6.1,
+// extend-only): `deny` and `allow` are the v1 faces; `require_approval` and
+// `allow_with_limits` are v2 rule decisions; `unknown` replaces the implicit
+// default-deny when `defaultAction:"unknown"` is configured — it fails closed
+// like deny but additionally names the cause (`no-rule-matched`). `defer` is
+// deliberately NOT introduced: async PDP semantics contradict ADR-0001's
+// synchronous artifact-first boundary (require_approval is the human-delay
+// path).
+const POLICY_DECISIONS = Object.freeze([
+	"deny",
+	"allow",
+	"require_approval",
+	"allow_with_limits",
+	"unknown",
+]);
+
+// Pure function: deny wins, then allow, then defaultAction — extended with
+// the v2 decision faces (§6.2). v1 command-text rules (`action`/`match`/
+// `pattern`) and v2 capability rules (`decision` + `match{capability,target,
+// effect,constraints}`) share one deny-wins precision order; the caller
+// resolves `require_approval` into the capture→grant→execute path and
+// `allow_with_limits` into RunScope-constrained execution.
+function evaluateCommandPolicy(command, rules = DEFAULT_RULES, subject = null) {
 	const list = Array.isArray(rules?.rules) ? rules.rules : [];
+	// v1 deny (deny-wins first pass, all rules).
 	for (const rule of list) {
 		if (rule.action === "deny" && matches(rule, command)) {
 			return {
 				allowed: false,
 				matchedRule: rule.id,
 				reason: `denied by rule ${rule.id}`,
+				...confidenceSpread(rules, rule.id),
+			};
+		}
+	}
+	// v2 explicit deny decisions ride the same first pass (a v2 rule with
+	// decision:"deny" is a deny, wherever it appears).
+	for (const rule of list) {
+		if (rule.decision === "deny" && v2RuleMatches(rule, subject)) {
+			return {
+				allowed: false,
+				matchedRule: rule.id,
+				reason: `denied by v2 rule ${rule.id}`,
+				...confidenceSpread(rules, rule.id),
+			};
+		}
+	}
+	// require_approval beats allow in the precision order (§6.2).
+	for (const rule of list) {
+		if (rule.decision === "require_approval" && v2RuleMatches(rule, subject)) {
+			return {
+				allowed: false,
+				matchedRule: rule.id,
+				decision: "require_approval",
+				reason: `require_approval by rule ${rule.id}; enter the capture→grant→execute path (governance contract §6.1)`,
 				...confidenceSpread(rules, rule.id),
 			};
 		}
@@ -86,7 +132,40 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
 			};
 		}
 	}
+	for (const rule of list) {
+		if (rule.decision === "allow" && v2RuleMatches(rule, subject)) {
+			return {
+				allowed: true,
+				matchedRule: rule.id,
+				reason: `allowed by v2 rule ${rule.id}`,
+				...confidenceSpread(rules, rule.id),
+			};
+		}
+	}
+	for (const rule of list) {
+		if (rule.decision === "allow_with_limits" && v2RuleMatches(rule, subject)) {
+			return {
+				allowed: true,
+				matchedRule: rule.id,
+				decision: "allow_with_limits",
+				limits: rule.match?.constraints ?? null,
+				reason: `allowed with limits by rule ${rule.id}; the limits snapshot rides RunScope constraints`,
+				...confidenceSpread(rules, rule.id),
+			};
+		}
+	}
 	const allowByDefault = rules?.defaultAction === "allow";
+	if (!allowByDefault && rules?.defaultAction === "unknown") {
+		// unknown ⊃ deny: fails closed identically, additionally names the
+		// cause (§6.1).
+		return {
+			allowed: false,
+			matchedRule: null,
+			decision: "unknown",
+			reason: "no-rule-matched; defaultAction=unknown — refused like deny, with the cause named",
+			...confidenceSpread(rules, null),
+		};
+	}
 	return {
 		allowed: allowByDefault,
 		matchedRule: null,
@@ -95,6 +174,32 @@ function evaluateCommandPolicy(command, rules = DEFAULT_RULES) {
 			: "no allow rule matched; defaultAction=deny",
 		...confidenceSpread(rules, null),
 	};
+}
+
+// The v2 capability face: a rule matches when every DECLARED dimension of
+// its `match` object agrees with the subject ({capability, target, effect,
+// constraints}). A rule without a `match` object is a v1-shaped record and
+// never matches on the v2 face.
+function v2RuleMatches(rule, subject) {
+	if (!rule || typeof rule !== "object" || !rule.match || typeof rule.match !== "object") {
+		return false;
+	}
+	if (!subject || typeof subject !== "object") return false;
+	const match = rule.match;
+	if (match.capability !== undefined && match.capability !== subject.capability) return false;
+	if (match.effect !== undefined && match.effect !== subject.effect) return false;
+	if (match.target && typeof match.target === "object") {
+		if (match.target.pathPrefix !== undefined) {
+			const subjectPaths = Array.isArray(subject.target?.paths) ? subject.target.paths : [];
+			const prefix = String(match.target.pathPrefix);
+			const inside = subjectPaths.some((candidate) => {
+				const p = String(candidate);
+				return prefix.endsWith("/") ? p.startsWith(prefix) : p === prefix || p.startsWith(`${prefix}/`);
+			});
+			if (!inside) return false;
+		}
+	}
+	return true;
 }
 
 // Optional confidence_gating block (T1, ADR-0011). When present AND enabled, the
@@ -268,4 +373,6 @@ module.exports = {
 	loadVerifyPolicyRules,
 	DEFAULT_RULES,
 	matches,
+	v2RuleMatches,
+	POLICY_DECISIONS,
 };

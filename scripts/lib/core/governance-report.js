@@ -18,6 +18,11 @@ const { attemptMetricsOf } = require("./run-freeze");
 
 // Trusted-control run contract (spec §7 R2): attempt counters fold over the
 // session ledgers' capture population — the aggregate across all sessions.
+// §8.4: policy decision counters (from `policy.evaluated` events) and budget
+// exhaustion counters (from `budget.exhausted` events) fold from the same
+// ledgers; approval counters from the approval registry. Excluded by design
+// (negative-tested): `tool_calls_total` (host-domain blind spot, C0 §2 E4)
+// and `context_grants_total` (reserved-disabled events emit nothing).
 function collectAttemptMetrics(targetRoot) {
 	const stateDir = resolveStateDirForRead(targetRoot);
 	const totals = {
@@ -27,17 +32,30 @@ function collectAttemptMetrics(targetRoot) {
 		attempts_denied_total: 0,
 		attempts_still_open: 0,
 		attempts_settled_total: {},
+		policy_evaluated_total: 0,
+		policy_denials_total: 0,
+		budget_exhausted_total: 0,
 	};
 	walkLedgers(stateDir, ({ home, ledgerPath }) => {
 		if (home !== "sessions") return;
 		totals.sessions += 1;
-		const metrics = attemptMetricsOf(readLedger(ledgerPath));
+		const records = readLedger(ledgerPath);
+		const metrics = attemptMetricsOf(records);
 		totals.attempts_requested_total += metrics.attempts_requested_total;
 		totals.attempts_admitted_total += metrics.attempts_admitted_total;
 		totals.attempts_denied_total += metrics.attempts_denied_total;
 		totals.attempts_still_open += metrics.attempts_still_open;
 		for (const [status, count] of Object.entries(metrics.attempts_settled_total)) {
 			totals.attempts_settled_total[status] = (totals.attempts_settled_total[status] ?? 0) + count;
+		}
+		for (const record of records) {
+			if (record.kind === "policy.evaluated") {
+				totals.policy_evaluated_total += 1;
+				if (record.decision === "deny" || record.decision === "unknown") {
+					totals.policy_denials_total += 1;
+				}
+			}
+			if (record.kind === "budget.exhausted") totals.budget_exhausted_total += 1;
 		}
 	});
 	return totals;
@@ -471,6 +489,9 @@ function renderAttemptMetricsMarkdown(metrics) {
 		`- attempts_still_open (requested-not-yet-gated or expired): ${metrics.attempts_still_open}`,
 		"- attempts_settled_total{status}:",
 		...(settled.length > 0 ? settled : ["  - none"]),
+		`- policy_evaluated_total: ${metrics.policy_evaluated_total}`,
+		`- policy_denials_total: ${metrics.policy_denials_total}`,
+		`- budget_exhausted_total: ${metrics.budget_exhausted_total}`,
 	];
 }
 

@@ -26,6 +26,12 @@ export interface SessionDetail extends Session {
     path: string;
     active: boolean;
   };
+  // Governance contract §9.4: the read-only drift projection. The four-state
+  // fold (EXACT | COMPATIBLE | DRIFTED | NON_REPLAYABLE) is computed by the
+  // replay read path; absent means the session carries no replay projection
+  // (the badge renders nothing — never a fabricated state).
+  driftState?: 'EXACT' | 'COMPATIBLE' | 'DRIFTED' | 'NON_REPLAYABLE' | null;
+  driftReportHref?: string | null;
 }
 
 function toSession(id: string, manifest: Record<string, unknown>): Session {

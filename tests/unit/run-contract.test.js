@@ -386,20 +386,29 @@ describe("run contract — capture → grant → execute (spec §10.7, §10.10)"
 			assert.strictEqual(executed.settled, true);
 			assert.strictEqual(executed.settlement.status, "succeeded");
 
-			// The ledger tells the whole story: requested → approved → executed
-			// (the governed record carries the verdict) → attempt_admitted (the
-			// admission outcome event, recording that verdict) → settled →
-			// completed. The admission event always precedes the settlement, so
-			// "only an admitted attempt settles" holds by fold (R-AD-2).
+			// The ledger tells the whole story: requested → approved →
+			// policy.evaluated (the §6.5 assertive-redundancy fact, whose
+			// policyHash equals the frozen value by construction) → executed →
+			// attempt_admitted (the admission outcome event, recording that
+			// verdict) → settled → completed. The admission event always
+			// precedes the settlement, so "only an admitted attempt settles"
+			// holds by fold (R-AD-2).
 			const kinds = ledgerRecords(sessionDir).map((record) => record.kind);
 			assert.deepStrictEqual(kinds, [
 				"stage_attempt_requested",
 				"approved",
+				"policy.evaluated",
 				"executed",
 				"attempt_admitted",
 				"stage_attempt_settled",
 				"stage_completed",
 			]);
+			// R-AD-4: the recorded policyHash equals the attempt's frozen value.
+			const evaluated = ledgerRecords(sessionDir).find(
+				(record) => record.kind === "policy.evaluated",
+			);
+			assert.strictEqual(evaluated.policyHash, capture.request.frozen.hashes.policyHash);
+			assert.strictEqual(evaluated.scopeHash, capture.request.frozen.hashes.scopeHash);
 			const admitted = recordsOfKind(sessionDir, "attempt_admitted")[0];
 			assert.strictEqual(admitted.requestId, capture.request.requestId);
 			assert.strictEqual(admitted.policyVerdict.matchedRule, COMMAND_ID);

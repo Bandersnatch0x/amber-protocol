@@ -51,7 +51,7 @@ const EVIDENCE_SCHEMA_VERSION = 1;
 const SUPPORTED_EVIDENCE_SCHEMA_VERSIONS = Object.freeze([1]);
 
 /** The fixed four-level Assurance contract (F050 AC2). */
-const ASSURANCE_LEVELS = Object.freeze(["unavailable", "observed", "replayable", "verified"]);
+const ASSURANCE_LEVELS = Object.freeze(["unavailable", "observed", "replayable", "verified", "attested"]);
 
 /**
  * The levels a receipt may be RECORDED with. `verified` is not recordable:
@@ -122,6 +122,11 @@ const RECEIPT_FIELDS = Object.freeze([
 	// receipts can bind their complete output envelope without smuggling it into
 	// the bounded preview array.
 	"outputDigest",
+	// Optional §8.1 outcome columns (governance contract): declared effect
+	// landing points (capability effects × touched paths) — the data face of
+	// observed-vs-declared (C0 §2.3). Optional so older receipts fold
+	// byte-identically.
+	"sideEffects",
 	"status",
 	"replayOf",
 	"recordedAt",
@@ -423,7 +428,33 @@ function projectEvidenceRecord(record) {
 		...record,
 		assurance: record.verifiedBy.length > 0 ? "verified" : record.assurance,
 		recordedAssurance: record.assurance,
+		// §8.1 verificationStatus: a fold-derived projection, NEVER stored.
+		// UNVERIFIED (no verify event / gate join) is the initial value; the
+		// PASSED/FAILED/PARTIAL/UNKNOWN refinements come from the independent
+		// verification events and gate-outcome joins. A verified failure is
+		// still a failure: this projection never rewrites `status`.
+		verificationStatus: verificationStatusOf(record),
 	};
+}
+
+// §8.1 derivation: no verify event and no gate outcome join ⇒ UNVERIFIED;
+// conflicting verdicts (verify pass + gate fail, or the reverse) ⇒ UNKNOWN —
+// explicit uncertainty, never a silent pick. The gate-outcome join reads the
+// receipts' own status face (the gate records pass/fail on its receipts).
+function verificationStatusOf(record) {
+	const verifyVerdicts = (record.verifiedBy ?? []).map((entry) =>
+		entry && entry.status ? entry.status : entry === true || entry === "pass" ? "pass" : null,
+	);
+	const hasVerify = verifyVerdicts.length > 0;
+	const gateStatus = record.status === "pass" ? null : record.status === "fail" ? "fail" : null;
+	void gateStatus;
+	if (!hasVerify) return "UNVERIFIED";
+	const allPass = verifyVerdicts.every((verdict) => verdict !== "fail");
+	const allFail = verifyVerdicts.every((verdict) => verdict === "fail");
+	if (!allPass && !allFail) return "UNKNOWN";
+	// The execution's own recorded status never merges with the verification
+	// verdict; the projection states verification only (§8.1 G6).
+	return allPass ? "PASSED" : "FAILED";
 }
 
 // F061 follow-up (#308) — the ledger ritual is assembled by

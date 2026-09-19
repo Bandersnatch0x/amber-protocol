@@ -749,6 +749,29 @@ function runGovernedCommand({
 	);
 	if (policyResult && policyResult.errors.length > 0) return policyResult;
 	const matchedRule = namedCommand ? policyResult.matchedRule : undefined;
+	// §6.5 `policy.evaluated`: the decision's own ledger event — the PDP
+	// verdict recorded as an assertive-redundancy fact whose policyHash equals
+	// the attempt's frozen value by construction (R-AD-4); a mismatch would
+	// itself be a tamper signal. Appended through the existing record pattern;
+	// no new ledger family (0045).
+	if (frozen && frozen.policyHash !== undefined && frozen.policyHash !== null) {
+		const policyNow = globalRules ?? loadPolicyRules(targetRoot, { required: true });
+		const { policyHashOf } = require("./run-freeze");
+		const evaluatedHash = policyHashOf(policyNow);
+		appendLedgerRecord(lp, {
+			kind: "policy.evaluated",
+			schemaVersion: 2,
+			at: new Date().toISOString(),
+			decision: policyResult && policyResult.allowed ? "allow" : "deny",
+			matchedRule: matchedRule ?? null,
+			reason: (policyResult && policyResult.verdict?.reason) || "evaluated against the frozen policy",
+			policyHash: evaluatedHash,
+			scopeHash: frozen.scopeHash ?? null,
+			confidence: policyResult?.verdict?.confidence ?? null,
+			executesAnything: false,
+			...executionSubject,
+		});
+	}
 	// Grant selection (R-AD-6 mutual binding): a frozen attempt consumes the
 	// grant bound to IT (or an explicitly unbound legacy grant) — never a
 	// foreign attempt's orphaned grant, which by construction can never be
@@ -819,6 +842,21 @@ function runGovernedCommand({
 			errors: [execution.error],
 			warnings: [],
 		};
+	// §7.4 budget exhaustion: a timed-out run (the duration budget exhausted)
+	// appends the durable `budget.exhausted` ledger event with the observed
+	// values — never silently settled as a plain failure.
+	if (execution.result?.timedOut === true) {
+		appendLedgerRecord(lp, {
+			kind: "budget.exhausted",
+			schemaVersion: 2,
+			at: new Date().toISOString(),
+			dimension: "maxMinutes",
+			limit: budgetMinutes,
+			observed: budgetMinutes,
+			executesAnything: false,
+			...executionSubject,
+		});
+	}
 	execution.result = {
 		...execution.result,
 		...(namedCommand ? { commandId, matchedRule } : {}),

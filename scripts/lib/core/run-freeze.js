@@ -50,6 +50,12 @@ const CAPABILITY_PINNED_FIELDS = Object.freeze([
 	"timeoutMsMax",
 	"credentialRequirement",
 	"rollback",
+	// §7.3 field extensions (governance contract): registered semantics whose
+	// change is capability drift. Pre-runtime records read them as null.
+	"targetSchema",
+	"constraints",
+	"idempotency",
+	"evidenceContract",
 ]);
 
 /**

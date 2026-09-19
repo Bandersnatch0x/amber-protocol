@@ -501,8 +501,8 @@ test("request constants pin the environments and the risk policy", () => {
 			runbookNamespace: "runbook.",
 		},
 	});
-	assert.deepEqual(RISK_LEVELS, ["low", "medium", "high"]);
-	assert.equal(RISK_POLICY_VERSION, 1);
+	assert.deepEqual(RISK_LEVELS, ["low", "medium", "high", "critical"]);
+	assert.equal(RISK_POLICY_VERSION, 2);
 	assert.deepEqual(EFFECT_RISK, {
 		read: "low",
 		prepare: "low",
@@ -525,7 +525,8 @@ test("a request derives its risk from capability facts, never from the caller", 
 	const submitted = submitRunnerRequest(dir, requestInput(), { now: NOW });
 	assert.equal(submitted.ok, true, (submitted.errors || []).join("; "));
 	assert.equal(submitted.record.status, "requested");
-	assert.equal(submitted.record.risk, "high");
+	// §7.2 escalation: scoped credential on a deploy effect ⇒ critical.
+	assert.equal(submitted.record.risk, "critical");
 	assert.equal(submitted.record.riskPolicyVersion, RISK_POLICY_VERSION);
 	assert.match(submitted.record.requestHash, /^sha256:[0-9a-f]{64}$/);
 	assert.equal(
@@ -581,7 +582,10 @@ test("a request derives its risk from capability facts, never from the caller", 
 		{ now: NOW },
 	);
 	assert.equal(subset.ok, true, (subset.errors || []).join("; "));
-	assert.equal(subset.record.risk, "high");
+	// The REGISTERED capability's effect set classifies (deploy-class), not
+	// the caller's read subset — and with the §7.2 escalation the registry
+	// capability (scoped credential on deploy) derives critical.
+	assert.equal(subset.record.risk, "critical");
 
 	assert.equal(showRunnerRequest(dir, submitted.record.requestHash).status, "requested");
 	assert.equal(showRunnerRequest(dir, `sha256:${"f".repeat(64)}`), null);

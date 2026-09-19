@@ -26,6 +26,18 @@ const TIMELINE_EVENT_TYPES = Object.freeze({
 	RUN_STARTED: "run_started",
 	RUN_COMPLETED: "run_completed",
 	RUN_FAILED: "run_failed",
+	POLICY_DENIED: "policy_denied",
+	APPROVAL_REQUESTED: "approval_requested",
+	APPROVAL_GRANTED: "approval_granted",
+	APPROVAL_CONSUMED: "approval_consumed",
+	SESSION_BLOCKED: "session_blocked",
+	SESSION_UNBLOCKED: "session_unblocked",
+	// Reserved-disabled (governance contract §10.3): present in the closed
+	// enum for schema stability, emitted by NO code path — the enabling
+	// ruling exists (context-runtime §3.3) and lands only with its own
+	// adopted slice. Nothing may claim these are implemented.
+	CONTEXT_GRANTED: "context_granted",
+	CONTEXT_DENIED: "context_denied",
 	VERIFICATION_FAILED: "verification_failed",
 	GATE_TRIGGERED: "gate_triggered",
 	GATE_PASSED: "gate_passed",

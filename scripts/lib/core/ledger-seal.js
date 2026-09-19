@@ -9,7 +9,26 @@ const fs = require("node:fs");
 const { resolveTarget } = require("./fs-utils");
 const { walkLedgers, readLedger } = require("./loop-ledger");
 const { resolveStateDirForRead } = require("../state-dir-resolver");
-const { gitOutput, gitRun } = require("./git-exec");
+// §5.5 row 6 split (governance contract G-9): the seal/verify LOGIC is
+// Core; the git EXECUTION source is Adapter-injected. Default reader: the
+// Coding domain adapter's git-exec seam — loaded lazily so tests (and any
+// future non-Coding domain) inject via setGitAdapter. Core never imports
+// git-exec at module load (guard G1/G8).
+let gitAdapter = null;
+function defaultGitAdapter() {
+	if (gitAdapter === null) {
+		gitAdapter = require("./git-exec");
+	}
+	return gitAdapter;
+}
+
+/**
+ * Test/adapter seam: inject the git runner ({gitOutput, gitRun}). Pass null
+ * to restore the default lazy Coding-domain reader.
+ */
+function setGitAdapter(adapter) {
+	gitAdapter = adapter;
+}
 
 const SEAL_PREFIX = "amber-ledger-seal-";
 
@@ -27,7 +46,7 @@ function collectTails(targetRoot) {
 
 function sealLedger(target, options = {}) {
 	const targetRoot = resolveTarget(target);
-	if (!gitOutput(targetRoot, ["rev-parse", "--is-inside-work-tree"])) {
+	if (!defaultGitAdapter().gitOutput(targetRoot, ["rev-parse", "--is-inside-work-tree"])) {
 		return { target: targetRoot, sealed: false, errors: ["not a git repository"], warnings: [] };
 	}
 	const { stateDir, tails } = collectTails(targetRoot);
@@ -39,11 +58,11 @@ function sealLedger(target, options = {}) {
 			warnings: [],
 		};
 	}
-	const head = gitOutput(targetRoot, ["rev-parse", "HEAD"]);
+	const head = defaultGitAdapter().gitOutput(targetRoot, ["rev-parse", "HEAD"]);
 	const headShort = head ? head.slice(0, 12) : "no-head";
 	const tagName = `${SEAL_PREFIX}${headShort}`;
 	const message = JSON.stringify({ reviewer: options.reviewer || null, ledgers: tails });
-	const res = gitRun(targetRoot, ["tag", "-f", "-a", tagName, "-m", message]);
+	const res = defaultGitAdapter().gitRun(targetRoot, ["tag", "-f", "-a", tagName, "-m", message]);
 	if (!res.ok) {
 		return {
 			target: targetRoot,
@@ -64,7 +83,7 @@ function sealLedger(target, options = {}) {
 }
 
 function latestSealTag(targetRoot) {
-	const list = gitOutput(targetRoot, ["tag", "-l", `${SEAL_PREFIX}*`, "--sort=-creatordate"]);
+	const list = defaultGitAdapter().gitOutput(targetRoot, ["tag", "-l", `${SEAL_PREFIX}*`, "--sort=-creatordate"]);
 	if (!list) return null;
 	return (
 		list
@@ -75,7 +94,7 @@ function latestSealTag(targetRoot) {
 }
 
 function readSealMessage(targetRoot, tagName) {
-	return gitOutput(targetRoot, ["tag", "-l", "--format=%(contents)", tagName]);
+	return defaultGitAdapter().gitOutput(targetRoot, ["tag", "-l", "--format=%(contents)", tagName]);
 }
 
 function verifyAnchoring(target) {
@@ -131,4 +150,4 @@ function verifyAnchoring(target) {
 	};
 }
 
-module.exports = { sealLedger, verifyAnchoring, collectTails, SEAL_PREFIX };
+module.exports = { sealLedger, verifyAnchoring, collectTails, SEAL_PREFIX, setGitAdapter };

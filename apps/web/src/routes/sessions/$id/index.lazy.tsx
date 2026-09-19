@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createLazyFileRoute, Link } from '@tanstack/react-router';
 import { trpc } from '@/lib/trpc';
 import { StatusBadge } from '@/components/session/StatusBadge';
+import { DriftBadge } from '@/components/session/DriftBadge';
 import { SessionControls } from '@/components/session/SessionControls';
 import { SessionStatus } from '@/components/session/SessionStatus';
 import { CodeBlock } from '@/components/code/CodeBlock';
@@ -291,6 +292,15 @@ function SessionDetailPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge status={effectiveStatus ?? session.status} />
+          {/* Governance contract §9.4: the read-only drift badge + R1 report
+              link. Data comes from the read-side projection; no interactive
+              replay control exists on this surface by contract. */}
+          {session.driftState ? (
+            <DriftBadge
+              state={session.driftState}
+              reportHref={session.driftReportHref ?? null}
+            />
+          ) : null}
           <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{session.id}</span>
           {effectiveStatus === 'completed' && (
             <span className="text-sm text-emerald-600 dark:text-emerald-400">

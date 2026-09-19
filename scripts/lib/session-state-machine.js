@@ -5,6 +5,7 @@ const STATES = {
 	ROUTED: "routed",
 	EXECUTING: "executing",
 	PAUSED: "paused",
+	BLOCKED: "blocked",
 	COMPLETED: "completed",
 	FAILED: "failed",
 	ABORTED: "aborted",
@@ -15,8 +16,13 @@ const FINAL_STATES = new Set([STATES.COMPLETED, STATES.FAILED, STATES.ABORTED]);
 const TRANSITIONS = {
 	[STATES.CREATED]: [STATES.ROUTED, STATES.COMPLETED, STATES.FAILED, STATES.ABORTED],
 	[STATES.ROUTED]: [STATES.EXECUTING, STATES.COMPLETED, STATES.FAILED, STATES.ABORTED],
-	[STATES.EXECUTING]: [STATES.PAUSED, STATES.COMPLETED, STATES.FAILED, STATES.ABORTED],
+	// +BLOCKED (governance contract §10.1): budget exhaustion / no-progress
+	// block the session as a recoverable state — same family as paused.
+	[STATES.EXECUTING]: [STATES.PAUSED, STATES.BLOCKED, STATES.COMPLETED, STATES.FAILED, STATES.ABORTED],
 	[STATES.PAUSED]: [STATES.EXECUTING, STATES.COMPLETED, STATES.FAILED, STATES.ABORTED],
+	// BLOCKED → EXECUTING (human-review recovery) | ABORTED only.
+	// BLOCKED → COMPLETED is illegal: unblocking precedes completion.
+	[STATES.BLOCKED]: [STATES.EXECUTING, STATES.ABORTED],
 	[STATES.COMPLETED]: [],
 	[STATES.FAILED]: [],
 	[STATES.ABORTED]: [],
@@ -26,6 +32,7 @@ const EVENT_TYPES = {
 	[STATES.ROUTED]: "route_selected",
 	[STATES.EXECUTING]: "session_resumed",
 	[STATES.PAUSED]: "session_paused",
+	[STATES.BLOCKED]: "session_blocked",
 	[STATES.COMPLETED]: "session_completed",
 	[STATES.FAILED]: "session_failed",
 	[STATES.ABORTED]: "session_aborted",

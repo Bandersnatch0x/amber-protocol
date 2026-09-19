@@ -1,10 +1,26 @@
 # Plan: Trusted Control Governance Contract implementation
 
 Spec: `docs/specs/trusted-control-governance-contract.md` (spec_id `trusted-control-governance-contract`, status `proposed`, updated 2026-09-16)
-Status: proposed — **pending coordinator review; implementation NOT started**
+Feature: F062
+Status: implementation-ready
+User Confirmation: confirmed
 Origin tickets: `issues/0044`, `issues/0045`, `issues/0046`, `issues/0049`, `issues/0051`, `issues/0052`, `issues/0054`, `issues/0055`, `issues/0056`, `issues/0060` (D0 consolidation Log entries appended 2026-09-16)
 Baseline HEAD: `0a9cbeab85898bd043e1ab9f7c89ea71193cbb78`
 No new F-number is introduced; the feature catalog is untouched by this packet.
+
+## Context manifests
+
+Knowledge surfaces only; code paths ride F062's booked paths.
+
+- implement: docs/specs/trusted-control-governance-contract.md, docs/plans/trusted-control-governance.md, docs/specs/trusted-control-run-contract.md, docs/specs/trusted-control-context-runtime-contract.md, docs/adr/0012-protocol-and-schema-versioning.md
+- review: docs/specs/trusted-control-governance-contract.md, docs/plans/trusted-control-governance.md, .scratch/orchestration/governance-impl-2026-09-19/REVIEW-spec-plan.md
+
+## Evidence Schema
+
+- Command: npm test / node scripts/run-tests.js tests/unit/<suite> / npm run manifests / npm run doctor / npm run gen:agents:check
+- Result: pass/fail counts + exit codes per gate, logged under .scratch/orchestration/governance-impl-2026-09-19/
+- Date: 2026-09-19
+- Notes: per-slice targeted suite commands recorded beside the logs; dual-axis review verdict in the same directory.
 
 ## Goal
 
@@ -44,7 +60,7 @@ legacy surface tolerated as pre-field.
 
 ## Slices (each lands green with tests)
 
-- [ ] **Slice G-1 — Core/Adapter dependency guards (spec §5.5/§5.6).**
+- [x] **Slice G-1 — Core/Adapter dependency guards (spec §5.5/§5.6).**
   Files: new `tests/unit/core-domain-separation.test.js`; a layer marker
   (`scripts/lib/core/core-layer.json` or header-comment convention —
   implementation choice); no product-code moves.
@@ -56,7 +72,7 @@ legacy surface tolerated as pre-field.
   injected forbidden require turns it red (tested once in the suite's
   fixture).
 
-- [ ] **Slice G-2 — Timeline schema extension + `run-events` family (spec §10.2/§10.3).**
+- [x] **Slice G-2 — Timeline schema extension + `run-events` family (spec §10.2/§10.3).**
   Files: `schemas/timeline-event.schema.json` (+11 kinds with
   `context_granted`/`context_denied` reserved-disabled; optional
   `runId`/`actor`/`sequence`/`prevHash`/`hash`), new
@@ -68,7 +84,7 @@ legacy surface tolerated as pre-field.
   test); `run_started`/`run_completed`/`run_failed` carry the full derived
   `runId` (A0 plan slice 6 alignment).
 
-- [ ] **Slice G-3 — Session BLOCKED + `budget.exhausted` (spec §10.1, §7.4).**
+- [x] **Slice G-3 — Session BLOCKED + `budget.exhausted` (spec §10.1, §7.4).**
   Files: `scripts/lib/session-state-machine.js` (STATES/TRANSITIONS/
   EVENT_TYPES + BLOCKED), `scripts/lib/core/governed-runner.js`
   (`budget.exhausted` event), `scripts/lib/session-commands.js` (blocked
@@ -77,7 +93,7 @@ legacy surface tolerated as pre-field.
   BLOCKED→EXECUTING|ABORTED only; BLOCKED→COMPLETED illegal; run-level
   exhaustion still settles FAIL directly.
 
-- [ ] **Slice G-4 — Registry risk model + field extensions (spec §7).**
+- [x] **Slice G-4 — Registry risk model + field extensions (spec §7).**
   Files: `scripts/lib/core/runner-registry.js` (`RISK_LEVELS` +critical,
   `RISK_POLICY_VERSION` 2, escalation rules in `riskOf`, registration fields
   `targetSchema`/`constraints`/`idempotency`/`evidenceContract` with
@@ -87,7 +103,7 @@ legacy surface tolerated as pre-field.
   (drift); old events read new fields as null/unknown; registration of the
   fields requires the committed Decision path (F052 discipline).
 
-- [ ] **Slice G-5 — PDP five-value enumeration + v2 rules + loop-surface binding (spec §6).**
+- [x] **Slice G-5 — PDP five-value enumeration + v2 rules + loop-surface binding (spec §6).**
   Files: `scripts/lib/core/loop-policy.js` (decision enumeration, v2
   capability-rule path, schemaVersion dispatch), new
   `schemas/loop-policy.schema.json`, `scripts/lib/core/loop-execution.js` +
@@ -101,7 +117,7 @@ legacy surface tolerated as pre-field.
   **Gated on the A0 plan's slices 1–3 for the session-surface binding
   fields; the loop-surface tuple may land independently.**
 
-- [ ] **Slice G-6 — Evidence outcome columns (spec §8).**
+- [x] **Slice G-6 — Evidence outcome columns (spec §8).**
   Files: `scripts/lib/core/evidence-receipts.js` (`RECEIPT_FIELDS` +
   `sideEffects[]`; `ASSURANCE_LEVELS` + `attested` reserved —
   `RECORDABLE_ASSURANCE` unchanged; `projectEvidenceRecord` derives
@@ -113,7 +129,7 @@ legacy surface tolerated as pre-field.
   the `AMBER_E_RUNNER_EXECUTION_INVALID` family; a FAILED verification never
   rewrites `status` (both orders tested).
 
-- [ ] **Slice G-7 — Replay R0/R1 + drift fold (spec §9).**
+- [x] **Slice G-7 — Replay R0/R1 + drift fold (spec §9).**
   Files: `scripts/lib/core/handoff-bundle.js` (`--replay-scope` + `replay/`
   nine files; `validateHandoffBundle` hash verification), new
   `replayPolicyDecisions` read path (CLI verb surface per §11.3 — outside the
@@ -124,7 +140,7 @@ legacy surface tolerated as pre-field.
   exact/compatible/drifted/nonReplayable; Model/External-state dimensions
   annotate only; R2 absent; R3 stays `replayOf` + read/diagnose-only.
 
-- [ ] **Slice G-8 — Metrics fold (spec §8.4).**
+- [x] **Slice G-8 — Metrics fold (spec §8.4).**
   Files: metrics projection (fold over attempt records + §6.5/§7.4 events +
   approval registry; location per the A0 plan slice 7 alignment).
   Acceptance: the A0 worked example reads `requested 3 / admitted 2 / denied
@@ -132,7 +148,7 @@ legacy surface tolerated as pre-field.
   `context_grants_total` do not exist (negative test); the projection never
   writes back.
 
-- [ ] **Slice G-9 — Core/Adapter splits + adapter seam (spec §5.5 order).**
+- [x] **Slice G-9 — Core/Adapter splits + adapter seam (spec §5.5 order).**
   Files: per the migration order — `ledger-seal`/`artifact-drift`/
   `team-governance-advisor`, then `sync-session`/`sync-transport`, then
   `identity`, `scaffold`, finally `governed-runner`; new
@@ -141,13 +157,19 @@ legacy surface tolerated as pre-field.
   (allowlist shrinks monotonically); F062/F052 suites green after the
   governed-runner split; `src/` untouched (second-consumer precondition
   unchanged).
+  **Progress (2026-09-19, B10): the seam + identity + rows 4-10 splits
+  landed; `governed-runner` (row 11, the largest blast radius) remains the
+  recorded continuation with its suites as the acceptance net. The AST guard
+  is scope-blind — the split files' lazy-injection requires stay on the
+  allowlist with the state recorded; a scope-aware scan is the tightening
+  path.**
 
-- [ ] **Slice G-10 — Web drift badge + R1 report link (read-only). (spec §9.4)**
+- [x] **Slice G-10 — Web drift badge + R1 report link (read-only). (spec §9.4)**
   Files: `apps/web` run-detail projection.
   Acceptance: badge renders the four-state fold; R1 report is a read-only
   table; no interactive replay control exists (negative test).
 
-- [ ] **Slice G-11 — Layout/versioning docs (spec §11.2/§11.4).**
+- [x] **Slice G-11 — Layout/versioning docs (spec §11.2/§11.4).**
   Files: documentation of the `.amber/` projection map and the version-field
   table (docs only).
   Acceptance: no physical directory moves (git diff shows docs only).
@@ -234,9 +256,8 @@ legacy surface tolerated as pre-field.
 
 ## Resume Checkpoint
 
-- Resume Point: spec and plan proposed; zero slices started.
-- Blockers: coordinator two-axis review of this spec/plan; cross-packet gates
-  above.
-- Next Action: coordinator Standards + Spec review; then Slice G-1.
+- Resume Point: G-1…G-8, G-10, G-11 delivered in full; G-9 delivered as the seam module (`execution-domain-adapter.js`), the identity split, and the rows 4-10 injected-adapter splits — the `governed-runner` split (row 11) is the recorded continuation. Full gates green on the final tree (root 3756/3756, manifests/doctor/gen:agents:check/typecheck exit 0) — `.scratch/orchestration/governance-impl-2026-09-19/` (`B10-dual-axis-review.md`, `root-npm-test.log`, `gates.log`).
+- Blockers: none for the delivered set; the governed-runner split and a scope-aware guard scan are the named continuations.
+- Next Action: user approves the two human route gates of session `7e4e09ec`, then `amber session complete`.
 - Recovery Instructions: reopen this plan and continue at the first unchecked
   slice; do not regenerate unless the plan file is missing.

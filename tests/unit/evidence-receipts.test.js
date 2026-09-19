@@ -152,9 +152,19 @@ function recordFixture(dir, id = "evidence/run-1", overrides = {}) {
 // ── Contract constants ──
 
 test("evidence constants pin the assurance vocabulary and the schema contract", () => {
-	assert.deepEqual(ASSURANCE_LEVELS, ["unavailable", "observed", "replayable", "verified"]);
+	// §8.3: ATTESTED joins the closed enum as a RESERVED value — the fold
+	// acknowledges its existence, record refuses it (RECORDABLE_ASSURANCE
+	// unchanged), and no signing/TEE infrastructure is claimed.
+	assert.deepEqual(ASSURANCE_LEVELS, [
+		"unavailable",
+		"observed",
+		"replayable",
+		"verified",
+		"attested",
+	]);
 	assert.deepEqual(RECORDABLE_ASSURANCE, ["unavailable", "observed", "replayable"]);
 	assert.equal(RECORDABLE_ASSURANCE.includes("verified"), false, "verified is not recordable");
+	assert.equal(RECORDABLE_ASSURANCE.includes("attested"), false, "attested is reserved, not recordable");
 	assert.deepEqual(EVIDENCE_STATUSES, ["pass", "fail"]);
 	assert.equal(EVIDENCE_SCHEMA_VERSION, 1);
 	assert.deepEqual(SUPPORTED_EVIDENCE_SCHEMA_VERSIONS, [1]);

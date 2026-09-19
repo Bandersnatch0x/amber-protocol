@@ -65,11 +65,11 @@ const GOLDEN = Object.freeze({
 	executions: path.join(FIXTURES_DIR, "executions-lifecycle.golden.jsonl"),
 });
 const GOLDEN_SHA256 = Object.freeze({
-	registry: "a2493061687c1b8aa20897723eaf75bc10a47ed0cdce9aeaf0928ac68e6f545b",
-	requests: "297d899e6d950e71416781affae45ef662f8640337743445f922298946b69371",
-	executions: "c597bf21bab2e30afcd6a1758c9406f41e052939ac660f61e58b785cf20e6cfb",
+	registry: "805237f7826cca1bbe0eb91c21debcbeba81dddc6940d5782103837c2f5c536d",
+	requests: "a9bf8f1ed98f8f7e2373ef3c95eb38dbf1cd254bdb05278f0e6047e6e2f0e916",
+	executions: "a4f96119113975059096171416944ada12c52c0727419823f42653f36ac996d9",
 });
-const GOLDEN_BYTES = Object.freeze({ registry: 1069, requests: 1779, executions: 1427 });
+const GOLDEN_BYTES = Object.freeze({ registry: 1156, requests: 1783, executions: 1427 });
 
 const DIGEST = `sha256:${"a".repeat(64)}`;
 const NOW = new Date("2026-08-28T00:00:00.000Z");

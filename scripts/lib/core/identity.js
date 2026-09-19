@@ -25,7 +25,28 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { statePath } = require("../state-dir-resolver");
-const { configGet } = require("./git-exec");
+
+// §5.5 row 5 split (governance contract G-9 step 4): Principal RESOLUTION is
+// Core; the git-config SOURCE is Adapter-injected. Default reader: the Coding
+// domain adapter's git config seam — loaded lazily so tests (and any future
+// non-Coding domain) can inject a reader via `setGitConfigReader`. Core
+// itself never imports `git-exec` directly (guard G1/G8).
+let gitConfigReader = null;
+function defaultGitConfigReader() {
+	if (gitConfigReader === null) {
+		const { configGet } = require("./git-exec");
+		gitConfigReader = configGet;
+	}
+	return gitConfigReader;
+}
+
+/**
+ * Test/adapter seam: inject the git-config reader (the Coding domain
+ * adapter's `configGet`). Pass null to restore the default lazy reader.
+ */
+function setGitConfigReader(reader) {
+	gitConfigReader = reader;
+}
 
 const DEFAULT_TENANT_ID = "local";
 const DEFAULT_ORGANIZATION_ID = "personal";
@@ -62,8 +83,8 @@ function inferFromGit(cwd) {
 	if (!fs.existsSync(path.join(cwd, ".git"))) {
 		return { personId: null, agentId: null };
 	}
-	const name = configGet(cwd, "user.name");
-	const email = configGet(cwd, "user.email");
+	const name = defaultGitConfigReader()(cwd, "user.name");
+	const email = defaultGitConfigReader()(cwd, "user.email");
 	const personId = name && email ? `${name} <${email}>` : null;
 	return { personId, agentId: null };
 }
@@ -134,7 +155,7 @@ function resolveRepositoryId(cwd, file = null) {
 		return file.repositoryId;
 	}
 	if (fs.existsSync(path.join(cwd, ".git"))) {
-		const remote = configGet(cwd, "remote.origin.url");
+		const remote = defaultGitConfigReader()(cwd, "remote.origin.url");
 		if (remote) {
 			return normalizeRemoteUrl(remote);
 		}
@@ -210,6 +231,7 @@ module.exports = {
 	inferFromGit,
 	loadIdentityFile,
 	normalizeRemoteUrl,
+	setGitConfigReader,
 	resolveRepositoryId,
 	resolveIdentity,
 };
