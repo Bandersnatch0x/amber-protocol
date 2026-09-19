@@ -366,6 +366,56 @@ const CATALOG = {
 		layer: "Context",
 		related: ["AMBER_E_CONTEXT_REQUEST_MISMATCH"],
 	},
+	AMBER_E_RESEARCH_CITATIONS_CORRUPT: {
+		title: "Research citation store failed its integrity walk",
+		cause:
+			"the citation ledger failed its chain walk or an entry violates the closed citation shape — the store is edited in place or written by something other than the ledger-family append.",
+		remedy:
+			"Restore .amber/research/citations.jsonl from version control or a backup; the store is append-only and must not be edited in place.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATIONS_LOCK"],
+	},
+	AMBER_E_RESEARCH_CITATIONS_LOCK: {
+		title: "Research citation store is locked by another writer",
+		cause: "another process holds the citations lock; concurrent citation appends serialize through it.",
+		remedy: "Retry the citation append once the writer finishes; never delete the lock file.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATIONS_CORRUPT"],
+	},
+	AMBER_E_RESEARCH_CITATIONS_CEILING: {
+		title: "Research citation store would exceed its size ceiling",
+		cause:
+			"appending this citation would grow the store beyond its size ceiling (AMBER_RESEARCH_CITATIONS_MAX_BYTES); the write is refused before any durable state changes.",
+		remedy: "Raise the ceiling explicitly via the env variable after reviewing the store, or archive old citations through a governed retention decision.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATIONS_CORRUPT"],
+	},
+	AMBER_E_RESEARCH_CITATION_INVALID: {
+		title: "Research citation input is invalid",
+		cause:
+			"the citation carries a closed-set violation (missing fields, non-digest rawHash, unparseable retrievedAt) or the citationId is already recorded — a citation is recorded once.",
+		remedy: "Correct the citation fields; a changed claim is a new citation id, never a rewrite.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATIONS_CORRUPT"],
+	},
+	AMBER_E_RESEARCH_VERIFIER_INVALID: {
+		title: "Research claim verification is invalid",
+		cause:
+			"claim_supported was invoked without an independent verifier principal (verifier = producer) or with missing claim fields (§6.3: the producer never verifies its own claim).",
+		remedy:
+			"Have a principal other than the producer record the verdict; human review is sufficient, a service Principal is allowed, self-verification is not.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATION_INVALID"],
+	},
+	AMBER_E_RESEARCH_QUERY_REFUSED: {
+		title: "Research query declaration refused",
+		cause:
+			"the search request's querySources[] fails R-EG-2: an unresolvable reference, a source above the capability's maxQueryClassification, or missing provenance where the capability requires it.",
+		remedy:
+			"Declare only sources that resolve in the current snapshot and fit the ceiling; a legitimately needed higher ceiling is a new capability version (human-approved), never a per-call override.",
+		layer: "Context",
+		related: ["AMBER_E_RESEARCH_CITATION_INVALID"],
+	},
 	AMBER_E_CONTEXT_CLAIM_UNCITED: {
 		title: "Context page block cites an undeclared source",
 		cause:

@@ -109,7 +109,7 @@ independent of A-C except for the seam shapes they project.
   Acceptance: both actions return `approvalRequired` with the exact command contract and
   never execute; contract-parity invariants stay green (F018 discipline).
 
-- [ ] **Slice E — Research adapter (0058 §6).**
+- [x] **Slice E — Research adapter (0058 §6).**
   Files: new `scripts/lib/core/research-adapter.js` (ResearchProcess ExecutionBoundary —
   the 0049 five-method contract, second implementation; no worktree, scope = citation
   store path + read-only retrieval), `scripts/lib/core/citation-store.js`
@@ -178,9 +178,9 @@ independent of A-C except for the seam shapes they project.
 
 ## Resume Checkpoint
 
-- Resume Point: Slices A, B, C, D, F, G delivered 2026-09-19 (session `99dfee60-be06-44fc-a4e9-001daf738702`); full gates green on the final tree (root 3738/3738, manifests/doctor/gen:agents:check/typecheck/ESLint exit 0) — `.scratch/orchestration/context-runtime-impl-2026-09-19/` (`B9-dual-axis-review.md`, `root-npm-test.log`, `gates.log`, `eslint.log`). Implementation choices recorded there: relabel decisions verified against the canonical artifact store; ttl base = page ingest/refresh instant; ceiling = a build option; F052 requestHash excludes the sessionBinding/contextAuthority fields (contextAuthority is authority-relevant through its own frozen scopeHash); closed event validators split ALLOWED from REQUIRED for the additive fields.
-- Blockers: **Slice E is the remaining open slice** (Research adapter + citation store + R-EG-2 query seam + §6.5 e2e fixture) — deliberately not half-landed; the batch was locked green before it.
-- Next Action: implement Slice E against the real 0049 ExecutionBoundary interface, then re-run the full gates and the two-axis review for it.
+- Resume Point: all seven slices delivered 2026-09-19 (session `99dfee60` completed; Slice E landed in the follow-up commit). Full gates green on the final tree — `.scratch/orchestration/context-runtime-impl-2026-09-19/`. Implementation choices: the five-method contract's first real second consumer; the citation store through `defineLedgerFamily` (0045 discipline); verification semantics per §6.3 (citation_exists/source_accessible deterministic, claim_supported independent-verifier-only via the Evidence seam); R-EG-2 reuses the F056 declared-source resolver (identical snapshot semantics).
+- Blockers: none.
+- Next Action: none — the contract is fully delivered; the Governance contract is the next spec in the packet's sequence.
 - Recovery Instructions: reopen this plan and continue at the first unchecked slice; do not regenerate unless the plan file is missing.
 - Recovery Instructions: reopen this plan and continue at the first unchecked slice;
   do not regenerate unless the plan file is missing.

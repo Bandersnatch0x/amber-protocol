@@ -1958,4 +1958,9 @@ module.exports = {
 	listExternalExecutions,
 	compensateExternalEffect,
 	listExternalTransactions,
+	// Context/runtime contract §3.5: the declared-source shape and resolver are
+	// shared with the R-EG-2 research query seam so both egress surfaces read
+	// identical snapshot semantics.
+	declaredSourceShapeProblem,
+	resolveDeclaredContextSource,
 };
